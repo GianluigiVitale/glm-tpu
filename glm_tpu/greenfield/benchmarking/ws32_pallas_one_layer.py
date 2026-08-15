@@ -157,32 +157,56 @@ def _computation_base(value: str) -> str:
     return value.split(" ", 1)[0]
 
 
+def _callee_attribute_text(value: str) -> str:
+    """Remove quoted/comment decoys before reading HLO callee attributes."""
+
+    without_strings = re.sub(r'"(?:\\.|[^"\\])*"', '""', value)
+    return re.sub(r"/\*.*?\*/", "", without_strings)
+
+
 def _called_computations(instruction: HloInstruction) -> tuple[str, ...]:
     result: list[str] = []
     consumed: set[str] = set()
+    attributes = _callee_attribute_text(instruction.raw_line)
     if instruction.raw_opcode in {"fusion", "call"}:
-        match = re.search(r"\bcalls=([^,\s]+)", instruction.raw_line)
+        match = re.search(r"\bcalls=([^,\s]+)", attributes)
         if match is None:
             raise ValueError(f"HLO caller {instruction.name} omits its callee")
         result.append(match.group(1))
         consumed.add("calls")
     if instruction.raw_opcode == "conditional":
         match = re.search(
-            r"\bbranch_computations=\{([^}]*)\}", instruction.raw_line
+            r"\bbranch_computations=\{([^}]*)\}", attributes
         )
         if match is None:
             raise ValueError(f"conditional {instruction.name} omits branches")
         result.extend(item.strip() for item in match.group(1).split(","))
         consumed.add("branch_computations")
-    if instruction.raw_opcode in {
+    if instruction.raw_opcode == "while":
+        condition = re.search(r"\bcondition=([^,\s]+)", attributes)
+        body = re.search(r"\bbody=([^,\s]+)", attributes)
+        if condition is None or body is None:
+            raise ValueError(
+                f"while {instruction.name} omits its condition or body"
+            )
+        result.extend((condition.group(1), body.group(1)))
+        consumed.update(("condition", "body"))
+    reducer_opcodes = {
         "all-reduce",
         "all-reduce-start",
+        "reduce",
+        "reduce-window",
         "reduce-scatter",
         "reduce-scatter-start",
-    }:
-        match = re.search(r"\bto_apply=([^,\s]+)", instruction.raw_line)
+        "scatter",
+        "sort",
+    }
+    if instruction.raw_opcode in reducer_opcodes:
+        match = re.search(r"\bto_apply=([^,\s]+)", attributes)
         if match is None:
-            raise ValueError(f"collective {instruction.name} omits its reducer")
+            raise ValueError(
+                f"HLO instruction {instruction.name} omits its to_apply callee"
+            )
         result.append(match.group(1))
         consumed.add("to_apply")
     callee_attributes = {
@@ -196,7 +220,7 @@ def _called_computations(instruction: HloInstruction) -> tuple[str, ...]:
     unconsumed = tuple(
         attribute
         for attribute in sorted(callee_attributes - consumed)
-        if re.search(rf"\b{attribute}\s*=", instruction.raw_line)
+        if re.search(rf"\b{attribute}\s*=", attributes)
     )
     if unconsumed:
         raise ValueError(
@@ -226,27 +250,89 @@ def _live_instruction_closure(
     if len(entry_roots) != 1:
         raise ValueError(f"expected one ENTRY root, found {len(entry_roots)}")
 
+    closure_cache: dict[str, frozenset[str]] = {}
+    visiting: set[str] = set()
+
+    def computation_closure(computation: str) -> frozenset[str]:
+        """Resolve exact local value flow, including fusion parameter use."""
+
+        if computation in closure_cache:
+            return closure_cache[computation]
+        if computation in visiting:
+            raise ValueError(f"recursive HLO computation {computation}")
+        root = roots.get(computation)
+        if root is None:
+            raise ValueError(f"live HLO callee {computation} has no root")
+        visiting.add(computation)
+        local_live: set[str] = set()
+
+        def visit_local(name: str) -> None:
+            if name in local_live:
+                return
+            instruction = by_computation.get(computation, {}).get(name)
+            if instruction is None:
+                raise ValueError(
+                    f"undefined live HLO value {computation}:{name}"
+                )
+            local_live.add(name)
+            if instruction.raw_opcode in {"fusion", "call"}:
+                callees = _called_computations(instruction)
+                if len(callees) != 1:
+                    raise ValueError(
+                        f"HLO caller {instruction.name} has ambiguous callee"
+                    )
+                callee = callees[0]
+                callee_live = computation_closure(callee)
+                parameter_numbers = []
+                for callee_name in callee_live:
+                    parameter = by_computation[callee][callee_name]
+                    if parameter.raw_opcode != "parameter":
+                        continue
+                    match = re.search(
+                        r"\bparameter\(([0-9]+)\)", parameter.raw_line
+                    )
+                    if match is None:
+                        raise ValueError(
+                            f"live HLO parameter {parameter.name} has no number"
+                        )
+                    parameter_numbers.append(int(match.group(1)))
+                if any(
+                    index >= len(instruction.operand_names)
+                    for index in parameter_numbers
+                ):
+                    raise ValueError(
+                        f"HLO caller {instruction.name} omits a live argument"
+                    )
+                operands = tuple(
+                    instruction.operand_names[index]
+                    for index in sorted(set(parameter_numbers))
+                )
+            else:
+                operands = instruction.operand_names
+            for operand in operands:
+                if operand.startswith("%"):
+                    visit_local(operand)
+
+        visit_local(root.name)
+        visiting.remove(computation)
+        result = frozenset(local_live)
+        closure_cache[computation] = result
+        return result
+
     live: set[tuple[str, str]] = set()
 
-    def visit(computation: str, name: str) -> None:
-        key = (computation, name)
-        if key in live:
-            return
-        instruction = by_computation.get(computation, {}).get(name)
-        if instruction is None:
-            raise ValueError(f"undefined live HLO value {computation}:{name}")
-        live.add(key)
-        for operand in instruction.operand_names:
-            if operand.startswith("%"):
-                visit(computation, operand)
-        for callee in _called_computations(instruction):
-            root = roots.get(callee)
-            if root is None:
-                raise ValueError(f"live HLO callee {callee} has no root")
-            visit(callee, root.name)
+    def materialize(computation: str) -> None:
+        for name in computation_closure(computation):
+            key = (computation, name)
+            if key in live:
+                continue
+            live.add(key)
+            instruction = by_computation[computation][name]
+            for callee in _called_computations(instruction):
+                materialize(callee)
 
     entry_root = entry_roots[0]
-    visit(_computation_base(entry_root.computation), entry_root.name)
+    materialize(_computation_base(entry_root.computation))
     return tuple(
         instruction
         for instruction in sorted(instructions, key=lambda item: item.index)

@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping, NamedTuple
 
+import jax
 import jax.numpy as jnp
 from jax.sharding import PartitionSpec as P
 
@@ -70,6 +71,34 @@ class Ws32DecodeStepResult(NamedTuple):
     state: Ws32DecoderState
     next_token: Any
     final_residual_local: Any
+
+
+class Ws32DsaObservation(NamedTuple):
+    """All full-indexer decisions from one complete decoder step."""
+
+    producer_layer_ids: Any
+    selected_positions: Any
+    selected_valid_counts: Any
+    selected_scores: Any
+
+
+class Ws32ObservedDecodeStepResult(NamedTuple):
+    result: Ws32DecodeStepResult
+    dsa: Ws32DsaObservation
+
+
+class Ws32PrefillResult(NamedTuple):
+    state: Ws32DecoderState
+    next_token: Any
+
+
+class Ws32CacheWriteProbe(NamedTuple):
+    """Compact rows written at the most recently completed position."""
+
+    position: Any
+    kv_rows: Any
+    index_rows: Any
+    contract_valid: Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,6 +236,93 @@ class Ws32DecoderConfig:
             local_parallel_size=8,
             packed_cache_width=self.packed_cache_width,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class Ws32DecoderProgram:
+    """One exact all-chip decode executable and its proof-only observers."""
+
+    config: Ws32DecoderConfig
+    mesh: Any
+    execute: Any
+    observe: Any
+    probe_cache_write: Any
+
+
+@dataclass(frozen=True, slots=True)
+class Ws32TeacherForcedPrefillProgram:
+    """One device-resident prompt scan with no per-token host dispatch."""
+
+    config: Ws32DecoderConfig
+    mesh: Any
+    prompt_length: int
+    execute: Any
+
+
+def make_ws32_initial_state(
+    mesh: Any,
+    config: Ws32DecoderConfig,
+) -> Ws32DecoderState:
+    """Allocate the zero cache directly on its final owners.
+
+    The callback returns one local shard at a time.  In particular it never
+    materializes either complete cache in host memory.
+    """
+
+    import ml_dtypes
+    import numpy as np
+    from jax.sharding import NamedSharding
+
+    if tuple(mesh.axis_names) != ("expert", "feature") or tuple(
+        np.asarray(mesh.devices, dtype=object).shape
+    ) != (8, 4):
+        raise PlanValidationError(
+            "WS32 initial state requires one exact expert8 x feature4 mesh"
+        )
+
+    def make(
+        shape: tuple[int, ...],
+        spec: P,
+        dtype: Any,
+        fill: int | float | bool,
+    ) -> Any:
+        sharding = NamedSharding(mesh, spec)
+        local_shape = sharding.shard_shape(shape)
+
+        def callback(_: tuple[slice, ...]) -> np.ndarray:
+            return np.full(local_shape, fill, dtype=dtype)
+
+        return jax.make_array_from_callback(shape, sharding, callback)
+
+    blocks = np.arange(config.page_count, dtype=np.int32)[None, :]
+    block_sharding = NamedSharding(mesh, P())
+    block_tables = jax.make_array_from_callback(
+        blocks.shape,
+        block_sharding,
+        lambda _: blocks.copy(),
+    )
+    geometry = config.geometry
+    return Ws32DecoderState(
+        make(
+            config.kv_cache_shape,
+            P(None, None, "expert", None),
+            ml_dtypes.bfloat16,
+            0,
+        ),
+        make(
+            config.index_cache_shape,
+            P(None, None, "expert", None),
+            ml_dtypes.bfloat16,
+            0,
+        ),
+        make((1, geometry.dsa_top_k), P(), np.int32, -1),
+        make((1,), P(), np.int32, 0),
+        make((1, geometry.dsa_top_k), P(), np.float32, -np.inf),
+        make((1,), P(), np.int32, 0),
+        block_tables,
+        make((1,), P(), np.int32, 1),
+        make((1,), P(), np.bool_, True),
+    )
 
 
 def _qkv_specs() -> Ws32QkvAWeights:
@@ -500,6 +616,24 @@ def ws32_decode_result_specs() -> Ws32DecodeStepResult:
     )
 
 
+def ws32_dsa_observation_specs() -> Ws32DsaObservation:
+    return Ws32DsaObservation(P(), P(), P(), P())
+
+
+def ws32_observed_decode_result_specs() -> Ws32ObservedDecodeStepResult:
+    return Ws32ObservedDecodeStepResult(
+        ws32_decode_result_specs(), ws32_dsa_observation_specs()
+    )
+
+
+def ws32_prefill_result_specs() -> Ws32PrefillResult:
+    return Ws32PrefillResult(ws32_decoder_state_specs(), P())
+
+
+def ws32_cache_write_probe_specs() -> Ws32CacheWriteProbe:
+    return Ws32CacheWriteProbe(P(), P(), P(), P())
+
+
 def _validate_local_state(
     state: Ws32DecoderState,
     config: Ws32DecoderConfig,
@@ -553,7 +687,7 @@ def _validate_local_state(
         raise ValueError("WS32 decoder health must be one boolean row")
 
 
-def ws32_decode_mapped(
+def _ws32_decode_impl(
     token_ids: Any,
     state: Ws32DecoderState,
     weights: Ws32DecoderWeights,
@@ -561,8 +695,9 @@ def ws32_decode_mapped(
     config: Ws32DecoderConfig,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
-) -> Ws32DecodeStepResult:
-    """Execute one complete batch-one target-model step on all 32 chips."""
+    observe_dsa: bool,
+) -> tuple[Ws32DecodeStepResult, Ws32DsaObservation | None]:
+    """Execute one complete batch-one step and optionally retain DSA events."""
 
     _validate_local_state(state, config)
     if token_ids.shape != (1,) or token_ids.dtype != jnp.int32:
@@ -584,6 +719,9 @@ def ws32_decode_mapped(
     sparse_config = SparseMlaConfig(
         segment_block=config.sparse_segment_block
     )
+    observed_positions = []
+    observed_valid_counts = []
+    observed_scores = []
 
     for layer_id, layer_weights in enumerate(weights.layers):
         indexer_kind = config.geometry.indexer_types[layer_id]
@@ -625,6 +763,10 @@ def ws32_decode_mapped(
             index_cache = index_cache.at[index_slot].set(
                 result.index_cache_local
             )
+            if observe_dsa:
+                observed_positions.append(result.selected_positions)
+                observed_valid_counts.append(result.selected_valid_counts)
+                observed_scores.append(result.selected_scores)
         selected_positions = result.selected_positions
         selected_valid_counts = result.selected_valid_counts
         selected_scores = result.selected_scores
@@ -649,4 +791,271 @@ def ws32_decode_mapped(
         state.context_lengths + jnp.ones_like(state.context_lengths),
         health & sampled.contract_valid,
     )
-    return Ws32DecodeStepResult(next_state, sampled.token_id, residual)
+    step = Ws32DecodeStepResult(next_state, sampled.token_id, residual)
+    if not observe_dsa:
+        return step, None
+    if len(observed_positions) != len(config.full_index_slots):
+        raise AssertionError("WS32 DSA observation cardinality drifted")
+    observation = Ws32DsaObservation(
+        jnp.asarray(config.full_index_slots, dtype=jnp.int32),
+        jnp.stack(tuple(observed_positions), axis=0),
+        jnp.stack(tuple(observed_valid_counts), axis=0),
+        jnp.stack(tuple(observed_scores), axis=0),
+    )
+    return step, observation
+
+
+def ws32_decode_mapped(
+    token_ids: Any,
+    state: Ws32DecoderState,
+    weights: Ws32DecoderWeights,
+    *,
+    config: Ws32DecoderConfig,
+    sparse_attention_interpret: bool = False,
+    linear_interpret: bool = False,
+) -> Ws32DecodeStepResult:
+    """Execute one complete batch-one target-model step on all 32 chips."""
+
+    result, observation = _ws32_decode_impl(
+        token_ids,
+        state,
+        weights,
+        config=config,
+        sparse_attention_interpret=sparse_attention_interpret,
+        linear_interpret=linear_interpret,
+        observe_dsa=False,
+    )
+    if observation is not None:
+        raise AssertionError("default WS32 decoder retained DSA observations")
+    return result
+
+
+def ws32_decode_observed_mapped(
+    token_ids: Any,
+    state: Ws32DecoderState,
+    weights: Ws32DecoderWeights,
+    *,
+    config: Ws32DecoderConfig,
+    sparse_attention_interpret: bool = False,
+    linear_interpret: bool = False,
+) -> Ws32ObservedDecodeStepResult:
+    """Execute one proof-only step returning all 21 full-indexer decisions."""
+
+    result, observation = _ws32_decode_impl(
+        token_ids,
+        state,
+        weights,
+        config=config,
+        sparse_attention_interpret=sparse_attention_interpret,
+        linear_interpret=linear_interpret,
+        observe_dsa=True,
+    )
+    if observation is None:
+        raise AssertionError("observed WS32 decoder lost DSA observations")
+    return Ws32ObservedDecodeStepResult(result, observation)
+
+
+def ws32_cache_write_probe_mapped(
+    state: Ws32DecoderState,
+    *,
+    config: Ws32DecoderConfig,
+    expert_axis: str = "expert",
+) -> Ws32CacheWriteProbe:
+    """Gather only the last written cache rows, never a context-sized tensor."""
+
+    _validate_local_state(state, config)
+    position = state.position - jnp.ones_like(state.position)
+    logical_page = position[0] // jnp.int32(config.logical_page_size)
+    owner = (
+        position[0] % jnp.int32(config.logical_page_size)
+    ) // jnp.int32(config.local_rows_per_page)
+    local_row = (
+        position[0] % jnp.int32(config.local_rows_per_page)
+    )
+    safe_page = jnp.clip(logical_page, 0, state.block_tables.shape[1] - 1)
+    physical_page = state.block_tables[0, safe_page]
+    safe_physical_page = jnp.clip(
+        physical_page, 0, state.kv_cache_local.shape[1] - 1
+    )
+    owns = jax.lax.axis_index(expert_axis) == owner
+    kv_local = state.kv_cache_local[
+        :, safe_physical_page, local_row, :
+    ]
+    index_local = state.index_cache_local[
+        :, safe_physical_page, local_row, :
+    ]
+    kv_local = jnp.where(owns, kv_local, jnp.zeros_like(kv_local))
+    index_local = jnp.where(owns, index_local, jnp.zeros_like(index_local))
+    with jax.named_scope("greenfield_ws32_cache_probe/kv_owner_reduce"):
+        kv_rows = jax.lax.psum(kv_local, axis_name=expert_axis)
+    with jax.named_scope("greenfield_ws32_cache_probe/index_owner_reduce"):
+        index_rows = jax.lax.psum(index_local, axis_name=expert_axis)
+    metadata_valid = (
+        (position[0] >= 0)
+        & (position[0] < state.context_lengths[0])
+        & (logical_page >= 0)
+        & (logical_page < state.block_tables.shape[1])
+        & (physical_page >= 0)
+        & (physical_page < state.kv_cache_local.shape[1])
+    )
+    content_valid = (
+        jnp.all(jnp.isfinite(kv_rows))
+        & jnp.all(jnp.isfinite(index_rows))
+        & jnp.all(jnp.any(kv_rows != jnp.bfloat16(0), axis=-1))
+        & jnp.all(jnp.any(index_rows != jnp.bfloat16(0), axis=-1))
+    )
+    return Ws32CacheWriteProbe(
+        position,
+        kv_rows,
+        index_rows,
+        state.contract_valid & (metadata_valid & content_valid)[None],
+    )
+
+
+def build_ws32_decoder_program(
+    mesh: Any,
+    config: Ws32DecoderConfig,
+    *,
+    sparse_attention_interpret: bool = False,
+    linear_interpret: bool = False,
+) -> Ws32DecoderProgram:
+    """Build the exact normal, observer, and cache-probe shard-map programs."""
+
+    import numpy as np
+
+    if tuple(mesh.axis_names) != ("expert", "feature") or tuple(
+        np.asarray(mesh.devices, dtype=object).shape
+    ) != (8, 4):
+        raise PlanValidationError("WS32 decoder requires one exact expert8 x feature4 mesh")
+    weight_specs = ws32_decoder_weight_specs(config)
+    state_specs = ws32_decoder_state_specs()
+
+    def execute_body(
+        token_ids: Any,
+        state: Ws32DecoderState,
+        weights: Ws32DecoderWeights,
+    ) -> Ws32DecodeStepResult:
+        with jax.named_scope("greenfield_ws32_complete_decoder"):
+            return ws32_decode_mapped(
+                token_ids,
+                state,
+                weights,
+                config=config,
+                sparse_attention_interpret=sparse_attention_interpret,
+                linear_interpret=linear_interpret,
+            )
+
+    def observe_body(
+        token_ids: Any,
+        state: Ws32DecoderState,
+        weights: Ws32DecoderWeights,
+    ) -> Ws32ObservedDecodeStepResult:
+        with jax.named_scope("greenfield_ws32_complete_decoder_dsa_observer"):
+            return ws32_decode_observed_mapped(
+                token_ids,
+                state,
+                weights,
+                config=config,
+                sparse_attention_interpret=sparse_attention_interpret,
+                linear_interpret=linear_interpret,
+            )
+
+    def probe_body(state: Ws32DecoderState) -> Ws32CacheWriteProbe:
+        with jax.named_scope("greenfield_ws32_cache_probe"):
+            return ws32_cache_write_probe_mapped(state, config=config)
+
+    return Ws32DecoderProgram(
+        config=config,
+        mesh=mesh,
+        execute=jax.shard_map(
+            execute_body,
+            mesh=mesh,
+            in_specs=(P(), state_specs, weight_specs),
+            out_specs=ws32_decode_result_specs(),
+            check_vma=False,
+        ),
+        observe=jax.shard_map(
+            observe_body,
+            mesh=mesh,
+            in_specs=(P(), state_specs, weight_specs),
+            out_specs=ws32_observed_decode_result_specs(),
+            check_vma=False,
+        ),
+        probe_cache_write=jax.shard_map(
+            probe_body,
+            mesh=mesh,
+            in_specs=(state_specs,),
+            out_specs=ws32_cache_write_probe_specs(),
+            check_vma=False,
+        ),
+    )
+
+
+def build_ws32_teacher_forced_prefill_program(
+    mesh: Any,
+    config: Ws32DecoderConfig,
+    *,
+    prompt_length: int,
+    sparse_attention_interpret: bool = False,
+    linear_interpret: bool = False,
+) -> Ws32TeacherForcedPrefillProgram:
+    """Build a complete teacher-forced prompt scan inside one shard map."""
+
+    if not isinstance(prompt_length, int) or isinstance(prompt_length, bool) or (
+        prompt_length <= 0 or prompt_length >= config.context_capacity
+    ):
+        raise PlanValidationError(
+            "WS32 prefill prompt must be positive and leave decode capacity"
+        )
+    import numpy as np
+
+    if tuple(mesh.axis_names) != ("expert", "feature") or tuple(
+        np.asarray(mesh.devices, dtype=object).shape
+    ) != (8, 4):
+        raise PlanValidationError("WS32 prefill requires one exact expert8 x feature4 mesh")
+
+    def body(
+        prompt_token_ids: Any,
+        state: Ws32DecoderState,
+        weights: Ws32DecoderWeights,
+    ) -> Ws32PrefillResult:
+        if prompt_token_ids.shape != (prompt_length,) or (
+            prompt_token_ids.dtype != jnp.int32
+        ):
+            raise ValueError("WS32 teacher-forced prompt geometry drifted")
+        initial_token = jnp.full((1,), -1, dtype=jnp.int32)
+
+        def scan_step(
+            carry: tuple[Ws32DecoderState, Any], token: Any
+        ) -> tuple[tuple[Ws32DecoderState, Any], None]:
+            result = ws32_decode_mapped(
+                token[None],
+                carry[0],
+                weights,
+                config=config,
+                sparse_attention_interpret=sparse_attention_interpret,
+                linear_interpret=linear_interpret,
+            )
+            return (result.state, result.next_token), None
+
+        with jax.named_scope("greenfield_ws32_teacher_forced_prefill"):
+            final, _ = jax.lax.scan(
+                scan_step,
+                (state, initial_token),
+                prompt_token_ids,
+                unroll=1,
+            )
+        return Ws32PrefillResult(final[0], final[1])
+
+    return Ws32TeacherForcedPrefillProgram(
+        config=config,
+        mesh=mesh,
+        prompt_length=prompt_length,
+        execute=jax.shard_map(
+            body,
+            mesh=mesh,
+            in_specs=(P(), ws32_decoder_state_specs(), ws32_decoder_weight_specs(config)),
+            out_specs=ws32_prefill_result_specs(),
+            check_vma=False,
+        ),
+    )

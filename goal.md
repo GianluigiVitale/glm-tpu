@@ -60,6 +60,7 @@ The fastest correct plan serves at 256K independently of legacy execution, uses 
 checkpoint, has local repeated collectives/no full-pod hidden reconstruction, and passes exactness,
 quality, integrity, HBM, HLO, PP8/PP16 measurement, WS32 adjudication, 128K smoke, 256K E0,
 DB/archive, and clean-fleet gates. Continue until section 18 has direct evidence.
-Use bulk batches; persist next. Fable audits only the current active diff/evidence in one fresh,
-narrow chat; forbid Fable subagents/workflows. Only if blocked, allow one narrow Opus-5/high helper.
-Never re-audit cleared code. Then Sol audits once; correct, commit/push, deploy.
+Work in bulk. Before deploy: one fresh Fable-max audit of only current diff/evidence; no
+workflows/subagents/cleared-code review. Then one Sol audit; correct, commit/push. After a protected
+failure, diagnose locally and open one narrow logged-in Fable-max chat with only relevant evidence;
+no API/workflow/subagents.

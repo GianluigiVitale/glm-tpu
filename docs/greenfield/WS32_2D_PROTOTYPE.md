@@ -138,3 +138,28 @@ This removes whole-matrix dequantization by roughly 411x/504x at this layer and 
 for the complete short decoder. The timing remains a layer diagnostic, not token throughput. Gate D
 still requires protected complete-decoder 2K/8K exactness, HLO, HBM, integrity and wall evidence.
 An unchanged PP8 8K rerun and another M1/M32 arithmetic arm remain forbidden.
+
+## Complete short-decoder execution boundary
+
+The local integration now has the missing Gate-D runtime surface, still default-off and not yet
+protected evidence:
+
+- one `shard_map` complete 78-layer batch-one decode over `expert=8 x feature=4`;
+- a device-resident teacher-forced prompt `lax.scan`, with no Python/host stage dispatch;
+- a proof-only all-21-full-indexer observer for the sealed 14-step DSA prefix;
+- a compact all-78-layer/all-21-indexer last-write cache witness;
+- direct zero-cache allocation on final owners without a global host cache;
+- independent prefill/observer/decode/cache-probe StableHLO and optimized-HLO pins, live-closure subgroup
+  checks, async/dead-collective refusal and full-pod hidden-value refusal;
+- exact sealed 2K/8K token and DSA comparisons, recurrent profiler-free samples, fresh eight-host
+  XPlanes, 32-chip HBM, raw DSA/cache arrays independently recomputed by the sealer, atomic DB
+  linkage with pre-commit-armed authenticated rollback, exact remote CRC/generation ledger and
+  `SUCCESS` last;
+- a forced-32 full-78-layer abstract trace derived from the real 2,310-tensor inventory, covering
+  decoder, observer, prefill and cache probe without loading checkpoint payload bytes.
+
+The runtime continues from the observed DSA prefix into the normal decoder instead of duplicating
+the multi-gigabyte cache on device. The normal timing window remains profiler-free; the trace runs
+afterward. This code does not close Gate D by itself. The full checkpoint must first be packed and
+sealed, then one compile acquisition must fill all eight HLO pins, followed by protected 2K and 8K
+numerical runs with terminal evidence.

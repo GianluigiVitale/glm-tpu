@@ -373,6 +373,12 @@ branches from the search tree.
   evidence. Recompute exact slot ownership from the pinned physical topology, rederive byte/tensor
   cardinalities, verify remote size plus CRC32C and exact object equality, and publish `SUCCESS`
   last in each prefix. Never include `SUCCESS` in a recursive nonterminal upload.
+- An oracle may keep payload under `oracle/` and terminal `SUCCESS` at the artifact root. Carry
+  both paths explicitly, hard-pin the terminal bytes and bind its manifest identity; never infer
+  the commit-marker location from the payload directory.
+- Full-model allocator policy is part of HBM provenance. Compute persistent state plus cache before
+  launch, pin the chosen XLA memory fraction in every worker environment, and seal that exact value;
+  never depend on an ambient shell variable or the default 75-percent reservation.
 - A GCSFuse checkpoint mount may be deliberately read-only. Finalize a manifest in a writable run
   directory against exact read-only payload symlinks, remove those links before failure archiving,
   and upload the manifest through a create-only storage API. Never infer writability from a mounted
@@ -391,6 +397,40 @@ branches from the search tree.
   the exact raw BF16 bits (or an equivalently content-addressed tensor), reconstruct every physical
   shard in the orchestrator, recompute hashes/errors against the independently sealed oracle and
   prove exact all-device ownership before publication.
+- Remote `SUCCESS` and its DB row are one terminal unit. On failed publication, delete the DB row
+  only after authenticated generation-matched `SUCCESS` deletion or proven absence; otherwise
+  retain the linkage and fail loudly for repair.
+- Compile acquisition and numerical execution are separate trust states. Persist every complete
+  StableHLO/optimized-HLO pair first; acquisition permits only the explicit vacant-pin failures,
+  while numerical execution requires all acquired digests and an independent structural replay
+  before the first call to each model program. A self-reported HLO result is not terminal proof.
+- A prompt scan lowers through `while`. Cross-computation liveness must include both its exact
+  condition and body roots; otherwise live prompt collectives are invisible or a dead decoy can be
+  misclassified. Unit-test this with a dead collective inside the body before TPU acquisition.
+- HLO call-graph proof must cover the real compiler vocabulary, not only fusion and collectives.
+  The complete decoder uses live `to_apply` callees on reduce, sort, reduce-window and scatter;
+  replay the preserved full graph and fail closed on every unobserved callee attribute.
+- TPU tuple all-reduce can share one ordinary two-parameter scalar reducer across every operand.
+  Prove equal arity, compatible geometry and that exact reducer; do not invent a tuple-root fixture
+  that the protected compiler never emits.
+- Short-context DSA owners may hold fewer rows than the global top-k (for example 256 local rows at
+  2K versus top-k 2,048). Pad each owner score row to top-k before `lax.top_k`, preserve `-1/-inf`
+  tails, then merge by global position. A short prompt does not invalidate the fixed top-k graph.
+- Branching a multi-gigabyte cache to separate observer and performance programs can exceed HBM.
+  Keep recurrent state device-resident and donated; use the proof-only observer for the sealed DSA
+  prefix, then continue with the normal executable for profiler-free timing. Pin both HLOs.
+- Terminal fleet validation must compare replicated token, DSA, state and cache evidence across all
+  eight hosts, replay every saved HLO, parse all eight XPlanes, and calculate distributed wall from
+  the per-iteration maximum—not accept eight unrelated local `passed` booleans.
+- Before a complete-model TPU compile, run a forced-32 abstract trace built from the real inventory,
+  exact 2,310-leaf final-layout plan and all decoder/observer/prefill/cache-probe entry points. This
+  catches Python, shape, dtype and sharding composition errors in roughly two minutes without model
+  payload I/O. It is a preflight, not TPU HLO, numerical or performance evidence.
+- Do not make every launch rank rehash every checkpoint owner. Each rank hashes only its four exact
+  final-owner files; the terminal fleet validator proves disjoint slots and complete 0--31 coverage.
+  This preserves local-read integrity without multiplying a 786-GB checkpoint scan eightfold.
+- A terminal validator must recompute token, DSA and cache verdicts from sealed raw arrays. A JSON
+  `passed` field is not a numerical artifact, even when eight hosts repeat it.
 - Every capture mode that can commit a provenance row must arm the same exact prefix-aware rollback
   before model execution. A mode is incomplete if a later DSA/sealing refusal can leave an
   unauthenticated provisional row.

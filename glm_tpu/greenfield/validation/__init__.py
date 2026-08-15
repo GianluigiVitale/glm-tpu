@@ -95,6 +95,13 @@ from .short_context_logprob_oracle import (
     inspect_short_context_logprob_oracle,
     normalize_sample_logprobs,
 )
+from .ws32_short_context import (
+    Ws32ShortContextOracle,
+    compare_ws32_dsa_step,
+    compare_ws32_raw_tokens,
+    load_ws32_short_context_oracle,
+    validate_ws32_cache_probe,
+)
 from .strategy_nd_dense_replay import validate_strategy_nd_dense_replay
 from .strategy_nd_dense_rms_replay import (
     validate_strategy_nd_dense_rms_replay,
@@ -127,6 +134,7 @@ __all__ = (
     "ShortContextOracleConfig",
     "ShortContextDsaOracleConfig",
     "ShortContextLogprobOracleConfig",
+    "Ws32ShortContextOracle",
     "capture_gate_c_oracle",
     "capture_accepted_attention_output_operand",
     "capture_accepted_attention_projection_operands",
@@ -155,6 +163,8 @@ __all__ = (
     "compare_short_context_dsa_oracles",
     "capture_short_context_logprob_oracle",
     "compare_dsa_association_scores",
+    "compare_ws32_dsa_step",
+    "compare_ws32_raw_tokens",
     "inspect_gate_c_oracle",
     "inspect_distributed_q_a_norm_artifact",
     "inspect_greenfield_layer0_dsa_internal_observation",
@@ -168,6 +178,7 @@ __all__ = (
     "inspect_short_context_oracle",
     "inspect_short_context_dsa_oracle",
     "inspect_short_context_logprob_oracle",
+    "load_ws32_short_context_oracle",
     "normalize_sample_logprobs",
     "pack_stage_local_index_keys",
     "stitch_stage_local_scores",
@@ -175,4 +186,5 @@ __all__ = (
     "validate_strategy_nd_dense_rms_replay",
     "validate_strategy_nd_integrated_dense_rms",
     "validate_output_geometry_replay",
+    "validate_ws32_cache_probe",
 )

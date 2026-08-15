@@ -200,6 +200,19 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
         value = stream.read(1)
         stream.seek(-1, 2)
         stream.write(bytes((value[0] ^ 1,)))
+    # A launch rank hashes only its four final-owner files.  All structural
+    # records are still checked, while the fleet sealer provides 0..31 hash
+    # coverage across the eight disjoint rank subsets.
+    verify_ws32_runtime_checkpoint(
+        config.output_dir,
+        expected_manifest_sha256=manifest["manifest_sha256"],
+        expected_success_sha256=success["success_sha256"],
+        expected_mesh_hash="b" * 64,
+        expected_topology_hash="c" * 64,
+        inventory=inventory,
+        geometry=_geometry(),
+        verify_file_hash_slots=(0, 1, 2, 3),
+    )
     with pytest.raises(CheckpointValidationError, match="checksum drifted"):
         verify_ws32_runtime_checkpoint(
             config.output_dir,
@@ -209,6 +222,18 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
             expected_topology_hash="c" * 64,
             inventory=inventory,
             geometry=_geometry(),
+            verify_file_hash_slots=(31,),
+        )
+    with pytest.raises(ValueError, match="slot subset"):
+        verify_ws32_runtime_checkpoint(
+            config.output_dir,
+            expected_manifest_sha256=manifest["manifest_sha256"],
+            expected_success_sha256=success["success_sha256"],
+            expected_mesh_hash="b" * 64,
+            expected_topology_hash="c" * 64,
+            inventory=inventory,
+            geometry=_geometry(),
+            verify_file_hash_slots=(0, 0),
         )
 
 

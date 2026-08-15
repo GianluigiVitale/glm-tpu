@@ -821,6 +821,7 @@ def _verify_ws32_runtime_value(
     plans: Sequence[Ws32RuntimeFilePlan],
     *,
     verify_file_hashes: bool,
+    verify_file_hash_slots: frozenset[int] | None = None,
 ) -> Mapping[int, Mapping[str, Any]]:
     if set(manifest) != _MANIFEST_KEYS:
         raise CheckpointValidationError("WS32 runtime manifest schema drifted")
@@ -876,7 +877,10 @@ def _verify_ws32_runtime_value(
             raise CheckpointValidationError(
                 f"WS32 runtime file is missing or truncated: {plan.filename!r}"
             )
-        if verify_file_hashes:
+        if verify_file_hashes and (
+            verify_file_hash_slots is None
+            or plan.device_slot in verify_file_hash_slots
+        ):
             observed = _destination_record(
                 path,
                 plan,
@@ -905,6 +909,7 @@ def verify_ws32_runtime_checkpoint(
     inventory: SourceInventory,
     geometry: ModelGeometry,
     verify_file_hashes: bool = True,
+    verify_file_hash_slots: Sequence[int] | None = None,
 ) -> VerifiedWs32RuntimeCheckpoint:
     """Re-derive every layout field and verify a protected sealed artifact."""
 
@@ -912,6 +917,20 @@ def verify_ws32_runtime_checkpoint(
     _digest(expected_success_sha256, field="expected_success_sha256")
     _digest(expected_mesh_hash, field="expected_mesh_hash")
     _digest(expected_topology_hash, field="expected_topology_hash")
+    selected_hash_slots = None
+    if verify_file_hash_slots is not None:
+        selected_hash_slots = frozenset(verify_file_hash_slots)
+        if (
+            not selected_hash_slots
+            or len(selected_hash_slots) != len(verify_file_hash_slots)
+            or any(
+                not isinstance(slot, int)
+                or isinstance(slot, bool)
+                or not 0 <= slot < 32
+                for slot in selected_hash_slots
+            )
+        ):
+            raise ValueError("WS32 runtime verification slot subset is invalid")
     root = Path(root)
     path = root / "manifest.json"
     if not path.is_file():
@@ -1003,6 +1022,7 @@ def verify_ws32_runtime_checkpoint(
         manifest,
         plans,
         verify_file_hashes=verify_file_hashes,
+        verify_file_hash_slots=selected_hash_slots,
     )
     return VerifiedWs32RuntimeCheckpoint(
         root=root,
