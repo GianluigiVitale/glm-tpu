@@ -138,6 +138,14 @@ from .ws32_one_layer import (
     validate_ws32_topology_fleet,
     ws32_one_layer_inputs,
 )
+from .ws32_pallas_one_layer import (
+    WS32_PALLAS_REAL_LAYER_LIVE_CLOSURE_SHA256,
+    WS32_PALLAS_REAL_LAYER_OPTIMIZED_HLO_SHA256,
+    WS32_PALLAS_REAL_LAYER_STABLEHLO_SHA256,
+    Ws32PallasOneLayerHloReport,
+    build_ws32_pallas_one_layer_mapped,
+    validate_ws32_pallas_one_layer_hlo,
+)
 from .one_layer import (
     REAL_LAYER_OUTPUT_TOLERANCE,
     ROUTE_WEIGHT_TOLERANCE,
@@ -269,10 +277,15 @@ __all__ = [
     "TransportKind",
     "WS32_ONE_LAYER_INPUT_SPECS",
     "WS32_ONE_LAYER_OUTPUT_SPEC",
+    "WS32_PALLAS_REAL_LAYER_LIVE_CLOSURE_SHA256",
+    "WS32_PALLAS_REAL_LAYER_OPTIMIZED_HLO_SHA256",
+    "WS32_PALLAS_REAL_LAYER_STABLEHLO_SHA256",
+    "Ws32PallasOneLayerHloReport",
     "Ws32OneLayerHloReport",
     "benchmark_transport_chain",
     "build_transport_chain",
     "build_ws32_one_layer_mapped",
+    "build_ws32_pallas_one_layer_mapped",
     "transport_chain_hlo_policy",
     "validate_compiled_transport",
     "validate_pallas_real_layer_hlo",
@@ -280,6 +293,7 @@ __all__ = [
     "validate_real_layer_hlo",
     "validate_transport_pairs",
     "validate_ws32_one_layer_hlo",
+    "validate_ws32_pallas_one_layer_hlo",
     "validate_ws32_topology_fleet",
     "ws32_one_layer_inputs",
 ]

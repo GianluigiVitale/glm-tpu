@@ -1,9 +1,8 @@
 # Goal — GLM-5.2-FP8 TPU v4 topology-first greenfield engine
 
-FULL ACCESS: work autonomously until done; do not ask permission in scope. Keep this file below
-4,000 characters. After every start/compaction, read it, then read
-`docs/glm-tpu-revolution.md` **in full**; it is authoritative. Inspect live
-code/processes and relevant handoff/research evidence before acting.
+FULL ACCESS: work autonomously to completion. Keep this below 4,000 characters. After
+start/compaction read it and `docs/glm-tpu-revolution.md` **in full**, then inspect live state and
+handoff/research evidence.
 
 ## Scope and precedence
 
@@ -61,4 +60,6 @@ The fastest correct plan serves at 256K independently of legacy execution, uses 
 checkpoint, has local repeated collectives/no full-pod hidden reconstruction, and passes exactness,
 quality, integrity, HBM, HLO, PP8/PP16 measurement, WS32 adjudication, 128K smoke, 256K E0,
 DB/archive, and clean-fleet gates. Continue until section 18 has direct evidence.
-Use logged batches; persist exact next before compaction. One Sol xhigh subagent audits each new diff once; never re-review cleared code. Verify, commit/push, deploy. Never use Claude Code or Fable.
+Use bulk batches; persist next. Fable audits only the current active diff/evidence in one fresh,
+narrow chat; forbid Fable subagents/workflows. Only if blocked, allow one narrow Opus-5/high helper.
+Never re-audit cleared code. Then Sol audits once; correct, commit/push, deploy.

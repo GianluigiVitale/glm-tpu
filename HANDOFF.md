@@ -2,6 +2,21 @@
 
 **Updated:** 2026-08-15 UTC
 
+## Narrow Fable audit
+
+- Retired session `0f8e2c2e-33a8-4d12-92e8-f7bd810f69d1`: its autonomous 20-task Fable workflow
+  consumed the available session usage and 35% of the weekly limit. Never resume it.
+- Current session: `79c40258-5c78-4c78-98ce-b214d76c26c9` (`claude-fable-5`, max effort).
+  It reads only the active WS32 Pallas diff, direct dependencies and two protected evidence sets.
+  No Fable subagents/workflow/fan-out. If a concrete fact blocks it, at most one narrowly scoped
+  Opus-5/high helper may read named material; no recursive delegation.
+- Fable is review-only: no edits, cloud/TPU actions, commits, deletion, or evidence mutation.
+- The one-time direct audit used zero subagents and returned result SHA
+  `caccc9ffb334d623c94559e90d21bb3ca82eef550b6561a1def0fef2498fb931`. It found source-coordinate
+  drift, numerical artifact mislabeling and a future callee-walker fail-open. The correction-only
+  review of staged SHA `df9c2456...cac455` verified all three fixes plus the protected numerical
+  wrapper and returned `APPROVE COMMIT`. Do not repeat this cleared review.
+
 ## Authority and isolation
 
 - Branch/worktree: `rewrite/topology-first-decode` at
@@ -26,12 +41,16 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   bytes/chip and the 51-object `SUCCESS`-last archive plus 8/8 cleanup pass. Diagnostic p50 is
   `516.5821635` / `1160.885836` ms, so whole-matrix dequantization is correctness-passing but
   execution-rejected. It has no DB/token-performance claim.
-- The sole bounded successor is now an isolated default-off WS32 Pallas body. It selects the
-  sealed `[out,in]` expert owner before the existing raw-FP8 tile-local kernels, avoiding a new pack,
-  runtime transpose and decoded-weight overlay. Forced-32 normal/concentrated semantics and exact
-  feature-4/expert-8 groups pass. Its dedicated compile acquisition keeps both HLO pins vacant and
-  cannot execute arithmetic. Exact next is one bulk immutable review, commit/push and one protected
-  HLO acquisition; only the acquired schedule authorizes the numerical latency discriminator.
+- The isolated default-off WS32 Pallas body selects the sealed `[out,in]` expert owner before the
+  raw-FP8 tile-local kernels. Compile acquisition
+  `greenfield_ws32_pallas_real_layer_hlo_20260815T094203579842098Z` proves 32 partitions, 15/15
+  live inputs, 18 F32 gate/up plus 9 BF16 down Pallas calls, and exactly nine feature-4 plus one
+  expert-8 reductions. StableHLO/optimized pins are `fa11961d0d3393d93191f9d591eb7d9efd12a32f54fc046a2983e200579e6118` /
+  `17ee208a3f828e72910f569bad7a8923a9e24a41001234bc3688223458e7ff5d`.
+  It executed no arithmetic and made no DB/performance/SUCCESS claim. The Fable-approved correction
+  preserves the acquired source coordinates, adds the fail-closed live-closure proof and a separate
+  protected numerical wrapper. Exact next is one Sol audit, commit/push, then the one protected
+  numerical/latency run.
 
 - The six-day PP8 bitwise arithmetic search is closed. The native-XLA feature tile folded back to
   the rejected ordinary-M1 schedule; all three Pallas forms are nonexact. Do not add another
