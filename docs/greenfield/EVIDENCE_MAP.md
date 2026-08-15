@@ -1109,3 +1109,19 @@ capture is still required.
   pins the ordered contiguous K512 input/weight/scale slices and every DB533 barrier-rounded
   `y -> x -> z` add. Decode, DSA observer and prefill must archive both representations with
   fleet-identical hashes; either contract failing blocks execution.
+
+## WS32 protected real-layer compile discriminator
+
+- Sealed input: layer-3 WS32 manifest `4bf8679d...1f40`, mesh `de5f59cb...0a88`, and independent
+  one-layer oracle manifest `c63ffa19...bff`.
+- Protected compile tag `greenfield_ws32_real_layer_hlo_20260815T081128291986777Z` binds the exact
+  launch-host/JAX permutation and all 32 direct device slots. Eight identical StableHLO/optimized
+  HLO files are pinned at `dea1384e...c01f` / `6a6acf94...e157`.
+- The scheduled graph proves 15/15 live inputs, 10/10 live F32-operand reductions, nine feature-4
+  and one expert-8 group, no group larger than eight and no physical 32-row hidden reconstruction.
+  Per-chip measured post-load peak is 311,859,200 bytes with at least 32,702,539,776 bytes in the
+  largest free block.
+- The attempt stopped before arithmetic because its validator misread XLA's BF16 scheduled result
+  as the reduction accumulator; exact HLO proves F32 operands/reducers and a fused BF16 output
+  conversion. No numerical, DB, archive-`SUCCESS`, Gate-D or performance claim exists. The single
+  pinned numerical run and independent terminal shard recomputation are pending.

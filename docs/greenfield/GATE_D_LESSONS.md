@@ -333,6 +333,16 @@ branches from the search tree.
   exact row-zero sources, shape-preserving `[1,6144] -> [8,768]`, six live `[8,128]` programs,
   ordered source roles and a layout-only return to semantic M1. Shape equality alone does not prove
   feature order or physical layout.
+- A scheduled collective result dtype is not necessarily its accumulator dtype. TPU XLA can fuse a
+  following BF16 conversion into an all-reduce result while retaining an F32 operand and exact F32
+  reducer. Prove and publish operand, reducer and scheduled-result dtypes separately; never derive
+  the reduction arithmetic from the result prefix alone.
+- TPU v4 may expose `local_hardware_id=None`. Bind runtime devices to the sealed fleet-observed
+  local-device order and require any non-null runtime id to agree; do not invent an id or reject a
+  valid runtime solely because this optional field is absent.
+- A sealed manifest and its payload need not share a directory. Treat the manifest root and exact
+  payload subdirectory as separate authenticated inputs, and test the same layout the protected
+  mount exposes before launch.
 
 ## Numerical rules
 
@@ -355,6 +365,10 @@ branches from the search tree.
 - Protected runs require clean code pins, exact source hashes, physical topology/host bindings,
   pre/post eight-host zero-work census, CRC-verified complete remote object equality and remote
   `SUCCESS` last. Diagnostics never become performance claims.
+- A worker's `passed` field, tensor SHA or error summary is not terminal numerical evidence. Preserve
+  the exact raw BF16 bits (or an equivalently content-addressed tensor), reconstruct every physical
+  shard in the orchestrator, recompute hashes/errors against the independently sealed oracle and
+  prove exact all-device ownership before publication.
 - Every capture mode that can commit a provenance row must arm the same exact prefix-aware rollback
   before model execution. A mode is incomplete if a later DSA/sealing refusal can leave an
   unauthenticated provisional row.

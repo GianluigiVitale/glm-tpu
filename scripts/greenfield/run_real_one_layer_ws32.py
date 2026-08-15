@@ -258,6 +258,7 @@ def _case_result(
                 "expert_coordinate": expert_coordinate,
                 "feature_coordinate": feature_coordinate,
                 "observed_bf16_sha256": sha256(observed_bits.tobytes()).hexdigest(),
+                "observed_bf16_bits": observed_bits.reshape(-1).tolist(),
                 "oracle_bf16_sha256": sha256(expected_bits.tobytes()).hexdigest(),
                 "bitwise_mismatch_count": int(np.count_nonzero(observed_bits != expected_bits)),
                 "comparison": comparison,
@@ -270,7 +271,6 @@ def _case_result(
         "passed": len(records) == 4
         and all(item["comparison"]["passed"] for item in records),
     }
-
 
 def main() -> int:
     args = parse_args()
@@ -385,6 +385,7 @@ def main() -> int:
         optimized_hlo,
         expected_stablehlo_sha256=args.expected_stablehlo_sha256,
         expected_optimized_hlo_sha256=args.expected_optimized_hlo_sha256,
+        expected_optimized_collective_result_dtype=None if args.compile_only else "bf16",
     )
     prevalidation = {
         "code_hash": args.expected_code_hash,
@@ -445,7 +446,6 @@ def main() -> int:
         return 0
     if not report.passed:
         raise RuntimeError("WS32 pre-execution HLO contract failed: " + "; ".join(report.violations))
-
     slot_by_device_id = {
         device_id: slot
         for slot, device_id in enumerate(physical_mesh.flattened_device_ids)
@@ -476,8 +476,7 @@ def main() -> int:
             "samples_ms": samples,
             "warmup": args.warmup,
         }
-    if not all(value["passed"] for value in cases.values()):
-        raise RuntimeError("WS32 real-layer oracle comparison failed")
+    correctness_passed = all(value["passed"] for value in cases.values())
     record = {
         **prevalidation,
         "artifact_kind": "greenfield_ws32_real_layer3",
@@ -487,10 +486,12 @@ def main() -> int:
         ],
         "performance_claim": False,
         "schema_version": 1,
-        "status": "SUCCESS",
+        "status": "SUCCESS" if correctness_passed else "ORACLE_MISMATCH",
         "timing": timing,
     }
     _atomic_json(args.output, record)
+    if not correctness_passed:
+        raise RuntimeError("WS32 real-layer oracle comparison failed")
     print(
         "GREENFIELD_WS32_REAL_LAYER_OK "
         f"rank={args.process_id} stable={report.stablehlo_sha256} "
@@ -498,7 +499,6 @@ def main() -> int:
         flush=True,
     )
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

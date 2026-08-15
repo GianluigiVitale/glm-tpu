@@ -718,6 +718,9 @@ class Ws32HloReport:
     all_reduce_count: int
     feature_reduce_count: int
     expert_reduce_count: int
+    f32_operand_reduce_count: int
+    bf16_result_reduce_count: int
+    f32_result_reduce_count: int
     maximum_group_size: int
     violations: tuple[str, ...]
 
@@ -763,7 +766,11 @@ def _exact_scalar_add_reducer(
     module_instructions: tuple[HloInstruction, ...],
 ) -> bool:
     match = re.search(r"\bto_apply=([A-Za-z0-9_.%:-]+)", item.raw_line)
-    if match is None or len(item.result_shapes) != 1:
+    if (
+        match is None
+        or len(item.result_shapes) != 1
+        or len(item.operand_shapes) != 1
+    ):
         return False
     reducer_name = match.group(1).lstrip("%")
     reducer = tuple(
@@ -774,7 +781,11 @@ def _exact_scalar_add_reducer(
     )
     if len(reducer) != 3:
         return False
-    dtype = item.result_shapes[0].dtype
+    # TPU may fuse the post-reduction BF16 conversion into the scheduled
+    # all-reduce result while retaining an F32 operand and F32 reducer.  The
+    # reducer contract therefore follows the operand/accumulator dtype rather
+    # than the externally scheduled result dtype.
+    dtype = item.operand_shapes[0].dtype
     parameters = tuple(
         instruction for instruction in reducer if instruction.raw_opcode == "parameter"
     )
@@ -813,11 +824,14 @@ def validate_ws32_repeated_hlo(
     dense_intermediate_size: int | None = None,
     moe_intermediate_size: int | None = None,
     top_k: int | None = None,
+    expected_result_dtype: str | None = "f32",
 ) -> Ws32HloReport:
     """Validate exact WS32 subgroup geometry for a dense or routed body."""
 
     if kind not in {"dense", "moe"}:
         raise ValueError("WS32 HLO kind must be 'dense' or 'moe'")
+    if expected_result_dtype not in {None, "bf16", "f32"}:
+        raise ValueError("WS32 result dtype must be BF16, F32, or unspecified")
     contract = Ws32MeshContract()
     if hidden_size <= 0 or hidden_size % contract.feature_axis_size:
         raise ValueError("WS32 hidden size must divide over feature axis")
@@ -891,12 +905,16 @@ def validate_ws32_repeated_hlo(
             violations.append(
                 f"{item.name} operand shape drifted from {expected_shape}"
             )
-        expected_dtype = "f32"
-        if len(item.result_shapes) != 1 or (
-            item.result_shapes[0].dtype != expected_dtype
+        if len(item.operand_shapes) != 1 or (
+            item.operand_shapes[0].dtype != "f32"
+        ):
+            violations.append(f"{item.name} operand dtype drifted from f32")
+        if expected_result_dtype is not None and (
+            len(item.result_shapes) != 1
+            or item.result_shapes[0].dtype != expected_result_dtype
         ):
             violations.append(
-                f"{item.name} result dtype drifted from {expected_dtype}"
+                f"{item.name} result dtype drifted from {expected_result_dtype}"
             )
         if not _exact_scalar_add_reducer(
             item, module_instructions=module.instructions
@@ -919,6 +937,21 @@ def validate_ws32_repeated_hlo(
         all_reduce_count=len(all_reduces),
         feature_reduce_count=len(feature_reduces),
         expert_reduce_count=len(expert_reduces),
+        f32_operand_reduce_count=sum(
+            len(item.operand_shapes) == 1
+            and item.operand_shapes[0].dtype == "f32"
+            for item in all_reduces
+        ),
+        bf16_result_reduce_count=sum(
+            len(item.result_shapes) == 1
+            and item.result_shapes[0].dtype == "bf16"
+            for item in all_reduces
+        ),
+        f32_result_reduce_count=sum(
+            len(item.result_shapes) == 1
+            and item.result_shapes[0].dtype == "f32"
+            for item in all_reduces
+        ),
         maximum_group_size=max(
             (item.maximum_group_size for item in collectives), default=0
         ),

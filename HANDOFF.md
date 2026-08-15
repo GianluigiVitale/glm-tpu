@@ -5537,3 +5537,30 @@ mode. The rollback accepts only DB551 on a copied protected database; apply it l
 Exact next is one bulk legacy+greenfield review, commit/push/deploy, one residual-only protected
 capture, then the already-built seconds-scale coherent StrategyND+RMS replay. Do not observe or
 retest the DB550-proven dense result.
+
+## Current exact next: one protected WS32 numerical discriminator
+
+The reviewed WS32 final-owner layer-3 pack is sealed at manifest
+`4bf8679de10ebbba055e9d0be991495080388c6355fa449f393c28f4751e1f40` and mesh
+`de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88`. Protected tag
+`greenfield_ws32_real_layer_hlo_20260815T081128291986777Z` loaded it directly on all 32 physical
+devices and compiled on all eight hosts. StableHLO/optimized-HLO are fleet-identical at
+`dea1384e...c01f` / `6a6acf94...e157`; load was 8.97--10.74 seconds and compile 2.83--3.01 seconds.
+Compiled per-chip memory is 311,753,728 argument, 34,843,648 temporary, 23,690,240 code and 6,144
+output bytes. Measured post-load peak is 311,859,200 bytes with a 32,702,539,776-byte largest free
+block. The graph has 15/15 live inputs, 10/10 live reductions, nine feature-4 groups and one
+expert-8 group, no full-pod group and no physical `[32,6144]` hidden reconstruction.
+
+The wrapper correctly produced no arithmetic result, DB row or terminal `SUCCESS`: its old
+validator confused the scheduled BF16 result of an all-reduce with its F32 operand/accumulator.
+The preserved HLO proves every reduction operand and exact scalar-add reducer is F32; XLA fused the
+post-reduction BF16 conversion into all ten scheduled results. The corrected validator now replays
+the pinned graph at 10 F32 operands, 10 BF16 results and zero violations, while reducer/group/dtype
+mutations refuse.
+
+Exact next is one bulk review of the numerical authorization batch, then one serialized protected
+run. Its terminal sealer reconstructs each of 64 case/device BF16 shards from recorded uint16 bits,
+independently rehashes and compares them to the sealed normal/concentrated oracle, proves all 32
+slots exactly once per case, revalidates every pinned HLO, recomputes timings and per-chip HBM, and
+publishes a CRC/generation ledger plus `SUCCESS` last. It remains diagnostic-only with no DB or
+performance claim. A pass authorizes WS32 full-decoder integration; it does not itself close Gate D.

@@ -5,6 +5,32 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 08:11--08:15 UTC — all-host WS32 real-layer graph and HBM acquired
+
+- Protected tag `greenfield_ws32_real_layer_hlo_20260815T081128291986777Z` loaded the exact
+  32-owner layer-3 pack and compiled the one-layer WS32 program on all eight hosts. The launch-to-JAX
+  process permutation is `[1,6,0,7,2,4,3,5]`. All eight StableHLO files are byte-identical at
+  `dea1384e0b6548c9ab81b5bafb84aceb3353cce1db7f5e21282742990295c01f`; all optimized HLO files
+  are byte-identical at `6a6acf94b92a0ad355fc824d3f62d58b562d9bb252e7bbcbafba1bead2f3e157`.
+- The graph has 15/15 live inputs and 10/10 live reductions: nine feature-axis groups of four and
+  one expert-axis group of eight, maximum group eight, with no full-pod group or physical
+  `[32,6144]`/`[32,1,6144]` hidden value. Per-host load was 8.97--10.74 seconds and compile
+  2.83--3.01 seconds. Per-chip compiled memory is 311,753,728 argument, 34,843,648 temporary,
+  23,690,240 code and 6,144 output bytes. Measured post-load peak is 311,859,200 bytes and the
+  smallest reported largest-free block is 32,702,539,776 bytes.
+- The attempt refused before arithmetic because the CPU-derived validator assumed an all-reduce's
+  scheduled result dtype was its accumulator dtype. The TPU HLO instead has ten F32 operands and
+  exact F32 scalar-add reducers with ten BF16 scheduled results: XLA fused the following BF16
+  conversion into each result. This is a proof bug, not a BF16 reduction. All artifacts and
+  prevalidation records were retained locally/remotely, failure cleanup is 8/8, and there is no
+  result, DB row, terminal archive, `SUCCESS` or performance claim.
+- The numerical authorization correction derives reducer dtype from the operand, separately pins
+  operand/result dtype counts, preserves the exact acquired HLO source line locations, and adds a
+  SHA-pinned real replay plus reducer/group/result-dtype mutations. The protected terminal path now
+  independently reconstructs recorded BF16 shards and oracle comparisons, exact slot coverage,
+  HLO, timing/HBM, remote object equality and CRC/generation identity before `SUCCESS` last. It is
+  still unrun and therefore makes no numerical or Gate-D claim.
+
 ## 2026-08-15 07:06--07:09 UTC — real WS32 layer-3 final-owner artifact sealed
 
 - After one bulk Sol audit and correction-only closure, ran exactly one offline derivative from

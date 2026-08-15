@@ -101,15 +101,25 @@ real-layer HLO, HBM, correctness, Gate-D or performance result.
 
 ## Bounded next discriminator
 
-Do not run a full decoder or hour-scale 8K workflow. The next WS32 step is one real layer-0 dense
-or one real MoE layer using already packed source leaves, with:
+Do not run a full decoder or hour-scale 8K workflow. The bounded real MoE layer now has protected
+compile evidence. Tag `greenfield_ws32_real_layer_hlo_20260815T081128291986777Z` loaded all 32
+final owners and compiled on all eight hosts. Fleet-identical StableHLO/optimized-HLO SHAs are
+`dea1384e...c01f` / `6a6acf94...e157`. The graph proves 15/15 live inputs, ten live F32-operand
+reductions, nine feature-4 groups, one expert-8 group, maximum group eight and no full-pod hidden
+reconstruction. Compiled argument/temp/code/output memory is
+311,753,728/34,843,648/23,690,240/6,144 bytes per chip; measured post-load peak is 311,859,200
+bytes. XLA schedules BF16 results by fusing post-reduction conversions, but every operand and exact
+scalar-add reducer remains F32.
+
+That acquisition intentionally has no arithmetic, terminal `SUCCESS`, DB or performance claim.
+The next WS32 step is the single pinned numerical retry using those already captured graphs, with:
 
 1. load the sealed final-owner derivative directly on its exact physical slots;
 2. persist generated StableHLO/optimized HLO before execution;
-3. prove exact packed-bit/scale-to-dequant-to-dot-to-live-root lineage and subgroup bijection;
+3. revalidate exact packed-bit/scale-to-dequant-to-dot-to-live-root lineage and subgroup bijection;
 4. retain one live row, no full hidden reconstruction, and only feature-4/expert-8 reductions;
 5. compare against the existing sealed layer-3 oracle;
 6. record exact topology, HBM, archive, and authenticated cleanup evidence.
 
-Only that bounded result decides whether WS32 advances toward a full decoder. An unchanged PP8 8K
+Only that bounded numerical result decides whether WS32 advances toward a full decoder. An unchanged PP8 8K
 rerun and another M1/M32 arithmetic arm are both forbidden by the Gate-D closure evidence.

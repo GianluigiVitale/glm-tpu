@@ -40,16 +40,10 @@ WS32_ONE_LAYER_OUTPUT_SPEC = P(None, "feature")
 
 _TOPOLOGY_CAPTURE_KEYS = frozenset(
     {
-        "captured_utc",
-        "contract",
-        "contract_hash",
-        "fleet_contract_hashes",
+        "captured_utc", "contract", "contract_hash", "fleet_contract_hashes",
         "fleet_local_device_ids_in_runtime_order",
         "hostname",
-        "jax_device_count",
-        "jax_local_device_count",
-        "jax_process_count",
-        "jax_process_index",
+        "jax_device_count", "jax_local_device_count", "jax_process_count", "jax_process_index",
         "jax_version",
         "launch_process_id",
         "local_device_ids",
@@ -176,6 +170,9 @@ class Ws32OneLayerHloReport:
     optimized_hlo_collective_count: int
     feature_reduce_count: int
     expert_reduce_count: int
+    f32_operand_reduce_count: int
+    bf16_result_reduce_count: int
+    f32_result_reduce_count: int
     maximum_group_size: int
     entry_parameter_count: int
     live_entry_parameter_count: int
@@ -190,7 +187,10 @@ class Ws32OneLayerHloReport:
         return {
             "entry_parameter_count": self.entry_parameter_count,
             "expert_reduce_count": self.expert_reduce_count,
+            "f32_operand_reduce_count": self.f32_operand_reduce_count,
             "feature_reduce_count": self.feature_reduce_count,
+            "bf16_result_reduce_count": self.bf16_result_reduce_count,
+            "f32_result_reduce_count": self.f32_result_reduce_count,
             "live_collective_count": self.live_collective_count,
             "live_entry_parameter_count": self.live_entry_parameter_count,
             "maximum_group_size": self.maximum_group_size,
@@ -488,6 +488,7 @@ def validate_ws32_one_layer_hlo(
     *,
     expected_stablehlo_sha256: str,
     expected_optimized_hlo_sha256: str,
+    expected_optimized_collective_result_dtype: str | None,
 ) -> Ws32OneLayerHloReport:
     """Fail closed before arithmetic on graph, groups, liveness, and pins.
 
@@ -539,6 +540,7 @@ def validate_ws32_one_layer_hlo(
         hidden_size=6144,
         moe_intermediate_size=2048,
         top_k=8,
+        expected_result_dtype=expected_optimized_collective_result_dtype,
     )
     violations.extend(repeated.violations)
     module = parse_hlo_module(optimized_hlo)
@@ -630,6 +632,9 @@ def validate_ws32_one_layer_hlo(
         optimized_hlo_collective_count=repeated.all_reduce_count,
         feature_reduce_count=repeated.feature_reduce_count,
         expert_reduce_count=repeated.expert_reduce_count,
+        f32_operand_reduce_count=repeated.f32_operand_reduce_count,
+        bf16_result_reduce_count=repeated.bf16_result_reduce_count,
+        f32_result_reduce_count=repeated.f32_result_reduce_count,
         maximum_group_size=repeated.maximum_group_size,
         entry_parameter_count=len(parameters),
         live_entry_parameter_count=live_parameters,
