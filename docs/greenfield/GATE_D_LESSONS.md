@@ -162,6 +162,11 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   itself. When exact NaN bits are part of a diagnostic input, place the same contiguous buffer on
   each addressable local device and assemble it with `jax.make_array_from_single_device_arrays`.
   Test equality by raw bits, and do not replace diagnostic sentinels merely to placate the check.
+- An internal physical tile cannot recover fusion association that was already destroyed at the
+  kernel boundary. The output-only M8 Pallas kernel reproduced the previously rejected Pallas row
+  exactly, while its external-row M32/ordinary-M1 controls reproduced the known 1,073-mismatch
+  row. Freeze both. A successor is justified only when it moves the exact native producer roles
+  proven by the accepted output fusion—not merely the same final BF16 row bits—inside the boundary.
 
 ## Evidence ladder
 

@@ -5,6 +5,44 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 03:03--03:27 UTC — source-fused true-M1 candidate is locally fail-closed
+
+- Implemented the final observed source-fusion discriminator without reopening any rejected
+  scalar/layout arm. `source_fused_output_m1_m8_scratch` accepts exact true-M1 dense, attention,
+  embedding, validity, layer-1 inverse and norm-weight sources; it preserves the accepted BF16
+  carried-sum, dense-add, normalization-round and weight-round order inside one Pallas boundary.
+  Public I/O is one row and the only wider extent is internal BF16 `8x128` VMEM scratch.
+- Wired the mode through the 13-input native-source graph, unique labels/classification, atomic HLO
+  prevalidation, fleet records, terminal recomputation, protected default-off wrapper and
+  SUCCESS-last fields. Its exact StableHLO/optimized-HLO pins remain intentionally empty. A first
+  protected attempt therefore persists the compiler artifacts and fails before device arithmetic,
+  host result records, terminal summary or SUCCESS.
+- Kernel/forced-32 graph, empty-pin refusal, prevalidation, terminal comparison and shared-wrapper
+  regressions pass 49/49 with Python compile, `bash -n`, `shellcheck`, JSON and diff checks clean.
+  This is readiness evidence only. One immutable audit/commit precedes one compile acquisition; a
+  separate numerical run is authorized only after the acquired TPU HLO is exactly pinned and
+  mutation-tested.
+
+## 2026-08-15 02:59--03:03 UTC — output-only Pallas geometry is numerically rejected
+
+- Reviewed/pushed correction `59c3b973bc8bd7f78fc7504ddcf6cb4b378113b5` completed the protected
+  output-only replay as `greenfield_strategy_nd_output_pallas_geometry_20260815T025949224210245Z`.
+  The pinned graph executed twice across all hosts in 20 seconds. Exact terminal recomputation,
+  fleet agreement, source/HLO hashes, complete 43-object local/remote equality, `SUCCESS`-last
+  publication and authenticated 8/8 cleanup all pass; no DB/performance row was created.
+- The M32 control is not the accepted full-M32 oracle: it has 1,073/6,144 mismatches, first index 1
+  and SHA `229dc8ac...812f` versus accepted `9936ee1e...d3039`. Ordinary M1 is exactly equal to that
+  M32 control. The Pallas M8-scratch result has 2,104/6,144 mismatches versus accepted, first index
+  0, maximum/mean error `0.001953125` / `5.7615582287932433e-05`, and SHA
+  `28b7db46...2c20`—byte-identical to the already rejected full-RMS Pallas row. It differs from the
+  M32 control at 1,622 values. Classification is `output_geometry_invalid_m32_control`.
+- Summary/`SUCCESS`/remote-ledger/post-census/evidence SHAs are `bfe711de...6dd`,
+  `fec2444b...939d`, `29327416...688a`, `77645539...670e` and `be29f531...80b5`. Freeze this
+  route: internal M8 output geometry cannot recover arithmetic already externalized into two BF16
+  rows. The exact full-M32 output fusion instead consumes native dense, attention, embedding,
+  validity, layer-1 inverse and norm weight. The next bounded true-M1 candidate must consume those
+  same source roles inside one Pallas M8 boundary; no scalar/layout tuning or full 8K is authorized.
+
 ## 2026-08-15 02:52--03:00 UTC — numerical launch isolates NaN replication assembly
 
 - Reviewed/pushed pin `2c440ba5bb8bd28736d2611fd654c466ee4450a0` launched the bounded

@@ -18,7 +18,11 @@ from .fp8_matmul import (
     fp8_selected_up_gate,
     fp8_strategy_nd_attention_matmul,
 )
-from .rmsnorm import fused_add_rms_norm_m1, weighted_output_m1_m8_scratch
+from .rmsnorm import (
+    fused_add_rms_norm_m1,
+    source_fused_output_m1_m8_scratch,
+    weighted_output_m1_m8_scratch,
+)
 from .sparse_attention import (
     SparseMlaConfig,
     pregathered_sparse_mla_pallas,
@@ -50,6 +54,7 @@ __all__ = [
     "dsa_scores_pallas",
     "fp8_block_matmul",
     "fused_add_rms_norm_m1",
+    "source_fused_output_m1_m8_scratch",
     "weighted_output_m1_m8_scratch",
     "fp8_block_matmul_f32",
     "fp8_block_vector_matmul_f32",

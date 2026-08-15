@@ -7,6 +7,7 @@ import pytest
 
 from glm_tpu.greenfield.kernels.pallas.rmsnorm import (
     fused_add_rms_norm_m1,
+    source_fused_output_m1_m8_scratch,
     weighted_output_m1_m8_scratch,
 )
 from glm_tpu.greenfield.kernels.reference.rmsnorm import fused_add_rms_norm
@@ -140,3 +141,57 @@ def test_weighted_output_m1_m8_scratch_jaxpr_has_true_m1_io() -> None:
     )
     assert traced.count(rank_two_block) == 4
     assert "BlockMapping(block_shape=(Blocked(block_size=128)))" not in traced
+
+
+def test_source_fused_output_m1_m8_scratch_matches_exact_source_order() -> None:
+    dense = jnp.linspace(-1.0, 2.0, 256, dtype=jnp.float32)[None].astype(
+        jnp.bfloat16
+    )
+    attention = jnp.linspace(0.5, -0.5, 256, dtype=jnp.float32)[None].astype(
+        jnp.bfloat16
+    )
+    embedding = jnp.linspace(-0.25, 0.75, 256, dtype=jnp.float32)[None].astype(
+        jnp.bfloat16
+    )
+    validity = jnp.asarray([True], dtype=jnp.bool_)
+    inverse = jnp.asarray([0.9375], dtype=jnp.float32)
+    weight = jnp.linspace(0.25, 1.25, 256, dtype=jnp.float32).astype(
+        jnp.bfloat16
+    )
+    carried = (
+        attention.astype(jnp.float32) + embedding.astype(jnp.float32)
+    ).astype(jnp.bfloat16)
+    expected = (
+        (
+            (dense.astype(jnp.float32) + carried.astype(jnp.float32))
+            * inverse[:, None]
+        ).astype(jnp.bfloat16)
+        * weight[None, :]
+    ).astype(jnp.bfloat16)
+    observed = source_fused_output_m1_m8_scratch(
+        dense,
+        attention,
+        embedding,
+        validity,
+        inverse,
+        weight,
+        interpret=True,
+    )
+    np.testing.assert_array_equal(np.asarray(observed), np.asarray(expected))
+
+
+def test_source_fused_output_m1_m8_scratch_has_true_m1_io() -> None:
+    traced = str(
+        jax.make_jaxpr(source_fused_output_m1_m8_scratch)(
+            jax.ShapeDtypeStruct((1, 128), jnp.bfloat16),
+            jax.ShapeDtypeStruct((1, 128), jnp.bfloat16),
+            jax.ShapeDtypeStruct((1, 128), jnp.bfloat16),
+            jax.ShapeDtypeStruct((1,), jnp.bool_),
+            jax.ShapeDtypeStruct((1,), jnp.float32),
+            jax.ShapeDtypeStruct((128,), jnp.bfloat16),
+        )
+    )
+    assert "greenfield_source_fused_output_m1_m8_scratch_h128" in traced
+    assert "Ref<vmem>{bf16[8,128]}" in traced
+    assert "out_avals=(ShapedArray(bfloat16[1,128]),)" in traced
+    assert "bf16[32,128]" not in traced

@@ -19,6 +19,33 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed correction `59c3b973bc8bd7f78fc7504ddcf6cb4b378113b5` completed and sealed the
+  output-only Pallas discriminator as
+  `greenfield_strategy_nd_output_pallas_geometry_20260815T025949224210245Z`. The exact pinned
+  graph ran twice on every host in a 20-second device workflow, the archive contains exactly the
+  same 43 local/remote objects with terminal `SUCCESS`, and post-census is authenticated 8/8.
+  The result conclusively rejects output geometry alone: M32 and ordinary M1 are bitwise equal to
+  each other but miss the accepted row at 1,073/6,144 (SHA `229dc8ac...812f` versus
+  `9936ee1e...d3039`); the Pallas M8-scratch row misses accepted at 2,104/6,144 and is byte-identical
+  to the previously rejected Pallas row (SHA `28b7db46...2c20`). It differs from its M32 control at
+  1,622 values. Summary/`SUCCESS`/ledger/post-census/evidence SHAs are `bfe711de...6dd`,
+  `fec2444b...939d`, `29327416...688a`, `77645539...670e` and `be29f531...80b5`. This is
+  diagnostic-only and created no DB/performance row.
+- Freeze the geometry-only kernel and both `229dc8ac...812f` / `28b7db46...2c20` rows; do not tune
+  or rerun them. The exact full-M32 graph differs because its one output fusion consumes the native
+  dense, attention, embedding, validity, inverse and norm-weight sources rather than externalized
+  dense/carried rows. The next bounded true-M1 candidate must put those exact six source roles and
+  their BF16 rounding order inside one M8-scratch Pallas boundary. This is the final observed
+  source-fusion discriminator, not another scalar/layout guess. Full 8K remains forbidden until it
+  is bitwise exact.
+- That final source-fused candidate is now implemented locally as one default-off true-M1 Pallas
+  boundary. Its public inputs/results contain one live row; its only wider extent is an internal
+  BF16 `8x128` VMEM scratch. Kernel, 13-input native graph, prevalidation, producer, terminal,
+  protected wrapper and SUCCESS-last schema are wired coherently. The candidate's StableHLO and
+  optimized-HLO pins are deliberately empty, so the first protected contact can only atomically
+  preserve the TPU graphs and refuse before arithmetic/publication. CPU/forced-32 and shared-wrapper
+  regressions pass 49/49. After one immutable review and commit, run exactly one compile acquisition;
+  do not execute numerically until the acquired HLO is pinned and adversarially mutation-tested.
 - Reviewed/pushed HLO pin `2c440ba5bb8bd28736d2611fd654c466ee4450a0` attempted the bounded
   numerical replay as `greenfield_strategy_nd_output_pallas_geometry_20260815T025239909411189Z`.
   All eight hosts reproduced the exact pinned graphs, then refused before arithmetic while placing

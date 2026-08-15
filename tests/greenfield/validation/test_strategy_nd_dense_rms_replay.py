@@ -713,7 +713,8 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
         '  "$INTEGRATED_ACCEPTED_SOURCE_REPLAY" \\\n'
         '  "$INTEGRATED_NATIVE_SOURCE_REPLAY" \\\n'
         '  "$INTEGRATED_NATIVE_M32_REPLAY" \\\n'
-        '  "$INTEGRATED_NATIVE_M1_PALLAS_REPLAY" <<\'PY\'\n'
+        '  "$INTEGRATED_NATIVE_M1_PALLAS_REPLAY" \\\n'
+        '  "$INTEGRATED_NATIVE_M1_PALLAS_SOURCES_REPLAY" <<\'PY\'\n'
         'from hashlib import sha256'
     )
     start = wrapper.index(marker) + marker.index("from hashlib")
@@ -932,6 +933,7 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
                 "0",
                 "0",
                 "0",
+                "0",
             ],
             input=body,
             text=True,
@@ -993,6 +995,7 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
             "0",
             "0",
             "0",
+            "0",
         ],
         input=body,
         text=True,
@@ -1003,3 +1006,64 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
     success = (output_dir / "SUCCESS").read_text()
     assert "classification=unit\n" in success
     assert "m32_control_exact_accepted=true\n" in success
+
+    source_pallas_dir = tmp_path / "source-fused-pallas"
+    source_pallas_dir.mkdir()
+    native_source = {
+        "checkpoint_manifest_sha256": "e" * 64,
+        "checkpoint_success_sha256": "9" * 64,
+        "native_npz_sha256": "1" * 64,
+        "native_remote_objects_sha256": "2" * 64,
+        "native_runner_sha256": "3" * 64,
+        "native_success_sha256": "4" * 64,
+        "native_summary_sha256": "5" * 64,
+        "native_tag": "unit-native",
+        "rms_npz_sha256": "f" * 64,
+        "rms_tag": "unit-rms",
+    }
+    (source_pallas_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                **common,
+                "elementwise_exact": True,
+                "expected_hidden_2795_bfloat16_bits": 48423,
+                "expected_raw_sha256": "a" * 64,
+                "mismatch_count": 0,
+                "observed_hidden_2795_bfloat16_bits": 48423,
+                "observed_raw_sha256": "a" * 64,
+                "optimized_hlo_sha256": "b" * 64,
+                "source": native_source,
+                "stablehlo_sha256": "c" * 64,
+                "topology_hash": "d" * 64,
+            }
+        )
+    )
+    for name in ("evidence.sha256", "census_post.txt", "remote_objects.json"):
+        (source_pallas_dir / name).write_text(name)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            str(source_pallas_dir),
+            "gs://unit/result",
+            "0",
+            "0",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0",
+            "1",
+            "0",
+            "0",
+            "1",
+        ],
+        input=body,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    success = (source_pallas_dir / "SUCCESS").read_text()
+    assert "native_source_context=true\n" in success
+    assert "native_m1_pallas_sources_output=true\n" in success
