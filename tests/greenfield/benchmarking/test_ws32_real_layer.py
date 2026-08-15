@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -23,6 +24,37 @@ REAL_TOPOLOGY_SHA256 = (
 REAL_TOPOLOGY_FLEET_SHA256 = (
     "50de0729c9e5080c5ddb5ae4f5cd948317c53ce8a8f6c9f3f6064e7afc6515a0"
 )
+
+
+def test_ws32_runtime_device_record_uses_sealed_observed_local_order() -> None:
+    import importlib.util
+
+    path = REPO / "scripts/greenfield/run_real_one_layer_ws32.py"
+    spec = importlib.util.spec_from_file_location("ws32_real_layer_runner", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    device = SimpleNamespace(
+        coords=(0, 2, 0),
+        core_on_chip=0,
+        id=4,
+        device_kind="TPU v4",
+        local_hardware_id=None,
+        platform="tpu",
+        process_index=1,
+    )
+    assert module._device_record(device, observed_local_device_id=0) == {
+        "coordinates": [0, 2, 0],
+        "core_on_chip": 0,
+        "device_id": 4,
+        "device_kind": "TPU v4",
+        "local_device_id": 0,
+        "platform": "tpu",
+        "process_index": 1,
+    }
+    device.local_hardware_id = 1
+    with pytest.raises(ValueError, match="local device ids disagree"):
+        module._device_record(device, observed_local_device_id=0)
 
 
 def test_ws32_production_shape_hlo_is_live_and_fail_closed() -> None:

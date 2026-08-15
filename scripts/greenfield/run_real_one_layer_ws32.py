@@ -112,13 +112,24 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _device_record(device: object) -> dict[str, Any]:
+def _device_record(
+    device: object, *, observed_local_device_id: int
+) -> dict[str, Any]:
+    runtime_local_device_id = device.local_hardware_id
+    if (
+        runtime_local_device_id is not None
+        and int(runtime_local_device_id) != observed_local_device_id
+    ):
+        raise ValueError(
+            "runtime and fleet-observed local device ids disagree: "
+            f"{runtime_local_device_id} != {observed_local_device_id}"
+        )
     return {
         "coordinates": [int(value) for value in device.coords],
         "core_on_chip": int(device.core_on_chip),
         "device_id": int(device.id),
         "device_kind": str(device.device_kind),
-        "local_device_id": int(device.local_hardware_id),
+        "local_device_id": observed_local_device_id,
         "platform": str(device.platform),
         "process_index": int(device.process_index),
     }
@@ -327,8 +338,15 @@ def main() -> int:
         raise ValueError("WS32 runtime device ids differ from physical mesh")
     for captured in topology.devices:
         runtime = runtime_by_id[captured.device_id]
-        if _device_record(runtime) != captured.to_dict():
+        if (
+            _device_record(
+                runtime,
+                observed_local_device_id=captured.local_device_id,
+            )
+            != captured.to_dict()
+        ):
             raise ValueError(f"WS32 runtime topology drifted at {captured.device_id}")
+    topology_by_id = {item.device_id: item for item in topology.devices}
     mesh = Mesh(
         np.asarray(
             [runtime_by_id[item] for item in physical_mesh.flattened_device_ids],
@@ -375,7 +393,13 @@ def main() -> int:
         "device_memory_before_load": list(loaded.device_memory_before),
         "hlo": report.to_dict(),
         "hostname": socket.gethostname(),
-        "jax_devices": [_device_record(device) for device in jax.local_devices()],
+        "jax_devices": [
+            _device_record(
+                device,
+                observed_local_device_id=topology_by_id[int(device.id)].local_device_id,
+            )
+            for device in jax.local_devices()
+        ],
         "jax_process_index": jax.process_index(),
         "launch_process_id": args.process_id,
         "load_seconds": load_seconds,
