@@ -5,6 +5,25 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 02:52--03:00 UTC — numerical launch isolates NaN replication assembly
+
+- Reviewed/pushed pin `2c440ba5bb8bd28736d2611fd654c466ee4450a0` launched the bounded
+  output-only Pallas numerical replay once as
+  `greenfield_strategy_nd_output_pallas_geometry_20260815T025239909411189Z`. Every host compiled
+  the exact pinned graph, but execution stopped at replicated input placement before arithmetic.
+  JAX's multi-host `device_put` consistency check compares host values and considers identical NaN
+  sentinels unequal; its expected/observed diagnostics print the same values.
+- StableHLO/optimized-HLO/prevalidation hashes remain exactly `0fda9f03...9c28`,
+  `0107fe68...12b` and `c1254e99...aaad`. The run produced no numerical artifact, host record,
+  comparison, summary, DB row, remote ledger or terminal `SUCCESS`. Its remote prefix contains 23
+  diagnostic/source objects. Capture SHA is `1982eb33...d60a`; pre/failure-census SHAs are
+  `b3276050...d2e5` / `2f91ab99...d2fa`, both authenticated 8/8 clean.
+- The correction changes only host-to-replicated-array assembly: each local device receives the
+  exact contiguous host buffer, then `jax.make_array_from_single_device_arrays` constructs the
+  global replicated array. The compiled program and HLO pins are unchanged. A forced-four-device
+  regression compares every BF16 shard by raw U16 bits, including NaNs. After one correction
+  review, one retry may execute the 6,144-value verdict; full 8K remains unauthorized.
+
 ## 2026-08-15 02:30--02:41 UTC — output-only Pallas TPU graph acquired and pinned
 
 - Reviewed/pushed correction `046a1f7bb4e945a47e8da86a74ee8815bbb8387a` launched one

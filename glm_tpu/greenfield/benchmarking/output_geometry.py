@@ -474,6 +474,27 @@ def build_output_geometry_replay(
     )
 
 
+def _replicated_device_put(value: np.ndarray, sharding: Any) -> Any:
+    """Assemble exact replicated shards without NaN host equality checks."""
+
+    import jax
+
+    host = np.ascontiguousarray(value)
+    devices = tuple(sharding.addressable_devices)
+    if not devices:
+        raise BenchmarkValidationError(
+            "output-geometry replicated sharding has no local devices"
+        )
+    local = tuple(jax.device_put(host, device) for device in devices)
+    for shard in local:
+        shard.block_until_ready()
+    return jax.make_array_from_single_device_arrays(
+        host.shape,
+        sharding,
+        local,
+    )
+
+
 def execute_output_geometry_replay(
     compiled: CompiledOutputGeometryReplay,
     inputs: OutputGeometryInputs,
@@ -492,11 +513,11 @@ def execute_output_geometry_replay(
     dense_m32[0] = dense[0]
     carried_m32[0] = carried[0]
     arguments = (
-        jax.device_put(dense_m32, compiled.replicated_sharding),
-        jax.device_put(carried_m32, compiled.replicated_sharding),
-        jax.device_put(dense, compiled.replicated_sharding),
-        jax.device_put(carried, compiled.replicated_sharding),
-        jax.device_put(weight, compiled.replicated_sharding),
+        _replicated_device_put(dense_m32, compiled.replicated_sharding),
+        _replicated_device_put(carried_m32, compiled.replicated_sharding),
+        _replicated_device_put(dense, compiled.replicated_sharding),
+        _replicated_device_put(carried, compiled.replicated_sharding),
+        _replicated_device_put(weight, compiled.replicated_sharding),
     )
 
     def once() -> tuple[dict[str, np.ndarray], dict[str, tuple[str, ...]]]:

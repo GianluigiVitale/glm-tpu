@@ -285,6 +285,40 @@ def test_output_geometry_explicitly_shard_maps_pallas_before_jit() -> None:
     assert completed.returncode == 0, completed.stderr
 
 
+def test_output_geometry_replicated_put_preserves_nan_sentinels() -> None:
+    environment = os.environ.copy()
+    environment["JAX_PLATFORMS"] = "cpu"
+    environment["XLA_FLAGS"] = "--xla_force_host_platform_device_count=4"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "\n".join(
+                (
+                    "import jax, ml_dtypes, numpy as np",
+                    "from jax.sharding import Mesh, NamedSharding, PartitionSpec as P",
+                    "from glm_tpu.greenfield.benchmarking.output_geometry import _replicated_device_put",
+                    "mesh = Mesh(np.asarray(jax.devices(), dtype=object), ('member',))",
+                    "sharding = NamedSharding(mesh, P())",
+                    "host = np.full((32, 16), ml_dtypes.bfloat16(np.nan), dtype=ml_dtypes.bfloat16)",
+                    "host[0] = np.arange(16, dtype=np.float32).astype(ml_dtypes.bfloat16)",
+                    "value = _replicated_device_put(host, sharding)",
+                    "assert len(value.addressable_shards) == 4",
+                    "expected = host.view(np.uint16)",
+                    "assert all(np.array_equal(np.asarray(s.data).view(np.uint16), expected) for s in value.addressable_shards)",
+                )
+            ),
+        ],
+        cwd=REPO,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
 def test_output_geometry_wrapper_is_default_off_and_disjoint() -> None:
     wrapper = (REPO / "scripts/greenfield/run_strategy_nd_dense_replay.sh").read_text()
     runner = (REPO / "scripts/greenfield/microbench_collectives.py").read_text()

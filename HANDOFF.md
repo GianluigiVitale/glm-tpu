@@ -19,6 +19,22 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed HLO pin `2c440ba5bb8bd28736d2611fd654c466ee4450a0` attempted the bounded
+  numerical replay as `greenfield_strategy_nd_output_pallas_geometry_20260815T025239909411189Z`.
+  All eight hosts reproduced the exact pinned graphs, then refused before arithmetic while placing
+  the replicated M32 diagnostic inputs: JAX's multi-host `device_put` equality assertion treats
+  identical NaN sentinels as unequal. The printed expected/observed tensors are byte-identical;
+  this is input assembly, not a kernel or numerical result. The wrapper ran from 02:52:42 to
+  02:53:45 UTC, preserved exactly 23 diagnostic/source objects, produced no output/host record/
+  comparison/summary/DB/ledger/terminal `SUCCESS`, and ended with authenticated 8/8 cleanup.
+  StableHLO/optimized-HLO/prevalidation remain exactly `0fda9f03...9c28`, `0107fe68...12b` and
+  `c1254e99...aaad`; capture and pre/failure-census SHAs are `1982eb33...d60a`,
+  `b3276050...d2e5` and `2f91ab99...d2fa`.
+- The correction assembles each replicated global input from exact per-local-device arrays with
+  `jax.make_array_from_single_device_arrays`, bypassing only the NaN-unsafe host equality check.
+  It does not alter the compiled function or pinned HLO. A forced-four-device test proves every
+  replica preserves the exact BF16 sentinel bits. Exact next is one correction review,
+  commit/push and one numerical retry; full 8K remains forbidden pending 0/6,144 mismatches.
 - Reviewed/pushed correction `046a1f7bb4e945a47e8da86a74ee8815bbb8387a` completed the one
   corrected fail-closed acquisition as
   `greenfield_strategy_nd_output_pallas_geometry_20260815T023028410400741Z`. The protected

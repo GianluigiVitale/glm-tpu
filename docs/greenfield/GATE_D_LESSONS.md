@@ -157,6 +157,11 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   `0fda9f03...9c28` / `0107fe68...12b`. It proves the output-only Pallas call has true-M1 public
   I/O, no collective, one shared M32-derived scalar input and one live ENTRY result. Iterate only
   against these preserved graphs; never compile this code pin again merely to inspect its lowering.
+- Multi-host replicated `jax.device_put(host_array, replicated_sharding)` performs a host-value
+  equality check for replicated inputs; identical NaN sentinels fail because NaN is not equal to
+  itself. When exact NaN bits are part of a diagnostic input, place the same contiguous buffer on
+  each addressable local device and assemble it with `jax.make_array_from_single_device_arrays`.
+  Test equality by raw bits, and do not replace diagnostic sentinels merely to placate the check.
 
 ## Evidence ladder
 
