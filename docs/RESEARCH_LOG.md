@@ -5,6 +5,31 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 02:30--02:41 UTC — output-only Pallas TPU graph acquired and pinned
+
+- Reviewed/pushed correction `046a1f7bb4e945a47e8da86a74ee8815bbb8387a` launched one
+  corrected compile acquisition as
+  `greenfield_strategy_nd_output_pallas_geometry_20260815T023028410400741Z`. The protected
+  wrapper ran from 02:30:30 to 02:31:34 UTC. Every host compiled the explicitly shard-mapped graph
+  and then refused on the deliberately empty StableHLO pin before arithmetic.
+- StableHLO, optimized-HLO and prevalidation SHAs are `0fda9f03...9c28`, `0107fe68...12b` and
+  `c1254e99...aaad`. Their local CRC32C values equal the protected remote objects. Capture and
+  pre/failure census SHAs are `9f08b7e2...ea40`, `ee9f447f...4c5a` and `ff928e0d...16b`; cleanup
+  is authenticated 8/8. The approved prefix contains 23 partial diagnostic/source objects and no
+  numerical tensor, host record, comparison, summary, DB row, remote ledger or terminal `SUCCESS`.
+- The scheduled graph has 76 instructions, 32 replicated partitions and no sync/async collective.
+  Its only TPU custom call is the live output-only Pallas kernel with exact BF16 `[1,6144]`, BF16
+  `[1,6144]`, FP32 `[1]`, BF16 `[1,6144]` inputs and BF16 `[1,6144]` output. The same M32-derived
+  inverse SSA feeds the M32 control, ordinary M1 control and Pallas arm; the Pallas result is
+  bitcast to U16 and occupies live ENTRY result 2. No M32 tensor crosses the Pallas boundary.
+- Both complete graph hashes are now pinned. Structural summaries independently bind manual
+  sharding, input order, inverse/weight sources, true-M1 Pallas I/O, live root and the absence of
+  collectives. Parser-valid optimized-HLO source-swap, rogue inverse, rogue weight and dead-result
+  mutations refuse even when their changed whole-file hashes are admitted; StableHLO source/root
+  mutations refuse too. The protected terminal test uses the preserved real graph and the affected
+  suite passes 34/34. Exact next is one immutable review, commit/push and one separate bounded
+  numerical replay. Full 8K remains forbidden pending zero mismatches across all 6,144 values.
+
 ## 2026-08-15 02:24--02:31 UTC — first Pallas-scratch acquisition isolates explicit-sharding defect
 
 - Reviewed/pushed pin `54b79bf8c6b8a69362cb6817baa92d44e3649ce8` launched the output-only

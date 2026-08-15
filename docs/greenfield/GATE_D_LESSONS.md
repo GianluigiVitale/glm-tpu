@@ -153,6 +153,10 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   integrated path does. A single-device Pallas interpreter/JAXPR test does not exercise this
   boundary; every standalone multi-device Pallas probe needs a forced-device regression that
   compiles the mapped graph and proves `sdy.manual_computation` before metal.
+- The corrected explicit-map acquisition is now frozen at StableHLO/optimized-HLO SHAs
+  `0fda9f03...9c28` / `0107fe68...12b`. It proves the output-only Pallas call has true-M1 public
+  I/O, no collective, one shared M32-derived scalar input and one live ENTRY result. Iterate only
+  against these preserved graphs; never compile this code pin again merely to inspect its lowering.
 
 ## Evidence ladder
 

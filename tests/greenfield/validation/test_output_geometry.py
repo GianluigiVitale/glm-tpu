@@ -27,6 +27,19 @@ REAL_FLEET = Path(
     "greenfield_strategy_nd_integrated_dense_native_m1_pallas_output_"
     "20260815T010951234829154Z"
 )
+REAL_OUTPUT_GEOMETRY_RUN = Path(
+    "/home/gianl/glm-run/"
+    "greenfield_strategy_nd_output_pallas_geometry_"
+    "20260815T023028410400741Z"
+)
+REAL_OUTPUT_GEOMETRY_STABLEHLO = (
+    REAL_OUTPUT_GEOMETRY_RUN
+    / "hlo/strategy_nd_output_geometry_bfloat16_m32_m1_pallas_m8.stablehlo.mlir"
+)
+REAL_OUTPUT_GEOMETRY_OPTIMIZED_HLO = (
+    REAL_OUTPUT_GEOMETRY_RUN
+    / "hlo/strategy_nd_output_geometry_bfloat16_m32_m1_pallas_m8.optimized_hlo.txt"
+)
 
 
 def test_output_geometry_pairwise_classification_is_decisive() -> None:
@@ -82,13 +95,142 @@ def test_output_geometry_source_reconstructs_exact_pinned_rows() -> None:
         geometry.load_output_geometry_inputs(REAL_SOURCE, tuple(range(32)))
 
 
-def test_output_geometry_empty_hlo_pins_refuse_execution() -> None:
-    assert geometry.OUTPUT_GEOMETRY_STABLEHLO_SHA256 == ""
-    assert geometry.OUTPUT_GEOMETRY_OPTIMIZED_HLO_SHA256 == ""
-    with pytest.raises(BenchmarkValidationError, match="deliberately empty"):
-        geometry.validate_output_geometry_stablehlo("module {}")
-    with pytest.raises(BenchmarkValidationError, match="deliberately empty"):
-        geometry.validate_output_geometry_hlo("HloModule x")
+@pytest.mark.skipif(
+    not REAL_OUTPUT_GEOMETRY_STABLEHLO.is_file()
+    or not REAL_OUTPUT_GEOMETRY_OPTIMIZED_HLO.is_file(),
+    reason="protected output-geometry HLO absent",
+)
+def test_output_geometry_hlo_pins_and_live_mutations_refuse(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from jaxlib import xla_client
+
+    stablehlo = REAL_OUTPUT_GEOMETRY_STABLEHLO.read_text()
+    optimized_hlo = REAL_OUTPUT_GEOMETRY_OPTIMIZED_HLO.read_text()
+    assert sha256(stablehlo.encode()).hexdigest() == (
+        geometry.OUTPUT_GEOMETRY_STABLEHLO_SHA256
+    )
+    assert sha256(optimized_hlo.encode()).hexdigest() == (
+        geometry.OUTPUT_GEOMETRY_OPTIMIZED_HLO_SHA256
+    )
+    assert geometry.validate_output_geometry_stablehlo(stablehlo)[
+        "pallas_true_m1_io"
+    ] is True
+    assert geometry.validate_output_geometry_hlo(optimized_hlo)[
+        "exact_shared_inverse_fanout"
+    ] is True
+
+    stable_mutations = (
+        stablehlo.replace(
+            "stablehlo.custom_call @tpu_custom_call(%38, %39, %40, %41)",
+            "stablehlo.custom_call @tpu_custom_call(%39, %38, %40, %41)",
+            1,
+        ),
+        stablehlo.replace(
+            "sdy.return %24, %37, %43 :",
+            "sdy.return %24, %37, %37 :",
+            1,
+        ),
+        stablehlo.replace(
+            "%43 = stablehlo.bitcast_convert %42 :",
+            "%43 = stablehlo.bitcast_convert %36 :",
+            1,
+        ),
+    )
+    for mutated in stable_mutations:
+        assert mutated != stablehlo
+        monkeypatch.setattr(
+            geometry,
+            "OUTPUT_GEOMETRY_STABLEHLO_SHA256",
+            sha256(mutated.encode()).hexdigest(),
+        )
+        with pytest.raises(BenchmarkValidationError, match="structure drifted"):
+            geometry.validate_output_geometry_stablehlo(mutated)
+
+    call = (
+        "custom-call(%copy-done.4, %copy-done.3, %bitcast.3, "
+        "%broadcast_in_dim.2)"
+    )
+    inverse_anchor = (
+        "  %greenfield_weighted_output_m1_m8_scratch_h6144.1 = "
+    )
+    optimized_mutations = (
+        optimized_hlo.replace(
+            call,
+            "custom-call(%copy-done.3, %copy-done.4, %bitcast.3, "
+            "%broadcast_in_dim.2)",
+            1,
+        ),
+        optimized_hlo.replace(
+            call,
+            "custom-call(%copy-done.4, %copy-done.3, %bitcast.3, "
+            "%copy-done.4)",
+            1,
+        ),
+        optimized_hlo.replace(
+            inverse_anchor,
+            (
+                "  %rogue_inverse = f32[1]{0:T(128)S(3)} "
+                "broadcast(%bitcast.2), dimensions={}\n"
+                + inverse_anchor
+            ),
+            1,
+        ).replace(
+            call,
+            "custom-call(%copy-done.4, %copy-done.3, %rogue_inverse, "
+            "%broadcast_in_dim.2)",
+            1,
+        ),
+        optimized_hlo.replace(
+            (
+                "tuple(%fusion.1, %multiply_bitcast-convert_fusion, "
+                "%bitcast_convert_type.11)"
+            ),
+            (
+                "tuple(%fusion.1, %multiply_bitcast-convert_fusion, "
+                "%multiply_bitcast-convert_fusion)"
+            ),
+            1,
+        ),
+        optimized_hlo.replace(
+            "copy-start(%param.8)",
+            "copy-start(%param.7)",
+            1,
+        ),
+        optimized_hlo.replace(
+            (
+                "%copy-start.4 = "
+                "(bf16[1,6144]{1,0:T(2,128)(2,1)S(3)}, "
+                "bf16[1,6144]{1,0:T(2,128)(2,1)}, u32[]{:S(2)})"
+            ),
+            (
+                "%copy-start.4 = "
+                "(bf16[1,6144]{1,0:T(4,128)(2,1)S(3)}, "
+                "bf16[1,6144]{1,0:T(2,128)(2,1)}, u32[]{:S(2)})"
+            ),
+            1,
+        ).replace(
+            (
+                "%copy-done.4 = "
+                "bf16[1,6144]{1,0:T(2,128)(2,1)S(3)}"
+            ),
+            (
+                "%copy-done.4 = "
+                "bf16[1,6144]{1,0:T(4,128)(2,1)S(3)}"
+            ),
+            1,
+        ),
+    )
+    for mutated in optimized_mutations:
+        assert mutated != optimized_hlo
+        xla_client._xla.hlo_module_from_text(mutated)
+        monkeypatch.setattr(
+            geometry,
+            "OUTPUT_GEOMETRY_OPTIMIZED_HLO_SHA256",
+            sha256(mutated.encode()).hexdigest(),
+        )
+        with pytest.raises(BenchmarkValidationError, match="structure drifted"):
+            geometry.validate_output_geometry_hlo(mutated)
 
 
 def test_output_geometry_abstract_graph_preserves_true_m1_boundary() -> None:
@@ -162,12 +304,14 @@ def test_output_geometry_wrapper_is_default_off_and_disjoint() -> None:
 
 
 @pytest.mark.skipif(
-    not REAL_FLEET.is_dir() or not REAL_SOURCE.is_file(),
+    not REAL_FLEET.is_dir()
+    or not REAL_SOURCE.is_file()
+    or not REAL_OUTPUT_GEOMETRY_STABLEHLO.is_file()
+    or not REAL_OUTPUT_GEOMETRY_OPTIMIZED_HLO.is_file(),
     reason="sealed fleet/source fixtures absent",
 )
 def test_output_geometry_terminal_recomputes_every_artifact(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run_dir = tmp_path / "run"
     for name in ("host_records", "hlo", "output_geometry", "source_rms"):
@@ -176,16 +320,10 @@ def test_output_geometry_terminal_recomputes_every_artifact(
         if source.is_file():
             shutil.copy2(source, run_dir / "source_rms" / source.name)
 
-    stablehlo = "module @output_geometry {}\n"
-    optimized_hlo = "HloModule output_geometry\n"
+    stablehlo = REAL_OUTPUT_GEOMETRY_STABLEHLO.read_text()
+    optimized_hlo = REAL_OUTPUT_GEOMETRY_OPTIMIZED_HLO.read_text()
     stable_digest = sha256(stablehlo.encode()).hexdigest()
     optimized_digest = sha256(optimized_hlo.encode()).hexdigest()
-    monkeypatch.setattr(
-        geometry, "OUTPUT_GEOMETRY_STABLEHLO_SHA256", stable_digest
-    )
-    monkeypatch.setattr(
-        geometry, "OUTPUT_GEOMETRY_OPTIMIZED_HLO_SHA256", optimized_digest
-    )
     stable_contract = geometry.validate_output_geometry_stablehlo(stablehlo)
     optimized_contract = geometry.validate_output_geometry_hlo(optimized_hlo)
     label = "strategy_nd_output_geometry_bfloat16_m32_m1_pallas_m8"

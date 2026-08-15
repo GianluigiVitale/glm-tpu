@@ -42,11 +42,11 @@ from .dense_rms_replay import (
 )
 
 
-# Deliberately empty until the one fail-closed TPU compile acquisition has
-# persisted both graphs.  Numerical execution is impossible while either pin
-# is empty.
-OUTPUT_GEOMETRY_STABLEHLO_SHA256 = ""
-OUTPUT_GEOMETRY_OPTIMIZED_HLO_SHA256 = ""
+# Acquired once by the fail-closed protected compile at ``046a1f7``.
+# Complete graph pins are mandatory before the numerical replay can run.
+# Keep this block line-stable: its locations are embedded in optimized HLO.
+OUTPUT_GEOMETRY_STABLEHLO_SHA256 = "0fda9f03eebe0d5d68f97dcb2fabec50face70209a3de8e921d0922162449c28"
+OUTPUT_GEOMETRY_OPTIMIZED_HLO_SHA256 = "0107fe68bf806de35873127be281029c618746c052047e719ed97b3f010db12b"
 
 M32_BF16_LAYOUT = "{1,0:T(8,128)(2,1)}"
 M1_AUTO_BF16_LAYOUT = "{1,0:T(2,128)(2,1)}"
@@ -306,11 +306,11 @@ def validate_output_geometry_stablehlo(stablehlo: str) -> Mapping[str, Any]:
         OUTPUT_GEOMETRY_STABLEHLO_SHA256,
         "StableHLO",
     )
-    return {
-        "exact_graph_digest": True,
-        "passed": True,
-        "stablehlo_sha256": digest,
-    }
+    from .output_geometry_hlo import (
+        validate_output_geometry_stable_structure,
+    )
+    return validate_output_geometry_stable_structure(
+        stablehlo, digest)
 
 
 def validate_output_geometry_hlo(optimized_hlo: str) -> Mapping[str, Any]:
@@ -321,11 +321,11 @@ def validate_output_geometry_hlo(optimized_hlo: str) -> Mapping[str, Any]:
         OUTPUT_GEOMETRY_OPTIMIZED_HLO_SHA256,
         "optimized HLO",
     )
-    return {
-        "exact_graph_digest": True,
-        "optimized_hlo_sha256": digest,
-        "passed": True,
-    }
+    from .output_geometry_hlo import (
+        validate_output_geometry_optimized_structure,
+    )
+    return validate_output_geometry_optimized_structure(
+        optimized_hlo, digest)
 
 
 def _output_geometry_program(*, pallas_interpret: bool) -> Any:

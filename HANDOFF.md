@@ -19,6 +19,26 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed correction `046a1f7bb4e945a47e8da86a74ee8815bbb8387a` completed the one
+  corrected fail-closed acquisition as
+  `greenfield_strategy_nd_output_pallas_geometry_20260815T023028410400741Z`. The protected
+  wrapper ran from 02:30:30 to 02:31:34 UTC. All eight hosts compiled, then refused on the
+  deliberately empty StableHLO pin before arithmetic. StableHLO/optimized-HLO/prevalidation SHAs
+  are `0fda9f03...9c28`, `0107fe68...12b` and `c1254e99...aaad`; local CRC32C values exactly
+  match the three remote diagnostic objects. Capture and pre/failure-census SHAs are
+  `9f08b7e2...ea40`, `ee9f447f...4c5a` and `ff928e0d...16b`, with authenticated 8/8 cleanup.
+  The approved prefix has 23 partial diagnostic/source objects and no output, host record,
+  comparison, summary, DB row, terminal ledger or `SUCCESS`.
+- The exact acquired graph is now pinned and mutation-tested locally. It has 76 scheduled
+  instructions, 32 replicated partitions, zero sync/async collectives, one live
+  `greenfield_weighted_output_m1_m8_scratch_h6144` custom call, exact BF16 `[1,6144]`, BF16
+  `[1,6144]`, FP32 `[1]`, BF16 `[1,6144]` operands and one BF16 `[1,6144]` result. The shared
+  device-computed M32 inverse feeds the M32 control, ordinary M1 control and Pallas arm; the
+  Pallas U16 result is exactly the third ENTRY result. Complete graph digests plus structural
+  proof reject source swaps, rogue inverse/weight sources and a dead Pallas result. The protected
+  terminal test now replays these real graphs; the affected kernel/output/integrated suite passes
+  34/34. Exact next is one immutable review of this HLO-pin batch, commit/push, then one bounded
+  protected 6,144-value numerical execution. Full 8K remains forbidden unless it is bitwise exact.
 - Reviewed/pushed pin `54b79bf8c6b8a69362cb6817baa92d44e3649ce8` attempted the output-only
   Pallas compile acquisition exactly once as
   `greenfield_strategy_nd_output_pallas_geometry_20260815T022444858045128Z`. The protected
@@ -52,7 +72,7 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   rejection of direct `Format(Layout(...T(8,128)...))` on a true logical M1 result. Do not rerun or
   loosen it: TPU v4/XLA forces the M1 tile before an executable graph exists.
 - The output-only true-M1 Pallas successor was locally complete, default-off and deliberately
-  deliberately HLO-unpinned. It reuses the same sealed rows and one shared device-computed M32
+  HLO-unpinned. It reuses the same sealed rows and one shared device-computed M32
   inverse, retains the M32 and ordinary-M1 controls, and changes only the final add/round/weight
   boundary. The candidate's four public operands and result remain true M1; each 128-feature
   program builds the observed first M32 tile internally as BF16 `[8,128]` VMEM with row zero live
