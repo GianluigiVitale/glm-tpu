@@ -270,6 +270,14 @@ branches from the search tree.
 - In a multi-host compile-acquisition run, process 0 writing HLO is not enough. Synchronize every
   JAX process after the atomic graph/prevalidation writes and before an intentionally failing
   validator, so peer teardown cannot destroy the only compiler evidence.
+- A compiler refusal does not require another metal run when the failure trap has preserved the
+  exact graph. Recover the approved `diagnostic_hlo/` objects, compare local and remote CRC32C, pin
+  both complete digests, and mutation-test the observed lowering offline. Rediscovering identical
+  HLO wastes the protected iteration budget.
+- Replacing dead batch lanes with a feature tiling is safe only when the graph proves a bijection:
+  exact row-zero sources, shape-preserving `[1,6144] -> [8,768]`, six live `[8,128]` programs,
+  ordered source roles and a layout-only return to semantic M1. Shape equality alone does not prove
+  feature order or physical layout.
 
 ## Numerical rules
 
@@ -339,5 +347,9 @@ branches from the search tree.
   arithmetic or authorize a decoder run until the complete protected row is exact.
 - Integrate only a structural boundary that makes the entire 6,144-value accepted row exact. Never
   patch one coordinate or accept a scalar selected from an inexact arithmetic surrogate.
+- The output-only and six-source dead-lane M8 Pallas arms are frozen negative evidence at
+  2,104/6,144 and 2,135/6,144 mismatches. Their near-identity rules out more scalar/layout tuning.
+  The only active discriminator is the acquired all-live feature-tiled M8 graph; its exact HLO is
+  already preserved and pinned, so proceed directly to one bounded numerical row after review.
 
 Do not return to hour-scale hypothesis runs or already exact contractions.

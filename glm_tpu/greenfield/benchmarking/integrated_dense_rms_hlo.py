@@ -73,11 +73,15 @@ INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_STABLEHLO_SHA256 = (
 INTEGRATED_DENSE_NATIVE_M1_PALLAS_SOURCES_OPTIMIZED_HLO_SHA256 = (
     "c6e6cc38fa5bc280c4152381e0f2a7a7e74608fa621b70f0394e47b7c295558f"
 )
-# Deliberately empty until one reviewed, protected compile-only acquisition
-# preserves the all-live feature-tiled lowering.  Empty pins must fail before
-# arithmetic or terminal publication.
-INTEGRATED_DENSE_NATIVE_M1_PALLAS_FEATURE_TILED_STABLEHLO_SHA256 = ""
-INTEGRATED_DENSE_NATIVE_M1_PALLAS_FEATURE_TILED_OPTIMIZED_HLO_SHA256 = ""
+# Captured once by the fail-closed protected compile-only acquisition at
+# ``c98cfc5``.  The acquisition stopped at the deliberately empty pin after
+# persisting both compiler graphs and before arithmetic or publication.
+INTEGRATED_DENSE_NATIVE_M1_PALLAS_FEATURE_TILED_STABLEHLO_SHA256 = (
+    "89d3257bc10bda023439c86b1653d223e07fb3c7a42210bb46ee93b7aad530d4"
+)
+INTEGRATED_DENSE_NATIVE_M1_PALLAS_FEATURE_TILED_OPTIMIZED_HLO_SHA256 = (
+    "afb68ab024200208499fc31d3c50e2d8ef5d1abb9b5097b9182671f3819bc2db"
+)
 
 _NATIVE_SOURCE_COLLECTIVE_SCOPES = (
     "native_source_context_embedding_collective",
@@ -215,10 +219,72 @@ def _stablehlo_without_comments(value: str) -> str:
     return "".join(result)
 
 
+def _exact_stablehlo_bf16_all_reduce(
+    main: str,
+    *,
+    result: str,
+    operand: str,
+    reducer_result: str,
+) -> bool:
+    """Bind one selected StableHLO all-reduce and its scalar add region."""
+
+    members = r"0,\s*1,\s*2,\s*3,\s*4,\s*5,\s*6,\s*7,\s*8,\s*9,\s*"
+    members += r"10,\s*11,\s*12,\s*13,\s*14,\s*15,\s*16,\s*17,\s*"
+    members += r"18,\s*19,\s*20,\s*21,\s*22,\s*23,\s*24,\s*25,\s*"
+    members += r"26,\s*27,\s*28,\s*29,\s*30,\s*31"
+    pattern = re.compile(
+        rf'^\s*{re.escape(result)}\s*=\s*"stablehlo\.all_reduce"\('
+        rf'{re.escape(operand)}\)\s*<\{{\s*channel_handle\s*=\s*'
+        r'#stablehlo\.channel_handle<handle\s*=\s*1,\s*type\s*=\s*1>,\s*'
+        rf'replica_groups\s*=\s*dense<\[\[{members}\]\]>\s*:\s*'
+        r'tensor<1x32xi64>,\s*use_global_device_ids\s*\}>\s*\(\{\s*'
+        r'^\s*\^bb0\(%arg27:\s*tensor<bf16>,\s*%arg28:\s*tensor<bf16>\):\s*'
+        rf'^\s*{re.escape(reducer_result)}\s*=\s*stablehlo\.add\s+'
+        r'%arg27,\s*%arg28\s*:\s*'
+        r'tensor<bf16>\s*'
+        rf'^\s*stablehlo\.return\s+{re.escape(reducer_result)}\s*:\s*'
+        r'tensor<bf16>\s*'
+        r'^\s*\}\)\s*:\s*\(tensor<32x6144xbf16>\)\s*->\s*'
+        r'tensor<32x6144xbf16>\s*$',
+        flags=re.MULTILINE,
+    )
+    return len(pattern.findall(main)) == 1
+
+
+def _exact_braced_hlo_attribute(
+    raw_line: str,
+    *,
+    name: str,
+    expected: str,
+) -> bool:
+    """Extract one real braced HLO attribute outside strings/comments."""
+
+    clean = _stablehlo_code_only(raw_line)
+    markers = tuple(re.finditer(rf"\b{re.escape(name)}\s*=\s*", clean))
+    if len(markers) != 1:
+        return False
+    start = markers[0].end()
+    if start >= len(clean) or clean[start] != "{":
+        return False
+    depth = 0
+    end = None
+    for index in range(start, len(clean)):
+        if clean[index] == "{":
+            depth += 1
+        elif clean[index] == "}":
+            depth -= 1
+            if depth == 0:
+                end = index + 1
+                break
+    return bool(end is not None and clean[start:end] == expected)
+
+
 def _exact_source_fused_layer1_rms_bodies(
     report: Any,
     reduction_caller: Any,
     inverse_caller: Any,
+    *,
+    feature_tiled: bool = False,
 ) -> bool:
     """Bind the complete source-combine, square/reduce and rsqrt bodies."""
 
@@ -350,6 +416,24 @@ def _exact_source_fused_layer1_rms_bodies(
             True,
         ),
     }
+    if feature_tiled:
+        renames = {
+            "%param_0.225": "%param_0.236",
+            "%param_1.244": "%param_1.250",
+            "%broadcast_in_dim.96": "%broadcast_in_dim.92",
+            "%broadcast.176": "%broadcast.179",
+            "%add.151": "%add.154",
+            "%add.143": "%add.146",
+        }
+        reduction_specs = {
+            renames.get(name, name): (
+                opcode,
+                tuple(renames.get(operand, operand) for operand in operands),
+                shape,
+                is_root,
+            )
+            for name, (opcode, operands, shape, is_root) in reduction_specs.items()
+        }
     reducer_specs = {
         "%reduce_sum.6": ("parameter", ("0",), f32_scalar, False),
         "%reduce_sum.7": ("parameter", ("1",), f32_scalar, False),
@@ -400,13 +484,56 @@ def _exact_source_fused_layer1_rms_bodies(
         ),
         "%rsqrt.10": ("rsqrt", ("%add.166",), f32_32, True),
     }
+    inverse_computation = "fused_computation.63"
+    if feature_tiled:
+        inverse_computation = "fused_computation.67"
+        inverse_specs = {
+            "%param_0.214": ("parameter", ("0",), f32_32, False),
+            "%constant.119.clone.2": (
+                "constant",
+                ("0.000162760422",),
+                f32_scalar,
+                False,
+            ),
+            "%broadcast.201": (
+                "broadcast",
+                ("%constant.119.clone.2",),
+                f32_32,
+                False,
+            ),
+            "%div.66": (
+                "multiply",
+                ("%param_0.214", "%broadcast.201"),
+                f32_32,
+                False,
+            ),
+            "%constant.120.clone.2": (
+                "constant",
+                ("1e-05",),
+                f32_scalar,
+                False,
+            ),
+            "%broadcast.199": (
+                "broadcast",
+                ("%constant.120.clone.2",),
+                f32_32,
+                False,
+            ),
+            "%add.169": (
+                "add",
+                ("%div.66", "%broadcast.199"),
+                f32_32,
+                False,
+            ),
+            "%rsqrt.10": ("rsqrt", ("%add.169",), f32_32, True),
+        }
     reduction_items = {
         item.name: item
         for item in graph.computations.get("fused_computation.13", ())
     }
     inverse_items = {
         item.name: item
-        for item in graph.computations.get("fused_computation.63", ())
+        for item in graph.computations.get(inverse_computation, ())
     }
     reduction_root = reduction_items.get("%reduce_sum.20")
     reduction_zero = reduction_items.get("%constant.114.clone.2")
@@ -419,10 +546,10 @@ def _exact_source_fused_layer1_rms_bodies(
         reduction_caller is not None
         and inverse_caller is not None
         and _called_computation(reduction_caller) == "fused_computation.13"
-        and _called_computation(inverse_caller) == "fused_computation.63"
+        and _called_computation(inverse_caller) == inverse_computation
         and exact_body("fused_computation.13", reduction_specs)
         and exact_body("region_4.5", reducer_specs)
-        and exact_body("fused_computation.63", inverse_specs)
+        and exact_body(inverse_computation, inverse_specs)
         and reduction_root is not None
         and re.findall(r"\bdimensions=\{([^}]*)\}", reduction_clean) == ["1"]
         and re.findall(r"\bto_apply=%?([^,\s}\]]+)", reduction_clean)
@@ -1637,7 +1764,7 @@ def validate_integrated_dense_rms_stablehlo(
             "integrated dense RMS StableHLO SHA-256 drifted: "
             f"expected={expected} found={digest}"
         )
-    if native_m1_pallas_sources_output:
+    if native_m1_pallas_sources_output or native_m1_pallas_feature_tiled_output:
         stable_code = _stablehlo_code_only(stablehlo)
         stable_without_comments = _stablehlo_without_comments(stablehlo)
         main_matches = re.findall(
@@ -1655,10 +1782,55 @@ def validate_integrated_dense_rms_stablehlo(
                 "integrated source-fused Pallas StableHLO main drifted"
             )
         main_code = main_matches[0]
+        comment_free_main = comment_free_main_matches[0]
         collective_assignments = re.findall(
             r'^\s*%[A-Za-z0-9_.-]+\s*=\s*"stablehlo\.all_reduce"\(',
             stable_without_comments,
             flags=re.MULTILINE,
+        )
+        async_collective_assignments = re.findall(
+            r'^\s*%[A-Za-z0-9_.-]+\s*=\s*"stablehlo\.(?:all_reduce|'
+            r'all_gather|all_to_all|collective_broadcast|collective_permute|'
+            r'reduce_scatter)_(?:start|done)"\(',
+            stable_without_comments,
+            flags=re.MULTILINE,
+        )
+        expected_kernel_name = (
+            "greenfield_source_fused_output_m1_feature_tiled_m8_h6144"
+            if native_m1_pallas_feature_tiled_output
+            else "greenfield_source_fused_output_m1_m8_scratch_h6144"
+        )
+        kernel_names = re.findall(
+            r'^\s*%237\s*=\s*stablehlo\.custom_call\s+'
+            r'@tpu_custom_call\(%232,\s*%233,\s*%234,\s*%236,\s*%231,\s*'
+            r'%235\)\s*\{backend_config\s*=\s*"(?:\\.|[^"\\])*"\s*,\s*'
+            r'kernel_name\s*=\s*"([^"\\]+)"\s*,',
+            comment_free_main,
+            flags=re.MULTILINE,
+        ) if native_m1_pallas_feature_tiled_output else re.findall(
+            r'^\s*%234\s*=\s*stablehlo\.custom_call\s+'
+            r'@tpu_custom_call\(%226,\s*%227,\s*%228,\s*%233,\s*%231,\s*'
+            r'%232\)\s*\{backend_config\s*=\s*"(?:\\.|[^"\\])*"\s*,\s*'
+            r'kernel_name\s*=\s*"([^"\\]+)"\s*,',
+            comment_free_main,
+            flags=re.MULTILINE,
+        )
+        exact_collectives = all(
+            _exact_stablehlo_bf16_all_reduce(
+                comment_free_main,
+                result=result_name,
+                operand=operand_name,
+                reducer_result=(
+                    "%240"
+                    if native_m1_pallas_feature_tiled_output
+                    else "%236"
+                ),
+            )
+            for result_name, operand_name in (
+                ("%37", "%36"),
+                ("%138", "%137"),
+                ("%204", "%203"),
+            )
         )
         exact_fragments = (
             "%225:3 = stablehlo.optimization_barrier %21, %37, %138 : "
@@ -1675,30 +1847,67 @@ def validate_integrated_dense_rms_stablehlo(
             "(tensor<32x1xf32>) -> tensor<1x1xf32>",
             "%231 = stablehlo.reshape %230 : "
             "(tensor<1x1xf32>) -> tensor<1xf32>",
-            "%232 = stablehlo.broadcast_in_dim %arg26, dims = [1] : "
-            "(tensor<6144xbf16>) -> tensor<1x6144xbf16>",
-            "%233 = stablehlo.convert %229 : "
-            "(tensor<1xi1>) -> tensor<1xi32>",
-            "%234 = stablehlo.custom_call @tpu_custom_call("
-            "%226, %227, %228, %233, %231, %232)",
+            *(
+                (
+                    "%232 = stablehlo.reshape %226 : "
+                    "(tensor<1x6144xbf16>) -> tensor<8x768xbf16>",
+                    "%233 = stablehlo.reshape %227 : "
+                    "(tensor<1x6144xbf16>) -> tensor<8x768xbf16>",
+                    "%234 = stablehlo.reshape %228 : "
+                    "(tensor<1x6144xbf16>) -> tensor<8x768xbf16>",
+                    "%235 = stablehlo.reshape %arg26 : "
+                    "(tensor<6144xbf16>) -> tensor<8x768xbf16>",
+                    "%236 = stablehlo.convert %229 : "
+                    "(tensor<1xi1>) -> tensor<1xi32>",
+                    "%237 = stablehlo.custom_call @tpu_custom_call("
+                    "%232, %233, %234, %236, %231, %235)",
+                )
+                if native_m1_pallas_feature_tiled_output
+                else (
+                    "%232 = stablehlo.broadcast_in_dim %arg26, dims = [1] : "
+                    "(tensor<6144xbf16>) -> tensor<1x6144xbf16>",
+                    "%233 = stablehlo.convert %229 : "
+                    "(tensor<1xi1>) -> tensor<1xi32>",
+                    "%234 = stablehlo.custom_call @tpu_custom_call("
+                    "%226, %227, %228, %233, %231, %232)",
+                )
+            ),
             "operand_layouts = [dense<[1, 0]> : tensor<2xindex>, "
             "dense<[1, 0]> : tensor<2xindex>, "
             "dense<[1, 0]> : tensor<2xindex>, "
             "dense<0> : tensor<1xindex>, dense<0> : tensor<1xindex>, "
             "dense<[1, 0]> : tensor<2xindex>]",
             "result_layouts = [dense<[1, 0]> : tensor<2xindex>]}",
-            ": (tensor<1x6144xbf16>, tensor<1x6144xbf16>, "
-            "tensor<1x6144xbf16>, tensor<1xi32>, tensor<1xf32>, "
-            "tensor<1x6144xbf16>) -> tensor<1x6144xbf16>",
-            "%235 = stablehlo.bitcast_convert %234 : "
-            "(tensor<1x6144xbf16>) -> tensor<1x6144xui16>",
-            "sdy.return %235 : tensor<1x6144xui16>",
+            *(
+                (
+                    ": (tensor<8x768xbf16>, tensor<8x768xbf16>, "
+                    "tensor<8x768xbf16>, tensor<1xi32>, tensor<1xf32>, "
+                    "tensor<8x768xbf16>) -> tensor<8x768xbf16>",
+                    "%238 = stablehlo.reshape %237 : "
+                    "(tensor<8x768xbf16>) -> tensor<1x6144xbf16>",
+                    "%239 = stablehlo.bitcast_convert %238 : "
+                    "(tensor<1x6144xbf16>) -> tensor<1x6144xui16>",
+                    "sdy.return %239 : tensor<1x6144xui16>",
+                )
+                if native_m1_pallas_feature_tiled_output
+                else (
+                    ": (tensor<1x6144xbf16>, tensor<1x6144xbf16>, "
+                    "tensor<1x6144xbf16>, tensor<1xi32>, tensor<1xf32>, "
+                    "tensor<1x6144xbf16>) -> tensor<1x6144xbf16>",
+                    "%235 = stablehlo.bitcast_convert %234 : "
+                    "(tensor<1x6144xbf16>) -> tensor<1x6144xui16>",
+                    "sdy.return %235 : tensor<1x6144xui16>",
+                )
+            ),
             "return %0 : tensor<1x6144xui16>",
         )
         if (
             any(main_code.count(fragment) != 1 for fragment in exact_fragments)
             or main_code.count("sdy.manual_computation") != 1
+            or kernel_names != [expected_kernel_name]
+            or not exact_collectives
             or len(collective_assignments) != 3
+            or async_collective_assignments
             or "all_reduce_start" in main_code
             or "all_reduce_done" in main_code
         ):
@@ -1837,7 +2046,9 @@ def _validate_native_source_context_hlo(
     report.raise_for_violations()
     module = report.module
     expected_instruction_count = (
-        579
+        608
+        if native_m1_pallas_feature_tiled_output
+        else 579
         if native_m1_pallas_sources_output
         else 558
         if native_m1_pallas_output
@@ -2075,6 +2286,7 @@ def _validate_native_source_context_hlo(
         report,
         layer1_reduction_value,
         layer1_inverse_value,
+        feature_tiled=native_m1_pallas_feature_tiled_output,
     )
     source_fused_pallas_calls = tuple(
         item
@@ -2122,6 +2334,67 @@ def _validate_native_source_context_hlo(
             "f32[1]{0}, bf16[1,6144]{1,0}}"
         )
         in item.raw_line
+    )
+
+    def exact_feature_pallas_call_attributes(item: Any) -> bool:
+        target_matches = re.findall(
+            r'\)\s*,\s*custom_call_target="([^"\\]+)"\s*,\s*'
+            r'operand_layout_constraints\s*=',
+            item.raw_line,
+        )
+        return bool(
+            target_matches == ["tpu_custom_call"]
+            and _exact_braced_hlo_attribute(
+                item.raw_line,
+                name="operand_layout_constraints",
+                expected=(
+                    "{bf16[8,768]{1,0}, bf16[8,768]{1,0}, "
+                    "bf16[8,768]{1,0}, s32[1]{0}, f32[1]{0}, "
+                    "bf16[8,768]{1,0}}"
+                ),
+            )
+        )
+
+    feature_pallas_calls = tuple(
+        item
+        for item in entry
+        if item.raw_opcode == "custom-call"
+        and item.name
+        == "%greenfield_source_fused_output_m1_feature_tiled_m8_h6144.1"
+        and item.op_name
+        == (
+            "jit(integrated)/shard_map/native_source_context_layer1_norm/"
+            "native_source_context_layer1_output/"
+            "native_source_context_layer1_pallas_feature_tiled/"
+            "greenfield_source_fused_output_m1_feature_tiled_m8_h6144/"
+            "pallas_call"
+        )
+        and _shape_signature(item) == (("bf16", (8, 768)),)
+        and tuple(
+            (shape.dtype, shape.dimensions) for shape in item.operand_shapes
+        )
+        == (
+            ("bf16", (8, 768)),
+            ("bf16", (8, 768)),
+            ("bf16", (8, 768)),
+            ("s32", (1,)),
+            ("f32", (1,)),
+            ("bf16", (8, 768)),
+        )
+        and item.operand_names
+        == (
+            "%reshape.104",
+            "%reshape.105",
+            "%reshape.106",
+            "%convert_element_type.88",
+            "%bitcast.95",
+            "%reshape.107",
+        )
+        and item.raw_line.lstrip().startswith(
+            "%greenfield_source_fused_output_m1_feature_tiled_m8_h6144.1 = "
+            "bf16[8,768]{1,0:T(8,128)(2,1)S(3)} custom-call("
+        )
+        and exact_feature_pallas_call_attributes(item)
     )
     roots = tuple(
         item
@@ -2258,8 +2531,292 @@ def _validate_native_source_context_hlo(
             "u16[1,6144]{1,0:T(2,128)(2,1)} bitcast-convert("
         )
     )
+
+    computations: dict[str, tuple[Any, ...]] = {}
+    for instruction in module.instructions:
+        computation = _computation_base(instruction.computation)
+        computations[computation] = computations.get(computation, ()) + (
+            instruction,
+        )
+
+    def exact_add_reducer(name: str) -> bool:
+        body = computations.get(name, ())
+        parameters = tuple(
+            item for item in body if item.raw_opcode == "parameter"
+        )
+        roots = tuple(
+            item
+            for item in body
+            if item.raw_line.lstrip().startswith("ROOT ")
+        )
+        return bool(
+            len(body) == 3
+            and len(parameters) == 2
+            and {item.operand_names for item in parameters}
+            == {("0",), ("1",)}
+            and all(_shape_signature(item) == (("bf16", ()),) for item in parameters)
+            and len(roots) == 1
+            and roots[0].raw_opcode == "add"
+            and set(roots[0].operand_names)
+            == {item.name for item in parameters}
+            and _shape_signature(roots[0]) == (("bf16", ()),)
+        )
+
+    feature_slice_specs = (
+        (
+            "%slice_reduce_fusion",
+            "%psum.23",
+            "%reshape.104",
+            "fused_computation.32",
+            "%param_0.235",
+            "%slice.67",
+            "%constant.192",
+            "%reduce.3",
+            "slice.49.reduce_sub_computation",
+        ),
+        (
+            "%slice_reduce_fusion.2",
+            "%psum.22",
+            "%reshape.105",
+            "fused_computation.36",
+            "%param_0.234",
+            "%slice.74",
+            "%constant.191",
+            "%reduce.5",
+            "slice.50.reduce_sub_computation",
+        ),
+        (
+            "%slice_reduce_fusion.1",
+            "%psum.21",
+            "%reshape.106",
+            "fused_computation.35",
+            "%param_0.233",
+            "%slice.73",
+            "%constant.190",
+            "%reduce.4",
+            "slice.51.reduce_sub_computation",
+        ),
+    )
+
+    def exact_feature_slice(spec: tuple[str, ...]) -> bool:
+        (
+            caller_name,
+            source_name,
+            reshape_name,
+            callee_name,
+            parameter_name,
+            slice_name,
+            zero_name,
+            root_name,
+            reducer_name,
+        ) = spec
+        caller = entry_by_name.get(caller_name)
+        reshape = entry_by_name.get(reshape_name)
+        body = computations.get(callee_name, ())
+        by_name = {item.name: item for item in body}
+        parameter = by_name.get(parameter_name)
+        sliced = by_name.get(slice_name)
+        zero = by_name.get(zero_name)
+        root = by_name.get(root_name)
+        slice_code = "" if sliced is None else _stablehlo_code_only(sliced.raw_line)
+        root_code = "" if root is None else _stablehlo_code_only(root.raw_line)
+        return bool(
+            caller is not None
+            and caller.raw_opcode == "fusion"
+            and caller.operand_names == (source_name,)
+            and _shape_signature(caller) == (("bf16", (6144,)),)
+            and _called_computation(caller) == callee_name
+            and caller.raw_line.lstrip().startswith(
+                f"{caller_name} = "
+                "bf16[6144]{0:T(1024)(128)(2,1)S(3)} fusion("
+            )
+            and len(body) == 4
+            and parameter is not None
+            and parameter.raw_opcode == "parameter"
+            and parameter.operand_names == ("0",)
+            and _shape_signature(parameter) == (("bf16", (32, 6144)),)
+            and parameter.raw_line.lstrip().startswith(
+                f"{parameter_name} = "
+                "bf16[32,6144]{1,0:T(8,128)(2,1)S(3)} parameter(0)"
+            )
+            and sliced is not None
+            and sliced.raw_opcode == "slice"
+            and sliced.operand_names == (parameter_name,)
+            and _shape_signature(sliced) == (("bf16", (1, 6144)),)
+            and re.findall(r"\bslice=(\{\[[^}\n]+\]\})", slice_code)
+            == ["{[0:1], [0:6144]}"]
+            and sliced.raw_line.lstrip().startswith(
+                f"{slice_name} = "
+                "bf16[1,6144]{1,0:T(2,128)(2,1)} slice("
+            )
+            and zero is not None
+            and zero.raw_opcode == "constant"
+            and zero.operand_names == ("-0",)
+            and _shape_signature(zero) == (("bf16", ()),)
+            and root is not None
+            and root.raw_line.lstrip().startswith("ROOT ")
+            and root.raw_opcode == "reduce"
+            and root.operand_names == (slice_name, zero_name)
+            and _shape_signature(root) == (("bf16", (6144,)),)
+            and re.findall(r"\bdimensions=\{([^}]*)\}", root_code) == ["0"]
+            and re.findall(r"\bto_apply=%?([^,\s}\]]+)", root_code)
+            == [reducer_name]
+            and root.raw_line.lstrip().startswith(
+                f"ROOT {root_name} = "
+                "bf16[6144]{0:T(1024)(128)(2,1)S(3)} reduce("
+            )
+            and exact_add_reducer(reducer_name)
+            and reshape is not None
+            and reshape.raw_opcode == "reshape"
+            and reshape.operand_names == (caller_name,)
+            and _shape_signature(reshape) == (("bf16", (8, 768)),)
+            and reshape.raw_line.lstrip().startswith(
+                f"{reshape_name} = "
+                "bf16[8,768]{1,0:T(8,128)(2,1)S(3)} reshape("
+            )
+        )
+
+    feature_validity = entry_by_name.get("%bitcast.94")
+    feature_validity_i32 = entry_by_name.get("%convert_element_type.88")
+    feature_inverse = entry_by_name.get("%bitcast.95")
+    feature_weight = entry_by_name.get("%reshape.107")
+    feature_output_fusion = entry_by_name.get("%bitcast-convert_bitcast_fusion")
+    feature_output_copy = entry_by_name.get("%copy.26")
+    feature_root = entry_by_name.get("%bitcast.33")
+    feature_output_body = computations.get("fused_computation.44", ())
+    feature_output_by_name = {
+        item.name: item for item in feature_output_body
+    }
+    feature_output_parameter = feature_output_by_name.get("%param_0.135")
+    feature_output_convert = feature_output_by_name.get(
+        "%bitcast_convert_type.21"
+    )
+    feature_output_root = feature_output_by_name.get("%bitcast.74")
+    exact_m1_pallas_feature_boundary = bool(
+        native_m1_pallas_feature_tiled_output
+        and len(feature_pallas_calls) == 1
+        and all(exact_feature_slice(spec) for spec in feature_slice_specs)
+        and validity_tuple_value is not None
+        and validity_tuple_value.raw_opcode == "get-tuple-element"
+        and validity_tuple_value.operand_names == ("%compare_and_fusion",)
+        and _shape_signature(validity_tuple_value) == (("pred", (32,)),)
+        and re.findall(
+            r"\bindex=(\d+)",
+            _stablehlo_code_only(validity_tuple_value.raw_line),
+        )
+        == ["0"]
+        and feature_validity is not None
+        and feature_validity.raw_opcode == "bitcast"
+        and feature_validity.operand_names == ("%get-tuple-element.29",)
+        and _shape_signature(feature_validity) == (("pred", (1,)),)
+        and feature_validity.raw_line.lstrip().startswith(
+            "%bitcast.94 = pred[1]{0:T(512)(128)(4,1)S(3)} bitcast("
+        )
+        and feature_validity_i32 is not None
+        and feature_validity_i32.raw_opcode == "convert"
+        and feature_validity_i32.operand_names == ("%bitcast.94",)
+        and _shape_signature(feature_validity_i32) == (("s32", (1,)),)
+        and feature_validity_i32.raw_line.lstrip().startswith(
+            "%convert_element_type.88 = s32[1]{0:T(128)S(6)} convert("
+        )
+        and layer1_reduction_value is not None
+        and layer1_reduction_value.raw_opcode == "fusion"
+        and layer1_reduction_value.operand_names
+        == ("%psum.23", "%psum.22", "%psum.21", "%get-tuple-element.29")
+        and _shape_signature(layer1_reduction_value) == (("f32", (32,)),)
+        and _called_computation(layer1_reduction_value) == "fused_computation.13"
+        and layer1_inverse_value is not None
+        and layer1_inverse_value.raw_opcode == "fusion"
+        and layer1_inverse_value.operand_names == ("%multiply_reduce_fusion",)
+        and _shape_signature(layer1_inverse_value) == (("f32", (32,)),)
+        and _called_computation(layer1_inverse_value) == "fused_computation.67"
+        and exact_source_fused_layer1_rms
+        and feature_inverse is not None
+        and feature_inverse.raw_opcode == "bitcast"
+        and feature_inverse.operand_names == ("%add_rsqrt_fusion",)
+        and _shape_signature(feature_inverse) == (("f32", (1,)),)
+        and feature_inverse.raw_line.lstrip().startswith(
+            "%bitcast.95 = f32[1]{0:T(128)S(3)} bitcast("
+        )
+        and pallas_norm_copy is not None
+        and pallas_norm_copy.raw_opcode == "copy-done"
+        and pallas_norm_copy.operand_names == ("%copy-start.7",)
+        and _shape_signature(pallas_norm_copy) == (("bf16", (6144,)),)
+        and pallas_norm_start is not None
+        and pallas_norm_start.raw_opcode == "copy-start"
+        and pallas_norm_start.operand_names == ("%param.26",)
+        and feature_weight is not None
+        and feature_weight.raw_opcode == "reshape"
+        and feature_weight.operand_names == ("%copy-done.7",)
+        and _shape_signature(feature_weight) == (("bf16", (8, 768)),)
+        and feature_weight.raw_line.lstrip().startswith(
+            "%reshape.107 = "
+            "bf16[8,768]{1,0:T(8,128)(2,1)S(3)} reshape("
+        )
+        and len(feature_output_body) == 3
+        and feature_output_parameter is not None
+        and feature_output_parameter.raw_opcode == "parameter"
+        and feature_output_parameter.operand_names == ("0",)
+        and _shape_signature(feature_output_parameter) == (("bf16", (8, 768)),)
+        and feature_output_parameter.raw_line.lstrip().startswith(
+            "%param_0.135 = "
+            "bf16[8,768]{1,0:T(8,128)(2,1)S(3)} parameter(0)"
+        )
+        and feature_output_convert is not None
+        and feature_output_convert.raw_opcode == "bitcast-convert"
+        and feature_output_convert.operand_names == ("%param_0.135",)
+        and _shape_signature(feature_output_convert) == (("u16", (8, 768)),)
+        and feature_output_convert.raw_line.lstrip().startswith(
+            "%bitcast_convert_type.21 = "
+            "u16[8,768]{1,0:T(8,128)(2,1)} bitcast-convert("
+        )
+        and feature_output_root is not None
+        and feature_output_root.raw_line.lstrip().startswith("ROOT ")
+        and feature_output_root.raw_opcode == "bitcast"
+        and feature_output_root.operand_names == ("%bitcast_convert_type.21",)
+        and _shape_signature(feature_output_root) == (("u16", (1, 1, 8, 768)),)
+        and feature_output_root.raw_line.lstrip().startswith(
+            "ROOT %bitcast.74 = "
+            "u16[1,1,8,768]{3,2,1,0:T(8,128)(2,1)S(3)} bitcast("
+        )
+        and feature_output_fusion is not None
+        and feature_output_fusion.raw_opcode == "fusion"
+        and feature_output_fusion.operand_names
+        == ("%greenfield_source_fused_output_m1_feature_tiled_m8_h6144.1",)
+        and _shape_signature(feature_output_fusion)
+        == (("u16", (1, 1, 8, 768)),)
+        and _called_computation(feature_output_fusion) == "fused_computation.44"
+        and feature_output_fusion.raw_line.lstrip().startswith(
+            "%bitcast-convert_bitcast_fusion = "
+            "u16[1,1,8,768]{3,2,1,0:T(8,128)(2,1)S(3)} fusion("
+        )
+        and feature_output_copy is not None
+        and feature_output_copy.raw_opcode == "copy"
+        and feature_output_copy.operand_names
+        == ("%bitcast-convert_bitcast_fusion",)
+        and _shape_signature(feature_output_copy) == (("u16", (1, 1, 8, 768)),)
+        and feature_output_copy.raw_line.lstrip().startswith(
+            "%copy.26 = "
+            "u16[1,1,8,768]{3,1,2,0:T(2,128)(2,1)} copy("
+        )
+        and feature_root is not None
+        and feature_root.raw_line.lstrip().startswith("ROOT ")
+        and feature_root.raw_opcode == "bitcast"
+        and feature_root.operand_names == ("%copy.26",)
+        and _shape_signature(feature_root) == (("u16", (1, 6144)),)
+        and feature_root.raw_line.lstrip().startswith(
+            "ROOT %bitcast.33 = "
+            "u16[1,6144]{1,0:T(2,128)(2,1)} bitcast("
+        )
+        and len(layer1_reductions) == 1
+        and len(layer1_rsqrt) == 1
+        and len(roots) == 1
+        and roots[0] is feature_root
+    )
     pallas_output_mode = bool(
-        native_m1_pallas_output or native_m1_pallas_sources_output
+        native_m1_pallas_output
+        or native_m1_pallas_sources_output
+        or native_m1_pallas_feature_tiled_output
     )
     if not (
         len(embedding_gathers) == 1
@@ -2277,11 +2834,19 @@ def _validate_native_source_context_hlo(
             if native_m1_pallas_output
             else exact_m1_pallas_sources_boundary
             if native_m1_pallas_sources_output
+            else exact_m1_pallas_feature_boundary
+            if native_m1_pallas_feature_tiled_output
             else len(layer1_reductions) == 1 and len(layer1_rsqrt) == 1
         )
         and len(roots) == 1
         and roots[0].raw_opcode
-        == ("bitcast-convert" if pallas_output_mode else "fusion")
+        == (
+            "bitcast"
+            if native_m1_pallas_feature_tiled_output
+            else "bitcast-convert"
+            if pallas_output_mode
+            else "fusion"
+        )
         and _shape_signature(roots[0]) == expected_root_shape
         and (
             expected_root_operands is None
@@ -2366,6 +2931,23 @@ def _validate_native_source_context_hlo(
                 "no_m32_pallas_io": True,
             }
             if native_m1_pallas_sources_output
+            else {}
+        ),
+        **(
+            {
+                "exact_m1_pallas_boundary": True,
+                "exact_m1_pallas_feature_mapping": True,
+                "exact_m1_pallas_source_binding": True,
+                "m1_pallas_custom_call_count": 1,
+                "m1_pallas_feature_rows": 8,
+                "m1_pallas_live_features": 6144,
+                "m1_pallas_operand_count": 6,
+                "m1_pallas_result_count": 1,
+                "native_m1_pallas_feature_tiled_output": True,
+                "no_dead_pallas_rows": True,
+                "no_m32_pallas_io": True,
+            }
+            if native_m1_pallas_feature_tiled_output
             else {}
         ),
     }

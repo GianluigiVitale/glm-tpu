@@ -19,19 +19,35 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed wiring `c98cfc5d837c64b75805484c3a77225ae1eb824c` completed exactly one
+  fail-closed compile acquisition as
+  `greenfield_strategy_nd_integrated_dense_native_m1_pallas_feature_tiled_output_20260815T044338647791046Z`.
+  All eight hosts compiled and refused on the deliberately empty StableHLO pin in about 32 seconds,
+  before arithmetic or publication. The recovered prevalidation, StableHLO and optimized-HLO files
+  match their remote CRC32C values; graph SHAs are `89d3257b...30d4` and `afb68ab0...c2db`.
+  The optimized graph has 608 instructions, 32 partitions, exactly three intended synchronous
+  StrategyND reductions, one live six-input Pallas call over `[8,768]`, and a layout-only
+  U16 `[8,768] -> [1,6144]` ENTRY-root path. No Pallas operand/result has an M32 batch axis and all
+  6,144 features are live. Pre/failure censuses and a direct process check are 8/8 clean; no output,
+  comparison, DB row, ledger or terminal `SUCCESS` exists. The partial remote prefix contains only
+  diagnostic/source evidence and three `diagnostic_hlo/` objects.
+- Both complete compiler hashes are now pinned locally. The structural proof binds exact row-zero
+  dense/attention/embedding sources through the `[8,768]` reshapes, validity, M32-derived inverse,
+  norm weight, ordered call operands/layouts and the live layout-only root. Parser-valid mutations
+  of source order, row selection, inverse/weight binding, physical layout, output arithmetic and
+  root bypass all refuse even when their mutated digest is temporarily trusted. Exact next is one
+  immutable Sol review of this pin/proof batch, correction-only closure, commit/push, then one
+  protected 6,144-value numerical discriminator. Only `0 / 6,144` authorizes full 8K.
 - Reviewed/pushed primitive `9f1e600` implements the sole derived successor as an all-live
   feature-tiled Pallas boundary: semantic BF16 `[1,6144]` sources reshape bijectively to
   `[8,768]`, six `[8,128]` programs cover every feature exactly once, and a layout-only reshape
   restores the true-M1 result. There are no NaN/dead sibling rows and no M32 kernel I/O. Independent
   sentinel replay found zero mapping errors; focused CPU/JAXPR proof passes.
-- That primitive is now wired locally as the distinct, default-off
+- That primitive is wired as the distinct, default-off
   `native_m1_pallas_feature_tiled_output` diagnostic through graph construction, HLO validators,
-  host/terminal schemas and the protected wrapper. Its StableHLO and optimized-HLO pins are
-  deliberately empty. The first protected contact can therefore only atomically preserve both
-  compiler graphs and refuse before arithmetic, host result, comparison, DB row, ledger or terminal
-  `SUCCESS`. Forced-32 abstract tracing covers the complete 13-input graph and the focused suite is
-  41/41. Exact next is one immutable Sol review of this bulk, correction-only closure, commit/push,
-  then exactly one compile-only acquisition. Full 8K remains forbidden.
+  host/terminal schemas and the protected wrapper. Forced-32 abstract tracing covers the complete
+  13-input graph. Its compile acquisition is complete as recorded above; do not rediscover the same
+  HLO. Full 8K remains forbidden until the bounded numerical row is exact.
 - Reviewed/pushed HLO pin `4579e5f1740f6a5b8891962249c066e0070fe40f` completed and sealed the
   source-fused true-M1 discriminator as
   `greenfield_strategy_nd_integrated_dense_native_m1_pallas_sources_output_20260815T041349845317572Z`.

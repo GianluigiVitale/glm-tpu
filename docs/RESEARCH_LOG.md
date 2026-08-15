@@ -5,6 +5,27 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 04:38--04:55 UTC — all-live feature-tiled TPU graph acquired once and pinned offline
+
+- Reviewed/pushed `c98cfc5d837c64b75805484c3a77225ae1eb824c`, then ran exactly one
+  compile-only protected acquisition as
+  `greenfield_strategy_nd_integrated_dense_native_m1_pallas_feature_tiled_output_20260815T044338647791046Z`.
+  All eight hosts compiled and stopped at the deliberately empty StableHLO pin after about 32
+  seconds of device workflow. No arithmetic tensor, host record, comparison, DB row, ledger or
+  terminal `SUCCESS` exists. Pre/failure censuses and a direct process check are 8/8 clean.
+- Recovered the three compiler objects from the approved partial `diagnostic_hlo/` archive.
+  Prevalidation/StableHLO/optimized-HLO local CRC32C values exactly match remote `u2P6nQ==`,
+  `fBWuJA==` and `GCsAPg==`; graph SHAs are `89d3257b...30d4` and `afb68ab0...c2db`.
+  The scheduled graph has 608 instructions, 32 partitions, exactly three intended synchronous
+  StrategyND reductions, one live six-input `[8,768]` Pallas call, no M32 Pallas I/O and a
+  layout-only U16 root path restoring semantic `[1,6144]`.
+- Pinned both complete graphs and added structural proof for the exact row-zero source fusions,
+  all-live feature reshape, validity, layer-1 reduction/inverse, norm weight, ordered call
+  layouts and live root. Parser-valid mutations of source order, row selection, inverse/weight,
+  physical layout and root arithmetic/bypass refuse after their mutated hashes are temporarily
+  admitted. No second compile is needed. One immutable review/closure precedes the single bounded
+  6,144-value numerical discriminator; full 8K remains forbidden unless it is bitwise exact.
+
 ## 2026-08-15 04:17--04:38 UTC — all-live feature-tiled successor is locally fail-closed
 
 - Committed/pushed `9f1e600` adds `source_fused_output_m1_feature_tiled_m8`, the only successor
