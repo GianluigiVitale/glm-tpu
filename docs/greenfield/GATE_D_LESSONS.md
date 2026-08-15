@@ -237,6 +237,12 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 - For WS32, the invariant is one logical row and a persistent local hidden shard. Feature-4 and
   expert-8 reductions are allowed; a repeated 32-chip group, physical `[32,6144]` activation, or
   hidden all-gather is immediate rejection.
+- Never infer JAX process ownership from the TPU-VM worker suffix. On this sealed fleet the launch
+  workers `0..7` map to JAX processes `[1,6,0,7,2,4,3,5]`; authenticate the complete captured
+  launch-host/JAX-process/device permutation before direct loading. Likewise,
+  `NamedSharding.addressable_devices` is an unordered set: feed
+  `make_array_from_single_device_arrays` only in the insertion order returned by
+  `addressable_devices_indices_map(global_shape)`, and reconstruct values in a content-level test.
 
 ## Evidence ladder
 

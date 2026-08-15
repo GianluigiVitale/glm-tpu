@@ -129,6 +129,15 @@ from .transport_chain import (
     validate_compiled_transport,
     validate_transport_pairs,
 )
+from .ws32_one_layer import (
+    WS32_ONE_LAYER_INPUT_SPECS,
+    WS32_ONE_LAYER_OUTPUT_SPEC,
+    Ws32OneLayerHloReport,
+    build_ws32_one_layer_mapped,
+    validate_ws32_one_layer_hlo,
+    validate_ws32_topology_fleet,
+    ws32_one_layer_inputs,
+)
 from .one_layer import (
     REAL_LAYER_OUTPUT_TOLERANCE,
     ROUTE_WEIGHT_TOLERANCE,
@@ -258,12 +267,19 @@ __all__ = [
     "validate_integrated_checkpoint_success",
     "TransportChainConfig",
     "TransportKind",
+    "WS32_ONE_LAYER_INPUT_SPECS",
+    "WS32_ONE_LAYER_OUTPUT_SPEC",
+    "Ws32OneLayerHloReport",
     "benchmark_transport_chain",
     "build_transport_chain",
+    "build_ws32_one_layer_mapped",
     "transport_chain_hlo_policy",
     "validate_compiled_transport",
     "validate_pallas_real_layer_hlo",
     "validate_paired_transport_hlo",
     "validate_real_layer_hlo",
     "validate_transport_pairs",
+    "validate_ws32_one_layer_hlo",
+    "validate_ws32_topology_fleet",
+    "ws32_one_layer_inputs",
 ]

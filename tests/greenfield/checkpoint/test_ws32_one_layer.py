@@ -22,6 +22,7 @@ from glm_tpu.greenfield.checkpoint.ws32_one_layer import (
     load_ws32_one_layer_slot,
     pack_ws32_one_layer,
 )
+from glm_tpu.greenfield.sharding.ws32 import Ws32PhysicalMesh
 from tests.greenfield.checkpoint.test_one_layer import (
     tiny_config,
     write_tiny_source,
@@ -396,6 +397,64 @@ def test_ws32_one_layer_does_not_publish_manifest_before_validation(
     with pytest.raises(ValueError, match="injected provisional"):
         pack_ws32_one_layer(config)
     assert not (config.output_dir / "manifest.json").exists()
+
+
+def test_ws32_one_layer_global_loader_uses_exact_final_owners(
+    tmp_path: Path,
+) -> None:
+    _, config = _source_and_config(tmp_path)
+    rows = tuple(tuple(range(row * 4, row * 4 + 4)) for row in range(8))
+    physical = Ws32PhysicalMesh(
+        device_ids=rows,
+        feature_groups=rows,
+        expert_groups=tuple(
+            tuple(row * 4 + column for row in range(8))
+            for column in range(4)
+        ),
+    )
+    config = replace(config, mesh_hash=physical.mesh_hash)
+    manifest = pack_ws32_one_layer(config)
+    program = f'''\
+import json
+from pathlib import Path
+import jax
+import numpy as np
+from jax.sharding import Mesh
+from safetensors import safe_open
+from glm_tpu.greenfield.checkpoint.ws32_one_layer import load_ws32_one_layer_global
+from glm_tpu.greenfield.sharding.ws32 import Ws32PhysicalMesh
+rows=tuple(tuple(range(row*4,row*4+4)) for row in range(8))
+physical=Ws32PhysicalMesh(device_ids=rows,feature_groups=rows,expert_groups=tuple(tuple(row*4+column for row in range(8)) for column in range(4)))
+mesh=Mesh(np.asarray(jax.devices(),dtype=object).reshape(8,4),('expert','feature'))
+loaded=load_ws32_one_layer_global(Path({str(config.output_dir)!r}),expected_manifest_sha256={manifest['manifest_sha256']!r},mesh=mesh,physical_mesh=physical)
+expected=np.empty((8,4,8),dtype=np.uint8)
+for row in range(8):
+  for column in range(4):
+    with safe_open(Path({str(config.output_dir)!r})/f'device_slot_{{row*4+column:02d}}.safetensors',framework='np') as handle:
+      expected[row,:,column*2:(column+1)*2]=handle.get_tensor('expert_gate_bits')[0]
+observed=np.asarray(jax.device_get(loaded.arrays['expert_gate_bits']))
+print(json.dumps({{'content_exact':bool(np.array_equal(observed,expected)),'slots':len(loaded.local_device_slots),'shapes':{{name:list(value.shape) for name,value in loaded.arrays.items()}},'specs':{{name:str(value.sharding.spec) for name,value in loaded.arrays.items()}}}},sort_keys=True))
+'''
+    environment = dict(os.environ)
+    environment["JAX_PLATFORMS"] = "cpu"
+    environment["XLA_FLAGS"] = "--xla_force_host_platform_device_count=32"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=REPO,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result["content_exact"]
+    assert result["slots"] == 32
+    assert result["shapes"]["expert_gate_bits"] == [8, 4, 8]
+    assert result["shapes"]["shared_down_bits"] == [8, 4]
+    assert result["specs"]["expert_gate_bits"] == "P('expert', None, 'feature')"
+    assert result["specs"]["shared_down_bits"] == "P('feature', None)"
 
 
 def test_ws32_one_layer_cli_and_protected_wrapper_are_wired(

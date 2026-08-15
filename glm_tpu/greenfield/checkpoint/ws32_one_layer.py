@@ -166,6 +166,17 @@ class LoadedWs32OneLayerSlot:
     arrays: Mapping[str, Any]
 
 
+@dataclass(frozen=True, slots=True)
+class LoadedWs32OneLayerGlobal:
+    """All WS32 one-layer leaves assembled from addressable final owners."""
+
+    manifest: Mapping[str, Any]
+    arrays: Mapping[str, Any]
+    local_device_slots: tuple[Mapping[str, Any], ...]
+    device_memory_before: tuple[Mapping[str, int] | None, ...]
+    device_memory_after: tuple[Mapping[str, int] | None, ...]
+
+
 def _source_manifest(config: Ws32OneLayerPackConfig) -> dict[str, Any]:
     if not config.source_manifest_path.is_file():
         raise FileNotFoundError(
@@ -958,4 +969,197 @@ def load_ws32_one_layer_slot(
         manifest_sha256=manifest["manifest_sha256"],
         file_sha256=record["sha256"],
         arrays=arrays,
+    )
+
+
+def _memory_stats(device: object) -> Mapping[str, int] | None:
+    value = device.memory_stats()
+    if value is None:
+        return None
+    return {
+        str(name): int(number)
+        for name, number in value.items()
+        if isinstance(number, int) and not isinstance(number, bool)
+    }
+
+
+def _global_tensor_layouts(
+    manifest: Mapping[str, Any],
+) -> Mapping[str, tuple[tuple[int, ...], tuple[str | None, ...]]]:
+    geometry = manifest["geometry"]
+    hidden = _positive(geometry.get("hidden_size"), "hidden_size")
+    intermediate = _positive(
+        geometry.get("intermediate_size"), "intermediate_size"
+    )
+    experts = _positive(geometry.get("num_experts"), "num_experts")
+    block_out, block_in = (
+        _positive(value, "fp8 block")
+        for value in geometry.get("fp8_block_shape", ())
+    )
+    return {
+        "correction_bias": ((experts,), ("expert",)),
+        "expert_down_bits": (
+            (experts, hidden, intermediate),
+            ("expert", "feature", None),
+        ),
+        "expert_down_scale": (
+            (experts, hidden // block_out, intermediate // block_in),
+            ("expert", "feature", None),
+        ),
+        "expert_gate_bits": (
+            (experts, intermediate, hidden),
+            ("expert", None, "feature"),
+        ),
+        "expert_gate_scale": (
+            (experts, intermediate // block_out, hidden // block_in),
+            ("expert", None, "feature"),
+        ),
+        "expert_up_bits": (
+            (experts, intermediate, hidden),
+            ("expert", None, "feature"),
+        ),
+        "expert_up_scale": (
+            (experts, intermediate // block_out, hidden // block_in),
+            ("expert", None, "feature"),
+        ),
+        "router_weight": (
+            (experts, hidden),
+            ("expert", "feature"),
+        ),
+        "shared_down_bits": (
+            (hidden, intermediate),
+            ("feature", None),
+        ),
+        "shared_down_scale": (
+            (hidden // block_out, intermediate // block_in),
+            ("feature", None),
+        ),
+        "shared_gate_bits": (
+            (intermediate, hidden),
+            (None, "feature"),
+        ),
+        "shared_gate_scale": (
+            (intermediate // block_out, hidden // block_in),
+            (None, "feature"),
+        ),
+        "shared_up_bits": (
+            (intermediate, hidden),
+            (None, "feature"),
+        ),
+        "shared_up_scale": (
+            (intermediate // block_out, hidden // block_in),
+            (None, "feature"),
+        ),
+    }
+
+
+def load_ws32_one_layer_global(
+    output_dir: Path,
+    *,
+    expected_manifest_sha256: str,
+    mesh: object,
+    physical_mesh: object,
+) -> LoadedWs32OneLayerGlobal:
+    """Direct-load this process's four files into the exact global mesh.
+
+    Every process reads only the files for its addressable TPU chips.  JAX
+    global arrays are then assembled from those already-device-resident local
+    shards; no complete expert table or hidden row is reconstructed on a host.
+    """
+
+    import jax
+    from jax.sharding import NamedSharding, PartitionSpec as P
+
+    root = Path(output_dir)
+    manifest = json.loads((root / "manifest.json").read_text())
+    if manifest.get("manifest_sha256") != _manifest_hash(manifest) or (
+        manifest.get("manifest_sha256") != expected_manifest_sha256
+    ):
+        raise ValueError("WS32 global loader manifest identity drifted")
+    if manifest.get("mesh_hash") != physical_mesh.mesh_hash:
+        raise ValueError("WS32 global loader physical mesh drifted")
+    observed_mesh_ids = tuple(
+        tuple(int(device.id) for device in row)
+        for row in mesh.devices.tolist()
+    )
+    if observed_mesh_ids != physical_mesh.device_ids:
+        raise ValueError("WS32 JAX mesh order differs from physical slots")
+
+    addressable = tuple(
+        device
+        for row in mesh.devices.tolist()
+        for device in row
+        if int(device.process_index) == jax.process_index()
+    )
+    expected_addressable = (
+        32
+        if jax.default_backend() == "cpu" and jax.process_count() == 1
+        else 4
+    )
+    if len(addressable) != expected_addressable or set(addressable) != set(
+        jax.local_devices()
+    ):
+        raise ValueError(
+            "WS32 global loader addressable-device geometry drifted"
+        )
+    slot_by_device_id = {
+        device_id: slot
+        for slot, device_id in enumerate(physical_mesh.flattened_device_ids)
+    }
+    before = tuple(_memory_stats(device) for device in addressable)
+    local: dict[int, LoadedWs32OneLayerSlot] = {}
+    for device in addressable:
+        device_id = int(device.id)
+        loaded = load_ws32_one_layer_slot(
+            root,
+            expected_manifest_sha256=expected_manifest_sha256,
+            device_slot=slot_by_device_id[device_id],
+            device=device,
+        )
+        if loaded.device_slot != slot_by_device_id[device_id]:
+            raise ValueError("WS32 local file/device binding drifted")
+        local[device_id] = loaded
+
+    arrays: dict[str, Any] = {}
+    layouts = _global_tensor_layouts(manifest)
+    if set(layouts) != _OUTPUT_NAMES:
+        raise AssertionError("WS32 global tensor layout coverage drifted")
+    for name in sorted(layouts):
+        global_shape, spec = layouts[name]
+        sharding = NamedSharding(mesh, P(*spec))
+        # JAX exposes ``addressable_devices`` as an unordered set.  The array
+        # constructor instead consumes shards in the insertion order of its
+        # device-to-index map, which follows the sharding's device assignment.
+        # Using the set's iteration order can silently attach valid final-owner
+        # bytes to the wrong TPU.
+        shard_devices = tuple(
+            sharding.addressable_devices_indices_map(global_shape)
+        )
+        if set(shard_devices) != set(addressable):
+            raise ValueError(f"WS32 {name} addressable device set drifted")
+        shards = tuple(local[int(device.id)].arrays[name] for device in shard_devices)
+        expected_local_shape = sharding.shard_shape(global_shape)
+        if any(tuple(shard.shape) != expected_local_shape for shard in shards):
+            raise ValueError(f"WS32 {name} local shard shape drifted")
+        arrays[name] = jax.make_array_from_single_device_arrays(
+            global_shape, sharding, shards
+        )
+    jax.block_until_ready(tuple(arrays.values()))
+    after = tuple(_memory_stats(device) for device in addressable)
+    local_records = tuple(
+        {
+            "device_id": device_id,
+            "device_slot": loaded.device_slot,
+            "expert_coordinate": loaded.expert_coordinate,
+            "feature_coordinate": loaded.feature_coordinate,
+            "file_sha256": loaded.file_sha256,
+        }
+        for device_id, loaded in sorted(local.items())
+    )
+    return LoadedWs32OneLayerGlobal(
+        manifest=manifest,
+        arrays=arrays,
+        local_device_slots=local_records,
+        device_memory_before=before,
+        device_memory_after=after,
     )
