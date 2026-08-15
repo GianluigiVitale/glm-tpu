@@ -5,6 +5,19 @@ Protected PP8 2K full-decoder evidence exists at DB484: p50 `244.091151 ms` and
 but not Gate E. No accepted 8K, 128K, 256K, PP16 full-decoder, or WS32 full-decoder performance
 measurement exists yet. Bounded layer/kernel/diagnostic results below are not token-speed proof.
 
+## 2026-08-15 — protected WS32 reference layer, correctness pass / execution reject
+
+`greenfield_ws32_real_layer_numerical_20260815T090957477700205Z` executes the sealed 32-owner
+layer-3 WS32 artifact on the physical expert8 x feature4 mesh. Both oracle cases pass the bounded
+numerical contract, all ten repeated reductions remain within groups of four/eight, peak HBM is
+335,805,440 bytes/chip, and the 51-object archive plus 8/8 cleanup pass.
+
+The readable reference body dequantizes complete local matrices. Its diagnostic-only p50 is
+`516.5821635 ms` for normal routes and `1160.885836 ms` with all eight routes on one owner. This
+rejects that implementation as a production execution body; it does not reject the WS32 ownership
+plan or claim token throughput. A distinct raw-FP8 Pallas body must reuse tile-local dequantization
+and demonstrate a materially lower protected layer latency before any full-decoder integration.
+
 ## 2026-08-06 — complete feature-runtime checkpoint, not performance
 
 `greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z` is the complete executable PP8

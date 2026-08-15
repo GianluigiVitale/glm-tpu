@@ -331,9 +331,9 @@
       "source_pin": "fce8d6c41d683502893ca578240edbed393f7018",
       "source_paths": ["origin/patemotter/2dtp-merge", "glm-decode-2d-f32@dab2db7b3", "glm-hybrid-ep-tp@6baf66e2a", "tests/layers/common/test_decode_2d_f32_reduce.py"],
       "disposition": "research_candidate",
-      "greenfield_consumers": ["glm_tpu/greenfield/sharding/ws32.py", "glm_tpu/greenfield/kernels/ws32.py", "glm_tpu/greenfield/checkpoint/ws32_one_layer.py", "tests/greenfield/kernels/test_ws32.py", "tests/greenfield/checkpoint/test_ws32_one_layer.py", "docs/greenfield/WS32_2D_PROTOTYPE.md"],
+      "greenfield_consumers": ["glm_tpu/greenfield/sharding/ws32.py", "glm_tpu/greenfield/kernels/ws32.py", "glm_tpu/greenfield/checkpoint/ws32_one_layer.py", "glm_tpu/greenfield/benchmarking/ws32_pallas_one_layer.py", "tests/greenfield/kernels/test_ws32.py", "tests/greenfield/kernels/test_ws32_pallas.py", "tests/greenfield/checkpoint/test_ws32_one_layer.py", "docs/greenfield/WS32_2D_PROTOTYPE.md"],
       "gate": "G",
-      "reason": "The reciprocal expert/feature specs and FP32 partial-preservation rule are adapted into the independent GLM WS32 prototype and sealed layer-3 final-owner derivative. They establish exact 8x4 layer ownership, not a complete-model packed checkpoint, TPU schedule, exact real layer result, HBM result, Gate-D result, or performance claim."
+      "reason": "The reciprocal expert/feature specs and FP32 partial-preservation rule are adapted into the independent GLM WS32 prototype, sealed layer-3 final-owner derivative, and protected bounded real layer. Exact 8x4 ownership, direct load, local HLO, bounded correctness, and layer HBM pass; the readable dequant body is performance-rejected. The isolated Pallas successor reuses the same owners and awaits protected HLO/latency evidence before complete-model or Gate-D promotion."
     },
     {
       "id": "quantized-2d-matmul-drafts",
@@ -342,9 +342,9 @@
       "source_pin": "57adb4b999476edac8e26a18df26cbc213458ace",
       "source_paths": ["origin/patemotter/2d_quant_matmul", "origin/patemotter/quant_2d_matmul"],
       "disposition": "research_candidate",
-      "greenfield_consumers": ["glm_tpu/greenfield/kernels/ws32.py", "tests/greenfield/kernels/test_ws32.py", "docs/greenfield/WS32_2D_PROTOTYPE.md"],
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/ws32.py", "glm_tpu/greenfield/benchmarking/ws32_pallas_one_layer.py", "tests/greenfield/kernels/test_ws32.py", "tests/greenfield/kernels/test_ws32_pallas.py", "docs/greenfield/WS32_2D_PROTOTYPE.md"],
       "gate": "G",
-      "reason": "The existing quantized 2D drafts were audited as arithmetic and tiling references. The first GLM prototype deliberately uses a readable independent JAX FP8 path; a Pallas successor must adapt measured useful mechanisms rather than reimplement or import the legacy execution path."
+      "reason": "The existing quantized 2D drafts remain arithmetic and tiling references only. The readable independent JAX path is now protected-correct but performance-rejected. Its isolated successor reuses the already protected greenfield raw-FP8 Pallas kernels and exact WS32 final owners without importing the legacy execution path; protected compiler and numerical latency evidence are still pending."
     },
     {
       "id": "glm-mtp-and-indexshare",

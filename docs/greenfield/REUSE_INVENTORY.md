@@ -73,17 +73,21 @@ The independent GLM prototype now consumes those pins in `sharding/ws32.py`, `ke
 and `tests/greenfield/kernels/test_ws32.py`. It fixes the logical mesh at `expert=8 x feature=4`,
 uses reciprocal gate/up and down ownership, preserves FP32 subgroup partials, and keeps the live
 residual physically `[1,1536]` per chip. The source inventory reconciles at 23,983,472,496
-persistent bytes per chip. This is capacity and forced-CPU mechanism evidence only; the final
-owner manifest/packer, real TPU HLO, exact real layer, KV/temporary HBM and protected latency remain
-open. See `WS32_2D_PROTOTYPE.md`.
+persistent bytes per chip. The sealed final-owner artifact and protected real layer now prove
+direct load, exact local groups, bounded correctness and layer HBM. The readable whole-matrix
+dequant body is performance-rejected at 516.582/1160.886 ms diagnostic p50; complete-model
+packing, KV/temporary target-context HBM and Gate-D decoder evidence remain open. See
+`WS32_2D_PROTOTYPE.md`.
 
 The next bounded reuse step derives WS32 layer 3 from the already sealed PP8 one-layer artifact
 `68ef8201...f938`; it does not reopen the three original checkpoint shards. The derivative's tiny
 test reconstructs all routed/shared source bytes after the 8x4 split and checks the append-only
 manifest plus direct slot loader. Reviewed real artifact
 `greenfield_ws32_one_layer_pack_20260815T070628458699950Z` now seals all 9,971,249,152 bytes under
-manifest `4bf8679d...1f40`; its remote CRC/object set and direct slots 0/31 pass. This is checkpoint
-reuse evidence only, not TPU/HLO/Gate-D evidence.
+manifest `4bf8679d...1f40`; its remote CRC/object set and direct slots 0/31 pass. The default-off
+Pallas challenger reuses this exact `[out,in]` layout plus the existing greenfield tile-local FP8
+kernels, selecting one owned expert before decode rather than creating another pack or transpose.
+Forced-32 semantics pass; its protected compiler acquisition is pending.
 
 ### Gate H: speculation
 

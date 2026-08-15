@@ -19,6 +19,20 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Protected tag `greenfield_ws32_real_layer_numerical_20260815T090957477700205Z` at reviewed code
+  `d3c3427` closes the readable WS32 layer's numerical/topology/load/HBM/archive discriminator.
+  Normal/concentrated maximum absolute errors are `0.015625` / `0.03125`; the exact acquired HLO
+  retains 15/15 inputs and ten local feature-4/expert-8 reductions. Maximum peak is 335,805,440
+  bytes/chip and the 51-object `SUCCESS`-last archive plus 8/8 cleanup pass. Diagnostic p50 is
+  `516.5821635` / `1160.885836` ms, so whole-matrix dequantization is correctness-passing but
+  execution-rejected. It has no DB/token-performance claim.
+- The sole bounded successor is now an isolated default-off WS32 Pallas body. It selects the
+  sealed `[out,in]` expert owner before the existing raw-FP8 tile-local kernels, avoiding a new pack,
+  runtime transpose and decoded-weight overlay. Forced-32 normal/concentrated semantics and exact
+  feature-4/expert-8 groups pass. Its dedicated compile acquisition keeps both HLO pins vacant and
+  cannot execute arithmetic. Exact next is one bulk immutable review, commit/push and one protected
+  HLO acquisition; only the acquired schedule authorizes the numerical latency discriminator.
+
 - The six-day PP8 bitwise arithmetic search is closed. The native-XLA feature tile folded back to
   the rejected ordinary-M1 schedule; all three Pallas forms are nonexact. Do not add another
   M1/M32 formula, scalar, fusion, layout or feature-tile arm, and do not spend an unchanged full-8K

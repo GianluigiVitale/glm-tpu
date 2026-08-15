@@ -431,7 +431,7 @@ def main() -> int:
             args.output,
             {
                 **prevalidation,
-                "artifact_kind": "greenfield_ws32_real_layer3_hlo_acquisition",
+                "artifact_kind": os.environ.get("GLM_GREENFIELD_WS32_ARTIFACT_KIND", "greenfield_ws32_real_layer3_hlo_acquisition"),
                 "performance_claim": False,
                 "schema_version": 1,
                 "status": "HLO_ACQUIRED",
@@ -479,7 +479,7 @@ def main() -> int:
     correctness_passed = all(value["passed"] for value in cases.values())
     record = {
         **prevalidation,
-        "artifact_kind": "greenfield_ws32_real_layer3",
+        "artifact_kind": os.environ.get("GLM_GREENFIELD_WS32_ARTIFACT_KIND", "greenfield_ws32_real_layer3"),
         "correctness": cases,
         "device_memory_after_execute": [
             _memory_stats(device) for device in jax.local_devices()

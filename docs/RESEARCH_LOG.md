@@ -5,6 +5,24 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 09:09--10:00 UTC — WS32 numerical baseline sealed; Pallas successor isolated
+
+- Protected tag `greenfield_ws32_real_layer_numerical_20260815T090957477700205Z` sealed the exact
+  acquired WS32 graphs at code `d3c3427`. Normal/concentrated oracle comparisons pass at maximum
+  absolute error `0.015625` / `0.03125`; 15/15 inputs and all ten F32-operand local reductions are
+  live. Maximum peak HBM is 335,805,440 bytes/chip and minimum largest-free block is
+  32,648,534,016 bytes/chip. The 51-object archive has `SUCCESS` last and 8/8 cleanup.
+- Diagnostic p50 is `516.5821635` / `1160.885836` ms. This is conclusive negative evidence for
+  the whole-matrix-dequant reference execution, not for the WS32 ownership topology and not a
+  token-speed claim.
+- Added one isolated default-off successor that selects the sealed rank-two expert owner before
+  invoking the already protected raw-FP8 Pallas matmuls. It changes no frozen reference source
+  location, creates no transpose or decoded overlay, and retains FP32 gate/up partials through the
+  feature-4 reduction plus the reference BF16 down/weighting boundary. Forced-32 distributed and
+  concentrated cases pass the bounded reference comparison and exact subgroup linter. A dedicated
+  compile-only wrapper has vacant pins and cannot execute arithmetic; one immutable audit precedes
+  the real TPU acquisition.
+
 ## 2026-08-15 08:11--08:15 UTC — all-host WS32 real-layer graph and HBM acquired
 
 - Protected tag `greenfield_ws32_real_layer_hlo_20260815T081128291986777Z` loaded the exact

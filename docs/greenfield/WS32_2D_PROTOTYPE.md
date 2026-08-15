@@ -111,15 +111,25 @@ reconstruction. Compiled argument/temp/code/output memory is
 bytes. XLA schedules BF16 results by fusing post-reduction conversions, but every operand and exact
 scalar-add reducer remains F32.
 
-That acquisition intentionally has no arithmetic, terminal `SUCCESS`, DB or performance claim.
-The next WS32 step is the single pinned numerical retry using those already captured graphs, with:
+The pinned numerical retry is now sealed as
+`greenfield_ws32_real_layer_numerical_20260815T090957477700205Z` at code `d3c3427`. Both normal
+and all-eight-on-one-owner cases pass the bounded oracle contract. Their maximum absolute errors
+are `0.015625` and `0.03125`; bitwise mismatch totals across 32 replicated shards are 31,632 and
+31,728. The graph retains the exact ten local reductions and all 15 live inputs. Maximum measured
+peak is 335,805,440 bytes/chip and the smallest largest-free block is 32,648,534,016 bytes/chip.
+The 51-object archive was sealed with `SUCCESS` last and authenticated 8/8 cleanup.
 
-1. load the sealed final-owner derivative directly on its exact physical slots;
-2. persist generated StableHLO/optimized HLO before execution;
-3. revalidate exact packed-bit/scale-to-dequant-to-dot-to-live-root lineage and subgroup bijection;
-4. retain one live row, no full hidden reconstruction, and only feature-4/expert-8 reductions;
-5. compare against the existing sealed layer-3 oracle;
-6. record exact topology, HBM, archive, and authenticated cleanup evidence.
+This proves the WS32 ownership, direct load, numerical contract, subgroup locality and ample layer
+HBM, but rejects the readable whole-matrix-dequant implementation as an execution candidate:
+diagnostic-only normal/concentrated p50 is `516.5821635` / `1160.885836` ms, compared with the
+protected PP8/PP16 real-layer sub-millisecond results. These timings are not token-throughput or
+production performance claims.
 
-Only that bounded numerical result decides whether WS32 advances toward a full decoder. An unchanged PP8 8K
-rerun and another M1/M32 arithmetic arm are both forbidden by the Gate-D closure evidence.
+The one remaining bounded WS32 discriminator is a distinct default-off raw-FP8 Pallas body. It
+selects one sealed `[out,in]` expert owner before invoking the existing tile-local decoder, so it
+requires neither a new pack nor an HBM transpose/decoded overlay. Forced-32 CPU execution already
+matches the reference within the protected bound and proves six exact feature-4/expert-8
+reductions for its smaller test geometry. One fail-closed protected compile acquisition must now
+pin its real StableHLO/optimized HLO before any arithmetic. If that acquired schedule is not live,
+local and materially faster, WS32 is evidence-rejected rather than extended to a full decoder.
+An unchanged PP8 8K rerun and another M1/M32 arithmetic arm remain forbidden.

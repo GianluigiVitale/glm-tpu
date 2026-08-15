@@ -1110,7 +1110,7 @@ capture is still required.
   `y -> x -> z` add. Decode, DSA observer and prefill must archive both representations with
   fleet-identical hashes; either contract failing blocks execution.
 
-## WS32 protected real-layer compile discriminator
+## WS32 protected real-layer numerical baseline
 
 - Sealed input: layer-3 WS32 manifest `4bf8679d...1f40`, mesh `de5f59cb...0a88`, and independent
   one-layer oracle manifest `c63ffa19...bff`.
@@ -1121,7 +1121,15 @@ capture is still required.
   and one expert-8 group, no group larger than eight and no physical 32-row hidden reconstruction.
   Per-chip measured post-load peak is 311,859,200 bytes with at least 32,702,539,776 bytes in the
   largest free block.
-- The attempt stopped before arithmetic because its validator misread XLA's BF16 scheduled result
-  as the reduction accumulator; exact HLO proves F32 operands/reducers and a fused BF16 output
-  conversion. No numerical, DB, archive-`SUCCESS`, Gate-D or performance claim exists. The single
-  pinned numerical run and independent terminal shard recomputation are pending.
+- Protected numerical tag `greenfield_ws32_real_layer_numerical_20260815T090957477700205Z` reused
+  those exact graphs and passed independent terminal shard/oracle recomputation. Normal and
+  concentrated maximum absolute errors are `0.015625` / `0.03125`; maximum peak HBM is
+  335,805,440 bytes/chip and the smallest largest-free block is 32,648,534,016 bytes/chip.
+- Diagnostic-only p50 is `516.5821635` / `1160.885836` ms. This rejects the readable
+  whole-matrix-dequant body as an execution candidate but is not token-throughput evidence. The
+  51-object archive has terminal `SUCCESS`, CRC/generation linkage and authenticated 8/8 cleanup;
+  there is deliberately no DB/performance row.
+- The only WS32 successor is a default-off Pallas body reusing the sealed `[out,in]` owner layout
+  and existing tile-local raw-FP8 kernels. Forced-32 semantics/local groups pass. Its real TPU HLO
+  acquisition and bounded latency discriminator remain required before WS32 can advance or be
+  formally evidence-rejected for Gate D.
