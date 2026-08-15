@@ -102,6 +102,7 @@ from .strategy_nd_dense_rms_replay import (
 from .strategy_nd_integrated_dense_rms import (
     validate_strategy_nd_integrated_dense_rms,
 )
+from .output_geometry import validate_output_geometry_replay
 
 __all__ = (
     "AcceptedAttentionUpdateCaptureConfig",
@@ -173,4 +174,5 @@ __all__ = (
     "validate_strategy_nd_dense_replay",
     "validate_strategy_nd_dense_rms_replay",
     "validate_strategy_nd_integrated_dense_rms",
+    "validate_output_geometry_replay",
 )

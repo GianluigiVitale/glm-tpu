@@ -68,6 +68,7 @@ readonly CHECKPOINT_REMOTE=$APPROVED_BUCKET/checkpoints/greenfield/glm52/runtime
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 RMS_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_RMS_REPLAY:-0}
+OUTPUT_GEOMETRY_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_OUTPUT_GEOMETRY_REPLAY:-0}
 INTEGRATED_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_RMS_REPLAY:-0}
 INTEGRATED_SPLIT_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_SPLIT_RMS_REPLAY:-0}
 INTEGRATED_ORDINAL_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_ORDINAL_RMS_REPLAY:-0}
@@ -78,6 +79,10 @@ INTEGRATED_NATIVE_M32_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M32_
 INTEGRATED_NATIVE_M1_PALLAS_REPLAY=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_PALLAS_OUTPUT_REPLAY:-0}
 [[ $RMS_REPLAY == 0 || $RMS_REPLAY == 1 ]] || {
   echo "GLM_GREENFIELD_STRATEGY_ND_RMS_REPLAY must be 0 or 1" >&2
+  exit 2
+}
+[[ $OUTPUT_GEOMETRY_REPLAY == 0 || $OUTPUT_GEOMETRY_REPLAY == 1 ]] || {
+  echo "GLM_GREENFIELD_STRATEGY_ND_OUTPUT_GEOMETRY_REPLAY must be 0 or 1" >&2
   exit 2
 }
 [[ $INTEGRATED_REPLAY == 0 || $INTEGRATED_REPLAY == 1 ]] || {
@@ -152,11 +157,14 @@ fi
 if [[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]]; then
   INTEGRATED_REPLAY=1
 fi
-[[ $((RMS_REPLAY + INTEGRATED_REPLAY)) -le 1 ]] || {
+[[ $((RMS_REPLAY + INTEGRATED_REPLAY + OUTPUT_GEOMETRY_REPLAY)) -le 1 ]] || {
   echo "dense RMS replay modes are mutually exclusive" >&2
   exit 2
 }
-if [[ $INTEGRATED_NATIVE_M1_PALLAS_REPLAY == 1 ]]; then
+if [[ $OUTPUT_GEOMETRY_REPLAY == 1 ]]; then
+  TAG=${GLM_GREENFIELD_STRATEGY_ND_OUTPUT_GEOMETRY_TAG:-greenfield_strategy_nd_output_geometry_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  REPLAY_OUTPUT_DIR=output_geometry
+elif [[ $INTEGRATED_NATIVE_M1_PALLAS_REPLAY == 1 ]]; then
   TAG=${GLM_GREENFIELD_STRATEGY_ND_INTEGRATED_NATIVE_M1_PALLAS_OUTPUT_TAG:-greenfield_strategy_nd_integrated_dense_native_m1_pallas_output_$(date -u +%Y%m%dT%H%M%S%NZ)}
   REPLAY_OUTPUT_DIR=integrated_dense_rms
 elif [[ $INTEGRATED_NATIVE_M32_REPLAY == 1 ]]; then
@@ -204,7 +212,7 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 }
 mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/hlo" \
   "$RUN_DIR/$REPLAY_OUTPUT_DIR" "$RUN_DIR/source" "$RUN_DIR/source_db533"
-if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 ]]; then
+if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 || $OUTPUT_GEOMETRY_REPLAY == 1 ]]; then
   mkdir -p "$RUN_DIR/source_rms"
 fi
 if [[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]]; then
@@ -290,7 +298,7 @@ require_sha "$DB533_ANALYSIS" "$DB533_ANALYSIS_SHA" "DB533 analysis"
 require_sha "$DB533_SUMMARY" "$DB533_SUMMARY_SHA" "DB533 summary"
 require_sha "$DB533_SUCCESS" "$DB533_SUCCESS_SHA" "DB533 SUCCESS"
 require_sha "$DB533_HLO_CONTRACT" "$DB533_HLO_CONTRACT_SHA" "DB533 HLO contract"
-if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 ]]; then
+if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 || $OUTPUT_GEOMETRY_REPLAY == 1 ]]; then
   require_sha "$RMS_SOURCE_NPZ" "$RMS_SOURCE_NPZ_SHA" "dense RMS tensor source"
   require_sha "$RMS_SOURCE_RUNNER" "$RMS_SOURCE_RUNNER_SHA" "dense RMS runner source"
   require_sha "$RMS_SOURCE_SUMMARY" "$RMS_SOURCE_SUMMARY_SHA" "dense RMS summary source"
@@ -388,7 +396,7 @@ fi
   say "ABORT: remote DB533 HLO contract drifted"
   exit 1
 }
-if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 ]]; then
+if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 || $OUTPUT_GEOMETRY_REPLAY == 1 ]]; then
   [[ $(gcloud storage cat "$RMS_SOURCE_REMOTE/dense_partial_capture.npz" |
     sha256sum | awk '{print $1}') == "$RMS_SOURCE_NPZ_SHA" ]] || {
     say "ABORT: remote dense RMS tensor source drifted"
@@ -444,7 +452,7 @@ cp "$DB533_ANALYSIS" "$RUN_DIR/source_db533/analysis.json"
 cp "$DB533_SUMMARY" "$RUN_DIR/source_db533/summary.json"
 cp "$DB533_SUCCESS" "$RUN_DIR/source_db533/SUCCESS"
 cp "$DB533_HLO_CONTRACT" "$RUN_DIR/source_db533/hlo_contract.json"
-if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 ]]; then
+if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 || $OUTPUT_GEOMETRY_REPLAY == 1 ]]; then
   cp "$RMS_SOURCE_NPZ" "$RUN_DIR/source_rms/dense_partial_capture.npz"
   cp "$RMS_SOURCE_RUNNER" "$RUN_DIR/source_rms/runner.json"
   cp "$RMS_SOURCE_SUMMARY" "$RUN_DIR/source_rms/summary.json"
@@ -474,7 +482,9 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
   exit 1
 }
 coordinator="$coordinator:8476"
-if [[ $INTEGRATED_REPLAY == 1 ]]; then
+if [[ $OUTPUT_GEOMETRY_REPLAY == 1 ]]; then
+  say "launching one shared-M32 reduction with M32, ordinary-M1 and tiled-M1 output arms"
+elif [[ $INTEGRATED_REPLAY == 1 ]]; then
   if [[ $INTEGRATED_NATIVE_M32_REPLAY == 1 ]]; then
     say "launching native full-M32 layer-1 output discriminator"
   elif [[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]]; then
@@ -497,7 +507,10 @@ else
 fi
 started=$(date +%s)
 
-if [[ $INTEGRATED_REPLAY == 1 ]]; then
+if [[ $OUTPUT_GEOMETRY_REPLAY == 1 ]]; then
+  # shellcheck disable=SC2016
+  capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; rms_remote='"$RMS_SOURCE_REMOTE"'; rms_sha='"$RMS_SOURCE_NPZ_SHA"'; coordinator='"$coordinator"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/host_records" "$run/hlo" "$run/output_geometry" "$run/source_rms"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; if compgen -G "$run/output_geometry/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/output_geometry/* "$remote/diagnostic_output_geometry/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; gcloud storage cp "$rms_remote/dense_partial_capture.npz" "$run/source_rms/dense_partial_capture.npz" >/dev/null; [[ $(sha256sum "$run/source_rms/dense_partial_capture.npz" | awk '\''{print $1}'\'') == "$rms_sha" ]]; cd "$wt"; GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_collectives.py --mode strategy_nd_output_geometry --coordinator-address "$coordinator" --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/collective.rank${idx}.json" --groups 32 --operations all_reduce --shape 32,6144 --dtype bfloat16 --association-trials 1 --association-rms-input "$run/source_rms/dense_partial_capture.npz"; gcloud storage cp --no-clobber "$run/collective.rank${idx}.json" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; if compgen -G "$run/output_geometry/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/output_geometry/* "$remote/output_geometry/" >/dev/null; fi; trap - EXIT; echo "REPLAY_UPLOAD_OK $(hostname) rank=$idx"'
+elif [[ $INTEGRATED_REPLAY == 1 ]]; then
   integrated_extra=""
   if [[ $INTEGRATED_SPLIT_REPLAY == 1 ]]; then
     integrated_extra="--integrated-split-layer1-rms"
@@ -556,6 +569,7 @@ post_census_done=1
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$TAG" "$elapsed" "$RMS_REPLAY" \
+  "$OUTPUT_GEOMETRY_REPLAY" \
   "$INTEGRATED_REPLAY" "$CHECKPOINT_ROOT" "$INTEGRATED_SPLIT_REPLAY" \
   "$INTEGRATED_ORDINAL_REPLAY" "$INTEGRATED_PREDENSE_SPLIT_REPLAY" \
   "$INTEGRATED_ACCEPTED_SOURCE_REPLAY" \
@@ -572,11 +586,18 @@ from glm_tpu.greenfield.validation import (
     validate_strategy_nd_dense_replay,
     validate_strategy_nd_dense_rms_replay,
     validate_strategy_nd_integrated_dense_rms,
+    validate_output_geometry_replay,
 )
 
-run_dir, pin, run_tag, elapsed, rms_replay, integrated_replay, checkpoint, split, ordinal, predense_split, accepted_source, native_source, native_m32, native_m1_pallas = sys.argv[1:]
+run_dir, pin, run_tag, elapsed, rms_replay, output_geometry, integrated_replay, checkpoint, split, ordinal, predense_split, accepted_source, native_source, native_m32, native_m1_pallas = sys.argv[1:]
 run_dir = Path(run_dir)
-if integrated_replay == "1":
+if output_geometry == "1":
+    summary = validate_output_geometry_replay(
+        run_dir,
+        expected_code_hash=pin,
+        expected_run_tag=run_tag,
+    )
+elif integrated_replay == "1":
     summary = validate_strategy_nd_integrated_dense_rms(
         run_dir,
         checkpoint_root=Path(checkpoint),
@@ -608,7 +629,9 @@ summary["results_db_role"] = "diagnostic_only_no_performance_row"
     json.dumps(summary, indent=2, sort_keys=True) + "\n"
 )
 label = (
-    "STRATEGY_ND_INTEGRATED_DENSE_RMS_VALID"
+    "STRATEGY_ND_OUTPUT_GEOMETRY_VALID"
+    if output_geometry == "1"
+    else "STRATEGY_ND_INTEGRATED_DENSE_RMS_VALID"
     if integrated_replay == "1"
     else "STRATEGY_ND_DENSE_RMS_REPLAY_VALID"
     if rms_replay == "1"
@@ -621,7 +644,7 @@ PY
 say "freezing and archiving model-free replay evidence"
 cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 evidence_dirs=(host_records hlo "$REPLAY_OUTPUT_DIR" source source_db533)
-if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 ]]; then
+if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 || $OUTPUT_GEOMETRY_REPLAY == 1 ]]; then
   evidence_dirs+=(source_rms)
 fi
 if [[ $INTEGRATED_NATIVE_SOURCE_REPLAY == 1 ]]; then
@@ -719,7 +742,8 @@ if observed != expected:
 PY
 
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" \
-  "$RMS_REPLAY" "$INTEGRATED_REPLAY" "$INTEGRATED_SPLIT_REPLAY" \
+  "$RMS_REPLAY" "$OUTPUT_GEOMETRY_REPLAY" "$INTEGRATED_REPLAY" \
+  "$INTEGRATED_SPLIT_REPLAY" \
   "$INTEGRATED_ORDINAL_REPLAY" "$INTEGRATED_PREDENSE_SPLIT_REPLAY" \
   "$INTEGRATED_ACCEPTED_SOURCE_REPLAY" \
   "$INTEGRATED_NATIVE_SOURCE_REPLAY" \
@@ -733,14 +757,15 @@ import sys
 root = Path(sys.argv[1])
 summary = json.loads((root / "summary.json").read_text())
 rms_replay = sys.argv[3] == "1"
-integrated_replay = sys.argv[4] == "1"
-integrated_split_replay = sys.argv[5] == "1"
-integrated_ordinal_replay = sys.argv[6] == "1"
-integrated_predense_split_replay = sys.argv[7] == "1"
-integrated_accepted_source_replay = sys.argv[8] == "1"
-integrated_native_source_replay = sys.argv[9] == "1"
-integrated_native_m32_replay = sys.argv[10] == "1"
-integrated_native_m1_pallas_replay = sys.argv[11] == "1"
+output_geometry_replay = sys.argv[4] == "1"
+integrated_replay = sys.argv[5] == "1"
+integrated_split_replay = sys.argv[6] == "1"
+integrated_ordinal_replay = sys.argv[7] == "1"
+integrated_predense_split_replay = sys.argv[8] == "1"
+integrated_accepted_source_replay = sys.argv[9] == "1"
+integrated_native_source_replay = sys.argv[10] == "1"
+integrated_native_m32_replay = sys.argv[11] == "1"
+integrated_native_m1_pallas_replay = sys.argv[12] == "1"
 common = {
     "artifact_kind": summary["artifact_kind"],
     "classification": summary["classification"],
@@ -751,7 +776,27 @@ common = {
     "remote_objects_sha256": sha256((root / "remote_objects.json").read_bytes()).hexdigest(),
     "remote_prefix": sys.argv[2],
 }
-if rms_replay or integrated_replay:
+if output_geometry_replay:
+    source = summary["source"]
+    values = {
+        **common,
+        "elementwise_exact": str(summary["elementwise_exact"]).lower(),
+        "expected_raw_sha256": summary["expected_raw_sha256"],
+        "m32_control_exact_accepted": str(
+            summary["m32_control_exact_accepted"]
+        ).lower(),
+        "m32_control_mismatch_count": summary["m32_control_mismatch_count"],
+        "mismatch_count": summary["mismatch_count"],
+        "observed_raw_sha256": summary["observed_raw_sha256"],
+        "optimized_hlo_sha256": summary["optimized_hlo_sha256"],
+        "performance_claim": "false",
+        "source_rms_npz_sha256": source["rms_npz_sha256"],
+        "source_rms_tag": source["rms_tag"],
+        "stablehlo_sha256": summary["stablehlo_sha256"],
+        "summary_sha256": sha256((root / "summary.json").read_bytes()).hexdigest(),
+        "topology_hash": summary["topology_hash"],
+    }
+elif rms_replay or integrated_replay:
     source = summary["source"]
     values = {
         **common,
@@ -848,7 +893,7 @@ terminal_success_done=1
 
 trap - EXIT
 classification=$(sed -n 's/^classification=//p' "$RUN_DIR/SUCCESS")
-if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 ]]; then
+if [[ $RMS_REPLAY == 1 || $INTEGRATED_REPLAY == 1 || $OUTPUT_GEOMETRY_REPLAY == 1 ]]; then
   mismatches=$(sed -n 's/^mismatch_count=//p' "$RUN_DIR/SUCCESS")
 else
   mismatches=$(sed -n 's/^row0_mismatch_count=//p' "$RUN_DIR/SUCCESS")

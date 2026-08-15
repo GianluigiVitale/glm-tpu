@@ -19,6 +19,46 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- The model-free output-geometry discriminator is now locally complete and default-off. One
+  executable computes the M32 RMS inverse once from the sealed dense/carried rows, then feeds that
+  identical live device value to three disjoint weighted-output arms: full M32 control, ordinary
+  logical M1 and logical M1 with the exact M32 `T(8,128)(2,1)` result tile. The corresponding result
+  layouts in forced-32 optimized HLO are exactly `T(8,128)`, `T(2,128)` and `T(8,128)`; the two M1
+  candidates remain logically `[1,6144]`. It loads no checkpoint/model weights, runs twice, retains
+  every complete output and recomputes all pairwise verdicts. Fleet/source/HLO/artifact/terminal/
+  archive contracts are wired through the existing protected wrapper and pass a complete synthetic
+  terminal replay plus 32 focused regressions. StableHLO and optimized-HLO pins remain deliberately
+  empty, so its first protected attempt can only persist the exact TPU graphs and refuse before
+  arithmetic. Exact next is one immutable Sol review, commit/push and one fail-closed compile
+  acquisition; then pin and mutation-test only that preserved graph before a separate numerical
+  replay. This replaces the former ambiguous instruction to hold a NumPy scalar fixed: that scalar
+  reproduces the rejected Pallas path, whereas all three decisive arms must consume the same
+  scheduled M32 reduction result.
+
+- Reviewed/pushed pin `97e0b66032d943a80c5263129397f3968a9168bf` completed the protected
+  true-M1 Pallas discriminator under tag
+  `greenfield_strategy_nd_integrated_dense_native_m1_pallas_output_20260815T010951234829154Z`.
+  The 94-second device workflow passed exact HLO/source/terminal revalidation, archived `SUCCESS`
+  last and finished 8/8 clean, but is numerically rejected: `2,104 / 6,144` BF16 mismatches,
+  first index 0, expected/observed SHAs `9936ee1e...d3039` / `28b7db46...2c20`, maximum/mean
+  error `0.001953125` / `5.7615582287932433e-05`. Hidden 2795 happens to match at 48423; that
+  does not authorize integration. Summary/`SUCCESS`/ledger/post-census/evidence SHAs are
+  `bffe1be6...60f0`, `a7e76b51...41ed`, `f524d3e7...d833`, `462b86d8...1d0a` and
+  `649f1c32...5428`. This remains diagnostic-only with no DB/performance row.
+- Offline replay from the sealed dense/residual/weight bits reproduces the Pallas hardware row
+  byte-for-byte, including SHA `28b7db46...2c20`. The kernel implemented the readable formula;
+  the accepted result depends on the scheduled physical output fusion instead. The preserved
+  native M1 and exact M32 HLOs use the same M32 RMS reduction/inverse, but the M1 final fusion is
+  `T(2,128)(2,1)`/megacore-split-1 and has 1,031 mismatches, while the exact full output is
+  `T(8,128)(2,1)`/megacore-split-0. Do not rerun or tune the rejected Pallas formula.
+- Exact next is one model-free, multi-arm output-geometry replay using sealed rows and one shared
+  scheduled M32 scalar: retain an exact full-M32 control, an ordinary M1 control and a logical-M1 result with the
+  concrete M32 output tile. JAX `with_layout_constraint` cannot encode tiling (its lowering has an
+  explicit TODO); use a concrete `Format(Layout(...), replicated_sharding)` result contract. This
+  test must keep the candidate logically `[1,6144]`, preserve all arms in one run and decide
+  whether physical padding alone reproduces the accepted elementwise fusion. Full 8K remains
+  forbidden until a complete true-M1 bounded row is exact.
+
 - Reviewed/pushed pin `38d3d61723c14bce8855494d4c5be4d548c000ef` ran the deliberately
   fail-closed true-M1 Pallas compile acquisition once under tag
   `greenfield_strategy_nd_integrated_dense_native_m1_pallas_output_20260815T005237606917753Z`.

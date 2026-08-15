@@ -706,11 +706,14 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
     ).read_text()
     marker = (
         '/home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" \\\n'
-        '  "$RMS_REPLAY" "$INTEGRATED_REPLAY" '
-        '"$INTEGRATED_SPLIT_REPLAY" \\\n'
+        '  "$RMS_REPLAY" "$OUTPUT_GEOMETRY_REPLAY" "$INTEGRATED_REPLAY" \\\n'
+        '  "$INTEGRATED_SPLIT_REPLAY" \\\n'
         '  "$INTEGRATED_ORDINAL_REPLAY" '
         '"$INTEGRATED_PREDENSE_SPLIT_REPLAY" \\\n'
-        '  "$INTEGRATED_ACCEPTED_SOURCE_REPLAY" <<\'PY\'\n'
+        '  "$INTEGRATED_ACCEPTED_SOURCE_REPLAY" \\\n'
+        '  "$INTEGRATED_NATIVE_SOURCE_REPLAY" \\\n'
+        '  "$INTEGRATED_NATIVE_M32_REPLAY" \\\n'
+        '  "$INTEGRATED_NATIVE_M1_PALLAS_REPLAY" <<\'PY\'\n'
         'from hashlib import sha256'
     )
     start = wrapper.index(marker) + marker.index("from hashlib")
@@ -920,11 +923,15 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
                 str(run_dir),
                 "gs://unit/result",
                 rms_mode,
+                "0",
                 integrated_mode,
                 split_mode,
                 ordinal_mode,
                 predense_split_mode,
                 accepted_source_mode,
+                "0",
+                "0",
+                "0",
             ],
             input=body,
             text=True,
@@ -945,3 +952,54 @@ def test_protected_wrapper_success_heredoc_executes_all_modes(
             assert (
                 "accepted_source_context=true\n" in success
             ) is (accepted_source_mode == "1")
+
+    output_dir = tmp_path / "output-geometry"
+    output_dir.mkdir()
+    (output_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                **common,
+                "elementwise_exact": True,
+                "expected_raw_sha256": "a" * 64,
+                "m32_control_exact_accepted": True,
+                "m32_control_mismatch_count": 0,
+                "mismatch_count": 0,
+                "observed_raw_sha256": "a" * 64,
+                "optimized_hlo_sha256": "b" * 64,
+                "source": {
+                    "rms_npz_sha256": "f" * 64,
+                    "rms_tag": "unit-rms",
+                },
+                "stablehlo_sha256": "c" * 64,
+                "topology_hash": "d" * 64,
+            }
+        )
+    )
+    for name in ("evidence.sha256", "census_post.txt", "remote_objects.json"):
+        (output_dir / name).write_text(name)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-",
+            str(output_dir),
+            "gs://unit/result",
+            "0",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+        ],
+        input=body,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    success = (output_dir / "SUCCESS").read_text()
+    assert "classification=unit\n" in success
+    assert "m32_control_exact_accepted=true\n" in success

@@ -1770,7 +1770,10 @@ def test_protected_integrated_wrapper_is_default_off_and_success_last() -> None:
     assert "--integrated-split-layer1-rms" in wrapper
     assert "--mode strategy_nd_integrated_dense_rms" in wrapper
     assert "validate_strategy_nd_integrated_dense_rms" in wrapper
-    assert '"$RMS_REPLAY" "$INTEGRATED_REPLAY"' in wrapper
+    assert (
+        '"$RMS_REPLAY" "$OUTPUT_GEOMETRY_REPLAY" "$INTEGRATED_REPLAY"'
+        in wrapper
+    )
     assert '"$INTEGRATED_NATIVE_M1_PALLAS_REPLAY" <<\'PY\'' in wrapper
     assert "expected_native_m32_output=native_m32 == \"1\"" in wrapper
     assert (

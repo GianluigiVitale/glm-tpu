@@ -5,6 +5,58 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 01:20--01:43 UTC — three-arm output-geometry probe is locally sealed
+
+- Implemented one default-off, model-free executable that loads only the SHA-pinned DB548
+  dense/carried/norm/accepted rows, reconstructs the exact DB533 dense association, computes one
+  shared M32 RMS inverse on device and sends that same value to three disjoint output arms. The
+  outputs are full M32 `T(8,128)(2,1)`, ordinary logical M1 `T(2,128)(2,1)` and logical M1 with
+  `T(8,128)(2,1)`. Both M1 outputs remain shape `[1,6144]`; only the physical result tile differs.
+- Corrected the initial local draft before metal: a fixed NumPy inverse makes even the M32 control
+  reproduce the rejected Pallas formula (`2,104` mismatches), so it cannot isolate output geometry.
+  The final graph computes the scalar once through the same M32-shaped reduction and shares it
+  across all arms. This keeps the observed final fusion extent/layout as the sole variable.
+- Added exact source reconstruction pins, two-invocation/four-local-replica capture, complete output
+  artifacts, pairwise verdict recomputation, fleet topology/hash agreement, exact source archive,
+  HLO prevalidation and protected `SUCCESS`-last sealing. A full synthetic terminal archive built
+  from the genuine protected fleet/source schema passes, while an artifact-byte mutation refuses.
+  The existing integrated/RMS suites plus the new suite pass 32/32; the new suite alone passes 6/6.
+- StableHLO/optimized-HLO pins are intentionally empty. The first protected attempt is compile
+  acquisition only and crosses a fleet barrier after atomically persisting both graphs before the
+  empty pin refuses. No arithmetic, host record, terminal verdict, DB row or `SUCCESS` can publish.
+  Exact next is one immutable Sol review, commit/push and that single acquisition; all HLO proof
+  iteration will then use the recovered graph locally.
+
+## 2026-08-15 01:09--01:13 UTC — true-M1 Pallas formula is numerically rejected
+
+- Reviewed/pushed pin `97e0b66032d943a80c5263129397f3968a9168bf` completed tag
+  `greenfield_strategy_nd_integrated_dense_native_m1_pallas_output_20260815T010951234829154Z`.
+  The protected device workflow took 94 seconds and passed the exact pinned StableHLO/optimized
+  HLO, source, deterministic-repeat, four-local-replica, artifact, remote-object and terminal
+  contracts. Publication was `SUCCESS`-last and the final census is authenticated 8/8 clean.
+- The row is nonexact at `2,104 / 6,144` BF16 values, first mismatch 0. Expected/observed raw SHAs
+  are `9936ee1e19049b297fd205292ebc378aee41d59401bbf56497004356998d3039` and
+  `28b7db466b74f462b5cd3109cb052bcce0c8be185d3f24199239f75136b22c20`; maximum/mean absolute
+  errors are `0.001953125` / `5.7615582287932433e-05`. Hidden 2795 is exact at 48423 in both,
+  but isolated coordinate agreement is not promotion evidence. Summary/`SUCCESS`/ledger/
+  post-census/evidence SHAs are `bffe1be6...60f0`, `a7e76b51...41ed`, `f524d3e7...d833`,
+  `462b86d8...1d0a` and `649f1c32...5428`. There is no DB or performance row.
+- An independent offline replay of the sealed dense-update, carried-residual and norm-weight bits
+  through the documented FP32-add/RMS, BF16-round and weighted-multiply formula produces the
+  hardware Pallas row byte-for-byte, including SHA `28b7db46...2c20`. The formula and kernel are
+  therefore coherent; they are not the accepted TPU schedule. Sweeping 131,073 adjacent FP32
+  inverse codes cannot reduce the accepted mismatch below 2,089, so this is not a one-scalar fix.
+- The preserved non-Pallas native-source M1 and exact full-M32 HLOs already isolate the next
+  difference without another model run. Both consume the same M32 `multiply_reduce_fusion` and
+  `add_rsqrt_fusion`. M1 slices afterward and lowers the weighted output as
+  `T(2,128)(2,1)`, megacore split dimension 1, producing 1,031 mismatches; full M32 retains
+  `T(8,128)(2,1)`, megacore split dimension 0, and is exact. Build one model-free multi-arm replay
+  that holds the inputs/scalar fixed and compares full-M32, ordinary-M1 and logical-M1 with the
+  exact concrete M32 output tile while sharing one scheduled M32 inverse. Use
+  `Format(Layout(...), sharding)`: the current JAX
+  `with_layout_constraint` lowering explicitly discards tiling. Do not rerun the Pallas formula or
+  launch the complete decoder until a true-M1 arm is bitwise exact.
+
 ## 2026-08-15 00:52--00:54 UTC — true-M1 Pallas TPU lowering acquired once
 
 - Reviewed/pushed pin `38d3d61723c14bce8855494d4c5be4d548c000ef` ran the intentionally

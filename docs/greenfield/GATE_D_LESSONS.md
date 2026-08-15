@@ -122,6 +122,24 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   acquisition on the same code/compiler pin, and do not confuse its upstream M32 diagnostic
   producers with M32 Pallas I/O. One bounded numerical execution decides the kernel; only an exact
   row authorizes decoder integration.
+- That protected execution rejected the Pallas formula at `2,104 / 6,144` mismatches, observed SHA
+  `28b7db46...2c20`. Offline replay of the readable FP32-add/RMS, BF16-round and weight-multiply
+  contract reproduces the TPU Pallas row exactly. Freeze this result: do not tune or rerun the same
+  formula, and do not mistake hidden-2795 agreement for row exactness.
+- The exact M32 and rejected non-Pallas M1 HLOs share the same M32 RMS reduction/inverse. Their
+  remaining discriminator is the final weighted-output geometry: exact M32 uses
+  `T(8,128)(2,1)` with megacore split 0, while M1 uses `T(2,128)(2,1)` with split 1. Test this
+  directly with one model-free multi-arm replay that holds inputs/scalar fixed; never reload model
+  weights to test a final-fusion layout.
+- `with_layout_constraint` currently serializes only major/minor order and explicitly drops tile
+  metadata. When the hypothesis is a concrete TPU tile, require it through
+  `Format(Layout(major_to_minor=..., tiling=...), sharding)` on the compiled result and pin the
+  resulting entry/result layout in HLO. A source-level `Layout(..., tiling=...)` call is not proof.
+- Do not freeze an offline scalar unless the offline computation first reproduces the accepted TPU
+  control. The readable NumPy inverse reproduces the rejected Pallas row, not the accepted output.
+  For a final-layout discriminator, compute one shared scheduled M32 inverse inside the graph and
+  feed that exact SSA value to every output-layout arm; otherwise scalar arithmetic and physical
+  output geometry change simultaneously and the experiment cannot classify either mechanism.
 
 ## Evidence ladder
 

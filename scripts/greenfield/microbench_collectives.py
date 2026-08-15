@@ -49,6 +49,10 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     DENSE_RMS_SOURCE_SUCCESS_SHA256,
     DENSE_RMS_SOURCE_SUMMARY_SHA256,
     DENSE_RMS_SOURCE_TAG,
+    M1_AUTO_BF16_LAYOUT,
+    M32_BF16_LAYOUT,
+    OUTPUT_GEOMETRY_DENSE_ROW_RAW_SHA256,
+    OUTPUT_GEOMETRY_INVERSE_RAW_SHA256,
     IntegratedDenseWeights,
     NATIVE_SOURCE_ATTENDED_LATENT_KEY,
     NATIVE_SOURCE_NPZ_SHA256,
@@ -65,19 +69,25 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     build_collective_chain,
     build_strategy_nd_dense_rms_replay,
     build_integrated_dense_rms,
+    build_output_geometry_replay,
     build_strategy_nd_fingerprint,
     execute_strategy_nd_dense_rms_replay,
     execute_integrated_dense_rms,
     execute_native_source_context,
+    execute_output_geometry_replay,
     execute_strategy_nd_fingerprint,
     generate_strategy_nd_input_bits,
     load_dense_rms_inputs,
     load_integrated_dense_rms_inputs,
+    load_output_geometry_inputs,
     model_axis_weights_to_physical,
     native_source_inputs,
     validate_integrated_checkpoint_success,
     model_axis_to_physical_input_bits,
     replay_db533_strategy_nd_row0_bits,
+    compare_output_geometry_arrays,
+    validate_output_geometry_hlo,
+    validate_output_geometry_stablehlo,
     validate_strategy_nd_fingerprint_hlo,
 )
 from glm_tpu.greenfield.topology import (  # noqa: E402
@@ -162,6 +172,7 @@ def parse_args() -> argparse.Namespace:
             "strategy_nd_dense_replay",
             "strategy_nd_dense_rms_replay",
             "strategy_nd_integrated_dense_rms",
+            "strategy_nd_output_geometry",
         ),
         default="chain",
     )
@@ -941,6 +952,8 @@ def _run_strategy_nd_integrated_dense_rms(
         "observed_hidden_2795_bfloat16_bits": int(output_bits[2795]),
         "observed_raw_sha256": output_raw_sha,
     }
+
+
     physical_weight_hashes = {
         name: array_sha256(getattr(physical_weights, name))
         for name in ("merged_bits", "merged_scale", "down_bits", "down_scale")
@@ -1131,6 +1144,162 @@ def _run_strategy_nd_integrated_dense_rms(
             if preceding_attention_collective
             else {}
         ),
+    }
+
+
+def _run_strategy_nd_output_geometry(
+    args: argparse.Namespace,
+    jax: Any,
+    multihost_utils: Any,
+    topology: Any,
+) -> dict[str, Any]:
+    """Test the accepted M32 output tile on one logical live row."""
+
+    source_path = args.association_rms_input
+    if source_path is None or not source_path.is_file():
+        raise RuntimeError("output geometry requires the sealed RMS source")
+    physical_ids = tuple(sorted(device.device_id for device in topology.devices))
+    if physical_ids != tuple(range(32)):
+        raise RuntimeError("output geometry requires physical ids 0..31")
+    model_axis_device_ids = accepted_tp32_model_axis_device_ids(jax.devices())
+    inputs = load_output_geometry_inputs(source_path, model_axis_device_ids)
+    label = "strategy_nd_output_geometry_bfloat16_m32_m1_tiled"
+    multihost_utils.sync_global_devices(f"greenfield-output-geometry-start-{label}")
+    compiled = build_output_geometry_replay(
+        physical_ids,
+        devices=jax.devices(),
+        validate_hlo=False,
+    )
+    stablehlo_sha = sha256(compiled.stablehlo.encode()).hexdigest()
+    optimized_hlo_sha = sha256(compiled.optimized_hlo.encode()).hexdigest()
+    replay_dir = args.output.parent / "output_geometry"
+    hlo_dir = args.output.parent / "hlo"
+    stablehlo_path = hlo_dir / f"{label}.stablehlo.mlir"
+    optimized_hlo_path = hlo_dir / f"{label}.optimized_hlo.txt"
+    contract_path = hlo_dir / f"{label}.hlo_contract.json"
+    if jax.process_index() == 0:
+        _atomic_write_text(stablehlo_path, compiled.stablehlo)
+        _atomic_write_text(optimized_hlo_path, compiled.optimized_hlo)
+        _atomic_write(
+            hlo_dir / f"{label}.hlo_prevalidation.json",
+            {
+                "optimized_hlo_sha256": optimized_hlo_sha,
+                "performance_claim": False,
+                "stablehlo_sha256": stablehlo_sha,
+                "validated": False,
+            },
+        )
+    # Every host must cross this barrier before the intentionally empty graph
+    # pins refuse the first acquisition.  That preserves both compiler graphs.
+    multihost_utils.sync_global_devices(
+        f"greenfield-output-geometry-graphs-written-{label}"
+    )
+    stablehlo_contract = validate_output_geometry_stablehlo(compiled.stablehlo)
+    optimized_hlo_contract = validate_output_geometry_hlo(compiled.optimized_hlo)
+    fleet_stablehlo_hashes = _fleet_digest(
+        multihost_utils,
+        stablehlo_sha,
+        label="output geometry StableHLO",
+        num_processes=args.num_processes,
+    )
+    fleet_hlo_hashes = _fleet_digest(
+        multihost_utils,
+        optimized_hlo_sha,
+        label="output geometry optimized HLO",
+        num_processes=args.num_processes,
+    )
+    outputs, capture = execute_output_geometry_replay(compiled, inputs)
+    comparison = compare_output_geometry_arrays(outputs, inputs.accepted_bits)
+    stable_hashes = {
+        "accepted": array_sha256(inputs.accepted_bits),
+        "carried": array_sha256(inputs.carried_bits),
+        "dense": array_sha256(inputs.dense_bits),
+        "inverse": array_sha256(inputs.inverse),
+        "m1_auto": array_sha256(outputs["m1_auto"]),
+        "m1_m32_tile": array_sha256(outputs["m1_m32_tile"]),
+        "m32_control": array_sha256(outputs["m32_control"]),
+        "source_file": DENSE_RMS_SOURCE_NPZ_SHA256,
+        "weight": array_sha256(inputs.weight_bits),
+    }
+    fleet_hashes = {
+        key: _fleet_digest(
+            multihost_utils,
+            value,
+            label=f"output geometry {key}",
+            num_processes=args.num_processes,
+        )
+        for key, value in stable_hashes.items()
+    }
+    artifact_manifest: dict[str, Any] = {}
+    if jax.process_index() == 0:
+        _atomic_write(
+            contract_path,
+            {
+                "optimized": dict(optimized_hlo_contract),
+                "stablehlo": dict(stablehlo_contract),
+                "valid": True,
+            },
+        )
+        artifacts = {
+            "accepted_bits": inputs.accepted_bits,
+            "m1_auto_bits": outputs["m1_auto"],
+            "m1_m32_tile_bits": outputs["m1_m32_tile"],
+            "m32_control_bits": outputs["m32_control"],
+        }
+        for name, value in artifacts.items():
+            path = replay_dir / f"{name}.npy"
+            _atomic_save(path, value)
+            reloaded = np.load(path, allow_pickle=False)
+            artifact_manifest[name] = {
+                "array_sha256": array_sha256(reloaded),
+                "dtype": reloaded.dtype.str,
+                "file": path.name,
+                "file_sha256": _file_sha256(path),
+                "shape": list(reloaded.shape),
+            }
+        _atomic_write(replay_dir / "comparison.json", comparison)
+        _atomic_write(replay_dir / "manifest.json", artifact_manifest)
+    multihost_utils.sync_global_devices(f"greenfield-output-geometry-end-{label}")
+    decisive = comparison["pairwise"]["m1_m32_tile_vs_m32_control"]
+    print(
+        "GREENFIELD_STRATEGY_ND_OUTPUT_GEOMETRY_OK "
+        f"launch_process={args.process_id} jax_process={jax.process_index()} "
+        f"classification={comparison['classification']} "
+        f"mismatches={decisive['mismatch_count']} hlo={optimized_hlo_sha}",
+        flush=True,
+    )
+    return {
+        "accepted_model_axis_device_ids": list(model_axis_device_ids),
+        "accepted_model_axis_recipe": ACCEPTED_TP32_MODEL_AXIS_RECIPE,
+        "artifact_manifest": artifact_manifest,
+        "capture": dict(capture),
+        "comparison": comparison,
+        "diagnostic_only": True,
+        "fleet_hashes": fleet_hashes,
+        "fleet_hlo_hashes": fleet_hlo_hashes,
+        "fleet_stablehlo_hashes": fleet_stablehlo_hashes,
+        "member_device_ids": list(physical_ids),
+        "optimized_hlo_contract": dict(optimized_hlo_contract),
+        "optimized_hlo_sha256": optimized_hlo_sha,
+        "output_layouts": {
+            "m1_auto": M1_AUTO_BF16_LAYOUT,
+            "m1_m32_tile": M32_BF16_LAYOUT,
+            "m32_control": M32_BF16_LAYOUT,
+        },
+        "performance_claim": False,
+        "source": {
+            "dense_row_raw_sha256": OUTPUT_GEOMETRY_DENSE_ROW_RAW_SHA256,
+            "inverse_raw_sha256": OUTPUT_GEOMETRY_INVERSE_RAW_SHA256,
+            "rms_code_hash": DENSE_RMS_SOURCE_CODE_HASH,
+            "rms_npz_sha256": DENSE_RMS_SOURCE_NPZ_SHA256,
+            "rms_remote_objects_sha256": DENSE_RMS_SOURCE_REMOTE_OBJECTS_SHA256,
+            "rms_runner_sha256": DENSE_RMS_SOURCE_RUNNER_SHA256,
+            "rms_success_sha256": DENSE_RMS_SOURCE_SUCCESS_SHA256,
+            "rms_summary_sha256": DENSE_RMS_SOURCE_SUMMARY_SHA256,
+            "rms_tag": DENSE_RMS_SOURCE_TAG,
+        },
+        "stablehlo_contract": dict(stablehlo_contract),
+        "stablehlo_sha256": stablehlo_sha,
     }
 
 
@@ -1358,6 +1527,7 @@ def main() -> int:
         "strategy_nd_dense_replay",
         "strategy_nd_dense_rms_replay",
         "strategy_nd_integrated_dense_rms",
+        "strategy_nd_output_geometry",
     }
     if args.mode in strategy_nd_modes and (
         tuple(args.groups) != (32,)
@@ -1373,6 +1543,7 @@ def main() -> int:
         "strategy_nd_dense_replay",
         "strategy_nd_dense_rms_replay",
         "strategy_nd_integrated_dense_rms",
+        "strategy_nd_output_geometry",
     } and args.association_trials != 1:
         raise ValueError("StrategyND real-data replay requires association-trials=1")
     if args.mode not in {
@@ -1383,6 +1554,7 @@ def main() -> int:
     rms_modes = {
         "strategy_nd_dense_rms_replay",
         "strategy_nd_integrated_dense_rms",
+        "strategy_nd_output_geometry",
     }
     if args.mode not in rms_modes and args.association_rms_input:
         raise ValueError("association RMS input is valid only for dense RMS replay")
@@ -1468,6 +1640,7 @@ def main() -> int:
         "strategy_nd_dense_replay",
         "strategy_nd_dense_rms_replay",
         "strategy_nd_integrated_dense_rms",
+        "strategy_nd_output_geometry",
     } and not run_tag:
         raise RuntimeError("StrategyND real-data replay requires GLM_GREENFIELD_RUN_TAG")
 
@@ -1498,6 +1671,7 @@ def main() -> int:
         association_dense_replay = None
         association_dense_rms_replay = None
         association_integrated_dense_rms = None
+        association_output_geometry = None
         matrix = []
         if args.mode == "strategy_nd_fingerprint":
             association_fingerprint = _run_strategy_nd_fingerprint(
@@ -1516,6 +1690,10 @@ def main() -> int:
                 _run_strategy_nd_integrated_dense_rms(
                     args, jax, multihost_utils, topology
                 )
+            )
+        elif args.mode == "strategy_nd_output_geometry":
+            association_output_geometry = _run_strategy_nd_output_geometry(
+                args, jax, multihost_utils, topology
             )
         else:
             for group_size in args.groups:
@@ -1615,7 +1793,9 @@ def main() -> int:
             "mode": args.mode,
             "run_tag": run_tag,
             "schema_version": (
-                5
+                6
+                if association_output_geometry is not None
+                else 5
                 if association_integrated_dense_rms is not None
                 else 4
                 if association_dense_rms_replay is not None
@@ -1634,6 +1814,8 @@ def main() -> int:
             record["association_integrated_dense_rms"] = (
                 association_integrated_dense_rms
             )
+        if association_output_geometry is not None:
+            record["association_output_geometry"] = association_output_geometry
         _atomic_write(args.output, record)
         print(
             "GREENFIELD_COLLECTIVE_HOST_OK "
