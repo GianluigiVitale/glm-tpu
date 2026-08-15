@@ -72,11 +72,16 @@ GLM DSA, FP8 block-scale ownership, persistent sharded residuals or the protecte
 The independent GLM prototype now consumes those pins in `sharding/ws32.py`, `kernels/ws32.py`,
 and `tests/greenfield/kernels/test_ws32.py`. It fixes the logical mesh at `expert=8 x feature=4`,
 uses reciprocal gate/up and down ownership, preserves FP32 subgroup partials, and keeps the live
-residual physically `[1,1536]` per chip. The source inventory reconciles at 23,983,472,496
-persistent bytes per chip. The sealed final-owner artifact and protected real layer now prove
-direct load, exact local groups, bounded correctness and layer HBM. The readable whole-matrix
-dequant body is performance-rejected at 516.582/1160.886 ms diagnostic p50; complete-model
-packing, KV/temporary target-context HBM and Gate-D decoder evidence remain open. See
+residual physically `[1,1536]` per chip. The exact complete runtime placement supersedes the early
+capacity estimate: 117,060 base source tensors become 2,310 final tensors per owner and
+24,567,890,256 payload bytes per chip, 786,172,488,192 bytes total. At 256K, exact local KV plus
+index state adds 3,447,717,888 bytes per chip; compiler/temporary peak HBM remains a measured metal
+gate, not inferred headroom. The sealed final-owner artifact and protected real layer prove direct
+load, exact local groups, bounded correctness and layer HBM. The readable whole-matrix dequant body
+is performance-rejected at 516.582/1160.886 ms diagnostic p50. Its protected raw-FP8 Pallas
+successor is correct at 1.257/2.304 ms p50 and is the complete-decoder body. The isolated 78-layer
+composition, exact tensor-name bijection, atomic 32-owner packer and direct final-owner loader now
+pass locally; the full pack/load and complete protected 2K/8K decoder evidence remain open. See
 `WS32_2D_PROTOTYPE.md`.
 
 The next bounded reuse step derives WS32 layer 3 from the already sealed PP8 one-layer artifact
@@ -87,7 +92,9 @@ manifest plus direct slot loader. Reviewed real artifact
 manifest `4bf8679d...1f40`; its remote CRC/object set and direct slots 0/31 pass. The default-off
 Pallas challenger reuses this exact `[out,in]` layout plus the existing greenfield tile-local FP8
 kernels, selecting one owned expert before decode rather than creating another pack or transpose.
-Forced-32 semantics pass; its protected compiler acquisition is pending.
+Forced-32 semantics and protected compiler/numerical evidence pass. Reuse those exact owners and
+kernel contracts in the complete decoder; do not repack a layer or revive the rejected readable
+dequant path.
 
 ### Gate H: speculation
 

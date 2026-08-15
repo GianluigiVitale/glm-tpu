@@ -73,6 +73,14 @@ def test_ws32_real_geometry_layout_is_one_row_and_reciprocal() -> None:
     assert layout["dense_down"]["local_shape"] == [1536, 1536]
     assert layout["routed_gate_up"]["local_shape"] == [32, 2048, 1536]
     assert layout["routed_down"]["local_shape"] == [32, 1536, 2048]
+    assert layout["attention"]["selected_cache"] == {
+        "context_partition_axis": "expert",
+        "replicated_axis": "feature",
+        "exchange_axis": "expert",
+        "physical_group_size": 8,
+    }
+    assert layout["attention"]["o_projection"]["reduction_axis"] == "expert"
+    assert layout["dsa"]["score_head_reduction_axis"] == "expert"
     assert layout["forbidden"] == {
         "batch_32_decode_rows": True,
         "full_pod_hidden_reconstruction": True,
@@ -173,11 +181,11 @@ def test_ws32_real_inventory_mlp_capacity_reconciles() -> None:
     assert base.source_inventory_sha256 == inventory_sha256
     assert base.source_tensor_count == 117_060
     assert base.source_bytes == 745_584_507_456
-    assert base.packed_bytes == 767_471_119_872
-    assert base.non_mlp_replication_extra_bytes == 2_063_457_216
-    assert base.maximum_persistent_bytes == 23_983_472_496
-    assert base.minimum_persistent_bytes == 23_983_472_496
-    assert set(base.fp8_scale_bytes_by_chip) == {5_824_752}
+    assert base.packed_bytes == 786_172_488_192
+    assert base.non_mlp_replication_extra_bytes == 20_764_825_536
+    assert base.maximum_persistent_bytes == 24_567_890_256
+    assert base.minimum_persistent_bytes == 24_567_890_256
+    assert set(base.fp8_scale_bytes_by_chip) == {5_967_312}
 
 
 def _synthetic_dense_hlo() -> str:

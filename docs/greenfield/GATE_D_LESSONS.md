@@ -365,6 +365,28 @@ branches from the search tree.
 - Protected runs require clean code pins, exact source hashes, physical topology/host bindings,
   pre/post eight-host zero-work census, CRC-verified complete remote object equality and remote
   `SUCCESS` last. Diagnostics never become performance claims.
+- `bash -n` validates only the outer wrapper, not shell programs stored in strings for remote
+  execution. Extract every generated worker command and run `bash -n` on the evaluated value; also
+  compile every embedded Python heredoc locally. A stray command separator after a heredoc is a
+  deterministic launch failure even when the wrapper itself parses.
+- A distributed checkpoint has two independent terminal prefixes: payload/manifest and run
+  evidence. Recompute exact slot ownership from the pinned physical topology, rederive byte/tensor
+  cardinalities, verify remote size plus CRC32C and exact object equality, and publish `SUCCESS`
+  last in each prefix. Never include `SUCCESS` in a recursive nonterminal upload.
+- A GCSFuse checkpoint mount may be deliberately read-only. Finalize a manifest in a writable run
+  directory against exact read-only payload symlinks, remove those links before failure archiving,
+  and upload the manifest through a create-only storage API. Never infer writability from a mounted
+  path merely because new remote objects become visible there.
+- Worker evidence uploaded before orchestration is already part of the remote append-only prefix.
+  A later create-only bulk uploader must skip those objects, then authenticate one exact combined
+  local/remote object set and CRC ledger. Re-uploading downloaded worker records is a deterministic
+  precondition failure, not additional protection.
+- A manifest is not a protected checkpoint commit marker by itself. Direct load requires an exact,
+  self-hashed `SUCCESS` bound to manifest bytes, code, mesh, topology, inventory and cardinalities.
+  Immediately before publishing it, revalidate all payload sizes, CRC32Cs and immutable generations
+  against both the preflight ledger and manifest; a prior check does not close the replacement race.
+- Give each remote-vacancy proof a distinct local evidence filename. Prefixes commonly share the
+  same final tag component, so deriving both filenames with `basename` silently overwrites one.
 - A worker's `passed` field, tensor SHA or error summary is not terminal numerical evidence. Preserve
   the exact raw BF16 bits (or an equivalently content-addressed tensor), reconstruct every physical
   shard in the orchestrator, recompute hashes/errors against the independently sealed oracle and

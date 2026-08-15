@@ -489,3 +489,237 @@ def ws32_moe_pallas_from_routes_mapped(
         contract.routed_scaling_factor, dtype=jnp.bfloat16
     )
     return (routed * routed_scale + shared).astype(jnp.bfloat16)
+
+
+# New complete-decoder primitives are intentionally appended below the
+# protected one-layer body.  Its TPU HLO records source coordinates in this
+# file, so inserting above it would invalidate an already sealed graph.
+def ws32_rms_norm_mapped(
+    hidden_local: Any,
+    weight_local: Any,
+    *,
+    global_hidden_size: int,
+    feature_axis: str = "feature",
+    epsilon: float = 1e-5,
+) -> Any:
+    """RMSNorm one persistent hidden shard with one feature-4 reduction."""
+
+    if hidden_local.ndim < 1 or hidden_local.shape[-1] <= 0:
+        raise ValueError("WS32 RMSNorm requires a nonempty hidden shard")
+    if hidden_local.dtype != jnp.bfloat16:
+        raise ValueError("WS32 RMSNorm activation must be bfloat16")
+    if weight_local.shape != (hidden_local.shape[-1],):
+        raise ValueError("WS32 RMSNorm weight must match the local hidden shard")
+    if (
+        not isinstance(global_hidden_size, int)
+        or isinstance(global_hidden_size, bool)
+        or global_hidden_size < hidden_local.shape[-1]
+        or global_hidden_size % hidden_local.shape[-1]
+    ):
+        raise ValueError("WS32 RMSNorm global hidden geometry is invalid")
+    if not isinstance(epsilon, (int, float)) or isinstance(epsilon, bool) or (
+        epsilon <= 0
+    ):
+        raise ValueError("WS32 RMSNorm epsilon must be positive")
+
+    value = hidden_local.astype(jnp.float32)
+    local_square_sum = jnp.sum(lax.square(value), axis=-1, keepdims=True)
+    with jax.named_scope("greenfield_ws32_rmsnorm/feature_square_reduce"):
+        square_sum = lax.psum(local_square_sum, axis_name=feature_axis)
+    inverse = lax.rsqrt(
+        square_sum / jnp.float32(global_hidden_size) + jnp.float32(epsilon)
+    )
+    normalized = value * inverse
+    return (
+        normalized.astype(hidden_local.dtype)
+        * weight_local.astype(hidden_local.dtype)
+    ).astype(hidden_local.dtype)
+
+
+def ws32_fp8_feature_linear_pallas_mapped(
+    lhs_local: Any,
+    weight_bits_local: Any,
+    weight_scale_local: Any,
+    *,
+    feature_axis: str = "feature",
+    block_shape: tuple[int, int] = (128, 128),
+    interpret: bool = False,
+) -> Any:
+    """Contract a hidden feature shard and replicate the compact result."""
+
+    from .pallas.fp8_matmul import Fp8BlockMatmulConfig, fp8_block_matmul_f32
+
+    if lhs_local.ndim != 2 or lhs_local.shape[0] != 1:
+        raise ValueError("WS32 feature linear requires one live row")
+    if weight_bits_local.ndim != 2 or (
+        weight_bits_local.shape[1] != lhs_local.shape[1]
+    ):
+        raise ValueError("WS32 feature linear weight geometry drifted")
+    config = Fp8BlockMatmulConfig(
+        block_shape=block_shape,
+        output_tile=block_shape[0],
+        contraction_tile=block_shape[1],
+    )
+    partial = fp8_block_matmul_f32(
+        lhs_local,
+        weight_bits_local,
+        weight_scale_local,
+        config=config,
+        interpret=interpret,
+    )
+    with jax.named_scope("greenfield_ws32_linear/feature_reduce"):
+        return lax.psum(partial, axis_name=feature_axis).astype(jnp.bfloat16)
+
+
+def ws32_fp8_expert_linear_pallas_mapped(
+    lhs_local: Any,
+    weight_bits_local: Any,
+    weight_scale_local: Any,
+    *,
+    expert_axis: str = "expert",
+    block_shape: tuple[int, int] = (128, 128),
+    interpret: bool = False,
+) -> Any:
+    """Contract an expert-sharded input into one hidden feature shard."""
+
+    from .pallas.fp8_matmul import Fp8BlockMatmulConfig, fp8_block_matmul_f32
+
+    if lhs_local.ndim != 2 or lhs_local.shape[0] != 1:
+        raise ValueError("WS32 expert linear requires one live row")
+    if weight_bits_local.ndim != 2 or (
+        weight_bits_local.shape[1] != lhs_local.shape[1]
+    ):
+        raise ValueError("WS32 expert linear weight geometry drifted")
+    config = Fp8BlockMatmulConfig(
+        block_shape=block_shape,
+        output_tile=block_shape[0],
+        contraction_tile=block_shape[1],
+    )
+    partial = fp8_block_matmul_f32(
+        lhs_local,
+        weight_bits_local,
+        weight_scale_local,
+        config=config,
+        interpret=interpret,
+    )
+    with jax.named_scope("greenfield_ws32_linear/expert_reduce"):
+        return lax.psum(partial, axis_name=expert_axis).astype(jnp.bfloat16)
+
+
+def ws32_dense_pallas_mapped(
+    hidden_local: Any,
+    gate_bits_local: Any,
+    gate_scale_local: Any,
+    up_bits_local: Any,
+    up_scale_local: Any,
+    down_bits_local: Any,
+    down_scale_local: Any,
+    *,
+    expert_axis: str = "expert",
+    feature_axis: str = "feature",
+    block_shape: tuple[int, int] = (128, 128),
+    interpret: bool = False,
+) -> Any:
+    """Raw-FP8 Pallas dense MLP with reciprocal feature/expert ownership."""
+
+    from .pallas.fp8_matmul import Fp8BlockMatmulConfig, fp8_block_matmul_f32
+
+    if hidden_local.ndim != 2 or hidden_local.shape[0] != 1:
+        raise ValueError("WS32 dense Pallas input must contain one live row")
+    if hidden_local.dtype != jnp.bfloat16:
+        raise ValueError("WS32 dense Pallas input must be bfloat16")
+    local_hidden = hidden_local.shape[-1]
+    if gate_bits_local.shape != up_bits_local.shape or (
+        gate_bits_local.ndim != 2
+        or gate_bits_local.shape[-1] != local_hidden
+    ):
+        raise ValueError("WS32 dense Pallas gate/up geometry drifted")
+    local_intermediate = gate_bits_local.shape[0]
+    if down_bits_local.shape != (local_hidden, local_intermediate):
+        raise ValueError("WS32 dense Pallas down geometry drifted")
+    config = Fp8BlockMatmulConfig(
+        block_shape=block_shape,
+        output_tile=block_shape[0],
+        contraction_tile=block_shape[1],
+    )
+    gate_partial = fp8_block_matmul_f32(
+        hidden_local,
+        gate_bits_local,
+        gate_scale_local,
+        config=config,
+        interpret=interpret,
+    )
+    up_partial = fp8_block_matmul_f32(
+        hidden_local,
+        up_bits_local,
+        up_scale_local,
+        config=config,
+        interpret=interpret,
+    )
+    with jax.named_scope("greenfield_ws32_dense/feature_gate_up_reduce"):
+        gate_up = lax.psum(
+            jnp.stack((gate_partial, up_partial), axis=0),
+            axis_name=feature_axis,
+        ).astype(jnp.bfloat16)
+    activated = (
+        gate_up[0] * jax.nn.sigmoid(gate_up[0]) * gate_up[1]
+    ).astype(jnp.bfloat16)
+    down_partial = fp8_block_matmul_f32(
+        activated,
+        down_bits_local,
+        down_scale_local,
+        config=config,
+        interpret=interpret,
+    )
+    with jax.named_scope("greenfield_ws32_dense/expert_down_reduce"):
+        return lax.psum(
+            down_partial, axis_name=expert_axis
+        ).astype(jnp.bfloat16)
+
+
+def ws32_router_from_shards_mapped(
+    hidden_local: Any,
+    router_weight_local: Any,
+    correction_bias_local: Any,
+    *,
+    top_k: int,
+    expert_axis: str = "expert",
+    feature_axis: str = "feature",
+) -> tuple[Any, Any]:
+    """Compute exact GLM routing from a 2D router shard and compact gathers."""
+
+    from .reference.moe import route_glm_noaux_tc_logits
+
+    if hidden_local.ndim != 2 or hidden_local.shape[0] != 1:
+        raise ValueError("WS32 router requires one live hidden row")
+    if router_weight_local.ndim != 2 or (
+        router_weight_local.shape[1] != hidden_local.shape[1]
+    ):
+        raise ValueError("WS32 router weight geometry drifted")
+    local_experts = router_weight_local.shape[0]
+    if correction_bias_local.shape != (local_experts,):
+        raise ValueError("WS32 router bias geometry drifted")
+    local_logits = lax.dot_general(
+        hidden_local.astype(jnp.float32),
+        router_weight_local.astype(jnp.float32),
+        dimension_numbers=(((1,), (1,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    )
+    with jax.named_scope("greenfield_ws32_router/feature_reduce"):
+        local_logits = lax.psum(local_logits, axis_name=feature_axis)
+    with jax.named_scope("greenfield_ws32_router/expert_gather"):
+        logits = lax.all_gather(
+            local_logits,
+            axis_name=expert_axis,
+            axis=1,
+            tiled=True,
+        )
+        correction_bias = lax.all_gather(
+            correction_bias_local,
+            axis_name=expert_axis,
+            axis=0,
+            tiled=True,
+        )
+    return route_glm_noaux_tc_logits(
+        logits, correction_bias, top_k=top_k
+    )

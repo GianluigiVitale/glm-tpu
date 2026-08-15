@@ -205,6 +205,52 @@ class Ws32MeshContract:
                 "down_partition_spec": [WS32_FEATURE_AXIS, None],
                 "declared_replication_factor": expert,
             },
+            "attention": {
+                # Q/KV low-rank projections contract the persistent hidden
+                # shard over feature-4 and remain compact/replicated.  Head
+                # projections shard complete heads over expert-8, and the
+                # reciprocal output projection returns the persistent hidden
+                # feature shard with one expert-8 reduction.
+                "q_a_kv_a": {
+                    "weight_partition_spec": [None, WS32_FEATURE_AXIS],
+                    "result_partition_spec": [None, None],
+                    "reduction_axis": WS32_FEATURE_AXIS,
+                },
+                "q_b_kv_b": {
+                    "weight_partition_spec": [WS32_EXPERT_AXIS, None],
+                    "head_partition_axis": WS32_EXPERT_AXIS,
+                    "replicated_axis": WS32_FEATURE_AXIS,
+                },
+                "o_projection": {
+                    "weight_partition_spec": [
+                        WS32_FEATURE_AXIS,
+                        WS32_EXPERT_AXIS,
+                    ],
+                    "result_partition_spec": [None, WS32_FEATURE_AXIS],
+                    "reduction_axis": WS32_EXPERT_AXIS,
+                },
+                "selected_cache": {
+                    "context_partition_axis": WS32_EXPERT_AXIS,
+                    "replicated_axis": WS32_FEATURE_AXIS,
+                    "exchange_axis": WS32_EXPERT_AXIS,
+                    "physical_group_size": expert,
+                },
+            },
+            "dsa": {
+                "query_head_partition_axis": WS32_EXPERT_AXIS,
+                "hidden_contraction_axis": WS32_FEATURE_AXIS,
+                "context_partition_axis": WS32_EXPERT_AXIS,
+                "score_head_reduction_axis": WS32_EXPERT_AXIS,
+                "candidate_merge_axis": WS32_EXPERT_AXIS,
+            },
+            "embedding_logits": {
+                "weight_partition_spec": [
+                    WS32_EXPERT_AXIS,
+                    WS32_FEATURE_AXIS,
+                ],
+                "embedding_owner_reduce_axis": WS32_EXPERT_AXIS,
+                "logit_contraction_axis": WS32_FEATURE_AXIS,
+            },
             "forbidden": {
                 "batch_32_decode_rows": True,
                 "full_pod_hidden_reconstruction": True,
@@ -566,7 +612,16 @@ def build_ws32_mlp_capacity_report(
 
 
 def _non_mlp_divisor(tensor: SourceTensor) -> int:
-    """Return exact final-owner divisor for one non-MLP base tensor."""
+    """Return the exact full-decoder WS32 divisor for a non-MLP tensor.
+
+    The divisor is derived from the executable layout, not merely from an
+    even-capacity split.  Compact q/kv-a projections are hidden-feature
+    sharded and expert-replicated; q/kv-b head projections are expert-sharded
+    and feature-replicated; output projections and vocabulary tables are
+    genuinely two-dimensional.  This costs about 0.58 GB/chip more than the
+    earlier capacity-only 32-way split, but it avoids a full-mesh reshard and
+    leaves the residual persistently feature-sharded.
+    """
 
     name = tensor.name
     if name in {"model.embed_tokens.weight", "lm_head.weight"}:
@@ -581,7 +636,7 @@ def _non_mlp_divisor(tensor: SourceTensor) -> int:
             ".self_attn.kv_a_layernorm.weight",
         )
     ):
-        return 8
+        return 1
     if name.endswith(
         (
             ".self_attn.indexer.k_norm.bias",
@@ -597,22 +652,33 @@ def _non_mlp_divisor(tensor: SourceTensor) -> int:
         ".self_attn.kv_a_proj_with_mqa.weight_scale_inv"
     ):
         return 4
+    if name.endswith(".self_attn.indexer.weights_proj.weight"):
+        return 32
     if name.endswith(
         (
-            ".self_attn.indexer.weights_proj.weight",
             ".self_attn.indexer.wq_b.weight",
             ".self_attn.indexer.wq_b.weight_scale_inv",
             ".self_attn.kv_b_proj.weight",
             ".self_attn.kv_b_proj.weight_scale_inv",
-            ".self_attn.o_proj.weight",
-            ".self_attn.o_proj.weight_scale_inv",
-            ".self_attn.q_a_proj.weight",
-            ".self_attn.q_a_proj.weight_scale_inv",
             ".self_attn.q_b_proj.weight",
             ".self_attn.q_b_proj.weight_scale_inv",
         )
     ):
+        return 8
+    if name.endswith(
+        (
+            ".self_attn.o_proj.weight",
+            ".self_attn.o_proj.weight_scale_inv",
+        )
+    ):
         return 32
+    if name.endswith(
+        (
+            ".self_attn.q_a_proj.weight",
+            ".self_attn.q_a_proj.weight_scale_inv",
+        )
+    ):
+        return 4
     raise PlanValidationError(
         f"WS32 has no non-MLP ownership rule for {tensor.name!r}"
     )

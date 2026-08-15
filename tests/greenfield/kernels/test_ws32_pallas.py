@@ -186,3 +186,229 @@ print(json.dumps({
         assert result["cases"][case]["output_shape"] == [1, 128]
         assert result["cases"][case]["output_sharding"] == "P(None, 'feature')"
         assert result["cases"][case]["max_abs_error"] <= 0.03125
+
+
+def test_ws32_complete_decoder_primitives_match_forced_32_references() -> None:
+    program = r'''
+import json
+
+import jax
+import jax.numpy as jnp
+import ml_dtypes
+import numpy as np
+from jax import lax
+from jax._src.pallas.mosaic import tpu_info
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+
+from glm_tpu.greenfield.kernels.reference.moe import route_glm_noaux_tc_logits
+from glm_tpu.greenfield.kernels.ws32 import (
+    ws32_dense_fp8_mapped,
+    ws32_dense_pallas_mapped,
+    ws32_rms_norm_mapped,
+    ws32_router_from_shards_mapped,
+)
+from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.greenfield.sharding.ws32 import validate_ws32_repeated_hlo
+
+tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
+    tpu_info.ChipVersion.TPU_V4, 1
+)
+tpu_info.get_tpu_info.cache_clear()
+
+def bits(value):
+    return np.asarray(value, dtype=ml_dtypes.float8_e4m3fn).view(np.uint8)
+
+def draw(seed, shape, scale=0.125):
+    return np.random.default_rng(seed).normal(0, scale, shape).astype(np.float32)
+
+devices = np.asarray(jax.devices(), dtype=object).reshape(8, 4)
+mesh = Mesh(devices, ("expert", "feature"))
+hidden = np.asarray(draw(1, (1, 128), 0.25), dtype=ml_dtypes.bfloat16)
+hidden_sharding = NamedSharding(mesh, P(None, "feature"))
+
+dense_size = 256
+block = (32, 32)
+gate = bits(draw(2, (dense_size, 128)))
+up = bits(draw(3, (dense_size, 128)))
+down = bits(draw(4, (128, dense_size)))
+gate_scale = np.random.default_rng(5).uniform(0.5, 1.25, (8, 4)).astype(np.float32)
+up_scale = np.random.default_rng(6).uniform(0.5, 1.25, (8, 4)).astype(np.float32)
+down_scale = np.random.default_rng(7).uniform(0.5, 1.25, (4, 8)).astype(np.float32)
+dense_specs = (
+    P(None, "feature"),
+    P("expert", "feature"), P("expert", "feature"),
+    P("expert", "feature"), P("expert", "feature"),
+    P("feature", "expert"), P("feature", "expert"),
+)
+dense_shardings = tuple(NamedSharding(mesh, spec) for spec in dense_specs)
+dense_values = tuple(
+    jax.device_put(value, sharding)
+    for value, sharding in zip(
+        (hidden, gate, gate_scale, up, up_scale, down, down_scale),
+        dense_shardings,
+    )
+)
+readable_dense = jax.shard_map(
+    lambda *values: ws32_dense_fp8_mapped(*values, block_shape=block),
+    mesh=mesh,
+    in_specs=dense_specs,
+    out_specs=P(None, "feature"),
+    check_vma=False,
+)
+pallas_dense = jax.shard_map(
+    lambda *values: ws32_dense_pallas_mapped(
+        *values, block_shape=block, interpret=True
+    ),
+    mesh=mesh,
+    in_specs=dense_specs,
+    out_specs=P(None, "feature"),
+    check_vma=False,
+)
+readable_compiled = jax.jit(readable_dense).lower(*dense_values).compile()
+pallas_compiled = jax.jit(pallas_dense).lower(*dense_values).compile()
+expected_dense = readable_compiled(*dense_values)
+actual_dense = pallas_compiled(*dense_values)
+dense_contract = validate_ws32_repeated_hlo(
+    pallas_compiled.as_text(),
+    kind="dense",
+    hidden_size=128,
+    dense_intermediate_size=dense_size,
+)
+
+norm_weight = np.asarray(
+    np.random.default_rng(8).uniform(0.75, 1.25, (128,)),
+    dtype=ml_dtypes.bfloat16,
+)
+norm_map = jax.shard_map(
+    lambda value, weight: ws32_rms_norm_mapped(
+        value, weight, global_hidden_size=128
+    ),
+    mesh=mesh,
+    in_specs=(P(None, "feature"), P("feature")),
+    out_specs=P(None, "feature"),
+    check_vma=False,
+)
+norm_values = (
+    jax.device_put(hidden, hidden_sharding),
+    jax.device_put(norm_weight, NamedSharding(mesh, P("feature"))),
+)
+norm_compiled = jax.jit(norm_map).lower(*norm_values).compile()
+actual_norm = norm_compiled(*norm_values)
+hidden_f32 = jnp.asarray(hidden).astype(jnp.float32)
+inverse = lax.rsqrt(jnp.sum(lax.square(hidden_f32), axis=-1, keepdims=True)
+                    / jnp.float32(128) + jnp.float32(1e-5))
+expected_norm = (
+    (hidden_f32 * inverse).astype(jnp.bfloat16)
+    * jnp.asarray(norm_weight)
+).astype(jnp.bfloat16)
+
+num_experts = 16
+router_weight = np.asarray(draw(9, (num_experts, 128), 0.2), dtype=ml_dtypes.bfloat16)
+router_bias = draw(10, (num_experts,), 0.01)
+router_map = jax.shard_map(
+    lambda value, weight, bias: ws32_router_from_shards_mapped(
+        value, weight, bias, top_k=4
+    ),
+    mesh=mesh,
+    in_specs=(P(None, "feature"), P("expert", "feature"), P("expert")),
+    out_specs=(P(), P()),
+    check_vma=False,
+)
+router_values = (
+    jax.device_put(hidden, hidden_sharding),
+    jax.device_put(router_weight, NamedSharding(mesh, P("expert", "feature"))),
+    jax.device_put(router_bias, NamedSharding(mesh, P("expert"))),
+)
+router_compiled = jax.jit(router_map).lower(*router_values).compile()
+actual_indices, actual_weights = router_compiled(*router_values)
+hidden_chunks = jnp.asarray(hidden).astype(jnp.float32).reshape(1, 4, 32)
+weight_chunks = jnp.asarray(router_weight).astype(jnp.float32).reshape(8, 2, 4, 32)
+logit_rows = []
+for expert_row in range(8):
+    partials = []
+    for feature in range(4):
+        partials.append(lax.dot_general(
+            hidden_chunks[:, feature, :],
+            weight_chunks[expert_row, :, feature, :],
+            dimension_numbers=(((1,), (1,)), ((), ())),
+            preferred_element_type=jnp.float32,
+        ))
+    logit_rows.append(jnp.sum(jnp.stack(partials), axis=0, dtype=jnp.float32))
+expected_indices, expected_weights = route_glm_noaux_tc_logits(
+    jnp.concatenate(logit_rows, axis=1), jnp.asarray(router_bias), top_k=4
+)
+
+def collective_summary(text):
+    module = parse_hlo_module(text)
+    return {
+        "count": len(module.collectives),
+        "maximum_group_size": max(
+            (item.maximum_group_size for item in module.collectives), default=0
+        ),
+        "opcodes": sorted(item.raw_opcode for item in module.collectives),
+    }
+
+print(json.dumps({
+    "dense": {
+        "max_abs": float(jnp.max(jnp.abs(
+            actual_dense.astype(jnp.float32) - expected_dense.astype(jnp.float32)
+        ))),
+        "sharding": str(actual_dense.sharding.spec),
+        "contract_valid": dense_contract.valid,
+        "violations": dense_contract.violations,
+        "collectives": collective_summary(pallas_compiled.as_text()),
+    },
+    "norm": {
+        "max_abs": float(jnp.max(jnp.abs(
+            actual_norm.astype(jnp.float32) - expected_norm.astype(jnp.float32)
+        ))),
+        "sharding": str(actual_norm.sharding.spec),
+        "collectives": collective_summary(norm_compiled.as_text()),
+    },
+    "router": {
+        "indices_equal": bool(np.array_equal(
+            np.asarray(actual_indices), np.asarray(expected_indices)
+        )),
+        "weights_max_abs": float(jnp.max(jnp.abs(
+            actual_weights - expected_weights
+        ))),
+        "index_sharding": str(actual_indices.sharding.spec),
+        "weight_sharding": str(actual_weights.sharding.spec),
+        "collectives": collective_summary(router_compiled.as_text()),
+    },
+}, sort_keys=True))
+'''
+    environment = dict(os.environ)
+    environment["JAX_PLATFORMS"] = "cpu"
+    existing = environment.get("XLA_FLAGS", "").strip()
+    environment["XLA_FLAGS"] = (
+        f"{existing} --xla_force_host_platform_device_count=32".strip()
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=300,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result["dense"]["max_abs"] <= 0.03125
+    assert result["dense"]["sharding"] == "P(None, 'feature')"
+    assert result["dense"]["contract_valid"], result["dense"]["violations"]
+    assert result["dense"]["collectives"]["count"] == 2
+    assert result["norm"]["max_abs"] <= 0.015625
+    assert result["norm"]["sharding"] == "P(None, 'feature')"
+    assert result["norm"]["collectives"]["count"] == 1
+    assert result["router"]["indices_equal"]
+    assert result["router"]["weights_max_abs"] == 0.0
+    assert result["router"]["index_sharding"] == "P()"
+    assert result["router"]["weight_sharding"] == "P()"
+    assert result["router"]["collectives"]["count"] == 3
+    for section in ("dense", "norm", "router"):
+        assert result[section]["collectives"]["maximum_group_size"] <= 8
+        assert not any(
+            opcode.endswith(("-start", "-done"))
+            for opcode in result[section]["collectives"]["opcodes"]
+        )
