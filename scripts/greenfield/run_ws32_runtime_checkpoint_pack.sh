@@ -12,8 +12,9 @@ readonly SOURCE_ROOT=/home/gianl/gcs-models/models/GLM-5.2-FP8
 readonly SOURCE_URI=$APPROVED_BUCKET/models/GLM-5.2-FP8
 readonly INVENTORY=/home/gianl/gcs-models/checkpoints/greenfield/glm52/plans/PP8_LP4/greenfield_checkpoint_plan_pp8_20260805T180552087295643Z/source_inventory.json
 readonly INVENTORY_SHA=a388627c08c8ff591903deb1fbf3198f43916e64a2295ed0e253f1e44a042fc4
-readonly TOPOLOGY_RUN=/home/gianl/glm-run/greenfield_topology_20260805T125842425591441Z
+readonly TOPOLOGY_ROOT=/home/gianl/gcs-models/results/greenfield_topology_20260805T125842425591441Z/host_records
 readonly TOPOLOGY_HASH=294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559
+readonly TOPOLOGY_FLEET_HASH=50de0729c9e5080c5ddb5ae4f5cd948317c53ce8a8f6c9f3f6064e7afc6515a0
 readonly MESH_HASH=de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88
 readonly EXPECTED_PAYLOAD_BYTES=786172488192
 readonly EXPECTED_SLOT_BYTES=24567890256
@@ -126,6 +127,47 @@ for index in 0 1; do
   }
 done
 
+PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+  "$TOPOLOGY_ROOT" "$TOPOLOGY_HASH" "$TOPOLOGY_FLEET_HASH" \
+  "$MESH_HASH" "$RUN_DIR/topology_preflight.json" <<'PY'
+from hashlib import sha256
+import json
+from pathlib import Path
+import sys
+
+from glm_tpu.greenfield.benchmarking.ws32_one_layer import (
+    validate_ws32_topology_fleet,
+)
+from glm_tpu.greenfield.sharding.ws32 import build_ws32_physical_mesh
+
+root = Path(sys.argv[1])
+expected_topology, expected_fleet, expected_mesh, output = sys.argv[2:]
+paths = tuple(root / f"topology.rank{rank}.json" for rank in range(8))
+captures = tuple(json.loads(path.read_text()) for path in paths)
+topology, ordered, fleet_hash = validate_ws32_topology_fleet(
+    captures,
+    expected_topology_sha256=expected_topology,
+    expected_fleet_sha256=expected_fleet,
+    slice_name="db-v4-64-od",
+)
+mesh_hash = build_ws32_physical_mesh(topology).mesh_hash
+if mesh_hash != expected_mesh:
+    raise SystemExit("WS32 topology mesh identity drifted")
+if any(
+    capture["launch_process_id"] != rank
+    for rank, capture in enumerate(captures)
+):
+    raise SystemExit("WS32 topology filename/launch identity drifted")
+value = {
+    "capture_sha256": [sha256(path.read_bytes()).hexdigest() for path in paths],
+    "launch_hostnames": [capture["hostname"] for capture in ordered],
+    "mesh_hash": mesh_hash,
+    "topology_fleet_hash": fleet_hash,
+    "topology_hash": topology.topology_hash,
+}
+Path(output).write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+PY
+
 strict_census pre || {
   say "ABORT: pre-pack fleet is not authenticated zero-work"
   exit 1
@@ -133,23 +175,31 @@ strict_census pre || {
 
 say "syncing exact reviewed code and immutable source/topology records"
 # shellcheck disable=SC2016
-sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$ORIGIN"'; wt='"$WORKTREE"'; source_root='"$SOURCE_ROOT"'; inventory='"$INVENTORY"'; topology='"$TOPOLOGY_RUN"'; idx=${HOSTNAME##*-w-}; if [[ "$idx" == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin '"$BRANCH"'; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository worktree" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch '"$BRANCH"' "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; capture="$topology/host_records/topology.rank${idx}.json"; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && [[ -r "$inventory" ]] && [[ -r "$source_root/model.safetensors.index.json" ]] && [[ -r "$capture" ]] && findmnt -T "$source_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && echo "SYNC_OK $(hostname) $pin"'
+sync_command='set -euo pipefail; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$ORIGIN"'; wt='"$WORKTREE"'; source_root='"$SOURCE_ROOT"'; inventory='"$INVENTORY"'; topology_root='"$TOPOLOGY_ROOT"'; idx=${HOSTNAME##*-w-}; if [[ "$idx" == 0 ]]; then [[ -e "$wt/.git" ]] && [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin '"$BRANCH"'; git -C "$wt" checkout -q --detach "$pin"; elif [[ -e "$wt" ]]; then echo "stale non-repository worktree" >&2; exit 1; else git clone -q --filter=blob:none --no-checkout --single-branch --branch '"$BRANCH"' "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; capture="$topology_root/topology.rank${idx}.json"; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && [[ -r "$inventory" ]] && [[ -r "$source_root/model.safetensors.index.json" ]] && [[ -r "$capture" ]] && findmnt -T "$source_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$topology_root" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && python3 - "$capture" "$idx" <<'"'"'PY'"'"'
+import json,socket,sys
+value=json.load(open(sys.argv[1])); rank=int(sys.argv[2])
+if value.get("launch_process_id") != rank or value.get("hostname") != socket.gethostname(): raise SystemExit("topology capture/launch host identity drifted")
+PY
+echo "SYNC_OK $(hostname) $pin"'
+sync_rc=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-  --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1
-has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK || {
+  --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1 || sync_rc=$?
+if [[ $sync_rc -ne 0 ]] || ! has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK; then
   say "ABORT: exact eight-host sync failed"
   exit 1
-}
+fi
 
 say "packing 32 slots and hashing 141 sources across eight hosts"
 # shellcheck disable=SC2016
-host_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; source_root='"$SOURCE_ROOT"'; source_uri='"$SOURCE_URI"'; inventory='"$INVENTORY"'; topology='"$TOPOLOGY_RUN"'; topology_sha='"$TOPOLOGY_HASH"'; mesh_sha='"$MESH_HASH"'; inventory_sha='"$INVENTORY_SHA"'; pin='"$PIN"'; checkpoint='"$CHECKPOINT_URI"'; remote='"$REMOTE_PREFIX"'; capture="$topology/host_records/topology.rank${idx}.json"; run=/home/gianl/glm-run/$tag/host_pack; mkdir -p "$run"; tmp=$(mktemp -d "/dev/shm/${tag}.worker${idx}.XXXXXXXX"); cleanup(){ if [[ -n ${tmp:-} && -d $tmp && $tmp == /dev/shm/${tag}.worker${idx}.* ]]; then rm -rf -- "$tmp"; fi; }; trap cleanup EXIT; available=$(df -B1 --output=avail /dev/shm | tail -1); required=100500000000; [[ $available -ge $required ]] || { echo "insufficient /dev/shm: $available" >&2; exit 1; }; cd "$wt"; read -r slots mesh observed_inventory observed_topology < <(PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python - "$capture" "$inventory" <<'"'"'PY'"'"'
-import json,sys
+host_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; source_root='"$SOURCE_ROOT"'; source_uri='"$SOURCE_URI"'; inventory='"$INVENTORY"'; topology_root='"$TOPOLOGY_ROOT"'; topology_sha='"$TOPOLOGY_HASH"'; mesh_sha='"$MESH_HASH"'; inventory_sha='"$INVENTORY_SHA"'; pin='"$PIN"'; checkpoint='"$CHECKPOINT_URI"'; remote='"$REMOTE_PREFIX"'; capture="$topology_root/topology.rank${idx}.json"; run=/home/gianl/glm-run/$tag/host_pack; mkdir -p "$run"; tmp=$(mktemp -d "/dev/shm/${tag}.worker${idx}.XXXXXXXX"); cleanup(){ if [[ -n ${tmp:-} && -d $tmp && $tmp == /dev/shm/${tag}.worker${idx}.* ]]; then rm -rf -- "$tmp"; fi; }; trap cleanup EXIT; available=$(df -B1 --output=avail /dev/shm | tail -1); required=100500000000; [[ $available -ge $required ]] || { echo "insufficient /dev/shm: $available" >&2; exit 1; }; cd "$wt"; read -r slots mesh observed_inventory observed_topology < <(PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python - "$capture" "$inventory" "$idx" <<'"'"'PY'"'"'
+import json,socket,sys
 from pathlib import Path
 from glm_tpu.greenfield.partitioning.source_inventory import inspect_source_inventory
 from glm_tpu.greenfield.sharding.ws32 import build_ws32_physical_mesh
 from glm_tpu.greenfield.types import PhysicalTopology
-x=json.loads(Path(sys.argv[1]).read_text()); topology=PhysicalTopology.from_dict(x["contract"]["topology"]); mesh=build_ws32_physical_mesh(topology); slots=tuple(mesh.flattened_device_ids.index(int(device_id)) for device_id in x["local_device_ids"]); print(",".join(map(str,slots)),mesh.mesh_hash,inspect_source_inventory(Path(sys.argv[2])).inventory_sha256,x["contract"]["topology_hash"])
+x=json.loads(Path(sys.argv[1]).read_text()); rank=int(sys.argv[3])
+if x.get("launch_process_id") != rank or x.get("hostname") != socket.gethostname(): raise SystemExit("topology capture/launch host identity drifted")
+topology=PhysicalTopology.from_dict(x["contract"]["topology"]); mesh=build_ws32_physical_mesh(topology); slots=tuple(mesh.flattened_device_ids.index(int(device_id)) for device_id in x["local_device_ids"]); print(",".join(map(str,slots)),mesh.mesh_hash,inspect_source_inventory(Path(sys.argv[2])).inventory_sha256,x["contract"]["topology_hash"])
 PY
 ); [[ "$mesh" == "$mesh_sha" && "$observed_inventory" == "$inventory_sha" && "$observed_topology" == "$topology_sha" ]] || { echo "host source/topology/mesh identity drifted" >&2; exit 1; }; slot_args=${slots//,/ }; PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/pack_ws32_runtime_checkpoint.py hash-sources --source-inventory "$inventory" --source-root "$source_root" --output "$run/source_hashes.json" --expected-code-hash "$pin" --shard-index "$idx" --shard-count 8 >"$run/source_hashes.log" 2>&1 & hash_pid=$!; PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python scripts/greenfield/pack_ws32_runtime_checkpoint.py pack-slots --source-inventory "$inventory" --source-root "$source_root" --source-uri "$source_uri" --output "$tmp/packed" --expected-code-hash "$pin" --mesh-hash "$mesh_sha" --slots $slot_args >"$run/pack.log" 2>&1; wait "$hash_pid"; cp "$tmp/packed/slot_records.json" "$run/slot_records.json"; for file in "$tmp"/packed/device_slot_*.safetensors; do gcloud storage cp --no-clobber "$file" "$checkpoint/$(basename "$file")" >/dev/null; done; PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python - "$run/slot_records.json" "$checkpoint" "$run/uploaded_slots.json" <<'"'"'PY'"'"'
 import json,sys
@@ -163,12 +213,13 @@ for record in records["files"]:
 Path(sys.argv[3]).write_text(json.dumps({"files":out},indent=2,sort_keys=True)+"\n")
 PY
 gcloud storage cp --recursive --no-clobber "$run" "$remote/host_records/worker${idx}/" >/dev/null; echo "PACK_HOST_OK $(hostname) $slots"'
+pack_rc=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-  --command="$host_command" >"$RUN_DIR/pack.txt" 2>&1
-has_eight_unique_markers "$RUN_DIR/pack.txt" PACK_HOST_OK || {
+  --command="$host_command" >"$RUN_DIR/pack.txt" 2>&1 || pack_rc=$?
+if [[ $pack_rc -ne 0 ]] || ! has_eight_unique_markers "$RUN_DIR/pack.txt" PACK_HOST_OK; then
   say "ABORT: distributed WS32 pack did not complete 8/8"
   exit 1
-}
+fi
 
 say "recovering exact host records and verifying remote object/source CRCs"
 gcloud storage cp --recursive "$REMOTE_PREFIX/host_records" "$RUN_DIR/" >/dev/null
@@ -317,7 +368,8 @@ Path(output).write_text(json.dumps({"object_count":34,"success":{"crc32c":blob.c
 PY
 say "sealing protected evidence archive"
 cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
-sha256sum "$RUN_DIR/census_pre.txt" "$RUN_DIR/census_post.txt" \
+sha256sum "$RUN_DIR/topology_preflight.json" \
+  "$RUN_DIR/census_pre.txt" "$RUN_DIR/census_post.txt" \
   "$RUN_DIR/sync.txt" "$RUN_DIR/pack.txt" "$RUN_DIR/remote_preflight.json" \
   "$RUN_DIR/finalize.txt" "$RUN_DIR/remote_terminal.json" \
   "$RUN_DIR/checkpoint_SUCCESS.json" "$RUN_DIR/remote_success.json" \

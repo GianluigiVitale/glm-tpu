@@ -393,6 +393,21 @@ def test_ws32_runtime_pack_wrapper_is_fail_closed_at_both_terminal_boundaries(
     )
     assert '"$RUN_DIR/vacancy_checkpoint.txt"' in source
     assert '"$RUN_DIR/vacancy_results.txt"' in source
+    assert (
+        "TOPOLOGY_ROOT=/home/gianl/gcs-models/results/"
+        "greenfield_topology_20260805T125842425591441Z/host_records"
+        in source
+    )
+    assert "TOPOLOGY_RUN=/home/gianl/glm-run/" not in source
+    assert "validate_ws32_topology_fleet" in source
+    assert 'value.get("launch_process_id") != rank' in source
+    assert 'value.get("hostname") != socket.gethostname()' in source
+    assert 'findmnt -T "$topology_root"' in source
+    assert '"$RUN_DIR/topology_preflight.json"' in source
+    assert '|| sync_rc=$?' in source
+    assert '[[ $sync_rc -ne 0 ]] || ! has_eight_unique_markers' in source
+    assert '|| pack_rc=$?' in source
+    assert '[[ $pack_rc -ne 0 ]] || ! has_eight_unique_markers' in source
     assert 'name.startswith("host_records/")' in source
     assert 'preflight_files!=terminal_files' in source
     assert 'int(blob.generation)!=prior["generation"]' in source
