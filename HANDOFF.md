@@ -34,6 +34,27 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed commit `a908c36` completes the protected WS32 short-decoder batch. The full
+  78-layer decoder has separate prefill/observer/decode/cache-probe executables, a one-row live
+  residual, exact sealed 2K/8K token and DSA-oracle inputs, raw cache/DSA evidence, sequential
+  executable lifetime, HBM telemetry, eight-HLO acquisition pins, DB rollback, exact remote
+  object/CRC/generation sealing and authenticated cleanup. The complete WS32 suite passed 70/70.
+  Correction audit `1b9038af...b668` replayed protected 177,168-instruction decoder and real
+  multi-operand all-reduce HLOs, closed eight finite launch blockers and returned `APPROVE COMMIT`.
+  Fable's same logged-in Max session again exhausted automatic backend retries without reaching
+  the model; no new chat/workflow/API/subagents were opened. The branch and origin both point to
+  `a908c36` and the worktree is clean.
+- The reviewed full-runtime pack is the only remaining prerequisite to WS32 Gate-D metal. No
+  sealed or partial full-runtime WS32 checkpoint exists in the local read-only bucket mount and no
+  local `greenfield_ws32_runtime_pack_*` run exists. This Codex shell cannot launch it: the snap
+  wrapper lacks `cap_dac_override`; direct Cloud SDK execution finds only the GCE service account,
+  whose cached token expired at `2026-08-15 17:09:27 UTC`; metadata and direct SSH sockets are
+  denied by the sandbox. This is external launch-path evidence, not a checkpoint/code failure.
+  Exact resume from an authenticated outbound shell is
+  `PATH=/snap/google-cloud-cli/current/bin:$PATH scripts/greenfield/run_ws32_runtime_checkpoint_pack.sh`.
+  After its sealed manifest/SUCCESS pins exist, run one protected 2K HLO acquisition, prove all
+  eight graphs locally, then 2K numerical; repeat acquisition/numerical at 8K only as required by
+  its distinct prefill shape. Do not reopen cleared implementation or pack audits.
 - Reviewed local commit `7fe3f19` completes the isolated WS32 78-layer composition and atomic
   final-owner runtime-checkpoint pack/load batch. Exact placement covers 117,060 base source
   tensors as 2,310 final tensors and 24,567,890,256 payload bytes per slot; the decoder has an

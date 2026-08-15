@@ -1129,7 +1129,48 @@ capture is still required.
   whole-matrix-dequant body as an execution candidate but is not token-throughput evidence. The
   51-object archive has terminal `SUCCESS`, CRC/generation linkage and authenticated 8/8 cleanup;
   there is deliberately no DB/performance row.
-- The only WS32 successor is a default-off Pallas body reusing the sealed `[out,in]` owner layout
-  and existing tile-local raw-FP8 kernels. Forced-32 semantics/local groups pass. Its real TPU HLO
-  acquisition and bounded latency discriminator remain required before WS32 can advance or be
-  formally evidence-rejected for Gate D.
+- Protected Pallas acquisition `greenfield_ws32_pallas_real_layer_hlo_20260815T094203579842098Z`
+  pins StableHLO/optimized-HLO `fa11961d...6118` / `17ee208a...ff5d` and live closure
+  `0a03b130...6a51`. Protected numerical tag
+  `greenfield_ws32_pallas_real_layer_numerical_20260815T163210555760825Z` reproduces those graphs
+  with 15/15 live inputs, 27 live raw-FP8 Pallas calls, nine feature-4 plus one expert-8 reduction,
+  maximum error `0.03125` in both oracle cases and peak HBM `314,218,496` bytes/chip. Diagnostic
+  p50 is `1.256975` / `2.303685` ms, selecting this body over the readable baseline without making
+  a token-throughput claim. Its 51-object SUCCESS-last archive and 8/8 cleanup pass.
+- Reviewed/pushed code `a908c36` composes the selected body into a complete default-off 78-layer
+  WS32 short decoder with separate prefill/observer/decode/cache-probe executables, eight
+  fail-closed HLO pins, exact sealed 2K/8K token and DSA oracles, one-row state, raw cache/DSA
+  evidence, sequential executable lifetime, HBM/wall/XPlane collection, DB rollback and exact
+  archive sealing. The complete WS32 local suite passes 70/70 and immutable correction audit
+  `1b9038af...b668` returned `APPROVE COMMIT`. This is readiness only: the full 32-owner checkpoint
+  pack, HLO acquisition and protected 2K/8K numerical executions remain missing.
+
+## Section 18 completion audit
+
+This table is the fail-closed project completion view. A bounded layer, CPU test, HLO-only replay
+or one short-context result cannot satisfy a broader row.
+
+| Section 18 requirement | Current direct evidence | Status |
+|---|---|---|
+| Serve GLM-5.2-FP8 at 256K on the existing v4-64 | Legacy oracle only; no greenfield 256K execution | Missing |
+| Independent greenfield execution path | Isolated native-JAX PP8/WS32 code; legacy used only for sealed oracles | Implemented; final runtime proof pending |
+| Plan-aware final-layout checkpoint | Complete PP8 pack/load DB420; reviewed WS32 full pack code, no sealed full WS32 pack | PP8 pass; WS32 pending |
+| Exact DSA sets and tie order | Gate C DB421 and PP8 2K DB484 | Pass at bounded/2K scope; long-context pending |
+| Raw tokens and quality | PP8 2K DB484 exact | Pass at 2K only |
+| State/load/cache protection | PP8 DB420/DB484 | Pass at PP8 2K scope; selected-plan 8K/long-context pending |
+| Repeated collectives topology-local | PP8/PP16 real layers and WS32 Pallas layer | Full selected decoder proof pending |
+| No full-pod hidden reconstruction inside transformer | Bounded HLOs pass; full WS32 eight-HLO acquisition absent | Pending |
+| Protected PP8 and PP16 measurements | PP8 full 2K DB484; PP16 transport/layer only | PP16 full-decoder measurement missing |
+| WS32 protected measurement or evidence-backed rejection | Protected Pallas layer selected; complete decoder absent | Pending |
+| Device and profiler-free wall agree | PP8 2K and bounded runs only | Selected plan/long-context pending |
+| Four-depth 128K smoke | None | Missing |
+| Protected 256K E0 | None | Missing |
+| Every accepted artifact linked to results DB | Existing accepted DB rows link; future required rows absent | Pending future gates |
+| Same-region durable archive | Existing accepted runs pass; future required archives absent | Pending future gates |
+| Authenticated eight-host cleanup | Existing accepted runs pass; future required runs absent | Pending future gates |
+| Base vs speculative throughput reported separately | No speculative promotion has begun | Pending after base decoder |
+
+The immediate critical path is therefore: seal the reviewed full WS32 checkpoint; protected WS32
+2K HLO acquisition and numerical run; protected 8K confirmation; then advance to long-context and
+identical-condition PP8/PP16/WS32 adjudication. Gate D closure must not be represented as Section 18
+completion.

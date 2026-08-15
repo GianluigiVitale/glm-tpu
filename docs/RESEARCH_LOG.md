@@ -5,6 +5,24 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 — WS32 short decoder reviewed and pushed; full-pack launch externally blocked
+
+- Reviewed/pushed `a908c36` adds the complete protected WS32 short-context decoder: four separate
+  executables and eight fail-closed HLO pins, exact 2K/8K token and DSA oracles, one-row state,
+  cache/DSA probes, HBM and timing evidence, DB transaction/rollback, SUCCESS-last archive and
+  eight-host cleanup. The complete WS32 suite passed 70/70.
+- Immutable Sol correction audit `1b9038af...b668` independently replayed the protected
+  177,168-instruction full decoder HLO and real arity-two/three all-reduces. It closed exact callee
+  liveness, oracle-root, scalar-reducer, allocator-policy, partition-count, feature-gather, tag and
+  rollback/SUCCESS authentication blockers and returned `APPROVE COMMIT`. Fable timed out before
+  model execution through all automatic retries; no alternate chat/workflow/API route was used.
+- No full WS32 runtime checkpoint or pack run exists locally. Direct Cloud SDK execution works but
+  has only an expired metadata-service credential; the sandbox denies metadata and SSH sockets,
+  while the snap launcher lacks its required capability. Therefore no pack, TPU workflow, DB row,
+  archive or performance result was started. Resume only from an authenticated outbound shell with
+  the already-reviewed `run_ws32_runtime_checkpoint_pack.sh`, then acquire/prove/execute 2K before
+  8K. This is a launch-path block, not another Gate-D implementation defect.
+
 ## 2026-08-15 — WS32 complete-runtime integration reviewed; external launch path unavailable
 
 - Local commit `7fe3f19` implements the isolated 78-layer WS32 decoder composition, exact
