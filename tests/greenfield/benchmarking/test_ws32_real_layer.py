@@ -126,6 +126,8 @@ def test_ws32_runner_and_protected_wrapper_are_default_off() -> None:
     assert "run_real_one_layer_ws32.py" in source
     assert "EXPECTED_STABLEHLO_SHA" in source
     assert "EXPECTED_OPTIMIZED_HLO_SHA" in source
+    assert "local label=$1\n  local out=" in source
+    assert "local label=$1 out=" not in source
     assert '"$REMOTE_PREFIX/SUCCESS"' not in source
     heredocs = re.findall(r"<<'PY'\n(.*?)\nPY", source, re.DOTALL)
     assert len(heredocs) == 1

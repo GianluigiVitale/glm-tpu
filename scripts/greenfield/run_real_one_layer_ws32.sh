@@ -59,7 +59,9 @@ has_eight_unique_markers() {
 }
 
 strict_census() {
-  local label=$1 out="$RUN_DIR/census_${label}.txt" carrier="${TAG}_${label}"
+  local label=$1
+  local out="$RUN_DIR/census_${label}.txt"
+  local carrier="${TAG}_${label}"
   local command
   # shellcheck disable=SC2016
   command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[r]un_real_one_layer_ws32[.]py|[r]un_real_one_layer[.]py|[c]ompile_short_decoder[.]py|[m]icrobench_collectives[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname)"; elif [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; else echo "CENSUS_OK $(hostname)"; fi'
