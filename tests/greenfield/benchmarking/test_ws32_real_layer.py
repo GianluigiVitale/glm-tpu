@@ -394,11 +394,19 @@ def test_ws32_numerical_terminal_recomputes_the_sealed_shards(
                 "samples_ms": samples,
                 "warmup": 2,
             }
+        after_execute = []
+        for memory in pre["device_memory_after_load"]:
+            observed = dict(memory)
+            observed["bytes_reservable_limit"] = 32_702_354_432
+            observed["bytes_reserved"] = 30_130_176
+            observed["peak_bytes_reserved"] = 30_130_176
+            observed["largest_free_block_bytes"] = 32_648_534_016
+            after_execute.append(observed)
         runner = {
             **pre,
             "artifact_kind": "greenfield_ws32_real_layer3",
             "correctness": correctness,
-            "device_memory_after_execute": pre["device_memory_after_load"],
+            "device_memory_after_execute": after_execute,
             "performance_claim": False,
             "schema_version": 1,
             "status": "SUCCESS",

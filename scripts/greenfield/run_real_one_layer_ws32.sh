@@ -229,7 +229,7 @@ def exact_equal(left,right):
         return len(left)==len(right) and all(exact_equal(a,b) for a,b in zip(left,right))
     return left==right
 
-def valid_memory_record(value):
+def valid_memory_record(value, *, require_full_reservable_limit):
     keys={
         'bytes_in_use','bytes_limit','bytes_reservable_limit','bytes_reserved',
         'largest_alloc_size','largest_free_block_bytes','num_allocs',
@@ -239,9 +239,15 @@ def valid_memory_record(value):
         isinstance(value,dict) and set(value)==keys
         and all(type(number) is int and number>=0 for number in value.values())
         and value['bytes_limit']==33014398976
-        and value['bytes_reservable_limit']==33014398976
+        and 0<value['bytes_reservable_limit']<=value['bytes_limit']
+        and (
+            not require_full_reservable_limit
+            or value['bytes_reservable_limit']==value['bytes_limit']
+        )
         and value['bytes_in_use']<=value['peak_bytes_in_use']<=value['bytes_limit']
-        and value['largest_free_block_bytes']<=value['bytes_limit']
+        and value['bytes_reserved']<=value['peak_bytes_reserved']<=value['bytes_reservable_limit']
+        and value['largest_alloc_size']<=value['peak_bytes_in_use']
+        and value['largest_free_block_bytes']<=value['bytes_reservable_limit']
     )
 
 expected_pre_keys={
@@ -317,7 +323,14 @@ for rank in range(8):
         raise SystemExit(f'direct-loader slot/file binding mismatch rank {rank}')
     for field in ('device_memory_before_load','device_memory_after_load','device_memory_after_execute'):
         values=runner[field]
-        if not isinstance(values,list) or len(values)!=4 or any(not valid_memory_record(value) for value in values):
+        require_full_reservable_limit=field!='device_memory_after_execute'
+        if not isinstance(values,list) or len(values)!=4 or any(
+            not valid_memory_record(
+                value,
+                require_full_reservable_limit=require_full_reservable_limit,
+            )
+            for value in values
+        ):
             raise SystemExit(f'invalid {field} rank {rank}')
     after_execute.extend(runner['device_memory_after_execute'])
     if not exact_equal(runner['compiled_memory_analysis'],expected_compiled_memory):
