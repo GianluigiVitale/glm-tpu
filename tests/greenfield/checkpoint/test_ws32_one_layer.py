@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import base64
 from contextlib import ExitStack
 from copy import deepcopy
 from dataclasses import replace
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
+import re
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -20,6 +25,13 @@ from glm_tpu.greenfield.checkpoint.ws32_one_layer import (
 from tests.greenfield.checkpoint.test_one_layer import (
     tiny_config,
     write_tiny_source,
+)
+
+
+REPO = Path(__file__).resolve().parents[3]
+REAL_SOURCE_MANIFEST = Path(
+    "/home/gianl/gcs-models/checkpoints/greenfield/glm52/layer3/PP8_LP4/"
+    "greenfield_one_layer_pack_20260805T151828912346032Z/manifest.json"
 )
 
 
@@ -384,3 +396,208 @@ def test_ws32_one_layer_does_not_publish_manifest_before_validation(
     with pytest.raises(ValueError, match="injected provisional"):
         pack_ws32_one_layer(config)
     assert not (config.output_dir / "manifest.json").exists()
+
+
+def test_ws32_one_layer_cli_and_protected_wrapper_are_wired(
+    tmp_path: Path,
+) -> None:
+    source_manifest, config = _source_and_config(tmp_path)
+    output = tmp_path / "cli_ws32_artifact"
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPO,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(REPO / "scripts/greenfield/pack_ws32_one_layer.py"),
+            "--source-manifest",
+            str(config.source_manifest_path),
+            "--source-payload-dir",
+            str(config.source_payload_dir),
+            "--source-artifact-uri",
+            config.source_artifact_uri,
+            "--source-manifest-sha256",
+            source_manifest["manifest_sha256"],
+            "--output",
+            str(output),
+            "--expected-code-hash",
+            head,
+            "--mesh-hash",
+            "d" * 64,
+        ],
+        cwd=REPO,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    summary = json.loads(completed.stdout)
+    manifest = inspect_ws32_one_layer(output, verify_tensor_hashes=True)
+    assert summary == {
+        "artifact_kind": "greenfield_ws32_one_layer_moe",
+        "files": 32,
+        "layer": 3,
+        "manifest_sha256": manifest["manifest_sha256"],
+        "mesh_hash": "d" * 64,
+        "packed_payload_byte_count": manifest["packed_payload_byte_count"],
+        "source_manifest_sha256": source_manifest["manifest_sha256"],
+    }
+    wrong_pin = subprocess.run(
+        [
+            *completed.args[:-4],
+            "--expected-code-hash",
+            "0" * 40,
+            "--mesh-hash",
+            "d" * 64,
+        ],
+        cwd=REPO,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert wrong_pin.returncode != 0
+    assert "code identity drifted" in wrong_pin.stderr
+    wrapper = REPO / "scripts/greenfield/run_pack_ws32_one_layer.sh"
+    syntax = subprocess.run(
+        ["bash", "-n", str(wrapper)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert syntax.returncode == 0, syntax.stdout + syntax.stderr
+    source = wrapper.read_text()
+    assert "EXPECTED_PACKED_BYTES=9971249152" in source
+    assert "SOURCE_PACKED_PAYLOAD_BYTES=9716380672" in source
+    assert "SOURCE_UNIQUE_PAYLOAD_BYTES=9706940416" in source
+    assert "WS32_MESH_HASH=de5f59cb" in source
+    assert "gcloud storage cp --no-clobber" in source
+    assert '"$REMOTE_PREFIX/SUCCESS"' in source
+    assert "terminal object set drifted" in source
+    heredocs = re.findall(r"<<'PY'[^\n]*\n(.*?)\nPY\n", source, re.DOTALL)
+    assert len(heredocs) == 6
+    for index, body in enumerate(heredocs):
+        compile(body, f"{wrapper}:heredoc-{index}", "exec")
+
+    run_dir = tmp_path / "archive"
+    run_dir.mkdir()
+    ledger_path = run_dir / "remote_objects.json"
+    ledger_path.write_text(json.dumps({"objects": []}))
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_sha256": "b" * 64,
+                "mesh_hash": "d" * 64,
+                "source": {"manifest_sha256": "c" * 64},
+            }
+        )
+    )
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_gcloud = fake_bin / "gcloud"
+    fake_gcloud.write_text(
+        """#!/usr/bin/env python3
+import json
+import os
+from pathlib import Path
+import sys
+
+args = sys.argv[1:]
+if args[:3] == ["storage", "objects", "describe"]:
+    path = Path(os.environ["FAKE_LEDGER"])
+    print(json.dumps({
+        "crc32c_hash": os.environ["FAKE_LEDGER_CRC32C"],
+        "generation": "123",
+        "size": path.stat().st_size,
+    }))
+elif args[:3] == ["storage", "objects", "list"]:
+    prefix = os.environ["FAKE_BUCKET_PREFIX"].rstrip("/") + "/"
+    for name in json.loads(os.environ["FAKE_OBJECTS"]):
+        print(prefix + name)
+else:
+    raise SystemExit(f"unexpected fake gcloud arguments: {args}")
+"""
+    )
+    fake_gcloud.chmod(0o755)
+    expected_nonterminal = {
+        "remote_objects.json",
+        "source_preflight.json",
+        "pack.log",
+        "inspection.json",
+        "orchestrator.log",
+        "evidence.sha256",
+        "manifest.json",
+    } | {f"packed/device_slot_{slot:02d}.safetensors" for slot in range(32)}
+    remote = "gs://driftbench-dsv4-uc/checkpoints/unit/ws32"
+    import google_crc32c
+
+    ledger_checksum = google_crc32c.Checksum(ledger_path.read_bytes())
+    environment = {
+        **os.environ,
+        "FAKE_BUCKET_PREFIX": remote.removeprefix("gs://").split("/", 1)[1],
+        "FAKE_LEDGER": str(ledger_path),
+        "FAKE_LEDGER_CRC32C": base64.b64encode(
+            ledger_checksum.digest()
+        ).decode("ascii"),
+        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+    }
+    command = [
+        sys.executable,
+        "-c",
+        heredocs[4],
+        str(run_dir),
+        str(manifest_path),
+        remote,
+        "a" * 40,
+        "greenfield_ws32_one_layer_pack_20260815T000000000000000Z",
+    ]
+    planted = subprocess.run(
+        command,
+        env={
+            **environment,
+            "FAKE_OBJECTS": json.dumps(
+                sorted(expected_nonterminal | {"planted-extra"})
+            ),
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert planted.returncode != 0
+    assert "nonterminal object set drifted" in planted.stderr
+    assert not (run_dir / "SUCCESS").exists()
+    exact = subprocess.run(
+        command,
+        env={
+            **environment,
+            "FAKE_OBJECTS": json.dumps(sorted(expected_nonterminal)),
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert exact.returncode == 0, exact.stdout + exact.stderr
+    success = json.loads((run_dir / "SUCCESS").read_text())
+    assert success["nonterminal_object_count"] == 39
+    nonterminal_check = source.index("remote WS32 nonterminal object set drifted")
+    success_upload = source.index(
+        'gcloud storage cp --no-clobber "$RUN_DIR/SUCCESS"'
+    )
+    assert nonterminal_check < success_upload
+
+
+@pytest.mark.skipif(
+    not REAL_SOURCE_MANIFEST.is_file(),
+    reason="SHA-pinned real PP8 layer artifact is unavailable",
+)
+def test_ws32_wrapper_source_byte_pins_match_real_manifest() -> None:
+    manifest = json.loads(REAL_SOURCE_MANIFEST.read_text())
+    assert manifest["manifest_sha256"] == (
+        "68ef82011892456409a194f6fa31697dd1e31d96fe1a3f0069228288f613f938"
+    )
+    assert manifest["packed_payload_byte_count"] == 9_716_380_672
+    assert manifest["source_payload_byte_count"] == 9_706_940_416
