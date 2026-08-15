@@ -1,0 +1,90 @@
+# WS32_2D prototype
+
+This document records the first independent GLM implementation of the mandatory all-chip
+weight-stationary challenger. It is subordinate to `../glm-tpu-revolution.md` and makes no Gate-D,
+TPU-performance, final-checkpoint, or HBM claim.
+
+## Reused evidence
+
+The implementation starts from existing work rather than rebuilding the idea:
+
+- `fce8d6c41` supplies the reciprocal expert/feature layout pattern;
+- `dab2db7b3` and `6baf66e2a` supply the FP32-partial rule for 2D reductions;
+- `57adb4b99` and `2baf3f0a0` are quantized 2D matmul references.
+
+These pins are design inputs only. No legacy or vLLM execution path is imported.
+
+## Exact prototype contract
+
+The logical mesh is `expert=8 x feature=4`, derived from physical TPU coordinates as
+`expert=(x,y)` and `feature=z` on the observed `2x4x4` slice. Repeated feature groups are eight
+physical rows of four chips. Repeated expert groups are four physical columns of eight chips.
+No repeated group contains 32 chips.
+
+The batch-one residual is globally `[1,6144]`, locally `[1,1536]`, sharded on `feature`, and
+replicated on `expert`. It stays in that ownership across a block:
+
+| Operation | Local weight/output ownership | Repeated reduction |
+|---|---|---|
+| dense gate/up | `[1536,1536]` on expert x feature | FP32 over feature-4 |
+| dense down | reciprocal `[1536,1536]` | FP32 over expert-8 |
+| routed gate/up | 32 expert identities x `[2048,1536]` | FP32 over feature-4 |
+| routed down | 32 expert identities x `[1536,2048]` | FP32 over expert-8 |
+| shared expert | feature-sharded and explicitly 8x replicated | FP32 over feature-4 |
+
+The routed body consumes one exact compact top-8 route row. Only the owning expert row computes a
+routed expert. The combine returns the same local `[1,1536]` residual shard; it never creates a
+physical `[32,6144]` activation or 32 decode rows.
+
+## Capacity accounting
+
+The prototype applies explicit ownership rules to the SHA-pinned source inventory
+`a388627c08c8ff591903deb1fbf3198f43916e64a2295ed0e253f1e44a042fc4`:
+
+| Quantity | Exact value |
+|---|---:|
+| base source tensors | 117,060 |
+| base source bytes | 745,584,507,456 |
+| MLP source bytes | 728,700,174,336 |
+| shared-expert replication overhead | 19,822,924,800 |
+| compact-router replication overhead | 230,400 |
+| non-MLP replication overhead | 2,063,457,216 |
+| WS32 packed persistent bytes | 767,471,119,872 |
+| persistent bytes per chip | 23,983,472,496 |
+| FP8-scale bytes per chip | 5,824,752 |
+
+Every chip is exactly balanced in this accounting. The shared expert's 8x replication is explicit,
+not silent. The report covers base-model persistent tensors, but it is not Gate B for WS32: it does
+not yet define every byte interval, checksum, destination file, or direct-load record. It also does
+not include target-context KV/DSA state, compiler overlays, collective buffers, or measured peak
+HBM.
+
+## Local proof completed
+
+Forced 32-device CPU tests prove:
+
+- the physical/logical mesh and subgroup families;
+- dense and routed/shared MoE results against independent unsharded references;
+- output sharding remains `P(None, 'feature')`;
+- dense uses one feature-4 and one expert-8 reduction;
+- the top-k-4 test MoE uses only subgroup reductions, with no group larger than eight;
+- async, wrong-group, wrong-shape, and wrong-reducer HLO mutations refuse;
+- all 117,060 base tensors have one explicit capacity rule and exact byte reconciliation.
+
+CPU and synthetic HLO results prove semantics only. The current subgroup linter does not claim the
+complete packed-bits-to-live-root arithmetic lineage required for a protected real-layer result.
+
+## Bounded next discriminator
+
+Do not run a full decoder or hour-scale 8K workflow. The next WS32 step is one real layer-0 dense
+or one real MoE layer using already packed source leaves, with:
+
+1. an exact final-owner slice manifest and direct loader for only that layer;
+2. generated StableHLO/optimized HLO persisted before execution;
+3. exact packed-bit/scale-to-dequant-to-dot-to-live-root lineage and subgroup bijection;
+4. one live row, no full hidden reconstruction, and only feature-4/expert-8 reductions;
+5. comparison against an existing sealed real-layer oracle;
+6. exact topology, HBM, archive, and authenticated cleanup evidence.
+
+Only that bounded result decides whether WS32 advances toward a full decoder. An unchanged PP8 8K
+rerun and another M1/M32 arithmetic arm are both forbidden by the Gate-D closure evidence.

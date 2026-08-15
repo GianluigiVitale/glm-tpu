@@ -5,6 +5,35 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 05:43--06:12 UTC — bitwise search closes; WS32 prototype reuses existing 2D work
+
+- Treated the protected native-XLA schedule rejection as the terminal result for PP8 internal
+  bitwise arms. The three Pallas variants and the native feature representation are frozen; no
+  further scalar/layout/fusion/feature-tile arm or unchanged 8K rerun is authorized. Gate D remains
+  open because the complete decoder has not passed exact token/DSA/integrity/HLO/HBM/wall, not
+  because another layer-0 bitwise formula remains untested.
+- Audited the existing PP16 and WS32 assets before writing code. PP16 already has topology,
+  transport, bounded packs and protected one-layer results but no complete decoder and no evidence
+  that it repairs the DSA boundary. WS32 therefore became the serious architecture successor,
+  adapting reciprocal expert/feature layouts from `fce8d6c41`, FP32 partial preservation from
+  `dab2db7b3`/`6baf66e2a`, and quantized-2D reference knowledge from
+  `57adb4b99`/`2baf3f0a0`.
+- Added an independent `expert=8 x feature=4` WS32 contract, physical `2x4x4` mapping, explicit
+  feature-4/expert-8 groups, one-row persistent `[1,1536]` residual, reciprocal dense and routed
+  weight layouts, readable FP8 dense/MoE bodies and a subgroup HLO linter. Forced-32 CPU execution
+  matches independent dense and routed/shared MoE references and retains `P(None,'feature')`; no
+  group exceeds eight and no full hidden activation appears. This is semantic/mechanism evidence,
+  not TPU performance.
+- Applied explicit ownership rules to source inventory SHA `a388627c...2fc4`. All 117,060 base
+  tensors / 745,584,507,456 source bytes reconcile to 767,471,119,872 packed persistent bytes,
+  exactly 23,983,472,496 bytes per chip including declared shared/compact/non-MLP replication.
+  Final byte intervals/checksums/direct loading, target-context state, temporary/overlay HBM and a
+  real TPU layer remain unproven.
+- Consolidated the non-repeat and architecture-pivot rules in `GATE_D_LESSONS.md`, updated the
+  reuse registry, and documented the exact bounded next step in `WS32_2D_PROTOTYPE.md`: one real
+  layer with a tiny final-owner pack, exact packed-lineage/subgroup/live-root HLO, sealed oracle
+  comparison and protected cleanup. No TPU workflow occurred in this interval.
+
 ## 2026-08-15 05:18--05:43 UTC — native-XLA feature tile acquired once and rejected by its schedule
 
 - After the three Pallas forms converged on the same nonexact result, selected one final mechanism

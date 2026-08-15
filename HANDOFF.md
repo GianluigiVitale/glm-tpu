@@ -19,6 +19,22 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- The six-day PP8 bitwise arithmetic search is closed. The native-XLA feature tile folded back to
+  the rejected ordinary-M1 schedule; all three Pallas forms are nonexact. Do not add another
+  M1/M32 formula, scalar, fusion, layout or feature-tile arm, and do not spend an unchanged full-8K
+  run. Gate D remains open because the complete PP8 decoder's exact token/DSA/integrity/HLO/HBM/
+  wall contract has not passed; the last protected 8K retained exact event 0 but diverged at DSA
+  event 1/layer 1.
+- The mandatory architecture successor is now an independent WS32 prototype, reusing the existing
+  `fce8d6c41`, `dab2db7b3`/`6baf66e2a`, and `57adb4b99`/`2baf3f0a0` design evidence. It fixes the
+  physical/logical mesh at `expert=8 x feature=4`, keeps one live residual row locally
+  `[1,1536]`, and uses only feature-4 or expert-8 repeated reductions. Forced-32 CPU dense/MoE and
+  subgroup-HLO tests pass. The pinned base inventory reconciles all 117,060 tensors / 745,584,507,456
+  source bytes to exactly 23,983,472,496 persistent bytes per chip after explicit replication.
+  This is capacity/mechanism proof only, not a final WS32 pack, real TPU HLO, HBM, Gate-D, or
+  performance result. Exact next is one bounded real-layer final-owner manifest/loader/HLO
+  discriminator, not an hour-scale decoder run. See `docs/greenfield/WS32_2D_PROTOTYPE.md` and
+  `docs/greenfield/GATE_D_LESSONS.md`.
 - Reviewed/pushed pin `6b3064f3f41137997133ea0dd343dca1ef064b25` completed the one authorized
   native-XLA feature-tile compile acquisition as
   `greenfield_strategy_nd_integrated_dense_native_m1_xla_feature_tiled_output_20260815T053956483733623Z`.

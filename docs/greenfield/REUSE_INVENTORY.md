@@ -69,6 +69,14 @@ Do not design WS32 from a blank page. Start with these existing pins:
 They are research inputs, not drop-ins: they target the DeepSeek native-JAX layout and do not prove
 GLM DSA, FP8 block-scale ownership, persistent sharded residuals or the protected workload.
 
+The independent GLM prototype now consumes those pins in `sharding/ws32.py`, `kernels/ws32.py`,
+and `tests/greenfield/kernels/test_ws32.py`. It fixes the logical mesh at `expert=8 x feature=4`,
+uses reciprocal gate/up and down ownership, preserves FP32 subgroup partials, and keeps the live
+residual physically `[1,1536]` per chip. The source inventory reconciles at 23,983,472,496
+persistent bytes per chip. This is capacity and forced-CPU mechanism evidence only; the final
+owner manifest/packer, real TPU HLO, exact real layer, KV/temporary HBM and protected latency remain
+open. See `WS32_2D_PROTOTYPE.md`.
+
 ### Gate H: speculation
 
 Do not rebuild GLM MTP plumbing. Pins `6beacb5d2` and `89e1d5b5a` already prove dense-MTP shared

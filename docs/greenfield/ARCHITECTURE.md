@@ -151,3 +151,24 @@ now pass. PP8 normal p50 is `0.696 ms` versus PP16
 `0.901 ms`; PP16 concentrated p50 is `1.076 ms` versus PP8 `1.134 ms`.
 PP8 therefore remains the provisional leader. The mandatory local-layer prerequisite is complete;
 full-checkpoint work is now authorized only through Gate B's ordered plan/manifest/pack/load gates.
+
+## WS32_2D architecture prototype
+
+After the bounded PP8 bitwise-arithmetic search closed without a true-M1 equivalent of the exact
+diagnostic M32 boundary, the mandatory WS32 challenger moved from a future research item to an
+implemented independent prototype. It reuses only the reciprocal-layout and FP32-partial lessons
+from the pinned earlier 2D work; it imports no legacy model execution.
+
+The exact logical mesh is `expert=8 x feature=4`, mapped from observed physical coordinates as
+`expert=(x,y)` and `feature=z`. The live residual is one row, sharded to `[1,1536]` over feature
+and replicated over expert. Dense and routed gate/up projections reduce FP32 partials over the
+four-chip feature group; reciprocal down projections reduce over the eight-chip expert group.
+The shared expert is feature-sharded and explicitly replicated across expert rows. There is no
+repeated 32-chip group or physical `[32,6144]` activation.
+
+The SHA-pinned base inventory reconciles 117,060 tensors and 745,584,507,456 source bytes to
+767,471,119,872 packed persistent bytes, exactly 23,983,472,496 bytes per chip. Forced-32 CPU tests
+prove dense/MoE semantics, persistent output sharding and subgroup HLO geometry. These are L0/L1/L2
+mechanism results only. A final owner manifest/packer/direct loader, target-context state, measured
+HBM, exact real-layer TPU HLO and protected numerical result remain open. The exact contract and
+bounded next step are in `WS32_2D_PROTOTYPE.md`.

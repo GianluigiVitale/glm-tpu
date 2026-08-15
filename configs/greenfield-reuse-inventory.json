@@ -331,9 +331,9 @@
       "source_pin": "fce8d6c41d683502893ca578240edbed393f7018",
       "source_paths": ["origin/patemotter/2dtp-merge", "glm-decode-2d-f32@dab2db7b3", "glm-hybrid-ep-tp@6baf66e2a", "tests/layers/common/test_decode_2d_f32_reduce.py"],
       "disposition": "research_candidate",
-      "greenfield_consumers": ["future WS32_2D plan and numerical contract"],
+      "greenfield_consumers": ["glm_tpu/greenfield/sharding/ws32.py", "glm_tpu/greenfield/kernels/ws32.py", "tests/greenfield/kernels/test_ws32.py", "docs/greenfield/WS32_2D_PROTOTYPE.md"],
       "gate": "G",
-      "reason": "Reciprocal expert/feature specs and FP32 partial preservation are the strongest existing WS32 starting point, but DeepSeek JAX layout is not a GLM drop-in."
+      "reason": "The reciprocal expert/feature specs and FP32 partial-preservation rule are adapted into the independent GLM WS32 prototype. They establish the 8x4 ownership pattern, not a final packed checkpoint, TPU schedule, exact real layer, HBM result, Gate-D result, or performance claim."
     },
     {
       "id": "quantized-2d-matmul-drafts",
@@ -342,9 +342,9 @@
       "source_pin": "57adb4b999476edac8e26a18df26cbc213458ace",
       "source_paths": ["origin/patemotter/2d_quant_matmul", "origin/patemotter/quant_2d_matmul"],
       "disposition": "research_candidate",
-      "greenfield_consumers": ["future WS32_2D Pallas discriminator"],
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/ws32.py", "tests/greenfield/kernels/test_ws32.py", "docs/greenfield/WS32_2D_PROTOTYPE.md"],
       "gate": "G",
-      "reason": "A working draft and reference already exist; audit and adapt them before writing any new 2D quantized matmul."
+      "reason": "The existing quantized 2D drafts were audited as arithmetic and tiling references. The first GLM prototype deliberately uses a readable independent JAX FP8 path; a Pallas successor must adapt measured useful mechanisms rather than reimplement or import the legacy execution path."
     },
     {
       "id": "glm-mtp-and-indexshare",

@@ -211,6 +211,29 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   PP8 short decoder and evaluate internal tensors under the documented bounded-error level while
   keeping DSA ordering, raw tokens, state/cache integrity and physical topology contracts exact.
 
+## Architecture-pivot rules
+
+- When every bounded implementation of one physical arithmetic boundary converges on a frozen
+  nonexact result, close the mechanism family. Do not convert review findings into an endless
+  supply of new numerical hypotheses. Proof hardening protects a chosen experiment; it does not
+  justify rerunning the same rejected architecture.
+- Gate D is an end-to-end exact-token/DSA/integrity/HLO/HBM/wall gate. A bitwise internal tensor is
+  useful localization evidence, not the gate itself. Conversely, bounded internal error is allowed
+  only when the complete token and DSA contracts remain exact.
+- Before writing a successor, inventory existing branches, packed artifacts, kernels, topology
+  tools and negative evidence. Record the source pins and exact adaptation boundary in the reuse
+  registry so later compactions cannot restart from a blank design.
+- Capacity arithmetic must precede a full-model load, but it must not be mislabeled as Gate B or
+  HBM proof. Separate source-byte coverage, final-owner byte intervals/checksums, direct loading,
+  KV/DSA state, compiler overlays, temporary buffers and measured per-chip peak HBM.
+- Iterate TPU-specific proof offline from one preserved compiler graph. The next WS32 experiment is
+  a bounded real layer whose final-owner shards, packed lineage, subgroup reductions and live root
+  are locally fail-closed before metal. Do not use the complete 8K decoder to discover a packer,
+  HLO-validator, wrapper or archive defect.
+- For WS32, the invariant is one logical row and a persistent local hidden shard. Feature-4 and
+  expert-8 reductions are allowed; a repeated 32-chip group, physical `[32,6144]` activation, or
+  hidden all-gather is immediate rejection.
+
 ## Evidence ladder
 
 1. Localize the first failing tensor boundary; do not optimize from the final token alone.
