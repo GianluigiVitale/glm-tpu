@@ -131,7 +131,7 @@ REAL_NATIVE_M32_TPU_RUN = Path(
         "GLM_GREENFIELD_INTEGRATED_NATIVE_M32_TPU_RUN",
         "/home/gianl/glm-run/"
         "greenfield_strategy_nd_integrated_dense_native_m32_output_"
-        "20260815T000518083058778Z",
+        "20260815T002503491762440Z",
     )
 )
 REAL_NATIVE_M32_TPU_HLO = (
@@ -143,6 +143,13 @@ REAL_NATIVE_M32_TPU_STABLEHLO = (
     REAL_NATIVE_M32_TPU_RUN
     / "hlo/strategy_nd_integrated_dense_native_m32_output_"
     "bfloat16_32x6144.stablehlo.mlir"
+)
+REAL_NATIVE_M32_ACQUISITION_TPU_HLO = Path(
+    "/home/gianl/glm-run/"
+    "greenfield_strategy_nd_integrated_dense_native_m32_output_"
+    "20260815T000518083058778Z/hlo/"
+    "strategy_nd_integrated_dense_native_m32_output_"
+    "bfloat16_32x6144.optimized_hlo.txt"
 )
 REAL_LEGACY_INTEGRATED_RUN = Path(
     "/home/gianl/glm-run/"
@@ -1280,6 +1287,20 @@ def test_real_native_m32_tpu_hlo_and_mutation_refusals() -> None:
     assert optimized_contract["exact_graph_sha256"] == (
         INTEGRATED_DENSE_NATIVE_M32_OPTIMIZED_HLO_SHA256
     )
+    if REAL_NATIVE_M32_ACQUISITION_TPU_HLO.is_file():
+        acquisition_hlo = REAL_NATIVE_M32_ACQUISITION_TPU_HLO.read_text()
+        assert (
+            acquisition_hlo.replace(
+                "line=1594 end_line=1594",
+                "line=1619 end_line=1619",
+                1,
+            ).replace(
+                "line=1460 end_line=1460",
+                "line=1485 end_line=1485",
+                1,
+            )
+            == optimized_hlo
+        )
 
     replacements = (
         (

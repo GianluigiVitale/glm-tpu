@@ -87,12 +87,19 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   value keeps the disputed physical extent live, after which the host comparator may select row
   zero. Prove the global output shape locally, but acquire and pin the real TPU fusion before any
   numerical execution.
-- That full-M32 acquisition is complete. The exact optimized graph SHA is
-  `e1260889...e3ee`; its live root is `u16[32,6144]` and consumes all six accepted source roles in
+- That full-M32 acquisition is complete. Its acquisition optimized graph SHA was
+  `e1260889...e3ee`; after reviewed terminal lines shifted source locations, the exact numerical
+  code pin produced `5bb78e31...2046`. The only diff is the stack-frame table line numbers; the
+  executable graph is byte-identical. Its live root is `u16[32,6144]` and consumes all six accepted source roles in
   one fusion, so the disputed early M1 materialization is absent. The compile acquisition stopped
   before arithmetic on its deliberately empty pin and ended 8/8 clean. Never rerun it merely to
   inspect the same graph. Pin and mutation-test this preserved lowering locally, then run one
   numerical replay.
+- A full raw optimized-HLO digest includes non-executable source-location tables. Compile acquisition
+  and numerical execution should use the same runner source layout when possible. If reviewed
+  terminal-only lines shift those locations, require an exact whole-file diff proving that only the
+  stack-frame line table changed, then pin the numerical code's raw digest; never broadly normalize
+  or ignore metadata drift without that proof.
 - When the compiled extent is itself the hypothesis, preserve the complete output artifact rather
   than hashing and discarding it. Terminal proof must recompute the full array hash, bind every
   local replica and deterministic repeat, prove the separately compared row is exactly row zero of

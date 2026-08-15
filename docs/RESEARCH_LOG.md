@@ -5,6 +5,23 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-15 00:25--00:27 UTC — numerical attempt stops on stack-frame-only HLO digest drift
+
+- Reviewed/pushed pin `4a39dcdbba49045a5637250d0ba6d57ba876da16` launched tag
+  `greenfield_strategy_nd_integrated_dense_native_m32_output_20260815T002503491762440Z` once.
+  Compilation completed, then the exact optimized-HLO digest refused before arithmetic. No output,
+  comparison, DB row, terminal archive or `SUCCESS` exists; partial diagnostic evidence is
+  preserved and the failure census is 8/8 clean.
+- StableHLO is unchanged at `289017ca...c1bb`. Optimized HLO is `5bb78e31...2046` rather than
+  `e1260889...e3ee`. `diff -u` has exactly one 13-line hunk: four line-number values in the HLO
+  stack-frame table changed from runner lines 1594/1460 to 1619/1485 after adding the reviewed
+  full-output terminal code. The 597 instructions, exact root operands, physical layouts, backend
+  configs and every executable line are otherwise byte-identical. This is a proof pin correction,
+  not a new schedule or numerical rejection.
+- The exact current graph is pinned and its preserved-real/mutation tests pass locally. Exact next is
+  correction-only Sol closure, commit/push and one seconds-scale numerical retry. Full 8K remains
+  forbidden pending `0 / 6,144`.
+
 ## 2026-08-15 00:05--00:35 UTC — exact full-M32 TPU lowering acquired; numerical retry remains
 
 - Reviewed/pushed pin `524cb1ff10294d94d33070a13f772d651980451d` ran the deliberately

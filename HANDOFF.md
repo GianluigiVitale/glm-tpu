@@ -19,6 +19,21 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Reviewed/pushed pin `4a39dcdbba49045a5637250d0ba6d57ba876da16` launched the protected M32
+  numerical discriminator once under tag
+  `greenfield_strategy_nd_integrated_dense_native_m32_output_20260815T002503491762440Z`.
+  All hosts compiled, but exact optimized-HLO validation refused before arithmetic: StableHLO
+  remained byte-identical at `289017ca...c1bb`, while optimized HLO became
+  `5bb78e31...2046`. A complete local diff proves the only changes are four source-line numbers in
+  the HLO stack-frame table (`1594/1460` to `1619/1485`) caused by the reviewed terminal code
+  insertion; all 597 scheduled instructions, operands, layouts, backend configs and the live M32
+  root are byte-identical. There is no tensor/verdict/DB row/terminal `SUCCESS`; partial diagnostics
+  are preserved and authenticated cleanup is 8/8 clean.
+- The exact current numerical-code lowering is now pinned locally, and the preserved real graph plus
+  parser-valid mutations pass. Exact next is correction-only Sol closure, commit/push and one
+  numerical retry. This is a proof correction, not another hypothesis or full run. Full 8K remains
+  forbidden until the protected row is `0 / 6,144`.
+
 - Reviewed/pushed pin `524cb1ff10294d94d33070a13f772d651980451d` launched the native full-M32
   compile acquisition exactly once under tag
   `greenfield_strategy_nd_integrated_dense_native_m32_output_20260815T000518083058778Z`.
@@ -33,13 +48,13 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
   attention psum, dense psum, scalar inverse, embedding psum, validity and layer-1 norm sources.
   The disputed M1 materialization is absent. Exact graph digests and parser-valid root
   source/layout/StableHLO reducer mutations now fail closed.
-- Terminal evidence is being closed locally before any numerical retry. The executor preserves
+- Terminal evidence is closed locally. The executor preserves
   the full `uint16[32,6144]` tensor as well as row zero; terminal recomputation requires exact
   artifact shape/dtype/file/array hashes, row-zero identity, two-invocation determinism and
   four-local-replica agreement, and binds the M32 mode/full-array hash through the summary and
   `SUCCESS`. The focused file passes 17/17 and the forced-32 dense/projection/integrated set passes
-  110/110 in 90.22 seconds. Exact next is one immutable Sol review/correction closure, commit/push,
-  then one protected seconds-scale numerical row. Only `0 / 6,144` authorizes the complete 8K
+  110/110 in 90.22 seconds. The immutable staged batch was approved by Sol, committed and pushed as
+  `4a39dcd`; the proof-only retry correction is recorded above. Only `0 / 6,144` authorizes the complete 8K
   Gate-D confirmation; Gate D remains open until that full protected decoder passes.
 
 - Reviewed/pushed pin `4a7b27719573e26752f805ca04c63c49de20f4b1` completed the protected
