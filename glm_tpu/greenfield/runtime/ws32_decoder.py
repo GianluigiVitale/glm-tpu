@@ -24,9 +24,9 @@ from ..kernels.reference.attention import (
 from ..kernels.reference.dsa import DsaNumericalContract
 from ..kernels.reference.moe import GlmMoeNumericalContract
 from ..kernels.ws32_io import (
-    Ws32GreedySampleResult,
+    Ws32SplitGreedySampleResult,
     ws32_embedding_mapped,
-    ws32_final_sample_mapped,
+    ws32_split_final_sample_mapped,
 )
 from ..kernels.ws32_layer import (
     Ws32AttentionWeights,
@@ -709,7 +709,8 @@ def _ws32_decode_impl(
         weights.embedding_local,
         vocab_size=config.geometry.vocab_size,
     )
-    residual = embedded.residual_local
+    hidden_update = embedded.residual_local
+    carried_residual = jnp.zeros_like(hidden_update)
     kv_cache = state.kv_cache_local
     index_cache = state.index_cache_local
     selected_positions = state.selected_positions
@@ -729,7 +730,8 @@ def _ws32_decode_impl(
         index_slot = config.full_index_slot_by_layer[layer_id]
         layer_index_cache = index_cache[0 if index_slot is None else index_slot]
         result = ws32_transformer_layer_mapped(
-            residual,
+            hidden_update,
+            carried_residual,
             kv_cache[layer_id],
             layer_index_cache,
             selected_positions,
@@ -757,7 +759,8 @@ def _ws32_decode_impl(
             sparse_attention_interpret=sparse_attention_interpret,
             linear_interpret=linear_interpret,
         )
-        residual = result.output_local
+        hidden_update = result.output_local
+        carried_residual = result.carried_residual_local
         kv_cache = kv_cache.at[layer_id].set(result.cache_local)
         if index_slot is not None:
             index_cache = index_cache.at[index_slot].set(
@@ -772,8 +775,9 @@ def _ws32_decode_impl(
         selected_scores = result.selected_scores
         health = result.contract_valid
 
-    sampled: Ws32GreedySampleResult = ws32_final_sample_mapped(
-        residual,
+    sampled: Ws32SplitGreedySampleResult = ws32_split_final_sample_mapped(
+        hidden_update,
+        carried_residual,
         weights.final_norm_weight_local,
         weights.lm_head_local,
         hidden_size=config.geometry.hidden_size,
@@ -791,7 +795,11 @@ def _ws32_decode_impl(
         state.context_lengths + jnp.ones_like(state.context_lengths),
         health & sampled.contract_valid,
     )
-    step = Ws32DecodeStepResult(next_state, sampled.token_id, residual)
+    step = Ws32DecodeStepResult(
+        next_state,
+        sampled.token_id,
+        sampled.final_residual_local,
+    )
     if not observe_dsa:
         return step, None
     if len(observed_positions) != len(config.full_index_slots):

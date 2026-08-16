@@ -5,6 +5,21 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 
 ## Current boundary
 
+- A new execution architecture must port the numerical state contract, not merely layer formulas
+  and weights. WS32 initially carried one already-rounded BF16 residual, although the authoritative
+  decoder contract carries `(hidden_update, residual)`, normalizes their unrounded FP32 sum, and
+  independently BF16-rounds the carried sum at both boundaries of all 78 layers and final norm.
+  That omission survived one-layer tolerance tests, then accumulated until protected 2K token 10
+  flipped. Every future architecture needs an adversarial bitwise split-boundary test and a
+  complete-HLO count before full-model execution.
+- Compile acquisition and numerical execution are separate. One protected acquisition may preserve
+  every graph pair; validator development must replay those local graphs and never spend another
+  TPU compile on the same lowering. A numerically failed run can still close load/topology/HBM/
+  wall mechanisms, but its wall rate is diagnostic and cannot be published as performance.
+- When raw tokens first diverge, bind the exact token index to a sealed top-logit record before
+  changing the sampler. At WS32 2K index 10, expected token 576 was rank 1 and observed EOS rank 3
+  with margin 1.25, proving accumulated body arithmetic rather than a tie, EOS fallback or token
+  alignment error.
 - DB550 proves all 32 real layer-0 dense down partials match DB548 bitwise: `0 / 196,608`
   mismatches and raw SHA `9d9f65dd...16e35`.
 - Therefore checkpoint packing, FP8 decode/scales, SwiGLU, all 16 contractions, scheduled fusion

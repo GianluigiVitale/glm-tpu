@@ -170,6 +170,7 @@ def _graph_valid(value: Any, *, mode: str) -> bool:
         "collective_count",
         "expert_collective_count",
         "feature_collective_count",
+        "fused_rmsnorm_collective_count",
         "forbidden_full_hidden_values",
         "instruction_count",
         "kind",
@@ -178,6 +179,7 @@ def _graph_valid(value: Any, *, mode: str) -> bool:
         "maximum_group_size",
         "optimized_hlo_sha256",
         "passed",
+        "rounded_first_rmsnorm_collective_count",
         "stablehlo_sha256",
         "violations",
     }
@@ -202,11 +204,15 @@ def _graph_valid(value: Any, *, mode: str) -> bool:
                 value["kind"] == "cache_probe"
                 and value["feature_collective_count"] == 0
                 and value["expert_collective_count"] > 0
+                and value["fused_rmsnorm_collective_count"] == 0
+                and value["rounded_first_rmsnorm_collective_count"] == 0
             )
             or (
                 value["kind"] in {"decode", "observer", "prefill"}
                 and value["feature_collective_count"] > 0
                 and value["expert_collective_count"] > 0
+                and value["fused_rmsnorm_collective_count"] == 157
+                and value["rounded_first_rmsnorm_collective_count"] == 0
             )
         )
         and value["all_reduce_count"] + value["all_gather_count"]

@@ -15,7 +15,10 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 
-from .ws32 import ws32_rms_norm_mapped
+from .ws32 import (
+    ws32_fused_add_rms_norm_mapped,
+    ws32_rms_norm_mapped,
+)
 
 
 class Ws32EmbeddingResult(NamedTuple):
@@ -26,6 +29,12 @@ class Ws32EmbeddingResult(NamedTuple):
 class Ws32GreedySampleResult(NamedTuple):
     token_id: Any
     contract_valid: Any
+
+
+class Ws32SplitGreedySampleResult(NamedTuple):
+    token_id: Any
+    contract_valid: Any
+    final_residual_local: Any
 
 
 def _require_vocabulary_geometry(
@@ -186,4 +195,42 @@ def ws32_final_sample_mapped(
     )
     return ws32_greedy_sample_mapped(
         logits, vocab_size=vocab_size, expert_axis=expert_axis
+    )
+
+
+def ws32_split_final_sample_mapped(
+    hidden_update_local: Any,
+    carried_residual_local: Any,
+    final_norm_weight_local: Any,
+    lm_head_local: Any,
+    *,
+    hidden_size: int,
+    vocab_size: int,
+    feature_axis: str = "feature",
+    expert_axis: str = "expert",
+    rms_norm_epsilon: float = 1e-5,
+) -> Ws32SplitGreedySampleResult:
+    """Apply the accepted final fused norm and compact greedy sampler."""
+
+    normalized, final_residual = ws32_fused_add_rms_norm_mapped(
+        hidden_update_local,
+        carried_residual_local,
+        final_norm_weight_local,
+        global_hidden_size=hidden_size,
+        feature_axis=feature_axis,
+        epsilon=rms_norm_epsilon,
+    )
+    logits = ws32_logits_mapped(
+        normalized,
+        lm_head_local,
+        vocab_size=vocab_size,
+        feature_axis=feature_axis,
+    )
+    sampled = ws32_greedy_sample_mapped(
+        logits, vocab_size=vocab_size, expert_axis=expert_axis
+    )
+    return Ws32SplitGreedySampleResult(
+        sampled.token_id,
+        sampled.contract_valid,
+        final_residual,
     )

@@ -40,6 +40,8 @@ class Ws32DecoderHloReport:
     all_gather_count: int
     feature_collective_count: int
     expert_collective_count: int
+    fused_rmsnorm_collective_count: int
+    rounded_first_rmsnorm_collective_count: int
     maximum_group_size: int
     async_collective_count: int
     forbidden_full_hidden_values: tuple[str, ...]
@@ -57,6 +59,9 @@ class Ws32DecoderHloReport:
             "collective_count": self.collective_count,
             "expert_collective_count": self.expert_collective_count,
             "feature_collective_count": self.feature_collective_count,
+            "fused_rmsnorm_collective_count": (
+                self.fused_rmsnorm_collective_count
+            ),
             "forbidden_full_hidden_values": list(
                 self.forbidden_full_hidden_values
             ),
@@ -67,6 +72,9 @@ class Ws32DecoderHloReport:
             "maximum_group_size": self.maximum_group_size,
             "optimized_hlo_sha256": self.optimized_hlo_sha256,
             "passed": self.passed,
+            "rounded_first_rmsnorm_collective_count": (
+                self.rounded_first_rmsnorm_collective_count
+            ),
             "stablehlo_sha256": self.stablehlo_sha256,
             "violations": list(self.violations),
         }
@@ -183,6 +191,7 @@ def validate_ws32_decoder_hlo(
     expected_optimized_hlo_sha256: str,
     hidden_size: int,
     kind: str = "decode",
+    expected_split_rmsnorm_collective_count: int = 157,
 ) -> Ws32DecoderHloReport:
     """Validate one complete decoder/prefill graph before device execution.
 
@@ -196,6 +205,12 @@ def validate_ws32_decoder_hlo(
         raise ValueError("WS32 complete HLO kind is invalid")
     if hidden_size <= 0 or hidden_size % 4:
         raise ValueError("WS32 complete HLO hidden size is invalid")
+    if (
+        not isinstance(expected_split_rmsnorm_collective_count, int)
+        or isinstance(expected_split_rmsnorm_collective_count, bool)
+        or expected_split_rmsnorm_collective_count < 0
+    ):
+        raise ValueError("WS32 split RMSNorm count is invalid")
     expected_stablehlo_sha256 = _digest(
         expected_stablehlo_sha256, field="expected_stablehlo_sha256"
     )
@@ -230,6 +245,18 @@ def validate_ws32_decoder_hlo(
         if _ASYNC_COLLECTIVE.fullmatch(item.raw_opcode)
     )
     families = Counter(_group_family(item) for item in collectives)
+    fused_rmsnorm_collectives = tuple(
+        item
+        for item in live_collectives
+        if item.op_name is not None
+        and "greenfield_ws32_fused_rmsnorm" in item.op_name.split("/")
+    )
+    rounded_first_rmsnorm_collectives = tuple(
+        item
+        for item in live_collectives
+        if item.op_name is not None
+        and "greenfield_ws32_rmsnorm" in item.op_name.split("/")
+    )
     forbidden_hidden = _forbidden_full_hidden_values(
         module.instructions, hidden_size=hidden_size
     )
@@ -301,6 +328,27 @@ def validate_ws32_decoder_hlo(
         violations.append("complete WS32 collective exceeds subgroup size eight")
     if module.num_partitions != 32:
         violations.append("complete WS32 executable is not partitioned 32 ways")
+    expected_split_boundaries = (
+        0 if kind == "cache_probe" else expected_split_rmsnorm_collective_count
+    )
+    if len(fused_rmsnorm_collectives) != expected_split_boundaries:
+        violations.append(
+            "complete WS32 graph lacks the exact split-residual RMSNorm "
+            "boundary count"
+        )
+    if rounded_first_rmsnorm_collectives:
+        violations.append(
+            "complete WS32 graph retains rounded-first RMSNorm boundaries"
+        )
+    if any(
+        _group_family(item) != "feature"
+        or item.raw_opcode != "all-reduce"
+        or any(shape.dtype != "f32" for shape in item.operand_shapes)
+        for item in fused_rmsnorm_collectives
+    ):
+        violations.append(
+            "split-residual RMSNorm reduction geometry drifted"
+        )
     return Ws32DecoderHloReport(
         kind=kind,
         stablehlo_sha256=stable_digest,
@@ -317,6 +365,10 @@ def validate_ws32_decoder_hlo(
         ),
         feature_collective_count=families["feature"],
         expert_collective_count=families["expert"],
+        fused_rmsnorm_collective_count=len(fused_rmsnorm_collectives),
+        rounded_first_rmsnorm_collective_count=len(
+            rounded_first_rmsnorm_collectives
+        ),
         maximum_group_size=maximum_group,
         async_collective_count=len(async_collectives),
         forbidden_full_hidden_values=forbidden_hidden,

@@ -9862,3 +9862,21 @@ unmotivated arithmetic variants.
   construction, so the first protected attempt can only preserve the compiler graphs and refuse
   before arithmetic. Focused validation and diff tests pass 19/19; one immutable review precedes
   that compile acquisition.
+# 2026-08-16 01:57--03:30 UTC — complete WS32 acquisition passes; 2K localizes a missed split-state contract
+
+- Protected acquisition `greenfield_ws32_short_decoder_2k_acquire_20260816T015734871067016Z`
+  loaded the sealed 32-slot runtime checkpoint and preserved identical prefill, observer, decode and
+  cache-probe graph pairs on all eight hosts. Every structural contract passed; no numerical work
+  or performance publication occurred in acquisition mode.
+- Protected numerical tag `greenfield_ws32_short_decoder_2k_numerical_20260816T022943471763105Z`
+  passed graph, checkpoint, cache, state, HBM and 8/8 cleanup checks, then refused on raw-token
+  mismatch 10 (expected 576, observed EOS 154827) after exact tokens 0--9. The sealed top-16 oracle
+  makes 576 rank 1 and EOS rank 3 at that position with margin 1.25. Its 122.154-ms/token wall rate
+  is diagnostic only because correctness failed.
+- The failure exposed a missed architecture-port invariant: WS32 normalized already-rounded BF16
+  residual sums, whereas the authoritative decoder contract normalizes the unrounded FP32 sum and
+  independently carries its BF16 round at both norms of every layer and final norm. The bounded
+  correction ports that split state without reconstructing a full hidden row. Forced-32 layer and
+  final-sampler tests are bitwise against the independent reference; the complete HLO contract now
+  requires 157 live fused feature-4 RMS reductions and zero rounded-first reductions. Review and a
+  fresh HLO acquisition precede one corrected 2K retry.

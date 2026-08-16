@@ -17,12 +17,16 @@ import numpy as np
 from jax import lax
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
+from glm_tpu.greenfield.kernels.reference.rmsnorm import fused_add_rms_norm
+from glm_tpu.greenfield.kernels.ws32 import ws32_fused_add_rms_norm_mapped
 from glm_tpu.greenfield.kernels.ws32_io import (
     Ws32EmbeddingResult,
     Ws32GreedySampleResult,
+    Ws32SplitGreedySampleResult,
     ws32_embedding_mapped,
     ws32_final_sample_mapped,
     ws32_logits_mapped,
+    ws32_split_final_sample_mapped,
 )
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 
@@ -40,6 +44,9 @@ lm_head = np.asarray(
     dtype=ml_dtypes.bfloat16,
 )
 hidden = np.asarray(
+    rng.normal(0, 0.25, (1, hidden_size)), dtype=ml_dtypes.bfloat16
+)
+carried = np.asarray(
     rng.normal(0, 0.25, (1, hidden_size)), dtype=ml_dtypes.bfloat16
 )
 norm = np.asarray(
@@ -83,6 +90,35 @@ sample_program = jax.shard_map(
     out_specs=Ws32GreedySampleResult(P(), P()),
     check_vma=False,
 )
+split_norm_program = jax.shard_map(
+    lambda update, residual, weight: ws32_fused_add_rms_norm_mapped(
+        update,
+        residual,
+        weight,
+        global_hidden_size=hidden_size,
+    ),
+    mesh=mesh,
+    in_specs=(P(None, "feature"), P(None, "feature"), P("feature")),
+    out_specs=(P(None, "feature"), P(None, "feature")),
+    check_vma=False,
+)
+split_sample_program = jax.shard_map(
+    lambda update, residual, weight, table: ws32_split_final_sample_mapped(
+        update,
+        residual,
+        weight,
+        table,
+        hidden_size=hidden_size,
+        vocab_size=vocab_size,
+    ),
+    mesh=mesh,
+    in_specs=(
+        P(None, "feature"), P(None, "feature"), P("feature"),
+        P("expert", "feature"),
+    ),
+    out_specs=Ws32SplitGreedySampleResult(P(), P(), P(None, "feature")),
+    check_vma=False,
+)
 
 embedding_args = (put(token, P()), put(embedding, P("expert", "feature")))
 logits_args = (
@@ -92,12 +128,24 @@ logits_args = (
 sample_args = logits_args[:1] + (
     put(norm, P("feature")), logits_args[1]
 )
+split_args = (
+    put(hidden, P(None, "feature")),
+    put(carried, P(None, "feature")),
+    put(norm, P("feature")),
+)
+split_sample_args = split_args + (logits_args[1],)
 embedding_compiled = jax.jit(embedding_program).lower(*embedding_args).compile()
 logits_compiled = jax.jit(logits_program).lower(*logits_args).compile()
 sample_compiled = jax.jit(sample_program).lower(*sample_args).compile()
+split_norm_compiled = jax.jit(split_norm_program).lower(*split_args).compile()
+split_sample_compiled = jax.jit(split_sample_program).lower(
+    *split_sample_args
+).compile()
 embedded = embedding_compiled(*embedding_args)
 logits = logits_compiled(*logits_args)
 sample = sample_compiled(*sample_args)
+split_normalized, split_carried = split_norm_compiled(*split_args)
+split_sample = split_sample_compiled(*split_sample_args)
 
 hidden_f32 = jnp.asarray(hidden).astype(jnp.float32)
 inverse = lax.rsqrt(
@@ -121,6 +169,19 @@ expected_sample_logits = lax.dot_general(
     preferred_element_type=jnp.float32,
 ).astype(jnp.bfloat16)
 expected_token = int(jnp.argmax(expected_sample_logits[0]))
+expected_split_normalized, expected_split_carried = fused_add_rms_norm(
+    jnp.asarray(hidden),
+    jnp.asarray(carried),
+    jnp.asarray(norm),
+    epsilon=1e-5,
+)
+expected_split_logits = lax.dot_general(
+    expected_split_normalized.astype(jnp.float32),
+    jnp.asarray(lm_head).astype(jnp.float32),
+    dimension_numbers=(((1,), (1,)), ((), ())),
+    preferred_element_type=jnp.float32,
+).astype(jnp.bfloat16)
+expected_split_token = int(jnp.argmax(expected_split_logits[0]))
 
 zero_head = put(
     np.zeros_like(lm_head), P("expert", "feature")
@@ -152,6 +213,22 @@ print(json.dumps({
     "sample_token": np.asarray(sample.token_id).tolist(),
     "expected_token": expected_token,
     "sample_valid": np.asarray(sample.contract_valid).tolist(),
+    "split_normalized_bitwise": bool(np.array_equal(
+        np.asarray(split_normalized).view(np.uint16),
+        np.asarray(expected_split_normalized).view(np.uint16),
+    )),
+    "split_carried_bitwise": bool(np.array_equal(
+        np.asarray(split_carried).view(np.uint16),
+        np.asarray(expected_split_carried).view(np.uint16),
+    )),
+    "split_sample_carried_bitwise": bool(np.array_equal(
+        np.asarray(split_sample.final_residual_local).view(np.uint16),
+        np.asarray(expected_split_carried).view(np.uint16),
+    )),
+    "split_sample_token": np.asarray(split_sample.token_id).tolist(),
+    "expected_split_token": expected_split_token,
+    "split_sample_valid": np.asarray(split_sample.contract_valid).tolist(),
+    "split_collectives": collectives(split_sample_compiled),
     "tie_token": np.asarray(tied.token_id).tolist(),
     "embedding_collectives": collectives(embedding_compiled),
     "logits_collectives": collectives(logits_compiled),
@@ -186,6 +263,12 @@ print(json.dumps({
     assert result["logits_sharding"] == "P(None, 'expert')"
     assert result["sample_token"] == [result["expected_token"]]
     assert result["sample_valid"] == [True]
+    assert result["split_normalized_bitwise"]
+    assert result["split_carried_bitwise"]
+    assert result["split_sample_carried_bitwise"]
+    assert result["split_sample_token"] == [result["expected_split_token"]]
+    assert result["split_sample_valid"] == [True]
+    assert max(item["group"] for item in result["split_collectives"]) <= 8
     assert result["tie_token"] == [0]
     assert [item["group"] for item in result["embedding_collectives"]] == [8]
     assert [item["group"] for item in result["logits_collectives"]] == [4]

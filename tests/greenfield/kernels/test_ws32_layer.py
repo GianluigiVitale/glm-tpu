@@ -864,6 +864,7 @@ from glm_tpu.greenfield.kernels.reference.attention import (
 )
 from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
 from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract
+from glm_tpu.greenfield.kernels.ws32 import ws32_fused_add_rms_norm_mapped
 from glm_tpu.greenfield.kernels.ws32_layer import (
     Ws32AttentionWeights,
     Ws32DenseWeights,
@@ -906,6 +907,7 @@ layout = StageLocalKvLayout(
 attention_config = SparseMlaConfig(segment_block=8)
 
 residual = np.asarray(draw(1, (1, 512), 0.25), dtype=ml_dtypes.bfloat16)
+carried = np.asarray(draw(25, (1, 512), 0.25), dtype=ml_dtypes.bfloat16)
 cache = np.asarray(draw(2, (1, 64, 640)), dtype=ml_dtypes.bfloat16)
 index_cache = np.asarray(draw(3, (1, 64, 128)), dtype=ml_dtypes.bfloat16)
 selected = np.asarray([[7, 0, 6, 1, 5, 2, 4, 3]], dtype=np.int32)
@@ -960,12 +962,12 @@ dense_specs = Ws32DenseWeights(
     P("feature", "expert"), P("feature", "expert"),
 )
 
-def mapped(res, kv, index, positions, valid, selected_scores, pos, block_tables,
-           context, qkv_weights, attention_weights, norm_weight, dense_weights,
-           incoming):
+def mapped(update, residual, kv, index, positions, valid, selected_scores, pos,
+           block_tables, context, qkv_weights, attention_weights, norm_weight,
+           dense_weights, incoming):
     return ws32_transformer_layer_mapped(
-        res, kv, index, positions, valid, selected_scores, pos, block_tables,
-        context, qkv_weights, attention_weights, None, norm_weight,
+        update, residual, kv, index, positions, valid, selected_scores, pos,
+        block_tables, context, qkv_weights, attention_weights, None, norm_weight,
         dense_weights, None, incoming, indexer_kind="shared", mlp_kind="dense",
         dsa_contract=dsa, attention_contract=mla, moe_contract=moe,
         cache_layout=layout, block_shape=block,
@@ -973,23 +975,34 @@ def mapped(res, kv, index, positions, valid, selected_scores, pos, block_tables,
         sparse_attention_interpret=True, linear_interpret=True,
     )
 
-def decomposed(res, kv, index, positions, valid, selected_scores, pos,
-               block_tables, context, qkv_weights, attention_weights,
+def decomposed(update, residual, kv, index, positions, valid, selected_scores,
+               pos, block_tables, context, qkv_weights, attention_weights,
                norm_weight, dense_weights, incoming):
+    normalized_input, combined = ws32_fused_add_rms_norm_mapped(
+        update, residual, qkv_weights.input_norm_weight_local,
+        global_hidden_size=512,
+    )
     attention_result = ws32_attention_layer_mapped(
-        res, kv, index, positions, valid, selected_scores, pos, block_tables,
+        combined, kv, index, positions, valid, selected_scores, pos, block_tables,
         context, qkv_weights, attention_weights, None,
         dsa_contract=dsa, attention_contract=mla, cache_layout=layout,
         block_shape=block, sparse_attention_config=attention_config,
         sparse_attention_interpret=True, linear_interpret=True,
+        precomputed_normalized_local=normalized_input, add_residual=False,
+    )
+    normalized_mlp, post_attention_residual = ws32_fused_add_rms_norm_mapped(
+        attention_result.output_local, combined, norm_weight,
+        global_hidden_size=512,
     )
     mlp_result = ws32_mlp_mapped(
-        attention_result.output_local, norm_weight, dense_weights, None,
+        post_attention_residual, norm_weight, dense_weights, None,
         mlp_kind="dense", contract=moe, block_shape=block,
-        linear_interpret=True,
+        linear_interpret=True, precomputed_normalized_local=normalized_mlp,
+        add_residual=False,
     )
     return Ws32TransformerLayerResult(
-        mlp_result.output_local, attention_result.cache_local,
+        mlp_result.output_local, post_attention_residual,
+        attention_result.cache_local,
         attention_result.index_cache_local, attention_result.selected_positions,
         attention_result.selected_valid_counts, attention_result.selected_scores,
         mlp_result.route_indices, mlp_result.route_weights,
@@ -997,13 +1010,13 @@ def decomposed(res, kv, index, positions, valid, selected_scores, pos,
     )
 
 input_specs = (
-    P(None, "feature"), P(None, "expert", None), P(None, "expert", None),
-    P(), P(), P(), P(), P(), P(), qkv_specs, attention_specs, P("feature"),
-    dense_specs, P(),
+    P(None, "feature"), P(None, "feature"), P(None, "expert", None),
+    P(None, "expert", None), P(), P(), P(), P(), P(), P(), qkv_specs,
+    attention_specs, P("feature"), dense_specs, P(),
 )
 output_specs = Ws32TransformerLayerResult(
-    P(None, "feature"), P(None, "expert", None), P(None, "expert", None),
-    P(), P(), P(), P(), P(), P(),
+    P(None, "feature"), P(None, "feature"), P(None, "expert", None),
+    P(None, "expert", None), P(), P(), P(), P(), P(), P(),
 )
 joined = jax.shard_map(
     mapped, mesh=mesh, in_specs=input_specs, out_specs=output_specs,
@@ -1020,8 +1033,8 @@ def put(value, spec):
     return jax.device_put(value, NamedSharding(mesh, spec))
 
 values = (
-    residual, cache, index_cache, selected, counts, scores, position, tables,
-    lengths, qkv, attention, norm, dense, health,
+    residual, carried, cache, index_cache, selected, counts, scores, position,
+    tables, lengths, qkv, attention, norm, dense, health,
 )
 arguments = tuple(put(value, spec) for value, spec in zip(values, input_specs))
 compiled = jax.jit(joined).lower(*arguments).compile()
@@ -1034,16 +1047,31 @@ print(json.dumps({
         np.asarray(actual.output_local).view(np.uint16),
         np.asarray(expected.output_local).view(np.uint16),
     )),
+    "carried_bitwise": bool(np.array_equal(
+        np.asarray(actual.carried_residual_local).view(np.uint16),
+        np.asarray(expected.carried_residual_local).view(np.uint16),
+    )),
     "cache_bitwise": bool(np.array_equal(
         np.asarray(actual.cache_local).view(np.uint16),
         np.asarray(expected.cache_local).view(np.uint16),
     )),
     "contract_valid": np.asarray(actual.contract_valid).tolist(),
     "output_sharding": str(actual.output_local.sharding.spec),
+    "carried_sharding": str(actual.carried_residual_local.sharding.spec),
     "cache_sharding": str(actual.cache_local.sharding.spec),
     "route_indices": np.asarray(actual.route_indices).tolist(),
     "maximum_group_size": max(
         item.maximum_group_size for item in module.collectives
+    ),
+    "fused_rmsnorm_collectives": sum(
+        item.op_name is not None
+        and "greenfield_ws32_fused_rmsnorm" in item.op_name.split("/")
+        for item in module.collectives
+    ),
+    "rounded_first_rmsnorm_collectives": sum(
+        item.op_name is not None
+        and "greenfield_ws32_rmsnorm" in item.op_name.split("/")
+        for item in module.collectives
     ),
     "async": [
         item.raw_opcode for item in module.collectives
@@ -1072,11 +1100,15 @@ print(json.dumps({
     assert completed.returncode == 0, completed.stdout + completed.stderr
     result = json.loads(completed.stdout.strip().splitlines()[-1])
     assert result["output_bitwise"]
+    assert result["carried_bitwise"]
     assert result["cache_bitwise"]
     assert result["contract_valid"] == [True]
     assert result["output_sharding"] == "P(None, 'feature')"
+    assert result["carried_sharding"] == "P(None, 'feature')"
     assert result["cache_sharding"] == "P(None, 'expert')"
     assert result["route_indices"] == [[-1, -1, -1, -1]]
     assert result["maximum_group_size"] <= 8
+    assert result["fused_rmsnorm_collectives"] == 2
+    assert result["rounded_first_rmsnorm_collectives"] == 0
     assert result["async"] == []
     assert not result["batch32_hidden"]

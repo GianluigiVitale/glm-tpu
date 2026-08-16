@@ -47,6 +47,7 @@ from .reference.rotary import apply_rotary, rotary_cos_sin
 from .stage_local import _require_decode_metadata
 from .ws32 import (
     ws32_dense_pallas_mapped,
+    ws32_fused_add_rms_norm_mapped,
     ws32_fp8_expert_linear_pallas_mapped,
     ws32_fp8_feature_linear_pallas_mapped,
     ws32_moe_pallas_from_routes_mapped,
@@ -142,6 +143,7 @@ class Ws32AttentionLayerResult(NamedTuple):
 
 class Ws32TransformerLayerResult(NamedTuple):
     output_local: Any
+    carried_residual_local: Any
     cache_local: Any
     index_cache_local: Any
     selected_positions: Any
@@ -182,6 +184,7 @@ def ws32_prepare_attention_mapped(
     residual_local: Any,
     weights: Ws32QkvAWeights,
     *,
+    precomputed_normalized_local: Any | None = None,
     hidden_size: int = 6144,
     feature_axis: str = "feature",
     block_shape: tuple[int, int] = (128, 128),
@@ -225,13 +228,22 @@ def ws32_prepare_attention_mapped(
     ):
         raise ValueError("WS32 kv-a final-owner geometry drifted")
 
-    normalized = ws32_rms_norm_mapped(
-        residual_local,
-        weights.input_norm_weight_local,
-        global_hidden_size=hidden_size,
-        feature_axis=feature_axis,
-        epsilon=rms_norm_epsilon,
-    )
+    if precomputed_normalized_local is None:
+        normalized = ws32_rms_norm_mapped(
+            residual_local,
+            weights.input_norm_weight_local,
+            global_hidden_size=hidden_size,
+            feature_axis=feature_axis,
+            epsilon=rms_norm_epsilon,
+        )
+    else:
+        normalized = precomputed_normalized_local
+        if normalized.shape != residual_local.shape or (
+            normalized.dtype != jnp.bfloat16
+        ):
+            raise ValueError(
+                "WS32 precomputed attention normalization geometry drifted"
+            )
     q_a = ws32_fp8_feature_linear_pallas_mapped(
         normalized,
         weights.q_a_bits_local,
@@ -488,6 +500,7 @@ def ws32_index_share_attention_mapped(
     ),
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
+    add_residual: bool = True,
 ) -> Ws32AttentionResult:
     """Consume exact DSA state and execute one WS32 sparse-MLA update."""
 
@@ -498,6 +511,8 @@ def ws32_index_share_attention_mapped(
         residual_local.dtype != jnp.bfloat16
     ):
         raise ValueError("WS32 IndexShare residual geometry drifted")
+    if not isinstance(add_residual, bool):
+        raise ValueError("WS32 attention residual-add flag must be boolean")
     if prepared.normalized_local.shape != residual_local.shape or (
         prepared.q_residual.ndim != 2
         or prepared.q_residual.shape[0] != 1
@@ -656,7 +671,7 @@ def ws32_index_share_attention_mapped(
         interpret=linear_interpret,
     )
     return Ws32AttentionResult(
-        residual_add(residual_local, update),
+        residual_add(residual_local, update) if add_residual else update,
         cache_local,
         metadata_valid & aligned.contract_valid,
     )
@@ -687,12 +702,15 @@ def ws32_attention_layer_mapped(
     ),
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
+    precomputed_normalized_local: Any | None = None,
+    add_residual: bool = True,
 ) -> Ws32AttentionLayerResult:
     """Execute either a full-indexer or IndexShare attention layer."""
 
     prepared = ws32_prepare_attention_mapped(
         residual_local,
         qkv_a_weights,
+        precomputed_normalized_local=precomputed_normalized_local,
         hidden_size=dsa_contract.hidden_size,
         block_shape=block_shape,
         linear_interpret=linear_interpret,
@@ -732,6 +750,7 @@ def ws32_attention_layer_mapped(
         sparse_attention_config=sparse_attention_config,
         sparse_attention_interpret=sparse_attention_interpret,
         linear_interpret=linear_interpret,
+        add_residual=add_residual,
     )
     return Ws32AttentionLayerResult(
         attention.output_local,
@@ -745,7 +764,8 @@ def ws32_attention_layer_mapped(
 
 
 def ws32_transformer_layer_mapped(
-    residual_local: Any,
+    hidden_update_local: Any,
+    carried_residual_local: Any,
     cache_local: Any,
     index_cache_local: Any,
     selected_positions: Any,
@@ -803,10 +823,14 @@ def ws32_transformer_layer_mapped(
     local_hidden = _require_ws32_layout(
         cache_layout, hidden_size=dsa_contract.hidden_size
     )
-    if residual_local.shape != (1, local_hidden) or (
-        residual_local.dtype != jnp.bfloat16
+    if hidden_update_local.shape != (1, local_hidden) or (
+        hidden_update_local.dtype != jnp.bfloat16
     ):
-        raise ValueError("WS32 layer residual must be one BF16 feature shard")
+        raise ValueError("WS32 layer update must be one BF16 feature shard")
+    if carried_residual_local.shape != hidden_update_local.shape or (
+        carried_residual_local.dtype != jnp.bfloat16
+    ):
+        raise ValueError("WS32 carried residual must match the BF16 update shard")
     if moe_contract.hidden_size != dsa_contract.hidden_size:
         raise ValueError("WS32 attention and MoE hidden widths disagree")
     if post_attention_norm_weight_local.shape != (local_hidden,) or (
@@ -818,8 +842,15 @@ def ws32_transformer_layer_mapped(
     ):
         raise ValueError("WS32 incoming layer health must be one boolean row")
 
+    normalized_input, combined_residual = ws32_fused_add_rms_norm_mapped(
+        hidden_update_local,
+        carried_residual_local,
+        qkv_a_weights.input_norm_weight_local,
+        global_hidden_size=dsa_contract.hidden_size,
+        epsilon=rms_norm_epsilon,
+    )
     attention = ws32_attention_layer_mapped(
-        residual_local,
+        combined_residual,
         cache_local,
         index_cache_local,
         selected_positions,
@@ -838,9 +869,20 @@ def ws32_transformer_layer_mapped(
         sparse_attention_config=sparse_attention_config,
         sparse_attention_interpret=sparse_attention_interpret,
         linear_interpret=linear_interpret,
+        precomputed_normalized_local=normalized_input,
+        add_residual=False,
+    )
+    normalized_mlp, post_attention_residual = (
+        ws32_fused_add_rms_norm_mapped(
+            attention.output_local,
+            combined_residual,
+            post_attention_norm_weight_local,
+            global_hidden_size=moe_contract.hidden_size,
+            epsilon=rms_norm_epsilon,
+        )
     )
     mlp = ws32_mlp_mapped(
-        attention.output_local,
+        post_attention_residual,
         post_attention_norm_weight_local,
         dense_weights,
         moe_weights,
@@ -849,10 +891,13 @@ def ws32_transformer_layer_mapped(
         block_shape=block_shape,
         rms_norm_epsilon=rms_norm_epsilon,
         linear_interpret=linear_interpret,
+        precomputed_normalized_local=normalized_mlp,
+        add_residual=False,
     )
 
     return Ws32TransformerLayerResult(
         mlp.output_local,
+        post_attention_residual,
         attention.cache_local,
         attention.index_cache_local,
         attention.selected_positions,
@@ -877,6 +922,8 @@ def ws32_mlp_mapped(
     block_shape: tuple[int, int] = (128, 128),
     rms_norm_epsilon: float = 1e-5,
     linear_interpret: bool = False,
+    precomputed_normalized_local: Any | None = None,
+    add_residual: bool = True,
 ) -> Ws32MlpResult:
     """Apply post-attention normalization and the exact WS32 MLP branch."""
 
@@ -899,13 +946,22 @@ def ws32_mlp_mapped(
         post_attention_norm_weight_local.dtype != jnp.bfloat16
     ):
         raise ValueError("WS32 MLP norm owner geometry drifted")
+    if not isinstance(add_residual, bool):
+        raise ValueError("WS32 MLP residual-add flag must be boolean")
 
-    normalized = ws32_rms_norm_mapped(
-        post_attention_residual_local,
-        post_attention_norm_weight_local,
-        global_hidden_size=contract.hidden_size,
-        epsilon=rms_norm_epsilon,
-    )
+    if precomputed_normalized_local is None:
+        normalized = ws32_rms_norm_mapped(
+            post_attention_residual_local,
+            post_attention_norm_weight_local,
+            global_hidden_size=contract.hidden_size,
+            epsilon=rms_norm_epsilon,
+        )
+    else:
+        normalized = precomputed_normalized_local
+        if normalized.shape != post_attention_residual_local.shape or (
+            normalized.dtype != jnp.bfloat16
+        ):
+            raise ValueError("WS32 precomputed MLP normalization geometry drifted")
     if mlp_kind == "dense":
         assert dense_weights is not None
         update = ws32_dense_pallas_mapped(
@@ -951,7 +1007,11 @@ def ws32_mlp_mapped(
             interpret=linear_interpret,
         )
     return Ws32MlpResult(
-        residual_add(post_attention_residual_local, update),
+        (
+            residual_add(post_attention_residual_local, update)
+            if add_residual
+            else update
+        ),
         route_indices,
         route_weights,
     )

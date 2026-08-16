@@ -40,6 +40,25 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- Protected 2K acquisition `greenfield_ws32_short_decoder_2k_acquire_20260816T015734871067016Z`
+  passed all four complete-graph contracts on all eight hosts. Exact StableHLO/optimized-HLO pins
+  are prefill `2557c56b...4448b` / `46462e9a...2d`, observer `639ab646...ace5` /
+  `84f79565...f8c`, decode `89efe7b5...30b3` / `976feb18...f8ae`, and cache
+  `664c331a...b14` / `4e0245cb...d05e`. Do not reacquire these rejected rounded-first graphs.
+- Protected numerical tag `greenfield_ws32_short_decoder_2k_numerical_20260816T022943471763105Z`
+  passed HLO, load, state, cache, HBM and cleanup but correctly refused publication on raw-token
+  mismatch 10: expected `576`, observed EOS `154827`. Tokens 0--9 are exact. The sealed legacy
+  top-16 oracle ranks 576 first and EOS third with raw-logit margin 1.25, so this is accumulated
+  body drift, not a tie or sampler fallback. Diagnostic steady wall is 122.154 ms/token (~8.19
+  tok/s) and is not a performance claim because correctness failed.
+- Root cause is concrete: WS32 omitted the authoritative split-residual RMSNorm contract and
+  normalized already-rounded BF16 sums twice per layer. The correction now carries
+  `(hidden_update, residual)`, normalizes each unrounded FP32 sum, independently carries its BF16
+  round, and uses the same fused boundary at final norm. Forced-32 layer/final-sampler comparisons
+  are bitwise against the independent reference. Complete-HLO validation now requires exactly 157
+  live feature-4 fused boundaries and zero old rounded-first boundaries. Exact next is one immutable
+  correction review, commit/push, one corrected four-graph acquisition, then one corrected 2K
+  numerical run. Gate D remains open until that run is exact; the failed speed is unclaimable.
 - The complete WS32 runtime checkpoint is sealed under protected tag
   `greenfield_ws32_runtime_pack_20260815T214050854386790Z`. Its exact manifest/SUCCESS identities
   are `c04f800e...5ee08` / `1bfea5bd...f1760`; all 32 final-owner slots and 141 source records

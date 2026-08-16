@@ -36,10 +36,12 @@ from .ws32_layer import (
 from .ws32_io import (
     Ws32EmbeddingResult,
     Ws32GreedySampleResult,
+    Ws32SplitGreedySampleResult,
     ws32_embedding_mapped,
     ws32_final_sample_mapped,
     ws32_greedy_sample_mapped,
     ws32_logits_mapped,
+    ws32_split_final_sample_mapped,
 )
 
 __all__ = (
@@ -62,6 +64,7 @@ __all__ = (
     "Ws32TransformerLayerResult",
     "Ws32EmbeddingResult",
     "Ws32GreedySampleResult",
+    "Ws32SplitGreedySampleResult",
     "stage_local_transformer_layer_fp8_mapped",
     "ws32_attention_layer_mapped",
     "ws32_dsa_mapped",
@@ -72,5 +75,6 @@ __all__ = (
     "ws32_prepare_attention_mapped",
     "ws32_logits_mapped",
     "ws32_mlp_mapped",
+    "ws32_split_final_sample_mapped",
     "ws32_transformer_layer_mapped",
 )

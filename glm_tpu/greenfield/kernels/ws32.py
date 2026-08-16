@@ -536,6 +536,63 @@ def ws32_rms_norm_mapped(
     ).astype(hidden_local.dtype)
 
 
+def ws32_fused_add_rms_norm_mapped(
+    hidden_update_local: Any,
+    carried_residual_local: Any,
+    weight_local: Any,
+    *,
+    global_hidden_size: int,
+    feature_axis: str = "feature",
+    epsilon: float = 1e-5,
+) -> tuple[Any, Any]:
+    """Apply the accepted split residual/RMSNorm boundary on feature-4.
+
+    The two BF16 inputs are added in FP32.  RMSNorm consumes that unrounded
+    sum, while the independently returned residual is the same sum rounded to
+    BF16.  Keeping these outputs distinct is part of GLM's numerical contract.
+    """
+
+    if hidden_update_local.shape != carried_residual_local.shape:
+        raise ValueError("WS32 split residual shapes differ")
+    if hidden_update_local.dtype != jnp.bfloat16 or (
+        carried_residual_local.dtype != jnp.bfloat16
+    ):
+        raise ValueError("WS32 split residual inputs must be bfloat16")
+    if hidden_update_local.ndim < 1 or hidden_update_local.shape[-1] <= 0:
+        raise ValueError("WS32 split residual requires a nonempty hidden shard")
+    if weight_local.shape != (hidden_update_local.shape[-1],) or (
+        weight_local.dtype != jnp.bfloat16
+    ):
+        raise ValueError("WS32 split RMSNorm weight must match the hidden shard")
+    if (
+        not isinstance(global_hidden_size, int)
+        or isinstance(global_hidden_size, bool)
+        or global_hidden_size < hidden_update_local.shape[-1]
+        or global_hidden_size % hidden_update_local.shape[-1]
+    ):
+        raise ValueError("WS32 split RMSNorm global hidden geometry is invalid")
+    if not isinstance(epsilon, (int, float)) or isinstance(epsilon, bool) or (
+        epsilon <= 0
+    ):
+        raise ValueError("WS32 split RMSNorm epsilon must be positive")
+
+    summed = hidden_update_local.astype(jnp.float32) + (
+        carried_residual_local.astype(jnp.float32)
+    )
+    carried = summed.astype(jnp.bfloat16)
+    local_square_sum = jnp.sum(lax.square(summed), axis=-1, keepdims=True)
+    with jax.named_scope("greenfield_ws32_fused_rmsnorm/feature_square_reduce"):
+        square_sum = lax.psum(local_square_sum, axis_name=feature_axis)
+    inverse = lax.rsqrt(
+        square_sum / jnp.float32(global_hidden_size) + jnp.float32(epsilon)
+    )
+    normalized = summed * inverse
+    output = (
+        normalized.astype(jnp.bfloat16) * weight_local
+    ).astype(jnp.bfloat16)
+    return output, carried
+
+
 def ws32_fp8_feature_linear_pallas_mapped(
     lhs_local: Any,
     weight_bits_local: Any,

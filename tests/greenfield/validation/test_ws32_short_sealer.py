@@ -27,6 +27,7 @@ def _graph() -> dict[str, object]:
         "collective_count": 3,
         "expert_collective_count": 1,
         "feature_collective_count": 2,
+        "fused_rmsnorm_collective_count": 157,
         "forbidden_full_hidden_values": [],
         "instruction_count": 100,
         "kind": "decode",
@@ -35,6 +36,7 @@ def _graph() -> dict[str, object]:
         "maximum_group_size": 8,
         "optimized_hlo_sha256": "2" * 64,
         "passed": True,
+        "rounded_first_rmsnorm_collective_count": 0,
         "stablehlo_sha256": "1" * 64,
         "violations": [],
     }
@@ -65,6 +67,7 @@ def test_ws32_short_sealer_graph_contract_refuses_dead_or_global_work() -> None:
         "collective_count": 1,
         "expert_collective_count": 1,
         "feature_collective_count": 0,
+        "fused_rmsnorm_collective_count": 0,
         "kind": "cache_probe",
         "live_collective_count": 1,
     }

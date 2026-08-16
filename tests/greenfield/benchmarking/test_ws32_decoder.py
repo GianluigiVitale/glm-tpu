@@ -69,7 +69,7 @@ expert_add {{
 
 ENTRY main {{
   %input = f32[1,1536] parameter(0)
-  %feature = f32[1,1536] all-reduce(%input), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_complete_decoder/feature"}}
+  %feature = f32[1,1536] all-reduce(%input), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_complete_decoder/greenfield_ws32_fused_rmsnorm/feature_square_reduce/psum"}}
   %gather = f32[8,1,1536] all-gather(%feature), dimensions={{0}}, replica_groups={{{expert}}}, use_global_device_ids=true
   ROOT %root = f32[8,1,1536] copy(%gather)
 }}
@@ -85,6 +85,7 @@ def _report(hlo: str, *, kind: str = "decode"):
         expected_optimized_hlo_sha256=sha256(hlo.encode()).hexdigest(),
         hidden_size=6144,
         kind=kind,
+        expected_split_rmsnorm_collective_count=1,
     )
 
 
@@ -111,7 +112,7 @@ body {{
   %input = f32[1,1536] get-tuple-element(%state), index=1
   %one = s32[] constant(1)
   %next = s32[] add(%index, %one)
-  %feature = f32[1,1536] all-reduce(%input), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_teacher_forced_prefill/feature"}}
+  %feature = f32[1,1536] all-reduce(%input), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_teacher_forced_prefill/greenfield_ws32_fused_rmsnorm/feature_square_reduce/psum"}}
   ROOT %result = (s32[], f32[1,1536]) tuple(%next, %feature)
 }}
 
@@ -185,7 +186,7 @@ use_first {{
 
 ENTRY main {{
   %input = f32[1,1536] parameter(0)
-  %live = f32[1,1536] all-reduce(%input), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_complete_decoder/live"}}
+  %live = f32[1,1536] all-reduce(%input), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_complete_decoder/greenfield_ws32_fused_rmsnorm/feature_square_reduce/psum"}}
   %decoy = f32[1,1536] all-reduce(%input), replica_groups={{{expert}}}, to_apply=expert_add, use_global_device_ids=true
   ROOT %root = f32[1,1536] fusion(%live, %decoy), calls=use_first
 }}
@@ -223,7 +224,17 @@ def test_ws32_complete_hlo_contract_refuses_structural_mutations() -> None:
         "ROOT %sum = f32[] maximum(%a, %b)",
         1,
     )
-    for mutation in (dead, async_value, wrong_group, full_hidden, bad_reducer):
+    rounded_first = base.replace(
+        "greenfield_ws32_fused_rmsnorm", "greenfield_ws32_rmsnorm"
+    )
+    for mutation in (
+        dead,
+        async_value,
+        wrong_group,
+        full_hidden,
+        bad_reducer,
+        rounded_first,
+    ):
         report = _report(mutation)
         assert not report.passed
 
@@ -267,6 +278,7 @@ def test_ws32_complete_hlo_binds_exact_scope_to_live_optimized_value() -> None:
         expected_optimized_hlo_sha256=sha256(unscoped.encode()).hexdigest(),
         hidden_size=6144,
         kind="decode",
+        expected_split_rmsnorm_collective_count=1,
     )
     assert not stable_report.passed
     assert stable_report.violations == (
@@ -393,8 +405,12 @@ def test_ws32_prefill_contract_replays_protected_acquisition() -> None:
     )
     assert set(report.violations) == {
         "StableHLO identity drifted",
+        "complete WS32 graph lacks the exact split-residual RMSNorm boundary count",
+        "complete WS32 graph retains rounded-first RMSNorm boundaries",
         "optimized HLO identity drifted",
     }
+    assert report.fused_rmsnorm_collective_count == 0
+    assert report.rounded_first_rmsnorm_collective_count == 157
     assert report.instruction_count == 173_829
     assert report.live_instruction_count == 173_229
     assert report.collective_count == report.live_collective_count == 1_289
