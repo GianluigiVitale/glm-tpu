@@ -50,7 +50,6 @@ def _stablehlo_body_sha256(stablehlo: str) -> str:
         len(lines) < 3
         or not lines[0].startswith("module @")
         or lines[-1] != "}"
-        or not lines[1].startswith("func.func public @main(")
         or sum(
             line.startswith("func.func public @main(") for line in lines
         )

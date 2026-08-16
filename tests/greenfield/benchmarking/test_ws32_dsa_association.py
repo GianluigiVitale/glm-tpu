@@ -6,6 +6,7 @@ import pytest
 
 from glm_tpu.greenfield.benchmarking.ws32_dsa_association import (
     _attribute_positions,
+    _stablehlo_body_sha256,
     classify_ws32_dsa_query_head_contract,
     validate_ws32_dsa_component_hlo,
     validate_ws32_dsa_stablehlo,
@@ -206,6 +207,19 @@ ENTRY main (input: f32[1,2048]) -> f32[1,2048] {
 '''
 
 
+def _sharded_stablehlo_envelope() -> str:
+    return '''module @sharded {
+  sdy.mesh @mesh = <["feature"=4]>
+  func.func public @main(%arg0: tensor<1xf32>) -> tensor<1xf32> {
+    return %arg0 : tensor<1xf32>
+  }
+  func.func private @helper(%arg0: tensor<1xf32>) -> tensor<1xf32> {
+    return %arg0 : tensor<1xf32>
+  }
+}
+'''
+
+
 def test_exact_stablehlo_bodies_and_arithmetic_mutations() -> None:
     for alias_count in (4, 8):
         component = f"tuple{alias_count}_query_head"
@@ -251,6 +265,36 @@ def test_exact_stablehlo_bodies_and_arithmetic_mutations() -> None:
             stablehlo.replace(marker, "stablehlo.add", 1),
             component=component,
         )["exact"]
+
+
+def test_stablehlo_envelope_allows_mesh_and_helpers_before_and_after_main() -> None:
+    stablehlo = _sharded_stablehlo_envelope()
+    digest = _stablehlo_body_sha256(stablehlo)
+    assert digest != _stablehlo_body_sha256(
+        stablehlo.replace('["feature"=4]', '["feature"=2]')
+    )
+    assert digest != _stablehlo_body_sha256(
+        stablehlo.replace("return %arg0", "%0 = stablehlo.negate %arg0", 1)
+    )
+
+
+def test_stablehlo_envelope_still_refuses_malformed_modules() -> None:
+    stablehlo = _sharded_stablehlo_envelope()
+    malformed = (
+        stablehlo.replace("module @sharded", "not_a_module @sharded", 1),
+        stablehlo.replace("func.func public @main", "func.func private @main", 1),
+        stablehlo.replace(
+            "  func.func public @main",
+            "  func.func public @main(%arg0: tensor<1xf32>) -> tensor<1xf32> {\n"
+            "    return %arg0 : tensor<1xf32>\n"
+            "  }\n  func.func public @main",
+            1,
+        ),
+        stablehlo.rstrip() + "\ntrailing text",
+    )
+    for value in malformed:
+        with pytest.raises(ValueError, match="module envelope drifted"):
+            _stablehlo_body_sha256(value)
 
 
 def test_optimized_tuple_fusion_binds_every_owner_and_q_source() -> None:
