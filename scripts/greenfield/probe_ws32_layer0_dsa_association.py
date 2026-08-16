@@ -348,10 +348,15 @@ def main() -> int:
                 bits, scale, output_dtype=jnp.float32
             )
         )
-        sample_bits = jax.device_put(full_wq_bits[:local_width], device)
-        sample_scale = jax.device_put(full_wq_scale[:scale_rows], device)
         started = time.monotonic()
-        lowered = materializer.lower(sample_bits, sample_scale)
+        lowered = materializer.lower(
+            jax.ShapeDtypeStruct(
+                (local_width, contract.q_lora_rank), jnp.uint8
+            ),
+            jax.ShapeDtypeStruct(
+                (scale_rows, contract.q_lora_rank // 128), jnp.float32
+            ),
+        )
         compiled = lowered.compile()
         compile_seconds = time.monotonic() - started
         stablehlo, hlo, hlo_record = _record_hlo(
@@ -398,8 +403,6 @@ def main() -> int:
         _, owners, materializer_record, materializer_seconds = (
             compile_materializer(alias_count=alias_count)
         )
-        sample_head = jax.device_put(full_head_weight[:local_heads], device)
-
         def query_candidate(
             q_state: Any,
             normalized: Any,
@@ -416,15 +419,25 @@ def main() -> int:
                 contract=contract,
             )
 
-        sample_aliases = tuple(owners[0] for _ in range(alias_count))
         query_jit = jax.jit(query_candidate)
         started = time.monotonic()
         query_lowered = query_jit.lower(
-            q_accepted_device,
-            normalized_device,
-            sample_aliases,
-            sample_head,
-            position_device,
+            jax.ShapeDtypeStruct(
+                (1, contract.q_lora_rank), jnp.bfloat16
+            ),
+            jax.ShapeDtypeStruct(
+                (1, contract.hidden_size), jnp.bfloat16
+            ),
+            tuple(
+                jax.ShapeDtypeStruct(
+                    (local_width, contract.q_lora_rank), jnp.float32
+                )
+                for _ in range(alias_count)
+            ),
+            jax.ShapeDtypeStruct(
+                (local_heads, contract.hidden_size), jnp.bfloat16
+            ),
+            jax.ShapeDtypeStruct((1,), jnp.int32),
         )
         query_compiled = query_lowered.compile()
         query_compile_seconds = time.monotonic() - started
@@ -553,7 +566,14 @@ def main() -> int:
             bits, scale, contract=contract
         )
     )
-    wk_decode_lowered = wk_decode.lower(wk_bits, wk_scale)
+    wk_decode_lowered = wk_decode.lower(
+        jax.ShapeDtypeStruct(
+            (contract.head_dim, contract.hidden_size), jnp.uint8
+        ),
+        jax.ShapeDtypeStruct(
+            (1, contract.hidden_size // 128), jnp.float32
+        ),
+    )
     wk_decode_compiled = wk_decode_lowered.compile()
     wk_decode_stablehlo, wk_decode_hlo, wk_decode_record = _record_hlo(
         args.hlo_dir, "wk_decode_bfloat16", wk_decode_lowered, wk_decode_compiled
@@ -574,7 +594,11 @@ def main() -> int:
             value, contract=contract
         )
     )
-    wk_promote_lowered = wk_promote.lower(wk_bf16)
+    wk_promote_lowered = wk_promote.lower(
+        jax.ShapeDtypeStruct(
+            (contract.head_dim, contract.hidden_size), jnp.bfloat16
+        )
+    )
     wk_promote_compiled = wk_promote_lowered.compile()
     wk_promote_stablehlo, wk_promote_hlo, wk_promote_record = _record_hlo(
         args.hlo_dir, "wk_promote_float32", wk_promote_lowered, wk_promote_compiled
@@ -614,7 +638,13 @@ def main() -> int:
         )
     )
     key_lowered = key_jit.lower(
-        normalized_device, wk_f32, norm_weight, norm_bias, position_device
+        jax.ShapeDtypeStruct((1, contract.hidden_size), jnp.bfloat16),
+        jax.ShapeDtypeStruct(
+            (contract.head_dim, contract.hidden_size), jnp.float32
+        ),
+        jax.ShapeDtypeStruct((contract.head_dim,), jnp.bfloat16),
+        jax.ShapeDtypeStruct((contract.head_dim,), jnp.bfloat16),
+        jax.ShapeDtypeStruct((1,), jnp.int32),
     )
     key_compiled = key_lowered.compile()
     key_stablehlo, key_hlo, key_hlo_record = _record_hlo(
@@ -683,7 +713,13 @@ def main() -> int:
             )
         )
         started = time.monotonic()
-        score_lowered = score_jit.lower(query_device, first_lane, head_device)
+        score_lowered = score_jit.lower(
+            jax.ShapeDtypeStruct(
+                (1, contract.num_heads, contract.head_dim), jnp.float32
+            ),
+            jax.ShapeDtypeStruct((1024, contract.head_dim), jnp.bfloat16),
+            jax.ShapeDtypeStruct((1, contract.num_heads), jnp.float32),
+        )
         score_compiled = score_lowered.compile()
         score_compile_seconds = time.monotonic() - started
         score_stablehlo, score_hlo, score_hlo_record = _record_hlo(
