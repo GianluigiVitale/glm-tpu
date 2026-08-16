@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import jax
 import jax.numpy as jnp
+import pytest
 
 from glm_tpu.greenfield.benchmarking.ws32_dsa_association import (
+    _attribute_positions,
     classify_ws32_dsa_query_head_contract,
     validate_ws32_dsa_component_hlo,
     validate_ws32_dsa_stablehlo,
@@ -163,6 +165,47 @@ ENTRY main (q_in: bf16[1,2048], w0_in: f32[1024,2048], w1_in: f32[1024,2048], w2
 '''
 
 
+def _marker_hlo(*, kernel_name: bool = False) -> str:
+    kernel_attribute = (
+        ', kernel_name="greenfield_marker_kernel"' if kernel_name else ""
+    )
+    return f'''HloModule marker
+
+ENTRY main (input: f32[1]) -> f32[1] {{
+  %input = f32[1] parameter(0)
+  ROOT %call = f32[1] custom-call(%input), custom_call_target="tpu_custom_call"{kernel_attribute}, metadata={{op_name="jit(marker)/pallas_call" stack_frame_id=1}}, backend_config={{"aliasing_operands":{{"lists":[]}},"flag_configs":[]}}
+}}
+'''
+
+
+def _copy_async_hlo() -> str:
+    return '''HloModule copy_async
+
+ENTRY main (input: f32[1,2048]) -> f32[1,2048] {
+  %input = f32[1,2048] parameter(0)
+  %start = (f32[1,2048], f32[1,2048], u32[]) copy-start(%input)
+  ROOT %done = f32[1,2048] copy-done(%start)
+}
+'''
+
+
+def _collective_async_hlo() -> str:
+    return '''HloModule collective_async
+
+%add (lhs: f32[], rhs: f32[]) -> f32[] {
+  %lhs = f32[] parameter(0)
+  %rhs = f32[] parameter(1)
+  ROOT %sum = f32[] add(%lhs, %rhs)
+}
+
+ENTRY main (input: f32[1,2048]) -> f32[1,2048] {
+  %input = f32[1,2048] parameter(0)
+  %start = (f32[1,2048], f32[1,2048]) all-reduce-start(%input), replica_groups={{0,1,2,3}}, to_apply=%add
+  ROOT %done = f32[1,2048] all-reduce-done(%start)
+}
+'''
+
+
 def test_exact_stablehlo_bodies_and_arithmetic_mutations() -> None:
     for alias_count in (4, 8):
         component = f"tuple{alias_count}_query_head"
@@ -288,6 +331,73 @@ def test_live_slash_marker_matches_named_scope_path_not_dead_decoy() -> None:
     assert not rejected["passed"]
     assert rejected["missing_markers"] == [
         "greenfield_ws32_linear/feature_reduce"
+    ]
+
+
+def test_actual_custom_call_and_kernel_attributes_are_scanner_safe() -> None:
+    target = validate_ws32_dsa_component_hlo(
+        _marker_hlo(),
+        expected_entry_parameters={("f32", (1,)): 1},
+        required_live_markers=("tpu_custom_call",),
+    )
+    assert target["passed"], target
+
+    kernel = validate_ws32_dsa_component_hlo(
+        _marker_hlo(kernel_name=True),
+        expected_entry_parameters={("f32", (1,)): 1},
+        required_live_markers=("greenfield_marker_kernel",),
+    )
+    assert kernel["passed"], kernel
+
+
+def test_quoted_attribute_decoy_cannot_supply_a_live_marker() -> None:
+    decoy = _tuple4_hlo().replace(
+        "calls=body, backend_config=",
+        'calls=body, metadata={op_name="jit(f)/fusion" '
+        'source_file="decoy custom_call_target=\\"greenfield_fake\\""}, '
+        "backend_config=",
+    )
+    rejected = validate_ws32_dsa_component_hlo(
+        decoy,
+        expected_entry_parameters={
+            ("bf16", (1, 2048)): 1,
+            ("f32", (1024, 2048)): 4,
+        },
+        required_live_markers=("greenfield_fake",),
+        required_16k_fusion_shape=(4, 1024),
+    )
+    assert not rejected["passed"]
+    assert rejected["missing_markers"] == ["greenfield_fake"]
+
+
+def test_attribute_scanner_refuses_unsafe_markers_and_malformed_text() -> None:
+    with pytest.raises(ValueError, match="marker is not scanner-safe"):
+        _attribute_positions('custom_call_target="ok"', 'custom_call_target="')
+    with pytest.raises(ValueError, match="unterminated comment/string"):
+        _attribute_positions('custom_call_target="unterminated', "kernel_name=")
+    with pytest.raises(ValueError, match="unterminated comment/string"):
+        _attribute_positions("/* unterminated", "kernel_name=")
+
+
+def test_local_async_copy_is_not_misclassified_as_a_collective() -> None:
+    result = validate_ws32_dsa_component_hlo(
+        _copy_async_hlo(),
+        expected_entry_parameters={("f32", (1, 2048)): 1},
+    )
+    assert result["passed"], result
+    assert result["async_collectives"] == []
+
+
+def test_real_async_collective_remains_fail_closed() -> None:
+    result = validate_ws32_dsa_component_hlo(
+        _collective_async_hlo(),
+        expected_entry_parameters={("f32", (1, 2048)): 1},
+        expected_collective_groups=(4,),
+    )
+    assert not result["passed"]
+    assert result["async_collectives"] == [
+        "all-reduce-done",
+        "all-reduce-start",
     ]
 
 

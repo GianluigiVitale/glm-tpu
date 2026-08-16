@@ -61,6 +61,8 @@ def _stablehlo_body_sha256(stablehlo: str) -> str:
 
 
 def _attribute_positions(value: str, marker: str) -> tuple[int, ...]:
+    if '"' in marker or "/*" in marker or "*/" in marker:
+        raise ValueError("WS32 DSA HLO attribute marker is not scanner-safe")
     positions: list[int] = []
     index = 0
     quoted = False
@@ -105,11 +107,11 @@ def _attribute_positions(value: str, marker: str) -> tuple[int, ...]:
 def _actual_marker_values(raw_line: str, op_name: str | None) -> set[str]:
     values = set(() if op_name is None else op_name.split("/"))
     for attribute in ("custom_call_target", "kernel_name"):
-        marker = f'{attribute}="'
+        marker = f"{attribute}="
         positions = _attribute_positions(raw_line, marker)
         for position in positions:
             tail = raw_line[position + len(marker) :]
-            match = re.match(r'([^"\\]*(?:\\.[^"\\]*)*)"', tail)
+            match = re.match(r'"([^"\\]*(?:\\.[^"\\]*)*)"', tail)
             if match is None:
                 raise ValueError(f"WS32 DSA {attribute} attribute drifted")
             values.add(match.group(1))
@@ -197,8 +199,11 @@ def validate_ws32_dsa_component_hlo(
     async_collectives = sorted(
         instruction.raw_opcode
         for instruction in live
-        if instruction.raw_opcode.endswith("-start")
-        or instruction.raw_opcode.endswith("-done")
+        if (
+            instruction.raw_opcode.endswith("-start")
+            or instruction.raw_opcode.endswith("-done")
+        )
+        and instruction.raw_opcode not in {"copy-start", "copy-done"}
     )
     forbidden_opcodes = sorted(
         {
