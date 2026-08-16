@@ -308,15 +308,29 @@ def _write_graph(
 def _require_graph_authorized(
     report: Mapping[str, Any], *, compile_only: bool
 ) -> None:
-    violations = set(report["violations"])
     if compile_only:
-        if report["passed"] or violations != _VACANT_HLO_VIOLATIONS:
-            raise RuntimeError("WS32 acquisition graph has structural violations")
+        # Acquisition never executes a model graph.  Preserve and validate all
+        # four compiler products before reporting any structural refusal so a
+        # single protected load cannot fail one graph at a time.
+        return
     elif not report["passed"]:
         raise RuntimeError(
             "WS32 numerical graph failed before execution: "
             + "; ".join(report["violations"])
         )
+
+
+def _require_acquisition_authorized(
+    graphs: Mapping[str, Mapping[str, Any]],
+) -> None:
+    expected = {"cache_probe", "decode", "observer", "prefill"}
+    if set(graphs) != expected:
+        raise RuntimeError("WS32 acquisition did not preserve all four graphs")
+    if all(value["passed"] for value in graphs.values()) or any(
+        set(value["violations"]) != _VACANT_HLO_VIOLATIONS
+        for value in graphs.values()
+    ):
+        raise RuntimeError("WS32 HLO acquisition found structural violations")
 
 
 def _trace_files(trace_dir: Path) -> list[dict[str, Any]]:
@@ -673,11 +687,7 @@ def main() -> int:
     _atomic_json(args.hlo_dir / "prevalidation.json", prevalidation)
     graph_passed = all(value["passed"] for value in graphs.values())
     if args.compile_only:
-        if graph_passed or any(
-            set(value["violations"]) != _VACANT_HLO_VIOLATIONS
-            for value in graphs.values()
-        ):
-            raise RuntimeError("WS32 HLO acquisition found structural violations")
+        _require_acquisition_authorized(graphs)
         result = {
             **prevalidation,
             "performance_claim": False,

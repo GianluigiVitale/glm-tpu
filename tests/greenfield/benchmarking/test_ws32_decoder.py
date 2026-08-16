@@ -23,6 +23,16 @@ FULL_DECODER_HLO = Path(
     "20260809T225800140051438Z/hlo/"
     "decoder_78layer_8k_token_dsa_observer.optimized_hlo.txt.gz"
 )
+WS32_PREFILL_STABLEHLO = Path(
+    "/home/gianl/glm-run/"
+    "greenfield_ws32_short_decoder_2k_acquire_20260816T004709157408071Z/"
+    "hlo/prefill.stablehlo.mlir"
+)
+WS32_PREFILL_OPTIMIZED_HLO = Path(
+    "/home/gianl/glm-run/"
+    "greenfield_ws32_short_decoder_2k_acquire_20260816T004709157408071Z/"
+    "hlo/prefill.optimized_hlo.txt"
+)
 TUPLE_ADD_HLO = Path(
     "/home/gianl/glm-run/greenfield_collectives_20260805T135850389312854Z/"
     "hlo/fused_tuple_all_reduce_g4_bfloat16_1x6144.optimized_hlo.txt"
@@ -59,7 +69,7 @@ expert_add {{
 
 ENTRY main {{
   %input = f32[1,1536] parameter(0)
-  %feature = f32[1,1536] all-reduce(%input), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true
+  %feature = f32[1,1536] all-reduce(%input), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_complete_decoder/feature"}}
   %gather = f32[8,1,1536] all-gather(%feature), dimensions={{0}}, replica_groups={{{expert}}}, use_global_device_ids=true
   ROOT %root = f32[8,1,1536] copy(%gather)
 }}
@@ -67,12 +77,7 @@ ENTRY main {{
 
 
 def _report(hlo: str, *, kind: str = "decode"):
-    scope = {
-        "cache_probe": "greenfield_ws32_cache_probe",
-        "decode": "greenfield_ws32_complete_decoder",
-        "prefill": "greenfield_ws32_teacher_forced_prefill",
-    }[kind]
-    stable = f'module @main loc("{scope}")'
+    stable = "module @main"
     return validate_ws32_decoder_hlo(
         stable,
         hlo,
@@ -106,7 +111,7 @@ body {{
   %input = f32[1,1536] get-tuple-element(%state), index=1
   %one = s32[] constant(1)
   %next = s32[] add(%index, %one)
-  %feature = f32[1,1536] all-reduce(%input), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true
+  %feature = f32[1,1536] all-reduce(%input), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_teacher_forced_prefill/feature"}}
   ROOT %result = (s32[], f32[1,1536]) tuple(%next, %feature)
 }}
 
@@ -132,7 +137,7 @@ tuple_add {{
 ENTRY main {{
   %first = bf16[78,640] parameter(0)
   %second = bf16[21,128] parameter(1)
-  ROOT %root = (bf16[78,640], bf16[21,128]) all-reduce(%first, %second), replica_groups={{{expert}}}, to_apply=tuple_add, use_global_device_ids=true
+  ROOT %root = (bf16[78,640], bf16[21,128]) all-reduce(%first, %second), replica_groups={{{expert}}}, to_apply=tuple_add, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_cache_probe/root"}}
 }}
 '''
 
@@ -151,7 +156,7 @@ ENTRY main {{
   %first = bf16[78,640] parameter(0)
   %second = bf16[21,128] parameter(1)
   %third = bf16[1,128] parameter(2)
-  ROOT %root = (bf16[78,640], bf16[21,128], bf16[1,128]) all-reduce(%first, %second, %third), replica_groups={{{expert}}}, to_apply=shared_add, use_global_device_ids=true
+  ROOT %root = (bf16[78,640], bf16[21,128], bf16[1,128]) all-reduce(%first, %second, %third), replica_groups={{{expert}}}, to_apply=shared_add, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_cache_probe/root"}}
 }}
 '''
 
@@ -180,7 +185,7 @@ use_first {{
 
 ENTRY main {{
   %input = f32[1,1536] parameter(0)
-  %live = f32[1,1536] all-reduce(%input), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true
+  %live = f32[1,1536] all-reduce(%input), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_complete_decoder/live"}}
   %decoy = f32[1,1536] all-reduce(%input), replica_groups={{{expert}}}, to_apply=expert_add, use_global_device_ids=true
   ROOT %root = f32[1,1536] fusion(%live, %decoy), calls=use_first
 }}
@@ -221,6 +226,52 @@ def test_ws32_complete_hlo_contract_refuses_structural_mutations() -> None:
     for mutation in (dead, async_value, wrong_group, full_hidden, bad_reducer):
         report = _report(mutation)
         assert not report.passed
+
+
+def test_ws32_complete_hlo_binds_exact_scope_to_live_optimized_value() -> None:
+    scope = "greenfield_ws32_complete_decoder"
+    base = _hlo()
+    unscoped = base.replace(scope, "unscoped_decoder")
+    dead_decoy = unscoped.replace(
+        "  ROOT %root =",
+        "  %scope_decoy = f32[1,1536] negate(%input), "
+        f'metadata={{op_name="jit(x)/{scope}/decoy"}}\n'
+        "  ROOT %root =",
+    )
+    dead_report = _report(dead_decoy)
+    assert not dead_report.passed
+    assert dead_report.violations == (
+        "optimized HLO lost live exact decode source scope",
+    )
+
+    superstring = base.replace(scope, f"{scope}_decoy")
+    assert not _report(superstring).passed
+
+    observer_scope = "greenfield_ws32_complete_decoder_dsa_observer"
+    observer = base.replace(scope, observer_scope)
+    assert _report(observer, kind="observer").passed
+    assert not _report(observer, kind="decode").passed
+
+    raw_text_decoy = unscoped.replace(
+        'metadata={op_name="jit(body)/shard_map/unscoped_decoder/feature"}',
+        'metadata={op_name="jit(body)/shard_map/unscoped_decoder/feature" '
+        f'source_file="{scope}"}}',
+    )
+    assert not _report(raw_text_decoy).passed
+
+    stable_decoy = f'module @main loc("{scope}")'
+    stable_report = validate_ws32_decoder_hlo(
+        stable_decoy,
+        unscoped,
+        expected_stablehlo_sha256=sha256(stable_decoy.encode()).hexdigest(),
+        expected_optimized_hlo_sha256=sha256(unscoped.encode()).hexdigest(),
+        hidden_size=6144,
+        kind="decode",
+    )
+    assert not stable_report.passed
+    assert stable_report.violations == (
+        "optimized HLO lost live exact decode source scope",
+    )
 
 
 def test_ws32_prefill_hlo_traces_live_while_condition_and_body() -> None:
@@ -324,3 +375,33 @@ def test_ws32_tuple_add_reducer_replays_real_tpu_lowering() -> None:
         _exact_add_reducer(item, module_instructions=module.instructions)
         for item in multi
     )
+
+
+@pytest.mark.skipif(
+    not WS32_PREFILL_STABLEHLO.exists()
+    or not WS32_PREFILL_OPTIMIZED_HLO.exists(),
+    reason="protected WS32 prefill acquisition HLO unavailable",
+)
+def test_ws32_prefill_contract_replays_protected_acquisition() -> None:
+    report = validate_ws32_decoder_hlo(
+        WS32_PREFILL_STABLEHLO.read_text(encoding="utf-8"),
+        WS32_PREFILL_OPTIMIZED_HLO.read_text(encoding="utf-8"),
+        expected_stablehlo_sha256="0" * 64,
+        expected_optimized_hlo_sha256="0" * 64,
+        hidden_size=6144,
+        kind="prefill",
+    )
+    assert set(report.violations) == {
+        "StableHLO identity drifted",
+        "optimized HLO identity drifted",
+    }
+    assert report.instruction_count == 173_829
+    assert report.live_instruction_count == 173_229
+    assert report.collective_count == report.live_collective_count == 1_289
+    assert report.all_reduce_count == 1_226
+    assert report.all_gather_count == 63
+    assert report.feature_collective_count == 914
+    assert report.expert_collective_count == 375
+    assert report.maximum_group_size == 8
+    assert report.async_collective_count == 0
+    assert report.forbidden_full_hidden_values == ()

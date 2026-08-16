@@ -5,6 +5,31 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-16 — WS32 2K reaches full prefill HLO; representation-only proof refusal is closed locally
+
+- Sealed checkpoint `greenfield_ws32_runtime_pack_20260815T214050854386790Z` passed exact
+  32-slot direct-load preflight. The protected 2K retry
+  `greenfield_ws32_short_decoder_2k_acquire_20260816T004709157408071Z` read about 98.3 GB per host,
+  peaked near 101 GB host RSS during streaming, released that staging memory, opened all four local
+  TPU devices and compiled the complete teacher-forced prefill on all eight hosts.
+- StableHLO/optimized-HLO SHAs are `2557c56b983a3d2fa3cbbe65c1bd318216ff3b5de7ea089af62d0affa134448b`
+  and `88a297420da467a9d555b029f68beb4049899efe701cd409e0acac89eb39d011`.
+  Exact local replay reports 173,829 instructions / 173,229 live; all 1,289 collectives are live,
+  with 1,226 all-reduces, 63 all-gathers, 914 feature-4 groups, 375 expert-8 groups, maximum group
+  eight, no async collective and no forbidden full-hidden value.
+- Execution stopped before observer compilation because the validator searched StableHLO raw text
+  for `greenfield_ws32_teacher_forced_prefill`. This toolchain emits no StableHLO location records;
+  the optimized HLO carries the exact component on 89,790 live instructions, including 1,212 live
+  collectives. All eight ranks failed identically. The failure archive has 33 objects / 937,227,528
+  bytes and no result, DB row, ledger or terminal `SUCCESS`; SHA
+  `ea32bc7cca455ad08feb56992c5784b2ef9879a92bd4fda1fd956b2c98d862fd` proves clean 8/8 cleanup.
+- Correction binds the exact `/`-delimited component to the parsed live optimized-HLO closure and
+  rejects dead, raw-text, superstring and decode/observer-prefix decoys. Acquisition now preserves
+  and validates all four compiler products before reporting any structural refusal; it remains
+  compile-only and cannot publish numerical evidence. A computation index reduces exact replay
+  from 163.6 to 25.9 seconds. Synthetic/focused tests and the SHA-pinned real replay pass locally;
+  immutable correction review, commit/push and one four-graph acquisition are next.
+
 ## 2026-08-15 — WS32 short decoder reviewed and pushed; full-pack launch externally blocked
 
 - Reviewed/pushed `a908c36` adds the complete protected WS32 short-context decoder: four separate

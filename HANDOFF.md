@@ -1,9 +1,15 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-15 UTC
+**Updated:** 2026-08-16 UTC
 
 ## Narrow Fable audit
 
+- Current protected-failure session: `3948b026-d3c6-4e23-b1ae-b83b62e5d0ad`
+  (`claude-fable-5`, max effort). It is one direct review-only chat with no workflow, API,
+  subagents, edits or cloud/TPU actions. Its initial audit independently replayed the exact
+  acquired prefill graph and approved moving source-scope provenance from absent StableHLO
+  locations to an exact path component on a parsed live optimized-HLO instruction. Use only this
+  same session for correction closure; do not reopen the initial audit.
 - Retired session `0f8e2c2e-33a8-4d12-92e8-f7bd810f69d1`: its autonomous 20-task Fable workflow
   consumed the available session usage and 35% of the weekly limit. Never resume it.
 - Current session: `79c40258-5c78-4c78-98ce-b214d76c26c9` (`claude-fable-5`, max effort).
@@ -34,6 +40,30 @@ and pipeline-parallelism ban are superseded. Never edit/delete the owner's untra
 
 ## Current Gate-D exact status (supersedes older exact-next text below)
 
+- The complete WS32 runtime checkpoint is sealed under protected tag
+  `greenfield_ws32_runtime_pack_20260815T214050854386790Z`. Its exact manifest/SUCCESS identities
+  are `c04f800e...5ee08` / `1bfea5bd...f1760`; all 32 final-owner slots and 141 source records
+  passed byte/checksum/topology verification and both checkpoint and run prefixes are terminal.
+  The first 2K acquisition attempt at `00:35 UTC` stopped before JAX because one Bash `local`
+  declaration referenced `label` in a sibling initializer under `set -u`; reviewed/pushed
+  `53369c9` orders those assignments and subshell-contains trap census failures.
+- Protected tag `greenfield_ws32_short_decoder_2k_acquire_20260816T004709157408071Z` then loaded
+  all four exact owner files per host (about 98.3 GB read and about 101 GB peak host RSS), opened
+  all four local TPU devices and compiled the complete 2K prefill. Every rank produced identical
+  29,081,020-byte StableHLO and 75,054,333-byte optimized HLO with SHAs
+  `2557c56b...4448b` / `88a29742...d011`. Local replay proves 173,829 instructions, 173,229 live,
+  all 1,289 collectives live, 914 feature-4 plus 375 expert-8 groups, maximum group 8, zero async
+  collectives and zero full-hidden reconstruction. The sole non-pin refusal was an impossible
+  StableHLO source-scope check: this Shardy printer emits no `loc` records, while 89,790 live
+  optimized instructions retain the exact prefill path component. The partial prefix has 33
+  diagnostic objects / 937,227,528 bytes, no runner result, DB row, ledger or terminal `SUCCESS`;
+  failure census SHA `ea32bc7c...62fd` authenticates 8/8 zero work.
+- The bounded correction binds scope only to a parsed live exact optimized-HLO path component;
+  dead, raw-text, superstring and decode/observer-prefix decoys refuse. It also defers acquisition
+  refusal until all four graphs are atomically preserved, while numerical mode still refuses
+  before execution. Indexing reducer computations once cuts the exact protected prefill replay
+  from 163.6 seconds to 25.9 seconds. Exact next is one correction-only review of this immutable
+  batch, commit/push, then one protected 2K acquisition that preserves all four graph pairs.
 - Reviewed/pushed commit `a908c36` completes the protected WS32 short-decoder batch. The full
   78-layer decoder has separate prefill/observer/decode/cache-probe executables, a one-row live
   residual, exact sealed 2K/8K token and DSA-oracle inputs, raw cache/DSA evidence, sequential

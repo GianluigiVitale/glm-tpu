@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import replace
 from dataclasses import dataclass
 from hashlib import sha256
 import re
-from typing import Any
+from typing import Any, Mapping
 
 from .ws32_pallas_one_layer import _live_instruction_closure
 from ..sharding.hlo_contract import HloInstruction, parse_hlo_module
@@ -92,6 +92,10 @@ def _exact_add_reducer(
     instruction: HloInstruction,
     *,
     module_instructions: tuple[HloInstruction, ...],
+    instructions_by_computation: Mapping[
+        str, tuple[HloInstruction, ...]
+    ]
+    | None = None,
 ) -> bool:
     """Accept an exact scalar add reducer, including tuple-combined psums."""
 
@@ -119,7 +123,9 @@ def _exact_add_reducer(
         result_shapes=(instruction.result_shapes[0],),
     )
     return _exact_scalar_add_reducer(
-        representative, module_instructions=module_instructions
+        representative,
+        module_instructions=module_instructions,
+        instructions_by_computation=instructions_by_computation,
     )
 
 
@@ -200,6 +206,16 @@ def validate_ws32_decoder_hlo(
     stable_digest = sha256(stablehlo.encode("utf-8")).hexdigest()
     optimized_digest = sha256(optimized_hlo.encode("utf-8")).hexdigest()
     module = parse_hlo_module(optimized_hlo)
+    mutable_computations: defaultdict[str, list[HloInstruction]] = defaultdict(
+        list
+    )
+    for instruction in module.instructions:
+        mutable_computations[
+            instruction.computation.split(" ", 1)[0].lstrip("%")
+        ].append(instruction)
+    instructions_by_computation = {
+        name: tuple(items) for name, items in mutable_computations.items()
+    }
     live = _live_instruction_closure(module.instructions)
     live_keys = {(item.computation, item.name) for item in live}
     collectives = tuple(module.collectives)
@@ -238,8 +254,14 @@ def validate_ws32_decoder_hlo(
         "prefill": "greenfield_ws32_teacher_forced_prefill",
         "cache_probe": "greenfield_ws32_cache_probe",
     }[kind]
-    if required_scope not in stablehlo:
-        violations.append(f"StableHLO lost exact {kind} source scope")
+    if not any(
+        item.op_name is not None
+        and required_scope in item.op_name.split("/")
+        for item in live
+    ):
+        violations.append(
+            f"optimized HLO lost live exact {kind} source scope"
+        )
     lowered_stable = stablehlo.lower()
     present_host = tuple(
         marker for marker in _HOST_MARKERS if marker in lowered_stable
@@ -265,7 +287,9 @@ def validate_ws32_decoder_hlo(
         violations.append("complete WS32 collective omits global device ids")
     for item in collectives:
         if item.raw_opcode == "all-reduce" and not _exact_add_reducer(
-            item, module_instructions=module.instructions
+            item,
+            module_instructions=module.instructions,
+            instructions_by_computation=instructions_by_computation,
         ):
             violations.append(f"{item.name} reducer is not exact scalar add")
     if forbidden_hidden:

@@ -81,3 +81,31 @@ def test_ws32_short_runner_is_default_off_and_independent() -> None:
     assert "performance_claim\": False" in source
     assert "tpu_inference" not in source
     assert "vllm" not in source
+
+
+def test_ws32_short_acquisition_preserves_all_graphs_before_refusal() -> None:
+    vacant = {
+        "passed": False,
+        "violations": sorted(RUNNER._VACANT_HLO_VIOLATIONS),
+    }
+    graphs = {
+        name: dict(vacant)
+        for name in ("cache_probe", "decode", "observer", "prefill")
+    }
+    for report in graphs.values():
+        RUNNER._require_graph_authorized(report, compile_only=True)
+    RUNNER._require_acquisition_authorized(graphs)
+
+    graphs["prefill"] = {
+        "passed": False,
+        "violations": [
+            *sorted(RUNNER._VACANT_HLO_VIOLATIONS),
+            "structural refusal",
+        ],
+    }
+    with pytest.raises(RuntimeError, match="structural violations"):
+        RUNNER._require_acquisition_authorized(graphs)
+    with pytest.raises(RuntimeError, match="failed before execution"):
+        RUNNER._require_graph_authorized(
+            graphs["prefill"], compile_only=False
+        )

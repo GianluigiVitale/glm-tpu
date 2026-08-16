@@ -404,6 +404,18 @@ branches from the search tree.
   StableHLO/optimized-HLO pair first; acquisition permits only the explicit vacant-pin failures,
   while numerical execution requires all acquired digests and an independent structural replay
   before the first call to each model program. A self-reported HLO result is not terminal proof.
+- `jax.named_scope` provenance is representation-specific. The current Shardy StableHLO printer
+  may emit no `loc` records while optimized HLO retains exact `op_name` paths. Bind the required
+  scope to a parsed live instruction and an exact `/`-delimited path component; never accept a raw
+  substring, dead instruction, metadata/source-file decoy or prefix collision.
+- A multi-graph compile-only acquisition must atomically preserve every independent graph before
+  returning its aggregate structural verdict. Do not stop after the first graph and pay another
+  full checkpoint load merely to discover the next compiler form. This does not authorize device
+  execution: numerical mode still validates each exact pinned graph before its first call.
+- Index immutable compiler structures once. Rescanning a 173,829-instruction module for each of
+  1,226 reducers made one offline replay take 163.6 seconds; a computation index produced the same
+  report in 25.9 seconds. Proof code is part of iteration latency and must not hide avoidable
+  quadratic work.
 - A prompt scan lowers through `while`. Cross-computation liveness must include both its exact
   condition and body roots; otherwise live prompt collectives are invisible or a dead decoy can be
   misclassified. Unit-test this with a dead collective inside the body before TPU acquisition.

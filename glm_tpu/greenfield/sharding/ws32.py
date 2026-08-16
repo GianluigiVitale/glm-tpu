@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 import json
 import re
-from typing import Any
+from typing import Any, Mapping
 
 from ..errors import PlanValidationError
 from .hlo_contract import HloInstruction, parse_hlo_module
@@ -830,6 +830,10 @@ def _exact_scalar_add_reducer(
     item: HloInstruction,
     *,
     module_instructions: tuple[HloInstruction, ...],
+    instructions_by_computation: Mapping[
+        str, tuple[HloInstruction, ...]
+    ]
+    | None = None,
 ) -> bool:
     match = re.search(r"\bto_apply=([A-Za-z0-9_.%:-]+)", item.raw_line)
     if (
@@ -839,12 +843,15 @@ def _exact_scalar_add_reducer(
     ):
         return False
     reducer_name = match.group(1).lstrip("%")
-    reducer = tuple(
-        instruction
-        for instruction in module_instructions
-        if instruction.computation.split(" ", 1)[0].lstrip("%")
-        == reducer_name
-    )
+    if instructions_by_computation is None:
+        reducer = tuple(
+            instruction
+            for instruction in module_instructions
+            if instruction.computation.split(" ", 1)[0].lstrip("%")
+            == reducer_name
+        )
+    else:
+        reducer = instructions_by_computation.get(reducer_name, ())
     if len(reducer) != 3:
         return False
     # TPU may fuse the post-reduction BF16 conversion into the scheduled
