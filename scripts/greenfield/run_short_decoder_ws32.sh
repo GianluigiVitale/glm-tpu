@@ -35,10 +35,6 @@ RECOVER=${GLM_GREENFIELD_WS32_SHORT_DECODER_RECOVER:-0}
   echo "WS32 recovery flag must be 0 or 1" >&2
   exit 2
 }
-[[ $RECOVER == 0 || $MODE == numerical ]] || {
-  echo "WS32 recovery is only valid for a completed numerical run" >&2
-  exit 2
-}
 
 readonly CHECKPOINT_ROOT=${GLM_GREENFIELD_WS32_CHECKPOINT_ROOT:?set sealed checkpoint root}
 readonly CHECKPOINT_MANIFEST_SHA=${GLM_GREENFIELD_WS32_CHECKPOINT_MANIFEST_SHA:?set checkpoint manifest SHA}
@@ -179,12 +175,12 @@ rollback_db() {
 }
 rollback_remote_nonterminal() {
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
-    "$RUN_DIR" "$REMOTE_PREFIX" <<'PY'
+    "$RUN_DIR" "$REMOTE_PREFIX" "$MODE" <<'PY'
 import base64,hashlib,json,sys
 from pathlib import Path
 import google_crc32c
 from google.cloud import storage
-root=Path(sys.argv[1]); remote=sys.argv[2]; bucket_name,prefix=remote[5:].split('/',1)
+root=Path(sys.argv[1]); remote=sys.argv[2]; mode=sys.argv[3]; bucket_name,prefix=remote[5:].split('/',1)
 source=json.loads((root/'source_remote_objects.json').read_text())
 canonical=lambda value: json.dumps(value,allow_nan=False,separators=(',',':'),sort_keys=True).encode()
 if source.get('ledger_sha256')!=hashlib.sha256(canonical({k:v for k,v in source.items() if k!='ledger_sha256'})).hexdigest() or source.get('remote_prefix')!=remote: raise SystemExit('refusing cleanup with drifted source ledger')
@@ -199,6 +195,8 @@ if 'SUCCESS' in extras: raise SystemExit('refusing nonterminal cleanup while SUC
 for name in sorted(extras):
  if name=='remote_objects.json': path=root/name
  elif name.startswith('orchestrator/') and '/' not in name.removeprefix('orchestrator/'):
+  path=root/Path(name).name
+ elif mode=='acquire' and name.startswith('diagnostic/') and '/' not in name.removeprefix('diagnostic/'):
   path=root/Path(name).name
  else: raise SystemExit(f'refusing to delete unowned remote object: {name}')
  raw=path.read_bytes(); crc=google_crc32c.Checksum(); crc.update(raw); expected=base64.b64encode(crc.digest()).decode('ascii'); blob=blobs[name]
@@ -241,9 +239,9 @@ on_exit() {
   fi
   if [[ $status -ne 0 && $terminal_success_verified -eq 0 ]]; then
     say "FAILED status=$status; nonterminal diagnostics retained"
-    if [[ ${RECOVER:-0} == 0 ]]; then
+    if [[ ${RECOVER:-0} == 0 && ! -e $RUN_DIR/source_remote_objects.json ]]; then
       for path in orchestrator.log remote_vacancy.txt sync.txt launch.txt \
-        census_pre.txt census_failure_exit.txt validate.log; do
+        census_pre.txt census_failure_exit.txt materialize.log validate.log; do
         [[ ! -f $RUN_DIR/$path ]] || gcloud storage cp --no-clobber \
           "$RUN_DIR/$path" "$REMOTE_PREFIX/diagnostic_local/$TAG/$path" \
           >/dev/null 2>&1 || true
@@ -353,7 +351,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --run-dir "$RUN_DIR" --remote-prefix "$REMOTE_PREFIX" --mode "$MODE" \
   --tag "$TAG" --code-hash "$PIN" --recovery-code-hash "$RECOVERY_PIN" \
   --output "$RUN_DIR/source_remote_objects.json" "${materialize_args[@]}" \
-  >"$RUN_DIR/materialize.log"
+  >"$RUN_DIR/materialize.log" 2>&1
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   "$WORKTREE/scripts/greenfield/seal_short_decoder_ws32.py" validate \
   --run-dir "$RUN_DIR" --topology-capture-root "$TOPOLOGY_ROOT" \
@@ -377,7 +375,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --expected-decode-optimized-hlo-sha256 "$DECODE_OPTIMIZED_SHA" \
   --expected-cache-probe-stablehlo-sha256 "$CACHE_PROBE_STABLE_SHA" \
   --expected-cache-probe-optimized-hlo-sha256 "$CACHE_PROBE_OPTIMIZED_SHA" \
-  --output "$RUN_DIR/summary.json" >"$RUN_DIR/validate.log"
+  --output "$RUN_DIR/summary.json" >"$RUN_DIR/validate.log" 2>&1
 
 strict_census post || {
   say "ABORT: post-run fleet census is not clean"
@@ -386,9 +384,34 @@ strict_census post || {
 post_census_done=1
 
 if [[ $MODE == acquire ]]; then
-  gcloud storage cp --no-clobber "$RUN_DIR/summary.json" "$RUN_DIR/census_post.txt" \
-    "$RUN_DIR/source_remote_objects.json" "$RUN_DIR/materialize.log" \
-    "$REMOTE_PREFIX/diagnostic/" >/dev/null
+  archive_upload_started=1
+  acquisition_files=(orchestrator.log summary.json validate.log census_post.txt
+    source_remote_objects.json materialize.log)
+  [[ $RECOVER == 0 ]] || acquisition_files+=(census_recovery_pre.txt)
+  for name in "${acquisition_files[@]}"; do
+    gcloud storage cp --no-clobber "$RUN_DIR/$name" \
+      "$REMOTE_PREFIX/diagnostic/$name" >/dev/null
+  done
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+    "$RUN_DIR" "$REMOTE_PREFIX" "${acquisition_files[@]}" <<'PY'
+import base64,json,sys
+from pathlib import Path
+import google_crc32c
+from google.cloud import storage
+root=Path(sys.argv[1]); remote=sys.argv[2]; outputs=sys.argv[3:]
+bucket_name,prefix=remote[5:].split('/',1); client=storage.Client()
+blobs={blob.name.removeprefix(prefix.rstrip('/')+'/'):blob for blob in client.list_blobs(bucket_name,prefix=prefix.rstrip('/')+'/')}
+source=json.loads((root/'source_remote_objects.json').read_text())
+source_by_name={item['name']:item for item in source['objects']}
+expected=set(source_by_name)|{f'diagnostic/{name}' for name in outputs}
+if set(blobs)!=expected: raise SystemExit('acquisition remote object set drifted')
+for name,item in source_by_name.items():
+ blob=blobs[name]
+ if int(blob.size)!=item['size'] or blob.crc32c!=item['crc32c'] or int(blob.generation)!=item['generation']: raise SystemExit(f'acquisition source object drifted: {name}')
+for name in outputs:
+ raw=(root/name).read_bytes(); crc=google_crc32c.Checksum(); crc.update(raw); expected_crc=base64.b64encode(crc.digest()).decode('ascii'); blob=blobs[f'diagnostic/{name}']
+ if int(blob.size)!=len(raw) or blob.crc32c!=expected_crc or not blob.generation: raise SystemExit(f'acquisition diagnostic bytes drifted: {name}')
+PY
   say "HLO acquisition complete; pins are in summary.json and no DB/SUCCESS was created"
   trap - EXIT
   exit 0

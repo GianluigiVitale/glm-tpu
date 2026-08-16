@@ -5693,3 +5693,22 @@ independently rehashes and compares them to the sealed normal/concentrated oracl
 slots exactly once per case, revalidates every pinned HLO, recomputes timings and per-chip HBM, and
 publishes a CRC/generation ledger plus `SUCCESS` last. It remains diagnostic-only with no DB or
 performance claim. A pass authorizes WS32 full-decoder integration; it does not itself close Gate D.
+
+## Current exact next: recover the completed 8K HLO acquisition without recompiling
+
+The split-residual WS32 2K numerical result is now terminally sealed as DB553 under tag
+`greenfield_ws32_short_decoder_2k_numerical_20260816T040707909547486Z`. It is exact for all 20
+protected tokens and all DSA set/tail/tie checks, with valid state/cache/HLO/HBM and eight fresh
+XPlanes. Fleet-critical wall is `122.630667 ms/token` p50, `124.75735031` p99 and
+`8.154567079 tok/s`; maximum peak HBM is `24,789,135,872` bytes and minimum headroom is
+`8,225,263,104`. Remote `SUCCESS` SHA is `c16a491d...6ad1f`; DB run is 553. This passes the
+2K half of Gate D and the strong Gate-F target, but Gate D remains open until 8K is exact.
+
+The reviewed 8K acquisition at pin `de3e3ab1...edc2`, tag
+`greenfield_ws32_short_decoder_8k_acquire_20260816T053520596741200Z`, completed all eight
+compile-only workers and preserved 64 HLOs plus 16 JSON/log host records. It then failed only
+because the evidence materializer incorrectly required the numerical-only eight NPZ records in
+acquire mode. Failure census is 8/8 clean; there is no DB row or `SUCCESS`. Do not recompile.
+Recover in the same wrapper after the finite mode-schema correction: acquire expects exactly 80
+primary objects, numerical 96. Revalidate all preserved HLOs, publish the acquisition summary and
+fresh census, then launch one separately pinned 8K numerical run.

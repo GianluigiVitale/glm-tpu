@@ -481,6 +481,16 @@ branches from the search tree.
   obtain a fresh eight-host census while holding the fleet lease, record both execution and
   recovery code hashes, then publish DB, exact remote ledger and `SUCCESS` last. Recovery must not
   delete inconvenient evidence or reinterpret a failed numerical result.
+- Compile acquisition and numerical execution have different exact evidence schemas. Acquisition
+  emits runner JSON/log plus HLO and deliberately has no tensor NPZ or XPlane; numerical adds both.
+  Derive expected host-record suffixes once and reuse that helper in remote-set validation and
+  download loops. Pin the full cardinalities in tests (`80` acquire, `96` numerical for WS32), and
+  exercise a complete acquisition materialization with no NPZ so a test cannot encode the bug.
+- A protected compile is recoverable evidence. If all workers and HLO uploads completed but later
+  sealing failed, generation-pin and replay those graphs under a recovery code hash; never rerun
+  the compiler merely to satisfy an orchestrator schema defect. Capture materializer/sealer stderr
+  in archived logs, publish the recovery census, and make partially uploaded acquisition
+  diagnostics authenticated and retryable without deleting source HLOs.
 - Every capture mode that can commit a provenance row must arm the same exact prefix-aware rollback
   before model execution. A mode is incomplete if a later DSA/sealing refusal can leave an
   unauthenticated provisional row.

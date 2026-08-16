@@ -51,11 +51,15 @@ def _crc32c_file(path: Path) -> str:
     return base64.b64encode(digest.digest()).decode("ascii")
 
 
+def _runner_suffixes(*, numerical: bool) -> tuple[str, ...]:
+    return ("json", "npz", "log") if numerical else ("json", "log")
+
+
 def _expected_primary_names(*, numerical: bool) -> set[str]:
     names = {
         f"host_records/runner.rank{rank}.{suffix}"
         for rank in RANKS
-        for suffix in ("json", "npz", "log")
+        for suffix in _runner_suffixes(numerical=numerical)
     }
     names.update(
         f"hlo/{graph}.rank{rank}.{suffix}"
@@ -213,7 +217,7 @@ def materialize(
     identity_cache: dict[tuple[int, int], tuple[int, str, str]] = {}
     fleet = run_dir / "fleet"
     for rank in RANKS:
-        for suffix in ("json", "npz", "log"):
+        for suffix in _runner_suffixes(numerical=numerical):
             name = f"host_records/runner.rank{rank}.{suffix}"
             blob = blobs[name]
             destination = fleet / f"runner.rank{rank}.{suffix}"
@@ -232,6 +236,7 @@ def materialize(
         runner = json.loads(path.read_text(encoding="utf-8"))
         if (
             runner.get("status") != expected_status
+            or runner.get("compile_only") is not (not numerical)
             or runner.get("launch_process_id") != rank
             or runner.get("code_hash") != code_hash
         ):

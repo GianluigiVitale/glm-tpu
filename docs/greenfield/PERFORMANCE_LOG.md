@@ -1387,3 +1387,20 @@ reproduced DB548's single layer-1 mismatch. It has no decoder loop, warmed token
 XPlane, HBM peak or profiler-free serving wall, and writes no performance DB row. Its elapsed time
 is orchestration/diagnostic time, not token latency. DB484 remains the only accepted PP8 decoder
 measurement at `244.091151 ms/token` / `4.096830 tok/s`; Gates D and E remain open.
+
+## DB553 complete WS32 2K decoder — accepted short-context performance
+
+DB553/item1837 is the first terminally accepted complete WS32 decoder result. Protected tag
+`greenfield_ws32_short_decoder_2k_numerical_20260816T040707909547486Z` passes exact 20-token raw
+comparison, all DSA selected-set/tail/device-tie checks, state/cache, HLO, HBM, eight-host XPlane,
+profiler-free wall, archive and cleanup contracts. Fleet-critical p50 is `122.630667 ms/token`,
+p99 is `124.75735031 ms/token`, and steady wall is `8.154567079 tok/s`. Peak HBM is
+`24,789,135,872` bytes/chip with at least `8,225,263,104` bytes measured headroom. The trace covers
+8 files/64 cores; the graph has 157 live split residual/RMS boundaries, zero rounded-first sites,
+no forbidden full hidden value, and maximum repeated group size 8.
+
+This result passes the Gate-E minimum and Gate-F strong target at 2K. Gate D remains open until the
+separate protected 8K numerical run is exact and sealed. The completed 8K acquisition ending
+`20260816T053520596741200Z` is compile evidence only: its 64 HLOs are preserved, but a mode-schema
+bug expected numerical-only NPZs and stopped before summary publication. It cannot be reported as
+8K performance and must be recovered without recompilation.

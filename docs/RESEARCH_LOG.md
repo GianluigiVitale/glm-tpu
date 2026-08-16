@@ -9891,3 +9891,25 @@ unmotivated arithmetic variants.
   final-sampler tests are bitwise against the independent reference; the complete HLO contract now
   requires 157 live fused feature-4 RMS reductions and zero rounded-first reductions. Review and a
   fresh HLO acquisition precede one corrected 2K retry.
+
+## 2026-08-16 04:07--05:56 UTC — split-state WS32 passes 2K; 8K compile is preserved
+
+- Corrected WS32 tag `greenfield_ws32_short_decoder_2k_numerical_20260816T040707909547486Z`
+  passed the complete protected 2K contract and was recovered without repeating model work after
+  local evidence fanout filled disk. The terminal recovery authenticates all 159 original remote
+  objects by generation/CRC/SHA, replays the unchanged sealer, takes a fresh 8/8 census, links DB553
+  and publishes an exact 175-object archive with `SUCCESS` last.
+- Tokens are exact `20/20`, including former mismatch index 10 now equal to `576`; DSA selected
+  sets, tails and actual device tie order are exact for all observer steps. State/cache, 157 live
+  split RMS boundaries, zero rounded-first boundaries, no full hidden reconstruction, HBM and
+  64-core XPlane contracts pass. Fleet wall is p50 `122.630667 ms`, p99 `124.75735031 ms`, or
+  `8.154567079 tok/s`; peak HBM is `24,789,135,872` bytes with `8,225,263,104` minimum headroom.
+  Summary, remote-ledger and terminal file SHAs are `04968951...b40d`, `c2bb9bb1...3a2` and
+  `c16a491d...6ad1f`. This closes 2K and passes Gates E/F numerically; it does not yet close 8K.
+- The 8K compile-only tag `greenfield_ws32_short_decoder_8k_acquire_20260816T053520596741200Z`
+  then completed 8/8 and preserved all 64 HLO objects plus 16 runner JSON/log records. The wrapper
+  refused only after compile because `_expected_primary_names(numerical=False)` incorrectly
+  included eight numerical-only NPZs; the unit test had encoded the same wrong 88-object count.
+  Exact acquire cardinality is 80, while numerical is 96 (adds eight NPZ and eight XPlane files).
+  No DB, numerical result or `SUCCESS` exists and cleanup is 8/8. Recover the immutable HLOs in a
+  mode-aware wrapper; never spend another compile on this code/compiler/context pin.

@@ -4,6 +4,7 @@ from hashlib import sha256
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import subprocess
 from types import SimpleNamespace
 
@@ -155,6 +156,7 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     assert "remote_objects.json" in source
     assert "XLA_PYTHON_CLIENT_MEM_FRACTION=.95" in source
     assert "GLM_GREENFIELD_WS32_SHORT_DECODER_RECOVER:-0" in source
+    assert "recovery is only valid for a completed numerical run" not in source
     assert "glm_tpu.greenfield.validation.ws32_evidence" in source
     assert "source_remote_objects.json" in source
     assert "RESULTS_DB=/home/gianl/glm-tpu/bench/results.db" in source
@@ -177,6 +179,14 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     assert "archive_failed_publication" in source
     assert "refusing cleanup with drifted source ledger" in source
     assert "source object drifted during cleanup" in source
+    assert "name.startswith('diagnostic/')" in source
+    assert 'materialize.log validate.log; do' in source
+    assert '>"$RUN_DIR/materialize.log" 2>&1' in source
+    assert '>"$RUN_DIR/validate.log" 2>&1' in source
+    assert "acquisition remote object set drifted" in source
+    assert "acquisition diagnostic bytes drifted" in source
+    assert 'acquisition_files+=(census_recovery_pre.txt)' in source
+    assert 'RECOVER:-0} == 0 && ! -e $RUN_DIR/source_remote_objects.json' in source
     assert "a prior terminal SUCCESS verification exists" in source
     assert source.index("a prior terminal SUCCESS verification exists") < source.index(
         "trap on_exit EXIT"
@@ -198,14 +208,99 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
 def test_ws32_evidence_primary_object_schema_is_exact() -> None:
     acquired = ws32_evidence._expected_primary_names(numerical=False)
     numerical = ws32_evidence._expected_primary_names(numerical=True)
-    assert len(acquired) == 88
+    assert ws32_evidence._runner_suffixes(numerical=False) == ("json", "log")
+    assert ws32_evidence._runner_suffixes(numerical=True) == (
+        "json",
+        "npz",
+        "log",
+    )
+    assert len(acquired) == 80
     assert len(numerical) == 96
+    assert not any(name.endswith(".npz") for name in acquired)
     assert numerical - acquired == {
-        f"traces/trace.rank{rank}.xplane.pb" for rank in range(8)
+        *{f"host_records/runner.rank{rank}.npz" for rank in range(8)},
+        *{f"traces/trace.rank{rank}.xplane.pb" for rank in range(8)},
     }
     assert all("_.gstmp" not in name for name in numerical)
     assert ws32_evidence._expected_runner_status("acquire") == "HLO_ACQUIRED"
     assert ws32_evidence._expected_runner_status("numerical") == "SUCCESS"
+
+
+def test_ws32_acquisition_materializes_without_numerical_npz(
+    tmp_path: Path, monkeypatch: object
+) -> None:
+    remote = tmp_path / "remote"
+    run_dir = tmp_path / "run"
+    prefix = "results/acquire"
+    graph_records: dict[str, dict[str, str]] = {}
+    for graph in ws32_evidence.GRAPHS:
+        graph_records[graph] = {}
+        for suffix, sha_key in ws32_evidence.HLO_FORMS:
+            raw = f"{graph}:{suffix}\n".encode()
+            graph_records[graph][sha_key] = sha256(raw).hexdigest()
+            for rank in ws32_evidence.RANKS:
+                path = remote / "hlo" / f"{graph}.rank{rank}.{suffix}"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(raw)
+    for rank in ws32_evidence.RANKS:
+        record = {
+            "code_hash": "a" * 40,
+            "compile_only": True,
+            "graphs": graph_records,
+            "launch_process_id": rank,
+            "status": "HLO_ACQUIRED",
+        }
+        root = remote / "host_records"
+        root.mkdir(parents=True, exist_ok=True)
+        (root / f"runner.rank{rank}.json").write_text(
+            json.dumps(record), encoding="utf-8"
+        )
+        (root / f"runner.rank{rank}.log").write_text(
+            f"rank={rank}\n", encoding="utf-8"
+        )
+
+    class FakeBlob:
+        def __init__(self, path: Path) -> None:
+            self.path = path
+            self.name = f"{prefix}/{path.relative_to(remote).as_posix()}"
+            self.generation = 1
+            self.size = path.stat().st_size
+            self.crc32c = ws32_evidence._crc32c_file(path)
+
+        def download_to_filename(
+            self, destination: str, *, if_generation_match: int
+        ) -> None:
+            assert if_generation_match == self.generation
+            shutil.copyfile(self.path, destination)
+
+        def download_as_bytes(self, *, if_generation_match: int) -> bytes:
+            assert if_generation_match == self.generation
+            return self.path.read_bytes()
+
+    blobs = [FakeBlob(path) for path in remote.rglob("*") if path.is_file()]
+
+    class FakeClient:
+        def list_blobs(self, bucket: str, *, prefix: str) -> list[FakeBlob]:
+            assert bucket == "unit"
+            assert prefix == "results/acquire/"
+            return blobs
+
+    monkeypatch.setattr(ws32_evidence.storage, "Client", FakeClient)
+    output = run_dir / "source_remote_objects.json"
+    result = ws32_evidence.materialize(
+        run_dir=run_dir,
+        remote_prefix="gs://unit/results/acquire",
+        mode="acquire",
+        tag="greenfield_ws32_short_decoder_8k_acquire_20260816T000000000000000Z",
+        code_hash="a" * 40,
+        recovery_code_hash="b" * 40,
+        allow_failure_diagnostics=False,
+        output=output,
+    )
+    names = {item["name"] for item in result["objects"]}
+    assert names == ws32_evidence._expected_primary_names(numerical=False)
+    assert not any(name.endswith(".npz") for name in names)
+    assert len(list((run_dir / "fleet_hlo").iterdir())) == 64
 
 
 def test_ws32_prelaunch_floor_covers_protected_unique_evidence_and_reserve() -> None:
@@ -332,6 +427,45 @@ on_exit
 [[ ! -e {marker} ]]
 '''
     subprocess.run(["bash", "-c", harness], check=True)
+
+
+def test_ws32_failure_after_source_ledger_does_not_expand_remote_source_set(
+    tmp_path: Path,
+) -> None:
+    source = WRAPPER.read_text(encoding="utf-8")
+    start = source.index("on_exit() {")
+    end = source.index("\n}\ntrap on_exit EXIT", start) + 2
+    on_exit = source[start:end]
+    (tmp_path / "source_remote_objects.json").write_text(
+        "sealed source set", encoding="utf-8"
+    )
+    marker = tmp_path / "remote-upload-called"
+    harness = f'''set -u
+post_census_done=1
+db_published=0
+archive_upload_started=0
+success_upload_started=0
+terminal_success_verified=0
+success_absent=1
+RECOVER=0
+RUN_DIR=$1
+REMOTE_PREFIX=gs://driftbench-dsv4-uc/results/unit
+strict_census() {{ :; }}
+rollback_success() {{ :; }}
+rollback_db() {{ :; }}
+rollback_remote_nonterminal() {{ :; }}
+archive_failed_publication() {{ :; }}
+say() {{ :; }}
+gcloud() {{ touch {marker}; }}
+{on_exit}
+false
+on_exit
+[[ ! -e {marker} ]]
+'''
+    subprocess.run(
+        ["bash", "-c", harness, "ws32-source-set-retry", str(tmp_path)],
+        check=True,
+    )
 
 
 def test_ws32_recovery_quarantines_derived_outputs_only(tmp_path: Path) -> None:
