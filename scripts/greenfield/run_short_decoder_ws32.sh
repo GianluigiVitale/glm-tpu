@@ -8,7 +8,7 @@ readonly BRANCH=rewrite/topology-first-decode
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly ORIGIN=git@github.com:GianluigiVitale/glm-tpu.git
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
-readonly RESULTS_DB=$WORKTREE/bench/results.db
+readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly INVENTORY=/home/gianl/gcs-models/checkpoints/greenfield/glm52/plans/PP8_LP4/greenfield_checkpoint_plan_pp8_20260805T180552087295643Z/source_inventory.json
 readonly INVENTORY_SHA=a388627c08c8ff591903deb1fbf3198f43916e64a2295ed0e253f1e44a042fc4
 readonly TOPOLOGY_ROOT=/home/gianl/gcs-models/results/greenfield_topology_20260805T125842425591441Z/host_records
@@ -22,12 +22,21 @@ readonly MESH_SHA=de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a
 }
 MODE=${GLM_GREENFIELD_WS32_SHORT_DECODER_MODE:-off}
 CONTEXT=${GLM_GREENFIELD_WS32_SHORT_DECODER_CONTEXT:-off}
+RECOVER=${GLM_GREENFIELD_WS32_SHORT_DECODER_RECOVER:-0}
 [[ $MODE == acquire || $MODE == numerical ]] || {
   echo "WS32 mode must be acquire or numerical" >&2
   exit 2
 }
 [[ $CONTEXT == 2k || $CONTEXT == 8k ]] || {
   echo "WS32 context must be 2k or 8k" >&2
+  exit 2
+}
+[[ $RECOVER == 0 || $RECOVER == 1 ]] || {
+  echo "WS32 recovery flag must be 0 or 1" >&2
+  exit 2
+}
+[[ $RECOVER == 0 || $MODE == numerical ]] || {
+  echo "WS32 recovery is only valid for a completed numerical run" >&2
   exit 2
 }
 
@@ -80,20 +89,34 @@ readonly PREFILL_STABLE_SHA PREFILL_OPTIMIZED_SHA OBSERVER_STABLE_SHA
 readonly OBSERVER_OPTIMIZED_SHA DECODE_STABLE_SHA DECODE_OPTIMIZED_SHA
 readonly CACHE_PROBE_STABLE_SHA CACHE_PROBE_OPTIMIZED_SHA
 
-PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_WS32_SHORT_DECODER_TAG:-greenfield_ws32_short_decoder_${CONTEXT}_${MODE}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+RECOVERY_PIN=$(git -C "$WORKTREE" rev-parse HEAD)
+if [[ $RECOVER == 1 ]]; then
+  PIN=${GLM_GREENFIELD_WS32_SOURCE_CODE_HASH:?set the exact code hash used by the completed run}
+  TAG=${GLM_GREENFIELD_WS32_SHORT_DECODER_TAG:?set the exact completed run tag}
+else
+  PIN=$RECOVERY_PIN
+  TAG=${GLM_GREENFIELD_WS32_SHORT_DECODER_TAG:-greenfield_ws32_short_decoder_${CONTEXT}_${MODE}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+fi
 [[ $TAG =~ ^greenfield_ws32_short_decoder_${CONTEXT}_${MODE}_[0-9]{8}T[0-9]{15}Z$ ]] || {
   echo "invalid WS32 short-decoder tag: $TAG" >&2
   exit 2
 }
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
-readonly PIN TAG RUN_DIR REMOTE_PREFIX
+readonly PIN RECOVERY_PIN TAG RUN_DIR REMOTE_PREFIX RECOVER
 
 [[ $(git -C "$WORKTREE" rev-parse --show-toplevel) == "$WORKTREE" ]]
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]]
 [[ -z $(git -C "$WORKTREE" status --porcelain) ]]
-[[ ! -e $RUN_DIR ]]
+if [[ $RECOVER == 1 ]]; then
+  [[ -d $RUN_DIR ]]
+  [[ ! -e $RUN_DIR/success_upload.json ]] || {
+    echo "a prior terminal SUCCESS verification exists; refusing recovery" >&2
+    exit 1
+  }
+else
+  [[ ! -e $RUN_DIR ]]
+fi
 mkdir -p "$RUN_DIR/fleet" "$RUN_DIR/fleet_hlo" "$RUN_DIR/traces"
 
 say() {
@@ -123,9 +146,9 @@ flock -n 9 || {
   say "ABORT: another protected workflow holds the fleet lease"
   exit 1
 }
-
 post_census_done=0
 db_published=0
+archive_upload_started=0
 success_upload_started=0
 terminal_success_verified=0
 success_absent=1
@@ -154,6 +177,49 @@ rollback_db() {
     --summary "$RUN_DIR/summary.json" --db-link "$RUN_DIR/db_link.json" \
     --results-db "$RESULTS_DB"
 }
+rollback_remote_nonterminal() {
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+    "$RUN_DIR" "$REMOTE_PREFIX" <<'PY'
+import base64,hashlib,json,sys
+from pathlib import Path
+import google_crc32c
+from google.cloud import storage
+root=Path(sys.argv[1]); remote=sys.argv[2]; bucket_name,prefix=remote[5:].split('/',1)
+source=json.loads((root/'source_remote_objects.json').read_text())
+canonical=lambda value: json.dumps(value,allow_nan=False,separators=(',',':'),sort_keys=True).encode()
+if source.get('ledger_sha256')!=hashlib.sha256(canonical({k:v for k,v in source.items() if k!='ledger_sha256'})).hexdigest() or source.get('remote_prefix')!=remote: raise SystemExit('refusing cleanup with drifted source ledger')
+source_names={item['name'] for item in source['objects']}
+client=storage.Client(); bucket=client.bucket(bucket_name)
+blobs={blob.name.removeprefix(prefix.rstrip('/')+'/'):blob for blob in client.list_blobs(bucket_name,prefix=prefix.rstrip('/')+'/')}
+for item in source['objects']:
+ blob=blobs.get(item['name'])
+ if blob is None or int(blob.size)!=item['size'] or blob.crc32c!=item['crc32c'] or int(blob.generation)!=item['generation']: raise SystemExit(f"refusing cleanup with drifted source object: {item['name']}")
+extras=set(blobs)-source_names
+if 'SUCCESS' in extras: raise SystemExit('refusing nonterminal cleanup while SUCCESS exists')
+for name in sorted(extras):
+ if name=='remote_objects.json': path=root/name
+ elif name.startswith('orchestrator/') and '/' not in name.removeprefix('orchestrator/'):
+  path=root/Path(name).name
+ else: raise SystemExit(f'refusing to delete unowned remote object: {name}')
+ raw=path.read_bytes(); crc=google_crc32c.Checksum(); crc.update(raw); expected=base64.b64encode(crc.digest()).decode('ascii'); blob=blobs[name]
+ if int(blob.size)!=len(raw) or blob.crc32c!=expected or not blob.generation: raise SystemExit(f'refusing to delete nonexact remote object: {name}')
+ blob.delete(if_generation_match=int(blob.generation))
+remaining={blob.name.removeprefix(prefix.rstrip('/')+'/'):blob for blob in client.list_blobs(bucket_name,prefix=prefix.rstrip('/')+'/')}
+if set(remaining)!=source_names: raise SystemExit('remote source set was not restored after cleanup')
+for item in source['objects']:
+ blob=remaining[item['name']]
+ if int(blob.size)!=item['size'] or blob.crc32c!=item['crc32c'] or int(blob.generation)!=item['generation']: raise SystemExit(f"source object drifted during cleanup: {item['name']}")
+PY
+}
+archive_failed_publication() {
+  local destination="$RUN_DIR/recovery_failures/$(date -u +%Y%m%dT%H%M%S%NZ)"
+  mkdir -p "$destination"
+  for name in summary.json validate.log census_post.txt census_recovery_pre.txt \
+    materialize.log results.db db_link.json db_publish.log remote_objects.json \
+    SUCCESS success_upload.json; do
+    [[ ! -e $RUN_DIR/$name ]] || mv "$RUN_DIR/$name" "$destination/$name"
+  done
+}
 on_exit() {
   local status=$?
   if [[ $post_census_done -eq 0 ]]; then (strict_census failure_exit) || true; fi
@@ -164,32 +230,94 @@ on_exit() {
       say "ABORT: remote SUCCESS could not be proven absent; retaining DB linkage"
     fi
   fi
+  if [[ $status -ne 0 && $archive_upload_started -eq 1 && $terminal_success_verified -eq 0 && $success_absent -eq 1 ]]; then
+    rollback_remote_nonterminal || say "ABORT: remote nonterminal objects could not be restored to the source set"
+  fi
   if [[ $status -ne 0 && $db_published -eq 1 && $terminal_success_verified -eq 0 && $success_absent -eq 1 ]]; then
-    rollback_db || true
+    if rollback_db; then archive_failed_publication; fi
+  fi
+  if [[ $status -ne 0 && ${RECOVER:-0} == 1 && $terminal_success_verified -eq 0 ]]; then
+    archive_failed_publication
   fi
   if [[ $status -ne 0 && $terminal_success_verified -eq 0 ]]; then
     say "FAILED status=$status; nonterminal diagnostics retained"
-    gcloud storage cp --recursive --no-clobber "$RUN_DIR" \
-      "$REMOTE_PREFIX/diagnostic_local/" >/dev/null 2>&1 || true
+    if [[ ${RECOVER:-0} == 0 ]]; then
+      for path in orchestrator.log remote_vacancy.txt sync.txt launch.txt \
+        census_pre.txt census_failure_exit.txt validate.log; do
+        [[ ! -f $RUN_DIR/$path ]] || gcloud storage cp --no-clobber \
+          "$RUN_DIR/$path" "$REMOTE_PREFIX/diagnostic_local/$TAG/$path" \
+          >/dev/null 2>&1 || true
+      done
+    fi
   fi
 }
 trap on_exit EXIT
 
-say "PIN=$PIN mode=$MODE context=$CONTEXT"
-listing="$RUN_DIR/remote_vacancy.txt"
-gcloud storage objects list "$REMOTE_PREFIX/**" --format='value(name)' >"$listing" || {
-  say "ABORT: remote vacancy listing failed"
-  exit 1
-}
-[[ ! -s $listing ]] || {
-  say "ABORT: remote prefix is not vacant"
-  exit 1
-}
-strict_census pre || {
-  say "ABORT: pre-run fleet census is not clean"
-  exit 1
-}
+if [[ $RECOVER == 1 ]]; then
+  if [[ -e $RUN_DIR/SUCCESS ]]; then
+    rollback_success
+  fi
+  if [[ -e $RUN_DIR/source_remote_objects.json ]]; then
+    rollback_remote_nonterminal
+  fi
+  if [[ -e $RUN_DIR/db_link.json || -e $RUN_DIR/results.db ]]; then
+    [[ -e $RUN_DIR/summary.json && -e $RUN_DIR/db_link.json ]]
+    rollback_db
+  fi
+  archive_failed_publication
+fi
 
+PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+  "$RESULTS_DB" "$TAG" <<'PY'
+import json,sqlite3,sys
+database,tag=sys.argv[1:3]
+connection=sqlite3.connect(f'file:{database}?mode=ro',uri=True)
+try:
+ tables={row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+ if not {'runs','items','summary'} <= tables: raise SystemExit('protected results DB schema is absent')
+ matches=0
+ for (raw,) in connection.execute('SELECT env_json FROM runs'):
+  try: environment=json.loads(raw)
+  except (TypeError,json.JSONDecodeError): continue
+  matches += environment.get('run_tag') == tag
+ if matches: raise SystemExit('protected results DB already contains this run tag')
+finally: connection.close()
+PY
+
+say "PIN=$PIN recovery_pin=$RECOVERY_PIN mode=$MODE context=$CONTEXT recover=$RECOVER"
+listing="$RUN_DIR/remote_vacancy.txt"
+if [[ $RECOVER == 0 ]]; then
+  gcloud storage objects list "$REMOTE_PREFIX/**" --format='value(name)' >"$listing" || {
+    say "ABORT: remote vacancy listing failed"
+    exit 1
+  }
+  [[ ! -s $listing ]] || {
+    say "ABORT: remote prefix is not vacant"
+    exit 1
+  }
+else
+  [[ -f $listing && ! -s $listing ]]
+fi
+if [[ $RECOVER == 0 ]]; then
+  strict_census pre || {
+    say "ABORT: pre-run fleet census is not clean"
+    exit 1
+  }
+else
+  strict_census recovery_pre || {
+    say "ABORT: recovery pre-census is not clean"
+    exit 1
+  }
+fi
+if [[ $RECOVER == 0 && $MODE == numerical ]]; then
+  available_bytes=$(df --output=avail -B1 "$RUN_DIR" | tail -1 | tr -d ' ')
+  [[ $available_bytes =~ ^[0-9]+$ && $available_bytes -ge 4294967296 ]] || {
+    say "ABORT: less than 4 GiB is available for unique fleet evidence and sealing"
+    exit 1
+  }
+fi
+
+if [[ $RECOVER == 0 ]]; then
 say "synchronizing exact code and sealed inputs on all hosts"
 # shellcheck disable=SC2016
 sync_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; pin='"$PIN"'; wt='"$WORKTREE"'; branch='"$BRANCH"'; origin='"$ORIGIN"'; checkpoint='"$CHECKPOINT_ROOT"'; inventory='"$INVENTORY"'; token='"$TOKEN_ORACLE"'; token_root='"$TOKEN_ORACLE_ROOT"'; token_success_sha='"$TOKEN_ORACLE_SUCCESS_SHA"'; dsa='"$DSA_ORACLE"'; dsa_root='"$DSA_ORACLE_ROOT"'; dsa_success_sha='"$DSA_ORACLE_SUCCESS_SHA"'; topology='"$TOPOLOGY_ROOT"'/topology.rank${idx}.json; if [[ $idx == 0 ]]; then [[ -e "$wt/.git" && $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; elif [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; for path in "$checkpoint/manifest.json" "$checkpoint/SUCCESS" "$inventory" "$token/manifest.json" "$token_root/SUCCESS" "$dsa/manifest.json" "$dsa_root/SUCCESS" "$topology"; do [[ -r $path ]]; done; token_observed=$(sha256sum "$token_root/SUCCESS"); dsa_observed=$(sha256sum "$dsa_root/SUCCESS"); [[ ${token_observed%% *} == "$token_success_sha" ]]; [[ ${dsa_observed%% *} == "$dsa_success_sha" ]]; findmnt -T "$checkpoint" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse"; echo "SYNC_OK $(hostname) $pin"'
@@ -207,7 +335,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching complete WS32 worker fleet coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; output="$run/runner.rank${idx}.json"; tensors="$run/runner.rank${idx}.npz"; hlo="$run/hlo"; trace="$run/trace"; log="$run/runner.rank${idx}.log"; mkdir -p "$run"; upload(){ [[ ! -f $output ]] || gcloud storage cp --no-clobber "$output" "$remote/host_records/runner.rank${idx}.json" >/dev/null 2>&1 || true; [[ ! -f $tensors ]] || gcloud storage cp --no-clobber "$tensors" "$remote/host_records/runner.rank${idx}.npz" >/dev/null 2>&1 || true; [[ ! -f $log ]] || gcloud storage cp --no-clobber "$log" "$remote/host_records/runner.rank${idx}.log" >/dev/null 2>&1 || true; for graph in prefill observer decode cache_probe; do [[ ! -f "$hlo/$graph.stablehlo.mlir" ]] || gcloud storage cp --no-clobber "$hlo/$graph.stablehlo.mlir" "$remote/hlo/${graph}.rank${idx}.stablehlo.mlir" >/dev/null 2>&1 || true; [[ ! -f "$hlo/$graph.optimized_hlo.txt" ]] || gcloud storage cp --no-clobber "$hlo/$graph.optimized_hlo.txt" "$remote/hlo/${graph}.rank${idx}.optimized_hlo.txt" >/dev/null 2>&1 || true; done; xplane=$(find "$trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); [[ -z $xplane ]] || gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; }; trap upload EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 14400 /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_short_decoder_ws32.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --topology-capture-root '"$TOPOLOGY_ROOT"' --checkpoint-root '"$CHECKPOINT_ROOT"' --source-inventory '"$INVENTORY"' --token-oracle-dir '"$TOKEN_ORACLE"' --dsa-oracle-dir '"$DSA_ORACLE"' --expected-code-hash '"$PIN"' --checkpoint-manifest-sha256 '"$CHECKPOINT_MANIFEST_SHA"' --checkpoint-success-sha256 '"$CHECKPOINT_SUCCESS_SHA"' --token-oracle-manifest-sha256 '"$TOKEN_ORACLE_SHA"' --dsa-oracle-manifest-sha256 '"$DSA_ORACLE_SHA"' --token-oracle-success-sha256 '"$TOKEN_ORACLE_SUCCESS_SHA"' --dsa-oracle-success-sha256 '"$DSA_ORACLE_SUCCESS_SHA"' --topology-sha256 '"$TOPOLOGY_SHA"' --topology-fleet-sha256 '"$TOPOLOGY_FLEET_SHA"' --mesh-sha256 '"$MESH_SHA"' --expected-prefill-stablehlo-sha256 '"$PREFILL_STABLE_SHA"' --expected-prefill-optimized-hlo-sha256 '"$PREFILL_OPTIMIZED_SHA"' --expected-observer-stablehlo-sha256 '"$OBSERVER_STABLE_SHA"' --expected-observer-optimized-hlo-sha256 '"$OBSERVER_OPTIMIZED_SHA"' --expected-decode-stablehlo-sha256 '"$DECODE_STABLE_SHA"' --expected-decode-optimized-hlo-sha256 '"$DECODE_OPTIMIZED_SHA"' --expected-cache-probe-stablehlo-sha256 '"$CACHE_PROBE_STABLE_SHA"' --expected-cache-probe-optimized-hlo-sha256 '"$CACHE_PROBE_OPTIMIZED_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --compile-only '"$([[ $MODE == acquire ]] && echo 1 || echo 0)"' --observer-steps '"$OBSERVER_STEPS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --trace-steps '"$TRACE_STEPS"' --output "$output" --tensor-output "$tensors" --hlo-dir "$hlo" --trace-dir "$trace" >"$log" 2>&1; trap - EXIT; upload; echo "WS32_SHORT_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; output="$run/runner.rank${idx}.json"; tensors="$run/runner.rank${idx}.npz"; hlo="$run/hlo"; trace="$run/trace"; log="$run/runner.rank${idx}.log"; mkdir -p "$run"; upload(){ local rc=0; [[ ! -f $output ]] || gcloud storage cp --no-clobber "$output" "$remote/host_records/runner.rank${idx}.json" >/dev/null 2>&1 || rc=1; [[ ! -f $tensors ]] || gcloud storage cp --no-clobber "$tensors" "$remote/host_records/runner.rank${idx}.npz" >/dev/null 2>&1 || rc=1; [[ ! -f $log ]] || gcloud storage cp --no-clobber "$log" "$remote/host_records/runner.rank${idx}.log" >/dev/null 2>&1 || rc=1; for graph in prefill observer decode cache_probe; do [[ ! -f "$hlo/$graph.stablehlo.mlir" ]] || gcloud storage cp --no-clobber "$hlo/$graph.stablehlo.mlir" "$remote/hlo/${graph}.rank${idx}.stablehlo.mlir" >/dev/null 2>&1 || rc=1; [[ ! -f "$hlo/$graph.optimized_hlo.txt" ]] || gcloud storage cp --no-clobber "$hlo/$graph.optimized_hlo.txt" "$remote/hlo/${graph}.rank${idx}.optimized_hlo.txt" >/dev/null 2>&1 || rc=1; done; xplane=$(find "$trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); [[ -z $xplane ]] || gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || rc=1; return "$rc"; }; trap "upload || true" EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 14400 /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_short_decoder_ws32.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --topology-capture-root '"$TOPOLOGY_ROOT"' --checkpoint-root '"$CHECKPOINT_ROOT"' --source-inventory '"$INVENTORY"' --token-oracle-dir '"$TOKEN_ORACLE"' --dsa-oracle-dir '"$DSA_ORACLE"' --expected-code-hash '"$PIN"' --checkpoint-manifest-sha256 '"$CHECKPOINT_MANIFEST_SHA"' --checkpoint-success-sha256 '"$CHECKPOINT_SUCCESS_SHA"' --token-oracle-manifest-sha256 '"$TOKEN_ORACLE_SHA"' --dsa-oracle-manifest-sha256 '"$DSA_ORACLE_SHA"' --token-oracle-success-sha256 '"$TOKEN_ORACLE_SUCCESS_SHA"' --dsa-oracle-success-sha256 '"$DSA_ORACLE_SUCCESS_SHA"' --topology-sha256 '"$TOPOLOGY_SHA"' --topology-fleet-sha256 '"$TOPOLOGY_FLEET_SHA"' --mesh-sha256 '"$MESH_SHA"' --expected-prefill-stablehlo-sha256 '"$PREFILL_STABLE_SHA"' --expected-prefill-optimized-hlo-sha256 '"$PREFILL_OPTIMIZED_SHA"' --expected-observer-stablehlo-sha256 '"$OBSERVER_STABLE_SHA"' --expected-observer-optimized-hlo-sha256 '"$OBSERVER_OPTIMIZED_SHA"' --expected-decode-stablehlo-sha256 '"$DECODE_STABLE_SHA"' --expected-decode-optimized-hlo-sha256 '"$DECODE_OPTIMIZED_SHA"' --expected-cache-probe-stablehlo-sha256 '"$CACHE_PROBE_STABLE_SHA"' --expected-cache-probe-optimized-hlo-sha256 '"$CACHE_PROBE_OPTIMIZED_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --compile-only '"$([[ $MODE == acquire ]] && echo 1 || echo 0)"' --observer-steps '"$OBSERVER_STEPS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --trace-steps '"$TRACE_STEPS"' --output "$output" --tensor-output "$tensors" --hlo-dir "$hlo" --trace-dir "$trace" >"$log" 2>&1; trap - EXIT; upload; echo "WS32_SHORT_OK $(hostname) rank=$idx"'
 launch_rc=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/launch.txt" 2>&1 || launch_rc=$?
@@ -215,13 +343,17 @@ if [[ $launch_rc -ne 0 ]] || ! has_eight_unique_markers "$RUN_DIR/launch.txt" WS
   say "ABORT: complete WS32 worker fleet did not finish 8/8"
   exit 1
 fi
-
-say "downloading and independently validating all-host evidence"
-gcloud storage cp "$REMOTE_PREFIX/host_records/*" "$RUN_DIR/fleet/" >/dev/null
-gcloud storage cp "$REMOTE_PREFIX/hlo/*" "$RUN_DIR/fleet_hlo/" >/dev/null
-if [[ $MODE == numerical ]]; then
-  gcloud storage cp "$REMOTE_PREFIX/traces/*" "$RUN_DIR/traces/" >/dev/null
 fi
+
+say "materializing generation-pinned all-host evidence with content deduplication"
+materialize_args=()
+[[ $RECOVER == 0 ]] || materialize_args+=(--allow-failure-diagnostics)
+PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+  -m glm_tpu.greenfield.validation.ws32_evidence \
+  --run-dir "$RUN_DIR" --remote-prefix "$REMOTE_PREFIX" --mode "$MODE" \
+  --tag "$TAG" --code-hash "$PIN" --recovery-code-hash "$RECOVERY_PIN" \
+  --output "$RUN_DIR/source_remote_objects.json" "${materialize_args[@]}" \
+  >"$RUN_DIR/materialize.log"
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   "$WORKTREE/scripts/greenfield/seal_short_decoder_ws32.py" validate \
   --run-dir "$RUN_DIR" --topology-capture-root "$TOPOLOGY_ROOT" \
@@ -255,6 +387,7 @@ post_census_done=1
 
 if [[ $MODE == acquire ]]; then
   gcloud storage cp --no-clobber "$RUN_DIR/summary.json" "$RUN_DIR/census_post.txt" \
+    "$RUN_DIR/source_remote_objects.json" "$RUN_DIR/materialize.log" \
     "$REMOTE_PREFIX/diagnostic/" >/dev/null
   say "HLO acquisition complete; pins are in summary.json and no DB/SUCCESS was created"
   trap - EXIT
@@ -270,8 +403,12 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   >"$RUN_DIR/db_publish.log"
 
 say "archiving orchestrator evidence and validating the exact remote object set"
-for name in orchestrator.log remote_vacancy.txt sync.txt launch.txt census_pre.txt \
-  census_post.txt summary.json validate.log results.db db_link.json db_publish.log; do
+archive_upload_started=1
+orchestrator_files=(orchestrator.log remote_vacancy.txt sync.txt launch.txt census_pre.txt
+  census_post.txt summary.json validate.log results.db db_link.json db_publish.log
+  source_remote_objects.json materialize.log)
+[[ $RECOVER == 0 ]] || orchestrator_files+=(census_recovery_pre.txt)
+for name in "${orchestrator_files[@]}"; do
   gcloud storage cp --no-clobber "$RUN_DIR/$name" "$REMOTE_PREFIX/orchestrator/$name" >/dev/null
 done
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
@@ -280,18 +417,28 @@ import base64,json,sys
 from pathlib import Path
 import google_crc32c
 from google.cloud import storage
-root=Path(sys.argv[1]); uri=sys.argv[2]; output=Path(sys.argv[3]); bucket_name,prefix=uri[5:].split('/',1); client=storage.Client(); blobs={blob.name.removeprefix(prefix.rstrip('/')+'/'):blob for blob in client.list_blobs(bucket_name,prefix=prefix.rstrip('/')+'/')}
+root=Path(sys.argv[1]); uri=sys.argv[2]; output=Path(sys.argv[3]); bucket_name,prefix=uri[5:].split('/',1); client=storage.Client(); blobs={blob.name.removeprefix(prefix.rstrip('/')+'/'):blob for blob in client.list_blobs(bucket_name,prefix=prefix.rstrip('/')+'/')}; source=json.loads((root/'source_remote_objects.json').read_text())
 expected={}
-for path in (root/'fleet').glob('*'): expected[f'host_records/{path.name}']=path
-for path in (root/'fleet_hlo').glob('*'): expected[f'hlo/{path.name}']=path
-for path in (root/'traces').glob('*'): expected[f'traces/{path.name}']=path
-for name in ('orchestrator.log','remote_vacancy.txt','sync.txt','launch.txt','census_pre.txt','census_post.txt','summary.json','validate.log','results.db','db_link.json','db_publish.log'): expected[f'orchestrator/{name}']=root/name
-if set(blobs)!=set(expected): raise SystemExit(f'remote nonterminal object set drifted: missing={sorted(set(expected)-set(blobs))} extra={sorted(set(blobs)-set(expected))}')
+source_by_name={item['name']:item for item in source['objects']}
+for name in source_by_name:
+ if name.startswith('host_records/'): expected[name]=root/'fleet'/Path(name).name
+ elif name.startswith('hlo/'): expected[name]=root/'fleet_hlo'/Path(name).name
+ elif name.startswith('traces/'): expected[name]=root/'traces'/Path(name).name
+orchestrator=('orchestrator.log','remote_vacancy.txt','sync.txt','launch.txt','census_pre.txt','census_post.txt','summary.json','validate.log','results.db','db_link.json','db_publish.log','source_remote_objects.json','materialize.log')
+for name in orchestrator: expected[f'orchestrator/{name}']=root/name
+recovery_pre=root/'census_recovery_pre.txt'
+if recovery_pre.exists(): expected['orchestrator/census_recovery_pre.txt']=recovery_pre
+diagnostics={name:item for name,item in source_by_name.items() if name.startswith('diagnostic_local/')}
+if set(blobs)!=set(expected)|set(diagnostics): raise SystemExit(f'remote nonterminal object set drifted: missing={sorted((set(expected)|set(diagnostics))-set(blobs))} extra={sorted(set(blobs)-(set(expected)|set(diagnostics)))}')
+for name,item in source_by_name.items():
+ blob=blobs[name]
+ if int(blob.size)!=item['size'] or blob.crc32c!=item['crc32c'] or int(blob.generation)!=item['generation']: raise SystemExit(f'source remote object drifted: {name}')
 records=[]
 for name,path in sorted(expected.items()):
  raw=path.read_bytes(); crc=google_crc32c.Checksum(); crc.update(raw); crc32c=base64.b64encode(crc.digest()).decode('ascii'); blob=blobs[name]
  if int(blob.size)!=len(raw) or blob.crc32c!=crc32c or not blob.generation: raise SystemExit(f'remote bytes drifted: {name}')
  records.append({'crc32c':crc32c,'generation':int(blob.generation),'name':name,'sha256':__import__('hashlib').sha256(raw).hexdigest(),'size':len(raw)})
+for name,item in sorted(diagnostics.items()): records.append(item)
 value={'artifact_kind':'greenfield_ws32_short_decoder_remote_ledger','objects':records,'remote_prefix':uri}; value['ledger_sha256']=__import__('hashlib').sha256(json.dumps(value,allow_nan=False,separators=(',',':'),sort_keys=True).encode()).hexdigest(); output.write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
 PY
 gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
@@ -299,19 +446,21 @@ gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR/summary.json" "$RUN_DIR/db_link.json" "$RUN_DIR/remote_objects.json" \
+  "$RUN_DIR/source_remote_objects.json" \
   "$RUN_DIR/census_post.txt" "$RUN_DIR/SUCCESS" "$TAG" "$PIN" \
-  "$REMOTE_PREFIX" <<'PY'
+  "$RECOVERY_PIN" "$REMOTE_PREFIX" <<'PY'
 from hashlib import sha256
 import base64,json,sys
 from pathlib import Path
 import google_crc32c
 from google.cloud import storage
-summary_path,db_path,ledger_path,census_path,output=map(Path,sys.argv[1:6]); tag,pin,remote=sys.argv[6:9]
-summary=json.loads(summary_path.read_text()); db=json.loads(db_path.read_text()); ledger=json.loads(ledger_path.read_text())
+summary_path,db_path,ledger_path,source_path,census_path,output=map(Path,sys.argv[1:7]); tag,pin,recovery_pin,remote=sys.argv[7:11]
+summary=json.loads(summary_path.read_text()); db=json.loads(db_path.read_text()); ledger=json.loads(ledger_path.read_text()); source=json.loads(source_path.read_text())
 def canonical(value): return json.dumps(value,allow_nan=False,separators=(',',':'),sort_keys=True).encode()
 if summary['summary_sha256']!=sha256(canonical({k:v for k,v in summary.items() if k!='summary_sha256'})).hexdigest() or summary['status']!='SUCCESS' or summary['performance_claim'] is not True: raise SystemExit('terminal summary identity drifted')
 if db['record_sha256']!=sha256(canonical({k:v for k,v in db.items() if k!='record_sha256'})).hexdigest() or db['summary_sha256']!=summary['summary_sha256']: raise SystemExit('terminal DB link drifted')
 if ledger['ledger_sha256']!=sha256(canonical({k:v for k,v in ledger.items() if k!='ledger_sha256'})).hexdigest() or ledger['remote_prefix']!=remote: raise SystemExit('terminal remote ledger drifted')
+if source['ledger_sha256']!=sha256(canonical({k:v for k,v in source.items() if k!='ledger_sha256'})).hexdigest() or source['code_hash']!=pin or source['recovery_code_hash']!=recovery_pin: raise SystemExit('terminal source ledger drifted')
 markers=[line.split()[1] for line in census_path.read_text().splitlines() if line.startswith('CENSUS_OK ')]
 if len(markers)!=8 or len(set(markers))!=8: raise SystemExit('terminal post-census drifted')
 bucket_name,prefix=remote[5:].split('/',1); client=storage.Client(); blobs={blob.name.removeprefix(prefix.rstrip('/')+'/'):blob for blob in client.list_blobs(bucket_name,prefix=prefix.rstrip('/')+'/')}; expected={item['name'] for item in ledger['objects']}|{'remote_objects.json'}
@@ -321,7 +470,7 @@ for item in ledger['objects']:
  if int(blob.size)!=item['size'] or blob.crc32c!=item['crc32c'] or int(blob.generation)!=item['generation']: raise SystemExit(f"terminal remote object drifted: {item['name']}")
 raw=ledger_path.read_bytes(); crc=google_crc32c.Checksum(); crc.update(raw); crc32c=base64.b64encode(crc.digest()).decode('ascii'); blob=blobs['remote_objects.json']
 if int(blob.size)!=len(raw) or blob.crc32c!=crc32c or not blob.generation: raise SystemExit('terminal remote ledger bytes drifted')
-value={'artifact_kind':'greenfield_ws32_short_decoder_SUCCESS','code_hash':pin,'context_label':summary['context_label'],'db_record_sha256':db['record_sha256'],'performance_claim':True,'remote_ledger_generation':int(blob.generation),'remote_ledger_sha256':ledger['ledger_sha256'],'results_db_run_id':db['results_db_run_id'],'run_tag':tag,'summary_sha256':summary['summary_sha256'],'topology_sha256':summary['topology_sha256'],'xplane_files':summary['xplane']['n_files'],'xplane_cores':summary['xplane']['n_cores']}; value['success_sha256']=sha256(canonical(value)).hexdigest(); output.write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+value={'artifact_kind':'greenfield_ws32_short_decoder_SUCCESS','code_hash':pin,'context_label':summary['context_label'],'db_record_sha256':db['record_sha256'],'performance_claim':True,'recovery_code_hash':recovery_pin,'remote_ledger_generation':int(blob.generation),'remote_ledger_sha256':ledger['ledger_sha256'],'results_db_run_id':db['results_db_run_id'],'run_tag':tag,'source_ledger_sha256':source['ledger_sha256'],'summary_sha256':summary['summary_sha256'],'topology_sha256':summary['topology_sha256'],'xplane_files':summary['xplane']['n_files'],'xplane_cores':summary['xplane']['n_cores']}; value['success_sha256']=sha256(canonical(value)).hexdigest(); output.write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
 PY
 success_upload_started=1
 success_absent=0

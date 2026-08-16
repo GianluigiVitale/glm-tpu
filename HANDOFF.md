@@ -2,6 +2,20 @@
 
 **Updated:** 2026-08-16 UTC
 
+## Corrected WS32 2K exact; sealing recovery in review
+
+- Commit `69513c1` corrected the missed split-residual contract. Protected numerical tag
+  `greenfield_ws32_short_decoder_2k_numerical_20260816T040707909547486Z` finished 8/8 and the
+  unchanged fleet sealer now reports exact 20/20 tokens, exact DSA/state/cache, 64-core trace,
+  `122.630667 ms/token` p50 / `8.154567 tok/s`, 24.789-GB maximum peak HBM and 8.225-GB minimum
+  headroom; local summary SHA is `04968951...6b40d`.
+- Terminal publication did not run because redundant all-rank HLO plus unique XPlane downloads
+  exhausted root disk. Remote host records/HLO/XPlanes are complete and the local reconstructed
+  set matches them. A default-off recovery/deduplicating materializer is being reviewed; it must
+  preserve the existing failure diagnostics, take a fresh census under the fleet lease, use the
+  canonical `/home/gianl/glm-tpu/bench/results.db`, and publish DB/ledger/`SUCCESS` last. Do not
+  rerun 2K model work or reopen split-residual arithmetic.
+
 ## Narrow Fable audit
 
 - Current protected-failure session: `3948b026-d3c6-4e23-b1ae-b83b62e5d0ad`

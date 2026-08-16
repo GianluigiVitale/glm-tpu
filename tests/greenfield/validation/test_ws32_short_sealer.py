@@ -8,6 +8,7 @@ import subprocess
 from types import SimpleNamespace
 
 import bench.provenance as provenance
+from glm_tpu.greenfield.validation import ws32_evidence
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -153,6 +154,15 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     assert "if_generation_match=int(blob.generation)" in source
     assert "remote_objects.json" in source
     assert "XLA_PYTHON_CLIENT_MEM_FRACTION=.95" in source
+    assert "GLM_GREENFIELD_WS32_SHORT_DECODER_RECOVER:-0" in source
+    assert "glm_tpu.greenfield.validation.ws32_evidence" in source
+    assert "source_remote_objects.json" in source
+    assert "RESULTS_DB=/home/gianl/glm-tpu/bench/results.db" in source
+    assert "less than 4 GiB" in source
+    assert 'trap "upload || true" EXIT' in source
+    assert 'return "$rc"' in source
+    assert 'gcloud storage cp "$REMOTE_PREFIX/hlo/*"' not in source
+    assert 'gcloud storage cp "$REMOTE_PREFIX/traces/*"' not in source
     assert '"$token_root/SUCCESS"' in source
     assert '"$dsa_root/SUCCESS"' in source
     assert "TOKEN_ORACLE_SUCCESS_SHA=" in source
@@ -163,6 +173,14 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     assert '[[ $launch_rc -ne 0 ]] || ! has_eight_unique_markers' in source
     assert "(strict_census failure_exit) || true" in source
     assert "rollback_success || true" not in source
+    assert "rollback_remote_nonterminal" in source
+    assert "archive_failed_publication" in source
+    assert "refusing cleanup with drifted source ledger" in source
+    assert "source object drifted during cleanup" in source
+    assert "a prior terminal SUCCESS verification exists" in source
+    assert source.index("a prior terminal SUCCESS verification exists") < source.index(
+        "trap on_exit EXIT"
+    )
     assert "success_absent -eq 1" in source
     success_upload = source.index(
         'gcloud storage cp --no-clobber "$RUN_DIR/SUCCESS"'
@@ -170,7 +188,76 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     post_census = source.index("strict_census post")
     db_publish = source.index("publish-db")
     assert post_census < db_publish < success_upload
+    on_exit = source[source.index("on_exit() {") : source.index("trap on_exit EXIT")]
+    assert on_exit.index("rollback_success") < on_exit.index(
+        "rollback_remote_nonterminal"
+    ) < on_exit.index("rollback_db")
     assert "rm -rf" not in source
+
+
+def test_ws32_evidence_primary_object_schema_is_exact() -> None:
+    acquired = ws32_evidence._expected_primary_names(numerical=False)
+    numerical = ws32_evidence._expected_primary_names(numerical=True)
+    assert len(acquired) == 88
+    assert len(numerical) == 96
+    assert numerical - acquired == {
+        f"traces/trace.rank{rank}.xplane.pb" for rank in range(8)
+    }
+    assert all("_.gstmp" not in name for name in numerical)
+    assert ws32_evidence._expected_runner_status("acquire") == "HLO_ACQUIRED"
+    assert ws32_evidence._expected_runner_status("numerical") == "SUCCESS"
+
+
+def test_ws32_prelaunch_floor_covers_protected_unique_evidence_and_reserve() -> None:
+    # Current protected fleet: worker-0 local HLO/trace/NPZ are created before
+    # materialization, then seven distinct traces and peer records remain to be
+    # fetched. Keep at least one GiB free throughout sealing.
+    rank0_generated = 311_539_059 + 277_949_672 + 4_952_000
+    remaining_unique = 1_946_790_017 + 35_000_000
+    sealing_reserve = 1024**3
+    required = rank0_generated + remaining_unique + sealing_reserve
+    assert required < 4 * 1024**3
+    source = WRAPPER.read_text(encoding="utf-8")
+    assert "available_bytes -ge 4294967296" in source
+
+
+def test_ws32_evidence_hardlink_refuses_existing_different_file(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.write_bytes(b"exact")
+    ws32_evidence._link_exact(source, destination)
+    assert destination.read_bytes() == b"exact"
+    assert source.stat().st_ino == destination.stat().st_ino
+    ws32_evidence._link_exact(source, destination)
+    destination.unlink()
+    destination.write_bytes(b"rogue")
+    try:
+        ws32_evidence._link_exact(source, destination)
+    except SystemExit as error:
+        assert "refusing to replace" in str(error)
+    else:
+        raise AssertionError("different existing evidence was replaced")
+
+
+def test_ws32_evidence_refuses_partial_transfer_files(tmp_path: Path) -> None:
+    for relative in (
+        "fleet/runner.rank0.json.partial",
+        "fleet_hlo/decode.rank0.optimized_hlo.txt_.gstmp",
+        "traces/trace.rank0.xplane.pb.partial",
+    ):
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"partial")
+    assert [
+        path.relative_to(tmp_path).as_posix()
+        for path in ws32_evidence._partial_evidence(tmp_path)
+    ] == [
+        "fleet/runner.rank0.json.partial",
+        "fleet_hlo/decode.rank0.optimized_hlo.txt_.gstmp",
+        "traces/trace.rank0.xplane.pb.partial",
+    ]
 
 
 def test_ws32_short_census_initializes_label_before_derived_locals(
@@ -226,6 +313,7 @@ def test_ws32_failed_success_delete_retains_db_link(tmp_path: Path) -> None:
     harness = f'''set -u
 post_census_done=1
 db_published=1
+archive_upload_started=0
 success_upload_started=1
 terminal_success_verified=0
 success_absent=0
@@ -234,6 +322,8 @@ REMOTE_PREFIX=gs://driftbench-dsv4-uc/results/unit
 strict_census() {{ :; }}
 rollback_success() {{ return 1; }}
 rollback_db() {{ touch {marker}; }}
+rollback_remote_nonterminal() {{ :; }}
+archive_failed_publication() {{ :; }}
 say() {{ :; }}
 gcloud() {{ :; }}
 {on_exit}
@@ -242,6 +332,57 @@ on_exit
 [[ ! -e {marker} ]]
 '''
     subprocess.run(["bash", "-c", harness], check=True)
+
+
+def test_ws32_recovery_quarantines_derived_outputs_only(tmp_path: Path) -> None:
+    source = WRAPPER.read_text(encoding="utf-8")
+    start = source.index("archive_failed_publication() {")
+    end = source.index("\n}\non_exit() {", start) + 2
+    function = source[start:end]
+    (tmp_path / "summary.json").write_text("summary", encoding="utf-8")
+    (tmp_path / "validate.log").write_text("validate", encoding="utf-8")
+    (tmp_path / "source_remote_objects.json").write_text(
+        "source", encoding="utf-8"
+    )
+    subprocess.run(
+        [
+            "bash",
+            "-c",
+            f"RUN_DIR=$1; {function}; archive_failed_publication",
+            "ws32-recovery-quarantine",
+            str(tmp_path),
+        ],
+        check=True,
+    )
+    assert not (tmp_path / "summary.json").exists()
+    assert not (tmp_path / "validate.log").exists()
+    assert (tmp_path / "source_remote_objects.json").read_text() == "source"
+    quarantined = list((tmp_path / "recovery_failures").glob("*/summary.json"))
+    assert len(quarantined) == 1 and quarantined[0].read_text() == "summary"
+
+
+def test_ws32_verified_success_refuses_before_cleanup_trap(tmp_path: Path) -> None:
+    success = tmp_path / "success_upload.json"
+    success.write_text("sealed", encoding="utf-8")
+    script = f'''set -euo pipefail
+RECOVER=1
+RUN_DIR=$1
+if [[ $RECOVER == 1 ]]; then
+  [[ -d $RUN_DIR ]]
+  [[ ! -e $RUN_DIR/success_upload.json ]] || {{
+    echo "a prior terminal SUCCESS verification exists; refusing recovery" >&2
+    exit 1
+  }}
+fi
+touch "$RUN_DIR/trap-was-armed"
+'''
+    result = subprocess.run(
+        ["bash", "-c", script, "ws32-verified-success", str(tmp_path)],
+        check=False,
+    )
+    assert result.returncode == 1
+    assert success.read_text(encoding="utf-8") == "sealed"
+    assert not (tmp_path / "trap-was-armed").exists()
 
 
 def test_ws32_wrapper_oracle_success_pins_match_all_four_trees() -> None:

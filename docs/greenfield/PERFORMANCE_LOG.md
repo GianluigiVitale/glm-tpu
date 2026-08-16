@@ -5,6 +5,23 @@ Protected PP8 2K full-decoder evidence exists at DB484: p50 `244.091151 ms` and
 but not Gate E. No accepted 8K, 128K, 256K, PP16 full-decoder, or WS32 full-decoder performance
 measurement exists yet. Bounded layer/kernel/diagnostic results below are not token-speed proof.
 
+## 2026-08-16 — corrected WS32 2K is exact; terminal recovery pending
+
+- Corrected acquisition `greenfield_ws32_short_decoder_2k_acquire_20260816T033411540978991Z`
+  preserved all four graph pairs across all hosts. Decode, observer and prefill each contain exactly
+  157 live split-residual RMS reductions and zero rounded-first sites.
+- Numerical tag `greenfield_ws32_short_decoder_2k_numerical_20260816T040707909547486Z` completed
+  successfully on all eight hosts. The independent fleet sealer recomputed exact 20/20 protected
+  tokens (including formerly wrong index 10 = `576`), exact executing-program DSA set/tail/ties,
+  valid state/cache, 64-core XPlanes, 24.789 GB maximum peak HBM and 8.225 GB minimum headroom.
+  Fleet-critical profiler-free p50 is `122.630667 ms/token` or `8.154567 tok/s`; p99 is
+  `124.75735031 ms/token`. Local summary SHA is `04968951...6b40d`.
+- The orchestrator filled `/dev/root` only after all worker computations and uploads succeeded:
+  blind materialization expanded eight unique HLO byte streams to 64 local paths and then downloaded
+  eight unique XPlanes. Therefore these numbers remain nonterminal until the reviewed recovery binds
+  the preexisting remote generations, obtains a fresh 8/8 census, links the canonical results DB,
+  publishes the exact remote ledger and verifies `SUCCESS` last. No TPU/model rerun is required.
+
 ## 2026-08-15 — protected WS32 reference layer, correctness pass / execution reject
 
 `greenfield_ws32_real_layer_numerical_20260815T090957477700205Z` executes the sealed 32-owner

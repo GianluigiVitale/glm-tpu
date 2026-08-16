@@ -458,6 +458,29 @@ branches from the search tree.
   This preserves local-read integrity without multiplying a 786-GB checkpoint scan eightfold.
 - A terminal validator must recompute token, DSA and cache verdicts from sealed raw arrays. A JSON
   `passed` field is not a numerical artifact, even when eight hosts repeat it.
+- Architecture ports must start from the authoritative numerical state machine, not from the
+  nearest single-tensor API. WS32 initially collapsed the required `(update, carried_residual)`
+  pair and normalized an already-rounded BF16 sum twice per layer. That known PP8 failure mode
+  survived unit arithmetic tests but flipped a protected token. Assert every required rounding
+  boundary and its count in the complete HLO before the first numerical run.
+- Evidence fanout needs a disk budget just as model execution needs an HBM budget. Sixty-four
+  per-rank HLO paths can contain only eight unique byte streams; downloading every path separately
+  consumed about 2.49 GB, then eight unique XPlanes consumed another 2.23 GB and filled the
+  orchestrator disk after a valid run. Verify each remote generation/CRC/SHA, then hard-link equal
+  local content. Preflight the bytes that truly need downloading plus a fixed sealing reserve.
+- A worker success marker must mean both execution and all required evidence uploads succeeded.
+  Best-effort uploads belong only in the failure trap; suppressing upload errors on the success
+  path can turn eight green markers into an incomplete remote fleet.
+- The provenance DB is shared state, not a worktree-local scratch file. Every protected wrapper
+  must use the canonical `/home/gianl/glm-tpu/bench/results.db`, open it read-only before launch,
+  require the exact schema and absence of the run tag, and never silently initialize an empty
+  ignored `results.db` in a feature worktree.
+- A completed TPU result may be sealed without rerunning model work only when recovery is itself a
+  protected workflow: preserve and content-address the original failure diagnostics, bind every
+  preexisting remote object's immutable generation/CRC/SHA, rerun the unchanged numerical sealer,
+  obtain a fresh eight-host census while holding the fleet lease, record both execution and
+  recovery code hashes, then publish DB, exact remote ledger and `SUCCESS` last. Recovery must not
+  delete inconvenient evidence or reinterpret a failed numerical result.
 - Every capture mode that can commit a provenance row must arm the same exact prefix-aware rollback
   before model execution. A mode is incomplete if a later DSA/sealing refusal can leave an
   unauthenticated provisional row.

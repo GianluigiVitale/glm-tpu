@@ -5,6 +5,17 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-16 — split residual closes corrected WS32 2K arithmetic
+
+The corrected complete WS32 numerical fleet generated the protected 2K prefix exactly 20/20; the
+former mismatch at index 10 is now token 576. Independent fleet validation passes DSA set/tail/tie,
+state, cache, HLO, HBM and all eight XPlanes. Fleet-critical p50 is 122.630667 ms/token
+(8.154567 tok/s), with summary SHA `04968951...6b40d`. This establishes the missed split-state
+port as the concrete prior root cause. Terminal standing is still withheld because redundant HLO
+and trace downloads filled the orchestrator disk before post-census/DB/`SUCCESS`. Recovery must
+generation-bind the already complete remote run and seal it without new TPU arithmetic; the durable
+wrapper must content-deduplicate HLO and fail closed on evidence-upload or disk-budget errors.
+
 ## 2026-08-16 — WS32 2K reaches full prefill HLO; representation-only proof refusal is closed locally
 
 - Sealed checkpoint `greenfield_ws32_runtime_pack_20260815T214050854386790Z` passed exact
