@@ -158,6 +158,7 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     assert '[[ $sync_rc -ne 0 ]] || ! has_eight_unique_markers' in source
     assert '|| launch_rc=$?' in source
     assert '[[ $launch_rc -ne 0 ]] || ! has_eight_unique_markers' in source
+    assert "(strict_census failure_exit) || true" in source
     assert "rollback_success || true" not in source
     assert "success_absent -eq 1" in source
     success_upload = source.index(
@@ -167,6 +168,31 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     db_publish = source.index("publish-db")
     assert post_census < db_publish < success_upload
     assert "rm -rf" not in source
+
+
+def test_ws32_short_census_initializes_label_before_derived_locals(
+    tmp_path: Path,
+) -> None:
+    source = WRAPPER.read_text(encoding="utf-8")
+    start = source.index("strict_census() {")
+    end = source.index("\n}\n\nexec 9>", start) + 3
+    function = source[start:end]
+    script = f"""\
+set -u
+RUN_DIR=$1
+TAG=unit
+POD=pod
+ZONE=zone
+gcloud() {{ :; }}
+has_eight_unique_markers() {{ :; }}
+{function}
+strict_census probe
+test -f "$RUN_DIR/census_probe.txt"
+"""
+    subprocess.run(
+        ["bash", "-c", script, "ws32-census-test", str(tmp_path)],
+        check=True,
+    )
 
 
 def test_ws32_run_tag_is_bound_to_context_and_mode() -> None:
