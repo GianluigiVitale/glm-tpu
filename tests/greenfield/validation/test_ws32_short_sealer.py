@@ -154,6 +154,10 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     assert '"$dsa_root/SUCCESS"' in source
     assert "TOKEN_ORACLE_SUCCESS_SHA=" in source
     assert "DSA_ORACLE_SUCCESS_SHA=" in source
+    assert '|| sync_rc=$?' in source
+    assert '[[ $sync_rc -ne 0 ]] || ! has_eight_unique_markers' in source
+    assert '|| launch_rc=$?' in source
+    assert '[[ $launch_rc -ne 0 ]] || ! has_eight_unique_markers' in source
     assert "rollback_success || true" not in source
     assert "success_absent -eq 1" in source
     success_upload = source.index(

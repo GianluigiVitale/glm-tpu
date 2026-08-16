@@ -191,12 +191,13 @@ strict_census pre || {
 say "synchronizing exact code and sealed inputs on all hosts"
 # shellcheck disable=SC2016
 sync_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; pin='"$PIN"'; wt='"$WORKTREE"'; branch='"$BRANCH"'; origin='"$ORIGIN"'; checkpoint='"$CHECKPOINT_ROOT"'; inventory='"$INVENTORY"'; token='"$TOKEN_ORACLE"'; token_root='"$TOKEN_ORACLE_ROOT"'; token_success_sha='"$TOKEN_ORACLE_SUCCESS_SHA"'; dsa='"$DSA_ORACLE"'; dsa_root='"$DSA_ORACLE_ROOT"'; dsa_success_sha='"$DSA_ORACLE_SUCCESS_SHA"'; topology='"$TOPOLOGY_ROOT"'/topology.rank${idx}.json; if [[ $idx == 0 ]]; then [[ -e "$wt/.git" && $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; elif [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; for path in "$checkpoint/manifest.json" "$checkpoint/SUCCESS" "$inventory" "$token/manifest.json" "$token_root/SUCCESS" "$dsa/manifest.json" "$dsa_root/SUCCESS" "$topology"; do [[ -r $path ]]; done; token_observed=$(sha256sum "$token_root/SUCCESS"); dsa_observed=$(sha256sum "$dsa_root/SUCCESS"); [[ ${token_observed%% *} == "$token_success_sha" ]]; [[ ${dsa_observed%% *} == "$dsa_success_sha" ]]; findmnt -T "$checkpoint" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse"; echo "SYNC_OK $(hostname) $pin"'
+sync_rc=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-  --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1
-has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK || {
+  --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1 || sync_rc=$?
+if [[ $sync_rc -ne 0 ]] || ! has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK; then
   say "ABORT: exact eight-host synchronization failed"
   exit 1
-}
+fi
 
 coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
   --command="hostname -I | awk '{print \$1}'" 2>/dev/null | tail -1 | tr -d '\r')
@@ -205,12 +206,13 @@ coordinator="$coordinator:8476"
 say "launching complete WS32 worker fleet coordinator=$coordinator"
 # shellcheck disable=SC2016
 execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; output="$run/runner.rank${idx}.json"; tensors="$run/runner.rank${idx}.npz"; hlo="$run/hlo"; trace="$run/trace"; log="$run/runner.rank${idx}.log"; mkdir -p "$run"; upload(){ [[ ! -f $output ]] || gcloud storage cp --no-clobber "$output" "$remote/host_records/runner.rank${idx}.json" >/dev/null 2>&1 || true; [[ ! -f $tensors ]] || gcloud storage cp --no-clobber "$tensors" "$remote/host_records/runner.rank${idx}.npz" >/dev/null 2>&1 || true; [[ ! -f $log ]] || gcloud storage cp --no-clobber "$log" "$remote/host_records/runner.rank${idx}.log" >/dev/null 2>&1 || true; for graph in prefill observer decode cache_probe; do [[ ! -f "$hlo/$graph.stablehlo.mlir" ]] || gcloud storage cp --no-clobber "$hlo/$graph.stablehlo.mlir" "$remote/hlo/${graph}.rank${idx}.stablehlo.mlir" >/dev/null 2>&1 || true; [[ ! -f "$hlo/$graph.optimized_hlo.txt" ]] || gcloud storage cp --no-clobber "$hlo/$graph.optimized_hlo.txt" "$remote/hlo/${graph}.rank${idx}.optimized_hlo.txt" >/dev/null 2>&1 || true; done; xplane=$(find "$trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); [[ -z $xplane ]] || gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || true; }; trap upload EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 14400 /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_short_decoder_ws32.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --topology-capture-root '"$TOPOLOGY_ROOT"' --checkpoint-root '"$CHECKPOINT_ROOT"' --source-inventory '"$INVENTORY"' --token-oracle-dir '"$TOKEN_ORACLE"' --dsa-oracle-dir '"$DSA_ORACLE"' --expected-code-hash '"$PIN"' --checkpoint-manifest-sha256 '"$CHECKPOINT_MANIFEST_SHA"' --checkpoint-success-sha256 '"$CHECKPOINT_SUCCESS_SHA"' --token-oracle-manifest-sha256 '"$TOKEN_ORACLE_SHA"' --dsa-oracle-manifest-sha256 '"$DSA_ORACLE_SHA"' --token-oracle-success-sha256 '"$TOKEN_ORACLE_SUCCESS_SHA"' --dsa-oracle-success-sha256 '"$DSA_ORACLE_SUCCESS_SHA"' --topology-sha256 '"$TOPOLOGY_SHA"' --topology-fleet-sha256 '"$TOPOLOGY_FLEET_SHA"' --mesh-sha256 '"$MESH_SHA"' --expected-prefill-stablehlo-sha256 '"$PREFILL_STABLE_SHA"' --expected-prefill-optimized-hlo-sha256 '"$PREFILL_OPTIMIZED_SHA"' --expected-observer-stablehlo-sha256 '"$OBSERVER_STABLE_SHA"' --expected-observer-optimized-hlo-sha256 '"$OBSERVER_OPTIMIZED_SHA"' --expected-decode-stablehlo-sha256 '"$DECODE_STABLE_SHA"' --expected-decode-optimized-hlo-sha256 '"$DECODE_OPTIMIZED_SHA"' --expected-cache-probe-stablehlo-sha256 '"$CACHE_PROBE_STABLE_SHA"' --expected-cache-probe-optimized-hlo-sha256 '"$CACHE_PROBE_OPTIMIZED_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --compile-only '"$([[ $MODE == acquire ]] && echo 1 || echo 0)"' --observer-steps '"$OBSERVER_STEPS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --trace-steps '"$TRACE_STEPS"' --output "$output" --tensor-output "$tensors" --hlo-dir "$hlo" --trace-dir "$trace" >"$log" 2>&1; trap - EXIT; upload; echo "WS32_SHORT_OK $(hostname) rank=$idx"'
+launch_rc=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-  --command="$execute_command" >"$RUN_DIR/launch.txt" 2>&1
-has_eight_unique_markers "$RUN_DIR/launch.txt" WS32_SHORT_OK || {
+  --command="$execute_command" >"$RUN_DIR/launch.txt" 2>&1 || launch_rc=$?
+if [[ $launch_rc -ne 0 ]] || ! has_eight_unique_markers "$RUN_DIR/launch.txt" WS32_SHORT_OK; then
   say "ABORT: complete WS32 worker fleet did not finish 8/8"
   exit 1
-}
+fi
 
 say "downloading and independently validating all-host evidence"
 gcloud storage cp "$REMOTE_PREFIX/host_records/*" "$RUN_DIR/fleet/" >/dev/null
