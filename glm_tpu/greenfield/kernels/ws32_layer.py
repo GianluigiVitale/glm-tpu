@@ -40,7 +40,7 @@ from .reference.dsa import (
     local_topk_candidates,
     merge_topk_candidates_with_scores,
 )
-from .reference.linear import residual_add
+from .reference.linear import linear, residual_add
 from .reference.moe import GlmMoeNumericalContract
 from .reference.rmsnorm import rms_norm
 from .reference.rotary import apply_rotary, rotary_cos_sin
@@ -475,6 +475,141 @@ def ws32_dsa_mapped(
         selected.scores,
         metadata_valid & selection_valid,
     )
+
+
+def ws32_grouped_dsa_query_and_head(
+    q_residual: Any,
+    normalized: Any,
+    query_weight_aliases: tuple[Any, ...],
+    head_weight: Any,
+    position: Any,
+    *,
+    contract: DsaNumericalContract = DsaNumericalContract(),
+) -> tuple[Any, Any]:
+    """Candidate WS32 form of the DB525 grouped query association.
+
+    DB525 proves that TPU-v4 needs one 16-KiB grouped reduction for the
+    recurrent DSA query.  PP8 obtains that geometry from four aliases of an
+    eight-head owner.  WS32's existing checkpoint instead owns four heads on
+    each expert coordinate, so the bounded discriminator must compare that
+    existing layout with eight aliases against a feature-owned eight-head
+    layout with four aliases.  This helper admits exactly those two physical
+    geometries and keeps the BF16 q-a completion boundary explicit.
+
+    The helper is not selected by :func:`ws32_dsa_mapped` until the real
+    position-8155 TPU discriminator chooses one of the two layouts.
+    """
+
+    alias_count = len(query_weight_aliases)
+    if alias_count not in (4, 8):
+        raise ValueError("WS32 exact DSA query requires four or eight aliases")
+    if q_residual.shape != (1, contract.q_lora_rank) or (
+        q_residual.dtype != jnp.bfloat16
+    ):
+        raise ValueError("WS32 exact DSA q residual geometry drifted")
+    if normalized.shape != (1, contract.hidden_size) or (
+        normalized.dtype != jnp.bfloat16
+    ):
+        raise ValueError("WS32 exact DSA normalized geometry drifted")
+    first = query_weight_aliases[0]
+    if first.ndim != 2 or first.shape[1] != contract.q_lora_rank or (
+        first.dtype != jnp.float32
+    ):
+        raise ValueError("WS32 exact DSA query owner geometry drifted")
+    if any(
+        weight.shape != first.shape or weight.dtype != jnp.float32
+        for weight in query_weight_aliases
+    ):
+        raise ValueError("WS32 exact DSA query aliases must be identical owners")
+    if first.shape[0] % contract.head_dim:
+        raise ValueError("WS32 exact DSA query owner is not head aligned")
+    local_heads = first.shape[0] // contract.head_dim
+    if local_heads * alias_count != contract.num_heads:
+        raise ValueError("WS32 exact DSA grouped query must retain 32 heads")
+    if head_weight.shape != (local_heads, contract.hidden_size) or (
+        head_weight.dtype != jnp.bfloat16
+    ):
+        raise ValueError("WS32 exact DSA head-weight owner geometry drifted")
+    # Four x 8-head and eight x 4-head both request the DB525 16-KiB grouped
+    # TPU reduction.  Reject any shape that only happens to have 32 heads but
+    # changes the physical result bytes.
+    grouped_bytes = alias_count * first.shape[0] * 4
+    if grouped_bytes != 16_384:
+        raise ValueError("WS32 exact DSA grouped reduction must be 16 KiB")
+
+    query_input = lax.optimization_barrier(q_residual)
+    grouped = jnp.stack(
+        tuple(
+            linear(query_input, weight, output_dtype=jnp.float32)
+            for weight in query_weight_aliases
+        )
+    )
+    projected_query = lax.optimization_barrier(grouped)[0]
+
+    with jax.default_matmul_precision("highest"):
+        projected_head_weight = linear(
+            lax.optimization_barrier(normalized),
+            head_weight,
+            output_dtype=jnp.float32,
+        ) * jnp.float32(contract.num_heads**-0.5)
+    query = projected_query.reshape(1, local_heads, contract.head_dim)
+    cos, sin = rotary_cos_sin(
+        position,
+        rotary_dim=contract.rotary_dim,
+        theta=contract.theta,
+        dtype=jnp.float32,
+    )
+    rotated = apply_rotary(
+        query[..., : contract.rotary_dim],
+        cos[:, None, :],
+        sin[:, None, :],
+        interleaved=contract.interleaved_rotary,
+    )
+    return (
+        jnp.concatenate(
+            (rotated, query[..., contract.rotary_dim :]), axis=-1
+        ).astype(jnp.float32),
+        projected_head_weight.astype(jnp.float32),
+    )
+
+
+def ws32_exact_dsa_current_key(
+    normalized: Any,
+    materialized_wk: Any,
+    key_norm_weight: Any,
+    key_norm_bias: Any,
+    position: Any,
+    *,
+    contract: DsaNumericalContract = DsaNumericalContract(),
+) -> Any:
+    """Apply the DB527 normalized/wk/divide-sqrt recurrent-key boundary."""
+
+    if normalized.shape != (1, contract.hidden_size) or (
+        normalized.dtype != jnp.bfloat16
+    ):
+        raise ValueError("WS32 exact DSA normalized geometry drifted")
+    if materialized_wk.shape != (contract.head_dim, contract.hidden_size) or (
+        materialized_wk.dtype != jnp.float32
+    ):
+        raise ValueError("WS32 exact DSA wk must be one complete FP32 owner")
+    if key_norm_weight.shape != (contract.head_dim,) or (
+        key_norm_bias.shape != key_norm_weight.shape
+    ):
+        raise ValueError("WS32 exact DSA key norm geometry drifted")
+    normalized_input = lax.optimization_barrier(normalized)
+    projected_key = linear(
+        normalized_input,
+        materialized_wk,
+        output_dtype=jnp.float32,
+    )
+    return dsa_index_keys_from_projection(
+        projected_key,
+        key_norm_weight,
+        key_norm_bias,
+        position,
+        contract=contract,
+        key_norm_mode="divide_sqrt",
+    ).astype(jnp.float32)
 
 
 def ws32_index_share_attention_mapped(

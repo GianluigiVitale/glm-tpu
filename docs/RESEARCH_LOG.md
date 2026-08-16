@@ -5,6 +5,25 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-16 — WS32 8K tokens exact; non-vacuous DSA ranking remains open
+
+Protected tag `greenfield_ws32_short_decoder_8k_numerical_20260816T063630156524394Z` loaded and
+executed the complete 8K WS32 decoder at code `b746b212...f23d3`. All four acquired graph hashes
+match; HLO reports 157 live split-RMS boundaries, zero rounded-first boundaries, maximum collective
+group eight and no full-hidden reconstruction. State/cache/HBM pass, raw generation matches the
+sealed oracle exactly 20/20, and diagnostic profiler-free p50/p99 is
+`122.487401/125.15601449 ms/token` (`~8.164 tok/s`). These are not terminal performance claims
+because correctness refused before DB/archive/SUCCESS publication.
+
+The sole refusal is the exact DSA contract. At position 8,155, layer-0 membership is exact but its
+position-aligned score mean/max absolute delta is `0.00445265/0.0122719`; layer 1 and later full
+indexers swap selected positions, and all 14 observer steps fail. This also exposes why the sealed
+2K DSA result was insufficient as a ranking proof: prompt length 2,034 is below `top_k=2,048`, so
+every live position is selected regardless of score. The 8K oracle positions/counts and the
+comparison schema are correctly aligned. Freeze full-model retries until a bounded score/state
+discriminator identifies and proves the first WS32 divergence; do not relax DSA exactness merely
+because tokens are exact.
+
 ## 2026-08-16 — split residual closes corrected WS32 2K arithmetic
 
 The corrected complete WS32 numerical fleet generated the protected 2K prefix exactly 20/20; the
@@ -9913,3 +9932,30 @@ unmotivated arithmetic variants.
   Exact acquire cardinality is 80, while numerical is 96 (adds eight NPZ and eight XPlane files).
   No DB, numerical result or `SUCCESS` exists and cleanup is 8/8. Recover the immutable HLOs in a
   mode-aware wrapper; never spend another compile on this code/compiler/context pin.
+
+## 2026-08-16 06:36--08:30 UTC — 8K tokens pass; DSA omission is localized without another full retry
+
+- Protected 8K numerical tag `greenfield_ws32_short_decoder_8k_numerical_20260816T063630156524394Z`
+  at `b746b2125f4fd236c2aeaa6aeb821817451f23d3` produces the exact 20-token oracle prefix. Its
+  profiler-free p50/p99 are `122.487401/125.15601449 ms/token`; state, cache, graph, checkpoint and
+  HBM records remain valid. Correctness still refuses: layer-0/event-0 membership is unchanged but
+  aligned-score mean/max drift is `0.0044526476/0.0122718811`; layer 1/event 1 swaps four positions
+  and later events diverge. Runner/failure-census SHAs are `52957d7e...b8c0` and
+  `dee6236d...54e9`. No DB row, performance promotion or terminal `SUCCESS` exists.
+- The 2K DSA pass was not a ranking proof because prompt length 2,034 is below top-k 2,048. The
+  first >top-k run exposed that WS32 had copied DSA formulas without four already-proven physical
+  mechanisms: DB518 M64 cache repair, DB525/526 grouped complete-owner query, DB527 complete-owner
+  key/divide-sqrt normalization, and DB529 DEFAULT score precision. Packing remains internally
+  consistent; there is no checkpoint-corruption evidence.
+- A new one-host/four-chip position-8155 discriminator loads only the sealed DB529 inputs/cache/
+  internals. It compiles tuple8 x four-head and tuple4 x eight-head 16-KiB query associations as
+  separate programs, tests both with accepted q and current WS32 q, builds the exact complete `wk`
+  key, and scores all 8,156 positions with DEFAULT precision. Up to ten complete StableHLO bodies
+  are exact-hashed and optimized HLO proves live inputs/groups/16-KiB fusion. If either tested query
+  layout does not form that fusion, the probe records that arm's full failed contract and continues
+  the other arm; StableHLO arithmetic, input and non-arm failures still abort. The terminal validator
+  recomputes every present tensor/classification and the rejected-arm graph. The protected wrapper
+  uses clean pre/post fleet census, atomic diagnostic DB publication/rollback, exact remote object
+  generations/CRCs/SHAs and `SUCCESS` last. Focused local suite is green; review precedes the
+  bounded TPU run. No further full-model retry is authorized until this probe identifies a
+  bitwise-exact owner layout and q-a breakpoint.

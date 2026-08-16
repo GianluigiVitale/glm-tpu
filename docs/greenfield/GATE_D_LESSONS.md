@@ -5,6 +5,29 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 
 ## Current boundary
 
+- A multi-arm discriminator must preserve the evidence from a rejected compiler hypothesis and
+  continue independent arms. Treat only the explicitly adjudicated physical property as a
+  recordable rejection (here, absence/misbinding of the 16-KiB query fusion); wrong StableHLO,
+  inputs, arithmetic, collectives or provenance remain fatal. This prevents the first experimental
+  layout from consuming a protected attempt before the stronger arm executes, without turning a
+  graph-validation failure into numerical evidence.
+- Treat a new topology as a numerical-state-machine port, not a fresh formula
+  implementation. Before its first complete-model run, inventory every exactness correction already
+  proven by the accepted challenger and make each one a named HLO assertion. WS32 copied the DSA
+  formulas but omitted four protected PP8 mechanisms: the physical-M64 prompt-cache repair, the
+  completed BF16 q boundary plus grouped FP32 query-owner association, the normalized-BF16 barrier
+  plus completed FP32 `wk` owner with divide/sqrt key norm, and DEFAULT scorer precision. The
+  omission survived small-context set checks and cost a full 8K run. Architecture-specific ownership
+  may change how a mechanism is realized, so compare bounded candidate layouts on real TPU inputs;
+  never mechanically copy a tuple width or silently discard the requirement.
+- A DSA selected-set pass is not a ranking discriminator when the live context is no wider than
+  `top_k`. The corrected WS32 2K run had 2,034 prompt positions for `top_k=2,048`, so every live
+  position was selected even though its position-aligned legacy score diagnostic was materially
+  different. The first protected WS32 8K run is the first real ranking test: raw tokens are exact
+  20/20, but layer 0 has the same selected membership with mean/max score delta
+  `0.00445265/0.0122719`, and layer 1 onward swaps membership. Every future DSA gate must use a
+  context strictly wider than `top_k` or directly prove the complete score/ranking boundary; a
+  shorter-context set check is only a state/tail/coverage check.
 - A new execution architecture must port the numerical state contract, not merely layer formulas
   and weights. WS32 initially carried one already-rounded BF16 residual, although the authoritative
   decoder contract carries `(hidden_update, residual)`, normalizes their unrounded FP32 sum, and

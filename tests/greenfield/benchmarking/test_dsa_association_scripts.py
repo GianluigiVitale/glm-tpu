@@ -21,6 +21,9 @@ SCORER_PROBE = (
 SCORER_WRAPPER = (
     REPO / "scripts/greenfield/run_layer0_dsa_scorer_association_probe.sh"
 )
+WS32_PROBE = (
+    REPO / "scripts/greenfield/probe_ws32_layer0_dsa_association.py"
+)
 
 
 def test_distributed_q_a_probe_is_exact_pin_and_collective_bound() -> None:
@@ -253,6 +256,43 @@ def test_scorer_association_wrapper_is_protected_and_bounded() -> None:
         assert forbidden not in source
     completed = subprocess.run(
         ["bash", "-n", str(SCORER_WRAPPER)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_ws32_probe_composes_only_bounded_sealed_dsa_breakpoints() -> None:
+    source = WS32_PROBE.read_text()
+    for required in (
+        "inspect_layer0_dsa_association_input",
+        "inspect_greenfield_layer0_dsa_internal_observation",
+        "inspect_legacy_prompt_index_cache",
+        "ws32_fp8_feature_linear_pallas_mapped",
+        "ws32_grouped_dsa_query_and_head",
+        "ws32_exact_dsa_current_key",
+        "decode_stage_local_prefill_index_wk_bf16",
+        "promote_stage_local_prefill_index_wk",
+        'precision="default"',
+        "local_parallel_size=8",
+        '"performance_claim": False',
+        '"one_live_row": True',
+        '"tuple8"',
+        '"tuple4"',
+    ):
+        assert required in source
+    for forbidden in (
+        "import tpu_inference",
+        "from tpu_inference",
+        "import vllm",
+        "jax.distributed.initialize",
+        "ws32_decode",
+        "load_ws32_runtime_checkpoint",
+    ):
+        assert forbidden not in source
+    completed = subprocess.run(
+        [sys.executable, "-m", "py_compile", str(WS32_PROBE)],
         text=True,
         capture_output=True,
         check=False,

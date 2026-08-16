@@ -2,6 +2,20 @@
 
 **Updated:** 2026-08-16 UTC
 
+## WS32 8K exact tokens expose the first non-vacuous DSA ranking failure
+
+- Protected tag `greenfield_ws32_short_decoder_8k_numerical_20260816T063630156524394Z` at
+  `b746b212...f23d3` executed the complete model. Raw tokens are exact 20/20; state, cache, HLO and
+  HBM pass; all four graph pins match; diagnostic p50 is `122.487401 ms/token` (~`8.164 tok/s`).
+  The run is nonterminal and has no DB/SUCCESS/performance standing because DSA exactness refused.
+- The refusal is precise: layer-0 selected membership is exact but its aligned score mean/max delta
+  is `0.00445265/0.0122719`; layer 1 onward swaps membership and all 14 observer steps fail. The 2K
+  DSA set pass did not exercise ranking because 2,034 live positions are fewer than
+  `top_k=2,048`. This non-repeat rule is now in `docs/greenfield/GATE_D_LESSONS.md`.
+- Exact next is a bounded comparison of the executing WS32 score/state boundary against the already
+  sealed 8K DSA and prior Gate-D internal evidence. Do not rerun the full decoder or relax the DSA
+  gate. Gate D remains open despite exact tokens and strong diagnostic wall time.
+
 ## Corrected WS32 2K exact; sealing recovery in review
 
 - Commit `69513c1` corrected the missed split-residual contract. Protected numerical tag
@@ -5712,3 +5726,30 @@ acquire mode. Failure census is 8/8 clean; there is no DB row or `SUCCESS`. Do n
 Recover in the same wrapper after the finite mode-schema correction: acquire expects exactly 80
 primary objects, numerical 96. Revalidate all preserved HLOs, publish the acquisition summary and
 fresh census, then launch one separately pinned 8K numerical run.
+
+## Current exact next: bounded WS32 layer-0 DSA ownership discriminator
+
+The recovered acquisition was followed by protected 8K numerical tag
+`greenfield_ws32_short_decoder_8k_numerical_20260816T063630156524394Z` at pin
+`b746b2125f4fd236c2aeaa6aeb821817451f23d3`. It generates all 20 protected tokens exactly and
+records profiler-free p50 `122.487401 ms/token` (`8.164104... tok/s`), valid state/cache/HLO/HBM
+and clean 8-host failure census `dee6236d...54e9`. It is not a Gate-D or performance result:
+the layer-0/event-0 selected set is unchanged but its 2,048 aligned scores differ by mean/max
+`0.0044526476/0.0122718811`, and event 1/layer 1 already swaps four members. There is no DB row or
+terminal `SUCCESS`.
+
+Finite source review identifies four PP8 mechanisms omitted by the WS32 DSA port: DB518's
+physical-M64 prompt-cache repair, DB525/526's completed-BF16 q boundary and 16-KiB grouped FP32
+query association, DB527's normalized barrier plus complete FP32 `wk` owner/divide-sqrt key norm,
+and DB529's DEFAULT scorer. The next run is not another full decoder. The new default-off
+`run_ws32_layer0_dsa_association.sh` loads only the sealed ~29-MiB DB529 position-8155 bundle on one
+four-chip host and compares tuple8/current ownership against tuple4/feature ownership at context
+8,156. Accepted q is used to adjudicate the two owner layouts independently; current WS32 q-a is
+reported as its own exact/nonexact breakpoint. The probe records up to ten complete
+StableHLO/optimized-HLO graph pairs; a query arm whose exact numerical body survives but whose
+required 16-KiB fusion does not materialize is sealed as an explicit rejected hypothesis while the
+other arm continues. Every unrelated graph/arithmetic/provenance failure remains fatal. Raw arrays,
+source pins, atomic DB rollback, exact CRC/generation archive and `SUCCESS`-last sealing are locally
+covered. Exact next: correction-only Fable and Sol review, commit/push, then this seconds/minutes-
+scale protected discriminator. A bitwise-exact arm authorizes DSA integration; only a subsequent
+protected exact 8K run closes Gate D.
