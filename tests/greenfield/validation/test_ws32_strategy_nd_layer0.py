@@ -68,3 +68,15 @@ def test_bounded_layer_wrapper_is_default_off_and_same_region() -> None:
     assert "performance_claim':False" in script
     assert "results_db_run_id':None" in script
     assert "driftbench-storage" not in script
+
+
+def test_bounded_layer_preserves_graph_before_structural_refusal() -> None:
+    script = (
+        REPO / "scripts/greenfield/probe_ws32_strategy_nd_layer0.py"
+    ).read_text(encoding="utf-8")
+    graph_write = script.index(
+        '(args.hlo_dir / "layer0.optimized_hlo.txt").write_text(optimized_hlo)'
+    )
+    refusal = script.index('if not contract["passed"]:', graph_write)
+    assert graph_write < refusal
+    assert '"status": "HLO_REFUSED"' in script[refusal:]

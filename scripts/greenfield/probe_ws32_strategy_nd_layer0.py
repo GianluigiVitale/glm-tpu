@@ -448,11 +448,40 @@ def main() -> int:
         _fleet_digest(multihost_utils, stable_sha)
         _fleet_digest(multihost_utils, optimized_sha)
         contract = _lowering_contract(optimized_hlo)
-        if not contract["passed"]:
-            raise RuntimeError("bounded layer HLO contract refused")
         args.hlo_dir.mkdir(parents=True)
         (args.hlo_dir / "layer0.stablehlo.mlir").write_text(stablehlo)
         (args.hlo_dir / "layer0.optimized_hlo.txt").write_text(optimized_hlo)
+        if not contract["passed"]:
+            _atomic_json(
+                args.output,
+                {
+                    "artifact_kind": "greenfield_ws32_strategy_nd_layer0_hlo_refusal",
+                    "checkpoint_manifest_sha256": CHECKPOINT_MANIFEST_SHA256,
+                    "code_hash": code_hash,
+                    "compiled_memory": _compiled_memory(compiled),
+                    "device_memory_after": [
+                        _memory_stats(device) for device in jax.local_devices()
+                    ],
+                    "device_memory_before": before_memory,
+                    "execution_performed": False,
+                    "hlo_contract": contract,
+                    "host": socket.gethostname(),
+                    "jax_process_index": int(jax.process_index()),
+                    "launch_process_id": args.process_id,
+                    "local_checkpoint_records": local_records,
+                    "mesh_sha256": physical_mesh.mesh_hash,
+                    "mode": args.mode,
+                    "optimized_hlo_sha256": optimized_sha,
+                    "performance_claim": False,
+                    "source_file_sha256": SOURCE_FILE_SHA256,
+                    "stablehlo_sha256": stable_sha,
+                    "status": "HLO_REFUSED",
+                    "tensor_file_sha256": None,
+                    "topology_fleet_sha256": fleet_sha,
+                    "topology_sha256": topology.topology_hash,
+                },
+            )
+            raise RuntimeError("bounded layer HLO contract refused")
         acquisition = args.mode == "acquire"
         if acquisition:
             if args.expected_stablehlo_sha256 != ZERO_SHA256 or args.expected_optimized_hlo_sha256 != ZERO_SHA256:
