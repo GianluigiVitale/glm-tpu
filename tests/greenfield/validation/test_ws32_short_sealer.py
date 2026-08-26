@@ -227,6 +227,15 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     assert "recovering immutable worker prevalidation" in source
     assert "rollback_recovery_seed" in source
     assert "recovery_seed_objects.json" in source
+    checkpoint_preflight = source.index(
+        "checkpoint identity pins must be lowercase SHA-256 values"
+    )
+    recovery_publish = source.index("recovering immutable worker prevalidation")
+    assert checkpoint_preflight < recovery_publish
+    assert "checkpoint manifest identity pin drifted" in source
+    assert "checkpoint SUCCESS identity pin drifted" in source
+    assert "checkpoint SUCCESS self-hash drifted" in source
+    assert "checkpoint manifest file hash drifted" in source
     assert source.index("a prior terminal SUCCESS verification exists") < source.index(
         "trap on_exit EXIT"
     )

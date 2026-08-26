@@ -5,6 +5,28 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-26 — exact-DSA HLO acquisition recovered without TPU re-execution
+
+The replacement-pod 8K exact-DSA compile-only tag
+`greenfield_ws32_short_decoder_8k_acquire_20260826T195124476893681Z` produced all six real HLO
+graphs and eight complete load/compile/HBM prevalidation records, then failed closed before model
+execution on three overbroad structural checks. Exact mutation-tested recognition now admits only
+ordinary slice markers, a closed four-quarter local W_K reconstruction, and the exact feature-4
+21-value scale tuple reduction emitted by XLA. All other full-hidden reconstruction, async or
+collective shapes remain rejected. Offline replay has no structural violations and only the
+expected vacant acquisition identity pins.
+
+Recovery synthesizes no numerical values: it replays the preserved HLO, copies the immutable
+prevalidation records, and derives only eight HLO_ACQUIRED envelopes. The first evidence seal
+correctly refused a manually mistyped checkpoint manifest pin. It created no DB row/SUCCESS or
+performance claim and ended with authenticated 8/8 zero work; all 16 generation-bound recovery
+objects remain in the approved bucket. Correct semantic checkpoint identities are
+`c04f800e...5ee08` / `1bfea5bd...f1760`; the distinct manifest-file SHA is
+`88df4143...a7cbf`. A full local seal replay with the correct pins passes, status HLO_ACQUIRED and
+summary `5cafab04...60214`. The wrapper now checks these identities and self/file hashes before
+remote recovery materialization. This is compiler/HLO acquisition evidence only, not Gate-D
+correctness, latency or performance evidence.
+
 ## 2026-08-26 — replacement-pod topology is freshly authenticated
 
 Protected model-free tag `greenfield_topology_20260826T194116460015528Z` at code `bfe064d` passed

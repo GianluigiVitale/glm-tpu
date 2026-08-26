@@ -44,6 +44,15 @@ Replacement topology code is `bfe064d`; its fleet hash is `4a0c9a33...c301`. Col
 pins are `fcd8426735...` and `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash remains
 `294e777...559`, PP8 group hash `d5943ab8...c14`, and PP16 group hash `6383e57c...f21`.
 
+The nonterminal compile-only tag
+`greenfield_ws32_short_decoder_8k_acquire_20260826T195124476893681Z` is preserved diagnostic
+evidence, not an accepted DB result. It contains eight complete load/compile/HBM prevalidations and
+six identical real HLO identities per rank. Recovery commits `bad88a6` / `8067bac` replay the
+structural contracts and derive only HLO_ACQUIRED envelopes; no token graph is executed. A first
+seal attempt used a mistyped checkpoint semantic pin and therefore produced no DB row, archive
+SUCCESS or performance claim; authenticated cleanup is 8/8. Corrected local validation passes with
+summary `5cafab04...60214`. Terminal acquisition publication remains pending.
+
 Superseded or failed diagnostics are preserved but not promotion evidence. DB 404 used a first
 non-neighbor PP8 ordering. Reduce-scatter diagnostics `...T134618415607642Z`,
 `...T135045281384327Z`, and `...T135140118884391Z` prove XLA rewrite-to-all-reduce and contain no

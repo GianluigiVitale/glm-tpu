@@ -329,6 +329,29 @@ try:
 finally: connection.close()
 PY
 
+PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+  "$CHECKPOINT_ROOT" "$CHECKPOINT_MANIFEST_SHA" "$CHECKPOINT_SUCCESS_SHA" <<'PY'
+import hashlib,json,sys
+from pathlib import Path
+root=Path(sys.argv[1]); expected_manifest,expected_success=sys.argv[2:4]
+if any(len(value)!=64 or any(char not in '0123456789abcdef' for char in value) for value in (expected_manifest,expected_success)):
+ raise SystemExit('checkpoint identity pins must be lowercase SHA-256 values')
+manifest_path=root/'manifest.json'; success_path=root/'SUCCESS'
+if not manifest_path.is_file() or not success_path.is_file():
+ raise SystemExit('sealed checkpoint manifest/SUCCESS is absent')
+manifest=json.loads(manifest_path.read_text()); success=json.loads(success_path.read_text())
+canonical=lambda value: json.dumps(value,allow_nan=False,ensure_ascii=True,separators=(',',':'),sort_keys=True).encode()
+if manifest.get('manifest_sha256')!=expected_manifest or success.get('manifest_sha256')!=expected_manifest:
+ raise SystemExit('checkpoint manifest identity pin drifted')
+if success.get('success_sha256')!=expected_success:
+ raise SystemExit('checkpoint SUCCESS identity pin drifted')
+without_success={key:value for key,value in success.items() if key!='success_sha256'}
+if hashlib.sha256(canonical(without_success)).hexdigest()!=expected_success:
+ raise SystemExit('checkpoint SUCCESS self-hash drifted')
+if hashlib.sha256(manifest_path.read_bytes()).hexdigest()!=success.get('manifest_file_sha256'):
+ raise SystemExit('checkpoint manifest file hash drifted')
+PY
+
 if [[ $EXACT_DSA == 1 ]]; then
   if [[ $RECOVER == 0 ]]; then
     gcloud storage cp --no-clobber "$DSA_ASSOCIATION_URI/summary.json" \

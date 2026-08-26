@@ -2,6 +2,29 @@
 
 **Updated:** 2026-08-26 UTC
 
+## 2026-08-26 exact-DSA acquisition recovery checkpoint
+
+- Protected compile-only tag
+  `greenfield_ws32_short_decoder_8k_acquire_20260826T195124476893681Z` compiled all six graphs on
+  the replacement pod and stopped before execution because the HLO linter misclassified ordinary
+  slice async markers, exact four-quarter W_K reconstruction, and XLA's exact local tuple scale
+  reduction. The corrected contracts pass 27 focused tests plus three skips and replay every
+  preserved graph with only the two required zero-pin identity violations. Commit `bad88a6` is
+  pushed and owner-mirror verified.
+- All eight original worker prevalidation records remain intact. Recovery commit `8067bac` derives
+  only HLO_ACQUIRED runner envelopes, generation-binds the 16 derived/source objects, and never
+  initializes JAX/TPU. The first seal attempt materialized the complete source ledger but correctly
+  rejected a mistyped checkpoint manifest identity before publication. Failure cleanup is 8/8
+  clean; the recovery objects remain immutable under the original approved-bucket result prefix.
+- The correct semantic checkpoint identities are manifest `c04f800e...5ee08` and SUCCESS
+  `1bfea5bd...f1760` (the manifest file byte hash is separately `88df4143...a7cbf`). A complete
+  local replay with these identities now passes as `HLO_ACQUIRED`, summary `5cafab04...60214`, with
+  no performance claim. The wrapper preflights the two semantic pins, SUCCESS self-hash and
+  manifest byte hash before any recovery materialization; focused tests are 28 passed / 3 skipped.
+- Exact next: commit/push/mirror this preflight correction, then rerun only the evidence seal with
+  the verified identities. Do not recompile, reload weights or execute a token graph. After the
+  acquisition is terminally archived, pin its six graph identities before an 8K numerical run.
+
 ## 2026-08-26 restart recovery and exact-DSA integration checkpoint
 
 - After the one-week shutdown, the authoritative branch remains
