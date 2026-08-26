@@ -171,6 +171,10 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     assert source.count("--exact-dsa") >= 3
     assert "661142816aa64ec8d085553b427e99f62" in source
     assert "79aba79e24026bc4c1d17aed2ca92055" in source
+    assert "greenfield_topology_20260826T194116460015528Z" in source
+    assert "4a0c9a338d55b8be37dab79396569aa10fc9e85b3c7210d72a70abfafe72c301" in source
+    assert "greenfield_topology_20260805T125842425591441Z" not in source
+    assert "50de0729c9e5080c5ddb5ae4f5cd948317c53ce8a8f6c9f3f6064e7afc6515a0" not in source
     assert ".glm_pod_workload.lock" in source
     assert "strict_census pre" in source
     assert "strict_census post" in source

@@ -11,9 +11,9 @@ readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly INVENTORY=/home/gianl/gcs-models/checkpoints/greenfield/glm52/plans/PP8_LP4/greenfield_checkpoint_plan_pp8_20260805T180552087295643Z/source_inventory.json
 readonly INVENTORY_SHA=a388627c08c8ff591903deb1fbf3198f43916e64a2295ed0e253f1e44a042fc4
-readonly TOPOLOGY_ROOT=/home/gianl/gcs-models/results/greenfield_topology_20260805T125842425591441Z/host_records
+readonly TOPOLOGY_ROOT=/home/gianl/gcs-models/results/greenfield_topology_20260826T194116460015528Z/host_records
 readonly TOPOLOGY_SHA=294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559
-readonly TOPOLOGY_FLEET_SHA=50de0729c9e5080c5ddb5ae4f5cd948317c53ce8a8f6c9f3f6064e7afc6515a0
+readonly TOPOLOGY_FLEET_SHA=4a0c9a338d55b8be37dab79396569aa10fc9e85b3c7210d72a70abfafe72c301
 readonly MESH_SHA=de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88
 
 [[ ${GLM_GREENFIELD_WS32_SHORT_DECODER:-0} == 1 ]] || {

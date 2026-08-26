@@ -14,6 +14,7 @@ fleet agreement, and eight-host clean pre/post census.
 
 | DB | tag | evidence |
 |---:|---|---|
+| 555 | `greenfield_topology_20260826T194116460015528Z` | replacement-pod physical `2x4x4` topology, fresh PP8/PP16 groups and fleet binding |
 | 405 | `greenfield_topology_20260805T125842425591441Z` | physical `2x4x4` topology and PP8/PP16 rings |
 | 406 | `greenfield_collectives_20260805T133905344573798Z` | `bf16[2,6144]` control/all-reduce, g2/4/8/32 |
 | 407 | `greenfield_collectives_20260805T134254891049866Z` | dominant-payload all-gather matrix |
@@ -39,9 +40,9 @@ fleet agreement, and eight-host clean pre/post census.
 | 440 | `greenfield_real_layer_pp8_pallas_20260806T052955364574577Z` | fully fused routed/shared raw-FP8 layer; all protection gates pass, 0.8–1.5% regression vs DB 439, rejected |
 | 441 | `greenfield_real_layer_pp8_pallas_feature_20260806T055854589778101Z` | feature-sharded raw-FP8 PP8 layer; exactness/locality pass, route-skew removed, selected for decoder integration |
 
-Topology code is `75c8bb14...`. Collective matrix pins are `fcd8426735...` and
-`b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash is `294e777...559`, PP8 group hash
-`d5943ab8...c14`, and PP16 group hash `6383e57c...f21`.
+Replacement topology code is `bfe064d`; its fleet hash is `4a0c9a33...c301`. Collective matrix
+pins are `fcd8426735...` and `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash remains
+`294e777...559`, PP8 group hash `d5943ab8...c14`, and PP16 group hash `6383e57c...f21`.
 
 Superseded or failed diagnostics are preserved but not promotion evidence. DB 404 used a first
 non-neighbor PP8 ordering. Reduce-scatter diagnostics `...T134618415607642Z`,

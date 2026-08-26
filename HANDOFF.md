@@ -7,7 +7,13 @@
 - After the one-week shutdown, the authoritative branch remains
   `rewrite/topology-first-decode` in `/home/gianl/glm-tpu-topology-rewrite`; starting resumed pin
   is `877a016f18d24e393d8914305079803345e56054`. The replacement `db-v4-64-od` reports
-  READY/HEALTHY v4-64. No TPU program has been launched in this resumed session.
+  READY/HEALTHY v4-64.
+- Fresh model-free replacement-pod topology tag
+  `greenfield_topology_20260826T194116460015528Z` passed DB555 with authenticated 8/8 pre/post
+  zero-work census and approved-bucket `SUCCESS`. Physical topology, PP8/PP16 group hashes and
+  WS32 mesh remain exactly `294e7772...d559`, `d5943ab8...3c14`, `6383e57c...0f21` and
+  `de5f59cb...0a88`. New hostnames and launch-to-JAX permutation correctly change only the fleet
+  identity to `4a0c9a33...c301`; the short-decoder wrapper now pins this fresh capture.
 - Canonical `/home/gianl/glm-tpu/bench/results.db` was restored from authenticated DB554 snapshot
   SHA `54051d...cb73`; SQLite integrity is `ok`, max run is 554 and DB529/DB554 are present. The
   old DB359 file is preserved under `/home/gianl/glm-run/db-recovery-20260826T1734Z/`.
@@ -25,10 +31,10 @@
   fused-QKV shard-order and production materializer focused tests are 2/2. Python compilation,
   Bash parse and `git diff --check` pass. These are preflight evidence only, not Gate-D or
   performance proof.
-- Exact next: commit/push and verify owner-bucket bytes, then inspect replacement-pod mounts and
-  fleet cleanliness. Run compile-only exact acquisition first; inspect/pin all six HLOs before any
-  protected 8K numerical execution. If a small structural check fails, preserve it and diagnose
-  locally rather than spending hours on the numerical workflow.
+- Exact next: commit/push the fresh topology binding and verify owner-bucket bytes, then run the
+  compile-only exact acquisition. Inspect and pin all six HLOs before any protected 8K numerical
+  execution. If a small structural check fails, preserve it and diagnose locally rather than
+  spending hours on the numerical workflow.
 - Review policy supersedes stale historical Fable text below: never use Fable or Opus. At most one
   fresh Sol review is allowed before deploy. Every checkpoint must be committed, pushed, and
   verified in the owner's GCSFuse repository mirror; never stop or count the protected rsync cron

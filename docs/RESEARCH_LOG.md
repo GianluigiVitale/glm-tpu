@@ -5,6 +5,18 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-26 — replacement-pod topology is freshly authenticated
+
+Protected model-free tag `greenfield_topology_20260826T194116460015528Z` at code `bfe064d` passed
+as DB555 in under one minute, with eight distinct replacement hosts, 32 TPU-v4 chips, four local
+devices per process, fleet agreement, approved-bucket `SUCCESS`, and authenticated 8/8 clean
+pre/post census. Physical topology remains `2x4x4`; topology, PP8, PP16 and WS32 mesh identities
+are unchanged at `294e7772...d559`, `d5943ab8...3c14`, `6383e57c...0f21` and
+`de5f59cb...0a88`. The replacement hostnames and launch-to-JAX permutation necessarily produce a
+new fleet identity, `4a0c9a33...c301`, so the complete WS32 wrapper now pins this capture instead
+of the closed pod's `50de0729...15a0` fleet. This proves topology only and makes no model or
+performance claim. The next authorized rung remains the six-graph compile-only exact acquisition.
+
 ## 2026-08-26 — restart recovery and default-off exact WS32 DSA integration
 
 The one-week shutdown removed the prior local oracle mount and left an old DB359 checkout file.
