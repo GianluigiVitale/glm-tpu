@@ -1,17 +1,15 @@
 # Goal — GLM-5.2-FP8 TPU v4 topology-first greenfield engine
 
-FULL ACCESS: work autonomously to completion. Keep this below 4,000 characters. After
-start/compaction read it and `docs/glm-tpu-revolution.md` **in full**, then inspect live state and
-handoff/research evidence.
+FULL ACCESS: work autonomously to completion. Keep below 4,000 characters. After start/compaction
+read it and `docs/glm-tpu-revolution.md` **in full**, then inspect live state and evidence.
 
 ## Scope and precedence
 
-The specification supersedes the incremental TP32 plan, old exact-next sequence, and old ban on
-pipeline parallelism. Preserve the legacy engine, evidence, oracles, and protection tools, but stop
-extending its execution architecture.
-Build a new, isolated, default-off native-JAX engine for `zai-org/GLM-5.2-FP8` on the existing
-`db-v4-64-od` pod (8 hosts/32 TPU-v4 chips) minimizing protected profiler-free single-stream
-latency at 256K. Legacy `tpu-inference` is an oracle only; never import its execution path.
+Supersede incremental TP32, prior exact-next sequences, and the pipeline ban. Preserve legacy
+engine/evidence/oracles/protection; never extend its execution architecture.
+Build an isolated, default-off native-JAX engine for `zai-org/GLM-5.2-FP8` on existing
+`db-v4-64-od` (8 hosts/32 TPU-v4 chips), minimizing protected profiler-free 256K stream latency.
+Legacy `tpu-inference` is oracle only; never import its execution path.
 Never create a VM, host, or TPU. Use only `gs://driftbench-dsv4-uc` and serialize TPU workflows.
 
 ## Required architecture search
@@ -60,6 +58,7 @@ The fastest correct plan serves at 256K independently of legacy execution, uses 
 checkpoint, has local repeated collectives/no full-pod hidden reconstruction, and passes exactness,
 quality, integrity, HBM, HLO, PP8/PP16 measurement, WS32 adjudication, 128K smoke, 256K E0,
 DB/archive, and clean-fleet gates. Continue until section 18 has direct evidence.
-Work in bulk. Never use Fable or Opus. Before deploy, allow at most one fresh Sol audit limited to
-current diff/evidence; no workflows, subagents, or cleared-code review. Correct, commit, push.
-After protected failure, diagnose locally; a narrow Sol review is optional under the same limits.
+Work in bulk. Never use Fable/Opus. Before deploy: at most one fresh Sol audit of current
+diff/evidence; no workflows/subagents/cleared-code review. Fix, commit, push. After failure,
+diagnose locally; optional narrow Sol review. Checkpoint every batch by commit+push and verified
+rsync of worktree/evidence to the owner's bucket. Never stop/count rsync as TPU work; avoid I/O overlap.
