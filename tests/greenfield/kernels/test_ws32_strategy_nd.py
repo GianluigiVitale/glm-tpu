@@ -23,6 +23,7 @@ from glm_tpu.greenfield.kernels.ws32 import (
     ws32_strategy_nd_dense_down_reduce_mapped,
 )
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from scripts.greenfield.probe_ws32_strategy_nd import _host_strategy_nd_reduce
 
 devices = np.asarray(jax.devices(), dtype=object).reshape(8, 4)
 mesh = Mesh(devices, ("expert", "feature"))
@@ -49,6 +50,7 @@ actual = np.asarray(compiled(sharded))
 expected = np.asarray(
     _strategy_nd_row0_bf16_reduce(jnp.asarray(model_partials))
 )
+host_expected = np.asarray(_host_strategy_nd_reduce(model_partials))
 module = parse_hlo_module(compiled.as_text())
 collectives = [
     {
@@ -61,6 +63,9 @@ collectives = [
 print(json.dumps({
     "bitwise": bool(np.array_equal(
         actual.view(np.uint16), expected.view(np.uint16)
+    )),
+    "host_bitwise": bool(np.array_equal(
+        host_expected.view(np.uint16), expected.view(np.uint16)
     )),
     "collectives": collectives,
     "output_shape": list(actual.shape),
@@ -83,6 +88,7 @@ print(json.dumps({
     assert completed.returncode == 0, completed.stdout + completed.stderr
     result = json.loads(completed.stdout.strip().splitlines()[-1])
     assert result["bitwise"]
+    assert result["host_bitwise"]
     assert result["output_shape"] == [1, 6144]
     assert result["collectives"] == [
         {
