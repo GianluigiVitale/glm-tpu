@@ -2,6 +2,22 @@
 
 **Updated:** 2026-08-26 UTC
 
+## 2026-08-26 repository mirror corrected to the TPU region
+
+- The inherited cron incorrectly wrote repository mirrors through the `driftbench-storage`
+  GCSFuse mount in `EUROPE-WEST4`; the TPU and approved bucket are in `US-CENTRAL2`. The active
+  23:30 EU rsync and its orphaned workers were terminated after the user identified the cost risk.
+  The old EU objects remain untouched for recovery, but no cron path writes them now.
+- `/home/gianl/bin/sync-glm.sh` now directly uses `gsutil rsync` against only
+  `gs://driftbench-dsv4-uc/repos/{glm-tpu,glm-tpu-topology-rewrite}`. It fails closed unless the
+  bucket API reports exact location `US-CENTRAL2`, retains the nonempty-source guard and serializes
+  through `/home/gianl/.glm-tpu-rsync.lock`. The implementation is versioned at
+  `scripts/greenfield/sync_repo_mirror_same_region.sh`.
+- The first same-region run completed both repositories in about 12 seconds: 1,551 legacy objects
+  and 1,009 topology-worktree objects. `goal.md`, `HANDOFF.md`, the active layer-0 harness and the
+  worktree `.git` pointer were directly rehashed from GCS and match local bytes. This mirror is
+  continuity protection, not TPU or performance evidence.
+
 ## 2026-08-26 bounded WS32 layer-0 checkpoint is sealed
 
 - Pushed/mirrored code `fbaaae3` derives only layer-0 dense tensors from the sealed PP8 final-layout

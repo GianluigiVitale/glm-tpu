@@ -5,6 +5,22 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-26 — repository continuity mirror moved from Europe to us-central2
+
+Live bucket inspection proved the old repository cron target `driftbench-storage` is
+`EUROPE-WEST4`, not colocated with the `US-CENTRAL2` TPU pod and approved
+`driftbench-dsv4-uc` bucket. The active EU rsync was stopped and the cron implementation was
+replaced in place; existing EU backup objects were not deleted. The new implementation refuses
+unless the destination API returns exact location `US-CENTRAL2`, uses direct `gsutil rsync` under
+the existing lock, and targets only `gs://driftbench-dsv4-uc/repos/`.
+
+The initial same-region sync completed in about 12 seconds with 1,551 legacy-repository and 1,009
+topology-worktree objects. Four representative current files were downloaded/hashed directly and
+match, including the active uncommitted bounded-layer harness. The cron source is now versioned as
+`scripts/greenfield/sync_repo_mirror_same_region.sh` and installed at
+`/home/gianl/bin/sync-glm.sh`; this prevents a future reboot/session from restoring the European
+target. Repository mirroring is continuity protection and is never counted as TPU work.
+
 ## 2026-08-26 — bounded WS32 layer-0 final-owner checkpoint is durable
 
 At pushed and owner-mirrored code `fbaaae3`, default-off tag
