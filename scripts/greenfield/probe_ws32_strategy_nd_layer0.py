@@ -280,23 +280,49 @@ def _shard_hidden(jax: Any, mesh: Any, bits: np.ndarray) -> Any:
 def _lowering_contract(optimized_hlo: str) -> dict[str, Any]:
     collectives = tuple(parse_hlo_module(optimized_hlo).collectives)
     signatures = tuple(
-        (item.opcode, item.maximum_group_size, tuple(shape.dimensions for shape in item.operand_shapes))
+        (
+            item.opcode,
+            item.maximum_group_size,
+            tuple((shape.dtype, shape.dimensions) for shape in item.operand_shapes),
+            tuple((shape.dtype, shape.dimensions) for shape in item.result_shapes),
+        )
         for item in collectives
     )
     expected = (
-        ("all-gather", 4, ((1, 1536),)),
-        ("all-gather", 8, ((1, 4, 1, 1536),)),
+        ("all-gather", 4, (("bf16", (1, 1536)),), (("bf16", (1, 6144)),)),
+        ("all-gather", 8, (("bf16", (4, 1, 1536)),), (("bf16", (32, 1, 1536)),)),
     )
-    passed = signatures == expected and all(
-        all(len(group) == item.maximum_group_size for group in item.replica_groups)
-        for item in collectives
+    expected_groups = (
+        tuple(tuple(range(start, start + 4)) for start in range(0, 32, 4)),
+        tuple(tuple(range(feature, 32, 4)) for feature in range(4)),
+    )
+    expected_scopes = (
+        "greenfield_ws32_strategy_nd_dense/hidden_gather/all_gather",
+        "greenfield_ws32_strategy_nd_dense/expert_gather/all_gather",
+    )
+    passed = (
+        signatures == expected
+        and tuple(item.replica_groups for item in collectives) == expected_groups
+        and all(item.use_global_device_ids for item in collectives)
+        and all(
+            item.op_name is not None and item.op_name.endswith(scope)
+            for item, scope in zip(collectives, expected_scopes, strict=True)
+        )
     )
     return {
         "collective_count": len(collectives),
         "collectives": [item.to_dict() for item in collectives],
         "maximum_group_size": max((item.maximum_group_size for item in collectives), default=0),
         "passed": passed,
-        "signatures": [[opcode, group, [list(shape) for shape in shapes]] for opcode, group, shapes in signatures],
+        "signatures": [
+            [
+                opcode,
+                group,
+                [[dtype, list(shape)] for dtype, shape in operands],
+                [[dtype, list(shape)] for dtype, shape in results],
+            ]
+            for opcode, group, operands, results in signatures
+        ],
     }
 
 
