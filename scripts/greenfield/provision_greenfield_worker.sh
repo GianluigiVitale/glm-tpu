@@ -79,15 +79,23 @@ fi
   >/tmp/greenfield_python_version.txt
 
 say "exact repository pin"
-if [[ -e $WORKTREE ]]; then
+if [[ $WORKER_INDEX == 0 ]]; then
+  # Worker 0 may be the orchestrator's live branch worktree. Never detach or
+  # fetch through that shared checkout; the caller must checkpoint it first.
+  [[ -e $WORKTREE ]]
+  git -C "$WORKTREE" rev-parse --is-inside-work-tree >/dev/null
+  [[ $(git -C "$WORKTREE" rev-parse HEAD) == "$EXPECTED_PIN" ]]
+  [[ -z $(git -C "$WORKTREE" status --porcelain) ]]
+elif [[ -e $WORKTREE ]]; then
   git -C "$WORKTREE" rev-parse --is-inside-work-tree >/dev/null
   [[ -z $(git -C "$WORKTREE" status --porcelain) ]]
   git -C "$WORKTREE" fetch -q origin "$BRANCH"
+  git -C "$WORKTREE" checkout -q --detach "$EXPECTED_PIN"
 else
   git clone -q --filter=blob:none --no-checkout --single-branch \
     --branch "$BRANCH" "$ORIGIN" "$WORKTREE"
+  git -C "$WORKTREE" checkout -q --detach "$EXPECTED_PIN"
 fi
-git -C "$WORKTREE" checkout -q --detach "$EXPECTED_PIN"
 [[ $(git -C "$WORKTREE" rev-parse HEAD) == "$EXPECTED_PIN" ]]
 [[ -z $(git -C "$WORKTREE" status --porcelain) ]]
 
