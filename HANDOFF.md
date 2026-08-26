@@ -2,6 +2,31 @@
 
 **Updated:** 2026-08-26 UTC
 
+## 2026-08-26 protected exact-DSA 8K numerical refusal
+
+- Protected tag `greenfield_ws32_short_decoder_8k_numerical_20260826T213125786075567Z` at code
+  `ed6dfc8` passed all six acquired HLO identities and executed the complete real checkpoint, then
+  failed closed on the exact DSA contract. All eight worker JSON/NPZ/log triplets are durable under
+  the approved result prefix; pre/failure censuses are independently 8/8 clean. There is no DB row,
+  terminal `SUCCESS`, trace claim, or performance claim.
+- Raw tokens are exact 20/20. State/cache contracts pass. Maximum observed peak HBM is
+  `26,331,170,304` bytes/chip and minimum largest-free block is `6,517,358,080` bytes/chip. All
+  recurrent graphs have maximum collective group eight, zero forbidden full-hidden values, 157
+  live split-RMS boundaries and zero rounded-first boundaries.
+- Profiler-free timing is diagnostic only because correctness refused: p50/p99
+  `127.35638/128.664678 ms/token` over ten iterations. Event 0/layer 0 is exact in selected
+  positions and scores. The first divergence is event 1/layer 1: seven positions swap at decode
+  position 8,155, while producer ids, executing-device score order/ties and score-contract checks
+  remain valid. Later events cascade. Runner/NPZ SHAs are `b46fd1be...713aa` /
+  `d2b3c9ab...4e65`; pre/failure census SHAs are `4d593fda...786c` / `fa98c71f...2aa`.
+- The complete model is frozen. Exact next is a model-free replay of DB550's sealed 32 BF16 dense
+  partials through a feature-sharded, expert-8-only realization of the accepted StrategyND tree.
+  It must reproduce the complete accepted row without a group larger than eight or a full-pod
+  hidden reconstruction before any layer/checkpoint/8K retry. The forced-32 CPU implementation
+  already does so: DB550 input `9d9f65dd...16e35` produces accepted row `efde8532...8f8e` with
+  zero mismatches and exactly one group-8 all-gather over `[1,4,1,1536]`. This is semantic/HLO
+  readiness only; one model-free TPU acquisition/numerical proof remains before integration.
+
 ## 2026-08-26 exact-DSA acquisition recovery checkpoint
 
 - Protected compile-only tag

@@ -780,3 +780,122 @@ def ws32_router_from_shards_mapped(
     return route_glm_noaux_tc_logits(
         logits, correction_bias, top_k=top_k
     )
+
+
+# Keep this discriminator after all acquired WS32 bodies.  Their TPU HLO
+# records exact source coordinates in this module.
+def _ws32_strategy_nd_sharded_bf16_reduce(
+    model_partials: Any,
+    global_feature_indices: Any,
+) -> Any:
+    """Replay DB533's row-zero tree for one contiguous hidden feature shard."""
+
+    from .stage_local import (
+        STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE,
+    )
+
+    if model_partials.ndim != 3 or model_partials.shape[:2] != (32, 1):
+        raise ValueError(
+            "WS32 StrategyND reduction requires 32 one-row model partials"
+        )
+    if model_partials.dtype != jnp.bfloat16:
+        raise ValueError("WS32 StrategyND partials must be rounded BF16")
+    local_hidden = model_partials.shape[-1]
+    if global_feature_indices.shape != (local_hidden,) or (
+        global_feature_indices.dtype != jnp.int32
+    ):
+        raise ValueError("WS32 StrategyND global feature indices drifted")
+
+    def add(left: Any, right: Any) -> Any:
+        return lax.optimization_barrier(
+            (left + right).astype(jnp.bfloat16)
+        )
+
+    physical = jnp.stack(
+        tuple(
+            model_partials[model_position]
+            for model_position in (
+                STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE
+            )
+        ),
+        axis=0,
+    )
+    physical_y_x_z = jnp.transpose(
+        physical.reshape(4, 4, 2, 1, local_hidden),
+        (1, 2, 0, 3, 4),
+    )
+    y_normal = add(
+        add(physical_y_x_z[0], physical_y_x_z[1]),
+        add(physical_y_x_z[2], physical_y_x_z[3]),
+    )
+    y_cross = add(
+        add(physical_y_x_z[0], physical_y_x_z[3]),
+        add(physical_y_x_z[1], physical_y_x_z[2]),
+    )
+    middle_band = (
+        (global_feature_indices >= jnp.int32(2048))
+        & (global_feature_indices < jnp.int32(4096))
+    )[None, None, None, :]
+    y_reduced = jnp.where(middle_band, y_cross, y_normal)
+    x_reduced = add(y_reduced[0], y_reduced[1])
+    z_normal = add(
+        add(x_reduced[0], x_reduced[1]),
+        add(x_reduced[2], x_reduced[3]),
+    )
+    z_cross = add(
+        add(x_reduced[0], x_reduced[3]),
+        add(x_reduced[1], x_reduced[2]),
+    )
+    cross_block = (
+        ((global_feature_indices // jnp.int32(256)) % jnp.int32(2))
+        == jnp.int32(1)
+    )[None, :]
+    return jnp.where(cross_block, z_cross, z_normal)
+
+
+def ws32_strategy_nd_dense_down_reduce_mapped(
+    local_partials: Any,
+    *,
+    expert_axis: str = "expert",
+    feature_axis: str = "feature",
+    global_hidden_size: int = 6144,
+) -> Any:
+    """Reduce four virtual dense partials per expert owner with one LP8 gather.
+
+    Each WS32 expert owner holds four consecutive legacy rank partials for its
+    local hidden feature quarter.  Gathering only over the expert-8 column
+    reconstructs the 32 compact partials for that quarter, never a full hidden
+    row or a full-pod group, and then replays the accepted DB533 association.
+    """
+
+    if local_partials.ndim != 3 or local_partials.shape[:2] != (4, 1):
+        raise ValueError(
+            "WS32 StrategyND owner must carry four one-row partials"
+        )
+    if local_partials.dtype != jnp.bfloat16:
+        raise ValueError("WS32 StrategyND owner partials must be BF16")
+    local_hidden = local_partials.shape[-1]
+    if (
+        not isinstance(global_hidden_size, int)
+        or isinstance(global_hidden_size, bool)
+        or global_hidden_size != 4 * local_hidden
+    ):
+        raise ValueError(
+            "WS32 StrategyND hidden width must be four equal feature shards"
+        )
+    with jax.named_scope("greenfield_ws32_strategy_nd_dense/expert_gather"):
+        gathered = lax.all_gather(
+            local_partials,
+            axis_name=expert_axis,
+            axis=0,
+            tiled=False,
+        )
+    feature_start = lax.axis_index(feature_axis) * jnp.int32(local_hidden)
+    global_indices = feature_start + jnp.arange(
+        local_hidden, dtype=jnp.int32
+    )
+    with jax.named_scope("greenfield_ws32_strategy_nd_dense/row0_tree"):
+        return _ws32_strategy_nd_sharded_bf16_reduce(
+            gathered.reshape(32, 1, local_hidden),
+            global_indices,
+        )

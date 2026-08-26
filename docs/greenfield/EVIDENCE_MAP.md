@@ -57,6 +57,15 @@ Source ledger is `b8f76d44...dde6`; acquisition remains deliberately outside DB/
 no performance claim. Its six StableHLO/optimized-HLO pairs are pinned in `HANDOFF.md` and authorize
 the protected exact-DSA 8K numerical run.
 
+The authorized numerical tag
+`greenfield_ws32_short_decoder_8k_numerical_20260826T213125786075567Z` is protected failed
+evidence, not an accepted result. It executed all six pinned real graphs, produced exact 20/20 raw
+tokens, valid state/cache/HBM and exact event-0 DSA scores/positions, then refused at event 1/layer
+1 with seven selected-position swaps. Maximum peak HBM is `26,331,170,304` bytes/chip and the
+diagnostic p50 is `127.35638 ms/token`; neither is a promotion claim. Runner/NPZ hashes are
+`b46fd1be...713aa` / `d2b3c9ab...4e65`; 24 worker artifacts are durable and pre/failure cleanup is
+8/8. It created no DB row, terminal `SUCCESS`, or accepted performance record.
+
 Superseded or failed diagnostics are preserved but not promotion evidence. DB 404 used a first
 non-neighbor PP8 ordering. Reduce-scatter diagnostics `...T134618415607642Z`,
 `...T135045281384327Z`, and `...T135140118884391Z` prove XLA rewrite-to-all-reduce and contain no

@@ -5,6 +5,14 @@ Protected PP8 2K full-decoder evidence exists at DB484: p50 `244.091151 ms` and
 but not Gate E. No accepted 8K, 128K, 256K, PP16 full-decoder, or WS32 full-decoder performance
 measurement exists yet. Bounded layer/kernel/diagnostic results below are not token-speed proof.
 
+## 2026-08-26 — exact-DSA 8K timing remains diagnostic after layer-1 refusal
+
+Protected WS32 tag `greenfield_ws32_short_decoder_8k_numerical_20260826T213125786075567Z`
+reproduced 20/20 raw tokens and measured profiler-free p50/p99 `127.35638/128.664678 ms/token`
+over ten iterations. HBM, HLO, state and cache pass, but DSA first diverges at event 1/layer 1.
+The run therefore has `performance_claim=false`, no DB row and no terminal `SUCCESS`; these timing
+numbers may guide diagnosis but cannot satisfy Gate D, E or F.
+
 ## 2026-08-16 — corrected WS32 2K is exact; terminal recovery pending
 
 - Corrected acquisition `greenfield_ws32_short_decoder_2k_acquire_20260816T033411540978991Z`

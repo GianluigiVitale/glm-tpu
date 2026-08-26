@@ -5,6 +5,34 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-26 — exact DSA closes layer 0 and exposes the layer-1 state boundary
+
+Protected tag `greenfield_ws32_short_decoder_8k_numerical_20260826T213125786075567Z` at pushed
+code `ed6dfc8` executed the real 78-layer WS32 checkpoint with the six recovered graph pairs. The
+runner passed HLO, state, cache and HBM checks and reproduced all 20 oracle tokens. Maximum peak HBM
+was `26,331,170,304` bytes/chip with at least `6,517,358,080` bytes in the smallest largest-free
+block. All decoder collectives remain feature-4/expert-8 or smaller; the graph has 157 live split
+RMS boundaries, zero rounded-first sites and no forbidden full-hidden value.
+
+Correctness refused before sealing. Exact DSA makes event 0/layer 0 positions and scores bitwise
+exact for the first time, but event 1/layer 1 swaps seven of 2,048 selected positions at position
+8,155 and later full-indexer events cascade. Producer ids, executing-program ordering/ties and score
+precision contracts are intact. This localizes the remaining defect after the scorer to layer-0
+state arithmetic, rather than prompt-cache mapping or DSA ownership. Diagnostic-only p50/p99 is
+`127.35638/128.664678 ms/token`; it is not a performance result because DSA failed and no terminal
+DB/archive/`SUCCESS` exists. All eight worker triplets are durable and fresh pre/failure censuses
+prove 8/8 zero work.
+
+Historical DB550 already seals the exact 32 BF16 dense partials and DB533's accepted StrategyND
+association. The next rung loads only that sub-megabyte artifact and proves whether its row can be
+reduced as four virtual partials per WS32 expert owner with communication confined to expert-8.
+The new appended-only reducer passes that forced-32 test on both randomized values and the restored
+DB550 NPZ: input SHA `9d9f65dd...16e35`, expected/actual `efde8532...8f8e`, zero mismatches. Its
+compiled graph has exactly one group-8 all-gather with operand `[1,4,1,1536]`, not a full hidden
+row or group 32; the existing WS32 regression batch passes 6/6. This is CPU semantic/HLO evidence,
+not TPU correctness. No complete checkpoint or unchanged 8K run is authorized until one bounded
+model-free TPU proof passes the same contract.
+
 ## 2026-08-26 — exact-DSA HLO acquisition recovered without TPU re-execution
 
 The replacement-pod 8K exact-DSA compile-only tag
