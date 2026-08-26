@@ -15,11 +15,20 @@ from glm_tpu.greenfield.validation import ws32_evidence
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts/greenfield/seal_short_decoder_ws32.py"
 WRAPPER = ROOT / "scripts/greenfield/run_short_decoder_ws32.sh"
+RECOVERY_SCRIPT = (
+    ROOT / "scripts/greenfield/recover_short_decoder_ws32_acquisition.py"
+)
 PROVISIONER = ROOT / "scripts/greenfield/provision_greenfield_worker.sh"
 SPEC = importlib.util.spec_from_file_location("ws32_short_sealer", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 SEALER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(SEALER)
+RECOVERY_SPEC = importlib.util.spec_from_file_location(
+    "ws32_short_recovery", RECOVERY_SCRIPT
+)
+assert RECOVERY_SPEC is not None and RECOVERY_SPEC.loader is not None
+RECOVERY = importlib.util.module_from_spec(RECOVERY_SPEC)
+RECOVERY_SPEC.loader.exec_module(RECOVERY)
 
 
 def _graph() -> dict[str, object]:
@@ -215,6 +224,9 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     assert 'acquisition_files+=(census_recovery_pre.txt)' in source
     assert 'RECOVER:-0} == 0 && ! -e $RUN_DIR/source_remote_objects.json' in source
     assert "a prior terminal SUCCESS verification exists" in source
+    assert "recovering immutable worker prevalidation" in source
+    assert "rollback_recovery_seed" in source
+    assert "recovery_seed_objects.json" in source
     assert source.index("a prior terminal SUCCESS verification exists") < source.index(
         "trap on_exit EXIT"
     )
@@ -365,6 +377,152 @@ def test_ws32_acquisition_materializes_without_numerical_npz(
     assert names == ws32_evidence._expected_primary_names(numerical=False)
     assert not any(name.endswith(".npz") for name in names)
     assert len(list((run_dir / "fleet_hlo").iterdir())) == 64
+
+    for rank in ws32_evidence.RANKS:
+        path = (
+            remote
+            / "recovery_prevalidation"
+            / f"prevalidation.rank{rank}.json"
+        )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"rank={rank}\n", encoding="utf-8")
+    blobs = [FakeBlob(path) for path in remote.rglob("*") if path.is_file()]
+    recovered_run = tmp_path / "recovered_run"
+    recovered = ws32_evidence.materialize(
+        run_dir=recovered_run,
+        remote_prefix="gs://unit/results/acquire",
+        mode="acquire",
+        tag="greenfield_ws32_short_decoder_8k_acquire_20260816T000000000000000Z",
+        code_hash="a" * 40,
+        recovery_code_hash="b" * 40,
+        exact_dsa=False,
+        allow_failure_diagnostics=True,
+        output=recovered_run / "source_remote_objects.json",
+    )
+    recovery_names = {
+        f"recovery_prevalidation/prevalidation.rank{rank}.json"
+        for rank in ws32_evidence.RANKS
+    }
+    assert recovered["recovered_prevalidation"] is True
+    assert {item["name"] for item in recovered["objects"]} == (
+        ws32_evidence._expected_primary_names(numerical=False)
+        | recovery_names
+    )
+
+
+def test_ws32_failed_acquisition_recovery_synthesizes_only_runner_envelope(
+    tmp_path: Path, monkeypatch: object
+) -> None:
+    recovered_graphs = {
+        graph: {
+            "kind": graph,
+            "optimized_hlo_sha256": f"{index + 1:064x}",
+            "stablehlo_sha256": f"{index + 11:064x}",
+            "passed": False,
+            "violations": list(RECOVERY.IDENTITY_VIOLATIONS),
+        }
+        for index, graph in enumerate(RECOVERY.GRAPHS)
+    }
+    monkeypatch.setattr(
+        RECOVERY, "_replay_graphs", lambda run_dir: recovered_graphs
+    )
+    source_hash = "a" * 40
+    for rank in RECOVERY.RANKS:
+        graphs = {
+            graph: {
+                **recovered_graphs[graph],
+                "violations": list(RECOVERY.ORIGINAL_VIOLATIONS[graph]),
+            }
+            for graph in RECOVERY.GRAPHS
+        }
+        source = {
+            "artifact_kind": "greenfield_ws32_short_decoder_prevalidation",
+            "code_hash": source_hash,
+            "compile_only": True,
+            "exact_dsa": True,
+            "graphs": graphs,
+            "hostname": f"worker-{rank}",
+            "launch_process_id": rank,
+        }
+        path = (
+            tmp_path
+            / "recovery_prevalidation"
+            / f"prevalidation.rank{rank}.json"
+        )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(source), encoding="utf-8")
+    outputs = RECOVERY.synthesize(
+        run_dir=tmp_path, source_code_hash=source_hash
+    )
+    assert len(outputs) == 8
+    for rank, path in enumerate(outputs):
+        runner = json.loads(path.read_text(encoding="utf-8"))
+        assert runner["launch_process_id"] == rank
+        assert runner["graphs"] == recovered_graphs
+        assert runner["performance_claim"] is False
+        assert runner["schema_version"] == 1
+        assert runner["status"] == "HLO_ACQUIRED"
+
+    remote: dict[str, object] = {}
+    next_generation = [100]
+
+    class FakeBlob:
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.generation = None
+            self.size = None
+            self.crc32c = None
+
+        def upload_from_filename(self, path: str, **kwargs: object) -> None:
+            assert kwargs["if_generation_match"] == 0
+            assert self.name not in remote
+            source = Path(path)
+            self.generation = next_generation[0]
+            next_generation[0] += 1
+            self.size = source.stat().st_size
+            self.crc32c = RECOVERY._crc32c_file(source)
+            remote[self.name] = self
+
+        def reload(self) -> None:
+            assert remote.get(self.name) is self
+
+        def delete(self, *, if_generation_match: int) -> None:
+            assert if_generation_match == self.generation
+            assert remote.get(self.name) is self
+            del remote[self.name]
+
+    class FakeBucket:
+        def blob(self, name: str) -> FakeBlob:
+            value = remote.get(name)
+            return value if isinstance(value, FakeBlob) else FakeBlob(name)
+
+    class FakeClient:
+        def bucket(self, name: str) -> FakeBucket:
+            assert name == "unit"
+            return FakeBucket()
+
+        def list_blobs(self, name: str, *, prefix: str) -> list[FakeBlob]:
+            assert name == "unit"
+            return [
+                value
+                for key, value in remote.items()
+                if key.startswith(prefix) and isinstance(value, FakeBlob)
+            ]
+
+    monkeypatch.setattr(RECOVERY.storage, "Client", FakeClient)
+    published = RECOVERY.publish(
+        run_dir=tmp_path,
+        remote_prefix="gs://unit/results/recover",
+        source_code_hash=source_hash,
+        recovery_code_hash="b" * 40,
+    )
+    assert len(published["objects"]) == 16
+    assert len(remote) == 16
+    seed = tmp_path / "recovery_seed_objects.json"
+    RECOVERY.rollback(
+        seed_path=seed, remote_prefix="gs://unit/results/recover"
+    )
+    assert remote == {}
 
 
 def test_ws32_prelaunch_floor_covers_protected_unique_evidence_and_reserve() -> None:

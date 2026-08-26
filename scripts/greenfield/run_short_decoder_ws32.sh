@@ -9,6 +9,7 @@ readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly ORIGIN=git@github.com:GianluigiVitale/glm-tpu.git
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
+readonly RECOVERY_TOOL=$WORKTREE/scripts/greenfield/recover_short_decoder_ws32_acquisition.py
 readonly INVENTORY=/home/gianl/gcs-models/checkpoints/greenfield/glm52/plans/PP8_LP4/greenfield_checkpoint_plan_pp8_20260805T180552087295643Z/source_inventory.json
 readonly INVENTORY_SHA=a388627c08c8ff591903deb1fbf3198f43916e64a2295ed0e253f1e44a042fc4
 readonly TOPOLOGY_ROOT=/home/gianl/gcs-models/results/greenfield_topology_20260826T194116460015528Z/host_records
@@ -243,12 +244,19 @@ for item in source['objects']:
  if int(blob.size)!=item['size'] or blob.crc32c!=item['crc32c'] or int(blob.generation)!=item['generation']: raise SystemExit(f"source object drifted during cleanup: {item['name']}")
 PY
 }
+rollback_recovery_seed() {
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$RECOVERY_TOOL" rollback \
+    --seed "$RUN_DIR/recovery_seed_objects.json" \
+    --remote-prefix "$REMOTE_PREFIX"
+}
 archive_failed_publication() {
   local destination="$RUN_DIR/recovery_failures/$(date -u +%Y%m%dT%H%M%S%NZ)"
   mkdir -p "$destination"
   for name in summary.json validate.log census_post.txt census_recovery_pre.txt \
     materialize.log results.db db_link.json db_publish.log remote_objects.json \
-    SUCCESS success_upload.json; do
+    SUCCESS success_upload.json recovery_seed_objects.json \
+    recovery_publish.log; do
     [[ ! -e $RUN_DIR/$name ]] || mv "$RUN_DIR/$name" "$destination/$name"
   done
 }
@@ -264,6 +272,9 @@ on_exit() {
   fi
   if [[ $status -ne 0 && $archive_upload_started -eq 1 && $terminal_success_verified -eq 0 && $success_absent -eq 1 ]]; then
     rollback_remote_nonterminal || say "ABORT: remote nonterminal objects could not be restored to the source set"
+  fi
+  if [[ $status -ne 0 && ${RECOVER:-0} == 1 && ! -e $RUN_DIR/source_remote_objects.json && -e $RUN_DIR/recovery_seed_objects.json ]]; then
+    rollback_recovery_seed || say "ABORT: recovery seed objects could not be removed"
   fi
   if [[ $status -ne 0 && $db_published -eq 1 && $terminal_success_verified -eq 0 && $success_absent -eq 1 ]]; then
     if rollback_db; then archive_failed_publication; fi
@@ -291,6 +302,8 @@ if [[ $RECOVER == 1 ]]; then
   fi
   if [[ -e $RUN_DIR/source_remote_objects.json ]]; then
     rollback_remote_nonterminal
+  elif [[ -e $RUN_DIR/recovery_seed_objects.json ]]; then
+    rollback_recovery_seed
   fi
   if [[ -e $RUN_DIR/db_link.json || -e $RUN_DIR/results.db ]]; then
     [[ -e $RUN_DIR/summary.json && -e $RUN_DIR/db_link.json ]]
@@ -352,6 +365,26 @@ else
     say "ABORT: recovery pre-census is not clean"
     exit 1
   }
+fi
+if [[ $RECOVER == 1 && $MODE == acquire && ! -e $RUN_DIR/source_remote_objects.json ]]; then
+  say "recovering immutable worker prevalidation; no TPU executable will run"
+  mkdir -p "$RUN_DIR/recovery_prevalidation"
+  for rank in {0..7}; do
+    destination="$RUN_DIR/recovery_prevalidation/prevalidation.rank${rank}.json"
+    if [[ ! -e $destination ]]; then
+      partial="${destination}.partial"
+      [[ ! -e $partial ]]
+      gcloud compute tpus tpu-vm scp \
+        "$POD:/home/gianl/glm-run/$TAG/hlo/prevalidation.json" "$partial" \
+        --zone "$ZONE" --worker="$rank" --quiet >/dev/null
+      mv "$partial" "$destination"
+    fi
+  done
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$RECOVERY_TOOL" publish --run-dir "$RUN_DIR" \
+    --remote-prefix "$REMOTE_PREFIX" --source-code-hash "$PIN" \
+    --recovery-code-hash "$RECOVERY_PIN" \
+    >"$RUN_DIR/recovery_publish.log" 2>&1
 fi
 if [[ $RECOVER == 0 && $MODE == numerical ]]; then
   available_bytes=$(df --output=avail -B1 "$RUN_DIR" | tail -1 | tr -d ' ')
@@ -444,6 +477,8 @@ if [[ $MODE == acquire ]]; then
   [[ $EXACT_DSA == 0 ]] || acquisition_files+=(exact_dsa_source_summary.json
     exact_dsa_source_SUCCESS)
   [[ $RECOVER == 0 ]] || acquisition_files+=(census_recovery_pre.txt)
+  [[ ! -e $RUN_DIR/recovery_seed_objects.json ]] || \
+    acquisition_files+=(recovery_seed_objects.json recovery_publish.log)
   for name in "${acquisition_files[@]}"; do
     gcloud storage cp --no-clobber "$RUN_DIR/$name" \
       "$REMOTE_PREFIX/diagnostic/$name" >/dev/null

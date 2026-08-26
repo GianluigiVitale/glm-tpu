@@ -216,9 +216,26 @@ def materialize(
     if forbidden:
         raise SystemExit(f"remote terminal/recovery objects already exist: {sorted(forbidden)}")
     diagnostic_prefix = f"diagnostic_local/{tag}/"
+    recovery_prevalidation = {
+        f"recovery_prevalidation/prevalidation.rank{rank}.json"
+        for rank in RANKS
+    }
+    observed_recovery_prevalidation = extras & recovery_prevalidation
+    if observed_recovery_prevalidation and (
+        not allow_failure_diagnostics
+        or observed_recovery_prevalidation != recovery_prevalidation
+    ):
+        raise SystemExit(
+            "recovered prevalidation source set is incomplete or unauthorized: "
+            f"{sorted(observed_recovery_prevalidation)}"
+        )
     if extras and (
         not allow_failure_diagnostics
-        or any(not name.startswith(diagnostic_prefix) for name in extras)
+        or any(
+            not name.startswith(diagnostic_prefix)
+            and name not in recovery_prevalidation
+            for name in extras
+        )
     ):
         raise SystemExit(f"unexpected remote preterminal objects: {sorted(extras)}")
 
@@ -349,6 +366,7 @@ def materialize(
         "artifact_kind": "greenfield_ws32_short_decoder_source_ledger",
         "code_hash": code_hash,
         "failure_diagnostics_preserved": bool(extras),
+        "recovered_prevalidation": bool(observed_recovery_prevalidation),
         "exact_dsa": exact_dsa,
         "mode": mode,
         "objects": sorted(records, key=lambda item: str(item["name"])),
