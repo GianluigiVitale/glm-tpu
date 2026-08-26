@@ -48,7 +48,7 @@ import numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from glm_tpu.greenfield.kernels.ws32 import (
-    ws32_strategy_nd_dense_final_layout_mapped,
+    ws32_strategy_nd_dense_final_layout_observed_mapped,
 )
 
 mesh = Mesh(
@@ -60,7 +60,7 @@ def abstract(shape, dtype, spec):
         shape, dtype, sharding=NamedSharding(mesh, spec)
     )
 mapped = jax.shard_map(
-    ws32_strategy_nd_dense_final_layout_mapped,
+    ws32_strategy_nd_dense_final_layout_observed_mapped,
     mesh=mesh,
     in_specs=(
         P(None, "feature"),
@@ -69,7 +69,7 @@ mapped = jax.shard_map(
         P("expert", None, "feature"),
         P("expert", None, "feature"),
     ),
-    out_specs=P(None, "feature"),
+    out_specs=(P(None, "feature"), P("expert", None, "feature")),
     check_vma=False,
 )
 arguments = (
@@ -82,6 +82,7 @@ arguments = (
 stablehlo = str(
     jax.jit(mapped).lower(*arguments).compiler_ir(dialect="stablehlo")
 )
+final, partials = jax.eval_shape(mapped, *arguments)
 gathers = [
     line.strip()
     for line in stablehlo.splitlines()
@@ -89,7 +90,9 @@ gathers = [
 ]
 print(json.dumps({
     "all_reduce_count": stablehlo.count("stablehlo.all_reduce"),
+    "final_shape": list(final.shape),
     "gathers": gathers,
+    "partial_shape": list(partials.shape),
 }, sort_keys=True))
 '''
     environment = dict(os.environ)
@@ -108,6 +111,8 @@ print(json.dumps({
 
     result = json.loads(completed.stdout.strip().splitlines()[-1])
     assert result["all_reduce_count"] == 0
+    assert result["final_shape"] == [1, 6144]
+    assert result["partial_shape"] == [32, 1, 6144]
     assert len(result["gathers"]) == 2
     assert "tensor<8x4xi64>" in result["gathers"][0]
     assert "tensor<1x1536xbf16>) -> tensor<1x6144xbf16>" in result["gathers"][0]

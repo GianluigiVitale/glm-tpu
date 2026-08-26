@@ -901,7 +901,7 @@ def ws32_strategy_nd_dense_down_reduce_mapped(
         )
 
 
-def ws32_strategy_nd_dense_final_layout_mapped(
+def _ws32_strategy_nd_dense_final_layout_partials_mapped(
     hidden_local: Any,
     merged_bits_in_out_local: Any,
     merged_scale_in_out_local: Any,
@@ -912,7 +912,7 @@ def ws32_strategy_nd_dense_final_layout_mapped(
     feature_axis: str = "feature",
     block_shape: tuple[int, int] = (128, 128),
 ) -> Any:
-    """Execute four accepted model ranks and the local WS32 StrategyND tree.
+    """Execute four accepted model ranks and return local down partials.
 
     Gate/up weights are rank-sharded over expert-8 and replicated over the
     feature axis.  Down weights retain only the local hidden feature quarter.
@@ -968,8 +968,65 @@ def ws32_strategy_nd_dense_final_layout_mapped(
             virtual_shards=4,
             output_size=1536,
         )
+    return local_partials
+
+
+def ws32_strategy_nd_dense_final_layout_mapped(
+    hidden_local: Any,
+    merged_bits_in_out_local: Any,
+    merged_scale_in_out_local: Any,
+    down_bits_in_out_local: Any,
+    down_scale_in_out_local: Any,
+    *,
+    expert_axis: str = "expert",
+    feature_axis: str = "feature",
+    block_shape: tuple[int, int] = (128, 128),
+) -> Any:
+    """Execute four accepted model ranks and the local StrategyND tree."""
+
+    local_partials = _ws32_strategy_nd_dense_final_layout_partials_mapped(
+        hidden_local,
+        merged_bits_in_out_local,
+        merged_scale_in_out_local,
+        down_bits_in_out_local,
+        down_scale_in_out_local,
+        expert_axis=expert_axis,
+        feature_axis=feature_axis,
+        block_shape=block_shape,
+    )
     return ws32_strategy_nd_dense_down_reduce_mapped(
         local_partials,
         expert_axis=expert_axis,
         feature_axis=feature_axis,
     )
+
+
+def ws32_strategy_nd_dense_final_layout_observed_mapped(
+    hidden_local: Any,
+    merged_bits_in_out_local: Any,
+    merged_scale_in_out_local: Any,
+    down_bits_in_out_local: Any,
+    down_scale_in_out_local: Any,
+    *,
+    expert_axis: str = "expert",
+    feature_axis: str = "feature",
+    block_shape: tuple[int, int] = (128, 128),
+) -> tuple[Any, Any]:
+    """Return the final row and all four local partials for a proof run."""
+
+    local_partials = _ws32_strategy_nd_dense_final_layout_partials_mapped(
+        hidden_local,
+        merged_bits_in_out_local,
+        merged_scale_in_out_local,
+        down_bits_in_out_local,
+        down_scale_in_out_local,
+        expert_axis=expert_axis,
+        feature_axis=feature_axis,
+        block_shape=block_shape,
+    )
+    final = ws32_strategy_nd_dense_down_reduce_mapped(
+        local_partials,
+        expert_axis=expert_axis,
+        feature_axis=feature_axis,
+    )
+    return final, local_partials
