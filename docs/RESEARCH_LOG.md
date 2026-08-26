@@ -5,6 +5,34 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-26 — real layer-0 generation and local combine are bitwise exact
+
+The identical-code acquisition/numerical pair
+`greenfield_ws32_strategy_nd_layer0_{acquire_20260826T234850848651359Z,numerical_20260826T235138819362125Z}`
+at `351d9f6` directly loaded the sealed 700,728,992-byte bounded owner checkpoint. Each host read
+only its four final-owner files. Acquisition compiled without arithmetic; numerical executed one
+DB548 normalized row and preserved raw full-partial/final bits from every host.
+
+StableHLO/optimized-HLO are fleet-identical at `3422d6a1...50f34` / `a8832ab8...1e3bf`. The
+scheduled graph has exactly two BF16 all-gathers: feature-4 operand/result `[1,1536]`/`[1,6144]`
+and expert-8 `[4,1,1536]`/`[32,1,1536]`. Exact scopes, dtypes, replica groups and global device ids
+pass; there is no other collective or group larger than eight. Compiled argument/code/output bytes
+are 21,903,360 / 2,500,096 / 18,944, with zero temporary bytes.
+
+All 32 real BF16 down partials match DB548/DB550 exactly at `9d9f65dd...16e35`; the combined row
+matches `efde8532...7b4fc`, zero mismatches for both on all 8/8 hosts. Maximum peak HBM is
+25,008,128 bytes/chip and minimum largest-free block is 32,989,389,312 bytes/chip. Numerical
+summary/SUCCESS file SHAs are `bf7a837c...965` / `63f70dff...2cde`; the 46-object preterminal
+ledger and clean pre/post censuses pass. This closes generation and association, not performance;
+DB id is null and `performance_claim` is false.
+
+The first acquisition failed before HLO preservation; a correction made graph bytes precede the
+structural gate. The second preserved exact TPU HLO and exposed only singleton elimination in the
+expert gather (`[1,4,1,1536]` StableHLO to `[4,1,1536]` optimized). The mutation-tested validator
+now binds the exact scheduled operand/result geometry instead of weakening locality. Both failed
+tags executed no arithmetic and remain nonterminal diagnostics. The next authorized action is
+default-off production integration and one exact 8K retry after focused graph tests.
+
 ## 2026-08-26 — repository continuity mirror moved from Europe to us-central2
 
 Live bucket inspection proved the old repository cron target `driftbench-storage` is

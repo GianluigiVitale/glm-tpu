@@ -65,6 +65,15 @@ DB550's accepted row `efde8532...8f8e` with zero mismatches on all eight hosts. 
 one BF16 group-8 all-gather over `[1,4,1,1536]`; pre/post censuses and append-only remote SUCCESS
 are clean. This closes combine association only, with no DB/performance claim or checkpoint load.
 
+The bounded real generation boundary is now protected TPU evidence. Identical-code acquisition and
+numerical tags `greenfield_ws32_strategy_nd_layer0_*_20260826T23*` at `351d9f6` directly load the
+sealed bounded owner checkpoint `ec6ef9cf...b3d3`. Fleet graphs are `3422d6a1...50f34` /
+`a8832ab8...1e3bf` and contain exactly one feature-4 plus one expert-8 BF16 all-gather. All 32 real
+partials match `9d9f65dd...16e35`; the final row matches `efde8532...7b4fc`, zero mismatches on all
+hosts. Numerical summary/SUCCESS file SHAs are `bf7a837c...965` / `63f70dff...2cde`; raw tensors,
+46 preterminal CRC/generation-ledger objects, HBM and 8/8 cleanup pass. This is exactness/locality
+evidence with no DB/latency claim; it authorizes production integration but does not close Gate D.
+
 Bounded checkpoint tag
 `greenfield_ws32_strategy_nd_layer0_pack_20260826T232037240198985Z` at pushed/mirrored code
 `fbaaae3` maps layer-0 dense ranks into 32 exact WS32 expert-8/feature-4 owners. Payload is

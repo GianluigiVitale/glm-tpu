@@ -2,6 +2,32 @@
 
 **Updated:** 2026-08-26 UTC
 
+## 2026-08-26 bounded real WS32 layer-0 dense proof passes
+
+- Acquisition/numerical tags
+  `greenfield_ws32_strategy_nd_layer0_{acquire_20260826T234850848651359Z,numerical_20260826T235138819362125Z}`
+  ran at identical pushed code `351d9f6`, bounded checkpoint `ec6ef9cf...b3d3`, DB548 source file
+  `f194d757...4298`, and replacement topology/fleet/mesh pins. Acquisition performed no arithmetic;
+  numerical loaded only four ~22-MB final-owner files per host and executed one layer-0 dense row.
+- Fleet-identical StableHLO/optimized-HLO are `3422d6a1...50f34` / `a8832ab8...1e3bf`.
+  Optimized HLO contains exactly two BF16 all-gathers: local feature-4 `[1,1536] -> [1,6144]`
+  and expert-8 `[4,1,1536] -> [32,1,1536]`, with exact physical groups/scopes. There is no other
+  collective, group 32, or full-pod hidden reconstruction.
+- All 32 real generated partials are bitwise DB548/DB550 exact at SHA `9d9f65dd...16e35`; the final
+  row is bitwise exact at `efde8532...7b4fc`, both with zero mismatches on all eight hosts. Compiled
+  arguments are 21,903,360 bytes/chip; maximum peak HBM is 25,008,128 bytes and minimum largest
+  free block is 32,989,389,312 bytes. This is exactness/HLO/HBM evidence, not latency evidence.
+- Acquisition summary/marker file SHAs are `30f68516...3a59` / `ed91158d...9fef`, with 38
+  preterminal ledger objects. Numerical summary/SUCCESS file SHAs are `bf7a837c...965` /
+  `63f70dff...2cde`, with 46 preterminal ledger objects and clean 8/8 censuses. No DB/performance
+  claim exists. Two earlier acquisition attempts are failed diagnostics: the first lost HLO due
+  preservation order; the second preserved the exact TPU singleton-elided lowering used to fix the
+  fail-closed validator. Neither executed arithmetic or has a terminal marker.
+- Exact next is production integration of this proven four-rank generation plus expert-8 combine
+  into the default-off WS32 decoder, followed by focused full-graph CPU/HLO tests and one separately
+  pinned protected 8K retry. Gate D remains open until that decoder passes exact DSA/tokens and all
+  trace/wall/state/cache/HBM/archive/cleanup gates.
+
 ## 2026-08-26 repository mirror corrected to the TPU region
 
 - The inherited cron incorrectly wrote repository mirrors through the `driftbench-storage`
