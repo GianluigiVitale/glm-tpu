@@ -65,6 +65,16 @@ DB550's accepted row `efde8532...8f8e` with zero mismatches on all eight hosts. 
 one BF16 group-8 all-gather over `[1,4,1,1536]`; pre/post censuses and append-only remote SUCCESS
 are clean. This closes combine association only, with no DB/performance claim or checkpoint load.
 
+Bounded checkpoint tag
+`greenfield_ws32_strategy_nd_layer0_pack_20260826T232037240198985Z` at pushed/mirrored code
+`fbaaae3` maps layer-0 dense ranks into 32 exact WS32 expert-8/feature-4 owners. Payload is
+`700,728,992` bytes; manifest self/file SHAs are `ec6ef9cf...b3d3` / `0f475ded...4512` and
+SUCCESS self/file SHAs are `f853e187...3c5a` / `c1304592...6840`. The 33 pre-SUCCESS objects pass
+size/CRC32C/generation equality; ledger self/file SHAs are `77c90337...0d14` /
+`52bcad82...deb8`, and the terminal set is exactly 35 objects with `SUCCESS` last. This is bounded
+checkpoint integrity/ownership evidence only, with no TPU, DB, model correctness or performance
+claim.
+
 The authorized numerical tag
 `greenfield_ws32_short_decoder_8k_numerical_20260826T213125786075567Z` is protected failed
 evidence, not an accepted result. It executed all six pinned real graphs, produced exact 20/20 raw

@@ -5,6 +5,28 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-26 — bounded WS32 layer-0 final-owner checkpoint is durable
+
+At pushed and owner-mirrored code `fbaaae3`, default-off tag
+`greenfield_ws32_strategy_nd_layer0_pack_20260826T232037240198985Z` read only the four layer-0
+dense tensors from each of four sealed PP8 stage-0 source owners. It transformed 32 virtual model
+ranks into the exact WS32 expert-8/feature-4 access layout: four consecutive ranks per expert
+coordinate, feature-replicated gate/up, and 1,536-feature down slices. The 32 target files contain
+`700,728,992` bytes; all file and tensor hashes, model-rank coverage and feature replicas pass.
+
+Manifest self/file SHAs are `ec6ef9cf...b3d3` / `0f475ded...4512`; SUCCESS self/file SHAs are
+`f853e187...3c5a` / `c1304592...6840`. Publication authenticated all 33 nonterminal objects by
+size, CRC32C and immutable generation before uploading the ledger and `SUCCESS`. Ledger self/file
+SHAs are `77c90337...0d14` / `52bcad82...deb8`; the terminal object set is exactly 35. This
+workflow held the rsync lock and performed no TPU work. It is checkpoint mechanism evidence, not a
+DB, model correctness, latency or Gate-D result.
+
+The next smallest test directly loads these bounded owners on the replacement pod and runs one
+real dense layer from DB548's normalized input. Acquisition must first seal the exact group-4
+hidden gather plus group-8 partial gather; numerical mode must compare all 32 generated BF16
+partials and the final row with DB550 bitwise. No full checkpoint or decoder retry is authorized
+until that passes.
+
 ## 2026-08-26 — expert-8 StrategyND combine is exact on the replacement pod
 
 The model-free acquisition/numerical pair

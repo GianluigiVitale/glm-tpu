@@ -2,6 +2,23 @@
 
 **Updated:** 2026-08-26 UTC
 
+## 2026-08-26 bounded WS32 layer-0 checkpoint is sealed
+
+- Pushed/mirrored code `fbaaae3` derives only layer-0 dense tensors from the sealed PP8 final-layout
+  source into 32 WS32 expert-8/feature-4 owner files. Tag
+  `greenfield_ws32_strategy_nd_layer0_pack_20260826T232037240198985Z` contains `700,728,992`
+  bytes. The 32 model ranks appear exactly once per expert-coordinate group; gate/up is replicated
+  only over feature-4, while down bits/scales are sliced to the owned 1,536 hidden features.
+- Manifest self/file SHAs are `ec6ef9cf...b3d3` / `0f475ded...4512`; SUCCESS self/file SHAs are
+  `f853e187...3c5a` / `c1304592...6840`. All 33 pre-SUCCESS objects passed local/remote size,
+  CRC32C and generation equality. Ledger self/file SHAs are `77c90337...0d14` /
+  `52bcad82...deb8`; the final approved-bucket object set is exactly 35 and `SUCCESS` was last.
+- This is bounded checkpoint ownership/integrity evidence only: no TPU, DB, latency, decoder or
+  Gate-D claim. Exact next is a separately pinned acquisition/numerical pair that directly loads
+  these 32 small files, generates all four accepted BF16 partials per expert owner from DB548's
+  sealed normalized row, and compares every partial plus the combined row against DB550. Only a
+  bitwise pass with exact feature-4/expert-8 HLO authorizes production wiring or another 8K run.
+
 ## 2026-08-26 WS32 local StrategyND TPU proof passes
 
 - Model-free acquisition `greenfield_ws32_strategy_nd_acquire_20260826T225219986470504Z`
