@@ -20,6 +20,8 @@ readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly VENV=/home/gianl/vllm-env
 readonly MODEL_MOUNT=/home/gianl/gcs-models
 readonly UV=/home/gianl/.local/bin/uv
+readonly GCSFUSE_URI=$APPROVED_BUCKET/artifacts/greenfield/gcsfuse-3.11.2-linux-amd64
+readonly GCSFUSE_SHA=298bc02d8a6fd6948bf93aa69aee0ff74cf07339e1c018eeabb5d80db93a2225
 WORKER_INDEX=${HOSTNAME##*-w-}
 readonly WORKER_INDEX
 
@@ -90,6 +92,21 @@ git -C "$WORKTREE" checkout -q --detach "$EXPECTED_PIN"
 [[ -z $(git -C "$WORKTREE" status --porcelain) ]]
 
 say "read-only approved-bucket mount"
+if ! command -v gcsfuse >/dev/null; then
+  gcsfuse_tmp=$(mktemp /tmp/greenfield-gcsfuse.XXXXXXXX)
+  cleanup_gcsfuse() {
+    if [[ -f ${gcsfuse_tmp:-} && $gcsfuse_tmp == /tmp/greenfield-gcsfuse.* ]]; then
+      rm -- "$gcsfuse_tmp"
+    fi
+  }
+  trap cleanup_gcsfuse EXIT
+  gcloud storage cp "$GCSFUSE_URI" "$gcsfuse_tmp" >/dev/null
+  [[ $(sha256sum "$gcsfuse_tmp" | awk '{print $1}') == "$GCSFUSE_SHA" ]]
+  sudo -n install -m 0755 "$gcsfuse_tmp" /usr/local/bin/gcsfuse
+  cleanup_gcsfuse
+  trap - EXIT
+fi
+[[ $(sha256sum "$(command -v gcsfuse)" | awk '{print $1}') == "$GCSFUSE_SHA" ]]
 mkdir -p "$MODEL_MOUNT"
 if ! findmnt -T "$MODEL_MOUNT" -n -o SOURCE,FSTYPE \
   | grep -q 'driftbench-dsv4-uc fuse.gcsfuse'; then

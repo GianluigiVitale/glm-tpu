@@ -235,6 +235,8 @@ def test_greenfield_replacement_worker_provisioner_is_narrow_and_default_off() -
     assert "gs://driftbench-dsv4-uc" in source
     assert "rewrite/topology-first-decode" in source
     assert "gcsfuse --implicit-dirs -o ro" in source
+    assert "gcsfuse-3.11.2-linux-amd64" in source
+    assert "298bc02d8a6fd6948bf93aa69aee0ff74cf07339e1c018eeabb5d80db93a2225" in source
     assert "PROVISION_OK pin=$EXPECTED_PIN" in source
     for forbidden in (
         "tpu-inference",
