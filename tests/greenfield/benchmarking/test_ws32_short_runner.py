@@ -94,7 +94,7 @@ def test_ws32_short_acquisition_preserves_all_graphs_before_refusal() -> None:
     }
     for report in graphs.values():
         RUNNER._require_graph_authorized(report, compile_only=True)
-    RUNNER._require_acquisition_authorized(graphs)
+    RUNNER._require_acquisition_authorized(graphs, exact_dsa=False)
 
     graphs["prefill"] = {
         "passed": False,
@@ -104,7 +104,7 @@ def test_ws32_short_acquisition_preserves_all_graphs_before_refusal() -> None:
         ],
     }
     with pytest.raises(RuntimeError, match="structural violations"):
-        RUNNER._require_acquisition_authorized(graphs)
+        RUNNER._require_acquisition_authorized(graphs, exact_dsa=False)
     with pytest.raises(RuntimeError, match="failed before execution"):
         RUNNER._require_graph_authorized(
             graphs["prefill"], compile_only=False

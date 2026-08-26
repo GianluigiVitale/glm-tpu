@@ -245,3 +245,44 @@ def test_prompt_index_repair_writes_only_each_lp4_owner() -> None:
         np.count_nonzero(np.asarray(value).view(np.uint16)) > 0
         for value in repaired
     )
+
+
+def test_prompt_index_repair_supports_lp8_offset_and_valid_tail() -> None:
+    contract = _contract()
+    history = jnp.asarray(
+        np.arange(4 * 8, dtype=np.float32).reshape(4, 8) / 64,
+        dtype=jnp.bfloat16,
+    )
+    initial = jnp.zeros((2, 1, 4), dtype=jnp.bfloat16)
+    block_tables = jnp.asarray([[0, 1]], dtype=jnp.int32)
+    wk_weight = jnp.ones((4, 8), dtype=jnp.float32)
+    key_norm = jnp.ones((4,), dtype=jnp.bfloat16)
+    key_bias = jnp.zeros((4,), dtype=jnp.bfloat16)
+    repaired = tuple(
+        repair_stage_local_prompt_index_cache(
+            initial,
+            history,
+            block_tables,
+            wk_weight,
+            key_norm,
+            key_bias,
+            jnp.int32(owner),
+            contract=contract,
+            logical_page_size=8,
+            local_rows_per_page=1,
+            prompt_chunk=4,
+            physical_rows=2,
+            local_parallel_size=8,
+            position_offset=8,
+            valid_rows=3,
+        )
+        for owner in range(8)
+    )
+    assert all(
+        np.count_nonzero(np.asarray(repaired[owner])[1].view(np.uint16)) > 0
+        for owner in range(3)
+    )
+    assert all(
+        np.count_nonzero(np.asarray(repaired[owner]).view(np.uint16)) == 0
+        for owner in range(3, 8)
+    )

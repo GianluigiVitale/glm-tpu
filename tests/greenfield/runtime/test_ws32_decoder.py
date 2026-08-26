@@ -6,11 +6,15 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
+import jax.numpy as jnp
+import numpy as np
 import pytest
 
 from glm_tpu.greenfield.errors import PlanValidationError
 from glm_tpu.greenfield.runtime.ws32_decoder import (
+    _pack_ws32_fused_qkv_a,
     Ws32DecoderConfig,
     Ws32DecoderWeights,
     bind_ws32_decoder_weights,
@@ -112,6 +116,139 @@ def test_ws32_decoder_contract_refuses_schedule_and_cache_drift() -> None:
         )
     with pytest.raises(PlanValidationError, match="context capacity"):
         Ws32DecoderConfig(geometry=geometry, context_capacity=0)
+    with pytest.raises(PlanValidationError, match="exact DSA flag"):
+        Ws32DecoderConfig(
+            geometry=geometry,
+            context_capacity=8192,
+            exact_dsa=1,  # type: ignore[arg-type]
+        )
+
+
+def test_ws32_exact_dsa_materializer_has_production_global_shapes() -> None:
+    program = r'''
+import json
+
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax.sharding import Mesh
+
+from glm_tpu.greenfield.runtime.ws32_decoder import (
+    Ws32DecoderConfig,
+    Ws32ExactDsaRawLayerWeights,
+    build_ws32_exact_dsa_materializer_program,
+)
+from glm_tpu.greenfield.types import ModelGeometry
+
+geometry = ModelGeometry.from_hf_config(
+    json.loads(open("configs/glm-5.2-fp8-config.json").read())
+)
+config = Ws32DecoderConfig(
+    geometry=geometry, context_capacity=8192, exact_dsa=True
+)
+mesh = Mesh(
+    np.asarray(jax.devices(), dtype=object).reshape(8, 4),
+    ("expert", "feature"),
+)
+raw = tuple(
+    Ws32ExactDsaRawLayerWeights(
+        jax.ShapeDtypeStruct((2048, 6144), jnp.uint8),
+        jax.ShapeDtypeStruct((16, 48), jnp.float32),
+        jax.ShapeDtypeStruct((576, 6144), jnp.uint8),
+        jax.ShapeDtypeStruct((5, 48), jnp.float32),
+        jax.ShapeDtypeStruct((4096, 2048), jnp.uint8),
+        jax.ShapeDtypeStruct((32, 16), jnp.float32),
+        jax.ShapeDtypeStruct((128, 6144), jnp.uint8),
+        jax.ShapeDtypeStruct((1, 48), jnp.float32),
+        jax.ShapeDtypeStruct((32, 6144), jnp.bfloat16),
+    )
+    for _ in config.full_index_slots
+)
+materializer = build_ws32_exact_dsa_materializer_program(mesh, config)
+decoded = jax.eval_shape(materializer.decode, raw)
+promoted = jax.eval_shape(materializer.promote, decoded)
+first = decoded[0]
+final = promoted[0]
+print(json.dumps({
+    "layers": len(decoded),
+    "qkv_bits": list(first.qkv_a_bits.shape),
+    "qkv_scale": list(first.qkv_a_scale.shape),
+    "wq": list(first.wq_b_weight_local.shape),
+    "wk_bf16": [list(first.wk_weight_bf16.shape), first.wk_weight_bf16.dtype.name],
+    "wq_aliases": [list(value.shape) for value in final.wq_b_weight_aliases],
+    "wk_f32": [list(final.wk_weight.shape), final.wk_weight.dtype.name],
+    "head": list(first.head_weight_local.shape),
+}))
+'''
+    environment = dict(os.environ)
+    environment["JAX_PLATFORMS"] = "cpu"
+    existing = environment.get("XLA_FLAGS", "").strip()
+    environment["XLA_FLAGS"] = (
+        f"{existing} --xla_force_host_platform_device_count=32".strip()
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=ROOT,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert json.loads(completed.stdout.strip().splitlines()[-1]) == {
+        "layers": 21,
+        "qkv_bits": [32, 6144, 82],
+        "qkv_scale": [32, 48, 82],
+        "wq": [4096, 2048],
+        "wq_aliases": [[4096, 2048]] * 4,
+        "wk_bf16": [[128, 6144], "bfloat16"],
+        "wk_f32": [[128, 6144], "float32"],
+        "head": [32, 6144],
+    }
+
+
+def test_ws32_exact_qkv_pack_preserves_virtual_shard_part_order() -> None:
+    geometry = SimpleNamespace(
+        hidden_size=128,
+        q_lora_rank=64,
+        kv_lora_rank=16,
+        qk_rope_head_dim=16,
+    )
+    config = SimpleNamespace(geometry=geometry)
+    q_bits = np.arange(64 * 128, dtype=np.uint16).reshape(64, 128).astype(
+        np.uint8
+    )
+    kv_bits = (
+        np.arange(32 * 128, dtype=np.uint16).reshape(32, 128) + 17
+    ).astype(np.uint8)
+    packed_bits, packed_scale = _pack_ws32_fused_qkv_a(
+        jnp.asarray(q_bits),
+        jnp.asarray([[2.0]], dtype=jnp.float32),
+        jnp.asarray(kv_bits),
+        jnp.asarray([[3.0]], dtype=jnp.float32),
+        config=config,  # type: ignore[arg-type]
+    )
+    expected_bits = np.stack(
+        [
+            np.concatenate(
+                (
+                    q_bits[shard * 2 : (shard + 1) * 2].T,
+                    kv_bits[shard : shard + 1].T,
+                ),
+                axis=1,
+            )
+            for shard in range(32)
+        ]
+    )
+    assert np.array_equal(np.asarray(packed_bits), expected_bits)
+    assert np.array_equal(
+        np.asarray(packed_scale),
+        np.broadcast_to(
+            np.asarray([2.0, 2.0, 3.0], dtype=np.float32),
+            (32, 1, 3),
+        ),
+    )
 
 
 def test_ws32_decoder_names_bind_every_exact_final_layout_tensor() -> None:

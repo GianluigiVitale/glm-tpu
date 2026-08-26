@@ -186,12 +186,16 @@ def repair_stage_local_prompt_index_cache(
     local_rows_per_page: int = 128,
     prompt_chunk: int = 2048,
     physical_rows: int = 64,
+    local_parallel_size: int = 4,
+    position_offset: int = 0,
+    valid_rows: int | None = None,
 ) -> Any:
     """Overwrite one final-owner cache with exact prompt keys.
 
-    Exact normalized inputs never leave their PP8 stage.  Each local lane
-    repeats the accepted projection/key-norm association and writes only the
-    page rows it owns.
+    Exact normalized inputs never leave their topology-local group. Each LP4
+    or LP8 lane repeats the accepted projection/key-norm association and
+    writes only the page rows it owns. ``position_offset`` and ``valid_rows``
+    admit bounded chunks without changing the default full-prompt contract.
     """
 
     if prompt_normalized_inputs.ndim != 2 or (
@@ -211,10 +215,16 @@ def repair_stage_local_prompt_index_cache(
         block_tables.dtype != jnp.int32
     ):
         raise ValueError("prompt repair block table must be one int32 row")
-    if logical_page_size != local_rows_per_page * 4:
-        raise ValueError("prompt repair is pinned to the PP8 LP4 page layout")
+    if local_parallel_size not in (4, 8) or (
+        logical_page_size != local_rows_per_page * local_parallel_size
+    ):
+        raise ValueError("prompt repair page ownership geometry drifted")
     if prompt_chunk <= 0 or prompt_chunk % physical_rows:
         raise ValueError("prompt repair chunk must divide into physical rows")
+    if not isinstance(position_offset, int) or isinstance(position_offset, bool) or (
+        position_offset < 0
+    ):
+        raise ValueError("prompt repair position offset must be nonnegative")
     if wk_weight.shape != (contract.head_dim, contract.hidden_size) or (
         wk_weight.dtype != jnp.float32
     ):
@@ -222,18 +232,25 @@ def repair_stage_local_prompt_index_cache(
             "prompt repair wk must be an externally materialized FP32 owner leaf"
         )
     prompt_tokens = prompt_normalized_inputs.shape[0]
+    if valid_rows is None:
+        valid_rows = prompt_tokens
+    if not isinstance(valid_rows, int) or isinstance(valid_rows, bool) or not (
+        0 < valid_rows <= prompt_tokens
+    ):
+        raise ValueError("prompt repair valid rows are out of range")
     padded_tokens = (
         (prompt_tokens + prompt_chunk - 1) // prompt_chunk * prompt_chunk
     )
     flat_cache = index_cache.reshape(-1, contract.head_dim)
     for chunk_start in range(0, padded_tokens, prompt_chunk):
-        positions = jnp.arange(
+        local_positions = jnp.arange(
             chunk_start,
             chunk_start + prompt_chunk,
             dtype=jnp.int32,
         )
+        positions = local_positions + jnp.int32(position_offset)
         safe_positions = jnp.minimum(
-            positions, jnp.int32(prompt_tokens - 1)
+            local_positions, jnp.int32(valid_rows - 1)
         )
         normalized_chunk = jnp.take(
             prompt_normalized_inputs, safe_positions, axis=0
@@ -266,7 +283,7 @@ def repair_stage_local_prompt_index_cache(
             & (physical_pages < jnp.int32(index_cache.shape[0]))
         )
         valid = (
-            (positions < jnp.int32(prompt_tokens))
+            (local_positions < jnp.int32(valid_rows))
             & table_valid
             & page_valid
             & (target_owner == local_slot)

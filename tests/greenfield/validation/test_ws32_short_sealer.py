@@ -74,6 +74,21 @@ def test_ws32_short_sealer_graph_contract_refuses_dead_or_global_work() -> None:
         "live_collective_count": 1,
     }
     assert SEALER._graph_valid(cache_probe, mode="numerical")
+    exact_materialize = {
+        "collective_count": 210,
+        "instruction_count": 1000,
+        "kind": "exact_materialize",
+        "live_instruction_count": 900,
+        "maximum_group_size": 8,
+        "optimized_hlo_sha256": "2" * 64,
+        "passed": True,
+        "stablehlo_sha256": "1" * 64,
+        "violations": [],
+    }
+    assert SEALER._graph_valid(exact_materialize, mode="numerical")
+    assert not SEALER._graph_valid(
+        {**exact_materialize, "maximum_group_size": 32}, mode="numerical"
+    )
 
 
 def test_ws32_short_db_publication_is_one_transaction(tmp_path: Path) -> None:
@@ -148,6 +163,13 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     subprocess.run(["bash", "-n", str(WRAPPER)], check=True)
     source = WRAPPER.read_text(encoding="utf-8")
     assert "GLM_GREENFIELD_WS32_SHORT_DECODER:-0" in source
+    assert "GLM_GREENFIELD_WS32_EXACT_DSA:-0" in source
+    # Two local commands receive the literal shell argument; the remote runner
+    # receives the same value through the quoted all-host command string.
+    assert source.count('--exact-dsa "$EXACT_DSA"') >= 2
+    assert source.count("--exact-dsa") >= 3
+    assert "661142816aa64ec8d085553b427e99f62" in source
+    assert "79aba79e24026bc4c1d17aed2ca92055" in source
     assert ".glm_pod_workload.lock" in source
     assert "strict_census pre" in source
     assert "strict_census post" in source
@@ -216,6 +238,20 @@ def test_ws32_evidence_primary_object_schema_is_exact() -> None:
     )
     assert len(acquired) == 80
     assert len(numerical) == 96
+    exact_acquired = ws32_evidence._expected_primary_names(
+        numerical=False, exact_dsa=True
+    )
+    exact_numerical = ws32_evidence._expected_primary_names(
+        numerical=True, exact_dsa=True
+    )
+    assert len(exact_acquired) == 112
+    assert len(exact_numerical) == 128
+    assert exact_acquired - acquired == {
+        f"hlo/{graph}.rank{rank}.{suffix}"
+        for graph in ("exact_materialize", "exact_promote")
+        for rank in range(8)
+        for suffix, _ in ws32_evidence.HLO_FORMS
+    }
     assert not any(name.endswith(".npz") for name in acquired)
     assert numerical - acquired == {
         *{f"host_records/runner.rank{rank}.npz" for rank in range(8)},
@@ -246,6 +282,7 @@ def test_ws32_acquisition_materializes_without_numerical_npz(
         record = {
             "code_hash": "a" * 40,
             "compile_only": True,
+            "exact_dsa": False,
             "graphs": graph_records,
             "launch_process_id": rank,
             "status": "HLO_ACQUIRED",
@@ -294,6 +331,7 @@ def test_ws32_acquisition_materializes_without_numerical_npz(
         tag="greenfield_ws32_short_decoder_8k_acquire_20260816T000000000000000Z",
         code_hash="a" * 40,
         recovery_code_hash="b" * 40,
+        exact_dsa=False,
         allow_failure_diagnostics=False,
         output=output,
     )

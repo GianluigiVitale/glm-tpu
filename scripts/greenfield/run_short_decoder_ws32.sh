@@ -23,6 +23,7 @@ readonly MESH_SHA=de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a
 MODE=${GLM_GREENFIELD_WS32_SHORT_DECODER_MODE:-off}
 CONTEXT=${GLM_GREENFIELD_WS32_SHORT_DECODER_CONTEXT:-off}
 RECOVER=${GLM_GREENFIELD_WS32_SHORT_DECODER_RECOVER:-0}
+EXACT_DSA=${GLM_GREENFIELD_WS32_EXACT_DSA:-0}
 [[ $MODE == acquire || $MODE == numerical ]] || {
   echo "WS32 mode must be acquire or numerical" >&2
   exit 2
@@ -35,6 +36,22 @@ RECOVER=${GLM_GREENFIELD_WS32_SHORT_DECODER_RECOVER:-0}
   echo "WS32 recovery flag must be 0 or 1" >&2
   exit 2
 }
+[[ $EXACT_DSA == 0 || $EXACT_DSA == 1 ]] || {
+  echo "WS32 exact DSA flag must be 0 or 1" >&2
+  exit 2
+}
+
+readonly DSA_ASSOCIATION_URI=$APPROVED_BUCKET/results/greenfield_ws32_layer0_dsa_association_20260816T101637335765581Z
+readonly DSA_ASSOCIATION_SUMMARY_SHA=661142816aa64ec8d085553b427e99f62ab3f1f16b3fc87fc4fc24880d467203
+readonly DSA_ASSOCIATION_SUCCESS_SHA=79aba79e24026bc4c1d17aed2ca92055530b8a551ed6e1279a25300d2cb0f52b
+if [[ $EXACT_DSA == 0 ]]; then
+  DSA_ASSOCIATION_SUMMARY_PIN=0000000000000000000000000000000000000000000000000000000000000000
+  DSA_ASSOCIATION_SUCCESS_PIN=0000000000000000000000000000000000000000000000000000000000000000
+else
+  DSA_ASSOCIATION_SUMMARY_PIN=$DSA_ASSOCIATION_SUMMARY_SHA
+  DSA_ASSOCIATION_SUCCESS_PIN=$DSA_ASSOCIATION_SUCCESS_SHA
+fi
+readonly EXACT_DSA DSA_ASSOCIATION_SUMMARY_PIN DSA_ASSOCIATION_SUCCESS_PIN
 
 readonly CHECKPOINT_ROOT=${GLM_GREENFIELD_WS32_CHECKPOINT_ROOT:?set sealed checkpoint root}
 readonly CHECKPOINT_MANIFEST_SHA=${GLM_GREENFIELD_WS32_CHECKPOINT_MANIFEST_SHA:?set checkpoint manifest SHA}
@@ -63,6 +80,10 @@ readonly ITERATIONS=10
 readonly TRACE_STEPS=2
 readonly ZERO_SHA=0000000000000000000000000000000000000000000000000000000000000000
 if [[ $MODE == acquire ]]; then
+  EXACT_MATERIALIZE_STABLE_SHA=$ZERO_SHA
+  EXACT_MATERIALIZE_OPTIMIZED_SHA=$ZERO_SHA
+  EXACT_PROMOTE_STABLE_SHA=$ZERO_SHA
+  EXACT_PROMOTE_OPTIMIZED_SHA=$ZERO_SHA
   PREFILL_STABLE_SHA=$ZERO_SHA
   PREFILL_OPTIMIZED_SHA=$ZERO_SHA
   OBSERVER_STABLE_SHA=$ZERO_SHA
@@ -72,6 +93,17 @@ if [[ $MODE == acquire ]]; then
   CACHE_PROBE_STABLE_SHA=$ZERO_SHA
   CACHE_PROBE_OPTIMIZED_SHA=$ZERO_SHA
 else
+  if [[ $EXACT_DSA == 1 ]]; then
+    EXACT_MATERIALIZE_STABLE_SHA=${GLM_GREENFIELD_WS32_EXACT_MATERIALIZE_STABLEHLO_SHA:?set acquired exact-materialize StableHLO SHA}
+    EXACT_MATERIALIZE_OPTIMIZED_SHA=${GLM_GREENFIELD_WS32_EXACT_MATERIALIZE_OPTIMIZED_HLO_SHA:?set acquired exact-materialize optimized HLO SHA}
+    EXACT_PROMOTE_STABLE_SHA=${GLM_GREENFIELD_WS32_EXACT_PROMOTE_STABLEHLO_SHA:?set acquired exact-promote StableHLO SHA}
+    EXACT_PROMOTE_OPTIMIZED_SHA=${GLM_GREENFIELD_WS32_EXACT_PROMOTE_OPTIMIZED_HLO_SHA:?set acquired exact-promote optimized HLO SHA}
+  else
+    EXACT_MATERIALIZE_STABLE_SHA=$ZERO_SHA
+    EXACT_MATERIALIZE_OPTIMIZED_SHA=$ZERO_SHA
+    EXACT_PROMOTE_STABLE_SHA=$ZERO_SHA
+    EXACT_PROMOTE_OPTIMIZED_SHA=$ZERO_SHA
+  fi
   PREFILL_STABLE_SHA=${GLM_GREENFIELD_WS32_PREFILL_STABLEHLO_SHA:?set acquired prefill StableHLO SHA}
   PREFILL_OPTIMIZED_SHA=${GLM_GREENFIELD_WS32_PREFILL_OPTIMIZED_HLO_SHA:?set acquired prefill optimized HLO SHA}
   OBSERVER_STABLE_SHA=${GLM_GREENFIELD_WS32_OBSERVER_STABLEHLO_SHA:?set acquired observer StableHLO SHA}
@@ -82,6 +114,8 @@ else
   CACHE_PROBE_OPTIMIZED_SHA=${GLM_GREENFIELD_WS32_CACHE_PROBE_OPTIMIZED_HLO_SHA:?set acquired cache-probe optimized HLO SHA}
 fi
 readonly PREFILL_STABLE_SHA PREFILL_OPTIMIZED_SHA OBSERVER_STABLE_SHA
+readonly EXACT_MATERIALIZE_STABLE_SHA EXACT_MATERIALIZE_OPTIMIZED_SHA
+readonly EXACT_PROMOTE_STABLE_SHA EXACT_PROMOTE_OPTIMIZED_SHA
 readonly OBSERVER_OPTIMIZED_SHA DECODE_STABLE_SHA DECODE_OPTIMIZED_SHA
 readonly CACHE_PROBE_STABLE_SHA CACHE_PROBE_OPTIMIZED_SHA
 
@@ -282,7 +316,19 @@ try:
 finally: connection.close()
 PY
 
-say "PIN=$PIN recovery_pin=$RECOVERY_PIN mode=$MODE context=$CONTEXT recover=$RECOVER"
+if [[ $EXACT_DSA == 1 ]]; then
+  if [[ $RECOVER == 0 ]]; then
+    gcloud storage cp --no-clobber "$DSA_ASSOCIATION_URI/summary.json" \
+      "$RUN_DIR/exact_dsa_source_summary.json" >/dev/null
+    gcloud storage cp --no-clobber "$DSA_ASSOCIATION_URI/SUCCESS" \
+      "$RUN_DIR/exact_dsa_source_SUCCESS" >/dev/null
+  fi
+  printf '%s  %s\n%s  %s\n' \
+    "$DSA_ASSOCIATION_SUMMARY_SHA" "$RUN_DIR/exact_dsa_source_summary.json" \
+    "$DSA_ASSOCIATION_SUCCESS_SHA" "$RUN_DIR/exact_dsa_source_SUCCESS" \
+    | sha256sum -c - >/dev/null
+fi
+say "PIN=$PIN recovery_pin=$RECOVERY_PIN mode=$MODE context=$CONTEXT recover=$RECOVER exact_dsa=$EXACT_DSA"
 listing="$RUN_DIR/remote_vacancy.txt"
 if [[ $RECOVER == 0 ]]; then
   gcloud storage objects list "$REMOTE_PREFIX/**" --format='value(name)' >"$listing" || {
@@ -333,7 +379,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching complete WS32 worker fleet coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; output="$run/runner.rank${idx}.json"; tensors="$run/runner.rank${idx}.npz"; hlo="$run/hlo"; trace="$run/trace"; log="$run/runner.rank${idx}.log"; mkdir -p "$run"; upload(){ local rc=0; [[ ! -f $output ]] || gcloud storage cp --no-clobber "$output" "$remote/host_records/runner.rank${idx}.json" >/dev/null 2>&1 || rc=1; [[ ! -f $tensors ]] || gcloud storage cp --no-clobber "$tensors" "$remote/host_records/runner.rank${idx}.npz" >/dev/null 2>&1 || rc=1; [[ ! -f $log ]] || gcloud storage cp --no-clobber "$log" "$remote/host_records/runner.rank${idx}.log" >/dev/null 2>&1 || rc=1; for graph in prefill observer decode cache_probe; do [[ ! -f "$hlo/$graph.stablehlo.mlir" ]] || gcloud storage cp --no-clobber "$hlo/$graph.stablehlo.mlir" "$remote/hlo/${graph}.rank${idx}.stablehlo.mlir" >/dev/null 2>&1 || rc=1; [[ ! -f "$hlo/$graph.optimized_hlo.txt" ]] || gcloud storage cp --no-clobber "$hlo/$graph.optimized_hlo.txt" "$remote/hlo/${graph}.rank${idx}.optimized_hlo.txt" >/dev/null 2>&1 || rc=1; done; xplane=$(find "$trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); [[ -z $xplane ]] || gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || rc=1; return "$rc"; }; trap "upload || true" EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 14400 /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_short_decoder_ws32.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --topology-capture-root '"$TOPOLOGY_ROOT"' --checkpoint-root '"$CHECKPOINT_ROOT"' --source-inventory '"$INVENTORY"' --token-oracle-dir '"$TOKEN_ORACLE"' --dsa-oracle-dir '"$DSA_ORACLE"' --expected-code-hash '"$PIN"' --checkpoint-manifest-sha256 '"$CHECKPOINT_MANIFEST_SHA"' --checkpoint-success-sha256 '"$CHECKPOINT_SUCCESS_SHA"' --token-oracle-manifest-sha256 '"$TOKEN_ORACLE_SHA"' --dsa-oracle-manifest-sha256 '"$DSA_ORACLE_SHA"' --token-oracle-success-sha256 '"$TOKEN_ORACLE_SUCCESS_SHA"' --dsa-oracle-success-sha256 '"$DSA_ORACLE_SUCCESS_SHA"' --topology-sha256 '"$TOPOLOGY_SHA"' --topology-fleet-sha256 '"$TOPOLOGY_FLEET_SHA"' --mesh-sha256 '"$MESH_SHA"' --expected-prefill-stablehlo-sha256 '"$PREFILL_STABLE_SHA"' --expected-prefill-optimized-hlo-sha256 '"$PREFILL_OPTIMIZED_SHA"' --expected-observer-stablehlo-sha256 '"$OBSERVER_STABLE_SHA"' --expected-observer-optimized-hlo-sha256 '"$OBSERVER_OPTIMIZED_SHA"' --expected-decode-stablehlo-sha256 '"$DECODE_STABLE_SHA"' --expected-decode-optimized-hlo-sha256 '"$DECODE_OPTIMIZED_SHA"' --expected-cache-probe-stablehlo-sha256 '"$CACHE_PROBE_STABLE_SHA"' --expected-cache-probe-optimized-hlo-sha256 '"$CACHE_PROBE_OPTIMIZED_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --compile-only '"$([[ $MODE == acquire ]] && echo 1 || echo 0)"' --observer-steps '"$OBSERVER_STEPS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --trace-steps '"$TRACE_STEPS"' --output "$output" --tensor-output "$tensors" --hlo-dir "$hlo" --trace-dir "$trace" >"$log" 2>&1; trap - EXIT; upload; echo "WS32_SHORT_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; output="$run/runner.rank${idx}.json"; tensors="$run/runner.rank${idx}.npz"; hlo="$run/hlo"; trace="$run/trace"; log="$run/runner.rank${idx}.log"; mkdir -p "$run"; upload(){ local rc=0; [[ ! -f $output ]] || gcloud storage cp --no-clobber "$output" "$remote/host_records/runner.rank${idx}.json" >/dev/null 2>&1 || rc=1; [[ ! -f $tensors ]] || gcloud storage cp --no-clobber "$tensors" "$remote/host_records/runner.rank${idx}.npz" >/dev/null 2>&1 || rc=1; [[ ! -f $log ]] || gcloud storage cp --no-clobber "$log" "$remote/host_records/runner.rank${idx}.log" >/dev/null 2>&1 || rc=1; for graph in exact_materialize exact_promote prefill observer decode cache_probe; do [[ ! -f "$hlo/$graph.stablehlo.mlir" ]] || gcloud storage cp --no-clobber "$hlo/$graph.stablehlo.mlir" "$remote/hlo/${graph}.rank${idx}.stablehlo.mlir" >/dev/null 2>&1 || rc=1; [[ ! -f "$hlo/$graph.optimized_hlo.txt" ]] || gcloud storage cp --no-clobber "$hlo/$graph.optimized_hlo.txt" "$remote/hlo/${graph}.rank${idx}.optimized_hlo.txt" >/dev/null 2>&1 || rc=1; done; xplane=$(find "$trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); [[ -z $xplane ]] || gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || rc=1; return "$rc"; }; trap "upload || true" EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 14400 /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_short_decoder_ws32.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --topology-capture-root '"$TOPOLOGY_ROOT"' --checkpoint-root '"$CHECKPOINT_ROOT"' --source-inventory '"$INVENTORY"' --token-oracle-dir '"$TOKEN_ORACLE"' --dsa-oracle-dir '"$DSA_ORACLE"' --expected-code-hash '"$PIN"' --checkpoint-manifest-sha256 '"$CHECKPOINT_MANIFEST_SHA"' --checkpoint-success-sha256 '"$CHECKPOINT_SUCCESS_SHA"' --token-oracle-manifest-sha256 '"$TOKEN_ORACLE_SHA"' --dsa-oracle-manifest-sha256 '"$DSA_ORACLE_SHA"' --token-oracle-success-sha256 '"$TOKEN_ORACLE_SUCCESS_SHA"' --dsa-oracle-success-sha256 '"$DSA_ORACLE_SUCCESS_SHA"' --dsa-association-summary-sha256 '"$DSA_ASSOCIATION_SUMMARY_PIN"' --dsa-association-success-sha256 '"$DSA_ASSOCIATION_SUCCESS_PIN"' --topology-sha256 '"$TOPOLOGY_SHA"' --topology-fleet-sha256 '"$TOPOLOGY_FLEET_SHA"' --mesh-sha256 '"$MESH_SHA"' --expected-exact-materialize-stablehlo-sha256 '"$EXACT_MATERIALIZE_STABLE_SHA"' --expected-exact-materialize-optimized-hlo-sha256 '"$EXACT_MATERIALIZE_OPTIMIZED_SHA"' --expected-exact-promote-stablehlo-sha256 '"$EXACT_PROMOTE_STABLE_SHA"' --expected-exact-promote-optimized-hlo-sha256 '"$EXACT_PROMOTE_OPTIMIZED_SHA"' --expected-prefill-stablehlo-sha256 '"$PREFILL_STABLE_SHA"' --expected-prefill-optimized-hlo-sha256 '"$PREFILL_OPTIMIZED_SHA"' --expected-observer-stablehlo-sha256 '"$OBSERVER_STABLE_SHA"' --expected-observer-optimized-hlo-sha256 '"$OBSERVER_OPTIMIZED_SHA"' --expected-decode-stablehlo-sha256 '"$DECODE_STABLE_SHA"' --expected-decode-optimized-hlo-sha256 '"$DECODE_OPTIMIZED_SHA"' --expected-cache-probe-stablehlo-sha256 '"$CACHE_PROBE_STABLE_SHA"' --expected-cache-probe-optimized-hlo-sha256 '"$CACHE_PROBE_OPTIMIZED_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --compile-only '"$([[ $MODE == acquire ]] && echo 1 || echo 0)"' --exact-dsa '"$EXACT_DSA"' --observer-steps '"$OBSERVER_STEPS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --trace-steps '"$TRACE_STEPS"' --output "$output" --tensor-output "$tensors" --hlo-dir "$hlo" --trace-dir "$trace" >"$log" 2>&1; trap - EXIT; upload; echo "WS32_SHORT_OK $(hostname) rank=$idx"'
 launch_rc=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/launch.txt" 2>&1 || launch_rc=$?
@@ -350,6 +396,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   -m glm_tpu.greenfield.validation.ws32_evidence \
   --run-dir "$RUN_DIR" --remote-prefix "$REMOTE_PREFIX" --mode "$MODE" \
   --tag "$TAG" --code-hash "$PIN" --recovery-code-hash "$RECOVERY_PIN" \
+  --exact-dsa "$EXACT_DSA" \
   --output "$RUN_DIR/source_remote_objects.json" "${materialize_args[@]}" \
   >"$RUN_DIR/materialize.log" 2>&1
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
@@ -363,10 +410,17 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --dsa-oracle-manifest-sha256 "$DSA_ORACLE_SHA" \
   --token-oracle-success-sha256 "$TOKEN_ORACLE_SUCCESS_SHA" \
   --dsa-oracle-success-sha256 "$DSA_ORACLE_SUCCESS_SHA" \
+  --dsa-association-summary-sha256 "$DSA_ASSOCIATION_SUMMARY_PIN" \
+  --dsa-association-success-sha256 "$DSA_ASSOCIATION_SUCCESS_PIN" \
   --topology-sha256 "$TOPOLOGY_SHA" --topology-fleet-sha256 "$TOPOLOGY_FLEET_SHA" \
   --mesh-sha256 "$MESH_SHA" --source-inventory-sha256 "$INVENTORY_SHA" \
   --context-capacity "$CONTEXT_CAPACITY" --observer-steps "$OBSERVER_STEPS" \
+  --exact-dsa "$EXACT_DSA" \
   --warmup "$WARMUP" --iterations "$ITERATIONS" --trace-steps "$TRACE_STEPS" \
+  --expected-exact-materialize-stablehlo-sha256 "$EXACT_MATERIALIZE_STABLE_SHA" \
+  --expected-exact-materialize-optimized-hlo-sha256 "$EXACT_MATERIALIZE_OPTIMIZED_SHA" \
+  --expected-exact-promote-stablehlo-sha256 "$EXACT_PROMOTE_STABLE_SHA" \
+  --expected-exact-promote-optimized-hlo-sha256 "$EXACT_PROMOTE_OPTIMIZED_SHA" \
   --expected-prefill-stablehlo-sha256 "$PREFILL_STABLE_SHA" \
   --expected-prefill-optimized-hlo-sha256 "$PREFILL_OPTIMIZED_SHA" \
   --expected-observer-stablehlo-sha256 "$OBSERVER_STABLE_SHA" \
@@ -387,6 +441,8 @@ if [[ $MODE == acquire ]]; then
   archive_upload_started=1
   acquisition_files=(orchestrator.log summary.json validate.log census_post.txt
     source_remote_objects.json materialize.log)
+  [[ $EXACT_DSA == 0 ]] || acquisition_files+=(exact_dsa_source_summary.json
+    exact_dsa_source_SUCCESS)
   [[ $RECOVER == 0 ]] || acquisition_files+=(census_recovery_pre.txt)
   for name in "${acquisition_files[@]}"; do
     gcloud storage cp --no-clobber "$RUN_DIR/$name" \
@@ -430,6 +486,8 @@ archive_upload_started=1
 orchestrator_files=(orchestrator.log remote_vacancy.txt sync.txt launch.txt census_pre.txt
   census_post.txt summary.json validate.log results.db db_link.json db_publish.log
   source_remote_objects.json materialize.log)
+[[ $EXACT_DSA == 0 ]] || orchestrator_files+=(exact_dsa_source_summary.json
+  exact_dsa_source_SUCCESS)
 [[ $RECOVER == 0 ]] || orchestrator_files+=(census_recovery_pre.txt)
 for name in "${orchestrator_files[@]}"; do
   gcloud storage cp --no-clobber "$RUN_DIR/$name" "$REMOTE_PREFIX/orchestrator/$name" >/dev/null
@@ -449,6 +507,8 @@ for name in source_by_name:
  elif name.startswith('traces/'): expected[name]=root/'traces'/Path(name).name
 orchestrator=('orchestrator.log','remote_vacancy.txt','sync.txt','launch.txt','census_pre.txt','census_post.txt','summary.json','validate.log','results.db','db_link.json','db_publish.log','source_remote_objects.json','materialize.log')
 for name in orchestrator: expected[f'orchestrator/{name}']=root/name
+for name in ('exact_dsa_source_summary.json','exact_dsa_source_SUCCESS'):
+ if (root/name).exists(): expected[f'orchestrator/{name}']=root/name
 recovery_pre=root/'census_recovery_pre.txt'
 if recovery_pre.exists(): expected['orchestrator/census_recovery_pre.txt']=recovery_pre
 diagnostics={name:item for name,item in source_by_name.items() if name.startswith('diagnostic_local/')}

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping, NamedTuple
 
 import jax
+from jax import lax
 import jax.numpy as jnp
 from jax.sharding import PartitionSpec as P
 
@@ -22,7 +23,13 @@ from ..kernels.reference.attention import (
     StageLocalKvLayout,
 )
 from ..kernels.reference.dsa import DsaNumericalContract
+from ..kernels.reference.fp8 import dequantize_fp8_bits_block_weight
 from ..kernels.reference.moe import GlmMoeNumericalContract
+from ..kernels.reference.prefill_index import (
+    decode_stage_local_prefill_index_wk_bf16,
+    promote_stage_local_prefill_index_wk,
+    repair_stage_local_prompt_index_cache,
+)
 from ..kernels.ws32_io import (
     Ws32SplitGreedySampleResult,
     ws32_embedding_mapped,
@@ -32,6 +39,7 @@ from ..kernels.ws32_layer import (
     Ws32AttentionWeights,
     Ws32DenseWeights,
     Ws32DsaWeights,
+    Ws32ExactDsaWeights,
     Ws32MoeWeights,
     Ws32QkvAWeights,
     ws32_transformer_layer_mapped,
@@ -53,6 +61,26 @@ class Ws32DecoderWeights(NamedTuple):
     layers: tuple[Ws32LayerWeights, ...]
     final_norm_weight_local: Any
     lm_head_local: Any
+
+
+class Ws32ExactDsaRawLayerWeights(NamedTuple):
+    q_a_bits_local: Any
+    q_a_scale_local: Any
+    kv_a_bits_local: Any
+    kv_a_scale_local: Any
+    wq_b_bits_local: Any
+    wq_b_scale_local: Any
+    wk_bits_local: Any
+    wk_scale_local: Any
+    head_weight_local: Any
+
+
+class Ws32DecodedExactDsaWeights(NamedTuple):
+    qkv_a_bits: Any
+    qkv_a_scale: Any
+    wq_b_weight_local: Any
+    wk_weight_bf16: Any
+    head_weight_local: Any
 
 
 class Ws32DecoderState(NamedTuple):
@@ -87,6 +115,11 @@ class Ws32ObservedDecodeStepResult(NamedTuple):
     dsa: Ws32DsaObservation
 
 
+class Ws32PrefillStepResult(NamedTuple):
+    result: Ws32DecodeStepResult
+    normalized_inputs_local: Any
+
+
 class Ws32PrefillResult(NamedTuple):
     state: Ws32DecoderState
     next_token: Any
@@ -109,6 +142,7 @@ class Ws32DecoderConfig:
     packed_cache_width: int = 640
     sparse_segment_block: int = 512
     rms_norm_epsilon: float = 1e-5
+    exact_dsa: bool = False
 
     def __post_init__(self) -> None:
         geometry = self.geometry
@@ -134,6 +168,8 @@ class Ws32DecoderConfig:
             self.rms_norm_epsilon, bool
         ) or self.rms_norm_epsilon <= 0:
             raise PlanValidationError("WS32 RMS epsilon must be positive")
+        if not isinstance(self.exact_dsa, bool):
+            raise PlanValidationError("WS32 exact DSA flag must be boolean")
         if not self.full_index_slots or self.full_index_slots[0] != 0:
             raise PlanValidationError("WS32 layer zero must seed IndexShare state")
         producer: int | None = None
@@ -257,6 +293,16 @@ class Ws32TeacherForcedPrefillProgram:
     mesh: Any
     prompt_length: int
     execute: Any
+
+
+@dataclass(frozen=True, slots=True)
+class Ws32ExactDsaMaterializerProgram:
+    """Two completed device boundaries for DB526/527 exact owners."""
+
+    config: Ws32DecoderConfig
+    mesh: Any
+    decode: Any
+    promote: Any
 
 
 def make_ws32_initial_state(
@@ -596,6 +642,273 @@ def bind_ws32_decoder_weights(
     return result
 
 
+def select_ws32_exact_dsa_raw_weights(
+    weights: Ws32DecoderWeights,
+    config: Ws32DecoderConfig,
+) -> tuple[Ws32ExactDsaRawLayerWeights, ...]:
+    """Select raw full-indexer leaves without copying checkpoint arrays."""
+
+    if not config.exact_dsa:
+        raise ValueError("WS32 exact DSA raw selection requires its default-off flag")
+    selected = []
+    for layer_id in config.full_index_slots:
+        layer = weights.layers[layer_id]
+        if layer.dsa is None:
+            raise ValueError("WS32 exact DSA source layer lost indexer weights")
+        selected.append(
+            Ws32ExactDsaRawLayerWeights(
+                layer.qkv_a.q_a_bits_local,
+                layer.qkv_a.q_a_scale_local,
+                layer.qkv_a.kv_a_bits_local,
+                layer.qkv_a.kv_a_scale_local,
+                layer.dsa.wq_b_bits_local,
+                layer.dsa.wq_b_scale_local,
+                layer.dsa.wk_bits_local,
+                layer.dsa.wk_scale_local,
+                layer.dsa.head_weight_local,
+            )
+        )
+    if len(selected) != len(config.full_index_slots):
+        raise AssertionError("WS32 exact DSA source cardinality drifted")
+    return tuple(selected)
+
+
+def _exact_dsa_raw_specs(
+    config: Ws32DecoderConfig,
+) -> tuple[Ws32ExactDsaRawLayerWeights, ...]:
+    return tuple(
+        Ws32ExactDsaRawLayerWeights(
+            P(None, "feature"),
+            P(None, "feature"),
+            P(None, "feature"),
+            P(None, "feature"),
+            P("expert", None),
+            P("expert", None),
+            P(None, "feature"),
+            P(None, "feature"),
+            P("expert", "feature"),
+        )
+        for _ in config.full_index_slots
+    )
+
+
+def ws32_decoded_exact_dsa_specs(
+    config: Ws32DecoderConfig,
+) -> tuple[Ws32DecodedExactDsaWeights, ...]:
+    return tuple(
+        Ws32DecodedExactDsaWeights(
+            P(),
+            P(),
+            P("feature", None),
+            P(),
+            P("feature", None),
+        )
+        for _ in config.full_index_slots
+    )
+
+
+def ws32_exact_dsa_specs(
+    config: Ws32DecoderConfig,
+) -> tuple[Ws32ExactDsaWeights, ...]:
+    return tuple(
+        Ws32ExactDsaWeights(
+            P(),
+            P(),
+            (P("feature", None),) * 4,
+            P(),
+            P("feature", None),
+        )
+        for _ in config.full_index_slots
+    )
+
+
+def _pack_ws32_fused_qkv_a(
+    q_bits: Any,
+    q_scale: Any,
+    kv_bits: Any,
+    kv_scale: Any,
+    *,
+    config: Ws32DecoderConfig,
+) -> tuple[Any, Any]:
+    geometry = config.geometry
+    q_width = geometry.q_lora_rank
+    kv_width = geometry.kv_lora_rank + geometry.qk_rope_head_dim
+    virtual_shards = 32
+    if q_width % virtual_shards or kv_width % virtual_shards:
+        raise ValueError("WS32 exact qkv-a virtual shard geometry drifted")
+    q_local = q_width // virtual_shards
+    kv_local = kv_width // virtual_shards
+    q_packed = jnp.transpose(
+        q_bits.reshape(virtual_shards, q_local, geometry.hidden_size),
+        (0, 2, 1),
+    )
+    kv_packed = jnp.transpose(
+        kv_bits.reshape(virtual_shards, kv_local, geometry.hidden_size),
+        (0, 2, 1),
+    )
+    q_expanded = jnp.repeat(q_scale, 128, axis=0)[:q_width]
+    kv_expanded = jnp.repeat(kv_scale, 128, axis=0)[:kv_width]
+    q_scale_packed = jnp.transpose(
+        q_expanded.reshape(virtual_shards, q_local, q_scale.shape[1]),
+        (0, 2, 1),
+    )
+    kv_scale_packed = jnp.transpose(
+        kv_expanded.reshape(virtual_shards, kv_local, kv_scale.shape[1]),
+        (0, 2, 1),
+    )
+    return (
+        jnp.concatenate((q_packed, kv_packed), axis=-1),
+        jnp.concatenate((q_scale_packed, kv_scale_packed), axis=-1),
+    )
+
+
+def build_ws32_exact_dsa_materializer_program(
+    mesh: Any,
+    config: Ws32DecoderConfig,
+) -> Ws32ExactDsaMaterializerProgram:
+    """Build the one-shot exact-owner decode and BF16-to-FP32 boundary."""
+
+    import numpy as np
+
+    if not config.exact_dsa:
+        raise PlanValidationError("WS32 exact materializer requires exact_dsa")
+    if tuple(mesh.axis_names) != ("expert", "feature") or tuple(
+        np.asarray(mesh.devices, dtype=object).shape
+    ) != (8, 4):
+        raise PlanValidationError("WS32 exact materializer requires expert8 x feature4")
+    contract = config.dsa_contract
+
+    def gather_feature(value: Any, *, axis: int) -> Any:
+        return lax.all_gather(
+            value,
+            axis_name="feature",
+            axis=axis,
+            tiled=True,
+        )
+
+    def gather_expert(value: Any, *, axis: int) -> Any:
+        return lax.all_gather(
+            value,
+            axis_name="expert",
+            axis=axis,
+            tiled=True,
+        )
+
+    def decode_layer(raw: Ws32ExactDsaRawLayerWeights) -> Ws32DecodedExactDsaWeights:
+        with jax.named_scope("greenfield_ws32_exact_dsa_materializer/qkv_a"):
+            q_bits = gather_feature(raw.q_a_bits_local, axis=1)
+            q_scale = gather_feature(raw.q_a_scale_local, axis=1)
+            kv_bits = gather_feature(raw.kv_a_bits_local, axis=1)
+            kv_scale = gather_feature(raw.kv_a_scale_local, axis=1)
+            qkv_bits, qkv_scale = _pack_ws32_fused_qkv_a(
+                q_bits,
+                q_scale,
+                kv_bits,
+                kv_scale,
+                config=config,
+            )
+        with jax.named_scope("greenfield_ws32_exact_dsa_materializer/tuple4_query"):
+            full_wq_bits = gather_expert(raw.wq_b_bits_local, axis=0)
+            full_wq_scale = gather_expert(raw.wq_b_scale_local, axis=0)
+            owner_width = contract.num_heads * contract.head_dim // 4
+            owner_scale_rows = owner_width // config.geometry.fp8_block_shape[0]
+            owner = lax.axis_index("feature")
+            wq_bits = lax.dynamic_slice_in_dim(
+                full_wq_bits,
+                owner * owner_width,
+                owner_width,
+                axis=0,
+            )
+            wq_scale = lax.dynamic_slice_in_dim(
+                full_wq_scale,
+                owner * owner_scale_rows,
+                owner_scale_rows,
+                axis=0,
+            )
+            wq_weight = dequantize_fp8_bits_block_weight(
+                wq_bits,
+                wq_scale,
+                block_shape=config.geometry.fp8_block_shape,
+                output_dtype=jnp.float32,
+            )
+        with jax.named_scope("greenfield_ws32_exact_dsa_materializer/wk_decode"):
+            wk_bits = gather_feature(raw.wk_bits_local, axis=1)
+            wk_scale = gather_feature(raw.wk_scale_local, axis=1)
+            wk_bf16 = decode_stage_local_prefill_index_wk_bf16(
+                wk_bits,
+                wk_scale,
+                contract=contract,
+                fp8_block_shape=config.geometry.fp8_block_shape,
+            )
+        with jax.named_scope("greenfield_ws32_exact_dsa_materializer/head_owner"):
+            full_head = gather_expert(
+                gather_feature(raw.head_weight_local, axis=1),
+                axis=0,
+            )
+            local_heads = contract.num_heads // 4
+            head_weight = lax.dynamic_slice_in_dim(
+                full_head,
+                lax.axis_index("feature") * local_heads,
+                local_heads,
+                axis=0,
+            )
+        return Ws32DecodedExactDsaWeights(
+            qkv_bits,
+            qkv_scale,
+            wq_weight,
+            wk_bf16,
+            head_weight,
+        )
+
+    def decode_body(
+        raw_layers: tuple[Ws32ExactDsaRawLayerWeights, ...],
+    ) -> tuple[Ws32DecodedExactDsaWeights, ...]:
+        return tuple(decode_layer(raw) for raw in raw_layers)
+
+    def promote_body(
+        decoded_layers: tuple[Ws32DecodedExactDsaWeights, ...],
+    ) -> tuple[Ws32ExactDsaWeights, ...]:
+        values = []
+        for decoded in decoded_layers:
+            with jax.named_scope(
+                "greenfield_ws32_exact_dsa_materializer/wk_promote"
+            ):
+                wk_weight = promote_stage_local_prefill_index_wk(
+                    decoded.wk_weight_bf16,
+                    contract=contract,
+                )
+            values.append(
+                Ws32ExactDsaWeights(
+                    decoded.qkv_a_bits,
+                    decoded.qkv_a_scale,
+                    (decoded.wq_b_weight_local,) * 4,
+                    wk_weight,
+                    decoded.head_weight_local,
+                )
+            )
+        return tuple(values)
+
+    decoded_specs = ws32_decoded_exact_dsa_specs(config)
+    return Ws32ExactDsaMaterializerProgram(
+        config=config,
+        mesh=mesh,
+        decode=jax.shard_map(
+            decode_body,
+            mesh=mesh,
+            in_specs=(_exact_dsa_raw_specs(config),),
+            out_specs=decoded_specs,
+            check_vma=False,
+        ),
+        promote=jax.shard_map(
+            promote_body,
+            mesh=mesh,
+            in_specs=(decoded_specs,),
+            out_specs=ws32_exact_dsa_specs(config),
+            check_vma=False,
+        ),
+    )
+
+
 def ws32_decoder_state_specs() -> Ws32DecoderState:
     return Ws32DecoderState(
         P(None, None, "expert", None),
@@ -693,10 +1006,16 @@ def _ws32_decode_impl(
     weights: Ws32DecoderWeights,
     *,
     config: Ws32DecoderConfig,
+    exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...] | None = None,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
     observe_dsa: bool,
-) -> tuple[Ws32DecodeStepResult, Ws32DsaObservation | None]:
+    observe_prefill_inputs: bool = False,
+) -> tuple[
+    Ws32DecodeStepResult,
+    Ws32DsaObservation | None,
+    Any | None,
+]:
     """Execute one complete batch-one step and optionally retain DSA events."""
 
     _validate_local_state(state, config)
@@ -704,6 +1023,12 @@ def _ws32_decode_impl(
         raise ValueError("WS32 decoder input must be one int32 token")
     if len(weights.layers) != config.geometry.num_layers:
         raise ValueError("WS32 decoder weight layer count drifted")
+    if config.exact_dsa != (exact_dsa_weights is not None):
+        raise ValueError("WS32 exact DSA flag/input presence drifted")
+    if exact_dsa_weights is not None and len(exact_dsa_weights) != len(
+        config.full_index_slots
+    ):
+        raise ValueError("WS32 exact DSA owner cardinality drifted")
     embedded = ws32_embedding_mapped(
         token_ids,
         weights.embedding_local,
@@ -723,11 +1048,15 @@ def _ws32_decode_impl(
     observed_positions = []
     observed_valid_counts = []
     observed_scores = []
+    prefill_inputs = []
 
     for layer_id, layer_weights in enumerate(weights.layers):
         indexer_kind = config.geometry.indexer_types[layer_id]
         mlp_kind = config.geometry.mlp_layer_types[layer_id]
         index_slot = config.full_index_slot_by_layer[layer_id]
+        exact_layer_weights = (
+            None if index_slot is None or exact_dsa_weights is None else exact_dsa_weights[index_slot]
+        )
         layer_index_cache = index_cache[0 if index_slot is None else index_slot]
         result = ws32_transformer_layer_mapped(
             hidden_update,
@@ -747,6 +1076,7 @@ def _ws32_decode_impl(
             layer_weights.dense,
             layer_weights.moe,
             health,
+            exact_dsa_weights=exact_layer_weights,
             indexer_kind=indexer_kind,
             mlp_kind=mlp_kind,
             dsa_contract=config.dsa_contract,
@@ -770,6 +1100,8 @@ def _ws32_decode_impl(
                 observed_positions.append(result.selected_positions)
                 observed_valid_counts.append(result.selected_valid_counts)
                 observed_scores.append(result.selected_scores)
+            if observe_prefill_inputs:
+                prefill_inputs.append(result.normalized_input_local[0])
         selected_positions = result.selected_positions
         selected_valid_counts = result.selected_valid_counts
         selected_scores = result.selected_scores
@@ -801,16 +1133,23 @@ def _ws32_decode_impl(
         sampled.final_residual_local,
     )
     if not observe_dsa:
-        return step, None
-    if len(observed_positions) != len(config.full_index_slots):
-        raise AssertionError("WS32 DSA observation cardinality drifted")
-    observation = Ws32DsaObservation(
-        jnp.asarray(config.full_index_slots, dtype=jnp.int32),
-        jnp.stack(tuple(observed_positions), axis=0),
-        jnp.stack(tuple(observed_valid_counts), axis=0),
-        jnp.stack(tuple(observed_scores), axis=0),
-    )
-    return step, observation
+        observation = None
+    else:
+        if len(observed_positions) != len(config.full_index_slots):
+            raise AssertionError("WS32 DSA observation cardinality drifted")
+        observation = Ws32DsaObservation(
+            jnp.asarray(config.full_index_slots, dtype=jnp.int32),
+            jnp.stack(tuple(observed_positions), axis=0),
+            jnp.stack(tuple(observed_valid_counts), axis=0),
+            jnp.stack(tuple(observed_scores), axis=0),
+        )
+    if not observe_prefill_inputs:
+        prefill = None
+    else:
+        if len(prefill_inputs) != len(config.full_index_slots):
+            raise AssertionError("WS32 prefill input cardinality drifted")
+        prefill = jnp.stack(tuple(prefill_inputs), axis=0)
+    return step, observation, prefill
 
 
 def ws32_decode_mapped(
@@ -819,22 +1158,26 @@ def ws32_decode_mapped(
     weights: Ws32DecoderWeights,
     *,
     config: Ws32DecoderConfig,
+    exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...] | None = None,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
 ) -> Ws32DecodeStepResult:
     """Execute one complete batch-one target-model step on all 32 chips."""
 
-    result, observation = _ws32_decode_impl(
+    result, observation, prefill = _ws32_decode_impl(
         token_ids,
         state,
         weights,
         config=config,
+        exact_dsa_weights=exact_dsa_weights,
         sparse_attention_interpret=sparse_attention_interpret,
         linear_interpret=linear_interpret,
         observe_dsa=False,
     )
     if observation is not None:
         raise AssertionError("default WS32 decoder retained DSA observations")
+    if prefill is not None:
+        raise AssertionError("default WS32 decoder retained prefill inputs")
     return result
 
 
@@ -844,23 +1187,55 @@ def ws32_decode_observed_mapped(
     weights: Ws32DecoderWeights,
     *,
     config: Ws32DecoderConfig,
+    exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...] | None = None,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
 ) -> Ws32ObservedDecodeStepResult:
     """Execute one proof-only step returning all 21 full-indexer decisions."""
 
-    result, observation = _ws32_decode_impl(
+    result, observation, prefill = _ws32_decode_impl(
         token_ids,
         state,
         weights,
         config=config,
+        exact_dsa_weights=exact_dsa_weights,
         sparse_attention_interpret=sparse_attention_interpret,
         linear_interpret=linear_interpret,
         observe_dsa=True,
     )
     if observation is None:
         raise AssertionError("observed WS32 decoder lost DSA observations")
+    if prefill is not None:
+        raise AssertionError("observed WS32 decoder retained prefill inputs")
     return Ws32ObservedDecodeStepResult(result, observation)
+
+
+def ws32_prefill_step_mapped(
+    token_ids: Any,
+    state: Ws32DecoderState,
+    weights: Ws32DecoderWeights,
+    exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...],
+    *,
+    config: Ws32DecoderConfig,
+    sparse_attention_interpret: bool = False,
+    linear_interpret: bool = False,
+) -> Ws32PrefillStepResult:
+    """Execute one exact step and retain only full-indexer norm inputs."""
+
+    result, observation, prefill = _ws32_decode_impl(
+        token_ids,
+        state,
+        weights,
+        config=config,
+        exact_dsa_weights=exact_dsa_weights,
+        sparse_attention_interpret=sparse_attention_interpret,
+        linear_interpret=linear_interpret,
+        observe_dsa=False,
+        observe_prefill_inputs=True,
+    )
+    if observation is not None or prefill is None:
+        raise AssertionError("WS32 exact prefill observation contract drifted")
+    return Ws32PrefillStepResult(result, prefill)
 
 
 def ws32_cache_write_probe_mapped(
@@ -968,27 +1343,80 @@ def build_ws32_decoder_program(
                 linear_interpret=linear_interpret,
             )
 
+    def execute_exact_body(
+        token_ids: Any,
+        state: Ws32DecoderState,
+        weights: Ws32DecoderWeights,
+        exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...],
+    ) -> Ws32DecodeStepResult:
+        with jax.named_scope("greenfield_ws32_complete_decoder"):
+            return ws32_decode_mapped(
+                token_ids,
+                state,
+                weights,
+                config=config,
+                exact_dsa_weights=exact_dsa_weights,
+                sparse_attention_interpret=sparse_attention_interpret,
+                linear_interpret=linear_interpret,
+            )
+
+    def observe_exact_body(
+        token_ids: Any,
+        state: Ws32DecoderState,
+        weights: Ws32DecoderWeights,
+        exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...],
+    ) -> Ws32ObservedDecodeStepResult:
+        with jax.named_scope("greenfield_ws32_complete_decoder_dsa_observer"):
+            return ws32_decode_observed_mapped(
+                token_ids,
+                state,
+                weights,
+                config=config,
+                exact_dsa_weights=exact_dsa_weights,
+                sparse_attention_interpret=sparse_attention_interpret,
+                linear_interpret=linear_interpret,
+            )
+
     def probe_body(state: Ws32DecoderState) -> Ws32CacheWriteProbe:
         with jax.named_scope("greenfield_ws32_cache_probe"):
             return ws32_cache_write_probe_mapped(state, config=config)
 
-    return Ws32DecoderProgram(
-        config=config,
-        mesh=mesh,
-        execute=jax.shard_map(
+    if config.exact_dsa:
+        exact_specs = ws32_exact_dsa_specs(config)
+        execute = jax.shard_map(
+            execute_exact_body,
+            mesh=mesh,
+            in_specs=(P(), state_specs, weight_specs, exact_specs),
+            out_specs=ws32_decode_result_specs(),
+            check_vma=False,
+        )
+        observe = jax.shard_map(
+            observe_exact_body,
+            mesh=mesh,
+            in_specs=(P(), state_specs, weight_specs, exact_specs),
+            out_specs=ws32_observed_decode_result_specs(),
+            check_vma=False,
+        )
+    else:
+        execute = jax.shard_map(
             execute_body,
             mesh=mesh,
             in_specs=(P(), state_specs, weight_specs),
             out_specs=ws32_decode_result_specs(),
             check_vma=False,
-        ),
-        observe=jax.shard_map(
+        )
+        observe = jax.shard_map(
             observe_body,
             mesh=mesh,
             in_specs=(P(), state_specs, weight_specs),
             out_specs=ws32_observed_decode_result_specs(),
             check_vma=False,
-        ),
+        )
+    return Ws32DecoderProgram(
+        config=config,
+        mesh=mesh,
+        execute=execute,
+        observe=observe,
         probe_cache_write=jax.shard_map(
             probe_body,
             mesh=mesh,
@@ -1055,15 +1483,117 @@ def build_ws32_teacher_forced_prefill_program(
             )
         return Ws32PrefillResult(final[0], final[1])
 
+    def exact_body(
+        prompt_token_ids: Any,
+        state: Ws32DecoderState,
+        weights: Ws32DecoderWeights,
+        exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...],
+    ) -> Ws32PrefillResult:
+        if prompt_token_ids.shape != (prompt_length,) or (
+            prompt_token_ids.dtype != jnp.int32
+        ):
+            raise ValueError("WS32 teacher-forced prompt geometry drifted")
+        initial_token = jnp.full((1,), -1, dtype=jnp.int32)
+
+        def scan_step(
+            carry: tuple[Ws32DecoderState, Any], token: Any
+        ) -> tuple[tuple[Ws32DecoderState, Any], Any]:
+            step = ws32_prefill_step_mapped(
+                token[None],
+                carry[0],
+                weights,
+                exact_dsa_weights,
+                config=config,
+                sparse_attention_interpret=sparse_attention_interpret,
+                linear_interpret=linear_interpret,
+            )
+            return (
+                (step.result.state, step.result.next_token),
+                step.normalized_inputs_local,
+            )
+
+        with jax.named_scope("greenfield_ws32_teacher_forced_prefill"):
+            final, prompt_inputs_local = jax.lax.scan(
+                scan_step,
+                (state, initial_token),
+                prompt_token_ids,
+                unroll=1,
+            )
+        repaired_index_cache = final[0].index_cache_local
+        owner = lax.axis_index("expert")
+        for full_slot, layer_id in enumerate(config.full_index_slots):
+            dsa = weights.layers[layer_id].dsa
+            if dsa is None:
+                raise AssertionError("WS32 exact prefill lost DSA parameters")
+            with jax.named_scope(
+                f"greenfield_ws32_exact_dsa/prompt_m64_repair_layer_{layer_id}"
+            ):
+                prompt_inputs = lax.all_gather(
+                    prompt_inputs_local[:, full_slot, :],
+                    axis_name="feature",
+                    axis=1,
+                    tiled=True,
+                )
+                repaired = repair_stage_local_prompt_index_cache(
+                    repaired_index_cache[full_slot],
+                    prompt_inputs,
+                    final[0].block_tables,
+                    exact_dsa_weights[full_slot].wk_weight,
+                    dsa.key_norm_weight,
+                    dsa.key_norm_bias,
+                    owner,
+                    contract=config.dsa_contract,
+                    logical_page_size=config.logical_page_size,
+                    local_rows_per_page=config.local_rows_per_page,
+                    prompt_chunk=2048,
+                    physical_rows=64,
+                    local_parallel_size=8,
+                )
+                repaired_index_cache = repaired_index_cache.at[
+                    full_slot
+                ].set(repaired)
+        repaired_state = Ws32DecoderState(
+            final[0].kv_cache_local,
+            repaired_index_cache,
+            final[0].selected_positions,
+            final[0].selected_valid_counts,
+            final[0].selected_scores,
+            final[0].position,
+            final[0].block_tables,
+            final[0].context_lengths,
+            final[0].contract_valid,
+        )
+        return Ws32PrefillResult(repaired_state, final[1])
+
+    if config.exact_dsa:
+        execute = jax.shard_map(
+            exact_body,
+            mesh=mesh,
+            in_specs=(
+                P(),
+                ws32_decoder_state_specs(),
+                ws32_decoder_weight_specs(config),
+                ws32_exact_dsa_specs(config),
+            ),
+            out_specs=ws32_prefill_result_specs(),
+            check_vma=False,
+        )
+    else:
+        execute = jax.shard_map(
+            body,
+            mesh=mesh,
+            in_specs=(
+                P(),
+                ws32_decoder_state_specs(),
+                ws32_decoder_weight_specs(config),
+            ),
+            out_specs=ws32_prefill_result_specs(),
+            check_vma=False,
+        )
+
     return Ws32TeacherForcedPrefillProgram(
         config=config,
         mesh=mesh,
         prompt_length=prompt_length,
-        execute=jax.shard_map(
-            body,
-            mesh=mesh,
-            in_specs=(P(), ws32_decoder_state_specs(), ws32_decoder_weight_specs(config)),
-            out_specs=ws32_prefill_result_specs(),
-            check_vma=False,
-        ),
+        execute=execute,
     )

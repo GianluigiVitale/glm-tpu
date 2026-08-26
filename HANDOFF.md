@@ -1,6 +1,38 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-16 UTC
+**Updated:** 2026-08-26 UTC
+
+## 2026-08-26 restart recovery and exact-DSA integration checkpoint
+
+- After the one-week shutdown, the authoritative branch remains
+  `rewrite/topology-first-decode` in `/home/gianl/glm-tpu-topology-rewrite`; starting resumed pin
+  is `877a016f18d24e393d8914305079803345e56054`. The replacement `db-v4-64-od` reports
+  READY/HEALTHY v4-64. No TPU program has been launched in this resumed session.
+- Canonical `/home/gianl/glm-tpu/bench/results.db` was restored from authenticated DB554 snapshot
+  SHA `54051d...cb73`; SQLite integrity is `ok`, max run is 554 and DB529/DB554 are present. The
+  old DB359 file is preserved under `/home/gianl/glm-run/db-recovery-20260826T1734Z/`.
+- The four sealed 2K/8K token/DSA runtime oracle payloads were restored from the approved
+  bucket. Their `SUCCESS` SHAs are unchanged: `07700db5...eec`, `c091d0b5...1b2`,
+  `38c0aeb6...3cc`, and `0b798974...1b9`. The archived WS32 position-8155 discriminator is pinned
+  by summary/SUCCESS `66114281...203` / `79aba79e...52b`: tuple4 is exact and all candidate
+  mechanisms are proven, while the old WS32 q-a composition remains correctly classified false.
+- The default-off exact WS32 path now composes DB526/527/529 and DB518: one-shot raw-FP8 owner
+  decode, a separate BF16-to-FP32 `wk` promotion, four distinct tuple4 WQ argument leaves, fused
+  shard-major N82 q-a/kv-a, full normalized row only inside feature-4 groups, divide-sqrt recurrent
+  keys, DEFAULT scorer, and LP8 M64 prompt-cache repair for the 21 full indexers. Acquisition
+  preserves six graph products and executes no token graph; numerical mode remains hash-pinned.
+- Local validation passes: complete `tests/greenfield` is 940 passed / 60 skipped, plus the new
+  fused-QKV shard-order and production materializer focused tests are 2/2. Python compilation,
+  Bash parse and `git diff --check` pass. These are preflight evidence only, not Gate-D or
+  performance proof.
+- Exact next: commit/push and verify owner-bucket bytes, then inspect replacement-pod mounts and
+  fleet cleanliness. Run compile-only exact acquisition first; inspect/pin all six HLOs before any
+  protected 8K numerical execution. If a small structural check fails, preserve it and diagnose
+  locally rather than spending hours on the numerical workflow.
+- Review policy supersedes stale historical Fable text below: never use Fable or Opus. At most one
+  fresh Sol review is allowed before deploy. Every checkpoint must be committed, pushed, and
+  verified in the owner's GCSFuse repository mirror; never stop or count the protected rsync cron
+  as TPU work.
 
 ## WS32 8K exact tokens expose the first non-vacuous DSA ranking failure
 

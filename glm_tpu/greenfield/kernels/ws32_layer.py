@@ -42,6 +42,10 @@ from .reference.dsa import (
 )
 from .reference.linear import linear, residual_add
 from .reference.moe import GlmMoeNumericalContract
+from .reference.qkv_a import (
+    FusedQkvAContract,
+    one_row_fused_qkv_a_convolution,
+)
 from .reference.rmsnorm import rms_norm
 from .reference.rotary import apply_rotary, rotary_cos_sin
 from .stage_local import _require_decode_metadata
@@ -73,6 +77,22 @@ class Ws32DsaWeights(NamedTuple):
     wk_scale_local: Any
     key_norm_weight: Any
     key_norm_bias: Any
+    head_weight_local: Any
+
+
+class Ws32ExactDsaWeights(NamedTuple):
+    """Externally materialized DB526/527 owners for one full indexer.
+
+    The tuple is deliberately separate from the base final-layout checkpoint
+    tree.  A one-shot device executable derives these persistent owners from
+    that tree; recurrent decode then transfers only the live hidden row and
+    compact query/key metadata.
+    """
+
+    qkv_a_bits: Any
+    qkv_a_scale: Any
+    wq_b_weight_aliases: tuple[Any, Any, Any, Any]
+    wk_weight: Any
     head_weight_local: Any
 
 
@@ -113,6 +133,7 @@ class Ws32MoeWeights(NamedTuple):
 
 class Ws32PreparedAttention(NamedTuple):
     normalized_local: Any
+    normalized_for_exact_dsa: Any
     q_residual: Any
     current_kv: Any
 
@@ -144,6 +165,7 @@ class Ws32AttentionLayerResult(NamedTuple):
 class Ws32TransformerLayerResult(NamedTuple):
     output_local: Any
     carried_residual_local: Any
+    normalized_input_local: Any
     cache_local: Any
     index_cache_local: Any
     selected_positions: Any
@@ -184,6 +206,7 @@ def ws32_prepare_attention_mapped(
     residual_local: Any,
     weights: Ws32QkvAWeights,
     *,
+    exact_dsa_weights: Ws32ExactDsaWeights | None = None,
     precomputed_normalized_local: Any | None = None,
     hidden_size: int = 6144,
     feature_axis: str = "feature",
@@ -244,25 +267,52 @@ def ws32_prepare_attention_mapped(
             raise ValueError(
                 "WS32 precomputed attention normalization geometry drifted"
             )
-    q_a = ws32_fp8_feature_linear_pallas_mapped(
-        normalized,
-        weights.q_a_bits_local,
-        weights.q_a_scale_local,
-        feature_axis=feature_axis,
-        block_shape=block_shape,
-        interpret=linear_interpret,
-    )
-    q_residual = rms_norm(
-        q_a, weights.q_a_norm_weight, epsilon=lora_norm_epsilon
-    )
-    projected_kv = ws32_fp8_feature_linear_pallas_mapped(
-        normalized,
-        weights.kv_a_bits_local,
-        weights.kv_a_scale_local,
-        feature_axis=feature_axis,
-        block_shape=block_shape,
-        interpret=linear_interpret,
-    )
+    if exact_dsa_weights is None:
+        normalized_for_exact_dsa = normalized
+        q_a = ws32_fp8_feature_linear_pallas_mapped(
+            normalized,
+            weights.q_a_bits_local,
+            weights.q_a_scale_local,
+            feature_axis=feature_axis,
+            block_shape=block_shape,
+            interpret=linear_interpret,
+        )
+        q_residual = rms_norm(
+            q_a, weights.q_a_norm_weight, epsilon=lora_norm_epsilon
+        )
+        projected_kv = ws32_fp8_feature_linear_pallas_mapped(
+            normalized,
+            weights.kv_a_bits_local,
+            weights.kv_a_scale_local,
+            feature_axis=feature_axis,
+            block_shape=block_shape,
+            interpret=linear_interpret,
+        )
+    else:
+        if block_shape != (128, 128):
+            raise ValueError("WS32 exact qkv-a requires 128x128 FP8 blocks")
+        with jax.named_scope("greenfield_ws32_exact_dsa/normalized_feature_gather"):
+            normalized_full = lax.all_gather(
+                normalized,
+                axis_name=feature_axis,
+                axis=1,
+                tiled=True,
+            )
+        normalized_for_exact_dsa = normalized_full
+        projected = one_row_fused_qkv_a_convolution(
+            normalized_full,
+            exact_dsa_weights.qkv_a_bits,
+            exact_dsa_weights.qkv_a_scale,
+            weights.q_a_norm_weight,
+            contract=FusedQkvAContract(
+                hidden_size=hidden_size,
+                q_lora_rank=q_lora_rank,
+                kv_a_width=kv_width,
+                epsilon=lora_norm_epsilon,
+            ),
+        )
+        q_residual = projected.q_residual
+        projected_kv = projected.kv_a_projection
     current_kv = jnp.concatenate(
         (
             rms_norm(
@@ -274,7 +324,12 @@ def ws32_prepare_attention_mapped(
         ),
         axis=-1,
     ).astype(jnp.bfloat16)
-    return Ws32PreparedAttention(normalized, q_residual, current_kv)
+    return Ws32PreparedAttention(
+        normalized,
+        normalized_for_exact_dsa,
+        q_residual,
+        current_kv,
+    )
 
 
 def ws32_dsa_mapped(
@@ -285,6 +340,7 @@ def ws32_dsa_mapped(
     context_lengths: Any,
     weights: Ws32DsaWeights,
     *,
+    exact_weights: Ws32ExactDsaWeights | None = None,
     expert_axis: str = "expert",
     feature_axis: str = "feature",
     contract: DsaNumericalContract = DsaNumericalContract(),
@@ -337,50 +393,94 @@ def ws32_dsa_mapped(
             physical_page_count=index_cache_local.shape[0],
         )
     )
-    projected_query = fp8_block_matmul_f32(
-        prepared.q_residual,
-        weights.wq_b_bits_local,
-        weights.wq_b_scale_local,
-        config=_pallas_config(block_shape),
-        interpret=linear_interpret,
-    )
-    query = projected_query.reshape(1, local_heads, contract.head_dim)
-    head_weight_partial = lax.dot_general(
-        normalized.astype(jnp.float32),
-        weights.head_weight_local.astype(jnp.float32),
-        dimension_numbers=(((1,), (1,)), ((), ())),
-        preferred_element_type=jnp.float32,
-    )
-    with jax.named_scope("greenfield_ws32_dsa/head_weight_feature_reduce"):
-        local_head_weights = lax.psum(
-            head_weight_partial, axis_name=feature_axis
-        ) * jnp.float32(contract.num_heads**-0.5)
-    cos, sin = rotary_cos_sin(
-        position,
-        rotary_dim=contract.rotary_dim,
-        theta=contract.theta,
-        dtype=jnp.float32,
-    )
-    rotated = apply_rotary(
-        query[..., : contract.rotary_dim],
-        cos[:, None, :],
-        sin[:, None, :],
-        interleaved=contract.interleaved_rotary,
-    )
-    local_query = jnp.concatenate(
-        (rotated, query[..., contract.rotary_dim :]), axis=-1
-    ).astype(jnp.float32)
-    packed_query = jnp.concatenate(
-        (local_query.reshape(1, -1), local_head_weights), axis=-1
-    )
-    with jax.named_scope("greenfield_ws32_dsa/query_expert_gather"):
+    if exact_weights is None:
+        projected_query = fp8_block_matmul_f32(
+            prepared.q_residual,
+            weights.wq_b_bits_local,
+            weights.wq_b_scale_local,
+            config=_pallas_config(block_shape),
+            interpret=linear_interpret,
+        )
+        query = projected_query.reshape(1, local_heads, contract.head_dim)
+        head_weight_partial = lax.dot_general(
+            normalized.astype(jnp.float32),
+            weights.head_weight_local.astype(jnp.float32),
+            dimension_numbers=(((1,), (1,)), ((), ())),
+            preferred_element_type=jnp.float32,
+        )
+        with jax.named_scope("greenfield_ws32_dsa/head_weight_feature_reduce"):
+            local_head_weights = lax.psum(
+                head_weight_partial, axis_name=feature_axis
+            ) * jnp.float32(contract.num_heads**-0.5)
+        cos, sin = rotary_cos_sin(
+            position,
+            rotary_dim=contract.rotary_dim,
+            theta=contract.theta,
+            dtype=jnp.float32,
+        )
+        rotated = apply_rotary(
+            query[..., : contract.rotary_dim],
+            cos[:, None, :],
+            sin[:, None, :],
+            interleaved=contract.interleaved_rotary,
+        )
+        local_query = jnp.concatenate(
+            (rotated, query[..., contract.rotary_dim :]), axis=-1
+        ).astype(jnp.float32)
+        packed_query = jnp.concatenate(
+            (local_query.reshape(1, -1), local_head_weights), axis=-1
+        )
+        query_axis = expert_axis
+        local_query_width = local_heads * contract.head_dim
+    else:
+        exact_local_heads = contract.num_heads // 4
+        aliases = exact_weights.wq_b_weight_aliases
+        if len(aliases) != 4 or any(
+            weight.shape
+            != (
+                exact_local_heads * contract.head_dim,
+                contract.q_lora_rank,
+            )
+            or weight.dtype != jnp.float32
+            for weight in aliases
+        ):
+            raise ValueError("WS32 exact DSA tuple4 query owner drifted")
+        if exact_weights.head_weight_local.shape != (
+            exact_local_heads,
+            contract.hidden_size,
+        ) or exact_weights.head_weight_local.dtype != jnp.bfloat16:
+            raise ValueError("WS32 exact DSA head owner drifted")
+        if exact_weights.wk_weight.shape != (
+            contract.head_dim,
+            contract.hidden_size,
+        ) or exact_weights.wk_weight.dtype != jnp.float32:
+            raise ValueError("WS32 exact DSA wk owner drifted")
+        normalized_full = prepared.normalized_for_exact_dsa
+        if normalized_full.shape != (1, contract.hidden_size) or (
+            normalized_full.dtype != jnp.bfloat16
+        ):
+            raise ValueError("WS32 exact DSA normalized owner drifted")
+        with jax.named_scope("greenfield_ws32_exact_dsa/tuple4_query"):
+            local_query, local_head_weights = ws32_grouped_dsa_query_and_head(
+                prepared.q_residual,
+                normalized_full,
+                aliases,
+                exact_weights.head_weight_local,
+                position,
+                contract=contract,
+            )
+        packed_query = jnp.concatenate(
+            (local_query.reshape(1, -1), local_head_weights), axis=-1
+        )
+        query_axis = feature_axis
+        local_query_width = exact_local_heads * contract.head_dim
+    with jax.named_scope(f"greenfield_ws32_dsa/query_{query_axis}_gather"):
         gathered_query = lax.all_gather(
             packed_query,
-            axis_name=expert_axis,
+            axis_name=query_axis,
             axis=0,
             tiled=False,
         )
-    local_query_width = local_heads * contract.head_dim
     query = jnp.transpose(
         gathered_query[..., :local_query_width], (1, 0, 2)
     ).reshape(1, contract.num_heads, contract.head_dim)
@@ -388,22 +488,35 @@ def ws32_dsa_mapped(
         gathered_query[..., local_query_width:], (1, 0, 2)
     ).reshape(1, contract.num_heads)
 
-    key_partial = fp8_block_matmul_f32(
-        normalized,
-        weights.wk_bits_local,
-        weights.wk_scale_local,
-        config=_pallas_config(block_shape),
-        interpret=linear_interpret,
-    )
-    with jax.named_scope("greenfield_ws32_dsa/key_feature_reduce"):
-        projected_key = lax.psum(key_partial, axis_name=feature_axis)
-    current_key_f32 = dsa_index_keys_from_projection(
-        projected_key,
-        weights.key_norm_weight,
-        weights.key_norm_bias,
-        position,
-        contract=contract,
-    ).astype(jnp.float32)
+    if exact_weights is None:
+        key_partial = fp8_block_matmul_f32(
+            normalized,
+            weights.wk_bits_local,
+            weights.wk_scale_local,
+            config=_pallas_config(block_shape),
+            interpret=linear_interpret,
+        )
+        with jax.named_scope("greenfield_ws32_dsa/key_feature_reduce"):
+            projected_key = lax.psum(key_partial, axis_name=feature_axis)
+        current_key_f32 = dsa_index_keys_from_projection(
+            projected_key,
+            weights.key_norm_weight,
+            weights.key_norm_bias,
+            position,
+            contract=contract,
+        ).astype(jnp.float32)
+        score_precision = "highest"
+    else:
+        with jax.named_scope("greenfield_ws32_exact_dsa/exact_current_key"):
+            current_key_f32 = ws32_exact_dsa_current_key(
+                normalized_full,
+                exact_weights.wk_weight,
+                weights.key_norm_weight,
+                weights.key_norm_bias,
+                position,
+                contract=contract,
+            )
+        score_precision = "default"
     current_key = current_key_f32.astype(index_cache_local.dtype)
 
     def write_current(value: Any) -> Any:
@@ -433,9 +546,15 @@ def ws32_dsa_mapped(
         page_ok[:, None], global_positions, jnp.int32(-1)
     ).reshape(-1)
     local_keys = logical_cache.reshape(-1, contract.head_dim)
-    local_scores = dsa_scores(
-        query, local_keys, head_weights, precision="highest"
+    score_scope = (
+        "greenfield_ws32_exact_dsa/default_score"
+        if exact_weights is not None
+        else "greenfield_ws32_dsa/highest_score"
     )
+    with jax.named_scope(score_scope):
+        local_scores = dsa_scores(
+            query, local_keys, head_weights, precision=score_precision
+        )
     candidate_scores, candidate_positions = local_topk_candidates(
         local_scores,
         global_positions,
@@ -496,8 +615,8 @@ def ws32_grouped_dsa_query_and_head(
     layout with four aliases.  This helper admits exactly those two physical
     geometries and keeps the BF16 q-a completion boundary explicit.
 
-    The helper is not selected by :func:`ws32_dsa_mapped` until the real
-    position-8155 TPU discriminator chooses one of the two layouts.
+    The default path does not select this helper. The default-off exact path
+    selects only the tuple4 layout proven by the position-8155 discriminator.
     """
 
     alias_count = len(query_weight_aliases)
@@ -826,6 +945,7 @@ def ws32_attention_layer_mapped(
     attention_weights: Ws32AttentionWeights,
     dsa_weights: Ws32DsaWeights | None,
     *,
+    exact_dsa_weights: Ws32ExactDsaWeights | None = None,
     dsa_contract: DsaNumericalContract = DsaNumericalContract(),
     attention_contract: MlaNumericalContract = MlaNumericalContract(),
     cache_layout: StageLocalKvLayout = StageLocalKvLayout(
@@ -845,6 +965,7 @@ def ws32_attention_layer_mapped(
     prepared = ws32_prepare_attention_mapped(
         residual_local,
         qkv_a_weights,
+        exact_dsa_weights=exact_dsa_weights,
         precomputed_normalized_local=precomputed_normalized_local,
         hidden_size=dsa_contract.hidden_size,
         block_shape=block_shape,
@@ -859,6 +980,7 @@ def ws32_attention_layer_mapped(
             block_tables,
             context_lengths,
             dsa_weights,
+            exact_weights=exact_dsa_weights,
             contract=dsa_contract,
             cache_layout=cache_layout,
             block_shape=block_shape,
@@ -917,6 +1039,7 @@ def ws32_transformer_layer_mapped(
     moe_weights: Ws32MoeWeights | None,
     incoming_contract_valid: Any,
     *,
+    exact_dsa_weights: Ws32ExactDsaWeights | None = None,
     indexer_kind: str,
     mlp_kind: str,
     dsa_contract: DsaNumericalContract = DsaNumericalContract(),
@@ -949,6 +1072,8 @@ def ws32_transformer_layer_mapped(
         raise ValueError("WS32 MLP kind must be dense or sparse")
     if (dsa_weights is None) != (indexer_kind == "shared"):
         raise ValueError("WS32 full indexer alone must carry DSA weights")
+    if exact_dsa_weights is not None and indexer_kind != "full":
+        raise ValueError("WS32 exact DSA owners must exist only on full indexers")
     if (dense_weights is None) != (mlp_kind == "sparse"):
         raise ValueError("WS32 dense weights must exist only on dense layers")
     if (moe_weights is None) != (mlp_kind == "dense"):
@@ -997,6 +1122,7 @@ def ws32_transformer_layer_mapped(
         qkv_a_weights,
         attention_weights,
         dsa_weights,
+        exact_dsa_weights=exact_dsa_weights,
         dsa_contract=dsa_contract,
         attention_contract=attention_contract,
         cache_layout=cache_layout,
@@ -1033,6 +1159,7 @@ def ws32_transformer_layer_mapped(
     return Ws32TransformerLayerResult(
         mlp.output_local,
         post_attention_residual,
+        normalized_input,
         attention.cache_local,
         attention.index_cache_local,
         attention.selected_positions,

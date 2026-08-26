@@ -80,6 +80,35 @@ class Ws32DecoderHloReport:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class Ws32ExactDsaMaterializerHloReport:
+    kind: str
+    stablehlo_sha256: str
+    optimized_hlo_sha256: str
+    instruction_count: int
+    live_instruction_count: int
+    collective_count: int
+    maximum_group_size: int
+    violations: tuple[str, ...]
+
+    @property
+    def passed(self) -> bool:
+        return not self.violations
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "collective_count": self.collective_count,
+            "instruction_count": self.instruction_count,
+            "kind": self.kind,
+            "live_instruction_count": self.live_instruction_count,
+            "maximum_group_size": self.maximum_group_size,
+            "optimized_hlo_sha256": self.optimized_hlo_sha256,
+            "passed": self.passed,
+            "stablehlo_sha256": self.stablehlo_sha256,
+            "violations": list(self.violations),
+        }
+
+
 def _digest(value: str, *, field: str) -> str:
     if _HEX.fullmatch(value) is None:
         raise ValueError(f"{field} must be one lowercase SHA-256")
@@ -157,7 +186,10 @@ def _forbidden_full_hidden_values(
 
 
 def _hidden_reconstructing_all_gathers(
-    instructions: tuple[HloInstruction, ...], *, hidden_size: int
+    instructions: tuple[HloInstruction, ...],
+    *,
+    hidden_size: int,
+    allow_exact_dsa_feature_gather: bool = False,
 ) -> tuple[str, ...]:
     """Reject a subgroup gather that physically rebuilds one hidden row."""
 
@@ -179,6 +211,14 @@ def _hidden_reconstructing_all_gathers(
             and operand.element_count * instruction.maximum_group_size
             == result.element_count
         ):
+            if (
+                allow_exact_dsa_feature_gather
+                and instruction.op_name is not None
+                and "greenfield_ws32_exact_dsa"
+                in instruction.op_name.split("/")
+                and _group_family(instruction) == "feature"
+            ):
+                continue
             forbidden.append(instruction.name)
     return tuple(sorted(forbidden))
 
@@ -192,6 +232,8 @@ def validate_ws32_decoder_hlo(
     hidden_size: int,
     kind: str = "decode",
     expected_split_rmsnorm_collective_count: int = 157,
+    exact_dsa: bool = False,
+    full_indexer_count: int = 21,
 ) -> Ws32DecoderHloReport:
     """Validate one complete decoder/prefill graph before device execution.
 
@@ -211,6 +253,12 @@ def validate_ws32_decoder_hlo(
         or expected_split_rmsnorm_collective_count < 0
     ):
         raise ValueError("WS32 split RMSNorm count is invalid")
+    if not isinstance(exact_dsa, bool):
+        raise ValueError("WS32 exact DSA HLO flag must be boolean")
+    if not isinstance(full_indexer_count, int) or isinstance(
+        full_indexer_count, bool
+    ) or full_indexer_count <= 0:
+        raise ValueError("WS32 full-indexer HLO count is invalid")
     expected_stablehlo_sha256 = _digest(
         expected_stablehlo_sha256, field="expected_stablehlo_sha256"
     )
@@ -265,7 +313,9 @@ def validate_ws32_decoder_hlo(
             set(forbidden_hidden)
             | set(
                 _hidden_reconstructing_all_gathers(
-                    live, hidden_size=hidden_size
+                    live,
+                    hidden_size=hidden_size,
+                    allow_exact_dsa_feature_gather=exact_dsa,
                 )
             )
         )
@@ -349,6 +399,76 @@ def validate_ws32_decoder_hlo(
         violations.append(
             "split-residual RMSNorm reduction geometry drifted"
         )
+    if exact_dsa and kind != "cache_probe":
+
+        def scoped(item: HloInstruction, marker: str) -> bool:
+            return item.op_name is not None and marker in item.op_name.split("/")
+
+        normalized_gathers = tuple(
+            item
+            for item in live_collectives
+            if item.raw_opcode == "all-gather"
+            and scoped(item, "greenfield_ws32_exact_dsa")
+            and scoped(item, "normalized_feature_gather")
+        )
+        query_gathers = tuple(
+            item
+            for item in live_collectives
+            if item.raw_opcode == "all-gather"
+            and scoped(item, "query_feature_gather")
+        )
+        repair_gathers = tuple(
+            item
+            for item in live_collectives
+            if item.raw_opcode == "all-gather"
+            and any(
+                part.startswith("prompt_m64_repair_layer_")
+                for part in (() if item.op_name is None else item.op_name.split("/"))
+            )
+        )
+        expected_normalized = full_indexer_count
+        if len(normalized_gathers) != expected_normalized or any(
+            _group_family(item) != "feature"
+            or item.maximum_group_size != 4
+            for item in normalized_gathers
+        ):
+            violations.append("exact WS32 DSA normalized gather count/geometry drifted")
+        if len(query_gathers) != full_indexer_count or any(
+            _group_family(item) != "feature"
+            or item.maximum_group_size != 4
+            for item in query_gathers
+        ):
+            violations.append("exact WS32 DSA tuple4 query gather count drifted")
+        expected_repairs = full_indexer_count if kind == "prefill" else 0
+        if len(repair_gathers) != expected_repairs or any(
+            _group_family(item) != "feature"
+            or item.maximum_group_size != 4
+            for item in repair_gathers
+        ):
+            violations.append("exact WS32 prompt M64 repair gather count drifted")
+        exact_markers = (
+            "one_row_fused_qkv_a_n82_convolution",
+            "tuple4_query",
+            "exact_current_key",
+            "default_score",
+        )
+        for marker in exact_markers:
+            if not any(scoped(item, marker) for item in live):
+                violations.append(f"exact WS32 DSA lost live {marker} scope")
+        if any(scoped(item, "query_expert_gather") for item in live):
+            violations.append("exact WS32 DSA retained expert-owned query gather")
+        sixteen_kib = tuple(
+            item
+            for item in live
+            if scoped(item, "tuple4_query")
+            and "megacore_allreduce_bytes" in item.raw_line
+            and re.search(
+                r'megacore_allreduce_bytes(?:\\?"|[^0-9]){1,32}16384',
+                item.raw_line,
+            )
+        )
+        if len(sixteen_kib) != full_indexer_count:
+            violations.append("exact WS32 DSA tuple4 16-KiB fusion count drifted")
     return Ws32DecoderHloReport(
         kind=kind,
         stablehlo_sha256=stable_digest,
@@ -372,5 +492,138 @@ def validate_ws32_decoder_hlo(
         maximum_group_size=maximum_group,
         async_collective_count=len(async_collectives),
         forbidden_full_hidden_values=forbidden_hidden,
+        violations=tuple(violations),
+    )
+
+
+def validate_ws32_exact_dsa_materializer_hlo(
+    stablehlo: str,
+    optimized_hlo: str,
+    *,
+    expected_stablehlo_sha256: str,
+    expected_optimized_hlo_sha256: str,
+    kind: str,
+    full_indexer_count: int = 21,
+) -> Ws32ExactDsaMaterializerHloReport:
+    """Fail closed on the two one-shot exact-owner executables."""
+
+    if kind not in {"exact_materialize", "exact_promote"}:
+        raise ValueError("WS32 exact materializer HLO kind is invalid")
+    if not isinstance(full_indexer_count, int) or isinstance(
+        full_indexer_count, bool
+    ) or full_indexer_count <= 0:
+        raise ValueError("WS32 exact materializer layer count is invalid")
+    expected_stablehlo_sha256 = _digest(
+        expected_stablehlo_sha256, field="expected_stablehlo_sha256"
+    )
+    expected_optimized_hlo_sha256 = _digest(
+        expected_optimized_hlo_sha256,
+        field="expected_optimized_hlo_sha256",
+    )
+    stable_digest = sha256(stablehlo.encode("utf-8")).hexdigest()
+    optimized_digest = sha256(optimized_hlo.encode("utf-8")).hexdigest()
+    module = parse_hlo_module(optimized_hlo)
+    live = _live_instruction_closure(module.instructions)
+    live_keys = {(item.computation, item.name) for item in live}
+    collectives = tuple(
+        item
+        for item in module.collectives
+        if (item.computation, item.name) in live_keys
+    )
+    violations: list[str] = []
+    if stable_digest != expected_stablehlo_sha256:
+        violations.append("StableHLO identity drifted")
+    if optimized_digest != expected_optimized_hlo_sha256:
+        violations.append("optimized HLO identity drifted")
+    if len(collectives) != len(module.collectives):
+        violations.append("exact materializer contains a dead collective decoy")
+    if module.num_partitions != 32:
+        violations.append("exact materializer is not partitioned 32 ways")
+    entry_parameters = Counter(
+        (shape.dtype, shape.dimensions)
+        for item in module.instructions
+        if item.computation.startswith("ENTRY ")
+        and item.raw_opcode == "parameter"
+        for shape in item.result_shapes
+    )
+    materialize_parameters = Counter(
+        {
+            ("u8", (2048, 1536)): full_indexer_count,
+            ("f32", (16, 12)): full_indexer_count,
+            ("u8", (576, 1536)): full_indexer_count,
+            ("f32", (5, 12)): full_indexer_count,
+            ("u8", (512, 2048)): full_indexer_count,
+            ("f32", (4, 16)): full_indexer_count,
+            ("u8", (128, 1536)): full_indexer_count,
+            ("f32", (1, 12)): full_indexer_count,
+            ("bf16", (4, 1536)): full_indexer_count,
+        }
+    )
+    promote_parameters = Counter(
+        {
+            ("u8", (32, 6144, 82)): full_indexer_count,
+            ("f32", (32, 48, 82)): full_indexer_count,
+            ("f32", (1024, 2048)): full_indexer_count,
+            ("bf16", (128, 6144)): full_indexer_count,
+            ("bf16", (8, 6144)): full_indexer_count,
+        }
+    )
+    expected_parameters = (
+        materialize_parameters
+        if kind == "exact_materialize"
+        else promote_parameters
+    )
+    if entry_parameters != expected_parameters:
+        violations.append("exact materializer entry parameter geometry drifted")
+    if any(marker in stablehlo.lower() for marker in _HOST_MARKERS):
+        violations.append("exact materializer StableHLO contains host execution")
+    if any(
+        item.raw_opcode not in {"all-gather"}
+        or _group_family(item) not in {"feature", "expert"}
+        or not item.use_global_device_ids
+        for item in collectives
+    ):
+        violations.append("exact materializer collective geometry drifted")
+    maximum_group = max(
+        (item.maximum_group_size for item in collectives), default=0
+    )
+    if maximum_group > 8:
+        violations.append("exact materializer collective exceeds group eight")
+    if any(
+        item.raw_opcode.endswith(("-start", "-done"))
+        for item in module.instructions
+        if item.raw_opcode not in {"copy-start", "copy-done"}
+    ):
+        violations.append("exact materializer contains async collectives")
+
+    def marker_present(marker: str) -> bool:
+        return any(
+            item.op_name is not None and marker in item.op_name.split("/")
+            for item in live
+        )
+
+    if kind == "exact_materialize":
+        if not collectives:
+            violations.append("exact owner decode contains no physical gather")
+        for marker in ("qkv_a", "tuple4_query", "wk_decode", "head_owner"):
+            if not marker_present(marker):
+                violations.append(f"exact owner decode lost live {marker} scope")
+        if marker_present("wk_promote"):
+            violations.append("exact owner decode crossed the BF16 wk boundary")
+    else:
+        if collectives:
+            violations.append("exact wk promotion unexpectedly communicates")
+        if not marker_present("wk_promote"):
+            violations.append("exact wk promotion lost its live source scope")
+        if marker_present("wk_decode"):
+            violations.append("exact wk promotion rematerializes raw wk")
+    return Ws32ExactDsaMaterializerHloReport(
+        kind=kind,
+        stablehlo_sha256=stable_digest,
+        optimized_hlo_sha256=optimized_digest,
+        instruction_count=len(module.instructions),
+        live_instruction_count=len(live),
+        collective_count=len(collectives),
+        maximum_group_size=maximum_group,
         violations=tuple(violations),
     )

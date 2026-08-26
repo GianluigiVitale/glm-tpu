@@ -9,6 +9,7 @@ import pytest
 from glm_tpu.greenfield.benchmarking.ws32_decoder import (
     _exact_add_reducer,
     validate_ws32_decoder_hlo,
+    validate_ws32_exact_dsa_materializer_hlo,
 )
 from glm_tpu.greenfield.benchmarking.ws32_pallas_one_layer import (
     _live_instruction_closure,
@@ -193,6 +194,48 @@ ENTRY main {{
 '''
 
 
+def _exact_materializer_hlo(*, promote: bool = False) -> str:
+    feature, expert = _groups()
+    if promote:
+        return '''HloModule exact_promote, num_partitions=32
+
+ENTRY main {
+  %qkv = u8[32,6144,82] parameter(0)
+  %scale = f32[32,48,82] parameter(1)
+  %wq = f32[1024,2048] parameter(2)
+  %wk = bf16[128,6144] parameter(3)
+  %head = bf16[8,6144] parameter(4)
+  %promoted = f32[128,6144] convert(%wk), metadata={op_name="jit(body)/shard_map/greenfield_ws32_exact_dsa_materializer/wk_promote"}
+  ROOT %root = (u8[32,6144,82], f32[32,48,82], f32[1024,2048], f32[128,6144], bf16[8,6144]) tuple(%qkv, %scale, %wq, %promoted, %head)
+}
+'''
+    return f'''HloModule exact_materialize, num_partitions=32
+
+ENTRY main {{
+  %q = u8[2048,1536] parameter(0)
+  %qs = f32[16,12] parameter(1)
+  %kv = u8[576,1536] parameter(2)
+  %kvs = f32[5,12] parameter(3)
+  %wq = u8[512,2048] parameter(4)
+  %wqs = f32[4,16] parameter(5)
+  %wk = u8[128,1536] parameter(6)
+  %wks = f32[1,12] parameter(7)
+  %head = bf16[4,1536] parameter(8)
+  %qg = u8[2048,6144] all-gather(%q), dimensions={{1}}, replica_groups={{{feature}}}, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_exact_dsa_materializer/qkv_a"}}
+  %qsg = f32[16,48] all-gather(%qs), dimensions={{1}}, replica_groups={{{feature}}}, use_global_device_ids=true
+  %kvg = u8[576,6144] all-gather(%kv), dimensions={{1}}, replica_groups={{{feature}}}, use_global_device_ids=true
+  %kvsg = f32[5,48] all-gather(%kvs), dimensions={{1}}, replica_groups={{{feature}}}, use_global_device_ids=true
+  %wqg = u8[4096,2048] all-gather(%wq), dimensions={{0}}, replica_groups={{{expert}}}, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_exact_dsa_materializer/tuple4_query"}}
+  %wqsg = f32[32,16] all-gather(%wqs), dimensions={{0}}, replica_groups={{{expert}}}, use_global_device_ids=true
+  %wkg = u8[128,6144] all-gather(%wk), dimensions={{1}}, replica_groups={{{feature}}}, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_exact_dsa_materializer/wk_decode"}}
+  %wksg = f32[1,48] all-gather(%wks), dimensions={{1}}, replica_groups={{{feature}}}, use_global_device_ids=true
+  %headf = bf16[4,6144] all-gather(%head), dimensions={{1}}, replica_groups={{{feature}}}, use_global_device_ids=true
+  %heade = bf16[32,6144] all-gather(%headf), dimensions={{0}}, replica_groups={{{expert}}}, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_exact_dsa_materializer/head_owner"}}
+  ROOT %root = (u8[2048,6144], f32[16,48], u8[576,6144], f32[5,48], u8[4096,2048], f32[32,16], u8[128,6144], f32[1,48], bf16[32,6144]) tuple(%qg, %qsg, %kvg, %kvsg, %wqg, %wqsg, %wkg, %wksg, %heade)
+}}
+'''
+
+
 def test_ws32_complete_hlo_contract_is_live_and_subgroup_only() -> None:
     report = _report(_hlo())
     assert report.passed, report.violations
@@ -361,6 +404,38 @@ def test_ws32_complete_hlo_requires_explicit_32_partitions_and_no_hidden_gather(
     report = _report(hidden_gather)
     assert not report.passed
     assert any("full-pod hidden value" in item for item in report.violations)
+
+
+def test_ws32_exact_materializer_hlo_is_subgroup_only_and_phase_separated() -> None:
+    for kind, hlo in (
+        ("exact_materialize", _exact_materializer_hlo()),
+        ("exact_promote", _exact_materializer_hlo(promote=True)),
+    ):
+        stable = "module @main"
+        report = validate_ws32_exact_dsa_materializer_hlo(
+            stable,
+            hlo,
+            expected_stablehlo_sha256=sha256(stable.encode()).hexdigest(),
+            expected_optimized_hlo_sha256=sha256(hlo.encode()).hexdigest(),
+            kind=kind,
+            full_indexer_count=1,
+        )
+        assert report.passed, report.violations
+        assert report.maximum_group_size == (
+            8 if kind == "exact_materialize" else 0
+        )
+    crossed = _exact_materializer_hlo().replace(
+        "head_owner", "wk_promote"
+    )
+    report = validate_ws32_exact_dsa_materializer_hlo(
+        "module @main",
+        crossed,
+        expected_stablehlo_sha256=sha256(b"module @main").hexdigest(),
+        expected_optimized_hlo_sha256=sha256(crossed.encode()).hexdigest(),
+        kind="exact_materialize",
+        full_indexer_count=1,
+    )
+    assert not report.passed
 
 
 @pytest.mark.skipif(

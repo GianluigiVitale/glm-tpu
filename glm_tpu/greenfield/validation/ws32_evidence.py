@@ -21,7 +21,10 @@ import google_crc32c
 from google.cloud import storage
 
 
-GRAPHS = ("prefill", "observer", "decode", "cache_probe")
+BASE_GRAPHS = ("prefill", "observer", "decode", "cache_probe")
+EXACT_DSA_GRAPHS = ("exact_materialize", "exact_promote") + BASE_GRAPHS
+# Compatibility alias for callers inspecting the default-off graph contract.
+GRAPHS = BASE_GRAPHS
 HLO_FORMS = (
     ("stablehlo.mlir", "stablehlo_sha256"),
     ("optimized_hlo.txt", "optimized_hlo_sha256"),
@@ -55,7 +58,11 @@ def _runner_suffixes(*, numerical: bool) -> tuple[str, ...]:
     return ("json", "npz", "log") if numerical else ("json", "log")
 
 
-def _expected_primary_names(*, numerical: bool) -> set[str]:
+def _graphs(*, exact_dsa: bool) -> tuple[str, ...]:
+    return EXACT_DSA_GRAPHS if exact_dsa else BASE_GRAPHS
+
+
+def _expected_primary_names(*, numerical: bool, exact_dsa: bool = False) -> set[str]:
     names = {
         f"host_records/runner.rank{rank}.{suffix}"
         for rank in RANKS
@@ -64,7 +71,7 @@ def _expected_primary_names(*, numerical: bool) -> set[str]:
     names.update(
         f"hlo/{graph}.rank{rank}.{suffix}"
         for rank in RANKS
-        for graph in GRAPHS
+        for graph in _graphs(exact_dsa=exact_dsa)
         for suffix, _ in HLO_FORMS
     )
     if numerical:
@@ -171,6 +178,7 @@ def materialize(
     tag: str,
     code_hash: str,
     recovery_code_hash: str,
+    exact_dsa: bool,
     allow_failure_diagnostics: bool,
     output: Path,
 ) -> dict[str, object]:
@@ -189,7 +197,10 @@ def materialize(
         blob.name.removeprefix(prefix + "/"): blob
         for blob in client.list_blobs(bucket_name, prefix=prefix + "/")
     }
-    primary = _expected_primary_names(numerical=numerical)
+    graph_names = _graphs(exact_dsa=exact_dsa)
+    primary = _expected_primary_names(
+        numerical=numerical, exact_dsa=exact_dsa
+    )
     missing = primary - set(blobs)
     if missing:
         raise SystemExit(f"remote fleet evidence is incomplete: {sorted(missing)}")
@@ -239,6 +250,7 @@ def materialize(
             or runner.get("compile_only") is not (not numerical)
             or runner.get("launch_process_id") != rank
             or runner.get("code_hash") != code_hash
+            or runner.get("exact_dsa") is not exact_dsa
         ):
             raise SystemExit(f"runner rank {rank} identity/status drifted")
         runners.append(runner)
@@ -259,9 +271,9 @@ def materialize(
     fleet_hlo = run_dir / "fleet_hlo"
     for rank, runner in enumerate(runners):
         graphs = runner.get("graphs")
-        if not isinstance(graphs, dict) or set(graphs) != set(GRAPHS):
+        if not isinstance(graphs, dict) or set(graphs) != set(graph_names):
             raise SystemExit(f"runner rank {rank} graph schema drifted")
-        for graph in GRAPHS:
+        for graph in graph_names:
             report = graphs[graph]
             if not isinstance(report, dict):
                 raise SystemExit(f"runner rank {rank} graph report drifted")
@@ -337,6 +349,7 @@ def materialize(
         "artifact_kind": "greenfield_ws32_short_decoder_source_ledger",
         "code_hash": code_hash,
         "failure_diagnostics_preserved": bool(extras),
+        "exact_dsa": exact_dsa,
         "mode": mode,
         "objects": sorted(records, key=lambda item: str(item["name"])),
         "recovery_code_hash": recovery_code_hash,
@@ -362,6 +375,7 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--tag", required=True)
     parser.add_argument("--code-hash", required=True)
     parser.add_argument("--recovery-code-hash", required=True)
+    parser.add_argument("--exact-dsa", choices=(0, 1), required=True, type=int)
     parser.add_argument("--allow-failure-diagnostics", action="store_true")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
@@ -376,6 +390,7 @@ def main() -> int:
         tag=args.tag,
         code_hash=args.code_hash,
         recovery_code_hash=args.recovery_code_hash,
+        exact_dsa=bool(args.exact_dsa),
         allow_failure_diagnostics=args.allow_failure_diagnostics,
         output=args.output,
     )

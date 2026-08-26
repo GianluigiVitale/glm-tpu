@@ -191,7 +191,9 @@ prepare_sharded = jax.shard_map(
     ),
     mesh=mesh,
     in_specs=(P(None, "feature"), qkv_specs),
-    out_specs=Ws32PreparedAttention(P(None, "feature"), P(), P()),
+    out_specs=Ws32PreparedAttention(
+        P(None, "feature"), P(None, "feature"), P(), P()
+    ),
     check_vma=False,
 )
 prepared_global = jax.jit(prepare_sharded)(arguments[0], arguments[5])
@@ -384,8 +386,12 @@ position = np.asarray([7], dtype=np.int32)
 block_tables = np.asarray([[0]], dtype=np.int32)
 context_lengths = np.asarray([8], dtype=np.int32)
 
-prepared_values = Ws32PreparedAttention(normalized, q_residual, current_kv)
-prepared_specs = Ws32PreparedAttention(P(None, "feature"), P(), P())
+prepared_values = Ws32PreparedAttention(
+    normalized, normalized, q_residual, current_kv
+)
+prepared_specs = Ws32PreparedAttention(
+    P(None, "feature"), P(None, "feature"), P(), P()
+)
 weight_values = Ws32AttentionWeights(
     q_b, q_b_scale, kv_b, kv_b_scale, o_weight, o_scale
 )
@@ -1002,6 +1008,7 @@ def decomposed(update, residual, kv, index, positions, valid, selected_scores,
     )
     return Ws32TransformerLayerResult(
         mlp_result.output_local, post_attention_residual,
+        normalized_input,
         attention_result.cache_local,
         attention_result.index_cache_local, attention_result.selected_positions,
         attention_result.selected_valid_counts, attention_result.selected_scores,
@@ -1015,7 +1022,8 @@ input_specs = (
     attention_specs, P("feature"), dense_specs, P(),
 )
 output_specs = Ws32TransformerLayerResult(
-    P(None, "feature"), P(None, "feature"), P(None, "expert", None),
+    P(None, "feature"), P(None, "feature"), P(None, "feature"),
+    P(None, "expert", None),
     P(None, "expert", None), P(), P(), P(), P(), P(), P(),
 )
 joined = jax.shard_map(

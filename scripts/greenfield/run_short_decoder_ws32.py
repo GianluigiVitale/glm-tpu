@@ -31,6 +31,7 @@ if str(REPO) not in sys.path:
 
 from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     validate_ws32_decoder_hlo,
+    validate_ws32_exact_dsa_materializer_hlo,
     validate_ws32_topology_fleet,
 )
 from glm_tpu.greenfield.checkpoint import (  # noqa: E402
@@ -42,8 +43,10 @@ from glm_tpu.greenfield.runtime import (  # noqa: E402
     Ws32DecoderConfig,
     bind_ws32_decoder_weights,
     build_ws32_decoder_program,
+    build_ws32_exact_dsa_materializer_program,
     build_ws32_teacher_forced_prefill_program,
     make_ws32_initial_state,
+    select_ws32_exact_dsa_raw_weights,
 )
 from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
     build_ws32_physical_mesh,
@@ -83,10 +86,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dsa-oracle-manifest-sha256", required=True)
     parser.add_argument("--token-oracle-success-sha256", required=True)
     parser.add_argument("--dsa-oracle-success-sha256", required=True)
+    parser.add_argument("--dsa-association-summary-sha256", required=True)
+    parser.add_argument("--dsa-association-success-sha256", required=True)
     parser.add_argument("--topology-sha256", required=True)
     parser.add_argument("--topology-fleet-sha256", required=True)
     parser.add_argument("--mesh-sha256", required=True)
-    for graph in ("prefill", "observer", "decode", "cache-probe"):
+    for graph in (
+        "exact-materialize",
+        "exact-promote",
+        "prefill",
+        "observer",
+        "decode",
+        "cache-probe",
+    ):
         parser.add_argument(
             f"--expected-{graph}-stablehlo-sha256", required=True
         )
@@ -99,6 +111,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hlo-dir", required=True, type=Path)
     parser.add_argument("--trace-dir", required=True, type=Path)
     parser.add_argument("--compile-only", choices=(0, 1), default=0, type=int)
+    parser.add_argument("--exact-dsa", choices=(0, 1), default=0, type=int)
     parser.add_argument("--observer-steps", default=14, type=int)
     parser.add_argument("--warmup", default=2, type=int)
     parser.add_argument("--iterations", default=10, type=int)
@@ -287,6 +300,7 @@ def _write_graph(
     expected_stable: str,
     expected_optimized: str,
     hidden_size: int,
+    exact_dsa: bool,
 ) -> tuple[dict[str, Any], str, str]:
     stable = str(lowered.compiler_ir(dialect="stablehlo"))
     optimized = compiled.as_text()
@@ -301,8 +315,31 @@ def _write_graph(
         expected_optimized_hlo_sha256=expected_optimized,
         hidden_size=hidden_size,
         kind=graph,
+        exact_dsa=exact_dsa,
     )
     return report.to_dict(), stable, optimized
+
+
+def _write_exact_materializer_graph(
+    *,
+    graph: str,
+    lowered: Any,
+    compiled: Any,
+    hlo_dir: Path,
+    expected_stable: str,
+    expected_optimized: str,
+) -> dict[str, Any]:
+    stable = str(lowered.compiler_ir(dialect="stablehlo"))
+    optimized = compiled.as_text()
+    _atomic_text(hlo_dir / f"{graph}.stablehlo.mlir", stable)
+    _atomic_text(hlo_dir / f"{graph}.optimized_hlo.txt", optimized)
+    return validate_ws32_exact_dsa_materializer_hlo(
+        stable,
+        optimized,
+        expected_stablehlo_sha256=expected_stable,
+        expected_optimized_hlo_sha256=expected_optimized,
+        kind=graph,
+    ).to_dict()
 
 
 def _require_graph_authorized(
@@ -322,8 +359,12 @@ def _require_graph_authorized(
 
 def _require_acquisition_authorized(
     graphs: Mapping[str, Mapping[str, Any]],
+    *,
+    exact_dsa: bool,
 ) -> None:
     expected = {"cache_probe", "decode", "observer", "prefill"}
+    if exact_dsa:
+        expected.update({"exact_materialize", "exact_promote"})
     if set(graphs) != expected:
         raise RuntimeError("WS32 acquisition did not preserve all four graphs")
     if all(value["passed"] for value in graphs.values()) or any(
@@ -426,18 +467,52 @@ def main() -> int:
         or args.trace_dir.exists()
     ):
         raise FileExistsError("WS32 short-decoder evidence is append-only")
-    if args.compile_only and any(
-        value != _ZERO_SHA
+    materializer_pin_names = {
+        "expected_exact_materialize_stablehlo_sha256",
+        "expected_exact_materialize_optimized_hlo_sha256",
+        "expected_exact_promote_stablehlo_sha256",
+        "expected_exact_promote_optimized_hlo_sha256",
+    }
+    active_hlo_pins = {
+        name: value
         for name, value in vars(args).items()
-        if name.startswith("expected_") and "hlo_sha256" in name
+        if name.startswith("expected_")
+        and "hlo_sha256" in name
+        and (args.exact_dsa or name not in materializer_pin_names)
+    }
+    inactive_hlo_pins = {
+        name: value
+        for name, value in vars(args).items()
+        if name in materializer_pin_names and not args.exact_dsa
+    }
+    if any(value != _ZERO_SHA for value in inactive_hlo_pins.values()):
+        raise ValueError("default WS32 path must keep exact materializer pins vacant")
+    if args.compile_only and any(
+        value != _ZERO_SHA for value in active_hlo_pins.values()
     ):
         raise ValueError("WS32 acquisition requires eight vacant HLO pins")
     if not args.compile_only and any(
-        value == _ZERO_SHA
-        for name, value in vars(args).items()
-        if name.startswith("expected_") and "hlo_sha256" in name
+        value == _ZERO_SHA for value in active_hlo_pins.values()
     ):
         raise ValueError("WS32 numerical execution requires eight acquired HLO pins")
+    association_pins = (
+        args.dsa_association_summary_sha256,
+        args.dsa_association_success_sha256,
+    )
+    if any(
+        len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+        for value in association_pins
+    ):
+        raise ValueError("WS32 DSA association pins must be lowercase SHA-256")
+    if (
+        args.exact_dsa
+        and any(value == _ZERO_SHA for value in association_pins)
+    ) or (
+        not args.exact_dsa
+        and any(value != _ZERO_SHA for value in association_pins)
+    ):
+        raise ValueError("WS32 exact DSA flag/association pins drifted")
     _require_clean_code(args.expected_code_hash)
     if os.environ.get("XLA_PYTHON_CLIENT_MEM_FRACTION") != _XLA_MEMORY_FRACTION:
         raise RuntimeError("WS32 XLA allocator fraction is not pinned to .95")
@@ -446,6 +521,7 @@ def main() -> int:
     config = Ws32DecoderConfig(
         geometry=geometry,
         context_capacity=args.context_capacity,
+        exact_dsa=bool(args.exact_dsa),
     )
     oracle = load_ws32_short_context_oracle(
         args.token_oracle_dir,
@@ -498,6 +574,69 @@ def main() -> int:
     )
     load_seconds = time.perf_counter() - load_started
     weights = bind_ws32_decoder_weights(loaded.arrays, config)
+    args.hlo_dir.mkdir(parents=True, exist_ok=False)
+    graphs: dict[str, Any] = {}
+    compile_seconds: dict[str, float] = {}
+    compiled_memory: dict[str, Any] = {}
+    exact_dsa_weights = None
+    if config.exact_dsa:
+        materializer = build_ws32_exact_dsa_materializer_program(mesh, config)
+        raw_exact_weights = select_ws32_exact_dsa_raw_weights(weights, config)
+        decode_exact_jit = jax.jit(materializer.decode)
+        decode_exact_lowered = decode_exact_jit.lower(raw_exact_weights)
+        started = time.perf_counter()
+        decode_exact_compiled = decode_exact_lowered.compile()
+        compile_seconds["exact_materialize"] = time.perf_counter() - started
+        compiled_memory["exact_materialize"] = _compiled_memory(
+            decode_exact_compiled
+        )
+        graphs["exact_materialize"] = _write_exact_materializer_graph(
+            graph="exact_materialize",
+            lowered=decode_exact_lowered,
+            compiled=decode_exact_compiled,
+            hlo_dir=args.hlo_dir,
+            expected_stable=args.expected_exact_materialize_stablehlo_sha256,
+            expected_optimized=(
+                args.expected_exact_materialize_optimized_hlo_sha256
+            ),
+        )
+        _require_graph_authorized(
+            graphs["exact_materialize"],
+            compile_only=bool(args.compile_only),
+        )
+        decoded_exact_weights = decode_exact_compiled(raw_exact_weights)
+        jax.block_until_ready(decoded_exact_weights)
+        promote_exact_jit = jax.jit(materializer.promote)
+        promote_exact_lowered = promote_exact_jit.lower(decoded_exact_weights)
+        started = time.perf_counter()
+        promote_exact_compiled = promote_exact_lowered.compile()
+        compile_seconds["exact_promote"] = time.perf_counter() - started
+        compiled_memory["exact_promote"] = _compiled_memory(
+            promote_exact_compiled
+        )
+        graphs["exact_promote"] = _write_exact_materializer_graph(
+            graph="exact_promote",
+            lowered=promote_exact_lowered,
+            compiled=promote_exact_compiled,
+            hlo_dir=args.hlo_dir,
+            expected_stable=args.expected_exact_promote_stablehlo_sha256,
+            expected_optimized=args.expected_exact_promote_optimized_hlo_sha256,
+        )
+        _require_graph_authorized(
+            graphs["exact_promote"],
+            compile_only=bool(args.compile_only),
+        )
+        exact_dsa_weights = promote_exact_compiled(decoded_exact_weights)
+        jax.block_until_ready(exact_dsa_weights)
+        decode_exact_jit.clear_cache()
+        promote_exact_jit.clear_cache()
+        del decode_exact_compiled
+        del decode_exact_lowered
+        del decoded_exact_weights
+        del promote_exact_compiled
+        del promote_exact_lowered
+        del raw_exact_weights
+        gc.collect()
     program = build_ws32_decoder_program(mesh, config)
     prefill_program = build_ws32_teacher_forced_prefill_program(
         mesh,
@@ -507,14 +646,11 @@ def main() -> int:
     prompt = _replicated(jax, mesh, oracle.prompt_token_ids)
     state = make_ws32_initial_state(mesh, config)
     initial_token = _replicated(jax, mesh, np.asarray([-1], dtype=np.int32))
-    args.hlo_dir.mkdir(parents=True, exist_ok=False)
-
-    graphs: dict[str, Any] = {}
-    compile_seconds: dict[str, float] = {}
-    compiled_memory: dict[str, Any] = {}
-
     prefill_jit = jax.jit(prefill_program.execute, donate_argnums=(1,))
-    prefill_lowered = prefill_jit.lower(prompt, state, weights)
+    prefill_inputs = (prompt, state, weights)
+    if exact_dsa_weights is not None:
+        prefill_inputs = (*prefill_inputs, exact_dsa_weights)
+    prefill_lowered = prefill_jit.lower(*prefill_inputs)
     started = time.perf_counter()
     prefill_compiled = prefill_lowered.compile()
     compile_seconds["prefill"] = time.perf_counter() - started
@@ -527,6 +663,7 @@ def main() -> int:
         expected_stable=args.expected_prefill_stablehlo_sha256,
         expected_optimized=args.expected_prefill_optimized_hlo_sha256,
         hidden_size=geometry.hidden_size,
+        exact_dsa=config.exact_dsa,
     )
     _require_graph_authorized(
         graphs["prefill"], compile_only=bool(args.compile_only)
@@ -536,7 +673,7 @@ def main() -> int:
         observer_state = state
         observer_token = initial_token
     else:
-        prefill_result = prefill_compiled(prompt, state, weights)
+        prefill_result = prefill_compiled(*prefill_inputs)
         jax.block_until_ready(prefill_result)
         observer_state = prefill_result.state
         observer_token = prefill_result.next_token
@@ -551,7 +688,10 @@ def main() -> int:
     gc.collect()
 
     observer_jit = jax.jit(program.observe, donate_argnums=(1,))
-    observer_lowered = observer_jit.lower(observer_token, observer_state, weights)
+    observer_inputs = (observer_token, observer_state, weights)
+    if exact_dsa_weights is not None:
+        observer_inputs = (*observer_inputs, exact_dsa_weights)
+    observer_lowered = observer_jit.lower(*observer_inputs)
     started = time.perf_counter()
     observer_compiled = observer_lowered.compile()
     compile_seconds["observer"] = time.perf_counter() - started
@@ -564,6 +704,7 @@ def main() -> int:
         expected_stable=args.expected_observer_stablehlo_sha256,
         expected_optimized=args.expected_observer_optimized_hlo_sha256,
         hidden_size=geometry.hidden_size,
+        exact_dsa=config.exact_dsa,
     )
     _require_graph_authorized(
         graphs["observer"], compile_only=bool(args.compile_only)
@@ -580,7 +721,10 @@ def main() -> int:
     if not args.compile_only:
         observed_tokens.append(_scalar_token(jax, observer_token))
         for step in range(args.observer_steps):
-            observed = observer_compiled(current_token, current_state, weights)
+            observer_inputs = (current_token, current_state, weights)
+            if exact_dsa_weights is not None:
+                observer_inputs = (*observer_inputs, exact_dsa_weights)
+            observed = observer_compiled(*observer_inputs)
             jax.block_until_ready(observed)
             host_dsa = jax.device_get(observed.dsa)
             producers = np.asarray(host_dsa.producer_layer_ids, dtype=np.int32)
@@ -616,7 +760,10 @@ def main() -> int:
     gc.collect()
 
     decode_jit = jax.jit(program.execute, donate_argnums=(1,))
-    decode_lowered = decode_jit.lower(current_token, current_state, weights)
+    decode_inputs = (current_token, current_state, weights)
+    if exact_dsa_weights is not None:
+        decode_inputs = (*decode_inputs, exact_dsa_weights)
+    decode_lowered = decode_jit.lower(*decode_inputs)
     started = time.perf_counter()
     decode_compiled = decode_lowered.compile()
     compile_seconds["decode"] = time.perf_counter() - started
@@ -629,6 +776,7 @@ def main() -> int:
         expected_stable=args.expected_decode_stablehlo_sha256,
         expected_optimized=args.expected_decode_optimized_hlo_sha256,
         hidden_size=geometry.hidden_size,
+        exact_dsa=config.exact_dsa,
     )
     _require_graph_authorized(
         graphs["decode"], compile_only=bool(args.compile_only)
@@ -647,6 +795,7 @@ def main() -> int:
         expected_stable=args.expected_cache_probe_stablehlo_sha256,
         expected_optimized=args.expected_cache_probe_optimized_hlo_sha256,
         hidden_size=geometry.hidden_size,
+        exact_dsa=config.exact_dsa,
     )
     _require_graph_authorized(
         graphs["cache_probe"], compile_only=bool(args.compile_only)
@@ -669,6 +818,13 @@ def main() -> int:
         "device_memory_before_load": list(loaded.device_memory_before),
         "dsa_oracle_manifest_sha256": oracle.dsa_manifest["manifest_sha256"],
         "dsa_oracle_success_sha256": oracle.dsa_success_sha256,
+        "dsa_association_summary_sha256": (
+            args.dsa_association_summary_sha256
+        ),
+        "dsa_association_success_sha256": (
+            args.dsa_association_success_sha256
+        ),
+        "exact_dsa": config.exact_dsa,
         "graphs": graphs,
         "hostname": socket.gethostname(),
         "jax_process_index": int(jax.process_index()),
@@ -687,7 +843,9 @@ def main() -> int:
     _atomic_json(args.hlo_dir / "prevalidation.json", prevalidation)
     graph_passed = all(value["passed"] for value in graphs.values())
     if args.compile_only:
-        _require_acquisition_authorized(graphs)
+        _require_acquisition_authorized(
+            graphs, exact_dsa=config.exact_dsa
+        )
         result = {
             **prevalidation,
             "performance_claim": False,
@@ -704,7 +862,10 @@ def main() -> int:
         raise RuntimeError("WS32 complete pre-execution HLO contract failed")
 
     for _ in range(args.warmup):
-        result = decode_compiled(current_token, current_state, weights)
+        decode_inputs = (current_token, current_state, weights)
+        if exact_dsa_weights is not None:
+            decode_inputs = (*decode_inputs, exact_dsa_weights)
+        result = decode_compiled(*decode_inputs)
         jax.block_until_ready(result)
         current_state = result.state
         current_token = result.next_token
@@ -713,7 +874,10 @@ def main() -> int:
     samples_ms = []
     for _ in range(args.iterations):
         started_ns = time.perf_counter_ns()
-        result = decode_compiled(current_token, current_state, weights)
+        decode_inputs = (current_token, current_state, weights)
+        if exact_dsa_weights is not None:
+            decode_inputs = (*decode_inputs, exact_dsa_weights)
+        result = decode_compiled(*decode_inputs)
         jax.block_until_ready(result)
         samples_ms.append((time.perf_counter_ns() - started_ns) / 1_000_000.0)
         current_state = result.state
@@ -723,7 +887,10 @@ def main() -> int:
     args.trace_dir.mkdir(parents=True, exist_ok=False)
     with jax.profiler.trace(str(args.trace_dir), create_perfetto_link=False):
         for _ in range(args.trace_steps):
-            result = decode_compiled(current_token, current_state, weights)
+            decode_inputs = (current_token, current_state, weights)
+            if exact_dsa_weights is not None:
+                decode_inputs = (*decode_inputs, exact_dsa_weights)
+            result = decode_compiled(*decode_inputs)
             jax.block_until_ready(result)
             current_state = result.state
             current_token = result.next_token

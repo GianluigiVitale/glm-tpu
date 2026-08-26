@@ -23,8 +23,16 @@ REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
+_DSA_ASSOCIATION_SUMMARY_SHA256 = (
+    "661142816aa64ec8d085553b427e99f62ab3f1f16b3fc87fc4fc24880d467203"
+)
+_DSA_ASSOCIATION_SUCCESS_SHA256 = (
+    "79aba79e24026bc4c1d17aed2ca92055530b8a551ed6e1279a25300d2cb0f52b"
+)
+
 from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     validate_ws32_decoder_hlo,
+    validate_ws32_exact_dsa_materializer_hlo,
     validate_ws32_topology_fleet,
 )
 from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
@@ -56,6 +64,8 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--dsa-oracle-manifest-sha256", required=True)
     validate.add_argument("--token-oracle-success-sha256", required=True)
     validate.add_argument("--dsa-oracle-success-sha256", required=True)
+    validate.add_argument("--dsa-association-summary-sha256", required=True)
+    validate.add_argument("--dsa-association-success-sha256", required=True)
     validate.add_argument("--topology-sha256", required=True)
     validate.add_argument("--topology-fleet-sha256", required=True)
     validate.add_argument("--mesh-sha256", required=True)
@@ -65,7 +75,15 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--warmup", required=True, type=int)
     validate.add_argument("--iterations", required=True, type=int)
     validate.add_argument("--trace-steps", required=True, type=int)
-    for graph in ("prefill", "observer", "decode", "cache-probe"):
+    validate.add_argument("--exact-dsa", choices=(0, 1), required=True, type=int)
+    for graph in (
+        "exact-materialize",
+        "exact-promote",
+        "prefill",
+        "observer",
+        "decode",
+        "cache-probe",
+    ):
         validate.add_argument(
             f"--expected-{graph}-stablehlo-sha256", required=True
         )
@@ -163,6 +181,43 @@ def _validate_run_tag(tag: str, *, context_label: str, mode: str) -> None:
 
 
 def _graph_valid(value: Any, *, mode: str) -> bool:
+    if type(value) is dict and value.get("kind") in {
+        "exact_materialize",
+        "exact_promote",
+    }:
+        keys = {
+            "collective_count",
+            "instruction_count",
+            "kind",
+            "live_instruction_count",
+            "maximum_group_size",
+            "optimized_hlo_sha256",
+            "passed",
+            "stablehlo_sha256",
+            "violations",
+        }
+        expected_violations = (
+            []
+            if mode == "numerical"
+            else ["StableHLO identity drifted", "optimized HLO identity drifted"]
+        )
+        return bool(
+            set(value) == keys
+            and value["passed"] is (mode == "numerical")
+            and value["violations"] == expected_violations
+            and type(value["collective_count"]) is int
+            and value["maximum_group_size"] <= 8
+            and (
+                (
+                    value["kind"] == "exact_materialize"
+                    and value["collective_count"] > 0
+                )
+                or (
+                    value["kind"] == "exact_promote"
+                    and value["collective_count"] == 0
+                )
+            )
+        )
     keys = {
         "all_gather_count",
         "all_reduce_count",
@@ -254,15 +309,58 @@ def _validate(args: argparse.Namespace) -> int:
     _validate_run_tag(
         args.tag, context_label=args.context_label, mode=args.mode
     )
+    materializer_pin_names = {
+        "expected_exact_materialize_stablehlo_sha256",
+        "expected_exact_materialize_optimized_hlo_sha256",
+        "expected_exact_promote_stablehlo_sha256",
+        "expected_exact_promote_optimized_hlo_sha256",
+    }
     hlo_pins = [
         value
         for name, value in vars(args).items()
-        if name.startswith("expected_") and "hlo_sha256" in name
+        if name.startswith("expected_")
+        and "hlo_sha256" in name
+        and (args.exact_dsa or name not in materializer_pin_names)
     ]
+    inactive_pins = [
+        value
+        for name, value in vars(args).items()
+        if name in materializer_pin_names and not args.exact_dsa
+    ]
+    if any(value != "0" * 64 for value in inactive_pins):
+        raise SystemExit("default WS32 sealer requires vacant materializer pins")
     if args.mode == "acquire" and any(value != "0" * 64 for value in hlo_pins):
-        raise SystemExit("WS32 acquisition sealer requires eight vacant HLO pins")
+        raise SystemExit("WS32 acquisition sealer requires vacant active HLO pins")
     if args.mode == "numerical" and any(value == "0" * 64 for value in hlo_pins):
-        raise SystemExit("WS32 numerical sealer requires eight acquired HLO pins")
+        raise SystemExit("WS32 numerical sealer requires acquired active HLO pins")
+    association_pins = (
+        args.dsa_association_summary_sha256,
+        args.dsa_association_success_sha256,
+    )
+    if args.exact_dsa:
+        if association_pins != (
+            _DSA_ASSOCIATION_SUMMARY_SHA256,
+            _DSA_ASSOCIATION_SUCCESS_SHA256,
+        ):
+            raise SystemExit("WS32 exact DSA association evidence pin drifted")
+        source_summary = args.run_dir / "exact_dsa_source_summary.json"
+        source_success = args.run_dir / "exact_dsa_source_SUCCESS"
+        if (
+            _digest_file(source_summary) != _DSA_ASSOCIATION_SUMMARY_SHA256
+            or _digest_file(source_success) != _DSA_ASSOCIATION_SUCCESS_SHA256
+        ):
+            raise SystemExit("WS32 exact DSA source evidence bytes drifted")
+        association = json.loads(source_summary.read_text(encoding="utf-8"))
+        if (
+            association.get("status") != "SUCCESS"
+            or association.get("candidate_mechanisms_proven") is not True
+            or association.get("association_restored") is not False
+            or association.get("exact_arms") != ["tuple4"]
+            or association.get("performance_claim") is not False
+        ):
+            raise SystemExit("WS32 exact DSA source classification drifted")
+    elif association_pins != ("0" * 64, "0" * 64):
+        raise SystemExit("default WS32 path must not claim DSA association evidence")
     runner_paths = sorted(args.run_dir.glob("fleet/runner.rank*.json"))
     if len(runner_paths) != 8:
         raise SystemExit(f"expected eight WS32 runner records, got {len(runner_paths)}")
@@ -301,6 +399,13 @@ def _validate(args: argparse.Namespace) -> int:
         "context_capacity": args.context_capacity,
         "dsa_oracle_manifest_sha256": args.dsa_oracle_manifest_sha256,
         "dsa_oracle_success_sha256": args.dsa_oracle_success_sha256,
+        "dsa_association_summary_sha256": (
+            args.dsa_association_summary_sha256
+        ),
+        "dsa_association_success_sha256": (
+            args.dsa_association_success_sha256
+        ),
+        "exact_dsa": bool(args.exact_dsa),
         "mesh_sha256": args.mesh_sha256,
         "source_inventory_sha256": args.source_inventory_sha256,
         "token_oracle_manifest_sha256": args.token_oracle_manifest_sha256,
@@ -310,12 +415,15 @@ def _validate(args: argparse.Namespace) -> int:
         "xla_python_client_mem_fraction": ".95",
     }
     first_graphs = records[0].get("graphs")
-    if type(first_graphs) is not dict or set(first_graphs) != {
+    expected_graphs = {
         "cache_probe",
         "decode",
         "observer",
         "prefill",
-    }:
+    }
+    if args.exact_dsa:
+        expected_graphs.update({"exact_materialize", "exact_promote"})
+    if type(first_graphs) is not dict or set(first_graphs) != expected_graphs:
         raise SystemExit("WS32 graph set drifted")
     slots: set[int] = set()
     all_samples: list[list[float]] = []
@@ -335,6 +443,9 @@ def _validate(args: argparse.Namespace) -> int:
         "device_memory_before_load",
         "dsa_oracle_manifest_sha256",
         "dsa_oracle_success_sha256",
+        "dsa_association_summary_sha256",
+        "dsa_association_success_sha256",
+        "exact_dsa",
         "graphs",
         "hostname",
         "jax_process_index",
@@ -407,7 +518,7 @@ def _validate(args: argparse.Namespace) -> int:
             or record["load_seconds"] <= 0
         ):
             raise SystemExit(f"WS32 load timing drifted at rank {rank}")
-        if set(record.get("compile_seconds", {})) != {"cache_probe", "decode", "observer", "prefill"} or any(
+        if set(record.get("compile_seconds", {})) != expected_graphs or any(
             type(value) is not float or not math.isfinite(value) or value <= 0
             for value in record["compile_seconds"].values()
         ):
@@ -419,7 +530,7 @@ def _validate(args: argparse.Namespace) -> int:
             "output_size_in_bytes",
             "temp_size_in_bytes",
         }
-        if set(record.get("compiled_memory_analysis", {})) != {"cache_probe", "decode", "observer", "prefill"} or any(
+        if set(record.get("compiled_memory_analysis", {})) != expected_graphs or any(
             set(value) != memory_fields
             or any(number is not None and (type(number) is not int or number < 0) for number in value.values())
             for value in record["compiled_memory_analysis"].values()
@@ -434,14 +545,28 @@ def _validate(args: argparse.Namespace) -> int:
             optimized_text = optimized.read_text(encoding="utf-8")
             if _digest_file(stable) != report["stablehlo_sha256"] or _digest_file(optimized) != report["optimized_hlo_sha256"]:
                 raise SystemExit(f"WS32 HLO artifact drifted at rank {rank}/{graph}")
-            replay = validate_ws32_decoder_hlo(
-                stable_text,
-                optimized_text,
-                expected_stablehlo_sha256=report["stablehlo_sha256"],
-                expected_optimized_hlo_sha256=report["optimized_hlo_sha256"],
-                hidden_size=6144,
-                kind=graph,
-            ).to_dict()
+            if graph.startswith("exact_"):
+                replay = validate_ws32_exact_dsa_materializer_hlo(
+                    stable_text,
+                    optimized_text,
+                    expected_stablehlo_sha256=report["stablehlo_sha256"],
+                    expected_optimized_hlo_sha256=(
+                        report["optimized_hlo_sha256"]
+                    ),
+                    kind=graph,
+                ).to_dict()
+            else:
+                replay = validate_ws32_decoder_hlo(
+                    stable_text,
+                    optimized_text,
+                    expected_stablehlo_sha256=report["stablehlo_sha256"],
+                    expected_optimized_hlo_sha256=(
+                        report["optimized_hlo_sha256"]
+                    ),
+                    hidden_size=6144,
+                    kind=graph,
+                    exact_dsa=bool(args.exact_dsa),
+                ).to_dict()
             normalized_record = dict(report)
             if args.mode == "acquire":
                 normalized_record["passed"] = True

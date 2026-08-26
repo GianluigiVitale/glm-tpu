@@ -5,6 +5,31 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-26 — restart recovery and default-off exact WS32 DSA integration
+
+The one-week shutdown removed the prior local oracle mount and left an old DB359 checkout file.
+Recovered the canonical results database from the authenticated DB554 snapshot (SHA
+`54051d...cb73`): integrity is `ok`, max run is 554, and DB529/DB554 are present; DB359 is retained
+unchanged in the recovery directory. Restored only the immutable 2K/8K token/DSA runtime inputs
+from `gs://driftbench-dsv4-uc`; all four hard-pinned `SUCCESS` hashes match. The replacement
+`db-v4-64-od` is READY/HEALTHY v4-64, but no TPU workload has run in this resumed session.
+
+Integrated the bounded evidence into the isolated WS32 decoder behind `exact_dsa=False`: DB526's
+fused N82 q-a/kv-a and tuple4 query, DB527's complete FP32 `wk`/divide-sqrt current key, DB529's
+DEFAULT scorer, and DB518's physical-M64 prompt repair. A two-phase device materializer preserves
+the BF16 `wk` decode boundary before FP32 promotion; four separate decoder leaves alias the same
+feature-owned WQ value so the backend must retain the 16-KiB tuple fusion. Recurrent graphs gather
+the one live normalized row only within feature-4 groups, never over the full pod. The 8K-only
+prefill history is about 0.53 GB/chip and must be chunked/bounded before 128K/256K.
+
+Acquisition now retains and validates exact-materialize, exact-promote, prefill, observer, decode
+and cache-probe HLO independently; failure traps preserve all available HLO/log bytes. The full CPU
+suite passes 940 tests with 60 skips, and two focused production-shape/shard-order tests pass after
+the suite. Python compile, Bash parse and diff checks pass. These results authorize only the next
+small compile-only acquisition; they are not hardware correctness, Gate-D, HBM or performance
+evidence. Commit/push/bucket verification and replacement-pod prerequisite checks come before that
+acquisition, and no numerical 8K run is authorized until all six acquired HLOs pass and are pinned.
+
 ## 2026-08-16 — WS32 8K tokens exact; non-vacuous DSA ranking remains open
 
 Protected tag `greenfield_ws32_short_decoder_8k_numerical_20260816T063630156524394Z` loaded and

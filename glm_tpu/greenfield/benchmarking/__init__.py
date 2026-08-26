@@ -148,7 +148,9 @@ from .ws32_pallas_one_layer import (
 )
 from .ws32_decoder import (
     Ws32DecoderHloReport,
+    Ws32ExactDsaMaterializerHloReport,
     validate_ws32_decoder_hlo,
+    validate_ws32_exact_dsa_materializer_hlo,
 )
 from .one_layer import (
     REAL_LAYER_OUTPUT_TOLERANCE,
@@ -286,6 +288,7 @@ __all__ = [
     "WS32_PALLAS_REAL_LAYER_STABLEHLO_SHA256",
     "Ws32PallasOneLayerHloReport",
     "Ws32DecoderHloReport",
+    "Ws32ExactDsaMaterializerHloReport",
     "Ws32OneLayerHloReport",
     "benchmark_transport_chain",
     "build_transport_chain",
@@ -300,6 +303,7 @@ __all__ = [
     "validate_ws32_one_layer_hlo",
     "validate_ws32_pallas_one_layer_hlo",
     "validate_ws32_decoder_hlo",
+    "validate_ws32_exact_dsa_materializer_hlo",
     "validate_ws32_topology_fleet",
     "ws32_one_layer_inputs",
 ]
