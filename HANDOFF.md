@@ -2,6 +2,27 @@
 
 **Updated:** 2026-08-26 UTC
 
+## 2026-08-26 WS32 local StrategyND TPU proof passes
+
+- Model-free acquisition `greenfield_ws32_strategy_nd_acquire_20260826T225219986470504Z`
+  and numerical tag `greenfield_ws32_strategy_nd_numerical_20260826T225424354570711Z`
+  ran at pushed code `676dea0`. Both used the replacement-pod topology/fleet/mesh identities
+  `294e7772...559` / `4a0c9a33...301` / `de5f59cb...a88`, with independently clean 8/8
+  pre/post censuses. GitHub and the owner-bucket repository mirror also pin `676dea0`.
+- Acquisition executed no reducer and sealed StableHLO/optimized-HLO
+  `1ef939fd...a2b` / `f01fd650...5e5`. The optimized executable contains exactly one BF16
+  all-gather over local operand `[1,4,1,1536]`, four explicit replica groups of eight and a
+  12,288-byte shard. There is no other collective, group 32, or full 6,144-wide communicated row.
+- Numerical execution loaded only DB550's 787,060-byte NPZ (`e5977248...582c`; accepted tensor
+  `9d9f65dd...16e35`). All eight hosts reproduced accepted BF16 row `efde8532...8f8e` with zero
+  mismatches under the acquired graph pins. Remote `SUCCESS` and summary file SHAs are
+  `f5e8a940...6357` / `243398af...a75`. This is exactness evidence only: performance claim false,
+  DB run id null, no checkpoint load.
+- The combine-association discriminator is closed. Exact next is one bounded real layer-0 dense
+  partial-generation proof: final-layout gate/up must create four model-rank activations per WS32
+  expert owner, down must create four rounded BF16 local partials, and this proven reducer must
+  match DB550 end to end before any complete-checkpoint or 8K retry.
+
 ## 2026-08-26 protected exact-DSA 8K numerical refusal
 
 - Protected tag `greenfield_ws32_short_decoder_8k_numerical_20260826T213125786075567Z` at code

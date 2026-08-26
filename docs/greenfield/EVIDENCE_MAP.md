@@ -57,6 +57,14 @@ Source ledger is `b8f76d44...dde6`; acquisition remains deliberately outside DB/
 no performance claim. Its six StableHLO/optimized-HLO pairs are pinned in `HANDOFF.md` and authorize
 the protected exact-DSA 8K numerical run.
 
+The local WS32 combine association is now protected TPU evidence. Acquisition tag
+`greenfield_ws32_strategy_nd_acquire_20260826T225219986470504Z` pins StableHLO/optimized-HLO
+`1ef939fd...a2b` / `f01fd650...5e5` without execution. Numerical tag
+`greenfield_ws32_strategy_nd_numerical_20260826T225424354570711Z` at code `676dea0` reproduces
+DB550's accepted row `efde8532...8f8e` with zero mismatches on all eight hosts. HLO contains exactly
+one BF16 group-8 all-gather over `[1,4,1,1536]`; pre/post censuses and append-only remote SUCCESS
+are clean. This closes combine association only, with no DB/performance claim or checkpoint load.
+
 The authorized numerical tag
 `greenfield_ws32_short_decoder_8k_numerical_20260826T213125786075567Z` is protected failed
 evidence, not an accepted result. It executed all six pinned real graphs, produced exact 20/20 raw

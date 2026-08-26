@@ -5,6 +5,32 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-26 — expert-8 StrategyND combine is exact on the replacement pod
+
+The model-free acquisition/numerical pair
+`greenfield_ws32_strategy_nd_{acquire_20260826T225219986470504Z,numerical_20260826T225424354570711Z}`
+at pushed code `676dea0` loaded only DB550's 787,060-byte sealed dense-partial NPZ. Acquisition
+compiled and inspected without calling the reducer. Numerical execution required its exact
+StableHLO/optimized-HLO pins `1ef939fd...a2b` / `f01fd650...5e5` before one execution.
+
+The optimized TPU HLO has one BF16 all-gather from `[1,4,1,1536]` to `[8,4,1,1536]`, with explicit
+replica groups `{0,4,...,28}`, `{1,5,...,29}`, `{2,6,...,30}` and `{3,7,...,31}`. Each group has
+eight members and each shard is 12,288 bytes. No all-reduce, group 32, or communicated full hidden
+row exists. All hosts agree on both graph hashes.
+
+Input tensor `9d9f65dd...16e35` produced accepted BF16 row `efde8532...8f8e` with zero mismatches on
+all 8/8 hosts. Both runs have clean pre/post censuses and hash-verified append-only bucket records;
+the numerical summary/SUCCESS file SHAs are `243398af...a75` / `f5e8a940...6357`. This proves the
+local combine association, not production partial generation or token speed; `performance_claim`
+is false and `results_db_run_id` is null. The first local wrapper attempt
+`...acquire_20260826T224935317277473Z` refused before worker sync because one `set -u` census local
+was expanded in its declaration. Its remote prefix is empty and a direct 8/8 census proved zero
+work; fixed code was committed and mirrored before retry.
+
+The next discriminator therefore moves only one boundary outward: repack layer-0 gate/up into four
+consecutive model-rank activations per expert owner, generate four BF16 down partials locally, then
+feed this proven reducer and compare against DB550. The complete checkpoint remains unauthorized.
+
 ## 2026-08-26 — exact DSA closes layer 0 and exposes the layer-1 state boundary
 
 Protected tag `greenfield_ws32_short_decoder_8k_numerical_20260826T213125786075567Z` at pushed
