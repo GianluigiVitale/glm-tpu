@@ -20,12 +20,20 @@ Recovery synthesizes no numerical values: it replays the preserved HLO, copies t
 prevalidation records, and derives only eight HLO_ACQUIRED envelopes. The first evidence seal
 correctly refused a manually mistyped checkpoint manifest pin. It created no DB row/SUCCESS or
 performance claim and ended with authenticated 8/8 zero work; all 16 generation-bound recovery
-objects remain in the approved bucket. Correct semantic checkpoint identities are
+objects were authenticated before rebinding the retry provenance. Correct semantic checkpoint identities are
 `c04f800e...5ee08` / `1bfea5bd...f1760`; the distinct manifest-file SHA is
 `88df4143...a7cbf`. A full local seal replay with the correct pins passes, status HLO_ACQUIRED and
-summary `5cafab04...60214`. The wrapper now checks these identities and self/file hashes before
-remote recovery materialization. This is compiler/HLO acquisition evidence only, not Gate-D
-correctness, latency or performance evidence.
+summary `5cafab04...60214`. Commit `92cb72c` adds the preflight and is pushed/owner-mirrored.
+
+The protected evidence-only retry then passed fresh 8/8 recovery-pre/post zero-work censuses and
+archived 137 immutable objects under the original approved result prefix. Source-ledger identity is
+`b8f76d44...dde6`, bound to recovery code `92cb72c`; acquisition intentionally has no DB row or
+SUCCESS. Stable/optimized pins are materialize `1d925d96...f36e` / `6befe0f4...3c7b`, promote
+`e38eb7a4...ffff` / `8522e690...b0af`, prefill `99bc4205...a25` / `bfd4568a...f54`, observer
+`65456b74...5312` / `de81614c...e7f8`, decode `92ff580b...0f37` / `78f1e03d...29dd`, and cache
+`664c331a...b14` / `e4530fc6...bf77`. This is compiler/HLO acquisition evidence only, not Gate-D
+correctness, latency or performance evidence. It authorizes one hash-pinned protected 8K numerical
+run.
 
 ## 2026-08-26 — replacement-pod topology is freshly authenticated
 

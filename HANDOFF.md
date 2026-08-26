@@ -14,16 +14,24 @@
 - All eight original worker prevalidation records remain intact. Recovery commit `8067bac` derives
   only HLO_ACQUIRED runner envelopes, generation-binds the 16 derived/source objects, and never
   initializes JAX/TPU. The first seal attempt materialized the complete source ledger but correctly
-  rejected a mistyped checkpoint manifest identity before publication. Failure cleanup is 8/8
-  clean; the recovery objects remain immutable under the original approved-bucket result prefix.
+  rejected a mistyped checkpoint manifest identity before publication. Failure cleanup was 8/8
+  clean and the exact old ledger is retained in the local failure archive.
 - The correct semantic checkpoint identities are manifest `c04f800e...5ee08` and SUCCESS
   `1bfea5bd...f1760` (the manifest file byte hash is separately `88df4143...a7cbf`). A complete
   local replay with these identities now passes as `HLO_ACQUIRED`, summary `5cafab04...60214`, with
   no performance claim. The wrapper preflights the two semantic pins, SUCCESS self-hash and
   manifest byte hash before any recovery materialization; focused tests are 28 passed / 3 skipped.
-- Exact next: commit/push/mirror this preflight correction, then rerun only the evidence seal with
-  the verified identities. Do not recompile, reload weights or execute a token graph. After the
-  acquisition is terminally archived, pin its six graph identities before an 8K numerical run.
+- Commit `92cb72c` is pushed and byte-identical in the owner mirror. The evidence-only retry passed
+  with fresh 8/8 recovery-pre/post zero-work censuses and 137 immutable approved-bucket objects.
+  Status is `HLO_ACQUIRED`, summary `5cafab04...60214`, source ledger `b8f76d44...dde6`, recovery
+  code `92cb72c`, and no DB/SUCCESS/performance claim by acquisition design. Stable/optimized pins:
+  materialize `1d925d96...f36e` / `6befe0f4...3c7b`, promote `e38eb7a4...ffff` /
+  `8522e690...b0af`, prefill `99bc4205...a25` / `bfd4568a...f54`, observer
+  `65456b74...5312` / `de81614c...e7f8`, decode `92ff580b...0f37` / `78f1e03d...29dd`, cache
+  `664c331a...b14` / `e4530fc6...bf77`.
+- Exact next: commit/push/mirror this acquisition record, then run one protected exact-DSA 8K
+  numerical workflow with all six pins. It must stop on DSA/token/state/cache/HBM/HLO/wall/trace
+  drift and may not claim performance until DB/archive/cleanup are terminal.
 
 ## 2026-08-26 restart recovery and exact-DSA integration checkpoint
 
