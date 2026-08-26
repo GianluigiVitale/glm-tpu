@@ -15,6 +15,7 @@ from glm_tpu.greenfield.validation import ws32_evidence
 ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts/greenfield/seal_short_decoder_ws32.py"
 WRAPPER = ROOT / "scripts/greenfield/run_short_decoder_ws32.sh"
+PROVISIONER = ROOT / "scripts/greenfield/provision_greenfield_worker.sh"
 SPEC = importlib.util.spec_from_file_location("ws32_short_sealer", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 SEALER = importlib.util.module_from_spec(SPEC)
@@ -225,6 +226,24 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
         "rollback_remote_nonterminal"
     ) < on_exit.index("rollback_db")
     assert "rm -rf" not in source
+
+
+def test_greenfield_replacement_worker_provisioner_is_narrow_and_default_off() -> None:
+    subprocess.run(["bash", "-n", str(PROVISIONER)], check=True)
+    source = PROVISIONER.read_text(encoding="utf-8")
+    assert "GLM_GREENFIELD_PROVISION:-0" in source
+    assert "gs://driftbench-dsv4-uc" in source
+    assert "rewrite/topology-first-decode" in source
+    assert "gcsfuse --implicit-dirs -o ro" in source
+    assert "PROVISION_OK pin=$EXPECTED_PIN" in source
+    for forbidden in (
+        "tpu-inference",
+        "vllm-build",
+        "ray start",
+        "jax.devices",
+        "gcloud compute tpus create",
+    ):
+        assert forbidden not in source
 
 
 def test_ws32_evidence_primary_object_schema_is_exact() -> None:
