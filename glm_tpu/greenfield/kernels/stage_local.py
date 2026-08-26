@@ -548,14 +548,15 @@ def _virtual_dense_final_layout_convolution_down_partials(
     block_shape: tuple[int, int],
     compile_rows: int = 32,
     virtual_shards: int = _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER,
+    output_size: int = 6144,
     accepted_gate_singleton: bool = False,
     accepted_gate_dequant_fusion: bool = False,
 ) -> Any:
     """Replay dense arithmetic from accepted ``[in, out]`` weight layout.
 
-    This diagnostic-only primitive consumes one or eight already-packed
-    virtual TP32 shards.  The one-shard form is used only by the isolated
-    contraction discriminator; the production candidate retains eight shards.
+    This primitive consumes one, four or eight already-packed virtual TP32
+    shards. The one-shard form is used only by the isolated contraction
+    discriminator, four is the WS32 owner, and PP8 retains eight shards.
     Unlike :func:`_virtual_dense_convolution_down_partials`, it does not
     transpose or concatenate checkpoint tensors in the compiled program. That
     distinction lets TPU layout assignment reproduce the accepted row-major
@@ -564,8 +565,10 @@ def _virtual_dense_final_layout_convolution_down_partials(
 
     if compile_rows not in (1, 32):
         raise ValueError("final-layout dense requires one or 32 compile rows")
-    if virtual_shards not in (1, _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER):
-        raise ValueError("final-layout dense requires one or eight virtual shards")
+    if virtual_shards not in (1, 4, _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER):
+        raise ValueError("final-layout dense requires one, four or eight virtual shards")
+    if output_size not in (1536, 6144):
+        raise ValueError("final-layout dense output must be local or complete hidden")
     if not isinstance(accepted_gate_singleton, bool):
         raise ValueError("accepted gate singleton flag must be boolean")
     if not isinstance(accepted_gate_dequant_fusion, bool):
@@ -578,8 +581,8 @@ def _virtual_dense_final_layout_convolution_down_partials(
         "normalized": (compile_rows, 6144),
         "merged_bits_in_out": (virtual_shards, 6144, 768),
         "merged_scale_in_out": (virtual_shards, 48, 768),
-        "down_bits_in_out": (virtual_shards, 384, 6144),
-        "down_scale_in_out": (virtual_shards, 3, 6144),
+        "down_bits_in_out": (virtual_shards, 384, output_size),
+        "down_scale_in_out": (virtual_shards, 3, output_size),
     }
     values = {
         "normalized": normalized,

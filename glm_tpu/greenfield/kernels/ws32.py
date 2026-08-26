@@ -899,3 +899,77 @@ def ws32_strategy_nd_dense_down_reduce_mapped(
             gathered.reshape(32, 1, local_hidden),
             global_indices,
         )
+
+
+def ws32_strategy_nd_dense_final_layout_mapped(
+    hidden_local: Any,
+    merged_bits_in_out_local: Any,
+    merged_scale_in_out_local: Any,
+    down_bits_in_out_local: Any,
+    down_scale_in_out_local: Any,
+    *,
+    expert_axis: str = "expert",
+    feature_axis: str = "feature",
+    block_shape: tuple[int, int] = (128, 128),
+) -> Any:
+    """Execute four accepted model ranks and the local WS32 StrategyND tree.
+
+    Gate/up weights are rank-sharded over expert-8 and replicated over the
+    feature axis.  Down weights retain only the local hidden feature quarter.
+    The only full hidden value is one 12 KiB BF16 row gathered inside each
+    feature-4 group; the four down partials remain feature-sharded and their
+    combine uses the proven expert-8 discriminator above.
+    """
+
+    from .stage_local import (
+        _virtual_dense_final_layout_convolution_down_partials,
+    )
+
+    if hidden_local.shape != (1, 1536) or hidden_local.dtype != jnp.bfloat16:
+        raise ValueError("WS32 final-layout dense input geometry drifted")
+    expected = {
+        "merged_bits": (4, 6144, 768),
+        "merged_scale": (4, 48, 768),
+        "down_bits": (4, 384, 1536),
+        "down_scale": (4, 3, 1536),
+    }
+    values = {
+        "merged_bits": merged_bits_in_out_local,
+        "merged_scale": merged_scale_in_out_local,
+        "down_bits": down_bits_in_out_local,
+        "down_scale": down_scale_in_out_local,
+    }
+    if any(values[name].shape != shape for name, shape in expected.items()):
+        raise ValueError("WS32 final-layout dense weight geometry drifted")
+    if any(
+        value.dtype != jnp.uint8
+        for value in (merged_bits_in_out_local, down_bits_in_out_local)
+    ) or any(
+        value.dtype != jnp.float32
+        for value in (merged_scale_in_out_local, down_scale_in_out_local)
+    ):
+        raise ValueError("WS32 final-layout dense weight dtype drifted")
+    with jax.named_scope("greenfield_ws32_strategy_nd_dense/hidden_gather"):
+        full_hidden = lax.all_gather(
+            hidden_local,
+            axis_name=feature_axis,
+            axis=1,
+            tiled=True,
+        )
+    with jax.named_scope("greenfield_ws32_strategy_nd_dense/virtual_partials"):
+        local_partials = _virtual_dense_final_layout_convolution_down_partials(
+            full_hidden,
+            merged_bits_in_out_local,
+            merged_scale_in_out_local,
+            down_bits_in_out_local,
+            down_scale_in_out_local,
+            block_shape=block_shape,
+            compile_rows=1,
+            virtual_shards=4,
+            output_size=1536,
+        )
+    return ws32_strategy_nd_dense_down_reduce_mapped(
+        local_partials,
+        expert_axis=expert_axis,
+        feature_axis=feature_axis,
+    )
