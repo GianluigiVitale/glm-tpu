@@ -5791,3 +5791,29 @@ source pins, atomic DB rollback, exact CRC/generation archive and `SUCCESS`-last
 covered. Exact next: correction-only Fable and Sol review, commit/push, then this seconds/minutes-
 scale protected discriminator. A bitwise-exact arm authorizes DSA integration; only a subsequent
 protected exact 8K run closes Gate D.
+
+## Current exact next: recover the replacement-pod exact-DSA acquisition
+
+After the one-week shutdown, replacement pod `db-v4-64-od` was rebound at topology DB555 and code
+pin `f92efa3f6de2d148b6fdf3299c677bb9d43cc57c`. Protected compile-only tag
+`greenfield_ws32_short_decoder_8k_acquire_20260826T195124476893681Z` loaded the complete packed
+checkpoint and compiled all six exact-DSA graphs on all eight hosts. It refused before token,
+prefill or decode execution because the fail-closed structural linter misclassified two exact XLA
+lowerings. Failure cleanup authenticates eight idle hosts; there is no DB row, summary or terminal
+`SUCCESS`.
+
+The 190-collective one-shot materializer contains 189 ordinary gathers and one feature-4 tuple
+all-reduce that exactly combines 21 `f32[48]` logical scale gathers. The old validator admitted
+only all-gather and also mistook ordinary `slice-start/done` opcodes for asynchronous collectives.
+The complete graphs contain closed local W_K weight tiling: `f32[128,6144]` is quarter-sliced into
+four `f32[32,6144]` values and immediately restored by `ConcatBitcast`; decode/observer consume it
+only in scoped `exact_current_key`, while prefill also carries the immutable weight through tuples.
+This is not batch-32 hidden state. Maximum collective group remains eight.
+
+The bounded correction admits only the exact feature-4 tuple reducer and exact closed W_K chain,
+with producer, spans, exclusive consumers and source scopes pinned. Wrong spans, extra consumers,
+unscoped use, wrong reducer geometry and true async collectives refuse. Focused tests pass 11/11.
+Offline replay of all six preserved TPU graphs now returns exactly the two expected acquisition
+identity mismatches and no structural violation; forbidden-hidden counts are zero. Do not
+recompile. Exact next is immutable-evidence recovery and sealing of these hashes, commit/push and
+verified owner-bucket mirror, then a separately pinned protected 8K numerical run.

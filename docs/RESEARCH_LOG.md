@@ -9996,3 +9996,26 @@ unmotivated arithmetic variants.
   generations/CRCs/SHAs and `SUCCESS` last. Focused local suite is green; review precedes the
   bounded TPU run. No further full-model retry is authorized until this probe identifies a
   bitwise-exact owner layout and q-a breakpoint.
+
+## 2026-08-26 19:41--20:21 UTC — replacement topology passes; exact-DSA HLO acquisition is preserved
+
+- Fresh topology tag `greenfield_topology_20260826T194116460015528Z` passed as DB555 on the
+  replacement `db-v4-64-od` pod. Topology/PP8/PP16/mesh hashes are unchanged; the new immutable
+  fleet hash is `4a0c9a338d55b8be37dab79396569aa10fc9e85b3c7210d72a70abfafe72c301`.
+- Compile-only exact-DSA tag
+  `greenfield_ws32_short_decoder_8k_acquire_20260826T195124476893681Z` compiled and preserved all
+  six graphs before execution authorization. Compile seconds on rank zero were 8.086/1.357 for
+  materialize/promote, 180.562 prefill, 151.434 observer, 151.623 decode and 0.523 cache probe.
+  Failure census proves 8/8 zero work after refusal; no correctness or performance claim exists.
+- Structural diagnosis found only linter false positives. The materializer's sole all-reduce is an
+  exact feature-4 tuple reducer over 21 `f32[48]` scale operands; the remaining 189 collectives are
+  subgroup gathers. Ordinary `slice-start/done` was incorrectly counted as async. The full graphs'
+  `f32[32,6144]` values are exact quarters of local promoted W_K weights, closed by
+  `ConcatBitcast`, never hidden/residual rows or full-pod communication.
+- The corrected fail-closed rules and mutation suite pass 11/11. Offline replay of every preserved
+  graph now leaves only the two allowed zero-pin identity violations. Stable/optimized hashes are:
+  materialize `1d925d96...6f36e`/`6befe0f4...33c7b`, promote
+  `e38eb7a4...3ffff`/`8522e690...10b0af`, prefill `99bc4205...ca25`/`bfd4568a...75f54`, observer
+  `65456b74...5312`/`de81614c...be7f8`, decode `92ff580b...60f37`/`78f1e03d...29dd`, and cache
+  `664c331a...eb14`/`e4530fc6...bf77`. Recovery must reuse these bytes; no TPU recompilation is
+  authorized.

@@ -1171,7 +1171,8 @@ or one short-context result cannot satisfy a broader row.
 | Authenticated eight-host cleanup | Existing accepted runs pass; future required runs absent | Pending future gates |
 | Base vs speculative throughput reported separately | No speculative promotion has begun | Pending after base decoder |
 
-The immediate critical path is therefore: seal the reviewed full WS32 checkpoint; protected WS32
-2K HLO acquisition and numerical run; protected 8K confirmation; then advance to long-context and
+The immediate critical path is therefore: recover and seal replacement-pod exact-DSA 8K HLO tag
+`greenfield_ws32_short_decoder_8k_acquire_20260826T195124476893681Z` without recompilation; run its
+separately pinned protected 8K numerical confirmation; then advance to long-context and
 identical-condition PP8/PP16/WS32 adjudication. Gate D closure must not be represented as Section 18
 completion.

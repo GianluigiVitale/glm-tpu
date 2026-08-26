@@ -8,6 +8,8 @@ import pytest
 
 from glm_tpu.greenfield.benchmarking.ws32_decoder import (
     _exact_add_reducer,
+    _exact_wk_feature_slice_instructions,
+    _forbidden_full_hidden_values,
     validate_ws32_decoder_hlo,
     validate_ws32_exact_dsa_materializer_hlo,
 )
@@ -194,20 +196,27 @@ ENTRY main {{
 '''
 
 
-def _exact_materializer_hlo(*, promote: bool = False) -> str:
+def _exact_materializer_hlo(
+    *, promote: bool = False, slice_roundtrip: bool = False
+) -> str:
     feature, expert = _groups()
     if promote:
-        return '''HloModule exact_promote, num_partitions=32
+        value = "%restored" if slice_roundtrip else "%promoted"
+        slices = '''  %slice-start = ((f32[128,6144]), f32[32,6144], s32[]) slice-start(%promoted), slice={[0:32], [0:6144]}
+  %slice-done = f32[32,6144] slice-done(%slice-start)
+  %restored = f32[128,6144] pad(%slice-done), padding=0_96x0_0
+''' if slice_roundtrip else ""
+        return f'''HloModule exact_promote, num_partitions=32
 
-ENTRY main {
+ENTRY main {{
   %qkv = u8[32,6144,82] parameter(0)
   %scale = f32[32,48,82] parameter(1)
   %wq = f32[1024,2048] parameter(2)
   %wk = bf16[128,6144] parameter(3)
   %head = bf16[8,6144] parameter(4)
-  %promoted = f32[128,6144] convert(%wk), metadata={op_name="jit(body)/shard_map/greenfield_ws32_exact_dsa_materializer/wk_promote"}
-  ROOT %root = (u8[32,6144,82], f32[32,48,82], f32[1024,2048], f32[128,6144], bf16[8,6144]) tuple(%qkv, %scale, %wq, %promoted, %head)
-}
+  %promoted = f32[128,6144] convert(%wk), metadata={{op_name="jit(body)/shard_map/greenfield_ws32_exact_dsa_materializer/wk_promote"}}
+{slices}  ROOT %root = (u8[32,6144,82], f32[32,48,82], f32[1024,2048], f32[128,6144], bf16[8,6144]) tuple(%qkv, %scale, %wq, {value}, %head)
+}}
 '''
     return f'''HloModule exact_materialize, num_partitions=32
 
@@ -234,6 +243,67 @@ ENTRY main {{
   ROOT %root = (u8[2048,6144], f32[16,48], u8[576,6144], f32[5,48], u8[4096,2048], f32[32,16], u8[128,6144], f32[1,48], bf16[32,6144]) tuple(%qg, %qsg, %kvg, %kvsg, %wqg, %wqsg, %wkg, %wksg, %heade)
 }}
 '''
+
+
+def _exact_wk_slice_hlo(*, kind: str = "decode") -> str:
+    scopes = {
+        "decode": "greenfield_ws32_complete_decoder",
+        "observer": "greenfield_ws32_complete_decoder_dsa_observer",
+        "prefill": "greenfield_ws32_teacher_forced_prefill",
+    }
+    consumer = (
+        "ROOT %use = (f32[128,6144]) tuple(%restored)"
+        if kind == "prefill"
+        else "ROOT %use = f32[128,6144] fusion(%restored), kind=kLoop, "
+        "calls=consume, metadata={op_name=\"jit(execute)/shard_map/"
+        f"{scopes[kind]}/greenfield_ws32_exact_dsa/exact_current_key/reduce_sum\"}}"
+    )
+    return f'''HloModule exact_wk_slice, num_partitions=32
+
+consume {{
+  %weight = f32[128,6144] parameter(0)
+  ROOT %copy = f32[128,6144] copy(%weight)
+}}
+
+ENTRY main {{
+  %wk = f32[128,6144] parameter(0)
+  %slice-start = ((f32[128,6144]), f32[32,6144], s32[]) slice-start(%wk), slice={{[0:32], [0:6144]}}
+  %slice-start.1 = ((f32[128,6144]), f32[32,6144], s32[]) slice-start(%wk), slice={{[32:64], [0:6144]}}
+  %slice-start.2 = ((f32[128,6144]), f32[32,6144], s32[]) slice-start(%wk), slice={{[64:96], [0:6144]}}
+  %slice-start.3 = ((f32[128,6144]), f32[32,6144], s32[]) slice-start(%wk), slice={{[96:128], [0:6144]}}
+  %slice-done = f32[32,6144] slice-done(%slice-start)
+  %slice-done.1 = f32[32,6144] slice-done(%slice-start.1)
+  %slice-done.2 = f32[32,6144] slice-done(%slice-start.2)
+  %slice-done.3 = f32[32,6144] slice-done(%slice-start.3)
+  %restored = f32[128,6144] custom-call(%slice-done, %slice-done.1, %slice-done.2, %slice-done.3), custom_call_target="ConcatBitcast"
+  {consumer}
+}}
+'''
+
+
+def _exact_materializer_tuple_reduce_hlo() -> str:
+    feature, _ = _groups()
+    hlo = _exact_materializer_hlo()
+    hlo = hlo.replace(
+        "ENTRY main {",
+        """feature_add {
+  %a = f32[] parameter(0)
+  %b = f32[] parameter(1)
+  ROOT %sum = f32[] add(%a, %b)
+}
+
+ENTRY main {""",
+    )
+    return hlo.replace(
+        "  %qsg = f32[16,48] all-gather(%qs), dimensions={1}, "
+        f"replica_groups={{{feature}}}, use_global_device_ids=true",
+        "  %qsflat = f32[192] bitcast(%qs)\n"
+        "  %qsslice = f32[48] slice(%qsflat), slice={[0:48]}\n"
+        "  %qsum = f32[48] all-reduce(%qsslice), "
+        f"replica_groups={{{feature}}}, to_apply=feature_add, "
+        "use_global_device_ids=true\n"
+        "  %qsg = f32[16,48] broadcast(%qsum), dimensions={1}",
+    )
 
 
 def test_ws32_complete_hlo_contract_is_live_and_subgroup_only() -> None:
@@ -436,6 +506,103 @@ def test_ws32_exact_materializer_hlo_is_subgroup_only_and_phase_separated() -> N
         full_indexer_count=1,
     )
     assert not report.passed
+
+
+def test_ws32_exact_materializer_accepts_only_pinned_tuple_reduce() -> None:
+    stable = "module @main"
+    hlo = _exact_materializer_tuple_reduce_hlo()
+    report = validate_ws32_exact_dsa_materializer_hlo(
+        stable,
+        hlo,
+        expected_stablehlo_sha256=sha256(stable.encode()).hexdigest(),
+        expected_optimized_hlo_sha256=sha256(hlo.encode()).hexdigest(),
+        kind="exact_materialize",
+        full_indexer_count=1,
+    )
+    assert report.passed, report.violations
+    assert report.collective_count == 10
+
+    wrong_shape = hlo.replace("f32[48] all-reduce", "f32[47] all-reduce")
+    refused = validate_ws32_exact_dsa_materializer_hlo(
+        stable,
+        wrong_shape,
+        expected_stablehlo_sha256=sha256(stable.encode()).hexdigest(),
+        expected_optimized_hlo_sha256=sha256(wrong_shape.encode()).hexdigest(),
+        kind="exact_materialize",
+        full_indexer_count=1,
+    )
+    assert not refused.passed
+    assert "exact materializer collective geometry drifted" in refused.violations
+
+
+def test_ws32_exact_materializer_distinguishes_slices_from_async_collectives() -> None:
+    stable = "module @main"
+    hlo = _exact_materializer_hlo(promote=True, slice_roundtrip=True)
+    report = validate_ws32_exact_dsa_materializer_hlo(
+        stable,
+        hlo,
+        expected_stablehlo_sha256=sha256(stable.encode()).hexdigest(),
+        expected_optimized_hlo_sha256=sha256(hlo.encode()).hexdigest(),
+        kind="exact_promote",
+        full_indexer_count=1,
+    )
+    assert report.passed, report.violations
+
+    async_hlo = _exact_materializer_tuple_reduce_hlo().replace(
+        "all-reduce(%qsslice)", "all-reduce-start(%qsslice)"
+    )
+    refused = validate_ws32_exact_dsa_materializer_hlo(
+        stable,
+        async_hlo,
+        expected_stablehlo_sha256=sha256(stable.encode()).hexdigest(),
+        expected_optimized_hlo_sha256=sha256(async_hlo.encode()).hexdigest(),
+        kind="exact_materialize",
+        full_indexer_count=1,
+    )
+    assert not refused.passed
+    assert "exact materializer contains async collectives" in refused.violations
+
+
+def test_ws32_exact_wk_slice_exception_is_closed_and_consumer_scoped() -> None:
+    for kind in ("decode", "observer", "prefill"):
+        module = parse_hlo_module(_exact_wk_slice_hlo(kind=kind))
+        allowed, group_count = _exact_wk_feature_slice_instructions(
+            module.instructions,
+            hidden_size=6144,
+            kind=kind,
+        )
+        assert group_count == 1
+        assert len(allowed) == 9
+        assert _forbidden_full_hidden_values(
+            module.instructions,
+            hidden_size=6144,
+            allowed_instruction_indices=allowed,
+        ) == ()
+        assert _forbidden_full_hidden_values(
+            module.instructions, hidden_size=6144
+        )
+
+    base = _exact_wk_slice_hlo()
+    mutations = (
+        base.replace("[96:128]", "[95:127]"),
+        base.replace("exact_current_key", "unscoped_key"),
+        base.replace(
+            "  ROOT %use =",
+            "  %rogue = f32[128,6144] copy(%restored)\n  ROOT %use =",
+        ),
+    )
+    for mutation in mutations:
+        module = parse_hlo_module(mutation)
+        allowed, group_count = _exact_wk_feature_slice_instructions(
+            module.instructions,
+            hidden_size=6144,
+            kind="decode",
+        )
+        assert group_count == 0
+        assert allowed == frozenset()
+        assert _forbidden_full_hidden_values(
+            module.instructions, hidden_size=6144
+        )
 
 
 @pytest.mark.skipif(

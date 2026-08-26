@@ -167,10 +167,15 @@ def _exact_add_reducer(
 
 
 def _forbidden_full_hidden_values(
-    instructions: tuple[HloInstruction, ...], *, hidden_size: int
+    instructions: tuple[HloInstruction, ...],
+    *,
+    hidden_size: int,
+    allowed_instruction_indices: frozenset[int] = frozenset(),
 ) -> tuple[str, ...]:
     forbidden = []
     for instruction in instructions:
+        if instruction.index in allowed_instruction_indices:
+            continue
         shapes = (*instruction.result_shapes, *instruction.operand_shapes)
         if any(
             shape.dtype in {"bf16", "f32"}
@@ -183,6 +188,144 @@ def _forbidden_full_hidden_values(
         ):
             forbidden.append(instruction.name)
     return tuple(sorted(set(forbidden)))
+
+
+def _exact_wk_feature_slice_instructions(
+    instructions: tuple[HloInstruction, ...],
+    *,
+    hidden_size: int,
+    kind: str,
+) -> tuple[frozenset[int], int]:
+    """Admit only XLA's closed local W_K quarter-slice scaffolding.
+
+    TPU XLA may tile one already-local ``f32[128, hidden]`` W_K weight into
+    four ``f32[32, hidden]`` values and immediately restore it with
+    ``ConcatBitcast``.  The intermediate shape aliases the batch-32 dead-row
+    sentinel, so recognize the exact producer/consumer chain rather than
+    creating a shape-wide exception.
+    """
+
+    full_shape = ("f32", (128, hidden_size))
+    slice_shape = ("f32", (32, hidden_size))
+    scalar_shape = ("s32", ())
+
+    def shapes(value: tuple[Any, ...]) -> tuple[tuple[str, tuple[int, ...]], ...]:
+        return tuple((shape.dtype, shape.dimensions) for shape in value)
+
+    by_key = {
+        (instruction.computation, instruction.name): instruction
+        for instruction in instructions
+    }
+    consumers: defaultdict[tuple[str, str], list[HloInstruction]] = defaultdict(
+        list
+    )
+    for instruction in instructions:
+        for operand_name in instruction.operand_names:
+            consumers[(instruction.computation, operand_name)].append(instruction)
+
+    expected_spans = ((0, 32), (32, 64), (64, 96), (96, 128))
+    span_pattern = re.compile(
+        rf"slice=\{{\s*\[([0-9]+):([0-9]+)\]\s*,\s*\[0:{hidden_size}\]\s*\}}"
+    )
+    required_scope = {
+        "decode": "greenfield_ws32_complete_decoder",
+        "observer": "greenfield_ws32_complete_decoder_dsa_observer",
+        "prefill": "greenfield_ws32_teacher_forced_prefill",
+    }.get(kind)
+    if required_scope is None:
+        return frozenset(), 0
+
+    allowed: set[int] = set()
+    group_count = 0
+    for concat in instructions:
+        if (
+            concat.raw_opcode != "custom-call"
+            or 'custom_call_target="ConcatBitcast"' not in concat.raw_line
+            or shapes(concat.operand_shapes) != (slice_shape,) * 4
+            or shapes(concat.result_shapes) != (full_shape,)
+            or len(concat.operand_names) != 4
+            or len(set(concat.operand_names)) != 4
+        ):
+            continue
+        done = tuple(
+            by_key.get((concat.computation, name))
+            for name in concat.operand_names
+        )
+        if any(item is None for item in done):
+            continue
+        if any(
+            item.raw_opcode != "slice-done"
+            or shapes(item.operand_shapes)
+            != (full_shape, slice_shape, scalar_shape)
+            or shapes(item.result_shapes) != (slice_shape,)
+            or len(item.operand_names) != 1
+            for item in done
+            if item is not None
+        ):
+            continue
+        starts = tuple(
+            by_key.get((concat.computation, item.operand_names[0]))
+            for item in done
+            if item is not None
+        )
+        if len(starts) != 4 or any(item is None for item in starts):
+            continue
+        if any(
+            item.raw_opcode != "slice-start"
+            or shapes(item.operand_shapes) != (full_shape,)
+            or shapes(item.result_shapes)
+            != (full_shape, slice_shape, scalar_shape)
+            or len(item.operand_names) != 1
+            for item in starts
+            if item is not None
+        ):
+            continue
+        concrete_done = tuple(item for item in done if item is not None)
+        concrete_starts = tuple(item for item in starts if item is not None)
+        matches = tuple(span_pattern.search(item.raw_line) for item in concrete_starts)
+        spans = tuple(
+            (int(match.group(1)), int(match.group(2)))
+            for match in matches
+            if match is not None
+        )
+        if (
+            len(matches) != 4
+            or any(match is None for match in matches)
+            or spans != expected_spans
+            or len({item.operand_names[0] for item in concrete_starts}) != 1
+        ):
+            continue
+        if any(
+            consumers[(item.computation, item.name)] != [next_item]
+            for item, next_item in zip(
+                concrete_starts, concrete_done, strict=True
+            )
+        ) or any(
+            consumers[(item.computation, item.name)] != [concat]
+            for item in concrete_done
+        ):
+            continue
+        concat_consumers = consumers[(concat.computation, concat.name)]
+        if len(concat_consumers) != 1:
+            continue
+        consumer = concat_consumers[0]
+        consumer_scopes = (
+            () if consumer.op_name is None else consumer.op_name.split("/")
+        )
+        exact_current_key_consumer = (
+            consumer.raw_opcode == "fusion"
+            and required_scope in consumer_scopes
+            and "greenfield_ws32_exact_dsa" in consumer_scopes
+            and "exact_current_key" in consumer_scopes
+        )
+        prefill_weight_carry = kind == "prefill" and consumer.raw_opcode == "tuple"
+        if not (exact_current_key_consumer or prefill_weight_carry):
+            continue
+        allowed.update(
+            item.index for item in (concat, *concrete_done, *concrete_starts)
+        )
+        group_count += 1
+    return frozenset(allowed), group_count
 
 
 def _hidden_reconstructing_all_gathers(
@@ -305,8 +448,19 @@ def validate_ws32_decoder_hlo(
         if item.op_name is not None
         and "greenfield_ws32_rmsnorm" in item.op_name.split("/")
     )
+    allowed_exact_wk_slice_indices, _ = (
+        _exact_wk_feature_slice_instructions(
+            module.instructions,
+            hidden_size=hidden_size,
+            kind=kind,
+        )
+        if exact_dsa
+        else (frozenset(), 0)
+    )
     forbidden_hidden = _forbidden_full_hidden_values(
-        module.instructions, hidden_size=hidden_size
+        module.instructions,
+        hidden_size=hidden_size,
+        allowed_instruction_indices=allowed_exact_wk_slice_indices,
     )
     forbidden_hidden = tuple(
         sorted(
@@ -577,8 +731,36 @@ def validate_ws32_exact_dsa_materializer_hlo(
         violations.append("exact materializer entry parameter geometry drifted")
     if any(marker in stablehlo.lower() for marker in _HOST_MARKERS):
         violations.append("exact materializer StableHLO contains host execution")
+    tuple_all_reduces = tuple(
+        item for item in collectives if item.raw_opcode == "all-reduce"
+    )
+    allowed_tuple_all_reduce = bool(
+        kind == "exact_materialize"
+        and len(tuple_all_reduces) == 1
+        and len(tuple_all_reduces[0].operand_shapes) == full_indexer_count
+        and len(tuple_all_reduces[0].result_shapes) == full_indexer_count
+        and all(
+            shape.dtype == "f32" and shape.dimensions == (48,)
+            for shape in (
+                *tuple_all_reduces[0].operand_shapes,
+                *tuple_all_reduces[0].result_shapes,
+            )
+        )
+        and _group_family(tuple_all_reduces[0]) == "feature"
+        and tuple_all_reduces[0].maximum_group_size == 4
+        and tuple_all_reduces[0].use_global_device_ids
+        and _exact_add_reducer(
+            tuple_all_reduces[0], module_instructions=module.instructions
+        )
+    )
     if any(
-        item.raw_opcode not in {"all-gather"}
+        (
+            item.raw_opcode != "all-gather"
+            and not (
+                allowed_tuple_all_reduce
+                and item is tuple_all_reduces[0]
+            )
+        )
         or _group_family(item) not in {"feature", "expert"}
         or not item.use_global_device_ids
         for item in collectives
@@ -590,9 +772,8 @@ def validate_ws32_exact_dsa_materializer_hlo(
     if maximum_group > 8:
         violations.append("exact materializer collective exceeds group eight")
     if any(
-        item.raw_opcode.endswith(("-start", "-done"))
+        _ASYNC_COLLECTIVE.fullmatch(item.raw_opcode)
         for item in module.instructions
-        if item.raw_opcode not in {"copy-start", "copy-done"}
     ):
         violations.append("exact materializer contains async collectives")
 
