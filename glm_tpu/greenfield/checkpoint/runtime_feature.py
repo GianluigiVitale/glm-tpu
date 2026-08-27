@@ -1,7 +1,7 @@
-"""Offline complete-runtime derivative for PP8 expert-feature ownership.
+"""Offline complete-runtime derivative for PP8/PP16 expert-feature ownership.
 
 The input is the already verified executable-ready complete-expert artifact.
-Four source files belonging to one host-local stage are transformed together
+All source files belonging to one topology-local stage are transformed together
 so each routed byte is read once and written directly to its final owner.  No
 full-model destination file or runtime repartition is staged in host storage.
 """
@@ -18,10 +18,10 @@ from typing import Any, BinaryIO
 
 from ..errors import CheckpointValidationError
 from ..model.weights import (
-    FEATURE_EXPERT_RUNTIME_LAYOUT,
     DecoderRuntimeWeightLayout,
     DeviceRuntimeWeightLayout,
     RuntimeSourceLeaf,
+    feature_expert_runtime_layout,
 )
 from .runtime_pack import (
     RuntimeDestinationFilePlan,
@@ -34,6 +34,34 @@ FEATURE_RUNTIME_LAYOUT_ARTIFACT_KIND = (
 FEATURE_RUNTIME_PACK_CONTROL_KIND = "greenfield_feature_runtime_checkpoint_pack_control"
 FEATURE_RUNTIME_PACKED_ARTIFACT_KIND = "greenfield_feature_runtime_packed_checkpoint"
 FEATURE_RUNTIME_FORMAT_VERSION = 1
+
+
+def _feature_stage_size(layout: DecoderRuntimeWeightLayout) -> int:
+    slots_by_stage: dict[int, set[int]] = {}
+    for device in layout.devices:
+        slots_by_stage.setdefault(device.stage_id, set()).add(
+            device.device_slot
+        )
+    sizes = {len(slots) for slots in slots_by_stage.values()}
+    if len(sizes) != 1:
+        raise CheckpointValidationError(
+            "feature runtime stages have inconsistent local sizes"
+        )
+    stage_size = next(iter(sizes), 0)
+    expected_slots = set(range(stage_size))
+    if stage_size not in (2, 4) or any(
+        slots != expected_slots for slots in slots_by_stage.values()
+    ):
+        raise CheckpointValidationError(
+            "feature runtime requires complete LP2 or LP4 stages"
+        )
+    if layout.routed_expert_layout != feature_expert_runtime_layout(
+        stage_size
+    ):
+        raise CheckpointValidationError(
+            "feature runtime document received the wrong routed layout"
+        )
+    return stage_size
 
 
 def _canonical_json(value: Any) -> str:
@@ -64,7 +92,7 @@ def _digest(value: str, *, field: str) -> str:
 
 @dataclass(frozen=True, slots=True)
 class FeatureRuntimeDestinationFilePlan:
-    """One feature-owner output and the four runtime files feeding it."""
+    """One feature-owner output and the local runtime files feeding it."""
 
     filename: str
     source_filenames: tuple[str, ...]
@@ -170,10 +198,7 @@ def build_feature_runtime_layout_document(
 ) -> dict[str, Any]:
     """Return the self-authenticating feature-runtime semantic layout."""
 
-    if layout.routed_expert_layout != FEATURE_EXPERT_RUNTIME_LAYOUT:
-        raise CheckpointValidationError(
-            "feature runtime document received the wrong routed layout"
-        )
+    _feature_stage_size(layout)
     value: dict[str, Any] = {
         "artifact_kind": FEATURE_RUNTIME_LAYOUT_ARTIFACT_KIND,
         "format_version": FEATURE_RUNTIME_FORMAT_VERSION,
@@ -230,27 +255,35 @@ def build_feature_runtime_destination_file_plans(
     *,
     source_runtime_manifest_sha256: str,
 ) -> tuple[FeatureRuntimeDestinationFilePlan, ...]:
-    """Build one final feature-owner plan for every PP8 physical device."""
+    """Build one final feature-owner plan for every PP8/PP16 device."""
 
     source_hash = _digest(
         source_runtime_manifest_sha256,
         field="source_runtime_manifest_sha256",
     )
-    if layout.routed_expert_layout != FEATURE_EXPERT_RUNTIME_LAYOUT:
-        raise CheckpointValidationError(
-            "feature runtime plans require the feature expert layout"
-        )
-    source_by_owner = {(plan.stage_id, plan.device_slot): plan for plan in source_plans}
-    if len(source_by_owner) != len(layout.devices):
+    stage_size = _feature_stage_size(layout)
+    source_by_owner = {
+        (plan.stage_id, plan.device_slot): plan for plan in source_plans
+    }
+    expected_owners = {
+        (device.stage_id, device.device_slot) for device in layout.devices
+    }
+    if (
+        len(source_by_owner) != len(source_plans)
+        or set(source_by_owner) != expected_owners
+    ):
         raise CheckpointValidationError(
             "feature runtime source files do not cover every base owner"
         )
     plans = []
     for device in layout.devices:
         stage_sources = tuple(
-            source_by_owner[(device.stage_id, source_slot)] for source_slot in range(4)
+            source_by_owner[(device.stage_id, source_slot)]
+            for source_slot in range(stage_size)
         )
-        if tuple(plan.device_slot for plan in stage_sources) != tuple(range(4)):
+        if tuple(plan.device_slot for plan in stage_sources) != tuple(
+            range(stage_size)
+        ):
             raise CheckpointValidationError(
                 "feature runtime stage source slots are incomplete"
             )
@@ -694,28 +727,34 @@ def stream_feature_runtime_stage(
     source_tensor_sha256: Mapping[tuple[str, str], str],
     chunk_bytes: int = 64 * 1024 * 1024,
 ) -> tuple[StreamedFeatureRuntimeFileEvidence, ...]:
-    """Transform all four files of one PP8 stage with bounded host memory."""
+    """Transform all files of one PP8/PP16 stage with bounded host memory."""
 
     if chunk_bytes <= 0:
         raise ValueError("feature runtime pack chunk_bytes must be positive")
     source_by_slot = {plan.device_slot: plan for plan in source_plans}
     destination_by_slot = {plan.device_slot: plan for plan in destination_plans}
-    expected_slots = set(range(4))
+    stage_size = len(source_by_slot)
+    expected_slots = set(range(stage_size))
     if (
-        set(source_by_slot) != expected_slots
+        stage_size not in (2, 4)
+        or len(source_by_slot) != len(source_plans)
+        or len(destination_by_slot) != len(destination_plans)
+        or set(source_by_slot) != expected_slots
         or set(destination_by_slot) != expected_slots
         or set(sources) != expected_slots
         or set(outputs) != expected_slots
     ):
         raise CheckpointValidationError(
-            "feature runtime stage requires exact slots 0,1,2,3"
+            "feature runtime stage requires one exact LP2 or LP4 slot set"
         )
     stage_ids = {plan.stage_id for plan in (*source_plans, *destination_plans)}
     if len(stage_ids) != 1:
         raise CheckpointValidationError(
             "feature runtime source/destination stages disagree"
         )
-    source_filenames = tuple(source_by_slot[slot].filename for slot in range(4))
+    source_filenames = tuple(
+        source_by_slot[slot].filename for slot in range(stage_size)
+    )
     for plan in destination_plans:
         if plan.source_filenames != source_filenames:
             raise CheckpointValidationError(
@@ -723,7 +762,7 @@ def stream_feature_runtime_stage(
             )
     source_tensor_by_slot = tuple(
         {tensor.spec.name: tensor for tensor in source_by_slot[slot].tensors}
-        for slot in range(4)
+        for slot in range(stage_size)
     )
     if any(
         len(by_name) != len(source_by_slot[slot].tensors)
@@ -732,7 +771,7 @@ def stream_feature_runtime_stage(
         raise CheckpointValidationError(
             "feature runtime source tensor names are duplicate"
         )
-    for slot in range(4):
+    for slot in range(stage_size):
         plan = source_by_slot[slot]
         digest = _digest(
             verified_source_file_sha256[plan.filename],
@@ -750,9 +789,9 @@ def stream_feature_runtime_stage(
     file_digests = {}
     output_bytes = {}
     tensor_evidence: dict[int, list[FeatureRuntimeTensorEvidence]] = {
-        slot: [] for slot in range(4)
+        slot: [] for slot in range(stage_size)
     }
-    for slot in range(4):
+    for slot in range(stage_size):
         plan = destination_by_slot[slot]
         count = outputs[slot].write(plan.header)
         if count is not None and count != len(plan.header):
@@ -764,34 +803,37 @@ def stream_feature_runtime_stage(
 
     destination_tensor_by_slot = tuple(
         {tensor.spec.name: tensor for tensor in destination_by_slot[slot].tensors}
-        for slot in range(4)
+        for slot in range(stage_size)
     )
     binding_by_slot = tuple(
         {
             tensor.spec.name: tensor
             for tensor in destination_by_slot[slot].device_layout.tensors
         }
-        for slot in range(4)
+        for slot in range(stage_size)
     )
     spec_names = tuple(tensor.spec.name for tensor in destination_by_slot[0].tensors)
     if any(
         tuple(tensor.spec.name for tensor in destination_by_slot[slot].tensors)
         != spec_names
-        for slot in range(1, 4)
+        for slot in range(1, stage_size)
     ):
         raise CheckpointValidationError(
             "feature runtime destination tensor order differs by owner"
         )
 
     for name in spec_names:
-        bindings = tuple(binding_by_slot[slot][name] for slot in range(4))
-        destinations = tuple(
-            destination_tensor_by_slot[slot][name] for slot in range(4)
+        bindings = tuple(
+            binding_by_slot[slot][name] for slot in range(stage_size)
         )
-        tensor_digests = tuple(sha256() for _ in range(4))
-        tensor_bytes = [0, 0, 0, 0]
+        destinations = tuple(
+            destination_tensor_by_slot[slot][name]
+            for slot in range(stage_size)
+        )
+        tensor_digests = tuple(sha256() for _ in range(stage_size))
+        tensor_bytes = [0 for _ in range(stage_size)]
         if all(binding.is_padding for binding in bindings):
-            for slot in range(4):
+            for slot in range(stage_size):
                 tensor_bytes[slot] = _write_zeros(
                     outputs[slot],
                     byte_count=destinations[slot].byte_count,
@@ -923,7 +965,7 @@ def stream_feature_runtime_stage(
                         tensor_digest=tensor_digests[destination_slot],
                     )
             else:
-                for source_slot in range(4):
+                for source_slot in range(stage_size):
                     source_tensor = source_tensor_by_slot[source_slot][name]
                     source_shape = source_tensor.spec.shape
                     if len(source_shape) != 3 or source_shape[0] <= 0:
@@ -945,14 +987,14 @@ def stream_feature_runtime_stage(
                             offset=tensor_start + expert * expert_bytes,
                             byte_count=expert_bytes,
                         )
-                        for destination_slot in range(4):
+                        for destination_slot in range(stage_size):
                             value = _transform_expert(
                                 raw,
                                 source_shape=source_shape,
                                 dtype=source_tensor.spec.dtype,
                                 transform=transform,
                                 destination_slot=destination_slot,
-                                stage_size=4,
+                                stage_size=stage_size,
                             )
                             tensor_bytes[destination_slot] += _write(
                                 outputs[destination_slot],
@@ -962,7 +1004,7 @@ def stream_feature_runtime_stage(
                             )
                         del raw
 
-        for slot in range(4):
+        for slot in range(stage_size):
             destination = destinations[slot]
             binding = bindings[slot]
             if tensor_bytes[slot] != destination.byte_count:
@@ -1002,7 +1044,7 @@ def stream_feature_runtime_stage(
         )
         for filename in source_filenames
     )
-    for slot in range(4):
+    for slot in range(stage_size):
         plan = destination_by_slot[slot]
         if output_bytes[slot] != plan.file_bytes:
             raise CheckpointValidationError(

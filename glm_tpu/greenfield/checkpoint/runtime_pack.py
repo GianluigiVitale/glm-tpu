@@ -15,6 +15,7 @@ from ..model.weights import (
     DeviceRuntimeWeightLayout,
     RuntimeTensorSpec,
 )
+from ..model.schedule import PipelineSchedule
 from ..partitioning import BASE_LOAD_SET
 from .stream_pack import DestinationFilePlan, DestinationTensorPlan
 
@@ -23,6 +24,44 @@ RUNTIME_LAYOUT_ARTIFACT_KIND = "greenfield_decoder_runtime_weight_layout"
 RUNTIME_PACK_CONTROL_KIND = "greenfield_runtime_checkpoint_pack_control"
 RUNTIME_PACKED_ARTIFACT_KIND = "greenfield_runtime_packed_checkpoint"
 RUNTIME_FORMAT_VERSION = 1
+
+
+def resolve_runtime_pack_stage(
+    schedule: PipelineSchedule,
+    *,
+    process_index: int,
+    requested_stage_id: int | None,
+) -> int:
+    """Resolve exactly one topology-local stage for a pack invocation."""
+
+    if not isinstance(process_index, int) or isinstance(process_index, bool):
+        raise CheckpointValidationError(
+            "runtime pack process index must be an integer"
+        )
+    if requested_stage_id is not None and (
+        not isinstance(requested_stage_id, int)
+        or isinstance(requested_stage_id, bool)
+        or requested_stage_id < 0
+    ):
+        raise CheckpointValidationError(
+            "runtime pack stage id must be a non-negative integer"
+        )
+    matches = tuple(
+        stage.assignment.stage_id
+        for stage in schedule.stages
+        if stage.assignment.process_index == process_index
+        and (
+            requested_stage_id is None
+            or stage.assignment.stage_id == requested_stage_id
+        )
+    )
+    if len(matches) != 1:
+        raise CheckpointValidationError(
+            "runtime pack process/stage selection is not unique: "
+            f"process={process_index} stage_id={requested_stage_id} "
+            f"matches={list(matches)}"
+        )
+    return matches[0]
 
 
 def _canonical_json(value: Any) -> str:

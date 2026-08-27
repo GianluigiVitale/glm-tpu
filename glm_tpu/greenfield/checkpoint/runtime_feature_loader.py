@@ -1,4 +1,4 @@
-"""Fail-closed verifier for the complete PP8 feature-runtime derivative."""
+"""Fail-closed verifier for complete PP8/PP16 feature-runtime derivatives."""
 
 from __future__ import annotations
 
@@ -72,8 +72,10 @@ class FeatureRuntimeCheckpointLoadExpectation:
             value = getattr(self, field)
             if not value.startswith("gs://driftbench-dsv4-uc/checkpoints/greenfield/"):
                 raise ValueError(f"{field} must be a greenfield approved-bucket prefix")
-        if self.plan_id != "PP8_LP4":
-            raise ValueError("feature runtime loader currently supports PP8_LP4")
+        if self.plan_id not in ("PP8_LP4", "PP16_LP2"):
+            raise ValueError(
+                "feature runtime loader supports only PP8_LP4 and PP16_LP2"
+            )
         if self.model_id != "zai-org/GLM-5.2-FP8":
             raise ValueError("feature runtime loader supports only GLM-5.2-FP8")
 
@@ -195,6 +197,8 @@ def verify_feature_runtime_packed_checkpoint(
         or source_layout_manifest_hash
         != expectation.source_runtime_layout_manifest_sha256
         or source_layout_hash != expectation.source_runtime_layout_hash
+        or source_checkpoint.runtime_manifest.get("plan_id")
+        != expectation.plan_id
         or source_checkpoint.runtime_manifest.get("destination")
         != expectation.source_destination
     ):

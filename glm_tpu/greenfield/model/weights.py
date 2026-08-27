@@ -48,12 +48,35 @@ _RUNTIME_SOURCE_TRANSFORMS = frozenset(
 )
 COMPLETE_EXPERT_RUNTIME_LAYOUT = "complete_expert_identity"
 FEATURE_EXPERT_RUNTIME_LAYOUT = "expert_intermediate_feature_lp4_pallas_kn_v1"
+FEATURE_EXPERT_RUNTIME_LAYOUT_LP2 = (
+    "expert_intermediate_feature_lp2_pallas_kn_v1"
+)
 SEPARATE_QKV_A_RUNTIME_LAYOUT = "separate_q_a_kv_a_v1"
 FUSED_QKV_A_N82_RUNTIME_LAYOUT = "fused_qkv_a_virtual_tp32_n82_v1"
 LEGACY_DENSE_RUNTIME_LAYOUT = "legacy_dense_output_major_v1"
 FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT = (
     "virtual_tp32_dense_convolution_in_out_v1"
 )
+
+
+def feature_expert_runtime_layout(local_parallel_size: int) -> str:
+    """Return the versioned expert-feature layout for one local stage."""
+
+    if not isinstance(local_parallel_size, int) or isinstance(
+        local_parallel_size, bool
+    ):
+        raise PlanValidationError(
+            "feature runtime local parallel size must be an integer"
+        )
+    try:
+        return {
+            2: FEATURE_EXPERT_RUNTIME_LAYOUT_LP2,
+            4: FEATURE_EXPERT_RUNTIME_LAYOUT,
+        }[local_parallel_size]
+    except KeyError as error:
+        raise PlanValidationError(
+            "feature runtime supports only LP2 and LP4"
+        ) from error
 
 
 def _canonical_json(value: Mapping[str, Any]) -> str:
@@ -551,6 +574,7 @@ class DecoderRuntimeWeightLayout:
         if self.routed_expert_layout not in (
             COMPLETE_EXPERT_RUNTIME_LAYOUT,
             FEATURE_EXPERT_RUNTIME_LAYOUT,
+            FEATURE_EXPERT_RUNTIME_LAYOUT_LP2,
         ):
             raise PlanValidationError("runtime routed expert layout is invalid")
         if self.attention_projection_layout not in (
@@ -1081,7 +1105,7 @@ def build_decoder_feature_runtime_weight_layout(
 
     The source is the verified complete-expert executable artifact.  Every
     non-routed tensor remains on the same physical owner.  Routed tensors are
-    redistributed offline across the four files of one host-local stage: all
+    redistributed offline across all files of one topology-local stage: all
     expert identities become local while each destination owns one contiguous
     intermediate-feature slice in the exact ``[expert,K,N]`` Pallas order.
     """
@@ -1090,11 +1114,17 @@ def build_decoder_feature_runtime_weight_layout(
         raise PlanValidationError(
             "feature runtime weights schedule belongs to another plan"
         )
-    if plan.name.value != "PP8_LP4" or plan.local_parallel_size != 4:
+    if (plan.name.value, plan.local_parallel_size) not in (
+        ("PP8_LP4", 4),
+        ("PP16_LP2", 2),
+    ):
         raise PlanValidationError(
-            "feature runtime layout currently requires PP8_LP4"
+            "feature runtime layout requires PP8 LP4 or PP16 LP2"
         )
-    if plan.expert_layout != FEATURE_EXPERT_RUNTIME_LAYOUT:
+    expected_feature_layout = feature_expert_runtime_layout(
+        plan.local_parallel_size
+    )
+    if plan.expert_layout != expected_feature_layout:
         raise PlanValidationError(
             "feature runtime plan does not declare the exact routed layout"
         )
@@ -1235,7 +1265,7 @@ def build_decoder_feature_runtime_weight_layout(
         schedule_hash=schedule.schedule_hash,
         specs=tuple(target_specs),
         devices=tuple(devices),
-        routed_expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+        routed_expert_layout=expected_feature_layout,
     )
 
 
@@ -1487,7 +1517,7 @@ def build_decoder_feature_fused_qkv_runtime_weight_layout(
         schedule_hash=schedule.schedule_hash,
         specs=specs,
         devices=tuple(devices),
-        routed_expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+        routed_expert_layout=feature_layout.routed_expert_layout,
         attention_projection_layout=FUSED_QKV_A_N82_RUNTIME_LAYOUT,
     )
 
@@ -1776,7 +1806,7 @@ def build_decoder_feature_fused_qkv_dense_runtime_weight_layout(
         schedule_hash=schedule.schedule_hash,
         specs=specs,
         devices=tuple(devices),
-        routed_expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+        routed_expert_layout=feature_qkv.routed_expert_layout,
         attention_projection_layout=FUSED_QKV_A_N82_RUNTIME_LAYOUT,
         dense_projection_layout=FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT,
     )

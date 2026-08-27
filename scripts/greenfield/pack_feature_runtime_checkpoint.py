@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the complete PP8 expert-feature runtime artifact directly in GCS."""
+"""Build a complete PP8/PP16 expert-feature runtime artifact in GCS."""
 
 from __future__ import annotations
 
@@ -29,6 +29,7 @@ from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     VerifiedRuntimeCheckpoint,
     build_feature_runtime_destination_file_plans,
     build_feature_runtime_layout_document,
+    resolve_runtime_pack_stage,
     stream_feature_runtime_stage,
     verify_full_packed_checkpoint,
     verify_runtime_packed_checkpoint,
@@ -38,7 +39,6 @@ from glm_tpu.greenfield.checkpoint.runtime_feature import (  # noqa: E402
     _source_evidence,
 )
 from glm_tpu.greenfield.model import (  # noqa: E402
-    FEATURE_EXPERT_RUNTIME_LAYOUT,
     LEGACY_DENSE_RUNTIME_LAYOUT,
     SEPARATE_QKV_A_RUNTIME_LAYOUT,
     DecoderRuntimeWeightLayout,
@@ -47,6 +47,7 @@ from glm_tpu.greenfield.model import (  # noqa: E402
     build_decoder_feature_runtime_weight_layout,
     build_decoder_runtime_weight_layout,
     build_pipeline_schedule,
+    feature_expert_runtime_layout,
 )
 from glm_tpu.greenfield.partitioning import inspect_layout_manifest  # noqa: E402
 from glm_tpu.greenfield.types import ExecutionPlan  # noqa: E402
@@ -190,7 +191,9 @@ def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
     )
     target_plan = replace(
         source_plan,
-        expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+        expert_layout=feature_expert_runtime_layout(
+            source_plan.local_parallel_size
+        ),
     )
     target_schedule = build_pipeline_schedule(target_plan)
     if getattr(args, "dense_convolution", False):
@@ -487,23 +490,22 @@ def _pack_stage(
         process_index = capture.get("jax_process_index")
         if not isinstance(process_index, int) or isinstance(process_index, bool):
             raise RuntimeError("topology capture lacks a valid JAX process index")
-    assignments = {
-        stage.assignment.process_index: stage.assignment.stage_id
-        for stage in build_pipeline_schedule(context.target_plan).stages
-    }
-    if process_index not in assignments:
-        raise RuntimeError(
-            f"process index {process_index} owns no PP8 feature-runtime stage"
-        )
-    stage_id = assignments[process_index]
+    stage_id = resolve_runtime_pack_stage(
+        build_pipeline_schedule(context.target_plan),
+        process_index=process_index,
+        requested_stage_id=args.stage_id,
+    )
     plans = tuple(plan for plan in context.plans if plan.stage_id == stage_id)
     source_plans = tuple(
         plan
         for plan in context.source_runtime_checkpoint.plans
         if plan.stage_id == stage_id
     )
-    if len(plans) != 4 or len(source_plans) != 4:
-        raise RuntimeError("PP8 feature-runtime stage does not contain four files")
+    stage_size = context.target_plan.local_parallel_size
+    if len(plans) != stage_size or len(source_plans) != stage_size:
+        raise RuntimeError(
+            "feature-runtime stage does not contain its exact local files"
+        )
     args.run_dir.mkdir(parents=True, exist_ok=True)
     existing = tuple(
         _validate_remote_record(
@@ -566,7 +568,7 @@ def _pack_stage(
                 source_tensor_sha256=context.source_tensor_hashes,
                 chunk_bytes=CHUNK_BYTES,
             )
-            for slot in range(4):
+            for slot in range(stage_size):
                 output_streams[slot].close()
                 closed_slots.add(slot)
         except BaseException:
@@ -757,6 +759,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--process-index", type=int)
     parser.add_argument("--topology-capture", type=Path)
+    parser.add_argument("--stage-id", type=int)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--fused-qkv-a", action="store_true")
     parser.add_argument("--dense-convolution", action="store_true")
@@ -774,6 +777,8 @@ def main() -> int:
         )
     if args.mode != "pack-stage" and selectors:
         raise RuntimeError("process/topology selectors are valid only for pack-stage")
+    if args.mode != "pack-stage" and args.stage_id is not None:
+        raise RuntimeError("stage selector is valid only for pack-stage")
     code_hash = _verify_repo(args.expected_code_hash)
     bucket_name, prefix = _parse_gs_uri(args.destination)
     context = _build_context(args, code_hash)

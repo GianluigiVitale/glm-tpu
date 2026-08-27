@@ -88,8 +88,10 @@ class RuntimeCheckpointLoadExpectation:
                 raise ValueError(
                     f"{field} must be a greenfield approved-bucket prefix"
                 )
-        if self.plan_id != "PP8_LP4":
-            raise ValueError("runtime loader currently supports only PP8_LP4")
+        if self.plan_id not in ("PP8_LP4", "PP16_LP2"):
+            raise ValueError(
+                "runtime loader supports only PP8_LP4 and PP16_LP2"
+            )
         if self.model_id != "zai-org/GLM-5.2-FP8":
             raise ValueError("runtime loader supports only GLM-5.2-FP8")
 
@@ -180,6 +182,8 @@ def verify_runtime_packed_checkpoint(
     if (
         source_manifest_hash != expectation.source_packed_manifest_sha256
         or source_layout_hash != expectation.source_layout_manifest_sha256
+        or source_checkpoint.packed_manifest.get("plan_id")
+        != expectation.plan_id
         or source_checkpoint.packed_manifest.get("destination")
         != expectation.source_destination
     ):
@@ -481,10 +485,27 @@ def load_runtime_checkpoint(
     by_stage: dict[int, set[int]] = {}
     for plan in selected:
         by_stage.setdefault(plan.stage_id, set()).add(plan.device_slot)
-    expected_slots = set(range(4))
+    layout_slots_by_stage: dict[int, set[int]] = {}
+    for device in layout.devices:
+        layout_slots_by_stage.setdefault(device.stage_id, set()).add(
+            device.device_slot
+        )
+    stage_sizes = {len(slots) for slots in layout_slots_by_stage.values()}
+    if len(stage_sizes) != 1:
+        raise CheckpointValidationError(
+            "runtime layout does not contain uniform LP2/LP4 stages"
+        )
+    stage_size = next(iter(stage_sizes), 0)
+    expected_slots = set(range(stage_size))
+    if stage_size not in (2, 4) or any(
+        slots != expected_slots for slots in layout_slots_by_stage.values()
+    ):
+        raise CheckpointValidationError(
+            "runtime layout does not contain complete LP2/LP4 stages"
+        )
     if any(slots != expected_slots for slots in by_stage.values()):
         raise CheckpointValidationError(
-            "runtime addressable files do not contain complete PP8 stages"
+            "runtime addressable files do not contain complete local stages"
         )
     plan_by_device = {plan.device_id: plan for plan in selected}
     device_by_id = {int(device.id): device for device in addressable_devices}

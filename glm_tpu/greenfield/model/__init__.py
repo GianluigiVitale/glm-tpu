@@ -15,6 +15,7 @@ from .state import (
 from .weights import (
     COMPLETE_EXPERT_RUNTIME_LAYOUT,
     FEATURE_EXPERT_RUNTIME_LAYOUT,
+    FEATURE_EXPERT_RUNTIME_LAYOUT_LP2,
     FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT,
     FUSED_QKV_A_N82_RUNTIME_LAYOUT,
     LEGACY_DENSE_RUNTIME_LAYOUT,
@@ -30,11 +31,13 @@ from .weights import (
     build_decoder_feature_fused_qkv_runtime_weight_layout,
     build_decoder_fused_qkv_runtime_weight_layout,
     build_decoder_runtime_weight_layout,
+    feature_expert_runtime_layout,
 )
 
 __all__ = [
     "COMPLETE_EXPERT_RUNTIME_LAYOUT",
     "FEATURE_EXPERT_RUNTIME_LAYOUT",
+    "FEATURE_EXPERT_RUNTIME_LAYOUT_LP2",
     "FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT",
     "FUSED_QKV_A_N82_RUNTIME_LAYOUT",
     "LEGACY_DENSE_RUNTIME_LAYOUT",
@@ -56,6 +59,7 @@ __all__ = [
     "build_decoder_feature_fused_qkv_runtime_weight_layout",
     "build_decoder_fused_qkv_runtime_weight_layout",
     "build_decoder_runtime_weight_layout",
+    "feature_expert_runtime_layout",
     "build_decoder_state_layout",
     "build_pipeline_schedule",
 ]

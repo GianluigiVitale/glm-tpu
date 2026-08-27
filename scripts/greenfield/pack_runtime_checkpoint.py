@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Build the executable-ready PP8 decoder checkpoint as an append-only artifact.
+"""Build an executable-ready PP8/PP16 checkpoint as an append-only artifact.
 
 The command is intentionally split into ``prepare``, ``pack-stage``, and
-``finalize`` modes.  A protected harness can prepare once, run one stage on
-each of the eight existing hosts, and commit the manifest only after all 32
-device files and sidecars reconcile.  Payloads stream from the protected
-final-owner checkpoint to GCS; no 26 GB destination file is staged on disk.
+``finalize`` modes.  A protected harness can prepare once, run every stage on
+its owning host, and commit the manifest only after all 32 device files and
+sidecars reconcile.  Payloads stream from the protected final-owner checkpoint
+to GCS; no complete destination file is staged on disk.
 """
 
 from __future__ import annotations
@@ -35,6 +35,7 @@ from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     VerifiedPackedCheckpoint,
     build_runtime_destination_file_plans,
     build_runtime_layout_document,
+    resolve_runtime_pack_stage,
     stream_runtime_weight_file,
     verify_full_packed_checkpoint,
     verify_source_file_sha256,
@@ -546,27 +547,24 @@ def _pack_stage(
         process_index = capture.get("jax_process_index")
         if not isinstance(process_index, int) or isinstance(process_index, bool):
             raise RuntimeError("topology capture lacks a valid JAX process index")
-    assignments = {
-        stage.assignment.process_index: stage.assignment.stage_id
-        for stage in build_pipeline_schedule(
-            ExecutionPlan.from_dict(
-                context.source_checkpoint.layout["plan_manifest"][
-                    "execution_plan"
-                ]
-            )
-        ).stages
-    }
-    if process_index not in assignments:
-        raise RuntimeError(
-            f"process index {process_index} owns no PP8 runtime stage"
-        )
-    stage_id = assignments[process_index]
+    execution_plan = ExecutionPlan.from_dict(
+        context.source_checkpoint.layout["plan_manifest"]["execution_plan"]
+    )
+    schedule = build_pipeline_schedule(execution_plan)
+    stage_id = resolve_runtime_pack_stage(
+        schedule,
+        process_index=process_index,
+        requested_stage_id=args.stage_id,
+    )
     plans = tuple(plan for plan in context.plans if plan.stage_id == stage_id)
-    if len(plans) != 4:
-        raise RuntimeError("PP8 runtime stage does not contain four files")
+    stage_size = execution_plan.local_parallel_size
+    if len(plans) != stage_size:
+        raise RuntimeError(
+            "runtime stage does not contain its exact local files"
+        )
     args.run_dir.mkdir(parents=True, exist_ok=True)
     records = []
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=stage_size) as executor:
         futures = {
             executor.submit(
                 _pack_one,
@@ -688,6 +686,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--process-index", type=int)
     parser.add_argument("--topology-capture", type=Path)
+    parser.add_argument("--stage-id", type=int)
     parser.add_argument("--resume", action="store_true")
     return parser.parse_args()
 
@@ -706,6 +705,8 @@ def main() -> int:
         raise RuntimeError(
             "process/topology selectors are valid only for pack-stage"
         )
+    if args.mode != "pack-stage" and args.stage_id is not None:
+        raise RuntimeError("stage selector is valid only for pack-stage")
     code_hash = _verify_repo(args.expected_code_hash)
     bucket_name, prefix = _parse_gs_uri(args.destination)
     context = _build_context(args, code_hash)

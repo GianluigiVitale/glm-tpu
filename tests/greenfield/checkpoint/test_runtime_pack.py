@@ -14,20 +14,24 @@ from glm_tpu.greenfield.checkpoint import (
     DestinationTensorPlan,
     build_runtime_destination_file_plans,
     build_runtime_layout_document,
+    resolve_runtime_pack_stage,
     stream_runtime_weight_file,
     verify_source_file_sha256,
 )
 from glm_tpu.greenfield.errors import CheckpointValidationError, PlanValidationError
 from glm_tpu.greenfield.model import (
     FEATURE_EXPERT_RUNTIME_LAYOUT,
+    FEATURE_EXPERT_RUNTIME_LAYOUT_LP2,
     FUSED_QKV_A_N82_RUNTIME_LAYOUT,
     build_decoder_feature_runtime_weight_layout,
     build_decoder_feature_fused_qkv_runtime_weight_layout,
     build_decoder_fused_qkv_runtime_weight_layout,
     build_decoder_runtime_weight_layout,
     build_pipeline_schedule,
+    feature_expert_runtime_layout,
 )
 from glm_tpu.greenfield.types import ExecutionPlan, PlanName, StageAssignment
+from glm_tpu.greenfield.topology import build_pp16_lp2_groups
 from tests.greenfield.model.test_schedule import _geometry, _topology
 
 
@@ -97,6 +101,122 @@ def _small_feature_source_plan() -> ExecutionPlan:
         plan,
         geometry=replace(plan.geometry, moe_intermediate_size=8),
     )
+
+
+def _small_feature_source_plan_pp16() -> ExecutionPlan:
+    source = _small_feature_source_plan()
+    geometry = replace(
+        source.geometry,
+        num_layers=16,
+        mlp_layer_types=("dense", "dense", "dense", *("sparse",) * 13),
+        indexer_types=("full",) * 16,
+    )
+    groups = build_pp16_lp2_groups(source.topology)
+    assignments = tuple(
+        StageAssignment(
+            stage_id=group.stage_id,
+            process_index=group.process_index,
+            device_ids=group.device_ids,
+            layer_start=group.stage_id,
+            layer_end_exclusive=group.stage_id + 1,
+            persistent_weight_bytes=1,
+            fp8_scale_bytes=1,
+            kv_bytes_at_target_context=1,
+            dsa_state_bytes=1,
+            temporary_bytes=1,
+            reserved_overlay_bytes=0,
+        )
+        for group in groups
+    )
+    return ExecutionPlan(
+        name=PlanName.PP16_LP2,
+        geometry=geometry,
+        topology=source.topology,
+        target_context_length=16,
+        pipeline_stages=16,
+        local_parallel_size=2,
+        stage_assignments=assignments,
+        local_mesh_shape=(2,),
+        residual_layout="stage_local_replicated",
+        expert_layout="complete_expert_identity_lp2",
+        kv_layout="stage_layer_context_sharded_lp2",
+        transport="collective_permute_stage_ring",
+    )
+
+
+def test_feature_runtime_layout_name_is_exact_for_local_stage_size() -> None:
+    assert feature_expert_runtime_layout(4) == FEATURE_EXPERT_RUNTIME_LAYOUT
+    assert feature_expert_runtime_layout(2) == FEATURE_EXPERT_RUNTIME_LAYOUT_LP2
+    with pytest.raises(PlanValidationError, match="supports only LP2 and LP4"):
+        feature_expert_runtime_layout(8)
+    with pytest.raises(PlanValidationError, match="must be an integer"):
+        feature_expert_runtime_layout(2.0)  # type: ignore[arg-type]
+
+
+def test_pp16_feature_runtime_refuses_lp4_layout_identity() -> None:
+    source_plan = _small_feature_source_plan_pp16()
+    source_layout = build_decoder_runtime_weight_layout(
+        source_plan,
+        build_pipeline_schedule(source_plan),
+    )
+    wrong_target = replace(
+        source_plan,
+        expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+    )
+    with pytest.raises(
+        PlanValidationError,
+        match="does not declare the exact routed layout",
+    ):
+        build_decoder_feature_runtime_weight_layout(
+            wrong_target,
+            build_pipeline_schedule(wrong_target),
+            source_layout,
+        )
+
+
+def test_runtime_pack_stage_selection_requires_pp16_stage_id() -> None:
+    pp8 = build_pipeline_schedule(_small_feature_source_plan())
+    assert resolve_runtime_pack_stage(
+        pp8,
+        process_index=3,
+        requested_stage_id=None,
+    ) == 3
+
+    pp16 = build_pipeline_schedule(_small_feature_source_plan_pp16())
+    with pytest.raises(
+        CheckpointValidationError,
+        match="selection is not unique",
+    ):
+        resolve_runtime_pack_stage(
+            pp16,
+            process_index=3,
+            requested_stage_id=None,
+        )
+    owned = tuple(
+        stage.assignment.stage_id
+        for stage in pp16.stages
+        if stage.assignment.process_index == 3
+    )
+    assert len(owned) == 2
+    assert resolve_runtime_pack_stage(
+        pp16,
+        process_index=3,
+        requested_stage_id=owned[1],
+    ) == owned[1]
+    wrong_stage = next(
+        stage.assignment.stage_id
+        for stage in pp16.stages
+        if stage.assignment.process_index != 3
+    )
+    with pytest.raises(
+        CheckpointValidationError,
+        match="selection is not unique",
+    ):
+        resolve_runtime_pack_stage(
+            pp16,
+            process_index=3,
+            requested_stage_id=wrong_stage,
+        )
 
 
 def _source_plans(layout: object) -> tuple[DestinationFilePlan, ...]:

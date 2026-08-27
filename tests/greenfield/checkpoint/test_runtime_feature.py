@@ -30,6 +30,7 @@ from glm_tpu.greenfield.checkpoint.runtime_feature import (
 )
 from glm_tpu.greenfield.model import (
     FEATURE_EXPERT_RUNTIME_LAYOUT,
+    FEATURE_EXPERT_RUNTIME_LAYOUT_LP2,
     FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT,
     SEPARATE_QKV_A_RUNTIME_LAYOUT,
     build_decoder_dense_convolution_runtime_weight_layout,
@@ -38,7 +39,9 @@ from glm_tpu.greenfield.model import (
     build_decoder_feature_runtime_weight_layout,
     build_decoder_runtime_weight_layout,
     build_pipeline_schedule,
+    feature_expert_runtime_layout,
 )
+from glm_tpu.greenfield.types import ExecutionPlan
 from tests.greenfield.checkpoint.test_runtime_loader import (
     _build_artifact,
     _mapping_hash,
@@ -46,6 +49,7 @@ from tests.greenfield.checkpoint.test_runtime_loader import (
 )
 from tests.greenfield.checkpoint.test_runtime_pack import (
     _small_feature_source_plan,
+    _small_feature_source_plan_pp16,
     _source_file,
     _source_plans,
 )
@@ -433,6 +437,96 @@ def test_feature_runtime_stage_streams_exact_final_owner_transforms() -> None:
     assert all(source.transpose_axes == (0, 2, 1) for source in gate_record.sources)
 
 
+def test_pp16_feature_runtime_stage_streams_both_final_owners() -> None:
+    source_plan = _small_feature_source_plan_pp16()
+    source_layout = build_decoder_runtime_weight_layout(
+        source_plan,
+        build_pipeline_schedule(source_plan),
+    )
+    packed_plans = _source_plans(source_layout)
+    runtime_plans = build_runtime_destination_file_plans(
+        source_layout,
+        packed_plans,
+        source_packed_manifest_sha256="a" * 64,
+    )
+    stage_id = 3
+    source_stage = tuple(
+        plan for plan in runtime_plans if plan.stage_id == stage_id
+    )
+    runtime_bytes: dict[int, bytes] = {}
+    runtime_evidence = {}
+    packed_by_owner = {
+        (plan.stage_id, plan.device_slot): plan for plan in packed_plans
+    }
+    for runtime_plan in source_stage:
+        packed = packed_by_owner[
+            (runtime_plan.stage_id, runtime_plan.device_slot)
+        ]
+        packed_bytes = _source_file(packed)
+        output = BytesIO()
+        item = stream_runtime_weight_file(
+            source_plan=packed,
+            runtime_plan=runtime_plan,
+            source=BytesIO(packed_bytes),
+            output=output,
+            verified_source_file_sha256=sha256(packed_bytes).hexdigest(),
+            chunk_bytes=7,
+        )
+        runtime_bytes[runtime_plan.device_slot] = output.getvalue()
+        runtime_evidence[runtime_plan.filename] = item
+
+    target_plan = replace(
+        source_plan,
+        expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT_LP2,
+    )
+    target_layout = build_decoder_feature_runtime_weight_layout(
+        target_plan,
+        build_pipeline_schedule(target_plan),
+        source_layout,
+    )
+    assert target_layout.routed_expert_layout == (
+        FEATURE_EXPERT_RUNTIME_LAYOUT_LP2
+    )
+    destination_plans = build_feature_runtime_destination_file_plans(
+        target_layout,
+        runtime_plans,
+        source_runtime_manifest_sha256="b" * 64,
+    )
+    destination_stage = tuple(
+        plan for plan in destination_plans if plan.stage_id == stage_id
+    )
+    outputs = {slot: BytesIO() for slot in range(2)}
+    evidence = stream_feature_runtime_stage(
+        source_plans=source_stage,
+        destination_plans=destination_stage,
+        sources={
+            slot: BytesIO(value) for slot, value in runtime_bytes.items()
+        },
+        outputs=outputs,
+        verified_source_file_sha256={
+            plan.filename: runtime_evidence[plan.filename].sha256
+            for plan in source_stage
+        },
+        source_tensor_sha256={
+            (plan.filename, tensor.name): tensor.sha256
+            for plan in source_stage
+            for tensor in runtime_evidence[plan.filename].tensors
+        },
+        chunk_bytes=7,
+    )
+    assert len(evidence) == 2
+    assert all(
+        len(outputs[slot].getvalue()) == destination_stage[slot].file_bytes
+        for slot in range(2)
+    )
+    routed = next(
+        spec
+        for spec in target_layout.specs
+        if spec.name.endswith("experts.gate_proj.weight_bits")
+    )
+    assert routed.shape[-1] == source_plan.geometry.moe_intermediate_size // 2
+
+
 def test_feature_runtime_stage_streams_fused_qkv_a_from_base_files() -> None:
     source_plan = _small_feature_source_plan()
     source_plan = replace(
@@ -667,9 +761,11 @@ def test_feature_runtime_stage_refuses_truncated_authenticated_source() -> None:
 def _build_feature_artifact(
     tmp_path: Path,
     *,
+    source_plan: ExecutionPlan | None = None,
     fused_qkv_a: bool = False,
 ) -> tuple[object, object, object]:
-    source_plan = _small_feature_source_plan()
+    if source_plan is None:
+        source_plan = _small_feature_source_plan()
     if fused_qkv_a:
         source_plan = replace(
             source_plan,
@@ -698,7 +794,9 @@ def _build_feature_artifact(
     )
     target_plan = replace(
         source_plan,
-        expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT,
+        expert_layout=feature_expert_runtime_layout(
+            source_plan.local_parallel_size
+        ),
     )
     target_schedule = build_pipeline_schedule(target_plan)
     if fused_qkv_a:
@@ -731,7 +829,7 @@ def _build_feature_artifact(
         "pack_code_hash": FEATURE_PACK_CODE_HASH,
         "padding_bytes": sum(device.padding_bytes for device in target_layout.devices),
         "plan_hash": target_layout.plan_hash,
-        "plan_id": "PP8_LP4",
+        "plan_id": target_plan.name.value,
         "routed_expert_layout": target_layout.routed_expert_layout,
         "runtime_file_bytes": sum(plan.file_bytes for plan in plans),
         "runtime_layout_hash": target_layout.layout_hash,
@@ -775,7 +873,7 @@ def _build_feature_artifact(
         for tensor in record["tensors"]
     }
     records = []
-    for stage_id in range(8):
+    for stage_id in range(target_plan.pipeline_stages):
         source_stage = tuple(
             plan for plan in source_checkpoint.plans if plan.stage_id == stage_id
         )
@@ -851,6 +949,7 @@ def _build_feature_artifact(
         pack_code_hash=FEATURE_PACK_CODE_HASH,
         destination=FEATURE_DESTINATION,
         source_destination=source_expectation.destination,
+        plan_id=target_plan.name.value,
     )
     return target_layout, source_checkpoint, expectation
 
@@ -918,3 +1017,33 @@ def test_fused_qkv_feature_runtime_artifact_roundtrips(
     )
     assert fused["transform"] == "fuse_qkv_a_expanded_scales"
     assert len(fused["sources"]) == 2
+
+
+def test_pp16_feature_runtime_artifact_verifies_all_two_chip_stages(
+    tmp_path: Path,
+) -> None:
+    target_layout, source_checkpoint, expectation = _build_feature_artifact(
+        tmp_path,
+        source_plan=_small_feature_source_plan_pp16(),
+    )
+    verified = verify_feature_runtime_packed_checkpoint(
+        tmp_path / "feature-runtime",
+        expectation,
+        target_layout,
+        source_checkpoint,
+    )
+    assert expectation.plan_id == "PP16_LP2"
+    assert target_layout.routed_expert_layout == (
+        FEATURE_EXPERT_RUNTIME_LAYOUT_LP2
+    )
+    assert {
+        (item.stage_id, item.device_slot) for item in verified.plans
+    } == {(stage, slot) for stage in range(16) for slot in range(2)}
+
+
+def test_feature_runtime_expectation_rejects_nonpipeline_plan(
+    tmp_path: Path,
+) -> None:
+    _, _, expectation = _build_feature_artifact(tmp_path)
+    with pytest.raises(ValueError, match="supports only PP8_LP4 and PP16_LP2"):
+        replace(expectation, plan_id="WS32_2D")

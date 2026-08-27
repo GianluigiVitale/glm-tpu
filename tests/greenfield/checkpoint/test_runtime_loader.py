@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
@@ -27,6 +28,7 @@ from glm_tpu.greenfield.model import (
 )
 from glm_tpu.greenfield.types import ExecutionPlan
 from tests.greenfield.checkpoint.test_runtime_pack import (
+    _small_feature_source_plan_pp16,
     _small_plan,
     _source_plans,
 )
@@ -88,6 +90,7 @@ def _build_artifact(
         packed_manifest={
             "destination": SOURCE_DESTINATION,
             "manifest_sha256": SOURCE_MANIFEST_SHA,
+            "plan_id": plan.name.value,
         },
         control={},
         plans=source_plans,
@@ -111,7 +114,7 @@ def _build_artifact(
             device.padding_bytes for device in layout.devices
         ),
         "plan_hash": layout.plan_hash,
-        "plan_id": "PP8_LP4",
+        "plan_id": plan.name.value,
         "runtime_file_bytes": sum(item.file_bytes for item in runtime_plans),
         "runtime_layout_hash": layout.layout_hash,
         "runtime_layout_manifest_sha256": layout_document["manifest_sha256"],
@@ -197,6 +200,7 @@ def _build_artifact(
         pack_code_hash=PACK_CODE_HASH,
         destination=RUNTIME_DESTINATION,
         source_destination=SOURCE_DESTINATION,
+        plan_id=plan.name.value,
     )
     return layout, source_checkpoint, expectation, runtime_plans
 
@@ -227,6 +231,33 @@ def test_runtime_artifact_verification_is_complete_and_fail_closed(
             layout,
             source_checkpoint,
         )
+
+
+def test_pp16_runtime_artifact_verifies_all_two_chip_stages(
+    tmp_path: Path,
+) -> None:
+    plan = _small_feature_source_plan_pp16()
+    layout, source_checkpoint, expectation, runtime_plans = _build_artifact(
+        tmp_path,
+        plan,
+    )
+    verified = verify_runtime_packed_checkpoint(
+        tmp_path,
+        expectation,
+        layout,
+        source_checkpoint,
+    )
+    assert expectation.plan_id == "PP16_LP2"
+    assert len(verified.plans) == len(runtime_plans) == 32
+    assert {
+        (item.stage_id, item.device_slot) for item in verified.plans
+    } == {(stage, slot) for stage in range(16) for slot in range(2)}
+
+
+def test_runtime_expectation_rejects_nonpipeline_plan(tmp_path: Path) -> None:
+    _, _, expectation, _ = _build_artifact(tmp_path)
+    with pytest.raises(ValueError, match="supports only PP8_LP4 and PP16_LP2"):
+        replace(expectation, plan_id="WS32_2D")
 
 
 def test_runtime_loader_reuses_final_owner_buffers_without_reshard(
