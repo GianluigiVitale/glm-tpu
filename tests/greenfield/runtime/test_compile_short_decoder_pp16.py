@@ -293,14 +293,30 @@ def test_pp16_compile_acquisition_validator_admits_pallas_linear(
     assert summary["runtime_kind"] == "pallas_feature_linear"
 
 
+def test_pp16_compile_acquisition_accepts_opt_in_output_tile_256(
+    tmp_path: Path,
+) -> None:
+    records = [_record(rank) for rank in range(8)]
+    for record in records:
+        record["feature_output_tile"] = 256
+        record["hlo_contract"]["feature_output_tile"] = 256
+    _write_records(tmp_path, records)
+
+    summary = validate_records(tmp_path, CODE_HASH, feature_output_tile=256)
+
+    assert summary["feature_output_tile"] == 256
+
+
 def test_pp16_compile_acquisition_runner_is_small_default_off_and_protected() -> None:
     source = RUNNER.read_text()
 
     assert "GLM_GREENFIELD_PP16_COMPILE_ACQUISITION:-0" in source
     assert "--context-capacity 2048 --warmup 1 --iterations 1 --trace-steps 0" in source
     assert "GLM_GREENFIELD_PP16_RUNTIME_KIND:-pallas_feature" in source
+    assert "GLM_GREENFIELD_PP16_FEATURE_OUTPUT_TILE:-128" in source
     assert '--runtime-kind ' in source
-    assert "--feature-output-tile 128" in source
+    assert '--feature-output-tile ' in source
+    assert '--feature-output-tile ' + "'\"$FEATURE_OUTPUT_TILE\"'" in source
     assert "--complete-token-path 1 --split-residual-state 1" in source
     assert "--dsa-query-exact-association 1" in source
     assert "--dsa-head-key-exact-association 0" in source

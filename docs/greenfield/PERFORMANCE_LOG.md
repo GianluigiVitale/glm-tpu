@@ -6,6 +6,21 @@ but not Gate E. WS32 has the accepted 2K DB553 point at `122.630667 ms/token` / 
 No accepted 8K, 128K, 256K or PP16 full-decoder measurement exists yet. Bounded
 layer/kernel/diagnostic results below are not token-speed proof.
 
+## 2026-08-27 — PP16 tile 256 is exact and 0.99% faster, but not a decoder rescue
+
+Protected DB562 changes only the PP16 feature-MoE output tile from 128 to 256. Normal p50/p99 is
+`3.835064/3.874908 ms` versus DB558's `3.873275/3.944720 ms`; concentrated p50 is
+`3.835575 ms` versus `3.866075 ms`. Exact route membership and both output checksums are identical.
+The selected Pallas call falls `3.162855 -> 3.094873 ms`; HLO retains one LP2-only BF16 combine,
+XPlane sees one physical psum, and peak HBM is 4.857 GB. DB/archive/remote `SUCCESS` and 8/8
+cleanup pass. This is a protected real-layer result, not token latency.
+
+Applying the measured normal p50 arithmetically to 75 MoE layers gives 287.6298 ms, only
+2.865825 ms below the DB558 attribution and already above the 200-ms complete-token target before
+other decoder work. The calculation is non-additive and not a formal latency result, but it is
+sufficient to reject another expensive full-PP16 run whose only change is tile size. Tile 256 is
+retained as an explicit default-off compiler option; PP8 becomes the next Gate-D acquisition plan.
+
 ## 2026-08-27 — exact PP16 LP2 query is fast but remains bounded
 
 DB561 / `greenfield_pp16_lp2_exact_query_20260827T161033467085863Z` proves the real layer-0

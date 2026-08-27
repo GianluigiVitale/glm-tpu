@@ -66,9 +66,12 @@ def validate_records(
     run_dir: Path,
     code_hash: str,
     runtime_kind: str = "pallas_feature",
+    feature_output_tile: int = 128,
 ) -> dict[str, Any]:
     if runtime_kind not in ("pallas_feature", "pallas_feature_linear"):
         raise ValueError("PP16 acquisition runtime kind is unknown")
+    if feature_output_tile not in (128, 256):
+        raise ValueError("PP16 feature output tile must be 128 or 256")
     linear_backend = (
         "pallas" if runtime_kind == "pallas_feature_linear" else "reference"
     )
@@ -116,7 +119,7 @@ def validate_records(
             "dsa_query_exact_association": True,
             "dsa_score_default_precision": False,
             "feature_fuse_route_weighting": False,
-            "feature_output_tile": 128,
+            "feature_output_tile": feature_output_tile,
             "feature_reconstruct_down_fp32": False,
             "iterations": 1,
             "linear_backend": linear_backend,
@@ -266,7 +269,7 @@ def validate_records(
             "backend_contract": backend_contract,
             "complete_token_path": True,
             "feature_fuse_route_weighting": False,
-            "feature_output_tile": 128,
+            "feature_output_tile": feature_output_tile,
             "feature_reconstruct_down_fp32": False,
             "forbidden_shapes": [],
             "forbidden_full_vocab_logits": [],
@@ -422,6 +425,7 @@ def validate_records(
         "collective_counts": contract["collective_counts"],
         "context_capacity": 2048,
         "diagnostic_only": True,
+        "feature_output_tile": feature_output_tile,
         "gate_d_passed": False,
         "host_count": 8,
         "launch_to_jax_process": {
@@ -472,13 +476,19 @@ def parse_args() -> argparse.Namespace:
         choices=("pallas_feature", "pallas_feature_linear"),
         default="pallas_feature",
     )
+    parser.add_argument(
+        "--feature-output-tile", type=int, choices=(128, 256), default=128
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     summary = validate_records(
-        args.run_dir, args.code_hash, runtime_kind=args.runtime_kind
+        args.run_dir,
+        args.code_hash,
+        runtime_kind=args.runtime_kind,
+        feature_output_tile=args.feature_output_tile,
     )
     print(
         "PP16_COMPILE_ACQUISITION_VALID "

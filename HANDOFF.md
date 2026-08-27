@@ -2,6 +2,34 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 PP16 MoE tile-256 wins narrowly; unchanged decoder rerun is refused
+
+- Offline report `greenfield_pp16_decoder_offline_attribution_20260827T185245848894355Z` at
+  pushed/mirrored generator `6506213` joins only the sealed PP16 acquisition and protected DB
+  558/482/560/561 rows. Its 431.834093-ms arithmetic attribution assigns 290.495625 ms / 67.27%
+  to 75 PP16 MoE layers, 24.8859 ms to reference attention and 9.41388 ms to exact query. The
+  report explicitly marks synchronized component timings non-additive and the PP8 comparison
+  non-causal because plan, tile and reconstruction mode differ. Report/file SHAs are
+  `4441cb3e...d4432` / `07696b6d...bfb042`; local and approved-bucket bytes match.
+- The resulting single-variable protected challenger is DB562 / tag
+  `greenfield_real_layer_pp16_pallas_feature_ot256_20260827T185331213479484Z`. It holds PP16,
+  reconstruction and route weighting fixed and changes only output tile 128 to 256. Normal p50/p99
+  improves `3.873275/3.944720 -> 3.835064/3.874908 ms`; concentrated p50 is
+  `3.866075 -> 3.835575 ms`. The selected kernel falls `3.162855 -> 3.094873 ms`; output checksums
+  and exact routes are unchanged. Peak HBM is 4,856,615,936 bytes with a 28,157,850,624-byte
+  minimum largest-free block.
+- HLO `01e640df...89f91` retains exactly three production calls and one
+  `bf16[2,1,6144]` all-reduce over `{{0,1}}`; XPlane sees one physical psum at 0.011659 ms/step.
+  DB snapshot/archive hashes, 13 remote objects, terminal marker and pre/post 8/8 censuses pass.
+  The tile-256 attribution report `...ot256_20260827T190034966677896Z` projects 287.6298 ms of
+  MoE and has report/file SHAs `c1d6522c...f04a` / `6096dcbb...a338f`.
+- The win predicts only 2.865825 ms across 75 layers and cannot rescue the 431.8-ms PP16 step.
+  The complete compiler now accepts tile 256 only through
+  `GLM_GREENFIELD_PP16_FEATURE_OUTPUT_TILE=256`; tile 128 remains the default. Do not spend another
+  32-chip PP16 run on this setting alone. Exact next is to commit/push/mirror this integration,
+  then restore the faster PP8 runtime sequentially from the canonical source and reproduction
+  capsule for the smallest current-code 2K acquisition before any 8K numerical run.
+
 ## 2026-08-27 PP16 exact-query full graph is sealed; 431.8 ms remains
 
 - Source tag `greenfield_short_decoder_compile_pp16_acquisition_20260827T172903119545622Z`

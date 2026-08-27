@@ -23,7 +23,12 @@ readonly RUNTIME_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtim
 readonly RUNTIME_MANIFEST_SHA=b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab
 RUNTIME_KIND=${GLM_GREENFIELD_PP16_RUNTIME_KIND:-pallas_feature}
 [[ $RUNTIME_KIND == pallas_feature || $RUNTIME_KIND == pallas_feature_linear ]]
-readonly RUNTIME_KIND
+FEATURE_OUTPUT_TILE=${GLM_GREENFIELD_PP16_FEATURE_OUTPUT_TILE:-128}
+[[ $FEATURE_OUTPUT_TILE == 128 || $FEATURE_OUTPUT_TILE == 256 ]] || {
+  echo "PP16 feature output tile must be 128 or 256" >&2
+  exit 2
+}
+readonly RUNTIME_KIND FEATURE_OUTPUT_TILE
 
 cd "$WORKTREE"
 [[ ${GLM_GREENFIELD_PP16_COMPILE_ACQUISITION:-0} == 1 ]] || {
@@ -38,7 +43,7 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 readonly PIN TAG RUN_DIR REMOTE_PREFIX
 
 [[ $(git branch --show-current) == "$BRANCH" ]]
-[[ -z $(git status --porcelain) ]]
+git diff --quiet && git diff --cached --quiet
 [[ ! -e $RUN_DIR ]]
 for prerequisite in \
   "$SOURCE_ROOT/SUCCESS" "$SOURCE_ROOT/packed_manifest.json" \
@@ -100,7 +105,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "PIN=$PIN TAG=$TAG profile=2K runtime=$RUNTIME_KIND warmup=1 iterations=1 trace=0"
+say "PIN=$PIN TAG=$TAG profile=2K runtime=$RUNTIME_KIND feature_output_tile=$FEATURE_OUTPUT_TILE warmup=1 iterations=1 trace=0"
 [[ $(git ls-remote "$ORIGIN" "refs/heads/$BRANCH" | awk '{print $1}') == "$PIN" ]]
 [[ $(gcloud storage buckets describe "$APPROVED_BUCKET" --format='value(location)') == "$APPROVED_LOCATION" ]]
 [[ $(gcloud compute tpus tpu-vm describe "$POD" --zone "$ZONE" --format='value(state,health)') == $'READY\tHEALTHY' ]]
@@ -114,12 +119,13 @@ gcloud storage objects list "$REMOTE_PREFIX/**" --format='value(name)' \
   "$SOURCE_FEATURE_ROOT/runtime_manifest.json" "$SOURCE_FEATURE_MANIFEST_SHA" \
   "$RUNTIME_ROOT/runtime_manifest.json" "$RUNTIME_MANIFEST_SHA" \
   "$RUN_DIR/preflight.json" "$PIN" "$TAG" "$REMOTE_PREFIX" \
-  "$RUNTIME_KIND" <<'PY'
+  "$RUNTIME_KIND" "$FEATURE_OUTPUT_TILE" <<'PY'
 import json
 from pathlib import Path
 import sys
 
-source_path, source_sha, base_path, base_sha, source_feature_path, source_feature_sha, runtime_path, runtime_sha, output, pin, tag, remote, runtime_kind = sys.argv[1:]
+source_path, source_sha, base_path, base_sha, source_feature_path, source_feature_sha, runtime_path, runtime_sha, output, pin, tag, remote, runtime_kind, feature_output_tile = sys.argv[1:]
+feature_output_tile = int(feature_output_tile)
 for path, expected in ((source_path, source_sha), (base_path, base_sha), (source_feature_path, source_feature_sha), (runtime_path, runtime_sha)):
     value = json.loads(Path(path).read_text())
     if value.get("manifest_sha256") != expected:
@@ -131,7 +137,7 @@ record = {
     "complete_token_path": True,
     "context_capacity": 2048,
     "feature_fuse_route_weighting": False,
-    "feature_output_tile": 128,
+    "feature_output_tile": feature_output_tile,
     "feature_source_verification_mode": "feature_runtime_with_metadata_parent",
     "feature_reconstruct_down_fp32": False,
     "gate_d_claim": False,
@@ -160,7 +166,7 @@ strict_census pre || {
 
 say "syncing exact pushed pin and same-region PP16 artifacts on all hosts"
 # shellcheck disable=SC2016
-sync_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; wt='"$WORKTREE"'; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$ORIGIN"'; source='"$SOURCE_ROOT"'; source_runtime='"$SOURCE_RUNTIME_ROOT"'; source_feature='"$SOURCE_FEATURE_ROOT"'; runtime='"$RUNTIME_ROOT"'; if [[ "$idx" == 0 ]]; then [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else [[ -e "$wt/.git" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q "$origin" "$branch"; git -C "$wt" checkout -q --detach "$pin"; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && [[ -r "$source/SUCCESS" && -r "$source/packed_manifest.json" ]] && [[ -r "$source_runtime/SUCCESS" && -r "$source_runtime/runtime_manifest.json" ]] && [[ -r "$source_feature/SUCCESS" && -r "$source_feature/runtime_manifest.json" ]] && [[ -r "$runtime/SUCCESS" && -r "$runtime/runtime_manifest.json" ]] && findmnt -T "$source" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$source_runtime" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$source_feature" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$runtime" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && echo "SYNC_OK $(hostname) $pin"'
+sync_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; wt='"$WORKTREE"'; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$ORIGIN"'; source='"$SOURCE_ROOT"'; source_runtime='"$SOURCE_RUNTIME_ROOT"'; source_feature='"$SOURCE_FEATURE_ROOT"'; runtime='"$RUNTIME_ROOT"'; if [[ "$idx" == 0 ]]; then [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && git -C "$wt" diff --quiet && git -C "$wt" diff --cached --quiet; else [[ -e "$wt/.git" ]] && git -C "$wt" diff --quiet && git -C "$wt" diff --cached --quiet; git -C "$wt" fetch -q "$origin" "$branch"; git -C "$wt" checkout -q --detach "$pin"; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && git -C "$wt" diff --quiet && git -C "$wt" diff --cached --quiet && [[ -r "$source/SUCCESS" && -r "$source/packed_manifest.json" ]] && [[ -r "$source_runtime/SUCCESS" && -r "$source_runtime/runtime_manifest.json" ]] && [[ -r "$source_feature/SUCCESS" && -r "$source_feature/runtime_manifest.json" ]] && [[ -r "$runtime/SUCCESS" && -r "$runtime/runtime_manifest.json" ]] && findmnt -T "$source" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$source_runtime" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$source_feature" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$runtime" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && echo "SYNC_OK $(hostname) $pin"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK || {
@@ -177,7 +183,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching one complete PP16 2K compile and diagnostic execution coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { [[ -f "$log" ]] && gcloud storage cp --no-clobber "$log" "$remote/host_logs/" >/dev/null 2>&1 || true; [[ -f "$output" ]] && gcloud storage cp --no-clobber "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip 0 --feature-source-metadata-only 1 --feature-output-tile 128 --feature-fuse-route-weighting 0 --feature-reconstruct-down-fp32 0 --complete-token-path 1 --split-residual-state 1 --prefill-index-repair 0 --dsa-query-exact-association 1 --dsa-head-key-exact-association 0 --dsa-score-default-precision 0 --main-rope-table 0 --pregathered-b512-attention 0 --strategy-nd-attention-projection 0 --dense-final-layout-convolution 0 --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-feature-runtime-root '"$SOURCE_FEATURE_ROOT"' --source-feature-runtime-manifest-sha256 '"$SOURCE_FEATURE_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup 1 --iterations 1 --trace-steps 0 --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { [[ -f "$log" ]] && gcloud storage cp --no-clobber "$log" "$remote/host_logs/" >/dev/null 2>&1 || true; [[ -f "$output" ]] && gcloud storage cp --no-clobber "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip 0 --feature-source-metadata-only 1 --feature-output-tile '"$FEATURE_OUTPUT_TILE"' --feature-fuse-route-weighting 0 --feature-reconstruct-down-fp32 0 --complete-token-path 1 --split-residual-state 1 --prefill-index-repair 0 --dsa-query-exact-association 1 --dsa-head-key-exact-association 0 --dsa-score-default-precision 0 --main-rope-table 0 --pregathered-b512-attention 0 --strategy-nd-attention-projection 0 --dense-final-layout-convolution 0 --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-feature-runtime-root '"$SOURCE_FEATURE_ROOT"' --source-feature-runtime-manifest-sha256 '"$SOURCE_FEATURE_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup 1 --iterations 1 --trace-steps 0 --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 execute_status=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1 || execute_status=$?
@@ -205,7 +211,8 @@ post_census_done=1
 say "validating full-graph PP16 locality, one-row shapes, load identity and 32-chip HBM"
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   scripts/greenfield/validate_short_decoder_compile_pp16.py \
-  --run-dir "$RUN_DIR" --code-hash "$PIN" --runtime-kind "$RUNTIME_KIND"
+  --run-dir "$RUN_DIR" --code-hash "$PIN" --runtime-kind "$RUNTIME_KIND" \
+  --feature-output-tile "$FEATURE_OUTPUT_TILE"
 
 cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 (

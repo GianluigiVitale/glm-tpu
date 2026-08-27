@@ -5,6 +5,31 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 18:24--19:05 UTC — PP16 MoE attribution and isolated tile-256 verdict
+
+The sealed 431.834093-ms PP16 acquisition was attributed offline without importing JAX or touching
+the TPU. Protected component rows assign 290.495625 ms (67.27%) to 75 DB558 MoE layers,
+24.8859 ms to 78 reference-attention layers and 9.41388 ms to 21 exact-query layers. This is a
+non-additive prioritization calculation, not performance evidence. The report separately records
+that DB482 differs in plan, output tile and reconstruction mode, preventing an invalid causal PP8
+comparison. Pushed/mirrored generator `6506213`, report SHA `4441cb3e...d4432`, and remote-equal
+file SHA `07696b6d...bfb042` bind the calculation.
+
+The selected protected one-layer experiment changes only PP16 output tile 128 to 256. DB562 passes
+exact routes and reproduces both DB558 output checksums. Normal p50/p99 improves
+`3.873275/3.944720 -> 3.835064/3.874908 ms`; concentrated p50 improves
+`3.866075 -> 3.835575 ms`. The intended selected custom call falls
+`3.162855 -> 3.094873 ms`; HLO `01e640df...89f91` keeps one local LP2 BF16 combine and XPlane
+records one 0.011659-ms physical psum. Peak HBM is 4,856,615,936 bytes. DB, exact archive and
+authenticated 8/8 cleanup pass.
+
+Re-attribution with DB562 reduces the MoE arithmetic term only to 287.6298 ms. Report SHA is
+`c1d6522c...f04a`, with remote-equal file SHA `6096dcbb...a338f`. This closes output-tile sizing as
+a bounded PP16 hypothesis: integrate 256 as an explicit default-off compiler setting, but refuse
+an unchanged full-decoder retry for a predicted 2.865825-ms gain. The cost-directed next plan is
+PP8 runtime recreation from the retained canonical source/capsule, followed by a current-code 2K
+acquisition and only then a protected 8K correctness run.
+
 ## 2026-08-27 17:29--18:24 UTC — exact-query PP16 full graph falls to 431.8 ms and is recovered
 
 Pushed workload pin `236f8b2` completed protected source tag
