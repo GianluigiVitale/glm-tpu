@@ -139,6 +139,13 @@ from .ws32_runtime_checkpoint import (
     pack_ws32_runtime_slots,
     verify_ws32_runtime_checkpoint,
 )
+from .ws32_strategy_nd_dense import (
+    LoadedWs32StrategyNdDenseOverlay,
+    Ws32StrategyNdDenseOverlay,
+    load_ws32_strategy_nd_dense_overlay,
+    strategy_nd_dense_tensor_names,
+    verify_ws32_strategy_nd_dense_overlay,
+)
 from .stream_pack import (
     DestinationFilePlan,
     DestinationTensorPlan,
@@ -196,7 +203,9 @@ __all__ = (
     "Ws32SourcePlacement",
     "Ws32RuntimeTensorPlan",
     "LoadedWs32RuntimeCheckpoint",
+    "LoadedWs32StrategyNdDenseOverlay",
     "VerifiedWs32RuntimeCheckpoint",
+    "Ws32StrategyNdDenseOverlay",
     "WS32_RUNTIME_ARTIFACT_KIND",
     "WS32_RUNTIME_FORMAT_VERSION",
     "WS32_RUNTIME_SLOT_RECORD_KIND",
@@ -236,6 +245,7 @@ __all__ = (
     "load_ws32_one_layer_global",
     "load_ws32_one_layer_slot",
     "load_ws32_runtime_checkpoint",
+    "load_ws32_strategy_nd_dense_overlay",
     "pack_gate_c_checkpoint",
     "pack_one_layer_moe",
     "pack_pallas_feature_one_layer",
@@ -251,6 +261,7 @@ __all__ = (
     "stream_feature_runtime_stage",
     "stream_pack_group",
     "stream_runtime_weight_file",
+    "strategy_nd_dense_tensor_names",
     "validate_gate_c_layout",
     "validate_gate_c_layout_bindings",
     "verify_feature_runtime_packed_checkpoint",
@@ -261,5 +272,6 @@ __all__ = (
     "verify_pallas_one_layer_load_contract",
     "verify_runtime_packed_checkpoint",
     "verify_ws32_runtime_checkpoint",
+    "verify_ws32_strategy_nd_dense_overlay",
     "verify_source_file_sha256",
 )

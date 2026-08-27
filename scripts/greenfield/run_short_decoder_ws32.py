@@ -36,7 +36,9 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
 )
 from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     load_ws32_runtime_checkpoint,
+    load_ws32_strategy_nd_dense_overlay,
     verify_ws32_runtime_checkpoint,
+    verify_ws32_strategy_nd_dense_overlay,
 )
 from glm_tpu.greenfield.partitioning import inspect_source_inventory  # noqa: E402
 from glm_tpu.greenfield.runtime import (  # noqa: E402
@@ -47,6 +49,7 @@ from glm_tpu.greenfield.runtime import (  # noqa: E402
     build_ws32_teacher_forced_prefill_program,
     make_ws32_initial_state,
     select_ws32_exact_dsa_raw_weights,
+    ws32_decoder_weight_names,
 )
 from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
     build_ws32_physical_mesh,
@@ -112,6 +115,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--trace-dir", required=True, type=Path)
     parser.add_argument("--compile-only", choices=(0, 1), default=0, type=int)
     parser.add_argument("--exact-dsa", choices=(0, 1), default=0, type=int)
+    parser.add_argument(
+        "--strategy-nd-dense", choices=(0, 1), default=0, type=int
+    )
+    parser.add_argument("--strategy-nd-dense-overlay-root", type=Path)
+    parser.add_argument(
+        "--strategy-nd-dense-overlay-manifest-sha256", default=_ZERO_SHA
+    )
+    parser.add_argument(
+        "--strategy-nd-dense-overlay-manifest-file-sha256",
+        default=_ZERO_SHA,
+    )
+    parser.add_argument(
+        "--strategy-nd-dense-overlay-success-file-sha256",
+        default=_ZERO_SHA,
+    )
     parser.add_argument("--observer-steps", default=14, type=int)
     parser.add_argument("--warmup", default=2, type=int)
     parser.add_argument("--iterations", default=10, type=int)
@@ -289,6 +307,18 @@ def _scalar_token(jax: Any, value: Any) -> int:
     if host.shape != (1,):
         raise RuntimeError("WS32 token result geometry drifted")
     return int(host[0])
+
+
+def _weight_name_leaves(value: object) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, tuple):
+        return tuple(
+            name for item in value for name in _weight_name_leaves(item)
+        )
+    raise TypeError("WS32 runner weight-name tree contains a non-string leaf")
 
 
 def _write_graph(
@@ -515,6 +545,32 @@ def main() -> int:
         and any(value != _ZERO_SHA for value in association_pins)
     ):
         raise ValueError("WS32 exact DSA flag/association pins drifted")
+    overlay_pins = (
+        args.strategy_nd_dense_overlay_manifest_sha256,
+        args.strategy_nd_dense_overlay_manifest_file_sha256,
+        args.strategy_nd_dense_overlay_success_file_sha256,
+    )
+    if any(
+        len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+        for value in overlay_pins
+    ):
+        raise ValueError(
+            "WS32 StrategyND dense overlay pins must be lowercase SHA-256"
+        )
+    if args.strategy_nd_dense:
+        if args.strategy_nd_dense_overlay_root is None or any(
+            value == _ZERO_SHA for value in overlay_pins
+        ):
+            raise ValueError(
+                "WS32 StrategyND dense path requires its pinned overlay"
+            )
+    elif args.strategy_nd_dense_overlay_root is not None or any(
+        value != _ZERO_SHA for value in overlay_pins
+    ):
+        raise ValueError(
+            "default WS32 dense path must keep overlay inputs vacant"
+        )
     _require_clean_code(args.expected_code_hash)
     if os.environ.get("XLA_PYTHON_CLIENT_MEM_FRACTION") != _XLA_MEMORY_FRACTION:
         raise RuntimeError("WS32 XLA allocator fraction is not pinned to .95")
@@ -524,6 +580,7 @@ def main() -> int:
         geometry=geometry,
         context_capacity=args.context_capacity,
         exact_dsa=bool(args.exact_dsa),
+        strategy_nd_dense=bool(args.strategy_nd_dense),
     )
     oracle = load_ws32_short_context_oracle(
         args.token_oracle_dir,
@@ -574,8 +631,50 @@ def main() -> int:
         mesh=mesh,
         physical_mesh=physical_mesh,
     )
+    device_memory_before_load = loaded.device_memory_before
+    base_device_memory_after_load = loaded.device_memory_after
+    local_device_slots = loaded.local_device_slots
+    all_arrays = dict(loaded.arrays)
+    dense_overlay = None
+    loaded_dense_overlay = None
+    if config.strategy_nd_dense:
+        assert args.strategy_nd_dense_overlay_root is not None
+        dense_overlay = verify_ws32_strategy_nd_dense_overlay(
+            args.strategy_nd_dense_overlay_root,
+            expected_manifest_sha256=(
+                args.strategy_nd_dense_overlay_manifest_sha256
+            ),
+            expected_manifest_file_sha256=(
+                args.strategy_nd_dense_overlay_manifest_file_sha256
+            ),
+            expected_success_file_sha256=(
+                args.strategy_nd_dense_overlay_success_file_sha256
+            ),
+        )
+        loaded_dense_overlay = load_ws32_strategy_nd_dense_overlay(
+            dense_overlay,
+            mesh=mesh,
+            physical_mesh=physical_mesh,
+        )
+        overlap = set(all_arrays) & set(loaded_dense_overlay.arrays)
+        if overlap:
+            raise RuntimeError(
+                "WS32 StrategyND dense overlay aliases base tensor names"
+            )
+        all_arrays.update(loaded_dense_overlay.arrays)
     load_seconds = time.perf_counter() - load_started
-    weights = bind_ws32_decoder_weights(loaded.arrays, config)
+    expected_names = _weight_name_leaves(ws32_decoder_weight_names(config))
+    if any(name not in all_arrays for name in expected_names):
+        raise RuntimeError("WS32 combined checkpoint is missing decoder tensors")
+    weights = bind_ws32_decoder_weights(
+        {name: all_arrays[name] for name in expected_names}, config
+    )
+    device_memory_after_load = tuple(
+        _memory_stats(device) for device in jax.local_devices()
+    )
+    del all_arrays
+    del loaded
+    gc.collect()
     args.hlo_dir.mkdir(parents=True, exist_ok=False)
     graphs: dict[str, Any] = {}
     compile_seconds: dict[str, float] = {}
@@ -820,8 +919,11 @@ def main() -> int:
         "device_memory_after_compile": [
             _memory_stats(device) for device in jax.local_devices()
         ],
-        "device_memory_after_load": list(loaded.device_memory_after),
-        "device_memory_before_load": list(loaded.device_memory_before),
+        "base_device_memory_after_load": list(
+            base_device_memory_after_load
+        ),
+        "device_memory_after_load": list(device_memory_after_load),
+        "device_memory_before_load": list(device_memory_before_load),
         "dsa_oracle_manifest_sha256": oracle.dsa_manifest["manifest_sha256"],
         "dsa_oracle_success_sha256": oracle.dsa_success_sha256,
         "dsa_association_summary_sha256": (
@@ -836,10 +938,25 @@ def main() -> int:
         "jax_process_index": int(jax.process_index()),
         "launch_process_id": args.process_id,
         "load_seconds": load_seconds,
-        "local_device_slots": list(loaded.local_device_slots),
+        "local_device_slots": list(local_device_slots),
         "mesh_sha256": physical_mesh.mesh_hash,
         "prompt_length": int(oracle.prompt_token_ids.size),
         "source_inventory_sha256": inventory.inventory_sha256,
+        "strategy_nd_dense": config.strategy_nd_dense,
+        "strategy_nd_dense_overlay": (
+            None
+            if dense_overlay is None or loaded_dense_overlay is None
+            else {
+                "local_records": list(loaded_dense_overlay.local_records),
+                "manifest_file_sha256": (
+                    dense_overlay.manifest_file_sha256
+                ),
+                "manifest_sha256": dense_overlay.manifest[
+                    "manifest_sha256"
+                ],
+                "success_file_sha256": dense_overlay.success_file_sha256,
+            }
+        ),
         "token_oracle_manifest_sha256": oracle.token_manifest["manifest_sha256"],
         "token_oracle_success_sha256": oracle.token_success_sha256,
         "topology_fleet_sha256": fleet_sha,

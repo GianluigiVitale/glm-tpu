@@ -76,6 +76,18 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--iterations", required=True, type=int)
     validate.add_argument("--trace-steps", required=True, type=int)
     validate.add_argument("--exact-dsa", choices=(0, 1), required=True, type=int)
+    validate.add_argument(
+        "--strategy-nd-dense", choices=(0, 1), required=True, type=int
+    )
+    validate.add_argument(
+        "--strategy-nd-dense-overlay-manifest-sha256", required=True
+    )
+    validate.add_argument(
+        "--strategy-nd-dense-overlay-manifest-file-sha256", required=True
+    )
+    validate.add_argument(
+        "--strategy-nd-dense-overlay-success-file-sha256", required=True
+    )
     for graph in (
         "exact-materialize",
         "exact-promote",
@@ -236,6 +248,8 @@ def _graph_valid(value: Any, *, mode: str) -> bool:
         "passed",
         "rounded_first_rmsnorm_collective_count",
         "stablehlo_sha256",
+        "strategy_nd_dense_expert_gather_count",
+        "strategy_nd_dense_hidden_gather_count",
         "violations",
     }
     expected_violations = (
@@ -361,6 +375,16 @@ def _validate(args: argparse.Namespace) -> int:
             raise SystemExit("WS32 exact DSA source classification drifted")
     elif association_pins != ("0" * 64, "0" * 64):
         raise SystemExit("default WS32 path must not claim DSA association evidence")
+    overlay_pins = (
+        args.strategy_nd_dense_overlay_manifest_sha256,
+        args.strategy_nd_dense_overlay_manifest_file_sha256,
+        args.strategy_nd_dense_overlay_success_file_sha256,
+    )
+    if args.strategy_nd_dense:
+        if any(value == "0" * 64 for value in overlay_pins):
+            raise SystemExit("WS32 StrategyND dense overlay pins are vacant")
+    elif any(value != "0" * 64 for value in overlay_pins):
+        raise SystemExit("default WS32 path must keep dense overlay pins vacant")
     runner_paths = sorted(args.run_dir.glob("fleet/runner.rank*.json"))
     if len(runner_paths) != 8:
         raise SystemExit(f"expected eight WS32 runner records, got {len(runner_paths)}")
@@ -408,6 +432,7 @@ def _validate(args: argparse.Namespace) -> int:
         "exact_dsa": bool(args.exact_dsa),
         "mesh_sha256": args.mesh_sha256,
         "source_inventory_sha256": args.source_inventory_sha256,
+        "strategy_nd_dense": bool(args.strategy_nd_dense),
         "token_oracle_manifest_sha256": args.token_oracle_manifest_sha256,
         "token_oracle_success_sha256": args.token_oracle_success_sha256,
         "topology_fleet_sha256": args.topology_fleet_sha256,
@@ -430,6 +455,7 @@ def _validate(args: argparse.Namespace) -> int:
     expected_prompt_length = {"2k": 2034, "8k": 8155}[args.context_label]
     pre_keys = {
         "artifact_kind",
+        "base_device_memory_after_load",
         "checkpoint_manifest_sha256",
         "checkpoint_success_sha256",
         "checkpoint_verified_device_slots",
@@ -455,6 +481,8 @@ def _validate(args: argparse.Namespace) -> int:
         "mesh_sha256",
         "prompt_length",
         "source_inventory_sha256",
+        "strategy_nd_dense",
+        "strategy_nd_dense_overlay",
         "token_oracle_manifest_sha256",
         "token_oracle_success_sha256",
         "topology_fleet_sha256",
@@ -566,6 +594,7 @@ def _validate(args: argparse.Namespace) -> int:
                     hidden_size=6144,
                     kind=graph,
                     exact_dsa=bool(args.exact_dsa),
+                    strategy_nd_dense=bool(args.strategy_nd_dense),
                 ).to_dict()
             normalized_record = dict(report)
             if args.mode == "acquire":
@@ -586,6 +615,46 @@ def _validate(args: argparse.Namespace) -> int:
         expected_ids = set(capture["local_device_ids"])
         if {item.get("device_id") for item in local_slots} != expected_ids:
             raise SystemExit(f"WS32 local device ownership drifted at rank {rank}")
+        overlay = record.get("strategy_nd_dense_overlay")
+        if args.strategy_nd_dense:
+            if type(overlay) is not dict or set(overlay) != {
+                "local_records",
+                "manifest_file_sha256",
+                "manifest_sha256",
+                "success_file_sha256",
+            }:
+                raise SystemExit(
+                    f"WS32 dense overlay schema drifted at rank {rank}"
+                )
+            if (
+                overlay["manifest_sha256"] != overlay_pins[0]
+                or overlay["manifest_file_sha256"] != overlay_pins[1]
+                or overlay["success_file_sha256"] != overlay_pins[2]
+            ):
+                raise SystemExit(
+                    f"WS32 dense overlay identity drifted at rank {rank}"
+                )
+            local_overlay = overlay["local_records"]
+            if type(local_overlay) is not list or len(local_overlay) != 12:
+                raise SystemExit(
+                    f"WS32 dense overlay cardinality drifted at rank {rank}"
+                )
+            coverage = {
+                (item.get("device_id"), item.get("layer_id"))
+                for item in local_overlay
+            }
+            if coverage != {
+                (device_id, layer)
+                for device_id in expected_ids
+                for layer in range(3)
+            }:
+                raise SystemExit(
+                    f"WS32 dense overlay coverage drifted at rank {rank}"
+                )
+        elif overlay is not None:
+            raise SystemExit(
+                f"default WS32 path retained dense overlay at rank {rank}"
+            )
         verified_slots = record.get("checkpoint_verified_device_slots")
         if (
             type(verified_slots) is not list
@@ -606,7 +675,12 @@ def _validate(args: argparse.Namespace) -> int:
             ):
                 raise SystemExit(f"WS32 slot record drifted at rank {rank}")
             slots.add(slot)
-        for field in ("device_memory_before_load", "device_memory_after_load", "device_memory_after_compile"):
+        for field in (
+            "device_memory_before_load",
+            "base_device_memory_after_load",
+            "device_memory_after_load",
+            "device_memory_after_compile",
+        ):
             if type(record.get(field)) is not list or len(record[field]) != 4 or any(not _memory_valid(item) for item in record[field]):
                 raise SystemExit(f"WS32 memory record drifted: rank={rank} field={field}")
         if args.mode == "numerical":
@@ -786,6 +860,9 @@ def _validate(args: argparse.Namespace) -> int:
         "run_tag": args.tag,
         "schema_version": 1,
         "status": "HLO_ACQUIRED" if args.mode == "acquire" else "SUCCESS",
+        "strategy_nd_dense_overlay_manifest_file_sha256": overlay_pins[1],
+        "strategy_nd_dense_overlay_manifest_sha256": overlay_pins[0],
+        "strategy_nd_dense_overlay_success_file_sha256": overlay_pins[2],
     }
     if args.mode == "numerical":
         sys.path.insert(0, str(REPO / "scripts" / "analysis"))
@@ -850,6 +927,10 @@ def _publish_db(args: argparse.Namespace) -> int:
             "mesh_sha256": summary["mesh_sha256"],
             "plan": "WS32_2D",
             "run_tag": summary["run_tag"],
+            "strategy_nd_dense": summary["strategy_nd_dense"],
+            "strategy_nd_dense_overlay_manifest_sha256": summary[
+                "strategy_nd_dense_overlay_manifest_sha256"
+            ],
             "token_oracle_manifest_sha256": summary["token_oracle_manifest_sha256"],
             "token_oracle_success_sha256": summary["token_oracle_success_sha256"],
             "xla_python_client_mem_fraction": summary[

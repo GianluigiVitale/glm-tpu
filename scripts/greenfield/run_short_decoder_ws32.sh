@@ -16,6 +16,7 @@ readonly TOPOLOGY_ROOT=/home/gianl/gcs-models/results/greenfield_topology_202608
 readonly TOPOLOGY_SHA=294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559
 readonly TOPOLOGY_FLEET_SHA=4a0c9a338d55b8be37dab79396569aa10fc9e85b3c7210d72a70abfafe72c301
 readonly MESH_SHA=de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88
+readonly ZERO_SHA=0000000000000000000000000000000000000000000000000000000000000000
 
 [[ ${GLM_GREENFIELD_WS32_SHORT_DECODER:-0} == 1 ]] || {
   echo "WS32 short decoder is default-off; set GLM_GREENFIELD_WS32_SHORT_DECODER=1" >&2
@@ -25,6 +26,7 @@ MODE=${GLM_GREENFIELD_WS32_SHORT_DECODER_MODE:-off}
 CONTEXT=${GLM_GREENFIELD_WS32_SHORT_DECODER_CONTEXT:-off}
 RECOVER=${GLM_GREENFIELD_WS32_SHORT_DECODER_RECOVER:-0}
 EXACT_DSA=${GLM_GREENFIELD_WS32_EXACT_DSA:-0}
+STRATEGY_ND_DENSE=${GLM_GREENFIELD_WS32_STRATEGY_ND_DENSE:-0}
 [[ $MODE == acquire || $MODE == numerical ]] || {
   echo "WS32 mode must be acquire or numerical" >&2
   exit 2
@@ -41,6 +43,10 @@ EXACT_DSA=${GLM_GREENFIELD_WS32_EXACT_DSA:-0}
   echo "WS32 exact DSA flag must be 0 or 1" >&2
   exit 2
 }
+[[ $STRATEGY_ND_DENSE == 0 || $STRATEGY_ND_DENSE == 1 ]] || {
+  echo "WS32 StrategyND dense flag must be 0 or 1" >&2
+  exit 2
+}
 
 readonly DSA_ASSOCIATION_URI=$APPROVED_BUCKET/results/greenfield_ws32_layer0_dsa_association_20260816T101637335765581Z
 readonly DSA_ASSOCIATION_SUMMARY_SHA=661142816aa64ec8d085553b427e99f62ab3f1f16b3fc87fc4fc24880d467203
@@ -53,6 +59,24 @@ else
   DSA_ASSOCIATION_SUCCESS_PIN=$DSA_ASSOCIATION_SUCCESS_SHA
 fi
 readonly EXACT_DSA DSA_ASSOCIATION_SUMMARY_PIN DSA_ASSOCIATION_SUCCESS_PIN
+
+if [[ $STRATEGY_ND_DENSE == 1 ]]; then
+  STRATEGY_ND_DENSE_OVERLAY_ROOT=${GLM_GREENFIELD_WS32_STRATEGY_ND_DENSE_OVERLAY_ROOT:?set sealed StrategyND dense overlay root}
+  STRATEGY_ND_DENSE_OVERLAY_MANIFEST_SHA=${GLM_GREENFIELD_WS32_STRATEGY_ND_DENSE_OVERLAY_MANIFEST_SHA:?set overlay manifest SHA}
+  STRATEGY_ND_DENSE_OVERLAY_MANIFEST_FILE_SHA=${GLM_GREENFIELD_WS32_STRATEGY_ND_DENSE_OVERLAY_MANIFEST_FILE_SHA:?set overlay manifest file SHA}
+  STRATEGY_ND_DENSE_OVERLAY_SUCCESS_FILE_SHA=${GLM_GREENFIELD_WS32_STRATEGY_ND_DENSE_OVERLAY_SUCCESS_FILE_SHA:?set overlay SUCCESS file SHA}
+  STRATEGY_ND_DENSE_CLI=' --strategy-nd-dense 1 --strategy-nd-dense-overlay-root '"$STRATEGY_ND_DENSE_OVERLAY_ROOT"' --strategy-nd-dense-overlay-manifest-sha256 '"$STRATEGY_ND_DENSE_OVERLAY_MANIFEST_SHA"' --strategy-nd-dense-overlay-manifest-file-sha256 '"$STRATEGY_ND_DENSE_OVERLAY_MANIFEST_FILE_SHA"' --strategy-nd-dense-overlay-success-file-sha256 '"$STRATEGY_ND_DENSE_OVERLAY_SUCCESS_FILE_SHA"
+else
+  STRATEGY_ND_DENSE_OVERLAY_ROOT=
+  STRATEGY_ND_DENSE_OVERLAY_MANIFEST_SHA=$ZERO_SHA
+  STRATEGY_ND_DENSE_OVERLAY_MANIFEST_FILE_SHA=$ZERO_SHA
+  STRATEGY_ND_DENSE_OVERLAY_SUCCESS_FILE_SHA=$ZERO_SHA
+  STRATEGY_ND_DENSE_CLI=' --strategy-nd-dense 0'
+fi
+readonly STRATEGY_ND_DENSE STRATEGY_ND_DENSE_OVERLAY_ROOT
+readonly STRATEGY_ND_DENSE_OVERLAY_MANIFEST_SHA
+readonly STRATEGY_ND_DENSE_OVERLAY_MANIFEST_FILE_SHA
+readonly STRATEGY_ND_DENSE_OVERLAY_SUCCESS_FILE_SHA STRATEGY_ND_DENSE_CLI
 
 readonly CHECKPOINT_ROOT=${GLM_GREENFIELD_WS32_CHECKPOINT_ROOT:?set sealed checkpoint root}
 readonly CHECKPOINT_MANIFEST_SHA=${GLM_GREENFIELD_WS32_CHECKPOINT_MANIFEST_SHA:?set checkpoint manifest SHA}
@@ -79,7 +103,6 @@ readonly OBSERVER_STEPS=14
 readonly WARMUP=2
 readonly ITERATIONS=10
 readonly TRACE_STEPS=2
-readonly ZERO_SHA=0000000000000000000000000000000000000000000000000000000000000000
 if [[ $MODE == acquire ]]; then
   EXACT_MATERIALIZE_STABLE_SHA=$ZERO_SHA
   EXACT_MATERIALIZE_OPTIMIZED_SHA=$ZERO_SHA
@@ -420,7 +443,7 @@ fi
 if [[ $RECOVER == 0 ]]; then
 say "synchronizing exact code and sealed inputs on all hosts"
 # shellcheck disable=SC2016
-sync_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; pin='"$PIN"'; wt='"$WORKTREE"'; branch='"$BRANCH"'; origin='"$ORIGIN"'; checkpoint='"$CHECKPOINT_ROOT"'; inventory='"$INVENTORY"'; token='"$TOKEN_ORACLE"'; token_root='"$TOKEN_ORACLE_ROOT"'; token_success_sha='"$TOKEN_ORACLE_SUCCESS_SHA"'; dsa='"$DSA_ORACLE"'; dsa_root='"$DSA_ORACLE_ROOT"'; dsa_success_sha='"$DSA_ORACLE_SUCCESS_SHA"'; topology='"$TOPOLOGY_ROOT"'/topology.rank${idx}.json; if [[ $idx == 0 ]]; then [[ -e "$wt/.git" && $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; elif [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; for path in "$checkpoint/manifest.json" "$checkpoint/SUCCESS" "$inventory" "$token/manifest.json" "$token_root/SUCCESS" "$dsa/manifest.json" "$dsa_root/SUCCESS" "$topology"; do [[ -r $path ]]; done; token_observed=$(sha256sum "$token_root/SUCCESS"); dsa_observed=$(sha256sum "$dsa_root/SUCCESS"); [[ ${token_observed%% *} == "$token_success_sha" ]]; [[ ${dsa_observed%% *} == "$dsa_success_sha" ]]; findmnt -T "$checkpoint" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse"; echo "SYNC_OK $(hostname) $pin"'
+sync_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; pin='"$PIN"'; wt='"$WORKTREE"'; branch='"$BRANCH"'; origin='"$ORIGIN"'; checkpoint='"$CHECKPOINT_ROOT"'; overlay_enabled='"$STRATEGY_ND_DENSE"'; overlay='"$STRATEGY_ND_DENSE_OVERLAY_ROOT"'; inventory='"$INVENTORY"'; token='"$TOKEN_ORACLE"'; token_root='"$TOKEN_ORACLE_ROOT"'; token_success_sha='"$TOKEN_ORACLE_SUCCESS_SHA"'; dsa='"$DSA_ORACLE"'; dsa_root='"$DSA_ORACLE_ROOT"'; dsa_success_sha='"$DSA_ORACLE_SUCCESS_SHA"'; topology='"$TOPOLOGY_ROOT"'/topology.rank${idx}.json; if [[ $idx == 0 ]]; then [[ -e "$wt/.git" && $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; elif [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; for path in "$checkpoint/manifest.json" "$checkpoint/SUCCESS" "$inventory" "$token/manifest.json" "$token_root/SUCCESS" "$dsa/manifest.json" "$dsa_root/SUCCESS" "$topology"; do [[ -r $path ]]; done; if [[ $overlay_enabled == 1 ]]; then [[ -r $overlay/manifest.json && -r $overlay/SUCCESS ]]; findmnt -T "$overlay" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse"; fi; token_observed=$(sha256sum "$token_root/SUCCESS"); dsa_observed=$(sha256sum "$dsa_root/SUCCESS"); [[ ${token_observed%% *} == "$token_success_sha" ]]; [[ ${dsa_observed%% *} == "$dsa_success_sha" ]]; findmnt -T "$checkpoint" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse"; echo "SYNC_OK $(hostname) $pin"'
 sync_rc=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1 || sync_rc=$?
@@ -435,7 +458,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching complete WS32 worker fleet coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; output="$run/runner.rank${idx}.json"; tensors="$run/runner.rank${idx}.npz"; hlo="$run/hlo"; trace="$run/trace"; log="$run/runner.rank${idx}.log"; mkdir -p "$run"; upload(){ local rc=0; [[ ! -f $output ]] || gcloud storage cp --no-clobber "$output" "$remote/host_records/runner.rank${idx}.json" >/dev/null 2>&1 || rc=1; [[ ! -f $tensors ]] || gcloud storage cp --no-clobber "$tensors" "$remote/host_records/runner.rank${idx}.npz" >/dev/null 2>&1 || rc=1; [[ ! -f $log ]] || gcloud storage cp --no-clobber "$log" "$remote/host_records/runner.rank${idx}.log" >/dev/null 2>&1 || rc=1; for graph in exact_materialize exact_promote prefill observer decode cache_probe; do [[ ! -f "$hlo/$graph.stablehlo.mlir" ]] || gcloud storage cp --no-clobber "$hlo/$graph.stablehlo.mlir" "$remote/hlo/${graph}.rank${idx}.stablehlo.mlir" >/dev/null 2>&1 || rc=1; [[ ! -f "$hlo/$graph.optimized_hlo.txt" ]] || gcloud storage cp --no-clobber "$hlo/$graph.optimized_hlo.txt" "$remote/hlo/${graph}.rank${idx}.optimized_hlo.txt" >/dev/null 2>&1 || rc=1; done; xplane=$(find "$trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); [[ -z $xplane ]] || gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || rc=1; return "$rc"; }; trap "upload || true" EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 14400 /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_short_decoder_ws32.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --topology-capture-root '"$TOPOLOGY_ROOT"' --checkpoint-root '"$CHECKPOINT_ROOT"' --source-inventory '"$INVENTORY"' --token-oracle-dir '"$TOKEN_ORACLE"' --dsa-oracle-dir '"$DSA_ORACLE"' --expected-code-hash '"$PIN"' --checkpoint-manifest-sha256 '"$CHECKPOINT_MANIFEST_SHA"' --checkpoint-success-sha256 '"$CHECKPOINT_SUCCESS_SHA"' --token-oracle-manifest-sha256 '"$TOKEN_ORACLE_SHA"' --dsa-oracle-manifest-sha256 '"$DSA_ORACLE_SHA"' --token-oracle-success-sha256 '"$TOKEN_ORACLE_SUCCESS_SHA"' --dsa-oracle-success-sha256 '"$DSA_ORACLE_SUCCESS_SHA"' --dsa-association-summary-sha256 '"$DSA_ASSOCIATION_SUMMARY_PIN"' --dsa-association-success-sha256 '"$DSA_ASSOCIATION_SUCCESS_PIN"' --topology-sha256 '"$TOPOLOGY_SHA"' --topology-fleet-sha256 '"$TOPOLOGY_FLEET_SHA"' --mesh-sha256 '"$MESH_SHA"' --expected-exact-materialize-stablehlo-sha256 '"$EXACT_MATERIALIZE_STABLE_SHA"' --expected-exact-materialize-optimized-hlo-sha256 '"$EXACT_MATERIALIZE_OPTIMIZED_SHA"' --expected-exact-promote-stablehlo-sha256 '"$EXACT_PROMOTE_STABLE_SHA"' --expected-exact-promote-optimized-hlo-sha256 '"$EXACT_PROMOTE_OPTIMIZED_SHA"' --expected-prefill-stablehlo-sha256 '"$PREFILL_STABLE_SHA"' --expected-prefill-optimized-hlo-sha256 '"$PREFILL_OPTIMIZED_SHA"' --expected-observer-stablehlo-sha256 '"$OBSERVER_STABLE_SHA"' --expected-observer-optimized-hlo-sha256 '"$OBSERVER_OPTIMIZED_SHA"' --expected-decode-stablehlo-sha256 '"$DECODE_STABLE_SHA"' --expected-decode-optimized-hlo-sha256 '"$DECODE_OPTIMIZED_SHA"' --expected-cache-probe-stablehlo-sha256 '"$CACHE_PROBE_STABLE_SHA"' --expected-cache-probe-optimized-hlo-sha256 '"$CACHE_PROBE_OPTIMIZED_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --compile-only '"$([[ $MODE == acquire ]] && echo 1 || echo 0)"' --exact-dsa '"$EXACT_DSA"' --observer-steps '"$OBSERVER_STEPS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --trace-steps '"$TRACE_STEPS"' --output "$output" --tensor-output "$tensors" --hlo-dir "$hlo" --trace-dir "$trace" >"$log" 2>&1; trap - EXIT; upload; echo "WS32_SHORT_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; output="$run/runner.rank${idx}.json"; tensors="$run/runner.rank${idx}.npz"; hlo="$run/hlo"; trace="$run/trace"; log="$run/runner.rank${idx}.log"; mkdir -p "$run"; upload(){ local rc=0; [[ ! -f $output ]] || gcloud storage cp --no-clobber "$output" "$remote/host_records/runner.rank${idx}.json" >/dev/null 2>&1 || rc=1; [[ ! -f $tensors ]] || gcloud storage cp --no-clobber "$tensors" "$remote/host_records/runner.rank${idx}.npz" >/dev/null 2>&1 || rc=1; [[ ! -f $log ]] || gcloud storage cp --no-clobber "$log" "$remote/host_records/runner.rank${idx}.log" >/dev/null 2>&1 || rc=1; for graph in exact_materialize exact_promote prefill observer decode cache_probe; do [[ ! -f "$hlo/$graph.stablehlo.mlir" ]] || gcloud storage cp --no-clobber "$hlo/$graph.stablehlo.mlir" "$remote/hlo/${graph}.rank${idx}.stablehlo.mlir" >/dev/null 2>&1 || rc=1; [[ ! -f "$hlo/$graph.optimized_hlo.txt" ]] || gcloud storage cp --no-clobber "$hlo/$graph.optimized_hlo.txt" "$remote/hlo/${graph}.rank${idx}.optimized_hlo.txt" >/dev/null 2>&1 || rc=1; done; xplane=$(find "$trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); [[ -z $xplane ]] || gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || rc=1; return "$rc"; }; trap "upload || true" EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 14400 /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_short_decoder_ws32.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --topology-capture-root '"$TOPOLOGY_ROOT"' --checkpoint-root '"$CHECKPOINT_ROOT"' --source-inventory '"$INVENTORY"' --token-oracle-dir '"$TOKEN_ORACLE"' --dsa-oracle-dir '"$DSA_ORACLE"' --expected-code-hash '"$PIN"' --checkpoint-manifest-sha256 '"$CHECKPOINT_MANIFEST_SHA"' --checkpoint-success-sha256 '"$CHECKPOINT_SUCCESS_SHA"' --token-oracle-manifest-sha256 '"$TOKEN_ORACLE_SHA"' --dsa-oracle-manifest-sha256 '"$DSA_ORACLE_SHA"' --token-oracle-success-sha256 '"$TOKEN_ORACLE_SUCCESS_SHA"' --dsa-oracle-success-sha256 '"$DSA_ORACLE_SUCCESS_SHA"' --dsa-association-summary-sha256 '"$DSA_ASSOCIATION_SUMMARY_PIN"' --dsa-association-success-sha256 '"$DSA_ASSOCIATION_SUCCESS_PIN"' --topology-sha256 '"$TOPOLOGY_SHA"' --topology-fleet-sha256 '"$TOPOLOGY_FLEET_SHA"' --mesh-sha256 '"$MESH_SHA"' --expected-exact-materialize-stablehlo-sha256 '"$EXACT_MATERIALIZE_STABLE_SHA"' --expected-exact-materialize-optimized-hlo-sha256 '"$EXACT_MATERIALIZE_OPTIMIZED_SHA"' --expected-exact-promote-stablehlo-sha256 '"$EXACT_PROMOTE_STABLE_SHA"' --expected-exact-promote-optimized-hlo-sha256 '"$EXACT_PROMOTE_OPTIMIZED_SHA"' --expected-prefill-stablehlo-sha256 '"$PREFILL_STABLE_SHA"' --expected-prefill-optimized-hlo-sha256 '"$PREFILL_OPTIMIZED_SHA"' --expected-observer-stablehlo-sha256 '"$OBSERVER_STABLE_SHA"' --expected-observer-optimized-hlo-sha256 '"$OBSERVER_OPTIMIZED_SHA"' --expected-decode-stablehlo-sha256 '"$DECODE_STABLE_SHA"' --expected-decode-optimized-hlo-sha256 '"$DECODE_OPTIMIZED_SHA"' --expected-cache-probe-stablehlo-sha256 '"$CACHE_PROBE_STABLE_SHA"' --expected-cache-probe-optimized-hlo-sha256 '"$CACHE_PROBE_OPTIMIZED_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --compile-only '"$([[ $MODE == acquire ]] && echo 1 || echo 0)"' --exact-dsa '"$EXACT_DSA"''"$STRATEGY_ND_DENSE_CLI"' --observer-steps '"$OBSERVER_STEPS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --trace-steps '"$TRACE_STEPS"' --output "$output" --tensor-output "$tensors" --hlo-dir "$hlo" --trace-dir "$trace" >"$log" 2>&1; trap - EXIT; upload; echo "WS32_SHORT_OK $(hostname) rank=$idx"'
 launch_rc=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/launch.txt" 2>&1 || launch_rc=$?
@@ -472,6 +495,10 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --mesh-sha256 "$MESH_SHA" --source-inventory-sha256 "$INVENTORY_SHA" \
   --context-capacity "$CONTEXT_CAPACITY" --observer-steps "$OBSERVER_STEPS" \
   --exact-dsa "$EXACT_DSA" \
+  --strategy-nd-dense "$STRATEGY_ND_DENSE" \
+  --strategy-nd-dense-overlay-manifest-sha256 "$STRATEGY_ND_DENSE_OVERLAY_MANIFEST_SHA" \
+  --strategy-nd-dense-overlay-manifest-file-sha256 "$STRATEGY_ND_DENSE_OVERLAY_MANIFEST_FILE_SHA" \
+  --strategy-nd-dense-overlay-success-file-sha256 "$STRATEGY_ND_DENSE_OVERLAY_SUCCESS_FILE_SHA" \
   --warmup "$WARMUP" --iterations "$ITERATIONS" --trace-steps "$TRACE_STEPS" \
   --expected-exact-materialize-stablehlo-sha256 "$EXACT_MATERIALIZE_STABLE_SHA" \
   --expected-exact-materialize-optimized-hlo-sha256 "$EXACT_MATERIALIZE_OPTIMIZED_SHA" \
