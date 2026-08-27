@@ -78,6 +78,40 @@ def _custom_call_result_name(line: str) -> str:
     return line.split(" = ", 1)[0].strip()
 
 
+def _validate_sampling_contract(
+    *, kernel: str, diagnostic_reference_timing: bool, warmup: int, iterations: int
+) -> None:
+    if diagnostic_reference_timing:
+        if kernel != "single_up_m1":
+            raise ValueError(
+                "reference timing is admitted only for the M=1 projection discriminator"
+            )
+        if warmup < 1 or iterations < 3:
+            raise ValueError("reference diagnostic requires warmup>=1 and iterations>=3")
+        return
+    if kernel == "single_up_m1":
+        raise ValueError("the M=1 projection discriminator requires reference timing")
+    if warmup < 200 or iterations < 1000:
+        raise ValueError("protected FP8 microbenchmark requires 200/1000 samples")
+
+
+def _reference_overlay_contract(
+    hlo: str, *, contraction: int, output_width: int
+) -> dict[str, object]:
+    overlays = [
+        shape
+        for shape in (
+            f"bf16[{output_width},{contraction}]",
+            f"f32[{output_width},{contraction}]",
+        )
+        if shape in hlo
+    ]
+    return {
+        "full_weight_overlays": overlays,
+        "passed": bool(overlays),
+    }
+
+
 def _is_bounded_compact_input_scatter(
     line: str,
     *,
@@ -113,6 +147,7 @@ def parse_args() -> argparse.Namespace:
         "--kernel",
         choices=(
             "single_up",
+            "single_up_m1",
             "attention_output",
             "rmsnorm_linear",
             "up_gate",
@@ -136,6 +171,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--warmup", type=int, default=200)
     parser.add_argument("--iterations", type=int, default=1000)
+    parser.add_argument("--diagnostic-reference-timing", action="store_true")
     return parser.parse_args()
 
 
@@ -152,6 +188,7 @@ def main() -> int:
         "attention_output": (1, 4096, 6144),
         "dsa_wq_b": (1, 2048, 1024),
         "dsa_wk": (1, 6144, 128),
+        "single_up_m1": (1, 6144, 2048),
     }
     expected_shape = production_shapes.get(
         args.kernel,
@@ -167,8 +204,12 @@ def main() -> int:
         raise ValueError(
             "a non-default output tile requires the attention-output kernel"
         )
-    if args.warmup < 200 or args.iterations < 1000:
-        raise ValueError("protected FP8 microbenchmark requires 200/1000 samples")
+    _validate_sampling_contract(
+        kernel=args.kernel,
+        diagnostic_reference_timing=args.diagnostic_reference_timing,
+        warmup=args.warmup,
+        iterations=args.iterations,
+    )
 
     import jax
     import jax.numpy as jnp
@@ -313,7 +354,7 @@ def main() -> int:
         weight_bits = jax.device_put(weight_host, device)
         scale = jax.device_put(scale_host, device)
         reference_lhs = lhs
-        if args.kernel in ("single_up", "attention_output"):
+        if args.kernel in ("single_up", "single_up_m1", "attention_output"):
             def kernel(*values: Any) -> Any:
                 return fp8_block_matmul(
                     *values,
@@ -694,9 +735,57 @@ def main() -> int:
         if not hlo_contract["passed"]:
             raise RuntimeError(f"FP8 Pallas HLO contract failed: {hlo_contract}")
 
+        reference_compiled = None
+        reference_hlo_record = None
+        if args.diagnostic_reference_timing:
+            def reference_kernel(*values: Any) -> Any:
+                reference_hidden, reference_bits, reference_scale = values
+                decoded = dequantize_fp8_bits_block_weight(
+                    reference_bits, reference_scale
+                )
+                return lax.dot_general(
+                    reference_hidden,
+                    decoded,
+                    dimension_numbers=(((1,), (1,)), ((), ())),
+                    preferred_element_type=jnp.float32,
+                ).astype(jnp.bfloat16)
+
+            reference_lower_started = time.monotonic()
+            reference_compiled = (
+                jax.jit(reference_kernel).lower(*kernel_inputs).compile()
+            )
+            reference_compile_seconds = (
+                time.monotonic() - reference_lower_started
+            )
+            reference_hlo = reference_compiled.as_text()
+            reference_hlo_path = args.hlo_output.with_name(
+                args.hlo_output.name.replace(
+                    ".optimized_hlo.txt", ".reference.optimized_hlo.txt"
+                )
+            )
+            if reference_hlo_path == args.hlo_output:
+                raise ValueError("diagnostic HLO output lacks the expected suffix")
+            reference_hlo_path.write_text(reference_hlo)
+            reference_overlay_contract = _reference_overlay_contract(
+                reference_hlo,
+                contraction=contraction,
+                output_width=output,
+            )
+            if not reference_overlay_contract["passed"]:
+                raise RuntimeError(
+                    "reference projection lacks the expected full-weight overlay"
+                )
+            reference_hlo_record = {
+                "compile_seconds": reference_compile_seconds,
+                "contract": reference_overlay_contract,
+                "path": str(reference_hlo_path),
+                "sha256": sha256(reference_hlo.encode()).hexdigest(),
+            }
+
         actual_raw = compiled(*kernel_inputs)
         single_output_kernel = args.kernel in (
             "single_up",
+            "single_up_m1",
             "attention_output",
             "rmsnorm_linear",
             "selected_swiglu_down",
@@ -839,6 +928,22 @@ def main() -> int:
                 float(np.asarray(value[0, 0], dtype=np.float32))
                 for value in values
             )
+        reference_samples = []
+        reference_checksum = None
+        if reference_compiled is not None:
+            for _ in range(args.warmup):
+                jax.block_until_ready(reference_compiled(*kernel_inputs))
+            reference_checksum = 0.0
+            for _ in range(args.iterations):
+                started = time.perf_counter_ns()
+                reference_value = reference_compiled(*kernel_inputs)
+                jax.block_until_ready(reference_value)
+                reference_samples.append(
+                    (time.perf_counter_ns() - started) / 1_000_000.0
+                )
+                reference_checksum += float(
+                    np.asarray(reference_value[0, 0], dtype=np.float32)
+                )
 
     if args.kernel == "selected_swiglu_down":
         shape_record: dict[str, Any] = {
@@ -906,10 +1011,25 @@ def main() -> int:
             "contract": hlo_contract,
         },
         "comparison": comparison,
+        "diagnostic_only": args.diagnostic_reference_timing,
+        "performance_claim": False,
         "profiler_free_timing": True,
         "warmup": args.warmup,
         "iterations": args.iterations,
         "latency": _percentiles(samples),
+        "reference_diagnostic": (
+            {
+                "checksum": reference_checksum,
+                "hlo": reference_hlo_record,
+                "latency": _percentiles(reference_samples),
+                "p50_slowdown": (
+                    _percentiles(reference_samples)["p50_ms"]
+                    / _percentiles(samples)["p50_ms"]
+                ),
+            }
+            if reference_samples
+            else None
+        ),
         "checksum": checksum,
         "memory_stats": _memory_stats(device),
     }

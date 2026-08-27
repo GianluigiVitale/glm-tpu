@@ -7,6 +7,7 @@ readonly ZONE=us-central2-b
 readonly BRANCH=rewrite/topology-first-decode
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
+readonly APPROVED_LOCATION=US-CENTRAL2
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
@@ -20,6 +21,7 @@ TAG_STEM=$KERNEL
 TAG=${GLM_GREENFIELD_FP8_MATMUL_TAG:-greenfield_fp8_${TAG_STEM}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 WARMUP=${GLM_GREENFIELD_FP8_MATMUL_WARMUP:-200}
 ITERATIONS=${GLM_GREENFIELD_FP8_MATMUL_ITERATIONS:-1000}
+DIAGNOSTIC_REFERENCE=${GLM_GREENFIELD_FP8_DIAGNOSTIC_REFERENCE:-0}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -31,12 +33,13 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "refusing FP8 kernel run from a dirty worktree" >&2
   exit 2
 }
-[[ $KERNEL == single_up || $KERNEL == rmsnorm_linear || $KERNEL == up_gate || \
+[[ $KERNEL == single_up || $KERNEL == single_up_m1 || \
+  $KERNEL == rmsnorm_linear || $KERNEL == up_gate || \
   $KERNEL == attention_output || $KERNEL == fused_attention_output || \
   $KERNEL == selected_up_gate || $KERNEL == selected_swiglu_down || \
   $KERNEL == structured_kv_b || $KERNEL == dsa_wq_b || \
   $KERNEL == dsa_wk ]] || {
-  echo "FP8 kernel must be single_up, attention_output," \
+  echo "FP8 kernel must be single_up, single_up_m1, attention_output," \
     "fused_attention_output, rmsnorm_linear, up_gate, selected_up_gate," \
     "selected_swiglu_down, structured_kv_b, dsa_wq_b, or dsa_wk" >&2
   exit 2
@@ -53,14 +56,18 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "selected route case must be normal_two or concentrated_eight" >&2
   exit 2
 }
-[[ $WARMUP =~ ^[0-9]+$ && $WARMUP -ge 200 ]] || {
-  echo "protected FP8 kernel run requires warmup>=200" >&2
-  exit 2
-}
-[[ $ITERATIONS =~ ^[0-9]+$ && $ITERATIONS -ge 1000 ]] || {
-  echo "protected FP8 kernel run requires iterations>=1000" >&2
-  exit 2
-}
+if [[ $DIAGNOSTIC_REFERENCE == 1 ]]; then
+  [[ $KERNEL == single_up_m1 ]] || {
+    echo "reference diagnostic requires single_up_m1" >&2
+    exit 2
+  }
+  [[ $WARMUP =~ ^[0-9]+$ && $WARMUP -ge 1 ]] || exit 2
+  [[ $ITERATIONS =~ ^[0-9]+$ && $ITERATIONS -ge 3 ]] || exit 2
+else
+  [[ $DIAGNOSTIC_REFERENCE == 0 && $KERNEL != single_up_m1 ]] || exit 2
+  [[ $WARMUP =~ ^[0-9]+$ && $WARMUP -ge 200 ]] || exit 2
+  [[ $ITERATIONS =~ ^[0-9]+$ && $ITERATIONS -ge 1000 ]] || exit 2
+fi
 [[ -r $RESULTS_DB && ! -e $RUN_DIR ]] || {
   echo "results DB missing or append-only run path already exists" >&2
   exit 2
@@ -76,6 +83,13 @@ flock -n 9 || {
   say "ABORT: another protected pod workflow holds the global lease"
   exit 1
 }
+exec 8>/home/gianl/.glm-tpu-rsync.lock
+flock 8
+
+[[ $(git -C "$WORKTREE" ls-remote origin \
+  refs/heads/rewrite/topology-first-decode | awk '{print $1}') == "$PIN" ]]
+[[ $(gcloud storage buckets describe "$APPROVED_BUCKET" \
+  --format='value(location)') == "$APPROVED_LOCATION" ]]
 
 has_eight_unique_markers() {
   local file=$1 marker=$2
@@ -121,7 +135,7 @@ strict_census pre || {
 say "compiling and timing GLM production $KERNEL projection on TPU v4"
 started=$(date +%s)
 ROWS=8
-[[ $KERNEL != rmsnorm_linear ]] || ROWS=1
+[[ $KERNEL != rmsnorm_linear && $KERNEL != single_up_m1 ]] || ROWS=1
 CONTRACTION=6144
 OUTPUT_WIDTH=2048
 if [[ $KERNEL == dsa_wq_b ]]; then
@@ -172,6 +186,9 @@ fi
       --iterations "$ITERATIONS"
     )
   fi
+  if [[ $DIAGNOSTIC_REFERENCE == 1 ]]; then
+    RUNNER+=(--diagnostic-reference-timing)
+  fi
   JAX_PLATFORMS=tpu \
     TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
     TPU_PROCESS_BOUNDS=1,1,1 \
@@ -207,6 +224,15 @@ if not runner["comparison"]["passed"]:
     raise SystemExit("Pallas/reference correctness failed")
 if not runner["profiler_free_timing"]:
     raise SystemExit("kernel wall distribution is not profiler-free")
+diagnostic_reference = runner.get("reference_diagnostic")
+if bool(diagnostic_reference) != runner.get("diagnostic_only"):
+    raise SystemExit("reference diagnostic identity drifted")
+if diagnostic_reference is not None:
+    if (
+        runner["kernel"] != "single_up_m1"
+        or not diagnostic_reference["hlo"]["contract"]["passed"]
+    ):
+        raise SystemExit("reference diagnostic HLO contract failed")
 
 sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
@@ -237,6 +263,7 @@ shape_ids = {
     "fused_attention_output": "h16_l512_v256_o6144",
     "dsa_wq_b": "m1_k2048_n1024",
     "dsa_wk": "m1_k6144_n128",
+    "single_up_m1": "m1_k6144_n2048",
 }
 if runner["kernel"] == "structured_kv_b":
     item_id = "h16_p192_l512_v256"
@@ -287,7 +314,12 @@ summary = {
     "elapsed_seconds": int(elapsed),
     "results_db_run_id": run_id,
     "runner": runner,
-    "claim_scope": "standalone profiler-free kernel wall; no token-rate claim",
+    "claim_scope": (
+        "diagnostic reference-vs-Pallas projection wall; no performance claim"
+        if diagnostic_reference is not None
+        else "standalone profiler-free kernel wall; no token-rate claim"
+    ),
+    "performance_claim": False,
 }
 (run_dir / "summary.json").write_text(
     json.dumps(summary, indent=2, sort_keys=True) + "\n"

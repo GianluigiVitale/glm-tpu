@@ -1,9 +1,18 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from scripts.greenfield.microbench_fp8_matmul import (
     _is_bounded_compact_input_scatter,
     _is_bounded_route_restore_index_call,
+    _reference_overlay_contract,
+    _validate_sampling_contract,
 )
+
+
+REPO = Path(__file__).resolve().parents[3]
 
 
 def test_route_restore_index_call_requires_exact_bounded_contract() -> None:
@@ -69,3 +78,53 @@ def test_compact_input_scatter_requires_exact_selected_down_contract() -> None:
         accepted.replace("scatter_dims_to_operand_dims={0,1}", ""),
         **kwargs,
     )
+
+
+def test_reference_diagnostic_is_small_and_shape_bounded() -> None:
+    _validate_sampling_contract(
+        kernel="single_up_m1",
+        diagnostic_reference_timing=True,
+        warmup=1,
+        iterations=3,
+    )
+    with pytest.raises(ValueError, match="M=1 projection"):
+        _validate_sampling_contract(
+            kernel="single_up",
+            diagnostic_reference_timing=True,
+            warmup=1,
+            iterations=3,
+        )
+    with pytest.raises(ValueError, match="warmup>=1"):
+        _validate_sampling_contract(
+            kernel="single_up_m1",
+            diagnostic_reference_timing=True,
+            warmup=0,
+            iterations=3,
+        )
+
+
+def test_reference_diagnostic_requires_full_weight_overlay() -> None:
+    accepted = _reference_overlay_contract(
+        "ROOT %x = bf16[2048,6144] copy(%p)",
+        contraction=6144,
+        output_width=2048,
+    )
+    rejected = _reference_overlay_contract(
+        "ROOT %x = bf16[8,2048] copy(%p)",
+        contraction=6144,
+        output_width=2048,
+    )
+
+    assert accepted["passed"] is True
+    assert rejected["passed"] is False
+
+
+def test_reference_diagnostic_wrapper_is_serialized_and_default_off() -> None:
+    source = (REPO / "scripts/greenfield/run_fp8_matmul_microbench.sh").read_text()
+
+    assert "GLM_GREENFIELD_FP8_DIAGNOSTIC_REFERENCE:-0" in source
+    assert "single_up_m1" in source
+    assert ".glm_pod_workload.lock" in source
+    assert ".glm-tpu-rsync.lock" in source
+    assert "US-CENTRAL2" in source
+    assert "--diagnostic-reference-timing" in source
