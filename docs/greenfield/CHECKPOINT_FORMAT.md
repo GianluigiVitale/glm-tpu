@@ -43,6 +43,26 @@ criteria. They do **not** prove full-decoder HBM safety: KV, DSA state,
 executables, compiler overlays, and decoder temporaries remain unmeasured, and
 the plan correctly records `promotion_memory_proven=false`.
 
+## Complete PP16 planning artifact
+
+Tag `greenfield_checkpoint_plan_pp16_20260827T022537742669498Z` applies the same complete source
+inventory to the mandatory two-chip challenger at pushed code `6dc7304`. The replacement topology
+assigns every layer once to 16 exact physical stages. The layout contains 32 base destination files
+and two optional-MTP files totaling 757,149,950,848 planned packed bytes. Execution, plan, and
+layout hashes are `079cefe6a646e0c56120c0903c395587bc95bf8dc6d66de0cf9eb029827794c3`,
+`3c3ea07b0f97a84702e7b2ad370b014ea22c9e69bc7d35ad88e23a4ad82ded16`, and
+`f97de2d8ec525d984963c522696e09c40b9cb478fb562917f0a42fc2083b15f9`.
+
+The arithmetic model reports maximum accounted memory 26,424,338,752 bytes/chip and minimum free
+margin 6,590,074,560. It therefore records `capacity_feasible=true` but deliberately retains
+`promotion_memory_proven=false`. Seven plan/evidence objects were uploaded to the approved
+`US-CENTRAL2` prefix, reconciled by generation and CRC, followed by the ledger and terminal SUCCESS
+last. The terminal set has nine objects / 145,627,682 bytes.
+
+This artifact is a pre-payload ownership contract. It does not contain packed model tensors and
+does not prove direct load, measured HBM, Gate B, decoder correctness, or performance. A bounded
+pack/load discriminator must pass before authorizing the complete 757-GB PP16 pack.
+
 ## Bounded Gate C derivative
 
 Artifact `greenfield_gate_c_pack_20260805T214609093206269Z` at code `8a50d6a` derives only the 31

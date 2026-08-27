@@ -5,6 +5,28 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 — complete PP16 plan is feasible and same-region sealed
+
+Protected metadata-only tag `greenfield_checkpoint_plan_pp16_20260827T022537742669498Z` at pushed
+and byte-mirrored code `6dc7304` converts the immutable 141-file / 118,629-leaf inventory into the
+mandatory 16-stage `PP16_LP2` plan. It reads safetensors headers only, forces CPU, holds the mirror
+I/O lease, checks the bucket API reports exact `US-CENTRAL2`, and binds replacement topology
+`294e777...559` plus PP16 groups `6383e57c...f21`. No TPU lease, tensor payload, DB row, timing, or
+performance claim exists.
+
+The execution/plan/layout hashes are `079cefe6...794c3`, `3c3ea07b...ed16`, and
+`f97de2d8...b15f9`. All 78 layers are assigned once across exact physical two-chip stages; 32 base
+and two MTP destination files account for 757,149,950,848 planned packed bytes. IndexShare
+crossings are `7,12,17,39,44,49,59,64,69`. Maximum modeled accounted memory is
+26,424,338,752 bytes/chip and the minimum margin is 6,590,074,560, so capacity is feasible.
+`promotion_memory_proven=false` correctly remains open.
+
+Publication wrote seven immutable evidence objects, then a generation/CRC ledger, then terminal
+SUCCESS last. The exact remote set is nine objects / 145,627,682 bytes; ledger SHA is
+`03b5719a...f2f`, SUCCESS self SHA is `ccb0b0d2...c8bd`, and byte-identical local/remote SUCCESS
+file SHA is `5cac6b62...2176`. The next discriminator is a bounded PP16 pack/load proof derived
+from this layout before authorizing the complete 757-GB pack.
+
 ## 2026-08-27 — exact dense WS32 remains wrong at the layer-1 state boundary
 
 Protected numerical tag `greenfield_ws32_short_decoder_8k_numerical_20260827T011711674195301Z`

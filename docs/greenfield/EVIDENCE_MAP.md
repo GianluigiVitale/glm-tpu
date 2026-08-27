@@ -44,6 +44,15 @@ Replacement topology code is `bfe064d`; its fleet hash is `4a0c9a33...c301`. Col
 pins are `fcd8426735...` and `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash remains
 `294e777...559`, PP8 group hash `d5943ab8...c14`, and PP16 group hash `6383e57c...f21`.
 
+Accepted nonperformance checkpoint-planning evidence is PP16 tag
+`greenfield_checkpoint_plan_pp16_20260827T022537742669498Z` at `6dc7304`. It covers the complete
+141-file / 118,629-leaf inventory with 16 exact two-chip stages, 32 base plus two MTP owner files,
+and 757,149,950,848 planned packed bytes. Execution/plan/layout hashes are
+`079cefe6...794c3`, `3c3ea07b...ed16`, and `f97de2d8...b15f9`; minimum modeled free bytes are
+6,590,074,560/chip. The exact nine-object `US-CENTRAL2` terminal archive is generation/CRC bound.
+This proves plan feasibility only: `promotion_memory_proven=false`, and there is no DB, TPU,
+direct-load, measured-HBM, Gate-B, or performance claim.
+
 The compile-only tag
 `greenfield_ws32_short_decoder_8k_acquire_20260826T195124476893681Z` is preserved diagnostic
 evidence, not an accepted DB result. It contains eight complete load/compile/HBM prevalidations and

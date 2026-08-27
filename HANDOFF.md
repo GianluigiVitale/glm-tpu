@@ -2,6 +2,29 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 complete PP16 checkpoint plan is terminal-sealed
+
+- Metadata-only tag `greenfield_checkpoint_plan_pp16_20260827T022537742669498Z` at pushed and
+  same-region-mirrored code `6dc7304` reads only the 141 safetensors headers and publishes the
+  complete `PP16_LP2` ownership/layout contract. It used the replacement-pod topology, exact
+  two-chip group hash `6383e57c...f21`, and approved `US-CENTRAL2` bucket; no tensor payload,
+  TPU, DB row, or performance claim exists.
+- The plan covers 118,629 leaves and 755,617,140,416 source payload bytes. Sixteen physical stages
+  produce 32 base owners plus two optional-MTP owners and 757,149,950,848 planned packed bytes.
+  Execution/plan/layout SHAs are `079cefe6...794c3`, `3c3ea07b...ed16`, and
+  `f97de2d8...b15f9`; IndexShare crossings are `7,12,17,39,44,49,59,64,69`.
+- Exact modeled maximum accounted bytes are 26,424,338,752/chip and the minimum free margin is
+  6,590,074,560 bytes/chip. `capacity_feasible=true`, while
+  `promotion_memory_proven=false` remains honest until a complete packed direct load and measured
+  decoder overlays exist.
+- The remote terminal set is exactly nine objects / 145,627,682 bytes. Its seven-object
+  generation/CRC ledger SHA is `03b5719a...f2f`, SUCCESS self SHA is `ccb0b0d2...c8bd`, and the
+  local/remote SUCCESS file SHA is `5cac6b62...2176`. Both workflow locks are free and results DB
+  remains integral at max run 555 / 553 rows.
+- Exact next is a bounded PP16 packer/direct-loader discriminator against this layout before the
+  757-GB full pack. Do not treat capacity arithmetic or this metadata artifact as Gate B, HBM, or
+  decoder evidence.
+
 ## 2026-08-27 exact-dense WS32 numerical run rejects on layer-1 DSA
 
 - Protected tag
