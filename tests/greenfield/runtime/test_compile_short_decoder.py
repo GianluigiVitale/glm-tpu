@@ -342,6 +342,9 @@ def test_pp8_runner_has_non_tpu_full_metadata_preflight() -> None:
     assert "short decoder preflight-only flag must be 0 or 1" in runner
     assert "scripts/greenfield/inspect_feature_runtime_checkpoint.py" in runner
     assert "SHORT_DECODER_PREFLIGHT_OK" in runner
+    assert runner.index("exec 9>/home/gianl/glm-run/.glm_pod_workload.lock") < (
+        runner.index("exec 8>/home/gianl/.glm-tpu-rsync.lock")
+    )
 
 
 def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
