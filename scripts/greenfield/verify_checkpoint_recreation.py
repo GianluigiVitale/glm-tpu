@@ -116,6 +116,8 @@ def main() -> None:
     parser.add_argument("--pp8-plan-layout", type=Path, required=True)
     parser.add_argument("--pp8-root", type=Path, required=True)
     parser.add_argument("--ws32-root", type=Path, required=True)
+    parser.add_argument("--metadata-archive", type=Path)
+    parser.add_argument("--metadata-archive-uri")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -240,6 +242,38 @@ def main() -> None:
         "total_recreated_bytes": sum(check["byte_count"] for check in checks),
         "ws32_manifest_sha256": WS32_MANIFEST_SHA256,
     }
+    if (args.metadata_archive is None) != (args.metadata_archive_uri is None):
+        raise RuntimeError(
+            "metadata archive path and URI must be provided together"
+        )
+    if args.metadata_archive is not None:
+        if not args.metadata_archive_uri.startswith(
+            "gs://driftbench-dsv4-uc/results/"
+        ):
+            raise RuntimeError("metadata archive URI is not protected")
+        archive = _read_json(args.metadata_archive)
+        archive_hash = _mapping_hash(archive, "archive_sha256")
+        files = archive.get("files")
+        if (
+            archive.get("archive_sha256") != archive_hash
+            or not isinstance(files, list)
+            or archive.get("source_objects") != len(files)
+            or archive.get("source_bytes")
+            != sum(record["source"]["size"] for record in files)
+            or any(
+                record["source"]["size"] != record["destination"]["size"]
+                or record["source"]["crc32c"]
+                != record["destination"]["crc32c"]
+                for record in files
+            )
+        ):
+            raise RuntimeError("preserved metadata archive identity drifted")
+        proof["metadata_archive"] = {
+            "archive_sha256": archive_hash,
+            "source_bytes": archive["source_bytes"],
+            "source_objects": archive["source_objects"],
+            "uri": args.metadata_archive_uri,
+        }
     proof["proof_sha256"] = _mapping_hash(proof, "proof_sha256")
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(proof, indent=2, sort_keys=True) + "\n")

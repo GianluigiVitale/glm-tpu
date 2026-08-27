@@ -31,9 +31,15 @@
     }
   ],
   "format_version": 1,
+  "metadata_archive": {
+    "archive_sha256": "c7a7d033a6454f05b0fe6308961a3040272b57ab937fa0c12bb72c1232ee8069",
+    "source_bytes": 121645216,
+    "source_objects": 21,
+    "uri": "gs://driftbench-dsv4-uc/results/greenfield_checkpoint_reproduction_capsule_20260827T140830890282163Z/"
+  },
   "pp8_manifest_sha256": "0869493164a3a63797ea61d88c575f35bea8aa50790c46aa21ce6f0f7c4c78f1",
   "pp8_plan_layout_file_sha256": "40efd1142fb6549616c188ea3ae52abb9e8fbcd8d2fcc42820373bb3af9faab6",
-  "proof_sha256": "dfe4cebcf3760d4c28e7c8159bd948a3dc05e32e81007c940a3cf2b54fb2d42e",
+  "proof_sha256": "915ea06eae08f2a33a438b260b613676b4133636bce5dc2c28ef553e8f0d0ea4",
   "source_inventory_sha256": "a388627c08c8ff591903deb1fbf3198f43916e64a2295ed0e253f1e44a042fc4",
   "status": "passed",
   "total_recreated_bytes": 20544,
