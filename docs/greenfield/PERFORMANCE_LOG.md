@@ -2,8 +2,18 @@
 
 Protected PP8 2K full-decoder evidence exists at DB484: p50 `244.091151 ms` and
 `4.096830 tok/s`, with exact tokens/DSA and complete protections. It passes 2K Gate-D correctness
-but not Gate E. No accepted 8K, 128K, 256K, PP16 full-decoder, or WS32 full-decoder performance
-measurement exists yet. Bounded layer/kernel/diagnostic results below are not token-speed proof.
+but not Gate E. WS32 has the accepted 2K DB553 point at `122.630667 ms/token` / `8.154567 tok/s`.
+No accepted 8K, 128K, 256K or PP16 full-decoder measurement exists yet. Bounded
+layer/kernel/diagnostic results below are not token-speed proof.
+
+## 2026-08-27 — bounded PP16 direct load, not performance
+
+DB556 / `greenfield_checkpoint_probe_load_pp16_20260827T031331899773974Z` proves the production
+loader can place and exactly round-trip 50,347,904 raw bytes across both physical PP16 stage-0
+owners with zero dequantization, global concat or reshard. Its 25,201,152-byte/chip HBM peak and
+32,989,212,160-byte minimum largest-free-block apply only to the bounded payload. It executes no
+decoder/token loop, collects no warmed latency distribution or XPlane, and makes no throughput
+claim. DB484 remains the accepted PP8 decoder performance point; PP16 performance is still absent.
 
 ## 2026-08-26 — exact-DSA 8K timing remains diagnostic after layer-1 refusal
 

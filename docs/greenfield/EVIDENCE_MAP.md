@@ -44,6 +44,15 @@ Replacement topology code is `bfe064d`; its fleet hash is `4a0c9a33...c301`. Col
 pins are `fcd8426735...` and `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash remains
 `294e777...559`, PP8 group hash `d5943ab8...c14`, and PP16 group hash `6383e57c...f21`.
 
+Accepted bounded checkpoint-loader evidence is DB556 / tag
+`greenfield_checkpoint_probe_load_pp16_20260827T031331899773974Z` at `46b8a4f`. The production
+final-layout loader places both stage-0 PP16 owners on physical ids `[0,1]` and round-trips
+50,347,904 raw bytes / 16 tensors with zero FP8 dequantization, global concat or runtime reshard.
+Peak HBM is 25,201,152 bytes/chip and minimum largest-free-block is 32,989,212,160 bytes. State SHA
+is `3957f3ed...3b535`; the 12-object ledger SHA is `a485bd19...990d4`; terminal SUCCESS self SHA
+is `9da2910f...2a88`; fleet censuses and DB integrity pass. This authorizes a complete PP16 pack but
+does not itself prove the complete checkpoint, decoder, Gate B or performance.
+
 Accepted nonperformance checkpoint-planning evidence is PP16 tag
 `greenfield_checkpoint_plan_pp16_20260827T022537742669498Z` at `6dc7304`. It covers the complete
 141-file / 118,629-leaf inventory with 16 exact two-chip stages, 32 base plus two MTP owner files,
@@ -58,8 +67,9 @@ Bounded real-byte pack tag `greenfield_checkpoint_probe_pp16_20260827T0249021589
 axes, and both expert-owner slots. It reconciles 50,345,920 source bytes to two 25,173,952-byte
 payloads in one grouped core invocation; owner SHAs are `87ac52df...7ea6` / `705ed0ff...0ac3` and
 manifest SHA is `14c36aeb...c4e3`. Its exact nine-object / 50,375,010-byte same-region archive is
-generation/CRC terminal-sealed. This closes the bounded pack discriminator only; direct-load,
-complete-pack, measured-HBM, Gate-B, and performance evidence remain missing.
+generation/CRC terminal-sealed. This closes the bounded pack discriminator only; direct-loader
+compatibility subsequently passes in DB556, while complete-pack, full-checkpoint HBM, Gate-B, and
+performance evidence remain missing.
 
 The compile-only tag
 `greenfield_ws32_short_decoder_8k_acquire_20260826T195124476893681Z` is preserved diagnostic

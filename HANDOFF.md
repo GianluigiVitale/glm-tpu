@@ -2,6 +2,25 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 bounded PP16 production direct-loader proof passes
+
+- Protected tag `greenfield_checkpoint_probe_load_pp16_20260827T031331899773974Z` at pushed,
+  same-region-mirrored code `46b8a4f` runs the production final-layout loader against both bounded
+  stage-0 PP16 owners on physical device ids `[0,1]`. All 50,347,904 raw payload bytes across 16
+  tensors round-trip exactly on device with zero host/device FP8 dequantization, global concat or
+  runtime reshard. State manifest SHA is `3957f3ed...3b535`.
+- The replacement topology maps TPU worker suffix 4 to JAX process 0; the protected wrapper now
+  authenticates/syncs that exact host and records both dispatch and sync evidence. The two devices
+  each peak at 25,201,152 HBM bytes and retain a 32,989,212,160-byte largest free block. Both
+  eight-host censuses are clean and canonical results DB run 556 is integral.
+- The 12-object preterminal generation/CRC ledger covers 27,065,689 bytes and has SHA
+  `a485bd19...990d4`; terminal SUCCESS self SHA is `9da2910f...2a88`. The first attempt stopped on
+  a shell-local initialization bug and the second diagnosed the worker/JAX-rank permutation;
+  neither has DB/SUCCESS or performance standing.
+- This closes only the bounded production-loader discriminator. It authorizes the complete PP16
+  final-layout pack, followed by a separately protected full direct-load/HBM proof; it is not Gate
+  B completion, decoder correctness, latency or throughput evidence.
+
 ## 2026-08-27 bounded real-byte PP16 pack probe passes
 
 - Tag `greenfield_checkpoint_probe_pp16_20260827T024902158913509Z` at pushed/mirrored code
@@ -20,8 +39,8 @@
 - The remote terminal set is exactly nine objects / 50,375,010 bytes. Ledger SHA is
   `a59b08a6...299d`, SUCCESS self SHA is `dcd2d2b1...7d06`, and local/remote SUCCESS file SHA is
   `0e6880d7...9945`. No TPU, complete checkpoint, DB row, HBM, or performance claim exists.
-- Exact next is the bounded two-device direct-loader compatibility proof against these probe
-  owners. Only after it passes may the complete 757-GB PP16 pack be authorized.
+- The bounded two-device production-loader proof now passes as DB556 above. Together these two
+  discriminators authorize the complete 757-GB PP16 pack.
 
 ## 2026-08-27 complete PP16 checkpoint plan is terminal-sealed
 
@@ -42,9 +61,9 @@
   generation/CRC ledger SHA is `03b5719a...f2f`, SUCCESS self SHA is `ccb0b0d2...c8bd`, and the
   local/remote SUCCESS file SHA is `5cac6b62...2176`. Both workflow locks are free and results DB
   remains integral at max run 555 / 553 rows.
-- Exact next is a bounded PP16 packer/direct-loader discriminator against this layout before the
-  757-GB full pack. Do not treat capacity arithmetic or this metadata artifact as Gate B, HBM, or
-  decoder evidence.
+- The bounded packer/direct-loader discriminators now pass. Exact next is the 757-GB full pack;
+  do not treat capacity arithmetic or the metadata artifact alone as Gate B, HBM, or decoder
+  evidence.
 
 ## 2026-08-27 exact-dense WS32 numerical run rejects on layer-1 DSA
 

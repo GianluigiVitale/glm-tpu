@@ -5,6 +5,28 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 — bounded PP16 production loader passes on its physical owner host
+
+Two deliberately small protected attempts prevented a larger mistake. The first stopped before
+census on a Bash `local` initialization error. The next reached TPU discovery but proved that TPU
+worker suffix and JAX process are permuted on the replacement pod: stage 0 belongs to JAX process 0
+on worker suffix 4, not suffix 0. Neither failed attempt wrote a DB row or terminal marker. Pin
+`46b8a4f` authenticates and syncs the exact target host, uses captured `topology.rank4.json`, and
+seals dispatch/sync evidence.
+
+Protected tag `greenfield_checkpoint_probe_load_pp16_20260827T031331899773974Z` then used the
+production `load_final_layout_stage` path for both bounded final owners on device ids `[0,1]`.
+All 50,347,904 bytes / 16 tensors round-trip exactly. There are zero host/device FP8
+dequantizations, host global concatenations or runtime reshard operations. Peak HBM is 25,201,152
+bytes per chip and the minimum largest free block is 32,989,212,160 bytes. State SHA is
+`3957f3ed...3b535`; pre/post fleet censuses are 8/8 clean; results DB run 556 and its snapshot pass
+integrity.
+
+The 12-object preterminal archive is 27,065,689 bytes with generation/CRC ledger SHA
+`a485bd19...990d4`; SUCCESS self SHA is `9da2910f...2a88`. This is bounded direct-loader/HBM
+evidence only. The now-authorized next step is the complete 757,149,950,848-byte PP16 pack and a
+separate full direct-load proof before Gate B can close.
+
 ## 2026-08-27 — bounded PP16 pack catches reread bug, then passes real bytes
 
 Before authorizing a 757-GB pack, source inspection found that the old cloud harness called
@@ -27,7 +49,8 @@ uploads. Seven objects were generation/CRC reconciled, then the ledger and termi
 written. The exact nine-object set is 50,375,010 bytes; ledger SHA is `a59b08a6...299d`, terminal
 self SHA `dcd2d2b1...7d06`, and local/remote SUCCESS file SHA `0e6880d7...9945`. Locks are free and
 DB remains integral at max run 555 / 553 rows. This is bounded pack evidence only; next prove
-two-device direct-loader compatibility before the complete PP16 pack.
+two-device direct-loader compatibility before the complete PP16 pack. That proof subsequently
+passed as DB556 above, authorizing the complete pack.
 
 ## 2026-08-27 — complete PP16 plan is feasible and same-region sealed
 
