@@ -5,6 +5,44 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 14:39--15:16 UTC — Pallas-linear cuts PP16 diagnostic step 62.6x; bytes recovered
+
+The smallest protected projection discriminator, DB559 / tag
+`greenfield_fp8_single_up_m1_20260827T143939728274623Z`, compares the exact M1 K6144 N2048 real
+FP8 shape. Reference and Pallas outputs are bitwise equal (`max_abs=0`). Profiler-free p50 is
+`176.976284 ms` for reference and `0.427020 ms` for Pallas, a `414.444953x` slowdown. The
+reference HLO contains a full `f32[2048,6144]` dequantized overlay; Pallas contains one bounded
+raw-weight custom call and no overlay. Both fleet censuses are 8/8 clean and DB559 is integral.
+
+The PP16 admission then binds every previously reference linear to its existing exact Pallas
+kernel. The first protected full compile stopped pre-execution only because the HLO linter retained
+LP4 projection widths. Its preserved graph proves 78 calls each at K6144/N2048, K2048/N8192,
+K6144/N640 and K8192/N6144, 78 structured q-absorb/value calls, 21 DSA W_K Pallas calls, three
+dense I6144 calls and 225 feature-MoE calls, with no decoded/formatted weight overlay. The
+plan-generic LP2 correction passes preserved-HLO replay and 16 focused tests.
+
+The identical bounded retry at workload pin `222b5c1`, source tag
+`greenfield_short_decoder_compile_pp16_acquisition_20260827T150038609599068Z`, passes the complete
+LP2 HLO gate and executes one warmup plus one diagnostic step on all eight hosts. Maximum step is
+`1,621.379175 ms` with host spread only `1,621.271--1,621.379 ms`; this is `62.6x` faster than the
+sealed 101.5-second reference-linear graph and rules out host dispatch. Compile/load maxima are
+`185.848/242.213 s`; peak HBM is `27,242,414,592` bytes/chip and minimum largest-free block is
+`5,622,536,192` bytes. Optimized/StableHLO SHAs are `e802ca5b...0814` / `7d26dc17...24bf`.
+
+The outer wrapper refused only the old artifact-kind spelling. Pin `6a2c7a4` corrects that schema
+and the preserved records validate. Metadata-only recovery tag
+`greenfield_short_decoder_compile_pp16_recovery_20260827T151519898058278Z` pins all 26 source
+objects and publishes 32 objects / 12,965,116 bytes in exact `US-CENTRAL2`. Ledger SHA is
+`27b66132...0887`; SUCCESS self SHA is `3d019eee...23b`; downloaded remote ledger/SUCCESS bytes
+match local SHA-256. The recovery uses a fresh 8/8 zero-work census and does not import JAX,
+initialize TPU, load weights or rerun the workload.
+
+Neither the isolated projection nor complete acquisition is a full-model performance result. The
+acquisition has synthetic state, one sample, no oracle/DSA comparison/XPlane/DB row, and explicitly
+keeps numerical/performance/Gate-D false. At 1.62 seconds it also fails the <=200-ms gate. Freeze
+unchanged decoder reruns; attribute preserved HLO costs offline and test the largest remaining
+real-shape component first, beginning with the exact DSA query path that still uses reference.
+
 ## 2026-08-27 14:27--14:35 UTC — PP16 acquisition recovery terminal-seals preserved bytes
 
 The metadata-only recovery at pushed and same-region-mirrored pin `2c50d96` replays the corrected

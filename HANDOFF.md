@@ -2,6 +2,32 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 PP16 Pallas-linear graph is sealed; remaining 1.62 s is the next bottleneck
+
+- DB559 / tag `greenfield_fp8_single_up_m1_20260827T143939728274623Z` isolates one exact real
+  M1 K6144 N2048 projection. Reference and Pallas outputs are bitwise equal. Profiler-free p50 is
+  `176.976284 ms` reference versus `0.427020 ms` Pallas, a `414.445x` difference. Reference HLO
+  materializes a full `f32[2048,6144]` overlay; Pallas has one bounded raw-weight custom call.
+- Pushed/mirrored pins `25acda9` and `222b5c1` admit PP16 Pallas-linear and parameterize the full
+  graph linter for exact LP2 geometry. The first compile correctly stopped on the inherited LP4
+  linter assumption; preserved-HLO replay and 16 focused tests pass after correction.
+- The identical bounded retry, source tag
+  `greenfield_short_decoder_compile_pp16_acquisition_20260827T150038609599068Z`, passes the full
+  HLO contract and one warmup/one diagnostic execution on all eight hosts. Fleet maximum step is
+  `1,621.379175 ms`, `62.6x` faster than the reference-linear graph but still above the 200-ms
+  useful gate. Peak HBM is `27,242,414,592` bytes/chip with minimum largest-free block
+  `5,622,536,192` bytes. Optimized HLO SHA is `e802ca5b...0814`.
+- Metadata-only recovery tag
+  `greenfield_short_decoder_compile_pp16_recovery_20260827T151519898058278Z` terminal-seals the
+  preserved graph/records as 32 objects / 12,965,116 bytes. All 26 source objects are pinned; the
+  remote ledger SHA is `27b66132...0887`, terminal SUCCESS self SHA `3d019eee...23b`, and local/
+  remote byte hashes match. Original pre/post and fresh recovery censuses are 8/8 clean; recovery
+  imported no JAX, initialized no TPU and reran no model work.
+- This remains synthetic diagnostic evidence: no oracle, DSA comparison, XPlane, DB row,
+  numerical/performance or Gate-D claim. Do not rerun the complete graph unchanged. Exact next is
+  offline HLO cost attribution, then the smallest isolated real-shape test of the largest remaining
+  component (beginning with the exact DSA query/reference exception).
+
 ## 2026-08-27 preserved PP16 acquisition is terminal-sealed without a model rerun
 
 - Recovery tag `greenfield_short_decoder_compile_pp16_recovery_20260827T143436340009791Z`
