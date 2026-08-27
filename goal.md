@@ -1,66 +1,60 @@
-# Goal — GLM-5.2-FP8 TPU v4 topology-first greenfield engine
+# Goal — Upstream GLM-5.2 DSA support for TPU Inference
 
-FULL ACCESS: work autonomously to completion. Keep this below 4,000 characters. After
-start/compaction read it and `docs/glm-tpu-revolution.md` **in full**, then inspect live state and
-handoff/research evidence.
+FULL ACCESS: work autonomously. Never push, open, or mutate upstream
+`vllm-project/tpu-inference` before the user audits and explicitly approves the exact diff. Keep
+below 4,000 characters. After start/compaction, read in full and inspect upstream/local state and
+protected evidence.
 
-## Scope and precedence
+## Primary objective
 
-The specification supersedes the incremental TP32 plan, old exact-next sequence, and old ban on
-pipeline parallelism. Preserve the legacy engine, evidence, oracles, and protection tools, but stop
-extending its execution architecture.
-Build a new, isolated, default-off native-JAX engine for `zai-org/GLM-5.2-FP8` on the existing
-`db-v4-64-od` pod (8 hosts/32 TPU-v4 chips) minimizing protected profiler-free single-stream
-latency at 256K. Legacy `tpu-inference` is an oracle only; never import its execution path.
-Never create a VM, host, or TPU. Use only `gs://driftbench-dsv4-uc` and serialize TPU workflows.
+Be the first to contribute correct, mergeable GLM-5.2 DSA support to TPU Inference. Do not wait for
+the greenfield engine's later Gates E-H. Use its protected v4 results as an oracle and evidence
+source, not as code to import into the legacy execution path.
 
-## Required architecture search
+Prepare three small **stacked** PRs. They are separately reviewable, but not independent:
 
-- `PP8_LP4`: 8 host-aligned stages × 4 local chips; implement first.
-- `PP16_LP2`: 16 topology-adjacent stages × 2 chips; mandatory challenger.
-- `WS32_2D`: all-chip 2D weight-stationary plan; protected result or evidence-backed rejection.
-- `LEGACY_TP32_DCP8`: measurement oracle only.
+1. **GLM/DSA semantic kernels, exactness tests, and real TPU benchmarks.** This is the foundation
+   and must be mergeable/useful alone. It must not depend on PR 2 or PR 3.
+2. **Thin TorchAX/vLLM integration.** Base it on PR 1 and keep it limited to wiring the accepted
+   kernels into the repository's preferred TorchAX-first path. It depends on PR 1.
+3. **Model/IndexShare enablement and CI.** Base it on PRs 1-2. Treat current vLLM registration and
+   IndexShare scheduling as authoritative; add registration only if the exact base lacks it. Add
+   only the configuration, fixtures, regressions, and CI coverage needed. It depends on both.
 
-Evidence chooses. Distribute weight capacity with pipeline depth; keep repeated communication in
-the smallest useful local group; transfer only live residual/compact metadata; never reconstruct
-hidden state across all 32 chips inside a layer. `decode_batch1` has one row, no batch-32 dead rows.
+Review PR 1 -> PR 2 -> PR 3. Use stacked branches; before submission, rebase each onto its declared
+parent and state dependencies in the PR body.
 
-## Mandatory order
+## Acceptance-first rules
 
-Use a dedicated branch/worktree and isolated greenfield code/scripts/tests/docs. Record starting
-pins; never weaken historical evidence. Before loading the full 753B model, prove:
+- Re-audit upstream main, PRs/issues, CONTRIBUTING, CI, ownership, and maintainer feedback before
+  finalizing each patch.
+- Reuse repository abstractions. Avoid parallel frameworks, greenfield execution imports,
+  unrelated cleanup, generated dumps, model weights, profiler traces, or bulk artifacts.
+- Current vLLM owns GLM model semantics, loading, IndexShare scheduling, and request metadata.
+  Supply TPU kernels/bridges without reviving old constructor monkeypatches or DSA-disable paths.
+- Top-k alone is incomplete beyond 2,048 tokens: selected positions must reach sparse MLA.
+- Match exact GLM-5.2 DSA semantics: selected set, deterministic tie/order behavior, padding and
+  sentinel rules, IndexShare reuse, dtypes, shapes, and one-live-row decode behavior.
+- Every behavior change needs focused tests. Performance claims require protected real-v4
+  correctness, profiler-free wall measurements, and exact provenance; CPU/synthetic/HLO-only
+  results are not performance proof.
+- Keep evidence compact; never commit checkpoints, raw XPlanes, environments, caches, or run trees.
+- Run prescribed pre-commit, tests, static checks, and relevant CI locally. Preserve compatibility.
+- Never use Fable or Opus. At most one fresh independent Sol review of the final current diff.
+- Commit and push coherent preparation batches only to the user's private fork/branches and mirror
+  compact evidence only to `gs://driftbench-dsv4-uc` in exact `US-CENTRAL2`; never EU. Keep sync
+  outside TPU timing and serialize with cron rsync.
 
-1. runtime physical topology and explicit local replica groups;
-2. device-resident PP8/PP16 transfer chains with exact HLO, no host/Ray/Python stage dispatch or
-   inactive-stage model compute, and warmed latency distributions;
-3. one exact real MoE layer whose combine never leaves its local 2/4-chip stage.
+## Required deliverables before user audit
 
-Then pass Gates A–H in order: plan/memory/HLO linter; final-layout checkpoint manifest/packer/direct
-loader; reference kernels; exact dense/DSA/IndexShare/MoE layers; complete 2K/8K decoder; protected
-128K smoke; protected 256K E0; identical-condition plan adjudication; only then speculation.
-
-## Proof and performance contract
-
-Every optimization defaults off. Require exact DSA set/tie order, raw tokens/quality,
-state/load/cache integrity, checkpoint bytes/checksums, per-chip peak HBM, code/plan hashes,
-physical collective groups/counts, fresh 8-host XPlanes, profiler-free steady wall,
-`bench/results.db` linkage, same-region archive, and authenticated zero-work cleanup. CPU tests,
-synthetic kernels, HLO alone, labels, aggregate
-throughput, or contaminated wall data are not performance proof. Stop and diagnose full-pod
-repeated layer collectives, host-staged transport, dead rows, unknown HBM margin, DSA drift, or a
-device-only win with wall regression.
-
-Minimum useful gate: `<=200 ms/token` and `>=4.5` wall tok/s. Strong base target: `<=125 ms` and
-`>=8 tok/s`; stretch: `<=100 ms` and `>=10 tok/s`. Base decode and speculative effective throughput
-must be separate; claim 20–50 tok/s only from protected local evidence.
+For each PR provide pins, minimal diff, dependencies, tests, TPU evidence where applicable, risks,
+rollback, and ready-to-paste title/body. Prove no bulk files or upstream mutation. Present PR 1
+first; do not let unfinished PRs 2-3 delay it.
 
 ## Definition of done
 
-The fastest correct plan serves at 256K independently of legacy execution, uses a plan-aware packed
-checkpoint, has local repeated collectives/no full-pod hidden reconstruction, and passes exactness,
-quality, integrity, HBM, HLO, PP8/PP16 measurement, WS32 adjudication, 128K smoke, 256K E0,
-DB/archive, and clean-fleet gates. Continue until section 18 has direct evidence.
-Work in bulk. Before deploy: one fresh Fable-max audit of only current diff/evidence; no
-workflows/subagents/cleared-code review. Then one Sol audit; correct, commit/push. After a protected
-failure, diagnose locally and open one narrow logged-in Fable-max chat with only relevant evidence;
-no API/workflow/subagents.
+All three patches are locally complete and reviewable in dependency order; PR 1 independently
+passes semantics, exactness, and protected TPU evidence; PRs 2-3 pass their integration and CI
+contracts; the user audits each exact diff before upstream submission. After explicit approval,
+submit in order, respond to maintainer feedback, rebase narrowly, and continue until all accepted
+PRs are merged or the maintainers explicitly request a different decomposition.
