@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from hashlib import sha256
 import json
 from pathlib import Path
 
@@ -20,6 +21,14 @@ from scripts.greenfield.seal_short_decoder_compile_pp16 import (
     _local_evidence,
     _parse_remote,
 )
+from scripts.greenfield.recover_short_decoder_compile_pp16 import (
+    _crc32c_file,
+    _parse_results_uri,
+    _require_census,
+    _source_blob_name,
+    _source_local_files,
+    prepare,
+)
 
 
 CODE_HASH = "1" * 40
@@ -28,6 +37,7 @@ STABLEHLO_HASH = "3" * 64
 STATE_HASH = "4" * 64
 REPO = Path(__file__).resolve().parents[3]
 RUNNER = REPO / "scripts/greenfield/run_short_decoder_compile_pp16.sh"
+RECOVERY = REPO / "scripts/greenfield/recover_short_decoder_compile_pp16.py"
 
 
 def _record(rank: int) -> dict[str, object]:
@@ -253,3 +263,120 @@ def test_pp16_compile_sealer_requires_exact_local_evidence_set(
     ) == ("driftbench-dsv4-uc", "results/compile-proof/")
     with pytest.raises(ValueError, match="approved results bucket"):
         _parse_remote("gs://driftbench-storage/results/compile-proof")
+
+
+class _RecoveryBlob:
+    def __init__(self, *, size: int, crc32c: str, generation: int = 1) -> None:
+        self.size = size
+        self.crc32c = crc32c
+        self.generation = generation
+
+
+class _RecoveryBucket:
+    def __init__(self, blobs: dict[str, _RecoveryBlob]) -> None:
+        self.blobs = blobs
+
+    def get_blob(self, name: str) -> _RecoveryBlob | None:
+        return self.blobs.get(name)
+
+
+class _RecoveryClient:
+    def __init__(self, blobs: dict[str, _RecoveryBlob]) -> None:
+        self.blobs = blobs
+
+    def bucket(self, name: str) -> _RecoveryBucket:
+        assert name == "driftbench-dsv4-uc"
+        return _RecoveryBucket(self.blobs)
+
+
+def _census() -> str:
+    return "".join(f"CENSUS_OK replacement-pod-w-{rank}\n" for rank in range(8))
+
+
+def _write_recovery_source(root: Path) -> None:
+    _write_records(root, [_record(rank) for rank in range(8)])
+    host_logs = root / "host_logs"
+    host_logs.mkdir()
+    for rank in range(8):
+        (host_logs / f"decoder.rank{rank}.log").write_text(f"rank={rank}\n")
+    hlo = root / "hlo"
+    hlo.mkdir()
+    for name in ("contract.json", "optimized.txt.gz", "stable.mlir.gz"):
+        (hlo / name).write_text(f"{name}\n")
+    for name in ("census_pre.txt", "census_post.txt"):
+        (root / name).write_text(_census())
+    for name in ("execute.txt", "preflight.json", "remote_vacancy.txt", "sync.txt"):
+        (root / name).write_text(f"{name}\n")
+    (root / "orchestrator.log").write_text("historical workload\n")
+
+
+def test_pp16_compile_recovery_prepares_generation_pinned_no_tpu_capsule(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_recovery_source(source)
+    census = tmp_path / "recovery-census.txt"
+    census.write_text(_census())
+    source_tag = "greenfield_short_decoder_compile_pp16_acquisition_20260827T132707782908362Z"
+    source_uri = f"gs://driftbench-dsv4-uc/results/{source_tag}"
+    recovery_tag = "greenfield_short_decoder_compile_pp16_recovery_20260827T170000000000000Z"
+    recovery_uri = f"gs://driftbench-dsv4-uc/results/{recovery_tag}"
+    _, source_prefix = _parse_results_uri(source_uri)
+    local_files = _source_local_files(source)
+    blobs = {}
+    for relative_name, path in local_files.items():
+        name = _source_blob_name(
+            relative_name,
+            source_prefix=source_prefix,
+            source_run_tag=source_tag,
+        )
+        blobs[name] = _RecoveryBlob(
+            size=path.stat().st_size, crc32c=_crc32c_file(path)
+        )
+    run_dir = tmp_path / "recovered"
+
+    result = prepare(
+        source_dir=source,
+        run_dir=run_dir,
+        recovery_census=census,
+        source_remote_prefix=source_uri,
+        remote_prefix=recovery_uri,
+        source_run_tag=source_tag,
+        recovery_run_tag=recovery_tag,
+        workload_code_hash=CODE_HASH,
+        recovery_code_hash="5" * 40,
+        client=_RecoveryClient(blobs),
+    )
+
+    assert result["summary"]["status"] == "SUCCESS"
+    assert result["recovery"]["model_workload_rerun"] is False
+    assert result["recovery"]["tpu_initialized_by_recovery"] is False
+    assert result["recovery"]["performance_claim"] is False
+    assert result["recovery"]["gate_d_passed"] is False
+    assert len(result["recovery"]["source_objects"]) == 26
+    for line in (run_dir / "evidence.sha256").read_text().splitlines():
+        expected, relative_name = line.split("  ", 1)
+        assert sha256((run_dir / relative_name).read_bytes()).hexdigest() == expected
+
+
+def test_pp16_compile_recovery_rejects_non_eight_host_census(tmp_path: Path) -> None:
+    census = tmp_path / "census.txt"
+    census.write_text("CENSUS_OK replacement-pod-w-0\n")
+
+    with pytest.raises(ValueError, match="not authenticated 8/8"):
+        _require_census(census)
+
+
+def test_pp16_compile_recovery_is_create_only_and_approved_bucket_only() -> None:
+    source = RECOVERY.read_text()
+
+    assert "if_generation_match=0" in source
+    assert "model_workload_rerun\": False" in source
+    assert "tpu_initialized_by_recovery\": False" in source
+    assert "import jax" not in source
+    assert _parse_results_uri(
+        "gs://driftbench-dsv4-uc/results/recovery"
+    ) == ("driftbench-dsv4-uc", "results/recovery/")
+    with pytest.raises(ValueError, match="approved results bucket"):
+        _parse_results_uri("gs://driftbench-storage/results/recovery")
