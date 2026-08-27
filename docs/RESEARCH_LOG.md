@@ -5,6 +5,31 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 13:27--13:42 UTC — PP16 device acquisition passes; outer host/JAX identity is wrong
+
+At pushed and mirrored pin `309ee8b`, protected tag
+`greenfield_short_decoder_compile_pp16_acquisition_20260827T132707782908362Z` completes the full
+load, compile, corrected HLO validation, one warmup and one measured execution on every host. All
+eight records set token and metadata passed; their optimized/StableHLO hashes agree at
+`72c7a09d...382f` / `c7b71689...7603`. The exact 219 AG / 301 physical and 315 logical AR / 33 CP
+contract passes, as do one-row state, LP2 groups, feature kernels and the plan-derived 65,535 visit
+mask. Peak HBM is 27,252,078,592 bytes/chip with minimum largest-free-block 4,322,943,488 bytes.
+
+Only the outer local validator refuses, after the authenticated 8/8 post census, because it assumes
+launcher suffix equals JAX process index. The records map suffixes 0--7 to JAX
+`[3,5,1,2,0,6,7,4]`, exactly the protected mapping in replacement-topology DB555 / topology hash
+`294e777...d559`. The correction pins that mapping, retains exact launch-id/hostname uniqueness,
+and exposes it in the summary. All 5 validator tests pass, including deliberate mapping drift, and
+all eight immutable records replay successfully. No TPU/model rerun is justified for this outer
+bookkeeping failure; recover metadata from source generations under a new recovery pin and fresh
+census.
+
+The one measured step after one warmup is again about 101.5 seconds (`101,500.446 ms` maximum).
+Its acquisition contract has synthetic state, no oracle, DSA comparison, trace, DB or distribution,
+so it is not accepted performance. Repetition nevertheless makes it a mandatory diagnostic stop:
+attribute the preserved HLO/trace at the smallest scale before any numerical 2K or 8K run. Gate D
+remains open and no terminal `SUCCESS` exists yet.
+
 ## 2026-08-27 12:59--13:16 UTC — PP16 full graph executes; visit-mask validator is PP8-specific
 
 The identical smallest retry at pushed pin `a670fdf`, tag
@@ -24,8 +49,8 @@ from the execution plan and refuses counts outside the signed-int32 representati
 tests plus invalid-count cases pass in the full 56-test compiler module; preserved rank-0 replay
 passes the corrected metadata gate. Python syntax and diff checks pass.
 
-This acquisition used synthetic initial state, no oracle, no trace, no warmup and one execution.
-Its roughly 101.5-second sample is explicitly diagnostic and cannot be reported as latency or
+This acquisition used synthetic initial state, no oracle, no trace, one warmup and one measured
+execution. Its roughly 101.5-second sample is explicitly diagnostic and cannot be reported as latency or
 throughput. There is no DB row, terminal `SUCCESS`, DSA comparison, Gate-D or performance claim.
 The rank-0 record/HLO-contract/failure-census SHAs are `1a57c70c...f099` /
 `2b7783f5...7e81` / `e35a3117...e40`; failure cleanup is 8/8 clean. Commit, push and same-region

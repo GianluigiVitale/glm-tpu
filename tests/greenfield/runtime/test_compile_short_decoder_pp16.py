@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts.greenfield.validate_short_decoder_compile_pp16 import (
+    EXPECTED_JAX_PROCESS_BY_LAUNCH,
     PLAN_HASH,
     RUNTIME_LAYOUT_HASH,
     RUNTIME_MANIFEST_SHA256,
@@ -101,7 +102,7 @@ def _record(rank: int) -> dict[str, object]:
         "hlo_contract": contract,
         "hostname": f"pod-w-{rank}",
         "iterations": 1,
-        "jax_process_index": rank,
+        "jax_process_index": EXPECTED_JAX_PROCESS_BY_LAUNCH[rank],
         "launch_process_id": rank,
         "linear_backend": "reference",
         "load_record": {
@@ -182,6 +183,11 @@ def test_pp16_compile_acquisition_validator_separates_diagnostic_timing(
     assert summary["numerical_claim"] is False
     assert summary["gate_d_passed"] is False
     assert summary["results_db_run_id"] is None
+    assert summary["topology_results_db_run_id"] == 555
+    assert summary["launch_to_jax_process"] == {
+        str(rank): process_index
+        for rank, process_index in enumerate(EXPECTED_JAX_PROCESS_BY_LAUNCH)
+    }
 
 
 def test_pp16_compile_acquisition_validator_rejects_hlo_locality_drift(
@@ -194,6 +200,17 @@ def test_pp16_compile_acquisition_validator_rejects_hlo_locality_drift(
     _write_records(tmp_path, records)
 
     with pytest.raises(ValueError, match="forbidden_shapes"):
+        validate_records(tmp_path, CODE_HASH)
+
+
+def test_pp16_compile_acquisition_validator_rejects_jax_process_drift(
+    tmp_path: Path,
+) -> None:
+    records = [_record(rank) for rank in range(8)]
+    records[0]["jax_process_index"] = 0
+    _write_records(tmp_path, records)
+
+    with pytest.raises(ValueError, match="protected topology DB555"):
         validate_records(tmp_path, CODE_HASH)
 
 

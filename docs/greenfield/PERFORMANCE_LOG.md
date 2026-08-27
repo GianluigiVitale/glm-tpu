@@ -6,13 +6,23 @@ but not Gate E. WS32 has the accepted 2K DB553 point at `122.630667 ms/token` / 
 No accepted 8K, 128K, 256K or PP16 full-decoder measurement exists yet. Bounded
 layer/kernel/diagnostic results below are not token-speed proof.
 
+## 2026-08-27 — PP16 repeats 101.5-second diagnostic wall; stop before numerical runs
+
+`greenfield_short_decoder_compile_pp16_acquisition_20260827T132707782908362Z` passes all on-device
+HLO/token-mechanism/metadata/HBM checks after one warmup and records one measured step at maximum
+`101,500.446 ms`. Its outer sealer refuses only because launcher suffix order is not JAX process
+order; the observed mapping exactly matches protected topology DB555. This remains nonperformance
+evidence—synthetic state, one sample, no oracle/DSA/trace/DB/terminal `SUCCESS`—but the repeat of the
+prior 101.5-second sample is a stop condition. Attribute the preserved HLO with the smallest trace
+before spending on a numerical PP16 2K/8K run.
+
 ## 2026-08-27 — first complete PP16 execution, not performance
 
 `greenfield_short_decoder_compile_pp16_acquisition_20260827T125930818874961Z` passes the corrected
 complete HLO contract and executes the real 78-layer PP16 graph once. The eight records agree on
 the synthetic token/state and measure maximum peak HBM 27,252,078,592 bytes/chip. It then fails
 only on a PP8-hardcoded expected visit mask: observed 65,535 is exactly all 16 PP16 stages, while
-the runner required 255. The one `101,500 ms` sample has no warmup, oracle, DSA comparison or trace
+the runner required 255. The one `101,500 ms` sample follows one warmup but has no oracle, DSA comparison or trace
 and is not accepted latency. There is no DB row, terminal `SUCCESS`, Gate-D or throughput claim;
 the plan-aware validator correction must terminal-pass the same acquisition before numerical 2K.
 

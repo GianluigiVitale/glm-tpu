@@ -2,6 +2,28 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 PP16 acquisition passes on device; outer sealer misreads host/JAX order
+
+- Protected tag `greenfield_short_decoder_compile_pp16_acquisition_20260827T132707782908362Z`
+  at pushed/mirrored pin `309ee8b` passes the full corrected HLO gate, one warmup, one measured
+  execution, token mechanism, metadata, 32-chip HBM and authenticated post-run cleanup on all eight
+  hosts. Every host record has `metadata_passed=true` and `token_passed=true`; the fleet HLO hashes
+  agree at optimized/StableHLO `72c7a09d...382f` / `c7b71689...7603`.
+- The outer validator alone refused `jax_process_index == launcher suffix`. DB555's protected
+  replacement-pod topology explicitly records launcher-to-JAX mapping `[3,5,1,2,0,6,7,4]`; the
+  eight new records match it exactly. The validator now pins that DB555 mapping and topology hash,
+  rather than assuming identity. Its 5/5 tests and replay of all eight preserved records pass.
+- The repeated post-warmup diagnostic sample is `101,500.446 ms`, with peak HBM
+  `27,252,078,592` bytes/chip and minimum largest-free-block `4,322,943,488` bytes. Although the
+  acquisition contract forbids a performance claim (one sample, synthetic state, no trace/oracle),
+  the reproducible 101.5-second wall is a stop signal: do not launch numerical 2K/8K before offline
+  HLO attribution and the smallest trace discriminator explain it.
+- No DB row, terminal `SUCCESS`, DSA comparison, Gate-D or accepted performance result exists.
+  Root host/HLO objects plus the failure archive are immutable in the approved bucket; post census
+  is 8/8 clean. Exact next: commit/push/mirror the sealer correction, recover this acquisition
+  metadata-only with a fresh census (no 753B rerun), then inspect the preserved HLO for the
+  101.5-second cause.
+
 ## 2026-08-27 PP16 executes once; only a PP8-hardcoded visit-mask gate refuses it
 
 - Protected tag `greenfield_short_decoder_compile_pp16_acquisition_20260827T125930818874961Z`
@@ -18,8 +40,8 @@
   PP8=`255` and PP16=`65535` tests. The full compiler test module passes 56/56; Python syntax,
   offline replay of the preserved rank-0 record and diff checks pass. The replay accepts every
   metadata field. Failure cleanup is authenticated 8/8.
-- This remains nonterminal acquisition evidence: the single unwarmed `101,500 ms` execution is
-  diagnostic only, with no oracle, DSA comparison, trace, DB, terminal `SUCCESS`, Gate-D or
+- This remains nonterminal acquisition evidence: the single post-warmup `101,500 ms` execution is
+  diagnostic only, with no oracle, DSA comparison, trace distribution, DB, terminal `SUCCESS`, Gate-D or
   performance standing. Exact next: commit/push/mirror this correction, then one smallest
   identical acquisition retry. Do not run 8K unchanged.
 

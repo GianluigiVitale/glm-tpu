@@ -26,6 +26,8 @@ RUNTIME_LAYOUT_HASH = (
 TOPOLOGY_HASH = (
     "294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559"
 )
+TOPOLOGY_RESULTS_DB_RUN_ID = 555
+EXPECTED_JAX_PROCESS_BY_LAUNCH = (3, 5, 1, 2, 0, 6, 7, 4)
 EXPECTED_PAYLOAD_BYTES_PER_HOST = 108_693_168_384
 EXPECTED_TENSORS_PER_HOST = 868
 EXPECTED_GLOBAL_ARRAYS = 217
@@ -125,7 +127,12 @@ def validate_records(run_dir: Path, code_hash: str) -> dict[str, Any]:
         for field, expected in expected_scalars.items():
             _require(record.get(field) == expected, f"rank {rank} drifted {field}")
         _require(record.get("launch_process_id") == rank, f"rank {rank} launch id drifted")
-        _require(record.get("jax_process_index") == rank, f"rank {rank} JAX id drifted")
+        _require(
+            record.get("jax_process_index")
+            == EXPECTED_JAX_PROCESS_BY_LAUNCH[rank],
+            f"rank {rank} JAX id drifted from protected topology DB"
+            f"{TOPOLOGY_RESULTS_DB_RUN_ID}",
+        )
         hostname = record.get("hostname")
         _require(isinstance(hostname, str) and hostname, f"rank {rank} hostname missing")
         hostnames.add(hostname)
@@ -294,6 +301,10 @@ def validate_records(run_dir: Path, code_hash: str) -> dict[str, Any]:
         "diagnostic_only": True,
         "gate_d_passed": False,
         "host_count": 8,
+        "launch_to_jax_process": {
+            str(rank): process_index
+            for rank, process_index in enumerate(EXPECTED_JAX_PROCESS_BY_LAUNCH)
+        },
         "maximum_compile_seconds": max(float(record["compile_seconds"]) for record in records),
         "maximum_diagnostic_step_ms": max(
             float(record["profiler_free_complete_step_wall"]["p50_ms"])
@@ -318,6 +329,7 @@ def validate_records(run_dir: Path, code_hash: str) -> dict[str, Any]:
         "state_layout_hash": next(iter(state_layout_hashes)),
         "status": "SUCCESS",
         "topology_hash": TOPOLOGY_HASH,
+        "topology_results_db_run_id": TOPOLOGY_RESULTS_DB_RUN_ID,
         "trace_claim": False,
     }
     (run_dir / "summary.json").write_text(

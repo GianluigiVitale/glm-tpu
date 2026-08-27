@@ -64,9 +64,20 @@ token 3592, active LP2 ranks `[0,1]`, health 1, producer 74, selected state `(0,
 position/context 3/4, visit mask 65,535 and peak HBM 27,252,078,592 bytes/chip. The only refusal is
 the host validator's PP8 literal 255; 65,535 is exactly the all-16-stage mask. Offline replay passes
 the plan-derived correction. Record/contract/census SHAs are `1a57c70c...f099` /
-`2b7783f5...7e81` / `e35a3117...e40`; failure cleanup is 8/8. The one unwarmed 101.5-second sample
+`2b7783f5...7e81` / `e35a3117...e40`; failure cleanup is 8/8. The one post-warmup 101.5-second sample
 has no performance standing. There is no oracle/DSA comparison, trace, DB, terminal `SUCCESS`,
 Gate-D or performance claim.
+
+Protected nonterminal PP16 successor
+`greenfield_short_decoder_compile_pp16_acquisition_20260827T132707782908362Z` at `309ee8b` passes
+the corrected in-program HLO/token/metadata/HBM contracts after one warmup and one measured step.
+All eight records match DB555's launcher-to-JAX mapping `[3,5,1,2,0,6,7,4]`; only the outer sealer
+wrongly expects identity order. Offline corrected-validator replay passes all records, with fleet
+HLO/StableHLO `72c7a09d...382f` / `c7b71689...7603`, peak HBM 27,252,078,592 and minimum largest
+free block 4,322,943,488 bytes. Post census is 8/8 clean. The reproduced 101.5-second post-warmup
+sample is a diagnostic stop requiring attribution, not accepted performance. There is no terminal
+`SUCCESS`, DB, oracle/DSA/trace, Gate-D or performance claim; recover metadata-only, never rerun the
+753B acquisition merely to correct outer host bookkeeping.
 
 Accepted nonperformance feature-runtime tag
 `greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z` at `a973425` contains all 16
