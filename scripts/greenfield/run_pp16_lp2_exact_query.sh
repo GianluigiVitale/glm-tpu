@@ -200,7 +200,7 @@ if not runner['query_comparison']['elementwise_exact'] or not runner['head_compa
 if not runner['hlo']['materializer']['contract']['passed'] or not runner['hlo']['query_head']['contract']['passed'] or not runner['hlo']['query_head']['stablehlo_contract']['passed']:
     raise SystemExit('materializer/query HLO contract failed')
 query_contract=runner['hlo']['query_head']['contract']
-if query_contract['exact_chunks_per_local_owner']!=2 or query_contract['tuple4_reduction_fusion_count']!=2:
+if query_contract['exact_chunks_per_local_owner']!=2 or query_contract['tuple4_reduction_fusion_count']!=1 or query_contract['expected_runtime_tuple4_reduction_count']!=2:
     raise SystemExit('LP2 two-chunk tuple4 contract drifted')
 if runner['physical_group']['device_ids']!=[0,1] or runner['physical_group']['coordinates']!=[[0,0,0],[1,0,0]]:
     raise SystemExit('physical LP2 group drifted')

@@ -1115,21 +1115,51 @@ def _local_dsa_query_tuple4_exact(
             "exact DSA query local heads must divide into eight-head chunks"
         )
     exact_chunk_width = exact_chunk_heads * contract.head_dim
-    projected_chunks = []
-    for start in range(0, expected_shape[0], exact_chunk_width):
-        stop = start + exact_chunk_width
+    exact_chunk_count = expected_shape[0] // exact_chunk_width
+
+    def grouped_projection(weight_chunks: tuple[Any, Any, Any, Any]) -> Any:
         grouped = jnp.stack(
             tuple(
                 linear(
                     query_input,
-                    weight[start:stop],
+                    weight,
                     output_dtype=jnp.float32,
+                )
+                for weight in weight_chunks
+            )
+        )
+        return lax.optimization_barrier(grouped)[0]
+
+    if exact_chunk_count == 1:
+        # Retain DB525's accepted PP8 graph without introducing loop state.
+        projected_query = grouped_projection(query_weight_aliases)
+    else:
+        # Independent barriers alone do not prevent TPU XLA from fusing both
+        # LP2 chunks into one rejected 32-KiB eight-result reduction. A
+        # two-iteration device loop keeps one proven 16-KiB tuple4 group in
+        # the loop body and executes it once for each local eight-head chunk.
+        def project_chunk(_: None, chunk_index: Any) -> tuple[None, Any]:
+            start = chunk_index * exact_chunk_width
+            weight_chunks = tuple(
+                lax.dynamic_slice_in_dim(
+                    weight,
+                    start,
+                    exact_chunk_width,
+                    axis=0,
                 )
                 for weight in query_weight_aliases
             )
+            return None, grouped_projection(weight_chunks)
+
+        _, projected_chunks = lax.scan(
+            project_chunk,
+            None,
+            jnp.arange(exact_chunk_count, dtype=jnp.int32),
+            unroll=1,
         )
-        projected_chunks.append(lax.optimization_barrier(grouped)[0])
-    projected_query = jnp.concatenate(projected_chunks, axis=-1)
+        projected_query = projected_chunks.reshape(
+            q_residual.shape[0], expected_shape[0]
+        )
     return _local_dsa_query_from_projection(
         projected_query,
         normalized,

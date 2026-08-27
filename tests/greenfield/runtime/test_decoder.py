@@ -4079,7 +4079,7 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
         f"%query_lp2_tuple_{index} = {tuple_result} fusion(%value), "
         'backend_config={"megacore_config":'
         '{"megacore_allreduce_bytes":"16384"}}'
-        for index in range(42)
+        for index in range(21)
     )
     lp2_exact = _validate_dsa_query_decoder_association(
         lp2_owner_hlo + "\n" + lp2_tuple_hlo,
@@ -4094,7 +4094,8 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
     assert lp2_exact["local_owner_shape"] == "f32[2048,2048]"
     assert lp2_exact["exact_chunk_width"] == 1024
     assert lp2_exact["exact_chunks_per_local_owner"] == 2
-    assert lp2_exact["tuple4_reduction_fusion_count"] == 42
+    assert lp2_exact["tuple4_reduction_fusion_count"] == 21
+    assert lp2_exact["expected_runtime_tuple4_reduction_count"] == 42
     lp2_collapsed = _validate_dsa_query_decoder_association(
         (lp2_owner_hlo + "\n" + lp2_tuple_hlo).replace(
             '"16384"', '"4096"', 1
@@ -4107,7 +4108,7 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
         exact_association=True,
     )
     assert not lp2_collapsed["passed"]
-    assert "expected=42 observed=41" in lp2_collapsed["violations"][0]
+    assert "expected=21 observed=20" in lp2_collapsed["violations"][0]
     global_owner = _validate_dsa_query_decoder_association(
         reference_dsa_hlo + "\n%global = f32[4096,2048] parameter(0)",
         full_indexer_layers=21,

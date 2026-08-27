@@ -41,6 +41,7 @@ def test_pp16_exact_query_runner_pins_two_local_chunks() -> None:
     assert "local_output_width=2048" in text
     assert "full_indexer_layers=1" in text
     assert '"exact_chunks_per_local_owner"' not in text
-    assert '"expected_dot_general_count": 9' in text
-    assert '"expected_optimization_barrier_count": 3' in text
+    assert '"expected_dot_general_count": 5' in text
+    assert '"expected_optimization_barrier_count": 2' in text
+    assert '"expected_while_loop_count": 1' in text
     assert "elementwise_exact" in text

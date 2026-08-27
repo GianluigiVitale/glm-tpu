@@ -255,6 +255,7 @@ print(json.dumps({
     'dots': stablehlo.count('stablehlo.dot_general'),
     'exact': bool(jnp.array_equal(actual, expected)),
     'all_gathers': stablehlo.count('stablehlo.all_gather'),
+    'while_loops': stablehlo.count('stablehlo.while'),
     'local_owner_aliases': stablehlo.count('tensor<64x8xf32>'),
 }, sort_keys=True))
 '''
@@ -276,8 +277,9 @@ print(json.dumps({
     import json
 
     result = json.loads(completed.stdout.strip().splitlines()[-1])
-    assert result["barriers"] == 3
-    assert result["dots"] == 8
+    assert result["barriers"] == 2
+    assert result["dots"] == 4
     assert result["exact"]
     assert result["all_gathers"] == 0
+    assert result["while_loops"] == 1
     assert result["local_owner_aliases"] >= 4

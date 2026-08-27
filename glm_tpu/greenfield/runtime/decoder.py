@@ -1400,6 +1400,11 @@ def _validate_dsa_query_decoder_association(
         else 0
     )
     expected_tuple4_reduction_fusion_count = (
+        full_indexer_layers
+        if exact_association
+        else 0
+    )
+    expected_runtime_tuple4_reduction_count = (
         full_indexer_layers * exact_chunks_per_local_owner
         if exact_association
         else 0
@@ -1486,6 +1491,9 @@ def _validate_dsa_query_decoder_association(
         "tuple4_reduction_fusion_count": tuple4_reduction_fusion_count,
         "expected_tuple4_reduction_fusion_count": (
             expected_tuple4_reduction_fusion_count
+        ),
+        "expected_runtime_tuple4_reduction_count": (
+            expected_runtime_tuple4_reduction_count
         ),
         "passed": not violations,
         "violations": violations,

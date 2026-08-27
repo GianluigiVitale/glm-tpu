@@ -311,11 +311,13 @@ def main() -> int:
     )
     stablehlo_contract = {
         "dot_general_count": query_stablehlo.count("stablehlo.dot_general"),
-        "expected_dot_general_count": 9,
+        "expected_dot_general_count": 5,
         "optimization_barrier_count": query_stablehlo.count(
             "stablehlo.optimization_barrier"
         ),
-        "expected_optimization_barrier_count": 3,
+        "expected_optimization_barrier_count": 2,
+        "while_loop_count": query_stablehlo.count("stablehlo.while"),
+        "expected_while_loop_count": 1,
         "all_gather_count": query_stablehlo.count("stablehlo.all_gather"),
         "host_callback_count": sum(
             query_stablehlo.lower().count(marker)
@@ -332,6 +334,8 @@ def main() -> int:
         == stablehlo_contract["expected_dot_general_count"]
         and stablehlo_contract["optimization_barrier_count"]
         == stablehlo_contract["expected_optimization_barrier_count"]
+        and stablehlo_contract["while_loop_count"]
+        == stablehlo_contract["expected_while_loop_count"]
         and stablehlo_contract["all_gather_count"] == 0
         and stablehlo_contract["host_callback_count"] == 0
     )
@@ -398,6 +402,7 @@ def main() -> int:
             "query_head": query_record,
         },
         "iterations": args.iterations,
+        "query_chunk_runtime_iterations": 2,
         "physical_group": {
             "coordinates": coordinates,
             "device_ids": [device.id for device in devices],
