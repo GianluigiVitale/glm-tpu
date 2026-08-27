@@ -57,6 +57,49 @@ def _memory_stats(device: Any) -> dict[str, int] | None:
     }
 
 
+def _validate_sampling_contract(
+    *, geometry: str, diagnostic_reference_timing: bool, warmup: int, iterations: int
+) -> None:
+    if diagnostic_reference_timing:
+        if geometry != "pp16_lp2_2k":
+            raise ValueError(
+                "reference timing is admitted only for the PP16 LP2 2K diagnostic"
+            )
+        if warmup < 1 or iterations < 3:
+            raise ValueError("reference diagnostic requires warmup>=1 and iterations>=3")
+        return
+    if geometry != "pp8_lp4_256k":
+        raise ValueError("PP16 LP2 2K is diagnostic-only")
+    if warmup < 200 or iterations < 1000:
+        raise ValueError("protected sparse MLA proof requires 200/1000 samples")
+
+
+def _reference_hlo_contract(hlo: str) -> dict[str, Any]:
+    qk_count = sum(
+        " convolution(" in line and "rhd,rkd->rhk/dot_general" in line
+        for line in hlo.splitlines()
+    )
+    pv_count = sum(
+        " convolution(" in line and "rhk,rkd->rhd/dot_general" in line
+        for line in hlo.splitlines()
+    )
+    selected_overlay = "bf16[2048,640]" in hlo
+    violations = []
+    if qk_count != 2:
+        violations.append(f"reference qk convolution count is {qk_count}, expected 2")
+    if pv_count != 1:
+        violations.append(f"reference pv convolution count is {pv_count}, expected 1")
+    if not selected_overlay:
+        violations.append("reference selected-KV overlay is absent")
+    return {
+        "qk_convolution_count": qk_count,
+        "pv_convolution_count": pv_count,
+        "selected_kv_overlay": selected_overlay,
+        "violations": violations,
+        "passed": not violations,
+    }
+
+
 def _owner_positions(
     owner: int,
     count: int,
@@ -117,6 +160,53 @@ def _selection_cases(valid_length: int) -> dict[str, dict[str, Any]]:
             "positions": concentrated_live[None, :],
             "valid_count": np.asarray([2048], dtype=np.int32),
             "owner": np.asarray(3, dtype=np.int32),
+            "expected_owner_rows": 0,
+        },
+    }
+
+
+def _selection_cases_lp2_2k(valid_length: int) -> dict[str, dict[str, Any]]:
+    if valid_length != 2035:
+        raise ValueError("PP16 LP2 diagnostic requires exactly 2,035 live positions")
+    rng = np.random.default_rng(70_216)
+    live = np.arange(valid_length, dtype=np.int32)
+    balanced_live = live[rng.permutation(live.size)]
+    balanced = np.full((2048,), -1, dtype=np.int32)
+    balanced[: balanced_live.size] = balanced_live
+    owner0_live = live[((live % 512) // 256) == 0]
+    owner0_live = owner0_live[rng.permutation(owner0_live.size)]
+    concentrated = np.full((2048,), -1, dtype=np.int32)
+    concentrated[: owner0_live.size] = owner0_live
+    tail_live = balanced_live[:-11]
+    tail = np.full((2048,), -1, dtype=np.int32)
+    tail[: tail_live.size] = tail_live
+    return {
+        "balanced_owner0": {
+            "positions": balanced[None, :],
+            "valid_count": np.asarray([balanced_live.size], dtype=np.int32),
+            "owner": np.asarray(0, dtype=np.int32),
+            "expected_owner_rows": int(
+                np.count_nonzero(((balanced_live % 512) // 256) == 0)
+            ),
+        },
+        "concentrated_owner0": {
+            "positions": concentrated[None, :],
+            "valid_count": np.asarray([owner0_live.size], dtype=np.int32),
+            "owner": np.asarray(0, dtype=np.int32),
+            "expected_owner_rows": int(owner0_live.size),
+        },
+        "tail2037_owner1": {
+            "positions": tail[None, :],
+            "valid_count": np.asarray([tail_live.size], dtype=np.int32),
+            "owner": np.asarray(1, dtype=np.int32),
+            "expected_owner_rows": int(
+                np.count_nonzero(((tail_live % 512) // 256) == 1)
+            ),
+        },
+        "empty_owner1": {
+            "positions": concentrated[None, :],
+            "valid_count": np.asarray([owner0_live.size], dtype=np.int32),
+            "owner": np.asarray(1, dtype=np.int32),
             "expected_owner_rows": 0,
         },
     }
@@ -196,8 +286,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--hlo-output", type=Path, required=True)
+    parser.add_argument(
+        "--geometry",
+        choices=("pp8_lp4_256k", "pp16_lp2_2k"),
+        default="pp8_lp4_256k",
+    )
     parser.add_argument("--warmup", type=int, default=200)
     parser.add_argument("--iterations", type=int, default=1000)
+    parser.add_argument("--diagnostic-reference-timing", action="store_true")
     return parser.parse_args()
 
 
@@ -210,8 +306,12 @@ def main() -> int:
         raise RuntimeError(
             f"stale code hash: expected={args.expected_code_hash} found={code_hash}"
         )
-    if args.warmup < 200 or args.iterations < 1000:
-        raise ValueError("protected sparse MLA proof requires 200/1000 samples")
+    _validate_sampling_contract(
+        geometry=args.geometry,
+        diagnostic_reference_timing=args.diagnostic_reference_timing,
+        warmup=args.warmup,
+        iterations=args.iterations,
+    )
 
     import jax
     import jax.numpy as jnp
@@ -243,17 +343,26 @@ def main() -> int:
         )
     device = jax.local_devices()[0]
     contract = MlaNumericalContract()
-    layout = StageLocalKvLayout()
+    local_parallel_size = 2 if args.geometry == "pp16_lp2_2k" else 4
+    layout = StageLocalKvLayout(local_parallel_size=local_parallel_size)
     config = SparseMlaConfig(segment_block=128)
-    pages = 512
-    valid_length = pages * layout.logical_page_size - 37
+    pages = 4 if args.geometry == "pp16_lp2_2k" else 512
+    valid_length = (
+        2035
+        if args.geometry == "pp16_lp2_2k"
+        else pages * layout.logical_page_size - 37
+    )
 
-    rows = np.arange(pages * 128, dtype=np.float32)[:, None]
+    rows = np.arange(
+        pages * layout.local_rows_per_page, dtype=np.float32
+    )[:, None]
     columns = np.arange(contract.packed_cache_width, dtype=np.float32)[None, :]
     cache_host = (
         np.sin(rows * np.float32(0.00137) + columns * np.float32(0.00311))
         * np.cos(rows * np.float32(0.00029) - columns * np.float32(0.00173))
-    ).astype(ml_dtypes.bfloat16).reshape(pages, 128, 640)
+    ).astype(ml_dtypes.bfloat16).reshape(
+        pages, layout.local_rows_per_page, 640
+    )
     query_nope_host = np.sin(
         np.arange(64 * 512, dtype=np.float32) * np.float32(0.00713)
     ).astype(ml_dtypes.bfloat16).reshape(1, 64, 512)
@@ -316,7 +425,11 @@ def main() -> int:
         )
         return sparse_mla_attention(q_nope, q_rope, segment, contract=contract)
 
-    host_cases = _selection_cases(valid_length)
+    host_cases = (
+        _selection_cases_lp2_2k(valid_length)
+        if args.geometry == "pp16_lp2_2k"
+        else _selection_cases(valid_length)
+    )
     device_cases: dict[str, tuple[Any, ...]] = {}
     for name, case in host_cases.items():
         device_cases[name] = (
@@ -346,6 +459,27 @@ def main() -> int:
     reference_compile_started = time.monotonic()
     compiled_reference = jax.jit(reference_fn).lower(*compile_inputs).compile()
     reference_compile_seconds = time.monotonic() - reference_compile_started
+    reference_hlo = compiled_reference.as_text()
+    reference_hlo_path = args.hlo_output.with_name(
+        args.hlo_output.name.replace(
+            ".optimized_hlo.txt", ".reference.optimized_hlo.txt"
+        )
+    )
+    if reference_hlo_path == args.hlo_output:
+        raise ValueError("diagnostic HLO output lacks the expected suffix")
+    reference_hlo_record = None
+    if args.diagnostic_reference_timing:
+        reference_hlo_path.write_text(reference_hlo)
+        reference_contract = _reference_hlo_contract(reference_hlo)
+        if not reference_contract["passed"]:
+            raise RuntimeError(
+                f"reference sparse-attention HLO contract failed: {reference_contract}"
+            )
+        reference_hlo_record = {
+            "path": str(reference_hlo_path),
+            "sha256": sha256(reference_hlo.encode()).hexdigest(),
+            "contract": reference_contract,
+        }
 
     comparisons: dict[str, dict[str, Any]] = {}
     for name, inputs in device_cases.items():
@@ -395,7 +529,9 @@ def main() -> int:
         )
 
     latency: dict[str, dict[str, float | int]] = {}
+    reference_latency: dict[str, dict[str, float | int]] = {}
     checksums: dict[str, float] = {}
+    reference_checksums: dict[str, float] = {}
     for name in ("balanced_owner0", "concentrated_owner0"):
         latency[name], checksums[name] = _time_compiled(
             compiled,
@@ -403,6 +539,13 @@ def main() -> int:
             warmup=args.warmup,
             iterations=args.iterations,
         )
+        if args.diagnostic_reference_timing:
+            reference_latency[name], reference_checksums[name] = _time_compiled(
+                compiled_reference,
+                device_cases[name],
+                warmup=args.warmup,
+                iterations=args.iterations,
+            )
 
     record = {
         "status": "SUCCESS",
@@ -411,13 +554,15 @@ def main() -> int:
         "device": str(device),
         "device_kind": device.device_kind,
         "kernel": "fused_selected_kv_sparse_mla",
+        "geometry": args.geometry,
         "shape": {
             "query_nope": [1, 64, 512],
             "query_rope": [1, 64, 64],
-            "local_cache": [512, 128, 640],
+            "local_cache": [pages, layout.local_rows_per_page, 640],
             "selected_positions": [1, 2048],
-            "global_context_capacity": 262_144,
+            "global_context_capacity": pages * layout.logical_page_size,
             "valid_length": valid_length,
+            "local_parallel_size": local_parallel_size,
             "segment_block": 128,
         },
         "dtype_contract": {
@@ -447,6 +592,7 @@ def main() -> int:
             "sha256": sha256(hlo.encode()).hexdigest(),
             "contract": hlo_contract,
         },
+        "reference_hlo": reference_hlo_record,
         "comparison": {
             "cases": comparisons,
             "invalid_page_safety": invalid_page_safety,
@@ -456,9 +602,13 @@ def main() -> int:
             ),
         },
         "profiler_free_timing": True,
+        "diagnostic_only": args.diagnostic_reference_timing,
+        "performance_claim": False,
         "warmup": args.warmup,
         "iterations": args.iterations,
         "latency": latency,
+        "reference_latency": reference_latency or None,
+        "reference_checksum": reference_checksums or None,
         "checksum": checksums,
         "memory_stats": _memory_stats(device),
     }

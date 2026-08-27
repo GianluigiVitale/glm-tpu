@@ -7,12 +7,16 @@ readonly ZONE=us-central2-b
 readonly BRANCH=rewrite/topology-first-decode
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
+readonly APPROVED_LOCATION=US-CENTRAL2
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 TAG=${GLM_GREENFIELD_SPARSE_ATTN_TAG:-greenfield_sparse_attention_$(date -u +%Y%m%dT%H%M%S%NZ)}
 WARMUP=${GLM_GREENFIELD_SPARSE_ATTN_WARMUP:-200}
 ITERATIONS=${GLM_GREENFIELD_SPARSE_ATTN_ITERATIONS:-1000}
+GEOMETRY=${GLM_GREENFIELD_SPARSE_ATTN_GEOMETRY:-pp8_lp4_256k}
+DIAGNOSTIC_REFERENCE=${GLM_GREENFIELD_SPARSE_ATTN_DIAGNOSTIC_REFERENCE:-0}
+[[ $GEOMETRY == pp8_lp4_256k ]] || TAG=${GLM_GREENFIELD_SPARSE_ATTN_TAG:-greenfield_sparse_attention_${GEOMETRY}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -24,14 +28,16 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "refusing sparse-attention run from a dirty worktree" >&2
   exit 2
 }
-[[ $WARMUP =~ ^[0-9]+$ && $WARMUP -ge 200 ]] || {
-  echo "protected sparse-attention run requires warmup>=200" >&2
-  exit 2
-}
-[[ $ITERATIONS =~ ^[0-9]+$ && $ITERATIONS -ge 1000 ]] || {
-  echo "protected sparse-attention run requires iterations>=1000" >&2
-  exit 2
-}
+[[ $GEOMETRY == pp8_lp4_256k || $GEOMETRY == pp16_lp2_2k ]] || exit 2
+if [[ $DIAGNOSTIC_REFERENCE == 1 ]]; then
+  [[ $GEOMETRY == pp16_lp2_2k ]] || exit 2
+  [[ $WARMUP =~ ^[0-9]+$ && $WARMUP -ge 1 ]] || exit 2
+  [[ $ITERATIONS =~ ^[0-9]+$ && $ITERATIONS -ge 3 ]] || exit 2
+else
+  [[ $DIAGNOSTIC_REFERENCE == 0 && $GEOMETRY == pp8_lp4_256k ]] || exit 2
+  [[ $WARMUP =~ ^[0-9]+$ && $WARMUP -ge 200 ]] || exit 2
+  [[ $ITERATIONS =~ ^[0-9]+$ && $ITERATIONS -ge 1000 ]] || exit 2
+fi
 [[ -r $RESULTS_DB && ! -e $RUN_DIR ]] || {
   echo "results DB missing or append-only run path already exists" >&2
   exit 2
@@ -47,6 +53,10 @@ flock -n 9 || {
   say "ABORT: another protected pod workflow holds the global lease"
   exit 1
 }
+exec 8>/home/gianl/.glm-tpu-rsync.lock
+flock 8
+[[ $(gcloud storage buckets describe "$APPROVED_BUCKET" \
+  --format='value(location)') == "$APPROVED_LOCATION" ]]
 
 has_eight_unique_markers() {
   local file=$1 marker=$2
@@ -83,28 +93,36 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN warmup=$WARMUP iterations=$ITERATIONS"
+say "RUN_DIR=$RUN_DIR PIN=$PIN geometry=$GEOMETRY warmup=$WARMUP iterations=$ITERATIONS diagnostic_reference=$DIAGNOSTIC_REFERENCE"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
   exit 1
 }
 
-say "compiling and timing fused 256K/LP4 selected-KV sparse MLA"
+say "compiling and timing fused $GEOMETRY selected-KV sparse MLA"
 started=$(date +%s)
 (
   cd "$WORKTREE"
-  JAX_PLATFORMS=tpu \
-    TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
-    TPU_PROCESS_BOUNDS=1,1,1 \
-    TPU_VISIBLE_DEVICES=0,1,2,3 \
-    PYTHONPATH="$WORKTREE" \
-    /home/gianl/vllm-env/bin/python \
-      scripts/greenfield/microbench_sparse_attention.py \
-      --expected-code-hash "$PIN" \
-      --output "$RUN_DIR/runner.json" \
-      --hlo-output "$RUN_DIR/hlo/sparse_attention.optimized_hlo.txt" \
-      --warmup "$WARMUP" \
+  RUNNER=(
+      /home/gianl/vllm-env/bin/python
+      scripts/greenfield/microbench_sparse_attention.py
+      --expected-code-hash "$PIN"
+      --output "$RUN_DIR/runner.json"
+      --hlo-output "$RUN_DIR/hlo/sparse_attention.optimized_hlo.txt"
+      --geometry "$GEOMETRY"
+      --warmup "$WARMUP"
       --iterations "$ITERATIONS"
+    )
+    if [[ $DIAGNOSTIC_REFERENCE == 1 ]]; then
+      RUNNER+=(--diagnostic-reference-timing)
+    fi
+    env \
+      JAX_PLATFORMS=tpu \
+      TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
+      TPU_PROCESS_BOUNDS=1,1,1 \
+      TPU_VISIBLE_DEVICES=0,1,2,3 \
+      PYTHONPATH="$WORKTREE" \
+      "${RUNNER[@]}"
 ) >"$RUN_DIR/runner.log" 2>&1
 elapsed=$(( $(date +%s) - started ))
 say "runner completed in ${elapsed}s"
@@ -129,6 +147,15 @@ if not runner["comparison"]["passed"]:
     raise SystemExit("fused sparse-attention correctness failed")
 if not runner["profiler_free_timing"]:
     raise SystemExit("sparse-attention wall distributions are not profiler-free")
+diagnostic_reference = runner.get("reference_latency")
+if bool(diagnostic_reference) != runner.get("diagnostic_only"):
+    raise SystemExit("sparse-attention diagnostic identity drifted")
+if diagnostic_reference is not None:
+    if (
+        runner.get("geometry") != "pp16_lp2_2k"
+        or not runner.get("reference_hlo", {}).get("contract", {}).get("passed")
+    ):
+        raise SystemExit("sparse-attention reference diagnostic HLO failed")
 
 sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
@@ -136,19 +163,24 @@ import provenance as pv
 conn = pv.connect(db_path)
 run_id = pv.start_run(
     conn,
-    model="zai-org/GLM-5.2-FP8:greenfield-sparse-attention-kernel",
+    model=(
+        "zai-org/GLM-5.2-FP8:greenfield-sparse-attention-kernel:"
+        + runner["geometry"]
+    ),
     revision="native-jax-pallas-v1",
     env={
         "GLM_ENGINE": "greenfield_sparse_attention",
         "greenfield_code_hash": pin,
         "hlo_sha256": runner["hlo"]["sha256"],
         "device_kind": runner["device_kind"],
+        "geometry": runner["geometry"],
+        "diagnostic_only": runner["diagnostic_only"],
     },
     note="Protected production-shaped fused selected-KV/sparse-MLA microbenchmark.",
     harness_repo=repo,
     fork_repo=None,
 )
-for item_id, prompt in (
+for base_item_id, prompt in (
     (
         "balanced_owner512",
         "One owner consumes 512 of 2,048 uniformly distributed selected rows.",
@@ -158,6 +190,7 @@ for item_id, prompt in (
         "Worst-case one owner consumes all 2,048 selected rows.",
     ),
 ):
+    item_id = runner["geometry"] + "_" + base_item_id
     pv.record_item(
         conn,
         run_id,
@@ -170,7 +203,9 @@ for item_id, prompt in (
         correct=True,
         score=1.0,
         latency_ms=runner["latency"][
-            "balanced_owner0" if item_id == "balanced_owner512" else "concentrated_owner0"
+            "balanced_owner0"
+            if base_item_id == "balanced_owner512"
+            else "concentrated_owner0"
         ]["p50_ms"],
     )
 pv.finalize(
@@ -189,7 +224,12 @@ summary = {
     "elapsed_seconds": int(elapsed),
     "results_db_run_id": run_id,
     "runner": runner,
-    "claim_scope": "standalone fused local-owner sparse MLA; no token-rate claim",
+    "claim_scope": (
+        "diagnostic standalone reference/Pallas comparison; no performance, "
+        "Gate-D or token-rate claim"
+        if runner["diagnostic_only"]
+        else "standalone fused local-owner sparse MLA; no token-rate claim"
+    ),
 }
 (run_dir / "summary.json").write_text(
     json.dumps(summary, indent=2, sort_keys=True) + "\n"
