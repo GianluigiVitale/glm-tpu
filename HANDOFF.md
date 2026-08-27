@@ -2,6 +2,31 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 PP16 exact-query full graph is sealed; 431.8 ms remains
+
+- Source tag `greenfield_short_decoder_compile_pp16_acquisition_20260827T172903119545622Z`
+  at workload pin `236f8b2` passes the complete 78-layer PP16 HLO, token-mechanism, metadata and
+  32-chip HBM contracts with the exact final runtime manifest `b385458f...6bab`. The materialized
+  query contract finds all 21 expected device-loop bodies and all 42 runtime tuple4 reductions;
+  there is no global WQ_B owner, host callback or full-pod hidden reconstruction.
+- One warmup plus one diagnostic execution completes fleet-wide at a maximum `431.834093 ms`,
+  down from `1,621.379175 ms` after removing the repeated WQ_B overlays. Compile/load maxima are
+  `171.894865/726.917752 s`; peak HBM is `27,316,557,824` bytes/chip with a minimum
+  `5,577,835,008`-byte largest free block. Optimized/StableHLO SHAs are `afb5bd38...f01` /
+  `00a109c9...a7d` and collectives remain 219 AG / 301 AR / 33 CP in exact LP2 groups.
+- The outer failure was only the old three-HLO sealing shape. Pushed recovery support `b685de3`
+  accepts the exact five-file acquisition and direct preterminal layout. Metadata-only recovery
+  `greenfield_short_decoder_compile_pp16_recovery_20260827T182414068120633Z` pins all 28 source
+  generations/CRCs/SHAs and publishes 34 objects / 12,904,347 bytes in `US-CENTRAL2`. Ledger SHA
+  is `314d5448...2633`; SUCCESS self SHA is `4227b542...090b`. All local evidence and remote
+  identities replay, the fresh census is 8/8 clean, and recovery imported no JAX, initialized no
+  TPU, loaded no weights and reran no model work.
+- This is diagnostic-only: synthetic state, one sample, no oracle/DSA comparison/XPlane/DB row,
+  and `performance/numerical/Gate-D=false`. Gate D remains open and 431.8 ms still fails the
+  200-ms useful gate. Exact next is offline HLO/custom-call attribution of the remaining step,
+  followed only by the smallest real-shape discriminator for its largest term; do not launch
+  numerical 2K/8K unchanged.
+
 ## 2026-08-27 PP16 exact query is bitwise restored at LP2 geometry
 
 - Protected DB561 / tag

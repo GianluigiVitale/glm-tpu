@@ -5,6 +5,36 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 17:29--18:24 UTC — exact-query PP16 full graph falls to 431.8 ms and is recovered
+
+Pushed workload pin `236f8b2` completed protected source tag
+`greenfield_short_decoder_compile_pp16_acquisition_20260827T172903119545622Z` on all eight hosts.
+The final direct runtime manifest is `b385458f...6bab`. The 78-layer HLO passes all existing
+locality/one-row checks plus the new exact-query contract: 21 materializer loop bodies and 42
+runtime tuple4 reductions, with no global WQ_B, host callback or full-pod hidden reconstruction.
+All records have exact replacement-pod launcher/JAX mapping, token mechanism and metadata.
+
+One warmup and one diagnostic sample reach a fleet maximum `431.834093 ms`, versus the previous
+`1,621.379175 ms`. Compile/load maxima are `171.894865/726.917752 s`; peak HBM is
+`27,316,557,824` bytes/chip and minimum largest-free-block is `5,577,835,008` bytes. The optimized/
+StableHLO SHAs are `afb5bd38...f01` / `00a109c9...a7d`; physical collectives remain 219 AG, 301 AR
+and 33 CP over exact LP2 groups. This validates the full-graph acquisition mechanism but is still
+above the 200-ms useful gate.
+
+The only outer failure was a stale three-HLO recovery/sealer shape. Pushed pin `b685de3` accepts
+the exact five-HLO set and prefers the directly published preterminal objects. Its focused suite
+passes 11/11. Metadata-only recovery tag
+`greenfield_short_decoder_compile_pp16_recovery_20260827T182414068120633Z`, at recovery pin
+`af991bf`, authenticates 28 source objects and terminal-seals 34 objects / 12,904,347 bytes in
+`US-CENTRAL2`. Ledger/SUCCESS self SHAs are `314d5448...2633` / `4227b542...090b`; every local
+evidence hash and remote generation/CRC/size replays. The fresh census is 8/8 zero work, both
+leases released, and recovery imported no JAX, initialized no TPU, loaded no weights and reran no
+model work.
+
+No numerical, performance, Gate-D, XPlane or DB claim is made. Gate D remains open. Do not repeat
+the complete graph or launch numerical 2K/8K unchanged; attribute the preserved HLO/custom calls
+offline, then run only the smallest real-shape discriminator for the largest remaining term.
+
 ## 2026-08-27 16:04--16:11 UTC — DB561 restores exact PP16 LP2 query in 0.448 ms
 
 The first bounded tag `greenfield_pp16_lp2_exact_query_20260827T160411795048512Z` at `67fb5d3`
