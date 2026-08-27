@@ -5,13 +5,13 @@
 ## 2026-08-27 upstream PR 1 kernel foundation is privately ready
 
 - Private TPU Inference branch `pr/glm-dsa-kernels-v3` is clean and pushed only to the user's fork
-  at `53b78b9519352b1bc64a115dee7190e35dad9d00` (base `5e2c7128...a3cb`). Official upstream is
-  untouched. Commits `78d7ee30` and `53b78b95` add current FP8+FP32-scale exact StreamIndex and a
+  at `d3ccafdfe5157dda4c26b779dc50eb505edfa96b` (base `5e2c7128...a3cb`). Official upstream is
+  untouched. Three commits add exact current FP8+FP32-scale cache pack/insertion, StreamIndex and a
   paged one-row sparse MLA consumer while preserving legacy defaults.
-- Exact-head real-v4 verification passes 15/15 with authenticated pre/post 8/8 fleet cleanup. The
-  complete 256K scorer -> exact K=2048 -> paged gather -> sparse-MLA chain measures p50/p99
-  `3.2935/3.3160 ms` over five warmups and 20 synchronized profiler-free samples. This is kernel
-  evidence, not an end-to-end serving claim.
+- Exact-head real-v4 verification passes 36/36 with authenticated pre/post 8/8 fleet cleanup. The
+  full 256K writer -> scorer -> exact K=2048 -> paged gather -> sparse-MLA step measures p50/p99
+  `3.5575/3.6684 ms` over five warmups and 20 synchronized profiler-free samples. This is kernel
+  evidence, not an end-to-end serving claim. StableHLO has one flat cache scatter and no loop.
 - Compact evidence and a ready maintainer-facing title/body are in
   `docs/upstream/glm-dsa-pr1-kernels.md`. Exact next is PR 2: a thin TorchAX/vLLM bridge that uses
   vLLM-owned metadata/IndexShare and consumes the selected positions; do not add registration or CI
