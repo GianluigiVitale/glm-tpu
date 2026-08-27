@@ -21,6 +21,10 @@ by 128 are padded before the bounds-check-free kernel and sliced back to their l
 Scope is deliberately limited to the scorer. Exact top-k/distributed merge and the Torchax
 `SparseAttnIndexer` bridge will be separate follow-ups.
 
+The new code is isolated under `kernels/experimental/glm`, has no caller, and changes no existing
+runtime behavior. This is intentionally a kernel-first slice: it can be reviewed and validated
+independently while preserving the repository's Torchax-first model path.
+
 Related: #1699, #2324.
 
 ## Tests
@@ -28,7 +32,8 @@ Related: #1699, #2324.
 - `pre-commit run --files <the five changed files>`
 - `python -m pytest -q tests/kernels/glm/test_indexer_score.py`
   - CPU/Pallas interpreter: 5 passed; real-TPU test skips off TPU.
-  - Changed-kernel CI executes the real kernel on TPU v6e and v7x.
+  - Changed-kernel CI executes the real kernel on TPU v6e and v7x; exact job results will be added
+    here before requesting review because those jobs are soft-fail.
 - TPU v4 production-local shape (`[1,32,128] x [65536,128]`):
   - exact top-2048 positions against the readable FP32 reference;
   - max/mean score error `2.861e-6 / 2.417e-7`;

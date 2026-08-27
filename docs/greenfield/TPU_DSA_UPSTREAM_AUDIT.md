@@ -15,22 +15,47 @@ Status on 2026-08-27: **prepared for owner review; not submitted upstream**.
 - DeepSeek V4 is a process lesson only. The diff contains no DeepSeek code, import, cache format,
   or execution path; the scorer is adapted from the protected GLM greenfield kernel.
 
-## Why this slice is reviewable
+## Maintainer acceptance audit
 
 `CONTRIBUTING.md` prefers Torchax model enablement first and requires unit/CI tests. This PR does
 not propose the independent greenfield engine for upstream. It contributes one reusable Pallas
 primitive that a later Torchax `SparseAttnIndexer` override can call.
 
-Relevant maintainer precedent:
+Official repository rules and routing:
+
+- The PR template asks for a short delta, rationale, implementation details, shortcomings,
+  reproducible tests, self-review, comments, and documentation consideration.
+- The `ready` label is a merge-blocking check. Do not apply/request it until the owner audit is
+  complete and the branch is current.
+- DCO sign-off is enforced. The audit commit is signed off.
+- Kernel and kernel-test changes trigger the full kernel suite on both v6e and v7x. Those jobs are
+  `soft_fail`, so their actual results must be inspected and reported rather than treating the
+  overall green check as sufficient.
+- Kernel CODEOWNERS are `@kyuyeunk`, `@bythew3i`, `@a1yssan13`, and `@jrplatin`.
+
+Observed maintainer behavior:
 
 - GLM PR [#2324](https://github.com/vllm-project/tpu-inference/pull/2324) remains open, disables the
   unported DSA forward, and was explicitly declined by one reviewer at 33 files / 4,400 additions.
 - Tuning PR [#3200](https://github.com/vllm-project/tpu-inference/pull/3200) was deferred because the
-  change was considered too large for a path being replaced.
-- Kernel-only PR [#3295](https://github.com/vllm-project/tpu-inference/pull/3295) merged without its
-  caller, establishing that a tested standalone kernel is acceptable.
-- Current changed-kernel CI automatically schedules the kernel suite on TPU v6e and v7x. The diff
-  includes a real non-interpreter TPU execution test, not only CPU interpretation.
+  change was considered too large and the path was being replaced. Reviewability and architectural
+  currency matter more than raw line count.
+- External-contributor PR [#1729](https://github.com/vllm-project/tpu-inference/pull/1729) merged as
+  a contained five-file model slice after focused review, MMLU evidence, a rebase, and an explicit
+  decision to leave MLA to a follow-up.
+- External-contributor kernel PRs [#3349](https://github.com/vllm-project/tpu-inference/pull/3349)
+  and [#3411](https://github.com/vllm-project/tpu-inference/pull/3411) were two-file changes and each
+  received kernel-owner approval. The first was later reverted after a nightly regression, then
+  re-landed, underscoring the need for production-shape coverage rather than only a toy test.
+- Experimental kernel PR [#3040](https://github.com/vllm-project/tpu-inference/pull/3040) merged
+  before final model integration. Reviewers asked for E2E comparison, but accepted a tested,
+  encapsulated kernel as a starting point with follow-up optimization.
+- On [#3250](https://github.com/vllm-project/tpu-inference/pull/3250), a kernel owner explicitly
+  approved because the code was isolated under `experimental` and could not affect other workloads.
+
+The merge-maximizing shape is therefore exactly one isolated experimental primitive, no existing
+runtime behavior change, executable hardware coverage, production-shape correctness evidence, and
+an honest scorer-only title. Selection and Torchax integration should be separate PRs.
 
 ## Evidence
 
@@ -47,8 +72,8 @@ Relevant maintainer precedent:
 
 ## Likely rejection points and mitigation
 
-1. **“Not integrated.”** State this is scorer-only; #3295 is the kernel-only precedent. Promise
-   exact selection and Torchax bridge as separate PRs, not hidden scope.
+1. **“Not integrated.”** State this is scorer-only; #3040 is the stronger kernel-before-integration
+   precedent. Promise exact selection and Torchax bridge as separate PRs, not hidden scope.
 2. **“Only tested on v4.”** Do not claim v6e/v7x performance. The PR's real hardware test compiles
    and executes in both current CI pipelines; wait for those results before requesting review.
 3. **“This is not full DSA.”** Title it “GLM DSA indexer scorer,” never full model/DSA support.
@@ -60,6 +85,19 @@ Relevant maintainer precedent:
    limitation later; it does not absorb that PR's loader/MoE/multihost changes.
 7. **“Current-generation compatibility.”** Local CPU used repository JAX 0.11; live v4 used 0.10.1.
    The upstream v6e/v7x hardware test is the authority for JAX 0.11 TPU lowering.
+8. **“Why merge before full model support?”** It is default-inert experimental code with no caller,
+   so it cannot regress existing workloads. It also directly removes one bounded blocker from the
+   already-open GLM effort without importing that PR's loader or execution architecture.
+
+## Submission sequence after owner approval
+
+1. Rebase onto the then-current `upstream/main`; rerun hooks and the focused CPU suite.
+2. Force-update only the owner's fork branch, open as a draft, and link #1699/#2324.
+3. Let both changed-kernel jobs execute on v6e and v7x; inspect the individual jobs despite
+   `soft_fail`, and add exact results to the PR body.
+4. Fix any current-generation lowering issue in this PR only. Do not add selector/model scope.
+5. Request kernel CODEOWNER review, then apply/request `ready` only when all evidence is visible.
+6. Respond quickly and split any requested follow-up instead of growing the first PR.
 
 ## Owner audit checklist
 
