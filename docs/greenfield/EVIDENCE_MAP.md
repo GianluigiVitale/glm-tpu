@@ -83,6 +83,19 @@ objects and direct verifier replay passes. Pushed production pins `7191206` / `1
 this as a default-off typed overlay and require exactly three feature-4 plus three expert-8 dense
 gathers. This is checkpoint/composition evidence; full-decoder HLO and numerical proof are pending.
 
+The complete production composition now has protected compile-only HLO evidence. Tag
+`greenfield_ws32_short_decoder_8k_acquire_20260827T003758068665390Z` at `39e0ab8` loaded the full
+checkpoint plus overlay on all eight hosts and produced six fleet-identical graph pairs. Exact
+materialize/promote/prefill/observer/decode/cache-probe StableHLO pins are respectively
+`1d925d96...f36e`, `e38eb7a4...ffff`, `9ef02642...b820`, `4e2496d9...89bf`,
+`e23a9e77...2429`, and `664c331a...b14`; optimized pins are `09d22ef7...4d77`,
+`ffc4a502...1dcb`, `68820860...891a`, `d6badd91...233d`, `8f964f9e...ce6`, and
+`6ead75f3...b5a`. The three model graphs each contain exactly three feature-4 plus three expert-8
+gathers, with no forbidden full-hidden values or group above eight; cache probe contains none.
+Peak compiled HBM is 26,375,554,560 bytes/chip with at least 6,646,212,608 bytes largest-free-block
+margin. This is HLO/HBM/cleanup evidence only: no arithmetic, DB, terminal SUCCESS or performance
+claim exists. It authorizes one separately pinned numerical run.
+
 Bounded checkpoint tag
 `greenfield_ws32_strategy_nd_layer0_pack_20260826T232037240198985Z` at pushed/mirrored code
 `fbaaae3` maps layer-0 dense ranks into 32 exact WS32 expert-8/feature-4 owners. Payload is

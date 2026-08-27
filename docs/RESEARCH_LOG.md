@@ -5,6 +5,27 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 — complete WS32 dense overlay passes fleet HLO acquisition
+
+Compile-only tag `greenfield_ws32_short_decoder_8k_acquire_20260827T003758068665390Z` at pushed
+code `39e0ab8` loaded the sealed full WS32 checkpoint and dense overlay on all eight replacement
+hosts. All six real graphs are identical across ranks. StableHLO/optimized-HLO are materialize
+`1d925d96...f36e` / `09d22ef7...4d77`, promote `e38eb7a4...ffff` / `ffc4a502...1dcb`, prefill
+`9ef02642...b820` / `68820860...891a`, observer `4e2496d9...89bf` / `d6badd91...233d`, decode
+`e23a9e77...2429` / `8f964f9e...ce6`, and cache probe `664c331a...b14` /
+`6ead75f3...b5a`.
+
+Prefill, observer and decode each contain exactly three feature-4 and three expert-8 strategy-dense
+gathers; cache probe contains none. No forbidden full-hidden value exists and the maximum group is
+eight. Maximum compiled peak HBM is 26,375,554,560 bytes/chip and minimum largest free block is
+6,646,212,608 bytes. Summary self/file SHAs are `f3644507...1049` / `52ab37c3...487b`; cleanup is
+8/8. This acquisition executed no arithmetic and created no DB, terminal SUCCESS or performance
+claim. It authorizes only a separately pinned numerical run.
+
+The obsolete `driftbench-storage` read-write GCSFuse mount was unmounted and its boot service
+disabled after verifying it was unused. Its historical repository prefix is only 74,428,911 bytes;
+it was retained, while all active mirrors remain guarded to exact `US-CENTRAL2`.
+
 ## 2026-08-27 — all three exact dense layers have final WS32 owners
 
 The default-off decoder now accepts a distinct `Ws32StrategyNdDenseWeights` tree only under exact

@@ -2,6 +2,25 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 complete WS32 exact-dense HLO acquisition passes
+
+- Compile-only tag
+  `greenfield_ws32_short_decoder_8k_acquire_20260827T003758068665390Z` at pushed code
+  `39e0ab8` loaded the sealed full WS32 checkpoint plus exact dense overlay on all eight replacement
+  hosts and acquired all six real graphs. It executed no model arithmetic, created no DB/SUCCESS
+  or performance claim, and ended with authenticated 8/8 zero-work cleanup.
+- All eight rank reports are identity-equal. StableHLO/optimized-HLO pins are: materialize
+  `1d925d96...f36e` / `09d22ef7...4d77`, promote `e38eb7a4...ffff` / `ffc4a502...1dcb`,
+  prefill `9ef02642...b820` / `68820860...891a`, observer `4e2496d9...89bf` /
+  `d6badd91...233d`, decode `e23a9e77...2429` / `8f964f9e...ce6`, and cache probe
+  `664c331a...b14` / `6ead75f3...b5a`.
+- Prefill/observer/decode each contain exactly three feature-4 and three expert-8 dense gathers;
+  cache probe contains zero. No forbidden full-hidden value appears and no group exceeds eight.
+  Maximum compiled peak HBM is 26,375,554,560 bytes/chip; minimum largest free block is
+  6,646,212,608 bytes. Acquisition summary self SHA is `f3644507...1049` and file SHA is
+  `52ab37c3...487b`. These pins authorize one separately pinned numerical run; they do not close
+  Gate D.
+
 ## 2026-08-27 complete exact-dense WS32 overlay is sealed
 
 - Pushed pins `7191206` / `1c1cb1f` compose the proven dense arithmetic into the
@@ -65,6 +84,10 @@
   and 1,009 topology-worktree objects. `goal.md`, `HANDOFF.md`, the active layer-0 harness and the
   worktree `.git` pointer were directly rehashed from GCS and match local bytes. This mirror is
   continuity protection, not TPU or performance evidence.
+- The leftover read-write `/home/gianl/bucket` GCSFuse mount and its reboot service were also
+  stopped, unmounted and disabled on 2026-08-27. The old EU prefix contains only 74,428,911 bytes
+  (70.98 MiB) of historical repository files and was not deleted; no active process or cron writes
+  that bucket.
 
 ## 2026-08-26 bounded WS32 layer-0 checkpoint is sealed
 
