@@ -6,6 +6,14 @@ but not Gate E. WS32 has the accepted 2K DB553 point at `122.630667 ms/token` / 
 No accepted 8K, 128K, 256K or PP16 full-decoder measurement exists yet. Bounded
 layer/kernel/diagnostic results below are not token-speed proof.
 
+## 2026-08-27 — complete PP16 feature-runtime pack, not performance
+
+`greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z` seals the full 32-file
+feature-Pallas runtime and 869,545,347,072 payload bytes. Its metadata, stage probe and fleet
+transformation times are checkpoint I/O, hashing and layout-conversion time—not model load or token
+latency. No TPU, decoder, HBM, XPlane, token, DSA, DB or throughput result exists. The verified
+manifest only authorizes the complete PP16 short-decoder compile/HLO/HBM acquisition.
+
 ## 2026-08-27 — complete PP16 executable-runtime pack, not performance
 
 `greenfield_runtime_pack_pp16_20260827T091323450875229Z` seals all 32 executable-runtime files and

@@ -2,6 +2,27 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 complete PP16 feature runtime is terminal-sealed
+
+- Tag `greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z` at exact code `a973425`
+  transforms all 16 stages / 32 owners from base runtime `b0f62466...4d2e5` into the production
+  PP16 feature-Pallas layout. Feature manifest SHA is `0f1bb271...52b6f1`; layout/schedule SHAs
+  are `77647844...399c7` / `02b0ae76...c8eac`.
+- All 869,545,347,072 payload bytes, 869,546,107,136 file bytes, 122,448,155,520 padding bytes and
+  6,944 tensor records reconcile. The independent mounted inspector passes every file against the
+  complete base runtime and original packed checkpoint. Attention remains separate q-a/kv-a and
+  dense remains legacy output-major because PP16 deliberately refuses Pallas-linear.
+- Metadata completed in 31 seconds. A real stage-0 discriminator completed before one parallel
+  fleet fanout. The local all-host session ended only after stage 12's payload/evidence had sealed
+  but before worker-6 record fanout; clean census plus metadata-only resume reproduced its exact
+  evidence and performed no payload reread, transform, or overwrite.
+- The exact 115-object `US-CENTRAL2` result archive has ledger SHA `9af3e535...28d3c` and terminal
+  SUCCESS self SHA `a6b36a46...1d7cf`. Pre/probe-post/recovery-pre/final censuses are 8/8 clean.
+  No TPU, HBM, DB, decoder, token, XPlane or performance claim exists.
+- This supersedes both runtime exact-next notes below. Exact next is the smallest complete PP16
+  short-decoder compile/HLO/HBM acquisition using manifest `0f1bb271...52b6f1`. Do not begin 8K
+  numerical execution until every full-graph locality, one-row and memory contract passes.
+
 ## 2026-08-27 complete PP16 base runtime checkpoint is terminal-sealed
 
 - Tag `greenfield_runtime_pack_pp16_20260827T091323450875229Z` at pushed/mirrored code `af0e226`

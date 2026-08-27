@@ -45,6 +45,15 @@ Replacement topology code is `bfe064d`; its fleet hash is `4a0c9a33...c301`. Col
 pins are `fcd8426735...` and `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash remains
 `294e777...559`, PP8 group hash `d5943ab8...c14`, and PP16 group hash `6383e57c...f21`.
 
+Accepted nonperformance feature-runtime tag
+`greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z` at `a973425` contains all 16
+stages / 32 production feature-Pallas owners. Manifest `0f1bb271...52b6f1` binds base runtime
+`b0f62466...4d2e5`, feature layout `77647844...399c7`, 6,944 tensor records and
+869,545,347,072 payload bytes; complete mounted inspection passes. The exact 115-object archive has
+ledger/SUCCESS self SHAs `9af3e535...28d3c` / `a6b36a46...1d7cf` and four clean fleet censuses.
+One metadata-only recovery copied worker-6 records after its payload had already sealed; no payload
+reran. This is the complete input for PP16 decoder compile, not DB, HBM, correctness or performance.
+
 Accepted nonperformance runtime checkpoint tag
 `greenfield_runtime_pack_pp16_20260827T091323450875229Z` at `af0e226` contains all 16 stages / 32
 executable owners. Runtime manifest `b0f62466...4d2e5` binds layout `2ad20708...3d59b`, schedule

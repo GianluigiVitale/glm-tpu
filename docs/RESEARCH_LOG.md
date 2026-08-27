@@ -5,6 +5,31 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 — complete PP16 feature runtime is sealed after bounded-first fanout
+
+Tag `greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z` at exact code `a973425`
+derives the complete production feature-Pallas runtime from base manifest `b0f62466...4d2e5`.
+Metadata-only preparation finished in 31 seconds. One real stage-0 transform then sealed both
+27,173,315,848-byte files before authorization of the eight-host fanout. Each host processed its
+two explicit topology-owned stages sequentially; all 16 stages / 32 files completed once.
+
+Feature manifest `0f1bb271...52b6f1` binds layout `77647844...399c7`, schedule
+`02b0ae76...c8eac`, feature plan `cefab5e7...d172`, source base manifest `b0f62466...4d2e5`, 6,944
+runtime tensor records, 869,545,347,072 payload bytes and 122,448,155,520 explicit padding bytes.
+The independent mounted inspector returned `verified=true` for every owner. This derivative uses
+`expert_intermediate_feature_lp2_pallas_kn_v1`; q-a/kv-a and dense projections deliberately remain
+separate/legacy because the complete PP16 backend refuses Pallas-linear.
+
+The local all-host SSH session ended after stage 12 had already sealed both payloads, per-tensor
+evidence, CRC/generations and summary, but before worker-6's compact result upload and markers. An
+authenticated 8/8 census preceded a metadata-only resume; it reproduced the exact original stage
+12 evidence byte-for-byte and performed no payload reread, transform or overwrite. The terminal
+result set has 115 objects, ledger SHA `9af3e535...28d3c` and SUCCESS self SHA
+`a6b36a46...1d7cf`, written last in `driftbench-dsv4-uc` (`US-CENTRAL2`). Four fleet censuses are
+8/8 clean. This is checkpoint-transform integrity only: no TPU, HBM, DB, decoder, token, XPlane,
+latency or throughput claim. Next compile and lint the complete PP16 short decoder before any 8K
+numerical execution.
+
 ## 2026-08-27 — complete PP16 executable-runtime base is sealed without TPU work
 
 Tag `greenfield_runtime_pack_pp16_20260827T091323450875229Z` at pushed and same-region-mirrored
