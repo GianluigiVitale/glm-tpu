@@ -11,7 +11,6 @@ without overwriting accepted objects.
 from __future__ import annotations
 
 import argparse
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 import gc
 from hashlib import sha256
@@ -41,6 +40,7 @@ from glm_tpu.greenfield.partitioning import (  # noqa: E402
 
 DEFAULT_SOURCE = Path("/home/gianl/gcs-models/models/GLM-5.2-FP8")
 APPROVED_BUCKET = "driftbench-dsv4-uc"
+APPROVED_LOCATION = "US-CENTRAL2"
 CHUNK_BYTES = 64 * 1024 * 1024
 
 
@@ -243,44 +243,70 @@ def _stream_pending_group(
     run_dir: Path,
     code_hash: str,
 ) -> list[dict[str, Any]]:
-    def upload_one(plan: DestinationFilePlan) -> dict[str, Any]:
-        blob = bucket.blob(
-            f"{prefix}/{plan.filename}", chunk_size=CHUNK_BYTES
-        )
-        if blob.exists():
-            raise RuntimeError(
-                f"destination appeared without accepted evidence: {plan.filename}"
+    blobs: dict[str, Any] = {}
+    streams: dict[str, Any] = {}
+    try:
+        for plan in plans:
+            blob = bucket.blob(
+                f"{prefix}/{plan.filename}", chunk_size=CHUNK_BYTES
             )
-        blob.content_type = "application/octet-stream"
-        blob.metadata = {
-            "greenfield_pack_code_hash": code_hash,
-            "layout_manifest_sha256": layout["manifest_sha256"],
-            "plan_id": layout["plan_id"],
-        }
-        stream = blob.open(
-            "wb",
-            chunk_size=CHUNK_BYTES,
-            ignore_flush=True,
-            if_generation_match=0,
-            checksum="crc32c",
-            timeout=300,
-        )
-        try:
-            streamed = stream_pack_group(
-                layout=layout,
-                plans=(plan,),
-                source_root=source_root,
-                outputs={plan.filename: stream},
-                validate_layout_contract=False,
+            if blob.exists():
+                raise RuntimeError(
+                    "destination appeared without accepted evidence: "
+                    f"{plan.filename}"
+                )
+            blob.content_type = "application/octet-stream"
+            blob.metadata = {
+                "greenfield_pack_code_hash": code_hash,
+                "layout_manifest_sha256": layout["manifest_sha256"],
+                "plan_id": layout["plan_id"],
+            }
+            stream = blob.open(
+                "wb",
+                chunk_size=CHUNK_BYTES,
+                ignore_flush=True,
+                if_generation_match=0,
+                checksum="crc32c",
+                timeout=300,
             )
-            stream.close()
-        except BaseException:
+            blobs[plan.filename] = blob
+            streams[plan.filename] = stream
+    except BaseException:
+        for stream in streams.values():
             try:
                 stream.terminate()
             except BaseException:
                 pass
-            raise
-        item = streamed[0]
+        raise
+
+    # This call must cover the complete pending owner set together. Besides
+    # making its axis-shard coverage explicit, it reads each relevant source
+    # tensor once and fans bytes directly to the two/four owner streams.
+    try:
+        streamed = stream_pack_group(
+            layout=layout,
+            plans=plans,
+            source_root=source_root,
+            outputs=streams,
+            validate_layout_contract=False,
+        )
+        for stream in streams.values():
+            stream.close()
+    except BaseException:
+        for stream in streams.values():
+            try:
+                stream.terminate()
+            except BaseException:
+                pass
+        raise
+
+    by_filename = {item.filename: item for item in streamed}
+    if set(by_filename) != {plan.filename for plan in plans}:
+        raise RuntimeError("streamed group evidence is incomplete")
+    result = []
+    for plan in plans:
+        item = by_filename[plan.filename]
+        blob = blobs[plan.filename]
         blob.reload()
         if int(blob.size) != item.file_bytes or not blob.crc32c:
             raise RuntimeError(
@@ -320,27 +346,19 @@ def _stream_pending_group(
             _evidence_blob_name(prefix, plan.filename)
         )
         _upload_json_once(evidence_blob, evidence)
-        return evidence
-
-    result = []
-    with ThreadPoolExecutor(max_workers=len(plans)) as executor:
-        futures = {executor.submit(upload_one, plan): plan for plan in plans}
-        for future in as_completed(futures):
-            plan = futures[future]
-            evidence = future.result()
-            result.append(evidence)
-            print(
-                json.dumps(
-                    {
-                        "event": "file_complete",
-                        "file_bytes": evidence["file_bytes"],
-                        "filename": plan.filename,
-                        "sha256": evidence["sha256"],
-                    },
-                    sort_keys=True,
-                ),
-                flush=True,
-            )
+        result.append(evidence)
+        print(
+            json.dumps(
+                {
+                    "event": "file_complete",
+                    "file_bytes": evidence["file_bytes"],
+                    "filename": plan.filename,
+                    "sha256": evidence["sha256"],
+                },
+                sort_keys=True,
+            ),
+            flush=True,
+        )
     return result
 
 
@@ -394,6 +412,7 @@ def main() -> int:
 
     control: dict[str, Any] = {
         "artifact_kind": "greenfield_streaming_full_checkpoint_pack",
+        "bucket_location": APPROVED_LOCATION,
         "code_hash": code_hash,
         "destination": args.destination.rstrip("/"),
         "destination_file_count": len(plans),
@@ -413,6 +432,12 @@ def main() -> int:
 
     client = storage.Client()
     bucket = client.bucket(bucket_name)
+    bucket.reload(timeout=300)
+    if bucket.location != APPROVED_LOCATION:
+        raise RuntimeError(
+            f"checkpoint bucket location is {bucket.location!r}, "
+            f"expected {APPROVED_LOCATION}"
+        )
     control_blob = bucket.blob(f"{prefix}/control.json")
     layout_blob = bucket.blob(f"{prefix}/layout_manifest.json")
     success_blob = bucket.blob(f"{prefix}/SUCCESS")
