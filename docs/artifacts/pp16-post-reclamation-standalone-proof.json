@@ -1,0 +1,28 @@
+{
+  "artifact_kind": "greenfield_pp16_post_reclamation_standalone_proof",
+  "capsule_sha256": "846c36f78c350e4561e7498e73fe9decdbb428c9579efe8f7252e48b5878d521",
+  "claim_scope": "storage_and_terminal_integrity_only_no_numerical_or_performance_claim",
+  "cumulative_deleted_bytes": 6510661611573,
+  "deleted_bytes": 1626713249016,
+  "deleted_objects": 132,
+  "deletion_receipt_sha256": "7d39d8a384c2b792a5609cb06d75b03e66ef5b127df3f6f9a3b44d7828ec595d",
+  "format_version": 1,
+  "inspection_byte_identical": true,
+  "postdelete_inspection_sha256": "29b11bb56cc322642568b1563f7e515a394e157db53e7ab0a7c101da0f525bbf",
+  "pp16_active_feature_runtime": {
+    "bytes": 869561965562,
+    "manifest_sha256": "0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1",
+    "objects": 68
+  },
+  "pp16_base_runtime_metadata": {
+    "bytes": 37629019,
+    "objects": 4
+  },
+  "pp16_packed_metadata": {
+    "bytes": 109174474,
+    "objects": 4
+  },
+  "predelete_inspection_sha256": "29b11bb56cc322642568b1563f7e515a394e157db53e7ab0a7c101da0f525bbf",
+  "proof_sha256": "5bd9bc05d1ac550c5c4cfa478a75e830d4452df6f69b9b6a4a37792cfa29a1c3",
+  "status": "passed"
+}

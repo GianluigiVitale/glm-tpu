@@ -2,6 +2,24 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 active PP16 runtime is standalone; parent payloads reclaimed
+
+- Pushed/mirrored `b619c94` adds an explicit metadata-lineage mode for feature-runtime parents;
+  complete parent payload verification remains the default, and the active final runtime still
+  requires all 32 payloads, sidecars, sizes, manifests and tensor ledgers. Focused CPU tests pass
+  31 with one hardware-only skip. Pre-delete standalone inspection SHA is `29b11b...25bbf`.
+- Capsule `846c36f7...8d521` was committed/pushed/mirrored at `27aab6c`. Under both global locks,
+  exact generation-conditional deletes removed 132 PP16 parent payload/sidecar objects /
+  1,626,713,249,016 bytes (1.479 TiB), preserving four root metadata objects per parent. Receipt
+  SHA is `7d39d8a...c595d`; the post-delete standalone inspection is byte-identical to pre-delete.
+- The active feature runtime remains 68 objects / 869,561,965,562 bytes with manifest
+  `0f1bb271...52b6f1`. Eight parent metadata objects / 146,803,493 bytes also have an independent
+  protected archive, SHA `5585174e...e6a4`. Cumulative current-generation reclamation is
+  6,510,661,611,573 bytes (5.921 TiB); seven-day soft delete delays physical/billed release.
+- Storage work is complete. Exact engine next: metadata-only seal recovery for PP16 acquisition
+  `...T132707782908362Z`, then offline HLO attribution and the smallest trace discriminator for the
+  reproducible 101.5-second step. Do not launch numerical 2K/8K before attribution.
+
 ## 2026-08-27 generation-pinned PP8/WS32 derivatives reclaimed
 
 - User-authorized storage reclamation completed under the TPU-workload and rsync locks. Capsule

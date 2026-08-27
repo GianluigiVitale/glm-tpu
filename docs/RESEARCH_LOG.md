@@ -10551,3 +10551,20 @@ show all six PP8/WS32 candidate prefixes empty, while canonical and all three PP
 retain their exact object counts and bytes. GCS soft-delete retention is 604,800 seconds, so the
 storage billing reduction can lag seven days. PP16 parents remain until standalone final-runtime
 verification/load wiring passes; no TPU, Gate-D, token, latency, or performance claim is made.
+
+## 2026-08-27 14:23 UTC — PP16 final runtime survives exact parent-payload reclamation
+
+An explicit fail-closed lineage mode now verifies the compact PP16 packed/base metadata while the
+default parent verifiers continue to require every payload and sidecar. The feature verifier still
+checks the active final runtime completely: 32 payloads, 6,944 tensor records, semantic layout,
+transform/source hashes, GCS identities, sidecars, sizes and SUCCESS. Its pre-delete standalone
+inspection SHA is `29b11b...25bbf`; focused CPU tests pass 31 with one forced-hardware skip.
+
+Capsule `846c36f7...8d521` pins all canonical, parent and active-runtime object identities. After an
+eight-object / 146,803,493-byte protected metadata archive (`5585174e...e6a4`), 132 exact
+generation-conditional deletes removed 1,626,713,249,016 parent payload/sidecar bytes. Each parent
+now contains only its four root metadata objects. Active manifest `0f1bb271...52b6f1` remains 68
+objects / 869,561,965,562 bytes. Post-delete standalone verification is byte-identical to the
+pre-delete result. Receipt SHA is `7d39d8a...c595d`; cumulative reclamation across both tranches is
+6,510,661,611,573 current-generation bytes (5.921 TiB). This is storage/integrity evidence only,
+not a numerical, Gate-D, latency or performance claim.
