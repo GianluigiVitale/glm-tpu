@@ -32,11 +32,16 @@ CHECKPOINT_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feat
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 RESUME=0
 RESUME_FLAG=
+ATTEMPT_LABEL=initial
 if [[ ${GLM_GREENFIELD_PP16_FEATURE_QKV_RESUME:-0} == 1 ]]; then
   RESUME=1
   RESUME_FLAG=--resume
+  ATTEMPT_LABEL=resume
 fi
-readonly PIN TAG RUN_DIR DESTINATION CHECKPOINT_ROOT REMOTE_PREFIX RESUME RESUME_FLAG
+PREPARE_LOG=$RUN_DIR/prepare_${ATTEMPT_LABEL}.txt
+PROBE_LOG=$RUN_DIR/probe_${ATTEMPT_LABEL}.txt
+PACK_LOG=$RUN_DIR/pack_${ATTEMPT_LABEL}.txt
+readonly PIN TAG RUN_DIR DESTINATION CHECKPOINT_ROOT REMOTE_PREFIX RESUME RESUME_FLAG ATTEMPT_LABEL PREPARE_LOG PROBE_LOG PACK_LOG
 
 [[ $(git branch --show-current) == "$BRANCH" ]]
 [[ -z $(git status --porcelain) ]]
@@ -121,25 +126,26 @@ COMMON_ARGS=(
 say "preparing direct derivative metadata"
 /home/gianl/vllm-env/bin/python scripts/greenfield/pack_feature_runtime_checkpoint.py \
   prepare "${COMMON_ARGS[@]}" --run-dir "$RUN_DIR/pack_control" $RESUME_FLAG \
-  >"$RUN_DIR/prepare.txt" 2>&1
+  >"$PREPARE_LOG" 2>&1
 
 # The probe executes only on the launcher whose captured JAX process index is 0.
 # shellcheck disable=SC2016
-probe_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; capture='"$TOPOLOGY_RUN"'/topology.rank${idx}.json; jax=$(/home/gianl/vllm-env/bin/python -c "import json,sys; print(json.load(open(sys.argv[1]))[\"jax_process_index\"])" "$capture"); if [[ "$jax" != 0 ]]; then echo "PROBE_SKIP $(hostname)"; exit 0; fi; cd '"$WORKTREE"'; run=/home/gianl/glm-run/'"$TAG"'/probe; mkdir -p "$run"; /home/gianl/vllm-env/bin/python scripts/greenfield/pack_feature_runtime_checkpoint.py pack-stage --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --source-runtime-root '"$PARENT_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$PARENT_RUNTIME_MANIFEST_SHA"' --source-feature-runtime-root '"$SOURCE_FEATURE_ROOT"' --source-feature-runtime-manifest-sha256 '"$SOURCE_FEATURE_MANIFEST_SHA"' --source-metadata-only --fused-qkv-a --destination '"$DESTINATION"' --run-dir "$run" --expected-code-hash '"$PIN"' --topology-capture "$capture" --stage-id 0 '"$RESUME_FLAG"' >"$run/pack.log" 2>&1; gcloud storage cp --recursive --no-clobber "$run" '"$REMOTE_PREFIX"'/probe/ >/dev/null; echo "PROBE_OK $(hostname)"'
+probe_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; capture='"$TOPOLOGY_RUN"'/topology.rank${idx}.json; jax=$(/home/gianl/vllm-env/bin/python -c "import json,sys; print(json.load(open(sys.argv[1]))[\"jax_process_index\"])" "$capture"); if [[ "$jax" != 0 ]]; then echo "PROBE_SKIP $(hostname)"; exit 0; fi; cd '"$WORKTREE"'; run=/home/gianl/glm-run/'"$TAG"'/probe_'"$ATTEMPT_LABEL"'; mkdir -p "$run"; /home/gianl/vllm-env/bin/python scripts/greenfield/pack_feature_runtime_checkpoint.py pack-stage --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --source-runtime-root '"$PARENT_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$PARENT_RUNTIME_MANIFEST_SHA"' --source-feature-runtime-root '"$SOURCE_FEATURE_ROOT"' --source-feature-runtime-manifest-sha256 '"$SOURCE_FEATURE_MANIFEST_SHA"' --source-metadata-only --fused-qkv-a --destination '"$DESTINATION"' --run-dir "$run" --expected-code-hash '"$PIN"' --topology-capture "$capture" --stage-id 0 '"$RESUME_FLAG"' >"$run/pack.log" 2>&1; gcloud storage cp --recursive --no-clobber "$run" '"$REMOTE_PREFIX"'/probe_'"$ATTEMPT_LABEL"'/ >/dev/null; echo "PROBE_OK $(hostname)"'
 say "running one exact stage-0 probe before fleet fanout"
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-  --command="$probe_command" >"$RUN_DIR/probe.txt" 2>&1
-[[ $(awk '$1=="PROBE_OK" {print $2}' "$RUN_DIR/probe.txt" | sort -u | wc -l) -eq 1 ]]
-[[ $(awk '$1=="PROBE_SKIP" {print $2}' "$RUN_DIR/probe.txt" | sort -u | wc -l) -eq 7 ]]
+  --command="$probe_command" >"$PROBE_LOG" 2>&1
+[[ $(awk '$1=="PROBE_OK" {print $2}' "$PROBE_LOG" | sort -u | wc -l) -eq 1 ]]
+[[ $(awk '$1=="PROBE_SKIP" {print $2}' "$PROBE_LOG" | sort -u | wc -l) -eq 7 ]]
 strict_census probe_post || { say "ABORT: probe left fleet work"; exit 1; }
 
-# Each host packs its two PP16 stages. Resume authenticates the sealed probe.
+# Each host reads its two byte-balanced PP16 stages from the pinned plan.
+# Resume authenticates the sealed probe and any previously completed stage.
 # shellcheck disable=SC2016
-pack_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; capture='"$TOPOLOGY_RUN"'/topology.rank${idx}.json; jax=$(/home/gianl/vllm-env/bin/python -c "import json,sys; print(json.load(open(sys.argv[1]))[\"jax_process_index\"])" "$capture"); run=/home/gianl/glm-run/'"$TAG"'/host_pack; mkdir -p "$run"; cd '"$WORKTREE"'; for stage in $((2*jax)) $((2*jax+1)); do timeout --signal=TERM --kill-after=60 21600 /home/gianl/vllm-env/bin/python scripts/greenfield/pack_feature_runtime_checkpoint.py pack-stage --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --source-runtime-root '"$PARENT_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$PARENT_RUNTIME_MANIFEST_SHA"' --source-feature-runtime-root '"$SOURCE_FEATURE_ROOT"' --source-feature-runtime-manifest-sha256 '"$SOURCE_FEATURE_MANIFEST_SHA"' --source-metadata-only --fused-qkv-a --destination '"$DESTINATION"' --run-dir "$run" --expected-code-hash '"$PIN"' --topology-capture "$capture" --stage-id "$stage" --resume >"$run/stage_${stage}.log" 2>&1; done; gcloud storage cp --recursive --no-clobber "$run" '"$REMOTE_PREFIX"'/host_records/worker${idx}/ >/dev/null; echo "PACK_HOST_OK $(hostname)"'
+pack_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; capture='"$TOPOLOGY_RUN"'/topology.rank${idx}.json; jax=$(/home/gianl/vllm-env/bin/python -c "import json,sys; print(json.load(open(sys.argv[1]))[\"jax_process_index\"])" "$capture"); plan='"$SOURCE_ROOT"'/layout_manifest.json; stages=$(/home/gianl/vllm-env/bin/python -c "import json,sys; p=json.load(open(sys.argv[1]))[\"plan_manifest\"][\"execution_plan\"]; j=int(sys.argv[2]); print(\" \".join(str(s[\"stage_id\"]) for s in p[\"stage_assignments\"] if s[\"process_index\"] == j))" "$plan" "$jax"); [[ $(wc -w <<<"$stages") -eq 2 ]]; run=/home/gianl/glm-run/'"$TAG"'/host_pack_'"$ATTEMPT_LABEL"'; mkdir -p "$run"; upload() { gcloud storage cp --recursive --no-clobber "$run" '"$REMOTE_PREFIX"'/host_records_'"$ATTEMPT_LABEL"'/worker${idx}/ >/dev/null 2>&1 || true; }; trap upload EXIT; cd '"$WORKTREE"'; for stage in $stages; do timeout --signal=TERM --kill-after=60 21600 /home/gianl/vllm-env/bin/python scripts/greenfield/pack_feature_runtime_checkpoint.py pack-stage --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --source-runtime-root '"$PARENT_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$PARENT_RUNTIME_MANIFEST_SHA"' --source-feature-runtime-root '"$SOURCE_FEATURE_ROOT"' --source-feature-runtime-manifest-sha256 '"$SOURCE_FEATURE_MANIFEST_SHA"' --source-metadata-only --fused-qkv-a --destination '"$DESTINATION"' --run-dir "$run" --expected-code-hash '"$PIN"' --topology-capture "$capture" --stage-id "$stage" --resume >"$run/stage_${stage}.log" 2>&1; done; trap - EXIT; upload; echo "PACK_HOST_OK $(hostname)"'
 say "streaming all 16 stages from the retained feature runtime"
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-  --command="$pack_command" >"$RUN_DIR/pack.txt" 2>&1
-has_eight_unique_markers "$RUN_DIR/pack.txt" PACK_HOST_OK || { say "ABORT: fanout failed"; exit 1; }
+  --command="$pack_command" >"$PACK_LOG" 2>&1
+has_eight_unique_markers "$PACK_LOG" PACK_HOST_OK || { say "ABORT: fanout failed"; exit 1; }
 
 say "finalizing only after all 32 files and tensor ledgers reconcile"
 /home/gianl/vllm-env/bin/python scripts/greenfield/pack_feature_runtime_checkpoint.py \
