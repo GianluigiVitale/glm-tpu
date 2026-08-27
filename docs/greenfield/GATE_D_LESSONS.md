@@ -540,6 +540,26 @@ branches from the search tree.
   compile solely to acquire the TPU-specific lowering. The acquisition must be structurally
   incapable of arithmetic publication.
 
+## Upstream-obsolescence guardrail
+
+- Before any multi-day implementation or protected long-context promotion, snapshot the current
+  model revision and the exact relevant upstream commits/PR states, then mechanically compare the
+  live source with the historical hypothesis. Reproduce and minimize a current failure before
+  reusing an old patch. Preserve parity tests, benchmarks and failure analysis; port the idea, not
+  the stale diff. Generate summaries from canonical raw artifacts instead of copying headline
+  values between documents.
+- Make the first discriminator the cheapest boundary that can falsify the hypothesis. For DSA this
+  includes `2047/2048/2049` and page-boundary cases: at `<=2048`, selected-set equality cannot prove
+  sparse ranking or consumption. Promote `2K -> 4K -> 8K -> 32K -> 128K -> 256K`, recording the
+  exact last pass and first failure rather than spending a full-pod run to discover a small-shape
+  contract error.
+- The 2026-08-27 source check confirms that `tpu-inference` PR #2324 is still open, correctness-first
+  and explicitly below performance expectations. Its loader, FP8-v4 and cross-shard correctness
+  ideas are research inputs; its Ray/Python execution, PP limitations and full-token all-gathers do
+  not satisfy this engine's topology/locality contract. The two August research handoffs therefore
+  do not override `goal.md` or `docs/glm-tpu-revolution.md`: legacy `tpu-inference` remains an oracle
+  only, and the isolated native-JAX topology-first engine remains the production architecture.
+
 ## Decision after the model-free replays
 
 - Hardware row zero equals DB533 software. Freeze dense arithmetic and standalone association.
