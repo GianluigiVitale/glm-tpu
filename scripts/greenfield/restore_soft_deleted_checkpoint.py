@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Restore one exact checkpoint artifact from a generation-pinned capsule.
+"""Restore exact checkpoint objects from a generation-pinned capsule.
 
 The restore is fail-closed, resumable, and writes ``SUCCESS`` last.  It never
-copies object payloads or scans unrelated bucket prefixes.
+copies object payloads or scans unrelated bucket prefixes.  Root-metadata mode
+restores only the artifact's top-level control files and terminal marker.
 """
 
 from __future__ import annotations
@@ -99,6 +100,24 @@ def _records(blobs: Iterable[Any]) -> dict[str, list[ObjectRecord]]:
     return result
 
 
+def _select_expected(
+    prefix: str,
+    expected: Mapping[str, ObjectRecord],
+    *,
+    root_metadata_only: bool,
+) -> dict[str, ObjectRecord]:
+    if not root_metadata_only:
+        return dict(expected)
+    selected = {
+        name: record
+        for name, record in expected.items()
+        if "/" not in name.removeprefix(prefix)
+    }
+    if f"{prefix}SUCCESS" not in selected or len(selected) < 2:
+        raise ValueError("artifact root metadata selection is incomplete")
+    return selected
+
+
 def _reconcile(
     expected: Mapping[str, ObjectRecord],
     active: Mapping[str, list[ObjectRecord]],
@@ -150,6 +169,7 @@ def restore(
     artifact_id: str,
     output: Path,
     execute: bool,
+    root_metadata_only: bool,
 ) -> dict[str, Any]:
     capsule = json.loads(capsule_path.read_text())
     if capsule.get("bucket") != APPROVED_BUCKET or capsule.get(
@@ -160,7 +180,12 @@ def restore(
         capsule, "capsule_sha256"
     ):
         raise ValueError("capsule self hash failed")
-    prefix, expected = _expected_artifact(capsule, artifact_id)
+    prefix, artifact_objects = _expected_artifact(capsule, artifact_id)
+    expected = _select_expected(
+        prefix,
+        artifact_objects,
+        root_metadata_only=root_metadata_only,
+    )
 
     from google.cloud import storage
 
@@ -191,6 +216,7 @@ def restore(
         "expected_objects": len(expected),
         "live_objects_before": len(already_active),
         "pending_objects": len(pending),
+        "selection": "root_metadata" if root_metadata_only else "complete_artifact",
     }
     if not execute:
         return {"status": "DRY_RUN", **plan}
@@ -279,6 +305,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--artifact-id", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--root-metadata-only", action="store_true")
     return parser.parse_args()
 
 
@@ -289,6 +316,7 @@ def main() -> int:
         artifact_id=args.artifact_id,
         output=args.output,
         execute=args.execute,
+        root_metadata_only=args.root_metadata_only,
     )
     print(
         "CHECKPOINT_RESTORE "

@@ -5,6 +5,7 @@ import pytest
 from scripts.greenfield.restore_soft_deleted_checkpoint import (
     ObjectRecord,
     _reconcile,
+    _select_expected,
 )
 
 
@@ -64,3 +65,25 @@ def test_reconcile_rejects_active_metadata_drift() -> None:
 
     with pytest.raises(ValueError, match="does not match capsule"):
         _reconcile({payload.name: payload}, {payload.name: [drifted]}, {})
+
+
+def test_select_expected_root_metadata_excludes_payloads_and_sidecars() -> None:
+    prefix = "prefix/"
+    records = {
+        name: _record(name)
+        for name in (
+            "prefix/SUCCESS",
+            "prefix/control.json",
+            "prefix/layout_manifest.json",
+            "prefix/base_decoder/stage_00/device_slot_00.safetensors",
+            "prefix/evidence/base_decoder/stage_00/device_slot_00.safetensors.json",
+        )
+    }
+
+    selected = _select_expected(prefix, records, root_metadata_only=True)
+
+    assert set(selected) == {
+        "prefix/SUCCESS",
+        "prefix/control.json",
+        "prefix/layout_manifest.json",
+    }

@@ -303,6 +303,28 @@ def test_selected_linear_runtime_defaults_to_fused_qkv_gate_b_artifact() -> None
     )
 
 
+def test_pp8_runner_supports_default_off_metadata_parent_lineage() -> None:
+    runner = PROTECTED_RUNNER.read_text()
+
+    assert (
+        "readonly FEATURE_SOURCE_METADATA_ONLY="
+        "${GLM_GREENFIELD_FEATURE_SOURCE_METADATA_ONLY:-0}" in runner
+    )
+    assert (
+        "SOURCE_ROOT=${GLM_GREENFIELD_SOURCE_CHECKPOINT_ROOT:-" in runner
+    )
+    assert (
+        "SOURCE_RUNTIME_ROOT=${GLM_GREENFIELD_SOURCE_RUNTIME_ROOT:-" in runner
+    )
+    assert "feature source metadata-only flag must be 0 or 1" in runner
+    assert (
+        "--feature-source-metadata-only $FEATURE_SOURCE_METADATA_ONLY "
+        "--feature-output-tile" in runner
+    )
+    assert "status --porcelain --untracked-files=no" in runner
+    assert "METADATA_SOURCE_SUFFIX=_metaparent" in runner
+
+
 def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
     runner = PROTECTED_RUNNER.read_text()
