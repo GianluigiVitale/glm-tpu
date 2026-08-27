@@ -195,6 +195,97 @@ def build_destination_file_plans(
     return tuple(plans)
 
 
+def build_destination_probe_plans(
+    layout: Mapping[str, Any],
+    *,
+    source_names: Sequence[str],
+) -> tuple[DestinationFilePlan, ...]:
+    """Build small, full-owner plans derived from one complete stage group."""
+
+    validate_layout_manifest(layout)
+    requested = tuple(source_names)
+    if not requested or len(requested) != len(set(requested)):
+        raise CheckpointValidationError(
+            "checkpoint probe source names must be nonempty and unique"
+        )
+    placements = {
+        placement["source"]["name"]: placement
+        for placement in layout["placements"]
+    }
+    if len(placements) != len(layout["placements"]):
+        raise CheckpointValidationError("layout contains duplicate source placements")
+    unknown = set(requested) - set(placements)
+    if unknown:
+        raise CheckpointValidationError(
+            f"checkpoint probe contains unknown source names: {sorted(unknown)!r}"
+        )
+    selected = [placements[name] for name in requested]
+    groups = {
+        (placement["load_set"], destination["stage_id"])
+        for placement in selected
+        for destination in placement["destinations"]
+    }
+    if len(groups) != 1:
+        raise CheckpointValidationError(
+            "checkpoint probe must stay within one load-set/stage group"
+        )
+    load_set, stage_id = next(iter(groups))
+    file_records = {
+        record["filename"]: record
+        for record in layout["destination_files"]
+        if record["load_set"] == load_set and record["stage_id"] == stage_id
+    }
+    by_file: dict[str, list[tuple[str, str, tuple[int, ...], int]]] = {}
+    for placement in sorted(selected, key=lambda item: item["source"]["name"]):
+        source = placement["source"]
+        for destination in placement["destinations"]:
+            by_file.setdefault(destination["filename"], []).append(
+                (
+                    source["name"],
+                    source["dtype"],
+                    tuple(destination["shape"]),
+                    destination["byte_count"],
+                )
+            )
+    if set(by_file) != set(file_records):
+        raise CheckpointValidationError(
+            "checkpoint probe must cover every owner in its stage group"
+        )
+    plans = []
+    for filename in sorted(by_file):
+        offset = 0
+        tensors = []
+        for name, dtype, shape, byte_count in by_file[filename]:
+            tensors.append(
+                DestinationTensorPlan(
+                    name=name,
+                    dtype=dtype,
+                    shape=shape,
+                    data_offset_start=offset,
+                    data_offset_end=offset + byte_count,
+                )
+            )
+            offset += byte_count
+        record = file_records[filename]
+        plans.append(
+            DestinationFilePlan(
+                filename=filename,
+                load_set=load_set,
+                stage_id=stage_id,
+                device_slot=record["device_slot"],
+                device_id=record["device_id"],
+                header=_header_bytes(
+                    filename=filename,
+                    tensors=tensors,
+                    layout_manifest_sha256=layout["manifest_sha256"],
+                ),
+                payload_bytes=offset,
+                tensors=tuple(tensors),
+            )
+        )
+    return tuple(plans)
+
+
 def destination_groups(
     plans: Sequence[DestinationFilePlan],
 ) -> tuple[tuple[DestinationFilePlan, ...], ...]:
@@ -358,6 +449,14 @@ def stream_pack_group(
         )
     if validate_layout_contract:
         validate_layout_manifest(layout)
+    tensor_names_by_file: dict[str, set[str]] = {}
+    for plan in plans:
+        names = {tensor.name for tensor in plan.tensors}
+        if len(names) != len(plan.tensors):
+            raise CheckpointValidationError(
+                f"destination plan {plan.filename!r} contains duplicate tensors"
+            )
+        tensor_names_by_file[plan.filename] = names
     expected_hashes = dict(expected_source_sha256 or {})
     if expected_source_sha256 is not None:
         relevant = {
@@ -365,6 +464,8 @@ def stream_pack_group(
             for placement in layout["placements"]
             if any(
                 destination["filename"] in filenames
+                and placement["source"]["name"]
+                in tensor_names_by_file[destination["filename"]]
                 for destination in placement["destinations"]
             )
         }
@@ -378,6 +479,8 @@ def stream_pack_group(
                 destination
                 for destination in destinations
                 if destination["filename"] in filenames
+                and placement["source"]["name"]
+                in tensor_names_by_file[destination["filename"]]
             ]
             if selected and len(selected) != len(destinations):
                 raise CheckpointValidationError(
@@ -400,21 +503,34 @@ def stream_pack_group(
     source_files = {
         record["filename"]: record for record in layout["source"]["files"]
     }
+    written_names = {filename: set() for filename in filenames}
     handles: dict[str, BinaryIO] = {}
     try:
         for placement in sorted(
             layout["placements"], key=lambda item: item["source"]["name"]
         ):
             all_destinations = placement["destinations"]
-            destinations = [
+            source_record = placement["source"]
+            source_name = source_record["name"]
+            current_destinations = [
                 destination
                 for destination in all_destinations
                 if destination["filename"] in filenames
             ]
+            destinations = [
+                destination
+                for destination in current_destinations
+                if source_name
+                in tensor_names_by_file[destination["filename"]]
+            ]
             if not destinations:
                 continue
-            source_record = placement["source"]
-            source_name = source_record["name"]
+            if len(destinations) != len(current_destinations):
+                raise CheckpointValidationError(
+                    f"destination plans select only part of {source_name!r}"
+                )
+            for destination in destinations:
+                written_names[destination["filename"]].add(source_name)
             source_digest = sha256() if expected_source_sha256 is not None else None
             filename = source_record["filename"]
             file_record = source_files.get(filename)
@@ -476,6 +592,10 @@ def stream_pack_group(
     finally:
         for handle in handles.values():
             handle.close()
+    if written_names != tensor_names_by_file:
+        raise CheckpointValidationError(
+            "destination plan tensors do not match streamed layout placements"
+        )
     evidence = []
     for plan in plans:
         writer = writers[plan.filename]

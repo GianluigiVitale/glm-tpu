@@ -10,6 +10,7 @@ import pytest
 
 from glm_tpu.greenfield.checkpoint import (
     build_destination_file_plans,
+    build_destination_probe_plans,
     destination_groups,
     stream_pack_group,
 )
@@ -335,6 +336,78 @@ def test_stream_pack_can_resume_one_missing_axis_shard(tmp_path: Path) -> None:
         actual = handle.get_tensor("model.layers.0.synthetic.weight")
     expected = torch.arange(32, dtype=torch.float32).reshape(4, 8)[:, 4:6]
     assert torch.equal(actual, expected)
+
+
+def test_probe_plans_stream_only_selected_real_layout_leaf(tmp_path: Path) -> None:
+    import torch
+    from safetensors import safe_open
+
+    source_root, layout = fixture(tmp_path)
+    selected = "model.layers.0.synthetic.weight"
+    plans = build_destination_probe_plans(layout, source_names=(selected,))
+    assert len(plans) == 4
+    assert all(tuple(tensor.name for tensor in plan.tensors) == (selected,)
+               for plan in plans)
+
+    with safe_open(
+        source_root / "model.safetensors", framework="pt", device="cpu"
+    ) as handle:
+        expected_hash = sha256(
+            handle.get_tensor(selected).numpy().tobytes()
+        ).hexdigest()
+    output_root = tmp_path / "probe"
+    outputs = {}
+    handles = []
+    try:
+        for plan in plans:
+            path = output_root / plan.filename
+            path.parent.mkdir(parents=True, exist_ok=True)
+            stream = path.open("wb")
+            handles.append(stream)
+            outputs[plan.filename] = stream
+        evidence = stream_pack_group(
+            layout=layout,
+            plans=plans,
+            source_root=source_root,
+            outputs=outputs,
+            chunk_bytes=64,
+            expected_source_sha256={selected: expected_hash},
+        )
+    finally:
+        for stream in handles:
+            stream.close()
+    assert len(evidence) == 4
+    source = torch.arange(32, dtype=torch.float32).reshape(4, 8)
+    for slot, plan in enumerate(plans):
+        with safe_open(
+            output_root / plan.filename, framework="pt", device="cpu"
+        ) as handle:
+            actual = handle.get_tensor(selected)
+        assert torch.equal(actual, source[:, slot * 2 : (slot + 1) * 2])
+
+
+def test_probe_plans_refuse_unknown_cross_stage_and_duplicate_sources(
+    tmp_path: Path,
+) -> None:
+    _, layout = fixture(tmp_path)
+    with pytest.raises(CheckpointValidationError, match="unknown source"):
+        build_destination_probe_plans(layout, source_names=("missing",))
+    with pytest.raises(CheckpointValidationError, match="nonempty and unique"):
+        build_destination_probe_plans(
+            layout,
+            source_names=(
+                "model.layers.0.synthetic.weight",
+                "model.layers.0.synthetic.weight",
+            ),
+        )
+    with pytest.raises(CheckpointValidationError, match="one load-set/stage"):
+        build_destination_probe_plans(
+            layout,
+            source_names=(
+                "model.layers.0.synthetic.weight",
+                "model.norm.weight",
+            ),
+        )
 
 
 def test_stream_pack_validates_exact_raw_source_tensor_hashes(

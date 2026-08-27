@@ -151,6 +151,7 @@ from .stream_pack import (
     DestinationTensorPlan,
     StreamedFileEvidence,
     build_destination_file_plans,
+    build_destination_probe_plans,
     destination_groups,
     stream_pack_group,
 )
@@ -216,6 +217,7 @@ __all__ = (
     "VerifiedPackedCheckpoint",
     "VerifiedRuntimeCheckpoint",
     "build_destination_file_plans",
+    "build_destination_probe_plans",
     "build_feature_runtime_destination_file_plans",
     "build_feature_runtime_layout_document",
     "build_gate_c_layout",
