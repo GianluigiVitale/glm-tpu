@@ -106,6 +106,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pack-code-hash", required=True)
     parser.add_argument("--destination", required=True)
     parser.add_argument("--plan-id", default="PP8_LP4")
+    parser.add_argument("--stage-id", type=int)
     parser.add_argument("--chunk-bytes", type=int, default=64 * 1024 * 1024)
     parser.add_argument("--verify-device-roundtrip", action="store_true")
     return parser.parse_args()
@@ -178,6 +179,7 @@ def main() -> int:
         local_devices,
         args.topology_capture,
         expectation,
+        stage_id=args.stage_id,
         visible_device_indices=visible,
     )
     selected = sorted(
