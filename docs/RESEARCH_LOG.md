@@ -5,6 +5,26 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 14:27--14:35 UTC — PP16 acquisition recovery terminal-seals preserved bytes
+
+The metadata-only recovery at pushed and same-region-mirrored pin `2c50d96` replays the corrected
+DB555 launcher/JAX mapping against all eight preserved records from workload `309ee8b`. It pins 26
+historical objects by generation, CRC32C, SHA-256 and size, including both original clean censuses,
+the exact 78-layer HLO and all host records. A fresh replacement-pod census is also 8/8 clean. The
+recovery does not import JAX, initialize TPU, load weights or rerun model compute.
+
+Tag `greenfield_short_decoder_compile_pp16_recovery_20260827T143436340009791Z` is terminal-sealed
+as 32 objects / 10,920,187 bytes. Ledger SHA is `a1e71627...dc07`; SUCCESS self SHA is
+`6e97fcc6...1439`. Local evidence manifests and downloaded remote `SUCCESS`/ledger hashes all
+replay exactly. The summary retains the real HLO hashes, 219 AG / 301 AR / 33 CP, 27,252,078,592
+peak bytes/chip and 4,322,943,488-byte minimum largest-free block.
+
+This closes only the missing acquisition archive. It explicitly has no numerical/performance/
+Gate-D claim and no DB row. The 101,500.446-ms single sample remains diagnostic. Perfect fleet
+wall agreement rules out host dispatch or a straggler; preserved HLO shows MoE is feature-Pallas
+but attention/dense projections remain the admitted reference linear path. The next experiment is
+the smallest isolated reference-vs-Pallas projection discriminator, not another 2K/8K decoder.
+
 ## 2026-08-27 13:27--13:42 UTC — PP16 device acquisition passes; outer host/JAX identity is wrong
 
 At pushed and mirrored pin `309ee8b`, protected tag

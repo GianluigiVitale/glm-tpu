@@ -2,6 +2,24 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 preserved PP16 acquisition is terminal-sealed without a model rerun
+
+- Recovery tag `greenfield_short_decoder_compile_pp16_recovery_20260827T143436340009791Z`
+  terminal-seals the successful device bytes from workload pin `309ee8b` under pushed/mirrored
+  recovery pin `2c50d96`. All 26 historical source objects are pinned by generation, CRC32C,
+  SHA-256 and size; all local and remote evidence hashes replay exactly.
+- The 32-object / 10.41-MiB approved-bucket archive has ledger SHA `a1e71627...dc07` and terminal
+  SUCCESS self SHA `6e97fcc6...1439`. Original pre/post and fresh replacement-pod recovery
+  censuses are each authenticated 8/8 zero work. The recovery imported no JAX, initialized no TPU,
+  and performed no model load or workload rerun.
+- The recovered acquisition proves full-graph load/compile/HLO, one diagnostic execution, token
+  mechanism, metadata and 32-chip HBM. It explicitly retains `performance/numerical/Gate-D=false`
+  and no DB row: the 101.5-second single sample remains a diagnostic stop, not accepted latency.
+- Offline attribution finds perfect fleet wall agreement and no host dispatch. The HLO still uses
+  reference FP8 linear projections while only MoE is feature-Pallas; PP16 Pallas-linear is
+  intentionally unadmitted. Exact next is a smallest isolated reference-vs-Pallas projection
+  discriminator before any unchanged 2K/8K complete-decoder run.
+
 ## 2026-08-27 active PP16 runtime is standalone; parent payloads reclaimed
 
 - Pushed/mirrored `b619c94` adds an explicit metadata-lineage mode for feature-runtime parents;
