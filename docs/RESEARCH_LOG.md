@@ -5,6 +5,27 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 — exact dense WS32 remains wrong at the layer-1 state boundary
+
+Protected numerical tag `greenfield_ws32_short_decoder_8k_numerical_20260827T011711674195301Z`
+at pushed/mirrored `04d059b` reproduced all six acquired HLO pairs and executed the complete real
+checkpoint plus dense overlay. All eight reports agree. Raw tokens are exact 20/20, state/cache
+contracts pass, and event 0/layer 0 DSA positions and scores are bitwise exact. Event 1/layer 1
+still swaps seven selected positions at decode position 8,155; later events cascade. Counts, tails,
+producer ids, device order/ties and score contracts remain valid.
+
+Direct comparison to the prior failure proves the overlay is active: layer-1 and later DSA arrays
+changed, while event 0 remains bitwise identical and exact. Therefore another unchanged full 8K
+run cannot discriminate anything. Diagnostic-only fleet p50 is `129.228901--129.2916055 ms/token`
+and p99 is `131.8674615--131.99492959`; maximum peak HBM is 26,375,554,560 bytes/chip and minimum
+largest-free block is 6,381,496,320 bytes. Rank-0 JSON/NPZ SHAs are `2b79c484...990b` /
+`2be686ff...eeb1`; all logs share `03629037...eac`.
+
+The 134-object remote prefix includes eight XPlanes but is deliberately nonterminal. Failure
+cleanup is 8/8 clean; there is no summary, DB row, terminal `SUCCESS` or performance claim. The
+current WS32 plan is exactness-rejected. Resume PP8/PP16 Gate-D work; WS32 may be reconsidered only
+after a bounded layer-1 state-boundary proof.
+
 ## 2026-08-27 — complete WS32 dense overlay passes fleet HLO acquisition
 
 Compile-only tag `greenfield_ws32_short_decoder_8k_acquire_20260827T003758068665390Z` at pushed

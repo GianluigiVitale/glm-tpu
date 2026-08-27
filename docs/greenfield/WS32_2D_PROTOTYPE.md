@@ -4,6 +4,17 @@ This document records the first independent GLM implementation of the mandatory 
 weight-stationary challenger. It is subordinate to `../glm-tpu-revolution.md` and makes no Gate-D,
 TPU-performance, final-checkpoint, or HBM claim.
 
+## Current adjudication
+
+The complete exact-dense 8K numerical run
+`greenfield_ws32_short_decoder_8k_numerical_20260827T011711674195301Z` rejects the current WS32
+plan on correctness. All six acquired HLO pairs reproduce and all eight hosts agree on exact 20/20
+tokens, valid state/cache and exact event-0 DSA, but event 1/layer 1 swaps seven selected positions
+and later events cascade. The sealed dense overlay is live and changes later DSA arrays, but does
+not repair this boundary. Diagnostic-only fleet p50 is about 129.23--129.29 ms/token; it is not a
+performance result. No DB row or terminal SUCCESS exists and cleanup is 8/8. Do not run the full
+WS32 decoder again unless a bounded layer-1 state-boundary proof first becomes exact.
+
 ## Reused evidence
 
 The implementation starts from existing work rather than rebuilding the idea:

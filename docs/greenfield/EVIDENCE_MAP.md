@@ -96,6 +96,17 @@ Peak compiled HBM is 26,375,554,560 bytes/chip with at least 6,646,212,608 bytes
 margin. This is HLO/HBM/cleanup evidence only: no arithmetic, DB, terminal SUCCESS or performance
 claim exists. It authorizes one separately pinned numerical run.
 
+That authorized numerical run is protected failed evidence. Tag
+`greenfield_ws32_short_decoder_8k_numerical_20260827T011711674195301Z` at `04d059b` reproduces all
+six graph pairs and all eight hosts agree on exact 20/20 tokens, valid state/cache and exact
+event-0 DSA. Event 1/layer 1 still swaps seven selected positions and later events cascade. The
+overlay changes the later DSA arrays relative to the prior failure but does not make them exact.
+Diagnostic-only fleet p50 is `129.228901--129.2916055 ms/token`; peak HBM is
+26,375,554,560 bytes/chip with at least 6,381,496,320 bytes largest-free-block margin. Rank-0
+JSON/NPZ SHAs are `2b79c484...990b` / `2be686ff...eeb1`, all logs share `03629037...eac`, and
+cleanup is 8/8. There is no summary, DB, terminal SUCCESS or performance claim. This rejects the
+current WS32 plan on exactness; another full WS32 run is forbidden without a bounded layer-1 proof.
+
 Bounded checkpoint tag
 `greenfield_ws32_strategy_nd_layer0_pack_20260826T232037240198985Z` at pushed/mirrored code
 `fbaaae3` maps layer-0 dense ranks into 32 exact WS32 expert-8/feature-4 owners. Payload is

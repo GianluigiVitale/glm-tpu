@@ -2,6 +2,27 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 exact-dense WS32 numerical run rejects on layer-1 DSA
+
+- Protected tag
+  `greenfield_ws32_short_decoder_8k_numerical_20260827T011711674195301Z` at pushed/mirrored code
+  `04d059b` reproduced all six acquired HLO pairs and executed the complete real checkpoint with
+  the sealed dense overlay. All eight reports agree on `ORACLE_MISMATCH`; raw tokens are exact
+  20/20, state/cache contracts pass, and event 0/layer 0 DSA positions and scores are bitwise exact.
+- The first failure remains event 1/layer 1 at position 8,155: seven expected positions are replaced
+  by seven others. Every later producer then cascades. The overlay is live--its layer-1/later DSA
+  arrays differ from the prior failed decoder--but it did not repair this boundary. Counts, tails,
+  producer ids, device order/tie rules and score contracts remain valid.
+- Diagnostic-only fleet p50 spans `129.228901--129.2916055 ms/token` and p99 spans
+  `131.8674615--131.99492959`; maximum peak HBM is 26,375,554,560 bytes/chip with minimum
+  largest-free block 6,381,496,320 bytes. Rank-0 JSON/NPZ SHAs are `2b79c484...990b` /
+  `2be686ff...eeb1`; all logs share `03629037...eac`. The remote prefix holds 134 nonterminal
+  diagnostics and eight XPlanes; failure cleanup is 8/8 clean. There is no summary, DB row,
+  terminal `SUCCESS` or performance claim.
+- Do not rerun the complete WS32 decoder. This is an exactness rejection for the current WS32 plan
+  despite useful diagnostic wall time. Resume PP8/PP16 Gate-D work; any future WS32 reconsideration
+  requires a bounded layer-1 state-boundary proof first.
+
 ## 2026-08-27 complete WS32 exact-dense HLO acquisition passes
 
 - Compile-only tag
