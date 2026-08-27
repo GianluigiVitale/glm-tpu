@@ -77,6 +77,11 @@ def validate_records(
         if linear_backend == "pallas"
         else "tpu_v4_pp16_pallas_feature"
     )
+    artifact_kind = (
+        "greenfield_real_78layer_2k_decoder_token_pallas_feature_linear"
+        if linear_backend == "pallas"
+        else "greenfield_real_78layer_2k_decoder_token_pallas_feature"
+    )
     paths = sorted((run_dir / "host_records").glob("decoder.rank*.json"))
     _require(len(paths) == 8, "PP16 acquisition requires exactly eight host records")
     records_by_rank: dict[int, dict[str, Any]] = {}
@@ -97,8 +102,7 @@ def validate_records(
     for rank, record in enumerate(records):
         _require(record.get("schema_version") == 18, f"rank {rank} schema drifted")
         _require(
-            record.get("artifact_kind")
-            == "greenfield_real_78layer_2k_decoder_token_pallas_feature",
+            record.get("artifact_kind") == artifact_kind,
             f"rank {rank} artifact kind drifted",
         )
         expected_scalars = {

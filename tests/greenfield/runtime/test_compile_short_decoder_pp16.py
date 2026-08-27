@@ -230,6 +230,9 @@ def test_pp16_compile_acquisition_validator_admits_pallas_linear(
 ) -> None:
     records = [_record(rank) for rank in range(8)]
     for record in records:
+        record["artifact_kind"] = (
+            "greenfield_real_78layer_2k_decoder_token_pallas_feature_linear"
+        )
         record["runtime_kind"] = "pallas_feature_linear"
         record["linear_backend"] = "pallas"
         contract = record["hlo_contract"]
@@ -371,6 +374,7 @@ def test_pp16_compile_recovery_prepares_generation_pinned_no_tpu_capsule(
         recovery_run_tag=recovery_tag,
         workload_code_hash=CODE_HASH,
         recovery_code_hash="5" * 40,
+        runtime_kind="pallas_feature",
         client=_RecoveryClient(blobs),
     )
 

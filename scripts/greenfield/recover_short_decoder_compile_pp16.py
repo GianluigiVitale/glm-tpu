@@ -221,6 +221,7 @@ def prepare(
     recovery_run_tag: str,
     workload_code_hash: str,
     recovery_code_hash: str,
+    runtime_kind: str,
     client: storage.Client,
 ) -> dict[str, Any]:
     if run_dir.exists():
@@ -253,7 +254,9 @@ def prepare(
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
     shutil.copyfile(recovery_census, run_dir / "census_recovery.txt")
-    summary = validate_records(run_dir, workload_code_hash)
+    summary = validate_records(
+        run_dir, workload_code_hash, runtime_kind=runtime_kind
+    )
     recovery: dict[str, Any] = {
         "artifact_kind": "greenfield_pp16_short_decoder_compile_recovery",
         "gate_d_passed": False,
@@ -264,6 +267,7 @@ def prepare(
         "recovery_run_tag": recovery_run_tag,
         "remote_prefix": remote_prefix,
         "results_db_run_id": None,
+        "runtime_kind": runtime_kind,
         "source_objects": source_objects,
         "source_remote_prefix": source_remote_prefix,
         "source_run_tag": source_run_tag,
@@ -397,6 +401,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--recovery-run-tag", required=True)
     parser.add_argument("--workload-code-hash", required=True)
     parser.add_argument("--recovery-code-hash", required=True)
+    parser.add_argument(
+        "--runtime-kind",
+        choices=("pallas_feature", "pallas_feature_linear"),
+        default="pallas_feature",
+    )
     parser.add_argument("--publish", action="store_true")
     return parser.parse_args()
 
@@ -414,6 +423,7 @@ def main() -> int:
         recovery_run_tag=args.recovery_run_tag,
         workload_code_hash=args.workload_code_hash,
         recovery_code_hash=args.recovery_code_hash,
+        runtime_kind=args.runtime_kind,
         client=client,
     )
     if not args.publish:
