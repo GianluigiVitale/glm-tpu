@@ -9,6 +9,8 @@ readonly BRANCH=rewrite/topology-first-decode
 readonly ORIGIN=git@github.com:GianluigiVitale/glm-tpu.git
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly APPROVED_LOCATION=US-CENTRAL2
+readonly TARGET_WORKER=4
+readonly TARGET_PROCESS=0
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly PROBE_TAG=greenfield_checkpoint_probe_pp16_20260827T024902158913509Z
 readonly PROBE_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/probes/PP16_LP2/$PROBE_TAG
@@ -17,7 +19,7 @@ readonly PROBE_MANIFEST_FILE_SHA=f235510cbdfcb1d16d534420cbaacb80283f8bd330c9207
 readonly PROBE_SUCCESS_FILE_SHA=0e6880d7ff80fc840fea0c15de4030febbd8146c8254d9f1506e463ec0149945
 readonly PLAN_TAG=greenfield_checkpoint_plan_pp16_20260827T022537742669498Z
 readonly LAYOUT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/plans/PP16_LP2/$PLAN_TAG/layout_manifest.json
-readonly TOPOLOGY=/home/gianl/gcs-models/results/greenfield_topology_20260826T194116460015528Z/host_records/topology.rank0.json
+readonly TOPOLOGY=/home/gianl/gcs-models/results/greenfield_topology_20260826T194116460015528Z/host_records/topology.rank4.json
 readonly SOURCE_REVISION=gcs-object-set-830fd1bf7d8d6b6242895cfd50f5978e5cc5749da42246c19391855e586e9658
 
 cd "$WORKTREE"
@@ -30,7 +32,8 @@ TAG=${GLM_GREENFIELD_PP16_CHECKPOINT_PROBE_LOAD_TAG:-greenfield_checkpoint_probe
 [[ $TAG =~ ^greenfield_checkpoint_probe_load_pp16_[0-9]{8}T[0-9]{15}Z$ ]]
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
-readonly PIN TAG RUN_DIR REMOTE_PREFIX
+STAGING_PREFIX=$APPROVED_BUCKET/diagnostics/greenfield/checkpoint_probe_load/$TAG
+readonly PIN TAG RUN_DIR REMOTE_PREFIX STAGING_PREFIX
 
 [[ $(git branch --show-current) == "$BRANCH" ]]
 [[ -z $(git status --porcelain) ]]
@@ -88,28 +91,34 @@ pod_state=$(gcloud compute tpus tpu-vm describe "$POD" --zone "$ZONE" \
 gcloud storage objects list "$REMOTE_PREFIX/**" --format='value(name)' \
   >"$RUN_DIR/remote_vacancy.txt"
 [[ ! -s $RUN_DIR/remote_vacancy.txt ]]
+gcloud storage objects list "$STAGING_PREFIX/**" --format='value(name)' \
+  >"$RUN_DIR/staging_vacancy.txt"
+[[ ! -s $RUN_DIR/staging_vacancy.txt ]]
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR/preflight.json" "$PIN" "$TAG" "$REMOTE_PREFIX" <<'PY'
 import json,sys
 from pathlib import Path
 value={'approved_bucket':'gs://driftbench-dsv4-uc','bucket_location':'US-CENTRAL2','code_hash':sys.argv[2],
  'performance_claim':False,'plan_id':'PP16_LP2','probe_manifest_sha256':'14c36aeb356b9856bd0fa2040ba2b3b2923909cda194afb9d41ab8af011ac4e3',
- 'remote_prefix':sys.argv[4],'run_tag':sys.argv[3]}
+ 'remote_prefix':sys.argv[4],'run_tag':sys.argv[3],'target_jax_process':0,'target_tpu_worker_suffix':4}
 Path(sys.argv[1]).write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
 PY
 
 strict_census pre || { say "ABORT: pre-run census is not 8/8 clean"; exit 1; }
+say "syncing authenticated worker $TARGET_WORKER / JAX process $TARGET_PROCESS to exact code pin"
+sync_command='set -euo pipefail; wt='"$WORKTREE"'; pin='"$PIN"'; branch='"$BRANCH"'; [[ -e "$wt/.git" ]]; [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]]; [[ -z $(git -C "$wt" status --porcelain) ]]; [[ $(hostname) == t1v-n-ae271d05-w-4 ]]; echo "SYNC_OK $(hostname) $pin"'
+gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker="$TARGET_WORKER" \
+  --command="$sync_command" >"$RUN_DIR/sync_target.txt" 2>&1
+grep -q "SYNC_OK t1v-n-ae271d05-w-4 $PIN" "$RUN_DIR/sync_target.txt"
+
 say "loading two final owners onto adjacent TPU v4 chips and round-tripping all bytes"
-JAX_PLATFORMS=tpu TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
-  TPU_PROCESS_BOUNDS=1,1,1 TPU_VISIBLE_DEVICES=0,1,2,3 \
-  XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$WORKTREE" \
-  timeout --signal=TERM --kill-after=30 600 \
-  /home/gianl/vllm-env/bin/python scripts/greenfield/load_checkpoint_probe.py \
-    --checkpoint-root "$PROBE_ROOT" --layout-manifest "$LAYOUT" \
-    --topology-capture "$TOPOLOGY" --destination "$APPROVED_BUCKET/checkpoints/greenfield/glm52/probes/PP16_LP2/$PROBE_TAG" \
-    --expected-code-hash "$PIN" --expected-manifest-sha256 "$PROBE_MANIFEST_SHA" \
-    --output "$RUN_DIR/runner.json" --state-manifest-output "$RUN_DIR/state.json" \
-    >"$RUN_DIR/runner.log" 2>&1
+runner_command='set -uo pipefail; wt='"$WORKTREE"'; pin='"$PIN"'; tag='"$TAG"'; probe='"$PROBE_ROOT"'; layout='"$LAYOUT"'; topology='"$TOPOLOGY"'; destination='"$APPROVED_BUCKET/checkpoints/greenfield/glm52/probes/PP16_LP2/$PROBE_TAG"'; manifest='"$PROBE_MANIFEST_SHA"'; staging='"$STAGING_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run"; cd "$wt"; status=0; env JAX_PLATFORMS=tpu TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 TPU_PROCESS_BOUNDS=1,1,1 TPU_VISIBLE_DEVICES=0,1,2,3 XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" timeout --signal=TERM --kill-after=30 600 /home/gianl/vllm-env/bin/python scripts/greenfield/load_checkpoint_probe.py --checkpoint-root "$probe" --layout-manifest "$layout" --topology-capture "$topology" --destination "$destination" --expected-code-hash "$pin" --expected-manifest-sha256 "$manifest" --output "$run/runner.json" --state-manifest-output "$run/state.json" >"$run/runner.log" 2>&1 || status=$?; gcloud storage cp --no-clobber "$run/runner.log" "$staging/runner.log" >/dev/null || true; [[ $status -eq 0 ]] || exit "$status"; gcloud storage cp --no-clobber "$run/runner.json" "$run/state.json" "$staging/" >/dev/null; echo "LOAD_OK $(hostname)"'
+gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker="$TARGET_WORKER" \
+  --command="$runner_command" >"$RUN_DIR/dispatch.txt" 2>&1
+grep -q "LOAD_OK t1v-n-ae271d05-w-4" "$RUN_DIR/dispatch.txt"
+gcloud storage cp "$STAGING_PREFIX/runner.json" "$RUN_DIR/runner.json" >/dev/null
+gcloud storage cp "$STAGING_PREFIX/state.json" "$RUN_DIR/state.json" >/dev/null
+gcloud storage cp "$STAGING_PREFIX/runner.log" "$RUN_DIR/runner.log" >/dev/null
 strict_census post || { say "ABORT: post-run census is not 8/8 clean"; exit 1; }
 post_census_done=1
 
@@ -165,13 +174,15 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 (
   cd "$RUN_DIR"
   sha256sum runner.json state.json runner.log summary.json results_ckpt.db \
-    preflight.json census_pre.txt census_post.txt orchestrator.sealed.log
+    preflight.json sync_target.txt dispatch.txt census_pre.txt census_post.txt \
+    orchestrator.sealed.log
 ) >"$RUN_DIR/evidence.sha256"
 (cd "$RUN_DIR" && sha256sum -c evidence.sha256 >/dev/null)
 
 say "publishing nonterminal protected load evidence"
 for name in runner.json state.json runner.log summary.json results_ckpt.db preflight.json \
-  census_pre.txt census_post.txt orchestrator.sealed.log evidence.sha256; do
+  sync_target.txt dispatch.txt census_pre.txt census_post.txt orchestrator.sealed.log \
+  evidence.sha256; do
   gcloud storage cp --no-clobber "$RUN_DIR/$name" "$REMOTE_PREFIX/$name" >/dev/null
 done
 
@@ -185,7 +196,9 @@ import sys
 import google_crc32c
 from google.cloud import storage
 run=Path(sys.argv[1]); remote=sys.argv[2]
-names=['runner.json','state.json','runner.log','summary.json','results_ckpt.db','preflight.json','census_pre.txt','census_post.txt','orchestrator.sealed.log','evidence.sha256']
+names=['runner.json','state.json','runner.log','summary.json','results_ckpt.db','preflight.json',
+ 'sync_target.txt','dispatch.txt','census_pre.txt','census_post.txt','orchestrator.sealed.log',
+ 'evidence.sha256']
 bucket_name,prefix=remote[5:].split('/',1); prefix=prefix.rstrip('/')+'/'
 blobs={b.name.removeprefix(prefix):b for b in storage.Client().list_blobs(bucket_name,prefix=prefix)}
 if set(blobs)!=set(names): raise SystemExit('load preterminal remote set drifted')
