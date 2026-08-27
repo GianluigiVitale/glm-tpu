@@ -17,6 +17,7 @@ from scripts.greenfield.validate_short_decoder_compile_pp16 import (
     validate_records,
 )
 from scripts.greenfield.seal_short_decoder_compile_pp16 import (
+    PP16_COMPILE_HLO_FILES,
     TOP_LEVEL_EVIDENCE,
     _local_evidence,
     _parse_remote,
@@ -318,20 +319,27 @@ def test_pp16_compile_acquisition_runner_is_small_default_off_and_protected() ->
 def test_pp16_compile_sealer_requires_exact_local_evidence_set(
     tmp_path: Path,
 ) -> None:
-    for folder, count in (("host_records", 8), ("host_logs", 8), ("hlo", 3)):
+    for folder, count in (("host_records", 8), ("host_logs", 8)):
         root = tmp_path / folder
         root.mkdir()
         for index in range(count):
             (root / f"artifact{index}").write_text("sealed\n")
+    hlo = tmp_path / "hlo"
+    hlo.mkdir()
+    for name in PP16_COMPILE_HLO_FILES:
+        (hlo / name).write_text("sealed\n")
     for name in TOP_LEVEL_EVIDENCE:
         (tmp_path / name).write_text("sealed\n")
 
     evidence = _local_evidence(tmp_path)
 
-    assert len(evidence) == 28
+    assert len(evidence) == 30
     assert _parse_remote(
         "gs://driftbench-dsv4-uc/results/compile-proof"
     ) == ("driftbench-dsv4-uc", "results/compile-proof/")
+    (hlo / "unexpected.hlo").write_text("drift\n")
+    with pytest.raises(ValueError, match="hlo set drifted"):
+        _local_evidence(tmp_path)
     with pytest.raises(ValueError, match="approved results bucket"):
         _parse_remote("gs://driftbench-storage/results/compile-proof")
 
@@ -372,7 +380,7 @@ def _write_recovery_source(root: Path) -> None:
         (host_logs / f"decoder.rank{rank}.log").write_text(f"rank={rank}\n")
     hlo = root / "hlo"
     hlo.mkdir()
-    for name in ("contract.json", "optimized.txt.gz", "stable.mlir.gz"):
+    for name in sorted(PP16_COMPILE_HLO_FILES):
         (hlo / name).write_text(f"{name}\n")
     for name in ("census_pre.txt", "census_post.txt"):
         (root / name).write_text(_census())
@@ -426,10 +434,57 @@ def test_pp16_compile_recovery_prepares_generation_pinned_no_tpu_capsule(
     assert result["recovery"]["tpu_initialized_by_recovery"] is False
     assert result["recovery"]["performance_claim"] is False
     assert result["recovery"]["gate_d_passed"] is False
-    assert len(result["recovery"]["source_objects"]) == 26
+    assert len(result["recovery"]["source_objects"]) == 28
     for line in (run_dir / "evidence.sha256").read_text().splitlines():
         expected, relative_name = line.split("  ", 1)
         assert sha256((run_dir / relative_name).read_bytes()).hexdigest() == expected
+
+
+def test_pp16_compile_recovery_accepts_current_direct_preterminal_layout(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    _write_recovery_source(source)
+    (source / "orchestrator.log").rename(source / "orchestrator.sealed.log")
+    census = tmp_path / "recovery-census.txt"
+    census.write_text(_census())
+    source_tag = "greenfield_short_decoder_compile_pp16_acquisition_current"
+    source_uri = f"gs://driftbench-dsv4-uc/results/{source_tag}"
+    recovery_tag = "greenfield_short_decoder_compile_pp16_recovery_current"
+    recovery_uri = f"gs://driftbench-dsv4-uc/results/{recovery_tag}"
+    _, source_prefix = _parse_results_uri(source_uri)
+    local_files = _source_local_files(source)
+    blobs = {}
+    for relative_name, path in local_files.items():
+        remote_name = (
+            source_prefix + "orchestrator.sealed.log"
+            if relative_name == "source_orchestrator.log"
+            else source_prefix + relative_name
+        )
+        blobs[remote_name] = _RecoveryBlob(
+            size=path.stat().st_size, crc32c=_crc32c_file(path)
+        )
+
+    result = prepare(
+        source_dir=source,
+        run_dir=tmp_path / "recovered",
+        recovery_census=census,
+        source_remote_prefix=source_uri,
+        remote_prefix=recovery_uri,
+        source_run_tag=source_tag,
+        recovery_run_tag=recovery_tag,
+        workload_code_hash=CODE_HASH,
+        recovery_code_hash="5" * 40,
+        runtime_kind="pallas_feature",
+        client=_RecoveryClient(blobs),
+    )
+
+    assert len(result["recovery"]["source_objects"]) == 28
+    assert all(
+        "/diagnostic_local/" not in str(item["name"])
+        for item in result["recovery"]["source_objects"]
+    )
 
 
 def test_pp16_compile_recovery_rejects_non_eight_host_census(tmp_path: Path) -> None:

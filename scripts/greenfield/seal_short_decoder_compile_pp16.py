@@ -26,6 +26,21 @@ TOP_LEVEL_EVIDENCE = (
     "sync.txt",
 )
 
+DECODER_HLO_FILES = frozenset(
+    {
+        "decoder_78layer_2k_token.hlo_contract.json",
+        "decoder_78layer_2k_token.optimized_hlo.txt.gz",
+        "decoder_78layer_2k_token.stablehlo.mlir.gz",
+    }
+)
+EXACT_QUERY_HLO_FILES = frozenset(
+    {
+        "dsa_query_weight_materializer.hlo_contract.json",
+        "dsa_query_weight_materializer.optimized_hlo.txt.gz",
+    }
+)
+PP16_COMPILE_HLO_FILES = DECODER_HLO_FILES | EXACT_QUERY_HLO_FILES
+
 
 def _canonical(value: dict[str, Any]) -> bytes:
     return json.dumps(
@@ -55,7 +70,7 @@ def _parse_remote(remote: str) -> tuple[str, str]:
 
 def _local_evidence(run_dir: Path) -> dict[str, Path]:
     local: dict[str, Path] = {}
-    expected_counts = {"host_records": 8, "host_logs": 8, "hlo": 3}
+    expected_counts = {"host_records": 8, "host_logs": 8}
     for folder, expected_count in expected_counts.items():
         paths = sorted((run_dir / folder).iterdir())
         paths = [path for path in paths if path.is_file()]
@@ -66,6 +81,18 @@ def _local_evidence(run_dir: Path) -> dict[str, Path]:
             )
         for path in paths:
             local[f"{folder}/{path.name}"] = path
+    hlo_paths = sorted(
+        path for path in (run_dir / "hlo").iterdir() if path.is_file()
+    )
+    observed_hlo = {path.name for path in hlo_paths}
+    if observed_hlo != PP16_COMPILE_HLO_FILES:
+        raise ValueError(
+            "PP16 compile hlo set drifted: "
+            f"missing={sorted(PP16_COMPILE_HLO_FILES - observed_hlo)} "
+            f"extra={sorted(observed_hlo - PP16_COMPILE_HLO_FILES)}"
+        )
+    for path in hlo_paths:
+        local[f"hlo/{path.name}"] = path
     for name in TOP_LEVEL_EVIDENCE:
         path = run_dir / name
         if not path.is_file():

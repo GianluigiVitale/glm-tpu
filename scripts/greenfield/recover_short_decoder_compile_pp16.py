@@ -25,11 +25,15 @@ from google.cloud import storage
 from scripts.greenfield.validate_short_decoder_compile_pp16 import (
     validate_records,
 )
+from scripts.greenfield.seal_short_decoder_compile_pp16 import (
+    DECODER_HLO_FILES,
+    PP16_COMPILE_HLO_FILES,
+)
 
 
 APPROVED_BUCKET = "driftbench-dsv4-uc"
 APPROVED_RESULTS_PREFIX = "results/"
-SOURCE_FOLDERS = {"hlo": 3, "host_logs": 8, "host_records": 8}
+SOURCE_FOLDERS = {"host_logs": 8, "host_records": 8}
 SOURCE_TOP_LEVEL = (
     "census_post.txt",
     "census_pre.txt",
@@ -117,17 +121,36 @@ def _verify_evidence_manifest(run_dir: Path) -> None:
 def _source_local_files(source_dir: Path) -> dict[str, Path]:
     files: dict[str, Path] = {}
     for folder, count in SOURCE_FOLDERS.items():
-        paths = sorted(path for path in (source_dir / folder).iterdir() if path.is_file())
+        paths = sorted(
+            path
+            for path in (source_dir / folder).iterdir()
+            if path.is_file()
+        )
         if len(paths) != count:
-            raise ValueError(f"source {folder} expected {count} files, found {len(paths)}")
+            raise ValueError(
+                f"source {folder} expected {count} files, found {len(paths)}"
+            )
         for path in paths:
             files[f"{folder}/{path.name}"] = path
+    hlo_paths = sorted(
+        path for path in (source_dir / "hlo").iterdir() if path.is_file()
+    )
+    observed_hlo = {path.name for path in hlo_paths}
+    if observed_hlo not in (DECODER_HLO_FILES, PP16_COMPILE_HLO_FILES):
+        raise ValueError(
+            "source hlo set drifted: "
+            f"observed={sorted(observed_hlo)}"
+        )
+    for path in hlo_paths:
+        files[f"hlo/{path.name}"] = path
     for name in SOURCE_TOP_LEVEL:
         path = source_dir / name
         if not path.is_file():
             raise ValueError(f"source acquisition is missing {name}")
         files[name] = path
-    orchestrator = source_dir / "orchestrator.log"
+    orchestrator = source_dir / "orchestrator.sealed.log"
+    if not orchestrator.is_file():
+        orchestrator = source_dir / "orchestrator.log"
     if not orchestrator.is_file():
         raise ValueError("source acquisition is missing orchestrator.log")
     files["source_orchestrator.log"] = orchestrator
@@ -151,6 +174,24 @@ def _source_blob_name(
     )
 
 
+def _source_blob_candidates(
+    relative_name: str, *, source_prefix: str, source_run_tag: str
+) -> tuple[str, ...]:
+    if relative_name == "source_orchestrator.log":
+        direct = (
+            source_prefix + "orchestrator.sealed.log",
+            source_prefix + "orchestrator.log",
+        )
+    else:
+        direct = (source_prefix + relative_name,)
+    legacy = _source_blob_name(
+        relative_name,
+        source_prefix=source_prefix,
+        source_run_tag=source_run_tag,
+    )
+    return (*direct, legacy)
+
+
 def _verify_source_objects(
     *,
     client: storage.Client,
@@ -162,21 +203,30 @@ def _verify_source_objects(
     bucket = client.bucket(bucket_name)
     result: list[dict[str, object]] = []
     for relative_name, path in sorted(local_files.items()):
-        blob_name = _source_blob_name(
+        crc = _crc32c_file(path)
+        blob_name = ""
+        blob = None
+        for candidate in _source_blob_candidates(
             relative_name,
             source_prefix=source_prefix,
             source_run_tag=source_run_tag,
-        )
-        blob = bucket.get_blob(blob_name)
-        crc = _crc32c_file(path)
-        if blob is None:
-            raise ValueError(f"preserved source object is missing: {blob_name}")
-        if (
-            int(blob.size) != path.stat().st_size
-            or blob.crc32c != crc
-            or not blob.generation
         ):
-            raise ValueError(f"preserved source object drifted: {blob_name}")
+            candidate_blob = bucket.get_blob(candidate)
+            if candidate_blob is None:
+                continue
+            if (
+                int(candidate_blob.size) == path.stat().st_size
+                and candidate_blob.crc32c == crc
+                and candidate_blob.generation
+            ):
+                blob_name = candidate
+                blob = candidate_blob
+                break
+        if blob is None:
+            raise ValueError(
+                "preserved source object is missing or drifted: "
+                f"{relative_name}"
+            )
         result.append(
             {
                 "crc32c": crc,
@@ -195,11 +245,26 @@ def _recovery_files(
 ) -> dict[str, Path]:
     files: dict[str, Path] = {}
     for folder, count in SOURCE_FOLDERS.items():
-        paths = sorted(path for path in (run_dir / folder).iterdir() if path.is_file())
+        paths = sorted(
+            path for path in (run_dir / folder).iterdir() if path.is_file()
+        )
         if len(paths) != count:
-            raise ValueError(f"recovery {folder} expected {count} files, found {len(paths)}")
+            raise ValueError(
+                f"recovery {folder} expected {count} files, found {len(paths)}"
+            )
         for path in paths:
             files[f"{folder}/{path.name}"] = path
+    hlo_paths = sorted(
+        path for path in (run_dir / "hlo").iterdir() if path.is_file()
+    )
+    observed_hlo = {path.name for path in hlo_paths}
+    if observed_hlo not in (DECODER_HLO_FILES, PP16_COMPILE_HLO_FILES):
+        raise ValueError(
+            "recovery hlo set drifted: "
+            f"observed={sorted(observed_hlo)}"
+        )
+    for path in hlo_paths:
+        files[f"hlo/{path.name}"] = path
     for name in RECOVERY_TOP_LEVEL:
         if name == "evidence.sha256" and not require_evidence_manifest:
             continue
