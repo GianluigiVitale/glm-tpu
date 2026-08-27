@@ -6,6 +6,16 @@ but not Gate E. WS32 has the accepted 2K DB553 point at `122.630667 ms/token` / 
 No accepted 8K, 128K, 256K or PP16 full-decoder measurement exists yet. Bounded
 layer/kernel/diagnostic results below are not token-speed proof.
 
+## 2026-08-27 — exact PP16 LP2 query is fast but remains bounded
+
+DB561 / `greenfield_pp16_lp2_exact_query_20260827T161033467085863Z` proves the real layer-0
+position-8155 query and head bitwise on the exact adjacent two-chip group. The device loop executes
+the proven 1,024-row tuple4 body twice per local 2,048-row owner; HLO has no global owner, all-gather
+or host callback. Its 1-warmup/3-sample profiler-free p50 is `0.448280 ms`, with query/head hashes
+matching the accepted oracle and only 22,087,680 peak bytes/device. This timing is a bounded
+component diagnostic, not complete-decoder or token latency and cannot close Gate D/E. It removes
+the repeated in-step FP32 dequantization hypothesis and authorizes one exact-query PP16 compile.
+
 ## 2026-08-27 — PP16 repeats 101.5-second diagnostic wall; stop before numerical runs
 
 `greenfield_short_decoder_compile_pp16_acquisition_20260827T132707782908362Z` passes all on-device

@@ -2,6 +2,27 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 PP16 exact query is bitwise restored at LP2 geometry
+
+- Protected DB561 / tag
+  `greenfield_pp16_lp2_exact_query_20260827T161033467085863Z` reuses DB554's immutable real
+  layer-0 position-8155 capsule and executes only the two adjacent stage-0 devices `[0,1]` at
+  coordinates `[(0,0,0),(1,0,0)]`. Code pin `4c01076` is pushed and same-region mirrored; pre/post
+  fleet censuses are authenticated 8/8 clean.
+- Each local FP32 WQ_B owner is `[2048,2048]` and is consumed as two 1,024-row/eight-head chunks.
+  StableHLO has one device loop, four tuple-anchor dots plus the live head dot, two barriers, zero
+  all-gather and zero host callback. Optimized HLO has one exact 16-KiB tuple4 body executed twice,
+  no global WQ_B shape, and SHA `62340567...a243`.
+- The real query `[1,32,128]` and head `[1,32]` are bitwise equal to the accepted oracle: SHAs
+  `1ff2c2ec...f0aecb12a` / `ec66b475...ae1725e`. Diagnostic profiler-free p50 is `0.448280 ms`
+  over 1 warmup/3 samples; peak HBM is only 22,087,680 bytes/device. This is bounded arithmetic/HLO
+  evidence, not decoder, Gate-D, token-rate or performance proof.
+- The first nine-second attempt at `67fb5d3` correctly refused before arithmetic because XLA fused
+  two source-level groups into one rejected 32-KiB eight-result reduction. Its 8/8 cleanup and HLO
+  are preserved. The device-loop correction retains PP8's one-group graph and passes 57 CPU/runtime
+  tests. Exact next: enable the materialized exact-query path in the PP16 acquisition, compile/lint
+  once, and require 21 loop bodies / 42 runtime tuple4 groups before any numerical 2K/8K run.
+
 ## 2026-08-27 PP16 exact-2K attention is not the remaining bottleneck
 
 - Protected DB560 / tag

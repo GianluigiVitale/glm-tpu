@@ -14,6 +14,7 @@ fleet agreement, and eight-host clean pre/post census.
 
 | DB | tag | evidence |
 |---:|---|---|
+| 561 | `greenfield_pp16_lp2_exact_query_20260827T161033467085863Z` | real DB554 layer-0 LP2 exact query/head bitwise proof; two adjacent chips, local 2,048-row owner split into two runtime 1,024-row tuple4 groups, no global owner/host callback; bounded diagnostic only |
 | 557 | `greenfield_full_checkpoint_load_pp16_20260827T070407924804237Z` | complete PP16 16-stage/32-owner raw direct-load, byte round-trip, state/HBM/archive/cleanup proof; no performance claim |
 | 555 | `greenfield_topology_20260826T194116460015528Z` | replacement-pod physical `2x4x4` topology, fresh PP8/PP16 groups and fleet binding |
 | 405 | `greenfield_topology_20260805T125842425591441Z` | physical `2x4x4` topology and PP8/PP16 rings |

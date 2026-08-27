@@ -57,6 +57,7 @@
 | WS32 full runtime pack | Reviewed pack/finalize/direct-load implementation covers 117,060 source tensors, 2,310 final tensors/slot and 24,567,890,256 payload bytes/slot with protected SUCCESS binding. | Local implementation/audit pass; sealed 32-slot artifact missing |
 | WS32 protected short decoder | Reviewed/pushed `a908c36`; four executables/eight pins, exact sealed 2K/8K token+DSA inputs, raw cache/DSA evidence, one-row state, HBM/wall/XPlane, DB/archive/cleanup; 70/70 local tests and immutable Sol approval. | Readiness pass only; checkpoint, HLO acquisition and protected 2K/8K executions missing |
 | Gate D prompt index-cache/scorer discriminator | DB505--518 make the complete 8,155-row cache exact; DB521--527 make current query/head/key exact. DB528 rejects page geometry. DB529's same-shape TPU default-precision arm matches the accepted logical and selected scores/set/order/ties exactly, with pinned HLO/DB/archive/cleanup. | Pass; do not repeat bounded scorer variants |
+| PP16 LP2 exact query discriminator | DB561: real DB554 layer-0 position-8155 WQ_B/q-a/normalized/head state; query/head bitwise exact; adjacent devices 0/1; one 16-KiB tuple4 loop body executed twice per local 2,048-row owner; p50 0.448280 ms; HLO/HBM/DB/archive/cleanup | Pass (bounded mechanism); integrate once into PP16 full graph, no Gate-D/performance claim |
 | Gates E–H | Await Gate D | Missing |
 
 Last complete CPU-only suite before the production integration: 441 passed / 1 expected skip

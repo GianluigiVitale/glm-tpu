@@ -5,6 +5,31 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 16:04--16:11 UTC — DB561 restores exact PP16 LP2 query in 0.448 ms
+
+The first bounded tag `greenfield_pp16_lp2_exact_query_20260827T160411795048512Z` at `67fb5d3`
+stopped at the HLO gate before arithmetic: StableHLO retained two source tuple4 groups, but TPU XLA
+merged all eight reductions into one `megacore_allreduce_bytes=32768` fusion. Failure cleanup was
+authenticated 8/8 and the narrow HLO was preserved. This is useful negative evidence; separate
+optimization barriers do not isolate two LP2 chunks.
+
+The correction keeps PP8's existing one-group branch unchanged and expresses LP2 as a two-iteration
+device loop whose body contains one proven tuple4 group. Fifty-seven CPU/runtime tests pass. The
+protected retry, DB561 / tag
+`greenfield_pp16_lp2_exact_query_20260827T161033467085863Z`, uses pushed/mirrored pin `4c01076`,
+DB554's real layer-0 position-8155 WQ_B/q-a/normalized/head capsule, and adjacent physical devices
+`0/1` at `(0,0,0)/(1,0,0)`. Both clean-fleet censuses pass.
+
+The materializer exposes only local `u8[2048,2048]`/`f32[16,16]` inputs and FP32
+`[2048,2048]` output with no communication, callback or global owner. Query StableHLO has one loop,
+five dots total (four tuple anchors plus one head projection), two barriers, zero all-gather and no
+host callback. Optimized HLO SHA `62340567...a243` has one 16-KiB tuple4 body executed twice and no
+global WQ_B shape. Query/head are bitwise exact with accepted SHAs `1ff2c2ec...f0aecb12a` and
+`ec66b475...ae1725e`. Diagnostic p50 is `0.448280 ms` over 1 warmup/3 iterations; maximum peak HBM
+is 22,087,680 bytes. This closes only the real LP2 query mechanism. No decoder, Gate-D, token-rate
+or performance claim is made. Next integrate exact materialization/query into one PP16 full-graph
+compile and require 21 loop bodies / 42 runtime tuple groups before numerical execution.
+
 ## 2026-08-27 15:26--15:28 UTC — exact LP2/2K attention is fast; Pallas loses
 
 The first protected attempt at tag
