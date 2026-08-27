@@ -325,6 +325,25 @@ def test_pp8_runner_supports_default_off_metadata_parent_lineage() -> None:
     assert "METADATA_SOURCE_SUFFIX=_metaparent" in runner
 
 
+def test_pp8_runner_reads_restart_safe_prerequisites_from_approved_mount() -> None:
+    runner = PROTECTED_RUNNER.read_text()
+
+    assert "PREREQUISITE_DIR=/home/gianl/glm-run/" not in runner
+    assert runner.count("PREREQUISITE_DIR=/home/gianl/gcs-models/") == 14
+
+
+def test_pp8_runner_has_non_tpu_full_metadata_preflight() -> None:
+    runner = PROTECTED_RUNNER.read_text()
+
+    assert (
+        "readonly PREFLIGHT_ONLY="
+        "${GLM_GREENFIELD_SHORT_DECODER_PREFLIGHT_ONLY:-0}" in runner
+    )
+    assert "short decoder preflight-only flag must be 0 or 1" in runner
+    assert "scripts/greenfield/inspect_feature_runtime_checkpoint.py" in runner
+    assert "SHORT_DECODER_PREFLIGHT_OK" in runner
+
+
 def test_prefill_index_repair_is_default_off_and_prerequisites_pinned() -> None:
     compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
     runner = PROTECTED_RUNNER.read_text()

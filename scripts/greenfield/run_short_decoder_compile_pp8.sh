@@ -14,6 +14,7 @@ readonly PROFILE=${GLM_GREENFIELD_SHORT_DECODER_PROFILE:-2k}
 readonly WARMUP=${GLM_GREENFIELD_SHORT_DECODER_WARMUP:-2}
 readonly ITERATIONS=${GLM_GREENFIELD_SHORT_DECODER_ITERATIONS:-10}
 readonly TRACE_STEPS=${GLM_GREENFIELD_SHORT_DECODER_TRACE_STEPS:-0}
+readonly PREFLIGHT_ONLY=${GLM_GREENFIELD_SHORT_DECODER_PREFLIGHT_ONLY:-0}
 readonly RUNTIME_KIND=${GLM_GREENFIELD_DECODER_RUNTIME_KIND:-pallas_feature_linear}
 readonly VERIFY_DEVICE_ROUNDTRIP=${GLM_GREENFIELD_RUNTIME_DEVICE_ROUNDTRIP:-0}
 readonly FEATURE_SOURCE_METADATA_ONLY=${GLM_GREENFIELD_FEATURE_SOURCE_METADATA_ONLY:-0}
@@ -102,6 +103,10 @@ readonly SOURCE_RUNTIME_ROOT=${GLM_GREENFIELD_SOURCE_RUNTIME_ROOT:-/home/gianl/g
 readonly SOURCE_RUNTIME_MANIFEST_SHA=${GLM_GREENFIELD_SOURCE_RUNTIME_MANIFEST_SHA:-fdedaae31fb3c094266272ed48dfe62bb098257a78272b93c14eafbd57e31dec}
 [[ $FEATURE_OUTPUT_TILE == 128 || $FEATURE_OUTPUT_TILE == 256 ]] || {
   echo "feature output tile must be 128 or 256" >&2
+  exit 2
+}
+[[ $PREFLIGHT_ONLY == 0 || $PREFLIGHT_ONLY == 1 ]] || {
+  echo "short decoder preflight-only flag must be 0 or 1" >&2
   exit 2
 }
 [[ $VERIFY_DEVICE_ROUNDTRIP == 0 || $VERIFY_DEVICE_ROUNDTRIP == 1 ]] || {
@@ -381,7 +386,7 @@ if [[ $LAYER0_DISCRIMINATOR == 1 ]]; then
 fi
 if [[ $PREGATHERED_B512_ATTENTION == 1 ]]; then
   readonly PREGATHERED_ATTENTION_PREREQUISITE_TAG=greenfield_layer0_attention_arithmetic_20260812T114701365714147Z
-  readonly PREGATHERED_ATTENTION_PREREQUISITE_DIR=/home/gianl/glm-run/$PREGATHERED_ATTENTION_PREREQUISITE_TAG
+  readonly PREGATHERED_ATTENTION_PREREQUISITE_DIR=/home/gianl/gcs-models/results/$PREGATHERED_ATTENTION_PREREQUISITE_TAG
   readonly PREGATHERED_ATTENTION_PREREQUISITE_REMOTE=$APPROVED_BUCKET/results/$PREGATHERED_ATTENTION_PREREQUISITE_TAG
   /home/gianl/vllm-env/bin/python - \
     "$PREGATHERED_ATTENTION_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
@@ -517,7 +522,7 @@ PY
 fi
 if [[ $STRATEGY_ND_ATTENTION_PROJECTION == 1 ]]; then
   readonly STRATEGY_ND_ATTENTION_PREREQUISITE_TAG=greenfield_legacy_layer0_attention_update_p8155_20260812T172809039093068Z
-  readonly STRATEGY_ND_ATTENTION_PREREQUISITE_DIR=/home/gianl/glm-run/$STRATEGY_ND_ATTENTION_PREREQUISITE_TAG
+  readonly STRATEGY_ND_ATTENTION_PREREQUISITE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/attention_update/8k/$STRATEGY_ND_ATTENTION_PREREQUISITE_TAG
   readonly STRATEGY_ND_ATTENTION_PREREQUISITE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/attention_update/8k/$STRATEGY_ND_ATTENTION_PREREQUISITE_TAG
   /home/gianl/vllm-env/bin/python - \
     "$STRATEGY_ND_ATTENTION_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
@@ -625,7 +630,7 @@ PY
 fi
 if [[ $DENSE_FINAL_LAYOUT_CONVOLUTION == 1 ]]; then
   readonly DENSE_FINAL_LAYOUT_PREREQUISITE_TAG=greenfield_layer0_dense_envelope_cross_layer_20260813T120703034434907Z
-  readonly DENSE_FINAL_LAYOUT_PREREQUISITE_DIR=/home/gianl/glm-run/$DENSE_FINAL_LAYOUT_PREREQUISITE_TAG
+  readonly DENSE_FINAL_LAYOUT_PREREQUISITE_DIR=/home/gianl/gcs-models/results/$DENSE_FINAL_LAYOUT_PREREQUISITE_TAG
   readonly DENSE_FINAL_LAYOUT_PREREQUISITE_REMOTE=$APPROVED_BUCKET/results/$DENSE_FINAL_LAYOUT_PREREQUISITE_TAG
   readonly DENSE_FINAL_LAYOUT_DECISION_TAG=greenfield_layer0_dense_envelope_split_rms_20260813T134012434338842Z
   readonly DENSE_FINAL_LAYOUT_DECISION_DIR=/home/gianl/glm-run/$DENSE_FINAL_LAYOUT_DECISION_TAG
@@ -936,7 +941,7 @@ if [[ $LAYER0_INGREDIENTS == 1 ]]; then
 fi
 if [[ $LAYER0_SUBSHARD_VARIANTS == 1 ]]; then
   readonly ISOLATED_RESIDUAL_PREREQUISITE_TAG=greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_oracle_dsa_layer0_residual_variants_trace2_20260810T221121969164909Z
-  readonly ISOLATED_RESIDUAL_PREREQUISITE_DIR=/home/gianl/glm-run/$ISOLATED_RESIDUAL_PREREQUISITE_TAG
+  readonly ISOLATED_RESIDUAL_PREREQUISITE_DIR=/home/gianl/gcs-models/results/$ISOLATED_RESIDUAL_PREREQUISITE_TAG
   readonly ISOLATED_RESIDUAL_PREREQUISITE_REMOTE=$APPROVED_BUCKET/results/$ISOLATED_RESIDUAL_PREREQUISITE_TAG
   /home/gianl/vllm-env/bin/python - "$ISOLATED_RESIDUAL_PREREQUISITE_DIR" <<'PY'
 from hashlib import sha256
@@ -1076,11 +1081,11 @@ fi
 
 if [[ $PREFILL_INDEX_REPAIR == 1 ]]; then
   readonly PREFILL_REPAIR_PREREQUISITE_TAG=greenfield_layer0_prompt_key_norm_m64_20260809T122010714691723Z
-  readonly PREFILL_REPAIR_PREREQUISITE_DIR=/home/gianl/glm-run/$PREFILL_REPAIR_PREREQUISITE_TAG
+  readonly PREFILL_REPAIR_PREREQUISITE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/prompt_key_norm_m64/8k/$PREFILL_REPAIR_PREREQUISITE_TAG
   readonly PREFILL_REPAIR_PREREQUISITE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_key_norm_m64/8k/$PREFILL_REPAIR_PREREQUISITE_TAG
   readonly PREFILL_REPAIR_PREREQUISITE_SUCCESS_SHA=a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee
   readonly PREFILL_SPLIT_PREREQUISITE_TAG=greenfield_layer0_prompt_key_norm_m64_20260809T200559393031635Z
-  readonly PREFILL_SPLIT_PREREQUISITE_DIR=/home/gianl/glm-run/$PREFILL_SPLIT_PREREQUISITE_TAG
+  readonly PREFILL_SPLIT_PREREQUISITE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/prompt_key_norm_m64/8k/$PREFILL_SPLIT_PREREQUISITE_TAG
   readonly PREFILL_SPLIT_PREREQUISITE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/prompt_key_norm_m64/8k/$PREFILL_SPLIT_PREREQUISITE_TAG
   readonly PREFILL_SPLIT_PREREQUISITE_SUCCESS_SHA=643f80eb8699e18714213bb828a72df8a9f89ba2db1e798ad598dd914a2083ca
   /home/gianl/vllm-env/bin/python - "$PREFILL_REPAIR_PREREQUISITE_DIR" "$RESULTS_DB" "$PREFILL_SPLIT_PREREQUISITE_DIR" <<'PY'
@@ -1267,7 +1272,7 @@ fi
 
 if [[ $DSA_QUERY_EXACT_ASSOCIATION == 1 ]]; then
   readonly DSA_QUERY_PREREQUISITE_TAG=greenfield_layer0_physical_lp4_dsa_head_geometry_20260810T060457076587721Z
-  readonly DSA_QUERY_PREREQUISITE_DIR=/home/gianl/glm-run/$DSA_QUERY_PREREQUISITE_TAG
+  readonly DSA_QUERY_PREREQUISITE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/physical_lp4_dsa_head_geometry_association/8k/$DSA_QUERY_PREREQUISITE_TAG
   readonly DSA_QUERY_PREREQUISITE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/physical_lp4_dsa_head_geometry_association/8k/$DSA_QUERY_PREREQUISITE_TAG
   /home/gianl/vllm-env/bin/python - "$DSA_QUERY_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
 from hashlib import sha256
@@ -1332,7 +1337,7 @@ PY
     exit 2
   }
   readonly DSA_QUERY_PRODUCTION_PREREQUISITE_TAG=greenfield_layer0_physical_lp4_dsa_query_production_exact_20260810T080508327295662Z
-  readonly DSA_QUERY_PRODUCTION_PREREQUISITE_DIR=/home/gianl/glm-run/$DSA_QUERY_PRODUCTION_PREREQUISITE_TAG
+  readonly DSA_QUERY_PRODUCTION_PREREQUISITE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/physical_lp4_dsa_query_production_exact/8k/$DSA_QUERY_PRODUCTION_PREREQUISITE_TAG
   readonly DSA_QUERY_PRODUCTION_PREREQUISITE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/physical_lp4_dsa_query_production_exact/8k/$DSA_QUERY_PRODUCTION_PREREQUISITE_TAG
   /home/gianl/vllm-env/bin/python - "$DSA_QUERY_PRODUCTION_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
 from hashlib import sha256
@@ -1419,7 +1424,7 @@ fi
 
 if [[ $DSA_HEAD_KEY_EXACT_ASSOCIATION == 1 ]]; then
   readonly DSA_HEAD_KEY_PREREQUISITE_TAG=greenfield_layer0_physical_lp4_dsa_head_key_boundary_20260810T104647319991568Z
-  readonly DSA_HEAD_KEY_PREREQUISITE_DIR=/home/gianl/glm-run/$DSA_HEAD_KEY_PREREQUISITE_TAG
+  readonly DSA_HEAD_KEY_PREREQUISITE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/physical_lp4_dsa_head_key_boundary_association/8k/$DSA_HEAD_KEY_PREREQUISITE_TAG
   readonly DSA_HEAD_KEY_PREREQUISITE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/physical_lp4_dsa_head_key_boundary_association/8k/$DSA_HEAD_KEY_PREREQUISITE_TAG
   /home/gianl/vllm-env/bin/python - "$DSA_HEAD_KEY_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
 from hashlib import sha256
@@ -1510,7 +1515,7 @@ PY
 fi
 if [[ $DSA_SCORE_DEFAULT_PRECISION == 1 ]]; then
   readonly DSA_SCORE_PRECISION_PREREQUISITE_TAG=greenfield_layer0_dsa_scorer_association_20260810T164030202890642Z
-  readonly DSA_SCORE_PRECISION_PREREQUISITE_DIR=/home/gianl/glm-run/$DSA_SCORE_PRECISION_PREREQUISITE_TAG
+  readonly DSA_SCORE_PRECISION_PREREQUISITE_DIR=/home/gianl/gcs-models/results/$DSA_SCORE_PRECISION_PREREQUISITE_TAG
   readonly DSA_SCORE_PRECISION_PREREQUISITE_REMOTE=$APPROVED_BUCKET/results/$DSA_SCORE_PRECISION_PREREQUISITE_TAG
   /home/gianl/vllm-env/bin/python - "$DSA_SCORE_PRECISION_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
 import json
@@ -1595,7 +1600,7 @@ PY
 fi
 if [[ $MAIN_ROPE_TABLE == 1 ]]; then
   readonly MAIN_ROPE_PREREQUISITE_TAG=greenfield_layer0_main_rope_20260811T072231959104598Z
-  readonly MAIN_ROPE_PREREQUISITE_DIR=/home/gianl/glm-run/$MAIN_ROPE_PREREQUISITE_TAG
+  readonly MAIN_ROPE_PREREQUISITE_DIR=/home/gianl/gcs-models/oracles/greenfield/glm52/main_rope_association/8k/$MAIN_ROPE_PREREQUISITE_TAG
   readonly MAIN_ROPE_PREREQUISITE_REMOTE=$APPROVED_BUCKET/oracles/greenfield/glm52/main_rope_association/8k/$MAIN_ROPE_PREREQUISITE_TAG
   /home/gianl/vllm-env/bin/python - "$MAIN_ROPE_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
 import json
@@ -1676,7 +1681,7 @@ PY
 fi
 if [[ $LAYER0_ATTENTION_VARIANTS == 1 ]]; then
   readonly ATTENTION_SCHEDULE_PREREQUISITE_TAG=greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_dsa_internal_trace2_20260811T113139003786245Z
-  readonly ATTENTION_SCHEDULE_PREREQUISITE_DIR=/home/gianl/glm-run/$ATTENTION_SCHEDULE_PREREQUISITE_TAG
+  readonly ATTENTION_SCHEDULE_PREREQUISITE_DIR=/home/gianl/gcs-models/results/$ATTENTION_SCHEDULE_PREREQUISITE_TAG
   readonly ATTENTION_SCHEDULE_PREREQUISITE_REMOTE=$APPROVED_BUCKET/results/$ATTENTION_SCHEDULE_PREREQUISITE_TAG
   /home/gianl/vllm-env/bin/python - "$ATTENTION_SCHEDULE_PREREQUISITE_DIR" <<'PY'
 from hashlib import sha256
@@ -1759,7 +1764,7 @@ PY
 fi
 if [[ $LAYER0_ATTENTION_OUTPUT_VARIANTS == 1 ]]; then
   readonly ATTENTION_OUTPUT_PREREQUISITE_TAG=greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_oracle_dsa_layer0_attention_schedule_variants_trace2_20260811T142025290162247Z
-  readonly ATTENTION_OUTPUT_PREREQUISITE_DIR=/home/gianl/glm-run/$ATTENTION_OUTPUT_PREREQUISITE_TAG
+  readonly ATTENTION_OUTPUT_PREREQUISITE_DIR=/home/gianl/gcs-models/results/$ATTENTION_OUTPUT_PREREQUISITE_TAG
   readonly ATTENTION_OUTPUT_PREREQUISITE_REMOTE=$APPROVED_BUCKET/results/$ATTENTION_OUTPUT_PREREQUISITE_TAG
   /home/gianl/vllm-env/bin/python - "$ATTENTION_OUTPUT_PREREQUISITE_DIR" <<'PY'
 from hashlib import sha256
@@ -1840,7 +1845,7 @@ PY
 fi
 if [[ $LAYER0_STRATEGY_ND_ROW0 == 1 ]]; then
   readonly STRATEGY_ND_PREREQUISITE_TAG=greenfield_collective_association_20260811T213152133863450Z
-  readonly STRATEGY_ND_PREREQUISITE_DIR=/home/gianl/glm-run/$STRATEGY_ND_PREREQUISITE_TAG
+  readonly STRATEGY_ND_PREREQUISITE_DIR=/home/gianl/gcs-models/results/$STRATEGY_ND_PREREQUISITE_TAG
   readonly STRATEGY_ND_PREREQUISITE_REMOTE=$APPROVED_BUCKET/results/$STRATEGY_ND_PREREQUISITE_TAG
   /home/gianl/vllm-env/bin/python - \
     "$STRATEGY_ND_PREREQUISITE_DIR" "$RESULTS_DB" <<'PY'
@@ -2152,6 +2157,27 @@ fi
   echo "results database is unavailable" >&2
   exit 2
 }
+if [[ $PREFLIGHT_ONLY == 1 ]]; then
+  [[ $RUNTIME_KIND == pallas_feature || $RUNTIME_KIND == pallas_feature_linear ]] || {
+    echo "preflight-only verification currently requires a feature runtime" >&2
+    exit 2
+  }
+  metadata_args=()
+  if [[ $FEATURE_SOURCE_METADATA_ONLY == 1 ]]; then
+    metadata_args=(--source-metadata-only)
+  fi
+  /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/inspect_feature_runtime_checkpoint.py" \
+    --runtime-root "$RUNTIME_ROOT" \
+    --source-checkpoint-root "$SOURCE_ROOT" \
+    --source-packed-manifest-sha256 "$SOURCE_MANIFEST_SHA" \
+    --source-runtime-root "$SOURCE_RUNTIME_ROOT" \
+    --source-runtime-manifest-sha256 "$SOURCE_RUNTIME_MANIFEST_SHA" \
+    --runtime-manifest-sha256 "$RUNTIME_MANIFEST_SHA" \
+    "${metadata_args[@]}" >/dev/null
+  echo "SHORT_DECODER_PREFLIGHT_OK pin=$PIN profile=$PROFILE runtime=$RUNTIME_MANIFEST_SHA metadata_only=$FEATURE_SOURCE_METADATA_ONLY"
+  exit 0
+fi
 [[ ! -e $RUN_DIR ]] || {
   echo "append-only run directory exists: $RUN_DIR" >&2
   exit 2
