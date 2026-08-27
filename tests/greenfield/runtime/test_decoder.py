@@ -120,6 +120,38 @@ def test_default_head_key_hlo_allows_only_prefill_repair_state() -> None:
     assert not rejected["passed"]
 
 
+def test_default_head_key_hlo_allows_lp2_attention_lse_signature() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _validate_dsa_head_key_decoder_association,
+    )
+
+    hlo = '''HloModule lp2_attention_lse, num_partitions=32
+
+%lse_fusion (partial: f32[128]) -> (f32[], f32[128]) {
+  %partial = f32[128] parameter(0)
+  %zero = f32[] constant(0)
+  ROOT %tuple = (f32[], f32[128]) tuple(%zero, %partial)
+}
+
+ENTRY %main (partial: f32[128]) -> f32[128] {
+  %partial = f32[128] parameter(0)
+  %lse = (f32[], f32[128]) fusion(%partial), kind=kLoop, calls=%lse_fusion, metadata={op_name="jit(mapped_token)/shard_map/reduce_sum"}, backend_config={"megacore_config":{"megacore_allreduce_bytes":"8192"}}
+  ROOT %result = f32[128] get-tuple-element(%lse), index=1
+}
+'''
+    contract = _validate_dsa_head_key_decoder_association(
+        hlo,
+        full_indexer_layers=21,
+        maximum_full_indexer_slots=5,
+        exact_association=False,
+    )
+    assert contract["key_projection_signature_count"] == 1
+    assert contract["key_projection_count"] == 0
+    assert contract["external_wk_parameter_count"] == 0
+    assert contract["key_sqrt_count"] == 0
+    assert contract["passed"], contract
+
+
 def test_fused_qkv_a_hlo_contract_requires_db502_primitive() -> None:
     from glm_tpu.greenfield.runtime.decoder import (
         _validate_fused_qkv_a_decoder_association,
@@ -1316,6 +1348,9 @@ def test_strategy_nd_attention_reduction_contract_replaces_projection_sum() -> N
         local_parallel_size=2,
     )
     assert lp2_arities["1"] >= 3
+    assert lp2_arities == {"1": 288, "2": 12, "3": 1}
+    assert lp2_shapes["f32[128]"] == 78
+    assert "f32[256]" not in lp2_shapes
     assert lp2_shapes["bf16[2]"] == 1
     assert lp2_shapes["s32[2]"] == 1
     assert "bf16[4]" not in lp2_shapes

@@ -2,6 +2,29 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 first complete PP16 HLO is preserved; bounded linter correction is ready
+
+- Protected tag `greenfield_short_decoder_compile_pp16_acquisition_20260827T122306083796688Z`
+  at pushed pin `9034764` loaded the complete 108.7-GB/host feature runtime and compiled the real
+  78-layer 2K token graph on all eight hosts. It failed closed at the HLO contract before warmup or
+  execution. No host record, post-execute HBM, token, timing, trace, DB row, terminal `SUCCESS`,
+  Gate-D or performance result exists; failure cleanup is authenticated 8/8.
+- The graph proves the intended architecture: 219 all-gathers, 301 physical / 315 logical
+  all-reduces and 33 collective permutes. Every gather/reduction uses exactly
+  `((0,1),...,(30,31))`; the 33 permutes are the two 16-stage residual lanes plus token return.
+  All 225 production feature-Pallas calls pass, including 75 exact LP2 MoE triples, and no
+  forbidden hidden/dead-row signature appears.
+- All four failures are PP8-shaped linter assumptions. LP2 attention LSE is `f32[128]`, not
+  `f32[256]`; XLA packs the 78 validity components as 51 singleton + 12 tuple2 + one tuple3,
+  yielding arities `288/12/1` after the three token reductions. The same LP2 LSE producer also
+  collides with the old 8-KiB recurrent-key signature, but has zero external FP32 `wk` owners and
+  zero divide-sqrt norms. Offline replay now matches the exact arity/shape maps and passes the
+  default head/key contract. Focused tests pass 58/58.
+- Optimized/StableHLO gzip SHAs are `ff3ae81b...a841` / `243279aa...1a7`; contract and failure
+  census SHAs are `72e31131...ba59d` / `1cc4a969...aedb`. Diagnostics are append-only in the
+  approved bucket. Exact next: commit/push/mirror this correction, then one smallest identical 2K
+  acquisition retry. Do not run 8K or claim numerical/performance evidence yet.
+
 ## 2026-08-27 PP16 complete-decoder acquisition is fail-closed and CPU-ready
 
 - The pre-TPU audit found that `compile_short_decoder.py` selected a PP16 HLO backend but still

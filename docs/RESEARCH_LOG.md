@@ -5,6 +5,29 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 12:23--14:00 UTC — first PP16 full graph localizes plan-specific linter assumptions
+
+The first protected complete PP16 acquisition at pushed pin `9034764`, tag
+`greenfield_short_decoder_compile_pp16_acquisition_20260827T122306083796688Z`, completed the
+full final-layout load and 78-layer 2K compilation on all eight hosts. It refused before warmup or
+execution at the HLO linter. The preserved graph contains 219 all-gathers, 301 physical
+all-reduces carrying 315 logical components, and 33 collective permutes. Every gather/reduction
+uses one of the exact 16 LP2 groups; the permutes are the two 16-stage lanes plus token return.
+All 75 three-call `I=1024` MoE feature bodies and one-row/live-state contracts pass. This is real
+full-graph locality evidence but not numerical, HBM-after-execute, timing, DB or Gate-D evidence.
+
+Forensic replay proves all four reported violations are inherited LP4 assumptions. Each LP2 owner
+contributes 64 attention-LSE values, so its local sum is `f32[128]` rather than `f32[256]`. XLA
+launch-fuses the 78 validity reductions as 51 singleton, 12 tuple2 and one tuple3 operation; with
+the remaining reductions and complete token path, exact physical arities are `288/12/1` and the
+logical count remains 315. Twenty-one ordinary LP2 LSE producer fusions also share the old
+`f32[128]`/8-KiB signature used to detect the optional exact recurrent-key path, but the graph has
+zero external FP32 `wk` parameters and zero divide-sqrt norms. The correction pins the LP2 arity
+and result maps while retaining exact local-group/count checks, and stops treating the ambiguous
+producer signature alone as activated key state. Preserved-HLO replay now matches both maps and
+passes head/key validation; focused tests pass 58/58. One identical smallest acquisition retry is
+authorized only after commit, push and same-region mirror verification.
+
 ## 2026-08-27 12:15 UTC — pre-TPU audit removes a hidden PP8 geometry assumption from PP16
 
 The smallest-first compile audit found a real launch blocker without consuming TPU time:

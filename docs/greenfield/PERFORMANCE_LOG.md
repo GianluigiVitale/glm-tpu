@@ -6,6 +6,15 @@ but not Gate E. WS32 has the accepted 2K DB553 point at `122.630667 ms/token` / 
 No accepted 8K, 128K, 256K or PP16 full-decoder measurement exists yet. Bounded
 layer/kernel/diagnostic results below are not token-speed proof.
 
+## 2026-08-27 — first complete PP16 graph, not performance
+
+`greenfield_short_decoder_compile_pp16_acquisition_20260827T122306083796688Z` loaded and compiled
+the complete 78-layer 2K PP16 graph but stopped at its structural linter before any warmup or model
+execution. Its 18-minute elapsed time is checkpoint verification/load plus compilation, not token
+latency. The preserved graph proves exact LP2-only collectives and production feature calls, while
+the bounded correction resolves inherited LP4 arity/LSE and ambiguous head-key signatures offline.
+No post-execute HBM, token, DSA, XPlane, DB, `SUCCESS`, latency or throughput result exists.
+
 ## 2026-08-27 — complete PP16 feature-runtime pack, not performance
 
 `greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z` seals the full 32-file

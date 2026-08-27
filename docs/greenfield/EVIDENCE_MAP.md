@@ -45,6 +45,17 @@ Replacement topology code is `bfe064d`; its fleet hash is `4a0c9a33...c301`. Col
 pins are `fcd8426735...` and `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash remains
 `294e777...559`, PP8 group hash `d5943ab8...c14`, and PP16 group hash `6383e57c...f21`.
 
+Protected failed PP16 compile tag
+`greenfield_short_decoder_compile_pp16_acquisition_20260827T122306083796688Z` at `9034764` is
+nonterminal diagnostic evidence. All eight hosts loaded and compiled the complete 78-layer 2K
+graph, then refused at the linter before execution. The graph has 219 AG / 301 physical AR / 315
+logical AR components / 33 CP, exact LP2 groups only, 75 production MoE feature triples and no
+forbidden hidden/dead-row state. The failures are bounded LP4-assumption collisions: LP2 LSE is
+`f32[128]`, validity tuple packing produces arities `288/12/1`, and 21 ordinary LSE producers share
+an ambiguous 8-KiB signature without external `wk` owners or divide-sqrt norms. HLO/StableHLO
+gzip SHAs are `ff3ae81b...a841` / `243279aa...1a7`; 8/8 failure cleanup passes. There is no host
+record, post-execute HBM, token, DB, `SUCCESS`, numerical, Gate-D or performance claim.
+
 Accepted nonperformance feature-runtime tag
 `greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z` at `a973425` contains all 16
 stages / 32 production feature-Pallas owners. Manifest `0f1bb271...52b6f1` binds base runtime

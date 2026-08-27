@@ -1494,7 +1494,7 @@ def _validate_dsa_head_key_decoder_association(
         for instruction in module.instructions
     )
     key_reduction_marker = '"megacore_allreduce_bytes":"8192"'
-    key_projection_count = sum(
+    key_projection_signature_count = sum(
         key_reduction_marker in line
         and "f32[128]" in line.split(" fusion(", 1)[0]
         for line in optimized_hlo.splitlines()
@@ -1510,6 +1510,11 @@ def _validate_dsa_head_key_decoder_association(
         and " convert(" in line
         and "/shard_map/" in line
         for line in optimized_hlo.splitlines()
+    )
+    key_projection_count = (
+        key_projection_signature_count
+        if exact_association or external_wk_parameters or key_sqrt_count
+        else 0
     )
     forbidden_global_shapes = [
         shape
@@ -1548,9 +1553,15 @@ def _validate_dsa_head_key_decoder_association(
             )
     elif (
         (external_wk_parameters and not prefill_index_repair)
-        or key_projection_count
         or key_sqrt_count
     ):
+        # ``f32[128]`` plus an 8-KiB megacore reduction is not sufficient to
+        # identify the exact recurrent-key projection on LP2.  The ordinary
+        # owner-split attention LSE has that same optimized fusion signature
+        # when two owners each contribute 64 values.  Exact head/key state is
+        # still unambiguously rejected by its external FP32 ``wk`` owner or
+        # divide-by-sqrt normalization, and the Pallas/reference projection
+        # counts are pinned independently by the stage-linear contract.
         violations.append(
             "default decoder unexpectedly enables exact DSA head/key state"
         )
@@ -1562,6 +1573,9 @@ def _validate_dsa_head_key_decoder_association(
         ),
         "forbidden_global_shapes": forbidden_global_shapes,
         "key_projection_count": key_projection_count,
+        "key_projection_signature_count": (
+            key_projection_signature_count
+        ),
         "expected_key_projection_count": (
             full_indexer_layers if exact_association else 0
         ),
@@ -3725,10 +3739,24 @@ def _expected_tpu_decoder_reductions(
         result_shapes["bf16[1,2048,640]"] = layers
     else:
         # The accepted full-decoder lowering launch-fuses the 312 logical
-        # attention/MLP components into this exact physical arity histogram.
-        arities = {"1": 277, "2": 16, "3": 1}
+        # attention/MLP components into a plan-specific physical arity
+        # histogram.  LP2 exposes four more singleton launches than LP4 while
+        # preserving all 312 logical components; this is the exact lowering
+        # acquired from the sealed PP16 final-layout schedule.
+        if local_parallel_size == 4:
+            arities = {"1": 277, "2": 16, "3": 1}
+        elif local_parallel_size == 2:
+            arities = {"1": 285, "2": 12, "3": 1}
+        else:
+            raise PlanValidationError(
+                "TPU decoder reduction contract requires LP2 or LP4"
+            )
+        attention_lse_width = 64 * local_parallel_size
         result_shapes.update(
-            {"f32[256]": layers, "u32[1,1,128]": layers}
+            {
+                f"f32[{attention_lse_width}]": layers,
+                "u32[1,1,128]": layers,
+            }
         )
     if feature_reconstruct_down_fp32:
         arities["1"] += sparse_layers
