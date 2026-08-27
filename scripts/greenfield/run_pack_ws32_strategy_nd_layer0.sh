@@ -17,15 +17,33 @@ cd "$WORKTREE"
   echo "WS32 StrategyND layer-0 pack is default-off" >&2
   exit 2
 }
+PACK_KIND=${GLM_GREENFIELD_WS32_STRATEGY_ND_PACK_KIND:-layer0}
+if [[ $PACK_KIND == layer0 ]]; then
+  TAG_PREFIX=greenfield_ws32_strategy_nd_layer0_pack
+  PACKER=scripts/greenfield/pack_ws32_strategy_nd_layer0.py
+  EXPECTED_KIND=greenfield_ws32_strategy_nd_layer0_checkpoint
+  EXPECTED_FILES=32
+  REMOTE_CLASS=discriminators
+elif [[ $PACK_KIND == dense_overlay ]]; then
+  TAG_PREFIX=greenfield_ws32_strategy_nd_dense_overlay_pack
+  PACKER=scripts/greenfield/pack_ws32_strategy_nd_dense_overlay.py
+  EXPECTED_KIND=greenfield_ws32_strategy_nd_dense_overlay
+  EXPECTED_FILES=96
+  REMOTE_CLASS=overlays
+else
+  echo "WS32 StrategyND pack kind must be layer0 or dense_overlay" >&2
+  exit 2
+fi
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_WS32_STRATEGY_ND_PACK_TAG:-greenfield_ws32_strategy_nd_layer0_pack_$(date -u +%Y%m%dT%H%M%S%NZ)}
-[[ $TAG =~ ^greenfield_ws32_strategy_nd_layer0_pack_[0-9]{8}T[0-9]{15}Z$ ]] || {
-  echo "invalid bounded checkpoint tag: $TAG" >&2
+TAG=${GLM_GREENFIELD_WS32_STRATEGY_ND_PACK_TAG:-${TAG_PREFIX}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+[[ $TAG =~ ^${TAG_PREFIX}_[0-9]{8}T[0-9]{15}Z$ ]] || {
+  echo "invalid StrategyND checkpoint tag: $TAG" >&2
   exit 2
 }
 RUN_DIR=/home/gianl/glm-run/$TAG
 OUTPUT_ROOT=$RUN_DIR/checkpoint
-REMOTE_PREFIX=$APPROVED_BUCKET/checkpoints/greenfield/glm52/discriminators/WS32_2D/$TAG
+REMOTE_PREFIX=$APPROVED_BUCKET/checkpoints/greenfield/glm52/$REMOTE_CLASS/WS32_2D/$TAG
+readonly PACK_KIND TAG_PREFIX PACKER EXPECTED_KIND EXPECTED_FILES REMOTE_CLASS
 readonly PIN TAG RUN_DIR OUTPUT_ROOT REMOTE_PREFIX
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]]
@@ -52,9 +70,9 @@ gcloud storage objects list "$REMOTE_PREFIX/**" --format='value(name)' \
   >"$RUN_DIR/remote_vacancy.txt"
 [[ ! -s $RUN_DIR/remote_vacancy.txt ]]
 
-say "packing only layer-0 final-layout tensors"
+say "packing $PACK_KIND final-layout tensors"
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
-  scripts/greenfield/pack_ws32_strategy_nd_layer0.py \
+  "$PACKER" \
   --source-root "$SOURCE_ROOT" \
   --source-manifest-file-sha256 "$SOURCE_MANIFEST_FILE_SHA" \
   --source-success-file-sha256 "$SOURCE_SUCCESS_FILE_SHA" \
@@ -63,33 +81,42 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
 
 say "validating local checkpoint before publication"
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
-  "$OUTPUT_ROOT" "$PIN" <<'PY'
+  "$OUTPUT_ROOT" "$PIN" "$EXPECTED_KIND" "$EXPECTED_FILES" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
 import sys
 
-root=Path(sys.argv[1]); pin=sys.argv[2]
+root=Path(sys.argv[1]); pin=sys.argv[2]; expected_kind=sys.argv[3]
+expected_files=int(sys.argv[4])
 manifest=json.loads((root/'manifest.json').read_text())
 canonical=lambda value: json.dumps(value,allow_nan=False,ensure_ascii=True,separators=(',',':'),sort_keys=True).encode()
 without_hash={key:value for key,value in manifest.items() if key!='manifest_sha256'}
 if manifest['manifest_sha256']!=sha256(canonical(without_hash)).hexdigest():
  raise SystemExit('bounded manifest self-hash drifted')
-if manifest['code_hash']!=pin or manifest['file_count']!=32 or len(manifest['files'])!=32:
- raise SystemExit('bounded manifest identity drifted')
-ranks=[]
+if manifest['artifact_kind']!=expected_kind or manifest['code_hash']!=pin or manifest['file_count']!=expected_files or len(manifest['files'])!=expected_files:
+ raise SystemExit('StrategyND manifest identity drifted')
+coverage=set()
 for record in manifest['files']:
  path=root/record['filename']
  if sha256(path.read_bytes()).hexdigest()!=record['sha256']:
-  raise SystemExit(f"bounded file hash drifted: {record['filename']}")
- ranks.extend(record['model_ranks'] if record['feature_coordinate']==0 else [])
-if ranks!=[rank for expert in range(8) for rank in range(expert*4,expert*4+4)]:
- raise SystemExit('bounded model-rank ownership drifted')
-for expert in range(8):
- records=[item for item in manifest['files'] if item['expert_coordinate']==expert]
- for name in ('merged_gate_up.weight_bits_in_out','merged_gate_up.scale_inv_in_out'):
-  if len({item['tensors'][name]['sha256'] for item in records})!=1:
-   raise SystemExit('feature replicas disagree in bounded manifest')
+  raise SystemExit(f"StrategyND file hash drifted: {record['filename']}")
+ layer=record.get('layer_id',0); expert=record['expert_coordinate']; feature=record['feature_coordinate']
+ coverage.add((layer,expert,feature))
+ if record['model_ranks']!=list(range(expert*4,expert*4+4)):
+  raise SystemExit('StrategyND model-rank ownership drifted')
+layers=range(3) if expected_files==96 else range(1)
+if coverage!={(layer,expert,feature) for layer in layers for expert in range(8) for feature in range(4)}:
+ raise SystemExit('StrategyND owner coverage drifted')
+for layer in layers:
+ for expert in range(8):
+  records=[item for item in manifest['files'] if item.get('layer_id',0)==layer and item['expert_coordinate']==expert]
+  names=sorted(records[0]['tensors'])
+  replica_names=[name for name in names if name.endswith(('merged_gate_up.weight_bits_in_out','merged_gate_up.scale_inv_in_out'))]
+  if len(replica_names)!=2: raise SystemExit('StrategyND replica tensor names drifted')
+  for name in replica_names:
+   if len({item['tensors'][name]['sha256'] for item in records})!=1:
+    raise SystemExit('feature replicas disagree in StrategyND manifest')
 success=json.loads((root/'SUCCESS').read_text())
 without_success={key:value for key,value in success.items() if key!='success_sha256'}
 if success['success_sha256']!=sha256(canonical(without_success)).hexdigest():
