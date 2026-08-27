@@ -1,0 +1,232 @@
+{
+  "artifact_kind": "greenfield_checkpoint_retention_policy",
+  "artifacts": [
+    {
+      "disposition": "keep",
+      "expected_bytes": 755663676164,
+      "expected_object_count": 150,
+      "id": "canonical_source",
+      "prefix": "models/GLM-5.2-FP8/",
+      "recipe": {
+        "code_hash": "61475d30a708252bc64aaf50fec2c2ea1ea03c63",
+        "dependencies": [],
+        "entrypoint": "scripts/greenfield/build_checkpoint_plan.py",
+        "notes": "Immutable canonical GLM-5.2-FP8 source; never delete. Source inventory a388627c08c8ff591903deb1fbf3198f43916e64a2295ed0e253f1e44a042fc4."
+      },
+      "terminal_objects": [
+        "model.safetensors.index.json"
+      ]
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 760342303698,
+      "expected_manifest_sha256": "0869493164a3a63797ea61d88c575f35bea8aa50790c46aa21ce6f0f7c4c78f1",
+      "expected_object_count": 76,
+      "id": "pp8_packed",
+      "manifest_object": "packed_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/",
+      "recipe": {
+        "code_hash": "61475d30a708252bc64aaf50fec2c2ea1ea03c63",
+        "dependencies": [
+          "canonical_source"
+        ],
+        "entrypoint": "scripts/greenfield/pack_checkpoint_streaming.py",
+        "notes": "Recreate sequentially from the preserved PP8 plan/source inventory; original protected result evidence remains under results/."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "packed_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 834222969444,
+      "expected_manifest_sha256": "fdedaae31fb3c094266272ed48dfe62bb098257a78272b93c14eafbd57e31dec",
+      "expected_object_count": 68,
+      "id": "pp8_base_runtime",
+      "manifest_object": "runtime_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/",
+      "recipe": {
+        "code_hash": "59352022b2843a3dea20f2563b15665b26d8ea8a",
+        "dependencies": [
+          "pp8_packed"
+        ],
+        "entrypoint": "scripts/greenfield/run_runtime_checkpoint_pack_pp8.sh",
+        "notes": "Recreate only while PP8 is the sequential Gate G challenger."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 834214864419,
+      "expected_manifest_sha256": "54e2f89b1832b994acbf9ef36f5f6ce68c942d9146efc4d7c15360d68b6d9917",
+      "expected_object_count": 68,
+      "id": "pp8_feature_runtime",
+      "manifest_object": "runtime_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/",
+      "recipe": {
+        "code_hash": "d9a883bfcdab922a1a7767c1ab073877bfe2ce5b",
+        "dependencies": [
+          "pp8_packed",
+          "pp8_base_runtime"
+        ],
+        "entrypoint": "scripts/greenfield/run_feature_runtime_checkpoint_pack_pp8.sh",
+        "notes": "Historical unfused feature generation; recreate only if its exact comparator is required."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 834405892809,
+      "expected_manifest_sha256": "123394906a153238e464fc096b626c77996b7cf22b95077b9377b8dcafbe699a",
+      "expected_object_count": 68,
+      "id": "pp8_qkv_runtime",
+      "manifest_object": "runtime_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/",
+      "recipe": {
+        "code_hash": "7d5dfb9ded22f1f7d66801a9ea63eabaaf36b4b7",
+        "dependencies": [
+          "pp8_packed",
+          "pp8_base_runtime"
+        ],
+        "entrypoint": "scripts/greenfield/run_feature_runtime_checkpoint_pack_pp8.sh",
+        "notes": "Set GLM_GREENFIELD_FEATURE_RUNTIME_FUSED_QKV_A=1; recreate only for the sequential PP8 challenger."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 834574250016,
+      "expected_manifest_sha256": "5b48a1f66be359cc70e8bb59e0ce77ed813f835305fd38ac9befc2eeaf8e2268",
+      "expected_object_count": 68,
+      "id": "pp8_qkv_dense_runtime",
+      "manifest_object": "runtime_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/",
+      "recipe": {
+        "code_hash": "5dc58b0607173d5aa842b22405cb45c2b334073c",
+        "dependencies": [
+          "pp8_packed",
+          "pp8_base_runtime"
+        ],
+        "entrypoint": "scripts/greenfield/run_feature_runtime_checkpoint_pack_pp8.sh",
+        "notes": "Set GLM_GREENFIELD_FEATURE_RUNTIME_FUSED_QKV_A=1 and GLM_GREENFIELD_FEATURE_RUNTIME_DENSE_CONVOLUTION=1."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 786188082171,
+      "expected_manifest_sha256": "c04f800edf15651198ab2c5183fff8a8ae9a427609b59cc61ccabdab32f5ee08",
+      "expected_object_count": 34,
+      "id": "ws32_runtime",
+      "manifest_object": "manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/",
+      "recipe": {
+        "code_hash": "382884043a4912fa002f77f5da19da9ddf16d368",
+        "dependencies": [
+          "canonical_source"
+        ],
+        "entrypoint": "scripts/greenfield/run_ws32_runtime_checkpoint_pack.sh",
+        "notes": "Direct canonical-source recreation; does not depend on a PP8 derived checkpoint."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "manifest.json"
+      ]
+    },
+    {
+      "disposition": "keep_until_standalone",
+      "expected_bytes": 757274907156,
+      "expected_manifest_sha256": "13ad2e926b44bee86e620d877d4c266dbacc4f9a59b352fc4f2c8ef534efedb5",
+      "expected_object_count": 72,
+      "id": "pp16_packed",
+      "manifest_object": "packed_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/",
+      "recipe": {
+        "code_hash": "3685ee40960f53874e18ad54ec1e8a0c65e53a62",
+        "dependencies": [
+          "canonical_source"
+        ],
+        "entrypoint": "scripts/greenfield/run_checkpoint_pack_pp16.sh",
+        "notes": "Retain until the active PP16 feature runtime passes standalone terminal verification and the runner no longer requires this parent."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "packed_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "disposition": "keep_until_standalone",
+      "expected_bytes": 869585145353,
+      "expected_manifest_sha256": "b0f624666e921a93e92c625e0e1248aaa9162c45a9be974f4491755c8604d2e5",
+      "expected_object_count": 68,
+      "id": "pp16_base_runtime",
+      "manifest_object": "runtime_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/",
+      "recipe": {
+        "code_hash": "af0e226cb2dfc0ab3c48ca19deceecacead6f9b5",
+        "dependencies": [
+          "pp16_packed"
+        ],
+        "entrypoint": "scripts/greenfield/pack_runtime_checkpoint.py",
+        "notes": "Retain until PP16 standalone verification is wired and exercised."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "disposition": "keep",
+      "expected_bytes": 869561965562,
+      "expected_manifest_sha256": "0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1",
+      "expected_object_count": 68,
+      "id": "pp16_active_feature_runtime",
+      "manifest_object": "runtime_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/",
+      "recipe": {
+        "code_hash": "a973425cd235758142c55c5a0127ddb9a36b45a9",
+        "dependencies": [
+          "pp16_packed",
+          "pp16_base_runtime"
+        ],
+        "entrypoint": "scripts/greenfield/pack_feature_runtime_checkpoint.py",
+        "notes": "Current active final runtime; never part of the first deletion tranche."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    }
+  ],
+  "bucket": "driftbench-dsv4-uc",
+  "bucket_location": "US-CENTRAL2",
+  "format_version": 1,
+  "protected_prefixes": [
+    "models/",
+    "results/",
+    "oracles/",
+    "checkpoints/greenfield/glm52/plans/",
+    "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/"
+  ]
+}
