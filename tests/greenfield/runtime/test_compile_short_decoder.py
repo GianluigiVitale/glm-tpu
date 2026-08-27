@@ -16,6 +16,7 @@ from scripts.greenfield.compile_short_decoder import (
     _canonicalize_dsa_internal_observation,
     _canonicalize_layer_residual_observation,
     _encode_bfloat16_bits,
+    _expected_stage_visit_mask,
     _load_short_context_dsa_oracle,
     _materialize_global_array,
     _observer_hlo_isolation_contract,
@@ -90,6 +91,27 @@ def test_runtime_pipeline_groups_reject_incomplete_layout() -> None:
 
     with pytest.raises(ValueError, match="cover every runtime-layout rank"):
         _runtime_pipeline_groups(schedule, layout)
+
+
+def test_expected_stage_visit_mask_is_plan_aware() -> None:
+    assert _expected_stage_visit_mask(8) == 255
+    assert _expected_stage_visit_mask(16) == 65535
+
+
+@pytest.mark.parametrize("stage_count", [0, -1, 32])
+def test_expected_stage_visit_mask_rejects_unsupported_counts(
+    stage_count: int,
+) -> None:
+    with pytest.raises(ValueError, match="signed int32"):
+        _expected_stage_visit_mask(stage_count)
+
+
+@pytest.mark.parametrize("stage_count", [True, 8.0])
+def test_expected_stage_visit_mask_rejects_non_integer_counts(
+    stage_count: object,
+) -> None:
+    with pytest.raises(TypeError, match="must be an integer"):
+        _expected_stage_visit_mask(stage_count)  # type: ignore[arg-type]
 
 
 def test_protected_runner_pins_fp32_feature_boundary_kernel() -> None:

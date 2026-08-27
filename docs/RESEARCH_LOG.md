@@ -5,6 +5,32 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 12:59--13:16 UTC — PP16 full graph executes; visit-mask validator is PP8-specific
+
+The identical smallest retry at pushed pin `a670fdf`, tag
+`greenfield_short_decoder_compile_pp16_acquisition_20260827T125930818874961Z`, clears the corrected
+full HLO contract and executes the complete 78-layer 2K PP16 token graph once on all eight hosts.
+Every host records the same optimized/StableHLO hashes `14cdc95d...64b0` / `c7b71689...7603`, exact
+219 AG / 301 physical and 315 logical AR / 33 CP structure, 16 LP2 groups, production feature
+kernels and one live row. Peak post-execute HBM is 27,252,078,592 bytes/chip; the minimum recorded
+largest free block is 4,322,943,488 bytes.
+
+The run then fails closed only because the host validator compares the visited-stage field with a
+literal PP8 mask of 255. Fleet metadata is otherwise exact and identical: active ranks `[0,1]`,
+health 1, producer 74, selected prefix `0,1,2`, valid count 3, aligned next position/context 3/4,
+both selected-state rows valid, and visited value 65,535. The decoder sets one bit per stage, so
+65,535 is exactly `(1 << 16) - 1`; it proves all PP16 stages ran. The correction derives this mask
+from the execution plan and refuses counts outside the signed-int32 representation. Exact PP8/PP16
+tests plus invalid-count cases pass in the full 56-test compiler module; preserved rank-0 replay
+passes the corrected metadata gate. Python syntax and diff checks pass.
+
+This acquisition used synthetic initial state, no oracle, no trace, no warmup and one execution.
+Its roughly 101.5-second sample is explicitly diagnostic and cannot be reported as latency or
+throughput. There is no DB row, terminal `SUCCESS`, DSA comparison, Gate-D or performance claim.
+The rank-0 record/HLO-contract/failure-census SHAs are `1a57c70c...f099` /
+`2b7783f5...7e81` / `e35a3117...e40`; failure cleanup is 8/8 clean. Commit, push and same-region
+mirror the validator correction before one identical acquisition retry; do not launch 8K first.
+
 ## 2026-08-27 12:23--13:00 UTC — first PP16 full graph localizes plan-specific linter assumptions
 
 The first protected complete PP16 acquisition at pushed pin `9034764`, tag

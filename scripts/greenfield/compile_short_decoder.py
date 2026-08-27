@@ -210,6 +210,16 @@ def _runtime_pipeline_groups(
     return canonical_groups, pairs
 
 
+def _expected_stage_visit_mask(stage_count: int) -> int:
+    """Return the exact all-stages-visited mask for the execution plan."""
+
+    if not isinstance(stage_count, int) or isinstance(stage_count, bool):
+        raise TypeError("stage count must be an integer")
+    if stage_count <= 0 or stage_count >= 32:
+        raise ValueError("stage count must fit the signed int32 metadata mask")
+    return (1 << stage_count) - 1
+
+
 def _percentiles(values: list[float]) -> dict[str, float]:
     array = np.asarray(values, dtype=np.float64)
     return {
@@ -5038,7 +5048,8 @@ def main() -> int:
             metadata_contract["active_ranks"] == list(groups[0])
             and metadata_contract["health"] == [1]
             and metadata_contract["producer"] == [expected_producer]
-            and metadata_contract["visited"] == [255]
+            and metadata_contract["visited"]
+            == [_expected_stage_visit_mask(execution_plan.pipeline_stages)]
         )
         if args.complete_token_path:
             next_position = np.asarray(jax.device_get(current[5]))

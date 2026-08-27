@@ -2,6 +2,27 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 PP16 executes once; only a PP8-hardcoded visit-mask gate refuses it
+
+- Protected tag `greenfield_short_decoder_compile_pp16_acquisition_20260827T125930818874961Z`
+  at pushed pin `a670fdf` loads, compiles and executes the complete 78-layer 2K PP16 token graph on
+  all eight hosts. The corrected HLO contract passes identically fleet-wide: optimized/StableHLO
+  SHAs are `14cdc95d...64b0` / `c7b71689...7603`, with 219 AG, 301 physical / 315 logical AR and
+  33 CP, exact LP2 groups, all production feature kernels and no forbidden hidden/dead rows.
+- All eight records agree on the synthetic token (`3592`), active LP2 ranks `[0,1]`, health `1`,
+  producer layer `74`, selected state `(0,1,2)`, next position/context `3/4`, and visit mask
+  `65535`. Peak post-execute HBM is `27,252,078,592` bytes/chip with at least `4,322,943,488`
+  largest-free-block bytes. The sole refusal is runner line 5041 requiring PP8's literal `255`;
+  `65535 = 2^16-1` is the exact all-16-stage PP16 mask.
+- The runner now derives the expected mask from `execution_plan.pipeline_stages`, with exact
+  PP8=`255` and PP16=`65535` tests. The full compiler test module passes 56/56; Python syntax,
+  offline replay of the preserved rank-0 record and diff checks pass. The replay accepts every
+  metadata field. Failure cleanup is authenticated 8/8.
+- This remains nonterminal acquisition evidence: the single unwarmed `101,500 ms` execution is
+  diagnostic only, with no oracle, DSA comparison, trace, DB, terminal `SUCCESS`, Gate-D or
+  performance standing. Exact next: commit/push/mirror this correction, then one smallest
+  identical acquisition retry. Do not run 8K unchanged.
+
 ## 2026-08-27 first complete PP16 HLO is preserved; bounded linter correction is ready
 
 - Protected tag `greenfield_short_decoder_compile_pp16_acquisition_20260827T122306083796688Z`

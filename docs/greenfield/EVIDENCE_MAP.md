@@ -56,6 +56,18 @@ an ambiguous 8-KiB signature without external `wk` owners or divide-sqrt norms. 
 gzip SHAs are `ff3ae81b...a841` / `243279aa...1a7`; 8/8 failure cleanup passes. There is no host
 record, post-execute HBM, token, DB, `SUCCESS`, numerical, Gate-D or performance claim.
 
+Protected failed PP16 execution tag
+`greenfield_short_decoder_compile_pp16_acquisition_20260827T125930818874961Z` at `a670fdf` is the
+nonterminal successor. The corrected HLO gate passes fleet-wide and the complete graph executes
+once. All eight records agree on HLO/StableHLO `14cdc95d...64b0` / `c7b71689...7603`, synthetic
+token 3592, active LP2 ranks `[0,1]`, health 1, producer 74, selected state `(0,1,2)`, aligned
+position/context 3/4, visit mask 65,535 and peak HBM 27,252,078,592 bytes/chip. The only refusal is
+the host validator's PP8 literal 255; 65,535 is exactly the all-16-stage mask. Offline replay passes
+the plan-derived correction. Record/contract/census SHAs are `1a57c70c...f099` /
+`2b7783f5...7e81` / `e35a3117...e40`; failure cleanup is 8/8. The one unwarmed 101.5-second sample
+has no performance standing. There is no oracle/DSA comparison, trace, DB, terminal `SUCCESS`,
+Gate-D or performance claim.
+
 Accepted nonperformance feature-runtime tag
 `greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z` at `a973425` contains all 16
 stages / 32 production feature-Pallas owners. Manifest `0f1bb271...52b6f1` binds base runtime

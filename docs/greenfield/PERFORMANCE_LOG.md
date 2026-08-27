@@ -6,6 +6,16 @@ but not Gate E. WS32 has the accepted 2K DB553 point at `122.630667 ms/token` / 
 No accepted 8K, 128K, 256K or PP16 full-decoder measurement exists yet. Bounded
 layer/kernel/diagnostic results below are not token-speed proof.
 
+## 2026-08-27 — first complete PP16 execution, not performance
+
+`greenfield_short_decoder_compile_pp16_acquisition_20260827T125930818874961Z` passes the corrected
+complete HLO contract and executes the real 78-layer PP16 graph once. The eight records agree on
+the synthetic token/state and measure maximum peak HBM 27,252,078,592 bytes/chip. It then fails
+only on a PP8-hardcoded expected visit mask: observed 65,535 is exactly all 16 PP16 stages, while
+the runner required 255. The one `101,500 ms` sample has no warmup, oracle, DSA comparison or trace
+and is not accepted latency. There is no DB row, terminal `SUCCESS`, Gate-D or throughput claim;
+the plan-aware validator correction must terminal-pass the same acquisition before numerical 2K.
+
 ## 2026-08-27 — first complete PP16 graph, not performance
 
 `greenfield_short_decoder_compile_pp16_acquisition_20260827T122306083796688Z` loaded and compiled
