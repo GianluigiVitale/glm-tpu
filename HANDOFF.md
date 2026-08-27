@@ -2,6 +2,22 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 PP16 runtime-derivative path is CPU-ready, not yet packed
+
+- Pushed and same-region-mirrored commits `589d9ef` plus export correction `5838ef6` adapt the
+  existing executable-runtime and expert-feature pack/load chain to exact `PP16_LP2` ownership.
+  LP2 has its own versioned feature layout, both verifiers bind the source plan id, and source and
+  destination owner sets must contain every exact `(stage,slot)` once.
+- One host owns two PP16 stages. The shared resolver therefore refuses an ambiguous process-only
+  invocation and requires the exact stage id; PP8's one-stage-per-process behavior is unchanged.
+  Base and feature packers stream exactly two files for LP2 and retain four-file LP4 behavior.
+- The affected CPU suite passes 31 tests with one expected forced-32 loader skip; the resolver
+  passes 11/11 again after the export correction. This is implementation evidence only: there is
+  no PP16 executable-runtime artifact, TPU execution, HBM, decoder, DB, or performance claim yet.
+- Exact next is metadata-only construction against the sealed PP16 source, then a protected
+  resumable one-stage real-byte discriminator. Only after it reconciles should the remaining 15
+  stages and the feature derivative stream, followed by the smallest PP16 compile/HLO derivative.
+
 ## 2026-08-27 complete PP16 direct-load/HBM proof passes; Gate B is closed
 
 - Protected tag `greenfield_full_checkpoint_load_pp16_20260827T070407924804237Z` at pushed,

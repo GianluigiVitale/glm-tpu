@@ -5,6 +5,20 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 — PP16 runtime derivative is plan-generic and fail-closed on stage selection
+
+Commits `589d9ef` and `5838ef6` adapt the existing PP8 executable-runtime chain rather than
+creating a second checkpoint implementation. LP2 routed tensors use a distinct versioned layout;
+base and feature manifests/verifiers accept only PP8/PP16, bind the source plan id, require exact
+owner sets, and preserve direct final-owner streaming. Because each PP16 process owns two stages,
+the common resolver rejects process-only selection and accepts only an explicitly owned stage id.
+
+The affected CPU suite passes 31 tests with one expected forced-32 loader skip, including complete
+synthetic 16-stage base and feature artifacts and wrong-layout/ambiguous-stage refusals. The export
+correction was then retested 11/11. No real bytes were packed and no TPU, DB, HBM, decoder, or
+performance evidence was produced. Next construct the real metadata context, then stream one
+protected resumable PP16 stage before authorizing the remaining stages.
+
 ## 2026-08-27 — complete PP16 direct final-owner load closes Gate B
 
 Protected tag `greenfield_full_checkpoint_load_pp16_20260827T070407924804237Z` at pushed and
