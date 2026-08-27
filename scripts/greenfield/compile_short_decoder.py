@@ -1473,6 +1473,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--source-runtime-root", type=Path)
     parser.add_argument("--source-runtime-manifest-sha256")
+    parser.add_argument("--source-feature-runtime-root", type=Path)
+    parser.add_argument("--source-feature-runtime-manifest-sha256")
     parser.add_argument(
         "--feature-source-metadata-only",
         type=int,
@@ -2133,6 +2135,19 @@ def main() -> int:
         raise ValueError(
             "feature runtime requires its source runtime root and manifest"
         )
+    if (args.source_feature_runtime_root is None) != (
+        args.source_feature_runtime_manifest_sha256 is None
+    ):
+        raise ValueError(
+            "source feature runtime root and manifest must be provided together"
+        )
+    if args.source_feature_runtime_root is not None and (
+        args.runtime_kind not in ("pallas_feature", "pallas_feature_linear")
+        or not args.feature_source_metadata_only
+    ):
+        raise ValueError(
+            "a source feature runtime requires a feature backend and metadata-only parent lineage"
+        )
     if args.feature_source_metadata_only and args.runtime_kind not in (
         "pallas_feature",
         "pallas_feature_linear",
@@ -2247,6 +2262,10 @@ def main() -> int:
             source_runtime_root=args.source_runtime_root,
             source_runtime_manifest_sha256=(
                 args.source_runtime_manifest_sha256
+            ),
+            source_feature_runtime_root=args.source_feature_runtime_root,
+            source_feature_runtime_manifest_sha256=(
+                args.source_feature_runtime_manifest_sha256
             ),
             destination=runtime_manifest["destination"],
             fused_qkv_a=(
@@ -5367,9 +5386,13 @@ def main() -> int:
             "sparse_moe_backend": decoder.sparse_moe_backend,
             "feature_output_tile": decoder.feature_output_tile,
             "feature_source_verification_mode": (
-                "metadata_lineage"
-                if args.feature_source_metadata_only
-                else "complete_payload"
+                "feature_runtime_with_metadata_parent"
+                if args.source_feature_runtime_root is not None
+                else (
+                    "metadata_lineage"
+                    if args.feature_source_metadata_only
+                    else "complete_payload"
+                )
             ),
             "feature_fuse_route_weighting": (
                 decoder.feature_fuse_route_weighting

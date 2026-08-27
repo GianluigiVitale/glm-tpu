@@ -37,6 +37,7 @@ from glm_tpu.greenfield.model import (
     build_decoder_feature_fused_qkv_dense_runtime_weight_layout,
     build_decoder_feature_fused_qkv_runtime_weight_layout,
     build_decoder_feature_runtime_weight_layout,
+    build_decoder_fused_qkv_runtime_weight_layout,
     build_decoder_runtime_weight_layout,
     build_pipeline_schedule,
     feature_expert_runtime_layout,
@@ -1017,6 +1018,108 @@ def test_fused_qkv_feature_runtime_artifact_roundtrips(
     )
     assert fused["transform"] == "fuse_qkv_a_expanded_scales"
     assert len(fused["sources"]) == 2
+
+
+def test_fused_qkv_derivative_streams_directly_from_feature_runtime(
+    tmp_path: Path,
+) -> None:
+    source_plan = _small_feature_source_plan_pp16()
+    source_plan = replace(
+        source_plan,
+        geometry=replace(
+            source_plan.geometry,
+            hidden_size=128,
+            q_lora_rank=128,
+            kv_lora_rank=30,
+            qk_nope_head_dim=2,
+            qk_rope_head_dim=2,
+            v_head_dim=2,
+            moe_intermediate_size=512,
+            fp8_block_shape=(128, 128),
+        ),
+    )
+    source_feature_layout, base_checkpoint, source_feature_expectation = (
+        _build_feature_artifact(tmp_path, source_plan=source_plan)
+    )
+    source_feature = verify_feature_runtime_packed_checkpoint(
+        tmp_path / "feature-runtime",
+        source_feature_expectation,
+        source_feature_layout,
+        base_checkpoint,
+    )
+    target_plan = replace(
+        source_plan,
+        expert_layout=feature_expert_runtime_layout(
+            source_plan.local_parallel_size
+        ),
+    )
+    target_layout = build_decoder_fused_qkv_runtime_weight_layout(
+        target_plan,
+        build_pipeline_schedule(target_plan),
+        source_feature_layout,
+    )
+    destination_plans = build_feature_runtime_destination_file_plans(
+        target_layout,
+        source_feature.plans,
+        source_runtime_manifest_sha256=(
+            source_feature_expectation.runtime_manifest_sha256
+        ),
+    )
+    stage_id = 0
+    source_stage = tuple(
+        plan for plan in source_feature.plans if plan.stage_id == stage_id
+    )
+    destination_stage = tuple(
+        plan for plan in destination_plans if plan.stage_id == stage_id
+    )
+    source_file_hashes = {
+        filename: record["sha256"]
+        for filename, record in source_feature.evidence_by_filename.items()
+    }
+    source_tensor_hashes = {
+        (filename, tensor["name"]): tensor["sha256"]
+        for filename, record in source_feature.evidence_by_filename.items()
+        for tensor in record["tensors"]
+    }
+    source_streams = {
+        plan.device_slot: (source_feature.root / plan.filename).open("rb")
+        for plan in source_stage
+    }
+    outputs = {slot: BytesIO() for slot in range(2)}
+    try:
+        evidence = stream_feature_runtime_stage(
+            source_plans=source_stage,
+            destination_plans=destination_stage,
+            sources=source_streams,
+            outputs=outputs,
+            verified_source_file_sha256=source_file_hashes,
+            source_tensor_sha256=source_tensor_hashes,
+            chunk_bytes=31,
+        )
+    finally:
+        for stream in source_streams.values():
+            stream.close()
+    assert len(evidence) == 2
+    transforms = {
+        tensor.name: tensor.transform
+        for tensor in evidence[0].tensors
+        if not tensor.padding
+    }
+    assert transforms["attention.slot_00.qkv_a.weight_bits"] == (
+        "fuse_qkv_a_output_shards"
+    )
+    assert transforms["attention.slot_00.qkv_a.scale_inv"] == (
+        "fuse_qkv_a_expanded_scales"
+    )
+    assert {
+        transform
+        for name, transform in transforms.items()
+        if ".qkv_a." not in name
+    } == {"identity_runtime_tensor"}
+    assert all(
+        len(outputs[slot].getvalue()) == destination_stage[slot].file_bytes
+        for slot in range(2)
+    )
 
 
 def test_pp16_feature_runtime_artifact_verifies_all_two_chip_stages(

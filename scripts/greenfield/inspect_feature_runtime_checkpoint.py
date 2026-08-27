@@ -34,6 +34,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source-packed-manifest-sha256", required=True)
     parser.add_argument("--source-runtime-root", type=Path, required=True)
     parser.add_argument("--source-runtime-manifest-sha256", required=True)
+    parser.add_argument("--source-feature-runtime-root", type=Path)
+    parser.add_argument("--source-feature-runtime-manifest-sha256")
     parser.add_argument("--runtime-manifest-sha256", required=True)
     parser.add_argument("--source-metadata-only", action="store_true")
     parser.add_argument("--output", type=Path)
@@ -60,6 +62,10 @@ def main() -> int:
         source_packed_manifest_sha256=args.source_packed_manifest_sha256,
         source_runtime_root=args.source_runtime_root,
         source_runtime_manifest_sha256=args.source_runtime_manifest_sha256,
+        source_feature_runtime_root=args.source_feature_runtime_root,
+        source_feature_runtime_manifest_sha256=(
+            args.source_feature_runtime_manifest_sha256
+        ),
         destination=manifest["destination"],
         fused_qkv_a=(
             manifest.get("attention_projection_layout")
@@ -105,7 +111,13 @@ def main() -> int:
         "source_runtime_manifest_sha256": (expectation.source_runtime_manifest_sha256),
         "source_tensor_count": manifest["source_tensor_count"],
         "source_verification_mode": (
-            "metadata_lineage" if args.source_metadata_only else "complete_payload"
+            "feature_runtime_with_metadata_parent"
+            if args.source_feature_runtime_root is not None
+            else (
+                "metadata_lineage"
+                if args.source_metadata_only
+                else "complete_payload"
+            )
         ),
         "tensor_count": manifest["tensor_count"],
         "verified": True,

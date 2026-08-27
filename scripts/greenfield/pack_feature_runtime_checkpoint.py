@@ -31,6 +31,7 @@ from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     build_feature_runtime_layout_document,
     resolve_runtime_pack_stage,
     stream_feature_runtime_stage,
+    verify_feature_runtime_packed_checkpoint,
     verify_full_packed_checkpoint,
     verify_runtime_packed_checkpoint,
     verify_source_file_sha256,
@@ -45,6 +46,7 @@ from glm_tpu.greenfield.model import (  # noqa: E402
     build_decoder_feature_fused_qkv_dense_runtime_weight_layout,
     build_decoder_feature_fused_qkv_runtime_weight_layout,
     build_decoder_feature_runtime_weight_layout,
+    build_decoder_fused_qkv_runtime_weight_layout,
     build_decoder_runtime_weight_layout,
     build_pipeline_schedule,
     feature_expert_runtime_layout,
@@ -164,6 +166,22 @@ def _source_hashes(
 
 def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
     source_metadata_only = bool(getattr(args, "source_metadata_only", False))
+    source_feature_root = getattr(args, "source_feature_runtime_root", None)
+    source_feature_manifest_sha256 = getattr(
+        args,
+        "source_feature_runtime_manifest_sha256",
+        None,
+    )
+    if (source_feature_root is None) != (
+        source_feature_manifest_sha256 is None
+    ):
+        raise RuntimeError(
+            "source feature runtime root and manifest must be provided together"
+        )
+    if source_feature_root is not None and not source_metadata_only:
+        raise RuntimeError(
+            "a feature-runtime source requires metadata-only parent lineage"
+        )
     full_expectation = _source_full_expectation(
         args.source_checkpoint_root,
         args.source_packed_manifest_sha256,
@@ -199,7 +217,59 @@ def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
         ),
     )
     target_schedule = build_pipeline_schedule(target_plan)
-    if getattr(args, "dense_convolution", False):
+    direct_source_runtime = source_runtime
+    direct_source_layout = source_layout
+    direct_source_expectation: (
+        RuntimeCheckpointLoadExpectation | FeatureRuntimeCheckpointLoadExpectation
+    ) = runtime_expectation
+    if source_feature_root is not None:
+        if not getattr(args, "fused_qkv_a", False):
+            raise RuntimeError(
+                "a feature-runtime source is only valid for a fused qkv-a derivative"
+            )
+        if getattr(args, "dense_convolution", False):
+            raise RuntimeError(
+                "a feature-runtime source cannot also derive dense convolution state"
+            )
+        source_feature_layout = build_decoder_feature_runtime_weight_layout(
+            target_plan,
+            target_schedule,
+            source_layout,
+        )
+        source_feature_manifest = _read_json(
+            source_feature_root / "runtime_manifest.json"
+        )
+        if (
+            _mapping_hash(
+                source_feature_manifest,
+                hash_field="manifest_sha256",
+            )
+            != source_feature_manifest_sha256
+        ):
+            raise RuntimeError("protected source feature manifest hash drifted")
+        direct_source_expectation = build_load_expectation(
+            source_feature_manifest
+        )
+        if (
+            direct_source_expectation.runtime_manifest_sha256
+            != source_feature_manifest_sha256
+            or direct_source_expectation.source_runtime_manifest_sha256
+            != args.source_runtime_manifest_sha256
+        ):
+            raise RuntimeError("source feature runtime lineage drifted")
+        direct_source_runtime = verify_feature_runtime_packed_checkpoint(
+            source_feature_root,
+            direct_source_expectation,
+            source_feature_layout,
+            source_runtime,
+        )
+        direct_source_layout = source_feature_layout
+        layout = build_decoder_fused_qkv_runtime_weight_layout(
+            target_plan,
+            target_schedule,
+            direct_source_layout,
+        )
+    elif getattr(args, "dense_convolution", False):
         if not getattr(args, "fused_qkv_a", False):
             raise RuntimeError(
                 "dense convolution derivative requires fused qkv-a"
@@ -227,10 +297,14 @@ def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
     ).encode("utf-8")
     plans = build_feature_runtime_destination_file_plans(
         layout,
-        source_runtime.plans,
-        source_runtime_manifest_sha256=args.source_runtime_manifest_sha256,
+        direct_source_runtime.plans,
+        source_runtime_manifest_sha256=(
+            direct_source_expectation.runtime_manifest_sha256
+        ),
     )
-    source_file_hashes, source_tensor_hashes = _source_hashes(source_runtime)
+    source_file_hashes, source_tensor_hashes = _source_hashes(
+        direct_source_runtime
+    )
     common: dict[str, Any] = {
         "destination": args.destination.rstrip("/"),
         "file_count": len(plans),
@@ -246,13 +320,17 @@ def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
         "runtime_layout_manifest_sha256": layout_document["manifest_sha256"],
         "runtime_payload_bytes": sum(plan.payload_bytes for plan in plans),
         "schedule_hash": target_schedule.schedule_hash,
-        "source_checkpoint_destination": runtime_expectation.destination,
+        "source_checkpoint_destination": direct_source_expectation.destination,
         "source_payload_bytes": sum(device.source_bytes for device in layout.devices),
-        "source_runtime_layout_hash": runtime_expectation.runtime_layout_hash,
-        "source_runtime_layout_manifest_sha256": (
-            runtime_expectation.runtime_layout_manifest_sha256
+        "source_runtime_layout_hash": (
+            direct_source_expectation.runtime_layout_hash
         ),
-        "source_runtime_manifest_sha256": args.source_runtime_manifest_sha256,
+        "source_runtime_layout_manifest_sha256": (
+            direct_source_expectation.runtime_layout_manifest_sha256
+        ),
+        "source_runtime_manifest_sha256": (
+            direct_source_expectation.runtime_manifest_sha256
+        ),
         "source_tensor_count": layout.source_leaf_count,
         "tensor_count": len(layout.specs) * len(layout.devices),
     }
@@ -262,6 +340,13 @@ def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
         )
     if layout.dense_projection_layout != LEGACY_DENSE_RUNTIME_LAYOUT:
         common["dense_projection_layout"] = layout.dense_projection_layout
+    if source_feature_root is not None:
+        common["source_runtime_artifact_kind"] = (
+            FEATURE_RUNTIME_PACKED_ARTIFACT_KIND
+        )
+        common["source_parent_runtime_manifest_sha256"] = (
+            args.source_runtime_manifest_sha256
+        )
     control: dict[str, Any] = {
         "artifact_kind": FEATURE_RUNTIME_PACK_CONTROL_KIND,
         **common,
@@ -273,8 +358,8 @@ def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
     )
     return PackContext(
         source_full_checkpoint=source_full,
-        source_runtime_checkpoint=source_runtime,
-        source_layout=source_layout,
+        source_runtime_checkpoint=direct_source_runtime,
+        source_layout=direct_source_layout,
         target_plan=target_plan,
         layout=layout,
         layout_document=layout_document,
@@ -757,6 +842,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source-packed-manifest-sha256", required=True)
     parser.add_argument("--source-runtime-root", type=Path, required=True)
     parser.add_argument("--source-runtime-manifest-sha256", required=True)
+    parser.add_argument("--source-feature-runtime-root", type=Path)
+    parser.add_argument("--source-feature-runtime-manifest-sha256")
+    parser.add_argument("--source-metadata-only", action="store_true")
     parser.add_argument("--destination", required=True)
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--expected-code-hash", required=True)

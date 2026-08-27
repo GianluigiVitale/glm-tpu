@@ -236,6 +236,23 @@ def verify_feature_runtime_packed_checkpoint(
         )
     if layout.dense_projection_layout != LEGACY_DENSE_RUNTIME_LAYOUT:
         common["dense_projection_layout"] = layout.dense_projection_layout
+    if (
+        source_checkpoint.runtime_manifest.get("artifact_kind")
+        == FEATURE_RUNTIME_PACKED_ARTIFACT_KIND
+    ):
+        parent_manifest_sha256 = source_checkpoint.runtime_manifest.get(
+            "source_runtime_manifest_sha256"
+        )
+        _digest(
+            parent_manifest_sha256,
+            field="source_parent_runtime_manifest_sha256",
+        )
+        common["source_runtime_artifact_kind"] = (
+            FEATURE_RUNTIME_PACKED_ARTIFACT_KIND
+        )
+        common["source_parent_runtime_manifest_sha256"] = (
+            parent_manifest_sha256
+        )
     for name, value in (("control", control), ("manifest", manifest)):
         for field, expected in common.items():
             if value.get(field) != expected:
