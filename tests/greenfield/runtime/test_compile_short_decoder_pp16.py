@@ -100,7 +100,7 @@ def _record(rank: int) -> dict[str, object]:
     }
     return {
         "artifact_kind": "greenfield_real_78layer_2k_decoder_token_pallas_feature",
-        "attention_projection_backend": "separate",
+        "attention_projection_backend": "fused_n82_convolution",
         "body_only": False,
         "code_hash": CODE_HASH,
         "compile_seconds": 10.0 + rank,
@@ -163,10 +163,10 @@ def _record(rank: int) -> dict[str, object]:
             "device_roundtrip_verified": False,
             "fp8_device_dequantizations": 0,
             "fp8_host_dequantizations": 0,
-            "global_array_count": 217,
+            "global_array_count": 203,
             "host_global_concatenations": 0,
-            "loaded_payload_bytes": 108_693_168_384,
-            "loaded_tensor_count": 868,
+            "loaded_payload_bytes": 108_707_162_112,
+            "loaded_tensor_count": 812,
             "runtime_checkpoint_reshards": 0,
         },
         "load_seconds": 20.0 + rank,

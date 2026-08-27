@@ -18,19 +18,19 @@ from typing import Any, Mapping
 PLAN_HASH = "cefab5e7ed373a0896e7d1471713abb8ef89c9dedca78ee115c8d1fccc7ad172"
 SCHEDULE_HASH = "02b0ae76572ee8ec40c850c2b252f6f85f06338ae5f956c2aa130c32b12c8eac"
 RUNTIME_MANIFEST_SHA256 = (
-    "0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1"
+    "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab"
 )
 RUNTIME_LAYOUT_HASH = (
-    "7764784461cc8614b703e3ff943851068ae63a4b97c9edb1c5a5376bc24399c7"
+    "5783a307ff4d67789bce25e80acd041530d15efa744e2628cedc44bb960efcb4"
 )
 TOPOLOGY_HASH = (
     "294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559"
 )
 TOPOLOGY_RESULTS_DB_RUN_ID = 555
 EXPECTED_JAX_PROCESS_BY_LAUNCH = (3, 5, 1, 2, 0, 6, 7, 4)
-EXPECTED_PAYLOAD_BYTES_PER_HOST = 108_693_168_384
-EXPECTED_TENSORS_PER_HOST = 868
-EXPECTED_GLOBAL_ARRAYS = 217
+EXPECTED_PAYLOAD_BYTES_PER_HOST = 108_707_162_112
+EXPECTED_TENSORS_PER_HOST = 812
+EXPECTED_GLOBAL_ARRAYS = 203
 
 
 def _require(condition: bool, message: str) -> None:
@@ -106,7 +106,7 @@ def validate_records(
             f"rank {rank} artifact kind drifted",
         )
         expected_scalars = {
-            "attention_projection_backend": "separate",
+            "attention_projection_backend": "fused_n82_convolution",
             "body_only": False,
             "code_hash": code_hash,
             "complete_token_path": True,

@@ -15,9 +15,12 @@ readonly SOURCE_MANIFEST_SHA=13ad2e926b44bee86e620d877d4c266dbacc4f9a59b352fc4f2
 readonly SOURCE_RUNTIME_TAG=greenfield_runtime_pack_pp16_20260827T091323450875229Z
 readonly SOURCE_RUNTIME_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime/PP16_LP2/$SOURCE_RUNTIME_TAG
 readonly SOURCE_RUNTIME_MANIFEST_SHA=b0f624666e921a93e92c625e0e1248aaa9162c45a9be974f4491755c8604d2e5
-readonly RUNTIME_TAG=greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z
+readonly SOURCE_FEATURE_TAG=greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z
+readonly SOURCE_FEATURE_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/$SOURCE_FEATURE_TAG
+readonly SOURCE_FEATURE_MANIFEST_SHA=0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1
+readonly RUNTIME_TAG=greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z
 readonly RUNTIME_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/$RUNTIME_TAG
-readonly RUNTIME_MANIFEST_SHA=0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1
+readonly RUNTIME_MANIFEST_SHA=b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab
 RUNTIME_KIND=${GLM_GREENFIELD_PP16_RUNTIME_KIND:-pallas_feature}
 [[ $RUNTIME_KIND == pallas_feature || $RUNTIME_KIND == pallas_feature_linear ]]
 readonly RUNTIME_KIND
@@ -40,6 +43,7 @@ readonly PIN TAG RUN_DIR REMOTE_PREFIX
 for prerequisite in \
   "$SOURCE_ROOT/SUCCESS" "$SOURCE_ROOT/packed_manifest.json" \
   "$SOURCE_RUNTIME_ROOT/SUCCESS" "$SOURCE_RUNTIME_ROOT/runtime_manifest.json" \
+  "$SOURCE_FEATURE_ROOT/SUCCESS" "$SOURCE_FEATURE_ROOT/runtime_manifest.json" \
   "$RUNTIME_ROOT/SUCCESS" "$RUNTIME_ROOT/runtime_manifest.json"; do
   [[ -r $prerequisite ]] || {
     echo "missing PP16 compile prerequisite: $prerequisite" >&2
@@ -107,6 +111,7 @@ gcloud storage objects list "$REMOTE_PREFIX/**" --format='value(name)' \
 /home/gianl/vllm-env/bin/python - \
   "$SOURCE_ROOT/packed_manifest.json" "$SOURCE_MANIFEST_SHA" \
   "$SOURCE_RUNTIME_ROOT/runtime_manifest.json" "$SOURCE_RUNTIME_MANIFEST_SHA" \
+  "$SOURCE_FEATURE_ROOT/runtime_manifest.json" "$SOURCE_FEATURE_MANIFEST_SHA" \
   "$RUNTIME_ROOT/runtime_manifest.json" "$RUNTIME_MANIFEST_SHA" \
   "$RUN_DIR/preflight.json" "$PIN" "$TAG" "$REMOTE_PREFIX" \
   "$RUNTIME_KIND" <<'PY'
@@ -114,8 +119,8 @@ import json
 from pathlib import Path
 import sys
 
-source_path, source_sha, base_path, base_sha, feature_path, feature_sha, output, pin, tag, remote, runtime_kind = sys.argv[1:]
-for path, expected in ((source_path, source_sha), (base_path, base_sha), (feature_path, feature_sha)):
+source_path, source_sha, base_path, base_sha, source_feature_path, source_feature_sha, runtime_path, runtime_sha, output, pin, tag, remote, runtime_kind = sys.argv[1:]
+for path, expected in ((source_path, source_sha), (base_path, base_sha), (source_feature_path, source_feature_sha), (runtime_path, runtime_sha)):
     value = json.loads(Path(path).read_text())
     if value.get("manifest_sha256") != expected:
         raise SystemExit(f"manifest identity drifted: {path}")
@@ -127,7 +132,7 @@ record = {
     "context_capacity": 2048,
     "feature_fuse_route_weighting": False,
     "feature_output_tile": 128,
-    "feature_source_verification_mode": "metadata_lineage",
+    "feature_source_verification_mode": "feature_runtime_with_metadata_parent",
     "feature_reconstruct_down_fp32": False,
     "gate_d_claim": False,
     "iterations": 1,
@@ -136,9 +141,10 @@ record = {
     "plan_id": "PP16_LP2",
     "remote_prefix": remote,
     "run_tag": tag,
-    "runtime_manifest_sha256": feature_sha,
+    "runtime_manifest_sha256": runtime_sha,
     "runtime_kind": runtime_kind,
     "source_packed_manifest_sha256": source_sha,
+    "source_feature_runtime_manifest_sha256": source_feature_sha,
     "source_runtime_manifest_sha256": base_sha,
     "split_residual_state": True,
     "trace_steps": 0,
@@ -154,7 +160,7 @@ strict_census pre || {
 
 say "syncing exact pushed pin and same-region PP16 artifacts on all hosts"
 # shellcheck disable=SC2016
-sync_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; wt='"$WORKTREE"'; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$ORIGIN"'; source='"$SOURCE_ROOT"'; source_runtime='"$SOURCE_RUNTIME_ROOT"'; runtime='"$RUNTIME_ROOT"'; if [[ "$idx" == 0 ]]; then [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else [[ -e "$wt/.git" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q "$origin" "$branch"; git -C "$wt" checkout -q --detach "$pin"; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && [[ -r "$source/SUCCESS" && -r "$source/packed_manifest.json" ]] && [[ -r "$source_runtime/SUCCESS" && -r "$source_runtime/runtime_manifest.json" ]] && [[ -r "$runtime/SUCCESS" && -r "$runtime/runtime_manifest.json" ]] && findmnt -T "$source" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$source_runtime" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$runtime" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && echo "SYNC_OK $(hostname) $pin"'
+sync_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; wt='"$WORKTREE"'; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$ORIGIN"'; source='"$SOURCE_ROOT"'; source_runtime='"$SOURCE_RUNTIME_ROOT"'; source_feature='"$SOURCE_FEATURE_ROOT"'; runtime='"$RUNTIME_ROOT"'; if [[ "$idx" == 0 ]]; then [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; else [[ -e "$wt/.git" ]] && [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q "$origin" "$branch"; git -C "$wt" checkout -q --detach "$pin"; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" ]] && [[ -z $(git -C "$wt" status --porcelain) ]] && [[ -r "$source/SUCCESS" && -r "$source/packed_manifest.json" ]] && [[ -r "$source_runtime/SUCCESS" && -r "$source_runtime/runtime_manifest.json" ]] && [[ -r "$source_feature/SUCCESS" && -r "$source_feature/runtime_manifest.json" ]] && [[ -r "$runtime/SUCCESS" && -r "$runtime/runtime_manifest.json" ]] && findmnt -T "$source" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$source_runtime" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$source_feature" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && findmnt -T "$runtime" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse" && echo "SYNC_OK $(hostname) $pin"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK || {
@@ -171,7 +177,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching one complete PP16 2K compile and diagnostic execution coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { [[ -f "$log" ]] && gcloud storage cp --no-clobber "$log" "$remote/host_logs/" >/dev/null 2>&1 || true; [[ -f "$output" ]] && gcloud storage cp --no-clobber "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip 0 --feature-source-metadata-only 1 --feature-output-tile 128 --feature-fuse-route-weighting 0 --feature-reconstruct-down-fp32 0 --complete-token-path 1 --split-residual-state 1 --prefill-index-repair 0 --dsa-query-exact-association 1 --dsa-head-key-exact-association 0 --dsa-score-default-precision 0 --main-rope-table 0 --pregathered-b512-attention 0 --strategy-nd-attention-projection 0 --dense-final-layout-convolution 0 --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup 1 --iterations 1 --trace-steps 0 --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { [[ -f "$log" ]] && gcloud storage cp --no-clobber "$log" "$remote/host_logs/" >/dev/null 2>&1 || true; [[ -f "$output" ]] && gcloud storage cp --no-clobber "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip 0 --feature-source-metadata-only 1 --feature-output-tile 128 --feature-fuse-route-weighting 0 --feature-reconstruct-down-fp32 0 --complete-token-path 1 --split-residual-state 1 --prefill-index-repair 0 --dsa-query-exact-association 1 --dsa-head-key-exact-association 0 --dsa-score-default-precision 0 --main-rope-table 0 --pregathered-b512-attention 0 --strategy-nd-attention-projection 0 --dense-final-layout-convolution 0 --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-feature-runtime-root '"$SOURCE_FEATURE_ROOT"' --source-feature-runtime-manifest-sha256 '"$SOURCE_FEATURE_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup 1 --iterations 1 --trace-steps 0 --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 execute_status=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1 || execute_status=$?
