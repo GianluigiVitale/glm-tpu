@@ -37,9 +37,9 @@ Then pass Gates A–H in order: plan/memory/HLO linter; final-layout checkpoint 
 loader; reference kernels; exact dense/DSA/IndexShare/MoE layers; complete 2K/8K decoder; protected
 128K smoke; protected 256K E0; identical-condition plan adjudication; only then speculation.
 
-Do not wait for Gates E–H to upstream DSA. Re-audit `tpu-inference` main/PRs, then cut the smallest
-TPU DSA scorer/indexer PR from protected v4 evidence. Keep it independent; respond/rebase until
-merged. Greenfield remains the oracle.
+Do not wait for E–H to upstream DSA. Re-audit `tpu-inference` main/PRs; cut the smallest TPU GLM
+DSA scorer/indexer from protected v4 evidence. User audits before upstream PR; then respond/rebase
+until merged. Greenfield is the oracle.
 
 ## Proof and performance contract
 
