@@ -5,6 +5,15 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 
 ## Current boundary
 
+- Treat empty optional evidence directories as absent, not as recursive-copy operands. Archive a
+  file tree with `gcloud storage rsync` (without delete) before building the exact remote ledger;
+  keep DB publication provisional until terminal `SUCCESS`, and recover a fully validated model
+  run from its exact snapshot rather than rerunning it for an outer archive bug.
+- A small byte count is not a compact transport if it consumes a separate cross-stage launch.
+  DB563's live `s32[1,2053]` IndexShare/control vector is only 8 KiB, yet its eight separate
+  ppermutes help make 17 pipeline launches cost 206.353 ms of a 245.640-ms step. Before any 8K
+  rerun, test exact bit-packing with the split residual in the smallest transport chain and require
+  one launch per stage plus exact unpacked bytes. Never infer the win from payload arithmetic.
 - A multi-arm discriminator must preserve the evidence from a rejected compiler hypothesis and
   continue independent arms. Treat only the explicitly adjudicated physical property as a
   recordable rejection (here, absence/misbinding of the 16-KiB query fusion); wrong StableHLO,

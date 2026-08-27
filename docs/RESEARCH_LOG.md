@@ -5,6 +5,37 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 19:31--20:34 UTC — current PP8 2K is exact; XPlane isolates transport
+
+The final PP8 feature runtime was restored exactly from soft-deleted generations, while only the
+two parent root metadata sets were restored. The final runtime is 68 objects / 834,405,892,809
+bytes with manifest `12339490...699a`; metadata-only lineage verifies 32 files, 10,880 tensors and
+834,369,271,808 payload bytes without restoring either parent payload. The full no-TPU preflight
+passed before the only model run.
+
+Protected workload pin `2c6c248` then completes the real 2,034-token prefill and 14 exact decode
+observations. DB563 passes the raw-token sequence, every 21-event DSA set/tie/order comparison,
+state/cache, observer isolation, HLO, HBM, 64-core XPlane and authenticated 8/8 cleanup. P50/p99 is
+`245.639880/245.835886 ms`; `4.071000 tok/s` misses the useful performance bar. Peak HBM is
+26,303,084,032 bytes/chip with 6,711,314,944 bytes minimum headroom.
+
+The wrapper failed after DB validation because `gcloud storage cp --recursive "$RUN_DIR"/*`
+treated empty optional observer directories as missing sources. It rolled DB563 back exactly.
+Pushed/mirrored pin `bec39f5` changes future archives to storage rsync and adds a no-JAX/no-TPU
+recovery with exact DB-prefix comparison and rollback-on-seal-failure. Recovery tag
+`greenfield_short_decoder_pp8_2k_gate_d_recovery_20260827T203000000000000Z` republishes DB563 and
+72 exact objects / 808,904,670 bytes; ledger/SUCCESS SHAs are `f21b8b13...29e03` /
+`95a18e10...e8ff`. A generation/CRC inventory then authorized deletion of the redundant failed
+prefix: 135 objects / 1,617,706,054 bytes, cleanup manifest `09362b4e...76f09`.
+
+The decisive XPlane result is not model arithmetic: collective-permute start/done consume
+`72.666388 + 133.686419 = 206.352807 ms/step` across 17 launches. HLO identifies eight
+`bf16[2,1,6144]` split-residual transfers, eight live `s32[1,2053]` IndexShare/control transfers and
+one scalar token return. All-reduce costs only 0.463573 ms/step. This is local/pipeline traffic, not
+full-pod hidden reconstruction, but launch count prevents the useful gate. Before 8K, run the
+smallest default-off experiment that bit-packs residual and metadata into one stage transfer and
+requires exact unpacked bytes plus one launch/stage; no full decoder until that mechanism wins.
+
 ## 2026-08-27 18:24--19:05 UTC — PP16 MoE attribution and isolated tile-256 verdict
 
 The sealed 431.834093-ms PP16 acquisition was attributed offline without importing JAX or touching

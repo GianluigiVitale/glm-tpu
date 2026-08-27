@@ -2,6 +2,33 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 current-code PP8 2K Gate D passes; pipeline transport dominates
+
+- Protected source tag `greenfield_short_decoder_compile_pp8_2k_pallas_feature_linear_ot256_`
+  `downf32_token_splitres_queryexact_oracle_dsa_metaparent_trace2_20260827T194450473110366Z`
+  at workload pin `2c6c248` executes the complete real-prompt 78-layer decoder. DB563 passes the
+  raw-token prefix, all 14 decode observations × 21 DSA events, tie/order, state/cache, HLO, HBM,
+  64-core XPlane and pre/post 8/8 cleanup contracts. Optimized HLO SHA is `751b60f7...9487d`;
+  peak HBM is 26,303,084,032 bytes/chip with 6,711,314,944 bytes minimum measured headroom.
+- Profiler-free p50/p99 is `245.639880/245.835886 ms` (`4.071000 tok/s`), so current PP8 2K
+  correctness passes but the result misses the `<=200 ms` / `>=4.5 tok/s` useful gate. The XPlane
+  attributes 206.353 ms to 17 pipeline collective-permutes: eight live split-residual transfers,
+  eight live `s32[1,2053]` IndexShare/control metadata transfers and one token return. Local
+  all-reduces total only 0.464 ms; no full-pod hidden reconstruction or dead decode rows appear.
+- The outer run failed only because recursive `gcloud storage cp` treated five intentionally empty
+  observer directories as missing sources. Pushed/mirrored recovery pin `bec39f5` replaces that
+  archive with file-tree rsync and adds transaction-safe, no-TPU recovery. Recovery tag
+  `greenfield_short_decoder_pp8_2k_gate_d_recovery_20260827T203000000000000Z` restores exact DB563
+  rows and terminal-seals 72 objects / 808,904,670 bytes. Ledger/SUCCESS self SHAs are
+  `f21b8b13...29e03` / `95a18e10...e8ff`; bucket location is `US-CENTRAL2`.
+- The superseded nonterminal source prefix (135 duplicate objects / 1,617,706,054 bytes) was deleted
+  generation-conditionally after a full receipt; it remains soft-deletable for seven days. Cleanup
+  manifest/SUCCESS SHAs are `09362b4e...76f09` / `0d5a5029...557b9`.
+- Gate D as a whole remains open until exact protected 8K. Do not launch 8K yet: first test one
+  default-off packed residual+metadata collective-permute in the existing smallest transport chain.
+  Require one transfer launch per stage, exact unpacked bytes and a material warmed latency win;
+  otherwise retain the current two-transfer boundary and proceed honestly.
+
 ## 2026-08-27 PP16 MoE tile-256 wins narrowly; unchanged decoder rerun is refused
 
 - Offline report `greenfield_pp16_decoder_offline_attribution_20260827T185245848894355Z` at

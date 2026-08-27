@@ -1,10 +1,26 @@
 # Greenfield performance and mechanism log
 
-Protected PP8 2K full-decoder evidence exists at DB484: p50 `244.091151 ms` and
-`4.096830 tok/s`, with exact tokens/DSA and complete protections. It passes 2K Gate-D correctness
-but not Gate E. WS32 has the accepted 2K DB553 point at `122.630667 ms/token` / `8.154567 tok/s`.
+Protected current-code PP8 2K full-decoder evidence exists at DB563: p50 `245.639880 ms` and
+`4.071000 tok/s`, with exact tokens/DSA and complete protections. It reconfirms DB484's
+`244.091151 ms` / `4.096830 tok/s` result and passes 2K Gate-D correctness but not Gate E. WS32 has
+the accepted 2K DB553 point at `122.630667 ms/token` / `8.154567 tok/s`.
 No accepted 8K, 128K, 256K or PP16 full-decoder measurement exists yet. Bounded
 layer/kernel/diagnostic results below are not token-speed proof.
+
+## 2026-08-27 — current PP8 2K Gate D is exact; 84% of wall is pipeline permute
+
+DB563 / recovered terminal tag
+`greenfield_short_decoder_pp8_2k_gate_d_recovery_20260827T203000000000000Z` passes the complete
+real-prompt token/DSA/state/cache/HLO/HBM/XPlane contract. P50/p99 is
+`245.639880/245.835886 ms`, answer rate is `4.071000 tok/s`, peak HBM is 26.303 GB/chip and minimum
+headroom is 6.711 GB. This is accepted current-code 2K evidence, but it misses both useful-gate
+thresholds and does not close the mandatory 8K portion of Gate D.
+
+The 64-core XPlane measures 206.352807 ms/step in 17 collective-permutes (84.0% of p50): eight
+split-residual sends, eight `s32[1,2053]` live-metadata sends and one token return. All local
+all-reduces sum to only 0.463573 ms/step and HLO has no full-pod hidden reconstruction. This makes
+stage-boundary launch count the next bounded target. A packed residual+metadata transport must
+first win the existing synthetic exact-byte/warmed-latency gate before any expensive 8K run.
 
 ## 2026-08-27 — PP16 tile 256 is exact and 0.99% faster, but not a decoder rescue
 
