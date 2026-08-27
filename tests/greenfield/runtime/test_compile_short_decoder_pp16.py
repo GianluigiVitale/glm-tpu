@@ -61,7 +61,17 @@ def _record(rank: int) -> dict[str, object]:
         "complete_token_collective_contract": {"passed": True},
         "complete_token_path": True,
         "dsa_head_key_association_contract": {"passed": True},
-        "dsa_query_association_contract": {"passed": True},
+        "dsa_query_association_contract": {
+            "exact_association": True,
+            "exact_chunk_width": 1024,
+            "exact_chunks_per_local_owner": 2,
+            "expected_runtime_tuple4_reduction_count": 42,
+            "expected_tuple4_reduction_fusion_count": 21,
+            "forbidden_global_shapes": [],
+            "local_owner_shape": "f32[2048,2048]",
+            "passed": True,
+            "tuple4_reduction_fusion_count": 21,
+        },
         "expected_collective_counts": {
             "all-gather": 1,
             "all-reduce": 1,
@@ -99,7 +109,37 @@ def _record(rank: int) -> dict[str, object]:
         "dense_final_layout_convolution": False,
         "device_memory_after_execute": memory,
         "dsa_head_key_exact_association": False,
-        "dsa_query_exact_association": False,
+        "dsa_query_exact_association": True,
+        "dsa_query_materialization_compile_seconds": 1.0,
+        "dsa_query_materialization_execute_seconds": 0.5,
+        "dsa_query_materialization_hlo_contract": {
+            "forbidden_custom_call_targets": [],
+            "forbidden_global_shapes": [],
+            "forbidden_operations": [],
+            "host_markers": [],
+            "local_fp32_shape": "f32[2048,2048]",
+            "local_raw_shape": "u8[2048,2048]",
+            "local_scale_shape": "f32[16,16]",
+            "num_partitions": 32,
+            "passed": True,
+        },
+        "dsa_query_materialization_hlo_sha256": "5" * 64,
+        "dsa_query_materialization_state": {
+            "input_alias_count": 4,
+            "local_shards": [
+                {
+                    "byte_count": 16_777_216,
+                    "device_id": local_slot,
+                    "sha256": "6" * 64,
+                    "slot": slot,
+                }
+                for slot in range(4)
+                for local_slot in range(4)
+            ],
+            "materialized_bytes_per_device": 67_108_864,
+            "slot_count": 4,
+            "source": "completed_stage_local_raw_fp8_to_fp32",
+        },
         "dsa_score_default_precision": False,
         "feature_fuse_route_weighting": False,
         "feature_output_tile": 128,
@@ -110,6 +150,7 @@ def _record(rank: int) -> dict[str, object]:
             for process in range(8)
         ],
         "fleet_stablehlo_hashes": [STABLEHLO_HASH] * 8,
+        "fleet_dsa_query_materialization_hlo_hashes": ["5" * 64] * 8,
         "hlo_contract": contract,
         "hostname": f"pod-w-{rank}",
         "iterations": 1,
@@ -260,6 +301,8 @@ def test_pp16_compile_acquisition_runner_is_small_default_off_and_protected() ->
     assert '--runtime-kind ' in source
     assert "--feature-output-tile 128" in source
     assert "--complete-token-path 1 --split-residual-state 1" in source
+    assert "--dsa-query-exact-association 1" in source
+    assert "--dsa-head-key-exact-association 0" in source
     assert "--verify-device-roundtrip 0" in source
     assert "US-CENTRAL2" in source
     assert "gs://driftbench-dsv4-uc" in source

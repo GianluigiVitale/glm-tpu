@@ -113,7 +113,7 @@ def validate_records(
             "context_capacity": 2048,
             "dense_final_layout_convolution": False,
             "dsa_head_key_exact_association": False,
-            "dsa_query_exact_association": False,
+            "dsa_query_exact_association": True,
             "dsa_score_default_precision": False,
             "feature_fuse_route_weighting": False,
             "feature_output_tile": 128,
@@ -172,6 +172,74 @@ def validate_records(
         for field, expected in expected_load.items():
             _require(load.get(field) == expected, f"rank {rank} load drifted {field}")
 
+        materializer = record.get("dsa_query_materialization_hlo_contract")
+        _require(
+            isinstance(materializer, dict) and materializer.get("passed") is True,
+            f"rank {rank} query materializer HLO contract failed",
+        )
+        materializer_expected = {
+            "forbidden_custom_call_targets": [],
+            "forbidden_global_shapes": [],
+            "forbidden_operations": [],
+            "host_markers": [],
+            "local_fp32_shape": "f32[2048,2048]",
+            "local_raw_shape": "u8[2048,2048]",
+            "local_scale_shape": "f32[16,16]",
+            "num_partitions": 32,
+        }
+        for field, expected in materializer_expected.items():
+            _require(
+                materializer.get(field) == expected,
+                f"rank {rank} query materializer drifted {field}",
+            )
+        materializer_hash = record.get(
+            "dsa_query_materialization_hlo_sha256"
+        )
+        _require(
+            isinstance(materializer_hash, str) and len(materializer_hash) == 64,
+            f"rank {rank} query materializer HLO hash missing",
+        )
+        _require(
+            record.get("fleet_dsa_query_materialization_hlo_hashes")
+            == [materializer_hash] * 8,
+            f"rank {rank} query materializer fleet hash disagreement",
+        )
+        for field in (
+            "dsa_query_materialization_compile_seconds",
+            "dsa_query_materialization_execute_seconds",
+        ):
+            _require(
+                isinstance(record.get(field), (int, float))
+                and record[field] > 0,
+                f"rank {rank} query materializer timing missing: {field}",
+            )
+        materialized_state = record.get("dsa_query_materialization_state")
+        _require(
+            isinstance(materialized_state, dict),
+            f"rank {rank} query materialized state missing",
+        )
+        _require(
+            materialized_state.get("input_alias_count") == 4
+            and materialized_state.get("slot_count") == 4
+            and materialized_state.get("materialized_bytes_per_device")
+            == 67_108_864
+            and materialized_state.get("source")
+            == "completed_stage_local_raw_fp8_to_fp32",
+            f"rank {rank} query materialized state drifted",
+        )
+        local_query_shards = materialized_state.get("local_shards")
+        _require(
+            isinstance(local_query_shards, list)
+            and len(local_query_shards) == 16
+            and all(
+                item.get("byte_count") == 16_777_216
+                and isinstance(item.get("sha256"), str)
+                and len(item["sha256"]) == 64
+                for item in local_query_shards
+            ),
+            f"rank {rank} query materialized local shards drifted",
+        )
+
         state_layout = record.get("state_layout")
         _require(isinstance(state_layout, dict), f"rank {rank} state layout missing")
         _require(
@@ -214,6 +282,27 @@ def validate_records(
         }
         for field, expected in contract_expected.items():
             _require(contract.get(field) == expected, f"rank {rank} HLO drifted {field}")
+        query_association = contract.get("dsa_query_association_contract")
+        _require(
+            isinstance(query_association, dict)
+            and query_association.get("passed") is True,
+            f"rank {rank} exact-query HLO contract failed",
+        )
+        query_expected = {
+            "exact_association": True,
+            "exact_chunk_width": 1024,
+            "exact_chunks_per_local_owner": 2,
+            "expected_runtime_tuple4_reduction_count": 42,
+            "expected_tuple4_reduction_fusion_count": 21,
+            "forbidden_global_shapes": [],
+            "local_owner_shape": "f32[2048,2048]",
+            "tuple4_reduction_fusion_count": 21,
+        }
+        for field, expected in query_expected.items():
+            _require(
+                query_association.get(field) == expected,
+                f"rank {rank} exact-query HLO drifted {field}",
+            )
         _require(
             contract.get("collective_counts") == contract.get("expected_collective_counts"),
             f"rank {rank} HLO collective counts drifted",
