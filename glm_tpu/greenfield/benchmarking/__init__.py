@@ -162,8 +162,11 @@ from .one_layer import (
 )
 from .paired_transport import (
     PairedTransportConfig,
+    PairedTransportKind,
     benchmark_paired_transport,
     build_paired_transport,
+    pack_paired_transport_payload,
+    unpack_paired_transport_payload,
     validate_paired_transport_hlo,
 )
 
@@ -227,6 +230,7 @@ __all__ = [
     "assemble_native_source_weights",
     "LatencyDistribution",
     "PairedTransportConfig",
+    "PairedTransportKind",
     "REAL_LAYER_OUTPUT_TOLERANCE",
     "ROUTE_WEIGHT_TOLERANCE",
     "STRATEGY_ND_ALGORITHM",
@@ -245,6 +249,7 @@ __all__ = [
     "build_integrated_dense_rms",
     "build_output_geometry_replay",
     "build_paired_transport",
+    "pack_paired_transport_payload",
     "collective_chain_hlo_policy",
     "compare_bounded_tensor",
     "compare_output_geometry_arrays",
@@ -298,6 +303,7 @@ __all__ = [
     "validate_compiled_transport",
     "validate_pallas_real_layer_hlo",
     "validate_paired_transport_hlo",
+    "unpack_paired_transport_payload",
     "validate_real_layer_hlo",
     "validate_transport_pairs",
     "validate_ws32_one_layer_hlo",

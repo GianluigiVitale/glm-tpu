@@ -116,6 +116,17 @@
       "reason": "The complete fused PP8 plan-aware artifact reconciles 834,369,271,808 payload bytes. DB504 directly loads and device-round-trips all 10,880 final tensors with zero reshard, concat or dequantization and proves the full 78-convolution HLO. PP16 DB557 separately proves complete final-owner direct loading and HBM; DB558 proves the exact LP2 feature-MoE mechanism. The standalone direct final runtime supplies every executable owner. The exact-query full graph passes all HLO/token-mechanism/metadata/HBM checks, including 21 device loops and 42 runtime tuple4 reductions, at 431.834093 ms diagnostic wall. Its five-HLO recovery is terminal-sealed with exact source generations and no model rerun. The result is still above the useful gate and provides no oracle/DSA exactness, XPlane, DB, Gate-D or accepted latency/token throughput. Reuse the immutable graph for offline attribution before any new TPU run."
     },
     {
+      "id": "greenfield-packed-paired-transport",
+      "category": "runtime optimization candidate",
+      "source_repo": "glm-tpu greenfield and protected DB563",
+      "source_pin": "transport skeleton 577aa4bf706976f3d25f552526d0b6eaa5d4920e / paired benchmark bfaec9d85206b3aaa3e0ace11336b740c7c80cfb / DB563 evidence pin 4890a1086f79c88d749f2ef5247e451ecdc95c7f",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/transport_chain.py", "glm_tpu/greenfield/benchmarking/paired_transport.py", "scripts/greenfield/microbench_pipeline_transport.py", "scripts/greenfield/run_pipeline_transport.sh", "/home/gianl/glm-run/greenfield_short_decoder_pp8_2k_gate_d_recovery_20260827T203000000000000Z"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/paired_transport.py", "scripts/greenfield/microbench_pipeline_transport.py", "scripts/greenfield/run_pipeline_transport.sh", "future default-off PP8 decoder integration only after protected promotion"],
+      "gate": "D transport challenger",
+      "reason": "DB563 is exact but spends 206.352807 ms/step in 17 pipeline permutes: eight bf16[2,1,6144] residual launches and eight s32[1,2053] metadata/control launches plus one scalar return. This candidate reuses the existing single-program PP8 ring and bitcasts only those two live stage-boundary arrays into one exact u16[16394] vector. Forced-32 CPU tests prove identical output bytes and reduce the PP8 HLO from 16 to eight permutes. It remains default-off and synthetic: protected TPU HLO plus >=20% warmed-p50 improvement with p99 non-regression are mandatory before any decoder integration or Gate-D claim."
+    },
+    {
       "id": "legacy-state-integrity",
       "category": "protection",
       "source_repo": "tpu-inference",

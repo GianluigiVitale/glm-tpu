@@ -16,18 +16,30 @@ PIN=$(git -C "$WORKTREE" rev-parse HEAD)
   echo "refusing benchmark outside $BRANCH" >&2
   exit 2
 }
-[[ -z $(git -C "$WORKTREE" status --porcelain) ]] || {
+git -C "$WORKTREE" diff --quiet && git -C "$WORKTREE" diff --cached --quiet || {
   echo "refusing benchmark from a dirty greenfield worktree" >&2
+  exit 2
+}
+unexpected_untracked=$(git -C "$WORKTREE" ls-files --others --exclude-standard | \
+  sed \
+    -e '\|^docs/DeepSeek-V4-Flash TPU Port — August 2026 Rebase - Obsolescence Audit and Codex Handoff\.md$|d' \
+    -e '\|^docs/deep-research-report\.md$|d')
+[[ -z $unexpected_untracked ]] || {
+  echo "refusing benchmark with unexpected untracked files:" >&2
+  echo "$unexpected_untracked" >&2
   exit 2
 }
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
 TAG=${GLM_GREENFIELD_TRANSPORT_TAG:-greenfield_transport_$(date -u +%Y%m%dT%H%M%S%NZ)}
 PLANS=${GLM_GREENFIELD_TRANSPORT_PLANS:-PP8_LP4,PP16_LP2}
 KINDS=${GLM_GREENFIELD_TRANSPORT_KINDS:-control,device_resident}
+PAIRED_KINDS=${GLM_GREENFIELD_TRANSPORT_PAIRED_KINDS:-control,device_resident,packed_device_resident}
 PAYLOADS=${GLM_GREENFIELD_TRANSPORT_PAYLOADS:-bfloat16:1:6144,bfloat16:2:6144,bfloat16:1:2048,int32:1:2048}
 WARMUP=${GLM_GREENFIELD_TRANSPORT_WARMUP:-200}
 ITERATIONS=${GLM_GREENFIELD_TRANSPORT_ITERATIONS:-2000}
 PAIRED_PRODUCTION=${GLM_GREENFIELD_TRANSPORT_PAIRED_PRODUCTION:-0}
+PAIRED_ONLY=${GLM_GREENFIELD_TRANSPORT_PAIRED_ONLY:-0}
+IFS= read -r ATTEMPT_NONCE </proc/sys/kernel/random/uuid
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 
@@ -37,6 +49,10 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 }
 [[ $KINDS =~ ^(control|device_resident|pallas_remote_copy)(,(control|device_resident|pallas_remote_copy))*$ ]] || {
   echo "invalid kinds: $KINDS" >&2
+  exit 2
+}
+[[ $PAIRED_KINDS =~ ^(control|device_resident|packed_device_resident)(,(control|device_resident|packed_device_resident))*$ ]] || {
+  echo "invalid paired kinds: $PAIRED_KINDS" >&2
   exit 2
 }
 [[ $PAYLOADS =~ ^(bfloat16|float32|int32):[1-9][0-9]*:[1-9][0-9]*(,(bfloat16|float32|int32):[1-9][0-9]*:[1-9][0-9]*)*$ ]] || {
@@ -55,7 +71,34 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "paired production flag must be 0 or 1" >&2
   exit 2
 }
+[[ $PAIRED_ONLY =~ ^[01]$ ]] || {
+  echo "paired-only flag must be 0 or 1" >&2
+  exit 2
+}
+[[ $ATTEMPT_NONCE =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]] || {
+  echo "failed to generate a protected attempt nonce" >&2
+  exit 2
+}
+if [[ $PAIRED_ONLY == 1 ]]; then
+  [[ $PAIRED_PRODUCTION == 1 ]] || {
+    echo "paired-only requires paired production" >&2
+    exit 2
+  }
+  [[ ,$PAIRED_KINDS, == *,device_resident,* && \
+     ,$PAIRED_KINDS, == *,packed_device_resident,* ]] || {
+    echo "paired-only adjudication requires device_resident and packed_device_resident" >&2
+    exit 2
+  }
+  [[ $PLANS == PP8_LP4 ]] || {
+    echo "paired-only challenger requires exactly PP8_LP4" >&2
+    exit 2
+  }
+fi
 
+[[ ! -e $RUN_DIR ]] || {
+  echo "refusing to reuse existing run directory: $RUN_DIR" >&2
+  exit 2
+}
 mkdir -p "$RUN_DIR/host_records" "$RUN_DIR/hlo"
 
 say() {
@@ -65,6 +108,16 @@ say() {
 exec 9>/home/gianl/glm-run/.glm_pod_workload.lock
 flock -n 9 || {
   say "ABORT: another protected pod workflow holds the global lease"
+  exit 1
+}
+exec 8>/home/gianl/.glm-tpu-rsync.lock
+flock -n 8 || {
+  say "ABORT: repository mirror sync is active; retry outside its window"
+  exit 1
+}
+existing_remote=$(gcloud storage ls "$REMOTE_PREFIX/**" 2>/dev/null || true)
+[[ -z $existing_remote ]] || {
+  say "ABORT: refusing to reuse nonempty remote prefix $REMOTE_PREFIX"
   exit 1
 }
 
@@ -90,10 +143,134 @@ strict_census() {
 }
 
 post_census_done=0
+terminal_success_done=0
+
+rollback_provisional_db() {
+  local run_id_file="$RUN_DIR/results_db_run_id.txt"
+  /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$run_id_file" \
+    "$TAG" "$PIN" "$ORACLE_PIN" "$ATTEMPT_NONCE" \
+    >"$RUN_DIR/provisional_db_rollback.txt" <<'PY'
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import re
+import sqlite3
+import sys
+
+db_path, run_id_path, run_tag, pin, oracle_pin, attempt_nonce = sys.argv[1:]
+run_id_file = Path(run_id_path)
+try:
+    recorded_run_id = (
+        int(run_id_file.read_text().strip()) if run_id_file.is_file() else None
+    )
+except ValueError:
+    recorded_run_id = None
+connection = sqlite3.connect(db_path)
+connection.execute("BEGIN IMMEDIATE")
+candidates = []
+for row in connection.execute(
+    "SELECT run_id, model, model_revision, harness_git, fork_git, env_json, "
+    "pod, note FROM runs WHERE model = ?",
+    ("zai-org/GLM-5.2-FP8:greenfield-transport-mechanism-only",),
+):
+    try:
+        candidate_environment = json.loads(row[5])
+    except (TypeError, json.JSONDecodeError):
+        continue
+    if (
+        candidate_environment.get("greenfield_run_tag") == run_tag
+        and candidate_environment.get("greenfield_code_hash") == pin
+        and candidate_environment.get("greenfield_attempt_nonce") == attempt_nonce
+    ):
+        candidates.append((row, candidate_environment))
+if not candidates:
+    connection.rollback()
+    print("NO_PROVISIONAL_DB_RUN")
+    raise SystemExit(0)
+if len(candidates) != 1:
+    connection.rollback()
+    raise SystemExit("refusing ambiguous provisional transport DB rollback")
+(run, environment), = candidates
+run_id = run[0]
+if recorded_run_id is not None and recorded_run_id != run_id:
+    connection.rollback()
+    raise SystemExit("provisional transport DB run-id binding differs")
+paired_only = environment.get("paired_only")
+expected_environment = {
+    "GLM_ENGINE": "greenfield_pipeline_transport",
+    "greenfield_code_hash": pin,
+    "greenfield_attempt_nonce": attempt_nonce,
+    "greenfield_run_tag": run_tag,
+    "legacy_oracle_code_hash": oracle_pin,
+    "paired_only": paired_only,
+    "topology_hash": environment.get("topology_hash"),
+}
+items = connection.execute(
+    "SELECT benchmark, correct FROM items WHERE run_id = ? ORDER BY id",
+    (run_id,),
+).fetchall()
+summaries = connection.execute(
+    "SELECT benchmark, metric, value FROM summary WHERE run_id = ? ORDER BY id",
+    (run_id,),
+).fetchall()
+allowed_benchmarks = {
+    "greenfield_pipeline_transport",
+    "greenfield_paired_pipeline_transport",
+}
+expected_note = (
+    "Gate-D PP8 exact packed transport challenger"
+    if paired_only
+    else "Gate-A PP8/PP16 device-resident synthetic transport benchmark"
+)
+expected_summary_benchmark = (
+    "greenfield_paired_pipeline_transport"
+    if paired_only
+    else "greenfield_pipeline_transport"
+)
+if (
+    run[1] != "zai-org/GLM-5.2-FP8:greenfield-transport-mechanism-only"
+    or run[2] is not None
+    or not run[3]
+    or not pin.startswith(run[3])
+    or not run[4]
+    or not oracle_pin.startswith(run[4])
+    or not isinstance(paired_only, bool)
+    or environment != expected_environment
+    or not re.fullmatch(r"[0-9a-f]{64}", environment["topology_hash"])
+    or run[6] != "db-v4-64-od"
+    or run[7] != expected_note
+    or any(
+        benchmark not in allowed_benchmarks or correct != 1
+        for benchmark, correct in items
+    )
+    or summaries not in (
+        [],
+        [(expected_summary_benchmark, "contract_valid", 1.0)],
+    )
+):
+    connection.rollback()
+    raise SystemExit("refusing non-identical provisional transport DB rollback")
+connection.execute("DELETE FROM summary WHERE run_id = ?", (run_id,))
+connection.execute("DELETE FROM items WHERE run_id = ?", (run_id,))
+connection.execute("DELETE FROM runs WHERE run_id = ?", (run_id,))
+if connection.execute(
+    "SELECT COUNT(*) FROM runs WHERE run_id = ?", (run_id,)
+).fetchone()[0]:
+    connection.rollback()
+    raise SystemExit("provisional transport DB rollback did not remove run")
+connection.commit()
+print(f"ROLLED_BACK_PROVISIONAL_DB_RUN={run_id}")
+PY
+}
+
 on_exit() {
   local status=$?
   if [[ $post_census_done -eq 0 ]]; then
     strict_census failure_exit || true
+  fi
+  if [[ $status -ne 0 && $terminal_success_done -eq 0 ]]; then
+    rollback_provisional_db || true
   fi
   if [[ $status -ne 0 ]]; then
     say "FAILED status=$status; partial evidence preserved at $RUN_DIR and $REMOTE_PREFIX"
@@ -102,8 +279,8 @@ on_exit() {
 trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR"
-say "PIN=$PIN ORACLE_PIN=$ORACLE_PIN"
-say "MATRIX plans=$PLANS kinds=$KINDS payloads=$PAYLOADS warmup=$WARMUP iterations=$ITERATIONS paired=$PAIRED_PRODUCTION"
+say "PIN=$PIN ORACLE_PIN=$ORACLE_PIN ATTEMPT_NONCE=$ATTEMPT_NONCE"
+say "MATRIX plans=$PLANS kinds=$KINDS paired_kinds=$PAIRED_KINDS payloads=$PAYLOADS warmup=$WARMUP iterations=$ITERATIONS paired=$PAIRED_PRODUCTION paired_only=$PAIRED_ONLY"
 strict_census pre || {
   say "ABORT: pre-run census is not eight-host zero work"
   exit 1
@@ -129,7 +306,7 @@ coordinator="$coordinator:8476"
 say "launching eight-host device-resident transport coordinator=$coordinator"
 
 # shellcheck disable=SC2016
-capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; paired='"$PAIRED_PRODUCTION"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; cd "$wt"; paired_arg=(); [[ "$paired" == 1 ]] && paired_arg=(--paired-production); GLM_GREENFIELD_RUN_TAG="$tag" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_pipeline_transport.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/transport.rank${idx}.json" --plans '"$PLANS"' --kinds '"$KINDS"' --payloads '"$PAYLOADS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${paired_arg[@]}"; sha256sum "$run/transport.rank${idx}.json" >"$run/transport.rank${idx}.sha256"; gcloud storage cp --no-clobber "$run/transport.rank${idx}.json" "$run/transport.rank${idx}.sha256" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; trap - EXIT; echo "CAPTURE_UPLOAD_OK $(hostname) rank=$idx"'
+capture_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; pin='"$PIN"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; paired='"$PAIRED_PRODUCTION"'; paired_only='"$PAIRED_ONLY"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run"; upload_diagnostics() { if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/diagnostic_hlo/" >/dev/null 2>&1 || true; fi; }; trap upload_diagnostics EXIT; cd "$wt"; paired_arg=(); [[ "$paired" == 1 ]] && paired_arg+=(--paired-production); [[ "$paired_only" == 1 ]] && paired_arg+=(--paired-only); GLM_GREENFIELD_RUN_TAG="$tag" /home/gianl/vllm-env/bin/python scripts/greenfield/microbench_pipeline_transport.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --expected-code-hash "$pin" --output "$run/transport.rank${idx}.json" --plans '"$PLANS"' --kinds '"$KINDS"' --paired-kinds '"$PAIRED_KINDS"' --payloads '"$PAYLOADS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' "${paired_arg[@]}"; sha256sum "$run/transport.rank${idx}.json" >"$run/transport.rank${idx}.sha256"; gcloud storage cp --no-clobber "$run/transport.rank${idx}.json" "$run/transport.rank${idx}.sha256" "$remote/host_records/" >/dev/null; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null; fi; trap - EXIT; echo "CAPTURE_UPLOAD_OK $(hostname) rank=$idx"'
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$capture_command" >"$RUN_DIR/capture.txt" 2>&1
 has_eight_unique_markers "$RUN_DIR/capture.txt" CAPTURE_UPLOAD_OK || {
@@ -142,7 +319,8 @@ gcloud storage cp "$REMOTE_PREFIX/host_records/transport.rank*.json" \
 gcloud storage cp "$REMOTE_PREFIX/hlo/*" "$RUN_DIR/hlo/" >/dev/null
 say "validating fleet agreement and appending provenance DB rows"
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" "$ORACLE_PIN" \
-  "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$PAIRED_PRODUCTION" <<'PY'
+  "$RESULTS_DB" "$WORKTREE" "$ORACLE_REPO" "$PAIRED_PRODUCTION" \
+  "$PAIRED_ONLY" "$ATTEMPT_NONCE" <<'PY'
 from __future__ import annotations
 
 import json
@@ -150,8 +328,19 @@ from pathlib import Path
 import sqlite3
 import sys
 
-run_dir, pin, oracle_pin, db_path, repo, oracle_repo, paired_expected_raw = sys.argv[1:]
+(
+    run_dir,
+    pin,
+    oracle_pin,
+    db_path,
+    repo,
+    oracle_repo,
+    paired_expected_raw,
+    paired_only_raw,
+    attempt_nonce,
+) = sys.argv[1:]
 paired_expected = paired_expected_raw == "1"
+paired_only = paired_only_raw == "1"
 run_dir = Path(run_dir)
 records = [
     json.loads(path.read_text())
@@ -174,6 +363,8 @@ if any(
     for record in records
 ):
     raise SystemExit("host/Python/Ray dispatch or model-equivalent compute contract failed")
+if {record.get("paired_only") for record in records} != {paired_only}:
+    raise SystemExit("fleet paired-only provenance differs")
 topology_hashes = {record["topology_hash"] for record in records}
 if len(topology_hashes) != 1:
     raise SystemExit(f"fleet topology hashes differ: {sorted(topology_hashes)}")
@@ -192,8 +383,8 @@ case_keys = [
     )
     for item in records[0]["matrix"]
 ]
-if not case_keys or len(case_keys) != len(set(case_keys)):
-    raise SystemExit("reference host has an empty or duplicate matrix")
+if (not paired_only and not case_keys) or len(case_keys) != len(set(case_keys)):
+    raise SystemExit("reference host has an unexpected empty or duplicate matrix")
 
 case_summaries = []
 for case_index, key in enumerate(case_keys):
@@ -259,6 +450,7 @@ for case_index, key in enumerate(case_keys):
             },
             "fleet_maximum_host_latency": distributions,
             "hlo_sha256": host_items[0]["optimized_hlo_sha256"],
+            "output_checksum": host_items[0]["first_addressable_checksum"],
             "physical_pairs": host_items[0]["physical_pairs"],
         }
     )
@@ -290,7 +482,11 @@ for case_index, key in enumerate(paired_keys):
         if (
             config["stage_count"] != expected_stages
             or config["hidden_width"] != 6144
-            or config["metadata_width"] != 2052
+            or config["residual_shape"] != [2, 1, 6144]
+            or config["metadata_shape"] != [1, 2053]
+            or config["metadata_width"] != 2053
+            or config["packed_dtype"] != "uint16"
+            or config["packed_width"] != 16394
             or config["warmup_iterations"] < 200
             or config["measured_iterations"] < 1000
         ):
@@ -301,7 +497,12 @@ for case_index, key in enumerate(paired_keys):
         if not contract["passed"] or contract["violations"]:
             raise SystemExit(f"paired HLO failed for {key}: {contract}")
         expected_kernels = expected_stages if key[1] == "pallas_remote_copy" else 0
-        expected_collectives = 2 * expected_stages if key[1] == "device_resident" else 0
+        expected_collectives = {
+            "control": 0,
+            "device_resident": 2 * expected_stages,
+            "packed_device_resident": expected_stages,
+            "pallas_remote_copy": 0,
+        }[key[1]]
         if (
             contract["kernel_custom_call_count"] != expected_kernels
             or contract["collective_count"] != expected_collectives
@@ -315,9 +516,16 @@ for case_index, key in enumerate(paired_keys):
     }
     paired_case_summaries.append(
         {
-            "case": {"kind": key[1], "plan": key[0]},
+            "case": {
+                "kind": key[1],
+                "metadata_shape": [1, 2053],
+                "packed_width": 16394,
+                "plan": key[0],
+                "residual_shape": [2, 1, 6144],
+            },
             "fleet_maximum_host_latency": distributions,
             "hlo_sha256": host_items[0]["optimized_hlo_sha256"],
+            "output_checksum": host_items[0]["first_addressable_checksum"],
             "physical_pairs": host_items[0]["physical_pairs"],
         }
     )
@@ -330,11 +538,13 @@ for record in records:
     }
     for plan in {key[0] for key in paired_keys}:
         reference = checksums.get((plan, "device_resident"))
-        pallas = checksums.get((plan, "pallas_remote_copy"))
-        if reference is not None and pallas is not None and reference != pallas:
-            raise SystemExit(
-                f"paired Pallas output differs from ppermute on {record['hostname']}"
-            )
+        for candidate_kind in ("packed_device_resident", "pallas_remote_copy"):
+            candidate = checksums.get((plan, candidate_kind))
+            if reference is not None and candidate is not None and reference != candidate:
+                raise SystemExit(
+                    f"paired {candidate_kind} output differs from ppermute "
+                    f"on {record['hostname']}"
+                )
 
 controls = {
     (case["case"]["plan"], case["case"]["dtype"], case["case"]["rows"], case["case"]["width"]):
@@ -358,14 +568,49 @@ paired_controls = {
 }
 for case in paired_case_summaries:
     identity = case["case"]
+    control_p50 = paired_controls.get(identity["plan"])
     case["control_net_p50_ms"] = (
         None
-        if identity["kind"] == "control"
+        if identity["kind"] == "control" or control_p50 is None
         else case["fleet_maximum_host_latency"]["p50_ms"]
-        - paired_controls[identity["plan"]]
+        - control_p50
+    )
+
+paired_by_key = {
+    (case["case"]["plan"], case["case"]["kind"]): case
+    for case in paired_case_summaries
+}
+paired_adjudication = []
+for plan in sorted({key[0] for key in paired_keys}):
+    reference = paired_by_key.get((plan, "device_resident"))
+    packed = paired_by_key.get((plan, "packed_device_resident"))
+    if reference is None or packed is None:
+        if paired_only:
+            raise SystemExit(f"paired-only run lacks packed/reference pair for {plan}")
+        continue
+    reference_latency = reference["fleet_maximum_host_latency"]
+    packed_latency = packed["fleet_maximum_host_latency"]
+    p50_reduction_fraction = (
+        1.0 - packed_latency["p50_ms"] / reference_latency["p50_ms"]
+    )
+    p99_non_regression = packed_latency["p99_ms"] <= reference_latency["p99_ms"]
+    material_win = p50_reduction_fraction >= 0.20 and p99_non_regression
+    paired_adjudication.append(
+        {
+            "decision": "promote" if material_win else "reject",
+            "exact_output": True,
+            "hlo_launch_count_packed": 8 if plan == "PP8_LP4" else 16,
+            "hlo_launch_count_reference": 16 if plan == "PP8_LP4" else 32,
+            "material_win": material_win,
+            "minimum_required_p50_reduction_fraction": 0.20,
+            "p50_reduction_fraction": p50_reduction_fraction,
+            "p99_non_regression": p99_non_regression,
+            "plan": plan,
+        }
     )
 
 summary = {
+    "attempt_nonce": attempt_nonce,
     "cases": case_summaries,
     "code_hash": pin,
     "hostnames": sorted(record["hostname"] for record in records),
@@ -375,7 +620,9 @@ summary = {
     },
     "mechanism_only": True,
     "oracle_code_hash": oracle_pin,
+    "paired_adjudication": paired_adjudication,
     "paired_cases": paired_case_summaries,
+    "paired_only": paired_only,
     "plan_contracts": records[0]["plan_contracts"],
     "topology_hash": topology_hashes.pop(),
 }
@@ -390,14 +637,22 @@ run_id = pv.start_run(
     revision=None,
     env={
         "GLM_ENGINE": "greenfield_pipeline_transport",
+        "greenfield_attempt_nonce": attempt_nonce,
         "greenfield_code_hash": pin,
+        "greenfield_run_tag": run_dir.name,
         "legacy_oracle_code_hash": oracle_pin,
+        "paired_only": paired_only,
         "topology_hash": summary["topology_hash"],
     },
-    note="Gate-A PP8/PP16 device-resident synthetic transport benchmark",
+    note=(
+        "Gate-D PP8 exact packed transport challenger"
+        if paired_only
+        else "Gate-A PP8/PP16 device-resident synthetic transport benchmark"
+    ),
     harness_repo=repo,
     fork_repo=oracle_repo,
 )
+(run_dir / "results_db_run_id.txt").write_text(f"{run_id}\n")
 for case in case_summaries:
     identity = case["case"]
     item_id = (
@@ -434,7 +689,11 @@ for case in paired_case_summaries:
 pv.finalize(
     conn,
     run_id,
-    benchmark="greenfield_pipeline_transport",
+    benchmark=(
+        "greenfield_paired_pipeline_transport"
+        if paired_only
+        else "greenfield_pipeline_transport"
+    ),
     metric="contract_valid",
     value=1.0,
     note="Synthetic mechanism only; not model latency or throughput.",
@@ -458,26 +717,39 @@ if check != "ok":
 print(f"TRANSPORT_PROOF_VALID cases={len(case_summaries)} db_run={run_id}")
 PY
 
-(cd "$RUN_DIR" && find host_records hlo -type f -print0 | sort -z | \
-  xargs -0 sha256sum >evidence.sha256)
-sha256sum "$RUN_DIR/summary.json" "$RUN_DIR/results_ckpt.db" \
-  >>"$RUN_DIR/evidence.sha256"
 strict_census post || {
   say "ABORT: post-run census is not eight-host zero work"
   exit 1
 }
 post_census_done=1
 
+(cd "$RUN_DIR" && find host_records hlo -type f -print0 | sort -z | \
+  xargs -0 sha256sum >evidence.sha256)
+sha256sum "$RUN_DIR/summary.json" "$RUN_DIR/results_ckpt.db" \
+  "$RUN_DIR/results_db_run_id.txt" "$RUN_DIR/sync.txt" \
+  "$RUN_DIR/capture.txt" "$RUN_DIR/census_pre.txt" \
+  "$RUN_DIR/census_post.txt" >>"$RUN_DIR/evidence.sha256"
 touch "$RUN_DIR/SUCCESS"
 gcloud storage cp --no-clobber "$RUN_DIR/summary.json" "$RUN_DIR/results_ckpt.db" \
   "$RUN_DIR/evidence.sha256" "$RUN_DIR/orchestrator.log" "$RUN_DIR/sync.txt" \
   "$RUN_DIR/capture.txt" "$RUN_DIR/census_pre.txt" "$RUN_DIR/census_post.txt" \
-  "$RUN_DIR/SUCCESS" "$REMOTE_PREFIX/" >/dev/null
+  "$RUN_DIR/results_db_run_id.txt" "$REMOTE_PREFIX/" >/dev/null
+for artifact in summary.json results_ckpt.db evidence.sha256 orchestrator.log \
+  sync.txt capture.txt census_pre.txt census_post.txt results_db_run_id.txt; do
+  remote_artifact=$(gcloud storage ls "$REMOTE_PREFIX/$artifact" 2>/dev/null || true)
+  [[ $remote_artifact == "$REMOTE_PREFIX/$artifact" ]] || {
+    say "ABORT: remote evidence did not verify: $artifact"
+    exit 1
+  }
+done
+gcloud storage cp --no-clobber "$RUN_DIR/SUCCESS" "$REMOTE_PREFIX/SUCCESS" \
+  >/dev/null
 remote_success=$(gcloud storage ls "$REMOTE_PREFIX/SUCCESS" 2>/dev/null || true)
 [[ $remote_success == "$REMOTE_PREFIX/SUCCESS" ]] || {
   say "ABORT: remote SUCCESS marker did not verify"
   exit 1
 }
+terminal_success_done=1
 say "SUCCESS cases=$(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["cases"]))' "$RUN_DIR/summary.json")"
 say "ARCHIVE=$REMOTE_PREFIX"
 trap - EXIT

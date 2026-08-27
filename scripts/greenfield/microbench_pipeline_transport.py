@@ -23,6 +23,7 @@ if str(REPO) not in sys.path:
 
 from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     PairedTransportConfig,
+    PairedTransportKind,
     TransportChainConfig,
     TransportKind,
     benchmark_paired_transport,
@@ -81,6 +82,22 @@ def _kinds(value: str) -> tuple[TransportKind, ...]:
     return result
 
 
+def _paired_kinds(value: str) -> tuple[PairedTransportKind, ...]:
+    try:
+        result = tuple(
+            PairedTransportKind(item.strip())
+            for item in value.split(",")
+            if item.strip()
+        )
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(str(error)) from error
+    if not result or len(result) != len(set(result)):
+        raise argparse.ArgumentTypeError(
+            "paired transport kinds must be non-empty and unique"
+        )
+    return result
+
+
 def _payloads(value: str) -> tuple[tuple[str, int, int], ...]:
     result = []
     for raw in value.split(","):
@@ -122,6 +139,15 @@ def parse_args() -> argparse.Namespace:
         default=tuple(TransportKind),
     )
     parser.add_argument(
+        "--paired-kinds",
+        type=_paired_kinds,
+        default=(
+            PairedTransportKind.CONTROL,
+            PairedTransportKind.DEVICE_RESIDENT,
+            PairedTransportKind.PACKED_DEVICE_RESIDENT,
+        ),
+    )
+    parser.add_argument(
         "--payloads",
         type=_payloads,
         default=(
@@ -134,6 +160,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--warmup", type=int, default=200)
     parser.add_argument("--iterations", type=int, default=2000)
     parser.add_argument("--paired-production", action="store_true")
+    parser.add_argument("--paired-only", action="store_true")
     parser.add_argument("--allow-unprotected-test-config", action="store_true")
     return parser.parse_args()
 
@@ -185,6 +212,8 @@ def main() -> int:
     args = parse_args()
     if args.num_processes != 8 or not 0 <= args.process_id < args.num_processes:
         raise ValueError("protected transport benchmark requires process ids 0..7")
+    if args.paired_only and not args.paired_production:
+        raise ValueError("--paired-only requires --paired-production")
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
         raise RuntimeError(
@@ -233,7 +262,7 @@ def main() -> int:
                 "physical_lanes": [list(lane) for lane in lanes],
                 "physical_pairs": [list(pair) for pair in pairs],
             }
-            for dtype, rows, width in args.payloads:
+            for dtype, rows, width in (() if args.paired_only else args.payloads):
                 for kind in args.kinds:
                     config = TransportChainConfig(
                         plan=plan,
@@ -296,10 +325,12 @@ def main() -> int:
                         f"greenfield-transport-end-{label}"
                     )
             if args.paired_production:
-                for kind in args.kinds:
+                for kind in args.paired_kinds:
                     config = PairedTransportConfig(
                         plan=plan,
                         kind=kind,
+                        residual_shape=(2, 1, 6144),
+                        metadata_shape=(1, 2053),
                         warmup_iterations=args.warmup,
                         measured_iterations=args.iterations,
                     )
@@ -358,8 +389,9 @@ def main() -> int:
             "mechanism_only": True,
             "model_equivalent_compute": False,
             "paired_matrix": paired_matrix,
+            "paired_only": args.paired_only,
             "plan_contracts": plan_contracts,
-            "schema_version": 1,
+            "schema_version": 2,
             "single_compiled_invocation_per_case": True,
             "stage_dispatch": "device_program_only",
             "topology": topology.to_dict(),
@@ -369,7 +401,8 @@ def main() -> int:
         print(
             "GREENFIELD_TRANSPORT_HOST_OK "
             f"launch_process={args.process_id} jax_process={jax.process_index()} "
-            f"cases={len(matrix)} output={args.output}",
+            f"cases={len(matrix)} paired_cases={len(paired_matrix)} "
+            f"output={args.output}",
             flush=True,
         )
         return 0
