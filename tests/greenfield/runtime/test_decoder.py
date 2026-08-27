@@ -1303,6 +1303,23 @@ def test_strategy_nd_attention_reduction_contract_replaces_projection_sum() -> N
         token_observation_candidates=1,
     )
     assert arities == {"1": 231}
+
+    lp2_arities, lp2_shapes = _expected_tpu_decoder_reductions(
+        layers=78,
+        dense_layers=3,
+        sparse_layers=75,
+        pregathered_b512_attention=False,
+        feature_reconstruct_down_fp32=False,
+        complete_token_path=True,
+        split_residual_state=False,
+        token_observation_candidates=1,
+        local_parallel_size=2,
+    )
+    assert lp2_arities["1"] >= 3
+    assert lp2_shapes["bf16[2]"] == 1
+    assert lp2_shapes["s32[2]"] == 1
+    assert "bf16[4]" not in lp2_shapes
+    assert "s32[4]" not in lp2_shapes
     assert "bf16[1,6144]" not in shapes
     assert shapes["bf16[1,2048,640]"] == 78
 
@@ -3592,6 +3609,38 @@ ENTRY %main (scores: bf16[4], ids: s32[4], token: s32[1]) -> s32[1] {{
         "s32[4,16]"
     ]
 
+    lp2_groups = tuple(
+        tuple(stage * 2 + slot for slot in range(2))
+        for stage in range(16)
+    )
+    lp2_pairs = tuple(
+        (lp2_groups[stage][slot], lp2_groups[(stage + 1) % 16][slot])
+        for stage in range(16)
+        for slot in range(2)
+    )
+    lp2_group_text = "{" + ",".join(
+        "{" + ",".join(map(str, group)) + "}" for group in lp2_groups
+    ) + "}"
+    lp2_pair_text = "{" + ",".join(
+        "{" + ",".join(map(str, pair)) + "}" for pair in lp2_pairs
+    ) + "}"
+    lp2_hlo = (
+        hlo.replace("bf16[4]", "bf16[2]")
+        .replace("s32[4]", "s32[2]")
+        .replace(group_text, lp2_group_text)
+        .replace(pair_text, lp2_pair_text)
+    )
+    lp2_record = _validate_complete_token_collective_lowering(
+        parse_hlo_module(lp2_hlo),
+        expected_groups=lp2_groups,
+        expected_pairs=lp2_pairs,
+        backend_contract="tpu_v4_pp16_pallas_feature",
+        local_parallel_size=2,
+    )
+    assert lp2_record["passed"], lp2_record
+    assert lp2_record["score_exchange"][0]["operand_shapes"] == ["bf16[2]"]
+    assert lp2_record["token_id_exchange"][0]["operand_shapes"] == ["s32[2]"]
+
     wrong_candidate_width = _validate_complete_token_collective_lowering(
         parse_hlo_module(hlo),
         expected_groups=groups,
@@ -3642,7 +3691,10 @@ ENTRY %main (scores: bf16[4], ids: s32[4], token: s32[1]) -> s32[1] {{
         backend_contract="tpu_v4_pp8_pallas_feature_linear",
     )
     assert not rejected["passed"]
-    assert any("escaped PP8 local groups" in item for item in rejected["violations"])
+    assert any(
+        "escaped pipeline-local groups" in item
+        for item in rejected["violations"]
+    )
 
     wrong_return = _validate_complete_token_collective_lowering(
         parse_hlo_module(hlo.replace("token: s32[1]", "token: s32[2]").replace(
@@ -3775,6 +3827,40 @@ def test_feature_decoder_hlo_contract_pins_all_raw_kernels_and_overlays() -> Non
     )
     assert not formatted["passed"]
     assert formatted["forbidden_formatted_shared_overlays"]
+
+    lp2_selected = (
+        "out = bf16[8,8,6144] custom-call("
+        "u8[256,6144,1024], u8[256,6144,1024], "
+        "u8[256,1024,6144]), "
+        'custom_call_target="tpu_custom_call", '
+        'metadata={op_name="greenfield_fp8_fused_selected_moe_'
+        'r8_g256_h6144_i1024_ot256"}'
+    )
+    lp2_shared_up = (
+        "up = bf16[1,1024] custom-call(u8[1024,6144]), "
+        'custom_call_target="tpu_custom_call", '
+        'metadata={op_name="greenfield_fp8_block_up_gate_m8_k6144_n1024"}'
+    )
+    lp2_shared_down = (
+        "down = bf16[1,6144] custom-call(u8[6144,1024]), "
+        'custom_call_target="tpu_custom_call", '
+        'metadata={op_name="greenfield_fp8_block_matmul_m8_k1024_n6144"}'
+    )
+    lp2_hlo = "\n".join((lp2_selected, lp2_shared_up, lp2_shared_down) * 75)
+    lp2 = _validate_pallas_feature_decoder_calls(
+        lp2_hlo,
+        sparse_layers=75,
+        local_parallel_size=2,
+    )
+    assert lp2["passed"], lp2
+    assert lp2["local_intermediate"] == 1024
+    assert lp2["local_parallel_size"] == 2
+    with pytest.raises(PlanValidationError, match="only LP2 and LP4"):
+        _validate_pallas_feature_decoder_calls(
+            lp2_hlo,
+            sparse_layers=75,
+            local_parallel_size=8,
+        )
 
 
 def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
@@ -4027,6 +4113,7 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
     from glm_tpu.greenfield.errors import PlanValidationError
     from glm_tpu.greenfield.model import (
         FEATURE_EXPERT_RUNTIME_LAYOUT,
+        FEATURE_EXPERT_RUNTIME_LAYOUT_LP2,
         build_decoder_feature_fused_qkv_runtime_weight_layout,
         build_decoder_feature_runtime_weight_layout,
         build_decoder_runtime_weight_layout,
@@ -4036,6 +4123,7 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
     from glm_tpu.greenfield.runtime import build_decoder_step_program
     from tests.greenfield.checkpoint.test_runtime_pack import (
         _small_feature_source_plan,
+        _small_feature_source_plan_pp16,
     )
 
     source_plan = _small_feature_source_plan()
@@ -4108,6 +4196,63 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             pairs,
             sparse_moe_backend="pallas_feature",
             attention_projection_backend="fused_n82_convolution",
+            devices=(object(),),
+        )
+
+    pp16_source = _small_feature_source_plan_pp16()
+    pp16_source = replace(
+        pp16_source,
+        geometry=replace(
+            pp16_source.geometry,
+            hidden_size=128,
+            q_lora_rank=128,
+            kv_lora_rank=30,
+            qk_nope_head_dim=2,
+            qk_rope_head_dim=2,
+            v_head_dim=2,
+            moe_intermediate_size=512,
+            fp8_block_shape=(128, 128),
+        ),
+    )
+    pp16_source_schedule = build_pipeline_schedule(pp16_source)
+    pp16_source_layout = build_decoder_runtime_weight_layout(
+        pp16_source, pp16_source_schedule
+    )
+    pp16_feature_plan = replace(
+        pp16_source,
+        expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT_LP2,
+    )
+    pp16_schedule = build_pipeline_schedule(pp16_feature_plan)
+    pp16_state = build_decoder_state_layout(
+        pp16_feature_plan,
+        pp16_schedule,
+        context_capacity=8,
+        logical_page_size=8,
+        packed_kv_width=8,
+    )
+    pp16_layout = build_decoder_feature_runtime_weight_layout(
+        pp16_feature_plan,
+        pp16_schedule,
+        pp16_source_layout,
+    )
+    pp16_groups = tuple(
+        tuple(stage * 2 + slot for slot in range(2))
+        for stage in range(16)
+    )
+    pp16_pairs = tuple(
+        (pp16_groups[stage][slot], pp16_groups[(stage + 1) % 16][slot])
+        for stage in range(16)
+        for slot in range(2)
+    )
+    with pytest.raises(PlanValidationError, match="expected 32 devices"):
+        build_decoder_step_program(
+            pp16_feature_plan,
+            pp16_schedule,
+            pp16_state,
+            pp16_layout,
+            pp16_groups,
+            pp16_pairs,
+            sparse_moe_backend="pallas_feature",
             devices=(object(),),
         )
 
@@ -4475,6 +4620,106 @@ def test_decoder_sparse_backend_fails_closed_on_layout_mismatch() -> None:
             observe_dsa_internals=True,
             observe_layer_residuals=True,
         )
+
+
+def test_pp16_feature_decoder_builds_on_forced_cpu_mesh() -> None:
+    program = r'''
+import json
+from dataclasses import replace
+import jax
+from glm_tpu.greenfield.model import (
+    FEATURE_EXPERT_RUNTIME_LAYOUT_LP2,
+    build_decoder_feature_runtime_weight_layout,
+    build_decoder_runtime_weight_layout,
+    build_decoder_state_layout,
+    build_pipeline_schedule,
+)
+from glm_tpu.greenfield.runtime import build_decoder_step_program
+from tests.greenfield.checkpoint.test_runtime_pack import _small_feature_source_plan_pp16
+
+source = _small_feature_source_plan_pp16()
+source = replace(
+    source,
+    geometry=replace(
+        source.geometry,
+        hidden_size=128,
+        q_lora_rank=128,
+        kv_lora_rank=30,
+        qk_nope_head_dim=2,
+        qk_rope_head_dim=2,
+        v_head_dim=2,
+        moe_intermediate_size=512,
+        fp8_block_shape=(128, 128),
+    ),
+)
+source_schedule = build_pipeline_schedule(source)
+source_layout = build_decoder_runtime_weight_layout(source, source_schedule)
+plan = replace(source, expert_layout=FEATURE_EXPERT_RUNTIME_LAYOUT_LP2)
+schedule = build_pipeline_schedule(plan)
+state = build_decoder_state_layout(
+    plan,
+    schedule,
+    context_capacity=8,
+    logical_page_size=8,
+    packed_kv_width=32,
+)
+layout = build_decoder_feature_runtime_weight_layout(
+    plan, schedule, source_layout
+)
+groups = tuple(
+    tuple(stage * 2 + slot for slot in range(2))
+    for stage in range(16)
+)
+pairs = tuple(
+    (groups[stage][slot], groups[(stage + 1) % 16][slot])
+    for stage in range(16)
+    for slot in range(2)
+)
+runtime_devices = tuple(
+    jax.devices()[device_id]
+    for stage in schedule.stages
+    for device_id in stage.assignment.device_ids
+)
+decoder = build_decoder_step_program(
+    plan,
+    schedule,
+    state,
+    layout,
+    groups,
+    pairs,
+    sparse_moe_backend="pallas_feature",
+    devices=runtime_devices,
+)
+print(json.dumps({
+    "devices": len(jax.devices()),
+    "groups": [list(group) for group in decoder.groups],
+    "local_parallel_size": decoder.config.local_parallel_size,
+    "plan": plan.name.value,
+    "routed_layout": layout.routed_expert_layout,
+    "stage_count": decoder.config.stage_count,
+}))
+'''
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    env["XLA_FLAGS"] = "--xla_force_host_platform_device_count=32"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=60,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result == {
+        "devices": 32,
+        "groups": [[2 * stage, 2 * stage + 1] for stage in range(16)],
+        "local_parallel_size": 2,
+        "plan": "PP16_LP2",
+        "routed_layout": "expert_intermediate_feature_lp2_pallas_kn_v1",
+        "stage_count": 16,
+    }
 
 
 def test_complete_small_decoder_token_step_runs_all_stages_on_forced_cpu() -> None:

@@ -46,12 +46,12 @@ from ..model.schedule import PipelineSchedule, StageExecution
 from ..model.state import DecoderStateLayout
 from ..model.weights import (
     COMPLETE_EXPERT_RUNTIME_LAYOUT,
-    FEATURE_EXPERT_RUNTIME_LAYOUT,
     FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT,
     FUSED_QKV_A_N82_RUNTIME_LAYOUT,
     LEGACY_DENSE_RUNTIME_LAYOUT,
     SEPARATE_QKV_A_RUNTIME_LAYOUT,
     DecoderRuntimeWeightLayout,
+    feature_expert_runtime_layout,
 )
 from ..sharding.hlo_contract import (
     HloInstruction,
@@ -76,6 +76,22 @@ from .pipeline import (
 REFERENCE_FEATURE_OUTPUT_TILE = 128
 PROMOTED_FEATURE_OUTPUT_TILE = 256
 TOKEN_OBSERVATION_CANDIDATES = 16
+_TPU_DECODER_BACKEND_CONTRACTS = frozenset(
+    (
+        "tpu_v4_pp8_reference",
+        "tpu_v4_pp8_pallas_feature",
+        "tpu_v4_pp8_pallas_feature_linear",
+        "tpu_v4_pp16_reference",
+        "tpu_v4_pp16_pallas_feature",
+    )
+)
+_FEATURE_DECODER_BACKEND_CONTRACTS = frozenset(
+    (
+        "tpu_v4_pp8_pallas_feature",
+        "tpu_v4_pp8_pallas_feature_linear",
+        "tpu_v4_pp16_pallas_feature",
+    )
+)
 LAYER0_RESIDUAL_DISCRIMINATOR_VARIANTS = (
     ("baseline_bf16", False, False),
     ("attention_output_fp32", True, False),
@@ -633,6 +649,7 @@ def _validate_pallas_feature_decoder_calls(
     feature_output_tile: int = PROMOTED_FEATURE_OUTPUT_TILE,
     fuse_route_weighting: bool = False,
     reconstruct_down_fp32: bool = False,
+    local_parallel_size: int = 4,
 ) -> dict[str, Any]:
     """Pin every production feature-MoE kernel and reject weight overlays."""
 
@@ -647,7 +664,15 @@ def _validate_pallas_feature_decoder_calls(
             "feature FP32 reconstruction is incompatible with fused route "
             "weighting"
         )
-    selected_name = "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512"
+    if local_parallel_size not in (2, 4):
+        raise PlanValidationError(
+            "feature Pallas decoder supports only LP2 and LP4"
+        )
+    local_intermediate = 2048 // local_parallel_size
+    selected_name = (
+        "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i"
+        f"{local_intermediate}"
+    )
     if feature_output_tile != 128:
         selected_name += f"_ot{feature_output_tile}"
     if reconstruct_down_fp32:
@@ -656,8 +681,10 @@ def _validate_pallas_feature_decoder_calls(
         selected_name += "_wsum"
     kernel_names = (
         selected_name,
-        "greenfield_fp8_block_up_gate_m8_k6144_n512",
-        "greenfield_fp8_block_matmul_m8_k512_n6144",
+        "greenfield_fp8_block_up_gate_m8_k6144_n"
+        f"{local_intermediate}",
+        "greenfield_fp8_block_matmul_m8_k"
+        f"{local_intermediate}_n6144",
     ) + (
         ("greenfield_fp32_to_bf16_r8_h6144",)
         if reconstruct_down_fp32
@@ -689,8 +716,8 @@ def _validate_pallas_feature_decoder_calls(
     malformed_selected = [
         line
         for line in selected_lines
-        if line.count("u8[256,6144,512]") < 2
-        or "u8[256,512,6144]" not in line
+        if line.count(f"u8[256,6144,{local_intermediate}]") < 2
+        or f"u8[256,{local_intermediate},6144]" not in line
     ]
     if malformed_selected:
         violations.append(
@@ -731,8 +758,8 @@ def _validate_pallas_feature_decoder_calls(
             )
 
     shared_raw_shapes = {
-        kernel_names[1]: ("u8[512,6144]",),
-        kernel_names[2]: ("u8[6144,512]",),
+        kernel_names[1]: (f"u8[{local_intermediate},6144]",),
+        kernel_names[2]: (f"u8[6144,{local_intermediate}]",),
     }
     malformed_shared = [
         name
@@ -749,10 +776,10 @@ def _validate_pallas_feature_decoder_calls(
         )
 
     forbidden_shapes = (
-        "bf16[256,6144,512]",
-        "f32[256,6144,512]",
-        "bf16[256,512,6144]",
-        "f32[256,512,6144]",
+        f"bf16[256,6144,{local_intermediate}]",
+        f"f32[256,6144,{local_intermediate}]",
+        f"bf16[256,{local_intermediate},6144]",
+        f"f32[256,{local_intermediate},6144]",
     )
     forbidden_overlays = [
         shape for shape in forbidden_shapes if shape in optimized_hlo
@@ -765,8 +792,8 @@ def _validate_pallas_feature_decoder_calls(
     forbidden_formatted_overlays = [
         shape
         for shape in (
-            "f8e4m3fn[512,6144]",
-            "f8e4m3fn[6144,512]",
+            f"f8e4m3fn[{local_intermediate},6144]",
+            f"f8e4m3fn[6144,{local_intermediate}]",
         )
         if shape in optimized_hlo
     ]
@@ -780,6 +807,8 @@ def _validate_pallas_feature_decoder_calls(
         "forbidden_decoded_expert_overlays": forbidden_overlays,
         "forbidden_formatted_shared_overlays": forbidden_formatted_overlays,
         "feature_output_tile": feature_output_tile,
+        "local_intermediate": local_intermediate,
+        "local_parallel_size": local_parallel_size,
         "fuse_route_weighting": fuse_route_weighting,
         "reconstruct_down_fp32": reconstruct_down_fp32,
         "kernel_counts": kernel_counts,
@@ -2272,6 +2301,7 @@ def _validate_complete_token_collective_lowering(
     token_observation_candidates: int = 1,
     dsa_query_exact_association: bool = False,
     main_rope_table_enabled: bool = False,
+    local_parallel_size: int = 4,
 ) -> dict[str, Any]:
     """Pin TPU's compact top-1 exchange and one-token return lowering."""
 
@@ -2300,7 +2330,7 @@ def _validate_complete_token_collective_lowering(
         if len(item.result_shapes) == 1
         and item.result_shapes[0].dtype == "bf16"
         and prod(item.result_shapes[0].dimensions)
-        == 4 * token_observation_candidates
+        == local_parallel_size * token_observation_candidates
     )
     token_id_exchange = tuple(
         item
@@ -2308,7 +2338,7 @@ def _validate_complete_token_collective_lowering(
         if len(item.result_shapes) == 1
         and item.result_shapes[0].dtype == "s32"
         and prod(item.result_shapes[0].dimensions)
-        == 4 * token_observation_candidates
+        == local_parallel_size * token_observation_candidates
     )
     token_return = tuple(
         item
@@ -2337,14 +2367,15 @@ def _validate_complete_token_collective_lowering(
                 len(collective.operand_shapes) != 1
                 or collective.operand_shapes[0].dtype != expected_dtype
                 or prod(collective.operand_shapes[0].dimensions)
-                != 4 * token_observation_candidates
+                != local_parallel_size * token_observation_candidates
             ):
                 violations.append(
                     f"complete-token {label} exchange operand shape drifted"
                 )
             if collective.replica_groups != canonical_groups:
                 violations.append(
-                    f"complete-token {label} exchange escaped PP8 local groups"
+                    "complete-token "
+                    f"{label} exchange escaped pipeline-local groups"
                 )
             if not collective.use_global_device_ids:
                 violations.append(
@@ -3665,6 +3696,7 @@ def _expected_tpu_decoder_reductions(
     complete_token_path: bool,
     split_residual_state: bool,
     token_observation_candidates: int,
+    local_parallel_size: int = 4,
     strategy_nd_attention_projection: bool = False,
     dense_final_layout_convolution: bool = False,
 ) -> tuple[dict[str, int], dict[str, int]]:
@@ -3708,7 +3740,10 @@ def _expected_tpu_decoder_reductions(
         )
         result_shapes[embedding_shape] = result_shapes.get(embedding_shape, 0) + 1
         if token_observation_candidates == 1:
-            result_shapes.update({"bf16[4]": 1, "s32[4]": 1})
+            lane_shape = str(local_parallel_size)
+            result_shapes.update(
+                {f"bf16[{lane_shape}]": 1, f"s32[{lane_shape}]": 1}
+            )
     return arities, result_shapes
 
 
@@ -3739,21 +3774,12 @@ def validate_decoder_step_hlo(
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
-    if backend_contract not in (
-        "cpu_reference",
-        "tpu_v4_pp8_reference",
-        "tpu_v4_pp8_pallas_feature",
-        "tpu_v4_pp8_pallas_feature_linear",
-    ):
+    if backend_contract not in {"cpu_reference", *_TPU_DECODER_BACKEND_CONTRACTS}:
         raise PlanValidationError("decoder HLO backend contract is unknown")
     if feature_output_tile is None:
         feature_output_tile = (
             PROMOTED_FEATURE_OUTPUT_TILE
-            if backend_contract
-            in (
-                "tpu_v4_pp8_pallas_feature",
-                "tpu_v4_pp8_pallas_feature_linear",
-            )
+            if backend_contract in _FEATURE_DECODER_BACKEND_CONTRACTS
             else REFERENCE_FEATURE_OUTPUT_TILE
         )
     if feature_output_tile not in (128, 256):
@@ -3850,26 +3876,22 @@ def validate_decoder_step_hlo(
             "token observation candidates require the complete token path"
         )
     if (
-        backend_contract
-        not in (
-            "tpu_v4_pp8_pallas_feature",
-            "tpu_v4_pp8_pallas_feature_linear",
-        )
+        backend_contract not in _FEATURE_DECODER_BACKEND_CONTRACTS
         and feature_output_tile != 128
     ):
         raise PlanValidationError(
             "a non-default feature output tile requires a feature backend"
         )
-    if feature_fuse_route_weighting and backend_contract not in (
-        "tpu_v4_pp8_pallas_feature",
-        "tpu_v4_pp8_pallas_feature_linear",
+    if (
+        feature_fuse_route_weighting
+        and backend_contract not in _FEATURE_DECODER_BACKEND_CONTRACTS
     ):
         raise PlanValidationError(
             "feature route-weight fusion requires a feature backend"
         )
-    if feature_reconstruct_down_fp32 and backend_contract not in (
-        "tpu_v4_pp8_pallas_feature",
-        "tpu_v4_pp8_pallas_feature_linear",
+    if (
+        feature_reconstruct_down_fp32
+        and backend_contract not in _FEATURE_DECODER_BACKEND_CONTRACTS
     ):
         raise PlanValidationError(
             "feature FP32 reconstruction requires a feature backend"
@@ -3913,18 +3935,24 @@ def validate_decoder_step_hlo(
             1 if complete_token_path else 0
         )
     else:
+        expected_pipeline_geometry = {
+            "tpu_v4_pp8_reference": (8, 4),
+            "tpu_v4_pp8_pallas_feature": (8, 4),
+            "tpu_v4_pp8_pallas_feature_linear": (8, 4),
+            "tpu_v4_pp16_reference": (16, 2),
+            "tpu_v4_pp16_pallas_feature": (16, 2),
+        }[backend_contract]
         if (
-            config.stage_count,
-            config.local_parallel_size,
+            (config.stage_count, config.local_parallel_size),
             config.hidden_size,
             config.selected_width,
             layers,
             dense_layers,
             sparse_layers,
-        ) != (8, 4, 6144, 2048, 78, 3, 75):
+        ) != (expected_pipeline_geometry, 6144, 2048, 78, 3, 75):
             raise PlanValidationError(
-                "the TPU v4 PP8 reference lowering contract is pinned to "
-                "the complete 78-layer GLM-5.2 decoder"
+                f"the {backend_contract} lowering contract is pinned to its "
+                "complete 78-layer GLM-5.2 pipeline geometry"
             )
 
         # Gate C and complete-decoder HLO establish both semantic result shapes
@@ -3957,6 +3985,7 @@ def validate_decoder_step_hlo(
             complete_token_path=complete_token_path,
             split_residual_state=split_residual_state,
             token_observation_candidates=token_observation_candidates,
+            local_parallel_size=config.local_parallel_size,
         )
         expected_reductions = sum(expected_reduction_arity_counts.values())
         expected_reduction_component_count = sum(
@@ -4005,7 +4034,7 @@ def validate_decoder_step_hlo(
                     for shape in item.result_shapes
                     if shape.dtype == dtype
                     and prod(shape.dimensions)
-                    == 4 * token_observation_candidates
+                    == config.local_parallel_size * token_observation_candidates
                 ]
                 if len(candidate_shapes) == 1:
                     shape = candidate_shapes[0]
@@ -4034,11 +4063,7 @@ def validate_decoder_step_hlo(
             f"decoder collective counts drifted: expected={expected_counts} "
             f"observed={observed_counts}"
         )
-    if backend_contract in (
-        "tpu_v4_pp8_reference",
-        "tpu_v4_pp8_pallas_feature",
-        "tpu_v4_pp8_pallas_feature_linear",
-    ):
+    if backend_contract in _TPU_DECODER_BACKEND_CONTRACTS:
         if reduction_arity_counts != expected_reduction_arity_counts:
             violations.append(
                 "decoder physical all-reduce tuple arities drifted: "
@@ -4120,6 +4145,7 @@ def validate_decoder_step_hlo(
                 token_observation_candidates=token_observation_candidates,
                 dsa_query_exact_association=dsa_query_exact_association,
                 main_rope_table_enabled=main_rope_table_enabled,
+                local_parallel_size=config.local_parallel_size,
             )
         )
         violations.extend(complete_token_collective_contract["violations"])
@@ -4171,16 +4197,14 @@ def validate_decoder_step_hlo(
             f"found {module.num_partitions}"
         )
     pallas_feature_contract: dict[str, Any] = {}
-    if backend_contract in (
-        "tpu_v4_pp8_pallas_feature",
-        "tpu_v4_pp8_pallas_feature_linear",
-    ):
+    if backend_contract in _FEATURE_DECODER_BACKEND_CONTRACTS:
         pallas_feature_contract = _validate_pallas_feature_decoder_calls(
             optimized_hlo,
             sparse_layers=sparse_layers,
             feature_output_tile=feature_output_tile,
             fuse_route_weighting=feature_fuse_route_weighting,
             reconstruct_down_fp32=feature_reconstruct_down_fp32,
+            local_parallel_size=config.local_parallel_size,
         )
         violations.extend(pallas_feature_contract["violations"])
     pallas_stage_linear_contract: dict[str, Any] = {}
@@ -6091,7 +6115,7 @@ def build_decoder_step_program(
     expected_expert_layout = (
         COMPLETE_EXPERT_RUNTIME_LAYOUT
         if sparse_moe_backend == "reference"
-        else FEATURE_EXPERT_RUNTIME_LAYOUT
+        else feature_expert_runtime_layout(plan.local_parallel_size)
     )
     if weight_layout.routed_expert_layout != expected_expert_layout:
         raise PlanValidationError(

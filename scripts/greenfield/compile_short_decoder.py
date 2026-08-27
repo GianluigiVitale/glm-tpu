@@ -2158,7 +2158,10 @@ def main() -> int:
         )
         sparse_moe_backend = "reference"
         linear_backend = "reference"
-        hlo_backend_contract = "tpu_v4_pp8_reference"
+        hlo_backend_contract = {
+            "PP8_LP4": "tpu_v4_pp8_reference",
+            "PP16_LP2": "tpu_v4_pp16_reference",
+        }[execution_plan.name.value]
     else:
         context_args = SimpleNamespace(
             source_checkpoint_root=args.source_checkpoint_root,
@@ -2220,11 +2223,15 @@ def main() -> int:
         linear_backend = (
             "pallas" if args.runtime_kind == "pallas_feature_linear" else "reference"
         )
-        hlo_backend_contract = (
-            "tpu_v4_pp8_pallas_feature_linear"
-            if linear_backend == "pallas"
-            else "tpu_v4_pp8_pallas_feature"
-        )
+        if execution_plan.name.value == "PP16_LP2" and linear_backend == "pallas":
+            raise ValueError(
+                "PP16 Pallas-linear lowering is not yet an admitted contract"
+            )
+        hlo_backend_contract = {
+            ("PP8_LP4", False): "tpu_v4_pp8_pallas_feature",
+            ("PP8_LP4", True): "tpu_v4_pp8_pallas_feature_linear",
+            ("PP16_LP2", False): "tpu_v4_pp16_pallas_feature",
+        }[(execution_plan.name.value, linear_backend == "pallas")]
     # DB499 proves that accepted M=1 DSA queries require a complete local
     # FP32 wq_b owner shard. Keep every other projection on its selected
     # runtime backend; only this exactness boundary uses the reference path.
