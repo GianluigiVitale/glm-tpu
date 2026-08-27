@@ -301,6 +301,7 @@ def _write_graph(
     expected_optimized: str,
     hidden_size: int,
     exact_dsa: bool,
+    strategy_nd_dense: bool,
 ) -> tuple[dict[str, Any], str, str]:
     stable = str(lowered.compiler_ir(dialect="stablehlo"))
     optimized = compiled.as_text()
@@ -316,6 +317,7 @@ def _write_graph(
         hidden_size=hidden_size,
         kind=graph,
         exact_dsa=exact_dsa,
+        strategy_nd_dense=strategy_nd_dense,
     )
     return report.to_dict(), stable, optimized
 
@@ -664,6 +666,7 @@ def main() -> int:
         expected_optimized=args.expected_prefill_optimized_hlo_sha256,
         hidden_size=geometry.hidden_size,
         exact_dsa=config.exact_dsa,
+        strategy_nd_dense=config.strategy_nd_dense,
     )
     _require_graph_authorized(
         graphs["prefill"], compile_only=bool(args.compile_only)
@@ -705,6 +708,7 @@ def main() -> int:
         expected_optimized=args.expected_observer_optimized_hlo_sha256,
         hidden_size=geometry.hidden_size,
         exact_dsa=config.exact_dsa,
+        strategy_nd_dense=config.strategy_nd_dense,
     )
     _require_graph_authorized(
         graphs["observer"], compile_only=bool(args.compile_only)
@@ -777,6 +781,7 @@ def main() -> int:
         expected_optimized=args.expected_decode_optimized_hlo_sha256,
         hidden_size=geometry.hidden_size,
         exact_dsa=config.exact_dsa,
+        strategy_nd_dense=config.strategy_nd_dense,
     )
     _require_graph_authorized(
         graphs["decode"], compile_only=bool(args.compile_only)
@@ -796,6 +801,7 @@ def main() -> int:
         expected_optimized=args.expected_cache_probe_optimized_hlo_sha256,
         hidden_size=geometry.hidden_size,
         exact_dsa=config.exact_dsa,
+        strategy_nd_dense=config.strategy_nd_dense,
     )
     _require_graph_authorized(
         graphs["cache_probe"], compile_only=bool(args.compile_only)

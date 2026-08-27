@@ -29,6 +29,9 @@ from glm_tpu.greenfield.runtime.ws32_decoder import (
     ws32_observed_decode_result_specs,
     ws32_prefill_result_specs,
 )
+from glm_tpu.greenfield.kernels.ws32_layer import (
+    Ws32StrategyNdDenseWeights,
+)
 from glm_tpu.greenfield.types import ModelGeometry
 
 
@@ -96,6 +99,41 @@ def test_ws32_decoder_contract_covers_exact_78_layer_model() -> None:
     assert local_kv_bytes == 3_271_557_120
     assert local_index_bytes == 176_160_768
     assert local_kv_bytes + local_index_bytes == 3_447_717_888
+
+
+def test_ws32_strategy_nd_dense_contract_is_default_off_and_final_layout() -> None:
+    geometry = _geometry()
+    default = Ws32DecoderConfig(geometry=geometry, context_capacity=8192)
+    assert not default.strategy_nd_dense
+    config = Ws32DecoderConfig(
+        geometry=geometry,
+        context_capacity=8192,
+        strategy_nd_dense=True,
+    )
+    specs = ws32_decoder_weight_specs(config)
+    names = ws32_decoder_weight_names(config)
+    for layer_id in range(3):
+        dense_specs = specs.layers[layer_id].dense
+        dense_names = names.layers[layer_id].dense
+        assert isinstance(dense_specs, Ws32StrategyNdDenseWeights)
+        assert isinstance(dense_names, Ws32StrategyNdDenseWeights)
+        assert tuple(map(str, dense_specs)) == (
+            "P('expert', None, None)",
+            "P('expert', None, None)",
+            "P('expert', None, 'feature')",
+            "P('expert', None, 'feature')",
+        )
+        assert dense_names.merged_bits_in_out_local == (
+            f"model.layers.{layer_id}.mlp.strategy_nd."
+            "merged_gate_up.weight_bits_in_out"
+        )
+    assert all(layer.dense is None for layer in specs.layers[3:])
+    with pytest.raises(PlanValidationError, match="exact GLM-5.2 geometry"):
+        Ws32DecoderConfig(
+            geometry=replace(geometry, hidden_size=3072),
+            context_capacity=8192,
+            strategy_nd_dense=True,
+        )
 
 
 def test_ws32_decoder_contract_refuses_schedule_and_cache_drift() -> None:

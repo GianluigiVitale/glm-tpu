@@ -42,6 +42,8 @@ class Ws32DecoderHloReport:
     expert_collective_count: int
     fused_rmsnorm_collective_count: int
     rounded_first_rmsnorm_collective_count: int
+    strategy_nd_dense_hidden_gather_count: int
+    strategy_nd_dense_expert_gather_count: int
     maximum_group_size: int
     async_collective_count: int
     forbidden_full_hidden_values: tuple[str, ...]
@@ -76,6 +78,12 @@ class Ws32DecoderHloReport:
                 self.rounded_first_rmsnorm_collective_count
             ),
             "stablehlo_sha256": self.stablehlo_sha256,
+            "strategy_nd_dense_expert_gather_count": (
+                self.strategy_nd_dense_expert_gather_count
+            ),
+            "strategy_nd_dense_hidden_gather_count": (
+                self.strategy_nd_dense_hidden_gather_count
+            ),
             "violations": list(self.violations),
         }
 
@@ -333,6 +341,7 @@ def _hidden_reconstructing_all_gathers(
     *,
     hidden_size: int,
     allow_exact_dsa_feature_gather: bool = False,
+    allow_strategy_nd_dense_feature_gather: bool = False,
 ) -> tuple[str, ...]:
     """Reject a subgroup gather that physically rebuilds one hidden row."""
 
@@ -362,6 +371,19 @@ def _hidden_reconstructing_all_gathers(
                 and _group_family(instruction) == "feature"
             ):
                 continue
+            if (
+                allow_strategy_nd_dense_feature_gather
+                and instruction.op_name is not None
+                and "greenfield_ws32_strategy_nd_dense"
+                in instruction.op_name.split("/")
+                and "hidden_gather" in instruction.op_name.split("/")
+                and _group_family(instruction) == "feature"
+                and operand.dtype == result.dtype == "bf16"
+                and operand.dimensions == (1, hidden_size // 4)
+                and result.dimensions == (1, hidden_size)
+                and instruction.maximum_group_size == 4
+            ):
+                continue
             forbidden.append(instruction.name)
     return tuple(sorted(forbidden))
 
@@ -376,6 +398,7 @@ def validate_ws32_decoder_hlo(
     kind: str = "decode",
     expected_split_rmsnorm_collective_count: int = 157,
     exact_dsa: bool = False,
+    strategy_nd_dense: bool = False,
     full_indexer_count: int = 21,
 ) -> Ws32DecoderHloReport:
     """Validate one complete decoder/prefill graph before device execution.
@@ -398,6 +421,8 @@ def validate_ws32_decoder_hlo(
         raise ValueError("WS32 split RMSNorm count is invalid")
     if not isinstance(exact_dsa, bool):
         raise ValueError("WS32 exact DSA HLO flag must be boolean")
+    if not isinstance(strategy_nd_dense, bool):
+        raise ValueError("WS32 StrategyND dense HLO flag must be boolean")
     if not isinstance(full_indexer_count, int) or isinstance(
         full_indexer_count, bool
     ) or full_indexer_count <= 0:
@@ -448,6 +473,22 @@ def validate_ws32_decoder_hlo(
         if item.op_name is not None
         and "greenfield_ws32_rmsnorm" in item.op_name.split("/")
     )
+    strategy_hidden_gathers = tuple(
+        item
+        for item in live_collectives
+        if item.op_name is not None
+        and "greenfield_ws32_strategy_nd_dense"
+        in item.op_name.split("/")
+        and "hidden_gather" in item.op_name.split("/")
+    )
+    strategy_expert_gathers = tuple(
+        item
+        for item in live_collectives
+        if item.op_name is not None
+        and "greenfield_ws32_strategy_nd_dense"
+        in item.op_name.split("/")
+        and "expert_gather" in item.op_name.split("/")
+    )
     allowed_exact_wk_slice_indices, _ = (
         _exact_wk_feature_slice_instructions(
             module.instructions,
@@ -470,6 +511,9 @@ def validate_ws32_decoder_hlo(
                     live,
                     hidden_size=hidden_size,
                     allow_exact_dsa_feature_gather=exact_dsa,
+                    allow_strategy_nd_dense_feature_gather=(
+                        strategy_nd_dense
+                    ),
                 )
             )
         )
@@ -552,6 +596,41 @@ def validate_ws32_decoder_hlo(
     ):
         violations.append(
             "split-residual RMSNorm reduction geometry drifted"
+        )
+    expected_strategy_count = (
+        3 if strategy_nd_dense and kind != "cache_probe" else 0
+    )
+    if len(strategy_hidden_gathers) != expected_strategy_count or any(
+        item.raw_opcode != "all-gather"
+        or _group_family(item) != "feature"
+        or item.maximum_group_size != 4
+        or len(item.operand_shapes) != 1
+        or len(item.result_shapes) != 1
+        or item.operand_shapes[0].dtype != "bf16"
+        or item.operand_shapes[0].dimensions != (1, hidden_size // 4)
+        or item.result_shapes[0].dtype != "bf16"
+        or item.result_shapes[0].dimensions != (1, hidden_size)
+        for item in strategy_hidden_gathers
+    ):
+        violations.append(
+            "WS32 StrategyND dense hidden gather count/geometry drifted"
+        )
+    if len(strategy_expert_gathers) != expected_strategy_count or any(
+        item.raw_opcode != "all-gather"
+        or _group_family(item) != "expert"
+        or item.maximum_group_size != 8
+        or len(item.operand_shapes) != 1
+        or len(item.result_shapes) != 1
+        or item.operand_shapes[0].dtype != "bf16"
+        or item.operand_shapes[0].dimensions
+        != (4, 1, hidden_size // 4)
+        or item.result_shapes[0].dtype != "bf16"
+        or item.result_shapes[0].dimensions
+        != (32, 1, hidden_size // 4)
+        for item in strategy_expert_gathers
+    ):
+        violations.append(
+            "WS32 StrategyND dense expert gather count/geometry drifted"
         )
     if exact_dsa and kind != "cache_probe":
 
@@ -642,6 +721,12 @@ def validate_ws32_decoder_hlo(
         fused_rmsnorm_collective_count=len(fused_rmsnorm_collectives),
         rounded_first_rmsnorm_collective_count=len(
             rounded_first_rmsnorm_collectives
+        ),
+        strategy_nd_dense_hidden_gather_count=len(
+            strategy_hidden_gathers
+        ),
+        strategy_nd_dense_expert_gather_count=len(
+            strategy_expert_gathers
         ),
         maximum_group_size=maximum_group,
         async_collective_count=len(async_collectives),

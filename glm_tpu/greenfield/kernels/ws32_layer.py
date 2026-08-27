@@ -57,6 +57,7 @@ from .ws32 import (
     ws32_moe_pallas_from_routes_mapped,
     ws32_rms_norm_mapped,
     ws32_router_from_shards_mapped,
+    ws32_strategy_nd_dense_final_layout_mapped,
 )
 
 
@@ -112,6 +113,15 @@ class Ws32DenseWeights(NamedTuple):
     up_scale_local: Any
     down_bits_local: Any
     down_scale_local: Any
+
+
+class Ws32StrategyNdDenseWeights(NamedTuple):
+    """Four ordered legacy-rank shards in their final WS32 ownership."""
+
+    merged_bits_in_out_local: Any
+    merged_scale_in_out_local: Any
+    down_bits_in_out_local: Any
+    down_scale_in_out_local: Any
 
 
 class Ws32MoeWeights(NamedTuple):
@@ -1035,7 +1045,7 @@ def ws32_transformer_layer_mapped(
     attention_weights: Ws32AttentionWeights,
     dsa_weights: Ws32DsaWeights | None,
     post_attention_norm_weight_local: Any,
-    dense_weights: Ws32DenseWeights | None,
+    dense_weights: Ws32DenseWeights | Ws32StrategyNdDenseWeights | None,
     moe_weights: Ws32MoeWeights | None,
     incoming_contract_valid: Any,
     *,
@@ -1174,7 +1184,7 @@ def ws32_transformer_layer_mapped(
 def ws32_mlp_mapped(
     post_attention_residual_local: Any,
     post_attention_norm_weight_local: Any,
-    dense_weights: Ws32DenseWeights | None,
+    dense_weights: Ws32DenseWeights | Ws32StrategyNdDenseWeights | None,
     moe_weights: Ws32MoeWeights | None,
     *,
     mlp_kind: str,
@@ -1226,17 +1236,31 @@ def ws32_mlp_mapped(
             raise ValueError("WS32 precomputed MLP normalization geometry drifted")
     if mlp_kind == "dense":
         assert dense_weights is not None
-        update = ws32_dense_pallas_mapped(
-            normalized,
-            dense_weights.gate_bits_local,
-            dense_weights.gate_scale_local,
-            dense_weights.up_bits_local,
-            dense_weights.up_scale_local,
-            dense_weights.down_bits_local,
-            dense_weights.down_scale_local,
-            block_shape=block_shape,
-            interpret=linear_interpret,
-        )
+        if isinstance(dense_weights, Ws32StrategyNdDenseWeights):
+            if linear_interpret:
+                raise ValueError(
+                    "WS32 StrategyND dense path has no interpreted fallback"
+                )
+            update = ws32_strategy_nd_dense_final_layout_mapped(
+                normalized,
+                dense_weights.merged_bits_in_out_local,
+                dense_weights.merged_scale_in_out_local,
+                dense_weights.down_bits_in_out_local,
+                dense_weights.down_scale_in_out_local,
+                block_shape=block_shape,
+            )
+        else:
+            update = ws32_dense_pallas_mapped(
+                normalized,
+                dense_weights.gate_bits_local,
+                dense_weights.gate_scale_local,
+                dense_weights.up_bits_local,
+                dense_weights.up_scale_local,
+                dense_weights.down_bits_local,
+                dense_weights.down_scale_local,
+                block_shape=block_shape,
+                interpret=linear_interpret,
+            )
         route_indices = jnp.full(
             (1, contract.top_k), jnp.int32(-1), dtype=jnp.int32
         )

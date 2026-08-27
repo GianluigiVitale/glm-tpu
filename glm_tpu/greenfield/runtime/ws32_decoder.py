@@ -42,6 +42,7 @@ from ..kernels.ws32_layer import (
     Ws32ExactDsaWeights,
     Ws32MoeWeights,
     Ws32QkvAWeights,
+    Ws32StrategyNdDenseWeights,
     ws32_transformer_layer_mapped,
 )
 from ..types import ModelGeometry
@@ -52,7 +53,7 @@ class Ws32LayerWeights(NamedTuple):
     attention: Ws32AttentionWeights
     dsa: Ws32DsaWeights | None
     post_attention_norm_weight_local: Any
-    dense: Ws32DenseWeights | None
+    dense: Ws32DenseWeights | Ws32StrategyNdDenseWeights | None
     moe: Ws32MoeWeights | None
 
 
@@ -143,6 +144,7 @@ class Ws32DecoderConfig:
     sparse_segment_block: int = 512
     rms_norm_epsilon: float = 1e-5
     exact_dsa: bool = False
+    strategy_nd_dense: bool = False
 
     def __post_init__(self) -> None:
         geometry = self.geometry
@@ -170,6 +172,19 @@ class Ws32DecoderConfig:
             raise PlanValidationError("WS32 RMS epsilon must be positive")
         if not isinstance(self.exact_dsa, bool):
             raise PlanValidationError("WS32 exact DSA flag must be boolean")
+        if not isinstance(self.strategy_nd_dense, bool):
+            raise PlanValidationError(
+                "WS32 StrategyND dense flag must be boolean"
+            )
+        if self.strategy_nd_dense and (
+            geometry.hidden_size != 6144
+            or geometry.dense_intermediate_size != 12288
+            or geometry.first_dense_layers != 3
+            or geometry.fp8_block_shape != (128, 128)
+        ):
+            raise PlanValidationError(
+                "WS32 StrategyND dense path requires exact GLM-5.2 geometry"
+            )
         if not self.full_index_slots or self.full_index_slots[0] != 0:
             raise PlanValidationError("WS32 layer zero must seed IndexShare state")
         producer: int | None = None
@@ -406,7 +421,16 @@ def _dsa_specs() -> Ws32DsaWeights:
     )
 
 
-def _dense_specs() -> Ws32DenseWeights:
+def _dense_specs(
+    *, strategy_nd: bool = False
+) -> Ws32DenseWeights | Ws32StrategyNdDenseWeights:
+    if strategy_nd:
+        return Ws32StrategyNdDenseWeights(
+            P("expert", None, None),
+            P("expert", None, None),
+            P("expert", None, "feature"),
+            P("expert", None, "feature"),
+        )
     return Ws32DenseWeights(
         P("expert", "feature"),
         P("expert", "feature"),
@@ -451,7 +475,11 @@ def ws32_decoder_weight_specs(config: Ws32DecoderConfig) -> Ws32DecoderWeights:
                 _attention_specs(),
                 _dsa_specs() if indexer_kind == "full" else None,
                 P("feature"),
-                _dense_specs() if mlp_kind == "dense" else None,
+                (
+                    _dense_specs(strategy_nd=config.strategy_nd_dense)
+                    if mlp_kind == "dense"
+                    else None
+                ),
                 _moe_specs() if mlp_kind == "sparse" else None,
             )
         )
@@ -513,17 +541,26 @@ def ws32_decoder_weight_names(config: Ws32DecoderConfig) -> Ws32DecoderWeights:
         dense = None
         moe = None
         if mlp_kind == "dense":
-            gate_bits, gate_scale = _fp8_names(f"{prefix}.mlp.gate_proj")
-            up_bits, up_scale = _fp8_names(f"{prefix}.mlp.up_proj")
-            down_bits, down_scale = _fp8_names(f"{prefix}.mlp.down_proj")
-            dense = Ws32DenseWeights(
-                gate_bits,
-                gate_scale,
-                up_bits,
-                up_scale,
-                down_bits,
-                down_scale,
-            )
+            if config.strategy_nd_dense:
+                strategy_prefix = f"{prefix}.mlp.strategy_nd"
+                dense = Ws32StrategyNdDenseWeights(
+                    f"{strategy_prefix}.merged_gate_up.weight_bits_in_out",
+                    f"{strategy_prefix}.merged_gate_up.scale_inv_in_out",
+                    f"{strategy_prefix}.down.weight_bits_in_out",
+                    f"{strategy_prefix}.down.scale_inv_in_out",
+                )
+            else:
+                gate_bits, gate_scale = _fp8_names(f"{prefix}.mlp.gate_proj")
+                up_bits, up_scale = _fp8_names(f"{prefix}.mlp.up_proj")
+                down_bits, down_scale = _fp8_names(f"{prefix}.mlp.down_proj")
+                dense = Ws32DenseWeights(
+                    gate_bits,
+                    gate_scale,
+                    up_bits,
+                    up_scale,
+                    down_bits,
+                    down_scale,
+                )
         else:
             expert_gate_bits, expert_gate_scale = _fp8_names(
                 f"{prefix}.mlp.experts.gate_proj"

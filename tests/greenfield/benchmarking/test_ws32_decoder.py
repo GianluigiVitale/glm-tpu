@@ -79,6 +79,36 @@ ENTRY main {{
 '''
 
 
+def _strategy_nd_dense_hlo() -> str:
+    feature, expert = _groups()
+    pairs = []
+    roots = ["%feature_rms"]
+    for layer in range(3):
+        pairs.append(
+            f'''  %hidden_{layer} = bf16[1,6144] all-gather(%hidden), dimensions={{1}}, replica_groups={{{feature}}}, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_complete_decoder/greenfield_ws32_strategy_nd_dense/hidden_gather/all_gather"}}
+  %partials_{layer} = bf16[4,1,1536] copy(%partial)
+  %expert_{layer} = bf16[32,1,1536] all-gather(%partials_{layer}), dimensions={{0}}, replica_groups={{{expert}}}, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_complete_decoder/greenfield_ws32_strategy_nd_dense/expert_gather/all_gather"}}'''
+        )
+        roots.extend((f"%hidden_{layer}", f"%expert_{layer}"))
+    return f'''HloModule ws32_strategy_nd_dense, num_partitions=32
+
+feature_add {{
+  %a = f32[] parameter(0)
+  %b = f32[] parameter(1)
+  ROOT %sum = f32[] add(%a, %b)
+}}
+
+ENTRY main {{
+  %rms = f32[1,1536] parameter(0)
+  %hidden = bf16[1,1536] parameter(1)
+  %partial = bf16[4,1,1536] parameter(2)
+  %feature_rms = f32[1,1536] all-reduce(%rms), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_complete_decoder/greenfield_ws32_fused_rmsnorm/feature_square_reduce/psum"}}
+{chr(10).join(pairs)}
+  ROOT %root = (f32[1,1536], bf16[1,6144], bf16[32,1,1536], bf16[1,6144], bf16[32,1,1536], bf16[1,6144], bf16[32,1,1536]) tuple({', '.join(roots)})
+}}
+'''
+
+
 def _report(hlo: str, *, kind: str = "decode"):
     stable = "module @main"
     return validate_ws32_decoder_hlo(
@@ -90,6 +120,35 @@ def _report(hlo: str, *, kind: str = "decode"):
         kind=kind,
         expected_split_rmsnorm_collective_count=1,
     )
+
+
+def test_ws32_strategy_nd_dense_hlo_requires_exact_scoped_local_pairs() -> None:
+    stable = "module @main"
+    hlo = _strategy_nd_dense_hlo()
+    report = validate_ws32_decoder_hlo(
+        stable,
+        hlo,
+        expected_stablehlo_sha256=sha256(stable.encode()).hexdigest(),
+        expected_optimized_hlo_sha256=sha256(hlo.encode()).hexdigest(),
+        hidden_size=6144,
+        expected_split_rmsnorm_collective_count=1,
+        strategy_nd_dense=True,
+    )
+    assert report.passed
+    assert report.strategy_nd_dense_hidden_gather_count == 3
+    assert report.strategy_nd_dense_expert_gather_count == 3
+
+    disabled = validate_ws32_decoder_hlo(
+        stable,
+        hlo,
+        expected_stablehlo_sha256=sha256(stable.encode()).hexdigest(),
+        expected_optimized_hlo_sha256=sha256(hlo.encode()).hexdigest(),
+        hidden_size=6144,
+        expected_split_rmsnorm_collective_count=1,
+    )
+    assert not disabled.passed
+    assert "optimized HLO reconstructs a full-pod hidden value" in disabled.violations
+    assert any("StrategyND dense" in item for item in disabled.violations)
 
 
 def _prefill_while_hlo() -> str:
