@@ -56,7 +56,9 @@ has_eight_unique_markers() {
 }
 
 strict_census() {
-  local label=$1 out="$RUN_DIR/census_${label}.txt" carrier="${TAG}_${label}"
+  local label=$1
+  local out="$RUN_DIR/census_${label}.txt"
+  local carrier="${TAG}_${label}"
   local command
   command='generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[l]oad_checkpoint_probe[.]py|[r]un_real_one_layer[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}}" 2>/dev/null); if [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; echo "$generic"; echo "$holders"; else echo "CENSUS_OK $(hostname)"; fi'
   GLM_CENSUS_CARRIER="$carrier" gcloud compute tpus tpu-vm ssh "$POD" \

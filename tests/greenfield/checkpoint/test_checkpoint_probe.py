@@ -87,6 +87,7 @@ def test_pp16_probe_wrapper_is_bounded_same_region_and_terminal_last() -> None:
         "performance_claim':False",
     ):
         assert required in source
+    assert 'local label=$1 out=' not in source
     for forbidden in (
         "driftbench-storage",
         "EUROPE-WEST4",
