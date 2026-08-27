@@ -151,6 +151,28 @@ def test_pallas_feature_real_layer_hlo_pins_local_routed_shapes() -> None:
     assert record["routed_layout"] == "expert_intermediate_shard"
     assert record["routed_output_tile"] == 128
 
+    pp16_hlo = (
+        _pallas_hlo()
+        .replace("num_partitions=4", "num_partitions=2")
+        .replace("{{0,1,2,3}}", "{{0,1}}")
+        .replace("r8_g64_h6144_i2048", "r8_g256_h6144_i1024")
+        .replace("u8[64,6144,2048]", "u8[256,6144,1024]")
+        .replace("u8[64,2048,6144]", "u8[256,1024,6144]")
+        .replace("m8_k6144_n512", "m8_k6144_n1024")
+        .replace("m8_k512_n6144", "m8_k1024_n6144")
+        .replace("u8[512,6144]", "u8[1024,6144]")
+        .replace("u8[6144,512]", "u8[6144,1024]")
+    )
+    pp16 = validate_pallas_real_layer_hlo(
+        pp16_hlo,
+        stage_size=2,
+        local_experts=256,
+        routed_intermediate_size=1024,
+        feature_sharded_routed=True,
+    )
+    assert pp16["passed"], pp16
+    assert pp16["collectives"][0]["replica_groups"] == [[0, 1]]
+
     wide_hlo = hlo.replace(
         "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512",
         "greenfield_fp8_fused_selected_moe_r8_g256_h6144_i512_ot256",

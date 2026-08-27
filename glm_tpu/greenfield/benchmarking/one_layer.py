@@ -325,10 +325,14 @@ def validate_pallas_real_layer_hlo(
         len(line.split("custom-call(", 1)[1].split(")", 1)[0].split(","))
         for line in concat_calls
     ]
-    if concat_arity != [stage_size] * len(concat_calls):
+    # ConcatBitcast arity is TPU v4's four-way on-device layout tiling, not
+    # the physical stage width. LP2 therefore retains four local slices while
+    # its sole real collective remains the independently checked two-rank sum.
+    expected_concat_arity = 4
+    if concat_arity != [expected_concat_arity] * len(concat_calls):
         violations.append(
             "local shared-FP8 ConcatBitcast arity drifted: "
-            f"expected={stage_size} observed={concat_arity}"
+            f"expected={expected_concat_arity} observed={concat_arity}"
         )
 
     selected_line = kernel_calls["greenfield_fp8_fused_selected_moe_"]
