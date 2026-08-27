@@ -5,9 +5,9 @@ read it and `docs/glm-tpu-revolution.md` **in full**, then inspect live state an
 
 ## Scope and precedence
 
-Supersede incremental TP32, prior exact-next sequences, and the pipeline ban. Preserve legacy
-engine/evidence/oracles/protection; never extend its execution architecture.
-Build an isolated, default-off native-JAX engine for `zai-org/GLM-5.2-FP8` on existing
+Supersede incremental TP32, sequencing and the pipeline ban. Preserve legacy evidence/oracles;
+never extend its execution path. Build an isolated, default-off native-JAX engine for
+`zai-org/GLM-5.2-FP8` on
 `db-v4-64-od` (8 hosts/32 TPU-v4 chips), minimizing protected profiler-free 256K stream latency.
 Legacy `tpu-inference` is oracle only; never import its execution path.
 Never create a VM, host, or TPU. Use only `gs://driftbench-dsv4-uc` and serialize TPU workflows.
@@ -37,14 +37,17 @@ Then pass Gates A–H in order: plan/memory/HLO linter; final-layout checkpoint 
 loader; reference kernels; exact dense/DSA/IndexShare/MoE layers; complete 2K/8K decoder; protected
 128K smoke; protected 256K E0; identical-condition plan adjudication; only then speculation.
 
+Do not wait for Gates E–H to upstream DSA. Re-audit `tpu-inference` main/PRs, then cut the smallest
+TPU DSA scorer/indexer PR from protected v4 evidence. Keep it independent; respond/rebase until
+merged. Greenfield remains the oracle.
+
 ## Proof and performance contract
 
 Every optimization defaults off. Require exact DSA set/tie order, raw tokens/quality,
 state/load/cache integrity, checkpoint bytes/checksums, per-chip peak HBM, code/plan hashes,
 physical collective groups/counts, fresh 8-host XPlanes, profiler-free steady wall,
-`bench/results.db` linkage, same-region archive, and authenticated zero-work cleanup. CPU tests,
-synthetic kernels, HLO alone, labels, aggregate
-throughput, or contaminated wall data are not performance proof. Stop and diagnose full-pod
+`bench/results.db` linkage, same-region archive, and authenticated zero-work cleanup. CPU/synthetic/
+HLO-only/aggregate or contaminated wall data are not performance proof. Stop on full-pod
 repeated layer collectives, host-staged transport, dead rows, unknown HBM margin, DSA drift, or a
 device-only win with wall regression.
 
@@ -54,10 +57,9 @@ must be separate; claim 20–50 tok/s only from protected local evidence.
 
 ## Definition of done
 
-The fastest correct plan serves at 256K independently of legacy execution, uses a plan-aware packed
-checkpoint, has local repeated collectives/no full-pod hidden reconstruction, and passes exactness,
-quality, integrity, HBM, HLO, PP8/PP16 measurement, WS32 adjudication, 128K smoke, 256K E0,
-DB/archive, and clean-fleet gates. Continue until section 18 has direct evidence.
+The fastest correct plan serves 256K independently, uses a plan-aware checkpoint/local collectives,
+and passes exactness, quality, integrity, HBM/HLO, PP8/PP16/WS32, 128K, 256K, DB/archive and clean
+fleet gates. Continue until section 18 has direct evidence.
 Work in bulk. Never use Fable/Opus. Before deploy: at most one fresh Sol audit of current
 diff/evidence; no workflows/subagents/cleared-code review. Fix, commit, push. After failure,
 diagnose locally; optional narrow Sol review. Checkpoint each batch: commit+push+verify mirror only
