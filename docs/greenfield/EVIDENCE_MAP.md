@@ -44,6 +44,14 @@ Replacement topology code is `bfe064d`; its fleet hash is `4a0c9a33...c301`. Col
 pins are `fcd8426735...` and `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash remains
 `294e777...559`, PP8 group hash `d5943ab8...c14`, and PP16 group hash `6383e57c...f21`.
 
+Complete nonperformance checkpoint tag `greenfield_full_pack_pp16_20260827T032310295108546Z` at
+`3685ee4` contains 32 base plus two optional-MTP final owners: 757,149,950,848 payload bytes and
+757,165,710,960 file bytes. Packed manifest SHA is `13ad2e92...fedb5`; independent inspection
+passes the exact 72-object checkpoint set and every generation/CRC/sidecar/metadata/plan identity.
+The results ledger/SUCCESS self SHAs are `c0097d9f...2af61` / `47c7745c...f9352`. This closes the
+complete-pack portion only; full-checkpoint device round-trip/HBM, Gate B and performance remain
+missing.
+
 Accepted bounded checkpoint-loader evidence is DB556 / tag
 `greenfield_checkpoint_probe_load_pp16_20260827T031331899773974Z` at `46b8a4f`. The production
 final-layout loader places both stage-0 PP16 owners on physical ids `[0,1]` and round-trips
@@ -68,8 +76,8 @@ axes, and both expert-owner slots. It reconciles 50,345,920 source bytes to two 
 payloads in one grouped core invocation; owner SHAs are `87ac52df...7ea6` / `705ed0ff...0ac3` and
 manifest SHA is `14c36aeb...c4e3`. Its exact nine-object / 50,375,010-byte same-region archive is
 generation/CRC terminal-sealed. This closes the bounded pack discriminator only; direct-loader
-compatibility subsequently passes in DB556, while complete-pack, full-checkpoint HBM, Gate-B, and
-performance evidence remain missing.
+compatibility subsequently passes in DB556 and the complete pack above is sealed, while
+full-checkpoint HBM, Gate-B, and performance evidence remain missing.
 
 The compile-only tag
 `greenfield_ws32_short_decoder_8k_acquire_20260826T195124476893681Z` is preserved diagnostic

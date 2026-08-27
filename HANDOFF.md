@@ -2,6 +2,24 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 complete PP16 final-layout checkpoint is sealed
+
+- Tag `greenfield_full_pack_pp16_20260827T032310295108546Z` at pushed/mirrored code `3685ee4`
+  streams the complete plan-aware `PP16_LP2` checkpoint directly within `US-CENTRAL2`. Thirty-two
+  base owners plus two optional-MTP owners contain 757,149,950,848 payload bytes and
+  757,165,710,960 total file bytes. Packed manifest SHA is `13ad2e92...fedb5` (file SHA
+  `7f212ea0...4362`).
+- All 17 two-owner stage groups completed without retry in 11,442.5 seconds. The independent
+  inspector reconciled the exact 72-object checkpoint set, every generation/CRC sidecar, metadata,
+  layout/source/plan pin and file size. This was CPU/GCS I/O only: no TPU, HBM, DB or performance
+  claim exists.
+- The separate results proof has ten preterminal objects / 42,526 bytes, ledger SHA
+  `c0097d9f...2af61`, SUCCESS self SHA `47c7745c...f9352`, and SUCCESS file SHA
+  `3be83f47...4d7ee`. The checkpoint-native SUCCESS file SHA is `c1a0a9ef...422f2`.
+- Exact next is a smallest-host complete-stage discriminator followed by all 16 physical PP16
+  stages / 32 chips, independently rehashing and round-tripping every base-decoder byte with
+  measured per-chip HBM. Only that separately protected proof can close Gate B.
+
 ## 2026-08-27 bounded PP16 production direct-loader proof passes
 
 - Protected tag `greenfield_checkpoint_probe_load_pp16_20260827T031331899773974Z` at pushed,

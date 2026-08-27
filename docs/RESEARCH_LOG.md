@@ -5,6 +5,24 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 — complete PP16 final-owner checkpoint is same-region sealed
+
+After the bounded pack and production-loader discriminators passed, protected tag
+`greenfield_full_pack_pp16_20260827T032310295108546Z` at pushed/mirrored `3685ee4` streamed all 17
+two-owner groups directly from the approved read-only model mount back to
+`driftbench-dsv4-uc` in `US-CENTRAL2`. It used no local payload staging and no TPU. All groups
+completed without retry in 11,442.5 seconds at an observed long-stream rate around 61--65 MiB/s.
+
+The 32 base and two optional-MTP owner files reconcile exactly to 757,149,950,848 payload bytes and
+757,165,710,960 total file bytes. Packed manifest SHA is `13ad2e92...fedb5`; its file SHA is
+`7f212ea0...4362`. An independent inspector then matched the exact 72-object checkpoint set and
+every immutable generation, CRC, sidecar, metadata, source, topology, plan and layout identity.
+
+The separate ten-object results ledger covers 42,526 bytes at SHA `c0097d9f...2af61`; terminal
+SUCCESS self/file SHAs are `47c7745c...f9352` / `3be83f47...4d7ee`. The checkpoint-native SUCCESS
+file SHA is `c1a0a9ef...422f2`. This closes the complete-pack portion only. It has no DB row, TPU,
+HBM, decoder or performance standing; next run the complete 16-stage/32-chip direct-load proof.
+
 ## 2026-08-27 — bounded PP16 production loader passes on its physical owner host
 
 Two deliberately small protected attempts prevented a larger mistake. The first stopped before
