@@ -2,6 +2,21 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 upstream PR 1 kernel foundation is privately ready
+
+- Private TPU Inference branch `pr/glm-dsa-kernels-v3` is clean and pushed only to the user's fork
+  at `53b78b9519352b1bc64a115dee7190e35dad9d00` (base `5e2c7128...a3cb`). Official upstream is
+  untouched. Commits `78d7ee30` and `53b78b95` add current FP8+FP32-scale exact StreamIndex and a
+  paged one-row sparse MLA consumer while preserving legacy defaults.
+- Exact-head real-v4 verification passes 15/15 with authenticated pre/post 8/8 fleet cleanup. The
+  complete 256K scorer -> exact K=2048 -> paged gather -> sparse-MLA chain measures p50/p99
+  `3.2935/3.3160 ms` over five warmups and 20 synchronized profiler-free samples. This is kernel
+  evidence, not an end-to-end serving claim.
+- Compact evidence and a ready maintainer-facing title/body are in
+  `docs/upstream/glm-dsa-pr1-kernels.md`. Exact next is PR 2: a thin TorchAX/vLLM bridge that uses
+  vLLM-owned metadata/IndexShare and consumes the selected positions; do not add registration or CI
+  yet, and do not mutate upstream before the owner's exact-diff audit.
+
 ## 2026-08-27 objective redirected to three private upstream GLM/DSA PRs
 
 - `goal.md` now supersedes the unfinished greenfield Gate-D sequence. Prepare three small stacked
