@@ -42,6 +42,7 @@ def _policy() -> dict:
                 "expected_object_count": 2,
                 "id": "derived",
                 "prefix": "checkpoints/derived/tag/",
+                "preserve_metadata_objects": ["SUCCESS"],
                 "recipe": {
                     "code_hash": CODE_HASH,
                     "dependencies": ["canonical"],

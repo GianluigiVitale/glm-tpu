@@ -166,9 +166,130 @@ def _inspect(args: argparse.Namespace) -> None:
     )
 
 
+def _archive_metadata(args: argparse.Namespace) -> None:
+    policy = _read_json(args.policy)
+    validate_policy(policy)
+    destination = args.destination_prefix
+    if (
+        not destination.startswith(
+            "results/greenfield_checkpoint_reproduction_capsule_"
+        )
+        or not destination.endswith("/")
+        or ".." in destination.split("/")
+    ):
+        raise ReclamationError("metadata archive destination is not protected")
+    client = storage.Client()
+    bucket = _bucket(client)
+    if _list_prefix(client, destination):
+        raise ReclamationError("metadata archive destination is not vacant")
+
+    archived: list[dict[str, Any]] = []
+    for artifact in policy["artifacts"]:
+        if artifact["disposition"] != "delete_now":
+            continue
+        live = {
+            item["name"]: item
+            for item in _list_prefix(client, artifact["prefix"])
+        }
+        if (
+            len(live) != artifact["expected_object_count"]
+            or sum(item["size"] for item in live.values())
+            != artifact["expected_bytes"]
+        ):
+            raise ReclamationError(
+                f"{artifact['id']} drifted before metadata archive"
+            )
+        for relative_name in artifact["preserve_metadata_objects"]:
+            source_name = f"{artifact['prefix']}{relative_name}"
+            source = live.get(source_name)
+            if source is None:
+                raise ReclamationError(
+                    f"metadata archive source is missing: {source_name}"
+                )
+            destination_name = (
+                f"{destination}metadata/{artifact['id']}/{relative_name}"
+            )
+            copied = bucket.copy_blob(
+                bucket.blob(source_name, generation=source["generation"]),
+                bucket,
+                destination_name,
+                source_generation=source["generation"],
+                if_generation_match=0,
+                if_source_generation_match=source["generation"],
+                timeout=300,
+            )
+            copied.reload(timeout=300)
+            destination_identity = _blob_identity(copied)
+            if (
+                destination_identity["size"] != source["size"]
+                or destination_identity["crc32c"] != source["crc32c"]
+            ):
+                raise ReclamationError(
+                    f"archived metadata identity drifted: {source_name}"
+                )
+            archived.append(
+                {
+                    "artifact_id": artifact["id"],
+                    "destination": destination_identity,
+                    "source": source,
+                }
+            )
+    index: dict[str, Any] = {
+        "artifact_kind": "greenfield_checkpoint_reproduction_metadata_archive",
+        "bucket": APPROVED_BUCKET,
+        "created_utc": datetime.now(timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        ),
+        "files": archived,
+        "format_version": 1,
+        "source_bytes": sum(item["source"]["size"] for item in archived),
+        "source_objects": len(archived),
+    }
+    index["archive_sha256"] = _mapping_hash(index, "archive_sha256")
+    raw = json.dumps(index, indent=2, sort_keys=True) + "\n"
+    index_blob = bucket.blob(f"{destination}metadata_index.json")
+    index_blob.upload_from_string(
+        raw,
+        content_type="application/json",
+        if_generation_match=0,
+        timeout=300,
+    )
+    success = {
+        "archive_sha256": index["archive_sha256"],
+        "artifact_kind": "greenfield_checkpoint_reproduction_metadata_success",
+        "metadata_index_generation": int(index_blob.generation),
+        "source_bytes": index["source_bytes"],
+        "source_objects": index["source_objects"],
+    }
+    success["success_sha256"] = _mapping_hash(success, "success_sha256")
+    bucket.blob(f"{destination}SUCCESS").upload_from_string(
+        json.dumps(success, indent=2, sort_keys=True) + "\n",
+        content_type="application/json",
+        if_generation_match=0,
+        timeout=300,
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(raw)
+    print(
+        json.dumps(
+            {
+                "archive_sha256": index["archive_sha256"],
+                "destination": f"gs://{APPROVED_BUCKET}/{destination}",
+                "source_bytes": index["source_bytes"],
+                "source_objects": index["source_objects"],
+            },
+            sort_keys=True,
+        )
+    )
+
+
 def _receipt_hash(receipt: dict[str, Any]) -> str:
-    unhashed = dict(receipt)
-    unhashed.pop("receipt_sha256", None)
+    return _mapping_hash(receipt, "receipt_sha256")
+
+
+def _mapping_hash(value: dict[str, Any], hash_field: str) -> str:
+    unhashed = dict(value)
+    unhashed.pop(hash_field, None)
     raw = json.dumps(
         unhashed,
         allow_nan=False,
@@ -253,6 +374,10 @@ def main() -> None:
     create.add_argument("--output", type=Path, required=True)
     inspect = subparsers.add_parser("inspect")
     inspect.add_argument("--capsule", type=Path, required=True)
+    archive = subparsers.add_parser("archive-metadata")
+    archive.add_argument("--policy", type=Path, required=True)
+    archive.add_argument("--destination-prefix", required=True)
+    archive.add_argument("--output", type=Path, required=True)
     apply = subparsers.add_parser("apply")
     apply.add_argument("--capsule", type=Path, required=True)
     apply.add_argument("--expected-capsule-sha256", required=True)
@@ -263,6 +388,8 @@ def main() -> None:
         _create(args)
     elif args.command == "inspect":
         _inspect(args)
+    elif args.command == "archive-metadata":
+        _archive_metadata(args)
     else:
         _apply(args)
 

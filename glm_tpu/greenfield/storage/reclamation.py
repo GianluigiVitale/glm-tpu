@@ -217,6 +217,22 @@ def build_reproducibility_capsule(
             f"{prefix}{name}" not in names for name in terminal_objects
         ):
             raise ReclamationError(f"{artifact_id} terminal objects are incomplete")
+        preserve_metadata = artifact.get("preserve_metadata_objects", [])
+        if not isinstance(preserve_metadata, list) or any(
+            not isinstance(name, str)
+            or not name
+            or name.startswith("/")
+            or ".." in name.split("/")
+            or f"{prefix}{name}" not in names
+            for name in preserve_metadata
+        ):
+            raise ReclamationError(
+                f"{artifact_id} preserved metadata object set is invalid"
+            )
+        if artifact["disposition"] == "delete_now" and not preserve_metadata:
+            raise ReclamationError(
+                f"{artifact_id} deletion lacks preserved metadata"
+            )
         expected_manifest = artifact.get("expected_manifest_sha256")
         if expected_manifest is not None:
             _digest(

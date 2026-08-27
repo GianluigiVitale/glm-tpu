@@ -25,6 +25,11 @@
       "id": "pp8_packed",
       "manifest_object": "packed_manifest.json",
       "prefix": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "packed_manifest.json"
+      ],
       "recipe": {
         "code_hash": "61475d30a708252bc64aaf50fec2c2ea1ea03c63",
         "dependencies": [
@@ -47,6 +52,12 @@
       "id": "pp8_base_runtime",
       "manifest_object": "runtime_manifest.json",
       "prefix": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "runtime_layout.json",
+        "runtime_manifest.json"
+      ],
       "recipe": {
         "code_hash": "59352022b2843a3dea20f2563b15665b26d8ea8a",
         "dependencies": [
@@ -69,6 +80,12 @@
       "id": "pp8_feature_runtime",
       "manifest_object": "runtime_manifest.json",
       "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "runtime_layout.json",
+        "runtime_manifest.json"
+      ],
       "recipe": {
         "code_hash": "d9a883bfcdab922a1a7767c1ab073877bfe2ce5b",
         "dependencies": [
@@ -92,6 +109,12 @@
       "id": "pp8_qkv_runtime",
       "manifest_object": "runtime_manifest.json",
       "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "runtime_layout.json",
+        "runtime_manifest.json"
+      ],
       "recipe": {
         "code_hash": "7d5dfb9ded22f1f7d66801a9ea63eabaaf36b4b7",
         "dependencies": [
@@ -115,6 +138,12 @@
       "id": "pp8_qkv_dense_runtime",
       "manifest_object": "runtime_manifest.json",
       "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "runtime_layout.json",
+        "runtime_manifest.json"
+      ],
       "recipe": {
         "code_hash": "5dc58b0607173d5aa842b22405cb45c2b334073c",
         "dependencies": [
@@ -138,6 +167,10 @@
       "id": "ws32_runtime",
       "manifest_object": "manifest.json",
       "prefix": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "manifest.json"
+      ],
       "recipe": {
         "code_hash": "382884043a4912fa002f77f5da19da9ddf16d368",
         "dependencies": [
