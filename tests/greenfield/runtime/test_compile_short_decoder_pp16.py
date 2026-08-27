@@ -38,6 +38,7 @@ STATE_HASH = "4" * 64
 REPO = Path(__file__).resolve().parents[3]
 RUNNER = REPO / "scripts/greenfield/run_short_decoder_compile_pp16.sh"
 RECOVERY = REPO / "scripts/greenfield/recover_short_decoder_compile_pp16.py"
+COMPILER = REPO / "scripts/greenfield/compile_short_decoder.py"
 
 
 def _record(rank: int) -> dict[str, object]:
@@ -224,12 +225,33 @@ def test_pp16_compile_acquisition_validator_rejects_jax_process_drift(
         validate_records(tmp_path, CODE_HASH)
 
 
+def test_pp16_compile_acquisition_validator_admits_pallas_linear(
+    tmp_path: Path,
+) -> None:
+    records = [_record(rank) for rank in range(8)]
+    for record in records:
+        record["runtime_kind"] = "pallas_feature_linear"
+        record["linear_backend"] = "pallas"
+        contract = record["hlo_contract"]
+        contract["backend_contract"] = "tpu_v4_pp16_pallas_feature_linear"
+        contract["pallas_stage_linear_contract"] = {"passed": True}
+
+    _write_records(tmp_path, records)
+    summary = validate_records(
+        tmp_path, CODE_HASH, runtime_kind="pallas_feature_linear"
+    )
+
+    assert summary["linear_backend"] == "pallas"
+    assert summary["runtime_kind"] == "pallas_feature_linear"
+
+
 def test_pp16_compile_acquisition_runner_is_small_default_off_and_protected() -> None:
     source = RUNNER.read_text()
 
     assert "GLM_GREENFIELD_PP16_COMPILE_ACQUISITION:-0" in source
     assert "--context-capacity 2048 --warmup 1 --iterations 1 --trace-steps 0" in source
-    assert "--runtime-kind pallas_feature" in source
+    assert "GLM_GREENFIELD_PP16_RUNTIME_KIND:-pallas_feature" in source
+    assert '--runtime-kind ' in source
     assert "--feature-output-tile 128" in source
     assert "--complete-token-path 1 --split-residual-state 1" in source
     assert "--verify-device-roundtrip 0" in source
@@ -380,3 +402,20 @@ def test_pp16_compile_recovery_is_create_only_and_approved_bucket_only() -> None
     ) == ("driftbench-dsv4-uc", "results/recovery/")
     with pytest.raises(ValueError, match="approved results bucket"):
         _parse_results_uri("gs://driftbench-storage/results/recovery")
+
+
+def test_pp16_pallas_linear_lowering_is_explicitly_admitted() -> None:
+    from glm_tpu.greenfield.runtime.decoder import (
+        _FEATURE_DECODER_BACKEND_CONTRACTS,
+        _PALLAS_LINEAR_DECODER_BACKEND_CONTRACTS,
+        _TPU_DECODER_BACKEND_CONTRACTS,
+    )
+
+    contract = "tpu_v4_pp16_pallas_feature_linear"
+    source = COMPILER.read_text()
+
+    assert contract in _TPU_DECODER_BACKEND_CONTRACTS
+    assert contract in _FEATURE_DECODER_BACKEND_CONTRACTS
+    assert contract in _PALLAS_LINEAR_DECODER_BACKEND_CONTRACTS
+    assert '("PP16_LP2", True): "tpu_v4_pp16_pallas_feature_linear"' in source
+    assert "PP16 Pallas-linear lowering is not yet an admitted contract" not in source

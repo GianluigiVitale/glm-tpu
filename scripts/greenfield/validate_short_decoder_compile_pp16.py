@@ -62,7 +62,21 @@ def _memory_rows(record: Mapping[str, Any], rank: int) -> list[dict[str, int]]:
     return result
 
 
-def validate_records(run_dir: Path, code_hash: str) -> dict[str, Any]:
+def validate_records(
+    run_dir: Path,
+    code_hash: str,
+    runtime_kind: str = "pallas_feature",
+) -> dict[str, Any]:
+    if runtime_kind not in ("pallas_feature", "pallas_feature_linear"):
+        raise ValueError("PP16 acquisition runtime kind is unknown")
+    linear_backend = (
+        "pallas" if runtime_kind == "pallas_feature_linear" else "reference"
+    )
+    backend_contract = (
+        "tpu_v4_pp16_pallas_feature_linear"
+        if linear_backend == "pallas"
+        else "tpu_v4_pp16_pallas_feature"
+    )
     paths = sorted((run_dir / "host_records").glob("decoder.rank*.json"))
     _require(len(paths) == 8, "PP16 acquisition requires exactly eight host records")
     records_by_rank: dict[int, dict[str, Any]] = {}
@@ -101,7 +115,7 @@ def validate_records(run_dir: Path, code_hash: str) -> dict[str, Any]:
             "feature_output_tile": 128,
             "feature_reconstruct_down_fp32": False,
             "iterations": 1,
-            "linear_backend": "reference",
+            "linear_backend": linear_backend,
             "main_rope_table_enabled": False,
             "metadata_passed": True,
             "plan_hash": PLAN_HASH,
@@ -111,7 +125,7 @@ def validate_records(run_dir: Path, code_hash: str) -> dict[str, Any]:
             "raw_token_claim": False,
             "residual_transport_bytes_per_stage": 24_576,
             "residual_transport_components": 2,
-            "runtime_kind": "pallas_feature",
+            "runtime_kind": runtime_kind,
             "runtime_layout_hash": RUNTIME_LAYOUT_HASH,
             "runtime_manifest_sha256": RUNTIME_MANIFEST_SHA256,
             "schedule_hash": SCHEDULE_HASH,
@@ -177,7 +191,7 @@ def validate_records(run_dir: Path, code_hash: str) -> dict[str, Any]:
         contract = record.get("hlo_contract")
         _require(isinstance(contract, dict), f"rank {rank} HLO contract missing")
         contract_expected = {
-            "backend_contract": "tpu_v4_pp16_pallas_feature",
+            "backend_contract": backend_contract,
             "complete_token_path": True,
             "feature_fuse_route_weighting": False,
             "feature_output_tile": 128,
@@ -211,6 +225,18 @@ def validate_records(run_dir: Path, code_hash: str) -> dict[str, Any]:
             _require(
                 isinstance(sub, dict) and sub.get("passed") is True,
                 f"rank {rank} HLO subcontract failed: {subfield}",
+            )
+        stage_linear = contract.get("pallas_stage_linear_contract")
+        if linear_backend == "pallas":
+            _require(
+                isinstance(stage_linear, dict)
+                and stage_linear.get("passed") is True,
+                f"rank {rank} Pallas-linear HLO contract failed",
+            )
+        else:
+            _require(
+                stage_linear in ({}, None),
+                f"rank {rank} unexpectedly claims Pallas-linear HLO",
             )
         pallas = contract["pallas_feature_contract"]
         _require(pallas.get("local_parallel_size") == 2, f"rank {rank} Pallas LP drifted")
@@ -324,6 +350,8 @@ def validate_records(run_dir: Path, code_hash: str) -> dict[str, Any]:
         "results_db_run_id": None,
         "runtime_layout_hash": RUNTIME_LAYOUT_HASH,
         "runtime_manifest_sha256": RUNTIME_MANIFEST_SHA256,
+        "runtime_kind": runtime_kind,
+        "linear_backend": linear_backend,
         "schedule_hash": SCHEDULE_HASH,
         "stablehlo_sha256": next(iter(stable_hashes)),
         "state_layout_hash": next(iter(state_layout_hashes)),
@@ -342,12 +370,19 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--code-hash", required=True)
+    parser.add_argument(
+        "--runtime-kind",
+        choices=("pallas_feature", "pallas_feature_linear"),
+        default="pallas_feature",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    summary = validate_records(args.run_dir, args.code_hash)
+    summary = validate_records(
+        args.run_dir, args.code_hash, runtime_kind=args.runtime_kind
+    )
     print(
         "PP16_COMPILE_ACQUISITION_VALID "
         f"hlo={summary['optimized_hlo_sha256']} "

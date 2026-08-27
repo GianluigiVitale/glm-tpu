@@ -83,6 +83,7 @@ _TPU_DECODER_BACKEND_CONTRACTS = frozenset(
         "tpu_v4_pp8_pallas_feature_linear",
         "tpu_v4_pp16_reference",
         "tpu_v4_pp16_pallas_feature",
+        "tpu_v4_pp16_pallas_feature_linear",
     )
 )
 _FEATURE_DECODER_BACKEND_CONTRACTS = frozenset(
@@ -90,6 +91,13 @@ _FEATURE_DECODER_BACKEND_CONTRACTS = frozenset(
         "tpu_v4_pp8_pallas_feature",
         "tpu_v4_pp8_pallas_feature_linear",
         "tpu_v4_pp16_pallas_feature",
+        "tpu_v4_pp16_pallas_feature_linear",
+    )
+)
+_PALLAS_LINEAR_DECODER_BACKEND_CONTRACTS = frozenset(
+    (
+        "tpu_v4_pp8_pallas_feature_linear",
+        "tpu_v4_pp16_pallas_feature_linear",
     )
 )
 LAYER0_RESIDUAL_DISCRIMINATOR_VARIANTS = (
@@ -3852,7 +3860,7 @@ def validate_decoder_step_hlo(
     if dsa_query_backend is None:
         dsa_query_backend = (
             "pallas"
-            if backend_contract == "tpu_v4_pp8_pallas_feature_linear"
+            if backend_contract in _PALLAS_LINEAR_DECODER_BACKEND_CONTRACTS
             else "reference"
         )
     if dsa_query_backend not in ("reference", "pallas"):
@@ -3969,6 +3977,7 @@ def validate_decoder_step_hlo(
             "tpu_v4_pp8_pallas_feature_linear": (8, 4),
             "tpu_v4_pp16_reference": (16, 2),
             "tpu_v4_pp16_pallas_feature": (16, 2),
+            "tpu_v4_pp16_pallas_feature_linear": (16, 2),
         }[backend_contract]
         if (
             (config.stage_count, config.local_parallel_size),
@@ -4236,7 +4245,7 @@ def validate_decoder_step_hlo(
         )
         violations.extend(pallas_feature_contract["violations"])
     pallas_stage_linear_contract: dict[str, Any] = {}
-    if backend_contract == "tpu_v4_pp8_pallas_feature_linear":
+    if backend_contract in _PALLAS_LINEAR_DECODER_BACKEND_CONTRACTS:
         pallas_stage_linear_contract = (
             _validate_pallas_stage_linear_decoder_calls(
                 optimized_hlo,

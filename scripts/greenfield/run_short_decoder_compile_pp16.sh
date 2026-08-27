@@ -18,6 +18,9 @@ readonly SOURCE_RUNTIME_MANIFEST_SHA=b0f624666e921a93e92c625e0e1248aaa9162c45a9b
 readonly RUNTIME_TAG=greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z
 readonly RUNTIME_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/$RUNTIME_TAG
 readonly RUNTIME_MANIFEST_SHA=0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1
+RUNTIME_KIND=${GLM_GREENFIELD_PP16_RUNTIME_KIND:-pallas_feature}
+[[ $RUNTIME_KIND == pallas_feature || $RUNTIME_KIND == pallas_feature_linear ]]
+readonly RUNTIME_KIND
 
 cd "$WORKTREE"
 [[ ${GLM_GREENFIELD_PP16_COMPILE_ACQUISITION:-0} == 1 ]] || {
@@ -93,7 +96,7 @@ on_exit() {
 }
 trap on_exit EXIT
 
-say "PIN=$PIN TAG=$TAG profile=2K warmup=1 iterations=1 trace=0"
+say "PIN=$PIN TAG=$TAG profile=2K runtime=$RUNTIME_KIND warmup=1 iterations=1 trace=0"
 [[ $(git ls-remote "$ORIGIN" "refs/heads/$BRANCH" | awk '{print $1}') == "$PIN" ]]
 [[ $(gcloud storage buckets describe "$APPROVED_BUCKET" --format='value(location)') == "$APPROVED_LOCATION" ]]
 [[ $(gcloud compute tpus tpu-vm describe "$POD" --zone "$ZONE" --format='value(state,health)') == $'READY\tHEALTHY' ]]
@@ -105,12 +108,13 @@ gcloud storage objects list "$REMOTE_PREFIX/**" --format='value(name)' \
   "$SOURCE_ROOT/packed_manifest.json" "$SOURCE_MANIFEST_SHA" \
   "$SOURCE_RUNTIME_ROOT/runtime_manifest.json" "$SOURCE_RUNTIME_MANIFEST_SHA" \
   "$RUNTIME_ROOT/runtime_manifest.json" "$RUNTIME_MANIFEST_SHA" \
-  "$RUN_DIR/preflight.json" "$PIN" "$TAG" "$REMOTE_PREFIX" <<'PY'
+  "$RUN_DIR/preflight.json" "$PIN" "$TAG" "$REMOTE_PREFIX" \
+  "$RUNTIME_KIND" <<'PY'
 import json
 from pathlib import Path
 import sys
 
-source_path, source_sha, base_path, base_sha, feature_path, feature_sha, output, pin, tag, remote = sys.argv[1:]
+source_path, source_sha, base_path, base_sha, feature_path, feature_sha, output, pin, tag, remote, runtime_kind = sys.argv[1:]
 for path, expected in ((source_path, source_sha), (base_path, base_sha), (feature_path, feature_sha)):
     value = json.loads(Path(path).read_text())
     if value.get("manifest_sha256") != expected:
@@ -133,6 +137,7 @@ record = {
     "remote_prefix": remote,
     "run_tag": tag,
     "runtime_manifest_sha256": feature_sha,
+    "runtime_kind": runtime_kind,
     "source_packed_manifest_sha256": source_sha,
     "source_runtime_manifest_sha256": base_sha,
     "split_residual_state": True,
@@ -166,7 +171,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching one complete PP16 2K compile and diagnostic execution coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { [[ -f "$log" ]] && gcloud storage cp --no-clobber "$log" "$remote/host_logs/" >/dev/null 2>&1 || true; [[ -f "$output" ]] && gcloud storage cp --no-clobber "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind pallas_feature --verify-device-roundtrip 0 --feature-source-metadata-only 1 --feature-output-tile 128 --feature-fuse-route-weighting 0 --feature-reconstruct-down-fp32 0 --complete-token-path 1 --split-residual-state 1 --prefill-index-repair 0 --dsa-query-exact-association 0 --dsa-head-key-exact-association 0 --dsa-score-default-precision 0 --main-rope-table 0 --pregathered-b512-attention 0 --strategy-nd-attention-projection 0 --dense-final-layout-convolution 0 --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup 1 --iterations 1 --trace-steps 0 --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; mkdir -p "$run/hlo"; output="$run/decoder.rank${idx}.json"; log="$run/decoder.rank${idx}.log"; upload() { [[ -f "$log" ]] && gcloud storage cp --no-clobber "$log" "$remote/host_logs/" >/dev/null 2>&1 || true; [[ -f "$output" ]] && gcloud storage cp --no-clobber "$output" "$remote/host_records/" >/dev/null 2>&1 || true; if compgen -G "$run/hlo/*" >/dev/null; then gcloud storage cp --no-clobber "$run"/hlo/* "$remote/hlo/" >/dev/null 2>&1 || true; fi; }; trap upload EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 10800 /home/gianl/vllm-env/bin/python -u scripts/greenfield/compile_short_decoder.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --expected-code-hash '"$PIN"' --runtime-kind '"$RUNTIME_KIND"' --verify-device-roundtrip 0 --feature-source-metadata-only 1 --feature-output-tile 128 --feature-fuse-route-weighting 0 --feature-reconstruct-down-fp32 0 --complete-token-path 1 --split-residual-state 1 --prefill-index-repair 0 --dsa-query-exact-association 0 --dsa-head-key-exact-association 0 --dsa-score-default-precision 0 --main-rope-table 0 --pregathered-b512-attention 0 --strategy-nd-attention-projection 0 --dense-final-layout-convolution 0 --runtime-root '"$RUNTIME_ROOT"' --runtime-manifest-sha256 '"$RUNTIME_MANIFEST_SHA"' --source-runtime-root '"$SOURCE_RUNTIME_ROOT"' --source-runtime-manifest-sha256 '"$SOURCE_RUNTIME_MANIFEST_SHA"' --source-checkpoint-root '"$SOURCE_ROOT"' --source-packed-manifest-sha256 '"$SOURCE_MANIFEST_SHA"' --context-capacity 2048 --warmup 1 --iterations 1 --trace-steps 0 --output "$output" >"$log" 2>&1; trap - EXIT; upload; echo "DECODER_HOST_OK $(hostname) rank=$idx"'
 execute_status=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/execute.txt" 2>&1 || execute_status=$?
@@ -194,7 +199,7 @@ post_census_done=1
 say "validating full-graph PP16 locality, one-row shapes, load identity and 32-chip HBM"
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   scripts/greenfield/validate_short_decoder_compile_pp16.py \
-  --run-dir "$RUN_DIR" --code-hash "$PIN"
+  --run-dir "$RUN_DIR" --code-hash "$PIN" --runtime-kind "$RUNTIME_KIND"
 
 cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 (
