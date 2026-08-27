@@ -66,6 +66,11 @@ def test_pallas_pack_wrappers_admit_pp16_only_in_approved_region() -> None:
         runner_source
     )
     assert "greenfield_topology_20260826T194116460015528Z" in runner_source
+    assert "GLM_GREENFIELD_PP16_REAL_LAYER_STAGE_ID" in runner_source
+    assert "fresh host capture does not own exactly two PP16 stages" in (
+        runner_source
+    )
+    assert "--stage-id 10" not in runner_source
     assert "US-CENTRAL2" in runner_source
     assert "driftbench-storage" not in runner_source
     subprocess.run(["bash", "-n", str(runner)], check=True)

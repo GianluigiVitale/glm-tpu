@@ -64,7 +64,28 @@ case "$PLAN_ID" in
     # subcube and place the executable/arrays only on adjacent devices 0,1.
     TPU_BOUNDS=2,2,1
     TPU_VISIBLE=0,1,2,3
-    STAGE_ARGS=(--stage-id 10)
+    PP16_STAGE_ID=${GLM_GREENFIELD_PP16_REAL_LAYER_STAGE_ID:-$(
+      /home/gianl/vllm-env/bin/python - "$TOPOLOGY_CAPTURE" <<'PY'
+import json
+import sys
+
+capture = json.load(open(sys.argv[1]))
+process_index = capture["jax_process_index"]
+stages = [
+    int(group["stage_id"])
+    for group in capture["contract"]["pp16_lp2"]["groups"]
+    if int(group["process_index"]) == int(process_index)
+]
+if len(stages) != 2:
+    raise SystemExit("fresh host capture does not own exactly two PP16 stages")
+print(min(stages))
+PY
+    )}
+    [[ $PP16_STAGE_ID =~ ^[0-9]+$ ]] || {
+      echo "invalid fresh-topology PP16 stage: $PP16_STAGE_ID" >&2
+      exit 2
+    }
+    STAGE_ARGS=(--stage-id "$PP16_STAGE_ID")
     EXPECTED_TRACE_CORES=4
     ;;
   *)
@@ -255,6 +276,7 @@ say "KERNEL=$KERNEL"
 say "FEATURE_OUTPUT_TILE=$FEATURE_OUTPUT_TILE"
 say "FEATURE_FUSE_ROUTE_WEIGHTING=$FEATURE_FUSE_ROUTE_WEIGHTING"
 say "FEATURE_RECONSTRUCT_DOWN_FP32=$FEATURE_RECONSTRUCT_DOWN_FP32"
+say "STAGE_ARGS=${STAGE_ARGS[*]:-none}"
 say "SOURCE_REVISION=$SOURCE_REVISION"
 say "warmup=$WARMUP iterations=$ITERATIONS trace_steps=20"
 strict_census pre || {
