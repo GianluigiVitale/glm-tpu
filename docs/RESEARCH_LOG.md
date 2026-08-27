@@ -5,6 +5,32 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 — PP16 real feature-MoE executes exactly with only an LP2 combine
+
+The smallest protected current-pod discriminator now passes as DB558 / tag
+`greenfield_real_layer_pp16_pallas_feature_20260827T085802120143668Z` at pushed and same-region
+mirrored code `825b2ab`. It consumes the sealed 9,710,087,168-byte two-owner feature derivative
+`31916b5b...cf04`, whose Pallas source is `6df1610a...8de6`, and directly loads current-topology
+stage 9. Normal and concentrated route indices are exact; both output checks pass with maximum
+absolute error `0.03125`, below the declared `0.125` bound.
+
+Optimized HLO `82ff1641...91d0` contains three exact `I=1024` feature-Pallas kernels and exactly
+one `bf16[2,1,6144]` all-reduce over `{{0,1}}`; maximum group size is two and the structural linter
+has no violations. The fresh XPlane independently records one physical `psum` per step at
+`0.012930308 ms`. After 200 warmups, 1,000 profiler-free synchronized iterations produce
+normal p50/p99 `3.873275/3.944720 ms` and concentrated p50/p99 `3.866075/3.905451 ms`. Peak HBM is
+`4,856,473,088` bytes per active chip against `33,014,413,312`. Direct loading reports zero host or
+device FP8 dequantizations, host-global concatenations and runtime routed transposes.
+
+DB558, its snapshot, all 13 archived objects and the terminal marker are integral and byte-equal in
+`driftbench-dsv4-uc` (`US-CENTRAL2`); both eight-host censuses are clean. The first nonterminal run
+stopped in seconds because a stale fixed stage did not belong to the replacement worker. The
+second compiled, then exposed that TPU's four async VMEM layout slices are independent of LP2
+stage width; the corrected linter validates that preserved HLO offline and in the passing rerun.
+Neither failure has DB/SUCCESS standing. This proves the PP16 real-layer mechanism only. Next
+acquire and lint the complete PP16 short decoder before any numerical 8K run; do not infer token
+latency from the one-layer p50.
+
 ## 2026-08-27 — PP16 runtime derivative is plan-generic and fail-closed on stage selection
 
 Commits `589d9ef` and `5838ef6` adapt the existing PP8 executable-runtime chain rather than

@@ -2,6 +2,31 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 protected PP16 feature-MoE derivative passes as DB558
+
+- Protected tag `greenfield_real_layer_pp16_pallas_feature_20260827T085802120143668Z` at pushed,
+  same-region-mirrored code `825b2ab` directly loads the exact two-owner layer-3 derivative and
+  executes the production `PP16_LP2` feature-Pallas MoE. Normal and concentrated routing indices
+  are exact; both bounded BF16 output checks pass with maximum absolute error `0.03125`.
+- Optimized-HLO SHA is `82ff1641...91d0`. It has exactly one repeated collective: one
+  `bf16[2,1,6144]` all-reduce over `{{0,1}}`, maximum group size two. XPlane independently sees
+  one physical `psum` per step at `0.012930308 ms`; there is no full-pod hidden reconstruction.
+  Three `I=1024` Pallas kernels are present and the HLO contract has no violations.
+- After 200 warmups, 1,000 profiler-free synchronized iterations give normal p50/p99
+  `3.873275/3.944720 ms` and concentrated p50/p99 `3.866075/3.905451 ms`. This is one real sparse
+  layer, not decoder latency or tok/s. Maximum measured peak HBM is `4,856,473,088` bytes on each
+  active chip against `33,014,413,312`; direct load performs zero FP8 dequantization, host-global
+  concatenation or runtime weight transpose.
+- DB558 and its snapshot pass integrity; all 13 local/remote objects are byte-identical in the
+  exact `US-CENTRAL2` bucket, and pre/post eight-host censuses are clean. The sealed feature
+  manifest is `31916b5b...cf04`, derived from Pallas manifest `6df1610a...8de6` and oracle
+  `c63ffa19...ebff`. Two earlier nonterminal attempts correctly exposed stale stage selection and
+  an LP2-versus-layout-tiling linter bug; neither has DB/SUCCESS standing.
+- This supersedes the stale CPU-only status immediately below and completes the bounded PP16
+  real-layer derivative, not Gate D. Exact next is the smallest complete PP16 short-decoder
+  compile/HLO/HBM acquisition. Do not start an 8K numerical run until all complete-graph contracts
+  pass; do not repack the already sealed 757-GB base checkpoint blindly.
+
 ## 2026-08-27 PP16 runtime-derivative path is CPU-ready, not yet packed
 
 - Pushed and same-region-mirrored commits `589d9ef` plus export correction `5838ef6` adapt the
