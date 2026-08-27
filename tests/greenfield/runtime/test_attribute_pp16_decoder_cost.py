@@ -99,6 +99,7 @@ def _inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
 def test_offline_attribution_selects_moe_discriminator(tmp_path: Path) -> None:
     summary, hlo, db = _inputs(tmp_path)
     report = attribute(
+        generator_git="test-git",
         summary_path=summary,
         hlo_contract_path=hlo,
         results_db=db,
@@ -138,6 +139,8 @@ def test_offline_attribution_selects_moe_discriminator(tmp_path: Path) -> None:
     assert "isolates only the output tile" in report["next_discriminator"]["reason"]
     assert report["performance_claim"] is False
     assert report["model_workload_rerun"] is False
+    assert report["generator_git"] == "test-git"
+    assert len(report["generator_script_sha256"]) == 64
 
 
 def test_offline_attribution_rejects_nonterminal_summary(tmp_path: Path) -> None:
@@ -147,6 +150,7 @@ def test_offline_attribution_rejects_nonterminal_summary(tmp_path: Path) -> None
     summary.write_text(json.dumps(value))
     with pytest.raises(ValueError, match="diagnostic identity"):
         attribute(
+            generator_git="test-git",
             summary_path=summary,
             hlo_contract_path=hlo,
             results_db=db,

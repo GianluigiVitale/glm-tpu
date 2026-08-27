@@ -48,6 +48,7 @@ def _one_item(
 
 def attribute(
     *,
+    generator_git: str,
     summary_path: Path,
     hlo_contract_path: Path,
     results_db: Path,
@@ -131,6 +132,8 @@ def attribute(
         "artifact_kind": "greenfield_pp16_decoder_offline_cost_attribution",
         "diagnostic_only": True,
         "gate_d_passed": False,
+        "generator_git": generator_git,
+        "generator_script_sha256": _sha256(Path(__file__)),
         "hlo_contract_sha256": _sha256(hlo_contract_path),
         "model_workload_rerun": False,
         "numerical_claim": False,
@@ -202,6 +205,7 @@ def attribute(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--generator-git", required=True)
     parser.add_argument("--summary", type=Path, required=True)
     parser.add_argument("--hlo-contract", type=Path, required=True)
     parser.add_argument("--results-db", type=Path, required=True)
@@ -218,6 +222,7 @@ def main() -> int:
     if args.output.exists():
         raise FileExistsError(f"attribution output is append-only: {args.output}")
     report = attribute(
+        generator_git=args.generator_git,
         summary_path=args.summary,
         hlo_contract_path=args.hlo_contract,
         results_db=args.results_db,
