@@ -74,6 +74,15 @@ hosts. Numerical summary/SUCCESS file SHAs are `bf7a837c...965` / `63f70dff...2c
 46 preterminal CRC/generation-ledger objects, HBM and 8/8 cleanup pass. This is exactness/locality
 evidence with no DB/latency claim; it authorizes production integration but does not close Gate D.
 
+Complete dense-overlay tag
+`greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z` at `7844f2e` extends
+that proven ownership to layers 0--2: 96 exact final owners, 2,102,200,128 bytes, manifest
+`a8dc8791...4b6a` (`c17194b6...5c8c` file), SUCCESS file `166566b9...32a6`, and preterminal
+ledger self/file `8f6f9ccf...a2d6` / `694e9af5...f10d`. The terminal approved-bucket set has 99
+objects and direct verifier replay passes. Pushed production pins `7191206` / `1c1cb1f` consume
+this as a default-off typed overlay and require exactly three feature-4 plus three expert-8 dense
+gathers. This is checkpoint/composition evidence; full-decoder HLO and numerical proof are pending.
+
 Bounded checkpoint tag
 `greenfield_ws32_strategy_nd_layer0_pack_20260826T232037240198985Z` at pushed/mirrored code
 `fbaaae3` maps layer-0 dense ranks into 32 exact WS32 expert-8/feature-4 owners. Payload is

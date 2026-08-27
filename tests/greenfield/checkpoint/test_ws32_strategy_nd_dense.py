@@ -33,10 +33,10 @@ def _sha(path: Path) -> str:
 
 def _write_overlay(root: Path, *, replica_drift: bool = False) -> tuple[str, str, str]:
     contracts = (
-        ((4, 6144, 768), "U8"),
-        ((4, 48, 768), "F32"),
-        ((4, 384, 1536), "U8"),
-        ((4, 3, 1536), "F32"),
+        ((4, 6144, 768), "U8", 1),
+        ((4, 48, 768), "F32", 4),
+        ((4, 384, 1536), "U8", 1),
+        ((4, 3, 1536), "F32", 4),
     )
     files = []
     for layer in range(3):
@@ -44,14 +44,14 @@ def _write_overlay(root: Path, *, replica_drift: bool = False) -> tuple[str, str
         for expert in range(8):
             for feature in range(4):
                 tensors = {}
-                for index, (name, (shape, dtype)) in enumerate(
+                for index, (name, (shape, dtype, itemsize)) in enumerate(
                     zip(names, contracts, strict=True)
                 ):
                     replica_feature = (
                         feature if replica_drift and index == 0 else 0
                     )
                     tensors[name] = {
-                        "byte_count": 1,
+                        "byte_count": int(np.prod(shape)) * itemsize,
                         "dtype": dtype,
                         "sha256": sha256(
                             f"{layer}:{expert}:{replica_feature}:{index}".encode()
@@ -60,7 +60,9 @@ def _write_overlay(root: Path, *, replica_drift: bool = False) -> tuple[str, str
                     }
                 files.append(
                     {
-                        "byte_count": 1,
+                        "byte_count": sum(
+                            item["byte_count"] for item in tensors.values()
+                        ),
                         "expert_coordinate": expert,
                         "feature_coordinate": feature,
                         "filename": (
@@ -82,8 +84,12 @@ def _write_overlay(root: Path, *, replica_drift: bool = False) -> tuple[str, str
         "file_count": 96,
         "files": files,
         "format_version": 1,
+        "model_id": "zai-org/GLM-5.2-FP8",
         "plan_id": "WS32_2D",
-        "total_bytes": 96,
+        "source_dense_projection_layout": (
+            "virtual_tp32_dense_convolution_in_out_v1"
+        ),
+        "total_bytes": sum(item["byte_count"] for item in files),
     }
     manifest["manifest_sha256"] = sha256(_canonical(manifest)).hexdigest()
     root.mkdir()
@@ -94,6 +100,7 @@ def _write_overlay(root: Path, *, replica_drift: bool = False) -> tuple[str, str
     )
     success = {
         "artifact_kind": "greenfield_ws32_strategy_nd_dense_overlay_success",
+        "manifest_file_sha256": _sha(manifest_path),
         "manifest_sha256": manifest["manifest_sha256"],
     }
     success["success_sha256"] = sha256(_canonical(success)).hexdigest()

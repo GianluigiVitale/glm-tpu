@@ -5,6 +5,30 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 — all three exact dense layers have final WS32 owners
+
+The default-off decoder now accepts a distinct `Ws32StrategyNdDenseWeights` tree only under exact
+GLM-5.2 geometry. Its checkpoint specifications preserve four ordered legacy-rank shards per
+expert owner, replicate merged gate/up only over feature-4, shard dense down over feature-4, and
+select the already protected generation/tree kernel. The production HLO validator admits the
+otherwise forbidden group-4 full-hidden gather only in the exact named dense scope and requires
+three exact feature-4/expert-8 pairs. A missing, extra, renamed, wrong-shaped, or default-on pair
+fails. This is production composition readiness, not complete-decoder HLO evidence.
+
+Tag `greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z` at `7844f2e`
+derives layers 0--2 from sealed PP8 virtual-rank slots and writes 96 direct WS32 owner files. The
+manifest is `a8dc8791...4b6a` (`c17194b6...5c8c` file), SUCCESS file is
+`166566b9...32a6`, payload is 2,102,200,128 bytes, and all model ranks 0--31 occur once per
+layer/feature owner group. The preterminal generation/CRC ledger covers manifest plus 96 payloads
+and has self/file SHAs `8f6f9ccf...a2d6` / `694e9af5...f10d`; remote terminal cardinality is 99.
+Direct verifier replay passes and the bucket API reports `US-CENTRAL2`.
+
+Observability prevented wasted work: the first local-only attempt had read 41 GB without creating
+an output because the initial implementation rehashed four complete ~24.5-GiB source files. It was
+interrupted before publication. The source artifact is already terminal-sealed and selected tensor
+hashes are independently checked, so the redundant 98-GiB pass was removed at `7844f2e`; the retry
+packed in 11 seconds. No TPU, DB, timing, or Gate-D claim follows.
+
 ## 2026-08-26 — real layer-0 generation and local combine are bitwise exact
 
 The identical-code acquisition/numerical pair

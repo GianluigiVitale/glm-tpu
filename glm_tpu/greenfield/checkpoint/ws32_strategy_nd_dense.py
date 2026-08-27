@@ -135,6 +135,10 @@ def verify_ws32_strategy_nd_dense_overlay(
         success.get("success_sha256")
         != sha256(_canonical(without_success)).hexdigest()
         or success.get("manifest_sha256") != expected_manifest_sha256
+        or success.get("manifest_file_sha256")
+        != expected_manifest_file_sha256
+        or success.get("artifact_kind")
+        != "greenfield_ws32_strategy_nd_dense_overlay_success"
     ):
         raise CheckpointValidationError(
             "WS32 StrategyND dense overlay SUCCESS drifted"
@@ -147,6 +151,11 @@ def verify_ws32_strategy_nd_dense_overlay(
         or manifest.get("dense_layer_ids") != [0, 1, 2]
         or manifest.get("file_count") != 96
         or len(manifest.get("files", ())) != 96
+        or manifest.get("model_id") != "zai-org/GLM-5.2-FP8"
+        or manifest.get("source_dense_projection_layout")
+        != "virtual_tp32_dense_convolution_in_out_v1"
+        or not isinstance(manifest.get("code_hash"), str)
+        or len(manifest["code_hash"]) != 40
     ):
         raise CheckpointValidationError(
             "WS32 StrategyND dense overlay contract drifted"
@@ -169,7 +178,26 @@ def verify_ws32_strategy_nd_dense_overlay(
         raise CheckpointValidationError(
             "WS32 StrategyND dense overlay owner coverage drifted"
         )
-    for (layer, expert, _), record in records.items():
+    if manifest.get("total_bytes") != sum(
+        int(record.get("byte_count", -1)) for record in records.values()
+    ):
+        raise CheckpointValidationError(
+            "WS32 StrategyND dense overlay byte total drifted"
+        )
+    for (layer, expert, feature), record in records.items():
+        expected_filename = (
+            f"layer_{layer:02d}/expert_{expert:02d}/"
+            f"feature_{feature:02d}.safetensors"
+        )
+        if (
+            record.get("filename") != expected_filename
+            or type(record.get("byte_count")) is not int
+            or record["byte_count"] <= 0
+        ):
+            raise CheckpointValidationError(
+                "WS32 StrategyND dense overlay file record drifted"
+            )
+        _require_digest(record.get("sha256", ""), field="file sha256")
         if record.get("model_ranks") != list(range(expert * 4, expert * 4 + 4)):
             raise CheckpointValidationError(
                 "WS32 StrategyND dense overlay rank ownership drifted"
@@ -185,10 +213,18 @@ def verify_ws32_strategy_nd_dense_overlay(
             expected_dtype = "U8" if dtype == np.dtype(np.uint8) else "F32"
             if tensor.get("shape") != list(shape) or (
                 tensor.get("dtype") != expected_dtype
-            ):
+            ) or tensor.get("byte_count") != int(np.prod(shape)) * dtype.itemsize:
                 raise CheckpointValidationError(
                     "WS32 StrategyND dense overlay tensor geometry drifted"
                 )
+            try:
+                _require_digest(
+                    tensor.get("sha256", ""), field="tensor sha256"
+                )
+            except CheckpointValidationError as error:
+                raise CheckpointValidationError(
+                    "WS32 StrategyND dense overlay tensor digest drifted"
+                ) from error
     for layer in range(3):
         for expert in range(8):
             group = [records[(layer, expert, feature)] for feature in range(4)]

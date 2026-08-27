@@ -1,6 +1,28 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-26 UTC
+**Updated:** 2026-08-27 UTC
+
+## 2026-08-27 complete exact-dense WS32 overlay is sealed
+
+- Pushed pins `7191206` / `1c1cb1f` compose the proven dense arithmetic into the
+  default-off decoder and add a direct final-owner overlay loader. The complete HLO contract now
+  requires exactly three BF16 feature-4 hidden gathers and three expert-8 partial gathers, with
+  exact shapes/scopes/groups and no other full-hidden exception. Focused layout/manifest/HLO
+  mutation tests pass; the protected decoder has not compiled or executed this path yet.
+- Offline pack tag
+  `greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z` at pushed code
+  `7844f2e` seals all dense layers 0--2 into 96 exact WS32 owners. Payload is 2,102,200,128 bytes;
+  manifest self/file SHAs are `a8dc8791...4b6a` / `c17194b6...5c8c`, and terminal SUCCESS file SHA
+  is `166566b9...32a6`. The 97-object preterminal ledger has self/file SHAs
+  `8f6f9ccf...a2d6` / `694e9af5...f10d`; the terminal remote set is exactly 99 objects in
+  `US-CENTRAL2`.
+- A first local-only attempt was interrupted before writing payload or remote objects after
+  observability exposed an unnecessary 98-GiB whole-source rehash. Pin `7844f2e` removes that pass
+  while retaining sealed manifest/SUCCESS identity plus every selected tensor hash. The successful
+  pack then completed local materialization in 11 seconds. This is checkpoint evidence only.
+- Exact next is a fresh local Sol-level audit of the current code/evidence, then one protected
+  compile-only 8K acquisition with the overlay pinned. Numerical execution remains forbidden until
+  all six active full-graph HLO identities and the strengthened structural contract pass.
 
 ## 2026-08-26 bounded real WS32 layer-0 dense proof passes
 
