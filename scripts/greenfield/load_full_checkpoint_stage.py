@@ -153,6 +153,8 @@ def main() -> int:
     import jax
 
     local_devices = tuple(jax.local_devices())
+    # libtpu requires the complete four-chip host subcube even when PP16
+    # places the loaded arrays only on its adjacent two-chip stage.
     if (
         jax.default_backend() != "tpu"
         or jax.process_count() != 1
@@ -170,7 +172,7 @@ def main() -> int:
         raise ValueError(f"invalid TPU_VISIBLE_DEVICES={visible_raw!r}") from error
     if visible != (0, 1, 2, 3):
         raise RuntimeError(
-            "protected PP8 load requires exact visible local devices 0,1,2,3"
+            "protected stage load requires exact visible local devices 0,1,2,3"
         )
     resolution = resolve_stage_devices(
         local_devices,
@@ -188,8 +190,10 @@ def main() -> int:
         key=lambda item: item.device_slot,
     )
     planned_payload_by_slot = [plan.payload_bytes for plan in selected]
-    if len(planned_payload_by_slot) != 4:
-        raise RuntimeError("resolved stage does not have four base owner files")
+    if len(planned_payload_by_slot) != expectation.stage_size:
+        raise RuntimeError(
+            "resolved stage does not have its exact base owner file count"
+        )
     memory_policy = checkpoint.layout["plan_manifest"]["memory_policy"]
     hbm_limit = int(memory_policy["hbm_limit_bytes"])
     load_started = time.perf_counter()

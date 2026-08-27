@@ -8,6 +8,7 @@ import subprocess
 from safetensors import safe_open
 
 from scripts.greenfield.pack_checkpoint_probe import pack_probe
+from scripts.greenfield.load_checkpoint_probe import verify_probe_artifact
 from tests.greenfield.checkpoint.test_stream_pack import fixture
 
 
@@ -57,6 +58,15 @@ def test_checkpoint_probe_derives_small_complete_owner_files(
             assert handle.keys() == ["model.layers.0.synthetic.weight"]
     evidence = (output / "evidence.sha256").read_text().splitlines()
     assert len(evidence) == 6
+    verified_layout, verified_manifest, plans, by_filename = verify_probe_artifact(
+        checkpoint_root=output,
+        layout_path=layout_path,
+        expected_manifest_sha256=manifest["manifest_sha256"],
+    )
+    assert verified_layout["manifest_sha256"] == layout["manifest_sha256"]
+    assert verified_manifest == manifest
+    assert len(plans) == 4
+    assert set(by_filename) == {plan.filename for plan in plans}
 
 
 def test_pp16_probe_wrapper_is_bounded_same_region_and_terminal_last() -> None:
@@ -90,5 +100,31 @@ def test_pp16_probe_wrapper_is_bounded_same_region_and_terminal_last() -> None:
         text=True,
         capture_output=True,
         check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_pp16_probe_load_wrapper_has_census_db_hbm_and_terminal_contract() -> None:
+    wrapper = REPO / "scripts/greenfield/run_checkpoint_probe_load_pp16.sh"
+    source = wrapper.read_text()
+    for required in (
+        "GLM_GREENFIELD_PP16_CHECKPOINT_PROBE_LOAD",
+        ".glm_pod_workload.lock",
+        ".glm-tpu-rsync.lock",
+        "strict_census pre",
+        "strict_census post",
+        "TPU_VISIBLE_DEVICES=0,1,2,3",
+        "load_checkpoint_probe.py",
+        "device_roundtrip_bytes",
+        "maximum_peak_hbm_bytes",
+        "greenfield_checkpoint_probe_load_pp16",
+        "results_ckpt.db",
+        "remote_objects.json",
+        '"$REMOTE_PREFIX/SUCCESS"',
+        "performance_claim':False",
+    ):
+        assert required in source
+    completed = subprocess.run(
+        ["bash", "-n", str(wrapper)], text=True, capture_output=True, check=False
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
