@@ -56,6 +56,8 @@ def test_pallas_pack_wrappers_admit_pp16_only_in_approved_region() -> None:
         assert "PP16_LP2" in source
         assert "US-CENTRAL2" in source
         assert "driftbench-storage" not in source
+        assert 'value.get("crc32c")' in source
+        assert "crc32c_hash" not in source
         subprocess.run(["bash", "-n", str(path)], check=True)
     runner = REPO / "scripts/greenfield/run_real_one_layer_pp8.sh"
     runner_source = runner.read_text()

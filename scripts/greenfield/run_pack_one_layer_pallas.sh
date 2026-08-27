@@ -198,11 +198,11 @@ for name, expected_size in objects:
     if (
         int(value["size"]) != int(expected_size)
         or not value.get("generation")
-        or not value.get("crc32c_hash")
+        or not value.get("crc32c")
     ):
         raise SystemExit(f"remote identity drift for {name}")
     records.append({
-        "crc32c": value["crc32c_hash"],
+        "crc32c": value["crc32c"],
         "generation": value["generation"],
         "name": name,
         "size": int(value["size"]),

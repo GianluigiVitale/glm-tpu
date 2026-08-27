@@ -170,10 +170,10 @@ for name, expected_size in objects:
         check=True, capture_output=True, text=True,
     )
     value = json.loads(completed.stdout)
-    if int(value["size"]) != int(expected_size) or not value.get("generation") or not value.get("crc32c_hash"):
+    if int(value["size"]) != int(expected_size) or not value.get("generation") or not value.get("crc32c"):
         raise SystemExit(f"remote feature identity drift for {name}")
     records.append({
-        "crc32c": value["crc32c_hash"], "generation": value["generation"],
+        "crc32c": value["crc32c"], "generation": value["generation"],
         "name": name, "size": int(value["size"]),
     })
 print(json.dumps({"objects": records}, indent=2, sort_keys=True))
