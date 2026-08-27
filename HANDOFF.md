@@ -2,6 +2,25 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 objective redirected to three private upstream GLM/DSA PRs
+
+- `goal.md` now supersedes the unfinished greenfield Gate-D sequence. Prepare three small stacked
+  PRs for `vllm-project/tpu-inference`: standalone TPU DSA+sparse-MLA kernels, thin TorchAX/vLLM
+  wiring, then focused IndexShare/model regressions and CI. Never push or open anything upstream
+  before owner audit. Never use Fable/Opus; reserve at most one Sol review for the final diff.
+- The 2,206-line research dossier was read in full. Current official TPU Inference main is
+  `5e2c7128...a3cb`; its vLLM LKG is `d626108b...e4b`. Current vLLM already owns GLM registration,
+  model semantics, FP8 loading and IndexShare. Do not revive the old constructor monkeypatch or
+  blanket DSA-disable path.
+- The untouched exact pins reproduce the real blocker on `db-v4-64-od` without weights:
+  `TpuPlatform tpu XLA`, followed by `SparseAttnIndexer`'s CUDA/ROCm/XPU-only
+  `NotImplementedError`. The serialized run took under 30 seconds and pre/post fleet censuses are
+  8/8 clean. Compact evidence is in `docs/upstream/glm-dsa-current-main-baseline.md`.
+- Exact next: compare the recovered exact BF16 kernel and current DeepSeek-v4 paged-FP8 kernel
+  against the vLLM V3.2/GLM FP8+FP32-scale cache contract, then implement the smallest current-main
+  PR1 that returns exact selected positions to a real sparse MLA consumer. Require 2047/2048/2049
+  boundary coverage before longer-context tests.
+
 ## 2026-08-27 current-code PP8 2K Gate D passes; pipeline transport dominates
 
 - Protected source tag `greenfield_short_decoder_compile_pp8_2k_pallas_feature_linear_ot256_`
