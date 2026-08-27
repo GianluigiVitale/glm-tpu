@@ -2,6 +2,27 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 complete PP16 base runtime checkpoint is terminal-sealed
+
+- Tag `greenfield_runtime_pack_pp16_20260827T091323450875229Z` at pushed/mirrored code `af0e226`
+  transforms the complete DB557-proven PP16 base owners into the exact executable-runtime layout.
+  All 16 stages / 32 files completed once across eight hosts. Runtime manifest SHA is
+  `b0f62466...4d2e5`; layout/schedule SHAs are `2ad20708...3d59b` / `65c31dfc...46987e`.
+- The artifact reconciles 747,097,191,552 source bytes to 869,545,347,072 runtime payload bytes,
+  869,546,107,136 file bytes and 122,448,155,520 explicit padding bytes. Each chip owns exactly
+  27,173,292,096 payload bytes. The independent mounted inspector passes all 32 files and 6,944
+  tensor records against source manifest `13ad2e92...fedb5`.
+- The result archive has 107 immutable objects. Remote ledger SHA is `e06f3e1f...0befd`; terminal
+  SUCCESS self SHA is `d1812196...fc83`, with `SUCCESS` written last in the approved
+  `US-CENTRAL2` bucket. Pre/probe-post/final censuses are each 8/8 clean.
+- The 26-second metadata pass and one-stage probe preceded the 14-minute distributed pack. Three
+  recorded wrapper-only corrections caused no model/TPU failure and no payload rerun. This is
+  checkpoint layout/integrity evidence only: no TPU, HBM, decoder, DB, token, or performance claim.
+- This supersedes the stale CPU-only runtime status below. Exact next is a metadata-only PP16
+  feature-runtime derivative, then one resumable stage discriminator. Only after that passes may
+  the remaining 15 stages stream and the complete PP16 short decoder compile; do not launch 8K
+  numerical execution before its full-graph HLO/HBM contracts pass.
+
 ## 2026-08-27 protected PP16 feature-MoE derivative passes as DB558
 
 - Protected tag `greenfield_real_layer_pp16_pallas_feature_20260827T085802120143668Z` at pushed,

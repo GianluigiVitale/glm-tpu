@@ -5,6 +5,31 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 — complete PP16 executable-runtime base is sealed without TPU work
+
+Tag `greenfield_runtime_pack_pp16_20260827T091323450875229Z` at pushed and same-region-mirrored
+code `af0e226` converts the complete DB557-proven base owners into the exact PP16 executable
+layout. A 26-second metadata pass reconciled all 118,920 source leaves before a single stage-0
+probe read real bytes. The probe sealed both 27,173,315,848-byte files in about five minutes; only
+then did eight hosts stream their two topology-owned stages in parallel. All 16 stages and 32 files
+completed once in about 14 minutes with no failed pack stage or retry.
+
+Runtime manifest `b0f62466...4d2e5` binds layout `2ad20708...3d59b`, schedule
+`65c31dfc...46987e`, source manifest `13ad2e92...fedb5`, 6,944 runtime tensor records and exactly
+27,173,292,096 payload bytes per chip. Totals reconcile 747,097,191,552 source bytes to
+869,545,347,072 runtime payload bytes, 869,546,107,136 file bytes and 122,448,155,520 explicit
+padding bytes. Finalization independently checked every remote file generation/CRC/evidence record;
+the mounted-artifact inspector then returned `verified=true` for all 32 files.
+
+The terminal result archive has 107 objects. Its generation/CRC/SHA ledger is
+`e06f3e1f...0befd`; SUCCESS self SHA is `d1812196...fc83` and was written last in
+`driftbench-dsv4-uc` (`US-CENTRAL2`). Pre/probe-post/final censuses are 8/8 clean. The first census
+self-matched future outer-shell text, the first probe archive assumed a flat evidence directory,
+and one post-finalize reporting command named the wrong summary file. Each correction is preserved;
+none repeated payload work or reached TPU/model execution. This is checkpoint integrity only, with
+no DB, HBM, token, decoder, XPlane, latency or throughput claim. Next derive the complete PP16
+feature runtime from this base, beginning with metadata and one stage before fleet fanout.
+
 ## 2026-08-27 — PP16 real feature-MoE executes exactly with only an LP2 combine
 
 The smallest protected current-pod discriminator now passes as DB558 / tag

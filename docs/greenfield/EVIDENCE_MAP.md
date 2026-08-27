@@ -45,6 +45,15 @@ Replacement topology code is `bfe064d`; its fleet hash is `4a0c9a33...c301`. Col
 pins are `fcd8426735...` and `b12af9633c8b14648db8d2a2ccd9a3c577a04817`. Topology hash remains
 `294e777...559`, PP8 group hash `d5943ab8...c14`, and PP16 group hash `6383e57c...f21`.
 
+Accepted nonperformance runtime checkpoint tag
+`greenfield_runtime_pack_pp16_20260827T091323450875229Z` at `af0e226` contains all 16 stages / 32
+executable owners. Runtime manifest `b0f62466...4d2e5` binds layout `2ad20708...3d59b`, schedule
+`65c31dfc...46987e`, 6,944 tensor records, 869,545,347,072 payload bytes and 122,448,155,520
+explicit padding bytes. The independent mounted inspector passes every owner. Its 107-object
+same-region result set has ledger SHA `e06f3e1f...0befd` and SUCCESS self SHA
+`d1812196...fc83`; three authenticated fleet censuses pass. This is the complete base input for the
+PP16 feature-runtime derivative, not a DB, HBM, decoder-correctness or performance result.
+
 Complete nonperformance checkpoint tag `greenfield_full_pack_pp16_20260827T032310295108546Z` at
 `3685ee4` contains 32 base plus two optional-MTP final owners: 757,149,950,848 payload bytes and
 757,165,710,960 file bytes. Packed manifest SHA is `13ad2e92...fedb5`; independent inspection
