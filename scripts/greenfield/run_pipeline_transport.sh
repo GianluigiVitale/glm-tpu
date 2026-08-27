@@ -20,13 +20,17 @@ git -C "$WORKTREE" diff --quiet && git -C "$WORKTREE" diff --cached --quiet || {
   echo "refusing benchmark from a dirty greenfield worktree" >&2
   exit 2
 }
-unexpected_untracked=$(git -C "$WORKTREE" ls-files --others --exclude-standard | \
-  sed \
-    -e '\|^docs/DeepSeek-V4-Flash TPU Port — August 2026 Rebase - Obsolescence Audit and Codex Handoff\.md$|d' \
-    -e '\|^docs/deep-research-report\.md$|d')
-[[ -z $unexpected_untracked ]] || {
+unexpected_untracked=()
+while IFS= read -r -d '' path; do
+  case "$path" in
+    "docs/DeepSeek-V4-Flash TPU Port — August 2026 Rebase - Obsolescence Audit and Codex Handoff.md" | \
+      "docs/deep-research-report.md") ;;
+    *) unexpected_untracked+=("$path") ;;
+  esac
+done < <(git -C "$WORKTREE" ls-files --others --exclude-standard -z)
+[[ ${#unexpected_untracked[@]} -eq 0 ]] || {
   echo "refusing benchmark with unexpected untracked files:" >&2
-  echo "$unexpected_untracked" >&2
+  printf '  %s\n' "${unexpected_untracked[@]}" >&2
   exit 2
 }
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)
