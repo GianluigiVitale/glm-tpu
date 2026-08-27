@@ -2,6 +2,26 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 generation-pinned PP8/WS32 derivatives reclaimed
+
+- User-authorized storage reclamation completed under the TPU-workload and rsync locks. Capsule
+  `2721223e...ac7e` at pushed/mirrored commit `be190f4` pinned every live name, size, generation and
+  CRC before mutation. Conditional deletes removed exactly 382 current objects / 4,883,948,362,557
+  bytes (4.441 TiB): PP8 packed, base runtime, three feature generations, and WS32 runtime.
+- The canonical 150-object source (755,663,676,164 bytes), PP8/PP16 plan trees, results/oracles,
+  PP16 packed parent (72 objects), PP16 base runtime (68), and active PP16 feature runtime (68) were
+  excluded. Post-delete listings prove all six candidate prefixes empty and every kept generation
+  unchanged. Receipt SHA is `0bf6cc91...d799`.
+- Before deletion, four real canonical-source byte transforms reproduced retained PP8/WS32 bytes
+  exactly. Twenty-one compact manifests/layouts/control/SUCCESS files (121,645,216 bytes) were
+  generation-conditionally copied to protected result tag
+  `greenfield_checkpoint_reproduction_capsule_20260827T140830890282163Z`, archive SHA
+  `c7a7d033...8069`. Historical Git pack pins and the exact PP8 plan/source inventory remain.
+- Bucket soft delete is active for 604,800 seconds, so physical/billed-byte release can lag seven
+  days. Next storage tranche remains gated: make the active PP16 feature runtime independently
+  verifiable/loadable, then delete its packed and base-runtime parents conditionally. Gate work
+  then resumes with metadata-only PP16 acquisition recovery and smallest HLO/trace attribution.
+
 ## 2026-08-27 PP16 acquisition passes on device; outer sealer misreads host/JAX order
 
 - Protected tag `greenfield_short_decoder_compile_pp16_acquisition_20260827T132707782908362Z`

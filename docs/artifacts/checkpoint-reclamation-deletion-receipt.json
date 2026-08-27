@@ -1,0 +1,3072 @@
+{
+  "artifact_kind": "greenfield_checkpoint_deletion_receipt",
+  "bucket": "driftbench-dsv4-uc",
+  "capsule_sha256": "2721223ed26eaa2a888bb04a02f092d5250667c2cecfdefbe48aa15dd890ac7e",
+  "completed": true,
+  "completed_utc": "2026-08-27T14:11:11Z",
+  "deleted": [
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "LX8ULQ==",
+      "generation": 1785976529906408,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/SUCCESS",
+      "size": 88,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "IgPZNQ==",
+      "generation": 1785976109215201,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/control.json",
+      "size": 1504,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "2VKb/Q==",
+      "generation": 1785976529854818,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/runtime_manifest.json",
+      "size": 2635043,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "Dswk4w==",
+      "generation": 1786000694141242,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/SUCCESS",
+      "size": 88,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "I1Be7A==",
+      "generation": 1785998463772843,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/control.json",
+      "size": 1716,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "ruzXcw==",
+      "generation": 1786000694079311,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/runtime_manifest.json",
+      "size": 12873311,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "r9CTXQ==",
+      "generation": 1785957822402263,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/SUCCESS",
+      "size": 87,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "mKKN5A==",
+      "generation": 1785954172596184,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/control.json",
+      "size": 877,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "4bscRQ==",
+      "generation": 1785957822312373,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/packed_manifest.json",
+      "size": 26321,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "hEqZIQ==",
+      "generation": 1786637144459878,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/SUCCESS",
+      "size": 88,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "ebklTg==",
+      "generation": 1786634493779004,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/control.json",
+      "size": 1867,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "hMnE+Q==",
+      "generation": 1786637144404850,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/runtime_manifest.json",
+      "size": 12594582,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "akY9uA==",
+      "generation": 1786200919825247,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/SUCCESS",
+      "size": 88,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "fsb1NQ==",
+      "generation": 1786198285266330,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/control.json",
+      "size": 1788,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "BU8PgA==",
+      "generation": 1786200919769130,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/runtime_manifest.json",
+      "size": 12643895,
+      "terminal": true
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "xIYe/g==",
+      "generation": 1786840268804040,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/SUCCESS",
+      "size": 1186,
+      "terminal": true
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "PP3jWA==",
+      "generation": 1786840265822059,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/manifest.json",
+      "size": 6407001,
+      "terminal": true
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "E96GEA==",
+      "generation": 1785976454815938,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_00/device_slot_00.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "yimO1Q==",
+      "generation": 1785976454305668,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_00/device_slot_01.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "q8s5aw==",
+      "generation": 1785976448858715,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_00/device_slot_02.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "XTvQ8A==",
+      "generation": 1785976449687379,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_00/device_slot_03.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "auHSrg==",
+      "generation": 1785976468236987,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_01/device_slot_00.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "7XFZQA==",
+      "generation": 1785976461412403,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_01/device_slot_01.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "OMTS0w==",
+      "generation": 1785976462477555,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_01/device_slot_02.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "HP3YYQ==",
+      "generation": 1785976453377613,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_01/device_slot_03.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "CzmNbA==",
+      "generation": 1785976448167313,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_02/device_slot_00.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "/4vptw==",
+      "generation": 1785976456319746,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_02/device_slot_01.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "XfWuEg==",
+      "generation": 1785976449637957,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_02/device_slot_02.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "Z0m/Kw==",
+      "generation": 1785976449513430,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_02/device_slot_03.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "AXRIXw==",
+      "generation": 1785976451679374,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_03/device_slot_00.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "F7pRIQ==",
+      "generation": 1785976442817865,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_03/device_slot_01.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "5GNzRQ==",
+      "generation": 1785976447025943,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_03/device_slot_02.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "WDkWvg==",
+      "generation": 1785976447590790,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_03/device_slot_03.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "hUjCIw==",
+      "generation": 1785976459421136,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_04/device_slot_00.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "jOFmog==",
+      "generation": 1785976467337376,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_04/device_slot_01.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "4155tQ==",
+      "generation": 1785976454646989,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_04/device_slot_02.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "CsSM+w==",
+      "generation": 1785976463059428,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_04/device_slot_03.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "Paef/w==",
+      "generation": 1785976449197495,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_05/device_slot_00.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "gl0ypg==",
+      "generation": 1785976442676828,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_05/device_slot_01.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "T4vG+g==",
+      "generation": 1785976450054531,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_05/device_slot_02.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "TG+GQA==",
+      "generation": 1785976448288199,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_05/device_slot_03.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "vcT4hQ==",
+      "generation": 1785976465679469,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_06/device_slot_00.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "so8f7w==",
+      "generation": 1785976468606880,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_06/device_slot_01.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "T4rckA==",
+      "generation": 1785976463604741,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_06/device_slot_02.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "1PPP/w==",
+      "generation": 1785976461080682,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_06/device_slot_03.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "+G+NNQ==",
+      "generation": 1785976455235260,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_07/device_slot_00.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "3vWg2Q==",
+      "generation": 1785976447805117,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_07/device_slot_01.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "MNN4Jw==",
+      "generation": 1785976454308264,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_07/device_slot_02.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "aaBW3Q==",
+      "generation": 1785976446120342,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/base_decoder_runtime/stage_07/device_slot_03.safetensors",
+      "size": 26068082264,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "WG5QDg==",
+      "generation": 1785976454972825,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_00/device_slot_00.safetensors.json",
+      "size": 73526,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "sgc5lQ==",
+      "generation": 1785976454472912,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_00/device_slot_01.safetensors.json",
+      "size": 73526,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "6aAB0A==",
+      "generation": 1785976449020770,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_00/device_slot_02.safetensors.json",
+      "size": 73526,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "sbrDlw==",
+      "generation": 1785976449853621,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_00/device_slot_03.safetensors.json",
+      "size": 73526,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "kTFnSQ==",
+      "generation": 1785976468390947,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_01/device_slot_00.safetensors.json",
+      "size": 73472,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "p2Dwww==",
+      "generation": 1785976461601702,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_01/device_slot_01.safetensors.json",
+      "size": 73473,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "0ErPmg==",
+      "generation": 1785976462634644,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_01/device_slot_02.safetensors.json",
+      "size": 73472,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "eSbeYA==",
+      "generation": 1785976453537214,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_01/device_slot_03.safetensors.json",
+      "size": 73473,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "AhPjtA==",
+      "generation": 1785976448346113,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_02/device_slot_00.safetensors.json",
+      "size": 73452,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "8FWNdw==",
+      "generation": 1785976456456465,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_02/device_slot_01.safetensors.json",
+      "size": 73452,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "5Sz/zw==",
+      "generation": 1785976449793882,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_02/device_slot_02.safetensors.json",
+      "size": 73452,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "o7LHcw==",
+      "generation": 1785976449670887,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_02/device_slot_03.safetensors.json",
+      "size": 73452,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "709weA==",
+      "generation": 1785976451831728,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_03/device_slot_00.safetensors.json",
+      "size": 73445,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "IzYuUg==",
+      "generation": 1785976442998181,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_03/device_slot_01.safetensors.json",
+      "size": 73445,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "vllH+g==",
+      "generation": 1785976447201885,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_03/device_slot_02.safetensors.json",
+      "size": 73445,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "KHjReQ==",
+      "generation": 1785976447746933,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_03/device_slot_03.safetensors.json",
+      "size": 73445,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "n4ETsQ==",
+      "generation": 1785976459573415,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_04/device_slot_00.safetensors.json",
+      "size": 73473,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "tF5VuQ==",
+      "generation": 1785976467474332,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_04/device_slot_01.safetensors.json",
+      "size": 73473,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "sQaK5Q==",
+      "generation": 1785976454809222,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_04/device_slot_02.safetensors.json",
+      "size": 73473,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "6tsrGA==",
+      "generation": 1785976463196900,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_04/device_slot_03.safetensors.json",
+      "size": 73473,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "LFDAyw==",
+      "generation": 1785976449352218,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_05/device_slot_00.safetensors.json",
+      "size": 73452,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "hHNURQ==",
+      "generation": 1785976442854204,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_05/device_slot_01.safetensors.json",
+      "size": 73452,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "hH/4lw==",
+      "generation": 1785976450201684,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_05/device_slot_02.safetensors.json",
+      "size": 73452,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "//Ptaw==",
+      "generation": 1785976448458180,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_05/device_slot_03.safetensors.json",
+      "size": 73452,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "qts6ug==",
+      "generation": 1785976465818143,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_06/device_slot_00.safetensors.json",
+      "size": 73473,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "+d4dbQ==",
+      "generation": 1785976468757206,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_06/device_slot_01.safetensors.json",
+      "size": 73473,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "L1C9Og==",
+      "generation": 1785976463776771,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_06/device_slot_02.safetensors.json",
+      "size": 73473,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "X/Fy9g==",
+      "generation": 1785976461234540,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_06/device_slot_03.safetensors.json",
+      "size": 73473,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "IU9z7w==",
+      "generation": 1785976455375498,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_07/device_slot_00.safetensors.json",
+      "size": 73446,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "WgQcTA==",
+      "generation": 1785976447962881,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_07/device_slot_01.safetensors.json",
+      "size": 73446,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "0V1dgg==",
+      "generation": 1785976454449370,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_07/device_slot_02.safetensors.json",
+      "size": 73446,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "/XRskg==",
+      "generation": 1785976446300097,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/evidence/base_decoder_runtime/stage_07/device_slot_03.safetensors.json",
+      "size": 73446,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_base_runtime",
+      "crc32c": "umTmGg==",
+      "generation": 1785976110765101,
+      "name": "checkpoints/greenfield/glm52/runtime/PP8_LP4/greenfield_runtime_pack_pp8_20260806T002756318310857Z/runtime_layout.json",
+      "size": 39349403,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "gAW2aA==",
+      "generation": 1786000412646574,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "0WzL+A==",
+      "generation": 1786000412940894,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "wgGpGQ==",
+      "generation": 1786000413211086,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_00/device_slot_02.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "/FDv2A==",
+      "generation": 1786000413451412,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_00/device_slot_03.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "qD0nCw==",
+      "generation": 1786000631666069,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "Mz21fw==",
+      "generation": 1786000631877348,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "Gm65DA==",
+      "generation": 1786000632195676,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_01/device_slot_02.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "cBoEfQ==",
+      "generation": 1786000632437132,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_01/device_slot_03.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "hdiCiQ==",
+      "generation": 1786000473859617,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "0+xrFQ==",
+      "generation": 1786000474140491,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "7OkOuw==",
+      "generation": 1786000474401525,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_02/device_slot_02.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "BY7FLg==",
+      "generation": 1786000474628939,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_02/device_slot_03.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "rxc8yA==",
+      "generation": 1786000430498866,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "QI7MpA==",
+      "generation": 1786000430784352,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "xTjHZQ==",
+      "generation": 1786000431025816,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_03/device_slot_02.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "peq3CA==",
+      "generation": 1786000431197164,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_03/device_slot_03.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "9VtTsA==",
+      "generation": 1786000583113057,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "pl9T6Q==",
+      "generation": 1786000583493704,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "D4Ab2w==",
+      "generation": 1786000583775881,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_04/device_slot_02.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "LJRpMw==",
+      "generation": 1786000584077154,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_04/device_slot_03.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "8I2ikw==",
+      "generation": 1786000395764813,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "xuimQw==",
+      "generation": 1786000396091265,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "J7Ckig==",
+      "generation": 1786000396279565,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_05/device_slot_02.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "vb7E7g==",
+      "generation": 1786000396736728,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_05/device_slot_03.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "ldN9NQ==",
+      "generation": 1786000608964675,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "IxL2EA==",
+      "generation": 1786000609265931,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "1ugMbQ==",
+      "generation": 1786000609455706,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_06/device_slot_02.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "JdeQkQ==",
+      "generation": 1786000609670307,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_06/device_slot_03.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "OqwGrA==",
+      "generation": 1786000618020000,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "asydxQ==",
+      "generation": 1786000618458353,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "MKRWiQ==",
+      "generation": 1786000618866083,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_07/device_slot_02.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "yARpFA==",
+      "generation": 1786000619297555,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/base_decoder_runtime_feature/stage_07/device_slot_03.safetensors",
+      "size": 26068082280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "vduHXw==",
+      "generation": 1786000413628251,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+      "size": 377950,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "RofohA==",
+      "generation": 1786000413782662,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+      "size": 378274,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "k3upQw==",
+      "generation": 1786000413943221,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_02.safetensors.json",
+      "size": 378490,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "sb1y5Q==",
+      "generation": 1786000414081196,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_03.safetensors.json",
+      "size": 378598,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "Pf75Mg==",
+      "generation": 1786000632601922,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors.json",
+      "size": 365919,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "MywQDg==",
+      "generation": 1786000632763263,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors.json",
+      "size": 366280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "lSqkJg==",
+      "generation": 1786000632921250,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_02.safetensors.json",
+      "size": 366519,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "jBwdPg==",
+      "generation": 1786000633079540,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_03.safetensors.json",
+      "size": 366640,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "EyIr5g==",
+      "generation": 1786000474805078,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors.json",
+      "size": 342762,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "8ohp+g==",
+      "generation": 1786000474960537,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors.json",
+      "size": 343086,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "TJG9VQ==",
+      "generation": 1786000475113767,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_02.safetensors.json",
+      "size": 343302,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "KyDdsg==",
+      "generation": 1786000475264820,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_03.safetensors.json",
+      "size": 343410,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "wyEdtw==",
+      "generation": 1786000431364377,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors.json",
+      "size": 339502,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "T+slZA==",
+      "generation": 1786000431531037,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors.json",
+      "size": 339826,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "Dx4e5w==",
+      "generation": 1786000431691486,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_02.safetensors.json",
+      "size": 340042,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "C4JQng==",
+      "generation": 1786000431846324,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_03.safetensors.json",
+      "size": 340150,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "pDko5w==",
+      "generation": 1786000584258431,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors.json",
+      "size": 365920,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "C4SmYg==",
+      "generation": 1786000584534351,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors.json",
+      "size": 366280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "+UuOBg==",
+      "generation": 1786000584687575,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_02.safetensors.json",
+      "size": 366520,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "m+qmOA==",
+      "generation": 1786000584855097,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_03.safetensors.json",
+      "size": 366640,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "phRO5A==",
+      "generation": 1786000396924024,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors.json",
+      "size": 342762,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "iiFt0w==",
+      "generation": 1786000397084409,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors.json",
+      "size": 343086,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "nyi2sg==",
+      "generation": 1786000397252995,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_02.safetensors.json",
+      "size": 343302,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "eRnK4Q==",
+      "generation": 1786000397409209,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_03.safetensors.json",
+      "size": 343410,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "6SKB6w==",
+      "generation": 1786000609843091,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors.json",
+      "size": 365920,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "e8O/dg==",
+      "generation": 1786000610004281,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors.json",
+      "size": 366280,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "CbpS1A==",
+      "generation": 1786000610149642,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_02.safetensors.json",
+      "size": 366520,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "uYzncg==",
+      "generation": 1786000610295451,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_03.safetensors.json",
+      "size": 366640,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "M/27HA==",
+      "generation": 1786000619481269,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors.json",
+      "size": 340400,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "ogZNzw==",
+      "generation": 1786000619647170,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors.json",
+      "size": 340724,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "Eq/kPQ==",
+      "generation": 1786000619789986,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_02.safetensors.json",
+      "size": 340940,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "xmqKvw==",
+      "generation": 1786000619962140,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_03.safetensors.json",
+      "size": 341048,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_feature_runtime",
+      "crc32c": "WHXPyQ==",
+      "generation": 1785998464083994,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_pack_pp8_20260806T064010287072141Z/runtime_layout.json",
+      "size": 11979202,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "/Y0Kqw==",
+      "generation": 1785954610050829,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_00/device_slot_00.safetensors",
+      "size": 23163628000,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "UvrKrw==",
+      "generation": 1785954604936135,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_00/device_slot_01.safetensors",
+      "size": 23163630056,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "ApXY9w==",
+      "generation": 1785954620105915,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_00/device_slot_02.safetensors",
+      "size": 23163632000,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "+DcCLw==",
+      "generation": 1785954637473809,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_00/device_slot_03.safetensors",
+      "size": 23163632000,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "VFsGqw==",
+      "generation": 1785955081230398,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_01/device_slot_00.safetensors",
+      "size": 24831339104,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "/pnSUw==",
+      "generation": 1785955066155624,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_01/device_slot_01.safetensors",
+      "size": 24831341384,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "3Oj1DQ==",
+      "generation": 1785955107649368,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_01/device_slot_02.safetensors",
+      "size": 24831343544,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "yiYFcw==",
+      "generation": 1785955067008566,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_01/device_slot_03.safetensors",
+      "size": 24831343544,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "COiE0w==",
+      "generation": 1785955518478105,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_02/device_slot_00.safetensors",
+      "size": 22351785640,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "uKU2XA==",
+      "generation": 1785955498803722,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_02/device_slot_01.safetensors",
+      "size": 22351787688,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "7w8t6A==",
+      "generation": 1785955526715459,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_02/device_slot_02.safetensors",
+      "size": 22351789632,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "9eHD0Q==",
+      "generation": 1785955512605946,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_02/device_slot_03.safetensors",
+      "size": 22351789632,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "wpZrhA==",
+      "generation": 1785955926397655,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_03/device_slot_00.safetensors",
+      "size": 22348801648,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "43gihQ==",
+      "generation": 1785955911093252,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_03/device_slot_01.safetensors",
+      "size": 22348803704,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "ZZy3oQ==",
+      "generation": 1785955928182337,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_03/device_slot_02.safetensors",
+      "size": 22348805648,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "qMzSBg==",
+      "generation": 1785955910898690,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_03/device_slot_03.safetensors",
+      "size": 22348805648,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "MuPfsA==",
+      "generation": 1785956392807771,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_04/device_slot_00.safetensors",
+      "size": 24831339104,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "rtQOQA==",
+      "generation": 1785956371162258,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_04/device_slot_01.safetensors",
+      "size": 24831341384,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "PdDpug==",
+      "generation": 1785956373928898,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_04/device_slot_02.safetensors",
+      "size": 24831343544,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "6SwcoA==",
+      "generation": 1785956398967273,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_04/device_slot_03.safetensors",
+      "size": 24831343544,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "3nQHzg==",
+      "generation": 1785956803012704,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_05/device_slot_00.safetensors",
+      "size": 22351785640,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "9yrzag==",
+      "generation": 1785956790542798,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_05/device_slot_01.safetensors",
+      "size": 22351787688,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "U7tgPQ==",
+      "generation": 1785956789835961,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_05/device_slot_02.safetensors",
+      "size": 22351789632,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "xqSQwA==",
+      "generation": 1785956789072819,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_05/device_slot_03.safetensors",
+      "size": 22351789632,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "LVPb7Q==",
+      "generation": 1785957269916074,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_06/device_slot_00.safetensors",
+      "size": 24831339104,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "IdMotQ==",
+      "generation": 1785957241371139,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_06/device_slot_01.safetensors",
+      "size": 24831341384,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "oqUbxQ==",
+      "generation": 1785957269383165,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_06/device_slot_02.safetensors",
+      "size": 24831343544,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "+eo5SQ==",
+      "generation": 1785957250999608,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_06/device_slot_03.safetensors",
+      "size": 24831343544,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "2qyEiA==",
+      "generation": 1785957705331151,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_07/device_slot_00.safetensors",
+      "size": 22824605848,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "Z0eqbw==",
+      "generation": 1785957671946831,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_07/device_slot_01.safetensors",
+      "size": 22824607896,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "QXIoUw==",
+      "generation": 1785957690525685,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_07/device_slot_02.safetensors",
+      "size": 22824609840,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "Sa/p9w==",
+      "generation": 1785957687537755,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/base_decoder/stage_07/device_slot_03.safetensors",
+      "size": 22824609840,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "InffEQ==",
+      "generation": 1785954610191036,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_00/device_slot_00.safetensors.json",
+      "size": 638,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "wVDrZg==",
+      "generation": 1785954605099331,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_00/device_slot_01.safetensors.json",
+      "size": 638,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "x3aEDA==",
+      "generation": 1785954620239402,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_00/device_slot_02.safetensors.json",
+      "size": 638,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "LuvhKQ==",
+      "generation": 1785954637621441,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_00/device_slot_03.safetensors.json",
+      "size": 638,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "OwuZeg==",
+      "generation": 1785955081361749,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_01/device_slot_00.safetensors.json",
+      "size": 638,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "2uaA6Q==",
+      "generation": 1785955066297866,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_01/device_slot_01.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "KNXJ8A==",
+      "generation": 1785955107823759,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_01/device_slot_02.safetensors.json",
+      "size": 638,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "bXvXmw==",
+      "generation": 1785955067157662,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_01/device_slot_03.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "TIeuPw==",
+      "generation": 1785955518611754,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_02/device_slot_00.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "Qp0NQw==",
+      "generation": 1785955498950275,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_02/device_slot_01.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "ClOuUg==",
+      "generation": 1785955526877890,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_02/device_slot_02.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "sHYQJw==",
+      "generation": 1785955512754607,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_02/device_slot_03.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "UEU3QQ==",
+      "generation": 1785955926568024,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_03/device_slot_00.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "RzZdhQ==",
+      "generation": 1785955911286952,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_03/device_slot_01.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "ZkFelg==",
+      "generation": 1785955928323942,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_03/device_slot_02.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "8NNCNA==",
+      "generation": 1785955911064608,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_03/device_slot_03.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "uJchzw==",
+      "generation": 1785956392958221,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_04/device_slot_00.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "9uc9hQ==",
+      "generation": 1785956371348053,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_04/device_slot_01.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "rj4XtA==",
+      "generation": 1785956374063237,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_04/device_slot_02.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "Fsbyug==",
+      "generation": 1785956399111521,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_04/device_slot_03.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "p1z79Q==",
+      "generation": 1785956803156496,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_05/device_slot_00.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "cnFQrA==",
+      "generation": 1785956790690065,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_05/device_slot_01.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "ah1FeQ==",
+      "generation": 1785956789976021,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_05/device_slot_02.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "FLff0A==",
+      "generation": 1785956789216908,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_05/device_slot_03.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "NbEI8A==",
+      "generation": 1785957270057881,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_06/device_slot_00.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "lN3zfw==",
+      "generation": 1785957241534620,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_06/device_slot_01.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "fzXH/g==",
+      "generation": 1785957269538790,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_06/device_slot_02.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "KlarCw==",
+      "generation": 1785957251186472,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_06/device_slot_03.safetensors.json",
+      "size": 639,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "rBC3QQ==",
+      "generation": 1785957705473433,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_07/device_slot_00.safetensors.json",
+      "size": 638,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "9uPMcw==",
+      "generation": 1785957672098615,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_07/device_slot_01.safetensors.json",
+      "size": 638,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "FewSlQ==",
+      "generation": 1785957690663655,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_07/device_slot_02.safetensors.json",
+      "size": 638,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "qJqHTQ==",
+      "generation": 1785957687690759,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/base_decoder/stage_07/device_slot_03.safetensors.json",
+      "size": 638,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "YXrm8g==",
+      "generation": 1785957798686881,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/mtp_optional/stage_00/device_slot_00.safetensors.json",
+      "size": 635,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "Ous1WA==",
+      "generation": 1785957806512214,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/mtp_optional/stage_00/device_slot_01.safetensors.json",
+      "size": 635,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "oryqcw==",
+      "generation": 1785957822233341,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/mtp_optional/stage_00/device_slot_02.safetensors.json",
+      "size": 635,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "fuBb1Q==",
+      "generation": 1785957768108205,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/evidence/mtp_optional/stage_00/device_slot_03.safetensors.json",
+      "size": 635,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "xfrOmg==",
+      "generation": 1785954173900840,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/layout_manifest.json",
+      "size": 110446155,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "LtC57A==",
+      "generation": 1785957798540712,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/mtp_optional/stage_00/device_slot_00.safetensors",
+      "size": 2523306528,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "rvTVhQ==",
+      "generation": 1785957806359920,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/mtp_optional/stage_00/device_slot_01.safetensors",
+      "size": 2523306760,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "NNwoNA==",
+      "generation": 1785957822087480,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/mtp_optional/stage_00/device_slot_02.safetensors",
+      "size": 2523306976,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_packed",
+      "crc32c": "814Wfw==",
+      "generation": 1785957767913680,
+      "name": "checkpoints/greenfield/glm52/packed/PP8_LP4/greenfield_full_pack_pp8_20260805T182222755355852Z/mtp_optional/stage_00/device_slot_03.safetensors",
+      "size": 2523306976,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "2ND8TQ==",
+      "generation": 1786636868353876,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "fuXqkQ==",
+      "generation": 1786636868634662,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "KH1x/w==",
+      "generation": 1786636869055846,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_00/device_slot_02.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "TTl6OA==",
+      "generation": 1786636869272397,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_00/device_slot_03.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "XsPi/Q==",
+      "generation": 1786637038746808,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "LDFDoQ==",
+      "generation": 1786637039112184,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "UYaHbw==",
+      "generation": 1786637039444889,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_01/device_slot_02.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "5WLdMA==",
+      "generation": 1786637039692454,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_01/device_slot_03.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "SC0Ocg==",
+      "generation": 1786636916605363,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "m5XV7w==",
+      "generation": 1786636916951376,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "FM+1bQ==",
+      "generation": 1786636917476015,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_02/device_slot_02.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "CAPnbw==",
+      "generation": 1786636917740346,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_02/device_slot_03.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "7g9YLw==",
+      "generation": 1786636926054482,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "pobLZw==",
+      "generation": 1786636926475508,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "KdKjYA==",
+      "generation": 1786636926851969,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_03/device_slot_02.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "7xZSdw==",
+      "generation": 1786636927301941,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_03/device_slot_03.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "WCYpwA==",
+      "generation": 1786637081825838,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "+deZBg==",
+      "generation": 1786637082109920,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "ZR0/Jw==",
+      "generation": 1786637082407260,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_04/device_slot_02.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "7miPmA==",
+      "generation": 1786637082680271,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_04/device_slot_03.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "4yWQnw==",
+      "generation": 1786636909318279,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "5pHMHQ==",
+      "generation": 1786636909768491,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "p/xHBw==",
+      "generation": 1786636909997633,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_05/device_slot_02.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "mOzK/A==",
+      "generation": 1786636910282443,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_05/device_slot_03.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "gHOm+w==",
+      "generation": 1786636991937080,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "Nx7nkg==",
+      "generation": 1786636992282637,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "y9fS0A==",
+      "generation": 1786636992626339,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_06/device_slot_02.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "e2bl2g==",
+      "generation": 1786636992875464,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_06/device_slot_03.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "kF2GjQ==",
+      "generation": 1786636898689241,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "7IKf9Q==",
+      "generation": 1786636899214168,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "iuZP+A==",
+      "generation": 1786636899526443,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_07/device_slot_02.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "eakheg==",
+      "generation": 1786636899853180,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_07/device_slot_03.safetensors",
+      "size": 26079343680,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "Hg9E/Q==",
+      "generation": 1786636869451983,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+      "size": 370207,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "s6+apg==",
+      "generation": 1786636869616681,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+      "size": 370531,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "rayNkA==",
+      "generation": 1786636869783291,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_02.safetensors.json",
+      "size": 370747,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "joki0g==",
+      "generation": 1786636869944280,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_03.safetensors.json",
+      "size": 370855,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "1PHgBQ==",
+      "generation": 1786637039895463,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors.json",
+      "size": 358240,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "/0fSrQ==",
+      "generation": 1786637040051270,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors.json",
+      "size": 358601,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "q8bOgQ==",
+      "generation": 1786637040207314,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_02.safetensors.json",
+      "size": 358840,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "bQFRuQ==",
+      "generation": 1786637040373576,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_03.safetensors.json",
+      "size": 358961,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "WfIANQ==",
+      "generation": 1786636917921687,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors.json",
+      "size": 335109,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "Xe8lCg==",
+      "generation": 1786636918061659,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors.json",
+      "size": 335433,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "i9F32w==",
+      "generation": 1786636918203245,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_02.safetensors.json",
+      "size": 335649,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "vO6jRQ==",
+      "generation": 1786636918337540,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_03.safetensors.json",
+      "size": 335757,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "xGxAUg==",
+      "generation": 1786636927468164,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors.json",
+      "size": 331849,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "WXAvTA==",
+      "generation": 1786636927617823,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors.json",
+      "size": 332173,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "K46wQw==",
+      "generation": 1786636927778143,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_02.safetensors.json",
+      "size": 332389,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "fvtRmA==",
+      "generation": 1786636927938578,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_03.safetensors.json",
+      "size": 332497,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "sd5TRg==",
+      "generation": 1786637082874227,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors.json",
+      "size": 358241,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "khqlGg==",
+      "generation": 1786637083028620,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors.json",
+      "size": 358601,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "ZUcLlQ==",
+      "generation": 1786637083210313,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_02.safetensors.json",
+      "size": 358841,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "aux/5g==",
+      "generation": 1786637083375785,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_03.safetensors.json",
+      "size": 358961,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "VWQdAg==",
+      "generation": 1786636910454628,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors.json",
+      "size": 335109,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "IMxu2Q==",
+      "generation": 1786636910618426,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors.json",
+      "size": 335433,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "xW80uA==",
+      "generation": 1786636910769666,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_02.safetensors.json",
+      "size": 335649,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "l/E0RA==",
+      "generation": 1786636910928822,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_03.safetensors.json",
+      "size": 335757,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "gPUx8g==",
+      "generation": 1786636993051146,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors.json",
+      "size": 358241,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "E8CIcg==",
+      "generation": 1786636993206240,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors.json",
+      "size": 358601,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "KFlvwA==",
+      "generation": 1786636993357725,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_02.safetensors.json",
+      "size": 358841,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "rOy64A==",
+      "generation": 1786636993527786,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_03.safetensors.json",
+      "size": 358961,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "C/DOFg==",
+      "generation": 1786636900043669,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors.json",
+      "size": 332747,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "jJ7+3Q==",
+      "generation": 1786636900208254,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors.json",
+      "size": 333071,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "4CObXw==",
+      "generation": 1786636900347642,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_02.safetensors.json",
+      "size": 333287,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "uZ706w==",
+      "generation": 1786636900502547,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_03.safetensors.json",
+      "size": 333395,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_dense_runtime",
+      "crc32c": "Y5UXTQ==",
+      "generation": 1786634494065690,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/runtime_layout.json",
+      "size": 11524145,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "qGHnTA==",
+      "generation": 1786200587428877,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "UxsQxw==",
+      "generation": 1786200587746587,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "PafpLg==",
+      "generation": 1786200588023472,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_00/device_slot_02.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "LfAa7Q==",
+      "generation": 1786200588254291,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_00/device_slot_03.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "e2IrsA==",
+      "generation": 1786200681882911,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "Aefj2A==",
+      "generation": 1786200682421696,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "odraTA==",
+      "generation": 1786200682765073,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_01/device_slot_02.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "/3fwDw==",
+      "generation": 1786200682978420,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_01/device_slot_03.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "ZUp6aA==",
+      "generation": 1786200524011639,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "PIKOJQ==",
+      "generation": 1786200524293260,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "kleXgw==",
+      "generation": 1786200524586137,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_02/device_slot_02.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "4pm7Ww==",
+      "generation": 1786200524799084,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_02/device_slot_03.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "4y9/yA==",
+      "generation": 1786200592664900,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "gwYv9A==",
+      "generation": 1786200592858979,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "PlbFow==",
+      "generation": 1786200593083724,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_03/device_slot_02.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "YNiuPw==",
+      "generation": 1786200593425813,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_03/device_slot_03.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "NxzaLQ==",
+      "generation": 1786200665571803,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "EQCEyg==",
+      "generation": 1786200665791227,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "RFwMyg==",
+      "generation": 1786200666009637,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_04/device_slot_02.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "VqxQ6g==",
+      "generation": 1786200666464615,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_04/device_slot_03.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "avy2lw==",
+      "generation": 1786200790618488,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "W+ZS2Q==",
+      "generation": 1786200790925377,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "uBi7PA==",
+      "generation": 1786200791137537,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_05/device_slot_02.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "krEflg==",
+      "generation": 1786200791423301,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_05/device_slot_03.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "beboZw==",
+      "generation": 1786200855768383,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "waqd5w==",
+      "generation": 1786200856045446,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "rG430Q==",
+      "generation": 1786200856266108,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_06/device_slot_02.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "JAlD6g==",
+      "generation": 1786200856477287,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_06/device_slot_03.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "VWdFvg==",
+      "generation": 1786200626979539,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "MZPO9w==",
+      "generation": 1786200627401470,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "iw0xjg==",
+      "generation": 1786200627791097,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_07/device_slot_02.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "Lhuqag==",
+      "generation": 1786200628194741,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_07/device_slot_03.safetensors",
+      "size": 26074077168,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "E2zuvg==",
+      "generation": 1786200588438907,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+      "size": 371566,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "jzFmFQ==",
+      "generation": 1786200588590169,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+      "size": 371890,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "IkxiqA==",
+      "generation": 1786200588745143,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_02.safetensors.json",
+      "size": 372106,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "xxb3Ew==",
+      "generation": 1786200588908903,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_03.safetensors.json",
+      "size": 372214,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "Cknl4g==",
+      "generation": 1786200683156014,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors.json",
+      "size": 359587,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "l4/f2g==",
+      "generation": 1786200683340350,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors.json",
+      "size": 359948,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "9A42Nw==",
+      "generation": 1786200683676515,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_02.safetensors.json",
+      "size": 360187,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "SWXTSQ==",
+      "generation": 1786200683832465,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_03.safetensors.json",
+      "size": 360308,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "fy2DYQ==",
+      "generation": 1786200524990079,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors.json",
+      "size": 336456,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "MDKOUA==",
+      "generation": 1786200525156113,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors.json",
+      "size": 336780,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "TP5yZQ==",
+      "generation": 1786200525321024,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_02.safetensors.json",
+      "size": 336996,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "0Y9n2g==",
+      "generation": 1786200525492974,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_03.safetensors.json",
+      "size": 337104,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "iHrLwg==",
+      "generation": 1786200593595036,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors.json",
+      "size": 333196,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "LKOUfQ==",
+      "generation": 1786200593741938,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors.json",
+      "size": 333520,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "B30lCg==",
+      "generation": 1786200593892892,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_02.safetensors.json",
+      "size": 333736,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "XZ41Hg==",
+      "generation": 1786200594050865,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_03.safetensors.json",
+      "size": 333844,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "+Ksrcg==",
+      "generation": 1786200666643052,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors.json",
+      "size": 359588,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "e5lS2w==",
+      "generation": 1786200666786728,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors.json",
+      "size": 359948,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "10w/cA==",
+      "generation": 1786200666940411,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_02.safetensors.json",
+      "size": 360188,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "hPD1TQ==",
+      "generation": 1786200667115594,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_03.safetensors.json",
+      "size": 360308,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "FFXHfQ==",
+      "generation": 1786200791614184,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors.json",
+      "size": 336456,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "2SFM6Q==",
+      "generation": 1786200791776224,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors.json",
+      "size": 336780,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "ds8GAw==",
+      "generation": 1786200792608449,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_02.safetensors.json",
+      "size": 336996,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "d4RGSQ==",
+      "generation": 1786200792754997,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_03.safetensors.json",
+      "size": 337104,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "dDQdkA==",
+      "generation": 1786200856717917,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors.json",
+      "size": 359588,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "TppFUQ==",
+      "generation": 1786200856898997,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors.json",
+      "size": 359948,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "+/BCrA==",
+      "generation": 1786200857045360,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_02.safetensors.json",
+      "size": 360188,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "ZQMQyw==",
+      "generation": 1786200857190293,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_03.safetensors.json",
+      "size": 360308,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "FH5KRw==",
+      "generation": 1786200628372839,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors.json",
+      "size": 334094,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "B0twQw==",
+      "generation": 1786200628539621,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors.json",
+      "size": 334418,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "trtyMg==",
+      "generation": 1786200628680763,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_02.safetensors.json",
+      "size": 334634,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "VY3ozQ==",
+      "generation": 1786200628824322,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_03.safetensors.json",
+      "size": 334742,
+      "terminal": false
+    },
+    {
+      "artifact_id": "pp8_qkv_runtime",
+      "crc32c": "FZPj1w==",
+      "generation": 1786198286365324,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/runtime_layout.json",
+      "size": 11602936,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "0Wdfig==",
+      "generation": 1786840092681533,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_00.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "uQvx6w==",
+      "generation": 1786840058421469,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_01.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "7dSQeg==",
+      "generation": 1786840100847559,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_02.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "gyoucg==",
+      "generation": 1786840106505976,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_03.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "VK0Fyg==",
+      "generation": 1786840115381541,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_04.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "pVQ81Q==",
+      "generation": 1786840081332651,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_05.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "NbH8cw==",
+      "generation": 1786840125709808,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_06.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "Feyk7Q==",
+      "generation": 1786840128084786,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_07.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "Ao0TAQ==",
+      "generation": 1786840120783241,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_08.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "kNljEQ==",
+      "generation": 1786840115119072,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_09.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "d4W8NQ==",
+      "generation": 1786840121131516,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_10.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "QKNhdw==",
+      "generation": 1786840116828846,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_11.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "QCAorA==",
+      "generation": 1786840141826723,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_12.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "ziNmwQ==",
+      "generation": 1786840136721454,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_13.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "762kig==",
+      "generation": 1786840143939382,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_14.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "+m9upw==",
+      "generation": 1786840140048681,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_15.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "gOToXw==",
+      "generation": 1786840139123637,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_16.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "w3rn+g==",
+      "generation": 1786840103589095,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_17.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "tH4bcw==",
+      "generation": 1786840148611173,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_18.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "xSUDag==",
+      "generation": 1786840149961490,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_19.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "5mpdSg==",
+      "generation": 1786840162864086,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_20.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "LmHjQw==",
+      "generation": 1786840127100789,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_21.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "aFKRQA==",
+      "generation": 1786840173126170,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_22.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "VQfRFQ==",
+      "generation": 1786840173292609,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_23.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "bpoXAA==",
+      "generation": 1786840163560541,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_24.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "psK+rw==",
+      "generation": 1786840162193402,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_25.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "2NlIVw==",
+      "generation": 1786840169134651,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_26.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "R0Q5Bg==",
+      "generation": 1786840162765183,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_27.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "2J0bPg==",
+      "generation": 1786840190751052,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_28.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "e+qbgQ==",
+      "generation": 1786840188379682,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_29.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "UyvQ5g==",
+      "generation": 1786840192825019,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_30.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    },
+    {
+      "artifact_id": "ws32_runtime",
+      "crc32c": "k6+xGw==",
+      "generation": 1786840190577132,
+      "name": "checkpoints/greenfield/glm52/runtime/WS32_2D/greenfield_ws32_runtime_pack_20260815T214050854386790Z/device_slot_31.safetensors",
+      "size": 24568177312,
+      "terminal": false
+    }
+  ],
+  "deleted_bytes": 4883948362557,
+  "deleted_objects": 382,
+  "format_version": 1,
+  "planned_bytes": 4883948362557,
+  "planned_objects": 382,
+  "receipt_sha256": "0bf6cc91792db66833665370e3d31db2dc06c866029f9a8f0256bd215fafd799",
+  "started_utc": "2026-08-27T14:10:57Z"
+}

@@ -10530,3 +10530,24 @@ unmotivated arithmetic variants.
   `65456b74...5312`/`de81614c...be7f8`, decode `92ff580b...60f37`/`78f1e03d...29dd`, and cache
   `664c331a...eb14`/`e4530fc6...bf77`. Recovery must reuse these bytes; no TPU recompilation is
   authorized.
+
+## 2026-08-27 14:11 UTC — exact derivative reclamation removes 4.441 TiB without deleting reproducibility
+
+The cost-focused retention contract now preserves one immutable 703.767-GiB canonical source,
+compact plan/recipe/integrity evidence, results/oracles, and the active PP16 runtime rather than
+permanently retaining every derived layout. A bounded real-byte proof reproduced PP8 replicated
+and axis-sharded bytes plus WS32 feature and 2D feature/expert tiles directly from the canonical
+source; all four hashes match the retained outputs. The packed PP8 layout is byte-identical to the
+already protected plan layout. Twenty-one compact terminal metadata objects totaling 121,645,216
+bytes were copied with source-generation preconditions to protected result tag
+`greenfield_checkpoint_reproduction_capsule_20260827T140830890282163Z`; source/destination sizes
+and CRC32Cs agree and archive SHA is `c7a7d033...8069`.
+
+Committed/pushed/mirrored capsule `2721223e...ac7e` binds all 832 relevant live objects and forbids
+any overlap with models, plans, results, oracles, or the active PP16 feature prefix. Under both
+global locks, 382 per-object deletes used exact `if_generation_match` conditions. Receipt
+`0bf6cc91...d799` proves completion and 4,883,948,362,557 deleted bytes (4.441 TiB). Fresh listings
+show all six PP8/WS32 candidate prefixes empty, while canonical and all three PP16 generations
+retain their exact object counts and bytes. GCS soft-delete retention is 604,800 seconds, so the
+storage billing reduction can lag seven days. PP16 parents remain until standalone final-runtime
+verification/load wiring passes; no TPU, Gate-D, token, latency, or performance claim is made.
