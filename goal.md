@@ -17,27 +17,28 @@ Prepare three small **stacked** PRs. They are separately reviewable, but not ind
    and must be mergeable/useful alone. It must not depend on PR 2 or PR 3.
 2. **Thin TorchAX/vLLM integration.** Base it on PR 1 and keep it limited to wiring the accepted
    kernels into the repository's preferred TorchAX-first path. It depends on PR 1.
-3. **Model registration and CI enablement.** Base it on PRs 1-2. Add only the registration,
-   configuration, fixtures, and CI coverage needed to enable GLM-5.2. It depends on both.
+3. **Model/IndexShare enablement and CI.** Base it on PRs 1-2. Treat current vLLM registration and
+   IndexShare scheduling as authoritative; add registration only if the exact base lacks it. Add
+   only the configuration, fixtures, regressions, and CI coverage needed. It depends on both.
 
-The review order is PR 1 -> PR 2 -> PR 3. While preparing locally, stacked branches are allowed;
-before submission, rebase each onto the exact parent reviewers should see and make dependencies
-explicit in the PR descriptions.
+Review PR 1 -> PR 2 -> PR 3. Use stacked branches; before submission, rebase each onto its declared
+parent and state dependencies in the PR body.
 
 ## Acceptance-first rules
 
 - Re-audit upstream main, PRs/issues, CONTRIBUTING, CI, ownership, and maintainer feedback before
   finalizing each patch.
-- Prefer existing repository abstractions and naming. Avoid a parallel framework, greenfield
-  execution imports, speculative refactors, unrelated cleanup, generated dumps, model weights,
-  profiler traces, or thousands of tracked artifacts.
+- Reuse repository abstractions. Avoid parallel frameworks, greenfield execution imports,
+  unrelated cleanup, generated dumps, model weights, profiler traces, or bulk artifacts.
+- Current vLLM owns GLM model semantics, loading, IndexShare scheduling, and request metadata.
+  Supply TPU kernels/bridges without reviving old constructor monkeypatches or DSA-disable paths.
+- Top-k alone is incomplete beyond 2,048 tokens: selected positions must reach sparse MLA.
 - Match exact GLM-5.2 DSA semantics: selected set, deterministic tie/order behavior, padding and
   sentinel rules, IndexShare reuse, dtypes, shapes, and one-live-row decode behavior.
 - Every behavior change needs focused tests. Performance claims require protected real-v4
   correctness, profiler-free wall measurements, and exact provenance; CPU/synthetic/HLO-only
   results are not performance proof.
-- Keep benchmark evidence compact: scripts/configs, hashes, summarized results, and durable links;
-  never commit checkpoints, raw XPlanes, generated environments, caches, or bulk run directories.
+- Keep evidence compact; never commit checkpoints, raw XPlanes, environments, caches, or run trees.
 - Run prescribed pre-commit, tests, static checks, and relevant CI locally. Preserve compatibility.
 - Never use Fable or Opus. At most one fresh independent Sol review of the final current diff.
 - Commit and push coherent preparation batches only to the user's private fork/branches and mirror
@@ -46,10 +47,9 @@ explicit in the PR descriptions.
 
 ## Required deliverables before user audit
 
-For each PR provide: exact base/head pins, a minimal diff, dependency statement, test matrix and
-results, real-TPU evidence where applicable, compatibility/risk notes, rollback behavior, and a
-ready-to-paste title/body. Prove no generated/bulk files are tracked and no upstream mutation
-occurred. Present PR 1 first for personal audit; do not let unfinished PRs 2-3 delay it.
+For each PR provide pins, minimal diff, dependencies, tests, TPU evidence where applicable, risks,
+rollback, and ready-to-paste title/body. Prove no bulk files or upstream mutation. Present PR 1
+first; do not let unfinished PRs 2-3 delay it.
 
 ## Definition of done
 
