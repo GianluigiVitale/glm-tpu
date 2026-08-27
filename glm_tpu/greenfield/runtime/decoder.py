@@ -1393,6 +1393,17 @@ def _validate_dsa_query_decoder_association(
 
     global_output_width = dsa_indexer_heads * index_key_width
     local_output_width = global_output_width // local_parallel_size
+    exact_chunk_width = min(8 * index_key_width, local_output_width)
+    exact_chunks_per_local_owner = (
+        local_output_width // exact_chunk_width
+        if exact_chunk_width and local_output_width % exact_chunk_width == 0
+        else 0
+    )
+    expected_tuple4_reduction_fusion_count = (
+        full_indexer_layers * exact_chunks_per_local_owner
+        if exact_association
+        else 0
+    )
     local_shape = f"f32[{local_output_width},2048]"
     global_shapes = tuple(
         f"{dtype}[{global_output_width},2048]"
@@ -1411,7 +1422,7 @@ def _validate_dsa_query_decoder_association(
     tuple4_reduction_fusion_count = sum(
         tuple4_reduction_key in line
         and line.split(" fusion(", 1)[0].count(
-            f"f32[{local_output_width}]"
+            f"f32[{exact_chunk_width}]"
         )
         == 4
         for line in optimized_hlo.splitlines()
@@ -1423,6 +1434,11 @@ def _validate_dsa_query_decoder_association(
         )
     if global_output_width % local_parallel_size:
         violations.append("DSA query width does not shard over the local group")
+    if not exact_chunks_per_local_owner:
+        violations.append(
+            "DSA query local owner does not divide into exact eight-head "
+            "chunks"
+        )
     if forbidden_global_shapes:
         violations.append(
             "decoder reconstructs a global DSA query weight: "
@@ -1436,11 +1452,12 @@ def _validate_dsa_query_decoder_association(
                 f"observed={local_shape_occurrences}"
             )
         if exact_association and (
-            tuple4_reduction_fusion_count != full_indexer_layers
+            tuple4_reduction_fusion_count
+            != expected_tuple4_reduction_fusion_count
         ):
             violations.append(
                 "decoder lost the exact four-reduction DSA query fusion: "
-                f"expected={full_indexer_layers} "
+                f"expected={expected_tuple4_reduction_fusion_count} "
                 f"observed={tuple4_reduction_fusion_count}"
             )
         if not exact_association and tuple4_reduction_fusion_count:
@@ -1461,12 +1478,14 @@ def _validate_dsa_query_decoder_association(
         "local_owner_shape": local_shape,
         "local_owner_shape_occurrences": local_shape_occurrences,
         "exact_association": exact_association,
+        "exact_chunk_width": exact_chunk_width,
+        "exact_chunks_per_local_owner": exact_chunks_per_local_owner,
         "all_16k_reduction_fusion_count": (
             all_16k_reduction_fusion_count
         ),
         "tuple4_reduction_fusion_count": tuple4_reduction_fusion_count,
         "expected_tuple4_reduction_fusion_count": (
-            full_indexer_layers if exact_association else 0
+            expected_tuple4_reduction_fusion_count
         ),
         "passed": not violations,
         "violations": violations,

@@ -4058,6 +4058,8 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
     assert exact["passed"], exact
     assert exact["tuple4_reduction_fusion_count"] == 21
     assert exact["all_16k_reduction_fusion_count"] == 22
+    assert exact["exact_chunk_width"] == 1024
+    assert exact["exact_chunks_per_local_owner"] == 1
     collapsed = _validate_dsa_query_decoder_association(
         exact_hlo.replace('"16384"', '"4096"', 2),
         full_indexer_layers=21,
@@ -4069,6 +4071,43 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
     )
     assert not collapsed["passed"]
     assert "expected=21 observed=20" in collapsed["violations"][0]
+    lp2_owner_hlo = "\n".join(
+        f"%dsa_lp2_owner_{index} = f32[2048,2048] parameter(0)"
+        for index in range(21)
+    )
+    lp2_tuple_hlo = "\n".join(
+        f"%query_lp2_tuple_{index} = {tuple_result} fusion(%value), "
+        'backend_config={"megacore_config":'
+        '{"megacore_allreduce_bytes":"16384"}}'
+        for index in range(42)
+    )
+    lp2_exact = _validate_dsa_query_decoder_association(
+        lp2_owner_hlo + "\n" + lp2_tuple_hlo,
+        full_indexer_layers=21,
+        local_parallel_size=2,
+        dsa_indexer_heads=32,
+        index_key_width=128,
+        backend="reference",
+        exact_association=True,
+    )
+    assert lp2_exact["passed"], lp2_exact
+    assert lp2_exact["local_owner_shape"] == "f32[2048,2048]"
+    assert lp2_exact["exact_chunk_width"] == 1024
+    assert lp2_exact["exact_chunks_per_local_owner"] == 2
+    assert lp2_exact["tuple4_reduction_fusion_count"] == 42
+    lp2_collapsed = _validate_dsa_query_decoder_association(
+        (lp2_owner_hlo + "\n" + lp2_tuple_hlo).replace(
+            '"16384"', '"4096"', 1
+        ),
+        full_indexer_layers=21,
+        local_parallel_size=2,
+        dsa_indexer_heads=32,
+        index_key_width=128,
+        backend="reference",
+        exact_association=True,
+    )
+    assert not lp2_collapsed["passed"]
+    assert "expected=42 observed=41" in lp2_collapsed["violations"][0]
     global_owner = _validate_dsa_query_decoder_association(
         reference_dsa_hlo + "\n%global = f32[4096,2048] parameter(0)",
         full_indexer_layers=21,

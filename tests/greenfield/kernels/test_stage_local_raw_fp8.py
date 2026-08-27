@@ -209,3 +209,75 @@ print(json.dumps({
     assert result["dots"] == 4
     assert result["exact"]
     assert result["global_aliases"] >= 4
+
+
+def test_exact_dsa_query_chunks_lp2_owner_without_global_reconstruction() -> None:
+    program = r'''
+import json
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
+from glm_tpu.greenfield.kernels.stage_local import _local_dsa_query, _local_dsa_query_tuple4_exact
+
+devices = np.asarray(jax.devices(), dtype=object)
+mesh = Mesh(devices, ('stage',))
+replicated = NamedSharding(mesh, P())
+weight_sharding = NamedSharding(mesh, P('stage', None))
+contract = DsaNumericalContract(hidden_size=8, q_lora_rank=8, num_heads=32, head_dim=4, rotary_dim=2, top_k=4)
+query = jax.device_put(jnp.asarray([[.5, -.25, .75, 1, -1, .125, .25, -.5]], jnp.bfloat16), replicated)
+normalized = jax.device_put(jnp.asarray([[.25, -.5, .125, 1, -.75, .5, -.125, .75]], jnp.bfloat16), replicated)
+weight = jax.device_put(jnp.arange(128 * 8, dtype=jnp.float32).reshape(128, 8) / 4096, weight_sharding)
+head_weight = jax.device_put(jnp.arange(16 * 8, dtype=jnp.float32).reshape(16, 8) / 256, replicated)
+position = jax.device_put(jnp.asarray([7], jnp.int32), replicated)
+
+exact = jax.shard_map(
+    lambda q, n, w0, w1, w2, w3, h, p: _local_dsa_query_tuple4_exact(q, n, (w0, w1, w2, w3), h, p, contract=contract)[0],
+    mesh=mesh,
+    in_specs=(P(), P(), P('stage', None), P('stage', None), P('stage', None), P('stage', None), P(), P()),
+    out_specs=P('stage', None, None),
+    check_vma=False,
+)
+ordinary = jax.shard_map(
+    lambda q, n, w, h, p: _local_dsa_query(q, n, w, h, p, contract=contract)[0],
+    mesh=mesh,
+    in_specs=(P(), P(), P('stage', None), P(), P()),
+    out_specs=P('stage', None, None),
+    check_vma=False,
+)
+lowered = jax.jit(exact).lower(query, normalized, weight, weight, weight, weight, head_weight, position)
+stablehlo = lowered.as_text()
+actual = lowered.compile()(query, normalized, weight, weight, weight, weight, head_weight, position)
+expected = jax.jit(ordinary)(query, normalized, weight, head_weight, position)
+print(json.dumps({
+    'barriers': stablehlo.count('stablehlo.optimization_barrier'),
+    'dots': stablehlo.count('stablehlo.dot_general'),
+    'exact': bool(jnp.array_equal(actual, expected)),
+    'all_gathers': stablehlo.count('stablehlo.all_gather'),
+    'local_owner_aliases': stablehlo.count('tensor<64x8xf32>'),
+}, sort_keys=True))
+'''
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    existing = env.get("XLA_FLAGS", "").strip()
+    env["XLA_FLAGS"] = (
+        f"{existing} --xla_force_host_platform_device_count=2".strip()
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    import json
+
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result["barriers"] == 3
+    assert result["dots"] == 8
+    assert result["exact"]
+    assert result["all_gathers"] == 0
+    assert result["local_owner_aliases"] >= 4
