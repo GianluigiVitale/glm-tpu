@@ -17,6 +17,7 @@ def validate_sparse_attention_hlo(
     cache_rows: int = 65_536,
     cache_width: int = 640,
     dtype: str = "bf16",
+    expected_metadata_gather_count: int = 1,
 ) -> dict[str, Any]:
     """Require the two intended kernels and reject selected-KV HBM materialization."""
 
@@ -32,6 +33,12 @@ def validate_sparse_attention_hlo(
     ):
         if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
             raise ValueError(f"{name} must be a positive integer")
+    if (
+        not isinstance(expected_metadata_gather_count, int)
+        or isinstance(expected_metadata_gather_count, bool)
+        or expected_metadata_gather_count < 0
+    ):
+        raise ValueError("expected metadata-gather count must be a nonnegative integer")
     if dtype not in ("bf16", "f32"):
         raise ValueError("sparse-attention HLO dtype must be 'bf16' or 'f32'")
 
@@ -118,10 +125,10 @@ def validate_sparse_attention_hlo(
     for name, lines in kernel_calls.items():
         if len(lines) != 1:
             violations.append(f"expected one {name} call, found {len(lines)}")
-    if len(metadata_gather_calls) != 1:
+    if len(metadata_gather_calls) != expected_metadata_gather_count:
         violations.append(
-            "expected one compact block-table metadata gather, found "
-            f"{len(metadata_gather_calls)}"
+            "expected compact block-table metadata gather count "
+            f"{expected_metadata_gather_count}, found {len(metadata_gather_calls)}"
         )
     if unexpected_custom_calls:
         violations.append(
@@ -153,6 +160,9 @@ def validate_sparse_attention_hlo(
         },
         "custom_call_count": len(custom_calls),
         "metadata_gather_custom_call_count": len(metadata_gather_calls),
+        "expected_metadata_gather_custom_call_count": (
+            expected_metadata_gather_count
+        ),
         "metadata_gather_custom_calls": metadata_gather_calls,
         "unexpected_custom_calls": unexpected_custom_calls,
         "forbidden_operations": forbidden_operations,

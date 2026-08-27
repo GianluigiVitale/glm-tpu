@@ -448,13 +448,19 @@ def main() -> int:
     compiled = jax.jit(pallas_fn).lower(*compile_inputs).compile()
     pallas_compile_seconds = time.monotonic() - compile_started
     hlo = compiled.as_text()
-    hlo_contract = validate_sparse_attention_hlo(hlo)
+    args.hlo_output.parent.mkdir(parents=True, exist_ok=True)
+    args.hlo_output.write_text(hlo)
+    hlo_contract = validate_sparse_attention_hlo(
+        hlo,
+        cache_rows=pages * layout.local_rows_per_page,
+        expected_metadata_gather_count=(
+            0 if args.geometry == "pp16_lp2_2k" else 1
+        ),
+    )
     if not hlo_contract["passed"]:
         raise RuntimeError(
             f"fused sparse-attention HLO contract failed: {hlo_contract}"
         )
-    args.hlo_output.parent.mkdir(parents=True, exist_ok=True)
-    args.hlo_output.write_text(hlo)
 
     reference_compile_started = time.monotonic()
     compiled_reference = jax.jit(reference_fn).lower(*compile_inputs).compile()

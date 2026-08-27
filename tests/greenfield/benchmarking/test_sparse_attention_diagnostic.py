@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -60,3 +62,10 @@ def test_reference_hlo_contract_requires_three_exact_convolutions() -> None:
     assert not _reference_hlo_contract(hlo.replace(" convolution(", " add(", 1))[
         "passed"
     ]
+
+
+def test_discriminator_persists_hlo_before_fail_closed_validation() -> None:
+    source = Path("scripts/greenfield/microbench_sparse_attention.py").read_text()
+    write_index = source.index("args.hlo_output.write_text(hlo)")
+    validate_index = source.index("hlo_contract = validate_sparse_attention_hlo(")
+    assert write_index < validate_index

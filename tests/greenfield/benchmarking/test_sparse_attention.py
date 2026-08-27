@@ -73,6 +73,27 @@ def test_validate_sparse_attention_hlo_rejects_shape_and_contract_drift() -> Non
         validate_sparse_attention_hlo(_valid_hlo(), top_k=0)
     with pytest.raises(ValueError, match="dtype"):
         validate_sparse_attention_hlo(_valid_hlo(), dtype="f16")
+    with pytest.raises(ValueError, match="nonnegative integer"):
+        validate_sparse_attention_hlo(
+            _valid_hlo(), expected_metadata_gather_count=-1
+        )
+
+
+def test_validate_sparse_attention_hlo_accepts_exact_small_cache_lowering() -> None:
+    small = _valid_hlo().replace(
+        "bf16[65536,640]", "bf16[1024,640]"
+    ).replace(
+        '%rows = s32[2048] custom-call(%positions), custom_call_target="AssumeGatherIndicesInBound", metadata={op_name="jit(pallas_fn)/jit(take_along_axis)/gather"}\n',
+        "",
+    )
+    record = validate_sparse_attention_hlo(
+        small,
+        cache_rows=1024,
+        expected_metadata_gather_count=0,
+    )
+    assert record["passed"]
+    assert record["custom_call_count"] == 2
+    assert record["metadata_gather_custom_call_count"] == 0
 
 
 def test_validate_sparse_attention_integration_requires_both_pallas_calls() -> None:
