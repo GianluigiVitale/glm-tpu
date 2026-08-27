@@ -14,6 +14,7 @@ fleet agreement, and eight-host clean pre/post census.
 
 | DB | tag | evidence |
 |---:|---|---|
+| 557 | `greenfield_full_checkpoint_load_pp16_20260827T070407924804237Z` | complete PP16 16-stage/32-owner raw direct-load, byte round-trip, state/HBM/archive/cleanup proof; no performance claim |
 | 555 | `greenfield_topology_20260826T194116460015528Z` | replacement-pod physical `2x4x4` topology, fresh PP8/PP16 groups and fleet binding |
 | 405 | `greenfield_topology_20260805T125842425591441Z` | physical `2x4x4` topology and PP8/PP16 rings |
 | 406 | `greenfield_collectives_20260805T133905344573798Z` | `bf16[2,6144]` control/all-reduce, g2/4/8/32 |
@@ -48,9 +49,19 @@ Complete nonperformance checkpoint tag `greenfield_full_pack_pp16_20260827T03231
 `3685ee4` contains 32 base plus two optional-MTP final owners: 757,149,950,848 payload bytes and
 757,165,710,960 file bytes. Packed manifest SHA is `13ad2e92...fedb5`; independent inspection
 passes the exact 72-object checkpoint set and every generation/CRC/sidecar/metadata/plan identity.
-The results ledger/SUCCESS self SHAs are `c0097d9f...2af61` / `47c7745c...f9352`. This closes the
-complete-pack portion only; full-checkpoint device round-trip/HBM, Gate B and performance remain
-missing.
+The results ledger/SUCCESS self SHAs are `c0097d9f...2af61` / `47c7745c...f9352`. Complete PP16
+device round-trip/HBM subsequently passes at DB557 below; the pack itself has no performance
+standing.
+
+Accepted complete PP16 loader evidence is DB557 / tag
+`greenfield_full_checkpoint_load_pp16_20260827T070407924804237Z` at `f7353eb`. All 16 stages and
+physical ids 0--31 load 747,097,191,552 base bytes / 118,920 tensors directly, with exact device
+round trip and zero FP8 dequantization, global concat, or runtime reshard. Maximum peak HBM is
+24,748,712,448 bytes/chip and minimum largest-free-block is 8,265,700,864 bytes. Its 78-object
+ledger self/file SHAs are `b70d5101...e1729` / `6d4907b9...5d16`; terminal SUCCESS self/file SHAs
+are `d920e7bc...90aa` / `f348a192...8ea`; the final same-region set has exactly 80 objects and all
+three fleet censuses are 8/8 clean. This closes Gate B with DB420 and the corruption-refusal suite,
+but makes no decoder or performance claim.
 
 Accepted bounded checkpoint-loader evidence is DB556 / tag
 `greenfield_checkpoint_probe_load_pp16_20260827T031331899773974Z` at `46b8a4f`. The production
@@ -59,7 +70,8 @@ final-layout loader places both stage-0 PP16 owners on physical ids `[0,1]` and 
 Peak HBM is 25,201,152 bytes/chip and minimum largest-free-block is 32,989,212,160 bytes. State SHA
 is `3957f3ed...3b535`; the 12-object ledger SHA is `a485bd19...990d4`; terminal SUCCESS self SHA
 is `9da2910f...2a88`; fleet censuses and DB integrity pass. This authorizes a complete PP16 pack but
-does not itself prove the complete checkpoint, decoder, Gate B or performance.
+does not itself prove the complete checkpoint or decoder performance; DB557 supplies the complete
+PP16 load/HBM proof.
 
 Accepted nonperformance checkpoint-planning evidence is PP16 tag
 `greenfield_checkpoint_plan_pp16_20260827T022537742669498Z` at `6dc7304`. It covers the complete
@@ -76,8 +88,8 @@ axes, and both expert-owner slots. It reconciles 50,345,920 source bytes to two 
 payloads in one grouped core invocation; owner SHAs are `87ac52df...7ea6` / `705ed0ff...0ac3` and
 manifest SHA is `14c36aeb...c4e3`. Its exact nine-object / 50,375,010-byte same-region archive is
 generation/CRC terminal-sealed. This closes the bounded pack discriminator only; direct-loader
-compatibility subsequently passes in DB556 and the complete pack above is sealed, while
-full-checkpoint HBM, Gate-B, and performance evidence remain missing.
+compatibility subsequently passes in DB556, the complete pack is sealed, and DB557 supplies
+full-checkpoint HBM/Gate-B evidence. Complete-decoder performance evidence remains missing.
 
 The compile-only tag
 `greenfield_ws32_short_decoder_8k_acquire_20260826T195124476893681Z` is preserved diagnostic

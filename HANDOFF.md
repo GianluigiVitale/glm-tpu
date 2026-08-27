@@ -2,6 +2,26 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 complete PP16 direct-load/HBM proof passes; Gate B is closed
+
+- Protected tag `greenfield_full_checkpoint_load_pp16_20260827T070407924804237Z` at pushed,
+  same-region-mirrored code `f7353eb` loads all 16 `PP16_LP2` stages / 32 physical owners from the
+  sealed complete pack. It independently verifies and device-round-trips 747,097,191,552 base
+  payload bytes / 118,920 tensors with zero FP8 dequantization, host-global concatenation, or
+  runtime checkpoint reshard. Every physical device id 0--31 occurs exactly once.
+- Maximum measured weights-only peak HBM is 24,748,712,448 bytes/chip; the minimum runtime-reported
+  largest free block is 8,265,700,864 bytes. Stage load/round-trip time spans 163.124--397.776
+  seconds. These are checkpoint initialization measurements, not decoder latency or throughput.
+- Canonical DB run 557 and its integral snapshot are sealed. The 78-object preterminal ledger has
+  semantic/file SHAs `b70d5101...e1729` / `6d4907b9...5d16`; terminal SUCCESS self/file SHAs are
+  `d920e7bc...90aa` / `f348a192...8ea`. The final archive has exactly 80 objects in
+  `gs://driftbench-dsv4-uc/results/` (`US-CENTRAL2`), and all three eight-host censuses are clean.
+- Together with DB420's complete PP8 load, corruption-refusal tests, and the complete PP16
+  plan/pack, this closes Gate B. Gate C is already passed under the documented device-score
+  numerical contract. Resume Gate D: produce an exact complete short-context decoder on the
+  selected pipeline path; PP16 still has no complete-decoder latency result, and WS32 remains
+  rejected at the layer-1 DSA boundary until bounded evidence changes that decision.
+
 ## 2026-08-27 complete PP16 final-layout checkpoint is sealed
 
 - Tag `greenfield_full_pack_pp16_20260827T032310295108546Z` at pushed/mirrored code `3685ee4`

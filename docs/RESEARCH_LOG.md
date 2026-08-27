@@ -5,6 +5,26 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 — complete PP16 direct final-owner load closes Gate B
+
+Protected tag `greenfield_full_checkpoint_load_pp16_20260827T070407924804237Z` at pushed and
+same-region-mirrored code `f7353eb` first ran a worker-4/stage-0 discriminator, then loaded both
+authenticated PP16 stages sequentially on each of the eight hosts. All 16 stages / 32 base owners
+passed exact checkpoint identities, file/tensor hashes, raw device-byte round trip, topology
+ownership, and state-manifest checks. The total is 747,097,191,552 bytes / 118,920 tensors, with
+zero host/device FP8 dequantization, host-global concatenation, or runtime checkpoint reshard.
+
+Maximum weights-only peak HBM is 24,748,712,448 bytes/chip and minimum largest-free block is
+8,265,700,864 bytes. Stage load/round-trip time spans 163.124--397.776 seconds; it is initialization
+I/O, not token latency. DB557 and its snapshot pass integrity. The 78-object preterminal ledger
+self/file SHAs are `b70d5101...e1729` / `6d4907b9...5d16`; terminal SUCCESS self/file SHAs are
+`d920e7bc...90aa` / `f348a192...8ea`. The exact final set is 80 generation/CRC-bound objects in
+the approved `US-CENTRAL2` bucket, and pre/probe-post/final censuses are each 8/8 clean.
+
+This closes Gate B when combined with the existing complete PP8 proof and corruption refusals. It
+does not execute a decoder, collect XPlanes, produce tokens, or claim throughput. Gate C is already
+passed; Gate D short-context decoder exactness and protected wall evidence remain next.
+
 ## 2026-08-27 — complete PP16 final-owner checkpoint is same-region sealed
 
 After the bounded pack and production-loader discriminators passed, protected tag

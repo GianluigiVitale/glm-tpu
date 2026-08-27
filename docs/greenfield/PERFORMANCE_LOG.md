@@ -6,6 +6,16 @@ but not Gate E. WS32 has the accepted 2K DB553 point at `122.630667 ms/token` / 
 No accepted 8K, 128K, 256K or PP16 full-decoder measurement exists yet. Bounded
 layer/kernel/diagnostic results below are not token-speed proof.
 
+## 2026-08-27 — complete PP16 direct load, not performance
+
+DB557 / `greenfield_full_checkpoint_load_pp16_20260827T070407924804237Z` proves that every one of
+the 32 PP16 base owners can directly load and device-round-trip the complete 747,097,191,552-byte
+base state. Maximum weights-only peak HBM is 24,748,712,448 bytes/chip and the minimum largest free
+block is 8,265,700,864 bytes. Stage initialization spans 163.124--397.776 seconds, but this is
+same-region checkpoint I/O and exhaustive hashing/round-trip time—not token latency. No decoder,
+XPlane, raw token, DSA event, or tok/s result exists for this run. Gate B is closed; PP16 still has
+no accepted complete-decoder performance measurement.
+
 ## 2026-08-27 — complete PP16 pack, not performance
 
 `greenfield_full_pack_pp16_20260827T032310295108546Z` seals 757,149,950,848 payload bytes across

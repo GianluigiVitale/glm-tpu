@@ -25,8 +25,10 @@
 | Real layer-3 PP16 pack | Two final-owner files; 128 experts + shared width 1024/chip; manifest `38573723...e454`; remote `SUCCESS` | Pass (layout mechanism; not Gate B) |
 | Exact real PP16 local MoE layer | DB 418: exact routes, bounded tensors, two-rank HLO, HBM, wall, XPlane, DB/archive/cleanup | Pass |
 | Complete PP8 plan/layout/pack | 118,629 source leaves; 32 base + 4 MTP owners; exact byte/hash reconciliation; manifest `08694931...78f1` | Pass |
-| Complete PP16 plan/layout | 118,629 leaves; 16 exact physical stages; 32 base + 2 MTP owners; 757,149,950,848 planned bytes; execution/plan/layout `079cefe6...794c3` / `3c3ea07b...ed16` / `f97de2d8...b15f9`; nine-object SUCCESS-last same-region archive | Plan pass; full pack/direct load/HBM and Gate B missing |
-| Bounded complete-layout PP16 pack probe | Ten real leaves / all six layout-value classes / axis 0+1 / both expert owners; 50,345,920 source to two 25,173,952-byte payloads in one grouped pass; manifest `14c36aeb...c4e3`; nine-object generation/CRC archive | Pack mechanism pass; bounded direct-load and full Gate B missing |
+| Complete PP16 plan/layout | 118,629 leaves; 16 exact physical stages; 32 base + 2 MTP owners; 757,149,950,848 planned bytes; execution/plan/layout `079cefe6...794c3` / `3c3ea07b...ed16` / `f97de2d8...b15f9`; nine-object SUCCESS-last same-region archive | Pass |
+| Bounded complete-layout PP16 pack/load probes | Ten real leaves / all six layout-value classes / axis 0+1 / both expert owners; 50,347,904 packed bytes; manifest `14c36aeb...c4e3`; DB556 raw device round trip | Pass |
+| Complete PP16 plan-aware pack | 32 base + 2 optional-MTP owners; 757,149,950,848 payload bytes; packed manifest `13ad2e92...fedb5`; exact 72-object checkpoint set | Pass |
+| Complete PP16 direct load | DB557: 16 stages / 32 physical owners, 747,097,191,552 base bytes / 118,920 tensors, exact device round trip, peak HBM 24,748,712,448 bytes/chip, 80-object archive and three clean censuses | Pass; no performance claim |
 | Complete PP8 direct load | DB 420: all 32 chips / 8 stages, 750,122,559,744 bytes, exact identities, device round trip, peak weights-only HBM, archive/cleanup | Pass |
 | Gate B base layout | Complete plan-aware checkpoint manifest/packer/direct loader and fail-closed corruption handling | Pass |
 | Gate B fused qkv-a derivative | Pack `7d5dfb9` plus DB504: 32 final-owner files / 834,369,271,808 bytes; exact device round trip; 78 fused convolutions; zero runtime reshards/concat/dequantization | Pass; Gate B re-closed |
