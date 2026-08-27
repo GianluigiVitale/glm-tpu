@@ -60,5 +60,6 @@ quality, integrity, HBM, HLO, PP8/PP16 measurement, WS32 adjudication, 128K smok
 DB/archive, and clean-fleet gates. Continue until section 18 has direct evidence.
 Work in bulk. Never use Fable/Opus. Before deploy: at most one fresh Sol audit of current
 diff/evidence; no workflows/subagents/cleared-code review. Fix, commit, push. After failure,
-diagnose locally; optional narrow Sol review. Checkpoint every batch by commit+push and verified
-rsync of worktree/evidence to the owner's bucket. Never stop/count rsync as TPU work; avoid I/O overlap.
+diagnose locally; optional narrow Sol review. Checkpoint each batch: commit+push+verify mirror only
+in `gs://driftbench-dsv4-uc` (`US-CENTRAL2`); fail closed on location drift, never EU. Keep sync
+outside TPU timing.
