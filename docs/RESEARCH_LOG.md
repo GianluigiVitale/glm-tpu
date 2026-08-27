@@ -5,7 +5,7 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
-## 2026-08-27 12:23--14:00 UTC — first PP16 full graph localizes plan-specific linter assumptions
+## 2026-08-27 12:23--13:00 UTC — first PP16 full graph localizes plan-specific linter assumptions
 
 The first protected complete PP16 acquisition at pushed pin `9034764`, tag
 `greenfield_short_decoder_compile_pp16_acquisition_20260827T122306083796688Z`, completed the
