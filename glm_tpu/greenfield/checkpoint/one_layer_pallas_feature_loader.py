@@ -48,16 +48,16 @@ class PallasFeatureLoadExpectation:
             raise ValueError("code_hash must be a lowercase Git object id")
         if not self.source_revision.strip():
             raise ValueError("source_revision must be non-empty")
-        if self.plan_id != "PP8_LP4":
-            raise ValueError("expert-feature loader requires PP8_LP4")
+        if self.plan_id not in ("PP8_LP4", "PP16_LP2"):
+            raise ValueError("expert-feature loader requires PP8_LP4 or PP16_LP2")
         if self.model_id != "zai-org/GLM-5.2-FP8" or self.layer != 3:
             raise ValueError("expert-feature loader supports GLM layer 3")
 
     @property
     def stage_size(self) -> int:
-        """Return the physical width required by the PP8 feature layout."""
+        """Return the physical width required by the feature layout."""
 
-        return 4
+        return {"PP8_LP4": 4, "PP16_LP2": 2}[self.plan_id]
 
 
 def _rss_peak_bytes() -> int:
@@ -87,9 +87,9 @@ def verify_pallas_feature_load_contract(
         for name, value in expected.items()
         if manifest.get(name) != value
     }
-    if manifest["geometry"].get("stage_size") != 4:
+    if manifest["geometry"].get("stage_size") != expectation.stage_size:
         mismatches["geometry.stage_size"] = {
-            "expected": 4,
+            "expected": expectation.stage_size,
             "observed": manifest["geometry"].get("stage_size"),
         }
     if mismatches:
@@ -104,15 +104,17 @@ def load_pallas_feature_one_layer(
     *,
     expert_chunk_size: int = 2,
 ) -> LoadedPallasOneLayer:
-    """Direct-load four final feature owners without concat or transpose."""
+    """Direct-load final LP2/LP4 feature owners without concat or transpose."""
 
     if expert_chunk_size <= 0:
         raise ValueError("expert_chunk_size must be positive")
     manifest = verify_pallas_feature_load_contract(
         artifact_dir, expectation
     )
-    if len(resolution.devices) != 4:
-        raise ValueError("expert-feature resolution must contain four chips")
+    if len(resolution.devices) != expectation.stage_size:
+        raise ValueError(
+            "expert-feature resolution width disagrees with the plan"
+        )
 
     import jax
     import numpy as np
@@ -285,7 +287,7 @@ def load_pallas_feature_one_layer(
         "packed_payload_byte_count": manifest[
             "packed_payload_byte_count"
         ],
-        "packed_single_device_transfers": 4 * len(local),
+        "packed_single_device_transfers": expectation.stage_size * len(local),
         "plan_id": expectation.plan_id,
         "routed_layout": "expert_intermediate_shard",
         "runtime_routed_weight_transposes": 0,

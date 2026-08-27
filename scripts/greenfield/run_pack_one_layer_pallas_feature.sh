@@ -1,21 +1,44 @@
 #!/usr/bin/env bash
-# Append-only PP8 layer-3 expert-feature derivative; no TPU execution.
+# Append-only PP8/PP16 layer-3 expert-feature derivative; no TPU execution.
 set -euo pipefail
 
 readonly BRANCH=rewrite/topology-first-decode
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
-readonly SOURCE_TAG=greenfield_one_layer_pallas_pack_20260806T041854316280053Z
-readonly SOURCE_RUN=/home/gianl/glm-run/$SOURCE_TAG
-readonly SOURCE_ARTIFACT=$SOURCE_RUN/packed
-readonly SOURCE_MANIFEST_SHA256=3da63bd9c2332dd67fc29a1d158e5468e0fdf1db1a9a0e8b7977277b0812e427
-readonly SOURCE_ARTIFACT_URI=$APPROVED_BUCKET/checkpoints/greenfield/glm52/layer3/PP8_LP4/pallas_final/$SOURCE_TAG
+
+PLAN_ID=${GLM_GREENFIELD_ONE_LAYER_PALLAS_FEATURE_PLAN:-PP8_LP4}
+case "$PLAN_ID" in
+  PP8_LP4)
+    SOURCE_TAG=greenfield_one_layer_pallas_pack_20260806T041854316280053Z
+    SOURCE_RUN=/home/gianl/glm-run/$SOURCE_TAG
+    SOURCE_MANIFEST_SHA256=3da63bd9c2332dd67fc29a1d158e5468e0fdf1db1a9a0e8b7977277b0812e427
+    PLAN_SLUG=pp8
+    ;;
+  PP16_LP2)
+    SOURCE_RUN=${GLM_GREENFIELD_ONE_LAYER_PALLAS_SOURCE_RUN:-}
+    SOURCE_MANIFEST_SHA256=${GLM_GREENFIELD_ONE_LAYER_PALLAS_SOURCE_MANIFEST_SHA256:-}
+    [[ -n $SOURCE_RUN && -n $SOURCE_MANIFEST_SHA256 ]] || {
+      echo "PP16 feature pack requires its local Pallas source run and manifest SHA" >&2
+      exit 2
+    }
+    SOURCE_TAG=$(basename "$SOURCE_RUN")
+    PLAN_SLUG=pp16
+    ;;
+  *)
+    echo "unsupported one-layer feature plan: $PLAN_ID" >&2
+    exit 2
+    ;;
+esac
+SOURCE_ARTIFACT=$SOURCE_RUN/packed
+SOURCE_ARTIFACT_URI=$APPROVED_BUCKET/checkpoints/greenfield/glm52/layer3/$PLAN_ID/pallas_final/$SOURCE_TAG
+readonly PLAN_ID SOURCE_TAG SOURCE_RUN SOURCE_ARTIFACT
+readonly SOURCE_MANIFEST_SHA256 SOURCE_ARTIFACT_URI PLAN_SLUG
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_ONE_LAYER_PALLAS_FEATURE_TAG:-greenfield_one_layer_pallas_feature_pack_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_ONE_LAYER_PALLAS_FEATURE_TAG:-greenfield_one_layer_pallas_feature_pack_${PLAN_SLUG}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 PACK_DIR=$RUN_DIR/packed
-REMOTE_PREFIX=$APPROVED_BUCKET/checkpoints/greenfield/glm52/layer3/PP8_LP4/pallas_feature/$TAG
+REMOTE_PREFIX=$APPROVED_BUCKET/checkpoints/greenfield/glm52/layer3/$PLAN_ID/pallas_feature/$TAG
 readonly PIN TAG RUN_DIR PACK_DIR REMOTE_PREFIX
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
@@ -24,6 +47,11 @@ readonly PIN TAG RUN_DIR PACK_DIR REMOTE_PREFIX
 }
 [[ -z $(git -C "$WORKTREE" status --porcelain) ]] || {
   echo "refusing feature pack from a dirty worktree" >&2
+  exit 2
+}
+bucket_location=$(gcloud storage buckets describe "$APPROVED_BUCKET" --format='value(location)')
+[[ $bucket_location == US-CENTRAL2 ]] || {
+  echo "approved bucket location drifted: $bucket_location" >&2
   exit 2
 }
 [[ -r $SOURCE_ARTIFACT/manifest.json ]] || {
@@ -70,7 +98,7 @@ say() {
 say "RUN_DIR=$RUN_DIR"
 say "PIN=$PIN SOURCE_MANIFEST_SHA256=$SOURCE_MANIFEST_SHA256"
 say "REMOTE_PREFIX=$REMOTE_PREFIX"
-say "offline redistributing expert identities into 512-wide feature shards; TPU forbidden"
+say "offline redistributing expert identities over exact $PLAN_ID feature owners; TPU forbidden"
 started=$(date +%s)
 (
   cd "$WORKTREE"

@@ -90,11 +90,24 @@ case "$KERNEL" in
     )
     ;;
   pallas_feature)
-    [[ $PLAN_ID == PP8_LP4 ]] || {
-      echo "Pallas feature artifact supports protected PP8 only" >&2
-      exit 2
-    }
-    PLAN_SLUG=pp8_pallas_feature
+    if [[ $PLAN_ID == PP8_LP4 ]]; then
+      PLAN_SLUG=pp8_pallas_feature
+      PACK_RUN=$PALLAS_FEATURE_PACK_RUN
+      PACK_MANIFEST_SHA=$PALLAS_FEATURE_PACK_MANIFEST_SHA
+      FEATURE_SOURCE_MANIFEST_SHA=$PALLAS_FEATURE_SOURCE_MANIFEST_SHA
+      FEATURE_PACK_CODE_HASH=$PALLAS_FEATURE_PACK_CODE_HASH
+    else
+      PLAN_SLUG=pp16_pallas_feature
+      PACK_RUN=${GLM_GREENFIELD_PP16_PALLAS_FEATURE_PACK_RUN:-}
+      PACK_MANIFEST_SHA=${GLM_GREENFIELD_PP16_PALLAS_FEATURE_PACK_MANIFEST_SHA:-}
+      FEATURE_SOURCE_MANIFEST_SHA=${GLM_GREENFIELD_PP16_PALLAS_FEATURE_SOURCE_MANIFEST_SHA:-}
+      FEATURE_PACK_CODE_HASH=${GLM_GREENFIELD_PP16_PALLAS_FEATURE_PACK_CODE_HASH:-}
+      [[ -n $PACK_RUN && -n $PACK_MANIFEST_SHA && \
+        -n $FEATURE_SOURCE_MANIFEST_SHA && -n $FEATURE_PACK_CODE_HASH ]] || {
+        echo "PP16 Pallas feature run requires exact artifact identities" >&2
+        exit 2
+      }
+    fi
     if [[ $FEATURE_OUTPUT_TILE != 128 ]]; then
       PLAN_SLUG=${PLAN_SLUG}_ot${FEATURE_OUTPUT_TILE}
     fi
@@ -104,12 +117,10 @@ case "$KERNEL" in
     if [[ $FEATURE_RECONSTRUCT_DOWN_FP32 == 1 ]]; then
       PLAN_SLUG=${PLAN_SLUG}_downf32
     fi
-    PACK_RUN=$PALLAS_FEATURE_PACK_RUN
-    PACK_MANIFEST_SHA=$PALLAS_FEATURE_PACK_MANIFEST_SHA
     KERNEL_ARGS=(
       --kernel pallas_feature
-      --source-packed-manifest-sha256 "$PALLAS_FEATURE_SOURCE_MANIFEST_SHA"
-      --packed-code-hash "$PALLAS_FEATURE_PACK_CODE_HASH"
+      --source-packed-manifest-sha256 "$FEATURE_SOURCE_MANIFEST_SHA"
+      --packed-code-hash "$FEATURE_PACK_CODE_HASH"
       --feature-output-tile "$FEATURE_OUTPUT_TILE"
       --feature-fuse-route-weighting "$FEATURE_FUSE_ROUTE_WEIGHTING"
       --feature-reconstruct-down-fp32 "$FEATURE_RECONSTRUCT_DOWN_FP32"
@@ -140,6 +151,7 @@ readonly PLAN_ID PLAN_SLUG PACK_RUN PACK_MANIFEST_SHA PLAN_GROUP_HASH KERNEL
 readonly TPU_BOUNDS TPU_VISIBLE EXPECTED_TRACE_CORES FEATURE_OUTPUT_TILE
 readonly FEATURE_FUSE_ROUTE_WEIGHTING
 readonly FEATURE_RECONSTRUCT_DOWN_FP32
+[[ $KERNEL != pallas_feature ]] || readonly FEATURE_SOURCE_MANIFEST_SHA FEATURE_PACK_CODE_HASH
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 ORACLE_PIN=$(git -C "$ORACLE_REPO" rev-parse HEAD)

@@ -1,10 +1,10 @@
-"""Append-only expert-feature derivative of the protected Pallas layer.
+"""Append-only expert-feature derivative of a protected pipeline-local layer.
 
-The source Pallas artifact stores 64 complete routed experts per PP8 chip.
+The source Pallas artifact stores complete routed experts per stage chip.
 This derivative preserves identical payload bytes while redistributing each
-expert's intermediate dimension: every chip owns a disjoint 512-wide slice
-of all 256 experts. Gate/up use the output slice and down uses the reciprocal
-contraction slice. Shared/router tensors keep their existing ownership.
+expert's intermediate dimension over the exact LP2/LP4 stage. Gate/up use the
+output slice and down uses the reciprocal contraction slice. Shared/router
+tensors keep their existing ownership.
 """
 
 from __future__ import annotations
@@ -80,7 +80,7 @@ def build_pallas_feature_layout(
     intermediate = int(geometry["intermediate_size"])
     stage_size = int(geometry["stage_size"])
     if intermediate % stage_size:
-        raise ValueError("routed intermediate must divide the PP8 stage")
+        raise ValueError("routed intermediate must divide the local stage")
     local_intermediate = intermediate // stage_size
     layout: dict[str, Any] = {
         "layout_id": PALLAS_FEATURE_LAYOUT_ID,
@@ -316,10 +316,14 @@ def pack_pallas_feature_one_layer(
     source = inspect_pallas_one_layer_artifact(config.source_artifact_dir)
     if source["manifest_sha256"] != config.source_manifest_sha256:
         raise ValueError("feature source Pallas manifest identity drifted")
-    if source["plan_id"] != "PP8_LP4" or int(
-        source["geometry"]["stage_size"]
-    ) != 4:
-        raise ValueError("feature derivative currently requires PP8_LP4")
+    expected_stage_size = {"PP8_LP4": 4, "PP16_LP2": 2}.get(
+        source["plan_id"]
+    )
+    stage_size = int(source["geometry"]["stage_size"])
+    if expected_stage_size is None or stage_size != expected_stage_size:
+        raise ValueError(
+            "feature derivative requires exact PP8_LP4 or PP16_LP2 geometry"
+        )
     if config.output_dir.exists():
         raise FileExistsError(
             f"append-only feature destination exists: {config.output_dir}"
@@ -340,7 +344,7 @@ def pack_pallas_feature_one_layer(
             source_manifest_sha256=config.source_manifest_sha256,
             layout_sha256=layout["layout_sha256"],
         )
-        for slot in range(4)
+        for slot in range(stage_size)
     ]
     manifest: dict[str, Any] = {
         "artifact_kind": PALLAS_FEATURE_ARTIFACT_KIND,
@@ -408,8 +412,16 @@ def inspect_pallas_feature_one_layer_artifact(
     files = sorted(
         manifest.get("files", []), key=lambda record: record["device_slot"]
     )
-    if len(files) != 4:
-        raise ValueError("Pallas feature artifact requires four device files")
+    stage_size = int(manifest["geometry"]["stage_size"])
+    expected_stage_size = {"PP8_LP4": 4, "PP16_LP2": 2}.get(
+        manifest["plan_id"]
+    )
+    if expected_stage_size is None or stage_size != expected_stage_size:
+        raise ValueError("Pallas feature artifact plan geometry is invalid")
+    if len(files) != stage_size:
+        raise ValueError(
+            "Pallas feature artifact device-file count disagrees with its stage"
+        )
 
     source = None
     source_files: list[Mapping[str, Any]] = []
@@ -481,7 +493,7 @@ def inspect_pallas_feature_one_layer_artifact(
                         destination_slot=expected_slot,
                         local_intermediate=int(
                             manifest["geometry"]["intermediate_size"]
-                        ) // 4,
+                        ) // stage_size,
                         block_shape=manifest["geometry"]["fp8_block_shape"],
                     )
                     if transform != record["transform"] or not torch.equal(

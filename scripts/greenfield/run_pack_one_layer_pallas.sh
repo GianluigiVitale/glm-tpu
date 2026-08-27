@@ -1,22 +1,48 @@
 #!/usr/bin/env bash
-# Append-only PP8 layer-3 derivative in selected-expert Pallas MXU order.
+# Append-only PP8/PP16 layer-3 derivative in selected-expert Pallas MXU order.
 set -euo pipefail
 
 readonly BRANCH=rewrite/topology-first-decode
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
-readonly SOURCE_TAG=greenfield_one_layer_pack_20260805T151828912346032Z
-readonly SOURCE_RUN=/home/gianl/glm-run/$SOURCE_TAG
-readonly SOURCE_ARTIFACT=$SOURCE_RUN/packed
-readonly SOURCE_MANIFEST_SHA256=68ef82011892456409a194f6fa31697dd1e31d96fe1a3f0069228288f613f938
-readonly SOURCE_ARTIFACT_URI=$APPROVED_BUCKET/checkpoints/greenfield/glm52/layer3/PP8_LP4/$SOURCE_TAG
+
+PLAN_ID=${GLM_GREENFIELD_ONE_LAYER_PALLAS_PLAN:-PP8_LP4}
+case "$PLAN_ID" in
+  PP8_LP4)
+    SOURCE_TAG=greenfield_one_layer_pack_20260805T151828912346032Z
+    SOURCE_ROOT=/home/gianl/glm-run/$SOURCE_TAG/packed
+    SOURCE_MANIFEST_PATH=$SOURCE_ROOT/manifest.json
+    SOURCE_MANIFEST_SHA256=68ef82011892456409a194f6fa31697dd1e31d96fe1a3f0069228288f613f938
+    SOURCE_ARTIFACT_URI=$APPROVED_BUCKET/checkpoints/greenfield/glm52/layer3/PP8_LP4/$SOURCE_TAG
+    PLAN_SLUG=pp8
+    SPLIT_MOUNT_SOURCE=0
+    ;;
+  PP16_LP2)
+    SOURCE_TAG=greenfield_one_layer_pack_pp16_20260805T172003732526347Z
+    SOURCE_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/layer3/PP16_LP2/$SOURCE_TAG
+    SOURCE_MANIFEST_PATH=$SOURCE_ROOT/manifest.json
+    SOURCE_MANIFEST_SHA256=385737230d593d6b2daa46911d1ac31973d9b79a7d43c3353cedf6d9779fe454
+    SOURCE_ARTIFACT_URI=$APPROVED_BUCKET/checkpoints/greenfield/glm52/layer3/PP16_LP2/$SOURCE_TAG
+    PLAN_SLUG=pp16
+    SPLIT_MOUNT_SOURCE=1
+    ;;
+  *)
+    echo "unsupported one-layer Pallas plan: $PLAN_ID" >&2
+    exit 2
+    ;;
+esac
+readonly PLAN_ID SOURCE_TAG SOURCE_ROOT SOURCE_MANIFEST_PATH
+readonly SOURCE_MANIFEST_SHA256 SOURCE_ARTIFACT_URI PLAN_SLUG
+readonly SPLIT_MOUNT_SOURCE
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_ONE_LAYER_PALLAS_PACK_TAG:-greenfield_one_layer_pallas_pack_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_ONE_LAYER_PALLAS_PACK_TAG:-greenfield_one_layer_pallas_pack_${PLAN_SLUG}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 PACK_DIR=$RUN_DIR/packed
-REMOTE_PREFIX=$APPROVED_BUCKET/checkpoints/greenfield/glm52/layer3/PP8_LP4/pallas_final/$TAG
-readonly PIN TAG RUN_DIR PACK_DIR REMOTE_PREFIX
+SOURCE_ARTIFACT=$SOURCE_ROOT
+[[ $SPLIT_MOUNT_SOURCE == 0 ]] || SOURCE_ARTIFACT=$RUN_DIR/source_artifact
+REMOTE_PREFIX=$APPROVED_BUCKET/checkpoints/greenfield/glm52/layer3/$PLAN_ID/pallas_final/$TAG
+readonly PIN TAG RUN_DIR PACK_DIR SOURCE_ARTIFACT REMOTE_PREFIX
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
   echo "refusing Pallas pack outside $BRANCH" >&2
@@ -26,13 +52,24 @@ readonly PIN TAG RUN_DIR PACK_DIR REMOTE_PREFIX
   echo "refusing Pallas pack from a dirty worktree" >&2
   exit 2
 }
-[[ -r $SOURCE_ARTIFACT/manifest.json ]] || {
+bucket_location=$(gcloud storage buckets describe "$APPROVED_BUCKET" --format='value(location)')
+[[ $bucket_location == US-CENTRAL2 ]] || {
+  echo "approved bucket location drifted: $bucket_location" >&2
+  exit 2
+}
+if [[ $SPLIT_MOUNT_SOURCE == 1 ]]; then
+  findmnt -T "$SOURCE_ROOT" -n -o SOURCE,FSTYPE | grep -q '^driftbench-dsv4-uc fuse.gcsfuse$' || {
+    echo "PP16 source is not on the approved read-only bucket mount" >&2
+    exit 2
+  }
+fi
+[[ -r $SOURCE_MANIFEST_PATH ]] || {
   echo "source one-layer artifact is unavailable" >&2
   exit 2
 }
 observed_source_manifest=$(/home/gianl/vllm-env/bin/python -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["manifest_sha256"])' \
-  "$SOURCE_ARTIFACT/manifest.json")
+  "$SOURCE_MANIFEST_PATH")
 [[ $observed_source_manifest == "$SOURCE_MANIFEST_SHA256" ]] || {
   echo "source one-layer manifest identity drifted" >&2
   exit 2
@@ -44,7 +81,7 @@ active_account=$(gcloud auth list --filter=status:ACTIVE --format='value(account
 }
 source_payload_bytes=$(/home/gianl/vllm-env/bin/python -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["packed_payload_byte_count"])' \
-  "$SOURCE_ARTIFACT/manifest.json")
+  "$SOURCE_MANIFEST_PATH")
 available_bytes=$(df -B1 --output=avail /home/gianl/glm-run | tail -n 1)
 required_bytes=$(( source_payload_bytes + 2147483648 ))
 [[ $available_bytes -ge $required_bytes ]] || {
@@ -62,6 +99,17 @@ flock -n 9 || {
   echo "another protected pod workflow holds the global lease" >&2
   exit 1
 }
+if [[ $SPLIT_MOUNT_SOURCE == 1 ]]; then
+  mkdir "$SOURCE_ARTIFACT"
+  ln -s "$SOURCE_MANIFEST_PATH" "$SOURCE_ARTIFACT/manifest.json"
+  for source_file in "$SOURCE_ROOT"/packed/device_slot_*.safetensors; do
+    [[ -r $source_file ]] || {
+      echo "mounted PP16 source shard is unavailable" >&2
+      exit 2
+    }
+    ln -s "$source_file" "$SOURCE_ARTIFACT/$(basename "$source_file")"
+  done
+fi
 
 say() {
   echo "[one-layer-pallas-pack $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
