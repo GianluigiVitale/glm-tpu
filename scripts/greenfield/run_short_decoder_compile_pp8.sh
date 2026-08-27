@@ -4650,8 +4650,12 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 DB_RUN=$(/home/gianl/vllm-env/bin/python -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["results_db_run_id"])' \
   "$RUN_DIR/summary.json")
-gcloud storage cp --recursive --no-clobber "$RUN_DIR"/* \
-  "$REMOTE_PREFIX/" >/dev/null
+# `gcloud storage cp --recursive "$RUN_DIR"/*` treats an intentionally empty
+# optional evidence directory as a failed source match.  Gate-D runs commonly
+# leave several observer directories empty, so archive the file tree with
+# storage rsync instead.  SUCCESS does not exist yet and remains terminal.
+gcloud storage rsync --recursive --checksums-only "$RUN_DIR" \
+  "$REMOTE_PREFIX" >/dev/null
 
 /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$REMOTE_PREFIX" \
   >"$RUN_DIR/remote_objects.json" <<'PY'

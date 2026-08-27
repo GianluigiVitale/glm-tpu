@@ -689,7 +689,7 @@ def test_protected_runner_seals_archive_before_terminal_success() -> None:
     post_census = runner.index("strict_census post")
     db_mutation = runner.index("pv.start_run(")
     bulk_upload = runner.index(
-        'gcloud storage cp --recursive --no-clobber "$RUN_DIR"/*'
+        'gcloud storage rsync --recursive --checksums-only "$RUN_DIR"'
     )
     exact_object_gate = runner.index(
         "validate_exact_remote_object_set(root, prefix, listing)"
