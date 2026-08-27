@@ -1,0 +1,2296 @@
+{
+  "artifact_kind": "greenfield_checkpoint_reproducibility_capsule",
+  "artifacts": [
+    {
+      "bytes": 755663676164,
+      "disposition": "keep",
+      "expected_manifest_sha256": null,
+      "id": "canonical_source",
+      "object_count": 150,
+      "objects": [
+        {
+          "crc32c": "6HZyOw==",
+          "generation": 1783384168989279,
+          "name": "models/GLM-5.2-FP8/.gitattributes",
+          "size": 1682
+        },
+        {
+          "crc32c": "Yov7mA==",
+          "generation": 1783384170973058,
+          "name": "models/GLM-5.2-FP8/LICENSE",
+          "size": 1065
+        },
+        {
+          "crc32c": "Lx6MjQ==",
+          "generation": 1783384161830320,
+          "name": "models/GLM-5.2-FP8/README.md",
+          "size": 10909
+        },
+        {
+          "crc32c": "I0Sqlg==",
+          "generation": 1783384163868537,
+          "name": "models/GLM-5.2-FP8/chat_template.jinja",
+          "size": 5076
+        },
+        {
+          "crc32c": "djQWpg==",
+          "generation": 1783384156632832,
+          "name": "models/GLM-5.2-FP8/config.json",
+          "size": 29464
+        },
+        {
+          "crc32c": "bSGKog==",
+          "generation": 1783384178112268,
+          "name": "models/GLM-5.2-FP8/generation_config.json",
+          "size": 194
+        },
+        {
+          "crc32c": "F4Vk/w==",
+          "generation": 1783382593522370,
+          "name": "models/GLM-5.2-FP8/model-00001-of-00141.safetensors",
+          "size": 5363940952
+        },
+        {
+          "crc32c": "SY7i2A==",
+          "generation": 1783383012200562,
+          "name": "models/GLM-5.2-FP8/model-00002-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "6B3RLA==",
+          "generation": 1783382846118640,
+          "name": "models/GLM-5.2-FP8/model-00003-of-00141.safetensors",
+          "size": 5363339120
+        },
+        {
+          "crc32c": "VMxLXg==",
+          "generation": 1783383416698247,
+          "name": "models/GLM-5.2-FP8/model-00004-of-00141.safetensors",
+          "size": 5361736640
+        },
+        {
+          "crc32c": "VowhVw==",
+          "generation": 1783381955460842,
+          "name": "models/GLM-5.2-FP8/model-00005-of-00141.safetensors",
+          "size": 5366353560
+        },
+        {
+          "crc32c": "UxPtkg==",
+          "generation": 1783383655990591,
+          "name": "models/GLM-5.2-FP8/model-00006-of-00141.safetensors",
+          "size": 5361736504
+        },
+        {
+          "crc32c": "w4jHtw==",
+          "generation": 1783381841761849,
+          "name": "models/GLM-5.2-FP8/model-00007-of-00141.safetensors",
+          "size": 5366353704
+        },
+        {
+          "crc32c": "4xwo5Q==",
+          "generation": 1783383814056313,
+          "name": "models/GLM-5.2-FP8/model-00008-of-00141.safetensors",
+          "size": 5361736368
+        },
+        {
+          "crc32c": "cgSzAQ==",
+          "generation": 1783381741238404,
+          "name": "models/GLM-5.2-FP8/model-00009-of-00141.safetensors",
+          "size": 5366353832
+        },
+        {
+          "crc32c": "KUWkKA==",
+          "generation": 1783384037352826,
+          "name": "models/GLM-5.2-FP8/model-00010-of-00141.safetensors",
+          "size": 5361736232
+        },
+        {
+          "crc32c": "hX+JnA==",
+          "generation": 1783382634944766,
+          "name": "models/GLM-5.2-FP8/model-00011-of-00141.safetensors",
+          "size": 5363339600
+        },
+        {
+          "crc32c": "kYImIQ==",
+          "generation": 1783382271496663,
+          "name": "models/GLM-5.2-FP8/model-00012-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "6A6r3g==",
+          "generation": 1783383016661560,
+          "name": "models/GLM-5.2-FP8/model-00013-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "p/jnpA==",
+          "generation": 1783382180245548,
+          "name": "models/GLM-5.2-FP8/model-00014-of-00141.safetensors",
+          "size": 5366353496
+        },
+        {
+          "crc32c": "ZTssCA==",
+          "generation": 1783383327334340,
+          "name": "models/GLM-5.2-FP8/model-00015-of-00141.safetensors",
+          "size": 5361736680
+        },
+        {
+          "crc32c": "UQGZJw==",
+          "generation": 1783382066038516,
+          "name": "models/GLM-5.2-FP8/model-00016-of-00141.safetensors",
+          "size": 5366353520
+        },
+        {
+          "crc32c": "rcvQ0w==",
+          "generation": 1783383554924928,
+          "name": "models/GLM-5.2-FP8/model-00017-of-00141.safetensors",
+          "size": 5361736544
+        },
+        {
+          "crc32c": "qr75zg==",
+          "generation": 1783382763332881,
+          "name": "models/GLM-5.2-FP8/model-00018-of-00141.safetensors",
+          "size": 5363339264
+        },
+        {
+          "crc32c": "iGifUg==",
+          "generation": 1783383761522537,
+          "name": "models/GLM-5.2-FP8/model-00019-of-00141.safetensors",
+          "size": 5361736408
+        },
+        {
+          "crc32c": "VdxHDg==",
+          "generation": 1783382594453577,
+          "name": "models/GLM-5.2-FP8/model-00020-of-00141.safetensors",
+          "size": 5364805840
+        },
+        {
+          "crc32c": "wS06Lw==",
+          "generation": 1783383883892371,
+          "name": "models/GLM-5.2-FP8/model-00021-of-00141.safetensors",
+          "size": 5361736336
+        },
+        {
+          "crc32c": "IDf/tA==",
+          "generation": 1783381730107452,
+          "name": "models/GLM-5.2-FP8/model-00022-of-00141.safetensors",
+          "size": 5366353872
+        },
+        {
+          "crc32c": "1BdOjw==",
+          "generation": 1783384201761648,
+          "name": "models/GLM-5.2-FP8/model-00023-of-00141.safetensors",
+          "size": 5357948328
+        },
+        {
+          "crc32c": "oEubIg==",
+          "generation": 1783384203419345,
+          "name": "models/GLM-5.2-FP8/model-00024-of-00141.safetensors",
+          "size": 5357555688
+        },
+        {
+          "crc32c": "rvj2AA==",
+          "generation": 1783382877435045,
+          "name": "models/GLM-5.2-FP8/model-00025-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "qImJIQ==",
+          "generation": 1783383099833254,
+          "name": "models/GLM-5.2-FP8/model-00026-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "UH5qzQ==",
+          "generation": 1783382119374212,
+          "name": "models/GLM-5.2-FP8/model-00027-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "rGGiqQ==",
+          "generation": 1783383371517341,
+          "name": "models/GLM-5.2-FP8/model-00028-of-00141.safetensors",
+          "size": 5361736648
+        },
+        {
+          "crc32c": "fNMcQQ==",
+          "generation": 1783382000410180,
+          "name": "models/GLM-5.2-FP8/model-00029-of-00141.safetensors",
+          "size": 5366353560
+        },
+        {
+          "crc32c": "itV8rQ==",
+          "generation": 1783383598240307,
+          "name": "models/GLM-5.2-FP8/model-00030-of-00141.safetensors",
+          "size": 5361736512
+        },
+        {
+          "crc32c": "/JfK9w==",
+          "generation": 1783381849540044,
+          "name": "models/GLM-5.2-FP8/model-00031-of-00141.safetensors",
+          "size": 5366353688
+        },
+        {
+          "crc32c": "yQUrvw==",
+          "generation": 1783383778340964,
+          "name": "models/GLM-5.2-FP8/model-00032-of-00141.safetensors",
+          "size": 5361736376
+        },
+        {
+          "crc32c": "72Xbiw==",
+          "generation": 1783382657063672,
+          "name": "models/GLM-5.2-FP8/model-00033-of-00141.safetensors",
+          "size": 5363339440
+        },
+        {
+          "crc32c": "cYpQmQ==",
+          "generation": 1783384037851770,
+          "name": "models/GLM-5.2-FP8/model-00034-of-00141.safetensors",
+          "size": 5361736240
+        },
+        {
+          "crc32c": "ygslkQ==",
+          "generation": 1783381609768003,
+          "name": "models/GLM-5.2-FP8/model-00035-of-00141.safetensors",
+          "size": 5366353976
+        },
+        {
+          "crc32c": "3FPW4g==",
+          "generation": 1783382286990112,
+          "name": "models/GLM-5.2-FP8/model-00036-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "XbMyOw==",
+          "generation": 1783383055849682,
+          "name": "models/GLM-5.2-FP8/model-00037-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "Ggj7hA==",
+          "generation": 1783382395903345,
+          "name": "models/GLM-5.2-FP8/model-00038-of-00141.safetensors",
+          "size": 5366353304
+        },
+        {
+          "crc32c": "cNIjiQ==",
+          "generation": 1783384099403947,
+          "name": "models/GLM-5.2-FP8/model-00039-of-00141.safetensors",
+          "size": 5361735832
+        },
+        {
+          "crc32c": "t1WXEw==",
+          "generation": 1783382487059867,
+          "name": "models/GLM-5.2-FP8/model-00040-of-00141.safetensors",
+          "size": 5366353016
+        },
+        {
+          "crc32c": "uBlNXQ==",
+          "generation": 1783383549336797,
+          "name": "models/GLM-5.2-FP8/model-00041-of-00141.safetensors",
+          "size": 5361736552
+        },
+        {
+          "crc32c": "MJLmww==",
+          "generation": 1783382802461224,
+          "name": "models/GLM-5.2-FP8/model-00042-of-00141.safetensors",
+          "size": 5363339264
+        },
+        {
+          "crc32c": "Yfgs3Q==",
+          "generation": 1783383706985498,
+          "name": "models/GLM-5.2-FP8/model-00043-of-00141.safetensors",
+          "size": 5361736416
+        },
+        {
+          "crc32c": "Fz7X2Q==",
+          "generation": 1783381839642266,
+          "name": "models/GLM-5.2-FP8/model-00044-of-00141.safetensors",
+          "size": 5366353776
+        },
+        {
+          "crc32c": "Nxwb8g==",
+          "generation": 1783383990128915,
+          "name": "models/GLM-5.2-FP8/model-00045-of-00141.safetensors",
+          "size": 5361736280
+        },
+        {
+          "crc32c": "7fHaqA==",
+          "generation": 1783381611357775,
+          "name": "models/GLM-5.2-FP8/model-00046-of-00141.safetensors",
+          "size": 5366353920
+        },
+        {
+          "crc32c": "AspFWA==",
+          "generation": 1783382192407616,
+          "name": "models/GLM-5.2-FP8/model-00047-of-00141.safetensors",
+          "size": 5366353496
+        },
+        {
+          "crc32c": "QPDRFg==",
+          "generation": 1783383076356326,
+          "name": "models/GLM-5.2-FP8/model-00048-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "MK8FPA==",
+          "generation": 1783382908777387,
+          "name": "models/GLM-5.2-FP8/model-00049-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "82gdfw==",
+          "generation": 1783383121684301,
+          "name": "models/GLM-5.2-FP8/model-00050-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "pmQnqA==",
+          "generation": 1783382072437891,
+          "name": "models/GLM-5.2-FP8/model-00051-of-00141.safetensors",
+          "size": 5366353512
+        },
+        {
+          "crc32c": "iqNmBA==",
+          "generation": 1783383481004888,
+          "name": "models/GLM-5.2-FP8/model-00052-of-00141.safetensors",
+          "size": 5361736584
+        },
+        {
+          "crc32c": "bafxng==",
+          "generation": 1783381945770140,
+          "name": "models/GLM-5.2-FP8/model-00053-of-00141.safetensors",
+          "size": 5366353608
+        },
+        {
+          "crc32c": "6qCZPw==",
+          "generation": 1783383673529125,
+          "name": "models/GLM-5.2-FP8/model-00054-of-00141.safetensors",
+          "size": 5361736448
+        },
+        {
+          "crc32c": "GMGRmA==",
+          "generation": 1783381844289713,
+          "name": "models/GLM-5.2-FP8/model-00055-of-00141.safetensors",
+          "size": 5366353744
+        },
+        {
+          "crc32c": "y4QPCA==",
+          "generation": 1783383921688119,
+          "name": "models/GLM-5.2-FP8/model-00056-of-00141.safetensors",
+          "size": 5361736312
+        },
+        {
+          "crc32c": "L/ymbQ==",
+          "generation": 1783382640996927,
+          "name": "models/GLM-5.2-FP8/model-00057-of-00141.safetensors",
+          "size": 5363339496
+        },
+        {
+          "crc32c": "yNHByw==",
+          "generation": 1783384147524206,
+          "name": "models/GLM-5.2-FP8/model-00058-of-00141.safetensors",
+          "size": 5357950744
+        },
+        {
+          "crc32c": "ZwVreg==",
+          "generation": 1783384231977882,
+          "name": "models/GLM-5.2-FP8/model-00059-of-00141.safetensors",
+          "size": 5357552376
+        },
+        {
+          "crc32c": "e2rJhw==",
+          "generation": 1783382499397792,
+          "name": "models/GLM-5.2-FP8/model-00060-of-00141.safetensors",
+          "size": 5366352776
+        },
+        {
+          "crc32c": "lmyWtw==",
+          "generation": 1783383144111853,
+          "name": "models/GLM-5.2-FP8/model-00061-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "v9EYpg==",
+          "generation": 1783382166226636,
+          "name": "models/GLM-5.2-FP8/model-00062-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "pcozpQ==",
+          "generation": 1783383435442965,
+          "name": "models/GLM-5.2-FP8/model-00063-of-00141.safetensors",
+          "size": 5361736624
+        },
+        {
+          "crc32c": "0aA/oQ==",
+          "generation": 1783381950910441,
+          "name": "models/GLM-5.2-FP8/model-00064-of-00141.safetensors",
+          "size": 5366353576
+        },
+        {
+          "crc32c": "nscigw==",
+          "generation": 1783383657741984,
+          "name": "models/GLM-5.2-FP8/model-00065-of-00141.safetensors",
+          "size": 5361736488
+        },
+        {
+          "crc32c": "lUkVRg==",
+          "generation": 1783382725846897,
+          "name": "models/GLM-5.2-FP8/model-00066-of-00141.safetensors",
+          "size": 5363339320
+        },
+        {
+          "crc32c": "/F54gA==",
+          "generation": 1783383866827676,
+          "name": "models/GLM-5.2-FP8/model-00067-of-00141.safetensors",
+          "size": 5361736360
+        },
+        {
+          "crc32c": "Ylfisw==",
+          "generation": 1783381737908725,
+          "name": "models/GLM-5.2-FP8/model-00068-of-00141.safetensors",
+          "size": 5366353848
+        },
+        {
+          "crc32c": "hMO5lw==",
+          "generation": 1783384039248766,
+          "name": "models/GLM-5.2-FP8/model-00069-of-00141.safetensors",
+          "size": 5361736224
+        },
+        {
+          "crc32c": "SGgmFw==",
+          "generation": 1783381615595016,
+          "name": "models/GLM-5.2-FP8/model-00070-of-00141.safetensors",
+          "size": 5366353992
+        },
+        {
+          "crc32c": "0Hpdqg==",
+          "generation": 1783382280954064,
+          "name": "models/GLM-5.2-FP8/model-00071-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "vnb21Q==",
+          "generation": 1783383149955165,
+          "name": "models/GLM-5.2-FP8/model-00072-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "ZK9s+A==",
+          "generation": 1783382842840702,
+          "name": "models/GLM-5.2-FP8/model-00073-of-00141.safetensors",
+          "size": 5363339112
+        },
+        {
+          "crc32c": "2nX9fQ==",
+          "generation": 1783383338618306,
+          "name": "models/GLM-5.2-FP8/model-00074-of-00141.safetensors",
+          "size": 5361736672
+        },
+        {
+          "crc32c": "Bpi0hg==",
+          "generation": 1783382067272489,
+          "name": "models/GLM-5.2-FP8/model-00075-of-00141.safetensors",
+          "size": 5366353528
+        },
+        {
+          "crc32c": "++vXCQ==",
+          "generation": 1783383571562250,
+          "name": "models/GLM-5.2-FP8/model-00076-of-00141.safetensors",
+          "size": 5361736528
+        },
+        {
+          "crc32c": "ZWbaSQ==",
+          "generation": 1783381846257857,
+          "name": "models/GLM-5.2-FP8/model-00077-of-00141.safetensors",
+          "size": 5366353672
+        },
+        {
+          "crc32c": "R81gwQ==",
+          "generation": 1783383768423478,
+          "name": "models/GLM-5.2-FP8/model-00078-of-00141.safetensors",
+          "size": 5361736392
+        },
+        {
+          "crc32c": "eAH0UA==",
+          "generation": 1783382397049642,
+          "name": "models/GLM-5.2-FP8/model-00079-of-00141.safetensors",
+          "size": 5366353168
+        },
+        {
+          "crc32c": "J1rWTw==",
+          "generation": 1783384141801539,
+          "name": "models/GLM-5.2-FP8/model-00080-of-00141.safetensors",
+          "size": 5361735408
+        },
+        {
+          "crc32c": "7fiFVw==",
+          "generation": 1783381741149905,
+          "name": "models/GLM-5.2-FP8/model-00081-of-00141.safetensors",
+          "size": 5366353872
+        },
+        {
+          "crc32c": "8IOnfA==",
+          "generation": 1783382906486973,
+          "name": "models/GLM-5.2-FP8/model-00082-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "YCjHhQ==",
+          "generation": 1783383217881622,
+          "name": "models/GLM-5.2-FP8/model-00083-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "GXzEoA==",
+          "generation": 1783382260884170,
+          "name": "models/GLM-5.2-FP8/model-00084-of-00141.safetensors",
+          "size": 5366353496
+        },
+        {
+          "crc32c": "R5JGdA==",
+          "generation": 1783383198045921,
+          "name": "models/GLM-5.2-FP8/model-00085-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "pPrj7w==",
+          "generation": 1783382077155975,
+          "name": "models/GLM-5.2-FP8/model-00086-of-00141.safetensors",
+          "size": 5366353512
+        },
+        {
+          "crc32c": "d3z6IQ==",
+          "generation": 1783383487321401,
+          "name": "models/GLM-5.2-FP8/model-00087-of-00141.safetensors",
+          "size": 5361736568
+        },
+        {
+          "crc32c": "69osPA==",
+          "generation": 1783381944689580,
+          "name": "models/GLM-5.2-FP8/model-00088-of-00141.safetensors",
+          "size": 5366353632
+        },
+        {
+          "crc32c": "rmxIew==",
+          "generation": 1783383704666229,
+          "name": "models/GLM-5.2-FP8/model-00089-of-00141.safetensors",
+          "size": 5361736432
+        },
+        {
+          "crc32c": "LZ5h2w==",
+          "generation": 1783382695888107,
+          "name": "models/GLM-5.2-FP8/model-00090-of-00141.safetensors",
+          "size": 5363339376
+        },
+        {
+          "crc32c": "k4v29g==",
+          "generation": 1783383919781532,
+          "name": "models/GLM-5.2-FP8/model-00091-of-00141.safetensors",
+          "size": 5361736296
+        },
+        {
+          "crc32c": "uSQLdw==",
+          "generation": 1783381610512924,
+          "name": "models/GLM-5.2-FP8/model-00092-of-00141.safetensors",
+          "size": 5366353904
+        },
+        {
+          "crc32c": "SiBw7A==",
+          "generation": 1783382286245925,
+          "name": "models/GLM-5.2-FP8/model-00093-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "mAZccA==",
+          "generation": 1783383216703924,
+          "name": "models/GLM-5.2-FP8/model-00094-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "D1KdOA==",
+          "generation": 1783382337394093,
+          "name": "models/GLM-5.2-FP8/model-00095-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "OhB+wg==",
+          "generation": 1783383228093679,
+          "name": "models/GLM-5.2-FP8/model-00096-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "ub/slA==",
+          "generation": 1783382860134613,
+          "name": "models/GLM-5.2-FP8/model-00097-of-00141.safetensors",
+          "size": 5363339112
+        },
+        {
+          "crc32c": "srs3Mw==",
+          "generation": 1783383443187214,
+          "name": "models/GLM-5.2-FP8/model-00098-of-00141.safetensors",
+          "size": 5361736616
+        },
+        {
+          "crc32c": "T6XqKQ==",
+          "generation": 1783382443485355,
+          "name": "models/GLM-5.2-FP8/model-00099-of-00141.safetensors",
+          "size": 5366353168
+        },
+        {
+          "crc32c": "fH/P7w==",
+          "generation": 1783384123012365,
+          "name": "models/GLM-5.2-FP8/model-00100-of-00141.safetensors",
+          "size": 5361735624
+        },
+        {
+          "crc32c": "siMEaA==",
+          "generation": 1783382966124896,
+          "name": "models/GLM-5.2-FP8/model-00101-of-00141.safetensors",
+          "size": 5363339032
+        },
+        {
+          "crc32c": "C+Y4qA==",
+          "generation": 1783383872397287,
+          "name": "models/GLM-5.2-FP8/model-00102-of-00141.safetensors",
+          "size": 5361736344
+        },
+        {
+          "crc32c": "AvL1zA==",
+          "generation": 1783381735876584,
+          "name": "models/GLM-5.2-FP8/model-00103-of-00141.safetensors",
+          "size": 5366353856
+        },
+        {
+          "crc32c": "sE5TuQ==",
+          "generation": 1783382552286262,
+          "name": "models/GLM-5.2-FP8/model-00104-of-00141.safetensors",
+          "size": 5364883208
+        },
+        {
+          "crc32c": "lgviFg==",
+          "generation": 1783382980721252,
+          "name": "models/GLM-5.2-FP8/model-00105-of-00141.safetensors",
+          "size": 5363207032
+        },
+        {
+          "crc32c": "WJrOHw==",
+          "generation": 1783382948721603,
+          "name": "models/GLM-5.2-FP8/model-00106-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "73+6jQ==",
+          "generation": 1783383257400035,
+          "name": "models/GLM-5.2-FP8/model-00107-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "xO+W/w==",
+          "generation": 1783382176785247,
+          "name": "models/GLM-5.2-FP8/model-00108-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "72QVPQ==",
+          "generation": 1783383377789554,
+          "name": "models/GLM-5.2-FP8/model-00109-of-00141.safetensors",
+          "size": 5361736648
+        },
+        {
+          "crc32c": "xSP0qw==",
+          "generation": 1783382056550218,
+          "name": "models/GLM-5.2-FP8/model-00110-of-00141.safetensors",
+          "size": 5366353552
+        },
+        {
+          "crc32c": "L/tmow==",
+          "generation": 1783383602180677,
+          "name": "models/GLM-5.2-FP8/model-00111-of-00141.safetensors",
+          "size": 5361736512
+        },
+        {
+          "crc32c": "0qEzsA==",
+          "generation": 1783381890937959,
+          "name": "models/GLM-5.2-FP8/model-00112-of-00141.safetensors",
+          "size": 5366353688
+        },
+        {
+          "crc32c": "Su2huQ==",
+          "generation": 1783383812611029,
+          "name": "models/GLM-5.2-FP8/model-00113-of-00141.safetensors",
+          "size": 5361736376
+        },
+        {
+          "crc32c": "WaTP1Q==",
+          "generation": 1783382704800650,
+          "name": "models/GLM-5.2-FP8/model-00114-of-00141.safetensors",
+          "size": 5363339432
+        },
+        {
+          "crc32c": "qQXsrg==",
+          "generation": 1783384015541829,
+          "name": "models/GLM-5.2-FP8/model-00115-of-00141.safetensors",
+          "size": 5361736240
+        },
+        {
+          "crc32c": "fd1yNw==",
+          "generation": 1783381613391912,
+          "name": "models/GLM-5.2-FP8/model-00116-of-00141.safetensors",
+          "size": 5366353976
+        },
+        {
+          "crc32c": "h5j6tQ==",
+          "generation": 1783382376791006,
+          "name": "models/GLM-5.2-FP8/model-00117-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "T7wHmg==",
+          "generation": 1783383260304807,
+          "name": "models/GLM-5.2-FP8/model-00118-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "y4c5/Q==",
+          "generation": 1783382391042265,
+          "name": "models/GLM-5.2-FP8/model-00119-of-00141.safetensors",
+          "size": 5366353304
+        },
+        {
+          "crc32c": "Lmbu5w==",
+          "generation": 1783384099157151,
+          "name": "models/GLM-5.2-FP8/model-00120-of-00141.safetensors",
+          "size": 5361735832
+        },
+        {
+          "crc32c": "E4Relg==",
+          "generation": 1783382500455366,
+          "name": "models/GLM-5.2-FP8/model-00121-of-00141.safetensors",
+          "size": 5366353016
+        },
+        {
+          "crc32c": "rWgtFQ==",
+          "generation": 1783383551187436,
+          "name": "models/GLM-5.2-FP8/model-00122-of-00141.safetensors",
+          "size": 5361736552
+        },
+        {
+          "crc32c": "1PEYLw==",
+          "generation": 1783382804149532,
+          "name": "models/GLM-5.2-FP8/model-00123-of-00141.safetensors",
+          "size": 5363339256
+        },
+        {
+          "crc32c": "RyC2Pw==",
+          "generation": 1783383761245181,
+          "name": "models/GLM-5.2-FP8/model-00124-of-00141.safetensors",
+          "size": 5361736416
+        },
+        {
+          "crc32c": "AwOp6A==",
+          "generation": 1783381742955247,
+          "name": "models/GLM-5.2-FP8/model-00125-of-00141.safetensors",
+          "size": 5366353784
+        },
+        {
+          "crc32c": "Z7JGnQ==",
+          "generation": 1783383988451191,
+          "name": "models/GLM-5.2-FP8/model-00126-of-00141.safetensors",
+          "size": 5361736288
+        },
+        {
+          "crc32c": "DWocGg==",
+          "generation": 1783381610904402,
+          "name": "models/GLM-5.2-FP8/model-00127-of-00141.safetensors",
+          "size": 5366353920
+        },
+        {
+          "crc32c": "nlsP3w==",
+          "generation": 1783382379001482,
+          "name": "models/GLM-5.2-FP8/model-00128-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "vp1eJg==",
+          "generation": 1783383308892795,
+          "name": "models/GLM-5.2-FP8/model-00129-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "IVoO4Q==",
+          "generation": 1783382949989727,
+          "name": "models/GLM-5.2-FP8/model-00130-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "i9u42w==",
+          "generation": 1783383329904535,
+          "name": "models/GLM-5.2-FP8/model-00131-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "hOvtpA==",
+          "generation": 1783382173666175,
+          "name": "models/GLM-5.2-FP8/model-00132-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "aaIcxw==",
+          "generation": 1783383456842134,
+          "name": "models/GLM-5.2-FP8/model-00133-of-00141.safetensors",
+          "size": 5361736592
+        },
+        {
+          "crc32c": "mOz5Zg==",
+          "generation": 1783381951985889,
+          "name": "models/GLM-5.2-FP8/model-00134-of-00141.safetensors",
+          "size": 5366353608
+        },
+        {
+          "crc32c": "ifmujA==",
+          "generation": 1783383663663786,
+          "name": "models/GLM-5.2-FP8/model-00135-of-00141.safetensors",
+          "size": 5361736456
+        },
+        {
+          "crc32c": "mLbBdg==",
+          "generation": 1783382502235730,
+          "name": "models/GLM-5.2-FP8/model-00136-of-00141.safetensors",
+          "size": 5366338752
+        },
+        {
+          "crc32c": "8Ri9qQ==",
+          "generation": 1783383898984028,
+          "name": "models/GLM-5.2-FP8/model-00137-of-00141.safetensors",
+          "size": 5361736352
+        },
+        {
+          "crc32c": "YEE88A==",
+          "generation": 1783382605070926,
+          "name": "models/GLM-5.2-FP8/model-00138-of-00141.safetensors",
+          "size": 5363351176
+        },
+        {
+          "crc32c": "mKBIaA==",
+          "generation": 1783384139802935,
+          "name": "models/GLM-5.2-FP8/model-00139-of-00141.safetensors",
+          "size": 5361735376
+        },
+        {
+          "crc32c": "EmQ5Sw==",
+          "generation": 1783382488416547,
+          "name": "models/GLM-5.2-FP8/model-00140-of-00141.safetensors",
+          "size": 5366353160
+        },
+        {
+          "crc32c": "NE3icw==",
+          "generation": 1783384235245206,
+          "name": "models/GLM-5.2-FP8/model-00141-of-00141.safetensors",
+          "size": 4724454592
+        },
+        {
+          "crc32c": "DtboPA==",
+          "generation": 1783384154820062,
+          "name": "models/GLM-5.2-FP8/model.safetensors.index.json",
+          "size": 11359251
+        },
+        {
+          "crc32c": "CJhfpQ==",
+          "generation": 1783384149331440,
+          "name": "models/GLM-5.2-FP8/tokenizer.json",
+          "size": 20217442
+        },
+        {
+          "crc32c": "s6fUuQ==",
+          "generation": 1783384176301056,
+          "name": "models/GLM-5.2-FP8/tokenizer_config.json",
+          "size": 761
+        }
+      ],
+      "prefix": "models/GLM-5.2-FP8/",
+      "preserve_metadata_objects": [],
+      "recipe": {
+        "code_hash": "3685ee40960f53874e18ad54ec1e8a0c65e53a62",
+        "dependencies": [],
+        "entrypoint": "scripts/greenfield/run_checkpoint_pack_pp16.sh",
+        "notes": "Immutable canonical source; never delete."
+      },
+      "terminal_objects": [
+        "model.safetensors.index.json"
+      ]
+    },
+    {
+      "bytes": 757274907156,
+      "disposition": "delete_payloads",
+      "expected_manifest_sha256": "13ad2e926b44bee86e620d877d4c266dbacc4f9a59b352fc4f2c8ef534efedb5",
+      "id": "pp16_packed_parent",
+      "object_count": 72,
+      "objects": [
+        {
+          "crc32c": "UX9tEg==",
+          "generation": 1787812453702602,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/SUCCESS",
+          "size": 87
+        },
+        {
+          "crc32c": "2gYJpw==",
+          "generation": 1787801678336746,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_00/device_slot_00.safetensors",
+          "size": 21367073800
+        },
+        {
+          "crc32c": "UrlrAw==",
+          "generation": 1787801678596815,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_00/device_slot_01.safetensors",
+          "size": 21367076440
+        },
+        {
+          "crc32c": "jIjBjA==",
+          "generation": 1787802451768867,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_01/device_slot_00.safetensors",
+          "size": 24734024304
+        },
+        {
+          "crc32c": "KNUwJw==",
+          "generation": 1787802452307206,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_01/device_slot_01.safetensors",
+          "size": 24734027608
+        },
+        {
+          "crc32c": "+DCo+w==",
+          "generation": 1787803231399053,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_02/device_slot_00.safetensors",
+          "size": 24734026688
+        },
+        {
+          "crc32c": "FKoBkg==",
+          "generation": 1787803231971450,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_02/device_slot_01.safetensors",
+          "size": 24734029992
+        },
+        {
+          "crc32c": "Q3tXkQ==",
+          "generation": 1787804024644704,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_03/device_slot_00.safetensors",
+          "size": 24734026672
+        },
+        {
+          "crc32c": "gbv0yg==",
+          "generation": 1787804024994419,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_03/device_slot_01.safetensors",
+          "size": 24734029976
+        },
+        {
+          "crc32c": "lJ+7qg==",
+          "generation": 1787804634066168,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_04/device_slot_00.safetensors",
+          "size": 19788256664
+        },
+        {
+          "crc32c": "bvHJQw==",
+          "generation": 1787804634715552,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_04/device_slot_01.safetensors",
+          "size": 19788259304
+        },
+        {
+          "crc32c": "zxfQhQ==",
+          "generation": 1787805243657583,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_05/device_slot_00.safetensors",
+          "size": 19788256664
+        },
+        {
+          "crc32c": "/JpDug==",
+          "generation": 1787805244125698,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_05/device_slot_01.safetensors",
+          "size": 19788259304
+        },
+        {
+          "crc32c": "Dp6JqQ==",
+          "generation": 1787805863069949,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_06/device_slot_00.safetensors",
+          "size": 19788256664
+        },
+        {
+          "crc32c": "EUyy5Q==",
+          "generation": 1787805863899586,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_06/device_slot_01.safetensors",
+          "size": 19788259304
+        },
+        {
+          "crc32c": "8rYiAA==",
+          "generation": 1787806638959972,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_07/device_slot_00.safetensors",
+          "size": 24739206632
+        },
+        {
+          "crc32c": "brtwJg==",
+          "generation": 1787806639343747,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_07/device_slot_01.safetensors",
+          "size": 24739209936
+        },
+        {
+          "crc32c": "9Ke1/w==",
+          "generation": 1787807403878896,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_08/device_slot_00.safetensors",
+          "size": 24734026688
+        },
+        {
+          "crc32c": "js6Dzg==",
+          "generation": 1787807404337368,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_08/device_slot_01.safetensors",
+          "size": 24734029992
+        },
+        {
+          "crc32c": "e7Rszw==",
+          "generation": 1787808110218694,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_09/device_slot_00.safetensors",
+          "size": 24734026688
+        },
+        {
+          "crc32c": "jdl9LQ==",
+          "generation": 1787808110631812,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_09/device_slot_01.safetensors",
+          "size": 24734029992
+        },
+        {
+          "crc32c": "XD2IXQ==",
+          "generation": 1787808821131615,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_10/device_slot_00.safetensors",
+          "size": 24734026672
+        },
+        {
+          "crc32c": "ngtFHQ==",
+          "generation": 1787808821559450,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_10/device_slot_01.safetensors",
+          "size": 24734029976
+        },
+        {
+          "crc32c": "v1bokQ==",
+          "generation": 1787809513844172,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_11/device_slot_00.safetensors",
+          "size": 24739206632
+        },
+        {
+          "crc32c": "uyiTxw==",
+          "generation": 1787809514222315,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_11/device_slot_01.safetensors",
+          "size": 24739209936
+        },
+        {
+          "crc32c": "7tzhrA==",
+          "generation": 1787810226262970,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_12/device_slot_00.safetensors",
+          "size": 24734026688
+        },
+        {
+          "crc32c": "sd0sDQ==",
+          "generation": 1787810226627906,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_12/device_slot_01.safetensors",
+          "size": 24734029992
+        },
+        {
+          "crc32c": "8NmOcw==",
+          "generation": 1787810953170726,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_13/device_slot_00.safetensors",
+          "size": 24734026688
+        },
+        {
+          "crc32c": "pdyyoQ==",
+          "generation": 1787810953699793,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_13/device_slot_01.safetensors",
+          "size": 24734029992
+        },
+        {
+          "crc32c": "LHrReg==",
+          "generation": 1787811679774492,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_14/device_slot_00.safetensors",
+          "size": 24734026672
+        },
+        {
+          "crc32c": "erhvKw==",
+          "generation": 1787811680160864,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_14/device_slot_01.safetensors",
+          "size": 24734029976
+        },
+        {
+          "crc32c": "ljXhbg==",
+          "generation": 1787812300080911,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_15/device_slot_00.safetensors",
+          "size": 20739852512
+        },
+        {
+          "crc32c": "pkuBXg==",
+          "generation": 1787812300203927,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/base_decoder/stage_15/device_slot_01.safetensors",
+          "size": 20739855152
+        },
+        {
+          "crc32c": "SYs0qg==",
+          "generation": 1787801010396629,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/control.json",
+          "size": 916
+        },
+        {
+          "crc32c": "7neQsQ==",
+          "generation": 1787801678766371,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_00/device_slot_00.safetensors.json",
+          "size": 638
+        },
+        {
+          "crc32c": "7zE1Mg==",
+          "generation": 1787801678902751,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_00/device_slot_01.safetensors.json",
+          "size": 638
+        },
+        {
+          "crc32c": "Dmqmrw==",
+          "generation": 1787802452499029,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_01/device_slot_00.safetensors.json",
+          "size": 638
+        },
+        {
+          "crc32c": "+5vZjQ==",
+          "generation": 1787802452633374,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_01/device_slot_01.safetensors.json",
+          "size": 638
+        },
+        {
+          "crc32c": "+VfZdA==",
+          "generation": 1787803232203404,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_02/device_slot_00.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "JbhvFg==",
+          "generation": 1787803232344692,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_02/device_slot_01.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "iykKIg==",
+          "generation": 1787804025143293,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_03/device_slot_00.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "pbaIhQ==",
+          "generation": 1787804025288688,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_03/device_slot_01.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "sDwSMA==",
+          "generation": 1787804634889083,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_04/device_slot_00.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "FuUQ3Q==",
+          "generation": 1787804635039833,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_04/device_slot_01.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "Rt/SwA==",
+          "generation": 1787805244305249,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_05/device_slot_00.safetensors.json",
+          "size": 638
+        },
+        {
+          "crc32c": "pWsmjA==",
+          "generation": 1787805244462433,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_05/device_slot_01.safetensors.json",
+          "size": 638
+        },
+        {
+          "crc32c": "q63zGQ==",
+          "generation": 1787805864071641,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_06/device_slot_00.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "/0Wp+g==",
+          "generation": 1787805864217453,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_06/device_slot_01.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "sLaW2A==",
+          "generation": 1787806639501953,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_07/device_slot_00.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "epnO+A==",
+          "generation": 1787806639660414,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_07/device_slot_01.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "NCv9JQ==",
+          "generation": 1787807404505210,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_08/device_slot_00.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "jZ1/Xg==",
+          "generation": 1787807404646358,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_08/device_slot_01.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "j4aZcw==",
+          "generation": 1787808110793722,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_09/device_slot_00.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "S3NLiw==",
+          "generation": 1787808110928654,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_09/device_slot_01.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "oPTJIQ==",
+          "generation": 1787808821704177,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_10/device_slot_00.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "3Fzg2g==",
+          "generation": 1787808821845175,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_10/device_slot_01.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "CB7Y2Q==",
+          "generation": 1787809514383170,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_11/device_slot_00.safetensors.json",
+          "size": 640
+        },
+        {
+          "crc32c": "oWbUyA==",
+          "generation": 1787809514531626,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_11/device_slot_01.safetensors.json",
+          "size": 640
+        },
+        {
+          "crc32c": "2a4k0Q==",
+          "generation": 1787810226796175,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_12/device_slot_00.safetensors.json",
+          "size": 640
+        },
+        {
+          "crc32c": "ixfVIg==",
+          "generation": 1787810226943539,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_12/device_slot_01.safetensors.json",
+          "size": 640
+        },
+        {
+          "crc32c": "A06ceg==",
+          "generation": 1787810953873880,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_13/device_slot_00.safetensors.json",
+          "size": 640
+        },
+        {
+          "crc32c": "BVYM1Q==",
+          "generation": 1787810954026033,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_13/device_slot_01.safetensors.json",
+          "size": 640
+        },
+        {
+          "crc32c": "AN70iQ==",
+          "generation": 1787811680333367,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_14/device_slot_00.safetensors.json",
+          "size": 640
+        },
+        {
+          "crc32c": "pZQWLQ==",
+          "generation": 1787811680471219,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_14/device_slot_01.safetensors.json",
+          "size": 640
+        },
+        {
+          "crc32c": "FRLKzA==",
+          "generation": 1787812300376793,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_15/device_slot_00.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "dcvh7g==",
+          "generation": 1787812300520361,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/base_decoder/stage_15/device_slot_01.safetensors.json",
+          "size": 639
+        },
+        {
+          "crc32c": "yuProw==",
+          "generation": 1787812453384733,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/mtp_optional/stage_00/device_slot_00.safetensors.json",
+          "size": 636
+        },
+        {
+          "crc32c": "SHPvGg==",
+          "generation": 1787812453549329,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/evidence/mtp_optional/stage_00/device_slot_01.safetensors.json",
+          "size": 636
+        },
+        {
+          "crc32c": "6tJ5HQ==",
+          "generation": 1787801011025738,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/layout_manifest.json",
+          "size": 109148533
+        },
+        {
+          "crc32c": "4bap3Q==",
+          "generation": 1787812452752245,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/mtp_optional/stage_00/device_slot_00.safetensors",
+          "size": 5026483048
+        },
+        {
+          "crc32c": "lhTSCQ==",
+          "generation": 1787812453207253,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/mtp_optional/stage_00/device_slot_01.safetensors",
+          "size": 5026483712
+        },
+        {
+          "crc32c": "eD1Yzw==",
+          "generation": 1787812453628623,
+          "name": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/packed_manifest.json",
+          "size": 24938
+        }
+      ],
+      "prefix": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "layout_manifest.json",
+        "packed_manifest.json"
+      ],
+      "recipe": {
+        "code_hash": "3685ee40960f53874e18ad54ec1e8a0c65e53a62",
+        "dependencies": [
+          "canonical_source"
+        ],
+        "entrypoint": "scripts/greenfield/run_checkpoint_pack_pp16.sh",
+        "notes": "Keep only compact lineage metadata after standalone final-runtime verification."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "packed_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "bytes": 869585145353,
+      "disposition": "delete_payloads",
+      "expected_manifest_sha256": "b0f624666e921a93e92c625e0e1248aaa9162c45a9be974f4491755c8604d2e5",
+      "id": "pp16_base_runtime_parent",
+      "object_count": 68,
+      "objects": [
+        {
+          "crc32c": "6Ir/jQ==",
+          "generation": 1787824015415735,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/SUCCESS",
+          "size": 88
+        },
+        {
+          "crc32c": "6AiBZA==",
+          "generation": 1787822846938154,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_00/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "2lS3OQ==",
+          "generation": 1787822846357739,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_00/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "JYa7mw==",
+          "generation": 1787823362371448,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_01/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "YCYlUA==",
+          "generation": 1787823364002788,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_01/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "Jr5QyQ==",
+          "generation": 1787823399037994,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_02/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "RcwoSQ==",
+          "generation": 1787823363456834,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_02/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "R43CBw==",
+          "generation": 1787823361935858,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_03/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "6Pe6mw==",
+          "generation": 1787823358959020,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_03/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "Xc5i7Q==",
+          "generation": 1787823654314075,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_04/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "269qNA==",
+          "generation": 1787823649299431,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_04/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "n/nmDA==",
+          "generation": 1787823371216146,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_05/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "5z5gzw==",
+          "generation": 1787823366130124,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_05/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "kbbyiA==",
+          "generation": 1787823662109104,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_06/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "2sBg2g==",
+          "generation": 1787823663469966,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_06/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "qgiyTw==",
+          "generation": 1787823719549982,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_07/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "xZMI4A==",
+          "generation": 1787823719137785,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_07/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "3bMPvQ==",
+          "generation": 1787823419383354,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_08/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "zegN+A==",
+          "generation": 1787823368987169,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_08/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "l4uplQ==",
+          "generation": 1787823474543056,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_09/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "HhPJTw==",
+          "generation": 1787823373093168,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_09/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "lDhivQ==",
+          "generation": 1787823370864221,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_10/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "hXtRUQ==",
+          "generation": 1787823368103873,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_10/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "xnR1Jg==",
+          "generation": 1787823372210909,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_11/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "unRdjQ==",
+          "generation": 1787823372541976,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_11/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "4r+X5w==",
+          "generation": 1787823688486105,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_12/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "E+WXHQ==",
+          "generation": 1787823699217064,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_12/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "ATKd7A==",
+          "generation": 1787823732275280,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_13/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "iumqfQ==",
+          "generation": 1787823741656891,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_13/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "ZoixsA==",
+          "generation": 1787823801400518,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_14/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "VosSzw==",
+          "generation": 1787823798029350,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_14/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "WF2Ptw==",
+          "generation": 1787823667806189,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_15/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "6lQOtA==",
+          "generation": 1787823668240284,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/base_decoder_runtime/stage_15/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "AohdnQ==",
+          "generation": 1787822025672883,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/control.json",
+          "size": 1509
+        },
+        {
+          "crc32c": "rpy64g==",
+          "generation": 1787822847107895,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_00/device_slot_00.safetensors.json",
+          "size": 44093
+        },
+        {
+          "crc32c": "2WGc5Q==",
+          "generation": 1787822846543745,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_00/device_slot_01.safetensors.json",
+          "size": 44093
+        },
+        {
+          "crc32c": "Lk2vCQ==",
+          "generation": 1787823362546746,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_01/device_slot_00.safetensors.json",
+          "size": 44039
+        },
+        {
+          "crc32c": "mmxaUA==",
+          "generation": 1787823364150458,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_01/device_slot_01.safetensors.json",
+          "size": 44039
+        },
+        {
+          "crc32c": "uLVRdQ==",
+          "generation": 1787823399216204,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_02/device_slot_00.safetensors.json",
+          "size": 44040
+        },
+        {
+          "crc32c": "VMBu1g==",
+          "generation": 1787823363624558,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_02/device_slot_01.safetensors.json",
+          "size": 44040
+        },
+        {
+          "crc32c": "YrEY1g==",
+          "generation": 1787823362109691,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_03/device_slot_00.safetensors.json",
+          "size": 44040
+        },
+        {
+          "crc32c": "BTFZcw==",
+          "generation": 1787823359133448,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_03/device_slot_01.safetensors.json",
+          "size": 44040
+        },
+        {
+          "crc32c": "d2gx/w==",
+          "generation": 1787823654476974,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_04/device_slot_00.safetensors.json",
+          "size": 44012
+        },
+        {
+          "crc32c": "o/Sujw==",
+          "generation": 1787823649479522,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_04/device_slot_01.safetensors.json",
+          "size": 44012
+        },
+        {
+          "crc32c": "trf4EA==",
+          "generation": 1787823371384634,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_05/device_slot_00.safetensors.json",
+          "size": 44011
+        },
+        {
+          "crc32c": "hVSvrA==",
+          "generation": 1787823366308285,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_05/device_slot_01.safetensors.json",
+          "size": 44011
+        },
+        {
+          "crc32c": "1yaYWw==",
+          "generation": 1787823662278880,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_06/device_slot_00.safetensors.json",
+          "size": 44012
+        },
+        {
+          "crc32c": "q4k4tQ==",
+          "generation": 1787823663614797,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_06/device_slot_01.safetensors.json",
+          "size": 44012
+        },
+        {
+          "crc32c": "C+eSXQ==",
+          "generation": 1787823719709895,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_07/device_slot_00.safetensors.json",
+          "size": 44047
+        },
+        {
+          "crc32c": "hd6u3w==",
+          "generation": 1787823719305890,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_07/device_slot_01.safetensors.json",
+          "size": 44047
+        },
+        {
+          "crc32c": "GisTkA==",
+          "generation": 1787823419550545,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_08/device_slot_00.safetensors.json",
+          "size": 44040
+        },
+        {
+          "crc32c": "oL4n/Q==",
+          "generation": 1787823369156211,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_08/device_slot_01.safetensors.json",
+          "size": 44040
+        },
+        {
+          "crc32c": "/xtDaw==",
+          "generation": 1787823474729720,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_09/device_slot_00.safetensors.json",
+          "size": 44040
+        },
+        {
+          "crc32c": "BsglSQ==",
+          "generation": 1787823373273827,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_09/device_slot_01.safetensors.json",
+          "size": 44040
+        },
+        {
+          "crc32c": "R/Ljrw==",
+          "generation": 1787823371029419,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_10/device_slot_00.safetensors.json",
+          "size": 44040
+        },
+        {
+          "crc32c": "xHVI3A==",
+          "generation": 1787823368291260,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_10/device_slot_01.safetensors.json",
+          "size": 44040
+        },
+        {
+          "crc32c": "pCy6eg==",
+          "generation": 1787823372375729,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_11/device_slot_00.safetensors.json",
+          "size": 44048
+        },
+        {
+          "crc32c": "oMVmtw==",
+          "generation": 1787823372709979,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_11/device_slot_01.safetensors.json",
+          "size": 44048
+        },
+        {
+          "crc32c": "fWzAZg==",
+          "generation": 1787823688642579,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_12/device_slot_00.safetensors.json",
+          "size": 44041
+        },
+        {
+          "crc32c": "rmXgYw==",
+          "generation": 1787823699390806,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_12/device_slot_01.safetensors.json",
+          "size": 44041
+        },
+        {
+          "crc32c": "UKqYmQ==",
+          "generation": 1787823732450202,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_13/device_slot_00.safetensors.json",
+          "size": 44041
+        },
+        {
+          "crc32c": "WpaOvw==",
+          "generation": 1787823741829596,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_13/device_slot_01.safetensors.json",
+          "size": 44041
+        },
+        {
+          "crc32c": "9Syscg==",
+          "generation": 1787823801568684,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_14/device_slot_00.safetensors.json",
+          "size": 44041
+        },
+        {
+          "crc32c": "dGL1XQ==",
+          "generation": 1787823798204962,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_14/device_slot_01.safetensors.json",
+          "size": 44041
+        },
+        {
+          "crc32c": "KJJFvg==",
+          "generation": 1787823667972850,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_15/device_slot_00.safetensors.json",
+          "size": 44014
+        },
+        {
+          "crc32c": "hKmQKA==",
+          "generation": 1787823668401164,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/evidence/base_decoder_runtime/stage_15/device_slot_01.safetensors.json",
+          "size": 44014
+        },
+        {
+          "crc32c": "l9lpEw==",
+          "generation": 1787822027031487,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/runtime_layout.json",
+          "size": 36047030
+        },
+        {
+          "crc32c": "i9rG2A==",
+          "generation": 1787824015351952,
+          "name": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/runtime_manifest.json",
+          "size": 1580392
+        }
+      ],
+      "prefix": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "runtime_layout.json",
+        "runtime_manifest.json"
+      ],
+      "recipe": {
+        "code_hash": "af0e226cb2dfc0ab3c48ca19deceecacead6f9b5",
+        "dependencies": [
+          "pp16_packed_parent"
+        ],
+        "entrypoint": "scripts/greenfield/pack_runtime_checkpoint.py",
+        "notes": "Keep only compact source file/tensor lineage metadata after standalone final-runtime verification."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "bytes": 869561965562,
+      "disposition": "keep",
+      "expected_manifest_sha256": "0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1",
+      "id": "pp16_active_feature_runtime",
+      "object_count": 68,
+      "objects": [
+        {
+          "crc32c": "C3l7fQ==",
+          "generation": 1787831512488772,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/SUCCESS",
+          "size": 88
+        },
+        {
+          "crc32c": "E5imZQ==",
+          "generation": 1787825803814243,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "eiKiAA==",
+          "generation": 1787825804141404,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "u5TNMg==",
+          "generation": 1787827214683027,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "3yr73w==",
+          "generation": 1787827215314132,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "/rYS8g==",
+          "generation": 1787827297637202,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "JuZ/kg==",
+          "generation": 1787827298059020,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "nFImnw==",
+          "generation": 1787827353226708,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "SXrzPQ==",
+          "generation": 1787827353697683,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "TwZ0nw==",
+          "generation": 1787828495336133,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "xt0LWQ==",
+          "generation": 1787828495774009,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "H8mzUQ==",
+          "generation": 1787827242576434,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "17Roag==",
+          "generation": 1787827243099353,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "kQ21aQ==",
+          "generation": 1787828354711998,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "hv5MiQ==",
+          "generation": 1787828355170440,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "RCadVQ==",
+          "generation": 1787828568852693,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "ZlIRTw==",
+          "generation": 1787828569168454,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "xbff6w==",
+          "generation": 1787827307124947,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_08/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "zD/98A==",
+          "generation": 1787827307628956,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_08/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "qjXyDg==",
+          "generation": 1787827309492462,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_09/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "7TYI+g==",
+          "generation": 1787827309887186,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_09/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "8j3yzA==",
+          "generation": 1787827260772321,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_10/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "sbwZ+w==",
+          "generation": 1787827261167824,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_10/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "HpVwmQ==",
+          "generation": 1787827279321659,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_11/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "RNEgkw==",
+          "generation": 1787827279869445,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_11/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "PX3flQ==",
+          "generation": 1787828638975492,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_12/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "yZX6mw==",
+          "generation": 1787828639395069,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_12/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "7PkT0w==",
+          "generation": 1787828573916956,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_13/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "QB/O5w==",
+          "generation": 1787828574236907,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_13/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "MwT/DA==",
+          "generation": 1787828582715957,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_14/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "OakJwA==",
+          "generation": 1787828583049868,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_14/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "30gSvA==",
+          "generation": 1787828464010439,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_15/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "dTWm7A==",
+          "generation": 1787828464742187,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_15/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "dy9JRw==",
+          "generation": 1787824499109869,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/control.json",
+          "size": 1720
+        },
+        {
+          "crc32c": "QiKaUA==",
+          "generation": 1787825804377542,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+          "size": 172785
+        },
+        {
+          "crc32c": "nHW/dA==",
+          "generation": 1787825804531885,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+          "size": 172881
+        },
+        {
+          "crc32c": "35Ym5Q==",
+          "generation": 1787827215494279,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors.json",
+          "size": 152846
+        },
+        {
+          "crc32c": "GCDRmg==",
+          "generation": 1787827215667178,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors.json",
+          "size": 152966
+        },
+        {
+          "crc32c": "eegcdA==",
+          "generation": 1787827298267044,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors.json",
+          "size": 152847
+        },
+        {
+          "crc32c": "feee9g==",
+          "generation": 1787827298412157,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors.json",
+          "size": 152967
+        },
+        {
+          "crc32c": "jQeiNw==",
+          "generation": 1787827353897997,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors.json",
+          "size": 152847
+        },
+        {
+          "crc32c": "lgOEKw==",
+          "generation": 1787827354057780,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors.json",
+          "size": 152967
+        },
+        {
+          "crc32c": "IXKpMA==",
+          "generation": 1787828495950713,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors.json",
+          "size": 134313
+        },
+        {
+          "crc32c": "veDkvQ==",
+          "generation": 1787828496098557,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors.json",
+          "size": 134409
+        },
+        {
+          "crc32c": "SBj8Eg==",
+          "generation": 1787827243267029,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors.json",
+          "size": 134312
+        },
+        {
+          "crc32c": "EX52lw==",
+          "generation": 1787827243416727,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors.json",
+          "size": 134408
+        },
+        {
+          "crc32c": "dNyOaQ==",
+          "generation": 1787828355351152,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors.json",
+          "size": 134313
+        },
+        {
+          "crc32c": "UoifZw==",
+          "generation": 1787828355508785,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors.json",
+          "size": 134409
+        },
+        {
+          "crc32c": "zi/OQQ==",
+          "generation": 1787828569347763,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors.json",
+          "size": 156111
+        },
+        {
+          "crc32c": "Ga2G7Q==",
+          "generation": 1787828569506419,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors.json",
+          "size": 156231
+        },
+        {
+          "crc32c": "2TBvkw==",
+          "generation": 1787827307792769,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_08/device_slot_00.safetensors.json",
+          "size": 152847
+        },
+        {
+          "crc32c": "x7mcUw==",
+          "generation": 1787827307942784,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_08/device_slot_01.safetensors.json",
+          "size": 152967
+        },
+        {
+          "crc32c": "dV28TQ==",
+          "generation": 1787827310102744,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_09/device_slot_00.safetensors.json",
+          "size": 152847
+        },
+        {
+          "crc32c": "FIivTQ==",
+          "generation": 1787827310244879,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_09/device_slot_01.safetensors.json",
+          "size": 152967
+        },
+        {
+          "crc32c": "6eWMyg==",
+          "generation": 1787827261341491,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_10/device_slot_00.safetensors.json",
+          "size": 152847
+        },
+        {
+          "crc32c": "1T6Xsg==",
+          "generation": 1787827261472684,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_10/device_slot_01.safetensors.json",
+          "size": 152967
+        },
+        {
+          "crc32c": "40k84g==",
+          "generation": 1787827280026087,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_11/device_slot_00.safetensors.json",
+          "size": 156112
+        },
+        {
+          "crc32c": "5AADew==",
+          "generation": 1787827280179545,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_11/device_slot_01.safetensors.json",
+          "size": 156232
+        },
+        {
+          "crc32c": "aPyPgA==",
+          "generation": 1787828639563111,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_12/device_slot_00.safetensors.json",
+          "size": 152848
+        },
+        {
+          "crc32c": "/ZNK4A==",
+          "generation": 1787828639724723,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_12/device_slot_01.safetensors.json",
+          "size": 152968
+        },
+        {
+          "crc32c": "hMg1nA==",
+          "generation": 1787828574419472,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_13/device_slot_00.safetensors.json",
+          "size": 152848
+        },
+        {
+          "crc32c": "/SLddg==",
+          "generation": 1787828574565847,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_13/device_slot_01.safetensors.json",
+          "size": 152968
+        },
+        {
+          "crc32c": "8YWseA==",
+          "generation": 1787828583216878,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_14/device_slot_00.safetensors.json",
+          "size": 152848
+        },
+        {
+          "crc32c": "hMuUQQ==",
+          "generation": 1787828583373720,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_14/device_slot_01.safetensors.json",
+          "size": 152968
+        },
+        {
+          "crc32c": "fq3hgg==",
+          "generation": 1787828464920038,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_15/device_slot_00.safetensors.json",
+          "size": 135212
+        },
+        {
+          "crc32c": "OOfYIg==",
+          "generation": 1787828465074605,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_15/device_slot_01.safetensors.json",
+          "size": 135308
+        },
+        {
+          "crc32c": "c0tPgw==",
+          "generation": 1787824499284395,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/runtime_layout.json",
+          "size": 5640785
+        },
+        {
+          "crc32c": "sKXI5Q==",
+          "generation": 1787831512430298,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/runtime_manifest.json",
+          "size": 5416467
+        }
+      ],
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/",
+      "preserve_metadata_objects": [],
+      "recipe": {
+        "code_hash": "a973425cd235758142c55c5a0127ddb9a36b45a9",
+        "dependencies": [
+          "pp16_packed_parent",
+          "pp16_base_runtime_parent"
+        ],
+        "entrypoint": "scripts/greenfield/pack_feature_runtime_checkpoint.py",
+        "notes": "Current active final runtime; full payload and sidecar verification remains mandatory."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    }
+  ],
+  "bucket": "driftbench-dsv4-uc",
+  "bucket_location": "US-CENTRAL2",
+  "capsule_sha256": "846c36f78c350e4561e7498e73fe9decdbb428c9579efe8f7252e48b5878d521",
+  "created_utc": "2026-08-27T14:22:36Z",
+  "format_version": 1,
+  "generator_code_hash": "0ddeedb7357949e37ec526a18decca4f75b1a25f",
+  "proof": {
+    "artifact_kind": "greenfield_pp16_standalone_runtime_proof",
+    "claim_scope": "terminal_integrity_and_load_lineage_only_no_numerical_or_performance_claim",
+    "cpu_tests": {
+      "passed": 31,
+      "skipped": 1
+    },
+    "file_count": 32,
+    "format_version": 1,
+    "inspection_sha256": "29b11bb56cc322642568b1563f7e515a394e157db53e7ab0a7c101da0f525bbf",
+    "metadata_archive": {
+      "archive_sha256": "5585174e8f2135335ed2503bac8247407d4f3924603fd343bfe40c264709e6a4",
+      "source_bytes": 146803493,
+      "source_objects": 8,
+      "uri": "gs://driftbench-dsv4-uc/results/greenfield_checkpoint_reproduction_capsule_20260827T142150774182905Z/"
+    },
+    "proof_sha256": "ad4dcf8fd3bf2d0d9ecbeaa25f0c9fc0effe23a44313e36d5abaf229717000ea",
+    "runtime_file_bytes": 869546107136,
+    "runtime_layout_manifest_sha256": "1b0464affdea4bc6f72c5f2011df79e155e26b834d2ead32408ad4c9afcf3584",
+    "runtime_manifest_sha256": "0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1",
+    "runtime_payload_bytes": 869545347072,
+    "source_packed_manifest_sha256": "13ad2e926b44bee86e620d877d4c266dbacc4f9a59b352fc4f2c8ef534efedb5",
+    "source_runtime_manifest_sha256": "b0f624666e921a93e92c625e0e1248aaa9162c45a9be974f4491755c8604d2e5",
+    "source_verification_mode": "metadata_lineage",
+    "status": "passed",
+    "verifier_code_hash": "b619c94ec4a699238ab05276651dbe4a48aa196e"
+  },
+  "protected_prefixes": [
+    "models/",
+    "results/",
+    "oracles/",
+    "checkpoints/greenfield/glm52/plans/",
+    "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/"
+  ]
+}
