@@ -1473,6 +1473,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--source-runtime-root", type=Path)
     parser.add_argument("--source-runtime-manifest-sha256")
+    parser.add_argument(
+        "--feature-source-metadata-only",
+        type=int,
+        choices=(0, 1),
+        default=0,
+    )
     parser.add_argument("--source-checkpoint-root", type=Path, required=True)
     parser.add_argument("--source-packed-manifest-sha256", required=True)
     parser.add_argument("--context-capacity", type=int, default=2048)
@@ -2127,6 +2133,13 @@ def main() -> int:
         raise ValueError(
             "feature runtime requires its source runtime root and manifest"
         )
+    if args.feature_source_metadata_only and args.runtime_kind not in (
+        "pallas_feature",
+        "pallas_feature_linear",
+    ):
+        raise ValueError(
+            "metadata-only source lineage requires a feature runtime"
+        )
     if args.runtime_kind == "reference" and args.feature_output_tile != 128:
         raise ValueError(
             "a non-default feature output tile requires a feature runtime"
@@ -2240,6 +2253,7 @@ def main() -> int:
                 attention_projection_backend == "fused_n82_convolution"
             ),
             dense_convolution=args.dense_final_layout_convolution,
+            source_metadata_only=bool(args.feature_source_metadata_only),
         )
         pack_context = _build_feature_context(
             context_args,
@@ -5355,6 +5369,11 @@ def main() -> int:
             "state_layout_hash": state_layout.state_layout_hash,
             "sparse_moe_backend": decoder.sparse_moe_backend,
             "feature_output_tile": decoder.feature_output_tile,
+            "feature_source_verification_mode": (
+                "metadata_lineage"
+                if args.feature_source_metadata_only
+                else "complete_payload"
+            ),
             "feature_fuse_route_weighting": (
                 decoder.feature_fuse_route_weighting
             ),

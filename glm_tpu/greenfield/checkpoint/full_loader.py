@@ -144,8 +144,15 @@ class VerifiedPackedCheckpoint:
 def verify_full_packed_checkpoint(
     root: Path,
     expectation: FullCheckpointLoadExpectation,
+    *,
+    require_payloads: bool = True,
 ) -> VerifiedPackedCheckpoint:
-    """Verify all metadata, sidecars, file sizes, identities, and completion."""
+    """Verify metadata and, by default, every sidecar and payload size.
+
+    ``require_payloads=False`` is only a lineage mode for a final derivative
+    whose own complete payload is verified separately.  It never authorizes a
+    load from this parent checkpoint.
+    """
 
     root = Path(root)
     required = {
@@ -278,23 +285,24 @@ def verify_full_packed_checkpoint(
             raise CheckpointValidationError(
                 f"packed file {plan.filename!r} has invalid CRC32C"
             )
-        sidecar = _read_json(root / "evidence" / f"{plan.filename}.json")
-        if sidecar != dict(record):
-            raise CheckpointValidationError(
-                f"packed file {plan.filename!r} sidecar disagrees"
-            )
-        payload_path = root / plan.filename
-        try:
-            observed_size = payload_path.stat().st_size
-        except OSError as error:
-            raise CheckpointValidationError(
-                f"packed payload is missing: {plan.filename}"
-            ) from error
-        if observed_size != plan.file_bytes:
-            raise CheckpointValidationError(
-                f"packed payload size drift for {plan.filename!r}: "
-                f"expected={plan.file_bytes} observed={observed_size}"
-            )
+        if require_payloads:
+            sidecar = _read_json(root / "evidence" / f"{plan.filename}.json")
+            if sidecar != dict(record):
+                raise CheckpointValidationError(
+                    f"packed file {plan.filename!r} sidecar disagrees"
+                )
+            payload_path = root / plan.filename
+            try:
+                observed_size = payload_path.stat().st_size
+            except OSError as error:
+                raise CheckpointValidationError(
+                    f"packed payload is missing: {plan.filename}"
+                ) from error
+            if observed_size != plan.file_bytes:
+                raise CheckpointValidationError(
+                    f"packed payload size drift for {plan.filename!r}: "
+                    f"expected={plan.file_bytes} observed={observed_size}"
+                )
         total_file_bytes += plan.file_bytes
         total_payload_bytes += plan.payload_bytes
     if (

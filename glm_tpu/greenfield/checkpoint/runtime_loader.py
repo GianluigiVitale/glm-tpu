@@ -130,8 +130,14 @@ def verify_runtime_packed_checkpoint(
     expectation: RuntimeCheckpointLoadExpectation,
     layout: DecoderRuntimeWeightLayout,
     source_checkpoint: VerifiedPackedCheckpoint,
+    *,
+    require_payloads: bool = True,
 ) -> VerifiedRuntimeCheckpoint:
-    """Verify semantic layout, metadata, ledgers, sizes, and completion."""
+    """Verify semantic lineage and, by default, all payloads and sidecars.
+
+    Metadata-only mode exists solely to authenticate a final derivative's
+    parent ledger.  It does not make the parent loadable.
+    """
 
     root = Path(root)
     required = {
@@ -332,21 +338,22 @@ def verify_runtime_packed_checkpoint(
                 tensor_record.get("sha256"),
                 field=f"{plan.filename}:{tensor.spec.name}.sha256",
             )
-        sidecar = _read_json(root / "evidence" / f"{plan.filename}.json")
-        if sidecar != dict(record):
-            raise CheckpointValidationError(
-                f"runtime file {plan.filename!r} sidecar disagrees"
-            )
-        try:
-            observed_size = (root / plan.filename).stat().st_size
-        except OSError as error:
-            raise CheckpointValidationError(
-                f"runtime payload is missing: {plan.filename}"
-            ) from error
-        if observed_size != plan.file_bytes:
-            raise CheckpointValidationError(
-                f"runtime payload size drift for {plan.filename!r}"
-            )
+        if require_payloads:
+            sidecar = _read_json(root / "evidence" / f"{plan.filename}.json")
+            if sidecar != dict(record):
+                raise CheckpointValidationError(
+                    f"runtime file {plan.filename!r} sidecar disagrees"
+                )
+            try:
+                observed_size = (root / plan.filename).stat().st_size
+            except OSError as error:
+                raise CheckpointValidationError(
+                    f"runtime payload is missing: {plan.filename}"
+                ) from error
+            if observed_size != plan.file_bytes:
+                raise CheckpointValidationError(
+                    f"runtime payload size drift for {plan.filename!r}"
+                )
     expected_success = f"{manifest_hash}  runtime_manifest.json\n"
     if required["success"].read_text() != expected_success:
         raise CheckpointValidationError("runtime checkpoint SUCCESS marker drifted")

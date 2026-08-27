@@ -254,6 +254,32 @@ def test_pp16_runtime_artifact_verifies_all_two_chip_stages(
     } == {(stage, slot) for stage in range(16) for slot in range(2)}
 
 
+def test_runtime_metadata_lineage_survives_payload_reclamation(
+    tmp_path: Path,
+) -> None:
+    layout, source_checkpoint, expectation, runtime_plans = _build_artifact(
+        tmp_path
+    )
+    for plan in runtime_plans:
+        (tmp_path / plan.filename).unlink()
+        (tmp_path / "evidence" / f"{plan.filename}.json").unlink()
+    verified = verify_runtime_packed_checkpoint(
+        tmp_path,
+        expectation,
+        layout,
+        source_checkpoint,
+        require_payloads=False,
+    )
+    assert len(verified.plans) == 32
+    with pytest.raises(CheckpointValidationError, match="cannot parse|missing"):
+        verify_runtime_packed_checkpoint(
+            tmp_path,
+            expectation,
+            layout,
+            source_checkpoint,
+        )
+
+
 def test_runtime_expectation_rejects_nonpipeline_plan(tmp_path: Path) -> None:
     _, _, expectation, _ = _build_artifact(tmp_path)
     with pytest.raises(ValueError, match="supports only PP8_LP4 and PP16_LP2"):

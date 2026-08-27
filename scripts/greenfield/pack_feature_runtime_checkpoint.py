@@ -163,6 +163,7 @@ def _source_hashes(
 
 
 def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
+    source_metadata_only = bool(getattr(args, "source_metadata_only", False))
     full_expectation = _source_full_expectation(
         args.source_checkpoint_root,
         args.source_packed_manifest_sha256,
@@ -170,6 +171,7 @@ def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
     source_full = verify_full_packed_checkpoint(
         args.source_checkpoint_root,
         full_expectation,
+        require_payloads=not source_metadata_only,
     )
     source_plan = ExecutionPlan.from_dict(
         source_full.layout["plan_manifest"]["execution_plan"]
@@ -188,6 +190,7 @@ def _build_context(args: argparse.Namespace, code_hash: str) -> PackContext:
         runtime_expectation,
         source_layout,
         source_full,
+        require_payloads=not source_metadata_only,
     )
     target_plan = replace(
         source_plan,

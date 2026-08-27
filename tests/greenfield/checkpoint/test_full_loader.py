@@ -264,6 +264,23 @@ def test_complete_artifact_verifier_refuses_missing_payload(tmp_path: Path) -> N
         verify_full_packed_checkpoint(root, expectation)
 
 
+def test_complete_artifact_metadata_lineage_survives_payload_reclamation(
+    tmp_path: Path,
+) -> None:
+    root, expectation = _fixture_artifact(tmp_path)
+    for plan in verify_full_packed_checkpoint(root, expectation).plans:
+        (root / plan.filename).unlink()
+        (root / "evidence" / f"{plan.filename}.json").unlink()
+    verified = verify_full_packed_checkpoint(
+        root,
+        expectation,
+        require_payloads=False,
+    )
+    assert len(verified.plans) == 33
+    with pytest.raises(CheckpointValidationError, match="cannot parse|missing"):
+        verify_full_packed_checkpoint(root, expectation)
+
+
 def test_complete_artifact_verifier_refuses_stale_identity(tmp_path: Path) -> None:
     root, expectation = _fixture_artifact(tmp_path)
     stale = FullCheckpointLoadExpectation(

@@ -35,6 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source-runtime-root", type=Path, required=True)
     parser.add_argument("--source-runtime-manifest-sha256", required=True)
     parser.add_argument("--runtime-manifest-sha256", required=True)
+    parser.add_argument("--source-metadata-only", action="store_true")
     parser.add_argument("--output", type=Path)
     return parser.parse_args()
 
@@ -68,6 +69,7 @@ def main() -> int:
             manifest.get("dense_projection_layout")
             == FINAL_DENSE_CONVOLUTION_RUNTIME_LAYOUT
         ),
+        source_metadata_only=args.source_metadata_only,
     )
     context = _build_context(context_args, manifest["pack_code_hash"])
     expectation = build_load_expectation(manifest)
@@ -102,6 +104,9 @@ def main() -> int:
         ),
         "source_runtime_manifest_sha256": (expectation.source_runtime_manifest_sha256),
         "source_tensor_count": manifest["source_tensor_count"],
+        "source_verification_mode": (
+            "metadata_lineage" if args.source_metadata_only else "complete_payload"
+        ),
         "tensor_count": manifest["tensor_count"],
         "verified": True,
     }
