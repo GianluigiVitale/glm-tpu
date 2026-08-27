@@ -185,7 +185,7 @@ def _archive_metadata(args: argparse.Namespace) -> None:
 
     archived: list[dict[str, Any]] = []
     for artifact in policy["artifacts"]:
-        if artifact["disposition"] != "delete_now":
+        if artifact["disposition"] not in ("delete_now", "delete_payloads"):
             continue
         live = {
             item["name"]: item
@@ -353,6 +353,18 @@ def _apply(args: argparse.Namespace) -> None:
                 raise ReclamationError(
                     f"candidate prefix remains nonempty: {artifact['id']}"
                 )
+        elif artifact["disposition"] == "delete_payloads":
+            prefix = artifact["prefix"]
+            preserved_names = {
+                f"{prefix}{name}"
+                for name in artifact["preserve_metadata_objects"]
+            }
+            expected_preserved = [
+                item
+                for item in artifact["objects"]
+                if item["name"] in preserved_names
+            ]
+            reconcile_live_objects(expected_preserved, observed)
         else:
             reconcile_live_objects(artifact["objects"], observed)
     receipt["completed"] = True

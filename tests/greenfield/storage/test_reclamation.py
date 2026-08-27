@@ -164,3 +164,19 @@ def test_policy_refuses_unknown_dependency_and_overlapping_artifacts() -> None:
     policy["artifacts"].append(duplicate)
     with pytest.raises(ReclamationError, match="prefixes overlap"):
         validate_policy(policy)
+
+
+def test_payload_only_reclamation_preserves_named_metadata() -> None:
+    policy = _policy()
+    policy["artifacts"][1]["disposition"] = "delete_payloads"
+    capsule = build_reproducibility_capsule(
+        policy,
+        _objects(),
+        generator_code_hash=CODE_HASH,
+        created_utc="2026-08-27T15:00:00Z",
+        proof=PROOF,
+    )
+    ordered = deletion_order(capsule)
+    assert [item["name"] for item in ordered] == [
+        "checkpoints/derived/tag/payload.bin"
+    ]

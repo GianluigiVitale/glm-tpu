@@ -133,9 +133,14 @@ def validate_policy(policy: Mapping[str, Any]) -> None:
         ):
             raise ReclamationError("artifact prefixes overlap")
         disposition = artifact.get("disposition")
-        if disposition not in ("keep", "delete_now", "keep_until_standalone"):
+        if disposition not in (
+            "keep",
+            "delete_now",
+            "delete_payloads",
+            "keep_until_standalone",
+        ):
             raise ReclamationError(f"{artifact_id} has an invalid disposition")
-        if disposition == "delete_now":
+        if disposition in ("delete_now", "delete_payloads"):
             delete_count += 1
             for protected_prefix in protected_prefixes:
                 if prefix.startswith(protected_prefix) or protected_prefix.startswith(prefix):
@@ -229,7 +234,10 @@ def build_reproducibility_capsule(
             raise ReclamationError(
                 f"{artifact_id} preserved metadata object set is invalid"
             )
-        if artifact["disposition"] == "delete_now" and not preserve_metadata:
+        if artifact["disposition"] in (
+            "delete_now",
+            "delete_payloads",
+        ) and not preserve_metadata:
             raise ReclamationError(
                 f"{artifact_id} deletion lacks preserved metadata"
             )
@@ -256,6 +264,7 @@ def build_reproducibility_capsule(
                 "object_count": len(objects),
                 "objects": objects,
                 "prefix": prefix,
+                "preserve_metadata_objects": list(preserve_metadata),
                 "recipe": deepcopy(artifact["recipe"]),
                 "terminal_objects": list(terminal_objects),
             }
@@ -318,7 +327,12 @@ def validate_capsule(capsule: Mapping[str, Any]) -> None:
             raise ReclamationError("capsule artifact ids are invalid or duplicate")
         prefix = _prefix(artifact.get("prefix"), field=f"{artifact_id}.prefix")
         disposition = artifact.get("disposition")
-        if disposition not in ("keep", "delete_now", "keep_until_standalone"):
+        if disposition not in (
+            "keep",
+            "delete_now",
+            "delete_payloads",
+            "keep_until_standalone",
+        ):
             raise ReclamationError(f"{artifact_id} disposition drifted")
         objects = artifact.get("objects")
         if not isinstance(objects, list) or not objects:
@@ -349,7 +363,15 @@ def validate_capsule(capsule: Mapping[str, Any]) -> None:
             raise ReclamationError(f"{artifact_id} object count drifted")
         if artifact.get("bytes") != sum(item["size"] for item in normalized):
             raise ReclamationError(f"{artifact_id} byte total drifted")
-        if disposition == "delete_now":
+        preserve_metadata = artifact.get("preserve_metadata_objects", [])
+        if not isinstance(preserve_metadata, list) or any(
+            not isinstance(name, str) or f"{prefix}{name}" not in names
+            for name in preserve_metadata
+        ):
+            raise ReclamationError(
+                f"{artifact_id} preserved metadata set drifted"
+            )
+        if disposition in ("delete_now", "delete_payloads"):
             for protected_prefix in protected_prefixes:
                 if prefix.startswith(protected_prefix) or protected_prefix.startswith(prefix):
                     raise ReclamationError(
@@ -365,11 +387,20 @@ def deletion_order(capsule: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
     validate_capsule(capsule)
     candidates: list[dict[str, Any]] = []
     for artifact in capsule["artifacts"]:
-        if artifact["disposition"] != "delete_now":
+        if artifact["disposition"] not in ("delete_now", "delete_payloads"):
             continue
         prefix = artifact["prefix"]
         terminal = {f"{prefix}{name}" for name in artifact["terminal_objects"]}
+        preserved = {
+            f"{prefix}{name}"
+            for name in artifact["preserve_metadata_objects"]
+        }
         for item in artifact["objects"]:
+            if (
+                artifact["disposition"] == "delete_payloads"
+                and item["name"] in preserved
+            ):
+                continue
             record = dict(item)
             record["artifact_id"] = artifact["id"]
             record["terminal"] = item["name"] in terminal

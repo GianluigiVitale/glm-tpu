@@ -1,0 +1,21 @@
+{
+  "artifact_kind": "greenfield_pp16_standalone_runtime_proof",
+  "claim_scope": "terminal_integrity_and_load_lineage_only_no_numerical_or_performance_claim",
+  "cpu_tests": {
+    "passed": 31,
+    "skipped": 1
+  },
+  "file_count": 32,
+  "format_version": 1,
+  "inspection_sha256": "29b11bb56cc322642568b1563f7e515a394e157db53e7ab0a7c101da0f525bbf",
+  "proof_sha256": "9764b8a808b8744a62bbcebc470d8f9d501b2decc2cd6a3976d94941b54d72ae",
+  "runtime_file_bytes": 869546107136,
+  "runtime_layout_manifest_sha256": "1b0464affdea4bc6f72c5f2011df79e155e26b834d2ead32408ad4c9afcf3584",
+  "runtime_manifest_sha256": "0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1",
+  "runtime_payload_bytes": 869545347072,
+  "source_packed_manifest_sha256": "13ad2e926b44bee86e620d877d4c266dbacc4f9a59b352fc4f2c8ef534efedb5",
+  "source_runtime_manifest_sha256": "b0f624666e921a93e92c625e0e1248aaa9162c45a9be974f4491755c8604d2e5",
+  "source_verification_mode": "metadata_lineage",
+  "status": "passed",
+  "verifier_code_hash": "b619c94ec4a699238ab05276651dbe4a48aa196e"
+}

@@ -1,0 +1,110 @@
+{
+  "artifact_kind": "greenfield_checkpoint_retention_policy",
+  "artifacts": [
+    {
+      "disposition": "keep",
+      "expected_bytes": 755663676164,
+      "expected_object_count": 150,
+      "id": "canonical_source",
+      "prefix": "models/GLM-5.2-FP8/",
+      "recipe": {
+        "code_hash": "3685ee40960f53874e18ad54ec1e8a0c65e53a62",
+        "dependencies": [],
+        "entrypoint": "scripts/greenfield/run_checkpoint_pack_pp16.sh",
+        "notes": "Immutable canonical source; never delete."
+      },
+      "terminal_objects": [
+        "model.safetensors.index.json"
+      ]
+    },
+    {
+      "disposition": "delete_payloads",
+      "expected_bytes": 757274907156,
+      "expected_manifest_sha256": "13ad2e926b44bee86e620d877d4c266dbacc4f9a59b352fc4f2c8ef534efedb5",
+      "expected_object_count": 72,
+      "id": "pp16_packed_parent",
+      "manifest_object": "packed_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/packed/PP16_LP2/greenfield_full_pack_pp16_20260827T032310295108546Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "layout_manifest.json",
+        "packed_manifest.json"
+      ],
+      "recipe": {
+        "code_hash": "3685ee40960f53874e18ad54ec1e8a0c65e53a62",
+        "dependencies": [
+          "canonical_source"
+        ],
+        "entrypoint": "scripts/greenfield/run_checkpoint_pack_pp16.sh",
+        "notes": "Keep only compact lineage metadata after standalone final-runtime verification."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "packed_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "disposition": "delete_payloads",
+      "expected_bytes": 869585145353,
+      "expected_manifest_sha256": "b0f624666e921a93e92c625e0e1248aaa9162c45a9be974f4491755c8604d2e5",
+      "expected_object_count": 68,
+      "id": "pp16_base_runtime_parent",
+      "manifest_object": "runtime_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/runtime/PP16_LP2/greenfield_runtime_pack_pp16_20260827T091323450875229Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "runtime_layout.json",
+        "runtime_manifest.json"
+      ],
+      "recipe": {
+        "code_hash": "af0e226cb2dfc0ab3c48ca19deceecacead6f9b5",
+        "dependencies": [
+          "pp16_packed_parent"
+        ],
+        "entrypoint": "scripts/greenfield/pack_runtime_checkpoint.py",
+        "notes": "Keep only compact source file/tensor lineage metadata after standalone final-runtime verification."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "disposition": "keep",
+      "expected_bytes": 869561965562,
+      "expected_manifest_sha256": "0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1",
+      "expected_object_count": 68,
+      "id": "pp16_active_feature_runtime",
+      "manifest_object": "runtime_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/",
+      "recipe": {
+        "code_hash": "a973425cd235758142c55c5a0127ddb9a36b45a9",
+        "dependencies": [
+          "pp16_packed_parent",
+          "pp16_base_runtime_parent"
+        ],
+        "entrypoint": "scripts/greenfield/pack_feature_runtime_checkpoint.py",
+        "notes": "Current active final runtime; full payload and sidecar verification remains mandatory."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    }
+  ],
+  "bucket": "driftbench-dsv4-uc",
+  "bucket_location": "US-CENTRAL2",
+  "format_version": 1,
+  "protected_prefixes": [
+    "models/",
+    "results/",
+    "oracles/",
+    "checkpoints/greenfield/glm52/plans/",
+    "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/"
+  ]
+}
