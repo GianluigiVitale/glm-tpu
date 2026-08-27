@@ -2,6 +2,27 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 bounded real-byte PP16 pack probe passes
+
+- Tag `greenfield_checkpoint_probe_pp16_20260827T024902158913509Z` at pushed/mirrored code
+  `42015a1` derives ten exact layer-3 leaves from the sealed complete PP16 layout. It independently
+  hashes 50,345,920 source bytes, then streams 50,347,904 packed payload bytes through both final
+  owners in one pack invocation. Each output has 25,173,952 payload bytes and 25,175,184 file
+  bytes; SHAs are `87ac52df...7ea6` and `705ed0ff...0ac3`.
+- The selection covers replicated/axis-sharded/expert-identity parameter and FP8-scale cases,
+  both axis-0 and axis-1 splitting, and expert identity on both slots (expert 0 -> slot 0, expert
+  128 -> slot 1). Every raw source SHA is recorded; manifest SHA is `14c36aeb...c4e3` and it binds
+  complete layout `f97de2d8...b15f9`.
+- The audit first found that the cloud pack harness invoked its streaming core once per owner,
+  contradicting the one-read-per-stage contract. Pin `7a2e081` fixes grouped owner streaming and
+  adds fail-closed cleanup/region tests before any large pack. The real probe completed in 43
+  seconds; payload uploads were about 150--158 MiB/s in `US-CENTRAL2`.
+- The remote terminal set is exactly nine objects / 50,375,010 bytes. Ledger SHA is
+  `a59b08a6...299d`, SUCCESS self SHA is `dcd2d2b1...7d06`, and local/remote SUCCESS file SHA is
+  `0e6880d7...9945`. No TPU, complete checkpoint, DB row, HBM, or performance claim exists.
+- Exact next is the bounded two-device direct-loader compatibility proof against these probe
+  owners. Only after it passes may the complete 757-GB PP16 pack be authorized.
+
 ## 2026-08-27 complete PP16 checkpoint plan is terminal-sealed
 
 - Metadata-only tag `greenfield_checkpoint_plan_pp16_20260827T022537742669498Z` at pushed and

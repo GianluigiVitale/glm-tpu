@@ -63,6 +63,20 @@ This artifact is a pre-payload ownership contract. It does not contain packed mo
 does not prove direct load, measured HBM, Gate B, decoder correctness, or performance. A bounded
 pack/load discriminator must pass before authorizing the complete 757-GB PP16 pack.
 
+The first discriminator is
+`greenfield_checkpoint_probe_pp16_20260827T024902158913509Z` at `42015a1`. It is derived directly
+from the complete manifest rather than an independent ownership recipe. Ten real layer-3 leaves
+cover replicated, axis-sharded, and expert-identity parameters and FP8 scales, both shard axes, and
+both owner slots. The packer hashes 50,345,920 unique source bytes and emits 50,347,904 payload
+bytes in two files. Their exact file SHAs are `87ac52df4c7f83dd993b59a1673fcef817cc2f2615e7c8c54e0a01e3ad657ea6`
+and `705ed0ffcdb67320ec38c1972e44ebf9fb0e903ea2d8a6bf7968c02b41ae0ac3`;
+probe manifest SHA is `14c36aeb356b9856bd0fa2040ba2b3b2923909cda194afb9d41ab8af011ac4e3`.
+
+This probe also enforces the grouped-streaming invariant: all pending two-chip owners are opened
+together and the core is invoked once, so relevant source bytes are read once per pack pass. Its
+same-region terminal archive is generation/CRC bound. It is not a complete checkpoint and cannot
+substitute for the remaining bounded direct-load proof, full pack/load, measured HBM, or Gate B.
+
 ## Bounded Gate C derivative
 
 Artifact `greenfield_gate_c_pack_20260805T214609093206269Z` at code `8a50d6a` derives only the 31

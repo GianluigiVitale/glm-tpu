@@ -53,6 +53,14 @@ and 757,149,950,848 planned packed bytes. Execution/plan/layout hashes are
 This proves plan feasibility only: `promotion_memory_proven=false`, and there is no DB, TPU,
 direct-load, measured-HBM, Gate-B, or performance claim.
 
+Bounded real-byte pack tag `greenfield_checkpoint_probe_pp16_20260827T024902158913509Z` at
+`42015a1` derives ten leaves from that exact layout and covers every layout/value class, both shard
+axes, and both expert-owner slots. It reconciles 50,345,920 source bytes to two 25,173,952-byte
+payloads in one grouped core invocation; owner SHAs are `87ac52df...7ea6` / `705ed0ff...0ac3` and
+manifest SHA is `14c36aeb...c4e3`. Its exact nine-object / 50,375,010-byte same-region archive is
+generation/CRC terminal-sealed. This closes the bounded pack discriminator only; direct-load,
+complete-pack, measured-HBM, Gate-B, and performance evidence remain missing.
+
 The compile-only tag
 `greenfield_ws32_short_decoder_8k_acquire_20260826T195124476893681Z` is preserved diagnostic
 evidence, not an accepted DB result. It contains eight complete load/compile/HBM prevalidations and

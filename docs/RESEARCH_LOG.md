@@ -5,6 +5,30 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 — bounded PP16 pack catches reread bug, then passes real bytes
+
+Before authorizing a 757-GB pack, source inspection found that the old cloud harness called
+`stream_pack_group` independently for each destination owner. It produced correct bytes but
+reread the same stage sources two times for PP16 (four for PP8), violating its documented grouped
+streaming contract and risking needless long I/O. Pin `7a2e081` now opens the complete pending
+owner set, calls the core once, fans each source read to both streams, terminates every stream on
+partial setup/execution failure, and rejects a bucket outside exact `US-CENTRAL2`. Nineteen focused
+uploader/stream/load tests passed before proceeding.
+
+Protected tag `greenfield_checkpoint_probe_pp16_20260827T024902158913509Z` at pushed/mirrored
+`42015a1` then selected ten real layer-3 leaves from complete layout `f97de2d8...b15f9`. The probe
+independently hashes 50,345,920 source bytes and packs 50,347,904 bytes across two owner payloads
+in one core invocation. It covers replicated, axis-sharded, and expert-identity parameters and
+FP8 scales, axis 0/1, both owner slots, and exact raw source hashes. Owner file SHAs are
+`87ac52df...7ea6` / `705ed0ff...0ac3`; manifest SHA is `14c36aeb...c4e3`.
+
+Execution plus same-region publication finished in 43 seconds, with 150--158 MiB/s payload
+uploads. Seven objects were generation/CRC reconciled, then the ledger and terminal marker were
+written. The exact nine-object set is 50,375,010 bytes; ledger SHA is `a59b08a6...299d`, terminal
+self SHA `dcd2d2b1...7d06`, and local/remote SUCCESS file SHA `0e6880d7...9945`. Locks are free and
+DB remains integral at max run 555 / 553 rows. This is bounded pack evidence only; next prove
+two-device direct-loader compatibility before the complete PP16 pack.
+
 ## 2026-08-27 — complete PP16 plan is feasible and same-region sealed
 
 Protected metadata-only tag `greenfield_checkpoint_plan_pp16_20260827T022537742669498Z` at pushed
