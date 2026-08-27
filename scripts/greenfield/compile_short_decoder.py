@@ -155,6 +155,61 @@ def _fleet_digest(
     return values
 
 
+def _runtime_pipeline_groups(
+    schedule: Any,
+    runtime_layout: Any,
+) -> tuple[tuple[tuple[int, ...], ...], tuple[tuple[int, int], ...]]:
+    """Map physical stage ownership to ranks in runtime-layout order.
+
+    ``build_decoder_step_program`` consumes ranks into its explicitly ordered
+    runtime-device tuple, while the execution plan records physical device
+    ids. Deriving this mapping from the final checkpoint layout keeps PP8 and
+    PP16 on the same code path without assuming either 8x4 or 16x2 geometry.
+    """
+
+    rank_by_device_id: dict[int, int] = {}
+    for rank, device in enumerate(runtime_layout.devices):
+        device_id = int(device.device_id)
+        if device_id in rank_by_device_id:
+            raise ValueError(
+                f"runtime layout repeats physical device id {device_id}"
+            )
+        rank_by_device_id[device_id] = rank
+    groups = []
+    for stage in schedule.stages:
+        try:
+            group = tuple(
+                rank_by_device_id[int(device_id)]
+                for device_id in stage.assignment.device_ids
+            )
+        except KeyError as exc:
+            raise ValueError(
+                "pipeline stage names a device absent from the runtime layout"
+            ) from exc
+        groups.append(group)
+    canonical_groups = tuple(groups)
+    flattened = tuple(rank for group in canonical_groups for rank in group)
+    if tuple(sorted(flattened)) != tuple(range(len(runtime_layout.devices))):
+        raise ValueError(
+            "pipeline groups do not cover every runtime-layout rank exactly once"
+        )
+    if not canonical_groups:
+        raise ValueError("pipeline schedule has no stages")
+    local_parallel_sizes = {len(group) for group in canonical_groups}
+    if len(local_parallel_sizes) != 1 or not next(iter(local_parallel_sizes)):
+        raise ValueError("pipeline groups have inconsistent local widths")
+    local_parallel_size = len(canonical_groups[0])
+    pairs = tuple(
+        (
+            canonical_groups[stage][slot],
+            canonical_groups[(stage + 1) % len(canonical_groups)][slot],
+        )
+        for stage in range(len(canonical_groups))
+        for slot in range(local_parallel_size)
+    )
+    return canonical_groups, pairs
+
+
 def _percentiles(values: list[float]) -> dict[str, float]:
     array = np.asarray(values, dtype=np.float64)
     return {
@@ -2315,13 +2370,9 @@ def main() -> int:
         runtime_devices = tuple(
             by_id[device.device_id] for device in pack_context.layout.devices
         )
-        groups = tuple(
-            tuple(range(stage * 4, stage * 4 + 4)) for stage in range(8)
-        )
-        pairs = tuple(
-            (groups[stage][slot], groups[(stage + 1) % 8][slot])
-            for stage in range(8)
-            for slot in range(4)
+        groups, pairs = _runtime_pipeline_groups(
+            schedule,
+            pack_context.layout,
         )
         decoder = build_decoder_step_program(
             execution_plan,

@@ -2,6 +2,25 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 PP16 complete-decoder acquisition is fail-closed and CPU-ready
+
+- The pre-TPU audit found that `compile_short_decoder.py` selected a PP16 HLO backend but still
+  constructed hardcoded PP8 `8x4` rank groups and pairs. The compiler now maps physical stage
+  ownership through final-runtime layout order. The sealed PP16 layout resolves to 16 exact
+  two-rank groups and 32 same-slot ring transfers; PP8 retains its existing derivation.
+- A dedicated default-off launcher runs only the smallest complete discriminator: 2K capacity,
+  complete token mechanism, split residual, feature tile 128, one warmup, one diagnostic
+  iteration, no oracle, no trace and no device round-trip already proved by Gate B. It binds the
+  three exact manifests, pushed pin, `US-CENTRAL2`, global TPU/rsync leases, eight-host pre/post
+  census, direct load, and terminal generation/CRC archive.
+- The independent validator requires all eight records / 32 HBM rows, LP2 Pallas `I=1024`, exact
+  fleet HLO/StableHLO agreement, 16 residual transfers, no forbidden shapes/full-vocab rebuild,
+  no dequantization/concat/reshard, and explicit `performance/numerical/Gate-D=false` with no DB
+  id. Focused compiler, PP16 forced-32, inventory and wrapper tests pass 59/59; Bash syntax passes.
+- This is implementation readiness only: no TPU compile, HLO, HBM, decoder token, DB or performance
+  result exists yet. Exact next is commit/push/same-region mirror, then one serialized acquisition.
+  Do not launch numerical 8K unless it terminal-seals every full-graph contract.
+
 ## 2026-08-27 complete PP16 feature runtime is terminal-sealed
 
 - Tag `greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z` at exact code `a973425`

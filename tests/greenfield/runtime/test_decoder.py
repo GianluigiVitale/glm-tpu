@@ -4635,6 +4635,7 @@ from glm_tpu.greenfield.model import (
     build_pipeline_schedule,
 )
 from glm_tpu.greenfield.runtime import build_decoder_step_program
+from scripts.greenfield.compile_short_decoder import _runtime_pipeline_groups
 from tests.greenfield.checkpoint.test_runtime_pack import _small_feature_source_plan_pp16
 
 source = _small_feature_source_plan_pp16()
@@ -4666,15 +4667,7 @@ state = build_decoder_state_layout(
 layout = build_decoder_feature_runtime_weight_layout(
     plan, schedule, source_layout
 )
-groups = tuple(
-    tuple(stage * 2 + slot for slot in range(2))
-    for stage in range(16)
-)
-pairs = tuple(
-    (groups[stage][slot], groups[(stage + 1) % 16][slot])
-    for stage in range(16)
-    for slot in range(2)
-)
+groups, pairs = _runtime_pipeline_groups(schedule, layout)
 runtime_devices = tuple(
     jax.devices()[device_id]
     for stage in schedule.stages

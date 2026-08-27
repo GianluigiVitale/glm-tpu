@@ -5,6 +5,30 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 12:15 UTC — pre-TPU audit removes a hidden PP8 geometry assumption from PP16
+
+The smallest-first compile audit found a real launch blocker without consuming TPU time:
+`compile_short_decoder.py` admitted `tpu_v4_pp16_pallas_feature` but still built eight four-rank
+groups and PP8 transfer pairs. It now derives runtime ranks from the final-layout device order and
+each schedule stage's physical ownership. Against sealed PP16 metadata this produces exactly
+`((0,1),...,(30,31))` and two same-slot transfers across each of 16 stage boundaries. A forced-32
+PP16 decoder construction and explicit incomplete-layout rejection protect the mapping; PP8 uses
+the same plan-generic helper.
+
+The dedicated default-off acquisition wrapper pins feature manifest `0f1bb271...52b6f1`, base
+runtime `b0f62466...4d2e5`, packed source `13ad2e92...fedb5`, the pushed code pin, pod health and
+the exact `US-CENTRAL2` bucket. It reuses the global lease, cron-rsync exclusion, authenticated
+eight-host census, direct final-layout loader and create-only archive. Its workload is deliberately
+2K / one warmup / one iteration / no trace / no oracle / no repeated device round-trip. The
+validator requires 16 LP2 residual transfers, all full-graph HLO subcontracts, one-row/live-tensor
+rules, fleet hash agreement, 32 HBM records and zero dequantization/concat/reshard, while sealing
+`performance_claim=false`, `numerical_claim=false`, `gate_d_passed=false`, and no DB id.
+
+Focused tests pass 59/59 and Bash/Python syntax plus diff checks pass. This is code readiness only:
+there is no TPU HLO/HBM/token/performance evidence and Gate D remains open. After commit, push and
+same-region mirror verification, run this acquisition once; only a terminal pass authorizes the
+first protected PP16 numerical 2K decoder.
+
 ## 2026-08-27 — complete PP16 feature runtime is sealed after bounded-first fanout
 
 Tag `greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z` at exact code `a973425`

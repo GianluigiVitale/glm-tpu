@@ -21,6 +21,7 @@ from scripts.greenfield.compile_short_decoder import (
     _observer_hlo_isolation_contract,
     _protected_short_context_label,
     _raw_token_sequence_contract,
+    _runtime_pipeline_groups,
     _validate_dsa_observation_step,
     _validate_completed_step_selected_states,
     _validate_layer0_ingredients,
@@ -35,6 +36,60 @@ PROTECTED_RUNNER = REPO / "scripts/greenfield/run_short_decoder_compile_pp8.sh"
 PROTECTED_8K_RUNNER = (
     REPO / "scripts/greenfield/run_short_decoder_compile_pp8_8k.sh"
 )
+
+
+def test_runtime_pipeline_groups_follow_final_layout_rank_order() -> None:
+    physical_groups = (
+        (0, 1),
+        (8, 9),
+        (16, 17),
+        (24, 25),
+    )
+    layout = SimpleNamespace(
+        devices=tuple(
+            SimpleNamespace(device_id=device_id)
+            for group in physical_groups
+            for device_id in group
+        )
+    )
+    schedule = SimpleNamespace(
+        stages=tuple(
+            SimpleNamespace(
+                assignment=SimpleNamespace(device_ids=group)
+            )
+            for group in physical_groups
+        )
+    )
+
+    groups, pairs = _runtime_pipeline_groups(schedule, layout)
+
+    assert groups == ((0, 1), (2, 3), (4, 5), (6, 7))
+    assert pairs == (
+        (0, 2),
+        (1, 3),
+        (2, 4),
+        (3, 5),
+        (4, 6),
+        (5, 7),
+        (6, 0),
+        (7, 1),
+    )
+
+
+def test_runtime_pipeline_groups_reject_incomplete_layout() -> None:
+    layout = SimpleNamespace(
+        devices=(SimpleNamespace(device_id=0), SimpleNamespace(device_id=1))
+    )
+    schedule = SimpleNamespace(
+        stages=(
+            SimpleNamespace(
+                assignment=SimpleNamespace(device_ids=(0,))
+            ),
+        )
+    )
+
+    with pytest.raises(ValueError, match="cover every runtime-layout rank"):
+        _runtime_pipeline_groups(schedule, layout)
 
 
 def test_protected_runner_pins_fp32_feature_boundary_kernel() -> None:
