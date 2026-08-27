@@ -110,8 +110,12 @@ def _load_sources(
     for owner in range(4):
         record = file_records[owner]
         path = source_root / str(record["destination_filename"])
-        if not path.is_file() or _sha256_file(path) != record["sha256"]:
-            raise RuntimeError("sealed source file identity drifted")
+        # The sealed source manifest/SUCCESS pair binds the whole owner-file
+        # hashes.  Re-reading four ~24.5-GiB files here would add a 98-GiB
+        # pass before selecting ~2.1 GiB.  Verify every selected tensor's
+        # payload hash below, matching the already protected layer-0 packer.
+        if not path.is_file():
+            raise RuntimeError("sealed source file is missing")
         tensor_records = {item["name"]: item for item in record["tensors"]}
         owner_evidence: dict[str, Any] = {
             "device_slot": owner,
