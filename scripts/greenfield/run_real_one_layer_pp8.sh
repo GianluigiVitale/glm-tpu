@@ -187,8 +187,8 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "refusing real-layer run outside $BRANCH" >&2
   exit 2
 }
-[[ -z $(git -C "$WORKTREE" status --porcelain) ]] || {
-  echo "refusing real-layer run from a dirty greenfield worktree" >&2
+git -C "$WORKTREE" diff --quiet && git -C "$WORKTREE" diff --cached --quiet || {
+  echo "refusing real-layer run with tracked changes" >&2
   exit 2
 }
 bucket_location=$(gcloud storage buckets describe "$APPROVED_BUCKET" --format='value(location)')
@@ -233,6 +233,8 @@ flock -n 9 || {
   say "ABORT: another protected pod workflow holds the global lease"
   exit 1
 }
+exec 8>/home/gianl/.glm-tpu-rsync.lock
+flock 8
 
 has_eight_unique_markers() {
   local file=$1 marker=$2
