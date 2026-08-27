@@ -1749,6 +1749,7 @@ def _validate_pallas_stage_linear_decoder_calls(
     layers: int,
     dense_layers: int,
     full_indexer_layers: int,
+    local_parallel_size: int = 4,
     dsa_query_backend: StageLinearBackend = "pallas",
     dsa_head_key_exact_association: bool = False,
     attention_projection_backend: AttentionProjectionBackend = "separate",
@@ -1764,28 +1765,36 @@ def _validate_pallas_stage_linear_decoder_calls(
         "fused_n82_convolution",
     ):
         raise PlanValidationError("attention projection HLO backend is unknown")
+    if local_parallel_size not in (2, 4):
+        raise PlanValidationError("stage-linear HLO contract requires LP2 or LP4")
+    attention_width = 16_384 // local_parallel_size
+    attention_heads = 64 // local_parallel_size
+    structured_width = 28_672 // local_parallel_size
+    dense_intermediate = 12_288 // local_parallel_size
+    if strategy_nd_attention_projection and local_parallel_size != 4:
+        raise PlanValidationError("StrategyND stage-linear HLO requires LP4")
     separate_qkv_a_calls = (
         layers if attention_projection_backend == "separate" else 0
     )
     expected_kernel_counts = {
         "greenfield_fp8_block_matmul_m8_k6144_n2048": separate_qkv_a_calls,
-        "greenfield_fp8_block_matmul_m8_k2048_n4096": layers,
+        f"greenfield_fp8_block_matmul_m8_k2048_n{attention_width}": layers,
         "greenfield_fp8_block_matmul_m8_k6144_n640": separate_qkv_a_calls,
-        "greenfield_fp8_block_matmul_m8_k4096_n6144": (
+        f"greenfield_fp8_block_matmul_m8_k{attention_width}_n6144": (
             0 if strategy_nd_attention_projection else layers
         ),
         "greenfield_fp8_strategy_nd_o_m8_k512_n6144": (
             8 * layers if strategy_nd_attention_projection else 0
         ),
-        "greenfield_fp8_structured_kv_b_q_absorb_h16_p192_l512": layers,
-        "greenfield_fp8_structured_kv_b_value_h16_l512_v256": layers,
+        f"greenfield_fp8_structured_kv_b_q_absorb_h{attention_heads}_p192_l512": layers,
+        f"greenfield_fp8_structured_kv_b_value_h{attention_heads}_l512_v256": layers,
         "greenfield_fp8_block_matmul_f32_m8_k2048_n1024": (
             full_indexer_layers if dsa_query_backend == "pallas" else 0
         ),
         "greenfield_fp8_block_matmul_f32_m8_k6144_n128": (
             0 if dsa_head_key_exact_association else full_indexer_layers
         ),
-        "greenfield_fp8_fused_block_swiglu_m8_h6144_i3072_o6144": (
+        f"greenfield_fp8_fused_block_swiglu_m8_h6144_i{dense_intermediate}_o6144": (
             0 if dense_final_layout_convolution else dense_layers
         ),
     }
@@ -1808,13 +1817,13 @@ def _validate_pallas_stage_linear_decoder_calls(
         )
     decoded_dimensions = (
         "2048,6144",
-        "4096,2048",
+        f"{attention_width},2048",
         "576,6144",
-        "6144,4096",
-        "7168,512",
+        f"6144,{attention_width}",
+        f"{structured_width},512",
         "128,6144",
-        "3072,6144",
-        "6144,3072",
+        f"{dense_intermediate},6144",
+        f"6144,{dense_intermediate}",
     )
     if dsa_query_backend != "reference":
         decoded_dimensions += ("1024,2048",)
@@ -1827,9 +1836,9 @@ def _validate_pallas_stage_linear_decoder_calls(
         forbidden_signatures.discard("f32[128,6144]")
     formatted_dimensions = (
         "2048,6144",
-        "4096,2048",
-        "6144,4096",
-        "7168,512",
+        f"{attention_width},2048",
+        f"6144,{attention_width}",
+        f"{structured_width},512",
         "1024,2048",
         "128,6144",
     )
@@ -1911,6 +1920,7 @@ def _validate_pallas_stage_linear_decoder_calls(
         "forbidden_decoded_weight_overlays": forbidden_overlays,
         "forbidden_formatted_weight_overlays": forbidden_formatted_overlays,
         "kernel_counts": kernel_counts,
+        "local_parallel_size": local_parallel_size,
         "passed": not violations,
         "violations": violations,
     }
@@ -4252,6 +4262,7 @@ def validate_decoder_step_hlo(
                 layers=layers,
                 dense_layers=dense_layers,
                 full_indexer_layers=full_layers,
+                local_parallel_size=config.local_parallel_size,
                 dsa_query_backend=dsa_query_backend,
                 dsa_head_key_exact_association=(
                     dsa_head_key_exact_association

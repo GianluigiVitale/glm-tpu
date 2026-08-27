@@ -234,7 +234,10 @@ def test_pp16_compile_acquisition_validator_admits_pallas_linear(
         record["linear_backend"] = "pallas"
         contract = record["hlo_contract"]
         contract["backend_contract"] = "tpu_v4_pp16_pallas_feature_linear"
-        contract["pallas_stage_linear_contract"] = {"passed": True}
+        contract["pallas_stage_linear_contract"] = {
+            "local_parallel_size": 2,
+            "passed": True,
+        }
 
     _write_records(tmp_path, records)
     summary = validate_records(

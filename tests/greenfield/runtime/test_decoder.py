@@ -3935,6 +3935,23 @@ def test_stage_linear_decoder_hlo_contract_pins_kernels_and_overlays() -> None:
     )
     assert record["passed"], record
 
+    lp2_hlo = (
+        hlo.replace("m8_k2048_n4096", "m8_k2048_n8192")
+        .replace("m8_k4096_n6144", "m8_k8192_n6144")
+        .replace("_h16_p192", "_h32_p192")
+        .replace("_h16_l512", "_h32_l512")
+        .replace("_i3072_o6144", "_i6144_o6144")
+    )
+    lp2_record = _validate_pallas_stage_linear_decoder_calls(
+        lp2_hlo,
+        layers=78,
+        dense_layers=3,
+        full_indexer_layers=21,
+        local_parallel_size=2,
+    )
+    assert lp2_record["passed"], lp2_record
+    assert lp2_record["local_parallel_size"] == 2
+
     reference_dsa_hlo = "\n".join(
         line
         for line in calls

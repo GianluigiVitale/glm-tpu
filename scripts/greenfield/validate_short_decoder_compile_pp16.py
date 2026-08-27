@@ -233,6 +233,10 @@ def validate_records(
                 and stage_linear.get("passed") is True,
                 f"rank {rank} Pallas-linear HLO contract failed",
             )
+            _require(
+                stage_linear.get("local_parallel_size") == 2,
+                f"rank {rank} Pallas-linear LP drifted",
+            )
         else:
             _require(
                 stage_linear in ({}, None),
