@@ -5,6 +5,33 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-27 15:26--15:28 UTC — exact LP2/2K attention is fast; Pallas loses
+
+The first protected attempt at tag
+`greenfield_sparse_attention_pp16_lp2_2k_20260827T152601123018011Z` compiled a graph with exactly
+the two intended Pallas calls and no forbidden op, materialized selected-KV tensor or dead row. It
+refused before arithmetic because the inherited HLO validator required LP4's 65,536 cache rows and
+one gather-bound annotation; exact LP2/2K has 1,024 local rows and XLA proves the four-page gather
+in bounds, eliminating that annotation. No DB row or `SUCCESS` exists and both censuses are clean.
+Pin `45aecd9` parameterizes only those exact geometry facts, retains the PP8 defaults and passes 21
+focused tests.
+
+The retry, protected DB560 / tag
+`greenfield_sparse_attention_pp16_lp2_2k_20260827T152817118334014Z`, passes on the exact one-row
+PP16 shape: cache `[4,256,640]`, query `[1,64,512]`, selected `[1,2048]`, valid 2,035 and LP2.
+Pallas optimized HLO SHA `a1d7ff0c...42aa` has exactly owner-order plus sparse-MLA custom calls;
+reference SHA `1cd8a3aa...88e37` has exactly two QK and one PV convolutions. The numerical contract
+passes balanced, concentrated, tail, empty-owner and invalid-page cases; maximum/mean output error
+is `0.00390625` / `2.451241e-05`, and maximum LSE error is `2.861023e-06`.
+
+The result is a negative optimization: balanced Pallas/reference p50 is `0.351020/0.319050 ms`,
+and concentrated is `0.348280/0.303580 ms`. Keep reference attention. Seventy-eight layers at the
+measured reference p50 are only about 25 ms, so attention is not the cause of the preserved
+`1,621.379175-ms` diagnostic full step. DB560 is diagnostic only with `performance_claim=false`;
+it makes no token, complete-decoder or Gate-D claim. Next use the existing HLO and protected DB
+measurements to attribute the 717 live Pallas calls and exact reference DSA exception before any
+new TPU launch.
+
 ## 2026-08-27 14:39--15:16 UTC — Pallas-linear cuts PP16 diagnostic step 62.6x; bytes recovered
 
 The smallest protected projection discriminator, DB559 / tag

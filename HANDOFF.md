@@ -2,6 +2,28 @@
 
 **Updated:** 2026-08-27 UTC
 
+## 2026-08-27 PP16 exact-2K attention is not the remaining bottleneck
+
+- Protected DB560 / tag
+  `greenfield_sparse_attention_pp16_lp2_2k_20260827T152817118334014Z` runs the smallest exact
+  PP16 LP2 discriminator: one live query row, local cache `[4,256,640]`, global selected K=2,048,
+  valid length 2,035, one warmup and three profiler-free iterations. Code pin `45aecd9` is pushed
+  and same-region mirrored; both fleet censuses are authenticated 8/8 clean.
+- Pallas and the current reference path pass balanced, concentrated, tail, empty-owner and invalid-
+  page safety cases. Maximum/mean output error is `0.00390625` / `2.45124e-05`; maximum LSE error
+  is `2.86102e-06`. Pallas HLO has exactly the owner-order and sparse-MLA custom calls with no
+  selected-KV overlay, forbidden op or dead row. Reference HLO has exactly two QK plus one PV
+  convolution and the expected selected-KV overlay.
+- Reference is already faster at this geometry: balanced p50 `0.319050 ms` versus Pallas
+  `0.351020 ms`; concentrated p50 `0.303580 ms` versus `0.348280 ms`. Do not integrate the Pallas
+  sparse-attention path into PP16. Even 78 reference layers project to only about 25 ms, so this
+  component cannot explain the sealed `1,621.379175-ms` diagnostic step.
+- This is diagnostic evidence only (`performance_claim=false`), not a token, Gate-D or complete-
+  decoder result. The first attempt stopped before arithmetic on a retained LP4 HLO cardinality;
+  the bounded LP2 correction was preserved at `45aecd9` and the retry passed. Exact next is offline
+  cost attribution of the 717 live TPU custom calls and remaining reference DSA exception from
+  existing DB/HLO evidence, followed only by the smallest discriminator for the largest term.
+
 ## 2026-08-27 PP16 Pallas-linear graph is sealed; remaining 1.62 s is the next bottleneck
 
 - DB559 / tag `greenfield_fp8_single_up_m1_20260827T143939728274623Z` isolates one exact real
