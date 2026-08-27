@@ -65,6 +65,9 @@ def test_pallas_pack_wrappers_admit_pp16_only_in_approved_region() -> None:
     assert "PP16 Pallas feature run requires exact artifact identities" in (
         runner_source
     )
+    assert "greenfield_topology_20260826T194116460015528Z" in runner_source
+    assert "US-CENTRAL2" in runner_source
+    assert "driftbench-storage" not in runner_source
     subprocess.run(["bash", "-n", str(runner)], check=True)
 
 

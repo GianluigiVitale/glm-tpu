@@ -9,8 +9,9 @@ readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly ORACLE_REPO=/home/gianl/tpu-inference
-readonly ORACLE_RUN=/home/gianl/glm-run/greenfield_one_layer_oracle_20260805T162210370718434Z
-readonly TOPOLOGY_CAPTURE=/home/gianl/glm-run/greenfield_topology_20260805T125842425591441Z/topology.rank0.json
+readonly ORACLE_RUN=/home/gianl/gcs-models/oracles/greenfield/glm52/layer3/greenfield_one_layer_oracle_20260805T162210370718434Z
+readonly ORACLE_DIR=$ORACLE_RUN
+readonly TOPOLOGY_CAPTURE=/home/gianl/gcs-models/results/greenfield_topology_20260826T194116460015528Z/host_records/topology.rank0.json
 readonly ORACLE_MANIFEST_SHA=c63ffa19820d5c2c39865ac8611fb313ffc6ebcd2f893c3507745a356bfdebff
 readonly SOURCE_REVISION=gcs-object-set-830fd1bf7d8d6b6242895cfd50f5978e5cc5749da42246c19391855e586e9658
 readonly TOPOLOGY_HASH=294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559
@@ -169,6 +170,17 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   echo "refusing real-layer run from a dirty greenfield worktree" >&2
   exit 2
 }
+bucket_location=$(gcloud storage buckets describe "$APPROVED_BUCKET" --format='value(location)')
+[[ $bucket_location == US-CENTRAL2 ]] || {
+  echo "approved result bucket location drifted: $bucket_location" >&2
+  exit 2
+}
+for protected_input in "$ORACLE_RUN" "$TOPOLOGY_CAPTURE"; do
+  findmnt -T "$protected_input" -n -o SOURCE,FSTYPE | grep -q '^driftbench-dsv4-uc fuse.gcsfuse$' || {
+    echo "protected input is not on the approved read-only bucket: $protected_input" >&2
+    exit 2
+  }
+done
 [[ $WARMUP =~ ^[0-9]+$ && $WARMUP -ge 200 ]] || {
   echo "protected real-layer run requires warmup>=200" >&2
   exit 2
@@ -261,7 +273,7 @@ started=$(date +%s)
     PYTHONPATH="$WORKTREE" \
     /home/gianl/vllm-env/bin/python scripts/greenfield/run_real_one_layer.py \
       --artifact-dir "$PACK_RUN/packed" \
-      --oracle-dir "$ORACLE_RUN/oracle" \
+      --oracle-dir "$ORACLE_DIR" \
       --topology-capture "$TOPOLOGY_CAPTURE" \
       --expected-code-hash "$PIN" \
       --packed-manifest-sha256 "$PACK_MANIFEST_SHA" \
