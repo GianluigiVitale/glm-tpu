@@ -104,6 +104,7 @@ from .runtime_pack import (
     StreamedRuntimeFileEvidence,
     build_runtime_destination_file_plans,
     build_runtime_layout_document,
+    resolve_runtime_pack_stage,
     stream_runtime_weight_file,
     verify_source_file_sha256,
 )
@@ -225,6 +226,7 @@ __all__ = (
     "build_pallas_one_layer_layout",
     "build_runtime_destination_file_plans",
     "build_runtime_layout_document",
+    "resolve_runtime_pack_stage",
     "build_ws32_runtime_placement_report",
     "build_ws32_runtime_file_plans",
     "finalize_ws32_runtime_checkpoint",
