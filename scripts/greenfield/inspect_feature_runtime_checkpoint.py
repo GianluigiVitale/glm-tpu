@@ -52,9 +52,13 @@ def main() -> int:
         != args.runtime_manifest_sha256
     ):
         raise RuntimeError("feature runtime manifest identity drifted")
-    if (
-        manifest.get("source_runtime_manifest_sha256")
-        != args.source_runtime_manifest_sha256
+    direct_source_manifest_sha256 = (
+        args.source_feature_runtime_manifest_sha256
+        if args.source_feature_runtime_manifest_sha256 is not None
+        else args.source_runtime_manifest_sha256
+    )
+    if manifest.get("source_runtime_manifest_sha256") != (
+        direct_source_manifest_sha256
     ):
         raise RuntimeError("feature runtime source manifest pin drifted")
     context_args = SimpleNamespace(

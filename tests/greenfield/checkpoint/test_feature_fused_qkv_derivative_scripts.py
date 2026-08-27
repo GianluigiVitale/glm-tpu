@@ -55,3 +55,12 @@ def test_pp16_direct_fused_qkv_wrapper_is_bounded_and_default_off() -> None:
         check=False,
     )
     assert syntax.returncode == 0, syntax.stdout + syntax.stderr
+
+
+def test_feature_inspector_selects_the_direct_source_manifest() -> None:
+    inspector = (
+        REPO / "scripts/greenfield/inspect_feature_runtime_checkpoint.py"
+    ).read_text()
+    assert "direct_source_manifest_sha256" in inspector
+    assert "args.source_feature_runtime_manifest_sha256" in inspector
+    assert "else args.source_runtime_manifest_sha256" in inspector
