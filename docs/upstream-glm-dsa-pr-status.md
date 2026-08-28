@@ -1,6 +1,6 @@
 # Upstream GLM-5.2 DSA PR preparation status
 
-Status date: 2026-08-27 UTC. This is private preparation evidence; nothing was
+Status date: 2026-08-28 UTC. This is private preparation evidence; nothing was
 pushed to or opened against `vllm-project/tpu-inference`.
 
 ## Pins and stack
@@ -11,6 +11,8 @@ pushed to or opened against `vllm-project/tpu-inference`.
   `d3ccafdfe5157dda4c26b779dc50eb505edfa96b` (private fork).
 - PR 2 branch/head: `pr/glm-dsa-bridge-v3` at
   `b1c863f44a783b8d44b52210c441fd360d50f691` (private fork), stacked on PR 1.
+- PR 3 branch/head: `pr/glm-dsa-model-ci-v3` at
+  `f7ed37ea5625577bffd5c6133bca4aa7cbbf2050` (private fork), stacked on PR 2.
 - Restored environment: JAX/JAXLIB 0.10.1, fsspec 2025.3.0,
   google-cloud-storage 3.10.1, Tokamax 0.0.13.
 
@@ -59,9 +61,31 @@ Validation:
 
 These are correctness/integration results, not full-model latency claims.
 
-## Next
+## PR 3 — model contract and CI
 
-Prepare PR 3 only: use current vLLM GLM registration and IndexShare scheduling,
-add the smallest model regression/config fixture and TPU CI case, then run one
-final independent Sol review over the complete three-PR stack. The user must
-audit exact diffs before any upstream action.
+One commit adds a no-weight GLM-5.2 model-contract test and a model-specific
+Buildkite entry. The test verifies that `GlmMoeDsaForCausalLM` resolves through
+the current vLLM registry, that all decoder layers receive the same shared
+top-k buffer, and that the public GLM-5.2 IndexShare schedule is interpreted as
+three initial producers, three consumers, then the next producer. The CI unit
+step runs on the single-TPU queue. Accuracy and performance remain explicitly
+`unverified`; this PR does not imply that the 753B checkpoint fits that queue.
+
+Validation:
+
+- Focused CPU test: 3/3 in 8.88 seconds; all repository pre-commit hooks pass.
+- Protected TPU model-contract test: 3/3 in 8.90 seconds; evidence
+  `upstream_streamindex_test_20260828T000713Z`, manifest-list SHA-256
+  `b8e991f3f494e155226ae77bc97b6b8111bd9206f439e0203ed35342f6de3c1e`.
+- The protected run ended with authenticated `CENSUS_OK` on all eight hosts.
+- The repository metadata validator was also inspected. Its current empty-env
+  query flags the same metadata-free execution steps in existing model YAMLs;
+  the new file follows those existing conventions and has unique, complete
+  metadata on every result-recording step.
+
+## Stack status and next action
+
+All three private stacked branches are prepared. One final independent Sol
+review is in progress over the exact diffs and evidence. Correct any concrete
+findings, then provide the user with exact reviewable diffs and ready-to-paste
+PR descriptions. The user must audit them before any upstream action.
