@@ -139,5 +139,12 @@ verified `US-CENTRAL2` regional bucket. PR 1 is 8 files (+1,250/-10), PR 2 is
 files, contains no tracked file above 1 MiB, and has no checkpoint, trace,
 cache, environment, or generated run tree. `upstream/main` remains exactly
 `5e2c7128bc74a75493f07930f3a749bcb272a3cb`; no upstream branch or PR was
-created. Present PR 1's exact diff to the user for audit. No upstream push or
-PR is authorized yet.
+created. The five-minute same-region cron now mirrors the authoritative
+`tpu-inference-glm-baseline` worktree to
+`gs://driftbench-dsv4-uc/repos/tpu-inference-glm-baseline`. A separately
+verified complete-history three-ref bundle is at
+`gs://driftbench-dsv4-uc/backups/tpu-inference-glm-dsa/`
+`glm-dsa-private-stack_20260828T010900Z.bundle` (11,099,433 bytes; SHA-256
+`1d8837c6905cb200cdf8637a85378b697721cf9749d5e9de5cb417be229396d5`).
+Present PR 1's exact diff to the user for audit. No upstream push or PR is
+authorized yet.
