@@ -4,6 +4,13 @@
 
 ## 2026-08-28 corrected three-PR stack passes and is private-audit ready
 
+- The owner entry point is now `docs/upstream/glm-dsa-owner-audit-index.md`.
+  It records a fresh official-API race/acceptance audit, exact non-floating
+  ranges, tree/bundle integrity, and the approval boundary. Ready-to-paste
+  bodies were rebuilt from the exact current heads: PR2 correctly states four
+  commits, PR1 uses only its exact-head 30/30 and tracked-benchmark evidence,
+  all bodies follow the repository template, and dependent PR URL placeholders
+  are explicit. No exact code head changed.
 - PR2 and PR3 now have immutable, file-by-file owner checklists at
   `docs/upstream/glm-dsa-pr2-owner-audit.md` and
   `docs/upstream/glm-dsa-pr3-owner-audit.md`. The PR2 audit found no code

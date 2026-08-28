@@ -1,170 +1,251 @@
-# Draft upstream GLM-5.2 DSA PR series
+# Ready-to-paste upstream GLM-5.2 DSA PR series
 
-Private review material only. Do not open these PRs until the user has audited
-the exact diffs. The series is stacked and must be reviewed/merged in order.
+Private review material only. Do not open these PRs until the owner audits the
+exact diffs and explicitly approves submission. The PRs are separately
+reviewable but stacked in order: PR 1 -> PR 2 -> PR 3.
 
-## PR 1 — `kernels: add exact V3.2/GLM sparse-attention primitives`
+## PR 1 title
 
-Base: `vllm-project/tpu-inference:main` at `5e2c7128`  
-Head: private `pr/glm-dsa-kernels-v3` at `fd29657d`
+`kernels: add exact V3.2 sparse-attention primitives`
 
-### Summary
+## PR 1 body
 
-This generalizes the existing experimental StreamIndex kernel for the current
-vLLM DeepSeek-V3.2/GLM index-cache format and adds the two missing selected-MLA
-primitives. It does not add a model fork or a second execution architecture.
+### Description
 
-- Decode FP8 index records with packed FP32 power-of-two scales.
-- Select exact top-k indices with deterministic low-index tie ordering.
-- Quantize, pack, and insert V3.2 indexer keys into the paged cache.
-- Gather selected paged MLA rows and compute sparse selected attention.
+Current vLLM DeepSeek-V3.2/GLM sparse attention stores each index-cache record
+as 128 FP8 E4M3 bytes followed by a power-of-two scale encoded in four raw FP32
+bytes. TPU Inference's experimental StreamIndex path currently handles the
+older one-byte E8M0 scale record and uses approximate selection.
 
-### Validation
+This patch adds the isolated primitives needed for the current contract:
 
-- Protected TPU suite: 36/36, 8/8 hosts clean.
-- Exact selected set/order at 2,047/2,048/2,049 boundaries and production
-  `n=262144, k=2048`.
-- Exact current head: 30/30 kernel/HLO tests in 61.19 seconds, 8/8 hosts clean.
-- Warming: 5 iterations; samples: 20 on TPU v4.
-- Reproduce from the repository root with
-  `PYTHONPATH=. python scripts/benchmarking/kernels/benchmark_glm_dsa.py --mode all`.
-- Current tracked-harness median wall times: StreamIndex 3.208 ms, cache insert
-  0.353 ms, selected gather plus MLA 0.222 ms, sparse MLA 0.159 ms, composed
-  DSA chain 3.280 ms.
-- Exact StableHLO captured; no end-to-end throughput claim is made.
+- exact FP8+FP32-scale record decoding and deterministic top-k selection;
+- UE8M0-compatible key quantization, record packing, and physical paged-cache
+  insertion;
+- selected-position paged MLA gather and one-row sparse attention; and
+- a bounded, synchronized real-TPU benchmark for the complete scorer-to-
+  consumer chain.
 
-Evidence: `upstream_streamindex_test_20260827T224406Z`, evidence-manifest SHA-256
-`dd461d99feae8b582457954473577e1ee46ca059cf1d96314ee4b4f486daf170`.
-Current-head correctness evidence: `upstream_streamindex_test_20260828T011411Z`,
-evidence-manifest SHA-256
-`1e08dad8c1ee87487df08a380a17b65cebac9134a4e82157240e1e71b8138704`.
-Current-head benchmark evidence:
-`upstream_glm_dsa_benchmark_20260828T011531Z`, evidence-manifest SHA-256
-`20cbf34d8576c8905d337f932584f3f9248865941bcbae63b9a68bf35bb8e285`.
+Existing DeepSeek-v4 callers keep the E8M0/approximate defaults. New V3.2 APIs
+remain under `kernels/experimental`; this PR contains no TorchAX bridge, model
+registration, scheduler change, or CI enablement. It is the dependency-free
+foundation of a three-PR series and is independently useful/testable.
 
-### Compatibility, risk, and rollback
+This contributes toward #1699 without closing it.
 
-- Existing DeepSeek-v4 behavior remains the default: E8M0 scale storage and
-  approximate top-k are unchanged unless the new explicit options are used.
-  New V3.2 cache/sparse-MLA APIs remain under `kernels/experimental`.
-- Direct performance evidence is TPU v4 only and covers isolated kernels, not
-  full-checkpoint serving, accuracy, HBM capacity, or other TPU generations.
-- Rollback is a five-commit revert. It removes only the new experimental
-  primitives/tests/benchmark and restores the StreamIndex defaults without a
-  checkpoint or state migration.
+### Tests
 
-## PR 2 — `layers: bridge V3.2/GLM sparse attention to TPU`
+Exact review range:
 
-Base: PR 1 `fd29657d`
+```text
+5e2c7128bc74a75493f07930f3a749bcb272a3cb..fd29657d336cee859c17d4568f8d38d276ca9707
+```
 
-Head: private `pr/glm-dsa-bridge-v3` at `dfb28231`
+Real TPU v4 correctness/HLO run:
 
-### Summary
+```bash
+pytest -q \
+  tests/kernels/deepseek_v4/test_streamindex_topk.py \
+  tests/kernels/deepseek_v32/test_indexer_cache.py \
+  tests/kernels/deepseek_v32/test_sparse_mla.py
+```
 
-This connects vLLM's existing `GlmMoeDsaForCausalLM`/DeepSeek-V3.2 model path
-to the PR 1 kernels through TPU out-of-tree custom ops. vLLM remains responsible
-for model registration, layer scheduling, weight loading, metadata, and the
-IndexShare buffer.
+Result: 30/30 passed in 61.19 seconds at the exact head above. Coverage includes
+exact cache bytes, fragmented physical slots, numerical scorer equivalence,
+low-position tie order, `-1` suffixes at 2047/2048/2049, fully masked rows,
+legacy compatibility, K=2048, and scorer -> selected gather -> sparse MLA.
+
+Profiler-free benchmark:
+
+```bash
+PYTHONPATH=. python scripts/benchmarking/kernels/benchmark_glm_dsa.py \
+  --mode all --warmup 5 --samples 20 --seq-len 262144 --topk 2048
+```
+
+Four local TPU v4 devices, five warmups and 20 individually synchronized
+samples at the same exact head:
+
+| Operation | p50 ms | p99 ms |
+|---|---:|---:|
+| exact top-k | 2.007 | 2.027 |
+| StreamIndex scorer + top-k | 3.208 | 3.223 |
+| index-cache insert | 0.353 | 0.412 |
+| sparse MLA | 0.159 | 0.172 |
+| selected gather + MLA | 0.222 | 0.253 |
+| scorer -> gather -> MLA chain | 3.280 | 3.294 |
+
+Both protected runs used a clean worktree, pinned vLLM
+`d626108b1841888ec90aced33367149a6bbc7e4b`, and authenticated 8/8 host cleanup.
+These are isolated-kernel measurements, not full-model quality, HBM, serving
+latency, other-generation performance, or throughput claims.
+
+### Compatibility, limitations, and rollback
+
+- Invalid record width/format, cache geometry, shape, or dtype fails loudly.
+- The V3.2 quantizer is intentionally specialized: the common
+  `quantize_tensor` helper returns an arbitrary `absmax/448` FP32 scale, while
+  this cache contract requires that value rounded up to a power of two and
+  serialized as four raw FP32 bytes. Exact-byte tests lock down the difference.
+- TPU v4 widens FP8 values to BF16 for scorer arithmetic; cache storage remains
+  FP8 and current E4M3 values are exactly representable.
+- The production bridge and prefill integration are intentionally deferred to
+  PR 2 so this kernel review remains bounded.
+- Rollback is the five commits in this range; no checkpoint/state migration is
+  introduced.
+
+### Checklist
+
+- [x] I have performed a self-review of my code.
+- [x] I have added comments for the non-obvious record and sentinel contracts.
+- [x] I have added focused tests and a reproducible TPU benchmark.
+
+---
+
+## PR 2 title
+
+`layers: bridge V3.2 sparse attention to TPU`
+
+## PR 2 body
+
+Before opening, replace `<PR1_URL>` with the submitted PR 1 URL.
+
+### Description
+
+Depends on PR 1: `<PR1_URL>`.
+
+This patch connects current vLLM DeepSeek-V3.2/`GlmMoeDsaForCausalLM`
+semantics to the PR 1 TPU kernels through the existing TorchAX/vLLM layer and
+out-of-tree custom-op abstractions.
 
 - Register a TPU `SparseAttnIndexer` implementation.
-- Allocate the physical index cache and derive paged insertion slots.
-- Preserve one shared top-k buffer across IndexShare producer/consumer layers.
-- Execute sparse MLA for decode and causal prefill; never silently fall back to
-  dense attention for a DSA layer.
-- Reconstruct complete token rows across TP before consuming global
-  top-k/cache metadata; reject data parallelism until it has its own proof.
-- Derive decode from request metadata, not bucket shape, and sentinel-pad TPU
-  bucket rows beyond vLLM's unpadded shared-buffer capacity.
-- On the static eight-row single-stream decode bucket, execute DSA only for the
-  one live row and zero-pad the remaining rows.
-- Fail closed for unimplemented configurations: more than one sequence,
-  data parallelism, continue-decode disabled, DCP/PCP,
-  non-FP8/UE8M0/block-128 index caches, and quantized or transposed MLA caches.
-- Fail closed when sparse MLA is requested without the model-owned shared
-  top-k buffer; never silently select dense MLA for that configuration.
+- Map logical tokens to the physical paged index cache and insert exact records.
+- Reuse the model-owned shared top-k buffer across IndexShare layers.
+- Consume selected positions in sparse MLA for causal prefill and decode.
+- Reconstruct complete TP query rows before consuming global top-k/cache
+  metadata.
+- Derive prefill/decode from request metadata, sentinel-pad TPU-only rows, and
+  execute DSA/model work for only the one live single-stream decode row.
 
-### Validation
+Current vLLM remains authoritative for model registration, weight loading,
+request metadata, IndexShare scheduling, and buffer lifetime. This patch adds
+no model fork, constructor monkeypatch, DSA-disable path, host dispatch, or CPU
+fallback.
 
-- Focused forced two-device CPU regressions pass; repository pre-commit hooks
-  pass.
-- Final protected TPU bridge suite: 22/22 in 44.04 seconds, 8/8 hosts clean.
-- Additional protected exact causal-prefill and selected-MLA tests pass.
-- Corrected current head: 57/57 protected tests in 98.64 seconds, including a
-  two-device TP prefill with the same eight-row shape as decode; 8/8 hosts
-  clean.
-- No full-checkpoint latency, accuracy, or serving claim is made.
+Unsupported configurations fail closed: more than one sequence, DP, DCP/PCP,
+continue-decode disabled, non-FP8/UE8M0/block-128 index caches, quantized or
+transposed main MLA caches, or sparse MLA without the model-owned top-k buffer.
 
-Primary evidence: `upstream_streamindex_test_20260827T235340Z`, manifest-list
-SHA-256
-`6d3a6b445568f8b4a5cd25c97feb50316d97acc0fc48e1259290b14591dd70fe`.
-Current-head evidence:
-`upstream_glm_dsa_pr2_full_local_bounds_20260828T015207Z`,
-evidence-manifest SHA-256
-`f5b39594dda06bd0a3546611568db747a93259d5c1e9022ab570ae7aa02ed473`.
+### Tests
 
-### Compatibility, risk, and rollback
+Exact review range:
 
-- The existing dense MLA path is unchanged when no shared top-k buffer is
-  supplied. The bridge uses vLLM's current model, metadata, cache ownership,
-  and IndexShare schedule rather than adding a competing model path.
-- Unsupported multi-sequence, DP, DCP/PCP, continue-decode-off, and alternate
-  cache layouts fail closed. Full 753B serving and quality remain unclaimed.
-- Rollback is a three-commit revert of PR 2 (and PR 3 if stacked). PR 1 remains
-  independently useful; no persistent checkpoint format is migrated.
+```text
+fd29657d336cee859c17d4568f8d38d276ca9707..dfb28231b9e35c11659d3db3125bc18cc3177ab8
+```
 
-## PR 3 — `models: add GLM-5.2 DSA contract CI`
+The exact-head protected TPU v4 suite passed 57/57 in 98.64 seconds. It covers
+the PR 1 kernels plus indexer construction/errors, cache insertion, causal
+prefill, one-row decode, shared-buffer reuse, missing-buffer rejection,
+metadata phase selection, sparse backend outputs, and TP2 complete-row
+reconstruction. Focused forced-two-device CPU tests and all-file pre-commit
+also pass.
 
-Base: PR 2 `dfb28231`
+Protected provenance pins vLLM
+`d626108b1841888ec90aced33367149a6bbc7e4b`, a clean worktree, four local TPU v4
+devices, and authenticated 8/8 pre/post cleanup. This is bridge correctness
+evidence, not full-checkpoint loading, quality, HBM, or serving latency.
 
-Head: private `pr/glm-dsa-model-ci-v3` at `8aae29ad`
+### Compatibility, limitations, and rollback
 
-### Summary
+- Dense MLA callers without a DSA/shared-buffer contract retain their existing
+  path; a DSA caller cannot silently fall back to dense MLA.
+- The explicit single-sequence/DP/DCP/cache restrictions prevent unproved
+  layouts from appearing supported.
+- Rollback is the four commits in this range. PR 1 remains independently
+  useful; no persistent format migration exists.
 
-Current vLLM already registers `GlmMoeDsaForCausalLM`; duplicating that
-registration in TPU Inference would be incorrect. This PR instead locks down
-the cross-repository model contract and makes the model's unit step real.
+### Checklist
 
-- Verify the public GLM-5.2 architecture resolves through vLLM's registry.
-- Verify one top-k buffer is shared across decoder layers.
-- Verify the public three-producer/three-consumer IndexShare prefix and next
-  producer are constructed correctly.
-- Add a model Buildkite unit step on the single-TPU queue.
-- Run the stacked kernel, cache, sparse-MLA, indexer bridge, and backend
-  regressions in that unit step, not only the registry contract.
-- Leave accuracy and performance explicitly `unverified`: the CI topology is
-  not represented as capable of loading the 753B checkpoint.
+- [x] I have performed a self-review of my code.
+- [x] I have preserved vLLM-owned model/metadata/IndexShare semantics.
+- [x] I have added focused unit, TP2, fail-closed, and real-TPU tests.
 
-### Validation
+---
 
-- Focused CPU: 3/3; repository pre-commit hooks pass.
-- Protected TPU at exact committed head: 3/3 in 9.09 seconds, 8/8 hosts clean.
-- Restacked current head: 3/3 in 9.24 seconds, 8/8 hosts clean.
+## PR 3 title
 
-Evidence: `upstream_streamindex_test_20260828T001254Z`, evidence-manifest SHA-256
-`f8f3bf38cd2dfed2735c82010f86af3b57e2cfe87b350726cdabe8b89690e5d3`.
-Current-head evidence: `upstream_glm_dsa_pr3_local_bounds_20260828T015441Z`,
-evidence-manifest SHA-256
-`ce0f35f0d12d564132d0eb58fd9cfc5bf3c3b17182057bd79e7d2a8fac4cad31`.
+`models: add GLM-5.2 DSA contract CI`
 
-### Compatibility, risk, and rollback
+## PR 3 body
 
-- This PR adds tests and Buildkite metadata only; current vLLM already owns
-  model registration. Accuracy/performance entries intentionally remain
-  `unverified` because the single-TPU CI queue cannot load the 753B model.
-- Rollback is a two-commit revert with no runtime or state effect. PRs 1-2 can
-  remain merged independently.
+Before opening, replace `<PR1_URL>` and `<PR2_URL>` with the submitted parent
+PR URLs.
 
-## Review notes common to the series
+### Description
 
-- Claim only the first upstream GLM-5.x DSA integration on TPU, not the first
-  DSA kernel on TPU; the existing DeepSeek-V4 StreamIndex work predates this.
-- TPU v4 results are direct evidence for the target deployment but do not
-  establish v6e/v7x performance. Maintainers should choose whether equivalent
-  pre-merge measurements on a supported-generation queue are required.
-- The patches intentionally reuse current vLLM registration and model logic.
-- Official upstream has not been mutated; all heads currently exist only on
-  the user's private fork.
-- Exact audit commands are:
-  `git diff 5e2c7128...fd29657d`,
-  `git diff fd29657d...dfb28231`, and
-  `git diff dfb28231...8aae29ad`.
+Depends on PR 1 `<PR1_URL>` and PR 2 `<PR2_URL>`.
+
+Current pinned vLLM already registers `GlmMoeDsaForCausalLM`; adding a second
+TPU-side registration would fork model semantics. This final stacked patch
+instead verifies and enables the cross-repository contract:
+
+- resolve the public GLM-5.2 architecture through vLLM's registry;
+- prove all decoder layers receive the same shared top-k buffer;
+- prove the public `full, full, full, shared, shared, shared, full` IndexShare
+  prefix and producer reuse;
+- add a model-specific Buildkite unit step on the single-TPU queue; and
+- run the PR 1 kernel and PR 2 bridge/sparse-backend regressions in that step.
+
+Accuracy and performance remain explicitly `unverified`; this patch does not
+claim that the 753B checkpoint fits the CI queue or that v4 measurements prove
+v6e performance. This contributes toward #1699 without closing it.
+
+### Tests
+
+Exact review range:
+
+```text
+dfb28231b9e35c11659d3db3125bc18cc3177ab8..8aae29ad6da2b2cd778be031b423e31eb4a85a80
+```
+
+```bash
+MODEL_IMPL_TYPE=vllm python3 -m pytest -q \
+  tests/models/vllm/test_glm_moe_dsa.py
+```
+
+Result: 3/3 passed in 9.24 seconds on the exact head, with a clean worktree and
+authenticated 8/8 host cleanup. Focused CPU tests and all-file pre-commit pass.
+
+The YAML parses as six unique steps; every dependency and referenced test path
+resolves, every result-recording step has complete metadata, and
+`CI_TARGET=zai-org/GLM-5.2-FP8` is globally unique. The repository metadata
+validator currently has an unrelated queue-parser defect reproduced on
+unchanged GLM-5 and DeepSeek-V3.2 YAMLs; that fix is intentionally not mixed
+into this model PR.
+
+### Compatibility, limitations, and rollback
+
+- Production code is unchanged; current vLLM remains the registration and
+  IndexShare authority.
+- The default CI queue proves unit behavior only. Full-checkpoint accuracy,
+  performance, HBM, and cross-generation validation remain unclaimed.
+- Rollback is the two commits in this range and removes only the test/YAML.
+  PRs 1-2 remain valid independently.
+
+### Checklist
+
+- [x] I have performed a self-review of my code.
+- [x] I have reused current vLLM registration instead of duplicating it.
+- [x] I have added focused model-contract tests and CI coverage.
+
+---
+
+## Submission invariants
+
+- Open and review in order: PR 1, then PR 2, then PR 3.
+- Re-check official `main` immediately before each submission. If its base has
+  moved, rebase narrowly and repeat exact-head validation before opening.
+- Replace dependency placeholders only after parent PR URLs exist.
+- Claim GLM-5.2/V3.2 DSA integration, not the first TPU DSA kernel; the merged
+  DeepSeek-v4 indexer predates this series.
+- Never submit a different diff than the owner-audited range.
