@@ -4,6 +4,14 @@
 
 ## 2026-08-28 corrected three-PR stack passes and is private-audit ready
 
+- Read-only `scripts/greenfield/check_glm_dsa_submission_readiness.sh` now
+  mechanically replays the exact private heads/ancestry/stats/DCO, bulk/import
+  scan, protected evidence/test/benchmark hashes, bundle, private remotes,
+  official base and `US-CENTRAL2` remote objects. Its paired readiness ledger
+  is `docs/upstream/glm-dsa-goal-readiness-ledger.md`. Success deliberately
+  ends at `OWNER_APPROVAL_REQUIRED`; it does not authorize upstream mutation.
+  The complete live run passed at `2026-08-28T02:37:32Z`; script SHA-256 is
+  `67395434...56478ba`.
 - The owner entry point is now `docs/upstream/glm-dsa-owner-audit-index.md`.
   It records a fresh official-API race/acceptance audit, exact non-floating
   ranges, tree/bundle integrity, and the approval boundary. Ready-to-paste
