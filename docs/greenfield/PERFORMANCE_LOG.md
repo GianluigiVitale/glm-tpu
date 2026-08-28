@@ -2,9 +2,11 @@
 
 The current protected PP8 8K attempt at pin `570cc453` produced no performance datum: it stopped at
 the exact event-1/layer-1 DSA gate before warmup, timing, XPlane, HBM or DB publication. Its emitted
-token/DSA artifacts exactly duplicate the old sealed numerical failure. The next PP16 two-device
-dense-boundary probe is also diagnostic-only; its 1/3 samples will describe a bounded component and
-must not be reported as token latency, Gate D or plan performance.
+token/DSA artifacts exactly duplicate the old sealed numerical failure. The PP16 two-device
+dense-boundary probe at pin `1f5c88e` is also diagnostic-only. Its three deterministic samples are
+`3.857550/3.823499/3.808450 ms`, compile is 1.151 seconds and peak allocation is 113,735,680
+bytes/device, but all three checked rows are nonexact. These numbers must not be reported as token
+latency, Gate D or plan performance; no accepted performance standing changes.
 
 DB564 rejects packed PP8 boundary transport despite exactness: reducing 16 HLO permutes to eight
 regresses fleet p50/p99 from `0.412015/0.578189 ms` to `0.550720/0.762192 ms` over 200 warmups and

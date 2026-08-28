@@ -5,7 +5,7 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
-## 2026-08-28 11:16--current UTC — duplicate PP8 failure closes retries; PP16 boundary first
+## 2026-08-28 11:16--current UTC — duplicate PP8 failure closes retries; first PP16 association rejects
 
 The protected current-pin PP8 8K attempt completed the full 8,155-token prefill but stopped before
 warmup at DSA event 1/layer 1: expected/observed counts are `8136/8150`, first mismatch offset 11,
@@ -30,12 +30,31 @@ and inventory tests pass 9/9 and selective manifest/header/tensor verification p
 The accepted carried residual is derived independently from DB548's sealed 32 partials through the
 measured DB533 association, rather than misusing DB548's pre-attention `combined_residual` field.
 The independently recomputed dense/carried SHAs are `efde8532...b4fc` / `35a601b7...44c`. Both
-state rows, repeated samples and both device replicas must be bitwise exact. The protected result
-is pending and cannot by itself prove event-1 DSA or close Gate D. Persistent Fable review first
+state rows, repeated samples and both device replicas must be bitwise exact. Persistent Fable review first
 blocked four concrete gaps, then verified their corrections and independently reproduced the two
-derived hashes before returning `APPROVE DEPLOY`. Its non-blocking forecast is that the known
-2,104/6,144 normalized-row miss may reappear; that would be valid rejection evidence, not a reason
-to run another PP8 8K test.
+derived hashes before returning `APPROVE DEPLOY`.
+
+Protected tag `greenfield_pp16_lp2_dense_boundary_20260828T133048539902952Z` at pin `1f5c88e`
+passes the exact two-partition HLO contract and executes once. Optimized/Stable HLO SHAs are
+`feb2a103...6a` / `111d72d4...48b6`: one `bf16[1,6144]` all-reduce over `{{0,1}}`, one fused
+dense custom call, three one-row outputs, no host marker, forbidden collective or 32-row hidden
+state. All three samples are deterministic and both physical replicas agree. The rows are still
+nonexact: dense update `3890/6144`, carried residual `2289/6144`, and layer-1 normalized
+`2820/6144`, first mismatch index 1 for all. Their observed SHAs are `6e870241...3af3`,
+`57f2d3c2...0997` and `a20b0f7a...16e9`. Compile was 1.151 seconds, bounded samples were
+`3.857550/3.823499/3.808450 ms`, and peak allocation was 113,735,680 bytes/device; none is token or
+plan performance evidence. Pre/failure censuses are 8/8 clean, no DB row exists and max run stays
+564. This causally rejects only two half-intermediate BF16 partials plus one LP2 sum as a bitwise
+replacement for DB533's 32-partial association. It does not reject PP16_LP2 or reach event-1 DSA.
+
+Failure archival then exposed an operational bug: gcloud SDK 428 rejects `gcloud storage rsync`,
+so both retries failed and the remote tag remains vacant. Local ledger SHA is `738b4f03...a0b1`;
+runner/tensor SHAs are `20247074...176` / `6c355d97...62cf`. The same Fable chat confirmed the
+cause and approved a no-TPU recovery that authenticates the original pin, exact ledger, HLO,
+runner, deterministic replicas, both censuses and unchanged read-only DB; it then uses supported
+`gsutil -m rsync -r`, verifies every remote hash, and writes `REJECTED` last. The implemented diff
+must receive the standard same-chat verdict and be committed/pushed/mirrored before recovery.
+Never rerun the TPU diagnostic merely to repair its archive.
 
 ## 2026-08-28 10:50--11:05 UTC — transport null recorded; 8K preflight is restart-safe
 

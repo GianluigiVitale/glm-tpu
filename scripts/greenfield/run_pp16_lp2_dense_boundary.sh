@@ -28,6 +28,10 @@ readonly ORACLE_SUCCESS_SHA=6cac897695fc1e78d0a10c0e36c993cffd281c6a88721d8955fa
   echo "set GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_MODE=bounded" >&2
   exit 2
 }
+command -v gsutil >/dev/null 2>&1 && gsutil help rsync >/dev/null 2>&1 || {
+  echo "gsutil rsync is required for authenticated failure archival" >&2
+  exit 2
+}
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 TAG=${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_TAG:-greenfield_pp16_lp2_dense_boundary_$(date -u +%Y%m%dT%H%M%S%NZ)}
@@ -95,7 +99,7 @@ upload_failure_diagnostic() {
       sort -z | xargs -0 sha256sum
   ) >"$RUN_DIR/diagnostic.evidence.sha256"
   for attempt in 1 2; do
-    if gcloud storage rsync --recursive "$RUN_DIR" \
+    if gsutil -m rsync -r "$RUN_DIR" \
       "$REMOTE_PREFIX/diagnostic" >/dev/null 2>&1 &&
       verify_failure_diagnostic; then
       return 0

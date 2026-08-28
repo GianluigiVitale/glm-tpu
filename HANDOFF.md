@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-28 UTC
 
-## 2026-08-28 current PP8 8K repeats the sealed numerical failure; bounded PP16 successor ready
+## 2026-08-28 PP8 repeats the sealed failure; the first bounded PP16 association is rejected
 
 - Protected current-pin tag `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_`
   `ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_`
@@ -35,8 +35,24 @@
   focused tests pass. Fable initially returned `BLOCK DEPLOY` on a copied stacked-HLO payload,
   missing carried-state/replica/determinism gates and best-effort failure upload. All four were
   corrected. In the same persistent chat it independently re-derived both state hashes, verified
-  the corrected code paths and returned `APPROVE DEPLOY`; no blocker remains. Protected TPU
-  execution is pending. Even a pass authorizes only a bounded event-1 DSA successor, not Gate D.
+  the corrected code paths and returned `APPROVE DEPLOY`.
+- Protected tag `greenfield_pp16_lp2_dense_boundary_20260828T133048539902952Z` at pushed pin
+  `1f5c88e` then passed the exact HLO/locality contract on physical devices 0/1 and executed three
+  deterministic, replica-identical samples. It is `NONEXACT`: dense update, carried residual and
+  layer-1 normalized rows differ in `3890/6144`, `2289/6144` and `2820/6144` values, each first at
+  index 1. Observed SHAs are `6e870241...3af3`, `57f2d3c2...0997` and `a20b0f7a...16e9`.
+  Stable/optimized HLO SHAs are `111d72d4...48b6` / `feb2a103...6a`; exactly one
+  `bf16[1,6144]` `{0,1}` all-reduce and one dense custom call appear, with no forbidden hidden
+  shape or host marker. Compile took 1.151 seconds; bounded p50 was 3.823499 ms and peak allocation
+  113,735,680 bytes/device, all diagnostic-only. Pre/failure censuses are 8/8 clean and DB remains
+  at run 564 with zero PP16-boundary row; there is no `SUCCESS`, Gate-D or performance claim.
+- This rejects only the tested two-half BF16 dense association, not PP16_LP2. The dense mismatch
+  precedes residual/RMS and proves an exact LP2 boundary must reproduce the accepted 32-partial
+  DB533 association within the two-chip stage. The wrapper's evidence upload alone failed because
+  installed gcloud 428 has no `storage rsync`; no remote object was written. Fable approved a
+  no-TPU recovery using supported `gsutil -m rsync -r`, exact local/remote ledgers, both locks and
+  terminal `REJECTED` last. The correction/recovery diff is awaiting its mandatory same-chat
+  review; do not rerun TPU or claim the rejection terminally archived until that sealer completes.
 
 ## 2026-08-28 adversarial review policy moves to one persistent Fable 5 Max chat
 

@@ -119,7 +119,47 @@ def test_pp16_dense_boundary_wrapper_is_bounded_and_default_off() -> None:
     assert "gate_d_passed':False" in text
     assert "next_residual_comparison" in text
     assert "DIAGNOSTIC_UPLOAD_FAILED" in text
-    assert "gcloud storage rsync --recursive" in text
+    assert 'gsutil help rsync' in text
+    assert 'gsutil -m rsync -r "$RUN_DIR"' in text
+    assert "gcloud storage rsync" not in text
+
+    gsutil = subprocess.run(
+        ["gsutil", "help", "rsync"],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert gsutil.returncode == 0, gsutil.stderr
+
+
+def test_pp16_dense_boundary_failure_recovery_is_bounded_and_default_off() -> None:
+    recovery = (
+        REPO / "scripts/greenfield/recover_pp16_lp2_dense_boundary_failure.sh"
+    )
+    text = recovery.read_text()
+    completed = subprocess.run(
+        ["bash", str(recovery)],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert completed.returncode == 2
+    assert "default-off" in completed.stderr
+    assert "RUN_PIN=1f5c88ebd1c1dc5206075c22da26ede8cff90f2f" in text
+    assert "mode=ro" in text
+    assert "EXPECTED_DB_MAX_RUN=564" in text
+    assert "pp16-lp2-dense" in text
+    assert "gsutil -m rsync -r -x" in text
+    assert "REJECTED$" in text
+    assert '"$REMOTE_PREFIX/REJECTED"' in text
+    assert '"$REMOTE_PREFIX/SUCCESS"' in text
+    assert "performance_claim" in text
+    assert "gate_d_passed" in text
+    assert "PP16_LP2_DENSE_BOUNDARY_REJECTION_ALREADY_SEALED" in text
+    assert "jax" not in text.lower()
+    assert "TPU_VISIBLE_DEVICES" not in text
 
 
 def test_pp16_dense_boundary_runner_is_selective_and_one_row() -> None:
