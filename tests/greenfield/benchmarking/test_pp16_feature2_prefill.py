@@ -50,11 +50,14 @@ def _graph():
 )
 def test_real_feature2_prefill_graph_is_causal_and_evidence_bound() -> None:
     graph = _graph()
+    assert graph.graph_sha256 == (
+        "ab5be45aecf3b0b5d87ad76af8076bc9351823529a08c0eadb414b072b31cb2d"
+    )
     assert validate_feature2_prefill_graph(graph) == {
         "context_length": 8156,
         "graph_sha256": graph.graph_sha256,
         "local_group": [0, 1],
-        "node_count": 34,
+        "node_count": 38,
         "selected_read_count": 78,
         "selected_weight_count": 39,
         "valid_rows_by_chunk": [2048, 2048, 2048, 2012],
@@ -62,6 +65,10 @@ def test_real_feature2_prefill_graph_is_causal_and_evidence_bound() -> None:
     assert graph.inputs.current_token_id == 220
     assert [chunk.start for chunk in graph.inputs.chunks] == [0, 2048, 4096, 6144]
     assert [chunk.stop for chunk in graph.inputs.chunks] == [2048, 4096, 6144, 8156]
+    assert next(
+        tensor.shape for tensor in graph.tensors if tensor.name == "token_chunk_3"
+    ) == (2012,)
+    assert not any(tensor.name.startswith("valid_mask_") for tensor in graph.tensors)
     assert not any(tensor.shape == (8156, 6144) for tensor in graph.tensors)
     scorer = next(
         node for node in graph.nodes if node.name == "layer1_event1_scorer"
@@ -72,6 +79,25 @@ def test_real_feature2_prefill_graph_is_causal_and_evidence_bound() -> None:
     )
     assert "layer1_normalized_3" in current.inputs
     assert "current_position" in current.inputs
+    main_rope = next(
+        source for source in graph.inputs.sources if source.name == "main_rope_table"
+    )
+    assert main_rope.shape == (8192, 64)
+    assert main_rope.dtype == "bf16"
+    assert main_rope.sha256 == (
+        "6a22140fc2aec475399738c6fc0f29be2a6c419feb0249aee35681c607c80701"
+    )
+    for index in range(4):
+        node = next(
+            node
+            for node in graph.nodes
+            if node.name == f"layer0_attention_indexer_{index}"
+        )
+        assert "main_rope_table" in node.inputs
+    query = next(
+        node for node in graph.nodes if node.name == "layer1_attention_query"
+    )
+    assert "main_rope_table" in query.inputs
 
 
 @pytest.mark.skipif(
@@ -95,6 +121,7 @@ def test_real_feature2_prefill_graph_is_causal_and_evidence_bound() -> None:
         ("dense1_weight", "weight-role"),
         ("range_sha", "selected range"),
         ("position_sha", "source tensors"),
+        ("missing_main_rope", "source tensors"),
         ("partial_carried_liveness", "carried liveness"),
     ],
 )
@@ -196,10 +223,22 @@ def test_feature2_prefill_graph_refuses_semantic_mutations(
             inputs=tuple(
                 value
                 for value in nodes[target].inputs
-                if value != "valid_mask_1"
+                if value != "position_chunk_1"
             ),
         )
         changed = replace(graph, nodes=tuple(nodes))
+    elif mutation == "missing_main_rope":
+        changed = replace(
+            graph,
+            inputs=replace(
+                graph.inputs,
+                sources=tuple(
+                    source
+                    for source in graph.inputs.sources
+                    if source.name != "main_rope_table"
+                ),
+            ),
+        )
     else:
         sources = list(graph.inputs.sources)
         sources[1] = replace(sources[1], sha256="0" * 64)

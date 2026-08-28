@@ -1684,7 +1684,7 @@ def _reshape_gathered_heads(
 
 
 def stage_local_dsa_fp8_mapped(
-    residual: Any,
+    residual: Any | None,
     index_cache: Any,
     position: Any,
     block_tables: Any,
@@ -1740,14 +1740,24 @@ def stage_local_dsa_fp8_mapped(
         raise ValueError(
             "exact DSA head/key execution requires one external FP32 wk owner"
         )
-    if residual.shape != (1, contract.hidden_size):
+    if residual is None:
+        if precomputed_normalized is None:
+            raise ValueError(
+                "DSA residual may be absent only with exact precomputed inputs"
+            )
+    elif residual.shape != (1, contract.hidden_size):
         raise ValueError("DSA residual must contain one exact hidden row")
     if index_cache.ndim != 3 or index_cache.shape[1:] != (
         cache_layout.local_rows_per_page,
         contract.head_dim,
     ):
         raise ValueError("local DSA key cache has an invalid shape")
-    if residual.dtype != jnp.bfloat16 or index_cache.dtype != jnp.bfloat16:
+    state_dtype = (
+        precomputed_normalized.dtype
+        if residual is None
+        else residual.dtype
+    )
+    if state_dtype != jnp.bfloat16 or index_cache.dtype != jnp.bfloat16:
         raise ValueError("DSA residual and key cache must remain BF16")
     if cache_layout.local_parallel_size <= 0 or (
         contract.num_heads % cache_layout.local_parallel_size
@@ -1802,6 +1812,7 @@ def stage_local_dsa_fp8_mapped(
     if (precomputed_normalized is None) != (precomputed_q_residual is None):
         raise ValueError("DSA shared q_a intermediates must be supplied together")
     if precomputed_normalized is None:
+        assert residual is not None
         if q_a_bits is None or q_a_scale is None:
             raise ValueError("DSA q_a FP8 state is required without intermediates")
         normalized = rms_norm(
@@ -1822,10 +1833,12 @@ def stage_local_dsa_fp8_mapped(
     else:
         normalized = precomputed_normalized
         q_residual = precomputed_q_residual
-        if normalized.shape != residual.shape or normalized.dtype != residual.dtype:
+        if normalized.shape != (1, contract.hidden_size) or (
+            normalized.dtype != state_dtype
+        ):
             raise ValueError("DSA precomputed normalized residual is invalid")
         if q_residual.shape != (1, contract.q_lora_rank) or (
-            q_residual.dtype != residual.dtype
+            q_residual.dtype != state_dtype
         ):
             raise ValueError("DSA precomputed q residual is invalid")
     indexer_normalized = (
@@ -2038,7 +2051,7 @@ def stage_local_dsa_fp8_mapped(
 
 
 def stage_local_index_share_fp8_mapped(
-    residual: Any,
+    residual: Any | None,
     cache: Any,
     selected_positions: Any,
     selected_valid_counts: Any,
@@ -2091,15 +2104,31 @@ def stage_local_index_share_fp8_mapped(
     """Consume compact DSA state and execute raw-FP8 stage-local sparse MLA."""
 
     groups = _axis_groups(axis_index_groups)
-    if residual.ndim != 2 or residual.shape[0] != 1:
-        raise ValueError("IndexShare residual must contain exactly one row")
-    hidden = residual.shape[1]
+    if residual is None:
+        if precomputed_normalized is None or add_residual:
+            raise ValueError(
+                "IndexShare residual may be absent only on a no-add "
+                "precomputed-input path"
+            )
+        if precomputed_normalized.ndim != 2 or (
+            precomputed_normalized.shape[0] != 1
+        ):
+            raise ValueError(
+                "IndexShare precomputed normalized input must contain one row"
+            )
+        hidden = precomputed_normalized.shape[1]
+        state_dtype = precomputed_normalized.dtype
+    else:
+        if residual.ndim != 2 or residual.shape[0] != 1:
+            raise ValueError("IndexShare residual must contain exactly one row")
+        hidden = residual.shape[1]
+        state_dtype = residual.dtype
     if cache.ndim != 3 or cache.shape[1:] != (
         cache_layout.local_rows_per_page,
         contract.packed_cache_width,
     ):
         raise ValueError("local IndexShare cache has an invalid shape")
-    if residual.dtype != jnp.bfloat16 or cache.dtype != jnp.bfloat16:
+    if state_dtype != jnp.bfloat16 or cache.dtype != jnp.bfloat16:
         raise ValueError("IndexShare residual and cache must remain BF16")
     if not isinstance(add_residual, bool):
         raise ValueError("IndexShare residual-add flag must be boolean")
@@ -2257,6 +2286,7 @@ def stage_local_index_share_fp8_mapped(
             "IndexShare shared q_a intermediates must be supplied together"
         )
     if precomputed_normalized is None:
+        assert residual is not None
         if q_a_bits is None or q_a_scale is None:
             raise ValueError(
                 "IndexShare q_a FP8 state is required without intermediates"
@@ -2279,12 +2309,12 @@ def stage_local_index_share_fp8_mapped(
     else:
         normalized = precomputed_normalized
         q_residual = precomputed_q_residual
-        if normalized.shape != residual.shape or normalized.dtype != residual.dtype:
+        if normalized.shape != (1, hidden) or normalized.dtype != state_dtype:
             raise ValueError(
                 "IndexShare precomputed normalized residual is invalid"
             )
         if q_residual.shape != (1, q_lora_rank) or (
-            q_residual.dtype != residual.dtype
+            q_residual.dtype != state_dtype
         ):
             raise ValueError("IndexShare precomputed q residual is invalid")
     q_states = _stage_fp8_linear(
@@ -2342,7 +2372,7 @@ def stage_local_index_share_fp8_mapped(
         if current_kv.shape != (
             1,
             contract.kv_lora_rank + contract.qk_rope_head_dim,
-        ) or current_kv.dtype != residual.dtype:
+        ) or current_kv.dtype != state_dtype:
             raise ValueError("IndexShare precomputed kv_a projection is invalid")
     current_latent = rms_norm(
         current_kv[..., : contract.kv_lora_rank],
@@ -2592,7 +2622,7 @@ def stage_local_index_share_fp8_mapped(
             attended_local.astype(jnp.float32),
             local_weight_uv.astype(jnp.float32),
             preferred_element_type=jnp.float32,
-        ).astype(residual.dtype)
+        ).astype(state_dtype)
     else:
         value_states = fp8_structured_kv_b_value(
             attended_local,
@@ -2729,7 +2759,9 @@ def stage_local_index_share_fp8_mapped(
                 interpret=linear_interpret,
             )
         else:
-            update = update.astype(residual.dtype)
+            update = update.astype(state_dtype)
+    if add_residual:
+        assert residual is not None
     output = residual_add(residual, update) if add_residual else update
     result = StageLocalIndexShareFp8Result(
         output,

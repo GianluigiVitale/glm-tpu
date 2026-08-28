@@ -2,6 +2,37 @@
 
 **Updated:** 2026-08-28 UTC
 
+## 2026-08-28 complete PP16 feature2 graph is implemented offline; review is next
+
+- `pp16_feature2_program.py` now composes the complete bounded candidate graph on exact stage-0
+  devices 0/1: 8,156 authenticated tokens run through layer 0 in four exact-valid scans; each
+  owner persists one BF16 `[1,3072]` residual half, while normalized rows exist only inside the LP2
+  stage. Layer-1 prompt keys are repaired per chunk with the accepted physical-M64/divide-sqrt
+  association. Execution stops after the layer-1/event-1 tuple4/DEFAULT scorer; no layer-1 output,
+  MLP, layer 2, logits or sampling exists.
+- The implementation binds two previously under-described exactness boundaries. The accepted BF16
+  main-RoPE table is an authenticated graph input at SHA `6a22140f...0701`. Post-attention carried
+  residual and RMS-normalized dense input are separate values; the last 2,012-row chunk executes no
+  36-row model tail, while only physical-M64 repair pads/repeats and drops those write lanes. The
+  corrected 38-node graph SHA is `ab5be45a...cb2d` and supersedes `d0160308...b4ea` as the candidate
+  executable contract without altering the historical record.
+- The abstract two-device trace consumes all 39 authenticated raw leaves transformed into exactly
+  37 executable leaves (six dense sources to four final-layout leaves). It has four physical-M64
+  projection sites, eight exact H16/K2048/B512/W640 calls, 12 local feature permutes, no H32 call,
+  callback, `[32,6144]` dead-row tensor or `[8156,6144]` history. Its only persistent hidden output
+  is `[2,1,3072]`; terminal caches are owner-local and event outputs remain one row. The ordered
+  dual-U32 witness consumes every carried BF16 value without retaining hidden history.
+- Focused graph/program tests pass 19/19. The neighboring loader, feature-state, prefill-index,
+  attention, layer, raw-FP8 and virtual-TP suite passes 65/65 with `JAX_PLATFORMS=cpu`; pycompile and
+  diff checks pass. Persistent Fable 5 Max reviewed the staged batch and returned `APPROVE COMMIT`
+  with no blockers. It independently confirmed the 8,156-row causality, residual/RMS sequencing,
+  exact tail, main-RoPE and 39→37 leaf bindings, LP2 specs and stop boundary. Its nonblocking notes
+  require the next runner to add a parsed optimized-HLO validator, use sealed event-1 lineage and
+  return for separate review. Read-only review could not recompute the staged SHA or tests; local
+  evidence above supplies those checks. No real 2.4-GB load, TPU lowering, numerical result, HBM,
+  Gate-D or performance claim exists. Exact next is commit/push/same-region mirror, then implement
+  the separately reviewed compile-only runner. No TPU run is authorized by this batch.
+
 ## 2026-08-28 PP16 feature2 projection/load primitives corrected after blocked review
 
 - The admitted persistent-half architecture now has its first executable arithmetic primitives.

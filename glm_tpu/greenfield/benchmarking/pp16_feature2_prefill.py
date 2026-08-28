@@ -18,6 +18,10 @@ from typing import Any, Sequence
 import numpy as np
 
 from ..errors import BenchmarkValidationError
+from ..kernels.reference.rotary import (
+    build_rotary_table_host,
+    rotary_table_sha256,
+)
 from ..validation.short_context_oracle import inspect_short_context_oracle
 from .pp16_feature_sharded_state import (
     PP16_FEATURE2_CONTEXT_LENGTH,
@@ -34,6 +38,12 @@ PP16_FEATURE2_LOGICAL_PAGE_SIZE = 512
 PP16_FEATURE2_LOCAL_ROWS_PER_PAGE = 256
 PP16_FEATURE2_LOGICAL_PAGES = 16
 PP16_FEATURE2_DSA_TOP_K = 2048
+PP16_FEATURE2_MAIN_ROPE_CAPACITY = 8192
+PP16_FEATURE2_MAIN_ROPE_WIDTH = 64
+PP16_FEATURE2_MAIN_ROPE_THETA = 8_000_000.0
+PP16_FEATURE2_MAIN_ROPE_TABLE_SHA256 = (
+    "6a22140fc2aec475399738c6fc0f29be2a6c419feb0249aee35681c607c80701"
+)
 PP16_FEATURE2_LOCAL_GROUP = (0, 1)
 PP16_FEATURE2_TIE_POLICY = "descending_score_then_lowest_global_position"
 PP16_FEATURE2_ORACLE_MANIFEST_SHA256 = (
@@ -179,7 +189,7 @@ class Feature2PrefillChunk:
     token_ids_sha256: str
     positions_sha256: str
     causal_context_sha256: str
-    tail_policy: str = "repeat_last_row_and_mask_false"
+    tail_policy: str = "exact_valid_rows_repair_only_pad_and_drop"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -378,6 +388,16 @@ def load_feature2_prefill_inputs(oracle_dir: Path) -> Feature2PrefillInputs:
     current_position = np.asarray(
         [PP16_FEATURE2_CURRENT_POSITION], dtype=np.int32
     )
+    main_rope_table = build_rotary_table_host(
+        PP16_FEATURE2_MAIN_ROPE_CAPACITY,
+        rotary_dim=PP16_FEATURE2_MAIN_ROPE_WIDTH,
+        theta=PP16_FEATURE2_MAIN_ROPE_THETA,
+    )
+    if (
+        rotary_table_sha256(main_rope_table)
+        != PP16_FEATURE2_MAIN_ROPE_TABLE_SHA256
+    ):
+        raise BenchmarkValidationError("feature2 main-RoPE table drifted")
     chunks: list[Feature2PrefillChunk] = []
     start = 0
     for index, valid_rows in enumerate(PP16_FEATURE2_PREFILL_VALID_ROWS):
@@ -437,6 +457,12 @@ def load_feature2_prefill_inputs(oracle_dir: Path) -> Feature2PrefillInputs:
                 _sha256_array(current_position),
                 (PP16_FEATURE2_CURRENT_POSITION,),
             ),
+            Feature2PrefillSource(
+                "main_rope_table",
+                main_rope_table.shape,
+                "bf16",
+                rotary_table_sha256(main_rope_table),
+            ),
         ),
         chunks=tuple(chunks),
     )
@@ -478,6 +504,15 @@ def _expected_sources() -> tuple[Feature2PrefillSource, ...]:
             "i32",
             PP16_FEATURE2_CURRENT_POSITION_SHA256,
             (8155,),
+        ),
+        Feature2PrefillSource(
+            "main_rope_table",
+            (
+                PP16_FEATURE2_MAIN_ROPE_CAPACITY,
+                PP16_FEATURE2_MAIN_ROPE_WIDTH,
+            ),
+            "bf16",
+            PP16_FEATURE2_MAIN_ROPE_TABLE_SHA256,
         ),
     )
 
@@ -582,40 +617,52 @@ def _tensors(inputs: Feature2PrefillInputs) -> tuple[Feature2PrefillTensor, ...]
     for index in range(4):
         suffix = str(index)
         next_suffix = str(index + 1)
+        rows = inputs.chunks[index].valid_rows
         values.extend(
             (
-                _tensor(f"token_chunk_{suffix}", (2048,), "i32", "ephemeral"),
+                _tensor(f"token_chunk_{suffix}", (rows,), "i32", "ephemeral"),
                 _tensor(
-                    f"position_chunk_{suffix}", (2048,), "i32", "ephemeral"
+                    f"position_chunk_{suffix}", (rows,), "i32", "ephemeral"
                 ),
                 _tensor(
                     f"causal_context_chunk_{suffix}",
-                    (2048,),
+                    (rows,),
                     "i32",
                     "ephemeral",
                 ),
-                _tensor(f"valid_mask_{suffix}", (2048,), "bool", "ephemeral"),
                 _tensor(
                     f"embedding_chunk_{suffix}",
-                    (2048, 6144),
+                    (rows, 6144),
+                    "bf16",
+                    "ephemeral",
+                ),
+                _tensor(
+                    f"layer0_attention_update_{suffix}",
+                    (rows, 6144),
+                    "bf16",
+                    "ephemeral",
+                ),
+                _tensor(
+                    f"layer0_post_attention_carried_{suffix}",
+                    (rows, 6144),
                     "bf16",
                     "ephemeral",
                 ),
                 _tensor(
                     f"layer0_dense_input_{suffix}",
-                    (2048, 6144),
+                    (rows, 6144),
                     "bf16",
                     "ephemeral",
                 ),
                 _tensor(
                     f"layer0_dense_update_{suffix}",
-                    (2048, 6144),
+                    (rows, 6144),
                     "bf16",
                     "ephemeral",
                 ),
                 _tensor(
                     f"layer1_carried_{suffix}",
-                    (2048, 6144),
+                    (rows, 6144),
                     "bf16",
                     "ephemeral",
                 ),
@@ -627,7 +674,7 @@ def _tensors(inputs: Feature2PrefillInputs) -> tuple[Feature2PrefillTensor, ...]
                 ),
                 _tensor(
                     f"layer1_normalized_{suffix}",
-                    (2048, 6144),
+                    (rows, 6144),
                     "bf16",
                     "ephemeral",
                 ),
@@ -714,57 +761,71 @@ def _nodes(inputs: Feature2PrefillInputs) -> tuple[Feature2PrefillNode, ...]:
                 Feature2PrefillNode(
                     f"slice_chunk_{suffix}",
                     (
-                        f"slice_[{chunk.start},{chunk.stop})_pad_to_"
-                        f"{chunk.padded_stop}_repeat_last_mask_false"
+                        f"slice_exact_valid_[{chunk.start},{chunk.stop})_"
+                        f"repair_only_pad_to_{chunk.padded_stop}_and_drop"
                     ),
                     ("candidate_token_ids", "candidate_positions"),
                     (
                         f"token_chunk_{suffix}",
                         f"position_chunk_{suffix}",
                         f"causal_context_chunk_{suffix}",
-                        f"valid_mask_{suffix}",
                     ),
                 ),
                 Feature2PrefillNode(
                     f"prompt_embedding_{suffix}",
-                    "owner_local_embedding_masked_chunk",
-                    (f"token_chunk_{suffix}", f"valid_mask_{suffix}"),
+                    "owner_local_embedding_exact_valid_chunk",
+                    (f"token_chunk_{suffix}",),
                     (f"embedding_chunk_{suffix}",),
                     "embedding",
                 ),
                 Feature2PrefillNode(
                     f"layer0_attention_indexer_{suffix}",
-                    "complete_layer0_with_loop_carried_kv_and_index",
+                    (
+                        "complete_layer0_with_loop_carried_kv_and_index_"
+                        "accepted_main_rope_table"
+                    ),
                     (
                         f"embedding_chunk_{suffix}",
                         f"position_chunk_{suffix}",
                         f"causal_context_chunk_{suffix}",
-                        f"valid_mask_{suffix}",
                         f"layer0_kv_cache_{suffix}",
                         f"layer0_index_cache_{suffix}",
                         "block_tables",
+                        "main_rope_table",
                     ),
                     (
-                        f"layer0_dense_input_{suffix}",
+                        f"layer0_attention_update_{suffix}",
                         f"layer0_kv_cache_{next_suffix}",
                         f"layer0_index_cache_{next_suffix}",
                     ),
                     "layer0_attention_indexer",
                 ),
                 Feature2PrefillNode(
+                    f"layer0_post_attention_boundary_{suffix}",
+                    "feature_sharded_attention_add_then_dense_rms_exact_valid",
+                    (
+                        f"embedding_chunk_{suffix}",
+                        f"layer0_attention_update_{suffix}",
+                    ),
+                    (
+                        f"layer0_post_attention_carried_{suffix}",
+                        f"layer0_dense_input_{suffix}",
+                    ),
+                    "layer0_dense",
+                ),
+                Feature2PrefillNode(
                     f"layer0_dense_{suffix}",
-                    "complete_candidate_layer0_dense_masked_chunk",
-                    (f"layer0_dense_input_{suffix}", f"valid_mask_{suffix}"),
+                    "complete_candidate_layer0_dense_exact_valid_chunk",
+                    (f"layer0_dense_input_{suffix}",),
                     (f"layer0_dense_update_{suffix}",),
                     "layer0_dense",
                 ),
                 Feature2PrefillNode(
                     f"layer1_feature2_boundary_{suffix}",
-                    "feature_sharded_add_then_layer1_rms_masked_chunk",
+                    "feature_sharded_add_then_layer1_rms_exact_valid_chunk",
                     (
-                        f"layer0_dense_input_{suffix}",
+                        f"layer0_post_attention_carried_{suffix}",
                         f"layer0_dense_update_{suffix}",
-                        f"valid_mask_{suffix}",
                     ),
                     (
                         f"layer1_carried_{suffix}",
@@ -780,7 +841,6 @@ def _nodes(inputs: Feature2PrefillInputs) -> tuple[Feature2PrefillNode, ...]:
                     ),
                     (
                         f"layer1_carried_{suffix}",
-                        f"valid_mask_{suffix}",
                         f"position_chunk_{suffix}",
                         f"layer1_carried_liveness_digest_{suffix}",
                     ),
@@ -792,7 +852,6 @@ def _nodes(inputs: Feature2PrefillInputs) -> tuple[Feature2PrefillNode, ...]:
                     (
                         f"layer1_normalized_{suffix}",
                         f"position_chunk_{suffix}",
-                        f"valid_mask_{suffix}",
                         f"layer1_index_cache_{suffix}",
                         "block_tables",
                     ),
@@ -810,7 +869,6 @@ def _nodes(inputs: Feature2PrefillInputs) -> tuple[Feature2PrefillNode, ...]:
                     "layer1_carried_3",
                     "layer1_normalized_3",
                     "position_chunk_3",
-                    "valid_mask_3",
                     "current_position",
                 ),
                 ("candidate_current_carried", "candidate_current_normalized"),
@@ -824,8 +882,15 @@ def _nodes(inputs: Feature2PrefillInputs) -> tuple[Feature2PrefillNode, ...]:
             ),
             Feature2PrefillNode(
                 "layer1_attention_query",
-                "candidate_attention_q_b_projection_and_position_8155_rope",
-                ("candidate_layer1_q_residual", "current_position"),
+                (
+                    "candidate_attention_q_b_projection_and_position_8155_"
+                    "accepted_main_rope_table"
+                ),
+                (
+                    "candidate_layer1_q_residual",
+                    "current_position",
+                    "main_rope_table",
+                ),
                 ("candidate_layer1_attention_query",),
                 "layer1_attention_query",
             ),
@@ -1078,7 +1143,6 @@ def validate_feature2_prefill_graph(
         liveness_node = node_by_name.get(liveness_name)
         expected_inputs = (
             carried_name,
-            f"valid_mask_{suffix}",
             f"position_chunk_{suffix}",
             f"layer1_carried_liveness_digest_{suffix}",
         )

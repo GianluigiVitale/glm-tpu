@@ -1,0 +1,213 @@
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+import jax.numpy as jnp
+import numpy as np
+import pytest
+
+from glm_tpu.greenfield.benchmarking.pp16_feature2_program import (
+    _update_liveness_digest,
+    load_feature2_prefill_runtime_inputs,
+)
+from glm_tpu.greenfield.kernels.reference.rotary import rotary_table_sha256
+
+
+REAL_PP16_FEATURE2_RUNTIME = Path(
+    "/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/"
+    "PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_"
+    "20260827T164842844148623Z"
+)
+REAL_8K_ORACLE = Path(
+    "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/8k/"
+    "greenfield_short_context_oracle_8k_20260807T172307269147351Z/oracle"
+)
+
+
+@pytest.mark.skipif(
+    not REAL_8K_ORACLE.is_dir(), reason="protected 8K oracle is unavailable"
+)
+def test_runtime_inputs_bind_tokens_pages_position_and_main_rope() -> None:
+    inputs = load_feature2_prefill_runtime_inputs(REAL_8K_ORACLE)
+    assert inputs.candidate_token_ids.shape == (8156,)
+    assert int(inputs.candidate_token_ids[-1]) == 220
+    np.testing.assert_array_equal(inputs.candidate_positions, np.arange(8156))
+    np.testing.assert_array_equal(inputs.block_tables, np.arange(16)[None, :])
+    np.testing.assert_array_equal(inputs.context_lengths, [8156])
+    np.testing.assert_array_equal(inputs.current_position, [8155])
+    assert inputs.main_rope_table.shape == (8192, 64)
+    assert rotary_table_sha256(inputs.main_rope_table) == (
+        "6a22140fc2aec475399738c6fc0f29be2a6c419feb0249aee35681c607c80701"
+    )
+
+
+def test_carried_liveness_digest_depends_on_values_owner_and_order() -> None:
+    zero = jnp.zeros((2,), dtype=jnp.uint32)
+    first = jnp.arange(3072, dtype=jnp.float32)[None, :].astype(jnp.bfloat16)
+    second = (first + jnp.bfloat16(1)).astype(jnp.bfloat16)
+
+    def digest(rows: tuple[jnp.ndarray, jnp.ndarray], owner: int) -> np.ndarray:
+        value = zero
+        for position, row in enumerate(rows):
+            value = _update_liveness_digest(
+                value,
+                row,
+                jnp.asarray(position, dtype=jnp.int32),
+                jnp.asarray(owner, dtype=jnp.int32),
+            )
+        return np.asarray(value)
+
+    ordered = digest((first, second), 0)
+    assert not np.array_equal(ordered, digest((second, first), 0))
+    assert not np.array_equal(ordered, digest((first, second), 1))
+    changed = np.asarray(first).copy()
+    changed[0, 17] = -3
+    assert not np.array_equal(
+        ordered,
+        digest((jnp.asarray(changed), second), 0),
+    )
+
+
+@pytest.mark.skipif(
+    not REAL_PP16_FEATURE2_RUNTIME.is_dir() or not REAL_8K_ORACLE.is_dir(),
+    reason="protected PP16 runtime or 8K oracle is unavailable",
+)
+def test_complete_program_abstract_graph_is_exact_lp2_and_fail_closed() -> None:
+    program = r'''
+from pathlib import Path
+import json
+import jax
+import jax.numpy as jnp
+from jax.sharding import NamedSharding, PartitionSpec as P
+from glm_tpu.greenfield.benchmarking.pp16_feature2_prefill import (
+    build_feature2_prefill_graph, load_feature2_prefill_inputs,
+)
+from glm_tpu.greenfield.benchmarking.pp16_feature_sharded_state import (
+    derive_feature2_tensor_allowlist, read_feature2_owner_headers,
+)
+from glm_tpu.greenfield.benchmarking.pp16_feature2_program import (
+    _EXECUTABLE_WEIGHT_SHAPES, build_feature2_prefill_program,
+    validate_feature2_prefill_jaxpr, validate_feature2_prefill_result_abstract,
+    validate_feature2_executable_weight_contract,
+)
+from glm_tpu.greenfield.errors import BenchmarkValidationError
+
+root = Path(__import__('os').environ['FEATURE2_RUNTIME'])
+oracle = Path(__import__('os').environ['FEATURE2_ORACLE'])
+manifest = json.loads((root / 'runtime_manifest.json').read_text())
+graph = build_feature2_prefill_graph(
+    derive_feature2_tensor_allowlist(
+        manifest, read_feature2_owner_headers(root, manifest)
+    ),
+    load_feature2_prefill_inputs(oracle),
+)
+built = build_feature2_prefill_program(graph, devices=jax.devices())
+dtypes = {'bf16': jnp.bfloat16, 'f32': jnp.float32, 'u8': jnp.uint8}
+def abstract(shape, dtype, spec):
+    return jax.ShapeDtypeStruct(
+        shape, dtype, sharding=NamedSharding(built.mesh, spec)
+    )
+weights = {
+    name: abstract((2, *shape), dtypes[dtype], built.weight_specs[name])
+    for name, (shape, dtype) in _EXECUTABLE_WEIGHT_SHAPES.items()
+}
+query = abstract((2, 2048, 2048), jnp.float32, P('feature', None, None))
+wk = abstract((2, 128, 6144), jnp.float32, P('feature', None, None))
+arguments = (
+    weights, query, query, wk, wk,
+    abstract((8156,), jnp.int32, P()),
+    abstract((8156,), jnp.int32, P()),
+    abstract((1, 16), jnp.int32, P()),
+    abstract((1,), jnp.int32, P()),
+    abstract((1,), jnp.int32, P()),
+    abstract((8192, 64), jnp.bfloat16, P()),
+)
+jaxpr = str(jax.make_jaxpr(built.execute)(*arguments))
+contract = validate_feature2_prefill_jaxpr(jaxpr)
+terminal = validate_feature2_prefill_result_abstract(
+    jax.eval_shape(built.execute, *arguments)
+)
+mutations = (
+    jaxpr + '\ndebug_callback',
+    jaxpr.replace(
+        'name=greenfield_pregathered_sparse_mla_h16_k2048_b512_w640',
+        'name=greenfield_pregathered_sparse_mla_h32_k2048_b512_w640',
+        1,
+    ),
+    jaxpr.replace('Precision.DEFAULT, Precision.HIGHEST', 'Precision.HIGHEST', 1),
+    jaxpr + '\nbf16[32,6144]',
+)
+rejected = 0
+for mutation in mutations:
+    try:
+        validate_feature2_prefill_jaxpr(mutation)
+    except BenchmarkValidationError:
+        rejected += 1
+print(json.dumps({
+    'contract': contract,
+    'graph_sha256': graph.graph_sha256,
+    'rejected_mutations': rejected,
+    'terminal': terminal,
+    'weight_contract': validate_feature2_executable_weight_contract(graph),
+    'weight_count': len(built.weight_specs),
+}, sort_keys=True))
+'''
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    env["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
+    env["FEATURE2_RUNTIME"] = str(REAL_PP16_FEATURE2_RUNTIME)
+    env["FEATURE2_ORACLE"] = str(REAL_8K_ORACLE)
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=90,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result["graph_sha256"] == (
+        "ab5be45aecf3b0b5d87ad76af8076bc9351823529a08c0eadb414b072b31cb2d"
+    )
+    assert result["weight_count"] == 37
+    assert result["weight_contract"] == {
+        "dense_final_leaf_count": 4,
+        "dense_source_leaf_count": 6,
+        "executable_leaf_count": 37,
+        "passed": True,
+        "source_leaf_count": 39,
+    }
+    assert result["rejected_mutations"] == 4
+    assert result["contract"] == {
+        "all_gather": 27,
+        "forbidden_markers": [],
+        "h16_b512_attention": 8,
+        "passed": True,
+        "physical_m64_projection": 4,
+        "pmin": 1,
+        "ppermute": 12,
+        "psum": 16,
+        "scan": 18,
+    }
+    assert result["terminal"] == {
+        "output_count": 11,
+        "passed": True,
+        "terminal_shapes": [
+            [1, 2048],
+            [1],
+            [1, 2048],
+            [2, 1, 3072],
+            [2, 1, 32, 256],
+            [1, 576],
+            [2, 16, 256, 640],
+            [2, 16, 256, 128],
+            [2, 16, 256, 128],
+            [2, 2],
+            [1],
+        ],
+    }

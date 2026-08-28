@@ -5,6 +5,36 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-28 22:00--current UTC — complete PP16 feature2 graph traces offline
+
+The bounded PP16 stage-0 program now evaluates all 8,156 authenticated candidate rows through the
+complete layer-0 DSA/IndexShare/dense path using two persistent BF16 `[1,3072]` residual halves.
+After each exact-valid chunk it reconstructs only that chunk's layer-1 normalized history into the
+owner-local index cache with physical-M64/divide-sqrt projection, then discards the history. The
+terminal work is the exact tuple4/DEFAULT layer-1 event-1 scorer plus compact state witnesses; no
+layer-1 attention output/MLP or later model work is present.
+
+Offline tracing caught two semantic omissions in the earlier abstract graph before TPU use. Exact
+MLA requires the DB531 BF16 main-RoPE table (`6a22140f...0701`), and post-attention carried residual
+cannot be conflated with RMS-normalized dense input. Both are now explicit. The final chunk contains
+exactly 2,012 model rows; only physical-M64 repair pads 36 repeated projection rows and drops their
+writes. Corrected 38-node graph SHA `ab5be45a...cb2d` supersedes `d0160308...b4ea` for execution.
+
+The two-device abstract program binds 39 authenticated sources to 37 final-layout executable leaves,
+traces four physical-M64 projections, eight H16/K2048/B512/W640 attention calls and 12 feature-local
+permutes, and rejects H32, callbacks, `[32,6144]` and `[8156,6144]` tensors. Terminal shapes pin one
+event row, owner-local caches and `[2,1,3072]` persistent hidden state. Focused tests pass 19/19 and
+the neighboring CPU-forced suite passes 65/65. No real selective load, TPU compile/arithmetic, HBM,
+DB row, archive, Gate-D or performance evidence exists. Scoped adversarial review is required before
+commit and before any compile-only runner is implemented.
+
+Persistent Fable 5 Max then returned `APPROVE COMMIT` with no blockers after reading the current
+batch. It confirmed exact chunk/cache causality, the three residual/RMS boundaries, no model tail,
+main-RoPE/tuple4/DEFAULT semantics, 39→37 leaf accounting, LP2 specs and the terminal stop. Its
+nonblocking notes require parsed optimized-HLO validation and sealed event-1 lineage in the future
+runner, which remains a separately reviewed batch. The read-only review could not recompute the
+staged SHA or tests; it authorized commit only and no TPU work.
+
 ## 2026-08-28 19:55--20:30 UTC — feature2 offline batch corrected after Sol block
 
 The manifest-derived selective loader and candidate-history graph were implemented without TPU or
