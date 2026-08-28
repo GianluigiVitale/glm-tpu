@@ -8,14 +8,14 @@ DOC_REPO="${GLM_DSA_DOC_REPO:-/home/gianl/glm-tpu-topology-rewrite}"
 RUN_ROOT="${GLM_DSA_RUN_ROOT:-/home/gianl/glm-run}"
 BUCKET="${GLM_DSA_BUCKET:-gs://driftbench-dsv4-uc}"
 
-BASE=5e2c7128bc74a75493f07930f3a749bcb272a3cb
-PR1=fd29657d336cee859c17d4568f8d38d276ca9707
-PR2=dfb28231b9e35c11659d3db3125bc18cc3177ab8
-PR3=8aae29ad6da2b2cd778be031b423e31eb4a85a80
+BASE=e08b64c14208cb5efc34cc3b41eeaa3402346911
+PR1=650b5fccb890b5a872871af489b50fc4c584e8ad
+PR2=d837832ab41f947ee9ff759e65ea8417ba1bd5c9
+PR3=101ec506d76a3ecb0b688315e432ae7e8d0ab37a
 VLLM=d626108b1841888ec90aced33367149a6bbc7e4b
-BUNDLE=glm-dsa-private-stack_20260828T015742Z.bundle
-BUNDLE_SHA=d9b13b3906184286ad67ddeddd6d46d2bff29b04b9465a366c16f88245844bfb
-BUNDLE_BYTES=12152990
+BUNDLE=glm-dsa-private-stack_20260828T090200Z.bundle
+BUNDLE_SHA=38800e54e9b03ffe930a8629c0ea6b4039e4cbb19d188a54665889ddb8e31f49
+BUNDLE_BYTES=12158343
 
 fail() {
   echo "READINESS_FAIL: $*" >&2
@@ -107,9 +107,17 @@ assert_equal origin_url git@github.com:GianluigiVitale/tpu-inference.git "$(
 assert_equal upstream_url https://github.com/vllm-project/tpu-inference.git "$(
   git -C "$CODE_REPO" remote get-url upstream
 )"
-assert_equal upstream_main "$BASE" "$(
-  git -C "$CODE_REPO" ls-remote upstream refs/heads/main | awk '{print $1}'
-)"
+UPSTREAM_MAIN="$(git -C "$CODE_REPO" ls-remote upstream \
+  refs/heads/main | awk '{print $1}')"
+git -C "$CODE_REPO" merge-base --is-ancestor "$BASE" "$UPSTREAM_MAIN" ||
+  fail "audited base is not an ancestor of current upstream main"
+overlap="$({
+  git -C "$CODE_REPO" diff --name-only "$BASE..$UPSTREAM_MAIN"
+  git -C "$CODE_REPO" diff --name-only "$BASE..$PR1"
+} | sort | uniq -d)"
+[[ -z "$overlap" ]] || fail "upstream moved across PR1 paths: $overlap"
+echo "OK upstream_main_descends_from_base $UPSTREAM_MAIN"
+echo "OK upstream_main_PR1_path_overlap none"
 
 verify_ref pr/glm-dsa-kernels-v3 "$PR1"
 verify_ref pr/glm-dsa-bridge-v3 "$PR2"
@@ -139,20 +147,20 @@ if git -C "$CODE_REPO" diff --unified=0 "$BASE..$PR3" -- \
 fi
 echo "OK no_bulk_or_greenfield_execution_imports"
 
-verify_evidence upstream_streamindex_test_20260828T011411Z \
-  results/upstream_glm_dsa_pr1_correctness_20260828T011411Z \
-  1e08dad8c1ee87487df08a380a17b65cebac9134a4e82157240e1e71b8138704 30
-verify_evidence upstream_glm_dsa_benchmark_20260828T011531Z \
-  results/upstream_glm_dsa_pr1_benchmark_20260828T011531Z \
-  20cbf34d8576c8905d337f932584f3f9248865941bcbae63b9a68bf35bb8e285
-verify_evidence upstream_glm_dsa_pr2_full_local_bounds_20260828T015207Z \
-  results/upstream_glm_dsa_pr2_full_local_bounds_20260828T015207Z \
-  f5b39594dda06bd0a3546611568db747a93259d5c1e9022ab570ae7aa02ed473 57
-verify_evidence upstream_glm_dsa_pr3_local_bounds_20260828T015441Z \
-  results/upstream_glm_dsa_pr3_local_bounds_20260828T015441Z \
-  ce0f35f0d12d564132d0eb58fd9cfc5bf3c3b17182057bd79e7d2a8fac4cad31 3
+verify_evidence upstream_glm_dsa_pr1_rebase_20260828T085145Z \
+  results/upstream_glm_dsa_pr1_rebase_20260828T085145Z \
+  1e20d3c5342c25537dfc2e98ee51e22aea0ca34ba66bef5e2778be4868bfcf3c 30
+verify_evidence upstream_glm_dsa_pr1_benchmark_rebase_20260828T085526Z \
+  results/upstream_glm_dsa_pr1_benchmark_rebase_20260828T085526Z \
+  54ec928ba42d5426c5d9096ea0959bbf2fede52c45b43eb232e5b01f95119575
+verify_evidence upstream_glm_dsa_pr2_rebase_20260828T085714Z \
+  results/upstream_glm_dsa_pr2_rebase_20260828T085714Z \
+  7731e8397b58b323b1f68e82509005dce24dc121bd2e235c194d95200a0383de 57
+verify_evidence upstream_glm_dsa_pr3_rebase_20260828T085938Z \
+  results/upstream_glm_dsa_pr3_rebase_20260828T085938Z \
+  a3cbb2b461d8329c8dc48f083671ac0cc02732ca1f4f31fcf7cdfaefc6a09df4 3
 
-python3 - "$RUN_ROOT/upstream_glm_dsa_benchmark_20260828T011531Z/benchmark.json" <<'PY'
+python3 - "$RUN_ROOT/upstream_glm_dsa_pr1_benchmark_rebase_20260828T085526Z/benchmark.json" <<'PY'
 import json
 import sys
 
@@ -167,12 +175,12 @@ assert data["config"] == {
     "warmup": 5,
 }
 expected = {
-    "lax_top_k_n262144_k2048": (2.007, 2.027),
-    "streamindex_n262144_k2048_bkvp4": (3.208, 3.223),
-    "index_cache_insert_n262144": (0.353, 0.412),
-    "sparse_mla_k2048_block512": (0.159, 0.172),
-    "gather_sparse_mla_n262144_k2048": (0.222, 0.253),
-    "dsa_decode_chain_n262144_k2048": (3.280, 3.294),
+    "lax_top_k_n262144_k2048": (2.009, 2.041),
+    "streamindex_n262144_k2048_bkvp4": (3.216, 3.248),
+    "index_cache_insert_n262144": (0.374, 0.434),
+    "sparse_mla_k2048_block512": (0.182, 0.201),
+    "gather_sparse_mla_n262144_k2048": (0.244, 0.264),
+    "dsa_decode_chain_n262144_k2048": (3.292, 3.318),
 }
 actual = {
     item["name"]: (round(item["p50_ms"], 3), round(item["p99_ms"], 3))

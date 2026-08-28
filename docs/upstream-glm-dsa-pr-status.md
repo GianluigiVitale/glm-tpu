@@ -5,14 +5,14 @@ pushed to or opened against `vllm-project/tpu-inference`.
 
 ## Pins and stack
 
-- Upstream TPU Inference base: `5e2c7128bc74a75493f07930f3a749bcb272a3cb`.
+- Upstream TPU Inference base: `e08b64c14208cb5efc34cc3b41eeaa3402346911`.
 - vLLM source pin: `d626108b1841888ec90aced33367149a6bbc7e4b`.
 - PR 1 branch/head: `pr/glm-dsa-kernels-v3` at
-  `fd29657d336cee859c17d4568f8d38d276ca9707` (private fork).
+  `650b5fccb890b5a872871af489b50fc4c584e8ad` (private fork).
 - PR 2 branch/head: `pr/glm-dsa-bridge-v3` at
-  `dfb28231b9e35c11659d3db3125bc18cc3177ab8` (private fork), stacked on PR 1.
+  `d837832ab41f947ee9ff759e65ea8417ba1bd5c9` (private fork), stacked on PR 1.
 - PR 3 branch/head: `pr/glm-dsa-model-ci-v3` at
-  `8aae29ad6da2b2cd778be031b423e31eb4a85a80` (private fork), stacked on PR 2.
+  `101ec506d76a3ecb0b688315e432ae7e8d0ab37a` (private fork), stacked on PR 2.
 - All eleven private commits carry the repository-required DCO signoff. The
   DCO rewrite preserved each PR head's exact tree hash; recoverable local
   pre-rewrite refs remain under `backup/glm-dsa-*-pre-dco`.
@@ -44,6 +44,16 @@ root was absent from `PYTHONPATH`; it is preserved as
 `upstream_glm_dsa_benchmark_20260828T005800Z` (SHA
 `244b114239c4a7a76efa4cef9fc60b3462b99a727b844537d9998b5f40ca1255`).
 Both attempts ended 8/8 clean.
+
+After official main advanced by two non-overlapping CI/support-matrix commits,
+the stack was rebased without changing any PR patch bytes. The exact new PR 1
+head passed 30/30 in 60.16 seconds and the refreshed 256K benchmark measured
+the composed chain at 3.292 ms p50 / 3.318 ms p99. Evidence tags are
+`upstream_glm_dsa_pr1_rebase_20260828T085145Z` and
+`upstream_glm_dsa_pr1_benchmark_rebase_20260828T085526Z`; evidence-manifest
+SHA-256 values are respectively
+`1e20d3c5342c25537df08a380a17b65cebac9134a4e82157240e1e71b8138704` and
+`54ec928ba42d5426c5d9096ea0959bbf2fede52c45b43eb232e5b01f95119575`.
 
 ## PR 2 — TorchAX/vLLM bridge
 
@@ -106,6 +116,11 @@ suite above isolates and passes the claimed contract.
 
 These are correctness/integration results, not full-model latency claims.
 
+The rebased exact PR 2 head passed the same 57/57 protected suite in 99.99
+seconds. Evidence `upstream_glm_dsa_pr2_rebase_20260828T085714Z`,
+evidence-manifest SHA-256
+`7731e8397b58b323b1f68e82509005dce24dc121bd2e235c194d95200a0383de`.
+
 ## PR 3 — model contract and CI
 
 Two commits add a no-weight GLM-5.2 model-contract test and a model-specific
@@ -138,6 +153,9 @@ Validation:
   fail identically. A separate structural audit passes all six new steps,
   unique keys/target, dependencies, referenced test paths, and recording-step
   metadata. Do not hide the upstream validator defect inside this model PR.
+- The rebased exact PR 3 head passed 3/3 in 9.43 seconds. Evidence
+  `upstream_glm_dsa_pr3_rebase_20260828T085938Z`, evidence-manifest SHA-256
+  `a3cbb2b461d8329c8dc48f083671ac0cc02732ca1f4f31fcf7cdfaefc6a09df4`.
 
 ## Stack status and next action
 
@@ -149,15 +167,17 @@ revalidated above. Compact evidence is mirrored under matching
 verified `US-CENTRAL2` regional bucket. PR 1 is 8 files (+1,250/-10), PR 2 is
 11 files (+1,344/-34), and PR 3 is 2 files (+302). The final stack tracks 1,103
 files, contains no tracked file above 1 MiB, and has no checkpoint, trace,
-cache, environment, or generated run tree. `upstream/main` remains exactly
-`5e2c7128bc74a75493f07930f3a749bcb272a3cb`; no upstream branch or PR was
+cache, environment, or generated run tree. The audited branch base is
+`e08b64c14208cb5efc34cc3b41eeaa3402346911`; live `upstream/main` is
+`b256da42e879f6070dc517cf171eb2ab8f6b2c9e` with only non-overlapping nightly
+support-matrix changes after that base. No upstream branch or PR was
 created. The five-minute same-region cron now mirrors the authoritative
 `tpu-inference-glm-baseline` worktree to
 `gs://driftbench-dsv4-uc/repos/tpu-inference-glm-baseline`. A separately
 verified complete-history three-ref bundle is at
 `gs://driftbench-dsv4-uc/backups/tpu-inference-glm-dsa/`
-`glm-dsa-private-stack_20260828T015742Z.bundle` (12,152,990 bytes; SHA-256
-`d9b13b3906184286ad67ddeddd6d46d2bff29b04b9465a366c16f88245844bfb`).
+`glm-dsa-private-stack_20260828T090200Z.bundle` (12,158,343 bytes; SHA-256
+`38800e54e9b03ffe930a8629c0ea6b4039e4cbb19d188a54665889ddb8e31f49`).
 
 The protected harness must set `TPU_PROCESS_BOUNDS=1,1,1`,
 `TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1`, and four visible local chips. Omitting the

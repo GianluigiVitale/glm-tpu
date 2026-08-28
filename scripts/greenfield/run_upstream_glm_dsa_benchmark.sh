@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Protected single-host TPU validation for the private upstream GLM DSA stack.
+# Protected single-host TPU benchmark for the private upstream GLM DSA stack.
 set -euo pipefail
 
 readonly POD=db-v4-64-od
@@ -7,20 +7,20 @@ readonly ZONE=us-central2-b
 readonly REPO=/home/gianl/tpu-inference-glm-baseline
 readonly VLLM_REPO=/home/gianl/vllm-build-lkg-d626108b
 readonly PYTHON=/home/gianl/vllm-env/bin/python
-readonly BASE=e08b64c14208cb5efc34cc3b41eeaa3402346911
 readonly VLLM_PIN=d626108b1841888ec90aced33367149a6bbc7e4b
 readonly BUCKET=gs://driftbench-dsv4-uc
+readonly BENCHMARK=scripts/benchmarking/kernels/benchmark_glm_dsa.py
 
 usage() {
-  echo "usage: $0 EXPECTED_HEAD TAG PYTEST_ARG..." >&2
+  echo "usage: $0 EXPECTED_BASE EXPECTED_HEAD TAG" >&2
   exit 2
 }
 
-[[ $# -ge 3 ]] || usage
-EXPECTED_HEAD=$1
-TAG=$2
-shift 2
-PYTEST_ARGS=("$@")
+[[ $# -eq 3 ]] || usage
+EXPECTED_BASE=$1
+EXPECTED_HEAD=$2
+TAG=$3
+[[ $EXPECTED_BASE =~ ^[0-9a-f]{40}$ ]] || usage
 [[ $EXPECTED_HEAD =~ ^[0-9a-f]{40}$ ]] || usage
 [[ $TAG =~ ^upstream_[a-z0-9_]+_[0-9]{8}T[0-9]{6}Z$ ]] || usage
 
@@ -47,12 +47,16 @@ flock -n 8 || {
   echo "current head does not match expected head" >&2
   exit 2
 }
+[[ $(git -C "$REPO" merge-base HEAD upstream/main) == "$EXPECTED_BASE" ]] || {
+  echo "current upstream base does not match expected base" >&2
+  exit 2
+}
 [[ $(git -C "$VLLM_REPO" rev-parse HEAD) == "$VLLM_PIN" ]] || {
   echo "vLLM pin drifted" >&2
   exit 2
 }
 [[ -z $(git -C "$REPO" status --porcelain) ]] || {
-  echo "refusing protected validation from a dirty worktree" >&2
+  echo "refusing protected benchmark from a dirty worktree" >&2
   exit 2
 }
 [[ $(gcloud storage buckets describe "$BUCKET" --format='value(location)') == \
@@ -86,56 +90,53 @@ strict_census() {
   has_eight_unique_markers "$out" CENSUS_OK
 }
 
+post_done=0
+trap 'status=$?; if [[ $post_done -eq 0 ]]; then strict_census failure_exit || true; fi; exit $status' EXIT
 strict_census pre
 {
-  echo "TPU_INFERENCE_BASE $BASE"
+  echo "TPU_INFERENCE_BASE $EXPECTED_BASE"
   echo "TPU_INFERENCE_HEAD $EXPECTED_HEAD"
   echo "WORKTREE_SNAPSHOT_SHA $(git -C "$REPO" diff --binary HEAD | sha256sum | cut -d' ' -f1)"
   echo "VLLM_PIN $VLLM_PIN"
-  printf 'PYTEST_ARGS'
-  printf ' %q' "${PYTEST_ARGS[@]}"
-  printf '\n'
-  echo "JAX_PLATFORMS tpu"
-  echo "TPU_CHIPS_PER_PROCESS_BOUNDS 2,2,1"
-  echo "TPU_PROCESS_BOUNDS 1,1,1"
-  echo "TPU_VISIBLE_DEVICES 0,1,2,3"
+  echo "BENCHMARK $BENCHMARK"
+  echo "BENCHMARK_SHA256 $(sha256sum "$REPO/$BENCHMARK" | cut -d' ' -f1)"
+  echo "ARGS --mode all --warmup 5 --samples 20 --seq-len 262144 --topk 2048"
   echo "BUCKET_LOCATION US-CENTRAL2"
   echo "STARTED_AT_UTC $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } >"$RUN_DIR/provenance.txt"
+cp "$0" "$RUN_DIR/protected_runner.sh"
 
 set +e
-(
-  cd "$REPO"
-  env JAX_PLATFORMS=tpu \
-    TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
-    TPU_PROCESS_BOUNDS=1,1,1 \
-    TPU_VISIBLE_DEVICES=0,1,2,3 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH="$REPO:$VLLM_REPO" \
-    "$PYTHON" -m pytest -q -s "${PYTEST_ARGS[@]}"
-) >"$RUN_DIR/pytest.txt" 2>&1
-pytest_rc=$?
+timeout 300 env JAX_PLATFORMS=tpu \
+  TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
+  TPU_PROCESS_BOUNDS=1,1,1 \
+  TPU_VISIBLE_DEVICES=0,1,2,3 \
+  PYTHONPATH="$REPO:$VLLM_REPO" \
+  "$PYTHON" "$REPO/$BENCHMARK" \
+    --mode all --warmup 5 --samples 20 --seq-len 262144 --topk 2048 \
+    >"$RUN_DIR/benchmark.json" 2>"$RUN_DIR/stderr.txt"
+benchmark_rc=$?
 set -e
-echo "$pytest_rc" >"$RUN_DIR/pytest.exit_code"
 
 census_rc=0
 strict_census post || census_rc=$?
+post_done=1
 {
   echo "FINISHED_AT_UTC $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  echo "PYTEST_EXIT_CODE $pytest_rc"
+  echo "BENCHMARK_EXIT_CODE $benchmark_rc"
   echo "POST_CENSUS_EXIT_CODE $census_rc"
 } >>"$RUN_DIR/provenance.txt"
 
 (
   cd "$RUN_DIR"
-  sha256sum census_pre.txt census_post.txt provenance.txt pytest.txt \
-    pytest.exit_code >evidence.sha256
+  sha256sum benchmark.json census_pre.txt census_post.txt provenance.txt \
+    protected_runner.sh stderr.txt >evidence.sha256
 )
-gcloud storage cp --no-clobber "$RUN_DIR"/*.txt "$RUN_DIR/evidence.sha256" \
-  "$REMOTE_PREFIX/"
+gcloud storage cp --no-clobber "$RUN_DIR"/*.json "$RUN_DIR"/*.sh \
+  "$RUN_DIR"/*.txt "$RUN_DIR/evidence.sha256" "$REMOTE_PREFIX/"
 gcloud storage cat "$REMOTE_PREFIX/evidence.sha256" |
   cmp - "$RUN_DIR/evidence.sha256"
 sha256sum "$RUN_DIR/evidence.sha256" | tee "$RUN_DIR/manifest_list.sha256"
 gcloud storage cp --no-clobber "$RUN_DIR/manifest_list.sha256" "$REMOTE_PREFIX/"
 
-[[ $pytest_rc -eq 0 && $census_rc -eq 0 ]] || exit 1
+[[ $benchmark_rc -eq 0 && $census_rc -eq 0 ]] || exit 1

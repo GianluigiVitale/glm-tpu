@@ -5,8 +5,8 @@ been mutated.
 
 ## Immutable review range
 
-- Base: `5e2c7128bc74a75493f07930f3a749bcb272a3cb`
-- Head: `fd29657d336cee859c17d4568f8d38d276ca9707`
+- Base: `e08b64c14208cb5efc34cc3b41eeaa3402346911`
+- Head: `650b5fccb890b5a872871af489b50fc4c584e8ad`
 - Branch: private `pr/glm-dsa-kernels-v3`
 - Dependency: none. PR 1 contains no TorchAX bridge, model registration, or CI
   enablement from PRs 2-3.
@@ -16,7 +16,7 @@ Inspect the exact patch:
 
 ```bash
 git -C /home/gianl/tpu-inference-glm-baseline \
-  diff --find-renames 5e2c7128bc74a75493f07930f3a749bcb272a3cb..fd29657d336cee859c17d4568f8d38d276ca9707
+  diff --find-renames e08b64c14208cb5efc34cc3b41eeaa3402346911..650b5fccb890b5a872871af489b50fc4c584e8ad
 ```
 
 ## File-by-file checklist
@@ -38,15 +38,15 @@ owners. `scripts/` has no required CODEOWNER.
 
 ## Evidence to accept or reject
 
-- Exact-head protected kernel/HLO suite: 30/30 in 61.19 seconds; 8/8 hosts
-  clean; local tag `upstream_streamindex_test_20260828T011411Z`; remote prefix
-  `upstream_glm_dsa_pr1_correctness_20260828T011411Z`; evidence-manifest SHA-256
-  `1e08dad8c1ee87487df08a380a17b65cebac9134a4e82157240e1e71b8138704`.
-- Same clean head, real-v4 benchmark: scorer 3.208 ms p50, cache insert
-  0.353 ms, selected gather + MLA 0.222 ms, sparse MLA 0.159 ms, composed chain
-  3.280 ms; local tag `upstream_glm_dsa_benchmark_20260828T011531Z`; remote
-  prefix `upstream_glm_dsa_pr1_benchmark_20260828T011531Z`; evidence-manifest
-  SHA-256 `20cbf34d8576c8905d337f932584f3f9248865941bcbae63b9a68bf35bb8e285`.
+- Exact-head protected kernel/HLO suite: 30/30 in 60.16 seconds; 8/8 hosts
+  clean; local/remote tag `upstream_glm_dsa_pr1_rebase_20260828T085145Z`;
+  evidence-manifest SHA-256
+  `1e20d3c5342c25537dfc2e98ee51e22aea0ca34ba66bef5e2778be4868bfcf3c`.
+- Same clean head, real-v4 benchmark: scorer 3.216 ms p50, cache insert
+  0.374 ms, selected gather + MLA 0.244 ms, sparse MLA 0.182 ms, composed chain
+  3.292 ms; local/remote tag
+  `upstream_glm_dsa_pr1_benchmark_rebase_20260828T085526Z`; evidence-manifest
+  SHA-256 `54ec928ba42d5426c5d9096ea0959bbf2fede52c45b43eb232e5b01f95119575`.
 - These are kernel measurements, not full-model correctness, HBM, quality,
   serving latency, or non-v4 performance claims.
 

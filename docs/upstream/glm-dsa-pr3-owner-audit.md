@@ -5,8 +5,8 @@ been mutated. Review PRs 1-2 first because this patch is stacked on both.
 
 ## Immutable review range
 
-- Parent: `dfb28231b9e35c11659d3db3125bc18cc3177ab8` (PR 2)
-- Head: `8aae29ad6da2b2cd778be031b423e31eb4a85a80`
+- Parent: `d837832ab41f947ee9ff759e65ea8417ba1bd5c9` (PR 2)
+- Head: `101ec506d76a3ecb0b688315e432ae7e8d0ab37a`
 - Branch: private `pr/glm-dsa-model-ci-v3`
 - Dependencies: PR 1 and PR 2.
 - Size: 2 files, +302/-0; two DCO-signed commits.
@@ -15,7 +15,7 @@ Inspect the exact patch:
 
 ```bash
 git -C /home/gianl/tpu-inference-glm-baseline \
-  diff --find-renames dfb28231b9e35c11659d3db3125bc18cc3177ab8..8aae29ad6da2b2cd778be031b423e31eb4a85a80
+  diff --find-renames d837832ab41f947ee9ff759e65ea8417ba1bd5c9..101ec506d76a3ecb0b688315e432ae7e8d0ab37a
 ```
 
 ## File-by-file checklist
@@ -52,10 +52,10 @@ Buildkite owners (`@QiliangCui @yiw-wang @CienetStingLin @yunyao-gg
 
 ## Evidence to accept or reject
 
-- Exact-head protected model-contract test: 3/3 in 9.24 seconds; local tag
-  `upstream_glm_dsa_pr3_local_bounds_20260828T015441Z`; remote prefix
-  `upstream_glm_dsa_pr3_local_bounds_20260828T015441Z`; evidence-manifest
-  SHA-256 `ce0f35f0d12d564132d0eb58fd9cfc5bf3c3b17182057bd79e7d2a8fac4cad31`.
+- Exact-head protected model-contract test: 3/3 in 9.43 seconds;
+  local/remote tag `upstream_glm_dsa_pr3_rebase_20260828T085938Z`;
+  evidence-manifest SHA-256
+  `a3cbb2b461d8329c8dc48f083671ac0cc02732ca1f4f31fcf7cdfaefc6a09df4`.
 - The run used the exact PR3 head and ended with authenticated 8/8 pre/post
   cleanup. Focused CPU tests and all-file pre-commit also pass.
 - This proves registry/constructor/IndexShare wiring only. It is not a

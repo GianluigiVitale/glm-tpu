@@ -38,7 +38,7 @@ This contributes toward #1699 without closing it.
 Exact review range:
 
 ```text
-5e2c7128bc74a75493f07930f3a749bcb272a3cb..fd29657d336cee859c17d4568f8d38d276ca9707
+e08b64c14208cb5efc34cc3b41eeaa3402346911..650b5fccb890b5a872871af489b50fc4c584e8ad
 ```
 
 Real TPU v4 correctness/HLO run:
@@ -50,7 +50,7 @@ pytest -q \
   tests/kernels/deepseek_v32/test_sparse_mla.py
 ```
 
-Result: 30/30 passed in 61.19 seconds at the exact head above. Coverage includes
+Result: 30/30 passed in 60.16 seconds at the exact head above. Coverage includes
 exact cache bytes, fragmented physical slots, numerical scorer equivalence,
 low-position tie order, `-1` suffixes at 2047/2048/2049, fully masked rows,
 legacy compatibility, K=2048, and scorer -> selected gather -> sparse MLA.
@@ -67,12 +67,12 @@ samples at the same exact head:
 
 | Operation | p50 ms | p99 ms |
 |---|---:|---:|
-| exact top-k | 2.007 | 2.027 |
-| StreamIndex scorer + top-k | 3.208 | 3.223 |
-| index-cache insert | 0.353 | 0.412 |
-| sparse MLA | 0.159 | 0.172 |
-| selected gather + MLA | 0.222 | 0.253 |
-| scorer -> gather -> MLA chain | 3.280 | 3.294 |
+| exact top-k | 2.009 | 2.041 |
+| StreamIndex scorer + top-k | 3.216 | 3.248 |
+| index-cache insert | 0.374 | 0.434 |
+| sparse MLA | 0.182 | 0.201 |
+| selected gather + MLA | 0.244 | 0.264 |
+| scorer -> gather -> MLA chain | 3.292 | 3.318 |
 
 Both protected runs used a clean worktree, pinned vLLM
 `d626108b1841888ec90aced33367149a6bbc7e4b`, and authenticated 8/8 host cleanup.
@@ -140,10 +140,10 @@ transposed main MLA caches, or sparse MLA without the model-owned top-k buffer.
 Exact review range:
 
 ```text
-fd29657d336cee859c17d4568f8d38d276ca9707..dfb28231b9e35c11659d3db3125bc18cc3177ab8
+650b5fccb890b5a872871af489b50fc4c584e8ad..d837832ab41f947ee9ff759e65ea8417ba1bd5c9
 ```
 
-The exact-head protected TPU v4 suite passed 57/57 in 98.64 seconds. It covers
+The exact-head protected TPU v4 suite passed 57/57 in 99.99 seconds. It covers
 the PR 1 kernels plus indexer construction/errors, cache insertion, causal
 prefill, one-row decode, shared-buffer reuse, missing-buffer rejection,
 metadata phase selection, sparse backend outputs, and TP2 complete-row
@@ -205,7 +205,7 @@ v6e performance. This contributes toward #1699 without closing it.
 Exact review range:
 
 ```text
-dfb28231b9e35c11659d3db3125bc18cc3177ab8..8aae29ad6da2b2cd778be031b423e31eb4a85a80
+d837832ab41f947ee9ff759e65ea8417ba1bd5c9..101ec506d76a3ecb0b688315e432ae7e8d0ab37a
 ```
 
 ```bash
@@ -213,7 +213,7 @@ MODEL_IMPL_TYPE=vllm python3 -m pytest -q \
   tests/models/vllm/test_glm_moe_dsa.py
 ```
 
-Result: 3/3 passed in 9.24 seconds on the exact head, with a clean worktree and
+Result: 3/3 passed in 9.43 seconds on the exact head, with a clean worktree and
 authenticated 8/8 host cleanup. Focused CPU tests and all-file pre-commit pass.
 
 The YAML parses as six unique steps; every dependency and referenced test path

@@ -21,14 +21,14 @@ The verifier is read-only and fails closed on:
   vLLM pin, complete-history bundle, remote evidence, or bucket region; and
 - missing exact owner checklists/drafts.
 
-It passed live at `2026-08-28T02:37:32Z`; verifier SHA-256 is
-`673954340845c685688bd25c302fab76c338a2559b2ac744d5b71724556478ba`.
+It passed live at `2026-08-28T09:07:18Z`; verifier SHA-256 is
+`25b886d12da0b70a624d0078c1cbb436d316824fe9d3406a014bd59d3c1c40c3`.
 
 Successful output ends with:
 
 ```text
 READINESS_OK_PRE_OWNER_AUDIT
-OWNER_APPROVAL_REQUIRED PR1_HEAD=fd29657d336cee859c17d4568f8d38d276ca9707
+OWNER_APPROVAL_REQUIRED PR1_HEAD=650b5fccb890b5a872871af489b50fc4c584e8ad
 NO_UPSTREAM_MUTATION_AUTHORIZED
 ```
 
@@ -37,9 +37,9 @@ NO_UPSTREAM_MUTATION_AUTHORIZED
 | Goal requirement | Status | Authoritative evidence |
 |---|---|---|
 | Three small stacked patches | Complete privately | Exact BASE->PR1->PR2->PR3 ancestry and 8/11/2-file ranges |
-| PR1 standalone semantics/tests/benchmark | Complete privately | Exact head `fd29657d`; 30/30 protected correctness plus synchronized v4 benchmark |
-| PR2 thin TorchAX/vLLM bridge | Complete privately | Exact head `dfb28231`; 57/57 protected integration/fail-closed/TP2 suite |
-| PR3 model/IndexShare/CI contract | Complete privately | Exact head `8aae29ad`; 3/3 protected registry/IndexShare test and structural CI audit |
+| PR1 standalone semantics/tests/benchmark | Complete privately | Exact head `650b5fcc`; 30/30 protected correctness plus synchronized v4 benchmark |
+| PR2 thin TorchAX/vLLM bridge | Complete privately | Exact head `d837832a`; 57/57 protected integration/fail-closed/TP2 suite |
+| PR3 model/IndexShare/CI contract | Complete privately | Exact head `101ec506`; 3/3 protected registry/IndexShare test and structural CI audit |
 | Current vLLM remains semantic authority | Complete | No duplicated registration/model fork; current registry is tested directly |
 | Exact pins, diffs, dependencies, risks, rollback, titles/bodies | Complete privately | Owner index, three file audits, and ready-to-paste PR series |
 | No bulk artifacts or upstream mutation | Complete privately | Tree/path scan, exact private remote refs, official main unchanged |

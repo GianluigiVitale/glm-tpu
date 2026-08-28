@@ -5,8 +5,8 @@ been mutated. Review PR 1 first because this patch is stacked on it.
 
 ## Immutable review range
 
-- Parent: `fd29657d336cee859c17d4568f8d38d276ca9707` (PR 1)
-- Head: `dfb28231b9e35c11659d3db3125bc18cc3177ab8`
+- Parent: `650b5fccb890b5a872871af489b50fc4c584e8ad` (PR 1)
+- Head: `d837832ab41f947ee9ff759e65ea8417ba1bd5c9`
 - Branch: private `pr/glm-dsa-bridge-v3`
 - Dependency: PR 1. PR 2 contains no model registration or Buildkite entry.
 - Size: 11 files, +1,344/-34; four DCO-signed commits.
@@ -15,7 +15,7 @@ Inspect the exact patch:
 
 ```bash
 git -C /home/gianl/tpu-inference-glm-baseline \
-  diff --find-renames fd29657d336cee859c17d4568f8d38d276ca9707..dfb28231b9e35c11659d3db3125bc18cc3177ab8
+  diff --find-renames 650b5fccb890b5a872871af489b50fc4c584e8ad..d837832ab41f947ee9ff759e65ea8417ba1bd5c9
 ```
 
 ## Production-file checklist
@@ -54,10 +54,9 @@ corresponding layer/runner test owners.
 
 ## Evidence to accept or reject
 
-- Exact-head protected suite: 57/57 in 98.64 seconds; local tag
-  `upstream_glm_dsa_pr2_full_local_bounds_20260828T015207Z`; remote prefix
-  `upstream_glm_dsa_pr2_full_local_bounds_20260828T015207Z`; evidence-manifest
-  SHA-256 `f5b39594dda06bd0a3546611568db747a93259d5c1e9022ab570ae7aa02ed473`.
+- Exact-head protected suite: 57/57 in 99.99 seconds; local/remote tag
+  `upstream_glm_dsa_pr2_rebase_20260828T085714Z`; evidence-manifest SHA-256
+  `7731e8397b58b323b1f68e82509005dce24dc121bd2e235c194d95200a0383de`.
 - Coverage includes scorer/top-k, cache bytes, sparse MLA, shared buffer,
   metadata phase, missing-buffer rejection, and TP2 behavior on real TPU v4.
 - The run used four local v4 devices and authenticated 8/8 pre/post fleet
