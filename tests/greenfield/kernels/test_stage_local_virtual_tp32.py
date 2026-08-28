@@ -8,13 +8,16 @@ import sys
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
+import glm_tpu.greenfield.kernels.stage_local as stage_local
 from glm_tpu.greenfield.kernels.stage_local import (
     _decode_dense_fp8_in_out,
     _dense_bf16_convolution,
     _strategy_nd_row0_bf16_reduce,
     _sum_virtual_dcp_bf16_partials,
     _virtual_dense_convolution_down_partials,
+    _virtual_dense_down_partials,
 )
 
 
@@ -278,6 +281,39 @@ def test_virtual_dense_convolution_rejects_nonexact_contract() -> None:
         )
 
 
+def test_virtual_dense_pallas_partials_accept_exact_pp16_ownership(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Shaped:
+        def __init__(self, shape: tuple[int, ...]):
+            self.shape = shape
+
+        def __getitem__(self, key: object) -> "Shaped":
+            return self
+
+    calls = []
+
+    def fake_fused(*args: object, **kwargs: object) -> jax.Array:
+        calls.append((args, kwargs))
+        return jnp.zeros((1, 6144), dtype=jnp.bfloat16)
+
+    monkeypatch.setattr(stage_local, "fp8_fused_block_swiglu", fake_fused)
+    result = _virtual_dense_down_partials(
+        Shaped((1, 6144)),
+        Shaped((6144, 6144)),
+        Shaped((48, 48)),
+        Shaped((6144, 6144)),
+        Shaped((48, 48)),
+        Shaped((6144, 6144)),
+        Shaped((48, 48)),
+        block_shape=(128, 128),
+        linear_interpret=False,
+    )
+    assert result.shape == (16, 1, 6144)
+    assert result.dtype == jnp.bfloat16
+    assert len(calls) == 16
+
+
 def test_strategy_nd_row0_forced_four_device_gather_is_local_and_exact() -> None:
     program = r'''
 import json
@@ -332,4 +368,71 @@ print(json.dumps({
         "all_gather_count": 1,
         "lane_replication": True,
         "shape": [4, 1, 6144],
+    }
+
+
+def test_strategy_nd_row0_forced_two_device_y_x_z_is_local_and_exact() -> None:
+    program = r'''
+import json
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from glm_tpu.greenfield.kernels.stage_local import (
+    _reduce_strategy_nd_row0_bf16_partials,
+    _strategy_nd_row0_bf16_reduce,
+)
+
+mesh = Mesh(np.asarray(jax.devices()), ("stage",))
+source = np.arange(2 * 16 * 6144, dtype=np.float32).reshape(2, 16, 1, 6144)
+source = jnp.asarray(np.sin(source / 37.0), dtype=jnp.bfloat16)
+sharded = jax.device_put(source, NamedSharding(mesh, P("stage", None, None, None)))
+
+def mapped(local):
+    reduced = _reduce_strategy_nd_row0_bf16_partials(
+        local[0], axis_name="stage", groups=((0, 1),)
+    )
+    return reduced[None, ...]
+
+execute = jax.shard_map(
+    mapped,
+    mesh=mesh,
+    in_specs=P("stage", None, None, None),
+    out_specs=P("stage", None, None),
+    check_vma=False,
+)
+lowered = jax.jit(execute).lower(sharded)
+actual = np.asarray(jax.jit(execute)(sharded))
+expected = np.asarray(
+    jax.jit(_strategy_nd_row0_bf16_reduce)(source.reshape(32, 1, 6144))
+)
+print(json.dumps({
+    "all_gather_count": lowered.as_text().count("stablehlo.all_gather"),
+    "all_reduce_count": lowered.as_text().count("stablehlo.all_reduce"),
+    "exact": bool(np.all(actual[0].view(np.uint16) == expected.view(np.uint16))),
+    "lane_replication": bool(np.all(actual == actual[0])),
+    "payload_present": "tensor<4x1x6144xbf16>" in lowered.as_text(),
+    "shape": list(actual.shape),
+}))
+'''
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    env["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result == {
+        "all_gather_count": 0,
+        "all_reduce_count": 1,
+        "exact": True,
+        "lane_replication": True,
+        "payload_present": True,
+        "shape": [2, 1, 6144],
     }

@@ -250,6 +250,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--oracle-npz-sha256", required=True)
     parser.add_argument("--warmup", type=int, default=1)
     parser.add_argument("--iterations", type=int, default=3)
+    parser.add_argument(
+        "--association",
+        choices=("lp2_single", "strategy_nd_y_x_z"),
+        default="lp2_single",
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--tensor-output", type=Path, required=True)
     parser.add_argument("--hlo-dir", type=Path, required=True)
@@ -284,6 +289,7 @@ def main() -> int:
     )
     from glm_tpu.greenfield.kernels.reference.rmsnorm import fused_add_rms_norm
     from glm_tpu.greenfield.kernels.stage_local import (
+        STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
         STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE,
         stage_local_dense_fp8_mapped,
     )
@@ -422,6 +428,11 @@ def main() -> int:
             linear_backend="pallas",
             precomputed_normalized=normalized_value,
             add_residual=False,
+            virtual_tp32_reduction_association=(
+                STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION
+                if args.association == "strategy_nd_y_x_z"
+                else None
+            ),
         )
         layer1_normalized, next_residual = fused_add_rms_norm(
             dense_update,
@@ -469,7 +480,9 @@ def main() -> int:
     optimized_hlo = compiled.as_text()
     _atomic_text(args.hlo_dir / "dense_boundary.stablehlo.mlir", stablehlo)
     _atomic_text(args.hlo_dir / "dense_boundary.optimized_hlo.txt", optimized_hlo)
-    hlo_contract = validate_pp16_dense_boundary_hlo(stablehlo, optimized_hlo)
+    hlo_contract = validate_pp16_dense_boundary_hlo(
+        stablehlo, optimized_hlo, association=args.association
+    )
     if not hlo_contract["passed"]:
         raise RuntimeError(f"PP16 dense boundary HLO failed: {hlo_contract}")
 
@@ -551,7 +564,8 @@ def main() -> int:
         expected_residual_bits, next_residual_bits
     )
     state_exact = bool(
-        normalized_comparison["elementwise_exact"]
+        dense_comparison["elementwise_exact"]
+        and normalized_comparison["elementwise_exact"]
         and residual_comparison["elementwise_exact"]
         and all(record["passed"] for record in determinism.values())
         and replica_agreement["passed"]
@@ -595,6 +609,7 @@ def main() -> int:
     )
     output = {
         "artifact_kind": "greenfield_pp16_lp2_dense_boundary_discriminator",
+        "association": args.association,
         "claim_scope": (
             "bounded real layer-0 dense/cross-layer arithmetic and exact HLO; "
             "no full decoder, DSA event-1, Gate-D, or performance claim"

@@ -69,6 +69,58 @@ def derive_expected_dense_boundary_bits(
     return dense_bits, carried_bits
 
 
+def replay_pp16_strategy_nd_y_x_z_bits(
+    dense_partial_bits: np.ndarray,
+) -> np.ndarray:
+    """Replay DB533 as local-y, one LP2-x combine, then local-z."""
+
+    bits = np.ascontiguousarray(dense_partial_bits)
+    if bits.dtype != np.uint16 or bits.shape != (4, 8, 1, 6144):
+        raise ValueError("PP16 StrategyND replay requires 32 sealed BF16 leaves")
+    partials = bits.reshape(32, 1, 6144).view(ml_dtypes.bfloat16)
+
+    def add(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+        return np.asarray(
+            left.astype(np.float32) + right.astype(np.float32),
+            dtype=ml_dtypes.bfloat16,
+        )
+
+    def reduce_four(values: np.ndarray, *, cross: bool) -> np.ndarray:
+        if cross:
+            return add(add(values[0], values[3]), add(values[1], values[2]))
+        return add(add(values[0], values[1]), add(values[2], values[3]))
+
+    owner_y_reduced = []
+    for owner in range(2):
+        physical_y_z = partials[owner * 16 : (owner + 1) * 16].reshape(
+            4, 4, 1, 6144
+        )
+        owner_y_reduced.append(
+            np.concatenate(
+                (
+                    reduce_four(physical_y_z[..., :2048], cross=False),
+                    reduce_four(
+                        physical_y_z[..., 2048:4096], cross=True
+                    ),
+                    reduce_four(physical_y_z[..., 4096:], cross=False),
+                ),
+                axis=-1,
+            )
+        )
+    x_reduced = add(owner_y_reduced[0], owner_y_reduced[1])
+    reduced = np.concatenate(
+        tuple(
+            reduce_four(
+                x_reduced[..., start : start + 256],
+                cross=bool((start // 256) % 2),
+            )
+            for start in range(0, 6144, 256)
+        ),
+        axis=-1,
+    )
+    return np.ascontiguousarray(reduced).view(np.uint16)
+
+
 def exact_bfloat16_bits(
     expected: np.ndarray, observed: np.ndarray
 ) -> dict[str, Any]:
@@ -101,8 +153,12 @@ def validate_pp16_dense_boundary_hlo(
     optimized_hlo: str,
     *,
     hidden_size: int = 6144,
+    association: str = "lp2_single",
 ) -> dict[str, Any]:
-    """Require one LP2 combine, one dense kernel, and no dead/global rows."""
+    """Require the selected LP2 dense association and no dead/global rows."""
+
+    if association not in {"lp2_single", "strategy_nd_y_x_z"}:
+        raise ValueError("unknown PP16 dense boundary association")
 
     module = parse_hlo_module(optimized_hlo)
     violations: list[str] = []
@@ -126,14 +182,19 @@ def validate_pp16_dense_boundary_hlo(
             (shape.dtype.lower(), shape.dimensions)
             for shape in collective.result_shapes
         }
+        expected_payload = (
+            (1, hidden_size)
+            if association == "lp2_single"
+            else (4, 1, hidden_size)
+        )
         if not any(
             dtype in {"bf16", "bfloat16"}
-            and dimensions == (1, hidden_size)
+            and dimensions == expected_payload
             for dtype, dimensions in payloads
         ):
             violations.append(
-                "LP2 combine lost the exact one-row hidden payload: "
-                f"{sorted(payloads)}"
+                "LP2 combine lost the exact association payload: "
+                f"expected={expected_payload} observed={sorted(payloads)}"
             )
     if module.num_partitions != 2:
         violations.append(
@@ -142,18 +203,55 @@ def validate_pp16_dense_boundary_hlo(
 
     kernel_name = (
         "greenfield_fp8_fused_block_swiglu_"
-        f"m8_h{hidden_size}_i{hidden_size}_o{hidden_size}"
+        f"m8_h{hidden_size}_i"
+        f"{hidden_size if association == 'lp2_single' else 384}"
+        f"_o{hidden_size}"
     )
     custom_calls = tuple(
-        line.strip()
-        for line in optimized_hlo.splitlines()
-        if 'custom_call_target="tpu_custom_call"' in line
+        instruction
+        for instruction in module.instructions
+        if 'custom_call_target="tpu_custom_call"' in instruction.raw_line
     )
-    kernel_count = sum(kernel_name in line for line in custom_calls)
-    if len(custom_calls) != 1 or kernel_count != 1:
+    kernel_count = sum(kernel_name in item.raw_line for item in custom_calls)
+    expected_kernel_count = 1 if association == "lp2_single" else 16
+    if (
+        len(custom_calls) != expected_kernel_count
+        or kernel_count != expected_kernel_count
+    ):
         violations.append(
             "PP16 dense kernel set drifted: "
-            f"custom_calls={len(custom_calls)} expected_kernel={kernel_count}"
+            f"custom_calls={len(custom_calls)} matching_kernel={kernel_count} "
+            f"expected={expected_kernel_count}"
+        )
+
+    entry_instructions = {
+        instruction.name: instruction
+        for instruction in module.instructions
+        if instruction.computation.startswith("ENTRY ")
+    }
+
+    def ancestors(names: tuple[str, ...]) -> set[str]:
+        pending = list(names)
+        result: set[str] = set()
+        while pending:
+            name = pending.pop()
+            if name in result:
+                continue
+            result.add(name)
+            instruction = entry_instructions.get(name)
+            if instruction is not None:
+                pending.extend(instruction.operand_names)
+        return result
+
+    custom_names = {item.name for item in custom_calls}
+    collective_ancestors = (
+        ancestors(collectives[0].operand_names) if len(collectives) == 1 else set()
+    )
+    missing_collective_inputs = sorted(custom_names - collective_ancestors)
+    if missing_collective_inputs:
+        violations.append(
+            "dense custom calls do not all feed the LP2 combine: "
+            f"{missing_collective_inputs}"
         )
 
     forbidden_shapes: list[dict[str, Any]] = []
@@ -218,9 +316,24 @@ def validate_pp16_dense_boundary_hlo(
             "optimized HLO lost the three one-row boundary outputs: "
             f"{dict(root_shapes)}"
         )
+    root_ancestors = (
+        ancestors(entry_roots[0].operand_names)
+        if len(entry_roots) == 1
+        else set()
+    )
+    collective_reaches_root = bool(
+        len(collectives) == 1 and collectives[0].name in root_ancestors
+    )
+    if not collective_reaches_root:
+        violations.append("LP2 combine does not feed the returned boundary")
 
     return {
         "collectives": [item.to_dict() for item in collectives],
+        "association": association,
+        "collective_input_custom_call_count": len(
+            custom_names & collective_ancestors
+        ),
+        "collective_reaches_root": collective_reaches_root,
         "custom_call_count": len(custom_calls),
         "expected_kernel_name": kernel_name,
         "forbidden_shapes": forbidden_shapes,

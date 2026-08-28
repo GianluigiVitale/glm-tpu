@@ -61,6 +61,26 @@ Remote `SUCCESS` is absent, DB remains integrity-ok at max run 564 with zero PP1
 and both locks are free. A second invocation exercised the already-sealed verification path and
 exited cleanly without republication. Never rerun the TPU diagnostic merely to repair its archive.
 
+The next association is derived directly from DB533 rather than guessed. Selective real-runtime
+comparison proves PP16 slot 0 is PP8 slots 0+1 and PP16 slot 1 is PP8 slots 2+3 for all gate/up/down
+weights and scales: 12/12 comparisons are byte-identical, with intermediate axis 0 for gate/up and
+axis 1 for down. Under DB533's physical mapping, owner slot is physical `x` and each owner's
+consecutive local rank is `y*4+z`. The exact distributed schedule is therefore local `y`, one LP2
+`x`, local `z`. Replaying it over the sealed DB548 32 partials gives zero mismatches and SHA
+`efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc`.
+
+The default-off implementation generalizes only the greenfield virtual-partial helper to 8/16
+owners. PP8's existing 8xLP4 gather path is unchanged. PP16 emits sixteen I384 fused calls per
+owner, performs local column-dependent `y` trees, one `bf16[4,1,6144]` `{0,1}` all-reduce, then
+local alternating-256 `z` trees. A forced-two-device CPU graph is bitwise equal to the full DB533
+replay, contains exactly one all-reduce and no all-gather; the existing forced-four PP8 test remains
+green. The HLO contract rejects a single I6144 call, any other collective/payload, any 32-row hidden
+shape or fewer/more than 16 exact I384 calls. Dense update is now explicitly part of the success
+predicate in addition to carried/normalized state, determinism and replica agreement. Future
+NONEXACT/HLO failures publish only a sealed exact diagnostic set and terminal `REJECTED`, never DB
+or `SUCCESS`. Twenty-two focused tests pass across isolated CPU processes. This is authorization for
+one bounded protected discriminator after Fable review, not numerical, Gate-D or performance proof.
+
 ## 2026-08-28 10:50--11:05 UTC — transport null recorded; 8K preflight is restart-safe
 
 Recovered terminal DB564 rather than repeating it. The exact packed PP8 stage boundary reduces

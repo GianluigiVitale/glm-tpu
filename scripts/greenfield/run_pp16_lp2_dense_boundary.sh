@@ -28,13 +28,18 @@ readonly ORACLE_SUCCESS_SHA=6cac897695fc1e78d0a10c0e36c993cffd281c6a88721d8955fa
   echo "set GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_MODE=bounded" >&2
   exit 2
 }
+readonly ASSOCIATION=${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_ASSOCIATION:-off}
+[[ $ASSOCIATION == strategy_nd_y_x_z ]] || {
+  echo "set GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_ASSOCIATION=strategy_nd_y_x_z" >&2
+  exit 2
+}
 command -v gsutil >/dev/null 2>&1 && gsutil help rsync >/dev/null 2>&1 || {
   echo "gsutil rsync is required for authenticated failure archival" >&2
   exit 2
 }
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_TAG:-greenfield_pp16_lp2_dense_boundary_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_TAG:-greenfield_pp16_lp2_strategy_nd_dense_boundary_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 readonly PIN TAG RUN_DIR REMOTE_PREFIX
@@ -72,6 +77,87 @@ strict_census() {
 }
 
 post_census_done=0
+terminal_success_done=0
+
+rollback_provisional_db() {
+  /home/gianl/vllm-env/bin/python - "$RESULTS_DB" "$RUN_DIR" \
+    "$TAG" "$PIN" >"$RUN_DIR/provisional_db_rollback.txt" <<'PY'
+import json
+from pathlib import Path
+import sqlite3
+import sys
+
+db_path, run_dir_raw, tag, pin = sys.argv[1:]
+run_dir = Path(run_dir_raw)
+run_id_path = run_dir / "results_db_run_id.txt"
+recorded = int(run_id_path.read_text()) if run_id_path.is_file() else None
+connection = sqlite3.connect(db_path)
+connection.execute("BEGIN IMMEDIATE")
+candidates = []
+for row in connection.execute(
+    "SELECT run_id, model, model_revision, env_json, note FROM runs WHERE model = ?",
+    ("zai-org/GLM-5.2-FP8:greenfield-pp16-lp2-dense-boundary",),
+):
+    try:
+        environment = json.loads(row[3])
+    except (TypeError, json.JSONDecodeError):
+        continue
+    if (
+        environment.get("greenfield_run_tag") == tag
+        and environment.get("greenfield_code_hash") == pin
+    ):
+        candidates.append((row, environment))
+if not candidates:
+    connection.rollback()
+    print("NO_PROVISIONAL_DB_RUN")
+    raise SystemExit(0)
+if len(candidates) != 1:
+    connection.rollback()
+    raise SystemExit("refusing ambiguous PP16 boundary DB rollback")
+(run, environment), = candidates
+run_id = int(run[0])
+items = connection.execute(
+    "SELECT benchmark, item_id, correct FROM items WHERE run_id=? ORDER BY id",
+    (run_id,),
+).fetchall()
+summaries = connection.execute(
+    "SELECT benchmark, metric, value FROM summary WHERE run_id=? ORDER BY id",
+    (run_id,),
+).fetchall()
+if (
+    (recorded is not None and recorded != run_id)
+    or run[1] != "zai-org/GLM-5.2-FP8:greenfield-pp16-lp2-dense-boundary"
+    or run[2] != "db548-position8155-pp16-final-runtime-v1"
+    or run[4] != "Protected bounded PP16 real dense/cross-layer discriminator."
+    or environment.get("GLM_ENGINE") != "greenfield_pp16_lp2_dense_boundary"
+    or environment.get("greenfield_run_tag") != tag
+    or environment.get("greenfield_code_hash") != pin
+    or environment.get("source_db_run_id") != 548
+    or environment.get("association") != "strategy_nd_y_x_z"
+    or items not in (
+        [],
+        [("greenfield_pp16_lp2_dense_boundary", "layer0_to_layer1_position8155_lp2", 1)],
+    )
+    or summaries not in (
+        [],
+        [("greenfield_pp16_lp2_dense_boundary", "bitwise_layer1_state_exact", 1.0)],
+    )
+):
+    connection.rollback()
+    raise SystemExit("refusing non-identical PP16 boundary DB rollback")
+connection.execute("DELETE FROM summary WHERE run_id=?", (run_id,))
+connection.execute("DELETE FROM items WHERE run_id=?", (run_id,))
+connection.execute("DELETE FROM runs WHERE run_id=?", (run_id,))
+if connection.execute(
+    "SELECT count(*) FROM runs WHERE run_id=?", (run_id,)
+).fetchone()[0]:
+    connection.rollback()
+    raise SystemExit("PP16 boundary DB rollback did not remove its run")
+connection.commit()
+print(f"ROLLED_BACK_PROVISIONAL_DB_RUN={run_id}")
+PY
+}
+
 verify_failure_diagnostic() {
   local expected relative observed ledger_sha remote_ledger_sha
   ledger_sha=$(sha256sum "$RUN_DIR/diagnostic.evidence.sha256" | awk '{print $1}')
@@ -87,19 +173,34 @@ verify_failure_diagnostic() {
       sha256sum | awk '{print $1}')
     [[ $expected == "$observed" ]] || return 1
   done <"$RUN_DIR/diagnostic.evidence.sha256"
+  diff -u \
+    <(
+      {
+        echo "$REMOTE_PREFIX/diagnostic/diagnostic.evidence.sha256"
+        while read -r _ relative; do
+          relative=${relative#\*}
+          relative=${relative#./}
+          echo "$REMOTE_PREFIX/diagnostic/$relative"
+        done <"$RUN_DIR/diagnostic.evidence.sha256"
+      } | sort
+    ) \
+    <(gcloud storage ls --recursive "$REMOTE_PREFIX/diagnostic/**" 2>/dev/null | sort) \
+    >/dev/null
 }
 
 upload_failure_diagnostic() {
   local original_status=$1 attempt
   printf 'original_status=%s\n' "$original_status" >"$RUN_DIR/failure_status.txt"
+  cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   (
     cd "$RUN_DIR"
     find . -type f ! -name orchestrator.log \
-      ! -name diagnostic.evidence.sha256 -print0 |
+      ! -name diagnostic.evidence.sha256 ! -name REJECTED -print0 |
       sort -z | xargs -0 sha256sum
   ) >"$RUN_DIR/diagnostic.evidence.sha256"
   for attempt in 1 2; do
-    if gsutil -m rsync -r "$RUN_DIR" \
+    if gsutil -m rsync -r \
+      -x '(^|/)orchestrator.log$|(^|/)REJECTED$' "$RUN_DIR" \
       "$REMOTE_PREFIX/diagnostic" >/dev/null 2>&1 &&
       verify_failure_diagnostic; then
       return 0
@@ -108,12 +209,53 @@ upload_failure_diagnostic() {
   return 1
 }
 
+seal_failure_rejected() {
+  local original_status=$1 local_sha remote_sha
+  /home/gianl/vllm-env/bin/python - \
+    "$RUN_DIR/runner.json" "$RUN_DIR/diagnostic.evidence.sha256" \
+    "$RUN_DIR/REJECTED" "$TAG" "$PIN" "$REMOTE_PREFIX" \
+    "$original_status" <<'PY'
+from hashlib import sha256
+import json
+from pathlib import Path
+import sys
+
+runner = Path(sys.argv[1])
+ledger = Path(sys.argv[2])
+output = Path(sys.argv[3])
+record = {
+    "artifact_kind": "greenfield_pp16_lp2_dense_boundary_rejection",
+    "run_tag": sys.argv[4],
+    "code_hash": sys.argv[5],
+    "remote_prefix": sys.argv[6],
+    "original_status": int(sys.argv[7]),
+    "runner_sha256": sha256(runner.read_bytes()).hexdigest() if runner.is_file() else None,
+    "diagnostic_ledger_sha256": sha256(ledger.read_bytes()).hexdigest(),
+    "performance_claim": False,
+    "gate_d_passed": False,
+    "status": "REJECTED",
+}
+raw = json.dumps(record, allow_nan=False, separators=(",", ":"), sort_keys=True).encode()
+record["rejected_sha256"] = sha256(raw).hexdigest()
+output.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
+PY
+  gcloud storage cp --no-clobber "$RUN_DIR/REJECTED" \
+    "$REMOTE_PREFIX/REJECTED" >/dev/null || return 1
+  local_sha=$(sha256sum "$RUN_DIR/REJECTED" | awk '{print $1}')
+  remote_sha=$(gcloud storage cat "$REMOTE_PREFIX/REJECTED" 2>/dev/null |
+    sha256sum | awk '{print $1}')
+  [[ $local_sha == "$remote_sha" ]]
+}
+
 on_exit() {
-  local status=$? census_status=0
+  local status=$? census_status=0 rollback_status=0
   if [[ $post_census_done -eq 0 ]]; then
     strict_census failure_exit || census_status=$?
   fi
   if [[ $status -ne 0 ]]; then
+    if [[ $terminal_success_done -eq 0 ]]; then
+      rollback_provisional_db || rollback_status=$?
+    fi
     say "FAILED status=$status; compact diagnostic evidence retained"
     if ! upload_failure_diagnostic "$status"; then
       say "DIAGNOSTIC_UPLOAD_FAILED after two attempts"
@@ -121,11 +263,22 @@ on_exit() {
       exit 70
     fi
     say "DIAGNOSTIC_UPLOAD_OK verified exact remote hashes"
+    if [[ $rollback_status -ne 0 ]]; then
+      say "PROVISIONAL_DB_ROLLBACK_FAILED status=$rollback_status"
+      trap - EXIT
+      exit 73
+    fi
     if [[ $census_status -ne 0 ]]; then
       say "FAILURE_CENSUS_FAILED status=$census_status"
       trap - EXIT
       exit 71
     fi
+    if ! seal_failure_rejected "$status"; then
+      say "REJECTED_SEAL_FAILED"
+      trap - EXIT
+      exit 72
+    fi
+    say "REJECTED_SEALED terminal marker verified; no SUCCESS or DB row"
   fi
 }
 
@@ -136,14 +289,14 @@ flock -n 9 || {
 }
 exec 8>/home/gianl/.glm-tpu-rsync.lock
 flock 8
-trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN source_db=548 mesh=LP2 warmup=1 iterations=3"
+say "RUN_DIR=$RUN_DIR PIN=$PIN source_db=548 mesh=LP2 association=$ASSOCIATION warmup=1 iterations=3"
 if gcloud storage ls "$REMOTE_PREFIX/**" >"$RUN_DIR/remote_vacancy.txt" 2>&1; then
   say "ABORT: append-only remote prefix already exists"
   exit 2
 fi
 echo "VACANT $REMOTE_PREFIX" >"$RUN_DIR/remote_vacancy.txt"
+trap on_exit EXIT
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUNTIME_ROOT" "$RUNTIME_REMOTE" "$RUNTIME_SUCCESS_SHA" \
@@ -216,6 +369,7 @@ started=$(date +%s)
       --runtime-manifest-sha256 "$RUNTIME_MANIFEST_SHA" \
       --oracle-npz "$ORACLE_NPZ" \
       --oracle-npz-sha256 "$ORACLE_NPZ_SHA" \
+      --association "$ASSOCIATION" \
       --warmup 1 --iterations 3 \
       --output "$RUN_DIR/runner.json" \
       --tensor-output "$RUN_DIR/dense_boundary.npz" \
@@ -244,6 +398,10 @@ run_dir,pin,db_path,repo,elapsed=sys.argv[1:]
 run_dir=Path(run_dir); runner=json.loads((run_dir/'runner.json').read_text())
 if runner.get('status')!='SUCCESS' or runner.get('code_hash')!=pin:
     raise SystemExit('runner identity/exactness failed')
+if runner.get('association')!='strategy_nd_y_x_z':
+    raise SystemExit('PP16 dense association drifted')
+if not runner['dense_update_comparison']['elementwise_exact']:
+    raise SystemExit('PP16 dense update is not bitwise exact')
 if not runner['layer1_comparison']['elementwise_exact']:
     raise SystemExit('PP16 layer-1 normalized row is not bitwise exact')
 if not runner['next_residual_comparison']['elementwise_exact']:
@@ -267,7 +425,9 @@ run_id=pv.start_run(
     env={
         'GLM_ENGINE':'greenfield_pp16_lp2_dense_boundary',
         'greenfield_code_hash':pin,
+        'greenfield_run_tag':run_dir.name,
         'source_db_run_id':548,
+        'association':runner['association'],
         'source':runner['source'],
         'runtime':runner['runtime'],
         'physical_group':runner['physical_group'],
@@ -277,6 +437,7 @@ run_id=pv.start_run(
     harness_repo=repo,
     fork_repo=None,
 )
+(run_dir/'results_db_run_id.txt').write_text(f'{run_id}\n')
 pv.record_item(
     conn,run_id,
     benchmark='greenfield_pp16_lp2_dense_boundary',
@@ -316,7 +477,7 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
   find hlo -type f -print0 | sort -z | xargs -0 sha256sum
   sha256sum runner.json runner.log dense_boundary.npz source_identity.json \
     summary.json results_ckpt.db census_pre.txt census_post.txt sync.txt \
-    remote_vacancy.txt orchestrator.sealed.log
+    remote_vacancy.txt orchestrator.sealed.log results_db_run_id.txt
 ) >"$RUN_DIR/evidence.sha256"
 (cd "$RUN_DIR" && sha256sum -c evidence.sha256 >/dev/null)
 
@@ -328,6 +489,7 @@ gcloud storage cp --no-clobber \
   "$RUN_DIR/evidence.sha256" "$RUN_DIR/census_pre.txt" \
   "$RUN_DIR/census_post.txt" "$RUN_DIR/sync.txt" \
   "$RUN_DIR/remote_vacancy.txt" "$RUN_DIR/orchestrator.sealed.log" \
+  "$RUN_DIR/results_db_run_id.txt" \
   "$REMOTE_PREFIX/" >/dev/null
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
@@ -355,9 +517,10 @@ gcloud storage cp --no-clobber "$RUN_DIR/SUCCESS" \
 local_success_sha=$(sha256sum "$RUN_DIR/SUCCESS" | awk '{print $1}')
 remote_success_sha=$(gcloud storage cat "$REMOTE_PREFIX/SUCCESS" | sha256sum | awk '{print $1}')
 [[ $local_success_sha == "$remote_success_sha" ]]
+terminal_success_done=1
+trap - EXIT
 
 db_run=$(/home/gianl/vllm-env/bin/python -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["results_db_run_id"])' \
   "$RUN_DIR/summary.json")
 say "SUCCESS DB=$db_run archive=$REMOTE_PREFIX"
-trap - EXIT

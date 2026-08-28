@@ -58,6 +58,22 @@
   `performance_claim=false` and `gate_d_passed=false`; remote `SUCCESS` is absent, DB remains
   564/zero PP16 rows, both locks are free, and an immediate already-sealed replay verified the
   archive idempotently. Do not rerun this rejected formulation.
+- The bounded successor now implements the exact DB533 phase decomposition instead of changing
+  chip count or transporting 32 partial rows. A read-only real-checkpoint comparison proves each
+  PP16 owner is the byte-exact concatenation of its two PP8 owners for all six layer-0 dense
+  tensors (12/12 owner/tensor comparisons): gate/up weights and scales concatenate on intermediate
+  rows; down weights and scales concatenate on intermediate columns. The two PP16 owners therefore
+  hold consecutive model ranks 0--15 and 16--31. Each computes sixteen already-rounded I384
+  partials, reduces DB533's `y` phase locally, performs one LP2 `x` combine of
+  `bf16[4,1,6144]`, then completes `z` locally. It never gathers a 32-row partial tensor.
+- Independent NumPy replay over the sealed DB548 leaves is bitwise exact at `0/6144` with accepted
+  SHA `efde8532...b4fc`. A forced-two-device CPU shard-map is also bitwise equal to the existing
+  full DB533 replay and lowers to exactly one all-reduce, zero all-gathers and the four-row payload;
+  the unchanged PP8 LP4 gather test still passes. The protected runner now requires 16 exact I384
+  fused calls, the one LP2 combine, dense/carried/normalized exactness, determinism and replica
+  agreement. The mode is default-off and its future failure path seals an exact diagnostic set plus
+  terminal `REJECTED`; 22 focused tests pass in isolated CPU processes. Exact next: one same-chat
+  Fable-max audit of this diff/evidence, commit/push/mirror, then one bounded protected run only.
 
 ## 2026-08-28 adversarial review policy moves to one persistent Fable 5 Max chat
 

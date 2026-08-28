@@ -468,6 +468,17 @@
       "reason": "Protected pin 1f5c88e passes the exact physical devices 0/1 HLO/locality contract and all three samples are deterministic with bitwise replica agreement. It is nevertheless NONEXACT: dense update, carried residual and layer-1 normalized rows differ in 3890/6144, 2289/6144 and 2820/6144 values. This rejects only the tested two half-intermediate BF16 partials plus one LP2 sum as a replacement for DB533's accepted 32-partial association; it does not reject PP16_LP2. Preserve the terminal 16-object REJECTED archive with recovery ledger 9bad7c5968b31de5290114e10b424cdd27751dfca196510fc53590bce204f328, never rerun this arm, and never treat its timing as plan performance."
     },
     {
+      "id": "greenfield-pp16-lp2-strategy-nd-y-x-z-successor",
+      "category": "bounded exact-association successor",
+      "source_repo": "glm-tpu greenfield PP16/PP8 final runtimes plus DB548/DB533 evidence",
+      "source_pin": "PP16 manifest b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab / PP8 manifest 123394906a153238e464fc096b626c77996b7cf22b95077b9377b8dcafbe699a / DB548 f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298 / DB533 physical association",
+      "source_paths": ["glm_tpu/greenfield/kernels/stage_local.py", "glm_tpu/greenfield/benchmarking/pp16_dense_boundary.py", "scripts/greenfield/probe_pp16_lp2_dense_boundary.py", "scripts/greenfield/run_pp16_lp2_dense_boundary.sh", "tests/greenfield/benchmarking/test_pp16_dense_boundary.py", "tests/greenfield/kernels/test_stage_local_virtual_tp32.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/probe_pp16_lp2_dense_boundary.py", "scripts/greenfield/run_pp16_lp2_dense_boundary.sh"],
+      "gate": "D",
+      "reason": "Real selective comparison proves all 12 PP16 owner/tensor values are byte-exact concatenations of paired PP8 owners. The DB533 physical mapping makes owner slot x and local rank y*4+z, so the successor computes 16 accepted-granularity I384 partials per owner, reduces y locally, performs one LP2 all-reduce of bf16[4,1,6144], and reduces z locally. Sealed DB548 replay is exact 0/6144 at efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc; forced-two-device CPU execution matches the full DB533 replay with one all-reduce and zero all-gathers. This authorizes one default-off reviewed protected discriminator and makes no TPU numerical, Gate-D or performance claim."
+    },
+    {
       "id": "greenfield-layer0-attention-schedule-discriminator",
       "category": "bounded diagnostic evidence",
       "source_repo": "glm-tpu greenfield runtime and protected artifacts",

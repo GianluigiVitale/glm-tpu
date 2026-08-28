@@ -10,6 +10,11 @@ latency, Gate D or plan performance; no accepted performance standing changes. I
 `REJECTED` archive is 16 objects / 241,003 bytes with no DB row or `SUCCESS`; archival completeness
 does not promote the bounded timing.
 
+The successor local-y / LP2-x / local-z association has no TPU timing yet. Its forced CPU graph and
+sealed-leaf replay are correctness/HLO authorization only. Sixteen fused I384 calls and one
+four-row LP2 combine may be faster or slower than the rejected 3.823499-ms single-I6144 component;
+do not estimate, compare, or promote it before a protected exact run.
+
 DB564 rejects packed PP8 boundary transport despite exactness: reducing 16 HLO permutes to eight
 regresses fleet p50/p99 from `0.412015/0.578189 ms` to `0.550720/0.762192 ms` over 200 warmups and
 1,000 synchronized samples. This is a bounded mechanism result, not token latency. The existing

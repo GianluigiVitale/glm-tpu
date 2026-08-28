@@ -269,20 +269,35 @@ def _virtual_dense_down_partials(
     block_shape: tuple[int, int],
     linear_interpret: bool,
 ) -> Any:
-    """Return eight already-rounded I384 fused-SwiGLU down partials."""
+    """Return 8/16 already-rounded I384 fused-SwiGLU down partials."""
 
-    if (
-        normalized.shape != (1, 6144)
-        or gate_bits.shape != (3072, 6144)
-        or block_shape != (128, 128)
-    ):
+    if normalized.shape != (1, 6144) or block_shape != (128, 128):
         raise ValueError(
-            "virtual dense partials require the exact GLM PP8 geometry"
+            "virtual dense partials require the exact GLM decode geometry"
         )
-    virtual_intermediate = (
-        gate_bits.shape[0] // _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER
-    )
+    virtual_intermediate = 384
+    virtual_shards = gate_bits.shape[0] // virtual_intermediate
+    if virtual_shards not in (8, 16):
+        raise ValueError("virtual dense partials require PP8 or PP16 ownership")
     virtual_scale_intermediate = virtual_intermediate // block_shape[0]
+    expected = {
+        "gate_bits": (virtual_shards * virtual_intermediate, 6144),
+        "gate_scale": (virtual_shards * virtual_scale_intermediate, 48),
+        "up_bits": (virtual_shards * virtual_intermediate, 6144),
+        "up_scale": (virtual_shards * virtual_scale_intermediate, 48),
+        "down_bits": (6144, virtual_shards * virtual_intermediate),
+        "down_scale": (48, virtual_shards * virtual_scale_intermediate),
+    }
+    values = {
+        "gate_bits": gate_bits,
+        "gate_scale": gate_scale,
+        "up_bits": up_bits,
+        "up_scale": up_scale,
+        "down_bits": down_bits,
+        "down_scale": down_scale,
+    }
+    if any(values[name].shape != shape for name, shape in expected.items()):
+        raise ValueError("virtual dense partial ownership geometry drifted")
     return jnp.stack(
         tuple(
             fp8_fused_block_swiglu(
@@ -327,7 +342,7 @@ def _virtual_dense_down_partials(
                 ),
                 interpret=linear_interpret,
             )
-            for shard in range(_VIRTUAL_DCP_SHARDS_PER_PP8_OWNER)
+            for shard in range(virtual_shards)
         ),
         axis=0,
     )
@@ -807,7 +822,59 @@ def _reduce_strategy_nd_row0_bf16_partials(
     axis_name: str,
     groups: tuple[tuple[int, ...], ...],
 ) -> Any:
-    """Gather four PP8 owners, then replay the accepted row-zero M32 tree."""
+    """Replay the accepted row-zero M32 tree inside an LP4 or LP2 stage."""
+
+    if local_partials.shape == (16, 1, 6144):
+        if groups is None or any(len(group) != 2 for group in groups):
+            raise ValueError(
+                "PP16 StrategyND reduction requires explicit LP2 groups"
+            )
+
+        def add(left: Any, right: Any) -> Any:
+            return lax.optimization_barrier(
+                (left + right).astype(jnp.bfloat16)
+            )
+
+        def reduce_four(values: Any, *, cross: bool) -> Any:
+            if cross:
+                return add(add(values[0], values[3]), add(values[1], values[2]))
+            return add(add(values[0], values[1]), add(values[2], values[3]))
+
+        # Each PP16 owner stores 16 consecutive model ranks.  DB533's
+        # physical x coordinate is the owner slot, while local rank
+        # ``y * 4 + z`` supplies the y/z coordinates.  Reduce y locally,
+        # combine x once over LP2, then finish z locally.  This reproduces the
+        # accepted y->x->z tree without gathering a 32-row partial tensor.
+        physical_y_z = local_partials.reshape(4, 4, 1, 6144)
+        y_reduced = jnp.concatenate(
+            (
+                reduce_four(physical_y_z[..., :2048], cross=False),
+                reduce_four(
+                    physical_y_z[..., 2048:4096], cross=True
+                ),
+                reduce_four(physical_y_z[..., 4096:], cross=False),
+            ),
+            axis=-1,
+        )
+        with jax.named_scope("greenfield_strategy_nd_row0_lp2_x_combine"):
+            x_reduced = lax.psum(
+                y_reduced,
+                axis_name=axis_name,
+                axis_index_groups=groups,
+            )
+        x_reduced = lax.optimization_barrier(
+            x_reduced.astype(jnp.bfloat16)
+        )
+        return jnp.concatenate(
+            tuple(
+                reduce_four(
+                    x_reduced[..., start : start + 256],
+                    cross=bool((start // 256) % 2),
+                )
+                for start in range(0, 6144, 256)
+            ),
+            axis=-1,
+        )
 
     if local_partials.shape != (8, 1, 6144):
         raise ValueError(
@@ -844,8 +911,13 @@ def _reduce_virtual_tp32_bf16_partials(
 
     if association not in _SUPPORTED_VIRTUAL_TP32_REDUCTION_ASSOCIATIONS:
         raise ValueError("virtual TP32 reduction association is unknown")
-    if groups is None or any(len(group) != 4 for group in groups):
-        raise ValueError("virtual TP32 reduction requires explicit LP4 groups")
+    local_shards = local_partials.shape[0]
+    if groups is None or any(
+        len(group) * local_shards != 32 for group in groups
+    ):
+        raise ValueError(
+            "virtual TP32 reduction must preserve exactly 32 virtual ranks"
+        )
     if association == STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION:
         return _reduce_strategy_nd_row0_bf16_partials(
             local_partials,
