@@ -7,12 +7,20 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 
 - The PP16 final-layout y-x-z run closes all upstream layer-0 arithmetic in the live two-chip graph:
   dense update and carried residual are bitwise exact, while only the final normalized row repeats
-  DB549 at `1,073/6,144` mismatches and SHA `229dc8ac...812f`. The rejected graph co-owns carried
-  state with the scalar reduction and leaves the norm-weight output in a detached one-row fusion.
-  Do not try a two-row/device-extent surrogate: geometry-only and true-M1 Pallas arms are already
-  frozen. Acquire exactly one logical-row graph that separates the reduction source from a direct
-  multi-output normalized/carried output owner. Compile with zero samples and empty pins, preserve
-  HLO, refuse before arithmetic, then build the exact value-flow/fusion validator from that graph.
+  DB549 at `1,073/6,144` mismatches and SHA `229dc8ac...812f`. The one-logical-row output-ownership
+  acquisition at `d1354ea` changed StableHLO but optimized to the same live boundary: tuple-owned
+  carried state plus scalar, then detached rsqrt and normalized-output fusions. It is a zero-sample,
+  terminal `REJECTED` acquisition with optimized/StableHLO SHAs `8d4f1cdf...e9036` /
+  `0db3e6e...79123f`; never execute or repeat it.
+- Offline replay disproves a variance/scalar-tree successor. FP32 inverse `178.59491`
+  (`0x4332984c`) plus one final BF16 round reproduces rejected TPU SHA `229dc8ac...812f` exactly;
+  an intermediate BF16 round reproduces frozen Pallas SHA `28b7db46...2c20`. Accepted SHA
+  `9936ee1e...d3039` admits no global scalar under either tested one-row formula. Freeze scalar
+  association, output ownership, layout coercion, true-M1 Pallas, feature-tiled and native-XLA
+  bitwise-equivalence routes. Gate D remains open and may resume only through a genuinely new legal
+  one-row topology-local architecture candidate: internal rows may use the documented bounded
+  comparison, but raw tokens, DSA selected sets/tie order, integrity, HLO/locality, HBM, trace and
+  profiler-free wall remain exact. Do not rerun unchanged PP8/WS32 8K paths with sealed DSA drift.
 - Treat empty optional evidence directories as absent, not as recursive-copy operands. Archive a
   file tree with `gcloud storage rsync` (without delete) before building the exact remote ledger;
   keep DB publication provisional until terminal `SUCCESS`, and recover a fully validated model

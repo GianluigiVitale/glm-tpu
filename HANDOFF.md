@@ -2,6 +2,33 @@
 
 **Updated:** 2026-08-28 UTC
 
+## 2026-08-28 output-ownership acquisition rejects; Gate D returns to its end-to-end contract
+
+- The zero-sample PP16 acquisition at pushed pin `d1354ea` is terminally `REJECTED`, with no
+  arithmetic, warmup, timing, `SUCCESS`, DB row, Gate-D or performance claim and authenticated 8/8
+  cleanup. Its source StableHLO changed as requested, but TPU optimization erased the ownership
+  distinction: the live boundary remains isomorphic to rejected pin `3c3426d`, with a tuple fusion
+  owning carried BF16 state plus the F32 scalar, followed by detached rsqrt and normalized-output
+  fusions. Optimized/StableHLO/acquisition SHAs are `8d4f1cdf...e9036` /
+  `0db3e6e...79123f` / `e1207052...709c8`. Preserve the exact same-region archive at
+  `greenfield_pp16_lp2_final_layout_output_ownership_acquisition_20260828T172559932712022Z` and do
+  not execute or repeat this source-level ownership arm.
+- Offline replay from sealed DB548/DB550 bytes disproves the proposed scalar/variance-tree
+  successor. The ordinary FP32 inverse is `178.59491` (`0x4332984c`). Rounding the normalized row
+  before applying the norm weight reproduces the frozen readable/Pallas SHA `28b7db46...2c20`;
+  one fused FP32 multiply followed by one BF16 output round reproduces rejected TPU SHA
+  `229dc8ac...812f` exactly. Accepted SHA `9936ee1e...d3039` has no global-scalar solution under
+  either tested one-row formula. The missing property is weighted-output schedule/geometry, not
+  variance association; no variance tree can recover the accepted row.
+- Persistent Fable reviewed the broad Gate-D blockage, then reached its session limit while
+  receiving this correction. The goal-authorized Sol fallback returned `BLOCK d1354ea NUMERICAL
+  DEPLOY`: freeze all true-M1 Pallas, feature-tiled, native-XLA, layout-coercion, scalar-tree and
+  output-ownership variants. Gate D remains open. Resume only with a genuinely new legal one-row,
+  topology-local architecture-level candidate, applying bounded internal tensor comparison while
+  keeping raw tokens, exact DSA selected sets/tie order, state/cache integrity, HLO/locality, HBM,
+  trace and profiler-free wall exact. Unchanged PP8/WS32 8K retries remain forbidden because their
+  current DSA drift is already sealed.
+
 ## 2026-08-28 PP16 final-layout leaves and y-x-z tree pass; output ownership remains
 
 - Protected tag `greenfield_pp16_lp2_final_layout_strategy_nd_dense_boundary_`
