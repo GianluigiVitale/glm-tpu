@@ -5,6 +5,20 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 
 ## Current boundary
 
+- The only admitted architecture successor is PP16 feature2 persistence: each device keeps one
+  ordered `[1,3072]` half of both dense update and its input residual, transported together as local
+  `[2,1,3072]` (global `[32,2,1,3072]`), with one local FP32 scalar RMS reduction, one
+  completed-normalized LP2 gather, and two slot-preserving 16-stage transport rings. The carried
+  output is computed once and separately pinned to DB550 SHA `35a601b7...044c`; it must never be
+  fed back as the input residual, which would double-add dense. The first
+  decision-capable run must
+  generate its own layer-1 query and all 8,156 layer-1 index keys, because accepted top-k output
+  cannot rescore candidate query/key state. Stop before layer-1 attention output/MLP/dense and all
+  later layers. Exact manifest/header derivation selects 39 ranges and 1,199,760,512 weight bytes
+  per owner; the selective state upper bound including cache/other allowance is 1,257,459,584
+  bytes/device. A norm-only replay is
+  already rejected offline and cannot authorize metal. Forced CPU/StableHLO and manifest checks are
+  scaffold evidence only; Gate D remains open until an exact complete protected 8K decoder.
 - The PP16 final-layout y-x-z run closes all upstream layer-0 arithmetic in the live two-chip graph:
   dense update and carried residual are bitwise exact, while only the final normalized row repeats
   DB549 at `1,073/6,144` mismatches and SHA `229dc8ac...812f`. The one-logical-row output-ownership

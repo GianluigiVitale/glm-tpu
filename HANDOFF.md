@@ -2,6 +2,38 @@
 
 **Updated:** 2026-08-28 UTC
 
+## 2026-08-28 PP16 feature2 architecture scaffold admitted; key history is the blocker
+
+- The persistent Fable 5 Max chat was invoked at the owner-requested checkpoint with the complete
+  Gate-D blockage and returned only `You've hit your session limit · resets 9:40pm (UTC)`. Per
+  `goal.md`, the same bounded evidence went to the existing independent Sol reviewer, which returned
+  `ADMIT FEATURE2 SCAFFOLD`. This is a no-TPU implementation verdict, not numerical authorization.
+- The admitted candidate keeps both dense update and its input residual feature-sharded: each PP16
+  device owns one ordered half of each input row and transports them together as one local
+  `bf16[2,1,3072]` payload (global device-shaped state `[32,2,1,3072]`). Forced-two StableHLO has
+  exactly one `{0,1}` FP32 scalar RMS reduction and separately rounds the accepted carried output.
+  DB550 pins dense/input/output SHAs `efde8532...b4fc` / `a105fdbd...f8e` / `35a601b7...044c`;
+  packing the output as the second input would double-add dense and is forbidden. The graph has
+  one post-normalization `{0,1}` BF16 `[1,3072] -> [1,6144]` gather. Forced-32 StableHLO has
+  exactly 16 dependent BF16 permutes over two slot-preserving stage rings, with no host marker,
+  extra collective, batch-32 row, `6144` transport intermediate or root bypass.
+- The sealed PP16 manifest `b385458f...6bab` directly proves stage-0 owners 0/1 already contain
+  identical layer-1 full-N82 weight/scale tensors at inferred shapes `[32,6144,82]` /
+  `[32,48,82]`, SHAs `6e8b4efd...855d` / `3ca2712f...11cc`, each derived only from its own source
+  file. No N82 weight gather or repack is needed for the first discriminator.
+- The remaining blocker is candidate-coherent layer-1 index-key history. Accepted top-k outputs
+  cannot rescore a changed query because this architecture also changes its own 8,156 key vectors.
+  The fail-fast acquisition scope therefore includes only prompt embedding, complete layer 0,
+  layer-1 feature2 boundary/query/key/index-cache/event-1 scorer and stops before layer-1 attention
+  output/MLP/dense, layers 2--77, logits or sampling. The pinned manifest and authenticated file
+  headers derive exactly 39 tensor ranges and `1,199,760,512` weight bytes per owner; loader receipts
+  must equal that allowlist. The reviewed total upper bound remains `1,257,459,584` bytes/device
+  (`2,514,919,168` total), including cache/other allowance and excluding `113,273,856` dense1
+  bytes/device. The manifest self-hash and exact N82 source identities/shapes/hashes are recomputed.
+  Gate D remains open. No norm-only probe, TPU compile, model load or numerical run is authorized;
+  next obtain immutable review of this scaffold, then separately design/review the selective loader
+  and abstract prefill graph before any metal acquisition.
+
 ## 2026-08-28 tested layer-1 consumer fusions reject offline; stop byte chasing
 
 - A sealed-byte CPU replay first validates the discriminator itself: the production one-row N82
