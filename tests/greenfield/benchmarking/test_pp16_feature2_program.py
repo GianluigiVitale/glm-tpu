@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import jax.numpy as jnp
 import numpy as np
@@ -12,8 +13,10 @@ import pytest
 
 from glm_tpu.greenfield.benchmarking.pp16_feature2_program import (
     _update_liveness_digest,
+    _validate_feature2_runtime_devices,
     load_feature2_prefill_runtime_inputs,
 )
+from glm_tpu.greenfield.errors import PlanValidationError
 from glm_tpu.greenfield.kernels.reference.rotary import rotary_table_sha256
 
 
@@ -70,6 +73,28 @@ def test_carried_liveness_digest_depends_on_values_owner_and_order() -> None:
         ordered,
         digest((jnp.asarray(changed), second), 0),
     )
+
+
+def test_feature2_runtime_device_coordinates_normalize_without_weakening() -> None:
+    adjacent = (
+        SimpleNamespace(id=0, coords=[0, 0, 0]),
+        SimpleNamespace(id=1, coords=[1, 0, 0]),
+    )
+    assert _validate_feature2_runtime_devices(adjacent) == adjacent
+    with pytest.raises(PlanValidationError):
+        _validate_feature2_runtime_devices(
+            (
+                SimpleNamespace(id=0, coords=[0, 0, 0]),
+                SimpleNamespace(id=1, coords=[0, 1, 0]),
+            )
+        )
+    with pytest.raises(PlanValidationError):
+        _validate_feature2_runtime_devices(
+            (
+                SimpleNamespace(id=0, coords=[0, 0, 0]),
+                SimpleNamespace(id=2, coords=[1, 0, 0]),
+            )
+        )
 
 
 @pytest.mark.skipif(

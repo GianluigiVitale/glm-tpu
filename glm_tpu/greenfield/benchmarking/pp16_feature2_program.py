@@ -103,6 +103,30 @@ class Feature2PrefillProgram:
     execute: Any
 
 
+def _validate_feature2_runtime_devices(devices: Sequence[Any]) -> tuple[Any, ...]:
+    runtime_devices = tuple(devices)
+    if len(runtime_devices) != 2 or tuple(
+        int(device.id) for device in runtime_devices
+    ) != (0, 1):
+        raise PlanValidationError(
+            "feature2 executable requires exact adjacent stage-0 devices 0,1"
+        )
+    coordinates = tuple(
+        None
+        if getattr(device, "coords", None) is None
+        else tuple(int(value) for value in device.coords)
+        for device in runtime_devices
+    )
+    if any(value is not None for value in coordinates) and coordinates != (
+        (0, 0, 0),
+        (1, 0, 0),
+    ):
+        raise PlanValidationError(
+            "feature2 executable devices 0,1 are not the protected adjacent pair"
+        )
+    return runtime_devices
+
+
 def validate_feature2_prefill_jaxpr(jaxpr: str) -> dict[str, Any]:
     """Fail closed on the complete abstract executable before TPU lowering."""
 
@@ -839,21 +863,7 @@ def build_feature2_prefill_program(
 
     validate_feature2_prefill_graph(graph)
     validate_feature2_executable_weight_contract(graph)
-    runtime_devices = tuple(devices)
-    if len(runtime_devices) != 2 or tuple(
-        int(device.id) for device in runtime_devices
-    ) != (0, 1):
-        raise PlanValidationError(
-            "feature2 executable requires exact adjacent stage-0 devices 0,1"
-        )
-    coordinates = tuple(getattr(device, "coords", None) for device in runtime_devices)
-    if any(value is not None for value in coordinates) and coordinates != (
-        (0, 0, 0),
-        (1, 0, 0),
-    ):
-        raise PlanValidationError(
-            "feature2 executable devices 0,1 are not the protected adjacent pair"
-        )
+    runtime_devices = _validate_feature2_runtime_devices(devices)
     mesh = Mesh(np.asarray(runtime_devices, dtype=object), (_AXIS_NAME,))
     weight_specs = {
         name: P(_AXIS_NAME, *(None for _ in shape))

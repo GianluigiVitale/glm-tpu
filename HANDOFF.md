@@ -2,7 +2,7 @@
 
 **Updated:** 2026-08-28 UTC
 
-## 2026-08-28 PP16 feature2 compile-only acquisition is locally complete; review is next
+## 2026-08-28 first PP16 feature2 acquisition stops on coordinate container type
 
 - A new default-off acquisition loads the exact 39 authenticated ranges per owner from the retained
   final PP16 runtime, packs dense weights directly into the DB550 final layout, materializes only
@@ -22,9 +22,7 @@
 - The protected wrapper pins the pushed clean branch, existing `db-v4-64-od`, US-CENTRAL2 bucket,
   exact runtime/oracles, global TPU and rsync locks, eight-host pre/post zero-work censuses, complete
   local/remote SHA verification, and terminal `HLO_ACQUIRED` publication last. Focused and
-  neighboring CPU suites pass 28/28 and 35/35; syntax and diff checks pass. No TPU run is authorized
-  until the current batch receives persistent Fable 5 Max approval, is committed, pushed and
-  mirrored. Exact next is that review, then one serialized compile-only acquisition.
+  neighboring CPU suites passed 30/30 and 35/35; syntax and diff checks passed.
 - The first persistent Fable review returned `BLOCK` before commit or TPU use. It found that
   first-contact StableHLO could be lost before a validation/compile refusal, six sharded optimized
   roots omitted their retained local size-one feature axis, and failure publication was an
@@ -33,7 +31,23 @@
   optimized-HLO parser test. Failure archives now use two attempts, a complete diagnostic ledger,
   per-object hashes and exact remote object-set verification; success preterminal archives use the
   same exact-set rule and census again includes independent Ray enumeration. The corrected focused
-  suite passes 30/30. This correction still requires Fable re-review before commit or metal.
+  suite passed 30/30. Fable returned `APPROVE COMMIT AND COMPILE-ONLY RUN` for staged SHA
+  `93524dc1...73eb`; reviewed commit `50337181...5f71` was pushed and byte-mirrored to the approved
+  bucket before the one authorized run.
+- Tag `greenfield_pp16_feature2_prefill_acquire_20260828T230033541905323Z` authenticated its exact
+  sources, loaded the 78 selected ranges and cleaned those arrays, but refused before materializer
+  or main compile/arithmetic. The runner's normalized coordinate check accepted devices 0/1 at
+  `(0,0,0)/(1,0,0)`; the builder compared raw JAX coordinate lists to tuples and rejected only the
+  Python container type. No HLO, runner JSON, HBM result, DB row, `HLO_ACQUIRED`, `SUCCESS`,
+  numerical, Gate-D or performance claim exists. Diagnostic ledger `617e1430...d2d0`, runner log
+  `60563a66...e1e` and failure census `2f6e95e2...8e80` are verified under the exact same-region
+  nine-object diagnostic set; cleanup is 8/8 clean.
+- Fable then reported 100% usage. The goal-authorized existing Sol fallback confirmed the exact
+  diagnosis, corrected the load-stage wording and returned `CORRECTION SOUND`. The bounded fix
+  normalizes each present coordinate to an integer tuple before retaining the exact ids and
+  `(0,0,0)/(1,0,0)` check; tests prove list-valued acceptance plus wrong-coordinate and wrong-id
+  refusal. Exact next: CPU verification, correction-only Sol review, commit/push/mirror, then one
+  repeat of the same compile-only scope. No numerical run is authorized.
 
 ## 2026-08-28 complete PP16 feature2 graph is implemented offline; review is next
 

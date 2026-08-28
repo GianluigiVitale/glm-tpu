@@ -5,9 +5,9 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
-## 2026-08-28 current UTC — feature2 compile-only runner and parsed HLO gate are ready for review
+## 2026-08-28 23:00--current UTC — first feature2 acquisition exposes a list/tuple guard defect
 
-The complete PP16 feature2 graph now has a bounded acquisition path, but no TPU work has run. The
+The complete PP16 feature2 graph received a bounded acquisition path. The
 runner authenticates the retained final-runtime manifest and 78 selected reads, directly packs the
 six dense sources into four final-layout leaves, separately compiles and executes three owner-local
 weight materializers, then lowers and compiles—but never invokes—the complete main executable.
@@ -44,8 +44,29 @@ real forced-two-device CPU `shard_map` lowering is parsed and proves `bf16[1,1,3
 relying on a synthetic fixture. Both diagnostic and success publication now verify the ledger,
 every object hash and the exact remote object set; diagnostics retry twice and fail with explicit
 status 70, while the census restores psutil/Ray enumeration. Corrected focused tests pass 30/30.
-The correction is staged for review only; no commit, push, TPU initialization or evidence claim has
-occurred.
+Persistent Fable re-review returned `APPROVE COMMIT AND COMPILE-ONLY RUN` for exact staged SHA
+`93524dc1...73eb`. Commit `50337181efb43b46a259469a762b618340685f71` was pushed and the 23:00
+same-region cron mirror produced a byte-identical runner before launch.
+
+The one authorized tag `greenfield_pp16_feature2_prefill_acquire_20260828T230033541905323Z`
+authenticated exact runtime/oracle lineage and loaded 78 selected ranges. It then refused before
+any materializer/main compile or arithmetic. The outer runner normalized `device.coords` to tuples
+and passed exact devices 0/1 at `(0,0,0)/(1,0,0)`; the program builder compared raw JAX list-valued
+coordinates directly to tuple-valued constants and raised `PlanValidationError`. This is a Python
+container-type defect, not changed topology or adjacency. The selective arrays were cleaned and
+failure census is 8/8 clean.
+
+No HLO, runner JSON, HBM result, DB row, `HLO_ACQUIRED`, `SUCCESS`, numerical, Gate-D or performance
+claim exists. The exact nine-object remote diagnostic is verified; diagnostic ledger, runner log,
+source identity and failure-census SHAs are `617e1430...d2d0`, `60563a66...e1e`,
+`41dee99d...aa7a` and `2f6e95e2...8e80`.
+
+The required narrow post-failure Fable call hit 100% usage. The existing independent Sol fallback
+returned `CORRECTION SOUND`, corrected the record from pre-load to post-load/pre-compile, and permits
+one separately reviewed repeat of the identical compile-only scope. The correction normalizes each
+present coordinate to `tuple(int(value) ...)` while retaining exact ids and coordinate values; a
+pure unit test accepts list-valued exact devices and rejects wrong coordinates and ids. It requires
+CPU verification, correction-only review, commit/push and mirror before any repeat.
 
 ## 2026-08-28 22:00--current UTC — complete PP16 feature2 graph traces offline
 
