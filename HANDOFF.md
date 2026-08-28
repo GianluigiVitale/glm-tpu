@@ -2,6 +2,32 @@
 
 **Updated:** 2026-08-28 UTC
 
+## 2026-08-28 tested layer-1 consumer fusions reject offline; stop byte chasing
+
+- A sealed-byte CPU replay first validates the discriminator itself: the production one-row N82
+  qkv-a convolution maps accepted layer-1 hidden SHA `9936ee1e...d3039` to accepted q-a SHA
+  `8e3dc61e...55d85` at `0/2,048` mismatches. The rejected one-round hidden
+  `229dc8ac...812f` instead gives q-a SHA `bb0de7a3...9b494` at `999/2,048` mismatches.
+- Every tested offline CPU semantic formulation is nonexact against accepted q-a: double-round
+  `617`, FP32-input/folded-FP32 `903`, folded-BF16 `1,081`, post-scale-FP32 `902`, and
+  post-scale-BF16-weight `1,078` mismatches. A `+/-4,096`-FP32-ULP inverse search bottoms out at
+  `1,031/6,144` hidden mismatches; no modulo group through 128 lanes and no contiguous block of 32
+  or more features admits an exact scalar. Sparse exact subsets exist for `4/256` and `71/512`
+  modulo groups, so per-lane/tile fitting is frozen as oracle-fitting policy rather than claimed
+  numerically impossible. CPU does not prove TPU query association or exclude every physical
+  fusion; it makes a compiler-layout-only acquisition for these formulas inadmissible.
+- The goal-authorized Sol fallback returned verdict B: stop chasing exact hidden/q-a bytes and
+  preserve the dense and carried rows bitwise. Bounded comparison applies only to normalized,
+  q-a and other internal rows. A future Gate-D candidate must name a genuinely new physical
+  state/ownership mechanism and is adjudicated by exact raw tokens plus every 8K DSA selected
+  set/tie order, integrity, locality, HBM, trace and wall—not by an intermediate-row SHA.
+  Unchanged PP8, WS32 and current PP16 remain frozen.
+- WS32's `score_diagnostic` intentionally excludes any event whose selected set differs; its
+  reported `aligned_count=2048,max_abs=0` describes exact event 0 only and does not prove that the
+  2,041 common layer-1 positions have exact scores. Never cite it as layer-1 score equality.
+  Exact next is no TPU run: finish the plan-level DSA-state ownership admission audit and accept
+  only a mechanism outside every frozen arithmetic/layout family before implementation.
+
 ## 2026-08-28 output-ownership acquisition rejects; Gate D returns to its end-to-end contract
 
 - The zero-sample PP16 acquisition at pushed pin `d1354ea` is terminally `REJECTED`, with no

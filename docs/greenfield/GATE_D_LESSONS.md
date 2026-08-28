@@ -21,6 +21,21 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   one-row topology-local architecture candidate: internal rows may use the documented bounded
   comparison, but raw tokens, DSA selected sets/tie order, integrity, HLO/locality, HBM, trace and
   profiler-free wall remain exact. Do not rerun unchanged PP8/WS32 8K paths with sealed DSA drift.
+- Every tested offline CPU consumer-fusion formulation is rejected before TPU use. The accepted hidden row passed
+  through the production one-row N82 qkv-a helper reproduces accepted q-a bitwise, while the
+  rejected one-round row misses `999/2,048`. Direct double-round, FP32-input/folded-weight and
+  post-scale forms all miss `617--1,081` q-a values. Searching `+/-4,096` FP32 inverse ULPs finds
+  no exact global scalar, no exact repeating group through 128 lanes, and no exact contiguous block
+  of 32 or more features. Sparse exact subsets at `4/256` and `71/512` modulo groups are not a
+  physical law; freeze per-lane/tile fitting as oracle-fitting policy. CPU does not prove TPU query
+  association or exclude every physical fusion, but compiler-layout hope alone cannot authorize an
+  acquisition for these formulas. Dense and carried rows remain bitwise exact; bounded comparison
+  applies only to normalized/q-a/internal rows. Admit only a genuinely new plan-level physical
+  state/ownership mechanism whose authority is exact full-8K tokens and every DSA set/tie order.
+- A zero WS32 `score_diagnostic` does not describe a mismatched event. The validator appends score
+  arrays only after count and selected-set equality; in the rejected 8K run its 2,048 aligned
+  values belong to exact event 0, while event 1 is excluded. Never infer that common positions in
+  a seven-swap event have exact scores from that field.
 - Treat empty optional evidence directories as absent, not as recursive-copy operands. Archive a
   file tree with `gcloud storage rsync` (without delete) before building the exact remote ledger;
   keep DB publication provisional until terminal `SUCCESS`, and recover a fully validated model
