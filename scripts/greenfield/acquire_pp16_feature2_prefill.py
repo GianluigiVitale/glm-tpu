@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile-only protected acquisition for the PP16 feature2 discriminator."""
+"""Shared protected compiler for PP16 feature2 acquisition and one-shot capture."""
 
 from __future__ import annotations
 
@@ -44,6 +44,16 @@ def _atomic_json(path: Path, value: Mapping[str, Any]) -> None:
     )
 
 
+def _atomic_npz(path: Path, values: Mapping[str, np.ndarray]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.partial.{os.getpid()}")
+    with temporary.open("wb") as stream:
+        np.savez(stream, **values)
+        stream.flush()
+        os.fsync(stream.fileno())
+    temporary.replace(path)
+
+
 def _memory_stats(device: Any) -> dict[str, int] | None:
     values = device.memory_stats()
     if values is None:
@@ -74,6 +84,26 @@ def _memory_analysis(compiled: Any) -> dict[str, int]:
         if value is not None:
             result[name] = int(value)
     return result
+
+
+def _validate_preexecution_memory(records: Sequence[dict[str, int] | None]) -> None:
+    required = {
+        "bytes_in_use",
+        "bytes_limit",
+        "largest_free_block_bytes",
+        "peak_bytes_in_use",
+    }
+    if len(records) != 2 or any(
+        record is None or not required.issubset(record) for record in records
+    ):
+        raise RuntimeError("feature2 pre-execution HBM evidence is incomplete")
+    for record in records:
+        assert record is not None
+        if (
+            record["peak_bytes_in_use"] >= record["bytes_limit"]
+            or record["largest_free_block_bytes"] < 8 * 1024**3
+        ):
+            raise RuntimeError("feature2 pre-execution HBM margin is insufficient")
 
 
 def _record_hlo(
@@ -150,8 +180,12 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
-    args = parse_args()
+def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
+    """Compile the protected graph and optionally execute it exactly once."""
+
+    result_npz = getattr(args, "result_npz", None)
+    if execute_main != (result_npz is not None):
+        raise RuntimeError("numerical execution and result capture must be paired")
     if REPO != EXPECTED_REPO:
         raise RuntimeError(f"wrong greenfield worktree: {REPO}")
     code_hash = _git_head()
@@ -241,6 +275,7 @@ def main() -> int:
     compiled_graphs: list[Any] = []
     disposable_arrays: list[Any] = []
     output: dict[str, Any] | None = None
+    main_execution_count = 0
     try:
         loaded = load_feature2_selective_checkpoint(
             args.runtime_root,
@@ -359,14 +394,52 @@ def main() -> int:
             }
         )
         memory_after_compile = [_memory_stats(device) for device in devices]
+        main_execution_seconds = None
+        memory_after_execute = None
+        if execute_main:
+            expected_stablehlo = getattr(args, "expected_main_stablehlo_sha256", None)
+            expected_optimized = getattr(
+                args, "expected_main_optimized_hlo_sha256", None
+            )
+            if (
+                main_record["stablehlo"]["sha256"] != expected_stablehlo
+                or main_record["optimized_hlo"]["sha256"] != expected_optimized
+            ):
+                raise RuntimeError(
+                    "feature2 executable HLO drifted from the acquired graph"
+                )
+            _validate_preexecution_memory(memory_after_compile)
+            execution_started = time.monotonic()
+            main_execution_count += 1
+            main_result = main_compiled(*main_arguments)
+            disposable_arrays.append(main_result)
+            jax.block_until_ready(main_result)
+            main_execution_seconds = time.monotonic() - execution_started
+            result_host = jax.device_get(main_result)
+            captured: dict[str, np.ndarray] = {}
+            for name, value in zip(main_result._fields, result_host, strict=True):
+                array = np.ascontiguousarray(np.asarray(value))
+                if str(array.dtype) == "bfloat16":
+                    name = f"{name}_bfloat16_bits"
+                    array = array.view(np.uint16)
+                captured[name] = array
+            _atomic_npz(Path(result_npz), captured)
+            memory_after_execute = [_memory_stats(device) for device in devices]
         output = {
-            "artifact_kind": "greenfield_pp16_feature2_compile_acquisition",
+            "artifact_kind": (
+                "greenfield_pp16_feature2_numerical_capture"
+                if execute_main
+                else "greenfield_pp16_feature2_compile_acquisition"
+            ),
             "claim_scope": (
-                "compile-only real selected-state/HLO/HBM acquisition; no main "
-                "arithmetic, numerical, Gate-D, token-rate, or performance claim"
+                "one zero-warmup main invocation and raw numerical capture; "
+                "no exactness, Gate-D, token-rate, or performance claim"
+                if execute_main
+                else "compile-only real selected-state/HLO/HBM acquisition; no "
+                "main arithmetic, numerical, Gate-D, token-rate, or performance claim"
             ),
             "code_hash": code_hash,
-            "compile_only": True,
+            "compile_only": not execute_main,
             "device_kind": devices[0].device_kind,
             "event1_target_lineage": event1_lineage,
             "graph_sha256": graph.graph_sha256,
@@ -376,9 +449,12 @@ def main() -> int:
                 "wk_decode_bf16": wk_decode_record,
                 "wk_promote_fp32": wk_promote_record,
             },
-            "main_executed": False,
+            "main_executed": execute_main,
+            "main_execution_count": main_execution_count,
+            "main_execution_seconds_operational_only": main_execution_seconds,
             "memory": {
                 "after_compile": memory_after_compile,
+                "after_execute": memory_after_execute,
                 "after_load": memory_after_load,
                 "before_load": memory_before_load,
             },
@@ -393,7 +469,7 @@ def main() -> int:
             "selective_load": loaded.load_record,
             "selective_plan": selective_plan,
             "state_manifest": loaded.state_manifest,
-            "status": "HLO_ACQUIRED",
+            "status": "NUMERICAL_CAPTURED" if execute_main else "HLO_ACQUIRED",
         }
     finally:
         for value in reversed(disposable_arrays):
@@ -409,13 +485,17 @@ def main() -> int:
         gc.collect()
 
     if output is None:
-        raise RuntimeError("feature2 compile acquisition produced no record")
+        raise RuntimeError("feature2 protected runner produced no record")
     output["memory"]["after_cleanup"] = [
         _memory_stats(device) for device in devices
     ]
     _atomic_json(args.output, output)
     print(json.dumps(output, allow_nan=False, sort_keys=True))
     return 0
+
+
+def main() -> int:
+    return run_feature2(parse_args(), execute_main=False)
 
 
 if __name__ == "__main__":
