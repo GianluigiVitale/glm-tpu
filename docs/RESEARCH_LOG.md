@@ -5,6 +5,39 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-28 19:55--20:30 UTC — feature2 offline batch corrected after Sol block
+
+The manifest-derived selective loader and candidate-history graph were implemented without TPU or
+real selected-payload acquisition. The first Sol review returned `BLOCK COMMIT` on three material
+gaps: four anonymous repetitions did not prove loop-carried cache/chunk causality; workload bytes,
+positions and range receipts were under-bound; and hashing followed by reopening a memmap admitted
+a file-change race. No blocked code was committed.
+
+The loader now reads each exact range once into one bounded bytearray, validates shape/dtype/SHA and
+BF16/F32/FP8 finiteness over that same buffer, passes that buffer to the final owner, and always
+device-roundtrips its SHA. The range receipts are retained. The causal graph is fully unrolled into
+34 nodes: exact intervals `[0,2048)`, `[2048,4096)`, `[4096,6144)`, `[6144,8156)`; explicit masked
+tail; row-wise causal contexts; and versioned layer-0 KV/index plus layer-1 index caches from zero
+through version 4. The current row is exactly chunk 3/local row 2,011/position 8,155. Its input
+contract authenticates 8K oracle `e4fbcbdb...acf2`, candidate token IDs (prompt plus token 220),
+positions, block table, final context and all 78 selected range records at digest
+`44d2a98e...8da1`.
+
+Fable was still at 100% usage, so the goal-authorized existing Sol fallback reviewed staged SHA
+`047d996e...0dab` and returned a second `BLOCK COMMIT`: carried rows 0--2 were dead and chunk 3
+retained only row 2,011, allowing DCE to erase the output-ownership mechanism under test. A compact
+ordered dual-U32 device-resident digest now consumes every valid carried BF16 element, chains across
+all four chunks and is terminal. Validation rejects any dead produced value, partial carried-row
+consumer, digest-range/order drift or missing terminal. Corrected graph SHA is
+`d0160308c0fd2622556f7eb4ddf64166b04d75746959af6f5413612a1912b4ea`.
+
+The loader/prefill suite passes 20/20 and the combined scaffold suite passes 29/29, including 15
+graph mutations plus manifest-before-directed-I/O, immutable-buffer and FP8 non-finite checks. This
+still proves only an offline contract. The correction-only Sol review verified staged SHA
+`5e46eeac...5219` and returned `APPROVE COMMIT`. No real 2.4-GB selected load, TPU, numerical result,
+HBM, Gate-D or performance claim exists. Approval is commit-only; the bounded acquisition requires
+a new implementation and separate review.
+
 ## 2026-08-28 14:33--current UTC — PP16 split tree passes; wrong live leaf primitive rejects
 
 The reviewed PP16 local-y / LP2-x / local-z run reached arithmetic once at pin `723512f`. HLO is

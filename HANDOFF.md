@@ -2,6 +2,38 @@
 
 **Updated:** 2026-08-28 UTC
 
+## 2026-08-28 PP16 feature2 loader/causal graph corrected after blocked review
+
+- The manifest-bound loader authenticates the exact PP16 runtime/SUCCESS/header chain, derives its
+  allowlist internally, streams only 39 ranges per final owner with per-range SHA/shape/dtype and
+  FP8-finite checks, and places each range directly on devices 0/1 as a feature-sharded global JAX
+  array. The authenticated bytearray—not a reopened file mapping—is passed to JAX, and every device
+  buffer is mandatorily read back and SHA-checked. Exact receipts and memory records are retained.
+  Real metadata-only inspection proves 78 reads and `1,199,760,512` bytes per owner; execution is
+  tested only with small forced-CPU payloads. No real 2.4-GB load has run.
+- The first Sol review returned `BLOCK COMMIT`: repeat-count metadata did not prove cache/chunk
+  causality, workload/position/range bytes were under-bound, and the loader had a hash/reopen TOCTOU
+  gap. After those corrections, Fable remained at 100% usage and the goal-authorized Sol fallback
+  blocked staged SHA `047d996e...0dab`: most carried rows were dead, so DCE could erase the output-
+  ownership mechanism under test. Corrected graph `d0160308...b4ea` unrolls 34 nodes over exact
+  intervals
+  `[0,2048)`, `[2048,4096)`, `[4096,6144)`, `[6144,8156)`, explicitly versions zero-initialized
+  layer-0 KV/index and layer-1 index caches, binds row-wise causal contexts and the masked 36-row
+  tail, and slices position 8,155 only from chunk 3 row 2,011. It authenticates the sealed token
+  oracle, exact candidate tokens (prompt plus token 220), positions, block table, final context and
+  all 78 manifest range records (`44d2a98e...8da1`). DEFAULT scoring consumes candidate cache
+  version 4 and candidate tuple4 query/head state. An ordered device-resident dual-U32 digest is
+  loop-carried across chunks, consumes every valid carried BF16 element and is terminal; generic
+  validation also rejects every dead produced value. The graph stops before layer-1 output/MLP/dense,
+  has one decode row, no `[8156,6144]` tensor, and only group `{0,1}`.
+- Corrected loader/prefill tests pass 20/20 and the combined scaffold suite passes 29/29, including
+  15 hostile graph mutations plus manifest-before-I/O, authenticated-buffer immutability and
+  FP8-finite checks. The correction-only Sol review verified exact staged SHA
+  `5e46eeac...5219` and returned `APPROVE COMMIT`. This remains offline evidence: no TPU, real
+  payload acquisition, HBM, numerical, Gate-D or performance claim exists. Approval authorizes
+  commit/push/mirror only. Exact next afterward is a separately reviewed bounded acquisition
+  implementation; no protected run is authorized yet.
+
 ## 2026-08-28 PP16 feature2 architecture scaffold admitted; key history is the blocker
 
 - The persistent Fable 5 Max chat was invoked at the owner-requested checkpoint with the complete
