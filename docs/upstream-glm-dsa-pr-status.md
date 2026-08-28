@@ -26,18 +26,18 @@ V3.2 index-cache insertion, sparse MLA selected attention, and a repository-
 native bounded TPU benchmark. The protected
 suite passed 36/36 in 74.90 seconds, including 262,144-position/top-k-2,048
 microbenchmarks and exact HLO checks. Evidence:
-`upstream_streamindex_test_20260827T224406Z`; manifest-list SHA-256
+`upstream_streamindex_test_20260827T224406Z`; evidence-manifest SHA-256
 `dd461d99feae8b582457954473577e1ee46ca059cf1d96314ee4b4f486daf170`.
 
 The exact current head passed 30/30 focused protected kernel/HLO tests in
 61.19 seconds. Evidence: `upstream_streamindex_test_20260828T011411Z`;
-manifest-list SHA-256
+evidence-manifest SHA-256
 `1e08dad8c1ee87487df08a380a17b65cebac9134a4e82157240e1e71b8138704`.
 The tracked benchmark then ran independently on that same clean head with five
 warmups and 20 individually synchronized samples: scorer p50 3.208 ms, cache
 insert 0.353 ms, sparse MLA 0.159 ms, selected gather plus MLA 0.222 ms, and
 composed scorer/gather/MLA 3.280 ms. Evidence:
-`upstream_glm_dsa_benchmark_20260828T011531Z`; manifest-list SHA-256
+`upstream_glm_dsa_benchmark_20260828T011531Z`; evidence-manifest SHA-256
 `20cbf34d8576c8905d337f932584f3f9248865941bcbae63b9a68bf35bb8e285`.
 One initial direct-script launch failed before compilation because the repo
 root was absent from `PYTHONPATH`; it is preserved as
@@ -127,10 +127,10 @@ Validation:
   `f8f3bf38cd2dfed2735c82010f86af3b57e2cfe87b350726cdabe8b89690e5d3`.
 - The protected run ended with authenticated `CENSUS_OK` on all eight hosts.
 - Exact current head: 3/3 in 9.59 seconds; evidence
-  `upstream_streamindex_test_20260828T011829Z`, manifest-list SHA-256
+  `upstream_streamindex_test_20260828T011829Z`, evidence-manifest SHA-256
   `0cd31c71911a890ce36f917e624cc60a234a1ede39ee7b7bcd140e5d5743a250`.
 - Restacked fail-closed head: 3/3 in 9.24 seconds; evidence
-  `upstream_glm_dsa_pr3_local_bounds_20260828T015441Z`, manifest-list SHA-256
+  `upstream_glm_dsa_pr3_local_bounds_20260828T015441Z`, evidence-manifest SHA-256
   `ce0f35f0d12d564132d0eb58fd9cfc5bf3c3b17182057bd79e7d2a8fac4cad31`.
 - The repository metadata validator was also inspected. Its current empty-env
   query flags the same metadata-free execution steps in existing model YAMLs;

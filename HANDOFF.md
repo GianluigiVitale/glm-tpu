@@ -4,6 +4,11 @@
 
 ## 2026-08-28 corrected three-PR stack passes and is private-audit ready
 
+- A fresh read-only race audit still finds official main at the exact base and no competing
+  GLM-5.2/TPU DSA or `SparseAttnIndexer` PR. Open #2324 remains the broad 24-commit GLM-5.1
+  multi-host change, hundreds of commits behind its base and awaiting code-owner review. PR1's
+  exact eight-file owner checklist is `docs/upstream/glm-dsa-pr1-owner-audit.md`; it was derived
+  from the immutable base/head diff and does not require reading PR2/PR3.
 - The three stacked private heads are PR1 `fd29657d336cee859c17d4568f8d38d276ca9707`,
   PR2 `dfb28231b9e35c11659d3db3125bc18cc3177ab8`, and PR3
   `8aae29ad6da2b2cd778be031b423e31eb4a85a80`. PR2 now fails closed if sparse MLA lacks the

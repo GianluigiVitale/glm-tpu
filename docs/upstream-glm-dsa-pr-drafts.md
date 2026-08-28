@@ -33,13 +33,13 @@ primitives. It does not add a model fork or a second execution architecture.
   DSA chain 3.280 ms.
 - Exact StableHLO captured; no end-to-end throughput claim is made.
 
-Evidence: `upstream_streamindex_test_20260827T224406Z`, manifest-list SHA-256
+Evidence: `upstream_streamindex_test_20260827T224406Z`, evidence-manifest SHA-256
 `dd461d99feae8b582457954473577e1ee46ca059cf1d96314ee4b4f486daf170`.
 Current-head correctness evidence: `upstream_streamindex_test_20260828T011411Z`,
-manifest-list SHA-256
+evidence-manifest SHA-256
 `1e08dad8c1ee87487df08a380a17b65cebac9134a4e82157240e1e71b8138704`.
 Current-head benchmark evidence:
-`upstream_glm_dsa_benchmark_20260828T011531Z`, manifest-list SHA-256
+`upstream_glm_dsa_benchmark_20260828T011531Z`, evidence-manifest SHA-256
 `20cbf34d8576c8905d337f932584f3f9248865941bcbae63b9a68bf35bb8e285`.
 
 ### Compatibility, risk, and rollback
@@ -99,7 +99,7 @@ SHA-256
 `6d3a6b445568f8b4a5cd25c97feb50316d97acc0fc48e1259290b14591dd70fe`.
 Current-head evidence:
 `upstream_glm_dsa_pr2_full_local_bounds_20260828T015207Z`,
-manifest-list SHA-256
+evidence-manifest SHA-256
 `f5b39594dda06bd0a3546611568db747a93259d5c1e9022ab570ae7aa02ed473`.
 
 ### Compatibility, risk, and rollback
@@ -140,10 +140,10 @@ the cross-repository model contract and makes the model's unit step real.
 - Protected TPU at exact committed head: 3/3 in 9.09 seconds, 8/8 hosts clean.
 - Restacked current head: 3/3 in 9.24 seconds, 8/8 hosts clean.
 
-Evidence: `upstream_streamindex_test_20260828T001254Z`, manifest-list SHA-256
+Evidence: `upstream_streamindex_test_20260828T001254Z`, evidence-manifest SHA-256
 `f8f3bf38cd2dfed2735c82010f86af3b57e2cfe87b350726cdabe8b89690e5d3`.
 Current-head evidence: `upstream_glm_dsa_pr3_local_bounds_20260828T015441Z`,
-manifest-list SHA-256
+evidence-manifest SHA-256
 `ce0f35f0d12d564132d0eb58fd9cfc5bf3c3b17182057bd79e7d2a8fac4cad31`.
 
 ### Compatibility, risk, and rollback
