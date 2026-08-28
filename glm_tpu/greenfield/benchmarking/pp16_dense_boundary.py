@@ -135,13 +135,11 @@ _PP16_FINAL_LAYOUT_CONTRACT = {
 }
 
 
-def pack_pp16_dense_final_layout(
-    owners: tuple[dict[str, np.ndarray], dict[str, np.ndarray]],
-) -> tuple[tuple[np.ndarray, ...], dict[str, dict[str, Any]]]:
-    """Pack two PP16 owners into 16 accepted ``[in, out]`` rank shards."""
+def pack_pp16_dense_final_layout_owner(
+    owner: dict[str, np.ndarray],
+) -> tuple[np.ndarray, ...]:
+    """Pack one authenticated PP16 owner into its 16 accepted rank shards."""
 
-    if len(owners) != 2:
-        raise ValueError("PP16 final-layout dense pack requires two owners")
     expected = {
         _PP16_DENSE_NAMES[0]: ((6144, 6144), np.uint8),
         _PP16_DENSE_NAMES[1]: ((48, 48), np.float32),
@@ -150,56 +148,75 @@ def pack_pp16_dense_final_layout(
         _PP16_DENSE_NAMES[4]: ((6144, 6144), np.uint8),
         _PP16_DENSE_NAMES[5]: ((48, 48), np.float32),
     }
-    for owner in owners:
-        if set(owner) != set(_PP16_DENSE_NAMES):
-            raise ValueError("PP16 final-layout dense source set drifted")
-        for name, (shape, dtype) in expected.items():
-            value = owner[name]
-            if value.shape != shape or value.dtype != dtype:
-                raise ValueError(
-                    f"PP16 final-layout source {name!r} drifted: "
-                    f"shape={value.shape} dtype={value.dtype}"
-                )
+    if set(owner) != set(_PP16_DENSE_NAMES):
+        raise ValueError("PP16 final-layout dense source set drifted")
+    for name, (shape, dtype) in expected.items():
+        value = owner[name]
+        if value.shape != shape or value.dtype != dtype:
+            raise ValueError(
+                f"PP16 final-layout source {name!r} drifted: "
+                f"shape={value.shape} dtype={value.dtype}"
+            )
 
-    merged_bits = np.empty((2, 16, 6144, 768), dtype=np.uint8)
-    merged_scale = np.empty((2, 16, 48, 768), dtype=np.float32)
-    down_bits = np.empty((2, 16, 384, 6144), dtype=np.uint8)
-    down_scale = np.empty((2, 16, 3, 6144), dtype=np.float32)
-    for owner_index, owner in enumerate(owners):
-        gate = owner[_PP16_DENSE_NAMES[0]]
-        gate_scale = owner[_PP16_DENSE_NAMES[1]]
-        up = owner[_PP16_DENSE_NAMES[2]]
-        up_scale = owner[_PP16_DENSE_NAMES[3]]
-        down = owner[_PP16_DENSE_NAMES[4]]
-        compact_down_scale = owner[_PP16_DENSE_NAMES[5]]
-        for shard in range(16):
-            start = shard * 384
-            stop = start + 384
-            scale_start = shard * 3
-            scale_stop = scale_start + 3
-            merged_bits[owner_index, shard] = np.concatenate(
-                (gate[start:stop].T, up[start:stop].T), axis=1
-            )
-            merged_scale[owner_index, shard] = np.concatenate(
-                (
-                    np.repeat(
-                        gate_scale[scale_start:scale_stop].T, 128, axis=1
-                    ),
-                    np.repeat(
-                        up_scale[scale_start:scale_stop].T, 128, axis=1
-                    ),
+    merged_bits = np.empty((16, 6144, 768), dtype=np.uint8)
+    merged_scale = np.empty((16, 48, 768), dtype=np.float32)
+    down_bits = np.empty((16, 384, 6144), dtype=np.uint8)
+    down_scale = np.empty((16, 3, 6144), dtype=np.float32)
+    gate = owner[_PP16_DENSE_NAMES[0]]
+    gate_scale = owner[_PP16_DENSE_NAMES[1]]
+    up = owner[_PP16_DENSE_NAMES[2]]
+    up_scale = owner[_PP16_DENSE_NAMES[3]]
+    down = owner[_PP16_DENSE_NAMES[4]]
+    compact_down_scale = owner[_PP16_DENSE_NAMES[5]]
+    for shard in range(16):
+        start = shard * 384
+        stop = start + 384
+        scale_start = shard * 3
+        scale_stop = scale_start + 3
+        merged_bits[shard] = np.concatenate(
+            (gate[start:stop].T, up[start:stop].T), axis=1
+        )
+        merged_scale[shard] = np.concatenate(
+            (
+                np.repeat(
+                    gate_scale[scale_start:scale_stop].T, 128, axis=1
                 ),
-                axis=1,
-            )
-            down_bits[owner_index, shard] = down[:, start:stop].T
-            down_scale[owner_index, shard] = np.repeat(
-                compact_down_scale[:, scale_start:scale_stop].T,
-                128,
-                axis=1,
-            )
-    packed = tuple(
+                np.repeat(
+                    up_scale[scale_start:scale_stop].T, 128, axis=1
+                ),
+            ),
+            axis=1,
+        )
+        down_bits[shard] = down[:, start:stop].T
+        down_scale[shard] = np.repeat(
+            compact_down_scale[:, scale_start:scale_stop].T,
+            128,
+            axis=1,
+        )
+    return tuple(
         np.ascontiguousarray(value)
         for value in (merged_bits, merged_scale, down_bits, down_scale)
+    )
+
+
+def pack_pp16_dense_final_layout(
+    owners: tuple[dict[str, np.ndarray], dict[str, np.ndarray]],
+) -> tuple[tuple[np.ndarray, ...], dict[str, dict[str, Any]]]:
+    """Pack two PP16 owners into 16 accepted ``[in, out]`` rank shards."""
+
+    if len(owners) != 2:
+        raise ValueError("PP16 final-layout dense pack requires two owners")
+    packed_by_owner = tuple(
+        pack_pp16_dense_final_layout_owner(owner) for owner in owners
+    )
+    packed = tuple(
+        np.ascontiguousarray(
+            np.stack(
+                tuple(owner_values[index] for owner_values in packed_by_owner),
+                axis=0,
+            )
+        )
+        for index in range(4)
     )
     names = (
         "dense.slot_00.merged_gate_up.weight_bits_in_out",

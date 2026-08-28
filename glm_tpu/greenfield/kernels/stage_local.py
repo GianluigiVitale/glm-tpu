@@ -257,6 +257,133 @@ def _virtual_attention_output_partials(
     )
 
 
+def _virtual_attention_output_feature_half_partials(
+    output_input: Any,
+    o_bits: Any,
+    o_scale: Any,
+    *,
+    feature_half: int,
+    block_shape: tuple[int, int],
+    linear_interpret: bool,
+) -> Any:
+    """Return PP16's 16 rounded attention partials for one hidden half."""
+
+    if feature_half not in (0, 1):
+        raise ValueError("PP16 attention feature half must be zero or one")
+    if (
+        output_input.shape != (1, 8192)
+        or o_bits.shape != (6144, 8192)
+        or o_scale.shape != (48, 64)
+        or block_shape != (128, 128)
+    ):
+        raise ValueError(
+            "PP16 attention feature partials require exact GLM geometry"
+        )
+    if output_input.dtype != jnp.bfloat16:
+        raise ValueError("PP16 attention input must remain BF16")
+    if o_bits.dtype != jnp.uint8 or o_scale.dtype != jnp.float32:
+        raise ValueError("PP16 attention weight dtypes drifted")
+
+    output_start = feature_half * 3072
+    output_stop = output_start + 3072
+    scale_output_start = feature_half * 24
+    scale_output_stop = scale_output_start + 24
+    virtual_contraction = 512
+    virtual_scale_contraction = 4
+    return jnp.stack(
+        tuple(
+            fp8_strategy_nd_attention_matmul(
+                output_input[
+                    :,
+                    shard * virtual_contraction : (shard + 1)
+                    * virtual_contraction,
+                ],
+                o_bits[
+                    output_start:output_stop,
+                    shard * virtual_contraction : (shard + 1)
+                    * virtual_contraction,
+                ],
+                o_scale[
+                    scale_output_start:scale_output_stop,
+                    shard
+                    * virtual_scale_contraction : (shard + 1)
+                    * virtual_scale_contraction,
+                ],
+                config=Fp8BlockMatmulConfig(
+                    block_shape=block_shape,
+                    output_tile=block_shape[0],
+                    contraction_tile=block_shape[1],
+                ),
+                interpret=linear_interpret,
+            )
+            for shard in range(16)
+        ),
+        axis=0,
+    )
+
+
+def _pregathered_b512_attention_lp2_h16_pair(
+    query_nope_absorbed: Any,
+    query_rope: Any,
+    selected_cache: Any,
+    valid_counts: Any,
+    *,
+    contract: MlaNumericalContract,
+    interpret: bool,
+) -> Any:
+    """Consume one LP2 owner's 32 heads as two proven H16/B512 calls.
+
+    DB537 protects the H16/K2048/B512/W640 Pallas geometry.  PP16 owns 32
+    consecutive heads per device, so a single H32 call would be a new,
+    unmeasured numerical association.  Both H16 calls consume the same
+    already-completed LP2 selected-cache sum and their outputs are restored in
+    head order without another collective.
+    """
+
+    expected_contract = MlaNumericalContract()
+    if contract != expected_contract:
+        raise ValueError(
+            "PP16 feature2 attention requires the exact GLM MLA contract"
+        )
+    if query_nope_absorbed.shape != (1, 32, contract.kv_lora_rank):
+        raise ValueError("PP16 feature2 absorbed query must contain 32 heads")
+    if query_rope.shape != (1, 32, contract.qk_rope_head_dim):
+        raise ValueError("PP16 feature2 RoPE query must contain 32 heads")
+    if selected_cache.shape != (
+        1,
+        contract.top_k,
+        contract.packed_cache_width,
+    ):
+        raise ValueError("PP16 feature2 selected-cache shape drifted")
+    if valid_counts.shape != (1,) or valid_counts.dtype != jnp.int32:
+        raise ValueError("PP16 feature2 selected count must be int32[1]")
+    if any(
+        value.dtype != jnp.bfloat16
+        for value in (query_nope_absorbed, query_rope, selected_cache)
+    ):
+        raise ValueError("PP16 feature2 attention operands must remain BF16")
+
+    h16_contract = replace(contract, num_heads=16)
+    outputs = []
+    for head_half in range(2):
+        start = head_half * 16
+        with jax.named_scope(
+            f"greenfield_pregathered_b512_attention_lp2_h16_{head_half}"
+        ):
+            outputs.append(
+                pregathered_sparse_mla_pallas(
+                    query_nope_absorbed[:, start : start + 16],
+                    query_rope[:, start : start + 16],
+                    selected_cache,
+                    valid_counts,
+                    contract=h16_contract,
+                    config=SparseMlaConfig(segment_block=512),
+                    interpret=interpret,
+                )
+            )
+    return jnp.concatenate(tuple(outputs), axis=1)
+
+
 def _virtual_dense_down_partials(
     normalized: Any,
     gate_bits: Any,
@@ -590,8 +717,11 @@ def _virtual_dense_final_layout_convolution_down_partials(
         raise ValueError(
             "final-layout dense requires one, four, eight or sixteen virtual shards"
         )
-    if output_size not in (1536, 6144):
-        raise ValueError("final-layout dense output must be local or complete hidden")
+    if output_size not in (1536, 3072, 6144):
+        raise ValueError(
+            "final-layout dense output must be a WS32 shard, PP16 half, "
+            "or complete hidden"
+        )
     if not isinstance(accepted_gate_singleton, bool):
         raise ValueError("accepted gate singleton flag must be boolean")
     if not isinstance(accepted_gate_dequant_fusion, bool):
@@ -722,6 +852,126 @@ def _virtual_dense_final_layout_convolution_down_partials(
             )
             partials.append(previous_partial)
     return jnp.stack(tuple(partials), axis=0)
+
+
+def _virtual_dense_final_layout_convolution_feature_half_partials(
+    normalized: Any,
+    merged_bits_in_out: Any,
+    merged_scale_in_out: Any,
+    down_bits_in_out: Any,
+    down_scale_in_out: Any,
+    *,
+    block_shape: tuple[int, int],
+) -> tuple[Any, Any]:
+    """Produce both PP16 output halves without a full hidden activation.
+
+    Gate/up is executed once per accepted virtual rank.  Each activated I384
+    row then feeds two 3,072-column down convolutions.  The weight parameter
+    remains its owner-local complete output matrix, but every live activation
+    and result is feature-half shaped.
+    """
+
+    expected = {
+        "normalized": (1, 6144),
+        "merged_bits_in_out": (16, 6144, 768),
+        "merged_scale_in_out": (16, 48, 768),
+        "down_bits_in_out": (16, 384, 6144),
+        "down_scale_in_out": (16, 3, 6144),
+    }
+    values = {
+        "normalized": normalized,
+        "merged_bits_in_out": merged_bits_in_out,
+        "merged_scale_in_out": merged_scale_in_out,
+        "down_bits_in_out": down_bits_in_out,
+        "down_scale_in_out": down_scale_in_out,
+    }
+    for name, shape in expected.items():
+        if values[name].shape != shape:
+            raise ValueError(
+                f"feature2 final-layout dense {name} shape drifted: "
+                f"expected={shape} found={values[name].shape}"
+            )
+    if block_shape != (128, 128):
+        raise ValueError("feature2 final-layout dense requires 128x128 blocks")
+    if normalized.dtype != jnp.bfloat16:
+        raise ValueError("feature2 final-layout dense input must be BF16")
+    if any(
+        value.dtype not in (jnp.uint8, jnp.float8_e4m3fn)
+        for value in (merged_bits_in_out, down_bits_in_out)
+    ) or any(
+        value.dtype != jnp.float32
+        for value in (merged_scale_in_out, down_scale_in_out)
+    ):
+        raise ValueError("feature2 final-layout dense weight dtypes drifted")
+    if merged_bits_in_out.dtype == jnp.uint8:
+        merged_bits_in_out = lax.bitcast_convert_type(
+            merged_bits_in_out, jnp.float8_e4m3fn
+        )
+    if down_bits_in_out.dtype == jnp.uint8:
+        down_bits_in_out = lax.bitcast_convert_type(
+            down_bits_in_out, jnp.float8_e4m3fn
+        )
+
+    half0_partials = []
+    half1_partials = []
+    previous: tuple[Any, Any] | None = None
+    for shard in range(16):
+        with jax.named_scope(
+            f"greenfield_dense_feature2_virtual_rank_{shard:02d}"
+        ):
+            gate_up_weight = _decode_dense_fp8_expanded_output_scale_in_out(
+                merged_bits_in_out[shard],
+                merged_scale_in_out[shard],
+                block_rows=block_shape[0],
+            )
+            gate_up_weight = with_layout_constraint(
+                gate_up_weight,
+                Layout(major_to_minor=(0, 1)),
+            )
+            with jax.named_scope(
+                "greenfield_dense_feature2_virtual_rank_dependency"
+            ):
+                if previous is None:
+                    gate_up_weight = lax.optimization_barrier(gate_up_weight)
+                else:
+                    gate_up_weight, previous_half0, previous_half1 = (
+                        lax.optimization_barrier(
+                            (gate_up_weight, previous[0], previous[1])
+                        )
+                    )
+                    half0_partials[-1] = previous_half0
+                    half1_partials[-1] = previous_half1
+            gate_up = _dense_bf16_convolution(normalized, gate_up_weight)
+            activated = (
+                gate_up[:, :384]
+                * jax.nn.sigmoid(gate_up[:, :384])
+                * gate_up[:, 384:]
+            ).astype(jnp.bfloat16)
+            with jax.named_scope("greenfield_dense_feature2_half_0"):
+                half0 = _dense_bf16_convolution(
+                    activated,
+                    _decode_dense_fp8_expanded_output_scale_in_out(
+                        down_bits_in_out[shard, :, :3072],
+                        down_scale_in_out[shard, :, :3072],
+                        block_rows=block_shape[0],
+                    ),
+                )
+            with jax.named_scope("greenfield_dense_feature2_half_1"):
+                half1 = _dense_bf16_convolution(
+                    activated,
+                    _decode_dense_fp8_expanded_output_scale_in_out(
+                        down_bits_in_out[shard, :, 3072:],
+                        down_scale_in_out[shard, :, 3072:],
+                        block_rows=block_shape[0],
+                    ),
+                )
+            half0_partials.append(half0)
+            half1_partials.append(half1)
+            previous = (half0, half1)
+    return (
+        jnp.stack(tuple(half0_partials), axis=0),
+        jnp.stack(tuple(half1_partials), axis=0),
+    )
 
 
 def _sum_virtual_dcp_bf16_partials(
@@ -908,6 +1158,138 @@ def _reduce_strategy_nd_row0_bf16_partials(
         )
 
 
+def _strategy_nd_feature_half_y_reduce(
+    local_partials: Any,
+    *,
+    feature_half: int,
+) -> Any:
+    """Reduce one PP16 owner's y dimension for one static hidden half.
+
+    ``feature_half`` names global columns ``[0,3072)`` or ``[3072,6144)``.
+    Keeping it static preserves DB533's column-dependent y association without
+    materializing a full hidden row or selecting a reduction tree dynamically.
+    The returned four rows retain the physical z dimension for the later
+    owner-to-owner x exchange and local z reduction.
+    """
+
+    if local_partials.shape != (16, 1, 3072):
+        raise ValueError(
+            "StrategyND feature-half y reduction requires 16 one-row "
+            "3072-feature partials"
+        )
+    if local_partials.dtype != jnp.bfloat16:
+        raise ValueError(
+            "StrategyND feature-half partials must already be rounded BF16"
+        )
+    if feature_half not in (0, 1):
+        raise ValueError("StrategyND feature half must be zero or one")
+
+    def add(left: Any, right: Any) -> Any:
+        return lax.optimization_barrier(
+            (left + right).astype(jnp.bfloat16)
+        )
+
+    def reduce_four(values: Any, *, cross: bool) -> Any:
+        if cross:
+            return add(add(values[0], values[3]), add(values[1], values[2]))
+        return add(add(values[0], values[1]), add(values[2], values[3]))
+
+    physical_y_z = local_partials.reshape(4, 4, 1, 3072)
+    if feature_half == 0:
+        segments = (
+            (0, 2048, False),
+            (2048, 3072, True),
+        )
+    else:
+        segments = (
+            (0, 1024, True),
+            (1024, 3072, False),
+        )
+    return jnp.concatenate(
+        tuple(
+            reduce_four(physical_y_z[..., start:stop], cross=cross)
+            for start, stop, cross in segments
+        ),
+        axis=-1,
+    )
+
+
+def _reduce_strategy_nd_feature_half_bf16_partials(
+    local_half0_partials: Any,
+    local_half1_partials: Any,
+    *,
+    axis_name: str,
+    pairs: Sequence[tuple[int, int]],
+) -> Any:
+    """Return only the PP16 owner's exact 3,072-feature output shard.
+
+    Every owner computes its contributions to both output halves.  It retains
+    the half it owns, sends only the peer half's four z rows to the adjacent
+    owner, performs the accepted x add, and finishes z locally.  Consequently
+    neither a physical device nor a collective ever owns a complete 6,144-
+    feature update.  This is the feature2 projection boundary used for both
+    layer-0 attention output and dense down projection.
+    """
+
+    if not axis_name:
+        raise ValueError("StrategyND feature-half axis name must be explicit")
+    canonical_pairs = tuple((int(source), int(target)) for source, target in pairs)
+    sources = tuple(source for source, _ in canonical_pairs)
+    targets = tuple(target for _, target in canonical_pairs)
+    if (
+        len(canonical_pairs) != 2
+        or set(sources) != {0, 1}
+        or set(targets) != {0, 1}
+        or set(canonical_pairs) != {(0, 1), (1, 0)}
+    ):
+        raise ValueError(
+            "bounded PP16 feature-half reduction requires exact 0<->1 pairs"
+        )
+
+    half0_y = _strategy_nd_feature_half_y_reduce(
+        local_half0_partials, feature_half=0
+    )
+    half1_y = _strategy_nd_feature_half_y_reduce(
+        local_half1_partials, feature_half=1
+    )
+    local_slot = lax.axis_index(axis_name)
+    owns_half0 = local_slot == jnp.int32(0)
+    owned_y = jnp.where(owns_half0, half0_y, half1_y)
+    peer_y = jnp.where(owns_half0, half1_y, half0_y)
+    with jax.named_scope("greenfield_strategy_nd_feature2_lp2_x_exchange"):
+        received_y = lax.ppermute(
+            peer_y,
+            axis_name=axis_name,
+            perm=canonical_pairs,
+        )
+    x_reduced = lax.optimization_barrier(
+        (owned_y + received_y).astype(jnp.bfloat16)
+    )
+
+    def add(left: Any, right: Any) -> Any:
+        return lax.optimization_barrier(
+            (left + right).astype(jnp.bfloat16)
+        )
+
+    def reduce_four(values: Any, *, cross: bool) -> Any:
+        if cross:
+            return add(add(values[0], values[3]), add(values[1], values[2]))
+        return add(add(values[0], values[1]), add(values[2], values[3]))
+
+    # Both half offsets contain an even number of 256-column blocks, so the
+    # accepted alternating z association begins with the same phase locally.
+    return jnp.concatenate(
+        tuple(
+            reduce_four(
+                x_reduced[..., start : start + 256],
+                cross=bool((start // 256) % 2),
+            )
+            for start in range(0, 3072, 256)
+        ),
+        axis=-1,
+    )
+
+
 def _reduce_virtual_tp32_bf16_partials(
     local_partials: Any,
     *,
@@ -998,6 +1380,47 @@ def _axis_groups(
     if not value or any(not group for group in value):
         raise ValueError("stage-local axis groups must be non-empty")
     return value
+
+
+def _require_pp16_feature_sharded_attention_contract(
+    *,
+    axis_name: str,
+    groups: tuple[tuple[int, ...], ...] | None,
+    feature_pairs: Sequence[tuple[int, int]],
+    cache_layout: StageLocalKvLayout,
+    contract: MlaNumericalContract,
+    pregathered_b512_attention: bool,
+    linear_backend: StageLinearBackend,
+    add_residual: bool,
+    reconstruct_output_fp32: bool,
+    virtual_tp32_reduction_association: VirtualTp32ReductionAssociation | None,
+    replicated_monolithic_attention: bool,
+    capture_ingredients: bool,
+) -> None:
+    """Fail closed unless the isolated PP16 feature2 path is exact."""
+
+    if (
+        cache_layout.local_parallel_size != 2
+        or cache_layout.logical_page_size != 512
+        or cache_layout.local_rows_per_page != 256
+        or cache_layout.packed_cache_width != 640
+        or groups != ((0, 1),)
+        or not axis_name
+        or not pregathered_b512_attention
+        or tuple(feature_pairs) != ((0, 1), (1, 0))
+        or contract != MlaNumericalContract()
+        or linear_backend != "pallas"
+        or add_residual
+        or reconstruct_output_fp32
+        or virtual_tp32_reduction_association is not None
+        or replicated_monolithic_attention
+        or capture_ingredients
+    ):
+        raise ValueError(
+            "IndexShare feature-sharded output requires the isolated PP16 "
+            "LP2 pregathered-B512 BF16 Pallas no-residual path with exact "
+            "groups and 0<->1 feature pairs"
+        )
 
 
 def _require_decode_metadata(
@@ -1662,6 +2085,8 @@ def stage_local_index_share_fp8_mapped(
     replicated_monolithic_attention: bool = False,
     pregathered_b512_attention: bool = False,
     capture_ingredients: bool = False,
+    feature_sharded_output: bool = False,
+    feature_pairs: Sequence[tuple[int, int]] = (),
 ) -> StageLocalIndexShareFp8Result | StageLocalIndexShareFp8ObservedResult:
     """Consume compact DSA state and execute raw-FP8 stage-local sparse MLA."""
 
@@ -1688,6 +2113,8 @@ def stage_local_index_share_fp8_mapped(
         raise ValueError("IndexShare pregathered-B512 flag must be boolean")
     if not isinstance(capture_ingredients, bool):
         raise ValueError("IndexShare ingredient-capture flag must be boolean")
+    if not isinstance(feature_sharded_output, bool):
+        raise ValueError("IndexShare feature-sharded output flag must be boolean")
     if main_rope_table_row is not None and (
         main_rope_table_row.shape != (2 * (contract.qk_rope_head_dim // 2),)
         or main_rope_table_row.dtype != jnp.bfloat16
@@ -1726,8 +2153,17 @@ def stage_local_index_share_fp8_mapped(
             "pregathered-B512 attention must remain isolated from diagnostic "
             "attention/output variants"
         )
-    if pregathered_b512_attention and cache_layout.local_parallel_size != 4:
-        raise ValueError("pregathered-B512 attention is protected only for PP8 LP4")
+    if pregathered_b512_attention and not (
+        cache_layout.local_parallel_size == 4
+        or (
+            cache_layout.local_parallel_size == 2
+            and feature_sharded_output
+        )
+    ):
+        raise ValueError(
+            "pregathered-B512 attention requires PP8 LP4 or the isolated "
+            "PP16 feature-sharded path"
+        )
     if capture_ingredients and (
         reconstruct_output_fp32
         or virtual_tp32_reduction_association is not None
@@ -1735,6 +2171,27 @@ def stage_local_index_share_fp8_mapped(
     ):
         raise ValueError(
             "IndexShare ingredient capture requires the production BF16 Pallas path"
+        )
+    if feature_sharded_output:
+        _require_pp16_feature_sharded_attention_contract(
+            axis_name=axis_name,
+            groups=groups,
+            feature_pairs=feature_pairs,
+            cache_layout=cache_layout,
+            contract=contract,
+            pregathered_b512_attention=pregathered_b512_attention,
+            linear_backend=linear_backend,
+            add_residual=add_residual,
+            reconstruct_output_fp32=reconstruct_output_fp32,
+            virtual_tp32_reduction_association=(
+                virtual_tp32_reduction_association
+            ),
+            replicated_monolithic_attention=replicated_monolithic_attention,
+            capture_ingredients=capture_ingredients,
+        )
+    if not feature_sharded_output and feature_pairs:
+        raise ValueError(
+            "IndexShare feature pairs require feature-sharded output"
         )
     if contract.num_heads % cache_layout.local_parallel_size:
         raise ValueError("attention heads must divide over the local stage")
@@ -1985,22 +2442,40 @@ def stage_local_index_share_fp8_mapped(
             layout=cache_layout,
             owner_index=local_slot,
         )
-        with jax.named_scope("greenfield_selected_cache_lp4_exchange"):
+        selected_cache_scope = (
+            "greenfield_selected_cache_lp2_exchange"
+            if feature_sharded_output
+            else "greenfield_selected_cache_lp4_exchange"
+        )
+        with jax.named_scope(selected_cache_scope):
             selected_cache = lax.psum(
                 aligned.values,
                 axis_name=axis_name,
                 axis_index_groups=groups,
             )
-        with jax.named_scope("greenfield_pregathered_b512_attention"):
-            attended_local = pregathered_sparse_mla_pallas(
-                q_absorbed_local,
-                q_rope,
-                selected_cache,
-                aligned.valid_counts,
-                contract=replace(contract, num_heads=local_heads),
-                config=SparseMlaConfig(segment_block=512),
-                interpret=sparse_attention_interpret,
-            )
+        if feature_sharded_output:
+            with jax.named_scope(
+                "greenfield_pregathered_b512_attention_lp2"
+            ):
+                attended_local = _pregathered_b512_attention_lp2_h16_pair(
+                    q_absorbed_local,
+                    q_rope,
+                    selected_cache,
+                    aligned.valid_counts,
+                    contract=contract,
+                    interpret=sparse_attention_interpret,
+                )
+        else:
+            with jax.named_scope("greenfield_pregathered_b512_attention"):
+                attended_local = pregathered_sparse_mla_pallas(
+                    q_absorbed_local,
+                    q_rope,
+                    selected_cache,
+                    aligned.valid_counts,
+                    contract=replace(contract, num_heads=local_heads),
+                    config=SparseMlaConfig(segment_block=512),
+                    interpret=sparse_attention_interpret,
+                )
         attention_contract_valid = aligned.contract_valid
         partial = None
         combined = None
@@ -2145,7 +2620,33 @@ def stage_local_index_share_fp8_mapped(
         if capture_ingredients
         else None
     )
-    if virtual_tp32_reduction_association is not None:
+    if feature_sharded_output:
+        half0_partials = _virtual_attention_output_feature_half_partials(
+            output_input,
+            o_bits,
+            o_scale,
+            feature_half=0,
+            block_shape=block_shape,
+            linear_interpret=linear_interpret,
+        )
+        half1_partials = _virtual_attention_output_feature_half_partials(
+            output_input,
+            o_bits,
+            o_scale,
+            feature_half=1,
+            block_shape=block_shape,
+            linear_interpret=linear_interpret,
+        )
+        with jax.named_scope(
+            "greenfield_strategy_nd_feature2_attention_output"
+        ):
+            update = _reduce_strategy_nd_feature_half_bf16_partials(
+                half0_partials,
+                half1_partials,
+                axis_name=axis_name,
+                pairs=feature_pairs,
+            )
+    elif virtual_tp32_reduction_association is not None:
         local_partials = _virtual_attention_output_partials(
             output_input,
             o_bits,
@@ -2206,7 +2707,10 @@ def stage_local_index_share_fp8_mapped(
             backend=linear_backend,
             interpret=linear_interpret,
         )
-    if virtual_tp32_reduction_association is None:
+    if (
+        not feature_sharded_output
+        and virtual_tp32_reduction_association is None
+    ):
         update = lax.psum(
             local_update,
             axis_name=axis_name,
@@ -2259,6 +2763,38 @@ def stage_local_index_share_fp8_mapped(
             update,
         ),
     )
+
+
+def stage_local_dense_feature2_fp8_mapped(
+    normalized: Any,
+    merged_bits_in_out: Any,
+    merged_scale_in_out: Any,
+    down_bits_in_out: Any,
+    down_scale_in_out: Any,
+    *,
+    axis_name: str,
+    pairs: Sequence[tuple[int, int]],
+    block_shape: tuple[int, int] = (128, 128),
+) -> Any:
+    """Execute PP16 dense down directly into the persistent feature shard."""
+
+    half0, half1 = (
+        _virtual_dense_final_layout_convolution_feature_half_partials(
+            normalized,
+            merged_bits_in_out,
+            merged_scale_in_out,
+            down_bits_in_out,
+            down_scale_in_out,
+            block_shape=block_shape,
+        )
+    )
+    with jax.named_scope("greenfield_strategy_nd_feature2_dense_down"):
+        return _reduce_strategy_nd_feature_half_bf16_partials(
+            half0,
+            half1,
+            axis_name=axis_name,
+            pairs=pairs,
+        )
 
 
 def stage_local_dense_fp8_mapped(

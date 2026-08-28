@@ -314,6 +314,230 @@ def test_virtual_dense_pallas_partials_accept_exact_pp16_ownership(
     assert len(calls) == 16
 
 
+def test_virtual_attention_partials_accept_exact_pp16_feature_halves(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Shaped:
+        def __init__(
+            self,
+            shape: tuple[int, ...],
+            dtype: object,
+            *,
+            name: str,
+            key: object | None = None,
+        ):
+            self.shape = shape
+            self.dtype = dtype
+            self.name = name
+            self.key = key
+
+        def __getitem__(self, key: object) -> "Shaped":
+            if not isinstance(key, tuple) or len(key) != 2:
+                raise AssertionError(f"unexpected {self.name} slice: {key!r}")
+            row_key, column_key = key
+            if row_key != slice(None):
+                row_count = row_key.stop - row_key.start
+            else:
+                row_count = self.shape[0]
+            column_count = column_key.stop - column_key.start
+            return Shaped(
+                (row_count, column_count),
+                self.dtype,
+                name=self.name,
+                key=key,
+            )
+
+    calls = []
+
+    def fake_projection(*args: object, **kwargs: object) -> jax.Array:
+        calls.append((args, kwargs))
+        return jnp.zeros((1, 3072), dtype=jnp.bfloat16)
+
+    monkeypatch.setattr(
+        stage_local, "fp8_strategy_nd_attention_matmul", fake_projection
+    )
+    output = Shaped((1, 8192), jnp.bfloat16, name="output")
+    bits = Shaped((6144, 8192), jnp.uint8, name="bits")
+    scale = Shaped((48, 64), jnp.float32, name="scale")
+    for feature_half in (0, 1):
+        result = stage_local._virtual_attention_output_feature_half_partials(
+            output,
+            bits,
+            scale,
+            feature_half=feature_half,
+            block_shape=(128, 128),
+            linear_interpret=False,
+        )
+        assert result.shape == (16, 1, 3072)
+        assert result.dtype == jnp.bfloat16
+    assert len(calls) == 32
+    for feature_half in (0, 1):
+        for shard in range(16):
+            args, _ = calls[feature_half * 16 + shard]
+            lhs, weight, weight_scale = args[:3]
+            assert lhs.name == "output"
+            assert lhs.key == (
+                slice(None),
+                slice(shard * 512, (shard + 1) * 512),
+            )
+            assert weight.name == "bits"
+            assert weight.key == (
+                slice(feature_half * 3072, (feature_half + 1) * 3072),
+                slice(shard * 512, (shard + 1) * 512),
+            )
+            assert weight_scale.name == "scale"
+            assert weight_scale.key == (
+                slice(feature_half * 24, (feature_half + 1) * 24),
+                slice(shard * 4, (shard + 1) * 4),
+            )
+
+    with pytest.raises(ValueError, match="weight dtypes"):
+        stage_local._virtual_attention_output_feature_half_partials(
+            output,
+            Shaped(
+                (6144, 8192),
+                jnp.float8_e4m3fn,
+                name="bits",
+            ),
+            scale,
+            feature_half=0,
+            block_shape=(128, 128),
+            linear_interpret=False,
+        )
+
+
+def test_pp16_pregathered_attention_is_two_exact_h16_b512_consumers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    contract = stage_local.MlaNumericalContract()
+    q_nope = jnp.zeros((1, 32, 512), dtype=jnp.bfloat16)
+    q_rope = jnp.zeros((1, 32, 64), dtype=jnp.bfloat16)
+    selected_cache = jnp.zeros((1, 2048, 640), dtype=jnp.bfloat16)
+    valid_counts = jnp.asarray([2048], dtype=jnp.int32)
+    calls = []
+
+    def fake_attention(*args: object, **kwargs: object) -> jax.Array:
+        calls.append((args, kwargs))
+        return jnp.full(
+            (1, 16, 512), len(calls), dtype=jnp.bfloat16
+        )
+
+    monkeypatch.setattr(
+        stage_local, "pregathered_sparse_mla_pallas", fake_attention
+    )
+    result = stage_local._pregathered_b512_attention_lp2_h16_pair(
+        q_nope,
+        q_rope,
+        selected_cache,
+        valid_counts,
+        contract=contract,
+        interpret=False,
+    )
+    assert result.shape == (1, 32, 512)
+    assert np.all(np.asarray(result[:, :16], dtype=np.float32) == 1)
+    assert np.all(np.asarray(result[:, 16:], dtype=np.float32) == 2)
+    assert len(calls) == 2
+    for head_half, (args, kwargs) in enumerate(calls):
+        np.testing.assert_array_equal(
+            np.asarray(args[0]),
+            np.asarray(q_nope[:, head_half * 16 : (head_half + 1) * 16]),
+        )
+        np.testing.assert_array_equal(
+            np.asarray(args[1]),
+            np.asarray(q_rope[:, head_half * 16 : (head_half + 1) * 16]),
+        )
+        assert args[2] is selected_cache
+        assert args[3] is valid_counts
+        assert kwargs["contract"].num_heads == 16
+        assert kwargs["contract"].top_k == 2048
+        assert kwargs["config"].segment_block == 512
+
+    with pytest.raises(ValueError, match="exact GLM MLA contract"):
+        stage_local._pregathered_b512_attention_lp2_h16_pair(
+            q_nope,
+            q_rope,
+            selected_cache,
+            valid_counts,
+            contract=stage_local.MlaNumericalContract(num_heads=32),
+            interpret=False,
+        )
+
+
+def test_pp16_pregathered_attention_jaxpr_has_exact_h16_b512_lineage() -> None:
+    contract = stage_local.MlaNumericalContract()
+    arguments = (
+        jax.ShapeDtypeStruct((1, 32, 512), jnp.bfloat16),
+        jax.ShapeDtypeStruct((1, 32, 64), jnp.bfloat16),
+        jax.ShapeDtypeStruct((1, 2048, 640), jnp.bfloat16),
+        jax.ShapeDtypeStruct((1,), jnp.int32),
+    )
+
+    def execute(*args: object) -> jax.Array:
+        return stage_local._pregathered_b512_attention_lp2_h16_pair(
+            *args,
+            contract=contract,
+            interpret=False,
+        )
+
+    jaxpr = str(jax.make_jaxpr(execute)(*arguments))
+    assert jaxpr.count(
+        "name=greenfield_pregathered_sparse_mla_h16_k2048_b512_w640"
+    ) == 2
+    assert "h32_k2048" not in jaxpr
+    assert "all_gather" not in jaxpr
+    assert "bf16[1,32,512] = concatenate[dimension=1]" in jaxpr
+
+
+def test_pp16_feature_attention_contract_rejects_every_legacy_escape() -> None:
+    valid = {
+        "axis_name": "feature",
+        "groups": ((0, 1),),
+        "feature_pairs": ((0, 1), (1, 0)),
+        "cache_layout": stage_local.StageLocalKvLayout(
+            logical_page_size=512,
+            local_parallel_size=2,
+            packed_cache_width=640,
+        ),
+        "contract": stage_local.MlaNumericalContract(),
+        "pregathered_b512_attention": True,
+        "linear_backend": "pallas",
+        "add_residual": False,
+        "reconstruct_output_fp32": False,
+        "virtual_tp32_reduction_association": None,
+        "replicated_monolithic_attention": False,
+        "capture_ingredients": False,
+    }
+    stage_local._require_pp16_feature_sharded_attention_contract(**valid)
+    mutations = (
+        {"axis_name": ""},
+        {"groups": None},
+        {"groups": ((0, 1, 2, 3),)},
+        {"feature_pairs": ()},
+        {
+            "cache_layout": stage_local.StageLocalKvLayout(
+                logical_page_size=512,
+                local_parallel_size=4,
+                packed_cache_width=640,
+            )
+        },
+        {"contract": stage_local.MlaNumericalContract(num_heads=32)},
+        {"pregathered_b512_attention": False},
+        {"linear_backend": "reference"},
+        {"add_residual": True},
+        {"reconstruct_output_fp32": True},
+        {"virtual_tp32_reduction_association": "strategy_nd_row0_bf16"},
+        {"replicated_monolithic_attention": True},
+        {"capture_ingredients": True},
+    )
+    for mutation in mutations:
+        candidate = dict(valid)
+        candidate.update(mutation)
+        with pytest.raises(ValueError, match="isolated PP16"):
+            stage_local._require_pp16_feature_sharded_attention_contract(
+                **candidate
+            )
+
+
 def test_strategy_nd_row0_forced_four_device_gather_is_local_and_exact() -> None:
     program = r'''
 import json
@@ -435,6 +659,204 @@ print(json.dumps({
         "lane_replication": True,
         "payload_present": True,
         "shape": [2, 1, 6144],
+    }
+
+
+def test_strategy_nd_feature_half_forced_two_device_is_exact_and_never_full() -> None:
+    program = r'''
+import json
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from glm_tpu.greenfield.kernels.stage_local import (
+    _reduce_strategy_nd_feature_half_bf16_partials,
+    _strategy_nd_row0_bf16_reduce,
+)
+
+mesh = Mesh(np.asarray(jax.devices()), ("stage",))
+source = np.arange(2 * 16 * 6144, dtype=np.float32).reshape(2, 16, 1, 6144)
+source = jnp.asarray(np.sin(source / 37.0), dtype=jnp.bfloat16)
+half0 = jax.device_put(
+    source[..., :3072],
+    NamedSharding(mesh, P("stage", None, None, None)),
+)
+half1 = jax.device_put(
+    source[..., 3072:],
+    NamedSharding(mesh, P("stage", None, None, None)),
+)
+
+def mapped(local_half0, local_half1):
+    reduced = _reduce_strategy_nd_feature_half_bf16_partials(
+        local_half0[0],
+        local_half1[0],
+        axis_name="stage",
+        pairs=((0, 1), (1, 0)),
+    )
+    return reduced[None, ...]
+
+execute = jax.shard_map(
+    mapped,
+    mesh=mesh,
+    in_specs=(
+        P("stage", None, None, None),
+        P("stage", None, None, None),
+    ),
+    out_specs=P("stage", None, None),
+    check_vma=False,
+)
+lowered = jax.jit(execute).lower(half0, half1)
+actual = np.asarray(jax.jit(execute)(half0, half1))
+expected = np.asarray(
+    jax.jit(_strategy_nd_row0_bf16_reduce)(source.reshape(32, 1, 6144))
+)
+concatenated = np.concatenate((actual[0], actual[1]), axis=-1)
+stablehlo = lowered.as_text()
+print(json.dumps({
+    "all_gather_count": stablehlo.count("stablehlo.all_gather"),
+    "all_reduce_count": stablehlo.count("stablehlo.all_reduce"),
+    "collective_permute_count": stablehlo.count("stablehlo.collective_permute"),
+    "exact": bool(np.array_equal(
+        concatenated.view(np.uint16), expected.view(np.uint16)
+    )),
+    "forbidden_full_hidden": "tensor<1x6144xbf16>" in stablehlo,
+    "payload_present": "tensor<4x1x3072xbf16>" in stablehlo,
+    "shape": list(actual.shape),
+}, sort_keys=True))
+'''
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    env["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result == {
+        "all_gather_count": 0,
+        "all_reduce_count": 0,
+        "collective_permute_count": 1,
+        "exact": True,
+        "forbidden_full_hidden": False,
+        "payload_present": True,
+        "shape": [2, 1, 3072],
+    }
+
+
+def test_strategy_nd_feature_half_rejects_wrong_geometry_dtype_or_pairs() -> None:
+    from glm_tpu.greenfield.kernels.stage_local import (
+        _reduce_strategy_nd_feature_half_bf16_partials,
+        _strategy_nd_feature_half_y_reduce,
+    )
+
+    valid = jnp.zeros((16, 1, 3072), dtype=jnp.bfloat16)
+    with np.testing.assert_raises_regex(ValueError, "16 one-row"):
+        _strategy_nd_feature_half_y_reduce(
+            valid[:, :, :-1], feature_half=0
+        )
+    with np.testing.assert_raises_regex(ValueError, "rounded BF16"):
+        _strategy_nd_feature_half_y_reduce(
+            valid.astype(jnp.float32), feature_half=0
+        )
+    with np.testing.assert_raises_regex(ValueError, "zero or one"):
+        _strategy_nd_feature_half_y_reduce(valid, feature_half=2)
+    with np.testing.assert_raises_regex(ValueError, "exact 0<->1 pairs"):
+        _reduce_strategy_nd_feature_half_bf16_partials(
+            valid,
+            valid,
+            axis_name="stage",
+            pairs=((0, 1),),
+        )
+
+
+def test_pp16_feature2_dense_graph_has_only_half_output_and_one_exchange() -> None:
+    program = r'''
+import json
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from glm_tpu.greenfield.kernels.stage_local import (
+    stage_local_dense_feature2_fp8_mapped,
+)
+
+mesh = Mesh(np.asarray(jax.devices()), ("feature",))
+def abstract(shape, dtype, spec):
+    return jax.ShapeDtypeStruct(
+        shape, dtype, sharding=NamedSharding(mesh, spec)
+    )
+
+def mapped(normalized, merged_bits, merged_scale, down_bits, down_scale):
+    value = stage_local_dense_feature2_fp8_mapped(
+        normalized,
+        merged_bits[0],
+        merged_scale[0],
+        down_bits[0],
+        down_scale[0],
+        axis_name="feature",
+        pairs=((0, 1), (1, 0)),
+    )
+    return value[None, ...]
+
+execute = jax.shard_map(
+    mapped,
+    mesh=mesh,
+    in_specs=(
+        P(),
+        P("feature", None, None, None),
+        P("feature", None, None, None),
+        P("feature", None, None, None),
+        P("feature", None, None, None),
+    ),
+    out_specs=P("feature", None, None),
+    check_vma=False,
+)
+arguments = (
+    abstract((1, 6144), jnp.bfloat16, P()),
+    abstract((2, 16, 6144, 768), jnp.uint8, P("feature", None, None, None)),
+    abstract((2, 16, 48, 768), jnp.float32, P("feature", None, None, None)),
+    abstract((2, 16, 384, 6144), jnp.uint8, P("feature", None, None, None)),
+    abstract((2, 16, 3, 6144), jnp.float32, P("feature", None, None, None)),
+)
+stablehlo = jax.jit(execute).lower(*arguments).as_text()
+public = next(
+    line.strip() for line in stablehlo.splitlines()
+    if "func.func public @main" in line
+)
+print(json.dumps({
+    "all_gather_count": stablehlo.count("stablehlo.all_gather"),
+    "all_reduce_count": stablehlo.count("stablehlo.all_reduce"),
+    "collective_permute_count": stablehlo.count("stablehlo.collective_permute"),
+    "convolution_count": stablehlo.count("stablehlo.convolution"),
+    "half_output": "-> (tensor<2x1x3072xbf16>" in public,
+    "payload_present": "tensor<4x1x3072xbf16>" in stablehlo,
+}, sort_keys=True))
+'''
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    env["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=180,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result == {
+        "all_gather_count": 0,
+        "all_reduce_count": 0,
+        "collective_permute_count": 1,
+        "convolution_count": 48,
+        "half_output": True,
+        "payload_present": True,
     }
 
 

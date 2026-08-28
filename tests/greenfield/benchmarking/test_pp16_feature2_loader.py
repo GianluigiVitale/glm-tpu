@@ -281,3 +281,129 @@ print(json.dumps(result, sort_keys=True))
     }
     assert result["receipt_count"] == 6
     assert result["scale"] == [[2.25], [3.25]]
+
+
+def test_forced_two_loader_packs_dense_before_any_device_materialization(
+    tmp_path: Path,
+) -> None:
+    dense_names = (
+        "dense.slot_00.gate.weight_bits",
+        "dense.slot_00.gate.scale_inv",
+        "dense.slot_00.up.weight_bits",
+        "dense.slot_00.up.scale_inv",
+        "dense.slot_00.down.weight_bits",
+        "dense.slot_00.down.scale_inv",
+    )
+    allowed = []
+    for slot in (0, 1):
+        filename = f"owner{slot}.bin"
+        raw = bytearray(b"prefix00")
+        for index, name in enumerate(dense_names):
+            if name.endswith("weight_bits"):
+                dtype = "U8"
+                shape = (2,)
+                value = bytes([slot + 1, index + 1])
+            else:
+                dtype = "F32"
+                shape = (1,)
+                value = np.asarray([slot + index + 0.25], np.float32).tobytes()
+            offset = len(raw)
+            raw.extend(value)
+            allowed.append(
+                _tensor(
+                    slot=slot,
+                    filename=filename,
+                    name=name,
+                    offset=offset,
+                    value=value,
+                    dtype=dtype,
+                    shape=shape,
+                )
+            )
+        (tmp_path / filename).write_bytes(raw)
+    (tmp_path / "plan.json").write_text(
+        json.dumps([tensor.to_dict() for tensor in allowed], sort_keys=True)
+    )
+    program = r'''
+import json
+from pathlib import Path
+import jax
+import numpy as np
+import glm_tpu.greenfield.benchmarking.pp16_dense_boundary as dense
+import glm_tpu.greenfield.benchmarking.pp16_feature2_loader as loader
+from glm_tpu.greenfield.benchmarking.pp16_feature2_loader import (
+    _load_ranges_to_final_owners,
+)
+from glm_tpu.greenfield.benchmarking.pp16_feature_sharded_state import (
+    Feature2TensorRead,
+)
+
+root = Path(__import__("os").environ["FEATURE2_TEST_ROOT"])
+allowed = tuple(
+    Feature2TensorRead(**item)
+    for item in json.loads((root / "plan.json").read_text())
+)
+def fake_pack(owner):
+    assert len(owner) == 6
+    seed = int(owner["dense.slot_00.gate.weight_bits"].reshape(-1)[0])
+    return (
+        np.full((1, 2, 3), seed, np.uint8),
+        np.full((1, 1, 3), seed + 0.5, np.float32),
+        np.full((1, 3, 2), seed + 1, np.uint8),
+        np.full((1, 1, 2), seed + 1.5, np.float32),
+    )
+dense.pack_pp16_dense_final_layout_owner = fake_pack
+dense.validate_pp16_dense_final_layout_records = lambda records: None
+loader._FINAL_WEIGHT_BYTES_PER_OWNER = 32
+weights, receipts, placement = _load_ranges_to_final_owners(
+    root,
+    allowed,
+    jax.devices(),
+    axis_name="feature",
+    chunk_bytes=5,
+    pack_dense_final_layout=True,
+)
+result = {
+    "derived_names": sorted(weights),
+    "device_roundtrip_bytes": placement["device_roundtrip_bytes"],
+    "raw_dense_device_materialization": placement[
+        "raw_dense_device_materialization"
+    ],
+    "receipt_count": len(receipts),
+    "shapes": {name: list(value.shape) for name, value in weights.items()},
+}
+for value in weights.values():
+    value.delete()
+print(json.dumps(result, sort_keys=True))
+'''
+    env = dict(os.environ)
+    env["FEATURE2_TEST_ROOT"] = str(tmp_path)
+    env["JAX_PLATFORMS"] = "cpu"
+    env["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=180,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result == {
+        "derived_names": [
+            "dense.slot_00.down.scale_inv_in_out",
+            "dense.slot_00.down.weight_bits_in_out",
+            "dense.slot_00.merged_gate_up.scale_inv_in_out",
+            "dense.slot_00.merged_gate_up.weight_bits_in_out",
+        ],
+        "device_roundtrip_bytes": 64,
+        "raw_dense_device_materialization": False,
+        "receipt_count": 12,
+        "shapes": {
+            "dense.slot_00.down.scale_inv_in_out": [2, 1, 1, 2],
+            "dense.slot_00.down.weight_bits_in_out": [2, 1, 3, 2],
+            "dense.slot_00.merged_gate_up.scale_inv_in_out": [2, 1, 1, 3],
+            "dense.slot_00.merged_gate_up.weight_bits_in_out": [2, 1, 2, 3],
+        },
+    }

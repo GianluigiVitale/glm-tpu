@@ -399,6 +399,74 @@ print(json.dumps(result, sort_keys=True))
     assert result["contract"]["all_gather_count"] == 1
 
 
+def test_feature2_embedding_forced_two_is_exact_and_never_builds_full_row() -> None:
+    program = r'''
+import json
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from glm_tpu.greenfield.benchmarking.pp16_feature_sharded_state import (
+    feature2_embedding_mapped,
+)
+
+mesh = Mesh(np.asarray(jax.devices()), ("feature",))
+source = np.arange(2 * 4 * 6144, dtype=np.float32).reshape(2, 4, 6144)
+source = np.asarray(np.sin(source / 29.0), dtype=jnp.bfloat16)
+embedding = jax.device_put(
+    source,
+    NamedSharding(mesh, P("feature", None, None)),
+)
+def mapped(local_embedding, token):
+    value = feature2_embedding_mapped(
+        token,
+        local_embedding[0],
+        axis_name="feature",
+        pairs=((0, 1), (1, 0)),
+    )
+    return value[None, ...]
+execute = jax.shard_map(
+    mapped,
+    mesh=mesh,
+    in_specs=(P("feature", None, None), P()),
+    out_specs=P("feature", None, None),
+    check_vma=False,
+)
+token = jnp.asarray(5, dtype=jnp.int32)
+lowered = jax.jit(execute).lower(embedding, token)
+actual = np.asarray(jax.jit(execute)(embedding, token))
+concatenated = np.concatenate((actual[0], actual[1]), axis=-1)
+stablehlo = lowered.as_text()
+print(json.dumps({
+    "collective_permute_count": stablehlo.count("stablehlo.collective_permute"),
+    "exact": bool(np.array_equal(
+        concatenated.view(np.uint16), source[1, 1][None, :].view(np.uint16)
+    )),
+    "full_activation": "tensor<1x6144xbf16>" in stablehlo,
+    "half_slice_count": stablehlo.count("tensor<1x3072xbf16>"),
+    "shape": list(actual.shape),
+}, sort_keys=True))
+'''
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    env["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=180,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result["collective_permute_count"] == 1
+    assert result["exact"]
+    assert not result["full_activation"]
+    assert result["half_slice_count"] > 0
+    assert result["shape"] == [2, 1, 3072]
+
+
 def test_feature2_stablehlo_mutations_refuse() -> None:
     program = r'''
 import json

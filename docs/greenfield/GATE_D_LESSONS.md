@@ -15,8 +15,11 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   generate its own layer-1 query and all 8,156 layer-1 index keys, because accepted top-k output
   cannot rescore candidate query/key state. Stop before layer-1 attention output/MLP/dense and all
   later layers. Exact manifest/header derivation selects 39 ranges and 1,199,760,512 weight bytes
-  per owner; the selective state upper bound including cache/other allowance is 1,257,459,584
-  bytes/device. A norm-only replay is
+  per owner. Acquisition-mode loading converts only the six authenticated dense leaves into their
+  DB550-proven final `[in,out]` layout before device placement; expanded scales raise the selective
+  state upper bound including cache/other allowance to 1,260,970,880 bytes/device. The direct
+  feature-half projection exchanges one `[4,1,3072]` y-reduced payload and finishes the accepted
+  y→x→z tree locally; no complete projection update exists on either device. A norm-only replay is
   already rejected offline and cannot authorize metal. Forced CPU/StableHLO and manifest checks are
   scaffold evidence only; Gate D remains open until an exact complete protected 8K decoder.
 - The PP16 final-layout y-x-z run closes all upstream layer-0 arithmetic in the live two-chip graph:
@@ -593,6 +596,11 @@ branches from the search tree.
   the full graph and test all source/checkpoint/wrapper schemas locally, then spend one protected
   compile solely to acquire the TPU-specific lowering. The acquisition must be structurally
   incapable of arithmetic publication.
+- An offline JAX test is offline only when its process explicitly sets `JAX_PLATFORMS=cpu` before
+  import. Never rely on the test name, `XLA_FLAGS`, or the caller's environment: on a TPU worker,
+  an omitted platform pin can open `/dev/accel*` during collection or lowering. Such a process is
+  unauthorized outside the fleet lease and its output is inadmissible; terminate the exact PID,
+  verify no accelerator handles remain, and rerun with the CPU platform forced.
 
 ## Upstream-obsolescence guardrail
 

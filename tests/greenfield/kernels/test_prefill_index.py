@@ -286,3 +286,94 @@ def test_prompt_index_repair_supports_lp8_offset_and_valid_tail() -> None:
         np.count_nonzero(np.asarray(repaired[owner]).view(np.uint16)) == 0
         for owner in range(3, 8)
     )
+
+
+def test_prompt_index_repair_supports_lp2_page_ownership() -> None:
+    contract = _contract()
+    prompt_chunk = 2048
+    valid_rows = 2012
+    position_offset = 4096
+    history = jnp.asarray(
+        np.sin(
+            np.arange(prompt_chunk * 8, dtype=np.float32).reshape(
+                prompt_chunk, 8
+            )
+            / 67.0
+        ),
+        dtype=jnp.bfloat16,
+    )
+    initial = jnp.zeros((12, 256, 4), dtype=jnp.bfloat16)
+    block_tables = jnp.arange(12, dtype=jnp.int32)[None, :]
+    wk_weight = jnp.asarray(
+        np.cos(np.arange(4 * 8, dtype=np.float32).reshape(4, 8) / 11.0),
+        dtype=jnp.float32,
+    )
+    key_norm = jnp.asarray([1.0, 0.75, -0.5, 1.25], dtype=jnp.bfloat16)
+    key_bias = jnp.asarray([0.0, 0.25, -0.125, 0.5], dtype=jnp.bfloat16)
+    repaired = tuple(
+        repair_stage_local_prompt_index_cache(
+            initial,
+            history,
+            block_tables,
+            wk_weight,
+            key_norm,
+            key_bias,
+            jnp.int32(owner),
+            contract=contract,
+            logical_page_size=512,
+            local_rows_per_page=256,
+            prompt_chunk=prompt_chunk,
+            physical_rows=64,
+            local_parallel_size=2,
+            position_offset=position_offset,
+            valid_rows=valid_rows,
+        )
+        for owner in range(2)
+    )
+    direct = physical_m64_prompt_index_key_chunk(
+        history,
+        jnp.arange(
+            position_offset,
+            position_offset + prompt_chunk,
+            dtype=jnp.int32,
+        ),
+        wk_weight,
+        key_norm,
+        key_bias,
+        contract=contract,
+        physical_rows=64,
+    ).astype(jnp.bfloat16)
+
+    logical = np.stack(
+        tuple(
+            np.asarray(repaired[(position % 512) // 256])[
+                position // 512, position % 256
+            ]
+            for position in range(
+                position_offset, position_offset + valid_rows
+            )
+        ),
+        axis=0,
+    )
+    np.testing.assert_array_equal(
+        logical.view(np.uint16),
+        np.asarray(direct[:valid_rows]).view(np.uint16),
+    )
+    masked_tail = np.stack(
+        tuple(
+            np.asarray(repaired[(position % 512) // 256])[
+                position // 512, position % 256
+            ]
+            for position in range(
+                position_offset + valid_rows,
+                position_offset + prompt_chunk,
+            )
+        ),
+        axis=0,
+    )
+    assert masked_tail.shape == (36, 4)
+    assert np.count_nonzero(masked_tail.view(np.uint16)) == 0
+    assert all(
+        np.count_nonzero(np.asarray(value)[:8].view(np.uint16)) == 0
+        for value in repaired
+    )

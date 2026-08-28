@@ -43,6 +43,31 @@ _DTYPE_BY_HEADER = {
     "F32": np.dtype("<f4"),
     "U8": np.dtype("u1"),
 }
+_DENSE_SOURCE_NAMES = frozenset(
+    {
+        "dense.slot_00.gate.weight_bits",
+        "dense.slot_00.gate.scale_inv",
+        "dense.slot_00.up.weight_bits",
+        "dense.slot_00.up.scale_inv",
+        "dense.slot_00.down.weight_bits",
+        "dense.slot_00.down.scale_inv",
+    }
+)
+_DENSE_FINAL_NAMES = (
+    "dense.slot_00.merged_gate_up.weight_bits_in_out",
+    "dense.slot_00.merged_gate_up.scale_inv_in_out",
+    "dense.slot_00.down.weight_bits_in_out",
+    "dense.slot_00.down.scale_inv_in_out",
+)
+_DENSE_FINAL_DTYPES = {
+    _DENSE_FINAL_NAMES[0]: "uint8",
+    _DENSE_FINAL_NAMES[1]: "float32",
+    _DENSE_FINAL_NAMES[2]: "uint8",
+    _DENSE_FINAL_NAMES[3]: "float32",
+}
+_DENSE_SOURCE_BYTES_PER_OWNER = 113_273_856
+_DENSE_FINAL_BYTES_PER_OWNER = 116_785_152
+_FINAL_WEIGHT_BYTES_PER_OWNER = 1_203_271_808
 
 
 @dataclass(slots=True)
@@ -214,6 +239,7 @@ def _load_ranges_to_final_owners(
     *,
     axis_name: str,
     chunk_bytes: int,
+    pack_dense_final_layout: bool = False,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
     """Execute an already-authenticated plan; production derives it internally."""
 
@@ -242,17 +268,61 @@ def _load_ranges_to_final_owners(
         raise CheckpointValidationError(
             "feature2 selective owners have different tensor sets"
         )
+    if not isinstance(pack_dense_final_layout, bool):
+        raise CheckpointValidationError(
+            "feature2 dense final-layout flag must be boolean"
+        )
+    if pack_dense_final_layout and not _DENSE_SOURCE_NAMES.issubset(
+        names_by_slot[0]
+    ):
+        raise CheckpointValidationError(
+            "feature2 dense final-layout source set is incomplete"
+        )
 
     mesh = Mesh(np.asarray(runtime_devices, dtype=object), (axis_name,))
+    output_names = set(names_by_slot[0])
+    if pack_dense_final_layout:
+        output_names.difference_update(_DENSE_SOURCE_NAMES)
+        output_names.update(_DENSE_FINAL_NAMES)
     local_by_name: dict[str, dict[int, Any]] = {
-        name: {} for name in names_by_slot[0]
+        name: {} for name in output_names
     }
     global_weights: dict[str, Any] = {}
     receipts: list[dict[str, Any]] = []
     loaded_local_arrays: list[Any] = []
+    dense_sources: dict[int, dict[str, np.ndarray]] = {0: {}, 1: {}}
     roundtrip_bytes = 0
+    roundtrip_bytes_by_slot = {0: 0, 1: 0}
+
+    def place(
+        slot: int,
+        name: str,
+        host: np.ndarray,
+        observed_sha: str,
+    ) -> None:
+        nonlocal roundtrip_bytes
+        device = runtime_devices[slot]
+        array = jax.device_put(host, device)
+        array.block_until_ready()
+        if tuple(array.shape) != tuple(host.shape) or (
+            array.nbytes != host.nbytes
+        ) or tuple(array.devices()) != (device,):
+            array.delete()
+            raise CheckpointValidationError(
+                f"feature2 tensor {name!r} missed its final owner"
+            )
+        if _array_bytes_sha256(jax.device_get(array)) != observed_sha:
+            array.delete()
+            raise CheckpointValidationError(
+                f"feature2 tensor {name!r} device bytes drifted"
+            )
+        roundtrip_bytes += int(host.nbytes)
+        roundtrip_bytes_by_slot[slot] += int(host.nbytes)
+        local_by_name[name][slot] = array
+        loaded_local_arrays.append(array)
+
     try:
-        for slot, device in enumerate(runtime_devices):
+        for slot in range(len(runtime_devices)):
             for tensor in sorted(
                 by_slot[slot], key=lambda item: (item.offset, item.name)
             ):
@@ -260,42 +330,91 @@ def _load_ranges_to_final_owners(
                 host, observed_sha = _read_authenticated_range(
                     path, tensor, chunk_bytes=chunk_bytes
                 )
-                array = jax.device_put(host, device)
-                array.block_until_ready()
-                if tuple(array.shape) != (1, *tensor.shape) or (
-                    array.nbytes != tensor.byte_count
-                ) or tuple(array.devices()) != (device,):
-                    array.delete()
-                    raise CheckpointValidationError(
-                        f"feature2 tensor {tensor.name!r} missed its final owner"
-                    )
-                if _array_bytes_sha256(jax.device_get(array)) != observed_sha:
-                    array.delete()
-                    raise CheckpointValidationError(
-                        f"feature2 tensor {tensor.name!r} device bytes drifted"
-                    )
-                roundtrip_bytes += tensor.byte_count
-                local_by_name[tensor.name][slot] = array
-                loaded_local_arrays.append(array)
                 receipts.append(tensor.to_dict())
-                del host
+                if pack_dense_final_layout and tensor.name in _DENSE_SOURCE_NAMES:
+                    dense_sources[slot][tensor.name] = host[0]
+                else:
+                    place(slot, tensor.name, host, observed_sha)
+                    del host
 
-        for name in sorted(names_by_slot[0]):
-            first = next(item for item in by_slot[0] if item.name == name)
+        dense_records: dict[str, dict[str, Any]] = {}
+        if pack_dense_final_layout:
+            from .pp16_dense_boundary import (
+                pack_pp16_dense_final_layout_owner,
+                validate_pp16_dense_final_layout_records,
+            )
+
+            digests = {name: sha256() for name in _DENSE_FINAL_NAMES}
+            byte_counts = {name: 0 for name in _DENSE_FINAL_NAMES}
+            shapes: dict[str, tuple[int, ...]] = {}
+            for slot in (0, 1):
+                packed = pack_pp16_dense_final_layout_owner(
+                    dense_sources[slot]
+                )
+                for name, host_owner in zip(
+                    _DENSE_FINAL_NAMES, packed, strict=True
+                ):
+                    host_owner = np.ascontiguousarray(host_owner)
+                    digests[name].update(host_owner.tobytes(order="C"))
+                    byte_counts[name] += int(host_owner.nbytes)
+                    shapes[name] = (2, *host_owner.shape)
+                    local_sha = sha256(
+                        host_owner.tobytes(order="C")
+                    ).hexdigest()
+                    place(slot, name, host_owner[None, ...], local_sha)
+                dense_sources[slot].clear()
+            dense_records = {
+                name: {
+                    "byte_count": byte_counts[name],
+                    "dtype": _DENSE_FINAL_DTYPES[name],
+                    "sha256": digests[name].hexdigest(),
+                    "shape": list(shapes[name]),
+                    "transform": "pp16_2x16_accepted_in_out_dense",
+                }
+                for name in _DENSE_FINAL_NAMES
+            }
+            validate_pp16_dense_final_layout_records(dense_records)
+            if set(roundtrip_bytes_by_slot.values()) != {
+                _FINAL_WEIGHT_BYTES_PER_OWNER
+            }:
+                raise CheckpointValidationError(
+                    "feature2 final-layout device byte totals drifted"
+                )
+
+        for name in sorted(output_names):
+            local_shape = tuple(local_by_name[name][0].shape[1:])
             sharding = NamedSharding(
                 mesh,
-                P(axis_name, *(None for _ in first.shape)),
+                P(axis_name, *(None for _ in local_shape)),
             )
             global_weights[name] = jax.make_array_from_single_device_arrays(
-                (2, *first.shape),
+                (2, *local_shape),
                 sharding,
                 (local_by_name[name][0], local_by_name[name][1]),
             )
-        return global_weights, receipts, {
+        placement = {
             "device_roundtrip_bytes": roundtrip_bytes,
             "mesh_axis": axis_name,
             "owner_device_ids": [int(device.id) for device in runtime_devices],
         }
+        if pack_dense_final_layout:
+            placement.update(
+                {
+                    "dense_final_layout": True,
+                    "dense_final_layout_records": dense_records,
+                    "dense_final_layout_bytes_per_owner": (
+                        _DENSE_FINAL_BYTES_PER_OWNER
+                    ),
+                    "dense_source_bytes_per_owner": (
+                        _DENSE_SOURCE_BYTES_PER_OWNER
+                    ),
+                    "final_weight_bytes_per_owner": (
+                        _FINAL_WEIGHT_BYTES_PER_OWNER
+                    ),
+                    "raw_dense_device_materialization": False,
+                }
+            )
+        return global_weights, receipts, placement
     except Exception:
         for array in global_weights.values():
             try:
@@ -316,6 +435,7 @@ def load_feature2_selective_checkpoint(
     *,
     axis_name: str = "feature",
     chunk_bytes: int = 64 * 1024 * 1024,
+    pack_dense_final_layout: bool = False,
 ) -> LoadedFeature2SelectiveCheckpoint:
     """Load exactly 39 selected tensors on each PP16 stage-0 owner."""
 
@@ -340,6 +460,7 @@ def load_feature2_selective_checkpoint(
         runtime_devices,
         axis_name=axis_name,
         chunk_bytes=chunk_bytes,
+        pack_dense_final_layout=pack_dense_final_layout,
     )
     try:
         read_report = validate_feature2_acquisition_reads(allowed, receipts)

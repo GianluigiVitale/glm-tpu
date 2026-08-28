@@ -63,8 +63,8 @@ PP16_FEATURE2_ACCEPTED_CARRIED_HALF_SHA256 = (
     "d6d8ded037474d90b3b8f8a649dc52fc17a290a40cbdf95f64b76f6741f3486e",
     "86f5e4a963e5c2a91195e3b9d6215d9d52fac579cdac2339e96c0f8788d1d1dd",
 )
-PP16_FEATURE2_MINIMUM_STATE_BYTES_PER_DEVICE = 1_257_459_584
-PP16_TWO_LAYER_STATE_BYTES_PER_DEVICE = 1_370_733_440
+PP16_FEATURE2_MINIMUM_STATE_BYTES_PER_DEVICE = 1_260_970_880
+PP16_TWO_LAYER_STATE_BYTES_PER_DEVICE = 1_374_244_736
 PP16_FEATURE2_SELECTED_WEIGHT_BYTES_PER_DEVICE = 1_199_760_512
 
 _HOST_MARKERS = (
@@ -916,6 +916,7 @@ def lower_feature2_transport(*, devices: Sequence[Any] | None = None) -> Lowered
 
     import jax
     from jax import lax
+    import jax
     import jax.numpy as jnp
     from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
@@ -1300,11 +1301,124 @@ def validate_feature2_boundary_stablehlo(stablehlo: str) -> dict[str, Any]:
     return report
 
 
+def feature2_embedding_mapped(
+    token_id: Any,
+    embedding: Any,
+    *,
+    axis_name: str,
+    pairs: Sequence[tuple[int, int]],
+) -> Any:
+    """Select one token directly into the owner's persistent feature half."""
+
+    import jax
+    import jax.numpy as jnp
+    from jax import lax
+
+    if token_id.shape != () or not jnp.issubdtype(token_id.dtype, jnp.integer):
+        raise ValueError("feature2 token id must be one integer scalar")
+    if embedding.ndim != 2 or embedding.shape[1] != PP16_FEATURE2_HIDDEN_WIDTH:
+        raise ValueError("feature2 embedding owner geometry drifted")
+    if embedding.dtype != jnp.bfloat16 or embedding.shape[0] <= 0:
+        raise ValueError("feature2 embedding owner must be nonempty BF16")
+    canonical_pairs = tuple((int(source), int(target)) for source, target in pairs)
+    if set(canonical_pairs) != {(0, 1), (1, 0)} or len(canonical_pairs) != 2:
+        raise ValueError("feature2 embedding requires exact 0<->1 pairs")
+
+    local_slot = lax.axis_index(axis_name)
+    local_vocab = jnp.int32(embedding.shape[0])
+    global_vocab = local_vocab * jnp.int32(2)
+    local_start = local_slot.astype(jnp.int32) * local_vocab
+    valid = (token_id >= jnp.int32(0)) & (token_id < global_vocab)
+    owns = valid & (token_id >= local_start) & (
+        token_id < local_start + local_vocab
+    )
+    local_id = jnp.clip(
+        token_id - local_start,
+        jnp.int32(0),
+        local_vocab - jnp.int32(1),
+    )
+    half0 = lax.dynamic_slice(
+        embedding,
+        (local_id, jnp.int32(0)),
+        (1, PP16_FEATURE2_SHARD_WIDTH),
+    )
+    half1 = lax.dynamic_slice(
+        embedding,
+        (local_id, jnp.int32(PP16_FEATURE2_SHARD_WIDTH)),
+        (1, PP16_FEATURE2_SHARD_WIDTH),
+    )
+    half0 = jnp.where(owns, half0, jnp.zeros_like(half0))
+    half1 = jnp.where(owns, half1, jnp.zeros_like(half1))
+    owns_half0 = local_slot == jnp.int32(0)
+    owned = jnp.where(owns_half0, half0, half1)
+    peer = jnp.where(owns_half0, half1, half0)
+    with jax.named_scope("greenfield_pp16_feature2_embedding_exchange"):
+        received = lax.ppermute(
+            peer,
+            axis_name=axis_name,
+            perm=canonical_pairs,
+        )
+    return (owned + received).astype(jnp.bfloat16)
+
+
+def feature2_add_rms_gather_mapped(
+    update: Any,
+    residual: Any,
+    norm_weight: Any,
+    *,
+    axis_name: str,
+    groups: Sequence[Sequence[int]],
+) -> tuple[Any, Any]:
+    """Add two feature halves, normalize locally, and gather only the result."""
+
+    import jax
+    import jax.numpy as jnp
+    from jax import lax
+
+    expected = (1, PP16_FEATURE2_SHARD_WIDTH)
+    if update.shape != expected or residual.shape != expected:
+        raise ValueError("feature2 RMS inputs must be one 3072-feature row")
+    if norm_weight.shape != expected:
+        raise ValueError("feature2 RMS weight must be its local feature half")
+    if any(
+        value.dtype != jnp.bfloat16
+        for value in (update, residual, norm_weight)
+    ):
+        raise ValueError("feature2 RMS inputs and weight must remain BF16")
+    canonical_groups = tuple(tuple(int(rank) for rank in group) for group in groups)
+    if canonical_groups != ((0, 1),):
+        raise ValueError("bounded feature2 RMS requires exact {0,1} group")
+    with jax.named_scope("greenfield_pp16_feature2_rms"):
+        total = update.astype(jnp.float32) + residual.astype(jnp.float32)
+        local_square_sum = jnp.sum(lax.square(total))
+        square_sum = lax.psum(
+            local_square_sum,
+            axis_name,
+            axis_index_groups=canonical_groups,
+        )
+        inverse = lax.rsqrt(
+            square_sum / jnp.float32(PP16_FEATURE2_HIDDEN_WIDTH)
+            + jnp.float32(1e-5)
+        )
+        carried = total.astype(jnp.bfloat16)
+        normalized_local = (
+            (total * inverse).astype(jnp.bfloat16) * norm_weight
+        ).astype(jnp.bfloat16)
+    with jax.named_scope("greenfield_pp16_feature2_normalized_gather"):
+        normalized = lax.all_gather(
+            normalized_local,
+            axis_name,
+            axis_index_groups=canonical_groups,
+            axis=1,
+            tiled=True,
+        )
+    return carried, normalized
+
+
 def build_feature2_boundary(*, devices: Sequence[Any] | None = None) -> CompiledFeature2Boundary:
     """Compile the feature2 RMS/gather scaffold on exactly two devices."""
 
     import jax
-    from jax import lax
     import jax.numpy as jnp
     from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
@@ -1319,33 +1433,13 @@ def build_feature2_boundary(*, devices: Sequence[Any] | None = None) -> Compiled
     def mapped(
         dense_update: Any, carried_residual: Any, norm_weight: Any
     ) -> tuple[Any, Any]:
-        update = dense_update[0]
-        residual = carried_residual[0]
-        weight = norm_weight[0]
-        with jax.named_scope("greenfield_pp16_feature2_rms"):
-            total = update.astype(jnp.float32) + residual.astype(jnp.float32)
-            local_square_sum = jnp.sum(lax.square(total))
-            square_sum = lax.psum(
-                local_square_sum,
-                "feature",
-                axis_index_groups=((0, 1),),
-            )
-            inverse = lax.rsqrt(
-                square_sum / jnp.float32(PP16_FEATURE2_HIDDEN_WIDTH)
-                + jnp.float32(1e-5)
-            )
-            carried = total.astype(jnp.bfloat16)
-            normalized_local = (
-                (total * inverse).astype(jnp.bfloat16) * weight
-            ).astype(jnp.bfloat16)
-        with jax.named_scope("greenfield_pp16_feature2_normalized_gather"):
-            normalized = lax.all_gather(
-                normalized_local,
-                "feature",
-                axis_index_groups=((0, 1),),
-                axis=1,
-                tiled=True,
-            )
+        carried, normalized = feature2_add_rms_gather_mapped(
+            dense_update[0],
+            carried_residual[0],
+            norm_weight[0],
+            axis_name="feature",
+            groups=((0, 1),),
+        )
         return carried[None, ...], normalized
 
     mapped_boundary = jax.shard_map(

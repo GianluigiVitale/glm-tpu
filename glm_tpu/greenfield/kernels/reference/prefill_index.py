@@ -192,8 +192,8 @@ def repair_stage_local_prompt_index_cache(
 ) -> Any:
     """Overwrite one final-owner cache with exact prompt keys.
 
-    Exact normalized inputs never leave their topology-local group. Each LP4
-    or LP8 lane repeats the accepted projection/key-norm association and
+    Exact normalized inputs never leave their topology-local group. Each LP2,
+    LP4 or LP8 lane repeats the accepted projection/key-norm association and
     writes only the page rows it owns. ``position_offset`` and ``valid_rows``
     admit bounded chunks without changing the default full-prompt contract.
     """
@@ -215,7 +215,7 @@ def repair_stage_local_prompt_index_cache(
         block_tables.dtype != jnp.int32
     ):
         raise ValueError("prompt repair block table must be one int32 row")
-    if local_parallel_size not in (4, 8) or (
+    if local_parallel_size not in (2, 4, 8) or (
         logical_page_size != local_rows_per_page * local_parallel_size
     ):
         raise ValueError("prompt repair page ownership geometry drifted")

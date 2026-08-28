@@ -2,6 +2,52 @@
 
 **Updated:** 2026-08-28 UTC
 
+## 2026-08-28 PP16 feature2 projection/load primitives corrected after blocked review
+
+- The admitted persistent-half architecture now has its first executable arithmetic primitives.
+  Direct token embedding slices two `[1,3072]` halves without forming a full activation and sends
+  only the peer half. Attention and dense output paths compute both owner-local half contributions,
+  reduce y locally, exchange one BF16 `[4,1,3072]` peer payload over exact `0<->1`, add x, and
+  finish z locally. A forced-two-device numerical test concatenates the two results and is bitwise
+  equal to DB533's accepted 32-rank y→x→z reducer. StableHLO contains exactly one
+  `collective_permute`, no all-reduce/all-gather, and no `[1,6144]` projection activation.
+- Dense final-layout loading remains manifest-derived and range-authenticated. In the explicit
+  acquisition mode, the six raw dense ranges are transformed on host directly into the four
+  DB550-proven 2x16 `[in,out]` leaves before any device placement; combined protected hashes and
+  every derived local device buffer are read back. Raw dense leaves never occupy HBM. Expanded
+  scale leaves add 3,511,296 bytes, so the conservative acquisition upper bound is now
+  `1,260,970,880` bytes/device. The default loader behavior remains unchanged.
+- The feature-half RMS primitive keeps one FP32 scalar `{0,1}` reduction and gathers only the
+  completed normalized BF16 row. The existing exact H16/B512 attention path is admitted only for
+  the isolated PP16 feature output mode, and physical-M64 prompt-index repair now accepts exact
+  LP2 page ownership (`512 = 2 x 256`). Before review, the neighboring CPU/forced-device suite
+  passed 253/253 and the focused batch passed 62/62.
+- The first Sol review returned `BLOCK COMMIT`: the feature flag did not require the pregathered
+  path or explicit LP2 groups, it combined 32 local heads in one unprotected H32/B512 call, the
+  attention-partial test discarded every slice key, and the new LP2 prompt repair test checked
+  only nonzero/finite output. The correction requires exact `{0,1}` groups, 512/256 LP2 page
+  geometry, pregathered B512 and exact `0<->1` feature pairs; it consumes the same completed
+  selected cache through two DB537-protected H16/K2048/B512/W640 calls. JAXpr rejects H32 and
+  proves exactly two H16 consumers, while the existing feature reducer StableHLO proves one
+  `[4,1,3072]` permute and no gather. Tests now pin all 32 input/weight/scale slices, reject
+  non-U8 bits, and compare LP2 physical-M64 output bitwise at nonzero offset with the masked
+  2,012/2,048 tail untouched. The correction-focused CPU suite passes 22/22 and the six-file
+  neighboring rerun passes 65/65; compileall/JSON/diff checks pass.
+- During the review, its broad pytest command omitted `JAX_PLATFORMS=cpu` and opened local TPU
+  devices outside the serialized workload wrapper. The exact PID was terminated immediately;
+  it produced no run directory or evidence and is inadmissible. Subsequent verification forces
+  CPU explicitly. This is not yet the complete four-chunk acquisition executable: no real 2.4-GB
+  selective load, authorized TPU compile, numerical result, HBM measurement, Gate-D or performance
+  claim exists. Exact next after correction approval is the device-resident four-chunk layer-0 scan
+  plus layer-1 physical-M64 history/event-1 scorer, then a separately reviewed compile-only
+  acquisition. No TPU run is authorized by this batch.
+- The correction-only Sol review returned `APPROVE COMMIT` for staged SHA
+  `ed4e09b290333b3b1b5cc5f83e0456d1affa1b35a3a7fe19be129e39a25978f2`. Persistent Fable 5 Max
+  independently inspected the current files with command execution disabled and also returned
+  `APPROVE COMMIT`, explicitly confirming all four blockers, loader/default-off safety and bounded
+  claims. Its only caveat was inability to recompute the staged SHA or rerun tests under the
+  read-only tool restriction; those checks were performed locally as recorded above.
+
 ## 2026-08-28 PP16 feature2 loader/causal graph corrected after blocked review
 
 - The manifest-bound loader authenticates the exact PP16 runtime/SUCCESS/header chain, derives its
