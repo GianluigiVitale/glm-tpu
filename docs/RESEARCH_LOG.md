@@ -5,6 +5,27 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-28 10:50--11:05 UTC — transport null recorded; 8K preflight is restart-safe
+
+Recovered terminal DB564 rather than repeating it. The exact packed PP8 stage boundary reduces
+the HLO permutes from 16 to eight, but worsens fleet p50/p99 from `0.412015/0.578189 ms` to
+`0.550720/0.762192 ms`; its p50 reduction fraction is `-0.336650`, so the predeclared >=20% win
+and p99 non-regression both fail. The current two-transfer boundary remains selected.
+
+The QKV+dense PP8 final runtime had been reclaimed during the cost reduction. A capsule dry-run
+found every exact generation inside the seven-day soft-delete window, so 68 objects /
+834,574,250,016 bytes were restored directly with no TPU or repacking. Receipt self-hash is
+`5f4e3b78...760e0f` and checkpoint `SUCCESS` was restored last. Its same-region recovery archive
+has receipt-file / terminal SHAs `2cd61594...49a91` / `143000c5...d149`. A first no-TPU 8K preflight then caught the
+replacement pod's missing local DB549 evidence in 27 seconds. The 27.2-MB immutable bucket copy
+passed its full ledger after local restoration; the repeated exact full-chain preflight passed at
+`fe330b7` against final runtime `5b48a1f6...e2268`. No model work has run in this session.
+
+The dedicated 8K Gate-D wrapper freezes the complete accepted chain and sample/trace counts so the
+protected launch cannot omit a historical correction. The affected CPU set passes 68/68. The one
+fresh Sol audit found that output tile still inherited the shell environment; the corrected wrapper
+and test pin OT256, and the reviewer returned `APPROVE DEPLOY` for one serialized run.
+
 ## 2026-08-27 19:31--20:34 UTC — current PP8 2K is exact; XPlane isolates transport
 
 The final PP8 feature runtime was restored exactly from soft-deleted generations, while only the

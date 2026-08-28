@@ -1,5 +1,10 @@
 # Greenfield performance and mechanism log
 
+DB564 rejects packed PP8 boundary transport despite exactness: reducing 16 HLO permutes to eight
+regresses fleet p50/p99 from `0.412015/0.578189 ms` to `0.550720/0.762192 ms` over 200 warmups and
+1,000 synchronized samples. This is a bounded mechanism result, not token latency. The existing
+two-transfer boundary remains selected for the exact protected 8K Gate-D run.
+
 Protected current-code PP8 2K full-decoder evidence exists at DB563: p50 `245.639880 ms` and
 `4.071000 tok/s`, with exact tokens/DSA and complete protections. It reconfirms DB484's
 `244.091151 ms` / `4.096830 tok/s` result and passes 2K Gate-D correctness but not Gate E. WS32 has

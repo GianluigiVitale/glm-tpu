@@ -37,6 +37,9 @@ PROTECTED_RUNNER = REPO / "scripts/greenfield/run_short_decoder_compile_pp8.sh"
 PROTECTED_8K_RUNNER = (
     REPO / "scripts/greenfield/run_short_decoder_compile_pp8_8k.sh"
 )
+PROTECTED_GATE_D_8K_RUNNER = (
+    REPO / "scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh"
+)
 
 
 def test_runtime_pipeline_groups_follow_final_layout_rank_order() -> None:
@@ -1046,6 +1049,46 @@ def test_protected_8k_runner_pins_paired_oracles() -> None:
         in source
     )
     assert "export GLM_GREENFIELD_SHORT_DECODER_PROFILE=8k" in wrapper
+
+
+def test_protected_gate_d_8k_runner_pins_exact_accepted_chain() -> None:
+    wrapper = PROTECTED_GATE_D_8K_RUNNER.read_text()
+    required = {
+        "GLM_GREENFIELD_SHORT_DECODER_PROFILE": "8k",
+        "GLM_GREENFIELD_DECODER_RUNTIME_KIND": "pallas_feature_linear",
+        "GLM_GREENFIELD_FEATURE_RUNTIME_TAG": (
+            "greenfield_runtime_feature_qkv_dense_pack_pp8_"
+            "20260813T152037261372350Z"
+        ),
+        "GLM_GREENFIELD_FEATURE_RUNTIME_MANIFEST_SHA": (
+            "5b48a1f66be359cc70e8bb59e0ce77ed813f835305fd38ac9befc2eeaf8e2268"
+        ),
+        "GLM_GREENFIELD_FEATURE_RUNTIME_LAYOUT_HASH": (
+            "5047020f7d36338ae63cd4d443a79493a1e4ca1190a9bfdb650eef76aba310f3"
+        ),
+        "GLM_GREENFIELD_FEATURE_SOURCE_METADATA_ONLY": "1",
+        "GLM_GREENFIELD_FEATURE_OUTPUT_TILE": "256",
+        "GLM_GREENFIELD_FEATURE_RECONSTRUCT_DOWN_FP32": "1",
+        "GLM_GREENFIELD_COMPLETE_TOKEN_PATH": "1",
+        "GLM_GREENFIELD_SPLIT_RESIDUAL_STATE": "1",
+        "GLM_GREENFIELD_PREFILL_INDEX_REPAIR": "1",
+        "GLM_GREENFIELD_DSA_QUERY_EXACT_ASSOCIATION": "1",
+        "GLM_GREENFIELD_DSA_HEAD_KEY_EXACT_ASSOCIATION": "1",
+        "GLM_GREENFIELD_DSA_SCORE_DEFAULT_PRECISION": "1",
+        "GLM_GREENFIELD_MAIN_ROPE_TABLE": "1",
+        "GLM_GREENFIELD_PREGATHERED_B512_ATTENTION": "1",
+        "GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION": "1",
+        "GLM_GREENFIELD_DENSE_FINAL_LAYOUT_CONVOLUTION": "1",
+        "GLM_GREENFIELD_SHORT_CONTEXT_ORACLE": "1",
+        "GLM_GREENFIELD_SHORT_CONTEXT_DSA_ORACLE": "1",
+        "GLM_GREENFIELD_SHORT_DECODER_WARMUP": "2",
+        "GLM_GREENFIELD_SHORT_DECODER_ITERATIONS": "10",
+        "GLM_GREENFIELD_SHORT_DECODER_TRACE_STEPS": "2",
+    }
+    for name, value in required.items():
+        assert f"export {name}={value}" in wrapper
+    assert "GLM_GREENFIELD_SHORT_DECODER_PREFLIGHT_ONLY" not in wrapper
+    assert 'exec bash "$WORKTREE/scripts/greenfield/run_short_decoder_compile_pp8.sh"' in wrapper
 
 
 class _Jax:

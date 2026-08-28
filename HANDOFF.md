@@ -2,6 +2,34 @@
 
 **Updated:** 2026-08-28 UTC
 
+## 2026-08-28 Gate D resumes; packed transport rejected and exact PP8 8K preflight passes
+
+- The previously unrecorded terminal protected transport run is DB564 / tag
+  `greenfield_transport_20260827T211844493549489Z` at pushed workload pin `7c9871c`. It passes
+  exact packed/unpacked bytes, physical PP8 topology, eight-host launch mapping, 200 warmups,
+  1,000 synchronized samples and 8/8 cleanup. The packed `u16[16394]` boundary has exactly eight
+  permutes instead of 16, but fleet p50/p99 regresses from `0.412015/0.578189 ms` to
+  `0.550720/0.762192 ms` (`-33.665%` p50 reduction). The predeclared decision is therefore
+  `reject`; retain the existing two-transfer boundary and do not rerun this challenger.
+- Storage capsule `2721223e...ac7e` dry-run proved all 68 exact soft-deleted generations of the
+  required QKV+dense PP8 runtime were available. They were restored without TPU work or repacking:
+  834,574,250,016 bytes, terminal `SUCCESS` last, receipt SHA
+  `5f4e3b78...760e0f`. The same-region two-object recovery archive has receipt-file / terminal
+  `SUCCESS` SHAs `2cd61594...49a91` / `143000c5...d149`. The independently sealed runtime manifest/layout remain
+  `5b48a1f6...e2268` / `5047020f...310f`; the bucket and mount are `US-CENTRAL2`.
+- The first no-TPU 8K preflight refused in 27 seconds because replacement-pod local DB549 evidence
+  was absent. Its immutable 16-object / 27,202,725-byte approved-bucket archive was restored and
+  every ledger hash passed. The identical full-chain preflight then passed at current pin
+  `fe330b7`, runtime `5b48a1f6...e2268`, with metadata-only parent lineage.
+- `run_short_decoder_gate_d_pp8_8k.sh` now pins the complete accepted 8K token/DSA/dense chain,
+  exact runtime, two warmups, ten samples and two fresh trace steps. Exact next: focused tests and
+  one independent Sol audit of only this launch delta/evidence, then commit/push/mirror and launch
+  exactly once under the global workload and rsync locks. The affected CPU set passes 68/68. Sol
+  caught one inherited-env risk: output tile was not frozen, so a stale value could select OT128.
+  The wrapper and test now pin OT256; the same reviewer returned `APPROVE DEPLOY`. Any HLO, HBM,
+  token, DSA, state/cache,
+  archive or cleanup refusal stops the run and is diagnosed before another full-model attempt.
+
 ## 2026-08-28 corrected three-PR stack passes and is private-audit ready
 
 - Read-only `scripts/greenfield/check_glm_dsa_submission_readiness.sh` now
