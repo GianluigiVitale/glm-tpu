@@ -5,6 +5,36 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-28 23:10--23:12 UTC — PP16 feature2 HLO/HBM acquisition passes
+
+Sol approved exact correction diff `2e259631...c5da` for commit and one repeat. Pin
+`bb5f281d499e2564293e8a9ced4adb3fa28bcd96` was pushed and byte-mirrored before protected tag
+`greenfield_pp16_feature2_prefill_acquire_20260828T231028891602866Z`. The complete wrapper finished
+in 52 seconds and terminally published `HLO_ACQUIRED`; main arithmetic was never invoked and there
+is no numerical, Gate-D, DB, token-rate or performance claim.
+
+The exact selected final runtime loaded 39 ranges / 1,199,760,512 source bytes per owner and
+round-tripped 2,406,543,616 device bytes. Dense weights were transformed directly into final layout;
+raw dense device materialization is false. Main StableHLO/optimized HLO are `127bf089...955e` /
+`c476e17a...8f01`; compile took 22.418 seconds after 2.472 seconds lowering. The parsed executable
+has exactly two partitions, 27 all-gathers, 17 all-reduces, 12 bidirectional feature permutes and
+eight H16/K2048/B512/W640 calls. Every group is explicit LP2, roots retain one-row/local-shard
+geometry, and there are no callbacks, host/device transport, H32, `[32,6144]` dead rows or
+`[8156,6144]` hidden history. Query/decode/promote materializers each have zero communication.
+
+Main memory analysis is 1,234,902,528 argument, 605,640,192 temporary, 7,389,696 output and
+71,058,944 generated-code bytes. Measured peak is 1,249,780,224 bytes/device with a
+31,747,741,184-byte post-compile largest free block; cleanup returns to 1,753,088 bytes/device.
+The exact 19-object same-region archive and 8/8 cleanup pass. Terminal, ledger, runner, summary and
+post-census SHAs are `91148032...db0`, `a149f888...ada`, `0a8a5876...b94`, `717bc51d...8ce0` and
+`7c78abb6...e2f`; machine-readable evidence is
+`docs/artifacts/pp16-feature2-hlo-acquisition.json`.
+
+This closes only the feature2 real-load/HLO/HBM prerequisite. The next bounded evidence is one
+separately reviewed zero-warmup execution of this exact event-1 graph, with raw positions/scores,
+valid count and sealed internal-boundary comparisons. It is diagnostic-only and can authorize a
+complete protected 8K PP16 retry only if exact. Gate D remains open.
+
 ## 2026-08-28 23:00--current UTC — first feature2 acquisition exposes a list/tuple guard defect
 
 The complete PP16 feature2 graph received a bounded acquisition path. The

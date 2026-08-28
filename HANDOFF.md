@@ -2,6 +2,31 @@
 
 **Updated:** 2026-08-28 UTC
 
+## 2026-08-28 PP16 feature2 HLO/HBM acquisition passes; numerical event 1 is next
+
+- Reviewed correction pin `bb5f281d499e2564293e8a9ced4adb3fa28bcd96` completed protected tag
+  `greenfield_pp16_feature2_prefill_acquire_20260828T231028891602866Z` in 52 seconds and terminally
+  sealed `HLO_ACQUIRED`. The exact selected final runtime loaded 39 ranges / 1,199,760,512 source
+  bytes per owner, packed dense weights before placement, and round-tripped 2,406,543,616 device
+  bytes. Main arithmetic was never invoked; there is no numerical, Gate-D, DB or performance claim.
+- Main StableHLO/optimized-HLO SHAs are `127bf089...955e` / `c476e17a...8f01`; lowering/compile took
+  2.472/22.418 seconds. Parsed optimized HLO proves two partitions, exact adjacent devices 0/1,
+  27 all-gathers, 17 all-reduces, 12 feature permutes, eight H16/K2048/B512/W640 calls, exact
+  one-row/local-shard roots, explicit LP2 groups, no host marker, forbidden transport, H32,
+  `[32,6144]` dead row or `[8156,6144]` hidden history. All three owner-local materializers have
+  zero physical communication.
+- Main executable memory analysis is 1,234,902,528 argument, 605,640,192 temporary, 7,389,696
+  output and 71,058,944 code bytes. Measured peak is 1,249,780,224 bytes/device, post-compile
+  largest free block is 31,747,741,184 bytes and post-cleanup use is 1,753,088 bytes/device.
+  Terminal/evidence/runner/summary/post-census SHAs are `91148032...db0`, `a149f888...ada`,
+  `0a8a5876...b94`, `717bc51d...8ce0` and `7c78abb6...e2f`; the exact 19-object same-region archive
+  and 8/8 cleanup pass. Compact evidence is in
+  `docs/artifacts/pp16-feature2-hlo-acquisition.json`.
+- Exact next is one separately reviewed, zero-warmup numerical execution of this already-bounded
+  event-1 graph. It must compare raw layer-1/event-1 positions, scores, valid count and sealed
+  internal boundaries, publish an exact/rejected diagnostic with no DB/performance claim, and
+  authorize a full protected 8K PP16 decoder only if exact. Gate D remains open.
+
 ## 2026-08-28 first PP16 feature2 acquisition stops on coordinate container type
 
 - A new default-off acquisition loads the exact 39 authenticated ranges per owner from the retained
