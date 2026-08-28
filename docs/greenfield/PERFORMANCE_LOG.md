@@ -6,7 +6,9 @@ token/DSA artifacts exactly duplicate the old sealed numerical failure. The PP16
 dense-boundary probe at pin `1f5c88e` is also diagnostic-only. Its three deterministic samples are
 `3.857550/3.823499/3.808450 ms`, compile is 1.151 seconds and peak allocation is 113,735,680
 bytes/device, but all three checked rows are nonexact. These numbers must not be reported as token
-latency, Gate D or plan performance; no accepted performance standing changes.
+latency, Gate D or plan performance; no accepted performance standing changes. Its terminal
+`REJECTED` archive is 16 objects / 241,003 bytes with no DB row or `SUCCESS`; archival completeness
+does not promote the bounded timing.
 
 DB564 rejects packed PP8 boundary transport despite exactness: reducing 16 HLO permutes to eight
 regresses fleet p50/p99 from `0.412015/0.578189 ms` to `0.550720/0.762192 ms` over 200 warmups and

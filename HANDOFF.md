@@ -51,8 +51,13 @@
   DB533 association within the two-chip stage. The wrapper's evidence upload alone failed because
   installed gcloud 428 has no `storage rsync`; no remote object was written. Fable approved a
   no-TPU recovery using supported `gsutil -m rsync -r`, exact local/remote ledgers, both locks and
-  terminal `REJECTED` last. The correction/recovery diff is awaiting its mandatory same-chat
-  review; do not rerun TPU or claim the rejection terminally archived until that sealer completes.
+  terminal `REJECTED` last. The same chat returned `APPROVE DEPLOY`; correction/recovery pin
+  `b3c2d10` was pushed and byte-verified in the US-CENTRAL2 repo mirror. Recovery then sealed 16
+  objects / 241,003 bytes with ledger SHA `9bad7c59...f328` and terminal file SHA
+  `c6d7eac4...5260`. The marker binds run/recovery pins, status 3, runner and ledger hashes,
+  `performance_claim=false` and `gate_d_passed=false`; remote `SUCCESS` is absent, DB remains
+  564/zero PP16 rows, both locks are free, and an immediate already-sealed replay verified the
+  archive idempotently. Do not rerun this rejected formulation.
 
 ## 2026-08-28 adversarial review policy moves to one persistent Fable 5 Max chat
 

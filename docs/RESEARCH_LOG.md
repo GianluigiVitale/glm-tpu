@@ -53,8 +53,13 @@ runner/tensor SHAs are `20247074...176` / `6c355d97...62cf`. The same Fable chat
 cause and approved a no-TPU recovery that authenticates the original pin, exact ledger, HLO,
 runner, deterministic replicas, both censuses and unchanged read-only DB; it then uses supported
 `gsutil -m rsync -r`, verifies every remote hash, and writes `REJECTED` last. The implemented diff
-must receive the standard same-chat verdict and be committed/pushed/mirrored before recovery.
-Never rerun the TPU diagnostic merely to repair its archive.
+received `APPROVE DEPLOY`, was committed/pushed as `b3c2d10`, and its eight changed files were
+byte-verified against the US-CENTRAL2 repository mirror before recovery. The no-TPU sealer
+published exactly 16 objects / 241,003 bytes. Recovery-ledger/file-marker SHAs are
+`9bad7c59...f328` / `c6d7eac4...5260`; the marker's bound-record SHA is `b994675f...6ef3`.
+Remote `SUCCESS` is absent, DB remains integrity-ok at max run 564 with zero PP16-boundary rows,
+and both locks are free. A second invocation exercised the already-sealed verification path and
+exited cleanly without republication. Never rerun the TPU diagnostic merely to repair its archive.
 
 ## 2026-08-28 10:50--11:05 UTC — transport null recorded; 8K preflight is restart-safe
 
