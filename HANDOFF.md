@@ -30,9 +30,14 @@
   must equal that allowlist. The reviewed total upper bound remains `1,257,459,584` bytes/device
   (`2,514,919,168` total), including cache/other allowance and excluding `113,273,856` dense1
   bytes/device. The manifest self-hash and exact N82 source identities/shapes/hashes are recomputed.
-  Gate D remains open. No norm-only probe, TPU compile, model load or numerical run is authorized;
-  next obtain immutable review of this scaffold, then separately design/review the selective loader
-  and abstract prefill graph before any metal acquisition.
+- The correction-only Sol review first blocked five proof gaps, then caught the double-add input and
+  an under-pinned local reduction. The corrected staged SHA `26798353...ca25` received
+  `APPROVE COMMIT` and is pushed/same-region-mirrored as `1c23924d6df6b8eb9b4cdf76697f4a9e983f8c31`.
+  Focused tests pass 9/9, including real DB550/manifest evidence and 20 transport/boundary HLO
+  mutations. Gate D remains open. No norm-only probe, TPU compile, model load or numerical run is
+  authorized. Exact next: implement the manifest-derived selective loader and abstract candidate-
+  coherent 8,156-position layer-1 key/query prefill graph, review both, and only then seek metal
+  acquisition authorization.
 
 ## 2026-08-28 tested layer-1 consumer fusions reject offline; stop byte chasing
 
