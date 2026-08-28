@@ -13,6 +13,7 @@ EXCLUDE='(^|/)bench/results[.]db-(journal|wal|shm)$'
 PAIRS=(
   "/home/gianl/glm-tpu:repos/glm-tpu"
   "/home/gianl/glm-tpu-topology-rewrite:repos/glm-tpu-topology-rewrite"
+  "/home/gianl/tpu-inference-glm-baseline:repos/tpu-inference-glm-baseline"
 )
 
 log() { echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $*" >> "$LOG"; }
