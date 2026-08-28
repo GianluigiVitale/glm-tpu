@@ -2,6 +2,43 @@
 
 **Updated:** 2026-08-28 UTC
 
+## 2026-08-28 PP16 y-x-z transport passes but fused-Pallas leaves reject
+
+- Protected tag `greenfield_pp16_lp2_strategy_nd_dense_boundary_20260828T143301291409038Z`
+  at reviewed/pushed pin `723512f` passes its full HLO/locality contract: 16 I384 Pallas calls all
+  feed one `bf16[4,1,6144]` `{0,1}` all-reduce, which feeds all three one-row outputs; no gather,
+  32-row hidden state or host marker exists. It is deterministic and replica-identical but
+  `NONEXACT`: dense/carried/normalized mismatches are `3821/2302/2867` of 6,144, with observed
+  SHAs `d4a1acc9...5515` / `dcfbc610...83e5` / `fc45b874...da4a`. Compile is 7.727 seconds;
+  diagnostic samples are `4.197789/4.035360/4.050661 ms`, never token/plan performance.
+- The 15-object exact remote archive has ledger SHA `22342774...ec6`, terminal-file SHA
+  `0d1a4610...e6aa`, no `SUCCESS` or DB row, DB integrity `ok` at max 564, 8/8 pre/failure
+  cleanup and both locks free. Never rerun this fused-Pallas arm.
+- Local diagnosis isolates the unproven premise: the reducer exactly replays DB533 only for its
+  input leaves, while DB550's `0/196608` proof covers accepted final-layout convolutions, not the
+  different fused-Pallas leaf kernel used by `723512f`. A corrected diagnostic host-packs only the
+  two authenticated layer-0 PP16 owners into 2x16 accepted `[in,out]` shards. All four payload
+  hashes equal DB550 exactly (`82c93c0f...facf`, `9b4bfee8...f8b3`, `8654c1eb...f7e`,
+  `f37e8798...bbd`), 233,570,304 bytes total. Its forced-two-device graph has 16 gate plus 16 down
+  convolutions, one four-row LP2 all-reduce, zero gathers and no dead row. Fable reported 100%
+  usage; the user-authorized independent Sol fallback reviewed exact diff `ed59af6b...1a24` and
+  returned `APPROVE DEPLOY`. The requested post-reset broad Fable diagnosis then reviewed live
+  diff `900fe3b9...c5d8`, found no cheaper admissible experiment and explicitly said to proceed.
+  This is still local authorization only, not TPU evidence.
+- Pre-deploy replay against DB550's preserved TPU graph caught and corrected one validator-only
+  gap: real convolutions live inside fusion computations, so entry-only ancestry would have
+  refused after compilation. The gate now reuses the production decoder's cross-fusion parameter/
+  root value-flow model, requires a 16-way gate-to-down bijection, and proves all 32 convolutions
+  reach the sole LP2 combine and returned boundary. A nested-fusion orphan mutation refuses; the
+  focused CPU/HLO/inventory suite passes 29/29. The complete dependent decoder/compile/prefill/
+  dense-validation set adds 178 passes and 13 hardware skips, for 207/207 executed tests green.
+  Real owner packing was repeated in 6.8 seconds and again matched all four DB550 hashes and
+  233,570,304 bytes. The success sealer now verifies the exact preterminal remote object set and
+  every evidence-ledger hash before it may publish `SUCCESS`; any mismatch rolls back a provisional
+  DB row and terminally seals `REJECTED`. A read-only replay of the same verifier pattern over
+  terminal DB561 authenticated all 14 ledger payloads, the ledger, exact object set and `SUCCESS`.
+  Sol and the resumed persistent Fable chat both cleared exactly one bounded protected run.
+
 ## 2026-08-28 PP8 repeats the sealed failure; the first bounded PP16 association is rejected
 
 - Protected current-pin tag `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_`

@@ -569,9 +569,10 @@ def _virtual_dense_final_layout_convolution_down_partials(
 ) -> Any:
     """Replay dense arithmetic from accepted ``[in, out]`` weight layout.
 
-    This primitive consumes one, four or eight already-packed virtual TP32
-    shards. The one-shard form is used only by the isolated contraction
-    discriminator, four is the WS32 owner, and PP8 retains eight shards.
+    This primitive consumes one, four, eight or sixteen already-packed
+    virtual TP32 shards. The one-shard form is used only by the isolated contraction
+    discriminator, four is the WS32 owner, PP8 retains eight shards, and
+    PP16 combines two consecutive PP8 owners into sixteen shards.
     Unlike :func:`_virtual_dense_convolution_down_partials`, it does not
     transpose or concatenate checkpoint tensors in the compiled program. That
     distinction lets TPU layout assignment reproduce the accepted row-major
@@ -580,8 +581,15 @@ def _virtual_dense_final_layout_convolution_down_partials(
 
     if compile_rows not in (1, 32):
         raise ValueError("final-layout dense requires one or 32 compile rows")
-    if virtual_shards not in (1, 4, _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER):
-        raise ValueError("final-layout dense requires one, four or eight virtual shards")
+    if virtual_shards not in (
+        1,
+        4,
+        _VIRTUAL_DCP_SHARDS_PER_PP8_OWNER,
+        16,
+    ):
+        raise ValueError(
+            "final-layout dense requires one, four, eight or sixteen virtual shards"
+        )
     if output_size not in (1536, 6144):
         raise ValueError("final-layout dense output must be local or complete hidden")
     if not isinstance(accepted_gate_singleton, bool):
@@ -824,6 +832,10 @@ def _reduce_strategy_nd_row0_bf16_partials(
 ) -> Any:
     """Replay the accepted row-zero M32 tree inside an LP4 or LP2 stage."""
 
+    if local_partials.dtype != jnp.bfloat16:
+        raise ValueError(
+            "StrategyND row-zero local partials must be rounded BF16"
+        )
     if local_partials.shape == (16, 1, 6144):
         if groups is None or any(len(group) != 2 for group in groups):
             raise ValueError(
@@ -879,10 +891,6 @@ def _reduce_strategy_nd_row0_bf16_partials(
     if local_partials.shape != (8, 1, 6144):
         raise ValueError(
             "StrategyND row-zero reduction requires eight local partials"
-        )
-    if local_partials.dtype != jnp.bfloat16:
-        raise ValueError(
-            "StrategyND row-zero local partials must be rounded BF16"
         )
     with jax.named_scope("greenfield_strategy_nd_row0_association"):
         with jax.named_scope(
@@ -2289,11 +2297,12 @@ def stage_local_dense_fp8_mapped(
     if norm_weight.shape != (hidden,):
         raise ValueError("dense norm shape disagrees with hidden size")
     if final_layout_convolution:
+        virtual_shards = gate_bits.shape[0]
         expected = {
-            "gate_bits": (8, hidden, 768),
-            "gate_scale": (8, 48, 768),
-            "down_bits": (8, 384, hidden),
-            "down_scale": (8, 3, hidden),
+            "gate_bits": (virtual_shards, hidden, 768),
+            "gate_scale": (virtual_shards, 48, 768),
+            "down_bits": (virtual_shards, 384, hidden),
+            "down_scale": (virtual_shards, 3, hidden),
         }
         values = {
             "gate_bits": gate_bits,
@@ -2378,6 +2387,7 @@ def stage_local_dense_fp8_mapped(
                 down_scale,
                 block_shape=block_shape,
                 compile_rows=1,
+                virtual_shards=gate_bits.shape[0],
             )
             if final_layout_convolution
             else _virtual_dense_down_partials(

@@ -252,8 +252,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--iterations", type=int, default=3)
     parser.add_argument(
         "--association",
-        choices=("lp2_single", "strategy_nd_y_x_z"),
-        default="lp2_single",
+        choices=("strategy_nd_y_x_z_final_layout",),
+        default="strategy_nd_y_x_z_final_layout",
     )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--tensor-output", type=Path, required=True)
@@ -276,7 +276,6 @@ def main() -> int:
         raise RuntimeError("sealed dense boundary oracle identity drifted")
 
     import jax
-    import jax.numpy as jnp
     from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
     import ml_dtypes
 
@@ -285,6 +284,8 @@ def main() -> int:
         PP16_DENSE_BOUNDARY_ACCEPTED_RESIDUAL_SHA256,
         derive_expected_dense_boundary_bits,
         exact_bfloat16_bits,
+        pack_pp16_dense_final_layout,
+        validate_pp16_dense_final_layout_records,
         validate_pp16_dense_boundary_hlo,
     )
     from glm_tpu.greenfield.kernels.reference.rmsnorm import fused_add_rms_norm
@@ -319,6 +320,15 @@ def main() -> int:
         arrays, evidence = _load_owner(args.runtime_root, records[slot])
         owners.append(arrays)
         owner_evidence.append(evidence)
+    packed_final_layout, packed_final_layout_records = (
+        pack_pp16_dense_final_layout(
+            tuple(
+                {name: owner[name] for name in _DENSE_NAMES}
+                for owner in owners
+            )
+        )
+    )
+    validate_pp16_dense_final_layout_records(packed_final_layout_records)
 
     with np.load(args.oracle_npz, allow_pickle=False) as payload:
         required = {
@@ -395,19 +405,19 @@ def main() -> int:
     residual = put_replicated_bits(residual_bits)
     layer1_norm = put_replicated_bits(layer1_norm_bits)
 
-    device_weights = {}
-    for name in _DENSE_NAMES:
-        host = np.stack([owner[name] for owner in owners], axis=0)
-        spec = P("stage", *(None for _ in _EXPECTED_SHAPES[name]))
-        device_weights[name] = jax.device_put(host, NamedSharding(mesh, spec))
+    device_weights = tuple(
+        jax.device_put(
+            value,
+            NamedSharding(mesh, P("stage", None, None, None)),
+        )
+        for value in packed_final_layout
+    )
 
     def local_dense_boundary(
         normalized_value: Any,
         residual_value: Any,
-        gate_bits_slot: Any,
-        gate_scale_slot: Any,
-        up_bits_slot: Any,
-        up_scale_slot: Any,
+        merged_bits_slot: Any,
+        merged_scale_slot: Any,
         down_bits_slot: Any,
         down_scale_slot: Any,
         next_norm: Any,
@@ -415,10 +425,10 @@ def main() -> int:
         dense_update = stage_local_dense_fp8_mapped(
             residual_value,
             next_norm,
-            gate_bits_slot[0],
-            gate_scale_slot[0],
-            up_bits_slot[0],
-            up_scale_slot[0],
+            merged_bits_slot[0],
+            merged_scale_slot[0],
+            None,
+            None,
             down_bits_slot[0],
             down_scale_slot[0],
             axis_name="stage",
@@ -430,9 +440,8 @@ def main() -> int:
             add_residual=False,
             virtual_tp32_reduction_association=(
                 STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION
-                if args.association == "strategy_nd_y_x_z"
-                else None
             ),
+            final_layout_convolution=True,
         )
         layer1_normalized, next_residual = fused_add_rms_norm(
             dense_update,
@@ -442,15 +451,13 @@ def main() -> int:
         )
         return dense_update, layer1_normalized, next_residual
 
-    weight_spec = P("stage", None, None)
+    weight_spec = P("stage", None, None, None)
     mapped = jax.shard_map(
         local_dense_boundary,
         mesh=mesh,
         in_specs=(
             P(),
             P(),
-            weight_spec,
-            weight_spec,
             weight_spec,
             weight_spec,
             weight_spec,
@@ -463,12 +470,7 @@ def main() -> int:
     program_args = (
         normalized,
         residual,
-        device_weights["dense.slot_00.gate.weight_bits"],
-        device_weights["dense.slot_00.gate.scale_inv"],
-        device_weights["dense.slot_00.up.weight_bits"],
-        device_weights["dense.slot_00.up.scale_inv"],
-        device_weights["dense.slot_00.down.weight_bits"],
-        device_weights["dense.slot_00.down.scale_inv"],
+        *device_weights,
         layer1_norm,
     )
     args.hlo_dir.mkdir(parents=True, exist_ok=True)
@@ -638,6 +640,8 @@ def main() -> int:
             "destination": manifest["destination"],
             "manifest_sha256": args.runtime_manifest_sha256,
             "owners": owner_evidence,
+            "boundary_final_layout": packed_final_layout_records,
+            "boundary_final_layout_ephemeral_host_pack": True,
             "plan_hash": manifest["plan_hash"],
             "plan_id": manifest["plan_id"],
             "runtime_layout_hash": manifest["runtime_layout_hash"],

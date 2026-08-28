@@ -5,6 +5,49 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-28 14:33--current UTC — PP16 split tree passes; wrong live leaf primitive rejects
+
+The reviewed PP16 local-y / LP2-x / local-z run reached arithmetic once at pin `723512f`. HLO is
+exactly the intended local graph (16 I384 Pallas calls, all feeding one `bf16[4,1,6144]` LP2
+all-reduce and the returned one-row boundary), and all three samples are deterministic with exact
+replica agreement. The live dense row nevertheless differs in 3,821/6,144 values
+(`efde8532...b4fc` expected, `d4a1acc9...5515` observed); carried and normalized rows differ in
+2,302 and 2,867 values. Stable/optimized HLO SHAs are `e5056929...62b7` / `c7527f9a...0bbe`.
+Compile took 7.727 seconds and diagnostic p50 was 4.050661 ms; neither is performance evidence.
+
+The failure is terminally sealed under tag
+`greenfield_pp16_lp2_strategy_nd_dense_boundary_20260828T143301291409038Z`: 15 exact remote
+objects, diagnostic-ledger SHA `22342774...ec6`, terminal-file SHA `0d1a4610...e6aa`, no remote
+`SUCCESS`, no DB row, integrity `ok` at max 564, 8/8 pre/failure cleanup and both locks free.
+
+Local diagnosis finds the split reduction correct but the leaf premise unsupported. DB550 proved
+all 32 leaves from `_virtual_dense_final_layout_convolution_down_partials`; the failed graph instead
+used `_virtual_dense_down_partials` / fused Pallas. The corrected no-TPU pack reshapes the two PP16
+owners into 2x16 accepted `[in,out]` tensors and exactly reproduces all four DB550 payload hashes:
+`82c93c0f...facf`, `9b4bfee8...f8b3`, `8654c1eb...f7e`, `f37e8798...bbd` (233,570,304 bytes).
+Forced-two-device StableHLO has 32 exact convolutions, one four-row LP2 reduction, zero gathers and
+no 32-row hidden tensor. A narrow Fable post-failure chat was opened as required but hit its account
+limit before verdict; resume the same chat after 16:40 UTC before commit/deploy. No TPU claim exists.
+
+The local gate was strengthened before review. DB550's preserved optimized TPU HLO demonstrates
+that final-layout convolutions are nested inside fusion computations; the initial entry-only
+ancestry would therefore have failed closed after compilation despite a valid graph. The corrected
+validator adapts the production decoder's computation-scoped RHS-layout and cross-fusion
+parameter/root flow, requires an exact 16-gate/16-down bijection, and proves all 32 convolutions
+reach the one LP2 combine and returned boundary. A nested-fusion orphan mutation refuses. The
+focused suite passes 29/29; dependent decoder/compile/prefill/dense-validation coverage adds 178
+passes and 13 hardware skips, so all 207 executed tests are green. Python compile, Bash syntax,
+JSON and diff checks pass; ShellCheck is unavailable on this host. A fresh read-only real owner
+pack again matches the four DB550 hashes over exactly 233,570,304 bytes.
+The success path also now verifies the exact remote preterminal object set and every ledger hash
+before `SUCCESS`; a mismatch takes the existing rollback/diagnostic/`REJECTED` path. A read-only
+replay of that exact verifier pattern over terminal DB561 authenticated all 14 ledger payloads,
+the ledger, exact object set and `SUCCESS`. Fable reported 100% usage, so the user-authorized
+independent Sol fallback reviewed exact diff `ed59af6b...1a24` and returned `APPROVE DEPLOY`.
+The resumed persistent Fable chat then reviewed live diff `900fe3b9...c5d8`, reconstructed the
+cross-plan Gate-D blockers, found no cheaper admissible experiment and explicitly authorized this
+single bounded run as the best immediate action. This adds no numerical or performance claim.
+
 ## 2026-08-28 11:16--current UTC — duplicate PP8 failure closes retries; first PP16 association rejects
 
 The protected current-pin PP8 8K attempt completed the full 8,155-token prefill but stopped before

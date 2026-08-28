@@ -593,7 +593,9 @@ def test_dense_final_layout_kernel_traces_one_isolated_virtual_shard() -> None:
     )
     assert result.shape == (1, 32, 6144)
     assert result.dtype == jnp.bfloat16
-    with pytest.raises(ValueError, match="one, four or eight virtual shards"):
+    with pytest.raises(
+        ValueError, match="one, four, eight or sixteen virtual shards"
+    ):
         _virtual_dense_final_layout_convolution_down_partials(
             *arguments,
             block_shape=(128, 128),

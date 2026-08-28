@@ -38,6 +38,32 @@ def test_ws32_strategy_nd_four_rank_partial_geometry() -> None:
     assert result.dtype == jnp.bfloat16
 
 
+def test_pp16_strategy_nd_sixteen_rank_partial_geometry() -> None:
+    shape = jax.ShapeDtypeStruct
+    result = jax.eval_shape(
+        lambda hidden, merged_bits, merged_scale, down_bits, down_scale: (
+            _virtual_dense_final_layout_convolution_down_partials(
+                hidden,
+                merged_bits,
+                merged_scale,
+                down_bits,
+                down_scale,
+                block_shape=(128, 128),
+                compile_rows=1,
+                virtual_shards=16,
+                output_size=6144,
+            )
+        ),
+        shape((1, 6144), jnp.bfloat16),
+        shape((16, 6144, 768), jnp.uint8),
+        shape((16, 48, 768), jnp.float32),
+        shape((16, 384, 6144), jnp.uint8),
+        shape((16, 3, 6144), jnp.float32),
+    )
+    assert result.shape == (16, 1, 6144)
+    assert result.dtype == jnp.bfloat16
+
+
 def test_ws32_strategy_nd_dense_stablehlo_uses_lp4_then_lp8() -> None:
     program = r'''
 import json

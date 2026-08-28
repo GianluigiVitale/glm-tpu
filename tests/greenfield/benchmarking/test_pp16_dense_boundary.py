@@ -5,11 +5,14 @@ import subprocess
 
 import ml_dtypes
 import numpy as np
+import pytest
 
 from glm_tpu.greenfield.benchmarking.pp16_dense_boundary import (
     derive_expected_dense_boundary_bits,
     exact_bfloat16_bits,
+    pack_pp16_dense_final_layout,
     replay_pp16_strategy_nd_y_x_z_bits,
+    validate_pp16_dense_final_layout_records,
     validate_pp16_dense_boundary_hlo,
 )
 
@@ -52,6 +55,135 @@ def _stablehlo(*, extra: str = "") -> str:
   }}
 }}
 """
+
+
+def _final_layout_hlo() -> tuple[str, str]:
+    optimized_instructions = []
+    stable_instructions = []
+    partials = []
+    for rank in range(16):
+        scope = f"greenfield_dense_convolution_virtual_rank_{rank:02d}"
+        optimized_instructions.extend(
+            (
+                f"  %gate{rank} = f32[1,768] convolution(%p, %wg), "
+                f'dim_labels=bf_io->bf, metadata={{op_name="{scope}/gate"}}',
+                f"  %activated{rank} = bf16[1,384] copy(%gate{rank})",
+                f"  %down{rank} = f32[1,6144] convolution(%activated{rank}, %wd), "
+                f'dim_labels=bf_io->bf, metadata={{op_name="{scope}/down"}}',
+                f"  %partial{rank} = bf16[1,6144] copy(%down{rank})",
+            )
+        )
+        partials.append(f"%partial{rank}")
+        stable_instructions.extend(
+            (
+                f"    %g{rank} = stablehlo.convolution %arg0, %arg1 : "
+                "dim_numbers = [b, f] x [i, o] -> [b, f], "
+                "window = {stride = [], pad = [], lhs_dilate = [], "
+                "rhs_dilate = [], reverse = []}, batch_group_count = 1 : i64, "
+                "feature_group_count = 1 : i64, precision_config = "
+                "[#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>] : "
+                "(tensor<1x6144xbf16>, tensor<6144x768xbf16>) "
+                "-> tensor<1x768xf32>",
+                f"    %d{rank} = stablehlo.convolution %arg2, %arg3 : "
+                "dim_numbers = [b, f] x [i, o] -> [b, f], "
+                "window = {stride = [], pad = [], lhs_dilate = [], "
+                "rhs_dilate = [], reverse = []}, batch_group_count = 1 : i64, "
+                "feature_group_count = 1 : i64, precision_config = "
+                "[#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>] : "
+                "(tensor<1x384xbf16>, tensor<384x6144xbf16>) "
+                "-> tensor<1x6144xf32>",
+            )
+        )
+    optimized = f"""HloModule dense, replica_count=1, num_partitions=2
+
+%add (x: bf16[], y: bf16[]) -> bf16[] {{
+  %x = bf16[] parameter(0)
+  %y = bf16[] parameter(1)
+  ROOT %sum = bf16[] add(%x, %y)
+}}
+
+ENTRY %main (p: bf16[1,6144], wg: bf16[6144,768], a: bf16[1,384], wd: bf16[384,6144]) -> (bf16[1,6144], bf16[1,6144], bf16[1,6144]) {{
+  %p = bf16[1,6144] parameter(0)
+  %wg = bf16[6144,768]{{1,0}} parameter(1)
+  %a = bf16[1,384] parameter(2)
+  %wd = bf16[384,6144]{{1,0}} parameter(3)
+{chr(10).join(optimized_instructions)}
+  %local_y = bf16[4,1,6144] concatenate({', '.join(partials)}), dimensions={0}
+  %reduce = bf16[4,1,6144] all-reduce(%local_y), replica_groups={{{{0,1}}}}, to_apply=%add
+  %dense = bf16[1,6144] slice(%reduce)
+  %norm = bf16[1,6144] copy(%dense)
+  %residual = bf16[1,6144] copy(%dense)
+  ROOT %result = (bf16[1,6144], bf16[1,6144], bf16[1,6144]) tuple(%dense, %norm, %residual)
+}}
+"""
+    stable = f"""module {{
+  func.func @main(%arg0: tensor<1x6144xbf16>, %arg1: tensor<6144x768xbf16>, %arg2: tensor<1x384xbf16>, %arg3: tensor<384x6144xbf16>, %arg4: tensor<4x1x6144xbf16>) -> tensor<4x1x6144xbf16> {{
+{chr(10).join(stable_instructions)}
+    %reduce = "stablehlo.all_reduce"(%arg4) <{{replica_groups=dense<[[0,1]]>:tensor<1x2xi64>}}> : (tensor<4x1x6144xbf16>) -> tensor<4x1x6144xbf16>
+    return %reduce : tensor<4x1x6144xbf16>
+  }}
+}}
+"""
+    return stable, optimized
+
+
+def _final_layout_nested_fusion_hlo() -> tuple[str, str]:
+    stable, _ = _final_layout_hlo()
+    computations = []
+    entry_instructions = []
+    partials = []
+    for rank in range(16):
+        scope = f"greenfield_dense_convolution_virtual_rank_{rank:02d}"
+        computations.append(
+            f"""
+%gate_comp_{rank} (p: bf16[1,6144], wg: bf16[6144,768]) -> bf16[1,768] {{
+  %p = bf16[1,6144] parameter(0)
+  %wg = bf16[6144,768]{{1,0}} parameter(1)
+  %gate = f32[1,768] convolution(%p, %wg), dim_labels=bf_io->bf, metadata={{op_name="{scope}/gate"}}
+  ROOT %gate_bits = bf16[1,768] convert(%gate)
+}}
+
+%down_comp_{rank} (activated: bf16[1,384], wd: bf16[384,6144]) -> bf16[1,6144] {{
+  %activated = bf16[1,384] parameter(0)
+  %wd = bf16[384,6144]{{1,0}} parameter(1)
+  %down = f32[1,6144] convolution(%activated, %wd), dim_labels=bf_io->bf, metadata={{op_name="{scope}/down"}}
+  ROOT %partial = bf16[1,6144] convert(%down)
+}}
+"""
+        )
+        entry_instructions.extend(
+            (
+                f"  %gate_value{rank} = bf16[1,768] fusion(%p, %wg), "
+                f"kind=kLoop, calls=%gate_comp_{rank}",
+                f"  %activated{rank} = bf16[1,384] slice(%gate_value{rank}), "
+                "slice={[0:1], [0:384]}",
+                f"  %partial{rank} = bf16[1,6144] fusion(%activated{rank}, %wd), "
+                f"kind=kLoop, calls=%down_comp_{rank}",
+            )
+        )
+        partials.append(f"%partial{rank}")
+    optimized = f"""HloModule dense, replica_count=1, num_partitions=2
+
+%add (x: bf16[], y: bf16[]) -> bf16[] {{
+  %x = bf16[] parameter(0)
+  %y = bf16[] parameter(1)
+  ROOT %sum = bf16[] add(%x, %y)
+}}
+{''.join(computations)}
+ENTRY %main (p: bf16[1,6144], wg: bf16[6144,768], wd: bf16[384,6144]) -> (bf16[1,6144], bf16[1,6144], bf16[1,6144]) {{
+  %p = bf16[1,6144] parameter(0)
+  %wg = bf16[6144,768]{{1,0}} parameter(1)
+  %wd = bf16[384,6144]{{1,0}} parameter(2)
+{chr(10).join(entry_instructions)}
+  %local_y = bf16[4,1,6144] concatenate({', '.join(partials)}), dimensions={0}
+  %reduce = bf16[4,1,6144] all-reduce(%local_y), replica_groups={{{{0,1}}}}, to_apply=%add
+  %dense = bf16[1,6144] slice(%reduce)
+  %norm = bf16[1,6144] copy(%dense)
+  %residual = bf16[1,6144] copy(%dense)
+  ROOT %result = (bf16[1,6144], bf16[1,6144], bf16[1,6144]) tuple(%dense, %norm, %residual)
+}}
+"""
+    return stable, optimized
 
 
 def test_exact_bfloat16_bits_reports_first_mismatch() -> None:
@@ -109,6 +241,60 @@ def test_pp16_y_x_z_replay_matches_db533_32_leaf_association() -> None:
     np.testing.assert_array_equal(observed, expected)
 
 
+def test_pp16_final_layout_pack_preserves_two_by_sixteen_rank_ownership() -> None:
+    names = (
+        "dense.slot_00.gate.weight_bits",
+        "dense.slot_00.gate.scale_inv",
+        "dense.slot_00.up.weight_bits",
+        "dense.slot_00.up.scale_inv",
+        "dense.slot_00.down.weight_bits",
+        "dense.slot_00.down.scale_inv",
+    )
+    owners = []
+    for owner in range(2):
+        owners.append(
+            {
+                names[0]: np.broadcast_to(
+                    np.array(owner + 1, dtype=np.uint8), (6144, 6144)
+                ),
+                names[1]: np.broadcast_to(
+                    np.array(owner + 1.25, dtype=np.float32), (48, 48)
+                ),
+                names[2]: np.broadcast_to(
+                    np.array(owner + 11, dtype=np.uint8), (6144, 6144)
+                ),
+                names[3]: np.broadcast_to(
+                    np.array(owner + 11.25, dtype=np.float32), (48, 48)
+                ),
+                names[4]: np.broadcast_to(
+                    np.array(owner + 21, dtype=np.uint8), (6144, 6144)
+                ),
+                names[5]: np.broadcast_to(
+                    np.array(owner + 21.25, dtype=np.float32), (48, 48)
+                ),
+            }
+        )
+    packed, records = pack_pp16_dense_final_layout(tuple(owners))
+    assert [value.shape for value in packed] == [
+        (2, 16, 6144, 768),
+        (2, 16, 48, 768),
+        (2, 16, 384, 6144),
+        (2, 16, 3, 6144),
+    ]
+    assert packed[0][0, 15, 0, 0] == 1
+    assert packed[0][1, 0, 0, 384] == 12
+    assert packed[1][0, 0, 0, 0] == np.float32(1.25)
+    assert packed[1][1, 15, 47, 767] == np.float32(12.25)
+    assert packed[2][0, 15, 383, 6143] == 21
+    assert packed[2][1, 0, 0, 0] == 22
+    assert packed[3][1, 15, 2, 6143] == np.float32(22.25)
+    assert sum(record["byte_count"] for record in records.values()) == sum(
+        value.nbytes for value in packed
+    )
+    with pytest.raises(ValueError, match="DB550-proven payload"):
+        validate_pp16_dense_final_layout_records(records)
+
+
 def test_pp16_dense_boundary_hlo_requires_exact_lp2_one_row_contract() -> None:
     report = validate_pp16_dense_boundary_hlo(_stablehlo(), _optimized_hlo())
     assert report["passed"], report
@@ -145,7 +331,7 @@ ENTRY %main (p: bf16[1,6144], q: bf16[4,1,6144]) -> (bf16[1,6144], bf16[1,6144],
   %p = bf16[1,6144] parameter(0)
   %q = bf16[4,1,6144] parameter(1)
 {calls}
-  %local_y = bf16[4,1,6144] fusion(%kernel0, %kernel1, %kernel2, %kernel3, %kernel4, %kernel5, %kernel6, %kernel7, %kernel8, %kernel9, %kernel10, %kernel11, %kernel12, %kernel13, %kernel14, %kernel15)
+  %local_y = bf16[4,1,6144] concatenate(%kernel0, %kernel1, %kernel2, %kernel3, %kernel4, %kernel5, %kernel6, %kernel7, %kernel8, %kernel9, %kernel10, %kernel11, %kernel12, %kernel13, %kernel14, %kernel15), dimensions={0}
   %reduce = bf16[4,1,6144] all-reduce(%local_y), replica_groups={{{{0,1}}}}, to_apply=%add
   %dense = bf16[1,6144] slice(%reduce)
   %norm = bf16[1,6144] copy(%dense)
@@ -187,6 +373,86 @@ ENTRY %main (p: bf16[1,6144], q: bf16[4,1,6144]) -> (bf16[1,6144], bf16[1,6144],
     assert not wrong["passed"]
 
 
+def test_pp16_dense_boundary_hlo_accepts_final_layout_convolutions_only() -> None:
+    stable, optimized = _final_layout_hlo()
+    report = validate_pp16_dense_boundary_hlo(
+        stable,
+        optimized,
+        association="strategy_nd_y_x_z_final_layout",
+    )
+    assert report["passed"], report
+    assert report["custom_call_count"] == 0
+    assert report["dense_convolution_count"] == 32
+    assert report["collective_input_convolution_count"] == 32
+    assert report["stablehlo_dense_gate_convolution_count"] == 16
+    assert report["stablehlo_dense_down_convolution_count"] == 16
+    assert report["dense_gate_convolution_ranks"] == {
+        rank: 1 for rank in range(16)
+    }
+    assert report["dense_down_convolution_ranks"] == {
+        rank: 1 for rank in range(16)
+    }
+
+    orphaned = validate_pp16_dense_boundary_hlo(
+        stable,
+        optimized.replace("%partial14, %partial15)", "%partial14, %partial14)"),
+        association="strategy_nd_y_x_z_final_layout",
+    )
+    assert not orphaned["passed"]
+    assert orphaned["collective_input_convolution_count"] == 30
+    assert any("do not all feed" in item for item in orphaned["violations"])
+
+
+def test_pp16_dense_boundary_hlo_follows_nested_tpu_fusion_lineage() -> None:
+    stable, optimized = _final_layout_nested_fusion_hlo()
+    report = validate_pp16_dense_boundary_hlo(
+        stable,
+        optimized,
+        association="strategy_nd_y_x_z_final_layout",
+    )
+    assert report["passed"], report
+    assert report["collective_input_convolution_count"] == 32
+    assert report["dense_gate_down_bijection"]
+
+    orphaned = validate_pp16_dense_boundary_hlo(
+        stable,
+        optimized.replace("%partial14, %partial15)", "%partial14, %partial14)"),
+        association="strategy_nd_y_x_z_final_layout",
+    )
+    assert not orphaned["passed"]
+    assert orphaned["collective_input_convolution_count"] == 30
+
+    wrong_rhs_layout = validate_pp16_dense_boundary_hlo(
+        stable,
+        optimized.replace(
+            "bf16[6144,768]{1,0} parameter(1)",
+            "bf16[6144,768]{0,1} parameter(1)",
+            1,
+        ),
+        association="strategy_nd_y_x_z_final_layout",
+    )
+    assert not wrong_rhs_layout["passed"]
+    assert any(
+        "convolution set drifted" in item
+        for item in wrong_rhs_layout["violations"]
+    )
+
+    wrong_stable_precision = validate_pp16_dense_boundary_hlo(
+        stable.replace(
+            "#stablehlo<precision DEFAULT>",
+            "#stablehlo<precision HIGHEST>",
+            1,
+        ),
+        optimized,
+        association="strategy_nd_y_x_z_final_layout",
+    )
+    assert not wrong_stable_precision["passed"]
+    assert any(
+        "StableHLO final-layout convolution set drifted" in item
+        for item in wrong_stable_precision["violations"]
+    )
+
+
 def test_pp16_dense_boundary_wrapper_is_bounded_and_default_off() -> None:
     wrapper = REPO / "scripts/greenfield/run_pp16_lp2_dense_boundary.sh"
     text = wrapper.read_text()
@@ -200,7 +466,7 @@ def test_pp16_dense_boundary_wrapper_is_bounded_and_default_off() -> None:
     assert completed.returncode == 2
     assert "default-off" in completed.stderr
     assert "source_db=548" in text
-    assert "strategy_nd_y_x_z" in text
+    assert "strategy_nd_y_x_z_final_layout" in text
     assert "--warmup 1 --iterations 3" in text
     assert "TPU_VISIBLE_DEVICES=0,1,2,3" in text
     assert "probe_pp16_lp2_dense_boundary.py" in text
@@ -216,6 +482,8 @@ def test_pp16_dense_boundary_wrapper_is_bounded_and_default_off() -> None:
     assert "orchestrator.log$" in text
     assert "gcloud storage rsync" not in text
     assert "REJECTED_SEALED" in text
+    assert "verify_success_evidence" in text
+    assert "SUCCESS_EVIDENCE_OK exact preterminal remote archive verified" in text
     assert "rollback_provisional_db" in text
     assert "PROVISIONAL_DB_ROLLBACK_FAILED" in text
     assert "greenfield_run_tag" in text
@@ -269,6 +537,8 @@ def test_pp16_dense_boundary_runner_is_selective_and_one_row() -> None:
     assert "jax.local_devices()[:2]" in text
     assert "safe_open(path, framework=\"pt\", device=\"cpu\")" in text
     assert "stage_local_dense_fp8_mapped" in text
+    assert "pack_pp16_dense_final_layout" in text
+    assert "final_layout_convolution=True" in text
     assert "precomputed_normalized=normalized_value" in text
     assert "axis_index_groups=((0, 1),)" in text
     assert "accepted_layer1_normalized_bfloat16_bits" in text

@@ -476,7 +476,18 @@
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/probe_pp16_lp2_dense_boundary.py", "scripts/greenfield/run_pp16_lp2_dense_boundary.sh"],
       "gate": "D",
-      "reason": "Real selective comparison proves all 12 PP16 owner/tensor values are byte-exact concatenations of paired PP8 owners. The DB533 physical mapping makes owner slot x and local rank y*4+z, so the successor computes 16 accepted-granularity I384 partials per owner, reduces y locally, performs one LP2 all-reduce of bf16[4,1,6144], and reduces z locally. Sealed DB548 replay is exact 0/6144 at efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc; forced-two-device CPU execution matches the full DB533 replay with one all-reduce and zero all-gathers. This authorizes one default-off reviewed protected discriminator and makes no TPU numerical, Gate-D or performance claim."
+      "reason": "Protected pin 723512f proves the 16-call local-y / one-LP2-x / local-z HLO is local, deterministic and replica-identical, but its fused-Pallas live leaves are NONEXACT at dense/carried/normalized mismatch counts 3821/2302/2867. Preserve the 15-object terminal archive with diagnostic ledger 22342774128abf686cac915187d7abc719064e1cd3e291b8b0c920a3e6234ec6; never rerun or treat its 4.050661-ms p50 as token/plan performance. The reducer remains valid, but DB550 never proved this different live leaf primitive."
+    },
+    {
+      "id": "greenfield-pp16-lp2-final-layout-strategy-nd-successor",
+      "category": "bounded exact-leaf architecture successor",
+      "source_repo": "glm-tpu DB550 final-layout dense payloads plus PP16 final runtime",
+      "source_pin": "DB550 payload hashes 82c93c0fafda7afa3853e3a689aace78be61bec88c5ef779bb0e9efeb834facf / 9b4bfee8b15d04545a277ba4e1ea0d3b73427a0f2cebf0a5f5fa4d7ab32bf8b3 / 8654c1ebb6f0ef29b1d3919699c08ca2b81e058bf3f9cd0827a9889994d72f7e / f37e87987745d263d152ff17415d21d572fa3c73ad5888207f1aa44916f74bdd; PP16 manifest b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/pp16_dense_boundary.py", "glm_tpu/greenfield/kernels/stage_local.py", "scripts/greenfield/probe_pp16_lp2_dense_boundary.py", "scripts/greenfield/run_pp16_lp2_dense_boundary.sh", "tests/greenfield/benchmarking/test_pp16_dense_boundary.py", "tests/greenfield/kernels/test_stage_local_virtual_tp32.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/probe_pp16_lp2_dense_boundary.py", "scripts/greenfield/run_pp16_lp2_dense_boundary.sh"],
+      "gate": "D",
+      "reason": "A local ephemeral pack of only the two layer-0 PP16 owners produces 2x16 accepted [in,out] shards whose four byte hashes exactly equal DB550's proven 4x8 payload hashes, totaling 233570304 bytes. Forced-two-device StableHLO contains 16 gate and 16 down convolutions, one bf16[4,1,6144] LP2 combine, zero all-gathers and no 32-row hidden state. The optimized-HLO gate follows computation-scoped RHS layouts and exact value flow through fusion parameters/roots, requires a 16-way gate/down bijection, and proves all 32 convolutions reach the sole LP2 combine and live boundary. Fable reported 100% usage; the authorized independent Sol fallback returned APPROVE DEPLOY for exact diff ed59af6b...1a24. The resumed persistent Fable chat then reviewed live diff 900fe3b9...c5d8 and explicitly selected this single bounded run as the best immediate action. This is not TPU numerical, Gate-D or performance evidence, and a successful discriminator must precede any full offline checkpoint repack."
     },
     {
       "id": "greenfield-layer0-attention-schedule-discriminator",

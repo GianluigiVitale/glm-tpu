@@ -29,8 +29,8 @@ readonly ORACLE_SUCCESS_SHA=6cac897695fc1e78d0a10c0e36c993cffd281c6a88721d8955fa
   exit 2
 }
 readonly ASSOCIATION=${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_ASSOCIATION:-off}
-[[ $ASSOCIATION == strategy_nd_y_x_z ]] || {
-  echo "set GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_ASSOCIATION=strategy_nd_y_x_z" >&2
+[[ $ASSOCIATION == strategy_nd_y_x_z_final_layout ]] || {
+  echo "set GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_ASSOCIATION=strategy_nd_y_x_z_final_layout" >&2
   exit 2
 }
 command -v gsutil >/dev/null 2>&1 && gsutil help rsync >/dev/null 2>&1 || {
@@ -39,7 +39,7 @@ command -v gsutil >/dev/null 2>&1 && gsutil help rsync >/dev/null 2>&1 || {
 }
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_TAG:-greenfield_pp16_lp2_strategy_nd_dense_boundary_$(date -u +%Y%m%dT%H%M%S%NZ)}
+TAG=${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_TAG:-greenfield_pp16_lp2_final_layout_strategy_nd_dense_boundary_$(date -u +%Y%m%dT%H%M%S%NZ)}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 readonly PIN TAG RUN_DIR REMOTE_PREFIX
@@ -127,13 +127,13 @@ summaries = connection.execute(
 if (
     (recorded is not None and recorded != run_id)
     or run[1] != "zai-org/GLM-5.2-FP8:greenfield-pp16-lp2-dense-boundary"
-    or run[2] != "db548-position8155-pp16-final-runtime-v1"
+    or run[2] != "db548-position8155-pp16-final-layout-boundary-v1"
     or run[4] != "Protected bounded PP16 real dense/cross-layer discriminator."
     or environment.get("GLM_ENGINE") != "greenfield_pp16_lp2_dense_boundary"
     or environment.get("greenfield_run_tag") != tag
     or environment.get("greenfield_code_hash") != pin
     or environment.get("source_db_run_id") != 548
-    or environment.get("association") != "strategy_nd_y_x_z"
+    or environment.get("association") != "strategy_nd_y_x_z_final_layout"
     or items not in (
         [],
         [("greenfield_pp16_lp2_dense_boundary", "layer0_to_layer1_position8155_lp2", 1)],
@@ -185,6 +185,36 @@ verify_failure_diagnostic() {
       } | sort
     ) \
     <(gcloud storage ls --recursive "$REMOTE_PREFIX/diagnostic/**" 2>/dev/null | sort) \
+    >/dev/null
+}
+
+verify_success_evidence() {
+  local expected relative observed ledger_sha remote_ledger_sha
+  ledger_sha=$(sha256sum "$RUN_DIR/evidence.sha256" | awk '{print $1}')
+  remote_ledger_sha=$(gcloud storage cat \
+    "$REMOTE_PREFIX/evidence.sha256" 2>/dev/null |
+    sha256sum | awk '{print $1}')
+  [[ $ledger_sha == "$remote_ledger_sha" ]] || return 1
+  while read -r expected relative; do
+    relative=${relative#\*}
+    relative=${relative#./}
+    observed=$(gcloud storage cat \
+      "$REMOTE_PREFIX/$relative" 2>/dev/null |
+      sha256sum | awk '{print $1}')
+    [[ $expected == "$observed" ]] || return 1
+  done <"$RUN_DIR/evidence.sha256"
+  diff -u \
+    <(
+      {
+        echo "$REMOTE_PREFIX/evidence.sha256"
+        while read -r _ relative; do
+          relative=${relative#\*}
+          relative=${relative#./}
+          echo "$REMOTE_PREFIX/$relative"
+        done <"$RUN_DIR/evidence.sha256"
+      } | sort
+    ) \
+    <(gcloud storage ls --recursive "$REMOTE_PREFIX/**" 2>/dev/null | sort) \
     >/dev/null
 }
 
@@ -398,7 +428,7 @@ run_dir,pin,db_path,repo,elapsed=sys.argv[1:]
 run_dir=Path(run_dir); runner=json.loads((run_dir/'runner.json').read_text())
 if runner.get('status')!='SUCCESS' or runner.get('code_hash')!=pin:
     raise SystemExit('runner identity/exactness failed')
-if runner.get('association')!='strategy_nd_y_x_z':
+if runner.get('association')!='strategy_nd_y_x_z_final_layout':
     raise SystemExit('PP16 dense association drifted')
 if not runner['dense_update_comparison']['elementwise_exact']:
     raise SystemExit('PP16 dense update is not bitwise exact')
@@ -421,7 +451,7 @@ conn=pv.connect(db_path)
 run_id=pv.start_run(
     conn,
     model='zai-org/GLM-5.2-FP8:greenfield-pp16-lp2-dense-boundary',
-    revision='db548-position8155-pp16-final-runtime-v1',
+    revision='db548-position8155-pp16-final-layout-boundary-v1',
     env={
         'GLM_ENGINE':'greenfield_pp16_lp2_dense_boundary',
         'greenfield_code_hash':pin,
@@ -491,6 +521,11 @@ gcloud storage cp --no-clobber \
   "$RUN_DIR/remote_vacancy.txt" "$RUN_DIR/orchestrator.sealed.log" \
   "$RUN_DIR/results_db_run_id.txt" \
   "$REMOTE_PREFIX/" >/dev/null
+verify_success_evidence || {
+  say "ABORT: success evidence remote hashes/object set drifted"
+  exit 1
+}
+say "SUCCESS_EVIDENCE_OK exact preterminal remote archive verified"
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR/summary.json" "$RUN_DIR/SUCCESS" "$TAG" "$REMOTE_PREFIX" <<'PY'

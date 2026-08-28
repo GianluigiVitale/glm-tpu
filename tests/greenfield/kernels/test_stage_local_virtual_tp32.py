@@ -436,3 +436,87 @@ print(json.dumps({
         "payload_present": True,
         "shape": [2, 1, 6144],
     }
+
+
+def test_pp16_final_layout_forced_two_device_graph_is_one_row_and_local() -> None:
+    program = r'''
+import json
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from glm_tpu.greenfield.kernels.stage_local import (
+    _reduce_strategy_nd_row0_bf16_partials,
+    _virtual_dense_final_layout_convolution_down_partials,
+)
+
+mesh = Mesh(np.asarray(jax.devices()), ("stage",))
+def abstract(shape, dtype, spec):
+    return jax.ShapeDtypeStruct(
+        shape, dtype, sharding=NamedSharding(mesh, spec)
+    )
+
+def mapped(normalized, merged_bits, merged_scale, down_bits, down_scale):
+    partials = _virtual_dense_final_layout_convolution_down_partials(
+        normalized,
+        merged_bits[0],
+        merged_scale[0],
+        down_bits[0],
+        down_scale[0],
+        block_shape=(128, 128),
+        compile_rows=1,
+        virtual_shards=16,
+    )
+    return _reduce_strategy_nd_row0_bf16_partials(
+        partials, axis_name="stage", groups=((0, 1),)
+    )
+
+execute = jax.shard_map(
+    mapped,
+    mesh=mesh,
+    in_specs=(
+        P(),
+        P("stage", None, None, None),
+        P("stage", None, None, None),
+        P("stage", None, None, None),
+        P("stage", None, None, None),
+    ),
+    out_specs=P(),
+    check_vma=False,
+)
+arguments = (
+    abstract((1, 6144), jnp.bfloat16, P()),
+    abstract((2, 16, 6144, 768), jnp.uint8, P("stage", None, None, None)),
+    abstract((2, 16, 48, 768), jnp.float32, P("stage", None, None, None)),
+    abstract((2, 16, 384, 6144), jnp.uint8, P("stage", None, None, None)),
+    abstract((2, 16, 3, 6144), jnp.float32, P("stage", None, None, None)),
+)
+stablehlo = jax.jit(execute).lower(*arguments).as_text()
+print(json.dumps({
+    "all_gather_count": stablehlo.count("stablehlo.all_gather"),
+    "all_reduce_count": stablehlo.count("stablehlo.all_reduce"),
+    "convolution_count": stablehlo.count("stablehlo.convolution"),
+    "dead_rows": "tensor<32x6144xbf16>" in stablehlo,
+    "payload_present": "tensor<4x1x6144xbf16>" in stablehlo,
+}))
+'''
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    env["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=180,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result == {
+        "all_gather_count": 0,
+        "all_reduce_count": 1,
+        "convolution_count": 32,
+        "dead_rows": False,
+        "payload_present": True,
+    }

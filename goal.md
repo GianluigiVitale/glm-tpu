@@ -58,7 +58,8 @@ has local repeated collectives/no full-pod hidden reconstruction, and passes exa
 quality, integrity, HBM, HLO, PP8/PP16 measurement, WS32 adjudication, 128K smoke, 256K E0,
 DB/archive, and clean-fleet gates. Continue until section 18 has direct evidence.
 Use logged batches; persist exact next before compaction. Adversarially review every new
-code/evidence batch in one persistent Fable 5 Max chat via Claude Code CLI
-`--dangerously-skip-permissions`; give it the current diff, relevant evidence/invariants and an
-explicit verdict request. Correct blockers; never re-review cleared code. Verify, commit/push, then
-let the locked same-region cron sync. Never use Opus or review workflows/subagents.
+code/evidence batch. Prefer one persistent Fable 5 Max Claude CLI chat with
+`--dangerously-skip-permissions`; if Fable reports 100% usage, use one independent
+Sol agent here with the same scoped diff/evidence and explicit verdict. Correct blockers; never
+re-review cleared code. Verify, commit/push, then let the locked same-region cron sync. Never use
+Opus, review workflows, or other subagents.

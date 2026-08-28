@@ -1,5 +1,12 @@
 # Greenfield performance and mechanism log
 
+Protected pin `723512f` rejects the PP16 local-y / LP2-x / local-z graph when its leaves come from
+the fused I384 Pallas kernel. The HLO mechanism is correct and all samples/replicas agree, but the
+dense/carried/normalized rows miss in `3821/2302/2867` values. Its 7.727-second compile and
+`4.197789/4.035360/4.050661 ms` samples are diagnostic-only and must not be compared as token or
+plan latency. The successor changes the leaf primitive to DB550's proven final-layout convolution;
+its current evidence is CPU/HLO/byte-pack only, with no TPU timing or correctness claim.
+
 The current protected PP8 8K attempt at pin `570cc453` produced no performance datum: it stopped at
 the exact event-1/layer-1 DSA gate before warmup, timing, XPlane, HBM or DB publication. Its emitted
 token/DSA artifacts exactly duplicate the old sealed numerical failure. The PP16 two-device
