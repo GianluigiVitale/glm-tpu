@@ -95,7 +95,7 @@ Validation:
   `8ad57d3ea3ee16008b40c03cb4ed5bc6dc7c4f4a6a18f1978ee15ffad332c608`.
 - Corrected fail-closed head: 57/57 in 98.64 seconds, including the missing-
   buffer rejection and all prior real-v4 contracts. Evidence
-  `upstream_glm_dsa_pr2_full_local_bounds_20260828T015207Z`, manifest-list
+  `upstream_glm_dsa_pr2_full_local_bounds_20260828T015207Z`, evidence-manifest
   SHA-256
   `f5b39594dda06bd0a3546611568db747a93259d5c1e9022ab570ae7aa02ed473`.
 
@@ -133,9 +133,11 @@ Validation:
   `upstream_glm_dsa_pr3_local_bounds_20260828T015441Z`, evidence-manifest SHA-256
   `ce0f35f0d12d564132d0eb58fd9cfc5bf3c3b17182057bd79e7d2a8fac4cad31`.
 - The repository metadata validator was also inspected. Its current empty-env
-  query flags the same metadata-free execution steps in existing model YAMLs;
-  the new file follows those existing conventions and has unique, complete
-  metadata on every result-recording step.
+  queue parser emits a literal `\t` and consequently reports all queues as
+  empty, including plain `cpu`; unchanged GLM-5 and DeepSeek-V3.2 model YAMLs
+  fail identically. A separate structural audit passes all six new steps,
+  unique keys/target, dependencies, referenced test paths, and recording-step
+  metadata. Do not hide the upstream validator defect inside this model PR.
 
 ## Stack status and next action
 
@@ -165,3 +167,8 @@ attempts and the unnecessary but harmless all-host runtime-service restart are
 preserved; the corrected one-test probe passed in 14.74 seconds before the
 full suites above. Present PR 1's exact diff to the user for audit. No upstream
 push or PR is authorized yet.
+
+Exact owner-facing checklists for the dependent patches are
+`docs/upstream/glm-dsa-pr2-owner-audit.md` and
+`docs/upstream/glm-dsa-pr3-owner-audit.md`. They do not change the submission
+order: present PR 1 first, then PR 2, then PR 3.

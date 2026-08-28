@@ -4,6 +4,15 @@
 
 ## 2026-08-28 corrected three-PR stack passes and is private-audit ready
 
+- PR2 and PR3 now have immutable, file-by-file owner checklists at
+  `docs/upstream/glm-dsa-pr2-owner-audit.md` and
+  `docs/upstream/glm-dsa-pr3-owner-audit.md`. The PR2 audit found no code
+  blocker: current vLLM retains semantic/metadata ownership, sparse mode
+  fails closed, top-k reaches paged sparse MLA, and one-row decode/TP2 behavior
+  is directly tested. The PR3 structural CI audit passes six unique steps,
+  dependencies, test paths, metadata and target uniqueness. The repository's
+  own validator has a baseline literal-`\t` queue-parser defect reproduced on
+  unchanged GLM-5 and DeepSeek-V3.2 YAMLs; do not mix that repair into PR3.
 - A fresh read-only race audit still finds official main at the exact base and no competing
   GLM-5.2/TPU DSA or `SparseAttnIndexer` PR. Open #2324 remains the broad 24-commit GLM-5.1
   multi-host change, hundreds of commits behind its base and awaiting code-owner review. PR1's
@@ -16,7 +25,7 @@
   All eleven commits have DCO and only these private-fork heads were pushed. Official upstream
   remains untouched at `5e2c7128bc74a75493f07930f3a749bcb272a3cb`.
 - All-file pre-commit and focused CPU coverage pass. Protected PR2 passes 57/57 in 98.64 seconds
-  (`upstream_glm_dsa_pr2_full_local_bounds_20260828T015207Z`, manifest-list
+  (`upstream_glm_dsa_pr2_full_local_bounds_20260828T015207Z`, evidence-manifest
   `f5b39594...ed473`); protected PR3 passes 3/3 in 9.24 seconds
   (`upstream_glm_dsa_pr3_local_bounds_20260828T015441Z`, `ce0f35f0...cad31`). Both have exact
   clean heads/pins, authenticated 8/8 pre/post cleanup and verified `US-CENTRAL2` archives.
