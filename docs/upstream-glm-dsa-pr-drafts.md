@@ -6,7 +6,7 @@ the exact diffs. The series is stacked and must be reviewed/merged in order.
 ## PR 1 — `kernels: add exact V3.2/GLM sparse-attention primitives`
 
 Base: `vllm-project/tpu-inference:main` at `5e2c7128`  
-Head: private `pr/glm-dsa-kernels-v3` at `7ae4eedc`
+Head: private `pr/glm-dsa-kernels-v3` at `fd29657d`
 
 ### Summary
 
@@ -24,21 +24,23 @@ primitives. It does not add a model fork or a second execution architecture.
 - Protected TPU suite: 36/36, 8/8 hosts clean.
 - Exact selected set/order at 2,047/2,048/2,049 boundaries and production
   `n=262144, k=2048`.
-- Exact current head: 30/30 kernel/HLO tests in 61.64 seconds, 8/8 hosts clean.
+- Exact current head: 30/30 kernel/HLO tests in 61.19 seconds, 8/8 hosts clean.
 - Warming: 5 iterations; samples: 20 on TPU v4.
-- Current tracked-harness median wall times: StreamIndex 3.214 ms, cache insert
-  0.357 ms, selected gather plus MLA 0.217 ms, sparse MLA 0.155 ms, composed
-  DSA chain 3.279 ms.
+- Reproduce from the repository root with
+  `PYTHONPATH=. python scripts/benchmarking/kernels/benchmark_glm_dsa.py --mode all`.
+- Current tracked-harness median wall times: StreamIndex 3.208 ms, cache insert
+  0.353 ms, selected gather plus MLA 0.222 ms, sparse MLA 0.159 ms, composed
+  DSA chain 3.280 ms.
 - Exact StableHLO captured; no end-to-end throughput claim is made.
 
 Evidence: `upstream_streamindex_test_20260827T224406Z`, manifest-list SHA-256
 `dd461d99feae8b582457954473577e1ee46ca059cf1d96314ee4b4f486daf170`.
-Current-head correctness evidence: `upstream_streamindex_test_20260828T005547Z`,
+Current-head correctness evidence: `upstream_streamindex_test_20260828T011411Z`,
 manifest-list SHA-256
-`ad807bb2e426a46caeabbeea8de18fb4ec37a5348a0fa386fc3ed3fcc8879e95`.
+`1e08dad8c1ee87487df08a380a17b65cebac9134a4e82157240e1e71b8138704`.
 Current-head benchmark evidence:
-`upstream_glm_dsa_benchmark_20260828T005834Z`, manifest-list SHA-256
-`0f045a7c0fcd2afae7819d648d86c7b59c71e43c4a7012078dfb7bf86b85b502`.
+`upstream_glm_dsa_benchmark_20260828T011531Z`, manifest-list SHA-256
+`20cbf34d8576c8905d337f932584f3f9248865941bcbae63b9a68bf35bb8e285`.
 
 ### Compatibility, risk, and rollback
 
@@ -47,15 +49,15 @@ Current-head benchmark evidence:
   New V3.2 cache/sparse-MLA APIs remain under `kernels/experimental`.
 - Direct performance evidence is TPU v4 only and covers isolated kernels, not
   full-checkpoint serving, accuracy, HBM capacity, or other TPU generations.
-- Rollback is a four-commit revert. It removes only the new experimental
+- Rollback is a five-commit revert. It removes only the new experimental
   primitives/tests/benchmark and restores the StreamIndex defaults without a
   checkpoint or state migration.
 
 ## PR 2 — `layers: bridge V3.2/GLM sparse attention to TPU`
 
-Base: PR 1 `7ae4eedc`
+Base: PR 1 `fd29657d`
 
-Head: private `pr/glm-dsa-bridge-v3` at `3c62d82a`
+Head: private `pr/glm-dsa-bridge-v3` at `58598703`
 
 ### Summary
 
@@ -85,7 +87,7 @@ IndexShare buffer.
   pass.
 - Final protected TPU bridge suite: 22/22 in 44.04 seconds, 8/8 hosts clean.
 - Additional protected exact causal-prefill and selected-MLA tests pass.
-- Exact current head: 56/56 protected tests in 98.81 seconds, including a
+- Exact current head: 56/56 protected tests in 97.71 seconds, including a
   two-device TP prefill with the same eight-row shape as decode; 8/8 hosts
   clean.
 - No full-checkpoint latency, accuracy, or serving claim is made.
@@ -93,9 +95,9 @@ IndexShare buffer.
 Primary evidence: `upstream_streamindex_test_20260827T235340Z`, manifest-list
 SHA-256
 `6d3a6b445568f8b4a5cd25c97feb50316d97acc0fc48e1259290b14591dd70fe`.
-Current-head evidence: `upstream_streamindex_test_20260828T010034Z`,
+Current-head evidence: `upstream_streamindex_test_20260828T011620Z`,
 manifest-list SHA-256
-`e0690f49393b355582caf432a62420a220675851d8c3c3e7f203278699592497`.
+`8ad57d3ea3ee16008b40c03cb4ed5bc6dc7c4f4a6a18f1978ee15ffad332c608`.
 
 ### Compatibility, risk, and rollback
 
@@ -109,9 +111,9 @@ manifest-list SHA-256
 
 ## PR 3 — `models: add GLM-5.2 DSA contract CI`
 
-Base: PR 2 `3c62d82a`
+Base: PR 2 `58598703`
 
-Head: private `pr/glm-dsa-model-ci-v3` at `516c9f13`
+Head: private `pr/glm-dsa-model-ci-v3` at `d1a8a4e4`
 
 ### Summary
 
@@ -133,13 +135,13 @@ the cross-repository model contract and makes the model's unit step real.
 
 - Focused CPU: 3/3; repository pre-commit hooks pass.
 - Protected TPU at exact committed head: 3/3 in 9.09 seconds, 8/8 hosts clean.
-- Exact current head: 3/3 in 9.89 seconds, 8/8 hosts clean.
+- Exact current head: 3/3 in 9.59 seconds, 8/8 hosts clean.
 
 Evidence: `upstream_streamindex_test_20260828T001254Z`, manifest-list SHA-256
 `f8f3bf38cd2dfed2735c82010f86af3b57e2cfe87b350726cdabe8b89690e5d3`.
-Current-head evidence: `upstream_streamindex_test_20260828T010235Z`,
+Current-head evidence: `upstream_streamindex_test_20260828T011829Z`,
 manifest-list SHA-256
-`d723e4c990988ddf1cc12f5a3410dde9abc68c8627898978f6474cc74c7e3de8`.
+`0cd31c71911a890ce36f917e624cc60a234a1ede39ee7b7bcd140e5d5743a250`.
 
 ### Compatibility, risk, and rollback
 
@@ -160,6 +162,6 @@ manifest-list SHA-256
 - Official upstream has not been mutated; all heads currently exist only on
   the user's private fork.
 - Exact audit commands are:
-  `git diff 5e2c7128...7ae4eedc`,
-  `git diff 7ae4eedc...3c62d82a`, and
-  `git diff 3c62d82a...516c9f13`.
+  `git diff 5e2c7128...fd29657d`,
+  `git diff fd29657d...58598703`, and
+  `git diff 58598703...d1a8a4e4`.
