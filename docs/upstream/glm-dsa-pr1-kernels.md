@@ -7,10 +7,11 @@ been mutated. **Dependency:** none; this is the foundation for the later bridge 
 
 - TPU Inference base: `5e2c7128bc74a75493f07930f3a749bcb272a3cb`.
 - vLLM LKG: `d626108b1841888ec90aced33367149a6bbc7e4b`.
-- Private branch/head: `pr/glm-dsa-kernels-v3` / `d3ccafdfe5157dda4c26b779dc50eb505edfa96b`.
-- Commits: `78d7ee30` (current FP8+FP32-scale exact scorer/top-k), `53b78b95` (paged sparse MLA
-  consumer), and `d3ccafdf` (exact V3.2 index-cache pack/insertion plus legacy-v4 lowering fix).
-- The branch contains seven changed/new source-test files and no generated data, checkpoints,
+- Private branch/head: `pr/glm-dsa-kernels-v3` / `fd29657d336cee859c17d4568f8d38d276ca9707`.
+- Commits: `e855b992` (current FP8+FP32-scale exact scorer/top-k), `2d44a912` (paged sparse MLA
+  consumer), `bb002856` (exact V3.2 index-cache pack/insertion), `7ae4eedc` (bounded real-TPU
+  benchmark), and `fd29657d` (reproducible benchmark invocation).
+- The branch contains eight changed/new source-test/benchmark files and no generated data, checkpoints,
   traces, caches, or benchmark run directories.
 
 The patch preserves the existing DeepSeek-v4 E8M0/approximate defaults. Opt-in static arguments

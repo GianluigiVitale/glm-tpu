@@ -57,7 +57,7 @@ Current-head benchmark evidence:
 
 Base: PR 1 `fd29657d`
 
-Head: private `pr/glm-dsa-bridge-v3` at `58598703`
+Head: private `pr/glm-dsa-bridge-v3` at `dfb28231`
 
 ### Summary
 
@@ -80,6 +80,8 @@ IndexShare buffer.
 - Fail closed for unimplemented configurations: more than one sequence,
   data parallelism, continue-decode disabled, DCP/PCP,
   non-FP8/UE8M0/block-128 index caches, and quantized or transposed MLA caches.
+- Fail closed when sparse MLA is requested without the model-owned shared
+  top-k buffer; never silently select dense MLA for that configuration.
 
 ### Validation
 
@@ -87,7 +89,7 @@ IndexShare buffer.
   pass.
 - Final protected TPU bridge suite: 22/22 in 44.04 seconds, 8/8 hosts clean.
 - Additional protected exact causal-prefill and selected-MLA tests pass.
-- Exact current head: 56/56 protected tests in 97.71 seconds, including a
+- Corrected current head: 57/57 protected tests in 98.64 seconds, including a
   two-device TP prefill with the same eight-row shape as decode; 8/8 hosts
   clean.
 - No full-checkpoint latency, accuracy, or serving claim is made.
@@ -95,9 +97,10 @@ IndexShare buffer.
 Primary evidence: `upstream_streamindex_test_20260827T235340Z`, manifest-list
 SHA-256
 `6d3a6b445568f8b4a5cd25c97feb50316d97acc0fc48e1259290b14591dd70fe`.
-Current-head evidence: `upstream_streamindex_test_20260828T011620Z`,
+Current-head evidence:
+`upstream_glm_dsa_pr2_full_local_bounds_20260828T015207Z`,
 manifest-list SHA-256
-`8ad57d3ea3ee16008b40c03cb4ed5bc6dc7c4f4a6a18f1978ee15ffad332c608`.
+`f5b39594dda06bd0a3546611568db747a93259d5c1e9022ab570ae7aa02ed473`.
 
 ### Compatibility, risk, and rollback
 
@@ -111,9 +114,9 @@ manifest-list SHA-256
 
 ## PR 3 — `models: add GLM-5.2 DSA contract CI`
 
-Base: PR 2 `58598703`
+Base: PR 2 `dfb28231`
 
-Head: private `pr/glm-dsa-model-ci-v3` at `d1a8a4e4`
+Head: private `pr/glm-dsa-model-ci-v3` at `8aae29ad`
 
 ### Summary
 
@@ -135,13 +138,13 @@ the cross-repository model contract and makes the model's unit step real.
 
 - Focused CPU: 3/3; repository pre-commit hooks pass.
 - Protected TPU at exact committed head: 3/3 in 9.09 seconds, 8/8 hosts clean.
-- Exact current head: 3/3 in 9.59 seconds, 8/8 hosts clean.
+- Restacked current head: 3/3 in 9.24 seconds, 8/8 hosts clean.
 
 Evidence: `upstream_streamindex_test_20260828T001254Z`, manifest-list SHA-256
 `f8f3bf38cd2dfed2735c82010f86af3b57e2cfe87b350726cdabe8b89690e5d3`.
-Current-head evidence: `upstream_streamindex_test_20260828T011829Z`,
+Current-head evidence: `upstream_glm_dsa_pr3_local_bounds_20260828T015441Z`,
 manifest-list SHA-256
-`0cd31c71911a890ce36f917e624cc60a234a1ede39ee7b7bcd140e5d5743a250`.
+`ce0f35f0d12d564132d0eb58fd9cfc5bf3c3b17182057bd79e7d2a8fac4cad31`.
 
 ### Compatibility, risk, and rollback
 
@@ -163,5 +166,5 @@ manifest-list SHA-256
   the user's private fork.
 - Exact audit commands are:
   `git diff 5e2c7128...fd29657d`,
-  `git diff fd29657d...58598703`, and
-  `git diff 58598703...d1a8a4e4`.
+  `git diff fd29657d...dfb28231`, and
+  `git diff dfb28231...8aae29ad`.

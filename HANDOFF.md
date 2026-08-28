@@ -1,6 +1,31 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-27 UTC
+**Updated:** 2026-08-28 UTC
+
+## 2026-08-28 corrected three-PR stack passes and is private-audit ready
+
+- The three stacked private heads are PR1 `fd29657d336cee859c17d4568f8d38d276ca9707`,
+  PR2 `dfb28231b9e35c11659d3db3125bc18cc3177ab8`, and PR3
+  `8aae29ad6da2b2cd778be031b423e31eb4a85a80`. PR2 now fails closed if sparse MLA lacks the
+  model-owned shared top-k buffer and removes unused token-count plumbing; PR3 was restacked.
+  All eleven commits have DCO and only these private-fork heads were pushed. Official upstream
+  remains untouched at `5e2c7128bc74a75493f07930f3a749bcb272a3cb`.
+- All-file pre-commit and focused CPU coverage pass. Protected PR2 passes 57/57 in 98.64 seconds
+  (`upstream_glm_dsa_pr2_full_local_bounds_20260828T015207Z`, manifest-list
+  `f5b39594...ed473`); protected PR3 passes 3/3 in 9.24 seconds
+  (`upstream_glm_dsa_pr3_local_bounds_20260828T015441Z`, `ce0f35f0...cad31`). Both have exact
+  clean heads/pins, authenticated 8/8 pre/post cleanup and verified `US-CENTRAL2` archives.
+- A new harness initially inherited full-pod `TPU_PROCESS_BOUNDS=1,2,4`, so three bounded attempts
+  waited below pytest in `CreateTpuSystemState`. An all-host `tpu-runtime.service` restart did not
+  change it. Comparing libtpu logs to the earlier pass identified the configuration error; the
+  harness now pins `1,1,1`, local `2,2,1` chips and devices `0,1,2,3`. The smallest exact kernel
+  test then passed in 14.74 seconds before either full suite. All failures remain archived.
+- Exact next: commit/mirror these durable records, then present only PR1's exact diff to the owner
+  for personal audit. The completed post-correction three-ref bundle is
+  `glm-dsa-private-stack_20260828T015742Z.bundle`, 12,152,990 bytes, SHA-256
+  `d9b13b3906184286ad67ddeddd6d46d2bff29b04b9465a366c16f88245844bfb`, under the approved
+  same-region backup prefix. Do not open or push anything to official upstream without explicit
+  approval.
 
 ## 2026-08-27 upstream PR 1 kernel foundation is privately ready
 

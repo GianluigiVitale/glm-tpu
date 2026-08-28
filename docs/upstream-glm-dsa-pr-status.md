@@ -10,10 +10,10 @@ pushed to or opened against `vllm-project/tpu-inference`.
 - PR 1 branch/head: `pr/glm-dsa-kernels-v3` at
   `fd29657d336cee859c17d4568f8d38d276ca9707` (private fork).
 - PR 2 branch/head: `pr/glm-dsa-bridge-v3` at
-  `58598703014b666d9d1b811f6bb0f37262885b47` (private fork), stacked on PR 1.
+  `dfb28231b9e35c11659d3db3125bc18cc3177ab8` (private fork), stacked on PR 1.
 - PR 3 branch/head: `pr/glm-dsa-model-ci-v3` at
-  `d1a8a4e42d0f2450cee29c1e6d7063b609468fc8` (private fork), stacked on PR 2.
-- All ten private commits carry the repository-required DCO signoff. The
+  `8aae29ad6da2b2cd778be031b423e31eb4a85a80` (private fork), stacked on PR 2.
+- All eleven private commits carry the repository-required DCO signoff. The
   DCO rewrite preserved each PR head's exact tree hash; recoverable local
   pre-rewrite refs remain under `backup/glm-dsa-*-pre-dco`.
 - Restored environment: JAX/JAXLIB 0.10.1, fsspec 2025.3.0,
@@ -70,6 +70,8 @@ reading stale indices.
 Current explicit limitations are fail-closed: `max_num_seqs=1`,
 `data_parallel_size=1`, `additional_config.enable_continue_decode=true`, no DCP/PCP, FP8+UE8M0
 block-128 index cache only, and no quantized or transposed main MLA cache.
+Requesting sparse MLA without the model-owned shared top-k buffer also raises
+immediately; it can no longer silently select the dense backend.
 
 Validation:
 
@@ -91,6 +93,11 @@ Validation:
   tests. Evidence `upstream_streamindex_test_20260828T011620Z`, manifest-list
   SHA-256
   `8ad57d3ea3ee16008b40c03cb4ed5bc6dc7c4f4a6a18f1978ee15ffad332c608`.
+- Corrected fail-closed head: 57/57 in 98.64 seconds, including the missing-
+  buffer rejection and all prior real-v4 contracts. Evidence
+  `upstream_glm_dsa_pr2_full_local_bounds_20260828T015207Z`, manifest-list
+  SHA-256
+  `f5b39594dda06bd0a3546611568db747a93259d5c1e9022ab570ae7aa02ed473`.
 
 A deliberately broader 66-test run passed all 63 relevant tests but also
 reproduced three existing dense FP8-cache v4 Mosaic legalization failures in
@@ -122,6 +129,9 @@ Validation:
 - Exact current head: 3/3 in 9.59 seconds; evidence
   `upstream_streamindex_test_20260828T011829Z`, manifest-list SHA-256
   `0cd31c71911a890ce36f917e624cc60a234a1ede39ee7b7bcd140e5d5743a250`.
+- Restacked fail-closed head: 3/3 in 9.24 seconds; evidence
+  `upstream_glm_dsa_pr3_local_bounds_20260828T015441Z`, manifest-list SHA-256
+  `ce0f35f0d12d564132d0eb58fd9cfc5bf3c3b17182057bd79e7d2a8fac4cad31`.
 - The repository metadata validator was also inspected. Its current empty-env
   query flags the same metadata-free execution steps in existing model YAMLs;
   the new file follows those existing conventions and has unique, complete
@@ -135,7 +145,7 @@ bucket-buffer, evidence-head, and CI-coverage gaps; each has been corrected and
 revalidated above. Compact evidence is mirrored under matching
 `gs://driftbench-dsv4-uc/results/upstream_glm_dsa_pr{1,2,3}_*` prefixes in the
 verified `US-CENTRAL2` regional bucket. PR 1 is 8 files (+1,250/-10), PR 2 is
-11 files (+1,332/-34), and PR 3 is 2 files (+302). The final stack tracks 1,103
+11 files (+1,344/-34), and PR 3 is 2 files (+302). The final stack tracks 1,103
 files, contains no tracked file above 1 MiB, and has no checkpoint, trace,
 cache, environment, or generated run tree. `upstream/main` remains exactly
 `5e2c7128bc74a75493f07930f3a749bcb272a3cb`; no upstream branch or PR was
@@ -144,7 +154,14 @@ created. The five-minute same-region cron now mirrors the authoritative
 `gs://driftbench-dsv4-uc/repos/tpu-inference-glm-baseline`. A separately
 verified complete-history three-ref bundle is at
 `gs://driftbench-dsv4-uc/backups/tpu-inference-glm-dsa/`
-`glm-dsa-private-stack_20260828T011900Z.bundle` (12,140,155 bytes; SHA-256
-`259be45cd524b9dd43d34e0eff84a8efbffd20e896bcef87f470a69dc9f0c867`).
-Present PR 1's exact diff to the user for audit. No upstream push or PR is
-authorized yet.
+`glm-dsa-private-stack_20260828T015742Z.bundle` (12,152,990 bytes; SHA-256
+`d9b13b3906184286ad67ddeddd6d46d2bff29b04b9465a366c16f88245844bfb`).
+
+The protected harness must set `TPU_PROCESS_BOUNDS=1,1,1`,
+`TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1`, and four visible local chips. Omitting the
+process bound made libtpu inherit the full `1,2,4` pod and wait in
+`CreateTpuSystemState` for absent peer pytest processes. Three bounded failed
+attempts and the unnecessary but harmless all-host runtime-service restart are
+preserved; the corrected one-test probe passed in 14.74 seconds before the
+full suites above. Present PR 1's exact diff to the user for audit. No upstream
+push or PR is authorized yet.
