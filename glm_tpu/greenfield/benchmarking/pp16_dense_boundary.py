@@ -33,6 +33,64 @@ PP16_DENSE_BOUNDARY_ACCEPTED_RESIDUAL_SHA256 = (
     "35a601b7f174eb9204848757f709549a31e82774309929f4071c61849626044c"
 )
 
+
+def fused_add_rms_norm_output_owned(
+    hidden_states: Any,
+    residual: Any,
+    weight: Any,
+    *,
+    epsilon: float,
+) -> tuple[Any, Any]:
+    """Keep the one-row weighted output and carried residual co-owned.
+
+    This diagnostic-only boundary preserves the accepted arithmetic while
+    separating the variance source from the recomputed output source.  The
+    reduction-side optimization barrier is value preserving; its purpose is
+    to stop XLA from co-owning the carried BF16 row with the scalar reduction,
+    which is the rejected DB549 schedule.  Real TPU HLO decides whether the
+    two returned one-row values become one final multi-output fusion.
+    """
+
+    import jax
+    import jax.numpy as jnp
+    from jax import lax
+
+    if hidden_states.shape != residual.shape:
+        raise ValueError("output-owned RMS hidden and residual shapes differ")
+    if hidden_states.dtype != residual.dtype:
+        raise ValueError("output-owned RMS hidden and residual dtypes differ")
+    if hidden_states.ndim != 2 or hidden_states.shape[0] != 1:
+        raise ValueError("output-owned RMS requires exactly one logical row")
+    if weight.shape != (hidden_states.shape[-1],):
+        raise ValueError("output-owned RMS weight width drifted")
+    if (
+        not isinstance(epsilon, (int, float))
+        or isinstance(epsilon, bool)
+        or epsilon <= 0
+    ):
+        raise ValueError("output-owned RMS epsilon must be positive")
+
+    activation_dtype = hidden_states.dtype
+    with jax.named_scope("greenfield_pp16_layer1_reduction_owner"):
+        reduction_hidden = lax.optimization_barrier(hidden_states)
+        reduction_sum = reduction_hidden.astype(jnp.float32) + residual.astype(
+            jnp.float32
+        )
+        inverse = lax.rsqrt(
+            jnp.mean(lax.square(reduction_sum), axis=-1, keepdims=True)
+            + jnp.float32(epsilon)
+        )
+    with jax.named_scope("greenfield_pp16_layer1_output_owner"):
+        output_sum = hidden_states.astype(jnp.float32) + residual.astype(
+            jnp.float32
+        )
+        carried = output_sum.astype(activation_dtype)
+        normalized = (
+            (output_sum * inverse).astype(weight.dtype) * weight
+        ).astype(activation_dtype)
+        return normalized, carried
+
+
 _PP16_DENSE_NAMES = (
     "dense.slot_00.gate.weight_bits",
     "dense.slot_00.gate.scale_inv",
@@ -308,9 +366,13 @@ def validate_pp16_dense_boundary_hlo(
         "lp2_single",
         "strategy_nd_y_x_z",
         "strategy_nd_y_x_z_final_layout",
+        "strategy_nd_y_x_z_final_layout_output_owned",
     }:
         raise ValueError("unknown PP16 dense boundary association")
-    final_layout = association == "strategy_nd_y_x_z_final_layout"
+    final_layout = association in {
+        "strategy_nd_y_x_z_final_layout",
+        "strategy_nd_y_x_z_final_layout_output_owned",
+    }
 
     module = parse_hlo_module(optimized_hlo)
     violations: list[str] = []

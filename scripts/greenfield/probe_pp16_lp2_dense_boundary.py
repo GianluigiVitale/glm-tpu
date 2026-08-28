@@ -251,8 +251,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--warmup", type=int, default=1)
     parser.add_argument("--iterations", type=int, default=3)
     parser.add_argument(
+        "--mode", choices=("acquisition", "bounded"), default="bounded"
+    )
+    parser.add_argument("--expected-stablehlo-sha256", default="")
+    parser.add_argument("--expected-optimized-hlo-sha256", default="")
+    parser.add_argument(
         "--association",
-        choices=("strategy_nd_y_x_z_final_layout",),
+        choices=(
+            "strategy_nd_y_x_z_final_layout",
+            "strategy_nd_y_x_z_final_layout_output_owned",
+        ),
         default="strategy_nd_y_x_z_final_layout",
     )
     parser.add_argument("--output", type=Path, required=True)
@@ -270,8 +278,18 @@ def main() -> int:
         raise RuntimeError(
             f"stale code hash: expected={args.expected_code_hash} found={code_hash}"
         )
-    if (args.warmup, args.iterations) != (1, 3):
-        raise ValueError("bounded LP2 dense probe requires exactly 1/3 samples")
+    expected_samples = (0, 0) if args.mode == "acquisition" else (1, 3)
+    if (args.warmup, args.iterations) != expected_samples:
+        raise ValueError(
+            f"{args.mode} LP2 dense probe requires exactly "
+            f"{expected_samples[0]}/{expected_samples[1]} samples"
+        )
+    output_owned = (
+        args.association
+        == "strategy_nd_y_x_z_final_layout_output_owned"
+    )
+    if args.mode == "acquisition" and not output_owned:
+        raise ValueError("compile acquisition is only for output ownership")
     if _sha256_file(args.oracle_npz) != args.oracle_npz_sha256:
         raise RuntimeError("sealed dense boundary oracle identity drifted")
 
@@ -284,6 +302,7 @@ def main() -> int:
         PP16_DENSE_BOUNDARY_ACCEPTED_RESIDUAL_SHA256,
         derive_expected_dense_boundary_bits,
         exact_bfloat16_bits,
+        fused_add_rms_norm_output_owned,
         pack_pp16_dense_final_layout,
         validate_pp16_dense_final_layout_records,
         validate_pp16_dense_boundary_hlo,
@@ -443,11 +462,13 @@ def main() -> int:
             ),
             final_layout_convolution=True,
         )
-        layer1_normalized, next_residual = fused_add_rms_norm(
-            dense_update,
-            residual_value,
-            next_norm,
-            epsilon=1e-5,
+        boundary = (
+            fused_add_rms_norm_output_owned
+            if output_owned
+            else fused_add_rms_norm
+        )
+        layer1_normalized, next_residual = boundary(
+            dense_update, residual_value, next_norm, epsilon=1e-5
         )
         return dense_update, layer1_normalized, next_residual
 
@@ -487,6 +508,56 @@ def main() -> int:
     )
     if not hlo_contract["passed"]:
         raise RuntimeError(f"PP16 dense boundary HLO failed: {hlo_contract}")
+
+    stablehlo_sha256 = sha256(stablehlo.encode()).hexdigest()
+    optimized_hlo_sha256 = sha256(optimized_hlo.encode()).hexdigest()
+    acquisition_record = {
+        "artifact_kind": "greenfield_pp16_output_ownership_acquisition",
+        "arithmetic_executed": False,
+        "association": args.association,
+        "code_hash": code_hash,
+        "compile_seconds": compile_seconds,
+        "hlo_contract": hlo_contract,
+        "logical_output_shapes": [[1, 6144], [1, 6144], [1, 6144]],
+        "mode": args.mode,
+        "optimized_hlo_sha256": optimized_hlo_sha256,
+        "stablehlo_sha256": stablehlo_sha256,
+        "status": "COMPILE_ACQUIRED_UNPINNED",
+    }
+    if output_owned:
+        _atomic_json(
+            args.hlo_dir / "fusion_ownership_acquisition.json",
+            acquisition_record,
+        )
+    if args.mode == "acquisition":
+        if (
+            args.expected_stablehlo_sha256
+            or args.expected_optimized_hlo_sha256
+        ):
+            raise RuntimeError(
+                "acquisition mode requires deliberately empty HLO pins"
+            )
+        raise RuntimeError(
+            "output-ownership HLO acquired; deliberately refusing before arithmetic"
+        )
+    if output_owned:
+        expected_pins = (
+            args.expected_stablehlo_sha256,
+            args.expected_optimized_hlo_sha256,
+        )
+        if any(len(value) != 64 for value in expected_pins):
+            raise RuntimeError(
+                "bounded output-ownership run requires exact HLO pins"
+            )
+        if expected_pins != (stablehlo_sha256, optimized_hlo_sha256):
+            raise RuntimeError(
+                "bounded output-ownership HLO drifted from the acquired graph"
+            )
+    elif (
+        args.expected_stablehlo_sha256
+        or args.expected_optimized_hlo_sha256
+    ):
+        raise RuntimeError("legacy bounded boundary does not accept HLO pins")
 
     for _ in range(args.warmup):
         jax.block_until_ready(compiled(*program_args))
@@ -634,6 +705,7 @@ def main() -> int:
             "replica_groups": [[0, 1]],
         },
         "position": 8155,
+        "mode": args.mode,
         "profiler_free_timing": True,
         "replica_agreement": replica_agreement,
         "runtime": {

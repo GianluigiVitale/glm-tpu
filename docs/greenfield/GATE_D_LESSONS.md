@@ -5,6 +5,14 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 
 ## Current boundary
 
+- The PP16 final-layout y-x-z run closes all upstream layer-0 arithmetic in the live two-chip graph:
+  dense update and carried residual are bitwise exact, while only the final normalized row repeats
+  DB549 at `1,073/6,144` mismatches and SHA `229dc8ac...812f`. The rejected graph co-owns carried
+  state with the scalar reduction and leaves the norm-weight output in a detached one-row fusion.
+  Do not try a two-row/device-extent surrogate: geometry-only and true-M1 Pallas arms are already
+  frozen. Acquire exactly one logical-row graph that separates the reduction source from a direct
+  multi-output normalized/carried output owner. Compile with zero samples and empty pins, preserve
+  HLO, refuse before arithmetic, then build the exact value-flow/fusion validator from that graph.
 - Treat empty optional evidence directories as absent, not as recursive-copy operands. Archive a
   file tree with `gcloud storage rsync` (without delete) before building the exact remote ledger;
   keep DB publication provisional until terminal `SUCCESS`, and recover a fully validated model

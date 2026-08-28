@@ -10904,3 +10904,22 @@ objects / 869,561,965,562 bytes. Post-delete standalone verification is byte-ide
 pre-delete result. Receipt SHA is `7d39d8a...c595d`; cumulative reclamation across both tranches is
 6,510,661,611,573 current-generation bytes (5.921 TiB). This is storage/integrity evidence only,
 not a numerical, Gate-D, latency or performance claim.
+
+## 2026-08-28 16:56--17:25 UTC — PP16 exact upstream boundary isolates output fusion ownership
+
+Protected pin `3c3426d` ran the final-layout y-x-z discriminator once. Its DB550-exact dense update
+and carried residual both pass bitwise (`0/6,144`, SHAs `efde8532...b4fc` and
+`35a601b7...044c`); only layer-1 normalized output repeats frozen DB549 at `1,073/6,144`, SHA
+`229dc8ac...812f`. Optimized/StableHLO `cf377322...e8743` / `7ce73fff...4293` prove 16 gate plus
+16 down convolutions, one `bf16[4,1,6144]` local `{{0,1}}` combine and three one-row roots with no
+gather, host marker or dead row. The run is terminally `REJECTED`, has no DB/`SUCCESS`/performance
+claim, and seals diagnostic ledger `f056fa57...359a` with authenticated 8/8 cleanup.
+
+The sole observed delta is now output fusion ownership. The rejected graph emits carried state with
+the scalar reduction and computes norm-weight output separately; weights, leaves, tree, residual and
+formula are closed. Persistent Fable review rejected a two-row extent as a repeat of closed geometry
+evidence and approved one compile-only logical-M1 acquisition. The candidate recomputes the exact
+dense+residual source for the output owner, returns normalized and carried one-row values together,
+uses zero samples, persists both compiler graphs with `arithmetic_executed=false`, and deliberately
+refuses on empty pins. Focused CPU/static tests pass 27/27. The acquired graph—not source intent—must
+define the exact fusion/value-flow mutations before a separately reviewed numerical execution.

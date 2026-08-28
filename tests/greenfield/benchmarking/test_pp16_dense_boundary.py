@@ -10,11 +10,13 @@ import pytest
 from glm_tpu.greenfield.benchmarking.pp16_dense_boundary import (
     derive_expected_dense_boundary_bits,
     exact_bfloat16_bits,
+    fused_add_rms_norm_output_owned,
     pack_pp16_dense_final_layout,
     replay_pp16_strategy_nd_y_x_z_bits,
     validate_pp16_dense_final_layout_records,
     validate_pp16_dense_boundary_hlo,
 )
+from glm_tpu.greenfield.kernels.reference.rmsnorm import fused_add_rms_norm
 
 
 REPO = Path(__file__).resolve().parents[3]
@@ -198,6 +200,45 @@ def test_exact_bfloat16_bits_reports_first_mismatch() -> None:
     assert not mismatch["elementwise_exact"]
     assert mismatch["mismatch_count"] == 1
     assert mismatch["first_mismatch_flat_index"] == 1
+
+
+def test_output_owned_rms_is_one_row_and_reference_exact() -> None:
+    import jax.numpy as jnp
+
+    hidden = jnp.asarray(
+        np.linspace(-2.0, 2.0, 6144, dtype=np.float32)[None, :],
+        dtype=jnp.bfloat16,
+    )
+    residual = jnp.asarray(
+        np.linspace(1.0, -1.0, 6144, dtype=np.float32)[None, :],
+        dtype=jnp.bfloat16,
+    )
+    weight = jnp.asarray(
+        np.linspace(0.5, 1.5, 6144, dtype=np.float32),
+        dtype=jnp.bfloat16,
+    )
+    expected = fused_add_rms_norm(
+        hidden, residual, weight, epsilon=1e-5
+    )
+    observed = fused_add_rms_norm_output_owned(
+        hidden, residual, weight, epsilon=1e-5
+    )
+    for expected_value, observed_value in zip(
+        expected, observed, strict=True
+    ):
+        np.testing.assert_array_equal(
+            np.asarray(observed_value).view(np.uint16),
+            np.asarray(expected_value).view(np.uint16),
+        )
+        assert observed_value.shape == (1, 6144)
+
+    with pytest.raises(ValueError, match="exactly one logical row"):
+        fused_add_rms_norm_output_owned(
+            jnp.broadcast_to(hidden, (2, 6144)),
+            jnp.broadcast_to(residual, (2, 6144)),
+            weight,
+            epsilon=1e-5,
+        )
 
 
 def test_derive_expected_dense_boundary_bits_preserves_zero_update() -> None:
@@ -393,6 +434,13 @@ def test_pp16_dense_boundary_hlo_accepts_final_layout_convolutions_only() -> Non
         rank: 1 for rank in range(16)
     }
 
+    output_owned = validate_pp16_dense_boundary_hlo(
+        stable,
+        optimized,
+        association="strategy_nd_y_x_z_final_layout_output_owned",
+    )
+    assert output_owned["passed"], output_owned
+
     orphaned = validate_pp16_dense_boundary_hlo(
         stable,
         optimized.replace("%partial14, %partial15)", "%partial14, %partial14)"),
@@ -467,7 +515,9 @@ def test_pp16_dense_boundary_wrapper_is_bounded_and_default_off() -> None:
     assert "default-off" in completed.stderr
     assert "source_db=548" in text
     assert "strategy_nd_y_x_z_final_layout" in text
-    assert "--warmup 1 --iterations 3" in text
+    assert '--warmup "$WARMUP" --iterations "$ITERATIONS"' in text
+    assert "acquisition:strategy_nd_y_x_z_final_layout_output_owned" in text
+    assert "compile acquisition requires deliberately empty HLO pins" in text
     assert "TPU_VISIBLE_DEVICES=0,1,2,3" in text
     assert "probe_pp16_lp2_dense_boundary.py" in text
     assert "strict_census pre" in text
@@ -540,6 +590,10 @@ def test_pp16_dense_boundary_runner_is_selective_and_one_row() -> None:
     assert "pack_pp16_dense_final_layout" in text
     assert "final_layout_convolution=True" in text
     assert "precomputed_normalized=normalized_value" in text
+    assert "fused_add_rms_norm_output_owned" in text
+    assert 'choices=("acquisition", "bounded")' in text
+    assert "COMPILE_ACQUIRED_UNPINNED" in text
+    assert "deliberately refusing before arithmetic" in text
     assert "axis_index_groups=((0, 1),)" in text
     assert "accepted_layer1_normalized_bfloat16_bits" in text
     assert "accepted_next_residual_bfloat16_bits" in text

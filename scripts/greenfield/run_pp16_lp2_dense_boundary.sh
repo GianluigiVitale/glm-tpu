@@ -24,22 +24,40 @@ readonly ORACLE_SUCCESS_SHA=6cac897695fc1e78d0a10c0e36c993cffd281c6a88721d8955fa
   echo "PP16 LP2 dense-boundary discriminator is default-off" >&2
   exit 2
 }
-[[ ${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_MODE:-off} == bounded ]] || {
-  echo "set GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_MODE=bounded" >&2
-  exit 2
-}
+readonly MODE=${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_MODE:-off}
 readonly ASSOCIATION=${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_ASSOCIATION:-off}
-[[ $ASSOCIATION == strategy_nd_y_x_z_final_layout ]] || {
-  echo "set GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_ASSOCIATION=strategy_nd_y_x_z_final_layout" >&2
-  exit 2
-}
+readonly EXPECTED_STABLEHLO_SHA=${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_STABLEHLO_SHA256:-}
+readonly EXPECTED_OPTIMIZED_HLO_SHA=${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_OPTIMIZED_HLO_SHA256:-}
+case "$MODE:$ASSOCIATION" in
+  bounded:strategy_nd_y_x_z_final_layout)
+    readonly WARMUP=1 ITERATIONS=3
+    ;;
+  acquisition:strategy_nd_y_x_z_final_layout_output_owned)
+    [[ -z $EXPECTED_STABLEHLO_SHA && -z $EXPECTED_OPTIMIZED_HLO_SHA ]] || {
+      echo "compile acquisition requires deliberately empty HLO pins" >&2
+      exit 2
+    }
+    readonly WARMUP=0 ITERATIONS=0
+    ;;
+  *)
+    echo "set an admitted PP16 dense-boundary mode/association pair" >&2
+    exit 2
+    ;;
+esac
 command -v gsutil >/dev/null 2>&1 && gsutil help rsync >/dev/null 2>&1 || {
   echo "gsutil rsync is required for authenticated failure archival" >&2
   exit 2
 }
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_TAG:-greenfield_pp16_lp2_final_layout_strategy_nd_dense_boundary_$(date -u +%Y%m%dT%H%M%S%NZ)}
+if [[ $MODE == acquisition ]]; then
+  default_tag=greenfield_pp16_lp2_final_layout_output_ownership_acquisition_$(
+    date -u +%Y%m%dT%H%M%S%NZ
+  )
+else
+  default_tag=greenfield_pp16_lp2_final_layout_strategy_nd_dense_boundary_$(date -u +%Y%m%dT%H%M%S%NZ)
+fi
+TAG=${GLM_GREENFIELD_PP16_LP2_DENSE_BOUNDARY_TAG:-$default_tag}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 readonly PIN TAG RUN_DIR REMOTE_PREFIX
@@ -320,7 +338,8 @@ flock -n 9 || {
 exec 8>/home/gianl/.glm-tpu-rsync.lock
 flock 8
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN source_db=548 mesh=LP2 association=$ASSOCIATION warmup=1 iterations=3"
+say "RUN_DIR=$RUN_DIR PIN=$PIN source_db=548 mesh=LP2 mode=$MODE"
+say "association=$ASSOCIATION warmup=$WARMUP iterations=$ITERATIONS"
 if gcloud storage ls "$REMOTE_PREFIX/**" >"$RUN_DIR/remote_vacancy.txt" 2>&1; then
   say "ABORT: append-only remote prefix already exists"
   exit 2
@@ -381,7 +400,7 @@ has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK || {
   exit 1
 }
 
-say "running one-row dense boundary on adjacent TPU devices 0/1"
+say "running one-row dense boundary $MODE on adjacent TPU devices 0/1"
 started=$(date +%s)
 (
   cd "$WORKTREE"
@@ -399,8 +418,11 @@ started=$(date +%s)
       --runtime-manifest-sha256 "$RUNTIME_MANIFEST_SHA" \
       --oracle-npz "$ORACLE_NPZ" \
       --oracle-npz-sha256 "$ORACLE_NPZ_SHA" \
+      --mode "$MODE" \
       --association "$ASSOCIATION" \
-      --warmup 1 --iterations 3 \
+      --expected-stablehlo-sha256 "$EXPECTED_STABLEHLO_SHA" \
+      --expected-optimized-hlo-sha256 "$EXPECTED_OPTIMIZED_HLO_SHA" \
+      --warmup "$WARMUP" --iterations "$ITERATIONS" \
       --output "$RUN_DIR/runner.json" \
       --tensor-output "$RUN_DIR/dense_boundary.npz" \
       --hlo-dir "$RUN_DIR/hlo"

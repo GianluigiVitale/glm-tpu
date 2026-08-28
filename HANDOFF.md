@@ -2,6 +2,30 @@
 
 **Updated:** 2026-08-28 UTC
 
+## 2026-08-28 PP16 final-layout leaves and y-x-z tree pass; output ownership remains
+
+- Protected tag `greenfield_pp16_lp2_final_layout_strategy_nd_dense_boundary_`
+  `20260828T165651664014277Z` at pushed pin `3c3426d` is terminally `REJECTED`, but closes the
+  complete upstream boundary: DB550 final-layout dense update is bitwise exact `0/6,144` at SHA
+  `efde8532...b4fc`, and the carried residual is bitwise exact `0/6,144` at SHA
+  `35a601b7...044c`. Only the layer-1 normalized row remains nonexact at `1,073/6,144`, observed
+  SHA `229dc8ac...812f`, exactly the frozen DB549 signature. Do not reopen packing, FP8/scales,
+  contractions, y-x-z association, carried state, scalar formula or prior M1/Pallas geometry arms.
+- The graph has 16 gate plus 16 down convolutions, one `bf16[4,1,6144]` all-reduce over `{{0,1}}`,
+  three one-row roots, zero gathers/host markers/dead rows and exact cross-fusion lineage.
+  Optimized/StableHLO SHAs are `cf377322...e8743` / `7ce73fff...4293`; runner/diagnostic-ledger/
+  terminal-file SHAs are `7ce798de...ab5e` / `f056fa57...359a` / `b8072350...25ac`. There is no
+  `SUCCESS`, DB row, Gate-D or performance claim; failure cleanup is authenticated 8/8.
+- Exact-vs-current HLO localizes the sole remaining property: the rejected graph co-owns the carried
+  row with the scalar reduction, then runs a detached one-row weighted-output fusion. Persistent
+  Fable session `9da32fc2-43f3-4b93-8135-a1aa47f7adae` rejected a two-row extent and returned
+  `APPROVE COMMIT AND ONE ACQUISITION` for the one-logical-row output-ownership batch. It duplicates
+  only the value-preserving source expression so the reduction path produces the inverse while the
+  direct output path returns normalized plus carried state together. The first protected run is
+  compile-only with `0/0` samples and empty pins: preserve both graphs, then deliberately refuse
+  before arithmetic. Build the exact ownership validator and mutations from that graph before one
+  separately reviewed/pinned bounded numerical run.
+
 ## 2026-08-28 PP16 y-x-z transport passes but fused-Pallas leaves reject
 
 - Protected tag `greenfield_pp16_lp2_strategy_nd_dense_boundary_20260828T143301291409038Z`
