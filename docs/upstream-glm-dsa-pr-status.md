@@ -1,14 +1,16 @@
 # Upstream GLM-5.2 DSA PR preparation status
 
-Status date: 2026-08-28 UTC. This is private preparation evidence; nothing was
-pushed to or opened against `vllm-project/tpu-inference`.
+Status date: 2026-08-28 UTC. Owner-approved PR 1 is open upstream as
+https://github.com/vllm-project/tpu-inference/pull/3480. PRs 2-3 remain private
+and unsubmitted.
 
 ## Pins and stack
 
 - Upstream TPU Inference base: `e08b64c14208cb5efc34cc3b41eeaa3402346911`.
 - vLLM source pin: `d626108b1841888ec90aced33367149a6bbc7e4b`.
 - PR 1 branch/head: `pr/glm-dsa-kernels-v3` at
-  `650b5fccb890b5a872871af489b50fc4c584e8ad` (private fork).
+  `650b5fccb890b5a872871af489b50fc4c584e8ad` (public submission fork,
+  upstream PR #3480).
 - PR 2 branch/head: `pr/glm-dsa-bridge-v3` at
   `d837832ab41f947ee9ff759e65ea8417ba1bd5c9` (private fork), stacked on PR 1.
 - PR 3 branch/head: `pr/glm-dsa-model-ci-v3` at
@@ -159,10 +161,12 @@ Validation:
 
 ## Stack status and next action
 
-All three private stacked branches are prepared and pushed only to the user's
-private fork. The one permitted independent Sol review found TP row/metadata,
-bucket-buffer, evidence-head, and CI-coverage gaps; each has been corrected and
-revalidated above. Compact evidence is mirrored under matching
+All three stacked branches are prepared. PR 1's exact approved head is public
+only on `GianluigiVitale/tpu-inference-glm-dsa` and open upstream as #3480;
+PRs 2-3 remain only on the user's private fork. The one permitted independent
+Sol review found TP row/metadata, bucket-buffer, evidence-head, and CI-coverage
+gaps; each has been corrected and revalidated above. Compact evidence is
+mirrored under matching
 `gs://driftbench-dsv4-uc/results/upstream_glm_dsa_pr{1,2,3}_*` prefixes in the
 verified `US-CENTRAL2` regional bucket. PR 1 is 8 files (+1,250/-10), PR 2 is
 11 files (+1,344/-34), and PR 3 is 2 files (+302). The final stack tracks 1,103
@@ -170,9 +174,10 @@ files, contains no tracked file above 1 MiB, and has no checkpoint, trace,
 cache, environment, or generated run tree. The audited branch base is
 `e08b64c14208cb5efc34cc3b41eeaa3402346911`; live `upstream/main` is
 `b256da42e879f6070dc517cf171eb2ab8f6b2c9e` with only non-overlapping nightly
-support-matrix changes after that base. No upstream branch or PR was
-created. The five-minute same-region cron now mirrors the authoritative
-`tpu-inference-glm-baseline` worktree to
+support-matrix changes after that base. PR #3480 is open and DCO passes;
+Buildkite intentionally stops until a maintainer applies the `ready` label,
+so its zero-second failure is not a test failure. The five-minute same-region
+cron now mirrors the authoritative `tpu-inference-glm-baseline` worktree to
 `gs://driftbench-dsv4-uc/repos/tpu-inference-glm-baseline`. A separately
 verified complete-history three-ref bundle is at
 `gs://driftbench-dsv4-uc/backups/tpu-inference-glm-dsa/`
@@ -185,8 +190,8 @@ process bound made libtpu inherit the full `1,2,4` pod and wait in
 `CreateTpuSystemState` for absent peer pytest processes. Three bounded failed
 attempts and the unnecessary but harmless all-host runtime-service restart are
 preserved; the corrected one-test probe passed in 14.74 seconds before the
-full suites above. Present PR 1's exact diff to the user for audit. No upstream
-push or PR is authorized yet.
+full suites above. Do not publish or open PR 2 until the owner audits and
+explicitly approves exact head `d837832ab41f947ee9ff759e65ea8417ba1bd5c9`.
 
 Exact owner-facing checklists for the dependent patches are
 `docs/upstream/glm-dsa-pr2-owner-audit.md` and

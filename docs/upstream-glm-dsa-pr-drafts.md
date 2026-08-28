@@ -1,8 +1,10 @@
 # Ready-to-paste upstream GLM-5.2 DSA PR series
 
-Private review material only. Do not open these PRs until the owner audits the
-exact diffs and explicitly approves submission. The PRs are separately
-reviewable but stacked in order: PR 1 -> PR 2 -> PR 3.
+PR 1 was owner-approved and submitted as
+https://github.com/vllm-project/tpu-inference/pull/3480. PRs 2-3 remain private
+review material and must not be opened until the owner audits and explicitly
+approves each exact diff. The PRs are separately reviewable but stacked in
+order: PR 1 -> PR 2 -> PR 3.
 
 ## PR 1 title
 
@@ -113,11 +115,9 @@ latency, other-generation performance, or throughput claims.
 
 ## PR 2 body
 
-Before opening, replace `<PR1_URL>` with the submitted PR 1 URL.
-
 ### Description
 
-Depends on PR 1: `<PR1_URL>`.
+Depends on PR 1: https://github.com/vllm-project/tpu-inference/pull/3480.
 
 This patch connects current vLLM DeepSeek-V3.2/`GlmMoeDsaForCausalLM`
 semantics to the PR 1 TPU kernels through the existing TorchAX/vLLM layer and
@@ -184,12 +184,12 @@ evidence, not full-checkpoint loading, quality, HBM, or serving latency.
 
 ## PR 3 body
 
-Before opening, replace `<PR1_URL>` and `<PR2_URL>` with the submitted parent
-PR URLs.
+Before opening, replace `<PR2_URL>` with the submitted PR 2 URL.
 
 ### Description
 
-Depends on PR 1 `<PR1_URL>` and PR 2 `<PR2_URL>`.
+Depends on PR 1 https://github.com/vllm-project/tpu-inference/pull/3480 and PR 2
+`<PR2_URL>`.
 
 Current pinned vLLM already registers `GlmMoeDsaForCausalLM`; adding a second
 TPU-side registration would fork model semantics. This final stacked patch

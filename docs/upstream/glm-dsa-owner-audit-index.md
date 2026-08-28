@@ -1,6 +1,7 @@
 # Owner audit index — exact private GLM-5.2 DSA stack
 
-Status: 2026-08-28 UTC. Official upstream has not been mutated.
+Status: 2026-08-28 UTC. Owner-approved PR 1 is open upstream as #3480; PRs 2-3
+remain private and unsubmitted.
 
 ## Live upstream acceptance audit
 
@@ -31,6 +32,7 @@ Status: 2026-08-28 UTC. Official upstream has not been mutated.
 
 Relevant live pages:
 
+- https://github.com/vllm-project/tpu-inference/pull/3480
 - https://github.com/vllm-project/tpu-inference/issues/1699
 - https://github.com/vllm-project/tpu-inference/pull/2324
 - https://github.com/vllm-project/tpu-inference/pull/2457
@@ -65,8 +67,9 @@ floating merge base.
 
 ## Integrity proof
 
-- All three private branch heads are pushed only to
-  `GianluigiVitale/tpu-inference`.
+- PR 1's exact approved head is public only on the dedicated submission fork
+  `GianluigiVitale/tpu-inference-glm-dsa`; PRs 2-3 remain only in the private
+  `GianluigiVitale/tpu-inference` repository.
 - Exact PR3 tree: 1,103 tracked files; largest tracked file 319,925 bytes
   (`docs/assets/torchax.png`). No checkpoint, safetensor, NumPy dump, XPlane,
   cache, environment, or generated run tree is tracked.
@@ -78,7 +81,10 @@ floating merge base.
 
 ## Owner decision boundary
 
-Audit and decide PR 1 first. Approval must name the exact PR 1 head
-`650b5fccb890b5a872871af489b50fc4c584e8ad`. No official branch, PR, issue
-comment, label, or other upstream mutation is authorized until that explicit
-approval is received.
+PR 1 exact head `650b5fccb890b5a872871af489b50fc4c584e8ad` was explicitly
+approved and submitted as https://github.com/vllm-project/tpu-inference/pull/3480.
+It is open, mergeable, and DCO-clean. Buildkite intentionally awaits the
+maintainer-only `ready` label; no label was forced. PR 2 remains unapproved:
+do not push its branch to the public submission fork or open it upstream until
+the owner audits and explicitly approves exact head
+`d837832ab41f947ee9ff759e65ea8417ba1bd5c9`.
