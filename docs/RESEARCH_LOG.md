@@ -5,6 +5,48 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-28 current UTC — feature2 compile-only runner and parsed HLO gate are ready for review
+
+The complete PP16 feature2 graph now has a bounded acquisition path, but no TPU work has run. The
+runner authenticates the retained final-runtime manifest and 78 selected reads, directly packs the
+six dense sources into four final-layout leaves, separately compiles and executes three owner-local
+weight materializers, then lowers and compiles—but never invokes—the complete main executable.
+Output is explicitly `HLO_ACQUIRED` with `main_executed=false`, `numerical_claim=false` and
+`performance_claim=false`; there is no DB or terminal `SUCCESS` path.
+
+The main optimized-HLO parser pins two partitions, exact local terminal shapes, explicit global
+LP2 groups, exact bidirectional feature permutes, eight H16/K2048/B512/W640 calls and authenticated
+runtime parameter counts. It rejects host callbacks/transport, H32, groups larger than two,
+`[32,6144]` dead rows and `[8156,6144]` hidden history. Separate materializer contracts require
+zero communication and exact owner-local parameter/root boundaries. StableHLO, JAXpr and abstract
+terminal checks remain independent prerequisites.
+
+Event-1 lineage is bound to token oracle `e4fbcbdb...acf2`, DSA oracle `f8154c5f...26da`, accepted
+layer-1 internals `79b813da...9054` and DB529 mechanism evidence. A hostile check proves DB529 is
+not the accepted layer-1 target: mismatch counts are 3,960 normalized, 942 q-a, 4,096 query, 32
+head weights and 128 current-key values. This prevents a plausible but wrong oracle substitution.
+
+The default-off wrapper uses both global leases, pushed-clean code pins, the existing pod only,
+US-CENTRAL2 source/archive validation, fresh eight-host pre/post censuses and object-by-object SHA
+verification. `HLO_ACQUIRED` is uploaded last; failures preserve diagnostics without a terminal.
+Focused tests pass 28/28 and neighboring PP16 tests pass 35/35 with `JAX_PLATFORMS=cpu`; pycompile,
+`bash -n` and diff checks pass. Review, commit/push and mirror remain mandatory before one serialized
+compile-only acquisition. There is still no real HLO, HBM, numerical, Gate-D or performance proof.
+
+Persistent Fable 5 Max blocked the first staged batch on three proof-path defects. StableHLO was
+written only after compile/validation, so the most useful first-contact refusal could lose its
+graph. Six sharded main roots were modeled as body values rather than rank-preserving local shards.
+The failure trap used an unverified best-effort rsync. No blocked code was committed or run.
+
+The correction writes every StableHLO atomically immediately after lowering and before semantic
+validation or compilation. Main root pins now retain the local leading size-one feature axis; a
+real forced-two-device CPU `shard_map` lowering is parsed and proves `bf16[1,1,3072]` rather than
+relying on a synthetic fixture. Both diagnostic and success publication now verify the ledger,
+every object hash and the exact remote object set; diagnostics retry twice and fail with explicit
+status 70, while the census restores psutil/Ray enumeration. Corrected focused tests pass 30/30.
+The correction is staged for review only; no commit, push, TPU initialization or evidence claim has
+occurred.
+
 ## 2026-08-28 22:00--current UTC — complete PP16 feature2 graph traces offline
 
 The bounded PP16 stage-0 program now evaluates all 8,156 authenticated candidate rows through the

@@ -2,6 +2,39 @@
 
 **Updated:** 2026-08-28 UTC
 
+## 2026-08-28 PP16 feature2 compile-only acquisition is locally complete; review is next
+
+- A new default-off acquisition loads the exact 39 authenticated ranges per owner from the retained
+  final PP16 runtime, packs dense weights directly into the DB550 final layout, materializes only
+  the owner-local query/key forms needed by the graph, and compiles the complete feature2 program
+  on adjacent devices 0/1. The main executable is never invoked. Its claim is limited to real
+  selected-state load, HBM observations and StableHLO/optimized-HLO acquisition; it cannot write a
+  numerical, Gate-D, latency, throughput, DB or `SUCCESS` claim.
+- Parsed contracts require exactly two partitions, explicit global LP2 groups, exact `0<->1`
+  permutes, eight H16/K2048/B512/W640 calls, the one-row terminal boundary and the authenticated
+  runtime inputs. They reject host/device transport, callbacks, H32, full-pod groups,
+  `[32,6144]` dead rows and `[8156,6144]` hidden history. The three weight materializers must have
+  zero physical communication and exact owner-local roots.
+- Event 1 is cross-sealed to token oracle `e4fbcbdb...acf2`, DSA oracle `f8154c5f...26da`, accepted
+  layer-1 internal NPZ `79b813da...9054` and DB529 scorer-mechanism evidence. The contract explicitly
+  proves DB529 values differ from the accepted layer-1 target, preventing mechanism evidence from
+  being substituted as the numerical oracle.
+- The protected wrapper pins the pushed clean branch, existing `db-v4-64-od`, US-CENTRAL2 bucket,
+  exact runtime/oracles, global TPU and rsync locks, eight-host pre/post zero-work censuses, complete
+  local/remote SHA verification, and terminal `HLO_ACQUIRED` publication last. Focused and
+  neighboring CPU suites pass 28/28 and 35/35; syntax and diff checks pass. No TPU run is authorized
+  until the current batch receives persistent Fable 5 Max approval, is committed, pushed and
+  mirrored. Exact next is that review, then one serialized compile-only acquisition.
+- The first persistent Fable review returned `BLOCK` before commit or TPU use. It found that
+  first-contact StableHLO could be lost before a validation/compile refusal, six sharded optimized
+  roots omitted their retained local size-one feature axis, and failure publication was an
+  unverified best-effort rsync. The correction atomically persists every StableHLO immediately
+  after lowering, pins the real per-partition root shapes, and adds a forced-two-CPU-device
+  optimized-HLO parser test. Failure archives now use two attempts, a complete diagnostic ledger,
+  per-object hashes and exact remote object-set verification; success preterminal archives use the
+  same exact-set rule and census again includes independent Ray enumeration. The corrected focused
+  suite passes 30/30. This correction still requires Fable re-review before commit or metal.
+
 ## 2026-08-28 complete PP16 feature2 graph is implemented offline; review is next
 
 - `pp16_feature2_program.py` now composes the complete bounded candidate graph on exact stage-0
