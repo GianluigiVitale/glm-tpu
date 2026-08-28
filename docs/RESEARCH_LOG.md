@@ -5,6 +5,38 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-28 11:16--current UTC — duplicate PP8 failure closes retries; PP16 boundary first
+
+The protected current-pin PP8 8K attempt completed the full 8,155-token prefill but stopped before
+warmup at DSA event 1/layer 1: expected/observed counts are `8136/8150`, first mismatch offset 11,
+with six first expected-only and observed-only positions recorded in `HANDOFF.md`. Token and event 0
+are exact, and aligned common event-1 scores have zero error. Its token/DSA artifacts are byte-for-
+byte identical to the old sealed failure (`e5e35f3b...b03c`, `17f0916d...d7e`). Eight identical
+logs, 8/8 pre/failure cleanup and no provisional DB row rule out a partial fleet or bookkeeping
+failure. No timing/HBM/XPlane/performance datum was created.
+
+The historical PP8 true-M1/full-M32/Pallas/source-fused/feature-tiled search already closed this
+association: full-M32 is exact only with 31 forbidden diagnostic rows, while all one-row arms are
+nonexact or compile-rejected. Persistent Fable 5 Max review returned `APPROVE CLASSIFICATION AND
+NEXT` and forbids another PP8 arithmetic arm or unchanged 8K retry.
+
+The implemented successor reuses DB548's sealed normalized/residual/accepted layer-1 arrays and
+PP16 final manifest `b385458f...6bab`. It reads only 226,572,288 authenticated tensor bytes total,
+uses physical adjacent devices 0/1, and compiles one real stage-local FP8 dense plus fused
+cross-layer residual/RMS boundary before arithmetic. HLO must expose exactly one local LP2 combine,
+one dense custom call, three one-row outputs, no host work and no 32-row hidden state. Focused CPU
+and inventory tests pass 9/9 and selective manifest/header/tensor verification passes locally in
+6.2 seconds.
+The accepted carried residual is derived independently from DB548's sealed 32 partials through the
+measured DB533 association, rather than misusing DB548's pre-attention `combined_residual` field.
+The independently recomputed dense/carried SHAs are `efde8532...b4fc` / `35a601b7...44c`. Both
+state rows, repeated samples and both device replicas must be bitwise exact. The protected result
+is pending and cannot by itself prove event-1 DSA or close Gate D. Persistent Fable review first
+blocked four concrete gaps, then verified their corrections and independently reproduced the two
+derived hashes before returning `APPROVE DEPLOY`. Its non-blocking forecast is that the known
+2,104/6,144 normalized-row miss may reappear; that would be valid rejection evidence, not a reason
+to run another PP8 8K test.
+
 ## 2026-08-28 10:50--11:05 UTC — transport null recorded; 8K preflight is restart-safe
 
 Recovered terminal DB564 rather than repeating it. The exact packed PP8 stage boundary reduces

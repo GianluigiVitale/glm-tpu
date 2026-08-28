@@ -457,6 +457,17 @@
       "reason": "DB550 proves all 32 accepted pre-psum BF16 dense partials are bitwise identical to DB548, closing packing, FP8 dequantization, SwiGLU, contractions, compiler fusion and rank-local outputs. The protected replay at 75101d proves the physical M32 StrategyND result is also bitwise identical to the DB533 software tree. The composed accepted-source context at 64151ef improves the miss from 1,073 to 1,031 values but remains nonexact. Automated report aadf858909421c4a5be200e26ec4e17e00e3a68154695d5202dd0565bd9cb81b localizes the remaining structural delta to native embedding/attention source production plus layer-1 fusion ownership. The next default-off bounded graph now reuses those existing greenfield producers with the frozen dense path; its 13-input global contract and exact checkpoint packing pass locally, while exact TPU HLO is deliberately unpinned until one fail-closed compile acquisition. No recapture, contraction rerun, coordinate patch, surrogate scalar or imported legacy execution is allowed."
     },
     {
+      "id": "greenfield-pp16-lp2-dense-boundary-successor",
+      "category": "bounded architecture-successor discriminator",
+      "source_repo": "glm-tpu greenfield sealed DB548 inputs and PP16 final runtime",
+      "source_pin": "DB548 f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298 / PP16 manifest b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+      "source_paths": ["/home/gianl/gcs-models/results/greenfield_layer0_dense_partial_capture_20260813T200736889447458Z/dense_partial_capture.npz", "/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z", "glm_tpu/greenfield/kernels/stage_local.py", "glm_tpu/greenfield/kernels/reference/rmsnorm.py", "glm_tpu/greenfield/sharding/hlo_contract.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/pp16_dense_boundary.py", "scripts/greenfield/probe_pp16_lp2_dense_boundary.py", "scripts/greenfield/run_pp16_lp2_dense_boundary.sh", "tests/greenfield/benchmarking/test_pp16_dense_boundary.py"],
+      "gate": "D",
+      "reason": "After the current 8K PP8 failure reproduced the sealed old numerical signature, another PP8 arithmetic arm or full retry is forbidden. The successor selectively authenticates seven tensors per PP16 final owner, compiles a one-row real fused dense/cross-layer boundary on physical adjacent devices 0/1, and fails before arithmetic unless StableHLO and optimized HLO contain one exact local pair combine, one dense kernel, no host execution and no 32-row hidden reconstruction. DB548's sealed 32 partials and DB533's measured association independently derive the accepted carried residual; both state rows, every repeated sample and both device replicas must be bitwise exact. It makes no event-1 DSA, decoder, Gate-D or performance claim. Protected execution is pending."
+    },
+    {
       "id": "greenfield-layer0-attention-schedule-discriminator",
       "category": "bounded diagnostic evidence",
       "source_repo": "glm-tpu greenfield runtime and protected artifacts",

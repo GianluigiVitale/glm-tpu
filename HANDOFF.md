@@ -2,6 +2,59 @@
 
 **Updated:** 2026-08-28 UTC
 
+## 2026-08-28 current PP8 8K repeats the sealed numerical failure; bounded PP16 successor ready
+
+- Protected current-pin tag `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_`
+  `ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_`
+  `pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_`
+  `20260828T111624599159951Z` at pushed pin `570cc453` completed all 8,155 prefill tokens and then
+  failed closed at the exact DSA gate before warmup/timing. Token `101252` and event 0/layer 0 are
+  exact. Event 1/layer 1 has expected count `8136`, observed `8150`, first set mismatch offset 11,
+  expected-only first `[680,1052,1143,1841,2436,7575]` and observed-only first
+  `[1026,6642,6690,6738,6810,7463]`; aligned common scores remain bitwise exact.
+- The current and old failed PP8 runs have byte-identical `prefill_token_observation.json` and
+  `step_00_position_8155.npz` (file SHAs `e5e35f3b...b03c` / `17f0916d...d7e`). The current
+  observation/token semantic SHAs are `ee032a54...f74` / `39145080...a6d`; all eight current logs
+  are byte-identical (`b337184c...058e`). This is the already sealed PP8 final-layout numerical
+  signature, not infrastructure, query/cache/transport regression or a new arithmetic branch.
+  No warmup, timing, XPlane, HBM, DB row, `SUCCESS`, Gate-D or performance claim exists.
+- Pre/failure censuses each authenticate 8/8 zero work; provisional DB rollback reports
+  `NO_PROVISIONAL_DB_RUN`. Persistent Fable session `9da32fc2-43f3-4b93-8135-a1aa47f7adae`
+  independently returned `APPROVE CLASSIFICATION AND NEXT`: freeze PP8 M1 arithmetic search and
+  refuse another full PP8 8K retry first.
+- The next smallest discriminator is now implemented default-off: two adjacent PP16 stage-0
+  devices selectively read seven authenticated tensors per final owner (113,286,144 bytes/owner),
+  consume the sealed DB548 position-8155 normalized/residual row, and produce dense update,
+  carried residual and layer-1 normalized one-row outputs. Arithmetic is blocked unless exact
+  StableHLO/optimized HLO proves one `{0,1}` BF16 combine, one fused dense kernel, no host callback,
+  no other collective and no 32-row hidden state. DB548's sealed 32 dense partials plus DB533's
+  measured StrategyND association derive accepted dense/carried SHAs `efde8532...b4fc` /
+  `35a601b7...44c`; both the carried residual and layer-1 normalized row must be bitwise exact.
+  Every timed sample must also be deterministic with bitwise agreement across both output
+  replicas. Local selective-load and
+  focused tests pass. Fable initially returned `BLOCK DEPLOY` on a copied stacked-HLO payload,
+  missing carried-state/replica/determinism gates and best-effort failure upload. All four were
+  corrected. In the same persistent chat it independently re-derived both state hashes, verified
+  the corrected code paths and returned `APPROVE DEPLOY`; no blocker remains. Protected TPU
+  execution is pending. Even a pass authorizes only a bounded event-1 DSA successor, not Gate D.
+
+## 2026-08-28 adversarial review policy moves to one persistent Fable 5 Max chat
+
+- At the owner's explicit direction, `goal.md` now requires adversarial review of every new
+  code/evidence batch through one persistent Fable 5 Max Claude Code CLI chat using
+  `--dangerously-skip-permissions`, with only the current diff, relevant evidence/invariants and an
+  explicit verdict request. Correct blockers before verify/commit/push/same-region sync; never use
+  Opus, workflows/subagents, or re-review cleared code. The file remains below its hard limit at
+  3,955 bytes and preserves the engine architecture, gate order and proof contract.
+- Persistent Fable review session `9da32fc2-43f3-4b93-8135-a1aa47f7adae` reviewed the complete
+  goal-policy diff with the in-flight-run boundary and returned `APPROVE GOAL POLICY`. The policy is
+  prospective: the already Sol-reviewed PP8 8K run at pin `570cc45` remains one uninterrupted
+  protected attempt and is not retroactively restarted or duplicated.
+- Operational mistake recorded: probing `claude models` was interpreted as a prompt and consumed
+  one small default Opus response listing model IDs. It invoked no tools and changed no file,
+  process, Git or cloud state. Never use that nonexistent subcommand again; invoke the exact
+  `claude-fable-5` model explicitly on every new/resumed review.
+
 ## 2026-08-28 Gate D resumes; packed transport rejected and exact PP8 8K preflight passes
 
 - The previously unrecorded terminal protected transport run is DB564 / tag
