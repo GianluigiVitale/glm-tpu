@@ -17,6 +17,12 @@ as 128 FP8 E4M3 bytes followed by a power-of-two scale encoded in four raw FP32
 bytes. TPU Inference's experimental StreamIndex path currently handles the
 older one-byte E8M0 scale record and uses approximate selection.
 
+The DeepSeek-named paths here follow current upstream ownership rather than
+mixing model implementations: vLLM registers `GlmMoeDsaForCausalLM` from its
+`deepseek_v32` model module, and TPU Inference's reusable StreamIndex primitive
+currently lives under `deepseek_v4/indexer`. This patch generalizes only that
+primitive and does not add or call a DeepSeek model-execution path for GLM.
+
 This patch adds the isolated primitives needed for the current contract:
 
 - exact FP8+FP32-scale record decoding and deterministic top-k selection;
