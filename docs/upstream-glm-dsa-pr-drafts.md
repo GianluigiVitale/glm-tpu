@@ -6,7 +6,7 @@ the exact diffs. The series is stacked and must be reviewed/merged in order.
 ## PR 1 — `kernels: add exact V3.2/GLM sparse-attention primitives`
 
 Base: `vllm-project/tpu-inference:main` at `5e2c7128`  
-Head: private `pr/glm-dsa-kernels-v3` at `bb002856`
+Head: private `pr/glm-dsa-kernels-v3` at `7ae4eedc`
 
 ### Summary
 
@@ -22,24 +22,40 @@ primitives. It does not add a model fork or a second execution architecture.
 ### Validation
 
 - Protected TPU suite: 36/36, 8/8 hosts clean.
-- Exact final signed head: 29/29 focused protected tests, 8/8 hosts clean.
 - Exact selected set/order at 2,047/2,048/2,049 boundaries and production
   `n=262144, k=2048`.
+- Exact current head: 30/30 kernel/HLO tests in 61.64 seconds, 8/8 hosts clean.
 - Warming: 5 iterations; samples: 20 on TPU v4.
-- Median device times: StreamIndex 3.232 ms, cache insert 0.361 ms, selected
-  gather 0.216 ms, sparse MLA 0.175 ms, composed DSA chain 3.276 ms.
+- Current tracked-harness median wall times: StreamIndex 3.214 ms, cache insert
+  0.357 ms, selected gather plus MLA 0.217 ms, sparse MLA 0.155 ms, composed
+  DSA chain 3.279 ms.
 - Exact StableHLO captured; no end-to-end throughput claim is made.
 
 Evidence: `upstream_streamindex_test_20260827T224406Z`, manifest-list SHA-256
 `dd461d99feae8b582457954473577e1ee46ca059cf1d96314ee4b4f486daf170`.
-Final-head evidence: `upstream_streamindex_test_20260828T004109Z`,
+Current-head correctness evidence: `upstream_streamindex_test_20260828T005547Z`,
 manifest-list SHA-256
-`699505e28e5b7684b046d68972cf91872f5a00065985a0827d329ca976bb1251`.
+`ad807bb2e426a46caeabbeea8de18fb4ec37a5348a0fa386fc3ed3fcc8879e95`.
+Current-head benchmark evidence:
+`upstream_glm_dsa_benchmark_20260828T005834Z`, manifest-list SHA-256
+`0f045a7c0fcd2afae7819d648d86c7b59c71e43c4a7012078dfb7bf86b85b502`.
+
+### Compatibility, risk, and rollback
+
+- Existing DeepSeek-v4 behavior remains the default: E8M0 scale storage and
+  approximate top-k are unchanged unless the new explicit options are used.
+  New V3.2 cache/sparse-MLA APIs remain under `kernels/experimental`.
+- Direct performance evidence is TPU v4 only and covers isolated kernels, not
+  full-checkpoint serving, accuracy, HBM capacity, or other TPU generations.
+- Rollback is a four-commit revert. It removes only the new experimental
+  primitives/tests/benchmark and restores the StreamIndex defaults without a
+  checkpoint or state migration.
 
 ## PR 2 — `layers: bridge V3.2/GLM sparse attention to TPU`
 
-Base: PR 1 `bb002856`  
-Head: private `pr/glm-dsa-bridge-v3` at `b6d92092`
+Base: PR 1 `7ae4eedc`
+
+Head: private `pr/glm-dsa-bridge-v3` at `3c62d82a`
 
 ### Summary
 
@@ -65,10 +81,11 @@ IndexShare buffer.
 
 ### Validation
 
-- Focused CPU regressions: 26/26; repository pre-commit hooks pass.
+- Focused forced two-device CPU regressions pass; repository pre-commit hooks
+  pass.
 - Final protected TPU bridge suite: 22/22 in 44.04 seconds, 8/8 hosts clean.
 - Additional protected exact causal-prefill and selected-MLA tests pass.
-- Exact final signed head: 55/55 protected tests in 97.15 seconds, including a
+- Exact current head: 56/56 protected tests in 98.81 seconds, including a
   two-device TP prefill with the same eight-row shape as decode; 8/8 hosts
   clean.
 - No full-checkpoint latency, accuracy, or serving claim is made.
@@ -76,14 +93,25 @@ IndexShare buffer.
 Primary evidence: `upstream_streamindex_test_20260827T235340Z`, manifest-list
 SHA-256
 `6d3a6b445568f8b4a5cd25c97feb50316d97acc0fc48e1259290b14591dd70fe`.
-Final-head evidence: `upstream_streamindex_test_20260828T004235Z`,
+Current-head evidence: `upstream_streamindex_test_20260828T010034Z`,
 manifest-list SHA-256
-`61a78d59e11eeb17a7a7c8b9bb6c2ee9a3e28b77c407b56b74c2f666be62dffe`.
+`e0690f49393b355582caf432a62420a220675851d8c3c3e7f203278699592497`.
+
+### Compatibility, risk, and rollback
+
+- The existing dense MLA path is unchanged when no shared top-k buffer is
+  supplied. The bridge uses vLLM's current model, metadata, cache ownership,
+  and IndexShare schedule rather than adding a competing model path.
+- Unsupported multi-sequence, DP, DCP/PCP, continue-decode-off, and alternate
+  cache layouts fail closed. Full 753B serving and quality remain unclaimed.
+- Rollback is a three-commit revert of PR 2 (and PR 3 if stacked). PR 1 remains
+  independently useful; no persistent checkpoint format is migrated.
 
 ## PR 3 — `models: add GLM-5.2 DSA contract CI`
 
-Base: PR 2 `b6d92092`  
-Head: private `pr/glm-dsa-model-ci-v3` at `f25c9a91`
+Base: PR 2 `3c62d82a`
+
+Head: private `pr/glm-dsa-model-ci-v3` at `516c9f13`
 
 ### Summary
 
@@ -105,13 +133,21 @@ the cross-repository model contract and makes the model's unit step real.
 
 - Focused CPU: 3/3; repository pre-commit hooks pass.
 - Protected TPU at exact committed head: 3/3 in 9.09 seconds, 8/8 hosts clean.
-- Exact final signed head: 3/3 in 9.86 seconds, 8/8 hosts clean.
+- Exact current head: 3/3 in 9.89 seconds, 8/8 hosts clean.
 
 Evidence: `upstream_streamindex_test_20260828T001254Z`, manifest-list SHA-256
 `f8f3bf38cd2dfed2735c82010f86af3b57e2cfe87b350726cdabe8b89690e5d3`.
-Final-head evidence: `upstream_streamindex_test_20260828T004433Z`,
+Current-head evidence: `upstream_streamindex_test_20260828T010235Z`,
 manifest-list SHA-256
-`cbe5fbb9129b425add5136b3c100ed9d19320d8cc49db48e98b5d0aa499c4149`.
+`d723e4c990988ddf1cc12f5a3410dde9abc68c8627898978f6474cc74c7e3de8`.
+
+### Compatibility, risk, and rollback
+
+- This PR adds tests and Buildkite metadata only; current vLLM already owns
+  model registration. Accuracy/performance entries intentionally remain
+  `unverified` because the single-TPU CI queue cannot load the 753B model.
+- Rollback is a two-commit revert with no runtime or state effect. PRs 1-2 can
+  remain merged independently.
 
 ## Review notes common to the series
 
@@ -123,3 +159,7 @@ manifest-list SHA-256
 - The patches intentionally reuse current vLLM registration and model logic.
 - Official upstream has not been mutated; all heads currently exist only on
   the user's private fork.
+- Exact audit commands are:
+  `git diff 5e2c7128...7ae4eedc`,
+  `git diff 7ae4eedc...3c62d82a`, and
+  `git diff 3c62d82a...516c9f13`.

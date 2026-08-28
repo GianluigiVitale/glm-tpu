@@ -8,12 +8,12 @@ pushed to or opened against `vllm-project/tpu-inference`.
 - Upstream TPU Inference base: `5e2c7128bc74a75493f07930f3a749bcb272a3cb`.
 - vLLM source pin: `d626108b1841888ec90aced33367149a6bbc7e4b`.
 - PR 1 branch/head: `pr/glm-dsa-kernels-v3` at
-  `bb002856ca32e05e22ffdc49b06eed4c9d47843e` (private fork).
+  `7ae4eedcf678ef4fdad6ab4a4a1dff4d89d5882d` (private fork).
 - PR 2 branch/head: `pr/glm-dsa-bridge-v3` at
-  `b6d920922984106d8098d4b64226f0d39565c553` (private fork), stacked on PR 1.
+  `3c62d82a5e7b760eb54cba577e46fa04dccd30a1` (private fork), stacked on PR 1.
 - PR 3 branch/head: `pr/glm-dsa-model-ci-v3` at
-  `f25c9a914bf6b98c05c657f461052ca355ffbca0` (private fork), stacked on PR 2.
-- All eight private commits carry the repository-required DCO signoff. The
+  `516c9f13c083d0dee65ea25d9cd043aec8283f64` (private fork), stacked on PR 2.
+- All nine private commits carry the repository-required DCO signoff. The
   DCO rewrite preserved each PR head's exact tree hash; recoverable local
   pre-rewrite refs remain under `backup/glm-dsa-*-pre-dco`.
 - Restored environment: JAX/JAXLIB 0.10.1, fsspec 2025.3.0,
@@ -21,17 +21,29 @@ pushed to or opened against `vllm-project/tpu-inference`.
 
 ## PR 1 — kernel foundation
 
-Three commits provide exact FP8+FP32-scale StreamIndex scoring/top-k, paged
-V3.2 index-cache insertion, and sparse MLA selected attention. The protected
+Four commits provide exact FP8+FP32-scale StreamIndex scoring/top-k, paged
+V3.2 index-cache insertion, sparse MLA selected attention, and a repository-
+native bounded TPU benchmark. The protected
 suite passed 36/36 in 74.90 seconds, including 262,144-position/top-k-2,048
 microbenchmarks and exact HLO checks. Evidence:
 `upstream_streamindex_test_20260827T224406Z`; manifest-list SHA-256
 `dd461d99feae8b582457954473577e1ee46ca059cf1d96314ee4b4f486daf170`.
 
-The exact final DCO-signed head passed 29/29 focused protected kernel tests in
-61.75 seconds. Evidence: `upstream_streamindex_test_20260828T004109Z`;
+The exact current head passed 30/30 focused protected kernel/HLO tests in
+61.64 seconds. Evidence: `upstream_streamindex_test_20260828T005547Z`;
 manifest-list SHA-256
-`699505e28e5b7684b046d68972cf91872f5a00065985a0827d329ca976bb1251`.
+`ad807bb2e426a46caeabbeea8de18fb4ec37a5348a0fa386fc3ed3fcc8879e95`.
+The tracked benchmark then ran independently on that same clean head with five
+warmups and 20 individually synchronized samples: scorer p50 3.214 ms, cache
+insert 0.357 ms, sparse MLA 0.155 ms, selected gather plus MLA 0.217 ms, and
+composed scorer/gather/MLA 3.279 ms. Evidence:
+`upstream_glm_dsa_benchmark_20260828T005834Z`; manifest-list SHA-256
+`0f045a7c0fcd2afae7819d648d86c7b59c71e43c4a7012078dfb7bf86b85b502`.
+One initial direct-script launch failed before compilation because the repo
+root was absent from `PYTHONPATH`; it is preserved as
+`upstream_glm_dsa_benchmark_20260828T005800Z` (SHA
+`244b114239c4a7a76efa4cef9fc60b3462b99a727b844537d9998b5f40ca1255`).
+Both attempts ended 8/8 clean.
 
 ## PR 2 — TorchAX/vLLM bridge
 
@@ -74,11 +86,11 @@ Validation:
   `upstream_streamindex_test_20260827T235340Z`, SHA
   `6d3a6b445568f8b4a5cd25c97feb50316d97acc0fc48e1259290b14591dd70fe`.
 - Every protected run ended with authenticated `CENSUS_OK` on all eight hosts.
-- Exact final-head bridge suite: 55/55 in 97.15 seconds, including real v4
+- Exact current-head bridge suite: 56/56 in 98.81 seconds, including real v4
   scorer/top-k, index-cache, sparse-MLA, shared-buffer, metadata-phase, and TP2
-  tests. Evidence `upstream_streamindex_test_20260828T004235Z`, manifest-list
+  tests. Evidence `upstream_streamindex_test_20260828T010034Z`, manifest-list
   SHA-256
-  `61a78d59e11eeb17a7a7c8b9bb6c2ee9a3e28b77c407b56b74c2f666be62dffe`.
+  `e0690f49393b355582caf432a62420a220675851d8c3c3e7f203278699592497`.
 
 A deliberately broader 66-test run passed all 63 relevant tests but also
 reproduced three existing dense FP8-cache v4 Mosaic legalization failures in
@@ -107,9 +119,9 @@ Validation:
   SHA-256
   `f8f3bf38cd2dfed2735c82010f86af3b57e2cfe87b350726cdabe8b89690e5d3`.
 - The protected run ended with authenticated `CENSUS_OK` on all eight hosts.
-- Exact final DCO-signed head: 3/3 in 9.86 seconds; evidence
-  `upstream_streamindex_test_20260828T004433Z`, manifest-list SHA-256
-  `cbe5fbb9129b425add5136b3c100ed9d19320d8cc49db48e98b5d0aa499c4149`.
+- Exact current head: 3/3 in 9.89 seconds; evidence
+  `upstream_streamindex_test_20260828T010235Z`, manifest-list SHA-256
+  `d723e4c990988ddf1cc12f5a3410dde9abc68c8627898978f6474cc74c7e3de8`.
 - The repository metadata validator was also inspected. Its current empty-env
   query flags the same metadata-free execution steps in existing model YAMLs;
   the new file follows those existing conventions and has unique, complete
@@ -122,5 +134,10 @@ private fork. The one permitted independent Sol review found TP row/metadata,
 bucket-buffer, evidence-head, and CI-coverage gaps; each has been corrected and
 revalidated above. Compact evidence is mirrored under matching
 `gs://driftbench-dsv4-uc/results/upstream_glm_dsa_pr{1,2,3}_*` prefixes in the
-verified `US-CENTRAL2` regional bucket. Present the exact diffs to the user for
-audit. No upstream push or PR is authorized yet.
+verified `US-CENTRAL2` regional bucket. PR 1 is 8 files (+1,250/-10), PR 2 is
+11 files (+1,332/-34), and PR 3 is 2 files (+302). The final stack tracks 1,103
+files, contains no tracked file above 1 MiB, and has no checkpoint, trace,
+cache, environment, or generated run tree. `upstream/main` remains exactly
+`5e2c7128bc74a75493f07930f3a749bcb272a3cb`; no upstream branch or PR was
+created. Present PR 1's exact diff to the user for audit. No upstream push or
+PR is authorized yet.
