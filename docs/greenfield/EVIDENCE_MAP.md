@@ -1499,3 +1499,20 @@ preimages that round to the same current and accepted BF16 carried rows. This pr
 retained BF16 evidence cannot identify the accepted FP32 boundary. Exact next is an accepted FP32
 layer-1 RMS-input acquisition through a separately reviewed non-perturbing oracle path. Unchanged
 BF16/full-8K reruns and bounded-error promotion remain forbidden; Gate D is open.
+
+## Offline accepted layer-1 FP32 boundary preparation
+
+Oracle-only commit `8dc7d20fedca5a98c27bfd1774827305973fa4c1` is now consumed only through a
+default-off protected mode. The observer hooks the exact real layer-1 input RMSNorm and sends the
+identical hidden-update/residual BF16 objects to a non-returning callback; FP32 addition exists only
+in the host artifact path. The greenfield sealer pins vLLM `a30addc7548...`, independently
+reconstructs and bitwise-checks the FP32 sum, and compares both operands plus rounded/unrounded
+results to exact DB550 leaves. It revalidates the tracked straddler capsule, raw source file,
+self-hashed manifests and exact source-code hashes at terminal publication.
+
+Focused synthetic, exact archive-runtime and real protected-source terminal tests pass 10/10;
+adjacent coverage passes 44/44 with one protected-source skip. The explicitly CPU-forced complete
+validation suite has 334 passes, 40 skips and only two unrelated WS32 baseline failures already
+reproduced at clean `HEAD`. This is preparation evidence only: no protected acquisition, accepted
+FP32 tensor, Gate-D, DB or performance result exists. The next action remains adversarial review
+of this immutable batch followed by a separate protected-run authorization.

@@ -643,3 +643,21 @@ preimages that round to the same BF16 carried rows. This does not admit bounded 
 TPU association. Reuse it to require the accepted FP32 layer-1 RMS input as the next oracle
 boundary; the rejected returned-residual callback remains forbidden and any capture must be
 separately reviewed as non-perturbing.
+
+## Accepted layer-1 fused-add/RMS input observer preparation
+
+Oracle-only pin `8dc7d20fedca5a98c27bfd1774827305973fa4c1` adds one default-off,
+non-returning pre-hook on the exact real `model.layers.1.input_layernorm`. It passes the identical
+two BF16 objects consumed by fused add/RMSNorm to a `jax.debug.callback`; the callback returns
+nothing and reconstructs FP32 only on the host. It is not a reusable execution path and must never
+be imported by the greenfield decoder.
+
+The greenfield adaptation is limited to evidence sealing. It pins vLLM
+`a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c` and both layernorm source-file hashes, verifies the
+observer's raw BF16 operands and host FP32 sum bitwise, and compares them with the exact DB550
+dense-update/post-attention leaves and rounded carried row. The wrapper additionally requires the
+tracked straddler capsule, exact legacy raw tokens/all DSA/state/load evidence and authenticated
+cleanup. The recreated fleet receives one pin-derived archive in a run-owned path; archive bytes,
+5,493 tracked entries, both semantic source hashes and all eight cleanup receipts are sealed. This
+is offline preparation only: no TPU acquisition or Gate-D claim exists until the new batch is
+adversarially reviewed and receives a separate protected-run authorization.

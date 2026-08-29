@@ -30,6 +30,7 @@ case "$INTERNAL_MODE" in
     readonly DENSE_BOUNDARY_CAPTURE=0
     readonly DENSE_INPUT_CAPTURE=0
     readonly DENSE_PARTIAL_CAPTURE=0
+    readonly LAYER1_RMS_INPUT_CAPTURE=0
     ;;
   prompt_key | prompt_key_input)
     readonly PROMPT_KEY_CAPTURE=1
@@ -39,6 +40,7 @@ case "$INTERNAL_MODE" in
     readonly DENSE_BOUNDARY_CAPTURE=0
     readonly DENSE_INPUT_CAPTURE=0
     readonly DENSE_PARTIAL_CAPTURE=0
+    readonly LAYER1_RMS_INPUT_CAPTURE=0
     ;;
   attention_output)
     readonly PROMPT_KEY_CAPTURE=0
@@ -48,6 +50,7 @@ case "$INTERNAL_MODE" in
     readonly DENSE_BOUNDARY_CAPTURE=0
     readonly DENSE_INPUT_CAPTURE=0
     readonly DENSE_PARTIAL_CAPTURE=0
+    readonly LAYER1_RMS_INPUT_CAPTURE=0
     ;;
   attention_projection)
     readonly PROMPT_KEY_CAPTURE=0
@@ -57,6 +60,7 @@ case "$INTERNAL_MODE" in
     readonly DENSE_BOUNDARY_CAPTURE=0
     readonly DENSE_INPUT_CAPTURE=0
     readonly DENSE_PARTIAL_CAPTURE=0
+    readonly LAYER1_RMS_INPUT_CAPTURE=0
     ;;
   attention_update)
     readonly PROMPT_KEY_CAPTURE=0
@@ -66,6 +70,7 @@ case "$INTERNAL_MODE" in
     readonly DENSE_BOUNDARY_CAPTURE=0
     readonly DENSE_INPUT_CAPTURE=0
     readonly DENSE_PARTIAL_CAPTURE=0
+    readonly LAYER1_RMS_INPUT_CAPTURE=0
     ;;
   dense_boundary)
     readonly PROMPT_KEY_CAPTURE=0
@@ -75,6 +80,7 @@ case "$INTERNAL_MODE" in
     readonly DENSE_BOUNDARY_CAPTURE=1
     readonly DENSE_INPUT_CAPTURE=0
     readonly DENSE_PARTIAL_CAPTURE=0
+    readonly LAYER1_RMS_INPUT_CAPTURE=0
     ;;
   dense_input)
     readonly PROMPT_KEY_CAPTURE=0
@@ -84,6 +90,7 @@ case "$INTERNAL_MODE" in
     readonly DENSE_BOUNDARY_CAPTURE=0
     readonly DENSE_INPUT_CAPTURE=1
     readonly DENSE_PARTIAL_CAPTURE=0
+    readonly LAYER1_RMS_INPUT_CAPTURE=0
     ;;
   dense_partial)
     readonly PROMPT_KEY_CAPTURE=0
@@ -93,6 +100,17 @@ case "$INTERNAL_MODE" in
     readonly DENSE_BOUNDARY_CAPTURE=0
     readonly DENSE_INPUT_CAPTURE=0
     readonly DENSE_PARTIAL_CAPTURE=1
+    readonly LAYER1_RMS_INPUT_CAPTURE=0
+    ;;
+  layer1_rms_input)
+    readonly PROMPT_KEY_CAPTURE=0
+    readonly ATTENTION_OUTPUT_CAPTURE=0
+    readonly ATTENTION_PROJECTION_CAPTURE=0
+    readonly ATTENTION_UPDATE_CAPTURE=0
+    readonly DENSE_BOUNDARY_CAPTURE=0
+    readonly DENSE_INPUT_CAPTURE=0
+    readonly DENSE_PARTIAL_CAPTURE=0
+    readonly LAYER1_RMS_INPUT_CAPTURE=1
     ;;
   *)
     echo "unsupported GLM_GREENFIELD_DSA_INTERNALS_MODE=$INTERNAL_MODE" >&2
@@ -134,9 +152,19 @@ if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
   readonly LEGACY_REPO=$OBSERVER_RUNTIME_REPO
   readonly LEGACY_SOURCE_REPO=$OBSERVER_DEV_REPO
 elif [[ $INTERNAL_CAPTURE == 1 ]]; then
-  readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
-  readonly OBSERVER_BRANCH=greenfield/legacy-dsa-internal-observer
-  if [[ $DENSE_PARTIAL_CAPTURE == 1 ]]; then
+  if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+    readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-layer1-rms-input-observer
+    readonly OBSERVER_BRANCH=greenfield/legacy-layer1-rms-input-observer
+    readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-8dc7d20fe
+    readonly OBSERVER_COMMIT_DISTANCE=12
+    readonly LEGACY_PIN=8dc7d20fedca5a98c27bfd1774827305973fa4c1
+  else
+    readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-dsa-internal-observer
+    readonly OBSERVER_BRANCH=greenfield/legacy-dsa-internal-observer
+  fi
+  if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+    :
+  elif [[ $DENSE_PARTIAL_CAPTURE == 1 ]]; then
     readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-4e3aa9666
     readonly OBSERVER_COMMIT_DISTANCE=12
     readonly LEGACY_PIN=4e3aa9666cefa38deba9c2824d5125c2e32ab2cf
@@ -183,6 +211,11 @@ else
 fi
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
+readonly VLLM_REFERENCE_REPO=/home/gianl/vllm-build-a30addc
+readonly VLLM_ARCHIVE_REPO=$VLLM_REFERENCE_REPO
+readonly VLLM_PIN=a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c
+readonly VLLM_IR_LAYERNORM_SHA=d8e4380ca97d2c719836a7e15fb410a73d354b15d79fc54275b573bbb1c06910
+readonly VLLM_EXECUTOR_LAYERNORM_SHA=53c6abdab25dc1675f26f4c8fc5ba2094f1fb4a106334e581f630436210d0c9b
 readonly OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 readonly DISK_MIN_FREE_GB=10
 readonly DISK_WARN_FREE_GB=15
@@ -230,7 +263,15 @@ readonly DENSE_PARTIAL_PROBE_TENSOR_SHA=f194d757d2f9ebe27430dfec8f828ca7588e433b
 readonly DENSE_PARTIAL_PROBE_SUMMARY_SHA=c349b5fd458f34986d8cc59c0f026af6b0a4c4e998f8691d6f6aa83a9b55e416
 readonly DENSE_PARTIAL_PROBE_SUCCESS_SHA=6cac897695fc1e78d0a10c0e36c993cffd281c6a88721d8955fa470bd44b0b85
 readonly DENSE_PARTIAL_PROBE_REMOTE=$APPROVED_BUCKET/results/$DENSE_PARTIAL_PROBE_TAG
-readonly INTERNAL_LAYER=model.layers.${INTERNAL_LAYER_ID}.self_attn.attn
+readonly DB550_BOUNDARY=/home/gianl/gcs-models/results/greenfield_layer0_dense_partial_capture_20260813T200736889447458Z/dense_partial_capture.npz
+readonly DB550_BOUNDARY_SHA=f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298
+readonly STRADDLER_CLASSIFICATION=$WORKTREE/docs/artifacts/pp16-feature2-layer1-straddler-classification.json
+readonly STRADDLER_CLASSIFICATION_SHA=eebe1c5d5ba475a5faf000243d881657754fc47ed2345fe2691d923c1d457b36
+if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+  readonly INTERNAL_LAYER=model.layers.1.input_layernorm
+else
+  readonly INTERNAL_LAYER=model.layers.${INTERNAL_LAYER_ID}.self_attn.attn
+fi
 
 PROFILE=${GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE:-2k}
 case "$PROFILE" in
@@ -300,6 +341,34 @@ if [[ $ATTENTION_OUTPUT_CAPTURE == 1 || $ATTENTION_PROJECTION_CAPTURE == 1 || \
      $PROMPT_CACHE_CAPTURE == 0 && $PREFILL_PROJECTION_CAPTURE == 0 && \
      $DECODE_PROJECTION_CAPTURE == 0 && $MAIN_CACHE_CAPTURE == 0 ]] || {
     echo "layer-0 boundary capture requires isolated 8K position 8155 mode" >&2
+    exit 2
+  }
+fi
+if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+  [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_LAYER_ID == 1 && \
+     $PROFILE == 8k && $INTERNAL_TARGET_POSITION == 8155 && \
+     $PROMPT_CACHE_CAPTURE == 0 && $PREFILL_PROJECTION_CAPTURE == 0 && \
+     $DECODE_PROJECTION_CAPTURE == 0 && $MAIN_CACHE_CAPTURE == 0 ]] || {
+    echo "layer-1 RMS-input capture requires isolated 8K position 8155 mode" >&2
+    exit 2
+  }
+  [[ -r $DB550_BOUNDARY && -r $STRADDLER_CLASSIFICATION && \
+     $(sha256sum "$DB550_BOUNDARY" | awk '{print $1}') == "$DB550_BOUNDARY_SHA" && \
+     $(sha256sum "$STRADDLER_CLASSIFICATION" | awk '{print $1}') == "$STRADDLER_CLASSIFICATION_SHA" ]] || {
+    echo "layer-1 RMS-input source contract drifted" >&2
+    exit 2
+  }
+  vllm_source_ok=0
+  if [[ -r $VLLM_REFERENCE_REPO/vllm/ir/ops/layernorm.py &&
+        -r $VLLM_REFERENCE_REPO/vllm/model_executor/layers/layernorm.py &&
+        $(git -C "$VLLM_REFERENCE_REPO" rev-parse HEAD) == "$VLLM_PIN" &&
+        -z $(git -C "$VLLM_REFERENCE_REPO" status --porcelain --untracked-files=no) &&
+        $(sha256sum "$VLLM_REFERENCE_REPO/vllm/ir/ops/layernorm.py" | awk '{print $1}') == "$VLLM_IR_LAYERNORM_SHA" &&
+        $(sha256sum "$VLLM_REFERENCE_REPO/vllm/model_executor/layers/layernorm.py" | awk '{print $1}') == "$VLLM_EXECUTOR_LAYERNORM_SHA" ]]; then
+    vllm_source_ok=1
+  fi
+  [[ $vllm_source_ok == 1 ]] || {
+    echo "layer-1 RMS-input source contract drifted" >&2
     exit 2
   }
 fi
@@ -549,6 +618,10 @@ HARNESS_SHORT=$(git -C "$HARNESS_REPO" rev-parse --short HEAD)
 LEGACY_SHORT=$(git -C "$LEGACY_SOURCE_REPO" rev-parse --short HEAD)
 ORACLE_SHORT=$(git -C "$ORACLE_REPO" rev-parse --short HEAD)
 TAG=${GLM_GREENFIELD_SHORT_DSA_ORACLE_TAG:-${TAG_PREFIX}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 && ! $TAG =~ ^[A-Za-z0-9_]+$ ]]; then
+  echo "layer-1 RMS-input tag contains unsafe characters" >&2
+  exit 2
+fi
 RUN_DIR=/home/gianl/glm-run/$TAG
 SOURCE_DIR=$RUN_DIR/source_dumps
 ORACLE_DIR=$RUN_DIR/oracle
@@ -566,6 +639,10 @@ PREFILL_PROJECTION_RESULT_DIR=$RUN_DIR/accepted_prompt_projection_lowering
 DECODE_HLO_PREFIX=/tmp/$TAG/decode_projection_hlo_raw
 DECODE_HLO_COMPACT_PREFIX=/tmp/$TAG/decode_projection_hlo
 DECODE_PROJECTION_RESULT_DIR=$RUN_DIR/accepted_decode_projection_lowering
+readonly VLLM_RUNTIME_ROOT=/tmp/glm_vllm_$TAG
+readonly VLLM_RUNTIME_ARCHIVE_REMOTE=/tmp/glm_vllm_$TAG.tar.gz
+VLLM_RUNTIME_ARCHIVE_SHA=
+VLLM_RUNTIME_FILE_COUNT=0
 if [[ $INTERNAL_MODE == prompt_key_input ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/prompt_projection_input_comparison
 elif [[ $INTERNAL_MODE == prompt_key ]]; then
@@ -582,6 +659,8 @@ elif [[ $DENSE_INPUT_CAPTURE == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/dense_input_capture
 elif [[ $DENSE_PARTIAL_CAPTURE == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/dense_partials_capture
+elif [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+  INTERNAL_RESULT_DIR=$RUN_DIR/layer1_rms_input_capture
 elif [[ $INTERNAL_COMPARE_LAYER0 == 1 ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/internal_comparison
 else
@@ -765,9 +844,22 @@ stop_owned_runtime() {
   has_eight_unique_markers "$RUN_DIR/stop.txt" STOP_OK
 }
 
+cleanup_vllm_runtime() {
+  local label=$1
+  local out="$RUN_DIR/vllm_cleanup_${label}.txt"
+  local command
+  # Only the run-owned, validated tag path is removable.
+  # shellcheck disable=SC2016
+  command='target='"$VLLM_RUNTIME_ROOT"'; archive='"$VLLM_RUNTIME_ARCHIVE_REMOTE"'; if ! printf "%s\n" "$target" | grep -Eq "^/tmp/glm_vllm_[A-Za-z0-9_]+$" || [ "$archive" != "${target}.tar.gz" ]; then echo "VLLM_CLEAN_BAD $(hostname) unsafe_target"; exit 0; fi; rm -rf -- "$target"; rm -f -- "$archive"; if [ ! -e "$target" ] && [ ! -e "$archive" ]; then echo "VLLM_CLEAN_OK $(hostname)"; else echo "VLLM_CLEAN_BAD $(hostname) residual"; fi'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$command" >"$out" 2>&1 || return 1
+  has_eight_unique_markers "$out" VLLM_CLEAN_OK
+}
+
 runtime_started=0
 post_census_done=0
 terminal_success_done=0
+vllm_runtime_prepared=0
 
 rollback_internal_capture_db() {
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
@@ -804,6 +896,10 @@ on_exit() {
   local status=$?
   if [[ $runtime_started -eq 1 ]]; then
     stop_owned_runtime || true
+  fi
+  if [[ $vllm_runtime_prepared -eq 1 ]]; then
+    cleanup_vllm_runtime failure_exit || true
+    vllm_runtime_prepared=0
   fi
   if [[ $post_census_done -eq 0 ]]; then
     strict_census failure_exit || true
@@ -855,6 +951,72 @@ if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
     exit 1
   }
 fi
+if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+  # The new pod no longer has the old ~/vllm-build worktree targeted by the
+  # editable install. Transfer one exact pin-derived source archive from the
+  # controller instead of assuming every worker has a complete Git object DB.
+  readonly VLLM_RUNTIME_ARCHIVE_LOCAL=$RUN_DIR/vllm_${VLLM_PIN}.tar.gz
+  git -C "$VLLM_ARCHIVE_REPO" archive --format=tar.gz \
+    --output "$VLLM_RUNTIME_ARCHIVE_LOCAL" "$VLLM_PIN"
+  VLLM_RUNTIME_ARCHIVE_SHA=$(sha256sum "$VLLM_RUNTIME_ARCHIVE_LOCAL" | awk '{print $1}')
+  VLLM_RUNTIME_FILE_COUNT=$(git -C "$VLLM_ARCHIVE_REPO" ls-tree -r \
+    --name-only "$VLLM_PIN" | wc -l)
+  readonly VLLM_RUNTIME_ARCHIVE_SHA VLLM_RUNTIME_FILE_COUNT
+  [[ $VLLM_RUNTIME_ARCHIVE_SHA =~ ^[0-9a-f]{64}$ && \
+     $VLLM_RUNTIME_FILE_COUNT -gt 0 ]] || {
+    say "ABORT: exact accepted vLLM archive identity is invalid"
+    exit 1
+  }
+  printf 'pin=%s\narchive_sha256=%s\ntracked_entries=%s\nsource_repository=%s\n' \
+    "$VLLM_PIN" "$VLLM_RUNTIME_ARCHIVE_SHA" "$VLLM_RUNTIME_FILE_COUNT" \
+    "$VLLM_ARCHIVE_REPO" >"$RUN_DIR/vllm_archive_identity.txt"
+
+  # Refuse rather than remove any path that predates this append-only run.
+  # shellcheck disable=SC2016
+  vllm_vacancy='dest='"$VLLM_RUNTIME_ROOT"'; archive='"$VLLM_RUNTIME_ARCHIVE_REMOTE"'; if [ ! -e "$dest" ] && [ ! -e "$archive" ]; then echo "VLLM_VACANT_OK $(hostname)"; else echo "VLLM_VACANT_BAD $(hostname)"; fi'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$vllm_vacancy" >"$RUN_DIR/vllm_vacancy.txt" 2>&1
+  has_eight_unique_markers "$RUN_DIR/vllm_vacancy.txt" VLLM_VACANT_OK || {
+    say "ABORT: run-owned accepted vLLM path is not vacant on all hosts"
+    exit 1
+  }
+
+  vllm_runtime_prepared=1
+  : >"$RUN_DIR/vllm_archive_copy.txt"
+  for worker in 0 1 2 3 4 5 6 7; do
+    if gcloud compute tpus tpu-vm scp --zone "$ZONE" --worker="$worker" \
+        "$VLLM_RUNTIME_ARCHIVE_LOCAL" \
+        "$POD:$VLLM_RUNTIME_ARCHIVE_REMOTE" >/dev/null 2>&1; then
+      echo "VLLM_ARCHIVE_COPY_OK $worker" >>"$RUN_DIR/vllm_archive_copy.txt"
+    else
+      echo "VLLM_ARCHIVE_COPY_BAD $worker" >>"$RUN_DIR/vllm_archive_copy.txt"
+    fi
+  done
+  has_eight_unique_markers "$RUN_DIR/vllm_archive_copy.txt" \
+    VLLM_ARCHIVE_COPY_OK || {
+    say "ABORT: exact accepted vLLM archive did not reach all hosts"
+    exit 1
+  }
+
+  # Authenticate archive bytes before extraction, then authenticate the two
+  # semantic source files and complete tracked-entry count after extraction.
+  # shellcheck disable=SC2016
+  sync_vllm='set -e; archive='"$VLLM_RUNTIME_ARCHIVE_REMOTE"'; dest='"$VLLM_RUNTIME_ROOT"'; archive_sha='"$VLLM_RUNTIME_ARCHIVE_SHA"'; expected_files='"$VLLM_RUNTIME_FILE_COUNT"'; ir_sha='"$VLLM_IR_LAYERNORM_SHA"'; executor_sha='"$VLLM_EXECUTOR_LAYERNORM_SHA"'; actual_archive=$(sha256sum "$archive" | cut -d " " -f 1); if [ "$actual_archive" != "$archive_sha" ] || [ -e "$dest" ]; then echo "VLLM_SYNC_BAD $(hostname) archive_or_destination"; exit 0; fi; umask 077; mkdir "$dest"; tar -xzf "$archive" -C "$dest"; actual_files=$(find "$dest" \( -type f -o -type l \) | wc -l); actual_ir=$(sha256sum "$dest/vllm/ir/ops/layernorm.py" | cut -d " " -f 1); actual_executor=$(sha256sum "$dest/vllm/model_executor/layers/layernorm.py" | cut -d " " -f 1); rm -f -- "$archive"; if [ "$actual_files" -eq "$expected_files" ] && [ "$actual_ir" = "$ir_sha" ] && [ "$actual_executor" = "$executor_sha" ] && [ ! -e "$archive" ]; then echo "VLLM_SYNC_OK $(hostname) archive_sha256=$actual_archive tracked_entries=$actual_files"; else echo "VLLM_SYNC_BAD $(hostname) files=$actual_files ir=$actual_ir executor=$actual_executor"; fi'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$sync_vllm" >"$RUN_DIR/sync_vllm.txt" 2>&1
+  has_eight_unique_markers "$RUN_DIR/sync_vllm.txt" VLLM_SYNC_OK || {
+    say "ABORT: exact accepted vLLM source authentication failed on the fleet"
+    exit 1
+  }
+  [[ $(awk -v sha="$VLLM_RUNTIME_ARCHIVE_SHA" \
+      -v count="$VLLM_RUNTIME_FILE_COUNT" \
+      '$1 == "VLLM_SYNC_OK" && $3 == "archive_sha256=" sha && \
+       $4 == "tracked_entries=" count {n++} END {print n + 0}' \
+      "$RUN_DIR/sync_vllm.txt") -eq 8 ]] || {
+    say "ABORT: accepted vLLM fleet receipts drifted"
+    exit 1
+  }
+fi
 
 # All hosts must carry the exact clean legacy tree, golden state file, and
 # approved read-only OOB checkpoint mirror used by the PWAL self-healer.
@@ -885,7 +1047,12 @@ if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
   COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO $COMMON_ENVS GLM_DCP_CACHE_DUMP=$MAIN_CACHE_DUMP_PREFIX GLM_DCP_CACHE_DUMP_LAYERS=1 GLM_DCP_CACHE_DUMP_STEPS=4,5"
 fi
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
-  COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO $COMMON_ENVS GLM_DSA_DUMP_INTERNALS=$INTERNAL_DUMP_PREFIX GLM_DSA_DUMP_INTERNALS_MODE=$INTERNAL_MODE GLM_DSA_DUMP_INTERNALS_LAYER=$INTERNAL_LAYER GLM_DSA_DUMP_INTERNALS_POSITION=$INTERNAL_TARGET_POSITION GLM_DSA_DUMP_INTERNALS_RUN_TAG=$TAG GLM_DSA_DUMP_INTERNALS_CODE_HASH=$LEGACY_PIN GLM_DSA_DUMP_INTERNALS_ORACLE_PIN=$ORACLE_PIN GLM_DSA_DUMP_INTERNALS_MODEL_ID=$MODEL_ID"
+  if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+    INTERNAL_PYTHONPATH=$OBSERVER_RUNTIME_REPO:$VLLM_RUNTIME_ROOT
+  else
+    INTERNAL_PYTHONPATH=$OBSERVER_RUNTIME_REPO
+  fi
+  COMMON_ENVS="PYTHONPATH=$INTERNAL_PYTHONPATH $COMMON_ENVS GLM_DSA_DUMP_INTERNALS=$INTERNAL_DUMP_PREFIX GLM_DSA_DUMP_INTERNALS_MODE=$INTERNAL_MODE GLM_DSA_DUMP_INTERNALS_LAYER=$INTERNAL_LAYER GLM_DSA_DUMP_INTERNALS_POSITION=$INTERNAL_TARGET_POSITION GLM_DSA_DUMP_INTERNALS_RUN_TAG=$TAG GLM_DSA_DUMP_INTERNALS_CODE_HASH=$LEGACY_PIN GLM_DSA_DUMP_INTERNALS_ORACLE_PIN=$ORACLE_PIN GLM_DSA_DUMP_INTERNALS_MODEL_ID=$MODEL_ID"
 fi
 PREFILL_PROJECTION_ENVS=
 if [[ $PREFILL_PROJECTION_CAPTURE == 1 ]]; then
@@ -916,7 +1083,7 @@ runtime_started=1
 env_check='p=$(pgrep -x raylet | head -1); f=/tmp/dsa_oracle_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_DCP=1" "$f" && grep -qx "GLM_DCP_SCATTER_IMPL=pageloop" "$f" && grep -qx "GLM_DSA_DCP_SCATTER_IMPL=flat" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK_EVENTS=all" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_LOAD_NAN_CHECK=1" "$f" && grep -qx "GLM_PWAL_NAN_CHECK=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f" && grep -qx "GLM_WK_OOB_DIR='"$OOB_DIR"'" "$f" && grep -qx "GLM_WK_OOB_GOLDEN=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
 if [[ $INTERNAL_CAPTURE == 1 ]]; then
   # shellcheck disable=SC2016
-  env_check='p=$(pgrep -x raylet | head -1); f=/tmp/dsa_internal_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "PYTHONPATH='"$OBSERVER_RUNTIME_REPO"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS='"$INTERNAL_DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_MODE='"$INTERNAL_MODE"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_LAYER='"$INTERNAL_LAYER"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_POSITION='"$INTERNAL_TARGET_POSITION"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_RUN_TAG='"$TAG"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_CODE_HASH='"$LEGACY_PIN"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_ORACLE_PIN='"$ORACLE_PIN"'" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
+  env_check='p=$(pgrep -x raylet | head -1); f=/tmp/dsa_internal_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "PYTHONPATH='"$INTERNAL_PYTHONPATH"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS='"$INTERNAL_DUMP_PREFIX"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_MODE='"$INTERNAL_MODE"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_LAYER='"$INTERNAL_LAYER"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_POSITION='"$INTERNAL_TARGET_POSITION"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_RUN_TAG='"$TAG"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_CODE_HASH='"$LEGACY_PIN"'" "$f" && grep -qx "GLM_DSA_DUMP_INTERNALS_ORACLE_PIN='"$ORACLE_PIN"'" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
 elif [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
   # shellcheck disable=SC2016
   env_check='p=$(pgrep -x raylet | head -1); f=/tmp/main_cache_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "PYTHONPATH='"$OBSERVER_RUNTIME_REPO"'" "$f" && grep -qx "GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"'" "$f" && grep -qx "GLM_DCP_CACHE_DUMP='"$MAIN_CACHE_DUMP_PREFIX"'" "$f" && grep -qx "GLM_DCP_CACHE_DUMP_LAYERS=1" "$f" && grep -qx "GLM_DCP_CACHE_DUMP_STEPS=4,5" "$f" && grep -qx "GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"'" "$f" && grep -qx "GLM_LOAD_CHECKSUM=1" "$f" && grep -qx "GLM_STATE_HASH_REF=/tmp/golden.json" "$f"; then echo "ENV_OK $(hostname)"; else echo "ENV_BAD $(hostname)"; fi; rm -f "$f"'
@@ -1389,7 +1556,26 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
       >"$RUN_DIR/prompt_index_cache_comparison_summary.json"
   fi
 fi
-if [[ $INTERNAL_CAPTURE == 1 && $DENSE_PARTIAL_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 && $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+  say "sealing accepted layer-1 fused-add/RMSNorm FP32 input boundary"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    "$WORKTREE/scripts/greenfield/capture_accepted_layer1_rms_input.py" \
+    --source-dump-dir "$SOURCE_DIR" \
+    --output "$INTERNAL_RESULT_DIR" \
+    --db550-boundary "$DB550_BOUNDARY" \
+    --straddler-classification "$STRADDLER_CLASSIFICATION" \
+    --vllm-repository "$VLLM_ARCHIVE_REPO" \
+    --run-tag "$TAG" \
+    --legacy-code-hash "$LEGACY_PIN" \
+    --oracle-pin "$ORACLE_PIN" \
+    --model-id "$MODEL_ID" \
+    --layer-name "$INTERNAL_LAYER" \
+    --position "$INTERNAL_TARGET_POSITION" \
+    --process-count 8 \
+    --capture-process-index 0 \
+    --source-row 0 \
+    >"$RUN_DIR/layer1_rms_input_capture_summary.json"
+elif [[ $INTERNAL_CAPTURE == 1 && $DENSE_PARTIAL_CAPTURE == 1 ]]; then
   say "sealing accepted layer-0 pre-reduction dense partials and comparing DB548"
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
     "$WORKTREE/scripts/greenfield/capture_accepted_dense_partials.py" \
@@ -1636,6 +1822,13 @@ elif [[ $INTERNAL_CAPTURE == 1 ]]; then
     --process-count 8 \
     --capture-process-indices 0 >"$RUN_DIR/internal_capture_summary.json"
 fi
+if [[ $vllm_runtime_prepared -eq 1 ]]; then
+  cleanup_vllm_runtime post || {
+    say "ABORT: run-owned accepted vLLM runtime cleanup failed"
+    exit 1
+  }
+  vllm_runtime_prepared=0
+fi
 strict_census post || {
   say "ABORT: post-run census is not eight-host zero work"
   exit 1
@@ -1774,7 +1967,8 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$TAG" "$DENSE_PARTIAL_PROBE_DIR" \
   "$DENSE_PARTIAL_PROBE_RUNNER_SHA" "$DENSE_PARTIAL_PROBE_TENSOR_SHA" \
   "$DENSE_PARTIAL_PROBE_SUMMARY_SHA" "$DENSE_PARTIAL_PROBE_SUCCESS_SHA" \
-  "$ORACLE_PIN" <<'PY'
+  "$ORACLE_PIN" "$VLLM_PIN" "$VLLM_RUNTIME_ARCHIVE_SHA" \
+  "$VLLM_RUNTIME_FILE_COUNT" "$VLLM_ARCHIVE_REPO" <<'PY'
 from hashlib import sha256
 import json
 import math
@@ -1861,7 +2055,154 @@ def valid_dense_boundary_numeric(value):
 if sys.argv[8] == "1":
     exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
     mode = sys.argv[13]
-    if mode == "dense_partial":
+    if mode == "layer1_rms_input":
+        from glm_tpu.greenfield.validation.layer1_rms_input import (
+            Layer1RmsInputCaptureConfig,
+            validate_layer1_rms_input_artifacts,
+        )
+        if not exact_dsa["exact"]:
+            raise SystemExit("layer-1 RMS-input DSA event tensors drifted")
+        capture_root = root / "layer1_rms_input_capture"
+        result = validate_layer1_rms_input_artifacts(
+            Layer1RmsInputCaptureConfig(
+                source_dump_dir=root / "source_dumps",
+                output_dir=capture_root,
+                db550_boundary_path=Path(
+                    "/home/gianl/gcs-models/results/"
+                    "greenfield_layer0_dense_partial_capture_"
+                    "20260813T200736889447458Z/dense_partial_capture.npz"
+                ),
+                straddler_classification_path=Path(
+                    "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+                    "pp16-feature2-layer1-straddler-classification.json"
+                ),
+                vllm_repository=Path(sys.argv[32]),
+                expected_run_tag=sys.argv[22],
+                expected_legacy_code_hash=sys.argv[4],
+                expected_oracle_pin=sys.argv[28],
+            )
+        )
+        capture = result["capture"]
+        comparison = result["comparison"]
+        capture_path = capture_root / "capture.json"
+        comparison_path = capture_root / "comparison.json"
+        archive_path = root / f"vllm_{sys.argv[29]}.tar.gz"
+        identity = dict(
+            line.split("=", 1)
+            for line in (root / "vllm_archive_identity.txt").read_text().splitlines()
+        )
+        source_repository = identity.pop("source_repository", None)
+        expected_identity = {
+            "archive_sha256": sys.argv[30],
+            "pin": sys.argv[29],
+            "tracked_entries": sys.argv[31],
+        }
+        if (
+            identity != expected_identity
+            or source_repository != sys.argv[32]
+            or sys.argv[32] != "/home/gianl/vllm-build-a30addc"
+        ):
+            raise SystemExit("accepted vLLM archive identity drifted")
+        if (
+            sys.argv[29] != capture["vllm_source_contract"]["repository_pin"]
+            or not is_sha256(sys.argv[30])
+            or sys.argv[31] != "5493"
+            or sha256(archive_path.read_bytes()).hexdigest() != sys.argv[30]
+        ):
+            raise SystemExit("accepted vLLM archive bytes drifted")
+
+        def exact_receipts(name, marker, expected_tail=None, expected_owners=None):
+            records = [
+                line.split()
+                for line in (root / name).read_text().splitlines()
+                if line.strip()
+            ]
+            if (
+                len(records) != 8
+                or any(len(record) < 2 or record[0] != marker for record in records)
+                or len({record[1] for record in records}) != 8
+                or (
+                    expected_tail is not None
+                    and any(record[2:] != expected_tail for record in records)
+                )
+                or (
+                    expected_owners is not None
+                    and {record[1] for record in records} != expected_owners
+                )
+            ):
+                raise SystemExit(f"accepted vLLM fleet receipt drifted: {name}")
+
+        exact_receipts(
+            "vllm_archive_copy.txt",
+            "VLLM_ARCHIVE_COPY_OK",
+            expected_owners={str(index) for index in range(8)},
+        )
+        exact_receipts("vllm_vacancy.txt", "VLLM_VACANT_OK", expected_tail=[])
+        exact_receipts(
+            "sync_vllm.txt",
+            "VLLM_SYNC_OK",
+            expected_tail=[
+                f"archive_sha256={sys.argv[30]}",
+                f"tracked_entries={sys.argv[31]}",
+            ],
+        )
+        exact_receipts(
+            "vllm_cleanup_post.txt", "VLLM_CLEAN_OK", expected_tail=[]
+        )
+        lines.update({
+            "accepted_layer1_rms_input_capture": "true",
+            "accepted_layer1_rms_input_capture_layout": capture[
+                "capture_layout"
+            ],
+            "accepted_layer1_rms_input_capture_mode": mode,
+            "accepted_layer1_rms_input_diagnostic_only": "true",
+            "accepted_layer1_rms_input_dsa_event_tensors_exact": "true",
+            "accepted_layer1_rms_input_manifest_file_sha256": sha256(
+                capture_path.read_bytes()
+            ).hexdigest(),
+            "accepted_layer1_rms_input_manifest_sha256": capture[
+                "manifest_sha256"
+            ],
+            "accepted_layer1_rms_input_source_file_count": sys.argv[9],
+            "accepted_layer1_rms_input_comparison_file_sha256": sha256(
+                comparison_path.read_bytes()
+            ).hexdigest(),
+            "accepted_layer1_rms_input_comparison_manifest_sha256": comparison[
+                "manifest_sha256"
+            ],
+            "accepted_layer1_rms_input_classification": comparison[
+                "classification"
+            ],
+            "accepted_layer1_rms_input_operands_match_db550": str(
+                comparison["operands_match_db550"]
+            ).lower(),
+            "accepted_layer1_fused_add_float32_sha256": capture["tensors"][
+                "fused_add_float32"
+            ]["tensor_sha256"],
+            "accepted_layer1_hidden_update_bfloat16_sha256": capture["tensors"][
+                "hidden_update_bfloat16_bits"
+            ]["tensor_sha256"],
+            "accepted_layer1_carried_residual_bfloat16_sha256": capture[
+                "tensors"
+            ]["carried_residual_bfloat16_bits"]["tensor_sha256"],
+            "accepted_oracle_pin": capture["oracle_pin"],
+            "accepted_vllm_pin": capture["vllm_source_contract"][
+                "repository_pin"
+            ],
+            "accepted_vllm_runtime_archive_sha256": sys.argv[30],
+            "accepted_vllm_runtime_fleet_receipts_exact": "true",
+            "accepted_vllm_runtime_tracked_entries": sys.argv[31],
+            "db550_boundary_sha256": comparison["db550"]["file_sha256"],
+            "dsa_internal_capture": "true",
+            "dsa_internal_capture_process_indices": "0",
+            "dsa_internal_file_count": sys.argv[9],
+            "dsa_internal_layer_name": capture["layer_name"],
+            "dsa_event_tensors_exact": "true",
+            "pp16_straddler_classification_sha256": comparison["straddler"][
+                "file_sha256"
+            ],
+        })
+    elif mode == "dense_partial":
         from glm_tpu.greenfield.validation.dense_partials import (
             DensePartialsCaptureConfig,
             validate_dense_partials_artifacts,

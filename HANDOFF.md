@@ -7487,3 +7487,30 @@ a separately reviewed, non-perturbing oracle-only acquisition of the accepted FP
 layer-1 RMSNorm. It must preserve exact legacy tokens/DSA and use no returned-residual execution
 path. Only that boundary can distinguish a real greenfield FP32 producer error from an oracle-
 precision straddler. Gate D remains open.
+
+## Current exact next: adversarial review of the accepted FP32 capture preparation
+
+The oracle-only observer is complete at pushed/mirrored pin
+`8dc7d20fedca5a98c27bfd1774827305973fa4c1` with 30/30 tests and prior Fable approval. The
+greenfield branch now has an uncommitted default-off sealer/wrapper batch: exact layer
+`model.layers.1.input_layernorm`, position 8155, one DCP-owner source file, vLLM
+`a30addc7548...` source/hash contract, independent host-FP32 reconstruction, direct DB550 operand
+comparison, straddler linkage, exact legacy token/all-DSA/state/load gates and terminal
+revalidation. Because workers 1--7 lack the exact vLLM Git objects, it now derives one archive from
+the pinned controller commit, verifies all 5,493 tracked entries plus the two semantic source
+hashes on every host, imports only from a run-owned `/tmp` tree, and seals vacancy/copy/extract/
+cleanup receipts before the final census. Focused synthetic, archive-reconstruction and real-source
+terminal validation passes 10/10; no protected TPU/model workflow ran.
+
+Adjacent validation passes 44/44 with one protected-source skip. The complete explicitly
+CPU-forced validation suite passes 334 tests with 40 skips except the same two pre-existing WS32
+failures previously reproduced at clean `HEAD`; this batch changes no WS32 file. An initial broad
+invocation was terminated at 38% after it auto-initialized the local TPU backend instead of CPU.
+It launched no protected wrapper, model, Ray or multi-host workflow and produced no evidence; a
+fresh read-only fleet census immediately afterward was 8/8 clean. Only the CPU-forced result is
+admissible validation.
+
+Exact next is Fable 5 Max review of only this new greenfield diff/evidence, correction of every
+blocker, then commit/push/locked same-region mirror. A protected oracle acquisition still requires
+a separate execution review; do not launch it from the implementation approval alone. Gate D is
+open, and unchanged BF16/full-8K retries remain forbidden.

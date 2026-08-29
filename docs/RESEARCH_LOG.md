@@ -11658,3 +11658,36 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
 - Focused hostile tests pass 9/9, the adjacent numerical/dense/p113 suite passes 68/68 in 20.97 s,
   and the complete explicitly CPU-forced PP16 feature2 suite passes 219/219 in 186.05 s. Fresh
   classifier output is byte-identical to the tracked capsule. No TPU process or workflow was used.
+
+## 2026-08-29 14:25 UTC — accepted FP32 boundary acquisition is prepared offline
+
+- Oracle-only commit `8dc7d20fedca5a98c27bfd1774827305973fa4c1` supplies a default-off,
+  non-returning pre-hook on the exact real layer-1 input RMSNorm. It observes the identical BF16
+  hidden-update and carried-residual objects consumed by fused add/RMSNorm and reconstructs their
+  FP32 sum only in the host callback. Its own focused suite passed 30/30 and Fable returned
+  `APPROVE COMMIT`; the branch is pushed and mirrored.
+- The greenfield sealer now authenticates the raw observer artifact, independently recomputes the
+  FP32 sum bitwise, pins vLLM `a30addc7548...` and both layernorm source hashes, and compares the
+  direct operands plus rounded/unrounded sums with sealed DB550. It accepts only an honest exact or
+  divergent classification and replays the entire contract during terminal publication.
+- The protected wrapper selects exact layer `model.layers.1.input_layernorm`, position 8155,
+  observer distance 12, isolated 8K mode, exact legacy token/all-DSA/state/load gates, same-region
+  append-only archive and authenticated cleanup. Workers 1--7 lack the exact vLLM Git object DB, so
+  one archive is derived from the pinned controller commit and copied into a vacant run-owned
+  `/tmp` tree. Every host authenticates the archive SHA, all 5,493 tracked entries and both semantic
+  source hashes; terminal publication replays copy/extract/cleanup receipts. No fallback source is
+  admitted.
+- Ten focused tests pass, including exact archive reconstruction/import, same-byte parsing under
+  hostile path replacement, and a terminal replay
+  against real DB550, the tracked straddler capsule and exact vLLM files. A hostile fleet-receipt
+  mutation refuses. Bash syntax and Ruff checks pass. This
+  batch is not yet adversarially reviewed, committed or authorized for TPU use. Gate D is open.
+- Adjacent validation passes 44/44 with one protected-source skip. The complete explicitly
+  CPU-forced validation suite reaches 334 passes and 40 skips with only the same two unrelated
+  WS32 baseline failures already reproduced at clean `HEAD`; the current diff touches no WS32
+  source or test.
+- One unforced broad-suite invocation was stopped at 38% when process inspection showed that JAX
+  had auto-opened local `/dev/accel` devices. It launched no protected wrapper, model, Ray or
+  multi-host workload and generated no evidence. The process was terminated, the rerun was pinned
+  to 32 CPU devices, and a fresh read-only fleet census reported 8/8 zero work. This interrupted
+  invocation is not validation or protected TPU evidence.
