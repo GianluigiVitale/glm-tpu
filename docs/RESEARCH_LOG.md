@@ -11691,3 +11691,21 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   multi-host workload and generated no evidence. The process was terminated, the rerun was pinned
   to 32 CPU devices, and a fresh read-only fleet census reported 8/8 zero work. This interrupted
   invocation is not validation or protected TPU evidence.
+
+## 2026-08-29 15:35 UTC — accepted FP32 capture preparation is reviewed and durable
+
+- Fable 5 Max reported its session limit. Under the goal's fallback rule, one independent Sol
+  review was scoped to the new accepted-layer-1 capture diff and local validation evidence. It
+  first blocked two source-distribution fail-late cases. The corrected batch globally binds the
+  only admitted clean vLLM source at `a30addc...`, uses the same archive identity in the sealer and
+  terminal, and cannot hit an unset archive-repository variable in other capture modes.
+- The final verdict was `APPROVE CORRECTION COMMIT/PUSH/MIRROR`, staged SHA
+  `5dba8602...c76c2ce`, with no execution authorization. Commit
+  `22ad78a651d8fd1c652ec150098e3a3dc31e9c20` is identical locally and on the origin branch; the
+  worktree was clean after commit.
+- The locked cron reported the topology-rewrite mirror at `2026-08-29T15:35:13Z`. An independent
+  read-only audit then proved bucket location `US-CENTRAL2` and SHA-256 equality for all 11 changed
+  local/object pairs in `gs://driftbench-dsv4-uc`. This closes only the preparation and persistence
+  batch. Gate D remains open.
+- A separate execution review must authorize exactly one oracle acquisition before any TPU/model
+  action. Unchanged BF16 and full-8K retries remain forbidden.

@@ -7514,3 +7514,27 @@ Exact next is Fable 5 Max review of only this new greenfield diff/evidence, corr
 blocker, then commit/push/locked same-region mirror. A protected oracle acquisition still requires
 a separate execution review; do not launch it from the implementation approval alone. Gate D is
 open, and unchanged BF16/full-8K retries remain forbidden.
+
+## Current exact next: separately review one accepted FP32 oracle acquisition
+
+Fable 5 Max returned its session-limit response, so the goal-authorized independent Sol reviewer
+audited only the new capture batch. Its first correction verdict found two fail-late source-
+distribution defects; both were corrected. The final verdict was
+`APPROVE CORRECTION COMMIT/PUSH/MIRROR` for staged-diff SHA `5dba8602...c76c2ce` and explicitly
+authorized no execution. The corrected batch is commit
+`22ad78a651d8fd1c652ec150098e3a3dc31e9c20`; local `HEAD` and
+`origin/rewrite/topology-first-decode` are identical, and the worktree was clean after that commit.
+
+The locked cron reported `OK repos/glm-tpu-topology-rewrite (1599 files)` at
+`2026-08-29T15:35:13Z`. A subsequent read-only object audit confirmed the bucket location is exactly
+`US-CENTRAL2` and every one of the commit's 11 changed paths is byte-identical to its object under
+`gs://driftbench-dsv4-uc/repos/glm-tpu-topology-rewrite/`. This proves the reviewed preparation is
+committed, pushed and mirrored; it does not prove an oracle or Gate-D result.
+
+No protected action is authorized by that implementation verdict. Exact next is an execution-only
+adversarial review of one invocation of
+`scripts/greenfield/run_capture_legacy_layer1_rms_input.sh`. The review must bind the clean source
+pins, isolated 8K position-8155 workload, exact legacy token/all-DSA/state/load gates, one observer
+artifact, append-only archive and authenticated 8/8 cleanup. If approved, execute exactly once and
+classify the accepted FP32 operands against DB550. Do not launch an unchanged BF16 comparator or
+the full 8K greenfield decoder. Gate D remains open.
