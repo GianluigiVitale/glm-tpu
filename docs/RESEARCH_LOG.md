@@ -11797,3 +11797,20 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   no fresh protected tag is authorized. Affected forced-CPU coverage passes 191 tests with three
   protected-source skips; Bash/JSON/Ruff/diff checks pass. The prior complete forced-CPU result is
   reused because this batch changes only shell protection, its tests and evidence metadata.
+
+## 2026-08-29 18:56--19:10 UTC — execution review caught recreated-pod mirror lifecycle
+
+- Sol approved the Ray protection diff for commit/push/mirror. Greenfield `ffe9d4c` and durable
+  harness branch commit `d2a5f42` match origin; all 14 changed paths are byte-identical in the
+  exact `US-CENTRAL2` repository mirror. That verdict authorized no execution.
+- Execution-only review then refused the vacant fresh tag without launching it: DB550 was absent
+  locally, then all eight recreated hosts lacked the approved read-only gcsfuse mount. The exact
+  862,828-byte DB550 object was authenticated at `f194d757...c4298`; the bucket was mounted
+  read-only on workers 0--7 with exact source/type/model-index/rank-golden/DB550 checks and eight
+  unique `MOUNT_OK` receipts. No Ray, model, JAX or TPU work ran.
+- A third preflight found the shared launcher's old fleet-stop command would unmount that required
+  mirror before model load. The correction removes only that obsolete unmount in both byte-equal
+  launchers and re-runs the exact eight-host legacy/golden/OOB prerequisite after Ray launch but
+  before the driver. Focused mocked coverage passes 10/10; Bash/Ruff/diff/copy checks pass. The
+  fresh tag remains vacant and unauthorized pending correction review, commit/push/mirror and a
+  new execution-only verdict. Gate D remains open.

@@ -198,6 +198,7 @@ def test_launcher_success_does_not_run_failure_cleanup(tmp_path: Path) -> None:
     assert accepted.returncode == 0
     calls = (tmp_path / "gcloud-calls.txt").read_text()
     assert "LAUNCH_FAILURE_CLEAN_OK" not in calls
+    assert "fusermount" not in calls
 
 
 def test_launcher_preserves_error_when_cleanup_itself_fails(tmp_path: Path) -> None:
@@ -269,6 +270,7 @@ def test_protected_launcher_and_wrapper_are_fail_closed() -> None:
     assert "RAY_JOIN_DIAGNOSTIC" in launcher
     assert "cleanup_failed_launch" in launcher
     assert "LAUNCH_FAILURE_CLEAN_OK" in launcher
+    assert "fusermount -u ~/gcs-models" not in launcher
     assert "timeout --signal=TERM --kill-after=5 -- 20" in launcher
     assert "timeout --signal=TERM --kill-after=5 -- 20" in wrapper
     assert (
@@ -283,7 +285,7 @@ def test_protected_launcher_and_wrapper_are_fail_closed() -> None:
     )
     assert "firewall-rules update" not in wrapper
     assert "RAY_JOIN_TIMEOUT_SECONDS=120" in wrapper
-    assert "RAY_LAUNCHER_SHA=ca580f36d7bf0908" in wrapper
+    assert "RAY_LAUNCHER_SHA=b587a8a39262a185" in wrapper
     assert "RAY_VALIDATOR_SHA=01f675a1e701a687" in wrapper
     assert "terminal_ray_rule_contract" in wrapper
     assert "terminal pre-tag TCP/6379 receipts drifted" in wrapper
@@ -295,6 +297,12 @@ def test_protected_launcher_and_wrapper_are_fail_closed() -> None:
         in wrapper
     )
     assert '$(<"$RUN_DIR/ray_firewall_preflight.txt")' in wrapper
+    assert wrapper.index('bash "$HARNESS_REPO/scripts/launch_glm_32chip.sh"') < (
+        wrapper.index('"$RUN_DIR/prereq_post_launch.txt"')
+    )
+    assert wrapper.index('"$RUN_DIR/prereq_post_launch.txt"') < wrapper.index(
+        "env $DRIVER_ENVS setsid --wait"
+    )
 
 
 def test_preflight_ip_order_is_numeric_and_terminal_receipt_is_exact() -> None:

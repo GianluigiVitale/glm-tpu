@@ -7625,3 +7625,12 @@ marks ownership before launcher entry and bounds join failure. Focused validatio
 adversarial review. Affected forced-CPU coverage passes 191 tests with three protected-source skips;
 Bash/JSON/Ruff/diff checks pass. The burned tag must not be reused; Gate D is open and no new acquisition is
 authorized until review, commit/push/mirror and a separate execution-only review.
+
+Execution review of fresh tag `greenfield_legacy_layer1_rms_input_p8155_20260829T185812614181490Z`
+found two recreated-pod prerequisites without launching it: missing local DB550 and missing
+read-only bucket mounts. DB550 is exact at `f194d757...c4298`; all eight mounts were restored with
+exact source/type/ro/model/golden/DB550 checks and `MOUNT_OK 0..7`. Review then found the legacy
+launcher stop would immediately unmount the required mirror. The current correction removes that
+obsolete unmount from both byte-identical launchers and adds exact post-Ray/pre-driver 8-host
+prerequisite replay. Focused mocked tests pass 10/10. No protected invocation is authorized until
+this correction is reviewed, committed, pushed, mirrored and separately execution-reviewed.

@@ -52,7 +52,7 @@
     "vllm_cleanup_sha256": "000121f7cc62ccd1175c9d11e9610222776f8a98fba6438813a519b8dc977631"
   },
   "protection_source": {
-    "launcher_sha256": "ca580f36d7bf0908eaf84264cf33b3a5ed18445ae90f10ed6138c7771edb8d5b",
+    "launcher_sha256": "b587a8a39262a185c3386989bc9471953b407dc9adbfcc0ae30bb50db68bea23",
     "validator_sha256": "01f675a1e701a687c04e7f096409fa30ce2b74e89148ec7dd574d043da8f70b6"
   },
   "status": "FAIL_CLOSED_AND_INFRA_REPAIRED"

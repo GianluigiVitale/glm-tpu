@@ -8,7 +8,7 @@ readonly RAY_FIREWALL_RULE=allow-ray-pod-internal
 readonly BRANCH=rewrite/topology-first-decode
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly HARNESS_REPO=/home/gianl/glm-tpu
-readonly RAY_LAUNCHER_SHA=ca580f36d7bf0908eaf84264cf33b3a5ed18445ae90f10ed6138c7771edb8d5b
+readonly RAY_LAUNCHER_SHA=b587a8a39262a185c3386989bc9471953b407dc9adbfcc0ae30bb50db68bea23
 readonly RAY_VALIDATOR_SHA=01f675a1e701a687c04e7f096409fa30ce2b74e89148ec7dd574d043da8f70b6
 readonly ORACLE_REPO=/home/gianl/tpu-inference
 readonly ORACLE_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
@@ -1338,6 +1338,20 @@ runtime_started=1
 RAY_JOIN_TIMEOUT_SECONDS=120 EXTRA_ENVS="$RAYLET_ENVS" TPU_MIN_TOKEN_BUCKET=32 \
   bash "$HARNESS_REPO/scripts/launch_glm_32chip.sh" \
   >"$RUN_DIR/launch.log" 2>&1
+
+# Ray hygiene must preserve the approved read-only model/oracle mirror. Re-run
+# the exact prerequisite after launch and before any driver/model invocation;
+# a future launcher regression therefore fails before loading 753B.
+bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 120 \
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  --command="$prereq" >"$RUN_DIR/prereq_post_launch.txt" 2>&1 || {
+  say "ABORT: bounded post-launch legacy/golden/OOB prerequisite failed"
+  exit 1
+}
+has_eight_unique_markers "$RUN_DIR/prereq_post_launch.txt" PREREQ_OK || {
+  say "ABORT: Ray launch drifted the legacy/golden/OOB prerequisite"
+  exit 1
+}
 
 # Verify every raylet inherited every source-defining flag.
 # shellcheck disable=SC2016
