@@ -68,6 +68,10 @@ ACQUIRED_RUN = Path(
     "/home/gianl/glm-run/"
     "greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z"
 )
+POSITION113_ACQUIRED_RUN = Path(
+    "/home/gianl/glm-run/"
+    "greenfield_pp16_feature2_position113_acquire_20260829T072101902362381Z"
+)
 FULL_WIDTH_RECOVERY_SOURCE = Path(
     "/home/gianl/glm-run/"
     "greenfield_pp16_feature2_prefill_numerical_20260829T051119686986506Z"
@@ -104,6 +108,7 @@ def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
     assert "--expected-jax-version" in numerical
     assert "--expected-jaxlib-version" in numerical
     assert "--expected-libtpu-version" in numerical
+    assert "--observe-position-113" in numerical
     assert "warmup" not in numerical.lower()
 
     wrapper = (
@@ -116,6 +121,8 @@ def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
     assert "== 0 ||" not in wrapper
     assert "runner_variant_args=(--full-width-rounded-then-slice)" in wrapper
     assert '"${runner_variant_args[@]}"' in wrapper
+    assert "GLM_GREENFIELD_PP16_OBSERVE_POSITION_113:-0" in wrapper
+    assert "runner_variant_args+=(--observe-position-113)" in wrapper
     assert "warmups=0 invocations=1" in wrapper
     assert '--result-npz "$RUN_DIR/result.npz"' in wrapper
     assert "ACQUIRED_CODE_HASH=a2ea1e9439493b0093824d0084bc46c813fc1c33" in wrapper
@@ -130,6 +137,9 @@ def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
     assert "verify_acquired_hlo_authorization" in wrapper
     assert "validate_feature2_sealed_hlo_archive_identity" in wrapper
     assert "compare_feature2_full_width_numerical_capture" in wrapper
+    assert "compare_feature2_position113_capture" in wrapper
+    assert "POSITION113_CAPTURE_CLASSIFIED" in wrapper
+    assert "p113 numerical source bytes changed before classification" in wrapper
     assert "validate_feature2_in_process_cleanup" in wrapper
     assert "compare_feature2_numerical_capture(" not in wrapper
     assert "full_width_sealed_boundaries_v2" in wrapper
@@ -181,11 +191,39 @@ def test_feature2_numerical_wrapper_refuses_the_rejected_variant() -> None:
     assert "admitted successor" in completed.stderr
 
 
+def test_feature2_numerical_wrapper_refuses_invalid_position113_flag() -> None:
+    wrapper = Path(__file__).parents[3] / (
+        "scripts/greenfield/run_pp16_feature2_prefill_numerical.sh"
+    )
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "GLM_GREENFIELD_PP16_FEATURE2_NUMERICAL": "1",
+            "GLM_GREENFIELD_PP16_FEATURE2_MODE": "execute_once",
+            "GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE": "1",
+            "GLM_GREENFIELD_PP16_OBSERVE_POSITION_113": "2",
+        }
+    )
+    completed = subprocess.run(
+        ["bash", str(wrapper)],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 2
+    assert "must be exactly 0 or 1" in completed.stderr
+
+
 def test_feature2_numerical_embedded_verifiers_compile_in_exact_scope() -> None:
     wrapper = Path(__file__).parents[3] / (
         "scripts/greenfield/run_pp16_feature2_prefill_numerical.sh"
     )
     source = wrapper.read_text()
+    embedded_programs = re.findall(r"<<'PY'\n(.*?)\nPY(?:\n|$)", source, re.DOTALL)
+    assert len(embedded_programs) == 6
+    for index, program in enumerate(embedded_programs):
+        compile(program, f"<pp16-feature2-embedded-{index}>", "exec")
     authorization = _python_heredoc_after(
         source,
         '"$RUN_DIR/acquisition_authorization.json"',
@@ -214,6 +252,10 @@ def test_feature2_numerical_embedded_verifiers_compile_in_exact_scope() -> None:
     assert (
         "glm_tpu.greenfield.benchmarking.pp16_feature2_numerical",
         "validate_feature2_in_process_cleanup",
+    ) in imports
+    assert (
+        "glm_tpu.greenfield.benchmarking.pp16_feature2_position113",
+        "compare_feature2_position113_capture",
     ) in imports
     assert "validate_feature2_sealed_hlo_archive_identity(" in verifier
     assert "compare_feature2_full_width_numerical_capture(" in verifier
@@ -280,6 +322,7 @@ def test_feature2_numerical_acquisition_authorization_is_executable(
         "9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5",
         "6558627",
         "14561",
+        "0",
         str(output),
     ]
     completed = subprocess.run(
@@ -300,6 +343,98 @@ def test_feature2_numerical_acquisition_authorization_is_executable(
     )
     assert rejected.returncode != 0
     assert "remote object set drifted" in rejected.stderr
+
+
+@pytest.mark.skipif(
+    not all(
+        (POSITION113_ACQUIRED_RUN / name).is_file()
+        for name in ("evidence.sha256", "runner.json", "summary.json", "HLO_ACQUIRED")
+    ),
+    reason="position-113 feature2 acquisition unavailable",
+)
+def test_feature2_position113_numerical_authorization_is_executable(
+    tmp_path: Path,
+) -> None:
+    repo = Path(__file__).parents[3]
+    wrapper = repo / "scripts/greenfield/run_pp16_feature2_prefill_numerical.sh"
+    authorization = _python_heredoc_after(
+        wrapper.read_text(),
+        '"$RUN_DIR/acquisition_authorization.json"',
+    )
+    directory = tmp_path / "acquired"
+    directory.mkdir()
+    for name in ("evidence.sha256", "runner.json", "summary.json", "HLO_ACQUIRED"):
+        shutil.copyfile(POSITION113_ACQUIRED_RUN / name, directory / name)
+    remote = (
+        "gs://driftbench-dsv4-uc/results/"
+        "greenfield_pp16_feature2_position113_acquire_20260829T072101902362381Z"
+    )
+    entries = []
+    for line in (directory / "evidence.sha256").read_text().splitlines():
+        _, relative = line.split(maxsplit=1)
+        entries.append(relative.removeprefix("*").removeprefix("./"))
+    objects = sorted(
+        [
+            f"{remote}/evidence.sha256",
+            f"{remote}/HLO_ACQUIRED",
+            *(f"{remote}/{name}" for name in entries),
+        ]
+    )
+    (directory / "remote_objects.txt").write_text("\n".join(objects) + "\n")
+    compact = repo / ("docs/artifacts/pp16-feature2-position113-hlo-acquisition.json")
+    output = tmp_path / "authorization.json"
+
+    def arguments(compact_path: Path, compact_sha: str) -> list[str]:
+        return [
+            sys.executable,
+            "-c",
+            authorization,
+            str(directory),
+            str(compact_path),
+            compact_sha,
+            "09285f7601ea1ca9cdc3f5447833d1440afb42dd",
+            "greenfield_pp16_feature2_position113_acquire_20260829T072101902362381Z",
+            remote,
+            "bbf01f34b20fb4d0c1af66573a5ee01c096abc870563db5f2ffa5bef39142728",
+            "331e7dba5b638ba5560962bc606b7bf3cc9c9069a7ebe418ecda0c9824334bb6",
+            "043073fc134be9fc2c1ab85d536d70012a6dc8a117d9e3bd2dde01b9f6571d72",
+            "ddda21877df8568c2504f38eaaa0df5a0538e7f295033c9b3d45c070fe6cd5d4",
+            "f5662dbf0ff3ca74efa4e2a701701281ba72eb680b1f5fc8352faf96993f05d4",
+            "bc2fcc77e84217ee0264e3856309f298e61e70ac0f4e3ecebecf72d290c26035",
+            "f1cd8286460c17e40e7a96d3aefc830ecba97338d55aaf3d301f54c4bcb91bfe",
+            "5b5dfacf015c579f41661868486e627bb383322fe8fb5c64597c259e85c4a10e",
+            "6662190",
+            "14781",
+            "1",
+            str(output),
+        ]
+
+    completed = subprocess.run(
+        arguments(
+            compact,
+            "644e59a8b108c8fa0f48b2135713e0084908c59f06215139f81bdc6e1713968d",
+        ),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    record = json.loads(output.read_text())
+    assert record["passed"] is True
+    assert record["observe_position_113"] is True
+
+    attacked = tmp_path / "attacked.json"
+    attacked_record = json.loads(compact.read_text())
+    attacked_record["structural_certificate"]["causal"] = False
+    attacked.write_text(json.dumps(attacked_record, indent=2, sort_keys=True) + "\n")
+    rejected = subprocess.run(
+        arguments(attacked, sha256(attacked.read_bytes()).hexdigest()),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert rejected.returncode != 0
+    assert "p113 compact acquisition evidence linkage drifted" in rejected.stderr
 
 
 @pytest.mark.skipif(

@@ -175,6 +175,58 @@ def test_position113_classifier_rejects_same_schema_source_redefinition(
     not BASELINE.is_file() or not ORACLE.is_file(),
     reason="sealed PP16 rejection or accepted p113 oracle is unavailable",
 )
+@pytest.mark.parametrize("source", ("baseline", "oracle"))
+def test_position113_classifier_uses_the_exact_bytes_it_hashes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source: str,
+) -> None:
+    capture = tmp_path / "capture.npz"
+    _write_candidate(capture)
+    raced_baseline = tmp_path / "baseline.npz"
+    raced_oracle = tmp_path / "oracle.npz"
+    raced_baseline.write_bytes(BASELINE.read_bytes())
+    raced_oracle.write_bytes(ORACLE.read_bytes())
+    raced_source = raced_baseline if source == "baseline" else raced_oracle
+    attacked = tmp_path / f"attacked_{source}.npz"
+    with np.load(raced_source, allow_pickle=False) as handle:
+        arrays = {name: np.ascontiguousarray(handle[name]) for name in handle.files}
+    if source == "baseline":
+        arrays["event1_scores"][0, 0] = np.nextafter(
+            arrays["event1_scores"][0, 0], np.float32(np.inf)
+        )
+    else:
+        arrays["accepted_projection_input"][0] = np.float32(1.0)
+    np.savez(attacked, **arrays)
+    attacked_bytes = attacked.read_bytes()
+    original_read_bytes = Path.read_bytes
+    replaced = False
+
+    def replace_after_read(path: Path) -> bytes:
+        nonlocal replaced
+        raw = original_read_bytes(path)
+        if path == raced_source and not replaced:
+            raced_source.write_bytes(attacked_bytes)
+            replaced = True
+        return raw
+
+    monkeypatch.setattr(Path, "read_bytes", replace_after_read)
+    report = compare_feature2_position113_capture(
+        capture,
+        sealed_rejection_path=raced_baseline,
+        accepted_prompt_key_path=raced_oracle,
+    )
+    assert replaced is True
+    assert original_read_bytes(raced_source) == attacked_bytes
+    assert report["classification"] == (
+        "FIRST_DIVERGENCE_AFTER_NORMALIZED_AT_OR_BEFORE_CURRENT_KEY"
+    )
+
+
+@pytest.mark.skipif(
+    not BASELINE.is_file() or not ORACLE.is_file(),
+    reason="sealed PP16 rejection or accepted p113 oracle is unavailable",
+)
 @pytest.mark.parametrize("attack", ("wrong_set", "duplicate", "tail", "score_tail"))
 def test_position113_classifier_rejects_invalid_selected_prefix(
     tmp_path: Path,

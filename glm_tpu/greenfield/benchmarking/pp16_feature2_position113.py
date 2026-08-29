@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -124,7 +125,7 @@ def _load_exact_npz(
 ) -> tuple[dict[str, np.ndarray], str]:
     source = Path(path)
     raw = source.read_bytes()
-    with np.load(source, allow_pickle=False) as handle:
+    with np.load(BytesIO(raw), allow_pickle=False) as handle:
         if set(handle.files) != set(expected):
             raise BenchmarkValidationError(
                 f"position-113 NPZ schema drifted: expected={sorted(expected)} "

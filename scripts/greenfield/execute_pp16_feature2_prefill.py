@@ -18,6 +18,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--layer1-internal-reference", type=Path, required=True)
     parser.add_argument("--db529-internal-dir", type=Path, required=True)
     parser.add_argument("--full-width-rounded-then-slice", action="store_true")
+    parser.add_argument("--observe-position-113", action="store_true")
     parser.add_argument("--expected-main-stablehlo-sha256", required=True)
     parser.add_argument("--expected-main-canonical-hlo-sha256", required=True)
     parser.add_argument(

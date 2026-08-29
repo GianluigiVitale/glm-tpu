@@ -7358,3 +7358,29 @@ definition and complete transitive producer ancestry, including referenced compu
 mechanical validation passes 168/168 plus Ruff, formatting, Python compilation, Bash syntax and
 diff hygiene. Exact next is the same Sol reviewer's correction-only verdict; numerical execution
 remains forbidden.
+
+## Current exact next: one reviewed PP16 position-113 numerical discriminator
+
+The same Sol reviewer returned `APPROVE COMMIT` for the final source-definition certificate.
+Commit `17785f9` is pushed, matches origin and was byte-verified through the locked cron mirror in
+bucket location `US-CENTRAL2`. The protected compile-only acquisition remains the sole admitted
+graph identity; it was not rerun.
+
+The local successor changes only the exactly-once numerical entrypoint, its wrapper and tests. A
+default-off `GLM_GREENFIELD_PP16_OBSERVE_POSITION_113=1` mode authenticates the exact 20-object
+acquisition, all HLO/runtime pins and the 32-branch causal topology before the main call. It uses
+zero warmups and one LP2 main invocation, then requires all 15 ordinary outputs and both observer
+owners bitwise equal before classifying the already-sealed normalized/key boundaries. It writes no
+DB row, exactness or performance claim. Both p113 source NPZs are byte-pinned before execution and
+re-hashed immediately before classification. Sol blocked the first numerical review because the
+classifier hashed a path and then reopened it; a replacement in between could authenticate old
+bytes but load new arrays. The correction parses each NPZ directly from its already-hashed byte
+buffer, with hostile baseline and oracle replacements after `read_bytes()` proving the loaded
+arrays remain bound to that hash. All six production Python heredocs compile in the permanent test.
+Focused validation passes 40/40; complete PP16 feature2 validation passes 172/172 plus Ruff,
+format, Python, Bash and diff checks.
+
+No TPU work is authorized yet. Exact next is a bounded staged-diff hash and correction-only Sol
+verdict that must explicitly approve both commit/push preparation and one protected numerical
+execution. On approval, commit/push, byte-verify the same-region cron mirror, confirm both global
+locks and 8/8 clean fleet, then run this discriminator exactly once.

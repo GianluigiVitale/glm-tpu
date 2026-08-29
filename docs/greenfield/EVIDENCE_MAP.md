@@ -1418,3 +1418,17 @@ fused callee parameters to exact caller predicate/true-current/false-prior sourc
 selected fields in all four scans, and field 15 must be exactly
 `prior_count + convert(position == 113)`. Both attacks now refuse under deliberately rebased
 canonical identities. Full validation passes; this correction still needs Sol re-review.
+
+The completed structural batch is commit `17785f9`; the same Sol reviewer returned `APPROVE
+COMMIT`, origin matches and all nine changed files were byte-verified in the locked same-region
+mirror. This closes only graph causality, not numerical Gate D.
+
+The current uncommitted successor is a default-off, zero-warmup, exactly-once p113 numerical
+discriminator. It authenticates the compile-only 20-object acquisition and current causal
+certificate before the call, then requires the sealed 15 ordinary outputs and both observer owners
+bitwise unchanged. Its only terminal is diagnostic `POSITION113_CAPTURE_CLASSIFIED`; there is no
+DB, Gate-D, token, exactness or performance claim. Oracle/rejection bytes are hashed on both sides
+of the TPU interval and each NPZ is parsed from the exact byte buffer that produced its hash. The
+first Sol numerical review blocked the prior hash-then-reopen implementation; hostile replacement
+tests now cover both sources. It needs a correction-only execution verdict before commit/push or
+TPU use.

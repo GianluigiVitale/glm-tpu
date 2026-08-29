@@ -26,24 +26,13 @@ readonly DB529_INTERNAL_CONTRACT_SHA=9bdab5023b5775b787e15c3c76d542eab921bd7a704
 readonly DB529_INTERNAL_TENSOR_SHA=c2fdeccfdcc81363fe01a566c34bf6c04f2f44b0a18e7b545e76fdf0f0d4560b
 readonly FEATURE2_GRAPH_SHA=ab5be45aecf3b0b5d87ad76af8076bc9351823529a08c0eadb414b072b31cb2d
 readonly DB550_BOUNDARY=/home/gianl/gcs-models/results/greenfield_layer0_dense_partial_capture_20260813T200736889447458Z/dense_partial_capture.npz
-readonly ACQUIRED_CODE_HASH=a2ea1e9439493b0093824d0084bc46c813fc1c33
-readonly ACQUIRED_RUN_TAG=greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z
-readonly ACQUIRED_REMOTE_PREFIX=$APPROVED_BUCKET/results/$ACQUIRED_RUN_TAG
-readonly ACQUIRED_COMPACT_EVIDENCE=$WORKTREE/docs/artifacts/pp16-feature2-sealed-hlo-acquisition.json
-readonly ACQUIRED_COMPACT_EVIDENCE_SHA=9498097422e8bd06e637a6e78360bae8156992777cd5c92294ab9321139025e0
-readonly ACQUIRED_EVIDENCE_LEDGER_SHA=7741bef152843992afc23902e5cab20be52dac55722f1da1ff7f017990449036
-readonly ACQUIRED_RUNNER_SHA=75bdd75f03fa4bba530f7863ae3b5728094745ea2e3884fb4d0ae72e8767c566
-readonly ACQUIRED_SUMMARY_SHA=1dda18f3d007c6859911d29d9b1e526c75e37d748ed3d27f61683026e2218c45
-readonly ACQUIRED_TERMINAL_SHA=b483460ebee19140d5fc30df77fa9851ad5bb080b307c740a0f6baa781b1d271
-readonly ACQUIRED_TERMINAL_SELF_SHA=abec1454910e319be88e72eb8d7e5dbb55b841911990b1f2f76a1795a536fbde
-readonly ACQUIRED_MAIN_STABLE_SHA=6c1c69d76c3d121ed4f84cb85fe0091d1605ae43d0d5707e3d52ba2cdd310ad4
-readonly ACQUIRED_MAIN_OPTIMIZED_SHA=a6307a5f487b0cfcd79712c45ace89753cf0dc54e332b5c24fe9010a36ae3175
-readonly ACQUIRED_MAIN_CANONICAL_SHA=9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5
-readonly ACQUIRED_MAIN_CANONICAL_BYTES=6558627
-readonly ACQUIRED_MAIN_STACK_FRAME_REFERENCES=14561
 readonly ACQUIRED_JAX_VERSION=0.10.1
 readonly ACQUIRED_JAXLIB_VERSION=0.10.1
 readonly ACQUIRED_LIBTPU_VERSION=0.0.41
+readonly POSITION113_SEALED_REJECTION=/home/gianl/glm-run/greenfield_pp16_feature2_prefill_numerical_20260829T051119686986506Z/result.npz
+readonly POSITION113_SEALED_REJECTION_SHA=e514fc28e9d8c30bc7de9d70f01ae04002666494446e2f4a06a7fe6c66901e65
+readonly POSITION113_ORACLE=/home/gianl/gcs-models/oracles/greenfield/glm52/prompt_projection_input/8k/greenfield_legacy_layer0_prompt_projection_input_p113_20260809T050055956585082Z/prompt_projection_input_comparison/prompt_key_internal_comparison.npz
+readonly POSITION113_ORACLE_SHA=a2ef16a7a55876099124d0ac4bd139f86c6318b27c0e48fef5d64193ed0a3023
 
 [[ ${GLM_GREENFIELD_PP16_FEATURE2_NUMERICAL:-0} == 1 ]] || {
   echo "PP16 feature2 numerical discriminator is default-off" >&2
@@ -54,20 +43,76 @@ readonly ACQUIRED_LIBTPU_VERSION=0.0.41
   exit 2
 }
 FULL_WIDTH_ROUNDED_THEN_SLICE=${GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE:-0}
-readonly FULL_WIDTH_ROUNDED_THEN_SLICE
+OBSERVE_POSITION_113=${GLM_GREENFIELD_PP16_OBSERVE_POSITION_113:-0}
+readonly FULL_WIDTH_ROUNDED_THEN_SLICE OBSERVE_POSITION_113
 [[ $FULL_WIDTH_ROUNDED_THEN_SLICE == 1 ]] || {
   echo "set GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE=1 for the admitted successor" >&2
   exit 2
 }
-readonly runner_variant_args=(--full-width-rounded-then-slice)
+case $OBSERVE_POSITION_113 in
+  0 | 1) ;;
+  *)
+    echo "GLM_GREENFIELD_PP16_OBSERVE_POSITION_113 must be exactly 0 or 1" >&2
+    exit 2
+    ;;
+esac
+runner_variant_args=(--full-width-rounded-then-slice)
+if [[ $OBSERVE_POSITION_113 == 1 ]]; then
+  ACQUIRED_CODE_HASH=09285f7601ea1ca9cdc3f5447833d1440afb42dd
+  ACQUIRED_RUN_TAG=greenfield_pp16_feature2_position113_acquire_20260829T072101902362381Z
+  ACQUIRED_COMPACT_EVIDENCE=$WORKTREE/docs/artifacts/pp16-feature2-position113-hlo-acquisition.json
+  ACQUIRED_COMPACT_EVIDENCE_SHA=644e59a8b108c8fa0f48b2135713e0084908c59f06215139f81bdc6e1713968d
+  ACQUIRED_EVIDENCE_LEDGER_SHA=bbf01f34b20fb4d0c1af66573a5ee01c096abc870563db5f2ffa5bef39142728
+  ACQUIRED_RUNNER_SHA=331e7dba5b638ba5560962bc606b7bf3cc9c9069a7ebe418ecda0c9824334bb6
+  ACQUIRED_SUMMARY_SHA=043073fc134be9fc2c1ab85d536d70012a6dc8a117d9e3bd2dde01b9f6571d72
+  ACQUIRED_TERMINAL_SHA=ddda21877df8568c2504f38eaaa0df5a0538e7f295033c9b3d45c070fe6cd5d4
+  ACQUIRED_TERMINAL_SELF_SHA=f5662dbf0ff3ca74efa4e2a701701281ba72eb680b1f5fc8352faf96993f05d4
+  ACQUIRED_MAIN_STABLE_SHA=bc2fcc77e84217ee0264e3856309f298e61e70ac0f4e3ecebecf72d290c26035
+  ACQUIRED_MAIN_OPTIMIZED_SHA=f1cd8286460c17e40e7a96d3aefc830ecba97338d55aaf3d301f54c4bcb91bfe
+  ACQUIRED_MAIN_CANONICAL_SHA=5b5dfacf015c579f41661868486e627bb383322fe8fb5c64597c259e85c4a10e
+  ACQUIRED_MAIN_CANONICAL_BYTES=6662190
+  ACQUIRED_MAIN_STACK_FRAME_REFERENCES=14781
+  runner_variant_args+=(--observe-position-113)
+else
+  ACQUIRED_CODE_HASH=a2ea1e9439493b0093824d0084bc46c813fc1c33
+  ACQUIRED_RUN_TAG=greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z
+  ACQUIRED_COMPACT_EVIDENCE=$WORKTREE/docs/artifacts/pp16-feature2-sealed-hlo-acquisition.json
+  ACQUIRED_COMPACT_EVIDENCE_SHA=9498097422e8bd06e637a6e78360bae8156992777cd5c92294ab9321139025e0
+  ACQUIRED_EVIDENCE_LEDGER_SHA=7741bef152843992afc23902e5cab20be52dac55722f1da1ff7f017990449036
+  ACQUIRED_RUNNER_SHA=75bdd75f03fa4bba530f7863ae3b5728094745ea2e3884fb4d0ae72e8767c566
+  ACQUIRED_SUMMARY_SHA=1dda18f3d007c6859911d29d9b1e526c75e37d748ed3d27f61683026e2218c45
+  ACQUIRED_TERMINAL_SHA=b483460ebee19140d5fc30df77fa9851ad5bb080b307c740a0f6baa781b1d271
+  ACQUIRED_TERMINAL_SELF_SHA=abec1454910e319be88e72eb8d7e5dbb55b841911990b1f2f76a1795a536fbde
+  ACQUIRED_MAIN_STABLE_SHA=6c1c69d76c3d121ed4f84cb85fe0091d1605ae43d0d5707e3d52ba2cdd310ad4
+  ACQUIRED_MAIN_OPTIMIZED_SHA=a6307a5f487b0cfcd79712c45ace89753cf0dc54e332b5c24fe9010a36ae3175
+  ACQUIRED_MAIN_CANONICAL_SHA=9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5
+  ACQUIRED_MAIN_CANONICAL_BYTES=6558627
+  ACQUIRED_MAIN_STACK_FRAME_REFERENCES=14561
+fi
+ACQUIRED_REMOTE_PREFIX=$APPROVED_BUCKET/results/$ACQUIRED_RUN_TAG
+readonly ACQUIRED_CODE_HASH ACQUIRED_RUN_TAG ACQUIRED_REMOTE_PREFIX
+readonly ACQUIRED_COMPACT_EVIDENCE ACQUIRED_COMPACT_EVIDENCE_SHA
+readonly ACQUIRED_EVIDENCE_LEDGER_SHA ACQUIRED_RUNNER_SHA ACQUIRED_SUMMARY_SHA
+readonly ACQUIRED_TERMINAL_SHA ACQUIRED_TERMINAL_SELF_SHA
+readonly ACQUIRED_MAIN_STABLE_SHA ACQUIRED_MAIN_OPTIMIZED_SHA
+readonly ACQUIRED_MAIN_CANONICAL_SHA ACQUIRED_MAIN_CANONICAL_BYTES
+readonly ACQUIRED_MAIN_STACK_FRAME_REFERENCES runner_variant_args
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-TAG=${GLM_GREENFIELD_PP16_FEATURE2_TAG:-greenfield_pp16_feature2_prefill_numerical_$(date -u +%Y%m%dT%H%M%S%NZ)}
+if [[ $OBSERVE_POSITION_113 == 1 ]]; then
+  TAG=${GLM_GREENFIELD_PP16_FEATURE2_TAG:-greenfield_pp16_feature2_position113_numerical_$(date -u +%Y%m%dT%H%M%S%NZ)}
+else
+  TAG=${GLM_GREENFIELD_PP16_FEATURE2_TAG:-greenfield_pp16_feature2_prefill_numerical_$(date -u +%Y%m%dT%H%M%S%NZ)}
+fi
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 readonly PIN TAG RUN_DIR REMOTE_PREFIX
 
-[[ $TAG =~ ^greenfield_pp16_feature2_prefill_numerical_[0-9]{8}T[0-9]{15}Z$ ]]
+if [[ $OBSERVE_POSITION_113 == 1 ]]; then
+  [[ $TAG =~ ^greenfield_pp16_feature2_position113_numerical_[0-9]{8}T[0-9]{15}Z$ ]]
+else
+  [[ $TAG =~ ^greenfield_pp16_feature2_prefill_numerical_[0-9]{8}T[0-9]{15}Z$ ]]
+fi
 [[ $(git -C "$WORKTREE" rev-parse --show-toplevel) == "$WORKTREE" ]]
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]]
 [[ -z $(git -C "$WORKTREE" status --porcelain) ]]
@@ -121,6 +166,7 @@ verify_acquired_hlo_authorization() {
     "$ACQUIRED_MAIN_OPTIMIZED_SHA" "$ACQUIRED_MAIN_CANONICAL_SHA" \
     "$ACQUIRED_MAIN_CANONICAL_BYTES" \
     "$ACQUIRED_MAIN_STACK_FRAME_REFERENCES" \
+    "$OBSERVE_POSITION_113" \
     "$RUN_DIR/acquisition_authorization.json" <<'PY'
 from hashlib import sha256
 import json
@@ -129,10 +175,11 @@ import sys
 
 (directory,compact_path,compact_sha,code_hash,run_tag,remote,
  ledger_sha,runner_sha,summary_sha,terminal_sha,terminal_self_sha,
- stable_sha,optimized_sha,canonical_sha,canonical_bytes,stack_refs,
+ stable_sha,optimized_sha,canonical_sha,canonical_bytes,stack_refs,observe_p113,
  output)=sys.argv[1:]
 directory=Path(directory); compact_path=Path(compact_path); output=Path(output)
 canonical_bytes=int(canonical_bytes); stack_refs=int(stack_refs)
+observe_p113=bool(int(observe_p113))
 
 def digest(path):
     return sha256(Path(path).read_bytes()).hexdigest()
@@ -151,14 +198,21 @@ terminal_without_self={key:terminal[key] for key in ('artifact_kind','evidence_s
 terminal_raw=json.dumps(terminal_without_self,allow_nan=False,separators=(',',':'),sort_keys=True).encode()
 if terminal.get('marker_self_sha256')!=terminal_self_sha or sha256(terminal_raw).hexdigest()!=terminal_self_sha or terminal.get('evidence_sha256')!=ledger_sha or terminal.get('summary_sha256')!=summary_sha:
     raise SystemExit('feature2 acquired terminal binding drifted')
-if compact.get('status')!='HLO_ACQUIRED' or compact.get('code_hash')!=code_hash or compact.get('run_tag')!=run_tag or compact.get('remote_prefix')!=remote or compact.get('review_verdict')!='APPROVE COMMIT AND ONE COMPILE-ONLY REPEAT' or compact.get('main_executed') is not False or compact.get('numerical_claim') is not False or compact.get('performance_claim') is not False:
+if compact.get('status')!='HLO_ACQUIRED' or compact.get('code_hash')!=code_hash or compact.get('run_tag')!=run_tag or compact.get('remote_prefix')!=remote or compact.get('main_executed') is not False or compact.get('numerical_claim') is not False or compact.get('performance_claim') is not False:
     raise SystemExit('feature2 compact acquisition authorization drifted')
-if compact.get('evidence',{}).get('remote_object_count_including_terminal')!=20 or compact.get('evidence',{}).get('evidence_ledger_sha256')!=ledger_sha or compact.get('evidence',{}).get('runner_sha256')!=runner_sha or compact.get('evidence',{}).get('summary_sha256')!=summary_sha or compact.get('evidence',{}).get('terminal_file_sha256')!=terminal_sha or compact.get('evidence',{}).get('terminal_marker_self_sha256')!=terminal_self_sha:
-    raise SystemExit('feature2 compact acquisition evidence linkage drifted')
+if observe_p113:
+    certificate=compact.get('structural_certificate',{})
+    if compact.get('artifact_kind')!='greenfield_pp16_feature2_position113_hlo_acquisition' or compact.get('remote_object_count')!=20 or compact.get('evidence_ledger_sha256')!=ledger_sha or compact.get('runner_sha256')!=runner_sha or compact.get('summary_sha256')!=summary_sha or compact.get('hlo_acquired_marker_sha256')!=terminal_sha or certificate.get('causal') is not True or certificate.get('branch_topology_record_count')!=32 or certificate.get('branch_topology_sha256')!='05322ce7ad09db5463e17d4a7e31142edaffe128abe5e9d85d5ee81f5e3eb02b' or certificate.get('rebased_identity_hostile_test_count')!=10:
+        raise SystemExit('feature2 p113 compact acquisition evidence linkage drifted')
+else:
+    if compact.get('review_verdict')!='APPROVE COMMIT AND ONE COMPILE-ONLY REPEAT':
+        raise SystemExit('feature2 compact acquisition review drifted')
+    if compact.get('evidence',{}).get('remote_object_count_including_terminal')!=20 or compact.get('evidence',{}).get('evidence_ledger_sha256')!=ledger_sha or compact.get('evidence',{}).get('runner_sha256')!=runner_sha or compact.get('evidence',{}).get('summary_sha256')!=summary_sha or compact.get('evidence',{}).get('terminal_file_sha256')!=terminal_sha or compact.get('evidence',{}).get('terminal_marker_self_sha256')!=terminal_self_sha:
+        raise SystemExit('feature2 compact acquisition evidence linkage drifted')
 for record in (runner,summary):
-    if record.get('status')!='HLO_ACQUIRED' or record.get('code_hash')!=code_hash or record.get('main_executed') is not False or record.get('numerical_claim') is not False or record.get('performance_claim') is not False:
+    if record.get('status')!='HLO_ACQUIRED' or record.get('code_hash')!=code_hash or record.get('main_executed') is not False or record.get('numerical_claim') is not False or record.get('performance_claim') is not False or bool(record.get('observe_position_113',False)) is not observe_p113:
         raise SystemExit('feature2 acquired claim boundary drifted')
-if runner.get('main_execution_count')!=0 or runner.get('compile_only') is not True or runner.get('full_width_rounded_then_slice') is not True or runner.get('sealed_boundary_capture') is not True:
+if runner.get('main_execution_count')!=0 or runner.get('compile_only') is not True or runner.get('full_width_rounded_then_slice') is not True or runner.get('sealed_boundary_capture') is not True or bool(runner.get('observe_position_113',False)) is not observe_p113:
     raise SystemExit('feature2 acquired execution variant drifted')
 main=runner.get('hlo',{}).get('feature2_main',{})
 canonical=main.get('execution_canonical_hlo',{})
@@ -197,6 +251,7 @@ record={
     'main_canonical_hlo_sha256':canonical_sha,
     'main_optimized_hlo_sha256':optimized_sha,
     'main_stablehlo_sha256':stable_sha,
+    'observe_position_113':observe_p113,
     'passed':True,
 }
 output.write_text(json.dumps(record,allow_nan=False,indent=2,sort_keys=True)+'\n')
@@ -460,6 +515,9 @@ PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - \
   "$LAYER1_INTERNAL_REFERENCE" "$LAYER1_INTERNAL_REFERENCE_SHA" \
   "$DB529_INTERNAL_DIR" "$DB529_INTERNAL_CONTRACT_SHA" \
   "$DB529_INTERNAL_TENSOR_SHA" "$FEATURE2_GRAPH_SHA" \
+  "$OBSERVE_POSITION_113" \
+  "$POSITION113_SEALED_REJECTION" "$POSITION113_SEALED_REJECTION_SHA" \
+  "$POSITION113_ORACLE" "$POSITION113_ORACLE_SHA" \
   "$RUN_DIR/source_identity.json" <<'PY'
 from hashlib import sha256
 import json
@@ -472,8 +530,10 @@ from glm_tpu.greenfield.benchmarking.pp16_feature2_prefill import build_feature2
 from glm_tpu.greenfield.benchmarking.pp16_feature_sharded_state import derive_feature2_tensor_allowlist, read_feature2_owner_headers
 
 (runtime,remote,runtime_sha,token,token_sha,dsa,dsa_sha,layer1,layer1_sha,
- db529,db529_contract,db529_tensor,graph_sha,output)=sys.argv[1:]
+ db529,db529_contract,db529_tensor,graph_sha,observe_p113,p113_baseline,
+ p113_baseline_sha,p113_oracle,p113_oracle_sha,output)=sys.argv[1:]
 runtime=Path(runtime); token=Path(token); dsa=Path(dsa); layer1=Path(layer1); db529=Path(db529)
+observe_p113=bool(int(observe_p113)); p113_baseline=Path(p113_baseline); p113_oracle=Path(p113_oracle)
 manifest=json.loads((runtime/'runtime_manifest.json').read_text())
 if manifest.get('manifest_sha256')!=runtime_sha:
     raise SystemExit('feature2 runtime manifest pin drifted')
@@ -485,7 +545,9 @@ if lineage['token_oracle_manifest_sha256']!=token_sha or lineage['dsa_oracle_man
 graph=build_feature2_prefill_graph(derive_feature2_tensor_allowlist(manifest,read_feature2_owner_headers(runtime,manifest)),load_feature2_prefill_inputs(token))
 if graph.graph_sha256!=graph_sha:
     raise SystemExit('feature2 graph pin drifted')
-record={'artifact_kind':'greenfield_pp16_feature2_source_identity','runtime_root':str(runtime),'runtime_remote':remote,'runtime_manifest_sha256':runtime_sha,'selective_plan':inspect_feature2_selective_plan(runtime),'event1_target_lineage':lineage,'graph_sha256':graph_sha}
+if observe_p113 and (sha256(p113_baseline.read_bytes()).hexdigest()!=p113_baseline_sha or sha256(p113_oracle.read_bytes()).hexdigest()!=p113_oracle_sha):
+    raise SystemExit('feature2 p113 numerical source identity drifted')
+record={'artifact_kind':'greenfield_pp16_feature2_source_identity','runtime_root':str(runtime),'runtime_remote':remote,'runtime_manifest_sha256':runtime_sha,'selective_plan':inspect_feature2_selective_plan(runtime),'event1_target_lineage':lineage,'graph_sha256':graph_sha,'observe_position_113':observe_p113,'position113_sealed_rejection_sha256':p113_baseline_sha if observe_p113 else None,'position113_oracle_sha256':p113_oracle_sha if observe_p113 else None}
 Path(output).write_text(json.dumps(record,allow_nan=False,indent=2,sort_keys=True)+'\n')
 PY
 
@@ -554,7 +616,10 @@ PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - \
   "$FULL_WIDTH_ROUNDED_THEN_SLICE" \
   "$ACQUIRED_MAIN_STABLE_SHA" "$ACQUIRED_MAIN_CANONICAL_SHA" \
   "$ACQUIRED_MAIN_CANONICAL_BYTES" "$ACQUIRED_MAIN_STACK_FRAME_REFERENCES" \
-  "$ACQUIRED_JAX_VERSION" "$ACQUIRED_JAXLIB_VERSION" "$ACQUIRED_LIBTPU_VERSION" <<'PY'
+  "$ACQUIRED_JAX_VERSION" "$ACQUIRED_JAXLIB_VERSION" "$ACQUIRED_LIBTPU_VERSION" \
+  "$OBSERVE_POSITION_113" \
+  "$POSITION113_SEALED_REJECTION" "$POSITION113_SEALED_REJECTION_SHA" \
+  "$POSITION113_ORACLE" "$POSITION113_ORACLE_SHA" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -562,6 +627,7 @@ import sys
 
 from glm_tpu.greenfield.benchmarking.pp16_feature2_hlo import validate_feature2_sealed_hlo_archive_identity
 from glm_tpu.greenfield.benchmarking.pp16_feature2_numerical import compare_feature2_full_width_numerical_capture, validate_feature2_in_process_cleanup
+from glm_tpu.greenfield.benchmarking.pp16_feature2_position113 import compare_feature2_position113_capture
 
 run=Path(sys.argv[1]); pin,tag,remote,elapsed=sys.argv[2:6]
 token,dsa,layer1,db529,db550=map(Path,sys.argv[6:11])
@@ -569,15 +635,22 @@ full_width_rounded_then_slice=bool(int(sys.argv[11]))
 stable_pin,canonical_pin=sys.argv[12:14]
 canonical_bytes,stack_frame_references=map(int,sys.argv[14:16])
 expected_runtime_pins=dict(zip(('jax','jaxlib','libtpu'),sys.argv[16:19],strict=True))
+observe_p113=bool(int(sys.argv[19]))
+p113_baseline=Path(sys.argv[20]); p113_baseline_sha=sys.argv[21]
+p113_oracle=Path(sys.argv[22]); p113_oracle_sha=sys.argv[23]
 runner=json.loads((run/'runner.json').read_text())
 source=json.loads((run/'source_identity.json').read_text())
 authorization=json.loads((run/'acquisition_authorization.json').read_text())
 if full_width_rounded_then_slice is not True or authorization.get('passed') is not True:
     raise SystemExit('feature2 numerical authorization drifted')
-if runner.get('status')!='NUMERICAL_CAPTURED' or runner.get('code_hash')!=pin or runner.get('compile_only') is not False or runner.get('full_width_rounded_then_slice') is not True or runner.get('sealed_boundary_capture') is not True or runner.get('main_executed') is not True or runner.get('main_execution_count')!=1 or runner.get('numerical_claim') is not False or runner.get('performance_claim') is not False:
+if runner.get('status')!='NUMERICAL_CAPTURED' or runner.get('code_hash')!=pin or runner.get('compile_only') is not False or runner.get('full_width_rounded_then_slice') is not True or runner.get('sealed_boundary_capture') is not True or runner.get('observe_position_113') is not observe_p113 or runner.get('main_executed') is not True or runner.get('main_execution_count')!=1 or runner.get('numerical_claim') is not False or runner.get('performance_claim') is not False:
     raise SystemExit('feature2 numerical-capture claim boundary drifted')
-if runner.get('graph_sha256')!=source.get('graph_sha256') or runner.get('event1_target_lineage')!=source.get('event1_target_lineage') or runner.get('selective_plan')!=source.get('selective_plan'):
+if runner.get('graph_sha256')!=source.get('graph_sha256') or runner.get('event1_target_lineage')!=source.get('event1_target_lineage') or runner.get('selective_plan')!=source.get('selective_plan') or source.get('observe_position_113') is not observe_p113:
     raise SystemExit('feature2 numerical source lineage drifted')
+if observe_p113 and (source.get('position113_sealed_rejection_sha256')!=p113_baseline_sha or source.get('position113_oracle_sha256')!=p113_oracle_sha):
+    raise SystemExit('feature2 p113 numerical source pins drifted')
+if observe_p113 and (sha256(p113_baseline.read_bytes()).hexdigest()!=p113_baseline_sha or sha256(p113_oracle.read_bytes()).hexdigest()!=p113_oracle_sha):
+    raise SystemExit('feature2 p113 numerical source bytes changed before classification')
 if runner.get('physical_group')!={'coordinates':[[0,0,0],[1,0,0]],'device_ids':[0,1],'local_device_count_visible':4,'mesh_device_count':2}:
     raise SystemExit('feature2 physical LP2 group drifted')
 runtime_pins=runner.get('runtime_pins',{})
@@ -613,14 +686,26 @@ expected_terminal_dtypes=['int32','int32','float32','bfloat16','bfloat16','bfloa
 expected_stable_types=['tensor<1x2048xi32>','tensor<1xi32>','tensor<1x2048xf32>','tensor<2x1x3072xbf16>','tensor<2x1x32x256xbf16>','tensor<1x576xbf16>','tensor<2x1x6144xbf16>','tensor<2x1x2048xbf16>','tensor<2x1x32x128xf32>','tensor<2x1x32xf32>','tensor<2x16x256x640xbf16>','tensor<2x16x256x128xbf16>','tensor<2x16x256x128xbf16>','tensor<2x2xui32>','tensor<1xi1>']
 expected_optimized_roots=[{'dtype':dtype,'shape':shape} for dtype,shape in [('s32',[1,2048]),('s32',[1]),('f32',[1,2048]),('bf16',[1,1,3072]),('bf16',[1,1,32,256]),('bf16',[1,576]),('bf16',[1,1,6144]),('bf16',[1,1,2048]),('f32',[1,1,32,128]),('f32',[1,1,32]),('bf16',[1,16,256,640]),('bf16',[1,16,256,128]),('bf16',[1,16,256,128]),('u32',[1,2]),('pred',[1])]]
 expected_sealed_bindings={'6':'greenfield_pp16_feature2_sealed_normalized_hidden','7':'greenfield_pp16_feature2_sealed_q_a_state','8':'greenfield_pp16_feature2_sealed_dsa_query','9':'greenfield_pp16_feature2_sealed_dsa_head_weights'}
+expected_observer_bindings={}
+if observe_p113:
+    expected_terminal_shapes += [[2,1,6144],[2,1,2048],[2,1,32,128],[2,1,32],[2,1,128],[2,1,2048],[2,1],[2,1,2048],[2,1]]
+    expected_terminal_dtypes += ['bfloat16','bfloat16','float32','float32','float32','int32','int32','float32','int32']
+    expected_stable_types += ['tensor<2x1x6144xbf16>','tensor<2x1x2048xbf16>','tensor<2x1x32x128xf32>','tensor<2x1x32xf32>','tensor<2x1x128xf32>','tensor<2x1x2048xi32>','tensor<2x1xi32>','tensor<2x1x2048xf32>','tensor<2x1xi32>']
+    expected_optimized_roots += [{'dtype':dtype,'shape':shape} for dtype,shape in [('bf16',[1,1,6144]),('bf16',[1,1,2048]),('f32',[1,1,32,128]),('f32',[1,1,32]),('f32',[1,1,128]),('s32',[1,1,2048]),('s32',[1,1]),('f32',[1,1,2048]),('s32',[1,1])]]
+    expected_observer_bindings={'15':'greenfield_pp16_feature2_p113_normalized_hidden','16':'greenfield_pp16_feature2_p113_q_a_state','17':'greenfield_pp16_feature2_p113_dsa_query','18':'greenfield_pp16_feature2_p113_dsa_head_weights','19':'greenfield_pp16_feature2_p113_current_key','20':'greenfield_pp16_feature2_p113_selected_positions','21':'greenfield_pp16_feature2_p113_selected_valid_counts','22':'greenfield_pp16_feature2_p113_selected_scores','23':'greenfield_pp16_feature2_p113_observation_count'}
 stable=main['stablehlo_contract']; optimized=main['optimized_contract']; terminal=main['terminal_contract']
 expected_canonical={'byte_count':canonical_bytes,'canonicalizer_version':1,'sha256':canonical_pin,'stripped_stack_frame_references':stack_frame_references}
-if stable.get('sealed_boundary_capture') is not True or stable.get('stablehlo_sha256')!=archive_identity['stablehlo_sha256'] or stable.get('output_count')!=15 or stable.get('terminal_shapes')!=expected_terminal_shapes or stable.get('terminal_types')!=expected_stable_types:
+expected_output_count=24 if observe_p113 else 15
+if stable.get('sealed_boundary_capture') is not True or stable.get('observe_position_113') is not observe_p113 or stable.get('stablehlo_sha256')!=archive_identity['stablehlo_sha256'] or stable.get('output_count')!=expected_output_count or stable.get('terminal_shapes')!=expected_terminal_shapes or stable.get('terminal_types')!=expected_stable_types:
     raise SystemExit('feature2 numerical StableHLO sealed terminal drifted')
-if optimized.get('sealed_boundary_capture') is not True or optimized.get('output_count')!=15 or optimized.get('root_shapes')!=expected_optimized_roots or optimized.get('sealed_bindings')!=expected_sealed_bindings or {key:optimized.get('sealed_canonical_hlo_identity',{}).get(key) for key in expected_canonical}!=expected_canonical:
+if optimized.get('sealed_boundary_capture') is not True or optimized.get('observe_position_113') is not observe_p113 or optimized.get('output_count')!=expected_output_count or optimized.get('root_shapes')!=expected_optimized_roots or optimized.get('sealed_bindings')!=expected_sealed_bindings or optimized.get('position113_observer_bindings')!=expected_observer_bindings or optimized.get('position113_observer_root_hints_causal') is not observe_p113 or {key:optimized.get('sealed_canonical_hlo_identity',{}).get(key) for key in expected_canonical}!=expected_canonical:
     raise SystemExit('feature2 numerical optimized-HLO sealed terminal drifted')
-if terminal.get('sealed_boundary_capture') is not True or terminal.get('output_count')!=15 or terminal.get('terminal_shapes')!=expected_terminal_shapes or terminal.get('terminal_dtypes')!=expected_terminal_dtypes:
+if terminal.get('sealed_boundary_capture') is not True or terminal.get('observe_position_113') is not observe_p113 or terminal.get('output_count')!=expected_output_count or terminal.get('terminal_shapes')!=expected_terminal_shapes or terminal.get('terminal_dtypes')!=expected_terminal_dtypes:
     raise SystemExit('feature2 numerical abstract sealed terminal drifted')
+if observe_p113:
+    lineage=optimized.get('position113_lineage',{})
+    if lineage.get('causal') is not True or lineage.get('branch_topology_record_count')!=32 or lineage.get('branch_topology_sha256')!='05322ce7ad09db5463e17d4a7e31142edaffe128abe5e9d85d5ee81f5e3eb02b':
+        raise SystemExit('feature2 p113 numerical causal lineage drifted')
 if canonical.get('sha256')!=canonical_pin or canonical.get('byte_count')!=canonical_bytes or canonical.get('stripped_stack_frame_references')!=stack_frame_references or canonical.get('canonicalizer_version')!=1 or canonical.get('canonicalizer_code_hash')!=pin or {key:archive_identity['canonical_hlo_identity'].get(key) for key in expected_canonical}!=expected_canonical:
     raise SystemExit('feature2 numerical executable HLO drifted from acquired graph')
 state=runner.get('state_manifest',{})
@@ -646,14 +731,19 @@ post_hosts=[line.split()[1] for line in post_census_path.read_text().splitlines(
 if len(post_hosts)!=8 or len(set(post_hosts))!=8:
     raise SystemExit('feature2 post-process cleanup census drifted')
 cleanup.update({'post_process_authenticated_zero_work_hosts':8,'post_process_census_sha256':sha256(post_census_path.read_bytes()).hexdigest(),'terminal_cleanup_gate':'authenticated post-process 8/8 zero work'})
-comparison=compare_feature2_full_width_numerical_capture(run/'result.npz',token_oracle_dir=token,dsa_oracle_dir=dsa,layer1_internal_reference=layer1,db529_internal_dir=db529,db550_boundary=db550)
-if sha256((run/'result.npz').read_bytes()).hexdigest()!=comparison['capture_sha256']:
-    raise SystemExit('feature2 numerical capture changed before sealing')
-expected_mismatch_fields={'carried_bfloat16_bits','contract_valid','event1_positions','event1_scores','event1_valid_counts','layer1_current_key_bfloat16_bits','layer1_normalized_hidden_bfloat16_bits','layer1_q_a_state_bfloat16_bits','layer1_dsa_query_float32','layer1_dsa_head_weights_float32'}
-if comparison.get('comparison_schema')!='full_width_sealed_boundaries_v2' or comparison.get('sealed_boundary_comparisons_required') is not True or set(comparison.get('mismatch_counts',{}))!=expected_mismatch_fields:
-    raise SystemExit('feature2 numerical strict comparison contract drifted')
+if observe_p113:
+    comparison=compare_feature2_position113_capture(run/'result.npz',sealed_rejection_path=p113_baseline,accepted_prompt_key_path=p113_oracle)
+    if sha256((run/'result.npz').read_bytes()).hexdigest()!=comparison['capture_npz_sha256'] or comparison.get('status')!='POSITION113_CAPTURE_CLASSIFIED' or comparison.get('numerical_exactness_claim') is not False or comparison.get('performance_claim') is not False or not all(comparison.get('ordinary_output_bitwise_equal',{}).values()) or not all(comparison.get('observer_owner_bitwise_equal',{}).values()):
+        raise SystemExit('feature2 p113 numerical classification contract drifted')
+else:
+    comparison=compare_feature2_full_width_numerical_capture(run/'result.npz',token_oracle_dir=token,dsa_oracle_dir=dsa,layer1_internal_reference=layer1,db529_internal_dir=db529,db550_boundary=db550)
+    if sha256((run/'result.npz').read_bytes()).hexdigest()!=comparison['capture_sha256']:
+        raise SystemExit('feature2 numerical capture changed before sealing')
+    expected_mismatch_fields={'carried_bfloat16_bits','contract_valid','event1_positions','event1_scores','event1_valid_counts','layer1_current_key_bfloat16_bits','layer1_normalized_hidden_bfloat16_bits','layer1_q_a_state_bfloat16_bits','layer1_dsa_query_float32','layer1_dsa_head_weights_float32'}
+    if comparison.get('comparison_schema')!='full_width_sealed_boundaries_v2' or comparison.get('sealed_boundary_comparisons_required') is not True or set(comparison.get('mismatch_counts',{}))!=expected_mismatch_fields:
+        raise SystemExit('feature2 numerical strict comparison contract drifted')
 (run/'comparison.json').write_text(json.dumps(comparison,allow_nan=False,indent=2,sort_keys=True)+'\n')
-summary={'acquisition_authorization_sha256':sha256((run/'acquisition_authorization.json').read_bytes()).hexdigest(),'artifact_kind':'greenfield_pp16_feature2_numerical_summary','claim_scope':comparison['claim_scope'],'cleanup':cleanup,'code_hash':pin,'elapsed_seconds_operational_only':int(elapsed),'exact':comparison['exact'],'full_width_rounded_then_slice':True,'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_canonical_hlo':canonical,'main_execution_count':1,'measured_memory':memory,'mismatch_counts':comparison['mismatch_counts'],'numerical_claim':comparison['exact'],'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'runtime_pins':runtime_pins,'sealed_boundary_capture':True,'status':comparison['status']}
+summary={'acquisition_authorization_sha256':sha256((run/'acquisition_authorization.json').read_bytes()).hexdigest(),'artifact_kind':'greenfield_pp16_feature2_position113_numerical_summary' if observe_p113 else 'greenfield_pp16_feature2_numerical_summary','claim_scope':'one position-113 diagnostic capture; no exactness, Gate-D, token-rate, or performance claim' if observe_p113 else comparison['claim_scope'],'cleanup':cleanup,'code_hash':pin,'elapsed_seconds_operational_only':int(elapsed),'exact':False if observe_p113 else comparison['exact'],'full_width_rounded_then_slice':True,'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_canonical_hlo':canonical,'main_execution_count':1,'measured_memory':memory,'mismatch_counts':{} if observe_p113 else comparison['mismatch_counts'],'numerical_claim':False if observe_p113 else comparison['exact'],'observe_position_113':observe_p113,'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'runtime_pins':runtime_pins,'sealed_boundary_capture':True,'status':comparison['status']}
 (run/'summary.json').write_text(json.dumps(summary,allow_nan=False,indent=2,sort_keys=True)+'\n')
 PY
 
@@ -680,7 +770,11 @@ terminal_status=$(PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu \
   /home/gianl/vllm-env/bin/python -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["status"])' \
   "$RUN_DIR/summary.json")
-[[ $terminal_status == NUMERICAL_EXACT || $terminal_status == NUMERICAL_REJECTED ]]
+if [[ $OBSERVE_POSITION_113 == 1 ]]; then
+  [[ $terminal_status == POSITION113_CAPTURE_CLASSIFIED ]]
+else
+  [[ $terminal_status == NUMERICAL_EXACT || $terminal_status == NUMERICAL_REJECTED ]]
+fi
 terminal_path="$RUN_DIR/$terminal_status"
 PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR/summary.json" "$RUN_DIR/comparison.json" \
@@ -747,4 +841,6 @@ verify_final_object_set "$terminal_status"
 terminal_written=1
 trap - EXIT
 say "$terminal_status archive=$REMOTE_PREFIX no_Gate-D_or_performance_claim=true"
-[[ $terminal_status == NUMERICAL_EXACT ]] || exit 3
+if [[ $OBSERVE_POSITION_113 == 0 ]]; then
+  [[ $terminal_status == NUMERICAL_EXACT ]] || exit 3
+fi

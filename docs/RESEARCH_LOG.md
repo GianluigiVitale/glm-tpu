@@ -11501,3 +11501,25 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   becomes the tenth rebased-identity hostile case. Complete PP16 feature2 validation passes
   168/168 and mechanical checks pass. Same-Sol re-review remains required; numerical execution is
   forbidden.
+
+## 2026-08-29 08:39 UTC — structural certificate lands; p113 numerical mode is prepared only
+
+- The same Sol reviewer approved the completed certificate. Commit `17785f9` is pushed and its nine
+  changed files match the locked same-region `US-CENTRAL2` mirror byte-for-byte. No TPU action
+  accompanied this commit.
+- A new default-off numerical mode authenticates the exact p113 compile acquisition, its 20-object
+  archive, StableHLO/raw/canonical identities, runtime pins and aggregate 32-branch topology SHA
+  before allowing the existing exactly-once runner to execute with `--observe-position-113`.
+  Zero warmups and one LP2 invocation remain mandatory.
+- Post-run admission requires 24 exact terminal roots, current causal lineage, unchanged 15-array
+  sealed output boundary, equal LP2 observer owners and the strict offline p113 classifier. The
+  result is diagnostic `POSITION113_CAPTURE_CLASSIFIED`; it cannot claim Gate D, numerical
+  exactness, tokens or performance and creates no DB row.
+- Sol blocked the first numerical review because `_load_exact_npz` hashed path bytes and then
+  independently reopened the path with `np.load`; a replacement between those operations could
+  classify changed arrays under the original hash. The correction loads through `BytesIO(raw)`
+  from the exact already-hashed buffer. Hostile post-read replacement tests cover both the sealed
+  rejection and accepted oracle paths. Focused tests pass 40/40 and the complete suite passes
+  172/172; Ruff/format/Python/Bash/diff checks pass.
+- Numerical execution remains forbidden. Exact next is a new bounded staged diff and
+  correction-only Sol verdict explicitly covering commit/push and at most one protected execution.

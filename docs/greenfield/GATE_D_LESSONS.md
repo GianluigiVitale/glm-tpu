@@ -771,3 +771,10 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
   its defining opcode to copy the prior branch. Bind the executable definition and complete
   transitive causal ancestry of every expected caller source, including referenced computations,
   as part of the ordered branch certificate.
+- A pre-run oracle hash does not protect a post-run classifier from local source replacement.
+  Re-hash every classification input immediately before it is consumed, retain the original
+  source-identity record, and parse from that exact in-memory byte buffer. Hashing a path and then
+  reopening it leaves a smaller but real time-of-check/time-of-use gap.
+- `bash -n` does not compile quoted Python heredocs. Extract and compile every production heredoc
+  in a permanent test; a wrapper with six embedded programs is only syntactically covered when all
+  six are checked.
