@@ -739,3 +739,11 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
   localized the upstream cache to 71 one-coordinate drifts and the first to position 113 / hidden
   35. Observe that first boundary and require every existing output unchanged; do not use a later
   normalized-row mismatch as the next broad search surface.
+- A first-time observer lowering has no pre-existing canonical TPU HLO identity. Keep its initial
+  metal action compile-only, archive the actual StableHLO/optimized/canonical graph, and inspect and
+  pin that graph before permitting a call. Source names and root geometry are acquisition evidence,
+  not a substitute for the later unchanged-output numerical guard.
+- An optional observer must not alter the prerequisites of its default-off path. Hash and record
+  observer-only oracles only when the observer is enabled, and regression-test malformed feature
+  flags before any Git, GCS or TPU action. Compile every production Python heredoc rather than
+  assuming outer `bash -n` covers embedded programs.

@@ -28,6 +28,9 @@ FEATURE2_SEALED_OPTIMIZED_CANONICAL_SHA256 = (
 )
 FEATURE2_SEALED_OPTIMIZED_CANONICAL_BYTES = 6_558_627
 FEATURE2_SEALED_OPTIMIZED_STACK_FRAME_REFERENCES = 14_561
+_FEATURE2_POSITION113_SOURCE_JAXPR_SHA256 = (
+    "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0"
+)
 _DEBUG_TABLES = ("FileNames", "FunctionNames", "FileLocations", "StackFrames")
 _INSTRUCTION_LINE = re.compile(r"^\s*(?:ROOT )?%[A-Za-z0-9_.-]+ = ")
 _DEBUG_ROW_PATTERNS = {
@@ -75,6 +78,18 @@ _SEALED_BOUNDARY_LOCAL_MAIN_ROOT = (
     ("f32", (1, 1, 32)),
     *_HISTORICAL_LOCAL_MAIN_ROOT[6:],
 )
+_POSITION113_OBSERVER_LOCAL_MAIN_ROOT = (
+    *_SEALED_BOUNDARY_LOCAL_MAIN_ROOT,
+    ("bf16", (1, 1, 6144)),
+    ("bf16", (1, 1, 2048)),
+    ("f32", (1, 1, 32, 128)),
+    ("f32", (1, 1, 32)),
+    ("f32", (1, 1, 128)),
+    ("s32", (1, 1, 2048)),
+    ("s32", (1, 1)),
+    ("f32", (1, 1, 2048)),
+    ("s32", (1, 1)),
+)
 _HISTORICAL_GLOBAL_MAIN_RESULTS = (
     ("tensor<1x2048xi32>", "result.event1_positions"),
     ("tensor<1xi32>", "result.event1_valid_counts"),
@@ -99,11 +114,43 @@ _SEALED_BOUNDARY_GLOBAL_MAIN_RESULTS = (
     ("tensor<2x1x32xf32>", "result.current_dsa_head_weights_owners"),
     *_HISTORICAL_GLOBAL_MAIN_RESULTS[6:],
 )
+_POSITION113_OBSERVER_GLOBAL_MAIN_RESULTS = (
+    *_SEALED_BOUNDARY_GLOBAL_MAIN_RESULTS,
+    (
+        "tensor<2x1x6144xbf16>",
+        "result.position113_normalized_hidden_owners",
+    ),
+    ("tensor<2x1x2048xbf16>", "result.position113_q_a_state_owners"),
+    ("tensor<2x1x32x128xf32>", "result.position113_dsa_query_owners"),
+    ("tensor<2x1x32xf32>", "result.position113_dsa_head_weights_owners"),
+    ("tensor<2x1x128xf32>", "result.position113_current_key_owners"),
+    (
+        "tensor<2x1x2048xi32>",
+        "result.position113_selected_positions_owners",
+    ),
+    (
+        "tensor<2x1xi32>",
+        "result.position113_selected_valid_counts_owners",
+    ),
+    ("tensor<2x1x2048xf32>", "result.position113_selected_scores_owners"),
+    ("tensor<2x1xi32>", "result.position113_observation_count_owners"),
+)
 _SEALED_BOUNDARY_ROOT_MARKERS = {
     6: "greenfield_pp16_feature2_sealed_normalized_hidden",
     7: "greenfield_pp16_feature2_sealed_q_a_state",
     8: "greenfield_pp16_feature2_sealed_dsa_query",
     9: "greenfield_pp16_feature2_sealed_dsa_head_weights",
+}
+_POSITION113_OBSERVER_ROOT_MARKERS = {
+    15: "greenfield_pp16_feature2_p113_normalized_hidden",
+    16: "greenfield_pp16_feature2_p113_q_a_state",
+    17: "greenfield_pp16_feature2_p113_dsa_query",
+    18: "greenfield_pp16_feature2_p113_dsa_head_weights",
+    19: "greenfield_pp16_feature2_p113_current_key",
+    20: "greenfield_pp16_feature2_p113_selected_positions",
+    21: "greenfield_pp16_feature2_p113_selected_valid_counts",
+    22: "greenfield_pp16_feature2_p113_selected_scores",
+    23: "greenfield_pp16_feature2_p113_observation_count",
 }
 _H16_ATTENTION_KERNEL = "greenfield_pregathered_sparse_mla_h16_k2048_b512_w640"
 _FP8_ATTENTION_O_PREFIX = "greenfield_fp8_strategy_nd_o_m8_k512_n"
@@ -488,13 +535,18 @@ def _stablehlo_main_boundary_contract(
     stablehlo: str,
     *,
     sealed_boundary_capture: bool,
+    observe_position_113: bool,
 ) -> tuple[dict[str, Any], list[str]]:
     """Bind public result names, types, and live return projections exactly."""
 
     expected = (
-        _SEALED_BOUNDARY_GLOBAL_MAIN_RESULTS
-        if sealed_boundary_capture
-        else _HISTORICAL_GLOBAL_MAIN_RESULTS
+        _POSITION113_OBSERVER_GLOBAL_MAIN_RESULTS
+        if observe_position_113
+        else (
+            _SEALED_BOUNDARY_GLOBAL_MAIN_RESULTS
+            if sealed_boundary_capture
+            else _HISTORICAL_GLOBAL_MAIN_RESULTS
+        )
     )
     signatures = tuple(
         re.finditer(
@@ -936,20 +988,28 @@ def _optimized_terminal_boundary_contract(
     live_keys: frozenset[tuple[str, str]],
     *,
     sealed_boundary_capture: bool,
+    observe_position_113: bool,
     sealed_canonical_identity_authenticated: bool,
 ) -> tuple[dict[str, Any], list[str]]:
-    """Require exact root arity/types and authenticated diagnostic producers.
+    """Require exact root arity/types and authenticated sealed identity.
 
     TPU optimization is allowed to erase identity barriers and their source
     names. The sealed successor therefore binds the complete executable
     producer graph with its separately validated canonical HLO identity rather
     than accepting weaker surviving-name or same-shape ancestry heuristics.
+    A first-time observer has no such identity yet: its ordered source result
+    names and optimized root geometry are acquisition hints only. They are
+    deliberately non-causal until the acquired canonical graph is inspected.
     """
 
     expected = (
-        _SEALED_BOUNDARY_LOCAL_MAIN_ROOT
-        if sealed_boundary_capture
-        else _HISTORICAL_LOCAL_MAIN_ROOT
+        _POSITION113_OBSERVER_LOCAL_MAIN_ROOT
+        if observe_position_113
+        else (
+            _SEALED_BOUNDARY_LOCAL_MAIN_ROOT
+            if sealed_boundary_capture
+            else _HISTORICAL_LOCAL_MAIN_ROOT
+        )
     )
     violations: list[str] = []
     if root is None or root.raw_opcode != "tuple":
@@ -980,13 +1040,14 @@ def _optimized_terminal_boundary_contract(
             )
 
     sealed_bindings: dict[str, str] = {}
+    sealed_acquisition_root_hints: dict[str, str] = {}
     if sealed_boundary_capture:
-        if not sealed_canonical_identity_authenticated:
+        if not observe_position_113 and not sealed_canonical_identity_authenticated:
             violations.append(
                 "optimized sealed roots lack the authenticated canonical-HLO "
                 "producer identity"
             )
-        elif all(
+        elif not observe_position_113 and all(
             index < len(root.operand_names)
             and local.get(root.operand_names[index]) is not None
             and _shape_signature(local[root.operand_names[index]].result_shapes)
@@ -998,15 +1059,56 @@ def _optimized_terminal_boundary_contract(
                 str(index): marker
                 for index, marker in _SEALED_BOUNDARY_ROOT_MARKERS.items()
             }
-        else:
+        elif not observe_position_113:
             violations.append(
                 "optimized sealed canonical roots lost exact live operand geometry"
+            )
+        elif all(
+            index < len(root.operand_names)
+            and local.get(root.operand_names[index]) is not None
+            and _shape_signature(local[root.operand_names[index]].result_shapes)
+            == (expected[index],)
+            and (root.computation, root.operand_names[index]) in live_keys
+            for index in _SEALED_BOUNDARY_ROOT_MARKERS
+        ):
+            sealed_acquisition_root_hints = {
+                str(index): marker
+                for index, marker in _SEALED_BOUNDARY_ROOT_MARKERS.items()
+            }
+        else:
+            violations.append(
+                "optimized sealed observer-mode acquisition roots lost live geometry"
+            )
+    observer_bindings: dict[str, str] = {}
+    observer_acquisition_root_hints: dict[str, str] = {}
+    if observe_position_113:
+        if all(
+            index < len(root.operand_names)
+            and local.get(root.operand_names[index]) is not None
+            and _shape_signature(local[root.operand_names[index]].result_shapes)
+            == (expected[index],)
+            and (root.computation, root.operand_names[index]) in live_keys
+            for index in _POSITION113_OBSERVER_ROOT_MARKERS
+        ):
+            observer_acquisition_root_hints = {
+                str(index): marker
+                for index, marker in _POSITION113_OBSERVER_ROOT_MARKERS.items()
+            }
+        else:
+            violations.append(
+                "optimized position-113 acquisition roots lost exact live geometry"
             )
     return (
         {
             "output_count": len(root.operand_names),
             "root_operands": list(root.operand_names),
             "sealed_bindings": sealed_bindings,
+            "sealed_acquisition_root_hints": sealed_acquisition_root_hints,
+            "position113_observer_bindings": observer_bindings,
+            "position113_observer_acquisition_root_hints": (
+                observer_acquisition_root_hints
+            ),
+            "position113_observer_root_hints_causal": False,
         },
         violations,
     )
@@ -1537,6 +1639,8 @@ def validate_feature2_main_stablehlo(
     *,
     full_width_rounded_then_slice: bool = False,
     sealed_boundary_capture: bool = False,
+    observe_position_113: bool = False,
+    source_jaxpr_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Pin the source-level manual LP2 boundary before TPU optimization."""
 
@@ -1546,11 +1650,27 @@ def validate_feature2_main_stablehlo(
         raise TypeError("feature2 StableHLO variant flag must be boolean")
     if not isinstance(sealed_boundary_capture, bool):
         raise TypeError("feature2 StableHLO sealed-boundary flag must be boolean")
+    if not isinstance(observe_position_113, bool):
+        raise TypeError("feature2 StableHLO position-113 observer flag must be boolean")
+    if observe_position_113 and not sealed_boundary_capture:
+        raise ValueError("position-113 observation requires sealed ordinary boundaries")
+    if observe_position_113 and (
+        source_jaxpr_sha256 != _FEATURE2_POSITION113_SOURCE_JAXPR_SHA256
+    ):
+        raise BenchmarkValidationError(
+            "position-113 StableHLO lacks the exact causal source JAXpr: "
+            f"expected={_FEATURE2_POSITION113_SOURCE_JAXPR_SHA256} "
+            f"observed={source_jaxpr_sha256}"
+        )
     compact = re.sub(r"\s+", "", stablehlo)
     markers = _host_markers(stablehlo)
     violations: list[str] = []
     stablehlo_sha256 = sha256(stablehlo.encode()).hexdigest()
-    if sealed_boundary_capture and stablehlo_sha256 != FEATURE2_SEALED_STABLEHLO_SHA256:
+    if (
+        sealed_boundary_capture
+        and not observe_position_113
+        and stablehlo_sha256 != FEATURE2_SEALED_STABLEHLO_SHA256
+    ):
         violations.append(
             "sealed StableHLO identity drifted: "
             f"expected={FEATURE2_SEALED_STABLEHLO_SHA256} "
@@ -1575,6 +1695,13 @@ def validate_feature2_main_stablehlo(
             "tensor<2x1x2048xbf16>",
             "tensor<2x1x32x128xf32>",
             "tensor<2x1x32xf32>",
+        )
+    if observe_position_113:
+        required += (
+            "tensor<2x1x128xf32>",
+            "tensor<2x1x2048xi32>",
+            "tensor<2x1xi32>",
+            "tensor<2x1x2048xf32>",
         )
     missing = tuple(marker for marker in required if marker not in compact)
     if missing:
@@ -1615,6 +1742,7 @@ def validate_feature2_main_stablehlo(
     terminal_contract, terminal_violations = _stablehlo_main_boundary_contract(
         stablehlo,
         sealed_boundary_capture=sealed_boundary_capture,
+        observe_position_113=observe_position_113,
     )
     violations.extend(terminal_violations)
     projection_contract, projection_violations = _stablehlo_projection_contract(
@@ -1631,8 +1759,10 @@ def validate_feature2_main_stablehlo(
         "host_markers": [],
         "num_partitions": 2,
         "passed": True,
+        "observe_position_113": observe_position_113,
         "projection_contract": projection_contract,
         "sealed_boundary_capture": sealed_boundary_capture,
+        "source_jaxpr_sha256": source_jaxpr_sha256,
         "stablehlo_sha256": stablehlo_sha256,
         **terminal_contract,
     }
@@ -1643,6 +1773,7 @@ def validate_feature2_main_optimized_hlo(
     *,
     full_width_rounded_then_slice: bool = False,
     sealed_boundary_capture: bool = False,
+    observe_position_113: bool = False,
 ) -> dict[str, Any]:
     """Parse and bound the optimized two-device feature2 executable."""
 
@@ -1650,10 +1781,16 @@ def validate_feature2_main_optimized_hlo(
         raise TypeError("feature2 optimized-HLO variant flag must be boolean")
     if not isinstance(sealed_boundary_capture, bool):
         raise TypeError("feature2 optimized-HLO sealed-boundary flag must be boolean")
+    if not isinstance(observe_position_113, bool):
+        raise TypeError(
+            "feature2 optimized-HLO position-113 observer flag must be boolean"
+        )
+    if observe_position_113 and not sealed_boundary_capture:
+        raise ValueError("position-113 observation requires sealed ordinary boundaries")
     sealed_canonical_identity: dict[str, Any] = {}
     sealed_canonical_identity_authenticated = False
     canonical_identity_violation: str | None = None
-    if sealed_boundary_capture:
+    if sealed_boundary_capture and not observe_position_113:
         try:
             _, sealed_canonical_identity = canonicalize_feature2_optimized_hlo(
                 optimized_hlo
@@ -1697,9 +1834,13 @@ def validate_feature2_main_optimized_hlo(
     if module.num_partitions != 2:
         violations.append(f"expected two partitions, found {module.num_partitions}")
     expected_root = (
-        _SEALED_BOUNDARY_LOCAL_MAIN_ROOT
-        if sealed_boundary_capture
-        else _HISTORICAL_LOCAL_MAIN_ROOT
+        _POSITION113_OBSERVER_LOCAL_MAIN_ROOT
+        if observe_position_113
+        else (
+            _SEALED_BOUNDARY_LOCAL_MAIN_ROOT
+            if sealed_boundary_capture
+            else _HISTORICAL_LOCAL_MAIN_ROOT
+        )
     )
     if root_shapes != expected_root:
         violations.append(
@@ -1711,6 +1852,7 @@ def validate_feature2_main_optimized_hlo(
         root,
         live_keys,
         sealed_boundary_capture=sealed_boundary_capture,
+        observe_position_113=observe_position_113,
         sealed_canonical_identity_authenticated=(
             sealed_canonical_identity_authenticated
         ),
@@ -2095,6 +2237,7 @@ def validate_feature2_main_optimized_hlo(
         "live_dense_gate_convolution_count": live_gate_count,
         "num_partitions": module.num_partitions,
         "passed": True,
+        "observe_position_113": observe_position_113,
         "physical_collective_count": len(collectives),
         "projection_width": expected_width,
         "reachable_computation_count": reachable_computation_count,
@@ -2106,7 +2249,9 @@ def validate_feature2_main_optimized_hlo(
         ],
         "runtime_parameter_counts": observed_runtime_parameters,
         "sealed_canonical_hlo_identity": (
-            sealed_canonical_identity if sealed_boundary_capture else {}
+            sealed_canonical_identity
+            if sealed_boundary_capture and not observe_position_113
+            else {}
         ),
         **terminal_contract,
     }

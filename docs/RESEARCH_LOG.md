@@ -11413,3 +11413,37 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
 - Exact next is observation-only roots at layer-0 position 113. Every prior captured output must
   remain bitwise equal, preventing the observer from changing fusion. No further full-model launch
   is authorized first.
+
+## 2026-08-29 06:29 UTC — p113 observer is locally bounded; only compile acquisition is admissible
+
+- A default-off PP16 observer now latches the already-live layer-0 p113 normalized BF16, q-a BF16,
+  query/head/key FP32, selected positions/count/scores and one-occurrence counter. The default and
+  full-width non-observer graphs keep their prior exact JAXpr identities and 15 roots; observer
+  mode is a separate 24-root graph. It adds no callback, model arithmetic or execution path.
+- StableHLO pins all 24 ordered public names/types. Optimized HLO requires the 24 exact local root
+  geometries, live ordinary/observer roots, the same two-chip physical/local communication and all
+  pre-existing producer/reducer contracts. Because this is the first TPU lowering of the observer,
+  acquisition recomputes and archives its canonical HLO rather than claiming the older sealed HLO
+  identity. The acquired graph must be inspected and hard-pinned before numerical execution.
+- The strict offline classifier refuses any change in the 15 sealed ordinary arrays, owner
+  disagreement, count other than one, valid count other than 114, or an observed key that does not
+  reproduce the sealed candidate cache row. Accepted comparison scope is limited to the BF16 round
+  of the accepted FP32 normalized input and accepted FP32/BF16 current key; no q-a/query/head/set
+  exactness is claimed without an accepted oracle.
+- The wrapper regression that made default non-observer acquisition depend on p113-only source
+  files was removed. All three embedded Python programs now compile under a permanent test and an
+  invalid observer flag refuses before Git/GCS/TPU work.
+- The first scoped Sol audit correctly blocked shape-only root “bindings”, literal/count-only p113
+  evidence and caller-supplied same-schema oracle redefinition. The correction hard-pins the exact
+  observer JAXpr and links it into StableHLO admission; pins both NPZ byte hashes; and proves the
+  selected live set `{0..113}`, uniqueness, `-1` tail and finite/`-inf` score split. Hostile
+  wrong-position/compensating-literal and disconnected-counter JAXprs refuse. A second audit found
+  that marker paths still did not prove operand ancestry. They are now removed: ordered source
+  results and optimized-root geometry are explicitly non-causal acquisition hints, both binding
+  maps remain empty, and a hostile correct-marker/wrong-source substitution is admitted only with
+  `position113_observer_root_hints_causal=false`. The acquired canonical graph must separately
+  establish and pin value ancestry before any numerical call.
+- The complete PP16 feature2 suite now passes 157/157 with `JAX_PLATFORMS=cpu`; Ruff/format/Python/
+  Bash pass and ShellCheck is unavailable on this host. No TPU work occurred. Exact next is
+  correction closure from the same Sol reviewer, then commit/push/same-region mirror and at most
+  one protected compile-only observer acquisition. Full-model and numerical runs remain forbidden.

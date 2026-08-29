@@ -45,6 +45,7 @@ def test_feature2_acquisition_entrypoint_compiles_but_never_executes_main() -> N
     assert "return run_feature2(parse_args(), execute_main=False)" in source
     assert '"main_executed": execute_main' in source
     assert '"sealed_boundary_capture": program.sealed_boundary_capture' in source
+    assert '"observe_position_113": program.observe_position_113' in source
     assert '"numerical_claim": False' in source
     assert '"performance_claim": False' in source
     assert '"NUMERICAL_CAPTURED" if execute_main else "HLO_ACQUIRED"' in source
@@ -58,6 +59,7 @@ def test_feature2_acquisition_runner_requires_all_fail_closed_contracts() -> Non
         "load_feature2_selective_checkpoint(",
         "pack_dense_final_layout=True",
         "full_width_rounded_then_slice=(",
+        "observe_position_113=observe_position_113",
         "validate_feature2_materializer_optimized_hlo(",
         "validate_feature2_prefill_jaxpr(",
         "validate_feature2_prefill_result_abstract(",
@@ -89,6 +91,17 @@ def test_feature2_acquisition_runner_requires_all_fail_closed_contracts() -> Non
             ast.unparse(keywords["sealed_boundary_capture"])
             == "program.sealed_boundary_capture"
         )
+        assert "observe_position_113" in keywords
+        assert (
+            ast.unparse(keywords["observe_position_113"])
+            == "program.observe_position_113"
+        )
+        if name == "validate_feature2_main_stablehlo":
+            assert "source_jaxpr_sha256" in keywords
+            assert (
+                ast.unparse(keywords["source_jaxpr_sha256"])
+                == "jaxpr_contract['jaxpr_sha256']"
+            )
 
 
 def test_feature2_acquisition_persists_stablehlo_before_compile() -> None:
@@ -150,6 +163,7 @@ def test_feature2_acquisition_runner_cli_is_compile_only() -> None:
     assert completed.returncode == 0, completed.stderr
     assert "--compile-only" in completed.stdout
     assert "--full-width-rounded-then-slice" in completed.stdout
+    assert "--observe-position-113" in completed.stdout
     source = RUNNER.read_text()
     assert "choices=(1,)" in source
 

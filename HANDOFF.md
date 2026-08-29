@@ -7278,3 +7278,35 @@ DB518 `3808d502...59d1`: exactly 71 coordinates differ, one per position, all wi
 observation-only layer-0 discriminator at position 113 for normalized,
 q-a, query/head, current key and selected set, with all existing outputs required bitwise unchanged.
 Do not run another full model before that boundary is localized.
+
+## Current exact next: compile-only PP16 position-113 observer acquisition
+
+The default-off observer batch is locally complete but has not executed on TPU. It latches only
+already-live layer-0 position-113 normalized BF16, q-a BF16, query/head/key FP32, selected
+positions/count/scores and a one-occurrence counter. The ordinary non-observer graph retains its
+exact prior JAXpr identities and 15-root boundary; observer mode has a distinct 24-root contract.
+The protected wrapper remains compile-only, accepts only the full-width successor, requires the
+same-region bucket and both global locks, and cannot publish a tensor, DB row, `SUCCESS`, warmup or
+performance result. It archives the actual StableHLO, optimized HLO and recomputed canonical HLO
+before any numerical authorization.
+
+The offline classifier requires all 15 ordinary arrays to remain byte-identical to the sealed
+rejection, both LP2 owner observations to be byte-identical, exactly one observation per owner,
+and p113 valid count 114. It compares only the accepted boundaries that exist: normalized BF16
+against the explicit BF16 round of the accepted FP32 projection input, and current-key FP32/BF16
+against the accepted key/cache. It explicitly makes no accepted-oracle claim for q-a, query/head
+or selected values. Every PP16 feature2 test passes 157/157 with `JAX_PLATFORMS=cpu`; Ruff,
+formatting, Python compilation, all three embedded Python programs and Bash syntax pass;
+ShellCheck is unavailable on this host.
+
+The first scoped Sol audit blocked three false-proof surfaces. The correction hard-pins the exact
+observer JAXpr and links that identity into StableHLO admission. For this first TPU observer
+lowering, however, ordered source results and exact optimized-root geometry are explicitly
+non-causal acquisition hints: a hostile correct-marker/wrong-source substitution remains admitted
+and the report keeps both binding maps empty with `position113_observer_root_hints_causal=false`.
+Only separate inspection and hard-pinning of the acquired canonical graph may establish value
+ancestry. The classifier still requires the exact rejection/oracle NPZ hashes, exact p113 live set
+`{0..113}`, unique prefix, `-1` tail and finite/`-inf` score boundary. Exact next is correction
+closure by the same Sol reviewer on the new immutable staged diff. Only approval permits
+commit/push/mirror and one protected compile-only acquisition; numerical execution remains frozen
+until the acquired HLO is separately inspected and pinned.

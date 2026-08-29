@@ -1370,3 +1370,14 @@ arrays. Reconstructed layer-0 prompt cache `35350ca0...8d7a` differs from DB518
 discriminator at that position, with every prior output required bitwise unchanged. Only after that
 boundary is localized may a separately reviewed model retry occur. Gate D remains open and must not
 be represented as Section 18 completion.
+
+The p113 observer and compile-only wrapper are now locally ready, not protected evidence. Observer
+mode has 24 exact result roots while the default graph remains unchanged; its classifier requires
+all 15 ordinary captured arrays and both owner observations byte-identical before interpreting the
+accepted normalized/key boundaries. The corrected contracts require exact observer JAXpr identity,
+exact rejection/oracle NPZ hashes and the complete p113 selected-prefix/tail invariant. Ordered
+source results and exact optimized-root geometry are explicitly non-causal acquisition hints;
+binding maps remain empty until the acquired canonical graph is separately inspected and pinned.
+The full PP16 feature2 CPU suite passes 157/157. No TPU HLO,
+tensor, DB row, terminal or performance claim exists for this batch. Review, commit/push/mirror and
+one compile-only acquisition are still required before the graph can be numerically authorized.

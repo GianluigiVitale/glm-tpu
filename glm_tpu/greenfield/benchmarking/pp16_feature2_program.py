@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
+from hashlib import sha256
 from typing import Any, NamedTuple
 
 import numpy as np
@@ -68,6 +69,16 @@ _CACHE_LAYOUT = StageLocalKvLayout(
 )
 _DSA_CONTRACT = DsaNumericalContract()
 _MLA_CONTRACT = MlaNumericalContract()
+PP16_FEATURE2_OBSERVATION_POSITION = 113
+_FEATURE2_DEFAULT_JAXPR_SHA256 = (
+    "75deaf2087d62885eb6e0a9a4d26317ad70e405f912d793dbd9bc355de6d856d"
+)
+_FEATURE2_FULL_WIDTH_JAXPR_SHA256 = (
+    "9773c7b150a5b277116b33574b56f40316da24c5fc497d8827edbeb83fde372d"
+)
+_FEATURE2_POSITION113_JAXPR_SHA256 = (
+    "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0"
+)
 
 
 class Feature2PrefillRuntimeInputs(NamedTuple):
@@ -97,11 +108,41 @@ class Feature2PrefillProgramResult(NamedTuple):
     contract_valid: Any
 
 
+class Feature2Position113ProgramResult(NamedTuple):
+    """Ordinary feature2 roots plus already-live layer-0 position-113 values."""
+
+    event1_positions: Any
+    event1_valid_counts: Any
+    event1_scores: Any
+    current_carried_halves: Any
+    current_attention_query_owners: Any
+    current_kv_a: Any
+    current_normalized_hidden_owners: Any
+    current_q_a_state_owners: Any
+    current_dsa_query_owners: Any
+    current_dsa_head_weights_owners: Any
+    layer0_kv_cache_owners: Any
+    layer0_index_cache_owners: Any
+    layer1_index_cache_owners: Any
+    carried_liveness_digest_owners: Any
+    contract_valid: Any
+    position113_normalized_hidden_owners: Any
+    position113_q_a_state_owners: Any
+    position113_dsa_query_owners: Any
+    position113_dsa_head_weights_owners: Any
+    position113_current_key_owners: Any
+    position113_selected_positions_owners: Any
+    position113_selected_valid_counts_owners: Any
+    position113_selected_scores_owners: Any
+    position113_observation_count_owners: Any
+
+
 @dataclass(frozen=True, slots=True)
 class Feature2PrefillProgram:
     graph_sha256: str
     full_width_rounded_then_slice: bool
     sealed_boundary_capture: bool
+    observe_position_113: bool
     mesh: Any
     weight_specs: Mapping[str, Any]
     materialize_query_weights_fp32: Any
@@ -138,6 +179,7 @@ def validate_feature2_prefill_jaxpr(
     jaxpr: str,
     *,
     full_width_rounded_then_slice: bool = False,
+    observe_position_113: bool = False,
 ) -> dict[str, Any]:
     """Fail closed on the complete abstract executable before TPU lowering."""
 
@@ -145,6 +187,18 @@ def validate_feature2_prefill_jaxpr(
         raise BenchmarkValidationError("feature2 executable JAXpr is empty")
     if not isinstance(full_width_rounded_then_slice, bool):
         raise TypeError("feature2 JAXpr full-width-then-slice flag must be boolean")
+    if not isinstance(observe_position_113, bool):
+        raise TypeError("feature2 JAXpr position-113 observer flag must be boolean")
+    jaxpr_sha256 = sha256(jaxpr.encode()).hexdigest()
+    expected_jaxpr_sha256 = (
+        _FEATURE2_POSITION113_JAXPR_SHA256
+        if observe_position_113
+        else (
+            _FEATURE2_FULL_WIDTH_JAXPR_SHA256
+            if full_width_rounded_then_slice
+            else _FEATURE2_DEFAULT_JAXPR_SHA256
+        )
+    )
     counts = {
         "all_gather": jaxpr.count("all_gather["),
         "convolution": jaxpr.count("conv_general_dilated["),
@@ -157,6 +211,7 @@ def validate_feature2_prefill_jaxpr(
         "h16_b512_attention": jaxpr.count(
             "name=greenfield_pregathered_sparse_mla_h16_k2048_b512_w640"
         ),
+        "observation_position_literal": jaxpr.count(" 113"),
         "physical_m64_projection": jaxpr.count("Precision.DEFAULT, Precision.HIGHEST"),
         "pmin": jaxpr.count("pmin["),
         "ppermute": jaxpr.count("ppermute["),
@@ -169,8 +224,9 @@ def validate_feature2_prefill_jaxpr(
         "fp8_attention_o_n3072": 0 if full_width_rounded_then_slice else 128,
         "fp8_attention_o_n6144": 64 if full_width_rounded_then_slice else 0,
         "h16_b512_attention": 8,
+        "observation_position_literal": 4 if observe_position_113 else 0,
         "physical_m64_projection": 4,
-        "pmin": 1,
+        "pmin": 2 if observe_position_113 else 1,
         "ppermute": 12,
         "psum": 16,
         "scan": 18,
@@ -180,6 +236,11 @@ def validate_feature2_prefill_jaxpr(
         violations.append(
             f"feature2 executable primitive counts drifted: "
             f"expected={expected}, observed={counts}"
+        )
+    if jaxpr_sha256 != expected_jaxpr_sha256:
+        violations.append(
+            "feature2 executable causal JAXpr identity drifted: "
+            f"expected={expected_jaxpr_sha256}, observed={jaxpr_sha256}"
         )
     forbidden = tuple(
         marker
@@ -204,15 +265,27 @@ def validate_feature2_prefill_jaxpr(
         raise BenchmarkValidationError(
             f"feature2 executable JAXpr rejected: {violations}"
         )
-    return {
+    report = {
         **counts,
         "forbidden_markers": [],
+        "jaxpr_sha256": jaxpr_sha256,
         "passed": True,
     }
+    if observe_position_113:
+        report["observe_position_113"] = True
+        report["position113_causal_contract"] = {
+            "counter_carried_through_all_scans": True,
+            "observed_value_count": 8,
+            "position": PP16_FEATURE2_OBSERVATION_POSITION,
+            "terminal_validity_gated_by_exact_count": True,
+        }
+    return report
 
 
 def validate_feature2_prefill_result_abstract(
-    result: Feature2PrefillProgramResult,
+    result: Feature2PrefillProgramResult | Feature2Position113ProgramResult,
+    *,
+    observe_position_113: bool = False,
 ) -> dict[str, Any]:
     """Pin the only admitted terminal/state boundary of the executable."""
 
@@ -233,19 +306,36 @@ def validate_feature2_prefill_result_abstract(
         ((2, 2), "uint32"),
         ((1,), "bool"),
     )
+    if not isinstance(observe_position_113, bool):
+        raise TypeError("feature2 terminal position-113 observer flag must be boolean")
+    if observe_position_113:
+        expected += (
+            ((2, 1, 6144), "bfloat16"),
+            ((2, 1, 2048), "bfloat16"),
+            ((2, 1, 32, 128), "float32"),
+            ((2, 1, 32), "float32"),
+            ((2, 1, 128), "float32"),
+            ((2, 1, 2048), "int32"),
+            ((2, 1), "int32"),
+            ((2, 1, 2048), "float32"),
+            ((2, 1), "int32"),
+        )
     observed = tuple((tuple(value.shape), str(value.dtype)) for value in result)
     if observed != expected:
         raise BenchmarkValidationError(
             "feature2 executable terminal boundary drifted: "
             f"expected={expected}, observed={observed}"
         )
-    return {
+    report = {
         "output_count": len(observed),
         "passed": True,
         "sealed_boundary_capture": True,
         "terminal_dtypes": [dtype for _, dtype in observed],
         "terminal_shapes": [list(shape) for shape, _ in observed],
     }
+    if observe_position_113:
+        report["observe_position_113"] = True
+    return report
 
 
 _EXECUTABLE_WEIGHT_SHAPES: dict[str, tuple[tuple[int, ...], str]] = {
@@ -506,12 +596,15 @@ def _feature2_prefill_mapped(
     main_rope_table: Any,
     *,
     full_width_rounded_then_slice: bool = False,
-) -> Feature2PrefillProgramResult:
+    observe_position_113: bool = False,
+) -> Feature2PrefillProgramResult | Feature2Position113ProgramResult:
     import jax.numpy as jnp
     from jax import lax, named_scope
 
     if not isinstance(full_width_rounded_then_slice, bool):
         raise TypeError("feature2 full-width-then-slice flag must be boolean")
+    if not isinstance(observe_position_113, bool):
+        raise TypeError("feature2 position-113 observer flag must be boolean")
     if candidate_token_ids.shape != (PP16_FEATURE2_CONTEXT_LENGTH,) or (
         candidate_token_ids.dtype != jnp.int32
     ):
@@ -570,6 +663,20 @@ def _feature2_prefill_mapped(
     contract_valid = jnp.ones((1,), dtype=jnp.bool_)
     last_carried = zero_half
     last_normalized = jnp.zeros((1, 6144), dtype=jnp.bfloat16)
+    if observe_position_113:
+        observer = (
+            jnp.zeros((1, 6144), dtype=jnp.bfloat16),
+            jnp.zeros((1, 2048), dtype=jnp.bfloat16),
+            jnp.zeros((1, 32, 128), dtype=jnp.float32),
+            jnp.zeros((1, 32), dtype=jnp.float32),
+            jnp.zeros((1, 128), dtype=jnp.float32),
+            jnp.zeros((1, 2048), dtype=jnp.int32),
+            jnp.zeros((1,), dtype=jnp.int32),
+            jnp.zeros((1, 2048), dtype=jnp.float32),
+            jnp.zeros((1,), dtype=jnp.int32),
+        )
+    else:
+        observer = ()
 
     def run_chunk(
         start: int,
@@ -581,7 +688,8 @@ def _feature2_prefill_mapped(
         valid_value: Any,
         last_carried_value: Any,
         last_normalized_value: Any,
-    ) -> tuple[Any, Any, Any, Any, Any, Any, Any]:
+        observer_value: Any,
+    ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
         token_chunk = lax.dynamic_slice_in_dim(
             candidate_token_ids, start, valid_rows, axis=0
         )
@@ -597,6 +705,7 @@ def _feature2_prefill_mapped(
                 current_valid,
                 _,
                 _,
+                current_observer,
             ) = carry
             token_id, position_scalar = values
             position = position_scalar[None]
@@ -718,6 +827,30 @@ def _feature2_prefill_mapped(
                 current_digest, carried1, position_scalar, local_slot
             )
             next_valid = current_valid & dsa0.contract_valid & attention0.contract_valid
+            if observe_position_113:
+                should_observe = position_scalar == jnp.int32(
+                    PP16_FEATURE2_OBSERVATION_POSITION
+                )
+                observed_values = (
+                    dsa0.internals.normalized_hidden,
+                    dsa0.internals.q_a_state,
+                    dsa0.internals.query,
+                    dsa0.internals.head_weights,
+                    dsa0.internals.current_key,
+                    dsa0.selected_positions,
+                    dsa0.valid_counts,
+                    dsa0.selected_scores,
+                )
+                next_observer = tuple(
+                    jnp.where(should_observe, observed, previous)
+                    for observed, previous in zip(
+                        observed_values,
+                        current_observer[:-1],
+                        strict=True,
+                    )
+                ) + (current_observer[-1] + should_observe.astype(jnp.int32)[None],)
+            else:
+                next_observer = current_observer
             next_carry = (
                 attention0.cache,
                 dsa0.index_cache,
@@ -725,6 +858,7 @@ def _feature2_prefill_mapped(
                 next_valid,
                 carried1,
                 normalized1,
+                next_observer,
             )
             return next_carry, normalized1[0]
 
@@ -735,6 +869,7 @@ def _feature2_prefill_mapped(
             valid_value,
             last_carried_value,
             last_normalized_value,
+            observer_value,
         )
         final, normalized_history = lax.scan(
             step,
@@ -767,6 +902,7 @@ def _feature2_prefill_mapped(
             final[3],
             final[4],
             final[5],
+            final[6],
         )
 
     start = 0
@@ -779,6 +915,7 @@ def _feature2_prefill_mapped(
             contract_valid,
             last_carried,
             last_normalized,
+            observer,
         ) = run_chunk(
             start,
             valid_rows,
@@ -789,6 +926,7 @@ def _feature2_prefill_mapped(
             contract_valid,
             last_carried,
             last_normalized,
+            observer,
         )
         start += valid_rows
 
@@ -847,6 +985,13 @@ def _feature2_prefill_mapped(
         _AXIS_NAME,
         axis_index_groups=_GROUPS,
     ) == jnp.int32(1)
+    if observe_position_113:
+        observation_count_valid = lax.pmin(
+            (observer[-1] == jnp.int32(1)).astype(jnp.int32),
+            _AXIS_NAME,
+            axis_index_groups=_GROUPS,
+        ) == jnp.int32(1)
+        contract_valid = contract_valid & observation_count_valid
 
     def seal_boundary(value: Any, scope: str) -> Any:
         with named_scope(scope):
@@ -868,7 +1013,7 @@ def _feature2_prefill_mapped(
         event1.internals.head_weights,
         "greenfield_pp16_feature2_sealed_dsa_head_weights",
     )
-    return Feature2PrefillProgramResult(
+    ordinary = Feature2PrefillProgramResult(
         event1.selected_positions,
         event1.valid_counts,
         event1.selected_scores,
@@ -885,6 +1030,32 @@ def _feature2_prefill_mapped(
         digest[None, ...],
         contract_valid,
     )
+    if not observe_position_113:
+        return ordinary
+
+    def seal_observer(value: Any, scope: str) -> Any:
+        with named_scope(scope):
+            return lax.optimization_barrier(value[None, ...])
+
+    sealed_observer = tuple(
+        seal_observer(value, scope)
+        for value, scope in zip(
+            observer,
+            (
+                "greenfield_pp16_feature2_p113_normalized_hidden",
+                "greenfield_pp16_feature2_p113_q_a_state",
+                "greenfield_pp16_feature2_p113_dsa_query",
+                "greenfield_pp16_feature2_p113_dsa_head_weights",
+                "greenfield_pp16_feature2_p113_current_key",
+                "greenfield_pp16_feature2_p113_selected_positions",
+                "greenfield_pp16_feature2_p113_selected_valid_counts",
+                "greenfield_pp16_feature2_p113_selected_scores",
+                "greenfield_pp16_feature2_p113_observation_count",
+            ),
+            strict=True,
+        )
+    )
+    return Feature2Position113ProgramResult(*ordinary, *sealed_observer)
 
 
 def build_feature2_prefill_program(
@@ -892,6 +1063,7 @@ def build_feature2_prefill_program(
     *,
     devices: Sequence[Any],
     full_width_rounded_then_slice: bool = False,
+    observe_position_113: bool = False,
 ) -> Feature2PrefillProgram:
     """Build the exact LP2 executable and its separate FP32 materializers."""
 
@@ -904,6 +1076,8 @@ def build_feature2_prefill_program(
     validate_feature2_executable_weight_contract(graph)
     if not isinstance(full_width_rounded_then_slice, bool):
         raise PlanValidationError("feature2 full-width-then-slice flag must be boolean")
+    if not isinstance(observe_position_113, bool):
+        raise PlanValidationError("feature2 position-113 observer flag must be boolean")
     runtime_devices = _validate_feature2_runtime_devices(devices)
     mesh = Mesh(np.asarray(runtime_devices, dtype=object), (_AXIS_NAME,))
     weight_specs = {
@@ -958,7 +1132,7 @@ def build_feature2_prefill_program(
         out_specs=(wk_specs, wk_specs),
         check_vma=False,
     )
-    result_specs = Feature2PrefillProgramResult(
+    ordinary_result_specs = Feature2PrefillProgramResult(
         P(),
         P(),
         P(),
@@ -975,10 +1149,27 @@ def build_feature2_prefill_program(
         P(_AXIS_NAME, None),
         P(),
     )
+    result_specs: Any
+    if observe_position_113:
+        result_specs = Feature2Position113ProgramResult(
+            *ordinary_result_specs,
+            P(_AXIS_NAME, None, None),
+            P(_AXIS_NAME, None, None),
+            P(_AXIS_NAME, None, None, None),
+            P(_AXIS_NAME, None, None),
+            P(_AXIS_NAME, None, None),
+            P(_AXIS_NAME, None, None),
+            P(_AXIS_NAME, None),
+            P(_AXIS_NAME, None, None),
+            P(_AXIS_NAME, None),
+        )
+    else:
+        result_specs = ordinary_result_specs
     execute = jax.shard_map(
         partial(
             _feature2_prefill_mapped,
             full_width_rounded_then_slice=full_width_rounded_then_slice,
+            observe_position_113=observe_position_113,
         ),
         mesh=mesh,
         in_specs=(
@@ -1003,6 +1194,7 @@ def build_feature2_prefill_program(
         graph_sha256=graph.graph_sha256,
         full_width_rounded_then_slice=full_width_rounded_then_slice,
         sealed_boundary_capture=True,
+        observe_position_113=observe_position_113,
         mesh=mesh,
         weight_specs=weight_specs,
         materialize_query_weights_fp32=materialize_query_weights_fp32,

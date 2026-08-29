@@ -494,7 +494,9 @@ def _main_optimized_hlo(
     *,
     full_width_rounded_then_slice: bool = False,
     sealed_boundary_capture: bool = False,
+    observe_position_113: bool = False,
 ) -> str:
+    assert not observe_position_113 or sealed_boundary_capture
     width = 6144 if full_width_rounded_then_slice else 3072
     attention_per_chunk = 16 if full_width_rounded_then_slice else 32
     down_per_chunk = 16 if full_width_rounded_then_slice else 32
@@ -772,6 +774,33 @@ def _main_optimized_hlo(
             "%sealed.query",
             "%sealed.head",
         ]
+    if observe_position_113:
+        observed = (
+            ("normalized", "bf16[1,1,6144]", "normalized_hidden"),
+            ("q_a", "bf16[1,1,2048]", "q_a_state"),
+            ("query", "f32[1,1,32,128]", "dsa_query"),
+            ("head", "f32[1,1,32]", "dsa_head_weights"),
+            ("key", "f32[1,1,128]", "current_key"),
+            ("positions", "s32[1,1,2048]", "selected_positions"),
+            ("valid", "s32[1,1]", "selected_valid_counts"),
+            ("scores", "f32[1,1,2048]", "selected_scores"),
+            ("count", "s32[1,1]", "observation_count"),
+        )
+        for short_name, shape, marker in observed:
+            lines.extend(
+                [
+                    f"  %p113.{short_name}.source = {shape} fusion(%residual)",
+                    (
+                        f"  %p113.{short_name} = {shape} optimization-barrier("
+                        f'%p113.{short_name}.source), metadata={{op_name="jit(main)/'
+                        f"greenfield_pp16_feature2_p113_{marker}/"
+                        'optimization_barrier"}'
+                    ),
+                ]
+            )
+        root_fields.extend(shape for _, shape, _ in observed)
+        root_operands.extend(f"%p113.{name}" for name, _, _ in observed)
+        root = f"({', '.join(root_fields)})"
     lines.extend(
         [
             f"  ROOT %root = {root} tuple({', '.join(root_operands)})",
@@ -836,6 +865,76 @@ def test_feature2_main_successor_optimized_hlo_pins_sealed_boundaries(
             full_width_rounded_then_slice=True,
             sealed_boundary_capture=True,
         )
+
+
+def test_feature2_main_position113_observer_pins_24_live_roots() -> None:
+    hlo = _main_optimized_hlo(
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+    )
+    report = validate_feature2_main_optimized_hlo(
+        hlo,
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+    )
+    assert report["output_count"] == 24
+    assert report["observe_position_113"] is True
+    assert report["sealed_canonical_hlo_identity"] == {}
+    assert report["sealed_bindings"] == {}
+    assert report["sealed_acquisition_root_hints"] == {
+        "6": "greenfield_pp16_feature2_sealed_normalized_hidden",
+        "7": "greenfield_pp16_feature2_sealed_q_a_state",
+        "8": "greenfield_pp16_feature2_sealed_dsa_query",
+        "9": "greenfield_pp16_feature2_sealed_dsa_head_weights",
+    }
+    assert report["position113_observer_bindings"] == {}
+    assert report["position113_observer_acquisition_root_hints"] == {
+        "15": "greenfield_pp16_feature2_p113_normalized_hidden",
+        "16": "greenfield_pp16_feature2_p113_q_a_state",
+        "17": "greenfield_pp16_feature2_p113_dsa_query",
+        "18": "greenfield_pp16_feature2_p113_dsa_head_weights",
+        "19": "greenfield_pp16_feature2_p113_current_key",
+        "20": "greenfield_pp16_feature2_p113_selected_positions",
+        "21": "greenfield_pp16_feature2_p113_selected_valid_counts",
+        "22": "greenfield_pp16_feature2_p113_selected_scores",
+        "23": "greenfield_pp16_feature2_p113_observation_count",
+    }
+    assert report["position113_observer_root_hints_causal"] is False
+    with pytest.raises(BenchmarkValidationError):
+        validate_feature2_main_optimized_hlo(
+            hlo.replace(", %p113.count", "", 1),
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+            observe_position_113=True,
+        )
+
+
+def test_feature2_position113_optimized_hlo_reports_wrong_source_as_noncausal_hint() -> (
+    None
+):
+    original = _main_optimized_hlo(
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+    )
+    attacked = original.replace(
+        "%p113.normalized.source), metadata=",
+        "%sealed.normalized.source), metadata=",
+        1,
+    )
+    assert attacked != original
+    report = validate_feature2_main_optimized_hlo(
+        attacked,
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+    )
+    assert report["passed"] is True
+    assert report["sealed_bindings"] == {}
+    assert report["position113_observer_bindings"] == {}
+    assert report["position113_observer_root_hints_causal"] is False
 
 
 @pytest.mark.parametrize(
@@ -1221,7 +1320,9 @@ def _main_stablehlo(
     *,
     full_width_rounded_then_slice: bool = False,
     sealed_boundary_capture: bool = False,
+    observe_position_113: bool = False,
 ) -> str:
+    assert not observe_position_113 or sealed_boundary_capture
     width = 6144 if full_width_rounded_then_slice else 3072
     attention_per_chunk = 16 if full_width_rounded_then_slice else 32
     down_per_chunk = 16 if full_width_rounded_then_slice else 32
@@ -1375,6 +1476,47 @@ def _main_stablehlo(
                 "result.current_dsa_head_weights_owners",
             ),
         ]
+    if observe_position_113:
+        main_results.extend(
+            [
+                (
+                    "tensor<2x1x6144xbf16>",
+                    "result.position113_normalized_hidden_owners",
+                ),
+                (
+                    "tensor<2x1x2048xbf16>",
+                    "result.position113_q_a_state_owners",
+                ),
+                (
+                    "tensor<2x1x32x128xf32>",
+                    "result.position113_dsa_query_owners",
+                ),
+                (
+                    "tensor<2x1x32xf32>",
+                    "result.position113_dsa_head_weights_owners",
+                ),
+                (
+                    "tensor<2x1x128xf32>",
+                    "result.position113_current_key_owners",
+                ),
+                (
+                    "tensor<2x1x2048xi32>",
+                    "result.position113_selected_positions_owners",
+                ),
+                (
+                    "tensor<2x1xi32>",
+                    "result.position113_selected_valid_counts_owners",
+                ),
+                (
+                    "tensor<2x1x2048xf32>",
+                    "result.position113_selected_scores_owners",
+                ),
+                (
+                    "tensor<2x1xi32>",
+                    "result.position113_observation_count_owners",
+                ),
+            ]
+        )
     result_signature = ", ".join(
         f'{tensor_type} {{jax.result_info = "{result_info}"}}'
         for tensor_type, result_info in main_results
@@ -1447,6 +1589,58 @@ def test_feature2_main_successor_stablehlo_pins_sealed_boundaries(
             _main_stablehlo(full_width_rounded_then_slice=True),
             full_width_rounded_then_slice=True,
             sealed_boundary_capture=True,
+        )
+
+
+def test_feature2_main_position113_stablehlo_pins_named_results() -> None:
+    stablehlo = _main_stablehlo(
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+    )
+    report = validate_feature2_main_stablehlo(
+        stablehlo,
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+        source_jaxpr_sha256=(
+            "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0"
+        ),
+    )
+    assert report["output_count"] == 24
+    assert report["observe_position_113"] is True
+    assert report["result_infos"][15:] == [
+        "result.position113_normalized_hidden_owners",
+        "result.position113_q_a_state_owners",
+        "result.position113_dsa_query_owners",
+        "result.position113_dsa_head_weights_owners",
+        "result.position113_current_key_owners",
+        "result.position113_selected_positions_owners",
+        "result.position113_selected_valid_counts_owners",
+        "result.position113_selected_scores_owners",
+        "result.position113_observation_count_owners",
+    ]
+    with pytest.raises(BenchmarkValidationError, match="causal source JAXpr"):
+        validate_feature2_main_stablehlo(
+            stablehlo,
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+            observe_position_113=True,
+            source_jaxpr_sha256="0" * 64,
+        )
+    with pytest.raises(BenchmarkValidationError):
+        validate_feature2_main_stablehlo(
+            stablehlo.replace(
+                "result.position113_current_key_owners",
+                "result.position113_selected_scores_owners",
+                1,
+            ),
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+            observe_position_113=True,
+            source_jaxpr_sha256=(
+                "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0"
+            ),
         )
 
 

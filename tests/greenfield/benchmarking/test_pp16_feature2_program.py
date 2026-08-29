@@ -136,6 +136,12 @@ successor = build_feature2_prefill_program(
     devices=jax.devices(),
     full_width_rounded_then_slice=True,
 )
+observer = build_feature2_prefill_program(
+    graph,
+    devices=jax.devices(),
+    full_width_rounded_then_slice=True,
+    observe_position_113=True,
+)
 dtypes = {'bf16': jnp.bfloat16, 'f32': jnp.float32, 'u8': jnp.uint8}
 def abstract(shape, dtype, spec):
     return jax.ShapeDtypeStruct(
@@ -164,16 +170,20 @@ def inspect_program(value):
             full_width_rounded_then_slice=(
                 value.full_width_rounded_then_slice
             ),
+            observe_position_113=value.observe_position_113,
         ),
         'full_width_rounded_then_slice': value.full_width_rounded_then_slice,
+        'observe_position_113': value.observe_position_113,
         'jaxpr_sha256': sha256(text.encode()).hexdigest(),
         'terminal': validate_feature2_prefill_result_abstract(
-            jax.eval_shape(value.execute, *arguments)
+            jax.eval_shape(value.execute, *arguments),
+            observe_position_113=value.observe_position_113,
         ),
     }, text
 
 default_report, jaxpr = inspect_program(built)
 successor_report, successor_jaxpr = inspect_program(successor)
+observer_report, observer_jaxpr = inspect_program(observer)
 mutations = (
     jaxpr + '\ndebug_callback',
     jaxpr.replace(
@@ -201,11 +211,28 @@ try:
     )
 except BenchmarkValidationError:
     hybrid_rejected = True
+causal_mutations_rejected = 0
+causal_mutations = (
+    observer_jaxpr.replace(' 113', ' 114') + ('\n 113' * 4),
+    observer_jaxpr.replace('pmin[', 'pmax[', 1) + '\npmin[',
+)
+for mutation in causal_mutations:
+    try:
+        validate_feature2_prefill_jaxpr(
+            mutation,
+            full_width_rounded_then_slice=True,
+            observe_position_113=True,
+        )
+    except BenchmarkValidationError:
+        causal_mutations_rejected += 1
 print(json.dumps({
+    'causal_mutations_rejected': causal_mutations_rejected,
     'default': default_report,
     'graph_sha256': graph.graph_sha256,
     'hybrid_rejected': hybrid_rejected,
     'jaxpr_distinct': jaxpr != successor_jaxpr,
+    'observer': observer_report,
+    'observer_distinct': observer_jaxpr != successor_jaxpr,
     'rejected_mutations': rejected,
     'successor': successor_report,
     'weight_contract': validate_feature2_executable_weight_contract(graph),
@@ -240,6 +267,7 @@ print(json.dumps({
     }
     assert result["rejected_mutations"] == 4
     assert result["hybrid_rejected"] is True
+    assert result["causal_mutations_rejected"] == 2
     expected_contract = {
         "all_gather": 27,
         "convolution": 197,
@@ -247,6 +275,10 @@ print(json.dumps({
         "fp8_attention_o_n6144": 0,
         "forbidden_markers": [],
         "h16_b512_attention": 8,
+        "jaxpr_sha256": (
+            "75deaf2087d62885eb6e0a9a4d26317ad70e405f912d793dbd9bc355de6d856d"
+        ),
+        "observation_position_literal": 0,
         "passed": True,
         "physical_m64_projection": 4,
         "pmin": 1,
@@ -294,9 +326,11 @@ print(json.dumps({
         ],
     }
     assert result["jaxpr_distinct"] is True
+    assert result["observer_distinct"] is True
     assert result["default"] == {
         "contract": expected_contract,
         "full_width_rounded_then_slice": False,
+        "observe_position_113": False,
         "jaxpr_sha256": "75deaf2087d62885eb6e0a9a4d26317ad70e405f912d793dbd9bc355de6d856d",
         "terminal": expected_terminal,
     }
@@ -306,8 +340,66 @@ print(json.dumps({
             "convolution": 133,
             "fp8_attention_o_n3072": 0,
             "fp8_attention_o_n6144": 64,
+            "jaxpr_sha256": (
+                "9773c7b150a5b277116b33574b56f40316da24c5fc497d8827edbeb83fde372d"
+            ),
         },
         "full_width_rounded_then_slice": True,
+        "observe_position_113": False,
         "jaxpr_sha256": "9773c7b150a5b277116b33574b56f40316da24c5fc497d8827edbeb83fde372d",
         "terminal": expected_terminal,
+    }
+    assert result["observer"] == {
+        "contract": {
+            **expected_contract,
+            "convolution": 133,
+            "fp8_attention_o_n3072": 0,
+            "fp8_attention_o_n6144": 64,
+            "jaxpr_sha256": (
+                "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0"
+            ),
+            "observe_position_113": True,
+            "observation_position_literal": 4,
+            "position113_causal_contract": {
+                "counter_carried_through_all_scans": True,
+                "observed_value_count": 8,
+                "position": 113,
+                "terminal_validity_gated_by_exact_count": True,
+            },
+            "pmin": 2,
+        },
+        "full_width_rounded_then_slice": True,
+        "jaxpr_sha256": (
+            "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0"
+        ),
+        "observe_position_113": True,
+        "terminal": {
+            **expected_terminal,
+            "observe_position_113": True,
+            "output_count": 24,
+            "terminal_dtypes": [
+                *expected_terminal["terminal_dtypes"],
+                "bfloat16",
+                "bfloat16",
+                "float32",
+                "float32",
+                "float32",
+                "int32",
+                "int32",
+                "float32",
+                "int32",
+            ],
+            "terminal_shapes": [
+                *expected_terminal["terminal_shapes"],
+                [2, 1, 6144],
+                [2, 1, 2048],
+                [2, 1, 32, 128],
+                [2, 1, 32],
+                [2, 1, 128],
+                [2, 1, 2048],
+                [2, 1],
+                [2, 1, 2048],
+                [2, 1],
+            ],
+        },
     }

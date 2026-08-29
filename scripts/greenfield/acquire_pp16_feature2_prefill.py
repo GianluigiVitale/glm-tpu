@@ -194,6 +194,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db529-internal-dir", type=Path, required=True)
     parser.add_argument("--compile-only", type=int, choices=(1,), required=True)
     parser.add_argument("--full-width-rounded-then-slice", action="store_true")
+    parser.add_argument("--observe-position-113", action="store_true")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--hlo-dir", type=Path, required=True)
     return parser.parse_args()
@@ -203,6 +204,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
     """Compile the protected graph and optionally execute it exactly once."""
 
     result_npz = getattr(args, "result_npz", None)
+    observe_position_113 = bool(getattr(args, "observe_position_113", False))
     if execute_main != (result_npz is not None):
         raise RuntimeError("numerical execution and result capture must be paired")
     if REPO != EXPECTED_REPO:
@@ -321,6 +323,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             graph,
             devices=devices,
             full_width_rounded_then_slice=(args.full_width_rounded_then_slice),
+            observe_position_113=observe_position_113,
         )
         weights = loaded.weights
 
@@ -395,9 +398,11 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
         jaxpr_contract = validate_feature2_prefill_jaxpr(
             str(jax.make_jaxpr(program.execute)(*main_arguments)),
             full_width_rounded_then_slice=(program.full_width_rounded_then_slice),
+            observe_position_113=program.observe_position_113,
         )
         terminal_contract = validate_feature2_prefill_result_abstract(
-            jax.eval_shape(program.execute, *main_arguments)
+            jax.eval_shape(program.execute, *main_arguments),
+            observe_position_113=program.observe_position_113,
         )
 
         main_jit = jax.jit(program.execute)
@@ -410,6 +415,8 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             main_stablehlo,
             full_width_rounded_then_slice=(program.full_width_rounded_then_slice),
             sealed_boundary_capture=program.sealed_boundary_capture,
+            observe_position_113=program.observe_position_113,
+            source_jaxpr_sha256=jaxpr_contract["jaxpr_sha256"],
         )
         compile_started = time.monotonic()
         main_compiled = main_lowered.compile()
@@ -429,6 +436,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
                         program.full_width_rounded_then_slice
                     ),
                     sealed_boundary_capture=program.sealed_boundary_capture,
+                    observe_position_113=program.observe_position_113,
                 ),
                 "stablehlo_contract": main_stable_contract,
                 "terminal_contract": terminal_contract,
@@ -487,16 +495,31 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             memory_after_execute = [_memory_stats(device) for device in devices]
         output = {
             "artifact_kind": (
-                "greenfield_pp16_feature2_numerical_capture"
+                (
+                    "greenfield_pp16_feature2_position113_numerical_capture"
+                    if program.observe_position_113
+                    else "greenfield_pp16_feature2_numerical_capture"
+                )
                 if execute_main
-                else "greenfield_pp16_feature2_compile_acquisition"
+                else (
+                    "greenfield_pp16_feature2_position113_compile_acquisition"
+                    if program.observe_position_113
+                    else "greenfield_pp16_feature2_compile_acquisition"
+                )
             ),
             "claim_scope": (
                 "one zero-warmup main invocation and raw numerical capture; "
                 "no exactness, Gate-D, token-rate, or performance claim"
                 if execute_main
-                else "compile-only real selected-state/HLO/HBM acquisition; no "
-                "main arithmetic, numerical, Gate-D, token-rate, or performance claim"
+                else (
+                    "compile-only position-113 already-live observer/HLO/HBM "
+                    "acquisition; no main arithmetic, numerical, Gate-D, "
+                    "token-rate, or performance claim"
+                    if program.observe_position_113
+                    else "compile-only real selected-state/HLO/HBM acquisition; "
+                    "no main arithmetic, numerical, Gate-D, token-rate, or "
+                    "performance claim"
+                )
             ),
             "code_hash": code_hash,
             "compile_only": not execute_main,
@@ -521,6 +544,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
                 "before_load": memory_before_load,
             },
             "numerical_claim": False,
+            "observe_position_113": program.observe_position_113,
             "performance_claim": False,
             "physical_group": {
                 "coordinates": [list(value) for value in coordinates],
