@@ -11814,3 +11814,20 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   before the driver. Focused mocked coverage passes 10/10; Bash/Ruff/diff/copy checks pass. The
   fresh tag remains vacant and unauthorized pending correction review, commit/push/mirror and a
   new execution-only verdict. Gate D remains open.
+
+## 2026-08-29 19:13--19:14 UTC — metadata receipt false refusal before Ray
+
+- The separately approved one-shot tag
+  `greenfield_legacy_layer1_rms_input_p8155_20260829T185812614181490Z` refused before Ray launch,
+  model load or TPU execution. All eight observer runtimes reconstructed exactly, but the newly
+  shared strict receipt helper incorrectly required their intentionally metadata-bearing
+  `OBSERVER_SYNC_OK host bundle_sha256=... tracked_entries=947 disposition=existing` records to
+  have only two fields.
+- Failure cleanup removed the tag-scoped observer transport on all eight hosts and authenticated
+  8/8 `CENSUS_OK`; 17 diagnostics were archived. Compact evidence is
+  `docs/artifacts/layer1-rms-input-metadata-receipt-refusal.json`. The tag is burned and no retry is
+  authorized.
+- The narrow correction keeps two fields as the default strict grammar, while requiring exact
+  declared widths only for the three existing metadata receipts: observer 5, vLLM 4 and golden 5.
+  Extra or missing fields still refuse. Gate D remains open pending review/commit/push/mirror and
+  a fresh execution-only tag.

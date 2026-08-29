@@ -7634,3 +7634,13 @@ launcher stop would immediately unmount the required mirror. The current correct
 obsolete unmount from both byte-identical launchers and adds exact post-Ray/pre-driver 8-host
 prerequisite replay. Focused mocked tests pass 10/10. No protected invocation is authorized until
 this correction is reviewed, committed, pushed, mirrored and separately execution-reviewed.
+
+The subsequently approved one-shot tag
+`greenfield_legacy_layer1_rms_input_p8155_20260829T185812614181490Z` failed before Ray/model/TPU:
+all eight observer bundles reconstructed exactly, but the shared strict helper falsely required
+their valid five-field metadata receipts to contain only two fields. Tag-scoped observer transport
+cleanup and 8/8 zero-work census passed; 17 diagnostics are archived and the tag is burned. The
+narrow correction preserves strict two-field defaults and explicitly requires exact widths only
+for observer (5), vLLM (4) and golden (5) metadata receipts; extra/missing fields still refuse.
+Gate D remains open; no new tag is authorized before review, persistence and a fresh execution
+verdict.

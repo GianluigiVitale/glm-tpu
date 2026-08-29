@@ -53,7 +53,7 @@
   },
   "protection_source": {
     "launcher_sha256": "b587a8a39262a185c3386989bc9471953b407dc9adbfcc0ae30bb50db68bea23",
-    "validator_sha256": "01f675a1e701a687c04e7f096409fa30ce2b74e89148ec7dd574d043da8f70b6"
+    "validator_sha256": "00bc87d99e087434eb429a66a3e10df9f2bd9140eac92c2c60ac62ac39ae2db1"
   },
   "status": "FAIL_CLOSED_AND_INFRA_REPAIRED"
 }

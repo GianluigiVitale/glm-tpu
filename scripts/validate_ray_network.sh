@@ -29,14 +29,16 @@ case "$mode" in
     marker=${2:?receipt marker is required}
     expected_count=${3:?expected count is required}
     expected_owners=${4:-}
-    [[ $marker =~ ^[A-Z0-9_]+$ && $expected_count =~ ^[1-9][0-9]*$ ]] || {
+    expected_fields=${5:-2}
+    [[ $marker =~ ^[A-Z0-9_]+$ && $expected_count =~ ^[1-9][0-9]*$ &&
+       $expected_fields =~ ^([2-9]|1[0-6])$ ]] || {
       echo "invalid receipt-validation arguments" >&2
       exit 2
     }
     payload=$(cat)
-    if ! owners=$(awk -v marker="$marker" '
+    if ! owners=$(awk -v marker="$marker" -v fields="$expected_fields" '
       $1 == marker {
-        if (NF != 2 || $2 !~ /^[A-Za-z0-9_.-]+$/) bad = 1
+        if (NF != fields || $2 !~ /^[A-Za-z0-9_.-]+$/) bad = 1
         else print $2
       }
       END { if (bad) exit 1 }
@@ -63,7 +65,7 @@ case "$mode" in
     exec timeout --signal=TERM --kill-after=10 -- "$seconds" "$@"
     ;;
   *)
-    echo "usage: $0 firewall EXPECTED_TARGET POD_ID | receipts MARKER COUNT [OWNERS] | bounded SECONDS COMMAND..." >&2
+    echo "usage: $0 firewall EXPECTED_TARGET POD_ID | receipts MARKER COUNT [OWNERS [FIELDS]] | bounded SECONDS COMMAND..." >&2
     exit 2
     ;;
 esac

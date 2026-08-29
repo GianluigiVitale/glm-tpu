@@ -9,7 +9,7 @@ readonly BRANCH=rewrite/topology-first-decode
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly HARNESS_REPO=/home/gianl/glm-tpu
 readonly RAY_LAUNCHER_SHA=b587a8a39262a185c3386989bc9471953b407dc9adbfcc0ae30bb50db68bea23
-readonly RAY_VALIDATOR_SHA=01f675a1e701a687c04e7f096409fa30ce2b74e89148ec7dd574d043da8f70b6
+readonly RAY_VALIDATOR_SHA=00bc87d99e087434eb429a66a3e10df9f2bd9140eac92c2c60ac62ac39ae2db1
 readonly ORACLE_REPO=/home/gianl/tpu-inference
 readonly ORACLE_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
 readonly INTERNAL_CAPTURE=${GLM_GREENFIELD_DSA_INTERNALS_CAPTURE:-0}
@@ -961,8 +961,9 @@ if [[ $DENSE_BOUNDARY_CAPTURE == 1 || $DENSE_INPUT_CAPTURE == 1 ]]; then
 fi
 
 has_eight_unique_markers() {
-  local file=$1 marker=$2
-  bash "$WORKTREE/scripts/validate_ray_network.sh" receipts "$marker" 8 <"$file"
+  local file=$1 marker=$2 expected_fields=${3:-2}
+  bash "$WORKTREE/scripts/validate_ray_network.sh" receipts \
+    "$marker" 8 '' "$expected_fields" <"$file"
 }
 
 strict_census() {
@@ -1168,7 +1169,7 @@ if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
     gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
       --command="$sync_observer" >"$RUN_DIR/sync_observer.txt" \
       2>"$RUN_DIR/sync_observer_ssh.txt"
-    has_eight_unique_markers "$RUN_DIR/sync_observer.txt" OBSERVER_SYNC_OK || {
+    has_eight_unique_markers "$RUN_DIR/sync_observer.txt" OBSERVER_SYNC_OK 5 || {
       say "ABORT: exact legacy observer bundle did not reconstruct on all hosts"
       exit 1
     }
@@ -1245,7 +1246,7 @@ if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$sync_vllm" >"$RUN_DIR/sync_vllm.txt" \
     2>"$RUN_DIR/sync_vllm_ssh.txt"
-  has_eight_unique_markers "$RUN_DIR/sync_vllm.txt" VLLM_SYNC_OK || {
+  has_eight_unique_markers "$RUN_DIR/sync_vllm.txt" VLLM_SYNC_OK 4 || {
     say "ABORT: exact accepted vLLM source authentication failed on the fleet"
     exit 1
   }
@@ -1267,7 +1268,7 @@ golden_sync='set -e; idx=${HOSTNAME##*-w-}; source='"$GOLDEN_SOURCE_DIR"'/golden
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$golden_sync" >"$RUN_DIR/golden_sync.txt" \
   2>"$RUN_DIR/golden_sync_ssh.txt"
-has_eight_unique_markers "$RUN_DIR/golden_sync.txt" GOLDEN_SYNC_OK || {
+has_eight_unique_markers "$RUN_DIR/golden_sync.txt" GOLDEN_SYNC_OK 5 || {
   say "ABORT: exact golden state manifest is unavailable on all hosts"
   exit 1
 }

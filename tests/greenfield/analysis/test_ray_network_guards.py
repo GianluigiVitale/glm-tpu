@@ -108,6 +108,25 @@ def test_bounded_ray_join_refuses_timeout() -> None:
     assert refused.returncode == 124
 
 
+def test_metadata_receipts_require_the_declared_exact_grammar() -> None:
+    metadata = "".join(
+        f"OBSERVER_SYNC_OK host-{index} bundle_sha256=abc tracked_entries=947 "
+        "disposition=existing\n"
+        for index in range(8)
+    )
+    assert (
+        _run("receipts", "OBSERVER_SYNC_OK", "8", "", "5", stdin=metadata).returncode
+        == 0
+    )
+    assert _run("receipts", "OBSERVER_SYNC_OK", "8", stdin=metadata).returncode == 1
+    extra = metadata.replace(
+        "disposition=existing\n", "disposition=existing extra\n", 1
+    )
+    assert (
+        _run("receipts", "OBSERVER_SYNC_OK", "8", "", "5", stdin=extra).returncode == 1
+    )
+
+
 def _run_mocked_launcher(tmp_path: Path, mode: str) -> subprocess.CompletedProcess[str]:
     fake_bin = tmp_path / "bin"
     ray_bin = tmp_path / "vllm-env/bin"
@@ -277,7 +296,10 @@ def test_protected_launcher_and_wrapper_are_fail_closed() -> None:
         'bounded 120 \\\n    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all'
         in wrapper
     )
-    assert 'validate_ray_network.sh" receipts "$marker" 8' in wrapper
+    assert 'validate_ray_network.sh" receipts \\\n    "$marker" 8' in wrapper
+    assert "OBSERVER_SYNC_OK 5" in wrapper
+    assert "VLLM_SYNC_OK 4" in wrapper
+    assert "GOLDEN_SYNC_OK 5" in wrapper
     assert wrapper.index("RAY_FIREWALL_RULE") < wrapper.index('mkdir -p "$RUN_DIR"')
     assert wrapper.index("pretag_probe_output") < wrapper.index('mkdir -p "$RUN_DIR"')
     assert wrapper.index("runtime_started=1") < wrapper.index(
@@ -286,7 +308,7 @@ def test_protected_launcher_and_wrapper_are_fail_closed() -> None:
     assert "firewall-rules update" not in wrapper
     assert "RAY_JOIN_TIMEOUT_SECONDS=120" in wrapper
     assert "RAY_LAUNCHER_SHA=b587a8a39262a185" in wrapper
-    assert "RAY_VALIDATOR_SHA=01f675a1e701a687" in wrapper
+    assert "RAY_VALIDATOR_SHA=00bc87d99e087434" in wrapper
     assert "terminal_ray_rule_contract" in wrapper
     assert "terminal pre-tag TCP/6379 receipts drifted" in wrapper
     assert 'terminal_tcp_receipts == "$ray_tcp6379_contract"' in wrapper
