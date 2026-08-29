@@ -56,6 +56,7 @@ def test_feature2_acquisition_runner_requires_all_fail_closed_contracts() -> Non
         "inspect_feature2_selective_plan(",
         "load_feature2_selective_checkpoint(",
         "pack_dense_final_layout=True",
+        "full_width_rounded_then_slice=(",
         "validate_feature2_materializer_optimized_hlo(",
         "validate_feature2_prefill_jaxpr(",
         "validate_feature2_prefill_result_abstract(",
@@ -64,6 +65,24 @@ def test_feature2_acquisition_runner_requires_all_fail_closed_contracts() -> Non
         "jax.clear_caches()",
     ):
         assert marker in source
+    tree = ast.parse(source)
+    for name in (
+        "validate_feature2_main_stablehlo",
+        "validate_feature2_main_optimized_hlo",
+    ):
+        call = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == name
+        )
+        keywords = {item.arg: item.value for item in call.keywords}
+        assert "full_width_rounded_then_slice" in keywords
+        assert (
+            ast.unparse(keywords["full_width_rounded_then_slice"])
+            == "program.full_width_rounded_then_slice"
+        )
 
 
 def test_feature2_acquisition_persists_stablehlo_before_compile() -> None:
@@ -124,6 +143,7 @@ def test_feature2_acquisition_runner_cli_is_compile_only() -> None:
     )
     assert completed.returncode == 0, completed.stderr
     assert "--compile-only" in completed.stdout
+    assert "--full-width-rounded-then-slice" in completed.stdout
     source = RUNNER.read_text()
     assert "choices=(1,)" in source
 

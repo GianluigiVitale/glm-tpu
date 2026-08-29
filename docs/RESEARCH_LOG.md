@@ -5,6 +5,107 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-29 01:13--01:29 UTC — both full-width-leaf producers are locally admitted
+
+The only admitted PP16 successor is now implemented behind the default-false
+`full_width_rounded_then_slice` switch. Attention runs each DB539-proven K512 output projection
+against all 6,144 output columns, rounds BF16, and immediately slices the leaf. Dense runs each
+DB550-proven I384 down convolution against all 6,144 output columns and performs the same immediate
+slice. Only the two `[16,1,3072]` leaf stacks reach the existing exact LP2 feature reducer; no full
+hidden stack or collective was introduced. The rejected half-width producers remain the default and
+cannot be confused with this successor in acquisition records.
+
+Forced-two-CPU structural/JAXpr tests prove 16 rather than 32 attention projections; a separate
+forced-two-CPU StableHLO test proves 32 rather than 48 dense convolutions, one `[4,1,3072]`
+collective-permute, zero all-reduce/all-gather, half-sharded output and no `[16,1,6144]` stack. The complete abstract executable remains one-row and
+LP2-local: default/successor JAXpr SHAs are `01f18a7e...dc3` / `78ba7f12...89b2`; exact convolution
+counts are 197/133 while all-gather, ppermute, psum, scan and H16/B512 counts remain 27/12/16/18/8.
+The selection is wired through the compile-only protected acquisition and recorded in runner and
+summary evidence. The complete adjacent CPU batch passes 99/99. This is implementation/HLO
+readiness only, not TPU, numerical, HBM, Gate-D or performance proof. Exact next is one adversarial
+review, commit/push/same-region byte mirror, and one compile-only real-state HLO/HBM acquisition;
+main arithmetic remains forbidden.
+
+Sol blocked the first staged batch before commit or TPU use. Convolution totals alone allowed a
+successor-dense/rejected-attention hybrid; the protected StableHLO and optimized-HLO validators did
+not receive the variant; the wrapper accepted the frozen flag value `0`; and the preceding text
+incorrectly described the attention structural test as StableHLO proof. The corrected JAXpr contract
+requires exactly `128×N3072/0×N6144` for the default and `0×N3072/64×N6144` for the successor.
+The protected wrapper now requires explicit successor value `1` and refuses `0` before any cloud or
+TPU operation.
+
+Variant-aware main StableHLO validation now binds four reachable chunk producers, each producer's
+exact K512 output geometry, immediate Pallas row slice and—on the successor—two immediate 3,072-
+feature slices. It separately pins `128/64` dense-down convolutions, 64 gate convolutions and two
+half reducers per chunk, and forbids a `[16,1,6144]` stack. Optimized-HLO validation traces liveness
+from the ENTRY root through called computations, requires exact live Pallas and convolution operand/
+result shapes, four named attention plus four named dense `[4,1,3072]` permutes, and rejects hybrid,
+opposite-width, dead-decoy, reducer-scope and full-stack mutations. The historical rejected real HLO
+still passes its default contract; the corrected adjacent CPU suite passes 105/105. This is still
+offline validator/implementation evidence. The successor has no TPU StableHLO, optimized HLO, HBM,
+numerical, DB, Gate-D or performance result. Exact next is correction-only Sol review.
+
+That review returned `BLOCK` before commit or TPU use. StableHLO checked only slice opcode/result
+shape, so a Pallas `[1:2]` row and duplicate or exchanged feature halves remained admissible.
+Optimized HLO separately counted producers, root liveness and scoped permutes, so exchanging an
+attention reducer's `[4,1,3072]` input with a dense reducer's same-shaped input preserved every
+count. The correction parses every static range and requires exact row zero, unit strides and
+ordered complementary `[0:3072]`/`[3072:6144]` owner halves for attention and dense leaves.
+
+The optimized validator now performs call-frame-aware backwards lineage through nested fusion
+parameters and tuple-result selection. Each scoped reducer must terminate at only its corresponding
+producer frontier: `32/16` default/successor attention or dense leaves per chunk. Between that
+frontier and the permute it requires exactly two `[16,1,3072]` stacks, two `[4,4,1,3072]`
+reshapes, two each 1024/2048 BF16 y-adds and one `[4,1,3072]` owner select. The exact type-valid
+operand exchange used by review is rejected on the sealed real TPU HLO; a synthetic equivalent and
+five wrong-row/stride/duplicate/swap slice attacks also refuse. The full adjacent CPU batch passes
+106/106, real default StableHLO still passes, Ruff/pycompile/diff checks pass, and no TPU work
+occurred. This remains offline proof only. Exact next is correction-only Sol re-review of this
+bounded delta; numerical execution remains unauthorized.
+
+That re-review returned `BLOCK` again before commit or TPU use. Although reducer traversal reached
+the right 16 full-width producers, it stopped there without preserving which complementary slice
+fed which half stack. Exchanging one lower and upper attention leaf only at their same-shaped stack
+consumers was accepted; dense had the same gap, and reversing the owner select was also unbound.
+
+The corrected traversal now forks at the single owner select and follows predicate, true and false
+branches through the same call-frame bindings. The predicate must contain exactly one partition-id,
+one EQ comparison against scalar zero and no model producer. The true peer branch must contain one
+stack and exactly 16 upper `[0:1,3072:6144]` slices; the false branch must contain one stack and
+exactly 16 lower `[0:1,0:3072]` slices. Every slice is individually traced to exactly one typed
+producer, both branch frontier sets must equal the reducer's same 16 producers, and no duplicate or
+omitted producer is admitted. Hostile attention and dense leaf swaps and both owner-select branch
+swaps reject. The focused HLO suite passes 53/53 and the complete adjacent CPU suite passes 110/110;
+focused Ruff, critical changed-file lint, pycompile and diff checks pass. No TPU work occurred.
+Exact next remains correction-only Sol re-review; numerical execution is not authorized.
+
+The next correction-only review again returned `BLOCK` before commit or TPU use. The owner
+predicate report counted one EQ, scalar zero and partition-id somewhere in its ancestry but did not
+bind the compare's direct operands. Replacing the zero operand with an added `1 + 0` kept those
+counts and reversed owner identity while all half lineage remained apparently valid.
+
+The predicate contract now resolves the EQ operands in the exact call frame and admits only the
+compiler's pinned LP2 axis-index chain: scalar `u32 partition-id`, direct bitwise `AND` with scalar
+`u32 1`, direct conversion to scalar `s32`, then direct comparison against scalar `s32 0` with
+`direction=EQ`. Added arithmetic, alternate constants, changed types or operand order cannot be
+satisfied by unrelated ancestor counts. Shifted-zero hostile mutations for attention and dense
+both reject. The focused HLO suite passes 55/55 and the exact adjacent CPU batch passes 112/112;
+no TPU work occurred. Exact next remains correction-only Sol re-review, and numerical execution
+remains unauthorized.
+
+The following correction-only review returned `BLOCK` on a parser spoof, still before commit or
+TPU use. Compare direction and constant values were searched over the whole raw instruction, so
+valid metadata text could satisfy them after executable semantics changed. An executable
+`direction=NE` with metadata containing `direction=EQ`, and a mask `constant(2)` with metadata
+containing `constant(1)`, were both accepted.
+
+The validator now isolates the executable instruction prefix before metadata, backend config or
+frontend attributes. Compare direction is parsed from its exact opcode attribute and constant
+literals from the sole executable `constant(...)` operand; metadata cannot satisfy either. Four
+hostile mutations cover direction and mask decoys independently for attention and dense. The
+focused HLO suite passes 59/59 and the exact adjacent CPU batch passes 116/116. No TPU work
+occurred. Exact next remains correction-only Sol re-review; numerical execution is unauthorized.
+
 ## 2026-08-29 00:10--00:52 UTC — PP16 feature2 rejected and sealed; real-leaf reducer is exact
 
 Protected tag `greenfield_pp16_feature2_prefill_numerical_20260829T001056567299421Z` at pin

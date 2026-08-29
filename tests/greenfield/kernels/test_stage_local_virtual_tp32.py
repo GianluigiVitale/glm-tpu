@@ -406,6 +406,83 @@ def test_virtual_attention_partials_accept_exact_pp16_feature_halves(
         )
 
 
+def test_virtual_attention_full_width_leaves_are_immediately_sliced(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Shaped:
+        def __init__(
+            self,
+            shape: tuple[int, ...],
+            dtype: object,
+            *,
+            name: str,
+            key: object | None = None,
+        ):
+            self.shape = shape
+            self.dtype = dtype
+            self.name = name
+            self.key = key
+
+        def __getitem__(self, key: object) -> "Shaped":
+            if not isinstance(key, tuple) or len(key) != 2:
+                raise AssertionError(f"unexpected {self.name} slice: {key!r}")
+            row_key, column_key = key
+            row_count = (
+                self.shape[0]
+                if row_key == slice(None)
+                else row_key.stop - row_key.start
+            )
+            return Shaped(
+                (row_count, column_key.stop - column_key.start),
+                self.dtype,
+                name=self.name,
+                key=key,
+            )
+
+    calls = []
+    rounded = jnp.arange(6144, dtype=jnp.float32)[None, :].astype(
+        jnp.bfloat16
+    )
+
+    def fake_projection(*args: object, **kwargs: object) -> jax.Array:
+        calls.append((args, kwargs))
+        return rounded
+
+    monkeypatch.setattr(
+        stage_local, "fp8_strategy_nd_attention_matmul", fake_projection
+    )
+    output = Shaped((1, 8192), jnp.bfloat16, name="output")
+    bits = Shaped((6144, 8192), jnp.uint8, name="bits")
+    scale = Shaped((48, 64), jnp.float32, name="scale")
+    half0, half1 = (
+        stage_local._virtual_attention_output_full_width_then_slice_partials(
+            output,
+            bits,
+            scale,
+            block_shape=(128, 128),
+            linear_interpret=False,
+        )
+    )
+    assert half0.shape == half1.shape == (16, 1, 3072)
+    np.testing.assert_array_equal(np.asarray(half0[0]), np.asarray(rounded[:, :3072]))
+    np.testing.assert_array_equal(np.asarray(half1[0]), np.asarray(rounded[:, 3072:]))
+    assert len(calls) == 16
+    for shard, (args, _) in enumerate(calls):
+        lhs, weight, weight_scale = args[:3]
+        assert lhs.key == (
+            slice(None),
+            slice(shard * 512, (shard + 1) * 512),
+        )
+        assert weight.key == (
+            slice(None),
+            slice(shard * 512, (shard + 1) * 512),
+        )
+        assert weight_scale.key == (
+            slice(None),
+            slice(shard * 4, (shard + 1) * 4),
+        )
+
+
 def test_pp16_pregathered_attention_is_two_exact_h16_b512_consumers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -791,31 +868,6 @@ def abstract(shape, dtype, spec):
         shape, dtype, sharding=NamedSharding(mesh, spec)
     )
 
-def mapped(normalized, merged_bits, merged_scale, down_bits, down_scale):
-    value = stage_local_dense_feature2_fp8_mapped(
-        normalized,
-        merged_bits[0],
-        merged_scale[0],
-        down_bits[0],
-        down_scale[0],
-        axis_name="feature",
-        pairs=((0, 1), (1, 0)),
-    )
-    return value[None, ...]
-
-execute = jax.shard_map(
-    mapped,
-    mesh=mesh,
-    in_specs=(
-        P(),
-        P("feature", None, None, None),
-        P("feature", None, None, None),
-        P("feature", None, None, None),
-        P("feature", None, None, None),
-    ),
-    out_specs=P("feature", None, None),
-    check_vma=False,
-)
 arguments = (
     abstract((1, 6144), jnp.bfloat16, P()),
     abstract((2, 16, 6144, 768), jnp.uint8, P("feature", None, None, None)),
@@ -823,18 +875,52 @@ arguments = (
     abstract((2, 16, 384, 6144), jnp.uint8, P("feature", None, None, None)),
     abstract((2, 16, 3, 6144), jnp.float32, P("feature", None, None, None)),
 )
-stablehlo = jax.jit(execute).lower(*arguments).as_text()
-public = next(
-    line.strip() for line in stablehlo.splitlines()
-    if "func.func public @main" in line
-)
+
+def lower(full_width_rounded_then_slice):
+    def mapped(normalized, merged_bits, merged_scale, down_bits, down_scale):
+        value = stage_local_dense_feature2_fp8_mapped(
+            normalized,
+            merged_bits[0],
+            merged_scale[0],
+            down_bits[0],
+            down_scale[0],
+            axis_name="feature",
+            pairs=((0, 1), (1, 0)),
+            full_width_rounded_then_slice=full_width_rounded_then_slice,
+        )
+        return value[None, ...]
+
+    execute = jax.shard_map(
+        mapped,
+        mesh=mesh,
+        in_specs=(
+            P(),
+            P("feature", None, None, None),
+            P("feature", None, None, None),
+            P("feature", None, None, None),
+            P("feature", None, None, None),
+        ),
+        out_specs=P("feature", None, None),
+        check_vma=False,
+    )
+    stablehlo = jax.jit(execute).lower(*arguments).as_text()
+    public = next(
+        line.strip() for line in stablehlo.splitlines()
+        if "func.func public @main" in line
+    )
+    return {
+        "all_gather_count": stablehlo.count("stablehlo.all_gather"),
+        "all_reduce_count": stablehlo.count("stablehlo.all_reduce"),
+        "collective_permute_count": stablehlo.count("stablehlo.collective_permute"),
+        "convolution_count": stablehlo.count("stablehlo.convolution"),
+        "full_hidden_stack": "tensor<16x1x6144xbf16>" in stablehlo,
+        "half_output": "-> (tensor<2x1x3072xbf16>" in public,
+        "payload_present": "tensor<4x1x3072xbf16>" in stablehlo,
+    }
+
 print(json.dumps({
-    "all_gather_count": stablehlo.count("stablehlo.all_gather"),
-    "all_reduce_count": stablehlo.count("stablehlo.all_reduce"),
-    "collective_permute_count": stablehlo.count("stablehlo.collective_permute"),
-    "convolution_count": stablehlo.count("stablehlo.convolution"),
-    "half_output": "-> (tensor<2x1x3072xbf16>" in public,
-    "payload_present": "tensor<4x1x3072xbf16>" in stablehlo,
+    "default": lower(False),
+    "full_width_then_slice": lower(True),
 }, sort_keys=True))
 '''
     env = dict(os.environ)
@@ -850,13 +936,17 @@ print(json.dumps({
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
     result = json.loads(completed.stdout.strip().splitlines()[-1])
-    assert result == {
+    common = {
         "all_gather_count": 0,
         "all_reduce_count": 0,
         "collective_permute_count": 1,
-        "convolution_count": 48,
+        "full_hidden_stack": False,
         "half_output": True,
         "payload_present": True,
+    }
+    assert result == {
+        "default": {**common, "convolution_count": 48},
+        "full_width_then_slice": {**common, "convolution_count": 32},
     }
 
 

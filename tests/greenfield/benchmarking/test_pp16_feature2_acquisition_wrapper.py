@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
+import os
 import subprocess
-
+from pathlib import Path
 
 WRAPPER = Path("scripts/greenfield/run_pp16_feature2_prefill_acquisition.sh")
 
@@ -12,6 +12,7 @@ def test_feature2_acquisition_wrapper_is_default_off_and_serialized() -> None:
     for marker in (
         "GLM_GREENFIELD_PP16_FEATURE2_ACQUIRE:-0",
         "GLM_GREENFIELD_PP16_FEATURE2_MODE:-off",
+        "GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE:-0",
         "compile_only",
         "/home/gianl/glm-run/.glm_pod_workload.lock",
         "/home/gianl/.glm-tpu-rsync.lock",
@@ -25,8 +26,34 @@ def test_feature2_acquisition_wrapper_is_default_off_and_serialized() -> None:
         "TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1",
         "TPU_VISIBLE_DEVICES=0,1,2,3",
         "--compile-only 1",
+        "--full-width-rounded-then-slice",
+        "full_width_rounded_then_slice",
     ):
         assert marker in source
+
+
+def test_feature2_acquisition_wrapper_refuses_the_rejected_variant() -> None:
+    source = WRAPPER.read_text()
+    assert "[[ $FULL_WIDTH_ROUNDED_THEN_SLICE == 1 ]]" in source
+    assert "== 0 ||" not in source
+    assert "readonly runner_variant_args=(--full-width-rounded-then-slice)" in source
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "GLM_GREENFIELD_PP16_FEATURE2_ACQUIRE": "1",
+            "GLM_GREENFIELD_PP16_FEATURE2_MODE": "compile_only",
+            "GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE": "0",
+        }
+    )
+    completed = subprocess.run(
+        ["bash", str(WRAPPER)],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 2
+    assert "admitted successor" in completed.stderr
 
 
 def test_feature2_acquisition_wrapper_has_no_numerical_or_db_success_path() -> None:

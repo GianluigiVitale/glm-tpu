@@ -322,6 +322,76 @@ def _virtual_attention_output_feature_half_partials(
     )
 
 
+def _virtual_attention_output_full_width_then_slice_partials(
+    output_input: Any,
+    o_bits: Any,
+    o_scale: Any,
+    *,
+    block_shape: tuple[int, int],
+    linear_interpret: bool,
+) -> tuple[Any, Any]:
+    """Return PP16 halves sliced from each rounded full-width attention leaf.
+
+    DB539 proved the accepted K512 contraction with a complete 6,144-column
+    output.  Keep that contraction geometry, but slice each already-rounded
+    BF16 result immediately.  A complete hidden row is never stacked or sent
+    through a collective.
+    """
+
+    if (
+        output_input.shape != (1, 8192)
+        or o_bits.shape != (6144, 8192)
+        or o_scale.shape != (48, 64)
+        or block_shape != (128, 128)
+    ):
+        raise ValueError(
+            "PP16 full-width attention partials require exact GLM geometry"
+        )
+    if output_input.dtype != jnp.bfloat16:
+        raise ValueError("PP16 full-width attention input must remain BF16")
+    if o_bits.dtype != jnp.uint8 or o_scale.dtype != jnp.float32:
+        raise ValueError("PP16 full-width attention weight dtypes drifted")
+
+    half0_partials = []
+    half1_partials = []
+    virtual_contraction = 512
+    virtual_scale_contraction = 4
+    for shard in range(16):
+        with jax.named_scope(
+            f"greenfield_attention_full_width_virtual_rank_{shard:02d}"
+        ):
+            rounded = fp8_strategy_nd_attention_matmul(
+                output_input[
+                    :,
+                    shard * virtual_contraction : (shard + 1)
+                    * virtual_contraction,
+                ],
+                o_bits[
+                    :,
+                    shard * virtual_contraction : (shard + 1)
+                    * virtual_contraction,
+                ],
+                o_scale[
+                    :,
+                    shard
+                    * virtual_scale_contraction : (shard + 1)
+                    * virtual_scale_contraction,
+                ],
+                config=Fp8BlockMatmulConfig(
+                    block_shape=block_shape,
+                    output_tile=block_shape[0],
+                    contraction_tile=block_shape[1],
+                ),
+                interpret=linear_interpret,
+            )
+            half0_partials.append(rounded[:, :3072])
+            half1_partials.append(rounded[:, 3072:])
+    return (
+        jnp.stack(tuple(half0_partials), axis=0),
+        jnp.stack(tuple(half1_partials), axis=0),
+    )
+
+
 def _pregathered_b512_attention_lp2_h16_pair(
     query_nope_absorbed: Any,
     query_rope: Any,
@@ -862,13 +932,15 @@ def _virtual_dense_final_layout_convolution_feature_half_partials(
     down_scale_in_out: Any,
     *,
     block_shape: tuple[int, int],
+    full_width_rounded_then_slice: bool = False,
 ) -> tuple[Any, Any]:
-    """Produce both PP16 output halves without a full hidden activation.
+    """Produce both PP16 output halves without stacked full-hidden state.
 
     Gate/up is executed once per accepted virtual rank.  Each activated I384
-    row then feeds two 3,072-column down convolutions.  The weight parameter
-    remains its owner-local complete output matrix, but every live activation
-    and result is feature-half shaped.
+    row normally feeds two 3,072-column down convolutions.  The default-off
+    successor instead preserves DB550's complete 6,144-column contraction and
+    immediately slices its rounded BF16 leaf.  Neither mode stacks or reduces
+    a complete hidden row.
     """
 
     expected = {
@@ -893,6 +965,10 @@ def _virtual_dense_final_layout_convolution_feature_half_partials(
             )
     if block_shape != (128, 128):
         raise ValueError("feature2 final-layout dense requires 128x128 blocks")
+    if not isinstance(full_width_rounded_then_slice, bool):
+        raise ValueError(
+            "feature2 dense full-width-then-slice flag must be boolean"
+        )
     if normalized.dtype != jnp.bfloat16:
         raise ValueError("feature2 final-layout dense input must be BF16")
     if any(
@@ -947,24 +1023,39 @@ def _virtual_dense_final_layout_convolution_feature_half_partials(
                 * jax.nn.sigmoid(gate_up[:, :384])
                 * gate_up[:, 384:]
             ).astype(jnp.bfloat16)
-            with jax.named_scope("greenfield_dense_feature2_half_0"):
-                half0 = _dense_bf16_convolution(
-                    activated,
-                    _decode_dense_fp8_expanded_output_scale_in_out(
-                        down_bits_in_out[shard, :, :3072],
-                        down_scale_in_out[shard, :, :3072],
-                        block_rows=block_shape[0],
-                    ),
-                )
-            with jax.named_scope("greenfield_dense_feature2_half_1"):
-                half1 = _dense_bf16_convolution(
-                    activated,
-                    _decode_dense_fp8_expanded_output_scale_in_out(
-                        down_bits_in_out[shard, :, 3072:],
-                        down_scale_in_out[shard, :, 3072:],
-                        block_rows=block_shape[0],
-                    ),
-                )
+            if full_width_rounded_then_slice:
+                with jax.named_scope(
+                    "greenfield_dense_feature2_full_width_then_slice"
+                ):
+                    rounded = _dense_bf16_convolution(
+                        activated,
+                        _decode_dense_fp8_expanded_output_scale_in_out(
+                            down_bits_in_out[shard],
+                            down_scale_in_out[shard],
+                            block_rows=block_shape[0],
+                        ),
+                    )
+                    half0 = rounded[:, :3072]
+                    half1 = rounded[:, 3072:]
+            else:
+                with jax.named_scope("greenfield_dense_feature2_half_0"):
+                    half0 = _dense_bf16_convolution(
+                        activated,
+                        _decode_dense_fp8_expanded_output_scale_in_out(
+                            down_bits_in_out[shard, :, :3072],
+                            down_scale_in_out[shard, :, :3072],
+                            block_rows=block_shape[0],
+                        ),
+                    )
+                with jax.named_scope("greenfield_dense_feature2_half_1"):
+                    half1 = _dense_bf16_convolution(
+                        activated,
+                        _decode_dense_fp8_expanded_output_scale_in_out(
+                            down_bits_in_out[shard, :, 3072:],
+                            down_scale_in_out[shard, :, 3072:],
+                            block_rows=block_shape[0],
+                        ),
+                    )
             half0_partials.append(half0)
             half1_partials.append(half1)
             previous = (half0, half1)
@@ -2100,6 +2191,7 @@ def stage_local_index_share_fp8_mapped(
     capture_ingredients: bool = False,
     feature_sharded_output: bool = False,
     feature_pairs: Sequence[tuple[int, int]] = (),
+    feature_full_width_rounded_then_slice: bool = False,
 ) -> StageLocalIndexShareFp8Result | StageLocalIndexShareFp8ObservedResult:
     """Consume compact DSA state and execute raw-FP8 stage-local sparse MLA."""
 
@@ -2144,6 +2236,10 @@ def stage_local_index_share_fp8_mapped(
         raise ValueError("IndexShare ingredient-capture flag must be boolean")
     if not isinstance(feature_sharded_output, bool):
         raise ValueError("IndexShare feature-sharded output flag must be boolean")
+    if not isinstance(feature_full_width_rounded_then_slice, bool):
+        raise ValueError(
+            "IndexShare full-width-then-slice flag must be boolean"
+        )
     if main_rope_table_row is not None and (
         main_rope_table_row.shape != (2 * (contract.qk_rope_head_dim // 2),)
         or main_rope_table_row.dtype != jnp.bfloat16
@@ -2221,6 +2317,10 @@ def stage_local_index_share_fp8_mapped(
     if not feature_sharded_output and feature_pairs:
         raise ValueError(
             "IndexShare feature pairs require feature-sharded output"
+        )
+    if feature_full_width_rounded_then_slice and not feature_sharded_output:
+        raise ValueError(
+            "IndexShare full-width-then-slice requires feature-sharded output"
         )
     if contract.num_heads % cache_layout.local_parallel_size:
         raise ValueError("attention heads must divide over the local stage")
@@ -2651,22 +2751,33 @@ def stage_local_index_share_fp8_mapped(
         else None
     )
     if feature_sharded_output:
-        half0_partials = _virtual_attention_output_feature_half_partials(
-            output_input,
-            o_bits,
-            o_scale,
-            feature_half=0,
-            block_shape=block_shape,
-            linear_interpret=linear_interpret,
-        )
-        half1_partials = _virtual_attention_output_feature_half_partials(
-            output_input,
-            o_bits,
-            o_scale,
-            feature_half=1,
-            block_shape=block_shape,
-            linear_interpret=linear_interpret,
-        )
+        if feature_full_width_rounded_then_slice:
+            half0_partials, half1_partials = (
+                _virtual_attention_output_full_width_then_slice_partials(
+                    output_input,
+                    o_bits,
+                    o_scale,
+                    block_shape=block_shape,
+                    linear_interpret=linear_interpret,
+                )
+            )
+        else:
+            half0_partials = _virtual_attention_output_feature_half_partials(
+                output_input,
+                o_bits,
+                o_scale,
+                feature_half=0,
+                block_shape=block_shape,
+                linear_interpret=linear_interpret,
+            )
+            half1_partials = _virtual_attention_output_feature_half_partials(
+                output_input,
+                o_bits,
+                o_scale,
+                feature_half=1,
+                block_shape=block_shape,
+                linear_interpret=linear_interpret,
+            )
         with jax.named_scope(
             "greenfield_strategy_nd_feature2_attention_output"
         ):
@@ -2807,6 +2918,7 @@ def stage_local_dense_feature2_fp8_mapped(
     axis_name: str,
     pairs: Sequence[tuple[int, int]],
     block_shape: tuple[int, int] = (128, 128),
+    full_width_rounded_then_slice: bool = False,
 ) -> Any:
     """Execute PP16 dense down directly into the persistent feature shard."""
 
@@ -2818,6 +2930,7 @@ def stage_local_dense_feature2_fp8_mapped(
             down_bits_in_out,
             down_scale_in_out,
             block_shape=block_shape,
+            full_width_rounded_then_slice=full_width_rounded_then_slice,
         )
     )
     with jax.named_scope("greenfield_strategy_nd_feature2_dense_down"):

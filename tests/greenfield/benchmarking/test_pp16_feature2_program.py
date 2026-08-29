@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import jax.numpy as jnp
@@ -18,7 +18,6 @@ from glm_tpu.greenfield.benchmarking.pp16_feature2_program import (
 )
 from glm_tpu.greenfield.errors import PlanValidationError
 from glm_tpu.greenfield.kernels.reference.rotary import rotary_table_sha256
-
 
 REAL_PP16_FEATURE2_RUNTIME = Path(
     "/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/"
@@ -104,6 +103,7 @@ def test_feature2_runtime_device_coordinates_normalize_without_weakening() -> No
 def test_complete_program_abstract_graph_is_exact_lp2_and_fail_closed() -> None:
     program = r'''
 from pathlib import Path
+from hashlib import sha256
 import json
 import jax
 import jax.numpy as jnp
@@ -131,6 +131,11 @@ graph = build_feature2_prefill_graph(
     load_feature2_prefill_inputs(oracle),
 )
 built = build_feature2_prefill_program(graph, devices=jax.devices())
+successor = build_feature2_prefill_program(
+    graph,
+    devices=jax.devices(),
+    full_width_rounded_then_slice=True,
+)
 dtypes = {'bf16': jnp.bfloat16, 'f32': jnp.float32, 'u8': jnp.uint8}
 def abstract(shape, dtype, spec):
     return jax.ShapeDtypeStruct(
@@ -151,11 +156,24 @@ arguments = (
     abstract((1,), jnp.int32, P()),
     abstract((8192, 64), jnp.bfloat16, P()),
 )
-jaxpr = str(jax.make_jaxpr(built.execute)(*arguments))
-contract = validate_feature2_prefill_jaxpr(jaxpr)
-terminal = validate_feature2_prefill_result_abstract(
-    jax.eval_shape(built.execute, *arguments)
-)
+def inspect_program(value):
+    text = str(jax.make_jaxpr(value.execute)(*arguments))
+    return {
+        'contract': validate_feature2_prefill_jaxpr(
+            text,
+            full_width_rounded_then_slice=(
+                value.full_width_rounded_then_slice
+            ),
+        ),
+        'full_width_rounded_then_slice': value.full_width_rounded_then_slice,
+        'jaxpr_sha256': sha256(text.encode()).hexdigest(),
+        'terminal': validate_feature2_prefill_result_abstract(
+            jax.eval_shape(value.execute, *arguments)
+        ),
+    }, text
+
+default_report, jaxpr = inspect_program(built)
+successor_report, successor_jaxpr = inspect_program(successor)
 mutations = (
     jaxpr + '\ndebug_callback',
     jaxpr.replace(
@@ -172,11 +190,24 @@ for mutation in mutations:
         validate_feature2_prefill_jaxpr(mutation)
     except BenchmarkValidationError:
         rejected += 1
+hybrid_rejected = False
+try:
+    validate_feature2_prefill_jaxpr(
+        successor_jaxpr.replace(
+            'name=greenfield_fp8_strategy_nd_o_m8_k512_n6144',
+            'name=greenfield_fp8_strategy_nd_o_m8_k512_n3072',
+        ),
+        full_width_rounded_then_slice=True,
+    )
+except BenchmarkValidationError:
+    hybrid_rejected = True
 print(json.dumps({
-    'contract': contract,
+    'default': default_report,
     'graph_sha256': graph.graph_sha256,
+    'hybrid_rejected': hybrid_rejected,
+    'jaxpr_distinct': jaxpr != successor_jaxpr,
     'rejected_mutations': rejected,
-    'terminal': terminal,
+    'successor': successor_report,
     'weight_contract': validate_feature2_executable_weight_contract(graph),
     'weight_count': len(built.weight_specs),
 }, sort_keys=True))
@@ -208,8 +239,12 @@ print(json.dumps({
         "source_leaf_count": 39,
     }
     assert result["rejected_mutations"] == 4
-    assert result["contract"] == {
+    assert result["hybrid_rejected"] is True
+    expected_contract = {
         "all_gather": 27,
+        "convolution": 197,
+        "fp8_attention_o_n3072": 128,
+        "fp8_attention_o_n6144": 0,
         "forbidden_markers": [],
         "h16_b512_attention": 8,
         "passed": True,
@@ -219,7 +254,7 @@ print(json.dumps({
         "psum": 16,
         "scan": 18,
     }
-    assert result["terminal"] == {
+    expected_terminal = {
         "output_count": 11,
         "passed": True,
         "terminal_shapes": [
@@ -235,4 +270,22 @@ print(json.dumps({
             [2, 2],
             [1],
         ],
+    }
+    assert result["jaxpr_distinct"] is True
+    assert result["default"] == {
+        "contract": expected_contract,
+        "full_width_rounded_then_slice": False,
+        "jaxpr_sha256": "01f18a7e2fdaaa07837ba66bfe66dde871b0eb641ce5ec87181468cbd17a1dc3",
+        "terminal": expected_terminal,
+    }
+    assert result["successor"] == {
+        "contract": {
+            **expected_contract,
+            "convolution": 133,
+            "fp8_attention_o_n3072": 0,
+            "fp8_attention_o_n6144": 64,
+        },
+        "full_width_rounded_then_slice": True,
+        "jaxpr_sha256": "78ba7f12806d3f3fc4c8291c5d1afbd55914b3ecc280bf96e96cd39b913289b2",
+        "terminal": expected_terminal,
     }

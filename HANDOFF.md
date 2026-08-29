@@ -22,9 +22,58 @@
   SHAs `efde8532...b4fc` / `35a601b7...044c`; StableHLO has one 4×1×3072 ppermute, no
   all-reduce/all-gather or full hidden. This closes only reducer/add semantics on accepted inputs.
   The final carried capture cannot distinguish the graph's separate half-width attention O-projection
-  and dense-down producers. Exact next restores both already-proven DB539 attention and DB550 dense
-  full-width virtual-rank contractions, immediately slices each rounded BF16 leaf into halves, then
-  reuses the existing half reducer/persistent state. No TPU action is authorized yet.
+  and dense-down producers. The default-off successor now restores both already-proven DB539
+  attention and DB550 dense full-width virtual-rank contractions, immediately slices each rounded
+  BF16 leaf into halves, then reuses the existing half reducer/persistent state. Default/successor
+  complete JAXpr SHAs are `01f18a7e...dc3` / `78ba7f12...89b2`; convolution counts fall from
+  197 to 133 without changing the 27/12 gather/permute contract or half-sharded roots. Structural/
+  JAXpr proof covers the attention producer; dense forced-two-CPU StableHLO changes 48
+  convolutions to 32, retains one 4×1×3072 ppermute and has no 16×1×6144 stack.
+- Sol blocked the first batch before commit: convolution totals did not independently bind the
+  attention variant; protected HLO validation was variant-unaware; the wrapper still admitted the
+  rejected flag value; and the log overstated attention StableHLO evidence. The correction pins
+  JAXpr attention counts at default `128×N3072` versus successor `64×N6144`, requires explicit
+  successor opt-in, and makes both main StableHLO and optimized-HLO validators variant-aware.
+  StableHLO now proves four reachable chunk producers, immediate rounded-row/half slices, exact
+  `128/64` attention and dense-down geometry, `64` gate convolutions and eight half reducers.
+  Optimized HLO independently traces ENTRY-root liveness across called computations, requires the
+  same exact producer geometry/counts, four named attention plus four named dense half reducers,
+  and rejects hybrid, dead-decoy, opposite-width and full-stack attacks. The complete adjacent
+  CPU batch initially passed 105 tests.
+- Sol's correction-only review then found two remaining fail-open cases before commit: StableHLO
+  accepted a wrong Pallas row and duplicate/swapped half ranges, while optimized HLO counted live
+  producers and scoped reducers independently and accepted exchanging the same-shaped attention
+  and dense permute inputs. The corrected StableHLO parser requires exact row 0, unit strides and
+  ordered complementary owner ranges. The optimized parser now follows each reducer operand
+  through tuple selection and nested fusion parameter bindings, stops at its exact producer
+  frontier, and requires per chunk `32/16` default/successor leaves, two `[16,1,3072]` stacks, two
+  `[4,4,1,3072]` reshapes, the exact 1024/2048 y-add trees and one owner select. It rejects the
+  reviewer's type-valid attention/dense operand swap on the sealed real TPU HLO. Five hostile slice
+  mutations and both synthetic/real reducer swaps are regression tests; the complete adjacent CPU
+  batch then passed 106 tests.
+- Sol's next correction-only review found that producer lineage still discarded lower/upper owner
+  identity at its full-width frontier. A same-shaped lower/upper leaf exchange between the two
+  stacks—or exchanging the owner-select branches—preserved every count. The lineage walker now
+  separately follows the `owns_half0` predicate and both select branches through call frames. It
+  requires exactly one partition-id/EQ-zero predicate; the true peer branch must contain exactly
+  the 16 upper `[0:1,3072:6144]` slices and the false branch exactly the 16 lower
+  `[0:1,0:3072]` slices, each one-to-one with the same 16 typed producer frontiers and its own
+  half stack. Attention and dense stack-leaf swaps and select-branch swaps all reject; the complete
+  adjacent CPU batch passes 110 tests. This remains offline evidence: no successor TPU HLO/HBM or
+  numerical claim exists.
+- Sol then found the owner predicate was count-bound but not edge-bound: replacing zero with
+  `1 + 0` retained an EQ, zero constant and partition-id somewhere in its ancestry. The corrected
+  contract requires the exact compiler LP2 chain: `u32 partition-id`, `AND u32 1`, `s32 convert`,
+  then `EQ s32 0`. Compare operands are resolved in their call frame, so inserted arithmetic, other
+  constants or reversed operands refuse. Both attention and dense shifted-zero attacks reject;
+  the focused HLO suite then passed 55 tests and complete adjacent batch passed 112 tests.
+- Sol found one parser-level spoof remained: unanchored searches admitted executable `NE` or mask
+  `2` when metadata contained the strings `direction=EQ` or `constant(1)`. Opcode attributes and
+  literals are now parsed only from the executable prefix before metadata/backend/frontend fields.
+  Direction and mask metadata-decoy attacks reject for both attention and dense; focused HLO tests
+  pass 59/59 and the complete adjacent batch passes 116/116. Exact next is correction-only Sol
+  re-review, commit/push/mirror, then one compile-only real-state HLO/HBM acquisition. Numerical
+  execution is not authorized.
 
 ## 2026-08-28 PP16 feature2 HLO/HBM acquisition passes; numerical event 1 is next
 

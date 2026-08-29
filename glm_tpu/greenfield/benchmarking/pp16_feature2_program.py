@@ -10,6 +10,7 @@ DSA scorer.  It neither executes layer-1 attention output nor any later layer.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import partial
 from typing import Any, Mapping, NamedTuple, Sequence
 
 import numpy as np
@@ -38,6 +39,7 @@ from ..kernels.stage_local import (
     stage_local_dsa_fp8_mapped,
     stage_local_index_share_fp8_mapped,
 )
+from ..validation.short_context_oracle import inspect_short_context_oracle
 from .pp16_feature2_prefill import (
     PP16_FEATURE2_CONTEXT_LENGTH,
     PP16_FEATURE2_CURRENT_POSITION,
@@ -54,8 +56,6 @@ from .pp16_feature_sharded_state import (
     feature2_add_rms_gather_mapped,
     feature2_embedding_mapped,
 )
-from ..validation.short_context_oracle import inspect_short_context_oracle
-
 
 _AXIS_NAME = "feature"
 _GROUPS = ((0, 1),)
@@ -95,6 +95,7 @@ class Feature2PrefillProgramResult(NamedTuple):
 @dataclass(frozen=True, slots=True)
 class Feature2PrefillProgram:
     graph_sha256: str
+    full_width_rounded_then_slice: bool
     mesh: Any
     weight_specs: Mapping[str, Any]
     materialize_query_weights_fp32: Any
@@ -127,13 +128,28 @@ def _validate_feature2_runtime_devices(devices: Sequence[Any]) -> tuple[Any, ...
     return runtime_devices
 
 
-def validate_feature2_prefill_jaxpr(jaxpr: str) -> dict[str, Any]:
+def validate_feature2_prefill_jaxpr(
+    jaxpr: str,
+    *,
+    full_width_rounded_then_slice: bool = False,
+) -> dict[str, Any]:
     """Fail closed on the complete abstract executable before TPU lowering."""
 
     if not isinstance(jaxpr, str) or not jaxpr.strip():
         raise BenchmarkValidationError("feature2 executable JAXpr is empty")
+    if not isinstance(full_width_rounded_then_slice, bool):
+        raise ValueError(
+            "feature2 JAXpr full-width-then-slice flag must be boolean"
+        )
     counts = {
         "all_gather": jaxpr.count("all_gather["),
+        "convolution": jaxpr.count("conv_general_dilated["),
+        "fp8_attention_o_n3072": jaxpr.count(
+            "name=greenfield_fp8_strategy_nd_o_m8_k512_n3072"
+        ),
+        "fp8_attention_o_n6144": jaxpr.count(
+            "name=greenfield_fp8_strategy_nd_o_m8_k512_n6144"
+        ),
         "h16_b512_attention": jaxpr.count(
             "name=greenfield_pregathered_sparse_mla_h16_k2048_b512_w640"
         ),
@@ -147,6 +163,9 @@ def validate_feature2_prefill_jaxpr(jaxpr: str) -> dict[str, Any]:
     }
     expected = {
         "all_gather": 27,
+        "convolution": 133 if full_width_rounded_then_slice else 197,
+        "fp8_attention_o_n3072": 0 if full_width_rounded_then_slice else 128,
+        "fp8_attention_o_n6144": 64 if full_width_rounded_then_slice else 0,
         "h16_b512_attention": 8,
         "physical_m64_projection": 4,
         "pmin": 1,
@@ -482,11 +501,16 @@ def _feature2_prefill_mapped(
     context_lengths: Any,
     current_position: Any,
     main_rope_table: Any,
+    *,
+    full_width_rounded_then_slice: bool = False,
 ) -> Feature2PrefillProgramResult:
-    import jax
     import jax.numpy as jnp
     from jax import lax
 
+    if not isinstance(full_width_rounded_then_slice, bool):
+        raise ValueError(
+            "feature2 full-width-then-slice flag must be boolean"
+        )
     if candidate_token_ids.shape != (PP16_FEATURE2_CONTEXT_LENGTH,) or (
         candidate_token_ids.dtype != jnp.int32
     ):
@@ -671,6 +695,9 @@ def _feature2_prefill_mapped(
                 pregathered_b512_attention=True,
                 feature_sharded_output=True,
                 feature_pairs=_PAIRS,
+                feature_full_width_rounded_then_slice=(
+                    full_width_rounded_then_slice
+                ),
             )
             post_attention, normalized_mlp = (
                 feature2_add_rms_gather_mapped(
@@ -689,6 +716,9 @@ def _feature2_prefill_mapped(
                 weight("dense.slot_00.down.scale_inv_in_out"),
                 axis_name=_AXIS_NAME,
                 pairs=_PAIRS,
+                full_width_rounded_then_slice=(
+                    full_width_rounded_then_slice
+                ),
             )
             carried1, normalized1 = feature2_add_rms_gather_mapped(
                 dense_update,
@@ -854,15 +884,21 @@ def build_feature2_prefill_program(
     graph: Feature2PrefillGraph,
     *,
     devices: Sequence[Any],
+    full_width_rounded_then_slice: bool = False,
 ) -> Feature2PrefillProgram:
     """Build the exact LP2 executable and its separate FP32 materializers."""
 
     import jax
     import jax.numpy as jnp
-    from jax.sharding import Mesh, PartitionSpec as P
+    from jax.sharding import Mesh
+    from jax.sharding import PartitionSpec as P
 
     validate_feature2_prefill_graph(graph)
     validate_feature2_executable_weight_contract(graph)
+    if not isinstance(full_width_rounded_then_slice, bool):
+        raise PlanValidationError(
+            "feature2 full-width-then-slice flag must be boolean"
+        )
     runtime_devices = _validate_feature2_runtime_devices(devices)
     mesh = Mesh(np.asarray(runtime_devices, dtype=object), (_AXIS_NAME,))
     weight_specs = {
@@ -931,7 +967,10 @@ def build_feature2_prefill_program(
         P(),
     )
     execute = jax.shard_map(
-        _feature2_prefill_mapped,
+        partial(
+            _feature2_prefill_mapped,
+            full_width_rounded_then_slice=full_width_rounded_then_slice,
+        ),
         mesh=mesh,
         in_specs=(
             weight_specs,
@@ -953,6 +992,7 @@ def build_feature2_prefill_program(
         raise PlanValidationError("feature2 executable weight spec drifted")
     return Feature2PrefillProgram(
         graph_sha256=graph.graph_sha256,
+        full_width_rounded_then_slice=full_width_rounded_then_slice,
         mesh=mesh,
         weight_specs=weight_specs,
         materialize_query_weights_fp32=materialize_query_weights_fp32,

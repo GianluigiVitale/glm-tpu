@@ -34,6 +34,13 @@ readonly FEATURE2_GRAPH_SHA=ab5be45aecf3b0b5d87ad76af8076bc9351823529a08c0eadb41
   echo "set GLM_GREENFIELD_PP16_FEATURE2_MODE=compile_only" >&2
   exit 2
 }
+FULL_WIDTH_ROUNDED_THEN_SLICE=${GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE:-0}
+readonly FULL_WIDTH_ROUNDED_THEN_SLICE
+[[ $FULL_WIDTH_ROUNDED_THEN_SLICE == 1 ]] || {
+  echo "set GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE=1 for the admitted successor" >&2
+  exit 2
+}
+readonly runner_variant_args=(--full-width-rounded-then-slice)
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 TAG=${GLM_GREENFIELD_PP16_FEATURE2_TAG:-greenfield_pp16_feature2_prefill_acquire_$(date -u +%Y%m%dT%H%M%S%NZ)}
@@ -268,6 +275,7 @@ started=$(date +%s)
       --layer1-internal-reference "$LAYER1_INTERNAL_REFERENCE" \
       --db529-internal-dir "$DB529_INTERNAL_DIR" \
       --compile-only 1 \
+      "${runner_variant_args[@]}" \
       --output "$RUN_DIR/runner.json" --hlo-dir "$RUN_DIR/hlo"
 ) >"$RUN_DIR/runner.log" 2>&1
 elapsed=$(( $(date +%s) - started ))
@@ -281,17 +289,21 @@ post_census_done=1
 
 say "recomputing every HLO/source/load claim without JAX"
 PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - \
-  "$RUN_DIR" "$PIN" "$TAG" "$REMOTE_PREFIX" "$elapsed" <<'PY'
+  "$RUN_DIR" "$PIN" "$TAG" "$REMOTE_PREFIX" "$elapsed" \
+  "$FULL_WIDTH_ROUNDED_THEN_SLICE" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
 import sys
 
-run=Path(sys.argv[1]); pin,tag,remote,elapsed=sys.argv[2:]
+run=Path(sys.argv[1]); pin,tag,remote,elapsed=sys.argv[2:6]
+full_width_rounded_then_slice=bool(int(sys.argv[6]))
 runner=json.loads((run/'runner.json').read_text())
 source=json.loads((run/'source_identity.json').read_text())
 if runner.get('status')!='HLO_ACQUIRED' or runner.get('code_hash')!=pin or runner.get('compile_only') is not True or runner.get('main_executed') is not False or runner.get('numerical_claim') is not False or runner.get('performance_claim') is not False:
     raise SystemExit('feature2 acquisition claim boundary drifted')
+if runner.get('full_width_rounded_then_slice') is not full_width_rounded_then_slice:
+    raise SystemExit('feature2 acquisition producer variant drifted')
 if runner.get('graph_sha256')!=source.get('graph_sha256') or runner.get('event1_target_lineage')!=source.get('event1_target_lineage') or runner.get('selective_plan')!=source.get('selective_plan'):
     raise SystemExit('feature2 acquisition source lineage drifted')
 if runner.get('physical_group')!={'coordinates':[[0,0,0],[1,0,0]],'device_ids':[0,1],'local_device_count_visible':4,'mesh_device_count':2}:
@@ -314,7 +326,7 @@ for name,record in runner['hlo'].items():
 state=runner.get('state_manifest',{})
 if state.get('plan_id')!='PP16_LP2' or state.get('owner_device_ids')!=[0,1] or state.get('selected_read_count')!=78 or state.get('raw_dense_device_materialization') is not False or state.get('dense_final_layout') is not True:
     raise SystemExit('feature2 selective state contract drifted')
-summary={'artifact_kind':'greenfield_pp16_feature2_compile_acquisition_summary','claim_scope':runner['claim_scope'],'code_hash':pin,'elapsed_seconds':int(elapsed),'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_executed':False,'numerical_claim':False,'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'status':'HLO_ACQUIRED'}
+summary={'artifact_kind':'greenfield_pp16_feature2_compile_acquisition_summary','claim_scope':runner['claim_scope'],'code_hash':pin,'elapsed_seconds':int(elapsed),'full_width_rounded_then_slice':full_width_rounded_then_slice,'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_executed':False,'numerical_claim':False,'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'status':'HLO_ACQUIRED'}
 (run/'summary.json').write_text(json.dumps(summary,allow_nan=False,indent=2,sort_keys=True)+'\n')
 PY
 

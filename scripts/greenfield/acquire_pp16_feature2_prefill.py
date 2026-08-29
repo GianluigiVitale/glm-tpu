@@ -193,6 +193,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--layer1-internal-reference", type=Path, required=True)
     parser.add_argument("--db529-internal-dir", type=Path, required=True)
     parser.add_argument("--compile-only", type=int, choices=(1,), required=True)
+    parser.add_argument("--full-width-rounded-then-slice", action="store_true")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--hlo-dir", type=Path, required=True)
     return parser.parse_args()
@@ -316,7 +317,13 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             pack_dense_final_layout=True,
         )
         memory_after_load = [_memory_stats(device) for device in devices]
-        program = build_feature2_prefill_program(graph, devices=devices)
+        program = build_feature2_prefill_program(
+            graph,
+            devices=devices,
+            full_width_rounded_then_slice=(
+                args.full_width_rounded_then_slice
+            ),
+        )
         weights = loaded.weights
 
         query_arguments = (
@@ -388,7 +395,10 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             *runtime_arrays,
         )
         jaxpr_contract = validate_feature2_prefill_jaxpr(
-            str(jax.make_jaxpr(program.execute)(*main_arguments))
+            str(jax.make_jaxpr(program.execute)(*main_arguments)),
+            full_width_rounded_then_slice=(
+                program.full_width_rounded_then_slice
+            ),
         )
         terminal_contract = validate_feature2_prefill_result_abstract(
             jax.eval_shape(program.execute, *main_arguments)
@@ -400,7 +410,12 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
         main_lowering_seconds = time.monotonic() - lowering_started
         main_stablehlo = main_lowered.as_text()
         _atomic_text(args.hlo_dir / "feature2_main.stablehlo.mlir", main_stablehlo)
-        main_stable_contract = validate_feature2_main_stablehlo(main_stablehlo)
+        main_stable_contract = validate_feature2_main_stablehlo(
+            main_stablehlo,
+            full_width_rounded_then_slice=(
+                program.full_width_rounded_then_slice
+            ),
+        )
         compile_started = time.monotonic()
         main_compiled = main_lowered.compile()
         main_compile_seconds = time.monotonic() - compile_started
@@ -413,7 +428,12 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
                 "compile_seconds": main_compile_seconds,
                 "jaxpr_contract": jaxpr_contract,
                 "lowering_seconds": main_lowering_seconds,
-                "optimized_contract": validate_feature2_main_optimized_hlo(main_hlo),
+                "optimized_contract": validate_feature2_main_optimized_hlo(
+                    main_hlo,
+                    full_width_rounded_then_slice=(
+                        program.full_width_rounded_then_slice
+                    ),
+                ),
                 "stablehlo_contract": main_stable_contract,
                 "terminal_contract": terminal_contract,
             }
@@ -486,6 +506,9 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             "compile_only": not execute_main,
             "device_kind": devices[0].device_kind,
             "event1_target_lineage": event1_lineage,
+            "full_width_rounded_then_slice": (
+                program.full_width_rounded_then_slice
+            ),
             "graph_sha256": graph.graph_sha256,
             "hlo": {
                 "feature2_main": main_record,

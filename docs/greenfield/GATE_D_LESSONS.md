@@ -20,9 +20,22 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   two half-width producers caused drift. The only admitted successor changes both unproved
   producer geometries: run each already-proven DB539 attention O-projection and DB550 dense-down
   full-width virtual-rank contraction, round BF16, immediately slice each leaf into ordered halves,
-  then use the existing LP2 half reducer and persistent feature state. It must never stack or reduce
-  a full hidden row, must retain exact accepted convolution backend geometry and needs review before
-  any TPU acquisition. Scalar,
+  then use the existing LP2 half reducer and persistent feature state. This successor is locally
+  implemented behind one default-false library flag; the protected wrapper requires explicit value
+  `1` and refuses the frozen value `0`. JAXpr independently pins its 64 full-width attention calls.
+  Variant-aware StableHLO/optimized-HLO contracts require exact live attention/dense geometry,
+  row-zero/unit-stride/ordered-complementary half slices, four attention plus four dense half
+  reducers, one-row/half-sharded roots and no full-hidden stack. Reducer proof must be causal, not
+  independent counts: trace each permute input through nested fusion bindings to only its matching
+  producer frontier and exact two-stack/y-tree/owner-select path. Do not discard half identity at
+  that frontier: trace each lower/upper slice one-to-one into its half stack, require the exact
+  compiler LP2 owner chain (`u32 partition-id -> AND 1 -> s32 convert -> EQ s32 0`) by direct
+  operands, not ancestor counts, and pin `owns_half0 ? upper : lower` for the peer payload.
+  Hostile hybrid, dead-decoy, wrong-row, duplicate/swap-half, cross-scope reducer, stack-leaf and
+  select-branch, shifted-zero predicate and metadata-decoy direction/mask swaps are mandatory;
+  executable attributes must never be inferred from provenance text. The corrected adjacent suite
+  passes 116 tests. It still needs correction-only adversarial review before one compile-only TPU
+  HLO/HBM acquisition; numerical execution is not authorized. Scalar,
   normalization, consumer-fusion, output-ownership, half-width-contraction fitting and unchanged
   decoder retries remain frozen. Gate D stays open.
 - The PP16 final-layout y-x-z run closes all upstream layer-0 arithmetic in the live two-chip graph:
