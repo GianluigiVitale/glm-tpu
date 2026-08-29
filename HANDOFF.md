@@ -7452,3 +7452,38 @@ SHA `92a1b18b...e46d`. Six hostile mutations refuse even when canonical identity
 Complete PP16 feature2 validation passes 192/192 under pinned JAX 0.10.1. Exact next is the same
 Sol reviewer's correction-only verdict. Numerical TPU execution remains forbidden until that
 review and a separate protected numerical-entrypoint batch. Gate D is open.
+
+## Current exact next: accepted FP32 layer-1 RMS-input boundary, not another 8K retry
+
+Commit `dafe2eed4f5b224faf3d4cbeeba069518be18606` was reviewed, pushed and mirrored to
+`US-CENTRAL2` before the one authorized DB518 numerical invocation. Protected tag
+`greenfield_pp16_feature2_layer0_db518_numerical_20260829T115022665987633Z` executed the main LP2
+graph exactly once with zero warmups and honestly returned `NUMERICAL_REJECTED`. The exact DB518
+position-113 normalized/key boundary and the reconstructed 8,155-row layer-0 prompt cache pass
+bitwise; candidate and accepted cache SHA are both `3808d502...859d1`. All ordinary model outputs
+remain byte-identical to the sealed predecessor. Thus DB518 was a real cache correction but is
+non-causal for the retained layer-1/DSA rejection. There is no DB row, token, performance or Gate-D
+claim. Post-process cleanup is authenticated 8/8 (`fd41e1f4...69b`), and the terminal-bound
+44-entry evidence ledger (`fe1c8acf...22d7`) plus terminal is preserved in the approved bucket.
+
+The earliest retained mismatch is now exactly one BF16 value per normalized owner at hidden index
+2795: observed `48422`, accepted `48423`; owners are bitwise equal. It cascades to 47 q-a values,
+all 4,096 query values, 32 head weights and the event-1 DSA set per owner. Current versus accepted
+carried BF16 rows differ in 968 values, but both have bit `47953` at index 2795.
+
+Offline classifier `docs/artifacts/pp16-feature2-layer1-straddler-classification.json` (SHA
+`eebe1c5d...7b36`) authenticates the exact capture/comparison/summary, accepted layer-1 oracle,
+DB550 boundary, optimized HLO and DB518 runner. Both protected runtime copies of the layer-1 norm
+weight match the DB550 bytes at SHA `10e34f4f...b6c87`. BF16 weight bit `15762` makes literal
+`BF16(BF16(x*inverse)*weight)` globally unable to emit protected bit `48422`; the sealed optimized
+HLO carries 12 scoped BF16 float-type-correction markers. Under an explicitly non-TPU NumPy FP32
+single-round model, exhaustive 65,535-value preimage searches construct both `48422` and `48423`
+from distinct FP32 rows that round to the same current and accepted BF16 carried rows. Therefore the
+retained BF16 boundary cannot adjudicate which FP32 source is accepted. This is evidence
+insufficiency, not bounded-error acceptance or numerical exactness.
+
+Do not rerun the unchanged BF16 comparator, alter DSA tolerances, or launch full 8K. Exact next is
+a separately reviewed, non-perturbing oracle-only acquisition of the accepted FP32 row entering
+layer-1 RMSNorm. It must preserve exact legacy tokens/DSA and use no returned-residual execution
+path. Only that boundary can distinguish a real greenfield FP32 producer error from an oracle-
+precision straddler. Gate D remains open.

@@ -622,3 +622,24 @@ alongside the older returned-residual design. Reuse the internal callback machin
 0's already-consumed normalized MLP input, under exact full-model token/DSA adjudication.
 Oracle-only pin `0c2f7f28a075a51f5eb51dc98bbb74e363d3290f` and the greenfield `dense_input`
 sealer localize the remaining boundary without importing legacy execution or reopening M1/M32.
+
+## PP16 DB518 rejection and layer-1 BF16 straddler reuse
+
+Reviewed/pushed pin `dafe2eed4f5b224faf3d4cbeeba069518be18606` executed the DB518 PP16 graph
+exactly once. Reuse its exact capture `534bacc5...62f0`, comparison `06ee82b9...2a4d`, summary
+`b01a5ac1...0d2c`, optimized HLO `634cf81a...07ca`, accepted layer-1 oracle
+`79b813da...9054`, DB550 boundary `f194d757...4298` and runner `fd51aacb...7a80`. The intervention makes position-113 and
+the full 8,155-row layer-0 prompt cache exact but leaves all ordinary outputs byte-identical to the
+sealed rejection, so DB518 is closed as the causal Gate-D fix. Do not repeat the cache repair or an
+unchanged BF16/full-8K comparison.
+
+Adapt `pp16_feature2_straddler.py` only as an offline fail-closed evidence classifier. Its capsule
+`eebe1c5d...7b36` proves both runtime norm-weight receipts equal the DB550 bytes at
+`10e34f4f...b6c87` and the retained current/accepted BF16 rows share bit `47953` at the sole
+normalized mismatch index 2795, while literal double-round BF16 with weight bit `15762` cannot
+produce observed bit `48422`. The sealed HLO carries scoped float-type-correction markers, and a
+clearly non-TPU NumPy FP32 model constructs both `48422` and accepted `48423` from distinct FP32
+preimages that round to the same BF16 carried rows. This does not admit bounded error or establish
+TPU association. Reuse it to require the accepted FP32 layer-1 RMS input as the next oracle
+boundary; the rejected returned-residual callback remains forbidden and any capture must be
+separately reviewed as non-perturbing.

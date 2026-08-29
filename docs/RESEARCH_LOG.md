@@ -11613,3 +11613,48 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
 - The same Sol reviewer approved exact diff `447117e2...06de` for commit/push/same-region mirror and
   exactly one zero-warmup protected DB518 numerical invocation through the wrapper. No full 8K, DB,
   Gate-D or performance expansion is authorized; there is not yet a numerical result or claim.
+
+## 2026-08-29 11:50--11:52 UTC — exact DB518 cache passes but is non-causal for Gate D
+
+- Reviewed commit `dafe2eed4f5b224faf3d4cbeeba069518be18606` was pushed and mirrored before
+  exactly one zero-warmup LP2 invocation. Tag
+  `greenfield_pp16_feature2_layer0_db518_numerical_20260829T115022665987633Z` executed once and
+  returned `NUMERICAL_REJECTED`; operational elapsed 80 seconds is not performance evidence.
+- The position-113 normalized BF16, FP32/BF16 current key and complete reconstructed 8,155-row
+  logical layer-0 prompt cache are exact. Candidate/accepted cache SHA is
+  `3808d502...859d1`, with zero mismatches. All ordinary arrays are byte-identical to the prior
+  sealed rejection, proving the cache repair changed the intended state but did not cause the
+  surviving output trajectory.
+- The first retained boundary mismatch is one BF16 value per equal owner at layer-1 normalized
+  hidden index 2795 (`48422` versus `48423`). It expands to 47 q-a, 4,096 query, 32 head-weight and
+  event-1 DSA differences per owner. Carried rows differ at 968 coordinates but share bit `47953`
+  at index 2795. Comparison/summary/capture SHAs are `06ee82b9...2a4d`, `b01a5ac1...0d2c` and
+  `534bacc5...62f0`.
+- There is no DB row, exact token result, trace/wall, performance or Gate-D claim. The terminal is
+  linked to the comparison/ledger/summary, the same-region archive is durable, and authenticated
+  post-process cleanup is 8/8 (`fd41e1f4...69b`).
+
+## 2026-08-29 12:40 UTC — sealed BF16 evidence is insufficient to decide the FP32 cause
+
+- New offline classifier authenticates the exact protected capture, comparison, summary, optimized
+  HLO (`634cf81a...07ca`), accepted layer-1 oracle (`79b813da...9054`), DB550 boundary
+  (`f194d757...4298`) and DB518 runner (`fd51aacb...7a80`). Its two runtime-selected layer-1 norm
+  weights exactly match the DB550 bytes at SHA `10e34f4f...b6c87`. Artifact
+  `docs/artifacts/pp16-feature2-layer1-straddler-classification.json` has SHA
+  `eebe1c5d5ba475a5faf000243d881657754fc47ed2345fe2691d923c1d457b36`.
+- With layer-1 norm-weight bit `15762`, exhaustive enumeration of every finite BF16 intermediate
+  proves literal `BF16(BF16(x*inverse)*BF16(weight))` cannot emit observed bit `48422` at all;
+  accepted `48423` is reachable. The exact optimized HLO contains 12 scoped RMS multiply
+  `float_type_correction_info/original_type=BF16` markers, so treating the source conversion as a
+  materialized arithmetic boundary is falsified by the protected result.
+- Under an explicitly labeled deterministic NumPy FP32 single-round reference—not TPU association
+  proof—all 65,535 FP32 preimages of carried bit `47953` are searched. Both protected bits have
+  constructive witnesses for both the current and accepted carried rows; each witness pair rounds
+  to an identical BF16 row while retaining distinct FP32 row hashes. Classification is therefore
+  `BF16_BOUNDARY_INSUFFICIENT_FOR_FP32_CAUSAL_ADJUDICATION`.
+- This does not relax exact DSA, accept internal error, or establish correctness. It forbids another
+  unchanged BF16-only or full-8K rerun. Exact next is a separately reviewed non-perturbing capture
+  of the accepted FP32 value entering layer-1 RMSNorm. Gate D remains open.
+- Focused hostile tests pass 9/9, the adjacent numerical/dense/p113 suite passes 68/68 in 20.97 s,
+  and the complete explicitly CPU-forced PP16 feature2 suite passes 219/219 in 186.05 s. Fresh
+  classifier output is byte-identical to the tracked capsule. No TPU process or workflow was used.

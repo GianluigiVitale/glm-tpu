@@ -1476,3 +1476,26 @@ physical-M64 key association before layer-0 causal consumption; it does not clos
 - This is implementation/readiness evidence only: no model arithmetic, tensor, DB row, exactness,
   Gate-D or performance claim exists. Sol review, commit/push/mirror and one separately authorized
   compile-only acquisition remain required.
+
+## Protected DB518 numerical rejection and FP32-boundary insufficiency
+
+Reviewed/pushed/mirrored commit `dafe2ee` executed the DB518-enabled PP16 graph once with zero
+warmups under tag
+`greenfield_pp16_feature2_layer0_db518_numerical_20260829T115022665987633Z`. Position-113
+normalized/key checks and all 8,155 logical prompt-cache rows are bitwise exact at cache SHA
+`3808d502...859d1`; all ordinary arrays equal the prior rejection. The terminal remains
+`NUMERICAL_REJECTED`: layer-1 normalized differs once per equal owner at hidden 2795
+(`48422/48423`) and downstream q-a/query/head/event-1 DSA differ. Capture/comparison/summary SHAs
+are `534bacc5...62f0`, `06ee82b9...2a4d`, and `b01a5ac1...0d2c`; cleanup is authenticated 8/8.
+There is no DB, token, trace/wall, performance or Gate-D claim.
+
+Offline capsule `docs/artifacts/pp16-feature2-layer1-straddler-classification.json`, SHA
+`eebe1c5d...7b36`, fail-closes on all sealed inputs, DB518 runner `fd51aacb...7a80` and optimized
+HLO `634cf81a...07ca`. Both runtime norm-weight receipts match DB550 SHA `10e34f4f...b6c87`. Literal
+double-round BF16 arithmetic cannot produce protected bit `48422` for norm-weight bit `15762`,
+while the optimized graph has 12 scoped BF16 float-type-correction markers. A deterministic NumPy
+FP32 single-round model constructs both observed and accepted output witnesses from different FP32
+preimages that round to the same current and accepted BF16 carried rows. This proves only that the
+retained BF16 evidence cannot identify the accepted FP32 boundary. Exact next is an accepted FP32
+layer-1 RMS-input acquisition through a separately reviewed non-perturbing oracle path. Unchanged
+BF16/full-8K reruns and bounded-error promotion remain forbidden; Gate D is open.
