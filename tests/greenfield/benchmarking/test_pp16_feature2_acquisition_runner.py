@@ -44,6 +44,7 @@ def test_feature2_acquisition_entrypoint_compiles_but_never_executes_main() -> N
     assert _calls(source, "wk_promote_compiled") == 1
     assert "return run_feature2(parse_args(), execute_main=False)" in source
     assert '"main_executed": execute_main' in source
+    assert '"sealed_boundary_capture": program.sealed_boundary_capture' in source
     assert '"numerical_claim": False' in source
     assert '"performance_claim": False' in source
     assert '"NUMERICAL_CAPTURED" if execute_main else "HLO_ACQUIRED"' in source
@@ -82,6 +83,11 @@ def test_feature2_acquisition_runner_requires_all_fail_closed_contracts() -> Non
         assert (
             ast.unparse(keywords["full_width_rounded_then_slice"])
             == "program.full_width_rounded_then_slice"
+        )
+        assert "sealed_boundary_capture" in keywords
+        assert (
+            ast.unparse(keywords["sealed_boundary_capture"])
+            == "program.sealed_boundary_capture"
         )
 
 

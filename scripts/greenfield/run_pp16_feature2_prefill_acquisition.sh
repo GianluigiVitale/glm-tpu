@@ -300,7 +300,7 @@ run=Path(sys.argv[1]); pin,tag,remote,elapsed=sys.argv[2:6]
 full_width_rounded_then_slice=bool(int(sys.argv[6]))
 runner=json.loads((run/'runner.json').read_text())
 source=json.loads((run/'source_identity.json').read_text())
-if runner.get('status')!='HLO_ACQUIRED' or runner.get('code_hash')!=pin or runner.get('compile_only') is not True or runner.get('main_executed') is not False or runner.get('numerical_claim') is not False or runner.get('performance_claim') is not False:
+if runner.get('status')!='HLO_ACQUIRED' or runner.get('code_hash')!=pin or runner.get('compile_only') is not True or runner.get('sealed_boundary_capture') is not True or runner.get('main_executed') is not False or runner.get('numerical_claim') is not False or runner.get('performance_claim') is not False:
     raise SystemExit('feature2 acquisition claim boundary drifted')
 if runner.get('full_width_rounded_then_slice') is not full_width_rounded_then_slice:
     raise SystemExit('feature2 acquisition producer variant drifted')
@@ -311,6 +311,11 @@ if runner.get('physical_group')!={'coordinates':[[0,0,0],[1,0,0]],'device_ids':[
 expected_graphs={'feature2_main','query_fp32','wk_decode_bf16','wk_promote_fp32'}
 if set(runner.get('hlo',{}))!=expected_graphs:
     raise SystemExit('feature2 HLO graph set drifted')
+expected_terminal_shapes=[[1,2048],[1],[1,2048],[2,1,3072],[2,1,32,256],[1,576],[2,1,6144],[2,1,2048],[2,1,32,128],[2,1,32],[2,16,256,640],[2,16,256,128],[2,16,256,128],[2,2],[1]]
+expected_terminal_dtypes=['int32','int32','float32','bfloat16','bfloat16','bfloat16','bfloat16','bfloat16','float32','float32','bfloat16','bfloat16','bfloat16','uint32','bool']
+expected_stable_types=['tensor<1x2048xi32>','tensor<1xi32>','tensor<1x2048xf32>','tensor<2x1x3072xbf16>','tensor<2x1x32x256xbf16>','tensor<1x576xbf16>','tensor<2x1x6144xbf16>','tensor<2x1x2048xbf16>','tensor<2x1x32x128xf32>','tensor<2x1x32xf32>','tensor<2x16x256x640xbf16>','tensor<2x16x256x128xbf16>','tensor<2x16x256x128xbf16>','tensor<2x2xui32>','tensor<1xi1>']
+expected_optimized_roots=[{'dtype':dtype,'shape':shape} for dtype,shape in [('s32',[1,2048]),('s32',[1]),('f32',[1,2048]),('bf16',[1,1,3072]),('bf16',[1,1,32,256]),('bf16',[1,576]),('bf16',[1,1,6144]),('bf16',[1,1,2048]),('f32',[1,1,32,128]),('f32',[1,1,32]),('bf16',[1,16,256,640]),('bf16',[1,16,256,128]),('bf16',[1,16,256,128]),('u32',[1,2]),('pred',[1])]]
+expected_sealed_bindings={'6':'greenfield_pp16_feature2_sealed_normalized_hidden','7':'greenfield_pp16_feature2_sealed_q_a_state','8':'greenfield_pp16_feature2_sealed_dsa_query','9':'greenfield_pp16_feature2_sealed_dsa_head_weights'}
 for name,record in runner['hlo'].items():
     for kind,suffix in (('stablehlo','.stablehlo.mlir'),('optimized_hlo','.optimized_hlo.txt')):
         identity=record.get(kind,{})
@@ -321,12 +326,19 @@ for name,record in runner['hlo'].items():
         for contract in ('jaxpr_contract','optimized_contract','stablehlo_contract','terminal_contract'):
             if record.get(contract,{}).get('passed') is not True:
                 raise SystemExit(f'feature2 main {contract} failed')
+        stable=record['stablehlo_contract']; optimized=record['optimized_contract']; terminal=record['terminal_contract']
+        if stable.get('sealed_boundary_capture') is not True or stable.get('output_count')!=15 or stable.get('terminal_shapes')!=expected_terminal_shapes or stable.get('terminal_types')!=expected_stable_types:
+            raise SystemExit('feature2 main StableHLO sealed terminal drifted')
+        if optimized.get('sealed_boundary_capture') is not True or optimized.get('output_count')!=15 or optimized.get('root_shapes')!=expected_optimized_roots or optimized.get('sealed_bindings')!=expected_sealed_bindings:
+            raise SystemExit('feature2 main optimized-HLO sealed terminal drifted')
+        if terminal.get('sealed_boundary_capture') is not True or terminal.get('output_count')!=15 or terminal.get('terminal_shapes')!=expected_terminal_shapes or terminal.get('terminal_dtypes')!=expected_terminal_dtypes:
+            raise SystemExit('feature2 main abstract sealed terminal drifted')
     elif record.get('contract',{}).get('passed') is not True:
         raise SystemExit(f'feature2 materializer {name} contract failed')
 state=runner.get('state_manifest',{})
 if state.get('plan_id')!='PP16_LP2' or state.get('owner_device_ids')!=[0,1] or state.get('selected_read_count')!=78 or state.get('raw_dense_device_materialization') is not False or state.get('dense_final_layout') is not True:
     raise SystemExit('feature2 selective state contract drifted')
-summary={'artifact_kind':'greenfield_pp16_feature2_compile_acquisition_summary','claim_scope':runner['claim_scope'],'code_hash':pin,'elapsed_seconds':int(elapsed),'full_width_rounded_then_slice':full_width_rounded_then_slice,'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_executed':False,'numerical_claim':False,'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'status':'HLO_ACQUIRED'}
+summary={'artifact_kind':'greenfield_pp16_feature2_compile_acquisition_summary','claim_scope':runner['claim_scope'],'code_hash':pin,'elapsed_seconds':int(elapsed),'full_width_rounded_then_slice':full_width_rounded_then_slice,'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_executed':False,'numerical_claim':False,'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'sealed_boundary_capture':True,'status':'HLO_ACQUIRED'}
 (run/'summary.json').write_text(json.dumps(summary,allow_nan=False,indent=2,sort_keys=True)+'\n')
 PY
 

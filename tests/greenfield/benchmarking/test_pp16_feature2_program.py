@@ -101,7 +101,7 @@ def test_feature2_runtime_device_coordinates_normalize_without_weakening() -> No
     reason="protected PP16 runtime or 8K oracle is unavailable",
 )
 def test_complete_program_abstract_graph_is_exact_lp2_and_fail_closed() -> None:
-    program = r'''
+    program = r"""
 from pathlib import Path
 from hashlib import sha256
 import json
@@ -211,7 +211,7 @@ print(json.dumps({
     'weight_contract': validate_feature2_executable_weight_contract(graph),
     'weight_count': len(built.weight_specs),
 }, sort_keys=True))
-'''
+"""
     env = dict(os.environ)
     env["JAX_PLATFORMS"] = "cpu"
     env["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
@@ -255,8 +255,26 @@ print(json.dumps({
         "scan": 18,
     }
     expected_terminal = {
-        "output_count": 11,
+        "output_count": 15,
         "passed": True,
+        "sealed_boundary_capture": True,
+        "terminal_dtypes": [
+            "int32",
+            "int32",
+            "float32",
+            "bfloat16",
+            "bfloat16",
+            "bfloat16",
+            "bfloat16",
+            "bfloat16",
+            "float32",
+            "float32",
+            "bfloat16",
+            "bfloat16",
+            "bfloat16",
+            "uint32",
+            "bool",
+        ],
         "terminal_shapes": [
             [1, 2048],
             [1],
@@ -264,6 +282,10 @@ print(json.dumps({
             [2, 1, 3072],
             [2, 1, 32, 256],
             [1, 576],
+            [2, 1, 6144],
+            [2, 1, 2048],
+            [2, 1, 32, 128],
+            [2, 1, 32],
             [2, 16, 256, 640],
             [2, 16, 256, 128],
             [2, 16, 256, 128],
@@ -275,7 +297,7 @@ print(json.dumps({
     assert result["default"] == {
         "contract": expected_contract,
         "full_width_rounded_then_slice": False,
-        "jaxpr_sha256": "01f18a7e2fdaaa07837ba66bfe66dde871b0eb641ce5ec87181468cbd17a1dc3",
+        "jaxpr_sha256": "75deaf2087d62885eb6e0a9a4d26317ad70e405f912d793dbd9bc355de6d856d",
         "terminal": expected_terminal,
     }
     assert result["successor"] == {
@@ -286,6 +308,6 @@ print(json.dumps({
             "fp8_attention_o_n6144": 64,
         },
         "full_width_rounded_then_slice": True,
-        "jaxpr_sha256": "78ba7f12806d3f3fc4c8291c5d1afbd55914b3ecc280bf96e96cd39b913289b2",
+        "jaxpr_sha256": "9773c7b150a5b277116b33574b56f40316da24c5fc497d8827edbeb83fde372d",
         "terminal": expected_terminal,
     }

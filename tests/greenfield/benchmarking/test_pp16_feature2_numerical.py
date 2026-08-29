@@ -16,6 +16,7 @@ from glm_tpu.greenfield.benchmarking.pp16_dense_boundary import (
 )
 from glm_tpu.greenfield.benchmarking.pp16_feature2_numerical import (
     _bitwise_mismatches,
+    compare_feature2_full_width_numerical_capture,
     compare_feature2_numerical_capture,
 )
 from glm_tpu.greenfield.errors import BenchmarkValidationError
@@ -122,7 +123,7 @@ def test_exact_comparator_rejects_signed_zero_and_one_bit_float_drift() -> None:
     assert _bitwise_mismatches(baseline, one_bit.view(np.float32)) == 1
 
 
-def _capture(path: Path) -> None:
+def _capture(path: Path, *, full_width_boundaries: bool = False) -> None:
     from safetensors import safe_open
 
     from glm_tpu.greenfield.validation.short_context_dsa_oracle import (
@@ -141,6 +142,10 @@ def _capture(path: Path) -> None:
         )
         valid = np.ascontiguousarray(handle.get_tensor("valid_counts")[0, 1][None])
     with np.load(LAYER1, allow_pickle=False) as handle:
+        normalized_bits = np.ascontiguousarray(handle["accepted__normalized_hidden"])
+        q_a_bits = np.ascontiguousarray(handle["accepted__q_a_state"])
+        dsa_query = np.ascontiguousarray(handle["accepted__query"])
+        dsa_head_weights = np.ascontiguousarray(handle["accepted__head_weights"])
         key_bits = np.ascontiguousarray(
             np.asarray(handle["accepted__current_key"], dtype=ml_dtypes.bfloat16).view(
                 np.uint16
@@ -160,32 +165,60 @@ def _capture(path: Path) -> None:
         )
     layer1_cache = np.zeros((2, 16, 256, 128), dtype=np.uint16)
     layer1_cache[1, 15, 219] = key_bits
-    np.savez(
-        path,
-        event1_positions=positions,
-        event1_valid_counts=valid,
-        event1_scores=scores,
-        current_carried_halves_bfloat16_bits=np.stack(
+    values = {
+        "event1_positions": positions,
+        "event1_valid_counts": valid,
+        "event1_scores": scores,
+        "current_carried_halves_bfloat16_bits": np.stack(
             (carried[:, :3072], carried[:, 3072:])
         ),
-        current_attention_query_owners_bfloat16_bits=np.zeros(
+        "current_attention_query_owners_bfloat16_bits": np.zeros(
             (2, 1, 32, 256), dtype=np.uint16
         ),
-        current_kv_a_bfloat16_bits=np.zeros((1, 576), dtype=np.uint16),
-        layer0_kv_cache_owners_bfloat16_bits=np.zeros(
+        "current_kv_a_bfloat16_bits": np.zeros((1, 576), dtype=np.uint16),
+        "layer0_kv_cache_owners_bfloat16_bits": np.zeros(
             (2, 16, 256, 640), dtype=np.uint16
         ),
-        layer0_index_cache_owners_bfloat16_bits=np.zeros(
+        "layer0_index_cache_owners_bfloat16_bits": np.zeros(
             (2, 16, 256, 128), dtype=np.uint16
         ),
-        layer1_index_cache_owners_bfloat16_bits=layer1_cache,
-        carried_liveness_digest_owners=np.zeros((2, 2), dtype=np.uint32),
-        contract_valid=np.ones((1,), dtype=np.bool_),
-    )
+        "layer1_index_cache_owners_bfloat16_bits": layer1_cache,
+        "carried_liveness_digest_owners": np.zeros((2, 2), dtype=np.uint32),
+        "contract_valid": np.ones((1,), dtype=np.bool_),
+    }
+    if full_width_boundaries:
+        values.update(
+            {
+                "current_normalized_hidden_owners_bfloat16_bits": (
+                    np.ascontiguousarray(np.broadcast_to(normalized_bits, (2, 1, 6144)))
+                ),
+                "current_q_a_state_owners_bfloat16_bits": np.ascontiguousarray(
+                    np.broadcast_to(q_a_bits, (2, 1, 2048))
+                ),
+                "current_dsa_query_owners": np.ascontiguousarray(
+                    np.broadcast_to(dsa_query, (2, 1, 32, 128))
+                ),
+                "current_dsa_head_weights_owners": np.ascontiguousarray(
+                    np.broadcast_to(dsa_head_weights, (2, 1, 32))
+                ),
+            }
+        )
+    np.savez(path, **values)
 
 
 def _compare(path: Path) -> dict[str, object]:
     return compare_feature2_numerical_capture(
+        path,
+        token_oracle_dir=TOKEN_ORACLE,
+        dsa_oracle_dir=DSA_ORACLE,
+        layer1_internal_reference=LAYER1,
+        db529_internal_dir=DB529,
+        db550_boundary=DB550,
+    )
+
+
+def _compare_full_width(path: Path) -> dict[str, object]:
+    return compare_feature2_full_width_numerical_capture(
         path,
         token_oracle_dir=TOKEN_ORACLE,
         dsa_oracle_dir=DSA_ORACLE,
@@ -228,6 +261,76 @@ def test_feature2_numerical_comparator_rejects_schema_drift(tmp_path: Path) -> N
         _compare(capture)
 
 
+@pytest.mark.skipif(not SOURCES_AVAILABLE, reason="protected sources unavailable")
+def test_full_width_comparator_requires_every_sealed_boundary(
+    tmp_path: Path,
+) -> None:
+    capture = tmp_path / "capture.npz"
+    _capture(capture, full_width_boundaries=True)
+    report = _compare_full_width(capture)
+    assert report["exact"] is True
+    assert report["status"] == "NUMERICAL_EXACT"
+    assert report["comparison_schema"] == "full_width_sealed_boundaries_v2"
+    assert report["sealed_boundary_comparisons_required"] is True
+    assert set(report["mismatch_counts"].values()) == {0}
+    for name in (
+        "layer1_normalized_hidden_bfloat16_bits",
+        "layer1_q_a_state_bfloat16_bits",
+        "layer1_dsa_query_float32",
+        "layer1_dsa_head_weights_float32",
+    ):
+        assert name in report["mismatch_counts"]
+
+    base = tmp_path / "base.npz"
+    _capture(base)
+    with pytest.raises(BenchmarkValidationError, match="keys drifted"):
+        _compare_full_width(base)
+    with pytest.raises(BenchmarkValidationError, match="keys drifted"):
+        _compare(capture)
+
+
+@pytest.mark.skipif(not SOURCES_AVAILABLE, reason="protected sources unavailable")
+@pytest.mark.parametrize(
+    ("field", "mismatch_name"),
+    (
+        (
+            "current_normalized_hidden_owners_bfloat16_bits",
+            "layer1_normalized_hidden_bfloat16_bits",
+        ),
+        (
+            "current_q_a_state_owners_bfloat16_bits",
+            "layer1_q_a_state_bfloat16_bits",
+        ),
+        ("current_dsa_query_owners", "layer1_dsa_query_float32"),
+        (
+            "current_dsa_head_weights_owners",
+            "layer1_dsa_head_weights_float32",
+        ),
+    ),
+)
+@pytest.mark.parametrize("owner", (0, 1))
+def test_full_width_comparator_rejects_one_bit_drift_from_either_owner(
+    tmp_path: Path,
+    field: str,
+    mismatch_name: str,
+    owner: int,
+) -> None:
+    capture = tmp_path / "capture.npz"
+    _capture(capture, full_width_boundaries=True)
+    with np.load(capture, allow_pickle=False) as handle:
+        values = {name: np.asarray(handle[name]).copy() for name in handle.files}
+    target = values[field][owner].reshape(-1)
+    if target.dtype == np.uint16:
+        target[0] ^= np.uint16(1)
+    else:
+        target.view(np.uint32)[0] ^= np.uint32(1)
+    np.savez(capture, **values)
+    report = _compare_full_width(capture)
+    assert report["exact"] is False
+    assert report["status"] == "NUMERICAL_REJECTED"
+    assert report["mismatch_counts"][mismatch_name] == 1
+
+
 def test_feature2_rejection_recovery_is_cpu_only_distinct_and_default_off() -> None:
     recovery = (
         Path(__file__).parents[3]
@@ -254,8 +357,7 @@ def test_feature2_rejection_recovery_is_cpu_only_distinct_and_default_off() -> N
         "d857d2e98cf18eb505d447acd52acf062106af75e83ac0918fa64c13105e96c2"
     ) in text
     assert (
-        "CAPTURE_SHA="
-        "be3dda446cfbde547af49dd5ea371af690b553bcc8414907add1b0a2503b9d0d"
+        "CAPTURE_SHA=be3dda446cfbde547af49dd5ea371af690b553bcc8414907add1b0a2503b9d0d"
     ) in text
     assert (
         "POST_CENSUS_SHA="
@@ -274,20 +376,16 @@ def test_feature2_rejection_recovery_is_cpu_only_distinct_and_default_off() -> N
     assert "72_812_032" in text
     assert '"event1_positions": 1852' in text
     assert '"carried_bfloat16_bits": 968' in text
-    assert (
-        "3f6c86ed6e96a59adfe706a522297bf83c2ed0802a36ede9f06a88cf6f3f53d2"
-    ) in text
-    assert (
-        "35a601b7f174eb9204848757f709549a31e82774309929f4071c61849626044c"
-    ) in text
+    assert ("3f6c86ed6e96a59adfe706a522297bf83c2ed0802a36ede9f06a88cf6f3f53d2") in text
+    assert ("35a601b7f174eb9204848757f709549a31e82774309929f4071c61849626044c") in text
     assert "--if-generation-match=0" in text
     assert 'gcloud storage rm --if-generation-match="$generation"' in text
     assert "rollback_unverified_terminal" in text
     assert "terminal_verified=1\ntrap - EXIT" in text
     assert '"cat", f"{uri}#{generation}"' in text
     assert 'metadata.get("crc32c_hash", metadata.get("crc32c"))' in text
-    assert '[[ -s $receipt ]] || return 1' in text
-    assert 'assert matches == [(remote, generation)]' in text
+    assert "[[ -s $receipt ]] || return 1" in text
+    assert "assert matches == [(remote, generation)]" in text
     assert 'sync -f "$RECOVERY_DIR/upload_receipts/terminal_create.stderr"' in text
     assert '"gate_d_passed": False' in text
     assert '"performance_claim": False' in text
@@ -303,6 +401,12 @@ def test_feature2_rejection_recovery_is_cpu_only_distinct_and_default_off() -> N
 )
 def test_protected_feature2_rejection_exact_identities_are_executable() -> None:
     report = _compare(PROTECTED_CAPTURE)
+    sealed_bytes = (
+        json.dumps(report, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    ).encode()
+    assert sha256(sealed_bytes).hexdigest() == (
+        "7882af406cadfaa27191297ed44a74028f4227c52bb7f15cf17b0f9624981b45"
+    )
     assert report["status"] == "NUMERICAL_REJECTED"
     assert report["exact"] is False
     assert report["capture_sha256"] == (
@@ -316,9 +420,10 @@ def test_protected_feature2_rejection_exact_identities_are_executable() -> None:
         "event1_valid_counts": 0,
         "layer1_current_key_bfloat16_bits": 0,
     }
-    assert report["captured_array_sha256"][
-        "current_carried_halves_bfloat16_bits"
-    ] == "3f6c86ed6e96a59adfe706a522297bf83c2ed0802a36ede9f06a88cf6f3f53d2"
+    assert (
+        report["captured_array_sha256"]["current_carried_halves_bfloat16_bits"]
+        == "3f6c86ed6e96a59adfe706a522297bf83c2ed0802a36ede9f06a88cf6f3f53d2"
+    )
     assert report["expected_sha256"]["carried_bfloat16_bits"] == (
         "35a601b7f174eb9204848757f709549a31e82774309929f4071c61849626044c"
     )
@@ -326,7 +431,7 @@ def test_protected_feature2_rejection_exact_identities_are_executable() -> None:
 
 @pytest.mark.skipif(not DB550.is_file(), reason="protected DB550 leaves unavailable")
 def test_real_db550_leaves_are_exact_through_feature_half_reducer() -> None:
-    program = r'''
+    program = r"""
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -398,7 +503,7 @@ print(json.dumps({
     "stablehlo_byte_count": len(hlo.encode()),
     "stablehlo_sha256": sha256(hlo.encode()).hexdigest(),
 }, sort_keys=True))
-'''
+"""
     environment = dict(os.environ)
     environment["JAX_PLATFORMS"] = "cpu"
     environment["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"

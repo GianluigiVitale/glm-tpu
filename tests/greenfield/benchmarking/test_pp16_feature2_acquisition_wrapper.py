@@ -28,6 +28,15 @@ def test_feature2_acquisition_wrapper_is_default_off_and_serialized() -> None:
         "--compile-only 1",
         "--full-width-rounded-then-slice",
         "full_width_rounded_then_slice",
+        "sealed_boundary_capture",
+        "expected_terminal_shapes",
+        "expected_terminal_dtypes",
+        "expected_stable_types",
+        "expected_optimized_roots",
+        "expected_sealed_bindings",
+        "StableHLO sealed terminal drifted",
+        "optimized-HLO sealed terminal drifted",
+        "abstract sealed terminal drifted",
     ):
         assert marker in source
 

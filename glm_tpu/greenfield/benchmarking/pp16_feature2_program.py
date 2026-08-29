@@ -9,9 +9,10 @@ DSA scorer.  It neither executes layer-1 attention output nor any later layer.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Mapping, NamedTuple, Sequence
+from typing import Any, NamedTuple
 
 import numpy as np
 
@@ -85,6 +86,10 @@ class Feature2PrefillProgramResult(NamedTuple):
     current_carried_halves: Any
     current_attention_query_owners: Any
     current_kv_a: Any
+    current_normalized_hidden_owners: Any
+    current_q_a_state_owners: Any
+    current_dsa_query_owners: Any
+    current_dsa_head_weights_owners: Any
     layer0_kv_cache_owners: Any
     layer0_index_cache_owners: Any
     layer1_index_cache_owners: Any
@@ -96,6 +101,7 @@ class Feature2PrefillProgramResult(NamedTuple):
 class Feature2PrefillProgram:
     graph_sha256: str
     full_width_rounded_then_slice: bool
+    sealed_boundary_capture: bool
     mesh: Any
     weight_specs: Mapping[str, Any]
     materialize_query_weights_fp32: Any
@@ -138,9 +144,7 @@ def validate_feature2_prefill_jaxpr(
     if not isinstance(jaxpr, str) or not jaxpr.strip():
         raise BenchmarkValidationError("feature2 executable JAXpr is empty")
     if not isinstance(full_width_rounded_then_slice, bool):
-        raise ValueError(
-            "feature2 JAXpr full-width-then-slice flag must be boolean"
-        )
+        raise TypeError("feature2 JAXpr full-width-then-slice flag must be boolean")
     counts = {
         "all_gather": jaxpr.count("all_gather["),
         "convolution": jaxpr.count("conv_general_dilated["),
@@ -153,9 +157,7 @@ def validate_feature2_prefill_jaxpr(
         "h16_b512_attention": jaxpr.count(
             "name=greenfield_pregathered_sparse_mla_h16_k2048_b512_w640"
         ),
-        "physical_m64_projection": jaxpr.count(
-            "Precision.DEFAULT, Precision.HIGHEST"
-        ),
+        "physical_m64_projection": jaxpr.count("Precision.DEFAULT, Precision.HIGHEST"),
         "pmin": jaxpr.count("pmin["),
         "ppermute": jaxpr.count("ppermute["),
         "psum": jaxpr.count("psum["),
@@ -221,15 +223,17 @@ def validate_feature2_prefill_result_abstract(
         ((2, 1, 3072), "bfloat16"),
         ((2, 1, 32, 256), "bfloat16"),
         ((1, 576), "bfloat16"),
+        ((2, 1, 6144), "bfloat16"),
+        ((2, 1, 2048), "bfloat16"),
+        ((2, 1, 32, 128), "float32"),
+        ((2, 1, 32), "float32"),
         ((2, 16, 256, 640), "bfloat16"),
         ((2, 16, 256, 128), "bfloat16"),
         ((2, 16, 256, 128), "bfloat16"),
         ((2, 2), "uint32"),
         ((1,), "bool"),
     )
-    observed = tuple(
-        (tuple(value.shape), str(value.dtype)) for value in result
-    )
+    observed = tuple((tuple(value.shape), str(value.dtype)) for value in result)
     if observed != expected:
         raise BenchmarkValidationError(
             "feature2 executable terminal boundary drifted: "
@@ -238,6 +242,8 @@ def validate_feature2_prefill_result_abstract(
     return {
         "output_count": len(observed),
         "passed": True,
+        "sealed_boundary_capture": True,
+        "terminal_dtypes": [dtype for _, dtype in observed],
         "terminal_shapes": [list(shape) for shape, _ in observed],
     }
 
@@ -298,8 +304,9 @@ _DENSE_SOURCE_NAMES = frozenset(
     }
 )
 _DENSE_FINAL_NAMES = frozenset(
-    name for name in _EXECUTABLE_WEIGHT_SHAPES if ".weight_bits_in_out" in name
-    or ".scale_inv_in_out" in name
+    name
+    for name in _EXECUTABLE_WEIGHT_SHAPES
+    if ".weight_bits_in_out" in name or ".scale_inv_in_out" in name
 )
 
 
@@ -365,9 +372,7 @@ def load_feature2_prefill_runtime_inputs(
     token_record = manifest["files"]["tokens"]
     with safe_open(root / token_record["filename"], framework="np") as handle:
         prompt = np.asarray(handle.get_tensor("prompt_token_ids"), dtype=np.int32)
-        generated = np.asarray(
-            handle.get_tensor("generated_token_ids"), dtype=np.int32
-        )
+        generated = np.asarray(handle.get_tensor("generated_token_ids"), dtype=np.int32)
     tokens = np.ascontiguousarray(np.concatenate((prompt, generated[:1])))
     if tokens.shape != token_source.shape:
         raise BenchmarkValidationError("feature2 runtime token shape drifted")
@@ -433,9 +438,7 @@ def _update_liveness_digest(
     )
     position_word = position.astype(jnp.uint32) + jnp.uint32(1)
     with jax.named_scope("greenfield_pp16_feature2_carried_liveness"):
-        row0 = jnp.sum(
-            bits * (global_feature * jnp.uint32(2654435761) + position_word)
-        )
+        row0 = jnp.sum(bits * (global_feature * jnp.uint32(2654435761) + position_word))
         row1 = jnp.sum(
             (bits ^ (position_word * jnp.uint32(2246822519)))
             * (global_feature * jnp.uint32(3266489917) + jnp.uint32(1))
@@ -505,12 +508,10 @@ def _feature2_prefill_mapped(
     full_width_rounded_then_slice: bool = False,
 ) -> Feature2PrefillProgramResult:
     import jax.numpy as jnp
-    from jax import lax
+    from jax import lax, named_scope
 
     if not isinstance(full_width_rounded_then_slice, bool):
-        raise ValueError(
-            "feature2 full-width-then-slice flag must be boolean"
-        )
+        raise TypeError("feature2 full-width-then-slice flag must be boolean")
     if candidate_token_ids.shape != (PP16_FEATURE2_CONTEXT_LENGTH,) or (
         candidate_token_ids.dtype != jnp.int32
     ):
@@ -525,9 +526,7 @@ def _feature2_prefill_mapped(
         raise ValueError("feature2 executable requires one context length")
     if current_position.shape != (1,) or current_position.dtype != jnp.int32:
         raise ValueError("feature2 executable requires one current position")
-    if main_rope_table.shape != (8192, 64) or (
-        main_rope_table.dtype != jnp.bfloat16
-    ):
+    if main_rope_table.shape != (8192, 64) or (main_rope_table.dtype != jnp.bfloat16):
         raise ValueError("feature2 executable main-RoPE table drifted")
 
     local_slot = lax.axis_index(_AXIS_NAME)
@@ -557,15 +556,9 @@ def _feature2_prefill_mapped(
         if value.shape != shape or value.dtype != jnp.float32:
             raise ValueError(f"feature2 materialized {name} drifted")
 
-    input_norm0_half = _feature_half(
-        weight("attention.slot_00.input_norm"), local_slot
-    )
-    post_norm0_half = _feature_half(
-        weight("attention.slot_00.post_norm"), local_slot
-    )
-    input_norm1_half = _feature_half(
-        weight("attention.slot_01.input_norm"), local_slot
-    )
+    input_norm0_half = _feature_half(weight("attention.slot_00.input_norm"), local_slot)
+    post_norm0_half = _feature_half(weight("attention.slot_00.post_norm"), local_slot)
+    input_norm1_half = _feature_half(weight("attention.slot_01.input_norm"), local_slot)
     zero_half = jnp.zeros((1, 3072), dtype=jnp.bfloat16)
     layer0_query_aliases = (layer0_query,) * 4
     layer1_query_aliases = (layer1_query,) * 4
@@ -695,18 +688,14 @@ def _feature2_prefill_mapped(
                 pregathered_b512_attention=True,
                 feature_sharded_output=True,
                 feature_pairs=_PAIRS,
-                feature_full_width_rounded_then_slice=(
-                    full_width_rounded_then_slice
-                ),
+                feature_full_width_rounded_then_slice=(full_width_rounded_then_slice),
             )
-            post_attention, normalized_mlp = (
-                feature2_add_rms_gather_mapped(
-                    attention0.output,
-                    carried0,
-                    post_norm0_half,
-                    axis_name=_AXIS_NAME,
-                    groups=_GROUPS,
-                )
+            post_attention, normalized_mlp = feature2_add_rms_gather_mapped(
+                attention0.output,
+                carried0,
+                post_norm0_half,
+                axis_name=_AXIS_NAME,
+                groups=_GROUPS,
             )
             dense_update = stage_local_dense_feature2_fp8_mapped(
                 normalized_mlp,
@@ -716,9 +705,7 @@ def _feature2_prefill_mapped(
                 weight("dense.slot_00.down.scale_inv_in_out"),
                 axis_name=_AXIS_NAME,
                 pairs=_PAIRS,
-                full_width_rounded_then_slice=(
-                    full_width_rounded_then_slice
-                ),
+                full_width_rounded_then_slice=(full_width_rounded_then_slice),
             )
             carried1, normalized1 = feature2_add_rms_gather_mapped(
                 dense_update,
@@ -730,9 +717,7 @@ def _feature2_prefill_mapped(
             next_digest = _update_liveness_digest(
                 current_digest, carried1, position_scalar, local_slot
             )
-            next_valid = (
-                current_valid & dsa0.contract_valid & attention0.contract_valid
-            )
+            next_valid = current_valid & dsa0.contract_valid & attention0.contract_valid
             next_carry = (
                 attention0.cache,
                 dsa0.index_cache,
@@ -857,13 +842,31 @@ def _feature2_prefill_mapped(
         & (current_position[0] == jnp.int32(PP16_FEATURE2_CURRENT_POSITION))
     )[None]
     contract_valid = contract_valid & event1.contract_valid & source_valid
-    contract_valid = (
-        lax.pmin(
-            contract_valid.astype(jnp.int32),
-            _AXIS_NAME,
-            axis_index_groups=_GROUPS,
-        )
-        == jnp.int32(1)
+    contract_valid = lax.pmin(
+        contract_valid.astype(jnp.int32),
+        _AXIS_NAME,
+        axis_index_groups=_GROUPS,
+    ) == jnp.int32(1)
+
+    def seal_boundary(value: Any, scope: str) -> Any:
+        with named_scope(scope):
+            return lax.optimization_barrier(value[None, ...])
+
+    sealed_normalized_hidden = seal_boundary(
+        event1.internals.normalized_hidden,
+        "greenfield_pp16_feature2_sealed_normalized_hidden",
+    )
+    sealed_q_a_state = seal_boundary(
+        event1.internals.q_a_state,
+        "greenfield_pp16_feature2_sealed_q_a_state",
+    )
+    sealed_dsa_query = seal_boundary(
+        event1.internals.query,
+        "greenfield_pp16_feature2_sealed_dsa_query",
+    )
+    sealed_dsa_head_weights = seal_boundary(
+        event1.internals.head_weights,
+        "greenfield_pp16_feature2_sealed_dsa_head_weights",
     )
     return Feature2PrefillProgramResult(
         event1.selected_positions,
@@ -872,6 +875,10 @@ def _feature2_prefill_mapped(
         last_carried[None, ...],
         attention_query[None, ...],
         projected1.kv_a_projection,
+        sealed_normalized_hidden,
+        sealed_q_a_state,
+        sealed_dsa_query,
+        sealed_dsa_head_weights,
         kv_cache[None, ...],
         layer0_index_cache[None, ...],
         event1.index_cache[None, ...],
@@ -896,9 +903,7 @@ def build_feature2_prefill_program(
     validate_feature2_prefill_graph(graph)
     validate_feature2_executable_weight_contract(graph)
     if not isinstance(full_width_rounded_then_slice, bool):
-        raise PlanValidationError(
-            "feature2 full-width-then-slice flag must be boolean"
-        )
+        raise PlanValidationError("feature2 full-width-then-slice flag must be boolean")
     runtime_devices = _validate_feature2_runtime_devices(devices)
     mesh = Mesh(np.asarray(runtime_devices, dtype=object), (_AXIS_NAME,))
     weight_specs = {
@@ -925,9 +930,9 @@ def build_feature2_prefill_program(
 
     def decode_wk(bits0: Any, scale0: Any, bits1: Any, scale1: Any) -> Any:
         def decode(bits: Any, scale: Any) -> Any:
-            return decode_stage_local_prefill_index_wk_bf16(
-                bits[0], scale[0]
-            )[None, ...]
+            return decode_stage_local_prefill_index_wk_bf16(bits[0], scale[0])[
+                None, ...
+            ]
 
         return decode(bits0, scale0), decode(bits1, scale1)
 
@@ -960,6 +965,10 @@ def build_feature2_prefill_program(
         P(_AXIS_NAME, None, None),
         P(_AXIS_NAME, None, None, None),
         P(),
+        P(_AXIS_NAME, None, None),
+        P(_AXIS_NAME, None, None),
+        P(_AXIS_NAME, None, None, None),
+        P(_AXIS_NAME, None, None),
         P(_AXIS_NAME, None, None, None),
         P(_AXIS_NAME, None, None, None),
         P(_AXIS_NAME, None, None, None),
@@ -993,6 +1002,7 @@ def build_feature2_prefill_program(
     return Feature2PrefillProgram(
         graph_sha256=graph.graph_sha256,
         full_width_rounded_then_slice=full_width_rounded_then_slice,
+        sealed_boundary_capture=True,
         mesh=mesh,
         weight_specs=weight_specs,
         materialize_query_weights_fp32=materialize_query_weights_fp32,

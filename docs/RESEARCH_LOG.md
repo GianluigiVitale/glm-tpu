@@ -5,6 +5,39 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-29 03:00--03:14 UTC — PP16 exact boundary capture/comparator implemented offline
+
+The full-width feature2 successor now returns four already-live layer-1/event-1 diagnostic roots
+from each LP2 owner: normalized hidden `[2,1,6144]` BF16, q-a state `[2,1,2048]` BF16, DSA query
+`[2,1,32,128]` FP32 and head weights `[2,1,32]` FP32. Persistent residual state remains the
+existing `[2,1,3072]` halves. The source graph adds no transport operation; the next real
+compile-only acquisition must prove optimized collective counts and the exact new 15-root terminal
+boundary. Four named optimization barriers bind the terminal roots to their intended producers.
+Default and full-width forced-two-device JAXpr SHAs are `75deaf20...856d` and
+`9773c7b1...372d`.
+
+The HLO validators retain the historical 11-root contract unless the new sealed-boundary flag is
+explicitly true, when all four additional per-owner roots become mandatory. The strict successor
+comparator authenticates every accepted layer-1 reference hash and compares both owners bitwise
+for all four new boundaries, along with the previously sealed carried state, current key, event-1
+positions/scores/valid count and contract. Historical and successor NPZ schemas are mutually
+exclusive. Eight hostile one-bit cases cover every new field on owners 0 and 1.
+
+Sol returned `BLOCK` on the first staged correction. The historical comparator changed its sealed
+report; StableHLO accepted module-wide shape decoys; optimized HLO declared 15 types without 15
+live ordered operands or intended-producer bindings; and the wrapper checked only the top-level
+flag. The corrected legacy report is byte-identical at SHA `7882af40...1b45`. StableHLO now pins
+the exact public `result_info` names/types and contiguous live tuple projections. Optimized HLO
+requires exact root arity/operand geometry and one linearly bound named barrier per new root; decoy,
+missing, swapped, mixed and wrong-marker attacks reject. Publication independently checks sealed
+mode, count, shapes/types and bindings in StableHLO, optimized HLO and the abstract terminal.
+The focused suite passes 99/99; the complete benchmarking suite passes 283 with 10 expected skips;
+Ruff, shell syntax and diff checks pass. No TPU work, numerical result, Gate-D claim or performance
+claim occurred.
+The execution wrapper remains intentionally pinned to the rejected predecessor until a reviewed
+compile-only acquisition supplies new HLO pins. Exact next is scoped adversarial Sol review,
+commit/push/same-region mirror, then one compile-only acquisition; 8K remains unauthorized.
+
 ## 2026-08-29 02:37--02:47 UTC — PP16 full-width successor HLO/HBM acquisition passes
 
 The correction-only Sol review returned `APPROVE COMMIT AND ONE COMPILE-ONLY ACQUISITION` for

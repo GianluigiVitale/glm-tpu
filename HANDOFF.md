@@ -2,6 +2,35 @@
 
 **Updated:** 2026-08-29 UTC
 
+## 2026-08-29 PP16 sealed numerical boundaries implemented offline; review is next
+
+- The admitted full-width successor now returns four already-live layer-1/event-1 values from
+  each LP2 owner: normalized hidden `[2,1,6144]` BF16, q-a state `[2,1,2048]` BF16, DSA query
+  `[2,1,32,128]` FP32 and head weights `[2,1,32]` FP32. They are terminal diagnostics only;
+  persistent residual state remains half-sharded and no new collective was added in source.
+  Named optimization barriers now bind each diagnostic to its intended producer. Default/full-width
+  two-device JAXpr SHAs are `75deaf20...856d` / `9773c7b1...372d`.
+- StableHLO and optimized-HLO validators preserve the immutable 11-root historical contract by
+  default and require the exact 15-root sealed contract only when explicitly selected. The strict
+  successor comparator authenticates the accepted layer-1 reference and bitwise-compares all four
+  boundaries from both owners in addition to the carried state, current key, DSA positions,
+  scores, valid count and contract bit. Historical and strict capture schemas refuse each other;
+  hostile one-bit mutations of every new field on either owner reject.
+- Sol blocked the first staged version: module-wide StableHLO strings could masquerade as outputs,
+  optimized root result types were not bound to live tuple operands/producers, the wrapper trusted
+  only a top-level flag, and the historical report SHA changed. The correction pins exact public
+  `result_info` names/types and ordered live projections, exact optimized root arity/operand shapes
+  plus linear named-barrier ancestry, and all three terminal contracts in the wrapper. The legacy
+  rejected report is byte-identical again at SHA `7882af40...1b45`.
+- Focused verification passes 99 tests; the complete greenfield benchmarking suite passes 283
+  with 10 expected skips. Ruff, Bash syntax and diff checks pass. The correction has not been
+  re-reviewed, committed, pushed or used on TPU. The numerical launcher deliberately remains
+  pinned to the immutable rejected predecessor until a newly reviewed compile-only acquisition
+  supplies exact
+  StableHLO/canonical-HLO pins. Exact next is adversarial Sol review of only this diff, corrections
+  if required, commit/push/mirror, then one compile-only acquisition. Gate D and complete 8K remain
+  forbidden.
+
 ## 2026-08-29 PP16 full-width successor HLO/HBM passes; numerical remains unrun
 
 - Sol approved staged code SHA `b6bd4a60...7856` for commit and one compile-only acquisition.

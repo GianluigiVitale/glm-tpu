@@ -5,6 +5,20 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 
 ## Current boundary
 
+- The full-width PP16 successor's missing exact observation boundary is implemented offline but is
+  not yet reviewed or deployed. It exposes already-live normalized-hidden, q-a-state, DSA-query
+  and head-weight values from both LP2 owners as four diagnostic roots while retaining half-sharded
+  persistent residuals. The strict schema bitwise-compares all four accepted layer-1 boundaries
+  for both owners and rejects every tested one-bit mutation; it cannot accept the historical
+  capture schema. Its legacy path must retain sealed report SHA `7882af40...1b45`. Public
+  StableHLO result names/types and projections, optimized root arity/operand geometry plus named
+  producer-barrier ancestry, and wrapper-level copies of all three terminal contracts are
+  mandatory; module-wide shapes and a top-level flag are insufficient. The complete benchmarking
+  suite passes 283 tests with 10 expected skips. Do not
+  use the old HLO pins or historical comparator for this graph. First review/commit/push/mirror the
+  batch, then acquire and validate the changed 15-root HLO compile-only. Numerical execution and
+  complete 8K remain forbidden until that evidence is reviewed and the launcher is separately
+  pinned to it.
 - The only admitted PP16 successor now has real selected-state HLO/HBM evidence at pushed pin
   `79a1590812bd805187737cc85d2068d8486519a6`, tag
   `greenfield_pp16_feature2_prefill_acquire_20260829T023702949220285Z`. Main arithmetic was not

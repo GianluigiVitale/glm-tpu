@@ -245,7 +245,11 @@ def test_feature2_materializer_hlo_refuses_mutations(mutation) -> None:
         )
 
 
-def _main_optimized_hlo(*, full_width_rounded_then_slice: bool = False) -> str:
+def _main_optimized_hlo(
+    *,
+    full_width_rounded_then_slice: bool = False,
+    sealed_boundary_capture: bool = False,
+) -> str:
     width = 6144 if full_width_rounded_then_slice else 3072
     attention_per_chunk = 16 if full_width_rounded_then_slice else 32
     down_per_chunk = 16 if full_width_rounded_then_slice else 32
@@ -294,8 +298,8 @@ def _main_optimized_hlo(*, full_width_rounded_then_slice: bool = False) -> str:
                 f"  %{prefix}.local_partition_s32 = s32[] convert(%{prefix}.local_partition)",
                 f"  %{prefix}.zero_partition = s32[] constant(0)",
                 f"  %{prefix}.owns_half0 = pred[] compare(%{prefix}.local_partition_s32, %{prefix}.zero_partition), direction=EQ",
-                f"  %{prefix}.select = bf16[4,1,3072] select(%{prefix}.owns_half0, {reduced_halves[1]}, {reduced_halves[0]}), metadata={{op_name=\"jit(f)/{scope}/jit(_where)/select_n\"}}",
-                f"  %{prefix}.permute = bf16[4,1,3072] collective-permute(%{prefix}.select), source_target_pairs={{{{0,1}},{{1,0}}}}, metadata={{op_name=\"jit(f)/{scope}/greenfield_strategy_nd_feature2_lp2_x_exchange/ppermute\"}}",
+                f'  %{prefix}.select = bf16[4,1,3072] select(%{prefix}.owns_half0, {reduced_halves[1]}, {reduced_halves[0]}), metadata={{op_name="jit(f)/{scope}/jit(_where)/select_n"}}',
+                f'  %{prefix}.permute = bf16[4,1,3072] collective-permute(%{prefix}.select), source_target_pairs={{{{0,1}},{{1,0}}}}, metadata={{op_name="jit(f)/{scope}/greenfield_strategy_nd_feature2_lp2_x_exchange/ppermute"}}',
             ]
         )
         return body, f"%{prefix}.permute"
@@ -366,7 +370,7 @@ def _main_optimized_hlo(*, full_width_rounded_then_slice: bool = False) -> str:
                 [
                     f"  {gate_slice} = f32[1,384] slice(%gate.{chunk}.{index % 16}), slice={{[0:1],[0:384]}}",
                     f"  {activated} = bf16[1,384] convert({gate_slice})",
-                    f"  {name} = f32[1,{width}] convolution({activated}, %down_rhs), dim_labels=bf_io->bf, metadata={{op_name=\"jit(f)/greenfield_dense_feature2_virtual_rank_{index % 16:02d}/{scope}/conv_general_dilated\"}}",
+                    f'  {name} = f32[1,{width}] convolution({activated}, %down_rhs), dim_labels=bf_io->bf, metadata={{op_name="jit(f)/greenfield_dense_feature2_virtual_rank_{index % 16:02d}/{scope}/conv_general_dilated"}}',
                     f"  {rounded} = bf16[1,{width}] convert({name})",
                 ]
             )
@@ -414,11 +418,27 @@ def _main_optimized_hlo(*, full_width_rounded_then_slice: bool = False) -> str:
         )
         computations.extend(body)
 
-    root = (
-        "(s32[1,2048], s32[1], f32[1,2048], bf16[1,1,3072], "
-        "bf16[1,1,32,256], bf16[1,576], bf16[1,16,256,640], "
-        "bf16[1,16,256,128], bf16[1,16,256,128], u32[1,2], pred[1])"
-    )
+    root_fields = [
+        "s32[1,2048]",
+        "s32[1]",
+        "f32[1,2048]",
+        "bf16[1,1,3072]",
+        "bf16[1,1,32,256]",
+        "bf16[1,576]",
+        "bf16[1,16,256,640]",
+        "bf16[1,16,256,128]",
+        "bf16[1,16,256,128]",
+        "u32[1,2]",
+        "pred[1]",
+    ]
+    if sealed_boundary_capture:
+        root_fields[6:6] = [
+            "bf16[1,1,6144]",
+            "bf16[1,1,2048]",
+            "f32[1,1,32,128]",
+            "f32[1,1,32]",
+        ]
+    root = f"({', '.join(root_fields)})"
     lines = [
         "HloModule feature2_main, num_partitions=2",
         "",
@@ -433,18 +453,7 @@ def _main_optimized_hlo(*, full_width_rounded_then_slice: bool = False) -> str:
         "  %g = bf16[1,3072] all-gather(%rope), replica_groups={{0,1}}, use_global_device_ids=true",
         "  %p = bf16[1,3072] collective-permute(%g), source_target_pairs={{0,1},{1,0}}",
     ]
-    live_entry = [
-        "%tokens",
-        "%positions",
-        "%blocks",
-        "%context",
-        "%position",
-        "%rope",
-        "%g",
-        "%p",
-    ]
     for index in range(8):
-        live_entry.append(f"%attn.{index}")
         lines.append(
             f"  %attn.{index} = bf16[1,16,256] custom-call(%rope), "
             'custom_call_target="tpu_custom_call", '
@@ -466,12 +475,61 @@ def _main_optimized_hlo(*, full_width_rounded_then_slice: bool = False) -> str:
             "  %chunks.01 = bf16[1,1,3072] add(%chunk.row.0, %chunk.row.1)",
             "  %chunks.23 = bf16[1,1,3072] add(%chunk.row.2, %chunk.row.3)",
             "  %residual = bf16[1,1,3072] add(%chunks.01, %chunks.23)",
+            "  %out.positions = s32[1,2048] fusion(%tokens)",
+            "  %out.valid = s32[1] copy(%context)",
+            "  %out.scores = f32[1,2048] fusion(%positions)",
+            "  %out.attention = bf16[1,1,32,256] fusion("
+            + ", ".join(f"%attn.{index}" for index in range(8))
+            + ")",
+            "  %out.kv = bf16[1,576] fusion(%rope)",
+            "  %out.kv_cache = bf16[1,16,256,640] fusion(%p)",
+            "  %out.index0 = bf16[1,16,256,128] fusion(%blocks)",
+            "  %out.index1 = bf16[1,16,256,128] fusion(%position)",
+            "  %out.digest = u32[1,2] fusion(%position)",
+            "  %out.contract = pred[1] compare(%context, %position), direction=EQ",
         ]
     )
-    live_entry.insert(3, "%residual")
+    root_operands = [
+        "%out.positions",
+        "%out.valid",
+        "%out.scores",
+        "%residual",
+        "%out.attention",
+        "%out.kv",
+        "%out.kv_cache",
+        "%out.index0",
+        "%out.index1",
+        "%out.digest",
+        "%out.contract",
+    ]
+    if sealed_boundary_capture:
+        sealed = (
+            ("normalized", "bf16[1,1,6144]", "normalized_hidden"),
+            ("q_a", "bf16[1,1,2048]", "q_a_state"),
+            ("query", "f32[1,1,32,128]", "dsa_query"),
+            ("head", "f32[1,1,32]", "dsa_head_weights"),
+        )
+        for short_name, shape, marker in sealed:
+            lines.extend(
+                [
+                    f"  %sealed.{short_name}.source = {shape} fusion(%residual)",
+                    (
+                        f"  %sealed.{short_name} = {shape} optimization-barrier("
+                        f'%sealed.{short_name}.source), metadata={{op_name="jit(main)/'
+                        f"greenfield_pp16_feature2_sealed_{marker}/"
+                        'optimization_barrier"}'
+                    ),
+                ]
+            )
+        root_operands[6:6] = [
+            "%sealed.normalized",
+            "%sealed.q_a",
+            "%sealed.query",
+            "%sealed.head",
+        ]
     lines.extend(
         [
-            f"  ROOT %root = {root} tuple({', '.join(live_entry)})",
+            f"  ROOT %root = {root} tuple({', '.join(root_operands)})",
             "}",
             "",
         ]
@@ -504,6 +562,80 @@ def test_feature2_main_successor_optimized_hlo_pins_live_full_width_producers() 
         "greenfield_strategy_nd_feature2_attention_output": 4,
         "greenfield_strategy_nd_feature2_dense_down": 4,
     }
+
+
+def test_feature2_main_successor_optimized_hlo_pins_sealed_boundaries() -> None:
+    hlo = _main_optimized_hlo(
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+    )
+    report = validate_feature2_main_optimized_hlo(
+        hlo,
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+    )
+    assert report["sealed_boundary_capture"] is True
+    assert report["output_count"] == 15
+    assert report["sealed_bindings"] == {
+        "6": "greenfield_pp16_feature2_sealed_normalized_hidden",
+        "7": "greenfield_pp16_feature2_sealed_q_a_state",
+        "8": "greenfield_pp16_feature2_sealed_dsa_query",
+        "9": "greenfield_pp16_feature2_sealed_dsa_head_weights",
+    }
+    with pytest.raises(BenchmarkValidationError, match="terminal boundary drifted"):
+        validate_feature2_main_optimized_hlo(
+            _main_optimized_hlo(full_width_rounded_then_slice=True),
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda value: value.replace(
+            ", %sealed.head, %out.kv_cache", ", %out.kv_cache", 1
+        ),
+        lambda value: value.replace(
+            "%sealed.normalized, %sealed.q_a",
+            "%sealed.normalized.source, %sealed.q_a",
+            1,
+        ),
+        lambda value: value.replace(
+            "greenfield_pp16_feature2_sealed_normalized_hidden",
+            "greenfield_pp16_feature2_sealed_q_a_state",
+            1,
+        ),
+        lambda value: value.replace(
+            "%sealed.query, %sealed.head", "%sealed.head, %sealed.query", 1
+        ),
+        lambda value: value.replace(
+            "  ROOT %root",
+            "  %sealed.normalized.mixed = bf16[1,1,6144] "
+            "fusion(%sealed.normalized, %sealed.normalized.source)\n"
+            "  ROOT %root",
+            1,
+        ).replace(
+            "%sealed.normalized, %sealed.q_a",
+            "%sealed.normalized.mixed, %sealed.q_a",
+            1,
+        ),
+    ),
+)
+def test_feature2_main_successor_optimized_hlo_refuses_unbound_sealed_roots(
+    mutation,
+) -> None:
+    with pytest.raises(BenchmarkValidationError):
+        validate_feature2_main_optimized_hlo(
+            mutation(
+                _main_optimized_hlo(
+                    full_width_rounded_then_slice=True,
+                    sealed_boundary_capture=True,
+                )
+            ),
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+        )
 
 
 def test_feature2_main_successor_optimized_hlo_refuses_hybrid_and_dead_decoy() -> None:
@@ -670,9 +802,7 @@ def _shift_first_successor_owner_zero(
     )
     assert optimized_hlo.count(zero) == 1
     assert optimized_hlo.count(compare) == 1
-    return optimized_hlo.replace(zero, injected, 1).replace(
-        compare, shifted_compare, 1
-    )
+    return optimized_hlo.replace(zero, injected, 1).replace(compare, shifted_compare, 1)
 
 
 def _add_first_successor_predicate_metadata_decoy(
@@ -683,9 +813,7 @@ def _add_first_successor_predicate_metadata_decoy(
 ) -> str:
     prefix = "attention" if kind == "attention" else "dense"
     if attack == "direction":
-        original = (
-            f"%{prefix}.0.zero_partition), direction=EQ"
-        )
+        original = f"%{prefix}.0.zero_partition), direction=EQ"
         attacked = (
             f"%{prefix}.0.zero_partition), direction=NE, "
             'metadata={op_name="direction=EQ"}'
@@ -840,7 +968,11 @@ def test_feature2_main_optimized_hlo_refuses_mutations(mutation) -> None:
         validate_feature2_main_optimized_hlo(mutation(_main_optimized_hlo()))
 
 
-def _main_stablehlo(*, full_width_rounded_then_slice: bool = False) -> str:
+def _main_stablehlo(
+    *,
+    full_width_rounded_then_slice: bool = False,
+    sealed_boundary_capture: bool = False,
+) -> str:
     width = 6144 if full_width_rounded_then_slice else 3072
     attention_per_chunk = 16 if full_width_rounded_then_slice else 32
     down_per_chunk = 16 if full_width_rounded_then_slice else 32
@@ -956,25 +1088,70 @@ def _main_stablehlo(*, full_width_rounded_then_slice: bool = False) -> str:
             ]
         )
         chunks.extend(body)
+    main_results = [
+        ("tensor<1x2048xi32>", "result.event1_positions"),
+        ("tensor<1xi32>", "result.event1_valid_counts"),
+        ("tensor<1x2048xf32>", "result.event1_scores"),
+        ("tensor<2x1x3072xbf16>", "result.current_carried_halves"),
+        (
+            "tensor<2x1x32x256xbf16>",
+            "result.current_attention_query_owners",
+        ),
+        ("tensor<1x576xbf16>", "result.current_kv_a"),
+        (
+            "tensor<2x16x256x640xbf16>",
+            "result.layer0_kv_cache_owners",
+        ),
+        (
+            "tensor<2x16x256x128xbf16>",
+            "result.layer0_index_cache_owners",
+        ),
+        (
+            "tensor<2x16x256x128xbf16>",
+            "result.layer1_index_cache_owners",
+        ),
+        ("tensor<2x2xui32>", "result.carried_liveness_digest_owners"),
+        ("tensor<1xi1>", "result.contract_valid"),
+    ]
+    if sealed_boundary_capture:
+        main_results[6:6] = [
+            (
+                "tensor<2x1x6144xbf16>",
+                "result.current_normalized_hidden_owners",
+            ),
+            ("tensor<2x1x2048xbf16>", "result.current_q_a_state_owners"),
+            ("tensor<2x1x32x128xf32>", "result.current_dsa_query_owners"),
+            (
+                "tensor<2x1x32xf32>",
+                "result.current_dsa_head_weights_owners",
+            ),
+        ]
+    result_signature = ", ".join(
+        f'{tensor_type} {{jax.result_info = "{result_info}"}}'
+        for tensor_type, result_info in main_results
+    )
+    result_types = ", ".join(item[0] for item in main_results)
+    result_operands = ", ".join(
+        f"%result#{index}" for index in range(len(main_results))
+    )
     return (
-        """module attributes {mhlo.num_partitions = 2 : i32} {
-  func.func @main(%arg0: tensor<8156xi32>, %arg1: tensor<8156xi32>,
+        f"""module attributes {{mhlo.num_partitions = 2 : i32}} {{
+  func.func public @main(%arg0: tensor<8156xi32>, %arg1: tensor<8156xi32>,
       %arg2: tensor<1x16xi32>, %arg3: tensor<8192x64xbf16>)
-      -> (tensor<1x2048xi32>, tensor<1x2048xf32>,
-          tensor<2x1x3072xbf16>, tensor<2x16x256x640xbf16>,
-          tensor<2x16x256x128xbf16>, tensor<2x2xui32>) {
+      -> ({result_signature}) {{
     %0 = stablehlo.all_gather %arg3, dim = 0,
       replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>
     %1 = stablehlo.collective_permute %0,
       source_target_pairs = dense<[[0, 1], [1, 0]]> : tensor<2x2xi64>
     %2 = stablehlo.custom_call @tpu_custom_call(%1)
-      {backend_config = "greenfield_pregathered_sparse_mla_h16_k2048_b512_w640"}
+      {{backend_config = "greenfield_pregathered_sparse_mla_h16_k2048_b512_w640"}}
     %3 = call @chunk0() : () -> tensor<1x3072xbf16>
     %4 = call @chunk1() : () -> tensor<1x3072xbf16>
     %5 = call @chunk2() : () -> tensor<1x3072xbf16>
     %6 = call @chunk3() : () -> tensor<1x3072xbf16>
-    return
-  }
+    %result:{len(main_results)} = "test.results"() : () -> ({result_types})
+    return {result_operands} : {result_types}
+  }}
 """
         + "\n".join(chunks)
         + "\n}\n"
@@ -993,6 +1170,73 @@ def test_feature2_main_successor_stablehlo_pins_immediate_half_slices() -> None:
     assert report["projection_contract"]["attention_producer_count"] == 64
     assert report["projection_contract"]["dense_down_convolution_count"] == 64
     assert report["projection_contract"]["half_reducer_count"] == 8
+
+
+def test_feature2_main_successor_stablehlo_pins_sealed_boundaries() -> None:
+    stablehlo = _main_stablehlo(
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+    )
+    report = validate_feature2_main_stablehlo(
+        stablehlo,
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+    )
+    assert report["sealed_boundary_capture"] is True
+    assert report["output_count"] == 15
+    assert report["result_infos"][6:10] == [
+        "result.current_normalized_hidden_owners",
+        "result.current_q_a_state_owners",
+        "result.current_dsa_query_owners",
+        "result.current_dsa_head_weights_owners",
+    ]
+    with pytest.raises(BenchmarkValidationError, match="boundary shapes drifted"):
+        validate_feature2_main_stablehlo(
+            _main_stablehlo(full_width_rounded_then_slice=True),
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda value: value.replace(
+            "result.current_normalized_hidden_owners",
+            "result.current_q_a_state_owners",
+            1,
+        ),
+        lambda value: value.replace("%result#9, %result#10", "%result#10", 1),
+    ),
+)
+def test_feature2_main_successor_stablehlo_refuses_decoy_or_unbound_results(
+    mutation,
+) -> None:
+    with pytest.raises(BenchmarkValidationError):
+        validate_feature2_main_stablehlo(
+            mutation(
+                _main_stablehlo(
+                    full_width_rounded_then_slice=True,
+                    sealed_boundary_capture=True,
+                )
+            ),
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+        )
+
+
+def test_feature2_main_successor_stablehlo_refuses_module_wide_shape_decoys() -> None:
+    historical = _main_stablehlo(full_width_rounded_then_slice=True)
+    decoy = (
+        historical + "\n// tensor<2x1x6144xbf16> tensor<2x1x2048xbf16> "
+        "tensor<2x1x32x128xf32> tensor<2x1x32xf32>\n"
+    )
+    with pytest.raises(BenchmarkValidationError):
+        validate_feature2_main_stablehlo(
+            decoy,
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+        )
 
 
 def test_feature2_main_successor_stablehlo_refuses_hybrid_or_delayed_slice() -> None:
@@ -1070,9 +1314,7 @@ def test_feature2_successor_stablehlo_refuses_slice_geometry_or_owner_drift(
     attacked = mutation(original)
     assert attacked != original
     with pytest.raises(BenchmarkValidationError):
-        validate_feature2_main_stablehlo(
-            attacked, full_width_rounded_then_slice=True
-        )
+        validate_feature2_main_stablehlo(attacked, full_width_rounded_then_slice=True)
 
 
 @pytest.mark.parametrize(

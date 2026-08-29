@@ -45,7 +45,7 @@ _HOST_MARKERS = (
     "xla_python_cpu_callback",
 )
 _FORBIDDEN_TRANSPORT_OPCODES = frozenset({"infeed", "outfeed", "recv", "send"})
-_LOCAL_MAIN_ROOT = (
+_HISTORICAL_LOCAL_MAIN_ROOT = (
     ("s32", (1, 2048)),
     ("s32", (1,)),
     ("f32", (1, 2048)),
@@ -58,6 +58,44 @@ _LOCAL_MAIN_ROOT = (
     ("u32", (1, 2)),
     ("pred", (1,)),
 )
+_SEALED_BOUNDARY_LOCAL_MAIN_ROOT = (
+    *_HISTORICAL_LOCAL_MAIN_ROOT[:6],
+    ("bf16", (1, 1, 6144)),
+    ("bf16", (1, 1, 2048)),
+    ("f32", (1, 1, 32, 128)),
+    ("f32", (1, 1, 32)),
+    *_HISTORICAL_LOCAL_MAIN_ROOT[6:],
+)
+_HISTORICAL_GLOBAL_MAIN_RESULTS = (
+    ("tensor<1x2048xi32>", "result.event1_positions"),
+    ("tensor<1xi32>", "result.event1_valid_counts"),
+    ("tensor<1x2048xf32>", "result.event1_scores"),
+    ("tensor<2x1x3072xbf16>", "result.current_carried_halves"),
+    ("tensor<2x1x32x256xbf16>", "result.current_attention_query_owners"),
+    ("tensor<1x576xbf16>", "result.current_kv_a"),
+    ("tensor<2x16x256x640xbf16>", "result.layer0_kv_cache_owners"),
+    ("tensor<2x16x256x128xbf16>", "result.layer0_index_cache_owners"),
+    ("tensor<2x16x256x128xbf16>", "result.layer1_index_cache_owners"),
+    ("tensor<2x2xui32>", "result.carried_liveness_digest_owners"),
+    ("tensor<1xi1>", "result.contract_valid"),
+)
+_SEALED_BOUNDARY_GLOBAL_MAIN_RESULTS = (
+    *_HISTORICAL_GLOBAL_MAIN_RESULTS[:6],
+    (
+        "tensor<2x1x6144xbf16>",
+        "result.current_normalized_hidden_owners",
+    ),
+    ("tensor<2x1x2048xbf16>", "result.current_q_a_state_owners"),
+    ("tensor<2x1x32x128xf32>", "result.current_dsa_query_owners"),
+    ("tensor<2x1x32xf32>", "result.current_dsa_head_weights_owners"),
+    *_HISTORICAL_GLOBAL_MAIN_RESULTS[6:],
+)
+_SEALED_BOUNDARY_ROOT_MARKERS = {
+    6: "greenfield_pp16_feature2_sealed_normalized_hidden",
+    7: "greenfield_pp16_feature2_sealed_q_a_state",
+    8: "greenfield_pp16_feature2_sealed_dsa_query",
+    9: "greenfield_pp16_feature2_sealed_dsa_head_weights",
+}
 _H16_ATTENTION_KERNEL = "greenfield_pregathered_sparse_mla_h16_k2048_b512_w640"
 _FP8_ATTENTION_O_PREFIX = "greenfield_fp8_strategy_nd_o_m8_k512_n"
 _ATTENTION_REDUCER_SCOPE = "greenfield_strategy_nd_feature2_attention_output"
@@ -370,6 +408,99 @@ def _stablehlo_reachable_functions(
     return frozenset(reachable)
 
 
+def _stablehlo_main_boundary_contract(
+    stablehlo: str,
+    *,
+    sealed_boundary_capture: bool,
+) -> tuple[dict[str, Any], list[str]]:
+    """Bind public result names, types, and live return projections exactly."""
+
+    expected = (
+        _SEALED_BOUNDARY_GLOBAL_MAIN_RESULTS
+        if sealed_boundary_capture
+        else _HISTORICAL_GLOBAL_MAIN_RESULTS
+    )
+    signatures = tuple(
+        re.finditer(
+            r"^\s*func\.func public @main\(.*?\)\s*->\s*\((.*?)\)\s*\{",
+            stablehlo,
+            flags=re.MULTILINE | re.DOTALL,
+        )
+    )
+    violations: list[str] = []
+    if len(signatures) != 1:
+        return (
+            {"output_count": 0, "result_infos": [], "terminal_types": []},
+            [f"expected one public @main signature, found {len(signatures)}"],
+        )
+    observed_signature = re.sub(r"\s+", "", signatures[0].group(1))
+    expected_signature = ",".join(
+        f'{tensor_type}{{jax.result_info="{result_info}"}}'
+        for tensor_type, result_info in expected
+    )
+    if observed_signature != expected_signature:
+        violations.append(
+            "public @main result-info/type boundary drifted: "
+            f"expected={expected_signature} observed={observed_signature}"
+        )
+
+    statements = _stablehlo_function_statements(stablehlo)
+    returns = tuple(
+        statement
+        for statement in statements["main"]
+        if re.match(r"^\s*return\b", statement)
+    )
+    return_operands: tuple[str, ...] = ()
+    return_types: tuple[str, ...] = ()
+    if len(returns) != 1:
+        violations.append(f"public @main return count drifted: {len(returns)}")
+    else:
+        match = re.fullmatch(
+            r"\s*return\s+(.+?)\s*:\s*(.+?)\s*",
+            returns[0].splitlines()[0],
+        )
+        if match is None:
+            violations.append("public @main return syntax drifted")
+        else:
+            return_operands = tuple(_STABLE_VALUE.findall(match.group(1)))
+            return_types = tuple(item.strip() for item in match.group(2).split(","))
+            expected_types = tuple(item[0] for item in expected)
+            if return_types != expected_types:
+                violations.append(
+                    "public @main return types drifted: "
+                    f"expected={expected_types} observed={return_types}"
+                )
+            projections = tuple(
+                re.fullmatch(r"(%[A-Za-z0-9_.$-]+)#([0-9]+)", operand)
+                for operand in return_operands
+            )
+            if (
+                len(return_operands) != len(expected)
+                or any(item is None for item in projections)
+                or len({item.group(1) for item in projections if item is not None}) != 1
+                or tuple(int(item.group(2)) for item in projections if item is not None)
+                != tuple(range(len(expected)))
+            ):
+                violations.append(
+                    "public @main return lost exact live ordered tuple projections: "
+                    f"operands={return_operands}"
+                )
+
+    terminal_shapes = []
+    for tensor_type, _ in expected:
+        fields = tensor_type.removeprefix("tensor<").removesuffix(">").split("x")
+        terminal_shapes.append([int(item) for item in fields[:-1]])
+    return (
+        {
+            "output_count": len(return_operands),
+            "result_infos": [item[1] for item in expected],
+            "terminal_shapes": terminal_shapes,
+            "terminal_types": [item[0] for item in expected],
+        },
+        violations,
+    )
+
+
 def _stablehlo_direct_users(
     statements: tuple[str, ...],
     definition_index: int,
@@ -466,16 +597,13 @@ def _stablehlo_projection_contract(
                 row_ranges = (
                     None
                     if len(direct_users) != 1
-                    else _stablehlo_slice_ranges(
-                        direct_users[0], operand=name
-                    )
+                    else _stablehlo_slice_ranges(direct_users[0], operand=name)
                 )
                 if (
                     len(direct_users) != 1
                     or "stablehlo.slice" not in direct_users[0]
                     or f"-> tensor<1x{expected_width}xbf16>" not in direct_users[0]
-                    or row_ranges
-                    != ((0, 1, 1), (0, expected_width, 1))
+                    or row_ranges != ((0, 1, 1), (0, expected_width, 1))
                 ):
                     violations.append(
                         f"attention producer {function}:{name} lost its immediate "
@@ -543,9 +671,7 @@ def _stablehlo_projection_contract(
                         half_results = tuple(
                             (
                                 user,
-                                _stablehlo_slice_ranges(
-                                    user, operand=rounded_name
-                                ),
+                                _stablehlo_slice_ranges(user, operand=rounded_name),
                             )
                             for user in half_users
                             if "stablehlo.slice" in user
@@ -728,6 +854,118 @@ def _live_optimized_instruction_keys(
     return frozenset(live), len(seen_computations)
 
 
+def _optimized_terminal_boundary_contract(
+    instructions: tuple[HloInstruction, ...],
+    root: HloInstruction | None,
+    live_keys: frozenset[tuple[str, str]],
+    *,
+    sealed_boundary_capture: bool,
+) -> tuple[dict[str, Any], list[str]]:
+    """Require exact root arity/types and causal named diagnostic producers."""
+
+    expected = (
+        _SEALED_BOUNDARY_LOCAL_MAIN_ROOT
+        if sealed_boundary_capture
+        else _HISTORICAL_LOCAL_MAIN_ROOT
+    )
+    violations: list[str] = []
+    if root is None or root.raw_opcode != "tuple":
+        return (
+            {"output_count": 0, "root_operands": [], "sealed_bindings": {}},
+            ["optimized ENTRY requires one tuple root"],
+        )
+    if len(root.operand_names) != len(expected):
+        violations.append(
+            "optimized root operand count drifted: "
+            f"expected={len(expected)} observed={len(root.operand_names)}"
+        )
+    local = {
+        instruction.name: instruction
+        for instruction in instructions
+        if instruction.computation == root.computation
+    }
+    for index, (operand, expected_shape) in enumerate(
+        zip(root.operand_names, expected, strict=False)
+    ):
+        source = local.get(operand)
+        observed = () if source is None else _shape_signature(source.result_shapes)
+        if observed != (expected_shape,):
+            violations.append(
+                "optimized root operand geometry drifted: "
+                f"index={index} operand={operand} expected={expected_shape} "
+                f"observed={observed}"
+            )
+
+    sealed_bindings: dict[str, str] = {}
+    if sealed_boundary_capture:
+        all_marker_names = tuple(_SEALED_BOUNDARY_ROOT_MARKERS.values())
+        for index, marker in _SEALED_BOUNDARY_ROOT_MARKERS.items():
+            live_markers = tuple(
+                instruction
+                for instruction in instructions
+                if (instruction.computation, instruction.name) in live_keys
+                and instruction.op_name is not None
+                and f"/{marker}/optimization_barrier" in instruction.op_name
+            )
+            if len(live_markers) != 1:
+                violations.append(
+                    f"optimized sealed marker {marker} count drifted: "
+                    f"{len(live_markers)}"
+                )
+                continue
+            boundary = live_markers[0]
+            if _shape_signature(boundary.result_shapes) != (expected[index],):
+                violations.append(
+                    f"optimized sealed marker {marker} geometry drifted: "
+                    f"{_shape_signature(boundary.result_shapes)}"
+                )
+            ancestry: list[str] = []
+            cursor = (
+                root.operand_names[index] if index < len(root.operand_names) else None
+            )
+            while cursor is not None and cursor not in ancestry:
+                ancestry.append(cursor)
+                if cursor == boundary.name:
+                    break
+                source = local.get(cursor)
+                if (
+                    source is None
+                    or source.raw_opcode not in {"bitcast", "copy", "reshape"}
+                    or len(source.operand_names) != 1
+                    or _shape_signature(source.result_shapes) != (expected[index],)
+                ):
+                    cursor = None
+                    break
+                cursor = source.operand_names[0]
+            observed_markers = {
+                candidate
+                for name in ancestry
+                for candidate in all_marker_names
+                if (local.get(name) is not None)
+                and (local[name].op_name is not None)
+                and f"/{candidate}/optimization_barrier" in local[name].op_name
+            }
+            if (
+                observed_markers != {marker}
+                or not ancestry
+                or ancestry[-1] != boundary.name
+            ):
+                violations.append(
+                    "optimized sealed root lost intended producer binding: "
+                    f"index={index} expected={marker} observed={sorted(observed_markers)}"
+                )
+            else:
+                sealed_bindings[str(index)] = marker
+    return (
+        {
+            "output_count": len(root.operand_names),
+            "root_operands": list(root.operand_names),
+            "sealed_bindings": sealed_bindings,
+        },
+        violations,
+    )
+
+
 def _optimized_projection_producer_kind(
     instruction: HloInstruction,
 ) -> Literal["attention", "dense_down"] | None:
@@ -759,9 +997,7 @@ def _optimized_slice_ranges(
     if match is None:
         return None
     raw_ranges = match.group(1)
-    if re.fullmatch(
-        r"\s*\[[^]]+\](?:\s*,\s*\[[^]]+\])*\s*", raw_ranges
-    ) is None:
+    if re.fullmatch(r"\s*\[[^]]+\](?:\s*,\s*\[[^]]+\])*\s*", raw_ranges) is None:
         return None
     ranges: list[tuple[int, int, int]] = []
     for raw_dimension in re.findall(r"\[([^]]+)\]", raw_ranges):
@@ -868,6 +1104,7 @@ def _optimized_reducer_lineage(
         0: (reducer.computation, ())
     }
     child_frames: dict[tuple[int, int, str], int] = {}
+
     def called_computation(instruction: HloInstruction) -> str | None:
         matches = tuple(_HLO_CALLED_COMPUTATION.findall(instruction.raw_line))
         if len(matches) > 1:
@@ -914,9 +1151,7 @@ def _optimized_reducer_lineage(
                         "feature2 optimized HLO tuple result index exceeds root: "
                         f"call={instruction.name} index={selected_index}"
                     )
-                pending.append(
-                    (child_id, root.operand_names[selected_index], None)
-                )
+                pending.append((child_id, root.operand_names[selected_index], None))
                 return
             if selected_index != 0:
                 raise BenchmarkValidationError(
@@ -990,9 +1225,7 @@ def _optimized_reducer_lineage(
                         "feature2 optimized HLO tuple selection has no index: "
                         f"{instruction.name}"
                     )
-                source = by_computation[computation].get(
-                    instruction.operand_names[0]
-                )
+                source = by_computation[computation].get(instruction.operand_names[0])
                 if source is not None and called_computation(source) is not None:
                     visited[(frame_id, source.name)] = source
                     descend_call(
@@ -1012,17 +1245,14 @@ def _optimized_reducer_lineage(
             )
         return visited, frontiers
 
-    visited, frontiers = walk(
-        [(0, operand, None) for operand in reducer.operand_names]
-    )
+    visited, frontiers = walk([(0, operand, None) for operand in reducer.operand_names])
     ownership: dict[str, Any] | None = None
     if full_width_rounded_then_slice:
         owner_selects = tuple(
             (frame_id, instruction)
             for (frame_id, _), instruction in visited.items()
             if instruction.raw_opcode == "select"
-            and _shape_signature(instruction.result_shapes)
-            == (("bf16", (4, 1, 3072)),)
+            and _shape_signature(instruction.result_shapes) == (("bf16", (4, 1, 3072)),)
         )
         if len(owner_selects) == 1 and len(owner_selects[0][1].operand_names) == 3:
             select_frame, owner_select = owner_selects[0]
@@ -1050,9 +1280,7 @@ def _optimized_reducer_lineage(
                     if len(half_slice.operand_names) != 1:
                         slice_frontiers.append(())
                         continue
-                    _, traced = walk(
-                        [(frame_id, half_slice.operand_names[0], None)]
-                    )
+                    _, traced = walk([(frame_id, half_slice.operand_names[0], None)])
                     slice_frontiers.append(tuple(sorted(traced)))
                 branch_reports[branch] = {
                     "frontier_keys": tuple(sorted(branch_frontiers)),
@@ -1108,28 +1336,22 @@ def _optimized_reducer_lineage(
                     == (("s32", ()), ("s32", ()))
                     and _shape_signature(compare.result_shapes) == (("pred", ()),)
                     and axis_s32 is not None
-                    and _shape_signature(axis_s32.operand_shapes)
-                    == (("u32", ()),)
-                    and _shape_signature(axis_s32.result_shapes)
-                    == (("s32", ()),)
+                    and _shape_signature(axis_s32.operand_shapes) == (("u32", ()),)
+                    and _shape_signature(axis_s32.result_shapes) == (("s32", ()),)
                     and masked_u32 is not None
                     and _shape_signature(masked_u32.operand_shapes)
                     == (("u32", ()), ("u32", ()))
-                    and _shape_signature(masked_u32.result_shapes)
-                    == (("u32", ()),)
+                    and _shape_signature(masked_u32.result_shapes) == (("u32", ()),)
                     and partition_id is not None
                     and partition_id.raw_opcode == "partition-id"
-                    and _shape_signature(partition_id.result_shapes)
-                    == (("u32", ()),)
+                    and _shape_signature(partition_id.result_shapes) == (("u32", ()),)
                     and mask_one is not None
                     and mask_one.raw_opcode == "constant"
-                    and _shape_signature(mask_one.result_shapes)
-                    == (("u32", ()),)
+                    and _shape_signature(mask_one.result_shapes) == (("u32", ()),)
                     and _optimized_constant_literal(mask_one) == "1"
                     and zero_s32 is not None
                     and zero_s32.raw_opcode == "constant"
-                    and _shape_signature(zero_s32.result_shapes)
-                    == (("s32", ()),)
+                    and _shape_signature(zero_s32.result_shapes) == (("s32", ()),)
                     and _optimized_constant_literal(zero_s32) == "0"
                 )
             branch_reports["predicate"] = {
@@ -1268,6 +1490,7 @@ def validate_feature2_main_stablehlo(
     stablehlo: str,
     *,
     full_width_rounded_then_slice: bool = False,
+    sealed_boundary_capture: bool = False,
 ) -> dict[str, Any]:
     """Pin the source-level manual LP2 boundary before TPU optimization."""
 
@@ -1275,6 +1498,8 @@ def validate_feature2_main_stablehlo(
         raise BenchmarkValidationError("feature2 main StableHLO is empty")
     if not isinstance(full_width_rounded_then_slice, bool):
         raise TypeError("feature2 StableHLO variant flag must be boolean")
+    if not isinstance(sealed_boundary_capture, bool):
+        raise TypeError("feature2 StableHLO sealed-boundary flag must be boolean")
     compact = re.sub(r"\s+", "", stablehlo)
     markers = _host_markers(stablehlo)
     violations: list[str] = []
@@ -1291,6 +1516,13 @@ def validate_feature2_main_stablehlo(
         "tensor<2x16x256x128xbf16>",
         "tensor<2x2xui32>",
     )
+    if sealed_boundary_capture:
+        required += (
+            "tensor<2x1x6144xbf16>",
+            "tensor<2x1x2048xbf16>",
+            "tensor<2x1x32x128xf32>",
+            "tensor<2x1x32xf32>",
+        )
     missing = tuple(marker for marker in required if marker not in compact)
     if missing:
         violations.append(f"StableHLO boundary shapes drifted: {missing}")
@@ -1327,6 +1559,11 @@ def validate_feature2_main_stablehlo(
         violations.append(f"StableHLO permute pairs drifted: {bad_pairs}")
     if _H16_ATTENTION_KERNEL not in stablehlo:
         violations.append("StableHLO lost the exact H16/B512 attention kernel")
+    terminal_contract, terminal_violations = _stablehlo_main_boundary_contract(
+        stablehlo,
+        sealed_boundary_capture=sealed_boundary_capture,
+    )
+    violations.extend(terminal_violations)
     projection_contract, projection_violations = _stablehlo_projection_contract(
         stablehlo,
         full_width_rounded_then_slice=full_width_rounded_then_slice,
@@ -1342,6 +1579,8 @@ def validate_feature2_main_stablehlo(
         "num_partitions": 2,
         "passed": True,
         "projection_contract": projection_contract,
+        "sealed_boundary_capture": sealed_boundary_capture,
+        **terminal_contract,
     }
 
 
@@ -1349,11 +1588,14 @@ def validate_feature2_main_optimized_hlo(
     optimized_hlo: str,
     *,
     full_width_rounded_then_slice: bool = False,
+    sealed_boundary_capture: bool = False,
 ) -> dict[str, Any]:
     """Parse and bound the optimized two-device feature2 executable."""
 
     if not isinstance(full_width_rounded_then_slice, bool):
         raise TypeError("feature2 optimized-HLO variant flag must be boolean")
+    if not isinstance(sealed_boundary_capture, bool):
+        raise TypeError("feature2 optimized-HLO sealed-boundary flag must be boolean")
     module = parse_hlo_module(optimized_hlo)
     instructions = module.instructions
     live_keys, reachable_computation_count = _live_optimized_instruction_keys(
@@ -1366,11 +1608,23 @@ def validate_feature2_main_optimized_hlo(
     violations: list[str] = []
     if module.num_partitions != 2:
         violations.append(f"expected two partitions, found {module.num_partitions}")
-    if root_shapes != _LOCAL_MAIN_ROOT:
+    expected_root = (
+        _SEALED_BOUNDARY_LOCAL_MAIN_ROOT
+        if sealed_boundary_capture
+        else _HISTORICAL_LOCAL_MAIN_ROOT
+    )
+    if root_shapes != expected_root:
         violations.append(
             "optimized terminal boundary drifted: "
-            f"expected={_LOCAL_MAIN_ROOT} observed={root_shapes}"
+            f"expected={expected_root} observed={root_shapes}"
         )
+    terminal_contract, terminal_violations = _optimized_terminal_boundary_contract(
+        instructions,
+        root,
+        live_keys,
+        sealed_boundary_capture=sealed_boundary_capture,
+    )
+    violations.extend(terminal_violations)
     allowed_collectives = {"all-gather", "all-reduce", "collective-permute"}
     for collective in collectives:
         if collective.opcode not in allowed_collectives:
@@ -1583,13 +1837,9 @@ def validate_feature2_main_optimized_hlo(
             ) = _optimized_reducer_lineage(
                 instructions,
                 reducer,
-                full_width_rounded_then_slice=(
-                    full_width_rounded_then_slice
-                ),
+                full_width_rounded_then_slice=(full_width_rounded_then_slice),
             )
-            frontier_counts = Counter(
-                kind for kind, _, _ in frontier_instances
-            )
+            frontier_counts = Counter(kind for kind, _, _ in frontier_instances)
             target_frontier = tuple(
                 instruction
                 for kind, _, instruction in frontier_instances
@@ -1630,12 +1880,8 @@ def validate_feature2_main_optimized_hlo(
             owner_select_count = shape_opcode_counts[
                 ("select", (("bf16", (4, 1, 3072)),))
             ]
-            y_add_1024_count = shape_opcode_counts[
-                ("add", (("bf16", (4, 1, 1024)),))
-            ]
-            y_add_2048_count = shape_opcode_counts[
-                ("add", (("bf16", (4, 1, 2048)),))
-            ]
+            y_add_1024_count = shape_opcode_counts[("add", (("bf16", (4, 1, 1024)),))]
+            y_add_2048_count = shape_opcode_counts[("add", (("bf16", (4, 1, 2048)),))]
             if (
                 len(target_frontier) != expected_frontier_count
                 or opposite_count
@@ -1667,20 +1913,14 @@ def validate_feature2_main_optimized_hlo(
                 lower = ((0, 1, 1), (0, 3072, 1))
                 upper = ((0, 1, 1), (3072, 6144, 1))
                 true_report = {} if ownership is None else ownership.get("true", {})
-                false_report = (
-                    {} if ownership is None else ownership.get("false", {})
-                )
+                false_report = {} if ownership is None else ownership.get("false", {})
                 predicate_report = (
                     {} if ownership is None else ownership.get("predicate", {})
                 )
                 true_frontiers = tuple(true_report.get("frontier_keys", ()))
                 false_frontiers = tuple(false_report.get("frontier_keys", ()))
-                true_slice_frontiers = tuple(
-                    true_report.get("slice_frontiers", ())
-                )
-                false_slice_frontiers = tuple(
-                    false_report.get("slice_frontiers", ())
-                )
+                true_slice_frontiers = tuple(true_report.get("slice_frontiers", ()))
+                false_slice_frontiers = tuple(false_report.get("slice_frontiers", ()))
                 true_mapped = tuple(
                     keys[0] for keys in true_slice_frontiers if len(keys) == 1
                 )
@@ -1695,8 +1935,7 @@ def validate_feature2_main_optimized_hlo(
                 owner_half_contract_passed = bool(
                     ownership is not None
                     and ownership.get("owner_select_count") == 1
-                    and predicate_report.get("causal_eq_zero_partition_id")
-                    is True
+                    and predicate_report.get("causal_eq_zero_partition_id") is True
                     and predicate_report.get("compare_eq_count") == 1
                     and predicate_report.get("constant_zero_count") == 1
                     and predicate_report.get("frontier_count") == 0
@@ -1728,9 +1967,7 @@ def validate_feature2_main_optimized_hlo(
             scope_reports.append(
                 {
                     "half_reshape_count": half_reshape_count,
-                    "owner_half_contract_passed": int(
-                        owner_half_contract_passed
-                    ),
+                    "owner_half_contract_passed": int(owner_half_contract_passed),
                     "owner_select_count": owner_select_count,
                     "producer_frontier_count": len(target_frontier),
                     "stack_count": stack_count,
@@ -1770,10 +2007,12 @@ def validate_feature2_main_optimized_hlo(
         "physical_collective_count": len(collectives),
         "projection_width": expected_width,
         "reachable_computation_count": reachable_computation_count,
+        "sealed_boundary_capture": sealed_boundary_capture,
         "reducer_counts": reducer_counts,
         "reducer_lineage": reducer_lineage,
         "root_shapes": [
             {"dtype": dtype, "shape": list(shape)} for dtype, shape in root_shapes
         ],
         "runtime_parameter_counts": observed_runtime_parameters,
+        **terminal_contract,
     }

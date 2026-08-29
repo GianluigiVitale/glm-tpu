@@ -320,9 +320,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
         program = build_feature2_prefill_program(
             graph,
             devices=devices,
-            full_width_rounded_then_slice=(
-                args.full_width_rounded_then_slice
-            ),
+            full_width_rounded_then_slice=(args.full_width_rounded_then_slice),
         )
         weights = loaded.weights
 
@@ -396,9 +394,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
         )
         jaxpr_contract = validate_feature2_prefill_jaxpr(
             str(jax.make_jaxpr(program.execute)(*main_arguments)),
-            full_width_rounded_then_slice=(
-                program.full_width_rounded_then_slice
-            ),
+            full_width_rounded_then_slice=(program.full_width_rounded_then_slice),
         )
         terminal_contract = validate_feature2_prefill_result_abstract(
             jax.eval_shape(program.execute, *main_arguments)
@@ -412,9 +408,8 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
         _atomic_text(args.hlo_dir / "feature2_main.stablehlo.mlir", main_stablehlo)
         main_stable_contract = validate_feature2_main_stablehlo(
             main_stablehlo,
-            full_width_rounded_then_slice=(
-                program.full_width_rounded_then_slice
-            ),
+            full_width_rounded_then_slice=(program.full_width_rounded_then_slice),
+            sealed_boundary_capture=program.sealed_boundary_capture,
         )
         compile_started = time.monotonic()
         main_compiled = main_lowered.compile()
@@ -433,6 +428,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
                     full_width_rounded_then_slice=(
                         program.full_width_rounded_then_slice
                     ),
+                    sealed_boundary_capture=program.sealed_boundary_capture,
                 ),
                 "stablehlo_contract": main_stable_contract,
                 "terminal_contract": terminal_contract,
@@ -506,9 +502,8 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             "compile_only": not execute_main,
             "device_kind": devices[0].device_kind,
             "event1_target_lineage": event1_lineage,
-            "full_width_rounded_then_slice": (
-                program.full_width_rounded_then_slice
-            ),
+            "full_width_rounded_then_slice": (program.full_width_rounded_then_slice),
+            "sealed_boundary_capture": program.sealed_boundary_capture,
             "graph_sha256": graph.graph_sha256,
             "hlo": {
                 "feature2_main": main_record,
