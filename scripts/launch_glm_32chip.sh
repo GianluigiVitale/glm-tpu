@@ -28,7 +28,7 @@
 #       the host PID namespace, run as root, and sudo reaches them).
 #     - sudo pkill -9 -x raylet                -> ANY user's raylet.
 #     - sudo pkill -9 -f '[R]ayWorkerWrapper'  -> any Ray worker, any user.
-#   CANNOT kill: qdrant, gcsfuse mounts other than ~/gcs-models, non-vLLM
+#   CANNOT kill: qdrant, gcsfuse mounts, non-vLLM
 #     python (parity harnesses, ASPt's non-vLLM JAX procs). Such a survivor
 #     may still HOLD the libtpu flock while `sudo rm -f /tmp/libtpu_lockfile`
 #     removes the lock inode — the next engine then fails later at device-open
@@ -129,7 +129,8 @@ done
 dry() { printf 'DRY-RUN> %s\n' "$*"; }
 
 # Same stop hygiene as the DSV4 launcher: force-stop ray, kill stray raylets /
-# engine cores / ray workers, unmount any stale gcsfuse mount (no-op if absent).
+# engine cores / ray workers. The approved read-only gcsfuse model mirror is
+# preserved because protected wrappers require it after Ray starts.
 # ⚠ These patterns kill ANY vLLM/Ray proc as root on all 8 hosts — including
 # the cohabiting ASPt stack. See the SHARED-POD COLLISION POLICY in the header.
 # Round-6 F8 (docs/reviews/round6-observability.md): flight-recorder files
@@ -138,7 +139,7 @@ dry() { printf 'DRY-RUN> %s\n' "$*"; }
 # /tmp/glm_flight_* per host. The just-crashed run's files are always the
 # newest, so they survive a relaunch; still fetch (triage_crash.sh) BEFORE
 # relaunching per the docs/10 run-book.
-STOP_CMD="timeout --signal=TERM --kill-after=5 -- 20 $RAY stop -f >/dev/null 2>&1 || true; sudo pkill -9 -f 'VLLM::[E]ngineCore' >/dev/null 2>&1; sudo pkill -9 -f '[R]ayWorkerWrapper' >/dev/null 2>&1; sudo pkill -9 -x raylet >/dev/null 2>&1; sudo rm -f /tmp/libtpu_lockfile; fusermount -u ~/gcs-models >/dev/null 2>&1; ls -1t /tmp/glm_flight_* 2>/dev/null | tail -n +9 | xargs -r sudo rm -f >/dev/null 2>&1; true"
+STOP_CMD="timeout --signal=TERM --kill-after=5 -- 20 $RAY stop -f >/dev/null 2>&1 || true; sudo pkill -9 -f 'VLLM::[E]ngineCore' >/dev/null 2>&1; sudo pkill -9 -f '[R]ayWorkerWrapper' >/dev/null 2>&1; sudo pkill -9 -x raylet >/dev/null 2>&1; sudo rm -f /tmp/libtpu_lockfile; ls -1t /tmp/glm_flight_* 2>/dev/null | tail -n +9 | xargs -r sudo rm -f >/dev/null 2>&1; true"
 FAILURE_STOP_CMD='idx=${HOSTNAME##*-w-}; timeout --signal=TERM --kill-after=5 -- 20 /home/gianl/vllm-env/bin/ray stop -f >/dev/null 2>&1 || true; sudo pkill -TERM -f "[r]ay start --address|[r]ay start --head" >/dev/null 2>&1 || true; sudo pkill -TERM -f "VLLM::[E]ngineCore" >/dev/null 2>&1 || true; sudo pkill -TERM -f "[R]ayWorkerWrapper" >/dev/null 2>&1 || true; sudo pkill -TERM -x raylet >/dev/null 2>&1 || true; sleep 2; sudo pkill -KILL -f "[r]ay start --address|[r]ay start --head" >/dev/null 2>&1 || true; sudo pkill -KILL -f "VLLM::[E]ngineCore" >/dev/null 2>&1 || true; sudo pkill -KILL -f "[R]ayWorkerWrapper" >/dev/null 2>&1 || true; sudo pkill -KILL -x raylet >/dev/null 2>&1 || true; sudo rm -f /tmp/libtpu_lockfile; echo "LAUNCH_FAILURE_CLEAN_OK $idx"'
 runtime_owned=0
 
