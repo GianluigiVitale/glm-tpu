@@ -5,6 +5,42 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-29 04:40--05:05 UTC — strict PP16 numerical launcher corrected offline
+
+The separately default-off numerical wrapper now requires explicit full-width-rounded-then-slice
+value `1` and passes that flag to the exactly-once runner; value `0` refuses before locks, GCS or
+TPU contact. It pins acquisition code `a2ea1e9`, StableHLO `6c1c69d7...10ad`, raw optimized HLO
+`a6307a5f...175`, canonical HLO `9e933384...19a5`, 6,558,627 canonical bytes, v1/14,561 stripped
+references and JAX/JAXLIB/libtpu `0.10.1/0.10.1/0.0.41`.
+
+Before TPU work, a CPU-only authorization step binds the reviewed compact artifact and the remote
+acquisition terminal/ledger/runner/summary hashes, recomputes the terminal self-hash, checks the
+exact 20-object remote set from the authenticated ledger and pins its three main HLO entries. Its
+exact embedded block executes successfully against the real acquisition. The TPU runner must then
+reproduce the acquired StableHLO/canonical identity and HBM floor before its sole invocation. The
+post-run CPU verifier hashes actual raw HLO files, regenerates and byte-compares canonical HLO,
+requires all 15 terminal roots and four sealed bindings, and calls only the strict full-width v2
+comparator covering both owners' normalized-hidden, q-a-state, DSA-query and head weights plus the
+carried/current-key/DSA/contract boundaries. Authorization inputs are included in the no-clobber
+archive. Only exact/rejected numerical terminals are possible; no DB, Gate-D, token-rate or
+performance claim exists.
+
+Sol's first review blocked the batch before metal for two evidence rules, not arithmetic. Raw
+optimized SHA `a630...` is now acquisition-authorization provenance only. Numerical execution binds
+its own raw optimized bytes to the runner record and must regenerate the exact acquired canonical
+executable. A regression mutates only a real sealed HLO debug-table line, observes a different raw
+SHA and reproduces canonical SHA `9e933384...19a5`, 6,558,627 bytes and 14,561 stripped references.
+The old 4-MiB in-process cleanup refusal is replaced by a generated-code-residency bound and the
+post-process 8/8 zero-work census is the terminal cleanup gate. Regression values are the sealed
+prior `72,812,032 = 71,058,944 + 1,753,088` bytes and expected successor
+`66,017,792 = 64,264,704 + 1,753,088`; excess or asymmetric residue refuses.
+
+The adjacent PP16 suite passes 159/159; the complete CPU benchmarking suite passes 298 with 10
+expected skips. Ruff and Bash syntax pass. No TPU work occurred. Exact next is correction-only Sol
+closure on the immutable staged diff, then commit/push/same-region byte mirror before one protected
+zero-warmup invocation. Complete PP16 8K remains unauthorized until exact numerical evidence is
+independently audited.
+
 ## 2026-08-29 04:25--04:29 UTC — sealed PP16 HLO/HBM acquisition passes
 
 - Sol returned `APPROVE COMMIT AND ONE COMPILE-ONLY REPEAT` for staged SHA

@@ -2,6 +2,37 @@
 
 **Updated:** 2026-08-29 UTC
 
+## 2026-08-29 PP16 numerical-launch review blockers corrected offline
+
+- The default-off exactly-once launcher now refuses the rejected half-width producer flag and
+  requires explicit `full_width_rounded_then_slice=1`. It pins the successful `a2ea1e9` acquisition
+  code, StableHLO/raw optimized/canonical HLO, canonical bytes/version/reference count, runtime
+  packages, terminal/ledger/runner/summary hashes and the reviewed compact-evidence SHA.
+- Before any TPU census or compile, the launcher downloads only the acquisition's small
+  authorization records, authenticates the terminal self-hash and compact evidence, verifies the
+  exact 20-object remote name set from the pinned ledger and checks the key HLO ledger entries. The
+  executable authorization block passes against the real local acquisition. Before main execution,
+  the TPU runner itself must reproduce the exact acquired StableHLO/canonical HLO and measured HBM
+  margin. After the one invocation, the independent CPU verifier hashes the actual StableHLO and
+  raw optimized files, regenerates and byte-compares canonical HLO, requires all 15 roots/four
+  sealed bindings and invokes only the strict two-owner v2 comparator.
+- Sol's first numerical-launch review blocked two proof rules before metal. Raw optimized-HLO SHA
+  `a630...` now authenticates only the acquisition archive: the numerical graph binds its actual raw
+  bytes to its runner record and must regenerate the exact acquired canonical executable. A real
+  sealed-HLO regression changes only source-debug provenance, proves the raw SHA changes, and still
+  reproduces canonical SHA `9e933384...19a5`, 6,558,627 bytes and 14,561 stripped references.
+  The old impossible 4-MiB in-process cleanup rule is replaced by a generated-code-residency bound:
+  sealed prior `72,812,032 = 71,058,944 + 1,753,088` and expected successor
+  `66,017,792 = 64,264,704 + 1,753,088` both pass, excess/asymmetric residue refuses, and the
+  independently parsed post-process 8/8 zero-work census is the terminal cleanup gate.
+- The numerical archive includes the raw acquisition-authorization inputs and generated linkage.
+  It can terminally classify only `NUMERICAL_EXACT` or `NUMERICAL_REJECTED`; it cannot write a DB,
+  Gate-D, token-rate or performance claim. The adjacent PP16 suite passes 159/159 and the complete
+  benchmarking suite passes 298 with 10 expected skips; Ruff and Bash syntax pass. No TPU work
+  occurred. Exact next is correction-only Sol closure of the immutable diff, then commit/push/
+  byte-mirror before one zero-warmup invocation. Complete PP16 8K remains forbidden until an exact
+  terminal result is independently audited.
+
 ## 2026-08-29 sealed PP16 compile-only acquisition passes after exact-identity correction
 
 - Sol approved staged SHA `5a6d493b...84aaf` for commit and exactly one compile-only repeat.

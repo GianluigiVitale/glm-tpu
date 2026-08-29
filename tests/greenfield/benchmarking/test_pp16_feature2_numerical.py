@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import ast
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 from hashlib import sha256
@@ -14,10 +17,14 @@ import pytest
 from glm_tpu.greenfield.benchmarking.pp16_dense_boundary import (
     derive_expected_dense_boundary_bits,
 )
+from glm_tpu.greenfield.benchmarking.pp16_feature2_hlo import (
+    canonicalize_feature2_optimized_hlo,
+)
 from glm_tpu.greenfield.benchmarking.pp16_feature2_numerical import (
     _bitwise_mismatches,
     compare_feature2_full_width_numerical_capture,
     compare_feature2_numerical_capture,
+    validate_feature2_in_process_cleanup,
 )
 from glm_tpu.greenfield.errors import BenchmarkValidationError
 from glm_tpu.greenfield.kernels.stage_local import (
@@ -52,9 +59,18 @@ PROTECTED_CAPTURE = Path(
     "greenfield_pp16_feature2_prefill_numerical_20260829T001056567299421Z/"
     "result.npz"
 )
+ACQUIRED_RUN = Path(
+    "/home/gianl/glm-run/"
+    "greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z"
+)
 SOURCES_AVAILABLE = all(
     path.exists() for path in (TOKEN_ORACLE, DSA_ORACLE, LAYER1, DB529, DB550)
 )
+
+
+def _python_heredoc_after(source: str, marker: str) -> str:
+    section = source.split(marker, 1)[1]
+    return section.split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
 
 
 def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
@@ -86,15 +102,32 @@ def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
     ).read_text()
     assert "GLM_GREENFIELD_PP16_FEATURE2_NUMERICAL:-0" in wrapper
     assert "GLM_GREENFIELD_PP16_FEATURE2_MODE:-off} == execute_once" in wrapper
+    assert "GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE:-0" in wrapper
+    assert "[[ $FULL_WIDTH_ROUNDED_THEN_SLICE == 1 ]]" in wrapper
+    assert "== 0 ||" not in wrapper
+    assert "runner_variant_args=(--full-width-rounded-then-slice)" in wrapper
+    assert '"${runner_variant_args[@]}"' in wrapper
     assert "warmups=0 invocations=1" in wrapper
     assert '--result-npz "$RUN_DIR/result.npz"' in wrapper
-    assert "ACQUIRED_MAIN_STABLE_SHA=127bf089" in wrapper
-    assert "ACQUIRED_MAIN_CANONICAL_SHA=fb5aaf02" in wrapper
-    assert "ACQUIRED_MAIN_CANONICAL_BYTES=7870521" in wrapper
-    assert "ACQUIRED_MAIN_STACK_FRAME_REFERENCES=16170" in wrapper
+    assert "ACQUIRED_CODE_HASH=a2ea1e9439493b0093824d0084bc46c813fc1c33" in wrapper
+    assert "ACQUIRED_MAIN_STABLE_SHA=6c1c69d7" in wrapper
+    assert "ACQUIRED_MAIN_OPTIMIZED_SHA=a6307a5f" in wrapper
+    assert "ACQUIRED_MAIN_CANONICAL_SHA=9e933384" in wrapper
+    assert "ACQUIRED_MAIN_CANONICAL_BYTES=6558627" in wrapper
+    assert "ACQUIRED_MAIN_STACK_FRAME_REFERENCES=14561" in wrapper
     assert "ACQUIRED_JAX_VERSION=0.10.1" in wrapper
     assert "ACQUIRED_JAXLIB_VERSION=0.10.1" in wrapper
     assert "ACQUIRED_LIBTPU_VERSION=0.0.41" in wrapper
+    assert "verify_acquired_hlo_authorization" in wrapper
+    assert "validate_feature2_sealed_hlo_archive_identity" in wrapper
+    assert "compare_feature2_full_width_numerical_capture" in wrapper
+    assert "validate_feature2_in_process_cleanup" in wrapper
+    assert "compare_feature2_numerical_capture(" not in wrapper
+    assert "full_width_sealed_boundaries_v2" in wrapper
+    assert "expected_mismatch_fields" in wrapper
+    assert "archive_identity['optimized_hlo_sha256']!=optimized_pin" not in wrapper
+    assert "record['bytes_in_use']>4*1024**2" not in wrapper
+    assert "post_process_authenticated_zero_work_hosts" in wrapper
     assert "bench/results.db" not in wrapper
     assert "gsutil" not in wrapper
     assert "upload_ledger_no_clobber" in wrapper
@@ -109,6 +142,240 @@ def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
     assert 'sync -f "$RUN_DIR/terminal_create.receipt.stderr"' in wrapper[create:]
     assert "[[ -n $terminal_remote_name && -s $receipt ]] || return 1" in wrapper
     assert 'gcloud storage cp --no-clobber "$terminal_path"' not in wrapper
+
+
+def test_feature2_numerical_wrapper_refuses_the_rejected_variant() -> None:
+    wrapper = Path(__file__).parents[3] / (
+        "scripts/greenfield/run_pp16_feature2_prefill_numerical.sh"
+    )
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "GLM_GREENFIELD_PP16_FEATURE2_NUMERICAL": "1",
+            "GLM_GREENFIELD_PP16_FEATURE2_MODE": "execute_once",
+            "GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE": "0",
+        }
+    )
+    completed = subprocess.run(
+        ["bash", str(wrapper)],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 2
+    assert "admitted successor" in completed.stderr
+
+
+def test_feature2_numerical_embedded_verifiers_compile_in_exact_scope() -> None:
+    wrapper = Path(__file__).parents[3] / (
+        "scripts/greenfield/run_pp16_feature2_prefill_numerical.sh"
+    )
+    source = wrapper.read_text()
+    authorization = _python_heredoc_after(
+        source,
+        '"$RUN_DIR/acquisition_authorization.json"',
+    )
+    verifier = _python_heredoc_after(
+        source,
+        'say "recomputing HLO/source/load claims and exact numerical result without JAX"',
+    )
+    compile(authorization, "<pp16-feature2-acquisition-authorization>", "exec")
+    compile(verifier, "<pp16-feature2-numerical-verifier>", "exec")
+    tree = ast.parse(verifier)
+    imports = {
+        (node.module, alias.name)
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+    }
+    assert (
+        "glm_tpu.greenfield.benchmarking.pp16_feature2_hlo",
+        "validate_feature2_sealed_hlo_archive_identity",
+    ) in imports
+    assert (
+        "glm_tpu.greenfield.benchmarking.pp16_feature2_numerical",
+        "compare_feature2_full_width_numerical_capture",
+    ) in imports
+    assert (
+        "glm_tpu.greenfield.benchmarking.pp16_feature2_numerical",
+        "validate_feature2_in_process_cleanup",
+    ) in imports
+    assert "validate_feature2_sealed_hlo_archive_identity(" in verifier
+    assert "compare_feature2_full_width_numerical_capture(" in verifier
+
+
+@pytest.mark.skipif(
+    not all(
+        (ACQUIRED_RUN / name).is_file()
+        for name in ("evidence.sha256", "runner.json", "summary.json", "HLO_ACQUIRED")
+    ),
+    reason="sealed feature2 acquisition unavailable",
+)
+def test_feature2_numerical_acquisition_authorization_is_executable(
+    tmp_path: Path,
+) -> None:
+    wrapper = Path(__file__).parents[3] / (
+        "scripts/greenfield/run_pp16_feature2_prefill_numerical.sh"
+    )
+    authorization = _python_heredoc_after(
+        wrapper.read_text(),
+        '"$RUN_DIR/acquisition_authorization.json"',
+    )
+    directory = tmp_path / "acquired"
+    directory.mkdir()
+    for name in ("evidence.sha256", "runner.json", "summary.json", "HLO_ACQUIRED"):
+        shutil.copyfile(ACQUIRED_RUN / name, directory / name)
+    remote = (
+        "gs://driftbench-dsv4-uc/results/"
+        "greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z"
+    )
+    entries = []
+    for line in (directory / "evidence.sha256").read_text().splitlines():
+        _, relative = line.split(maxsplit=1)
+        entries.append(relative.removeprefix("*").removeprefix("./"))
+    objects = sorted(
+        [
+            f"{remote}/evidence.sha256",
+            f"{remote}/HLO_ACQUIRED",
+            *(f"{remote}/{name}" for name in entries),
+        ]
+    )
+    (directory / "remote_objects.txt").write_text("\n".join(objects) + "\n")
+    output = tmp_path / "authorization.json"
+    arguments = [
+        sys.executable,
+        "-c",
+        authorization,
+        str(directory),
+        str(
+            Path(__file__).parents[3]
+            / "docs/artifacts/pp16-feature2-sealed-hlo-acquisition.json"
+        ),
+        "9498097422e8bd06e637a6e78360bae8156992777cd5c92294ab9321139025e0",
+        "a2ea1e9439493b0093824d0084bc46c813fc1c33",
+        "greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z",
+        remote,
+        "7741bef152843992afc23902e5cab20be52dac55722f1da1ff7f017990449036",
+        "75bdd75f03fa4bba530f7863ae3b5728094745ea2e3884fb4d0ae72e8767c566",
+        "1dda18f3d007c6859911d29d9b1e526c75e37d748ed3d27f61683026e2218c45",
+        "b483460ebee19140d5fc30df77fa9851ad5bb080b307c740a0f6baa781b1d271",
+        "abec1454910e319be88e72eb8d7e5dbb55b841911990b1f2f76a1795a536fbde",
+        "6c1c69d76c3d121ed4f84cb85fe0091d1605ae43d0d5707e3d52ba2cdd310ad4",
+        "a6307a5f487b0cfcd79712c45ace89753cf0dc54e332b5c24fe9010a36ae3175",
+        "9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5",
+        "6558627",
+        "14561",
+        str(output),
+    ]
+    completed = subprocess.run(
+        arguments,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert json.loads(output.read_text())["passed"] is True
+
+    (directory / "remote_objects.txt").write_text("\n".join(objects[:-1]) + "\n")
+    rejected = subprocess.run(
+        arguments,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert rejected.returncode != 0
+    assert "remote object set drifted" in rejected.stderr
+
+
+@pytest.mark.skipif(
+    not (ACQUIRED_RUN / "hlo/feature2_main.optimized_hlo.txt").is_file(),
+    reason="sealed feature2 acquisition optimized HLO unavailable",
+)
+def test_feature2_raw_hlo_provenance_may_differ_only_when_canonical_identity_matches() -> (
+    None
+):
+    optimized_path = ACQUIRED_RUN / "hlo/feature2_main.optimized_hlo.txt"
+    acquired_raw = optimized_path.read_text()
+    acquired_raw_sha = sha256(acquired_raw.encode()).hexdigest()
+    assert acquired_raw_sha == (
+        "a6307a5f487b0cfcd79712c45ace89753cf0dc54e332b5c24fe9010a36ae3175"
+    )
+
+    file_locations_start = acquired_raw.index("FileLocations\n")
+    stack_frames_start = acquired_raw.index("StackFrames\n", file_locations_start)
+    file_locations = acquired_raw[file_locations_start:stack_frames_start]
+    line_match = re.search(r"\bline=([0-9]+)\b", file_locations)
+    assert line_match is not None
+    original_line = int(line_match.group(1))
+    mutated_locations = (
+        file_locations[: line_match.start(1)]
+        + str(original_line + 1)
+        + file_locations[line_match.end(1) :]
+    )
+    numerical_raw = (
+        acquired_raw[:file_locations_start]
+        + mutated_locations
+        + acquired_raw[stack_frames_start:]
+    )
+
+    acquired_canonical, acquired_identity = canonicalize_feature2_optimized_hlo(
+        acquired_raw
+    )
+    numerical_canonical, numerical_identity = canonicalize_feature2_optimized_hlo(
+        numerical_raw
+    )
+    assert sha256(numerical_raw.encode()).hexdigest() != acquired_raw_sha
+    assert numerical_canonical == acquired_canonical
+    for identity in (acquired_identity, numerical_identity):
+        assert identity["sha256"] == (
+            "9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5"
+        )
+        assert identity["byte_count"] == 6_558_627
+        assert identity["stripped_stack_frame_references"] == 14_561
+
+
+def test_feature2_cleanup_accepts_only_bounded_generated_code_residency() -> None:
+    prior = validate_feature2_in_process_cleanup(
+        [{"bytes_in_use": 72_812_032, "num_allocs": 6}] * 2,
+        generated_code_size_bytes=71_058_944,
+    )
+    assert prior["mode"] == "generated_code_resident_until_process_exit"
+    assert prior["residual_over_generated_code_bytes"] == 1_753_088
+
+    successor = validate_feature2_in_process_cleanup(
+        [{"bytes_in_use": 66_017_792, "num_allocs": 6}] * 2,
+        generated_code_size_bytes=64_264_704,
+    )
+    assert successor["mode"] == "generated_code_resident_until_process_exit"
+    assert successor["residual_over_generated_code_bytes"] == 1_753_088
+
+    released = validate_feature2_in_process_cleanup(
+        [{"bytes_in_use": 1_753_088, "num_allocs": 5}] * 2,
+        generated_code_size_bytes=64_264_704,
+    )
+    assert released["mode"] == "released_to_small_baseline"
+    assert released["residual_over_generated_code_bytes"] is None
+
+    with pytest.raises(BenchmarkValidationError, match="exceeds generated-code"):
+        validate_feature2_in_process_cleanup(
+            [
+                {
+                    "bytes_in_use": 64_264_704 + 4 * 1024**2 + 1,
+                    "num_allocs": 7,
+                }
+            ]
+            * 2,
+            generated_code_size_bytes=64_264_704,
+        )
+    with pytest.raises(BenchmarkValidationError, match="asymmetric or negative"):
+        validate_feature2_in_process_cleanup(
+            [
+                {"bytes_in_use": 66_017_792, "num_allocs": 6},
+                {"bytes_in_use": 66_017_792, "num_allocs": 7},
+            ],
+            generated_code_size_bytes=64_264_704,
+        )
 
 
 def test_exact_comparator_rejects_signed_zero_and_one_bit_float_drift() -> None:

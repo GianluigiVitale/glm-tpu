@@ -28,9 +28,17 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   physical main graph remains two adjacent partitions with 27 all-gathers, 17 all-reduces and 12
   feature permutes. Main execution count is zero. The independently hash-verified 20-object archive
   and 8/8 pre/sync/post evidence close only this graph's real-state HLO/HBM prerequisite. Pin the
-  separate default-off strict numerical wrapper to this exact code/HLO/archive identity, review and
-  commit/push/mirror it, then run one zero-warmup event-1 comparison. Numerical execution and
-  complete 8K remain forbidden until that separately protected comparison is exact.
+  separate default-off strict numerical wrapper to this exact code/HLO/archive identity. The local
+  wrapper now has those pins, refuses the half-width flag, authenticates the exact acquisition
+  terminal/ledger/object set before TPU work, revalidates actual HLO files after execution and uses
+  only the strict two-owner v2 comparator. Acquisition raw optimized-HLO identity authorizes the
+  acquisition archive only; a numerical entrypoint may differ in source-debug provenance but must
+  bind its own raw bytes and reproduce the acquired canonical executable exactly. In-process PJRT
+  cleanup may retain the measured generated-code allocation plus at most a small baseline; the
+  authenticated post-process 8/8 zero-work census is the terminal cleanup gate. Both rules have
+  real sealed-evidence regressions and the adjacent CPU suite passes. Obtain correction-only review,
+  commit/push/mirror, then run one zero-warmup event-1 comparison. Numerical execution and complete
+  8K remain forbidden until that separately protected comparison is exact.
 
 ## Historical and frozen boundaries
 

@@ -26,10 +26,21 @@ readonly DB529_INTERNAL_CONTRACT_SHA=9bdab5023b5775b787e15c3c76d542eab921bd7a704
 readonly DB529_INTERNAL_TENSOR_SHA=c2fdeccfdcc81363fe01a566c34bf6c04f2f44b0a18e7b545e76fdf0f0d4560b
 readonly FEATURE2_GRAPH_SHA=ab5be45aecf3b0b5d87ad76af8076bc9351823529a08c0eadb414b072b31cb2d
 readonly DB550_BOUNDARY=/home/gianl/gcs-models/results/greenfield_layer0_dense_partial_capture_20260813T200736889447458Z/dense_partial_capture.npz
-readonly ACQUIRED_MAIN_STABLE_SHA=127bf089f93bc9dd4f1b85576e8e70267a752d2be90dee74525322b5148a955e
-readonly ACQUIRED_MAIN_CANONICAL_SHA=fb5aaf025005f3fbb5a3c66e6a719ec3a78fb86d344afcf6288e6e93720310f7
-readonly ACQUIRED_MAIN_CANONICAL_BYTES=7870521
-readonly ACQUIRED_MAIN_STACK_FRAME_REFERENCES=16170
+readonly ACQUIRED_CODE_HASH=a2ea1e9439493b0093824d0084bc46c813fc1c33
+readonly ACQUIRED_RUN_TAG=greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z
+readonly ACQUIRED_REMOTE_PREFIX=$APPROVED_BUCKET/results/$ACQUIRED_RUN_TAG
+readonly ACQUIRED_COMPACT_EVIDENCE=$WORKTREE/docs/artifacts/pp16-feature2-sealed-hlo-acquisition.json
+readonly ACQUIRED_COMPACT_EVIDENCE_SHA=9498097422e8bd06e637a6e78360bae8156992777cd5c92294ab9321139025e0
+readonly ACQUIRED_EVIDENCE_LEDGER_SHA=7741bef152843992afc23902e5cab20be52dac55722f1da1ff7f017990449036
+readonly ACQUIRED_RUNNER_SHA=75bdd75f03fa4bba530f7863ae3b5728094745ea2e3884fb4d0ae72e8767c566
+readonly ACQUIRED_SUMMARY_SHA=1dda18f3d007c6859911d29d9b1e526c75e37d748ed3d27f61683026e2218c45
+readonly ACQUIRED_TERMINAL_SHA=b483460ebee19140d5fc30df77fa9851ad5bb080b307c740a0f6baa781b1d271
+readonly ACQUIRED_TERMINAL_SELF_SHA=abec1454910e319be88e72eb8d7e5dbb55b841911990b1f2f76a1795a536fbde
+readonly ACQUIRED_MAIN_STABLE_SHA=6c1c69d76c3d121ed4f84cb85fe0091d1605ae43d0d5707e3d52ba2cdd310ad4
+readonly ACQUIRED_MAIN_OPTIMIZED_SHA=a6307a5f487b0cfcd79712c45ace89753cf0dc54e332b5c24fe9010a36ae3175
+readonly ACQUIRED_MAIN_CANONICAL_SHA=9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5
+readonly ACQUIRED_MAIN_CANONICAL_BYTES=6558627
+readonly ACQUIRED_MAIN_STACK_FRAME_REFERENCES=14561
 readonly ACQUIRED_JAX_VERSION=0.10.1
 readonly ACQUIRED_JAXLIB_VERSION=0.10.1
 readonly ACQUIRED_LIBTPU_VERSION=0.0.41
@@ -42,6 +53,13 @@ readonly ACQUIRED_LIBTPU_VERSION=0.0.41
   echo "set GLM_GREENFIELD_PP16_FEATURE2_MODE=execute_once" >&2
   exit 2
 }
+FULL_WIDTH_ROUNDED_THEN_SLICE=${GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE:-0}
+readonly FULL_WIDTH_ROUNDED_THEN_SLICE
+[[ $FULL_WIDTH_ROUNDED_THEN_SLICE == 1 ]] || {
+  echo "set GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE=1 for the admitted successor" >&2
+  exit 2
+}
+readonly runner_variant_args=(--full-width-rounded-then-slice)
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 TAG=${GLM_GREENFIELD_PP16_FEATURE2_TAG:-greenfield_pp16_feature2_prefill_numerical_$(date -u +%Y%m%dT%H%M%S%NZ)}
@@ -82,6 +100,107 @@ remote_prefix_is_vacant() {
     [[ $(grep -c '^ERROR:' "$error") -eq 1 ]] &&
     [[ $(tail -n 1 "$error") == \
       "ERROR: (gcloud.storage.ls) One or more URLs matched no objects." ]]
+}
+
+verify_acquired_hlo_authorization() {
+  local directory="$RUN_DIR/acquired_hlo_authorization" relative
+  mkdir -p "$directory"
+  for relative in evidence.sha256 runner.json summary.json HLO_ACQUIRED; do
+    gcloud storage cat "$ACQUIRED_REMOTE_PREFIX/$relative" \
+      >"$directory/$relative"
+  done
+  gcloud storage ls --recursive "$ACQUIRED_REMOTE_PREFIX/**" \
+    >"$directory/remote_objects.txt"
+  PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - \
+    "$directory" "$ACQUIRED_COMPACT_EVIDENCE" \
+    "$ACQUIRED_COMPACT_EVIDENCE_SHA" "$ACQUIRED_CODE_HASH" \
+    "$ACQUIRED_RUN_TAG" "$ACQUIRED_REMOTE_PREFIX" \
+    "$ACQUIRED_EVIDENCE_LEDGER_SHA" "$ACQUIRED_RUNNER_SHA" \
+    "$ACQUIRED_SUMMARY_SHA" "$ACQUIRED_TERMINAL_SHA" \
+    "$ACQUIRED_TERMINAL_SELF_SHA" "$ACQUIRED_MAIN_STABLE_SHA" \
+    "$ACQUIRED_MAIN_OPTIMIZED_SHA" "$ACQUIRED_MAIN_CANONICAL_SHA" \
+    "$ACQUIRED_MAIN_CANONICAL_BYTES" \
+    "$ACQUIRED_MAIN_STACK_FRAME_REFERENCES" \
+    "$RUN_DIR/acquisition_authorization.json" <<'PY'
+from hashlib import sha256
+import json
+from pathlib import Path
+import sys
+
+(directory,compact_path,compact_sha,code_hash,run_tag,remote,
+ ledger_sha,runner_sha,summary_sha,terminal_sha,terminal_self_sha,
+ stable_sha,optimized_sha,canonical_sha,canonical_bytes,stack_refs,
+ output)=sys.argv[1:]
+directory=Path(directory); compact_path=Path(compact_path); output=Path(output)
+canonical_bytes=int(canonical_bytes); stack_refs=int(stack_refs)
+
+def digest(path):
+    return sha256(Path(path).read_bytes()).hexdigest()
+
+ledger_path=directory/'evidence.sha256'
+runner_path=directory/'runner.json'
+summary_path=directory/'summary.json'
+terminal_path=directory/'HLO_ACQUIRED'
+if digest(compact_path)!=compact_sha or digest(ledger_path)!=ledger_sha or digest(runner_path)!=runner_sha or digest(summary_path)!=summary_sha or digest(terminal_path)!=terminal_sha:
+    raise SystemExit('feature2 acquired authorization identity drifted')
+compact=json.loads(compact_path.read_text())
+runner=json.loads(runner_path.read_text())
+summary=json.loads(summary_path.read_text())
+terminal=json.loads(terminal_path.read_text())
+terminal_without_self={key:terminal[key] for key in ('artifact_kind','evidence_sha256','status','summary_sha256')}
+terminal_raw=json.dumps(terminal_without_self,allow_nan=False,separators=(',',':'),sort_keys=True).encode()
+if terminal.get('marker_self_sha256')!=terminal_self_sha or sha256(terminal_raw).hexdigest()!=terminal_self_sha or terminal.get('evidence_sha256')!=ledger_sha or terminal.get('summary_sha256')!=summary_sha:
+    raise SystemExit('feature2 acquired terminal binding drifted')
+if compact.get('status')!='HLO_ACQUIRED' or compact.get('code_hash')!=code_hash or compact.get('run_tag')!=run_tag or compact.get('remote_prefix')!=remote or compact.get('review_verdict')!='APPROVE COMMIT AND ONE COMPILE-ONLY REPEAT' or compact.get('main_executed') is not False or compact.get('numerical_claim') is not False or compact.get('performance_claim') is not False:
+    raise SystemExit('feature2 compact acquisition authorization drifted')
+if compact.get('evidence',{}).get('remote_object_count_including_terminal')!=20 or compact.get('evidence',{}).get('evidence_ledger_sha256')!=ledger_sha or compact.get('evidence',{}).get('runner_sha256')!=runner_sha or compact.get('evidence',{}).get('summary_sha256')!=summary_sha or compact.get('evidence',{}).get('terminal_file_sha256')!=terminal_sha or compact.get('evidence',{}).get('terminal_marker_self_sha256')!=terminal_self_sha:
+    raise SystemExit('feature2 compact acquisition evidence linkage drifted')
+for record in (runner,summary):
+    if record.get('status')!='HLO_ACQUIRED' or record.get('code_hash')!=code_hash or record.get('main_executed') is not False or record.get('numerical_claim') is not False or record.get('performance_claim') is not False:
+        raise SystemExit('feature2 acquired claim boundary drifted')
+if runner.get('main_execution_count')!=0 or runner.get('compile_only') is not True or runner.get('full_width_rounded_then_slice') is not True or runner.get('sealed_boundary_capture') is not True:
+    raise SystemExit('feature2 acquired execution variant drifted')
+main=runner.get('hlo',{}).get('feature2_main',{})
+canonical=main.get('execution_canonical_hlo',{})
+if main.get('stablehlo',{}).get('sha256')!=stable_sha or main.get('optimized_hlo',{}).get('sha256')!=optimized_sha or canonical.get('sha256')!=canonical_sha or canonical.get('byte_count')!=canonical_bytes or canonical.get('canonicalizer_version')!=1 or canonical.get('stripped_stack_frame_references')!=stack_refs or canonical.get('canonicalizer_code_hash')!=code_hash:
+    raise SystemExit('feature2 acquired HLO identity drifted')
+entries={}
+for line in ledger_path.read_text().splitlines():
+    expected,relative=line.split(maxsplit=1)
+    relative=relative.removeprefix('*').removeprefix('./')
+    if relative in entries:
+        raise SystemExit('feature2 acquired ledger has duplicate paths')
+    entries[relative]=expected
+required_entries={
+    'runner.json':runner_sha,
+    'summary.json':summary_sha,
+    'hlo/feature2_main.stablehlo.mlir':stable_sha,
+    'hlo/feature2_main.optimized_hlo.txt':optimized_sha,
+    'hlo/feature2_main.execution_canonical_hlo.txt':canonical_sha,
+}
+if any(entries.get(name)!=expected for name,expected in required_entries.items()):
+    raise SystemExit('feature2 acquired ledger content drifted')
+expected_objects=sorted([f'{remote}/evidence.sha256',f'{remote}/HLO_ACQUIRED',*(f'{remote}/{name}' for name in entries)])
+observed_objects=sorted(line for line in (directory/'remote_objects.txt').read_text().splitlines() if line)
+if len(expected_objects)!=20 or observed_objects!=expected_objects:
+    raise SystemExit('feature2 acquired remote object set drifted')
+record={
+    'artifact_kind':'greenfield_pp16_feature2_acquisition_authorization',
+    'acquired_code_hash':code_hash,
+    'acquired_compact_evidence_sha256':compact_sha,
+    'acquired_evidence_ledger_sha256':ledger_sha,
+    'acquired_remote_object_count':len(observed_objects),
+    'acquired_remote_prefix':remote,
+    'acquired_run_tag':run_tag,
+    'acquired_terminal_marker_self_sha256':terminal_self_sha,
+    'main_canonical_hlo_byte_count':canonical_bytes,
+    'main_canonical_hlo_sha256':canonical_sha,
+    'main_optimized_hlo_sha256':optimized_sha,
+    'main_stablehlo_sha256':stable_sha,
+    'passed':True,
+}
+output.write_text(json.dumps(record,allow_nan=False,indent=2,sort_keys=True)+'\n')
+PY
 }
 
 upload_ledger_no_clobber() {
@@ -360,6 +479,9 @@ record={'artifact_kind':'greenfield_pp16_feature2_source_identity','runtime_root
 Path(output).write_text(json.dumps(record,allow_nan=False,indent=2,sort_keys=True)+'\n')
 PY
 
+say "authenticating the reviewed sealed-HLO acquisition and exact remote object set"
+verify_acquired_hlo_authorization
+
 strict_census pre || {
   say "ABORT: pre-run census is not authenticated 8/8 zero work"
   exit 1
@@ -401,6 +523,7 @@ started=$(date +%s)
       --expected-jax-version "$ACQUIRED_JAX_VERSION" \
       --expected-jaxlib-version "$ACQUIRED_JAXLIB_VERSION" \
       --expected-libtpu-version "$ACQUIRED_LIBTPU_VERSION" \
+      "${runner_variant_args[@]}" \
       --output "$RUN_DIR/runner.json" --hlo-dir "$RUN_DIR/hlo" \
       --result-npz "$RUN_DIR/result.npz"
 ) >"$RUN_DIR/runner.log" 2>&1
@@ -418,6 +541,7 @@ PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$TAG" "$REMOTE_PREFIX" "$elapsed" \
   "$TOKEN_ORACLE_DIR" "$DSA_ORACLE_DIR" "$LAYER1_INTERNAL_REFERENCE" \
   "$DB529_INTERNAL_DIR" "$DB550_BOUNDARY" \
+  "$FULL_WIDTH_ROUNDED_THEN_SLICE" \
   "$ACQUIRED_MAIN_STABLE_SHA" "$ACQUIRED_MAIN_CANONICAL_SHA" \
   "$ACQUIRED_MAIN_CANONICAL_BYTES" "$ACQUIRED_MAIN_STACK_FRAME_REFERENCES" \
   "$ACQUIRED_JAX_VERSION" "$ACQUIRED_JAXLIB_VERSION" "$ACQUIRED_LIBTPU_VERSION" <<'PY'
@@ -426,16 +550,21 @@ import json
 from pathlib import Path
 import sys
 
-from glm_tpu.greenfield.benchmarking.pp16_feature2_numerical import compare_feature2_numerical_capture
+from glm_tpu.greenfield.benchmarking.pp16_feature2_hlo import validate_feature2_sealed_hlo_archive_identity
+from glm_tpu.greenfield.benchmarking.pp16_feature2_numerical import compare_feature2_full_width_numerical_capture, validate_feature2_in_process_cleanup
 
 run=Path(sys.argv[1]); pin,tag,remote,elapsed=sys.argv[2:6]
 token,dsa,layer1,db529,db550=map(Path,sys.argv[6:11])
-stable_pin,canonical_pin=sys.argv[11:13]
-canonical_bytes,stack_frame_references=map(int,sys.argv[13:15])
-expected_runtime_pins=dict(zip(('jax','jaxlib','libtpu'),sys.argv[15:18],strict=True))
+full_width_rounded_then_slice=bool(int(sys.argv[11]))
+stable_pin,canonical_pin=sys.argv[12:14]
+canonical_bytes,stack_frame_references=map(int,sys.argv[14:16])
+expected_runtime_pins=dict(zip(('jax','jaxlib','libtpu'),sys.argv[16:19],strict=True))
 runner=json.loads((run/'runner.json').read_text())
 source=json.loads((run/'source_identity.json').read_text())
-if runner.get('status')!='NUMERICAL_CAPTURED' or runner.get('code_hash')!=pin or runner.get('compile_only') is not False or runner.get('main_executed') is not True or runner.get('main_execution_count')!=1 or runner.get('numerical_claim') is not False or runner.get('performance_claim') is not False:
+authorization=json.loads((run/'acquisition_authorization.json').read_text())
+if full_width_rounded_then_slice is not True or authorization.get('passed') is not True:
+    raise SystemExit('feature2 numerical authorization drifted')
+if runner.get('status')!='NUMERICAL_CAPTURED' or runner.get('code_hash')!=pin or runner.get('compile_only') is not False or runner.get('full_width_rounded_then_slice') is not True or runner.get('sealed_boundary_capture') is not True or runner.get('main_executed') is not True or runner.get('main_execution_count')!=1 or runner.get('numerical_claim') is not False or runner.get('performance_claim') is not False:
     raise SystemExit('feature2 numerical-capture claim boundary drifted')
 if runner.get('graph_sha256')!=source.get('graph_sha256') or runner.get('event1_target_lineage')!=source.get('event1_target_lineage') or runner.get('selective_plan')!=source.get('selective_plan'):
     raise SystemExit('feature2 numerical source lineage drifted')
@@ -461,11 +590,29 @@ for name,record in runner['hlo'].items():
         raise SystemExit(f'feature2 materializer {name} contract failed')
 main=runner['hlo']['feature2_main']
 canonical=main.get('execution_canonical_hlo',{})
-if main['stablehlo']['sha256']!=stable_pin or canonical.get('sha256')!=canonical_pin or canonical.get('byte_count')!=canonical_bytes or canonical.get('stripped_stack_frame_references')!=stack_frame_references or canonical.get('canonicalizer_version')!=1 or canonical.get('canonicalizer_code_hash')!=pin:
-    raise SystemExit('feature2 numerical executable HLO drifted from acquired graph')
+stable_path=run/'hlo'/main.get('stablehlo',{}).get('filename','')
+optimized_path=run/'hlo'/main.get('optimized_hlo',{}).get('filename','')
 canonical_path=run/'hlo'/canonical.get('filename','')
-if canonical_path.parent!=run/'hlo' or canonical_path.name!='feature2_main.execution_canonical_hlo.txt' or not canonical_path.is_file() or canonical_path.stat().st_size!=canonical_bytes or sha256(canonical_path.read_bytes()).hexdigest()!=canonical_pin:
-    raise SystemExit('feature2 canonical executable artifact identity drifted')
+if stable_path.parent!=run/'hlo' or not stable_path.name.endswith('.stablehlo.mlir') or optimized_path.parent!=run/'hlo' or not optimized_path.name.endswith('.optimized_hlo.txt') or canonical_path.parent!=run/'hlo' or canonical_path.name!='feature2_main.execution_canonical_hlo.txt':
+    raise SystemExit('feature2 numerical executable HLO archive paths drifted')
+archive_identity=validate_feature2_sealed_hlo_archive_identity(stable_path,optimized_path,canonical_path,expected_stablehlo_sha256=stable_pin,expected_canonical_sha256=canonical_pin,expected_canonical_bytes=canonical_bytes,expected_canonicalizer_version=1,expected_stripped_stack_frame_references=stack_frame_references)
+if main.get('stablehlo',{}).get('sha256')!=archive_identity['stablehlo_sha256'] or main.get('optimized_hlo',{}).get('sha256')!=archive_identity['optimized_hlo_sha256']:
+    raise SystemExit('feature2 numerical raw HLO identity drifted')
+expected_terminal_shapes=[[1,2048],[1],[1,2048],[2,1,3072],[2,1,32,256],[1,576],[2,1,6144],[2,1,2048],[2,1,32,128],[2,1,32],[2,16,256,640],[2,16,256,128],[2,16,256,128],[2,2],[1]]
+expected_terminal_dtypes=['int32','int32','float32','bfloat16','bfloat16','bfloat16','bfloat16','bfloat16','float32','float32','bfloat16','bfloat16','bfloat16','uint32','bool']
+expected_stable_types=['tensor<1x2048xi32>','tensor<1xi32>','tensor<1x2048xf32>','tensor<2x1x3072xbf16>','tensor<2x1x32x256xbf16>','tensor<1x576xbf16>','tensor<2x1x6144xbf16>','tensor<2x1x2048xbf16>','tensor<2x1x32x128xf32>','tensor<2x1x32xf32>','tensor<2x16x256x640xbf16>','tensor<2x16x256x128xbf16>','tensor<2x16x256x128xbf16>','tensor<2x2xui32>','tensor<1xi1>']
+expected_optimized_roots=[{'dtype':dtype,'shape':shape} for dtype,shape in [('s32',[1,2048]),('s32',[1]),('f32',[1,2048]),('bf16',[1,1,3072]),('bf16',[1,1,32,256]),('bf16',[1,576]),('bf16',[1,1,6144]),('bf16',[1,1,2048]),('f32',[1,1,32,128]),('f32',[1,1,32]),('bf16',[1,16,256,640]),('bf16',[1,16,256,128]),('bf16',[1,16,256,128]),('u32',[1,2]),('pred',[1])]]
+expected_sealed_bindings={'6':'greenfield_pp16_feature2_sealed_normalized_hidden','7':'greenfield_pp16_feature2_sealed_q_a_state','8':'greenfield_pp16_feature2_sealed_dsa_query','9':'greenfield_pp16_feature2_sealed_dsa_head_weights'}
+stable=main['stablehlo_contract']; optimized=main['optimized_contract']; terminal=main['terminal_contract']
+expected_canonical={'byte_count':canonical_bytes,'canonicalizer_version':1,'sha256':canonical_pin,'stripped_stack_frame_references':stack_frame_references}
+if stable.get('sealed_boundary_capture') is not True or stable.get('stablehlo_sha256')!=archive_identity['stablehlo_sha256'] or stable.get('output_count')!=15 or stable.get('terminal_shapes')!=expected_terminal_shapes or stable.get('terminal_types')!=expected_stable_types:
+    raise SystemExit('feature2 numerical StableHLO sealed terminal drifted')
+if optimized.get('sealed_boundary_capture') is not True or optimized.get('output_count')!=15 or optimized.get('root_shapes')!=expected_optimized_roots or optimized.get('sealed_bindings')!=expected_sealed_bindings or {key:optimized.get('sealed_canonical_hlo_identity',{}).get(key) for key in expected_canonical}!=expected_canonical:
+    raise SystemExit('feature2 numerical optimized-HLO sealed terminal drifted')
+if terminal.get('sealed_boundary_capture') is not True or terminal.get('output_count')!=15 or terminal.get('terminal_shapes')!=expected_terminal_shapes or terminal.get('terminal_dtypes')!=expected_terminal_dtypes:
+    raise SystemExit('feature2 numerical abstract sealed terminal drifted')
+if canonical.get('sha256')!=canonical_pin or canonical.get('byte_count')!=canonical_bytes or canonical.get('stripped_stack_frame_references')!=stack_frame_references or canonical.get('canonicalizer_version')!=1 or canonical.get('canonicalizer_code_hash')!=pin or {key:archive_identity['canonical_hlo_identity'].get(key) for key in expected_canonical}!=expected_canonical:
+    raise SystemExit('feature2 numerical executable HLO drifted from acquired graph')
 state=runner.get('state_manifest',{})
 if state.get('plan_id')!='PP16_LP2' or state.get('owner_device_ids')!=[0,1] or state.get('selected_read_count')!=78 or state.get('raw_dense_device_materialization') is not False or state.get('dense_final_layout') is not True:
     raise SystemExit('feature2 selective state contract drifted')
@@ -477,18 +624,26 @@ for phase in sorted(required_memory):
     records=memory[phase]
     if not isinstance(records,list) or len(records)!=2 or any(not isinstance(record,dict) for record in records):
         raise SystemExit(f'feature2 measured-memory records missing at {phase}')
-    required={'bytes_in_use','bytes_limit','largest_free_block_bytes','peak_bytes_in_use'}
+    required={'bytes_in_use','bytes_limit','largest_free_block_bytes','num_allocs','peak_bytes_in_use'}
     if any(not required.issubset(record) for record in records):
         raise SystemExit(f'feature2 measured-memory fields missing at {phase}')
 if any(record['peak_bytes_in_use']>=record['bytes_limit'] or record['largest_free_block_bytes']<8*1024**3 for record in memory['after_execute']):
     raise SystemExit('feature2 numerical execution has unknown/insufficient HBM margin')
-if any(record['bytes_in_use']>4*1024**2 for record in memory['after_cleanup']):
-    raise SystemExit('feature2 numerical runner did not release device state')
-comparison=compare_feature2_numerical_capture(run/'result.npz',token_oracle_dir=token,dsa_oracle_dir=dsa,layer1_internal_reference=layer1,db529_internal_dir=db529,db550_boundary=db550)
+generated_code_size=main.get('memory_analysis',{}).get('generated_code_size_in_bytes')
+cleanup=validate_feature2_in_process_cleanup(memory['after_cleanup'],generated_code_size_bytes=generated_code_size)
+post_census_path=run/'census_post.txt'
+post_hosts=[line.split()[1] for line in post_census_path.read_text().splitlines() if line.startswith('CENSUS_OK ')]
+if len(post_hosts)!=8 or len(set(post_hosts))!=8:
+    raise SystemExit('feature2 post-process cleanup census drifted')
+cleanup.update({'post_process_authenticated_zero_work_hosts':8,'post_process_census_sha256':sha256(post_census_path.read_bytes()).hexdigest(),'terminal_cleanup_gate':'authenticated post-process 8/8 zero work'})
+comparison=compare_feature2_full_width_numerical_capture(run/'result.npz',token_oracle_dir=token,dsa_oracle_dir=dsa,layer1_internal_reference=layer1,db529_internal_dir=db529,db550_boundary=db550)
 if sha256((run/'result.npz').read_bytes()).hexdigest()!=comparison['capture_sha256']:
     raise SystemExit('feature2 numerical capture changed before sealing')
+expected_mismatch_fields={'carried_bfloat16_bits','contract_valid','event1_positions','event1_scores','event1_valid_counts','layer1_current_key_bfloat16_bits','layer1_normalized_hidden_bfloat16_bits','layer1_q_a_state_bfloat16_bits','layer1_dsa_query_float32','layer1_dsa_head_weights_float32'}
+if comparison.get('comparison_schema')!='full_width_sealed_boundaries_v2' or comparison.get('sealed_boundary_comparisons_required') is not True or set(comparison.get('mismatch_counts',{}))!=expected_mismatch_fields:
+    raise SystemExit('feature2 numerical strict comparison contract drifted')
 (run/'comparison.json').write_text(json.dumps(comparison,allow_nan=False,indent=2,sort_keys=True)+'\n')
-summary={'artifact_kind':'greenfield_pp16_feature2_numerical_summary','claim_scope':comparison['claim_scope'],'code_hash':pin,'elapsed_seconds_operational_only':int(elapsed),'exact':comparison['exact'],'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_canonical_hlo':canonical,'main_execution_count':1,'measured_memory':memory,'mismatch_counts':comparison['mismatch_counts'],'numerical_claim':comparison['exact'],'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'runtime_pins':runtime_pins,'status':comparison['status']}
+summary={'acquisition_authorization_sha256':sha256((run/'acquisition_authorization.json').read_bytes()).hexdigest(),'artifact_kind':'greenfield_pp16_feature2_numerical_summary','claim_scope':comparison['claim_scope'],'cleanup':cleanup,'code_hash':pin,'elapsed_seconds_operational_only':int(elapsed),'exact':comparison['exact'],'full_width_rounded_then_slice':True,'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_canonical_hlo':canonical,'main_execution_count':1,'measured_memory':memory,'mismatch_counts':comparison['mismatch_counts'],'numerical_claim':comparison['exact'],'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'runtime_pins':runtime_pins,'sealed_boundary_capture':True,'status':comparison['status']}
 (run/'summary.json').write_text(json.dumps(summary,allow_nan=False,indent=2,sort_keys=True)+'\n')
 PY
 
@@ -496,8 +651,9 @@ cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
 (
   cd "$RUN_DIR"
   find hlo -type f -print0 | sort -z | xargs -0 sha256sum
+  find acquired_hlo_authorization -type f -print0 | sort -z | xargs -0 sha256sum
   sha256sum runner.json runner.log result.npz comparison.json \
-    source_identity.json summary.json \
+    acquisition_authorization.json source_identity.json summary.json \
     census_pre.txt census_post.txt sync.txt remote_vacancy.txt \
     orchestrator.sealed.log
 ) >"$RUN_DIR/evidence.sha256"

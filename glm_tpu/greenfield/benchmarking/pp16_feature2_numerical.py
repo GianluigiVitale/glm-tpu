@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -78,6 +79,71 @@ def _bitwise_mismatches(candidate: np.ndarray, expected: np.ndarray) -> int:
     candidate_words = np.ascontiguousarray(candidate).view(f"V{byte_width}")
     expected_words = np.ascontiguousarray(expected).view(f"V{byte_width}")
     return int(np.count_nonzero(candidate_words != expected_words))
+
+
+def validate_feature2_in_process_cleanup(
+    records: Sequence[dict[str, int]],
+    *,
+    generated_code_size_bytes: int,
+    baseline_limit_bytes: int = 4 * 1024**2,
+) -> dict[str, Any]:
+    """Bound honest PJRT generated-code residency before process exit."""
+
+    if (
+        not isinstance(generated_code_size_bytes, int)
+        or isinstance(generated_code_size_bytes, bool)
+        or generated_code_size_bytes <= 0
+        or not isinstance(baseline_limit_bytes, int)
+        or isinstance(baseline_limit_bytes, bool)
+        or baseline_limit_bytes <= 0
+    ):
+        raise BenchmarkValidationError("feature2 cleanup byte bounds are invalid")
+    if len(records) != 2 or any(
+        not isinstance(record, dict)
+        or not {"bytes_in_use", "num_allocs"}.issubset(record)
+        or not isinstance(record["bytes_in_use"], int)
+        or isinstance(record["bytes_in_use"], bool)
+        or not isinstance(record["num_allocs"], int)
+        or isinstance(record["num_allocs"], bool)
+        for record in records
+    ):
+        raise BenchmarkValidationError(
+            "feature2 in-process cleanup records are incomplete"
+        )
+    bytes_in_use = [record["bytes_in_use"] for record in records]
+    num_allocs = [record["num_allocs"] for record in records]
+    if (
+        len(set(bytes_in_use)) != 1
+        or len(set(num_allocs)) != 1
+        or any(value < 0 for value in (*bytes_in_use, *num_allocs))
+    ):
+        raise BenchmarkValidationError(
+            "feature2 in-process cleanup is asymmetric or negative"
+        )
+    observed = bytes_in_use[0]
+    if observed <= baseline_limit_bytes:
+        mode = "released_to_small_baseline"
+        residual_over_generated_code = None
+    elif (
+        generated_code_size_bytes
+        <= observed
+        <= (generated_code_size_bytes + baseline_limit_bytes)
+    ):
+        mode = "generated_code_resident_until_process_exit"
+        residual_over_generated_code = observed - generated_code_size_bytes
+    else:
+        raise BenchmarkValidationError(
+            "feature2 in-process cleanup exceeds generated-code residency plus "
+            "the bounded baseline"
+        )
+    return {
+        "baseline_limit_bytes": baseline_limit_bytes,
+        "bytes_in_use_per_device": bytes_in_use,
+        "generated_code_size_bytes": generated_code_size_bytes,
+        "mode": mode,
+        "num_allocs_per_device": num_allocs,
+        "residual_over_generated_code_bytes": residual_over_generated_code,
+    }
 
 
 def _compare_feature2_numerical_capture(
