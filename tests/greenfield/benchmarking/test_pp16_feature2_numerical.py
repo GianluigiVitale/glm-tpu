@@ -42,6 +42,11 @@ DB550 = ROOT / (
     "results/greenfield_layer0_dense_partial_capture_"
     "20260813T200736889447458Z/dense_partial_capture.npz"
 )
+PROTECTED_CAPTURE = Path(
+    "/home/gianl/glm-run/"
+    "greenfield_pp16_feature2_prefill_numerical_20260829T001056567299421Z/"
+    "result.npz"
+)
 SOURCES_AVAILABLE = all(
     path.exists() for path in (TOKEN_ORACLE, DSA_ORACLE, LAYER1, DB529, DB550)
 )
@@ -253,6 +258,11 @@ def test_feature2_rejection_recovery_is_cpu_only_distinct_and_default_off() -> N
         "cd1f25488e876acf475068131c5eb7f1ca25dabea158c553de86483aa8a40798"
     ) in text
     assert "RECOVERY_REMOTE=$APPROVED_BUCKET/results/$RECOVERY_TAG" in text
+    assert "RECOVERY_MODE == validate_only" in text
+    assert text.index("if [[ $RECOVERY_MODE == validate_only ]]") < text.index(
+        'upload_preterminal "$RECOVERY_DIR/recovery.evidence.sha256"'
+    )
+    assert "VALIDATED_ONLY" in text
     assert '"$SOURCE_REMOTE/NUMERICAL_REJECTED"' in text
     assert '"$SOURCE_REMOTE/SUCCESS"' in text
     assert '"in_process_release_passed": False' in text
@@ -262,6 +272,9 @@ def test_feature2_rejection_recovery_is_cpu_only_distinct_and_default_off() -> N
     assert '"carried_bfloat16_bits": 968' in text
     assert (
         "3f6c86ed6e96a59adfe706a522297bf83c2ed0802a36ede9f06a88cf6f3f53d2"
+    ) in text
+    assert (
+        "35a601b7f174eb9204848757f709549a31e82774309929f4071c61849626044c"
     ) in text
     assert "--if-generation-match=0" in text
     assert 'gcloud storage rm --if-generation-match="$generation"' in text
@@ -278,3 +291,30 @@ def test_feature2_rejection_recovery_is_cpu_only_distinct_and_default_off() -> N
     assert "gcloud compute" not in text
     assert "TPU_VISIBLE_DEVICES" not in text
     assert "gcloud storage cp --no-clobber" not in text
+
+
+@pytest.mark.skipif(
+    not SOURCES_AVAILABLE or not PROTECTED_CAPTURE.is_file(),
+    reason="protected feature2 numerical sources unavailable",
+)
+def test_protected_feature2_rejection_exact_identities_are_executable() -> None:
+    report = _compare(PROTECTED_CAPTURE)
+    assert report["status"] == "NUMERICAL_REJECTED"
+    assert report["exact"] is False
+    assert report["capture_sha256"] == (
+        "be3dda446cfbde547af49dd5ea371af690b553bcc8414907add1b0a2503b9d0d"
+    )
+    assert report["mismatch_counts"] == {
+        "carried_bfloat16_bits": 968,
+        "contract_valid": 0,
+        "event1_positions": 1852,
+        "event1_scores": 2048,
+        "event1_valid_counts": 0,
+        "layer1_current_key_bfloat16_bits": 0,
+    }
+    assert report["captured_array_sha256"][
+        "current_carried_halves_bfloat16_bits"
+    ] == "3f6c86ed6e96a59adfe706a522297bf83c2ed0802a36ede9f06a88cf6f3f53d2"
+    assert report["expected_sha256"]["carried_bfloat16_bits"] == (
+        "35a601b7f174eb9204848757f709549a31e82774309929f4071c61849626044c"
+    )

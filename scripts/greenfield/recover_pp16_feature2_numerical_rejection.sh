@@ -26,8 +26,10 @@ readonly DB550_BOUNDARY=/home/gianl/gcs-models/results/greenfield_layer0_dense_p
   echo "PP16 feature2 numerical rejection recovery is default-off" >&2
   exit 2
 }
-[[ ${GLM_GREENFIELD_PP16_FEATURE2_RECOVERY_MODE:-off} == seal_rejected ]] || {
-  echo "set GLM_GREENFIELD_PP16_FEATURE2_RECOVERY_MODE=seal_rejected" >&2
+RECOVERY_MODE=${GLM_GREENFIELD_PP16_FEATURE2_RECOVERY_MODE:-off}
+readonly RECOVERY_MODE
+[[ $RECOVERY_MODE == validate_only || $RECOVERY_MODE == seal_rejected ]] || {
+  echo "set recovery mode to validate_only or seal_rejected" >&2
   exit 2
 }
 for command_name in flock gcloud git sha256sum; do
@@ -354,7 +356,7 @@ if (
     )
     != "3f6c86ed6e96a59adfe706a522297bf83c2ed0802a36ede9f06a88cf6f3f53d2"
     or comparison.get("expected_sha256", {}).get("carried_bfloat16_bits")
-    != "35a601b76cd7298550b33afe88ee769008edcb7dcf3cd08b131add884681044c"
+    != "35a601b7f174eb9204848757f709549a31e82774309929f4071c61849626044c"
 ):
     raise SystemExit("source feature2 numerical rejection drifted")
 
@@ -473,6 +475,11 @@ verify_preterminal() {
     <(gcloud storage ls --recursive "$RECOVERY_REMOTE/**" 2>/dev/null | sort) \
     >/dev/null
 }
+
+if [[ $RECOVERY_MODE == validate_only ]]; then
+  say "VALIDATED_ONLY source/authentication/comparison/cleanup pass; no remote recovery objects written"
+  exit 0
+fi
 
 say "publishing the distinct recovery archive append-only"
 upload_preterminal "$RECOVERY_DIR/recovery.evidence.sha256"
