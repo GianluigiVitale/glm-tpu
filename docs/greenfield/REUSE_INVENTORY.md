@@ -686,3 +686,9 @@ The reviewed correction applies that pre-lease contract to every mode that later
 DSA-oracle comparison. Fable's final correction verdict approves commit/push/mirror only. A fresh
 tag still requires a separate execution-only review; never infer execution authorization from this
 reuse approval.
+
+Do not reuse burned tag `greenfield_legacy_layer1_rms_input_p8155_20260829T174920080399586Z`.
+Before any fresh tag, reuse the fail-fast Ray guards: exact current TPU system-tag equality against
+`allow-ray-pod-internal`, seven worker-to-head TCP/6379 receipts, bounded seven-worker join and
+census coverage for orphaned `ray start` commands. Accepted no-model network proof is local at
+`/home/gianl/glm-run/ray_firewall_smoke.PRVpCS0d`; it is not model or Gate-D evidence.

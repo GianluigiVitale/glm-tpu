@@ -4,9 +4,12 @@ set -euo pipefail
 
 readonly POD=db-v4-64-od
 readonly ZONE=us-central2-b
+readonly RAY_FIREWALL_RULE=allow-ray-pod-internal
 readonly BRANCH=rewrite/topology-first-decode
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly HARNESS_REPO=/home/gianl/glm-tpu
+readonly RAY_LAUNCHER_SHA=ca580f36d7bf0908eaf84264cf33b3a5ed18445ae90f10ed6138c7771edb8d5b
+readonly RAY_VALIDATOR_SHA=01f675a1e701a687c04e7f096409fa30ce2b74e89148ec7dd574d043da8f70b6
 readonly ORACLE_REPO=/home/gianl/tpu-inference
 readonly ORACLE_PIN=b3c25df47ac98783912dc658878181ec0a8ae16d
 readonly INTERNAL_CAPTURE=${GLM_GREENFIELD_DSA_INTERNALS_CAPTURE:-0}
@@ -692,6 +695,17 @@ readonly INTERNAL_RESULT_DIR
   echo "tracked harness files are dirty" >&2
   exit 2
 }
+for ray_source in \
+  "$WORKTREE/scripts/launch_glm_32chip.sh:$RAY_LAUNCHER_SHA" \
+  "$HARNESS_REPO/scripts/launch_glm_32chip.sh:$RAY_LAUNCHER_SHA" \
+  "$WORKTREE/scripts/validate_ray_network.sh:$RAY_VALIDATOR_SHA" \
+  "$HARNESS_REPO/scripts/validate_ray_network.sh:$RAY_VALIDATOR_SHA"; do
+  IFS=: read -r ray_path ray_sha <<<"$ray_source"
+  [[ -f $ray_path && $(sha256sum "$ray_path" | awk '{print $1}') == "$ray_sha" ]] || {
+    echo "reviewed Ray protection source drifted: $ray_path" >&2
+    exit 2
+  }
+done
 [[ $(git -C "$LEGACY_SOURCE_REPO" rev-parse HEAD) == "$LEGACY_PIN" ]] || {
   echo "legacy repository pin changed" >&2
   exit 2
@@ -782,17 +796,108 @@ PY
     }
   fi
 fi
-[[ ! -e $RUN_DIR ]] || {
-  echo "append-only run directory exists: $RUN_DIR" >&2
-  exit 2
-}
-mkdir -p "$RUN_DIR" "$SOURCE_DIR"
-
 exec 9>/home/gianl/glm-run/.glm_pod_workload.lock
 flock -n 9 || {
   echo "another protected pod workflow holds the global lease" >&2
   exit 1
 }
+
+# Refuse stale recreated-pod networking before creating the append-only run
+# directory. The wrapper may inspect this rule but must never mutate it.
+pod_contract=$(gcloud compute tpus tpu-vm describe "$POD" --zone "$ZONE" \
+  --format='value(id,state,health)')
+IFS=$'\t' read -r current_pod_id current_pod_state current_pod_health \
+  <<<"$pod_contract"
+[[ $current_pod_id =~ ^[0-9]+$ && $current_pod_state == READY &&
+   $current_pod_health == HEALTHY ]] || {
+  echo "TPU pod is not ready and healthy" >&2
+  exit 2
+}
+current_pod_rule="tpu-pod-${POD}-${current_pod_id}"
+current_ray_target=$(gcloud compute firewall-rules describe "$current_pod_rule" \
+  --format='value(targetTags.list())')
+ray_rule_contract=$(gcloud compute firewall-rules describe "$RAY_FIREWALL_RULE" \
+  --format='value(network.basename(),direction,priority,sourceRanges.list(),allowed[].map().firewall_rule().list(),disabled,targetTags.list())')
+printf '%s\n' "$ray_rule_contract" | \
+  bash "$WORKTREE/scripts/validate_ray_network.sh" firewall \
+    "$current_ray_target" "$current_pod_id" || {
+  echo "stale or unsafe Ray firewall contract; refusing before tag burn" >&2
+  exit 2
+}
+
+# Prove the exact worker-to-head data-plane path before creating the run
+# directory. The short-lived listener accepts seven connections and touches
+# neither Ray nor libtpu; the global lease prevents collision with real work.
+head_ip=$(gcloud compute tpus tpu-vm describe "$POD" --zone "$ZONE" \
+  --format='value(networkEndpoints[0].ipAddress)')
+endpoint_ips=$(gcloud compute tpus tpu-vm describe "$POD" --zone "$ZONE" \
+  --format='value(networkEndpoints.ipAddress)')
+[[ $head_ip =~ ^[0-9]+([.][0-9]+){3}$ ]] || {
+  echo "invalid worker-0 private IP" >&2
+  exit 2
+}
+hostname -i | tr ' ' '\n' | grep -qxF -- "$head_ip" || {
+  echo "worker-0 private IP is not local to this controller" >&2
+  exit 2
+}
+expected_peer_ips=$(/home/gianl/vllm-env/bin/python -c \
+  'import ipaddress,sys; head=sys.argv[1]; peers={x for x in sys.argv[2].split(";") if x and x != head}; print(",".join(sorted(peers, key=ipaddress.ip_address)))' \
+  "$head_ip" "$endpoint_ips")
+[[ $(tr ';' '\n' <<<"$endpoint_ips" | sort -u | wc -l) -eq 8 &&
+   $(tr ',' '\n' <<<"$expected_peer_ips" | wc -l) -eq 7 ]] || {
+  echo "TPU pod endpoint contract is not exactly eight unique hosts" >&2
+  exit 2
+}
+expected_listener_receipt="PREFLIGHT_LISTENER_OK $expected_peer_ips"
+listener_log=$(mktemp /tmp/glm_ray_preflight_listener.XXXXXXXX)
+listener_pid=
+cleanup_preflight_listener() {
+  if [[ -n $listener_pid ]]; then
+    kill "$listener_pid" >/dev/null 2>&1 || true
+    wait "$listener_pid" >/dev/null 2>&1 || true
+  fi
+  rm -f -- "$listener_log"
+}
+trap cleanup_preflight_listener EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+/home/gianl/vllm-env/bin/python -c \
+  'import ipaddress,socket,sys; s=socket.socket(); s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); s.bind((sys.argv[1],6379)); s.listen(7); s.settimeout(15); peers=sorted({s.accept()[1][0] for _ in range(7)}, key=ipaddress.ip_address); print("PREFLIGHT_LISTENER_OK", ",".join(peers)); raise SystemExit(0 if len(peers)==7 else 1)' \
+  "$head_ip" >"$listener_log" 2>&1 &
+listener_pid=$!
+sleep 1
+pretag_probe='idx=${HOSTNAME##*-w-}; if timeout 3 bash -c "</dev/tcp/'"$head_ip"'/6379" >/dev/null 2>&1; then echo "PRETAG_TCP6379_OK $idx"; else echo "PRETAG_TCP6379_BAD $idx"; exit 1; fi'
+set +e
+pretag_probe_output=$(bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 60 \
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" \
+  --worker=1,2,3,4,5,6,7 --command="$pretag_probe" 2>&1)
+pretag_probe_rc=$?
+wait "$listener_pid"
+listener_rc=$?
+listener_pid=
+set -e
+pretag_listener_output=$(<"$listener_log")
+cleanup_preflight_listener
+trap - EXIT INT TERM
+[[ $pretag_probe_rc -eq 0 && $listener_rc -eq 0 &&
+   $pretag_listener_output == "$expected_listener_receipt" ]] &&
+  printf '%s\n' "$pretag_probe_output" | \
+    bash "$WORKTREE/scripts/validate_ray_network.sh" receipts \
+      PRETAG_TCP6379_OK 7 1,2,3,4,5,6,7 || {
+  printf '%s\n%s\n' "$pretag_probe_output" "$pretag_listener_output" >&2
+  echo "worker-to-head TCP/6379 preflight refused before tag burn" >&2
+  exit 2
+}
+
+[[ ! -e $RUN_DIR ]] || {
+  echo "append-only run directory exists: $RUN_DIR" >&2
+  exit 2
+}
+mkdir -p "$RUN_DIR" "$SOURCE_DIR"
+printf '%s\n' "$ray_rule_contract" >"$RUN_DIR/ray_firewall_preflight.txt"
+ray_tcp6379_contract=$(printf '%s\n%s' \
+  "$pretag_probe_output" "$pretag_listener_output")
+printf '%s\n' "$ray_tcp6379_contract" >"$RUN_DIR/ray_tcp6379_preflight.txt"
 
 say() {
   echo "[short-dsa-oracle $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
@@ -857,8 +962,7 @@ fi
 
 has_eight_unique_markers() {
   local file=$1 marker=$2
-  [[ $(awk -v marker="$marker" '$1 == marker {print $2}' "$file" | wc -l) -eq 8 ]] &&
-    [[ $(awk -v marker="$marker" '$1 == marker {print $2}' "$file" | sort -u | wc -l) -eq 8 ]]
+  bash "$WORKTREE/scripts/validate_ray_network.sh" receipts "$marker" 8 <"$file"
 }
 
 strict_census() {
@@ -869,9 +973,11 @@ strict_census() {
   # shellcheck disable=SC2016
   ray_enum='GLM_CENSUS_CARRIER='"$carrier"' /home/gianl/vllm-env/bin/python -c "import os,psutil,subprocess; from ray.autoscaler._private.constants import RAY_PROCESSES; carrier=os.environ[\"GLM_CENSUS_CARRIER\"]; marked={p.pid for p in psutil.process_iter([\"environ\"]) if (p.info[\"environ\"] or {}).get(\"GLM_CENSUS_CARRIER\")==carrier}; me=psutil.Process(); skip={me.pid}|{p.pid for p in me.parents()}|marked; out={p.pid for p in psutil.process_iter([\"name\",\"cmdline\"]) if p.pid not in skip and any(k in ((p.info[\"name\"] or \"\") if f else subprocess.list2cmdline(p.info[\"cmdline\"] or [])) for k,f in RAY_PROCESSES)}; print(\" \".join(map(str,sorted(out))))"'
   # shellcheck disable=SC2016
-  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname)"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu: $holders"; else echo "CENSUS_OK $(hostname)"; fi'
-  GLM_CENSUS_CARRIER="$carrier" gcloud compute tpus tpu-vm ssh "$POD" \
-    --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 || return 1
+  command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[r]ay start --address|[r]ay start --head|[g]lm_longctx[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname)"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu: $holders"; else echo "CENSUS_OK $(hostname)"; fi'
+  GLM_CENSUS_CARRIER="$carrier" \
+    bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 120 \
+    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$command" >"$out" 2>&1 || return 1
   has_eight_unique_markers "$out" CENSUS_OK
 }
 
@@ -880,8 +986,9 @@ stop_owned_runtime() {
   # was launched under this global lease.
   local command
   # shellcheck disable=SC2016
-  command='/home/gianl/vllm-env/bin/ray stop -f >/dev/null 2>&1 || true; sudo pkill -TERM -f "VLLM::[E]ngineCore" >/dev/null 2>&1 || true; sudo pkill -TERM -f "[R]ayWorkerWrapper" >/dev/null 2>&1 || true; sudo pkill -TERM -x raylet >/dev/null 2>&1 || true; sleep 2; sudo pkill -KILL -f "VLLM::[E]ngineCore" >/dev/null 2>&1 || true; sudo pkill -KILL -f "[R]ayWorkerWrapper" >/dev/null 2>&1 || true; sudo pkill -KILL -x raylet >/dev/null 2>&1 || true; sudo rm -f /tmp/libtpu_lockfile; echo STOP_OK $(hostname)'
-  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  command='timeout --signal=TERM --kill-after=5 -- 20 /home/gianl/vllm-env/bin/ray stop -f >/dev/null 2>&1 || true; sudo pkill -TERM -f "[r]ay start --address|[r]ay start --head" >/dev/null 2>&1 || true; sudo pkill -TERM -f "VLLM::[E]ngineCore" >/dev/null 2>&1 || true; sudo pkill -TERM -f "[R]ayWorkerWrapper" >/dev/null 2>&1 || true; sudo pkill -TERM -x raylet >/dev/null 2>&1 || true; sleep 2; sudo pkill -KILL -f "[r]ay start --address|[r]ay start --head" >/dev/null 2>&1 || true; sudo pkill -KILL -f "VLLM::[E]ngineCore" >/dev/null 2>&1 || true; sudo pkill -KILL -f "[R]ayWorkerWrapper" >/dev/null 2>&1 || true; sudo pkill -KILL -x raylet >/dev/null 2>&1 || true; sudo rm -f /tmp/libtpu_lockfile; echo STOP_OK $(hostname)'
+  bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 120 \
+    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$command" >"$RUN_DIR/stop.txt" 2>&1 || return 1
   has_eight_unique_markers "$RUN_DIR/stop.txt" STOP_OK
 }
@@ -893,7 +1000,8 @@ cleanup_vllm_runtime() {
   # Only the run-owned, validated tag path is removable.
   # shellcheck disable=SC2016
   command='target='"$VLLM_RUNTIME_ROOT"'; archive='"$VLLM_RUNTIME_ARCHIVE_REMOTE"'; if ! printf "%s\n" "$target" | grep -Eq "^/tmp/glm_vllm_[A-Za-z0-9_]+$" || [ "$archive" != "${target}.tar.gz" ]; then echo "VLLM_CLEAN_BAD $(hostname) unsafe_target"; exit 0; fi; rm -rf -- "$target"; rm -f -- "$archive"; if [ ! -e "$target" ] && [ ! -e "$archive" ]; then echo "VLLM_CLEAN_OK $(hostname)"; else echo "VLLM_CLEAN_BAD $(hostname) residual"; fi'
-  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 120 \
+    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$command" >"$out" \
     2>"$RUN_DIR/vllm_cleanup_${label}_ssh.txt" || return 1
   has_eight_unique_markers "$out" VLLM_CLEAN_OK
@@ -907,7 +1015,8 @@ cleanup_observer_transport() {
   # The exact pin-specific runtime checkout is intentionally reusable.
   # shellcheck disable=SC2016
   command='bundle='"$OBSERVER_BUNDLE_REMOTE"'; temp='"$OBSERVER_BUNDLE_TEMP"'; if ! printf "%s\n" "$bundle" | grep -Eq "^/tmp/glm_observer_[A-Za-z0-9_]+[.]bundle$" || ! printf "%s\n" "$temp" | grep -Eq "^/tmp/glm_observer_[A-Za-z0-9_]+[.]tmp$" || [ "${bundle%.bundle}" != "${temp%.tmp}" ]; then echo "OBSERVER_TRANSPORT_CLEAN_BAD $(hostname) unsafe_target"; exit 0; fi; rm -f -- "$bundle"; rm -rf -- "$temp"; if [ ! -e "$bundle" ] && [ ! -e "$temp" ]; then echo "OBSERVER_TRANSPORT_CLEAN_OK $(hostname)"; else echo "OBSERVER_TRANSPORT_CLEAN_BAD $(hostname) residual"; fi'
-  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 120 \
+    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$command" >"$out" \
     2>"$RUN_DIR/observer_transport_cleanup_${label}_ssh.txt" || return 1
   has_eight_unique_markers "$out" OBSERVER_TRANSPORT_CLEAN_OK
@@ -1225,10 +1334,10 @@ RAYLET_ENVS="$COMMON_ENVS$PREFILL_PROJECTION_ENVS$DECODE_PROJECTION_ENVS LIBTPU_
 DRIVER_ENVS='NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray OMP_NUM_THREADS=1 HF_HUB_DISABLE_XET=1 TPU_DISABLE_DSA_INDEXER=1 DISABLE_WEIGHT_REQUANTIZATION=1 REQUANTIZE_WEIGHT_DTYPE=float8_e4m3fn TPU_MIN_TOKEN_BUCKET=32 GLM_TP=32 GLM_ASYNC_SCHED=0 GLM_LOG_STATS=1 RUNAI_STREAMER_CONCURRENCY=32 RUNAI_STREAMER_MEMORY_LIMIT=34359738368 JAX_SHARE_BINARY_BETWEEN_HOSTS=1 JAX_SHARE_BINARY_BETWEEN_HOSTS_TIMEOUT_MS=120000 '"$COMMON_ENVS"
 
 say "launching exact protected legacy runtime"
-EXTRA_ENVS="$RAYLET_ENVS" TPU_MIN_TOKEN_BUCKET=32 \
+runtime_started=1
+RAY_JOIN_TIMEOUT_SECONDS=120 EXTRA_ENVS="$RAYLET_ENVS" TPU_MIN_TOKEN_BUCKET=32 \
   bash "$HARNESS_REPO/scripts/launch_glm_32chip.sh" \
   >"$RUN_DIR/launch.log" 2>&1
-runtime_started=1
 
 # Verify every raylet inherited every source-defining flag.
 # shellcheck disable=SC2016
@@ -1986,6 +2095,36 @@ strict_census post || {
   exit 1
 }
 post_census_done=1
+
+# Revalidate the pre-tag network contract immediately before hashing and
+# archiving the run. This prevents a stale/mutated receipt from being sealed
+# merely because it exists in the append-only object ledger.
+terminal_ray_rule_contract=$(gcloud compute firewall-rules describe \
+  "$RAY_FIREWALL_RULE" \
+  --format='value(network.basename(),direction,priority,sourceRanges.list(),allowed[].map().firewall_rule().list(),disabled,targetTags.list())')
+[[ $terminal_ray_rule_contract == "$ray_rule_contract" ]] &&
+  [[ $(<"$RUN_DIR/ray_firewall_preflight.txt") == "$ray_rule_contract" ]] &&
+  printf '%s\n' "$terminal_ray_rule_contract" | \
+    bash "$WORKTREE/scripts/validate_ray_network.sh" firewall \
+      "$current_ray_target" "$current_pod_id" || {
+  say "ABORT: terminal Ray firewall contract drifted"
+  exit 1
+}
+terminal_tcp_receipts=$(<"$RUN_DIR/ray_tcp6379_preflight.txt")
+[[ $terminal_tcp_receipts == "$ray_tcp6379_contract" ]] &&
+  printf '%s\n' "$terminal_tcp_receipts" | \
+    bash "$WORKTREE/scripts/validate_ray_network.sh" receipts \
+    PRETAG_TCP6379_OK 7 1,2,3,4,5,6,7 || {
+  say "ABORT: terminal pre-tag TCP/6379 receipts drifted"
+  exit 1
+}
+[[ $(grep -c '^PREFLIGHT_LISTENER_OK ' \
+  "$RUN_DIR/ray_tcp6379_preflight.txt") -eq 1 &&
+   $(grep '^PREFLIGHT_LISTENER_OK ' \
+     "$RUN_DIR/ray_tcp6379_preflight.txt") == "$expected_listener_receipt" ]] || {
+  say "ABORT: terminal pre-tag listener receipt drifted"
+  exit 1
+}
 
 say "freezing fresh DSA-oracle evidence"
 cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"

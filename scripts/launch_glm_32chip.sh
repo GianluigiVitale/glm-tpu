@@ -52,6 +52,15 @@ ZONE=us-central2-b
 POD=db-v4-64-od
 HEAD_IP=$(hostname -i)  # worker 0 = this host (was hardcoded 192.168.0.8 — the pod was re-created since DSV4 and w-0 is now .21)
 RAY=~/vllm-env/bin/ray
+RECEIPT_VALIDATOR=$(cd "$(dirname "$0")" && pwd)/validate_ray_network.sh
+# The protected parent owns the workload lease; launcher descendants must not
+# retain that descriptor if the parent dies while gcloud/ssh is still alive.
+exec 9>&-
+JOIN_TIMEOUT_SECONDS=${RAY_JOIN_TIMEOUT_SECONDS:-120}
+[[ $JOIN_TIMEOUT_SECONDS =~ ^[1-9][0-9]*$ && $JOIN_TIMEOUT_SECONDS -le 300 ]] || {
+  echo "RAY_JOIN_TIMEOUT_SECONDS must be an integer in 1..300" >&2
+  exit 2
+}
 
 # ── Env baked into every raylet (GLM-5.2 Stage-1 set) ────────────────────────
 # NEW_MODEL_DESIGN=1 MODEL_IMPL_TYPE=vllm TPU_MULTIHOST_BACKEND=ray
@@ -129,11 +138,38 @@ dry() { printf 'DRY-RUN> %s\n' "$*"; }
 # /tmp/glm_flight_* per host. The just-crashed run's files are always the
 # newest, so they survive a relaunch; still fetch (triage_crash.sh) BEFORE
 # relaunching per the docs/10 run-book.
-STOP_CMD="$RAY stop -f >/dev/null 2>&1; sudo pkill -9 -f 'VLLM::[E]ngineCore' >/dev/null 2>&1; sudo pkill -9 -f '[R]ayWorkerWrapper' >/dev/null 2>&1; sudo pkill -9 -x raylet >/dev/null 2>&1; sudo rm -f /tmp/libtpu_lockfile; fusermount -u ~/gcs-models >/dev/null 2>&1; ls -1t /tmp/glm_flight_* 2>/dev/null | tail -n +9 | xargs -r sudo rm -f >/dev/null 2>&1; true"
+STOP_CMD="timeout --signal=TERM --kill-after=5 -- 20 $RAY stop -f >/dev/null 2>&1 || true; sudo pkill -9 -f 'VLLM::[E]ngineCore' >/dev/null 2>&1; sudo pkill -9 -f '[R]ayWorkerWrapper' >/dev/null 2>&1; sudo pkill -9 -x raylet >/dev/null 2>&1; sudo rm -f /tmp/libtpu_lockfile; fusermount -u ~/gcs-models >/dev/null 2>&1; ls -1t /tmp/glm_flight_* 2>/dev/null | tail -n +9 | xargs -r sudo rm -f >/dev/null 2>&1; true"
+FAILURE_STOP_CMD='idx=${HOSTNAME##*-w-}; timeout --signal=TERM --kill-after=5 -- 20 /home/gianl/vllm-env/bin/ray stop -f >/dev/null 2>&1 || true; sudo pkill -TERM -f "[r]ay start --address|[r]ay start --head" >/dev/null 2>&1 || true; sudo pkill -TERM -f "VLLM::[E]ngineCore" >/dev/null 2>&1 || true; sudo pkill -TERM -f "[R]ayWorkerWrapper" >/dev/null 2>&1 || true; sudo pkill -TERM -x raylet >/dev/null 2>&1 || true; sleep 2; sudo pkill -KILL -f "[r]ay start --address|[r]ay start --head" >/dev/null 2>&1 || true; sudo pkill -KILL -f "VLLM::[E]ngineCore" >/dev/null 2>&1 || true; sudo pkill -KILL -f "[R]ayWorkerWrapper" >/dev/null 2>&1 || true; sudo pkill -KILL -x raylet >/dev/null 2>&1 || true; sudo rm -f /tmp/libtpu_lockfile; echo "LAUNCH_FAILURE_CLEAN_OK $idx"'
+runtime_owned=0
+
+cleanup_failed_launch() {
+  local status=$?
+  local cleanup_output=
+  trap - EXIT
+  if [[ $status -ne 0 && $runtime_owned -eq 1 ]]; then
+    if ! cleanup_output=$(bash "$RECEIPT_VALIDATOR" bounded 120 \
+      gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+      --command="$FAILURE_STOP_CMD" 2>&1); then
+      printf '%s\n' "$cleanup_output" >&2
+      echo "ABORT: bounded launcher failure cleanup failed" >&2
+      return "$status"
+    fi
+    printf '%s\n' "$cleanup_output" >&2
+    printf '%s\n' "$cleanup_output" | \
+      bash "$RECEIPT_VALIDATOR" receipts LAUNCH_FAILURE_CLEAN_OK 8 \
+        0,1,2,3,4,5,6,7 || {
+      echo "ABORT: launcher failure cleanup receipts are incomplete" >&2
+      return "$status"
+    }
+  fi
+  return "$status"
+}
+trap cleanup_failed_launch EXIT
 
 # Worker join: bake ENVS into the raylet, then join the head. Escaped $(...)
-# and $? run on the REMOTE host, not here.
-JOIN_CMD="$ENVS; $RAY start --address=$HEAD_IP:6379 --node-ip-address=\$(hostname -i) >/tmp/rayjoin.log 2>&1; echo \"\$(hostname) rc=\$?\"; true"
+# and $? run on the REMOTE host, not here. Preserve the real exit status: a
+# failed worker must fail the launcher instead of being hidden by `true`.
+JOIN_CMD="$ENVS; $RAY start --address=$HEAD_IP:6379 --node-ip-address=\$(hostname -i) >/tmp/rayjoin.log 2>&1; rc=\$?; echo \"RAY_JOIN_RC_\$rc \${HOSTNAME##*-w-}\"; exit \$rc"
 
 # Soft sanity check: this script must run on worker 0 (the Ray head).
 if ! hostname -i 2>/dev/null | grep -qw -- "$HEAD_IP"; then
@@ -144,8 +180,13 @@ echo "[1/3] stop any existing ray + stray procs on all workers"
 if (( DRY_RUN )); then
   dry "gcloud compute tpus tpu-vm ssh $POD --zone $ZONE --worker=all --command=\"$STOP_CMD\""
 else
-  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-    --command="$STOP_CMD" >/dev/null 2>&1
+  bash "$RECEIPT_VALIDATOR" bounded 120 \
+    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$STOP_CMD" >/dev/null 2>&1 || {
+    echo "ABORT: bounded fleet stop failed" >&2
+    exit 1
+  }
+  runtime_owned=1
 fi
 
 # NOTE: NO gcsfuse mount step — the runai streamer reads gs:// directly.
@@ -157,18 +198,63 @@ if (( DRY_RUN )); then
   dry "$RAY start --head --port=6379 --node-ip-address=$HEAD_IP --disable-usage-stats"
 else
   eval "$ENVS"
-  "$RAY" stop -f >/dev/null 2>&1
+  bash "$RECEIPT_VALIDATOR" bounded 30 "$RAY" stop -f >/dev/null 2>&1 || {
+    echo "ABORT: bounded local Ray stop failed" >&2
+    exit 1
+  }
   sleep 2
-  "$RAY" start --head --port=6379 --node-ip-address="$HEAD_IP" --disable-usage-stats 2>&1 \
-    | grep -i "runtime started"
+  if ! HEAD_OUTPUT=$(bash "$RECEIPT_VALIDATOR" bounded 60 \
+    "$RAY" start --head --port=6379 \
+    --node-ip-address="$HEAD_IP" --disable-usage-stats 2>&1); then
+    printf '%s\n' "$HEAD_OUTPUT"
+    echo "ABORT: Ray head failed to start" >&2
+    exit 1
+  fi
+  printf '%s\n' "$HEAD_OUTPUT"
+  grep -qi "runtime started" <<<"$HEAD_OUTPUT" || {
+    echo "ABORT: Ray head success receipt is absent" >&2
+    exit 1
+  }
 fi
 
 echo "[3/3] join workers 1-7 (with env)"
 if (( DRY_RUN )); then
-  dry "gcloud compute tpus tpu-vm ssh $POD --zone $ZONE --worker=1,2,3,4,5,6,7 --command=\"$JOIN_CMD\""
+  dry "probe workers 1-7 -> $HEAD_IP:6379; require 7 unique TCP6379_OK receipts"
+  dry "timeout $JOIN_TIMEOUT_SECONDS gcloud compute tpus tpu-vm ssh $POD --zone $ZONE --worker=1,2,3,4,5,6,7 --command=\"$JOIN_CMD\""
 else
-  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=1,2,3,4,5,6,7 \
-    --command="$JOIN_CMD" 2>&1 | grep "rc="
+  PROBE_CMD='idx=${HOSTNAME##*-w-}; if timeout 3 bash -c "</dev/tcp/'"$HEAD_IP"'/6379" >/dev/null 2>&1; then echo "TCP6379_OK $idx"; else echo "TCP6379_BAD $idx"; exit 1; fi'
+  if ! PROBE_OUTPUT=$(bash "$RECEIPT_VALIDATOR" bounded 60 \
+    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" \
+    --worker=1,2,3,4,5,6,7 --command="$PROBE_CMD" 2>&1); then
+    printf '%s\n' "$PROBE_OUTPUT"
+    echo "ABORT: worker-to-head TCP/6379 connectivity probe failed" >&2
+    exit 1
+  fi
+  printf '%s\n' "$PROBE_OUTPUT"
+  if ! printf '%s\n' "$PROBE_OUTPUT" | \
+    bash "$RECEIPT_VALIDATOR" receipts TCP6379_OK 7 1,2,3,4,5,6,7; then
+    echo "ABORT: worker-to-head TCP/6379 receipts are incomplete" >&2
+    exit 1
+  fi
+
+  if ! JOIN_OUTPUT=$(bash "$RECEIPT_VALIDATOR" bounded "$JOIN_TIMEOUT_SECONDS" \
+    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" \
+    --worker=1,2,3,4,5,6,7 --command="$JOIN_CMD" 2>&1); then
+    printf '%s\n' "$JOIN_OUTPUT"
+    bash "$RECEIPT_VALIDATOR" bounded 30 \
+      gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" \
+      --worker=1,2,3,4,5,6,7 \
+      --command='echo "RAY_JOIN_DIAGNOSTIC $(hostname)"; tail -80 /tmp/rayjoin.log 2>/dev/null || true' \
+      2>&1 || true
+    echo "ABORT: bounded Ray worker join failed or timed out" >&2
+    exit 1
+  fi
+  printf '%s\n' "$JOIN_OUTPUT"
+  if ! printf '%s\n' "$JOIN_OUTPUT" | \
+    bash "$RECEIPT_VALIDATOR" receipts RAY_JOIN_RC_0 7 1,2,3,4,5,6,7; then
+    echo "ABORT: successful Ray worker-join receipts are incomplete" >&2
+    exit 1
+  fi
 fi
 
 if (( DRY_RUN )); then
@@ -176,6 +262,19 @@ if (( DRY_RUN )); then
 else
   sleep 3
   echo "=== ray status ==="
-  "$RAY" status 2>&1 | grep -E "^ 1 node_|/.*TPU|Total Usage" | head
-  echo "nodes: $("$RAY" status 2>&1 | grep -cE '^ 1 node_') (expect 8 nodes / 32 TPU)"
+  if ! STATUS_OUTPUT=$(bash "$RECEIPT_VALIDATOR" bounded 30 \
+    "$RAY" status 2>&1); then
+    printf '%s\n' "$STATUS_OUTPUT"
+    echo "ABORT: bounded Ray status failed" >&2
+    exit 1
+  fi
+  printf '%s\n' "$STATUS_OUTPUT" | grep -E "^ 1 node_|/.*TPU|Total Usage" | head
+  NODE_COUNT=$(grep -cE '^ 1 node_' <<<"$STATUS_OUTPUT")
+  echo "nodes: $NODE_COUNT (expect 8 nodes / 32 TPU)"
+  if [[ $NODE_COUNT -ne 8 ]] || ! grep -qE '^ 0[.]0/32[.]0 TPU$' <<<"$STATUS_OUTPUT"; then
+    echo "ABORT: Ray resource contract is not exactly 8 nodes / 32 TPU" >&2
+    exit 1
+  fi
 fi
+runtime_owned=0
+trap - EXIT

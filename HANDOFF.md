@@ -7607,3 +7607,21 @@ uses the same four-mode condition as downstream comparison, and a regex regressi
 condition directly to the SUCCESS check. Final verdict is `APPROVE POST-VERDICT DELTA; PRIOR
 COMMIT/PUSH/MIRROR VERDICT UNCHANGED`, with no execution or tag authorization. Exact next is
 commit/push/locked mirror, then a separate execution-only review of one fresh tag.
+
+## Current exact next: review fail-fast Ray remediation; no fresh protected tag
+
+The one Fable-approved acquisition at tag
+`greenfield_legacy_layer1_rms_input_p8155_20260829T174920080399586Z` passed canonical oracle and
+bootstrap gates but failed before model load or TPU execution. Worker-0 GCS listened healthily on
+`192.168.0.37:6379`; workers 1--7 timed out because the Ray firewall still targeted deleted pod
+`tpu-t1v-n-6c15e171-w-5201142156555843955`, not recreated pod
+`tpu-t1v-n-ae271d05-w-3005566610109598201`. Only `targetTags` changed; before/post rule hashes are
+`6cf56fd8...e5c3` and `f2161be6...aee8`.
+
+No-model smoke `/home/gianl/glm-run/ray_firewall_smoke.PRVpCS0d` proves seven TCP receipts, seven
+joins, exactly 8 Ray nodes/32 TPU resources and 8/8 teardown/census. The protection delta moves
+firewall/live-connectivity checks before run-dir creation, detects orphaned Ray CLI processes,
+marks ownership before launcher entry and bounds join failure. Focused validation is pending final
+adversarial review. Affected forced-CPU coverage passes 191 tests with three protected-source skips;
+Bash/JSON/Ruff/diff checks pass. The burned tag must not be reused; Gate D is open and no new acquisition is
+authorized until review, commit/push/mirror and a separate execution-only review.

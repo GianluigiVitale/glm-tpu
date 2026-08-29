@@ -102,3 +102,8 @@ adjacent numerical/dense/p113 set passes 68/68 in 20.97 seconds; and the complet
 CPU-forced PP16 feature2 suite passes 219/219 in 186.05 seconds. The tracked capsule is byte-equal
 to fresh classifier output. Ruff, formatting, Python compilation, JSON and diff checks pass. This
 is offline evidence classification only and does not close Gate D.
+
+Latest recreated-pod Ray protection validation: focused firewall/receipt/timeout/positive guards
+plus every shared-wrapper suite pass 191 tests with three protected-source skips. The no-model live smoke
+passes seven TCP/6379 receipts, seven joins, exactly 8 nodes/32 TPU resources and 8/8
+stop/post-census. No model/JAX driver or TPU computation was launched; Gate D remains open.

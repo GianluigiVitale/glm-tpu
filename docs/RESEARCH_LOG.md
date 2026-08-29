@@ -11770,3 +11770,30 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   parity follow-up because it changed the earlier Git-pin condition instead of the artifact gate.
   The corrected preflight and direct structural regression received final verdict `APPROVE
   POST-VERDICT DELTA; PRIOR COMMIT/PUSH/MIRROR VERDICT UNCHANGED`. No execution or tag is authorized.
+
+## 2026-08-29 17:49--18:08 UTC — recreated-pod Ray firewall fault repaired without model work
+
+- Fable authorized exactly one accepted-FP32 acquisition under tag
+  `greenfield_legacy_layer1_rms_input_p8155_20260829T174920080399586Z`. It stopped in Ray worker
+  join before model load or TPU execution: worker-0 GCS was healthy on `192.168.0.37:6379`, while
+  workers 1--7 timed out. The observed worker attempts eventually returned and the wrapper's
+  environment check failed; cleanup produced eight
+  unique STOP, VLLM-clean and zero-work census receipts and archived 31 diagnostic objects.
+- Root cause is exact: `allow-ray-pod-internal` still targeted deleted-pod tag
+  `tpu-t1v-n-6c15e171-w-5201142156555843955`; the recreated pod uses
+  `tpu-t1v-n-ae271d05-w-3005566610109598201`. The repair changed only `targetTags`; canonical
+  before/post JSON hashes are `6cf56fd8...e5c3` and `f2161be6...aee8`. Network, source
+  `192.168.0.0/16`, TCP `1024-65535`, direction, priority and enabled state are unchanged.
+- A lease-held no-tag/no-model smoke then proved seven TCP/6379 connections, seven Ray joins,
+  exactly 8 nodes/32 TPU resources, 8/8 stop and 8/8 clean post-census. Accepted receipts are in
+  `/home/gianl/glm-run/ray_firewall_smoke.PRVpCS0d`; it launched no model/JAX driver or TPU
+  computation (Ray only advertised TPU resources). A first smoke refused
+  15 nodes/60 resources, consistent with seven orphaned remote `ray start` commands from the burned
+  attempt completing after firewall repair; its teardown removed all observed Ray work.
+- The protection delta validates the exact pod firewall and live seven-worker path before run-dir
+  creation, detects orphaned Ray CLI processes, marks ownership before launcher entry, preserves
+  join status and bounds joins. Compact evidence is
+  `docs/artifacts/layer1-rms-input-recreated-pod-ray-firewall-failure.json`. Gate D remains open;
+  no fresh protected tag is authorized. Affected forced-CPU coverage passes 191 tests with three
+  protected-source skips; Bash/JSON/Ruff/diff checks pass. The prior complete forced-CPU result is
+  reused because this batch changes only shell protection, its tests and evidence metadata.

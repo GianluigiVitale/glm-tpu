@@ -1546,3 +1546,10 @@ contract before the workload lease in all four downstream-comparison modes. Focu
 shared-wrapper 167/2 and complete forced-CPU 1,315/53 validation pass apart from the same two
 unrelated WS32 baseline failures. Fable approved commit/push/mirror only; it contains no accepted
 FP32 operand or Gate-D result.
+
+Fresh tag `...174920080399586Z` subsequently reached Ray bootstrap but no model/TPU work. It exposed
+a recreated-pod firewall rule still targeted at the deleted pod. Artifact
+`docs/artifacts/layer1-rms-input-recreated-pod-ray-firewall-failure.json` binds the burned tag,
+before/post rule hashes, archived diagnostics and 8/8 cleanup. After changing only `targetTags`, a
+lease-held no-model smoke proves seven TCP/6379 receipts, seven joins, exactly 8 Ray nodes/32 TPU
+resources and 8/8 cleanup. This is infrastructure evidence only, not Gate D.
