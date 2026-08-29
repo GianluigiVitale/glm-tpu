@@ -224,7 +224,10 @@ readonly OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 readonly DISK_MIN_FREE_GB=10
 readonly DISK_WARN_FREE_GB=15
 readonly MODEL_ID=zai-org/GLM-5.2-FP8
-readonly REFERENCE_8K_DSA_ORACLE=/home/gianl/glm-run/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle
+readonly REFERENCE_8K_DSA_ORACLE_ROOT=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z
+readonly REFERENCE_8K_DSA_ORACLE=$REFERENCE_8K_DSA_ORACLE_ROOT/oracle
+readonly REFERENCE_8K_DSA_ORACLE_MANIFEST_SHA=f8154c5f79b909efd9ebc14c8e004925482844d05ef28fcf0a4d29bb4a7b26da
+readonly REFERENCE_8K_DSA_ORACLE_SUCCESS_SHA=0b798974ae8a9f95c32d3aa2eff532213624f1e2ae7f1de809a161e18dbdf1b9
 readonly LAYER0_INPUT_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z
 readonly LAYER0_INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e2a4914b73141
 readonly DISTRIBUTED_Q_A_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_association_20260807T231449677046310Z/distributed_q_a_norm_artifact
@@ -697,7 +700,8 @@ readonly INTERNAL_RESULT_DIR
   echo "tracked legacy files are dirty" >&2
   exit 2
 }
-if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 || $PREFILL_PROJECTION_CAPTURE == 1 ||
+      $DECODE_PROJECTION_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
   [[ $(git -C "$ORACLE_REPO" rev-parse HEAD) == "$ORACLE_PIN" ]] || {
     echo "accepted legacy oracle pin changed" >&2
     exit 2
@@ -742,11 +746,33 @@ if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
     exit 2
   }
 fi
-if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
-  [[ -r $REFERENCE_8K_DSA_ORACLE/manifest.json ]] || {
+if [[ $INTERNAL_CAPTURE == 1 || $PREFILL_PROJECTION_CAPTURE == 1 ||
+      $DECODE_PROJECTION_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
+  [[ -r $REFERENCE_8K_DSA_ORACLE_ROOT/SUCCESS &&
+     -r $REFERENCE_8K_DSA_ORACLE/manifest.json &&
+     -r $REFERENCE_8K_DSA_ORACLE/dsa_events.safetensors &&
+     -r $REFERENCE_8K_DSA_ORACLE/source_row.json ]] || {
     echo "sealed DSA oracle comparison prerequisite is unavailable" >&2
     exit 2
   }
+  [[ $(sha256sum "$REFERENCE_8K_DSA_ORACLE_ROOT/SUCCESS" | awk '{print $1}') == \
+     "$REFERENCE_8K_DSA_ORACLE_SUCCESS_SHA" ]] || {
+    echo "sealed DSA oracle SUCCESS identity drifted" >&2
+    exit 2
+  }
+  JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+    "$REFERENCE_8K_DSA_ORACLE" "$REFERENCE_8K_DSA_ORACLE_MANIFEST_SHA" <<'PY'
+from pathlib import Path
+import sys
+
+from glm_tpu.greenfield.validation.short_context_dsa_oracle import (
+    inspect_short_context_dsa_oracle,
+)
+
+manifest = inspect_short_context_dsa_oracle(Path(sys.argv[1]))
+if manifest["manifest_sha256"] != sys.argv[2]:
+    raise SystemExit("sealed DSA oracle manifest identity drifted")
+PY
   if [[ $INTERNAL_CAPTURE == 1 && \
         ($INTERNAL_COMPARE_LAYER0 == 1 || $PROMPT_KEY_CAPTURE == 1) ]]; then
     [[ -r $LAYER0_INPUT_DIR/manifest.json &&

@@ -1534,3 +1534,15 @@ stdout receipts and seven archived SSH-status files are now separate, and a real
 terminal regression proves mixed receipts refuse. The same validation results pass on this final
 diff. Sol approved correction commit/push/mirror at staged SHA `95f6a0ec...1d20317` and authorized
 no execution. Gate D remains open.
+
+The correction was subsequently persisted as `89e0e3c`. Fable approved one new literal tag, but
+the invocation failed closed before run initialization because the comparison oracle still named
+the deleted controller-local `/home/gianl/glm-run` copy. Artifact
+`docs/artifacts/layer1-rms-input-recreated-controller-prerequisite-failure.json` records status 2,
+the burned tag, vacant local/remote namespace, free lease and fresh 8/8 clean census. The reviewed
+successor uses the canonical same-region gcsfuse oracle, pins manifest
+`f8154c5f...b26da` plus SUCCESS `0b798974...df1b9`, and fully inspects its files and 294-event
+contract before the workload lease in all four downstream-comparison modes. Focused 13/13,
+shared-wrapper 167/2 and complete forced-CPU 1,315/53 validation pass apart from the same two
+unrelated WS32 baseline failures. Fable approved commit/push/mirror only; it contains no accepted
+FP32 operand or Gate-D result.

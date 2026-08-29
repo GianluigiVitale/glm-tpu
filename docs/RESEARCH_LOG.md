@@ -11746,3 +11746,27 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   Sol returned `APPROVE CORRECTION COMMIT/PUSH/MIRROR` for staged SHA
   `95f6a0ec...1d20317`, with no execution authorization. Commit/push/locked same-region mirror are
   next. No protected execution occurred and Gate D remains open.
+
+## 2026-08-29 17:01--17:16 UTC — accepted-FP32 acquisition refuses an obsolete controller path
+
+- Bootstrap commit `89e0e3c94171624c1f163c411763b1e947b14c0e` was pushed, mirrored and
+  byte-verified before Fable authorized one literal acquisition. The invocation under tag
+  `greenfield_legacy_layer1_rms_input_p8155_20260829T170132519143132Z` exited status 2 in about
+  0.1 seconds: the DSA comparison prerequisite still used the deleted pre-recreation
+  `/home/gianl/glm-run/.../oracle` path.
+- The failure preceded run-directory creation, lease acquisition, bootstrap and model execution.
+  The local/remote tag is vacant, the global lease is free and a fresh all-worker census is 8/8
+  `CENSUS_OK`. The tag is burned despite zero work and will not be reused.
+- The identical sealed oracle is present in the approved same-region gcsfuse tree and is already
+  consumed there by PP16 and WS32. Its semantic manifest is `f8154c5f...b26da`; SUCCESS-file SHA is
+  `0b798974...df1b9`; its full inspector validates the token linkage and all 294 exact DSA events.
+- The local correction replaces the obsolete path, pins both identities and executes the full
+  inspector before the workload lease. A regression forbids the old controller-local path and
+  requires the inspector before the first fleet census. This is unreviewed correction evidence,
+  not a protected oracle, Gate-D, token or performance result.
+- Final forced-CPU validation is focused 13/13, affected shared-wrapper 167 passed/two skipped, and
+  complete tree 1,315 passed/53 skipped with only the same two unrelated WS32 baseline failures;
+  no WS32 file changed. Fable approved the path/hash/inspector correction, then blocked the first
+  parity follow-up because it changed the earlier Git-pin condition instead of the artifact gate.
+  The corrected preflight and direct structural regression received final verdict `APPROVE
+  POST-VERDICT DELTA; PRIOR COMMIT/PUSH/MIRROR VERDICT UNCHANGED`. No execution or tag is authorized.

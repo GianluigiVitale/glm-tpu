@@ -1,0 +1,28 @@
+{
+  "artifact_kind": "greenfield_layer1_rms_input_recreated_controller_prerequisite_failure",
+  "burned_tag": "greenfield_legacy_layer1_rms_input_p8155_20260829T170132519143132Z",
+  "classification": "CONTROLLER_LOCAL_PREREQUISITE_REFUSED_BEFORE_RUN_INITIALIZATION",
+  "command": "GLM_GREENFIELD_LAYER1_RMS_INPUT_CAPTURE_TAG=greenfield_legacy_layer1_rms_input_p8155_20260829T170132519143132Z bash scripts/greenfield/run_capture_legacy_layer1_rms_input.sh",
+  "elapsed_seconds_approximate": 0.1,
+  "exit_status": 2,
+  "failed_prerequisite": {
+    "historical_path": "/home/gianl/glm-run/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle",
+    "stderr": "sealed DSA oracle comparison prerequisite is unavailable"
+  },
+  "greenfield_pin": "89e0e3c94171624c1f163c411763b1e947b14c0e",
+  "replacement_contract": {
+    "canonical_root": "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z",
+    "manifest_file_sha256": "62c3fc2ad45d368c91cc41901947a69abf7a8c7abb57fb56b088871e90e5f1d3",
+    "manifest_sha256": "f8154c5f79b909efd9ebc14c8e004925482844d05ef28fcf0a4d29bb4a7b26da",
+    "success_file_sha256": "0b798974ae8a9f95c32d3aa2eff532213624f1e2ae7f1de809a161e18dbdf1b9"
+  },
+  "status": "FAIL_CLOSED",
+  "zero_work_audit": {
+    "audit_time_utc": "2026-08-29T17:15:58Z",
+    "fleet_census": "8/8 CENSUS_OK",
+    "global_workload_lease": "FREE",
+    "local_tag_path": "ABSENT",
+    "remote_prefix": "gs://driftbench-dsv4-uc/oracles/greenfield/glm52/layer1_rms_input/8k/greenfield_legacy_layer1_rms_input_p8155_20260829T170132519143132Z",
+    "remote_prefix_state": "VACANT"
+  }
+}

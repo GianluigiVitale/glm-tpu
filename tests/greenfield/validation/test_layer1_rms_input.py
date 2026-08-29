@@ -340,10 +340,29 @@ def test_protected_wrapper_is_default_off_and_pins_sources() -> None:
         "GOLDEN_MANIFEST_SHA=916d421a10de9495086c0ad52645c9937746c88bae87a5ca1a69483bfe60d45d",
         "GOLDEN_MANIFEST_BYTES=321146",
         "LAYER1_OBSERVER_TRACKED_FILE_COUNT=947",
+        "REFERENCE_8K_DSA_ORACLE_ROOT=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z",
+        "REFERENCE_8K_DSA_ORACLE_MANIFEST_SHA=f8154c5f79b909efd9ebc14c8e004925482844d05ef28fcf0a4d29bb4a7b26da",
+        "REFERENCE_8K_DSA_ORACLE_SUCCESS_SHA=0b798974ae8a9f95c32d3aa2eff532213624f1e2ae7f1de809a161e18dbdf1b9",
         "DB550_BOUNDARY_SHA=f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298",
         "STRADDLER_CLASSIFICATION_SHA=eebe1c5d5ba475a5faf000243d881657754fc47ed2345fe2691d923c1d457b36",
     ):
         assert exact in wrapper
+    assert (
+        "/home/gianl/glm-run/greenfield_short_context_dsa_oracle_8k_recovery_"
+        not in wrapper
+    )
+    assert "inspect_short_context_dsa_oracle" in wrapper
+    assert re.search(
+        r"if \[\[ \$INTERNAL_CAPTURE == 1 \|\| "
+        r"\$PREFILL_PROJECTION_CAPTURE == 1 \|\|\n\s+"
+        r"\$DECODE_PROJECTION_CAPTURE == 1 \|\| "
+        r"\$MAIN_CACHE_CAPTURE == 1 \]\]; then\n\s+"
+        r"\[\[ -r \$REFERENCE_8K_DSA_ORACLE_ROOT/SUCCESS",
+        wrapper,
+    )
+    assert wrapper.index("inspect_short_context_dsa_oracle") < wrapper.index(
+        "strict_census pre"
+    )
     assert wrapper.index("layer-1 RMS-input source contract drifted") < wrapper.index(
         "strict_census pre"
     )
@@ -382,6 +401,48 @@ def test_protected_wrapper_is_default_off_and_pins_sources() -> None:
     assert wrapper.index("strict_census post") < wrapper.index(
         "freezing fresh DSA-oracle evidence"
     )
+
+
+def test_protected_wrapper_python_heredocs_compile() -> None:
+    wrapper = Path(__file__).resolve().parents[3] / (
+        "scripts/greenfield/run_capture_short_context_dsa_oracle.sh"
+    )
+    programs = re.findall(r"<<'PY'\n(.*?)\nPY\n", wrapper.read_text(), re.DOTALL)
+    assert len(programs) == 10
+    for index, program in enumerate(programs):
+        compile(program, f"{wrapper}:heredoc-{index}", "exec")
+
+
+def test_canonical_dsa_prerequisite_passes_full_inspection() -> None:
+    repo = Path(__file__).resolve().parents[3]
+    wrapper = repo / "scripts/greenfield/run_capture_short_context_dsa_oracle.sh"
+    programs = re.findall(r"<<'PY'\n(.*?)\nPY\n", wrapper.read_text(), re.DOTALL)
+    program = next(
+        item for item in programs if "inspect_short_context_dsa_oracle" in item
+    )
+    oracle = Path(
+        "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/"
+        "greenfield_short_context_dsa_oracle_8k_recovery_"
+        "20260807T174904381704076Z/oracle"
+    )
+    if not oracle.is_dir():
+        pytest.skip("canonical protected 8K DSA oracle is unavailable")
+    environment = dict(os.environ)
+    environment.update({"JAX_PLATFORMS": "cpu", "PYTHONPATH": str(repo)})
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            program,
+            str(oracle),
+            "f8154c5f79b909efd9ebc14c8e004925482844d05ef28fcf0a4d29bb4a7b26da",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
 
 
 def test_exact_observer_bundle_reconstructs_reviewed_git_tree(tmp_path: Path) -> None:

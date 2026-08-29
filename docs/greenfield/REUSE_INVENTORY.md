@@ -673,3 +673,16 @@ execution-blocked until the corrected batch is re-reviewed and persisted. Never 
 `gcloud ssh` stderr into an exact receipt file: archive it separately and require both artifacts at
 terminal publication. Sol approved this correction for persistence at staged SHA
 `95f6a0ec...1d20317`; a separate execution review remains mandatory.
+
+Commit `89e0e3c` persists that bootstrap. Do not reuse the burned zero-work tag
+`greenfield_legacy_layer1_rms_input_p8155_20260829T170132519143132Z` or recreate the deleted
+controller-local DSA oracle. Reuse the independently sealed canonical source at
+`/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z`.
+Its admitted identities are semantic manifest `f8154c5f...b26da` and SUCCESS-file SHA
+`0b798974...df1b9`; the full inspector, not a readability check, must pass before any workload
+lease or TPU action.
+
+The reviewed correction applies that pre-lease contract to every mode that later performs exact
+DSA-oracle comparison. Fable's final correction verdict approves commit/push/mirror only. A fresh
+tag still requires a separate execution-only review; never infer execution authorization from this
+reuse approval.

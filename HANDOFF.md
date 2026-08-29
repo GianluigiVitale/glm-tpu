@@ -7573,3 +7573,37 @@ occurred. Sol returned `APPROVE CORRECTION COMMIT/PUSH/MIRROR` for staged SHA
 `95f6a0eccff1a91608ee7383e1af0d00671ce8df6c81bf44ac3a5a1141d20317`; it authorized no
 execution. Exact next is commit/push/locked same-region mirror, then a fresh execution-only review.
 Gate D remains open; the frozen rejected tag must not be reused.
+
+## Current exact next: review canonical DSA-prerequisite correction; burned tag is zero-work
+
+The reviewed bootstrap batch is commit `89e0e3c94171624c1f163c411763b1e947b14c0e`, matches origin,
+and was mirrored by the locked cron at `2026-08-29T17:00:13Z`; all seven changed objects were
+byte-equal in the `US-CENTRAL2` bucket. Fable 5 Max then approved exactly one literal oracle
+acquisition under tag
+`greenfield_legacy_layer1_rms_input_p8155_20260829T170132519143132Z`. That invocation refused in
+about 0.1 seconds with status 2 because the wrapper still named the pre-recreation controller path
+`/home/gianl/glm-run/.../oracle`. It created no run directory, acquired no workload lease, wrote no
+remote object and performed no host, Ray, model or TPU action. A fresh wrapper-equivalent audit
+proves the global lease free, the burned local/remote tag vacant and all eight hosts `CENSUS_OK`.
+
+The local correction points only to the already sealed same-region oracle under
+`/home/gianl/gcs-models/oracles/...`, pins semantic manifest `f8154c5f...b26da` and SUCCESS file
+`0b798974...df1b9`, and runs the complete oracle inspector before the workload lease rather than
+checking only readability. The inspector authenticates the manifest, source-row and tensor bytes,
+all 294 DSA events, exact positions/ties and token-oracle linkage. A focused regression forbids the
+old `/home/gianl/glm-run` prerequisite and requires this validation before `strict_census pre`.
+Compact failure evidence is
+`docs/artifacts/layer1-rms-input-recreated-controller-prerequisite-failure.json`. The burned tag
+must never be reused. Exact next is validation and one narrow persistent Fable correction review;
+only after commit/push/locked mirror may a new tag receive a separate execution-only review. Gate D
+is open; no unchanged BF16 or full-8K retry is authorized.
+
+Final validation passes Bash syntax, JSON/diff/Ruff checks, focused 13/13 and affected shared-wrapper
+167/167 with two skips. The complete explicitly CPU-forced tree has 1,315 passes and 53 skips with
+only the same two unrelated WS32 baseline failures; this diff touches no WS32 file. Fable first
+approved the canonical path/hash/inspector correction, then correctly blocked a parity edit that had
+landed on the earlier Git-pin gate rather than the artifact-inspection gate. The actual preflight now
+uses the same four-mode condition as downstream comparison, and a regex regression binds that
+condition directly to the SUCCESS check. Final verdict is `APPROVE POST-VERDICT DELTA; PRIOR
+COMMIT/PUSH/MIRROR VERDICT UNCHANGED`, with no execution or tag authorization. Exact next is
+commit/push/locked mirror, then a separate execution-only review of one fresh tag.

@@ -1,8 +1,8 @@
 # Goal — GLM-5.2-FP8 TPU v4 topology-first greenfield engine
 
-FULL ACCESS: work autonomously to completion. Keep below 4,000 characters. After each
-start/compaction, read this and `docs/glm-tpu-revolution.md` **in full**; the spec is authoritative.
-Inspect live code/processes and relevant handoff/research evidence before acting.
+FULL ACCESS: work autonomously. Keep below 4,000 characters. After start/compaction,
+read this and `docs/glm-tpu-revolution.md` **in full**, then inspect live state/evidence; the spec
+is authoritative.
 
 ## Scope and precedence
 
@@ -57,9 +57,9 @@ The fastest correct plan serves at 256K independent of legacy, uses a plan-aware
 has local repeated collectives/no full-pod hidden reconstruction, and passes exactness,
 quality, integrity, HBM, HLO, PP8/PP16 measurement, WS32 adjudication, 128K smoke, 256K E0,
 DB/archive, and clean-fleet gates. Continue until section 18 has direct evidence.
-Use logged batches; persist exact next before compaction. Adversarially review every new
-code/evidence batch. Prefer one persistent Fable 5 Max Claude CLI chat with
-`--dangerously-skip-permissions`; if Fable reports 100% usage, use one independent
-Sol agent here with the same scoped diff/evidence and explicit verdict. Correct blockers; never
-re-review cleared code. Verify, commit/push, then let the locked same-region cron sync. Never use
-Opus, review workflows, or other subagents.
+Log batches; persist exact next before compaction. Review each new batch adversarially in Fable
+5 Max CLI chat (`--dangerously-skip-permissions`); at 100% use one Sol on the same scope. Fix
+blockers; do not re-review cleared code. Avoid waste: smallest decisive checks first; reuse
+unaffected broad evidence; overlap independent CPU/read-only work with review; preflight before
+tags/locks. Never weaken correctness/evidence/review or parallelize TPU. Verify, commit/push, then
+locked same-region cron sync. Never use Opus, workflows or other subagents.
