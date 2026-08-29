@@ -1,0 +1,41 @@
+{
+  "artifact_kind": "greenfield_pp16_feature2_position113_hlo_acquisition",
+  "canonical_hlo": {
+    "byte_count": 6662190,
+    "canonicalizer_version": 1,
+    "sha256": "5b5dfacf015c579f41661868486e627bb383322fe8fb5c64597c259e85c4a10e",
+    "stripped_stack_frame_references": 14781
+  },
+  "census_post_sha256": "99e11e72ffa72f0ff14140c84cc45a7f0dddcc07abb901f47ab45166c3168a64",
+  "census_pre_sha256": "6ae6f96d9a2281f93f9ab9b50cf8cdc390a6abca1a78ce1224e8ef834bd90ef9",
+  "code_hash": "09285f7601ea1ca9cdc3f5447833d1440afb42dd",
+  "evidence_ledger_sha256": "bbf01f34b20fb4d0c1af66573a5ee01c096abc870563db5f2ffa5bef39142728",
+  "hlo_acquired_marker_sha256": "ddda21877df8568c2504f38eaaa0df5a0538e7f295033c9b3d45c070fe6cd5d4",
+  "main_executed": false,
+  "numerical_claim": false,
+  "optimized_hlo_sha256": "f1cd8286460c17e40e7a96d3aefc830ecba97338d55aaf3d301f54c4bcb91bfe",
+  "performance_claim": false,
+  "remote_object_count": 20,
+  "remote_prefix": "gs://driftbench-dsv4-uc/results/greenfield_pp16_feature2_position113_acquire_20260829T072101902362381Z",
+  "run_tag": "greenfield_pp16_feature2_position113_acquire_20260829T072101902362381Z",
+  "runner_sha256": "331e7dba5b638ba5560962bc606b7bf3cc9c9069a7ebe418ecda0c9824334bb6",
+  "source_identity_sha256": "6c4b1e69555608d777fa58010db3652933bcffe2c0ea8c095ef33435e4ee4b97",
+  "stablehlo_sha256": "bc2fcc77e84217ee0264e3856309f298e61e70ac0f4e3ecebecf72d290c26035",
+  "status": "HLO_ACQUIRED",
+  "structural_certificate": {
+    "bound_entry_root_count": 9,
+    "branch_topology_record_count": 32,
+    "branch_topology_sha256": "05322ce7ad09db5463e17d4a7e31142edaffe128abe5e9d85d5ee81f5e3eb02b",
+    "call_frame_bound_select_count": 32,
+    "causal": true,
+    "exact_count_recurrence_count": 4,
+    "first_scan_initialized_fields": [7, 8, 9, 10, 11, 12, 14],
+    "observation_position": 113,
+    "rebased_identity_hostile_test_count": 10,
+    "scan_count": 4,
+    "scan_handoff_field_count": 27,
+    "scan_limits": [2048, 2048, 2048, 2012],
+    "while_tuple_fields": [7, 8, 9, 10, 11, 12, 13, 14, 15]
+  },
+  "summary_sha256": "043073fc134be9fc2c1ab85d536d70012a6dc8a117d9e3bd2dde01b9f6571d72"
+}

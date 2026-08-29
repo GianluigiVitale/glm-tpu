@@ -39,6 +39,17 @@ REAL_SEALED_RUN = Path(
 )
 REAL_SEALED_STABLEHLO = REAL_SEALED_RUN / "feature2_main.stablehlo.mlir"
 REAL_SEALED_OPTIMIZED_HLO = REAL_SEALED_RUN / "feature2_main.optimized_hlo.txt"
+REAL_POSITION113_RUN = Path(
+    "/home/gianl/glm-run/greenfield_pp16_feature2_position113_acquire_"
+    "20260829T072101902362381Z/hlo"
+)
+REAL_POSITION113_STABLEHLO = REAL_POSITION113_RUN / "feature2_main.stablehlo.mlir"
+REAL_POSITION113_OPTIMIZED_HLO = (
+    REAL_POSITION113_RUN / "feature2_main.optimized_hlo.txt"
+)
+REAL_POSITION113_CANONICAL_HLO = (
+    REAL_POSITION113_RUN / "feature2_main.execution_canonical_hlo.txt"
+)
 
 
 def _pin_synthetic_sealed_optimized_hlo(
@@ -81,6 +92,28 @@ def _pin_synthetic_sealed_optimized_hlo(
     )
 
 
+def _pin_synthetic_position113_optimized_hlo(
+    monkeypatch: pytest.MonkeyPatch,
+    optimized_hlo: str,
+) -> None:
+    _pin_synthetic_sealed_optimized_hlo(monkeypatch, optimized_hlo)
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_POSITION113_OPTIMIZED_CANONICAL_SHA256",
+        sha256(optimized_hlo.encode()).hexdigest(),
+    )
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_POSITION113_OPTIMIZED_CANONICAL_BYTES",
+        len(optimized_hlo.encode()),
+    )
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_POSITION113_OPTIMIZED_STACK_FRAME_REFERENCES",
+        0,
+    )
+
+
 def _pin_synthetic_sealed_stablehlo(
     monkeypatch: pytest.MonkeyPatch,
     stablehlo: str,
@@ -88,6 +121,17 @@ def _pin_synthetic_sealed_stablehlo(
     monkeypatch.setattr(
         feature2_hlo_module,
         "FEATURE2_SEALED_STABLEHLO_SHA256",
+        sha256(stablehlo.encode()).hexdigest(),
+    )
+
+
+def _pin_synthetic_position113_stablehlo(
+    monkeypatch: pytest.MonkeyPatch,
+    stablehlo: str,
+) -> None:
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_POSITION113_STABLEHLO_SHA256",
         sha256(stablehlo.encode()).hexdigest(),
     )
 
@@ -248,6 +292,205 @@ def test_feature2_real_sealed_hlo_authenticates_complete_producer_identity() -> 
         optimized["sealed_canonical_hlo_identity"]["stripped_stack_frame_references"]
         == 14_561
     )
+
+
+@pytest.mark.skipif(
+    not REAL_POSITION113_STABLEHLO.is_file()
+    or not REAL_POSITION113_OPTIMIZED_HLO.is_file()
+    or not REAL_POSITION113_CANONICAL_HLO.is_file(),
+    reason="protected position-113 PP16 HLO is unavailable",
+)
+def test_feature2_real_position113_hlo_authenticates_complete_producer_identity() -> (
+    None
+):
+    stable = validate_feature2_main_stablehlo(
+        REAL_POSITION113_STABLEHLO.read_text(),
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+        source_jaxpr_sha256=(
+            "c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd"
+        ),
+    )
+    optimized = validate_feature2_main_optimized_hlo(
+        REAL_POSITION113_OPTIMIZED_HLO.read_text(),
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+    )
+    archive = validate_feature2_sealed_hlo_archive_identity(
+        REAL_POSITION113_STABLEHLO,
+        REAL_POSITION113_OPTIMIZED_HLO,
+        REAL_POSITION113_CANONICAL_HLO,
+        expected_stablehlo_sha256=(
+            "bc2fcc77e84217ee0264e3856309f298e61e70ac0f4e3ecebecf72d290c26035"
+        ),
+        expected_canonical_sha256=(
+            "5b5dfacf015c579f41661868486e627bb383322fe8fb5c64597c259e85c4a10e"
+        ),
+        expected_canonical_bytes=6_662_190,
+        expected_canonicalizer_version=1,
+        expected_stripped_stack_frame_references=14_781,
+    )
+    assert stable["stablehlo_sha256"] == archive["stablehlo_sha256"]
+    assert (
+        optimized["sealed_canonical_hlo_identity"]["sha256"]
+        == (archive["canonical_hlo_identity"]["sha256"])
+    )
+    assert optimized["sealed_bindings"] == {
+        str(index): marker
+        for index, marker in feature2_hlo_module._SEALED_BOUNDARY_ROOT_MARKERS.items()
+    }
+    assert optimized["position113_observer_bindings"] == {
+        str(index): marker
+        for index, marker in feature2_hlo_module._POSITION113_OBSERVER_ROOT_MARKERS.items()
+    }
+    assert optimized["position113_observer_root_hints_causal"] is True
+    assert optimized["position113_lineage"]["scan_count"] == 4
+    assert optimized["position113_lineage"]["scan_handoff_field_count"] == 27
+    assert optimized["position113_lineage"]["branch_topology_record_count"] == 32
+    assert optimized["position113_lineage"]["branch_topology_sha256"] == (
+        "05322ce7ad09db5463e17d4a7e31142edaffe128abe5e9d85d5ee81f5e3eb02b"
+    )
+    assert [
+        scan["causal_observer_field_count"]
+        for scan in optimized["position113_lineage"]["scans"]
+    ] == [9, 9, 9, 9]
+
+
+def _swap_position113_current_key_padding_ranges(value: str) -> str:
+    header = "%fused_computation.2186.clone.clone.clone ("
+    start = value.index(header)
+    end = value.index("\n}\n", start)
+    computation = value[start:end]
+    low = "padding=0_0x0_64"
+    high = "padding=0_0x64_0"
+    assert computation.count(low) == 1
+    assert computation.count(high) == 1
+    swapped = computation.replace(low, "padding=POSITION113_SWAP", 1)
+    swapped = swapped.replace(high, low, 1)
+    swapped = swapped.replace("padding=POSITION113_SWAP", high, 1)
+    return value[:start] + swapped + value[end:]
+
+
+def _negate_position113_field7_predicate(value: str) -> str:
+    anchor = "  %broadcast_select_fusion.218 = "
+    start = value.index(anchor)
+    end = value.index("\n", start)
+    caller = value[start:end]
+    original = "fusion(%get-tuple-element.18356, %get-tuple-element.17770, %eq.941)"
+    assert caller.count(original) == 1
+    attacked = caller.replace(
+        original,
+        "fusion(%get-tuple-element.18356, %get-tuple-element.17770, "
+        "%observer_attack_not)",
+        1,
+    )
+    negation = "  %observer_attack_not = pred[]{:T(512)} not(%eq.941)\n"
+    return value[:start] + negation + attacked + value[end:]
+
+
+def _negate_position113_count_predicate(value: str) -> str:
+    anchor = "  %broadcast_in_dim.4828 = "
+    start = value.index(anchor)
+    end = value.index("\n", start)
+    convert = value[start:end]
+    assert convert.count("convert(%bitcast.6183)") == 1
+    attacked = convert.replace(
+        "convert(%bitcast.6183)",
+        "convert(%observer_count_not)",
+        1,
+    )
+    negation = (
+        "  %observer_count_not = pred[1]{0:T(512)(128)(4,1)} not(%bitcast.6183)\n"
+    )
+    return value[:start] + negation + attacked + value[end:]
+
+
+def _replace_position113_current_source_with_named_prior_copy(value: str) -> str:
+    original = (
+        "%get-tuple-element.18356 = "
+        "bf16[1,6144]{1,0:T(2,128)(2,1)} "
+        "get-tuple-element(%while.594), index=4"
+    )
+    attacked = (
+        "%get-tuple-element.18356 = "
+        "bf16[1,6144]{1,0:T(2,128)(2,1)} "
+        "copy(%get-tuple-element.17770)"
+    )
+    assert value.count(original) == 1
+    return value.replace(original, attacked, 1)
+
+
+@pytest.mark.skipif(
+    not REAL_POSITION113_OPTIMIZED_HLO.is_file(),
+    reason="protected position-113 PP16 HLO is unavailable",
+)
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda value: value.replace(
+            "/*index=15*/%bitcast.6728,",
+            "/*index=15*/%copy.1223,",
+            1,
+        ),
+        lambda value: value.replace("constant(113)", "constant(114)"),
+        lambda value: value.replace(
+            "%all_gather.491, %broadcast_select_fusion.218,",
+            "%all_gather.491, %get-tuple-element.17770,",
+            1,
+        ),
+        lambda value: value.replace(
+            "/*index=15*/%add.14031,",
+            "/*index=15*/%get-tuple-element.17778,",
+            1,
+        ),
+        lambda value: value.replace(
+            "fusion(%get-tuple-element.18356, %get-tuple-element.17770, %eq.941)",
+            "fusion(%get-tuple-element.17770, %get-tuple-element.17770, %eq.941)",
+            1,
+        ),
+        lambda value: value.replace(
+            "add(%get-tuple-element.17778, %broadcast_in_dim.4828)",
+            "add(%get-tuple-element.17778, %select_n.5648)",
+            1,
+        ),
+        _swap_position113_current_key_padding_ranges,
+        _negate_position113_field7_predicate,
+        _negate_position113_count_predicate,
+        _replace_position113_current_source_with_named_prior_copy,
+    ),
+)
+def test_feature2_position113_lineage_refuses_mutation_even_with_rebased_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    mutation,
+) -> None:
+    original = REAL_POSITION113_OPTIMIZED_HLO.read_text()
+    attacked = mutation(original)
+    assert attacked != original
+    _, identity = canonicalize_feature2_optimized_hlo(attacked)
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_POSITION113_OPTIMIZED_CANONICAL_SHA256",
+        identity["sha256"],
+    )
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_POSITION113_OPTIMIZED_CANONICAL_BYTES",
+        identity["byte_count"],
+    )
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_POSITION113_OPTIMIZED_STACK_FRAME_REFERENCES",
+        identity["stripped_stack_frame_references"],
+    )
+    with pytest.raises(BenchmarkValidationError, match="position-113"):
+        validate_feature2_main_optimized_hlo(
+            attacked,
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+            observe_position_113=True,
+        )
 
 
 def _validate_real_sealed_archive(
@@ -867,74 +1110,48 @@ def test_feature2_main_successor_optimized_hlo_pins_sealed_boundaries(
         )
 
 
-def test_feature2_main_position113_observer_pins_24_live_roots() -> None:
+def test_feature2_main_position113_observer_refuses_geometry_only_fixture(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     hlo = _main_optimized_hlo(
         full_width_rounded_then_slice=True,
         sealed_boundary_capture=True,
         observe_position_113=True,
     )
-    report = validate_feature2_main_optimized_hlo(
-        hlo,
-        full_width_rounded_then_slice=True,
-        sealed_boundary_capture=True,
-        observe_position_113=True,
-    )
-    assert report["output_count"] == 24
-    assert report["observe_position_113"] is True
-    assert report["sealed_canonical_hlo_identity"] == {}
-    assert report["sealed_bindings"] == {}
-    assert report["sealed_acquisition_root_hints"] == {
-        "6": "greenfield_pp16_feature2_sealed_normalized_hidden",
-        "7": "greenfield_pp16_feature2_sealed_q_a_state",
-        "8": "greenfield_pp16_feature2_sealed_dsa_query",
-        "9": "greenfield_pp16_feature2_sealed_dsa_head_weights",
-    }
-    assert report["position113_observer_bindings"] == {}
-    assert report["position113_observer_acquisition_root_hints"] == {
-        "15": "greenfield_pp16_feature2_p113_normalized_hidden",
-        "16": "greenfield_pp16_feature2_p113_q_a_state",
-        "17": "greenfield_pp16_feature2_p113_dsa_query",
-        "18": "greenfield_pp16_feature2_p113_dsa_head_weights",
-        "19": "greenfield_pp16_feature2_p113_current_key",
-        "20": "greenfield_pp16_feature2_p113_selected_positions",
-        "21": "greenfield_pp16_feature2_p113_selected_valid_counts",
-        "22": "greenfield_pp16_feature2_p113_selected_scores",
-        "23": "greenfield_pp16_feature2_p113_observation_count",
-    }
-    assert report["position113_observer_root_hints_causal"] is False
-    with pytest.raises(BenchmarkValidationError):
+    _pin_synthetic_position113_optimized_hlo(monkeypatch, hlo)
+    with pytest.raises(BenchmarkValidationError, match="final-while field"):
         validate_feature2_main_optimized_hlo(
-            hlo.replace(", %p113.count", "", 1),
+            hlo,
             full_width_rounded_then_slice=True,
             sealed_boundary_capture=True,
             observe_position_113=True,
         )
 
 
-def test_feature2_position113_optimized_hlo_reports_wrong_source_as_noncausal_hint() -> (
-    None
-):
+def test_feature2_position113_optimized_hlo_refuses_wrong_source_under_exact_pin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     original = _main_optimized_hlo(
         full_width_rounded_then_slice=True,
         sealed_boundary_capture=True,
         observe_position_113=True,
     )
+    _pin_synthetic_position113_optimized_hlo(monkeypatch, original)
     attacked = original.replace(
         "%p113.normalized.source), metadata=",
         "%sealed.normalized.source), metadata=",
         1,
     )
     assert attacked != original
-    report = validate_feature2_main_optimized_hlo(
-        attacked,
-        full_width_rounded_then_slice=True,
-        sealed_boundary_capture=True,
-        observe_position_113=True,
-    )
-    assert report["passed"] is True
-    assert report["sealed_bindings"] == {}
-    assert report["position113_observer_bindings"] == {}
-    assert report["position113_observer_root_hints_causal"] is False
+    with pytest.raises(
+        BenchmarkValidationError, match="canonical-HLO identity drifted"
+    ):
+        validate_feature2_main_optimized_hlo(
+            attacked,
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+            observe_position_113=True,
+        )
 
 
 @pytest.mark.parametrize(
@@ -1592,12 +1809,15 @@ def test_feature2_main_successor_stablehlo_pins_sealed_boundaries(
         )
 
 
-def test_feature2_main_position113_stablehlo_pins_named_results() -> None:
+def test_feature2_main_position113_stablehlo_pins_named_results(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     stablehlo = _main_stablehlo(
         full_width_rounded_then_slice=True,
         sealed_boundary_capture=True,
         observe_position_113=True,
     )
+    _pin_synthetic_position113_stablehlo(monkeypatch, stablehlo)
     report = validate_feature2_main_stablehlo(
         stablehlo,
         full_width_rounded_then_slice=True,

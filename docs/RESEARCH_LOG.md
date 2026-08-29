@@ -11469,3 +11469,35 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   `docs/artifacts/pp16-feature2-position113-jaxpr-runtime-diagnosis.json`.
 - Exact next is complete local validation and one narrow correction-only Sol review. A second
   compile-only attempt is forbidden until that review approves a new commit/push/mirror.
+
+## 2026-08-29 07:20--07:24 UTC — protected p113 HLO acquisition succeeds
+
+- Correction diff `5e09b4a7...d3b6` passed 157/157 and Sol returned `APPROVE COMMIT AND ONE
+  COMPILE-ONLY RETRY`. Commit `09285f7` was pushed and all 11 changed files were verified
+  byte-for-byte in the `US-CENTRAL2` mirror before launch.
+- Compile-only tag `greenfield_pp16_feature2_position113_acquire_20260829T072101902362381Z`
+  authenticated all inputs, synchronized all eight hosts, loaded 39 ranges per owner and compiled
+  four graphs. Main execution was forbidden and remained false. Both fleet censuses are 8/8 clean.
+- The exact main StableHLO/raw optimized/canonical optimized identities are `bc2fcc77...6035`,
+  `f1cd8286...1bfe`, and `5b5dfacf...a10e`; canonical size/reference count are 6,662,190/14,781.
+  The verified archive has 20 objects. There is no tensor, DB row, numerical or performance claim.
+- Post-acquisition Sol inspection confirmed the graph is sufficient offline but required a
+  while-aware SSA certificate. The local classifier now proves roots 15--23 are fields 7--15 of the
+  same final while, all four scans preserve those fields at identical indices, every update depends
+  on its prior field and runtime position `==113`, count is the predicate recurrence, and the first
+  scan sanitizes allocated observer buffers. Exact whole-graph pins remain mandatory. Sol blocked
+  the first certificate because ancestry-only checks admitted current=prior and count
+  increment=valid-count attacks after rebasing identity. The correction resolves fused callee
+  parameters to all 32 exact caller predicate/current/prior bindings and requires four exact
+  `prior_count + convert(predicate)` recurrences. Sol then demonstrated three residual set-only
+  proofs: swapping the two 64-wide current-key padding ranges, selecting on `not(predicate)`, and
+  converting `not(predicate)` into the count. The correction preserves ordered callee instructions,
+  operands and padding ranges in 32 branch records; fused
+  branches must consume the predicate directly, direct selects must consume its exact bitcast, and
+  count must convert that exact bitcast. Sol then replaced a pinned current SSA definition with a
+  same-shaped copy of its prior value while retaining the name. The corrected 32-record topology
+  now also binds each caller source definition and its complete transitive executable ancestry,
+  including referenced computations, with aggregate SHA `05322ce7...b02b`; the exact name-decoy
+  becomes the tenth rebased-identity hostile case. Complete PP16 feature2 validation passes
+  168/168 and mechanical checks pass. Same-Sol re-review remains required; numerical execution is
+  forbidden.

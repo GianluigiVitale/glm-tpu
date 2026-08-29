@@ -1389,3 +1389,32 @@ row, terminal success or performance claim. The 15-object diagnostic ledger is
 the two mesh renderings reproduces observed TPU SHA `4e7f821d...d5d`. The correction pins both raw
 forms plus canonical complete-JAXpr SHA `c8b59417...d1cd` and refuses mixed/unknown meshes. Review,
 commit/push/mirror and one separately approved compile-only retry remain required.
+
+The approved retry is now protected HLO evidence under tag
+`greenfield_pp16_feature2_position113_acquire_20260829T072101902362381Z`. It compiled without main
+execution and archived 20 byte-verified same-region objects with clean 8/8 pre/post censuses.
+Stable/optimized/canonical identities are `bc2fcc77...6035`, `f1cd8286...1bfe`, and
+`5b5dfacf...a10e` (6,662,190 bytes; 14,781 stripped debug references). Compact provenance is
+`docs/artifacts/pp16-feature2-position113-hlo-acquisition.json`.
+
+This acquisition is not numerical Gate-D evidence. Its local, unreviewed successor adds the missing
+causal certificate: nine ENTRY observer roots bind to fields 7--15 of the final while; four scans
+have exact 2048/2048/2048/2012 limits and 27 same-index handoffs; each field update reaches both its
+prior field and the exact runtime-position-113 predicate; the count is an add recurrence; first-scan
+observer storage is zero-sanitized. Complete StableHLO/canonical-HLO identity remains mandatory.
+The first Sol pass found that unordered ancestry still admitted a current-key half-padding swap,
+an inverted selected-field predicate and an inverted count predicate. The correction pins all 32
+ordered branch subgraphs, requires the exact direct/fused predicate wrappers, and requires count
+conversion from the unmodified predicate bitcast. A follow-up review found that a pinned current
+SSA name could still be redefined as prior. The successor also binds every caller source definition
+and complete transitive executable ancestry, including referenced computations, in aggregate SHA
+`05322ce7...b02b`; the exact name-decoy is the tenth rebased-identity hostile case. Complete
+PP16 feature2 validation passes 168/168. Numerical execution stays frozen until this classifier
+passes the same independent Sol review.
+
+That first structural review blocked ancestry-only binding: a current arm could be replaced with
+its prior value and the count increment with the valid-count select. The local correction resolves
+fused callee parameters to exact caller predicate/true-current/false-prior sources for all eight
+selected fields in all four scans, and field 15 must be exactly
+`prior_count + convert(position == 113)`. Both attacks now refuse under deliberately rebased
+canonical identities. Full validation passes; this correction still needs Sol re-review.

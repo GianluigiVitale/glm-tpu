@@ -7328,3 +7328,33 @@ common complete observer JAXpr SHA `c8b59417...d1cd`; mixed, missing and unknown
 Evidence is in `docs/artifacts/pp16-feature2-position113-jaxpr-runtime-diagnosis.json`. Exact next is
 full local validation and one narrow correction-only Sol review. Only a new approval permits
 commit/push/mirror and one compile-only retry.
+
+That correction passed 157/157 and Sol approved one retry. Commit `09285f7` was pushed, mirrored
+byte-for-byte to `US-CENTRAL2`, and compile-only tag
+`greenfield_pp16_feature2_position113_acquire_20260829T072101902362381Z` succeeded. The main graph
+was lowered/compiled but never executed. Stable/optimized/canonical SHAs are `bc2fcc77...6035`,
+`f1cd8286...1bfe`, and `5b5dfacf...a10e`; the canonical graph is 6,662,190 bytes with 14,781
+stripped debug-frame references. The exact 20-object archive and both 8/8 clean censuses are
+recorded in `docs/artifacts/pp16-feature2-position113-hlo-acquisition.json`.
+
+Sol's post-acquisition audit found the graph sufficient without another acquisition but required a
+while-aware SSA certificate in addition to the complete HLO pins. The local successor now follows
+roots 15--23 to fields 7--15 of one final device while, verifies four same-index scan handoffs with
+limits 2048/2048/2048/2012, requires each field's prior value and the exact runtime-position
+`==113` predicate, pins the observation-count recurrence, and preserves first-scan zero
+initialization. Same-shape root/body/count/literal mutations refuse even when the canonical identity
+is deliberately rebased in tests. Sol blocked the first certificate because ancestry alone still
+allowed current=prior and count-increment substitutions. The correction now resolves fused select
+parameters back to exact caller predicate/true-current/false-prior sources for all 32 field updates
+and requires four exact `prior_count + convert(position == 113)` recurrences. Sol's next review
+found three remaining unordered-ancestry bypasses: a fused current-key half swap,
+`not(predicate)` on a selected field and `convert(not(predicate))` on the count. The correction now
+pins the ordered executable topology of all 32 select branches, requires
+the exact direct/fused predicate wrapper, and requires count conversion from `bitcast(predicate)`
+without a logical transform. Sol then found that an expected current SSA name could be redefined as
+a copy of the prior value. Each selected caller source now also binds its exact executable
+definition and complete transitive producer ancestry, including referenced computations, in SHA
+`05322ce7...b02b`. All ten rebased-canonical-identity hostile mutations refuse. Complete-suite and
+mechanical validation passes 168/168 plus Ruff, formatting, Python compilation, Bash syntax and
+diff hygiene. Exact next is the same Sol reviewer's correction-only verdict; numerical execution
+remains forbidden.

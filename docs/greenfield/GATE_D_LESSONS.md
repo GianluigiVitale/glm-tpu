@@ -752,3 +752,22 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
   runtime fragments and counts, pin each complete raw identity, canonicalize only those fragments,
   and pin the complete canonical JAXpr. Mixed CPU/TPU meshes, unknown device kinds, missing
   fragments and every other textual difference must refuse.
+- A complete canonical-HLO pin is the admission boundary, but observer semantics should also be
+  explained and machine-checked. Follow ENTRY roots through while GTEs, body/condition references,
+  same-index scan handoffs, current/prior selects and the predicate/count recurrence. Preserve
+  first-scan initialization explicitly; a four-scan observer can otherwise expose allocated decoys
+  while still having the right root shapes and names.
+- Ancestry is not branch identity. For fused observer selects, resolve callee parameters to caller
+  operands and bind predicate, true-current and false-prior separately; seeing all three somewhere
+  in a value's ancestry admits `current=prior` substitutions. Likewise, require observation count
+  as the exact two-operand `prior + convert(predicate)` recurrence, not merely an `add` whose graph
+  happens to contain both values.
+- Dependency sets also discard executable order and logical polarity. Preserve and pin ordered
+  callee operations, operand order and layout attributes such as complementary padding ranges;
+  require an exact predicate or explicitly allowed shape-only wrapper. A graph depending on
+  `not(predicate)` has the same ancestry but the opposite observation semantics. Apply the same
+  rule to the predicate converted into an observation counter.
+- A pinned SSA name is not a pinned value: an attacker can retain the name and shape while changing
+  its defining opcode to copy the prior branch. Bind the executable definition and complete
+  transitive causal ancestry of every expected caller source, including referenced computations,
+  as part of the ordered branch certificate.
