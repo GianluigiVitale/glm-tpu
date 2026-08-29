@@ -9,17 +9,22 @@ from pathlib import Path
 
 import pytest
 
+import glm_tpu.greenfield.benchmarking.pp16_feature2_hlo as feature2_hlo_module
 from glm_tpu.greenfield.benchmarking.pp16_feature2_hlo import (
     canonicalize_feature2_optimized_hlo,
     validate_feature2_main_optimized_hlo,
     validate_feature2_main_stablehlo,
     validate_feature2_materializer_optimized_hlo,
+    validate_feature2_sealed_hlo_archive_identity,
 )
 from glm_tpu.greenfield.errors import BenchmarkValidationError
 
 REAL_ACQUIRED_MAIN_HLO = Path(
     "/home/gianl/glm-run/greenfield_pp16_feature2_prefill_acquire_"
     "20260828T231028891602866Z/hlo/feature2_main.optimized_hlo.txt"
+)
+REAL_ACQUIRED_MAIN_STABLEHLO = (
+    REAL_ACQUIRED_MAIN_HLO.parent / "feature2_main.stablehlo.mlir"
 )
 REAL_NUMERICAL_REFUSAL_MAIN_HLO = Path(
     "/home/gianl/glm-run/greenfield_pp16_feature2_prefill_numerical_"
@@ -28,6 +33,63 @@ REAL_NUMERICAL_REFUSAL_MAIN_HLO = Path(
 EXPECTED_CANONICAL_SHA256 = (
     "fb5aaf025005f3fbb5a3c66e6a719ec3a78fb86d344afcf6288e6e93720310f7"
 )
+REAL_SEALED_RUN = Path(
+    "/home/gianl/glm-run/greenfield_pp16_feature2_prefill_acquire_"
+    "20260829T034414037011891Z/hlo"
+)
+REAL_SEALED_STABLEHLO = REAL_SEALED_RUN / "feature2_main.stablehlo.mlir"
+REAL_SEALED_OPTIMIZED_HLO = REAL_SEALED_RUN / "feature2_main.optimized_hlo.txt"
+
+
+def _pin_synthetic_sealed_optimized_hlo(
+    monkeypatch: pytest.MonkeyPatch,
+    optimized_hlo: str,
+) -> None:
+    """Give a synthetic fixture the same immutable-identity behavior as TPU HLO."""
+
+    expected_sha = sha256(optimized_hlo.encode()).hexdigest()
+    expected_bytes = len(optimized_hlo.encode())
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_SEALED_OPTIMIZED_CANONICAL_SHA256",
+        expected_sha,
+    )
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_SEALED_OPTIMIZED_CANONICAL_BYTES",
+        expected_bytes,
+    )
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_SEALED_OPTIMIZED_STACK_FRAME_REFERENCES",
+        0,
+    )
+
+    def synthetic_canonicalizer(value: str) -> tuple[str, dict[str, object]]:
+        return value, {
+            "byte_count": len(value.encode()),
+            "canonicalizer_version": 1,
+            "debug_sections": {},
+            "sha256": sha256(value.encode()).hexdigest(),
+            "stripped_stack_frame_references": 0,
+        }
+
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "canonicalize_feature2_optimized_hlo",
+        synthetic_canonicalizer,
+    )
+
+
+def _pin_synthetic_sealed_stablehlo(
+    monkeypatch: pytest.MonkeyPatch,
+    stablehlo: str,
+) -> None:
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_SEALED_STABLEHLO_SHA256",
+        sha256(stablehlo.encode()).hexdigest(),
+    )
 
 
 def _optimized_hlo_with_debug_provenance(
@@ -158,6 +220,189 @@ def test_feature2_real_hlo_pair_has_one_execution_canonical_identity() -> None:
     assert refused_report["byte_count"] == 7_870_521
     assert acquired_report["stripped_stack_frame_references"] == 16_170
     assert refused_report["stripped_stack_frame_references"] == 16_170
+
+
+@pytest.mark.skipif(
+    not REAL_SEALED_STABLEHLO.is_file() or not REAL_SEALED_OPTIMIZED_HLO.is_file(),
+    reason="protected sealed PP16 HLO is unavailable",
+)
+def test_feature2_real_sealed_hlo_authenticates_complete_producer_identity() -> None:
+    stable = validate_feature2_main_stablehlo(
+        REAL_SEALED_STABLEHLO.read_text(),
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+    )
+    optimized = validate_feature2_main_optimized_hlo(
+        REAL_SEALED_OPTIMIZED_HLO.read_text(),
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+    )
+    assert stable["stablehlo_sha256"] == (
+        "6c1c69d76c3d121ed4f84cb85fe0091d1605ae43d0d5707e3d52ba2cdd310ad4"
+    )
+    assert optimized["sealed_canonical_hlo_identity"]["sha256"] == (
+        "9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5"
+    )
+    assert optimized["sealed_canonical_hlo_identity"]["byte_count"] == 6_558_627
+    assert (
+        optimized["sealed_canonical_hlo_identity"]["stripped_stack_frame_references"]
+        == 14_561
+    )
+
+
+def _validate_real_sealed_archive(
+    stablehlo_path: Path,
+    optimized_hlo_path: Path,
+    canonical_hlo_path: Path,
+) -> dict[str, object]:
+    return validate_feature2_sealed_hlo_archive_identity(
+        stablehlo_path,
+        optimized_hlo_path,
+        canonical_hlo_path,
+        expected_stablehlo_sha256=(
+            "6c1c69d76c3d121ed4f84cb85fe0091d1605ae43d0d5707e3d52ba2cdd310ad4"
+        ),
+        expected_canonical_sha256=(
+            "9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5"
+        ),
+        expected_canonical_bytes=6_558_627,
+        expected_canonicalizer_version=1,
+        expected_stripped_stack_frame_references=14_561,
+    )
+
+
+@pytest.mark.skipif(
+    not REAL_SEALED_STABLEHLO.is_file() or not REAL_SEALED_OPTIMIZED_HLO.is_file(),
+    reason="protected sealed PP16 HLO is unavailable",
+)
+def test_feature2_real_sealed_archive_recomputes_actual_files(
+    tmp_path: Path,
+) -> None:
+    canonical, _ = canonicalize_feature2_optimized_hlo(
+        REAL_SEALED_OPTIMIZED_HLO.read_text()
+    )
+    canonical_path = tmp_path / "feature2_main.execution_canonical_hlo.txt"
+    canonical_path.write_text(canonical)
+    report = _validate_real_sealed_archive(
+        REAL_SEALED_STABLEHLO,
+        REAL_SEALED_OPTIMIZED_HLO,
+        canonical_path,
+    )
+    assert report["stablehlo_sha256"] == (
+        "6c1c69d76c3d121ed4f84cb85fe0091d1605ae43d0d5707e3d52ba2cdd310ad4"
+    )
+    assert report["canonical_hlo_identity"]["sha256"] == (
+        "9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5"
+    )
+
+
+@pytest.mark.skipif(
+    not REAL_SEALED_STABLEHLO.is_file()
+    or not REAL_SEALED_OPTIMIZED_HLO.is_file()
+    or not REAL_ACQUIRED_MAIN_STABLEHLO.is_file()
+    or not REAL_ACQUIRED_MAIN_HLO.is_file(),
+    reason="protected sealed/stale PP16 HLO pair is unavailable",
+)
+@pytest.mark.parametrize(
+    "crosswire",
+    ("stale_stablehlo", "stale_optimized_hlo", "stale_canonical_hlo"),
+)
+def test_feature2_real_sealed_archive_refuses_cross_wired_actual_files(
+    tmp_path: Path,
+    crosswire: str,
+) -> None:
+    current_canonical, _ = canonicalize_feature2_optimized_hlo(
+        REAL_SEALED_OPTIMIZED_HLO.read_text()
+    )
+    stale_canonical, _ = canonicalize_feature2_optimized_hlo(
+        REAL_ACQUIRED_MAIN_HLO.read_text()
+    )
+    stablehlo_path = REAL_SEALED_STABLEHLO
+    optimized_hlo_path = REAL_SEALED_OPTIMIZED_HLO
+    canonical = current_canonical
+    if crosswire == "stale_stablehlo":
+        stablehlo_path = REAL_ACQUIRED_MAIN_STABLEHLO
+    elif crosswire == "stale_optimized_hlo":
+        optimized_hlo_path = REAL_ACQUIRED_MAIN_HLO
+        canonical = stale_canonical
+    else:
+        canonical = stale_canonical
+    canonical_path = tmp_path / "feature2_main.execution_canonical_hlo.txt"
+    canonical_path.write_text(canonical)
+    with pytest.raises(BenchmarkValidationError):
+        _validate_real_sealed_archive(
+            stablehlo_path,
+            optimized_hlo_path,
+            canonical_path,
+        )
+
+
+@pytest.mark.skipif(
+    not REAL_SEALED_OPTIMIZED_HLO.is_file(),
+    reason="protected sealed PP16 HLO is unavailable",
+)
+@pytest.mark.parametrize(
+    "attack",
+    ("dead_decoy", "same_shape_bypass", "root_operand_swap", "mixed_fusion"),
+)
+def test_feature2_real_sealed_hlo_refuses_any_producer_identity_mutation(
+    attack: str,
+) -> None:
+    original = REAL_SEALED_OPTIMIZED_HLO.read_text()
+    root_marker = "\n  ROOT %tuple.2849"
+    assert original.count(root_marker) == 1
+    if attack == "dead_decoy":
+        attacked = original.replace(
+            root_marker,
+            "\n  %sealed.dead.decoy = bf16[1,1,6144] copy(%copy.1106)" + root_marker,
+            1,
+        )
+    elif attack == "same_shape_bypass":
+        attacked = original.replace(
+            root_marker,
+            "\n  %sealed.same.shape = bf16[1,1,6144] copy(%copy.1106)" + root_marker,
+            1,
+        ).replace(
+            "tuple(%copy-done.105, %min.728, %compare_select_fusion.131, "
+            "%bitcast.6914, %maximum_bitcast_fusion.8, /*index=5*/"
+            "%reshape_transpose.236, %copy.1106, %bitcast.6876",
+            "tuple(%copy-done.105, %min.728, %compare_select_fusion.131, "
+            "%bitcast.6914, %maximum_bitcast_fusion.8, /*index=5*/"
+            "%reshape_transpose.236, %sealed.same.shape, %bitcast.6876",
+            1,
+        )
+    elif attack == "root_operand_swap":
+        attacked = original.replace(
+            "%bitcast.6895, %broadcast_in_dim_reshape_transpose.7, /*index=10*/",
+            "%broadcast_in_dim_reshape_transpose.7, %bitcast.6895, /*index=10*/",
+            1,
+        )
+    else:
+        attacked = original.replace(
+            root_marker,
+            "\n  %sealed.mixed = bf16[1,1,6144] "
+            "fusion(%copy.1106, %bitcast.6876), kind=kLoop, "
+            "calls=%fused_computation.0" + root_marker,
+            1,
+        ).replace(
+            "tuple(%copy-done.105, %min.728, %compare_select_fusion.131, "
+            "%bitcast.6914, %maximum_bitcast_fusion.8, /*index=5*/"
+            "%reshape_transpose.236, %copy.1106, %bitcast.6876",
+            "tuple(%copy-done.105, %min.728, %compare_select_fusion.131, "
+            "%bitcast.6914, %maximum_bitcast_fusion.8, /*index=5*/"
+            "%reshape_transpose.236, %sealed.mixed, %bitcast.6876",
+            1,
+        )
+    assert attacked != original
+    with pytest.raises(
+        BenchmarkValidationError,
+        match="sealed optimized canonical-HLO identity drifted",
+    ):
+        validate_feature2_main_optimized_hlo(
+            attacked,
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+        )
 
 
 @pytest.mark.skipif(
@@ -564,11 +809,14 @@ def test_feature2_main_successor_optimized_hlo_pins_live_full_width_producers() 
     }
 
 
-def test_feature2_main_successor_optimized_hlo_pins_sealed_boundaries() -> None:
+def test_feature2_main_successor_optimized_hlo_pins_sealed_boundaries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     hlo = _main_optimized_hlo(
         full_width_rounded_then_slice=True,
         sealed_boundary_capture=True,
     )
+    _pin_synthetic_sealed_optimized_hlo(monkeypatch, hlo)
     report = validate_feature2_main_optimized_hlo(
         hlo,
         full_width_rounded_then_slice=True,
@@ -624,15 +872,16 @@ def test_feature2_main_successor_optimized_hlo_pins_sealed_boundaries() -> None:
 )
 def test_feature2_main_successor_optimized_hlo_refuses_unbound_sealed_roots(
     mutation,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    original = _main_optimized_hlo(
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+    )
+    _pin_synthetic_sealed_optimized_hlo(monkeypatch, original)
     with pytest.raises(BenchmarkValidationError):
         validate_feature2_main_optimized_hlo(
-            mutation(
-                _main_optimized_hlo(
-                    full_width_rounded_then_slice=True,
-                    sealed_boundary_capture=True,
-                )
-            ),
+            mutation(original),
             full_width_rounded_then_slice=True,
             sealed_boundary_capture=True,
         )
@@ -1172,11 +1421,14 @@ def test_feature2_main_successor_stablehlo_pins_immediate_half_slices() -> None:
     assert report["projection_contract"]["half_reducer_count"] == 8
 
 
-def test_feature2_main_successor_stablehlo_pins_sealed_boundaries() -> None:
+def test_feature2_main_successor_stablehlo_pins_sealed_boundaries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     stablehlo = _main_stablehlo(
         full_width_rounded_then_slice=True,
         sealed_boundary_capture=True,
     )
+    _pin_synthetic_sealed_stablehlo(monkeypatch, stablehlo)
     report = validate_feature2_main_stablehlo(
         stablehlo,
         full_width_rounded_then_slice=True,
@@ -1211,22 +1463,30 @@ def test_feature2_main_successor_stablehlo_pins_sealed_boundaries() -> None:
 )
 def test_feature2_main_successor_stablehlo_refuses_decoy_or_unbound_results(
     mutation,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    original = _main_stablehlo(
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+    )
+    _pin_synthetic_sealed_stablehlo(monkeypatch, original)
     with pytest.raises(BenchmarkValidationError):
         validate_feature2_main_stablehlo(
-            mutation(
-                _main_stablehlo(
-                    full_width_rounded_then_slice=True,
-                    sealed_boundary_capture=True,
-                )
-            ),
+            mutation(original),
             full_width_rounded_then_slice=True,
             sealed_boundary_capture=True,
         )
 
 
-def test_feature2_main_successor_stablehlo_refuses_module_wide_shape_decoys() -> None:
+def test_feature2_main_successor_stablehlo_refuses_module_wide_shape_decoys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     historical = _main_stablehlo(full_width_rounded_then_slice=True)
+    sealed = _main_stablehlo(
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+    )
+    _pin_synthetic_sealed_stablehlo(monkeypatch, sealed)
     decoy = (
         historical + "\n// tensor<2x1x6144xbf16> tensor<2x1x2048xbf16> "
         "tensor<2x1x32x128xf32> tensor<2x1x32xf32>\n"

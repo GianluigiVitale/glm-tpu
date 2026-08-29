@@ -25,6 +25,10 @@ readonly DB529_INTERNAL_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_scorer_ass
 readonly DB529_INTERNAL_CONTRACT_SHA=9bdab5023b5775b787e15c3c76d542eab921bd7a704602b4502b2305fad03d4c
 readonly DB529_INTERNAL_TENSOR_SHA=c2fdeccfdcc81363fe01a566c34bf6c04f2f44b0a18e7b545e76fdf0f0d4560b
 readonly FEATURE2_GRAPH_SHA=ab5be45aecf3b0b5d87ad76af8076bc9351823529a08c0eadb414b072b31cb2d
+readonly SEALED_MAIN_STABLEHLO_SHA=6c1c69d76c3d121ed4f84cb85fe0091d1605ae43d0d5707e3d52ba2cdd310ad4
+readonly SEALED_MAIN_CANONICAL_HLO_SHA=9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5
+readonly SEALED_MAIN_CANONICAL_HLO_BYTES=6558627
+readonly SEALED_MAIN_CANONICAL_STACK_REFS=14561
 
 [[ ${GLM_GREENFIELD_PP16_FEATURE2_ACQUIRE:-0} == 1 ]] || {
   echo "PP16 feature2 acquisition is default-off" >&2
@@ -290,14 +294,22 @@ post_census_done=1
 say "recomputing every HLO/source/load claim without JAX"
 PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$TAG" "$REMOTE_PREFIX" "$elapsed" \
-  "$FULL_WIDTH_ROUNDED_THEN_SLICE" <<'PY'
+  "$FULL_WIDTH_ROUNDED_THEN_SLICE" "$SEALED_MAIN_STABLEHLO_SHA" \
+  "$SEALED_MAIN_CANONICAL_HLO_SHA" "$SEALED_MAIN_CANONICAL_HLO_BYTES" \
+  "$SEALED_MAIN_CANONICAL_STACK_REFS" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
 import sys
 
+from glm_tpu.greenfield.benchmarking.pp16_feature2_hlo import validate_feature2_sealed_hlo_archive_identity
+
 run=Path(sys.argv[1]); pin,tag,remote,elapsed=sys.argv[2:6]
 full_width_rounded_then_slice=bool(int(sys.argv[6]))
+expected_stable_sha=sys.argv[7]
+expected_canonical_sha=sys.argv[8]
+expected_canonical_bytes=int(sys.argv[9])
+expected_canonical_stack_refs=int(sys.argv[10])
 runner=json.loads((run/'runner.json').read_text())
 source=json.loads((run/'source_identity.json').read_text())
 if runner.get('status')!='HLO_ACQUIRED' or runner.get('code_hash')!=pin or runner.get('compile_only') is not True or runner.get('sealed_boundary_capture') is not True or runner.get('main_executed') is not False or runner.get('numerical_claim') is not False or runner.get('performance_claim') is not False:
@@ -327,10 +339,25 @@ for name,record in runner['hlo'].items():
             if record.get(contract,{}).get('passed') is not True:
                 raise SystemExit(f'feature2 main {contract} failed')
         stable=record['stablehlo_contract']; optimized=record['optimized_contract']; terminal=record['terminal_contract']
-        if stable.get('sealed_boundary_capture') is not True or stable.get('output_count')!=15 or stable.get('terminal_shapes')!=expected_terminal_shapes or stable.get('terminal_types')!=expected_stable_types:
+        stable_path=run/'hlo'/record.get('stablehlo',{}).get('filename','')
+        optimized_path=run/'hlo'/record.get('optimized_hlo',{}).get('filename','')
+        canonical=record.get('execution_canonical_hlo',{})
+        canonical_path=run/'hlo'/canonical.get('filename','')
+        if stable_path.parent!=run/'hlo' or not stable_path.name.endswith('.stablehlo.mlir') or optimized_path.parent!=run/'hlo' or not optimized_path.name.endswith('.optimized_hlo.txt') or canonical_path.parent!=run/'hlo' or not canonical_path.name.endswith('.execution_canonical_hlo.txt'):
+            raise SystemExit('feature2 main HLO archive paths drifted')
+        archive_identity=validate_feature2_sealed_hlo_archive_identity(stable_path,optimized_path,canonical_path,expected_stablehlo_sha256=expected_stable_sha,expected_canonical_sha256=expected_canonical_sha,expected_canonical_bytes=expected_canonical_bytes,expected_canonicalizer_version=1,expected_stripped_stack_frame_references=expected_canonical_stack_refs)
+        if record.get('stablehlo',{}).get('sha256')!=archive_identity['stablehlo_sha256'] or record.get('optimized_hlo',{}).get('sha256')!=archive_identity['optimized_hlo_sha256']:
+            raise SystemExit('feature2 main raw HLO identity records drifted')
+        if stable.get('sealed_boundary_capture') is not True or stable.get('stablehlo_sha256')!=archive_identity['stablehlo_sha256'] or stable.get('output_count')!=15 or stable.get('terminal_shapes')!=expected_terminal_shapes or stable.get('terminal_types')!=expected_stable_types:
             raise SystemExit('feature2 main StableHLO sealed terminal drifted')
-        if optimized.get('sealed_boundary_capture') is not True or optimized.get('output_count')!=15 or optimized.get('root_shapes')!=expected_optimized_roots or optimized.get('sealed_bindings')!=expected_sealed_bindings:
+        expected_canonical={'byte_count':expected_canonical_bytes,'canonicalizer_version':1,'sha256':expected_canonical_sha,'stripped_stack_frame_references':expected_canonical_stack_refs}
+        optimized_canonical={key:optimized.get('sealed_canonical_hlo_identity',{}).get(key) for key in expected_canonical}
+        runner_canonical={key:canonical.get(key) for key in expected_canonical}
+        recomputed_canonical={key:archive_identity['canonical_hlo_identity'].get(key) for key in expected_canonical}
+        if optimized.get('sealed_boundary_capture') is not True or optimized.get('output_count')!=15 or optimized.get('root_shapes')!=expected_optimized_roots or optimized.get('sealed_bindings')!=expected_sealed_bindings or optimized_canonical!=expected_canonical:
             raise SystemExit('feature2 main optimized-HLO sealed terminal drifted')
+        if runner_canonical!=expected_canonical or recomputed_canonical!=expected_canonical or canonical.get('canonicalizer_code_hash')!=pin:
+            raise SystemExit('feature2 main canonical-HLO artifact drifted')
         if terminal.get('sealed_boundary_capture') is not True or terminal.get('output_count')!=15 or terminal.get('terminal_shapes')!=expected_terminal_shapes or terminal.get('terminal_dtypes')!=expected_terminal_dtypes:
             raise SystemExit('feature2 main abstract sealed terminal drifted')
     elif record.get('contract',{}).get('passed') is not True:

@@ -2,6 +2,38 @@
 
 **Updated:** 2026-08-29 UTC
 
+## 2026-08-29 sealed PP16 compile-only run refused on erased TPU marker names
+
+- Reviewed commit `6aa39b6374787a02fa44e0297a3a8a012ada60e9` was pushed and all 13 changed
+  files matched the locked `US-CENTRAL2` repository mirror byte-for-byte. The one authorized
+  compile-only tag `greenfield_pp16_feature2_prefill_acquire_20260829T034414037011891Z`
+  authenticated sources, an 8/8 clean census and exact fleet code, then compiled the four bounded
+  graphs. It refused before `HLO_ACQUIRED` because the TPU optimizer erased the barrier opcode and
+  exact `/optimization_barrier` suffix for all four sealed roots; three also lost the scope, while
+  the head scope survived on a folded reshape. Main arithmetic was unreachable and never invoked;
+  no numerical, Gate-D, DB or performance claim exists. The 17-object diagnostic archive is
+  independently hash-verified in the approved bucket and cleanup is 8/8 clean.
+- The refusal preserved the exact real graph needed for diagnosis. StableHLO SHA is
+  `6c1c69d7...10ad`; canonical optimized-HLO SHA/bytes are `9e933384...19a5` / `6,558,627`,
+  with canonicalizer v1 stripping exactly 14,561 validated stack-frame references. Sol confirmed
+  roots 6/7 are the intended QKV/q-a loop slots and roots 8/9 are the complementary `[0:2048]`
+  query and `[2048:2064]` head slices of the same LP2 gather.
+- The local correction preserves every structural/locality/root validator and replaces only the
+  erased optimized-name requirement with the authenticated StableHLO plus canonical-HLO identity.
+  The real captured HLO passes; dead-decoy, same-shape bypass, root-swap and mixed-fusion mutations
+  reject. Sol blocked the first correction because the outer wrapper still trusted self-reported
+  HLO records. The corrected CPU verifier hashes the actual StableHLO and optimized-HLO files,
+  recanonicalizes the latter, byte-compares the regenerated text with the archived canonical file,
+  and cross-checks all runner/contract identities plus the code pin. Stale StableHLO, optimized HLO
+  and canonical-file cross-wires reject. Sol's second correction review found the helper import in
+  the earlier source-authentication heredoc rather than the separate post-run verifier that calls
+  it. The import is now in the exact verifier scope; a regression test extracts and compiles that
+  embedded Python block, inspects its AST for the import and proves the source-authentication block
+  cannot mask it. Focused HLO/wrapper tests pass 84/84 and the full benchmarking suite passes 293
+  with 10 expected skips. This second correction has not been re-reviewed, committed, pushed or
+  used on TPU. Exact next is correction-only Sol review, then commit/push/mirror and one repeat of
+  the same compile-only scope. Numerical and 8K remain forbidden.
+
 ## 2026-08-29 PP16 sealed numerical boundaries implemented offline; review is next
 
 - The admitted full-width successor now returns four already-live layer-1/event-1 values from

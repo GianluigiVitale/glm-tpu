@@ -1,0 +1,50 @@
+{
+  "artifact_kind": "greenfield_pp16_feature2_sealed_hlo_refusal_evidence",
+  "schema_version": 1,
+  "status": "COMPILE_ONLY_REFUSED",
+  "run_tag": "greenfield_pp16_feature2_prefill_acquire_20260829T034414037011891Z",
+  "code_hash": "6aa39b6374787a02fa44e0297a3a8a012ada60e9",
+  "remote_prefix": "gs://driftbench-dsv4-uc/results/greenfield_pp16_feature2_prefill_acquire_20260829T034414037011891Z/diagnostic",
+  "bucket_location": "US-CENTRAL2",
+  "claim_scope": "fail-closed compile-only diagnostic; no main invocation, HLO_ACQUIRED, numerical, Gate-D, DB, token-rate, or performance claim",
+  "failure": {
+    "phase": "post-compile optimized-HLO validation",
+    "exception": "BenchmarkValidationError",
+    "reason": "the TPU optimizer erased the optimization-barrier opcode and exact marker suffix for all four sealed roots; three also lost the scope while the head scope survived on a folded reshape",
+    "expected_marker_count_each": 1,
+    "observed_marker_count_each": 0,
+    "model_arithmetic_executed": false
+  },
+  "captured_hlo": {
+    "stablehlo_sha256": "6c1c69d76c3d121ed4f84cb85fe0091d1605ae43d0d5707e3d52ba2cdd310ad4",
+    "optimized_hlo_sha256": "a6307a5f487b0cfcd79712c45ace89753cf0dc54e332b5c24fe9010a36ae3175",
+    "execution_canonical_hlo_sha256": "9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5",
+    "execution_canonical_hlo_bytes": 6558627,
+    "canonicalizer_version": 1,
+    "stripped_stack_frame_references": 14561,
+    "sealed_output_count": 15,
+    "root_shapes_and_locality_passed_before_marker_check": true
+  },
+  "diagnosis": {
+    "stablehlo_named_barriers_present": true,
+    "optimized_values_and_exact_root_geometry_present": true,
+    "sol_verdict": "pin the authenticated StableHLO and canonical optimized-HLO identities; do not substitute surviving names or shape-only heuristics",
+    "first_correction_review": "BLOCK: outer verifier trusted self-reported raw and canonical HLO records",
+    "correction_scope": "identity pin plus existing structural/locality/root checks; outer CPU verifier hashes actual raw files, recanonicalizes actual optimized HLO, byte-compares the archived canonical file, and rejects stale cross-wires"
+  },
+  "evidence": {
+    "diagnostic_payload_count": 16,
+    "remote_object_count_including_ledger": 17,
+    "all_remote_sha256_match": true,
+    "diagnostic_ledger_sha256": "7e1a69b1f47160985fe3d418af46199d2f9a8c333e11932ba59e62f897fe73cc",
+    "runner_log_sha256": "9a43e2d931de66bbcda5046fd851fcbf68508c85e28e948842a9a0b9bd429795",
+    "source_identity_sha256": "41dee99d08ca3d170e8545513674b6292b8a9243720e740615ad865f64c3aa7a",
+    "sync_sha256": "11522c6b3c5ae4d9f3607d12d01e4986246b019e0799cc5c8aa16cd301c053dd",
+    "pre_census_sha256": "c7b72790e1f3ecfdc2745a6026ae1bda03d34139bb7d7d465970f7859608f777",
+    "failure_exit_census_sha256": "5098114dbb400199bbfd40e64650d801c4db82345fadabe2f052fd6205b8c7d8",
+    "pre_census": "authenticated 8/8 zero work",
+    "failure_exit_census": "authenticated 8/8 zero work",
+    "terminal_marker_present": false
+  },
+  "exact_next": "adversarially review the identity-pin correction, then commit, push, byte-mirror, and repeat only the same compile-only acquisition; numerical execution and complete PP16 8K remain forbidden"
+}

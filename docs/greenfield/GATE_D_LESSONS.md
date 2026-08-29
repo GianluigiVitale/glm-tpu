@@ -3,22 +3,34 @@
 This is the compact operational memory for the GLM-5.2 greenfield short-context gate. The
 append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the reusable rules.
 
+## TPU optimization may erase identity-barrier names
+
+- A named `lax.optimization_barrier` is a valid source/StableHLO seal, but its opcode and exact
+  `op_name` suffix are not a durable optimized-TPU contract. The sealed PP16 acquisition retained
+  all four intended values and exact roots while erasing every exact barrier marker; only one
+  enclosing scope survived on a folded reshape.
+- Do not fall back to surviving scope substrings, root shapes alone or an ad hoc ancestry walker.
+  Preserve the exact StableHLO contract and authenticate the complete optimized executable with
+  the existing debug-provenance-stripping canonicalizer. Pin SHA, byte count, canonicalizer
+  version and stripped-reference count explicitly. The outer wrapper must hash the actual raw HLO
+  files, recanonicalize the actual optimized HLO, byte-compare that result with the archived
+  canonical file, and only then cross-check runner/contract records; self-reported hashes are not
+  an independent boundary.
+- Treat a validator refusal after compile as diagnostic only. Archive the HLO before failure,
+  authenticate the exact remote set, prove cleanup, and do not infer numerical or Gate-D progress.
+
 ## Current boundary
 
-- The full-width PP16 successor's missing exact observation boundary is implemented offline but is
-  not yet reviewed or deployed. It exposes already-live normalized-hidden, q-a-state, DSA-query
-  and head-weight values from both LP2 owners as four diagnostic roots while retaining half-sharded
-  persistent residuals. The strict schema bitwise-compares all four accepted layer-1 boundaries
-  for both owners and rejects every tested one-bit mutation; it cannot accept the historical
-  capture schema. Its legacy path must retain sealed report SHA `7882af40...1b45`. Public
-  StableHLO result names/types and projections, optimized root arity/operand geometry plus named
-  producer-barrier ancestry, and wrapper-level copies of all three terminal contracts are
-  mandatory; module-wide shapes and a top-level flag are insufficient. The complete benchmarking
-  suite passes 283 tests with 10 expected skips. Do not
-  use the old HLO pins or historical comparator for this graph. First review/commit/push/mirror the
-  batch, then acquire and validate the changed 15-root HLO compile-only. Numerical execution and
-  complete 8K remain forbidden until that evidence is reviewed and the launcher is separately
-  pinned to it.
+- The reviewed 15-root compile-only graph compiled once but refused because optimized TPU HLO
+  erased all four barrier names. Its actual StableHLO and complete canonical optimized executable
+  are now pinned, while every structural/locality/root check remains mandatory. The wrapper hashes
+  actual archive files, regenerates canonical HLO and byte-compares the stored canonical artifact.
+  Stale-file cross-wires reject. The helper import must live in the same post-run Python heredoc as
+  its call; a regression test extracts and compiles that exact block and checks its AST so another
+  heredoc cannot mask scope failure. Focused HLO/wrapper tests pass 84/84 and the complete
+  benchmarking suite passes 293 with 10 expected skips. This correction still needs Sol approval,
+  commit/push/mirror and exactly one compile-only repeat. Numerical execution and complete 8K
+  remain forbidden.
 - The only admitted PP16 successor now has real selected-state HLO/HBM evidence at pushed pin
   `79a1590812bd805187737cc85d2068d8486519a6`, tag
   `greenfield_pp16_feature2_prefill_acquire_20260829T023702949220285Z`. Main arithmetic was not

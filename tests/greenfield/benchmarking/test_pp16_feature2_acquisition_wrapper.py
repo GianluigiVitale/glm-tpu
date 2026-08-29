@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import ast
 import os
 import subprocess
 from pathlib import Path
 
 WRAPPER = Path("scripts/greenfield/run_pp16_feature2_prefill_acquisition.sh")
+
+
+def _python_heredoc_after(source: str, marker: str) -> str:
+    section = source.split(marker, 1)[1]
+    return section.split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
 
 
 def test_feature2_acquisition_wrapper_is_default_off_and_serialized() -> None:
@@ -34,11 +40,49 @@ def test_feature2_acquisition_wrapper_is_default_off_and_serialized() -> None:
         "expected_stable_types",
         "expected_optimized_roots",
         "expected_sealed_bindings",
+        "expected_stable_sha",
+        "expected_canonical_sha",
+        "expected_canonical_bytes",
+        "expected_canonical_stack_refs",
+        "sealed_canonical_hlo_identity",
+        "validate_feature2_sealed_hlo_archive_identity",
+        "archive_identity['stablehlo_sha256']",
+        "archive_identity['optimized_hlo_sha256']",
+        "recomputed_canonical",
+        "canonicalizer_code_hash",
+        "raw HLO identity records drifted",
+        "canonical-HLO artifact drifted",
         "StableHLO sealed terminal drifted",
         "optimized-HLO sealed terminal drifted",
         "abstract sealed terminal drifted",
     ):
         assert marker in source
+
+
+def test_feature2_acquisition_postrun_verifier_import_is_in_exact_scope() -> None:
+    source = WRAPPER.read_text()
+    source_auth = _python_heredoc_after(
+        source,
+        'say "authenticating the exact selected runtime and accepted event-1 lineage"',
+    )
+    verifier = _python_heredoc_after(
+        source,
+        'say "recomputing every HLO/source/load claim without JAX"',
+    )
+
+    assert "validate_feature2_sealed_hlo_archive_identity" not in source_auth
+    compile(verifier, "<pp16-feature2-postrun-verifier>", "exec")
+    tree = ast.parse(verifier)
+    assert any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "glm_tpu.greenfield.benchmarking.pp16_feature2_hlo"
+        and any(
+            alias.name == "validate_feature2_sealed_hlo_archive_identity"
+            for alias in node.names
+        )
+        for node in tree.body
+    )
+    assert "validate_feature2_sealed_hlo_archive_identity(" in verifier
 
 
 def test_feature2_acquisition_wrapper_refuses_the_rejected_variant() -> None:
@@ -86,6 +130,8 @@ def test_feature2_acquisition_wrapper_pins_region_sources_and_remote_hashes() ->
         "f8154c5f79b909efd9ebc14c8e004925482844d05ef28fcf0a4d29bb4a7b26da",
         "79b813daa8e194b6c9a9ad883a0199f4a938ca4d4ab7277d20a291b480349054",
         "ab5be45aecf3b0b5d87ad76af8076bc9351823529a08c0eadb414b072b31cb2d",
+        "6c1c69d76c3d121ed4f84cb85fe0091d1605ae43d0d5707e3d52ba2cdd310ad4",
+        "9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5",
         'gcloud storage cat "$REMOTE_PREFIX/$relative"',
         "upload_failure_diagnostic",
         "verify_failure_diagnostic",

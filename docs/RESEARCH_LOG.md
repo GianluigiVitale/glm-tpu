@@ -5,6 +5,40 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-29 03:40--04:00 UTC — sealed PP16 compile-only refusal yields exact executable identity
+
+- Commit `6aa39b6374787a02fa44e0297a3a8a012ada60e9` was pushed and its 13 changed
+  files were independently matched against the locked same-region mirror before the sole
+  authorized compile-only acquisition. Tag
+  `greenfield_pp16_feature2_prefill_acquire_20260829T034414037011891Z` passed exact source,
+  pre-census and eight-host code authentication, compiled four graphs, and failed closed in the
+  optimized-HLO validator before any main invocation or terminal publication. The cause is narrow:
+  real TPU optimization erased the barrier opcode and exact suffix for all four roots while
+  retaining every value and the exact 15-root geometry; only the head scope survived on a folded
+  reshape.
+- Failure archival verified 16 payload hashes and the exact 17-object remote set under
+  `gs://driftbench-dsv4-uc`; diagnostic-ledger SHA is `7e1a69b1...73cc`. Pre/failure censuses are
+  authenticated 8/8 clean. Compact evidence is
+  `docs/artifacts/pp16-feature2-sealed-hlo-refusal.json`; there is no `HLO_ACQUIRED`, runner JSON,
+  numerical result, Gate-D row or performance claim.
+- The captured StableHLO is `6c1c69d7...10ad`. Its complete optimized executable canonicalizes to
+  `9e933384...19a5`, 6,558,627 bytes, canonicalizer v1 and 14,561 stripped debug-only stack-frame
+  references. Narrow Sol diagnosis verified the four causal root paths and required this
+  authenticated full identity instead of weaker post-optimization name/shape heuristics.
+- The offline correction pins both identities inside the validators and independently inside the
+  protected wrapper while preserving all earlier HLO/locality/root checks. Real-HLO dead-decoy,
+  same-shape bypass, root-swap and mixed-fusion attacks reject. Sol blocked the first version because
+  its CPU verifier bound actual files only to self-reported records. The correction now hashes the
+  actual StableHLO/optimized-HLO files, recanonicalizes the latter and requires byte identity with
+  the archived canonical file before cross-checking pinned contract/runner/code identities. Three
+  executable stale-file cross-wires reject. Sol's second review found that the helper import was in
+  the earlier source-authentication heredoc, not the separate post-run verifier that called it. The
+  import is now in the exact calling scope, and a regression test extracts and compiles that
+  embedded Python block, checks its AST import and proves the earlier heredoc lacks the helper.
+  Focused HLO/wrapper tests pass 84/84 and the complete benchmarking suite passes 293 with 10
+  expected skips. Exact next is correction-only Sol review, commit/push/mirror and one compile-only
+  repeat. Numerical execution and full PP16 8K remain unauthorized.
+
 ## 2026-08-29 03:00--03:14 UTC — PP16 exact boundary capture/comparator implemented offline
 
 The full-width feature2 successor now returns four already-live layer-1/event-1 diagnostic roots

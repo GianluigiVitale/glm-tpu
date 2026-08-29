@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from collections import Counter, defaultdict, deque
 from hashlib import sha256
+from pathlib import Path
 from typing import Any, Literal
 
 from ..errors import BenchmarkValidationError
@@ -19,6 +20,14 @@ from ..sharding.hlo_contract import HloInstruction, HloShape, parse_hlo_module
 Feature2MaterializerPhase = Literal["query_fp32", "wk_decode_bf16", "wk_promote_fp32"]
 
 FEATURE2_OPTIMIZED_HLO_CANONICALIZER_VERSION = 1
+FEATURE2_SEALED_STABLEHLO_SHA256 = (
+    "6c1c69d76c3d121ed4f84cb85fe0091d1605ae43d0d5707e3d52ba2cdd310ad4"
+)
+FEATURE2_SEALED_OPTIMIZED_CANONICAL_SHA256 = (
+    "9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5"
+)
+FEATURE2_SEALED_OPTIMIZED_CANONICAL_BYTES = 6_558_627
+FEATURE2_SEALED_OPTIMIZED_STACK_FRAME_REFERENCES = 14_561
 _DEBUG_TABLES = ("FileNames", "FunctionNames", "FileLocations", "StackFrames")
 _INSTRUCTION_LINE = re.compile(r"^\s*(?:ROOT )?%[A-Za-z0-9_.-]+ = ")
 _DEBUG_ROW_PATTERNS = {
@@ -296,6 +305,73 @@ def canonicalize_feature2_optimized_hlo(
         "debug_sections": section_records,
         "sha256": sha256(canonical_bytes).hexdigest(),
         "stripped_stack_frame_references": stripped_stack_frame_references,
+    }
+
+
+def validate_feature2_sealed_hlo_archive_identity(
+    stablehlo_path: str | Path,
+    optimized_hlo_path: str | Path,
+    canonical_hlo_path: str | Path,
+    *,
+    expected_stablehlo_sha256: str,
+    expected_canonical_sha256: str,
+    expected_canonical_bytes: int,
+    expected_canonicalizer_version: int,
+    expected_stripped_stack_frame_references: int,
+) -> dict[str, Any]:
+    """Recompute the sealed archive identity from its three actual HLO files."""
+
+    expected_hashes = (expected_stablehlo_sha256, expected_canonical_sha256)
+    if any(re.fullmatch(r"[0-9a-f]{64}", value) is None for value in expected_hashes):
+        raise ValueError("sealed HLO expected hashes must be lowercase SHA-256")
+    if (
+        expected_canonical_bytes <= 0
+        or expected_canonicalizer_version <= 0
+        or expected_stripped_stack_frame_references <= 0
+    ):
+        raise ValueError("sealed HLO expected identity counts must be positive")
+    stable_path = Path(stablehlo_path)
+    optimized_path = Path(optimized_hlo_path)
+    canonical_path = Path(canonical_hlo_path)
+    stable_bytes = stable_path.read_bytes()
+    optimized_bytes = optimized_path.read_bytes()
+    archived_canonical_bytes = canonical_path.read_bytes()
+    stable_sha256 = sha256(stable_bytes).hexdigest()
+    optimized_sha256 = sha256(optimized_bytes).hexdigest()
+    if stable_sha256 != expected_stablehlo_sha256:
+        raise BenchmarkValidationError(
+            "sealed archive StableHLO identity drifted: "
+            f"expected={expected_stablehlo_sha256} observed={stable_sha256}"
+        )
+    canonical, canonical_identity = canonicalize_feature2_optimized_hlo(
+        optimized_bytes.decode()
+    )
+    expected_canonical_identity = {
+        "byte_count": expected_canonical_bytes,
+        "canonicalizer_version": expected_canonicalizer_version,
+        "sha256": expected_canonical_sha256,
+        "stripped_stack_frame_references": (expected_stripped_stack_frame_references),
+    }
+    observed_canonical_identity = {
+        key: canonical_identity.get(key) for key in expected_canonical_identity
+    }
+    if observed_canonical_identity != expected_canonical_identity:
+        raise BenchmarkValidationError(
+            "sealed archive optimized canonical-HLO identity drifted: "
+            f"expected={expected_canonical_identity} "
+            f"observed={observed_canonical_identity}"
+        )
+    recomputed_canonical_bytes = canonical.encode()
+    if archived_canonical_bytes != recomputed_canonical_bytes:
+        raise BenchmarkValidationError(
+            "sealed archive canonical-HLO file is not the recomputed optimized HLO"
+        )
+    return {
+        "canonical_hlo_identity": canonical_identity,
+        "optimized_hlo_bytes": len(optimized_bytes),
+        "optimized_hlo_sha256": optimized_sha256,
+        "stablehlo_bytes": len(stable_bytes),
+        "stablehlo_sha256": stable_sha256,
     }
 
 
@@ -860,8 +936,15 @@ def _optimized_terminal_boundary_contract(
     live_keys: frozenset[tuple[str, str]],
     *,
     sealed_boundary_capture: bool,
+    sealed_canonical_identity_authenticated: bool,
 ) -> tuple[dict[str, Any], list[str]]:
-    """Require exact root arity/types and causal named diagnostic producers."""
+    """Require exact root arity/types and authenticated diagnostic producers.
+
+    TPU optimization is allowed to erase identity barriers and their source
+    names. The sealed successor therefore binds the complete executable
+    producer graph with its separately validated canonical HLO identity rather
+    than accepting weaker surviving-name or same-shape ancestry heuristics.
+    """
 
     expected = (
         _SEALED_BOUNDARY_LOCAL_MAIN_ROOT
@@ -898,64 +981,27 @@ def _optimized_terminal_boundary_contract(
 
     sealed_bindings: dict[str, str] = {}
     if sealed_boundary_capture:
-        all_marker_names = tuple(_SEALED_BOUNDARY_ROOT_MARKERS.values())
-        for index, marker in _SEALED_BOUNDARY_ROOT_MARKERS.items():
-            live_markers = tuple(
-                instruction
-                for instruction in instructions
-                if (instruction.computation, instruction.name) in live_keys
-                and instruction.op_name is not None
-                and f"/{marker}/optimization_barrier" in instruction.op_name
+        if not sealed_canonical_identity_authenticated:
+            violations.append(
+                "optimized sealed roots lack the authenticated canonical-HLO "
+                "producer identity"
             )
-            if len(live_markers) != 1:
-                violations.append(
-                    f"optimized sealed marker {marker} count drifted: "
-                    f"{len(live_markers)}"
-                )
-                continue
-            boundary = live_markers[0]
-            if _shape_signature(boundary.result_shapes) != (expected[index],):
-                violations.append(
-                    f"optimized sealed marker {marker} geometry drifted: "
-                    f"{_shape_signature(boundary.result_shapes)}"
-                )
-            ancestry: list[str] = []
-            cursor = (
-                root.operand_names[index] if index < len(root.operand_names) else None
-            )
-            while cursor is not None and cursor not in ancestry:
-                ancestry.append(cursor)
-                if cursor == boundary.name:
-                    break
-                source = local.get(cursor)
-                if (
-                    source is None
-                    or source.raw_opcode not in {"bitcast", "copy", "reshape"}
-                    or len(source.operand_names) != 1
-                    or _shape_signature(source.result_shapes) != (expected[index],)
-                ):
-                    cursor = None
-                    break
-                cursor = source.operand_names[0]
-            observed_markers = {
-                candidate
-                for name in ancestry
-                for candidate in all_marker_names
-                if (local.get(name) is not None)
-                and (local[name].op_name is not None)
-                and f"/{candidate}/optimization_barrier" in local[name].op_name
+        elif all(
+            index < len(root.operand_names)
+            and local.get(root.operand_names[index]) is not None
+            and _shape_signature(local[root.operand_names[index]].result_shapes)
+            == (expected[index],)
+            and (root.computation, root.operand_names[index]) in live_keys
+            for index in _SEALED_BOUNDARY_ROOT_MARKERS
+        ):
+            sealed_bindings = {
+                str(index): marker
+                for index, marker in _SEALED_BOUNDARY_ROOT_MARKERS.items()
             }
-            if (
-                observed_markers != {marker}
-                or not ancestry
-                or ancestry[-1] != boundary.name
-            ):
-                violations.append(
-                    "optimized sealed root lost intended producer binding: "
-                    f"index={index} expected={marker} observed={sorted(observed_markers)}"
-                )
-            else:
-                sealed_bindings[str(index)] = marker
+        else:
+            violations.append(
+                "optimized sealed canonical roots lost exact live operand geometry"
+            )
     return (
         {
             "output_count": len(root.operand_names),
@@ -1503,6 +1549,13 @@ def validate_feature2_main_stablehlo(
     compact = re.sub(r"\s+", "", stablehlo)
     markers = _host_markers(stablehlo)
     violations: list[str] = []
+    stablehlo_sha256 = sha256(stablehlo.encode()).hexdigest()
+    if sealed_boundary_capture and stablehlo_sha256 != FEATURE2_SEALED_STABLEHLO_SHA256:
+        violations.append(
+            "sealed StableHLO identity drifted: "
+            f"expected={FEATURE2_SEALED_STABLEHLO_SHA256} "
+            f"observed={stablehlo_sha256}"
+        )
     if "mhlo.num_partitions=2:i32" not in compact:
         violations.append("StableHLO lost the exact two-partition module")
     required = (
@@ -1580,6 +1633,7 @@ def validate_feature2_main_stablehlo(
         "passed": True,
         "projection_contract": projection_contract,
         "sealed_boundary_capture": sealed_boundary_capture,
+        "stablehlo_sha256": stablehlo_sha256,
         **terminal_contract,
     }
 
@@ -1596,6 +1650,38 @@ def validate_feature2_main_optimized_hlo(
         raise TypeError("feature2 optimized-HLO variant flag must be boolean")
     if not isinstance(sealed_boundary_capture, bool):
         raise TypeError("feature2 optimized-HLO sealed-boundary flag must be boolean")
+    sealed_canonical_identity: dict[str, Any] = {}
+    sealed_canonical_identity_authenticated = False
+    canonical_identity_violation: str | None = None
+    if sealed_boundary_capture:
+        try:
+            _, sealed_canonical_identity = canonicalize_feature2_optimized_hlo(
+                optimized_hlo
+            )
+        except BenchmarkValidationError as error:
+            canonical_identity_violation = (
+                f"sealed optimized HLO canonicalization refused: {error}"
+            )
+        else:
+            expected_identity = {
+                "byte_count": FEATURE2_SEALED_OPTIMIZED_CANONICAL_BYTES,
+                "canonicalizer_version": FEATURE2_OPTIMIZED_HLO_CANONICALIZER_VERSION,
+                "sha256": FEATURE2_SEALED_OPTIMIZED_CANONICAL_SHA256,
+                "stripped_stack_frame_references": (
+                    FEATURE2_SEALED_OPTIMIZED_STACK_FRAME_REFERENCES
+                ),
+            }
+            observed_identity = {
+                key: sealed_canonical_identity.get(key) for key in expected_identity
+            }
+            sealed_canonical_identity_authenticated = (
+                observed_identity == expected_identity
+            )
+            if not sealed_canonical_identity_authenticated:
+                canonical_identity_violation = (
+                    "sealed optimized canonical-HLO identity drifted: "
+                    f"expected={expected_identity} observed={observed_identity}"
+                )
     module = parse_hlo_module(optimized_hlo)
     instructions = module.instructions
     live_keys, reachable_computation_count = _live_optimized_instruction_keys(
@@ -1606,6 +1692,8 @@ def validate_feature2_main_optimized_hlo(
     collectives = tuple(module.collectives)
     collective_counts = Counter(item.opcode for item in collectives)
     violations: list[str] = []
+    if canonical_identity_violation is not None:
+        violations.append(canonical_identity_violation)
     if module.num_partitions != 2:
         violations.append(f"expected two partitions, found {module.num_partitions}")
     expected_root = (
@@ -1623,6 +1711,9 @@ def validate_feature2_main_optimized_hlo(
         root,
         live_keys,
         sealed_boundary_capture=sealed_boundary_capture,
+        sealed_canonical_identity_authenticated=(
+            sealed_canonical_identity_authenticated
+        ),
     )
     violations.extend(terminal_violations)
     allowed_collectives = {"all-gather", "all-reduce", "collective-permute"}
@@ -2014,5 +2105,8 @@ def validate_feature2_main_optimized_hlo(
             {"dtype": dtype, "shape": list(shape)} for dtype, shape in root_shapes
         ],
         "runtime_parameter_counts": observed_runtime_parameters,
+        "sealed_canonical_hlo_identity": (
+            sealed_canonical_identity if sealed_boundary_capture else {}
+        ),
         **terminal_contract,
     }
