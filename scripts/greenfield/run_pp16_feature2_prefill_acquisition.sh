@@ -378,7 +378,8 @@ if observe_position_113:
     expected_stable_types += ['tensor<2x1x6144xbf16>','tensor<2x1x2048xbf16>','tensor<2x1x32x128xf32>','tensor<2x1x32xf32>','tensor<2x1x128xf32>','tensor<2x1x2048xi32>','tensor<2x1xi32>','tensor<2x1x2048xf32>','tensor<2x1xi32>']
     expected_optimized_roots += [{'dtype':dtype,'shape':shape} for dtype,shape in [('bf16',[1,1,6144]),('bf16',[1,1,2048]),('f32',[1,1,32,128]),('f32',[1,1,32]),('f32',[1,1,128]),('s32',[1,1,2048]),('s32',[1,1]),('f32',[1,1,2048]),('s32',[1,1])]]
 expected_output_count=24 if observe_position_113 else 15
-expected_jaxpr_sha=('a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0' if observe_position_113 else '9773c7b150a5b277116b33574b56f40316da24c5fc497d8827edbeb83fde372d')
+expected_jaxpr_sha=('c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd' if observe_position_113 else '7e1e4b549fa7b87c098f06644e918fe9f4fb05255a089ae9a94d1f218922aac0')
+expected_raw_jaxpr_sha=('4e7f821d11e9a4fcf12ae39ef657c2a3f054c0a5976898d62069470e4d957d5d' if observe_position_113 else '319e357a13ea4b26cd261cd0b7eefc87830d45409ee5c288dcf505bf7c2f6c4a')
 expected_causal_contract=({'counter_carried_through_all_scans':True,'observed_value_count':8,'position':113,'terminal_validity_gated_by_exact_count':True} if observe_position_113 else None)
 for name,record in runner['hlo'].items():
     for kind,suffix in (('stablehlo','.stablehlo.mlir'),('optimized_hlo','.optimized_hlo.txt')):
@@ -407,7 +408,7 @@ for name,record in runner['hlo'].items():
             archive_identity=validate_feature2_sealed_hlo_archive_identity(stable_path,optimized_path,canonical_path,expected_stablehlo_sha256=expected_stable_sha,expected_canonical_sha256=expected_canonical_sha,expected_canonical_bytes=expected_canonical_bytes,expected_canonicalizer_version=1,expected_stripped_stack_frame_references=expected_canonical_stack_refs)
         if record.get('stablehlo',{}).get('sha256')!=archive_identity['stablehlo_sha256'] or record.get('optimized_hlo',{}).get('sha256')!=archive_identity['optimized_hlo_sha256']:
             raise SystemExit('feature2 main raw HLO identity records drifted')
-        if jaxpr.get('jaxpr_sha256')!=expected_jaxpr_sha or jaxpr.get('position113_causal_contract')!=expected_causal_contract:
+        if jaxpr.get('jaxpr_sha256')!=expected_jaxpr_sha or jaxpr.get('raw_jaxpr_sha256')!=expected_raw_jaxpr_sha or jaxpr.get('jaxpr_canonicalizer_version')!=1 or jaxpr.get('jaxpr_runtime_mesh')!='tpu_v4' or jaxpr.get('jaxpr_runtime_mesh_fragment_count')!=2 or jaxpr.get('position113_causal_contract')!=expected_causal_contract:
             raise SystemExit('feature2 main causal JAXpr contract drifted')
         if stable.get('sealed_boundary_capture') is not True or bool(stable.get('observe_position_113',False))!=observe_position_113 or stable.get('source_jaxpr_sha256')!=expected_jaxpr_sha or stable.get('stablehlo_sha256')!=archive_identity['stablehlo_sha256'] or stable.get('output_count')!=expected_output_count or stable.get('terminal_shapes')!=expected_terminal_shapes or stable.get('terminal_types')!=expected_stable_types:
             raise SystemExit('feature2 main StableHLO sealed terminal drifted')

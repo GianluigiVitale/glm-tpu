@@ -11447,3 +11447,25 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   Bash pass and ShellCheck is unavailable on this host. No TPU work occurred. Exact next is
   correction closure from the same Sol reviewer, then commit/push/same-region mirror and at most
   one protected compile-only observer acquisition. Full-model and numerical runs remain forbidden.
+
+## 2026-08-29 07:05--07:17 UTC — first p113 acquisition refuses backend-rendered raw JAXpr
+
+- Sol approved staged diff `b4a715ee...d40`; commit `2a20740e` was pushed and the same-region cron
+  mirror was verified byte-for-byte for the HLO contract, observer classifier and wrapper.
+- The one approved compile-only tag
+  `greenfield_pp16_feature2_position113_acquire_20260829T070550803626247Z` compiled only the three
+  existing materializer graphs, then refused before main lowering. CPU and TPU render the same two
+  manual feature meshes as `cpu/None/cpu` versus `TPU v4/2/tpu`; the raw observer JAXpr SHA was
+  therefore `a6ce2233...bf0` locally and `4e7f821d...d5d` on TPU. No main StableHLO, main call,
+  tensor, DB row, `HLO_ACQUIRED`, `SUCCESS` or performance claim exists.
+- Failure evidence is a verified 15-object diagnostic under the approved bucket. Ledger/runner/
+  pre-census/failure-census SHAs are `7948231f...6185`, `9ffd5d54...2ac0`,
+  `e4ecdafb...bfeb`, and `a9bef654...70ad`; both censuses are 8/8 clean.
+- Local reconstruction replaces exactly two CPU mesh fragments with the exact TPU-v4 fragments
+  and reproduces observed SHA `4e7f821d...d5d` with zero other text changes. Correction v1 admits
+  only two equal known CPU or TPU-v4 fragments, pins each complete raw SHA, replaces only those
+  fragments and pins complete canonical observer JAXpr SHA `c8b59417...d1cd`. Mixed/unknown mesh
+  mutations refuse. The compact diagnosis is tracked at
+  `docs/artifacts/pp16-feature2-position113-jaxpr-runtime-diagnosis.json`.
+- Exact next is complete local validation and one narrow correction-only Sol review. A second
+  compile-only attempt is forbidden until that review approves a new commit/push/mirror.

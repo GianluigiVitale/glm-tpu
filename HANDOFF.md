@@ -7281,7 +7281,7 @@ Do not run another full model before that boundary is localized.
 
 ## Current exact next: compile-only PP16 position-113 observer acquisition
 
-The default-off observer batch is locally complete but has not executed on TPU. It latches only
+The default-off observer latches only
 already-live layer-0 position-113 normalized BF16, q-a BF16, query/head/key FP32, selected
 positions/count/scores and a one-occurrence counter. The ordinary non-observer graph retains its
 exact prior JAXpr identities and 15-root boundary; observer mode has a distinct 24-root contract.
@@ -7310,3 +7310,21 @@ ancestry. The classifier still requires the exact rejection/oracle NPZ hashes, e
 closure by the same Sol reviewer on the new immutable staged diff. Only approval permits
 commit/push/mirror and one protected compile-only acquisition; numerical execution remains frozen
 until the acquired HLO is separately inspected and pinned.
+
+Approved commit `2a20740e` was pushed and mirrored byte-for-byte to the same-region bucket. Its
+single compile-only attempt, tag
+`greenfield_pp16_feature2_position113_acquire_20260829T070550803626247Z`, compiled and archived only
+the three existing materializers, then refused before main lowering because raw CPU and TPU JAXpr
+text render the same two abstract meshes differently. No main StableHLO, call, tensor, DB row,
+`HLO_ACQUIRED`, `SUCCESS` or performance result exists; failure cleanup is 8/8 and the verified
+15-object diagnostic ledger SHA is `7948231f...6185`.
+
+The diagnosis is exact, not a relaxed hash allowlist. Replacing the two CPU fragments
+`device_kind=cpu,num_cores=None,platform=cpu` with the real TPU-v4 fragments
+`device_kind=TPU v4,num_cores=2,platform=tpu` changes raw SHA `a6ce2233...bf0` to the observed
+`4e7f821d...d5d` with zero other text changes. Canonicalizer v1 accepts exactly two equal CPU or
+TPU-v4 fragments, pins each complete raw identity, replaces only those fragments, and requires the
+common complete observer JAXpr SHA `c8b59417...d1cd`; mixed, missing and unknown meshes refuse.
+Evidence is in `docs/artifacts/pp16-feature2-position113-jaxpr-runtime-diagnosis.json`. Exact next is
+full local validation and one narrow correction-only Sol review. Only a new approval permits
+commit/push/mirror and one compile-only retry.

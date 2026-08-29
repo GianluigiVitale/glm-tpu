@@ -747,3 +747,8 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
   observer-only oracles only when the observer is enabled, and regression-test malformed feature
   flags before any Git, GCS or TPU action. Compile every production Python heredoc rather than
   assuming outer `bash -n` covers embedded programs.
+- Raw JAXpr text can encode backend-only `AbstractMesh` rendering even when the complete semantic
+  graph is identical. Never weaken this to a set of unexplained hashes. Admit only exact known
+  runtime fragments and counts, pin each complete raw identity, canonicalize only those fragments,
+  and pin the complete canonical JAXpr. Mixed CPU/TPU meshes, unknown device kinds, missing
+  fragments and every other textual difference must refuse.

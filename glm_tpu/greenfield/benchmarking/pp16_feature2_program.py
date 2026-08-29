@@ -70,15 +70,72 @@ _CACHE_LAYOUT = StageLocalKvLayout(
 _DSA_CONTRACT = DsaNumericalContract()
 _MLA_CONTRACT = MlaNumericalContract()
 PP16_FEATURE2_OBSERVATION_POSITION = 113
-_FEATURE2_DEFAULT_JAXPR_SHA256 = (
-    "75deaf2087d62885eb6e0a9a4d26317ad70e405f912d793dbd9bc355de6d856d"
+FEATURE2_JAXPR_CANONICALIZER_VERSION = 1
+_FEATURE2_JAXPR_RUNTIME_MESHES = {
+    "cpu": (
+        "AbstractMesh('feature': 2, axis_types=(Manual,), device_kind=cpu, "
+        "num_cores=None, platform=cpu)"
+    ),
+    "tpu_v4": (
+        "AbstractMesh('feature': 2, axis_types=(Manual,), device_kind=TPU v4, "
+        "num_cores=2, platform=tpu)"
+    ),
+}
+_FEATURE2_JAXPR_CANONICAL_MESH = (
+    "AbstractMesh('feature': 2, axis_types=(Manual,), runtime=canonical)"
 )
-_FEATURE2_FULL_WIDTH_JAXPR_SHA256 = (
-    "9773c7b150a5b277116b33574b56f40316da24c5fc497d8827edbeb83fde372d"
-)
-_FEATURE2_POSITION113_JAXPR_SHA256 = (
-    "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0"
-)
+_FEATURE2_JAXPR_RAW_SHA256 = {
+    "default": {
+        "cpu": "75deaf2087d62885eb6e0a9a4d26317ad70e405f912d793dbd9bc355de6d856d",
+        "tpu_v4": "796b75c5fee9662208f2283de6c59ce08a6019e0e4337f2705f382e69cab9da6",
+    },
+    "full_width": {
+        "cpu": "9773c7b150a5b277116b33574b56f40316da24c5fc497d8827edbeb83fde372d",
+        "tpu_v4": "319e357a13ea4b26cd261cd0b7eefc87830d45409ee5c288dcf505bf7c2f6c4a",
+    },
+    "position113": {
+        "cpu": "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0",
+        "tpu_v4": "4e7f821d11e9a4fcf12ae39ef657c2a3f054c0a5976898d62069470e4d957d5d",
+    },
+}
+_FEATURE2_JAXPR_CANONICAL_SHA256 = {
+    "default": "459866bc4d9bc0dc581aad1704e74db26e2d3576dec5b88979db5c09f96cd11b",
+    "full_width": "7e1e4b549fa7b87c098f06644e918fe9f4fb05255a089ae9a94d1f218922aac0",
+    "position113": "c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd",
+}
+
+
+def _canonicalize_feature2_jaxpr(jaxpr: str) -> tuple[str, str]:
+    """Remove only the exact CPU/TPU-v4 AbstractMesh rendering difference."""
+
+    counts = {
+        runtime: jaxpr.count(fragment)
+        for runtime, fragment in _FEATURE2_JAXPR_RUNTIME_MESHES.items()
+    }
+    runtimes = tuple(runtime for runtime, count in counts.items() if count)
+    if len(runtimes) != 1 or counts[runtimes[0]] != 2:
+        raise BenchmarkValidationError(
+            "feature2 JAXpr runtime mesh identity drifted: "
+            f"expected exactly two equal CPU or TPU-v4 meshes, observed={counts}"
+        )
+    runtime = runtimes[0]
+    return (
+        jaxpr.replace(
+            _FEATURE2_JAXPR_RUNTIME_MESHES[runtime],
+            _FEATURE2_JAXPR_CANONICAL_MESH,
+        ),
+        runtime,
+    )
+
+
+def _feature2_jaxpr_variant(
+    *, full_width_rounded_then_slice: bool, observe_position_113: bool
+) -> str:
+    if observe_position_113:
+        return "position113"
+    if full_width_rounded_then_slice:
+        return "full_width"
+    return "default"
 
 
 class Feature2PrefillRuntimeInputs(NamedTuple):
@@ -189,16 +246,15 @@ def validate_feature2_prefill_jaxpr(
         raise TypeError("feature2 JAXpr full-width-then-slice flag must be boolean")
     if not isinstance(observe_position_113, bool):
         raise TypeError("feature2 JAXpr position-113 observer flag must be boolean")
-    jaxpr_sha256 = sha256(jaxpr.encode()).hexdigest()
-    expected_jaxpr_sha256 = (
-        _FEATURE2_POSITION113_JAXPR_SHA256
-        if observe_position_113
-        else (
-            _FEATURE2_FULL_WIDTH_JAXPR_SHA256
-            if full_width_rounded_then_slice
-            else _FEATURE2_DEFAULT_JAXPR_SHA256
-        )
+    canonical_jaxpr, jaxpr_runtime_mesh = _canonicalize_feature2_jaxpr(jaxpr)
+    raw_jaxpr_sha256 = sha256(jaxpr.encode()).hexdigest()
+    jaxpr_sha256 = sha256(canonical_jaxpr.encode()).hexdigest()
+    variant = _feature2_jaxpr_variant(
+        full_width_rounded_then_slice=full_width_rounded_then_slice,
+        observe_position_113=observe_position_113,
     )
+    expected_raw_jaxpr_sha256 = _FEATURE2_JAXPR_RAW_SHA256[variant][jaxpr_runtime_mesh]
+    expected_jaxpr_sha256 = _FEATURE2_JAXPR_CANONICAL_SHA256[variant]
     counts = {
         "all_gather": jaxpr.count("all_gather["),
         "convolution": jaxpr.count("conv_general_dilated["),
@@ -237,9 +293,14 @@ def validate_feature2_prefill_jaxpr(
             f"feature2 executable primitive counts drifted: "
             f"expected={expected}, observed={counts}"
         )
+    if raw_jaxpr_sha256 != expected_raw_jaxpr_sha256:
+        violations.append(
+            "feature2 executable raw JAXpr identity drifted: "
+            f"expected={expected_raw_jaxpr_sha256}, observed={raw_jaxpr_sha256}"
+        )
     if jaxpr_sha256 != expected_jaxpr_sha256:
         violations.append(
-            "feature2 executable causal JAXpr identity drifted: "
+            "feature2 executable canonical JAXpr identity drifted: "
             f"expected={expected_jaxpr_sha256}, observed={jaxpr_sha256}"
         )
     forbidden = tuple(
@@ -268,8 +329,12 @@ def validate_feature2_prefill_jaxpr(
     report = {
         **counts,
         "forbidden_markers": [],
+        "jaxpr_canonicalizer_version": FEATURE2_JAXPR_CANONICALIZER_VERSION,
+        "jaxpr_runtime_mesh": jaxpr_runtime_mesh,
+        "jaxpr_runtime_mesh_fragment_count": 2,
         "jaxpr_sha256": jaxpr_sha256,
         "passed": True,
+        "raw_jaxpr_sha256": raw_jaxpr_sha256,
     }
     if observe_position_113:
         report["observe_position_113"] = True

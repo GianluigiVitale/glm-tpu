@@ -1,0 +1,30 @@
+{
+  "artifact_kind": "greenfield_pp16_feature2_position113_jaxpr_runtime_diagnosis",
+  "canonical_mesh": "AbstractMesh('feature': 2, axis_types=(Manual,), runtime=canonical)",
+  "canonical_observer_jaxpr_sha256": "c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd",
+  "canonicalizer_version": 1,
+  "code_hash": "2a20740e7a6fcb63040e638fbc1a7c16ef6cd607",
+  "cpu_mesh": "AbstractMesh('feature': 2, axis_types=(Manual,), device_kind=cpu, num_cores=None, platform=cpu)",
+  "cpu_observer_jaxpr_sha256": "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0",
+  "diagnostic": {
+    "census_failure_exit_sha256": "a9bef654166f67df5b86f684c3aadee515c16160b68f7fce662936c0f76070ad",
+    "census_pre_sha256": "e4ecdafb9b90a098b7e767b6de60da36648e1e121fb8284f113450444dbcbfeb",
+    "evidence_ledger_sha256": "7948231ff9c9352fcc4fd4da642e0fd78c66bd2636d4cd732c666e43ede06185",
+    "main_executed": false,
+    "remote_object_count": 15,
+    "remote_prefix": "gs://driftbench-dsv4-uc/results/greenfield_pp16_feature2_position113_acquire_20260829T070550803626247Z/diagnostic",
+    "runner_log_sha256": "9ffd5d541c8f1b8c9f86d7dac0a30ea1a7415a85ba902b48c866a0489fcf2ac0",
+    "source_identity_sha256": "6c4b1e69555608d777fa58010db3652933bcffe2c0ea8c095ef33435e4ee4b97",
+    "status": "FAILED_BEFORE_MAIN_LOWERING"
+  },
+  "exact_difference": {
+    "cpu_mesh_occurrences": 2,
+    "other_text_changes": 0,
+    "transformed_sha_matches_observed_tpu": true
+  },
+  "failed_run_tag": "greenfield_pp16_feature2_position113_acquire_20260829T070550803626247Z",
+  "numerical_claim": false,
+  "performance_claim": false,
+  "tpu_mesh": "AbstractMesh('feature': 2, axis_types=(Manual,), device_kind=TPU v4, num_cores=2, platform=tpu)",
+  "tpu_observer_jaxpr_sha256": "4e7f821d11e9a4fcf12ae39ef657c2a3f054c0a5976898d62069470e4d957d5d"
+}

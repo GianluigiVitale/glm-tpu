@@ -164,17 +164,19 @@ arguments = (
 )
 def inspect_program(value):
     text = str(jax.make_jaxpr(value.execute)(*arguments))
-    return {
-        'contract': validate_feature2_prefill_jaxpr(
-            text,
-            full_width_rounded_then_slice=(
-                value.full_width_rounded_then_slice
-            ),
-            observe_position_113=value.observe_position_113,
+    contract = validate_feature2_prefill_jaxpr(
+        text,
+        full_width_rounded_then_slice=(
+            value.full_width_rounded_then_slice
         ),
+        observe_position_113=value.observe_position_113,
+    )
+    return {
+        'contract': contract,
         'full_width_rounded_then_slice': value.full_width_rounded_then_slice,
         'observe_position_113': value.observe_position_113,
-        'jaxpr_sha256': sha256(text.encode()).hexdigest(),
+        'jaxpr_sha256': contract['jaxpr_sha256'],
+        'raw_jaxpr_sha256': sha256(text.encode()).hexdigest(),
         'terminal': validate_feature2_prefill_result_abstract(
             jax.eval_shape(value.execute, *arguments),
             observe_position_113=value.observe_position_113,
@@ -225,6 +227,27 @@ for mutation in causal_mutations:
         )
     except BenchmarkValidationError:
         causal_mutations_rejected += 1
+cpu_mesh = "AbstractMesh('feature': 2, axis_types=(Manual,), device_kind=cpu, num_cores=None, platform=cpu)"
+tpu_mesh = "AbstractMesh('feature': 2, axis_types=(Manual,), device_kind=TPU v4, num_cores=2, platform=tpu)"
+observer_tpu_contract = validate_feature2_prefill_jaxpr(
+    observer_jaxpr.replace(cpu_mesh, tpu_mesh),
+    full_width_rounded_then_slice=True,
+    observe_position_113=True,
+)
+runtime_mesh_mutations_rejected = 0
+runtime_mesh_mutations = (
+    observer_jaxpr.replace(cpu_mesh, tpu_mesh, 1),
+    observer_jaxpr.replace('device_kind=cpu', 'device_kind=TPU v5'),
+)
+for mutation in runtime_mesh_mutations:
+    try:
+        validate_feature2_prefill_jaxpr(
+            mutation,
+            full_width_rounded_then_slice=True,
+            observe_position_113=True,
+        )
+    except BenchmarkValidationError:
+        runtime_mesh_mutations_rejected += 1
 print(json.dumps({
     'causal_mutations_rejected': causal_mutations_rejected,
     'default': default_report,
@@ -233,7 +256,9 @@ print(json.dumps({
     'jaxpr_distinct': jaxpr != successor_jaxpr,
     'observer': observer_report,
     'observer_distinct': observer_jaxpr != successor_jaxpr,
+    'observer_tpu_contract': observer_tpu_contract,
     'rejected_mutations': rejected,
+    'runtime_mesh_mutations_rejected': runtime_mesh_mutations_rejected,
     'successor': successor_report,
     'weight_contract': validate_feature2_executable_weight_contract(graph),
     'weight_count': len(built.weight_specs),
@@ -268,6 +293,7 @@ print(json.dumps({
     assert result["rejected_mutations"] == 4
     assert result["hybrid_rejected"] is True
     assert result["causal_mutations_rejected"] == 2
+    assert result["runtime_mesh_mutations_rejected"] == 2
     expected_contract = {
         "all_gather": 27,
         "convolution": 197,
@@ -275,8 +301,11 @@ print(json.dumps({
         "fp8_attention_o_n6144": 0,
         "forbidden_markers": [],
         "h16_b512_attention": 8,
+        "jaxpr_canonicalizer_version": 1,
+        "jaxpr_runtime_mesh": "cpu",
+        "jaxpr_runtime_mesh_fragment_count": 2,
         "jaxpr_sha256": (
-            "75deaf2087d62885eb6e0a9a4d26317ad70e405f912d793dbd9bc355de6d856d"
+            "459866bc4d9bc0dc581aad1704e74db26e2d3576dec5b88979db5c09f96cd11b"
         ),
         "observation_position_literal": 0,
         "passed": True,
@@ -284,6 +313,9 @@ print(json.dumps({
         "pmin": 1,
         "ppermute": 12,
         "psum": 16,
+        "raw_jaxpr_sha256": (
+            "75deaf2087d62885eb6e0a9a4d26317ad70e405f912d793dbd9bc355de6d856d"
+        ),
         "scan": 18,
     }
     expected_terminal = {
@@ -331,7 +363,8 @@ print(json.dumps({
         "contract": expected_contract,
         "full_width_rounded_then_slice": False,
         "observe_position_113": False,
-        "jaxpr_sha256": "75deaf2087d62885eb6e0a9a4d26317ad70e405f912d793dbd9bc355de6d856d",
+        "jaxpr_sha256": "459866bc4d9bc0dc581aad1704e74db26e2d3576dec5b88979db5c09f96cd11b",
+        "raw_jaxpr_sha256": "75deaf2087d62885eb6e0a9a4d26317ad70e405f912d793dbd9bc355de6d856d",
         "terminal": expected_terminal,
     }
     assert result["successor"] == {
@@ -341,12 +374,16 @@ print(json.dumps({
             "fp8_attention_o_n3072": 0,
             "fp8_attention_o_n6144": 64,
             "jaxpr_sha256": (
+                "7e1e4b549fa7b87c098f06644e918fe9f4fb05255a089ae9a94d1f218922aac0"
+            ),
+            "raw_jaxpr_sha256": (
                 "9773c7b150a5b277116b33574b56f40316da24c5fc497d8827edbeb83fde372d"
             ),
         },
         "full_width_rounded_then_slice": True,
         "observe_position_113": False,
-        "jaxpr_sha256": "9773c7b150a5b277116b33574b56f40316da24c5fc497d8827edbeb83fde372d",
+        "jaxpr_sha256": "7e1e4b549fa7b87c098f06644e918fe9f4fb05255a089ae9a94d1f218922aac0",
+        "raw_jaxpr_sha256": "9773c7b150a5b277116b33574b56f40316da24c5fc497d8827edbeb83fde372d",
         "terminal": expected_terminal,
     }
     assert result["observer"] == {
@@ -356,7 +393,7 @@ print(json.dumps({
             "fp8_attention_o_n3072": 0,
             "fp8_attention_o_n6144": 64,
             "jaxpr_sha256": (
-                "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0"
+                "c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd"
             ),
             "observe_position_113": True,
             "observation_position_literal": 4,
@@ -367,9 +404,15 @@ print(json.dumps({
                 "terminal_validity_gated_by_exact_count": True,
             },
             "pmin": 2,
+            "raw_jaxpr_sha256": (
+                "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0"
+            ),
         },
         "full_width_rounded_then_slice": True,
         "jaxpr_sha256": (
+            "c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd"
+        ),
+        "raw_jaxpr_sha256": (
             "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0"
         ),
         "observe_position_113": True,
@@ -402,4 +445,18 @@ print(json.dumps({
                 [2, 1],
             ],
         },
+    }
+    observer_tpu_contract = result["observer_tpu_contract"]
+    assert observer_tpu_contract["jaxpr_runtime_mesh"] == "tpu_v4"
+    assert observer_tpu_contract["raw_jaxpr_sha256"] == (
+        "4e7f821d11e9a4fcf12ae39ef657c2a3f054c0a5976898d62069470e4d957d5d"
+    )
+    assert {
+        key: value
+        for key, value in observer_tpu_contract.items()
+        if key not in {"jaxpr_runtime_mesh", "raw_jaxpr_sha256"}
+    } == {
+        key: value
+        for key, value in result["observer"]["contract"].items()
+        if key not in {"jaxpr_runtime_mesh", "raw_jaxpr_sha256"}
     }

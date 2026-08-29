@@ -1371,13 +1371,21 @@ discriminator at that position, with every prior output required bitwise unchang
 boundary is localized may a separately reviewed model retry occur. Gate D remains open and must not
 be represented as Section 18 completion.
 
-The p113 observer and compile-only wrapper are now locally ready, not protected evidence. Observer
+The p113 observer and compile-only wrapper remain pre-numerical evidence. Observer
 mode has 24 exact result roots while the default graph remains unchanged; its classifier requires
 all 15 ordinary captured arrays and both owner observations byte-identical before interpreting the
 accepted normalized/key boundaries. The corrected contracts require exact observer JAXpr identity,
 exact rejection/oracle NPZ hashes and the complete p113 selected-prefix/tail invariant. Ordered
 source results and exact optimized-root geometry are explicitly non-causal acquisition hints;
 binding maps remain empty until the acquired canonical graph is separately inspected and pinned.
-The full PP16 feature2 CPU suite passes 157/157. No TPU HLO,
-tensor, DB row, terminal or performance claim exists for this batch. Review, commit/push/mirror and
-one compile-only acquisition are still required before the graph can be numerically authorized.
+
+Commit `2a20740e` made one compile-only attempt under tag
+`greenfield_pp16_feature2_position113_acquire_20260829T070550803626247Z`. It refused before main
+lowering because two otherwise-identical JAXpr mesh descriptions render as CPU and TPU-v4 runtime
+labels. Only three already-known materializer HLOs exist; there is no observer main HLO, tensor, DB
+row, terminal success or performance claim. The 15-object diagnostic ledger is
+`7948231f...6185`, cleanup is 8/8, and tracked diagnosis
+`docs/artifacts/pp16-feature2-position113-jaxpr-runtime-diagnosis.json` proves that changing exactly
+the two mesh renderings reproduces observed TPU SHA `4e7f821d...d5d`. The correction pins both raw
+forms plus canonical complete-JAXpr SHA `c8b59417...d1cd` and refuses mixed/unknown meshes. Review,
+commit/push/mirror and one separately approved compile-only retry remain required.

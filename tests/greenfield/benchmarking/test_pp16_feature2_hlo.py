@@ -1604,7 +1604,7 @@ def test_feature2_main_position113_stablehlo_pins_named_results() -> None:
         sealed_boundary_capture=True,
         observe_position_113=True,
         source_jaxpr_sha256=(
-            "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0"
+            "c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd"
         ),
     )
     assert report["output_count"] == 24
@@ -1639,7 +1639,7 @@ def test_feature2_main_position113_stablehlo_pins_named_results() -> None:
             sealed_boundary_capture=True,
             observe_position_113=True,
             source_jaxpr_sha256=(
-                "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0"
+                "c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd"
             ),
         )
 
