@@ -106,14 +106,8 @@ case "$INTERNAL_MODE" in
     readonly LAYER1_RMS_INPUT_CAPTURE=0
     ;;
   layer1_rms_input)
-    readonly PROMPT_KEY_CAPTURE=0
-    readonly ATTENTION_OUTPUT_CAPTURE=0
-    readonly ATTENTION_PROJECTION_CAPTURE=0
-    readonly ATTENTION_UPDATE_CAPTURE=0
-    readonly DENSE_BOUNDARY_CAPTURE=0
-    readonly DENSE_INPUT_CAPTURE=0
-    readonly DENSE_PARTIAL_CAPTURE=0
-    readonly LAYER1_RMS_INPUT_CAPTURE=1
+    echo "REFUSED REJECTED_OBSERVER_PERTURBATION: layer1_rms_input callback mode reproduced DB551 in protected run greenfield_legacy_layer1_rms_input_p8155_20260829T192233297523063Z; no cloud, JAX, Ray, or model action is permitted" >&2
+    exit 2
     ;;
   *)
     echo "unsupported GLM_GREENFIELD_DSA_INTERNALS_MODE=$INTERNAL_MODE" >&2

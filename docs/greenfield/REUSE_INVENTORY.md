@@ -644,7 +644,10 @@ TPU association. Reuse it to require the accepted FP32 layer-1 RMS input as the 
 boundary; the rejected returned-residual callback remains forbidden and any capture must be
 separately reviewed as non-perturbing.
 
-## Accepted layer-1 fused-add/RMS input observer preparation
+## Historical layer-1 fused-add/RMS observer preparation — rejected
+
+This section records the preparation history only. The callback observer was later proven
+perturbing and is permanently tombstoned; the final paragraph below is authoritative.
 
 Oracle-only pin `8dc7d20fedca5a98c27bfd1774827305973fa4c1` adds one default-off,
 non-returning pre-hook on the exact real `model.layers.1.input_layernorm`. It passes the identical
@@ -692,3 +695,11 @@ Before any fresh tag, reuse the fail-fast Ray guards: exact current TPU system-t
 `allow-ray-pod-internal`, seven worker-to-head TCP/6379 receipts, bounded seven-worker join and
 census coverage for orphaned `ray start` commands. Accepted no-model network proof is local at
 `/home/gianl/glm-run/ray_firewall_smoke.PRVpCS0d`; it is not model or Gate-D evidence.
+
+Do not reuse the layer-1 callback observer at pin `8dc7d20f` or protected tag
+`...192233297523063Z`. The latter reproduced DB551 exactly and is classified
+`REJECTED_OBSERVER_PERTURBATION`; its internally consistent BF16/host-FP32 bytes are diagnostic
+only. Registration, both launch entry points and accepted sealing must remain tombstoned. Compact
+artifact `docs/artifacts/layer1-rms-input-observer-perturbation-rejection.json` records the exact
+DSA and cleanup evidence. The generation-bound prune manifest preserves all removed object names,
+generations and CRC32Cs; 45 compact live objects remain after deleting 485 reproducible objects.

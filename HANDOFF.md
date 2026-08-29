@@ -7644,3 +7644,33 @@ narrow correction preserves strict two-field defaults and explicitly requires ex
 for observer (5), vLLM (4) and golden (5) metadata receipts; extra/missing fields still refuse.
 Gate D remains open; no new tag is authorized before review, persistence and a fresh execution
 verdict.
+
+## Current exact next: callback observer rejected; return to unperturbed compiler evidence
+
+The reviewed one-shot tag
+`greenfield_legacy_layer1_rms_input_p8155_20260829T192233297523063Z` loaded the full model, passed
+the exact 8K passkey item and wrote the requested operand file, but the mandatory DSA gate refused.
+Positions/scores differ at 557,434/573,438 entries beginning at event 1; decode positions,
+producer ids, valid counts and event 0 are exact. This is the exact DB551 fingerprint already
+frozen in `GATE_D_LESSONS.md`, so the artifact is `REJECTED_OBSERVER_PERTURBATION`, not an accepted
+FP32 oracle. Host `float32(BF16+BF16)` authenticates only the callback-materialized BF16 bytes.
+Cleanup is 8/8 and DB565/item1869 remain diagnostic provenance only.
+
+The dedicated/shared launch paths, sealer/validator, load entry, direct callback and observer
+registration are tombstoned before cloud/JAX/model work; isolated observer commit
+`c7973435aa2fc948da9185ef99938f886613ce2f` is pushed. Offline cleanup for this one rejected run
+copied compact diagnostics and omitted only its reproducible top-k/source transports; active shared
+failure paths retain full append-only uploads. A generation-bound manifest was archived at SHA
+`b582f02d...03cb`; 485 live objects/3,079,571,533 bytes were removed, leaving 45 live objects/
+14,629,391 bytes. Fable hit its session limit; the goal-authorized Sol review independently
+confirmed rejection and no retry. Exact next after review/persistence is a no-TPU optimized-HLO
+diff of unobserved versus callback graphs to identify the exact compiler mechanism. It cannot
+close Gate D. A future numeric capture is admissible only through a documented post-optimization
+backend tracepoint with unchanged executable identity and exact DSA; otherwise the FP32 boundary
+remains unobservable and a different Gate-D correction path is required.
+
+The correction-only Sol audit returned `APPROVE COMMIT/PUSH/MIRROR` with no P0--P2 blockers and
+authorized no protected execution. Final validation is 10/10 focused greenfield tests, 175 passed/
+2 skipped affected shared tests and 4/4 isolated observer tests. The exact archived prune manifest
+reconstructs byte-for-byte, and a real local compact replay retains 45 files/14,629,391 bytes while
+recording the 485 excluded reproducible files. Gate D remains open.

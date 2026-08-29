@@ -1,19 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
-readonly TAG=${GLM_GREENFIELD_LAYER1_RMS_INPUT_CAPTURE_TAG:-greenfield_legacy_layer1_rms_input_p8155_$(date -u +%Y%m%dT%H%M%S%NZ)}
-
-export GLM_GREENFIELD_SHORT_DSA_ORACLE_TAG=$TAG
-export GLM_GREENFIELD_SHORT_DSA_ORACLE_PROFILE=8k
-export GLM_GREENFIELD_DSA_INTERNALS_CAPTURE=1
-export GLM_GREENFIELD_DSA_INTERNALS_MODE=layer1_rms_input
-export GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID=1
-export GLM_GREENFIELD_DSA_INTERNALS_POSITION=8155
-export GLM_GREENFIELD_PROMPT_CACHE_CAPTURE=0
-export GLM_GREENFIELD_ACCEPTED_PREFILL_PROJECTION_CAPTURE=0
-export GLM_GREENFIELD_ACCEPTED_DECODE_PROJECTION_CAPTURE=0
-export GLM_GREENFIELD_MAIN_CACHE_CAPTURE=0
-export GLM_GREENFIELD_SHORT_DSA_REMOTE_PREFIX=gs://driftbench-dsv4-uc/oracles/greenfield/glm52/layer1_rms_input/8k/$TAG
-
-exec bash "$WORKTREE/scripts/greenfield/run_capture_short_context_dsa_oracle.sh"
+cat >&2 <<'EOF'
+REFUSED REJECTED_OBSERVER_PERTURBATION: the layer-1 RMS-input callback path is
+tombstoned. Protected run greenfield_legacy_layer1_rms_input_p8155_20260829T192233297523063Z
+reproduced DB551 exactly (557434 position and 573438 score mismatches, first at
+event 1). Do not acquire, retry, or promote callback-derived operands.
+EOF
+exit 2

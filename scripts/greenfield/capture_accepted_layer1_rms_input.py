@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
-"""Seal the accepted layer-1 fused-add/RMSNorm FP32 input boundary."""
+"""Fail closed for the rejected layer-1 RMS-input callback artifact."""
 
 from __future__ import annotations
 
 import argparse
-import json
-from pathlib import Path
 import sys
-
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from glm_tpu.greenfield.validation.layer1_rms_input import (  # noqa: E402
+from glm_tpu.greenfield.validation.layer1_rms_input import (
     Layer1RmsInputCaptureConfig,
     capture_accepted_layer1_rms_input,
 )
@@ -36,25 +34,27 @@ def main() -> None:
     parser.add_argument("--capture-process-index", type=int, default=0)
     parser.add_argument("--source-row", type=int, default=0)
     args = parser.parse_args()
-    result = capture_accepted_layer1_rms_input(
-        Layer1RmsInputCaptureConfig(
-            source_dump_dir=args.source_dump_dir,
-            output_dir=args.output,
-            db550_boundary_path=args.db550_boundary,
-            straddler_classification_path=args.straddler_classification,
-            vllm_repository=args.vllm_repository,
-            expected_run_tag=args.run_tag,
-            expected_legacy_code_hash=args.legacy_code_hash,
-            expected_oracle_pin=args.oracle_pin,
-            expected_model_id=args.model_id,
-            expected_layer_name=args.layer_name,
-            expected_position=args.position,
-            expected_process_count=args.process_count,
-            expected_capture_process_index=args.capture_process_index,
-            expected_source_row=args.source_row,
+    try:
+        capture_accepted_layer1_rms_input(
+            Layer1RmsInputCaptureConfig(
+                source_dump_dir=args.source_dump_dir,
+                output_dir=args.output,
+                db550_boundary_path=args.db550_boundary,
+                straddler_classification_path=args.straddler_classification,
+                vllm_repository=args.vllm_repository,
+                expected_run_tag=args.run_tag,
+                expected_legacy_code_hash=args.legacy_code_hash,
+                expected_oracle_pin=args.oracle_pin,
+                expected_model_id=args.model_id,
+                expected_layer_name=args.layer_name,
+                expected_position=args.position,
+                expected_process_count=args.process_count,
+                expected_capture_process_index=args.capture_process_index,
+                expected_source_row=args.source_row,
+            )
         )
-    )
-    print(json.dumps(result, indent=2, sort_keys=True))
+    except RuntimeError as error:
+        parser.exit(2, f"REFUSED: {error}\n")
 
 
 if __name__ == "__main__":

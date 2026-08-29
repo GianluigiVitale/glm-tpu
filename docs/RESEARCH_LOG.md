@@ -11831,3 +11831,37 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   declared widths only for the three existing metadata receipts: observer 5, vLLM 4 and golden 5.
   Extra or missing fields still refuse. Gate D remains open pending review/commit/push/mirror and
   a fresh execution-only tag.
+
+## 2026-08-29 19:24--20:26 UTC — layer-1 callback reproduces DB551 and is retired
+
+- Protected tag `greenfield_legacy_layer1_rms_input_p8155_20260829T192233297523063Z` loaded the
+  full 753B model, ran exact 8K passkey DB565/item1869 and returned `881446` at 100% item accuracy.
+  It captured the requested 55,502-byte operand NPZ (`f92d742c...08ebe`) and completed 8/8 cleanup.
+- Mandatory DSA exactness refused before sealing: selected positions/scores differ at
+  557,434/573,438 entries, first indices `[0,1,11]`/`[0,1,0]`; event 0, decode positions,
+  producer-layer ids and valid counts are exact. Candidate array SHAs are `e9b3a1b5...fa4da` and
+  `2c26ae39...79483`; accepted SHAs are `e57d061e...0f5d0` and `7025272d...2fc76`.
+- This exactly repeats DB551 and the residual-only follow-up already forbidden in
+  `GATE_D_LESSONS.md`. The callback consumes the operands and caused perturbation consistent with
+  materialization or a fusion/scheduling change; the exact mechanism awaits a no-TPU compiler
+  diff. It cannot expose the invisible unperturbed FP32 source. Internally consistent operand/sum SHAs
+  `efde8532...b4fc`, `a105fdbd...99f8e`, `96459ad3...e76b2` and `35a601b7...044c` remain rejected
+  diagnostics. No retry, tolerance change or Gate-D inference is admissible.
+- Fable's persistent Max chat hit its session limit. The goal fallback Sol review independently
+  returned `REJECT`, required fail-fast tombstones before cloud/JAX work and limited follow-up to a
+  compiler-only unobserved/callback optimized-HLO diff. That diff can explain the mechanism but
+  cannot promote bytes or close Gate D.
+- The recursive failure trap had uploaded 530 objects/3,094,200,924 bytes. Exact generation-bound
+  manifest file SHA `b582f02d...03cb` was copied to the approved same-region bucket before removing
+  485 reproducible objects/3,079,571,533 live bytes. The retained prefix is exactly 45 objects/
+  14,629,391 bytes; soft-delete retention may delay billed-byte reduction.
+- The correction-only Sol audit found and closed every bypass: refusal now occurs at shell entry,
+  model-load entry, registration, direct device helper, central mode parser and host callback sink.
+  Isolated tombstone commit `c7973435aa2fc948da9185ef99938f886613ce2f` is pushed. Other observer
+  semantics are unchanged by AST comparison.
+- The shared active-mode failure trap retains its full append-only upload. Compact staging is
+  offline and exact-run-only, rejects aliases/symlinks/special entries, copies rather than links,
+  and revalidates source/destination identity. The prune builder requires the exact semantic and
+  serialized file SHAs of the archived 530-object authority. Final validation passes 10/10 focused,
+  175/2 affected shared and 4/4 isolated observer tests. Sol returned
+  `APPROVE COMMIT/PUSH/MIRROR`; no protected execution was authorized and Gate D remains open.

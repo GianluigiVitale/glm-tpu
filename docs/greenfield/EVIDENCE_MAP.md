@@ -1496,11 +1496,15 @@ double-round BF16 arithmetic cannot produce protected bit `48422` for norm-weigh
 while the optimized graph has 12 scoped BF16 float-type-correction markers. A deterministic NumPy
 FP32 single-round model constructs both observed and accepted output witnesses from different FP32
 preimages that round to the same current and accepted BF16 carried rows. This proves only that the
-retained BF16 evidence cannot identify the accepted FP32 boundary. Exact next is an accepted FP32
-layer-1 RMS-input acquisition through a separately reviewed non-perturbing oracle path. Unchanged
+retained BF16 evidence cannot identify the accepted FP32 boundary. At that historical point, the
+next planned action was an accepted FP32 layer-1 RMS-input acquisition through a separately
+reviewed non-perturbing oracle path. Unchanged
 BF16/full-8K reruns and bounded-error promotion remain forbidden; Gate D is open.
 
-## Offline accepted layer-1 FP32 boundary preparation
+## Historical layer-1 FP32 boundary preparation — observer rejected
+
+This preparation record is historical. The protected acquisition later proved that the callback
+perturbs the executable, so none of the preparation below authorizes reuse or another acquisition.
 
 Oracle-only commit `8dc7d20fedca5a98c27bfd1774827305973fa4c1` is now consumed only through a
 default-off protected mode. The observer hooks the exact real layer-1 input RMSNorm and sends the
@@ -1513,9 +1517,9 @@ self-hashed manifests and exact source-code hashes at terminal publication.
 Focused synthetic, exact archive-runtime and real protected-source terminal tests pass 10/10;
 adjacent coverage passes 44/44 with one protected-source skip. The explicitly CPU-forced complete
 validation suite has 334 passes, 40 skips and only two unrelated WS32 baseline failures already
-reproduced at clean `HEAD`. This is preparation evidence only: no protected acquisition, accepted
-FP32 tensor, Gate-D, DB or performance result exists. The next action remains adversarial review
-of this immutable batch followed by a separate protected-run authorization.
+reproduced at clean `HEAD`. At this historical point no protected acquisition, accepted FP32
+tensor, Gate-D, DB or performance result existed. That planned review/acquisition sequence was
+completed and rejected by the protected result recorded below; it is not a current next action.
 
 The first execution-only review then blocked before launch on recreated-pod state: workers 1--7
 lack the base Git checkout assumed by observer worktree creation and all hosts lack
@@ -1553,3 +1557,18 @@ a recreated-pod firewall rule still targeted at the deleted pod. Artifact
 before/post rule hashes, archived diagnostics and 8/8 cleanup. After changing only `targetTags`, a
 lease-held no-model smoke proves seven TCP/6379 receipts, seven joins, exactly 8 Ray nodes/32 TPU
 resources and 8/8 cleanup. This is infrastructure evidence only, not Gate D.
+
+Protected tag `...192233297523063Z` later completed the model/item but exactly reproduced DB551:
+557,434 selected-position and 573,438 selected-score mismatches beginning at event 1, with event 0
+and structural arrays exact. Artifact
+`docs/artifacts/layer1-rms-input-observer-perturbation-rejection.json` binds DB565/item1869, raw
+array/operand SHAs, 8/8 cleanup and the generation-bound cost cleanup. Classification is
+`REJECTED_OBSERVER_PERTURBATION`; neither its BF16 operands nor host FP32 reconstruction is an
+accepted oracle. All layer-1 RMS-input callback acquisition/sealing routes must fail before
+cloud/JAX/model work.
+Only an executable-identity-preserving backend tracepoint could reopen numeric capture; otherwise
+the FP32 boundary is unobservable and Gate D remains open.
+
+Isolated observer tombstone commit `c7973435aa2fc948da9185ef99938f886613ce2f` is pushed. Sol's
+correction-only audit approved commit/push/mirror with no P0--P2 blockers and no execution. Final
+coverage is 10/10 focused greenfield, 175 passed/2 skipped affected shared and 4/4 observer tests.

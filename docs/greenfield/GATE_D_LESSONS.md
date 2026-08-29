@@ -796,3 +796,10 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
   not prove that the corrected key is used. Also bind persistent state independently: require the
   first scan's exact zero cache and every later cache initializer from the same predecessor while,
   or a locally correct chunk can silently discard all keys written by earlier chunks.
+- The 2026-08-29 layer-1 two-operand callback repeated DB551 exactly: 557,434 position and 573,438
+  score mismatches, first at event 1, despite exact token and event 0. “Non-returning” is not
+  “non-consuming”; `jax.debug.callback` materializes values and may split the fused schedule. The
+  observer pin, registration, launch mode and accepted sealer are permanently tombstoned. Never
+  repeat this layer-1 fused-boundary callback capture class. Only a documented post-optimization
+  backend tracepoint with
+  unchanged executable identity plus exact DSA could qualify; compiler diffs are mechanism-only.
