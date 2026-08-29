@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -62,7 +63,6 @@ def test_feature2_acquisition_runner_requires_all_fail_closed_contracts() -> Non
         "full_width_rounded_then_slice=(",
         "observe_position_113=observe_position_113",
         "exact_layer0_prompt_keys=exact_layer0_prompt_keys",
-        "DB518 layer-0 successor is compile-only until acquired HLO is pinned",
         "validate_feature2_materializer_optimized_hlo(",
         "validate_feature2_prefill_jaxpr(",
         "validate_feature2_prefill_result_abstract(",
@@ -177,24 +177,76 @@ def test_feature2_acquisition_runner_cli_is_compile_only() -> None:
     assert "choices=(1,)" in source
 
 
-def test_feature2_acquisition_runner_exact_keys_are_compile_only() -> None:
+def test_feature2_db518_execution_is_exposed_only_by_the_pinned_entrypoint() -> None:
     source = RUNNER.read_text()
-    tree = ast.parse(source)
-    run_function = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "run_feature2"
+    numerical = Path("scripts/greenfield/execute_pp16_feature2_prefill.py").read_text()
+    assert "return run_feature2(parse_args(), execute_main=False)" in source
+    assert "compile-only until acquired HLO is pinned" not in source
+    assert 'parser.add_argument("--exact-layer0-prompt-keys"' in numerical
+    for pin in (
+        "--expected-main-stablehlo-sha256",
+        "--expected-main-canonical-hlo-sha256",
+        "--expected-main-canonical-hlo-byte-count",
+        "--expected-main-stack-frame-reference-count",
+    ):
+        assert pin in numerical
+    assert (
+        "return run_feature2(_require_exact_db518_pins(parse_args()), execute_main=True)"
+        in numerical
     )
-    guard = next(
-        node
-        for node in run_function.body
-        if isinstance(node, ast.If)
-        and ast.unparse(node.test) == "execute_main and exact_layer0_prompt_keys"
+
+
+def test_feature2_db518_direct_execution_rejects_caller_chosen_hlo_pin(
+    tmp_path: Path,
+) -> None:
+    runner = Path("scripts/greenfield/execute_pp16_feature2_prefill.py")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(runner),
+            "--expected-code-hash",
+            "unused-before-pin-validation",
+            "--runtime-root",
+            str(tmp_path),
+            "--token-oracle-dir",
+            str(tmp_path),
+            "--dsa-oracle-dir",
+            str(tmp_path),
+            "--layer1-internal-reference",
+            str(tmp_path / "layer1.npz"),
+            "--db529-internal-dir",
+            str(tmp_path),
+            "--full-width-rounded-then-slice",
+            "--observe-position-113",
+            "--exact-layer0-prompt-keys",
+            "--expected-main-stablehlo-sha256",
+            "caller-chosen",
+            "--expected-main-canonical-hlo-sha256",
+            "56b9b88dc081dd5d3ea2219d46be641128cbed6e9759754be7f87578b51b5d8c",
+            "--expected-main-canonical-hlo-byte-count",
+            "6863602",
+            "--expected-main-stack-frame-reference-count",
+            "15339",
+            "--expected-jax-version",
+            "0.10.1",
+            "--expected-jaxlib-version",
+            "0.10.1",
+            "--expected-libtpu-version",
+            "0.0.41",
+            "--output",
+            str(tmp_path / "summary.json"),
+            "--hlo-dir",
+            str(tmp_path / "hlo"),
+            "--result-npz",
+            str(tmp_path / "result.npz"),
+        ],
+        env={**os.environ, "JAX_PLATFORMS": "cpu"},
+        text=True,
+        capture_output=True,
+        check=False,
     )
-    assert len(guard.body) == 1
-    refusal = guard.body[0]
-    assert isinstance(refusal, ast.Raise)
-    assert "compile-only until acquired HLO is pinned" in ast.unparse(refusal)
+    assert completed.returncode != 0
+    assert "exact DB518 acquisition pin drift" in completed.stderr
 
 
 def test_feature2_acquisition_runner_is_syntax_valid() -> None:

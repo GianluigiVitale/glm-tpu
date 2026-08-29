@@ -209,10 +209,10 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
     exact_layer0_prompt_keys = bool(getattr(args, "exact_layer0_prompt_keys", False))
     if execute_main != (result_npz is not None):
         raise RuntimeError("numerical execution and result capture must be paired")
-    if execute_main and exact_layer0_prompt_keys:
-        raise RuntimeError(
-            "DB518 layer-0 successor is compile-only until acquired HLO is pinned"
-        )
+    # Preserve the acquired source-line geometry below this point. The dedicated
+    # numerical wrapper now authenticates the immutable DB518 acquisition and
+    # supplies all executable identity pins before this shared runner can call
+    # the compiled main graph.
     if REPO != EXPECTED_REPO:
         raise RuntimeError(f"wrong greenfield worktree: {REPO}")
     code_hash = _git_head()

@@ -1403,6 +1403,18 @@ StableHLO/raw/canonical identities and proves four field-29 prompt-key chunks re
 cache update and scorer through only LP2 collectives. It is causal HLO evidence only: main
 execution, numerical correctness, Gate D, DB linkage and performance remain unclaimed.
 
+Its separate default-off numerical entrypoint is now locally prepared. It bytewise authenticates all
+20 acquisition objects and both causal topology hashes, retains zero warmups/exactly one invocation,
+and hard-pins the acquired identity even through direct exact-CLI use. Two independent classifiers
+require the accepted full-width event-1/layer-1/dense boundary and exact DB518 p113/key plus all
+8,155 reconstructed logical cache rows. The historical p113 classifier still requires all ordinary
+outputs unchanged; only the new DB518 classifier permits correction effects. An invalid non-CPU-
+forced suite attempt opened local accelerators, was terminated/excluded and ended with authenticated
+8/8 cleanup (`5fe2caf7...1a8e4`). The valid CPU-forced suite passes 199/199 in 175.93 s. Same-Sol
+review approved diff `447117e2...06de` for commit/push/mirror and exactly one zero-warmup protected
+DB518 numerical invocation through the wrapper. There is not yet numerical, Gate-D, DB or
+performance evidence.
+
 This acquisition is not numerical Gate-D evidence. Its local, unreviewed successor adds the missing
 causal certificate: nine ENTRY observer roots bind to fields 7--15 of the final while; four scans
 have exact 2048/2048/2048/2012 limits and 27 same-index handoffs; each field update reaches both its

@@ -22,6 +22,7 @@ from glm_tpu.greenfield.benchmarking.pp16_feature2_hlo import (
 )
 from glm_tpu.greenfield.benchmarking.pp16_feature2_numerical import (
     _bitwise_mismatches,
+    compare_feature2_db518_numerical_capture,
     compare_feature2_full_width_numerical_capture,
     compare_feature2_numerical_capture,
     validate_feature2_in_process_cleanup,
@@ -72,6 +73,10 @@ POSITION113_ACQUIRED_RUN = Path(
     "/home/gianl/glm-run/"
     "greenfield_pp16_feature2_position113_acquire_20260829T072101902362381Z"
 )
+DB518_ACQUIRED_RUN = Path(
+    "/home/gianl/glm-run/"
+    "greenfield_pp16_feature2_layer0_db518_acquire_20260829T101159660007493Z"
+)
 FULL_WIDTH_RECOVERY_SOURCE = Path(
     "/home/gianl/glm-run/"
     "greenfield_pp16_feature2_prefill_numerical_20260829T051119686986506Z"
@@ -86,6 +91,19 @@ def _python_heredoc_after(source: str, marker: str) -> str:
     return section.split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
 
 
+def _copy_acquired_archive(source: Path, directory: Path) -> list[str]:
+    archive = directory / "archive"
+    entries: list[str] = []
+    for line in (directory / "evidence.sha256").read_text().splitlines():
+        _, relative = line.split(maxsplit=1)
+        relative = relative.removeprefix("*").removeprefix("./")
+        entries.append(relative)
+        destination = archive / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source / relative, destination)
+    return entries
+
+
 def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
     repo = Path(__file__).resolve().parents[3]
     shared = (repo / "scripts/greenfield/acquire_pp16_feature2_prefill.py").read_text()
@@ -93,7 +111,10 @@ def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
         repo / "scripts/greenfield/execute_pp16_feature2_prefill.py"
     ).read_text()
     assert "return run_feature2(parse_args(), execute_main=False)" in shared
-    assert "return run_feature2(parse_args(), execute_main=True)" in numerical
+    assert (
+        "return run_feature2(_require_exact_db518_pins(parse_args()), execute_main=True)"
+        in numerical
+    )
     assert shared.count("main_compiled(*main_arguments)") == 1
     assert shared.index("feature2 executable canonical HLO drifted") < shared.index(
         "main_compiled(*main_arguments)"
@@ -105,10 +126,10 @@ def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
     assert "--expected-main-canonical-hlo-sha256" in numerical
     assert "--expected-main-canonical-hlo-byte-count" in numerical
     assert "--expected-main-stack-frame-reference-count" in numerical
-    assert "--expected-jax-version" in numerical
-    assert "--expected-jaxlib-version" in numerical
-    assert "--expected-libtpu-version" in numerical
+    assert 'for package in ("jax", "jaxlib", "libtpu")' in numerical
+    assert 'f"--expected-{package}-version"' in numerical
     assert "--observe-position-113" in numerical
+    assert "--exact-layer0-prompt-keys" in numerical
     assert "warmup" not in numerical.lower()
 
     wrapper = (
@@ -123,6 +144,11 @@ def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
     assert '"${runner_variant_args[@]}"' in wrapper
     assert "GLM_GREENFIELD_PP16_OBSERVE_POSITION_113:-0" in wrapper
     assert "runner_variant_args+=(--observe-position-113)" in wrapper
+    assert "GLM_GREENFIELD_PP16_EXACT_LAYER0_PROMPT_KEYS:-0" in wrapper
+    assert (
+        "runner_variant_args+=(--observe-position-113 --exact-layer0-prompt-keys)"
+        in wrapper
+    )
     assert "warmups=0 invocations=1" in wrapper
     assert '--result-npz "$RUN_DIR/result.npz"' in wrapper
     assert "ACQUIRED_CODE_HASH=a2ea1e9439493b0093824d0084bc46c813fc1c33" in wrapper
@@ -138,6 +164,8 @@ def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
     assert "validate_feature2_sealed_hlo_archive_identity" in wrapper
     assert "compare_feature2_full_width_numerical_capture" in wrapper
     assert "compare_feature2_position113_capture" in wrapper
+    assert "compare_feature2_db518_numerical_capture" in wrapper
+    assert "compare_feature2_db518_position113_capture" in wrapper
     assert "POSITION113_CAPTURE_CLASSIFIED" in wrapper
     assert "p113 numerical source bytes changed before classification" in wrapper
     assert "validate_feature2_in_process_cleanup" in wrapper
@@ -215,6 +243,55 @@ def test_feature2_numerical_wrapper_refuses_invalid_position113_flag() -> None:
     assert "must be exactly 0 or 1" in completed.stderr
 
 
+def test_feature2_numerical_wrapper_refuses_invalid_db518_flag() -> None:
+    wrapper = Path(__file__).parents[3] / (
+        "scripts/greenfield/run_pp16_feature2_prefill_numerical.sh"
+    )
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "GLM_GREENFIELD_PP16_FEATURE2_NUMERICAL": "1",
+            "GLM_GREENFIELD_PP16_FEATURE2_MODE": "execute_once",
+            "GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE": "1",
+            "GLM_GREENFIELD_PP16_EXACT_LAYER0_PROMPT_KEYS": "2",
+        }
+    )
+    completed = subprocess.run(
+        ["bash", str(wrapper)],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 2
+    assert "EXACT_LAYER0_PROMPT_KEYS must be exactly 0 or 1" in completed.stderr
+
+
+def test_feature2_numerical_wrapper_requires_observer_for_db518() -> None:
+    wrapper = Path(__file__).parents[3] / (
+        "scripts/greenfield/run_pp16_feature2_prefill_numerical.sh"
+    )
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "GLM_GREENFIELD_PP16_FEATURE2_NUMERICAL": "1",
+            "GLM_GREENFIELD_PP16_FEATURE2_MODE": "execute_once",
+            "GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE": "1",
+            "GLM_GREENFIELD_PP16_EXACT_LAYER0_PROMPT_KEYS": "1",
+            "GLM_GREENFIELD_PP16_OBSERVE_POSITION_113": "0",
+        }
+    )
+    completed = subprocess.run(
+        ["bash", str(wrapper)],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 2
+    assert "require position-113 observation" in completed.stderr
+
+
 def test_feature2_numerical_embedded_verifiers_compile_in_exact_scope() -> None:
     wrapper = Path(__file__).parents[3] / (
         "scripts/greenfield/run_pp16_feature2_prefill_numerical.sh"
@@ -247,11 +324,19 @@ def test_feature2_numerical_embedded_verifiers_compile_in_exact_scope() -> None:
     ) in imports
     assert (
         "glm_tpu.greenfield.benchmarking.pp16_feature2_numerical",
+        "compare_feature2_db518_numerical_capture",
+    ) in imports
+    assert (
+        "glm_tpu.greenfield.benchmarking.pp16_feature2_numerical",
         "compare_feature2_full_width_numerical_capture",
     ) in imports
     assert (
         "glm_tpu.greenfield.benchmarking.pp16_feature2_numerical",
         "validate_feature2_in_process_cleanup",
+    ) in imports
+    assert (
+        "glm_tpu.greenfield.benchmarking.pp16_feature2_position113",
+        "compare_feature2_db518_position113_capture",
     ) in imports
     assert (
         "glm_tpu.greenfield.benchmarking.pp16_feature2_position113",
@@ -286,10 +371,7 @@ def test_feature2_numerical_acquisition_authorization_is_executable(
         "gs://driftbench-dsv4-uc/results/"
         "greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z"
     )
-    entries = []
-    for line in (directory / "evidence.sha256").read_text().splitlines():
-        _, relative = line.split(maxsplit=1)
-        entries.append(relative.removeprefix("*").removeprefix("./"))
+    entries = _copy_acquired_archive(ACQUIRED_RUN, directory)
     objects = sorted(
         [
             f"{remote}/evidence.sha256",
@@ -322,6 +404,7 @@ def test_feature2_numerical_acquisition_authorization_is_executable(
         "9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5",
         "6558627",
         "14561",
+        "0",
         "0",
         str(output),
     ]
@@ -369,10 +452,7 @@ def test_feature2_position113_numerical_authorization_is_executable(
         "gs://driftbench-dsv4-uc/results/"
         "greenfield_pp16_feature2_position113_acquire_20260829T072101902362381Z"
     )
-    entries = []
-    for line in (directory / "evidence.sha256").read_text().splitlines():
-        _, relative = line.split(maxsplit=1)
-        entries.append(relative.removeprefix("*").removeprefix("./"))
+    entries = _copy_acquired_archive(POSITION113_ACQUIRED_RUN, directory)
     objects = sorted(
         [
             f"{remote}/evidence.sha256",
@@ -406,6 +486,7 @@ def test_feature2_position113_numerical_authorization_is_executable(
             "6662190",
             "14781",
             "1",
+            "0",
             str(output),
         ]
 
@@ -435,6 +516,106 @@ def test_feature2_position113_numerical_authorization_is_executable(
     )
     assert rejected.returncode != 0
     assert "p113 compact acquisition evidence linkage drifted" in rejected.stderr
+
+
+@pytest.mark.skipif(
+    not all(
+        (DB518_ACQUIRED_RUN / name).is_file()
+        for name in ("evidence.sha256", "runner.json", "summary.json", "HLO_ACQUIRED")
+    ),
+    reason="DB518 feature2 acquisition unavailable",
+)
+def test_feature2_db518_numerical_authorization_is_executable(
+    tmp_path: Path,
+) -> None:
+    repo = Path(__file__).parents[3]
+    wrapper = repo / "scripts/greenfield/run_pp16_feature2_prefill_numerical.sh"
+    authorization = _python_heredoc_after(
+        wrapper.read_text(),
+        '"$RUN_DIR/acquisition_authorization.json"',
+    )
+    directory = tmp_path / "acquired"
+    directory.mkdir()
+    for name in ("evidence.sha256", "runner.json", "summary.json", "HLO_ACQUIRED"):
+        shutil.copyfile(DB518_ACQUIRED_RUN / name, directory / name)
+    remote = (
+        "gs://driftbench-dsv4-uc/results/"
+        "greenfield_pp16_feature2_layer0_db518_acquire_20260829T101159660007493Z"
+    )
+    entries = _copy_acquired_archive(DB518_ACQUIRED_RUN, directory)
+    objects = sorted(
+        [
+            f"{remote}/evidence.sha256",
+            f"{remote}/HLO_ACQUIRED",
+            *(f"{remote}/{name}" for name in entries),
+        ]
+    )
+    (directory / "remote_objects.txt").write_text("\n".join(objects) + "\n")
+    compact = repo / ("docs/artifacts/pp16-feature2-layer0-db518-hlo-acquisition.json")
+    output = tmp_path / "authorization.json"
+
+    def arguments(compact_path: Path, compact_sha: str) -> list[str]:
+        return [
+            sys.executable,
+            "-c",
+            authorization,
+            str(directory),
+            str(compact_path),
+            compact_sha,
+            "e2a7b4e1d5298d39cb5f0e736808baa96b1c49a3",
+            "greenfield_pp16_feature2_layer0_db518_acquire_20260829T101159660007493Z",
+            remote,
+            "d6cd668388120a1ce29823584079ba4e06463ca9f0d57d8cf4214dbea1a79bfd",
+            "e4900076353f755875f81e9df11c2b2731fe93e38465b433dec0e8b38aca55da",
+            "f24fc959853b0945aeff03fedb67c95d55890ac63d0ee78c597ce30f7c7e1ef5",
+            "2a23d911e379107ed984cb9f102432240d07c94e4d80ae96b3f5265e8e952609",
+            "c17adbee494c9b69d2c73b9b17e8e0d4dafd1a23d6b92899421c61765ea72c49",
+            "a79d4823db0fecf8b1bc980b16df283bbe7a497795fa06ff783d3cde8fa98f6b",
+            "0b0481d16811c6ad9cb34f73d3b13690f4200f5b45a76e54936ab132cdb9d133",
+            "56b9b88dc081dd5d3ea2219d46be641128cbed6e9759754be7f87578b51b5d8c",
+            "6863602",
+            "15339",
+            "1",
+            "1",
+            str(output),
+        ]
+
+    completed = subprocess.run(
+        arguments(compact, sha256(compact.read_bytes()).hexdigest()),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    record = json.loads(output.read_text())
+    assert record["passed"] is True
+    assert record["observe_position_113"] is True
+    assert record["exact_layer0_prompt_keys"] is True
+
+    archive_leaf = directory / "archive/hlo/query_fp32.stablehlo.mlir"
+    archive_leaf.write_bytes(archive_leaf.read_bytes() + b"hostile")
+    rejected_archive = subprocess.run(
+        arguments(compact, sha256(compact.read_bytes()).hexdigest()),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert rejected_archive.returncode != 0
+    assert "acquired archive bytes drifted" in rejected_archive.stderr
+    shutil.copyfile(DB518_ACQUIRED_RUN / "hlo/query_fp32.stablehlo.mlir", archive_leaf)
+
+    attacked = tmp_path / "attacked.json"
+    attacked_record = json.loads(compact.read_text())
+    attacked_record["structural_certificate"]["cache_handoff_count"] = 2
+    attacked.write_text(json.dumps(attacked_record, indent=2, sort_keys=True) + "\n")
+    rejected = subprocess.run(
+        arguments(attacked, sha256(attacked.read_bytes()).hexdigest()),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert rejected.returncode != 0
+    assert "DB518 compact acquisition evidence linkage drifted" in rejected.stderr
 
 
 @pytest.mark.skipif(
@@ -830,6 +1011,37 @@ def _compare_full_width(path: Path) -> dict[str, object]:
     )
 
 
+def _add_position113_observer_schema(path: Path) -> None:
+    with np.load(path, allow_pickle=False) as handle:
+        values = {name: np.ascontiguousarray(handle[name]) for name in handle.files}
+    selected = np.full((2, 1, 2048), -1, dtype=np.int32)
+    selected[:, 0, :114] = np.arange(114, dtype=np.int32)
+    scores = np.full((2, 1, 2048), -np.inf, dtype=np.float32)
+    scores[:, 0, :114] = np.float32(0.0)
+    values.update(
+        {
+            "position113_normalized_hidden_owners_bfloat16_bits": np.zeros(
+                (2, 1, 6144), dtype=np.uint16
+            ),
+            "position113_q_a_state_owners_bfloat16_bits": np.zeros(
+                (2, 1, 2048), dtype=np.uint16
+            ),
+            "position113_dsa_query_owners": np.zeros((2, 1, 32, 128), dtype=np.float32),
+            "position113_dsa_head_weights_owners": np.zeros(
+                (2, 1, 32), dtype=np.float32
+            ),
+            "position113_current_key_owners": np.zeros((2, 1, 128), dtype=np.float32),
+            "position113_selected_positions_owners": selected,
+            "position113_selected_valid_counts_owners": np.full(
+                (2, 1), 114, dtype=np.int32
+            ),
+            "position113_selected_scores_owners": scores,
+            "position113_observation_count_owners": np.ones((2, 1), dtype=np.int32),
+        }
+    )
+    np.savez(path, **values)
+
+
 @pytest.mark.skipif(not SOURCES_AVAILABLE, reason="protected sources unavailable")
 def test_feature2_numerical_comparator_accepts_only_exact_capture(
     tmp_path: Path,
@@ -864,6 +1076,38 @@ def test_feature2_numerical_comparator_rejects_schema_drift(tmp_path: Path) -> N
 
 
 @pytest.mark.skipif(not SOURCES_AVAILABLE, reason="protected sources unavailable")
+def test_feature2_numerical_comparator_uses_the_exact_bytes_it_hashes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    capture = tmp_path / "capture.npz"
+    attacked = tmp_path / "attacked.npz"
+    _capture(capture)
+    with np.load(capture, allow_pickle=False) as handle:
+        values = {name: np.ascontiguousarray(handle[name]) for name in handle.files}
+    values["event1_positions"][0, 0] ^= np.int32(1)
+    np.savez(attacked, **values)
+    attacked_bytes = attacked.read_bytes()
+    original_read_bytes = Path.read_bytes
+    replaced = False
+
+    def replace_after_read(path: Path) -> bytes:
+        nonlocal replaced
+        raw = original_read_bytes(path)
+        if path == capture and not replaced:
+            capture.write_bytes(attacked_bytes)
+            replaced = True
+        return raw
+
+    monkeypatch.setattr(Path, "read_bytes", replace_after_read)
+    report = _compare(capture)
+    assert replaced is True
+    assert original_read_bytes(capture) == attacked_bytes
+    assert report["exact"] is True
+    assert report["capture_sha256"] != sha256(attacked_bytes).hexdigest()
+
+
+@pytest.mark.skipif(not SOURCES_AVAILABLE, reason="protected sources unavailable")
 def test_full_width_comparator_requires_every_sealed_boundary(
     tmp_path: Path,
 ) -> None:
@@ -889,6 +1133,29 @@ def test_full_width_comparator_requires_every_sealed_boundary(
         _compare_full_width(base)
     with pytest.raises(BenchmarkValidationError, match="keys drifted"):
         _compare(capture)
+
+
+@pytest.mark.skipif(not SOURCES_AVAILABLE, reason="protected sources unavailable")
+def test_db518_full_width_comparator_accepts_exact_observer_extension_only(
+    tmp_path: Path,
+) -> None:
+    capture = tmp_path / "capture.npz"
+    _capture(capture, full_width_boundaries=True)
+    _add_position113_observer_schema(capture)
+    report = compare_feature2_db518_numerical_capture(
+        capture,
+        token_oracle_dir=TOKEN_ORACLE,
+        dsa_oracle_dir=DSA_ORACLE,
+        layer1_internal_reference=LAYER1,
+        db529_internal_dir=DB529,
+        db550_boundary=DB550,
+    )
+    assert report["status"] == "NUMERICAL_EXACT"
+    assert report["exact"] is True
+    assert report["comparison_schema"] == "db518_full_width_plus_position113_v1"
+    assert len(report["captured_array_sha256"]) == 24
+    with pytest.raises(BenchmarkValidationError, match="keys drifted"):
+        _compare_full_width(capture)
 
 
 @pytest.mark.skipif(not SOURCES_AVAILABLE, reason="protected sources unavailable")

@@ -11589,3 +11589,27 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
 - Complete PP16 feature2 validation passes 192/192 under pinned JAX 0.10.1. Exact next is a scoped
   correction-only same-Sol review. This certificate may prepare a separate numerical entrypoint
   batch but does not itself authorize execution. Gate D remains open.
+
+## 2026-08-29 11:17 UTC — DB518 numerical entrypoint is prepared, not authorized
+
+- The existing protected wrapper now has a third, explicit default-off DB518 mode. It authenticates
+  and bytewise verifies every member of the immutable 20-object acquisition, exact
+  StableHLO/canonical identities, four scan limits,
+  one zero initializer, three cache handoffs, four writes, 16 physical-M64 projections, both causal
+  topology hashes and all six hostile certificate tests before any TPU call.
+- The exactly-once runner accepts the DB518 flag only with sealed full-width p113 observation. The
+  acquired source-line geometry is preserved, zero warmups and one main invocation remain fixed,
+  current post-lowering validation must reproduce both causal certificates before execution, and
+  the low-level exact CLI itself rejects caller-chosen acquisition/HLO/runtime pins.
+- A new dual comparator separately requires the accepted event-1/layer-1/dense/current-key boundary,
+  reconstructs all 8,155 live logical layer-0 cache rows from the two physical owners, and requires
+  exact DB518 cache plus p113 normalized-BF16/FP32-key/BF16-key association. The historical observer
+  comparator remains unchanged and still refuses any ordinary-output effect.
+- One invalid local suite attempt lacked CPU forcing and opened local `/dev/accel*`; it was terminated,
+  is excluded from validation, and ended with authenticated 8/8 `CENSUS_OK` (census SHA
+  `5fe2caf7...1a8e4`). The subsequent explicitly CPU-forced complete PP16 feature2 suite passes
+  199/199 in 175.93 s; Bash, embedded Python, Ruff and diff checks pass. Compact evidence is
+  `docs/artifacts/pp16-feature2-layer0-db518-numerical-preparation.json`.
+- The same Sol reviewer approved exact diff `447117e2...06de` for commit/push/same-region mirror and
+  exactly one zero-warmup protected DB518 numerical invocation through the wrapper. No full 8K, DB,
+  Gate-D or performance expansion is authorized; there is not yet a numerical result or claim.

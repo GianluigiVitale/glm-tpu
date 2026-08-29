@@ -1,0 +1,65 @@
+{
+  "acquired_hlo": {
+    "canonical_byte_count": 6863602,
+    "canonical_sha256": "56b9b88dc081dd5d3ea2219d46be641128cbed6e9759754be7f87578b51b5d8c",
+    "compact_evidence_sha256": "52b9e227d124d67cbc908cc02b9a4b47182443dd7482766221b6b5367ededc02",
+    "layer0_key_topology_sha256": "235dfa726f82a152bf0218506cf8d3345520a7673ab7a6b908ef06df821465bd",
+    "position113_topology_sha256": "92a1b18b523984dd98d2579d25668b6bd582f6f9f23a26d9e4449b29a81ee46d",
+    "run_tag": "greenfield_pp16_feature2_layer0_db518_acquire_20260829T101159660007493Z",
+    "stablehlo_sha256": "a79d4823db0fecf8b1bc980b16df283bbe7a497795fa06ff783d3cde8fa98f6b"
+  },
+  "artifact_kind": "greenfield_pp16_feature2_layer0_db518_numerical_preparation",
+  "base_code_hash": "95d857f2aa0e7f89c9f6f3c86a68464a268bf175",
+  "claim_scope": "local default-off numerical-entrypoint preparation only; no TPU numerical, Gate-D, token-rate, or performance claim",
+  "created_utc": "2026-08-29T11:16:55Z",
+  "entrypoint_contract": {
+    "acquired_remote_objects_bytewise_verified": 20,
+    "default_off": true,
+    "direct_exact_mode_requires_hard_pinned_acquisition_identity": true,
+    "exact_layer0_prompt_keys": true,
+    "full_width_rounded_then_slice": true,
+    "main_invocation_count": 1,
+    "observe_position_113": true,
+    "warmup_count": 0
+  },
+  "implementation_file_sha256": {
+    "glm_tpu/greenfield/benchmarking/pp16_feature2_numerical.py": "0e403be6c219f0319b284ecb730536116611fb3efc3442ad4e230ac373d45952",
+    "glm_tpu/greenfield/benchmarking/pp16_feature2_position113.py": "d9ac1fcdab0263ace45fd464e67733284664e8bc6f9d7705e6d85afbbd93c427",
+    "scripts/greenfield/acquire_pp16_feature2_prefill.py": "18f08a21ba5e19ab6425c2de4d1c607488af7a331ccf326f7aef6d672d4e824b",
+    "scripts/greenfield/execute_pp16_feature2_prefill.py": "b10f41b8a236686946266ba3ed39c4a11e0ee2ea6d59ea7c0a49fcfd06be92a5",
+    "scripts/greenfield/run_pp16_feature2_prefill_numerical.sh": "464d2e32c0d06a28d03345fe4e96f043900078e69cb235e08023183964ff6338"
+  },
+  "numerical_contract": {
+    "combined_terminal": [
+      "NUMERICAL_EXACT",
+      "NUMERICAL_REJECTED"
+    ],
+    "full_width_comparison_schema": "db518_full_width_plus_position113_v1",
+    "full_prompt_cache_comparison": "all 8155 live layer-0 logical rows reconstructed from both physical owners and exact against authenticated DB518 BF16 cache",
+    "position113_comparison": "exact normalized BF16 round plus exact FP32/BF16 key and physical cache association",
+    "position113_observer_owner_equality_required": true,
+    "sealed_rejection_ordinary_outputs_may_change": true
+  },
+  "review": {
+    "commit_push_same_region_mirror_authorized": true,
+    "numerical_execution_authorized": true,
+    "reviewed_diff_sha256": "447117e2ffd29896769610941839bf4f7773b14278b187933dda4c90300506de",
+    "scope": "exactly one zero-warmup protected DB518 numerical invocation through the wrapper; no full 8K, DB, Gate-D, or performance expansion",
+    "status": "APPROVED_BY_SAME_SOL"
+  },
+  "validation": {
+    "bash_syntax": "PASS",
+    "complete_pp16_feature2_suite": "199 passed in 175.93s with JAX_PLATFORMS=cpu and XLA_FLAGS=--xla_force_host_platform_device_count=32",
+    "embedded_python_heredocs": "PASS",
+    "git_diff_check": "PASS",
+    "ruff_check": "PASS",
+    "ruff_format": "PASS",
+    "validation_incident": {
+      "contaminated_suite_counted": false,
+      "description": "an earlier full-suite attempt lacked CPU forcing, opened local /dev/accel handles, was terminated and is excluded",
+      "post_termination_census": "8/8 CENSUS_OK",
+      "post_termination_census_sha256": "5fe2caf7141710c2a567ed6886d36bf18d5aa3d2ff3c598bf08110784ee1a8e4",
+      "run_tag": "greenfield_cpu_validation_tpu_contamination_20260829T113822070773289Z"
+    }
+  }
+}

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from hashlib import sha256
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,7 @@ from ..kernels.stage_local import STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE
 from ..validation.short_context_dsa_oracle import inspect_short_context_dsa_oracle
 from .pp16_dense_boundary import derive_expected_dense_boundary_bits
 from .pp16_feature2_acquisition import inspect_feature2_event1_lineage
+from .pp16_feature2_position113 import feature2_position113_capture_schema
 from .pp16_feature_sharded_state import validate_feature2_accepted_state
 
 _BASE_CAPTURE_SCHEMA = {
@@ -155,28 +157,32 @@ def _compare_feature2_numerical_capture(
     db529_internal_dir: Path,
     db550_boundary: Path,
     require_sealed_boundaries: bool,
+    capture_schema_override: dict[str, tuple[tuple[int, ...], np.dtype[Any]]]
+    | None = None,
+    comparison_schema: str = "full_width_sealed_boundaries_v2",
 ) -> dict[str, Any]:
     """Authenticate sources and classify a raw capture without JAX."""
 
     capture_path = Path(capture_path)
-    capture_sha256 = _sha256_file(capture_path)
+    capture_raw = capture_path.read_bytes()
+    capture_sha256 = sha256(capture_raw).hexdigest()
     lineage = inspect_feature2_event1_lineage(
         token_oracle_dir=token_oracle_dir,
         dsa_oracle_dir=dsa_oracle_dir,
         layer1_internal_reference=layer1_internal_reference,
         db529_internal_dir=db529_internal_dir,
     )
-    capture_schema = (
+    if capture_schema_override is not None and not require_sealed_boundaries:
+        raise ValueError("feature2 capture-schema extension requires sealed boundaries")
+    capture_schema = capture_schema_override or (
         _FULL_WIDTH_CAPTURE_SCHEMA
         if require_sealed_boundaries
         else _BASE_CAPTURE_SCHEMA
     )
-    with np.load(capture_path, allow_pickle=False) as handle:
+    with np.load(BytesIO(capture_raw), allow_pickle=False) as handle:
         if set(handle.files) != set(capture_schema):
             raise BenchmarkValidationError("feature2 numerical capture keys drifted")
         captured = {name: np.ascontiguousarray(handle[name]) for name in handle.files}
-    if _sha256_file(capture_path) != capture_sha256:
-        raise BenchmarkValidationError("feature2 numerical capture changed while read")
     for name, (shape, dtype) in capture_schema.items():
         value = captured[name]
         if value.shape != shape or value.dtype != dtype:
@@ -349,7 +355,11 @@ def _compare_feature2_numerical_capture(
             "status": "NUMERICAL_EXACT" if exact else "NUMERICAL_REJECTED",
         }
     return {
-        "artifact_kind": "greenfield_pp16_feature2_full_width_numerical_comparison",
+        "artifact_kind": (
+            "greenfield_pp16_feature2_db518_numerical_comparison"
+            if capture_schema_override is not None
+            else "greenfield_pp16_feature2_full_width_numerical_comparison"
+        ),
         "capture_sha256": capture_sha256,
         "captured_array_sha256": {
             name: _sha256_array(value) for name, value in sorted(captured.items())
@@ -360,7 +370,7 @@ def _compare_feature2_numerical_capture(
             "current key, carried boundary and contract; no Gate-D, token-rate, "
             "or performance claim"
         ),
-        "comparison_schema": "full_width_sealed_boundaries_v2",
+        "comparison_schema": comparison_schema,
         "event1_target_lineage": lineage,
         "exact": exact,
         "expected_sha256": {
@@ -426,4 +436,28 @@ def compare_feature2_full_width_numerical_capture(
         db529_internal_dir=db529_internal_dir,
         db550_boundary=db550_boundary,
         require_sealed_boundaries=True,
+    )
+
+
+def compare_feature2_db518_numerical_capture(
+    capture_path: Path,
+    *,
+    token_oracle_dir: Path,
+    dsa_oracle_dir: Path,
+    layer1_internal_reference: Path,
+    db529_internal_dir: Path,
+    db550_boundary: Path,
+) -> dict[str, Any]:
+    """Require accepted full-width outputs while admitting exact p113 observer roots."""
+
+    return _compare_feature2_numerical_capture(
+        capture_path,
+        token_oracle_dir=token_oracle_dir,
+        dsa_oracle_dir=dsa_oracle_dir,
+        layer1_internal_reference=layer1_internal_reference,
+        db529_internal_dir=db529_internal_dir,
+        db550_boundary=db550_boundary,
+        require_sealed_boundaries=True,
+        capture_schema_override=feature2_position113_capture_schema(),
+        comparison_schema="db518_full_width_plus_position113_v1",
     )

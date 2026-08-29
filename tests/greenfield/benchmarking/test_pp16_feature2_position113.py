@@ -9,9 +9,13 @@ import numpy as np
 import pytest
 
 from glm_tpu.greenfield.benchmarking.pp16_feature2_position113 import (
+    compare_feature2_db518_position113_capture,
     compare_feature2_position113_capture,
 )
 from glm_tpu.greenfield.errors import BenchmarkValidationError
+from glm_tpu.greenfield.validation.prompt_index_cache import (
+    inspect_legacy_prompt_index_cache,
+)
 
 BASELINE = Path(
     "/home/gianl/glm-run/greenfield_pp16_feature2_prefill_numerical_"
@@ -22,6 +26,11 @@ ORACLE = Path(
     "greenfield_legacy_layer0_prompt_projection_input_p113_"
     "20260809T050055956585082Z/prompt_projection_input_comparison/"
     "prompt_key_internal_comparison.npz"
+)
+DB518_PROMPT_CACHE = Path(
+    "/home/gianl/glm-run/"
+    "greenfield_layer0_dsa_scorer_association_20260810T164030202890642Z/"
+    "inputs/prompt_cache"
 )
 PROTECTED_RUN = Path(
     "/home/gianl/glm-run/"
@@ -207,6 +216,82 @@ def test_position113_classifier_rejects_observer_effect(tmp_path: Path) -> None:
             sealed_rejection_path=BASELINE,
             accepted_prompt_key_path=ORACLE,
         )
+
+
+@pytest.mark.skipif(
+    not BASELINE.is_file() or not ORACLE.is_file() or not DB518_PROMPT_CACHE.is_dir(),
+    reason="sealed PP16 rejection or accepted p113 oracle is unavailable",
+)
+def test_db518_position113_comparator_allows_ordinary_change_but_requires_exact_key(
+    tmp_path: Path,
+) -> None:
+    capture = tmp_path / "capture.npz"
+    _write_candidate(capture)
+    with (
+        np.load(capture, allow_pickle=False) as handle,
+        np.load(ORACLE, allow_pickle=False) as oracle,
+    ):
+        arrays = {name: np.ascontiguousarray(handle[name]) for name in handle.files}
+        accepted_key = np.ascontiguousarray(oracle["accepted_post_rope_key"])
+        accepted_bits = np.ascontiguousarray(oracle["accepted_cache_row_bfloat16_bits"])
+    arrays["event1_scores"][0, 0] = np.nextafter(
+        arrays["event1_scores"][0, 0], np.float32(np.inf)
+    )
+    arrays["position113_current_key_owners"] = np.broadcast_to(
+        accepted_key, (2, 1, 128)
+    ).copy()
+    _, accepted_cache = inspect_legacy_prompt_index_cache(DB518_PROMPT_CACHE)
+    positions = np.arange(accepted_cache.shape[0], dtype=np.int64)
+    rows = positions % 512
+    arrays["layer0_index_cache_owners_bfloat16_bits"][
+        rows // 256, positions // 512, rows % 256
+    ] = accepted_cache
+    assert np.array_equal(accepted_cache[113], accepted_bits)
+    np.savez(capture, **arrays)
+
+    report = compare_feature2_db518_position113_capture(
+        capture,
+        sealed_rejection_path=BASELINE,
+        accepted_prompt_key_path=ORACLE,
+        accepted_prompt_cache_dir=DB518_PROMPT_CACHE,
+    )
+    assert report["status"] == "DB518_POSITION113_EXACT"
+    assert report["boundary_exact"] is True
+    assert report["current_key_matches_accepted_float32"] is True
+    assert report["current_key_matches_accepted_bfloat16"] is True
+    assert report["normalized_matches_accepted_bfloat16_round"] is True
+    assert report["prompt_cache_matches_accepted"] is True
+    assert report["prompt_cache_diff"]["mismatch_count"] == 0
+    assert report["cache_ownership"] == {
+        "live_prompt_row_count": 8155,
+        "owner": 0,
+        "owner_local_page": 0,
+        "owner_local_row": 113,
+        "page_rows": 512,
+        "rows_per_owner": 256,
+    }
+    assert (
+        report["ordinary_output_bitwise_equal_to_sealed_rejection"]["event1_scores"]
+        is False
+    )
+    assert all(report["observer_owner_bitwise_equal"].values())
+
+    arrays["position113_current_key_owners"][:, 0, 35] = np.nextafter(
+        arrays["position113_current_key_owners"][:, 0, 35], np.float32(np.inf)
+    )
+    changed_bits = np.ascontiguousarray(
+        arrays["position113_current_key_owners"][0, 0].astype(ml_dtypes.bfloat16)
+    ).view(np.uint16)
+    arrays["layer0_index_cache_owners_bfloat16_bits"][0, 0, 113] = changed_bits
+    np.savez(capture, **arrays)
+    rejected = compare_feature2_db518_position113_capture(
+        capture,
+        sealed_rejection_path=BASELINE,
+        accepted_prompt_key_path=ORACLE,
+        accepted_prompt_cache_dir=DB518_PROMPT_CACHE,
+    )
+    assert rejected["status"] == "DB518_POSITION113_REJECTED"
+    assert rejected["boundary_exact"] is False
 
 
 @pytest.mark.skipif(

@@ -11,6 +11,7 @@ import ml_dtypes
 import numpy as np
 
 from ..errors import BenchmarkValidationError
+from ..validation.prompt_index_cache import inspect_legacy_prompt_index_cache
 
 PP16_FEATURE2_POSITION113 = 113
 PP16_FEATURE2_SEALED_REJECTION_SHA256 = (
@@ -18,6 +19,15 @@ PP16_FEATURE2_SEALED_REJECTION_SHA256 = (
 )
 PP16_FEATURE2_POSITION113_ORACLE_SHA256 = (
     "a2ef16a7a55876099124d0ac4bd139f86c6318b27c0e48fef5d64193ed0a3023"
+)
+PP16_FEATURE2_DB518_PROMPT_CACHE_MANIFEST_SHA256 = (
+    "acc631e71148922448eb03c839f71544c80ca00cea47b639bdd80eb34567fdab"
+)
+PP16_FEATURE2_DB518_PROMPT_CACHE_SHA256 = (
+    "3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1"
+)
+PP16_FEATURE2_DB518_PROMPT_CACHE_TENSOR_SHA256 = (
+    "36303f0638661b4a56d3c9a1d4023a9b39eb19dbfd6d48e0718c29a45c41c07a"
 )
 _ORDINARY_FIELDS: dict[str, tuple[tuple[int, ...], np.dtype[Any]]] = {
     "event1_positions": ((1, 2048), np.dtype(np.int32)),
@@ -90,6 +100,14 @@ _ORACLE_FIELDS: dict[str, tuple[tuple[int, ...], np.dtype[Any]]] = {
 }
 
 
+def feature2_position113_capture_schema() -> dict[
+    str, tuple[tuple[int, ...], np.dtype[Any]]
+]:
+    """Return a defensive copy of the exact ordinary-plus-observer schema."""
+
+    return {**_ORDINARY_FIELDS, **_OBSERVER_FIELDS}
+
+
 def _sha256_array(value: np.ndarray) -> str:
     return sha256(np.ascontiguousarray(value).tobytes()).hexdigest()
 
@@ -142,16 +160,24 @@ def _load_exact_npz(
     return arrays, sha256(raw).hexdigest()
 
 
-def compare_feature2_position113_capture(
+def _compare_feature2_position113_capture(
     capture_path: str | Path,
     *,
     sealed_rejection_path: str | Path,
     accepted_prompt_key_path: str | Path,
+    accepted_prompt_cache_dir: str | Path | None,
+    require_ordinary_unchanged: bool,
+    require_exact_boundary: bool,
 ) -> dict[str, Any]:
-    """Classify p113 without treating unavailable internal oracles as exact."""
+    """Authenticate and classify either the observer or corrected DB518 boundary."""
+
+    if require_ordinary_unchanged == require_exact_boundary:
+        raise ValueError("position-113 comparison mode must be unique")
+    if require_exact_boundary != (accepted_prompt_cache_dir is not None):
+        raise ValueError("DB518 exact boundary requires the accepted full prompt cache")
 
     capture, capture_sha = _load_exact_npz(
-        capture_path, {**_ORDINARY_FIELDS, **_OBSERVER_FIELDS}
+        capture_path, feature2_position113_capture_schema()
     )
     baseline, baseline_sha = _load_exact_npz(sealed_rejection_path, _ORDINARY_FIELDS)
     oracle_all, oracle_sha = _load_exact_npz(
@@ -190,10 +216,32 @@ def compare_feature2_position113_capture(
             f"expected={PP16_FEATURE2_POSITION113_ORACLE_SHA256} "
             f"observed={oracle_sha}"
         )
+    accepted_prompt_cache: np.ndarray | None = None
+    accepted_prompt_cache_manifest: dict[str, Any] | None = None
+    if accepted_prompt_cache_dir is not None:
+        accepted_prompt_cache_manifest, accepted_prompt_cache = (
+            inspect_legacy_prompt_index_cache(
+                Path(accepted_prompt_cache_dir),
+                expected_manifest_sha256=(
+                    PP16_FEATURE2_DB518_PROMPT_CACHE_MANIFEST_SHA256
+                ),
+            )
+        )
+        if (
+            accepted_prompt_cache_manifest.get("prompt_index_key_bfloat16_sha256")
+            != PP16_FEATURE2_DB518_PROMPT_CACHE_SHA256
+            or accepted_prompt_cache_manifest.get("tensor_file", {}).get("sha256")
+            != PP16_FEATURE2_DB518_PROMPT_CACHE_TENSOR_SHA256
+            or _sha256_array(accepted_prompt_cache)
+            != PP16_FEATURE2_DB518_PROMPT_CACHE_SHA256
+        ):
+            raise BenchmarkValidationError(
+                "position-113 accepted DB518 prompt cache identity drifted"
+            )
     ordinary_equal = {
         name: _bitwise_equal(capture[name], baseline[name]) for name in _ORDINARY_FIELDS
     }
-    if not all(ordinary_equal.values()):
+    if require_ordinary_unchanged and not all(ordinary_equal.values()):
         changed = sorted(name for name, equal in ordinary_equal.items() if not equal)
         raise BenchmarkValidationError(
             f"position-113 observer changed sealed rejection outputs: {changed}"
@@ -265,8 +313,12 @@ def compare_feature2_position113_capture(
     current_key_matches_accepted_bf16 = _bitwise_equal(
         current_key_bits, oracle_all["accepted_cache_row_bfloat16_bits"]
     )
+    position_row = PP16_FEATURE2_POSITION113 % 512
+    position_owner = position_row // 256
+    position_local_row = position_row % 256
+    position_local_page = PP16_FEATURE2_POSITION113 // 512
     candidate_cache_row = capture["layer0_index_cache_owners_bfloat16_bits"][
-        0, 0, PP16_FEATURE2_POSITION113
+        position_owner, position_local_page, position_local_row
     ]
     if not _bitwise_equal(current_key_bits, candidate_cache_row):
         raise BenchmarkValidationError(
@@ -285,6 +337,88 @@ def compare_feature2_position113_capture(
     observer_hashes = {
         name: _sha256_array(capture[name]) for name in sorted(_OBSERVER_FIELDS)
     }
+    prompt_cache_exact: bool | None = None
+    prompt_cache_diff: dict[str, Any] | None = None
+    candidate_prompt_cache_sha256: str | None = None
+    if accepted_prompt_cache is not None:
+        positions = np.arange(accepted_prompt_cache.shape[0], dtype=np.int64)
+        rows = positions % 512
+        candidate_prompt_cache = np.ascontiguousarray(
+            capture["layer0_index_cache_owners_bfloat16_bits"][
+                rows // 256, positions // 512, rows % 256
+            ]
+        )
+        prompt_cache_diff = _bitwise_mismatch(
+            candidate_prompt_cache, accepted_prompt_cache
+        )
+        prompt_cache_exact = prompt_cache_diff["mismatch_count"] == 0
+        candidate_prompt_cache_sha256 = _sha256_array(candidate_prompt_cache)
+    boundary_exact = bool(
+        normalized_matches_accepted_round
+        and current_key_matches_accepted_fp32
+        and current_key_matches_accepted_bf16
+        and prompt_cache_exact is not False
+    )
+    if require_exact_boundary:
+        return {
+            "accepted_oracle_scope": {
+                "current_key_bfloat16": True,
+                "current_key_float32": True,
+                "normalized_bfloat16_round_of_fp32_projection_input": True,
+                "q_a_query_head_selected_set": False,
+            },
+            "accepted_prompt_key_npz_sha256": oracle_sha,
+            "artifact_kind": "greenfield_pp16_feature2_db518_position113_comparison",
+            "baseline_capture_npz_sha256": baseline_sha,
+            "boundary_exact": boundary_exact,
+            "cache_ownership": {
+                "live_prompt_row_count": int(accepted_prompt_cache.shape[0]),
+                "owner": position_owner,
+                "owner_local_page": position_local_page,
+                "owner_local_row": position_local_row,
+                "page_rows": 512,
+                "rows_per_owner": 256,
+            },
+            "candidate_prompt_cache_sha256": candidate_prompt_cache_sha256,
+            "capture_npz_sha256": capture_sha,
+            "classification": classification,
+            "current_key_matches_accepted_bfloat16": (
+                current_key_matches_accepted_bf16
+            ),
+            "current_key_matches_accepted_float32": current_key_matches_accepted_fp32,
+            "current_key_bfloat16_diff": _bitwise_mismatch(
+                current_key_bits, oracle_all["accepted_cache_row_bfloat16_bits"]
+            ),
+            "current_key_float32_diff": _bitwise_mismatch(
+                current_key, oracle_all["accepted_post_rope_key"]
+            ),
+            "normalized_matches_accepted_bfloat16_round": (
+                normalized_matches_accepted_round
+            ),
+            "normalized_bfloat16_diff": _bitwise_mismatch(
+                normalized_bits, accepted_projection_bf16_bits
+            ),
+            "numerical_exactness_claim": False,
+            "observer_array_sha256": observer_hashes,
+            "observer_owner_bitwise_equal": owner_equal,
+            "ordinary_output_bitwise_equal_to_sealed_rejection": ordinary_equal,
+            "performance_claim": False,
+            "position": PP16_FEATURE2_POSITION113,
+            "prompt_cache_diff": prompt_cache_diff,
+            "prompt_cache_matches_accepted": prompt_cache_exact,
+            "accepted_prompt_cache_manifest_sha256": (
+                PP16_FEATURE2_DB518_PROMPT_CACHE_MANIFEST_SHA256
+            ),
+            "accepted_prompt_cache_sha256": (PP16_FEATURE2_DB518_PROMPT_CACHE_SHA256),
+            "accepted_prompt_cache_tensor_sha256": (
+                PP16_FEATURE2_DB518_PROMPT_CACHE_TENSOR_SHA256
+            ),
+            "status": (
+                "DB518_POSITION113_EXACT"
+                if boundary_exact
+                else "DB518_POSITION113_REJECTED"
+            ),
+        }
     return {
         "accepted_oracle_scope": {
             "current_key_bfloat16": True,
@@ -318,3 +452,40 @@ def compare_feature2_position113_capture(
         "position": PP16_FEATURE2_POSITION113,
         "status": "POSITION113_CAPTURE_CLASSIFIED",
     }
+
+
+def compare_feature2_position113_capture(
+    capture_path: str | Path,
+    *,
+    sealed_rejection_path: str | Path,
+    accepted_prompt_key_path: str | Path,
+) -> dict[str, Any]:
+    """Classify p113 while proving the observer did not affect ordinary outputs."""
+
+    return _compare_feature2_position113_capture(
+        capture_path,
+        sealed_rejection_path=sealed_rejection_path,
+        accepted_prompt_key_path=accepted_prompt_key_path,
+        accepted_prompt_cache_dir=None,
+        require_ordinary_unchanged=True,
+        require_exact_boundary=False,
+    )
+
+
+def compare_feature2_db518_position113_capture(
+    capture_path: str | Path,
+    *,
+    sealed_rejection_path: str | Path,
+    accepted_prompt_key_path: str | Path,
+    accepted_prompt_cache_dir: str | Path,
+) -> dict[str, Any]:
+    """Require the corrected DB518 p113 key/cache boundary to be bitwise exact."""
+
+    return _compare_feature2_position113_capture(
+        capture_path,
+        sealed_rejection_path=sealed_rejection_path,
+        accepted_prompt_key_path=accepted_prompt_key_path,
+        accepted_prompt_cache_dir=accepted_prompt_cache_dir,
+        require_ordinary_unchanged=False,
+        require_exact_boundary=True,
+    )

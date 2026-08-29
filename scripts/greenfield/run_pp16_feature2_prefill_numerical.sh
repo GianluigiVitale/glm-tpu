@@ -33,6 +33,7 @@ readonly POSITION113_SEALED_REJECTION=/home/gianl/glm-run/greenfield_pp16_featur
 readonly POSITION113_SEALED_REJECTION_SHA=e514fc28e9d8c30bc7de9d70f01ae04002666494446e2f4a06a7fe6c66901e65
 readonly POSITION113_ORACLE=/home/gianl/gcs-models/oracles/greenfield/glm52/prompt_projection_input/8k/greenfield_legacy_layer0_prompt_projection_input_p113_20260809T050055956585082Z/prompt_projection_input_comparison/prompt_key_internal_comparison.npz
 readonly POSITION113_ORACLE_SHA=a2ef16a7a55876099124d0ac4bd139f86c6318b27c0e48fef5d64193ed0a3023
+readonly DB518_PROMPT_CACHE_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_scorer_association_20260810T164030202890642Z/inputs/prompt_cache
 
 [[ ${GLM_GREENFIELD_PP16_FEATURE2_NUMERICAL:-0} == 1 ]] || {
   echo "PP16 feature2 numerical discriminator is default-off" >&2
@@ -44,7 +45,8 @@ readonly POSITION113_ORACLE_SHA=a2ef16a7a55876099124d0ac4bd139f86c6318b27c0e48fe
 }
 FULL_WIDTH_ROUNDED_THEN_SLICE=${GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE:-0}
 OBSERVE_POSITION_113=${GLM_GREENFIELD_PP16_OBSERVE_POSITION_113:-0}
-readonly FULL_WIDTH_ROUNDED_THEN_SLICE OBSERVE_POSITION_113
+EXACT_LAYER0_PROMPT_KEYS=${GLM_GREENFIELD_PP16_EXACT_LAYER0_PROMPT_KEYS:-0}
+readonly FULL_WIDTH_ROUNDED_THEN_SLICE OBSERVE_POSITION_113 EXACT_LAYER0_PROMPT_KEYS
 [[ $FULL_WIDTH_ROUNDED_THEN_SLICE == 1 ]] || {
   echo "set GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE=1 for the admitted successor" >&2
   exit 2
@@ -56,8 +58,35 @@ case $OBSERVE_POSITION_113 in
     exit 2
     ;;
 esac
+case $EXACT_LAYER0_PROMPT_KEYS in
+  0 | 1) ;;
+  *)
+    echo "GLM_GREENFIELD_PP16_EXACT_LAYER0_PROMPT_KEYS must be exactly 0 or 1" >&2
+    exit 2
+    ;;
+esac
+if [[ $EXACT_LAYER0_PROMPT_KEYS == 1 && $OBSERVE_POSITION_113 != 1 ]]; then
+  echo "DB518 exact layer-0 keys require position-113 observation" >&2
+  exit 2
+fi
 runner_variant_args=(--full-width-rounded-then-slice)
-if [[ $OBSERVE_POSITION_113 == 1 ]]; then
+if [[ $EXACT_LAYER0_PROMPT_KEYS == 1 ]]; then
+  ACQUIRED_CODE_HASH=e2a7b4e1d5298d39cb5f0e736808baa96b1c49a3
+  ACQUIRED_RUN_TAG=greenfield_pp16_feature2_layer0_db518_acquire_20260829T101159660007493Z
+  ACQUIRED_COMPACT_EVIDENCE=$WORKTREE/docs/artifacts/pp16-feature2-layer0-db518-hlo-acquisition.json
+  ACQUIRED_COMPACT_EVIDENCE_SHA=52b9e227d124d67cbc908cc02b9a4b47182443dd7482766221b6b5367ededc02
+  ACQUIRED_EVIDENCE_LEDGER_SHA=d6cd668388120a1ce29823584079ba4e06463ca9f0d57d8cf4214dbea1a79bfd
+  ACQUIRED_RUNNER_SHA=e4900076353f755875f81e9df11c2b2731fe93e38465b433dec0e8b38aca55da
+  ACQUIRED_SUMMARY_SHA=f24fc959853b0945aeff03fedb67c95d55890ac63d0ee78c597ce30f7c7e1ef5
+  ACQUIRED_TERMINAL_SHA=2a23d911e379107ed984cb9f102432240d07c94e4d80ae96b3f5265e8e952609
+  ACQUIRED_TERMINAL_SELF_SHA=c17adbee494c9b69d2c73b9b17e8e0d4dafd1a23d6b92899421c61765ea72c49
+  ACQUIRED_MAIN_STABLE_SHA=a79d4823db0fecf8b1bc980b16df283bbe7a497795fa06ff783d3cde8fa98f6b
+  ACQUIRED_MAIN_OPTIMIZED_SHA=0b0481d16811c6ad9cb34f73d3b13690f4200f5b45a76e54936ab132cdb9d133
+  ACQUIRED_MAIN_CANONICAL_SHA=56b9b88dc081dd5d3ea2219d46be641128cbed6e9759754be7f87578b51b5d8c
+  ACQUIRED_MAIN_CANONICAL_BYTES=6863602
+  ACQUIRED_MAIN_STACK_FRAME_REFERENCES=15339
+  runner_variant_args+=(--observe-position-113 --exact-layer0-prompt-keys)
+elif [[ $OBSERVE_POSITION_113 == 1 ]]; then
   ACQUIRED_CODE_HASH=09285f7601ea1ca9cdc3f5447833d1440afb42dd
   ACQUIRED_RUN_TAG=greenfield_pp16_feature2_position113_acquire_20260829T072101902362381Z
   ACQUIRED_COMPACT_EVIDENCE=$WORKTREE/docs/artifacts/pp16-feature2-position113-hlo-acquisition.json
@@ -99,7 +128,9 @@ readonly ACQUIRED_MAIN_CANONICAL_SHA ACQUIRED_MAIN_CANONICAL_BYTES
 readonly ACQUIRED_MAIN_STACK_FRAME_REFERENCES runner_variant_args
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-if [[ $OBSERVE_POSITION_113 == 1 ]]; then
+if [[ $EXACT_LAYER0_PROMPT_KEYS == 1 ]]; then
+  TAG=${GLM_GREENFIELD_PP16_FEATURE2_TAG:-greenfield_pp16_feature2_layer0_db518_numerical_$(date -u +%Y%m%dT%H%M%S%NZ)}
+elif [[ $OBSERVE_POSITION_113 == 1 ]]; then
   TAG=${GLM_GREENFIELD_PP16_FEATURE2_TAG:-greenfield_pp16_feature2_position113_numerical_$(date -u +%Y%m%dT%H%M%S%NZ)}
 else
   TAG=${GLM_GREENFIELD_PP16_FEATURE2_TAG:-greenfield_pp16_feature2_prefill_numerical_$(date -u +%Y%m%dT%H%M%S%NZ)}
@@ -108,7 +139,9 @@ RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 readonly PIN TAG RUN_DIR REMOTE_PREFIX
 
-if [[ $OBSERVE_POSITION_113 == 1 ]]; then
+if [[ $EXACT_LAYER0_PROMPT_KEYS == 1 ]]; then
+  [[ $TAG =~ ^greenfield_pp16_feature2_layer0_db518_numerical_[0-9]{8}T[0-9]{15}Z$ ]]
+elif [[ $OBSERVE_POSITION_113 == 1 ]]; then
   [[ $TAG =~ ^greenfield_pp16_feature2_position113_numerical_[0-9]{8}T[0-9]{15}Z$ ]]
 else
   [[ $TAG =~ ^greenfield_pp16_feature2_prefill_numerical_[0-9]{8}T[0-9]{15}Z$ ]]
@@ -148,14 +181,30 @@ remote_prefix_is_vacant() {
 }
 
 verify_acquired_hlo_authorization() {
-  local directory="$RUN_DIR/acquired_hlo_authorization" relative
-  mkdir -p "$directory"
+  local directory="$RUN_DIR/acquired_hlo_authorization" relative expected
+  local archive="$RUN_DIR/acquired_hlo_authorization/archive"
+  mkdir -p "$archive"
   for relative in evidence.sha256 runner.json summary.json HLO_ACQUIRED; do
     gcloud storage cat "$ACQUIRED_REMOTE_PREFIX/$relative" \
       >"$directory/$relative"
   done
   gcloud storage ls --recursive "$ACQUIRED_REMOTE_PREFIX/**" \
     >"$directory/remote_objects.txt"
+  while read -r expected relative; do
+    relative=${relative#\*}
+    relative=${relative#./}
+    case $relative in
+      "" | /* | ../* | */../* | */..)
+        echo "unsafe acquired ledger path: $relative" >&2
+        return 1
+        ;;
+    esac
+    mkdir -p "$archive/$(dirname "$relative")"
+    gcloud storage cat "$ACQUIRED_REMOTE_PREFIX/$relative" \
+      >"$archive/$relative"
+    [[ $(sha256sum "$archive/$relative" | awk '{print $1}') == "$expected" ]] ||
+      return 1
+  done <"$directory/evidence.sha256"
   PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - \
     "$directory" "$ACQUIRED_COMPACT_EVIDENCE" \
     "$ACQUIRED_COMPACT_EVIDENCE_SHA" "$ACQUIRED_CODE_HASH" \
@@ -167,6 +216,7 @@ verify_acquired_hlo_authorization() {
     "$ACQUIRED_MAIN_CANONICAL_BYTES" \
     "$ACQUIRED_MAIN_STACK_FRAME_REFERENCES" \
     "$OBSERVE_POSITION_113" \
+    "$EXACT_LAYER0_PROMPT_KEYS" \
     "$RUN_DIR/acquisition_authorization.json" <<'PY'
 from hashlib import sha256
 import json
@@ -176,10 +226,12 @@ import sys
 (directory,compact_path,compact_sha,code_hash,run_tag,remote,
  ledger_sha,runner_sha,summary_sha,terminal_sha,terminal_self_sha,
  stable_sha,optimized_sha,canonical_sha,canonical_bytes,stack_refs,observe_p113,
+ exact_layer0_prompt_keys,
  output)=sys.argv[1:]
 directory=Path(directory); compact_path=Path(compact_path); output=Path(output)
 canonical_bytes=int(canonical_bytes); stack_refs=int(stack_refs)
 observe_p113=bool(int(observe_p113))
+exact_layer0_prompt_keys=bool(int(exact_layer0_prompt_keys))
 
 def digest(path):
     return sha256(Path(path).read_bytes()).hexdigest()
@@ -200,7 +252,11 @@ if terminal.get('marker_self_sha256')!=terminal_self_sha or sha256(terminal_raw)
     raise SystemExit('feature2 acquired terminal binding drifted')
 if compact.get('status')!='HLO_ACQUIRED' or compact.get('code_hash')!=code_hash or compact.get('run_tag')!=run_tag or compact.get('remote_prefix')!=remote or compact.get('main_executed') is not False or compact.get('numerical_claim') is not False or compact.get('performance_claim') is not False:
     raise SystemExit('feature2 compact acquisition authorization drifted')
-if observe_p113:
+if exact_layer0_prompt_keys:
+    certificate=compact.get('structural_certificate',{})
+    if compact.get('artifact_kind')!='greenfield_pp16_feature2_layer0_db518_hlo_acquisition' or compact.get('remote_object_count')!=20 or compact.get('evidence_ledger_sha256')!=ledger_sha or compact.get('runner_sha256')!=runner_sha or compact.get('summary_sha256')!=summary_sha or compact.get('hlo_acquired_marker_sha256')!=terminal_sha or certificate.get('causal') is not True or certificate.get('scan_count')!=4 or certificate.get('scan_limits')!=[2048,2048,2048,2012] or certificate.get('physical_m64_projection_count')!=16 or certificate.get('cache_write_count')!=4 or certificate.get('zero_cache_initializer_count')!=1 or certificate.get('cache_handoff_count')!=3 or certificate.get('layer0_key_topology_sha256')!='235dfa726f82a152bf0218506cf8d3345520a7673ab7a6b908ef06df821465bd' or certificate.get('position113_branch_topology_sha256')!='92a1b18b523984dd98d2579d25668b6bd582f6f9f23a26d9e4449b29a81ee46d' or certificate.get('rebased_identity_hostile_test_count')!=6:
+        raise SystemExit('feature2 DB518 compact acquisition evidence linkage drifted')
+elif observe_p113:
     certificate=compact.get('structural_certificate',{})
     if compact.get('artifact_kind')!='greenfield_pp16_feature2_position113_hlo_acquisition' or compact.get('remote_object_count')!=20 or compact.get('evidence_ledger_sha256')!=ledger_sha or compact.get('runner_sha256')!=runner_sha or compact.get('summary_sha256')!=summary_sha or compact.get('hlo_acquired_marker_sha256')!=terminal_sha or certificate.get('causal') is not True or certificate.get('branch_topology_record_count')!=32 or certificate.get('branch_topology_sha256')!='05322ce7ad09db5463e17d4a7e31142edaffe128abe5e9d85d5ee81f5e3eb02b' or certificate.get('rebased_identity_hostile_test_count')!=10:
         raise SystemExit('feature2 p113 compact acquisition evidence linkage drifted')
@@ -210,9 +266,9 @@ else:
     if compact.get('evidence',{}).get('remote_object_count_including_terminal')!=20 or compact.get('evidence',{}).get('evidence_ledger_sha256')!=ledger_sha or compact.get('evidence',{}).get('runner_sha256')!=runner_sha or compact.get('evidence',{}).get('summary_sha256')!=summary_sha or compact.get('evidence',{}).get('terminal_file_sha256')!=terminal_sha or compact.get('evidence',{}).get('terminal_marker_self_sha256')!=terminal_self_sha:
         raise SystemExit('feature2 compact acquisition evidence linkage drifted')
 for record in (runner,summary):
-    if record.get('status')!='HLO_ACQUIRED' or record.get('code_hash')!=code_hash or record.get('main_executed') is not False or record.get('numerical_claim') is not False or record.get('performance_claim') is not False or bool(record.get('observe_position_113',False)) is not observe_p113:
+    if record.get('status')!='HLO_ACQUIRED' or record.get('code_hash')!=code_hash or record.get('main_executed') is not False or record.get('numerical_claim') is not False or record.get('performance_claim') is not False or bool(record.get('observe_position_113',False)) is not observe_p113 or bool(record.get('exact_layer0_prompt_keys',False)) is not exact_layer0_prompt_keys:
         raise SystemExit('feature2 acquired claim boundary drifted')
-if runner.get('main_execution_count')!=0 or runner.get('compile_only') is not True or runner.get('full_width_rounded_then_slice') is not True or runner.get('sealed_boundary_capture') is not True or bool(runner.get('observe_position_113',False)) is not observe_p113:
+if runner.get('main_execution_count')!=0 or runner.get('compile_only') is not True or runner.get('full_width_rounded_then_slice') is not True or runner.get('sealed_boundary_capture') is not True or bool(runner.get('observe_position_113',False)) is not observe_p113 or bool(runner.get('exact_layer0_prompt_keys',False)) is not exact_layer0_prompt_keys:
     raise SystemExit('feature2 acquired execution variant drifted')
 main=runner.get('hlo',{}).get('feature2_main',{})
 canonical=main.get('execution_canonical_hlo',{})
@@ -224,7 +280,15 @@ for line in ledger_path.read_text().splitlines():
     relative=relative.removeprefix('*').removeprefix('./')
     if relative in entries:
         raise SystemExit('feature2 acquired ledger has duplicate paths')
+    if not relative or relative.startswith('/') or '..' in Path(relative).parts:
+        raise SystemExit('feature2 acquired ledger path is unsafe')
     entries[relative]=expected
+archive=directory/'archive'
+observed_archive_files=sorted(
+    str(path.relative_to(archive)) for path in archive.rglob('*') if path.is_file()
+)
+if observed_archive_files!=sorted(entries) or any(digest(archive/name)!=expected for name,expected in entries.items()):
+    raise SystemExit('feature2 acquired archive bytes drifted')
 required_entries={
     'runner.json':runner_sha,
     'summary.json':summary_sha,
@@ -251,6 +315,7 @@ record={
     'main_canonical_hlo_sha256':canonical_sha,
     'main_optimized_hlo_sha256':optimized_sha,
     'main_stablehlo_sha256':stable_sha,
+    'exact_layer0_prompt_keys':exact_layer0_prompt_keys,
     'observe_position_113':observe_p113,
     'passed':True,
 }
@@ -516,8 +581,10 @@ PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - \
   "$DB529_INTERNAL_DIR" "$DB529_INTERNAL_CONTRACT_SHA" \
   "$DB529_INTERNAL_TENSOR_SHA" "$FEATURE2_GRAPH_SHA" \
   "$OBSERVE_POSITION_113" \
+  "$EXACT_LAYER0_PROMPT_KEYS" \
   "$POSITION113_SEALED_REJECTION" "$POSITION113_SEALED_REJECTION_SHA" \
   "$POSITION113_ORACLE" "$POSITION113_ORACLE_SHA" \
+  "$DB518_PROMPT_CACHE_DIR" \
   "$RUN_DIR/source_identity.json" <<'PY'
 from hashlib import sha256
 import json
@@ -527,13 +594,17 @@ import sys
 from glm_tpu.greenfield.benchmarking.pp16_feature2_acquisition import inspect_feature2_event1_lineage
 from glm_tpu.greenfield.benchmarking.pp16_feature2_loader import inspect_feature2_selective_plan
 from glm_tpu.greenfield.benchmarking.pp16_feature2_prefill import build_feature2_prefill_graph, load_feature2_prefill_inputs
+from glm_tpu.greenfield.benchmarking.pp16_feature2_position113 import PP16_FEATURE2_DB518_PROMPT_CACHE_MANIFEST_SHA256, PP16_FEATURE2_DB518_PROMPT_CACHE_SHA256, PP16_FEATURE2_DB518_PROMPT_CACHE_TENSOR_SHA256
 from glm_tpu.greenfield.benchmarking.pp16_feature_sharded_state import derive_feature2_tensor_allowlist, read_feature2_owner_headers
+from glm_tpu.greenfield.validation.prompt_index_cache import inspect_legacy_prompt_index_cache
 
 (runtime,remote,runtime_sha,token,token_sha,dsa,dsa_sha,layer1,layer1_sha,
- db529,db529_contract,db529_tensor,graph_sha,observe_p113,p113_baseline,
- p113_baseline_sha,p113_oracle,p113_oracle_sha,output)=sys.argv[1:]
+ db529,db529_contract,db529_tensor,graph_sha,observe_p113,exact_layer0_prompt_keys,p113_baseline,
+ p113_baseline_sha,p113_oracle,p113_oracle_sha,db518_prompt_cache,output)=sys.argv[1:]
 runtime=Path(runtime); token=Path(token); dsa=Path(dsa); layer1=Path(layer1); db529=Path(db529)
 observe_p113=bool(int(observe_p113)); p113_baseline=Path(p113_baseline); p113_oracle=Path(p113_oracle)
+exact_layer0_prompt_keys=bool(int(exact_layer0_prompt_keys))
+db518_prompt_cache=Path(db518_prompt_cache)
 manifest=json.loads((runtime/'runtime_manifest.json').read_text())
 if manifest.get('manifest_sha256')!=runtime_sha:
     raise SystemExit('feature2 runtime manifest pin drifted')
@@ -547,7 +618,13 @@ if graph.graph_sha256!=graph_sha:
     raise SystemExit('feature2 graph pin drifted')
 if observe_p113 and (sha256(p113_baseline.read_bytes()).hexdigest()!=p113_baseline_sha or sha256(p113_oracle.read_bytes()).hexdigest()!=p113_oracle_sha):
     raise SystemExit('feature2 p113 numerical source identity drifted')
-record={'artifact_kind':'greenfield_pp16_feature2_source_identity','runtime_root':str(runtime),'runtime_remote':remote,'runtime_manifest_sha256':runtime_sha,'selective_plan':inspect_feature2_selective_plan(runtime),'event1_target_lineage':lineage,'graph_sha256':graph_sha,'observe_position_113':observe_p113,'position113_sealed_rejection_sha256':p113_baseline_sha if observe_p113 else None,'position113_oracle_sha256':p113_oracle_sha if observe_p113 else None}
+db518_cache_identity=None
+if exact_layer0_prompt_keys:
+    cache_manifest,cache_bits=inspect_legacy_prompt_index_cache(db518_prompt_cache,expected_manifest_sha256=PP16_FEATURE2_DB518_PROMPT_CACHE_MANIFEST_SHA256)
+    if cache_manifest.get('prompt_index_key_bfloat16_sha256')!=PP16_FEATURE2_DB518_PROMPT_CACHE_SHA256 or cache_manifest.get('tensor_file',{}).get('sha256')!=PP16_FEATURE2_DB518_PROMPT_CACHE_TENSOR_SHA256 or sha256(cache_bits.tobytes()).hexdigest()!=PP16_FEATURE2_DB518_PROMPT_CACHE_SHA256:
+        raise SystemExit('feature2 DB518 prompt cache source identity drifted')
+    db518_cache_identity={'manifest_sha256':PP16_FEATURE2_DB518_PROMPT_CACHE_MANIFEST_SHA256,'prompt_cache_sha256':PP16_FEATURE2_DB518_PROMPT_CACHE_SHA256,'tensor_file_sha256':PP16_FEATURE2_DB518_PROMPT_CACHE_TENSOR_SHA256}
+record={'artifact_kind':'greenfield_pp16_feature2_source_identity','db518_prompt_cache_identity':db518_cache_identity,'runtime_root':str(runtime),'runtime_remote':remote,'runtime_manifest_sha256':runtime_sha,'selective_plan':inspect_feature2_selective_plan(runtime),'event1_target_lineage':lineage,'exact_layer0_prompt_keys':exact_layer0_prompt_keys,'graph_sha256':graph_sha,'observe_position_113':observe_p113,'position113_sealed_rejection_sha256':p113_baseline_sha if observe_p113 else None,'position113_oracle_sha256':p113_oracle_sha if observe_p113 else None}
 Path(output).write_text(json.dumps(record,allow_nan=False,indent=2,sort_keys=True)+'\n')
 PY
 
@@ -618,16 +695,18 @@ PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - \
   "$ACQUIRED_MAIN_CANONICAL_BYTES" "$ACQUIRED_MAIN_STACK_FRAME_REFERENCES" \
   "$ACQUIRED_JAX_VERSION" "$ACQUIRED_JAXLIB_VERSION" "$ACQUIRED_LIBTPU_VERSION" \
   "$OBSERVE_POSITION_113" \
+  "$EXACT_LAYER0_PROMPT_KEYS" \
   "$POSITION113_SEALED_REJECTION" "$POSITION113_SEALED_REJECTION_SHA" \
-  "$POSITION113_ORACLE" "$POSITION113_ORACLE_SHA" <<'PY'
+  "$POSITION113_ORACLE" "$POSITION113_ORACLE_SHA" \
+  "$DB518_PROMPT_CACHE_DIR" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
 import sys
 
 from glm_tpu.greenfield.benchmarking.pp16_feature2_hlo import validate_feature2_sealed_hlo_archive_identity
-from glm_tpu.greenfield.benchmarking.pp16_feature2_numerical import compare_feature2_full_width_numerical_capture, validate_feature2_in_process_cleanup
-from glm_tpu.greenfield.benchmarking.pp16_feature2_position113 import compare_feature2_position113_capture
+from glm_tpu.greenfield.benchmarking.pp16_feature2_numerical import compare_feature2_db518_numerical_capture, compare_feature2_full_width_numerical_capture, validate_feature2_in_process_cleanup
+from glm_tpu.greenfield.benchmarking.pp16_feature2_position113 import compare_feature2_db518_position113_capture, compare_feature2_position113_capture
 
 run=Path(sys.argv[1]); pin,tag,remote,elapsed=sys.argv[2:6]
 token,dsa,layer1,db529,db550=map(Path,sys.argv[6:11])
@@ -636,17 +715,22 @@ stable_pin,canonical_pin=sys.argv[12:14]
 canonical_bytes,stack_frame_references=map(int,sys.argv[14:16])
 expected_runtime_pins=dict(zip(('jax','jaxlib','libtpu'),sys.argv[16:19],strict=True))
 observe_p113=bool(int(sys.argv[19]))
-p113_baseline=Path(sys.argv[20]); p113_baseline_sha=sys.argv[21]
-p113_oracle=Path(sys.argv[22]); p113_oracle_sha=sys.argv[23]
+exact_layer0_prompt_keys=bool(int(sys.argv[20]))
+p113_baseline=Path(sys.argv[21]); p113_baseline_sha=sys.argv[22]
+p113_oracle=Path(sys.argv[23]); p113_oracle_sha=sys.argv[24]
+db518_prompt_cache=Path(sys.argv[25])
 runner=json.loads((run/'runner.json').read_text())
 source=json.loads((run/'source_identity.json').read_text())
 authorization=json.loads((run/'acquisition_authorization.json').read_text())
-if full_width_rounded_then_slice is not True or authorization.get('passed') is not True:
+if full_width_rounded_then_slice is not True or authorization.get('passed') is not True or authorization.get('exact_layer0_prompt_keys') is not exact_layer0_prompt_keys:
     raise SystemExit('feature2 numerical authorization drifted')
-if runner.get('status')!='NUMERICAL_CAPTURED' or runner.get('code_hash')!=pin or runner.get('compile_only') is not False or runner.get('full_width_rounded_then_slice') is not True or runner.get('sealed_boundary_capture') is not True or runner.get('observe_position_113') is not observe_p113 or runner.get('main_executed') is not True or runner.get('main_execution_count')!=1 or runner.get('numerical_claim') is not False or runner.get('performance_claim') is not False:
+if runner.get('status')!='NUMERICAL_CAPTURED' or runner.get('code_hash')!=pin or runner.get('compile_only') is not False or runner.get('full_width_rounded_then_slice') is not True or runner.get('sealed_boundary_capture') is not True or runner.get('observe_position_113') is not observe_p113 or runner.get('exact_layer0_prompt_keys') is not exact_layer0_prompt_keys or runner.get('main_executed') is not True or runner.get('main_execution_count')!=1 or runner.get('numerical_claim') is not False or runner.get('performance_claim') is not False:
     raise SystemExit('feature2 numerical-capture claim boundary drifted')
-if runner.get('graph_sha256')!=source.get('graph_sha256') or runner.get('event1_target_lineage')!=source.get('event1_target_lineage') or runner.get('selective_plan')!=source.get('selective_plan') or source.get('observe_position_113') is not observe_p113:
+if runner.get('graph_sha256')!=source.get('graph_sha256') or runner.get('event1_target_lineage')!=source.get('event1_target_lineage') or runner.get('selective_plan')!=source.get('selective_plan') or source.get('observe_position_113') is not observe_p113 or source.get('exact_layer0_prompt_keys') is not exact_layer0_prompt_keys:
     raise SystemExit('feature2 numerical source lineage drifted')
+expected_db518_cache_identity={'manifest_sha256':'acc631e71148922448eb03c839f71544c80ca00cea47b639bdd80eb34567fdab','prompt_cache_sha256':'3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1','tensor_file_sha256':'36303f0638661b4a56d3c9a1d4023a9b39eb19dbfd6d48e0718c29a45c41c07a'} if exact_layer0_prompt_keys else None
+if source.get('db518_prompt_cache_identity')!=expected_db518_cache_identity:
+    raise SystemExit('feature2 DB518 prompt cache source lineage drifted')
 if observe_p113 and (source.get('position113_sealed_rejection_sha256')!=p113_baseline_sha or source.get('position113_oracle_sha256')!=p113_oracle_sha):
     raise SystemExit('feature2 p113 numerical source pins drifted')
 if observe_p113 and (sha256(p113_baseline.read_bytes()).hexdigest()!=p113_baseline_sha or sha256(p113_oracle.read_bytes()).hexdigest()!=p113_oracle_sha):
@@ -696,16 +780,21 @@ if observe_p113:
 stable=main['stablehlo_contract']; optimized=main['optimized_contract']; terminal=main['terminal_contract']
 expected_canonical={'byte_count':canonical_bytes,'canonicalizer_version':1,'sha256':canonical_pin,'stripped_stack_frame_references':stack_frame_references}
 expected_output_count=24 if observe_p113 else 15
-if stable.get('sealed_boundary_capture') is not True or stable.get('observe_position_113') is not observe_p113 or stable.get('stablehlo_sha256')!=archive_identity['stablehlo_sha256'] or stable.get('output_count')!=expected_output_count or stable.get('terminal_shapes')!=expected_terminal_shapes or stable.get('terminal_types')!=expected_stable_types:
+if stable.get('sealed_boundary_capture') is not True or stable.get('observe_position_113') is not observe_p113 or stable.get('exact_layer0_prompt_keys') is not exact_layer0_prompt_keys or stable.get('stablehlo_sha256')!=archive_identity['stablehlo_sha256'] or stable.get('output_count')!=expected_output_count or stable.get('terminal_shapes')!=expected_terminal_shapes or stable.get('terminal_types')!=expected_stable_types:
     raise SystemExit('feature2 numerical StableHLO sealed terminal drifted')
-if optimized.get('sealed_boundary_capture') is not True or optimized.get('observe_position_113') is not observe_p113 or optimized.get('output_count')!=expected_output_count or optimized.get('root_shapes')!=expected_optimized_roots or optimized.get('sealed_bindings')!=expected_sealed_bindings or optimized.get('position113_observer_bindings')!=expected_observer_bindings or optimized.get('position113_observer_root_hints_causal') is not observe_p113 or {key:optimized.get('sealed_canonical_hlo_identity',{}).get(key) for key in expected_canonical}!=expected_canonical:
+if optimized.get('sealed_boundary_capture') is not True or optimized.get('observe_position_113') is not observe_p113 or optimized.get('exact_layer0_prompt_keys') is not exact_layer0_prompt_keys or optimized.get('output_count')!=expected_output_count or optimized.get('root_shapes')!=expected_optimized_roots or optimized.get('sealed_bindings')!=expected_sealed_bindings or optimized.get('position113_observer_bindings')!=expected_observer_bindings or optimized.get('position113_observer_root_hints_causal') is not observe_p113 or {key:optimized.get('sealed_canonical_hlo_identity',{}).get(key) for key in expected_canonical}!=expected_canonical:
     raise SystemExit('feature2 numerical optimized-HLO sealed terminal drifted')
 if terminal.get('sealed_boundary_capture') is not True or terminal.get('observe_position_113') is not observe_p113 or terminal.get('output_count')!=expected_output_count or terminal.get('terminal_shapes')!=expected_terminal_shapes or terminal.get('terminal_dtypes')!=expected_terminal_dtypes:
     raise SystemExit('feature2 numerical abstract sealed terminal drifted')
 if observe_p113:
     lineage=optimized.get('position113_lineage',{})
-    if lineage.get('causal') is not True or lineage.get('branch_topology_record_count')!=32 or lineage.get('branch_topology_sha256')!='05322ce7ad09db5463e17d4a7e31142edaffe128abe5e9d85d5ee81f5e3eb02b':
+    expected_p113_topology='92a1b18b523984dd98d2579d25668b6bd582f6f9f23a26d9e4449b29a81ee46d' if exact_layer0_prompt_keys else '05322ce7ad09db5463e17d4a7e31142edaffe128abe5e9d85d5ee81f5e3eb02b'
+    if lineage.get('causal') is not True or lineage.get('branch_topology_record_count')!=32 or lineage.get('branch_topology_sha256')!=expected_p113_topology:
         raise SystemExit('feature2 p113 numerical causal lineage drifted')
+if exact_layer0_prompt_keys:
+    lineage=optimized.get('db518_layer0_key_lineage',{})
+    if lineage.get('causal') is not True or lineage.get('scan_count')!=4 or [scan.get('rows') for scan in lineage.get('scans',[])]!=[2048,2048,2048,2012] or lineage.get('physical_m64_projection_count')!=16 or lineage.get('cache_write_count')!=4 or lineage.get('topology_sha256')!='235dfa726f82a152bf0218506cf8d3345520a7673ab7a6b908ef06df821465bd' or sum(scan.get('cache_seed_kind')=='zero' for scan in lineage.get('scans',[]))!=1 or sum(scan.get('cache_seed_kind')=='handoff' for scan in lineage.get('scans',[]))!=3:
+        raise SystemExit('feature2 DB518 numerical causal lineage drifted')
 if canonical.get('sha256')!=canonical_pin or canonical.get('byte_count')!=canonical_bytes or canonical.get('stripped_stack_frame_references')!=stack_frame_references or canonical.get('canonicalizer_version')!=1 or canonical.get('canonicalizer_code_hash')!=pin or {key:archive_identity['canonical_hlo_identity'].get(key) for key in expected_canonical}!=expected_canonical:
     raise SystemExit('feature2 numerical executable HLO drifted from acquired graph')
 state=runner.get('state_manifest',{})
@@ -731,7 +820,16 @@ post_hosts=[line.split()[1] for line in post_census_path.read_text().splitlines(
 if len(post_hosts)!=8 or len(set(post_hosts))!=8:
     raise SystemExit('feature2 post-process cleanup census drifted')
 cleanup.update({'post_process_authenticated_zero_work_hosts':8,'post_process_census_sha256':sha256(post_census_path.read_bytes()).hexdigest(),'terminal_cleanup_gate':'authenticated post-process 8/8 zero work'})
-if observe_p113:
+expected_mismatch_fields={'carried_bfloat16_bits','contract_valid','event1_positions','event1_scores','event1_valid_counts','layer1_current_key_bfloat16_bits','layer1_normalized_hidden_bfloat16_bits','layer1_q_a_state_bfloat16_bits','layer1_dsa_query_float32','layer1_dsa_head_weights_float32'}
+if exact_layer0_prompt_keys:
+    full_comparison=compare_feature2_db518_numerical_capture(run/'result.npz',token_oracle_dir=token,dsa_oracle_dir=dsa,layer1_internal_reference=layer1,db529_internal_dir=db529,db550_boundary=db550)
+    position113_comparison=compare_feature2_db518_position113_capture(run/'result.npz',sealed_rejection_path=p113_baseline,accepted_prompt_key_path=p113_oracle,accepted_prompt_cache_dir=db518_prompt_cache)
+    capture_sha=sha256((run/'result.npz').read_bytes()).hexdigest()
+    if capture_sha!=full_comparison.get('capture_sha256') or capture_sha!=position113_comparison.get('capture_npz_sha256') or full_comparison.get('comparison_schema')!='db518_full_width_plus_position113_v1' or full_comparison.get('sealed_boundary_comparisons_required') is not True or set(full_comparison.get('mismatch_counts',{}))!=expected_mismatch_fields or position113_comparison.get('status') not in {'DB518_POSITION113_EXACT','DB518_POSITION113_REJECTED'} or position113_comparison.get('numerical_exactness_claim') is not False or position113_comparison.get('performance_claim') is not False or not all(position113_comparison.get('observer_owner_bitwise_equal',{}).values()):
+        raise SystemExit('feature2 DB518 dual numerical comparison contract drifted')
+    exact=bool(full_comparison.get('exact') and position113_comparison.get('boundary_exact'))
+    comparison={'artifact_kind':'greenfield_pp16_feature2_db518_dual_numerical_comparison','capture_sha256':capture_sha,'claim_scope':'accepted event-1/layer-1/dense/current-key boundaries plus exact DB518 layer-0 position-113 normalized/key/cache boundary; no Gate-D, token-rate, or performance claim','exact':exact,'full_width_comparison':full_comparison,'performance_claim':False,'position113_comparison':position113_comparison,'status':'NUMERICAL_EXACT' if exact else 'NUMERICAL_REJECTED'}
+elif observe_p113:
     comparison=compare_feature2_position113_capture(run/'result.npz',sealed_rejection_path=p113_baseline,accepted_prompt_key_path=p113_oracle)
     if sha256((run/'result.npz').read_bytes()).hexdigest()!=comparison['capture_npz_sha256'] or comparison.get('status')!='POSITION113_CAPTURE_CLASSIFIED' or comparison.get('numerical_exactness_claim') is not False or comparison.get('performance_claim') is not False or not all(comparison.get('ordinary_output_bitwise_equal',{}).values()) or not all(comparison.get('observer_owner_bitwise_equal',{}).values()):
         raise SystemExit('feature2 p113 numerical classification contract drifted')
@@ -739,11 +837,16 @@ else:
     comparison=compare_feature2_full_width_numerical_capture(run/'result.npz',token_oracle_dir=token,dsa_oracle_dir=dsa,layer1_internal_reference=layer1,db529_internal_dir=db529,db550_boundary=db550)
     if sha256((run/'result.npz').read_bytes()).hexdigest()!=comparison['capture_sha256']:
         raise SystemExit('feature2 numerical capture changed before sealing')
-    expected_mismatch_fields={'carried_bfloat16_bits','contract_valid','event1_positions','event1_scores','event1_valid_counts','layer1_current_key_bfloat16_bits','layer1_normalized_hidden_bfloat16_bits','layer1_q_a_state_bfloat16_bits','layer1_dsa_query_float32','layer1_dsa_head_weights_float32'}
     if comparison.get('comparison_schema')!='full_width_sealed_boundaries_v2' or comparison.get('sealed_boundary_comparisons_required') is not True or set(comparison.get('mismatch_counts',{}))!=expected_mismatch_fields:
         raise SystemExit('feature2 numerical strict comparison contract drifted')
 (run/'comparison.json').write_text(json.dumps(comparison,allow_nan=False,indent=2,sort_keys=True)+'\n')
-summary={'acquisition_authorization_sha256':sha256((run/'acquisition_authorization.json').read_bytes()).hexdigest(),'artifact_kind':'greenfield_pp16_feature2_position113_numerical_summary' if observe_p113 else 'greenfield_pp16_feature2_numerical_summary','claim_scope':'one position-113 diagnostic capture; no exactness, Gate-D, token-rate, or performance claim' if observe_p113 else comparison['claim_scope'],'cleanup':cleanup,'code_hash':pin,'elapsed_seconds_operational_only':int(elapsed),'exact':False if observe_p113 else comparison['exact'],'full_width_rounded_then_slice':True,'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_canonical_hlo':canonical,'main_execution_count':1,'measured_memory':memory,'mismatch_counts':{} if observe_p113 else comparison['mismatch_counts'],'numerical_claim':False if observe_p113 else comparison['exact'],'observe_position_113':observe_p113,'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'runtime_pins':runtime_pins,'sealed_boundary_capture':True,'status':comparison['status']}
+if exact_layer0_prompt_keys:
+    summary_kind='greenfield_pp16_feature2_db518_numerical_summary'; summary_claim=comparison['claim_scope']; summary_exact=comparison['exact']; summary_mismatches=comparison['full_width_comparison']['mismatch_counts']; summary_numerical_claim=comparison['exact']
+elif observe_p113:
+    summary_kind='greenfield_pp16_feature2_position113_numerical_summary'; summary_claim='one position-113 diagnostic capture; no exactness, Gate-D, token-rate, or performance claim'; summary_exact=False; summary_mismatches={}; summary_numerical_claim=False
+else:
+    summary_kind='greenfield_pp16_feature2_numerical_summary'; summary_claim=comparison['claim_scope']; summary_exact=comparison['exact']; summary_mismatches=comparison['mismatch_counts']; summary_numerical_claim=comparison['exact']
+summary={'acquisition_authorization_sha256':sha256((run/'acquisition_authorization.json').read_bytes()).hexdigest(),'artifact_kind':summary_kind,'claim_scope':summary_claim,'cleanup':cleanup,'code_hash':pin,'elapsed_seconds_operational_only':int(elapsed),'exact':summary_exact,'exact_layer0_prompt_keys':exact_layer0_prompt_keys,'full_width_rounded_then_slice':True,'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_canonical_hlo':canonical,'main_execution_count':1,'measured_memory':memory,'mismatch_counts':summary_mismatches,'numerical_claim':summary_numerical_claim,'observe_position_113':observe_p113,'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'runtime_pins':runtime_pins,'sealed_boundary_capture':True,'status':comparison['status']}
 (run/'summary.json').write_text(json.dumps(summary,allow_nan=False,indent=2,sort_keys=True)+'\n')
 PY
 
@@ -770,7 +873,9 @@ terminal_status=$(PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu \
   /home/gianl/vllm-env/bin/python -c \
   'import json,sys; print(json.load(open(sys.argv[1]))["status"])' \
   "$RUN_DIR/summary.json")
-if [[ $OBSERVE_POSITION_113 == 1 ]]; then
+if [[ $EXACT_LAYER0_PROMPT_KEYS == 1 ]]; then
+  [[ $terminal_status == NUMERICAL_EXACT || $terminal_status == NUMERICAL_REJECTED ]]
+elif [[ $OBSERVE_POSITION_113 == 1 ]]; then
   [[ $terminal_status == POSITION113_CAPTURE_CLASSIFIED ]]
 else
   [[ $terminal_status == NUMERICAL_EXACT || $terminal_status == NUMERICAL_REJECTED ]]
@@ -841,6 +946,6 @@ verify_final_object_set "$terminal_status"
 terminal_written=1
 trap - EXIT
 say "$terminal_status archive=$REMOTE_PREFIX no_Gate-D_or_performance_claim=true"
-if [[ $OBSERVE_POSITION_113 == 0 ]]; then
+if [[ $EXACT_LAYER0_PROMPT_KEYS == 1 || $OBSERVE_POSITION_113 == 0 ]]; then
   [[ $terminal_status == NUMERICAL_EXACT ]] || exit 3
 fi
