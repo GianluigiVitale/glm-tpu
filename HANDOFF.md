@@ -1,6 +1,30 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-28 UTC
+**Updated:** 2026-08-29 UTC
+
+## 2026-08-29 PP16 feature2 is numerically rejected; full-width-leaf successor admitted offline
+
+- Protected graph `ab5be45a...cb2d` at pin `363a52b` executed exactly once and passed load,
+  runtime/HLO pins, LP2 locality and HBM, but failed its first required state boundary: carried
+  BF16 bits mismatch `968/6,144`, observed SHA `3f6c86ed...53d2` versus DB550
+  `35a601b7...044c`. Event-1 positions/scores mismatch `1,852/2,048` and `2,048/2,048`; valid
+  count, contract bit and the current key are exact. Freeze this graph and every unchanged 8K
+  extension. Its 30.424-second one-shot wall is operational only and has no performance standing.
+- The failed source prefix remains diagnostic-only. Reviewed recovery pin `d57d752` authenticated
+  every source object at its exact GCS generation, preserved the failed in-process release
+  (`72,812,032` bytes/device, six allocs), authenticated the exited process/locks and post-process
+  8/8 census, and terminally sealed a distinct 18,662-byte `NUMERICAL_REJECTED` archive at
+  `greenfield_pp16_feature2_numerical_recovery_20260829T004819684644332Z`. There is no `SUCCESS`,
+  DB, Gate-D, token-rate or performance claim. Compact evidence is
+  `docs/artifacts/pp16-feature2-numerical-rejection.json`.
+- The smallest forced-two-CPU replay now feeds the real sealed DB550 32 full-width rounded leaves
+  through the actual feature-half y→x→z reducer. Dense and carried results are exact `0/6,144`,
+  SHAs `efde8532...b4fc` / `35a601b7...044c`; StableHLO has one 4×1×3072 ppermute, no
+  all-reduce/all-gather or full hidden. This closes only reducer/add semantics on accepted inputs.
+  The final carried capture cannot distinguish the graph's separate half-width attention O-projection
+  and dense-down producers. Exact next restores both already-proven DB539 attention and DB550 dense
+  full-width virtual-rank contractions, immediately slices each rounded BF16 leaf into halves, then
+  reuses the existing half reducer/persistent state. No TPU action is authorized yet.
 
 ## 2026-08-28 PP16 feature2 HLO/HBM acquisition passes; numerical event 1 is next
 

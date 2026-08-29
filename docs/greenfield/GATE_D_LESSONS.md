@@ -5,23 +5,26 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 
 ## Current boundary
 
-- The only admitted architecture successor is PP16 feature2 persistence: each device keeps one
-  ordered `[1,3072]` half of both dense update and its input residual, transported together as local
-  `[2,1,3072]` (global `[32,2,1,3072]`), with one local FP32 scalar RMS reduction, one
-  completed-normalized LP2 gather, and two slot-preserving 16-stage transport rings. The carried
-  output is computed once and separately pinned to DB550 SHA `35a601b7...044c`; it must never be
-  fed back as the input residual, which would double-add dense. The first
-  decision-capable run must
-  generate its own layer-1 query and all 8,156 layer-1 index keys, because accepted top-k output
-  cannot rescore candidate query/key state. Stop before layer-1 attention output/MLP/dense and all
-  later layers. Exact manifest/header derivation selects 39 ranges and 1,199,760,512 weight bytes
-  per owner. Acquisition-mode loading converts only the six authenticated dense leaves into their
-  DB550-proven final `[in,out]` layout before device placement; expanded scales raise the selective
-  state upper bound including cache/other allowance to 1,260,970,880 bytes/device. The direct
-  feature-half projection exchanges one `[4,1,3072]` y-reduced payload and finishes the accepted
-  y→x→z tree locally; no complete projection update exists on either device. A norm-only replay is
-  already rejected offline and cannot authorize metal. Forced CPU/StableHLO and manifest checks are
-  scaffold evidence only; Gate D remains open until an exact complete protected 8K decoder.
+- PP16 feature2 graph `ab5be45a...cb2d` is numerically rejected and frozen. Its one protected
+  invocation passed load/HLO/locality/HBM but its first carried boundary missed `968/6,144` BF16
+  values (`3f6c86ed...53d2` versus `35a601b7...044c`), followed by `1,852/2,048` event-1 position
+  and `2,048/2,048` score mismatches. Exact valid count, contract bit and one current key do not
+  rescue it or prove the other 8,155 keys/query. Do not repeat this graph or a full 8K extension.
+  The distinct terminal rejection archive is
+  `greenfield_pp16_feature2_numerical_recovery_20260829T004819684644332Z`; its source remains
+  diagnostic-only and its 30.424-second wall is not performance evidence.
+- Real DB550 leaves prove the existing half reducer/add semantics are exact on accepted inputs:
+  forced-two-CPU y→x→z replay
+  matches dense/carried at `0/6,144`, SHAs `efde8532...b4fc` / `35a601b7...044c`, with one
+  `[4,1,3072]` ppermute and no full hidden. The final carried capture cannot isolate which of the
+  two half-width producers caused drift. The only admitted successor changes both unproved
+  producer geometries: run each already-proven DB539 attention O-projection and DB550 dense-down
+  full-width virtual-rank contraction, round BF16, immediately slice each leaf into ordered halves,
+  then use the existing LP2 half reducer and persistent feature state. It must never stack or reduce
+  a full hidden row, must retain exact accepted convolution backend geometry and needs review before
+  any TPU acquisition. Scalar,
+  normalization, consumer-fusion, output-ownership, half-width-contraction fitting and unchanged
+  decoder retries remain frozen. Gate D stays open.
 - The PP16 final-layout y-x-z run closes all upstream layer-0 arithmetic in the live two-chip graph:
   dense update and carried residual are bitwise exact, while only the final normalized row repeats
   DB549 at `1,073/6,144` mismatches and SHA `229dc8ac...812f`. The one-logical-row output-ownership

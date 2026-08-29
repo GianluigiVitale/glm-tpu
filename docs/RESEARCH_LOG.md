@@ -5,6 +5,38 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-29 00:10--00:52 UTC — PP16 feature2 rejected and sealed; real-leaf reducer is exact
+
+Protected tag `greenfield_pp16_feature2_prefill_numerical_20260829T001056567299421Z` at pin
+`363a52b7c8a4201ffbbb899352b7159c26a95b80` passed exact source, runtime, StableHLO/canonical-HLO,
+LP2 locality and measured-HBM gates, then invoked the main graph exactly once. It completed in
+30.424 seconds operationally and captured result SHA `be3dda44...d0d`; this is not performance
+evidence. Offline exact comparison rejects the first carried boundary at `968/6,144` BF16 bits,
+observed/expected SHAs `3f6c86ed...53d2` / `35a601b7...044c`. Event-1 positions and scores mismatch
+`1,852/2,048` and `2,048/2,048`; valid count, contract bit and the current key are exact. The graph
+and any unchanged complete-8K extension are frozen.
+
+The numerical wrapper's in-process cleanup threshold refused at `72,812,032` bytes/device and six
+allocations, after which the process exited and the protected post-census authenticated 8/8 zero
+work. A reviewed CPU/storage-only recovery preserved that failure rather than relabeling it. After
+one validate-only preflight, pin `d57d752e392adaa36cd564f7167826777f3c1dda` sealed the distinct
+same-region recovery tag `greenfield_pp16_feature2_numerical_recovery_20260829T004819684644332Z`.
+Its 11 objects / 18,662 bytes were create-only; `NUMERICAL_REJECTED` generation
+`1787964662056934`, CRC32C `7/9ghw==`, was last. The source prefix is untouched, DB max remains 564,
+and there is no `SUCCESS`, Gate-D, numerical-success, token-rate or performance claim. Evidence is
+`docs/artifacts/pp16-feature2-numerical-rejection.json`.
+
+The next seconds-scale discriminator passed on forced two-device CPU. The actual feature-half
+y→x→z reducer consumed DB550's real 32 full-width rounded BF16 leaves, returned local shape
+`[2,1,3072]`, and matched both the full replay and accepted carried result at `0/6,144`: dense SHA
+`efde8532...b4fc`, carried SHA `35a601b7...044c`. StableHLO SHA `5a8b9e36...8b55` has one
+collective-permute carrying `[4,1,3072]`, zero all-reduce/all-gather and no `[1,6144]` value. This
+is CPU mechanism evidence, not TPU/Gate-D/performance proof. It establishes only that the shared
+reducer/add path is exact on accepted dense leaves. The final carried capture does not distinguish
+the graph's half-width attention O-projection from its half-width dense-down contractions. Exact
+next is implement/review default-off full-width-rounded-then-slice producers for both the already-
+proven DB539 attention and DB550 dense paths before the existing half reducer; no TPU run is authorized.
+
 ## 2026-08-28 23:10--23:12 UTC — PP16 feature2 HLO/HBM acquisition passes
 
 Sol approved exact correction diff `2e259631...c5da` for commit and one repeat. Pin

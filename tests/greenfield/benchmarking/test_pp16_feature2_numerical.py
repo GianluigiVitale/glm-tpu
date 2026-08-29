@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import json
+import os
 import subprocess
+import sys
+from hashlib import sha256
 from pathlib import Path
 
 import ml_dtypes
@@ -318,3 +322,115 @@ def test_protected_feature2_rejection_exact_identities_are_executable() -> None:
     assert report["expected_sha256"]["carried_bfloat16_bits"] == (
         "35a601b7f174eb9204848757f709549a31e82774309929f4071c61849626044c"
     )
+
+
+@pytest.mark.skipif(not DB550.is_file(), reason="protected DB550 leaves unavailable")
+def test_real_db550_leaves_are_exact_through_feature_half_reducer() -> None:
+    program = r'''
+from hashlib import sha256
+import json
+from pathlib import Path
+import jax
+import jax.numpy as jnp
+import ml_dtypes
+import numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from glm_tpu.greenfield.benchmarking.pp16_dense_boundary import (
+    derive_expected_dense_boundary_bits,
+    replay_pp16_strategy_nd_y_x_z_bits,
+)
+from glm_tpu.greenfield.kernels.stage_local import (
+    STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE,
+    _reduce_strategy_nd_feature_half_bf16_partials,
+)
+
+path = Path("/home/gianl/gcs-models/results/greenfield_layer0_dense_partial_capture_20260813T200736889447458Z/dense_partial_capture.npz")
+with np.load(path, allow_pickle=False) as handle:
+    bits = np.ascontiguousarray(handle["dense_virtual_partials_bfloat16_bits"])
+    residual = np.ascontiguousarray(handle["post_attention_residual_bfloat16_bits"])
+source = bits.reshape(2, 16, 1, 6144).view(ml_dtypes.bfloat16)
+mesh = Mesh(np.asarray(jax.devices()), ("stage",))
+half0 = jax.device_put(source[..., :3072], NamedSharding(mesh, P("stage", None, None, None)))
+half1 = jax.device_put(source[..., 3072:], NamedSharding(mesh, P("stage", None, None, None)))
+
+def mapped(local0, local1):
+    reduced = _reduce_strategy_nd_feature_half_bf16_partials(
+        local0[0], local1[0], axis_name="stage", pairs=((0, 1), (1, 0))
+    )
+    return reduced[None, ...]
+
+execute = jax.shard_map(
+    mapped,
+    mesh=mesh,
+    in_specs=(P("stage", None, None, None), P("stage", None, None, None)),
+    out_specs=P("stage", None, None),
+    check_vma=False,
+)
+lowered = jax.jit(execute).lower(half0, half1)
+hlo = lowered.as_text()
+halves = np.asarray(jax.jit(execute)(half0, half1))
+actual = np.ascontiguousarray(np.concatenate((halves[0], halves[1]), axis=-1)).view(np.uint16)
+model_ids = tuple(int(item) for item in np.argsort(np.asarray(STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE)))
+expected, expected_carried = derive_expected_dense_boundary_bits(bits, residual, model_ids)
+full = replay_pp16_strategy_nd_y_x_z_bits(bits)
+actual_carried = np.asarray(
+    actual.view(ml_dtypes.bfloat16).astype(np.float32)
+    + residual.view(ml_dtypes.bfloat16).astype(np.float32),
+    dtype=ml_dtypes.bfloat16,
+).view(np.uint16)
+print(json.dumps({
+    "actual_carried_sha256": sha256(actual_carried.tobytes()).hexdigest(),
+    "actual_dense_sha256": sha256(actual.tobytes()).hexdigest(),
+    "all_gather_count": hlo.count("stablehlo.all_gather"),
+    "all_reduce_count": hlo.count("stablehlo.all_reduce"),
+    "carried_mismatch_count": int(np.count_nonzero(actual_carried != expected_carried)),
+    "collective_permute_count": hlo.count("stablehlo.collective_permute"),
+    "dense_mismatch_count": int(np.count_nonzero(actual != expected)),
+    "expected_carried_sha256": sha256(expected_carried.tobytes()).hexdigest(),
+    "expected_dense_sha256": sha256(expected.tobytes()).hexdigest(),
+    "forbidden_full_hidden": "tensor<1x6144xbf16>" in hlo,
+    "full_replay_sha256": sha256(full.tobytes()).hexdigest(),
+    "jax": jax.__version__,
+    "backend": jax.default_backend(),
+    "device_count": jax.device_count(),
+    "payload_present": "tensor<4x1x3072xbf16>" in hlo,
+    "source_file_sha256": sha256(path.read_bytes()).hexdigest(),
+    "stablehlo_byte_count": len(hlo.encode()),
+    "stablehlo_sha256": sha256(hlo.encode()).hexdigest(),
+}, sort_keys=True))
+'''
+    environment = dict(os.environ)
+    environment["JAX_PLATFORMS"] = "cpu"
+    environment["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    report = json.loads(completed.stdout.strip().splitlines()[-1])
+    report["replay_program_sha256"] = sha256(program.encode()).hexdigest()
+    assert report == {
+        "actual_carried_sha256": "35a601b7f174eb9204848757f709549a31e82774309929f4071c61849626044c",
+        "actual_dense_sha256": "efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc",
+        "all_gather_count": 0,
+        "all_reduce_count": 0,
+        "backend": "cpu",
+        "carried_mismatch_count": 0,
+        "collective_permute_count": 1,
+        "dense_mismatch_count": 0,
+        "device_count": 2,
+        "expected_carried_sha256": "35a601b7f174eb9204848757f709549a31e82774309929f4071c61849626044c",
+        "expected_dense_sha256": "efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc",
+        "forbidden_full_hidden": False,
+        "full_replay_sha256": "efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc",
+        "jax": "0.10.1",
+        "payload_present": True,
+        "replay_program_sha256": "3910d1ea062222df05deabc06b8f0ce711d8d59f948330c82e2d3da6f4cda1aa",
+        "source_file_sha256": "f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298",
+        "stablehlo_byte_count": 23203,
+        "stablehlo_sha256": "5a8b9e36d685eee5c938d62c54a826291466156321540e81d99d5113bf5d8b55",
+    }
