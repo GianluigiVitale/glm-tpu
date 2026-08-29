@@ -7674,3 +7674,37 @@ authorized no protected execution. Final validation is 10/10 focused greenfield 
 2 skipped affected shared tests and 4/4 isolated observer tests. The exact archived prune manifest
 reconstructs byte-for-byte, and a real local compact replay retains 45 files/14,629,391 bytes while
 recording the 485 excluded reproducible files. Gate D remains open.
+
+## Current exact next: close missing-HLO evidence offline; no TPU action
+
+Fresh Fable 5 Max advice and independent review agree that the proposed no-TPU exact optimized-HLO
+diff has no sealed recovery path: the accepted DB485, historical DB551 and current DB565 inventory
+snapshots contain no compiler-artifact-named object, every anchored engine config has
+`debug_dump_path=None`, the old compiling pod is deleted and the surviving cache has no step
+executable. Object payloads were not exhaustively scanned for embedded compiler IR, so this is not
+a content-absence claim. They also agree that callback rearming, CPU-substitute HLO and unsupported
+value tracepoints are forbidden. The merged review rejects Fable's optional PP16 boundary
+relaxation: DB518 already proves downstream q-a/query/head/event-1 DSA drift, so a full 8K run would
+violate the smallest-decisive-test rule.
+
+The new offline classifier byte-authenticates DB485's manifest and terminal SUCCESS seal, including
+its full `b3c25df47ac98783912dc658878181ec0a8ae16d` pin and DB485/item1769 identity. It also
+authenticates the three log SHAs, every anchored code marker, exact date/PID/tag windows, sole
+`debug_dump_path=None` configuration, ordered `[32,64,128,256,512,1024,2048]` buckets, and seven
+ordered `(executable, executable-including-data, host-transfer)` triples per run. The certificate
+binds the 509/507/45-file archive inventories, DB551/DB565 equality, DB485 disjointness in all three
+identity dimensions and the exact repeated 557,434/573,438 DSA mismatch. Tracked capsule
+`docs/artifacts/callback-executable-class-certificate.json` has SHA
+`6e58bca961c0629799683ccfb75efda195206885e36975e497630ec379076e48`. Its classification is
+`CALLBACK_EXECUTABLE_CLASS_REJECTED;ACCEPTED_CLASS_HAS_NO_SEALED_HLO_RECOVERY_PATH`.
+It explicitly does not localize materialization/fusion/scheduling or make a Gate-D claim.
+
+Fable supplied the blocker analysis but reached 100% usage on the correction review. The
+goal-authorized independent Sol correction-only review then returned
+`APPROVE COMMIT/PUSH/MIRROR` with no P0--P2 blockers. Ruff and diff checks are clean; 31
+focused/adjacent tests pass, including real-source byte-for-byte regeneration. After persistence,
+exact next is a separate execution design for at most one accepted-`b3c25df` compile-only HLO dump,
+with no decode and a hard requirement that all seven fingerprint triples equal DB485 in all three
+identity dimensions before the HLO is admissible. A mismatch is terminal for that design; a match
+is mechanism evidence only. No TPU execution is authorized here. Gate D is open and a numerical
+successor still requires a genuinely new bounded plan-level physical state/ownership mechanism.

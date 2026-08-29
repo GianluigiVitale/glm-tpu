@@ -798,8 +798,26 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
   or a locally correct chunk can silently discard all keys written by earlier chunks.
 - The 2026-08-29 layer-1 two-operand callback repeated DB551 exactly: 557,434 position and 573,438
   score mismatches, first at event 1, despite exact token and event 0. “Non-returning” is not
-  “non-consuming”; `jax.debug.callback` materializes values and may split the fused schedule. The
+  “non-consuming”; the callback creates a distinct value consumer. The two callback runs share the
+  same seven ordered executable, executable-including-data and host-transfer fingerprint triples,
+  while accepted DB485 is disjoint in all three dimensions. This is consistent with
+  materialization/fusion/scheduling change, but no sealed HLO localizes the responsible optimized
+  operation and the source pins contain other diagnostic support deltas. Do not promote the
+  consistency statement into a causal compiler claim. The
   observer pin, registration, launch mode and accepted sealer are permanently tombstoned. Never
-  repeat this layer-1 fused-boundary callback capture class. Only a documented post-optimization
-  backend tracepoint with
-  unchanged executable identity plus exact DSA could qualify; compiler diffs are mechanism-only.
+  repeat this layer-1 fused-boundary callback capture class.
+- Certificate `docs/artifacts/callback-executable-class-certificate.json`, SHA
+  `6e58bca9...6e48`, byte-authenticates DB485's manifest/SUCCESS/full code pin/run/item identity and
+  all three logs, every anchored code marker, run date/PID/tag windows, token-bucket order and
+  509/507/45-object archive inventories. No inventory has a compiler-artifact-named object; payloads
+  were not exhaustively scanned for embedded compiler IR. The original no-TPU optimized-HLO diff
+  therefore has no sealed recovery path without one new compile. A CPU JAXpr/StableHLO is not a
+  substitute. No documented TPU value tracepoint currently promises unchanged executable identity;
+  stop hidden-value capture work.
+- If separately reviewed, admit at most one accepted-tree compile-only dump with no decode and a
+  hard DB485 seven-triple equality gate covering executable, executable-including-data and
+  host-transfer identities. A mismatch seals an inadmissible diagnostic and stops; a match permits
+  mechanism inspection only. It cannot close Gate D or promise recovery of the hidden FP32 value.
+  DB518 already differs in downstream q-a/query/head/event-1 DSA, so do not weaken its boundary
+  policy to justify a known-risk full 8K run. A numerical successor still requires a genuinely new
+  bounded plan-level physical state/ownership mechanism.

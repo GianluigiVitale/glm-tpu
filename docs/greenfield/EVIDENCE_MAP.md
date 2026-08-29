@@ -1566,9 +1566,34 @@ array/operand SHAs, 8/8 cleanup and the generation-bound cost cleanup. Classific
 `REJECTED_OBSERVER_PERTURBATION`; neither its BF16 operands nor host FP32 reconstruction is an
 accepted oracle. All layer-1 RMS-input callback acquisition/sealing routes must fail before
 cloud/JAX/model work.
-Only an executable-identity-preserving backend tracepoint could reopen numeric capture; otherwise
-the FP32 boundary is unobservable and Gate D remains open.
+No documented TPU backend tracepoint currently extracts the value while promising unchanged
+executable identity. Without such a supported mechanism, the FP32 boundary is unobservable and
+hidden-value capture remains closed; Gate D remains open.
 
 Isolated observer tombstone commit `c7973435aa2fc948da9185ef99938f886613ce2f` is pushed. Sol's
 correction-only audit approved commit/push/mirror with no P0--P2 blockers and no execution. Final
 coverage is 10/10 focused greenfield, 175 passed/2 skipped affected shared and 4/4 observer tests.
+
+Offline certificate `docs/artifacts/callback-executable-class-certificate.json`, SHA
+`6e58bca961c0629799683ccfb75efda195206885e36975e497630ec379076e48`, supersedes the proposed
+no-TPU HLO diff. It byte-authenticates DB485's manifest and terminal SUCCESS seal, including the
+full `b3c25df47ac98783912dc658878181ec0a8ae16d` pin and DB485/item1769 identity. It authenticates
+log SHAs `c680eb58...2f51`, `29911df0...f12` and `2285a893...f549` through run date, EngineCore
+PID, every anchored Git marker and tag/profile anchors. Each run has exactly the ordered
+`[32,64,128,256,512,1024,2048]` backbone buckets and seven ordered executable,
+executable-including-data and host-transfer fingerprint triples. DB551 and DB565 match; DB485 is
+disjoint in all three identity dimensions. Exact 509/507/45-file inventory snapshots contain no
+HLO/StableHLO/XLA/compile/executable/fingerprint-named object, and every anchored engine config
+recorded `debug_dump_path=None`. Object payloads were not exhaustively scanned for embedded
+compiler IR; this is an inventory-name and sealed-recovery-path result, not content-absence proof.
+
+Classification is `CALLBACK_EXECUTABLE_CLASS_REJECTED;`
+`ACCEPTED_CLASS_HAS_NO_SEALED_HLO_RECOVERY_PATH`. Proven class identity does not localize
+materialization, fusion, scheduling, collective order or any other optimized operation; the source
+diffs contain other diagnostic support changes and compiler-fingerprint identity is an explicit
+assumption. The surviving-cache check remains only a dated host observation. No CPU-derived IR,
+callback retry, unsupported value tracepoint, Gate-D, DB or performance claim follows. Exact next
+after offline review/persistence is separate design review of at most one accepted-`b3c25df`
+compile-only dump. Its seven fingerprint triples must equal DB485 in all three identity dimensions
+before any HLO is admissible; it executes no decode and remains mechanism-only. The already-rejected
+DB518 downstream DSA path does not receive a relaxed boundary or a full-8K retry.
