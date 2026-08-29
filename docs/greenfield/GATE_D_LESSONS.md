@@ -21,34 +21,41 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 
 ## Current boundary
 
-- The reviewed 15-root compile-only graph compiled once but refused because optimized TPU HLO
-  erased all four barrier names. Its actual StableHLO and complete canonical optimized executable
-  are now pinned, while every structural/locality/root check remains mandatory. The wrapper hashes
-  actual archive files, regenerates canonical HLO and byte-compares the stored canonical artifact.
-  Stale-file cross-wires reject. The helper import must live in the same post-run Python heredoc as
-  its call; a regression test extracts and compiles that exact block and checks its AST so another
-  heredoc cannot mask scope failure. Focused HLO/wrapper tests pass 84/84 and the complete
-  benchmarking suite passes 293 with 10 expected skips. This correction still needs Sol approval,
-  commit/push/mirror and exactly one compile-only repeat. Numerical execution and complete 8K
-  remain forbidden.
-- The only admitted PP16 successor now has real selected-state HLO/HBM evidence at pushed pin
+- The corrected 15-root compile-only successor passed at reviewed commit `a2ea1e9`, tag
+  `greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z`. Exact actual-file
+  StableHLO/raw optimized/canonical identities, every structural/locality/root contract, four
+  sealed bindings, selected final-layout state, HBM and zero-collective materializers pass. The
+  physical main graph remains two adjacent partitions with 27 all-gathers, 17 all-reduces and 12
+  feature permutes. Main execution count is zero. The independently hash-verified 20-object archive
+  and 8/8 pre/sync/post evidence close only this graph's real-state HLO/HBM prerequisite. Pin the
+  separate default-off strict numerical wrapper to this exact code/HLO/archive identity, review and
+  commit/push/mirror it, then run one zero-warmup event-1 comparison. Numerical execution and
+  complete 8K remain forbidden until that separately protected comparison is exact.
+
+## Historical and frozen boundaries
+
+- The compile-only predecessor at pushed pin
   `79a1590812bd805187737cc85d2068d8486519a6`, tag
-  `greenfield_pp16_feature2_prefill_acquire_20260829T023702949220285Z`. Main arithmetic was not
-  invoked. StableHLO pins 64 N6144 attention producers, 64 N6144 dense-down convolutions and eight
+  `greenfield_pp16_feature2_prefill_acquire_20260829T023702949220285Z`, is superseded historical
+  evidence. Main arithmetic was not invoked. StableHLO pins 64 N6144 attention producers, 64
+  N6144 dense-down convolutions and eight
   half reducers; optimized HLO additionally proves all eight causal producer-frontier/owner-half
   lineages. One-row/half-sharded roots, two adjacent partitions and forbidden-transport contracts
   pass. Load/peak use is 1,203,933,696 / 1,249,780,224 bytes per device with 31,747,741,184 bytes
   in the post-compile largest free block; all three materializers have zero collectives. The exact
   20-object `US-CENTRAL2` archive and pre/sync/post 8/8 checks are independently byte-verified.
-  This is compile-only evidence, not numerical, Gate-D or performance proof. The current exact
-  comparator omits authenticated normalized-hidden, q-a-state, DSA-query and head-weight
-  comparisons. Add those and hostile tests, then acquire the changed output graph before one
-  reviewed numerical execution; complete PP16 8K remains forbidden.
-- PP16 feature2 graph `ab5be45a...cb2d` is numerically rejected and frozen. Its one protected
-  invocation passed load/HLO/locality/HBM but its first carried boundary missed `968/6,144` BF16
+  This predecessor is compile-only evidence, not numerical, Gate-D or performance proof. Its
+  missing normalized-hidden, q-a-state, DSA-query and head-weight comparisons were added and the
+  changed 15-root graph was acquired at `a2ea1e9` above. Do not repeat its obsolete next step.
+- The half-width producer variant executed at code pin `363a52b7c8a4201ffbbb899352b7159c26a95b80`
+  is numerically rejected and frozen. Its abstract graph SHA `ab5be45a...cb2d` is shared with the
+  later full-width-rounded-then-slice variant and is not a sufficient freeze identity by itself.
+  The rejected variant's one protected invocation passed load/HLO/locality/HBM but its first
+  carried boundary missed `968/6,144` BF16
   values (`3f6c86ed...53d2` versus `35a601b7...044c`), followed by `1,852/2,048` event-1 position
   and `2,048/2,048` score mismatches. Exact valid count, contract bit and one current key do not
-  rescue it or prove the other 8,155 keys/query. Do not repeat this graph or a full 8K extension.
+  rescue it or prove the other 8,155 keys/query. Do not repeat this half-width variant or extend it
+  to a full 8K run.
   The distinct terminal rejection archive is
   `greenfield_pp16_feature2_numerical_recovery_20260829T004819684644332Z`; its source remains
   diagnostic-only and its 30.424-second wall is not performance evidence.
@@ -74,9 +81,9 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   select-branch, shifted-zero predicate and metadata-decoy direction/mask swaps are mandatory;
   executable attributes must never be inferred from provenance text. The corrected adjacent suite
   passes 116 tests. The compile-only acquisition above closes this graph's real-state HLO/HBM
-  prerequisite; numerical execution remains unauthorized until the missing exact boundary
-  comparisons and hostile tests are added and the changed output graph is acquired and reviewed.
-  Scalar,
+  prerequisite with the exact boundary comparisons and hostile tests present. Numerical execution
+  remains unauthorized until the separate strict numerical wrapper is pinned to the `a2ea1e9`
+  acquisition, adversarially reviewed, committed, pushed and byte-mirrored. Scalar,
   normalization, consumer-fusion, output-ownership, half-width-contraction fitting and unchanged
   decoder retries remain frozen. Gate D stays open.
 - The PP16 final-layout y-x-z run closes all upstream layer-0 arithmetic in the live two-chip graph:

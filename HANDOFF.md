@@ -2,6 +2,30 @@
 
 **Updated:** 2026-08-29 UTC
 
+## 2026-08-29 sealed PP16 compile-only acquisition passes after exact-identity correction
+
+- Sol approved staged SHA `5a6d493b...84aaf` for commit and exactly one compile-only repeat.
+  Commit `a2ea1e9439493b0093824d0084bc46c813fc1c33` was pushed and all eight changed
+  files matched the locked `US-CENTRAL2` mirror before protected tag
+  `greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z`. The wrapper authenticated
+  sources, 8/8 pre-census and fleet pin, loaded the final selected state, compiled four graphs in
+  52 seconds and terminally sealed `HLO_ACQUIRED`. Main execution count is zero; there is no
+  numerical, Gate-D, DB, token-rate or performance claim.
+- Actual StableHLO/raw optimized/canonical HLO identities are `6c1c69d7...10ad` /
+  `a6307a5f...175` / `9e933384...19a5`; the canonical artifact is 6,558,627 bytes under v1 with
+  14,561 stripped stack-frame references. All 15 roots and the four exact sealed bindings pass.
+  The executable has two adjacent partitions, 27 all-gathers, 17 all-reduces and 12 feature
+  permutes; all three materializers have zero collectives. Load/peak use is 1,203,933,696 /
+  1,249,780,224 bytes per device, the post-compile largest free block is 31,747,741,184 bytes and
+  cleanup returns to 1,753,088 bytes/five allocations.
+- Independent audit re-downloaded and hash-matched the exact 20-object archive, recomputed the
+  terminal self-hash, actual-file canonical identity and both main HLO contracts, and confirmed
+  8/8 pre/sync/post evidence. Compact evidence is
+  `docs/artifacts/pp16-feature2-sealed-hlo-acquisition.json`. This closes the sealed successor's
+  real-state HLO/HBM prerequisite only. Exact next is update the separate default-off strict
+  numerical wrapper to pin this acquisition, review/commit/push/mirror it, then run one protected
+  zero-warmup event-1 numerical execution. Complete PP16 8K remains forbidden until exact success.
+
 ## 2026-08-29 sealed PP16 compile-only run refused on erased TPU marker names
 
 - Reviewed commit `6aa39b6374787a02fa44e0297a3a8a012ada60e9` was pushed and all 13 changed

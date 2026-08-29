@@ -1,0 +1,129 @@
+{
+  "artifact_kind": "greenfield_pp16_feature2_sealed_hlo_acquisition_evidence",
+  "schema_version": 1,
+  "status": "HLO_ACQUIRED",
+  "run_tag": "greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z",
+  "code_hash": "a2ea1e9439493b0093824d0084bc46c813fc1c33",
+  "reviewed_staged_diff_sha256": "5a6d493b491e4912475df05f475e0e70ce8728a8e9ea365d1b18d83f79d84aaf",
+  "review_verdict": "APPROVE COMMIT AND ONE COMPILE-ONLY REPEAT",
+  "graph_sha256": "ab5be45aecf3b0b5d87ad76af8076bc9351823529a08c0eadb414b072b31cb2d",
+  "remote_prefix": "gs://driftbench-dsv4-uc/results/greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z",
+  "bucket_location": "US-CENTRAL2",
+  "claim_scope": "compile-only real selected-state/HLO/HBM acquisition for the default-off full-width-rounded-then-slice successor with exact sealed boundaries; no main arithmetic, numerical, Gate-D, token-rate, or performance claim",
+  "elapsed_seconds": 52,
+  "compile_only": true,
+  "full_width_rounded_then_slice": true,
+  "sealed_boundary_capture": true,
+  "main_executed": false,
+  "main_execution_count": 0,
+  "numerical_claim": false,
+  "performance_claim": false,
+  "physical_group": {
+    "device_ids": [0, 1],
+    "coordinates": [[0, 0, 0], [1, 0, 0]],
+    "local_device_count_visible": 4,
+    "mesh_device_count": 2,
+    "num_partitions": 2
+  },
+  "selected_state": {
+    "manifest_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+    "state_sha256": "ee5cfb59c0d0028175565a3caf3f84d6b2b3bef0bd48a4ed8b914d02753482cc",
+    "selected_read_count": 78,
+    "selected_reads_per_owner": 39,
+    "selected_weight_bytes_per_owner": 1199760512,
+    "final_weight_bytes_per_owner": 1203271808,
+    "device_roundtrip_bytes": 2406543616,
+    "dense_final_layout": true,
+    "raw_dense_device_materialization": false,
+    "device_roundtrip_verified": true
+  },
+  "main_hlo": {
+    "stablehlo_sha256": "6c1c69d76c3d121ed4f84cb85fe0091d1605ae43d0d5707e3d52ba2cdd310ad4",
+    "stablehlo_bytes": 1763539,
+    "optimized_hlo_sha256": "a6307a5f487b0cfcd79712c45ace89753cf0dc54e332b5c24fe9010a36ae3175",
+    "optimized_hlo_bytes": 6927166,
+    "execution_canonical_hlo_sha256": "9e933384f340eef45b0479f740379356831feb792a046d11db266f5d69c719a5",
+    "execution_canonical_hlo_bytes": 6558627,
+    "canonicalizer_version": 1,
+    "stripped_stack_frame_references": 14561,
+    "lowering_seconds": 1.7068114119756501,
+    "compile_seconds": 19.24423160101287,
+    "stablehlo_reachable_function_count": 92,
+    "optimized_instruction_count": 22233,
+    "h16_b512_attention_calls": 8,
+    "attention_n6144_producers": 64,
+    "dense_down_n6144_convolutions": 64,
+    "dense_gate_convolutions": 64,
+    "attention_n3072_producers": 0,
+    "dense_down_n3072_convolutions": 0,
+    "half_reducer_count": 8,
+    "producer_chunk_count": 4,
+    "owner_half_lineage_contracts_passed": 8,
+    "sealed_output_count": 15,
+    "sealed_bindings": {
+      "6": "greenfield_pp16_feature2_sealed_normalized_hidden",
+      "7": "greenfield_pp16_feature2_sealed_q_a_state",
+      "8": "greenfield_pp16_feature2_sealed_dsa_query",
+      "9": "greenfield_pp16_feature2_sealed_dsa_head_weights"
+    },
+    "physical_collectives": {
+      "all-gather": 27,
+      "all-reduce": 17,
+      "collective-permute": 12,
+      "total": 56
+    },
+    "one_row_half_sharded_terminal": true,
+    "host_markers": [],
+    "forbidden_markers": [],
+    "memory_analysis_bytes": {
+      "argument": 1234902528,
+      "temporary": 597798912,
+      "output": 7439360,
+      "generated_code": 64264704
+    }
+  },
+  "materializers": {
+    "physical_collective_count_each": 0,
+    "query_fp32": {
+      "stablehlo_sha256": "a4b03c88da70887fc3f9df98782d7a76620b94edb2f67d9533a5b5ad5929de00",
+      "optimized_hlo_sha256": "fee0090619f141d82c79020f96a9b9377b06a324bf9632433b565156eb0b2067"
+    },
+    "wk_decode_bf16": {
+      "stablehlo_sha256": "11c5e2745744ff2e4aa0a8bf061f603cb107cae9a04b3397e3c6f6a99607c133",
+      "optimized_hlo_sha256": "33002156656d7a2b13a5326199f9bf8e34c992537440c41f6b4b96b23751299c"
+    },
+    "wk_promote_fp32": {
+      "stablehlo_sha256": "7485fbee1cec48207dc1d8c73af68fc888c1bf15e19347647fc35e323fd5bc58",
+      "optimized_hlo_sha256": "83ffc3978d5b3d80b2b219bf32c716c833ffb9d75c622e7bdfdeb2692d49a94e"
+    }
+  },
+  "measured_device_memory_bytes": {
+    "after_load_in_use": 1203933696,
+    "peak_in_use": 1249780224,
+    "after_compile_largest_free_block": 31747741184,
+    "after_cleanup_in_use": 1753088,
+    "after_cleanup_largest_free_block": 31748856320,
+    "after_cleanup_allocations": 5,
+    "after_execute": null
+  },
+  "evidence": {
+    "preterminal_object_count": 19,
+    "remote_object_count_including_terminal": 20,
+    "all_remote_sha256_match": true,
+    "terminal_self_hash_recomputed": true,
+    "hlo_contracts_independently_recomputed": true,
+    "runner_sha256": "75bdd75f03fa4bba530f7863ae3b5728094745ea2e3884fb4d0ae72e8767c566",
+    "summary_sha256": "1dda18f3d007c6859911d29d9b1e526c75e37d748ed3d27f61683026e2218c45",
+    "source_identity_sha256": "41dee99d08ca3d170e8545513674b6292b8a9243720e740615ad865f64c3aa7a",
+    "evidence_ledger_sha256": "7741bef152843992afc23902e5cab20be52dac55722f1da1ff7f017990449036",
+    "pre_census_sha256": "2b88593b8365d19f6df2d0d253c40f38ec6394d918c890efea2f33bdac2a61cc",
+    "post_census_sha256": "6baa9c910ee4b3314f396b80a914652f2d62ad7135af5709b602d083bcde02bc",
+    "sync_sha256": "adda4d7dc92ac447b850e74ff62e18652bb2917aef806d3e791546a75ea3b613",
+    "terminal_file_sha256": "b483460ebee19140d5fc30df77fa9851ad5bb080b307c740a0f6baa781b1d271",
+    "terminal_marker_self_sha256": "abec1454910e319be88e72eb8d7e5dbb55b841911990b1f2f76a1795a536fbde",
+    "pre_census": "authenticated 8/8 zero work",
+    "sync": "8/8 exact code pin",
+    "post_census": "authenticated 8/8 zero work"
+  },
+  "exact_next": "pin the separately default-off strict numerical wrapper to this exact successful code/HLO/archive identity, adversarially review that launcher, commit/push/byte-mirror it, then run one protected zero-warmup numerical event-1 execution; complete PP16 8K remains forbidden until exact numerical success"
+}

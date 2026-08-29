@@ -5,6 +5,33 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-29 04:25--04:29 UTC — sealed PP16 HLO/HBM acquisition passes
+
+- Sol returned `APPROVE COMMIT AND ONE COMPILE-ONLY REPEAT` for staged SHA
+  `5a6d493b...84aaf`. Reviewed commit `a2ea1e9439493b0093824d0084bc46c813fc1c33` was
+  pushed and its eight changed files were byte-matched to the locked `US-CENTRAL2` repository
+  mirror before tag `greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z` ran.
+  Source authentication, 8/8 clean pre-census and 8/8 exact fleet pin passed. The selected state
+  loaded and all four graphs compiled in 52 seconds; main execution count remained zero. The run
+  terminally sealed `HLO_ACQUIRED` with no numerical, Gate-D, DB, token-rate or performance claim.
+- Main StableHLO/raw optimized/canonical SHAs are `6c1c69d7...10ad` / `a6307a5f...175` /
+  `9e933384...19a5`. Canonical bytes/version/stripped references are 6,558,627 / 1 / 14,561.
+  Exact 15-root geometry and sealed root bindings 6--9 pass. The executable has two adjacent
+  partitions, eight H16/B512 calls, 64 live N6144 attention producers, 64 live N6144 dense-down
+  convolutions, 64 gates, 27 all-gathers, 17 all-reduces and 12 feature permutes. The three
+  materializers each have zero collectives; forbidden work/transport and host markers are absent.
+- Selected load/peak memory is 1,203,933,696 / 1,249,780,224 bytes per device. The post-compile
+  largest free block is 31,747,741,184 bytes; post-cleanup use is 1,753,088 bytes and five
+  allocations. An independent audit downloaded and hash-matched the exact 20 remote objects,
+  recomputed the terminal self-hash, canonical artifact and both main HLO contracts, and confirmed
+  8/8 pre/sync/post evidence. Ledger/runner/summary/terminal SHAs are `7741bef1...036` /
+  `75bdd75f...566` / `1dda18f3...c45` / `b483460e...271`. Compact evidence is
+  `docs/artifacts/pp16-feature2-sealed-hlo-acquisition.json`.
+- This is the sealed successor's real-state HLO/HBM prerequisite, not numerical or Gate-D proof.
+  Exact next is pin the separate default-off strict numerical wrapper to this code/HLO/archive
+  identity, adversarially review and commit/push/mirror that launcher, then execute one protected
+  zero-warmup event-1 comparison. Complete PP16 8K remains unauthorized until exact success.
+
 ## 2026-08-29 03:40--04:00 UTC — sealed PP16 compile-only refusal yields exact executable identity
 
 - Commit `6aa39b6374787a02fa44e0297a3a8a012ada60e9` was pushed and its 13 changed
