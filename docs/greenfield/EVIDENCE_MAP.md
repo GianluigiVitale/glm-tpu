@@ -1516,3 +1516,21 @@ validation suite has 334 passes, 40 skips and only two unrelated WS32 baseline f
 reproduced at clean `HEAD`. This is preparation evidence only: no protected acquisition, accepted
 FP32 tensor, Gate-D, DB or performance result exists. The next action remains adversarial review
 of this immutable batch followed by a separate protected-run authorization.
+
+The first execution-only review then blocked before launch on recreated-pod state: workers 1--7
+lack the base Git checkout assumed by observer worktree creation and all hosts lack
+`/tmp/golden.json`. No TPU/model/Ray action occurred. The pending correction uses a self-contained
+bundle of exact observer pin `8dc7d20f` (947 tracked entries, 12 accepted-parent commits), validates
+copy/clone/ancestry/cleanup on all hosts, and restores the 321,146-byte golden manifest only from
+the SHA-bound `driftbench-dsv4-uc` rank source. Terminal replay seals both receipt sets. Corrected
+focused coverage passes 11/11 and all adjacent shared-wrapper suites pass 165 with two skips. This
+batch's full forced-CPU validation has 335 passes and 40 skips with only the same two unrelated WS32
+baseline failures already reproduced at clean `HEAD`; no WS32 file changed. The first correction
+audit caught caller-CWD-dependent bundle verification and an unset default-mode terminal branch;
+the final diff supplies repository-explicit verification, a safe default argument and independent
+clone/verify/checkout refusal, then reproduces those validation results. This is still offline
+preparation. A second audit caught real `gcloud ssh` banners contaminating exact receipt files;
+stdout receipts and seven archived SSH-status files are now separate, and a real-banner-shaped
+terminal regression proves mixed receipts refuse. The same validation results pass on this final
+diff. Sol approved correction commit/push/mirror at staged SHA `95f6a0ec...1d20317` and authorized
+no execution. Gate D remains open.

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from hashlib import sha256
 import json
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
+from hashlib import sha256
+from pathlib import Path
 
 import ml_dtypes
 import numpy as np
@@ -21,12 +21,11 @@ from glm_tpu.greenfield.kernels.stage_local import (
 from glm_tpu.greenfield.validation.layer1_rms_input import (
     CAPTURE_KIND,
     COMPARISON_KIND,
-    Layer1RmsInputCaptureConfig,
     RECONSTRUCTION_SEMANTICS,
+    Layer1RmsInputCaptureConfig,
     capture_accepted_layer1_rms_input,
     validate_layer1_rms_input_artifacts,
 )
-
 
 LEGACY_PIN = "8dc7d20fedca5a98c27bfd1774827305973fa4c1"
 ORACLE_PIN = "b3c25df47ac98783912dc658878181ec0a8ae16d"
@@ -338,6 +337,9 @@ def test_protected_wrapper_is_default_off_and_pins_sources() -> None:
         "VLLM_PIN=a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c",
         "VLLM_IR_LAYERNORM_SHA=d8e4380ca97d2c719836a7e15fb410a73d354b15d79fc54275b573bbb1c06910",
         "VLLM_EXECUTOR_LAYERNORM_SHA=53c6abdab25dc1675f26f4c8fc5ba2094f1fb4a106334e581f630436210d0c9b",
+        "GOLDEN_MANIFEST_SHA=916d421a10de9495086c0ad52645c9937746c88bae87a5ca1a69483bfe60d45d",
+        "GOLDEN_MANIFEST_BYTES=321146",
+        "LAYER1_OBSERVER_TRACKED_FILE_COUNT=947",
         "DB550_BOUNDARY_SHA=f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298",
         "STRADDLER_CLASSIFICATION_SHA=eebe1c5d5ba475a5faf000243d881657754fc47ed2345fe2691d923c1d457b36",
     ):
@@ -347,12 +349,29 @@ def test_protected_wrapper_is_default_off_and_pins_sources() -> None:
     )
     for exact in (
         'git -C "$VLLM_ARCHIVE_REPO" archive --format=tar.gz',
+        'git -C "$LEGACY_SOURCE_REPO" bundle create',
+        '"$POD:$OBSERVER_BUNDLE_REMOTE"',
+        'actual_bundle=$(sha256sum "$bundle"',
+        'git -C "$dest" bundle verify "$bundle"',
+        'git -C "$temp" bundle verify "$bundle"',
+        "OBSERVER_SYNC_BAD $(hostname) clone",
+        "OBSERVER_SYNC_BAD $(hostname) checkout",
+        "OBSERVER_SYNC_BAD $(hostname) temp_identity",
+        'git clone -q --no-checkout "$bundle" "$temp"',
+        "golden.rank${idx}.json",
+        "OBSERVER_TRANSPORT_CLEAN_OK $(hostname)",
+        '2>"$RUN_DIR/observer_transport_vacancy_ssh.txt"',
+        '2>"$RUN_DIR/sync_observer_ssh.txt"',
+        '2>"$RUN_DIR/golden_sync_ssh.txt"',
+        '2>"$RUN_DIR/vllm_vacancy_ssh.txt"',
+        '2>"$RUN_DIR/sync_vllm_ssh.txt"',
         '"$POD:$VLLM_RUNTIME_ARCHIVE_REMOTE"',
         'actual_archive=$(sha256sum "$archive"',
         "INTERNAL_PYTHONPATH=$OBSERVER_RUNTIME_REPO:$VLLM_RUNTIME_ROOT",
         'grep -Eq "^/tmp/glm_vllm_[A-Za-z0-9_]+$"',
         '--vllm-repository "$VLLM_ARCHIVE_REPO"',
         "vllm_repository=Path(sys.argv[32])",
+        '"${OBSERVER_BRANCH:-none}"',
     ):
         assert exact in wrapper
     assert "VLLM_SYNC_BAD $(hostname) missing_pin" not in wrapper
@@ -363,6 +382,72 @@ def test_protected_wrapper_is_default_off_and_pins_sources() -> None:
     assert wrapper.index("strict_census post") < wrapper.index(
         "freezing fresh DSA-oracle evidence"
     )
+
+
+def test_exact_observer_bundle_reconstructs_reviewed_git_tree(tmp_path: Path) -> None:
+    repository = Path("/home/gianl/tpu-inference-greenfield-layer1-rms-input-observer")
+    if not repository.is_dir():
+        pytest.skip("exact accepted layer-1 observer source is unavailable")
+    bundle = tmp_path / "observer.bundle"
+    runtime = tmp_path / "runtime"
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repository),
+            "bundle",
+            "create",
+            str(bundle),
+            "greenfield/legacy-layer1-rms-input-observer",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "bundle", "verify", str(bundle)], check=True
+    )
+    subprocess.run(
+        ["git", "clone", "-q", "--no-checkout", str(bundle), str(runtime)],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(runtime), "checkout", "-q", "--detach", LEGACY_PIN],
+        check=True,
+    )
+    head = subprocess.run(
+        ["git", "-C", str(runtime), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    distance = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(runtime),
+            "rev-list",
+            "--count",
+            f"{ORACLE_PIN}..{LEGACY_PIN}",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    tracked = subprocess.run(
+        ["git", "-C", str(runtime), "ls-tree", "-r", "--name-only", LEGACY_PIN],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    dirty = subprocess.run(
+        ["git", "-C", str(runtime), "status", "--porcelain"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert head == LEGACY_PIN
+    assert distance == "12"
+    assert len(tracked) == 947
+    assert dirty == ""
 
 
 def test_exact_vllm_archive_reconstructs_runtime_tree(tmp_path: Path) -> None:
@@ -516,6 +601,58 @@ def test_terminal_reauthenticates_real_source_contract(tmp_path: Path) -> None:
     (tmp_path / "vllm_cleanup_post.txt").write_text(
         "".join(f"VLLM_CLEAN_OK {host}\n" for host in hosts)
     )
+    observer_bundle = tmp_path / f"observer_{LEGACY_PIN}.bundle"
+    observer_bundle.write_bytes(b"unit-test exact reviewed observer bundle")
+    observer_bundle_sha = _file_sha256(observer_bundle)
+    observer_source = "/home/gianl/tpu-inference-greenfield-layer1-rms-input-observer"
+    observer_branch = "greenfield/legacy-layer1-rms-input-observer"
+    (tmp_path / "observer_bundle_identity.txt").write_text(
+        f"pin={LEGACY_PIN}\n"
+        f"oracle_pin={ORACLE_PIN}\n"
+        f"branch={observer_branch}\n"
+        f"bundle_sha256={observer_bundle_sha}\n"
+        "tracked_entries=947\n"
+        f"source_repository={observer_source}\n"
+    )
+    (tmp_path / "observer_bundle_copy.txt").write_text(
+        "".join(f"OBSERVER_BUNDLE_COPY_OK {index}\n" for index in range(8))
+    )
+    (tmp_path / "observer_transport_vacancy.txt").write_text(
+        "".join(f"OBSERVER_TRANSPORT_VACANT_OK {host}\n" for host in hosts)
+    )
+    (tmp_path / "observer_transport_cleanup_post_sync.txt").write_text(
+        "".join(f"OBSERVER_TRANSPORT_CLEAN_OK {host}\n" for host in hosts)
+    )
+    (tmp_path / "sync_observer.txt").write_text(
+        "".join(
+            f"OBSERVER_SYNC_OK {host} bundle_sha256={observer_bundle_sha} "
+            "tracked_entries=947 "
+            f"disposition={'existing' if index == 0 else 'installed'}\n"
+            for index, host in enumerate(hosts)
+        )
+    )
+    golden_sha = "916d421a10de9495086c0ad52645c9937746c88bae87a5ca1a69483bfe60d45d"
+    (tmp_path / "golden_sync.txt").write_text(
+        "".join(
+            f"GOLDEN_SYNC_OK {host} sha256={golden_sha} bytes=321146 "
+            "disposition=installed\n"
+            for host in hosts
+        )
+    )
+    ssh_status_names = {
+        "golden_sync_ssh.txt",
+        "observer_transport_cleanup_post_sync_ssh.txt",
+        "observer_transport_vacancy_ssh.txt",
+        "sync_observer_ssh.txt",
+        "sync_vllm_ssh.txt",
+        "vllm_cleanup_post_ssh.txt",
+        "vllm_vacancy_ssh.txt",
+    }
+    real_gcloud_status = "".join(
+        f"SSH: Attempting to connect to worker {index}...\n" for index in range(8)
+    )
+    for name in ssh_status_names:
+        (tmp_path / name).write_text(real_gcloud_status)
     command = [
         sys.executable,
         "-c",
@@ -552,6 +689,12 @@ def test_terminal_reauthenticates_real_source_contract(tmp_path: Path) -> None:
         archive_sha,
         "5493",
         "/home/gianl/vllm-build-a30addc",
+        observer_bundle_sha,
+        "947",
+        golden_sha,
+        "321146",
+        observer_source,
+        observer_branch,
     ]
     completed = subprocess.run(
         command,
@@ -561,8 +704,23 @@ def test_terminal_reauthenticates_real_source_contract(tmp_path: Path) -> None:
         cwd=repo,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
+    original_observer_sync = (tmp_path / "sync_observer.txt").read_text()
+    (tmp_path / "sync_observer.txt").write_text(
+        real_gcloud_status + original_observer_sync
+    )
+    refused = subprocess.run(
+        command,
+        text=True,
+        capture_output=True,
+        check=False,
+        cwd=repo,
+    )
+    assert refused.returncode != 0
+    assert "accepted observer fleet receipt drifted" in refused.stderr
+    (tmp_path / "sync_observer.txt").write_text(original_observer_sync)
+    original_vllm_sync = (tmp_path / "sync_vllm.txt").read_text()
     (tmp_path / "sync_vllm.txt").write_text(
-        (tmp_path / "sync_vllm.txt").read_text().replace(archive_sha, "0" * 64, 1)
+        original_vllm_sync.replace(archive_sha, "0" * 64, 1)
     )
     refused = subprocess.run(
         command,
@@ -573,3 +731,16 @@ def test_terminal_reauthenticates_real_source_contract(tmp_path: Path) -> None:
     )
     assert refused.returncode != 0
     assert "accepted vLLM fleet receipt drifted" in refused.stderr
+    (tmp_path / "sync_vllm.txt").write_text(original_vllm_sync)
+    (tmp_path / "golden_sync.txt").write_text(
+        (tmp_path / "golden_sync.txt").read_text().replace(golden_sha, "0" * 64, 1)
+    )
+    refused = subprocess.run(
+        command,
+        text=True,
+        capture_output=True,
+        check=False,
+        cwd=repo,
+    )
+    assert refused.returncode != 0
+    assert "accepted golden-manifest fleet receipt drifted" in refused.stderr

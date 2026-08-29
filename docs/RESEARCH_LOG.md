@@ -11709,3 +11709,40 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   batch. Gate D remains open.
 - A separate execution review must authorize exactly one oracle acquisition before any TPU/model
   action. Unchanged BF16 and full-8K retries remain forbidden.
+
+## 2026-08-29 16:14 UTC — recreated-pod prerequisites block execution before launch
+
+- The execution-only Sol audit refused the frozen layer-1 acquisition because workers 1--7 lack the
+  base `/home/gianl/tpu-inference` repository assumed by the observer worktree sync and all eight
+  hosts lack `/tmp/golden.json`. No protected wrapper, model, Ray or TPU workflow started.
+- Read-only fleet inspection proves every rank-named golden source exists in the approved
+  `driftbench-dsv4-uc` gcsfuse mount at SHA `916d421a...0d45d`, 321,146 bytes. The observer source
+  remains clean at reviewed/pushed pin `8dc7d20f`, 947 tracked entries and exactly 12 commits over
+  accepted `b3c25df`.
+- The offline correction makes layer-1 bootstrap self-contained: a SHA-bound Git bundle reconstructs
+  and verifies the observer runtime without a worker base checkout or fetch; tag-scoped bundle/temp
+  paths are authenticated and cleaned. Missing golden destinations are populated from the exact
+  read-only rank source, while any existing wrong/unreadable destination refuses without overwrite.
+  Terminal publication replays all eight bundle copy/reconstruction/cleanup and golden receipts.
+- Focused forced-CPU tests pass 11/11 and all adjacent shared-wrapper contracts pass 165 with two
+  skips. The full forced-CPU validation suite has 335 passes and 40 skips with only the same two
+  unrelated WS32 baseline failures previously reproduced at clean `HEAD`; this batch changes no
+  WS32 file. Bash syntax, nine embedded Python programs, Ruff, Python compilation and diff checks
+  pass.
+- The first correction-only Sol audit blocked controller/worker bundle verification that depended
+  on the caller's Git working directory and an unconditional terminal expansion of the mode-local
+  observer branch. The corrected wrapper supplies an explicit repository to every bundle verify,
+  passes `none` safely in default modes, and makes clone, verify, checkout and temporary-tree
+  identity separate fail-closed steps. The focused 11/11, adjacent 165/2 and full 335/40-plus-two-
+  baseline-failures results were reproduced on the final diff. This batch remains uncommitted and
+  has not mutated fleet bootstrap state.
+- The second correction audit found that real all-worker `gcloud ssh` writes eight connection
+  banners before the eight host markers when stderr is merged into the receipt. The final wrapper
+  separates stdout receipts from seven named SSH-status artifacts across observer, vLLM and golden
+  bootstrap/cleanup; terminal publication requires those status files. The terminal regression
+  uses eight realistic `SSH: Attempting to connect...` lines per status file, passes when separate
+  and rejects when those lines contaminate `sync_observer.txt`. Focused 11/11, adjacent 165/2 and
+  full 335/40 validation were reproduced; only the two unrelated WS32 baseline tests fail.
+  Sol returned `APPROVE CORRECTION COMMIT/PUSH/MIRROR` for staged SHA
+  `95f6a0ec...1d20317`, with no execution authorization. Commit/push/locked same-region mirror are
+  next. No protected execution occurred and Gate D remains open.

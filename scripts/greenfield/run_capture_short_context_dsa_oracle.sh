@@ -216,6 +216,10 @@ readonly VLLM_ARCHIVE_REPO=$VLLM_REFERENCE_REPO
 readonly VLLM_PIN=a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c
 readonly VLLM_IR_LAYERNORM_SHA=d8e4380ca97d2c719836a7e15fb410a73d354b15d79fc54275b573bbb1c06910
 readonly VLLM_EXECUTOR_LAYERNORM_SHA=53c6abdab25dc1675f26f4c8fc5ba2094f1fb4a106334e581f630436210d0c9b
+readonly GOLDEN_SOURCE_DIR=/home/gianl/gcs-models/manifests/golden_v1
+readonly GOLDEN_MANIFEST_SHA=916d421a10de9495086c0ad52645c9937746c88bae87a5ca1a69483bfe60d45d
+readonly GOLDEN_MANIFEST_BYTES=321146
+readonly LAYER1_OBSERVER_TRACKED_FILE_COUNT=947
 readonly OOB_DIR=/home/gianl/gcs-models/models/GLM-5.2-FP8
 readonly DISK_MIN_FREE_GB=10
 readonly DISK_WARN_FREE_GB=15
@@ -643,6 +647,11 @@ readonly VLLM_RUNTIME_ROOT=/tmp/glm_vllm_$TAG
 readonly VLLM_RUNTIME_ARCHIVE_REMOTE=/tmp/glm_vllm_$TAG.tar.gz
 VLLM_RUNTIME_ARCHIVE_SHA=
 VLLM_RUNTIME_FILE_COUNT=0
+readonly OBSERVER_BUNDLE_LOCAL=$RUN_DIR/observer_${LEGACY_PIN}.bundle
+readonly OBSERVER_BUNDLE_REMOTE=/tmp/glm_observer_$TAG.bundle
+readonly OBSERVER_BUNDLE_TEMP=/tmp/glm_observer_$TAG.tmp
+OBSERVER_BUNDLE_SHA=
+OBSERVER_TRACKED_FILE_COUNT=0
 if [[ $INTERNAL_MODE == prompt_key_input ]]; then
   INTERNAL_RESULT_DIR=$RUN_DIR/prompt_projection_input_comparison
 elif [[ $INTERNAL_MODE == prompt_key ]]; then
@@ -707,6 +716,13 @@ if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
       echo "legacy observer commit distance drifted" >&2
       exit 2
     }
+  if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+    [[ $(git -C "$LEGACY_SOURCE_REPO" rev-parse "$OBSERVER_BRANCH") == \
+       "$LEGACY_PIN" ]] || {
+      echo "legacy layer-1 observer branch ref drifted" >&2
+      exit 2
+    }
+  fi
 fi
 [[ -r $RESULTS_DB && -r $TOKEN_ORACLE_DIR/manifest.json ]] || {
   echo "source DB or sealed token oracle is unavailable" >&2
@@ -852,14 +868,30 @@ cleanup_vllm_runtime() {
   # shellcheck disable=SC2016
   command='target='"$VLLM_RUNTIME_ROOT"'; archive='"$VLLM_RUNTIME_ARCHIVE_REMOTE"'; if ! printf "%s\n" "$target" | grep -Eq "^/tmp/glm_vllm_[A-Za-z0-9_]+$" || [ "$archive" != "${target}.tar.gz" ]; then echo "VLLM_CLEAN_BAD $(hostname) unsafe_target"; exit 0; fi; rm -rf -- "$target"; rm -f -- "$archive"; if [ ! -e "$target" ] && [ ! -e "$archive" ]; then echo "VLLM_CLEAN_OK $(hostname)"; else echo "VLLM_CLEAN_BAD $(hostname) residual"; fi'
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-    --command="$command" >"$out" 2>&1 || return 1
+    --command="$command" >"$out" \
+    2>"$RUN_DIR/vllm_cleanup_${label}_ssh.txt" || return 1
   has_eight_unique_markers "$out" VLLM_CLEAN_OK
+}
+
+cleanup_observer_transport() {
+  local label=$1
+  local out="$RUN_DIR/observer_transport_cleanup_${label}.txt"
+  local command
+  # Remove only this validated tag's transient bundle and pre-install tree.
+  # The exact pin-specific runtime checkout is intentionally reusable.
+  # shellcheck disable=SC2016
+  command='bundle='"$OBSERVER_BUNDLE_REMOTE"'; temp='"$OBSERVER_BUNDLE_TEMP"'; if ! printf "%s\n" "$bundle" | grep -Eq "^/tmp/glm_observer_[A-Za-z0-9_]+[.]bundle$" || ! printf "%s\n" "$temp" | grep -Eq "^/tmp/glm_observer_[A-Za-z0-9_]+[.]tmp$" || [ "${bundle%.bundle}" != "${temp%.tmp}" ]; then echo "OBSERVER_TRANSPORT_CLEAN_BAD $(hostname) unsafe_target"; exit 0; fi; rm -f -- "$bundle"; rm -rf -- "$temp"; if [ ! -e "$bundle" ] && [ ! -e "$temp" ]; then echo "OBSERVER_TRANSPORT_CLEAN_OK $(hostname)"; else echo "OBSERVER_TRANSPORT_CLEAN_BAD $(hostname) residual"; fi'
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$command" >"$out" \
+    2>"$RUN_DIR/observer_transport_cleanup_${label}_ssh.txt" || return 1
+  has_eight_unique_markers "$out" OBSERVER_TRANSPORT_CLEAN_OK
 }
 
 runtime_started=0
 post_census_done=0
 terminal_success_done=0
 vllm_runtime_prepared=0
+observer_transport_prepared=0
 
 rollback_internal_capture_db() {
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
@@ -901,6 +933,10 @@ on_exit() {
     cleanup_vllm_runtime failure_exit || true
     vllm_runtime_prepared=0
   fi
+  if [[ $observer_transport_prepared -eq 1 ]]; then
+    cleanup_observer_transport failure_exit || true
+    observer_transport_prepared=0
+  fi
   if [[ $post_census_done -eq 0 ]]; then
     strict_census failure_exit || true
   fi
@@ -940,16 +976,84 @@ MIN_FREE_GB="$DISK_MIN_FREE_GB" WARN_FREE_GB="$DISK_WARN_FREE_GB" \
   }
 
 if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
-  # Materialize the exact observer in a pin-specific detached worktree;
-  # the accepted oracle checkout remains untouched on every host.
-  # shellcheck disable=SC2016
-  sync_observer='set -e; base='"$ORACLE_REPO"'; dest='"$OBSERVER_RUNTIME_REPO"'; pin='"$LEGACY_PIN"'; oracle='"$ORACLE_PIN"'; branch='"$OBSERVER_BRANCH"'; distance='"$OBSERVER_COMMIT_DISTANCE"'; if git -C "$dest" rev-parse HEAD >/dev/null 2>&1; then :; elif [ -e "$dest" ]; then echo "SYNC_BAD $(hostname) destination_exists"; exit 0; else git -C "$base" fetch origin "$branch" >/dev/null 2>&1 && git -C "$base" worktree add --detach "$dest" "$pin" >/dev/null 2>&1; fi; code=$(git -C "$dest" rev-parse HEAD); dirty=$(git -C "$dest" status --porcelain | wc -l); commits=$(git -C "$dest" rev-list --count "$oracle..$pin"); ancestor=0; git -C "$dest" merge-base --is-ancestor "$oracle" "$pin" && ancestor=1; if [ "$code" = "$pin" ] && [ "$dirty" -eq 0 ] && [ "$commits" -eq "$distance" ] && [ "$ancestor" -eq 1 ]; then echo "SYNC_OK $(hostname)"; else echo "SYNC_BAD $(hostname) code=$code dirty=$dirty commits=$commits ancestor=$ancestor"; fi'
-  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-    --command="$sync_observer" >"$RUN_DIR/sync_observer.txt" 2>&1
-  has_eight_unique_markers "$RUN_DIR/sync_observer.txt" SYNC_OK || {
-    say "ABORT: exact legacy observer is unavailable on all hosts"
-    exit 1
-  }
+  if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+    # The recreated pod has no accepted-oracle Git checkout on workers 1--7.
+    # Build one authenticated self-contained bundle from the already reviewed
+    # controller observer instead of fetching or assuming per-host Git state.
+    git -C "$LEGACY_SOURCE_REPO" bundle create \
+      "$OBSERVER_BUNDLE_LOCAL" "$OBSERVER_BRANCH"
+    git -C "$LEGACY_SOURCE_REPO" bundle verify "$OBSERVER_BUNDLE_LOCAL" \
+      >"$RUN_DIR/observer_bundle_verify.txt" 2>&1
+    OBSERVER_BUNDLE_SHA=$(sha256sum "$OBSERVER_BUNDLE_LOCAL" | awk '{print $1}')
+    OBSERVER_TRACKED_FILE_COUNT=$(git -C "$LEGACY_SOURCE_REPO" ls-tree -r \
+      --name-only "$LEGACY_PIN" | wc -l)
+    readonly OBSERVER_BUNDLE_SHA OBSERVER_TRACKED_FILE_COUNT
+    [[ $OBSERVER_BUNDLE_SHA =~ ^[0-9a-f]{64}$ && \
+       $OBSERVER_TRACKED_FILE_COUNT -eq $LAYER1_OBSERVER_TRACKED_FILE_COUNT ]] || {
+      say "ABORT: exact legacy observer bundle identity is invalid"
+      exit 1
+    }
+    printf 'pin=%s\noracle_pin=%s\nbranch=%s\nbundle_sha256=%s\ntracked_entries=%s\nsource_repository=%s\n' \
+      "$LEGACY_PIN" "$ORACLE_PIN" "$OBSERVER_BRANCH" \
+      "$OBSERVER_BUNDLE_SHA" "$OBSERVER_TRACKED_FILE_COUNT" \
+      "$LEGACY_SOURCE_REPO" >"$RUN_DIR/observer_bundle_identity.txt"
+
+    # Refuse rather than remove any transient path predating this append-only run.
+    # shellcheck disable=SC2016
+    observer_vacancy='bundle='"$OBSERVER_BUNDLE_REMOTE"'; temp='"$OBSERVER_BUNDLE_TEMP"'; if [ ! -e "$bundle" ] && [ ! -e "$temp" ]; then echo "OBSERVER_TRANSPORT_VACANT_OK $(hostname)"; else echo "OBSERVER_TRANSPORT_VACANT_BAD $(hostname)"; fi'
+    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+      --command="$observer_vacancy" \
+      >"$RUN_DIR/observer_transport_vacancy.txt" \
+      2>"$RUN_DIR/observer_transport_vacancy_ssh.txt"
+    has_eight_unique_markers "$RUN_DIR/observer_transport_vacancy.txt" \
+      OBSERVER_TRANSPORT_VACANT_OK || {
+      say "ABORT: run-owned observer transport path is not vacant"
+      exit 1
+    }
+
+    observer_transport_prepared=1
+    : >"$RUN_DIR/observer_bundle_copy.txt"
+    for worker in 0 1 2 3 4 5 6 7; do
+      if gcloud compute tpus tpu-vm scp --zone "$ZONE" --worker="$worker" \
+          "$OBSERVER_BUNDLE_LOCAL" \
+          "$POD:$OBSERVER_BUNDLE_REMOTE" >/dev/null 2>&1; then
+        echo "OBSERVER_BUNDLE_COPY_OK $worker" >>"$RUN_DIR/observer_bundle_copy.txt"
+      else
+        echo "OBSERVER_BUNDLE_COPY_BAD $worker" >>"$RUN_DIR/observer_bundle_copy.txt"
+      fi
+    done
+    has_eight_unique_markers "$RUN_DIR/observer_bundle_copy.txt" \
+      OBSERVER_BUNDLE_COPY_OK || {
+      say "ABORT: exact legacy observer bundle did not reach all hosts"
+      exit 1
+    }
+
+    # shellcheck disable=SC2016
+    sync_observer='set -e; bundle='"$OBSERVER_BUNDLE_REMOTE"'; bundle_sha='"$OBSERVER_BUNDLE_SHA"'; dest='"$OBSERVER_RUNTIME_REPO"'; temp='"$OBSERVER_BUNDLE_TEMP"'; pin='"$LEGACY_PIN"'; oracle='"$ORACLE_PIN"'; distance='"$OBSERVER_COMMIT_DISTANCE"'; expected_files='"$OBSERVER_TRACKED_FILE_COUNT"'; actual_bundle=$(sha256sum "$bundle" | cut -d " " -f 1); disposition=existing; if [ "$actual_bundle" != "$bundle_sha" ]; then echo "OBSERVER_SYNC_BAD $(hostname) bundle_sha"; exit 0; fi; if git -C "$dest" rev-parse HEAD >/dev/null 2>&1; then git -C "$dest" bundle verify "$bundle" >/dev/null 2>&1 || { echo "OBSERVER_SYNC_BAD $(hostname) bundle_verify"; exit 0; }; elif [ -e "$dest" ]; then echo "OBSERVER_SYNC_BAD $(hostname) destination_exists"; exit 0; elif [ -e "$temp" ]; then echo "OBSERVER_SYNC_BAD $(hostname) temp_exists"; exit 0; else disposition=installed; git clone -q --no-checkout "$bundle" "$temp" || { echo "OBSERVER_SYNC_BAD $(hostname) clone"; exit 0; }; git -C "$temp" bundle verify "$bundle" >/dev/null 2>&1 || { echo "OBSERVER_SYNC_BAD $(hostname) bundle_verify"; exit 0; }; git -C "$temp" checkout -q --detach "$pin" || { echo "OBSERVER_SYNC_BAD $(hostname) checkout"; exit 0; }; temp_code=$(git -C "$temp" rev-parse HEAD); temp_dirty=$(git -C "$temp" status --porcelain | wc -l); if [ "$temp_code" != "$pin" ] || [ "$temp_dirty" -ne 0 ]; then echo "OBSERVER_SYNC_BAD $(hostname) temp_identity"; exit 0; fi; mv "$temp" "$dest"; fi; code=$(git -C "$dest" rev-parse HEAD); dirty=$(git -C "$dest" status --porcelain | wc -l); commits=$(git -C "$dest" rev-list --count "$oracle..$pin"); files=$(git -C "$dest" ls-tree -r --name-only "$pin" | wc -l); ancestor=0; git -C "$dest" merge-base --is-ancestor "$oracle" "$pin" && ancestor=1; if [ "$code" = "$pin" ] && [ "$dirty" -eq 0 ] && [ "$commits" -eq "$distance" ] && [ "$ancestor" -eq 1 ] && [ "$files" -eq "$expected_files" ]; then echo "OBSERVER_SYNC_OK $(hostname) bundle_sha256=$actual_bundle tracked_entries=$files disposition=$disposition"; else echo "OBSERVER_SYNC_BAD $(hostname) code=$code dirty=$dirty commits=$commits ancestor=$ancestor files=$files"; fi'
+    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+      --command="$sync_observer" >"$RUN_DIR/sync_observer.txt" \
+      2>"$RUN_DIR/sync_observer_ssh.txt"
+    has_eight_unique_markers "$RUN_DIR/sync_observer.txt" OBSERVER_SYNC_OK || {
+      say "ABORT: exact legacy observer bundle did not reconstruct on all hosts"
+      exit 1
+    }
+    cleanup_observer_transport post_sync || {
+      say "ABORT: run-owned observer transport cleanup failed"
+      exit 1
+    }
+    observer_transport_prepared=0
+  else
+    # Historical observer modes retain their already proven worktree sync.
+    # shellcheck disable=SC2016
+    sync_observer='set -e; base='"$ORACLE_REPO"'; dest='"$OBSERVER_RUNTIME_REPO"'; pin='"$LEGACY_PIN"'; oracle='"$ORACLE_PIN"'; branch='"$OBSERVER_BRANCH"'; distance='"$OBSERVER_COMMIT_DISTANCE"'; if git -C "$dest" rev-parse HEAD >/dev/null 2>&1; then :; elif [ -e "$dest" ]; then echo "SYNC_BAD $(hostname) destination_exists"; exit 0; else git -C "$base" fetch origin "$branch" >/dev/null 2>&1 && git -C "$base" worktree add --detach "$dest" "$pin" >/dev/null 2>&1; fi; code=$(git -C "$dest" rev-parse HEAD); dirty=$(git -C "$dest" status --porcelain | wc -l); commits=$(git -C "$dest" rev-list --count "$oracle..$pin"); ancestor=0; git -C "$dest" merge-base --is-ancestor "$oracle" "$pin" && ancestor=1; if [ "$code" = "$pin" ] && [ "$dirty" -eq 0 ] && [ "$commits" -eq "$distance" ] && [ "$ancestor" -eq 1 ]; then echo "SYNC_OK $(hostname)"; else echo "SYNC_BAD $(hostname) code=$code dirty=$dirty commits=$commits ancestor=$ancestor"; fi'
+    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+      --command="$sync_observer" >"$RUN_DIR/sync_observer.txt" \
+      2>"$RUN_DIR/sync_observer_ssh.txt"
+    has_eight_unique_markers "$RUN_DIR/sync_observer.txt" SYNC_OK || {
+      say "ABORT: exact legacy observer is unavailable on all hosts"
+      exit 1
+    }
+  fi
 fi
 if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
   # The new pod no longer has the old ~/vllm-build worktree targeted by the
@@ -975,7 +1079,8 @@ if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
   # shellcheck disable=SC2016
   vllm_vacancy='dest='"$VLLM_RUNTIME_ROOT"'; archive='"$VLLM_RUNTIME_ARCHIVE_REMOTE"'; if [ ! -e "$dest" ] && [ ! -e "$archive" ]; then echo "VLLM_VACANT_OK $(hostname)"; else echo "VLLM_VACANT_BAD $(hostname)"; fi'
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-    --command="$vllm_vacancy" >"$RUN_DIR/vllm_vacancy.txt" 2>&1
+    --command="$vllm_vacancy" >"$RUN_DIR/vllm_vacancy.txt" \
+    2>"$RUN_DIR/vllm_vacancy_ssh.txt"
   has_eight_unique_markers "$RUN_DIR/vllm_vacancy.txt" VLLM_VACANT_OK || {
     say "ABORT: run-owned accepted vLLM path is not vacant on all hosts"
     exit 1
@@ -1003,7 +1108,8 @@ if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
   # shellcheck disable=SC2016
   sync_vllm='set -e; archive='"$VLLM_RUNTIME_ARCHIVE_REMOTE"'; dest='"$VLLM_RUNTIME_ROOT"'; archive_sha='"$VLLM_RUNTIME_ARCHIVE_SHA"'; expected_files='"$VLLM_RUNTIME_FILE_COUNT"'; ir_sha='"$VLLM_IR_LAYERNORM_SHA"'; executor_sha='"$VLLM_EXECUTOR_LAYERNORM_SHA"'; actual_archive=$(sha256sum "$archive" | cut -d " " -f 1); if [ "$actual_archive" != "$archive_sha" ] || [ -e "$dest" ]; then echo "VLLM_SYNC_BAD $(hostname) archive_or_destination"; exit 0; fi; umask 077; mkdir "$dest"; tar -xzf "$archive" -C "$dest"; actual_files=$(find "$dest" \( -type f -o -type l \) | wc -l); actual_ir=$(sha256sum "$dest/vllm/ir/ops/layernorm.py" | cut -d " " -f 1); actual_executor=$(sha256sum "$dest/vllm/model_executor/layers/layernorm.py" | cut -d " " -f 1); rm -f -- "$archive"; if [ "$actual_files" -eq "$expected_files" ] && [ "$actual_ir" = "$ir_sha" ] && [ "$actual_executor" = "$executor_sha" ] && [ ! -e "$archive" ]; then echo "VLLM_SYNC_OK $(hostname) archive_sha256=$actual_archive tracked_entries=$actual_files"; else echo "VLLM_SYNC_BAD $(hostname) files=$actual_files ir=$actual_ir executor=$actual_executor"; fi'
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-    --command="$sync_vllm" >"$RUN_DIR/sync_vllm.txt" 2>&1
+    --command="$sync_vllm" >"$RUN_DIR/sync_vllm.txt" \
+    2>"$RUN_DIR/sync_vllm_ssh.txt"
   has_eight_unique_markers "$RUN_DIR/sync_vllm.txt" VLLM_SYNC_OK || {
     say "ABORT: exact accepted vLLM source authentication failed on the fleet"
     exit 1
@@ -1018,6 +1124,19 @@ if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
   }
 fi
 
+# Recreated pods do not retain /tmp/golden.json. Rehydrate it from the
+# approved read-only same-region manifest mirror, but never overwrite an
+# existing non-identical file. All rank files are independently authenticated.
+# shellcheck disable=SC2016
+golden_sync='set -e; idx=${HOSTNAME##*-w-}; source='"$GOLDEN_SOURCE_DIR"'/golden.rank${idx}.json; dest=/tmp/golden.json; temp=/tmp/golden_sync_$$.tmp; expected_sha='"$GOLDEN_MANIFEST_SHA"'; expected_bytes='"$GOLDEN_MANIFEST_BYTES"'; disposition=existing; case "$idx" in 0|1|2|3|4|5|6|7) ;; *) echo "GOLDEN_SYNC_BAD $(hostname) rank"; exit 0 ;; esac; mount_source=$(findmnt -T "$source" -n -o SOURCE 2>/dev/null); mount_type=$(findmnt -T "$source" -n -o FSTYPE 2>/dev/null); [ "$mount_source" = driftbench-dsv4-uc ] && [ "$mount_type" = fuse.gcsfuse ] && [ -r "$source" ] || { echo "GOLDEN_SYNC_BAD $(hostname) source"; exit 0; }; source_sha=$(sha256sum "$source" | cut -d " " -f 1); source_bytes=$(stat -c %s "$source"); [ "$source_sha" = "$expected_sha" ] && [ "$source_bytes" -eq "$expected_bytes" ] || { echo "GOLDEN_SYNC_BAD $(hostname) source_identity"; exit 0; }; if [ -e "$dest" ]; then [ -r "$dest" ] || { echo "GOLDEN_SYNC_BAD $(hostname) unreadable_destination"; exit 0; }; else disposition=installed; trap '\''rm -f -- "$temp"'\'' EXIT; [ ! -e "$temp" ] || { echo "GOLDEN_SYNC_BAD $(hostname) temp_exists"; exit 0; }; umask 022; cp -- "$source" "$temp"; actual_temp=$(sha256sum "$temp" | cut -d " " -f 1); [ "$actual_temp" = "$expected_sha" ] || { echo "GOLDEN_SYNC_BAD $(hostname) copied_identity"; exit 0; }; chmod 0444 "$temp"; mv "$temp" "$dest"; trap - EXIT; fi; actual_sha=$(sha256sum "$dest" | cut -d " " -f 1); actual_bytes=$(stat -c %s "$dest"); if [ "$actual_sha" = "$expected_sha" ] && [ "$actual_bytes" -eq "$expected_bytes" ]; then echo "GOLDEN_SYNC_OK $(hostname) sha256=$actual_sha bytes=$actual_bytes disposition=$disposition"; else echo "GOLDEN_SYNC_BAD $(hostname) destination_identity"; fi'
+gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  --command="$golden_sync" >"$RUN_DIR/golden_sync.txt" \
+  2>"$RUN_DIR/golden_sync_ssh.txt"
+has_eight_unique_markers "$RUN_DIR/golden_sync.txt" GOLDEN_SYNC_OK || {
+  say "ABORT: exact golden state manifest is unavailable on all hosts"
+  exit 1
+}
+
 # All hosts must carry the exact clean legacy tree, golden state file, and
 # approved read-only OOB checkpoint mirror used by the PWAL self-healer.
 # shellcheck disable=SC2016
@@ -1029,8 +1148,15 @@ has_eight_unique_markers "$RUN_DIR/prereq.txt" PREREQ_OK || {
   exit 1
 }
 if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
-  # shellcheck disable=SC2016
-  oracle_prereq='code=$(git -C '"$ORACLE_REPO"' rev-parse HEAD); dirty=$(git -C '"$ORACLE_REPO"' status --porcelain --untracked-files=no | wc -l); if [ "$code" = '"$ORACLE_PIN"' ] && [ "$dirty" -eq 0 ]; then echo "ORACLE_OK $(hostname)"; else echo "ORACLE_BAD $(hostname) code=$code dirty=$dirty"; fi'
+  if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+    # The self-contained reviewed observer bundle carries and proves the
+    # accepted ancestor; no separate per-host oracle checkout is required.
+    # shellcheck disable=SC2016
+    oracle_prereq='repo='"$LEGACY_REPO"'; pin='"$LEGACY_PIN"'; oracle='"$ORACLE_PIN"'; distance='"$OBSERVER_COMMIT_DISTANCE"'; commits=$(git -C "$repo" rev-list --count "$oracle..$pin" 2>/dev/null || echo invalid); ancestor=0; git -C "$repo" merge-base --is-ancestor "$oracle" "$pin" >/dev/null 2>&1 && ancestor=1; if [ "$commits" = "$distance" ] && [ "$ancestor" -eq 1 ]; then echo "ORACLE_OK $(hostname)"; else echo "ORACLE_BAD $(hostname) commits=$commits ancestor=$ancestor"; fi'
+  else
+    # shellcheck disable=SC2016
+    oracle_prereq='code=$(git -C '"$ORACLE_REPO"' rev-parse HEAD); dirty=$(git -C '"$ORACLE_REPO"' status --porcelain --untracked-files=no | wc -l); if [ "$code" = '"$ORACLE_PIN"' ] && [ "$dirty" -eq 0 ]; then echo "ORACLE_OK $(hostname)"; else echo "ORACLE_BAD $(hostname) code=$code dirty=$dirty"; fi'
+  fi
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$oracle_prereq" >"$RUN_DIR/oracle_prereq.txt" 2>&1
   has_eight_unique_markers "$RUN_DIR/oracle_prereq.txt" ORACLE_OK || {
@@ -1968,7 +2094,10 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$DENSE_PARTIAL_PROBE_RUNNER_SHA" "$DENSE_PARTIAL_PROBE_TENSOR_SHA" \
   "$DENSE_PARTIAL_PROBE_SUMMARY_SHA" "$DENSE_PARTIAL_PROBE_SUCCESS_SHA" \
   "$ORACLE_PIN" "$VLLM_PIN" "$VLLM_RUNTIME_ARCHIVE_SHA" \
-  "$VLLM_RUNTIME_FILE_COUNT" "$VLLM_ARCHIVE_REPO" <<'PY'
+  "$VLLM_RUNTIME_FILE_COUNT" "$VLLM_ARCHIVE_REPO" \
+  "$OBSERVER_BUNDLE_SHA" "$OBSERVER_TRACKED_FILE_COUNT" \
+  "$GOLDEN_MANIFEST_SHA" "$GOLDEN_MANIFEST_BYTES" \
+  "$LEGACY_SOURCE_REPO" "${OBSERVER_BRANCH:-none}" <<'PY'
 from hashlib import sha256
 import json
 import math
@@ -2111,6 +2240,36 @@ if sys.argv[8] == "1":
         ):
             raise SystemExit("accepted vLLM archive bytes drifted")
 
+        observer_archive_path = root / f"observer_{sys.argv[4]}.bundle"
+        observer_identity = dict(
+            line.split("=", 1)
+            for line in (root / "observer_bundle_identity.txt")
+            .read_text()
+            .splitlines()
+        )
+        expected_observer_identity = {
+            "branch": sys.argv[38],
+            "bundle_sha256": sys.argv[33],
+            "oracle_pin": sys.argv[28],
+            "pin": sys.argv[4],
+            "source_repository": sys.argv[37],
+            "tracked_entries": sys.argv[34],
+        }
+        if (
+            observer_identity != expected_observer_identity
+            or sys.argv[37]
+            != "/home/gianl/tpu-inference-greenfield-layer1-rms-input-observer"
+            or sys.argv[38] != "greenfield/legacy-layer1-rms-input-observer"
+            or not is_sha256(sys.argv[33])
+            or sys.argv[34] != "947"
+            or sha256(observer_archive_path.read_bytes()).hexdigest()
+            != sys.argv[33]
+            or sys.argv[35]
+            != "916d421a10de9495086c0ad52645c9937746c88bae87a5ca1a69483bfe60d45d"
+            or sys.argv[36] != "321146"
+        ):
+            raise SystemExit("accepted observer/golden bootstrap identity drifted")
+
         def exact_receipts(name, marker, expected_tail=None, expected_owners=None):
             records = [
                 line.split()
@@ -2149,6 +2308,71 @@ if sys.argv[8] == "1":
         exact_receipts(
             "vllm_cleanup_post.txt", "VLLM_CLEAN_OK", expected_tail=[]
         )
+        exact_receipts(
+            "observer_bundle_copy.txt",
+            "OBSERVER_BUNDLE_COPY_OK",
+            expected_owners={str(index) for index in range(8)},
+        )
+        exact_receipts(
+            "observer_transport_vacancy.txt",
+            "OBSERVER_TRANSPORT_VACANT_OK",
+            expected_tail=[],
+        )
+        exact_receipts(
+            "observer_transport_cleanup_post_sync.txt",
+            "OBSERVER_TRANSPORT_CLEAN_OK",
+            expected_tail=[],
+        )
+        ssh_status_names = {
+            "golden_sync_ssh.txt",
+            "observer_transport_cleanup_post_sync_ssh.txt",
+            "observer_transport_vacancy_ssh.txt",
+            "sync_observer_ssh.txt",
+            "sync_vllm_ssh.txt",
+            "vllm_cleanup_post_ssh.txt",
+            "vllm_vacancy_ssh.txt",
+        }
+        if any(not (root / name).is_file() for name in ssh_status_names):
+            raise SystemExit("accepted gcloud SSH status separation drifted")
+
+        observer_sync_records = [
+            line.split()
+            for line in (root / "sync_observer.txt").read_text().splitlines()
+            if line.strip()
+        ]
+        if (
+            len(observer_sync_records) != 8
+            or len({record[1] for record in observer_sync_records}) != 8
+            or any(
+                len(record) != 5
+                or record[0] != "OBSERVER_SYNC_OK"
+                or record[2] != f"bundle_sha256={sys.argv[33]}"
+                or record[3] != f"tracked_entries={sys.argv[34]}"
+                or record[4]
+                not in {"disposition=existing", "disposition=installed"}
+                for record in observer_sync_records
+            )
+        ):
+            raise SystemExit("accepted observer fleet receipt drifted")
+
+        golden_records = [
+            line.split()
+            for line in (root / "golden_sync.txt").read_text().splitlines()
+            if line.strip()
+        ]
+        if (
+            len(golden_records) != 8
+            or len({record[1] for record in golden_records}) != 8
+            or any(
+                len(record) != 5
+                or record[0] != "GOLDEN_SYNC_OK"
+                or record[2] != f"sha256={sys.argv[35]}"
+                or record[3] != f"bytes={sys.argv[36]}"
+                or record[4] not in {"disposition=existing", "disposition=installed"}
+                for record in golden_records
+            )
+        ):
+            raise SystemExit("accepted golden-manifest fleet receipt drifted")
         lines.update({
             "accepted_layer1_rms_input_capture": "true",
             "accepted_layer1_rms_input_capture_layout": capture[
@@ -2186,6 +2410,10 @@ if sys.argv[8] == "1":
                 "tensors"
             ]["carried_residual_bfloat16_bits"]["tensor_sha256"],
             "accepted_oracle_pin": capture["oracle_pin"],
+            "accepted_observer_bundle_sha256": sys.argv[33],
+            "accepted_observer_runtime_fleet_receipts_exact": "true",
+            "accepted_observer_runtime_tracked_entries": sys.argv[34],
+            "accepted_gcloud_ssh_status_separated": "true",
             "accepted_vllm_pin": capture["vllm_source_contract"][
                 "repository_pin"
             ],
@@ -2198,6 +2426,8 @@ if sys.argv[8] == "1":
             "dsa_internal_file_count": sys.argv[9],
             "dsa_internal_layer_name": capture["layer_name"],
             "dsa_event_tensors_exact": "true",
+            "golden_manifest_fleet_receipts_exact": "true",
+            "golden_manifest_sha256": sys.argv[35],
             "pp16_straddler_classification_sha256": comparison["straddler"][
                 "file_sha256"
             ],

@@ -661,3 +661,15 @@ cleanup. The recreated fleet receives one pin-derived archive in a run-owned pat
 5,493 tracked entries, both semantic source hashes and all eight cleanup receipts are sealed. This
 is offline preparation only: no TPU acquisition or Gate-D claim exists until the new batch is
 adversarially reviewed and receives a separate protected-run authorization.
+
+Do not assume recreated workers have an accepted-oracle Git checkout or `/tmp/golden.json`. The
+layer-1 bootstrap correction instead bundles the complete reviewed observer history from pin
+`8dc7d20f`, proves 947 tracked entries and the exact 12-commit accepted ancestry on every worker,
+and cleans only tag-scoped transport paths. Reuse the approved read-only rank manifests at SHA
+`916d421a...0d45d` to populate only a missing `/tmp/golden.json`; refuse an existing non-identical
+file. Bundle verification must always name a repository explicitly; historical modes must pass a
+safe terminal placeholder instead of expanding a mode-local branch. Both operations remain
+execution-blocked until the corrected batch is re-reviewed and persisted. Never merge multi-host
+`gcloud ssh` stderr into an exact receipt file: archive it separately and require both artifacts at
+terminal publication. Sol approved this correction for persistence at staged SHA
+`95f6a0ec...1d20317`; a separate execution review remains mandatory.

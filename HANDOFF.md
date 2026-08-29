@@ -7538,3 +7538,38 @@ pins, isolated 8K position-8155 workload, exact legacy token/all-DSA/state/load 
 artifact, append-only archive and authenticated 8/8 cleanup. If approved, execute exactly once and
 classify the accepted FP32 operands against DB550. Do not launch an unchanged BF16 comparator or
 the full 8K greenfield decoder. Gate D remains open.
+
+## Current exact next: review recreated-pod bootstrap correction; no execution yet
+
+The execution-only Sol review blocked the frozen acquisition before launch: workers 1--7 have no
+`/home/gianl/tpu-inference` base checkout, so the prior observer worktree fetch could not produce
+8/8 `SYNC_OK`; all eight hosts also lack `/tmp/golden.json`. No protected wrapper, model, Ray or TPU
+workflow started. Fresh read-only inspection instead proves the approved gcsfuse manifest source is
+present on all eight hosts at identical SHA `916d421a...0d45d`, 321,146 bytes.
+
+The uncommitted correction removes those recreated-pod assumptions only for the layer-1 mode. It
+builds a self-contained Git bundle from clean reviewed observer pin `8dc7d20f`, requires exactly
+947 tracked entries and 12 commits over accepted `b3c25df`, copies and reconstructs the exact clean
+runtime without any per-worker base repo or network fetch, then deletes only tag-scoped transport
+paths. It rehydrates `/tmp/golden.json` from each worker's rank-named file in the authenticated
+`driftbench-dsv4-uc` read-only mount, refusing to overwrite any non-identical destination. Terminal
+publication now seals bundle identity, 8/8 copy/reconstruction/cleanup receipts and 8/8 golden
+source/destination receipts.
+
+Focused forced-CPU validation passes 11/11; every adjacent shared-wrapper suite passes 165 tests
+with two skips. The full forced-CPU validation suite has 335 passes and 40 skips with only the same
+two unrelated WS32 baseline failures previously reproduced at clean `HEAD`; this batch touches no
+WS32 file. Bash syntax, all nine embedded Python programs, Ruff, Python compilation and diff checks
+pass. The first correction-only Sol audit then blocked two P1 defects: `git bundle verify` lacked an
+explicit repository context, and default historical modes expanded an unset observer branch in the
+terminal. Both are corrected; bundle clone/verify/checkout also now refuse independently rather
+than relying on an `&&` chain. A second audit caught multi-host `gcloud ssh` connection banners
+being merged into exact receipt files. Every new observer, vLLM and golden receipt now keeps stdout
+separate from a named, archived SSH-status file; terminal publication requires all seven status
+files and a real-gcloud-shaped regression proves that mixed banners refuse. The focused 11/11,
+adjacent 165/2 and complete 335/40 results were reproduced after these final changes, with only the
+same two unrelated WS32 baseline failures. No bootstrap mutation or protected execution has
+occurred. Sol returned `APPROVE CORRECTION COMMIT/PUSH/MIRROR` for staged SHA
+`95f6a0eccff1a91608ee7383e1af0d00671ce8df6c81bf44ac3a5a1141d20317`; it authorized no
+execution. Exact next is commit/push/locked same-region mirror, then a fresh execution-only review.
+Gate D remains open; the frozen rejected tag must not be reused.
