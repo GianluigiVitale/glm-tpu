@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import ml_dtypes
@@ -216,3 +217,61 @@ def test_feature2_numerical_comparator_rejects_schema_drift(tmp_path: Path) -> N
     np.savez(capture, **values)
     with pytest.raises(BenchmarkValidationError, match="keys drifted"):
         _compare(capture)
+
+
+def test_feature2_rejection_recovery_is_cpu_only_distinct_and_default_off() -> None:
+    recovery = (
+        Path(__file__).parents[3]
+        / "scripts/greenfield/recover_pp16_feature2_numerical_rejection.sh"
+    )
+    text = recovery.read_text()
+    environment = {
+        "GLM_GREENFIELD_PP16_FEATURE2_RECOVER": "0",
+        "GLM_GREENFIELD_PP16_FEATURE2_RECOVERY_MODE": "off",
+    }
+    completed = subprocess.run(
+        ["bash", str(recovery)],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert completed.returncode == 2
+    assert "default-off" in completed.stderr
+    assert "RUN_PIN=363a52b7c8a4201ffbbb899352b7159c26a95b80" in text
+    assert (
+        "ORIGINAL_LEDGER_SHA="
+        "d857d2e98cf18eb505d447acd52acf062106af75e83ac0918fa64c13105e96c2"
+    ) in text
+    assert (
+        "CAPTURE_SHA="
+        "be3dda446cfbde547af49dd5ea371af690b553bcc8414907add1b0a2503b9d0d"
+    ) in text
+    assert (
+        "POST_CENSUS_SHA="
+        "cd1f25488e876acf475068131c5eb7f1ca25dabea158c553de86483aa8a40798"
+    ) in text
+    assert "RECOVERY_REMOTE=$APPROVED_BUCKET/results/$RECOVERY_TAG" in text
+    assert '"$SOURCE_REMOTE/NUMERICAL_REJECTED"' in text
+    assert '"$SOURCE_REMOTE/SUCCESS"' in text
+    assert '"in_process_release_passed": False' in text
+    assert '"terminal_cleanup_authentication_passed": True' in text
+    assert "72_812_032" in text
+    assert '"event1_positions": 1852' in text
+    assert '"carried_bfloat16_bits": 968' in text
+    assert "--if-generation-match=0" in text
+    assert 'gcloud storage rm --if-generation-match="$generation"' in text
+    assert "rollback_unverified_terminal" in text
+    assert "terminal_verified=1\ntrap - EXIT" in text
+    assert '"cat", f"{uri}#{generation}"' in text
+    assert 'metadata.get("crc32c_hash", metadata.get("crc32c"))' in text
+    assert '[[ -s $receipt ]] || return 1' in text
+    assert 'assert matches == [(remote, generation)]' in text
+    assert 'sync -f "$RECOVERY_DIR/upload_receipts/terminal_create.stderr"' in text
+    assert '"gate_d_passed": False' in text
+    assert '"performance_claim": False' in text
+    assert "JAX_PLATFORMS=cpu" in text
+    assert "gcloud compute" not in text
+    assert "TPU_VISIBLE_DEVICES" not in text
+    assert "gcloud storage cp --no-clobber" not in text
