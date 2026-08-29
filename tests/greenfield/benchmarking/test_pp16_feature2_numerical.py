@@ -260,6 +260,9 @@ def test_feature2_rejection_recovery_is_cpu_only_distinct_and_default_off() -> N
     assert "72_812_032" in text
     assert '"event1_positions": 1852' in text
     assert '"carried_bfloat16_bits": 968' in text
+    assert (
+        "3f6c86ed6e96a59adfe706a522297bf83c2ed0802a36ede9f06a88cf6f3f53d2"
+    ) in text
     assert "--if-generation-match=0" in text
     assert 'gcloud storage rm --if-generation-match="$generation"' in text
     assert "rollback_unverified_terminal" in text

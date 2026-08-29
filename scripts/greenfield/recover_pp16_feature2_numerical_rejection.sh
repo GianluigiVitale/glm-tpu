@@ -352,7 +352,7 @@ if (
     or comparison.get("captured_array_sha256", {}).get(
         "current_carried_halves_bfloat16_bits"
     )
-    != "3f6c86edba7b192bed0570b5a5dfe886a376736473f5c0a10f2d90d874dc53d2"
+    != "3f6c86ed6e96a59adfe706a522297bf83c2ed0802a36ede9f06a88cf6f3f53d2"
     or comparison.get("expected_sha256", {}).get("carried_bfloat16_bits")
     != "35a601b76cd7298550b33afe88ee769008edcb7dcf3cd08b131add884681044c"
 ):
