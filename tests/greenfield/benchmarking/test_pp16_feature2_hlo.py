@@ -50,6 +50,13 @@ REAL_POSITION113_OPTIMIZED_HLO = (
 REAL_POSITION113_CANONICAL_HLO = (
     REAL_POSITION113_RUN / "feature2_main.execution_canonical_hlo.txt"
 )
+REAL_DB518_RUN = Path(
+    "/home/gianl/glm-run/greenfield_pp16_feature2_layer0_db518_acquire_"
+    "20260829T101159660007493Z/hlo"
+)
+REAL_DB518_STABLEHLO = REAL_DB518_RUN / "feature2_main.stablehlo.mlir"
+REAL_DB518_OPTIMIZED_HLO = REAL_DB518_RUN / "feature2_main.optimized_hlo.txt"
+REAL_DB518_CANONICAL_HLO = REAL_DB518_RUN / "feature2_main.execution_canonical_hlo.txt"
 
 
 def _pin_synthetic_sealed_optimized_hlo(
@@ -356,6 +363,143 @@ def test_feature2_real_position113_hlo_authenticates_complete_producer_identity(
         scan["causal_observer_field_count"]
         for scan in optimized["position113_lineage"]["scans"]
     ] == [9, 9, 9, 9]
+
+
+@pytest.mark.skipif(
+    not REAL_DB518_STABLEHLO.is_file()
+    or not REAL_DB518_OPTIMIZED_HLO.is_file()
+    or not REAL_DB518_CANONICAL_HLO.is_file(),
+    reason="protected DB518 PP16 HLO is unavailable",
+)
+def test_feature2_real_db518_hlo_authenticates_causal_key_consumption() -> None:
+    stable = validate_feature2_main_stablehlo(
+        REAL_DB518_STABLEHLO.read_text(),
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+        exact_layer0_prompt_keys=True,
+        source_jaxpr_sha256=(
+            "f87c0f162523bf6221d2824aa4b7268f1c770a55d2f8cde6da7506f595e9447f"
+        ),
+    )
+    optimized = validate_feature2_main_optimized_hlo(
+        REAL_DB518_OPTIMIZED_HLO.read_text(),
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+        exact_layer0_prompt_keys=True,
+    )
+    archive = validate_feature2_sealed_hlo_archive_identity(
+        REAL_DB518_STABLEHLO,
+        REAL_DB518_OPTIMIZED_HLO,
+        REAL_DB518_CANONICAL_HLO,
+        expected_stablehlo_sha256=(
+            "a79d4823db0fecf8b1bc980b16df283bbe7a497795fa06ff783d3cde8fa98f6b"
+        ),
+        expected_canonical_sha256=(
+            "56b9b88dc081dd5d3ea2219d46be641128cbed6e9759754be7f87578b51b5d8c"
+        ),
+        expected_canonical_bytes=6_863_602,
+        expected_canonicalizer_version=1,
+        expected_stripped_stack_frame_references=15_339,
+    )
+    assert stable["stablehlo_sha256"] == archive["stablehlo_sha256"]
+    assert stable["identity_acquisition_only"] is False
+    assert optimized["identity_acquisition_only"] is False
+    assert (
+        optimized["sealed_canonical_hlo_identity"]["sha256"]
+        == (archive["canonical_hlo_identity"]["sha256"])
+    )
+    assert optimized["position113_lineage"]["causal"] is True
+    assert optimized["position113_lineage"]["branch_topology_sha256"] == (
+        "92a1b18b523984dd98d2579d25668b6bd582f6f9f23a26d9e4449b29a81ee46d"
+    )
+    key_lineage = optimized["db518_layer0_key_lineage"]
+    assert key_lineage["causal"] is True
+    assert key_lineage["scan_count"] == 4
+    assert key_lineage["cache_write_count"] == 4
+    assert key_lineage["physical_m64_projection_count"] == 16
+    assert key_lineage["topology_sha256"] == (
+        "235dfa726f82a152bf0218506cf8d3345520a7673ab7a6b908ef06df821465bd"
+    )
+    assert [scan["cache_seed_kind"] for scan in key_lineage["scans"]] == [
+        "zero",
+        "handoff",
+        "handoff",
+        "handoff",
+    ]
+
+
+def _crosswire_db518_first_key_chunk(value: str) -> str:
+    original = "%pad_maximum_fusion.36, /*index=30*/"
+    assert value.count(original) == 1
+    return value.replace(original, "%pad_maximum_fusion.37, /*index=30*/", 1)
+
+
+def _disconnect_db518_first_cache_write(value: str) -> str:
+    original = "fusion(%conditional.35, %pad_clamp_fusion.19)"
+    assert value.count(original) == 1
+    return value.replace(original, "fusion(%copy-done.31, %pad_clamp_fusion.19)", 1)
+
+
+@pytest.mark.skipif(
+    not REAL_DB518_OPTIMIZED_HLO.is_file(),
+    reason="protected DB518 PP16 HLO is unavailable",
+)
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        _crosswire_db518_first_key_chunk,
+        lambda value: value.replace(
+            "tuple(%copy.991, %get-tuple-element.18251, %get-tuple-element.18252,",
+            "tuple(%copy.991, %get-tuple-element.18251, %broadcast_in_dim.3762,",
+            1,
+        ),
+        lambda value: value.replace(
+            "fusion(%get-tuple-element.17095, %get-tuple-element.16978)",
+            "fusion(%get-tuple-element.17095, %get-tuple-element.16979)",
+            1,
+        ),
+        lambda value: value.replace(
+            "tuple(%bitcast.6336, %select_n.5970, %fusion.3617, %copy-done.31)",
+            "tuple(%bitcast.6336, %select_n.5970, %fusion.3618, %copy-done.31)",
+            1,
+        ),
+        _disconnect_db518_first_cache_write,
+        lambda value: value.replace("constant(113)", "constant(114)", 1),
+    ),
+)
+def test_feature2_db518_lineage_refuses_mutation_even_with_rebased_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    mutation,
+) -> None:
+    original = REAL_DB518_OPTIMIZED_HLO.read_text()
+    attacked = mutation(original)
+    assert attacked != original
+    _, identity = canonicalize_feature2_optimized_hlo(attacked)
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_DB518_OPTIMIZED_CANONICAL_SHA256",
+        identity["sha256"],
+    )
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_DB518_OPTIMIZED_CANONICAL_BYTES",
+        identity["byte_count"],
+    )
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_DB518_OPTIMIZED_STACK_FRAME_REFERENCES",
+        identity["stripped_stack_frame_references"],
+    )
+    with pytest.raises(BenchmarkValidationError, match="DB518|position-113"):
+        validate_feature2_main_optimized_hlo(
+            attacked,
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+            observe_position_113=True,
+            exact_layer0_prompt_keys=True,
+        )
 
 
 def _swap_position113_current_key_padding_ranges(value: str) -> str:
@@ -1128,7 +1272,7 @@ def test_feature2_main_position113_observer_refuses_geometry_only_fixture(
         )
 
 
-def test_feature2_db518_optimized_hlo_is_acquisition_only(
+def test_feature2_db518_optimized_hlo_refuses_unpinned_synthetic_graph(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     hlo = _main_optimized_hlo(
@@ -1137,25 +1281,14 @@ def test_feature2_db518_optimized_hlo_is_acquisition_only(
         observe_position_113=True,
     )
     _pin_synthetic_position113_optimized_hlo(monkeypatch, hlo)
-    report = validate_feature2_main_optimized_hlo(
-        hlo,
-        full_width_rounded_then_slice=True,
-        sealed_boundary_capture=True,
-        observe_position_113=True,
-        exact_layer0_prompt_keys=True,
-    )
-    assert report["passed"] is True
-    assert report["exact_layer0_prompt_keys"] is True
-    assert report["identity_acquisition_only"] is True
-    assert report["sealed_bindings"] == {}
-    assert set(report["sealed_acquisition_root_hints"]) == {"6", "7", "8", "9"}
-    assert report["position113_observer_bindings"] == {}
-    assert set(report["position113_observer_acquisition_root_hints"]) == {
-        str(index) for index in range(15, 24)
-    }
-    assert report["position113_observer_root_hints_causal"] is False
-    assert report["position113_lineage"] == {}
-    assert report["sealed_canonical_hlo_identity"]["sha256"]
+    with pytest.raises(BenchmarkValidationError, match="canonical-HLO identity"):
+        validate_feature2_main_optimized_hlo(
+            hlo,
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+            observe_position_113=True,
+            exact_layer0_prompt_keys=True,
+        )
 
 
 @pytest.mark.parametrize(
@@ -1940,8 +2073,15 @@ def _db518_acquisition_stablehlo() -> str:
     )
 
 
-def test_feature2_db518_stablehlo_requires_exact_source_and_chunk_geometry() -> None:
+def test_feature2_db518_stablehlo_requires_exact_source_and_chunk_geometry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     stablehlo = _db518_acquisition_stablehlo()
+    monkeypatch.setattr(
+        feature2_hlo_module,
+        "FEATURE2_DB518_STABLEHLO_SHA256",
+        sha256(stablehlo.encode()).hexdigest(),
+    )
     source_sha = "f87c0f162523bf6221d2824aa4b7268f1c770a55d2f8cde6da7506f595e9447f"
     report = validate_feature2_main_stablehlo(
         stablehlo,
@@ -1953,7 +2093,7 @@ def test_feature2_db518_stablehlo_requires_exact_source_and_chunk_geometry() -> 
     )
     assert report["passed"] is True
     assert report["exact_layer0_prompt_keys"] is True
-    assert report["identity_acquisition_only"] is True
+    assert report["identity_acquisition_only"] is False
     assert report["source_jaxpr_sha256"] == source_sha
     with pytest.raises(BenchmarkValidationError, match="exact causal source JAXpr"):
         validate_feature2_main_stablehlo(

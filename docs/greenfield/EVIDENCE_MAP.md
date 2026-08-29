@@ -1397,6 +1397,12 @@ Stable/optimized/canonical identities are `bc2fcc77...6035`, `f1cd8286...1bfe`, 
 `5b5dfacf...a10e` (6,662,190 bytes; 14,781 stripped debug references). Compact provenance is
 `docs/artifacts/pp16-feature2-position113-hlo-acquisition.json`.
 
+The DB518 layer-0 successor compile-only acquisition is sealed at
+`docs/artifacts/pp16-feature2-layer0-db518-hlo-acquisition.json`. It binds the exact acquired
+StableHLO/raw/canonical identities and proves four field-29 prompt-key chunks reach the layer-0
+cache update and scorer through only LP2 collectives. It is causal HLO evidence only: main
+execution, numerical correctness, Gate D, DB linkage and performance remain unclaimed.
+
 This acquisition is not numerical Gate-D evidence. Its local, unreviewed successor adds the missing
 causal certificate: nine ENTRY observer roots bind to fields 7--15 of the final while; four scans
 have exact 2048/2048/2048/2012 limits and 27 same-index handoffs; each field update reaches both its

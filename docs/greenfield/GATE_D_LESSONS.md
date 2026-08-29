@@ -789,3 +789,10 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
   Python-derived equivalent range. Pad both values and positions through the same live-row index so
   the compiled RoPE/key association remains bound to the scan input even when the sealed values are
   currently equal.
+- After first-time compilation, replace acquisition hints with both immutable whole-graph identity
+  and a causal consumption certificate before numerical execution. For chunked prompt keys this
+  means following the exact initializer field through the scan body, live-row slice, cache-write
+  conditional, scorer consumer and carried roots; shape, source names and root positions alone do
+  not prove that the corrected key is used. Also bind persistent state independently: require the
+  first scan's exact zero cache and every later cache initializer from the same predecessor while,
+  or a locally correct chunk can silently discard all keys written by earlier chunks.

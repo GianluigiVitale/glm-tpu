@@ -7430,3 +7430,25 @@ No TPU action has occurred for this successor. Exact next is one scoped adversar
 the staged diff and local evidence. Only approval permits commit/push, same-region mirror
 verification and one serialized compile-only acquisition. Numerical execution remains forbidden
 until the acquired graph receives a separate causal inspection and authorization. Gate D is open.
+
+## Current exact next: review the acquired DB518 causal HLO certificate
+
+Reviewed commit `e2a7b4e1` was pushed and mirrored before exactly one compile-only acquisition,
+tag `greenfield_pp16_feature2_layer0_db518_acquire_20260829T101159660007493Z`. The main graph was
+lowered and compiled in 54 seconds but never executed. Its Stable/raw/canonical HLO SHAs are
+`a79d4823...8f6b`, `0b0481d1...133` and `56b9b88d...5d8c`; the canonical graph is 6,863,602 bytes
+after stripping 15,339 stack references. The 20-object same-region archive and pre/post 8/8 clean
+censuses are sealed. This is not a numerical, Gate-D, token-rate or performance result.
+
+Offline inspection now pins the complete graph identity and proves all four prompt chunks carry
+their FP32 DB518 keys in scan field 29, slice them by the live loop counter, convert the current key
+for the layer-0 cache conditional, and causally consume the updated cache in scoring and the
+carried cache/position/score roots. The first scan starts from the exact BF16-zero cache and each
+later scan takes field 2 from the same predecessor while proven by field 7, so prompt keys remain
+cumulative across chunks. Each chunk depends on exactly seven authenticated entry boundaries and
+contains four physical-M64 projection whiles; the aggregate four-record topology SHA is
+`235dfa72...65bd`. The existing position-113 certificate was rebased to the acquired graph with
+SHA `92a1b18b...e46d`. Six hostile mutations refuse even when canonical identity is rebased.
+Complete PP16 feature2 validation passes 192/192 under pinned JAX 0.10.1. Exact next is the same
+Sol reviewer's correction-only verdict. Numerical TPU execution remains forbidden until that
+review and a separate protected numerical-entrypoint batch. Gate D is open.

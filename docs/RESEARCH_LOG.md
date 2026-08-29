@@ -11564,3 +11564,28 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
 - Complete affected CPU validation passes 202/202. No TPU call, tensor, DB row, HLO acquisition,
   numerical result or performance result exists for this successor. Exact next is staged-diff Sol
   review; only approval permits commit/push/mirror and one compile-only acquisition.
+
+## 2026-08-29 10:11 UTC — DB518 main HLO acquired; causal layer-0 consumption certified offline
+
+- Sol approved exactly one compile-only action at reviewed commit `e2a7b4e1`. Tag
+  `greenfield_pp16_feature2_layer0_db518_acquire_20260829T101159660007493Z` lowered and compiled
+  the main graph in 54 seconds without executing it. The archive has exactly 20 objects, both
+  censuses are 8/8 clean, and no tensor, DB row, numerical, Gate-D or performance claim exists.
+- Stable/raw/canonical main HLO identities are `a79d4823...8f6b`, `0b0481d1...133` and
+  `56b9b88d...5d8c`; canonical size/reference count is 6,863,602/15,339. The optimized graph has
+  31 gathers, 18 reduces and 16 LP2 permutes, maximum group two, no host transport, and compile
+  memory arguments/temp/code of 1,234,902,528/589,921,280/71,248,384 bytes.
+- The local causal certificate follows the four exact 2048/2048/2048/2012 scan initializers to
+  field 29. Each key chunk depends on exactly token ids, positions, embedding, layer-0 input norm,
+  `wk`, key-norm weight and bias; contains four physical-M64 whiles; is sliced by the live loop
+  counter; feeds the cache dynamic-update conditional; and reaches scoring plus the cache,
+  selected-position and selected-score roots. It additionally requires the first cache to be the
+  exact BF16-zero broadcast and later field-2 cache initializers to come from the same predecessor
+  while identified by field 7. Aggregate topology SHA is `235dfa72...65bd`.
+- Position-113 causal bindings remain exact on the new graph under SHA `92a1b18b...e46d`.
+  Cross-chunk, stale-cache-handoff, slice-index, cache-input, scorer-disconnect and p113 mutations refuse after
+  deliberately rebasing canonical identity. Compact evidence is
+  `docs/artifacts/pp16-feature2-layer0-db518-hlo-acquisition.json`.
+- Complete PP16 feature2 validation passes 192/192 under pinned JAX 0.10.1. Exact next is a scoped
+  correction-only same-Sol review. This certificate may prepare a separate numerical entrypoint
+  batch but does not itself authorize execution. Gate D remains open.

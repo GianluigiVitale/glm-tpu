@@ -39,6 +39,20 @@ FEATURE2_POSITION113_OPTIMIZED_STACK_FRAME_REFERENCES = 14_781
 FEATURE2_POSITION113_BRANCH_TOPOLOGY_SHA256 = (
     "05322ce7ad09db5463e17d4a7e31142edaffe128abe5e9d85d5ee81f5e3eb02b"
 )
+FEATURE2_DB518_STABLEHLO_SHA256 = (
+    "a79d4823db0fecf8b1bc980b16df283bbe7a497795fa06ff783d3cde8fa98f6b"
+)
+FEATURE2_DB518_OPTIMIZED_CANONICAL_SHA256 = (
+    "56b9b88dc081dd5d3ea2219d46be641128cbed6e9759754be7f87578b51b5d8c"
+)
+FEATURE2_DB518_OPTIMIZED_CANONICAL_BYTES = 6_863_602
+FEATURE2_DB518_OPTIMIZED_STACK_FRAME_REFERENCES = 15_339
+FEATURE2_DB518_POSITION113_BRANCH_TOPOLOGY_SHA256 = (
+    "92a1b18b523984dd98d2579d25668b6bd582f6f9f23a26d9e4449b29a81ee46d"
+)
+FEATURE2_DB518_LAYER0_KEY_TOPOLOGY_SHA256 = (
+    "235dfa726f82a152bf0218506cf8d3345520a7673ab7a6b908ef06df821465bd"
+)
 _FEATURE2_POSITION113_SOURCE_JAXPR_SHA256 = (
     "c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd"
 )
@@ -213,6 +227,73 @@ _POSITION113_PRIOR_SSA_WRAPPERS = {
     "%wide.wide.region_41.88_spmd.sunk": {12: "%copy-done.85"},
     "%wide.wide.region_81.128_spmd.sunk": {12: "%copy-done.87"},
     "%wide.wide.region_121.168_spmd.sunk": {12: "%copy-done.89"},
+}
+_POSITION113_DB518_CURRENT_SSA_BINDINGS = {
+    "%wide.wide.region_7.54_spmd.clone.sunk": {
+        7: ("%copy-done.62",),
+        8: ("%reshape_transpose.368", "%get-tuple-element.17098"),
+        9: ("%bitcast.6794",),
+        10: ("%reshape_transpose.370",),
+        11: ("%get-tuple-element.16978", "%get-tuple-element.17095"),
+        12: ("%bitcast.7005", "%min.1136", "%get-tuple-element.16273"),
+        13: ("%bitcast.6342",),
+        14: ("%get-tuple-element.16584", "%min.1136"),
+    },
+    "%wide.wide.region_50.97_spmd.sunk": {
+        7: ("%copy-done.64",),
+        8: ("%reshape_transpose.356", "%get-tuple-element.17362"),
+        9: ("%bitcast.6796",),
+        10: ("%reshape_transpose.358",),
+        11: ("%get-tuple-element.17242", "%get-tuple-element.17359"),
+        12: ("%bitcast.7006", "%min.1100", "%get-tuple-element.15076"),
+        13: ("%bitcast.5589",),
+        14: ("%get-tuple-element.15387", "%min.1100"),
+    },
+    "%wide.wide.region_93.140_spmd.sunk": {
+        7: ("%copy-done.66",),
+        8: ("%reshape_transpose.360", "%get-tuple-element.17626"),
+        9: ("%bitcast.6798",),
+        10: ("%reshape_transpose.362",),
+        11: ("%get-tuple-element.17506", "%get-tuple-element.17623"),
+        12: ("%bitcast.7007", "%min.1112", "%get-tuple-element.15475"),
+        13: ("%bitcast.5840",),
+        14: ("%get-tuple-element.15786", "%min.1112"),
+    },
+    "%wide.wide.region_136.184_spmd.sunk": {
+        7: ("%copy-done.68",),
+        8: ("%reshape_transpose.364", "%get-tuple-element.17890"),
+        9: ("%bitcast.6800",),
+        10: ("%reshape_transpose.366",),
+        11: ("%get-tuple-element.17770", "%get-tuple-element.17887"),
+        12: ("%bitcast.7008", "%min.1124", "%get-tuple-element.15874"),
+        13: ("%bitcast.6091",),
+        14: ("%get-tuple-element.16185", "%min.1124"),
+    },
+}
+_POSITION113_DB518_PRIOR_SSA_WRAPPERS = {
+    "%wide.wide.region_7.54_spmd.clone.sunk": {
+        7: "%copy-done.84",
+        9: "%copy-done.103",
+        14: "%copy-done.126",
+    },
+    "%wide.wide.region_50.97_spmd.sunk": {
+        7: "%copy-done.86",
+        9: "%copy-done.105",
+        10: "%copy-done.168",
+        14: "%copy-done.128",
+    },
+    "%wide.wide.region_93.140_spmd.sunk": {
+        7: "%copy-done.88",
+        9: "%copy-done.107",
+        10: "%copy-done.170",
+        14: "%copy-done.130",
+    },
+    "%wide.wide.region_136.184_spmd.sunk": {
+        7: "%copy-done.90",
+        9: "%copy-done.109",
+        10: "%copy-done.172",
+        14: "%copy-done.132",
+    },
 }
 _H16_ATTENTION_KERNEL = "greenfield_pregathered_sparse_mla_h16_k2048_b512_w640"
 _FP8_ATTENTION_O_PREFIX = "greenfield_fp8_strategy_nd_o_m8_k512_n"
@@ -1186,6 +1267,14 @@ def _optimized_terminal_boundary_contract(
 def _optimized_position113_lineage_contract(
     instructions: tuple[HloInstruction, ...],
     root: HloInstruction | None,
+    *,
+    current_ssa_bindings: dict[str, dict[int, tuple[str, ...]]] = (
+        _POSITION113_CURRENT_SSA_BINDINGS
+    ),
+    prior_ssa_wrappers: dict[str, dict[int, str]] = (_POSITION113_PRIOR_SSA_WRAPPERS),
+    expected_branch_topology_sha256: str = (
+        FEATURE2_POSITION113_BRANCH_TOPOLOGY_SHA256
+    ),
 ) -> tuple[dict[str, Any], list[str]]:
     """Certify the four-scan position-113 capture through while tuple fields."""
 
@@ -1577,9 +1666,7 @@ def _optimized_position113_lineage_contract(
                 )
             else:
                 initialization_predicate = initialization_predicates[0]
-        expected_current_bindings = _POSITION113_CURRENT_SSA_BINDINGS.get(
-            body_matches[0], {}
-        )
+        expected_current_bindings = current_ssa_bindings.get(body_matches[0], {})
         causal_fields = 0
         for field_index in range(7, 16):
             if field_index >= len(body_root.operand_names):
@@ -1644,9 +1731,9 @@ def _optimized_position113_lineage_contract(
                 expected_current_sources = set(
                     expected_current_bindings.get(field_index, ())
                 )
-                prior_wrapper = _POSITION113_PRIOR_SSA_WRAPPERS.get(
-                    body_matches[0], {}
-                ).get(field_index)
+                prior_wrapper = prior_ssa_wrappers.get(body_matches[0], {}).get(
+                    field_index
+                )
                 expected_prior_sources = {prior_wrapper or carried[0].name}
                 if initialization_predicate is not None and field_index in (
                     *range(7, 13),
@@ -1814,7 +1901,7 @@ def _optimized_position113_lineage_contract(
     ).hexdigest()
     if (
         len(branch_topology_records) != 32
-        or branch_topology_sha256 != FEATURE2_POSITION113_BRANCH_TOPOLOGY_SHA256
+        or branch_topology_sha256 != expected_branch_topology_sha256
     ):
         violations.append(
             "position-113 ordered branch topology drifted: "
@@ -1869,6 +1956,613 @@ def _optimized_position113_lineage_contract(
             "scan_count": len(scan_reports),
             "scan_handoff_field_count": chain_handoff_fields,
             "scans": list(reversed(scan_reports)),
+        },
+        violations,
+    )
+
+
+def _optimized_db518_layer0_key_contract(
+    instructions: tuple[HloInstruction, ...],
+    root: HloInstruction | None,
+) -> tuple[dict[str, Any], list[str]]:
+    """Bind each DB518 key chunk to layer-0 cache write and causal scoring."""
+
+    violations: list[str] = []
+    by_computation: dict[str, dict[str, HloInstruction]] = defaultdict(dict)
+    roots: dict[str, HloInstruction] = {}
+    for instruction in instructions:
+        local = by_computation[instruction.computation]
+        if instruction.name in local:
+            violations.append(
+                "DB518 key lineage has a duplicate local instruction: "
+                f"{instruction.computation} {instruction.name}"
+            )
+        local[instruction.name] = instruction
+        if instruction.raw_line.startswith("ROOT "):
+            if instruction.computation in roots:
+                violations.append(
+                    "DB518 key lineage has duplicate computation roots: "
+                    f"{instruction.computation}"
+                )
+            roots[instruction.computation] = instruction
+
+    def symbol(computation: str) -> str:
+        return computation.removeprefix("ENTRY ").split(" ", 1)[0]
+
+    computation_by_symbol = {
+        symbol(computation): computation for computation in by_computation
+    }
+    if len(computation_by_symbol) != len(by_computation):
+        violations.append("DB518 key lineage has ambiguous computation symbols")
+
+    def tuple_index(instruction: HloInstruction | None) -> int | None:
+        if instruction is None or instruction.raw_opcode != "get-tuple-element":
+            return None
+        match = _HLO_TUPLE_INDEX.search(instruction.raw_line)
+        return None if match is None else int(match.group(1))
+
+    def dependencies(local: dict[str, HloInstruction], seed: str) -> set[str]:
+        visited: set[str] = set()
+        pending = [seed]
+        while pending:
+            if len(visited) > 100_000:
+                violations.append("DB518 local lineage exceeded its finite bound")
+                break
+            name = pending.pop()
+            if name in visited:
+                continue
+            visited.add(name)
+            instruction = local.get(name)
+            if instruction is not None:
+                pending.extend(instruction.operand_names)
+        return visited
+
+    topology_cache: dict[tuple[str, str], tuple[str, int, set[tuple[str, str]]]] = {}
+
+    def executable_topology(
+        computation: str,
+        seed: str,
+    ) -> tuple[str, int, set[tuple[str, str]]]:
+        cache_key = (computation, seed)
+        cached = topology_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        visited: set[tuple[str, str]] = set()
+        pending = [cache_key]
+        while pending:
+            if len(visited) > 100_000:
+                violations.append("DB518 causal topology exceeded its finite bound")
+                break
+            current_computation, name = pending.pop()
+            key = (current_computation, name)
+            if key in visited:
+                continue
+            visited.add(key)
+            instruction = by_computation.get(current_computation, {}).get(name)
+            if instruction is None:
+                continue
+            pending.extend(
+                (current_computation, operand_name)
+                for operand_name in instruction.operand_names
+                if operand_name in by_computation[current_computation]
+            )
+            for reference in _HLO_COMPUTATION_REFERENCE.findall(instruction.raw_line):
+                referenced_computation = computation_by_symbol.get(reference)
+                referenced_root = roots.get(referenced_computation or "")
+                if referenced_root is not None:
+                    pending.append((referenced_root.computation, referenced_root.name))
+        digest = sha256()
+        for current_computation, name in sorted(
+            visited,
+            key=lambda key: (
+                by_computation.get(key[0], {}).get(key[1]).index
+                if by_computation.get(key[0], {}).get(key[1]) is not None
+                else 1 << 62
+            ),
+        ):
+            instruction = by_computation.get(current_computation, {}).get(name)
+            if instruction is None:
+                digest.update(
+                    f"{symbol(current_computation)}|missing={name}\n".encode()
+                )
+            else:
+                digest.update(
+                    (
+                        f"{symbol(current_computation)}|"
+                        f"{_optimized_executable_prefix(instruction)}\n"
+                    ).encode()
+                )
+        result = (digest.hexdigest(), len(visited), visited)
+        topology_cache[cache_key] = result
+        return result
+
+    expected_boundary_parameters = {
+        "candidate_token_ids": ("s32", (8156,)),
+        "candidate_positions": ("s32", (8156,)),
+        "local_weights['global.embedding']": ("bf16", (1, 77_440, 6144)),
+        "local_weights['attention.slot_00.input_norm']": (
+            "bf16",
+            (1, 6144),
+        ),
+        "layer0_wk_weight": ("f32", (1, 128, 6144)),
+        "local_weights['indexer.slot_00.key_norm_weight']": (
+            "bf16",
+            (1, 128),
+        ),
+        "local_weights['indexer.slot_00.key_norm_bias']": (
+            "bf16",
+            (1, 128),
+        ),
+    }
+    projection_while_signature = (
+        ("s32", ()),
+        ("f32", (32, 64, 128)),
+        ("bf16", (32, 64, 6144)),
+        ("f32", (128, 6144)),
+        ("bf16", (128,)),
+        ("bf16", (128,)),
+        ("s32", ()),
+    )
+    entry_local = {} if root is None else by_computation.get(root.computation, {})
+    final_while: HloInstruction | None = None
+    if root is None or root.raw_opcode != "tuple" or len(root.operand_names) != 24:
+        violations.append("DB518 key lineage requires the exact 24-field ENTRY root")
+    else:
+        boundary = entry_local.get(root.operand_names[15])
+        source = (
+            entry_local.get(boundary.operand_names[0])
+            if boundary is not None
+            and boundary.raw_opcode == "bitcast"
+            and len(boundary.operand_names) == 1
+            else None
+        )
+        candidate = (
+            entry_local.get(source.operand_names[0])
+            if source is not None
+            and tuple_index(source) == 7
+            and len(source.operand_names) == 1
+            else None
+        )
+        if candidate is None or candidate.raw_opcode != "while":
+            violations.append("DB518 key lineage lost the final feature2 scan")
+        else:
+            final_while = candidate
+
+    scan_reports: list[dict[str, Any]] = []
+    topology_records: list[str] = []
+    current_while = final_while
+    for reverse_scan_index in range(4):
+        chunk_index = 3 - reverse_scan_index
+        expected_rows = 2012 if chunk_index == 3 else 2048
+        if current_while is None:
+            violations.append("DB518 four-scan chain ended early")
+            break
+        body_matches = tuple(_HLO_WHILE_BODY.findall(current_while.raw_line))
+        condition_matches = tuple(_HLO_WHILE_CONDITION.findall(current_while.raw_line))
+        body_computation = (
+            computation_by_symbol.get(body_matches[0])
+            if len(body_matches) == 1
+            else None
+        )
+        condition_computation = (
+            computation_by_symbol.get(condition_matches[0])
+            if len(condition_matches) == 1
+            else None
+        )
+        body_root = roots.get(body_computation or "")
+        condition_root = roots.get(condition_computation or "")
+        if (
+            body_computation is None
+            or body_root is None
+            or body_root.raw_opcode != "tuple"
+            or len(body_root.operand_names) <= 29
+        ):
+            violations.append(
+                f"DB518 scan lost its exact body tuple: {current_while.name}"
+            )
+            break
+        condition_limit = None
+        if condition_root is not None and condition_root.raw_opcode == "compare":
+            condition_local = by_computation[condition_computation]
+            numeric = tuple(
+                int(value)
+                for name in condition_root.operand_names
+                if (value := _optimized_constant_literal(condition_local.get(name)))
+                and value.isdigit()
+            )
+            if len(numeric) == 1:
+                condition_limit = numeric[0]
+        if condition_limit != expected_rows:
+            violations.append(
+                "DB518 scan limit drifted: "
+                f"chunk={chunk_index} expected={expected_rows} "
+                f"observed={condition_limit}"
+            )
+
+        if len(current_while.operand_names) != 1:
+            violations.append(f"DB518 scan init arity drifted: {current_while.name}")
+            break
+        initial = entry_local.get(current_while.operand_names[0])
+        if (
+            initial is None
+            or initial.raw_opcode != "tuple"
+            or len(initial.operand_names) <= 29
+        ):
+            violations.append(f"DB518 scan initializer drifted: {current_while.name}")
+            break
+        handoff = entry_local.get(initial.operand_names[7])
+        previous_while = (
+            entry_local.get(handoff.operand_names[0])
+            if handoff is not None
+            and tuple_index(handoff) == 7
+            and len(handoff.operand_names) == 1
+            else None
+        )
+        cache_seed = entry_local.get(initial.operand_names[2])
+        expected_cache_shape = (("bf16", (16, 256, 128)),)
+        cache_seed_kind = "handoff"
+        cache_predecessor = None
+        if chunk_index == 0:
+            cache_seed_kind = "zero"
+            zero_constant = (
+                entry_local.get(cache_seed.operand_names[0])
+                if cache_seed is not None
+                and cache_seed.raw_opcode == "broadcast"
+                and len(cache_seed.operand_names) == 1
+                else None
+            )
+            if (
+                cache_seed is None
+                or _shape_signature(cache_seed.result_shapes) != expected_cache_shape
+                or zero_constant is None
+                or _shape_signature(zero_constant.result_shapes) != (("bf16", ()),)
+                or _optimized_constant_literal(zero_constant) != "0"
+            ):
+                violations.append("DB518 first scan lost its exact zero cache")
+        else:
+            cache_predecessor = None if previous_while is None else previous_while.name
+            if (
+                previous_while is None
+                or previous_while.raw_opcode != "while"
+                or cache_seed is None
+                or _shape_signature(cache_seed.result_shapes) != expected_cache_shape
+                or tuple_index(cache_seed) != 2
+                or cache_seed.operand_names != (previous_while.name,)
+            ):
+                violations.append(
+                    "DB518 scan cache handoff lost the field-7 predecessor: "
+                    f"chunk={chunk_index} cache={initial.operand_names[2]} "
+                    f"predecessor={cache_predecessor}"
+                )
+        key_seed = entry_local.get(initial.operand_names[29])
+        expected_key_shape = (("f32", (expected_rows, 128)),)
+        if (
+            key_seed is None
+            or _shape_signature(key_seed.result_shapes) != expected_key_shape
+        ):
+            violations.append(f"DB518 key chunk shape drifted: chunk={chunk_index}")
+            break
+        seed_sha256, seed_node_count, seed_topology = executable_topology(
+            root.computation, key_seed.name
+        )
+        boundary_parameters = {
+            instruction.op_name: _shape_signature(instruction.result_shapes)[0]
+            for computation, name in seed_topology
+            if computation == root.computation
+            and (instruction := by_computation[computation].get(name)) is not None
+            and instruction.raw_opcode == "parameter"
+            and instruction.op_name is not None
+        }
+        if boundary_parameters != expected_boundary_parameters:
+            violations.append(
+                "DB518 key chunk boundary parameters drifted: "
+                f"chunk={chunk_index} observed={boundary_parameters}"
+            )
+        projection_whiles = tuple(
+            instruction
+            for computation, name in seed_topology
+            if (instruction := by_computation.get(computation, {}).get(name))
+            is not None
+            and instruction.raw_opcode == "while"
+            and _shape_signature(instruction.result_shapes)
+            == projection_while_signature
+        )
+        if len(projection_whiles) != 4:
+            violations.append(
+                "DB518 physical-M64 projection count drifted: "
+                f"chunk={chunk_index} observed={len(projection_whiles)}"
+            )
+
+        body_local = by_computation[body_computation]
+        parameters = tuple(
+            instruction
+            for instruction in body_local.values()
+            if instruction.raw_opcode == "parameter"
+            and _HLO_PARAMETER_INDEX.search(instruction.raw_line)
+            and int(_HLO_PARAMETER_INDEX.search(instruction.raw_line).group(1)) == 0
+        )
+        if len(parameters) != 1:
+            violations.append(f"DB518 scan body parameter drifted: {body_matches[0]}")
+            break
+        parameter = parameters[0]
+        key_fields = tuple(
+            instruction
+            for instruction in body_local.values()
+            if instruction.raw_opcode == "get-tuple-element"
+            and instruction.operand_names == (parameter.name,)
+            and tuple_index(instruction) == 29
+            and _shape_signature(instruction.result_shapes) == expected_key_shape
+        )
+        if len(key_fields) != 1:
+            violations.append(f"DB518 scan key field drifted: {body_matches[0]}")
+            break
+        key_field = key_fields[0]
+        key_users = tuple(
+            instruction
+            for instruction in body_local.values()
+            if key_field.name in instruction.operand_names
+        )
+        key_slice_candidates = tuple(
+            instruction
+            for instruction in key_users
+            if instruction.raw_opcode == "fusion"
+            and _shape_signature(instruction.result_shapes) == (("bf16", (1, 128)),)
+        )
+        observer_candidates = tuple(
+            instruction
+            for instruction in key_users
+            if instruction.raw_opcode == "fusion"
+            and _shape_signature(instruction.result_shapes) == (("f32", (1, 128)),)
+        )
+        if (
+            len(key_users) != 3
+            or len(key_slice_candidates) != 1
+            or len(observer_candidates) != 1
+            or body_root not in key_users
+            or body_root.operand_names[29] != key_field.name
+        ):
+            violations.append(
+                "DB518 key field lost exact slice/observer/carry consumers: "
+                f"body={body_matches[0]} users={[item.name for item in key_users]}"
+            )
+            break
+        key_slice = key_slice_candidates[0]
+        loop_index_sources = tuple(
+            body_local.get(name)
+            for name in key_slice.operand_names
+            if tuple_index(body_local.get(name)) == 0
+            and body_local.get(name) is not None
+            and body_local[name].operand_names == (parameter.name,)
+        )
+        call_matches = tuple(_HLO_CALLED_COMPUTATION.findall(key_slice.raw_line))
+        called_computation = (
+            computation_by_symbol.get(call_matches[0])
+            if len(call_matches) == 1
+            else None
+        )
+        called_root = roots.get(called_computation or "")
+        key_slice_callee_ok = bool(
+            len(key_slice.operand_names) == 2
+            and key_slice.operand_names[0] == key_field.name
+            and len(loop_index_sources) == 1
+            and called_root is not None
+            and called_root.raw_opcode == "dynamic-slice"
+            and _shape_signature(called_root.result_shapes) == (("bf16", (1, 128)),)
+            and "dynamic_slice_sizes={1,128}" in called_root.raw_line
+        )
+        if not key_slice_callee_ok:
+            violations.append(
+                f"DB518 current-key dynamic slice drifted: {body_matches[0]}"
+            )
+        slice_sha256, slice_node_count, _ = executable_topology(
+            body_computation, key_slice.name
+        )
+
+        cache_tuples = tuple(
+            instruction
+            for instruction in body_local.values()
+            if instruction.raw_opcode == "tuple"
+            and key_slice.name in instruction.operand_names
+        )
+        cache_tuple = cache_tuples[0] if len(cache_tuples) == 1 else None
+        cache_tuple_shape = (
+            ("s32", ()),
+            ("s32", ()),
+            ("bf16", (1, 128)),
+            ("bf16", (16, 256, 128)),
+        )
+        if (
+            cache_tuple is None
+            or _shape_signature(cache_tuple.result_shapes) != cache_tuple_shape
+            or len(cache_tuple.operand_names) != 4
+            or cache_tuple.operand_names[2] != key_slice.name
+        ):
+            violations.append(f"DB518 cache-write tuple drifted: {body_matches[0]}")
+            break
+        conditionals = tuple(
+            instruction
+            for instruction in body_local.values()
+            if instruction.raw_opcode == "conditional"
+            and cache_tuple.name in instruction.operand_names
+            and _shape_signature(instruction.result_shapes)
+            == (("bf16", (16, 256, 128)),)
+        )
+        cache_write = conditionals[0] if len(conditionals) == 1 else None
+        if cache_write is None:
+            violations.append(
+                f"DB518 cache-write conditional drifted: {body_matches[0]}"
+            )
+            break
+        branch_symbols = tuple(
+            reference
+            for reference in _HLO_COMPUTATION_REFERENCE.findall(cache_write.raw_line)
+            if reference in computation_by_symbol
+        )
+        branch_roots = tuple(
+            roots.get(computation_by_symbol[reference]) for reference in branch_symbols
+        )
+        identity_roots = tuple(
+            branch
+            for branch in branch_roots
+            if branch is not None and branch.raw_opcode == "parameter"
+        )
+        update_roots = tuple(
+            branch
+            for branch in branch_roots
+            if branch is not None and branch.raw_opcode == "dynamic-update-slice"
+        )
+        update_root = update_roots[0] if len(update_roots) == 1 else None
+        update_local = (
+            {} if update_root is None else by_computation[update_root.computation]
+        )
+        update_parameters = tuple(
+            instruction
+            for instruction in update_local.values()
+            if instruction.raw_opcode == "parameter"
+            and _HLO_PARAMETER_INDEX.search(instruction.raw_line)
+            and int(_HLO_PARAMETER_INDEX.search(instruction.raw_line).group(1)) == 0
+        )
+        update_parameter = update_parameters[0] if len(update_parameters) == 1 else None
+        update_gtes = {
+            tuple_index(instruction): instruction
+            for instruction in update_local.values()
+            if instruction.raw_opcode == "get-tuple-element"
+            and update_parameter is not None
+            and instruction.operand_names == (update_parameter.name,)
+        }
+        update_branch_ok = bool(
+            len(branch_symbols) == 2
+            and len(identity_roots) == 1
+            and update_root is not None
+            and update_parameter is not None
+            and set(update_gtes) == {0, 1, 2, 3}
+            and update_root.operand_names[0] == update_gtes[3].name
+            and update_gtes[2].name
+            in dependencies(update_local, update_root.operand_names[1])
+            and update_gtes[0].name
+            in dependencies(update_local, update_root.operand_names[2])
+            and update_gtes[1].name
+            in dependencies(update_local, update_root.operand_names[3])
+        )
+        if not update_branch_ok:
+            violations.append(
+                f"DB518 cache dynamic-update branch drifted: {body_matches[0]}"
+            )
+
+        cache_users = tuple(
+            instruction
+            for instruction in body_local.values()
+            if cache_write.name in instruction.operand_names
+        )
+        score_users = tuple(
+            instruction
+            for instruction in cache_users
+            if instruction.raw_opcode == "fusion"
+            and _shape_signature(instruction.result_shapes)
+            == (("bf16", (16, 256, 128)),)
+        )
+        slice_users = tuple(
+            instruction
+            for instruction in cache_users
+            if instruction.raw_opcode == "slice-start"
+        )
+        cache_reaches = {
+            index: cache_write.name
+            in dependencies(body_local, body_root.operand_names[index])
+            for index in (2, 12, 13, 14)
+        }
+        if (
+            len(cache_users) != 5
+            or len(score_users) != 1
+            or len(slice_users) != 4
+            or cache_reaches != {2: True, 12: True, 13: False, 14: True}
+        ):
+            violations.append(
+                "DB518 updated cache lost scoring/carried consumers: "
+                f"body={body_matches[0]} users={[item.name for item in cache_users]} "
+                f"reaches={cache_reaches}"
+            )
+        cache_sha256, cache_node_count, _ = executable_topology(
+            body_computation, cache_write.name
+        )
+        record = "|".join(
+            (
+                f"chunk={chunk_index}",
+                f"rows={expected_rows}",
+                f"while={current_while.name}",
+                f"body={body_matches[0]}",
+                f"cache_seed={cache_seed.name if cache_seed is not None else ''}",
+                f"cache_seed_kind={cache_seed_kind}",
+                f"cache_predecessor={cache_predecessor or ''}",
+                f"key_seed={key_seed.name}",
+                f"key_seed_nodes={seed_node_count}",
+                f"key_seed_sha256={seed_sha256}",
+                f"key_field={key_field.name}",
+                f"key_slice={key_slice.name}",
+                f"key_slice_nodes={slice_node_count}",
+                f"key_slice_sha256={slice_sha256}",
+                f"cache_write={cache_write.name}",
+                f"cache_write_nodes={cache_node_count}",
+                f"cache_write_sha256={cache_sha256}",
+                f"score_user={score_users[0].name if len(score_users) == 1 else ''}",
+            )
+        )
+        topology_records.append(record)
+        scan_reports.append(
+            {
+                "body": body_matches[0],
+                "cache_reaches_carried_and_score_roots": cache_reaches,
+                "cache_predecessor": cache_predecessor,
+                "cache_seed": cache_seed.name if cache_seed is not None else None,
+                "cache_seed_kind": cache_seed_kind,
+                "cache_write": cache_write.name,
+                "chunk_index": chunk_index,
+                "key_seed": key_seed.name,
+                "key_seed_node_count": seed_node_count,
+                "key_seed_sha256": seed_sha256,
+                "key_slice": key_slice.name,
+                "key_slice_node_count": slice_node_count,
+                "key_slice_sha256": slice_sha256,
+                "physical_m64_projection_while_count": len(projection_whiles),
+                "rows": expected_rows,
+                "score_user": score_users[0].name if len(score_users) == 1 else None,
+            }
+        )
+
+        if reverse_scan_index == 3:
+            if previous_while is not None and previous_while.raw_opcode == "while":
+                violations.append("DB518 scan chain has an unexpected predecessor")
+            current_while = None
+        elif previous_while is None or previous_while.raw_opcode != "while":
+            violations.append("DB518 scan chain lost its predecessor")
+            current_while = None
+        else:
+            current_while = previous_while
+
+    ordered_reports = list(reversed(scan_reports))
+    ordered_records = list(reversed(topology_records))
+    topology_sha256 = sha256("\n".join(ordered_records).encode()).hexdigest()
+    if len(ordered_records) != 4 or (
+        topology_sha256 != FEATURE2_DB518_LAYER0_KEY_TOPOLOGY_SHA256
+    ):
+        violations.append(
+            "DB518 layer-0 key topology drifted: "
+            f"count={len(ordered_records)} sha256={topology_sha256}"
+        )
+    passed = not violations
+    return (
+        {
+            "boundary_parameter_count": len(expected_boundary_parameters),
+            "cache_write_count": len(ordered_reports),
+            "causal": passed,
+            "physical_m64_projection_count": sum(
+                report["physical_m64_projection_while_count"]
+                for report in ordered_reports
+            ),
+            "scan_count": len(ordered_reports),
+            "scans": ordered_reports,
+            "topology_record_count": len(ordered_records),
+            "topology_sha256": topology_sha256,
         },
         violations,
     )
@@ -2440,26 +3134,22 @@ def validate_feature2_main_stablehlo(
     markers = _host_markers(stablehlo)
     violations: list[str] = []
     stablehlo_sha256 = sha256(stablehlo.encode()).hexdigest()
-    if (
-        sealed_boundary_capture
-        and not exact_layer0_prompt_keys
-        and stablehlo_sha256
-        != (
-            FEATURE2_POSITION113_STABLEHLO_SHA256
-            if observe_position_113
-            else FEATURE2_SEALED_STABLEHLO_SHA256
-        )
-    ):
+    if sealed_boundary_capture:
         expected_stablehlo_sha256 = (
-            FEATURE2_POSITION113_STABLEHLO_SHA256
-            if observe_position_113
-            else FEATURE2_SEALED_STABLEHLO_SHA256
+            FEATURE2_DB518_STABLEHLO_SHA256
+            if exact_layer0_prompt_keys
+            else (
+                FEATURE2_POSITION113_STABLEHLO_SHA256
+                if observe_position_113
+                else FEATURE2_SEALED_STABLEHLO_SHA256
+            )
         )
-        violations.append(
-            "sealed StableHLO identity drifted: "
-            f"expected={expected_stablehlo_sha256} "
-            f"observed={stablehlo_sha256}"
-        )
+        if stablehlo_sha256 != expected_stablehlo_sha256:
+            violations.append(
+                "sealed StableHLO identity drifted: "
+                f"expected={expected_stablehlo_sha256} "
+                f"observed={stablehlo_sha256}"
+            )
     if "mhlo.num_partitions=2:i32" not in compact:
         violations.append("StableHLO lost the exact two-partition module")
     required = (
@@ -2554,7 +3244,7 @@ def validate_feature2_main_stablehlo(
         "passed": True,
         "observe_position_113": observe_position_113,
         "exact_layer0_prompt_keys": exact_layer0_prompt_keys,
-        "identity_acquisition_only": exact_layer0_prompt_keys,
+        "identity_acquisition_only": False,
         "projection_contract": projection_contract,
         "sealed_boundary_capture": sealed_boundary_capture,
         "source_jaxpr_sha256": source_jaxpr_sha256,
@@ -2608,32 +3298,41 @@ def validate_feature2_main_optimized_hlo(
         else:
             expected_identity = {
                 "byte_count": (
-                    FEATURE2_POSITION113_OPTIMIZED_CANONICAL_BYTES
-                    if observe_position_113
-                    else FEATURE2_SEALED_OPTIMIZED_CANONICAL_BYTES
+                    FEATURE2_DB518_OPTIMIZED_CANONICAL_BYTES
+                    if exact_layer0_prompt_keys
+                    else (
+                        FEATURE2_POSITION113_OPTIMIZED_CANONICAL_BYTES
+                        if observe_position_113
+                        else FEATURE2_SEALED_OPTIMIZED_CANONICAL_BYTES
+                    )
                 ),
                 "canonicalizer_version": FEATURE2_OPTIMIZED_HLO_CANONICALIZER_VERSION,
                 "sha256": (
-                    FEATURE2_POSITION113_OPTIMIZED_CANONICAL_SHA256
-                    if observe_position_113
-                    else FEATURE2_SEALED_OPTIMIZED_CANONICAL_SHA256
+                    FEATURE2_DB518_OPTIMIZED_CANONICAL_SHA256
+                    if exact_layer0_prompt_keys
+                    else (
+                        FEATURE2_POSITION113_OPTIMIZED_CANONICAL_SHA256
+                        if observe_position_113
+                        else FEATURE2_SEALED_OPTIMIZED_CANONICAL_SHA256
+                    )
                 ),
                 "stripped_stack_frame_references": (
-                    FEATURE2_POSITION113_OPTIMIZED_STACK_FRAME_REFERENCES
-                    if observe_position_113
-                    else FEATURE2_SEALED_OPTIMIZED_STACK_FRAME_REFERENCES
+                    FEATURE2_DB518_OPTIMIZED_STACK_FRAME_REFERENCES
+                    if exact_layer0_prompt_keys
+                    else (
+                        FEATURE2_POSITION113_OPTIMIZED_STACK_FRAME_REFERENCES
+                        if observe_position_113
+                        else FEATURE2_SEALED_OPTIMIZED_STACK_FRAME_REFERENCES
+                    )
                 ),
             }
             observed_identity = {
                 key: sealed_canonical_identity.get(key) for key in expected_identity
             }
             sealed_canonical_identity_authenticated = bool(
-                not exact_layer0_prompt_keys and observed_identity == expected_identity
+                observed_identity == expected_identity
             )
-            if (
-                not exact_layer0_prompt_keys
-                and not sealed_canonical_identity_authenticated
-            ):
+            if not sealed_canonical_identity_authenticated:
                 canonical_identity_violation = (
                     "sealed optimized canonical-HLO identity drifted: "
                     f"expected={expected_identity} observed={observed_identity}"
@@ -2668,12 +3367,36 @@ def validate_feature2_main_optimized_hlo(
         )
     position113_lineage: dict[str, Any] = {}
     position113_lineage_authenticated = False
-    if observe_position_113 and not exact_layer0_prompt_keys:
+    if observe_position_113:
         position113_lineage, position113_lineage_violations = (
-            _optimized_position113_lineage_contract(instructions, root)
+            _optimized_position113_lineage_contract(
+                instructions,
+                root,
+                current_ssa_bindings=(
+                    _POSITION113_DB518_CURRENT_SSA_BINDINGS
+                    if exact_layer0_prompt_keys
+                    else _POSITION113_CURRENT_SSA_BINDINGS
+                ),
+                prior_ssa_wrappers=(
+                    _POSITION113_DB518_PRIOR_SSA_WRAPPERS
+                    if exact_layer0_prompt_keys
+                    else _POSITION113_PRIOR_SSA_WRAPPERS
+                ),
+                expected_branch_topology_sha256=(
+                    FEATURE2_DB518_POSITION113_BRANCH_TOPOLOGY_SHA256
+                    if exact_layer0_prompt_keys
+                    else FEATURE2_POSITION113_BRANCH_TOPOLOGY_SHA256
+                ),
+            )
         )
         violations.extend(position113_lineage_violations)
         position113_lineage_authenticated = bool(position113_lineage.get("causal"))
+    db518_layer0_key_lineage: dict[str, Any] = {}
+    if exact_layer0_prompt_keys:
+        db518_layer0_key_lineage, db518_layer0_key_violations = (
+            _optimized_db518_layer0_key_contract(instructions, root)
+        )
+        violations.extend(db518_layer0_key_violations)
     terminal_contract, terminal_violations = _optimized_terminal_boundary_contract(
         instructions,
         root,
@@ -2684,7 +3407,7 @@ def validate_feature2_main_optimized_hlo(
             sealed_canonical_identity_authenticated
         ),
         position113_lineage_authenticated=position113_lineage_authenticated,
-        acquisition_only=exact_layer0_prompt_keys,
+        acquisition_only=False,
     )
     violations.extend(terminal_violations)
     allowed_collectives = {"all-gather", "all-reduce", "collective-permute"}
@@ -3068,10 +3791,11 @@ def validate_feature2_main_optimized_hlo(
         "passed": True,
         "observe_position_113": observe_position_113,
         "exact_layer0_prompt_keys": exact_layer0_prompt_keys,
-        "identity_acquisition_only": exact_layer0_prompt_keys,
+        "identity_acquisition_only": False,
         "physical_collective_count": len(collectives),
         "projection_width": expected_width,
         "position113_lineage": position113_lineage,
+        "db518_layer0_key_lineage": db518_layer0_key_lineage,
         "reachable_computation_count": reachable_computation_count,
         "sealed_boundary_capture": sealed_boundary_capture,
         "reducer_counts": reducer_counts,
