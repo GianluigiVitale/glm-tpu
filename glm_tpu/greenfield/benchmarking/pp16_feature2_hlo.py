@@ -42,6 +42,9 @@ FEATURE2_POSITION113_BRANCH_TOPOLOGY_SHA256 = (
 _FEATURE2_POSITION113_SOURCE_JAXPR_SHA256 = (
     "c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd"
 )
+_FEATURE2_POSITION113_DB518_SOURCE_JAXPR_SHA256 = (
+    "f87c0f162523bf6221d2824aa4b7268f1c770a55d2f8cde6da7506f595e9447f"
+)
 _DEBUG_TABLES = ("FileNames", "FunctionNames", "FileLocations", "StackFrames")
 _INSTRUCTION_LINE = re.compile(r"^\s*(?:ROOT )?%[A-Za-z0-9_.-]+ = ")
 _DEBUG_ROW_PATTERNS = {
@@ -1052,6 +1055,7 @@ def _optimized_terminal_boundary_contract(
     observe_position_113: bool,
     sealed_canonical_identity_authenticated: bool,
     position113_lineage_authenticated: bool,
+    acquisition_only: bool = False,
 ) -> tuple[dict[str, Any], list[str]]:
     """Require exact root arity/types and authenticated sealed identity.
 
@@ -1104,19 +1108,25 @@ def _optimized_terminal_boundary_contract(
     sealed_bindings: dict[str, str] = {}
     sealed_acquisition_root_hints: dict[str, str] = {}
     if sealed_boundary_capture:
-        if not sealed_canonical_identity_authenticated:
-            violations.append(
-                "optimized sealed roots lack the authenticated canonical-HLO "
-                "producer identity"
-            )
-        elif all(
+        sealed_roots_live = all(
             index < len(root.operand_names)
             and local.get(root.operand_names[index]) is not None
             and _shape_signature(local[root.operand_names[index]].result_shapes)
             == (expected[index],)
             and (root.computation, root.operand_names[index]) in live_keys
             for index in _SEALED_BOUNDARY_ROOT_MARKERS
-        ):
+        )
+        if acquisition_only and sealed_roots_live:
+            sealed_acquisition_root_hints = {
+                str(index): marker
+                for index, marker in _SEALED_BOUNDARY_ROOT_MARKERS.items()
+            }
+        elif not sealed_canonical_identity_authenticated:
+            violations.append(
+                "optimized sealed roots lack the authenticated canonical-HLO "
+                "producer identity"
+            )
+        elif sealed_roots_live:
             sealed_bindings = {
                 str(index): marker
                 for index, marker in _SEALED_BOUNDARY_ROOT_MARKERS.items()
@@ -1128,17 +1138,23 @@ def _optimized_terminal_boundary_contract(
     observer_bindings: dict[str, str] = {}
     observer_acquisition_root_hints: dict[str, str] = {}
     if observe_position_113:
-        if (
+        observer_roots_live = all(
+            index < len(root.operand_names)
+            and local.get(root.operand_names[index]) is not None
+            and _shape_signature(local[root.operand_names[index]].result_shapes)
+            == (expected[index],)
+            and (root.computation, root.operand_names[index]) in live_keys
+            for index in _POSITION113_OBSERVER_ROOT_MARKERS
+        )
+        if acquisition_only and observer_roots_live:
+            observer_acquisition_root_hints = {
+                str(index): marker
+                for index, marker in _POSITION113_OBSERVER_ROOT_MARKERS.items()
+            }
+        elif (
             sealed_canonical_identity_authenticated
             and position113_lineage_authenticated
-            and all(
-                index < len(root.operand_names)
-                and local.get(root.operand_names[index]) is not None
-                and _shape_signature(local[root.operand_names[index]].result_shapes)
-                == (expected[index],)
-                and (root.computation, root.operand_names[index]) in live_keys
-                for index in _POSITION113_OBSERVER_ROOT_MARKERS
-            )
+            and observer_roots_live
         ):
             observer_bindings = {
                 str(index): marker
@@ -1159,7 +1175,9 @@ def _optimized_terminal_boundary_contract(
             "position113_observer_acquisition_root_hints": (
                 observer_acquisition_root_hints
             ),
-            "position113_observer_root_hints_causal": bool(observer_bindings),
+            "position113_observer_root_hints_causal": bool(
+                observer_bindings and not acquisition_only
+            ),
         },
         violations,
     )
@@ -2382,6 +2400,7 @@ def validate_feature2_main_stablehlo(
     full_width_rounded_then_slice: bool = False,
     sealed_boundary_capture: bool = False,
     observe_position_113: bool = False,
+    exact_layer0_prompt_keys: bool = False,
     source_jaxpr_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Pin the source-level manual LP2 boundary before TPU optimization."""
@@ -2394,24 +2413,42 @@ def validate_feature2_main_stablehlo(
         raise TypeError("feature2 StableHLO sealed-boundary flag must be boolean")
     if not isinstance(observe_position_113, bool):
         raise TypeError("feature2 StableHLO position-113 observer flag must be boolean")
+    if not isinstance(exact_layer0_prompt_keys, bool):
+        raise TypeError("feature2 StableHLO DB518 layer-0 flag must be boolean")
+    if exact_layer0_prompt_keys and (
+        not observe_position_113
+        or not sealed_boundary_capture
+        or not full_width_rounded_then_slice
+    ):
+        raise ValueError(
+            "DB518 layer-0 acquisition requires sealed full-width p113 observation"
+        )
     if observe_position_113 and not sealed_boundary_capture:
         raise ValueError("position-113 observation requires sealed ordinary boundaries")
-    if observe_position_113 and (
-        source_jaxpr_sha256 != _FEATURE2_POSITION113_SOURCE_JAXPR_SHA256
-    ):
+    expected_source_jaxpr = (
+        _FEATURE2_POSITION113_DB518_SOURCE_JAXPR_SHA256
+        if exact_layer0_prompt_keys
+        else _FEATURE2_POSITION113_SOURCE_JAXPR_SHA256
+    )
+    if observe_position_113 and source_jaxpr_sha256 != expected_source_jaxpr:
         raise BenchmarkValidationError(
             "position-113 StableHLO lacks the exact causal source JAXpr: "
-            f"expected={_FEATURE2_POSITION113_SOURCE_JAXPR_SHA256} "
+            f"expected={expected_source_jaxpr} "
             f"observed={source_jaxpr_sha256}"
         )
     compact = re.sub(r"\s+", "", stablehlo)
     markers = _host_markers(stablehlo)
     violations: list[str] = []
     stablehlo_sha256 = sha256(stablehlo.encode()).hexdigest()
-    if sealed_boundary_capture and stablehlo_sha256 != (
-        FEATURE2_POSITION113_STABLEHLO_SHA256
-        if observe_position_113
-        else FEATURE2_SEALED_STABLEHLO_SHA256
+    if (
+        sealed_boundary_capture
+        and not exact_layer0_prompt_keys
+        and stablehlo_sha256
+        != (
+            FEATURE2_POSITION113_STABLEHLO_SHA256
+            if observe_position_113
+            else FEATURE2_SEALED_STABLEHLO_SHA256
+        )
     ):
         expected_stablehlo_sha256 = (
             FEATURE2_POSITION113_STABLEHLO_SHA256
@@ -2449,6 +2486,15 @@ def validate_feature2_main_stablehlo(
             "tensor<2x1x2048xi32>",
             "tensor<2x1xi32>",
             "tensor<2x1x2048xf32>",
+        )
+    if exact_layer0_prompt_keys:
+        required += (
+            "tensor<2048x3072xbf16>",
+            "tensor<2012x3072xbf16>",
+            "tensor<2048x6144xbf16>",
+            "tensor<2012x6144xbf16>",
+            "tensor<2048x128xf32>",
+            "tensor<2012x128xf32>",
         )
     missing = tuple(marker for marker in required if marker not in compact)
     if missing:
@@ -2507,6 +2553,8 @@ def validate_feature2_main_stablehlo(
         "num_partitions": 2,
         "passed": True,
         "observe_position_113": observe_position_113,
+        "exact_layer0_prompt_keys": exact_layer0_prompt_keys,
+        "identity_acquisition_only": exact_layer0_prompt_keys,
         "projection_contract": projection_contract,
         "sealed_boundary_capture": sealed_boundary_capture,
         "source_jaxpr_sha256": source_jaxpr_sha256,
@@ -2521,6 +2569,7 @@ def validate_feature2_main_optimized_hlo(
     full_width_rounded_then_slice: bool = False,
     sealed_boundary_capture: bool = False,
     observe_position_113: bool = False,
+    exact_layer0_prompt_keys: bool = False,
 ) -> dict[str, Any]:
     """Parse and bound the optimized two-device feature2 executable."""
 
@@ -2531,6 +2580,16 @@ def validate_feature2_main_optimized_hlo(
     if not isinstance(observe_position_113, bool):
         raise TypeError(
             "feature2 optimized-HLO position-113 observer flag must be boolean"
+        )
+    if not isinstance(exact_layer0_prompt_keys, bool):
+        raise TypeError("feature2 optimized-HLO DB518 layer-0 flag must be boolean")
+    if exact_layer0_prompt_keys and (
+        not observe_position_113
+        or not sealed_boundary_capture
+        or not full_width_rounded_then_slice
+    ):
+        raise ValueError(
+            "DB518 layer-0 acquisition requires sealed full-width p113 observation"
         )
     if observe_position_113 and not sealed_boundary_capture:
         raise ValueError("position-113 observation requires sealed ordinary boundaries")
@@ -2568,10 +2627,13 @@ def validate_feature2_main_optimized_hlo(
             observed_identity = {
                 key: sealed_canonical_identity.get(key) for key in expected_identity
             }
-            sealed_canonical_identity_authenticated = (
-                observed_identity == expected_identity
+            sealed_canonical_identity_authenticated = bool(
+                not exact_layer0_prompt_keys and observed_identity == expected_identity
             )
-            if not sealed_canonical_identity_authenticated:
+            if (
+                not exact_layer0_prompt_keys
+                and not sealed_canonical_identity_authenticated
+            ):
                 canonical_identity_violation = (
                     "sealed optimized canonical-HLO identity drifted: "
                     f"expected={expected_identity} observed={observed_identity}"
@@ -2606,7 +2668,7 @@ def validate_feature2_main_optimized_hlo(
         )
     position113_lineage: dict[str, Any] = {}
     position113_lineage_authenticated = False
-    if observe_position_113:
+    if observe_position_113 and not exact_layer0_prompt_keys:
         position113_lineage, position113_lineage_violations = (
             _optimized_position113_lineage_contract(instructions, root)
         )
@@ -2622,6 +2684,7 @@ def validate_feature2_main_optimized_hlo(
             sealed_canonical_identity_authenticated
         ),
         position113_lineage_authenticated=position113_lineage_authenticated,
+        acquisition_only=exact_layer0_prompt_keys,
     )
     violations.extend(terminal_violations)
     allowed_collectives = {"all-gather", "all-reduce", "collective-permute"}
@@ -3004,6 +3067,8 @@ def validate_feature2_main_optimized_hlo(
         "num_partitions": module.num_partitions,
         "passed": True,
         "observe_position_113": observe_position_113,
+        "exact_layer0_prompt_keys": exact_layer0_prompt_keys,
+        "identity_acquisition_only": exact_layer0_prompt_keys,
         "physical_collective_count": len(collectives),
         "projection_width": expected_width,
         "position113_lineage": position113_lineage,

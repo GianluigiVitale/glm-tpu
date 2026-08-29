@@ -287,6 +287,111 @@ def test_feature2_transport_reuses_two_slot_preserving_pp16_rings() -> None:
         validate_feature2_transport_contract(config, bad)
 
 
+def test_feature2_batched_embedding_and_rms_are_scalar_exact_on_lp2() -> None:
+    program = r"""
+import json
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from glm_tpu.greenfield.benchmarking.pp16_feature_sharded_state import (
+    feature2_add_rms_gather_batch_mapped,
+    feature2_add_rms_gather_mapped,
+    feature2_embedding_batch_mapped,
+    feature2_embedding_mapped,
+)
+
+mesh = Mesh(np.asarray(jax.devices(), dtype=object), ('feature',))
+tokens = jnp.asarray([0, 3, 4, 7], dtype=jnp.int32)
+embedding = jnp.asarray(
+    np.sin(np.arange(2 * 4 * 6144, dtype=np.float32) / 97.0).reshape(2, 4, 6144),
+    dtype=jnp.bfloat16,
+)
+norm = jnp.asarray(
+    np.cos(np.arange(2 * 3072, dtype=np.float32) / 131.0).reshape(2, 1, 3072),
+    dtype=jnp.bfloat16,
+)
+
+def batched(token_ids, embedding_owners, norm_owners):
+    halves = feature2_embedding_batch_mapped(
+        token_ids, embedding_owners[0], axis_name='feature', pairs=((0, 1), (1, 0))
+    )
+    carried, normalized = feature2_add_rms_gather_batch_mapped(
+        halves,
+        jnp.zeros_like(halves),
+        norm_owners[0],
+        axis_name='feature',
+        groups=((0, 1),),
+    )
+    return halves[None, ...], carried[None, ...], normalized
+
+def scalar(token_id, embedding_owners, norm_owners):
+    half = feature2_embedding_mapped(
+        token_id, embedding_owners[0], axis_name='feature', pairs=((0, 1), (1, 0))
+    )
+    carried, normalized = feature2_add_rms_gather_mapped(
+        half,
+        jnp.zeros_like(half),
+        norm_owners[0],
+        axis_name='feature',
+        groups=((0, 1),),
+    )
+    return half[None, ...], carried[None, ...], normalized
+
+batch_map = jax.shard_map(
+    batched,
+    mesh=mesh,
+    in_specs=(P(), P('feature', None, None), P('feature', None, None)),
+    out_specs=(P('feature', None, None), P('feature', None, None), P()),
+    check_vma=False,
+)
+scalar_map = jax.shard_map(
+    scalar,
+    mesh=mesh,
+    in_specs=(P(), P('feature', None, None), P('feature', None, None)),
+    out_specs=(P('feature', None, None), P('feature', None, None), P()),
+    check_vma=False,
+)
+batch_values = tuple(np.asarray(value) for value in jax.jit(batch_map)(tokens, embedding, norm))
+scalar_values = tuple(
+    np.concatenate(values, axis=axis)
+    for values, axis in zip(
+        zip(*(tuple(np.asarray(value) for value in jax.jit(scalar_map)(token, embedding, norm)) for token in tokens), strict=True),
+        (1, 1, 0),
+        strict=True,
+    )
+)
+jaxpr = str(jax.make_jaxpr(batch_map)(tokens, embedding, norm))
+print(json.dumps({
+    'all_gather': jaxpr.count('all_gather['),
+    'equal': [bool(np.array_equal(a.view(np.uint16), b.view(np.uint16))) for a, b in zip(batch_values, scalar_values, strict=True)],
+    'ppermute': jaxpr.count('ppermute['),
+    'psum': jaxpr.count('psum['),
+    'shapes': [list(value.shape) for value in batch_values],
+}, sort_keys=True))
+"""
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    env["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=90,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result == {
+        "all_gather": 1,
+        "equal": [True, True, True],
+        "ppermute": 1,
+        "psum": 1,
+        "shapes": [[2, 4, 3072], [2, 4, 3072], [4, 6144]],
+    }
+
+
 def test_feature2_transport_forced_32_has_two_live_bf16_lanes() -> None:
     program = r'''
 import json

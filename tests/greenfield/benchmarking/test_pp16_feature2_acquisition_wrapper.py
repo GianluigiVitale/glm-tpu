@@ -25,6 +25,7 @@ def test_feature2_acquisition_wrapper_is_default_off_and_serialized() -> None:
         "GLM_GREENFIELD_PP16_FEATURE2_MODE:-off",
         "GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE:-0",
         "GLM_GREENFIELD_PP16_FEATURE2_OBSERVE_POSITION_113:-0",
+        "GLM_GREENFIELD_PP16_EXACT_LAYER0_PROMPT_KEYS:-0",
         "compile_only",
         "/home/gianl/glm-run/.glm_pod_workload.lock",
         "/home/gianl/.glm-tpu-rsync.lock",
@@ -40,6 +41,9 @@ def test_feature2_acquisition_wrapper_is_default_off_and_serialized() -> None:
         "--compile-only 1",
         "--full-width-rounded-then-slice",
         "--observe-position-113",
+        "--exact-layer0-prompt-keys",
+        "exact_layer0_prompt_keys",
+        "identity_acquisition_only",
         "full_width_rounded_then_slice",
         "sealed_boundary_capture",
         "expected_terminal_shapes",
@@ -50,6 +54,7 @@ def test_feature2_acquisition_wrapper_is_default_off_and_serialized() -> None:
         "expected_observer_root_hints",
         "expected_optimized_observer_bindings",
         "sealed_acquisition_root_hints",
+        "expected_sealed_acquisition_hints",
         "position113_observer_acquisition_root_hints",
         "position113_observer_root_hints_causal",
         "expected_jaxpr_sha",
@@ -65,6 +70,7 @@ def test_feature2_acquisition_wrapper_is_default_off_and_serialized() -> None:
         "expected_canonical_stack_refs",
         "sealed_canonical_hlo_identity",
         "validate_feature2_sealed_hlo_archive_identity",
+        "canonicalize_feature2_optimized_hlo",
         "POSITION113_MAIN_STABLEHLO_SHA",
         "POSITION113_MAIN_CANONICAL_HLO_SHA",
         "POSITION113_MAIN_CANONICAL_HLO_BYTES",
@@ -158,6 +164,49 @@ def test_feature2_acquisition_wrapper_refuses_invalid_observer_flag_early() -> N
     )
     assert completed.returncode == 2
     assert "observer flag must be 0 or 1" in completed.stderr
+
+
+def test_feature2_acquisition_wrapper_refuses_invalid_exact_key_flag_early() -> None:
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "GLM_GREENFIELD_PP16_FEATURE2_ACQUIRE": "1",
+            "GLM_GREENFIELD_PP16_FEATURE2_MODE": "compile_only",
+            "GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE": "1",
+            "GLM_GREENFIELD_PP16_EXACT_LAYER0_PROMPT_KEYS": "2",
+        }
+    )
+    completed = subprocess.run(
+        ["bash", str(WRAPPER)],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 2
+    assert "exact layer-0 prompt-key flag must be 0 or 1" in completed.stderr
+
+
+def test_feature2_acquisition_wrapper_requires_observer_for_exact_keys() -> None:
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "GLM_GREENFIELD_PP16_FEATURE2_ACQUIRE": "1",
+            "GLM_GREENFIELD_PP16_FEATURE2_MODE": "compile_only",
+            "GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLICE": "1",
+            "GLM_GREENFIELD_PP16_FEATURE2_OBSERVE_POSITION_113": "0",
+            "GLM_GREENFIELD_PP16_EXACT_LAYER0_PROMPT_KEYS": "1",
+        }
+    )
+    completed = subprocess.run(
+        ["bash", str(WRAPPER)],
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 2
+    assert "requires the p113 observer" in completed.stderr
 
 
 def test_feature2_acquisition_wrapper_has_no_numerical_or_db_success_path() -> None:

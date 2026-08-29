@@ -785,3 +785,7 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
 - A correct post-scan repair cannot fix a value already consumed inside a causal scan. Prompt keys
   for the current layer must have the accepted physical association before that layer's attention
   scores them; repairing only the next layer's cache after the chunk is too late.
+- A chunk-local exact reconstruction must consume the authenticated runtime position tensor, not a
+  Python-derived equivalent range. Pad both values and positions through the same live-row index so
+  the compiled RoPE/key association remains bound to the scan input even when the sealed values are
+  currently equal.

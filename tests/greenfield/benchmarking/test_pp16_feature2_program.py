@@ -142,6 +142,13 @@ observer = build_feature2_prefill_program(
     full_width_rounded_then_slice=True,
     observe_position_113=True,
 )
+db518 = build_feature2_prefill_program(
+    graph,
+    devices=jax.devices(),
+    full_width_rounded_then_slice=True,
+    observe_position_113=True,
+    exact_layer0_prompt_keys=True,
+)
 dtypes = {'bf16': jnp.bfloat16, 'f32': jnp.float32, 'u8': jnp.uint8}
 def abstract(shape, dtype, spec):
     return jax.ShapeDtypeStruct(
@@ -170,6 +177,7 @@ def inspect_program(value):
             value.full_width_rounded_then_slice
         ),
         observe_position_113=value.observe_position_113,
+        exact_layer0_prompt_keys=value.exact_layer0_prompt_keys,
     )
     return {
         'contract': contract,
@@ -186,6 +194,7 @@ def inspect_program(value):
 default_report, jaxpr = inspect_program(built)
 successor_report, successor_jaxpr = inspect_program(successor)
 observer_report, observer_jaxpr = inspect_program(observer)
+db518_report, db518_jaxpr = inspect_program(db518)
 mutations = (
     jaxpr + '\ndebug_callback',
     jaxpr.replace(
@@ -234,6 +243,12 @@ observer_tpu_contract = validate_feature2_prefill_jaxpr(
     full_width_rounded_then_slice=True,
     observe_position_113=True,
 )
+db518_tpu_contract = validate_feature2_prefill_jaxpr(
+    db518_jaxpr.replace(cpu_mesh, tpu_mesh),
+    full_width_rounded_then_slice=True,
+    observe_position_113=True,
+    exact_layer0_prompt_keys=True,
+)
 runtime_mesh_mutations_rejected = 0
 runtime_mesh_mutations = (
     observer_jaxpr.replace(cpu_mesh, tpu_mesh, 1),
@@ -251,6 +266,8 @@ for mutation in runtime_mesh_mutations:
 print(json.dumps({
     'causal_mutations_rejected': causal_mutations_rejected,
     'default': default_report,
+    'db518': db518_report,
+    'db518_tpu_contract': db518_tpu_contract,
     'graph_sha256': graph.graph_sha256,
     'hybrid_rejected': hybrid_rejected,
     'jaxpr_distinct': jaxpr != successor_jaxpr,
@@ -446,6 +463,33 @@ print(json.dumps({
             ],
         },
     }
+    db518_contract = {
+        **result["observer"]["contract"],
+        "all_gather": 31,
+        "exact_layer0_prompt_keys": True,
+        "jaxpr_sha256": (
+            "f87c0f162523bf6221d2824aa4b7268f1c770a55d2f8cde6da7506f595e9447f"
+        ),
+        "physical_m64_projection": 8,
+        "ppermute": 16,
+        "psum": 20,
+        "raw_jaxpr_sha256": (
+            "f2c8b06727e2839109d78626a9eb94639747beab3800b34a4392c4a865b47aef"
+        ),
+        "scan": 22,
+    }
+    assert result["db518"] == {
+        "contract": db518_contract,
+        "full_width_rounded_then_slice": True,
+        "jaxpr_sha256": (
+            "f87c0f162523bf6221d2824aa4b7268f1c770a55d2f8cde6da7506f595e9447f"
+        ),
+        "observe_position_113": True,
+        "raw_jaxpr_sha256": (
+            "f2c8b06727e2839109d78626a9eb94639747beab3800b34a4392c4a865b47aef"
+        ),
+        "terminal": result["observer"]["terminal"],
+    }
     observer_tpu_contract = result["observer_tpu_contract"]
     assert observer_tpu_contract["jaxpr_runtime_mesh"] == "tpu_v4"
     assert observer_tpu_contract["raw_jaxpr_sha256"] == (
@@ -458,5 +502,19 @@ print(json.dumps({
     } == {
         key: value
         for key, value in result["observer"]["contract"].items()
+        if key not in {"jaxpr_runtime_mesh", "raw_jaxpr_sha256"}
+    }
+    db518_tpu_contract = result["db518_tpu_contract"]
+    assert db518_tpu_contract["jaxpr_runtime_mesh"] == "tpu_v4"
+    assert db518_tpu_contract["raw_jaxpr_sha256"] == (
+        "2a81016ac0db10e47beca9a86bb858193b43131f5e61aa5f339a98d7bfdb866b"
+    )
+    assert {
+        key: value
+        for key, value in db518_tpu_contract.items()
+        if key not in {"jaxpr_runtime_mesh", "raw_jaxpr_sha256"}
+    } == {
+        key: value
+        for key, value in db518_contract.items()
         if key not in {"jaxpr_runtime_mesh", "raw_jaxpr_sha256"}
     }

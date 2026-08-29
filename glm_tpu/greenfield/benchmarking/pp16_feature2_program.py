@@ -23,6 +23,7 @@ from ..kernels.reference.dsa import DsaNumericalContract
 from ..kernels.reference.fp8 import dequantize_fp8_bits_block_weight
 from ..kernels.reference.prefill_index import (
     decode_stage_local_prefill_index_wk_bf16,
+    physical_m64_prompt_index_key_chunk,
     promote_stage_local_prefill_index_wk,
     repair_stage_local_prompt_index_cache,
 )
@@ -55,7 +56,9 @@ from .pp16_feature2_prefill import (
     validate_feature2_prefill_graph,
 )
 from .pp16_feature_sharded_state import (
+    feature2_add_rms_gather_batch_mapped,
     feature2_add_rms_gather_mapped,
+    feature2_embedding_batch_mapped,
     feature2_embedding_mapped,
 )
 
@@ -97,11 +100,16 @@ _FEATURE2_JAXPR_RAW_SHA256 = {
         "cpu": "a6ce2233eed467ae85be0a718532f3e4996b1588673b45687173459caa5adbf0",
         "tpu_v4": "4e7f821d11e9a4fcf12ae39ef657c2a3f054c0a5976898d62069470e4d957d5d",
     },
+    "position113_db518": {
+        "cpu": "f2c8b06727e2839109d78626a9eb94639747beab3800b34a4392c4a865b47aef",
+        "tpu_v4": "2a81016ac0db10e47beca9a86bb858193b43131f5e61aa5f339a98d7bfdb866b",
+    },
 }
 _FEATURE2_JAXPR_CANONICAL_SHA256 = {
     "default": "459866bc4d9bc0dc581aad1704e74db26e2d3576dec5b88979db5c09f96cd11b",
     "full_width": "7e1e4b549fa7b87c098f06644e918fe9f4fb05255a089ae9a94d1f218922aac0",
     "position113": "c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd",
+    "position113_db518": "f87c0f162523bf6221d2824aa4b7268f1c770a55d2f8cde6da7506f595e9447f",
 }
 
 
@@ -129,8 +137,17 @@ def _canonicalize_feature2_jaxpr(jaxpr: str) -> tuple[str, str]:
 
 
 def _feature2_jaxpr_variant(
-    *, full_width_rounded_then_slice: bool, observe_position_113: bool
+    *,
+    full_width_rounded_then_slice: bool,
+    observe_position_113: bool,
+    exact_layer0_prompt_keys: bool,
 ) -> str:
+    if exact_layer0_prompt_keys:
+        if not full_width_rounded_then_slice or not observe_position_113:
+            raise BenchmarkValidationError(
+                "DB518 layer-0 acquisition requires full-width p113 observation"
+            )
+        return "position113_db518"
     if observe_position_113:
         return "position113"
     if full_width_rounded_then_slice:
@@ -200,6 +217,7 @@ class Feature2PrefillProgram:
     full_width_rounded_then_slice: bool
     sealed_boundary_capture: bool
     observe_position_113: bool
+    exact_layer0_prompt_keys: bool
     mesh: Any
     weight_specs: Mapping[str, Any]
     materialize_query_weights_fp32: Any
@@ -237,6 +255,7 @@ def validate_feature2_prefill_jaxpr(
     *,
     full_width_rounded_then_slice: bool = False,
     observe_position_113: bool = False,
+    exact_layer0_prompt_keys: bool = False,
 ) -> dict[str, Any]:
     """Fail closed on the complete abstract executable before TPU lowering."""
 
@@ -246,12 +265,15 @@ def validate_feature2_prefill_jaxpr(
         raise TypeError("feature2 JAXpr full-width-then-slice flag must be boolean")
     if not isinstance(observe_position_113, bool):
         raise TypeError("feature2 JAXpr position-113 observer flag must be boolean")
+    if not isinstance(exact_layer0_prompt_keys, bool):
+        raise TypeError("feature2 JAXpr DB518 layer-0 flag must be boolean")
     canonical_jaxpr, jaxpr_runtime_mesh = _canonicalize_feature2_jaxpr(jaxpr)
     raw_jaxpr_sha256 = sha256(jaxpr.encode()).hexdigest()
     jaxpr_sha256 = sha256(canonical_jaxpr.encode()).hexdigest()
     variant = _feature2_jaxpr_variant(
         full_width_rounded_then_slice=full_width_rounded_then_slice,
         observe_position_113=observe_position_113,
+        exact_layer0_prompt_keys=exact_layer0_prompt_keys,
     )
     expected_raw_jaxpr_sha256 = _FEATURE2_JAXPR_RAW_SHA256[variant][jaxpr_runtime_mesh]
     expected_jaxpr_sha256 = _FEATURE2_JAXPR_CANONICAL_SHA256[variant]
@@ -275,17 +297,17 @@ def validate_feature2_prefill_jaxpr(
         "scan": jaxpr.count("scan["),
     }
     expected = {
-        "all_gather": 27,
+        "all_gather": 31 if exact_layer0_prompt_keys else 27,
         "convolution": 133 if full_width_rounded_then_slice else 197,
         "fp8_attention_o_n3072": 0 if full_width_rounded_then_slice else 128,
         "fp8_attention_o_n6144": 64 if full_width_rounded_then_slice else 0,
         "h16_b512_attention": 8,
         "observation_position_literal": 4 if observe_position_113 else 0,
-        "physical_m64_projection": 4,
+        "physical_m64_projection": 8 if exact_layer0_prompt_keys else 4,
         "pmin": 2 if observe_position_113 else 1,
-        "ppermute": 12,
-        "psum": 16,
-        "scan": 18,
+        "ppermute": 16 if exact_layer0_prompt_keys else 12,
+        "psum": 20 if exact_layer0_prompt_keys else 16,
+        "scan": 22 if exact_layer0_prompt_keys else 18,
     }
     violations = []
     if counts != expected:
@@ -344,6 +366,8 @@ def validate_feature2_prefill_jaxpr(
             "position": PP16_FEATURE2_OBSERVATION_POSITION,
             "terminal_validity_gated_by_exact_count": True,
         }
+    if exact_layer0_prompt_keys:
+        report["exact_layer0_prompt_keys"] = True
     return report
 
 
@@ -662,6 +686,7 @@ def _feature2_prefill_mapped(
     *,
     full_width_rounded_then_slice: bool = False,
     observe_position_113: bool = False,
+    exact_layer0_prompt_keys: bool = False,
 ) -> Feature2PrefillProgramResult | Feature2Position113ProgramResult:
     import jax.numpy as jnp
     from jax import lax, named_scope
@@ -670,6 +695,8 @@ def _feature2_prefill_mapped(
         raise TypeError("feature2 full-width-then-slice flag must be boolean")
     if not isinstance(observe_position_113, bool):
         raise TypeError("feature2 position-113 observer flag must be boolean")
+    if not isinstance(exact_layer0_prompt_keys, bool):
+        raise TypeError("feature2 DB518 layer-0 flag must be boolean")
     if candidate_token_ids.shape != (PP16_FEATURE2_CONTEXT_LENGTH,) or (
         candidate_token_ids.dtype != jnp.int32
     ):
@@ -761,6 +788,38 @@ def _feature2_prefill_mapped(
         position_chunk = lax.dynamic_slice_in_dim(
             candidate_positions, start, valid_rows, axis=0
         )
+        if exact_layer0_prompt_keys:
+            embedding_batch = feature2_embedding_batch_mapped(
+                token_chunk,
+                weight("global.embedding"),
+                axis_name=_AXIS_NAME,
+                pairs=_PAIRS,
+            )
+            _, normalized_batch = feature2_add_rms_gather_batch_mapped(
+                embedding_batch,
+                jnp.zeros_like(embedding_batch),
+                input_norm0_half,
+                axis_name=_AXIS_NAME,
+                groups=_GROUPS,
+            )
+            safe_rows = jnp.minimum(
+                jnp.arange(2048, dtype=jnp.int32),
+                jnp.int32(valid_rows - 1),
+            )
+            physical_normalized = jnp.take(normalized_batch, safe_rows, axis=0)
+            physical_positions = jnp.take(position_chunk, safe_rows, axis=0)
+            exact_layer0_keys = physical_m64_prompt_index_key_chunk(
+                physical_normalized,
+                physical_positions,
+                layer0_wk,
+                weight("indexer.slot_00.key_norm_weight"),
+                weight("indexer.slot_00.key_norm_bias"),
+                contract=_DSA_CONTRACT,
+                physical_rows=64,
+            )[:valid_rows]
+            scan_values = (token_chunk, position_chunk, exact_layer0_keys)
+        else:
+            scan_values = (token_chunk, position_chunk)
 
         def step(carry: Any, values: Any) -> tuple[Any, Any]:
             (
@@ -772,7 +831,11 @@ def _feature2_prefill_mapped(
                 _,
                 current_observer,
             ) = carry
-            token_id, position_scalar = values
+            if exact_layer0_prompt_keys:
+                token_id, position_scalar, exact_current_key = values
+            else:
+                token_id, position_scalar = values
+                exact_current_key = None
             position = position_scalar[None]
             causal_context = (position_scalar + jnp.int32(1))[None]
             rope_row = main_rope_table[position_scalar]
@@ -823,6 +886,11 @@ def _feature2_prefill_mapped(
                 dsa_query_backend="reference",
                 dsa_query_weight_aliases=layer0_query_aliases,
                 precomputed_wk_weight=layer0_wk,
+                precomputed_current_key=(
+                    exact_current_key[None, ...]
+                    if exact_current_key is not None
+                    else None
+                ),
                 dsa_head_key_exact_association=True,
                 dsa_score_precision="default",
             )
@@ -939,7 +1007,7 @@ def _feature2_prefill_mapped(
         final, normalized_history = lax.scan(
             step,
             initial,
-            (token_chunk, position_chunk),
+            scan_values,
             unroll=1,
         )
         repaired_index1 = repair_stage_local_prompt_index_cache(
@@ -1129,6 +1197,7 @@ def build_feature2_prefill_program(
     devices: Sequence[Any],
     full_width_rounded_then_slice: bool = False,
     observe_position_113: bool = False,
+    exact_layer0_prompt_keys: bool = False,
 ) -> Feature2PrefillProgram:
     """Build the exact LP2 executable and its separate FP32 materializers."""
 
@@ -1143,6 +1212,14 @@ def build_feature2_prefill_program(
         raise PlanValidationError("feature2 full-width-then-slice flag must be boolean")
     if not isinstance(observe_position_113, bool):
         raise PlanValidationError("feature2 position-113 observer flag must be boolean")
+    if not isinstance(exact_layer0_prompt_keys, bool):
+        raise PlanValidationError("feature2 DB518 layer-0 flag must be boolean")
+    if exact_layer0_prompt_keys and (
+        not full_width_rounded_then_slice or not observe_position_113
+    ):
+        raise PlanValidationError(
+            "DB518 layer-0 acquisition requires full-width p113 observation"
+        )
     runtime_devices = _validate_feature2_runtime_devices(devices)
     mesh = Mesh(np.asarray(runtime_devices, dtype=object), (_AXIS_NAME,))
     weight_specs = {
@@ -1235,6 +1312,7 @@ def build_feature2_prefill_program(
             _feature2_prefill_mapped,
             full_width_rounded_then_slice=full_width_rounded_then_slice,
             observe_position_113=observe_position_113,
+            exact_layer0_prompt_keys=exact_layer0_prompt_keys,
         ),
         mesh=mesh,
         in_specs=(
@@ -1260,6 +1338,7 @@ def build_feature2_prefill_program(
         full_width_rounded_then_slice=full_width_rounded_then_slice,
         sealed_boundary_capture=True,
         observe_position_113=observe_position_113,
+        exact_layer0_prompt_keys=exact_layer0_prompt_keys,
         mesh=mesh,
         weight_specs=weight_specs,
         materialize_query_weights_fp32=materialize_query_weights_fp32,

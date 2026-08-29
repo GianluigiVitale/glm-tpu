@@ -1442,3 +1442,19 @@ from accepted at 74 FP32 values and one BF16 value, hidden 35 (`47091/47092`). C
 CRC pass. Compact artifact `docs/artifacts/pp16-feature2-position113-numerical.json` has SHA
 `7c551346...9a7e`. This is diagnostic only. It selects integration of the already-proven DB518
 physical-M64 key association before layer-0 causal consumption; it does not close Gate D.
+
+## Local DB518 layer-0 integration preparation
+
+- The uncommitted successor is default-off and leaves all three prior executable identities
+  unchanged. It batch-reconstructs the exact scalar embedding/input-RMS boundary, consumes the
+  authenticated runtime positions, and injects DB518 physical-M64 FP32 keys before layer-0 causal
+  cache write/scoring.
+- Forced-LP2 tests prove batch/scalar BF16 equality, one local exchange/reduction/gather per chunk,
+  exact injected cache/internal-key bits and true bypass of the rejected one-row key projection.
+  The complete affected suite passes 202/202.
+- New semantic identities are raw CPU `f2c8b067...a7aef`, raw TPU-v4
+  `2a81016a...b866b` and canonical JAXpr `f87c0f16...9447f`. There is deliberately no TPU HLO pin
+  yet. Exact mode can only archive a compile acquisition and reports non-causal root hints.
+- This is implementation/readiness evidence only: no model arithmetic, tensor, DB row, exactness,
+  Gate-D or performance claim exists. Sol review, commit/push/mirror and one separately authorized
+  compile-only acquisition remain required.

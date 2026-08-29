@@ -11546,3 +11546,21 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   `7c551346...9a7e`.
 - Exact next is local CPU/HLO integration of DB518 for layer-0 prompt keys before causal
   consumption, followed by a fresh review. No further model execution is authorized first.
+
+## 2026-08-29 09:55 UTC — DB518 layer-0 integration is prepared, compile-only
+
+- Four chunk-batched embedding/input-RMS calls are bitwise equal to the existing scalar LP2 path.
+  Each chunk now uses the authenticated runtime position tensor, pads only the last 36 compile rows,
+  runs DB518's physical M64 projection/key norm/RoPE, and supplies the resulting FP32 key before
+  layer-0 cache write and scoring. The ordinary scan path remains unchanged.
+- The injected-key unit proof verifies owner cache bits and internal FP32 key, proves the old
+  one-row `wk` path is bypassed, and proves a changed injected key changes selected scores.
+- Older default/full-width/p113 JAXpr identities are unchanged. The new variant pins raw CPU
+  `f2c8b067...a7aef`, raw TPU-v4 `2a81016a...b866b` and canonical `f87c0f16...9447f`; its exact
+  counts are 31 gathers, eight physical-M64 projections, 16 permutes, 20 psums and 22 scans.
+- First-time TPU HLO remains an acquisition-only trust state. The exact flag requires sealed
+  full-width p113 mode, preserves all locality/host/dead-row/producer/reducer gates, exposes no
+  causal root binding, and makes numerical execution raise before any model call.
+- Complete affected CPU validation passes 202/202. No TPU call, tensor, DB row, HLO acquisition,
+  numerical result or performance result exists for this successor. Exact next is staged-diff Sol
+  review; only approval permits commit/push/mirror and one compile-only acquisition.

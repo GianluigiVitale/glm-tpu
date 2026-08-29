@@ -1361,6 +1361,63 @@ def feature2_embedding_mapped(
     return (owned + received).astype(jnp.bfloat16)
 
 
+def feature2_embedding_batch_mapped(
+    token_ids: Any,
+    embedding: Any,
+    *,
+    axis_name: str,
+    pairs: Sequence[tuple[int, int]],
+) -> Any:
+    """Select a token chunk into persistent halves with one LP2 exchange."""
+
+    import jax
+    import jax.numpy as jnp
+    from jax import lax
+
+    if (
+        token_ids.ndim != 1
+        or token_ids.shape[0] <= 0
+        or not jnp.issubdtype(token_ids.dtype, jnp.integer)
+    ):
+        raise ValueError("feature2 token batch must be one nonempty integer vector")
+    if embedding.ndim != 2 or embedding.shape[1] != PP16_FEATURE2_HIDDEN_WIDTH:
+        raise ValueError("feature2 embedding owner geometry drifted")
+    if embedding.dtype != jnp.bfloat16 or embedding.shape[0] <= 0:
+        raise ValueError("feature2 embedding owner must be nonempty BF16")
+    canonical_pairs = tuple((int(source), int(target)) for source, target in pairs)
+    if set(canonical_pairs) != {(0, 1), (1, 0)} or len(canonical_pairs) != 2:
+        raise ValueError("feature2 embedding requires exact 0<->1 pairs")
+
+    local_slot = lax.axis_index(axis_name)
+    local_vocab = jnp.int32(embedding.shape[0])
+    global_vocab = local_vocab * jnp.int32(2)
+    local_start = local_slot.astype(jnp.int32) * local_vocab
+    valid = (token_ids >= jnp.int32(0)) & (token_ids < global_vocab)
+    owns = valid & (token_ids >= local_start) & (token_ids < local_start + local_vocab)
+    local_ids = jnp.clip(
+        token_ids - local_start,
+        jnp.int32(0),
+        local_vocab - jnp.int32(1),
+    )
+    rows = jnp.take(embedding, local_ids, axis=0)
+    half0 = jnp.where(
+        owns[:, None],
+        rows[:, :PP16_FEATURE2_SHARD_WIDTH],
+        jnp.zeros((token_ids.shape[0], PP16_FEATURE2_SHARD_WIDTH), jnp.bfloat16),
+    )
+    half1 = jnp.where(
+        owns[:, None],
+        rows[:, PP16_FEATURE2_SHARD_WIDTH:],
+        jnp.zeros((token_ids.shape[0], PP16_FEATURE2_SHARD_WIDTH), jnp.bfloat16),
+    )
+    owns_half0 = local_slot == jnp.int32(0)
+    owned = jnp.where(owns_half0, half0, half1)
+    peer = jnp.where(owns_half0, half1, half0)
+    with jax.named_scope("greenfield_pp16_feature2_embedding_batch_exchange"):
+        received = lax.ppermute(peer, axis_name=axis_name, perm=canonical_pairs)
+    return (owned + received).astype(jnp.bfloat16)
+
+
 def feature2_add_rms_gather_mapped(
     update: Any,
     residual: Any,
@@ -1405,6 +1462,61 @@ def feature2_add_rms_gather_mapped(
             (total * inverse).astype(jnp.bfloat16) * norm_weight
         ).astype(jnp.bfloat16)
     with jax.named_scope("greenfield_pp16_feature2_normalized_gather"):
+        normalized = lax.all_gather(
+            normalized_local,
+            axis_name,
+            axis_index_groups=canonical_groups,
+            axis=1,
+            tiled=True,
+        )
+    return carried, normalized
+
+
+def feature2_add_rms_gather_batch_mapped(
+    update: Any,
+    residual: Any,
+    norm_weight: Any,
+    *,
+    axis_name: str,
+    groups: Sequence[Sequence[int]],
+) -> tuple[Any, Any]:
+    """Normalize a token chunk row-wise with one LP2 scalar-vector reduction."""
+
+    import jax
+    import jax.numpy as jnp
+    from jax import lax
+
+    if (
+        update.ndim != 2
+        or update.shape[0] <= 0
+        or update.shape[1] != PP16_FEATURE2_SHARD_WIDTH
+    ):
+        raise ValueError("feature2 RMS batch must contain nonempty 3072-feature rows")
+    if residual.shape != update.shape:
+        raise ValueError("feature2 RMS batch residual geometry drifted")
+    if norm_weight.shape != (1, PP16_FEATURE2_SHARD_WIDTH):
+        raise ValueError("feature2 RMS weight must be its local feature half")
+    if any(value.dtype != jnp.bfloat16 for value in (update, residual, norm_weight)):
+        raise ValueError("feature2 RMS inputs and weight must remain BF16")
+    canonical_groups = tuple(tuple(int(rank) for rank in group) for group in groups)
+    if canonical_groups != ((0, 1),):
+        raise ValueError("bounded feature2 RMS requires exact {0,1} group")
+    with jax.named_scope("greenfield_pp16_feature2_rms_batch"):
+        total = update.astype(jnp.float32) + residual.astype(jnp.float32)
+        local_square_sum = jnp.sum(lax.square(total), axis=1)
+        square_sum = lax.psum(
+            local_square_sum,
+            axis_name,
+            axis_index_groups=canonical_groups,
+        )
+        inverse = lax.rsqrt(
+            square_sum / jnp.float32(PP16_FEATURE2_HIDDEN_WIDTH) + jnp.float32(1e-5)
+        )
+        carried = total.astype(jnp.bfloat16)
+        normalized_local = (
+            (total * inverse[:, None]).astype(jnp.bfloat16) * norm_weight
+        ).astype(jnp.bfloat16)
+    with jax.named_scope("greenfield_pp16_feature2_normalized_batch_gather"):
         normalized = lax.all_gather(
             normalized_local,
             axis_name,

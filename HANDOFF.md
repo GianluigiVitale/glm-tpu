@@ -7408,3 +7408,25 @@ next is a CPU/HLO-only integration of the already-protected DB518 physical-M64 p
 LayerNorm for layer-0 keys before causal consumption. Do not launch another model run until that
 correction preserves the default-off boundary, exact ownership and full HLO contract and receives
 a fresh execution review.
+
+## Current exact next: review one compile-only DB518 layer-0 HLO acquisition
+
+The local default-off successor now reconstructs layer-0 input normalization in four token chunks,
+applies the already-protected DB518 physical-M64 projection, affine key LayerNorm and RoPE to the
+authenticated runtime positions, and injects each FP32 key before the causal cache write and DSA
+score. Batched embedding/RMS is bitwise equal to the existing scalar path on forced LP2; changing
+the old one-row `wk` cannot affect an injected key, while changing that key changes the stored row
+and scores. The default, full-width and p113 graphs retain their prior identities.
+
+The new acquisition identity is raw CPU `f2c8b067...a7aef`, raw TPU-v4 `2a81016a...b866b` and
+canonical JAXpr `f87c0f16...9447f`. StableHLO/optimized-HLO validation keeps every locality,
+producer, reducer, host-transport and dead-row refusal, but deliberately reports only acquisition
+root hints until the first actual TPU graph is archived and pinned. The runner refuses main
+execution whenever this flag is enabled; the wrapper can publish only `HLO_ACQUIRED`, never a
+tensor, DB row, numerical or performance claim. Complete affected validation passes 202/202 plus
+syntax, JSON, Bash and diff checks.
+
+No TPU action has occurred for this successor. Exact next is one scoped adversarial Sol verdict on
+the staged diff and local evidence. Only approval permits commit/push, same-region mirror
+verification and one serialized compile-only acquisition. Numerical execution remains forbidden
+until the acquired graph receives a separate causal inspection and authorization. Gate D is open.

@@ -46,6 +46,7 @@ def test_feature2_acquisition_entrypoint_compiles_but_never_executes_main() -> N
     assert '"main_executed": execute_main' in source
     assert '"sealed_boundary_capture": program.sealed_boundary_capture' in source
     assert '"observe_position_113": program.observe_position_113' in source
+    assert '"exact_layer0_prompt_keys": program.exact_layer0_prompt_keys' in source
     assert '"numerical_claim": False' in source
     assert '"performance_claim": False' in source
     assert '"NUMERICAL_CAPTURED" if execute_main else "HLO_ACQUIRED"' in source
@@ -60,6 +61,8 @@ def test_feature2_acquisition_runner_requires_all_fail_closed_contracts() -> Non
         "pack_dense_final_layout=True",
         "full_width_rounded_then_slice=(",
         "observe_position_113=observe_position_113",
+        "exact_layer0_prompt_keys=exact_layer0_prompt_keys",
+        "DB518 layer-0 successor is compile-only until acquired HLO is pinned",
         "validate_feature2_materializer_optimized_hlo(",
         "validate_feature2_prefill_jaxpr(",
         "validate_feature2_prefill_result_abstract(",
@@ -95,6 +98,11 @@ def test_feature2_acquisition_runner_requires_all_fail_closed_contracts() -> Non
         assert (
             ast.unparse(keywords["observe_position_113"])
             == "program.observe_position_113"
+        )
+        assert "exact_layer0_prompt_keys" in keywords
+        assert (
+            ast.unparse(keywords["exact_layer0_prompt_keys"])
+            == "program.exact_layer0_prompt_keys"
         )
         if name == "validate_feature2_main_stablehlo":
             assert "source_jaxpr_sha256" in keywords
@@ -164,8 +172,29 @@ def test_feature2_acquisition_runner_cli_is_compile_only() -> None:
     assert "--compile-only" in completed.stdout
     assert "--full-width-rounded-then-slice" in completed.stdout
     assert "--observe-position-113" in completed.stdout
+    assert "--exact-layer0-prompt-keys" in completed.stdout
     source = RUNNER.read_text()
     assert "choices=(1,)" in source
+
+
+def test_feature2_acquisition_runner_exact_keys_are_compile_only() -> None:
+    source = RUNNER.read_text()
+    tree = ast.parse(source)
+    run_function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "run_feature2"
+    )
+    guard = next(
+        node
+        for node in run_function.body
+        if isinstance(node, ast.If)
+        and ast.unparse(node.test) == "execute_main and exact_layer0_prompt_keys"
+    )
+    assert len(guard.body) == 1
+    refusal = guard.body[0]
+    assert isinstance(refusal, ast.Raise)
+    assert "compile-only until acquired HLO is pinned" in ast.unparse(refusal)
 
 
 def test_feature2_acquisition_runner_is_syntax_valid() -> None:

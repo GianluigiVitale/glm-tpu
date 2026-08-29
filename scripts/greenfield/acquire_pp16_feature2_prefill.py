@@ -195,6 +195,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--compile-only", type=int, choices=(1,), required=True)
     parser.add_argument("--full-width-rounded-then-slice", action="store_true")
     parser.add_argument("--observe-position-113", action="store_true")
+    parser.add_argument("--exact-layer0-prompt-keys", action="store_true")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--hlo-dir", type=Path, required=True)
     return parser.parse_args()
@@ -205,8 +206,13 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
 
     result_npz = getattr(args, "result_npz", None)
     observe_position_113 = bool(getattr(args, "observe_position_113", False))
+    exact_layer0_prompt_keys = bool(getattr(args, "exact_layer0_prompt_keys", False))
     if execute_main != (result_npz is not None):
         raise RuntimeError("numerical execution and result capture must be paired")
+    if execute_main and exact_layer0_prompt_keys:
+        raise RuntimeError(
+            "DB518 layer-0 successor is compile-only until acquired HLO is pinned"
+        )
     if REPO != EXPECTED_REPO:
         raise RuntimeError(f"wrong greenfield worktree: {REPO}")
     code_hash = _git_head()
@@ -324,6 +330,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             devices=devices,
             full_width_rounded_then_slice=(args.full_width_rounded_then_slice),
             observe_position_113=observe_position_113,
+            exact_layer0_prompt_keys=exact_layer0_prompt_keys,
         )
         weights = loaded.weights
 
@@ -399,6 +406,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             str(jax.make_jaxpr(program.execute)(*main_arguments)),
             full_width_rounded_then_slice=(program.full_width_rounded_then_slice),
             observe_position_113=program.observe_position_113,
+            exact_layer0_prompt_keys=program.exact_layer0_prompt_keys,
         )
         terminal_contract = validate_feature2_prefill_result_abstract(
             jax.eval_shape(program.execute, *main_arguments),
@@ -416,6 +424,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             full_width_rounded_then_slice=(program.full_width_rounded_then_slice),
             sealed_boundary_capture=program.sealed_boundary_capture,
             observe_position_113=program.observe_position_113,
+            exact_layer0_prompt_keys=program.exact_layer0_prompt_keys,
             source_jaxpr_sha256=jaxpr_contract["jaxpr_sha256"],
         )
         compile_started = time.monotonic()
@@ -437,6 +446,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
                     ),
                     sealed_boundary_capture=program.sealed_boundary_capture,
                     observe_position_113=program.observe_position_113,
+                    exact_layer0_prompt_keys=program.exact_layer0_prompt_keys,
                 ),
                 "stablehlo_contract": main_stable_contract,
                 "terminal_contract": terminal_contract,
@@ -526,6 +536,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             "device_kind": devices[0].device_kind,
             "event1_target_lineage": event1_lineage,
             "full_width_rounded_then_slice": (program.full_width_rounded_then_slice),
+            "exact_layer0_prompt_keys": program.exact_layer0_prompt_keys,
             "sealed_boundary_capture": program.sealed_boundary_capture,
             "graph_sha256": graph.graph_sha256,
             "hlo": {

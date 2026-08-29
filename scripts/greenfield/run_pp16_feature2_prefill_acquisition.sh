@@ -50,8 +50,14 @@ FULL_WIDTH_ROUNDED_THEN_SLICE=${GLM_GREENFIELD_PP16_FULL_WIDTH_ROUNDED_THEN_SLIC
 readonly FULL_WIDTH_ROUNDED_THEN_SLICE
 OBSERVE_POSITION_113=${GLM_GREENFIELD_PP16_FEATURE2_OBSERVE_POSITION_113:-0}
 readonly OBSERVE_POSITION_113
+EXACT_LAYER0_PROMPT_KEYS=${GLM_GREENFIELD_PP16_EXACT_LAYER0_PROMPT_KEYS:-0}
+readonly EXACT_LAYER0_PROMPT_KEYS
 [[ $OBSERVE_POSITION_113 == 0 || $OBSERVE_POSITION_113 == 1 ]] || {
   echo "position-113 observer flag must be 0 or 1" >&2
+  exit 2
+}
+[[ $EXACT_LAYER0_PROMPT_KEYS == 0 || $EXACT_LAYER0_PROMPT_KEYS == 1 ]] || {
+  echo "exact layer-0 prompt-key flag must be 0 or 1" >&2
   exit 2
 }
 [[ $FULL_WIDTH_ROUNDED_THEN_SLICE == 1 ]] || {
@@ -59,6 +65,13 @@ readonly OBSERVE_POSITION_113
   exit 2
 }
 runner_variant_args=(--full-width-rounded-then-slice)
+if [[ $EXACT_LAYER0_PROMPT_KEYS == 1 ]]; then
+  [[ $OBSERVE_POSITION_113 == 1 ]] || {
+    echo "exact layer-0 prompt-key acquisition requires the p113 observer" >&2
+    exit 2
+  }
+  runner_variant_args+=(--exact-layer0-prompt-keys)
+fi
 if [[ $OBSERVE_POSITION_113 == 1 ]]; then
   runner_variant_args+=(--observe-position-113)
   EXPECTED_MAIN_STABLEHLO_SHA=$POSITION113_MAIN_STABLEHLO_SHA
@@ -76,7 +89,10 @@ readonly EXPECTED_MAIN_STABLEHLO_SHA EXPECTED_MAIN_CANONICAL_HLO_SHA
 readonly EXPECTED_MAIN_CANONICAL_HLO_BYTES EXPECTED_MAIN_CANONICAL_STACK_REFS
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
-if [[ $OBSERVE_POSITION_113 == 1 ]]; then
+if [[ $EXACT_LAYER0_PROMPT_KEYS == 1 ]]; then
+  default_tag=greenfield_pp16_feature2_layer0_db518_acquire_$(date -u +%Y%m%dT%H%M%S%NZ)
+  tag_pattern='^greenfield_pp16_feature2_layer0_db518_acquire_[0-9]{8}T[0-9]{15}Z$'
+elif [[ $OBSERVE_POSITION_113 == 1 ]]; then
   default_tag=greenfield_pp16_feature2_position113_acquire_$(date -u +%Y%m%dT%H%M%S%NZ)
   tag_pattern='^greenfield_pp16_feature2_position113_acquire_[0-9]{8}T[0-9]{15}Z$'
 else
@@ -235,7 +251,7 @@ exec 8>/home/gianl/.glm-tpu-rsync.lock
 flock 8
 trap on_exit EXIT
 
-say "RUN_DIR=$RUN_DIR PIN=$PIN mode=compile_only devices=0,1 observe_position_113=$OBSERVE_POSITION_113"
+say "RUN_DIR=$RUN_DIR PIN=$PIN mode=compile_only devices=0,1 observe_position_113=$OBSERVE_POSITION_113 exact_layer0_prompt_keys=$EXACT_LAYER0_PROMPT_KEYS"
 if gcloud storage ls "$REMOTE_PREFIX/**" >"$RUN_DIR/remote_vacancy.txt" 2>&1; then
   say "ABORT: append-only remote prefix already exists"
   exit 2
@@ -253,7 +269,7 @@ PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - \
   "$DB529_INTERNAL_TENSOR_SHA" "$FEATURE2_GRAPH_SHA" \
   "$SEALED_REJECTION_CAPTURE" "$SEALED_REJECTION_CAPTURE_SHA" \
   "$POSITION113_ORACLE" "$POSITION113_ORACLE_SHA" \
-  "$OBSERVE_POSITION_113" \
+  "$OBSERVE_POSITION_113" "$EXACT_LAYER0_PROMPT_KEYS" \
   "$RUN_DIR/source_identity.json" <<'PY'
 from hashlib import sha256
 import json
@@ -267,9 +283,9 @@ from glm_tpu.greenfield.benchmarking.pp16_feature_sharded_state import derive_fe
 
 (runtime,remote,runtime_sha,token,token_sha,dsa,dsa_sha,layer1,layer1_sha,
  db529,db529_contract,db529_tensor,graph_sha,baseline,baseline_sha,
- p113,p113_sha,observe_p113,output)=sys.argv[1:]
+ p113,p113_sha,observe_p113,exact_layer0_keys,output)=sys.argv[1:]
 runtime=Path(runtime); token=Path(token); dsa=Path(dsa); layer1=Path(layer1); db529=Path(db529)
-baseline=Path(baseline); p113=Path(p113); observe_p113=bool(int(observe_p113))
+baseline=Path(baseline); p113=Path(p113); observe_p113=bool(int(observe_p113)); exact_layer0_keys=bool(int(exact_layer0_keys))
 manifest=json.loads((runtime/'runtime_manifest.json').read_text())
 if manifest.get('manifest_sha256')!=runtime_sha:
     raise SystemExit('feature2 runtime manifest pin drifted')
@@ -281,7 +297,7 @@ if lineage['token_oracle_manifest_sha256']!=token_sha or lineage['dsa_oracle_man
 graph=build_feature2_prefill_graph(derive_feature2_tensor_allowlist(manifest,read_feature2_owner_headers(runtime,manifest)),load_feature2_prefill_inputs(token))
 if graph.graph_sha256!=graph_sha:
     raise SystemExit('feature2 graph pin drifted')
-record={'artifact_kind':'greenfield_pp16_feature2_source_identity','runtime_root':str(runtime),'runtime_remote':remote,'runtime_manifest_sha256':runtime_sha,'selective_plan':inspect_feature2_selective_plan(runtime),'event1_target_lineage':lineage,'graph_sha256':graph_sha,'observe_position_113':observe_p113}
+record={'artifact_kind':'greenfield_pp16_feature2_source_identity','runtime_root':str(runtime),'runtime_remote':remote,'runtime_manifest_sha256':runtime_sha,'selective_plan':inspect_feature2_selective_plan(runtime),'event1_target_lineage':lineage,'exact_layer0_prompt_keys':exact_layer0_keys,'graph_sha256':graph_sha,'observe_position_113':observe_p113}
 if observe_p113:
     if sha256(baseline.read_bytes()).hexdigest()!=baseline_sha or sha256(p113.read_bytes()).hexdigest()!=p113_sha:
         raise SystemExit('feature2 position-113 comparison source pin drifted')
@@ -342,6 +358,7 @@ PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - \
   "$FULL_WIDTH_ROUNDED_THEN_SLICE" "$EXPECTED_MAIN_STABLEHLO_SHA" \
   "$EXPECTED_MAIN_CANONICAL_HLO_SHA" "$EXPECTED_MAIN_CANONICAL_HLO_BYTES" \
   "$EXPECTED_MAIN_CANONICAL_STACK_REFS" "$OBSERVE_POSITION_113" \
+  "$EXACT_LAYER0_PROMPT_KEYS" \
   "$SEALED_REJECTION_CAPTURE" "$SEALED_REJECTION_CAPTURE_SHA" \
   "$POSITION113_ORACLE" "$POSITION113_ORACLE_SHA" <<'PY'
 from hashlib import sha256
@@ -349,7 +366,7 @@ import json
 from pathlib import Path
 import sys
 
-from glm_tpu.greenfield.benchmarking.pp16_feature2_hlo import validate_feature2_sealed_hlo_archive_identity
+from glm_tpu.greenfield.benchmarking.pp16_feature2_hlo import canonicalize_feature2_optimized_hlo, validate_feature2_sealed_hlo_archive_identity
 
 run=Path(sys.argv[1]); pin,tag,remote,elapsed=sys.argv[2:6]
 full_width_rounded_then_slice=bool(int(sys.argv[6]))
@@ -358,16 +375,17 @@ expected_canonical_sha=sys.argv[8]
 expected_canonical_bytes=int(sys.argv[9])
 expected_canonical_stack_refs=int(sys.argv[10])
 observe_position_113=bool(int(sys.argv[11]))
-baseline,baseline_sha,p113,p113_sha=sys.argv[12:16]
+exact_layer0_prompt_keys=bool(int(sys.argv[12]))
+baseline,baseline_sha,p113,p113_sha=sys.argv[13:17]
 runner=json.loads((run/'runner.json').read_text())
 source=json.loads((run/'source_identity.json').read_text())
-if runner.get('status')!='HLO_ACQUIRED' or runner.get('code_hash')!=pin or runner.get('compile_only') is not True or runner.get('sealed_boundary_capture') is not True or runner.get('observe_position_113') is not observe_position_113 or runner.get('main_executed') is not False or runner.get('numerical_claim') is not False or runner.get('performance_claim') is not False:
+if runner.get('status')!='HLO_ACQUIRED' or runner.get('code_hash')!=pin or runner.get('compile_only') is not True or runner.get('sealed_boundary_capture') is not True or runner.get('observe_position_113') is not observe_position_113 or runner.get('exact_layer0_prompt_keys') is not exact_layer0_prompt_keys or runner.get('main_executed') is not False or runner.get('numerical_claim') is not False or runner.get('performance_claim') is not False:
     raise SystemExit('feature2 acquisition claim boundary drifted')
 if runner.get('full_width_rounded_then_slice') is not full_width_rounded_then_slice:
     raise SystemExit('feature2 acquisition producer variant drifted')
 if runner.get('graph_sha256')!=source.get('graph_sha256') or runner.get('event1_target_lineage')!=source.get('event1_target_lineage') or runner.get('selective_plan')!=source.get('selective_plan'):
     raise SystemExit('feature2 acquisition source lineage drifted')
-if source.get('observe_position_113') is not observe_position_113:
+if source.get('observe_position_113') is not observe_position_113 or source.get('exact_layer0_prompt_keys') is not exact_layer0_prompt_keys:
     raise SystemExit('feature2 position-113 source identity drifted')
 observer_source={'sealed_rejection_capture':baseline,'sealed_rejection_capture_sha256':baseline_sha,'position113_oracle':p113,'position113_oracle_sha256':p113_sha}
 if observe_position_113:
@@ -392,8 +410,8 @@ if observe_position_113:
     expected_stable_types += ['tensor<2x1x6144xbf16>','tensor<2x1x2048xbf16>','tensor<2x1x32x128xf32>','tensor<2x1x32xf32>','tensor<2x1x128xf32>','tensor<2x1x2048xi32>','tensor<2x1xi32>','tensor<2x1x2048xf32>','tensor<2x1xi32>']
     expected_optimized_roots += [{'dtype':dtype,'shape':shape} for dtype,shape in [('bf16',[1,1,6144]),('bf16',[1,1,2048]),('f32',[1,1,32,128]),('f32',[1,1,32]),('f32',[1,1,128]),('s32',[1,1,2048]),('s32',[1,1]),('f32',[1,1,2048]),('s32',[1,1])]]
 expected_output_count=24 if observe_position_113 else 15
-expected_jaxpr_sha=('c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd' if observe_position_113 else '7e1e4b549fa7b87c098f06644e918fe9f4fb05255a089ae9a94d1f218922aac0')
-expected_raw_jaxpr_sha=('4e7f821d11e9a4fcf12ae39ef657c2a3f054c0a5976898d62069470e4d957d5d' if observe_position_113 else '319e357a13ea4b26cd261cd0b7eefc87830d45409ee5c288dcf505bf7c2f6c4a')
+expected_jaxpr_sha=('f87c0f162523bf6221d2824aa4b7268f1c770a55d2f8cde6da7506f595e9447f' if exact_layer0_prompt_keys else ('c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd' if observe_position_113 else '7e1e4b549fa7b87c098f06644e918fe9f4fb05255a089ae9a94d1f218922aac0'))
+expected_raw_jaxpr_sha=('2a81016ac0db10e47beca9a86bb858193b43131f5e61aa5f339a98d7bfdb866b' if exact_layer0_prompt_keys else ('4e7f821d11e9a4fcf12ae39ef657c2a3f054c0a5976898d62069470e4d957d5d' if observe_position_113 else '319e357a13ea4b26cd261cd0b7eefc87830d45409ee5c288dcf505bf7c2f6c4a'))
 expected_causal_contract=({'counter_carried_through_all_scans':True,'observed_value_count':8,'position':113,'terminal_validity_gated_by_exact_count':True} if observe_position_113 else None)
 for name,record in runner['hlo'].items():
     for kind,suffix in (('stablehlo','.stablehlo.mlir'),('optimized_hlo','.optimized_hlo.txt')):
@@ -412,19 +430,29 @@ for name,record in runner['hlo'].items():
         canonical_path=run/'hlo'/canonical.get('filename','')
         if stable_path.parent!=run/'hlo' or not stable_path.name.endswith('.stablehlo.mlir') or optimized_path.parent!=run/'hlo' or not optimized_path.name.endswith('.optimized_hlo.txt') or canonical_path.parent!=run/'hlo' or not canonical_path.name.endswith('.execution_canonical_hlo.txt'):
             raise SystemExit('feature2 main HLO archive paths drifted')
-        archive_identity=validate_feature2_sealed_hlo_archive_identity(stable_path,optimized_path,canonical_path,expected_stablehlo_sha256=expected_stable_sha,expected_canonical_sha256=expected_canonical_sha,expected_canonical_bytes=expected_canonical_bytes,expected_canonicalizer_version=1,expected_stripped_stack_frame_references=expected_canonical_stack_refs)
+        if exact_layer0_prompt_keys:
+            recomputed_text,recomputed_record=canonicalize_feature2_optimized_hlo(optimized_path.read_text())
+            if canonical_path.read_text()!=recomputed_text:
+                raise SystemExit('feature2 DB518 acquisition canonical-HLO bytes drifted')
+            archive_identity={'stablehlo_sha256':sha256(stable_path.read_bytes()).hexdigest(),'optimized_hlo_sha256':sha256(optimized_path.read_bytes()).hexdigest(),'canonical_hlo_identity':recomputed_record}
+        else:
+            archive_identity=validate_feature2_sealed_hlo_archive_identity(stable_path,optimized_path,canonical_path,expected_stablehlo_sha256=expected_stable_sha,expected_canonical_sha256=expected_canonical_sha,expected_canonical_bytes=expected_canonical_bytes,expected_canonicalizer_version=1,expected_stripped_stack_frame_references=expected_canonical_stack_refs)
         if record.get('stablehlo',{}).get('sha256')!=archive_identity['stablehlo_sha256'] or record.get('optimized_hlo',{}).get('sha256')!=archive_identity['optimized_hlo_sha256']:
             raise SystemExit('feature2 main raw HLO identity records drifted')
         if jaxpr.get('jaxpr_sha256')!=expected_jaxpr_sha or jaxpr.get('raw_jaxpr_sha256')!=expected_raw_jaxpr_sha or jaxpr.get('jaxpr_canonicalizer_version')!=1 or jaxpr.get('jaxpr_runtime_mesh')!='tpu_v4' or jaxpr.get('jaxpr_runtime_mesh_fragment_count')!=2 or jaxpr.get('position113_causal_contract')!=expected_causal_contract:
             raise SystemExit('feature2 main causal JAXpr contract drifted')
-        if stable.get('sealed_boundary_capture') is not True or bool(stable.get('observe_position_113',False))!=observe_position_113 or stable.get('source_jaxpr_sha256')!=expected_jaxpr_sha or stable.get('stablehlo_sha256')!=archive_identity['stablehlo_sha256'] or stable.get('output_count')!=expected_output_count or stable.get('terminal_shapes')!=expected_terminal_shapes or stable.get('terminal_types')!=expected_stable_types:
+        if stable.get('sealed_boundary_capture') is not True or bool(stable.get('observe_position_113',False))!=observe_position_113 or stable.get('exact_layer0_prompt_keys') is not exact_layer0_prompt_keys or stable.get('identity_acquisition_only') is not exact_layer0_prompt_keys or stable.get('source_jaxpr_sha256')!=expected_jaxpr_sha or stable.get('stablehlo_sha256')!=archive_identity['stablehlo_sha256'] or stable.get('output_count')!=expected_output_count or stable.get('terminal_shapes')!=expected_terminal_shapes or stable.get('terminal_types')!=expected_stable_types:
             raise SystemExit('feature2 main StableHLO sealed terminal drifted')
-        expected_canonical={'byte_count':expected_canonical_bytes,'canonicalizer_version':1,'sha256':expected_canonical_sha,'stripped_stack_frame_references':expected_canonical_stack_refs}
+        expected_canonical=(archive_identity['canonical_hlo_identity'] if exact_layer0_prompt_keys else {'byte_count':expected_canonical_bytes,'canonicalizer_version':1,'sha256':expected_canonical_sha,'stripped_stack_frame_references':expected_canonical_stack_refs})
         optimized_canonical={key:optimized.get('sealed_canonical_hlo_identity',{}).get(key) for key in expected_canonical}
         runner_canonical={key:canonical.get(key) for key in expected_canonical}
         recomputed_canonical={key:archive_identity['canonical_hlo_identity'].get(key) for key in expected_canonical}
-        expected_optimized_observer_bindings=expected_observer_root_hints if observe_position_113 else {}
-        if optimized.get('sealed_boundary_capture') is not True or bool(optimized.get('observe_position_113',False))!=observe_position_113 or optimized.get('output_count')!=expected_output_count or optimized.get('root_shapes')!=expected_optimized_roots or optimized.get('sealed_bindings')!=expected_sealed_bindings or optimized.get('sealed_acquisition_root_hints')!={} or optimized.get('position113_observer_bindings')!=expected_optimized_observer_bindings or optimized.get('position113_observer_acquisition_root_hints')!={} or optimized.get('position113_observer_root_hints_causal') is not observe_position_113 or optimized_canonical!=expected_canonical:
+        expected_optimized_observer_bindings=(expected_observer_root_hints if observe_position_113 and not exact_layer0_prompt_keys else {})
+        expected_sealed_runtime_bindings=({} if exact_layer0_prompt_keys else expected_sealed_bindings)
+        expected_sealed_acquisition_hints=(expected_sealed_bindings if exact_layer0_prompt_keys else {})
+        expected_observer_acquisition_hints=(expected_observer_root_hints if exact_layer0_prompt_keys else {})
+        expected_observer_causal=observe_position_113 and not exact_layer0_prompt_keys
+        if optimized.get('sealed_boundary_capture') is not True or bool(optimized.get('observe_position_113',False))!=observe_position_113 or optimized.get('exact_layer0_prompt_keys') is not exact_layer0_prompt_keys or optimized.get('identity_acquisition_only') is not exact_layer0_prompt_keys or optimized.get('output_count')!=expected_output_count or optimized.get('root_shapes')!=expected_optimized_roots or optimized.get('sealed_bindings')!=expected_sealed_runtime_bindings or optimized.get('sealed_acquisition_root_hints')!=expected_sealed_acquisition_hints or optimized.get('position113_observer_bindings')!=expected_optimized_observer_bindings or optimized.get('position113_observer_acquisition_root_hints')!=expected_observer_acquisition_hints or optimized.get('position113_observer_root_hints_causal') is not expected_observer_causal or optimized_canonical!=expected_canonical:
             raise SystemExit('feature2 main optimized-HLO sealed terminal drifted')
         if runner_canonical!=expected_canonical or recomputed_canonical!=expected_canonical or canonical.get('canonicalizer_code_hash')!=pin:
             raise SystemExit('feature2 main canonical-HLO artifact drifted')
@@ -435,7 +463,7 @@ for name,record in runner['hlo'].items():
 state=runner.get('state_manifest',{})
 if state.get('plan_id')!='PP16_LP2' or state.get('owner_device_ids')!=[0,1] or state.get('selected_read_count')!=78 or state.get('raw_dense_device_materialization') is not False or state.get('dense_final_layout') is not True:
     raise SystemExit('feature2 selective state contract drifted')
-summary={'artifact_kind':'greenfield_pp16_feature2_compile_acquisition_summary','claim_scope':runner['claim_scope'],'code_hash':pin,'elapsed_seconds':int(elapsed),'full_width_rounded_then_slice':full_width_rounded_then_slice,'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_executed':False,'numerical_claim':False,'observe_position_113':observe_position_113,'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'sealed_boundary_capture':True,'status':'HLO_ACQUIRED'}
+summary={'artifact_kind':'greenfield_pp16_feature2_compile_acquisition_summary','claim_scope':runner['claim_scope'],'code_hash':pin,'elapsed_seconds':int(elapsed),'exact_layer0_prompt_keys':exact_layer0_prompt_keys,'full_width_rounded_then_slice':full_width_rounded_then_slice,'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_executed':False,'numerical_claim':False,'observe_position_113':observe_position_113,'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'sealed_boundary_capture':True,'status':'HLO_ACQUIRED'}
 (run/'summary.json').write_text(json.dumps(summary,allow_nan=False,indent=2,sort_keys=True)+'\n')
 PY
 

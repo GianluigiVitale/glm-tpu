@@ -1128,6 +1128,69 @@ def test_feature2_main_position113_observer_refuses_geometry_only_fixture(
         )
 
 
+def test_feature2_db518_optimized_hlo_is_acquisition_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hlo = _main_optimized_hlo(
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+    )
+    _pin_synthetic_position113_optimized_hlo(monkeypatch, hlo)
+    report = validate_feature2_main_optimized_hlo(
+        hlo,
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+        exact_layer0_prompt_keys=True,
+    )
+    assert report["passed"] is True
+    assert report["exact_layer0_prompt_keys"] is True
+    assert report["identity_acquisition_only"] is True
+    assert report["sealed_bindings"] == {}
+    assert set(report["sealed_acquisition_root_hints"]) == {"6", "7", "8", "9"}
+    assert report["position113_observer_bindings"] == {}
+    assert set(report["position113_observer_acquisition_root_hints"]) == {
+        str(index) for index in range(15, 24)
+    }
+    assert report["position113_observer_root_hints_causal"] is False
+    assert report["position113_lineage"] == {}
+    assert report["sealed_canonical_hlo_identity"]["sha256"]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda value: value.replace("num_partitions=2", "num_partitions=32", 1),
+        lambda value: value.replace(
+            "source_target_pairs={{0,1},{1,0}}",
+            "source_target_pairs={{0,2},{2,0}}",
+            1,
+        ),
+        lambda value: value + "\nhost_callback",
+        lambda value: value + "\nbf16[32,6144]",
+    ),
+)
+def test_feature2_db518_acquisition_keeps_structural_refusals(
+    mutation,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    hlo = _main_optimized_hlo(
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+    )
+    _pin_synthetic_position113_optimized_hlo(monkeypatch, hlo)
+    with pytest.raises(BenchmarkValidationError):
+        validate_feature2_main_optimized_hlo(
+            mutation(hlo),
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+            observe_position_113=True,
+            exact_layer0_prompt_keys=True,
+        )
+
+
 def test_feature2_position113_optimized_hlo_refuses_wrong_source_under_exact_pin(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1861,6 +1924,88 @@ def test_feature2_main_position113_stablehlo_pins_named_results(
             source_jaxpr_sha256=(
                 "c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd"
             ),
+        )
+
+
+def _db518_acquisition_stablehlo() -> str:
+    return _main_stablehlo(
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+    ) + (
+        "\n// acquisition-only DB518 chunk geometry: "
+        "tensor<2048x3072xbf16> tensor<2012x3072xbf16> "
+        "tensor<2048x6144xbf16> tensor<2012x6144xbf16> "
+        "tensor<2048x128xf32> tensor<2012x128xf32>\n"
+    )
+
+
+def test_feature2_db518_stablehlo_requires_exact_source_and_chunk_geometry() -> None:
+    stablehlo = _db518_acquisition_stablehlo()
+    source_sha = "f87c0f162523bf6221d2824aa4b7268f1c770a55d2f8cde6da7506f595e9447f"
+    report = validate_feature2_main_stablehlo(
+        stablehlo,
+        full_width_rounded_then_slice=True,
+        sealed_boundary_capture=True,
+        observe_position_113=True,
+        exact_layer0_prompt_keys=True,
+        source_jaxpr_sha256=source_sha,
+    )
+    assert report["passed"] is True
+    assert report["exact_layer0_prompt_keys"] is True
+    assert report["identity_acquisition_only"] is True
+    assert report["source_jaxpr_sha256"] == source_sha
+    with pytest.raises(BenchmarkValidationError, match="exact causal source JAXpr"):
+        validate_feature2_main_stablehlo(
+            stablehlo,
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+            observe_position_113=True,
+            exact_layer0_prompt_keys=True,
+            source_jaxpr_sha256=(
+                "c8b59417193eac580290648c28430cd8c11477dc6f465585c347b2001e97d1cd"
+            ),
+        )
+    with pytest.raises(BenchmarkValidationError, match="boundary shapes drifted"):
+        validate_feature2_main_stablehlo(
+            stablehlo.replace("tensor<2012x128xf32>", "tensor<2011x128xf32>"),
+            full_width_rounded_then_slice=True,
+            sealed_boundary_capture=True,
+            observe_position_113=True,
+            exact_layer0_prompt_keys=True,
+            source_jaxpr_sha256=source_sha,
+        )
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    (
+        {
+            "full_width_rounded_then_slice": False,
+            "sealed_boundary_capture": True,
+            "observe_position_113": True,
+        },
+        {
+            "full_width_rounded_then_slice": True,
+            "sealed_boundary_capture": False,
+            "observe_position_113": True,
+        },
+        {
+            "full_width_rounded_then_slice": True,
+            "sealed_boundary_capture": True,
+            "observe_position_113": False,
+        },
+    ),
+)
+def test_feature2_db518_hlo_requires_sealed_full_width_observer(kwargs) -> None:
+    with pytest.raises(ValueError, match="DB518 layer-0 acquisition requires"):
+        validate_feature2_main_stablehlo(
+            _db518_acquisition_stablehlo(),
+            exact_layer0_prompt_keys=True,
+            source_jaxpr_sha256=(
+                "f87c0f162523bf6221d2824aa4b7268f1c770a55d2f8cde6da7506f595e9447f"
+            ),
+            **kwargs,
         )
 
 

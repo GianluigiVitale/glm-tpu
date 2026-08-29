@@ -624,3 +624,114 @@ print(json.dumps({
     assert not result["bad_attention_valid"]
     assert result["bad_attention_cache_unchanged"]
     assert result["bad_attention_output_finite"]
+
+
+def test_precomputed_current_key_is_written_and_scored_before_dsa_selection() -> None:
+    program = r"""
+import json
+import jax
+import jax.numpy as jnp
+import numpy as np
+from jax import lax
+from jax.sharding import Mesh, PartitionSpec as P
+from glm_tpu.greenfield.kernels.reference.attention import StageLocalKvLayout
+from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
+from glm_tpu.greenfield.kernels.stage_local import stage_local_dsa_fp8_mapped
+
+mesh = Mesh(np.asarray(jax.devices(), dtype=object), ('feature',))
+contract = DsaNumericalContract(
+    hidden_size=8,
+    q_lora_rank=4,
+    num_heads=2,
+    head_dim=2,
+    rotary_dim=2,
+    top_k=2,
+)
+layout = StageLocalKvLayout(
+    logical_page_size=8,
+    local_parallel_size=2,
+    packed_cache_width=8,
+)
+
+def mapped(current_key, wk_owners):
+    local_slot = lax.axis_index('feature')
+    result = stage_local_dsa_fp8_mapped(
+        None,
+        jnp.zeros((1, 4, 2), dtype=jnp.bfloat16),
+        jnp.asarray([0], dtype=jnp.int32),
+        jnp.asarray([[0]], dtype=jnp.int32),
+        jnp.asarray([1], dtype=jnp.int32),
+        jnp.ones((8,), dtype=jnp.bfloat16),
+        None,
+        None,
+        jnp.ones((4,), dtype=jnp.bfloat16),
+        jnp.full((2, 4), 0x38, dtype=jnp.uint8),
+        jnp.ones((1, 2), dtype=jnp.float32),
+        jnp.full((2, 8), 0x38, dtype=jnp.uint8),
+        jnp.ones((1, 4), dtype=jnp.float32),
+        jnp.ones((2,), dtype=jnp.bfloat16),
+        jnp.zeros((2,), dtype=jnp.bfloat16),
+        jnp.ones((1, 8), dtype=jnp.bfloat16),
+        local_slot,
+        axis_name='feature',
+        contract=contract,
+        cache_layout=layout,
+        axis_index_groups=((0, 1),),
+        block_shape=(2, 2),
+        precomputed_normalized=jnp.ones((1, 8), dtype=jnp.bfloat16),
+        precomputed_q_residual=jnp.ones((1, 4), dtype=jnp.bfloat16),
+        precomputed_wk_weight=wk_owners[0],
+        precomputed_current_key=current_key,
+        dsa_head_key_exact_association=True,
+        dsa_score_precision='default',
+    )
+    return (
+        result.index_cache[None, ...],
+        result.internals.current_key[None, ...],
+        result.selected_scores,
+    )
+
+mapped_program = jax.shard_map(
+    mapped,
+    mesh=mesh,
+    in_specs=(P(), P('feature', None, None)),
+    out_specs=(P('feature', None, None, None), P('feature', None, None), P()),
+    check_vma=False,
+)
+wk_a = jnp.ones((2, 2, 8), dtype=jnp.float32)
+wk_b = jnp.full((2, 2, 8), 37.0, dtype=jnp.float32)
+key_a = jnp.asarray([[1.0, 2.0]], dtype=jnp.float32)
+key_b = jnp.asarray([[4.0, 8.0]], dtype=jnp.float32)
+execute = jax.jit(mapped_program)
+a = tuple(np.asarray(value) for value in execute(key_a, wk_a))
+wk_changed = tuple(np.asarray(value) for value in execute(key_a, wk_b))
+b = tuple(np.asarray(value) for value in execute(key_b, wk_a))
+expected = np.asarray(key_a, dtype=np.float32).astype(jnp.bfloat16)
+print(json.dumps({
+    'cache_owner0_exact': bool(np.array_equal(a[0][0, 0, 0].view(np.uint16), np.asarray(expected[0]).view(np.uint16))),
+    'cache_owner1_zero': int(np.count_nonzero(a[0][1].view(np.uint16))) == 0,
+    'current_key_exact': bool(np.array_equal(a[1], np.broadcast_to(np.asarray(key_a), (2, 1, 2)))),
+    'key_changes_scores': not bool(np.array_equal(a[2], b[2])),
+    'wk_is_bypassed': [bool(np.array_equal(x, y)) for x, y in zip(a, wk_changed, strict=True)],
+}, sort_keys=True))
+"""
+    env = dict(os.environ)
+    env["JAX_PLATFORMS"] = "cpu"
+    env["XLA_FLAGS"] = "--xla_force_host_platform_device_count=2"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=90,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result == {
+        "cache_owner0_exact": True,
+        "cache_owner1_zero": True,
+        "current_key_exact": True,
+        "key_changes_scores": True,
+        "wk_is_bypassed": [True, True, True],
+    }

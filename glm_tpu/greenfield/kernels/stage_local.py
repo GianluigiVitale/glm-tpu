@@ -1806,6 +1806,7 @@ def stage_local_dsa_fp8_mapped(
     dsa_query_backend: StageLinearBackend | None = None,
     dsa_query_weight_aliases: tuple[Any, Any, Any, Any] | None = None,
     precomputed_wk_weight: Any | None = None,
+    precomputed_current_key: Any | None = None,
     dsa_head_key_exact_association: bool = False,
     dsa_score_precision: Literal["default", "highest"] = "highest",
     linear_interpret: bool = False,
@@ -1830,6 +1831,10 @@ def stage_local_dsa_fp8_mapped(
     if dsa_head_key_exact_association != (precomputed_wk_weight is not None):
         raise ValueError(
             "exact DSA head/key execution requires one external FP32 wk owner"
+        )
+    if precomputed_current_key is not None and not dsa_head_key_exact_association:
+        raise ValueError(
+            "precomputed DSA current key requires the exact head/key association"
         )
     if residual is None:
         if precomputed_normalized is None:
@@ -1879,6 +1884,11 @@ def stage_local_dsa_fp8_mapped(
         or precomputed_wk_weight.dtype != jnp.float32
     ):
         raise ValueError("external DSA wk owner must be exact local FP32")
+    if precomputed_current_key is not None and (
+        precomputed_current_key.shape != (1, contract.head_dim)
+        or precomputed_current_key.dtype != jnp.float32
+    ):
+        raise ValueError("precomputed DSA current key must be exact local FP32")
     if key_norm_weight.shape != (contract.head_dim,) or key_norm_bias.shape != (
         contract.head_dim,
     ):
@@ -2009,7 +2019,9 @@ def stage_local_dsa_fp8_mapped(
         gathered_query[..., query_width:], (1, 0, 2)
     ).reshape(1, contract.num_heads)
 
-    if dsa_head_key_exact_association:
+    if precomputed_current_key is not None:
+        current_key_f32 = precomputed_current_key
+    elif dsa_head_key_exact_association:
         assert precomputed_wk_weight is not None
         projected_key = linear(
             indexer_normalized,
