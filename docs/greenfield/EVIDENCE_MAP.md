@@ -1353,8 +1353,20 @@ or one short-context result cannot satisfy a broader row.
 | Authenticated eight-host cleanup | Existing accepted runs pass; future required runs absent | Pending future gates |
 | Base vs speculative throughput reported separately | No speculative promotion has begun | Pending after base decoder |
 
-The immediate critical path is therefore: recover and seal replacement-pod exact-DSA 8K HLO tag
-`greenfield_ws32_short_decoder_8k_acquire_20260826T195124476893681Z` without recompilation; run its
-separately pinned protected 8K numerical confirmation; then advance to long-context and
-identical-condition PP8/PP16/WS32 adjudication. Gate D closure must not be represented as Section 18
-completion.
+## PP16 full-width rejection recovery and next discriminator
+
+Commit `8cf6d07` recovered the already-completed protected PP16 arithmetic under tag
+`greenfield_pp16_feature2_full_width_recovery_20260829T055100992443538Z` without a model rerun.
+The exact 18-object same-region archive ends in `NUMERICAL_REJECTED` generation
+`1787982898735781`, CRC `qGjEoQ==`, SHA `67d08d19...62fb`; evidence ledger is
+`58e1403e...7f23`. Both fresh censuses are 8/8 clean, all 28 source objects were read at immutable
+generations, original terminal generation `1787980539108624` is unchanged, DB integrity passes
+with zero source/recovery rows, and no exact-success marker exists.
+
+CPU authentication proves the full-width and half-width captures bitwise equal across 11 common
+arrays. Reconstructed layer-0 prompt cache `35350ca0...8d7a` differs from DB518
+`3808d502...59d1` at exactly 71 coordinates; the earliest is position 113 / hidden 35,
+`47091` versus `47092` BF16 bits. The immediate critical path is one observation-only PP16 layer-0
+discriminator at that position, with every prior output required bitwise unchanged. Only after that
+boundary is localized may a separately reviewed model retry occur. Gate D remains open and must not
+be represented as Section 18 completion.

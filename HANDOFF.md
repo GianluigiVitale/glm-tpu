@@ -7251,7 +7251,7 @@ identity mismatches and no structural violation; forbidden-hidden counts are zer
 recompile. Exact next is immutable-evidence recovery and sealing of these hashes, commit/push and
 verified owner-bucket mirror, then a separately pinned protected 8K numerical run.
 
-## Current exact next: seal the PP16 rejection, then observe position 113
+## Current exact next: observe PP16 layer-0 position 113
 
 Reviewed pin `e404abee10a770f74cf1b22a7dd9d7ba904add06` executed exactly one zero-warmup
 PP16 full-width feature2 numerical replay under tag
@@ -7262,16 +7262,19 @@ remain downstream. Stable/raw/canonical HLO SHAs are `6c1c69d7...10ad`, `9e8641b
 `9e933384...19a5`; cleanup is 8/8 clean. There is no DB, Gate-D or performance claim.
 
 The original wrapper then failed terminal verification because current `gcloud storage objects
-describe` emits `crc32c`, not only `crc32c_hash`. The already-created terminal is nevertheless
-authentic at generation `1787980539108624`, CRC `jCuZbg==` and SHA `60b605c8...9ad`; never alter
-or delete it. Recovery must fail on absent/conflicting checksum spellings, generation-read all 28
-immutable source objects, recompute the comparator/HLO/cleanup/DB/no-success contracts, and publish
-only a distinct `NUMERICAL_REJECTED` recovery terminal last.
+describe` emits `crc32c`, not only `crc32c_hash`. Commit `8cf6d07` sealed the honest result without
+rerunning model arithmetic under recovery tag
+`greenfield_pp16_feature2_full_width_recovery_20260829T055100992443538Z`. Its exact 18-object
+archive has terminal generation `1787982898735781`, CRC `qGjEoQ==`, terminal SHA
+`67d08d19...62fb`, evidence-ledger SHA `58e1403e...7f23` and pre/post 8/8 census SHAs
+`0ea70237...cf9` / `e29cb45a...f7c5`. It generation-read all 28 original objects, recomputed the
+comparator/HLO/cleanup/DB/no-success contracts, found zero DB rows and proved original terminal
+generation `1787980539108624` unchanged. There is still no Gate-D or performance claim.
 
 CPU reconstruction proves the full-width capture is bitwise identical to the earlier half-width
 capture across all 11 common arrays. Its logical layer-0 prompt cache SHA is `35350ca0...8d7a`, not
 DB518 `3808d502...59d1`: exactly 71 coordinates differ, one per position, all within hidden indices
-0--63. The earliest is position 113 / hidden index 35 (`47091` versus `47092`). Exact next after
-the recovery seal is an observation-only layer-0 discriminator at position 113 for normalized,
+0--63. The earliest is position 113 / hidden index 35 (`47091` versus `47092`). Exact next is an
+observation-only layer-0 discriminator at position 113 for normalized,
 q-a, query/head, current key and selected set, with all existing outputs required bitwise unchanged.
 Do not run another full model before that boundary is localized.

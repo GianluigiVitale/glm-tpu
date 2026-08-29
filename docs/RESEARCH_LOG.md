@@ -11403,6 +11403,13 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   position % 256)` yields SHA `35350ca0...8d7a` versus DB518 `3808d502...59d1`. There are exactly
   71 unequal coordinates at 71 positions, all hidden indices 0--63; coordinate-list SHA is
   `72dc17d4...aaf3`. The earliest is position 113 / hidden 35, actual/accepted `47091/47092`.
-- Exact next is to finish/review/seal the immutable rejection recovery, then add observation-only
-  roots at layer-0 position 113. Every prior captured output must remain bitwise equal, preventing
-  the observer from changing fusion. No further full-model launch is authorized first.
+- Reviewed recovery commit `8cf6d07` sealed the immutable rejection without model arithmetic as
+  `greenfield_pp16_feature2_full_width_recovery_20260829T055100992443538Z`. Its 18-object archive,
+  generation-qualified 28-object source manifest, strict comparator, original-terminal binding,
+  DB no-row check and pre/post 8/8 censuses pass. Recovery terminal generation/CRC/SHA are
+  `1787982898735781`, `qGjEoQ==`, `67d08d19...62fb`; ledger/summary/local-auth/source-manifest SHAs
+  are `58e1403e...7f23`, `de25a63b...9777`, `e62646e9...cf70`, `06caca8f...4b90`. Original terminal
+  generation `1787980539108624` is unchanged; no `SUCCESS`/`NUMERICAL_EXACT` or DB row exists.
+- Exact next is observation-only roots at layer-0 position 113. Every prior captured output must
+  remain bitwise equal, preventing the observer from changing fusion. No further full-model launch
+  is authorized first.
