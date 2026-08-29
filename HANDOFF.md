@@ -7384,3 +7384,27 @@ No TPU work is authorized yet. Exact next is a bounded staged-diff hash and corr
 verdict that must explicitly approve both commit/push preparation and one protected numerical
 execution. On approval, commit/push, byte-verify the same-region cron mirror, confirm both global
 locks and 8/8 clean fleet, then run this discriminator exactly once.
+
+## Protected p113 result: current PP16 layer-0 key still uses the rejected association
+
+Sol approved staged SHA `90f0b321...6b9d` for commit/push and one execution. Commit `94d1ea5` was
+pushed and all nine changed files matched the locked `US-CENTRAL2` mirror byte-for-byte. Protected
+tag `greenfield_pp16_feature2_position113_numerical_20260829T085708974224501Z` then executed the
+LP2 main exactly once with zero warmups. All 15 ordinary outputs remained bitwise equal to the
+sealed rejection, all nine observer fields agreed between owners, the observer count was one, and
+pre/post cleanup was 8/8. The 26-entry ledger plus terminal form an exact 28-object archive.
+
+Position 113 normalized BF16 is exact at 0/6,144 mismatches. The following current key differs from
+accepted at 74/128 FP32 values and one BF16 value, hidden 35 (`47091` candidate versus `47092`
+accepted). Its candidate BF16 SHA `ac1cf9e...59bc` is exactly the already-sealed greenfield row and
+not the accepted SHA `a4d52dc2...db87`. This re-establishes the historical DB515--DB518 boundary in
+the active PP16 graph: input normalization is closed, while the causal layer-0 scan still consumes
+the rejected one-row key association. The existing post-scan M64 repair covers layer 1 only and
+cannot retroactively fix layer-0 attention. Compact evidence SHA is `7c551346...9a7e` at
+`docs/artifacts/pp16-feature2-position113-numerical.json`.
+
+This is diagnostic evidence, not numerical exactness, Gate D, DB, tokens or performance. Exact
+next is a CPU/HLO-only integration of the already-protected DB518 physical-M64 projection plus key
+LayerNorm for layer-0 keys before causal consumption. Do not launch another model run until that
+correction preserves the default-off boundary, exact ownership and full HLO contract and receives
+a fresh execution review.

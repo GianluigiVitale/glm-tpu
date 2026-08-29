@@ -11523,3 +11523,26 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   172/172; Ruff/format/Python/Bash/diff checks pass.
 - Numerical execution remains forbidden. Exact next is a new bounded staged diff and
   correction-only Sol verdict explicitly covering commit/push and at most one protected execution.
+
+## 2026-08-29 09:05 UTC — p113 metal result reconnects PP16 to the known DB518 boundary
+
+- Sol approved corrected staged SHA `90f0b321...6b9d` for commit/push and one protected execution.
+  Commit `94d1ea5` was pushed and its nine files matched the locked `US-CENTRAL2` mirror. Tag
+  `greenfield_pp16_feature2_position113_numerical_20260829T085708974224501Z` executed one LP2 main
+  invocation with zero warmups; both fleet censuses are 8/8 clean.
+- All 15 sealed ordinary arrays are byte-identical and all nine observer fields agree across the
+  two owners. Position-113 normalized BF16 is exact. Current key differs from accepted at 74/128
+  FP32 values and one BF16 value, index 35 (`47091/47092`). Candidate BF16 SHA
+  `ac1cf9e...59bc` exactly equals the earlier greenfield row and differs from accepted SHA
+  `a4d52dc2...db87`.
+- The result therefore does not open another arithmetic search. It binds the active PP16 layer-0
+  scan to the already-rejected pre-DB518 association. DB518 already proves exact physical-M64
+  projection and key LayerNorm. Current PP16 repairs the next layer's prompt cache only after each
+  scan chunk; that cannot repair layer-0 keys before layer-0 causal attention consumes them.
+- The archive has 28 exact objects, evidence ledger SHA `d5677329...b1ef`, result SHA
+  `b8c43edc...07e0`, terminal generation/CRC/SHA
+  `1787994098230280` / `+EpLHQ==` / `6cb0aa3b...b6f25`, and no DB/exactness/performance claim.
+  Compact evidence is `docs/artifacts/pp16-feature2-position113-numerical.json`, SHA
+  `7c551346...9a7e`.
+- Exact next is local CPU/HLO integration of DB518 for layer-0 prompt keys before causal
+  consumption, followed by a fresh review. No further model execution is authorized first.

@@ -778,3 +778,10 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
 - `bash -n` does not compile quoted Python heredocs. Extract and compile every production heredoc
   in a permanent test; a wrapper with six embedded programs is only syntactically covered when all
   six are checked.
+- Compare a newly observed boundary against both the accepted oracle and the sealed prior
+  candidate. At p113, the active PP16 key differed from accepted by one BF16 value but was exactly
+  the old greenfield row; this selects the already-proven DB518 correction instead of another
+  arithmetic search.
+- A correct post-scan repair cannot fix a value already consumed inside a causal scan. Prompt keys
+  for the current layer must have the accepted physical association before that layer's attention
+  scores them; repairing only the next layer's cache after the chunk is too late.

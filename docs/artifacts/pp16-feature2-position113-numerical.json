@@ -1,0 +1,88 @@
+{
+  "artifact_kind": "greenfield_pp16_feature2_position113_numerical",
+  "archive": {
+    "bucket_location": "US-CENTRAL2",
+    "evidence_ledger_entry_count": 26,
+    "evidence_ledger_sha256": "d56773294c2aefd240dd4e2c1894ffce065a613cf373d9f3d77d90a077d2b1ef",
+    "remote_object_count": 28,
+    "remote_object_list_sha256": "9547053bb889496d8a7e64fe652c8f7614b3b1cc683d61b11001f9ded5a7c757",
+    "remote_prefix": "gs://driftbench-dsv4-uc/results/greenfield_pp16_feature2_position113_numerical_20260829T085708974224501Z",
+    "terminal_crc32c": "+EpLHQ==",
+    "terminal_file_sha256": "6cb0aa3b24e8b3b2bf3805aee975ce2a7c26a6d636f16dd4402f4b22c17b6f25",
+    "terminal_generation": "1787994098230280",
+    "terminal_marker_self_sha256": "353d81ba57e31a9d4956d9a6eb5afb4eeebf3b0095e15843cabf146cdd048c62"
+  },
+  "classification": {
+    "accepted_current_key_bfloat16_sha256": "a4d52dc2505d4700f1dd178889cf869730f83cd78e93d56d186a7c4937b8db87",
+    "candidate_current_key_bfloat16_sha256": "ac1cf9e058e7fdfd11831bee22920c60b53cc1559ac99f6376f289be084059bc",
+    "candidate_equals_greenfield_current_key_bfloat16": true,
+    "candidate_vs_accepted_current_key_bfloat16_first_mismatch": 35,
+    "candidate_vs_accepted_current_key_bfloat16_mismatch_count": 1,
+    "candidate_vs_accepted_current_key_bfloat16_values": [
+      47091,
+      47092
+    ],
+    "candidate_vs_accepted_current_key_float32_first_mismatch": 2,
+    "candidate_vs_accepted_current_key_float32_mismatch_count": 74,
+    "classification": "FIRST_DIVERGENCE_AFTER_NORMALIZED_AT_OR_BEFORE_CURRENT_KEY",
+    "greenfield_current_key_bfloat16_sha256": "ac1cf9e058e7fdfd11831bee22920c60b53cc1559ac99f6376f289be084059bc",
+    "normalized_bfloat16_mismatch_count": 0,
+    "observer_owner_field_count": 9,
+    "observer_owners_all_bitwise_equal": true,
+    "ordinary_output_field_count": 15,
+    "ordinary_outputs_all_bitwise_equal": true,
+    "position": 113
+  },
+  "claim_scope": "one position-113 diagnostic capture; no exactness, Gate-D, token-rate, database, or performance claim",
+  "cleanup": {
+    "post_census_sha256": "183e9c75f68802b6068899c0237c465dbd94a7d8184355039b2e4ad15009601b",
+    "post_zero_work_hosts": 8,
+    "pre_census_sha256": "6f399533884b6638dd617332d42aa196796bcda46f58b94aa4d51900a83c37b7",
+    "pre_zero_work_hosts": 8
+  },
+  "code_hash": "94d1ea5b6bdfad5e942746deb5e9a53a5a10453a",
+  "database_write_permitted": false,
+  "execution": {
+    "elapsed_seconds_operational_only": 82,
+    "local_parallel_size": 2,
+    "main_execution_count": 1,
+    "observed_position_count_per_owner": 1,
+    "warmup_count": 0
+  },
+  "hlo": {
+    "branch_topology_record_count": 32,
+    "branch_topology_sha256": "05322ce7ad09db5463e17d4a7e31142edaffe128abe5e9d85d5ee81f5e3eb02b",
+    "causal": true,
+    "canonical_byte_count": 6662190,
+    "canonical_optimized_sha256": "5b5dfacf015c579f41661868486e627bb383322fe8fb5c64597c259e85c4a10e",
+    "raw_optimized_sha256": "aef7e393044174cf7de9d702ad34b6e8c8dbb02e1f37d6d1c458731be0ee5a15",
+    "stablehlo_sha256": "bc2fcc77e84217ee0264e3856309f298e61e70ac0f4e3ecebecf72d290c26035",
+    "stripped_stack_frame_references": 14781
+  },
+  "integrity": {
+    "acquisition_authorization_sha256": "3f4a1af2a81096ed36d43e0c3d970df20088a7e19fca8120cfc96e65a53c7a10",
+    "comparison_sha256": "aa1fd5a310a27f3976e3138903f07efd6781e63e33a436a01d9b0e7303dd8fff",
+    "result_npz_sha256": "b8c43edc5a90da7323d3ee3ce7cd3f39d6a683786f9e07ea86401dbbceba07e0",
+    "runner_sha256": "b5ee2affb371156782a3fdf1bfbc50cea6196784b46ef7017a03a96177697585",
+    "source_identity_sha256": "3381fb01ecda2dcdf5ffc97a67a18ce99b80b849148afa45bf155e5bb794feec",
+    "summary_sha256": "2a71c83c17b94b66afd0982847a2cae26e572f985359a1fa94feb7a988ac45cb",
+    "sync_sha256": "bf109f31bf93258f94ad792fbff5889689c44b4d2cb5048e14ef7b9e0993cb58"
+  },
+  "memory": {
+    "after_execute_bytes_limit_per_device": 33014413312,
+    "after_execute_largest_free_block_bytes_per_device": 31208658432,
+    "after_execute_peak_bytes_in_use_per_device": 1321805312,
+    "owner_device_count": 2
+  },
+  "numerical_claim": false,
+  "performance_claim": false,
+  "proposed_next_boundary": "reuse the already-protected DB518 physical-M64 prompt-key association for layer-0 keys before each key is consumed by the causal scan; prove locally and in HLO before any further model execution",
+  "review": {
+    "execution_verdict": "APPROVE ONE PROTECTED EXECUTION",
+    "preparation_verdict": "APPROVE COMMIT/PUSH/PREPARE",
+    "reviewed_staged_diff_sha256": "90f0b321061050bc98c512a0a0a8c546ca040885bb33d84adb55b6f289fc6b9d",
+    "reviewer": "independent Sol agent"
+  },
+  "run_tag": "greenfield_pp16_feature2_position113_numerical_20260829T085708974224501Z",
+  "status": "POSITION113_CAPTURE_CLASSIFIED"
+}

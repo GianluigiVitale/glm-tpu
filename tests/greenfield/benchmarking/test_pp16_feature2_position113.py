@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from hashlib import sha256
 from pathlib import Path
 
 import ml_dtypes
@@ -20,6 +22,14 @@ ORACLE = Path(
     "greenfield_legacy_layer0_prompt_projection_input_p113_"
     "20260809T050055956585082Z/prompt_projection_input_comparison/"
     "prompt_key_internal_comparison.npz"
+)
+PROTECTED_RUN = Path(
+    "/home/gianl/glm-run/"
+    "greenfield_pp16_feature2_position113_numerical_"
+    "20260829T085708974224501Z"
+)
+COMPACT_ARTIFACT = Path(__file__).parents[3] / (
+    "docs/artifacts/pp16-feature2-position113-numerical.json"
 )
 
 
@@ -97,6 +107,85 @@ def test_position113_classifier_preserves_baseline_and_limits_claim(
     assert report["accepted_oracle_scope"]["q_a_query_head_selected_set"] is False
     assert all(report["ordinary_output_bitwise_equal"].values())
     assert all(report["observer_owner_bitwise_equal"].values())
+
+
+@pytest.mark.skipif(
+    not all(
+        path.is_file()
+        for path in (
+            PROTECTED_RUN / "result.npz",
+            PROTECTED_RUN / "comparison.json",
+            PROTECTED_RUN / "summary.json",
+            PROTECTED_RUN / "POSITION113_CAPTURE_CLASSIFIED",
+            BASELINE,
+            ORACLE,
+            COMPACT_ARTIFACT,
+        )
+    ),
+    reason="protected position-113 result is unavailable",
+)
+def test_position113_compact_artifact_matches_protected_result() -> None:
+    artifact = json.loads(COMPACT_ARTIFACT.read_text())
+    result = PROTECTED_RUN / "result.npz"
+    comparison_path = PROTECTED_RUN / "comparison.json"
+    summary_path = PROTECTED_RUN / "summary.json"
+    terminal_path = PROTECTED_RUN / "POSITION113_CAPTURE_CLASSIFIED"
+    report = compare_feature2_position113_capture(
+        result,
+        sealed_rejection_path=BASELINE,
+        accepted_prompt_key_path=ORACLE,
+    )
+    comparison = json.loads(comparison_path.read_text())
+    summary = json.loads(summary_path.read_text())
+    terminal = json.loads(terminal_path.read_text())
+    assert report == comparison
+    assert artifact["status"] == report["status"]
+    assert artifact["code_hash"] == summary["code_hash"]
+    assert artifact["classification"]["classification"] == report["classification"]
+    assert artifact["classification"]["ordinary_outputs_all_bitwise_equal"] is all(
+        report["ordinary_output_bitwise_equal"].values()
+    )
+    assert artifact["classification"]["observer_owners_all_bitwise_equal"] is all(
+        report["observer_owner_bitwise_equal"].values()
+    )
+    assert artifact["integrity"] == {
+        **artifact["integrity"],
+        "comparison_sha256": sha256(comparison_path.read_bytes()).hexdigest(),
+        "result_npz_sha256": sha256(result.read_bytes()).hexdigest(),
+        "summary_sha256": sha256(summary_path.read_bytes()).hexdigest(),
+    }
+    assert (
+        artifact["archive"]["terminal_file_sha256"]
+        == sha256(terminal_path.read_bytes()).hexdigest()
+    )
+    assert (
+        artifact["archive"]["terminal_marker_self_sha256"]
+        == terminal["marker_self_sha256"]
+    )
+    with (
+        np.load(result, allow_pickle=False) as capture,
+        np.load(ORACLE, allow_pickle=False) as oracle,
+    ):
+        candidate = np.ascontiguousarray(
+            capture["position113_current_key_owners"][0, 0].astype(ml_dtypes.bfloat16)
+        ).view(np.uint16)
+        accepted = np.ascontiguousarray(oracle["accepted_cache_row_bfloat16_bits"])
+        greenfield = np.ascontiguousarray(oracle["greenfield_cache_row_bfloat16_bits"])
+    assert artifact["classification"]["candidate_current_key_bfloat16_sha256"] == (
+        sha256(candidate.tobytes()).hexdigest()
+    )
+    assert artifact["classification"]["accepted_current_key_bfloat16_sha256"] == (
+        sha256(accepted.tobytes()).hexdigest()
+    )
+    assert artifact["classification"]["greenfield_current_key_bfloat16_sha256"] == (
+        sha256(greenfield.tobytes()).hexdigest()
+    )
+    assert np.array_equal(candidate, greenfield)
+    mismatches = np.flatnonzero(candidate != accepted)
+    assert mismatches.tolist() == [35]
+    assert artifact["classification"][
+        "candidate_vs_accepted_current_key_bfloat16_values"
+    ] == [int(candidate[35]), int(accepted[35])]
 
 
 @pytest.mark.skipif(

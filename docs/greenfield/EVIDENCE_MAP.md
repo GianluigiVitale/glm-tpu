@@ -1432,3 +1432,13 @@ of the TPU interval and each NPZ is parsed from the exact byte buffer that produ
 first Sol numerical review blocked the prior hash-then-reopen implementation; hostile replacement
 tests now cover both sources. It needs a correction-only execution verdict before commit/push or
 TPU use.
+
+Protected tag `greenfield_pp16_feature2_position113_numerical_20260829T085708974224501Z` at
+`94d1ea5` closes that discriminator. The one zero-warmup LP2 invocation retained all 15 ordinary
+arrays and all nine cross-owner observer equalities. Normalized BF16 is exact; current key differs
+from accepted at 74 FP32 values and one BF16 value, hidden 35 (`47091/47092`). Candidate BF16 SHA
+`ac1cf9e...59bc` exactly equals the sealed greenfield row, while accepted is
+`a4d52dc2...db87`. The 28-object same-region archive, 8/8 pre/post cleanup and terminal generation/
+CRC pass. Compact artifact `docs/artifacts/pp16-feature2-position113-numerical.json` has SHA
+`7c551346...9a7e`. This is diagnostic only. It selects integration of the already-proven DB518
+physical-M64 key association before layer-0 causal consumption; it does not close Gate D.
