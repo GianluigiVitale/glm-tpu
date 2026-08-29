@@ -27,7 +27,12 @@ readonly DB529_INTERNAL_TENSOR_SHA=c2fdeccfdcc81363fe01a566c34bf6c04f2f44b0a18e7
 readonly FEATURE2_GRAPH_SHA=ab5be45aecf3b0b5d87ad76af8076bc9351823529a08c0eadb414b072b31cb2d
 readonly DB550_BOUNDARY=/home/gianl/gcs-models/results/greenfield_layer0_dense_partial_capture_20260813T200736889447458Z/dense_partial_capture.npz
 readonly ACQUIRED_MAIN_STABLE_SHA=127bf089f93bc9dd4f1b85576e8e70267a752d2be90dee74525322b5148a955e
-readonly ACQUIRED_MAIN_OPTIMIZED_SHA=c476e17ad247dea64b9860b0f386cf48b58c123301a5d42e6b66ec1f069c8f01
+readonly ACQUIRED_MAIN_CANONICAL_SHA=fb5aaf025005f3fbb5a3c66e6a719ec3a78fb86d344afcf6288e6e93720310f7
+readonly ACQUIRED_MAIN_CANONICAL_BYTES=7870521
+readonly ACQUIRED_MAIN_STACK_FRAME_REFERENCES=16170
+readonly ACQUIRED_JAX_VERSION=0.10.1
+readonly ACQUIRED_JAXLIB_VERSION=0.10.1
+readonly ACQUIRED_LIBTPU_VERSION=0.0.41
 
 [[ ${GLM_GREENFIELD_PP16_FEATURE2_NUMERICAL:-0} == 1 ]] || {
   echo "PP16 feature2 numerical discriminator is default-off" >&2
@@ -390,7 +395,12 @@ started=$(date +%s)
       --layer1-internal-reference "$LAYER1_INTERNAL_REFERENCE" \
       --db529-internal-dir "$DB529_INTERNAL_DIR" \
       --expected-main-stablehlo-sha256 "$ACQUIRED_MAIN_STABLE_SHA" \
-      --expected-main-optimized-hlo-sha256 "$ACQUIRED_MAIN_OPTIMIZED_SHA" \
+      --expected-main-canonical-hlo-sha256 "$ACQUIRED_MAIN_CANONICAL_SHA" \
+      --expected-main-canonical-hlo-byte-count "$ACQUIRED_MAIN_CANONICAL_BYTES" \
+      --expected-main-stack-frame-reference-count "$ACQUIRED_MAIN_STACK_FRAME_REFERENCES" \
+      --expected-jax-version "$ACQUIRED_JAX_VERSION" \
+      --expected-jaxlib-version "$ACQUIRED_JAXLIB_VERSION" \
+      --expected-libtpu-version "$ACQUIRED_LIBTPU_VERSION" \
       --output "$RUN_DIR/runner.json" --hlo-dir "$RUN_DIR/hlo" \
       --result-npz "$RUN_DIR/result.npz"
 ) >"$RUN_DIR/runner.log" 2>&1
@@ -408,7 +418,9 @@ PYTHONPATH="$WORKTREE" JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$TAG" "$REMOTE_PREFIX" "$elapsed" \
   "$TOKEN_ORACLE_DIR" "$DSA_ORACLE_DIR" "$LAYER1_INTERNAL_REFERENCE" \
   "$DB529_INTERNAL_DIR" "$DB550_BOUNDARY" \
-  "$ACQUIRED_MAIN_STABLE_SHA" "$ACQUIRED_MAIN_OPTIMIZED_SHA" <<'PY'
+  "$ACQUIRED_MAIN_STABLE_SHA" "$ACQUIRED_MAIN_CANONICAL_SHA" \
+  "$ACQUIRED_MAIN_CANONICAL_BYTES" "$ACQUIRED_MAIN_STACK_FRAME_REFERENCES" \
+  "$ACQUIRED_JAX_VERSION" "$ACQUIRED_JAXLIB_VERSION" "$ACQUIRED_LIBTPU_VERSION" <<'PY'
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -418,7 +430,9 @@ from glm_tpu.greenfield.benchmarking.pp16_feature2_numerical import compare_feat
 
 run=Path(sys.argv[1]); pin,tag,remote,elapsed=sys.argv[2:6]
 token,dsa,layer1,db529,db550=map(Path,sys.argv[6:11])
-stable_pin,optimized_pin=sys.argv[11:13]
+stable_pin,canonical_pin=sys.argv[11:13]
+canonical_bytes,stack_frame_references=map(int,sys.argv[13:15])
+expected_runtime_pins=dict(zip(('jax','jaxlib','libtpu'),sys.argv[15:18],strict=True))
 runner=json.loads((run/'runner.json').read_text())
 source=json.loads((run/'source_identity.json').read_text())
 if runner.get('status')!='NUMERICAL_CAPTURED' or runner.get('code_hash')!=pin or runner.get('compile_only') is not False or runner.get('main_executed') is not True or runner.get('main_execution_count')!=1 or runner.get('numerical_claim') is not False or runner.get('performance_claim') is not False:
@@ -427,6 +441,9 @@ if runner.get('graph_sha256')!=source.get('graph_sha256') or runner.get('event1_
     raise SystemExit('feature2 numerical source lineage drifted')
 if runner.get('physical_group')!={'coordinates':[[0,0,0],[1,0,0]],'device_ids':[0,1],'local_device_count_visible':4,'mesh_device_count':2}:
     raise SystemExit('feature2 physical LP2 group drifted')
+runtime_pins=runner.get('runtime_pins',{})
+if {name:runtime_pins.get(name) for name in expected_runtime_pins}!=expected_runtime_pins or runtime_pins.get('backend_platform')!='tpu' or runtime_pins.get('device_kind')!='TPU v4' or not isinstance(runtime_pins.get('platform_version'),str) or not runtime_pins['platform_version']:
+    raise SystemExit('feature2 compiler/runtime package pins drifted')
 expected_graphs={'feature2_main','query_fp32','wk_decode_bf16','wk_promote_fp32'}
 if set(runner.get('hlo',{}))!=expected_graphs:
     raise SystemExit('feature2 HLO graph set drifted')
@@ -443,8 +460,12 @@ for name,record in runner['hlo'].items():
     elif record.get('contract',{}).get('passed') is not True:
         raise SystemExit(f'feature2 materializer {name} contract failed')
 main=runner['hlo']['feature2_main']
-if main['stablehlo']['sha256']!=stable_pin or main['optimized_hlo']['sha256']!=optimized_pin:
+canonical=main.get('execution_canonical_hlo',{})
+if main['stablehlo']['sha256']!=stable_pin or canonical.get('sha256')!=canonical_pin or canonical.get('byte_count')!=canonical_bytes or canonical.get('stripped_stack_frame_references')!=stack_frame_references or canonical.get('canonicalizer_version')!=1 or canonical.get('canonicalizer_code_hash')!=pin:
     raise SystemExit('feature2 numerical executable HLO drifted from acquired graph')
+canonical_path=run/'hlo'/canonical.get('filename','')
+if canonical_path.parent!=run/'hlo' or canonical_path.name!='feature2_main.execution_canonical_hlo.txt' or not canonical_path.is_file() or canonical_path.stat().st_size!=canonical_bytes or sha256(canonical_path.read_bytes()).hexdigest()!=canonical_pin:
+    raise SystemExit('feature2 canonical executable artifact identity drifted')
 state=runner.get('state_manifest',{})
 if state.get('plan_id')!='PP16_LP2' or state.get('owner_device_ids')!=[0,1] or state.get('selected_read_count')!=78 or state.get('raw_dense_device_materialization') is not False or state.get('dense_final_layout') is not True:
     raise SystemExit('feature2 selective state contract drifted')
@@ -467,7 +488,7 @@ comparison=compare_feature2_numerical_capture(run/'result.npz',token_oracle_dir=
 if sha256((run/'result.npz').read_bytes()).hexdigest()!=comparison['capture_sha256']:
     raise SystemExit('feature2 numerical capture changed before sealing')
 (run/'comparison.json').write_text(json.dumps(comparison,allow_nan=False,indent=2,sort_keys=True)+'\n')
-summary={'artifact_kind':'greenfield_pp16_feature2_numerical_summary','claim_scope':comparison['claim_scope'],'code_hash':pin,'elapsed_seconds_operational_only':int(elapsed),'exact':comparison['exact'],'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_execution_count':1,'measured_memory':memory,'mismatch_counts':comparison['mismatch_counts'],'numerical_claim':comparison['exact'],'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'status':comparison['status']}
+summary={'artifact_kind':'greenfield_pp16_feature2_numerical_summary','claim_scope':comparison['claim_scope'],'code_hash':pin,'elapsed_seconds_operational_only':int(elapsed),'exact':comparison['exact'],'graph_sha256':runner['graph_sha256'],'hlo_sha256':{name:{kind:record[kind]['sha256'] for kind in ('stablehlo','optimized_hlo')} for name,record in runner['hlo'].items()},'main_canonical_hlo':canonical,'main_execution_count':1,'measured_memory':memory,'mismatch_counts':comparison['mismatch_counts'],'numerical_claim':comparison['exact'],'performance_claim':False,'remote_prefix':remote,'run_tag':tag,'runtime_pins':runtime_pins,'status':comparison['status']}
 (run/'summary.json').write_text(json.dumps(summary,allow_nan=False,indent=2,sort_keys=True)+'\n')
 PY
 

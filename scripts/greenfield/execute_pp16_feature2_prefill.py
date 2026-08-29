@@ -18,7 +18,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--layer1-internal-reference", type=Path, required=True)
     parser.add_argument("--db529-internal-dir", type=Path, required=True)
     parser.add_argument("--expected-main-stablehlo-sha256", required=True)
-    parser.add_argument("--expected-main-optimized-hlo-sha256", required=True)
+    parser.add_argument("--expected-main-canonical-hlo-sha256", required=True)
+    parser.add_argument(
+        "--expected-main-canonical-hlo-byte-count", type=int, required=True
+    )
+    parser.add_argument(
+        "--expected-main-stack-frame-reference-count", type=int, required=True
+    )
+    parser.add_argument("--expected-jax-version", required=True)
+    parser.add_argument("--expected-jaxlib-version", required=True)
+    parser.add_argument("--expected-libtpu-version", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--hlo-dir", type=Path, required=True)
     parser.add_argument("--result-npz", type=Path, required=True)

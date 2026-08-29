@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 import subprocess
 import sys
-
+from pathlib import Path
 
 RUNNER = Path("scripts/greenfield/acquire_pp16_feature2_prefill.py")
 
@@ -19,16 +18,35 @@ def _calls(source: str, name: str) -> int:
     )
 
 
-def test_feature2_acquisition_runner_compiles_but_never_executes_main() -> None:
+def test_feature2_acquisition_entrypoint_compiles_but_never_executes_main() -> None:
     source = RUNNER.read_text()
-    assert _calls(source, "main_compiled") == 0
+    tree = ast.parse(source)
+    parents = {
+        child: parent
+        for parent in ast.walk(tree)
+        for child in ast.iter_child_nodes(parent)
+    }
+    main_call = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "main_compiled"
+    )
+    ancestor = parents[main_call]
+    while not isinstance(ancestor, ast.If):
+        ancestor = parents[ancestor]
+    assert isinstance(ancestor.test, ast.Name)
+    assert ancestor.test.id == "execute_main"
+    assert _calls(source, "main_compiled") == 1
     assert _calls(source, "query_compiled") == 1
     assert _calls(source, "wk_decode_compiled") == 1
     assert _calls(source, "wk_promote_compiled") == 1
-    assert '"main_executed": False' in source
+    assert "return run_feature2(parse_args(), execute_main=False)" in source
+    assert '"main_executed": execute_main' in source
     assert '"numerical_claim": False' in source
     assert '"performance_claim": False' in source
-    assert '"status": "HLO_ACQUIRED"' in source
+    assert '"NUMERICAL_CAPTURED" if execute_main else "HLO_ACQUIRED"' in source
 
 
 def test_feature2_acquisition_runner_requires_all_fail_closed_contracts() -> None:
@@ -56,11 +74,7 @@ def test_feature2_acquisition_persists_stablehlo_before_compile() -> None:
         for node in tree.body
         if isinstance(node, ast.FunctionDef) and node.name == "_compile"
     )
-    calls = [
-        node
-        for node in ast.walk(compile_function)
-        if isinstance(node, ast.Call)
-    ]
+    calls = [node for node in ast.walk(compile_function) if isinstance(node, ast.Call)]
     atomic_line = min(
         node.lineno
         for node in calls
@@ -72,11 +86,32 @@ def test_feature2_acquisition_persists_stablehlo_before_compile() -> None:
         if isinstance(node.func, ast.Attribute) and node.func.attr == "compile"
     )
     assert atomic_line < compile_line
-    main_atomic = source.index(
-        '_atomic_text(\n            args.hlo_dir / "feature2_main.stablehlo.mlir"'
+    run_function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "run_feature2"
     )
-    main_validate = source.index("validate_feature2_main_stablehlo(main_stablehlo)")
-    main_compile = source.index("main_lowered.compile()")
+    run_calls = [node for node in ast.walk(run_function) if isinstance(node, ast.Call)]
+    main_atomic = next(
+        node.lineno
+        for node in run_calls
+        if isinstance(node.func, ast.Name)
+        and node.func.id == "_atomic_text"
+        and "feature2_main.stablehlo.mlir" in ast.unparse(node)
+    )
+    main_validate = next(
+        node.lineno
+        for node in run_calls
+        if isinstance(node.func, ast.Name)
+        and node.func.id == "validate_feature2_main_stablehlo"
+    )
+    main_compile = next(
+        node.lineno
+        for node in run_calls
+        if isinstance(node.func, ast.Attribute)
+        and node.func.attr == "compile"
+        and ast.unparse(node.func.value) == "main_lowered"
+    )
     assert main_atomic < main_validate < main_compile
 
 
@@ -90,7 +125,7 @@ def test_feature2_acquisition_runner_cli_is_compile_only() -> None:
     assert completed.returncode == 0, completed.stderr
     assert "--compile-only" in completed.stdout
     source = RUNNER.read_text()
-    assert 'choices=(1,)' in source
+    assert "choices=(1,)" in source
 
 
 def test_feature2_acquisition_runner_is_syntax_valid() -> None:

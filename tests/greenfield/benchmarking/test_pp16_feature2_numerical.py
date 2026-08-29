@@ -55,14 +55,19 @@ def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
     assert "return run_feature2(parse_args(), execute_main=False)" in shared
     assert "return run_feature2(parse_args(), execute_main=True)" in numerical
     assert shared.count("main_compiled(*main_arguments)") == 1
-    assert shared.index("feature2 executable HLO drifted") < shared.index(
+    assert shared.index("feature2 executable canonical HLO drifted") < shared.index(
         "main_compiled(*main_arguments)"
     )
     assert shared.index("_validate_preexecution_memory(memory_after_compile)") < (
         shared.index("main_compiled(*main_arguments)")
     )
     assert "--expected-main-stablehlo-sha256" in numerical
-    assert "--expected-main-optimized-hlo-sha256" in numerical
+    assert "--expected-main-canonical-hlo-sha256" in numerical
+    assert "--expected-main-canonical-hlo-byte-count" in numerical
+    assert "--expected-main-stack-frame-reference-count" in numerical
+    assert "--expected-jax-version" in numerical
+    assert "--expected-jaxlib-version" in numerical
+    assert "--expected-libtpu-version" in numerical
     assert "warmup" not in numerical.lower()
 
     wrapper = (
@@ -73,7 +78,12 @@ def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
     assert "warmups=0 invocations=1" in wrapper
     assert '--result-npz "$RUN_DIR/result.npz"' in wrapper
     assert "ACQUIRED_MAIN_STABLE_SHA=127bf089" in wrapper
-    assert "ACQUIRED_MAIN_OPTIMIZED_SHA=c476e17a" in wrapper
+    assert "ACQUIRED_MAIN_CANONICAL_SHA=fb5aaf02" in wrapper
+    assert "ACQUIRED_MAIN_CANONICAL_BYTES=7870521" in wrapper
+    assert "ACQUIRED_MAIN_STACK_FRAME_REFERENCES=16170" in wrapper
+    assert "ACQUIRED_JAX_VERSION=0.10.1" in wrapper
+    assert "ACQUIRED_JAXLIB_VERSION=0.10.1" in wrapper
+    assert "ACQUIRED_LIBTPU_VERSION=0.0.41" in wrapper
     assert "bench/results.db" not in wrapper
     assert "gsutil" not in wrapper
     assert "upload_ledger_no_clobber" in wrapper

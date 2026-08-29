@@ -5,17 +5,17 @@ from __future__ import annotations
 
 import argparse
 import gc
-from hashlib import sha256
 import json
 import os
-from pathlib import Path
 import subprocess
-import sys
 import time
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from hashlib import sha256
+from importlib.metadata import version
+from pathlib import Path
+from typing import Any
 
 import numpy as np
-
 
 REPO = Path(__file__).resolve().parents[2]
 EXPECTED_REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
@@ -106,6 +106,22 @@ def _validate_preexecution_memory(records: Sequence[dict[str, int] | None]) -> N
             raise RuntimeError("feature2 pre-execution HBM margin is insufficient")
 
 
+def _runtime_pins(jax: Any, devices: Sequence[Any]) -> dict[str, str]:
+    """Record the exact compiler/runtime package and TPU backend identities."""
+
+    platform_version = getattr(devices[0].client, "platform_version", None)
+    return {
+        "backend_platform": str(jax.default_backend()),
+        "device_kind": str(devices[0].device_kind),
+        "jax": version("jax"),
+        "jaxlib": version("jaxlib"),
+        "libtpu": version("libtpu"),
+        "platform_version": (
+            str(platform_version) if platform_version is not None else "UNAVAILABLE"
+        ),
+    }
+
+
 def _record_hlo(
     hlo_dir: Path,
     name: str,
@@ -118,17 +134,21 @@ def _record_hlo(
     optimized_path = hlo_dir / f"{name}.optimized_hlo.txt"
     _atomic_text(stable_path, stablehlo)
     _atomic_text(optimized_path, optimized_hlo)
-    return stablehlo, optimized_hlo, {
-        "memory_analysis": _memory_analysis(compiled),
-        "optimized_hlo": {
-            "filename": optimized_path.name,
-            "sha256": sha256(optimized_hlo.encode()).hexdigest(),
+    return (
+        stablehlo,
+        optimized_hlo,
+        {
+            "memory_analysis": _memory_analysis(compiled),
+            "optimized_hlo": {
+                "filename": optimized_path.name,
+                "sha256": sha256(optimized_hlo.encode()).hexdigest(),
+            },
+            "stablehlo": {
+                "filename": stable_path.name,
+                "sha256": sha256(stablehlo.encode()).hexdigest(),
+            },
         },
-        "stablehlo": {
-            "filename": stable_path.name,
-            "sha256": sha256(stablehlo.encode()).hexdigest(),
-        },
-    }
+    )
 
 
 def _compile(
@@ -146,9 +166,7 @@ def _compile(
     started = time.monotonic()
     compiled = lowered.compile()
     compile_seconds = time.monotonic() - started
-    stablehlo, optimized_hlo, record = _record_hlo(
-        hlo_dir, name, lowered, compiled
-    )
+    stablehlo, optimized_hlo, record = _record_hlo(hlo_dir, name, lowered, compiled)
     record.update(
         {
             "compile_seconds": compile_seconds,
@@ -210,10 +228,11 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
     selective_plan = inspect_feature2_selective_plan(args.runtime_root)
 
     import jax
-    import jax.numpy as jnp
-    from jax.sharding import NamedSharding, PartitionSpec as P
+    from jax.sharding import NamedSharding
+    from jax.sharding import PartitionSpec as P
 
     from glm_tpu.greenfield.benchmarking.pp16_feature2_hlo import (
+        canonicalize_feature2_optimized_hlo,
         validate_feature2_main_optimized_hlo,
         validate_feature2_main_stablehlo,
         validate_feature2_materializer_optimized_hlo,
@@ -251,6 +270,21 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             "feature2 acquisition lost exact adjacent devices 0,1: "
             f"ids={[device.id for device in devices]} coords={coordinates}"
         )
+    runtime_pins = _runtime_pins(jax, devices)
+    if execute_main:
+        expected_runtime_pins = {
+            "jax": getattr(args, "expected_jax_version", None),
+            "jaxlib": getattr(args, "expected_jaxlib_version", None),
+            "libtpu": getattr(args, "expected_libtpu_version", None),
+        }
+        observed_runtime_pins = {
+            name: runtime_pins[name] for name in expected_runtime_pins
+        }
+        if observed_runtime_pins != expected_runtime_pins:
+            raise RuntimeError(
+                "feature2 compiler/runtime package pins drifted: "
+                f"expected={expected_runtime_pins} observed={observed_runtime_pins}"
+            )
     args.hlo_dir.mkdir(parents=True, exist_ok=True)
     memory_before_load = [_memory_stats(device) for device in devices]
 
@@ -266,8 +300,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
     )
     if graph.graph_sha256 != FEATURE2_GRAPH_SHA256:
         raise RuntimeError(
-            "feature2 executable graph identity drifted: "
-            f"{graph.graph_sha256}"
+            f"feature2 executable graph identity drifted: {graph.graph_sha256}"
         )
     runtime_host = load_feature2_prefill_runtime_inputs(args.token_oracle_dir)
 
@@ -319,10 +352,8 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             name="wk_decode_bf16",
         )
         compiled_graphs.append(wk_decode_compiled)
-        wk_decode_record["contract"] = (
-            validate_feature2_materializer_optimized_hlo(
-                wk_decode_hlo, phase="wk_decode_bf16"
-            )
+        wk_decode_record["contract"] = validate_feature2_materializer_optimized_hlo(
+            wk_decode_hlo, phase="wk_decode_bf16"
         )
         wk_bf16 = wk_decode_compiled(*wk_arguments)
         jax.block_until_ready(wk_bf16)
@@ -335,10 +366,8 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
             name="wk_promote_fp32",
         )
         compiled_graphs.append(wk_promote_compiled)
-        wk_promote_record["contract"] = (
-            validate_feature2_materializer_optimized_hlo(
-                wk_promote_hlo, phase="wk_promote_fp32"
-            )
+        wk_promote_record["contract"] = validate_feature2_materializer_optimized_hlo(
+            wk_promote_hlo, phase="wk_promote_fp32"
         )
         wk_fp32 = wk_promote_compiled(*wk_bf16)
         jax.block_until_ready(wk_fp32)
@@ -370,9 +399,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
         main_lowered = main_jit.lower(*main_arguments)
         main_lowering_seconds = time.monotonic() - lowering_started
         main_stablehlo = main_lowered.as_text()
-        _atomic_text(
-            args.hlo_dir / "feature2_main.stablehlo.mlir", main_stablehlo
-        )
+        _atomic_text(args.hlo_dir / "feature2_main.stablehlo.mlir", main_stablehlo)
         main_stable_contract = validate_feature2_main_stablehlo(main_stablehlo)
         compile_started = time.monotonic()
         main_compiled = main_lowered.compile()
@@ -386,27 +413,44 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
                 "compile_seconds": main_compile_seconds,
                 "jaxpr_contract": jaxpr_contract,
                 "lowering_seconds": main_lowering_seconds,
-                "optimized_contract": validate_feature2_main_optimized_hlo(
-                    main_hlo
-                ),
+                "optimized_contract": validate_feature2_main_optimized_hlo(main_hlo),
                 "stablehlo_contract": main_stable_contract,
                 "terminal_contract": terminal_contract,
             }
         )
+        canonical_hlo, canonical_record = canonicalize_feature2_optimized_hlo(main_hlo)
+        canonical_path = args.hlo_dir / "feature2_main.execution_canonical_hlo.txt"
+        _atomic_text(canonical_path, canonical_hlo)
+        canonical_record.update(
+            {
+                "canonicalizer_code_hash": code_hash,
+                "filename": canonical_path.name,
+            }
+        )
+        main_record["execution_canonical_hlo"] = canonical_record
         memory_after_compile = [_memory_stats(device) for device in devices]
         main_execution_seconds = None
         memory_after_execute = None
         if execute_main:
             expected_stablehlo = getattr(args, "expected_main_stablehlo_sha256", None)
-            expected_optimized = getattr(
-                args, "expected_main_optimized_hlo_sha256", None
+            expected_canonical = getattr(
+                args, "expected_main_canonical_hlo_sha256", None
+            )
+            expected_canonical_bytes = getattr(
+                args, "expected_main_canonical_hlo_byte_count", None
+            )
+            expected_stack_frames = getattr(
+                args, "expected_main_stack_frame_reference_count", None
             )
             if (
                 main_record["stablehlo"]["sha256"] != expected_stablehlo
-                or main_record["optimized_hlo"]["sha256"] != expected_optimized
+                or canonical_record["sha256"] != expected_canonical
+                or canonical_record["byte_count"] != expected_canonical_bytes
+                or canonical_record["stripped_stack_frame_references"]
+                != expected_stack_frames
             ):
                 raise RuntimeError(
-                    "feature2 executable HLO drifted from the acquired graph"
+                    "feature2 executable canonical HLO drifted from the acquired graph"
                 )
             _validate_preexecution_memory(memory_after_compile)
             execution_started = time.monotonic()
@@ -466,6 +510,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
                 "local_device_count_visible": jax.local_device_count(),
                 "mesh_device_count": 2,
             },
+            "runtime_pins": runtime_pins,
             "selective_load": loaded.load_record,
             "selective_plan": selective_plan,
             "state_manifest": loaded.state_manifest,
@@ -486,9 +531,7 @@ def run_feature2(args: argparse.Namespace, *, execute_main: bool) -> int:
 
     if output is None:
         raise RuntimeError("feature2 protected runner produced no record")
-    output["memory"]["after_cleanup"] = [
-        _memory_stats(device) for device in devices
-    ]
+    output["memory"]["after_cleanup"] = [_memory_stats(device) for device in devices]
     _atomic_json(args.output, output)
     print(json.dumps(output, allow_nan=False, sort_keys=True))
     return 0
