@@ -26,6 +26,11 @@ from glm_tpu.greenfield.benchmarking.pp16_feature2_numerical import (
     compare_feature2_numerical_capture,
     validate_feature2_in_process_cleanup,
 )
+from glm_tpu.greenfield.benchmarking.pp16_feature2_recovery import (
+    _arrays_bitwise_equal,
+    _metadata_crc32c,
+    authenticate_feature2_full_width_rejection,
+)
 from glm_tpu.greenfield.errors import BenchmarkValidationError
 from glm_tpu.greenfield.kernels.stage_local import (
     STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE,
@@ -62,6 +67,10 @@ PROTECTED_CAPTURE = Path(
 ACQUIRED_RUN = Path(
     "/home/gianl/glm-run/"
     "greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z"
+)
+FULL_WIDTH_RECOVERY_SOURCE = Path(
+    "/home/gianl/glm-run/"
+    "greenfield_pp16_feature2_prefill_numerical_20260829T051119686986506Z"
 )
 SOURCES_AVAILABLE = all(
     path.exists() for path in (TOKEN_ORACLE, DSA_ORACLE, LAYER1, DB529, DB550)
@@ -141,6 +150,11 @@ def test_compile_and_numerical_entrypoints_are_fail_closed() -> None:
     assert '>"$RUN_DIR/terminal_create.stdout"' in wrapper[create:]
     assert 'sync -f "$RUN_DIR/terminal_create.receipt.stderr"' in wrapper[create:]
     assert "[[ -n $terminal_remote_name && -s $receipt ]] || return 1" in wrapper
+    assert 'for key in ("crc32c_hash", "crc32c")' in wrapper
+    assert "not crc_values" in wrapper
+    assert "len(set(crc_values)) != 1" in wrapper
+    assert 'record["crc32c_hash"]' not in wrapper
+    assert 'after["crc32c_hash"]' not in wrapper
     assert 'gcloud storage cp --no-clobber "$terminal_path"' not in wrapper
 
 
@@ -376,6 +390,192 @@ def test_feature2_cleanup_accepts_only_bounded_generated_code_residency() -> Non
             ],
             generated_code_size_bytes=64_264_704,
         )
+
+
+def test_full_width_recovery_is_default_off_cpu_only_and_compilable() -> None:
+    recovery = Path(__file__).parents[3] / (
+        "scripts/greenfield/recover_pp16_feature2_full_width_rejection.sh"
+    )
+    text = recovery.read_text()
+    completed = subprocess.run(
+        ["bash", str(recovery)],
+        env={
+            "GLM_GREENFIELD_PP16_FEATURE2_FULL_WIDTH_RECOVER": "0",
+            "PATH": os.environ["PATH"],
+        },
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    assert completed.returncode == 2
+    assert "default-off" in completed.stderr
+    assert "JAX_PLATFORMS=cpu" in text
+    assert "TPU_VISIBLE_DEVICES" not in text
+    assert "execute_pp16_feature2_prefill.py" not in text
+    assert "source_untouched=true" in text
+    assert "1787980539108624" in text
+    assert "len(expected) != 28" in text
+    assert text.count('for key in ("crc32c_hash", "crc32c")') == 3
+    assert text.count("not crc_values") == 3
+    assert text.count("len(set(crc_values)) != 1") == 3
+    assert "not crc_values or len(set(crc_values)) != 1" in text
+    assert "authenticate_feature2_full_width_rejection" in text
+    assert "--if-generation-match=0" in text
+    assert "gcloud compute tpus tpu-vm create" not in text
+    programs = re.findall(r"<<'PY'\n(.*?)\nPY\n", text, flags=re.DOTALL)
+    assert len(programs) == 6
+    for index, program in enumerate(programs):
+        compile(program, f"<pp16-feature2-full-width-recovery-{index}>", "exec")
+
+
+@pytest.mark.skipif(
+    not SOURCES_AVAILABLE or not FULL_WIDTH_RECOVERY_SOURCE.is_dir(),
+    reason="protected full-width feature2 rejection unavailable",
+)
+def test_full_width_recovery_recomputes_the_sealed_rejection() -> None:
+    record = authenticate_feature2_full_width_rejection(
+        FULL_WIDTH_RECOVERY_SOURCE,
+        source_remote=(
+            "gs://driftbench-dsv4-uc/results/"
+            "greenfield_pp16_feature2_prefill_numerical_"
+            "20260829T051119686986506Z"
+        ),
+        token_oracle_dir=TOKEN_ORACLE,
+        dsa_oracle_dir=DSA_ORACLE,
+        layer1_internal_reference=LAYER1,
+        db529_internal_dir=DB529,
+        db550_boundary=DB550,
+        half_width_capture=PROTECTED_CAPTURE,
+        db518_prompt_cache_dir=(DB529.parent / "prompt_cache"),
+        results_db=Path("/home/gianl/glm-tpu/bench/results.db"),
+        recovery_tag=(
+            "greenfield_pp16_feature2_full_width_recovery_20260829T000000000000000Z"
+        ),
+    )
+    assert record["status"] == "NUMERICAL_REJECTED"
+    assert record["comparison"]["exact"] is False
+    assert record["normalized_hidden_localization"] == {
+        "actual_bits_per_owner": [48422, 48422],
+        "expected_bits": 48423,
+        "hidden_index": 2795,
+        "mismatches_per_owner": [1, 1],
+        "owners_bitwise_equal": True,
+    }
+    assert record["terminal"]["generation"] == "1787980539108624"
+    assert record["terminal"]["crc32c"] == "jCuZbg=="
+    assert len(record["ledger_entries"]) == 26
+    assert record["full_width_vs_half_width"]["bitwise_equal"] is True
+    assert record["full_width_vs_half_width"]["common_array_count"] == 11
+    assert record["db518_cache_localization"] == {
+        "accepted_cache_sha256": (
+            "3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1"
+        ),
+        "actual_bits": 47091,
+        "candidate_cache_sha256": (
+            "35350ca026c437def5c958b3382ea3aabc97747d3fbdea8205e1aa336cd48d7a"
+        ),
+        "earliest_hidden_index": 35,
+        "earliest_position": 113,
+        "expected_bits": 47092,
+        "manifest_sha256": (
+            "acc631e71148922448eb03c839f71544c80ca00cea47b639bdd80eb34567fdab"
+        ),
+        "mismatch_coordinate_count": 71,
+        "mismatch_coordinates_sha256": (
+            "72dc17d4ec3fa5473f05cd33f34cc2eda522413d8ca73e4b93e81b2556c6aaf3"
+        ),
+        "mismatch_position_count": 71,
+        "maximum_hidden_index": 63,
+        "tensor_file_sha256": (
+            "36303f0638661b4a56d3c9a1d4023a9b39eb19dbfd6d48e0718c29a45c41c07a"
+        ),
+    }
+
+
+def test_feature2_recovery_crc32c_metadata_is_unambiguous() -> None:
+    assert _metadata_crc32c({"crc32c": "AAAAAA=="}) == "AAAAAA=="
+    assert _metadata_crc32c({"crc32c_hash": "AAAAAA=="}) == "AAAAAA=="
+    assert (
+        _metadata_crc32c({"crc32c": "AAAAAA==", "crc32c_hash": "AAAAAA=="})
+        == "AAAAAA=="
+    )
+    with pytest.raises(BenchmarkValidationError, match="absent or conflicting"):
+        _metadata_crc32c({})
+    with pytest.raises(BenchmarkValidationError, match="absent or conflicting"):
+        _metadata_crc32c({"crc32c": "AAAAAA==", "crc32c_hash": "BBBBBB=="})
+
+
+def test_feature2_recovery_array_identity_is_bitwise_for_signed_zero() -> None:
+    positive_zero = np.asarray([0.0], dtype=np.float32)
+    negative_zero = np.asarray([-0.0], dtype=np.float32)
+    assert np.array_equal(positive_zero, negative_zero)
+    assert not _arrays_bitwise_equal(positive_zero, negative_zero)
+    assert _arrays_bitwise_equal(positive_zero, positive_zero.copy())
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    (
+        {"generation": "123", "size": 7},
+        {
+            "crc32c": "AAAAAA==",
+            "crc32c_hash": "BBBBBB==",
+            "generation": "123",
+            "size": 7,
+        },
+    ),
+)
+def test_terminal_verifiers_fail_closed_under_optimized_python(
+    tmp_path: Path,
+    metadata: dict[str, object],
+) -> None:
+    repo = Path(__file__).parents[3]
+    sources = (
+        (
+            repo / "scripts/greenfield/run_pp16_feature2_prefill_numerical.sh"
+        ).read_text(),
+        (
+            repo / "scripts/greenfield/recover_pp16_feature2_full_width_rejection.sh"
+        ).read_text(),
+    )
+    terminal_programs = []
+    for source in sources:
+        programs = re.findall(r"<<'PY'\n(.*?)\nPY\n", source, flags=re.DOTALL)
+        selected = [
+            program
+            for program in programs
+            if "path, receipt" in program and "crc_values = [" in program
+        ]
+        assert len(selected) == 2
+        assert all("assert " not in program for program in selected)
+        terminal_programs.extend(selected)
+
+    marker = tmp_path / "NUMERICAL_REJECTED"
+    marker.write_bytes(b"payload")
+    remote = "gs://driftbench-dsv4-uc/results/hostile/NUMERICAL_REJECTED"
+    receipt = tmp_path / "receipt.stderr"
+    receipt.write_text(f"Created: {remote}#123\n")
+    describe = tmp_path / "describe.json"
+    describe.write_text(json.dumps(metadata))
+    for program in terminal_programs:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-O",
+                "-c",
+                program,
+                str(marker),
+                str(receipt),
+                str(describe),
+                remote,
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert completed.returncode != 0
+        assert "authentication failed" in completed.stderr
 
 
 def test_exact_comparator_rejects_signed_zero_and_one_bit_float_drift() -> None:

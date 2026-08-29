@@ -11382,3 +11382,27 @@ dense+residual source for the output owner, returns normalized and carried one-r
 uses zero samples, persists both compiler graphs with `arithmetic_executed=false`, and deliberately
 refuses on empty pins. Focused CPU/static tests pass 27/27. The acquired graph—not source intent—must
 define the exact fusion/value-flow mutations before a separately reviewed numerical execution.
+
+## 2026-08-29 05:11--06:00 UTC — PP16 full-width hypothesis closes; cache drift localizes to p113
+
+- Commit `e404abee` passed one zero-warmup protected PP16 numerical replay. Its complete device
+  program executed once, then the strict comparator returned `NUMERICAL_REJECTED`; 8/8 post-process
+  cleanup is authenticated. The full-width and earlier half-width captures are bitwise identical
+  across all 11 common arrays, closing the combined attention+dense full-width owner hypothesis.
+- Both owners have one normalized-row mismatch at hidden 2795: actual `48422`, accepted `48423`
+  BF16 bits. q-a has 47 mismatches/owner, query 4096/owner and head weights 32/owner; event-1 set
+  and score drift remains. The owner copies themselves are bitwise equal, so this is not owner
+  asymmetry. No DB row, exactness, Gate-D or performance result exists.
+- The terminal protocol—not the arithmetic—then failed because `gcloud storage objects describe`
+  returned `crc32c` while the wrapper indexed only `crc32c_hash`. The existing rejection terminal
+  is independently authentic at generation `1787980539108624`, CRC `jCuZbg==`, file SHA
+  `60b605c8...9ad`; its 26-entry ledger and exact 28-object remote set pass. Recovery is CPU-only,
+  distinct-prefix/no-clobber, generation-qualified and must never remove the original terminal.
+- The complete retained DB518 cache was found in the authenticated DB529 input bundle. Reconstructing
+  the PP16 owner cache as `(owner,page,local) = ((position % 512) // 256, position // 512,
+  position % 256)` yields SHA `35350ca0...8d7a` versus DB518 `3808d502...59d1`. There are exactly
+  71 unequal coordinates at 71 positions, all hidden indices 0--63; coordinate-list SHA is
+  `72dc17d4...aaf3`. The earliest is position 113 / hidden 35, actual/accepted `47091/47092`.
+- Exact next is to finish/review/seal the immutable rejection recovery, then add observation-only
+  roots at layer-0 position 113. Every prior captured output must remain bitwise equal, preventing
+  the observer from changing fusion. No further full-model launch is authorized first.

@@ -729,3 +729,13 @@ branches from the search tree.
   protected decoder required to close Gate D.
 
 Do not return to hour-scale hypothesis runs or already exact contractions.
+
+- Cloud metadata field names are versioned interfaces. Terminal verification must accept exactly
+  one unambiguous CRC value from `crc32c_hash` and/or `crc32c`, refuse absence or disagreement, and
+  always bind it to a generation-qualified content read. A receipt-schema failure after arithmetic
+  must be recovered without changing the original terminal or rerunning the model.
+- Before another graph variant, reconstruct compact state against its complete accepted oracle.
+  The PP16 full/half-width variants were identical across 11 outputs, while CPU reconstruction
+  localized the upstream cache to 71 one-coordinate drifts and the first to position 113 / hidden
+  35. Observe that first boundary and require every existing output unchanged; do not use a later
+  normalized-row mismatch as the next broad search surface.

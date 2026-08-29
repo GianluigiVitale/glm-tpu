@@ -380,10 +380,20 @@ remote = sys.argv[4]
 after = json.loads(current.read_text())
 checksum = google_crc32c.Checksum(path.read_bytes())
 crc = base64.b64encode(checksum.digest()).decode("ascii")
+crc_values = [
+    str(after[key])
+    for key in ("crc32c_hash", "crc32c")
+    if after.get(key) not in (None, "")
+]
 matches = re.findall(r"(gs://[^\s]+)#([0-9]+)", receipt.read_text())
-assert matches == [(remote, str(after["generation"]))]
-assert path.stat().st_size == int(after["size"])
-assert crc == after["crc32c_hash"]
+if (
+    not crc_values
+    or len(set(crc_values)) != 1
+    or matches != [(remote, str(after.get("generation", "")))]
+    or path.stat().st_size != int(after.get("size", -1))
+    or crc != crc_values[0]
+):
+    raise SystemExit("terminal rollback receipt/generation/size/CRC authentication failed")
 print(str(after["generation"]))
 PY
   ) || return 1
@@ -712,10 +722,20 @@ remote = sys.argv[4]
 record = json.loads(metadata.read_text())
 checksum = google_crc32c.Checksum(path.read_bytes())
 crc = base64.b64encode(checksum.digest()).decode("ascii")
+crc_values = [
+    str(record[key])
+    for key in ("crc32c_hash", "crc32c")
+    if record.get(key) not in (None, "")
+]
 matches = re.findall(r"(gs://[^\s]+)#([0-9]+)", receipt.read_text())
-assert matches == [(remote, str(record["generation"]))]
-assert path.stat().st_size == int(record["size"])
-assert crc == record["crc32c_hash"]
+if (
+    not crc_values
+    or len(set(crc_values)) != 1
+    or matches != [(remote, str(record.get("generation", "")))]
+    or path.stat().st_size != int(record.get("size", -1))
+    or crc != crc_values[0]
+):
+    raise SystemExit("terminal receipt/generation/size/CRC authentication failed")
 print(str(record["generation"]))
 PY
 )

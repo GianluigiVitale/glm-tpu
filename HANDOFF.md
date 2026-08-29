@@ -7250,3 +7250,28 @@ Offline replay of all six preserved TPU graphs now returns exactly the two expec
 identity mismatches and no structural violation; forbidden-hidden counts are zero. Do not
 recompile. Exact next is immutable-evidence recovery and sealing of these hashes, commit/push and
 verified owner-bucket mirror, then a separately pinned protected 8K numerical run.
+
+## Current exact next: seal the PP16 rejection, then observe position 113
+
+Reviewed pin `e404abee10a770f74cf1b22a7dd9d7ba904add06` executed exactly one zero-warmup
+PP16 full-width feature2 numerical replay under tag
+`greenfield_pp16_feature2_prefill_numerical_20260829T051119686986506Z`. Arithmetic completed once
+and honestly returned `NUMERICAL_REJECTED`: both owners differ from the accepted layer-1 normalized
+row only at hidden index 2795 (`48422` versus `48423` BF16 bits), while q-a/query/head mismatches
+remain downstream. Stable/raw/canonical HLO SHAs are `6c1c69d7...10ad`, `9e8641ba...2daf` and
+`9e933384...19a5`; cleanup is 8/8 clean. There is no DB, Gate-D or performance claim.
+
+The original wrapper then failed terminal verification because current `gcloud storage objects
+describe` emits `crc32c`, not only `crc32c_hash`. The already-created terminal is nevertheless
+authentic at generation `1787980539108624`, CRC `jCuZbg==` and SHA `60b605c8...9ad`; never alter
+or delete it. Recovery must fail on absent/conflicting checksum spellings, generation-read all 28
+immutable source objects, recompute the comparator/HLO/cleanup/DB/no-success contracts, and publish
+only a distinct `NUMERICAL_REJECTED` recovery terminal last.
+
+CPU reconstruction proves the full-width capture is bitwise identical to the earlier half-width
+capture across all 11 common arrays. Its logical layer-0 prompt cache SHA is `35350ca0...8d7a`, not
+DB518 `3808d502...59d1`: exactly 71 coordinates differ, one per position, all within hidden indices
+0--63. The earliest is position 113 / hidden index 35 (`47091` versus `47092`). Exact next after
+the recovery seal is an observation-only layer-0 discriminator at position 113 for normalized,
+q-a, query/head, current key and selected set, with all existing outputs required bitwise unchanged.
+Do not run another full model before that boundary is localized.
