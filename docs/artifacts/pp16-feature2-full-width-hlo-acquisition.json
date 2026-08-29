@@ -1,0 +1,112 @@
+{
+  "artifact_kind": "greenfield_pp16_feature2_full_width_hlo_acquisition_evidence",
+  "schema_version": 1,
+  "status": "HLO_ACQUIRED",
+  "run_tag": "greenfield_pp16_feature2_prefill_acquire_20260829T023702949220285Z",
+  "code_hash": "79a1590812bd805187737cc85d2068d8486519a6",
+  "reviewed_staged_diff_sha256": "b6bd4a602515ec6fe43bef5cd712f8651291b6629282d16f466961e768856785",
+  "graph_sha256": "ab5be45aecf3b0b5d87ad76af8076bc9351823529a08c0eadb414b072b31cb2d",
+  "remote_prefix": "gs://driftbench-dsv4-uc/results/greenfield_pp16_feature2_prefill_acquire_20260829T023702949220285Z",
+  "bucket_location": "US-CENTRAL2",
+  "claim_scope": "compile-only real selected-state/HLO/HBM acquisition for the default-off full-width-rounded-then-slice successor; no main arithmetic, numerical, Gate-D, token-rate, or performance claim",
+  "compile_only": true,
+  "full_width_rounded_then_slice": true,
+  "main_executed": false,
+  "main_execution_count": 0,
+  "numerical_claim": false,
+  "performance_claim": false,
+  "physical_group": {
+    "device_ids": [0, 1],
+    "coordinates": [[0, 0, 0], [1, 0, 0]],
+    "local_device_count_visible": 4,
+    "mesh_device_count": 2,
+    "num_partitions": 2
+  },
+  "selected_state": {
+    "manifest_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+    "state_sha256": "ee5cfb59c0d0028175565a3caf3f84d6b2b3bef0bd48a4ed8b914d02753482cc",
+    "selected_read_count": 78,
+    "selected_reads_per_owner": 39,
+    "selected_weight_bytes_per_owner": 1199760512,
+    "final_weight_bytes_per_owner": 1203271808,
+    "device_roundtrip_bytes": 2406543616,
+    "dense_final_layout": true,
+    "raw_dense_device_materialization": false,
+    "device_roundtrip_verified": true
+  },
+  "main_hlo": {
+    "stablehlo_sha256": "699b418b157a43068c6723dc08b3bb00aa575456c2fe40a83017a90ef8d58e6e",
+    "optimized_hlo_sha256": "a8f5bab0b3eb2320f03e336871ad7227c001779066d2a31c48aa33e166ee0147",
+    "execution_canonical_hlo_sha256": "114c7d836c907249f4c1baa49476e28dec54e7a367e50e4142a78957919e6dd4",
+    "lowering_seconds": 1.7463564290083013,
+    "compile_seconds": 19.12494689002051,
+    "stablehlo_reachable_function_count": 92,
+    "optimized_instruction_count": 22219,
+    "h16_b512_attention_calls": 8,
+    "attention_n6144_producers": 64,
+    "dense_down_n6144_convolutions": 64,
+    "dense_gate_convolutions": 64,
+    "attention_n3072_producers": 0,
+    "dense_down_n3072_convolutions": 0,
+    "half_reducer_count": 8,
+    "producer_chunk_count": 4,
+    "owner_half_lineage_contracts_passed": 8,
+    "physical_collectives": {
+      "all-gather": 27,
+      "all-reduce": 17,
+      "collective-permute": 12,
+      "total": 56
+    },
+    "one_row_half_sharded_terminal": true,
+    "host_markers": [],
+    "forbidden_markers": [],
+    "memory_analysis_bytes": {
+      "argument": 1234902528,
+      "temporary": 597845504,
+      "output": 7389696,
+      "generated_code": 64258048
+    }
+  },
+  "materializers": {
+    "physical_collective_count_each": 0,
+    "query_fp32": {
+      "stablehlo_sha256": "a4b03c88da70887fc3f9df98782d7a76620b94edb2f67d9533a5b5ad5929de00",
+      "optimized_hlo_sha256": "69b3f9001e3dff5ca67570e8749486b51a20915e3994b95dc8b321baa612fd5d"
+    },
+    "wk_decode_bf16": {
+      "stablehlo_sha256": "11c5e2745744ff2e4aa0a8bf061f603cb107cae9a04b3397e3c6f6a99607c133",
+      "optimized_hlo_sha256": "9e0ebc46929380d53e80189f7151594165e72f90b54e6b84d04a2eaf7e4061b5"
+    },
+    "wk_promote_fp32": {
+      "stablehlo_sha256": "7485fbee1cec48207dc1d8c73af68fc888c1bf15e19347647fc35e323fd5bc58",
+      "optimized_hlo_sha256": "ac8a195136abee24b2443cfe30283e2600bf25cb3fcae3115f24c53bde211526"
+    }
+  },
+  "measured_device_memory_bytes": {
+    "after_load_in_use": 1203933696,
+    "peak_in_use": 1249780224,
+    "after_compile_largest_free_block": 31747741184,
+    "after_cleanup_in_use": 1753088,
+    "after_cleanup_largest_free_block": 31748856320,
+    "after_cleanup_allocations": 5,
+    "after_execute": null
+  },
+  "evidence": {
+    "preterminal_object_count": 19,
+    "remote_object_count_including_terminal": 20,
+    "all_remote_sha256_match": true,
+    "runner_sha256": "28e9816b325371b2bd7e1ac5cf4a9bbb0c1e59a46087c660b4e0a2acfa7f801c",
+    "summary_sha256": "0110ccd20024ff67605f299319632062b5efb1d7a1d2cb6dca92254e839f6781",
+    "source_identity_sha256": "41dee99d08ca3d170e8545513674b6292b8a9243720e740615ad865f64c3aa7a",
+    "evidence_ledger_sha256": "4e0ddf5a133624e7687fa7a67e9070c54d2cf75719b97d46abbc7b2bd2199bdb",
+    "pre_census_sha256": "45e128d03b8bf6d0b48a0f420fa45b6745040f5e91b4e247036eba3693d85d46",
+    "post_census_sha256": "6f6ff2a2145dac3b6b50fda3fdaf4292149fe41aabc332c04049720859576e90",
+    "sync_sha256": "c483565b30153fe00f1e2a6be635bb44b9dfeec8c922ab778fb3f05f6ac1ac94",
+    "terminal_file_sha256": "8218429811e53ff3fe205eb3d31bd6645fe64deced82c41814340f6ee2be25b3",
+    "terminal_marker_self_sha256": "00f083f6e1965509e4f17b334890b0a6743f66d240aaae73360f9f835c531713",
+    "pre_census": "authenticated 8/8 zero work",
+    "sync": "8/8 exact code pin",
+    "post_census": "authenticated 8/8 zero work"
+  },
+  "exact_next": "extend the discriminator with authenticated exact normalized-hidden, q-a-state, DSA-query, and head-weight comparisons plus hostile tests, then acquire the changed output graph before one separately reviewed zero-warmup numerical execution; the current acquisition does not authorize numerical execution or the complete protected PP16 8K decoder"
+}

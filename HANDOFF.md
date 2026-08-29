@@ -2,6 +2,36 @@
 
 **Updated:** 2026-08-29 UTC
 
+## 2026-08-29 PP16 full-width successor HLO/HBM passes; numerical remains unrun
+
+- Sol approved staged code SHA `b6bd4a60...7856` for commit and one compile-only acquisition.
+  Commit `79a1590812bd805187737cc85d2068d8486519a6` was pushed and byte-mirrored before
+  protected tag `greenfield_pp16_feature2_prefill_acquire_20260829T023702949220285Z` ran. It
+  terminally sealed `HLO_ACQUIRED` in 49 seconds. The main executable was never invoked:
+  `main_executed=false`, execution count zero, and no numerical, Gate-D, DB, token-rate or
+  performance claim exists.
+- The exact selected final runtime loaded 39 ranges / 1,199,760,512 source bytes per owner and
+  round-tripped 2,406,543,616 device bytes. Dense weights were placed only in the final layout.
+  StableHLO/optimized/canonical HLO SHAs are `699b418b...8e6e` / `a8f5bab0...0147` /
+  `114c7d83...dd4`. StableHLO pins 64 attention N6144 producers, 64 dense-down N6144
+  convolutions, 64 gates and zero N3072 attention/down producers. Optimized HLO additionally
+  proves all eight causal producer-frontier/owner-half reducer lineages. The graph uses two
+  adjacent partitions, 27 all-gathers, 17 all-reduces and 12 feature permutes; roots stay
+  one-row/half-sharded and all three materializers have zero physical collectives.
+- Measured load/peak use is 1,203,933,696 / 1,249,780,224 bytes per device; the post-compile
+  largest free block is 31,747,741,184 bytes. Cleanup returns to 1,753,088 bytes and five
+  allocations per device. Independent audit downloaded the exact 20-object archive from the
+  `US-CENTRAL2` bucket and matched every SHA; pre/post census and code sync are each authenticated
+  8/8. Compact evidence is
+  `docs/artifacts/pp16-feature2-full-width-hlo-acquisition.json`.
+- This closes only the successor's real-state load/HLO/HBM prerequisite. The current comparator
+  checks carried state, contract, event-1 positions/scores/valid count and one current key, but only
+  hashes other captures and does not compare the sealed normalized-hidden, q-a-state, DSA-query or
+  head-weight boundaries. Therefore this acquisition authorizes neither numerical execution nor
+  complete PP16 8K. Exact next is add those authenticated exact comparisons and hostile tests,
+  then re-acquire the changed output graph before one reviewed zero-warmup execution. Gate D
+  remains open.
+
 ## 2026-08-29 PP16 feature2 is numerically rejected; full-width-leaf successor admitted offline
 
 - Protected graph `ab5be45a...cb2d` at pin `363a52b` executed exactly once and passed load,

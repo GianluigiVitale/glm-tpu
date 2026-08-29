@@ -5,6 +5,46 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-29 02:37--02:47 UTC — PP16 full-width successor HLO/HBM acquisition passes
+
+The correction-only Sol review returned `APPROVE COMMIT AND ONE COMPILE-ONLY ACQUISITION` for
+staged SHA `b6bd4a602515ec6fe43bef5cd712f8651291b6629282d16f466961e768856785`.
+Commit `79a1590812bd805187737cc85d2068d8486519a6` was pushed and byte-mirrored before protected tag
+`greenfield_pp16_feature2_prefill_acquire_20260829T023702949220285Z`. The self-locking wrapper
+finished in 49 seconds and terminally published `HLO_ACQUIRED`. Main arithmetic was never invoked:
+`main_executed=false`, `main_execution_count=0`, after-execute memory is null, and there is no
+numerical, Gate-D, DB, token-rate or performance claim.
+
+The selected final runtime loaded 39 authenticated ranges and 1,199,760,512 source bytes per
+owner, transformed dense sources before placement, and round-tripped 2,406,543,616 device bytes.
+The final state/manifest SHAs are `ee5cfb59...82cc` / `b385458f...6bab`; raw dense device
+materialization is false. Exact StableHLO/optimized/canonical HLO SHAs are `699b418b...8e6e` /
+`a8f5bab0...0147` / `114c7d83...dd4`. StableHLO pins 64 live N6144 attention producers, 64 N6144
+dense-down convolutions, 64 gates, zero N3072 successor producers, four producer chunks and eight
+half reducers. Optimized HLO additionally proves all eight causal lineages: every reducer binds 16
+matching producer frontiers through the exact two-stack, y-add and owner-select path. The graph has
+two adjacent partitions, eight H16/B512 attention calls, 27 all-gathers, 17 all-reduces and 12
+feature permutes; one-row/half-sharded roots and forbidden-marker contracts pass. Each of the three
+owner-local materializers has zero physical collectives.
+
+Main memory analysis is 1,234,902,528 argument, 597,845,504 temporary, 7,389,696 output and
+64,258,048 generated-code bytes. Measured load/peak use is 1,203,933,696 / 1,249,780,224 bytes per
+device, with a 31,747,741,184-byte post-compile largest free block. Cleanup returns to 1,753,088
+bytes and five allocations per device. A separate CPU/storage audit downloaded the exact 20 remote
+objects from `US-CENTRAL2`, matched every local/remote SHA, recomputed the terminal self-hash, and
+confirmed unique 8/8 pre/post censuses plus 8/8 exact code sync. Terminal/ledger/runner/summary SHAs
+are `82184298...2b3` / `4e0ddf5a...9bdb` / `28e9816b...801c` / `0110ccd2...6781`.
+Machine-readable evidence is
+`docs/artifacts/pp16-feature2-full-width-hlo-acquisition.json`.
+
+This closes only the successor's real-state load, physical-HLO and HBM prerequisite. The current
+comparator's `exact` bit covers carried state, contract, event-1 positions/scores/valid count and one
+current key. It merely hashes other captured arrays and does not compare the sealed normalized-
+hidden, q-a-state, DSA-query or head-weight boundaries, so neither numerical execution nor complete
+PP16 8K is authorized by this acquisition. Exact next is add authenticated exact comparisons and
+hostile tests for those boundaries, then acquire the changed output graph before one separately
+reviewed zero-warmup execution. Gate D remains open.
+
 ## 2026-08-29 01:13--01:29 UTC — both full-width-leaf producers are locally admitted
 
 The only admitted PP16 successor is now implemented behind the default-false

@@ -5,6 +5,19 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 
 ## Current boundary
 
+- The only admitted PP16 successor now has real selected-state HLO/HBM evidence at pushed pin
+  `79a1590812bd805187737cc85d2068d8486519a6`, tag
+  `greenfield_pp16_feature2_prefill_acquire_20260829T023702949220285Z`. Main arithmetic was not
+  invoked. StableHLO pins 64 N6144 attention producers, 64 N6144 dense-down convolutions and eight
+  half reducers; optimized HLO additionally proves all eight causal producer-frontier/owner-half
+  lineages. One-row/half-sharded roots, two adjacent partitions and forbidden-transport contracts
+  pass. Load/peak use is 1,203,933,696 / 1,249,780,224 bytes per device with 31,747,741,184 bytes
+  in the post-compile largest free block; all three materializers have zero collectives. The exact
+  20-object `US-CENTRAL2` archive and pre/sync/post 8/8 checks are independently byte-verified.
+  This is compile-only evidence, not numerical, Gate-D or performance proof. The current exact
+  comparator omits authenticated normalized-hidden, q-a-state, DSA-query and head-weight
+  comparisons. Add those and hostile tests, then acquire the changed output graph before one
+  reviewed numerical execution; complete PP16 8K remains forbidden.
 - PP16 feature2 graph `ab5be45a...cb2d` is numerically rejected and frozen. Its one protected
   invocation passed load/HLO/locality/HBM but its first carried boundary missed `968/6,144` BF16
   values (`3f6c86ed...53d2` versus `35a601b7...044c`), followed by `1,852/2,048` event-1 position
@@ -34,8 +47,10 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   Hostile hybrid, dead-decoy, wrong-row, duplicate/swap-half, cross-scope reducer, stack-leaf and
   select-branch, shifted-zero predicate and metadata-decoy direction/mask swaps are mandatory;
   executable attributes must never be inferred from provenance text. The corrected adjacent suite
-  passes 116 tests. It still needs correction-only adversarial review before one compile-only TPU
-  HLO/HBM acquisition; numerical execution is not authorized. Scalar,
+  passes 116 tests. The compile-only acquisition above closes this graph's real-state HLO/HBM
+  prerequisite; numerical execution remains unauthorized until the missing exact boundary
+  comparisons and hostile tests are added and the changed output graph is acquired and reviewed.
+  Scalar,
   normalization, consumer-fusion, output-ownership, half-width-contraction fitting and unchanged
   decoder retries remain frozen. Gate D stays open.
 - The PP16 final-layout y-x-z run closes all upstream layer-0 arithmetic in the live two-chip graph:
