@@ -16,7 +16,11 @@ from .reference.qkv_a import (
     FusedQkvAContract,
     one_row_fused_qkv_a_convolution,
 )
-from .reference.rmsnorm import fused_add_rms_norm, rms_norm
+from .reference.rmsnorm import (
+    fused_add_rms_norm,
+    fused_add_rms_norm_with_auxiliary,
+    rms_norm,
+)
 from .stage_local import (
     STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
     StageLocalDenseFp8Ingredients,
@@ -134,6 +138,13 @@ class StageLocalSplitLayerFp8ObservedResult(NamedTuple):
 
     result: StageLocalSplitLayerFp8Result
     ingredients: StageLocalSplitLayerFp8Ingredients
+
+
+class StageLocalSplitLayerFp8AuxiliaryResult(NamedTuple):
+    """Default-off layer result retaining the device-local FP32 RMS input."""
+
+    result: StageLocalSplitLayerFp8Result
+    input_rms_fp32: Any
 
 
 def _empty_dsa_internals(
@@ -591,7 +602,12 @@ def stage_local_transformer_layer_fp8_split_mapped(
     pregathered_b512_attention: bool = False,
     dense_final_layout_convolution: bool = False,
     capture_ingredients: bool = False,
-) -> StageLocalSplitLayerFp8Result | StageLocalSplitLayerFp8ObservedResult:
+    retain_input_rms_auxiliary: bool = False,
+) -> (
+    StageLocalSplitLayerFp8Result
+    | StageLocalSplitLayerFp8ObservedResult
+    | StageLocalSplitLayerFp8AuxiliaryResult
+):
     """Execute one layer while preserving legacy hidden/residual association."""
 
     if indexer_kind not in ("full", "shared"):
@@ -614,6 +630,12 @@ def stage_local_transformer_layer_fp8_split_mapped(
         raise ValueError("layer virtual-TP32 attention-only flag must be boolean")
     if not isinstance(capture_ingredients, bool):
         raise ValueError("layer ingredient-capture flag must be boolean")
+    if not isinstance(retain_input_rms_auxiliary, bool):
+        raise ValueError("layer RMS auxiliary-retention flag must be boolean")
+    if retain_input_rms_auxiliary and capture_ingredients:
+        raise ValueError(
+            "layer RMS auxiliary retention must remain isolated from ingredient capture"
+        )
     if reconstruct_dense_down_fp32 and mlp_kind != "dense":
         raise ValueError("dense FP32 reconstruction requires a dense layer")
     if virtual_tp32_reduction_association is not None and (
@@ -720,12 +742,24 @@ def stage_local_transformer_layer_fp8_split_mapped(
     ):
         raise ValueError("layer norm weights disagree with hidden size")
 
-    normalized_input, combined_residual = fused_add_rms_norm(
-        hidden_states,
-        residual,
-        input_norm_weight,
-        epsilon=rms_norm_epsilon,
-    )
+    if retain_input_rms_auxiliary:
+        rms_candidate = fused_add_rms_norm_with_auxiliary(
+            hidden_states,
+            residual,
+            input_norm_weight,
+            epsilon=rms_norm_epsilon,
+        )
+        normalized_input = rms_candidate.output
+        combined_residual = rms_candidate.carried_residual
+        input_rms_fp32 = rms_candidate.rms_input_fp32
+    else:
+        normalized_input, combined_residual = fused_add_rms_norm(
+            hidden_states,
+            residual,
+            input_norm_weight,
+            epsilon=rms_norm_epsilon,
+        )
+        input_rms_fp32 = None
     q_residual, current_kv = _project_attention_qkv_a(
         normalized_input,
         attention,
@@ -951,6 +985,9 @@ def stage_local_transformer_layer_fp8_split_mapped(
         incoming_contract_valid & dsa_valid & attention_result.contract_valid,
         dsa_internals,
     )
+    if retain_input_rms_auxiliary:
+        assert input_rms_fp32 is not None
+        return StageLocalSplitLayerFp8AuxiliaryResult(result, input_rms_fp32)
     if not capture_ingredients:
         return result
     assert attention_ingredients is not None

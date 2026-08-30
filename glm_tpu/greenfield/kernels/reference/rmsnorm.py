@@ -8,9 +8,19 @@ functions in this module are native JAX and have no legacy-engine dependency.
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 import jax
 from jax import lax
 import jax.numpy as jnp
+
+
+class FusedAddRmsNormAuxiliaryResult(NamedTuple):
+    """Device-resident candidate tuple at the fused layer RMS boundary."""
+
+    output: jax.Array
+    carried_residual: jax.Array
+    rms_input_fp32: jax.Array
 
 
 def rms_norm(
@@ -91,6 +101,67 @@ def fused_add_rms_norm(
         normalized.astype(weight.dtype) * weight
     ).astype(activation_dtype)
     return output, carried_residual
+
+
+def fused_add_rms_norm_with_auxiliary(
+    hidden_states: jax.Array,
+    residual: jax.Array,
+    weight: jax.Array,
+    *,
+    epsilon: float,
+) -> FusedAddRmsNormAuxiliaryResult:
+    """Default-off tuple candidate retaining the exact FP32 RMS input.
+
+    Primary arithmetic is written independently and identically to
+    :func:`fused_add_rms_norm`.  The third tuple member is the same FP32 sum
+    consumed by the variance reduction; it is not substituted into the BF16
+    recurrent residual and has no host consumer here.
+    """
+
+    if hidden_states.shape != residual.shape:
+        raise ValueError(
+            "fused auxiliary RMSNorm hidden and residual shapes must match"
+        )
+    if hidden_states.dtype != residual.dtype:
+        raise ValueError(
+            "fused auxiliary RMSNorm hidden and residual dtypes must match"
+        )
+    if hidden_states.ndim < 1:
+        raise ValueError(
+            "fused auxiliary RMSNorm inputs must have at least one dimension"
+        )
+    if weight.shape != (hidden_states.shape[-1],):
+        raise ValueError(
+            "fused auxiliary RMSNorm weight must match the final hidden dimension"
+        )
+    if (
+        not isinstance(epsilon, (int, float))
+        or isinstance(epsilon, bool)
+        or epsilon <= 0
+    ):
+        raise ValueError("fused auxiliary RMSNorm epsilon must be positive")
+    if not jnp.issubdtype(hidden_states.dtype, jnp.inexact):
+        raise ValueError(
+            "fused auxiliary RMSNorm activations must have an inexact dtype"
+        )
+    if not jnp.issubdtype(weight.dtype, jnp.inexact):
+        raise ValueError("fused auxiliary RMSNorm weight must have an inexact dtype")
+
+    activation_dtype = hidden_states.dtype
+    rms_input_fp32 = hidden_states.astype(jnp.float32) + residual.astype(
+        jnp.float32
+    )
+    carried_residual = rms_input_fp32.astype(activation_dtype)
+    variance = jnp.mean(lax.square(rms_input_fp32), axis=-1, keepdims=True)
+    normalized = rms_input_fp32 * lax.rsqrt(variance + jnp.float32(epsilon))
+    output = (
+        normalized.astype(weight.dtype) * weight
+    ).astype(activation_dtype)
+    return FusedAddRmsNormAuxiliaryResult(
+        output,
+        carried_residual,
+        rms_input_fp32,
+    )
 
 
 def final_norm(

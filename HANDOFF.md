@@ -8198,3 +8198,25 @@ producer/execution receipt. The capsule must retain
 both candidate BF16 RMS operands and byte-match their independently derived FP32 sum. If any
 authority cannot be produced offline, reject that variant and do not compile. Only a v2 admission plus a separate
 compile-only review may consider one optimized-HLO acquisition. Gate D remains open.
+
+## Uncommitted source-only tuple-auxiliary candidate; no compile authority
+
+The first remaining v2 blocker is implemented locally without compilation in
+`glm_tpu/greenfield/kernels/reference/rmsnorm.py`: default-off
+`fused_add_rms_norm_with_auxiliary` writes the accepted weighted/double-rounded RMS arithmetic
+concretely and returns the same FP32 sum consumed by variance as a third device tuple member. The
+real caller is `stage_local_transformer_layer_fp8_split_mapped`, gated by
+`retain_input_rms_auxiliary=False`; enabled output is a device PyTree
+`StageLocalSplitLayerFp8AuxiliaryResult`. It is isolated from ingredient capture and contains no
+host consumer. The accepted default branch remains the existing two-result function.
+
+Stdlib-only AST tests in `tests/greenfield/validation/test_gate_d_tuple_auxiliary_source.py` pass
+2/2 and bind concrete operator calls, exact arguments, false default, accepted else branch, device
+tuple return and absence of host callbacks/transfers without importing JAX. This source-only batch
+has not compiled or executed the candidate and is not v2 admission evidence. Fable 5 Max supplied
+no opinion because its usage was at 100%; the goal-authorized Sol fallback blocked the first proof
+because it did not bind exact arithmetic, then approved corrected staged SHA
+`231979e1...a7362` with no remaining P0--P2 after exact alpha-normalized expression, NamedTuple and
+branch AST checks. Only the resulting committed pin may
+be used to build the separate concrete source certificate and immutable-parser correction; the
+producer-bound coherent capsule remains missing. Gate D is open and no TPU action is authorized.
