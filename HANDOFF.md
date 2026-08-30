@@ -7751,7 +7751,7 @@ identity dimensions before the HLO is admissible. A mismatch is terminal for tha
 is mechanism evidence only. No TPU execution is authorized here. Gate D is open and a numerical
 successor still requires a genuinely new bounded plan-level physical state/ownership mechanism.
 
-## Current exact next: persist replicated-HLO correction; separately review any retry
+## Current exact next: separately review any replicated-HLO retry
 
 The sole authorized accepted-tree acquisition at committed/pushed/mirrored pin `6274f760`, tag
 `accepted_db485_compile_only_hlo_20260830T003358774368259Z`, completed exact model initialization
@@ -7794,3 +7794,11 @@ in 234.68 seconds; its unaffected remainder is reused rather than rerun. An earl
 `JAX_PLATFORMS=cpu`, opened worker 0's local TPU client and was terminated after its wait-state was
 identified; it ran no model or Ray workload. A fresh read-only census afterward is 8/8 `CENSUS_OK`.
 Only the CPU-forced result is validation evidence.
+
+The reviewed correction is signed-off commit
+`4d419506ebd4bfd1da755309e5d1d15c953897c3`; local `HEAD` and
+`origin/rewrite/topology-first-decode` match. The locked continuity mirror completed against exact
+`US-CENTRAL2`, and all ten changed files are byte-identical under
+`gs://driftbench-dsv4-uc/repos/glm-tpu-topology-rewrite/`. This persistence authorizes no TPU work.
+Exact next is a separate execution-only review of at most one fresh compile-only acquisition; Gate D
+remains open and no retry is currently authorized.

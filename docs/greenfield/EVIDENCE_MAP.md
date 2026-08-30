@@ -1641,4 +1641,6 @@ expected skips in 234.68 seconds; its unaffected remainder is reused. A fresh re
 is 8/8 clean. Fable remains usage-blocked; the correction-only Sol follow-up found no P0--P2 issue
 and approved tracked diff `b72383df...74646` plus failure artifact `b099ca24...56bb` for
 commit/push/locked same-region mirror only. The correction remains offline evidence preparation,
-and no retry is currently authorized.
+and no retry is currently authorized. It is persisted as signed-off commit `4d419506...97c3`, with
+local/origin equality and all ten changed files byte-identical in the exact `US-CENTRAL2`
+repository mirror. Exact next is a separate execution-only review.
