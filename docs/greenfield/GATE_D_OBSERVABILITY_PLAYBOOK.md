@@ -169,17 +169,20 @@ Do not weaken v1 or rewrite its historical evidence. The append-only repair now 
 
 V2 authenticates committed blob/AST identity for concrete or declarative source authority, a
 content-derived plan, structural StableHLO and typed eight-watchpoint capsule invariants. The tuple
-survivor now binds concrete commit `c8b2200`; the compensated survivor has no source authority,
-and declarative fixtures remain non-admissible.
+survivor binds concrete commit `c8b2200` and exact sealed PP16 plan/watchpoint authority; the
+compensated survivor has neither source nor plan authority, and declarative fixtures remain
+non-admissible.
 Its parent process remains
 stdlib-only; HLO fixture validation runs in a SHA-bound offline child using jaxlib MLIR without
 importing `jax`, compiling or initializing a backend. It also inherits the exact v1
-frontier and closed fingerprints rather than resetting history. The canonical report accepts only
-the tuple candidate's concrete source authority. It still refuses that candidate for plan,
-StableHLO and capsule gaps; the compensated candidate also lacks source authority. V2 always leaves
+frontier and closed fingerprints rather than resetting history. The canonical report accepts the
+tuple candidate's concrete source and PP16 plan authority. It still refuses that candidate for
+StableHLO and capsule gaps; the compensated candidate retains all four gaps. V2 always leaves
 candidate admission and TPU authorization false. A synthetic complete fixture is still refused
 until concrete executable source/callsite authority, immutable parser loading and a pinned
-replayable capsule producer/execution receipt exist.
+replayable capsule producer/execution receipt exist. Current core/contract/report/plan SHAs are
+`69dbce5f...c222`, `bec6457a...9fc0`, `f1ea5fed...5804` and `98b4fa21...7880`; hostile and
+source-plus-adjacent offline coverage is 60/60 and 71/71.
 
 ### 3.5 Domain-specific state readers
 
@@ -254,7 +257,7 @@ These compact artifacts are the quickest way to recover *why* the current rules 
 | `docs/artifacts/pp16-feature2-qkv-khalf-event1-cpu-rejection.json` | A mechanically valid downstream arm can be rejected offline when coherent event replay still misses the oracle. |
 | `docs/artifacts/plan-local-persistent-fp32-shadow-source-rejection.json` | Direct unrounded FP32-shadow substitution is source/HLO-incompatible; rounded or auxiliary-consumer forms remain separate and unadjudicated. |
 | `docs/artifacts/gate-d-capsule-constructability.json` | DB518 cannot supply a new variant's coherent capsule, and admission v1 cannot represent the required precompile StableHLO authority; build append-only v2 rather than weakening history. |
-| `docs/artifacts/gate-d-precompile-admission-v2.json` | V2 validates the precompile schema without weakening v1 and refuses both survivors; fixture completion still cannot admit without executable source, immutable parser loading and producer-bound capsule provenance. |
+| `docs/artifacts/gate-d-precompile-admission-v2.json` | V2 validates the precompile schema without weakening v1; the tuple survivor now has concrete source plus exact PP16 plan authority but still lacks causal StableHLO and producer-bound capsule provenance. |
 
 Always recompute a file's SHA before citing it. The SHA is the identity; the filename is only a
 human-readable locator.

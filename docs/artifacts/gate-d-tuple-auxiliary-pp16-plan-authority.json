@@ -1,0 +1,130 @@
+{
+  "local_device_groups": [
+    [
+      0,
+      1
+    ],
+    [
+      8,
+      9
+    ],
+    [
+      16,
+      17
+    ],
+    [
+      24,
+      25
+    ],
+    [
+      26,
+      27
+    ],
+    [
+      2,
+      3
+    ],
+    [
+      10,
+      11
+    ],
+    [
+      18,
+      19
+    ],
+    [
+      20,
+      21
+    ],
+    [
+      12,
+      13
+    ],
+    [
+      4,
+      5
+    ],
+    [
+      28,
+      29
+    ],
+    [
+      30,
+      31
+    ],
+    [
+      22,
+      23
+    ],
+    [
+      14,
+      15
+    ],
+    [
+      6,
+      7
+    ]
+  ],
+  "plan": "PP16_LP2",
+  "plan_sha256": "d824c19c4393e3b54767ea3a4a228bc865bac1b218fbce63eb04df7a05bc5833",
+  "schema_version": 2,
+  "topology_hash": "294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559",
+  "watchpoints": {
+    "layer1.cache_history": {
+      "layout": "lp2.local",
+      "owner_ids": [
+        0,
+        1
+      ]
+    },
+    "layer1.current_key": {
+      "layout": "lp2.local",
+      "owner_ids": [
+        0,
+        1
+      ]
+    },
+    "layer1.head_weights": {
+      "layout": "lp2.local",
+      "owner_ids": [
+        0,
+        1
+      ]
+    },
+    "layer1.normalized": {
+      "layout": "lp2.local",
+      "owner_ids": [
+        0,
+        1
+      ]
+    },
+    "layer1.query": {
+      "layout": "lp2.local",
+      "owner_ids": [
+        0,
+        1
+      ]
+    },
+    "layer1.rms_input_fp32": {
+      "layout": "lp2.local",
+      "owner_ids": [
+        0,
+        1
+      ]
+    },
+    "layer1.rms_operands_bf16": {
+      "layout": "lp2.local",
+      "owner_ids": [
+        0,
+        1
+      ]
+    },
+    "layer1.scorer_event1": {
+      "layout": "lp2.local",
+      "owner_ids": [
+        0,
+        1
+      ]
+    }
+  }
+}

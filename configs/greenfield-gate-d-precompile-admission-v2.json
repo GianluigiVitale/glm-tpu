@@ -26,7 +26,10 @@
         "normalization_input": "persistent.shadow",
         "primary_recurrence": "bf16.rounded"
       },
-      "plan_authority": null,
+      "plan_authority": {
+        "path": "../docs/artifacts/gate-d-tuple-auxiliary-pp16-plan-authority.json",
+        "sha256": "98b4fa21272e0bb019af1ad99abedee35593f9a1c8067a15983e9023c01f7880"
+      },
       "reconstructs_full_pod_hidden": false,
       "source_authority": {
         "files": [
@@ -115,7 +118,7 @@
     "id": "layer1.rms_input_fp32",
     "order": 0
   },
-  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates the tuple candidate's concrete committed JAX source/callsite and can validate declarative fixtures, plan/topology, structural StableHLO and typed capsule shape/content invariants. The current tuple candidate remains unadmitted until plan authority, immutable parser-backed causal StableHLO and a pinned replayable capsule producer/execution receipt exist; the compensated candidate also lacks concrete source authority. It never authorizes compilation or TPU execution.",
+  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates the tuple candidate's concrete committed JAX source/callsite and exact PP16_LP2 physical plan/watchpoint authority, and can validate declarative fixtures, structural StableHLO and typed capsule shape/content invariants. The tuple candidate remains unadmitted until immutable parser-backed causal StableHLO and a pinned replayable capsule producer/execution receipt exist; the compensated candidate also lacks concrete source and plan authority. It never authorizes compilation or TPU execution.",
   "contract_id": "gate.d.precompile.admission.v2.20260830",
   "evidence": [
     {
@@ -150,7 +153,7 @@
     },
     "core": {
       "path": "../glm_tpu/greenfield/gate_d_precompile_admission.py",
-      "sha256": "000a2348521e49bbb48088abf1308ac1cb76f5beee3ce32fc37f48e4e8797aa6"
+      "sha256": "69dbce5fc0a85181c40f838ec5b83724a063ce9c542162777e762b319d10c222"
     },
     "git": {
       "path": "/usr/bin/git",

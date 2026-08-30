@@ -1859,33 +1859,37 @@ remains open and no TPU successor is authorized.
   `scripts/greenfield/admit_gate_d_precompile.py` and canonical report
   `docs/artifacts/gate-d-precompile-admission-v2.json`.
 - V2 authenticates the exact inherited v1 contract/core/frontier and closed fingerprints, the
-  sealed two-variant normal-form catalogue, committed Git blob/AST identity for a declarative
-  semantic fixture, a content-derived plan, parsed StableHLO structure, explicit plan-local
-  topology and the exact layer-1/position-8155 typed eight-watchpoint NPZ schema. The parent auditor
-  is stdlib-only; structural HLO validation uses a SHA-bound offline jaxlib-MLIR parser that imports
-  neither `jax` nor a backend. It rejects host effects, implicit,
+  sealed two-variant normal-form catalogue, committed Git blob/AST identity for concrete or
+  non-admissible declarative source, a content-derived plan, parsed StableHLO structure, explicit
+  plan-local topology and the exact layer-1/position-8155 typed eight-watchpoint NPZ schema. The
+  parent auditor is stdlib-only; structural HLO validation uses a SHA-bound offline jaxlib-MLIR
+  parser that imports neither `jax` nor a backend. It rejects host effects, implicit,
   ring, nonlocal or greater-than-four groups, changed accepted-primary backward slices, mixed
   authority, hostile archives and symlinked or occupied evidence paths. Auxiliary causality and its
-  candidate-specific slice are checked separately from the unchanged primary. The abstract source
-  DSL describes the complete weighted/double-rounded RMS consumer but is not executable source or
-  a real integration callsite. Both BF16 RMS operands
+  candidate-specific slice are checked separately from the unchanged primary. The tuple survivor
+  binds its exact concrete weighted/double-rounded RMS operators and real false-default device
+  caller; abstract fixtures remain non-admissible. Both BF16 RMS operands
   are required, and their independently derived 6,144-value FP32 sum must byte-match the declared
   `layer1.rms_input_fp32` array.
 - Current classification is
   `NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`.
   `auxiliary_device_tuple_dependency` has concrete committed source/callsite authority at
-  `c8b2200` and remains refused for plan, causal StableHLO and coherent candidate capsule.
-  `compensated_auxiliary_dependency` also lacks source authority. No JAX, compile, model, cloud or
-  TPU work occurred.
-- Canonical contract/report/locality SHAs are respectively `74e8c06f...7752`,
-  `1ce76704...2957` and `49cf6bb1...25eb`. Source certificate
-  `gate-d-tuple-auxiliary-source-authority.json` is `c95c8aa1...f0e1`. Focused hostile admission
-  passes 58/58 (2,277.49 seconds with four isolated workers), the source-only suite passes 2/2 and
-  the adjacent
-  offline suites pass 69/69. These are admission-tool tests, not candidate or Gate-D evidence.
+  `c8b2200` and exact sealed `PP16_LP2` plan/watchpoint authority. It remains refused only for
+  causal StableHLO and a coherent candidate capsule. `compensated_auxiliary_dependency` retains
+  all four gaps. No JAX, compile, model, cloud or TPU work occurred.
+- Canonical core/contract/report/locality SHAs are respectively `69dbce5f...c222`,
+  `bec6457a...9fc0`, `f1ea5fed...5804` and `49cf6bb1...25eb`. Source certificate
+  `gate-d-tuple-auxiliary-source-authority.json` is `c95c8aa1...f0e1`; PP16 plan authority is
+  `98b4fa21...7880` with content plan SHA `d824c19c...5833`. Focused hostile admission passes
+  60/60 across four isolated CPU workers; source-only plus adjacent offline suites pass 71/71.
+  These are admission-tool tests, not candidate or Gate-D evidence.
 - Fable session `d6512b94-52af-4a03-85de-d7d5b43ea5cc` was usage-blocked and supplied no opinion.
   The Sol fallback approved exact staged SHA `5003b44e...55bf` for persistence with no P0--P2 and
   explicitly no JAX/backend/model/cloud/compile/TPU authorization or Gate-D closure.
+- The same Fable session remained usage-blocked for the plan batch. Sol withheld the first draft
+  after the local audit found a movable sealed-stage owner group, then approved corrected staged
+  SHA `775b3644...c8fa` with no P0--P2 after exact stage-zero binding and a fully rebound migration
+  attack. The verdict remains persistence-only with no execution or Gate-D authorization.
 - A complete synthetic fixture remains refused for three explicit reasons:
   `MISSING_EXECUTABLE_SOURCE_AUTHORITY`, `MISSING_IMMUTABLE_STABLEHLO_PARSER_AUTHORITY`, and
   `MISSING_PINNED_COHERENT_CAPSULE_PRODUCER`. Therefore v2 has no positive admission path and cannot

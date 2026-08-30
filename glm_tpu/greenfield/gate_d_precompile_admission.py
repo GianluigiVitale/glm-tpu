@@ -2169,6 +2169,7 @@ def _verify_plan_authority(
             "plan groups are not the sealed runtime physical allowlist"
         )
     local_group_size = 2 if plan_name == "PP16_LP2" else 4
+    expected_layout = "lp2.local" if plan_name == "PP16_LP2" else "lp4.local"
     if any(len(group) != local_group_size for group in local_groups):
         raise BenchmarkValidationError("plan local group size drifted")
     watchpoints = document["watchpoints"]
@@ -2185,6 +2186,10 @@ def _verify_plan_authority(
             )
         _exact_keys(item, {"layout", "owner_ids"}, f"plan watchpoint {watchpoint_id}")
         layout = _identifier(item["layout"], f"plan watchpoint {watchpoint_id} layout")
+        if layout != expected_layout:
+            raise BenchmarkValidationError(
+                f"plan watchpoint layout is not exact {plan_name} authority: {watchpoint_id}"
+            )
         owner_ids = item["owner_ids"]
         if (
             not isinstance(owner_ids, list)
@@ -2212,6 +2217,10 @@ def _verify_plan_authority(
             "layout": layout,
             "owner_ids": owner_ids,
         }
+    if sealed_owner_group != local_groups[0]:
+        raise BenchmarkValidationError(
+            f"plan watchpoints are not the exact {plan_name} stage-zero owner group"
+        )
     payload = {
         "local_device_groups": local_groups,
         "plan": plan_name,

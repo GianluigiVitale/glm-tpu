@@ -1033,11 +1033,16 @@ normalized-state cause.
   exact bytes at `layer1.rms_input_fp32` rather than trusting a captured or self-declared sum.
   A coherence id supplied by the capsule author proves nothing; require a pinned replayable producer
   or candidate-execution receipt. Relabeled DB518 arrays and callback-observer bytes remain invalid.
+- Plan authority must reproduce the complete sealed physical group order, topology hash, exact
+  group size and one shared local owner group for every watchpoint. Layout is not a free label:
+  PP16 and PP8 accept only `lp2.local` and `lp4.local`. Recompute the plan hash from those fields and
+  reject a renamed layout even when the attacker also rebinds every outer SHA.
 - Bound total NPZ decompression before reading members, reject non-stored/deflated compression,
   traverse every parent with no-follow directory descriptors and make append-only publication safe
   against concurrent replacement.
-- The current v2 report binds concrete tuple-candidate source/callsite authority and refuses it for
-  plan, StableHLO and producer-bound capsule gaps; the compensated variant also lacks source. It
+- The current v2 report binds concrete tuple-candidate source/callsite and exact PP16 plan authority
+  and refuses it for StableHLO and producer-bound capsule gaps; the compensated variant retains all
+  four gaps. It
   always leaves compilation/TPU authorization false. This is an honest sequencing result, not
   Gate-D progress through execution.
 - A scalar inversion must target the actual retained program edge. Here qkv-a consumes

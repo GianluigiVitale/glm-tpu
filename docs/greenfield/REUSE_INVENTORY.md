@@ -841,12 +841,13 @@ separately, and the parent independently derives the full FP32 addition before a
 operands and the rejected callback remains perturbation evidence only.
 
 Canonical report `docs/artifacts/gate-d-precompile-admission-v2.json` binds the tuple candidate's
-concrete source/callsite at `c8b2200` and refuses it for plan, causal StableHLO and coherent capsule;
-the compensated candidate also lacks source authority.
+concrete source/callsite at `c8b2200` and exact sealed PP16 plan/watchpoint authority, and refuses it
+only for causal StableHLO and a coherent capsule; the compensated candidate retains all four gaps.
 This report is the correct offline starting point; do not modify v1, relabel DB518 state, compile a
 placeholder or infer TPU causality from structural synthetic fixtures. V2 has no positive admission
-path for the tuple candidate until plan authority, immutable parser-backed causal StableHLO and a
-pinned capsule producer/execution receipt exist; the compensated candidate also needs concrete
-source/callsite authority.
-The canonical contract/report/locality SHAs are `74e8c06f...7752`, `1ce76704...2957` and
-`49cf6bb1...25eb`; focused/source-only/adjacent offline coverage is 58/58, 2/2 and 69/69.
+path for the tuple candidate until immutable parser-backed causal StableHLO and a pinned capsule
+producer/execution receipt exist; the compensated candidate also needs concrete source/callsite and
+plan authority.
+The canonical core/contract/report/locality SHAs are `69dbce5f...c222`, `bec6457a...9fc0`,
+`f1ea5fed...5804` and `49cf6bb1...25eb`; focused/source-plus-adjacent offline coverage is 60/60
+and 71/71. PP16 plan authority is `98b4fa21...7880`, content SHA `d824c19c...5833`.

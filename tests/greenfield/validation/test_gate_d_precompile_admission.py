@@ -25,7 +25,7 @@ from glm_tpu.greenfield.gate_d_precompile_admission import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CURRENT_CONTRACT = REPO_ROOT / "configs/greenfield-gate-d-precompile-admission-v2.json"
-CURRENT_CONTRACT_SHA256 = "74e8c06fefc71ebee9f7b583c6bc34c5fe5724830b46ffd64fdc5572642a7752"
+CURRENT_CONTRACT_SHA256 = "bec6457adb5e512440985c62654aaf62b226d78d8b8e3e155472675099f29fc0"
 
 
 def _sha(path: Path) -> str:
@@ -970,7 +970,6 @@ def test_current_contract_fails_closed_without_jax() -> None:
         item["id"]: item["reasons"] for item in report["candidate_results"]
     } == {
         "auxiliary_device_tuple_dependency": [
-            "MISSING_PLAN_AUTHORITY",
             "MISSING_CAUSAL_STABLEHLO_AUTHORITY",
             "MISSING_CANDIDATE_COHERENT_CAPSULE",
         ],
@@ -985,6 +984,13 @@ def test_current_contract_fails_closed_without_jax() -> None:
     assert source["authority_kind"] == "concrete.committed.jax.source"
     assert source["executable_source_authority"] is True
     assert source["code_pin"] == "c8b220067577004ddfb824667eadc746642baaca"
+    plan = report["candidate_results"][0]["plan_authority"]
+    assert plan["plan"] == "PP16_LP2"
+    assert plan["local_group_size"] == 2
+    assert plan["owner_group"] == [0, 1]
+    assert plan["plan_sha256"] == (
+        "d824c19c4393e3b54767ea3a4a228bc865bac1b218fbce63eb04df7a05bc5833"
+    )
 
 
 def test_complete_synthetic_fixture_never_admits_precompile(tmp_path: Path) -> None:
@@ -1230,6 +1236,53 @@ def test_self_declared_nonlocal_plan_is_rejected(tmp_path: Path) -> None:
     candidate = report["candidate_results"][0]
     assert "INVALID_PLAN_AUTHORITY" in candidate["reasons"]
     assert "physical allowlist" in candidate["plan_authority"]["refusal"]
+
+
+def test_self_declared_plan_layout_is_rejected(tmp_path: Path) -> None:
+    path, contract, _, _ = _prepared_contract(tmp_path)
+    binding = contract["candidates"][0]["plan_authority"]
+    plan_path = Path(binding["path"])
+    plan = json.loads(plan_path.read_text())
+    for watchpoint in plan["watchpoints"].values():
+        watchpoint["layout"] = "forged.local"
+    payload = {
+        "local_device_groups": plan["local_device_groups"],
+        "plan": plan["plan"],
+        "topology_hash": plan["topology_hash"],
+        "watchpoints": plan["watchpoints"],
+    }
+    plan["plan_sha256"] = sha256(_canonical(payload).encode("ascii")).hexdigest()
+    binding["sha256"] = _write_json(plan_path, plan)
+    _write_json(path, contract)
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][0]
+    assert "INVALID_PLAN_AUTHORITY" in candidate["reasons"]
+    assert "layout is not exact PP16_LP2 authority" in candidate["plan_authority"][
+        "refusal"
+    ]
+
+
+def test_self_declared_plan_owner_stage_is_rejected(tmp_path: Path) -> None:
+    path, contract, _, _ = _prepared_contract(tmp_path)
+    binding = contract["candidates"][0]["plan_authority"]
+    plan_path = Path(binding["path"])
+    plan = json.loads(plan_path.read_text())
+    wrong_stage = plan["local_device_groups"][1]
+    for watchpoint in plan["watchpoints"].values():
+        watchpoint["owner_ids"] = wrong_stage
+    payload = {
+        "local_device_groups": plan["local_device_groups"],
+        "plan": plan["plan"],
+        "topology_hash": plan["topology_hash"],
+        "watchpoints": plan["watchpoints"],
+    }
+    plan["plan_sha256"] = sha256(_canonical(payload).encode("ascii")).hexdigest()
+    binding["sha256"] = _write_json(plan_path, plan)
+    _write_json(path, contract)
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][0]
+    assert "INVALID_PLAN_AUTHORITY" in candidate["reasons"]
+    assert "stage-zero owner group" in candidate["plan_authority"]["refusal"]
 
 
 def test_mutated_candidate_array_is_rejected_even_with_new_artifact_sha(

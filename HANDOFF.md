@@ -8233,3 +8233,37 @@ message and supplied no opinion. The goal-authorized Sol fallback approved exact
 commit and blobs, hard-whitelisted source/certificate/semantic pins, concrete arithmetic/caller
 checks, canonical report and exact remaining reason sets. The verdict authorizes persistence only:
 no JAX/backend/model/cloud/compile/TPU execution and no Gate-D closure.
+
+## PP16 tuple-candidate plan authority; StableHLO and capsule still missing
+
+The next precompile blocker is now closed offline for
+`auxiliary_device_tuple_dependency`. Authority
+`docs/artifacts/gate-d-tuple-auxiliary-pp16-plan-authority.json` has file SHA
+`98b4fa21...7880` and content-derived plan SHA `d824c19c...5833`. It reproduces the sealed DB555
+`PP16_LP2` physical group order and topology hash `294e7772...559`, fixes all eight candidate
+watchpoints to exact stage-0 owners `[0,1]` and layout `lp2.local`, and is bound by the canonical
+contract. The verifier now also rejects a self-declared layout even when every enclosing file and
+content hash is recomputed; PP16 and PP8 accept only `lp2.local` and `lp4.local` respectively.
+
+Core `glm_tpu/greenfield/gate_d_precompile_admission.py` is `69dbce5f...c222`; contract
+`configs/greenfield-gate-d-precompile-admission-v2.json` is `bec6457a...9fc0`; canonical report
+`docs/artifacts/gate-d-precompile-admission-v2.json` is `f1ea5fed...5804`. Classification remains
+`NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`. The tuple candidate is now
+refused for exactly `MISSING_CAUSAL_STABLEHLO_AUTHORITY` and
+`MISSING_CANDIDATE_COHERENT_CAPSULE`; the compensated candidate retains all four gaps.
+
+The complete hostile admission suite passes 60/60 across four isolated CPU workers; source-only
+plus adjacent constructability/observability/admission/shadow suites pass 71/71. These validate the
+offline authority boundary only. No JAX backend, compilation, model, cloud or TPU workflow ran and
+no execution successor is authorized. Exact next after adversarial review, commit/push and locked
+same-region mirror is immutable-parser-backed causal StableHLO authority, followed by the one
+candidate-coherent eight-watchpoint capsule. If either cannot be produced under one replayable
+producer/execution identity, reject the tuple variant before compilation.
+
+Fable 5 Max session `d6512b94-52af-4a03-85de-d7d5b43ea5cc` again returned only its hard
+usage-limit message and supplied no opinion. The goal-authorized Sol fallback withheld approval of
+the first staged draft after the local audit found that all watchpoints could migrate together to a
+different sealed stage. Corrected exact staged SHA `775b3644...c8fa` hard-binds stage zero, adds the
+fully rebound migration attack and received `APPROVE PERSISTENCE` with no P0--P2. The verdict is
+persistence only and explicitly authorizes no JAX/backend/model/cloud/compile/TPU execution or
+Gate-D closure.
