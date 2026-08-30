@@ -1,0 +1,72 @@
+{
+  "artifact_kind": "greenfield_accepted_db485_compile_only_hlo_replica_contract_failure",
+  "classification": "COMPILE_SUCCEEDED_REPLICATED_HLO_RECEIPTS_REJECTED",
+  "claims": {
+    "db_run_id": null,
+    "gate_d_closed": false,
+    "numerical": false,
+    "performance": false,
+    "scheduled_hlo_recovered": false
+  },
+  "compile": {
+    "compile_seconds": 1161.58,
+    "db485_executable_class_match": true,
+    "generate_calls": 0,
+    "token_buckets": [32, 64, 128, 256, 512, 1024, 2048]
+  },
+  "evidence": {
+    "census_failure_exit_1.txt": {
+      "byte_count": 568,
+      "sha256": "97955e013e9ffcd3069140a46f12622b8b37489db55d94124669809eac29b709"
+    },
+    "compile.log": {
+      "byte_count": 9475839,
+      "sha256": "12ae4ff2982ccb969cf968b256b4385edf03fa492c3e5bad76ef128dc170d0aa"
+    },
+    "fingerprint_precheck.txt": {
+      "byte_count": 29,
+      "sha256": "3b74c86555c6ba61312c35dffb48233066fe99e017426f4cc8cfe53de010706e"
+    },
+    "fleet_integrity.txt": {
+      "byte_count": 2912,
+      "sha256": "3c3440898373033b63e39762a160bc8bae7ed15e55eb8d3a12089975836d5d03"
+    },
+    "hlo_owner_validation.txt": {
+      "byte_count": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "hlo_owners.txt": {
+      "byte_count": 296,
+      "sha256": "c5b7361c24b67eda4d9e513cb22f697c0d8f9e9c329ca15c409bd332b992b4ef"
+    },
+    "orchestrator.log": {
+      "byte_count": 340,
+      "sha256": "b1b3fa96501aed250f1363f6bbff002c4ea1692414e82426a62db26bceacdcfd"
+    },
+    "source_cleanup_failure_exit.txt": {
+      "byte_count": 280,
+      "sha256": "9b11742f67f964c6b33a35c21c874681ba32c7c483da97088189a4fec5bb29fb"
+    },
+    "stop.txt": {
+      "byte_count": 552,
+      "sha256": "0115877d3866aa3d616b5fa2f89b15cb228e2cdd2cdf92e3e99e17fea44b34f0"
+    }
+  },
+  "failure": {
+    "expected_contract": "ONE_HLO_OWNER_SEVEN_NONOWNERS",
+    "observed_contract": "EIGHT_HOSTS_EACH_WITH_SEVEN_QUALIFYING_DUMPS",
+    "remote_scheduled_hlo_removed_by_authenticated_cleanup": true
+  },
+  "fleet_cleanup": {
+    "census_ok": 8,
+    "source_clean_ok": 8,
+    "stop_ok": 8
+  },
+  "greenfield_pin": "6274f76093f70e4e436ea8a54084dccace52914b",
+  "remote_diagnostics": {
+    "live_object_count": 28,
+    "prefix": "gs://driftbench-dsv4-uc/oracles/greenfield/glm52/accepted_compile_only_hlo/accepted_db485_compile_only_hlo_20260830T003358774368259Z/diagnostic_local/accepted_db485_compile_only_hlo_20260830T003358774368259Z"
+  },
+  "run_tag": "accepted_db485_compile_only_hlo_20260830T003358774368259Z",
+  "status": "TERMINAL_FAILURE_TAG_BURNED"
+}

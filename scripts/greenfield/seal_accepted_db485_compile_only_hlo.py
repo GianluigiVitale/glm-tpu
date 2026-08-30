@@ -15,9 +15,10 @@ from glm_tpu.greenfield.benchmarking.accepted_compile_only_hlo import (
     ACCEPTED_VLLM_PIN,
     ACCEPTED_VLLM_VERSION,
     ACCEPTED_VLLM_VERSION_FILE_SHA256,
+    validate_canonical_hlo_replica,
     validate_compile_only_log,
-    validate_hlo_owner_receipts,
-    validate_scheduled_hlo_files,
+    validate_hlo_replica_evidence,
+    validate_worker_host_receipts,
 )
 
 HARNESS_PIN = "3409bf58a758e7bfa398eb92051db701d623e6b9"
@@ -58,7 +59,8 @@ def main() -> int:
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--log", required=True, type=Path)
     parser.add_argument("--hlo-dir", required=True, type=Path)
-    parser.add_argument("--hlo-owner-receipts", required=True, type=Path)
+    parser.add_argument("--hlo-replica-receipts", required=True, type=Path)
+    parser.add_argument("--hlo-replica-audits", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--greenfield-pin", required=True)
     parser.add_argument("--accepted-bundle-sha256", required=True)
@@ -86,7 +88,12 @@ def main() -> int:
     )
     if any(path.exists() or path.is_symlink() for path in reserved):
         raise SystemExit("compile-only manifest output already exists")
-    for path in (args.log, args.hlo_dir, args.hlo_owner_receipts):
+    for path in (
+        args.log,
+        args.hlo_dir,
+        args.hlo_replica_receipts,
+        args.hlo_replica_audits,
+    ):
         try:
             path.resolve(strict=True).relative_to(run_root)
         except ValueError as exc:
@@ -125,16 +132,15 @@ def main() -> int:
         raise SystemExit("compile-only provenance identity is invalid")
 
     report = validate_compile_only_log(args.log.read_bytes(), run_tag=args.run_tag)
-    report["hlo_owner"] = validate_hlo_owner_receipts(
-        args.hlo_owner_receipts.read_bytes()
+    expected_hosts = validate_worker_host_receipts(
+        (args.run_dir / "prereq.txt").read_bytes(), marker="PREREQ_OK"
     )
-    report["hlo"] = validate_scheduled_hlo_files(
-        [
-            path
-            for path in args.hlo_dir.iterdir()
-            if path.is_file() and path.name.endswith(".txt.gz")
-        ]
+    report["hlo_replicas"] = validate_hlo_replica_evidence(
+        args.hlo_replica_receipts.read_bytes(),
+        args.hlo_replica_audits,
+        expected_hosts,
     )
+    report["hlo"] = validate_canonical_hlo_replica(args.hlo_dir, report["hlo_replicas"])
     raw_inventory = args.hlo_dir / "raw_hlo_inventory.txt"
     raw_inventory_bytes = raw_inventory.read_bytes()
     inventory_paths: dict[str, int] = {}
@@ -196,6 +202,10 @@ def main() -> int:
     ]
     if bucket_map != expected_map:
         raise SystemExit("bucket/HLO map differs from sealed HLO contents")
+    if (args.hlo_dir / "replica_audit.tsv").read_bytes() != (
+        args.hlo_replica_audits / "worker_0.tsv"
+    ).read_bytes():
+        raise SystemExit("canonical HLO audit differs from worker-0 audit")
     report["hlo"]["raw_inventory"] = {
         "byte_count": len(raw_inventory_bytes),
         "line_count": len(inventory_paths),

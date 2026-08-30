@@ -729,3 +729,16 @@ an unexpected object. Any mismatch is terminal. Even a pass is accepted-only com
 evidence: there is no callback HLO to compare, and no inference request, DB row, numerical result,
 performance claim or Gate-D closure. No TPU invocation is authorized until the corrected
 implementation receives a separate adversarial verdict and is committed, pushed and mirrored.
+
+The first authorized acquisition used pin `6274f760` and burned tag
+`accepted_db485_compile_only_hlo_20260830T003358774368259Z`. Exact initialization, DB485
+fingerprints and load integrity passed with no request (`generate_calls=0`), but all eight hosts
+materialized seven scheduled dumps. The one-owner contract refused and no success artifact was
+published; 8/8 cleanup passed. Reuse the archived diagnostics as ownership-assumption evidence only.
+There is no recoverable scheduled-HLO payload. The successor must collect eight full host audits,
+compare common raw `(bucket,size,SHA)` identities without requiring equal compiler filenames, seal
+worker 0 only after equality, and attempt a bounded eight-host copy on any divergence. Remote dumps
+on the normal path are cleanup-eligible after eight audits agree and worker 0 validates. Once failure
+preservation starts, cleanup requires all eight local sets to byte-validate; otherwise every remaining
+exact tag dump is retained, eight retention receipts are required and no cleanup claim is made. It
+remains offline/unapproved and cannot close Gate D.

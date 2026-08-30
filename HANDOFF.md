@@ -7750,3 +7750,47 @@ with no decode and a hard requirement that all seven fingerprint triples equal D
 identity dimensions before the HLO is admissible. A mismatch is terminal for that design; a match
 is mechanism evidence only. No TPU execution is authorized here. Gate D is open and a numerical
 successor still requires a genuinely new bounded plan-level physical state/ownership mechanism.
+
+## Current exact next: persist replicated-HLO correction; separately review any retry
+
+The sole authorized accepted-tree acquisition at committed/pushed/mirrored pin `6274f760`, tag
+`accepted_db485_compile_only_hlo_20260830T003358774368259Z`, completed exact model initialization
+and all seven M32--M2048 compiles. The terminal model marker is
+`ACCEPTED_DB485_COMPILE_ONLY_COMPLETE ... generate_calls=0`; compilation took 1,161.58 seconds.
+The exact DB485 three-fingerprint gate and 8-host load/state integrity passed. Post-codegen
+compaction then returned seven valid scheduled modules on every host, not the assumed one owner and
+seven nonowners. All eight receipts were `HLO_OWNER ... count=7`; the ownership validator refused,
+published no manifest/SUCCESS and made no numerical, performance, DB or Gate-D claim.
+
+Failure cleanup is authenticated by 8/8 `STOP_OK`, `CENSUS_OK` and `SOURCE_CLEAN_OK`. Compact local
+diagnostics are archived under the exact same-region tag prefix; the local HLO directory is empty
+because the reviewed failure trap removed every tag-scoped remote dump. This run cannot be salvaged
+into exact HLO evidence and its tag is burned. Compact hash evidence is
+`docs/artifacts/accepted-db485-compile-only-hlo-replica-contract-failure.json`. Gate D remains open.
+
+Fable remains at 100% usage, so the goal-authorized independent Sol reviewer examined only this
+failure. Its diagnosis agrees that multihost dump materialization is replicated, while warning that
+the receipts alone do not prove independent compilation or identical bytes. The current offline
+correction therefore gathers and seals all eight full host audit manifests before cleanup, compares
+bucket-sorted `(M, raw_bytes, raw_sha256)` identities independent of compiler filenames, validates
+worker 0's copied payload against the common identity and, on any divergence/copy failure, first
+quiesces the runtime and attempts a globally bounded eight-host preservation. Every gzip round-trips
+to its recorded raw size/SHA and a v2 audit binds both metadata files. On the normal path, eight
+matching host audits plus one fully validated canonical worker-0 payload permit cleanup. Once failure
+preservation begins, remote dump deletion requires eight byte-validated local sets; an incomplete
+copy refuses all tag-dump deletion, requires eight `SOURCE_RETAINED` receipts and otherwise reports
+cleanup/preservation incomplete. Model integrity now runs after safe
+local HLO collection so a late refusal cannot discard the acquisition. Fable remains usage-blocked;
+the goal-authorized Sol review
+found five preservation/lifecycle blockers, all now corrected and covered by executable copy-loss,
+timeout and retained-dump tests. No retry is authorized until broad validation, correction-only Sol
+approval, commit/push/locked same-region mirror and a separate one-shot execution verdict. The
+correction-only Sol follow-up found no remaining P0--P2 issue and approved tracked diff
+`b72383df...74646` plus failure artifact `b099ca24...56bb` for persistence only; it authorized no
+execution. Focused
+hostile coverage passes 45/45 at the final affected diff. Before the final hostname/mkdir-only
+correction, the complete explicitly CPU-forced adjacent suite passed 425/425 with 10 expected skips
+in 234.68 seconds; its unaffected remainder is reused rather than rerun. An earlier invocation omitted
+`JAX_PLATFORMS=cpu`, opened worker 0's local TPU client and was terminated after its wait-state was
+identified; it ran no model or Ray workload. A fresh read-only census afterward is 8/8 `CENSUS_OK`.
+Only the CPU-forced result is validation evidence.

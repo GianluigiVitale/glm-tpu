@@ -84,11 +84,14 @@ _HLO_FILENAME_RE = re.compile(
     r"(?P<raw>module_(?P<module>\d+)\.jit_step_fun_impl\."
     r"cl_\d+\.after_codegen\.txt)\.gz$"
 )
-_OWNER_RECEIPT_RE = re.compile(
-    r"^(?P<kind>HLO_OWNER|HLO_NONOWNER) "
-    r"(?P<host>[A-Za-z0-9.-]+-w-(?P<worker>[0-7]))"
-    r"(?: count=(?P<count>\d+))?$"
+_REPLICA_RECEIPT_RE = re.compile(
+    r"^HLO_REPLICA "
+    r"(?P<host>[A-Za-z0-9.-]+-w-(?P<worker>[0-7])) "
+    r"count=(?P<count>\d+) "
+    r"identity_sha256=(?P<identity_sha256>[0-9a-f]{64}) "
+    r"audit_sha256=(?P<audit_sha256>[0-9a-f]{64})$"
 )
+_WORKER_HOST_RE = re.compile(r"^(?P<host>[A-Za-z0-9.-]+-w-(?P<worker>[0-7]))$")
 _FORBIDDEN_EXECUTION_MARKERS = (
     "[longctx]",
     "correct=True",
@@ -231,36 +234,294 @@ def validate_compile_only_log(raw: bytes, *, run_tag: str) -> dict[str, Any]:
     }
 
 
-def validate_hlo_owner_receipts(raw: bytes) -> dict[str, Any]:
-    """Require one compile owner and seven nonowners across exact workers 0--7."""
+def validate_worker_host_receipts(raw: bytes, *, marker: str) -> dict[int, str]:
+    """Return the authenticated worker-to-Linux-hostname mapping for a fleet receipt."""
 
+    if not re.fullmatch(r"[A-Z][A-Z0-9_]+", marker):
+        raise BenchmarkValidationError("worker-host receipt marker is invalid")
+    prefix = f"{marker} "
+    lines = [
+        line.removeprefix(prefix)
+        for line in raw.decode("utf-8", errors="strict").splitlines()
+        if line.startswith(prefix)
+    ]
+    matches = [_WORKER_HOST_RE.fullmatch(line) for line in lines]
+    if len(lines) != 8 or any(match is None for match in matches):
+        raise BenchmarkValidationError(
+            "worker-host receipts are malformed or incomplete"
+        )
+    mapping = {
+        int(match.group("worker")): match.group("host")
+        for match in matches
+        if match is not None
+    }
+    if len(mapping) != 8 or sorted(mapping) != list(range(8)):
+        raise BenchmarkValidationError("worker-host receipt mapping drifted")
+    return mapping
+
+
+def validate_hlo_replica_evidence(
+    raw: bytes,
+    audit_dir: Path,
+    expected_hosts: dict[int, str],
+    *,
+    require_common_identity: bool = True,
+) -> dict[str, Any]:
+    """Require eight host audits with one common raw-HLO identity."""
+
+    expected_matches = {
+        worker: _WORKER_HOST_RE.fullmatch(host)
+        for worker, host in expected_hosts.items()
+    }
+    if (
+        sorted(expected_hosts) != list(range(8))
+        or len(set(expected_hosts.values())) != 8
+        or any(
+            match is None or int(match.group("worker")) != worker
+            for worker, match in expected_matches.items()
+        )
+    ):
+        raise BenchmarkValidationError("expected worker-host mapping drifted")
     all_lines = raw.decode("utf-8", errors="strict").splitlines()
     lines = [line for line in all_lines if line.startswith("HLO_")]
-    matches = [_OWNER_RECEIPT_RE.fullmatch(line) for line in lines]
+    matches = [_REPLICA_RECEIPT_RE.fullmatch(line) for line in lines]
     if len(lines) != 8 or any(match is None for match in matches):
-        raise BenchmarkValidationError("HLO owner receipts are malformed or incomplete")
+        raise BenchmarkValidationError(
+            "HLO replica receipts are malformed or incomplete"
+        )
     records = [match.groupdict() for match in matches if match is not None]
     workers = [int(record["worker"]) for record in records]
     hosts = [record["host"] for record in records]
-    owners = [record for record in records if record["kind"] == "HLO_OWNER"]
     if (
         sorted(workers) != list(range(8))
         or len(set(hosts)) != 8
-        or len(owners) != 1
-        or owners[0]["count"] != "7"
+        or any(record["count"] != "7" for record in records)
         or any(
-            record["count"] is not None
+            record["host"] != expected_hosts.get(int(record["worker"]))
             for record in records
-            if record["kind"] == "HLO_NONOWNER"
         )
     ):
-        raise BenchmarkValidationError("HLO owner/nonowner host contract drifted")
+        raise BenchmarkValidationError("HLO replica host contract drifted")
+    try:
+        audit_paths = sorted(audit_dir.iterdir())
+    except OSError as exc:
+        raise BenchmarkValidationError(
+            "HLO replica audit directory is unavailable"
+        ) from exc
+    if any(not path.is_file() or path.is_symlink() for path in audit_paths) or [
+        path.name for path in audit_paths
+    ] != [f"worker_{worker}.tsv" for worker in range(8)]:
+        raise BenchmarkValidationError("HLO replica audit file set drifted")
+
+    audits = []
+    common_identities: set[bytes] = set()
+    expected_columns = (
+        "bucket\traw_path\traw_bytes\traw_sha256\tsealed_name\t"
+        "compressed_bytes\tcompressed_sha256"
+    )
+    for record in sorted(records, key=lambda item: int(item["worker"])):
+        worker = int(record["worker"])
+        path = audit_dir / f"worker_{worker}.tsv"
+        audit_bytes = path.read_bytes()
+        if sha256(audit_bytes).hexdigest() != record["audit_sha256"]:
+            raise BenchmarkValidationError("HLO replica audit receipt hash drifted")
+        audit_lines = audit_bytes.decode("utf-8", errors="strict").splitlines()
+        if (
+            len(audit_lines) != 14
+            or audit_lines[0] != "schema\thlo_replica_audit_v2"
+            or audit_lines[1] != f"host\t{record['host']}"
+            or audit_lines[2] != f"worker\t{worker}"
+            or audit_lines[3] != f"identity_sha256\t{record['identity_sha256']}"
+            or not re.fullmatch(r"raw_inventory_sha256\t[0-9a-f]{64}", audit_lines[4])
+            or not re.fullmatch(r"bucket_map_sha256\t[0-9a-f]{64}", audit_lines[5])
+            or audit_lines[6] != expected_columns
+        ):
+            raise BenchmarkValidationError("HLO replica audit header drifted")
+        rows = []
+        module_ids = []
+        for line in audit_lines[7:]:
+            fields = line.split("\t")
+            if len(fields) != 7:
+                raise BenchmarkValidationError("HLO replica audit row drifted")
+            (
+                bucket,
+                raw_path,
+                raw_bytes,
+                raw_sha,
+                sealed_name,
+                compressed_bytes,
+                compressed_sha,
+            ) = fields
+            filename = _HLO_FILENAME_RE.fullmatch(sealed_name)
+            if (
+                not bucket.isdigit()
+                or not raw_bytes.isdigit()
+                or int(raw_bytes) <= 0
+                or not compressed_bytes.isdigit()
+                or int(compressed_bytes) <= 0
+                or not re.fullmatch(r"[0-9a-f]{64}", raw_sha)
+                or not re.fullmatch(r"[0-9a-f]{64}", compressed_sha)
+                or not raw_path
+                or raw_path.startswith("/")
+                or ".." in Path(raw_path).parts
+                or filename is None
+                or int(filename.group("tokens")) != int(bucket)
+                or filename.group("raw") != Path(raw_path).name
+            ):
+                raise BenchmarkValidationError("HLO replica audit row drifted")
+            module_ids.append(int(filename.group("module")))
+            rows.append(
+                {
+                    "compressed_bytes": int(compressed_bytes),
+                    "compressed_sha256": compressed_sha,
+                    "num_tokens": int(bucket),
+                    "raw_bytes": int(raw_bytes),
+                    "raw_path": raw_path,
+                    "raw_sha256": raw_sha,
+                    "sealed_name": sealed_name,
+                }
+            )
+        if (
+            tuple(row["num_tokens"] for row in rows) != TOKEN_BUCKETS
+            or module_ids != sorted(module_ids)
+            or len(module_ids) != len(set(module_ids))
+        ):
+            raise BenchmarkValidationError("HLO replica audit bucket order drifted")
+        identity_bytes = "".join(
+            f"{row['num_tokens']}\t{row['raw_bytes']}\t{row['raw_sha256']}\n"
+            for row in rows
+        ).encode()
+        if sha256(identity_bytes).hexdigest() != record["identity_sha256"]:
+            raise BenchmarkValidationError("HLO replica common identity hash drifted")
+        common_identities.add(identity_bytes)
+        audits.append(
+            {
+                "audit_bytes": len(audit_bytes),
+                "audit_sha256": record["audit_sha256"],
+                "bucket_map_sha256": audit_lines[5].split("\t", 1)[1],
+                "host": record["host"],
+                "raw_inventory_sha256": audit_lines[4].split("\t", 1)[1],
+                "rows": rows,
+                "worker": worker,
+            }
+        )
+    if require_common_identity and len(common_identities) != 1:
+        raise BenchmarkValidationError("HLO replica raw identities diverged")
+    common_identity = (
+        next(iter(common_identities)) if len(common_identities) == 1 else None
+    )
+    canonical = next(record for record in records if record["worker"] == "0")
     return {
-        "owner_host": owners[0]["host"],
-        "owner_worker": int(owners[0]["worker"]),
-        "status": "ONE_HLO_OWNER_SEVEN_NONOWNERS",
+        "audits": audits,
+        "canonical_host": canonical["host"],
+        "canonical_worker": 0,
+        "common_identity": (
+            [
+                {
+                    "num_tokens": int(line.split("\t")[0]),
+                    "raw_bytes": int(line.split("\t")[1]),
+                    "raw_sha256": line.split("\t")[2],
+                }
+                for line in common_identity.decode().splitlines()
+            ]
+            if common_identity is not None
+            else None
+        ),
+        "common_identity_count": len(common_identities),
+        "common_identity_sha256": (
+            sha256(common_identity).hexdigest() if common_identity is not None else None
+        ),
+        "replica_count": 8,
+        "status": (
+            "EIGHT_MATCHING_RAW_HLO_REPLICAS"
+            if len(common_identities) == 1
+            else "EIGHT_AUDITED_DIVERGENT_RAW_HLO_REPLICAS"
+        ),
         "worker_count": 8,
     }
+
+
+def validate_hlo_replica_payload(
+    hlo_dir: Path, audit: dict[str, Any]
+) -> dict[str, Any]:
+    """Bind one copied compact payload to its full per-host audit."""
+
+    paths = [
+        path
+        for path in hlo_dir.iterdir()
+        if path.is_file() and path.name.endswith(".txt.gz")
+    ]
+    report = validate_scheduled_hlo_files(paths)
+    expected_names = {
+        *(item["name"] for item in report["files"]),
+        "bucket_hlo_map.tsv",
+        "raw_hlo_inventory.txt",
+        "replica_audit.tsv",
+        "replica_identity.tsv",
+    }
+    entries = list(hlo_dir.iterdir())
+    if (
+        any(not path.is_file() or path.is_symlink() for path in entries)
+        or {path.name for path in entries} != expected_names
+    ):
+        raise BenchmarkValidationError(
+            "canonical HLO directory contains an unexpected entry"
+        )
+    actual_identity = [
+        {
+            "num_tokens": item["num_tokens"],
+            "raw_bytes": item["raw_bytes"],
+            "raw_sha256": item["raw_sha256"],
+        }
+        for item in report["files"]
+    ]
+    identity_bytes = "".join(
+        f"{item['num_tokens']}\t{item['raw_bytes']}\t{item['raw_sha256']}\n"
+        for item in actual_identity
+    ).encode()
+    audit_rows = audit["rows"]
+    if (
+        (hlo_dir / "replica_identity.tsv").read_bytes() != identity_bytes
+        or sha256((hlo_dir / "replica_audit.tsv").read_bytes()).hexdigest()
+        != audit["audit_sha256"]
+        or sha256((hlo_dir / "raw_hlo_inventory.txt").read_bytes()).hexdigest()
+        != audit["raw_inventory_sha256"]
+        or sha256((hlo_dir / "bucket_hlo_map.tsv").read_bytes()).hexdigest()
+        != audit["bucket_map_sha256"]
+        or len(audit_rows) != len(report["files"])
+        or any(
+            row["num_tokens"] != item["num_tokens"]
+            or row["raw_bytes"] != item["raw_bytes"]
+            or row["raw_sha256"] != item["raw_sha256"]
+            or row["sealed_name"] != item["name"]
+            or row["compressed_bytes"] != item["compressed_bytes"]
+            or row["compressed_sha256"] != item["compressed_sha256"]
+            for row, item in zip(audit_rows, report["files"], strict=True)
+        )
+    ):
+        raise BenchmarkValidationError("HLO payload differs from replica audit")
+    report["replica_identity"] = {
+        "records": actual_identity,
+        "sha256": sha256(identity_bytes).hexdigest(),
+    }
+    return report
+
+
+def validate_canonical_hlo_replica(
+    hlo_dir: Path, replica_report: dict[str, Any]
+) -> dict[str, Any]:
+    """Bind worker 0's copied payload to the common eight-host identity."""
+
+    report = validate_hlo_replica_payload(hlo_dir, replica_report["audits"][0])
+    if (
+        report["replica_identity"]["records"] != replica_report["common_identity"]
+        or report["replica_identity"]["sha256"]
+        != replica_report["common_identity_sha256"]
+    ):
+        raise BenchmarkValidationError(
+            "canonical HLO payload differs from replica evidence"
+        )
+    return report
 
 
 def validate_scheduled_hlo_files(paths: list[Path]) -> dict[str, Any]:

@@ -824,8 +824,11 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
 - “Seven scheduled modules” is not a bucket certificate. Bind every artifact independently to its
   logical bucket using an already-proven physical signature. For DB485 that means exactly 156
   source-backed `bf16[M,6144]` row-parallel reductions, 32 partitions, an exact M32--M2048 map and
-  strictly increasing compiler module ids. Also require one owner plus seven nonowners across exact
-  worker suffixes 0--7 and compare decompressed bytes with the recorded raw size.
+  strictly increasing compiler module ids. The superseded binary-share assumption expected one
+  owner plus seven nonowners; direct evidence requires seven host-local replicas on every exact
+  worker suffix 0--7, a common raw size/SHA identity, and worker 0 as canonical only after all eight
+  audits agree. Compare every decompressed payload with its recorded raw size and SHA before raw
+  deletion.
 - A compile-only diagnostic still needs production-grade lifecycle rules. The driver must own a
   bounded killable session; Ray ownership remains armed until zero-work census passes; post-launch
   cloud operations are bounded; source mounts are explicitly read-only. A remote prefix is not
@@ -837,9 +840,10 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
   guarantee failure only after the expensive model initialization. Inject and byte-pin the exact
   generated version file, import that reconstructed path on all eight hosts before model work and
   seal both the semantic version and file hash. Do not weaken the DB485 version check.
-- Under `set -euo pipefail`, never probe an optional binary-share HLO root with `find | wc` before
-  classifying the root. An absent or empty root is a valid nonowner; a non-directory or unreadable
-  root is a failure. Exercise the actual compactor command for these branches before TPU work.
+- Under `set -euo pipefail`, never probe an HLO root with `find | wc` before classifying the root.
+  The superseded binary-share design treated absent/empty roots as nonowners; direct evidence now
+  requires a nonempty root on all eight hosts. A missing, empty, non-directory or unreadable root is
+  a failure. Exercise the actual compactor command for every branch before TPU work.
 - Shell `-e` does not detect a dangling symlink. Every append-only local/fleet vacancy check must
   require both `! -e` and `! -L`; otherwise SCP can follow a stale transport link outside the
   tag-owned namespace while cleanup removes only the link. Likewise, evidence walkers must lstat
@@ -848,3 +852,15 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
   reconstruct its exact canonical bytes from the sealed manifest, exact remote prefix and immutable
   ledger; require every provenance field, `db_run_id=None`, and all numerical/performance/Gate-D
   claims false. Missing, extra, reordered or altered fields and a prefix folder-marker object fail.
+- A multihost JAX debug dump is not necessarily a binary-share one-owner artifact. The 2026-08-30
+  accepted DB485 acquisition emitted seven qualifying scheduled HLOs on every one of eight hosts;
+  the old one-owner/seven-nonowner validator correctly refused publication but discarded the remote
+  compact payloads during authenticated cleanup. Receipts prove replicated dump materialization,
+  not independent compilation or byte equality. Future admission must collect all eight fixed-schema
+  audits first, compare exact bucket-sorted raw size/SHA identities independent of compiler filenames,
+  replay the canonical worker-0 payload and attempt bounded preservation of all divergent compressed
+  sets. The normal matching path may clean up after eight audits agree and worker 0's copied payload
+  validates. Once failure preservation begins, delete remote dumps only after eight copied payloads
+  validate; otherwise retain every exact tag dump wherever present, require eight retention receipts
+  and report preservation incomplete rather than claiming cleanup.
+  Never burn another full compile merely because a post-compile evidence assumption was wrong.

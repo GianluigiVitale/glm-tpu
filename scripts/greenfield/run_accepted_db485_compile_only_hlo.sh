@@ -56,6 +56,8 @@ readonly HLO_COMPACT=$DUMP_ROOT/hlo_compact
 readonly XLA_CACHE=$DUMP_ROOT/xla_cache
 readonly TOPK_PREFIX=$DUMP_ROOT/topk.npz
 readonly HLO_LOCAL=$RUN_DIR/hlo
+readonly HLO_AUDIT_LOCAL=$RUN_DIR/hlo_replica_audits
+readonly HLO_DIVERGENCE_LOCAL=$RUN_DIR/divergent_hlo_replicas
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
   echo "refusing outside $BRANCH" >&2
@@ -183,16 +185,112 @@ stop_driver_session() {
 }
 
 cleanup_run_owned_sources() {
-  local label=$1 command
+  local label=$1 retain_dump=${2:-0} command marker expected_fields
   # Every recursive deletion is constrained to this validated tag's exact
   # /tmp names; preflight refuses any pre-existing target.
   # shellcheck disable=SC2016
-  command='code='"$CODE_RUNTIME"'; code_tmp='"$CODE_RUNTIME_TEMP"'; code_bundle='"$CODE_BUNDLE_REMOTE"'; vllm='"$VLLM_RUNTIME"'; vllm_archive='"$VLLM_ARCHIVE_REMOTE"'; dump='"$DUMP_ROOT"'; safe=1; printf "%s\n" "$code" | grep -Eq "^/tmp/glm_accepted_[A-Za-z0-9_]+$" || safe=0; [ "$code_tmp" = "${code}.tmp" ] || safe=0; [ "$code_bundle" = "${code}.bundle" ] || safe=0; printf "%s\n" "$vllm" | grep -Eq "^/tmp/glm_vllm_[A-Za-z0-9_]+$" || safe=0; [ "$vllm_archive" = "${vllm}.tar.gz" ] || safe=0; [ "$dump" = /tmp/'"$TAG"' ] || safe=0; if [ "$safe" -ne 1 ]; then echo "SOURCE_CLEAN_BAD $(hostname) unsafe_target"; exit 0; fi; rm -rf -- "$code" "$code_tmp" "$vllm" "$dump"; rm -f -- "$code_bundle" "$vllm_archive"; if [ ! -e "$code" ] && [ ! -e "$code_tmp" ] && [ ! -e "$code_bundle" ] && [ ! -e "$vllm" ] && [ ! -e "$vllm_archive" ] && [ ! -e "$dump" ]; then echo "SOURCE_CLEAN_OK $(hostname)"; else echo "SOURCE_CLEAN_BAD $(hostname) residual"; fi'
+  command='code='"$CODE_RUNTIME"'; code_tmp='"$CODE_RUNTIME_TEMP"'; code_bundle='"$CODE_BUNDLE_REMOTE"'; vllm='"$VLLM_RUNTIME"'; vllm_archive='"$VLLM_ARCHIVE_REMOTE"'; dump='"$DUMP_ROOT"'; retain_dump='"$retain_dump"'; safe=1; printf "%s\n" "$code" | grep -Eq "^/tmp/glm_accepted_[A-Za-z0-9_]+$" || safe=0; [ "$code_tmp" = "${code}.tmp" ] || safe=0; [ "$code_bundle" = "${code}.bundle" ] || safe=0; printf "%s\n" "$vllm" | grep -Eq "^/tmp/glm_vllm_[A-Za-z0-9_]+$" || safe=0; [ "$vllm_archive" = "${vllm}.tar.gz" ] || safe=0; [ "$dump" = /tmp/'"$TAG"' ] || safe=0; [[ $retain_dump == 0 || $retain_dump == 1 ]] || safe=0; if [ "$safe" -ne 1 ]; then echo "SOURCE_CLEAN_BAD $(hostname) unsafe_target"; exit 0; fi; rm -rf -- "$code" "$code_tmp" "$vllm"; rm -f -- "$code_bundle" "$vllm_archive"; if [ "$retain_dump" -eq 0 ]; then rm -rf -- "$dump"; fi; sources_absent=0; [ ! -e "$code" ] && [ ! -e "$code_tmp" ] && [ ! -e "$code_bundle" ] && [ ! -e "$vllm" ] && [ ! -e "$vllm_archive" ] && sources_absent=1; if [ "$sources_absent" -eq 1 ] && [ "$retain_dump" -eq 0 ] && [ ! -e "$dump" ] && [ ! -L "$dump" ]; then echo "SOURCE_CLEAN_OK $(hostname)"; elif [ "$sources_absent" -eq 1 ] && [ "$retain_dump" -eq 1 ] && [ -d "$dump" ] && [ ! -L "$dump" ]; then echo "SOURCE_RETAINED $(hostname) dump=$dump"; else echo "SOURCE_CLEAN_BAD $(hostname) residual"; fi'
   bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 180 \
     gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$command" >"$RUN_DIR/source_cleanup_${label}.txt" \
     2>"$RUN_DIR/source_cleanup_${label}_ssh.txt" || return 1
-  has_eight_unique_markers "$RUN_DIR/source_cleanup_${label}.txt" SOURCE_CLEAN_OK
+  if [[ $retain_dump -eq 1 ]]; then
+    marker=SOURCE_RETAINED
+    expected_fields=3
+  else
+    marker=SOURCE_CLEAN_OK
+    expected_fields=2
+  fi
+  has_eight_unique_markers \
+    "$RUN_DIR/source_cleanup_${label}.txt" "$marker" "$expected_fields"
+}
+
+preserve_divergent_hlo_replicas() {
+  local worker target deadline remaining per_copy copy_rc=0 validation_rc
+  # Fail closed from the first preservation instruction: any local/transport
+  # error after this point makes the exact remote tag dumps cleanup-ineligible.
+  hlo_preservation_incomplete=1
+  if [[ $runtime_started -eq 1 ]]; then
+    stop_owned_runtime || {
+      hlo_preservation_incomplete=1
+      return 1
+    }
+    strict_census preservation_pre || {
+      hlo_preservation_incomplete=1
+      return 1
+    }
+    post_census_done=1
+    runtime_started=0
+  fi
+  mkdir -p "$HLO_DIVERGENCE_LOCAL/audits"
+  deadline=$((SECONDS + 600))
+  for worker in 0 1 2 3 4 5 6 7; do
+    remaining=$((deadline - SECONDS))
+    if [[ $remaining -le 0 ]]; then
+      copy_rc=1
+      break
+    fi
+    per_copy=$remaining
+    [[ $per_copy -gt 120 ]] && per_copy=120
+    target="$HLO_DIVERGENCE_LOCAL/worker_$worker"
+    mkdir -p "$target"
+    if ! bash "$WORKTREE/scripts/validate_ray_network.sh" bounded "$per_copy" \
+      gcloud compute tpus tpu-vm scp --zone "$ZONE" --worker="$worker" \
+      "$POD:$HLO_COMPACT/*" "$target/" \
+      >"$HLO_DIVERGENCE_LOCAL/worker_${worker}_copy.txt" \
+      2>"$HLO_DIVERGENCE_LOCAL/worker_${worker}_copy_ssh.txt"; then
+      copy_rc=1
+      continue
+    fi
+    if [[ -f $target/replica_audit.tsv && ! -L $target/replica_audit.tsv ]]; then
+      cp -- "$target/replica_audit.tsv" \
+        "$HLO_DIVERGENCE_LOCAL/audits/worker_$worker.tsv"
+    else
+      copy_rc=1
+    fi
+  done
+  set +e
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+    "$RUN_DIR/hlo_replicas.txt" "$HLO_DIVERGENCE_LOCAL" \
+    >"$HLO_DIVERGENCE_LOCAL/preservation_validation.txt" \
+    2>"$HLO_DIVERGENCE_LOCAL/preservation_validation_stderr.txt" <<'PY'
+from pathlib import Path
+import sys
+from glm_tpu.greenfield.benchmarking.accepted_compile_only_hlo import (
+    validate_hlo_replica_evidence,
+    validate_hlo_replica_payload,
+    validate_worker_host_receipts,
+)
+root = Path(sys.argv[2])
+expected_hosts = validate_worker_host_receipts(
+    (Path(sys.argv[1]).parent / "prereq.txt").read_bytes(), marker="PREREQ_OK"
+)
+report = validate_hlo_replica_evidence(
+    Path(sys.argv[1]).read_bytes(),
+    root / "audits",
+    expected_hosts,
+    require_common_identity=False,
+)
+for audit in report["audits"]:
+    validate_hlo_replica_payload(root / f"worker_{audit['worker']}", audit)
+print(f"EIGHT_HLO_REPLICAS_PRESERVED identity_count={report['common_identity_count']}")
+PY
+  validation_rc=$?
+  set -e
+  if [[ $copy_rc -eq 0 && $validation_rc -eq 0 ]]; then
+    hlo_preservation_verified=1
+    hlo_preservation_incomplete=0
+    return 0
+  fi
+  return 1
+}
+
+prepare_hlo_audit_collection() {
+  if mkdir "$HLO_AUDIT_LOCAL"; then
+    return 0
+  fi
+  preserve_divergent_hlo_replicas || true
+  return 1
 }
 
 runtime_started=0
@@ -201,6 +299,8 @@ post_census_done=0
 terminal_success=0
 remote_prefix_owned=0
 terminal_publication_started=0
+hlo_preservation_verified=0
+hlo_preservation_incomplete=0
 
 on_exit() {
   local status=$?
@@ -219,13 +319,20 @@ on_exit() {
     post_census_done=1
   fi
   if [[ $sources_prepared -eq 1 && $post_census_done -eq 1 ]]; then
-    cleanup_run_owned_sources failure_exit || true
+    if [[ $hlo_preservation_incomplete -eq 1 ]]; then
+      cleanup_run_owned_sources failure_exit 1 || true
+    else
+      cleanup_run_owned_sources failure_exit 0 || true
+    fi
   fi
   rm -f -- "$CODE_BUNDLE_LOCAL" "$VLLM_ARCHIVE_LOCAL" "$VLLM_TAR_LOCAL"
   if [[ $status -ne 0 && $terminal_success -eq 0 &&
         $remote_prefix_owned -eq 1 && $terminal_publication_started -eq 0 ]]; then
-    say "FAILED status=$status; uploading compact diagnostics only"
-    bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 300 \
+    say "FAILED status=$status; uploading failure diagnostics only"
+    failure_upload_timeout=300
+    [[ -d $HLO_DIVERGENCE_LOCAL ]] && failure_upload_timeout=1800
+    bash "$WORKTREE/scripts/validate_ray_network.sh" bounded \
+      "$failure_upload_timeout" \
       gcloud storage cp --recursive --no-clobber "$RUN_DIR" \
         "$REMOTE_PREFIX/diagnostic_local/" >/dev/null 2>&1 || true
   fi
@@ -429,7 +536,112 @@ report = validate_compile_only_log(Path(sys.argv[1]).read_bytes(), run_tag=sys.a
 print(report["status"])
 PY
 
+# Compact every host-local replica. Each module is selected by its exact
+# 156-operation row-parallel result shape, not merely by count/order. All eight
+# fixed raw-HLO identities must match before worker 0 is a copy source. Full
+# per-host audits are collected before any remote evidence is removed.
+# shellcheck disable=SC2016
+compact='set -euo pipefail; raw='"$HLO_RAW"'; compact='"$HLO_COMPACT"'; host=$(hostname); worker=${host##*-w-}; [[ $host =~ -w-[0-7]$ && $worker =~ ^[0-7]$ ]] || { echo "HLO_BAD $host worker_suffix"; exit 0; }; if [ ! -e "$raw" ]; then echo "HLO_BAD $host absent_root"; exit 0; fi; if [ ! -d "$raw" ] || [ ! -r "$raw" ] || [ ! -x "$raw" ]; then echo "HLO_BAD $host raw_root"; exit 0; fi; total=$(find "$raw" -type f | wc -l); if [ "$total" -eq 0 ]; then echo "HLO_BAD $host empty_root"; exit 0; fi; after_count=$(find "$raw" -type f -name "*after_codegen.txt" | wc -l); [ "$after_count" -eq 7 ] || { echo "HLO_BAD $host after_codegen=$after_count total=$total"; exit 0; }; mkdir "$compact"; find "$raw" -type f -printf "%P\t%s\n" | LC_ALL=C sort >"$compact/raw_hlo_inventory.txt"; : >"$compact/bucket_hlo_map.tsv"; : >"$compact/replica_identity.tsv"; : >"$compact/replica_audit_rows.tmp"; last_module=-1; ok=0; for bucket in 32 64 128 256 512 1024 2048; do pattern="bf16\\[$bucket,6144\\].*all-reduce\\(.*VllmRowParallelLinear/shard_map/psum"; mapfile -t candidates < <(find "$raw" -type f -name "*after_codegen.txt" -exec grep -lE "$pattern" {} + 2>/dev/null || true); [ "${#candidates[@]}" -eq 1 ] || { echo "HLO_BAD $host bucket=$bucket candidates=${#candidates[@]}"; exit 0; }; file=${candidates[0]}; matches=$(grep -cE "$pattern" "$file"); [ "$matches" -eq 156 ] || { echo "HLO_BAD $host bucket=$bucket matches=$matches"; exit 0; }; header=$(head -n 1 "$file"); [[ $header == "HloModule jit_step_fun_impl, is_scheduled=true"* && $header == *"num_partitions=32"* ]] || { echo "HLO_BAD $host bucket=$bucket header"; exit 0; }; base=$(basename "$file"); [[ $base =~ ^module_([0-9]+)\.jit_step_fun_impl\.cl_[0-9]+\.after_codegen\.txt$ ]] || { echo "HLO_BAD $host bucket=$bucket filename=$base"; exit 0; }; module=$((10#${BASH_REMATCH[1]})); [ "$module" -gt "$last_module" ] || { echo "HLO_BAD $host bucket=$bucket module_order"; exit 0; }; last_module=$module; relative=${file#"$raw"/}; raw_size=$(stat -c %s "$file"); raw_sha=$(sha256sum "$file" | awk '\''{print $1}'\''); output="jit_step_fun_impl.m${bucket}.${base}.gz"; gzip -n -c "$file" >"$compact/$output"; gzip -t "$compact/$output"; roundtrip_size=$(gzip -dc "$compact/$output" | wc -c); roundtrip_sha=$(gzip -dc "$compact/$output" | sha256sum | awk '\''{print $1}'\''); [ "$roundtrip_size" -eq "$raw_size" ] && [ "$roundtrip_sha" = "$raw_sha" ] || { echo "HLO_BAD $host bucket=$bucket gzip_roundtrip"; exit 0; }; compressed_size=$(stat -c %s "$compact/$output"); compressed_sha=$(sha256sum "$compact/$output" | awk '\''{print $1}'\''); printf "%s\t%s\t%s\t%s\n" "$bucket" "$relative" "$raw_size" "$output" >>"$compact/bucket_hlo_map.tsv"; printf "%s\t%s\t%s\n" "$bucket" "$raw_size" "$raw_sha" >>"$compact/replica_identity.tsv"; printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$bucket" "$relative" "$raw_size" "$raw_sha" "$output" "$compressed_size" "$compressed_sha" >>"$compact/replica_audit_rows.tmp"; ok=$((ok+1)); done; [ "$ok" -eq 7 ] || { echo "HLO_BAD $host compact_count=$ok"; exit 0; }; identity_sha=$(sha256sum "$compact/replica_identity.tsv" | awk '\''{print $1}'\''); inventory_sha=$(sha256sum "$compact/raw_hlo_inventory.txt" | awk '\''{print $1}'\''); bucket_map_sha=$(sha256sum "$compact/bucket_hlo_map.tsv" | awk '\''{print $1}'\''); { printf "schema\thlo_replica_audit_v2\nhost\t%s\nworker\t%s\nidentity_sha256\t%s\nraw_inventory_sha256\t%s\nbucket_map_sha256\t%s\nbucket\traw_path\traw_bytes\traw_sha256\tsealed_name\tcompressed_bytes\tcompressed_sha256\n" "$host" "$worker" "$identity_sha" "$inventory_sha" "$bucket_map_sha"; cat "$compact/replica_audit_rows.tmp"; } >"$compact/replica_audit.tsv"; rm -f "$compact/replica_audit_rows.tmp"; audit_sha=$(sha256sum "$compact/replica_audit.tsv" | awk '\''{print $1}'\''); find "$raw" -depth -delete; echo "HLO_REPLICA $host count=$ok identity_sha256=$identity_sha audit_sha256=$audit_sha"'
+if ! bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 900 \
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  --command="$compact" >"$RUN_DIR/hlo_replicas.txt" \
+  2>"$RUN_DIR/hlo_replicas_ssh.txt"; then
+  preserve_divergent_hlo_replicas || true
+  say "ABORT: fleet HLO compaction transport failed"
+  exit 1
+fi
+prepare_hlo_audit_collection || {
+  say "ABORT: local HLO audit directory could not be created"
+  exit 1
+}
+audit_copy_rc=0
+for worker in 0 1 2 3 4 5 6 7; do
+  bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 180 \
+    gcloud compute tpus tpu-vm scp --zone "$ZONE" --worker="$worker" \
+    "$POD:$HLO_COMPACT/replica_audit.tsv" \
+    "$HLO_AUDIT_LOCAL/worker_$worker.tsv" \
+    >>"$RUN_DIR/hlo_audit_copy.txt" \
+    2>>"$RUN_DIR/hlo_audit_copy_ssh.txt" || audit_copy_rc=1
+done
+if [[ $audit_copy_rc -ne 0 ]]; then
+  preserve_divergent_hlo_replicas || true
+  say "ABORT: one or more host HLO audits could not be collected"
+  exit 1
+fi
+set +e
+PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+  "$RUN_DIR/hlo_replicas.txt" "$HLO_AUDIT_LOCAL" "$RUN_DIR/prereq.txt" \
+  >"$RUN_DIR/hlo_replica_validation.txt" \
+  2>"$RUN_DIR/hlo_replica_validation_stderr.txt" <<'PY'
+from pathlib import Path
+import sys
+from glm_tpu.greenfield.benchmarking.accepted_compile_only_hlo import (
+    validate_hlo_replica_evidence,
+    validate_worker_host_receipts,
+)
+expected_hosts = validate_worker_host_receipts(
+    Path(sys.argv[3]).read_bytes(), marker="PREREQ_OK"
+)
+report = validate_hlo_replica_evidence(
+    Path(sys.argv[1]).read_bytes(), Path(sys.argv[2]), expected_hosts
+)
+print(f"{report['status']} canonical_worker={report['canonical_worker']} canonical_host={report['canonical_host']} identity_sha256={report['common_identity_sha256']}")
+PY
+replica_validation_rc=$?
+set -e
+if [[ $replica_validation_rc -ne 0 ]]; then
+  preserve_divergent_hlo_replicas || true
+  say "ABORT: eight-host raw-HLO identity validation failed"
+  exit 1
+fi
+canonical_worker=$(sed -n 's/.* canonical_worker=\([0-7]\) .*/\1/p' \
+  "$RUN_DIR/hlo_replica_validation.txt")
+[[ $canonical_worker == 0 ]] || {
+  say "ABORT: exact eight-replica HLO validation failed"
+  preserve_divergent_hlo_replicas || true
+  exit 1
+}
+if ! bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 900 \
+  gcloud compute tpus tpu-vm scp --zone "$ZONE" \
+  --worker="$canonical_worker" "$POD:$HLO_COMPACT/*" "$HLO_LOCAL/" \
+  >"$RUN_DIR/hlo_copy.txt" 2>"$RUN_DIR/hlo_copy_ssh.txt"; then
+  preserve_divergent_hlo_replicas || true
+  say "ABORT: canonical worker-0 HLO copy failed"
+  exit 1
+fi
+set +e
+PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+  "$RUN_DIR/hlo_replicas.txt" "$HLO_AUDIT_LOCAL" "$HLO_LOCAL" \
+  "$RUN_DIR/prereq.txt" \
+  >"$RUN_DIR/hlo_canonical_validation.txt" \
+  2>"$RUN_DIR/hlo_canonical_validation_stderr.txt" <<'PY'
+from pathlib import Path
+import sys
+from glm_tpu.greenfield.benchmarking.accepted_compile_only_hlo import (
+    validate_canonical_hlo_replica,
+    validate_hlo_replica_evidence,
+    validate_worker_host_receipts,
+)
+expected_hosts = validate_worker_host_receipts(
+    Path(sys.argv[4]).read_bytes(), marker="PREREQ_OK"
+)
+replicas = validate_hlo_replica_evidence(
+    Path(sys.argv[1]).read_bytes(), Path(sys.argv[2]), expected_hosts
+)
+report = validate_canonical_hlo_replica(Path(sys.argv[3]), replicas)
+print(f"{report['status']} identity_sha256={replicas['common_identity_sha256']}")
+PY
+canonical_validation_rc=$?
+set -e
+if [[ $canonical_validation_rc -ne 0 ]]; then
+  preserve_divergent_hlo_replicas || true
+  say "ABORT: canonical worker-0 HLO payload validation failed"
+  exit 1
+fi
+
 # Model-load integrity is required even though there is no inference request.
+# It runs after the HLO payload is safely local so a late integrity refusal
+# cannot discard another expensive compiler acquisition.
 # shellcheck disable=SC2016
 integrity='logs=/tmp/ray/session_latest/logs; checksum=$(grep -Rhs --include="worker-*.out" -E "\[GLM_LOAD_CHECKSUM\].*SUMMARY verified=1882 mismatches=0 skipped=312$" "$logs" 2>/dev/null | tail -1); state=$(grep -Rhs --include="worker-*.out" -E "\[GLM_STATE_HASH\].*manifest VERIFIED leaves=2455 combined=371110325 ref=/tmp/golden.json$" "$logs" 2>/dev/null | tail -1); refusal=$(grep -Rhs --include="worker-*.out" -E "StateHashMismatchError|LoadNanCheckError|PwalNanCheckError|LoadChecksumError|CodeFingerprintMismatchError" "$logs" 2>/dev/null | tail -1); printf "%s\n%s\n" "$checksum" "$state"; if [ -n "$checksum" ] && [ -n "$state" ] && [ -z "$refusal" ]; then echo "INTEGRITY_OK $(hostname)"; else echo "INTEGRITY_BAD $(hostname)"; fi'
 bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 180 \
@@ -439,33 +651,6 @@ has_eight_unique_markers "$RUN_DIR/fleet_integrity.txt" INTEGRITY_OK || {
   say "ABORT: accepted model-load integrity failed"
   exit 1
 }
-
-# Compact on the sole binary-share compile owner. Each module is selected by
-# its exact 156-operation row-parallel result shape, not merely by count/order.
-# shellcheck disable=SC2016
-compact='set -euo pipefail; raw='"$HLO_RAW"'; compact='"$HLO_COMPACT"'; if [ ! -e "$raw" ]; then echo "HLO_NONOWNER $(hostname)"; exit 0; fi; if [ ! -d "$raw" ] || [ ! -r "$raw" ] || [ ! -x "$raw" ]; then echo "HLO_BAD $(hostname) raw_root"; exit 0; fi; total=$(find "$raw" -type f | wc -l); if [ "$total" -eq 0 ]; then echo "HLO_NONOWNER $(hostname)"; exit 0; fi; after_count=$(find "$raw" -type f -name "*after_codegen.txt" | wc -l); [ "$after_count" -eq 7 ] || { echo "HLO_BAD $(hostname) after_codegen=$after_count total=$total"; exit 0; }; mkdir "$compact"; find "$raw" -type f -printf "%P\t%s\n" | LC_ALL=C sort >"$compact/raw_hlo_inventory.txt"; : >"$compact/bucket_hlo_map.tsv"; last_module=-1; ok=0; for bucket in 32 64 128 256 512 1024 2048; do pattern="bf16\\[$bucket,6144\\].*all-reduce\\(.*VllmRowParallelLinear/shard_map/psum"; mapfile -t candidates < <(find "$raw" -type f -name "*after_codegen.txt" -exec grep -lE "$pattern" {} + 2>/dev/null || true); [ "${#candidates[@]}" -eq 1 ] || { echo "HLO_BAD $(hostname) bucket=$bucket candidates=${#candidates[@]}"; exit 0; }; file=${candidates[0]}; matches=$(grep -cE "$pattern" "$file"); [ "$matches" -eq 156 ] || { echo "HLO_BAD $(hostname) bucket=$bucket matches=$matches"; exit 0; }; header=$(head -n 1 "$file"); [[ $header == "HloModule jit_step_fun_impl, is_scheduled=true"* && $header == *"num_partitions=32"* ]] || { echo "HLO_BAD $(hostname) bucket=$bucket header"; exit 0; }; base=$(basename "$file"); [[ $base =~ ^module_([0-9]+)\.jit_step_fun_impl\.cl_[0-9]+\.after_codegen\.txt$ ]] || { echo "HLO_BAD $(hostname) bucket=$bucket filename=$base"; exit 0; }; module=$((10#${BASH_REMATCH[1]})); [ "$module" -gt "$last_module" ] || { echo "HLO_BAD $(hostname) bucket=$bucket module_order"; exit 0; }; last_module=$module; relative=${file#"$raw"/}; raw_size=$(stat -c %s "$file"); output="jit_step_fun_impl.m${bucket}.${base}.gz"; gzip -n -c "$file" >"$compact/$output"; gzip -t "$compact/$output"; printf "%s\t%s\t%s\t%s\n" "$bucket" "$relative" "$raw_size" "$output" >>"$compact/bucket_hlo_map.tsv"; ok=$((ok+1)); done; [ "$ok" -eq 7 ] || { echo "HLO_BAD $(hostname) compact_count=$ok"; exit 0; }; find "$raw" -depth -delete; echo "HLO_OWNER $(hostname) count=$ok"'
-bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 900 \
-  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-  --command="$compact" >"$RUN_DIR/hlo_owners.txt" \
-  2>"$RUN_DIR/hlo_owners_ssh.txt"
-PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
-  "$RUN_DIR/hlo_owners.txt" >"$RUN_DIR/hlo_owner_validation.txt" <<'PY'
-from pathlib import Path
-import sys
-from glm_tpu.greenfield.benchmarking.accepted_compile_only_hlo import validate_hlo_owner_receipts
-report = validate_hlo_owner_receipts(Path(sys.argv[1]).read_bytes())
-print(f"{report['status']} owner_worker={report['owner_worker']} owner_host={report['owner_host']}")
-PY
-owner_worker=$(sed -n 's/.* owner_worker=\([0-7]\) .*/\1/p' \
-  "$RUN_DIR/hlo_owner_validation.txt")
-[[ $owner_worker =~ ^[0-7]$ ]] || {
-  say "ABORT: exact one-owner/seven-nonowner receipt validation failed"
-  exit 1
-}
-bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 900 \
-  gcloud compute tpus tpu-vm scp --zone "$ZONE" \
-  --worker="$owner_worker" "$POD:$HLO_COMPACT/*" "$HLO_LOCAL/" \
-  >"$RUN_DIR/hlo_copy.txt" 2>"$RUN_DIR/hlo_copy_ssh.txt"
 
 stop_owned_runtime
 strict_census post
@@ -478,7 +663,8 @@ rm -f -- "$CODE_BUNDLE_LOCAL" "$VLLM_ARCHIVE_LOCAL" "$VLLM_TAR_LOCAL"
 say "zero-work and source cleanup authenticated; sealing immutable payload"
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python "$SEALER" \
   --run-tag "$TAG" --run-dir "$RUN_DIR" --log "$RUN_DIR/compile.log" \
-  --hlo-dir "$HLO_LOCAL" --hlo-owner-receipts "$RUN_DIR/hlo_owners.txt" \
+  --hlo-dir "$HLO_LOCAL" --hlo-replica-receipts "$RUN_DIR/hlo_replicas.txt" \
+  --hlo-replica-audits "$HLO_AUDIT_LOCAL" \
   --output "$RUN_DIR/manifest.json" \
   --greenfield-pin "$(git -C "$WORKTREE" rev-parse HEAD)" \
   --accepted-bundle-sha256 "$CODE_BUNDLE_SHA" \

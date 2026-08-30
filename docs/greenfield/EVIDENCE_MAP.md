@@ -1617,3 +1617,28 @@ prefix. Hostile tests cover each class; focused coverage is 45/45 and the correc
 passes 415 tests with 10 expected skips. No TPU, Ray, model load, DB or bucket write occurred. This
 remains unreviewed preparation, not evidence; exact next is correction-only Sol review, then
 persistence/mirror before any separately approved single compile-only invocation.
+
+The subsequently authorized invocation at pin `6274f760`, tag
+`accepted_db485_compile_only_hlo_20260830T003358774368259Z`, completed the exact accepted runtime
+with `generate_calls=0`, all seven DB485 fingerprint triples and 8-host load/state integrity. It is
+not a successful HLO artifact: every host returned `HLO_OWNER ... count=7`, contradicting the
+one-owner/seven-nonowner evidence assumption, so validation failed before copy/seal/publication.
+Cleanup is 8/8 authenticated and the same-region failure prefix contains diagnostics only; no
+`manifest.json` or `SUCCESS` exists. This is direct evidence of replicated per-host dump
+materialization, not proof of independent compilation or identical HLO bytes. The tag is burned and
+compact hashes are recorded in
+`docs/artifacts/accepted-db485-compile-only-hlo-replica-contract-failure.json`. Gate D remains open.
+The reviewed-next correction must gather all eight audit manifests, compare
+raw bucket identities, validate worker 0 as canonical only after equality, and retain divergent
+payloads before destructive cleanup. It now quiesces before a globally bounded eight-host copy,
+round-trip validates every gzip, binds metadata hashes into each host audit, and deletes remote dumps
+on the normal path only after eight audits agree and worker 0's canonical payload validates. If
+failure preservation starts, deletion instead requires all eight copied sets to validate; otherwise
+it refuses every tag-dump deletion and requires eight explicit retention receipts.
+Focused hostile tests pass 45/45 at the final affected diff. Before the final hostname/mkdir-only
+correction, the complete explicitly CPU-forced adjacent benchmarking suite passed 425 tests with 10
+expected skips in 234.68 seconds; its unaffected remainder is reused. A fresh read-only fleet census
+is 8/8 clean. Fable remains usage-blocked; the correction-only Sol follow-up found no P0--P2 issue
+and approved tracked diff `b72383df...74646` plus failure artifact `b099ca24...56bb` for
+commit/push/locked same-region mirror only. The correction remains offline evidence preparation,
+and no retry is currently authorized.

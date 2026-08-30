@@ -5,6 +5,8 @@ import base64
 import gzip
 import json
 import os
+import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -23,9 +25,12 @@ from glm_tpu.greenfield.benchmarking.accepted_compile_only_hlo import (
     ACCEPTED_VLLM_VERSION,
     ACCEPTED_VLLM_VERSION_FILE_SHA256,
     CLAIM_SCOPE,
+    validate_canonical_hlo_replica,
     validate_compile_only_log,
-    validate_hlo_owner_receipts,
+    validate_hlo_replica_evidence,
+    validate_hlo_replica_payload,
     validate_scheduled_hlo_files,
+    validate_worker_host_receipts,
 )
 from glm_tpu.greenfield.benchmarking.callback_executable_class import (
     ACCEPTED_FINGERPRINTS,
@@ -51,6 +56,18 @@ from scripts.greenfield.seal_accepted_db485_compile_only_hlo import (
 from scripts.greenfield.seal_accepted_db485_compile_only_hlo import (
     validate_regular_tree as validate_seal_tree,
 )
+
+TEST_WORKER_HOSTS = {worker: f"t1v-n-ae271d05-w-{worker}" for worker in range(8)}
+
+
+def _prereq_receipts() -> bytes:
+    return (
+        "\n".join(
+            ["SSH: Attempting to connect..."]
+            + [f"PREREQ_OK {TEST_WORKER_HOSTS[worker]}" for worker in range(8)]
+        )
+        + "\n"
+    ).encode()
 
 
 def _log(*, tag: str = "unit_tag", triples=ACCEPTED_FINGERPRINTS) -> bytes:
@@ -114,6 +131,80 @@ def _hlo_paths(tmp_path: Path) -> list[Path]:
         path.write_bytes(gzip.compress(_hlo(tokens, index), mtime=0))
         paths.append(path)
     return paths
+
+
+def _replica_evidence(
+    tmp_path: Path,
+    *,
+    canonical_hlo_dir: Path | None = None,
+    replica_hlo_root: Path | None = None,
+) -> tuple[bytes, Path]:
+    audit_dir = (
+        canonical_hlo_dir.parent / "hlo_replica_audits"
+        if canonical_hlo_dir is not None
+        else tmp_path / "audits"
+    )
+    audit_dir.mkdir(parents=True)
+    identity_rows = []
+    raw_payloads = []
+    for index, tokens in enumerate(TOKEN_BUCKETS):
+        raw = _hlo(tokens, index)
+        raw_payloads.append(raw)
+        identity_rows.append(f"{tokens}\t{len(raw)}\t{sha256(raw).hexdigest()}")
+    identity_bytes = ("\n".join(identity_rows) + "\n").encode()
+    identity_sha = sha256(identity_bytes).hexdigest()
+    receipts = []
+    for worker in range(8):
+        host = TEST_WORKER_HOSTS[worker]
+        rows = []
+        inventory = []
+        bucket_map = []
+        payload_dirs = []
+        if replica_hlo_root is not None:
+            payload_dirs.append(replica_hlo_root / f"worker_{worker}")
+        if worker == 0 and canonical_hlo_dir is not None:
+            payload_dirs.append(canonical_hlo_dir)
+        for payload_dir in payload_dirs:
+            payload_dir.mkdir(parents=True, exist_ok=True)
+        for index, (tokens, raw) in enumerate(zip(TOKEN_BUCKETS, raw_payloads)):
+            raw_name = (
+                f"module_{100 + worker * 1000 + index}.jit_step_fun_impl."
+                "cl_914450892.after_codegen.txt"
+            )
+            sealed_name = f"jit_step_fun_impl.m{tokens}.{raw_name}.gz"
+            compressed = gzip.compress(raw, mtime=0)
+            rows.append(
+                f"{tokens}\traw/{raw_name}\t{len(raw)}\t"
+                f"{sha256(raw).hexdigest()}\t{sealed_name}\t{len(compressed)}\t"
+                f"{sha256(compressed).hexdigest()}"
+            )
+            inventory.append(f"raw/{raw_name}\t{len(raw)}")
+            bucket_map.append(f"{tokens}\traw/{raw_name}\t{len(raw)}\t{sealed_name}")
+            for payload_dir in payload_dirs:
+                (payload_dir / sealed_name).write_bytes(compressed)
+        inventory_bytes = ("\n".join(inventory) + "\n").encode()
+        bucket_map_bytes = ("\n".join(bucket_map) + "\n").encode()
+        audit_bytes = (
+            "schema\thlo_replica_audit_v2\n"
+            f"host\t{host}\n"
+            f"worker\t{worker}\n"
+            f"identity_sha256\t{identity_sha}\n"
+            f"raw_inventory_sha256\t{sha256(inventory_bytes).hexdigest()}\n"
+            f"bucket_map_sha256\t{sha256(bucket_map_bytes).hexdigest()}\n"
+            "bucket\traw_path\traw_bytes\traw_sha256\tsealed_name\t"
+            "compressed_bytes\tcompressed_sha256\n" + "\n".join(rows) + "\n"
+        ).encode()
+        (audit_dir / f"worker_{worker}.tsv").write_bytes(audit_bytes)
+        receipts.append(
+            f"HLO_REPLICA {host} count=7 identity_sha256={identity_sha} "
+            f"audit_sha256={sha256(audit_bytes).hexdigest()}"
+        )
+        for payload_dir in payload_dirs:
+            (payload_dir / "replica_audit.tsv").write_bytes(audit_bytes)
+            (payload_dir / "replica_identity.tsv").write_bytes(identity_bytes)
+            (payload_dir / "raw_hlo_inventory.txt").write_bytes(inventory_bytes)
+            (payload_dir / "bucket_hlo_map.tsv").write_bytes(bucket_map_bytes)
+    return ("\n".join(receipts) + "\n").encode(), audit_dir
 
 
 def test_compile_only_log_matches_db485_in_all_three_dimensions() -> None:
@@ -200,16 +291,132 @@ def test_scheduled_hlo_refuses_wrong_bucket_shape_and_module_order(
         validate_scheduled_hlo_files(paths)
 
 
-def test_hlo_owner_receipts_require_exact_unique_workers() -> None:
-    raw = "\n".join(
-        ["HLO_OWNER db-v4-64-od-w-3 count=7"]
-        + [f"HLO_NONOWNER db-v4-64-od-w-{index}" for index in range(8) if index != 3]
-    ).encode()
-    report = validate_hlo_owner_receipts(raw)
-    assert report["owner_worker"] == 3
-    hostile = raw.replace(b"db-v4-64-od-w-7", b"db-v4-64-od-w-6")
+def test_hlo_replica_evidence_requires_exact_unique_workers_and_raw_bytes(
+    tmp_path: Path,
+) -> None:
+    raw, audit_dir = _replica_evidence(tmp_path)
+    report = validate_hlo_replica_evidence(raw, audit_dir, TEST_WORKER_HOSTS)
+    assert report["canonical_worker"] == 0
+    assert report["replica_count"] == 8
+    assert len(report["common_identity"]) == 7
+    hostile = raw.replace(b"t1v-n-ae271d05-w-7", b"t1v-n-ae271d05-w-6")
     with pytest.raises(BenchmarkValidationError, match="host contract"):
-        validate_hlo_owner_receipts(hostile)
+        validate_hlo_replica_evidence(hostile, audit_dir, TEST_WORKER_HOSTS)
+    wrong_pod = raw.replace(b"t1v-n-ae271d05-w-7", b"other-pod-w-7")
+    with pytest.raises(BenchmarkValidationError, match="host contract"):
+        validate_hlo_replica_evidence(wrong_pod, audit_dir, TEST_WORKER_HOSTS)
+    mixed = raw.replace(raw.splitlines()[7], b"HLO_NONOWNER db-v4-64-od-w-7")
+    with pytest.raises(BenchmarkValidationError, match="malformed"):
+        validate_hlo_replica_evidence(mixed, audit_dir, TEST_WORKER_HOSTS)
+    first = raw.splitlines()[0]
+    forged_first = first.rsplit(b"=", 1)[0] + b"=" + b"f" * 64
+    forged = raw.replace(first, forged_first, 1)
+    with pytest.raises(BenchmarkValidationError, match="receipt hash"):
+        validate_hlo_replica_evidence(forged, audit_dir, TEST_WORKER_HOSTS)
+
+
+def test_worker_host_mapping_is_bound_to_real_preflight_receipts() -> None:
+    mapping = validate_worker_host_receipts(_prereq_receipts(), marker="PREREQ_OK")
+    assert mapping == TEST_WORKER_HOSTS
+    duplicate = _prereq_receipts().replace(
+        TEST_WORKER_HOSTS[7].encode(), TEST_WORKER_HOSTS[6].encode()
+    )
+    with pytest.raises(BenchmarkValidationError, match="mapping drifted"):
+        validate_worker_host_receipts(duplicate, marker="PREREQ_OK")
+    with pytest.raises(BenchmarkValidationError, match="marker is invalid"):
+        validate_worker_host_receipts(_prereq_receipts(), marker="bad marker")
+
+
+def test_hlo_replica_evidence_refuses_one_host_raw_drift(tmp_path: Path) -> None:
+    raw, audit_dir = _replica_evidence(tmp_path)
+    path = audit_dir / "worker_7.tsv"
+    lines = path.read_text().splitlines()
+    fields = lines[7].split("\t")
+    fields[3] = "f" * 64
+    lines[7] = "\t".join(fields)
+    identity = "".join(
+        f"{row.split(chr(9))[0]}\t{row.split(chr(9))[2]}\t{row.split(chr(9))[3]}\n"
+        for row in lines[7:]
+    ).encode()
+    identity_sha = sha256(identity).hexdigest()
+    lines[3] = f"identity_sha256\t{identity_sha}"
+    audit = ("\n".join(lines) + "\n").encode()
+    path.write_bytes(audit)
+    receipt_lines = raw.decode().splitlines()
+    receipt_lines[7] = (
+        f"HLO_REPLICA {TEST_WORKER_HOSTS[7]} count=7 "
+        f"identity_sha256={identity_sha} audit_sha256={sha256(audit).hexdigest()}"
+    )
+    with pytest.raises(BenchmarkValidationError, match="raw identities diverged"):
+        validate_hlo_replica_evidence(
+            ("\n".join(receipt_lines) + "\n").encode(),
+            audit_dir,
+            TEST_WORKER_HOSTS,
+        )
+
+
+def test_hlo_replica_evidence_refuses_swapped_bucket_and_host_rank(
+    tmp_path: Path,
+) -> None:
+    raw, audit_dir = _replica_evidence(tmp_path)
+    path = audit_dir / "worker_4.tsv"
+    lines = path.read_text().splitlines()
+    lines[7], lines[8] = lines[8], lines[7]
+    audit = ("\n".join(lines) + "\n").encode()
+    path.write_bytes(audit)
+    receipt_lines = raw.decode().splitlines()
+    receipt_lines[4] = (
+        receipt_lines[4].rsplit("=", 1)[0] + "=" + sha256(audit).hexdigest()
+    )
+    with pytest.raises(BenchmarkValidationError, match="bucket order"):
+        validate_hlo_replica_evidence(
+            ("\n".join(receipt_lines) + "\n").encode(),
+            audit_dir,
+            TEST_WORKER_HOSTS,
+        )
+    raw, audit_dir = _replica_evidence(tmp_path / "second")
+    path = audit_dir / "worker_4.tsv"
+    audit = path.read_bytes().replace(b"worker\t4", b"worker\t5", 1)
+    path.write_bytes(audit)
+    receipt_lines = raw.decode().splitlines()
+    receipt_lines[4] = (
+        receipt_lines[4].rsplit("=", 1)[0] + "=" + sha256(audit).hexdigest()
+    )
+    with pytest.raises(BenchmarkValidationError, match="audit header"):
+        validate_hlo_replica_evidence(
+            ("\n".join(receipt_lines) + "\n").encode(),
+            audit_dir,
+            TEST_WORKER_HOSTS,
+        )
+
+
+def test_canonical_hlo_payload_must_match_common_identity(tmp_path: Path) -> None:
+    hlo_dir = tmp_path / "hlo"
+    hlo_dir.mkdir()
+    raw, audit_dir = _replica_evidence(tmp_path, canonical_hlo_dir=hlo_dir)
+    replicas = validate_hlo_replica_evidence(raw, audit_dir, TEST_WORKER_HOSTS)
+    report = validate_canonical_hlo_replica(hlo_dir, replicas)
+    assert report["replica_identity"]["sha256"] == replicas["common_identity_sha256"]
+    path = next(hlo_dir.glob("jit_step_fun_impl.m32.*.txt.gz"))
+    path.write_bytes(gzip.compress(_hlo(32, 0) + b"\n", mtime=0))
+    with pytest.raises(BenchmarkValidationError, match="differs from replica"):
+        validate_canonical_hlo_replica(hlo_dir, replicas)
+
+
+@pytest.mark.parametrize(
+    "metadata_name", ["raw_hlo_inventory.txt", "bucket_hlo_map.tsv"]
+)
+def test_hlo_replica_payload_binds_metadata_to_host_audit(
+    tmp_path: Path, metadata_name: str
+) -> None:
+    hlo_dir = tmp_path / "hlo"
+    hlo_dir.mkdir()
+    raw, audit_dir = _replica_evidence(tmp_path, canonical_hlo_dir=hlo_dir)
+    replicas = validate_hlo_replica_evidence(raw, audit_dir, TEST_WORKER_HOSTS)
+    path = hlo_dir / metadata_name
+    path.write_bytes(path.read_bytes() + b"hostile\n")
+    with pytest.raises(BenchmarkValidationError, match="differs from replica audit"):
+        validate_hlo_replica_payload(hlo_dir, replicas["audits"][0])
 
 
 def test_driver_kwargs_are_exact_db485_and_have_no_request() -> None:
@@ -272,6 +479,32 @@ def test_protected_wrapper_is_compile_only_and_fail_closed() -> None:
     assert "! -L $CODE_BUNDLE_LOCAL" in wrapper
     assert "! -L $VLLM_ARCHIVE_LOCAL" in wrapper
     assert "! -L $VLLM_TAR_LOCAL" in wrapper
+    assert "preserve_divergent_hlo_replicas" in wrapper
+    assert "hlo_preservation_incomplete=1" in wrapper
+    assert "hlo_preservation_verified=1" in wrapper
+    assert "deadline=$((SECONDS + 600))" in wrapper
+    assert "[[ $per_copy -gt 120 ]] && per_copy=120" in wrapper
+    assert (
+        'if ! bash "$WORKTREE/scripts/validate_ray_network.sh" bounded 900' in wrapper
+    )
+    assert 'say "ABORT: fleet HLO compaction transport failed"' in wrapper
+    assert wrapper.count("preserve_divergent_hlo_replicas || true") == 7
+    assert "prepare_hlo_audit_collection" in wrapper
+    assert 'say "ABORT: local HLO audit directory could not be created"' in wrapper
+    assert "cleanup_run_owned_sources failure_exit 1" in wrapper
+    assert '[ -d "$dump" ] && [ ! -L "$dump" ]' in wrapper
+    assert "roundtrip_size=$(gzip -dc" in wrapper
+    assert "roundtrip_sha=$(gzip -dc" in wrapper
+    audit_collection = wrapper.index('mkdir "$HLO_AUDIT_LOCAL"')
+    assert audit_collection < wrapper.index(
+        "validate_hlo_replica_evidence", audit_collection
+    )
+    assert wrapper.index("validate_canonical_hlo_replica") < wrapper.index(
+        "# Model-load integrity is required"
+    )
+    assert wrapper.index("# Model-load integrity is required") < wrapper.index(
+        "stop_owned_runtime", wrapper.index("# Model-load integrity is required")
+    )
 
 
 def _run_real_compactor(
@@ -284,7 +517,11 @@ def _run_real_compactor(
         [
             "bash",
             "-c",
-            f'HLO_RAW={raw!s}; HLO_COMPACT={compact!s}; {assignment}; eval "$compact"',
+            (
+                f"hostname() {{ printf '%s\\n' {TEST_WORKER_HOSTS[0]}; }}; "
+                f"HLO_RAW={raw!s}; HLO_COMPACT={compact!s}; {assignment}; "
+                'eval "$compact"'
+            ),
         ],
         check=False,
         capture_output=True,
@@ -317,7 +554,94 @@ def _run_real_vacancy(
     )
 
 
-def test_real_compactor_distinguishes_absent_empty_and_invalid_roots(
+def _extract_shell_function(wrapper: str, name: str) -> str:
+    lines = wrapper.splitlines()
+    start = lines.index(f"{name}() {{")
+    end = next(index for index in range(start + 1, len(lines)) if lines[index] == "}")
+    return "\n".join(lines[start : end + 1])
+
+
+def _run_real_preservation(
+    wrapper: str,
+    *,
+    repo: Path,
+    run_dir: Path,
+    remote_root: Path,
+    divergence_root: Path,
+    fail_worker: int | None = None,
+    expire_after_first: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    function = _extract_shell_function(wrapper, "preserve_divergent_hlo_replicas")
+    script = f"""
+set -euo pipefail
+{function}
+stop_owned_runtime() {{ return 0; }}
+strict_census() {{ return 0; }}
+bash() {{
+  local worker='' arg target
+  for arg in "$@"; do
+    case "$arg" in --worker=*) worker=${{arg#--worker=}} ;; esac
+  done
+  target=${{!#}}
+  [[ -n $worker ]] || return 99
+  if [[ $FAIL_WORKER == "$worker" ]]; then
+    return 1
+  fi
+  command cp -- "$REMOTE_ROOT/worker_$worker/"* "$target/"
+  if [[ $EXPIRE_AFTER_FIRST == 1 && $worker == 0 ]]; then
+    SECONDS=$((SECONDS + 601))
+  fi
+}}
+WORKTREE={shlex.quote(str(repo))}
+RUN_DIR={shlex.quote(str(run_dir))}
+HLO_COMPACT=/unused/hlo_compact
+HLO_DIVERGENCE_LOCAL={shlex.quote(str(divergence_root))}
+REMOTE_ROOT={shlex.quote(str(remote_root))}
+POD=unused
+ZONE=unused
+runtime_started=1
+post_census_done=0
+hlo_preservation_verified=0
+hlo_preservation_incomplete=0
+FAIL_WORKER={-1 if fail_worker is None else fail_worker}
+EXPIRE_AFTER_FIRST={1 if expire_after_first else 0}
+rc=0
+preserve_divergent_hlo_replicas || rc=$?
+printf 'RESULT rc=%s verified=%s incomplete=%s runtime=%s census=%s\n' \
+  "$rc" "$hlo_preservation_verified" "$hlo_preservation_incomplete" \
+  "$runtime_started" "$post_census_done"
+"""
+    return subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _run_real_audit_prepare(
+    wrapper: str, audit_dir: Path
+) -> subprocess.CompletedProcess[str]:
+    function = _extract_shell_function(wrapper, "prepare_hlo_audit_collection")
+    script = f"""
+set -euo pipefail
+{function}
+preservation_called=0
+preserve_divergent_hlo_replicas() {{ preservation_called=1; return 1; }}
+HLO_AUDIT_LOCAL={shlex.quote(str(audit_dir))}
+rc=0
+prepare_hlo_audit_collection || rc=$?
+printf 'RESULT rc=%s preservation_called=%s\n' "$rc" "$preservation_called"
+"""
+    return subprocess.run(
+        ["bash", "-c", script],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_real_compactor_refuses_absent_empty_and_invalid_roots(
     tmp_path: Path,
 ) -> None:
     repo = Path(__file__).resolve().parents[3]
@@ -326,12 +650,12 @@ def test_real_compactor_distinguishes_absent_empty_and_invalid_roots(
     ).read_text()
     absent = _run_real_compactor(wrapper, tmp_path / "absent", tmp_path / "out1")
     assert absent.returncode == 0
-    assert "HLO_NONOWNER" in absent.stdout
+    assert "HLO_BAD" in absent.stdout
     empty = tmp_path / "empty"
     empty.mkdir()
     empty_result = _run_real_compactor(wrapper, empty, tmp_path / "out2")
     assert empty_result.returncode == 0
-    assert "HLO_NONOWNER" in empty_result.stdout
+    assert "HLO_BAD" in empty_result.stdout
     invalid = tmp_path / "not_a_directory"
     invalid.write_text("hostile")
     invalid_result = _run_real_compactor(wrapper, invalid, tmp_path / "out3")
@@ -346,6 +670,178 @@ def test_real_compactor_distinguishes_absent_empty_and_invalid_roots(
         assert "HLO_BAD" in unreadable_result.stdout
     finally:
         unreadable.chmod(0o700)
+
+
+def test_real_compactor_seals_raw_identity_and_host_audit(
+    tmp_path: Path,
+) -> None:
+    repo = Path(__file__).resolve().parents[3]
+    wrapper = (
+        repo / "scripts/greenfield/run_accepted_db485_compile_only_hlo.sh"
+    ).read_text()
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    for index, tokens in enumerate(TOKEN_BUCKETS):
+        (
+            raw / f"module_{100 + index}.jit_step_fun_impl.cl_7.after_codegen.txt"
+        ).write_bytes(_hlo(tokens, index))
+    compact = tmp_path / "compact"
+    result = _run_real_compactor(wrapper, raw, compact)
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert result.stdout.startswith("HLO_REPLICA ")
+    identity = compact / "replica_identity.tsv"
+    audit = compact / "replica_audit.tsv"
+    identity_sha = sha256(identity.read_bytes()).hexdigest()
+    audit_sha = sha256(audit.read_bytes()).hexdigest()
+    assert (
+        f"count=7 identity_sha256={identity_sha} audit_sha256={audit_sha}"
+        in result.stdout
+    )
+    assert len(identity.read_text().splitlines()) == 7
+    assert len(audit.read_text().splitlines()) == 14
+    assert not raw.exists()
+
+
+def test_local_audit_directory_failure_arms_preservation(tmp_path: Path) -> None:
+    repo = Path(__file__).resolve().parents[3]
+    wrapper = (
+        repo / "scripts/greenfield/run_accepted_db485_compile_only_hlo.sh"
+    ).read_text()
+    blocked_parent = tmp_path / "not_a_directory"
+    blocked_parent.write_bytes(b"block mkdir")
+    result = _run_real_audit_prepare(wrapper, blocked_parent / "audits")
+    assert result.returncode == 0, result.stderr
+    assert "RESULT rc=1 preservation_called=1" in result.stdout
+    assert not (blocked_parent / "audits").exists()
+
+
+def test_real_preservation_requires_eight_byte_validated_payloads(
+    tmp_path: Path,
+) -> None:
+    repo = Path(__file__).resolve().parents[3]
+    wrapper = (
+        repo / "scripts/greenfield/run_accepted_db485_compile_only_hlo.sh"
+    ).read_text()
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    remote_root = tmp_path / "remote"
+    receipts, _ = _replica_evidence(tmp_path / "evidence", replica_hlo_root=remote_root)
+    (run_dir / "hlo_replicas.txt").write_bytes(receipts)
+    (run_dir / "prereq.txt").write_bytes(_prereq_receipts())
+    divergence = run_dir / "hlo_divergence"
+    result = _run_real_preservation(
+        wrapper,
+        repo=repo,
+        run_dir=run_dir,
+        remote_root=remote_root,
+        divergence_root=divergence,
+    )
+    assert result.returncode == 0, result.stderr
+    assert (
+        "EIGHT_HLO_REPLICAS_PRESERVED identity_count=1"
+        in (divergence / "preservation_validation.txt").read_text()
+    )
+    assert "RESULT rc=0 verified=1 incomplete=0 runtime=0 census=1" in result.stdout
+    for worker in range(8):
+        assert len(list((divergence / f"worker_{worker}").iterdir())) == 11
+
+
+@pytest.mark.parametrize(
+    ("fail_worker", "expire_after_first"), [(3, False), (None, True)]
+)
+def test_real_preservation_failure_keeps_cleanup_gate_closed(
+    tmp_path: Path, fail_worker: int | None, expire_after_first: bool
+) -> None:
+    repo = Path(__file__).resolve().parents[3]
+    wrapper = (
+        repo / "scripts/greenfield/run_accepted_db485_compile_only_hlo.sh"
+    ).read_text()
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    remote_root = tmp_path / "remote"
+    receipts, _ = _replica_evidence(tmp_path / "evidence", replica_hlo_root=remote_root)
+    (run_dir / "hlo_replicas.txt").write_bytes(receipts)
+    (run_dir / "prereq.txt").write_bytes(_prereq_receipts())
+    result = _run_real_preservation(
+        wrapper,
+        repo=repo,
+        run_dir=run_dir,
+        remote_root=remote_root,
+        divergence_root=run_dir / "hlo_divergence",
+        fail_worker=fail_worker,
+        expire_after_first=expire_after_first,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "RESULT rc=1 verified=0 incomplete=1 runtime=0 census=1" in result.stdout
+    assert all((remote_root / f"worker_{worker}").is_dir() for worker in range(8))
+
+
+def test_real_cleanup_retains_exact_dump_when_preservation_is_incomplete(
+    tmp_path: Path,
+) -> None:
+    repo = Path(__file__).resolve().parents[3]
+    wrapper = (
+        repo / "scripts/greenfield/run_accepted_db485_compile_only_hlo.sh"
+    ).read_text()
+    function = _extract_shell_function(wrapper, "cleanup_run_owned_sources")
+    token = f"pytest_{os.getpid()}_{time.time_ns()}"
+    code = Path(f"/tmp/glm_accepted_{token}")
+    vllm = Path(f"/tmp/glm_vllm_{token}")
+    dump = Path(f"/tmp/accepted_hlo_{token}")
+    code_tmp = Path(f"{code}.tmp")
+    code_bundle = Path(f"{code}.bundle")
+    vllm_archive = Path(f"{vllm}.tar.gz")
+    run_dir = tmp_path / "cleanup_run"
+    run_dir.mkdir()
+    try:
+        for directory in (code, code_tmp, vllm, dump):
+            directory.mkdir()
+        code_bundle.write_bytes(b"bundle")
+        vllm_archive.write_bytes(b"archive")
+        (dump / "partial_raw_hlo.txt").write_bytes(b"retain")
+        script = f"""
+set -euo pipefail
+{function}
+bash() {{
+  local arg remote_command=''
+  for arg in "$@"; do
+    case "$arg" in --command=*) remote_command=${{arg#--command=}} ;; esac
+  done
+  [[ -n $remote_command ]] || return 99
+  command bash -c "$remote_command"
+}}
+has_eight_unique_markers() {{ grep -q '^SOURCE_RETAINED ' "$1"; }}
+WORKTREE={shlex.quote(str(repo))}
+RUN_DIR={shlex.quote(str(run_dir))}
+CODE_RUNTIME={shlex.quote(str(code))}
+CODE_RUNTIME_TEMP={shlex.quote(str(code_tmp))}
+CODE_BUNDLE_REMOTE={shlex.quote(str(code_bundle))}
+VLLM_RUNTIME={shlex.quote(str(vllm))}
+VLLM_ARCHIVE_REMOTE={shlex.quote(str(vllm_archive))}
+DUMP_ROOT={shlex.quote(str(dump))}
+TAG={shlex.quote(dump.name)}
+POD=unused
+ZONE=unused
+cleanup_run_owned_sources test 1
+"""
+        result = subprocess.run(
+            ["bash", "-c", script],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
+        assert dump.is_dir()
+        assert (dump / "partial_raw_hlo.txt").read_bytes() == b"retain"
+        assert not any(
+            path.exists() for path in (code, code_tmp, code_bundle, vllm, vllm_archive)
+        )
+    finally:
+        for path in (code, code_tmp, vllm, dump):
+            shutil.rmtree(path, ignore_errors=True)
+        for path in (code_bundle, vllm_archive):
+            path.unlink(missing_ok=True)
 
 
 def test_real_fleet_vacancy_refuses_a_dangling_symlink(tmp_path: Path) -> None:
@@ -765,24 +1261,10 @@ def test_sealer_binds_provenance_and_complete_raw_inventory(
     hlo_dir.mkdir(parents=True)
     log = run_dir / "compile.log"
     log.write_bytes(_log(tag="sealed_tag"))
-    inventory = []
-    bucket_map = []
-    for index, tokens in enumerate(TOKEN_BUCKETS):
-        raw_name = (
-            f"module_{100 + index}.jit_step_fun_impl.cl_914450892.after_codegen.txt"
-        )
-        raw = _hlo(tokens, index)
-        sealed_name = f"jit_step_fun_impl.m{tokens}.{raw_name}.gz"
-        (hlo_dir / sealed_name).write_bytes(gzip.compress(raw, mtime=0))
-        inventory.append(f"raw/{raw_name}\t{len(raw)}")
-        bucket_map.append(f"{tokens}\traw/{raw_name}\t{len(raw)}\t{sealed_name}")
-    (hlo_dir / "raw_hlo_inventory.txt").write_text("\n".join(inventory) + "\n")
-    (hlo_dir / "bucket_hlo_map.tsv").write_text("\n".join(bucket_map) + "\n")
-    receipts = run_dir / "hlo_owners.txt"
-    receipts.write_text(
-        "HLO_OWNER db-v4-64-od-w-0 count=7\n"
-        + "".join(f"HLO_NONOWNER db-v4-64-od-w-{index}\n" for index in range(1, 8))
-    )
+    receipt_bytes, audit_dir = _replica_evidence(tmp_path, canonical_hlo_dir=hlo_dir)
+    receipts = run_dir / "hlo_replicas.txt"
+    receipts.write_bytes(receipt_bytes)
+    (run_dir / "prereq.txt").write_bytes(_prereq_receipts())
     output = run_dir / "manifest.json"
     monkeypatch.setattr(
         sys,
@@ -797,8 +1279,10 @@ def test_sealer_binds_provenance_and_complete_raw_inventory(
             str(log),
             "--hlo-dir",
             str(hlo_dir),
-            "--hlo-owner-receipts",
+            "--hlo-replica-receipts",
             str(receipts),
+            "--hlo-replica-audits",
+            str(audit_dir),
             "--output",
             str(output),
             "--greenfield-pin",
@@ -830,11 +1314,21 @@ def test_sealer_binds_provenance_and_complete_raw_inventory(
             ),
         ],
     )
+    unexpected = hlo_dir / "unexpected"
+    unexpected.mkdir()
+    with pytest.raises(BenchmarkValidationError, match="unexpected entry"):
+        seal_main()
+    unexpected.rmdir()
     assert seal_main() == 0
     report = json.loads(output.read_text())
     assert report["hlo"]["raw_inventory"]["line_count"] == 7
     assert len(report["hlo"]["bucket_map"]["records"]) == 7
-    assert report["hlo_owner"]["owner_worker"] == 0
+    assert report["hlo_replicas"]["canonical_worker"] == 0
+    assert report["hlo_replicas"]["replica_count"] == 8
+    assert (
+        report["hlo"]["replica_identity"]["sha256"]
+        == report["hlo_replicas"]["common_identity_sha256"]
+    )
     assert report["provenance"]["accepted_bundle_sha256"] == "b" * 64
     assert {item["path"] for item in report["archive_files_before_manifest"]} >= {
         "compile.log",
