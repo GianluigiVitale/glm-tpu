@@ -8371,3 +8371,23 @@ Do not perform executable compilation, execute arrays, launch a cloud/TPU workfl
 candidate from producer self-assertion. Real source may correctly fail the current parser because
 it contains `chlo.square` and non-synthetic slice signatures; preserve that raw refusal. Any CHLO
 allowlist/legalization or expected-signature update is a separate reviewed batch.
+
+## First producer start failed before JAX; correction source only
+
+After commit `d8f5830`, exact remote equality and a five-file `US-CENTRAL2` mirror check, Sol
+approved exactly one literal forced-CPU producer start. It failed before JAX import, output-directory
+creation or lowering because sealed CPython omits the optional `fcntl.F_ADD_SEALS` symbol. The
+approved output path remains absent, there is no producer process and no retry authority. Canonical
+failure record is `docs/artifacts/gate-d-stablehlo-producer-pre-jax-failure.json`, SHA
+`9a5c88a1...4bc7`.
+
+Local Linux UAPI headers bind `F_ADD_SEALS=1033`, `F_GET_SEALS=1034` and the four-seal mask `15`.
+The corrected source uses those numeric UAPI values and still verifies the exact post-add mask;
+sealed-runtime numeric probing returns `SEALED_RUNTIME_MEMFD_OK`, and a real memfd snapshot
+regression passes. Corrected producer SHA is `7292477b...0b6e`. Sol approved exact staged SHA
+`d0bea1d5...2620` for correction install only. One-file tree `4bf3edb4...a5d0a` was provisioned
+root-owned and atomically replaced the fixed bin link. Fixed/new-source inode and SHA match,
+root:root mode is 0555 and link count is two; old `2513a305...2182` remains immutable with link
+count one. The corrected producer has not been invoked. Expanded hostile coverage passes 82/82.
+Exact next is commit/push/mirror review and persistence, then a separately reviewed new output tag.
+Never reuse the burned `...20260830T223600Z` tag.

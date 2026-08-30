@@ -86,7 +86,13 @@ RISKY_ENVIRONMENT_PREFIXES = (
 )
 HIDDEN_SIZE = 6144
 EPSILON = 1e-5
-_MEMFD_SEALS = 1 | 2 | 4 | 8
+# Linux UAPI values from <linux/fcntl.h>. CPython exposes ``fcntl.fcntl`` on
+# this host but omits the GNU-gated symbolic constants from its ``fcntl``
+# module, so source-level attribute lookup is not portable across the sealed
+# runtime. The post-add exact mask check below remains the runtime authority.
+_F_ADD_SEALS = 1033
+_F_GET_SEALS = 1034
+_MEMFD_SEALS = 0x0001 | 0x0002 | 0x0004 | 0x0008
 
 
 def _canonical(value: Any) -> str:
@@ -173,8 +179,8 @@ def _sealed_source_snapshot(path: Path, expected_sha256: str) -> bytes:
             os.close(source_fd)
         if digest.hexdigest() != expected_sha256:
             raise SystemExit(f"committed source drifted: {path}")
-        fcntl.fcntl(descriptor, fcntl.F_ADD_SEALS, _MEMFD_SEALS)
-        if fcntl.fcntl(descriptor, fcntl.F_GET_SEALS) != _MEMFD_SEALS:
+        fcntl.fcntl(descriptor, _F_ADD_SEALS, _MEMFD_SEALS)
+        if fcntl.fcntl(descriptor, _F_GET_SEALS) != _MEMFD_SEALS:
             raise SystemExit(f"source memfd seal drifted: {path}")
         payload = bytearray()
         offset = 0

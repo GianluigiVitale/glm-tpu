@@ -614,11 +614,12 @@
       "id": "gate-d-tuple-auxiliary-stablehlo-producer",
       "category": "Gate-D source-bound lowering producer",
       "source_repo": "glm-tpu greenfield",
-      "source_pin": "producer source 2513a305bbdbff421b97f96cb92987debaacafa4d17d7e4f0c9c37ebb91f2182 / dependency builder 5334dd1eb6eeef2bb8dfee92f150305ec96ddd180a3abd66dfb88758470200d2 / immutable site tree 55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df / blocked tree 561118be6d05df9ad0a28cf387decf3c655cb16ed49afafc9576d20c3367d151 / tuple source c8b220067577004ddfb824667eadc746642baaca / source certificate c95c8aa188e2eda77270022128d121dc3693a899607b1ab2f9977ddb45def0e1 / PP16 authority 98b4fa21272e0bb019af1ad99abedee35593f9a1c8067a15983e9023c01f7880",
+      "source_pin": "corrected producer source 7292477bc8a0547c86a7032bcc6758cf90be124136e00e00f05a6069c9ab0b6e / failed installed producer 2513a305bbdbff421b97f96cb92987debaacafa4d17d7e4f0c9c37ebb91f2182 / dependency builder 5334dd1eb6eeef2bb8dfee92f150305ec96ddd180a3abd66dfb88758470200d2 / immutable site tree 55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df / blocked tree 561118be6d05df9ad0a28cf387decf3c655cb16ed49afafc9576d20c3367d151 / tuple source c8b220067577004ddfb824667eadc746642baaca / source certificate c95c8aa188e2eda77270022128d121dc3693a899607b1ab2f9977ddb45def0e1 / PP16 authority 98b4fa21272e0bb019af1ad99abedee35593f9a1c8067a15983e9023c01f7880",
       "source_paths": [
         "scripts/greenfield/build_gate_d_jax_site_capsule.py",
         "scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py",
         "tests/greenfield/validation/test_gate_d_stablehlo_producer_source.py",
+        "docs/artifacts/gate-d-stablehlo-producer-pre-jax-failure.json",
         "docs/artifacts/gate-d-tuple-auxiliary-source-authority.json",
         "docs/artifacts/gate-d-tuple-auxiliary-pp16-plan-authority.json"
       ],
@@ -627,7 +628,7 @@
         "future immutable-parser Gate-D causal StableHLO authority; never direct admission"
       ],
       "gate": "D precompile admission",
-      "reason": "Default-off forced-CPU abstract compiler lowering only. A stdlib-only builder creates an explicit no-libtpu/no-plugin dependency capsule and verifies future unprivileged readability/traversability after root sealing; the producer binds its root-owned complete tree, exact sealed -I -S interpreter before Python startup, clean code/source/plan/producer identities, exact real RMS shapes and epsilon, every loaded Python/native file and inode-pinned append-only raw/annotated HLO receipts. The first mode-0400/generic-shebang draft and tree 561118be...d151 are blocked and must never be provisioned. After Sol pre-install approval, the corrected site tree 55233c63...a0df was provisioned root-owned with mode-0444 manifest and exact producer 2513a305...2182 was installed root:root mode 0555 through an immutable one-file source/hard link. Static/dynamic builder/producer tests pass 5/5, but the corrected producer has not been invoked and supplies no StableHLO, executable-compilation, JAX array/numerical execution, TPU or Gate-D evidence until persisted, separately invocation-reviewed, run once and independently parsed. Real CHLO/signature refusal remains a valid diagnostic outcome."
+      "reason": "Default-off forced-CPU abstract compiler lowering only. The first approved start of installed producer 2513a305...2182 failed before JAX import and output creation because sealed CPython omits fcntl.F_ADD_SEALS; the burned output remains absent and no retry is authorized. Linux UAPI values 1033/1034 plus exact mask 15 are source-bound and dynamically exercised under the sealed runtime. Sol approved exact correction staged SHA d0bea1d5...2620; producer 7292477b...0b6e was provisioned from one-file tree 4bf3edb4...a5d0a and atomically installed root:root 0555, retaining the old immutable source inode. Expanded hostile coverage passes 82/82; the corrected producer has not been invoked. The no-libtpu/no-plugin site tree 55233c63...a0df remains exact and root-owned; blocked tree 561118be...d151 remains forbidden. No StableHLO, executable compilation, JAX numerical execution, TPU or Gate-D evidence exists until persistence, separate invocation approval, one new tag and independent parsing."
     },
     {
       "id": "legacy-execution-stack",

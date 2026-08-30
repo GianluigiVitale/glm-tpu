@@ -1945,6 +1945,19 @@ remains open and no TPU successor is authorized.
   corrected builder requires future unprivileged file/directory access and the producer shebang
   names the exact sealed interpreter with `-I -S`; the blocked tree must never be installed.
 
+- The one Sol-approved post-persistence producer start at clean pin `d8f5830` failed before JAX
+  import, output-directory creation or lowering: sealed CPython does not export the optional
+  `fcntl.F_ADD_SEALS` name. The burned output path remains absent and no retry is authorized.
+  `docs/artifacts/gate-d-stablehlo-producer-pre-jax-failure.json` (`9a5c88a1...4bc7`) binds the literal command, old
+  producer/site identities and no-output classification. Local Linux UAPI headers give numeric
+  commands 1033/1034 and seal mask 15; corrected source `7292477b...0b6e` uses them while retaining
+  an exact post-seal mask check. A sealed-runtime numeric memfd probe and source regression pass.
+  Sol approved exact staged correction `d0bea1d5...2620` for install only. One-file tree
+  `4bf3edb4...a5d0a` was provisioned root-owned and atomically linked into the fixed path; fixed and
+  new source share exact SHA/inode, mode 0555 and link count two, while the old immutable source
+  remains at link count one. Expanded hostile coverage passes 82/82. The correction is not yet
+  persisted or invoked and supplies no StableHLO authority.
+
 ## Corrected scalar-frontier research adjudication
 
 - `docs/greenfield/GATE_D_SCALAR_FRONTIER_V2_ADJUDICATION.md` accepts only the corrected report's

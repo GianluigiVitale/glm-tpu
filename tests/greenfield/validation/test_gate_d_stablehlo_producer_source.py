@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+from hashlib import sha256
 import importlib.util
 import os
 from pathlib import Path
@@ -15,6 +16,14 @@ BUILDER = REPO_ROOT / "scripts/greenfield/build_gate_d_jax_site_capsule.py"
 
 def _load_builder() -> object:
     spec = importlib.util.spec_from_file_location("gate_d_jax_site_builder_test", BUILDER)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_producer() -> object:
+    spec = importlib.util.spec_from_file_location("gate_d_stablehlo_producer_test", PRODUCER)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -82,6 +91,10 @@ def test_gate_d_stablehlo_producer_binds_real_source_and_shape() -> None:
     assert "EXPECTED_PYTHON_RUNTIME_TREE_SHA256" in text
     assert "EXPECTED_SITE_TREE_SHA256" in text
     assert "RISKY_ENVIRONMENT_PREFIXES" in text
+    assert "_F_ADD_SEALS = 1033" in text
+    assert "_F_GET_SEALS = 1034" in text
+    assert "fcntl.F_ADD_SEALS" not in text
+    assert "fcntl.F_GET_SEALS" not in text
     assert "expected-producer-sha256" in text
     assert "expected-code-pin" in text
     assert '"installed_path": str(producer)' in text
@@ -97,6 +110,16 @@ def test_gate_d_stablehlo_producer_binds_real_source_and_shape() -> None:
         "_lower",
         "main",
     } <= functions
+
+
+def test_gate_d_stablehlo_producer_seals_source_without_optional_fcntl_names(
+    tmp_path: Path,
+) -> None:
+    producer = _load_producer()
+    source = tmp_path / "source.py"
+    payload = b"answer = 42\n"
+    source.write_bytes(payload)
+    assert producer._sealed_source_snapshot(source, sha256(payload).hexdigest()) == payload
 
 
 def test_gate_d_stablehlo_producer_is_append_only_and_cpu_forced() -> None:

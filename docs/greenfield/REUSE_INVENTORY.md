@@ -886,3 +886,15 @@ unreadable after root sealing, and the old generic shebang did not select the se
 before Python startup. The corrected builder validates future unprivileged read/traverse modes and
 the corrected shebang names exact sealed Python with `-I -S`. The corrected producer remains
 uninvoked; installation is not StableHLO or admission evidence.
+
+The first separately approved start at clean/pushed pin `d8f5830` failed before JAX import and
+before output-directory creation because the sealed CPython `fcntl` module omits the optional
+`F_ADD_SEALS` symbol. The burned tag remains absent and has no retry authority; canonical failure is
+`docs/artifacts/gate-d-stablehlo-producer-pre-jax-failure.json` (`9a5c88a1...4bc7`). Linux UAPI headers bind numeric
+commands 1033/1034 and mask 15. Corrected source `7292477b...0b6e` uses those values, checks the exact
+resulting mask and passes both an exact-source snapshot test and sealed-runtime numeric memfd probe.
+Sol approved exact staged correction `d0bea1d5...2620` for install only. One-file tree
+`4bf3edb4...a5d0a` was provisioned root-owned and atomically replaced the fixed link: corrected
+source/fixed path share SHA/inode, mode 0555 and link count two; old `2513a305...2182` remains
+immutable at link count one. Expanded hostile coverage passes 82/82. The correction is not committed
+or invoked; the old producer and burned tag are tombstoned.
