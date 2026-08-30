@@ -8074,3 +8074,32 @@ this batch. It rejected staged SHA `d1651110...65e8` for non-exhaustive wording,
 premise and missing machine supersession. Corrected staged SHA `0045e9b8...2154` narrows the claim,
 binds the sealed HLO and prior identities, and received `APPROVE PERSISTENCE` with no P0--P2. The
 review authorizes no compilation or TPU execution.
+
+## 2026-08-30 shadow declarations leave two unresolved device-only variants
+
+The stdlib-only normal-form adjudicator classifies six rounded, compensated, auxiliary and host
+shadow formulations before JAX. Contract
+`configs/greenfield-gate-d-shadow-variant-adjudication.json` is `28ab4766...8f44`; core/CLI are
+`33d60081...4463` / `6b041474...9039`; canonical report
+`docs/artifacts/gate-d-shadow-variant-adjudication.json` is `a9b39271...a622`. It classifies
+`NO_OFFLINE_COMPLETE_SHADOW_VARIANT;AUXILIARY_DEVICE_VARIANTS_REMAIN_UNADJUDICATED;GATE_D_OPEN;NO_TPU_SUCCESSOR`.
+
+Rounded-widened primary state is duplicate-closed; restoring unrounded low bits changes the BF16
+recurrence; cancelled compensation without a consumer is non-causal; callback/dead-row/full-pod
+forms are illegal. Cancelled compensation kept live on device and an explicit FP32 tuple auxiliary
+remain two distinct declarations under one search umbrella; physical equivalence is unproved. The
+contract binds only reviewed abstract declarations, not future source/AST. Before compile-only
+review, either needs source semantics, a causal StableHLO contract, offline coherent seven-watchpoint
+state and separate admission. The compile-only acquisition must preserve exact optimized TPU HLO
+before any numerical-run review. Neither variant currently passes the pre-compile gates.
+
+Fresh source snapshot `upstream-glm52-shadow-search-20260830.json` (`263d4e7a...5aa8`) pins current
+vLLM/TPU-Inference refs and finds no upstream residual-shadow mechanism. Hostile validation is
+17/17, including catalogue deletion/addition/class drift and intermediate/evidence symlinks.
+Compact capsule `gate-d-shadow-variant-adjudication-frontier.json` is `6baec873...dec0`. Sol blocked
+two drafts, then approved exact staged SHA `e0da721b...922b` for persistence with no P0--P2; this
+authorizes no JAX, compilation or TPU work.
+
+Exact next is a source-bound minimal device dependency only if its pre-compile source semantics,
+causal StableHLO, offline coherent seven-watchpoint state and separate admission are constructable
+without arithmetic change. Gate D remains open; no TPU action is authorized.

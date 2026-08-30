@@ -783,3 +783,23 @@ none of the 15 catalogued candidates passes the contract; it is not a general im
 A new proposal must provide one SHA-bound capsule whose stdlib observability audit authenticates
 typed RMS-input, normalized, cache-history, query, head-weight, current-key and event-1 scorer
 arrays plus common code/plan/executable/coherence identity and sealed layout/owner metadata.
+
+## Gate-D shadow normal-form adjudication
+
+Reuse `glm_tpu/greenfield/shadow_variant_adjudication.py`, contract
+`configs/greenfield-gate-d-shadow-variant-adjudication.json` and CLI
+`scripts/greenfield/adjudicate_shadow_variants.py` before implementing any rounded, compensated or
+auxiliary residual shadow. The stdlib-only classifier authenticates cited artifacts, preserves the
+accepted transient-FP32-normalization/BF16-recurrence split, canonicalizes semantics independently
+of names, rejects illegal rows/groups/host/full-pod paths and writes append-only without symlinks.
+
+Canonical report `docs/artifacts/gate-d-shadow-variant-adjudication.json` closes rounded-widened
+primary state as duplicate, compensation-restoring-unrounded as semantic drift, cancelled-without-
+dependency as non-causal and host observation as illegal. Compensated and tuple-carried device
+auxiliaries remain two separate unresolved variants within the auxiliary-device search umbrella;
+their distinct abstract normal-form hashes do not prove physical equivalence. Do not treat either
+as a candidate: both lack source/AST binding, causal StableHLO, an offline coherent seven-watchpoint
+capsule and separate admission. A reviewed compile-only acquisition—not a precondition to compile—
+must then preserve optimized TPU HLO before numerical review. Fresh source snapshot
+`docs/artifacts/upstream-glm52-shadow-search-20260830.json` finds no upstream implementation that
+supplies the pre-compile evidence. TPU authorization remains false.

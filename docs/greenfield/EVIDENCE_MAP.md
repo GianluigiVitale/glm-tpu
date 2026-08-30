@@ -1797,3 +1797,37 @@ remains open and no TPU successor is authorized.
   this audit. They require separate fingerprints and causal HLO/coherence adjudication. The
   artifact binds candidate id plus prior contract/report/compact hashes and supersedes only the
   three narrow interpretations. No JAX/TPU successor is authorized.
+
+## Rounded, compensated and auxiliary-shadow normal forms
+
+- Contract `configs/greenfield-gate-d-shadow-variant-adjudication.json`, SHA
+  `28ab4766a3a279624be7625d565eda3ec3169257926e46e855569e75a2b58f44`, binds the accepted
+  transient-FP32 normalization/BF16 returned recurrence, seven watchpoints, one-row/local execution
+  rules and six proposal forms to authenticated evidence.
+- Core/CLI SHAs are `33d60081bb2c0904036c2a55f3fda4aebf095dc57457a278112e340517924463` /
+  `6b041474acb925532ef1ec96495bc9e45533e66dd8de320bddfc79ce33c09039`. Canonical report
+  `docs/artifacts/gate-d-shadow-variant-adjudication.json`, SHA
+  `a9b392712dd685488ad9e07a70274d4f5b61eec1e14c8327e1c28e43c8baa622`, classifies
+  `NO_OFFLINE_COMPLETE_SHADOW_VARIANT;AUXILIARY_DEVICE_VARIANTS_REMAIN_UNADJUDICATED;GATE_D_OPEN;NO_TPU_SUCCESSOR`.
+- Rounded/widened primary state is duplicate-closed; restoring unrounded state is semantic drift;
+  cancelled compensation without a consumer is non-causal; host/full-pod/dead-row observation is
+  illegal. Compensated and tuple-carried device variants remain separate unresolved identities
+  under one search umbrella; their physical equivalence is unproved. Each still needs source/AST
+  binding, causal StableHLO, offline coherent state and admission before compile-only review. Exact
+  optimized TPU HLO is an output required before later numerical review, not a compile prerequisite.
+- Fresh source snapshot `docs/artifacts/upstream-glm52-shadow-search-20260830.json`, SHA
+  `263d4e7a1d846854fbba3d8a39097241996e93f6517c592fb57ebd6597fb5aa8`, pins vLLM main
+  `5e71a11e...deb5`, TPU Inference main `c8593a4c...6005` and PR-2324 head `c2822bd7...4a17`.
+  No upstream residual-shadow mechanism was found. This is source-search evidence only.
+- Hostile validation passes 17/17: renamed/deleted/added/class-drift forms, semantic mislabeling,
+  every locality prohibition, boolean schema/unhashable members,
+  recurrence/watchpoint weakening, forged certificate fields, evidence drift, hostile JSON,
+  final/intermediate/evidence symlinks, occupied outputs, byte stability and `python -S` without
+  JAX. The versioned contract classifies declarations only; it does not bind a future implementation
+  to those declarations. This is not Gate-D closure.
+- Compact capsule `docs/artifacts/gate-d-shadow-variant-adjudication-frontier.json`, SHA
+  `6baec8732175021d72c4663adeab50e1bf2c3a7c11fe85a2bbb030372a16dec0`, binds reproduction,
+  source snapshot, validation and the three exact staged-review identities. Sol blocked the first
+  two drafts for workflow/canonicalization/provenance/security/claim-scope issues and one remaining
+  documentation contradiction, then approved corrected staged SHA `e0da721b...922b` for persistence
+  with no P0--P2. The approval explicitly authorizes no JAX, compilation or TPU work.

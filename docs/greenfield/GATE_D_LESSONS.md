@@ -958,3 +958,24 @@ normalized-state cause.
 - Open every input parent and report-output parent component through dirfds with
   `O_DIRECTORY|O_NOFOLLOW`. Final-component checks alone do not stop an intermediate symlink from
   redirecting append-only evidence.
+
+## Normalize shadow proposals before compilation
+
+- Rounded-then-widened primary state is the accepted BF16 recurrence expressed with another dtype
+  conversion; it does not create a new retained value. Historical split-RMS/barrier evidence already
+  rejects that physical family. Do not compile a renamed version.
+- A compensation that restores discarded FP32 low bits is direct unrounded substitution and changes
+  model semantics. A compensation cancelled without a later device consumer is non-causal. If the
+  cancellation stays live only through a device consumer, it becomes the distinct unresolved
+  `compensated_auxiliary_dependency` declaration within the broader auxiliary-device search
+  umbrella. Its equivalence to an explicit tuple auxiliary remains unproved.
+- A BF16 primary recurrence plus an FP32 auxiliary device dependency is structurally distinct but
+  not evidence-complete. Before compile-only review it needs a source-semantics binding, a causal
+  StableHLO contract, an offline candidate-coherent seven-watchpoint capsule and separate admission.
+  The compile-only acquisition must then preserve optimized-TPU-HLO value flow before any numerical-
+  run review. StableHLO tuple membership alone is insufficient: output-ownership work changed
+  StableHLO and optimized back to the same rejected live boundary.
+- Run `scripts/greenfield/adjudicate_shadow_variants.py` first. Its append-only stdlib report
+  authenticates evidence, one-row/local/no-host rules and declared normal forms. The declarations
+  are not source/AST bindings. The current result leaves two separate unresolved variants under one
+  search umbrella and authorizes no JAX, compilation or TPU work.

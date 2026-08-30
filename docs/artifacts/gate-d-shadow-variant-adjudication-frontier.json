@@ -1,0 +1,37 @@
+{
+  "artifact_kind": "greenfield_gate_d_shadow_variant_adjudication_frontier",
+  "classification": "NO_OFFLINE_COMPLETE_SHADOW_VARIANT;AUXILIARY_DEVICE_VARIANTS_REMAIN_UNADJUDICATED;GATE_D_OPEN;NO_TPU_SUCCESSOR",
+  "created_utc": "2026-08-30T12:12:43Z",
+  "gate_d_passed": false,
+  "jax_compile_tpu_or_cloud_work_performed": false,
+  "reproduction": {
+    "cli_sha256": "6b041474acb925532ef1ec96495bc9e45533e66dd8de320bddfc79ce33c09039",
+    "command": "/home/gianl/vllm-env/bin/python -S scripts/greenfield/adjudicate_shadow_variants.py --contract configs/greenfield-gate-d-shadow-variant-adjudication.json --contract-sha256 28ab4766a3a279624be7625d565eda3ec3169257926e46e855569e75a2b58f44 --output <new-path>",
+    "contract_sha256": "28ab4766a3a279624be7625d565eda3ec3169257926e46e855569e75a2b58f44",
+    "core_sha256": "33d60081bb2c0904036c2a55f3fda4aebf095dc57457a278112e340517924463",
+    "parent_git_sha": "ba09f5edb6686e9693664558ac6be39e6ddc3aab",
+    "report_sha256": "a9b392712dd685488ad9e07a70274d4f5b61eec1e14c8327e1c28e43c8baa622",
+    "test_sha256": "3251c70320ee26332414b080f9e2ae2a416482944ccb400d0aa44a5d5a4b0b9d",
+    "upstream_snapshot_sha256": "263d4e7a1d846854fbba3d8a39097241996e93f6517c592fb57ebd6597fb5aa8"
+  },
+  "review": {
+    "approved_staged_diff_sha256": "e0da721bebf7d9e6a087732bf545ae553e9137730d324549346b3f9ce5d4922b",
+    "initial_staged_diff_sha256": "4ad20957d618da6459959346f1719f938a05870f76189536b409360bc9e17098",
+    "initial_verdict": "BLOCK_4_P1_1_P2_GROUP",
+    "second_staged_diff_sha256": "492e6036f50133275ea7ec7b5c814f3bafd600f6f68b5f732bac20ef52912d5b",
+    "second_verdict": "BLOCK_1_P2_DOCUMENTATION_CONTRADICTION",
+    "sol_reviewer": "sol_gate_d_observability_review",
+    "verdict": "APPROVE_PERSISTENCE_NO_P0_P2"
+  },
+  "tpu_successor_authorized": false,
+  "unresolved_variants": {
+    "auxiliary_device_tuple_dependency": "DECLARATION_ONLY;MISSING_SOURCE_STABLEHLO_OFFLINE_CAPSULE_AND_ADMISSION",
+    "compensated_auxiliary_dependency": "DECLARATION_ONLY;MISSING_SOURCE_STABLEHLO_OFFLINE_CAPSULE_AND_ADMISSION"
+  },
+  "validation": {
+    "combined_shadow_admission_observability": "55 passed",
+    "hostile_shadow_tests": "17 passed",
+    "python_s_no_jax": true,
+    "report_reproduced_byte_identically": true
+  }
+}
