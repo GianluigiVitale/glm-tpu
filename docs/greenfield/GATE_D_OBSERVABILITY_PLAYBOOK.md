@@ -162,6 +162,53 @@ The authoritative reuse/evidence indexes are:
 - `HANDOFF.md`
 - `bench/results.db`
 
+### 3.5 End-to-end tool map by observation plane
+
+No single tool is authoritative for the whole run. Use the smallest row below that can answer the
+current question, then combine planes only at the terminal gate.
+
+| Observation plane | Primary tools | What they establish | What they cannot establish |
+|---|---|---|---|
+| Operational black box | `docs/10-observability.md` patterns: append-only flight records, engine statistics, scheduling/compile attribution and sharding/cache guards | Whether a stall, crash, dropped stripe or recorder failure preceded the numerical symptom | Greenfield numerical truth; reuse the interfaces and failure semantics, never the legacy execution path |
+| Typed numerical state | `observability.py`, `audit_observability.py`, `legacy_dsa_internals.py`, `legacy_main_cache.py`, `legacy_residuals.py`, `prompt_index_cache.py` | Immutable bytes, dtype/shape/slice, causal watchpoint order, source authority and same-run coherence | TPU causality when a value was not captured; physical execution identity; performance |
+| Exact DSA behavior | `short_context_dsa_oracle.py`, the `capture_*dsa*`, `compare_*dsa*` and scorer/query association tools | Raw event state, selected-set membership, order/ties, scores, positions and current-key/cache inputs | Ranking correctness at `context <= top_k`; accepted conclusions from a hybrid cache/history |
+| Logical and physical HLO | `hlo_contract.py`, `inspect_hlo_contract.py`, `live_ssa_diff.py`, `diff_layer0_live_ssa.py`, compile-only acquisition/sealer tools | Live SSA producer-to-consumer flow, layouts, reducer bodies, collective groups, roots, call graph and structural deltas | Hidden runtime bytes, numerical equality or wall latency; logical BF16 edges alone do not prove physical materialization |
+| Topology and transport | `topology/discover.py`, `topology/groups.py`, `capture_topology.sh`, `inspect_topology.py`, `transport_chain.py`, `trace_pipeline_transport.py` | Runtime device permutation, explicit local groups, device-resident stage transfer, payload bytes and launch/collective structure | Complete decoder correctness or clean profiler-free latency from a synthetic transfer alone |
+| Raw output and quality | sealed short-context oracle/capture tools, complete-decoder validators and the GLM quality/passkey harness indexed in `REUSE_INVENTORY.md` | Raw token identity, prompt/position alignment and quality outcomes bound to an exact run | Internal root cause or DSA correctness from token equality alone |
+| Checkpoint, load and cache integrity | final-layout manifests, `inspect_{packed,runtime}_checkpoint.py`, `load_checkpoint_probe.py`, state/hash/write probes and terminal fleet validators | Exact source/final-owner bytes, checksums, finite state, slot ownership, direct load, cache health and replica agreement | Numerical equivalence of the decoder merely because all bytes loaded correctly |
+| HBM | plan memory model, allocator preflight, per-worker runtime memory records and terminal fleet sealer | Planned capacity separately from measured per-chip peak, compiler overlays and required headroom | Performance or safety from a plan estimate alone; measured peak is mandatory for a protected result |
+| Wall and device trace | `scripts/analysis/extract_steady_decode.py`, `scripts/analysis/parse_xplane.py` | Profiler-free warmed wall distribution separately from fresh XPlane device-step attribution | Correctness, provenance or user-visible speed from a profiler-contaminated trace alone |
+| Provenance and lifecycle | `bench/provenance.py`, protected launchers, fleet lease/census guards, terminal sealers | Code/plan/checkpoint/run identity, DB linkage, unique ownership, pre/post 8-host zero work and terminal publication | Numerical truth from a worker `passed` field or DB row without the sealed raw arrays |
+| Archive and recovery | protected `seal_*`, `publish_*` and `recover_*` wrappers plus generation/CRC/SHA ledgers | Durable negative evidence, exact remote object identity, recovery without recompute and failure-preserving cleanup | Promotion of a diagnostic or compile-only run into a numerical/performance result |
+| Mechanism search control | `gate_d_admission.py`, `admit_gate_d_mechanisms.py`, reuse inventory and family-closure artifact | Duplicate-family detection, one-row/local/no-host legality, first-watchpoint relevance and completeness of candidate state | TPU authorization; an offline pass is only permission to seek separate review |
+
+Use `rg --files` rather than relying on this table when locating a tool. The table describes stable
+roles; exact wrappers evolve and their committed code pin is part of every result.
+
+`prepare_compact_failure_archive.py` is bound to one historical run, not a generic publisher.
+`scripts/dump_archiver.sh` is a legacy quota helper with destructive cleanup and only a weak remote
+size check; it is never terminal/protected publication evidence. Current archival must use the
+run-specific protected sealer/recovery path, prove immutable generation/CRC/SHA and exact object-set
+equality, and delete local evidence only after that equality is authenticated.
+
+### 3.6 Immutable teaching artifacts
+
+These compact artifacts are the quickest way to recover *why* the current rules exist:
+
+| Artifact | Durable lesson |
+|---|---|
+| `docs/artifacts/gate-d-observability-frontier.json` | The first missing accepted/candidate authority is layer-1 `rms_input_fp32`; hidden 2795 is the first observable downstream BF16 mismatch. |
+| `docs/artifacts/layer1-rms-input-observer-perturbation-rejection.json` | A callback can expose bytes while invalidating the executable/output authority that made those bytes useful. |
+| `docs/artifacts/callback-executable-class-certificate.json` | The rejected callback executions form a distinct, reproducible executable class; do not rearm that observer. |
+| `docs/artifacts/accepted-db485-compile-only-hlo-success.json` | Compile-only acquisition can preserve a complete eight-host graph set without issuing a decode request. |
+| `docs/artifacts/db485-layer1-rms-hlo-causality.json` | Accepted logical BF16 association is pinned causally, but physical BF16 materialization remains unproved. |
+| `docs/artifacts/gate-d-mechanism-admission-frontier.json` | Every currently catalogued candidate is closed or incomplete; this is finite-catalogue evidence, not impossibility. |
+| `docs/artifacts/pp16-feature2-qkv-khalf-event1-cpu-rejection.json` | A mechanically valid downstream arm can be rejected offline when coherent event replay still misses the oracle. |
+| `docs/artifacts/plan-local-persistent-fp32-shadow-source-rejection.json` | Direct unrounded FP32-shadow substitution is source/HLO-incompatible; rounded or auxiliary-consumer forms remain separate and unadjudicated. |
+
+Always recompute a file's SHA before citing it. The SHA is the identity; the filename is only a
+human-readable locator.
+
 ## 4. End-to-end debugging workflow
 
 ### Phase 0 — establish authority and a clean boundary
@@ -328,6 +375,47 @@ The observability work produced concrete progress that blind retries could not:
 
 The general lesson is: create the debugger before asking the system to answer the hypothesis.
 
+### 6.1 Unlock sequence: from blind retries to a causal frontier
+
+The most important progress was not a faster kernel but a sequence of questions that became
+answerable:
+
+1. State/hash/cache guards showed whether the failure was load corruption, dropped ownership or
+   genuine arithmetic drift.
+2. Accepted internal captures and typed comparisons moved the search from final tokens to exact
+   layer/event boundaries.
+3. Pre-reduction partial captures closed checkpoint decode, FP8 scales, contractions and local
+   leaves before testing association.
+4. Exact StrategyND and attention/cache replays separated formula correctness from physical
+   reduction and producer/consumer ownership.
+5. Live-SSA diffing replaced source-level guesses with one observed scheduled-graph delta at a
+   time.
+6. Observer executable fingerprints exposed that additional consumers were changing the system
+   being measured.
+7. Compile-only all-host HLO acquisition recovered physical graphs without contaminating a
+   numerical result or paying for another full run.
+8. The immutable watchpoint auditor proved the current evidence gap instead of silently borrowing
+   state from incompatible histories.
+9. Canonical mechanism fingerprints turned many renamed variants into immediate offline
+   rejections.
+10. Exact archive, DB and cleanup contracts made a failed run reusable; it no longer disappeared
+    into logs or required an identical rerun.
+
+### 6.2 Questions now answerable quickly
+
+| Question | Fastest reliable answer |
+|---|---|
+| Did bytes change, and where first? | Immutable typed watchpoint audit in causal order |
+| Is a candidate using mixed histories? | Code/plan/executable/coherence binding before arithmetic |
+| Is the idea actually new? | Five-field fingerprint against the sealed family catalogue |
+| Did a named HLO operation affect the live output? | Exact SSA/callee/root traversal with hostile mutations |
+| Did instrumentation perturb execution? | Compare executable, executable-including-data and host-transfer fingerprint triples plus outputs/DSA |
+| Is the collective local and live? | Physical replica groups plus producer-to-root HLO certificate on every host |
+| Is a short DSA pass meaningful? | Require `context > top_k`, or classify it only as state/tail coverage |
+| Is a run fast? | Profiler-free warmed wall; use XPlane only for attribution |
+| Can a failed run be reused? | Generation/CRC/SHA ledger, preserved raw HLO/tensors/logs and explicit diagnostic-only claims |
+| Is the fleet safe for the next action? | Lease ownership plus authenticated 8-host zero-work census |
+
 ## 7. Decision tree
 
 ```text
@@ -381,3 +469,54 @@ WS32 adjudication and speculation.
 - Preserve immutable evidence and tombstones; never silently rewrite a report or DB row.
 - Update this playbook when a failure changes a permanent rule, not for transient status.
 - Put current status and exact next action in `HANDOFF.md`, not here.
+
+## 10. Minimal incident packet
+
+When a run or offline audit fails, preserve enough information for another session to diagnose it
+without rerunning:
+
+- UTC tag, hypothesis, candidate fingerprint and first watchpoint;
+- Git/code/runtime/generated-version, plan, checkpoint and oracle identities;
+- exact command, environment flags, host/JAX-process/device map and local replica groups;
+- preflight and postflight fleet census plus workload owner;
+- raw typed arrays and their schema/shape/dtype/SHA, not only summaries;
+- every StableHLO/optimized-HLO file from every host, with canonical and raw digests;
+- executable, executable-including-data and host-transfer fingerprints;
+- tokens and complete cutoff-active DSA event arrays;
+- cache/state/load/replica/HBM records;
+- profiler-free per-step wall samples and, only when required, fresh XPlanes;
+- stdout/stderr, failure trap output, upload receipts and exact remote generation/CRC/SHA ledger;
+- explicit claims matrix: numerical, Gate D, HLO, performance, recovery and cleanup true/false;
+- reviewer verdict, terminal classification and the one exact next action.
+
+If any item was never produced, record it as absent. Never fill an evidence gap with inference.
+
+## 11. Definition of an observable mechanism
+
+A mechanism is eligible to request a separate compile-only review only when all of the following
+are true:
+
+- its hypothesis names one first causal watchpoint and one falsifying outcome;
+- it has a unique canonical fingerprint not already closed by evidence;
+- it uses one logical decode row, groups of at most four, device-only execution and no full-pod
+  hidden reconstruction;
+- all seven Gate-D candidate watchpoints come from one authenticated history;
+- its smallest real captured-input reference test passes;
+- its expected source/StableHLO and structural contract names the required live value flow and
+  rejects every locally representable hostile decoy;
+- the proposed acquisition is bounded, performs no numerical request and cannot publish a
+  numerical, Gate-D or performance claim;
+- failure, archive, DB rollback and eight-host cleanup paths have been tested locally;
+- an immutable adversarial review has approved the exact staged diff and compile-only evidence
+  contract.
+
+Eligibility is not authorization. Only a separate compile-only review may authorize acquisition of
+the TPU-specific lowering. A later numerical-run review is eligible only after that exact
+StableHLO/optimized-HLO pair is preserved, independently replayed against its causal/locality
+contract, mutation-tested, and bound to the intended executable identity; the complete candidate
+state and protected numerical wrapper must then receive another immutable review.
+
+Until then, the mechanism is an idea, not a TPU experiment. Neither this checklist, its persistence
+review nor a compile-only result authorizes TPU numerical execution. Only the separate
+execution-only review may authorize one bounded protected discriminator, and even an exact
+discriminator does not close Gate D.
