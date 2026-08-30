@@ -11992,3 +11992,23 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   failure into a much more expensive 128K run. Reclassification capsule SHA is
   `d9272a93a1eb43e2cbfe3d00e01343919458722c21cc969c6dcee2d1bea01582`. No
   TPU/cloud/JAX/model workflow ran.
+
+## 2026-08-30 11:18 UTC — direct unrounded FP32-shadow substitution rejected before JAX
+
+- Accepted vLLM `a30addc...d1c`, the greenfield split decoder and WS32 form a transient FP32 sum,
+  normalize it unrounded, then return recurrent state in activation dtype. Accepted HLO certificate
+  `a8c9577d...ba21` binds protected logical BF16 association while making no physical
+  materialization claim.
+- Directly substituting the unrounded shadow at the next boundary deletes that BF16 recurrence and
+  is nonexact. No-dependency is non-causal; origin-only is the existing transient sum. The review
+  correctly identified rounded/widened, compensated and auxiliary device-consumer forms as
+  separate unadjudicated fingerprints that may preserve arithmetic while changing physical flow.
+- Artifact `plan-local-persistent-fp32-shadow-source-rejection.json` SHA
+  `ec78266731f1e0730fe108c37e3455ad921c724801693bda5f9245c680e6dbd6` binds
+  exact source ASTs, accepted HLO, candidate id and prior admission contract/report/compact hashes.
+  Its limited supersession authorizes no JAX/TPU and makes no general impossibility, physical,
+  numerical, DSA, performance, DB or Gate-D claim.
+- Fable remained usage-blocked. The goal-authorized Sol fallback rejected initial staged SHA
+  `d1651110...65e8` for the overbroad interpretation, unbound BF16 premise and missing machine
+  supersession. Corrected SHA `0045e9b8...2154` closes all three and received
+  `APPROVE PERSISTENCE`, no P0--P2 and no execution authorization.

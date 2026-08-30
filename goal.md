@@ -22,7 +22,7 @@ Evidence chooses. Distribute weights by depth; communicate locally; move live st
 
 ## Mandatory order
 
-Worktree; record pins. Before model prove
+Worktree; pin. Before model prove
 topology/groups; device-only PP8/PP16 chains with exact HLO, no host/Ray/Python dispatch/inactive
 compute, warmed distributions; one exact MoE layer with local 2/4-chip combine.
 Pass Gates A–H: plan/memory/HLO; final-layout manifest/packer/loader; reference kernels; exact

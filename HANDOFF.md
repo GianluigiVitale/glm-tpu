@@ -8050,3 +8050,27 @@ auditor, binds raw arrays/common identity/layout owners, matches canonical five-
 fingerprints independently of family names, and traverses every parent through no-symlink dirfds.
 Hostile tests cover each former bypass. Sol returned `APPROVE PERSISTENCE` with no remaining P0--P2;
 this remains offline-only and authorizes no compilation or TPU execution.
+
+## 2026-08-30 direct unrounded FP32-shadow substitution is rejected; variants remain offline
+
+Exact accepted vLLM commit `a30addc...d1c` casts the fused FP32 sum back to input dtype before
+returning recurrent state. Sealed accepted HLO `a8c9577d...ba21` binds that protected logical dtype
+to BF16 while explicitly leaving physical materialization unresolved. PP8/PP16 and WS32 preserve
+the transient-unrounded-sum/separately-rounded-residual distinction. Exact source ASTs, HLO,
+candidate id and prior admission contract/report/compact identities are bound in
+`plan-local-persistent-fp32-shadow-source-rejection.json`, SHA
+`ec78266731f1e0730fe108c37e3455ad921c724801693bda5f9245c680e6dbd6`.
+
+Only direct unrounded-shadow substitution is source-rejected: using it at the next boundary removes
+the accepted BF16 recurrence. A no-dependency shadow is non-causal and origin-only use duplicates
+the existing transient sum. Rounded/widened, compensated or auxiliary device-consumer variants can
+preserve BF16 arithmetic while changing physical dependency, so they remain unadjudicated separate
+fingerprints. No JAX/TPU/model/cloud work ran and no successor is authorized. Exact next is offline
+fingerprint/causal-HLO adjudication of those variants plus broader upstream source search; any
+survivor still needs the seven-watchpoint coherent capsule before compilation.
+
+Fable remained at its documented 100% usage limit, so the goal-authorized Sol fallback reviewed
+this batch. It rejected staged SHA `d1651110...65e8` for non-exhaustive wording, an unbound BF16
+premise and missing machine supersession. Corrected staged SHA `0045e9b8...2154` narrows the claim,
+binds the sealed HLO and prior identities, and received `APPROVE PERSISTENCE` with no P0--P2. The
+review authorizes no compilation or TPU execution.

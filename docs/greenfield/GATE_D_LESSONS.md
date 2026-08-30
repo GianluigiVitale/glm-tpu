@@ -945,8 +945,13 @@ normalized-state cause.
   layout, or borrowed cache does not move the frontier. An offline pass still sets
   `tpu_successor_authorized=false` and needs a separate reviewed compilation/execution batch.
 - `NO_ADMISSIBLE_MECHANISM` is scoped to the catalogued candidates. Never convert it into a general
-  impossibility claim. The current plan-local persistent-FP32 shadow is a hypothesis, not a fix: it
-  lacks a complete coherent capsule and must not reach JAX or TPU until that evidence exists.
+  impossibility claim. Source plus sealed accepted-HLO audit closes only direct unrounded-shadow
+  substitution: it removes the accepted BF16 recurrent-state round. An unused no-dependency value
+  is non-causal, and origin-only use is the existing transient fused sum. Rounded/widened,
+  compensated or auxiliary device-consumer forms remain unadjudicated separate fingerprints; do
+  not collapse them into the rejected direct form or advance them without causal HLO and the full
+  coherent-state contract. Artifact `plan-local-persistent-fp32-shadow-source-rejection.json`
+  machine-binds this limited supersession. No form is currently authorized for JAX/TPU.
 - Snapshot current upstream refs before designing a mechanism. As of the sealed 2026-08-30 audit,
   experimental GLM5 branches add downstream DSA/indexer/cache/attention work but no new layer-1
   fused-add/RMS physical ownership mechanism.

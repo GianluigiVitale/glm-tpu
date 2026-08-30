@@ -294,6 +294,7 @@ A failed discriminator is useful if it is bounded, coherent and sealed. Never re
 | Calling exact M32 a legal solution | It depends on 31 sentinel rows and full-pod geometry | `decode_batch1` has one live row; admission rejects dead rows/global reconstruction |
 | Adding `jax.debug.callback` to observe RMS input | Added a consumer, changed executable class and reproduced wrong DSA | Callback class is tombstoned; require unchanged executable identity |
 | Reconstructing FP32 on the host | Host formula is not the unperturbed TPU value | Capture device-produced typed bytes or leave the watchpoint unobservable |
+| Directly substituting an unrounded FP32 residual shadow | Removes the sealed accepted BF16 recurrent round | Reject direct substitution; fingerprint rounded/auxiliary-consumer variants separately |
 | Borrowing accepted cache for candidate arithmetic | Cache/query/head/key/scorer no longer share one history | Require one candidate coherence id and complete state |
 | Using CPU as a TPU numerical oracle | CPU controls failed to reproduce TPU event-1 ordering | CPU only admits semantics; protected TPU evidence decides association |
 | Reading shapes/names as value-flow proof | Matching shapes can carry the wrong source | Use SSA/callee/root traversal and SHA-pinned producer-to-consumer certificates |

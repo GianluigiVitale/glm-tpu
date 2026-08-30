@@ -1782,3 +1782,18 @@ remains open and no TPU successor is authorized.
   The Sol fallback rejected initial staged SHA `5063f72a...7b62` for the opaque-capsule,
   renamed-family and intermediate-symlink bypasses. Corrected SHA `5d23db63...9982` closes all
   three with permanent hostile tests; correction review returned `APPROVE PERSISTENCE`, no P0--P2.
+
+## Direct unrounded persistent-FP32 shadow source/HLO rejection
+
+- Artifact `docs/artifacts/plan-local-persistent-fp32-shadow-source-rejection.json`, SHA
+  `ec78266731f1e0730fe108c37e3455ad921c724801693bda5f9245c680e6dbd6`, pins accepted vLLM commit
+  `a30addc...d1c`, exact file/function AST hashes, current greenfield sources and accepted
+  logical-HLO certificate `a8c9577d...ba21`.
+- Source and sealed HLO establish the accepted logical BF16 recurrence, not physical BF16
+  materialization. Directly consuming an unrounded shadow at the next boundary removes that round
+  and is nonexact; a no-dependency shadow is non-causal; origin-only use duplicates the transient
+  fused sum.
+- Rounded/widened, algebraically compensated or auxiliary device-only consumers are not closed by
+  this audit. They require separate fingerprints and causal HLO/coherence adjudication. The
+  artifact binds candidate id plus prior contract/report/compact hashes and supersedes only the
+  three narrow interpretations. No JAX/TPU successor is authorized.
