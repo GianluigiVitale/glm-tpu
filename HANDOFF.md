@@ -8018,3 +8018,35 @@ upstream of the normalized/head split. It must expose or otherwise deterministic
 missing layer-1 RMS input while preserving complete candidate-coherent cache/query/head/current-key/
 scorer state. Reject it before JAX/TPU if it duplicates a frozen association, cannot provide that
 state, or does not move the ordered causal frontier. No TPU successor is currently authorized.
+
+## 2026-08-30 offline Gate-D mechanism admission closes the current catalogue
+
+The new stdlib-only admission tool authenticates nine sealed mechanism families, 15 candidates,
+the immutable watchpoint frontier and current upstream refs without importing JAX. Contract
+`configs/greenfield-gate-d-mechanism-admission.json` is `f96d144e...a7d3`; canonical report is
+`2af563ed...7abb`. Compact capsule
+`docs/artifacts/gate-d-mechanism-admission-frontier.json` is `9dafd4c6...6315` and classifies
+`NO_ADMISSIBLE_MECHANISM;GATE_D_OPEN;NO_TPU_SUCCESSOR`. This means no currently catalogued
+candidate passes, not that a legal solution is impossible.
+
+Thirteen historical/illegal arms are duplicate or contract rejected. The unclosed plan-local
+persistent-FP32 shadow is structurally legal but has no complete candidate-coherent capsule; it is
+not an implementation or fix. Current upstream GLM5 experimental branches add DSA/indexer/cache/
+attention work downstream of the frontier and do not supply a new layer-1 RMS physical ownership
+mechanism. No JAX, TPU, model or cloud work ran.
+
+Exact next remains offline. Adversarially review this admission batch, persist it, then construct
+the smallest source-derived candidate capsule for the plan-local persistent-FP32 shadow only if it
+can bind one executable/plan/code identity and the RMS-input, normalized, cache-history, query,
+head-weight, current-key and event-1 scorer watchpoints. Otherwise record the hypothesis as
+unconstructable and broaden source-level mechanism search. A separate review is required before
+any compilation or TPU action.
+
+Fable session `d6512b94-52af-4a03-85de-d7d5b43ea5cc` returned only its hard usage-limit response.
+The goal-authorized Sol reviewer rejected initial staged SHA `5063f72a...7b62`: opaque named
+watchpoints could pass, a null family could rename a closed mechanism, and intermediate symlink
+components were followed. Corrected SHA `5d23db63...9982` reuses the typed stdlib observability
+auditor, binds raw arrays/common identity/layout owners, matches canonical five-field mechanism
+fingerprints independently of family names, and traverses every parent through no-symlink dirfds.
+Hostile tests cover each former bypass. Sol returned `APPROVE PERSISTENCE` with no remaining P0--P2;
+this remains offline-only and authorizes no compilation or TPU execution.

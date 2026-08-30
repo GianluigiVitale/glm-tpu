@@ -1,0 +1,31 @@
+{
+  "artifact_kind": "upstream_glm52_obsolescence_snapshot",
+  "captured_utc": "2026-08-30T10:20:00Z",
+  "claim_scope": "Read-only source/ref snapshot only; no correctness, performance, Gate-D, JAX or TPU claim.",
+  "conclusion": "CURRENT_UPSTREAM_GLM_BRANCHES_ADD_DSA_INDEXER_CACHE_ATTENTION_PATHS;NO_NEW_LAYER1_FUSED_ADD_RMS_PHYSICAL_OWNERSHIP_MECHANISM_FOUND",
+  "refs": {
+    "tpu_inference_main": "da5c192ad01162d705336a5a3f360a46ea877850",
+    "tpu_inference_upstream_glm_5_2": "d446bf000f71ef214322a3e436612f6d9daa0508",
+    "tpu_inference_upstream_glm_5_2_try_2": "a1f1289dc6a8bf2034539fa41ccf94ac2013aa63",
+    "tpu_inference_upstream_glm_5_2_try_3": "59d8c491db044b078620f16cd7faa03647ad0d89",
+    "tpu_inference_upstream_glm_5_2_try_4": "52b26cb6818857ef45ca07fa0fd14b2f31a9a260",
+    "tpu_inference_upstream_glm_5_2_try_5": "269fa9a7dc19e0770a25bb8882e4e356a9eca7bd",
+    "tpu_inference_upstream_glm_5_2_try_6": "8bc2100a7e460c9f815765b5fe31d1c261684d5e",
+    "tpu_inference_upstream_glm_cc": "22ffb3f7c160da31f92309f87df962dab09d37a7",
+    "tpu_inference_upstream_glm_try_cc": "2cce88e931e19751d1c008fa6c856a2207ad08c4",
+    "vllm_main": "2c7d7dd64a2eaba0feedf42cab2f527486d7479c"
+  },
+  "reviewed_boundaries": [
+    "tpu_inference/layers/jax/norm.py",
+    "tpu_inference/platforms/tpu_platform.py",
+    "tpu_inference/kernels/experimental/glm5/",
+    "tpu_inference/layers/vllm/custom_ops/experimental/glm5/",
+    "tpu_inference/models/vllm/experimental/glm5.py",
+    "vllm/model_executor/layers/layernorm.py",
+    "vllm/model_executor/models/glm4_moe.py"
+  ],
+  "source_baselines": {
+    "accepted_tpu_inference": "83ff4a3576602ca844ea090550139a2ff00b0bb1",
+    "accepted_vllm": "a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c"
+  }
+}

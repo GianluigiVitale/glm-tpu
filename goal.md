@@ -1,13 +1,13 @@
 # Goal — GLM-5.2-FP8 TPU v4 topology-first greenfield engine
 
-FULL ACCESS: work autonomously. Keep <4,000 chars. At start/compaction read this,
+FULL ACCESS: work autonomously. Keep <4,000 chars. At start/compaction read
 `docs/glm-tpu-revolution.md` and `docs/suggestions.md` **in full**, then inspect live evidence.
 
 ## Scope and precedence
 
-Build an isolated default-off native-JAX `zai-org/GLM-5.2-FP8` engine on `db-v4-64-od`
-(8 hosts/32 v4 chips), minimizing protected 256K single-stream latency; supersedes old rules.
-Preserve legacy evidence/oracles/tools, not execution. Create no infrastructure; use only
+Build a default-off native-JAX `zai-org/GLM-5.2-FP8` engine on `db-v4-64-od`
+(8 hosts/32 v4 chips), minimizing protected 256K stream latency.
+Preserve legacy evidence/oracles/tools, not execution. Create no infrastructure; only
 `gs://driftbench-dsv4-uc`; serialize TPU work.
 
 ## Required architecture search
@@ -17,12 +17,12 @@ Preserve legacy evidence/oracles/tools, not execution. Create no infrastructure;
 - `WS32_2D`: all-chip 2D; result or evidenced rejection.
 - `LEGACY_TP32_DCP8`: oracle only.
 
-Evidence chooses. Distribute weights with depth; communicate locally; move live state only; no
+Evidence chooses. Distribute weights by depth; communicate locally; move live state; no
 32-chip hidden reconstruction/layer. `decode_batch1`: one row, no dead rows.
 
 ## Mandatory order
 
-Isolated worktree; record pins; preserve evidence. Before full model prove
+Worktree; record pins. Before model prove
 topology/groups; device-only PP8/PP16 chains with exact HLO, no host/Ray/Python dispatch/inactive
 compute, warmed distributions; one exact MoE layer with local 2/4-chip combine.
 Pass Gates A–H: plan/memory/HLO; final-layout manifest/packer/loader; reference kernels; exact
@@ -37,12 +37,13 @@ data, coherent cache/query/head/key/scorer state, causal HLO fingerprints and ar
 Prefer device buffers plus one bounded transfer. Host consumers require unchanged executable,
 outputs and DSA. Bind source/code/plan SHAs; append-only, fail closed, offline-first; test attacks.
 
-Observability: `docs/10-observability.md` (legacy oracle);
-`docs/greenfield/{REUSE_INVENTORY,EVIDENCE_MAP,GATE_D_LESSONS}.md` and
-`configs/greenfield-reuse-inventory.json` are indexes. Tools:
-`configs/greenfield-gate-d-observability.json`, `glm_tpu/greenfield/observability.py`,
-`scripts/greenfield/audit_observability.py`. Search `glm_tpu/greenfield/{validation,
-benchmarking,sharding}/`, `scripts/greenfield/{capture,compare,inspect,probe,trace}*` and
+Observability: `docs/10-observability.md` (oracle);
+`docs/greenfield/{REUSE_INVENTORY,EVIDENCE_MAP,GATE_D_LESSONS,GATE_D_OBSERVABILITY_PLAYBOOK}.md` and
+`configs/greenfield-reuse-inventory.json` are indexes. Core/config/CLI:
+`glm_tpu/greenfield/{observability,gate_d_admission}.py`,
+`configs/greenfield-gate-d-{observability,mechanism-admission}.json`,
+`scripts/greenfield/{audit_observability,admit_gate_d_mechanisms}.py`. Search
+`glm_tpu/greenfield/{validation,benchmarking,sharding}/`, `scripts/greenfield/{capture,compare,inspect,probe,trace}*` and
 `tests/greenfield/`. Evidence: `docs/artifacts/`, `HANDOFF.md`, `bench/results.db`, bucket
 `oracles/`/`results/`. Read/register first.
 
@@ -60,8 +61,8 @@ wall regression. Useful: `<=200 ms/token`, `>=4.5 tok/s`; strong:
 
 ## Definition of done and workflow
 
-Finish only with §18 direct evidence: independent 256K service; packed checkpoint; exactness/integrity,
-HBM/HLO, local collectives, plan adjudication, 128K/256K, DB/archive and clean fleet.
+Finish only with §18 evidence: independent 256K service; packed checkpoint; exactness/integrity,
+HBM/HLO, local collectives, plan adjudication, 128K/256K, DB/archive, clean fleet.
 Log batches/exact next. Review each new batch in Fable 5 Max CLI
 (`--dangerously-skip-permissions`); at 100% use one Sol on the same scope. Fix blockers; don't
 re-review cleared code. Use smallest checks, reuse proof, preflight locks/tags; serialize TPU

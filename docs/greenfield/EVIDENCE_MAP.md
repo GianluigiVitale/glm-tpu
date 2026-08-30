@@ -1752,3 +1752,33 @@ remains open and no TPU successor is authorized.
   no P0--P2 blocker. This proves the evidence frontier, not the numerical root cause, correctness,
   performance, Gate D or a TPU successor. Future candidates must move upstream and supply complete
   coherent state; no JAX/TPU action follows from this report.
+
+## Gate-D mechanism admission frontier
+
+- Contract `configs/greenfield-gate-d-mechanism-admission.json`, SHA
+  `f96d144ecc1bdca7382a0a220b41aa30f3f77b69a7b42dff73fc551d5869a7d3`, authenticates nine sealed
+  mechanism families, their structured primitive fingerprints, 15 named candidates, the immutable
+  watchpoint frontier and current upstream
+  refs. Core/CLI SHAs are `1cacd246...33ba` / `ea18b497...70c7c` and the canonical report SHA is
+  `2af563ed...7abb`.
+- Family closure artifact `docs/artifacts/gate-d-mechanism-family-closure.json`, SHA
+  `545740afbb2f79ecf6783871673c5aa6038b34550b3a120d399b8c3881d4ccf0`, records duplicate closures
+  only. Upstream snapshot `docs/artifacts/upstream-glm52-obsolescence-snapshot.json`, SHA
+  `76badaf418f3d7bc721eb98802389660a41f16456a40543f86802f6c062e0b1d`, finds new experimental
+  GLM5 DSA/indexer/cache/attention paths but no new upstream layer-1 RMS ownership mechanism.
+- Compact capsule `docs/artifacts/gate-d-mechanism-admission-frontier.json`, SHA
+  `9dafd4c6642686d446c344f9ea3d9a4f5c7d29511b8ecb5e8d02031dcd776315`, classifies
+  `NO_ADMISSIBLE_MECHANISM;GATE_D_OPEN;NO_TPU_SUCCESSOR`. All 13 historical/illegal candidates are
+  duplicate or contract rejected. The otherwise structurally legal plan-local persistent-FP32
+  shadow lacks a candidate-coherent capsule; current upstream DSA work is also downstream of the
+  causal frontier. No JAX, TPU, cloud or model work occurred.
+- This is finite-catalogue admission evidence, not proof that no solution exists. A successor must
+  be genuinely new, true-one-row and topology-local, move or expose `layer1.rms_input_fp32`, and
+  pass the existing stdlib observability auditor over typed candidate RMS-input/normalized/cache/
+  query/head/current-key/scorer arrays, common identity and layout/owner evidence. Component-wise
+  no-symlink path traversal and append-only publication fail closed. Offline admission still never
+  authorizes TPU execution.
+- Fable session `d6512b94-52af-4a03-85de-d7d5b43ea5cc` was usage-blocked and supplied no opinion.
+  The Sol fallback rejected initial staged SHA `5063f72a...7b62` for the opaque-capsule,
+  renamed-family and intermediate-symlink bypasses. Corrected SHA `5d23db63...9982` closes all
+  three with permanent hostile tests; correction review returned `APPROVE PERSISTENCE`, no P0--P2.

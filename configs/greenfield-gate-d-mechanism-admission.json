@@ -1,0 +1,350 @@
+{
+  "candidates": [
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["accepted_hlo", "family_closure"],
+      "family_id": "m32_dead_row_association",
+      "host_effect": false,
+      "id": "accepted_m32_weighted_rms",
+      "logical_rows": 32,
+      "max_collective_group_size": 32,
+      "mechanism_fingerprint": {"association": "accepted.m32", "consumer_boundary": "rms.weighted", "reduction": "m32.local", "representation": "sentinel.rows", "transport": "full.pod.hidden"},
+      "reconstructs_full_pod_hidden": true,
+      "summary": "Exact accepted M32 weighted-RMS geometry with 31 sentinel rows."
+    },
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["family_closure", "observability_frontier"],
+      "family_id": "one_row_formula_scalar_layout",
+      "host_effect": false,
+      "id": "pp8_fullwidth_replicated_m1",
+      "logical_rows": 1,
+      "max_collective_group_size": 4,
+      "mechanism_fingerprint": {"association": "one.row.rms", "consumer_boundary": "rms.weighted", "reduction": "fullwidth.local", "representation": "replicated.fullwidth", "transport": "stage.local"},
+      "reconstructs_full_pod_hidden": false,
+      "summary": "Stage-local full-width replicated split residual and one-row RMS."
+    },
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["db518_straddler", "observability_frontier"],
+      "family_id": "one_row_formula_scalar_layout",
+      "host_effect": false,
+      "id": "pp16_feature2_weighted_rms",
+      "logical_rows": 1,
+      "max_collective_group_size": 2,
+      "mechanism_fingerprint": {"association": "one.row.rms", "consumer_boundary": "rms.weighted", "reduction": "feature2.scalar", "representation": "sharded.feature2", "transport": "local.gather"},
+      "reconstructs_full_pod_hidden": false,
+      "summary": "DB518 feature-2 RMS scalar reduction, local weight and gather."
+    },
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["accepted_hlo", "family_closure"],
+      "family_id": "one_row_formula_scalar_layout",
+      "host_effect": false,
+      "id": "ws32_feature4_weighted_rms",
+      "logical_rows": 1,
+      "max_collective_group_size": 4,
+      "mechanism_fingerprint": {"association": "one.row.rms", "consumer_boundary": "rms.weighted", "reduction": "feature4.scalar", "representation": "sharded.feature4", "transport": "local.gather"},
+      "reconstructs_full_pod_hidden": false,
+      "summary": "WS32 persistent feature-4 one-row weighted-RMS path."
+    },
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["family_closure"],
+      "family_id": "one_row_pallas_equivalence",
+      "host_effect": false,
+      "id": "true_m1_pallas_output_only",
+      "logical_rows": 1,
+      "max_collective_group_size": 4,
+      "mechanism_fingerprint": {"association": "one.row.rms", "consumer_boundary": "rms.weighted", "reduction": "pallas.m1", "representation": "output.only", "transport": "stage.local"},
+      "reconstructs_full_pod_hidden": false,
+      "summary": "True-M1 output-only Pallas weighted-RMS kernel."
+    },
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["family_closure"],
+      "family_id": "one_row_pallas_equivalence",
+      "host_effect": false,
+      "id": "true_m1_pallas_source_fused",
+      "logical_rows": 1,
+      "max_collective_group_size": 4,
+      "mechanism_fingerprint": {"association": "one.row.rms", "consumer_boundary": "rms.weighted", "reduction": "pallas.m1", "representation": "source.fused", "transport": "stage.local"},
+      "reconstructs_full_pod_hidden": false,
+      "summary": "True-M1 Pallas kernel with native dense/attention/source roles."
+    },
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["family_closure"],
+      "family_id": "one_row_pallas_equivalence",
+      "host_effect": false,
+      "id": "true_m1_feature_tiled_m8",
+      "logical_rows": 1,
+      "max_collective_group_size": 4,
+      "mechanism_fingerprint": {"association": "one.row.rms", "consumer_boundary": "rms.weighted", "reduction": "pallas.m1", "representation": "feature.tiled.m8", "transport": "stage.local"},
+      "reconstructs_full_pod_hidden": false,
+      "summary": "All-live feature-tiled M8 representation returning one semantic row."
+    },
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["accepted_hlo", "family_closure"],
+      "family_id": "output_ownership_fusion",
+      "host_effect": false,
+      "id": "gather_before_weight",
+      "logical_rows": 1,
+      "max_collective_group_size": 4,
+      "mechanism_fingerprint": {"association": "one.row.rms", "consumer_boundary": "rms.weighted", "reduction": "feature.local", "representation": "gather.before.weight", "transport": "local.gather"},
+      "reconstructs_full_pod_hidden": false,
+      "summary": "Gather feature halves before final RMS weight application."
+    },
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["accepted_hlo", "family_closure"],
+      "family_id": "output_ownership_fusion",
+      "host_effect": false,
+      "id": "direct_rms_to_qkva_fusion",
+      "logical_rows": 1,
+      "max_collective_group_size": 4,
+      "mechanism_fingerprint": {"association": "one.row.rms", "consumer_boundary": "qkva.n82", "reduction": "feature.local", "representation": "nonrooted.fusion", "transport": "stage.local"},
+      "reconstructs_full_pod_hidden": false,
+      "summary": "Consume RMS output directly in N82 qkv-a without rooting it."
+    },
+    {
+      "causal_frontier_action": "expose",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["callback_certificate", "callback_rejection"],
+      "family_id": "callback_observation",
+      "host_effect": true,
+      "id": "layer1_rms_callback_observer",
+      "logical_rows": 32,
+      "max_collective_group_size": 32,
+      "mechanism_fingerprint": {"association": "accepted.m32", "consumer_boundary": "host.callback", "reduction": "m32.local", "representation": "callback.observer", "transport": "host.transfer"},
+      "reconstructs_full_pod_hidden": true,
+      "summary": "Accepted-tree callback intended to expose the hidden FP32 RMS input."
+    },
+    {
+      "causal_frontier_action": "downstream",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["khalf_rejection"],
+      "family_id": "split_k_downstream",
+      "host_effect": false,
+      "id": "lp2_khalf_n82",
+      "logical_rows": 1,
+      "max_collective_group_size": 2,
+      "mechanism_fingerprint": {"association": "normalized.downstream", "consumer_boundary": "qkva.n82", "reduction": "split.k.fp32", "representation": "sharded.feature2", "transport": "local.reduce"},
+      "reconstructs_full_pod_hidden": false,
+      "summary": "LP2 half-K FP32 qkv-a partial reduction after normalized state."
+    },
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["family_closure", "observability_frontier"],
+      "family_id": "mixed_authority_replay",
+      "host_effect": false,
+      "id": "mixed_accepted_db518_event_replay",
+      "logical_rows": 1,
+      "max_collective_group_size": 2,
+      "mechanism_fingerprint": {"association": "mixed.authority", "consumer_boundary": "dsa.event1", "reduction": "borrowed.state", "representation": "mixed.cache", "transport": "offline.replay"},
+      "reconstructs_full_pod_hidden": false,
+      "summary": "Combine a candidate row with accepted or DB518 downstream state."
+    },
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["db563_reclassification", "family_closure"],
+      "family_id": "tolerance_relaxation",
+      "host_effect": false,
+      "id": "bounded_dsa_or_cutoff_vacuity",
+      "logical_rows": 1,
+      "max_collective_group_size": 4,
+      "mechanism_fingerprint": {"association": "bounded.error", "consumer_boundary": "dsa.event1", "reduction": "tolerance", "representation": "cutoff.vacuous", "transport": "offline.compare"},
+      "reconstructs_full_pod_hidden": false,
+      "summary": "Treat bounded scores or context not wider than top-k as exact DSA."
+    },
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["family_closure", "observability_frontier"],
+      "family_id": null,
+      "host_effect": false,
+      "id": "plan_local_persistent_fp32_shadow",
+      "logical_rows": 1,
+      "max_collective_group_size": 4,
+      "mechanism_fingerprint": {"association": "plan.local.shadow", "consumer_boundary": "rms.weighted", "reduction": "local.fp32", "representation": "persistent.fp32", "transport": "stage.local"},
+      "reconstructs_full_pod_hidden": false,
+      "summary": "Proposed plan-local split update/residual shadow carried from embedding through a complete coherent DSA history."
+    },
+    {
+      "causal_frontier_action": "downstream",
+      "coherent_state_capsule": null,
+      "evidence_ids": ["upstream_snapshot"],
+      "family_id": null,
+      "host_effect": false,
+      "id": "current_upstream_glm5_dsa_kernels",
+      "logical_rows": 1,
+      "max_collective_group_size": 4,
+      "mechanism_fingerprint": {"association": "normalized.downstream", "consumer_boundary": "dsa.event1", "reduction": "dsa.kernels", "representation": "upstream.experimental", "transport": "stage.local"},
+      "reconstructs_full_pod_hidden": false,
+      "summary": "Current upstream GLM DSA/indexer/cache/attention implementation."
+    }
+  ],
+  "causal_frontier": {
+    "evidence_id": "observability_frontier",
+    "id": "layer1.rms_input_fp32",
+    "order": 0
+  },
+  "closed_families": [
+    {
+      "evidence_ids": ["callback_certificate", "callback_rejection"],
+      "id": "callback_observation",
+      "mechanism_fingerprint_sha256s": ["73c72279a23820d3dd7a63a781e91e512f10b28cfc358a3c1ca5a163711f3728"],
+      "reason": "The observer changes executable class and DSA output."
+    },
+    {
+      "evidence_ids": ["accepted_hlo", "family_closure"],
+      "id": "m32_dead_row_association",
+      "mechanism_fingerprint_sha256s": ["11982a3dac5926e4e7f5055d710a659245784731774693b7a93752eb7b35813b"],
+      "reason": "Exact M32 requires forbidden rows, group and hidden reconstruction."
+    },
+    {
+      "evidence_ids": ["family_closure", "observability_frontier"],
+      "id": "mixed_authority_replay",
+      "mechanism_fingerprint_sha256s": ["dfd4d1d639af55f088a2ba4645fba9689a6842585bcaf397b7ca8a770e62b668"],
+      "reason": "The combined sources do not share one coherent event history."
+    },
+    {
+      "evidence_ids": ["accepted_hlo", "db518_straddler", "family_closure"],
+      "id": "one_row_formula_scalar_layout",
+      "mechanism_fingerprint_sha256s": ["9cfbd531c3fc8a8c8c69703ccfcc86d765df53b33cb5748b6c54d3d8ccaa5af9", "d8b9d9041728682ae193282890bd8965a92f09555a162ca77103dd85f0c4c940", "194703e9598bd6e3a10fe87433d32681216d09fa4c8246b77ffd433580cd83da"],
+      "reason": "Full-width, feature-sharded, scalar and layout variants are sealed failures."
+    },
+    {
+      "evidence_ids": ["family_closure"],
+      "id": "one_row_pallas_equivalence",
+      "mechanism_fingerprint_sha256s": ["75eea0072aace3aa19c8137d40a2517c9df092adeec04d66ac5af55aa1cd7ad7", "e49a225ec72b86b387d1a36a9a2ae1e4539b154c6c8ee9e25555a4f5e73fbceb", "b734b79638ba35c5cf1191337e89ef75ed96c495d52efc416cf6ed5094af2dfa"],
+      "reason": "Output-only, source-fused and all-live Pallas variants are sealed failures."
+    },
+    {
+      "evidence_ids": ["accepted_hlo", "family_closure"],
+      "id": "output_ownership_fusion",
+      "mechanism_fingerprint_sha256s": ["3e3aaad8cc37ab75799060aa1557248bbe7fd1868653256e285ba3d28e8b6969", "fb29ad021f1db9c7838bdb97d2e0ba3bc8d85dccecc82822f39d24531b366b38"],
+      "reason": "Gather-before-weight and direct RMS-to-qkv-a fusion are duplicate-closed."
+    },
+    {
+      "evidence_ids": ["khalf_rejection"],
+      "id": "split_k_downstream",
+      "mechanism_fingerprint_sha256s": ["3bdf4fc5d55a92583d4f5c29d159348ea30a4f57746adfb2decc6cf43b1ac5bc"],
+      "reason": "This arm begins after the frontier and fails coherent CPU event-1 admission."
+    },
+    {
+      "evidence_ids": ["db563_reclassification", "family_closure"],
+      "id": "tolerance_relaxation",
+      "mechanism_fingerprint_sha256s": ["5ed7e5d82bfffc9fea033488953f6b421bde90063668c833a85f587e2cd44de4"],
+      "reason": "Bounded internal error and cutoff-vacuous selection are not DSA exactness."
+    },
+    {
+      "evidence_ids": ["family_closure"],
+      "id": "unchanged_plan_retry",
+      "mechanism_fingerprint_sha256s": ["da2fab4e11341f1ce90ee621723eb683aec8e48d18850bd64f38bb969f6ca92b"],
+      "reason": "The unchanged plans retain sealed cutoff-active DSA drift."
+    }
+  ],
+  "contract_id": "gate.d.mechanism.admission",
+  "evidence": [
+    {
+      "claim_scope": "Accepted/DB518/WS32 HLO causality and geometry only.",
+      "id": "accepted_hlo",
+      "path": "../docs/artifacts/db485-layer1-rms-hlo-causality.json",
+      "sha256": "a8c9577d63909e647cd1b1a6d63210a818c51fc7efe7b305e385bad59189ba21"
+    },
+    {
+      "claim_scope": "Rejected callback executable-class identity only.",
+      "id": "callback_certificate",
+      "path": "../docs/artifacts/callback-executable-class-certificate.json",
+      "sha256": "6e58bca961c0629799683ccfb75efda195206885e36975e497630ec379076e48"
+    },
+    {
+      "claim_scope": "Protected callback observer perturbation rejection only.",
+      "id": "callback_rejection",
+      "path": "../docs/artifacts/layer1-rms-input-observer-perturbation-rejection.json",
+      "sha256": "d164972602b7d69c478b7afe0d63f6e9df2ff9d48d354f67565b9369ce4a5b1a"
+    },
+    {
+      "claim_scope": "Strict DB563 Gate-D reclassification only.",
+      "id": "db563_reclassification",
+      "path": "../docs/artifacts/db563-gate-d-strict-reclassification.json",
+      "sha256": "d9272a93a1eb43e2cbfe3d00e01343919458722c21cc969c6dcee2d1bea01582"
+    },
+    {
+      "claim_scope": "DB518 BF16 boundary evidence insufficiency only.",
+      "id": "db518_straddler",
+      "path": "../docs/artifacts/pp16-feature2-layer1-straddler-classification.json",
+      "sha256": "eebe1c5d5ba475a5faf000243d881657754fc47ed2345fe2691d923c1d457b36"
+    },
+    {
+      "claim_scope": "Immutable summary of already sealed duplicate families.",
+      "id": "family_closure",
+      "path": "../docs/artifacts/gate-d-mechanism-family-closure.json",
+      "sha256": "545740afbb2f79ecf6783871673c5aa6038b34550b3a120d399b8c3881d4ccf0"
+    },
+    {
+      "claim_scope": "Authenticated current observability frontier only.",
+      "id": "observability_frontier",
+      "path": "../docs/artifacts/gate-d-observability-frontier.json",
+      "sha256": "4fbf4583826f3db39eb30e285cd97a4f69f5ff5dad13eb3511b7b727d6cb0200"
+    },
+    {
+      "claim_scope": "LP2 K-half coherent CPU event-1 rejection only.",
+      "id": "khalf_rejection",
+      "path": "../docs/artifacts/pp16-feature2-qkv-khalf-event1-cpu-rejection.json",
+      "sha256": "b7f5e43284fcbc2160cefc94d7aa95a7ce9ecbb19bbd60d3fa8d9178a5a1f9ec"
+    },
+    {
+      "claim_scope": "Read-only current upstream source/ref snapshot only.",
+      "id": "upstream_snapshot",
+      "path": "../docs/artifacts/upstream-glm52-obsolescence-snapshot.json",
+      "sha256": "76badaf418f3d7bc721eb98802389660a41f16456a40543f86802f6c062e0b1d"
+    }
+  ],
+  "locality_contract": {
+    "logical_rows": 1,
+    "max_collective_group_size": 4,
+    "no_full_pod_hidden_reconstruction": true,
+    "no_host_effects": true
+  },
+  "required_coherent_watchpoints": [
+    "layer1.rms_input_fp32",
+    "layer1.normalized",
+    "layer1.cache_history",
+    "layer1.query",
+    "layer1.head_weights",
+    "layer1.current_key",
+    "layer1.scorer_event1"
+  ],
+  "schema_version": 1,
+  "upstream_snapshots": [
+    {
+      "commit": "da5c192ad01162d705336a5a3f360a46ea877850",
+      "id": "tpu_inference.main",
+      "scope": "Current main source at admission design time."
+    },
+    {
+      "commit": "2cce88e931e19751d1c008fa6c856a2207ad08c4",
+      "id": "tpu_inference.glm5_try_cc",
+      "scope": "Newest experimental GLM5 DSA kernel branch by commit date."
+    },
+    {
+      "commit": "2c7d7dd64a2eaba0feedf42cab2f527486d7479c",
+      "id": "vllm.main",
+      "scope": "Current vLLM main source at admission design time."
+    }
+  ]
+}

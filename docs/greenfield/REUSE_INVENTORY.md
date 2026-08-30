@@ -761,3 +761,25 @@ capsule proves a logical BF16 association match but leaves physical correction m
 the missing-unrounded-state cause unresolved. Reuse historical protected evidence—not this HLO
 capsule alone—to reject scalar, gather-before-weight, output-ownership, direct-layout and Pallas
 variants unless a new mechanism is structurally outside the sealed historical family.
+
+## Gate-D mechanism admission and upstream source snapshot
+
+Reuse `glm_tpu/greenfield/gate_d_admission.py`, contract
+`configs/greenfield-gate-d-mechanism-admission.json` and CLI
+`scripts/greenfield/admit_gate_d_mechanisms.py` before any new JAX, compilation or TPU work. The
+stdlib-only path SHA-authenticates the observability frontier, historical closure evidence,
+structured mechanism fingerprints, a candidate's typed observability contract and layout/owner
+evidence. It rejects dead rows, nonlocal groups, full-pod reconstruction, host effects,
+downstream-only action, renamed fingerprint matches and incomplete candidate-coherent state.
+It always leaves TPU authorization false; even a passing candidate is admitted offline only.
+
+The immutable family summary is
+`docs/artifacts/gate-d-mechanism-family-closure.json`; the read-only upstream source/ref audit is
+`docs/artifacts/upstream-glm52-obsolescence-snapshot.json`. Current upstream GLM5 branches add
+DSA/indexer/cache/attention code but expose no new layer-1 fused-add/RMS physical ownership
+mechanism. The compact admission result is
+`docs/artifacts/gate-d-mechanism-admission-frontier.json`. Its empty admitted set means only that
+none of the 15 catalogued candidates passes the contract; it is not a general impossibility claim.
+A new proposal must provide one SHA-bound capsule whose stdlib observability audit authenticates
+typed RMS-input, normalized, cache-history, query, head-weight, current-key and event-1 scorer
+arrays plus common code/plan/executable/coherence identity and sealed layout/owner metadata.

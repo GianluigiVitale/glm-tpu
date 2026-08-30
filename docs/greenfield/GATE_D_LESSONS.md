@@ -928,3 +928,28 @@ CPU event arithmetic is not a TPU oracle. Capsule
 this arm. Its DB518 history is candidate-coherent and source-authenticated, but accepted layer-1
 cache exactness is unknown; the accepted-row arm is sensitivity only. Return to the upstream
 normalized-state cause.
+
+## Admit mechanism families offline before compilation
+
+- A new mechanism name is not a new mechanism. Compute its canonical association/consumer/
+  reduction/representation/transport fingerprint and map it to the sealed
+  formula/layout, Pallas, ownership/fusion, callback, downstream split-K, mixed-authority,
+  tolerance or unchanged-plan families before spending JAX/TPU time.
+- Structural legality and causal coherence are separate gates. Require exactly one logical row,
+  local groups of at most four, no full-pod hidden reconstruction and no host effect; then require
+  one SHA-bound candidate history. Reuse the stdlib observability auditor to validate the exact
+  typed arrays, slices and raw SHAs for RMS input, normalized row, cache history, query, head
+  weights, current key and event-1 scorer state; bind common code/plan/executable/coherence identity
+  plus layout/owner evidence. Watchpoint names over an opaque blob are a permanent hostile test.
+- `expose` or `resolve` must act at the first missing watchpoint. A downstream DSA kernel, renamed
+  layout, or borrowed cache does not move the frontier. An offline pass still sets
+  `tpu_successor_authorized=false` and needs a separate reviewed compilation/execution batch.
+- `NO_ADMISSIBLE_MECHANISM` is scoped to the catalogued candidates. Never convert it into a general
+  impossibility claim. The current plan-local persistent-FP32 shadow is a hypothesis, not a fix: it
+  lacks a complete coherent capsule and must not reach JAX or TPU until that evidence exists.
+- Snapshot current upstream refs before designing a mechanism. As of the sealed 2026-08-30 audit,
+  experimental GLM5 branches add downstream DSA/indexer/cache/attention work but no new layer-1
+  fused-add/RMS physical ownership mechanism.
+- Open every input parent and report-output parent component through dirfds with
+  `O_DIRECTORY|O_NOFOLLOW`. Final-component checks alone do not stop an intermediate symlink from
+  redirecting append-only evidence.

@@ -1,0 +1,51 @@
+{
+  "admitted_candidate_ids": [],
+  "artifact_kind": "greenfield_gate_d_mechanism_admission_frontier",
+  "candidate_count": 15,
+  "classification": "NO_ADMISSIBLE_MECHANISM;GATE_D_OPEN;NO_TPU_SUCCESSOR",
+  "closed_family_count": 9,
+  "created_utc": "2026-08-30T10:34:56Z",
+  "current_unclosed_proposals": {
+    "current_upstream_glm5_dsa_kernels": "DOES_NOT_MOVE_CAUSAL_FRONTIER;MISSING_CANDIDATE_COHERENT_CAPSULE",
+    "plan_local_persistent_fp32_shadow": "MISSING_CANDIDATE_COHERENT_CAPSULE"
+  },
+  "gate_d_passed": false,
+  "jax_or_tpu_work_performed": false,
+  "reproduction": {
+    "cli_sha256": "ea18b497dd850079a7303027d2c181a6f527eff98f084060d278c17126570c7c",
+    "command": "/home/gianl/vllm-env/bin/python -S scripts/greenfield/admit_gate_d_mechanisms.py --contract configs/greenfield-gate-d-mechanism-admission.json --contract-sha256 f96d144ecc1bdca7382a0a220b41aa30f3f77b69a7b42dff73fc551d5869a7d3 --output <new-path>",
+    "contract_sha256": "f96d144ecc1bdca7382a0a220b41aa30f3f77b69a7b42dff73fc551d5869a7d3",
+    "core_sha256": "1cacd24607ffc203bfcb7dfee9a0cd4b78feafa8ef7e36fda75f690dfc5733ba",
+    "report_sha256": "2af563ed7835fe84f7b42cc60ad0a8db2b097e9caff5ae697f9f59b574117abb"
+  },
+  "required_coherent_watchpoints": [
+    "layer1.cache_history",
+    "layer1.current_key",
+    "layer1.head_weights",
+    "layer1.normalized",
+    "layer1.query",
+    "layer1.rms_input_fp32",
+    "layer1.scorer_event1"
+  ],
+  "review": {
+    "corrected_staged_diff_sha256": "5d23db632eaec57d93f00aac53c4a2634ab29b1f94ed04fa12fc02e037909982",
+    "fable_result": "USAGE_LIMIT_NO_TECHNICAL_REVIEW",
+    "fable_session_id": "d6512b94-52af-4a03-85de-d7d5b43ea5cc",
+    "initial_staged_diff_sha256": "5063f72a76a207888149d9bae500f200593d27a5431fccc68360b626af887b62",
+    "initial_sol_verdict": "REQUEST_CHANGES_2_P1_1_P2",
+    "sol_correction_verdict": "APPROVE_PERSISTENCE_NO_P0_P2",
+    "sol_reviewer": "sol_gate_d_observability_review"
+  },
+  "tpu_successor_authorized": false,
+  "upstream_snapshot": {
+    "artifact_sha256": "76badaf418f3d7bc721eb98802389660a41f16456a40543f86802f6c062e0b1d",
+    "tpu_inference_glm5_try_cc": "2cce88e931e19751d1c008fa6c856a2207ad08c4",
+    "tpu_inference_main": "da5c192ad01162d705336a5a3f360a46ea877850",
+    "vllm_main": "2c7d7dd64a2eaba0feedf42cab2f527486d7479c"
+  },
+  "validation": {
+    "adjacent_cpu_forced": "372 passed, 40 skipped; two known unrelated WS32 sealer fixture failures",
+    "focused_admission_and_observability": "38 passed",
+    "python_s_no_jax": true
+  }
+}
