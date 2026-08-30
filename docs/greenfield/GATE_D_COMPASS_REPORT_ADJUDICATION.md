@@ -168,7 +168,8 @@ state. Local evidence leaves it unadjudicated; Compass supplies no proof that it
    - preserves the independent BF16 carried residual;
    - does not assume accepted runtime FP32 bytes/partials are present in HLO;
    - states a new fingerprint relative to sealed rounded/Pallas/tree families;
-   - constructs all seven coherent watchpoints from one candidate identity.
+   - constructs all eight coherent watchpoints, including both BF16 RMS operands and their
+     independently derived FP32 sum, from one candidate identity.
 5. Only if such a proposal passes source, plan, parser-verified causal StableHLO and coherent-capsule
    admission should a separate review consider one compile-only acquisition.
 6. Only if optimized TPU HLO preserves the intended source-exact physical flow should a later review

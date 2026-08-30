@@ -1,0 +1,811 @@
+{
+  "candidates": [
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": [
+        "constructability",
+        "direct_shadow_rejection",
+        "observability_frontier",
+        "shadow_adjudication"
+      ],
+      "host_effect": false,
+      "id": "auxiliary_device_tuple_dependency",
+      "logical_rows": 1,
+      "max_collective_group_size": 4,
+      "mechanism_fingerprint": {
+        "association": "plan.local.shadow",
+        "consumer_boundary": "device.auxiliary",
+        "reduction": "local.fp32",
+        "representation": "tuple.bf16.fp32",
+        "transport": "stage.local"
+      },
+      "normal_form": {
+        "compensation": "none",
+        "dependency": "device.auxiliary",
+        "normalization_input": "persistent.shadow",
+        "primary_recurrence": "bf16.rounded"
+      },
+      "plan_authority": null,
+      "reconstructs_full_pod_hidden": false,
+      "source_authority": null,
+      "stablehlo_authority": null,
+      "summary": "Carry accepted BF16 primary state plus a semantically isolated FP32 auxiliary through a device-only tuple dependency."
+    },
+    {
+      "causal_frontier_action": "resolve",
+      "coherent_state_capsule": null,
+      "evidence_ids": [
+        "constructability",
+        "direct_shadow_rejection",
+        "observability_frontier",
+        "shadow_adjudication"
+      ],
+      "host_effect": false,
+      "id": "compensated_auxiliary_dependency",
+      "logical_rows": 1,
+      "max_collective_group_size": 4,
+      "mechanism_fingerprint": {
+        "association": "plan.local.compensated",
+        "consumer_boundary": "device.auxiliary",
+        "reduction": "cancelled.local.fp32",
+        "representation": "compensated.bf16.fp32",
+        "transport": "stage.local"
+      },
+      "normal_form": {
+        "compensation": "cancelled",
+        "dependency": "device.auxiliary",
+        "normalization_input": "persistent.shadow",
+        "primary_recurrence": "bf16.rounded"
+      },
+      "plan_authority": null,
+      "reconstructs_full_pod_hidden": false,
+      "source_authority": null,
+      "stablehlo_authority": null,
+      "summary": "Preserve accepted BF16 primary arithmetic while a declared FP32 add/sub auxiliary remains live on device; its graph identity is checked and numerical cancellation is explicitly unproven."
+    }
+  ],
+  "causal_frontier": {
+    "evidence_id": "observability_frontier",
+    "id": "layer1.rms_input_fp32",
+    "order": 0
+  },
+  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates declarative source AST fixtures, plan/topology, structural StableHLO fixtures and typed capsule shape/content invariants, but cannot admit a candidate until concrete executable source/callsite authority, immutable parser loading and a pinned replayable capsule producer/execution receipt exist. It never authorizes compilation or TPU execution.",
+  "contract_id": "gate.d.precompile.admission.v2.20260830",
+  "evidence": [
+    {
+      "claim_scope": "DB518 capsule incompleteness and admission-v1 sequencing limit only.",
+      "id": "constructability",
+      "path": "../docs/artifacts/gate-d-capsule-constructability.json",
+      "sha256": "77fa743228fb322a1ca0ac1190f73f27a59e12cd56b4a6637e5980c38bb1a11f"
+    },
+    {
+      "claim_scope": "Direct unrounded-shadow source rejection and accepted recurrence semantics only.",
+      "id": "direct_shadow_rejection",
+      "path": "../docs/artifacts/plan-local-persistent-fp32-shadow-source-rejection.json",
+      "sha256": "ec78266731f1e0730fe108c37e3455ad921c724801693bda5f9245c680e6dbd6"
+    },
+    {
+      "claim_scope": "Authenticated layer-1 RMS-input observability frontier only.",
+      "id": "observability_frontier",
+      "path": "../docs/artifacts/gate-d-observability-frontier.json",
+      "sha256": "4fbf4583826f3db39eb30e285cd97a4f69f5ff5dad13eb3511b7b727d6cb0200"
+    },
+    {
+      "claim_scope": "Offline normal-form classification and the exact two unresolved variant ids only.",
+      "id": "shadow_adjudication",
+      "path": "../docs/artifacts/gate-d-shadow-variant-adjudication.json",
+      "sha256": "a9b392712dd685488ad9e07a70274d4f5b61eec1e14c8327e1c28e43c8baa622"
+    }
+  ],
+  "implementation": {
+    "cli": {
+      "path": "../scripts/greenfield/admit_gate_d_precompile.py",
+      "sha256": "044b2b21d4e8d4c63d23d9971f6cd218b7ed6797fb8d377ef528044ca9104442"
+    },
+    "core": {
+      "path": "../glm_tpu/greenfield/gate_d_precompile_admission.py",
+      "sha256": "104fc7b53a157ef0c8e52529d187e2f0fb9ad151f21a019425e463e7222dbe3c"
+    },
+    "git": {
+      "path": "/usr/bin/git",
+      "sha256": "587ef21868c948b883993e23209b86a72a6ddc06aab1545c697ffc31075acd4a"
+    },
+    "stablehlo_validator": {
+      "path": "../scripts/greenfield/validate_gate_d_stablehlo.py",
+      "sha256": "40a1196296f0d076489bb2739e2c7cf9a095b5646e642663b95312dd5f8b8204"
+    },
+    "validator_imports": [
+      {
+        "bytes": 629,
+        "path": "jaxlib/__init__.py",
+        "sha256": "2a5b37b2bc9802769f45ca43de7cdc1a8b532f0afd2bf9542131ab68f649c4a3"
+      },
+      {
+        "bytes": 348039992,
+        "path": "jaxlib/libjax_common.so",
+        "sha256": "b836d25d48b50c3e32f8344f19a3cbff25b3e5840d1500d85024ef3dfaf55fbd"
+      },
+      {
+        "bytes": 8512,
+        "path": "jaxlib/mlir/_mlir_libs/__init__.py",
+        "sha256": "1e053fc5d003af7296a29f55ae8079f10a81c36b35819e03b283fe5dbb8e6dea"
+      },
+      {
+        "bytes": 3632,
+        "path": "jaxlib/mlir/_mlir_libs/_jax_mlir_ext.so",
+        "sha256": "7a92d593271ab74d921de638bc2ee50dd90d9f191fc42cfe927e5d34321ff9c8"
+      },
+      {
+        "bytes": 3592,
+        "path": "jaxlib/mlir/_mlir_libs/_mlir.so",
+        "sha256": "ee42e2f7d805b9cbed32cf002320092cfa75a95f901694274ce1f41a76c5b929"
+      },
+      {
+        "bytes": 3624,
+        "path": "jaxlib/mlir/_mlir_libs/_stablehlo.so",
+        "sha256": "e21b420f7a3d58f8594ac4ab23f59ce3bbd9442aea7b775640e33064fe7a0ffd"
+      },
+      {
+        "bytes": 10887,
+        "path": "jaxlib/mlir/dialects/_ods_common.py",
+        "sha256": "52f38ee6701961f4840d52958feb128f3fcc31a0c41ef586bd70a6e63d95b7a7"
+      },
+      {
+        "bytes": 412837,
+        "path": "jaxlib/mlir/dialects/_stablehlo_ops_gen.py",
+        "sha256": "4a4a1ac5b161a5d65862838fc2bc9d63b5d7db554e82a3ae377313bc95b007dd"
+      },
+      {
+        "bytes": 1133,
+        "path": "jaxlib/mlir/dialects/stablehlo.py",
+        "sha256": "912840177a1c2945155e0f0841b4fde386315a1bca83d0f63cfc0439a10a21e7"
+      },
+      {
+        "bytes": 12758,
+        "path": "jaxlib/mlir/ir.py",
+        "sha256": "d4fb18407e74c6d496eeeaeda99a9be354f5ffbd9edad41b8498525c4ebfdaf9"
+      },
+      {
+        "bytes": 6848,
+        "path": "jaxlib/version.py",
+        "sha256": "6cecd708aacaa994c28a11cfcdcc56e9e67e64e4d1dcfc3ac7b85b87585c1bc0"
+      }
+    ],
+    "validator_python": {
+      "path": "/home/gianl/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12",
+      "sha256": "021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7"
+    },
+    "validator_pythonpath": "/home/gianl/vllm-env/lib/python3.12/site-packages"
+  },
+  "inherited_v1": {
+    "contract": {
+      "path": "greenfield-gate-d-mechanism-admission.json",
+      "sha256": "f96d144ecc1bdca7382a0a220b41aa30f3f77b69a7b42dff73fc551d5869a7d3"
+    },
+    "core": {
+      "path": "../glm_tpu/greenfield/gate_d_admission.py",
+      "sha256": "1cacd24607ffc203bfcb7dfee9a0cd4b78feafa8ef7e36fda75f690dfc5733ba"
+    },
+    "expected_classification": "NO_ADMISSIBLE_MECHANISM;GATE_D_OPEN;NO_TPU_SUCCESSOR",
+    "frontier": {
+      "path": "../docs/artifacts/gate-d-mechanism-admission-frontier.json",
+      "sha256": "9dafd4c6642686d446c344f9ea3d9a4f5c7d29511b8ecb5e8d02031dcd776315"
+    }
+  },
+  "locality_contract": {
+    "logical_rows": 1,
+    "max_collective_group_size": 4,
+    "no_full_pod_hidden_reconstruction": true,
+    "no_host_effects": true
+  },
+  "physical_locality_authority": {
+    "path": "../docs/artifacts/gate-d-runtime-locality-authority.json",
+    "sha256": "49cf6bb1a553985855556d1401ad85918669df52d12f8dc5150f247d18b325eb"
+  },
+  "required_coherent_watchpoints": {
+    "PP16_LP2": [
+      {
+        "arrays": [
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "hidden_update",
+            "semantic_dtype": "bf16_bits",
+            "shape": [
+              6144
+            ],
+            "storage_dtype": "<u2"
+          },
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "residual",
+            "semantic_dtype": "bf16_bits",
+            "shape": [
+              6144
+            ],
+            "storage_dtype": "<u2"
+          }
+        ],
+        "id": "layer1.rms_operands_bf16",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "value",
+            "semantic_dtype": "float32",
+            "shape": [
+              6144
+            ],
+            "storage_dtype": "<f4"
+          }
+        ],
+        "id": "layer1.rms_input_fp32",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [
+              0,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 0,
+            "role": "owner0",
+            "semantic_dtype": "bf16_bits",
+            "shape": [
+              6144
+            ],
+            "storage_dtype": "<u2"
+          },
+          {
+            "index_prefix": [
+              1,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 1,
+            "role": "owner1",
+            "semantic_dtype": "bf16_bits",
+            "shape": [
+              6144
+            ],
+            "storage_dtype": "<u2"
+          }
+        ],
+        "id": "layer1.normalized",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [],
+            "owner_axis": 0,
+            "owner_axis_slots": [
+              0,
+              1
+            ],
+            "owner_slot": null,
+            "role": "value",
+            "semantic_dtype": "bf16_bits",
+            "shape": [
+              2,
+              16,
+              256,
+              128
+            ],
+            "storage_dtype": "<u2"
+          }
+        ],
+        "id": "layer1.cache_history",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [
+              0,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 0,
+            "role": "owner0",
+            "semantic_dtype": "float32",
+            "shape": [
+              32,
+              128
+            ],
+            "storage_dtype": "<f4"
+          },
+          {
+            "index_prefix": [
+              1,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 1,
+            "role": "owner1",
+            "semantic_dtype": "float32",
+            "shape": [
+              32,
+              128
+            ],
+            "storage_dtype": "<f4"
+          }
+        ],
+        "id": "layer1.query",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [
+              0,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 0,
+            "role": "owner0",
+            "semantic_dtype": "float32",
+            "shape": [
+              32
+            ],
+            "storage_dtype": "<f4"
+          },
+          {
+            "index_prefix": [
+              1,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 1,
+            "role": "owner1",
+            "semantic_dtype": "float32",
+            "shape": [
+              32
+            ],
+            "storage_dtype": "<f4"
+          }
+        ],
+        "id": "layer1.head_weights",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "value",
+            "semantic_dtype": "float32",
+            "shape": [
+              128
+            ],
+            "storage_dtype": "<f4"
+          }
+        ],
+        "id": "layer1.current_key",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "positions",
+            "semantic_dtype": "int32",
+            "shape": [
+              1,
+              2048
+            ],
+            "storage_dtype": "<i4"
+          },
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "scores",
+            "semantic_dtype": "float32",
+            "shape": [
+              1,
+              2048
+            ],
+            "storage_dtype": "<f4"
+          },
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "valid_count",
+            "semantic_dtype": "int32",
+            "shape": [
+              1
+            ],
+            "storage_dtype": "<i4"
+          }
+        ],
+        "id": "layer1.scorer_event1",
+        "layer": 1,
+        "position": 8155
+      }
+    ],
+    "PP8_LP4": [
+      {
+        "arrays": [
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "hidden_update",
+            "semantic_dtype": "bf16_bits",
+            "shape": [
+              6144
+            ],
+            "storage_dtype": "<u2"
+          },
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "residual",
+            "semantic_dtype": "bf16_bits",
+            "shape": [
+              6144
+            ],
+            "storage_dtype": "<u2"
+          }
+        ],
+        "id": "layer1.rms_operands_bf16",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "value",
+            "semantic_dtype": "float32",
+            "shape": [
+              6144
+            ],
+            "storage_dtype": "<f4"
+          }
+        ],
+        "id": "layer1.rms_input_fp32",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [
+              0,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 0,
+            "role": "owner0",
+            "semantic_dtype": "bf16_bits",
+            "shape": [
+              6144
+            ],
+            "storage_dtype": "<u2"
+          },
+          {
+            "index_prefix": [
+              1,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 1,
+            "role": "owner1",
+            "semantic_dtype": "bf16_bits",
+            "shape": [
+              6144
+            ],
+            "storage_dtype": "<u2"
+          },
+          {
+            "index_prefix": [
+              2,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 2,
+            "role": "owner2",
+            "semantic_dtype": "bf16_bits",
+            "shape": [
+              6144
+            ],
+            "storage_dtype": "<u2"
+          },
+          {
+            "index_prefix": [
+              3,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 3,
+            "role": "owner3",
+            "semantic_dtype": "bf16_bits",
+            "shape": [
+              6144
+            ],
+            "storage_dtype": "<u2"
+          }
+        ],
+        "id": "layer1.normalized",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [],
+            "owner_axis": 0,
+            "owner_axis_slots": [
+              0,
+              1,
+              2,
+              3
+            ],
+            "owner_slot": null,
+            "role": "value",
+            "semantic_dtype": "bf16_bits",
+            "shape": [
+              4,
+              16,
+              256,
+              128
+            ],
+            "storage_dtype": "<u2"
+          }
+        ],
+        "id": "layer1.cache_history",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [
+              0,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 0,
+            "role": "owner0",
+            "semantic_dtype": "float32",
+            "shape": [
+              32,
+              128
+            ],
+            "storage_dtype": "<f4"
+          },
+          {
+            "index_prefix": [
+              1,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 1,
+            "role": "owner1",
+            "semantic_dtype": "float32",
+            "shape": [
+              32,
+              128
+            ],
+            "storage_dtype": "<f4"
+          },
+          {
+            "index_prefix": [
+              2,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 2,
+            "role": "owner2",
+            "semantic_dtype": "float32",
+            "shape": [
+              32,
+              128
+            ],
+            "storage_dtype": "<f4"
+          },
+          {
+            "index_prefix": [
+              3,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 3,
+            "role": "owner3",
+            "semantic_dtype": "float32",
+            "shape": [
+              32,
+              128
+            ],
+            "storage_dtype": "<f4"
+          }
+        ],
+        "id": "layer1.query",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [
+              0,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 0,
+            "role": "owner0",
+            "semantic_dtype": "float32",
+            "shape": [
+              32
+            ],
+            "storage_dtype": "<f4"
+          },
+          {
+            "index_prefix": [
+              1,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 1,
+            "role": "owner1",
+            "semantic_dtype": "float32",
+            "shape": [
+              32
+            ],
+            "storage_dtype": "<f4"
+          },
+          {
+            "index_prefix": [
+              2,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 2,
+            "role": "owner2",
+            "semantic_dtype": "float32",
+            "shape": [
+              32
+            ],
+            "storage_dtype": "<f4"
+          },
+          {
+            "index_prefix": [
+              3,
+              0
+            ],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": 3,
+            "role": "owner3",
+            "semantic_dtype": "float32",
+            "shape": [
+              32
+            ],
+            "storage_dtype": "<f4"
+          }
+        ],
+        "id": "layer1.head_weights",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "value",
+            "semantic_dtype": "float32",
+            "shape": [
+              128
+            ],
+            "storage_dtype": "<f4"
+          }
+        ],
+        "id": "layer1.current_key",
+        "layer": 1,
+        "position": 8155
+      },
+      {
+        "arrays": [
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "positions",
+            "semantic_dtype": "int32",
+            "shape": [
+              1,
+              2048
+            ],
+            "storage_dtype": "<i4"
+          },
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "scores",
+            "semantic_dtype": "float32",
+            "shape": [
+              1,
+              2048
+            ],
+            "storage_dtype": "<f4"
+          },
+          {
+            "index_prefix": [],
+            "owner_axis": null,
+            "owner_axis_slots": [],
+            "owner_slot": null,
+            "role": "valid_count",
+            "semantic_dtype": "int32",
+            "shape": [
+              1
+            ],
+            "storage_dtype": "<i4"
+          }
+        ],
+        "id": "layer1.scorer_event1",
+        "layer": 1,
+        "position": 8155
+      }
+    ]
+  },
+  "schema_version": 2
+}

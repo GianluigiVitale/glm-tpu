@@ -1850,3 +1850,50 @@ remains open and no TPU successor is authorized.
   capsule tuple. Do not overload its generic fingerprint kind. Preserve v1. The exact next is an
   append-only precompile admission v2, then source-bound StableHLO and a coherent offline capsule.
   This result authorizes no JAX, compile or TPU action and does not close Gate D.
+
+## Gate-D precompile admission v2
+
+- Append-only v2 is implemented separately from historical admission v1 in
+  `glm_tpu/greenfield/gate_d_precompile_admission.py`, with contract
+  `configs/greenfield-gate-d-precompile-admission-v2.json`, CLI
+  `scripts/greenfield/admit_gate_d_precompile.py` and canonical report
+  `docs/artifacts/gate-d-precompile-admission-v2.json`.
+- V2 authenticates the exact inherited v1 contract/core/frontier and closed fingerprints, the
+  sealed two-variant normal-form catalogue, committed Git blob/AST identity for a declarative
+  semantic fixture, a content-derived plan, parsed StableHLO structure, explicit plan-local
+  topology and the exact layer-1/position-8155 typed eight-watchpoint NPZ schema. The parent auditor
+  is stdlib-only; structural HLO validation uses a SHA-bound offline jaxlib-MLIR parser that imports
+  neither `jax` nor a backend. It rejects host effects, implicit,
+  ring, nonlocal or greater-than-four groups, changed accepted-primary backward slices, mixed
+  authority, hostile archives and symlinked or occupied evidence paths. Auxiliary causality and its
+  candidate-specific slice are checked separately from the unchanged primary. The abstract source
+  DSL describes the complete weighted/double-rounded RMS consumer but is not executable source or
+  a real integration callsite. Both BF16 RMS operands
+  are required, and their independently derived 6,144-value FP32 sum must byte-match the declared
+  `layer1.rms_input_fp32` array.
+- Current classification is
+  `NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`. Both
+  `auxiliary_device_tuple_dependency` and `compensated_auxiliary_dependency` are refused for the
+  same four explicit gaps: source/AST, plan, causal StableHLO and coherent candidate capsule. No
+  JAX, compile, model, cloud or TPU work occurred.
+- Canonical contract/report/locality SHAs are respectively `237d76cc...4412`,
+  `c64fcf2e...a06e` and `49cf6bb1...25eb`. Focused hostile admission passes 50/50 and the adjacent
+  offline suites pass 69/69. These are admission-tool tests, not candidate or Gate-D evidence.
+- A complete synthetic fixture remains refused for three explicit reasons:
+  `MISSING_EXECUTABLE_SOURCE_AUTHORITY`, `MISSING_IMMUTABLE_STABLEHLO_PARSER_AUTHORITY`, and
+  `MISSING_PINNED_COHERENT_CAPSULE_PRODUCER`. Therefore v2 has no positive admission path and cannot
+  request compile-only review. Its structural checks are preparation, not optimized TPU lowering or
+  numerical truth.
+
+## Corrected scalar-frontier research adjudication
+
+- `docs/greenfield/GATE_D_SCALAR_FRONTIER_V2_ADJUDICATION.md` accepts only the corrected report's
+  T1 derivation: finite BF16 operands determine one correctly rounded FP32 sum. DB550 seals the
+  accepted operands; every future candidate must seal its own two operands under the candidate's
+  complete authority tuple.
+- DB518 cannot be repaired retrospectively because it lacks its candidate RMS operands/input.
+  Admission v2 turns the derivation into a capsule invariant rather than accepting a label or
+  rejected callback observation.
+- T2--T4 are not local mechanism authority. Their written inversion omits the per-element norm
+  weight at the retained weighted, double-rounded qkv-a input, and sealed replay already reports no
+  global-scalar solution for the tested one-row formulas. No compile or TPU successor follows.

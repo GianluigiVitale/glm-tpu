@@ -40,15 +40,16 @@ Gate D is open. The immutable accepted/DB518 comparison currently establishes:
 
 The required coherent candidate watchpoints are:
 
-1. `layer1.rms_input_fp32`
-2. `layer1.normalized`
-3. `layer1.cache_history`
-4. `layer1.query`
-5. `layer1.head_weights`
-6. `layer1.current_key`
-7. `layer1.scorer_event1`
+1. `layer1.rms_operands_bf16` (`hidden_update`, `residual`)
+2. `layer1.rms_input_fp32` (must equal the independently derived BF16-operand sum)
+3. `layer1.normalized`
+4. `layer1.cache_history`
+5. `layer1.query`
+6. `layer1.head_weights`
+7. `layer1.current_key`
+8. `layer1.scorer_event1`
 
-The next mechanism must expose or deterministically resolve the first item and bind all seven to
+The next mechanism must expose or deterministically resolve the FP32 frontier and bind all eight to
 one code/plan/executable/coherence authority.
 
 ## 3. The observability stack
@@ -158,10 +159,25 @@ The current result is fail-closed for two independent reasons:
   therefore cannot faithfully implement the reviewed order “source semantics + causal StableHLO +
   offline capsule/admission, then compile-only acquisition.”
 
-Do not weaken v1 or rewrite its historical evidence. The repair is an append-only precompile
-admission v2 with explicit source/AST and StableHLO authority, narrow claim scope and no TPU
-authorization. It must still bind one coherent seven-watchpoint state and then require separate
-review before compile-only acquisition.
+Do not weaken v1 or rewrite its historical evidence. The append-only repair now exists:
+
+- core: `glm_tpu/greenfield/gate_d_precompile_admission.py`;
+- contract: `configs/greenfield-gate-d-precompile-admission-v2.json`;
+- CLI: `scripts/greenfield/admit_gate_d_precompile.py`;
+- hostile tests: `tests/greenfield/validation/test_gate_d_precompile_admission.py`;
+- canonical report: `docs/artifacts/gate-d-precompile-admission-v2.json`.
+
+V2 authenticates committed blob/AST identity for a declarative source fixture, a content-derived
+plan, structural StableHLO and typed eight-watchpoint capsule invariants. Its parent process remains
+stdlib-only; HLO fixture validation runs in a SHA-bound offline child using jaxlib MLIR without
+importing `jax`, compiling or initializing a backend. It also inherits the exact v1
+frontier and closed fingerprints rather than resetting history. The current contract leaves all four
+candidate authorities null for both surviving declarations, so the canonical report refuses both
+with `MISSING_SOURCE_AST_AUTHORITY`, `MISSING_PLAN_AUTHORITY`,
+`MISSING_CAUSAL_STABLEHLO_AUTHORITY` and `MISSING_CANDIDATE_COHERENT_CAPSULE`. V2 always leaves
+candidate admission and TPU authorization false. A synthetic complete fixture is still refused
+until concrete executable source/callsite authority, immutable parser loading and a pinned
+replayable capsule producer/execution receipt exist.
 
 ### 3.5 Domain-specific state readers
 
@@ -210,7 +226,7 @@ current question, then combine planes only at the terminal gate.
 | Wall and device trace | `scripts/analysis/extract_steady_decode.py`, `scripts/analysis/parse_xplane.py` | Profiler-free warmed wall distribution separately from fresh XPlane device-step attribution | Correctness, provenance or user-visible speed from a profiler-contaminated trace alone |
 | Provenance and lifecycle | `bench/provenance.py`, protected launchers, fleet lease/census guards, terminal sealers | Code/plan/checkpoint/run identity, DB linkage, unique ownership, pre/post 8-host zero work and terminal publication | Numerical truth from a worker `passed` field or DB row without the sealed raw arrays |
 | Archive and recovery | protected `seal_*`, `publish_*` and `recover_*` wrappers plus generation/CRC/SHA ledgers | Durable negative evidence, exact remote object identity, recovery without recompute and failure-preserving cleanup | Promotion of a diagnostic or compile-only run into a numerical/performance result |
-| Mechanism search control | `gate_d_admission.py`, `admit_gate_d_mechanisms.py`, reuse inventory and family-closure artifact | Duplicate-family detection, one-row/local/no-host legality, first-watchpoint relevance and completeness of candidate state | TPU authorization; an offline pass is only permission to seek separate review |
+| Mechanism search control | `gate_d_admission.py`, `admit_gate_d_mechanisms.py`, `gate_d_precompile_admission.py`, `admit_gate_d_precompile.py`, reuse inventory and family-closure artifact | Duplicate-family detection, one-row/local/no-host legality, first-watchpoint relevance, source/AST-plan-StableHLO authority and completeness of candidate state | TPU authorization; an offline pass is only permission to seek separate review |
 
 Use `rg --files` rather than relying on this table when locating a tool. The table describes stable
 roles; exact wrappers evolve and their committed code pin is part of every result.
@@ -236,6 +252,7 @@ These compact artifacts are the quickest way to recover *why* the current rules 
 | `docs/artifacts/pp16-feature2-qkv-khalf-event1-cpu-rejection.json` | A mechanically valid downstream arm can be rejected offline when coherent event replay still misses the oracle. |
 | `docs/artifacts/plan-local-persistent-fp32-shadow-source-rejection.json` | Direct unrounded FP32-shadow substitution is source/HLO-incompatible; rounded or auxiliary-consumer forms remain separate and unadjudicated. |
 | `docs/artifacts/gate-d-capsule-constructability.json` | DB518 cannot supply a new variant's coherent capsule, and admission v1 cannot represent the required precompile StableHLO authority; build append-only v2 rather than weakening history. |
+| `docs/artifacts/gate-d-precompile-admission-v2.json` | V2 validates the precompile schema without weakening v1 and refuses both survivors; fixture completion still cannot admit without executable source, immutable parser loading and producer-bound capsule provenance. |
 
 Always recompute a file's SHA before citing it. The SHA is the identity; the filename is only a
 human-readable locator.
@@ -298,8 +315,8 @@ after executable identity, outputs and DSA are shown unchanged.
 2. Compute the structured mechanism fingerprint.
 3. Compare it with every sealed family, independent of the candidate name.
 4. Define the smallest source-bound implementation and source-semantics certificate.
-5. For a precompile source/StableHLO candidate, build and review append-only admission v2. Preserve
-   v1 for candidates that already have its executable authority; never weaken or overload v1.
+5. For a precompile source/StableHLO candidate, use and review the append-only v2 path. Preserve v1
+   for candidates that already have its executable authority; never weaken or overload v1.
 
 Do not write a TPU wrapper for a duplicate, illegal or source-unbound candidate.
 
@@ -313,10 +330,11 @@ Before TPU compilation:
 4. prove one live row, exact local groups and absence of host callbacks/global hidden gathers;
 5. prove the intended value flows from producer through consumer, not merely that an operation
    string or shape exists;
-6. construct one offline candidate-coherent seven-watchpoint capsule under the same source and
+6. construct one offline candidate-coherent eight-watchpoint capsule under the same source and
    StableHLO authority;
-7. run precompile admission v2 under `python -S`, then attack evidence, identities, raw slices,
-   shapes/dtypes, coherence, renamed families, symlinks and occupied outputs;
+7. run `scripts/greenfield/admit_gate_d_precompile.py` under `python -S`, then attack evidence,
+   identities, raw slices, shapes/dtypes, coherence, renamed families, symlinks and occupied
+   outputs;
 8. reject locally if any condition remains incomplete.
 
 CPU tests prove semantics. StableHLO proves pre-TPU lowering structure. Neither proves optimized
@@ -382,7 +400,7 @@ A failed discriminator is useful if it is bounded, coherent and sealed. Never re
 | Reading shapes/names as value-flow proof | Matching shapes can carry the wrong source | Use SSA/callee/root traversal and SHA-pinned producer-to-consumer certificates |
 | Inferring physical materialization from correction metadata | Logical BF16 association does not prove an HBM boundary | State the limit; acquire optimized causal evidence only if necessary |
 | Renaming a layout/Pallas/output variant | Same mechanism returned under a new id | Compare canonical five-field fingerprints independent of `family_id` |
-| Naming seven watchpoints over one opaque blob | Proved only arbitrary bytes existed | Reuse typed observability contract; validate raw array SHAs and identity evidence |
+| Naming watchpoints over one opaque blob | Proved only arbitrary bytes existed | Reuse typed observability contract; validate raw array SHAs and identity evidence |
 | Checking only a final symlink component | A parent symlink can redirect evidence | Component-wise dirfd traversal with `O_DIRECTORY|O_NOFOLLOW`; final `O_NOFOLLOW` |
 | Assuming HLO dumps exist only on worker 0 | All eight hosts materialized the seven buckets | Audit all hosts, compare bucket/size/SHA, then choose a canonical copy |
 | Running a full compile before validating the sealer | Post-compile ownership assumptions discarded expensive output | Exercise every sealer branch and failure-preservation path first |
@@ -535,7 +553,8 @@ are true:
 - it has a unique canonical fingerprint not already closed by evidence;
 - it uses one logical decode row, groups of at most four, device-only execution and no full-pod
   hidden reconstruction;
-- all seven Gate-D candidate watchpoints come from one authenticated history;
+- all eight Gate-D candidate watchpoints come from one authenticated history, including both BF16
+  RMS operands and their independently derived FP32 sum;
 - its smallest real captured-input reference test passes;
 - its expected source/StableHLO and structural contract names the required live value flow and
   rejects every locally representable hostile decoy;

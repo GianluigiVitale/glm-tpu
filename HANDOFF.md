@@ -8137,3 +8137,64 @@ contradictory. They were fixed, with hostile regressions for artifact authority,
 writer replacement. A final stale behavior-probe docstring P2 was also corrected. Sol approved
 exact staged SHA `05ef6091...9b3ab` for persistence with no remaining P0--P2. The verdict explicitly
 authorizes no compilation or TPU execution.
+
+## Current exact next: adversarially close precompile admission v2; no TPU action
+
+Append-only precompile admission v2 now represents the authority ordering that v1 could not and
+validates hostile fixtures for declarative source semantics, plan, full-RMS StableHLO structure and
+the typed eight-watchpoint capsule schema. It deliberately cannot admit a candidate: the current
+source snippet is an abstract semantic DSL rather than executable integration source, the copied
+jaxlib parser tree is not immutable against a same-UID replace/import race, and capsule coherence
+has no pinned producer/execution receipt. Core `glm_tpu/greenfield/gate_d_precompile_admission.py`
+is `104fc7b5...be3c`; CLI `scripts/greenfield/admit_gate_d_precompile.py` is
+`044b2b21...0442`; contract `configs/greenfield-gate-d-precompile-admission-v2.json` is
+`237d76cc...4412`; the jaxlib-MLIR structural validator is `40a11962...8204`; physical-locality
+authority `docs/artifacts/gate-d-runtime-locality-authority.json` is `49cf6bb1...25eb`; canonical
+report `docs/artifacts/gate-d-precompile-admission-v2.json` is `c64fcf2e...a06e`.
+
+The canonical classification is
+`NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`. Both sealed survivors are
+refused with exactly `MISSING_SOURCE_AST_AUTHORITY`, `MISSING_PLAN_AUTHORITY`,
+`MISSING_CAUSAL_STABLEHLO_AUTHORITY` and `MISSING_CANDIDATE_COHERENT_CAPSULE`. V2 inherits the exact
+v1 frontier/closure set and binds its own core/CLI/parser/toolchain. It requires the exact accepted
+weighted and carried RMS slices, validates a declarative function and consumer edge as distinct
+committed Git blob/AST symbols, parses full three-input RMS StableHLO with bound jaxlib MLIR,
+proves auxiliary causality, requires all primary roots to remain identical, and rejects extra args,
+roots, dead operations, host/custom-call effects and collectives outside sealed physically local
+groups. The capsule is fixed to exact PP16/PP8 shapes, dtypes, roles, owner-axis slots and runtime-
+derived physical plan groups; repeated slices, extra storage rows and unreferenced arrays are
+forbidden. Its two BF16 RMS operands must independently derive the declared FP32 input. It never
+authorizes compilation or TPU work.
+
+The first Sol review blocked staged SHA `823ff1ec...ad16a`: arbitrary singleton capsules/layouts,
+asserted accepted recurrence, regex HLO parsing, cardinality-only groups, forgeable Git context,
+structured-dtype failure and a wrong documented classification could all fail open. The corrected
+batch closes the topology, shape, source/HLO declaration, exact-frontier,
+candidate-specific auxiliary-slice and owner-axis issue classes, but explicitly leaves executable
+source binding, immutable parser loading and capsule producer provenance open.
+Hostile validation is now 50/50; the four adjacent offline suites pass 69/69. Coverage includes
+source/blob/mode/Git environment/replace-object attacks, parser-source replacement during copy,
+comments/strings/constants/calls, altered primary and auxiliary slices, implicit/oversized/ring/
+nonlocal collectives, exact watchpoint shape/dtype/position/role/owner/layout and slice reuse,
+malformed NPZ/JSON/compression, symlink and append-only writer races. Sol approved exact staged SHA
+`33e75c13...24dcc` for persistence with no remaining P0--P2 after confirming all three residual
+authority gaps fail closed. No JAX module, compilation, model, cloud or TPU action occurred; only
+the sealed child imports jaxlib MLIR, with no backend initialization.
+
+The corrected scalar-frontier v2 research input is adjudicated in
+`docs/greenfield/GATE_D_SCALAR_FRONTIER_V2_ADJUDICATION.md`. Its durable contribution is offline
+derivation of the FP32 RMS input from two sealed BF16 operands. Admission v2 therefore requires
+`layer1.rms_operands_bf16` and verifies all 6,144 derived FP32 values. Its scale-window T2--T4 is
+not adopted: as written it omits the per-element norm weight at the retained weighted,
+double-rounded boundary, while sealed replay already tombstones ordinary global-scalar and
+variance-tree successors. This changes observability, not mechanism status or TPU authorization.
+
+After correction-only approval and durable persistence, exact next is to source-bind only
+`auxiliary_device_tuple_dependency`, the simpler non-compensated survivor. Commit its minimal
+concrete operators and real integration caller before lowering; make parser loading immutable and
+mapped-inode bound; derive and review its accepted-preserving CPU source semantics and causal
+StableHLO; then construct one candidate-coherent eight-watchpoint capsule from a pinned replayable
+producer/execution receipt. The capsule must retain
+both candidate BF16 RMS operands and byte-match their independently derived FP32 sum. If any
+authority cannot be produced offline, reject that variant and do not compile. Only a v2 admission plus a separate
+compile-only review may consider one optimized-HLO acquisition. Gate D remains open.

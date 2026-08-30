@@ -971,7 +971,7 @@ normalized-state cause.
   umbrella. Its equivalence to an explicit tuple auxiliary remains unproved.
 - A BF16 primary recurrence plus an FP32 auxiliary device dependency is structurally distinct but
   not evidence-complete. Before compile-only review it needs a source-semantics binding, a causal
-  StableHLO contract, an offline candidate-coherent seven-watchpoint capsule and separate admission.
+  StableHLO contract, an offline candidate-coherent eight-watchpoint capsule and separate admission.
   The compile-only acquisition must then preserve optimized-TPU-HLO value flow before any numerical-
   run review. StableHLO tuple membership alone is insufficient: output-ownership work changed
   StableHLO and optimized back to the same rejected live boundary.
@@ -999,3 +999,47 @@ normalized-state cause.
   Run `scripts/greenfield/audit_capsule_constructability.py` first; its current report is
   `docs/artifacts/gate-d-capsule-constructability.json` SHA
   `77fa743228fb322a1ca0ac1190f73f27a59e12cd56b4a6637e5980c38bb1a11f`.
+
+## Precompile admission must authenticate the candidate, not merely describe it
+
+- Preserve executable-bound admission v1. A precompile path is a separate schema because its
+  authority is committed source/blob/AST plus plan and StableHLO, not a not-yet-existing executable
+  identity.
+- Bind the v2 implementation itself, inherit the exact v1 closure set, and match the sealed
+  survivor catalogue and normal forms. Otherwise a new schema can silently erase old negative
+  evidence or admit a renamed family.
+- A StableHLO operation name or tuple membership is not causality. Require an SSA chain from the
+  auxiliary source to a live returned auxiliary, require the accepted BF16 primary result to remain
+  independently live, and require its complete backward slice to remain identical to the accepted
+  primary. The source may legitimately be shared by the unchanged primary and the auxiliary.
+- Do not parse StableHLO with regular expressions. Comments, string attributes, constants and
+  opaque calls can forge textual edges. Use a pinned MLIR parser, bind the exact accepted primary
+  backward slice, bind the candidate-specific auxiliary slice, and require every candidate
+  collective component to fit one sealed physically local plan group.
+- A Git commit string is not source authority when `PATH`, `GIT_DIR`, object directories or replace
+  objects remain ambient. Pin the Git executable bytes, scrub `GIT_*`, disable replacement, retain
+  one repository dirfd and bind each tree object id to the exact parsed blob bytes.
+- Source-semantics and StableHLO certificates are authenticated review inputs, not self-proving
+  facts. Their exact source/plan/artifact identities must be reviewed before they can support an
+  offline admission.
+- An abstract AST with unresolved helper names is a declarative DSL, not executable source
+  authority. Bind every concrete operator and the real integration caller before admission.
+- A hash-checked copied parser tree is still mutable during import. Until code loads from immutable
+  descriptors and shared-library mappings match expected device/inode identities, treat parser
+  output as structural fixture validation only.
+- A coherent capsule must carry all eight watchpoints under one code/source/plan/StableHLO/coherence
+  authority, with role-specific arrays, raw selected-slice SHAs, layout and physical-owner evidence.
+  The two BF16 RMS operands are separate evidence; independently derive their FP32 sum and require
+  exact bytes at `layer1.rms_input_fp32` rather than trusting a captured or self-declared sum.
+  A coherence id supplied by the capsule author proves nothing; require a pinned replayable producer
+  or candidate-execution receipt. Relabeled DB518 arrays and callback-observer bytes remain invalid.
+- Bound total NPZ decompression before reading members, reject non-stored/deflated compression,
+  traverse every parent with no-follow directory descriptors and make append-only publication safe
+  against concurrent replacement.
+- The current v2 report refuses both surviving variants for four missing authorities and always
+  leaves compilation/TPU authorization false. This is an honest sequencing result, not Gate-D
+  progress through execution.
+- A scalar inversion must target the actual retained program edge. Here qkv-a consumes
+  `BF16(BF16(sum*inverse)*weight)`, so an interval for only `BF16(sum*inverse)` omits a sealed
+  per-element operand and cannot adjudicate the boundary. Keep the useful BF16-input derivation;
+  do not revive tombstoned global-scalar or variance-tree searches from an incomplete inversion.

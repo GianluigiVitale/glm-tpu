@@ -820,3 +820,31 @@ identity, has no explicit source/AST authority and rejects an explicit StableHLO
 generic fingerprint kind must not be overloaded to hide those omissions. Do not modify v1 or weaken
 historical evidence. Add a separately reviewed precompile admission v2; even that v2 must remain
 offline-only and cannot authorize compilation or TPU execution.
+
+## Gate-D precompile admission v2
+
+Reuse `glm_tpu/greenfield/gate_d_precompile_admission.py`, contract
+`configs/greenfield-gate-d-precompile-admission-v2.json` and CLI
+`scripts/greenfield/admit_gate_d_precompile.py` for any source-bound survivor before compilation.
+The stdlib-only parent authenticates inherited v1 closure evidence, the exact two surviving shadow
+normal forms, committed Git source/blob and AST symbols, a content-derived plan and one coherent
+typed eight-watchpoint NPZ. Positive HLO authority runs only through the pinned offline
+`scripts/greenfield/validate_gate_d_stablehlo.py` jaxlib-MLIR parser. It rejects host/custom-call
+effects, accepted-primary backward-slice drift, implicit/ring/nonlocal groups, mixed identity,
+repeated array slices, malformed/compression-bomb archives, symlinks and occupied append-only
+outputs. It separately proves the exact RMS-frontier source and candidate-specific causal auxiliary
+slice, with physical groups bound to the sealed runtime-topology authority.
+
+The eighth watchpoint is `layer1.rms_operands_bf16`: hidden update and residual are retained
+separately, and the parent independently derives the full FP32 addition before accepting
+`layer1.rms_input_fp32`. Reuse this invariant for new candidates; DB518 lacks these candidate
+operands and the rejected callback remains perturbation evidence only.
+
+Canonical report `docs/artifacts/gate-d-precompile-admission-v2.json` currently refuses both
+survivors because their source/AST, plan, causal StableHLO and coherent capsules do not yet exist.
+This report is the correct offline starting point; do not modify v1, relabel DB518 state, compile a
+placeholder or infer TPU causality from structural synthetic fixtures. V2 has no positive admission
+path until executable source/callsite authority, immutable parser loading and a pinned capsule
+producer/execution receipt exist.
+The canonical contract/report/locality SHAs are `237d76cc...4412`, `c64fcf2e...a06e` and
+`49cf6bb1...25eb`; focused/adjacent offline coverage is 50/50 plus 69/69.
