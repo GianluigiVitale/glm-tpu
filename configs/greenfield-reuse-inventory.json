@@ -605,10 +605,29 @@
       "source_repo": "glm-tpu greenfield, PP16 final runtime, accepted layer-1 oracle and DB518",
       "source_pin": "PP16 manifest b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab / accepted internals 79b813daa8e194b6c9a9ad883a0199f4a938ca4d4ab7277d20a291b480349054 / DB518 534bacc54d74992f5a8ab4d422f9fa0947523d59325b4bfa272d4fbeb56262f0 / CPU admission 33e8dd0a1b0fb8e9c46c1acb3ce05357beff8969fb694464f32f6a071493619c / event-1 rejection b7f5e43284fcbc2160cefc94d7aa95a7ce9ecbb19bbd60d3fa8d9178a5a1f9ec",
       "source_paths": ["glm_tpu/greenfield/benchmarking/pp16_feature2_qkv_partial.py", "glm_tpu/greenfield/benchmarking/pp16_feature2_qkv_partial_event1.py", "scripts/greenfield/classify_pp16_feature2_qkv_partial.py", "scripts/greenfield/classify_pp16_feature2_qkv_partial_event1.py", "docs/artifacts/pp16-feature2-qkv-khalf-cpu-admission.json", "docs/artifacts/pp16-feature2-qkv-khalf-event1-cpu-rejection.json", "/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z", "/home/gianl/gcs-models/oracles/greenfield/glm52/dsa_internals/8k/layer1/greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z/internals.npz", "/home/gianl/glm-run/greenfield_pp16_feature2_layer0_db518_numerical_20260829T115022665987633Z/result.npz"],
-      "disposition": "rejected_negative_evidence",
+      "disposition": "rejected",
       "greenfield_consumers": [],
       "gate": "D diagnostic",
       "reason": "The split-K FP32 partial is mechanically legal but begins after DB518's first wrong normalized BF16 value and cannot repair the independent head path. A provenance-bound two-CPU replay authenticates and removes only DB518's post-event current cache row while preserving every candidate historical row. Its captured-q control cannot reproduce DB518 TPU event 1 (1723 ordered-position mismatches and all scores), proving CPU association is not a TPU oracle. The intended split-K association also remains nonexact against accepted event 1 (1892 ordered positions, all scores and 18 set members). DB518 layer-1 accepted-cache exactness is explicitly unknown; its sealed-exact layer-0 cache is not conflated. Classification is CPU_EVENT1_ADMISSION_REJECTED;NO_TPU_SUCCESSOR. Tombstone the arm before metal; no wrapper, full decoder, performance or Gate-D claim is authorized."
+    },
+    {
+      "id": "gate-d-tuple-auxiliary-stablehlo-producer",
+      "category": "Gate-D source-bound lowering producer",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "producer source 2513a305bbdbff421b97f96cb92987debaacafa4d17d7e4f0c9c37ebb91f2182 / dependency builder 5334dd1eb6eeef2bb8dfee92f150305ec96ddd180a3abd66dfb88758470200d2 / immutable site tree 55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df / blocked tree 561118be6d05df9ad0a28cf387decf3c655cb16ed49afafc9576d20c3367d151 / tuple source c8b220067577004ddfb824667eadc746642baaca / source certificate c95c8aa188e2eda77270022128d121dc3693a899607b1ab2f9977ddb45def0e1 / PP16 authority 98b4fa21272e0bb019af1ad99abedee35593f9a1c8067a15983e9023c01f7880",
+      "source_paths": [
+        "scripts/greenfield/build_gate_d_jax_site_capsule.py",
+        "scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py",
+        "tests/greenfield/validation/test_gate_d_stablehlo_producer_source.py",
+        "docs/artifacts/gate-d-tuple-auxiliary-source-authority.json",
+        "docs/artifacts/gate-d-tuple-auxiliary-pp16-plan-authority.json"
+      ],
+      "disposition": "adapted",
+      "greenfield_consumers": [
+        "future immutable-parser Gate-D causal StableHLO authority; never direct admission"
+      ],
+      "gate": "D precompile admission",
+      "reason": "Default-off forced-CPU abstract compiler lowering only. A stdlib-only builder creates an explicit no-libtpu/no-plugin dependency capsule and verifies future unprivileged readability/traversability after root sealing; the producer binds its root-owned complete tree, exact sealed -I -S interpreter before Python startup, clean code/source/plan/producer identities, exact real RMS shapes and epsilon, every loaded Python/native file and inode-pinned append-only raw/annotated HLO receipts. The first mode-0400/generic-shebang draft and tree 561118be...d151 are blocked and must never be provisioned. After Sol pre-install approval, the corrected site tree 55233c63...a0df was provisioned root-owned with mode-0444 manifest and exact producer 2513a305...2182 was installed root:root mode 0555 through an immutable one-file source/hard link. Static/dynamic builder/producer tests pass 5/5, but the corrected producer has not been invoked and supplies no StableHLO, executable-compilation, JAX array/numerical execution, TPU or Gate-D evidence until persisted, separately invocation-reviewed, run once and independently parsed. Real CHLO/signature refusal remains a valid diagnostic outcome."
     },
     {
       "id": "legacy-execution-stack",

@@ -8326,3 +8326,48 @@ replayable CPU-only producer for accepted and candidate lowerings at the real sh
 source/producer receipt and parser-validated causal certificate. Do not relabel the synthetic
 fixture. Only after that authority passes may the coherent eight-watchpoint producer/capsule be
 constructed; no compile-only or TPU successor is authorized.
+
+## Source-bound Gate-D StableHLO producer; not yet invoked
+
+The next smallest default-off batch adds the stdlib-only dependency-capsule builder
+`scripts/greenfield/build_gate_d_jax_site_capsule.py` (SHA `5334dd1e...00d2`), producer
+`scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py` (SHA `2513a305...2182`) and four
+stdlib AST tests. The builder imported no JAX and copied only an explicit no-libtpu/no-plugin
+allowlist into a 566,191,608-byte, 3,205-file source tree with canonical safe-mode SHA
+`55233c63...a0df`. After correction-only Sol pre-install approval for staged SHA
+`645e36e5...b515`, the fixed provisioner installed that exact tree root-owned at
+`/opt/glm-tpu/gate-d-jax-site-55233c63939e`; the manifest remains mode 0444. The exact producer
+was separately provisioned as one root-owned file and hard-linked without replacement into
+`/opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_stablehlo.py`; installed/source SHA is
+`2513a305...2182`, mode is 0555 and link count is two. The producer refuses root, a dirty/unexpected Git
+pin, a non-isolated sealed interpreter, every JAX/XLA/PJRT/TPU/libtpu/CUDA/ROCm/HIP/loader-control
+environment prefix, changed source/plan certificates, changed source files or changed producer
+bytes. It requires the exact root-owned site-capsule tree and forbids `libtpu`, `jax_plugins` and
+plugin entry points, then records every loaded Python file and pathname-backed native mapping. It
+uses only real `[1,6144]` BF16 plus `[6144]` BF16 abstract inputs, caller epsilon `1e-5`,
+`ShapeDtypeStruct`, `lower()` and `compiler_ir("stablehlo")`. Lowering is a compiler stage, but there
+is no executable compilation or JAX array/numerical execution; JAX import may perform read-only host
+TPU PCI discovery, while the capsule prevents libtpu/plugin loading and TPU backend initialization.
+The only Python built-in `compile` parses the already
+SHA-bound RMS source bytes directly so repository bytecode cannot substitute for them. Candidate source metadata is inserted by an exactly
+reversible text transform; a nofollow component-opened parent/output dirfd pins every O_EXCL write,
+directory inode and final fsync. Raw accepted/candidate HLO, annotated candidate HLO, loaded-
+dependency/source/producer receipt and last-written SUCCESS are append-only.
+
+Sol blocked the first pre-install draft because its mode-0400 manifest would become unreadable after
+root ownership and its generic shebang could start a PATH-selected interpreter before refusal. The
+corrected builder writes mode 0444 and rejects any file/directory that would be unreadable or
+untraversable after root sealing. The producer's exact direct shebang is
+`/usr/bin/env -S /opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12 -I -S`;
+the equivalent explicit invocation must name that interpreter, both flags and the fixed installed
+producer path. The blocked `561118be...d151` tree must never be provisioned.
+
+Static/dynamic producer-builder validation passes 5/5, registry-plus-source passes 9/9, and compileall/JSON/
+diff checks pass. The producer has not been invoked and
+there is no new HLO or authority claim. Exact next is one adversarial review of only this source
+batch for commit/push/mirror and then separately exactly one forced-CPU lowering-only invocation.
+Commit/push/mirror must happen first; run once only from that clean exact pin after explicit review.
+Do not perform executable compilation, execute arrays, launch a cloud/TPU workflow, or admit the
+candidate from producer self-assertion. Real source may correctly fail the current parser because
+it contains `chlo.square` and non-synthetic slice signatures; preserve that raw refusal. Any CHLO
+allowlist/legalization or expected-signature update is a separate reviewed batch.

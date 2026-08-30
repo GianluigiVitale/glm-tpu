@@ -865,3 +865,24 @@ The canonical core/contract/report/locality SHAs are `1d434b0f...cee23`, `72673f
 installed/source provisioner and runtime-tree SHAs are `2b9c8c2b...0594` and
 `308748a9...d616`; focused/source-plus-adjacent offline coverage is 72/72
 and 71/71. PP16 plan authority is `98b4fa21...7880`, content SHA `d824c19c...5833`.
+
+For the missing real causal-HLO authority, reuse the source/plan pins above through the default-off
+`scripts/greenfield/build_gate_d_jax_site_capsule.py` (`5334dd1e...00d2`) and
+`scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py` (`2513a305...2182`). The builder's
+explicit no-libtpu/no-plugin allowlist produced source-tree SHA `55233c63...a0df`. After Sol
+pre-install approval for staged SHA `645e36e5...b515`, the fixed provisioner installed those exact
+bytes at `/opt/glm-tpu/gate-d-jax-site-55233c63939e` root-owned with the manifest mode 0444; exact
+producer `2513a305...2182` is root:root mode 0555 at its fixed path through a provisioned immutable
+one-file source and no-replace hard link. The producer is deliberately not a validator: run it only
+after persistence and separate invocation review, under the exact sealed CPython and JAX site capsule from
+a clean expected Git pin. It lowers
+abstract accepted/candidate RMS functions at `[1,6144]`, BF16 weight `[6144]`, epsilon `1e-5`,
+records every loaded Python/native file, and writes inode-pinned append-only raw/annotated HLO plus
+a receipt. Feed its output only to the immutable admission parser; never infer authority from the
+producer's own label. A `chlo.square` or real-signature refusal is evidence for a later reviewed
+parser update, not permission to mutate the HLO. It has not been invoked in the source-only batch.
+The superseded `561118be...d151` tree is permanently blocked: mode 0400 on its manifest would become
+unreadable after root sealing, and the old generic shebang did not select the sealed interpreter
+before Python startup. The corrected builder validates future unprivileged read/traverse modes and
+the corrected shebang names exact sealed Python with `-I -S`. The corrected producer remains
+uninvoked; installation is not StableHLO or admission evidence.

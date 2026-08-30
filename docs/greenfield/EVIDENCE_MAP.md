@@ -1925,6 +1925,25 @@ remains open and no TPU successor is authorized.
   forced-CPU lowering-only diagnostic inspected the committed source and found that its real HLO
   includes the `[6144]` weight, an explicit broadcast, `chlo.square`, and caller epsilon `1e-5`.
   It produced no authority artifact; the synthetic fixture must not be relabeled as real lowering.
+- Source-only producer `scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py` is the
+  proposed replacement for that diagnostic. It binds the exact committed RMS source/callsite and
+  PP16 authority, clean producer pin/bytes, sealed CPython and an explicit root-owned JAX dependency
+  capsule that excludes libtpu/plugins and records all loaded Python/native files. Its stdlib-only
+  corrected builder produced source-tree SHA `55233c63...a0df` without importing JAX. Sol approved
+  pre-install staged SHA `645e36e5...b515`; the sealed provisioner installed the exact tree at
+  `/opt/glm-tpu/gate-d-jax-site-55233c63939e` root-owned with its manifest mode 0444. Exact producer
+  SHA `2513a305...2182` was installed root:root mode 0555 at its fixed path via an immutable
+  provisioned one-file source and no-replace hard link. The producer lowers only abstract real-shape accepted/candidate RMS
+  functions and writes raw plus reversibly annotated StableHLO through inode-pinned append-only
+  dirfds. Static/dynamic builder/producer tests pass 5/5 and registry-plus-source passes 9/9. It has not run
+  and is not StableHLO, executable-compilation, numerical or Gate-D evidence yet. It has not been
+  invoked; commit/push/mirror and a separate invocation review remain mandatory. Real `chlo.square`
+  or signature refusal by the current synthetic-derived parser is a valid diagnostic outcome, not
+  permission to rewrite the raw HLO.
+  Sol blocked the superseded tree `561118be...d151`: its manifest would become root-only after
+  provisioning and the generic producer shebang did not seal the interpreter before startup. The
+  corrected builder requires future unprivileged file/directory access and the producer shebang
+  names the exact sealed interpreter with `-I -S`; the blocked tree must never be installed.
 
 ## Corrected scalar-frontier research adjudication
 
