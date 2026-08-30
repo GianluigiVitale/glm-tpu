@@ -348,13 +348,93 @@ def classify_texts(accepted: str, db518: str, ws32: str) -> dict[str, Any]:
         accepted, "fusion.9360 = ", "accepted weighted-output live consumer"
     )
     for needle, label in (
+        (
+            "bf16[32,1,82]{2,0,1:T(8,128)(2,1)S(3)}",
+            "accepted qkv-a output type",
+        ),
         ("fusion(fusion.6342", "accepted weighted output consumption"),
+        (
+            "fusion(fusion.6342, bitcast.24623, copy-done.350)",
+            "accepted qkv-a operand roles",
+        ),
+        ("calls=fused_computation.16511", "accepted qkv-a callee"),
         (
             "DeepSeekV2FusedQkvAProjLinear/shard_map/dot_general",
             "accepted next-layer projection role",
         ),
     ):
         _require(accepted_live_consumer, needle, label)
+
+    accepted_qkv_a_bitcast = _sealed_computation(
+        accepted,
+        "bitcast_fusion.232",
+        "11eac6ac5ba67d1f1f3346c363e7226f6322c2268128c88f9f76dfefc3bccbd6",
+        "accepted qkv-a input bitcast",
+    )
+    for needle, label in (
+        (
+            "bitcast_input.232 = bf16[32,6144]",
+            "accepted qkv-a bitcast input type",
+        ),
+        (
+            "ROOT bitcast.20841 = bf16[32,6144]",
+            "accepted qkv-a bitcast output type",
+        ),
+        ("bitcast(bitcast_input.232)", "accepted qkv-a bitcast value flow"),
+    ):
+        _require(accepted_qkv_a_bitcast, needle, label)
+
+    accepted_qkv_a = _sealed_computation(
+        accepted,
+        "fused_computation.16511",
+        "b7cdfb915620603e24fa50b03f38aa71f69310a02b1642675cd2446cc5bed969",
+        "accepted qkv-a consumer",
+    )
+    for needle, label in (
+        (
+            "param_0.48555 = bf16[32,6144]",
+            "accepted qkv-a weighted-input type",
+        ),
+        (
+            "fusion(param_0.48555), kind=kLoop, calls=bitcast_fusion.232",
+            "accepted qkv-a weighted-input bitcast",
+        ),
+        ("param_1.55079 = f32[6144,82]", "accepted qkv-a scale type"),
+        ("param_2.43308 = f8e4m3fn[6144,82]", "accepted qkv-a weight type"),
+        (
+            "multiply_convert_fusion.1803 = bf16[6144,82]",
+            "accepted qkv-a decoded-weight type",
+        ),
+        (
+            "convolution.3669 = f32[32,82]",
+            "accepted qkv-a accumulation type",
+        ),
+        (
+            "convolution(fusion.11239, multiply_convert_fusion.1803)",
+            "accepted qkv-a convolution operands",
+        ),
+        (
+            "convert_element_type.21737 = bf16[32,82]",
+            "accepted qkv-a rounded output type",
+        ),
+        (
+            "ROOT bitcast.18218 = bf16[32,1,82]",
+            "accepted qkv-a live root type",
+        ),
+    ):
+        _require(accepted_qkv_a, needle, label)
+    _require_order(
+        accepted_qkv_a,
+        (
+            "param_0.48555 =",
+            "fusion.11239 =",
+            "multiply_convert_fusion.1803 =",
+            "convolution.3669 =",
+            "convert_element_type.21737 =",
+            "ROOT bitcast.18218 =",
+        ),
+        "accepted weighted-RMS-to-qkv-a value flow",
+    )
 
     db518_embedding_select = _sealed_computation(
         db518,
@@ -1402,7 +1482,15 @@ def classify_texts(accepted: str, db518: str, ws32: str) -> dict[str, Any]:
                 "fp32(bf16_dense + bf16(bf16_attention + bf16_residual))"
             ),
         },
-        "artifact_kind": "db485_layer1_rms_hlo_causality_v2",
+        "accepted_qkv_a_boundary": {
+            "accumulation_dtype": "f32",
+            "consumer_input_dtype": "bf16",
+            "decoded_weight_dtype": "bf16",
+            "physical_materialization_claim": False,
+            "pre_round_fp32_operand_exposed_in_hlo": False,
+            "value_flow": "bf16_weighted_rms -> bf16_bitcast -> f32_convolution",
+        },
+        "artifact_kind": "db485_layer1_rms_hlo_causality_v3",
         "classification": (
             "LOGICAL_BF16_ASSOCIATION_MATCHES;"
             "UNROUNDED_STATE_PHYSICAL_CAUSE_UNRESOLVED;"

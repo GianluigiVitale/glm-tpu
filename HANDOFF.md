@@ -7901,3 +7901,23 @@ relaxation and mixed-cache replay are invalid. The smallest future offline admis
 metadata/SHA inventory requiring a complete candidate-coherent capsule; absent one, stop before
 JAX/TPU. Current inventory guidance was corrected without rewriting the historical sealed
 straddler artifact. No code, JAX, cloud, Ray, model or TPU workflow ran.
+
+## 2026-08-30 accepted qkv-a consumer closes the last fusion-only hypothesis
+
+Fable 5 Max session `c9d696b7-d318-4596-8284-6a4cca100ba4` again returned its hard usage-limit
+refusal before reading evidence. The goal-authorized Sol fallback and an independent local audit
+agree on `NO TPU SUCCESSOR`. The accepted DB485 caller `fusion.9360` is not a hidden unrounded-state
+route: SHA-pinned `fused_computation.16511` receives `fusion.6342` as
+`bf16[32,6144]`, applies only a BF16 bitcast, decodes the N82 weight to BF16 and accumulates its
+convolution in FP32 before rounding the output to BF16. No pre-round FP32 RMS operand crosses that
+HLO boundary. This is a semantic dataflow certificate and deliberately does not claim physical
+BF16 materialization.
+
+The fail-closed classifier/capsule is upgraded to v3 and hostile-tests caller/callee, input dtype,
+bitcast and convolution lineage. Direct/non-rooted RMS-to-qkv fusion is therefore duplicate-closed
+compiler-layout hope, not a new mechanism. Active reuse guidance is corrected so it no longer asks
+for the already-run residual discriminator, a DB525/526 full-8K retry, open WS32 pack/8K work, the
+superseded dense compile acquisition or the already-rejected packed transport. Gate D remains open.
+Before any future JAX or TPU work, require a genuinely new true-one-row topology-local ownership
+mechanism and a complete candidate-coherent 8,156-key/cache/query/head/current-key/scorer capsule;
+absent both, stop. No cloud, JAX, model or TPU workflow ran in this batch.

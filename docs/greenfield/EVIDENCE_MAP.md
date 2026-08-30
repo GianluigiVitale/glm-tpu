@@ -1657,7 +1657,11 @@ numerical/DSA/Gate-D/DB/performance claim.
 `scripts/greenfield/classify_db485_layer1_rms_hlo.py`. It proves accepted and DB518 share the same
 logical BF16 dense-plus-rounded-carried association. It does not prove that TPU correction metadata
 materialized BF16 at the DB518 FP32 tuple/copy boundary, so the missing-unrounded-state physical
-cause remains unresolved.
+cause remains unresolved. The v3 certificate also SHA-pins accepted `fused_computation.16511` and
+its BF16-only input bitcast. The qkv-a consumer receives the weighted RMS output as
+`bf16[32,6144]`, decodes its FP8 weight to BF16 and accumulates the convolution in FP32; no
+pre-round FP32 RMS operand is exposed across that HLO boundary. This is a semantic dataflow
+certificate, not proof that any BF16 value physically materialized in HBM.
 Sealed WS32 supplies boundary-local pre-dense and next-layer-RMS
 evidence only; no complete dense value path is claimed. It binds exact accepted/DB518 source/copy
 roles plus SHA-pinned reviewed computations, WS32 local roles, inverse, weight-owner indices,

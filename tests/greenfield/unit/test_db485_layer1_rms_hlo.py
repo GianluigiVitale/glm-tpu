@@ -69,6 +69,14 @@ def test_db485_layer1_rms_hlo_classification_is_fail_closed() -> None:
     assert result["correction_materialization_proven"] is False
     assert result["logical_bf16_association_matches"] is True
     assert result["unrounded_state_adjudicated"] is False
+    assert result["accepted_qkv_a_boundary"] == {
+        "accumulation_dtype": "f32",
+        "consumer_input_dtype": "bf16",
+        "decoded_weight_dtype": "bf16",
+        "physical_materialization_claim": False,
+        "pre_round_fp32_operand_exposed_in_hlo": False,
+        "value_flow": "bf16_weighted_rms -> bf16_bitcast -> f32_convolution",
+    }
     assert result["accepted"]["rms_association"].startswith("fp32(bf16_dense")
     assert result["db518"]["post_weight_all_gather_shape"] == [1, 6144]
     assert result["db518"]["rms_feature_group_size"] == 2
@@ -190,6 +198,37 @@ def test_db485_layer1_rms_hlo_rejects_hostile_value_flow_mutations() -> None:
             accepted.replace(
                 "fusion(fusion.6342, bitcast.24623, copy-done.350), kind=kOutput",
                 "fusion(fusion.6341, bitcast.24623, copy-done.350), kind=kOutput",
+                1,
+            ),
+            db518,
+            ws32,
+        ),
+        (
+            "accepted qkv-a consumer callee break",
+            accepted.replace(
+                "calls=fused_computation.16511",
+                "calls=fused_computation.16510",
+                1,
+            ),
+            db518,
+            ws32,
+        ),
+        (
+            "accepted qkv-a input dtype break",
+            accepted.replace(
+                "param_0.48555 = bf16[32,6144]",
+                "param_0.48555 = f32[32,6144]",
+                1,
+            ),
+            db518,
+            ws32,
+        ),
+        (
+            "accepted qkv-a input value-flow break",
+            accepted.replace(
+                "convolution(fusion.11239, multiply_convert_fusion.1803)",
+                "convolution(multiply_convert_fusion.1803, "
+                "multiply_convert_fusion.1803)",
                 1,
             ),
             db518,

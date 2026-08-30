@@ -18,7 +18,15 @@
       6144
     ]
   },
-  "artifact_kind": "db485_layer1_rms_hlo_causality_v2",
+  "accepted_qkv_a_boundary": {
+    "accumulation_dtype": "f32",
+    "consumer_input_dtype": "bf16",
+    "decoded_weight_dtype": "bf16",
+    "physical_materialization_claim": false,
+    "pre_round_fp32_operand_exposed_in_hlo": false,
+    "value_flow": "bf16_weighted_rms -> bf16_bitcast -> f32_convolution"
+  },
+  "artifact_kind": "db485_layer1_rms_hlo_causality_v3",
   "classification": "LOGICAL_BF16_ASSOCIATION_MATCHES;UNROUNDED_STATE_PHYSICAL_CAUSE_UNRESOLVED;RMS_REDUCTION_AND_WEIGHTED_OUTPUT_GEOMETRY_REMAIN_DISTINCT",
   "correction_materialization_proven": false,
   "db518": {

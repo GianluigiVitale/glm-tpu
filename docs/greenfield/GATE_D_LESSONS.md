@@ -888,3 +888,10 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
   swapped sources, wrong owner indices, broken zero/select/copy/inverse/weight/dense paths,
   missing rounds, wrong groups/layouts and duplicate target calls;
   a matching substring or operation count is not a value-flow proof.
+- The accepted next-layer qkv-a consumer is now part of the fail-closed causal certificate, not an
+  open fusion hypothesis. `fusion.9360` passes the weighted RMS result as explicit
+  `bf16[32,6144]` to SHA-pinned `fused_computation.16511`; a SHA-pinned BF16 bitcast is its only
+  input transformation before the BF16-input/BF16-weight, FP32-accumulating N82 convolution. No
+  pre-round FP32 RMS operand is exposed across that HLO boundary. This proves semantic dataflow,
+  not physical BF16 materialization. Direct/non-rooted RMS-to-qkv fusion is duplicate-closed and
+  must not receive another compile or TPU run.

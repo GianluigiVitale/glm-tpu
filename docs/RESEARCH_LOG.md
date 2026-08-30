@@ -11900,3 +11900,23 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   `db485-layer1-rms-hlo-causality.json`. Exact next is offline review/reconciliation only; Gate D
   remains open. A separate test binds the accepted compact success capsule back to the local
   manifest/ledger/SUCCESS hashes, object count/bytes and M32 compressed/raw identities.
+
+## 2026-08-30 — accepted qkv-a BF16 consumer certified; no TPU successor
+
+- Fable 5 Max session `c9d696b7-d318-4596-8284-6a4cca100ba4` was invoked at max effort with the
+  required permission bypass but returned its hard usage-limit refusal before evidence review. The
+  goal-authorized Sol fallback and an independent audit both return `NO TPU SUCCESSOR`.
+- The accepted DB485 HLO closes the last direct-consumer ambiguity. `fusion.9360` passes
+  `fusion.6342` into SHA-pinned `fused_computation.16511` as `bf16[32,6144]`; its only input
+  transform is SHA-pinned BF16 `bitcast_fusion.232`. The consumer decodes FP8 weights to BF16,
+  convolves BF16 input/weight with FP32 accumulation and rounds the N82 result to BF16. It exposes
+  no pre-round FP32 RMS operand across this HLO boundary. The certificate makes no physical-
+  materialization claim.
+- Classifier/capsule v3 now fail closed on exact caller/callee, BF16 input/bitcast, decoded weight,
+  convolution operands/order and live result. Direct/non-rooted RMS-to-qkv fusion remains the
+  already-rejected double-round/output-ownership family, not a new physical mechanism.
+- Current inventory text is corrected to tombstone already-run residual, DB525/526 full-8K, WS32,
+  final-layout dense-acquisition and packed-transport actions. A new event-1 candidate is admissible
+  only with its own complete 8,156-row cache/query/head/current-key/scorer history and a genuinely
+  new true-one-row topology-local ownership mechanism. Gate D remains open; no JAX/cloud/model/TPU
+  workflow ran.
