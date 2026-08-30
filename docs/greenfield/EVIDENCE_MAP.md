@@ -1342,9 +1342,9 @@ or one short-context result cannot satisfy a broader row.
 | Raw tokens and quality | PP8 2K DB484 exact | Pass at 2K only |
 | State/load/cache protection | PP8 DB420/DB484 | Pass at PP8 2K scope; selected-plan 8K/long-context pending |
 | Repeated collectives topology-local | PP8/PP16 real layers and WS32 Pallas layer | Full selected decoder proof pending |
-| No full-pod hidden reconstruction inside transformer | Bounded HLOs pass; full WS32 eight-HLO acquisition absent | Pending |
+| No full-pod hidden reconstruction inside transformer | Bounded HLOs pass; sealed WS32 8K acquisition has only feature-4/expert-8 groups and no forbidden full-hidden value | Pass for acquired WS32 graph; selected final decoder still pending |
 | Protected PP8 and PP16 measurements | PP8 full 2K DB484; PP16 transport/layer only | PP16 full-decoder measurement missing |
-| WS32 protected measurement or evidence-backed rejection | Protected Pallas layer selected; complete decoder absent | Pending |
+| WS32 protected measurement or evidence-backed rejection | Protected WS32 8K numerical run has exact tokens/state/cache/event 0 but seven event-1 swaps; diagnostic p50 about 129.23 ms/token, no DB/SUCCESS/performance claim | Current WS32 plan rejected on exactness; Gate-G final adjudication still pending |
 | Device and profiler-free wall agree | PP8 2K and bounded runs only | Selected plan/long-context pending |
 | Four-depth 128K smoke | None | Missing |
 | Protected 256K E0 | None | Missing |

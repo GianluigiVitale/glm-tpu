@@ -21,24 +21,21 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
 
 ## Current boundary
 
-- The corrected 15-root compile-only successor passed at reviewed commit `a2ea1e9`, tag
-  `greenfield_pp16_feature2_prefill_acquire_20260829T042559840055981Z`. Exact actual-file
-  StableHLO/raw optimized/canonical identities, every structural/locality/root contract, four
-  sealed bindings, selected final-layout state, HBM and zero-collective materializers pass. The
-  physical main graph remains two adjacent partitions with 27 all-gathers, 17 all-reduces and 12
-  feature permutes. Main execution count is zero. The independently hash-verified 20-object archive
-  and 8/8 pre/sync/post evidence close only this graph's real-state HLO/HBM prerequisite. Pin the
-  separate default-off strict numerical wrapper to this exact code/HLO/archive identity. The local
-  wrapper now has those pins, refuses the half-width flag, authenticates the exact acquisition
-  terminal/ledger/object set before TPU work, revalidates actual HLO files after execution and uses
-  only the strict two-owner v2 comparator. Acquisition raw optimized-HLO identity authorizes the
-  acquisition archive only; a numerical entrypoint may differ in source-debug provenance but must
-  bind its own raw bytes and reproduce the acquired canonical executable exactly. In-process PJRT
-  cleanup may retain the measured generated-code allocation plus at most a small baseline; the
-  authenticated post-process 8/8 zero-work census is the terminal cleanup gate. Both rules have
-  real sealed-evidence regressions and the adjacent CPU suite passes. Obtain correction-only review,
-  commit/push/mirror, then run one zero-warmup event-1 comparison. Numerical execution and complete
-  8K remain forbidden until that separately protected comparison is exact.
+- The corrected 15-root acquisition remains valid HLO/HBM/locality evidence, but its separately
+  reviewed DB518 numerical successor already executed exactly once at commit `dafe2ee`, tag
+  `greenfield_pp16_feature2_layer0_db518_numerical_20260829T115022665987633Z`. It makes the
+  position-113 key/normalization and all 8,155 layer-0 prompt-cache rows bitwise exact, yet every
+  ordinary model output remains byte-identical to the sealed rejection. The first retained
+  mismatch is one layer-1 BF16 normalized value per owner at hidden index 2795; q-a, query,
+  head-weight and event-1 DSA drift follow. DB518 is therefore closed as a causal Gate-D fix. Do
+  not run its numerical wrapper again and do not launch an unchanged complete 8K decoder.
+- The accepted DB485 M32, rejected DB518 feature-2 and sealed WS32 feature-4 HLOs prove matching
+  logical BF16 state association but distinct RMS-reduction/weighted-output geometry. They do not
+  reveal the missing unrounded physical state or correction materialization. The accepted hidden
+  callback is permanently rejected because it changed the executable class and reproduced DB551.
+  Gate D remains open. Admit only a genuinely new legal one-row, topology-local mechanism, first
+  falsified with the smallest sealed offline token/DSA authority available; exact full-8K tokens
+  and every DSA selected set/tie order remain the closure authority.
 
 ## Historical and frozen boundaries
 

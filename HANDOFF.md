@@ -7851,3 +7851,24 @@ verdict. Exact next is offline reconciliation/review only, then identify a genui
 one-row topology-local mechanism or remain blocked. The accepted success capsule is also tested
 against local terminal manifest/ledger/SUCCESS identities, object count/bytes and M32 raw/gzip
 bytes. Gate D is open.
+
+## 2026-08-30 Gate-D blocker reconciliation rejects the last layout-only capsule
+
+Fable 5 Max returned its hard usage-limit response before reviewing evidence, so there is no Fable
+opinion to cite. The goal-authorized independent Sol fallback and a separate local causal audit
+agree that Gate D is open, DB518 and the callback path are closed failures, and a 32-lane RMS
+association/digest bank violates the true-one-row rule. No TPU work is authorized.
+
+The first merged review suggested one possible combination: gather both genuine LP2
+dense-update/residual BF16 halves before RMS and consume the weighted row immediately in the real
+N82 qkv-a helper without rooting the normalized row. A source/JAXpr-only capsule was built and its
+forced-two-CPU test passed in 2.57 seconds. The first attempted test was stopped after two minutes;
+the corrected shape/JAXpr plus tiny-gather test completed in seconds and no TPU work occurred.
+
+The final adversarial pass rejects and removes that capsule. Its mathematics is exactly the sealed
+double-round-to-real-N82 formulation that misses 617 q-a values; gathering before weight is already
+frozen as output ownership/layout. Not rooting the normalized row only invites another compiler
+lowering and supplies neither missing unrounded state nor a new physical arithmetic mechanism.
+Substring/count tests also cannot prove the required SSA lineage. Do not rebuild it, write a TPU
+classifier for it or spend a compile on it. Current-state summaries were corrected to remove
+obsolete DB518/DB485 and missing-WS32 instructions that could otherwise trigger repeated work.
