@@ -8103,3 +8103,37 @@ authorizes no JAX, compilation or TPU work.
 Exact next is a source-bound minimal device dependency only if its pre-compile source semantics,
 causal StableHLO, offline coherent seven-watchpoint state and separate admission are constructable
 without arithmetic change. Gate D remains open; no TPU action is authorized.
+
+## 2026-08-30 sealed state cannot construct the shadow capsule; admission v1 is sequenced too late
+
+The new stdlib-only constructability audit authenticates DB518's 24-array result and the current
+observability/admission sources without importing JAX. Contract
+`configs/greenfield-gate-d-capsule-constructability.json` is `632c3064...d40a`; core/CLI are
+`df029b0b...e56a` / `be5f870a...803`; canonical report
+`docs/artifacts/gate-d-capsule-constructability.json` is `77fa7432...a11f`. It classifies
+`SEALED_STATE_INCOMPLETE;PRECOMPILE_SOURCE_STABLEHLO_AUTHORITY_UNREPRESENTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`.
+
+DB518 directly contains normalized/query/head/event-1 state and a post-event layer-1 cache, but it
+lacks both the position-8155 FP32 RMS input and current key. All present bytes are also bound to
+DB518's old code/optimized-HLO identity, so neither abstract auxiliary variant may relabel them as
+its own candidate state. The callback artifact does contain an FP32 sum, but remains explicitly
+rejected because that observer reproduced perturbed DSA behavior.
+
+SHA-bound source-AST inspection proves that observability v1 rejects `stablehlo` identity and any
+candidate without a non-null executable-identity SHA; admission v1 additionally binds that SHA in
+the capsule authority tuple. V1 has no explicit source/AST authority, and its generic fingerprint
+kind must not be overloaded to conceal that omission. Thus v1 cannot faithfully realize the
+already-reviewed precompile order. Preserve v1 and its historical evidence. Exact next is an
+append-only precompile admission v2 for source/AST + causal StableHLO authority, followed by a
+source-bound variant and coherent offline seven-watchpoint capsule. A
+separate review is still required before any compile-only acquisition. No JAX/TPU/model/cloud work
+ran; Gate D remains open.
+
+The goal-authorized Sol reviewer found five substantive implementation/sequencing issue classes:
+candidate bytes were not cross-bound to exact artifact authority, aggregate NPZ decompression was
+unbounded, observability behavior was imported instead of inspected from pinned source, failed
+writer cleanup could race a replacement, and the documented StableHLO/admission order was
+contradictory. They were fixed, with hostile regressions for artifact authority, decompression and
+writer replacement. A final stale behavior-probe docstring P2 was also corrected. Sol approved
+exact staged SHA `05ef6091...9b3ab` for persistence with no remaining P0--P2. The verdict explicitly
+authorizes no compilation or TPU execution.

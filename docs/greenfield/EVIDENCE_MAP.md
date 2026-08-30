@@ -1831,3 +1831,22 @@ remains open and no TPU successor is authorized.
   two drafts for workflow/canonicalization/provenance/security/claim-scope issues and one remaining
   documentation contradiction, then approved corrected staged SHA `e0da721b...922b` for persistence
   with no P0--P2. The approval explicitly authorizes no JAX, compilation or TPU work.
+
+## Gate-D capsule constructability and precompile sequencing
+
+- `glm_tpu/greenfield/capsule_constructability.py` plus
+  `scripts/greenfield/audit_capsule_constructability.py` authenticate the old candidate NPZ,
+  inventory the exact seven watchpoints and inspect admission authority from SHA-bound source AST
+  under `python -S`.
+- Contract `configs/greenfield-gate-d-capsule-constructability.json` SHA
+  `632c30643032b787bf82ddebabfbee29211cd450f0e8b42aac6f8a24f91cd40a`; canonical report
+  `docs/artifacts/gate-d-capsule-constructability.json` SHA
+  `77fa743228fb322a1ca0ac1190f73f27a59e12cd56b4a6637e5980c38bb1a11f`.
+- DB518 lacks candidate position-8155 `layer1.rms_input_fp32` and `layer1.current_key`; every
+  present state array remains old DB518 code/HLO authority and is unusable as either new variant's
+  candidate authority. The observer FP32 bytes are rejected perturbation evidence, not an oracle.
+- Observability v1 refuses both explicit `stablehlo` identity and an uncompiled candidate;
+  admission v1 binds a non-null executable-identity SHA but no explicit source/AST authority in its
+  capsule tuple. Do not overload its generic fingerprint kind. Preserve v1. The exact next is an
+  append-only precompile admission v2, then source-bound StableHLO and a coherent offline capsule.
+  This result authorizes no JAX, compile or TPU action and does not close Gate D.

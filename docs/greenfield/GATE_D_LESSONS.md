@@ -979,3 +979,23 @@ normalized-state cause.
   authenticates evidence, one-row/local/no-host rules and declared normal forms. The declarations
   are not source/AST bindings. The current result leaves two separate unresolved variants under one
   search umbrella and authorizes no JAX, compilation or TPU work.
+
+## Audit capsule constructability before implementing a survivor
+
+- A numerically useful old artifact is not automatically a new candidate capsule. DB518 directly
+  preserves normalized/query/head/event-1 state and a post-event cache, but not p8155
+  `rms_input_fp32` or `current_key`; all present bytes remain bound to DB518's code and optimized
+  HLO. Relabeling them for an auxiliary-shadow implementation would be mixed authority.
+- The rejected callback's FP32 sum is not missing data that can be promoted later. Its consuming
+  observer changed the executable class and reproduced the frozen DSA mismatch, so those bytes are
+  perturbation evidence only.
+- Admission ordering must be representable in the schema. The current observability v1 accepts
+  optimized-HLO or generic executable identities, rejects explicit `stablehlo`, requires a non-null
+  executable-identity SHA and has no explicit source/AST authority; admission v1 binds the same
+  tuple. Do not overload a generic fingerprint to hide that omission. V1 cannot faithfully enforce
+  source/AST + StableHLO + offline capsule *before* compile-only acquisition.
+- Preserve v1 for its historical claims. Build an append-only precompile v2 with explicit source
+  and StableHLO authority, hostile identity tests, narrow offline claims and a hard false TPU flag.
+  Run `scripts/greenfield/audit_capsule_constructability.py` first; its current report is
+  `docs/artifacts/gate-d-capsule-constructability.json` SHA
+  `77fa743228fb322a1ca0ac1190f73f27a59e12cd56b4a6637e5980c38bb1a11f`.

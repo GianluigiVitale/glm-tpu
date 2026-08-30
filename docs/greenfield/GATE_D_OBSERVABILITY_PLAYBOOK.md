@@ -133,7 +133,37 @@ and `transport`. They prevent a closed mechanism from becoming “new” by chan
 Even `OFFLINE_CANDIDATE_ADMITTED` always leaves `tpu_successor_authorized=false`. Compilation and
 execution require separate review and evidence.
 
-### 3.4 Domain-specific state readers
+### 3.4 Capsule constructability and sequencing
+
+Core: `glm_tpu/greenfield/capsule_constructability.py`
+
+Contract: `configs/greenfield-gate-d-capsule-constructability.json`
+
+CLI: `scripts/greenfield/audit_capsule_constructability.py`
+
+Hostile tests: `tests/greenfield/validation/test_capsule_constructability.py`
+
+Run this before attempting to turn an abstract mechanism into a precompile capsule. It
+SHA-authenticates the sealed DB518 NPZ, inventories the seven required watchpoints, binds the two
+surviving shadow declarations and inspects the current admission schemas from SHA-bound source AST
+without JAX.
+
+The current result is fail-closed for two independent reasons:
+
+- DB518 lacks the position-8155 `layer1.rms_input_fp32` and `layer1.current_key` arrays; its other
+  state belongs to DB518's old code/HLO authority and cannot be relabeled as a new variant;
+- the existing observability/admission v1 path requires a non-null executable-identity SHA, has no
+  explicit source/AST authority, and rejects `stablehlo` or an uncompiled candidate identity. A
+  generic `executable_fingerprint` label must not be overloaded to hide that missing authority. V1
+  therefore cannot faithfully implement the reviewed order “source semantics + causal StableHLO +
+  offline capsule/admission, then compile-only acquisition.”
+
+Do not weaken v1 or rewrite its historical evidence. The repair is an append-only precompile
+admission v2 with explicit source/AST and StableHLO authority, narrow claim scope and no TPU
+authorization. It must still bind one coherent seven-watchpoint state and then require separate
+review before compile-only acquisition.
+
+### 3.5 Domain-specific state readers
 
 Use the existing readers before creating another capture format:
 
@@ -162,7 +192,7 @@ The authoritative reuse/evidence indexes are:
 - `HANDOFF.md`
 - `bench/results.db`
 
-### 3.5 End-to-end tool map by observation plane
+### 3.6 End-to-end tool map by observation plane
 
 No single tool is authoritative for the whole run. Use the smallest row below that can answer the
 current question, then combine planes only at the terminal gate.
@@ -191,7 +221,7 @@ size check; it is never terminal/protected publication evidence. Current archiva
 run-specific protected sealer/recovery path, prove immutable generation/CRC/SHA and exact object-set
 equality, and delete local evidence only after that equality is authenticated.
 
-### 3.6 Immutable teaching artifacts
+### 3.7 Immutable teaching artifacts
 
 These compact artifacts are the quickest way to recover *why* the current rules exist:
 
@@ -205,6 +235,7 @@ These compact artifacts are the quickest way to recover *why* the current rules 
 | `docs/artifacts/gate-d-mechanism-admission-frontier.json` | Every currently catalogued candidate is closed or incomplete; this is finite-catalogue evidence, not impossibility. |
 | `docs/artifacts/pp16-feature2-qkv-khalf-event1-cpu-rejection.json` | A mechanically valid downstream arm can be rejected offline when coherent event replay still misses the oracle. |
 | `docs/artifacts/plan-local-persistent-fp32-shadow-source-rejection.json` | Direct unrounded FP32-shadow substitution is source/HLO-incompatible; rounded or auxiliary-consumer forms remain separate and unadjudicated. |
+| `docs/artifacts/gate-d-capsule-constructability.json` | DB518 cannot supply a new variant's coherent capsule, and admission v1 cannot represent the required precompile StableHLO authority; build append-only v2 rather than weakening history. |
 
 Always recompute a file's SHA before citing it. The SHA is the identity; the filename is only a
 human-readable locator.
@@ -260,32 +291,36 @@ Prefer device buffers and one bounded post-run transfer. A host callback, print 
 new consumer and may change fusion/materialization/scheduling. Instrumentation is acceptable only
 after executable identity, outputs and DSA are shown unchanged.
 
-### Phase 3 — offline mechanism admission
+### Phase 3 — offline mechanism and authority preflight
 
-1. Compute the structured mechanism fingerprint.
-2. Compare it with every sealed family, independent of the candidate name.
-3. Run the admission CLI under `python -S`.
-4. Attack the contract: replaced evidence, duplicate/nonfinite JSON, wrong identity, missing typed
-   watchpoint, wrong array SHA/shape/dtype, renamed null-family mechanism, final/intermediate
-   symlinks, occupied output and mixed coherence.
-5. Reject locally if any reason remains.
+1. Run the constructability audit; reject reuse when any watchpoint is absent or belongs to an old
+   code/HLO authority.
+2. Compute the structured mechanism fingerprint.
+3. Compare it with every sealed family, independent of the candidate name.
+4. Define the smallest source-bound implementation and source-semantics certificate.
+5. For a precompile source/StableHLO candidate, build and review append-only admission v2. Preserve
+   v1 for candidates that already have its executable authority; never weaken or overload v1.
 
-Do not write a TPU wrapper for a rejected or incomplete candidate.
+Do not write a TPU wrapper for a duplicate, illegal or source-unbound candidate.
 
-### Phase 4 — smallest semantic and HLO checks
+### Phase 4 — source-bound semantics, StableHLO and precompile admission
 
-Only after offline admission:
+Before TPU compilation:
 
 1. run pure reference arithmetic on the smallest real captured row/state;
 2. force CPU backends explicitly for JAX semantic tests;
-3. lower the smallest relevant program and inspect exact StableHLO/optimized HLO;
+3. lower the smallest relevant source-bound program and inspect exact StableHLO;
 4. prove one live row, exact local groups and absence of host callbacks/global hidden gathers;
 5. prove the intended value flows from producer through consumer, not merely that an operation
    string or shape exists;
-6. compare full raw bits and exact cutoff-active selected sets/tie order.
+6. construct one offline candidate-coherent seven-watchpoint capsule under the same source and
+   StableHLO authority;
+7. run precompile admission v2 under `python -S`, then attack evidence, identities, raw slices,
+   shapes/dtypes, coherence, renamed families, symlinks and occupied outputs;
+8. reject locally if any condition remains incomplete.
 
-CPU tests prove semantics. HLO proves lowering structure. Neither proves TPU numerical association
-or performance.
+CPU tests prove semantics. StableHLO proves pre-TPU lowering structure. Neither proves optimized
+TPU association, numerical behavior or performance.
 
 ### Phase 5 — compile-only acquisition when necessary
 

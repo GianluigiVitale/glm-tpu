@@ -803,3 +803,20 @@ capsule and separate admission. A reviewed compile-only acquisition—not a prec
 must then preserve optimized TPU HLO before numerical review. Fresh source snapshot
 `docs/artifacts/upstream-glm52-shadow-search-20260830.json` finds no upstream implementation that
 supplies the pre-compile evidence. TPU authorization remains false.
+
+## Gate-D capsule constructability audit
+
+Reuse `glm_tpu/greenfield/capsule_constructability.py`, contract
+`configs/greenfield-gate-d-capsule-constructability.json` and CLI
+`scripts/greenfield/audit_capsule_constructability.py` before attempting to reuse an old numerical
+artifact for a new mechanism. The stdlib-only audit inventories raw NPZ keys/shapes/dtypes/SHAs,
+binds the unresolved variant set, rejects the perturbed callback as authority and inspects the
+current observability schema from SHA-bound source AST. Canonical result
+`docs/artifacts/gate-d-capsule-constructability.json` proves DB518 is missing the p8155 FP32 RMS
+input and current key, while every present array is bound to DB518's old executable identity.
+
+The audit also records a process blocker: observability/admission v1 requires a non-null executable
+identity, has no explicit source/AST authority and rejects an explicit StableHLO identity. Its
+generic fingerprint kind must not be overloaded to hide those omissions. Do not modify v1 or weaken
+historical evidence. Add a separately reviewed precompile admission v2; even that v2 must remain
+offline-only and cannot authorize compilation or TPU execution.
