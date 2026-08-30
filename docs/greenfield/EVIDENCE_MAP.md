@@ -1710,3 +1710,20 @@ remains open and no TPU successor is authorized.
   candidate changes qkv-a after normalized-history/`wk` cache construction. A metal successor must
   recompute q-a/query/head/current-key/event-1 in one bounded executable. No TPU, decoder,
   numerical success, performance, DB or Gate-D claim exists.
+
+## PP16 feature2 K-half event-1 CPU rejection
+
+- Capsule: `docs/artifacts/pp16-feature2-qkv-khalf-event1-cpu-rejection.json`, SHA
+  `b7f5e43284fcbc2160cefc94d7aa95a7ce9ecbb19bbd60d3fa8d9178a5a1f9ec`.
+- The replay authenticates both runtime owners and 22 selective tensor ranges, DB518, accepted
+  layer-1 internals/event 1 and the prior admission capsule. It verifies DB518's saved current cache
+  row, removes only owner 1/page 15/row 219 and proves all historical rows remain unchanged.
+- The captured-q CPU control fails to reproduce DB518 TPU event 1 at 1,723 positions/all scores;
+  the intended split-K association fails accepted event 1 at 1,892 positions/all scores/18 set
+  members. CPU cannot provide an exact control and the arm is independently downstream of the
+  first wrong normalized value/head path.
+- Classification is `CPU_EVENT1_ADMISSION_REJECTED;NO_TPU_SUCCESSOR`. No TPU execution is
+  authorized; tombstone the K-half arm and return to a new upstream normalized-state mechanism.
+  Complete arm values, toolchain, executed sources and all checked input identities are frozen.
+  DB518's sealed comparison proves its layer-0 prompt cache exact; no accepted layer-1 cache oracle
+  exists, so the sensitivity arm makes no accepted-history claim.

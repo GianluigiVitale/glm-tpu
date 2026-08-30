@@ -7936,8 +7936,8 @@ absent both, stop. No cloud, JAX, model or TPU workflow ran in this batch.
   cannot decide the surviving arm's TPU association.
 - This arm has coherent bounded state without borrowing a counterfactual cache: DB518 constructs
   its complete layer-1 index cache from normalized history plus `wk` before layer-1 qkv-a. The
-  candidate leaves that state/current key/head input unchanged, but must recompute q-a, query,
-  head/current-key lineage and event 1 together in one isolated metal executable.
+  candidate leaves that history unchanged. Head weights and the current key depend on the same
+  normalized row, not qkv-a, but are computed later inside DSA; the saved DB518 cache is post-event.
 - Capsule SHA is `33e8dd0a...619c`. No TPU, cloud, model load, decoder, correctness, performance,
   DB or Gate-D claim occurred. Gate D remains open. Exact next after adversarial review and durable
   persistence is the smallest bounded layer-1/event-1 replay, not a full 8K decoder.
@@ -7947,3 +7947,27 @@ absent both, stop. No cloud, JAX, model or TPU workflow ran in this batch.
   JAX/greenfield import, creates output with `O_EXCL`, rejects regular/dangling occupied paths and
   limits novelty to split-K accumulation. Final focused/adjacent coverage is 33/33; Sol returned
   `APPROVE COMMIT/PUSH/MIRROR` with no P0--P2 blocker and no execution authorization.
+
+## Current exact next: K-half event-1 admission rejects TPU; return upstream
+
+Fable 5 Max session `c9d696b7-d318-4596-8284-6a4cca100ba4` again returned its hard usage-limit
+refusal before evidence review. The goal-authorized Sol fallback and an independent audit agree
+that split-K starts after the first wrong normalized BF16 value and cannot repair the independent
+head-weight path. Sol required a forced-two-CPU coherent event-1 admission before any TPU design.
+
+That admission is now reproducible and rejects the arm. It authenticates all 22 selective runtime
+ranges, accepted layer-1 internals/DSA event 1, DB518 and the prior split-K capsule. It removes only
+the already-written position-8155 cache row, proves every historical row remains unchanged and
+reuses the existing exact DSA composition. The captured-q CPU control does not reproduce DB518 TPU
+event 1: 1,723 positions and all 2,048 scores differ. The intended `c488a3f9...368c` split-K
+association is also nonexact against accepted event 1: 1,892 ordered positions, all scores and 18
+set members differ. Even the accepted-current-row sensitivity arm remains nonexact, but it is not
+an accepted control: DB518 layer-1 history has no accepted-cache oracle and CPU physical
+association is independently nonexact.
+
+Capsule `docs/artifacts/pp16-feature2-qkv-khalf-event1-cpu-rejection.json` has SHA
+`b7f5e432...f9ec` and classification `CPU_EVENT1_ADMISSION_REJECTED;NO_TPU_SUCCESSOR`. It freezes
+the complete arm digest, exact CPU toolchain/source hashes and DB518 comparison identity. No TPU,
+cloud, model or full decoder ran. Do not build a metal wrapper or retry this arm. Gate D remains
+open at the upstream layer-0-output/layer-1-normalized-state cause; require a genuinely new legal
+one-row topology-local mechanism there before any further TPU work.

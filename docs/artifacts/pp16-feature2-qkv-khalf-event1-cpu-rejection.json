@@ -1,0 +1,988 @@
+{
+  "accepted_internal_file_sha256": "79b813daa8e194b6c9a9ad883a0199f4a938ca4d4ab7277d20a291b480349054",
+  "admission_artifact_sha256": "33e8dd0a1b0fb8e9c46c1acb3ce05357beff8969fb694464f32f6a071493619c",
+  "arms": {
+    "accepted_current_row_sensitivity": {
+      "accepted_event": {
+        "positions": {
+          "first_mismatch_indices": [
+            11,
+            12,
+            21,
+            22,
+            24,
+            25,
+            27,
+            28,
+            34,
+            35,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47
+          ],
+          "mismatch_count": 1881,
+          "observed_sha256": "7f4eccff6fb78a80a6044f711fdbfdf4db0ddb3fb65b4003aa16aa383f4d638c"
+        },
+        "scores": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 2048,
+          "observed_sha256": "36e6cccaebcb000fcc6a74b7af2da6623d8a2c35b0cec666a0259293e6ffc8b3"
+        },
+        "symmetric_set_difference_count": 18,
+        "valid_counts": {
+          "first_mismatch_indices": [],
+          "mismatch_count": 0,
+          "observed_sha256": "cbfd218787df784c39fbc4f4fad92a8f28e2a880430c210b6d0d8dc133c07e66"
+        }
+      },
+      "accepted_internals": {
+        "current_key": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 109,
+          "observed_sha256": "441e9b8322235d6cb9d2b65cb32658837959e20ea21c0fa255581ccc063816ed"
+        },
+        "head_weights": {
+          "first_mismatch_indices": [
+            0,
+            2,
+            4,
+            5,
+            6,
+            7,
+            8,
+            10,
+            11,
+            13,
+            14,
+            18,
+            20,
+            21,
+            22,
+            23
+          ],
+          "mismatch_count": 19,
+          "observed_sha256": "fd4c63acfe73b1ee1f01eca4908cfcdbd2aed29051a16824ce1acbf35c9cc8ca"
+        },
+        "query": {
+          "first_mismatch_indices": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16
+          ],
+          "mismatch_count": 3290,
+          "observed_sha256": "da8f7bc4de794f249fd49cad2d3e4645154983e6d62bfd7c32164343913dc11a"
+        }
+      },
+      "current_cache_key_vs_accepted": {
+        "first_mismatch_indices": [
+          3,
+          4,
+          7,
+          13,
+          14
+        ],
+        "mismatch_count": 5,
+        "observed_sha256": "9167f087076ed0b5436a4a18dd40299bf921f1ef8f0266f543cb43c4bdd4a3d3"
+      },
+      "current_cache_key_vs_replay_round": {
+        "first_mismatch_indices": [],
+        "mismatch_count": 0,
+        "observed_sha256": "9167f087076ed0b5436a4a18dd40299bf921f1ef8f0266f543cb43c4bdd4a3d3"
+      },
+      "db518_event": {
+        "positions": {
+          "first_mismatch_indices": [
+            34,
+            35,
+            42,
+            43,
+            45,
+            46,
+            47,
+            51,
+            52,
+            66,
+            67,
+            68,
+            82,
+            83,
+            85,
+            86
+          ],
+          "mismatch_count": 1709,
+          "observed_sha256": "7f4eccff6fb78a80a6044f711fdbfdf4db0ddb3fb65b4003aa16aa383f4d638c"
+        },
+        "scores": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 2048,
+          "observed_sha256": "36e6cccaebcb000fcc6a74b7af2da6623d8a2c35b0cec666a0259293e6ffc8b3"
+        },
+        "symmetric_set_difference_count": 4,
+        "valid_counts": {
+          "first_mismatch_indices": [],
+          "mismatch_count": 0,
+          "observed_sha256": "cbfd218787df784c39fbc4f4fad92a8f28e2a880430c210b6d0d8dc133c07e66"
+        }
+      },
+      "db518_internals": {
+        "head_weights": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 31,
+          "observed_sha256": "fd4c63acfe73b1ee1f01eca4908cfcdbd2aed29051a16824ce1acbf35c9cc8ca"
+        },
+        "query": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 4095,
+          "observed_sha256": "da8f7bc4de794f249fd49cad2d3e4645154983e6d62bfd7c32164343913dc11a"
+        }
+      },
+      "normalized_hidden_sha256": "9936ee1e19049b297fd205292ebc378aee41d59401bbf56497004356998d3039",
+      "q_a_state_sha256": "8e3dc61e24591cef1979e10b4a79613505f92f45df1e25e4fde844fc61255d85"
+    },
+    "db518_captured_q_control": {
+      "accepted_event": {
+        "positions": {
+          "first_mismatch_indices": [
+            11,
+            12,
+            21,
+            22,
+            24,
+            25,
+            27,
+            28,
+            34,
+            35,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47
+          ],
+          "mismatch_count": 1892,
+          "observed_sha256": "788f4ffcb228fe24faf4c417d4c82f743cd4f4968a0c6c951b3afeb06e571af6"
+        },
+        "scores": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 2048,
+          "observed_sha256": "80c34807e08d6d71ffe19deb27d79588f81f24cbad61ac8a43fd11c3b7d3d028"
+        },
+        "symmetric_set_difference_count": 18,
+        "valid_counts": {
+          "first_mismatch_indices": [],
+          "mismatch_count": 0,
+          "observed_sha256": "cbfd218787df784c39fbc4f4fad92a8f28e2a880430c210b6d0d8dc133c07e66"
+        }
+      },
+      "accepted_internals": {
+        "current_key": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 126,
+          "observed_sha256": "ec9a03b928985e08116e75b15589ee0a4f130d8ceeac3db69fca0e9440be0022"
+        },
+        "head_weights": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 32,
+          "observed_sha256": "b1326dab14c0d8c5467f10e7258472325bec82e7a990a9a9ed9b6e6e454536e2"
+        },
+        "query": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 4096,
+          "observed_sha256": "7e94f3df7aede2baf7514a99cb379c747d8c5d3446aa198b32a8f674969fc688"
+        }
+      },
+      "current_cache_key_vs_accepted": {
+        "first_mismatch_indices": [
+          3,
+          4,
+          7,
+          13,
+          14
+        ],
+        "mismatch_count": 5,
+        "observed_sha256": "9167f087076ed0b5436a4a18dd40299bf921f1ef8f0266f543cb43c4bdd4a3d3"
+      },
+      "current_cache_key_vs_replay_round": {
+        "first_mismatch_indices": [],
+        "mismatch_count": 0,
+        "observed_sha256": "9167f087076ed0b5436a4a18dd40299bf921f1ef8f0266f543cb43c4bdd4a3d3"
+      },
+      "db518_event": {
+        "positions": {
+          "first_mismatch_indices": [
+            34,
+            35,
+            42,
+            43,
+            45,
+            46,
+            47,
+            51,
+            52,
+            66,
+            67,
+            68,
+            82,
+            83,
+            85,
+            86
+          ],
+          "mismatch_count": 1723,
+          "observed_sha256": "788f4ffcb228fe24faf4c417d4c82f743cd4f4968a0c6c951b3afeb06e571af6"
+        },
+        "scores": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 2048,
+          "observed_sha256": "80c34807e08d6d71ffe19deb27d79588f81f24cbad61ac8a43fd11c3b7d3d028"
+        },
+        "symmetric_set_difference_count": 4,
+        "valid_counts": {
+          "first_mismatch_indices": [],
+          "mismatch_count": 0,
+          "observed_sha256": "cbfd218787df784c39fbc4f4fad92a8f28e2a880430c210b6d0d8dc133c07e66"
+        }
+      },
+      "db518_internals": {
+        "head_weights": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            4,
+            5,
+            8,
+            9,
+            10,
+            11,
+            13,
+            14,
+            18,
+            19,
+            20,
+            21,
+            22
+          ],
+          "mismatch_count": 22,
+          "observed_sha256": "b1326dab14c0d8c5467f10e7258472325bec82e7a990a9a9ed9b6e6e454536e2"
+        },
+        "query": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 3303,
+          "observed_sha256": "7e94f3df7aede2baf7514a99cb379c747d8c5d3446aa198b32a8f674969fc688"
+        }
+      },
+      "normalized_hidden_sha256": "9b52a04e2852719237f4465b28665cbc213b635763303b554bb12345e99a4005",
+      "q_a_state_sha256": "4126636daa3bc8864f234281e7c18c15fd80b5b9b6402d4b84cb217dbd1b1b64"
+    },
+    "intended_split_k_association": {
+      "accepted_event": {
+        "positions": {
+          "first_mismatch_indices": [
+            11,
+            12,
+            21,
+            22,
+            24,
+            25,
+            27,
+            28,
+            34,
+            35,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47
+          ],
+          "mismatch_count": 1892,
+          "observed_sha256": "3e724627906caf35ac0054578d34dffcb345a8f44e9e2225acbf8aa92fcad600"
+        },
+        "scores": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 2048,
+          "observed_sha256": "66ae35396b62a53f9cbcb62f0956d18b5538d6b8a909b797ff5915dbfa636cad"
+        },
+        "symmetric_set_difference_count": 18,
+        "valid_counts": {
+          "first_mismatch_indices": [],
+          "mismatch_count": 0,
+          "observed_sha256": "cbfd218787df784c39fbc4f4fad92a8f28e2a880430c210b6d0d8dc133c07e66"
+        }
+      },
+      "accepted_internals": {
+        "current_key": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 126,
+          "observed_sha256": "ec9a03b928985e08116e75b15589ee0a4f130d8ceeac3db69fca0e9440be0022"
+        },
+        "head_weights": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 32,
+          "observed_sha256": "b1326dab14c0d8c5467f10e7258472325bec82e7a990a9a9ed9b6e6e454536e2"
+        },
+        "query": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 4094,
+          "observed_sha256": "6d9d761ada650c3b9ad549aee0b3f6797ad0ab1cebe582a84a96e1ed856ca1bf"
+        }
+      },
+      "current_cache_key_vs_accepted": {
+        "first_mismatch_indices": [
+          3,
+          4,
+          7,
+          13,
+          14
+        ],
+        "mismatch_count": 5,
+        "observed_sha256": "9167f087076ed0b5436a4a18dd40299bf921f1ef8f0266f543cb43c4bdd4a3d3"
+      },
+      "current_cache_key_vs_replay_round": {
+        "first_mismatch_indices": [],
+        "mismatch_count": 0,
+        "observed_sha256": "9167f087076ed0b5436a4a18dd40299bf921f1ef8f0266f543cb43c4bdd4a3d3"
+      },
+      "db518_event": {
+        "positions": {
+          "first_mismatch_indices": [
+            34,
+            35,
+            42,
+            43,
+            45,
+            46,
+            47,
+            51,
+            52,
+            66,
+            67,
+            68,
+            82,
+            83,
+            85,
+            86
+          ],
+          "mismatch_count": 1722,
+          "observed_sha256": "3e724627906caf35ac0054578d34dffcb345a8f44e9e2225acbf8aa92fcad600"
+        },
+        "scores": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 2048,
+          "observed_sha256": "66ae35396b62a53f9cbcb62f0956d18b5538d6b8a909b797ff5915dbfa636cad"
+        },
+        "symmetric_set_difference_count": 4,
+        "valid_counts": {
+          "first_mismatch_indices": [],
+          "mismatch_count": 0,
+          "observed_sha256": "cbfd218787df784c39fbc4f4fad92a8f28e2a880430c210b6d0d8dc133c07e66"
+        }
+      },
+      "db518_internals": {
+        "head_weights": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            4,
+            5,
+            8,
+            9,
+            10,
+            11,
+            13,
+            14,
+            18,
+            19,
+            20,
+            21,
+            22
+          ],
+          "mismatch_count": 22,
+          "observed_sha256": "b1326dab14c0d8c5467f10e7258472325bec82e7a990a9a9ed9b6e6e454536e2"
+        },
+        "query": {
+          "first_mismatch_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "mismatch_count": 4031,
+          "observed_sha256": "6d9d761ada650c3b9ad549aee0b3f6797ad0ab1cebe582a84a96e1ed856ca1bf"
+        }
+      },
+      "normalized_hidden_sha256": "9b52a04e2852719237f4465b28665cbc213b635763303b554bb12345e99a4005",
+      "q_a_state_sha256": "c488a3f95ecb476adcc2ea8d0d8db1b6a88944fcfaccb9a85042a3a34b06368c"
+    }
+  },
+  "arms_sha256": "6068183397d415f2baa28e33c53d0229a970d6173bad61e9763fba2c1d93382b",
+  "artifact_kind": "pp16_feature2_qkv_khalf_event1_cpu_admission_v2",
+  "classification": "CPU_EVENT1_ADMISSION_REJECTED;NO_TPU_SUCCESSOR",
+  "cpu_backend": "cpu",
+  "cpu_control_exact": false,
+  "cpu_device_count": 2,
+  "db518_comparison_file_sha256": "06ee82b9d487e3fdf8f9f19d4e824e33f1f9d453738a0090ace5e2cac7272a4d",
+  "db518_result_file_sha256": "534bacc54d74992f5a8ab4d422f9fa0947523d59325b4bfa272d4fbeb56262f0",
+  "dsa_manifest_file_sha256": "62c3fc2ad45d368c91cc41901947a69abf7a8c7abb57fb56b088871e90e5f1d3",
+  "dsa_manifest_self_sha256": "f8154c5f79b909efd9ebc14c8e004925482844d05ef28fcf0a4d29bb4a7b26da",
+  "dsa_tensor_file_sha256": "b591a4622a8c646799989f235bc98bcf8ae99e9e04d2ad55a982d70ba00dde82",
+  "gate_d_closed": false,
+  "historical_cache_provenance": {
+    "comparison_file_sha256": "06ee82b9d487e3fdf8f9f19d4e824e33f1f9d453738a0090ace5e2cac7272a4d",
+    "layer0_prompt_cache_exact": true,
+    "layer0_prompt_cache_sha256": "3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1",
+    "layer1_post_event_cache_sha256": "adc7cc27d46c654f4df11959bd3e13ef52502a8167976ea94838b426a30ea728",
+    "layer1_prompt_history_accepted_exactness": "UNKNOWN_NO_ACCEPTED_LAYER1_CACHE",
+    "layer1_prompt_history_sha256": "f1594a300ad7593254eb96b2874a3bb6f1b265da681c08ff00ea96dda7068477",
+    "prompt_only_physical_cache_sha256": "bbee9a907725d9375141b38d6908fdd206d935bb9b1bf2b4cbea7ddaa93bb023"
+  },
+  "performance_claim": false,
+  "prompt_only_cache_sha256": "bbee9a907725d9375141b38d6908fdd206d935bb9b1bf2b4cbea7ddaa93bb023",
+  "protected_tpu_evidence": false,
+  "runtime_manifest_file_sha256": "e13ccefb7341756cd68d85e51209eaa8516ea506eac7ace3b4fd0a1d56828032",
+  "runtime_manifest_self_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+  "runtime_tensor_receipts": [
+    {
+      "byte_count": 12288,
+      "device_slot": 0,
+      "name": "attention.slot_01.input_norm",
+      "sha256": "10e34f4f99c638b29557526283205071c1ac8f81f168f4a6817e7e1def4b6c87",
+      "shape": [
+        6144
+      ]
+    },
+    {
+      "byte_count": 16121856,
+      "device_slot": 0,
+      "name": "attention.slot_01.qkv_a.weight_bits",
+      "sha256": "6e8b4efd28df17b493b1348a6ac82a05a468379e930a575a917636e1d506855d",
+      "shape": [
+        32,
+        6144,
+        82
+      ]
+    },
+    {
+      "byte_count": 503808,
+      "device_slot": 0,
+      "name": "attention.slot_01.qkv_a.scale_inv",
+      "sha256": "3ca2712f5387e086f4251b5c1eea46b4bc2744911ca214c0ab9c7a3d70711cc5",
+      "shape": [
+        32,
+        48,
+        82
+      ]
+    },
+    {
+      "byte_count": 4096,
+      "device_slot": 0,
+      "name": "attention.slot_01.q_a_norm",
+      "sha256": "d436eddb448639bcef313d66d3dac97f8cfd676215bacfa0dc5786701cef7b2f",
+      "shape": [
+        2048
+      ]
+    },
+    {
+      "byte_count": 4194304,
+      "device_slot": 0,
+      "name": "indexer.slot_01.wq_b.weight_bits",
+      "sha256": "0d2a7ad08f478be2ced145bf663ec2ee6edad2e3375d696251c1e7e90524a234",
+      "shape": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "byte_count": 1024,
+      "device_slot": 0,
+      "name": "indexer.slot_01.wq_b.scale_inv",
+      "sha256": "99c73fe79a5e17683c6a76bcbda17b0c25e3b45145364c55bc3dfa3ae225909e",
+      "shape": [
+        16,
+        16
+      ]
+    },
+    {
+      "byte_count": 786432,
+      "device_slot": 0,
+      "name": "indexer.slot_01.wk.weight_bits",
+      "sha256": "eae2e8e285314f6719e2f13c4b5a8690782d51a8cfbfce946a45489d4ac75350",
+      "shape": [
+        128,
+        6144
+      ]
+    },
+    {
+      "byte_count": 192,
+      "device_slot": 0,
+      "name": "indexer.slot_01.wk.scale_inv",
+      "sha256": "ef32daf64521d5af482ffea7f79c324f9c1ce0ebe0941e570b75e2c33cb6f8dc",
+      "shape": [
+        1,
+        48
+      ]
+    },
+    {
+      "byte_count": 256,
+      "device_slot": 0,
+      "name": "indexer.slot_01.key_norm_weight",
+      "sha256": "91fa92e59aac9c9f0fff2962c61ba3507e4ba4dde0057537933efa89e5df22f8",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "byte_count": 256,
+      "device_slot": 0,
+      "name": "indexer.slot_01.key_norm_bias",
+      "sha256": "fe55f3f6644053fa64d24e88c30b4efe54fead8da626061bc1c6cdd24c70ff95",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "byte_count": 196608,
+      "device_slot": 0,
+      "name": "indexer.slot_01.head_weight",
+      "sha256": "1c1acfd5bca77f94741a725212e07056f5f284f22269d577a8d4ac2eb8e4ea79",
+      "shape": [
+        16,
+        6144
+      ]
+    },
+    {
+      "byte_count": 12288,
+      "device_slot": 1,
+      "name": "attention.slot_01.input_norm",
+      "sha256": "10e34f4f99c638b29557526283205071c1ac8f81f168f4a6817e7e1def4b6c87",
+      "shape": [
+        6144
+      ]
+    },
+    {
+      "byte_count": 16121856,
+      "device_slot": 1,
+      "name": "attention.slot_01.qkv_a.weight_bits",
+      "sha256": "6e8b4efd28df17b493b1348a6ac82a05a468379e930a575a917636e1d506855d",
+      "shape": [
+        32,
+        6144,
+        82
+      ]
+    },
+    {
+      "byte_count": 503808,
+      "device_slot": 1,
+      "name": "attention.slot_01.qkv_a.scale_inv",
+      "sha256": "3ca2712f5387e086f4251b5c1eea46b4bc2744911ca214c0ab9c7a3d70711cc5",
+      "shape": [
+        32,
+        48,
+        82
+      ]
+    },
+    {
+      "byte_count": 4096,
+      "device_slot": 1,
+      "name": "attention.slot_01.q_a_norm",
+      "sha256": "d436eddb448639bcef313d66d3dac97f8cfd676215bacfa0dc5786701cef7b2f",
+      "shape": [
+        2048
+      ]
+    },
+    {
+      "byte_count": 4194304,
+      "device_slot": 1,
+      "name": "indexer.slot_01.wq_b.weight_bits",
+      "sha256": "4b58c9b6f0a3c030bee5791ad356d136b7fdb1477c4f3b0d5579e806ddf5f07c",
+      "shape": [
+        2048,
+        2048
+      ]
+    },
+    {
+      "byte_count": 1024,
+      "device_slot": 1,
+      "name": "indexer.slot_01.wq_b.scale_inv",
+      "sha256": "ae089aa8fa79b0c216c99b8773c7447ac1b0856dd4ce5dfb19b67abdf2ba71a8",
+      "shape": [
+        16,
+        16
+      ]
+    },
+    {
+      "byte_count": 786432,
+      "device_slot": 1,
+      "name": "indexer.slot_01.wk.weight_bits",
+      "sha256": "eae2e8e285314f6719e2f13c4b5a8690782d51a8cfbfce946a45489d4ac75350",
+      "shape": [
+        128,
+        6144
+      ]
+    },
+    {
+      "byte_count": 192,
+      "device_slot": 1,
+      "name": "indexer.slot_01.wk.scale_inv",
+      "sha256": "ef32daf64521d5af482ffea7f79c324f9c1ce0ebe0941e570b75e2c33cb6f8dc",
+      "shape": [
+        1,
+        48
+      ]
+    },
+    {
+      "byte_count": 256,
+      "device_slot": 1,
+      "name": "indexer.slot_01.key_norm_weight",
+      "sha256": "91fa92e59aac9c9f0fff2962c61ba3507e4ba4dde0057537933efa89e5df22f8",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "byte_count": 256,
+      "device_slot": 1,
+      "name": "indexer.slot_01.key_norm_bias",
+      "sha256": "fe55f3f6644053fa64d24e88c30b4efe54fead8da626061bc1c6cdd24c70ff95",
+      "shape": [
+        128
+      ]
+    },
+    {
+      "byte_count": 196608,
+      "device_slot": 1,
+      "name": "indexer.slot_01.head_weight",
+      "sha256": "be782f4985722f347c7418e2314a19c8d18a99d6bc1155507b7d03413e7c1ad8",
+      "shape": [
+        16,
+        6144
+      ]
+    }
+  ],
+  "script_sha256": "6acb55555b2a4d3adec6bfe558eb482c9d748effe1644280e67b681f665e3c9d",
+  "source_sha256": {
+    "glm_tpu/greenfield/benchmarking/pp16_feature2_qkv_partial_event1.py": "714104ece85756e93687566eaa5e657eb3a779c1f2c65d6fb56fa10c1b8ca82c",
+    "glm_tpu/greenfield/kernels/reference/attention.py": "0314931e50dedb9b40b2570c7716b38b32421a8c8749eb36bb5636717787c54a",
+    "glm_tpu/greenfield/kernels/reference/dsa.py": "c4b451ab7ca2bf79b7cc7b148a7b1b146996051891c1c82f1952d8ab9ef53fac",
+    "glm_tpu/greenfield/kernels/reference/dsa_association.py": "28d2faf69c9619ee38c4d5dfdbd8cd4a5618f90bb2993aabee5fc9fe777355f5",
+    "glm_tpu/greenfield/kernels/reference/fp8.py": "9d4ded1d4d553d103ff64eb5066507a612aee183985fe45ee62cd1fe3c4b9f58",
+    "glm_tpu/greenfield/kernels/reference/linear.py": "c3d679dab63d1975f0fbfd1ceda7bd8e198621face135151f5fe05cedd07a0f6",
+    "glm_tpu/greenfield/kernels/reference/prefill_index.py": "74dbda42b55bd7190f283e33b182d22d12b8ae73eadf75877ab26e71493fa086",
+    "glm_tpu/greenfield/kernels/reference/qkv_a.py": "1e6d2cb6464d1733708c227283898f0687c965e1883cbea4c441ece2a40d3bb3",
+    "glm_tpu/greenfield/kernels/reference/rmsnorm.py": "fc0234da4ea4e718cd42d3a3ebb529de3b77d453c13590fa931d834654efe572",
+    "glm_tpu/greenfield/kernels/reference/rotary.py": "cb17440803331de962328b409212e9647fc736590c3b525a4a2d43daa46b05b3",
+    "glm_tpu/greenfield/kernels/stage_local.py": "0fa80ae74390a79bb63e6ac82357a08770b644bc07093139a825eb68b82ac490"
+  },
+  "status": "SUCCESS",
+  "toolchain": {
+    "jax": "0.10.1",
+    "jaxlib": "0.10.1",
+    "ml_dtypes": "0.5.4",
+    "numpy": "2.3.5",
+    "safetensors": "0.7.0"
+  },
+  "tpu_execution_authorized": false,
+  "tpus_used": 0
+}

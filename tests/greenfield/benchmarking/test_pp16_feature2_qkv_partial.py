@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -92,12 +93,13 @@ def test_tracked_admission_is_fail_closed() -> None:
     assert report["protected_tpu_evidence"] is False
     assert report["tpus_used"] == 0
     assert report["stablehlo"]["collective_group"] == [[0, 1]]
-    assert report["comparisons"]["accepted_f32_partial_vs_accepted"][
-        "mismatch_count"
-    ] == 0
-    assert report["comparisons"]["accepted_bf16_partial_vs_accepted"][
-        "mismatch_count"
-    ] == 656
+    assert (
+        report["comparisons"]["accepted_f32_partial_vs_accepted"]["mismatch_count"] == 0
+    )
+    assert (
+        report["comparisons"]["accepted_bf16_partial_vs_accepted"]["mismatch_count"]
+        == 656
+    )
     assert report["state_coherence"]["candidate_coherent_history_reusable"] is True
 
 
@@ -182,9 +184,20 @@ def test_existing_output_refuses_before_importing_jax(
 def test_real_sources_regenerate_tracked_admission(tmp_path: Path) -> None:
     if os.environ.get("JAX_PLATFORMS") != "cpu":
         pytest.skip("real admission regeneration requires forced CPU JAX")
+    uv = shutil.which("uv")
+    if uv is None:
+        pytest.skip("historical admission regeneration requires uv")
     output = tmp_path / "admission.json"
     command = (
-        sys.executable,
+        uv,
+        "run",
+        "--with",
+        "jax[cpu]==0.11.1",
+        "--with",
+        "numpy==2.5.2",
+        "--with",
+        "ml-dtypes==0.6.0",
+        "python",
         str(SCRIPT),
         "--runtime-root",
         str(RUNTIME),

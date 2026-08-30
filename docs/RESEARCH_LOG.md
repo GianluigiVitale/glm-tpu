@@ -11937,13 +11937,39 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
 - The exact StableHLO has one FP32 `[32,1,82]` all-reduce over `{0,1}`, one live row, K-half
   weights/scales, no gather, host callback or dead rows. Capsule
   `pp16-feature2-qkv-khalf-cpu-admission.json` SHA is `33e8dd0a...619c`.
-- Candidate coherence is available without mixing states: DB518's complete layer-1 index cache and
-  current key are functions of unchanged normalized hidden plus `wk` and are completed before
-  qkv-a. A future smallest metal discriminator can reuse that cache only while recomputing the new
-  q-a/query/head/current-key/event-1 lineage together. No TPU or model workflow ran; Gate D remains
-  open and a full decoder is not authorized.
+- Candidate coherence is available without mixing historical states: DB518's complete layer-1
+  prompt index cache is built from unchanged normalized history plus `wk` before qkv-a. The current
+  key/head weights depend on the same normalized row but are computed later inside DSA, and the
+  saved cache is post-event; any replay must remove/authenticate that current slot first.
 - Fable 5 Max was usage-blocked before evidence review. The goal-authorized Sol fallback found and
   closed three P1s: JAX could import before the CPU-only check, output was overwrite-capable, and
   ownership novelty was overstated. Import-trap and occupied regular/dangling-output regressions now
   fail before JAX; final creation is exclusive. All docs retain the gathered/full-weight premise.
   The corrected 33-test scope passes and Sol approved commit/push/mirror only.
+
+## 2026-08-30 08:02 UTC — coherent event-1 CPU gate rejects the K-half TPU successor
+
+- Fable 5 Max returned its hard 100%-usage refusal before reading evidence. The goal-authorized Sol
+  fallback and independent review agree split-K cannot repair DB518's first normalized-BF16 miss or
+  its independent head-weight drift. Their merged gate required an exact forced-two-CPU event-1
+  replay before any metal design.
+- The new classifier authenticates runtime manifest `b385458f...6bab`, 22 exact selective ranges
+  over both owner files, DB518 `534bacc5...62f0`, accepted layer-1 internals
+  `79b813da...9054`, DSA manifest `f8154c5f...b26da` and admission capsule
+  `33e8dd0a...619c`. It derives prompt-only cache SHA `bbee9a90...bb023` by verifying and zeroing
+  only owner 1/page 15/row 219, then proves the replay changes no historical row.
+- The DB518 captured-q CPU control fails to reproduce TPU event 1: `1,723/2,048` ordered positions,
+  all scores and four set members differ. Its position SHA is `788f4ffc...1af6`. This confirms CPU
+  query/key/scorer association is not a protected TPU oracle.
+- The intended split-K association q-a SHA `c488a3f9...368c` is also nonexact against accepted
+  event 1: `1,892/2,048` ordered positions, all scores and 18 set members differ; position SHA is
+  `3e724627...d600`. The accepted-current-row sensitivity arm still differs at 1,881 positions and
+  18 set members, but cannot isolate cause: DB518 layer-1 history has no accepted-cache oracle and
+  CPU association is independently nonexact.
+- Capsule `pp16-feature2-qkv-khalf-event1-cpu-rejection.json` SHA is
+  `b7f5e43284fcbc2160cefc94d7aa95a7ce9ecbb19bbd60d3fa8d9178a5a1f9ec` with classification
+  `CPU_EVENT1_ADMISSION_REJECTED;NO_TPU_SUCCESSOR`. No TPU/HLO performance/DB/Gate-D claim follows.
+  Its complete arms SHA `60681833...382b`, exact CPU toolchain, executed-source hashes, checked
+  input identities and DB518 comparison are fail-closed. The DB518 layer-0 cache is sealed exact;
+  layer-1 accepted-history exactness is explicitly unknown. Tombstone this arm before metal. Gate D
+  remains open at the upstream normalized-state cause.

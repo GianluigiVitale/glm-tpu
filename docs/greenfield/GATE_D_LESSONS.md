@@ -912,9 +912,17 @@ values and differ from the captured TPU q-a at one value. Therefore CPU does not
 surviving arm's TPU physical association and supplies no Gate-D evidence.
 
 This candidate has a narrow coherent-state exception to the general mixed-cache prohibition.
-DB518 builds the complete layer-1 index cache from normalized hidden plus `wk` before layer-1 qkv-a;
-the candidate changes only that later qkv-a projection. Current key and head weights also depend on
-the unchanged normalized hidden, not qkv-a. The existing cache is therefore coherent only if a
-future bounded executable recomputes candidate q-a, query, head/current-key lineage and event 1
-together. Reusing captured old query values, running a full decoder, or making correctness,
-performance or Gate-D claims remains forbidden.
+DB518 builds the complete layer-1 prompt index cache from normalized hidden plus `wk` before
+layer-1 qkv-a; the candidate changes only that later projection. Current key and head weights depend
+on the unchanged normalized hidden, not qkv-a, but are computed later inside DSA. The saved cache is
+post-event and must have its current slot authenticated/removed before replay.
+
+The coherent forced-two-CPU replay closes the arm before metal. Its DB518 captured-q control cannot
+reproduce the TPU event (1,723 ordered-position mismatches), and the intended split-K association
+still misses accepted event 1 at 1,892 positions/all scores/18 set members. This also confirms that
+CPU event arithmetic is not a TPU oracle. Capsule
+`pp16-feature2-qkv-khalf-event1-cpu-rejection.json` SHA `b7f5e432...f9ec` is classified
+`CPU_EVENT1_ADMISSION_REJECTED;NO_TPU_SUCCESSOR`. Do not build or launch a TPU discriminator for
+this arm. Its DB518 history is candidate-coherent and source-authenticated, but accepted layer-1
+cache exactness is unknown; the accepted-row arm is sensitivity only. Return to the upstream
+normalized-state cause.
