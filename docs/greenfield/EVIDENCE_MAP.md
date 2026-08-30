@@ -1863,7 +1863,17 @@ remains open and no TPU successor is authorized.
   non-admissible declarative source, a content-derived plan, parsed StableHLO structure, explicit
   plan-local topology and the exact layer-1/position-8155 typed eight-watchpoint NPZ schema. The
   parent auditor is stdlib-only; structural HLO validation uses a SHA-bound offline jaxlib-MLIR
-  parser that imports neither `jax` nor a backend. It rejects host effects, implicit,
+  parser running as a bound non-root UID in an exact content/symlink/safe-mode-tree-SHA-bound
+  root-owned CPython runtime with `-I -S`, `cwd=/` and no inherited import environment. Provisioning
+  is trusted manual administration outside parser authority: only a fixed root-owned mode-0555
+  installed tool is run as `sudo -n /usr/bin/python3 -I -S /opt/glm-tpu/bin/`
+  `provision_gate_d_python_runtime.py ...`; that exact pre-start command or equivalent absolute-path
+  shebang is the security boundary, while the runtime check only detects accidental misinvocation.
+  Admission binds it byte-for-byte to reviewed source,
+  and it nofollow-validates exact root:root `/opt` parents. Atomic `RENAME_NOREPLACE` refuses every
+  pre-existing target, including dangling symlinks and publish races. Parser Python sources load from exact sealed memfds; parser
+  native libraries must map from those same sealed inodes, and every other file mapping must be a
+  recorded root-owned immutable dependency. It imports neither `jax` nor a backend. It rejects host effects, implicit,
   ring, nonlocal or greater-than-four groups, changed accepted-primary backward slices, mixed
   authority, hostile archives and symlinked or occupied evidence paths. Auxiliary causality and its
   candidate-specific slice are checked separately from the unchanged primary. The tuple survivor
@@ -1877,11 +1887,13 @@ remains open and no TPU successor is authorized.
   `c8b2200` and exact sealed `PP16_LP2` plan/watchpoint authority. It remains refused only for
   causal StableHLO and a coherent candidate capsule. `compensated_auxiliary_dependency` retains
   all four gaps. No JAX, compile, model, cloud or TPU work occurred.
-- Canonical core/contract/report/locality SHAs are respectively `69dbce5f...c222`,
-  `bec6457a...9fc0`, `f1ea5fed...5804` and `49cf6bb1...25eb`. Source certificate
+- Canonical core/contract/report/locality SHAs are respectively `1d434b0f...cee23`,
+  `72673fbc...fb48`, `e1fcf314...aff7` and `49cf6bb1...25eb`. Validator SHA is
+  `2f4e73b0...c37a7`; installed/source provisioner and runtime-tree SHAs are
+  `2b9c8c2b...0594` and `308748a9...d616`. Source certificate
   `gate-d-tuple-auxiliary-source-authority.json` is `c95c8aa1...f0e1`; PP16 plan authority is
   `98b4fa21...7880` with content plan SHA `d824c19c...5833`. Focused hostile admission passes
-  60/60 across four isolated CPU workers; source-only plus adjacent offline suites pass 71/71.
+  72/72; source-only plus adjacent offline suites pass 71/71.
   These are admission-tool tests, not candidate or Gate-D evidence.
 - Fable session `d6512b94-52af-4a03-85de-d7d5b43ea5cc` was usage-blocked and supplied no opinion.
   The Sol fallback approved exact staged SHA `5003b44e...55bf` for persistence with no P0--P2 and
@@ -1890,11 +1902,29 @@ remains open and no TPU successor is authorized.
   after the local audit found a movable sealed-stage owner group, then approved corrected staged
   SHA `775b3644...c8fa` with no P0--P2 after exact stage-zero binding and a fully rebound migration
   attack. The verdict remains persistence-only with no execution or Gate-D authorization.
-- A complete synthetic fixture remains refused for three explicit reasons:
-  `MISSING_EXECUTABLE_SOURCE_AUTHORITY`, `MISSING_IMMUTABLE_STABLEHLO_PARSER_AUTHORITY`, and
-  `MISSING_PINNED_COHERENT_CAPSULE_PRODUCER`. Therefore v2 has no positive admission path and cannot
-  request compile-only review. Its structural checks are preparation, not optimized TPU lowering or
-  numerical truth.
+- A complete synthetic fixture now proves the immutable parser path and remains refused for two
+  explicit reasons: `MISSING_EXECUTABLE_SOURCE_AUTHORITY` and
+  `MISSING_PINNED_COHERENT_CAPSULE_PRODUCER`. The concrete tuple candidate still has no causal
+  StableHLO artifact at all, so it remains refused for `MISSING_CAUSAL_STABLEHLO_AUTHORITY` plus
+  `MISSING_CANDIDATE_COHERENT_CAPSULE` and cannot request compile-only review. Structural fixtures
+  remain preparation, not candidate lowering, optimized TPU HLO or numerical truth.
+- Sol blocked the first sealed-parser draft because the child runtime and early stdlib imports were
+  still same-UID writable, CWD shadowing remained possible, maps parsing was lossy for paths with
+  spaces/renames, and the parent did not post-seal rehash. None of that draft was persisted or used
+  to authorize work. The corrected hostile suite covers all four defects; ephemeral memfd inode
+  values remain exact internal comparisons but are emitted only as deterministic counts.
+- Sol blocked the first root-runtime correction too: tree hashing omitted modes, provisioning could
+  preserve setuid/setgid bits or xattrs, mutable repo code was passed directly to sudo, the mapping
+  scan preceded parsing, and raw runtime/dependency inodes leaked into authority hashes. The final
+  correction binds the root directory and all canonical safe modes, strips/rejects privilege bits
+  and xattrs, refuses root validator execution, demotes provisioning to a fixed root-owned
+  trusted-admin tool outside parser authority, nofollow-validates exact safe staging parents,
+  performs the authority scan only after both parses and all validation walks, and normalizes raw
+  identities and numeric UID only after parent corroboration.
+- The canonical admission artifact itself performed no JAX/backend/compile work. Separately, one
+  forced-CPU lowering-only diagnostic inspected the committed source and found that its real HLO
+  includes the `[6144]` weight, an explicit broadcast, `chlo.square`, and caller epsilon `1e-5`.
+  It produced no authority artifact; the synthetic fixture must not be relabeled as real lowering.
 
 ## Corrected scalar-frontier research adjudication
 

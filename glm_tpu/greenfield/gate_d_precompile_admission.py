@@ -13,6 +13,7 @@ from __future__ import annotations
 import ast
 import base64
 from contextlib import contextmanager
+import fcntl
 from hashlib import sha256
 import io
 import json
@@ -23,7 +24,6 @@ import re
 import stat
 import struct
 import subprocess
-import tempfile
 from typing import Any, BinaryIO, Iterator, Mapping, Sequence
 import zipfile
 
@@ -49,6 +49,11 @@ _MAX_ARTIFACT_BYTES = 64 * 1024 * 1024
 _MAX_ARRAY_BYTES = 64 * 1024 * 1024
 _MAX_TOTAL_UNCOMPRESSED_BYTES = 64 * 1024 * 1024
 _MAX_PARSER_TOTAL_BYTES = 512 * 1024 * 1024
+_F_ADD_SEALS = getattr(fcntl, "F_ADD_SEALS", 1033)
+_F_GET_SEALS = getattr(fcntl, "F_GET_SEALS", 1034)
+_PARSER_MEMFD_SEALS = 1 | 2 | 4 | 8
+_FORBIDDEN_RUNTIME_MODE = stat.S_ISUID | stat.S_ISGID | stat.S_ISVTX
+_VERIFIED_RUNTIME_TREES: set[tuple[str, str]] = set()
 _EXPECTED_JAXLIB_VERSION = "0.10.1"
 _EXPECTED_STABLEHLO_VERSION = "1.17.0"
 _EXPECTED_ACCEPTED_PRIMARY_SLICE_SHA256 = (
@@ -500,6 +505,138 @@ def _open_regular_file(path: Path, label: str) -> Iterator[BinaryIO]:
         finally:
             if descriptor >= 0:
                 os.close(descriptor)
+
+
+def _require_root_owned_immutable_directory(path: Path, label: str) -> Path:
+    """Require an absolute, symlink-free directory chain outside same-UID control."""
+
+    normalized = Path(os.path.abspath(os.fspath(path)))
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    try:
+        descriptor = os.open("/", flags)
+    except OSError as error:
+        raise BenchmarkValidationError(
+            f"cannot safely open immutable {label}: {normalized}"
+        ) from error
+    try:
+        for component in normalized.parts:
+            if component in ("", ".", "/"):
+                continue
+            try:
+                child = os.open(component, flags, dir_fd=descriptor)
+            except OSError as error:
+                raise BenchmarkValidationError(
+                    f"cannot safely open immutable {label}: {normalized}"
+                ) from error
+            os.close(descriptor)
+            descriptor = child
+            metadata = os.fstat(descriptor)
+            if metadata.st_uid != 0 or metadata.st_gid != 0 or metadata.st_mode & (
+                stat.S_IWGRP | stat.S_IWOTH | _FORBIDDEN_RUNTIME_MODE
+            ):
+                raise BenchmarkValidationError(
+                    f"immutable {label} is not root-owned read-only: {normalized}"
+                )
+        return normalized
+    finally:
+        os.close(descriptor)
+
+
+def _require_root_owned_immutable_file(
+    path: Path, label: str, *, beneath: Path
+) -> None:
+    normalized = Path(os.path.abspath(os.fspath(path)))
+    try:
+        normalized.relative_to(beneath)
+    except ValueError as error:
+        raise BenchmarkValidationError(
+            f"immutable {label} is outside its runtime root: {normalized}"
+        ) from error
+    _require_root_owned_immutable_directory(normalized.parent, f"{label} parent")
+    with _open_regular_file(normalized, label) as stream:
+        metadata = os.fstat(stream.fileno())
+        if metadata.st_uid != 0 or metadata.st_gid != 0 or metadata.st_mode & (
+            stat.S_IWGRP | stat.S_IWOTH | _FORBIDDEN_RUNTIME_MODE
+        ):
+            raise BenchmarkValidationError(
+                f"immutable {label} is not root-owned read-only: {normalized}"
+            )
+        try:
+            attributes = os.listxattr(normalized, follow_symlinks=False)
+        except OSError as error:
+            raise BenchmarkValidationError(
+                f"cannot inspect immutable {label} attributes: {normalized}"
+            ) from error
+        if attributes:
+            raise BenchmarkValidationError(
+                f"immutable {label} has extended attributes: {normalized}"
+            )
+
+
+def _runtime_tree_sha256(root: Path) -> str:
+    digest = sha256()
+    entries = [root, *sorted(
+        root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()
+    )]
+    for entry in entries:
+        relative = entry.relative_to(root).as_posix().encode("utf-8")
+        metadata = entry.lstat()
+        if metadata.st_uid != 0 or metadata.st_gid != 0 or (
+            not stat.S_ISLNK(metadata.st_mode)
+            and metadata.st_mode
+            & (stat.S_IWGRP | stat.S_IWOTH | _FORBIDDEN_RUNTIME_MODE)
+        ):
+            raise BenchmarkValidationError(
+                f"immutable Python runtime entry remains writable: {entry}"
+            )
+        if stat.S_ISDIR(metadata.st_mode):
+            kind = b"D"
+            payload = b""
+        elif stat.S_ISREG(metadata.st_mode):
+            kind = b"F"
+            file_digest = sha256()
+            with _open_regular_file(entry, "immutable Python runtime entry") as stream:
+                while block := stream.read(1024 * 1024):
+                    file_digest.update(block)
+            payload = struct.pack(">Q", metadata.st_size) + file_digest.digest()
+        elif stat.S_ISLNK(metadata.st_mode):
+            kind = b"L"
+            target = os.readlink(entry).encode("utf-8")
+            resolved = Path(os.path.realpath(entry))
+            try:
+                resolved.relative_to(root)
+            except ValueError as error:
+                raise BenchmarkValidationError(
+                    f"immutable Python runtime symlink escapes root: {entry}"
+                ) from error
+            payload = struct.pack(">I", len(target)) + target
+        else:
+            raise BenchmarkValidationError(
+                f"immutable Python runtime entry type is unsupported: {entry}"
+            )
+        try:
+            attributes = os.listxattr(entry, follow_symlinks=False)
+        except OSError as error:
+            raise BenchmarkValidationError(
+                f"cannot inspect immutable Python runtime attributes: {entry}"
+            ) from error
+        if attributes:
+            raise BenchmarkValidationError(
+                f"immutable Python runtime entry has extended attributes: {entry}"
+            )
+        digest.update(kind)
+        digest.update(struct.pack(">I", len(relative)))
+        digest.update(relative)
+        digest.update(
+            struct.pack(">I", stat.S_IMODE(metadata.st_mode) & ~0o7022)
+        )
+        digest.update(payload)
+    return digest.hexdigest()
 
 
 def _snapshot(
@@ -972,6 +1109,10 @@ def _verify_inherited_v1(
 
 
 def _verify_implementation(value: Any, base: Path) -> dict[str, Any]:
+    if os.geteuid() == 0:
+        raise BenchmarkValidationError(
+            "StableHLO admission must run as an unprivileged user"
+        )
     if not isinstance(value, dict):
         raise BenchmarkValidationError("precompile implementation must be an object")
     _exact_keys(
@@ -983,6 +1124,10 @@ def _verify_implementation(value: Any, base: Path) -> dict[str, Any]:
             "stablehlo_validator",
             "validator_imports",
             "validator_python",
+            "validator_python_provisioner",
+            "validator_python_provisioner_source",
+            "validator_python_runtime_root",
+            "validator_python_runtime_sha256",
             "validator_pythonpath",
         },
         "precompile implementation",
@@ -1008,6 +1153,60 @@ def _verify_implementation(value: Any, base: Path) -> dict[str, Any]:
         "StableHLO validator Python",
         limit=64 * 1024 * 1024,
     )
+    provisioner_path, provisioner_sha, _ = _binding(
+        base,
+        value["validator_python_provisioner"],
+        "StableHLO validator Python runtime provisioner",
+        limit=_MAX_SOURCE_BYTES,
+    )
+    _require_root_owned_immutable_file(
+        provisioner_path,
+        "StableHLO validator Python runtime provisioner",
+        beneath=Path("/opt/glm-tpu"),
+    )
+    with _open_regular_file(
+        provisioner_path, "StableHLO validator Python runtime provisioner"
+    ) as stream:
+        if stat.S_IMODE(os.fstat(stream.fileno()).st_mode) != 0o555:
+            raise BenchmarkValidationError(
+                "installed Python runtime provisioner mode is not 0555"
+            )
+    provisioner_source_path, provisioner_source_sha, _ = _binding(
+        base,
+        value["validator_python_provisioner_source"],
+        "StableHLO validator Python runtime provisioner source",
+        limit=_MAX_SOURCE_BYTES,
+    )
+    if provisioner_source_sha != provisioner_sha:
+        raise BenchmarkValidationError(
+            "installed Python runtime provisioner differs from reviewed source"
+        )
+    python_runtime_root = _require_root_owned_immutable_directory(
+        _resolve(
+            base,
+            value["validator_python_runtime_root"],
+            "StableHLO validator Python runtime root",
+        ),
+        "StableHLO validator Python runtime root",
+    )
+    _require_root_owned_immutable_file(
+        python_path,
+        "StableHLO validator Python",
+        beneath=python_runtime_root,
+    )
+    python_runtime_sha = _sha(
+        value["validator_python_runtime_sha256"],
+        "StableHLO validator Python runtime SHA-256",
+    )
+    runtime_key = (str(python_runtime_root), python_runtime_sha)
+    if runtime_key not in _VERIFIED_RUNTIME_TREES:
+        if _runtime_tree_sha256(python_runtime_root) != python_runtime_sha:
+            raise BenchmarkValidationError(
+                "StableHLO validator Python runtime tree SHA-256 drifted"
+            )
+        # Every entry is root-owned and non-writable to this process, so the
+        # authenticated tree cannot change within the same admission process.
+        _VERIFIED_RUNTIME_TREES.add(runtime_key)
     pythonpath = _resolve(
         base, value["validator_pythonpath"], "StableHLO validator PYTHONPATH"
     )
@@ -1068,6 +1267,12 @@ def _verify_implementation(value: Any, base: Path) -> dict[str, Any]:
         "stablehlo_validator_sha256": validator_sha,
         "validator_imports": sorted(parser_imports, key=lambda item: item["path"]),
         "validator_python_path": str(python_path),
+        "validator_python_provisioner_path": str(provisioner_path),
+        "validator_python_provisioner_sha256": provisioner_sha,
+        "validator_python_provisioner_source_path": str(provisioner_source_path),
+        "validator_python_provisioner_source_sha256": provisioner_source_sha,
+        "validator_python_runtime_root": str(python_runtime_root),
+        "validator_python_runtime_sha256": python_runtime_sha,
         "validator_python_sha256": python_sha,
         "validator_pythonpath": str(pythonpath),
     }
@@ -2243,26 +2448,23 @@ def _verify_plan_authority(
     }
 
 
-def _copy_bound_parser_file(
+def _sealed_parser_memfd(
     source: Path,
-    destination: Path,
     *,
+    logical_path: str,
     expected_bytes: int,
     expected_sha256: str,
-) -> None:
-    destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    flags = (
-        os.O_WRONLY
-        | os.O_CREAT
-        | os.O_EXCL
-        | getattr(os, "O_CLOEXEC", 0)
-        | getattr(os, "O_NOFOLLOW", 0)
+) -> int:
+    if not hasattr(os, "memfd_create") or not hasattr(os, "MFD_ALLOW_SEALING"):
+        raise BenchmarkValidationError("sealed parser memfd is unavailable")
+    descriptor = os.memfd_create(
+        f"glm-gate-d-parser:{logical_path}",
+        os.MFD_ALLOW_SEALING | getattr(os, "MFD_CLOEXEC", 0),
     )
     digest = sha256()
     observed = 0
-    with _open_regular_file(source, f"parser import {source.name}") as reader:
-        descriptor = os.open(destination, flags, 0o400)
-        try:
+    try:
+        with _open_regular_file(source, f"parser import {source.name}") as reader:
             while block := reader.read(1024 * 1024):
                 observed += len(block)
                 if observed > expected_bytes:
@@ -2272,31 +2474,257 @@ def _copy_bound_parser_file(
                 while view:
                     written = os.write(descriptor, view)
                     view = view[written:]
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-    if observed != expected_bytes or digest.hexdigest() != expected_sha256:
-        raise BenchmarkValidationError("parser import manifest drifted")
+        if observed != expected_bytes or digest.hexdigest() != expected_sha256:
+            raise BenchmarkValidationError("parser import manifest drifted")
+        os.fsync(descriptor)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        fcntl.fcntl(descriptor, _F_ADD_SEALS, _PARSER_MEMFD_SEALS)
+        if fcntl.fcntl(descriptor, _F_GET_SEALS) != _PARSER_MEMFD_SEALS:
+            raise BenchmarkValidationError("parser memfd seal set drifted")
+        sealed_digest = sha256()
+        sealed_bytes = 0
+        while sealed_bytes < expected_bytes:
+            block = os.pread(
+                descriptor,
+                min(1024 * 1024, expected_bytes - sealed_bytes),
+                sealed_bytes,
+            )
+            if not block:
+                break
+            sealed_digest.update(block)
+            sealed_bytes += len(block)
+        if (
+            sealed_bytes != expected_bytes
+            or os.pread(descriptor, 1, sealed_bytes)
+            or sealed_digest.hexdigest() != expected_sha256
+        ):
+            raise BenchmarkValidationError("sealed parser memfd revalidation drifted")
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
 
 
 @contextmanager
-def _sealed_parser_pythonpath(
+def _sealed_parser_memfds(
     implementation: Mapping[str, Any],
-) -> Iterator[tuple[int, str]]:
-    with tempfile.TemporaryDirectory(prefix="glm-gate-d-parser-") as temporary:
-        root = Path(temporary)
-        source_root = Path(implementation["validator_pythonpath"])
-        manifest = implementation["validator_imports"]
-        for item in manifest:
+) -> Iterator[tuple[dict[str, dict[str, Any]], tuple[int, ...]]]:
+    source_root = Path(implementation["validator_pythonpath"])
+    bindings: dict[str, dict[str, Any]] = {}
+    descriptors: list[int] = []
+    try:
+        for item in implementation["validator_imports"]:
             relative = PurePosixPath(item["path"])
-            _copy_bound_parser_file(
+            logical_path = relative.as_posix()
+            descriptor = _sealed_parser_memfd(
                 source_root.joinpath(*relative.parts),
-                root.joinpath(*relative.parts),
+                logical_path=logical_path,
                 expected_bytes=item["bytes"],
                 expected_sha256=item["sha256"],
             )
-        with _open_directory_no_symlinks(root, "sealed parser root") as descriptor:
-            yield descriptor, f"/proc/self/fd/{descriptor}"
+            descriptors.append(descriptor)
+            bindings[logical_path] = {
+                "bytes": item["bytes"],
+                "fd": descriptor,
+                "sha256": item["sha256"],
+            }
+        yield bindings, tuple(descriptors)
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+
+
+def _verify_immutable_runtime_file_record(
+    value: Any,
+    *,
+    label: str,
+    beneath: Path,
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise BenchmarkValidationError(f"{label} record is invalid")
+    _exact_keys(
+        value,
+        {
+            "bytes",
+            "device_major",
+            "device_minor",
+            "inode",
+            "path",
+            "sha256",
+        },
+        f"{label} record",
+    )
+    path = Path(value["path"])
+    expected_bytes = _nonnegative_int(value["bytes"], f"{label} bytes")
+    expected_major = _nonnegative_int(
+        value["device_major"], f"{label} device major"
+    )
+    expected_minor = _nonnegative_int(
+        value["device_minor"], f"{label} device minor"
+    )
+    expected_inode = _positive_int(value["inode"], f"{label} inode")
+    expected_sha = _sha(value["sha256"], f"{label} SHA-256")
+    _require_root_owned_immutable_file(path, label, beneath=beneath)
+    digest = sha256()
+    with _open_regular_file(path, label) as stream:
+        metadata = os.fstat(stream.fileno())
+        while block := stream.read(1024 * 1024):
+            digest.update(block)
+    if (
+        metadata.st_size != expected_bytes
+        or os.major(metadata.st_dev) != expected_major
+        or os.minor(metadata.st_dev) != expected_minor
+        or metadata.st_ino != expected_inode
+        or digest.hexdigest() != expected_sha
+    ):
+        raise BenchmarkValidationError(f"{label} identity drifted")
+    return {
+        "bytes": expected_bytes,
+        "path": str(path),
+        "sha256": expected_sha,
+    }
+
+
+def _verify_parser_runtime_authority(
+    value: Any, implementation: Mapping[str, Any]
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise BenchmarkValidationError("parser runtime authority is invalid")
+    _exact_keys(
+        value,
+        {
+            "immutable_native_dependencies",
+            "memfd_seal_mask",
+            "native_mapped_paths",
+            "new_native_mapping_count",
+            "python_executable",
+            "python_loaded_files",
+            "process_uid",
+            "python_runtime_root",
+            "python_runtime_tree_sha256",
+            "python_search_path",
+            "sealed_native_mapping_count",
+            "source_loaded_paths",
+        },
+        "parser runtime authority",
+    )
+    runtime_root = Path(implementation["validator_python_runtime_root"])
+    if (
+        value["memfd_seal_mask"] != _PARSER_MEMFD_SEALS
+        or value["python_runtime_root"] != str(runtime_root)
+        or value["python_runtime_tree_sha256"]
+        != implementation["validator_python_runtime_sha256"]
+        or value["native_mapped_paths"]
+        != sorted(
+            item["path"]
+            for item in implementation["validator_imports"]
+            if item["path"].endswith(".so")
+        )
+        or value["source_loaded_paths"]
+        != sorted(
+            item["path"]
+            for item in implementation["validator_imports"]
+            if item["path"].endswith(".py")
+        )
+    ):
+        raise BenchmarkValidationError("parser runtime authority drifted")
+    process_identity = _normalize_bound_nonroot_uid(
+        value["process_uid"], os.geteuid()
+    )
+    search_path = value["python_search_path"]
+    if not isinstance(search_path, list) or not search_path:
+        raise BenchmarkValidationError("isolated Python search path is absent")
+    for raw_path in search_path:
+        if not isinstance(raw_path, str) or not Path(raw_path).is_absolute():
+            raise BenchmarkValidationError("isolated Python search path is invalid")
+        candidate = Path(os.path.realpath(raw_path))
+        parent = candidate if candidate.is_dir() else candidate.parent
+        try:
+            parent.relative_to(runtime_root)
+        except ValueError as error:
+            raise BenchmarkValidationError(
+                "isolated Python search path escapes runtime root"
+            ) from error
+    executable = _verify_immutable_runtime_file_record(
+        value["python_executable"],
+        label="parser Python executable",
+        beneath=runtime_root,
+    )
+    if (
+        executable["path"] != implementation["validator_python_path"]
+        or executable["sha256"] != implementation["validator_python_sha256"]
+    ):
+        raise BenchmarkValidationError("parser Python executable binding drifted")
+    loaded = value["python_loaded_files"]
+    if not isinstance(loaded, list) or not loaded:
+        raise BenchmarkValidationError("parser Python loaded-file authority is absent")
+    loaded_paths: set[str] = set()
+    normalized_loaded: list[dict[str, Any]] = []
+    for index, item in enumerate(loaded):
+        record = _verify_immutable_runtime_file_record(
+            item,
+            label=f"parser Python loaded file {index}",
+            beneath=runtime_root,
+        )
+        if record["path"] in loaded_paths:
+            raise BenchmarkValidationError("parser Python loaded file is duplicated")
+        loaded_paths.add(record["path"])
+        normalized_loaded.append(record)
+    dependencies = value["immutable_native_dependencies"]
+    if not isinstance(dependencies, list) or not dependencies:
+        raise BenchmarkValidationError("immutable native dependencies are absent")
+    dependency_paths: set[str] = set()
+    normalized_dependencies: list[dict[str, Any]] = []
+    for index, item in enumerate(dependencies):
+        record = _verify_immutable_runtime_file_record(
+            item,
+            label=f"immutable native dependency {index}",
+            beneath=Path("/"),
+        )
+        if record["path"] in dependency_paths:
+            raise BenchmarkValidationError("immutable native dependency is duplicated")
+        dependency_paths.add(record["path"])
+        normalized_dependencies.append(record)
+    new_mapping_count = value["new_native_mapping_count"]
+    if (
+        not isinstance(new_mapping_count, int)
+        or isinstance(new_mapping_count, bool)
+        or new_mapping_count <= 0
+        or value["sealed_native_mapping_count"]
+        != sum(
+            item["path"].endswith(".so")
+            for item in implementation["validator_imports"]
+        )
+    ):
+        raise BenchmarkValidationError("native mapping counts are invalid")
+    return {
+        "immutable_native_dependencies": normalized_dependencies,
+        "memfd_seal_mask": value["memfd_seal_mask"],
+        "native_mapped_paths": list(value["native_mapped_paths"]),
+        "new_native_mapping_count": new_mapping_count,
+        "process_identity": process_identity,
+        "python_executable": executable,
+        "python_loaded_files": normalized_loaded,
+        "python_runtime_root": value["python_runtime_root"],
+        "python_runtime_tree_sha256": value["python_runtime_tree_sha256"],
+        "python_search_path": list(search_path),
+        "sealed_native_mapping_count": value["sealed_native_mapping_count"],
+        "source_loaded_paths": list(value["source_loaded_paths"]),
+    }
+
+
+def _normalize_bound_nonroot_uid(value: Any, expected: int) -> str:
+    if (
+        not isinstance(value, int)
+        or isinstance(value, bool)
+        or value <= 0
+        or not isinstance(expected, int)
+        or isinstance(expected, bool)
+        or expected <= 0
+        or value != expected
+    ):
+        raise BenchmarkValidationError("parser process UID binding drifted")
+    return "bound_nonroot"
 
 
 def _run_stablehlo_validator(
@@ -2315,9 +2743,9 @@ def _run_stablehlo_validator(
     payload = (_canonical_json(request) + "\n").encode("ascii")
     python_path = Path(implementation["validator_python_path"])
     try:
-        with _sealed_parser_pythonpath(implementation) as (
-            parser_descriptor,
-            sealed_pythonpath,
+        with _sealed_parser_memfds(implementation) as (
+            parser_bindings,
+            parser_descriptors,
         ), _open_regular_file(
             python_path, "StableHLO validator Python"
         ) as stream:
@@ -2329,21 +2757,33 @@ def _run_stablehlo_validator(
                     "StableHLO validator Python SHA-256 drifted"
                 )
             environment = {
-                "GATE_D_VALIDATOR_ROOT": sealed_pythonpath,
+                "GATE_D_VALIDATOR_FDS": _canonical_json(parser_bindings),
+                "GATE_D_VALIDATOR_PYTHON_FD": str(stream.fileno()),
+                "GATE_D_VALIDATOR_PYTHON_SHA256": implementation[
+                    "validator_python_sha256"
+                ],
+                "GATE_D_VALIDATOR_RUNTIME_ROOT": implementation[
+                    "validator_python_runtime_root"
+                ],
+                "GATE_D_VALIDATOR_RUNTIME_SHA256": implementation[
+                    "validator_python_runtime_sha256"
+                ],
+                "GATE_D_VALIDATOR_UID": str(os.geteuid()),
                 "LANG": "C",
                 "LC_ALL": "C",
                 "PYTHONHASHSEED": "0",
-                "PYTHONPATH": sealed_pythonpath,
+                "PYTHONDONTWRITEBYTECODE": "1",
             }
             completed = subprocess.run(
-                ["python", "-S", "-c", validator_source],
+                [str(python_path), "-I", "-S", "-c", validator_source],
                 check=False,
                 capture_output=True,
+                cwd="/",
                 env=environment,
                 executable=f"/proc/self/fd/{stream.fileno()}",
                 input=payload,
                 pass_fds=(
-                    parser_descriptor,
+                    *parser_descriptors,
                     stream.fileno(),
                 ),
                 timeout=30,
@@ -2368,14 +2808,15 @@ def _run_stablehlo_validator(
             item["path"]: item["sha256"]
             for item in implementation["validator_imports"]
         }
+        or report.get("immutable_parser_authority") is not True
+        or report.get("parser_authority_scope")
+        != "root-owned isolated Python plus sealed-memfd exact-fd parser and "
+        "mapped-inode native authority"
     ):
         raise BenchmarkValidationError("StableHLO parser authority drifted")
-    # The copied import tree is hash checked, but it is mutable by the invoking
-    # UID while the child imports it.  Until loading is bound to immutable FDs
-    # and mapped inode identities, this is a structural parser fixture rather
-    # than admissible StableHLO authority.
-    report["immutable_parser_authority"] = False
-    report["parser_authority_scope"] = "mutable-copy structural fixture only"
+    report["parser_runtime_authority"] = _verify_parser_runtime_authority(
+        report.get("parser_runtime_authority"), implementation
+    )
     return report
 
 
@@ -3345,7 +3786,8 @@ def admit_gate_d_precompile_candidates(
                     locality=locality,
                     implementation=implementation,
                 )
-                reasons.append("MISSING_IMMUTABLE_STABLEHLO_PARSER_AUTHORITY")
+                if stablehlo_report["immutable_parser_authority"] is not True:
+                    reasons.append("MISSING_IMMUTABLE_STABLEHLO_PARSER_AUTHORITY")
             except BenchmarkValidationError as error:
                 reasons.append("INVALID_CAUSAL_STABLEHLO_AUTHORITY")
                 stablehlo_report = {"refusal": str(error)}

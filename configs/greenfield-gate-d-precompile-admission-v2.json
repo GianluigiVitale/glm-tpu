@@ -153,7 +153,7 @@
     },
     "core": {
       "path": "../glm_tpu/greenfield/gate_d_precompile_admission.py",
-      "sha256": "69dbce5fc0a85181c40f838ec5b83724a063ce9c542162777e762b319d10c222"
+      "sha256": "1d434b0fec7640af49f1c0f8292d93c5d5aade05b2d27684f789354cf4acee23"
     },
     "git": {
       "path": "/usr/bin/git",
@@ -161,7 +161,7 @@
     },
     "stablehlo_validator": {
       "path": "../scripts/greenfield/validate_gate_d_stablehlo.py",
-      "sha256": "40a1196296f0d076489bb2739e2c7cf9a095b5646e642663b95312dd5f8b8204"
+      "sha256": "2f4e73b088b4b5eb724a7dbf8ec9e5b64b72cdefbd1f971dfe3502bf689c37a7"
     },
     "validator_imports": [
       {
@@ -221,9 +221,19 @@
       }
     ],
     "validator_python": {
-      "path": "/home/gianl/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12",
+      "path": "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12",
       "sha256": "021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7"
     },
+    "validator_python_provisioner": {
+      "path": "/opt/glm-tpu/bin/provision_gate_d_python_runtime.py",
+      "sha256": "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594"
+    },
+    "validator_python_provisioner_source": {
+      "path": "../scripts/greenfield/provision_gate_d_python_runtime.py",
+      "sha256": "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594"
+    },
+    "validator_python_runtime_root": "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95",
+    "validator_python_runtime_sha256": "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616",
     "validator_pythonpath": "/home/gianl/vllm-env/lib/python3.12/site-packages"
   },
   "inherited_v1": {

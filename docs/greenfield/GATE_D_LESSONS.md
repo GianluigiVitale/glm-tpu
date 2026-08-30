@@ -1024,9 +1024,27 @@ normalized-state cause.
   offline admission.
 - An abstract AST with unresolved helper names is a declarative DSL, not executable source
   authority. Bind every concrete operator and the real integration caller before admission.
-- A hash-checked copied parser tree is still mutable during import. Until code loads from immutable
-  descriptors and shared-library mappings match expected device/inode identities, treat parser
-  output as structural fixture validation only.
+- A hash-checked copied parser tree is still mutable during import, and sealed parser files alone
+  are insufficient if CPython or an early stdlib import remains same-UID writable. Bind and
+  provision the entire runtime tree root-owned/read-only; launch `-I -S` from a root-owned CWD with
+  no inherited import environment. Copy every parser blob into a Linux memfd, apply
+  write/grow/shrink/further-seal prohibitions, independently reread the sealed bytes, load sources
+  from exact fds and require native mappings to match the sealed device/inode identities. Parse
+  maps with `split(maxsplit=5)` and validate all remaining mapped files by identity, ownership and
+  content rather than by a `jaxlib` pathname substring. Keep ephemeral inode comparisons internal
+  and normalize their public receipt, or identical authority runs become nondeterministic.
+- Root-owned is not enough if provisioning preserves source modes/xattrs or executes a mutable repo
+  pathname under sudo. Include canonical safe modes in the complete tree hash; strip and reject
+  setuid/setgid/sticky bits and every xattr; refuse root validator execution. Treat provisioning as
+  trusted manual administration outside parser authority: install reviewed bytes once as a fixed
+  root-owned non-writable tool and invoke it only through exact `/usr/bin/python3 -I -S` or an
+  equivalent absolute-path isolated shebang. That pre-start command is the security boundary; an
+  in-process executable/flags check only detects accidental misinvocation after startup. Fail
+  admission unless the tool matches bound source, and
+  nofollow-validate exact root:root staging parents. Publish with atomic `RENAME_NOREPLACE`; a
+  preceding `exists()` check cannot protect dangling symlinks or a privileged race. Include the runtime root's own
+  mode in the tree hash. Perform the final Python-module/maps scan after parsing, dialect registration,
+  verification and every causal/collective walk so lazy dependencies cannot escape the receipt.
 - A coherent capsule must carry all eight watchpoints under one code/source/plan/StableHLO/coherence
   authority, with role-specific arrays, raw selected-slice SHAs, layout and physical-owner evidence.
   The two BF16 RMS operands are separate evidence; independently derive their FP32 sum and require

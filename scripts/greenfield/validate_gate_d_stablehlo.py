@@ -9,12 +9,357 @@ imports JAX, lowers, compiles, initializes a backend, or touches a device.
 from __future__ import annotations
 
 import base64
+import ctypes
+import fcntl
 from hashlib import sha256
+import importlib.abc
+import importlib.machinery
+import importlib.util
 import json
 import os
 from pathlib import Path
+import re
+import stat
 import sys
 from typing import Any, Mapping, Sequence
+
+
+_F_GET_SEALS = getattr(fcntl, "F_GET_SEALS", 1034)
+_MEMFD_SEAL_MASK = 1 | 2 | 4 | 8
+_SEALED_BINDINGS: dict[str, dict[str, Any]] = {}
+_SEALED_SOURCE_MODULES: dict[str, tuple[str, bool]] = {}
+_SEALED_EXTENSION_MODULES: dict[str, str] = {}
+_SEALED_NAMESPACE_MODULES: set[str] = set()
+_LOADED_SOURCE_PATHS: set[str] = set()
+_LOADED_NATIVE_PATHS: set[str] = set()
+_PROC_MAP_ESCAPE = re.compile(r"\\([0-7]{3})")
+_FORBIDDEN_RUNTIME_MODE = stat.S_ISUID | stat.S_ISGID | stat.S_ISVTX
+
+
+def _read_sealed_fd(descriptor: int, expected_bytes: int) -> bytes:
+    chunks: list[bytes] = []
+    offset = 0
+    while offset < expected_bytes:
+        block = os.pread(descriptor, min(1024 * 1024, expected_bytes - offset), offset)
+        if not block:
+            break
+        chunks.append(block)
+        offset += len(block)
+    if offset != expected_bytes or os.pread(descriptor, 1, offset):
+        raise ImportError("sealed parser byte count drifted")
+    return b"".join(chunks)
+
+
+def _sealed_fd_sha256(descriptor: int, expected_bytes: int) -> str:
+    digest = sha256()
+    offset = 0
+    while offset < expected_bytes:
+        block = os.pread(descriptor, min(1024 * 1024, expected_bytes - offset), offset)
+        if not block:
+            break
+        digest.update(block)
+        offset += len(block)
+    if offset != expected_bytes or os.pread(descriptor, 1, offset):
+        raise ImportError("sealed parser byte count drifted")
+    return digest.hexdigest()
+
+
+def _mapped_file_records() -> dict[tuple[int, int, int], set[str]]:
+    try:
+        lines = Path("/proc/self/maps").read_text().splitlines()
+    except OSError as error:
+        raise ImportError("cannot inspect process mappings") from error
+    records: dict[tuple[int, int, int], set[str]] = {}
+    for line in lines:
+        fields = line.split(maxsplit=5)
+        if len(fields) < 5 or ":" not in fields[3]:
+            continue
+        try:
+            major_text, minor_text = fields[3].split(":", 1)
+            identity = (int(major_text, 16), int(minor_text, 16), int(fields[4]))
+        except ValueError:
+            continue
+        if identity[2] == 0:
+            continue
+        raw_path = fields[5] if len(fields) == 6 else ""
+        mapped_path = _PROC_MAP_ESCAPE.sub(
+            lambda match: chr(int(match.group(1), 8)), raw_path
+        )
+        records.setdefault(identity, set()).add(mapped_path)
+    return records
+
+
+def _immutable_file_record(
+    path: str, *, expected_identity: tuple[int, int, int] | None = None
+) -> dict[str, Any]:
+    if not path.startswith("/") or path.endswith(" (deleted)"):
+        raise ImportError(f"mapped dependency path is not immutable: {path}")
+    resolved = os.path.realpath(path)
+    if not resolved.startswith("/") or not os.path.exists(resolved):
+        raise ImportError(f"mapped dependency path is unavailable: {path}")
+    current = Path("/")
+    for component in Path(resolved).parts[1:]:
+        current /= component
+        try:
+            metadata = os.lstat(current)
+        except OSError as error:
+            raise ImportError(f"cannot inspect immutable path: {resolved}") from error
+        if (
+            metadata.st_uid != 0
+            or metadata.st_gid != 0
+            or metadata.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
+        ):
+            raise ImportError(f"path remains writable outside root: {resolved}")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(resolved, flags)
+    except OSError as error:
+        raise ImportError(f"cannot open immutable mapped file: {resolved}") from error
+    try:
+        metadata = os.fstat(descriptor)
+        identity = (
+            os.major(metadata.st_dev),
+            os.minor(metadata.st_dev),
+            metadata.st_ino,
+        )
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_uid != 0
+            or metadata.st_gid != 0
+            or metadata.st_mode
+            & (stat.S_IWGRP | stat.S_IWOTH | _FORBIDDEN_RUNTIME_MODE)
+            or (expected_identity is not None and identity != expected_identity)
+        ):
+            raise ImportError(f"immutable mapped file identity drifted: {resolved}")
+        try:
+            attributes = os.listxattr(resolved, follow_symlinks=False)
+        except OSError as error:
+            raise ImportError(
+                f"cannot inspect immutable mapped file attributes: {resolved}"
+            ) from error
+        if attributes:
+            raise ImportError(f"immutable mapped file has extended attributes: {resolved}")
+        return {
+            "bytes": metadata.st_size,
+            "device_major": identity[0],
+            "device_minor": identity[1],
+            "inode": identity[2],
+            "path": resolved,
+            "sha256": _sealed_fd_sha256(descriptor, metadata.st_size),
+        }
+    finally:
+        os.close(descriptor)
+
+
+def _runtime_root() -> tuple[str, str, dict[str, Any]]:
+    raw = os.environ.pop("GATE_D_VALIDATOR_RUNTIME_ROOT", None)
+    raw_fd = os.environ.pop("GATE_D_VALIDATOR_PYTHON_FD", None)
+    expected_sha = os.environ.pop("GATE_D_VALIDATOR_PYTHON_SHA256", None)
+    expected_runtime_sha = os.environ.pop("GATE_D_VALIDATOR_RUNTIME_SHA256", None)
+    expected_uid = os.environ.pop("GATE_D_VALIDATOR_UID", None)
+    if (
+        raw is None
+        or raw_fd is None
+        or expected_sha is None
+        or expected_runtime_sha is None
+        or expected_uid is None
+        or not re.fullmatch(r"[0-9a-f]{64}", expected_runtime_sha)
+    ):
+        raise ImportError("immutable Python runtime binding is absent")
+    try:
+        bound_uid = int(expected_uid)
+    except ValueError as error:
+        raise ImportError("validator process UID binding is invalid") from error
+    if bound_uid <= 0 or os.geteuid() != bound_uid:
+        raise ImportError("validator must retain the bound unprivileged UID")
+    root = os.path.realpath(raw)
+    if not root.startswith("/") or root == "/":
+        raise ImportError("immutable Python runtime root is invalid")
+    root_record = os.stat(root)
+    if (
+        not stat.S_ISDIR(root_record.st_mode)
+        or root_record.st_uid != 0
+        or root_record.st_gid != 0
+        or root_record.st_mode
+        & (stat.S_IWGRP | stat.S_IWOTH | _FORBIDDEN_RUNTIME_MODE)
+    ):
+        raise ImportError("immutable Python runtime root remains writable")
+    try:
+        descriptor = int(raw_fd)
+    except ValueError as error:
+        raise ImportError("immutable Python descriptor is invalid") from error
+    executable = os.path.realpath(f"/proc/self/fd/{descriptor}")
+    if os.path.commonpath((root, executable)) != root:
+        raise ImportError("immutable Python executable is outside runtime root")
+    executable_record = _immutable_file_record(executable)
+    if executable_record["sha256"] != expected_sha:
+        raise ImportError("immutable Python executable SHA-256 drifted")
+    if sys.flags.isolated != 1 or sys.flags.no_site != 1 or os.getcwd() != "/":
+        raise ImportError("Python validator process is not isolated")
+    for entry in sys.path:
+        if not entry or not os.path.isabs(entry):
+            raise ImportError("Python validator search path is not isolated")
+        resolved = os.path.realpath(entry)
+        parent = resolved if os.path.isdir(resolved) else os.path.dirname(resolved)
+        if os.path.commonpath((root, parent)) != root:
+            raise ImportError("Python validator search path escapes runtime root")
+        if os.path.exists(resolved):
+            metadata = os.stat(resolved)
+            if (
+                metadata.st_uid != 0
+                or metadata.st_gid != 0
+                or metadata.st_mode
+                & (stat.S_IWGRP | stat.S_IWOTH | _FORBIDDEN_RUNTIME_MODE)
+            ):
+                raise ImportError("Python validator search path remains writable")
+    return root, expected_runtime_sha, executable_record
+
+
+(
+    _PYTHON_RUNTIME_ROOT,
+    _PYTHON_RUNTIME_TREE_SHA256,
+    _PYTHON_EXECUTABLE_RECORD,
+) = _runtime_root()
+_NATIVE_MAPPING_BASELINE = _mapped_file_records()
+
+
+class _SealedSourceLoader(importlib.abc.Loader):
+    def __init__(self, fullname: str, logical_path: str, is_package: bool) -> None:
+        self.fullname = fullname
+        self.logical_path = logical_path
+        self.is_package = is_package
+
+    def create_module(self, spec: Any) -> None:
+        return None
+
+    def exec_module(self, module: Any) -> None:
+        binding = _SEALED_BINDINGS[self.logical_path]
+        raw = _read_sealed_fd(binding["fd"], binding["bytes"])
+        if sha256(raw).hexdigest() != binding["sha256"]:
+            raise ImportError(f"sealed parser source drifted: {self.logical_path}")
+        module.__file__ = f"<sealed-memfd:{self.logical_path}>"
+        if self.is_package:
+            module.__path__ = []
+        code = compile(raw, module.__file__, "exec", dont_inherit=True)
+        exec(code, module.__dict__)
+        _LOADED_SOURCE_PATHS.add(self.logical_path)
+
+
+class _SealedExtensionLoader(importlib.machinery.ExtensionFileLoader):
+    def __init__(self, fullname: str, logical_path: str, descriptor: int) -> None:
+        super().__init__(fullname, f"/proc/self/fd/{descriptor}")
+        self.logical_path = logical_path
+
+    def exec_module(self, module: Any) -> None:
+        super().exec_module(module)
+        _LOADED_NATIVE_PATHS.add(self.logical_path)
+
+
+class _SealedParserFinder(importlib.abc.MetaPathFinder):
+    def find_spec(
+        self,
+        fullname: str,
+        path: Any = None,
+        target: Any = None,
+    ) -> Any:
+        if fullname in _SEALED_SOURCE_MODULES:
+            logical_path, is_package = _SEALED_SOURCE_MODULES[fullname]
+            loader = _SealedSourceLoader(fullname, logical_path, is_package)
+            return importlib.util.spec_from_loader(
+                fullname,
+                loader,
+                origin=f"sealed-memfd:{logical_path}",
+                is_package=is_package,
+            )
+        if fullname in _SEALED_EXTENSION_MODULES:
+            logical_path = _SEALED_EXTENSION_MODULES[fullname]
+            descriptor = _SEALED_BINDINGS[logical_path]["fd"]
+            loader = _SealedExtensionLoader(fullname, logical_path, descriptor)
+            return importlib.util.spec_from_file_location(
+                fullname,
+                f"/proc/self/fd/{descriptor}",
+                loader=loader,
+            )
+        if fullname in _SEALED_NAMESPACE_MODULES:
+            spec = importlib.machinery.ModuleSpec(fullname, loader=None, is_package=True)
+            spec.submodule_search_locations = []
+            return spec
+        if fullname == "jaxlib" or fullname.startswith("jaxlib."):
+            raise ModuleNotFoundError(f"unsealed parser import refused: {fullname}")
+        return None
+
+
+def _module_binding(logical_path: str) -> tuple[str, bool] | None:
+    if logical_path.endswith("/__init__.py"):
+        return logical_path[: -len("/__init__.py")].replace("/", "."), True
+    if logical_path.endswith(".py"):
+        return logical_path[:-3].replace("/", "."), False
+    if logical_path.endswith(".so") and not logical_path.endswith("/libjax_common.so"):
+        return logical_path[:-3].replace("/", "."), False
+    return None
+
+
+def _install_sealed_parser_importer() -> None:
+    raw = os.environ.pop("GATE_D_VALIDATOR_FDS", None)
+    if raw is None:
+        raise ImportError("sealed parser descriptor manifest is absent")
+    try:
+        manifest = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise ImportError("sealed parser descriptor manifest is invalid") from error
+    if not isinstance(manifest, dict) or not manifest:
+        raise ImportError("sealed parser descriptor manifest is invalid")
+    for logical_path, binding in manifest.items():
+        if (
+            not isinstance(logical_path, str)
+            or not logical_path.startswith("jaxlib/")
+            or not isinstance(binding, dict)
+            or set(binding) != {"bytes", "fd", "sha256"}
+            or not isinstance(binding["bytes"], int)
+            or isinstance(binding["bytes"], bool)
+            or binding["bytes"] <= 0
+            or not isinstance(binding["fd"], int)
+            or isinstance(binding["fd"], bool)
+            or binding["fd"] < 0
+            or not isinstance(binding["sha256"], str)
+            or len(binding["sha256"]) != 64
+        ):
+            raise ImportError("sealed parser descriptor binding is invalid")
+        descriptor = binding["fd"]
+        status = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(status.st_mode)
+            or status.st_size != binding["bytes"]
+            or fcntl.fcntl(descriptor, _F_GET_SEALS) != _MEMFD_SEAL_MASK
+        ):
+            raise ImportError("sealed parser descriptor identity drifted")
+        if _sealed_fd_sha256(descriptor, binding["bytes"]) != binding["sha256"]:
+            raise ImportError("sealed parser descriptor content drifted")
+        _SEALED_BINDINGS[logical_path] = dict(binding)
+        module = _module_binding(logical_path)
+        if module is None:
+            continue
+        fullname, is_package = module
+        if logical_path.endswith(".py"):
+            _SEALED_SOURCE_MODULES[fullname] = (logical_path, is_package)
+        else:
+            _SEALED_EXTENSION_MODULES[fullname] = logical_path
+        components = fullname.split(".")
+        for index in range(1, len(components)):
+            parent = ".".join(components[:index])
+            if parent not in _SEALED_SOURCE_MODULES:
+                _SEALED_NAMESPACE_MODULES.add(parent)
+    common_path = "jaxlib/libjax_common.so"
+    if common_path not in _SEALED_BINDINGS:
+        raise ImportError("sealed libjax_common binding is absent")
+    common_fd = _SEALED_BINDINGS[common_path]["fd"]
+    ctypes.CDLL(f"/proc/self/fd/{common_fd}", mode=ctypes.RTLD_GLOBAL)
+    _LOADED_NATIVE_PATHS.add(common_path)
+    sys.dont_write_bytecode = True
+    sys.meta_path.insert(0, _SealedParserFinder())
+
+
+_install_sealed_parser_importer()
 
 import jaxlib
 from jaxlib.mlir import ir
@@ -135,7 +480,47 @@ def _local_groups(value: Any) -> tuple[tuple[int, ...], ...]:
     return tuple(groups)
 
 
-def _loaded_parser_files(expected: Any) -> dict[str, str]:
+def _loaded_python_runtime_files() -> list[dict[str, Any]]:
+    records: dict[str, dict[str, Any]] = {}
+    sealed_identities = {
+        (
+            os.major(os.fstat(binding["fd"]).st_dev),
+            os.minor(os.fstat(binding["fd"]).st_dev),
+            os.fstat(binding["fd"]).st_ino,
+        )
+        for binding in _SEALED_BINDINGS.values()
+    }
+    for module in tuple(sys.modules.values()):
+        raw_path = getattr(module, "__file__", None)
+        if not isinstance(raw_path, str) or raw_path.startswith("<sealed-memfd:"):
+            continue
+        if raw_path.startswith("/proc/self/fd/"):
+            try:
+                metadata = os.stat(raw_path)
+            except OSError as error:
+                raise ValidationError("loaded descriptor-backed module vanished") from error
+            identity = (
+                os.major(metadata.st_dev),
+                os.minor(metadata.st_dev),
+                metadata.st_ino,
+            )
+            if identity in sealed_identities:
+                continue
+            raise ValidationError("unrecognized descriptor-backed module is loaded")
+        resolved = os.path.realpath(raw_path)
+        if os.path.commonpath((_PYTHON_RUNTIME_ROOT, resolved)) != _PYTHON_RUNTIME_ROOT:
+            raise ValidationError(f"Python module escaped immutable runtime: {raw_path}")
+        if resolved not in records:
+            try:
+                records[resolved] = _immutable_file_record(resolved)
+            except ImportError as error:
+                raise ValidationError(str(error)) from error
+    return [records[path] for path in sorted(records)]
+
+
+def _loaded_parser_files(
+    expected: Any,
+) -> tuple[dict[str, str], dict[str, Any]]:
     if not isinstance(expected, dict) or not expected:
         raise ValidationError("parser file manifest is absent")
     if any(
@@ -146,41 +531,71 @@ def _loaded_parser_files(expected: Any) -> dict[str, str]:
         for path, digest in expected.items()
     ):
         raise ValidationError("parser file manifest is invalid")
-    raw_root = os.environ.get("GATE_D_VALIDATOR_ROOT")
-    if not raw_root:
-        raise ValidationError("sealed parser root is absent")
-    root = Path(raw_root).resolve(strict=True)
-    observed_paths: set[Path] = set()
-    for module in tuple(sys.modules.values()):
-        raw_path = getattr(module, "__file__", None)
-        if raw_path:
-            try:
-                path = Path(raw_path).resolve(strict=True)
-            except (OSError, RuntimeError):
-                continue
-            if path.is_relative_to(root / "jaxlib"):
-                observed_paths.add(path)
+    bound = {
+        path: binding["sha256"] for path, binding in _SEALED_BINDINGS.items()
+    }
+    if bound != expected:
+        raise ValidationError("sealed parser bindings differ from requested manifest")
+    expected_sources = {path for path in expected if path.endswith(".py")}
+    expected_native = {path for path in expected if path.endswith(".so")}
+    if _LOADED_SOURCE_PATHS != expected_sources:
+        raise ValidationError("sealed parser source load set drifted")
+    if _LOADED_NATIVE_PATHS != expected_native:
+        raise ValidationError("sealed parser native load set drifted")
     try:
-        maps = Path("/proc/self/maps").read_text()
-    except OSError as error:
-        raise ValidationError("cannot inspect loaded parser libraries") from error
-    for line in maps.splitlines():
-        fields = line.split()
-        if len(fields) < 6 or not fields[-1].startswith("/"):
+        mapped_records = _mapped_file_records()
+    except ImportError as error:
+        raise ValidationError(str(error)) from error
+    mapped_identities = set(mapped_records)
+    native_identities: set[tuple[int, int, int]] = set()
+    for logical_path, binding in _SEALED_BINDINGS.items():
+        descriptor = binding["fd"]
+        status = os.fstat(descriptor)
+        if (
+            status.st_size != binding["bytes"]
+            or _sealed_fd_sha256(descriptor, binding["bytes"])
+            != binding["sha256"]
+            or fcntl.fcntl(descriptor, _F_GET_SEALS) != _MEMFD_SEAL_MASK
+        ):
+            raise ValidationError("loaded sealed parser descriptor drifted")
+        if logical_path.endswith(".so"):
+            identity = (os.major(status.st_dev), os.minor(status.st_dev), status.st_ino)
+            native_identities.add(identity)
+            if identity not in mapped_identities:
+                raise ValidationError(
+                    f"parser native library is not mapped from its sealed inode: {logical_path}"
+                )
+    immutable_dependencies: dict[str, dict[str, Any]] = {}
+    for identity, paths in mapped_records.items():
+        if identity in native_identities:
             continue
-        try:
-            path = Path(fields[-1]).resolve(strict=True)
-        except (OSError, RuntimeError):
-            continue
-        if path.is_relative_to(root / "jaxlib"):
-            observed_paths.add(path)
-    observed: dict[str, str] = {}
-    for path in observed_paths:
-        relative = path.relative_to(root).as_posix()
-        observed[relative] = sha256(path.read_bytes()).hexdigest()
-    if observed != expected:
-        raise ValidationError("loaded parser files differ from sealed manifest")
-    return dict(sorted(observed.items()))
+        if not paths or any(not path for path in paths):
+            raise ValidationError("a pathname-free native file mapping is present")
+        for mapped_path in sorted(paths):
+            try:
+                record = _immutable_file_record(
+                    mapped_path, expected_identity=identity
+                )
+            except ImportError as error:
+                raise ValidationError(str(error)) from error
+            immutable_dependencies[record["path"]] = record
+    newly_mapped = set(mapped_records) - set(_NATIVE_MAPPING_BASELINE)
+    return dict(sorted(bound.items())), {
+        "immutable_native_dependencies": [
+            immutable_dependencies[path] for path in sorted(immutable_dependencies)
+        ],
+        "memfd_seal_mask": _MEMFD_SEAL_MASK,
+        "native_mapped_paths": sorted(_LOADED_NATIVE_PATHS),
+        "new_native_mapping_count": len(newly_mapped),
+        "python_executable": _PYTHON_EXECUTABLE_RECORD,
+        "python_loaded_files": _loaded_python_runtime_files(),
+        "process_uid": os.geteuid(),
+        "python_runtime_root": _PYTHON_RUNTIME_ROOT,
+        "python_runtime_tree_sha256": _PYTHON_RUNTIME_TREE_SHA256,
+        "python_search_path": list(sys.path),
+        "sealed_native_mapping_count": len(native_identities),
+        "source_loaded_paths": sorted(_LOADED_SOURCE_PATHS),
+    }
 
 
 def _operation_name(operation: Any) -> str:
@@ -514,7 +929,6 @@ def validate(request: Mapping[str, Any]) -> dict[str, Any]:
         "accepted-primary StableHLO",
     )
     groups = _local_groups(request["local_device_groups"])
-    loaded_parser_files = _loaded_parser_files(request["expected_parser_files"])
     weighted_output_index = _positive_index(
         request["weighted_output_result_index"], "weighted-output result index"
     )
@@ -615,6 +1029,9 @@ def validate(request: Mapping[str, Any]) -> dict[str, Any]:
             raise ValidationError("accepted StableHLO contains dead or unrooted operations")
         candidate_collectives = _collectives(candidate, groups, "candidate StableHLO")
         accepted_collectives = _collectives(accepted, groups, "accepted-primary StableHLO")
+        loaded_parser_files, parser_runtime_authority = _loaded_parser_files(
+            request["expected_parser_files"]
+        )
         return {
             "accepted_primary_slice_sha256": accepted_signature_sha,
             "accepted_primary_slice_sha256s": accepted_signature_shas,
@@ -631,8 +1048,14 @@ def validate(request: Mapping[str, Any]) -> dict[str, Any]:
             "jax_imported": "jax" in sys.modules,
             "jaxlib_version": jaxlib.__version__,
             "loaded_parser_files": loaded_parser_files,
+            "immutable_parser_authority": True,
             "local_device_groups": [list(group) for group in groups],
             "parser": "jaxlib.mlir.ir",
+            "parser_authority_scope": (
+                "root-owned isolated Python plus sealed-memfd exact-fd parser "
+                "and mapped-inode native authority"
+            ),
+            "parser_runtime_authority": parser_runtime_authority,
             "carried_residual_result_index": carried_residual_index,
             "weighted_output_result_index": weighted_output_index,
             "stablehlo_version": stablehlo.get_current_version(),

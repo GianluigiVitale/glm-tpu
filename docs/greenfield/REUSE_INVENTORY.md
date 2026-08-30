@@ -829,7 +829,19 @@ Reuse `glm_tpu/greenfield/gate_d_precompile_admission.py`, contract
 The stdlib-only parent authenticates inherited v1 closure evidence, the exact two surviving shadow
 normal forms, committed Git source/blob and AST symbols, a content-derived plan and one coherent
 typed eight-watchpoint NPZ. Positive HLO authority runs only through the pinned offline
-`scripts/greenfield/validate_gate_d_stablehlo.py` jaxlib-MLIR parser. It rejects host/custom-call
+`scripts/greenfield/validate_gate_d_stablehlo.py` jaxlib-MLIR parser. Provision the exact
+root/content/symlink/safe-mode-tree-SHA runtime through trusted manual administration outside parser
+authority: install reviewed `scripts/greenfield/provision_gate_d_python_runtime.py` bytes as the
+fixed root-owned mode-0555 `/opt/glm-tpu/bin/provision_gate_d_python_runtime.py`, then invoke only
+that installed tool as `sudo -n /usr/bin/python3 -I -S /opt/glm-tpu/bin/`
+`provision_gate_d_python_runtime.py ...`. Never pass the mutable repository pathname to sudo. Its
+exact pre-start command or equivalent absolute-path isolated shebang is the security boundary; its
+runtime check only detects accidental misinvocation after startup. Admission
+binds the installed tool to source; it validates exact root:root `/opt` parents, uses atomic
+`RENAME_NOREPLACE`, and strips privilege bits/xattrs. The parser
+refuses root execution, runs `-I -S`, `cwd=/`, loads Python sources from rehashed sealed memfds and
+requires native parser mappings to match those sealed inodes. Every remaining file mapping must be
+root-owned, non-writable, identity-matched and content-recorded. It rejects host/custom-call
 effects, accepted-primary backward-slice drift, implicit/ring/nonlocal groups, mixed identity,
 repeated array slices, malformed/compression-bomb archives, symlinks and occupied append-only
 outputs. It separately proves the exact RMS-frontier source and candidate-specific causal auxiliary
@@ -845,9 +857,11 @@ concrete source/callsite at `c8b2200` and exact sealed PP16 plan/watchpoint auth
 only for causal StableHLO and a coherent capsule; the compensated candidate retains all four gaps.
 This report is the correct offline starting point; do not modify v1, relabel DB518 state, compile a
 placeholder or infer TPU causality from structural synthetic fixtures. V2 has no positive admission
-path for the tuple candidate until immutable parser-backed causal StableHLO and a pinned capsule
+path for the tuple candidate until source-produced causal StableHLO and a pinned capsule
 producer/execution receipt exist; the compensated candidate also needs concrete source/callsite and
 plan authority.
-The canonical core/contract/report/locality SHAs are `69dbce5f...c222`, `bec6457a...9fc0`,
-`f1ea5fed...5804` and `49cf6bb1...25eb`; focused/source-plus-adjacent offline coverage is 60/60
+The canonical core/contract/report/locality SHAs are `1d434b0f...cee23`, `72673fbc...fb48`,
+`e1fcf314...aff7` and `49cf6bb1...25eb`; validator SHA is `2f4e73b0...c37a7`;
+installed/source provisioner and runtime-tree SHAs are `2b9c8c2b...0594` and
+`308748a9...d616`; focused/source-plus-adjacent offline coverage is 72/72
 and 71/71. PP16 plan authority is `98b4fa21...7880`, content SHA `d824c19c...5833`.

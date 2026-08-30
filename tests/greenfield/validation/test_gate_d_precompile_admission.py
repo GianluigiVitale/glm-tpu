@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import ast
 import base64
+import errno
 from hashlib import sha256
 import io
 import json
 import os
 from pathlib import Path
+import runpy
+import stat
 import subprocess
 import sys
+from types import SimpleNamespace
 from typing import Any
 import zipfile
 
@@ -25,7 +29,7 @@ from glm_tpu.greenfield.gate_d_precompile_admission import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CURRENT_CONTRACT = REPO_ROOT / "configs/greenfield-gate-d-precompile-admission-v2.json"
-CURRENT_CONTRACT_SHA256 = "bec6457adb5e512440985c62654aaf62b226d78d8b8e3e155472675099f29fc0"
+CURRENT_CONTRACT_SHA256 = "72673fbcd904f19589435f090cb35ee9b6027f30c33ed07dddb8d46a2aa6fb48"
 
 
 def _sha(path: Path) -> str:
@@ -199,7 +203,15 @@ def _absolute_current_contract() -> dict[str, Any]:
     for name in ("contract", "core", "frontier"):
         binding = contract["inherited_v1"][name]
         binding["path"] = str((base / binding["path"]).resolve())
-    for name in ("cli", "core", "git", "stablehlo_validator", "validator_python"):
+    for name in (
+        "cli",
+        "core",
+        "git",
+        "stablehlo_validator",
+        "validator_python",
+        "validator_python_provisioner",
+        "validator_python_provisioner_source",
+    ):
         binding = contract["implementation"][name]
         binding["path"] = str((base / binding["path"]).resolve())
     contract["implementation"]["validator_pythonpath"] = str(
@@ -1004,13 +1016,12 @@ def test_complete_synthetic_fixture_never_admits_precompile(tmp_path: Path) -> N
     candidate = report["candidate_results"][0]
     assert candidate["reasons"] == [
         "MISSING_EXECUTABLE_SOURCE_AUTHORITY",
-        "MISSING_IMMUTABLE_STABLEHLO_PARSER_AUTHORITY",
         "MISSING_PINNED_COHERENT_CAPSULE_PRODUCER",
     ]
     assert candidate["source_authority"]["executable_source_authority"] is False
     assert (
         candidate["stablehlo_authority"]["immutable_parser_authority"]
-        is False
+        is True
     )
     assert candidate["capsule"]["producer_provenance_verified"] is False
     assert report["compile_only_review_required"] is True
@@ -1184,12 +1195,55 @@ def test_mutated_same_version_parser_tree_is_rejected(tmp_path: Path) -> None:
     assert "drifted" in candidate["stablehlo_authority"]["refusal"]
 
 
-def test_parser_copy_hashes_the_same_bytes_it_writes(
+def test_parser_source_replace_after_memfd_seal_cannot_change_child_imports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    contract = _absolute_current_contract()
+    candidate = contract["candidates"][0]
+    locality = contract["locality_contract"]
+    _, source = _source_authority(tmp_path, candidate, locality)
+    _, plan = _plan_authority(tmp_path, "PP16_LP2")
+    original_root = Path(contract["implementation"]["validator_pythonpath"])
+    parser_root = tmp_path / "parser"
+    for item in contract["implementation"]["validator_imports"]:
+        relative = Path(item["path"])
+        source_path = original_root / relative
+        destination = parser_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if source_path.suffix == ".so":
+            os.link(source_path, destination)
+        else:
+            destination.write_bytes(source_path.read_bytes())
+    contract["implementation"]["validator_pythonpath"] = str(parser_root)
+    monkeypatch.setattr(
+        sys.modules[__name__], "_absolute_current_contract", lambda: contract
+    )
+    target = parser_root / "jaxlib/mlir/ir.py"
+    replacement = parser_root / "replacement.py"
+    replacement.write_bytes(b"raise RuntimeError('hostile parser replacement')\n")
+    real_run = admission_module.subprocess.run
+    replaced = False
+
+    def replace_after_sealing(*args: Any, **kwargs: Any) -> Any:
+        nonlocal replaced
+        os.replace(replacement, target)
+        replaced = True
+        return real_run(*args, **kwargs)
+
+    monkeypatch.setattr(admission_module.subprocess, "run", replace_after_sealing)
+    _, stablehlo = _stablehlo_authority(
+        tmp_path, candidate, locality, source, plan
+    )
+    assert replaced is True
+    assert stablehlo["authority_sha256"] != "0" * 64
+    assert target.read_bytes().startswith(b"raise RuntimeError")
+
+
+def test_parser_memfd_hashes_the_same_bytes_it_seals(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "source.bin"
     replacement = tmp_path / "replacement.bin"
-    destination = tmp_path / "sealed" / "source.bin"
     original = b"a" * (1024 * 1024) + b"b" * 257
     source.write_bytes(original)
     replacement.write_bytes(b"z" * len(original))
@@ -1205,15 +1259,280 @@ def test_parser_copy_hashes_the_same_bytes_it_writes(
         return written
 
     monkeypatch.setattr(admission_module.os, "write", replace_source_after_first_write)
-    admission_module._copy_bound_parser_file(
+    descriptor = admission_module._sealed_parser_memfd(
         source,
-        destination,
+        logical_path="jaxlib/source.bin",
         expected_bytes=len(original),
         expected_sha256=sha256(original).hexdigest(),
     )
-    assert replaced is True
-    assert destination.read_bytes() == original
-    assert source.read_bytes() != original
+    try:
+        assert replaced is True
+        assert os.pread(descriptor, len(original), 0) == original
+        assert source.read_bytes() != original
+        assert admission_module.fcntl.fcntl(
+            descriptor, admission_module._F_GET_SEALS
+        ) == admission_module._PARSER_MEMFD_SEALS
+        with pytest.raises(OSError):
+            os.pwrite(descriptor, b"z", 0)
+    finally:
+        os.close(descriptor)
+
+
+def test_parser_memfd_is_independently_rehashed_after_sealing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "source.bin"
+    payload = b"causal-parser-authority"
+    source.write_bytes(payload)
+
+    def forged_pread(descriptor: int, size: int, offset: int) -> bytes:
+        del descriptor, offset
+        return b"z" * size
+
+    monkeypatch.setattr(admission_module.os, "pread", forged_pread)
+    with pytest.raises(BenchmarkValidationError, match="revalidation drifted"):
+        admission_module._sealed_parser_memfd(
+            source,
+            logical_path="jaxlib/source.bin",
+            expected_bytes=len(payload),
+            expected_sha256=sha256(payload).hexdigest(),
+        )
+
+
+def test_user_owned_python_runtime_is_rejected(tmp_path: Path) -> None:
+    contract = _absolute_current_contract()
+    original = Path(contract["implementation"]["validator_python"]["path"])
+    runtime = tmp_path / "runtime"
+    executable = runtime / "bin/python3.12"
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(original.read_bytes())
+    executable.chmod(0o755)
+    contract["implementation"]["validator_python"] = {
+        "path": str(executable),
+        "sha256": _sha(executable),
+    }
+    contract["implementation"]["validator_python_runtime_root"] = str(runtime)
+    with pytest.raises(BenchmarkValidationError, match="not root-owned read-only"):
+        admission_module._verify_implementation(
+            contract["implementation"], CURRENT_CONTRACT.parent
+        )
+
+
+def test_root_admission_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    contract = _absolute_current_contract()
+    monkeypatch.setattr(admission_module.os, "geteuid", lambda: 0)
+    with pytest.raises(BenchmarkValidationError, match="unprivileged user"):
+        admission_module._verify_implementation(
+            contract["implementation"], CURRENT_CONTRACT.parent
+        )
+
+
+def test_bound_nonroot_uid_normalizes_across_hosts() -> None:
+    assert admission_module._normalize_bound_nonroot_uid(2001, 2001) == (
+        admission_module._normalize_bound_nonroot_uid(12345, 12345)
+    )
+    with pytest.raises(BenchmarkValidationError, match="UID binding drifted"):
+        admission_module._normalize_bound_nonroot_uid(2001, 12345)
+
+
+def test_runtime_provisioner_strips_privilege_modes_and_xattrs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    provisioner = runpy.run_path(
+        str(REPO_ROOT / "scripts/greenfield/provision_gate_d_python_runtime.py")
+    )
+    hostile = tmp_path / "hostile"
+    safe = tmp_path / "safe"
+    hostile.mkdir()
+    safe.mkdir()
+    hostile_python = hostile / "python3.12"
+    safe_python = safe / "python3.12"
+    hostile_python.write_bytes(b"exact-runtime-bytes")
+    safe_python.write_bytes(b"exact-runtime-bytes")
+    hostile_python.chmod(0o6755)
+    safe_python.chmod(0o755)
+    os.setxattr(hostile_python, "user.gate_d_hostile", b"capability-like-payload")
+    assert provisioner["_tree_sha256"](hostile) == provisioner["_tree_sha256"](
+        safe
+    )
+    safe_python.chmod(0o700)
+    assert provisioner["_tree_sha256"](hostile) != provisioner["_tree_sha256"](
+        safe
+    )
+    safe_python.chmod(0o755)
+    safe.chmod(0o700)
+    assert provisioner["_tree_sha256"](hostile) != provisioner["_tree_sha256"](
+        safe
+    )
+    monkeypatch.setattr(provisioner["os"], "chown", lambda *args, **kwargs: None)
+    provisioner["_seal_ownership"](hostile)
+    assert stat.S_IMODE(hostile_python.stat().st_mode) == 0o755
+    assert os.listxattr(hostile_python) == []
+
+
+def test_runtime_provisioner_rejects_permissive_staging_parent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provisioner = runpy.run_path(
+        str(REPO_ROOT / "scripts/greenfield/provision_gate_d_python_runtime.py")
+    )
+    monkeypatch.setattr(
+        provisioner["os"],
+        "fstat",
+        lambda descriptor: SimpleNamespace(
+            st_mode=stat.S_IFDIR | 0o777,
+            st_uid=0,
+            st_gid=0,
+        ),
+    )
+    monkeypatch.setattr(
+        provisioner["os"], "listxattr", lambda *args, **kwargs: []
+    )
+    with pytest.raises(SystemExit, match="exact root-owned 0755"):
+        provisioner["_verify_directory_descriptor"](3, Path("/opt/glm-tpu"))
+
+
+def test_runtime_provisioner_rejects_nonroot_group(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provisioner = runpy.run_path(
+        str(REPO_ROOT / "scripts/greenfield/provision_gate_d_python_runtime.py")
+    )
+    monkeypatch.setattr(
+        provisioner["os"],
+        "fstat",
+        lambda descriptor: SimpleNamespace(
+            st_mode=stat.S_IFDIR | 0o755,
+            st_uid=0,
+            st_gid=1000,
+        ),
+    )
+    monkeypatch.setattr(
+        provisioner["os"], "listxattr", lambda *args, **kwargs: []
+    )
+    with pytest.raises(SystemExit, match="exact root-owned 0755"):
+        provisioner["_verify_directory_descriptor"](3, Path("/opt/glm-tpu"))
+
+
+def test_runtime_provisioner_requires_exact_isolated_interpreter() -> None:
+    provisioner = runpy.run_path(
+        str(REPO_ROOT / "scripts/greenfield/provision_gate_d_python_runtime.py")
+    )
+    with pytest.raises(SystemExit, match="exact /usr/bin/python3 -I -S"):
+        provisioner["_verify_root_interpreter"]()
+    completed = subprocess.run(
+        [
+            "/usr/bin/python3",
+            "-I",
+            "-S",
+            "-c",
+            (
+                "import runpy; "
+                f"m=runpy.run_path({str(REPO_ROOT / 'scripts/greenfield/provision_gate_d_python_runtime.py')!r}); "
+                "m['_verify_root_interpreter']()"
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_runtime_provisioner_publication_never_replaces_dangling_target(
+    tmp_path: Path,
+) -> None:
+    provisioner = runpy.run_path(
+        str(REPO_ROOT / "scripts/greenfield/provision_gate_d_python_runtime.py")
+    )
+    staging = tmp_path / "staging"
+    target = tmp_path / "target"
+    staging.mkdir()
+    target.symlink_to("missing")
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    descriptor = os.open(tmp_path, flags)
+    try:
+        with pytest.raises(OSError) as error:
+            provisioner["_rename_noreplace"](
+                staging.name,
+                target.name,
+                directory_fd=descriptor,
+            )
+        assert error.value.errno == errno.EEXIST
+    finally:
+        os.close(descriptor)
+    assert target.is_symlink()
+    assert staging.is_dir()
+
+
+def test_hostile_cwd_stdlib_shadows_cannot_enter_isolated_parser(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    contract = _absolute_current_contract()
+    candidate = contract["candidates"][0]
+    locality = contract["locality_contract"]
+    _, source = _source_authority(tmp_path, candidate, locality)
+    _, plan = _plan_authority(tmp_path, "PP16_LP2")
+    hostile = tmp_path / "hostile-cwd"
+    hostile.mkdir()
+    for name in ("json.py", "ctypes.py", "hashlib.py", "pathlib.py"):
+        (hostile / name).write_text("raise RuntimeError('hostile cwd shadow loaded')\n")
+    monkeypatch.chdir(hostile)
+    real_run = admission_module.subprocess.run
+    observed_isolation = False
+
+    def assert_isolated(*args: Any, **kwargs: Any) -> Any:
+        nonlocal observed_isolation
+        command = args[0]
+        assert command[1:4] == ["-I", "-S", "-c"]
+        assert kwargs["cwd"] == "/"
+        assert "PYTHONPATH" not in kwargs["env"]
+        observed_isolation = True
+        return real_run(*args, **kwargs)
+
+    monkeypatch.setattr(admission_module.subprocess, "run", assert_isolated)
+    _, stablehlo = _stablehlo_authority(
+        tmp_path, candidate, locality, source, plan
+    )
+    assert observed_isolation is True
+    assert stablehlo["authority_sha256"] != "0" * 64
+
+
+def test_renamed_space_path_unsealed_native_mapping_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    system_library = Path("/usr/lib/x86_64-linux-gnu/libuuid.so.1.3.0")
+    if not system_library.exists():
+        pytest.skip("host libuuid fixture is unavailable")
+    unsealed = tmp_path / "renamed dependency with spaces.so"
+    unsealed.write_bytes(system_library.read_bytes())
+    contract = _absolute_current_contract()
+    original_validator = Path(
+        contract["implementation"]["stablehlo_validator"]["path"]
+    ).read_text()
+    marker = "    return context, module\n"
+    assert original_validator.count(marker) == 1
+    injected = original_validator.replace(
+        marker,
+        f"    ctypes.CDLL({str(unsealed)!r})\n" + marker,
+    )
+    validator = tmp_path / "hostile-validator.py"
+    validator.write_text(injected)
+    contract["implementation"]["stablehlo_validator"] = {
+        "path": str(validator),
+        "sha256": _sha(validator),
+    }
+    monkeypatch.setattr(
+        sys.modules[__name__], "_absolute_current_contract", lambda: contract
+    )
+    candidate = contract["candidates"][0]
+    locality = contract["locality_contract"]
+    _, source = _source_authority(tmp_path, candidate, locality)
+    _, plan = _plan_authority(tmp_path, "PP16_LP2")
+    _, stablehlo = _stablehlo_authority(
+        tmp_path, candidate, locality, source, plan
+    )
+    assert stablehlo["authority_sha256"] == "0" * 64
 
 
 def test_self_declared_nonlocal_plan_is_rejected(tmp_path: Path) -> None:

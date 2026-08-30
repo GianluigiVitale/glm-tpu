@@ -174,15 +174,27 @@ compensated survivor has neither source nor plan authority, and declarative fixt
 non-admissible.
 Its parent process remains
 stdlib-only; HLO fixture validation runs in a SHA-bound offline child using jaxlib MLIR without
-importing `jax`, compiling or initializing a backend. It also inherits the exact v1
+importing `jax`, compiling or initializing a backend. The child uses an exact
+content/symlink/safe-mode-tree-SHA root-owned CPython runtime, a bound non-root UID, `-I -S`,
+`cwd=/` and no inherited import path. Provisioning is trusted manual administration outside parser
+authority: reviewed bytes are installed as one fixed root-owned mode-0555 tool, only that installed
+tool is run through exact `/usr/bin/python3 -I -S` or its equivalent absolute-path isolated
+shebang. That pre-start invocation is the security boundary; the runtime check only detects
+accidental misinvocation after startup. Admission requires it to byte-match bound source.
+It nofollow-validates exact root:root `/opt` parents, atomically publishes with
+`RENAME_NOREPLACE`, and strips privilege bits/xattrs. Parser Python sources execute from memfds independently rehashed after sealing against
+writes/growth/shrinkage/further seals; every native parser
+library must be mapped from its matching sealed inode, while every other pathname-backed mapping
+must be root-owned, non-writable, identity-matched and content-recorded. It also inherits the exact v1
 frontier and closed fingerprints rather than resetting history. The canonical report accepts the
 tuple candidate's concrete source and PP16 plan authority. It still refuses that candidate for
 StableHLO and capsule gaps; the compensated candidate retains all four gaps. V2 always leaves
-candidate admission and TPU authorization false. A synthetic complete fixture is still refused
-until concrete executable source/callsite authority, immutable parser loading and a pinned
-replayable capsule producer/execution receipt exist. Current core/contract/report/plan SHAs are
-`69dbce5f...c222`, `bec6457a...9fc0`, `f1ea5fed...5804` and `98b4fa21...7880`; hostile and
-source-plus-adjacent offline coverage is 60/60 and 71/71.
+candidate admission and TPU authorization false. A synthetic complete fixture proves the immutable
+parser boundary but remains refused without concrete executable source/callsite authority and a
+pinned replayable capsule producer/execution receipt. Current core/contract/report/plan SHAs are
+`1d434b0f...cee23`, `72673fbc...fb48`, `e1fcf314...aff7` and `98b4fa21...7880`; validator SHA is
+`2f4e73b0...c37a7`; installed/source provisioner and runtime-tree SHAs are `2b9c8c2b...0594` and
+`308748a9...d616`; hostile and source-plus-adjacent offline coverage is 72/72 and 71/71.
 
 ### 3.5 Domain-specific state readers
 

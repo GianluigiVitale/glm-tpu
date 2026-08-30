@@ -8267,3 +8267,62 @@ different sealed stage. Corrected exact staged SHA `775b3644...c8fa` hard-binds 
 fully rebound migration attack and received `APPROVE PERSISTENCE` with no P0--P2. The verdict is
 persistence only and explicitly authorizes no JAX/backend/model/cloud/compile/TPU execution or
 Gate-D closure.
+
+## Immutable StableHLO parser boundary; real causal HLO still missing
+
+The same-UID replace/import gap in precompile admission v2 is closed offline. Neither rejected
+draft was persisted. Sol first found that `python -S` still admitted repository-CWD stdlib shadows,
+the configured interpreter/stdlib remained user-writable, `/proc/self/maps` parsing lost paths with
+spaces and pathname matching could miss renamed libraries, and the parent did not independently
+rehash a sealed fd. Its second audit found that omitted mode bits could turn root provisioning into
+a setuid-root Python escalation, a mutable repo script must never be passed directly to sudo, the
+mapping snapshot occurred before parsing could lazily load dependencies, and raw device/inode
+receipts were not reproducible after reprovisioning. The corrected boundary provisions the exact
+114 MiB CPython 3.12 runtime as a
+root-owned, non-group/world-writable `/opt/glm-tpu` tree, binds its root directory plus complete
+content/symlink/canonical-safe-mode tree and interpreter SHA, strips setuid/setgid/sticky bits and
+all xattrs, and rejects root admission/child execution. Provisioning is trusted manual
+administration outside parser authority: a reviewed exact source is installed once as the fixed
+root-owned mode-0555 `/opt/glm-tpu/bin/provision_gate_d_python_runtime.py`, and only that installed
+tool may be run as `sudo -n /usr/bin/python3 -I -S /opt/glm-tpu/bin/`
+`provision_gate_d_python_runtime.py ...`. Its equivalent absolute-path shebang and runtime check
+define the required invocation and fail fast on accidental misinvocation respectively; only the
+pre-start absolute command/shebang boundary prevents unsafe root Python startup. Admission requires
+it to byte-match bound repository source; the tool
+nofollow-opens and requires exact root-owned 0755, xattr-free `/opt` parents. The validator launches through
+the authenticated interpreter fd with `-I -S`, `cwd=/` and a cleared environment. Its final scan is
+after both parses, verification and causal/collective walks. The child records and the parent
+independently reopens/hashes every loaded Python file and pathname-backed native mapping; only exact
+sealed parser inodes or root-owned immutable dependencies without privilege bits/xattrs are legal.
+Maps use `split(maxsplit=5)`, so renamed libraries and paths containing spaces cannot evade checks.
+
+Each SHA/byte-bound jaxlib parser file is copied into a Linux memfd, sealed against writes, growth,
+shrinkage and further seal changes, then independently reread for exact byte count/SHA before use.
+Python parser sources compile from those fds; extensions and `libjax_common` load through their
+exact fds and must be mapped from the same device/inode identities. Hostile tests prove CWD
+`json`/`ctypes`/`hashlib`/`pathlib` shadows cannot load, a post-seal source replacement cannot alter
+imports, writes and forged post-seal rereads fail, a user-owned runtime is refused, and a renamed
+unsealed native library lazily loaded during parsing with spaces in its path is detected. Hostile
+coverage also proves setuid/xattr stripping, root/root-mode refusal and cross-host UID
+normalization. Raw runtime/dependency and memfd identities plus the exact non-root UID are checked
+internally and reopened/corroborated by the parent, then normalized to stable path/byte/SHA records,
+counts and `bound_nonroot` before hashing the authority.
+Runtime, parent-directory and installed-tool checks require exact root UID and GID. Publication uses
+Linux `RENAME_NOREPLACE`, so dangling symlinks and privileged check/publish races cannot replace an
+existing target.
+
+Core/validator/contract/report SHAs are `1d434b0f...cee23`, `2f4e73b0...c37a7`,
+`72673fbc...fb48` and `e1fcf314...aff7`. Installed/source provisioner SHA is
+`2b9c8c2b...0594`; runtime-tree SHA is `308748a9...d616`. The complete hostile suite passes 72/72;
+source-only plus adjacent suites pass 71/71. The canonical tuple candidate still has no StableHLO
+authority object and remains refused for exactly
+`MISSING_CAUSAL_STABLEHLO_AUTHORITY` and `MISSING_CANDIDATE_COHERENT_CAPSULE`; Gate D is open.
+
+One forced-CPU, lowering-only diagnostic inspected the committed auxiliary RMS operator. It ran no
+compile, model, cloud or TPU work and produced no authority artifact. It exposed that the existing
+synthetic fixture is not the committed lowering: real JAX source has a `[6144]` norm-weight input,
+an explicit broadcast and `chlo.square`; the real caller epsilon is `1e-5`. Exact next is a pinned,
+replayable CPU-only producer for accepted and candidate lowerings at the real shapes/epsilon, plus a
+source/producer receipt and parser-validated causal certificate. Do not relabel the synthetic
+fixture. Only after that authority passes may the coherent eight-watchpoint producer/capsule be
+constructed; no compile-only or TPU successor is authorized.
