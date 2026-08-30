@@ -7872,3 +7872,32 @@ lowering and supplies neither missing unrounded state nor a new physical arithme
 Substring/count tests also cannot prove the required SSA lineage. Do not rebuild it, write a TPU
 classifier for it or spend a compile on it. Current-state summaries were corrected to remove
 obsolete DB518/DB485 and missing-WS32 instructions that could otherwise trigger repeated work.
+
+## 2026-08-30 broad Gate-D blocker merge finds no TPU successor
+
+Fable 5 Max session `c9d696b7-d318-4596-8284-6a4cca100ba4` returned its hard usage-limit response
+before reading evidence, so it supplied no advice. The goal-authorized Sol fallback and an
+independent local audit agree on `NO TPU SUCCESSOR`. Gate D remains open: WS32 first drifts by seven
+layer-1/event-1 selected-position swaps, and DB518 first retains one layer-1 normalized BF16 miss
+before q-a/query/head/event-1 divergence. Accepted DB485 is compiler-mechanism evidence whose M32
+geometry requires 31 forbidden rows, not a legal batch-one implementation.
+
+Direct NPZ inventory confirms there is no preserved accepted, unperturbed FP32 row entering
+layer-1 RMSNorm. Accepted layer-1 oracle `79b813da...9054` stores BF16 normalized/q-a plus
+downstream FP32 query/head/key at only position 8155. DB550 `f194d757...4298` stores only BF16
+hidden/update/residual/partial boundaries. DB518 `534bacc5...62f0` stores BF16 carried/normalized
+state, its own complete BF16 layer-1 cache and downstream FP32 values. WS32
+`2be686ff...eeb1` stores caches and DSA events only. The callback NPZ
+`f92d742c...08ebe` stores BF16 operands plus host-reconstructed `FP32(BF16+BF16)`, but belongs to
+the rejected DB551/DB565 executable class. Optimized HLO identifies a structural FP32 tuple/copy
+chain, not its runtime bytes or correction materialization.
+
+Therefore a candidate-to-event-1 replay is admissible only with that candidate's own complete
+8,156-key history and query/head/current-key/scorer provenance. Older Pallas/source-fused rows lack
+that state; mixing them with accepted or DB518 cache is an incoherent counterfactual. Split state,
+direct/layout/Pallas/source-fused/scalar/output-owned/gather-before-weight/double-round fusion,
+callbacks and unchanged retries are duplicate-closed; M32/dead rows, CPU-substitute HLO, tolerance
+relaxation and mixed-cache replay are invalid. The smallest future offline admission test is a
+metadata/SHA inventory requiring a complete candidate-coherent capsule; absent one, stop before
+JAX/TPU. Current inventory guidance was corrected without rewriting the historical sealed
+straddler artifact. No code, JAX, cloud, Ray, model or TPU workflow ran.

@@ -1669,3 +1669,21 @@ weights with `T(2,128)(2,1)`/window `1x12`/split 1; WS32 squares `1x1536`, reduc
 and weights with `T(2,128)(2,1)`/window `1x6`/split 1. Both one-row plans gather afterward. Historical one-row variants already
 reject direct-layout, Pallas, source-fused and ownership reformulations. No TPU successor is
 authorized; Gate D remains open.
+
+## Gate-D coherent-state inventory and blocker merge
+
+Fable 5 Max was usage-blocked before reviewing evidence. The goal-authorized Sol fallback and an
+independent artifact audit both return `NO TPU SUCCESSOR`. No preserved artifact contains the
+accepted unperturbed FP32 layer-1 RMS input: accepted `79b813da...9054`, DB550
+`f194d757...4298`, DB518 `534bacc5...62f0` and WS32 `2be686ff...eeb1` retain BF16 hidden/cache
+boundaries or downstream FP32 values, while callback file `f92d742c...08ebe` contains only a host
+reconstruction and belongs to the rejected DB551/DB565 executable class.
+
+An event-1 discriminator requires one candidate's own full 8,156-key history plus its query,
+head weights, current key and scorer provenance. DB518 is coherent and already fails; older
+one-row candidates do not contain that history, so replay against borrowed accepted/DB518 cache is
+invalid. Existing split-state, direct/layout/Pallas/source-fused/scalar/output-owned,
+gather-before-weight/double-round, callback and unchanged-run mechanisms are closed. M32/dead-row,
+CPU-substitute HLO, tolerance relaxation and mixed-cache routes are invalid. Require a complete
+candidate-coherent metadata/SHA capsule before any future JAX or TPU work; otherwise stop. Gate D
+remains open and no TPU successor is authorized.

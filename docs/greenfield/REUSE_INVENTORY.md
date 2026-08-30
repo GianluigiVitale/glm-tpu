@@ -640,9 +640,11 @@ normalized mismatch index 2795, while literal double-round BF16 with weight bit 
 produce observed bit `48422`. The sealed HLO carries scoped float-type-correction markers, and a
 clearly non-TPU NumPy FP32 model constructs both `48422` and accepted `48423` from distinct FP32
 preimages that round to the same BF16 carried rows. This does not admit bounded error or establish
-TPU association. Reuse it to require the accepted FP32 layer-1 RMS input as the next oracle
-boundary; the rejected returned-residual callback remains forbidden and any capture must be
-separately reviewed as non-perturbing.
+TPU association. Its historical request for an accepted FP32 layer-1 RMS input is superseded by
+the protected callback rejection below. No preserved artifact contains the unperturbed accepted
+FP32 source bytes, and no supported backend tracepoint currently proves unchanged executable
+identity. Do not attempt another callback acquisition or treat host `FP32(BF16+BF16)` as that
+source.
 
 ## Historical layer-1 fused-add/RMS observer preparation — rejected
 
