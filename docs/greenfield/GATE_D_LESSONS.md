@@ -895,3 +895,26 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
   pre-round FP32 RMS operand is exposed across that HLO boundary. This proves semantic dataflow,
   not physical BF16 materialization. Direct/non-rooted RMS-to-qkv fusion is duplicate-closed and
   must not receive another compile or TPU run.
+
+## LP2 K-half N82 reduction passes only the offline admission gate
+
+The full-K N82 path used by DB518 is not the same accumulation mechanism as contracting one
+hidden-feature half per LP2 rank and reducing a compact FP32 N82 partial. The diagnostic retains
+DB518's gathered/replicated row and full packed weights, keeps one token row, selects `K=3072` plus
+24 exact scale blocks on each rank and performs exactly one local `{0,1}` FP32
+`[32,1,82]` reduction before the existing BF16 q-a boundary. Its forced-two-CPU StableHLO contains
+no gather, host callback, nonlocal group or dead token rows.
+
+Real SHA-authenticated p8155 replay proves the full-K control and FP32-partial arm both map accepted
+hidden to accepted q-a at `0/2,048`; BF16-rounded partials miss `656/2,048` and are rejected. On
+DB518's current hidden row, CPU full-K and FP32-partial are identical, miss accepted q-a at 46
+values and differ from the captured TPU q-a at one value. Therefore CPU does not decide the only
+surviving arm's TPU physical association and supplies no Gate-D evidence.
+
+This candidate has a narrow coherent-state exception to the general mixed-cache prohibition.
+DB518 builds the complete layer-1 index cache from normalized hidden plus `wk` before layer-1 qkv-a;
+the candidate changes only that later qkv-a projection. Current key and head weights also depend on
+the unchanged normalized hidden, not qkv-a. The existing cache is therefore coherent only if a
+future bounded executable recomputes candidate q-a, query, head/current-key lineage and event 1
+together. Reusing captured old query values, running a full decoder, or making correctness,
+performance or Gate-D claims remains forbidden.

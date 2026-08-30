@@ -7921,3 +7921,29 @@ superseded dense compile acquisition or the already-rejected packed transport. G
 Before any future JAX or TPU work, require a genuinely new true-one-row topology-local ownership
 mechanism and a complete candidate-coherent 8,156-key/cache/query/head/current-key/scorer capsule;
 absent both, stop. No cloud, JAX, model or TPU workflow ran in this batch.
+
+## 2026-08-30 LP2 K-half N82 arm passes CPU admission only
+
+- Historical search confirms DB518 used a gathered full-6,144 row and a full-K N82 convolution on
+  both owners. The isolated arm retains that gathered/replicated row and full packed weights; it
+  does not claim persistent-half ownership or gather removal. Its new mechanism is the N82
+  accumulation association: each LP2 rank selects one disjoint K=3,072/24-scale half, computes an
+  FP32 partial and performs exactly one local `{0,1}` FP32 `[32,1,82]` reduction before BF16.
+- The classifier authenticates both final-runtime owners, manifest/SUCCESS, N82 weights/scales,
+  accepted layer-1 p8155 internals and DB518. Forced-two-CPU StableHLO has one live row, the exact
+  compact reduction and no gather/host/dead rows. Accepted full-K and FP32-partial q-a are both
+  exact; BF16 partials reject at 656/2,048. Current CPU full-K/FP32-partial are identical, so CPU
+  cannot decide the surviving arm's TPU association.
+- This arm has coherent bounded state without borrowing a counterfactual cache: DB518 constructs
+  its complete layer-1 index cache from normalized history plus `wk` before layer-1 qkv-a. The
+  candidate leaves that state/current key/head input unchanged, but must recompute q-a, query,
+  head/current-key lineage and event 1 together in one isolated metal executable.
+- Capsule SHA is `33e8dd0a...619c`. No TPU, cloud, model load, decoder, correctness, performance,
+  DB or Gate-D claim occurred. Gate D remains open. Exact next after adversarial review and durable
+  persistence is the smallest bounded layer-1/event-1 replay, not a full 8K decoder.
+- Fable 5 Max returned its hard usage-limit refusal before reading this batch. The goal-authorized
+  Sol fallback first blocked CPU enforcement after JAX import, overwrite-capable output and
+  overstated ownership wording. The corrected classifier refuses unforced execution before any
+  JAX/greenfield import, creates output with `O_EXCL`, rejects regular/dangling occupied paths and
+  limits novelty to split-K accumulation. Final focused/adjacent coverage is 33/33; Sol returned
+  `APPROVE COMMIT/PUSH/MIRROR` with no P0--P2 blocker and no execution authorization.

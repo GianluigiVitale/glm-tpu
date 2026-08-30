@@ -1691,3 +1691,22 @@ gather-before-weight/double-round, callback and unchanged-run mechanisms are clo
 CPU-substitute HLO, tolerance relaxation and mixed-cache routes are invalid. Require a complete
 candidate-coherent metadata/SHA capsule before any future JAX or TPU work; otherwise stop. Gate D
 remains open and no TPU successor is authorized.
+
+## PP16 feature2 K-half N82 CPU admission
+
+- Capsule: `docs/artifacts/pp16-feature2-qkv-khalf-cpu-admission.json`, SHA
+  `33e8dd0a1b0fb8e9c46c1acb3ce05357beff8969fb694464f32f6a071493619c`.
+- Sources: PP16 final manifest `b385458f...6bab`, N82 weights/scales
+  `6e8b4efd...855d` / `3ca2712f...11cc5`, accepted layer-1 internals file
+  `79b813da...9054`, and DB518 result `534bacc5...62f0`.
+- Structure: the helper retains the prior gathered/replicated hidden row and full packed weights;
+  it selects one disjoint K=3,072 weight half and 24 scale rows per LP2 rank, then performs exactly
+  one `{0,1}` FP32 `[32,1,82]` reduction. BF16 appears only after that reduction; there is no new
+  gather, host callback or dead row inside the helper.
+- CPU arithmetic: accepted full-K and FP32-partial q-a are both exact at `0/2,048`; BF16 partials
+  reject at `656/2,048`. Current full-K and FP32-partial are identical on CPU, so CPU cannot decide
+  whether the physical TPU boundary changes the result.
+- Coherence: DB518's layer-1 index cache is reusable for only this narrow challenger because the
+  candidate changes qkv-a after normalized-history/`wk` cache construction. A metal successor must
+  recompute q-a/query/head/current-key/event-1 in one bounded executable. No TPU, decoder,
+  numerical success, performance, DB or Gate-D claim exists.

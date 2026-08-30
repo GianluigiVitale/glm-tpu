@@ -11920,3 +11920,30 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   only with its own complete 8,156-row cache/query/head/current-key/scorer history and a genuinely
   new true-one-row topology-local ownership mechanism. Gate D remains open; no JAX/cloud/model/TPU
   workflow ran.
+
+## 2026-08-30 — LP2 hidden-feature N82 partial reduction survives offline admission
+
+- A repository/evidence sweep found one mechanically new accumulation mechanism. DB518's
+  projection is full-K on a gathered 6,144-wide BF16 row. The challenger retains that replicated
+  row and full weights; it selects K=3,072 and 24 scale blocks per LP2 rank, performs the
+  raw-FP8/BF16-weight convolution into FP32 and reduces only
+  `[32,1,82]` over exact group `{0,1}` before one BF16 round.
+- Real-source forced-two-CPU replay authenticates manifest `b385458f...6bab`, both identical N82
+  owners, accepted internals `79b813da...9054` and DB518 `534bacc5...62f0`. Accepted full-K and
+  FP32-partial both reproduce q-a SHA `8e3dc61e...55d85` at zero mismatches. Rounding each partial
+  to BF16 first yields SHA `5e4ede6a...fd61` and 656 mismatches, so that arm is closed. Current
+  full-K and FP32-partial both yield `c488a3f9...368c`, 46 mismatches versus accepted and one versus
+  DB518's captured TPU q-a; CPU cannot adjudicate TPU accumulation association.
+- The exact StableHLO has one FP32 `[32,1,82]` all-reduce over `{0,1}`, one live row, K-half
+  weights/scales, no gather, host callback or dead rows. Capsule
+  `pp16-feature2-qkv-khalf-cpu-admission.json` SHA is `33e8dd0a...619c`.
+- Candidate coherence is available without mixing states: DB518's complete layer-1 index cache and
+  current key are functions of unchanged normalized hidden plus `wk` and are completed before
+  qkv-a. A future smallest metal discriminator can reuse that cache only while recomputing the new
+  q-a/query/head/current-key/event-1 lineage together. No TPU or model workflow ran; Gate D remains
+  open and a full decoder is not authorized.
+- Fable 5 Max was usage-blocked before evidence review. The goal-authorized Sol fallback found and
+  closed three P1s: JAX could import before the CPU-only check, output was overwrite-capable, and
+  ownership novelty was overstated. Import-trap and occupied regular/dangling-output regressions now
+  fail before JAX; final creation is exclusive. All docs retain the gathered/full-weight premise.
+  The corrected 33-test scope passes and Sol approved commit/push/mirror only.
