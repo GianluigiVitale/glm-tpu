@@ -77,7 +77,40 @@
           "sha256": "c95c8aa188e2eda77270022128d121dc3693a899607b1ab2f9977ddb45def0e1"
         }
       },
-      "stablehlo_authority": null,
+      "stablehlo_authority": {
+        "accepted_primary": {
+          "path": "/home/gianl/gate-d-runs/greenfield_gate_d_tuple_auxiliary_stablehlo_20260830T224500Z/accepted.raw.stablehlo",
+          "sha256": "649cdc9ed5aef5e2fc4822e750ed3284255f3bfba438a755b48ade828658cc82"
+        },
+        "candidate": {
+          "path": "/home/gianl/gate-d-runs/greenfield_gate_d_tuple_auxiliary_stablehlo_20260830T224500Z/candidate.stablehlo",
+          "sha256": "87e7fb6b92998106e1cc0579d1be0d55e8c69b0ebe23924d8fe7c03df06b9791"
+        },
+        "candidate_raw": {
+          "path": "/home/gianl/gate-d-runs/greenfield_gate_d_tuple_auxiliary_stablehlo_20260830T224500Z/candidate.raw.stablehlo",
+          "sha256": "3645d16ecbce1eaebef31aee2b8dcc6bcc0e9ac26651fc8fc1e83693f5ba3e43"
+        },
+        "certificate": {
+          "path": "../docs/artifacts/gate-d-tuple-auxiliary-stablehlo-authority.json",
+          "sha256": "8cc45b81c3a85ad6131790e82eb73f0839cab7eefd13a634db7ff5a697b0338b"
+        },
+        "producer_receipt": {
+          "path": "/home/gianl/gate-d-runs/greenfield_gate_d_tuple_auxiliary_stablehlo_20260830T224500Z/producer_receipt.json",
+          "sha256": "8042acf16425aa86a5e825e8bfe38010002b307a0e93eadaf49599a1129d5eb4"
+        },
+        "producer_repository": {
+          "commit": "6a95811d6f0e6c8f51a38a59e36c2a2b2149bead",
+          "root": ".."
+        },
+        "producer_source": {
+          "path": "../scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py",
+          "sha256": "7292477bc8a0547c86a7032bcc6758cf90be124136e00e00f05a6069c9ab0b6e"
+        },
+        "success": {
+          "path": "/home/gianl/gate-d-runs/greenfield_gate_d_tuple_auxiliary_stablehlo_20260830T224500Z/SUCCESS",
+          "sha256": "0839d98fe9cbf78e3dc496390e90c77a42592e81340d0538d312e65286d58979"
+        }
+      },
       "summary": "Carry accepted BF16 primary state plus a semantically isolated FP32 auxiliary through a device-only tuple dependency."
     },
     {
@@ -118,7 +151,7 @@
     "id": "layer1.rms_input_fp32",
     "order": 0
   },
-  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates the tuple candidate's concrete committed JAX source/callsite and exact PP16_LP2 physical plan/watchpoint authority, and can validate declarative fixtures, structural StableHLO and typed capsule shape/content invariants. The tuple candidate remains unadmitted until immutable parser-backed causal StableHLO and a pinned replayable capsule producer/execution receipt exist; the compensated candidate also lacks concrete source and plan authority. It never authorizes compilation or TPU execution.",
+  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates the tuple candidate's concrete committed JAX source/callsite, exact PP16_LP2 physical plan/watchpoint authority, and forced-CPU immutable-parser-backed causal StableHLO. The tuple candidate remains unadmitted until a pinned replayable candidate-coherent capsule producer/execution receipt exists; the compensated candidate also lacks concrete source, plan and StableHLO authority. It never authorizes executable compilation, numerical execution, TPU work, performance claims or Gate-D closure.",
   "contract_id": "gate.d.precompile.admission.v2.20260830",
   "evidence": [
     {
@@ -153,7 +186,7 @@
     },
     "core": {
       "path": "../glm_tpu/greenfield/gate_d_precompile_admission.py",
-      "sha256": "1d434b0fec7640af49f1c0f8292d93c5d5aade05b2d27684f789354cf4acee23"
+      "sha256": "2325cbd6d84820223e2cbecfd612a32c19af8eb3d802d1d89f2d803f7366ef23"
     },
     "git": {
       "path": "/usr/bin/git",
@@ -161,7 +194,7 @@
     },
     "stablehlo_validator": {
       "path": "../scripts/greenfield/validate_gate_d_stablehlo.py",
-      "sha256": "2f4e73b088b4b5eb724a7dbf8ec9e5b64b72cdefbd1f971dfe3502bf689c37a7"
+      "sha256": "4338229ac7f67449e2afe592c486235f4caf546cc5ebac2483e30911635c6b6d"
     },
     "validator_imports": [
       {
@@ -180,6 +213,11 @@
         "sha256": "1e053fc5d003af7296a29f55ae8079f10a81c36b35819e03b283fe5dbb8e6dea"
       },
       {
+        "bytes": 3592,
+        "path": "jaxlib/mlir/_mlir_libs/_chlo.so",
+        "sha256": "9e2e2a1f402c556061570d47cee5d6406b0d1968a35555a7e8a79ec942c2c4f6"
+      },
+      {
         "bytes": 3632,
         "path": "jaxlib/mlir/_mlir_libs/_jax_mlir_ext.so",
         "sha256": "7a92d593271ab74d921de638bc2ee50dd90d9f191fc42cfe927e5d34321ff9c8"
@@ -195,6 +233,11 @@
         "sha256": "e21b420f7a3d58f8594ac4ab23f59ce3bbd9442aea7b775640e33064fe7a0ffd"
       },
       {
+        "bytes": 127559,
+        "path": "jaxlib/mlir/dialects/_chlo_ops_gen.py",
+        "sha256": "7a728d3b8249532dbdcf8418e3c1dfea21440aa99ab4c79de6c631f6dff4ba43"
+      },
+      {
         "bytes": 10887,
         "path": "jaxlib/mlir/dialects/_ods_common.py",
         "sha256": "52f38ee6701961f4840d52958feb128f3fcc31a0c41ef586bd70a6e63d95b7a7"
@@ -203,6 +246,11 @@
         "bytes": 412837,
         "path": "jaxlib/mlir/dialects/_stablehlo_ops_gen.py",
         "sha256": "4a4a1ac5b161a5d65862838fc2bc9d63b5d7db554e82a3ae377313bc95b007dd"
+      },
+      {
+        "bytes": 1025,
+        "path": "jaxlib/mlir/dialects/chlo.py",
+        "sha256": "a85a5da8895f401f01f9d0816873cb28fb7d848832d07a19704d4b9be4595071"
       },
       {
         "bytes": 1133,

@@ -139,10 +139,11 @@ accepted HLO rejects changing primary arithmetic to a compensated algorithm; it 
 that every future, source-exact auxiliary physical dependency is impossible. The separately
 fingerprinted compensated auxiliary declaration therefore remains unadjudicated, not approved.
 
-M5's rejection is too broad. The declared `auxiliary_device_tuple_dependency` is not the
+M5's rejection was too broad. The declared `auxiliary_device_tuple_dependency` is not the
 unconsumed-shadow form. Its auxiliary is a rooted device result and may remain live, although that
-can perturb fusion/scheduling and still requires exact source, plan, causal StableHLO and coherent
-state. Local evidence leaves it unadjudicated; Compass supplies no proof that it must be DCE'd.
+can perturb fusion/scheduling. Subsequent work has now bound its exact source, PP16 plan and causal
+StableHLO; one candidate-coherent capsule remains missing. Compass itself supplied none of that
+authority and still does not prove numerical or optimized-TPU behavior.
 
 ## 4. What the report genuinely adds
 
@@ -157,23 +158,14 @@ state. Local evidence leaves it unadjudicated; Compass supplies no proof that it
 5. The report correctly recommends a bounded layer-0-to-layer-1/event-1 test before a full decoder,
    but only after offline authority and compile-only review exist.
 
-## 5. Correct next sequence
+## 5. Historical sequence and current exact next
 
-1. Finish and adversarially approve the current precompile-admission-v2 hardening. Do not mix its
-   staged blocked baseline with live candidate-fix bytes.
-2. Register the Compass file and this adjudication as research evidence, not mechanism authority.
-3. Reject Compass M1 at the source-semantics gate exactly as written; perform no JAX or TPU work.
-4. Ask for a corrected proposal that:
-   - preserves unrounded `summed_fp32` as the current RMS input;
-   - preserves the independent BF16 carried residual;
-   - does not assume accepted runtime FP32 bytes/partials are present in HLO;
-   - states a new fingerprint relative to sealed rounded/Pallas/tree families;
-   - constructs all eight coherent watchpoints, including both BF16 RMS operands and their
-     independently derived FP32 sum, from one candidate identity.
-5. Only if such a proposal passes source, plan, parser-verified causal StableHLO and coherent-capsule
-   admission should a separate review consider one compile-only acquisition.
-6. Only if optimized TPU HLO preserves the intended source-exact physical flow should a later review
-   consider the smallest one-row layer-0-to-layer-1/event-1 numerical test.
+The original steps to finish admission v2, source-bind the tuple candidate and obtain PP16/causal
+StableHLO authority are complete. Compass M1 remains rejected. The current exact next is to
+construct all eight coherent watchpoints, including both BF16 RMS operands and their independently
+derived FP32 sum, from one pinned replayable candidate identity. Only successful offline admission
+and separate review may consider one compile-only acquisition. Only exact optimized TPU HLO may
+then allow the smallest one-row layer-0-to-layer-1/event-1 numerical review.
 
 ## 6. External claims checked
 
@@ -196,3 +188,37 @@ The Compass report gives us a useful word and primitive for the search, not the 
 Its main proposed implementation violates accepted RMS semantics, and its offline discriminator
 requires the exact runtime value that our observability work proved absent. Gate D remains open;
 there is no compile or TPU successor from this report.
+
+## Addendum: adjudication of the appended scalar-v2 and A--H reports
+
+The current 611-line Compass artifact, SHA
+`d5e4bf8c47fe23d712eb28e1796b4cb1c1569704e1105152cb344826485bc6dd`, appends two later
+reports after the M1--M5 analysis. They remain research inputs and authorize no execution.
+
+The corrected scalar-v2 report contributes one admitted result: two finite BF16 RMS operands
+determine their single correctly rounded FP32 sum. The separate
+`GATE_D_SCALAR_FRONTIER_V2_ADJUDICATION.md` records the limits. Admission v2 now requires every
+candidate to seal both operands and byte-match an independently derived 6,144-element FP32 input.
+Its T2--T4 tolerance/window proposal is not adopted: the written inversion omits the per-element
+norm weight and double rounding at the retained qkv-a boundary, and local replay already rejects
+the tested global-scalar successors.
+
+The A--H report contributes useful hardening and diagnostic reminders, not a new Gate-D mechanism:
+
+- exact loaded-library/source hashes, source-to-HLO binding, runtime topology and owner-axis maps
+  are valid requirements and are already represented by the fail-closed authority work;
+- snapshots capture executable arguments/results, not arbitrary fused intermediates, while an
+  isolated submodule can change fusion/layout and cannot be relabelled candidate-coherent state;
+- layout, conversion placement and dot algorithms remain possible later diagnostics only after a
+  coherent first-divergence capsule exists;
+- the proposed dot-precision root cause is downstream of the sealed first mismatch: normalized
+  BF16 hidden 2,795 diverges before qkv-a;
+- generic CUDA/top-k nondeterminism and margin literature cannot weaken this project's required
+  exact DSA selected sets and lowest-position tie order. Local canonical evidence, not an unrelated
+  backend's default behavior, defines the oracle;
+- formal FP tools may adjudicate a future small, concrete expression, but do not recover missing
+  runtime values or an unknown accepted physical tree.
+
+The useful next action remains the smallest one: construct one replayable candidate-coherent
+eight-watchpoint capsule, including both BF16 RMS operands and their independently derived FP32
+sum, before any compile-only or TPU consideration.

@@ -29,7 +29,7 @@ from glm_tpu.greenfield.gate_d_precompile_admission import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CURRENT_CONTRACT = REPO_ROOT / "configs/greenfield-gate-d-precompile-admission-v2.json"
-CURRENT_CONTRACT_SHA256 = "72673fbcd904f19589435f090cb35ee9b6027f30c33ed07dddb8d46a2aa6fb48"
+CURRENT_CONTRACT_SHA256 = "9006a42bf24ae957cf0b14160d68b40ebc9ba6073bf01b7990e2ab6b37d067d6"
 
 
 def _sha(path: Path) -> str:
@@ -49,6 +49,21 @@ def _canonical(value: dict[str, Any]) -> str:
 def _write_json(path: Path, value: dict[str, Any]) -> str:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
     return _sha(path)
+
+
+def _write_canonical_json(path: Path, value: dict[str, Any]) -> str:
+    path.write_text(_canonical(value) + "\n")
+    return _sha(path)
+
+
+def _current_lowering_dependencies() -> dict[str, list[dict[str, Any]]]:
+    contract = json.loads(CURRENT_CONTRACT.read_text())
+    binding = contract["candidates"][0]["stablehlo_authority"]["producer_receipt"]
+    path = Path(binding["path"])
+    if not path.is_absolute():
+        path = CURRENT_CONTRACT.parent / path
+    receipt = json.loads(path.read_text())
+    return json.loads(json.dumps(receipt["loaded_dependencies"]))
 
 
 def _current_concrete_source_nodes() -> tuple[
@@ -392,6 +407,8 @@ def _source_authority(
             "id": "candidate.source:candidate_dependency",
         },
         "code_pin": code_pin,
+        "certificate_sha256": semantics_sha,
+        "files": files,
         "source_semantic_sha256": source_semantic_sha,
         "source_set_sha256": source_set_sha,
     }
@@ -463,6 +480,8 @@ def _stablehlo_authority(
     extra_argument: bool = False,
     extra_result: bool = False,
     dead_operation: bool = False,
+    producer_attack: str | None = None,
+    metadata_attack: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     comment = "\n    // xla_python_cpu_callback" if host_effect else ""
     collective = ""
@@ -487,16 +506,14 @@ def _stablehlo_authority(
                 ": (tensor<1x6144xf32>) -> tensor<1x6144xf32>\n"
             )
         auxiliary_base = "%transport"
-    metadata = {
-        "gate_d.callsite_ast_sha256": source["callsite_symbol"]["ast_sha256"],
-        "gate_d.candidate_ast_sha256": source["candidate_symbol"]["ast_sha256"],
-        "gate_d.source_set_sha256": source["source_set_sha256"],
-    }
-    if string_edge:
-        metadata["gate_d.unexpected"] = "%sum"
-    module_header = "module attributes {" + ", ".join(
-        f'{key} = "{value}"' for key, value in sorted(metadata.items())
-    ) + "} {\n"
+    module_attributes = (
+        'gate_d.unexpected = "%sum", ' if string_edge else ""
+    ) + "mhlo.num_partitions = 1 : i32, mhlo.num_replicas = 1 : i32"
+    module_header = (
+        "module @jit_gate_d_tuple_auxiliary_rms attributes {"
+        + module_attributes
+        + "} {\n"
+    )
     primary_extra = ""
     normalization_source = "%sum"
     if primary_depends_on_auxiliary:
@@ -543,10 +560,11 @@ def _stablehlo_authority(
         auxiliary_value = auxiliary_base
     candidate_text = (
         module_header
-        + "  func.func @candidate(%arg0: tensor<1x6144xbf16>, "
-        "%arg1: tensor<1x6144xbf16>, %arg2: tensor<1x6144xbf16>) "
-        "-> (tensor<1x6144xbf16>, tensor<1x6144xbf16>, "
-        "tensor<1x6144xf32>) {\n"
+        + "  func.func public @main(%arg0: tensor<1x6144xbf16>, "
+        "%arg1: tensor<1x6144xbf16>, %arg2: tensor<6144xbf16>) "
+        "-> (tensor<1x6144xbf16> {jax.result_info = \"result.output\"}, "
+        "tensor<1x6144xbf16> {jax.result_info = \"result.carried_residual\"}, "
+        "tensor<1x6144xf32> {jax.result_info = \"result.rms_input_fp32\"}) {\n"
         "    %hidden = stablehlo.convert %arg0 : "
         "(tensor<1x6144xbf16>) -> tensor<1x6144xf32>\n"
         "    %residual = stablehlo.convert %arg1 : "
@@ -556,8 +574,8 @@ def _stablehlo_authority(
         f"    %carried = stablehlo.convert {carried_source} : "
         "(tensor<1x6144xf32>) -> tensor<1x6144xbf16>\n"
         f"{primary_extra}"
-        f"    %square = stablehlo.multiply {normalization_source}, "
-        f"{normalization_source} : tensor<1x6144xf32>\n"
+        f"    %square = chlo.square {normalization_source} : "
+        "tensor<1x6144xf32> -> tensor<1x6144xf32>\n"
         "    %zero = stablehlo.constant dense<0.0> : tensor<f32>\n"
         "    %variance_sum = \"stablehlo.reduce\"(%square, %zero) "
         "<{dimensions = array<i64: 1>}> ({\n"
@@ -565,25 +583,29 @@ def _stablehlo_authority(
         "      %added = stablehlo.add %lhs, %rhs : tensor<f32>\n"
         "      stablehlo.return %added : tensor<f32>\n"
         "    }) : (tensor<1x6144xf32>, tensor<f32>) -> tensor<1xf32>\n"
-        "    %divisor = stablehlo.constant dense<6.144000e+03> : tensor<1xf32>\n"
-        "    %variance = stablehlo.divide %variance_sum, %divisor : tensor<1xf32>\n"
-        "    %epsilon = stablehlo.constant dense<9.99999997e-07> : tensor<1xf32>\n"
-        "    %variance_epsilon = stablehlo.add %variance, %epsilon : tensor<1xf32>\n"
-        "    %inverse = stablehlo.rsqrt %variance_epsilon : tensor<1xf32>\n"
-        "    %scale = stablehlo.broadcast_in_dim %inverse, dims = [0] : "
-        "(tensor<1xf32>) -> tensor<1x6144xf32>\n"
+        "    %variance_row = stablehlo.broadcast_in_dim %variance_sum, dims = [0] : "
+        "(tensor<1xf32>) -> tensor<1x1xf32>\n"
+        "    %divisor = stablehlo.constant dense<6.144000e+03> : tensor<f32>\n"
+        "    %divisor_row = stablehlo.broadcast_in_dim %divisor, dims = [] : "
+        "(tensor<f32>) -> tensor<1x1xf32>\n"
+        "    %variance = stablehlo.divide %variance_row, %divisor_row : "
+        "tensor<1x1xf32>\n"
+        "    %epsilon = stablehlo.constant dense<9.99999974E-6> : tensor<f32>\n"
+        "    %epsilon_row = stablehlo.broadcast_in_dim %epsilon, dims = [] : "
+        "(tensor<f32>) -> tensor<1x1xf32>\n"
+        "    %variance_epsilon = stablehlo.add %variance, %epsilon_row : "
+        "tensor<1x1xf32>\n"
+        "    %inverse = stablehlo.rsqrt %variance_epsilon : tensor<1x1xf32>\n"
+        "    %scale = stablehlo.broadcast_in_dim %inverse, dims = [0, 1] : "
+        "(tensor<1x1xf32>) -> tensor<1x6144xf32>\n"
         f"    %normalized = stablehlo.multiply {normalization_source}, %scale : "
         "tensor<1x6144xf32>\n"
         "    %normalized_bf16 = stablehlo.convert %normalized : "
         "(tensor<1x6144xf32>) -> tensor<1x6144xbf16>\n"
-        "    %normalized_f32 = stablehlo.convert %normalized_bf16 : "
-        "(tensor<1x6144xbf16>) -> tensor<1x6144xf32>\n"
-        "    %weight = stablehlo.convert %arg2 : "
-        "(tensor<1x6144xbf16>) -> tensor<1x6144xf32>\n"
-        "    %weighted_f32 = stablehlo.multiply %normalized_f32, %weight : "
-        "tensor<1x6144xf32>\n"
-        "    %weighted = stablehlo.convert %weighted_f32 : "
-        "(tensor<1x6144xf32>) -> tensor<1x6144xbf16>\n"
+        "    %weight = stablehlo.broadcast_in_dim %arg2, dims = [1] : "
+        "(tensor<6144xbf16>) -> tensor<1x6144xbf16>\n"
+        "    %weighted = stablehlo.multiply %normalized_bf16, %weight : "
+        "tensor<1x6144xbf16>\n"
         f"{collective}"
         f"{auxiliary_operation}"
         f"{comment}\n"
@@ -594,14 +616,15 @@ def _stablehlo_authority(
     )
     if extra_argument:
         candidate_text = candidate_text.replace(
-            "%arg2: tensor<1x6144xbf16>) ",
-            "%arg2: tensor<1x6144xbf16>, %arg3: tensor<1x6144xbf16>) ",
+            "%arg2: tensor<6144xbf16>) ",
+            "%arg2: tensor<6144xbf16>, %arg3: tensor<1x6144xbf16>) ",
             1,
         )
     if extra_result:
         candidate_text = candidate_text.replace(
-            "tensor<1x6144xf32>) {\n",
-            "tensor<1x6144xf32>, tensor<1x6144xf32>) {\n",
+            'tensor<1x6144xf32> {jax.result_info = "result.rms_input_fp32"}) {\n',
+            'tensor<1x6144xf32> {jax.result_info = "result.rms_input_fp32"}, '
+            'tensor<1x6144xf32> {jax.result_info = "hostile"}) {\n',
             1,
         ).replace(
             f"return %weighted, %carried, {auxiliary_value} : ",
@@ -620,12 +643,47 @@ def _stablehlo_authority(
             "    return %weighted,",
             1,
         )
+    if metadata_attack == "candidate_replicas":
+        candidate_text = candidate_text.replace(
+            "mhlo.num_replicas = 1 : i32", "mhlo.num_replicas = 32 : i32", 1
+        )
+    elif metadata_attack == "function_name":
+        candidate_text = candidate_text.replace("public @main", "public @hostile", 1)
+    elif metadata_attack == "function_visibility":
+        candidate_text = candidate_text.replace("func.func public", "func.func private", 1)
+    elif metadata_attack == "arg_sharding":
+        candidate_text = candidate_text.replace(
+            "%arg0: tensor<1x6144xbf16>",
+            '%arg0: tensor<1x6144xbf16> {mhlo.sharding = "{replicated}"}',
+            1,
+        )
+    elif metadata_attack == "arg_alias":
+        candidate_text = candidate_text.replace(
+            "%arg0: tensor<1x6144xbf16>",
+            "%arg0: tensor<1x6144xbf16> {tf.aliasing_output = 0 : i32}",
+            1,
+        )
+    elif metadata_attack == "result_sharding":
+        candidate_text = candidate_text.replace(
+            '{jax.result_info = "result.output"}',
+            '{jax.result_info = "result.output", mhlo.sharding = "{replicated}"}',
+            1,
+        )
+    candidate_raw_text = candidate_text
+    candidate_annotated, annotation_sha = admission_module._annotate_lowered_candidate(
+        candidate_raw_text.encode("utf-8"), source
+    )
+    candidate_text = candidate_annotated.decode("utf-8")
+    if producer_attack == "candidate_raw_drift":
+        candidate_raw_text += "\n"
     accepted_normalization_source = "%hidden" if alter_accepted_primary else "%sum"
     accepted_text = (
-        "module {\n"
-        "  func.func @accepted(%arg0: tensor<1x6144xbf16>, "
-        "%arg1: tensor<1x6144xbf16>, %arg2: tensor<1x6144xbf16>) "
-        "-> (tensor<1x6144xbf16>, tensor<1x6144xbf16>) {\n"
+        "module @jit_gate_d_accepted_rms attributes {mhlo.num_partitions = 1 : i32, "
+        "mhlo.num_replicas = 1 : i32} {\n"
+        "  func.func public @main(%arg0: tensor<1x6144xbf16>, "
+        "%arg1: tensor<1x6144xbf16>, %arg2: tensor<6144xbf16>) "
+        "-> (tensor<1x6144xbf16> {jax.result_info = \"result[0]\"}, "
+        "tensor<1x6144xbf16> {jax.result_info = \"result[1]\"}) {\n"
         "    %hidden = stablehlo.convert %arg0 : "
         "(tensor<1x6144xbf16>) -> tensor<1x6144xf32>\n"
         "    %residual = stablehlo.convert %arg1 : "
@@ -633,8 +691,8 @@ def _stablehlo_authority(
         "    %sum = stablehlo.add %hidden, %residual : tensor<1x6144xf32>\n"
         "    %carried = stablehlo.convert %sum : "
         "(tensor<1x6144xf32>) -> tensor<1x6144xbf16>\n"
-        f"    %square = stablehlo.multiply {accepted_normalization_source}, "
-        f"{accepted_normalization_source} : tensor<1x6144xf32>\n"
+        f"    %square = chlo.square {accepted_normalization_source} : "
+        "tensor<1x6144xf32> -> tensor<1x6144xf32>\n"
         "    %zero = stablehlo.constant dense<0.0> : tensor<f32>\n"
         "    %variance_sum = \"stablehlo.reduce\"(%square, %zero) "
         "<{dimensions = array<i64: 1>}> ({\n"
@@ -642,35 +700,46 @@ def _stablehlo_authority(
         "      %added = stablehlo.add %lhs, %rhs : tensor<f32>\n"
         "      stablehlo.return %added : tensor<f32>\n"
         "    }) : (tensor<1x6144xf32>, tensor<f32>) -> tensor<1xf32>\n"
-        "    %divisor = stablehlo.constant dense<6.144000e+03> : tensor<1xf32>\n"
-        "    %variance = stablehlo.divide %variance_sum, %divisor : tensor<1xf32>\n"
-        "    %epsilon = stablehlo.constant dense<9.99999997e-07> : tensor<1xf32>\n"
-        "    %variance_epsilon = stablehlo.add %variance, %epsilon : tensor<1xf32>\n"
-        "    %inverse = stablehlo.rsqrt %variance_epsilon : tensor<1xf32>\n"
-        "    %scale = stablehlo.broadcast_in_dim %inverse, dims = [0] : "
-        "(tensor<1xf32>) -> tensor<1x6144xf32>\n"
+        "    %variance_row = stablehlo.broadcast_in_dim %variance_sum, dims = [0] : "
+        "(tensor<1xf32>) -> tensor<1x1xf32>\n"
+        "    %divisor = stablehlo.constant dense<6.144000e+03> : tensor<f32>\n"
+        "    %divisor_row = stablehlo.broadcast_in_dim %divisor, dims = [] : "
+        "(tensor<f32>) -> tensor<1x1xf32>\n"
+        "    %variance = stablehlo.divide %variance_row, %divisor_row : "
+        "tensor<1x1xf32>\n"
+        "    %epsilon = stablehlo.constant dense<9.99999974E-6> : tensor<f32>\n"
+        "    %epsilon_row = stablehlo.broadcast_in_dim %epsilon, dims = [] : "
+        "(tensor<f32>) -> tensor<1x1xf32>\n"
+        "    %variance_epsilon = stablehlo.add %variance, %epsilon_row : "
+        "tensor<1x1xf32>\n"
+        "    %inverse = stablehlo.rsqrt %variance_epsilon : tensor<1x1xf32>\n"
+        "    %scale = stablehlo.broadcast_in_dim %inverse, dims = [0, 1] : "
+        "(tensor<1x1xf32>) -> tensor<1x6144xf32>\n"
         f"    %normalized = stablehlo.multiply {accepted_normalization_source}, "
         "%scale : tensor<1x6144xf32>\n"
         "    %normalized_bf16 = stablehlo.convert %normalized : "
         "(tensor<1x6144xf32>) -> tensor<1x6144xbf16>\n"
-        "    %normalized_f32 = stablehlo.convert %normalized_bf16 : "
-        "(tensor<1x6144xbf16>) -> tensor<1x6144xf32>\n"
-        "    %weight = stablehlo.convert %arg2 : "
-        "(tensor<1x6144xbf16>) -> tensor<1x6144xf32>\n"
-        "    %weighted_f32 = stablehlo.multiply %normalized_f32, %weight : "
-        "tensor<1x6144xf32>\n"
-        "    %weighted = stablehlo.convert %weighted_f32 : "
-        "(tensor<1x6144xf32>) -> tensor<1x6144xbf16>\n"
+        "    %weight = stablehlo.broadcast_in_dim %arg2, dims = [1] : "
+        "(tensor<6144xbf16>) -> tensor<1x6144xbf16>\n"
+        "    %weighted = stablehlo.multiply %normalized_bf16, %weight : "
+        "tensor<1x6144xbf16>\n"
         "    return %weighted, %carried : tensor<1x6144xbf16>, "
         "tensor<1x6144xbf16>\n"
         "  }\n"
         "}\n"
     )
+    if metadata_attack == "accepted_partitions":
+        accepted_text = accepted_text.replace(
+            "mhlo.num_partitions = 1 : i32", "mhlo.num_partitions = 2 : i32", 1
+        )
     candidate_path = root / "candidate.stablehlo.mlir"
+    candidate_raw_path = root / "candidate.raw.stablehlo.mlir"
     accepted_path = root / "accepted-primary.stablehlo.mlir"
     candidate_path.write_text(candidate_text)
+    candidate_raw_path.write_text(candidate_raw_text)
     accepted_path.write_text(accepted_text)
     candidate_sha = _sha(candidate_path)
+    candidate_raw_sha = _sha(candidate_raw_path)
     accepted_sha = _sha(accepted_path)
     fingerprint_sha = sha256(
         _canonical(candidate["mechanism_fingerprint"]).encode("ascii")
@@ -680,34 +749,140 @@ def _stablehlo_authority(
         "carried_residual_result_index": 1,
         "weighted_output_result_index": 0,
     }
+    producer_source_path = (
+        REPO_ROOT
+        / "scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py"
+    )
+    producer_source_sha = _sha(producer_source_path)
+    producer_code_pin = "6a95811d6f0e6c8f51a38a59e36c2a2b2149bead"
+    loaded_dependencies = _current_lowering_dependencies()
+    receipt = {
+        "artifacts": {
+            "accepted.raw.stablehlo": {
+                "bytes": len(accepted_text.encode("utf-8")),
+                "sha256": accepted_sha,
+            },
+            "candidate.raw.stablehlo": {
+                "bytes": len(candidate_raw_text.encode("utf-8")),
+                "sha256": candidate_raw_sha,
+            },
+            "candidate.stablehlo": {
+                "bytes": len(candidate_text.encode("utf-8")),
+                "sha256": candidate_sha,
+            },
+        },
+        "backend": {"device_count": 1, "platform": "cpu"},
+        "claim_scope": admission_module._EXPECTED_LOWERING_CLAIM_SCOPE,
+        "environment": {
+            **admission_module._EXPECTED_LOWERING_ENVIRONMENT,
+            "python_version": "3.12.13 synthetic fixture",
+        },
+        "inputs": admission_module._EXPECTED_LOWERING_INPUTS,
+        "loaded_dependencies": loaded_dependencies,
+        "metadata_annotation_sha256": annotation_sha,
+        "plan_authority_sha256": plan["file_sha256"],
+        "producer": {
+            "code_pin": producer_code_pin,
+            "installed_path": admission_module._EXPECTED_LOWERING_PRODUCER_INSTALLED_PATH,
+            "sha256": producer_source_sha,
+            "source_path": admission_module._EXPECTED_LOWERING_PRODUCER_SOURCE_PATH,
+        },
+        "schema_version": 1,
+        "source": {
+            "callsite_ast_sha256": source["callsite_symbol"]["ast_sha256"],
+            "candidate_ast_sha256": source["candidate_symbol"]["ast_sha256"],
+            "certificate_sha256": source["certificate_sha256"],
+            "code_pin": source["code_pin"],
+            "files": {
+                item["repo_path"]: item["sha256"] for item in source["files"]
+            },
+            "source_set_sha256": source["source_set_sha256"],
+        },
+    }
+    if producer_attack == "backend":
+        receipt["backend"]["device_count"] = 2
+    elif producer_attack == "dependency_escape":
+        receipt["loaded_dependencies"]["python_modules"].append(
+            {
+                "bytes": 1,
+                "path": "/tmp/hostile.py",
+                "sha256": "0" * 64,
+            }
+        )
+    elif producer_attack == "dependency_truncate":
+        receipt["loaded_dependencies"]["python_modules"].pop()
+    elif producer_attack == "dependency_rebind":
+        receipt["loaded_dependencies"]["native_mappings"][0]["sha256"] = "0" * 64
+    elif producer_attack == "dependency_dotdot":
+        receipt["loaded_dependencies"]["native_mappings"][0]["path"] = (
+            "/usr/lib/../tmp/hostile.so"
+        )
+    elif producer_attack == "source_tuple":
+        receipt["source"]["source_set_sha256"] = "0" * 64
+    elif producer_attack == "producer_identity":
+        receipt["producer"]["installed_path"] = "/tmp/hostile-producer.py"
+    producer_receipt_path = root / "producer_receipt.json"
+    producer_receipt_sha = _write_canonical_json(producer_receipt_path, receipt)
+    success = {
+        "producer_receipt_sha256": producer_receipt_sha,
+        "schema_version": 1,
+    }
+    if producer_attack == "success":
+        success["schema_version"] = 2
+    success_path = root / "SUCCESS"
+    success_sha = _write_canonical_json(success_path, success)
     certificate = {
         "accepted_primary_stablehlo_sha256": accepted_sha,
         "candidate_id": candidate["id"],
+        "candidate_raw_stablehlo_sha256": candidate_raw_sha,
         "candidate_source_semantic_sha256": source["source_semantic_sha256"],
         "candidate_stablehlo_sha256": candidate_sha,
         "causal_frontier": {
             "action": candidate["causal_frontier_action"],
             "id": "layer1.rms_input_fp32",
         },
-        "claim_scope": "Synthetic parser-validated StableHLO fixture only.",
+        "claim_scope": admission_module._EXPECTED_STABLEHLO_CERTIFICATE_CLAIM_SCOPE,
         "code_pin": source["code_pin"],
         "locality": locality,
         "mechanism_fingerprint_sha256": fingerprint_sha,
         "normal_form": candidate["normal_form"],
         "plan_sha256": plan["plan_sha256"],
+        "producer_code_pin": producer_code_pin,
+        "producer_receipt_sha256": producer_receipt_sha,
+        "producer_source_sha256": producer_source_sha,
         "schema_version": 2,
         "source_set_sha256": source["source_set_sha256"],
+        "success_sha256": success_sha,
         "validator_contract": validator_contract,
     }
+    if producer_attack == "certificate_claim":
+        certificate["claim_scope"] = "Hostile overclaim."
     certificate_path = root / "stablehlo-certificate.json"
     certificate_sha = _write_json(certificate_path, certificate)
     authority = {
         "accepted_primary": {"path": str(accepted_path), "sha256": accepted_sha},
         "candidate": {"path": str(candidate_path), "sha256": candidate_sha},
+        "candidate_raw": {
+            "path": str(candidate_raw_path),
+            "sha256": candidate_raw_sha,
+        },
         "certificate": {
             "path": str(certificate_path),
             "sha256": certificate_sha,
         },
+        "producer_receipt": {
+            "path": str(producer_receipt_path),
+            "sha256": producer_receipt_sha,
+        },
+        "producer_repository": {
+            "commit": producer_code_pin,
+            "root": str(REPO_ROOT),
+        },
+        "producer_source": {
+            "path": str(producer_source_path),
+            "sha256": producer_source_sha,
+        },
+        "success": {"path": str(success_path), "sha256": success_sha},
     }
     request = {
         "accepted_stablehlo_base64": base64.b64encode(
@@ -746,11 +921,15 @@ def _stablehlo_authority(
                     "accepted_primary_slice_sha256"
                 ],
                 "candidate_sha256": candidate_sha,
+                "candidate_raw_sha256": candidate_raw_sha,
                 "certificate_sha256": certificate_sha,
                 "mechanism_fingerprint_sha256": fingerprint_sha,
                 "plan_sha256": plan["plan_sha256"],
+                "producer_receipt_sha256": producer_receipt_sha,
+                "producer_source_sha256": producer_source_sha,
                 "source_semantic_sha256": source["source_semantic_sha256"],
                 "source_set_sha256": source["source_set_sha256"],
+                "success_sha256": success_sha,
                 "validator_report_sha256": validator_sha,
             }
         ).encode("ascii")
@@ -894,6 +1073,8 @@ def _prepared_contract(
     extra_argument: bool = False,
     extra_result: bool = False,
     dead_operation: bool = False,
+    producer_attack: str | None = None,
+    metadata_attack: str | None = None,
     plan_name: str = "PP16_LP2",
 ) -> tuple[Path, dict[str, Any], Path, Path]:
     contract = _absolute_current_contract()
@@ -928,6 +1109,8 @@ def _prepared_contract(
         extra_argument=extra_argument,
         extra_result=extra_result,
         dead_operation=dead_operation,
+        producer_attack=producer_attack,
+        metadata_attack=metadata_attack,
     )
     capsule_binding, capsule_path, artifact = _capsule(
         root, candidate, source, stablehlo, plan
@@ -982,7 +1165,6 @@ def test_current_contract_fails_closed_without_jax() -> None:
         item["id"]: item["reasons"] for item in report["candidate_results"]
     } == {
         "auxiliary_device_tuple_dependency": [
-            "MISSING_CAUSAL_STABLEHLO_AUTHORITY",
             "MISSING_CANDIDATE_COHERENT_CAPSULE",
         ],
         "compensated_auxiliary_dependency": [
@@ -1003,6 +1185,18 @@ def test_current_contract_fails_closed_without_jax() -> None:
     assert plan["plan_sha256"] == (
         "d824c19c4393e3b54767ea3a4a228bc865bac1b218fbce63eb04df7a05bc5833"
     )
+    stablehlo = report["candidate_results"][0]["stablehlo_authority"]
+    assert stablehlo["accepted_primary_slice_sha256"] == (
+        "5037b5a7ef21226f8405d0175c83bc7528fadf588811755e719d20a75f295610"
+    )
+    assert stablehlo["auxiliary_slice_sha256"] == (
+        "02eee1d7a84fd447396577c21c1d2988f23d9b6312b8fa0df4838a9b41642f7c"
+    )
+    assert stablehlo["collectives"] == []
+    assert stablehlo["lowering_receipt"]["backend"] == {
+        "device_count": 1,
+        "platform": "cpu",
+    }
 
 
 def test_complete_synthetic_fixture_never_admits_precompile(tmp_path: Path) -> None:
@@ -1123,6 +1317,59 @@ def test_authority_attacks_fail_closed(
     candidate = report["candidate_results"][0]
     assert candidate["admitted_precompile"] is False
     assert reason in candidate["reasons"]
+
+
+@pytest.mark.parametrize(
+    ("producer_attack", "refusal"),
+    [
+        ("backend", "not forced CPU"),
+        ("candidate_raw_drift", "annotation drifted"),
+        ("dependency_escape", "escaped immutable roots"),
+        ("dependency_truncate", "python modules manifest drifted"),
+        ("dependency_rebind", "native mappings manifest drifted"),
+        ("dependency_dotdot", "unsafe or duplicated"),
+        ("producer_identity", "producer identity drifted"),
+        ("source_tuple", "producer source tuple drifted"),
+        ("success", "SUCCESS drifted"),
+        ("certificate_claim", "certificate claim scope drifted"),
+    ],
+)
+def test_producer_authority_attacks_fail_closed(
+    tmp_path: Path, producer_attack: str, refusal: str
+) -> None:
+    path, _, _, _ = _prepared_contract(
+        tmp_path, producer_attack=producer_attack
+    )
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][0]
+    assert candidate["admitted_precompile"] is False
+    assert "INVALID_CAUSAL_STABLEHLO_AUTHORITY" in candidate["reasons"]
+    assert refusal in candidate["stablehlo_authority"]["refusal"]
+
+
+@pytest.mark.parametrize(
+    ("metadata_attack", "refusal"),
+    [
+        ("candidate_replicas", "candidate module metadata drifted"),
+        ("accepted_partitions", "accepted-primary module metadata drifted"),
+        ("function_name", "candidate function metadata drifted"),
+        ("function_visibility", "candidate function metadata drifted"),
+        ("arg_sharding", "candidate function metadata drifted"),
+        ("arg_alias", "candidate function metadata drifted"),
+        ("result_sharding", "candidate function metadata drifted"),
+    ],
+)
+def test_compilation_metadata_attacks_fail_closed(
+    tmp_path: Path, metadata_attack: str, refusal: str
+) -> None:
+    path, _, _, _ = _prepared_contract(
+        tmp_path, metadata_attack=metadata_attack
+    )
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][0]
+    assert candidate["admitted_precompile"] is False
+    assert "INVALID_CAUSAL_STABLEHLO_AUTHORITY" in candidate["reasons"]
+    assert refusal in candidate["stablehlo_authority"]["refusal"]
 
 
 def test_source_blob_sha_cannot_be_relabelled(tmp_path: Path) -> None:

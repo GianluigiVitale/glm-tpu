@@ -8391,3 +8391,45 @@ root:root mode is 0555 and link count is two; old `2513a305...2182` remains immu
 count one. The corrected producer has not been invoked. Expanded hostile coverage passes 82/82.
 Exact next is commit/push/mirror review and persistence, then a separately reviewed new output tag.
 Never reuse the burned `...20260830T223600Z` tag.
+
+## Real causal StableHLO authority passed; candidate-coherent capsule is the sole tuple blocker
+
+The corrected producer was persisted at `6a95811d...bead`, reviewed for one new forced-CPU
+lowering-only start, and invoked once with tag
+`greenfield_gate_d_tuple_auxiliary_stablehlo_20260830T224500Z`. It produced the real committed
+accepted/candidate RMS StableHLO at `[1,6144]` BF16 plus `[6144]` BF16 weight and epsilon `1e-5`.
+No executable was compiled, no numerical arrays or model ran, no libtpu/plugin loaded and no
+cloud/TPU workflow occurred. The exact local bytes are archived byte-identically in the approved
+`US-CENTRAL2` bucket under `results/greenfield/glm52/gate_d_stablehlo/<tag>/`.
+
+The first parser attempt correctly exposed two real-versus-synthetic differences: `chlo.square`
+and the concrete weighted/broadcast RMS graph. The correction permits only `chlo.square`, pins the
+three CHLO implementation files, and changes exact expected signatures to the real graph. Admission
+also now authenticates canonical receipt/SUCCESS bytes; forced CPU/JAX/JAXLIB identity; raw and
+annotated HLO linkage; producer Git/blob/source; exact source/plan authorities; and the exact
+533-Python/46-native loaded-dependency manifests by count and canonical-list digest. Noncanonical
+paths, truncation and allowed-root rebinding fail closed. Exact accepted/candidate module and
+function metadata additionally require one partition/replica, fixed symbols/visibility/types and
+exact result attributes with no sharding or alias extras.
+
+The immutable parser proves:
+
+- accepted and candidate primary backward slices are identical at `5037b5a7...5610`;
+- carried residual and weighted-output slices are `b4108427...5fad` and `41097082...54bb`;
+- the rooted candidate FP32 RMS-sum auxiliary slice is `02eee1d7...2f7c` and is returned directly;
+- accepted and candidate collectives are both empty;
+- the parser imported no `jax` and retained immutable mapped-inode authority.
+
+Certificate `gate-d-tuple-auxiliary-stablehlo-authority.json` is `8cc45b81...338b`; canonical
+admission report `gate-d-precompile-admission-v2-stablehlo.json` is `454090e7...f25f`; compact
+parser adjudication is `0e3c6259...5c3c`; StableHLO authority is `19f43f39...6d88`.
+Contract/core/parser/test SHAs are `9006a42b...67d6`, `2325cbd6...ef23`,
+`4338229a...6b6d` and `6d38fba3...54b9`. Full focused/hostile admission passes 89/89.
+
+The tuple candidate now fails only `MISSING_CANDIDATE_COHERENT_CAPSULE`; the compensated candidate
+still lacks source, plan, StableHLO and capsule authority. Gate D remains open. Exact next is to
+construct one pinned replayable PP16 stage-zero eight-watchpoint capsule containing both BF16 RMS
+operands, their independently derived FP32 sum, normalized output, cache history, query, head
+weights, current key and scorer event-1 state under the same candidate identity. Admit it offline
+and obtain same-scope adversarial review before considering any compile-only optimized-HLO
+acquisition. No TPU action is authorized.

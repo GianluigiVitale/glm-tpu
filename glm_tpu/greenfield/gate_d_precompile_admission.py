@@ -56,8 +56,58 @@ _FORBIDDEN_RUNTIME_MODE = stat.S_ISUID | stat.S_ISGID | stat.S_ISVTX
 _VERIFIED_RUNTIME_TREES: set[tuple[str, str]] = set()
 _EXPECTED_JAXLIB_VERSION = "0.10.1"
 _EXPECTED_STABLEHLO_VERSION = "1.17.0"
+_EXPECTED_LOWERING_CLAIM_SCOPE = (
+    "Forced-CPU abstract compiler lowering only; no executable compilation, JAX array/"
+    "numerical execution, model, cloud workflow, TPU backend initialization, performance "
+    "or Gate-D closure claim. JAX import may perform read-only host TPU PCI discovery."
+)
+_EXPECTED_LOWERING_ENVIRONMENT = {
+    "jax_version": "0.10.1",
+    "jaxlib_version": "0.10.1",
+    "python_executable": (
+        "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12"
+    ),
+    "python_runtime_root": "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95",
+    "python_runtime_tree_sha256": (
+        "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616"
+    ),
+    "python_sha256": (
+        "021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7"
+    ),
+    "site_root": "/opt/glm-tpu/gate-d-jax-site-55233c63939e",
+    "site_tree_sha256": (
+        "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df"
+    ),
+}
+_EXPECTED_LOWERING_INPUTS = {
+    "activation_dtype": "bf16",
+    "activation_shape": [1, 6144],
+    "epsilon": 1e-5,
+    "weight_dtype": "bf16",
+    "weight_shape": [6144],
+}
+_EXPECTED_LOWERING_PRODUCER_INSTALLED_PATH = (
+    "/opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_stablehlo.py"
+)
+_EXPECTED_LOWERING_PRODUCER_SOURCE_PATH = (
+    "scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py"
+)
+_EXPECTED_LOWERING_DEPENDENCY_MANIFESTS = {
+    "native_mappings": {
+        "count": 46,
+        "sha256": "bf8f246cdec213e86988c6b224a920ad7244f3e232092f97e912c5ab0ec086a6",
+    },
+    "python_modules": {
+        "count": 533,
+        "sha256": "a37beeaec7baa7c78acc15efa75395bd3b6071d4519ed7bd22662653b5eb66d8",
+    },
+}
+_EXPECTED_STABLEHLO_CERTIFICATE_CLAIM_SCOPE = (
+    "Forced-CPU abstract-lowering structural StableHLO authority only; no executable "
+    "compilation, numerical execution, model, TPU, performance or Gate-D closure claim."
+)
 _EXPECTED_ACCEPTED_PRIMARY_SLICE_SHA256 = (
-    "91c947fc934ab00b44be4c4b7ece62c2a7905b337e05ee78012047ba2b007737"
+    "5037b5a7ef21226f8405d0175c83bc7528fadf588811755e719d20a75f295610"
 )
 _EXPECTED_TOPOLOGY_HASH = (
     "294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559"
@@ -100,6 +150,10 @@ _EXPECTED_VALIDATOR_IMPORTS = {
         3632,
         "7a92d593271ab74d921de638bc2ee50dd90d9f191fc42cfe927e5d34321ff9c8",
     ),
+    "jaxlib/mlir/_mlir_libs/_chlo.so": (
+        3592,
+        "9e2e2a1f402c556061570d47cee5d6406b0d1968a35555a7e8a79ec942c2c4f6",
+    ),
     "jaxlib/mlir/_mlir_libs/_mlir.so": (
         3592,
         "ee42e2f7d805b9cbed32cf002320092cfa75a95f901694274ce1f41a76c5b929",
@@ -112,6 +166,10 @@ _EXPECTED_VALIDATOR_IMPORTS = {
         10887,
         "52f38ee6701961f4840d52958feb128f3fcc31a0c41ef586bd70a6e63d95b7a7",
     ),
+    "jaxlib/mlir/dialects/_chlo_ops_gen.py": (
+        127559,
+        "7a728d3b8249532dbdcf8418e3c1dfea21440aa99ab4c79de6c631f6dff4ba43",
+    ),
     "jaxlib/mlir/dialects/_stablehlo_ops_gen.py": (
         412837,
         "4a4a1ac5b161a5d65862838fc2bc9d63b5d7db554e82a3ae377313bc95b007dd",
@@ -119,6 +177,10 @@ _EXPECTED_VALIDATOR_IMPORTS = {
     "jaxlib/mlir/dialects/stablehlo.py": (
         1133,
         "912840177a1c2945155e0f0841b4fde386315a1bca83d0f63cfc0439a10a21e7",
+    ),
+    "jaxlib/mlir/dialects/chlo.py": (
+        1025,
+        "a85a5da8895f401f01f9d0816873cb28fb7d848832d07a19704d4b9be4595071",
     ),
     "jaxlib/mlir/ir.py": (
         12758,
@@ -2820,6 +2882,376 @@ def _run_stablehlo_validator(
     return report
 
 
+def _annotate_lowered_candidate(
+    raw: bytes, source: Mapping[str, Any]
+) -> tuple[bytes, str]:
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise BenchmarkValidationError("raw candidate StableHLO is not UTF-8") from error
+    metadata = {
+        "gate_d.callsite_ast_sha256": source["callsite_symbol"]["ast_sha256"],
+        "gate_d.candidate_ast_sha256": source["candidate_symbol"]["ast_sha256"],
+        "gate_d.source_set_sha256": source["source_set_sha256"],
+    }
+    fragment = ", ".join(
+        f'{key} = "{value}"' for key, value in sorted(metadata.items())
+    )
+    first_line, separator, remainder = text.partition("\n")
+    if not separator or not first_line.startswith("module"):
+        raise BenchmarkValidationError("raw candidate module header is not canonical")
+    marker = " attributes {"
+    if marker in first_line:
+        annotated_first = first_line.replace(marker, f"{marker}{fragment}, ", 1)
+        inverse_first = annotated_first.replace(f"{marker}{fragment}, ", marker, 1)
+    else:
+        brace = first_line.find(" {")
+        if brace < 0:
+            raise BenchmarkValidationError("raw candidate module header is unsupported")
+        annotated_first = (
+            first_line[:brace]
+            + f" attributes {{{fragment}}}"
+            + first_line[brace:]
+        )
+        inverse_first = annotated_first.replace(
+            f" attributes {{{fragment}}}", "", 1
+        )
+    if inverse_first != first_line:
+        raise BenchmarkValidationError("candidate metadata transform is not reversible")
+    return (
+        (annotated_first + separator + remainder).encode("utf-8"),
+        sha256(fragment.encode("ascii")).hexdigest(),
+    )
+
+
+def _receipt_dependency_records(
+    value: Any,
+    *,
+    label: str,
+    allowed_roots: Sequence[str],
+    producer_path: str,
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or not value:
+        raise BenchmarkValidationError(f"{label} must be a non-empty list")
+    records: list[dict[str, Any]] = []
+    paths: set[str] = set()
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise BenchmarkValidationError(f"{label}[{index}] must be an object")
+        _exact_keys(item, {"bytes", "path", "sha256"}, f"{label}[{index}]")
+        path = _string(item["path"], f"{label}[{index}] path")
+        if (
+            not path.startswith("/")
+            or path.startswith("//")
+            or os.path.normpath(path) != path
+            or any(part in {".", ".."} for part in Path(path).parts)
+            or path.endswith(" (deleted)")
+            or path in paths
+            or "libtpu" in path.lower()
+            or "/jax_plugins/" in path.lower()
+        ):
+            raise BenchmarkValidationError(f"{label} path is unsafe or duplicated")
+        if path != producer_path and not any(
+            path == root or path.startswith(f"{root}/") for root in allowed_roots
+        ):
+            raise BenchmarkValidationError(f"{label} path escaped immutable roots")
+        paths.add(path)
+        records.append(
+            {
+                "bytes": _nonnegative_int(item["bytes"], f"{label}[{index}] bytes"),
+                "path": path,
+                "sha256": _sha(item["sha256"], f"{label}[{index}] SHA-256"),
+            }
+        )
+    return records
+
+
+def _verify_lowering_receipt(
+    *,
+    accepted_raw: bytes,
+    accepted_sha: str,
+    base: Path,
+    candidate_annotated_raw: bytes,
+    candidate_annotated_sha: str,
+    candidate_raw: bytes,
+    candidate_raw_sha: str,
+    implementation: Mapping[str, Any],
+    plan: Mapping[str, Any],
+    producer_receipt_raw: bytes,
+    producer_receipt_sha: str,
+    producer_repository: Any,
+    producer_source_path: Path,
+    producer_source_raw: bytes,
+    producer_source_sha: str,
+    source: Mapping[str, Any],
+    success_raw: bytes,
+    success_sha: str,
+) -> dict[str, Any]:
+    receipt = _load_json(producer_receipt_raw, "StableHLO producer receipt")
+    if producer_receipt_raw != (_canonical_json(receipt) + "\n").encode("ascii"):
+        raise BenchmarkValidationError("StableHLO producer receipt is not canonical JSON")
+    _exact_keys(
+        receipt,
+        {
+            "artifacts",
+            "backend",
+            "claim_scope",
+            "environment",
+            "inputs",
+            "loaded_dependencies",
+            "metadata_annotation_sha256",
+            "plan_authority_sha256",
+            "producer",
+            "schema_version",
+            "source",
+        },
+        "StableHLO producer receipt",
+    )
+    if receipt["schema_version"] != 1:
+        raise BenchmarkValidationError("StableHLO producer receipt schema drifted")
+    artifacts = receipt["artifacts"]
+    if not isinstance(artifacts, dict):
+        raise BenchmarkValidationError("StableHLO producer artifacts must be an object")
+    _exact_keys(
+        artifacts,
+        {
+            "accepted.raw.stablehlo",
+            "candidate.raw.stablehlo",
+            "candidate.stablehlo",
+        },
+        "StableHLO producer artifacts",
+    )
+    expected_artifacts = {
+        "accepted.raw.stablehlo": (accepted_raw, accepted_sha),
+        "candidate.raw.stablehlo": (candidate_raw, candidate_raw_sha),
+        "candidate.stablehlo": (
+            candidate_annotated_raw,
+            candidate_annotated_sha,
+        ),
+    }
+    for name, (raw, digest) in expected_artifacts.items():
+        record = artifacts[name]
+        if not isinstance(record, dict):
+            raise BenchmarkValidationError(f"producer artifact {name} is invalid")
+        _exact_keys(record, {"bytes", "sha256"}, f"producer artifact {name}")
+        if (
+            _positive_int(record["bytes"], f"producer artifact {name} bytes")
+            != len(raw)
+            or _sha(record["sha256"], f"producer artifact {name} SHA-256")
+            != digest
+        ):
+            raise BenchmarkValidationError(f"producer artifact {name} drifted")
+    backend = receipt["backend"]
+    if backend != {"device_count": 1, "platform": "cpu"}:
+        raise BenchmarkValidationError("StableHLO lowering backend was not forced CPU")
+    if receipt["claim_scope"] != _EXPECTED_LOWERING_CLAIM_SCOPE:
+        raise BenchmarkValidationError("StableHLO producer claim scope drifted")
+    environment = receipt["environment"]
+    if not isinstance(environment, dict):
+        raise BenchmarkValidationError("StableHLO producer environment is invalid")
+    _exact_keys(
+        environment,
+        set(_EXPECTED_LOWERING_ENVIRONMENT) | {"python_version"},
+        "StableHLO producer environment",
+    )
+    if any(
+        environment[key] != expected
+        for key, expected in _EXPECTED_LOWERING_ENVIRONMENT.items()
+    ):
+        raise BenchmarkValidationError("StableHLO producer environment drifted")
+    _string(environment["python_version"], "StableHLO producer Python version")
+    if receipt["inputs"] != _EXPECTED_LOWERING_INPUTS:
+        raise BenchmarkValidationError("StableHLO lowering inputs drifted")
+    annotated, annotation_sha = _annotate_lowered_candidate(candidate_raw, source)
+    if (
+        annotated != candidate_annotated_raw
+        or receipt["metadata_annotation_sha256"] != annotation_sha
+    ):
+        raise BenchmarkValidationError("candidate StableHLO annotation drifted")
+    producer = receipt["producer"]
+    if not isinstance(producer, dict):
+        raise BenchmarkValidationError("StableHLO producer identity is invalid")
+    _exact_keys(
+        producer,
+        {"code_pin", "installed_path", "sha256", "source_path"},
+        "StableHLO producer identity",
+    )
+    producer_code_pin = _code_pin(producer["code_pin"], "producer code pin")
+    if (
+        producer["installed_path"] != _EXPECTED_LOWERING_PRODUCER_INSTALLED_PATH
+        or producer["source_path"] != _EXPECTED_LOWERING_PRODUCER_SOURCE_PATH
+        or _sha(producer["sha256"], "producer SHA-256") != producer_source_sha
+    ):
+        raise BenchmarkValidationError("StableHLO producer identity drifted")
+    if not isinstance(producer_repository, dict):
+        raise BenchmarkValidationError("producer repository authority must be an object")
+    _exact_keys(
+        producer_repository,
+        {"commit", "root"},
+        "producer repository authority",
+    )
+    if (
+        _code_pin(producer_repository["commit"], "producer repository commit")
+        != producer_code_pin
+    ):
+        raise BenchmarkValidationError("producer repository commit drifted")
+    repository = _resolve(
+        base, producer_repository["root"], "producer repository root"
+    )
+    expected_source_path = Path(
+        os.path.abspath(repository / _EXPECTED_LOWERING_PRODUCER_SOURCE_PATH)
+    )
+    if Path(os.path.abspath(producer_source_path)) != expected_source_path:
+        raise BenchmarkValidationError("producer source path drifted")
+    with _open_directory_no_symlinks(repository, "producer repository") as repository_fd:
+        commit = _git_output(
+            repository_fd,
+            Path(implementation["git_path"]),
+            implementation["git_sha256"],
+            ["rev-parse", "--verify", f"{producer_code_pin}^{{commit}}"],
+            "producer commit",
+            limit=1024,
+        ).decode("ascii", errors="strict").strip()
+        object_id = _git_output(
+            repository_fd,
+            Path(implementation["git_path"]),
+            implementation["git_sha256"],
+            [
+                "rev-parse",
+                "--verify",
+                f"{producer_code_pin}:{_EXPECTED_LOWERING_PRODUCER_SOURCE_PATH}",
+            ],
+            "producer source object",
+            limit=1024,
+        ).decode("ascii", errors="strict").strip()
+        object_type = _git_output(
+            repository_fd,
+            Path(implementation["git_path"]),
+            implementation["git_sha256"],
+            ["cat-file", "-t", object_id],
+            "producer source object type",
+            limit=1024,
+        ).decode("ascii", errors="strict").strip()
+        committed_source = _git_output(
+            repository_fd,
+            Path(implementation["git_path"]),
+            implementation["git_sha256"],
+            ["cat-file", "blob", object_id],
+            "producer source blob",
+            limit=_MAX_SOURCE_BYTES,
+        )
+    if (
+        commit != producer_code_pin
+        or object_type != "blob"
+        or committed_source != producer_source_raw
+        or sha256(committed_source).hexdigest() != producer_source_sha
+    ):
+        raise BenchmarkValidationError("committed producer source drifted")
+    receipt_source = receipt["source"]
+    if not isinstance(receipt_source, dict):
+        raise BenchmarkValidationError("producer source tuple is invalid")
+    _exact_keys(
+        receipt_source,
+        {
+            "callsite_ast_sha256",
+            "candidate_ast_sha256",
+            "certificate_sha256",
+            "code_pin",
+            "files",
+            "source_set_sha256",
+        },
+        "producer source tuple",
+    )
+    source_files = {
+        item["repo_path"]: item["sha256"] for item in source["files"]
+    }
+    if (
+        receipt_source["callsite_ast_sha256"]
+        != source["callsite_symbol"]["ast_sha256"]
+        or receipt_source["candidate_ast_sha256"]
+        != source["candidate_symbol"]["ast_sha256"]
+        or receipt_source["certificate_sha256"] != source["certificate_sha256"]
+        or receipt_source["code_pin"] != source["code_pin"]
+        or receipt_source["files"] != source_files
+        or receipt_source["source_set_sha256"] != source["source_set_sha256"]
+    ):
+        raise BenchmarkValidationError("producer source tuple drifted")
+    if receipt["plan_authority_sha256"] != plan["authority_file_sha256"]:
+        raise BenchmarkValidationError("producer plan authority drifted")
+    dependencies = receipt["loaded_dependencies"]
+    if not isinstance(dependencies, dict):
+        raise BenchmarkValidationError("producer dependencies must be an object")
+    _exact_keys(
+        dependencies,
+        {"native_mappings", "python_modules"},
+        "producer dependencies",
+    )
+    python_records = _receipt_dependency_records(
+        dependencies["python_modules"],
+        label="producer Python dependencies",
+        allowed_roots=(
+            environment["python_runtime_root"],
+            environment["site_root"],
+        ),
+        producer_path=producer["installed_path"],
+    )
+    native_records = _receipt_dependency_records(
+        dependencies["native_mappings"],
+        label="producer native dependencies",
+        allowed_roots=(
+            environment["python_runtime_root"],
+            environment["site_root"],
+            "/usr/lib",
+            "/lib",
+        ),
+        producer_path=producer["installed_path"],
+    )
+    if any(item["path"] == producer["installed_path"] for item in native_records):
+        raise BenchmarkValidationError("producer source appeared as a native dependency")
+    dependency_records = {
+        "native_mappings": native_records,
+        "python_modules": python_records,
+    }
+    dependency_manifest_sha256s: dict[str, str] = {}
+    for name, records in dependency_records.items():
+        digest = sha256(_canonical_json(records).encode("ascii")).hexdigest()
+        expected = _EXPECTED_LOWERING_DEPENDENCY_MANIFESTS[name]
+        if len(records) != expected["count"] or digest != expected["sha256"]:
+            raise BenchmarkValidationError(
+                f"producer {name.replace('_', ' ')} manifest drifted"
+            )
+        dependency_manifest_sha256s[name] = digest
+    producer_records = [
+        item for item in python_records if item["path"] == producer["installed_path"]
+    ]
+    if len(producer_records) != 1 or producer_records[0]["sha256"] != producer_source_sha:
+        raise BenchmarkValidationError("loaded producer dependency identity drifted")
+    success = _load_json(success_raw, "StableHLO producer SUCCESS")
+    if success_raw != (_canonical_json(success) + "\n").encode("ascii"):
+        raise BenchmarkValidationError("StableHLO producer SUCCESS is not canonical JSON")
+    _exact_keys(
+        success,
+        {"producer_receipt_sha256", "schema_version"},
+        "StableHLO producer SUCCESS",
+    )
+    if success != {
+        "producer_receipt_sha256": producer_receipt_sha,
+        "schema_version": 1,
+    }:
+        raise BenchmarkValidationError("StableHLO producer SUCCESS drifted")
+    return {
+        "backend": dict(backend),
+        "candidate_raw_sha256": candidate_raw_sha,
+        "dependency_manifest_sha256s": dependency_manifest_sha256s,
+        "native_mapping_count": len(native_records),
+        "producer_code_pin": producer_code_pin,
+        "producer_receipt_sha256": producer_receipt_sha,
+        "producer_source_sha256": producer_source_sha,
+        "python_module_count": len(python_records),
+        "success_sha256": success_sha,
+    }
+
+
 def _verify_stablehlo_authority(
     value: Any,
     base: Path,
@@ -2838,10 +3270,19 @@ def _verify_stablehlo_authority(
         raise BenchmarkValidationError("StableHLO authority must be an object")
     _exact_keys(
         value,
-        {"accepted_primary", "candidate", "certificate"},
+        {
+            "accepted_primary",
+            "candidate",
+            "candidate_raw",
+            "certificate",
+            "producer_receipt",
+            "producer_repository",
+            "producer_source",
+            "success",
+        },
         "StableHLO authority",
     )
-    candidate_path, candidate_sha, candidate_raw = _binding(
+    candidate_path, candidate_sha, candidate_annotated_raw = _binding(
         base,
         value["candidate"],
         "candidate StableHLO",
@@ -2852,6 +3293,30 @@ def _verify_stablehlo_authority(
         value["accepted_primary"],
         "accepted-primary StableHLO",
         limit=_MAX_STABLEHLO_BYTES,
+    )
+    candidate_raw_path, candidate_raw_sha, candidate_raw = _binding(
+        base,
+        value["candidate_raw"],
+        "raw candidate StableHLO",
+        limit=_MAX_STABLEHLO_BYTES,
+    )
+    producer_receipt_path, producer_receipt_sha, producer_receipt_raw = _binding(
+        base,
+        value["producer_receipt"],
+        "StableHLO producer receipt",
+        limit=_MAX_JSON_BYTES,
+    )
+    producer_source_path, producer_source_sha, producer_source_raw = _binding(
+        base,
+        value["producer_source"],
+        "StableHLO producer source",
+        limit=_MAX_SOURCE_BYTES,
+    )
+    success_path, success_sha, success_raw = _binding(
+        base,
+        value["success"],
+        "StableHLO producer SUCCESS",
+        limit=_MAX_JSON_BYTES,
     )
     certificate_path, certificate_sha, certificate_raw = _binding(
         base,
@@ -2865,6 +3330,7 @@ def _verify_stablehlo_authority(
         {
             "accepted_primary_stablehlo_sha256",
             "candidate_id",
+            "candidate_raw_stablehlo_sha256",
             "candidate_source_semantic_sha256",
             "candidate_stablehlo_sha256",
             "causal_frontier",
@@ -2874,8 +3340,12 @@ def _verify_stablehlo_authority(
             "mechanism_fingerprint_sha256",
             "normal_form",
             "plan_sha256",
+            "producer_code_pin",
+            "producer_receipt_sha256",
+            "producer_source_sha256",
             "schema_version",
             "source_set_sha256",
+            "success_sha256",
             "validator_contract",
         },
         "StableHLO causal certificate",
@@ -2885,6 +3355,7 @@ def _verify_stablehlo_authority(
     if (
         certificate["accepted_primary_stablehlo_sha256"] != accepted_sha
         or certificate["candidate_id"] != candidate_id
+        or certificate["candidate_raw_stablehlo_sha256"] != candidate_raw_sha
         or certificate["candidate_stablehlo_sha256"] != candidate_sha
         or certificate["candidate_source_semantic_sha256"]
         != source["source_semantic_sha256"]
@@ -2893,10 +3364,36 @@ def _verify_stablehlo_authority(
         != mechanism_fingerprint_sha256
         or certificate["normal_form"] != dict(normal_form)
         or certificate["plan_sha256"] != plan["plan_sha256"]
+        or certificate["producer_receipt_sha256"] != producer_receipt_sha
+        or certificate["producer_source_sha256"] != producer_source_sha
         or certificate["source_set_sha256"] != source["source_set_sha256"]
+        or certificate["success_sha256"] != success_sha
     ):
         raise BenchmarkValidationError("StableHLO authority tuple drifted")
-    _string(certificate["claim_scope"], "StableHLO certificate claim scope")
+    lowering_receipt = _verify_lowering_receipt(
+        accepted_raw=accepted_raw,
+        accepted_sha=accepted_sha,
+        base=base,
+        candidate_annotated_raw=candidate_annotated_raw,
+        candidate_annotated_sha=candidate_sha,
+        candidate_raw=candidate_raw,
+        candidate_raw_sha=candidate_raw_sha,
+        implementation=implementation,
+        plan=plan,
+        producer_receipt_raw=producer_receipt_raw,
+        producer_receipt_sha=producer_receipt_sha,
+        producer_repository=value["producer_repository"],
+        producer_source_path=producer_source_path,
+        producer_source_raw=producer_source_raw,
+        producer_source_sha=producer_source_sha,
+        source=source,
+        success_raw=success_raw,
+        success_sha=success_sha,
+    )
+    if certificate["producer_code_pin"] != lowering_receipt["producer_code_pin"]:
+        raise BenchmarkValidationError("StableHLO producer code pin drifted")
+    if certificate["claim_scope"] != _EXPECTED_STABLEHLO_CERTIFICATE_CLAIM_SCOPE:
+        raise BenchmarkValidationError("StableHLO certificate claim scope drifted")
     _verify_locality(certificate["locality"], locality, "StableHLO locality")
     frontier = certificate["causal_frontier"]
     if not isinstance(frontier, dict):
@@ -2926,7 +3423,7 @@ def _verify_stablehlo_authority(
         "auxiliary_result_index": indices["auxiliary_result_index"],
         "callsite_ast_sha256": source["callsite_symbol"]["ast_sha256"],
         "candidate_ast_sha256": source["candidate_symbol"]["ast_sha256"],
-        "candidate_stablehlo_base64": base64.b64encode(candidate_raw).decode("ascii"),
+        "candidate_stablehlo_base64": base64.b64encode(candidate_annotated_raw).decode("ascii"),
         "candidate_stablehlo_sha256": candidate_sha,
         "carried_residual_result_index": indices[
             "carried_residual_result_index"
@@ -2941,6 +3438,12 @@ def _verify_stablehlo_authority(
     }
     validator = _run_stablehlo_validator(request, implementation)
     auxiliary_operations = validator.get("auxiliary_path_operations")
+    expected_source_semantic_sha256 = (
+        _EXPECTED_CONCRETE_TUPLE_SOURCE["semantic_sha256"]
+        if candidate_id == "auxiliary_device_tuple_dependency"
+        and source.get("executable_source_authority") is True
+        else _EXPECTED_SOURCE_SEMANTIC_SHA256[candidate_id]
+    )
     if (
         validator.get("accepted_stablehlo_sha256") != accepted_sha
         or validator.get("candidate_stablehlo_sha256") != candidate_sha
@@ -2956,7 +3459,7 @@ def _verify_stablehlo_authority(
         or validator.get("accepted_primary_slice_sha256")
         != _EXPECTED_ACCEPTED_PRIMARY_SLICE_SHA256
         or source["source_semantic_sha256"]
-        != _EXPECTED_SOURCE_SEMANTIC_SHA256[candidate_id]
+        != expected_source_semantic_sha256
         or validator.get("auxiliary_slice_sha256")
         != _EXPECTED_AUXILIARY_SLICE_SHA256[candidate_id]
         or not isinstance(auxiliary_operations, list)
@@ -2971,6 +3474,8 @@ def _verify_stablehlo_authority(
             "accepted_primary_slice_sha256"
         ],
         "candidate_path": str(candidate_path),
+        "candidate_raw_path": str(candidate_raw_path),
+        "candidate_raw_sha256": candidate_raw_sha,
         "candidate_sha256": candidate_sha,
         "certificate_path": str(certificate_path),
         "certificate_sha256": certificate_sha,
@@ -2980,6 +3485,13 @@ def _verify_stablehlo_authority(
         "local_device_groups": plan["local_device_groups"],
         "immutable_parser_authority": validator["immutable_parser_authority"],
         "parser_authority_scope": validator["parser_authority_scope"],
+        "producer_receipt_path": str(producer_receipt_path),
+        "producer_receipt_sha256": producer_receipt_sha,
+        "producer_source_path": str(producer_source_path),
+        "producer_source_sha256": producer_source_sha,
+        "lowering_receipt": lowering_receipt,
+        "success_path": str(success_path),
+        "success_sha256": success_sha,
         "validator_report_sha256": validator_sha,
     }
     report["authority_sha256"] = sha256(
@@ -2990,11 +3502,15 @@ def _verify_stablehlo_authority(
                     "accepted_primary_slice_sha256"
                 ],
                 "candidate_sha256": candidate_sha,
+                "candidate_raw_sha256": candidate_raw_sha,
                 "certificate_sha256": certificate_sha,
                 "mechanism_fingerprint_sha256": mechanism_fingerprint_sha256,
                 "plan_sha256": plan["plan_sha256"],
+                "producer_receipt_sha256": producer_receipt_sha,
+                "producer_source_sha256": producer_source_sha,
                 "source_semantic_sha256": source["source_semantic_sha256"],
                 "source_set_sha256": source["source_set_sha256"],
+                "success_sha256": success_sha,
                 "validator_report_sha256": validator_sha,
             }
         ).encode("ascii")

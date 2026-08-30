@@ -1970,3 +1970,46 @@ remains open and no TPU successor is authorized.
 - T2--T4 are not local mechanism authority. Their written inversion omits the per-element norm
   weight at the retained weighted, double-rounded qkv-a input, and sealed replay already reports no
   global-scalar solution for the tested one-row formulas. No compile or TPU successor follows.
+
+## Real tuple-auxiliary StableHLO authority; coherent capsule remains missing
+
+- One forced-CPU lowering-only acquisition at clean producer pin `6a95811d...bead` produced the
+  exact committed accepted and tuple-candidate RMS graphs at real shapes and epsilon `1e-5` under
+  JAX/JAXLIB `0.10.1`. It compiled no executable, executed no array/model, loaded no TPU plugin or
+  libtpu, and performed no cloud/TPU workflow.
+- Local acquisition
+  `/home/gianl/gate-d-runs/greenfield_gate_d_tuple_auxiliary_stablehlo_20260830T224500Z` is archived
+  byte-identically in `US-CENTRAL2` at
+  `gs://driftbench-dsv4-uc/results/greenfield/glm52/gate_d_stablehlo/`
+  `greenfield_gate_d_tuple_auxiliary_stablehlo_20260830T224500Z/`. Accepted raw, candidate raw,
+  reversibly annotated candidate, producer receipt and `SUCCESS` SHAs are respectively
+  `649cdc9e...cc82`, `3645d16e...3e43`, `87e7fb6b...9791`, `8042acf1...5eb4` and
+  `0839d98f...8979`.
+- Admission v2 now binds canonical receipt/SUCCESS bytes, exact forced-CPU environment, producer
+  Git/blob/source identity, source authority, plan authority and the exact 533-Python/46-native
+  loaded-dependency manifests by count and canonical-list digest. Noncanonical/dot-dot paths,
+  truncation, allowed-root rebinding, path escape, backend/source/annotation/producer/SUCCESS drift
+  attacks fail closed. The exact parser allowlist adds only `chlo.square` and pins its three CHLO
+  implementation files byte-for-byte.
+- Immutable exact parsing proves accepted and candidate primary backward slices identical at SHA
+  `5037b5a7...5610`; carried and weighted primary slices are `b4108427...5fad` and
+  `41097082...54bb`. The candidate's rooted FP32 RMS-sum auxiliary slice is
+  `02eee1d7...2f7c`, has no post-source operations and neither graph contains a collective. Parser
+  authority remains isolated, sealed-memfd and no-`jax`.
+- Exact module/function metadata is also causal authority: accepted and candidate require one
+  partition/replica, exact module/function symbols, public visibility, function types, result names
+  and no argument/result sharding or alias extras. Replica, partition, symbol, visibility, sharding
+  and alias attacks fail closed rather than preserving a misleading zero-collective slice result.
+- Certificate `docs/artifacts/gate-d-tuple-auxiliary-stablehlo-authority.json` is
+  `8cc45b81...338b`; canonical admission report
+  `docs/artifacts/gate-d-precompile-admission-v2-stablehlo.json` is `454090e7...f25f`; compact
+  adjudication `docs/artifacts/gate-d-tuple-auxiliary-stablehlo-parser-adjudication.json` is
+  `0e3c6259...5c3c`. StableHLO authority hash is `19f43f39...6d88` and contract/core/parser SHAs are
+  `9006a42b...67d6`, `2325cbd6...ef23` and `4338229a...6b6d`.
+- Focused plus hostile admission passes 89/89. The tuple candidate now has exactly one remaining
+  reason, `MISSING_CANDIDATE_COHERENT_CAPSULE`; the compensated declaration retains all four gaps.
+  Classification remains
+  `NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`.
+- Exact next is one pinned replayable PP16 stage-zero eight-watchpoint producer/capsule under this
+  source/plan/StableHLO identity, offline admission, then same-scope adversarial review. No
+  compile-only optimized-HLO acquisition or TPU action is authorized yet.

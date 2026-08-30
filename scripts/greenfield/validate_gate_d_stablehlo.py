@@ -364,7 +364,7 @@ _install_sealed_parser_importer()
 import jaxlib
 from jaxlib.mlir import ir
 from jaxlib.mlir._mlir_libs import _jax_mlir_ext
-from jaxlib.mlir.dialects import stablehlo
+from jaxlib.mlir.dialects import chlo, stablehlo
 
 
 _COLLECTIVES_WITH_GROUPS = {
@@ -677,7 +677,9 @@ def _collectives(
     for item in _walk(module.operation):
         name = _operation_name(item)
         dialect = name.split(".", 1)[0]
-        if dialect not in {"builtin", "func", "stablehlo"}:
+        if dialect == "chlo" and name != "chlo.square":
+            raise ValidationError(f"{label} contains an unsupported CHLO operation: {name}")
+        if dialect not in {"builtin", "chlo", "func", "stablehlo"}:
             raise ValidationError(f"{label} contains an unknown dialect: {name}")
         if name in _FORBIDDEN_OPERATIONS:
             raise ValidationError(f"{label} contains a forbidden operation: {name}")
@@ -866,23 +868,66 @@ def _reachable_operations(values: Sequence[Any], root_block: Any) -> set[Any]:
     return reachable
 
 
-def _candidate_module_metadata(module: ir.Module, request: Mapping[str, Any]) -> None:
-    expected = {
-        "gate_d.callsite_ast_sha256": request["callsite_ast_sha256"],
-        "gate_d.candidate_ast_sha256": request["candidate_ast_sha256"],
-        "gate_d.source_set_sha256": request["source_set_sha256"],
+def _attribute_signature(operation: Any) -> dict[str, str]:
+    raw = getattr(operation, "operation", operation)
+    return {
+        str(key): str(raw.attributes[key]) for key in sorted(raw.attributes)
     }
-    attributes = module.operation.attributes
-    observed: dict[str, str] = {}
-    for key in attributes:
-        name = str(key)
-        if name.startswith("gate_d."):
-            try:
-                observed[name] = ir.StringAttr(attributes[key]).value
-            except (TypeError, ValueError) as error:
-                raise ValidationError("candidate source metadata is not string-valued") from error
-    if observed != expected:
-        raise ValidationError("candidate source metadata drifted")
+
+
+def _program_metadata_contract(
+    module: ir.Module,
+    function: Any,
+    *,
+    candidate: bool,
+    request: Mapping[str, Any],
+) -> None:
+    if candidate:
+        expected_module = {
+            "gate_d.callsite_ast_sha256": f'"{request["callsite_ast_sha256"]}"',
+            "gate_d.candidate_ast_sha256": f'"{request["candidate_ast_sha256"]}"',
+            "gate_d.source_set_sha256": f'"{request["source_set_sha256"]}"',
+            "mhlo.num_partitions": "1 : i32",
+            "mhlo.num_replicas": "1 : i32",
+            "sym_name": '"jit_gate_d_tuple_auxiliary_rms"',
+        }
+        expected_function = {
+            "function_type": (
+                "(tensor<1x6144xbf16>, tensor<1x6144xbf16>, tensor<6144xbf16>) -> "
+                "(tensor<1x6144xbf16>, tensor<1x6144xbf16>, tensor<1x6144xf32>)"
+            ),
+            "res_attrs": (
+                '[{jax.result_info = "result.output"}, '
+                '{jax.result_info = "result.carried_residual"}, '
+                '{jax.result_info = "result.rms_input_fp32"}]'
+            ),
+            "sym_name": '"main"',
+            "sym_visibility": '"public"',
+        }
+        label = "candidate"
+    else:
+        expected_module = {
+            "mhlo.num_partitions": "1 : i32",
+            "mhlo.num_replicas": "1 : i32",
+            "sym_name": '"jit_gate_d_accepted_rms"',
+        }
+        expected_function = {
+            "function_type": (
+                "(tensor<1x6144xbf16>, tensor<1x6144xbf16>, tensor<6144xbf16>) -> "
+                "(tensor<1x6144xbf16>, tensor<1x6144xbf16>)"
+            ),
+            "res_attrs": (
+                '[{jax.result_info = "result[0]"}, '
+                '{jax.result_info = "result[1]"}]'
+            ),
+            "sym_name": '"main"',
+            "sym_visibility": '"public"',
+        }
+        label = "accepted-primary"
+    if _attribute_signature(module.operation) != expected_module:
+        raise ValidationError(f"{label} module metadata drifted")
+    if _attribute_signature(function) != expected_function:
+        raise ValidationError(f"{label} function metadata drifted")
 
 
 def _causal_operations(value: Any, source: Any, visited: set[Any]) -> list[str]:
@@ -907,6 +952,7 @@ def _parse(raw: bytes, label: str) -> tuple[ir.Context, ir.Module]:
     context = ir.Context()
     context.append_dialect_registry(registry)
     context.load_all_available_dialects()
+    chlo.register_chlo_dialect(context)
     stablehlo.register_dialect(context)
     try:
         module = ir.Module.parse(raw.decode("utf-8"), context=context)
@@ -941,12 +987,25 @@ def validate(request: Mapping[str, Any]) -> dict[str, Any]:
     candidate_context, candidate = _parse(candidate_raw, "candidate StableHLO")
     accepted_context, accepted = _parse(accepted_raw, "accepted-primary StableHLO")
     try:
-        _candidate_module_metadata(candidate, request)
-        _, candidate_block, candidate_ops = _function(candidate, "candidate StableHLO")
-        _, accepted_block, accepted_ops = _function(accepted, "accepted-primary StableHLO")
+        candidate_function, candidate_block, candidate_ops = _function(
+            candidate, "candidate StableHLO"
+        )
+        accepted_function, accepted_block, accepted_ops = _function(
+            accepted, "accepted-primary StableHLO"
+        )
+        _program_metadata_contract(
+            candidate, candidate_function, candidate=True, request=request
+        )
+        _program_metadata_contract(
+            accepted, accepted_function, candidate=False, request=request
+        )
         candidate_returns = list(candidate_ops[-1].operands)
         accepted_returns = list(accepted_ops[-1].operands)
-        expected_arguments = ["tensor<1x6144xbf16>"] * 3
+        expected_arguments = [
+            "tensor<1x6144xbf16>",
+            "tensor<1x6144xbf16>",
+            "tensor<6144xbf16>",
+        ]
         if (
             [str(argument.type) for argument in candidate_block.arguments]
             != expected_arguments

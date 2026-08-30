@@ -165,7 +165,7 @@ Do not weaken v1 or rewrite its historical evidence. The append-only repair now 
 - contract: `configs/greenfield-gate-d-precompile-admission-v2.json`;
 - CLI: `scripts/greenfield/admit_gate_d_precompile.py`;
 - hostile tests: `tests/greenfield/validation/test_gate_d_precompile_admission.py`;
-- canonical report: `docs/artifacts/gate-d-precompile-admission-v2.json`.
+- current real-HLO report: `docs/artifacts/gate-d-precompile-admission-v2-stablehlo.json`.
 
 V2 authenticates committed blob/AST identity for concrete or declarative source authority, a
 content-derived plan, structural StableHLO and typed eight-watchpoint capsule invariants. The tuple
@@ -186,15 +186,15 @@ It nofollow-validates exact root:root `/opt` parents, atomically publishes with
 writes/growth/shrinkage/further seals; every native parser
 library must be mapped from its matching sealed inode, while every other pathname-backed mapping
 must be root-owned, non-writable, identity-matched and content-recorded. It also inherits the exact v1
-frontier and closed fingerprints rather than resetting history. The canonical report accepts the
-tuple candidate's concrete source and PP16 plan authority. It still refuses that candidate for
-StableHLO and capsule gaps; the compensated candidate retains all four gaps. V2 always leaves
-candidate admission and TPU authorization false. A synthetic complete fixture proves the immutable
-parser boundary but remains refused without concrete executable source/callsite authority and a
-pinned replayable capsule producer/execution receipt. Current core/contract/report/plan SHAs are
-`1d434b0f...cee23`, `72673fbc...fb48`, `e1fcf314...aff7` and `98b4fa21...7880`; validator SHA is
-`2f4e73b0...c37a7`; installed/source provisioner and runtime-tree SHAs are `2b9c8c2b...0594` and
-`308748a9...d616`; hostile and source-plus-adjacent offline coverage is 72/72 and 71/71.
+frontier and closed fingerprints rather than resetting history. The current report accepts the
+tuple candidate's concrete source, PP16 plan and exact real causal StableHLO authority. It refuses
+that candidate only for a pinned replayable candidate-coherent capsule producer/execution receipt;
+the compensated candidate retains all four gaps. V2 always leaves candidate admission and TPU
+authorization false. Exact module/function metadata and the complete 533-Python/46-native lowering
+dependency manifests are bound by canonical digest/count, not trusted labels. Current
+core/contract/report/plan SHAs are `2325cbd6...ef23`, `9006a42b...67d6`, `454090e7...f25f` and
+`98b4fa21...7880`; validator SHA is `4338229a...6b6d`; installed/source provisioner and runtime-tree
+SHAs remain `2b9c8c2b...0594` and `308748a9...d616`; hostile admission coverage is 89/89.
 
 ### 3.5 Domain-specific state readers
 
