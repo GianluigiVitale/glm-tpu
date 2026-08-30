@@ -1,65 +1,69 @@
 # Goal — GLM-5.2-FP8 TPU v4 topology-first greenfield engine
 
-FULL ACCESS: work autonomously. Keep below 4,000 characters. After start/compaction,
-read this and `docs/glm-tpu-revolution.md` **in full**, then inspect live state/evidence; the spec
-is authoritative.
+FULL ACCESS: work autonomously. Keep <4,000 chars. At start/compaction read this,
+`docs/glm-tpu-revolution.md` and `docs/suggestions.md` **in full**, then inspect live evidence.
 
 ## Scope and precedence
 
-The specification supersedes incremental TP32, old exact-next, and the old pipeline-parallel ban.
-Preserve the legacy engine/evidence/oracles/protection tools; stop extending its architecture.
-Build an isolated, default-off native-JAX engine for `zai-org/GLM-5.2-FP8` on the existing
-`db-v4-64-od` pod (8 hosts/32 TPU-v4 chips) minimizing protected profiler-free single-stream
-latency at 256K. Legacy `tpu-inference` is an oracle only; never import its execution path.
-Never create a VM, host, or TPU. Use only `gs://driftbench-dsv4-uc` and serialize TPU workflows.
+Build an isolated default-off native-JAX `zai-org/GLM-5.2-FP8` engine on `db-v4-64-od`
+(8 hosts/32 v4 chips), minimizing protected 256K single-stream latency; supersedes old rules.
+Preserve legacy evidence/oracles/tools, not execution. Create no infrastructure; use only
+`gs://driftbench-dsv4-uc`; serialize TPU work.
 
 ## Required architecture search
 
-- `PP8_LP4`: 8 host-aligned stages × 4 local chips; implement first.
-- `PP16_LP2`: 16 topology-adjacent stages × 2 chips; mandatory challenger.
-- `WS32_2D`: all-chip 2D weight-stationary plan; protected result or evidence-backed rejection.
-- `LEGACY_TP32_DCP8`: measurement oracle only.
+- `PP8_LP4`: host-aligned 8×4; first.
+- `PP16_LP2`: adjacent 16×2; mandatory.
+- `WS32_2D`: all-chip 2D; result or evidenced rejection.
+- `LEGACY_TP32_DCP8`: oracle only.
 
-Evidence chooses. Distribute weights with pipeline depth; keep repeated communication in
-the smallest useful local group; transfer only live residual/compact metadata; never reconstruct
-hidden state across all 32 chips inside a layer. `decode_batch1` has one row, no batch-32 dead rows.
+Evidence chooses. Distribute weights with depth; communicate locally; move live state only; no
+32-chip hidden reconstruction/layer. `decode_batch1`: one row, no dead rows.
 
 ## Mandatory order
 
-Use a dedicated branch/worktree and isolated code/scripts/tests/docs. Record starting pins; never
-weaken historical evidence. Before loading the full 753B model, prove:
+Isolated worktree; record pins; preserve evidence. Before full model prove
+topology/groups; device-only PP8/PP16 chains with exact HLO, no host/Ray/Python dispatch/inactive
+compute, warmed distributions; one exact MoE layer with local 2/4-chip combine.
+Pass Gates A–H: plan/memory/HLO; final-layout manifest/packer/loader; reference kernels; exact
+dense/DSA/IndexShare/MoE; complete cutoff-active short decoder; protected 128K;
+protected 256K E0; identical plan adjudication; then speculation.
 
-1. runtime physical topology and explicit local replica groups;
-2. device-resident PP8/PP16 transfer chains with exact HLO, no host/Ray/Python stage dispatch or
-   inactive-stage model compute, and warmed latency distributions;
-3. one exact real MoE layer whose combine never leaves its local 2/4-chip stage.
+## Active priority: observe Gate D; find/fix root cause
 
-Then pass Gates A–H in order: plan/memory/HLO linter; final-layout checkpoint manifest/packer/direct
-loader; reference kernels; exact dense/DSA/IndexShare/MoE layers; complete 2K/8K decoder; protected
-128K smoke; protected 256K E0; identical-condition plan adjudication; only then speculation.
+Gate D is open; `context<=top_k` is not ranking proof; never rerun tombstoned graphs. Build
+default-off typed snapshots/watchpoints, first-divergence bisection, bit/dtype/shape/layout/owner
+data, coherent cache/query/head/key/scorer state, causal HLO fingerprints and artifact diffs.
+Prefer device buffers plus one bounded transfer. Host consumers require unchanged executable,
+outputs and DSA. Bind source/code/plan SHAs; append-only, fail closed, offline-first; test attacks.
+
+Observability: `docs/10-observability.md` (legacy oracle);
+`docs/greenfield/{REUSE_INVENTORY,EVIDENCE_MAP,GATE_D_LESSONS}.md` and
+`configs/greenfield-reuse-inventory.json` are indexes. Tools:
+`configs/greenfield-gate-d-observability.json`, `glm_tpu/greenfield/observability.py`,
+`scripts/greenfield/audit_observability.py`. Search `glm_tpu/greenfield/{validation,
+benchmarking,sharding}/`, `scripts/greenfield/{capture,compare,inspect,probe,trace}*` and
+`tests/greenfield/`. Evidence: `docs/artifacts/`, `HANDOFF.md`, `bench/results.db`, bucket
+`oracles/`/`results/`. Read/register first.
+
+Localize the first causal divergence; define a legal one-row local mechanism; falsify it on the
+smallest coherent state; compile/run only if it passes. Gate D requires root cause and fix.
 
 ## Proof and performance contract
 
-Every optimization defaults off. Require exact DSA set/ties, raw tokens/quality, state/load/cache,
-checkpoint bytes/checksums, per-chip peak HBM, code/plan hashes, physical groups/counts, fresh
-8-host XPlanes, profiler-free wall, `bench/results.db` linkage, same-region archive and authenticated
-zero-work cleanup. CPU/synthetic/HLO/labels/aggregate throughput/contaminated wall are not
-performance proof. Stop on full-pod repeated collectives, host staging, dead rows, unknown HBM,
-DSA drift, or device-only win with wall regression.
+Optimizations default off. Require exact DSA sets/ties, tokens/quality, state/load/cache/checkpoint
+checksums, per-chip HBM, code/plan hashes, groups/counts, fresh 8-host XPlanes, profiler-free wall,
+DB/archive/authenticated cleanup. CPU/synthetic/HLO/labels/throughput/contaminated wall are not
+performance proof. Stop on full-pod collectives, host staging, dead rows, unknown HBM, DSA drift or
+wall regression. Useful: `<=200 ms/token`, `>=4.5 tok/s`; strong:
+`<=125 ms`, `>=8 tok/s`; stretch: `<=100 ms`, `>=10 tok/s`. Separate base/speculative throughput.
 
-Useful gate: `<=200 ms/token`, `>=4.5` wall tok/s; strong: `<=125 ms`, `>=8 tok/s`; stretch:
-`<=100 ms`, `>=10 tok/s`. Separate base decode/speculative throughput; claim 20–50 tok/s only from
-protected local evidence.
+## Definition of done and workflow
 
-## Definition of done
-
-The fastest correct plan serves at 256K independent of legacy, uses a plan-aware packed checkpoint,
-has local repeated collectives/no full-pod hidden reconstruction, and passes exactness,
-quality, integrity, HBM, HLO, PP8/PP16 measurement, WS32 adjudication, 128K smoke, 256K E0,
-DB/archive, and clean-fleet gates. Continue until section 18 has direct evidence.
-Log batches; persist exact next before compaction. Review each new batch adversarially in Fable
-5 Max CLI chat (`--dangerously-skip-permissions`); at 100% use one Sol on the same scope. Fix
-blockers; do not re-review cleared code. Avoid waste: smallest decisive checks first; reuse
-unaffected broad evidence; overlap independent CPU/read-only work with review; preflight before
-tags/locks. Never weaken correctness/evidence/review or parallelize TPU. Verify, commit/push, then
-locked same-region cron sync. Never use Opus, workflows or other subagents.
+Finish only with §18 direct evidence: independent 256K service; packed checkpoint; exactness/integrity,
+HBM/HLO, local collectives, plan adjudication, 128K/256K, DB/archive and clean fleet.
+Log batches/exact next. Review each new batch in Fable 5 Max CLI
+(`--dangerously-skip-permissions`); at 100% use one Sol on the same scope. Fix blockers; don't
+re-review cleared code. Use smallest checks, reuse proof, preflight locks/tags; serialize TPU
+without weakening correctness. Verify, commit/push, then locked same-region sync. Never use Opus,
+workflows or other subagents.

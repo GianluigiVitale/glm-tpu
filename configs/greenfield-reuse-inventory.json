@@ -94,6 +94,17 @@
       "reason": "Accepted protected artifacts through DB565, DB518, the protected WS32 8K result and the accepted DB485 compile-only HLO are pinned to prevent repeated experiments and unsupported promotion claims. PP8/DB563 is valid protected 2K token/state/cache/HLO/HBM/trace/wall evidence under its historical relaxed DSA policy, but top_k=context=2048 makes selected-set equality cutoff-vacuous and oracle-relative tie equivalence is unproven; it does not close strict Gate D. DB518 makes the complete layer-0 cache exact and then diverges at the first layer-1 normalized BF16 value; WS32 is exact for 20/20 tokens and event 0 but has seven event-1 selected-position swaps. DB485's full-M32 lowering requires 31 forbidden rows and is compiler-mechanism evidence only. Do not retry the old residual discriminator, unchanged PP8/PP16/WS32 decoders, callbacks or M32/dead-row arms. Admit a future candidate only after a complete candidate-coherent cutoff-active state inventory and a genuinely new true-one-row topology-local mechanism. DB563 remains the latest protected PP8 2K performance point."
     },
     {
+      "id": "greenfield-gate-d-observability-frontier",
+      "category": "offline causal observability",
+      "source_repo": "glm-tpu greenfield sealed accepted and DB518 evidence",
+      "source_pin": "contract 6fcf46066e7e500202baeaffab5a731ff17a40b67f49db711f0ebc51e37914fc / report 366898b88ffdd2205ecf94838e5af3d0042c4ce3f735cec7f8ee86bd4487150b / accepted 79b813daa8e194b6c9a9ad883a0199f4a938ca4d4ab7277d20a291b480349054 / DB518 534bacc54d74992f5a8ab4d422f9fa0947523d59325b4bfa272d4fbeb56262f0",
+      "source_paths": ["configs/greenfield-gate-d-observability.json", "glm_tpu/greenfield/observability.py", "scripts/greenfield/audit_observability.py", "docs/artifacts/gate-d-observability-frontier.json", "/home/gianl/gcs-models/oracles/greenfield/glm52/dsa_internals/8k/layer1/greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z/internals.npz", "/home/gianl/glm-run/greenfield_pp16_feature2_layer0_db518_numerical_20260829T115022665987633Z/result.npz"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["future Gate-D candidate admission and first-divergence audits"],
+      "gate": "D diagnostic",
+      "reason": "The stdlib-only immutable NPZ auditor authenticates contract, artifacts, array bytes, code pins, plan identity, executable identity and candidate coherence before producing an ordered bit-level causal view. The sealed accepted/DB518 audit classifies the first frontier as an observability gap: neither authority preserves the FP32 row entering layer-1 RMSNorm. The first downstream divergence is one BF16 normalized value at hidden 2795, followed by q-a/query/head drift; current-key/cache/event-1 authority is incomplete. This localizes the evidence gap but does not prove the root cause, correctness, performance, Gate D or a TPU successor. Use it to reject incoherent or downstream-only candidates before JAX/TPU work."
+    },
+    {
       "id": "greenfield-prefill-loop-classifier",
       "category": "HLO protection",
       "source_repo": "glm-tpu greenfield and preserved protected HLO",

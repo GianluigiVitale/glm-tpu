@@ -7991,3 +7991,30 @@ no technical opinion. The goal-authorized Sol fallback and independent local aud
 `docs/artifacts/db563-gate-d-strict-reclassification.json`, SHA
 `d9272a93a1eb43e2cbfe3d00e01343919458722c21cc969c6dcee2d1bea01582`; no
 TPU/cloud/JAX/model work ran.
+
+## Current exact next: observable upstream mechanism only; no TPU action
+
+The new stdlib-only Gate-D auditor authenticates immutable accepted/DB518 NPZs, sibling JSON
+identity, code/plan/executable pins and raw selected-array bytes before comparison. Contract
+`configs/greenfield-gate-d-observability.json` is `6fcf4606...14fc`; its canonical report is
+`366898b8...150b` and compact capsule is
+`docs/artifacts/gate-d-observability-frontier.json` (`4fbf4583...0200`). The result is
+`OBSERVABILITY_GAP`: both
+authorities lack the unperturbed FP32 row entering layer-1 RMSNorm. The first downstream mismatch
+remains normalized BF16 hidden 2795 (`27bd` versus `26bd`), then q-a/query/head divergence.
+Cross-authority comparisons remain incomplete: candidate current-key and accepted cache/event-1
+are absent. This is an evidence frontier, not a root cause, numerical success, Gate-D, DB,
+performance or TPU-successor claim.
+
+The hostile suite passes 19/19. Explicitly CPU-forced adjacent validation passes 334 with 40
+expected skips and retains only the two known unrelated WS32 sealer fixture failures. One discarded
+adjacent invocation omitted `JAX_PLATFORMS=cpu`, initialized only the controller's local TPU client
+and was terminated by exact PID; it ran no model/Ray/greenfield workload and a local census/lease
+check was clean afterward. Fable returned its usage-limit refusal without reviewing evidence. The
+same goal-authorized Sol reviewer found no remaining P0--P2 issue and approved persistence only.
+
+Exact next is offline design/admission of a genuinely new true-one-row topology-local mechanism
+upstream of the normalized/head split. It must expose or otherwise deterministically resolve the
+missing layer-1 RMS input while preserving complete candidate-coherent cache/query/head/current-key/
+scorer state. Reject it before JAX/TPU if it duplicates a frozen association, cannot provide that
+state, or does not move the ordered causal frontier. No TPU successor is currently authorized.

@@ -1,0 +1,57 @@
+{
+  "artifact_kind": "greenfield_gate_d_observability_frontier",
+  "classification": "OBSERVABILITY_GAP;GATE_D_OPEN;NO_TPU_SUCCESSOR",
+  "created_utc": "2026-08-30T10:10:17Z",
+  "causal_frontier": {
+    "id": "layer1.rms_input_fp32",
+    "missing_accepted": true,
+    "missing_candidate": true,
+    "order": 0
+  },
+  "contract": {
+    "path": "configs/greenfield-gate-d-observability.json",
+    "sha256": "6fcf46066e7e500202baeaffab5a731ff17a40b67f49db711f0ebc51e37914fc"
+  },
+  "first_downstream_divergence": {
+    "accepted_array_sha256": "9936ee1e19049b297fd205292ebc378aee41d59401bbf56497004356998d3039",
+    "accepted_raw_hex": "27bd",
+    "candidate_array_sha256": "9b52a04e2852719237f4465b28665cbc213b635763303b554bb12345e99a4005",
+    "candidate_raw_hex": "26bd",
+    "index": [2795],
+    "max_abs_error": 0.000244140625,
+    "mismatch_count": 1,
+    "watchpoint_id": "layer1.normalized.owner0"
+  },
+  "observed_downstream_mismatch_counts_per_owner": {
+    "layer1.head": 32,
+    "layer1.normalized": 1,
+    "layer1.q_a": 47,
+    "layer1.query": 4096
+  },
+  "report_sha256": "366898b88ffdd2205ecf94838e5af3d0042c4ce3f735cec7f8ee86bd4487150b",
+  "reproduction": {
+    "command": "/home/gianl/vllm-env/bin/python -S scripts/greenfield/audit_observability.py --contract configs/greenfield-gate-d-observability.json --contract-sha256 6fcf46066e7e500202baeaffab5a731ff17a40b67f49db711f0ebc51e37914fc --output <new-path>",
+    "core_sha256": "b8ca069f18bccf63269e224261d04ee0fbebb1bb786b0094c462a288211d3090",
+    "parent_git_sha": "d75190910549ff8247ac2aa699091a4ffd886662",
+    "script_sha256": "d8a930a9e0d3316b517cdb380a27d376232e6311f6af5def78cbad3b998fd4b8"
+  },
+  "review": {
+    "fable_verdict": "USAGE_LIMIT;NO_TECHNICAL_OPINION",
+    "sol_verdict": "APPROVE_COMMIT_PUSH_MIRROR;NO_P0_P1_P2"
+  },
+  "sources": {
+    "accepted_artifact_sha256": "79b813daa8e194b6c9a9ad883a0199f4a938ca4d4ab7277d20a291b480349054",
+    "accepted_code_pin": "83ff4a3576602ca844ea090550139a2ff00b0bb1",
+    "candidate_artifact_sha256": "534bacc54d74992f5a8ab4d422f9fa0947523d59325b4bfa272d4fbeb56262f0",
+    "candidate_code_pin": "dafe2eed4f5b224faf3d4cbeeba069518be18606",
+    "candidate_optimized_hlo_sha256": "634cf81a31a89aaa704a1715ae7d2cb4fd96b588463d76c6061f5c90ab4607ca",
+    "candidate_plan_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab"
+  },
+  "validation": {
+    "adjacent_cpu_forced": "334 passed, 40 skipped; two unchanged unrelated WS32 sealer fixture failures",
+    "focused": "19 passed",
+    "invalid_unforced_run": "terminated after local TPU client initialization; no model, Ray, greenfield workload, or result",
+    "no_cloud_or_model_work": true,
+    "no_performance_or_numerical_success_claim": true
+  }
+}

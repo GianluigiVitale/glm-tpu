@@ -110,6 +110,13 @@ from .strategy_nd_integrated_dense_rms import (
     validate_strategy_nd_integrated_dense_rms,
 )
 from .output_geometry import validate_output_geometry_replay
+from .observability import (
+    ArrayObservation,
+    audit_observability_contract,
+    compare_array_observations,
+    inspect_npz_artifact,
+    write_observability_report,
+)
 
 __all__ = (
     "AcceptedAttentionUpdateCaptureConfig",
@@ -125,6 +132,7 @@ __all__ = (
     "GateCOracleConfig",
     "OneLayerOracleConfig",
     "AcceptedGreenfieldDsaInternalComparisonConfig",
+    "ArrayObservation",
     "LegacyResidualComparisonConfig",
     "LegacyMainCacheComparisonConfig",
     "LegacyDsaInternalCaptureConfig",
@@ -162,6 +170,8 @@ __all__ = (
     "capture_short_context_dsa_oracle",
     "compare_short_context_dsa_oracles",
     "capture_short_context_logprob_oracle",
+    "audit_observability_contract",
+    "compare_array_observations",
     "compare_dsa_association_scores",
     "compare_ws32_dsa_step",
     "compare_ws32_raw_tokens",
@@ -171,6 +181,7 @@ __all__ = (
     "inspect_greenfield_layer0_dsa_selected_observation",
     "inspect_layer0_dsa_association_input",
     "inspect_one_layer_oracle",
+    "inspect_npz_artifact",
     "inspect_legacy_prompt_index_cache",
     "validate_prompt_index_key_association_hlo",
     "validate_prompt_index_key_probe_hlo",
@@ -187,4 +198,5 @@ __all__ = (
     "validate_strategy_nd_integrated_dense_rms",
     "validate_output_geometry_replay",
     "validate_ws32_cache_probe",
+    "write_observability_report",
 )

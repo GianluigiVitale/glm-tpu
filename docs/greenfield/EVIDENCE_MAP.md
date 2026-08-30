@@ -1728,3 +1728,27 @@ remains open and no TPU successor is authorized.
   Complete arm values, toolchain, executed sources and all checked input identities are frozen.
   DB518's sealed comparison proves its layer-0 prompt cache exact; no accepted layer-1 cache oracle
   exists, so the sensitivity arm makes no accepted-history claim.
+
+## Gate-D immutable watchpoint frontier
+
+- Contract `configs/greenfield-gate-d-observability.json`, SHA
+  `6fcf46066e7e500202baeaffab5a731ff17a40b67f49db711f0ebc51e37914fc`, binds the sealed accepted
+  layer-1 internals (`79b813da...9054`) and coherent DB518 result (`534bacc5...62f0`) to their
+  code/plan/executable and sibling-evidence identities.
+- The stdlib-only `glm_tpu/greenfield/observability.py` snapshots and hashes bounded regular files
+  before parsing, validates typed NPY/NPZ storage and selected-array SHAs, refuses mixed candidate
+  coherence, and compares ordered watchpoints at the raw-bit level. The CLI runs under `python -S`;
+  report creation is canonical, append-only and symlink-safe.
+- Canonical report SHA `366898b88ffdd2205ecf94838e5af3d0042c4ce3f735cec7f8ee86bd4487150b`
+  classifies `OBSERVABILITY_GAP`: neither authority stores the unperturbed FP32 row entering
+  layer-1 RMSNorm. The first downstream divergence is BF16 normalized hidden 2795 (`27bd` accepted,
+  `26bd` DB518), then 47 q-a, 4,096 query and 32 head mismatches per owner. Cross-authority
+  comparisons remain incomplete: candidate current-key and accepted cache/event-1 are absent.
+- Compact capsule `docs/artifacts/gate-d-observability-frontier.json`, SHA
+  `4fbf4583826f3db39eb30e285cd97a4f69f5ff5dad13eb3511b7b727d6cb0200`, records reproduction, review,
+  source and validation identities. Focused hostile coverage is 19/19; explicitly CPU-forced
+  adjacent validation is 334 passed/40 skipped with the same two unrelated WS32 fixture failures.
+  Fable returned only its usage-limit refusal; the same Sol reviewer approved the corrections with
+  no P0--P2 blocker. This proves the evidence frontier, not the numerical root cause, correctness,
+  performance, Gate D or a TPU successor. Future candidates must move upstream and supply complete
+  coherent state; no JAX/TPU action follows from this report.
