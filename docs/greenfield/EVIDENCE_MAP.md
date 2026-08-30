@@ -1597,3 +1597,23 @@ after offline review/persistence is separate design review of at most one accept
 compile-only dump. Its seven fingerprint triples must equal DB485 in all three identity dimensions
 before any HLO is admissible; it executes no decode and remains mechanism-only. The already-rejected
 DB518 downstream DSA path does not receive a relaxed boundary or a full-8K retry.
+
+The first and second accepted-tree acquisition snapshots were blocked by Sol before commit or TPU use.
+The corrected offline batch binds exact runtime kwargs/pins, unique workers 0--7, raw/decompressed
+sizes and one 32-partition scheduled module per M32--M2048 bucket using the established 156
+row-parallel-reduction signature. It uses a bounded task-owned driver, retry-until-census cleanup,
+read-only same-region mounts and generation-zero manifest replay with `SUCCESS` alone last. Focused
+callback/acquisition coverage is 45/45 after the second audit exposed two guaranteed late failures:
+the tracked-only vLLM transport omitted generated `_version.py` and an absent nonowner HLO root
+failed under `pipefail` before its receipt. The transport now injects a byte-pinned generated file,
+imports exact `0.1.dev1+ga30addc75` on every host before model work and seals that identity; the
+compactor explicitly distinguishes absent/empty nonowners from invalid roots. Fake storage tests
+also execute generation-zero and terminal-last publication, including the exact ledger generation
+bound by `SUCCESS`. A third audit then refused dangling-link vacancy, symlink/special-file archive
+admission and an incomplete/tampered terminal contract. Both archive walkers now lstat the complete
+tree, local/fleet vacancy treats links as occupied, folder markers are unexpected, and terminal
+publication requires exact canonical 17-key bytes derived from the manifest, ledger and remote
+prefix. Hostile tests cover each class; focused coverage is 45/45 and the corrected adjacent suite
+passes 415 tests with 10 expected skips. No TPU, Ray, model load, DB or bucket write occurred. This
+remains unreviewed preparation, not evidence; exact next is correction-only Sol review, then
+persistence/mirror before any separately approved single compile-only invocation.

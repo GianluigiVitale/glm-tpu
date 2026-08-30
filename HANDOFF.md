@@ -2,6 +2,48 @@
 
 **Updated:** 2026-08-29 UTC
 
+## 2026-08-29 accepted DB485 compile-only discriminator corrected after Sol block
+
+- Independent Sol review blocked the first frozen batch before persistence or TPU work. It found
+  early/unverified terminal publication, diagnostics that could contaminate an unowned prefix,
+  unbounded/untracked driver and cloud operations, premature runtime-ownership release, arbitrary
+  seven-HLO admission, incomplete raw-size/provenance binding, partial kwargs coverage, writable-
+  mount ambiguity and overstated callback-HLO claims. No code from that version was committed,
+  pushed, mirrored or run.
+- The correction publishes generation-zero payload objects from the sealed manifest, replays every
+  size/CRC/generation and exact remote name, uploads a sealed ledger, and publishes `SUCCESS` alone
+  last. Diagnostics are armed only after remote vacancy ownership and never after terminal
+  publication begins. The driver is a bounded task-owned session; EXIT terminates its process
+  group, retries Ray teardown and releases runtime ownership only after authenticated zero-work.
+  Post-launch SSH/SCP and publication are bounded, and model/golden mounts must be same-bucket,
+  gcsfuse and read-only.
+- Each accepted fingerprint triple is now paired by bucket with one scheduled HLO selected by the
+  already-proven exact signature: 156 `bf16[M,6144]` row-parallel reductions for each
+  `M=32..2048`, 32 partitions and strictly increasing compiler module ids. Exact workers 0--7,
+  decompressed/raw-inventory byte counts, the complete runtime kwargs marker, accepted/vLLM/
+  harness/callback-certificate identities and the bucket map are sealed. Callback HLO comparison
+  is explicitly impossible; a pass is accepted-only mechanism evidence.
+- A second frozen Sol audit correctly blocked the batch before persistence or TPU use: a tracked-
+  only vLLM archive omitted generated `_version.py`, so the transport imported as `dev` instead of
+  DB485's exact `0.1.dev1+ga30addc75`; and `set -euo pipefail` made an absent nonowner HLO root exit
+  before its receipt. The correction injects and byte-pins the deterministic generated version
+  file, imports the reconstructed transport on every host before model work, seals that identity,
+  and distinguishes absent/empty nonowners from invalid/unreadable roots before `find`. The reuse
+  inventory now includes the publisher and version resource; fake-backend tests exercise
+  generation-zero/terminal-last publication and bind the remote ledger generation carried by
+  `SUCCESS`. A third frozen Sol pass blocked two more path/terminal integrity classes before
+  persistence: dangling symlinks could pass shell vacancy and archive walkers followed links or
+  ignored special files; terminal publication accepted an incomplete/tampered `SUCCESS`. The
+  correction makes local/fleet vacancy lstat-complete, rejects links/special files across the whole
+  run tree in both sealer and publisher, treats a prefix folder marker as unexpected, and requires
+  the exact 17-key canonical terminal bytes derived from the manifest, remote prefix and immutable
+  ledger before upload. Hostile tests cover links, FIFO/root links, folder markers and missing,
+  extra, reordered, claim/provenance/prefix/manifest drift. Focused callback/acquisition tests pass
+  45/45 and the corrected full adjacent suite passes 415 with 10 expected skips. No TPU, Ray,
+  model-load or bucket write occurred. Exact next is correction-only Sol re-review, then—only if both
+  verdicts approve—commit/push/locked same-region mirror and one fresh preflight. The compile-only
+  invocation remains forbidden meanwhile.
+
 ## 2026-08-29 PP16 numerical-launch review blockers corrected offline
 
 - The default-off exactly-once launcher now refuses the rejected half-width producer flag and

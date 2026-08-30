@@ -703,3 +703,29 @@ only. Registration, both launch entry points and accepted sealing must remain to
 artifact `docs/artifacts/layer1-rms-input-observer-perturbation-rejection.json` records the exact
 DSA and cleanup evidence. The generation-bound prune manifest preserves all removed object names,
 generations and CRC32Cs; 45 compact live objects remain after deleting 485 reproducible objects.
+
+## Accepted DB485 compile-only HLO discriminator
+
+The offline callback certificate at `c3a43ee` proves that the two callback runs share one rejected
+seven-triple executable class while accepted DB485 is disjoint and has no sealed HLO recovery path;
+it did not exhaustively inspect every archived payload byte.
+Reuse the accepted `b3c25df47ac98783912dc658878181ec0a8ae16d` TPU-Inference tree, vLLM
+`a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c`, the protected Ray/network launcher and exact DB485
+engine arguments only for one separately reviewed initialization-only compiler acquisition.
+
+The recreated pod has neither source tree on workers 1--7, so the candidate builds authenticated
+pin-derived transports, injects the byte-pinned generated vLLM `_version.py`, reconstructs both
+into tag-owned `/tmp` paths on all eight hosts, imports exact `0.1.dev1+ga30addc75` before model
+work, and
+removes those paths after gathering HLO. Admission requires the seven ordered executable,
+executable-including-data and host-transfer triples to equal DB485, exact unique-host ownership
+receipts, and one shape-authenticated scheduled `jit_step_fun_impl` after-codegen module for each
+M32--M2048 bucket. It also requires exact model-load integrity, read-only same-region sources,
+terminal-last generation-zero publication, exact remote inventory replay and authenticated
+zero-work cleanup. Vacancy treats dangling links as occupied; sealer/publisher lstat the complete
+tree and reject links/special files. `SUCCESS` must be the exact canonical 17-key no-claim contract
+derived from the manifest, immutable ledger and exact remote prefix, and a prefix folder marker is
+an unexpected object. Any mismatch is terminal. Even a pass is accepted-only compiler-mechanism
+evidence: there is no callback HLO to compare, and no inference request, DB row, numerical result,
+performance claim or Gate-D closure. No TPU invocation is authorized until the corrected
+implementation receives a separate adversarial verdict and is committed, pushed and mirrored.

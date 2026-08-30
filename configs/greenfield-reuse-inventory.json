@@ -564,7 +564,7 @@
       "disposition": "rejected",
       "greenfield_consumers": ["fail-fast tombstones", "compact failure archival", "generation-bound cost cleanup", "historical diagnostic evidence only"],
       "gate": "D rejected diagnostic",
-      "reason": "The protected callback run exactly reproduced frozen DB551: 557,434 selected-position and 573,438 selected-score mismatches beginning at event 1, despite an exact token and event 0. A non-returning callback is still a consuming operation and caused perturbation consistent with materialization or a fusion/scheduling change; the exact compiler mechanism remains pending a no-TPU HLO diff. The BF16 operands and host float32(BF16+BF16) reconstruction are internally consistent but cannot reveal the unperturbed fused FP32 source. Never execute, retry, promote or seal this observer class. Preserve only compact rejection evidence; a future numeric capture requires a documented post-optimization backend tracepoint with unchanged executable identity and exact DSA."
+      "reason": "The protected callback run exactly reproduced frozen DB551: 557,434 selected-position and 573,438 selected-score mismatches beginning at event 1, despite an exact token and event 0. A non-returning callback is still a consuming operation and caused perturbation consistent with materialization or a fusion/scheduling change; the exact compiler mechanism remains unknown, and the sealed inventories provide no no-TPU HLO recovery path. The BF16 operands and host float32(BF16+BF16) reconstruction are internally consistent but cannot reveal the unperturbed fused FP32 source. Never execute, retry, promote or seal this observer class. Preserve only compact rejection evidence; a future numeric capture requires a documented post-optimization backend tracepoint with unchanged executable identity and exact DSA."
     },
     {
       "id": "old-glm-tpu-worktrees",
@@ -576,6 +576,17 @@
       "greenfield_consumers": ["greenfield collective benchmark, protected launchers, XPlane parser and HLO gates"],
       "gate": "A-H",
       "reason": "The current greenfield implementations supersede these single-purpose branches, but their tests and failure classes remain part of the audit trail."
+    },
+    {
+      "id": "accepted-db485-compile-only-hlo-discriminator",
+      "category": "oracle-only compiler mechanism acquisition",
+      "source_repo": "accepted tpu-inference and vLLM pins plus greenfield protection stack",
+      "source_pin": "accepted b3c25df47ac98783912dc658878181ec0a8ae16d / vLLM a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c / callback certificate c3a43eeded444d3724c2258977325720efa3e635",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/callback_executable_class.py", "glm_tpu/greenfield/benchmarking/accepted_compile_only_hlo.py", "scripts/greenfield/compile_accepted_db485_hlo.py", "scripts/greenfield/publish_accepted_db485_compile_only_hlo.py", "scripts/greenfield/resources/accepted_vllm_version.py", "scripts/greenfield/seal_accepted_db485_compile_only_hlo.py", "scripts/greenfield/run_accepted_db485_compile_only_hlo.sh", "docs/artifacts/callback-executable-class-certificate.json"],
+      "disposition": "research_candidate",
+      "greenfield_consumers": ["accepted-only optimized-HLO mechanism baseline; no callback HLO comparison exists"],
+      "gate": "D diagnostic",
+      "reason": "The callback certificate proves DB551/DB565 share one rejected seven-triple executable class while accepted DB485 is disjoint and has no sealed HLO recovery path; it did not exhaustively scan every payload byte. The default-off candidate reconstructs the exact accepted and vLLM pins in tag-owned paths on the recreated eight-host pod, initializes the DB485 engine without an inference request, requires ordered equality of all three fingerprint dimensions, and seals one exact 156-reducer scheduled after-codegen HLO for each M32--M2048 bucket. Exact unique-host ownership, read-only mounts, complete provenance, bounded process ownership, authenticated cleanup, generation-zero remote inventory replay and terminal-last SUCCESS all fail closed. A pass is accepted-only mechanism evidence: no callback HLO comparison, DB row, numerical, performance or Gate-D claim, and no TPU invocation is authorized until separate adversarial review and persistence."
     },
     {
       "id": "legacy-execution-stack",
