@@ -374,6 +374,8 @@ append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the re
   Both custom-Pallas and native-XLA bitwise equivalence branches are closed. Resume only the real
   PP8 short decoder and evaluate internal tensors under the documented bounded-error level while
   keeping DSA ordering, raw tokens, state/cache integrity and physical topology contracts exact.
+  This historical resume instruction is superseded by the sealed cutoff-active 8K event-1
+  membership failure: do not rerun an unchanged PP8 decoder.
 
 ## Architecture-pivot rules
 

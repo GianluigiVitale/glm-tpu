@@ -1706,10 +1706,11 @@ remains open and no TPU successor is authorized.
 - CPU arithmetic: accepted full-K and FP32-partial q-a are both exact at `0/2,048`; BF16 partials
   reject at `656/2,048`. Current full-K and FP32-partial are identical on CPU, so CPU cannot decide
   whether the physical TPU boundary changes the result.
-- Coherence: DB518's layer-1 index cache is reusable for only this narrow challenger because the
-  candidate changes qkv-a after normalized-history/`wk` cache construction. A metal successor must
-  recompute q-a/query/head/current-key/event-1 in one bounded executable. No TPU, decoder,
-  numerical success, performance, DB or Gate-D claim exists.
+- Historical admission only: DB518's layer-1 index cache was reusable for this narrow challenger
+  because the candidate changed qkv-a after normalized-history/`wk` cache construction. The
+  subsequent coherent event-1 CPU rejection below supersedes the former metal-successor
+  requirement. No TPU successor is authorized and no decoder, numerical success, performance, DB
+  or Gate-D claim exists.
 
 ## PP16 feature2 K-half event-1 CPU rejection
 
