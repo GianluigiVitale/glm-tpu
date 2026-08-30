@@ -7971,3 +7971,23 @@ the complete arm digest, exact CPU toolchain/source hashes and DB518 comparison 
 cloud, model or full decoder ran. Do not build a metal wrapper or retry this arm. Gate D remains
 open at the upstream layer-0-output/layer-1-normalized-state cause; require a genuinely new legal
 one-row topology-local mechanism there before any further TPU work.
+
+## 2026-08-30 strict DB563 Gate-D reclassification
+
+The original L6 specification permits a complete decoder at 2K or 8K; later wording that calls 8K
+an intrinsic mandatory half of Gate D is not authoritative. Nevertheless DB563 does not close the
+strict gate. Its historical comparator makes cross-backend total order and bounded scores
+diagnostic-only, all 14 such comparisons fail, and `actual_device_score_order_and_ties` checks
+canonical ordering only against the executing program's own scores. Because
+`context_capacity=dsa_top_k=2048`, selected-set equality is also cutoff-vacuous. Oracle-relative
+tie equivalence under a cutoff-active selection is therefore unproven.
+
+Keep DB563's exact 2K tokens, state/cache, local HLO, HBM, fresh XPlanes, wall, DB/archive and
+cleanup evidence; supersede only its `gate_d_passed=true` interpretation. Existing 8K failures
+already prove the practical blocker: PP8/WS32 diverge at layer-1/event-1 selected membership. Fable
+session `c9d696b7-d318-4596-8284-6a4cca100ba4` returned its hard usage-limit response and supplied
+no technical opinion. The goal-authorized Sol fallback and independent local audit both return
+`DB563 DOES NOT CLOSE GATE D`. Compact reclassification is
+`docs/artifacts/db563-gate-d-strict-reclassification.json`, SHA
+`d9272a93a1eb43e2cbfe3d00e01343919458722c21cc969c6dcee2d1bea01582`; no
+TPU/cloud/JAX/model work ran.

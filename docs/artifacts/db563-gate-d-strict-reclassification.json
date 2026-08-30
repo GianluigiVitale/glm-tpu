@@ -1,0 +1,49 @@
+{
+  "artifact_kind": "greenfield_db563_gate_d_strict_reclassification",
+  "classification": "HISTORICAL_RELAXED_DSA_PASS;STRICT_GATE_D_OPEN",
+  "created_utc": "2026-08-30T08:36:51Z",
+  "historical_artifact_immutable": true,
+  "historical_gate_d_passed_label": true,
+  "historical_run": {
+    "context_capacity": 2048,
+    "dsa_top_k": 2048,
+    "results_db_run_id": 563,
+    "success_sha256": "7ab55568897b0c20cc0bdfbcd7f37b800c1f5693cd6b41126381bd2c5461a970",
+    "summary_sha256": "143e40e18d560b1bcf259d727fa34dc033452053a2ca6357a1eeac47634e0c09",
+    "worker0_record_sha256": "854a8e4ea9ea04c15526518e42d1a7c2f595ff7655d80e61aec63d1681249c27"
+  },
+  "retained_valid_claims": [
+    "complete 78-layer token path",
+    "exact protected 2K raw tokens",
+    "state and cache integrity",
+    "topology-local HLO without repeated full-pod hidden reconstruction",
+    "fresh eight-host XPlanes",
+    "measured per-chip HBM headroom",
+    "profiler-free wall latency and results.db/archive/cleanup linkage",
+    "candidate-internal deterministic score ordering and lowest-position ties"
+  ],
+  "strict_gate_d_blockers": {
+    "all_14_legacy_score_bounded_comparisons_passed": false,
+    "all_14_legacy_total_order_matches": false,
+    "oracle_relative_tie_equivalence_proven": false,
+    "selected_set_cutoff_active": false,
+    "selected_set_reason": "context_capacity equals dsa_top_k, so every live position is selected regardless of scorer ranking"
+  },
+  "policy_reconciliation": {
+    "authoritative_l6_allows": "complete decoder at 2K or 8K",
+    "later_8k_only_wording_authoritative": false,
+    "strict_requirement": "a complete short-context decoder must prove oracle-relative exact DSA selected sets and tie order; a cutoff-active context is required when the 2K set is vacuous"
+  },
+  "source_pins": {
+    "comparator_sha256": "cbde0699ea7f74a81806cf0cadbad45632c58eeb04dcb0f447f1aa450d874243",
+    "comparator_tests_sha256": "c33de966044467201dd106e4f3864123e92bd80e81ea7f0fb49726c1db770c4a",
+    "goal_sha256": "583615bcd730effe4b5b583a6f253b4ee0b346714bc2e67886340a0a0cb0301e",
+    "spec_sha256": "c614ca18bdee968b725afd2d8eceb8385b486999340ca0211379389c7be3ed4e"
+  },
+  "review": {
+    "fable_session": "c9d696b7-d318-4596-8284-6a4cca100ba4",
+    "fable_verdict": "USAGE_LIMIT;NO_TECHNICAL_OPINION",
+    "independent_sol_verdict": "DB563 DOES NOT CLOSE GATE D",
+    "local_verdict": "DB563 DOES NOT CLOSE GATE D"
+  }
+}

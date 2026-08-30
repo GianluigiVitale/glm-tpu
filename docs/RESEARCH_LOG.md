@@ -11973,3 +11973,22 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   input identities and DB518 comparison are fail-closed. The DB518 layer-0 cache is sealed exact;
   layer-1 accepted-history exactness is explicitly unknown. Tombstone this arm before metal. Gate D
   remains open at the upstream normalized-state cause.
+
+## 2026-08-30 08:36 UTC — DB563's relaxed 2K label does not close strict Gate D
+
+- The authoritative L6 text allows 2K or 8K, so later “mandatory 8K half” wording is a project
+  strengthening rather than the original rule. The strict blocker is DSA evidence, not context
+  length by itself.
+- DB563 remains valid protected evidence for exact 2K tokens, state/cache, topology-local HLO,
+  HBM, fresh XPlanes, profiler-free wall, DB/archive and cleanup. Its historical
+  `gate_d_passed=true` interpretation is superseded, not rewritten.
+- `context_capacity=dsa_top_k=2048` makes selected-set equality cutoff-vacuous. All 14
+  `legacy_total_order_match` and bounded-score diagnostics fail; the gating tie check validates
+  only canonical order under candidate-produced scores. Oracle-relative tie equivalence is not
+  proved.
+- Fable 5 Max again returned only its usage-limit refusal. The goal-authorized Sol fallback and an
+  independent local audit both conclude `DB563 DOES NOT CLOSE GATE D`. Existing cutoff-active 8K
+  evidence already shows real event-1 membership drift, so bypassing it would only move a known
+  failure into a much more expensive 128K run. Reclassification capsule SHA is
+  `d9272a93a1eb43e2cbfe3d00e01343919458722c21cc969c6dcee2d1bea01582`. No
+  TPU/cloud/JAX/model workflow ran.

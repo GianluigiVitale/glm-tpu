@@ -28,20 +28,24 @@ regresses fleet p50/p99 from `0.412015/0.578189 ms` to `0.550720/0.762192 ms` ov
 two-transfer boundary remains selected for the exact protected 8K Gate-D run.
 
 Protected current-code PP8 2K full-decoder evidence exists at DB563: p50 `245.639880 ms` and
-`4.071000 tok/s`, with exact tokens/DSA and complete protections. It reconfirms DB484's
-`244.091151 ms` / `4.096830 tok/s` result and passes 2K Gate-D correctness but not Gate E. WS32 has
+`4.071000 tok/s`, with exact tokens and complete state/cache/HLO/HBM/trace/wall protections. It
+reconfirms DB484's `244.091151 ms` / `4.096830 tok/s` result under the historical relaxed 2K DSA
+policy, but does not close strict Gate D or Gate E. WS32 has
 the accepted 2K DB553 point at `122.630667 ms/token` / `8.154567 tok/s`.
 No accepted 8K, 128K, 256K or PP16 full-decoder measurement exists yet. Bounded
 layer/kernel/diagnostic results below are not token-speed proof.
 
-## 2026-08-27 — current PP8 2K Gate D is exact; 84% of wall is pipeline permute
+## 2026-08-27 — current PP8 2K protected run; 84% of wall is pipeline permute
 
 DB563 / recovered terminal tag
-`greenfield_short_decoder_pp8_2k_gate_d_recovery_20260827T203000000000000Z` passes the complete
-real-prompt token/DSA/state/cache/HLO/HBM/XPlane contract. P50/p99 is
+`greenfield_short_decoder_pp8_2k_gate_d_recovery_20260827T203000000000000Z` passes its historical
+real-prompt token/relaxed-DSA/state/cache/HLO/HBM/XPlane contract. P50/p99 is
 `245.639880/245.835886 ms`, answer rate is `4.071000 tok/s`, peak HBM is 26.303 GB/chip and minimum
-headroom is 6.711 GB. This is accepted current-code 2K evidence, but it misses both useful-gate
-thresholds and does not close the mandatory 8K portion of Gate D.
+headroom is 6.711 GB. This is accepted current-code 2K mechanism/performance evidence, but its
+historical DSA policy does not close strict Gate D: all 14 oracle total-order and bounded-score
+diagnostics fail, candidate tie ordering is checked only against candidate scores, and
+`top_k=context=2048` makes selected-set equality cutoff-vacuous. The original specification allows
+2K or 8K; the blocker is missing oracle-relative cutoff-active DSA proof, not an intrinsic 8K rule.
 
 The 64-core XPlane measures 206.352807 ms/step in 17 collective-permutes (84.0% of p50): eight
 split-residual sends, eight `s32[1,2053]` live-metadata sends and one token return. All local

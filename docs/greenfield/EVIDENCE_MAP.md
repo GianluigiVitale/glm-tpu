@@ -1338,7 +1338,7 @@ or one short-context result cannot satisfy a broader row.
 | Serve GLM-5.2-FP8 at 256K on the existing v4-64 | Legacy oracle only; no greenfield 256K execution | Missing |
 | Independent greenfield execution path | Isolated native-JAX PP8/WS32 code; legacy used only for sealed oracles | Implemented; final runtime proof pending |
 | Plan-aware final-layout checkpoint | Complete PP8 pack/load DB420; reviewed WS32 full pack code, no sealed full WS32 pack | PP8 pass; WS32 pending |
-| Exact DSA sets and tie order | Gate C DB421 and PP8 2K DB484 | Pass at bounded/2K scope; long-context pending |
+| Exact DSA sets and tie order | Gate C DB421; PP8 DB484/DB563 use `top_k=context=2048`, disable oracle total-order/score bounds as gates and check ties only against executing scores | Gate C bounded pass; strict complete-decoder proof missing because the 2K selected set is cutoff-vacuous and oracle-relative tie equivalence is unproven |
 | Raw tokens and quality | PP8 2K DB484 exact | Pass at 2K only |
 | State/load/cache protection | PP8 DB420/DB484 | Pass at PP8 2K scope; selected-plan 8K/long-context pending |
 | Repeated collectives topology-local | PP8/PP16 real layers and WS32 Pallas layer | Full selected decoder proof pending |
