@@ -864,3 +864,30 @@ Do not return to hour-scale hypothesis runs or already exact contractions.
   validate; otherwise retain every exact tag dump wherever present, require eight retention receipts
   and report preservation incomplete rather than claiming cleanup.
   Never burn another full compile merely because a post-compile evidence assumption was wrong.
+- The corrected DB485 retry sealed seven identical scheduled HLOs across all eight hosts without a
+  request. Its M32 module proves the first dense output is BF16 and layer-1 RMS consumes
+  `FP32(BF16 dense + BF16(BF16 attention + BF16 residual))`. DB518's FP32 carried operand descends
+  through an exact copy chain from a BF16-corrected embedding-owner sum with literal BF16-zero
+  fallback selections. This establishes a logical association match, not physical BF16
+  materialization across the DB518 FP32 tuple/copy boundary. The missing-unrounded-state cause
+  remains unresolved; do not reject or select it from HLO correction metadata alone.
+- Another inspected accepted/current distinction is RMS-reduction plus weighted-output
+  geometry: accepted squares `32x6144` locally and uses `T(8,128)(2,1)`, window `2x48`, split 0;
+  DB518 squares `1x3072`, scalar-reduces over feature-2, weights using `T(2,128)(2,1)`, window
+  `1x12`, split 1 and gathers afterward. WS32 squares `1x1536` and scalar-reduces over feature-4.
+  This agrees with the historical
+  full-M32-versus-one-row localization. Direct M1 tile coercion, true-M1 Pallas, source-fused,
+  scalar, output-ownership and layout routes are already rejected. Moving the gather before the
+  weight is another output-ownership/layout formulation, not a new architecture. Require a
+  genuinely untested legal one-row topology-local mechanism before any TPU work.
+- Do not treat PP16 alone as an independent causal comparator. The sealed WS32 8K HLO
+  `8f964f9e...0ce6` binds an update-plus-embedding BF16 round at the pre-dense boundary and exact
+  BF16 StrategyND row0-tree operands plus the normalized BF16 round and BF16 weight multiplication
+  at the next-layer-RMS boundary on `1x1536` feature shards. It does not prove the complete dense
+  value path between those boundaries. Its
+  feature-square reduction and normalized-feature gather use exact four-device groups, window
+  `1x6` and split 1. This independently places WS32 in the same one-row weighted-output physical
+  family rather than supporting a hidden FP32-state theory. A useful certificate must reject
+  swapped sources, wrong owner indices, broken zero/select/copy/inverse/weight/dense paths,
+  missing rounds, wrong groups/layouts and duplicate target calls;
+  a matching substring or operation count is not a value-flow proof.

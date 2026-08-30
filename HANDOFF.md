@@ -7802,3 +7802,52 @@ The reviewed correction is signed-off commit
 `gs://driftbench-dsv4-uc/repos/glm-tpu-topology-rewrite/`. This persistence authorizes no TPU work.
 Exact next is a separate execution-only review of at most one fresh compile-only acquisition; Gate D
 remains open and no retry is currently authorized.
+
+## Current exact next: weighted-output mechanism only; no TPU action
+
+The separately authorized retry succeeded under tag
+`accepted_db485_compile_only_hlo_20260830T025924791267740Z`. It compiled all seven M32--M2048
+buckets with the exact DB485 fingerprints and accepted/vLLM/harness pins, executed no generation or
+decode, and sealed eight raw host audits with identical bucket identities plus one canonical
+worker-0 copy. The archive has
+57 objects/162,332,478 bytes; manifest/remote-ledger/SUCCESS file SHAs are
+`8bf5abf3...391a` / `c87adfe5...e5bf` / `d6049f4d...86cf`, generation
+`1788062144194143`, with 8/8 load/state/integrity and zero-work cleanup. Compact provenance is
+`docs/artifacts/accepted-db485-compile-only-hlo-success.json`. This is compiler-mechanism evidence
+only: no numerical, DSA, Gate-D, DB, latency or performance claim exists.
+
+Offline fail-closed classifier `scripts/greenfield/classify_db485_layer1_rms_hlo.py` binds the
+accepted M32 gzip/raw SHAs `b0f7f7b9...024b` / `5c23a74f...72ea`, DB518 optimized HLO
+`634cf81a...07ca`, and the exact WS32 8K decoder HLO `8f964f9e...0ce6`. Accepted layer 0
+materializes the dense projection as BF16, rounds
+`BF16(attention + residual)`, then forms the layer-1 FP32 RMS input as
+`FP32(BF16 dense + BF16 carried)`. DB518 has the same logical BF16 association: its FP32 carried
+operand is copied from an initial RMS fusion whose complementary zero-masked embedding-owner sum
+is marked BF16-corrected and uses literal BF16-zero fallbacks. That compiler marker does not prove
+BF16 materialization before the FP32 tuple/copy boundary; the missing-unrounded-state physical
+cause remains unresolved, consistent with the sealed 2026-08-29 straddler verdict. WS32
+independently binds a one-row `1x1536` pre-dense boundary and the later next-layer RMS
+boundary, including both BF16 rounds, but makes no full value-path claim through the intervening
+dense graph. The certificate binds accepted/DB518 exact source/copy chains and WS32 boundary-local
+roles, reduction/inverse, weight owner, correction layout, physical groups and live gathered roots;
+in-scope hostile source, owner-index, zero/select, round, inverse, weight, row0-tree, group, layout
+and duplicate-target mutations all fail closed.
+
+Another inspected physical distinction is the RMS reduction plus weighted output. Accepted
+squares full `32x6144` state locally and weights `bf16[32,6144]` with tile `T(8,128)(2,1)`,
+window `2x48`, split 0. DB518 squares `1x3072`, reduces the scalar over feature-2, weights a
+`bf16[1,3072]` half with tile `T(2,128)(2,1)`, window `1x12`, split 1, then gathers. WS32 squares
+`1x1536`, reduces over feature-4, weights with the same tile family/window `1x6`/split 1, then
+gathers over exact feature-4 groups. Tracked certificate
+`docs/artifacts/db485-layer1-rms-hlo-causality.json` is
+classified `LOGICAL_BF16_ASSOCIATION_MATCHES;UNROUNDED_STATE_PHYSICAL_CAUSE_UNRESOLVED;`
+`RMS_REDUCTION_AND_WEIGHTED_OUTPUT_GEOMETRY_REMAIN_DISTINCT` and explicitly authorizes no TPU
+successor.
+Historical exact-M32 evidence already requires 31 forbidden diagnostic rows; direct M1 tile,
+Pallas M8 scratch, source-fused, scalar, ownership and layout arms are sealed failures. Do not
+rename gather-before-weight or another one-row output rearrangement as new. Fable 5 Max returned
+its usage-limit refusal; the goal-authorized Sol fallback independently reached the same no-TPU
+verdict. Exact next is offline reconciliation/review only, then identify a genuinely untested legal
+one-row topology-local mechanism or remain blocked. The accepted success capsule is also tested
+against local terminal manifest/ledger/SUCCESS identities, object count/bytes and M32 raw/gzip
+bytes. Gate D is open.

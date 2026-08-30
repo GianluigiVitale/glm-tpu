@@ -11865,3 +11865,38 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   serialized file SHAs of the archived 530-object authority. Final validation passes 10/10 focused,
   175/2 affected shared and 4/4 isolated observer tests. Sol returned
   `APPROVE COMMIT/PUSH/MIRROR`; no protected execution was authorized and Gate D remains open.
+
+## 2026-08-30 02:59--05:30 UTC — accepted HLO succeeds; physical residual cause remains unresolved
+
+- Fresh tag `accepted_db485_compile_only_hlo_20260830T025924791267740Z` completed the exact
+  accepted initialization and M32--M2048 compiles with `generate_calls=0`. Eight host audits have
+  identical raw bucket identities; worker 0 was sealed only after equality. The terminal archive
+  has 57 objects/162,332,478 bytes, manifest/remote-ledger/SUCCESS file SHAs
+  `8bf5abf3...391a` / `c87adfe5...e5bf` / `d6049f4d...86cf`, generation
+  `1788062144194143` and 8/8 integrity/state/cleanup. There is no numerical, DSA, Gate-D, DB,
+  latency or performance claim.
+- Exact M32 gzip/raw SHAs are `b0f7f7b9...024b` / `5c23a74f...72ea`. Offline causal parsing
+  proves the dense projection is BF16; accepted rounds attention+residual to BF16, then adds dense
+  in FP32 for layer-1 RMS. DB518 has the same logical BF16 association: its FP32 carried operand
+  descends through an exact copy chain from an initial BF16-corrected sum of complementary
+  zero-masked embedding-owner shards. Per the sealed 2026-08-29 straddler result,
+  `float_type_correction_info` does not prove materialization at that boundary; the physical
+  missing-unrounded-state cause is unresolved. The exact WS32 decoder HLO `8f964f9e...0ce6`
+  provides independent one-row `1x1536` pre-dense and next-layer-RMS boundary traces with the same
+  two BF16 rounds; it does not claim a complete value path through the intervening dense graph. The
+  fail-closed certificate SHA-pins every reviewed computation block, binds accepted/DB518 exact
+  operand/copy chains and WS32 boundary-local
+  roles, reduction/inverse, weight-owner indices, correction geometry, local groups and live roots;
+  in-scope hostile source/owner/zero/select/round/inverse/weight/row0-tree/group/layout/decoy
+  mutations are rejected.
+- Another inspected difference is RMS-reduction plus weighted-output geometry: accepted M32
+  squares `32x6144` locally and uses `T(8,128)(2,1)`, window `2x48`, split 0; DB518 squares
+  `1x3072`, scalar-reduces over feature-2, then weights with `T(2,128)(2,1)`, window `1x12`, split
+  1 and gathers; WS32 squares `1x1536`, scalar-reduces over feature-4, then weights with the same
+  tile family, window `1x6`, split 1 and gathers. This matches historical M32-vs-M1 localization, whose legal
+  one-row layout/Pallas/source-fused/ownership arms are already rejected. Fable 5 Max returned its
+  quota refusal; the goal-authorized Sol fallback independently rejected TPU work. Tracked
+  certificates are `accepted-db485-compile-only-hlo-success.json` and
+  `db485-layer1-rms-hlo-causality.json`. Exact next is offline review/reconciliation only; Gate D
+  remains open. A separate test binds the accepted compact success capsule back to the local
+  manifest/ledger/SUCCESS hashes, object count/bytes and M32 compressed/raw identities.

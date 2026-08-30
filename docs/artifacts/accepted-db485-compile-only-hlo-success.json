@@ -1,0 +1,57 @@
+{
+  "artifact_kind": "accepted_db485_compile_only_hlo_success_v1",
+  "claim_scope": "accepted compiler-mechanism evidence only; no numerical, DSA, Gate-D, DB, latency or performance claim",
+  "code_pins": {
+    "accepted": "b3c25df47ac98783912dc658878181ec0a8ae16d",
+    "greenfield": "4b4b4d24a969feb1d0230f6f3b3adf4da6aaa07b",
+    "harness": "3409bf58a758e7bfa398eb92051db701d623e6b9",
+    "vllm": "a30addc7548a9a8b9b3323a7bc3eb7d7c4895d1c"
+  },
+  "compile_bucket_rows": [
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048
+  ],
+  "compile_owner_workers": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "db_run_id": null,
+  "gate_d_passed": false,
+  "manifest_sha256": "8bf5abf3d992c117d14d3976d5d22e5091bf43697dd37c007106600fdbcf391a",
+  "m32_hlo": {
+    "compressed_byte_count": 22674262,
+    "compressed_sha256": "b0f7f7b90ea229caa73e1f7c29afff01fecb064065384298bc8659fdd11c024b",
+    "raw_byte_count": 87717729,
+    "raw_sha256": "5c23a74f03551923b4b6b0cc35e5802c2d26e634a05b9bdbf146aabf7ef972ea"
+  },
+  "numerical_claim": false,
+  "object_count": 57,
+  "performance_claim": false,
+  "remote_object_bytes": 162332478,
+  "remote_objects_generation": "1788062144194143",
+  "remote_objects_sha256": "c87adfe5c517a45aa859e0c09d5ba4386c13c6a9bd1e4a6a9bbb28aed200e5bf",
+  "remote_prefix": "gs://driftbench-dsv4-uc/oracles/greenfield/glm52/accepted_compile_only_hlo/accepted_db485_compile_only_hlo_20260830T025924791267740Z",
+  "run_tag": "accepted_db485_compile_only_hlo_20260830T025924791267740Z",
+  "status": "SUCCESS",
+  "success_file_sha256": "d6049f4d5fa50e3ccea3abd8e3524a673feb3a382ff06acbc662c335bfed86cf",
+  "terminal_model_marker": "ACCEPTED_DB485_COMPILE_ONLY_COMPLETE",
+  "workflow": {
+    "decode_calls": 0,
+    "generate_calls": 0,
+    "host_count": 8,
+    "integrity_passed": true,
+    "state_passed": true,
+    "zero_work_cleanup_hosts": 8
+  }
+}

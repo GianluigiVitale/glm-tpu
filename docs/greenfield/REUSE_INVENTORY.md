@@ -742,3 +742,18 @@ on the normal path are cleanup-eligible after eight audits agree and worker 0 va
 preservation starts, cleanup requires all eight local sets to byte-validate; otherwise every remaining
 exact tag dump is retained, eight retention receipts are required and no cleanup claim is made. It
 remains offline/unapproved and cannot close Gate D.
+
+The successful replacement acquisition is
+`accepted_db485_compile_only_hlo_20260830T025924791267740Z`; reuse only its immutable 57-object
+archive and compact tracked capsule `docs/artifacts/accepted-db485-compile-only-hlo-success.json`.
+Do not rerun the accepted 50-minute compile for the layer-1 issue. Its M32 HLO is now classified by
+`scripts/greenfield/classify_db485_layer1_rms_hlo.py`: accepted and DB518 logical BF16 state
+association matches, while sealed WS32 supplies separate pre-dense and next-layer-RMS boundary
+evidence without a complete intervening dense value-path claim. RMS-reduction and weighted-output
+geometry remain physically distinct across full M32, feature-2 and feature-4.
+The classifier byte-pins WS32 SHA `8f964f9e...0ce6`, its feature-4 reduction/gather groups and live
+`1x1536` weighted root; hostile value-flow mutations are permanent tests. The tracked causality
+capsule proves a logical BF16 association match but leaves physical correction materialization and
+the missing-unrounded-state cause unresolved. Reuse historical protected evidence—not this HLO
+capsule alone—to reject scalar, gather-before-weight, output-ownership, direct-layout and Pallas
+variants unless a new mechanism is structurally outside the sealed historical family.

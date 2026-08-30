@@ -1644,3 +1644,28 @@ commit/push/locked same-region mirror only. The correction remains offline evide
 and no retry is currently authorized. It is persisted as signed-off commit `4d419506...97c3`, with
 local/origin equality and all ten changed files byte-identical in the exact `US-CENTRAL2`
 repository mirror. Exact next is a separate execution-only review.
+
+The fresh accepted retry `accepted_db485_compile_only_hlo_20260830T025924791267740Z` supersedes
+the failed ownership assumption. Exact eight-host raw identities permitted worker 0 to seal the
+canonical seven-bucket archive: 57 objects/162,332,478 bytes, manifest `8bf5abf3...391a`, remote
+ledger `c87adfe5...e5bf`, SUCCESS file `d6049f4d...86cf`, generation `1788062144194143` and
+8/8 zero-work cleanup. Compact evidence is
+`docs/artifacts/accepted-db485-compile-only-hlo-success.json`. It executed no request and makes no
+numerical/DSA/Gate-D/DB/performance claim.
+
+`docs/artifacts/db485-layer1-rms-hlo-causality.json` is reproducible with
+`scripts/greenfield/classify_db485_layer1_rms_hlo.py`. It proves accepted and DB518 share the same
+logical BF16 dense-plus-rounded-carried association. It does not prove that TPU correction metadata
+materialized BF16 at the DB518 FP32 tuple/copy boundary, so the missing-unrounded-state physical
+cause remains unresolved.
+Sealed WS32 supplies boundary-local pre-dense and next-layer-RMS
+evidence only; no complete dense value path is claimed. It binds exact accepted/DB518 source/copy
+roles plus SHA-pinned reviewed computations, WS32 local roles, inverse, weight-owner indices,
+correction geometry, physical groups
+and live roots, with in-scope hostile mutation refusal. Another inspected HLO distinction is
+reduction plus weighted output: accepted squares `32x6144` locally
+and uses `T(8,128)(2,1)`/window `2x48`/split 0; DB518 squares `1x3072`, reduces over feature-2 and
+weights with `T(2,128)(2,1)`/window `1x12`/split 1; WS32 squares `1x1536`, reduces over feature-4
+and weights with `T(2,128)(2,1)`/window `1x6`/split 1. Both one-row plans gather afterward. Historical one-row variants already
+reject direct-layout, Pallas, source-fused and ownership reformulations. No TPU successor is
+authorized; Gate D remains open.
