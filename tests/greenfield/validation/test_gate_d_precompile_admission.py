@@ -25,7 +25,7 @@ from glm_tpu.greenfield.gate_d_precompile_admission import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CURRENT_CONTRACT = REPO_ROOT / "configs/greenfield-gate-d-precompile-admission-v2.json"
-CURRENT_CONTRACT_SHA256 = "237d76cc5081ff2dccc13692d2cdab424b6754f2037d2f7bd558b35ab6294412"
+CURRENT_CONTRACT_SHA256 = "74e8c06fefc71ebee9f7b583c6bc34c5fe5724830b46ffd64fdc5572642a7752"
 
 
 def _sha(path: Path) -> str:
@@ -45,6 +45,143 @@ def _canonical(value: dict[str, Any]) -> str:
 def _write_json(path: Path, value: dict[str, Any]) -> str:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
     return _sha(path)
+
+
+def _current_concrete_source_nodes() -> tuple[
+    dict[str, ast.AST], dict[str, ast.Module]
+]:
+    rms_tree = ast.parse(
+        (REPO_ROOT / "glm_tpu/greenfield/kernels/reference/rmsnorm.py").read_text()
+    )
+    layer_tree = ast.parse(
+        (REPO_ROOT / "glm_tpu/greenfield/kernels/layer.py").read_text()
+    )
+    names = {
+        "candidate.source:FusedAddRmsNormAuxiliaryResult": (
+            rms_tree,
+            "FusedAddRmsNormAuxiliaryResult",
+        ),
+        "candidate.source:fused_add_rms_norm": (
+            rms_tree,
+            "fused_add_rms_norm",
+        ),
+        "candidate.source:fused_add_rms_norm_with_auxiliary": (
+            rms_tree,
+            "fused_add_rms_norm_with_auxiliary",
+        ),
+        "candidate.callsite:StageLocalSplitLayerFp8AuxiliaryResult": (
+            layer_tree,
+            "StageLocalSplitLayerFp8AuxiliaryResult",
+        ),
+        "candidate.callsite:stage_local_transformer_layer_fp8_split_mapped": (
+            layer_tree,
+            "stage_local_transformer_layer_fp8_split_mapped",
+        ),
+    }
+    return (
+        {
+            source_id: admission_module._qualified_ast_node(tree, name)
+            for source_id, (tree, name) in names.items()
+        },
+        {
+            "candidate.source": rms_tree,
+            "candidate.callsite": layer_tree,
+        },
+    )
+
+
+def test_current_concrete_tuple_source_semantics_are_bound() -> None:
+    nodes, imports = _current_concrete_source_nodes()
+    report = admission_module._concrete_tuple_source_semantics(nodes, imports)
+    assert report["authority_scope"] == "concrete.committed.jax.source"
+    assert report["frontier"] == "layer1.rms_input_fp32"
+
+
+def test_concrete_tuple_source_refuses_precision_drift() -> None:
+    nodes, imports = _current_concrete_source_nodes()
+    candidate_id = "candidate.source:fused_add_rms_norm_with_auxiliary"
+    candidate = ast.parse(ast.unparse(nodes[candidate_id])).body[0]
+    assert isinstance(candidate, ast.FunctionDef)
+    for node in ast.walk(candidate):
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "jnp"
+            and node.attr == "float32"
+        ):
+            node.attr = "float16"
+            break
+    nodes[candidate_id] = candidate
+    with pytest.raises(BenchmarkValidationError, match="primary arithmetic drifted"):
+        admission_module._concrete_tuple_source_semantics(nodes, imports)
+
+
+def test_concrete_tuple_source_refuses_shared_baseline_precision_drift() -> None:
+    nodes, imports = _current_concrete_source_nodes()
+    for candidate_id in (
+        "candidate.source:fused_add_rms_norm",
+        "candidate.source:fused_add_rms_norm_with_auxiliary",
+    ):
+        candidate = ast.parse(ast.unparse(nodes[candidate_id])).body[0]
+        assert isinstance(candidate, ast.FunctionDef)
+        for node in ast.walk(candidate):
+            if (
+                isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "jnp"
+                and node.attr == "float32"
+            ):
+                node.attr = "float16"
+        nodes[candidate_id] = candidate
+    with pytest.raises(BenchmarkValidationError, match="accepted source primary arithmetic"):
+        admission_module._concrete_tuple_source_semantics(nodes, imports)
+
+
+@pytest.mark.parametrize(
+    ("module_id", "statement", "message"),
+    [
+        ("candidate.source", "jnp = object()", "global import was rebound"),
+        (
+            "candidate.source",
+            "if True:\n    jnp = object()",
+            "global import was rebound",
+        ),
+        (
+            "candidate.callsite",
+            "fused_add_rms_norm_with_auxiliary = fused_add_rms_norm",
+            "caller import was rebound",
+        ),
+    ],
+)
+def test_concrete_tuple_source_refuses_global_rebinding(
+    module_id: str, statement: str, message: str
+) -> None:
+    nodes, modules = _current_concrete_source_nodes()
+    modules[module_id].body.extend(ast.parse(statement).body)
+    with pytest.raises(BenchmarkValidationError, match=message):
+        admission_module._concrete_tuple_source_semantics(nodes, modules)
+
+
+def test_concrete_tuple_source_refuses_hidden_executable_statement() -> None:
+    nodes, modules = _current_concrete_source_nodes()
+    candidate_id = "candidate.source:fused_add_rms_norm_with_auxiliary"
+    candidate = ast.parse(ast.unparse(nodes[candidate_id])).body[0]
+    assert isinstance(candidate, ast.FunctionDef)
+    candidate.body.insert(-1, ast.parse("jax.debug.print('hidden')").body[0])
+    nodes[candidate_id] = candidate
+    with pytest.raises(BenchmarkValidationError, match="executable body drifted"):
+        admission_module._concrete_tuple_source_semantics(nodes, modules)
+
+
+def test_concrete_tuple_source_refuses_named_tuple_behavior() -> None:
+    nodes, modules = _current_concrete_source_nodes()
+    result_id = "candidate.source:FusedAddRmsNormAuxiliaryResult"
+    result = ast.parse(ast.unparse(nodes[result_id])).body[0]
+    assert isinstance(result, ast.ClassDef)
+    result.body.extend(ast.parse("def hidden(self):\n    return self.output\n").body)
+    nodes[result_id] = result
+    with pytest.raises(BenchmarkValidationError, match="not one exact NamedTuple"):
+        admission_module._concrete_tuple_source_semantics(nodes, modules)
 
 
 def _run_git(repository: Path, *arguments: str) -> str:
@@ -185,6 +322,7 @@ def _source_authority(
             "primary_outputs_bitwise_identical_by_construction": True,
             "primary_recurrence": "bf16.rounded",
         },
+        "authority_kind": "declarative.semantic.dsl",
         "candidate_id": candidate["id"],
         "candidate_callsite_symbol": "candidate.source:candidate_callsite",
         "candidate_semantic_sha256": source_semantic_sha,
@@ -221,6 +359,7 @@ def _source_authority(
                 "accepted_authority_sha256": accepted_semantics[
                     "authority_sha256"
                 ],
+                "authority_kind": semantics["authority_kind"],
                 "candidate_ast_sha256": candidate_ast_sha,
                 "callsite_ast_sha256": callsite_ast_sha,
                 "compensation_claim": semantics["compensation_claim"],
@@ -831,7 +970,6 @@ def test_current_contract_fails_closed_without_jax() -> None:
         item["id"]: item["reasons"] for item in report["candidate_results"]
     } == {
         "auxiliary_device_tuple_dependency": [
-            "MISSING_SOURCE_AST_AUTHORITY",
             "MISSING_PLAN_AUTHORITY",
             "MISSING_CAUSAL_STABLEHLO_AUTHORITY",
             "MISSING_CANDIDATE_COHERENT_CAPSULE",
@@ -843,6 +981,10 @@ def test_current_contract_fails_closed_without_jax() -> None:
             "MISSING_CANDIDATE_COHERENT_CAPSULE",
         ],
     }
+    source = report["candidate_results"][0]["source_authority"]
+    assert source["authority_kind"] == "concrete.committed.jax.source"
+    assert source["executable_source_authority"] is True
+    assert source["code_pin"] == "c8b220067577004ddfb824667eadc746642baaca"
 
 
 def test_complete_synthetic_fixture_never_admits_precompile(tmp_path: Path) -> None:

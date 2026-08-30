@@ -1872,13 +1872,20 @@ remains open and no TPU successor is authorized.
   are required, and their independently derived 6,144-value FP32 sum must byte-match the declared
   `layer1.rms_input_fp32` array.
 - Current classification is
-  `NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`. Both
-  `auxiliary_device_tuple_dependency` and `compensated_auxiliary_dependency` are refused for the
-  same four explicit gaps: source/AST, plan, causal StableHLO and coherent candidate capsule. No
-  JAX, compile, model, cloud or TPU work occurred.
-- Canonical contract/report/locality SHAs are respectively `237d76cc...4412`,
-  `c64fcf2e...a06e` and `49cf6bb1...25eb`. Focused hostile admission passes 50/50 and the adjacent
+  `NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`.
+  `auxiliary_device_tuple_dependency` has concrete committed source/callsite authority at
+  `c8b2200` and remains refused for plan, causal StableHLO and coherent candidate capsule.
+  `compensated_auxiliary_dependency` also lacks source authority. No JAX, compile, model, cloud or
+  TPU work occurred.
+- Canonical contract/report/locality SHAs are respectively `74e8c06f...7752`,
+  `1ce76704...2957` and `49cf6bb1...25eb`. Source certificate
+  `gate-d-tuple-auxiliary-source-authority.json` is `c95c8aa1...f0e1`. Focused hostile admission
+  passes 58/58 (2,277.49 seconds with four isolated workers), the source-only suite passes 2/2 and
+  the adjacent
   offline suites pass 69/69. These are admission-tool tests, not candidate or Gate-D evidence.
+- Fable session `d6512b94-52af-4a03-85de-d7d5b43ea5cc` was usage-blocked and supplied no opinion.
+  The Sol fallback approved exact staged SHA `5003b44e...55bf` for persistence with no P0--P2 and
+  explicitly no JAX/backend/model/cloud/compile/TPU authorization or Gate-D closure.
 - A complete synthetic fixture remains refused for three explicit reasons:
   `MISSING_EXECUTABLE_SOURCE_AUTHORITY`, `MISSING_IMMUTABLE_STABLEHLO_PARSER_AUTHORITY`, and
   `MISSING_PINNED_COHERENT_CAPSULE_PRODUCER`. Therefore v2 has no positive admission path and cannot

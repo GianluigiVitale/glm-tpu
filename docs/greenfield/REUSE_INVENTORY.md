@@ -840,11 +840,13 @@ separately, and the parent independently derives the full FP32 addition before a
 `layer1.rms_input_fp32`. Reuse this invariant for new candidates; DB518 lacks these candidate
 operands and the rejected callback remains perturbation evidence only.
 
-Canonical report `docs/artifacts/gate-d-precompile-admission-v2.json` currently refuses both
-survivors because their source/AST, plan, causal StableHLO and coherent capsules do not yet exist.
+Canonical report `docs/artifacts/gate-d-precompile-admission-v2.json` binds the tuple candidate's
+concrete source/callsite at `c8b2200` and refuses it for plan, causal StableHLO and coherent capsule;
+the compensated candidate also lacks source authority.
 This report is the correct offline starting point; do not modify v1, relabel DB518 state, compile a
 placeholder or infer TPU causality from structural synthetic fixtures. V2 has no positive admission
-path until executable source/callsite authority, immutable parser loading and a pinned capsule
-producer/execution receipt exist.
-The canonical contract/report/locality SHAs are `237d76cc...4412`, `c64fcf2e...a06e` and
-`49cf6bb1...25eb`; focused/adjacent offline coverage is 50/50 plus 69/69.
+path for the tuple candidate until plan authority, immutable parser-backed causal StableHLO and a
+pinned capsule producer/execution receipt exist; the compensated candidate also needs concrete
+source/callsite authority.
+The canonical contract/report/locality SHAs are `74e8c06f...7752`, `1ce76704...2957` and
+`49cf6bb1...25eb`; focused/source-only/adjacent offline coverage is 58/58, 2/2 and 69/69.

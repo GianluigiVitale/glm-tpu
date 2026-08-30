@@ -8141,24 +8141,24 @@ authorizes no compilation or TPU execution.
 ## Current exact next: adversarially close precompile admission v2; no TPU action
 
 Append-only precompile admission v2 now represents the authority ordering that v1 could not and
-validates hostile fixtures for declarative source semantics, plan, full-RMS StableHLO structure and
-the typed eight-watchpoint capsule schema. It deliberately cannot admit a candidate: the current
-source snippet is an abstract semantic DSL rather than executable integration source, the copied
-jaxlib parser tree is not immutable against a same-UID replace/import race, and capsule coherence
-has no pinned producer/execution receipt. Core `glm_tpu/greenfield/gate_d_precompile_admission.py`
-is `104fc7b5...be3c`; CLI `scripts/greenfield/admit_gate_d_precompile.py` is
+validates committed concrete or declarative source semantics, plan, full-RMS StableHLO structure
+and the typed eight-watchpoint capsule schema. It deliberately cannot admit a candidate: the copied
+jaxlib parser tree is not immutable against a same-UID replace/import race and capsule coherence has
+no pinned producer/execution receipt. Core `glm_tpu/greenfield/gate_d_precompile_admission.py`
+is `000a2348...7aa6`; CLI `scripts/greenfield/admit_gate_d_precompile.py` is
 `044b2b21...0442`; contract `configs/greenfield-gate-d-precompile-admission-v2.json` is
-`237d76cc...4412`; the jaxlib-MLIR structural validator is `40a11962...8204`; physical-locality
+`74e8c06f...7752`; the jaxlib-MLIR structural validator is `40a11962...8204`; physical-locality
 authority `docs/artifacts/gate-d-runtime-locality-authority.json` is `49cf6bb1...25eb`; canonical
-report `docs/artifacts/gate-d-precompile-admission-v2.json` is `c64fcf2e...a06e`.
+report `docs/artifacts/gate-d-precompile-admission-v2.json` is `1ce76704...2957`.
 
 The canonical classification is
-`NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`. Both sealed survivors are
-refused with exactly `MISSING_SOURCE_AST_AUTHORITY`, `MISSING_PLAN_AUTHORITY`,
-`MISSING_CAUSAL_STABLEHLO_AUTHORITY` and `MISSING_CANDIDATE_COHERENT_CAPSULE`. V2 inherits the exact
+`NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`. The tuple-auxiliary survivor
+now has concrete committed source authority and is refused for plan, causal StableHLO and coherent
+capsule only. The compensated survivor retains the additional `MISSING_SOURCE_AST_AUTHORITY`. V2
+inherits the exact
 v1 frontier/closure set and binds its own core/CLI/parser/toolchain. It requires the exact accepted
-weighted and carried RMS slices, validates a declarative function and consumer edge as distinct
-committed Git blob/AST symbols, parses full three-input RMS StableHLO with bound jaxlib MLIR,
+weighted and carried RMS slices, validates concrete imports/operators/caller or a non-admissible
+declarative fixture as distinct committed Git blob/AST symbols, parses full three-input StableHLO,
 proves auxiliary causality, requires all primary roots to remain identical, and rejects extra args,
 roots, dead operations, host/custom-call effects and collectives outside sealed physically local
 groups. The capsule is fixed to exact PP16/PP8 shapes, dtypes, roles, owner-axis slots and runtime-
@@ -8199,9 +8199,9 @@ both candidate BF16 RMS operands and byte-match their independently derived FP32
 authority cannot be produced offline, reject that variant and do not compile. Only a v2 admission plus a separate
 compile-only review may consider one optimized-HLO acquisition. Gate D remains open.
 
-## Uncommitted source-only tuple-auxiliary candidate; no compile authority
+## Committed source-only tuple-auxiliary candidate; source authority only
 
-The first remaining v2 blocker is implemented locally without compilation in
+The first remaining v2 blocker was implemented without compilation in commit `c8b2200` in
 `glm_tpu/greenfield/kernels/reference/rmsnorm.py`: default-off
 `fused_add_rms_norm_with_auxiliary` writes the accepted weighted/double-rounded RMS arithmetic
 concretely and returns the same FP32 sum consumed by variance as a third device tuple member. The
@@ -8217,6 +8217,19 @@ has not compiled or executed the candidate and is not v2 admission evidence. Fab
 no opinion because its usage was at 100%; the goal-authorized Sol fallback blocked the first proof
 because it did not bind exact arithmetic, then approved corrected staged SHA
 `231979e1...a7362` with no remaining P0--P2 after exact alpha-normalized expression, NamedTuple and
-branch AST checks. Only the resulting committed pin may
-be used to build the separate concrete source certificate and immutable-parser correction; the
-producer-bound coherent capsule remains missing. Gate D is open and no TPU action is authorized.
+branch AST checks. The current local admission-v2 correction binds that exact commit, both source
+files and five symbols, exact imports/no rebinding, accepted arithmetic after only alpha-renaming,
+the real false-default caller and device tuple schema. Certificate
+`docs/artifacts/gate-d-tuple-auxiliary-source-authority.json` is `c95c8aa1...f0e1`. The canonical
+report now accepts concrete source authority only. Focused hostile coverage is 58/58 in 2,277.49
+seconds with four isolated workers, including
+conditional global rebinding and hidden executable-statement attacks; plan, immutable causal StableHLO and the
+producer-bound coherent capsule remain missing. Gate D is open and no compile/TPU action is
+authorized.
+
+Fable 5 Max session `d6512b94-52af-4a03-85de-d7d5b43ea5cc` returned only its hard usage-limit
+message and supplied no opinion. The goal-authorized Sol fallback approved exact staged SHA
+`5003b44e...55bf` for persistence with no P0--P2 after independently confirming the parent/source
+commit and blobs, hard-whitelisted source/certificate/semantic pins, concrete arithmetic/caller
+checks, canonical report and exact remaining reason sets. The verdict authorizes persistence only:
+no JAX/backend/model/cloud/compile/TPU execution and no Gate-D closure.

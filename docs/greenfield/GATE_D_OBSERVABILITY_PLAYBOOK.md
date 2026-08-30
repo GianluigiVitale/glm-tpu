@@ -167,14 +167,16 @@ Do not weaken v1 or rewrite its historical evidence. The append-only repair now 
 - hostile tests: `tests/greenfield/validation/test_gate_d_precompile_admission.py`;
 - canonical report: `docs/artifacts/gate-d-precompile-admission-v2.json`.
 
-V2 authenticates committed blob/AST identity for a declarative source fixture, a content-derived
-plan, structural StableHLO and typed eight-watchpoint capsule invariants. Its parent process remains
+V2 authenticates committed blob/AST identity for concrete or declarative source authority, a
+content-derived plan, structural StableHLO and typed eight-watchpoint capsule invariants. The tuple
+survivor now binds concrete commit `c8b2200`; the compensated survivor has no source authority,
+and declarative fixtures remain non-admissible.
+Its parent process remains
 stdlib-only; HLO fixture validation runs in a SHA-bound offline child using jaxlib MLIR without
 importing `jax`, compiling or initializing a backend. It also inherits the exact v1
-frontier and closed fingerprints rather than resetting history. The current contract leaves all four
-candidate authorities null for both surviving declarations, so the canonical report refuses both
-with `MISSING_SOURCE_AST_AUTHORITY`, `MISSING_PLAN_AUTHORITY`,
-`MISSING_CAUSAL_STABLEHLO_AUTHORITY` and `MISSING_CANDIDATE_COHERENT_CAPSULE`. V2 always leaves
+frontier and closed fingerprints rather than resetting history. The canonical report accepts only
+the tuple candidate's concrete source authority. It still refuses that candidate for plan,
+StableHLO and capsule gaps; the compensated candidate also lacks source authority. V2 always leaves
 candidate admission and TPU authorization false. A synthetic complete fixture is still refused
 until concrete executable source/callsite authority, immutable parser loading and a pinned
 replayable capsule producer/execution receipt exist.

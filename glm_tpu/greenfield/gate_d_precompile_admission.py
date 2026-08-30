@@ -73,6 +73,14 @@ _EXPECTED_ACCEPTED_SOURCE = {
     "path": "vllm/ir/ops/layernorm.py",
     "symbol": "fused_add_rms_norm",
 }
+_EXPECTED_CONCRETE_TUPLE_SOURCE = {
+    "candidate_ast_sha256": "c94e64312aef9fa24bb5466082f787c579874e6f60ea512a72802ea77e3b4b14",
+    "callsite_ast_sha256": "27caa9d6276301a8caacaabd1d5564f5ee7c6b595793a54d915ee0dcfcd2045d",
+    "certificate_sha256": "c95c8aa188e2eda77270022128d121dc3693a899607b1ab2f9977ddb45def0e1",
+    "code_pin": "c8b220067577004ddfb824667eadc746642baaca",
+    "semantic_sha256": "49c2854b8c2e5a1dee760e22a647e45ba1a345fd031b6a1c14f1e732aa048ef3",
+    "source_set_sha256": "f1055660a97389ecd4700eff40d679657c8f274153cde5fe19e567b6435323bc",
+}
 _EXPECTED_VALIDATOR_IMPORTS = {
     "jaxlib/__init__.py": (629, "2a5b37b2bc9802769f45ca43de7cdc1a8b532f0afd2bf9542131ab68f649c4a3"),
     "jaxlib/libjax_common.so": (
@@ -1177,6 +1185,442 @@ def _candidate_source_semantics(
     }
 
 
+def _module_imports(tree: ast.Module) -> set[str]:
+    return {
+        ast.dump(node, annotate_fields=True, include_attributes=False)
+        for node in tree.body
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+    }
+
+
+def _assignment_names(target: ast.AST) -> set[str]:
+    if isinstance(target, ast.Name):
+        return {target.id}
+    if isinstance(target, (ast.Tuple, ast.List)):
+        return set().union(*(_assignment_names(item) for item in target.elts))
+    return set()
+
+
+def _top_level_bindings(tree: ast.Module) -> dict[str, list[str]]:
+    bindings: dict[str, list[str]] = {}
+    for statement in tree.body:
+        names: set[str] = set()
+        if isinstance(statement, ast.Import):
+            names = {
+                alias.asname or alias.name.split(".", 1)[0]
+                for alias in statement.names
+            }
+        elif isinstance(statement, ast.ImportFrom):
+            names = {alias.asname or alias.name for alias in statement.names}
+        elif isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names = {statement.name}
+        elif isinstance(statement, ast.Assign):
+            names = set().union(
+                *(_assignment_names(target) for target in statement.targets)
+            )
+        elif isinstance(statement, ast.AnnAssign):
+            names = _assignment_names(statement.target)
+        dump = ast.dump(statement, annotate_fields=True, include_attributes=False)
+        for name in names:
+            bindings.setdefault(name, []).append(dump)
+    return bindings
+
+
+def _refuse_sensitive_rebinding(
+    tree: ast.Module,
+    names: set[str],
+    *,
+    label: str,
+) -> None:
+    top_level_imports = {
+        id(node)
+        for node in tree.body
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+    }
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in names and isinstance(
+            node.ctx, (ast.Store, ast.Del)
+        ):
+            raise BenchmarkValidationError(f"{label} was rebound")
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and (
+            node.name in names
+        ):
+            raise BenchmarkValidationError(f"{label} was rebound")
+        if isinstance(node, (ast.Global, ast.Nonlocal)) and names.intersection(node.names):
+            raise BenchmarkValidationError(f"{label} was rebound")
+        if isinstance(node, ast.Import):
+            bound = {
+                alias.asname or alias.name.split(".", 1)[0]
+                for alias in node.names
+            }
+            if names.intersection(bound) and id(node) not in top_level_imports:
+                raise BenchmarkValidationError(f"{label} was rebound")
+        if isinstance(node, ast.ImportFrom):
+            bound = {alias.asname or alias.name for alias in node.names}
+            if names.intersection(bound) and id(node) not in top_level_imports:
+                raise BenchmarkValidationError(f"{label} was rebound")
+
+
+def _simple_assignments(function: ast.FunctionDef) -> dict[str, ast.AST]:
+    return {
+        target.id: statement.value
+        for statement in function.body
+        if isinstance(statement, ast.Assign)
+        and len(statement.targets) == 1
+        and isinstance((target := statement.targets[0]), ast.Name)
+    }
+
+
+class _AstNameRename(ast.NodeTransformer):
+    def __init__(self, old: str, new: str) -> None:
+        self.old = old
+        self.new = new
+
+    def visit_Name(self, node: ast.Name) -> ast.Name:  # noqa: N802
+        if node.id == self.old:
+            return ast.copy_location(ast.Name(id=self.new, ctx=node.ctx), node)
+        return node
+
+
+def _normalized_expression(value: ast.AST, old: str, new: str) -> str:
+    clone = ast.parse(ast.unparse(value), mode="eval").body
+    clone = _AstNameRename(old, new).visit(clone)
+    ast.fix_missing_locations(clone)
+    return ast.dump(clone, annotate_fields=True, include_attributes=False)
+
+
+def _validation_guards(function: ast.FunctionDef) -> list[ast.If]:
+    if (
+        not function.body
+        or not isinstance(function.body[0], ast.Expr)
+        or not isinstance(function.body[0].value, ast.Constant)
+        or not isinstance(function.body[0].value.value, str)
+    ):
+        raise BenchmarkValidationError("concrete source function docstring drifted")
+    guards: list[ast.If] = []
+    index = 1
+    while index < len(function.body) and isinstance(function.body[index], ast.If):
+        guard = function.body[index]
+        if (
+            guard.orelse
+            or len(guard.body) != 1
+            or not isinstance(guard.body[0], ast.Raise)
+            or not isinstance(guard.body[0].exc, ast.Call)
+            or ast.unparse(guard.body[0].exc.func) != "ValueError"
+            or len(guard.body[0].exc.args) != 1
+            or not isinstance(guard.body[0].exc.args[0], ast.Constant)
+            or not isinstance(guard.body[0].exc.args[0].value, str)
+            or guard.body[0].exc.keywords
+            or guard.body[0].cause is not None
+        ):
+            raise BenchmarkValidationError("concrete source validation guard drifted")
+        guards.append(guard)
+        index += 1
+    if len(guards) != 7:
+        raise BenchmarkValidationError("concrete source validation guards drifted")
+    return guards
+
+
+def _named_tuple_fields(node: ast.AST, label: str) -> list[tuple[str, str]]:
+    if (
+        not isinstance(node, ast.ClassDef)
+        or [ast.unparse(base) for base in node.bases] != ["NamedTuple"]
+        or node.decorator_list
+        or node.keywords
+        or not node.body
+        or not isinstance(node.body[0], ast.Expr)
+        or not isinstance(node.body[0].value, ast.Constant)
+        or not isinstance(node.body[0].value.value, str)
+        or any(not isinstance(statement, ast.AnnAssign) for statement in node.body[1:])
+        or any(
+            statement.value is not None or statement.simple != 1
+            for statement in node.body[1:]
+            if isinstance(statement, ast.AnnAssign)
+        )
+    ):
+        raise BenchmarkValidationError(f"{label} is not one exact NamedTuple")
+    fields = [
+        (statement.target.id, ast.unparse(statement.annotation))
+        for statement in node.body
+        if isinstance(statement, ast.AnnAssign)
+        and isinstance(statement.target, ast.Name)
+    ]
+    if len(fields) != len(node.body) - 1:
+        raise BenchmarkValidationError(f"{label} fields are not canonical")
+    return fields
+
+
+def _concrete_tuple_source_semantics(
+    symbols: Mapping[str, ast.AST],
+    modules: Mapping[str, ast.Module],
+) -> dict[str, Any]:
+    required = {
+        "candidate.source:FusedAddRmsNormAuxiliaryResult",
+        "candidate.source:fused_add_rms_norm",
+        "candidate.source:fused_add_rms_norm_with_auxiliary",
+        "candidate.callsite:StageLocalSplitLayerFp8AuxiliaryResult",
+        "candidate.callsite:stage_local_transformer_layer_fp8_split_mapped",
+    }
+    if not required.issubset(symbols):
+        raise BenchmarkValidationError("concrete source symbol set is incomplete")
+    rms_module = modules.get("candidate.source")
+    layer_module = modules.get("candidate.callsite")
+    if not isinstance(rms_module, ast.Module) or not isinstance(layer_module, ast.Module):
+        raise BenchmarkValidationError("concrete source modules are absent")
+    rms_imports = _module_imports(rms_module)
+    layer_imports = _module_imports(layer_module)
+    expected_rms_imports = _module_imports(
+        ast.parse(
+            "from __future__ import annotations\n"
+            "from typing import NamedTuple\n"
+            "import jax\n"
+            "from jax import lax\n"
+            "import jax.numpy as jnp\n"
+        )
+    )
+    expected_layer_import = ast.dump(
+        ast.parse(
+            "from .reference.rmsnorm import (fused_add_rms_norm, "
+            "fused_add_rms_norm_with_auxiliary, rms_norm)\n"
+        ).body[0],
+        annotate_fields=True,
+        include_attributes=False,
+    )
+    if not expected_rms_imports.issubset(rms_imports) or expected_layer_import not in layer_imports:
+        raise BenchmarkValidationError("concrete source imports are not bound")
+    rms_bindings = _top_level_bindings(rms_module)
+    layer_bindings = _top_level_bindings(layer_module)
+    expected_rms_tree = ast.parse(
+        "from typing import NamedTuple\n"
+        "import jax\n"
+        "from jax import lax\n"
+        "import jax.numpy as jnp\n"
+    )
+    expected_binding = _top_level_bindings(expected_rms_tree)
+    for name in ("NamedTuple", "jax", "lax", "jnp"):
+        if rms_bindings.get(name) != expected_binding[name]:
+            raise BenchmarkValidationError("concrete source global import was rebound")
+    if any(name in rms_bindings for name in ("ValueError", "isinstance", "int", "float", "bool")):
+        raise BenchmarkValidationError("concrete source builtin was rebound")
+    layer_import_node = ast.parse(
+        "from .reference.rmsnorm import (fused_add_rms_norm, "
+        "fused_add_rms_norm_with_auxiliary, rms_norm)\n"
+    ).body[0]
+    layer_import_dump = ast.dump(
+        layer_import_node, annotate_fields=True, include_attributes=False
+    )
+    for name in ("fused_add_rms_norm", "fused_add_rms_norm_with_auxiliary"):
+        if layer_bindings.get(name) != [layer_import_dump]:
+            raise BenchmarkValidationError("concrete source caller import was rebound")
+    _refuse_sensitive_rebinding(
+        rms_module,
+        {"NamedTuple", "ValueError", "bool", "float", "int", "isinstance", "jax", "jnp", "lax"},
+        label="concrete source global import",
+    )
+    _refuse_sensitive_rebinding(
+        layer_module,
+        {"fused_add_rms_norm", "fused_add_rms_norm_with_auxiliary"},
+        label="concrete source caller import",
+    )
+    if _named_tuple_fields(
+        symbols["candidate.source:FusedAddRmsNormAuxiliaryResult"],
+        "candidate RMS result",
+    ) != [
+        ("output", "jax.Array"),
+        ("carried_residual", "jax.Array"),
+        ("rms_input_fp32", "jax.Array"),
+    ]:
+        raise BenchmarkValidationError("candidate RMS result fields drifted")
+    if _named_tuple_fields(
+        symbols["candidate.callsite:StageLocalSplitLayerFp8AuxiliaryResult"],
+        "candidate layer result",
+    ) != [
+        ("result", "StageLocalSplitLayerFp8Result"),
+        ("input_rms_fp32", "Any"),
+    ]:
+        raise BenchmarkValidationError("candidate layer result fields drifted")
+    accepted = symbols["candidate.source:fused_add_rms_norm"]
+    candidate = symbols["candidate.source:fused_add_rms_norm_with_auxiliary"]
+    caller = symbols["candidate.callsite:stage_local_transformer_layer_fp8_split_mapped"]
+    if not all(isinstance(item, ast.FunctionDef) for item in (accepted, candidate, caller)):
+        raise BenchmarkValidationError("concrete source functions are invalid")
+    if (
+        accepted.decorator_list
+        or candidate.decorator_list
+        or ast.dump(accepted.args) != ast.dump(candidate.args)
+    ):
+        raise BenchmarkValidationError("concrete source function signature drifted")
+    expected_args = ast.parse(
+        "def expected(hidden_states: jax.Array, residual: jax.Array, "
+        "weight: jax.Array, *, epsilon: float):\n    pass\n"
+    ).body[0]
+    if not isinstance(expected_args, ast.FunctionDef) or ast.dump(
+        accepted.args
+    ) != ast.dump(expected_args.args):
+        raise BenchmarkValidationError("accepted source function signature drifted")
+    accepted_guards = _validation_guards(accepted)
+    candidate_guards = _validation_guards(candidate)
+    expected_guard_tests = [
+        ast.parse(f"if {expression}:\n    pass\n").body[0].test
+        for expression in (
+            "hidden_states.shape != residual.shape",
+            "hidden_states.dtype != residual.dtype",
+            "hidden_states.ndim < 1",
+            "weight.shape != (hidden_states.shape[-1],)",
+            "not isinstance(epsilon, (int, float)) or isinstance(epsilon, bool) or epsilon <= 0",
+            "not jnp.issubdtype(hidden_states.dtype, jnp.inexact)",
+            "not jnp.issubdtype(weight.dtype, jnp.inexact)",
+        )
+    ]
+    if [ast.dump(item.test) for item in accepted_guards] != [
+        ast.dump(item) for item in expected_guard_tests
+    ] or [ast.dump(item.test) for item in candidate_guards] != [
+        ast.dump(item) for item in expected_guard_tests
+    ]:
+        raise BenchmarkValidationError("concrete source validation conditions drifted")
+    accepted_assignments = _simple_assignments(accepted)
+    candidate_assignments = _simple_assignments(candidate)
+    pairs = (
+        ("activation_dtype", "activation_dtype"),
+        ("summed", "rms_input_fp32"),
+        ("carried_residual", "carried_residual"),
+        ("variance", "variance"),
+        ("normalized", "normalized"),
+        ("output", "output"),
+    )
+    if set(accepted_assignments) != {left for left, _ in pairs} or set(
+        candidate_assignments
+    ) != {right for _, right in pairs}:
+        raise BenchmarkValidationError("concrete source arithmetic assignments drifted")
+    if [type(item) for item in accepted.body] != (
+        [ast.Expr] + [ast.If] * 7 + [ast.Assign] * 6 + [ast.Return]
+    ) or [type(item) for item in candidate.body] != (
+        [ast.Expr] + [ast.If] * 7 + [ast.Assign] * 6 + [ast.Return]
+    ):
+        raise BenchmarkValidationError("concrete source executable body drifted")
+    expected_expressions = {
+        "activation_dtype": "hidden_states.dtype",
+        "summed": "hidden_states.astype(jnp.float32) + residual.astype(jnp.float32)",
+        "carried_residual": "summed.astype(activation_dtype)",
+        "variance": "jnp.mean(lax.square(summed), axis=-1, keepdims=True)",
+        "normalized": "summed * lax.rsqrt(variance + jnp.float32(epsilon))",
+        "output": "(normalized.astype(weight.dtype) * weight).astype(activation_dtype)",
+    }
+    for name, expression in expected_expressions.items():
+        if _normalized_expression(
+            accepted_assignments[name], "summed", "summed"
+        ) != _normalized_expression(ast.parse(expression, mode="eval").body, "summed", "summed"):
+            raise BenchmarkValidationError("accepted source primary arithmetic drifted")
+    for accepted_name, candidate_name in pairs:
+        if _normalized_expression(
+            accepted_assignments[accepted_name], "summed", "summed"
+        ) != _normalized_expression(
+            candidate_assignments[candidate_name], "rms_input_fp32", "summed"
+        ):
+            raise BenchmarkValidationError("concrete source primary arithmetic drifted")
+    accepted_return = accepted.body[-1]
+    if (
+        not isinstance(accepted_return, ast.Return)
+        or not isinstance(accepted_return.value, ast.Tuple)
+        or [ast.unparse(item) for item in accepted_return.value.elts]
+        != ["output", "carried_residual"]
+    ):
+        raise BenchmarkValidationError("accepted source return drifted")
+    returned = candidate.body[-1]
+    if (
+        not isinstance(returned, ast.Return)
+        or not isinstance(returned.value, ast.Call)
+        or ast.unparse(returned.value.func) != "FusedAddRmsNormAuxiliaryResult"
+        or [ast.unparse(item) for item in returned.value.args]
+        != ["output", "carried_residual", "rms_input_fp32"]
+        or returned.value.keywords
+    ):
+        raise BenchmarkValidationError("concrete source tuple return drifted")
+    keyword_defaults = dict(
+        zip(
+            (argument.arg for argument in caller.args.kwonlyargs),
+            caller.args.kw_defaults,
+            strict=True,
+        )
+    )
+    default = keyword_defaults.get("retain_input_rms_auxiliary")
+    if not isinstance(default, ast.Constant) or default.value is not False:
+        raise BenchmarkValidationError("concrete source flag is not default off")
+    branches = [
+        node
+        for node in caller.body
+        if isinstance(node, ast.If)
+        and ast.unparse(node.test) == "retain_input_rms_auxiliary"
+    ]
+    if len(branches) != 2:
+        raise BenchmarkValidationError("concrete source caller branches drifted")
+    expected_enabled = ast.parse(
+        "rms_candidate = fused_add_rms_norm_with_auxiliary("
+        "hidden_states, residual, input_norm_weight, epsilon=rms_norm_epsilon)\n"
+        "normalized_input = rms_candidate.output\n"
+        "combined_residual = rms_candidate.carried_residual\n"
+        "input_rms_fp32 = rms_candidate.rms_input_fp32\n"
+    ).body
+    expected_default = ast.parse(
+        "normalized_input, combined_residual = fused_add_rms_norm("
+        "hidden_states, residual, input_norm_weight, epsilon=rms_norm_epsilon)\n"
+        "input_rms_fp32 = None\n"
+    ).body
+    enabled = next((item for item in branches if item.orelse), None)
+    if (
+        enabled is None
+        or ast.dump(ast.Module(body=enabled.body, type_ignores=[]))
+        != ast.dump(ast.Module(body=expected_enabled, type_ignores=[]))
+        or ast.dump(ast.Module(body=enabled.orelse, type_ignores=[]))
+        != ast.dump(ast.Module(body=expected_default, type_ignores=[]))
+    ):
+        raise BenchmarkValidationError("concrete source caller selection drifted")
+    return_branch = next((item for item in branches if not item.orelse), None)
+    wrapper_returns = [
+        node
+        for node in (return_branch.body if return_branch is not None else [])
+        if isinstance(node, ast.Return)
+        and isinstance(node.value, ast.Call)
+        and ast.unparse(node.value.func) == "StageLocalSplitLayerFp8AuxiliaryResult"
+    ]
+    if (
+        return_branch is None
+        or len(return_branch.body) != 2
+        or not isinstance(return_branch.body[0], ast.Assert)
+        or ast.unparse(return_branch.body[0].test) != "input_rms_fp32 is not None"
+        or len(wrapper_returns) != 1
+        or [ast.unparse(item) for item in wrapper_returns[0].value.args]
+        != ["result", "input_rms_fp32"]
+        or wrapper_returns[0].value.keywords
+    ):
+        raise BenchmarkValidationError("concrete source device return drifted")
+    text = ast.unparse(candidate) + ast.unparse(caller)
+    if any(
+        marker in text
+        for marker in (
+            "debug.callback",
+            "debug.print",
+            "device_get",
+            "host_callback",
+            "io_callback",
+            "np.asarray",
+            "pure_callback",
+        )
+    ):
+        raise BenchmarkValidationError("concrete source contains a host effect")
+    return {
+        "authority_scope": "concrete.committed.jax.source",
+        "auxiliary": "transient.fp32.sum",
+        "callsite": "stage_local_transformer_layer_fp8_split_mapped.default_off_device_tuple",
+        "carried_residual": "bf16.round(transient.fp32.sum)",
+        "frontier": "layer1.rms_input_fp32",
+        "normalization_input": "transient.fp32.sum",
+        "weighted_output": (
+            "bf16.round(bf16.round(transient*rsqrt(mean(square(transient))+epsilon))*weight)"
+        ),
+    }
+
+
 def _accepted_semantics_from_evidence(document: Mapping[str, Any]) -> dict[str, Any]:
     authority = document.get("accepted_authority")
     logical_hlo = document.get("accepted_logical_hlo_authority")
@@ -1292,13 +1736,18 @@ def _read_source_records(
     *,
     git_path: Path,
     git_sha256: str,
-) -> tuple[list[dict[str, Any]], dict[str, ast.AST]]:
+) -> tuple[
+    list[dict[str, Any]],
+    dict[str, ast.AST],
+    dict[str, ast.Module],
+]:
     if not isinstance(files, list) or not files:
         raise BenchmarkValidationError("source authority files must be non-empty")
     records: list[dict[str, Any]] = []
     file_ids: set[str] = set()
     symbol_ids: set[str] = set()
     symbol_nodes: dict[str, ast.AST] = {}
+    file_modules: dict[str, ast.Module] = {}
     with _open_directory_no_symlinks(repository_root, "source repository") as repository:
         resolved_commit = _git_output(
             repository,
@@ -1388,6 +1837,7 @@ def _read_source_records(
                 raise BenchmarkValidationError(
                     f"source file is not valid Python: {source_id}"
                 ) from error
+            file_modules[source_id] = tree
             symbols = item["symbols"]
             if not isinstance(symbols, list) or not symbols:
                 raise BenchmarkValidationError(f"source symbols are absent: {source_id}")
@@ -1437,7 +1887,11 @@ def _read_source_records(
                     ),
                 }
             )
-    return sorted(records, key=lambda item: item["id"]), symbol_nodes
+    return (
+        sorted(records, key=lambda item: item["id"]),
+        symbol_nodes,
+        file_modules,
+    )
 
 
 def _verify_source_authority(
@@ -1466,7 +1920,7 @@ def _verify_source_authority(
     code_pin = _code_pin(repository["commit"], "source authority code pin")
     repository_root = _resolve(base, repository["root"], "source repository root")
     files = value["files"]
-    records, symbol_nodes = _read_source_records(
+    records, symbol_nodes, file_modules = _read_source_records(
         repository_root,
         code_pin,
         files,
@@ -1490,6 +1944,7 @@ def _verify_source_authority(
         {
             "accepted_authority_sha256",
             "arithmetic_contract",
+            "authority_kind",
             "candidate_id",
             "candidate_callsite_symbol",
             "candidate_semantic_sha256",
@@ -1508,6 +1963,14 @@ def _verify_source_authority(
     )
     if certificate["schema_version"] != GATE_D_PRECOMPILE_ADMISSION_SCHEMA_VERSION:
         raise BenchmarkValidationError("source semantics certificate schema drifted")
+    authority_kind = _identifier(
+        certificate["authority_kind"], "source authority kind"
+    )
+    if authority_kind not in {
+        "declarative.semantic.dsl",
+        "concrete.committed.jax.source",
+    }:
+        raise BenchmarkValidationError("source authority kind is unsupported")
     if (
         certificate["candidate_id"] != candidate_id
         or certificate["causal_frontier_action"] != frontier_action
@@ -1537,14 +2000,45 @@ def _verify_source_authority(
         or callsite_symbol == candidate_symbol
     ):
         raise BenchmarkValidationError("source symbol authority is incomplete")
-    source_semantics = _candidate_source_semantics(
-        symbol_nodes[candidate_symbol], symbol_nodes[callsite_symbol], candidate_id
-    )
+    if authority_kind == "concrete.committed.jax.source":
+        if (
+            candidate_id != "auxiliary_device_tuple_dependency"
+            or candidate_symbol
+            != "candidate.source:fused_add_rms_norm_with_auxiliary"
+            or callsite_symbol
+            != "candidate.callsite:stage_local_transformer_layer_fp8_split_mapped"
+        ):
+            raise BenchmarkValidationError("concrete source identity drifted")
+        if (
+            code_pin != _EXPECTED_CONCRETE_TUPLE_SOURCE["code_pin"]
+            or source_set_sha
+            != _EXPECTED_CONCRETE_TUPLE_SOURCE["source_set_sha256"]
+            or certificate_sha
+            != _EXPECTED_CONCRETE_TUPLE_SOURCE["certificate_sha256"]
+            or available_symbols[candidate_symbol]
+            != _EXPECTED_CONCRETE_TUPLE_SOURCE["candidate_ast_sha256"]
+            or available_symbols[callsite_symbol]
+            != _EXPECTED_CONCRETE_TUPLE_SOURCE["callsite_ast_sha256"]
+        ):
+            raise BenchmarkValidationError("concrete source reviewed authority drifted")
+        source_semantics = _concrete_tuple_source_semantics(
+            symbol_nodes, file_modules
+        )
+    else:
+        source_semantics = _candidate_source_semantics(
+            symbol_nodes[candidate_symbol], symbol_nodes[callsite_symbol], candidate_id
+        )
     source_semantic_sha = sha256(
         _canonical_json(source_semantics).encode("ascii")
     ).hexdigest()
     if certificate["candidate_semantic_sha256"] != source_semantic_sha:
         raise BenchmarkValidationError("candidate source/HLO semantics binding drifted")
+    if (
+        authority_kind == "concrete.committed.jax.source"
+        and source_semantic_sha
+        != _EXPECTED_CONCRETE_TUPLE_SOURCE["semantic_sha256"]
+    ):
+        raise BenchmarkValidationError("concrete source reviewed semantics drifted")
     claim_scope = _string(
         certificate["claim_scope"], "source semantics certificate claim scope"
     )
@@ -1589,6 +2083,7 @@ def _verify_source_authority(
         "certificate_sha256": certificate_sha,
         "code_pin": code_pin,
         "accepted_authority_sha256": accepted_semantics["authority_sha256"],
+        "authority_kind": authority_kind,
         "candidate_symbol": {
             "ast_sha256": available_symbols[candidate_symbol],
             "id": candidate_symbol,
@@ -1599,14 +2094,18 @@ def _verify_source_authority(
         },
         "certificate_claim_scope": claim_scope,
         "compensation_claim": expected_compensation_claim,
-        "executable_source_authority": False,
+        "executable_source_authority": (
+            authority_kind == "concrete.committed.jax.source"
+        ),
         "files": records,
         "mechanism_fingerprint_sha256": mechanism_fingerprint_sha256,
         "repository_root": str(repository_root),
         "source_semantic_sha256": source_semantic_sha,
         "source_set_sha256": source_set_sha,
         "validation_scope": (
-            "declarative semantic DSL and consumer-edge fixture only; "
+            "concrete committed JAX operators and real default-off device caller"
+            if authority_kind == "concrete.committed.jax.source"
+            else "declarative semantic DSL and consumer-edge fixture only; "
             "abstract operators and the real integration caller are not bound"
         ),
     }
@@ -1618,6 +2117,7 @@ def _verify_source_authority(
                 "accepted_authority_sha256": accepted_semantics[
                     "authority_sha256"
                 ],
+                "authority_kind": authority_kind,
                 "candidate_ast_sha256": available_symbols[candidate_symbol],
                 "callsite_ast_sha256": available_symbols[callsite_symbol],
                 "compensation_claim": expected_compensation_claim,
@@ -2797,7 +3297,8 @@ def admit_gate_d_precompile_candidates(
                     implementation=implementation,
                     accepted_semantics=accepted_semantics,
                 )
-                reasons.append("MISSING_EXECUTABLE_SOURCE_AUTHORITY")
+                if source_report["executable_source_authority"] is not True:
+                    reasons.append("MISSING_EXECUTABLE_SOURCE_AUTHORITY")
             except BenchmarkValidationError as error:
                 reasons.append("INVALID_SOURCE_AST_AUTHORITY")
                 source_report = {"refusal": str(error)}

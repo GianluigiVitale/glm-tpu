@@ -1036,9 +1036,10 @@ normalized-state cause.
 - Bound total NPZ decompression before reading members, reject non-stored/deflated compression,
   traverse every parent with no-follow directory descriptors and make append-only publication safe
   against concurrent replacement.
-- The current v2 report refuses both surviving variants for four missing authorities and always
-  leaves compilation/TPU authorization false. This is an honest sequencing result, not Gate-D
-  progress through execution.
+- The current v2 report binds concrete tuple-candidate source/callsite authority and refuses it for
+  plan, StableHLO and producer-bound capsule gaps; the compensated variant also lacks source. It
+  always leaves compilation/TPU authorization false. This is an honest sequencing result, not
+  Gate-D progress through execution.
 - A scalar inversion must target the actual retained program edge. Here qkv-a consumes
   `BF16(BF16(sum*inverse)*weight)`, so an interval for only `BF16(sum*inverse)` omits a sealed
   per-element operand and cannot adjudicate the boundary. Keep the useful BF16-input derivation;

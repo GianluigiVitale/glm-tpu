@@ -28,7 +28,52 @@
       },
       "plan_authority": null,
       "reconstructs_full_pod_hidden": false,
-      "source_authority": null,
+      "source_authority": {
+        "files": [
+          {
+            "id": "candidate.source",
+            "repo_path": "glm_tpu/greenfield/kernels/reference/rmsnorm.py",
+            "sha256": "751d946079f168257d63887bc2a1e4a0bd6b92785fbf3e5cd3635bfba59dd2d7",
+            "symbols": [
+              {
+                "ast_sha256": "f8f6abd15ecac150d7401321dad8154f2ef82db7b5e8570b6e00cbefd22d8268",
+                "qualified_name": "FusedAddRmsNormAuxiliaryResult"
+              },
+              {
+                "ast_sha256": "18e283baeefab51a577fa38afe6314b548420374579ae6a047efda546d36c9e7",
+                "qualified_name": "fused_add_rms_norm"
+              },
+              {
+                "ast_sha256": "c94e64312aef9fa24bb5466082f787c579874e6f60ea512a72802ea77e3b4b14",
+                "qualified_name": "fused_add_rms_norm_with_auxiliary"
+              }
+            ]
+          },
+          {
+            "id": "candidate.callsite",
+            "repo_path": "glm_tpu/greenfield/kernels/layer.py",
+            "sha256": "bfaa79070b9f80825f3365e12e3ce95f67b4ef7b0d0a1a9d15621ce1c474b0ec",
+            "symbols": [
+              {
+                "ast_sha256": "ec19e6d92339537b129bdee1c03e9a49e348a0414befdcd03dfd645a9ca04ce1",
+                "qualified_name": "StageLocalSplitLayerFp8AuxiliaryResult"
+              },
+              {
+                "ast_sha256": "27caa9d6276301a8caacaabd1d5564f5ee7c6b595793a54d915ee0dcfcd2045d",
+                "qualified_name": "stage_local_transformer_layer_fp8_split_mapped"
+              }
+            ]
+          }
+        ],
+        "repository": {
+          "commit": "c8b220067577004ddfb824667eadc746642baaca",
+          "root": ".."
+        },
+        "semantics_certificate": {
+          "path": "../docs/artifacts/gate-d-tuple-auxiliary-source-authority.json",
+          "sha256": "c95c8aa188e2eda77270022128d121dc3693a899607b1ab2f9977ddb45def0e1"
+        }
+      },
       "stablehlo_authority": null,
       "summary": "Carry accepted BF16 primary state plus a semantically isolated FP32 auxiliary through a device-only tuple dependency."
     },
@@ -70,7 +115,7 @@
     "id": "layer1.rms_input_fp32",
     "order": 0
   },
-  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates declarative source AST fixtures, plan/topology, structural StableHLO fixtures and typed capsule shape/content invariants, but cannot admit a candidate until concrete executable source/callsite authority, immutable parser loading and a pinned replayable capsule producer/execution receipt exist. It never authorizes compilation or TPU execution.",
+  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates the tuple candidate's concrete committed JAX source/callsite and can validate declarative fixtures, plan/topology, structural StableHLO and typed capsule shape/content invariants. The current tuple candidate remains unadmitted until plan authority, immutable parser-backed causal StableHLO and a pinned replayable capsule producer/execution receipt exist; the compensated candidate also lacks concrete source authority. It never authorizes compilation or TPU execution.",
   "contract_id": "gate.d.precompile.admission.v2.20260830",
   "evidence": [
     {
@@ -105,7 +150,7 @@
     },
     "core": {
       "path": "../glm_tpu/greenfield/gate_d_precompile_admission.py",
-      "sha256": "104fc7b53a157ef0c8e52529d187e2f0fb9ad151f21a019425e463e7222dbe3c"
+      "sha256": "000a2348521e49bbb48088abf1308ac1cb76f5beee3ce32fc37f48e4e8797aa6"
     },
     "git": {
       "path": "/usr/bin/git",
