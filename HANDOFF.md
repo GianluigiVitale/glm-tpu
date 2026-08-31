@@ -8805,3 +8805,79 @@ Exact next after commit/push/locked `gs://driftbench-dsv4-uc` persistence is a s
 one optimized PP16 TPU-HLO acquisition and locality/numerical-policy inspection. It is not yet
 authorized. Protected layer-1 exact replay follows only after HLO acceptance; full exact 8K is
 later. Never rerun the tuple capsule or reinterpret CPU logical equality as TPU numerical proof.
+
+## 2026-08-31 bounded PP16 compensated-HLO launcher source; not run
+
+The next boundary is implemented as a new default-off, stage-zero-only compile acquisition. New
+builder `gate_d_compensated_pp16_hlo.py` changes only the sealed replay's platform admission from
+two CPU devices to the exact adjacent TPU-v4 pair; a whole-function normalized AST test proves its
+computational body, shard-map inputs/outputs and DSA composition are otherwise identical. It does
+not modify the sealed CPU replay.
+
+Driver `acquire_gate_d_compensated_pp16_hlo.py` authenticates the admitted report, all 14 capsule
+input array shapes/dtypes/hashes, two derived materialized-weight shapes, and DB555 PP16 stage-zero
+topology before importing JAX. It builds only `ShapeDtypeStruct` arguments, lowers once, compiles
+once, writes StableHLO/optimized HLO, and never calls the executable. Wrapper
+`run_gate_d_compensated_pp16_hlo.sh` requires an explicit compile-only opt-in, a clean pushed and
+US-CENTRAL2-byte-mirrored pin, the global TPU lease, authenticated 8/8 pre/post zero-work census,
+exact `[0,1]` live coordinates, a vacant append-only tag, hash-verified same-region archive and a
+terminal marker. The archive is explicitly `HLO_ACQUIRED_UNADJUDICATED`; numerical, performance
+and Gate-D claims remain false.
+
+The first same-scope Sol review withheld persistence on three P1 boundaries: replace-capable local
+publication, non-generation-bound `rsync` archive publication, and project imports from the mutable
+worktree. A second frozen-diff review then found four additional P1s: the configured live root was
+0775 although the publisher required private authority; wrapper redirects still bypassed the
+exclusive writer and destroyed the raw vacancy result; remote SHA and terminal identity were not
+generation-qualified byte replays; and the compiler inherited undeclared environment/dependency
+state. Neither rejected version was persisted or started.
+
+The current correction derives every `glm_tpu` import from exact committed Git blobs in a sealed
+memfd zip and authenticates the running driver. It uses isolated Python, an exact environment
+allowlist and a before/after hash manifest of loaded Python/native compiler dependencies. The live
+root is fixed owner/group 0700. A separately reviewed absolute `env -i` plus
+`/usr/bin/bash --noprofile --norc` command is the required pre-start boundary; wrapper checks are
+fail-fast only. The wrapper authenticates the inode returned by initialization, then holds and
+locks inherited dirfd 7 across every publisher and compiler child. Path substitution between
+invocations therefore refuses, and driver output is written relative to that inherited descriptor
+rather than reopened pathnames.
+All wrapper evidence uses direct `O_EXCL`/no-follow/fsync publication; raw and canonical vacancy
+records are distinct, and exact local inventories reject extra files, empty directories, links and
+special files. Remote objects are generation-zero created and generation-qualified downloaded for
+size/CRC/SHA replay. Success and diagnostic terminals have append-only local receipts. Once local
+`HLO_ACQUIRED` exists, diagnostics and later evidence-log mutation are forbidden, so the terminal
+upload remains the last remote mutation.
+
+Correction review of staged diff `f40eb8ae...099ac9` withheld persistence on four more P1s and one
+P2: Path/string dependency ordering diverged for `numpy/` versus `numpy.libs/`; admission/topology
+hash and parse reopened mutable paths; append-log lacked a terminal guard; run-directory identity
+was not preserved between helper processes; and wrapper control commands inherited caller state.
+The current source standardizes bytewise path ordering with a multi-record regression, parses each
+authority from one identity-checked snapshot, applies one serialized preterminal guard to wrapper
+writes/logs, uses the inherited supervisor dirfd end-to-end, and validates the exact control-plane
+environment.
+
+A third correction review withheld on three P1s: Bash could process caller `BASH_ENV` before the
+self-sanitizer, diagnostic publication did not seal later local writes, and remote proof imported
+mutable user-owned cloud libraries. The corrected boundary removes self-reexec, requires the
+external absolute `env -i`/Bash command and tests a hostile caller `BASH_ENV`. Success and
+diagnostic marker/receipt states now share the same write/append refusal. New stdlib-only storage
+site builder `b7f4f869...4c5989` reproducibly created the same 1,593-file / 44,929,742-byte tree
+twice (`d94fd4c3...1b510`, manifest `67b485a5...6e3a`); publication requires that future tree at
+`/opt/glm-tpu/gate-d-storage-site-d94fd4c3e0ff`, root-owned and read-only, under the already sealed
+Python 3.12 runtime. Build artifact is
+`gate-d-compensated-pp16-storage-site-build.json` (`f6fe8b59...852657`) and explicitly says not
+installed/no network/JAX/TPU work.
+
+Builder/driver/storage-builder/publisher/wrapper/test SHAs are `a75b6eeb...e54fc`,
+`526aad55...748e4`, `b7f4f869...4c5989`, `2d83ab19...59d874`, `792af5af...b561eb` and
+`8c3b896d...e080b2`; focused hostile/static tests pass 43/43 and the adjacent compensated/reuse
+slice passes 65/65. A final local audit caught that the sealed publisher PATH had accidentally
+propagated into the expected compiler environment; the correction now binds the publisher to
+`/usr/bin:/bin` and the compiler to `/home/gianl/vllm-env/bin:/usr/bin:/bin`, exactly matching the
+wrapper's distinct invocations. No storage capsule installation, JAX
+import, backend initialization, compilation, cloud mutation or TPU work occurred while preparing
+this correction. Fable remains at its recorded 100% limit and supplied no opinion. Exact next is
+same-scope Sol correction review, then commit/push/locked US-CENTRAL2 mirror. Only a separate
+post-persistence review may authorize the immutable storage-site install and later one fresh-tag
+compile-only start; protected layer-1 numerical execution and exact 8K remain forbidden.

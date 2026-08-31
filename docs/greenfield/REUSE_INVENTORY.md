@@ -1002,3 +1002,31 @@ authorized. Distinct compensated producer source `a9431e8e...eed9` and candidate
 `17fadedf...0c19` now exist but are uninstalled/unrun. Exact next after persistence is a separate
 immutable-provisioning and one-shot forced-CPU lowering review; no process may start from source
 persistence alone.
+
+## Gate-D compensated PP16 HLO acquisition protection
+
+Adapt the compensated capsule producer's exact-Git-blob sealed memfd source archive and direct
+`O_EXCL|O_NOFOLLOW` publication, plus the accepted DB485 publisher's generation-zero,
+generation-qualified replay and terminal-last archive pattern. The PP16 HLO acquisition must not
+import `glm_tpu` from the mutable worktree, replace a local artifact, use `rsync` for evidence, or
+perform a remote operation after publishing `HLO_ACQUIRED`. The dedicated diagnostic path uses a
+fresh generation-zero subprefix and a diagnostic ledger without a success terminal. These are
+protection/observability adaptations only: compile-only HLO remains unadjudicated and cannot prove
+TPU numerical equality, performance or Gate-D closure.
+
+Three Sol passes exposed ten P1s before persistence. The corrected adaptation uses the fixed private
+0700 run root through held dirfds, routes all wrapper outputs through exclusive writers, preserves
+raw vacancy output, generation-qualified-downloads every remote object, receipts both terminal
+classes, launches the compiler under an exact empty-environment allowlist, and binds loaded
+Python/native compiler files before and after compile. Publication runs under sealed Python 3.12
+from a reproducible 1,593-file, 44,929,742-byte storage-client dependency capsule; its complete
+root-owned tree and source manifest are hash-bound into every local/remote evidence set. Exact local
+inventories reject unexpected files/directories/links; both success and diagnostic terminal states
+forbid later wrapper writes or log appends.
+Authority JSON is parsed from the same identity-checked bytes that are hashed. Dependency paths use
+one explicit bytewise ordering in producer and verifier, including `numpy/` versus `numpy.libs/`.
+The only admissible process entry is a separately reviewed literal absolute `env -i` plus
+`/usr/bin/bash --noprofile --norc` command; the wrapper's own exact-environment checks are fail-fast,
+not a pre-start trust boundary. It authenticates and locks one initialization inode as inherited
+dirfd 7; every publisher and compiler write stays bound to it, and both wrapper write modes share a
+serialized preterminal guard.

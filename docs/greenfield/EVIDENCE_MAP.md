@@ -2381,3 +2381,48 @@ remains open and no TPU successor is authorized.
   PP16 TPU-HLO acquisition and locality/numerical-policy inspection. It is not yet authorized.
   Only after that HLO passes may a separately reviewed protected layer-1 exact replay run; a full
   exact 8K decoder remains later. Gate D is open.
+
+## Bounded PP16 compensated-HLO acquisition source prepared; no process start
+
+- A new TPU-only builder is normalized-AST identical to the admitted sealed CPU replay except for
+  the exact two-device platform check. The sealed CPU module remains byte-identical at
+  `0f1930c0...313d`; the new module is `a75b6eeb...e54fc`.
+- Driver `526aad55...748e4` binds the exact admitted report, capsule/input authority and DB555 PP16
+  stage-zero group. It uses 16 abstract input specifications, including one live residual row and
+  two local owners, and records but never invokes the single compiled executable. All project
+  imports come from a sealed memfd archive built from exact committed Git blobs; the running driver
+  is itself committed-blob authenticated and isolated from mutable worktree import paths.
+- Publisher `2d83ab19...59d874` uses component-wise no-follow and direct exclusive local writes,
+  generation-zero remote creation, generation/size/CRC32C/SHA ledgers, generation-qualified replay,
+  exact preterminal inventory and a final-operation terminal upload. Wrapper `792af5af...b561eb`
+  remains default-off, serialized and 8/8-census protected; diagnostics use a separate fresh
+  generation-zero subprefix and never publish a success terminal.
+- Test `8c3b896d...e080b2` passes 43/43 (65/65 with adjacent compensated/reuse suites), including
+  hostile authority/shape/hash mutations, AST
+  equivalence, exactly one compile and no executable call, local final races, intermediate/final
+  symlinks, mutable-worktree replacement after source sealing, concurrent remote insertion,
+  diagnostic-ledger ordering and terminal-last ordering. No JAX/backend/cloud/TPU work occurred.
+  The first Sol review's three P1s and the second review's four P1s are corrected in source. The
+  latter cover the exact private live root, redirect-free wrapper evidence, raw vacancy retention,
+  generation-qualified remote bytes plus terminal receipts, and distinct exact publisher/compiler
+  paths with exact compiler environment/loaded
+  dependency provenance. Descriptor-bound root opens, exact local inventory and terminal-phase
+  diagnostic refusal close adjacent races. Correction review of `f40eb8ae...099ac9` then found and
+  the current source fixes mismatched `numpy/`/`numpy.libs/` ordering, authority hash/read TOCTOU,
+  unguarded post-terminal append, between-process run-directory substitution and inherited wrapper
+  control state. The fix uses one bytewise path order, single-snapshot authority parsing, a shared
+  preterminal writer/log guard, an inherited locked dirfd across all subprocesses and an
+  exact fail-fast wrapper environment.
+- A third Sol review found that self-reexec occurred after Bash could consume caller `BASH_ENV`,
+  diagnostic terminal publication still allowed local writes, and remote proof imported mutable
+  cloud-client code. The corrected pre-start contract requires a separately reviewed absolute
+  `env -i` plus `/usr/bin/bash --noprofile --norc` command and has a hostile-`BASH_ENV` regression.
+  Both terminal classes now reject later wrapper writes/appends. New stdlib-only builder
+  `b7f4f869...4c5989` reproduced the same 1,593-file / 44,929,742-byte storage-client tree twice;
+  tree/manifest SHAs are `d94fd4c3...1b510` / `67b485a5...6e3a`. Publication requires it as an
+  exact root-owned read-only `/opt` tree under the previously sealed Python 3.12 runtime, and embeds
+  the complete runtime/tree/manifest identity in the payload. Build record
+  `gate-d-compensated-pp16-storage-site-build.json` (`f6fe8b59...852657`) proves no install,
+  network, JAX/backend or TPU work. Same-scope correction review and durable persistence remain
+  mandatory before a separately reviewed immutable install or process start; no numerical or
+  Gate-D successor exists.
