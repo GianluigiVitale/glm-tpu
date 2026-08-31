@@ -8764,3 +8764,10 @@ producer installation; this batch authorizes no process start.
 Fable remains at its recorded 100% limit/no opinion. Existing Sol re-reviewed corrected staged
 diff `3133f3b2...d4f4` and returned `APPROVE SOURCE PERSISTENCE`, with no remaining P0--P2.
 The approval is persistence-only and grants no process-start or successor authority.
+
+After commit/push/mirror at `ff062cb3fbc39f77f4b5314f55a80d461b931f86`, the same Sol reviewer
+authorized only the exact complete offline test process. The two changed validation files passed
+187/187 in 393.54 seconds under offline `uv` with pytest/numpy. The run created no tracked change,
+installed/invoked no producer, imported no JAX for a successor, wrote no persistent admission
+report, and performed no model/cloud/TPU work. Gate D remains open. Exact next is separate review
+of one immutable compensated-producer installation and the smallest coherent CPU replay.

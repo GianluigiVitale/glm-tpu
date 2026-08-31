@@ -2346,3 +2346,7 @@ remains open and no TPU successor is authorized.
 - Fable remains at its recorded 100% limit/no opinion. Existing Sol approved source persistence
   for corrected staged diff `3133f3b2...d4f4`, with no remaining P0--P2 and explicitly no
   process-start or successor authorization.
+- At clean commit `ff062cb3fbc39f77f4b5314f55a80d461b931f86`, Sol separately authorized
+  only the complete offline test command. The admission-core and compensated-builder files passed
+  187/187 in 393.54 seconds. It produced no tracked change or persistent report and performed no
+  producer installation/invocation, JAX successor, model/cloud/TPU work or Gate-D closure.
