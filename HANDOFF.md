@@ -8562,3 +8562,19 @@ sealed `/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12` is Pytho
 review of this evidence and launcher-only correction, then commit/push/US-CENTRAL2 mirror. Only a
 separate post-persistence review may approve one fresh builder start with the sealed launcher; the
 contract remains null-bound and no admission/archive/compile/cloud/TPU/Gate-D action is authorized.
+
+## 2026-08-31 tuple capsule authority built; candidate rejected offline
+
+After failure evidence was committed/pushed and byte-mirrored at `73b51c0`, a separate Sol review
+approved exactly one builder start with the sealed Python 3.12.13 launcher. It succeeded without
+JAX, admission, archive, cloud workflow, infrastructure mutation or TPU and created immutable
+authority `docs/artifacts/gate-d-tuple-auxiliary-capsule-execution-authority.json`, SHA
+`ab0840bf...915a0` (142,157 bytes).
+
+The authority is coherent but negative. Its RMS hidden-update/residual hashes and valid count match
+the independently pinned accepted authority, while event-1 positions are `bb199543...aeeec` rather
+than `e55e66c6...8ad7` and scores are `6e666fe9...e05c` rather than `a61587a9...b0e7`.
+`gate_d_precompile_admission.py` would fail closed at the accepted-output comparison. Do not bind
+the contract or run admission: `auxiliary_device_tuple_dependency` is rejected by its own bounded
+candidate-coherent output. Preserve the capsule, authority and producer as negative evidence and
+reusable observability infrastructure. Gate D remains open; no compile or TPU successor exists.

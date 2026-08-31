@@ -964,3 +964,12 @@ no JAX, admission,
 archive, cloud workflow, infrastructure mutation or TPU occurred. Fable-max was usage-blocked. The
 existing sealed Python 3.12.13 launcher (`02104489...acec7`) is the launcher-only successor pending
 review/persistence and a separately authorized new start. The intended authority output is absent.
+
+The separately reviewed sealed-Python successor then built canonical authority
+`docs/artifacts/gate-d-tuple-auxiliary-capsule-execution-authority.json` (`ab0840bf...915a0`,
+142,157 bytes) at pushed/mirrored pin `73b51c0`. It is coherent negative evidence: accepted RMS
+operand hashes and valid count match, but event-1 positions (`bb199543...aeeec`) and scores
+(`6e666fe9...e05c`) differ from independently pinned accepted hashes (`e55e66c6...8ad7` and
+`a61587a9...b0e7`). Preserve the producer/capsule as reusable observability machinery, but reject
+the tuple-auxiliary numerical mechanism. Do not bind the contract or run redundant admission;
+there is no compile/TPU/Gate-D successor.

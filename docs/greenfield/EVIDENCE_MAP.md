@@ -2122,3 +2122,16 @@ remains open and no TPU successor is authorized.
   successor is the existing sealed Python 3.12.13 executable SHA `02104489...acec7`, but it has no
   retry authority until the negative evidence is reviewed, committed, pushed and mirrored and a
   separate review approves one new process start. The contract remains null-bound.
+
+## Tuple-capsule execution authority: coherent offline rejection
+
+- At clean pushed/mirrored pin `73b51c0`, one separately reviewed start with sealed Python 3.12.13
+  built `gate-d-tuple-auxiliary-capsule-execution-authority.json` (`ab0840bf...915a0`, 142,157
+  bytes). The no-JAX builder process exited successfully and is gone.
+- The authority preserves matching accepted RMS operand hashes and event-1 valid count 2048, but
+  candidate event positions `bb199543...aeeec` differ from accepted `e55e66c6...8ad7`, and
+  candidate scores `6e666fe9...e05c` differ from accepted `a61587a9...b0e7`.
+- This is immutable coherent negative evidence. The independent admission check at
+  `gate_d_precompile_admission.py:4935` must reject it. Do not bind the null contract or run a
+  redundant admission. The tuple-auxiliary mechanism has no compile/TPU successor and does not
+  close Gate D; retain its capsule/producer only as observability infrastructure and a tombstone.
