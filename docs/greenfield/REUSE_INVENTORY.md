@@ -1046,7 +1046,7 @@ negative operational evidence; the remote prefix is vacant and independent clean
 The corrected wrapper uses two declarations, and tests enforce the exact order, Bash `-u` behavior
 and a general ban on same-command local dependencies. Never reuse the failed tag.
 
-The next protected start exposed a distinct provenance refusal before lowering: its
+A later protected start exposed a distinct provenance refusal before lowering: its
 `vllm-env/bin/python` interpreter resolved to a user-writable UV Python and stdlib. A proposed
 root-owned-interpreter correction was therefore withheld when review found that it still selected
 JAX and `libtpu` from the same mutable venv site. Reuse the fixed no-replacement provisioner and
@@ -1054,11 +1054,23 @@ adapt the existing sealed-JAX-site builder pattern through
 `build_gate_d_libtpu_site_capsule.py` only for the exact 13-file `libtpu` supplement. Two
 independent builds produced the same 719,846,262-byte tree
 `db7598c8...8eca` and manifest `d34064f4...7efa`; build evidence is
-`gate-d-libtpu-site-build.json`. The target `/opt/glm-tpu/gate-d-libtpu-site-db7598c867f3` is
-was deliberately absent in the build evidence. At clean pushed and same-region mirrored pin
+`gate-d-libtpu-site-build.json`. The target `/opt/glm-tpu/gate-d-libtpu-site-db7598c867f3` was
+deliberately absent in the build evidence. At clean pushed and same-region mirrored pin
 `e922f96`, the reviewed absolute install-only command published that target without replacement;
 `gate-d-libtpu-site-install.json` binds its root ownership, 13 files, 719,846,262 bytes, complete
 tree and manifest. The build and install imported no JAX, started no backend, touched no TPU and
-authorize no HLO retry. A later compiler correction must
-bind both the existing sealed JAX tree and this separately sealed `libtpu` tree before import and
-after compile, constrain native mappings to sealed/system roots, and use `/usr/bin:/bin` as PATH.
+authorize no HLO retry.
+
+The current default-off compiler correction binds the root-owned Python runtime, sealed JAX tree
+`55233c63...a0df`/manifest `ef454caa...1eff` and sealed `libtpu` tree
+`db7598c8...8eca`/manifest `d34064f4...7efa` before any JAX import and again after compilation. Its
+only import path is the sealed Git-memfd archive, those two sites and the root runtime stdlib. The
+compiler PATH is `/usr/bin:/bin`; both driver and independent publisher reject Python/native files
+outside the exact sealed/system roots, except the separately Git-authenticated driver file itself.
+Publisher paths must be exact canonical realpaths and are reopened `O_NOFOLLOW` to verify
+regular/single-link device, inode, size, stable metadata and SHA before any remote mutation.
+Current driver/publisher/wrapper/test SHAs are `3842d06d...1f88`, `f481c610...4c15`,
+`7a7abfae...2a14` and `bf6556a7...e5c7`; focused acquisition/capsule tests pass 64/64. A sealed
+no-import probe validates both trees and resolves `jax`, `jaxlib` and `libtpu` only from their
+root-owned sites. This is source/read-only evidence only: no JAX import, backend, HLO compilation,
+cloud or TPU work occurred, and a fresh process start remains separately reviewed.

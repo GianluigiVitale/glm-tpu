@@ -228,9 +228,120 @@ def test_driver_compiles_once_and_contains_no_executable_invocation() -> None:
     assert "_sealed_git_source_archive" in source
     assert "_verify_running_source" in source
     assert "_compiler_dependency_records" in source
+    assert "_validate_python_runtime" in source
+    assert source.index("dependency_sites = _validate_dependency_sites()") < source.index(
+        "import jax"
+    )
+    assert source.rindex("_validate_dependency_sites()") > source.index(
+        "compiled = lowered.compile()"
+    )
+    assert source.rindex("_validate_python_runtime_storage()") > source.index(
+        "compiled = lowered.compile()"
+    )
     assert "/usr/bin/env -i" in WRAPPER.read_text()
     assert "-I -S -B -u" in WRAPPER.read_text()
     assert 'PYTHONPATH="$WORKTREE"' not in WRAPPER.read_text()
+
+
+def test_driver_uses_exact_root_owned_python_runtime() -> None:
+    wrapper = WRAPPER.read_text()
+    expected = Path("/opt/glm-tpu/gate-d-python-3.12.13-021044895e95")
+    assert DRIVER_MODULE.PYTHON_RUNTIME_ROOT == expected
+    assert DRIVER_MODULE.PYTHON == expected / "bin/python3.12"
+    assert f"readonly DRIVER_PYTHON={DRIVER_MODULE.PYTHON}\n" in wrapper
+    assert "readonly DRIVER_PYTHON=/home/gianl/vllm-env/bin/python\n" not in wrapper
+    assert Path(os.path.realpath(DRIVER_MODULE.PYTHON)) == DRIVER_MODULE.PYTHON
+
+    probe = (
+        "import importlib.util,json;"
+        f"p={str(DRIVER)!r};"
+        "s=importlib.util.spec_from_file_location('gate_d_driver_runtime_probe',p);"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        "print(json.dumps(m._validate_python_runtime(),sort_keys=True))"
+    )
+    completed = subprocess.run(
+        [str(DRIVER_MODULE.PYTHON), "-I", "-S", "-B", "-c", probe],
+        check=True,
+        capture_output=True,
+        env={
+            "HOME": "/home/gianl",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "PYTHONDONTWRITEBYTECODE": "1",
+        },
+        text=True,
+    )
+    assert json.loads(completed.stdout) == {
+        "python_executable": str(DRIVER_MODULE.PYTHON),
+        "python_runtime_root": str(DRIVER_MODULE.PYTHON_RUNTIME_ROOT),
+        "python_runtime_tree_sha256": DRIVER_MODULE.PYTHON_RUNTIME_TREE_SHA256,
+        "python_sha256": DRIVER_MODULE.PYTHON_SHA256,
+    }
+
+    mutable_interpreter = Path("/home/gianl/vllm-env/bin/python")
+    rejected = subprocess.run(
+        [str(mutable_interpreter), "-I", "-S", "-B", "-c", probe],
+        check=False,
+        capture_output=True,
+        env={
+            "HOME": "/home/gianl",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "PYTHONDONTWRITEBYTECODE": "1",
+        },
+        text=True,
+    )
+    assert rejected.returncode != 0
+    assert "compiler Python runtime boundary drifted" in rejected.stderr
+
+
+def test_compiler_dependency_roots_exclude_mutable_uv_runtime() -> None:
+    source = DRIVER.read_text()
+    function = _function(DRIVER, "_allowed_compiler_dependency_roots")
+    literals = {
+        node.value
+        for node in ast.walk(function)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+    assert "/home/gianl/vllm-env" not in literals
+    assert "/home/gianl/.local/share/uv/python" not in source
+    assert "PYTHON_RUNTIME_ROOT" in ast.unparse(function)
+    assert "JAX_SITE_ROOT" in ast.unparse(function)
+    assert "LIBTPU_SITE_ROOT" in ast.unparse(function)
+    with pytest.raises(RuntimeError, match="native mapping escaped allowed roots"):
+        DRIVER_MODULE._validate_native_mapping_root(
+            Path("/home/gianl/vllm-env/lib/python3.12/site-packages/libtpu.so")
+        )
+
+
+def test_compiler_import_path_and_dependency_sites_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source_archive = "/proc/self/fd/999"
+    expected_path = [
+        source_archive,
+        str(DRIVER_MODULE.JAX_SITE_ROOT),
+        str(DRIVER_MODULE.LIBTPU_SITE_ROOT),
+        *DRIVER_MODULE._EXPECTED_RUNTIME_PATH,
+    ]
+    monkeypatch.setattr(DRIVER_MODULE.sys, "path", expected_path)
+    DRIVER_MODULE._validate_compiler_import_path(source_archive)
+    monkeypatch.setattr(
+        DRIVER_MODULE.sys,
+        "path",
+        [*expected_path, "/home/gianl/vllm-env/lib/python3.12/site-packages"],
+    )
+    with pytest.raises(RuntimeError, match="compiler import path drifted"):
+        DRIVER_MODULE._validate_compiler_import_path(source_archive)
+
+    mutable_site = tmp_path / "jax-site"
+    mutable_site.mkdir()
+    (mutable_site / "CAPSULE_MANIFEST.json").write_text("{}\n")
+    monkeypatch.setattr(DRIVER_MODULE, "JAX_SITE_ROOT", mutable_site)
+    with pytest.raises(RuntimeError, match="root-owned sealed|dependency site drifted"):
+        DRIVER_MODULE._validate_dependency_sites()
 
 
 def test_driver_environment_is_exact_and_rejects_any_extra(
@@ -287,9 +398,10 @@ def test_dependency_prefix_requires_prior_files_to_remain_identical() -> None:
 
 
 def test_dependency_path_order_is_identical_for_numpy_and_numpy_libs() -> None:
+    site = PUBLISHER_MODULE.JAX_SITE_ROOT
     paths = [
-        "/home/gianl/vllm-env/lib/python3.12/site-packages/numpy/_core/_multi.so",
-        "/home/gianl/vllm-env/lib/python3.12/site-packages/numpy.libs/libopenblas.so",
+        str(site / "numpy/_core/_multi.so"),
+        str(site / "numpy.libs/libopenblas.so"),
     ]
     unsorted_paths = [paths[1], paths[0]]
     driver_order = [
@@ -318,6 +430,77 @@ def test_dependency_path_order_is_identical_for_numpy_and_numpy_libs() -> None:
         )
 
 
+def test_publisher_rejects_mutable_compiler_dependency_root() -> None:
+    record = {
+        "bytes": 1,
+        "device": 1,
+        "inode": 1,
+        "path": "/home/gianl/vllm-env/lib/python3.12/site-packages/libtpu/libtpu.so",
+        "sha256": "1" * 64,
+    }
+    with pytest.raises(RuntimeError, match="dependency escaped allowed roots"):
+        PUBLISHER_MODULE._validate_dependency_records([record], "native_mappings")
+
+
+@pytest.mark.parametrize(
+    "path",
+    (
+        "/usr/../home/gianl/evil.so",
+        "/opt/glm-tpu/gate-d-jax-site-55233c63939e/../../../../home/gianl/evil.so",
+        "/usr//lib/evil.so",
+        "/lib",
+    ),
+)
+def test_publisher_rejects_noncanonical_dependency_paths(path: str) -> None:
+    record = {
+        "bytes": 1,
+        "device": 1,
+        "inode": 1,
+        "path": path,
+        "sha256": "1" * 64,
+    }
+    with pytest.raises(RuntimeError, match="dependency identity drifted"):
+        PUBLISHER_MODULE._validate_dependency_records([record], "native_mappings")
+
+
+@pytest.mark.parametrize("bad_sha", (True, None, 1.0, ["1" * 64]))
+def test_publisher_requires_exact_sha_type(bad_sha: object) -> None:
+    record = {
+        "bytes": 1,
+        "device": 1,
+        "inode": 1,
+        "path": "/usr/lib/example.so",
+        "sha256": bad_sha,
+    }
+    with pytest.raises(RuntimeError, match="dependency identity drifted"):
+        PUBLISHER_MODULE._validate_dependency_records([record], "native_mappings")
+
+
+def test_publisher_requires_exact_sha_string_and_live_record() -> None:
+    path = Path(os.path.realpath("/usr/bin/true"))
+    metadata = path.stat()
+    record = {
+        "bytes": metadata.st_size,
+        "device": metadata.st_dev,
+        "inode": metadata.st_ino,
+        "path": str(path),
+        "sha256": sha256(path.read_bytes()).hexdigest(),
+    }
+    PUBLISHER_MODULE._validate_dependency_records(
+        [record], "native_mappings", verify_live=True
+    )
+    integer_sha = {**record, "sha256": int("1" * 64)}
+    with pytest.raises(RuntimeError, match="dependency identity drifted"):
+        PUBLISHER_MODULE._validate_dependency_records(
+            [integer_sha], "native_mappings"
+        )
+    wrong_sha = {**record, "sha256": "0" * 64}
+    with pytest.raises(RuntimeError, match="live bytes drifted"):
+        PUBLISHER_MODULE._validate_dependency_records(
+            [wrong_sha], "native_mappings", verify_live=True
+        )
+
+
 def test_publisher_environment_is_exact_allowlist(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -336,16 +519,14 @@ def test_publisher_environment_is_exact_allowlist(
 def test_publisher_and_compiler_paths_are_distinct_and_exact() -> None:
     wrapper = WRAPPER.read_text()
     assert PUBLISHER_MODULE._EXPECTED_ENVIRONMENT["PATH"] == "/usr/bin:/bin"
-    assert PUBLISHER_MODULE._EXPECTED_COMPILER_ENVIRONMENT["PATH"] == (
-        "/home/gianl/vllm-env/bin:/usr/bin:/bin"
-    )
+    assert PUBLISHER_MODULE._EXPECTED_COMPILER_ENVIRONMENT["PATH"] == "/usr/bin:/bin"
     assert (
         "PATH=/usr/bin:/bin \\\n"
         "    PYTHONDONTWRITEBYTECODE=1 \\\n"
         '    "$PUBLISHER_PYTHON"'
     ) in wrapper
     assert (
-        "PATH=/home/gianl/vllm-env/bin:/usr/bin:/bin \\\n"
+        "PATH=/usr/bin:/bin \\\n"
         "    PYTHONDONTWRITEBYTECODE=1 \\\n"
         "    TPU_CHIPS_PER_PROCESS_BOUNDS"
     ) in wrapper
@@ -859,6 +1040,9 @@ class _FakeBucket:
 def _fake_success_run(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> tuple[Path, str]:
+    monkeypatch.setattr(
+        PUBLISHER_MODULE, "_verify_dependency_record_live", lambda record: None
+    )
     run_root = tmp_path / "glm-run"
     run_root.mkdir(mode=0o700)
     monkeypatch.setattr(PUBLISHER_MODULE, "RUN_ROOT", run_root)
@@ -872,6 +1056,18 @@ def _fake_success_run(
     dependencies = {
         "artifact_kind": "gate_d_compensated_pp16_compiler_dependencies",
         "code_hash": "1" * 40,
+        "dependency_sites": {
+            "jax": {
+                "manifest_sha256": PUBLISHER_MODULE.JAX_SITE_MANIFEST_SHA256,
+                "root": str(PUBLISHER_MODULE.JAX_SITE_ROOT),
+                "tree_sha256": PUBLISHER_MODULE.JAX_SITE_TREE_SHA256,
+            },
+            "libtpu": {
+                "manifest_sha256": PUBLISHER_MODULE.LIBTPU_SITE_MANIFEST_SHA256,
+                "root": str(PUBLISHER_MODULE.LIBTPU_SITE_ROOT),
+                "tree_sha256": PUBLISHER_MODULE.LIBTPU_SITE_TREE_SHA256,
+            },
+        },
         "environment": PUBLISHER_MODULE._EXPECTED_COMPILER_ENVIRONMENT,
         "native_mappings": [
             {
@@ -882,6 +1078,14 @@ def _fake_success_run(
                 "sha256": "2" * 64,
             }
         ],
+        "python_runtime": {
+            "python_executable": str(PUBLISHER_MODULE.PYTHON),
+            "python_runtime_root": str(PUBLISHER_MODULE.PYTHON_RUNTIME_ROOT),
+            "python_runtime_tree_sha256": (
+                PUBLISHER_MODULE.PYTHON_RUNTIME_TREE_SHA256
+            ),
+            "python_sha256": PUBLISHER_MODULE.PYTHON_SHA256,
+        },
         "python_modules": [
             {
                 "bytes": 1,
@@ -981,6 +1185,68 @@ def test_remote_publication_is_generation_zero_and_terminal_last(
     assert any(name.endswith("/remote_objects.json") for name in bucket.objects)
     assert any(name.endswith("/HLO_ACQUIRED") for name in bucket.objects)
     assert (run / "terminal_upload_receipt.json").is_file()
+
+
+def test_compiler_runtime_rebinding_refuses_before_remote_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run, remote = _fake_success_run(tmp_path, monkeypatch)
+    dependencies_path = run / "dependencies.json"
+    dependencies = json.loads(dependencies_path.read_bytes())
+    dependencies["python_runtime"]["python_runtime_root"] = (
+        "/home/gianl/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu"
+    )
+    dependencies_raw = PUBLISHER_MODULE._canonical(dependencies)
+    dependencies_path.write_bytes(dependencies_raw)
+    runner_path = run / "runner.json"
+    runner = json.loads(runner_path.read_bytes())
+    runner["compiler_dependency_manifest"]["byte_count"] = len(dependencies_raw)
+    runner["compiler_dependency_manifest"]["sha256"] = sha256(
+        dependencies_raw
+    ).hexdigest()
+    runner_path.write_bytes(PUBLISHER_MODULE._canonical(runner))
+    bucket = _FakeBucket()
+    with pytest.raises(RuntimeError, match="compiler dependency manifest drifted"):
+        PUBLISHER_MODULE.publish_success(
+            run,
+            remote,
+            code_pin="1" * 40,
+            elapsed=7,
+            publication_runtime_raw=TEST_PUBLICATION_RUNTIME_RAW,
+            storage_bucket=bucket,
+        )
+    assert not bucket.mutations
+
+
+def test_compiler_site_rebinding_refuses_before_remote_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run, remote = _fake_success_run(tmp_path, monkeypatch)
+    dependencies_path = run / "dependencies.json"
+    dependencies = json.loads(dependencies_path.read_bytes())
+    dependencies["dependency_sites"]["libtpu"]["root"] = (
+        "/home/gianl/vllm-env/lib/python3.12/site-packages"
+    )
+    dependencies_raw = PUBLISHER_MODULE._canonical(dependencies)
+    dependencies_path.write_bytes(dependencies_raw)
+    runner_path = run / "runner.json"
+    runner = json.loads(runner_path.read_bytes())
+    runner["compiler_dependency_manifest"]["byte_count"] = len(dependencies_raw)
+    runner["compiler_dependency_manifest"]["sha256"] = sha256(
+        dependencies_raw
+    ).hexdigest()
+    runner_path.write_bytes(PUBLISHER_MODULE._canonical(runner))
+    bucket = _FakeBucket()
+    with pytest.raises(RuntimeError, match="compiler dependency manifest drifted"):
+        PUBLISHER_MODULE.publish_success(
+            run,
+            remote,
+            code_pin="1" * 40,
+            elapsed=7,
+            publication_runtime_raw=TEST_PUBLICATION_RUNTIME_RAW,
+            storage_bucket=bucket,
+        )
+    assert not bucket.mutations
 
 
 def test_remote_concurrent_insertion_never_publishes_terminal(

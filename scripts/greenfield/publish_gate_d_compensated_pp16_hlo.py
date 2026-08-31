@@ -32,6 +32,20 @@ PYTHON_SHA256 = "021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec
 PYTHON_RUNTIME_TREE_SHA256 = (
     "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616"
 )
+JAX_SITE_ROOT = Path("/opt/glm-tpu/gate-d-jax-site-55233c63939e")
+JAX_SITE_TREE_SHA256 = (
+    "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df"
+)
+JAX_SITE_MANIFEST_SHA256 = (
+    "ef454caafd2e4ba5da4bc7f7f73bef4e8f157afd6c795a91b09e319961941eff"
+)
+LIBTPU_SITE_ROOT = Path("/opt/glm-tpu/gate-d-libtpu-site-db7598c867f3")
+LIBTPU_SITE_TREE_SHA256 = (
+    "db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca"
+)
+LIBTPU_SITE_MANIFEST_SHA256 = (
+    "d34064f4a0dfcdcd9ec13288ce967ae060a4650b3e86e53bc47e49756c0e97fa"
+)
 STORAGE_SITE_ROOT = Path("/opt/glm-tpu/gate-d-storage-site-d94fd4c3e0ff")
 STORAGE_SITE_TREE_SHA256 = (
     "d94fd4c3e0ffbf024a0b53faff4565d28900b64fc5dd9944bff316f47db1b510"
@@ -46,6 +60,7 @@ STORAGE_SITE_BUILDER_SOURCE_SHA256 = (
     "b7f4f869ae9b98edf5195185bf49fffcf61ef6800a2b707127694b66424c5989"
 )
 SOURCE_PATH = "scripts/greenfield/publish_gate_d_compensated_pp16_hlo.py"
+COMPILER_DRIVER_PATH = REPO / "scripts/greenfield/acquire_gate_d_compensated_pp16_hlo.py"
 BUCKET_NAME = "driftbench-dsv4-uc"
 REMOTE_ROOT = "results/greenfield/glm52/gate_d_pp16_hlo/"
 TAG_PATTERN = re.compile(r"gate_d_compensated_pp16_hlo_[0-9]{8}T[0-9]{15}Z")
@@ -90,7 +105,6 @@ _EXPECTED_RUNTIME_PATH = (
 )
 _EXPECTED_COMPILER_ENVIRONMENT = {
     **_EXPECTED_ENVIRONMENT,
-    "PATH": "/home/gianl/vllm-env/bin:/usr/bin:/bin",
     "JAX_ENABLE_COMPILATION_CACHE": "0",
     "JAX_PLATFORMS": "tpu",
     "TPU_CHIPS_PER_PROCESS_BOUNDS": "2,2,1",
@@ -754,7 +768,44 @@ def _require_census(raw: bytes, marker: str) -> None:
         raise RuntimeError(f"authenticated eight-host marker is absent: {marker}")
 
 
-def _validate_dependency_records(records: Any, category: str) -> None:
+def _verify_dependency_record_live(record: Mapping[str, Any]) -> None:
+    path = record["path"]
+    descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        metadata = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_nlink != 1
+            or metadata.st_size != record["bytes"]
+            or metadata.st_dev != record["device"]
+            or metadata.st_ino != record["inode"]
+        ):
+            raise RuntimeError(f"PP16 HLO compiler dependency live identity drifted: {path}")
+        digest = sha256()
+        while block := os.read(descriptor, 8 * 1024 * 1024):
+            digest.update(block)
+        final = os.fstat(descriptor)
+        if (
+            final.st_dev,
+            final.st_ino,
+            final.st_size,
+            final.st_mtime_ns,
+            final.st_ctime_ns,
+        ) != (
+            metadata.st_dev,
+            metadata.st_ino,
+            metadata.st_size,
+            metadata.st_mtime_ns,
+            metadata.st_ctime_ns,
+        ) or digest.hexdigest() != record["sha256"]:
+            raise RuntimeError(f"PP16 HLO compiler dependency live bytes drifted: {path}")
+    finally:
+        os.close(descriptor)
+
+
+def _validate_dependency_records(
+    records: Any, category: str, *, verify_live: bool = False
+) -> None:
     if not isinstance(records, list) or not records:
         raise RuntimeError(
             f"PP16 HLO compiler dependency records are absent: {category}"
@@ -774,8 +825,10 @@ def _validate_dependency_records(records: Any, category: str) -> None:
         path = record["path"]
         integers = (record["bytes"], record["device"], record["inode"])
         if (
-            not isinstance(path, str)
+            type(path) is not str
             or not path.startswith("/")
+            or os.path.normpath(path) != path
+            or os.path.realpath(path) != path
             or any(
                 not isinstance(value, int) or isinstance(value, bool)
                 for value in integers
@@ -783,11 +836,31 @@ def _validate_dependency_records(records: Any, category: str) -> None:
             or record["bytes"] < 0
             or record["device"] < 0
             or record["inode"] <= 0
-            or not re.fullmatch(r"[0-9a-f]{64}", str(record["sha256"]))
+            or type(record["sha256"]) is not str
+            or not re.fullmatch(r"[0-9a-f]{64}", record["sha256"])
         ):
             raise RuntimeError(
                 f"PP16 HLO compiler dependency identity drifted: {category}"
             )
+        resolved = Path(path)
+        allowed_roots = (
+            PYTHON_RUNTIME_ROOT,
+            JAX_SITE_ROOT,
+            LIBTPU_SITE_ROOT,
+            Path("/lib"),
+            Path("/lib64"),
+            Path("/usr"),
+        )
+        if not any(
+            resolved == root or root in resolved.parents for root in allowed_roots
+        ) and not (
+            category == "python_modules" and resolved == COMPILER_DRIVER_PATH
+        ):
+            raise RuntimeError(
+                f"PP16 HLO compiler dependency escaped allowed roots: {category}"
+            )
+        if verify_live:
+            _verify_dependency_record_live(record)
         paths.append(path)
     if paths != sorted(set(paths), key=_canonical_path_key):
         raise RuntimeError(f"PP16 HLO compiler dependency order drifted: {category}")
@@ -820,15 +893,41 @@ def _prepare_success(
     dependency_identity = runner.get("compiler_dependency_manifest", {})
     native_mappings = dependencies.get("native_mappings")
     python_modules = dependencies.get("python_modules")
-    _validate_dependency_records(native_mappings, "native_mappings")
-    _validate_dependency_records(python_modules, "python_modules")
+    _validate_dependency_records(
+        native_mappings, "native_mappings", verify_live=True
+    )
+    _validate_dependency_records(
+        python_modules, "python_modules", verify_live=True
+    )
     dependency_source = dependencies.get("sealed_project_source")
+    compiler_python_runtime = dependencies.get("python_runtime")
+    compiler_dependency_sites = dependencies.get("dependency_sites")
     runner_source = runner.get("sealed_project_source")
     if (
         dependencies.get("artifact_kind")
         != "gate_d_compensated_pp16_compiler_dependencies"
         or dependencies.get("code_hash") != code_pin
         or dependencies.get("environment") != _EXPECTED_COMPILER_ENVIRONMENT
+        or compiler_python_runtime
+        != {
+            "python_executable": str(PYTHON),
+            "python_runtime_root": str(PYTHON_RUNTIME_ROOT),
+            "python_runtime_tree_sha256": PYTHON_RUNTIME_TREE_SHA256,
+            "python_sha256": PYTHON_SHA256,
+        }
+        or compiler_dependency_sites
+        != {
+            "jax": {
+                "manifest_sha256": JAX_SITE_MANIFEST_SHA256,
+                "root": str(JAX_SITE_ROOT),
+                "tree_sha256": JAX_SITE_TREE_SHA256,
+            },
+            "libtpu": {
+                "manifest_sha256": LIBTPU_SITE_MANIFEST_SHA256,
+                "root": str(LIBTPU_SITE_ROOT),
+                "tree_sha256": LIBTPU_SITE_TREE_SHA256,
+            },
+        }
         or not isinstance(dependency_source, Mapping)
         or set(dependency_source)
         != {"archive_sha256", "file_manifest_count", "file_manifest_sha256"}

@@ -15,6 +15,7 @@ import json
 import os
 import re
 import stat
+import struct
 import subprocess
 import sys
 import time
@@ -28,7 +29,26 @@ from typing import Any
 
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
-SITE_ROOT = Path("/home/gianl/vllm-env/lib/python3.12/site-packages")
+PYTHON_RUNTIME_ROOT = Path("/opt/glm-tpu/gate-d-python-3.12.13-021044895e95")
+PYTHON = PYTHON_RUNTIME_ROOT / "bin/python3.12"
+PYTHON_SHA256 = "021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7"
+PYTHON_RUNTIME_TREE_SHA256 = (
+    "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616"
+)
+JAX_SITE_ROOT = Path("/opt/glm-tpu/gate-d-jax-site-55233c63939e")
+JAX_SITE_TREE_SHA256 = (
+    "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df"
+)
+JAX_SITE_MANIFEST_SHA256 = (
+    "ef454caafd2e4ba5da4bc7f7f73bef4e8f157afd6c795a91b09e319961941eff"
+)
+LIBTPU_SITE_ROOT = Path("/opt/glm-tpu/gate-d-libtpu-site-db7598c867f3")
+LIBTPU_SITE_TREE_SHA256 = (
+    "db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca"
+)
+LIBTPU_SITE_MANIFEST_SHA256 = (
+    "d34064f4a0dfcdcd9ec13288ce967ae060a4650b3e86e53bc47e49756c0e97fa"
+)
 DRIVER_REPOSITORY_PATH = "scripts/greenfield/acquire_gate_d_compensated_pp16_hlo.py"
 ADMITTED_ID = "compensated_auxiliary_dependency"
 ADMITTED_CLASSIFICATION = (
@@ -106,19 +126,159 @@ _EXPECTED_ENVIRONMENT = {
     "JAX_PLATFORMS": "tpu",
     "LANG": "C",
     "LC_ALL": "C",
-    "PATH": "/home/gianl/vllm-env/bin:/usr/bin:/bin",
+    "PATH": "/usr/bin:/bin",
     "PYTHONDONTWRITEBYTECODE": "1",
     "TPU_CHIPS_PER_PROCESS_BOUNDS": "2,2,1",
     "TPU_PROCESS_BOUNDS": "1,1,1",
     "TPU_VISIBLE_DEVICES": "0,1,2,3",
     "XLA_PYTHON_CLIENT_MEM_FRACTION": ".50",
 }
+_EXPECTED_RUNTIME_PATH = (
+    str(PYTHON_RUNTIME_ROOT / "lib/python312.zip"),
+    str(PYTHON_RUNTIME_ROOT / "lib/python3.12"),
+    str(PYTHON_RUNTIME_ROOT / "lib/python3.12/lib-dynload"),
+)
 
 
 def _canonical(value: Any) -> str:
     return json.dumps(
         value, allow_nan=False, ensure_ascii=True, separators=(",", ":"), sort_keys=True
     )
+
+
+def _safe_mode(mode: int) -> int:
+    return stat.S_IMODE(mode) & ~0o7022
+
+
+def _sha_file(path: Path) -> str:
+    digest = sha256()
+    descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise RuntimeError(f"compiler runtime dependency is unsafe: {path}")
+        while block := os.read(descriptor, 8 * 1024 * 1024):
+            digest.update(block)
+        final_metadata = os.fstat(descriptor)
+        if (
+            final_metadata.st_dev,
+            final_metadata.st_ino,
+            final_metadata.st_size,
+            final_metadata.st_mtime_ns,
+            final_metadata.st_ctime_ns,
+        ) != (
+            metadata.st_dev,
+            metadata.st_ino,
+            metadata.st_size,
+            metadata.st_mtime_ns,
+            metadata.st_ctime_ns,
+        ):
+            raise RuntimeError(f"compiler runtime dependency changed: {path}")
+        return digest.hexdigest()
+    finally:
+        os.close(descriptor)
+
+
+def _runtime_tree_sha256(root: Path, *, require_sealed: bool) -> str:
+    digest = sha256()
+    entries = [
+        root,
+        *sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_posix()),
+    ]
+    for entry in entries:
+        relative = entry.relative_to(root).as_posix().encode("utf-8")
+        metadata = entry.lstat()
+        if require_sealed and (
+            metadata.st_uid != 0
+            or metadata.st_gid != 0
+            or os.listxattr(entry, follow_symlinks=False)
+            or (
+                not stat.S_ISLNK(metadata.st_mode)
+                and stat.S_IMODE(metadata.st_mode) != _safe_mode(metadata.st_mode)
+            )
+        ):
+            raise RuntimeError(
+                f"compiler Python runtime is not root-owned sealed: {entry}"
+            )
+        if stat.S_ISDIR(metadata.st_mode):
+            kind = b"D"
+            payload = b""
+        elif stat.S_ISREG(metadata.st_mode):
+            kind = b"F"
+            payload = struct.pack(">Q", metadata.st_size) + bytes.fromhex(
+                _sha_file(entry)
+            )
+        elif stat.S_ISLNK(metadata.st_mode):
+            kind = b"L"
+            target = os.readlink(entry).encode("utf-8")
+            try:
+                Path(os.path.realpath(entry)).relative_to(root)
+            except ValueError as error:
+                raise RuntimeError(
+                    f"compiler Python runtime symlink escapes root: {entry}"
+                ) from error
+            payload = struct.pack(">I", len(target)) + target
+        else:
+            raise RuntimeError(f"unsupported compiler Python runtime entry: {entry}")
+        digest.update(kind)
+        digest.update(struct.pack(">I", len(relative)))
+        digest.update(relative)
+        digest.update(struct.pack(">I", _safe_mode(metadata.st_mode)))
+        digest.update(payload)
+    return digest.hexdigest()
+
+
+def _validate_python_runtime_storage() -> dict[str, str]:
+    if Path(sys.executable) != PYTHON:
+        raise RuntimeError("Gate-D compiler Python executable boundary drifted")
+    if _sha_file(PYTHON) != PYTHON_SHA256:
+        raise RuntimeError("Gate-D compiler Python executable bytes drifted")
+    if (
+        _runtime_tree_sha256(PYTHON_RUNTIME_ROOT, require_sealed=True)
+        != PYTHON_RUNTIME_TREE_SHA256
+    ):
+        raise RuntimeError("Gate-D compiler Python runtime tree drifted")
+    return {
+        "python_executable": str(PYTHON),
+        "python_runtime_root": str(PYTHON_RUNTIME_ROOT),
+        "python_runtime_tree_sha256": PYTHON_RUNTIME_TREE_SHA256,
+        "python_sha256": PYTHON_SHA256,
+    }
+
+
+def _validate_python_runtime() -> dict[str, str]:
+    if tuple(sys.path) != _EXPECTED_RUNTIME_PATH:
+        raise RuntimeError("Gate-D compiler Python runtime boundary drifted")
+    return _validate_python_runtime_storage()
+
+
+def _validate_dependency_sites() -> dict[str, dict[str, str]]:
+    result = {}
+    for label, root, expected_tree, expected_manifest in (
+        (
+            "jax",
+            JAX_SITE_ROOT,
+            JAX_SITE_TREE_SHA256,
+            JAX_SITE_MANIFEST_SHA256,
+        ),
+        (
+            "libtpu",
+            LIBTPU_SITE_ROOT,
+            LIBTPU_SITE_TREE_SHA256,
+            LIBTPU_SITE_MANIFEST_SHA256,
+        ),
+    ):
+        if (
+            _runtime_tree_sha256(root, require_sealed=True) != expected_tree
+            or _sha_file(root / "CAPSULE_MANIFEST.json") != expected_manifest
+        ):
+            raise RuntimeError(f"Gate-D sealed {label} dependency site drifted")
+        result[label] = {
+            "manifest_sha256": expected_manifest,
+            "root": str(root),
+            "tree_sha256": expected_tree,
+        }
+    return result
 
 
 def _open_directory_chain(path: Path) -> int:
@@ -458,19 +618,23 @@ def _sealed_git_source_archive(
 
 
 def _install_sealed_source_path(source_archive_path: str) -> None:
-    retained = []
-    repository = REPO.resolve()
-    for entry in sys.path:
-        if not entry:
-            continue
-        try:
-            resolved = Path(entry).resolve()
-        except OSError:
-            continue
-        if resolved == repository or repository in resolved.parents:
-            continue
-        retained.append(entry)
-    sys.path[:] = [source_archive_path, str(SITE_ROOT), *retained]
+    sys.path[:] = [
+        source_archive_path,
+        str(JAX_SITE_ROOT),
+        str(LIBTPU_SITE_ROOT),
+        *_EXPECTED_RUNTIME_PATH,
+    ]
+
+
+def _validate_compiler_import_path(source_archive_path: str) -> None:
+    expected = (
+        source_archive_path,
+        str(JAX_SITE_ROOT),
+        str(LIBTPU_SITE_ROOT),
+        *_EXPECTED_RUNTIME_PATH,
+    )
+    if tuple(sys.path) != expected:
+        raise RuntimeError("Gate-D compiler import path drifted")
 
 
 def _verify_project_imports(source_archive_path: str) -> list[dict[str, str]]:
@@ -516,7 +680,7 @@ def _dependency_file_record(path: Path) -> dict[str, Any]:
     descriptor = os.open(resolved, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
     try:
         metadata = os.fstat(descriptor)
-        if not stat.S_ISREG(metadata.st_mode):
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
             raise RuntimeError(f"compiler dependency is not regular: {resolved}")
         digest = sha256()
         total = 0
@@ -540,15 +704,29 @@ def _dependency_file_record(path: Path) -> dict[str, Any]:
         os.close(descriptor)
 
 
-def _compiler_dependency_records(source_archive_path: str) -> dict[str, Any]:
-    python_paths = {Path(__file__), Path(sys.executable)}
-    source_prefix = source_archive_path + "/"
-    allowed_roots = (
-        Path("/home/gianl/vllm-env"),
+def _allowed_compiler_dependency_roots() -> tuple[Path, ...]:
+    return (
+        PYTHON_RUNTIME_ROOT,
+        JAX_SITE_ROOT,
+        LIBTPU_SITE_ROOT,
         Path("/lib"),
         Path("/lib64"),
         Path("/usr"),
     )
+
+
+def _validate_native_mapping_root(path: Path) -> None:
+    if not any(
+        path == root or root in path.parents
+        for root in _allowed_compiler_dependency_roots()
+    ):
+        raise RuntimeError(f"compiler native mapping escaped allowed roots: {path}")
+
+
+def _compiler_dependency_records(source_archive_path: str) -> dict[str, Any]:
+    python_paths = {Path(__file__), Path(sys.executable)}
+    source_prefix = source_archive_path + "/"
+    allowed_roots = _allowed_compiler_dependency_roots()
     for module in tuple(sys.modules.values()):
         raw_path = getattr(module, "__file__", None)
         if not isinstance(raw_path, str) or raw_path.startswith(source_prefix):
@@ -574,6 +752,7 @@ def _compiler_dependency_records(source_archive_path: str) -> dict[str, Any]:
         if raw_path.endswith(" (deleted)"):
             raise RuntimeError(f"loaded compiler dependency was deleted: {raw_path}")
         path = Path(os.path.realpath(raw_path))
+        _validate_native_mapping_root(path)
         try:
             metadata = path.stat()
         except OSError as error:
@@ -834,6 +1013,8 @@ def main() -> int:
         or not sys.flags.ignore_environment
     ):
         raise RuntimeError("Gate-D HLO acquisition requires Python -I -S")
+    python_runtime = _validate_python_runtime()
+    dependency_sites = _validate_dependency_sites()
     if _git_head() != args.expected_code_hash:
         raise RuntimeError("Gate-D HLO acquisition code pin drifted")
     _verify_running_source(args.expected_code_hash, args.expected_driver_sha256)
@@ -857,6 +1038,7 @@ def main() -> int:
         _sealed_git_source_archive(args.expected_code_hash)
     )
     _install_sealed_source_path(source_archive_path)
+    _validate_compiler_import_path(source_archive_path)
 
     import jax
     import jax.numpy as jnp
@@ -923,13 +1105,20 @@ def main() -> int:
         or fcntl.fcntl(source_archive_fd, _F_GET_SEALS) != _MEMFD_SEALS
     ):
         raise RuntimeError("Gate-D sealed project import closure drifted")
+    _validate_compiler_import_path(source_archive_path)
+    if _validate_python_runtime_storage() != python_runtime:
+        raise RuntimeError("Gate-D sealed Python runtime changed")
+    if _validate_dependency_sites() != dependency_sites:
+        raise RuntimeError("Gate-D sealed compiler dependency sites changed")
     dependencies_after = _compiler_dependency_records(source_archive_path)
     _require_dependency_prefix_stable(dependencies_before, dependencies_after)
     dependency_manifest = {
         "artifact_kind": "gate_d_compensated_pp16_compiler_dependencies",
         "code_hash": args.expected_code_hash,
+        "dependency_sites": dependency_sites,
         "environment": compiler_environment,
         "native_mappings": dependencies_after["native_mappings"],
+        "python_runtime": python_runtime,
         "python_modules": dependencies_after["python_modules"],
         "sealed_project_source": source_snapshot,
     }

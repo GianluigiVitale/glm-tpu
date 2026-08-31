@@ -44,13 +44,13 @@ readonly SEALED_CPU_REPLAY_SHA=0f1930c079bd7244452e84dca6d0bbf9da077ea133c685f0f
 readonly TPU_REPLAY=$WORKTREE/glm_tpu/greenfield/benchmarking/gate_d_compensated_pp16_hlo.py
 readonly TPU_REPLAY_SHA=a75b6eeb21ca94cd70910553f5804b8f1127ac88ca3c8b5545bec993adae54fc
 readonly DRIVER=$WORKTREE/scripts/greenfield/acquire_gate_d_compensated_pp16_hlo.py
-readonly DRIVER_SHA=526aad55d1e14b46b8c72a3061469913edb39ff3d29dda242515aaa33b4748e4
+readonly DRIVER_SHA=3842d06dd27dead13e485df48df82f49c8ce5aea99ef9603fab3eb0852681f88
 readonly PUBLISHER=$WORKTREE/scripts/greenfield/publish_gate_d_compensated_pp16_hlo.py
-readonly PUBLISHER_SHA=2d83ab19a5abcd0e8df6df46ef5002c482e68c8822299efcef8ede325f59d874
+readonly PUBLISHER_SHA=f481c6104c44b878f5eec14b65b699b40021f6e31d136a00e37107e136f14c15
 readonly STORAGE_SITE_BUILDER=$WORKTREE/scripts/greenfield/build_gate_d_storage_site_capsule.py
 readonly STORAGE_SITE_BUILDER_SHA=b7f4f869ae9b98edf5195185bf49fffcf61ef6800a2b707127694b66424c5989
 readonly PUBLISHER_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12
-readonly DRIVER_PYTHON=/home/gianl/vllm-env/bin/python
+readonly DRIVER_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12
 
 [[ ${GLM_GATE_D_COMPENSATED_PP16_HLO_ACQUIRE:-0} == 1 ]] || {
   echo "Gate-D compensated PP16 HLO acquisition is default-off" >&2
@@ -260,7 +260,7 @@ set +e
     JAX_ENABLE_COMPILATION_CACHE=0 \
     LANG=C \
     LC_ALL=C \
-    PATH=/home/gianl/vllm-env/bin:/usr/bin:/bin \
+    PATH=/usr/bin:/bin \
     PYTHONDONTWRITEBYTECODE=1 \
     TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
     TPU_PROCESS_BOUNDS=1,1,1 \

@@ -2476,3 +2476,23 @@ remains open and no TPU successor is authorized.
   still bind sealed Python, JAX and `libtpu` before import and after compile, reject unauthorized
   native mappings and strip mutable PATH entries before any fresh HLO start is reviewed. Gate D is
   open.
+
+## Sealed PP16 compiler dependency correction prepared; no process start
+
+- Current driver `3842d06d...1f88` now validates the exact root-owned Python runtime and complete
+  sealed JAX/`libtpu` trees plus manifests before any JAX import and again after compilation. Its
+  exact import path contains only the sealed Git-memfd project archive, the two sealed dependency
+  sites and root stdlib; compiler PATH is `/usr/bin:/bin`.
+- Driver and publisher `f481c610...4c15` both reject Python/native dependencies outside the sealed
+  runtime/sites or `/usr`/`/lib*`; the only worktree exception is the separately Git-blob-verified
+  driver file. Publisher binds the compiler runtime and both dependency-site identities before any
+  remote success publication. Publisher records must use exact canonical realpaths and are reopened
+  `O_NOFOLLOW` to verify regular/single-link device, inode, size, stable metadata and exact SHA
+  before remote mutation. Wrapper/test SHAs are `7a7abfae...2a14` and `bf6556a7...e5c7`.
+- Focused HLO-acquisition plus capsule suites pass 64/64. A root-Python `-I -S -B` no-import probe
+  revalidated both complete trees/manifests and resolved `jax`, `jaxlib` and `libtpu` exclusively
+  from `/opt/glm-tpu` sealed sites. Hostile checks cover mutable interpreter/site/path rebinding,
+  unauthorized native mappings, tree drift and publisher refusal before remote mutation.
+- No JAX import, backend initialization, cloud operation, HLO lowering/compile or TPU work occurred.
+  This source batch requires review, commit/push and same-region mirror before a distinct fresh HLO
+  start can be considered. Gate D remains open.
