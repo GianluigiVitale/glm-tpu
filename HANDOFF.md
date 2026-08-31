@@ -8712,3 +8712,24 @@ this parser success itself authorizes no producer execution or successor work.
 Fable 5 Max remains at its recorded hard usage limit and supplied no opinion. The goal-authorized
 existing Sol reviewer approved exact staged evidence diff `005590a5...6bf8` for persistence with no
 P0--P2; its verdict explicitly authorizes no successor work.
+
+## 2026-08-31 compensated coherent-capsule producer source; not installed or run
+
+A distinct bounded replay module now calls only
+`fused_add_rms_norm_with_compensated_auxiliary`, roots
+`restored_rms_input_fp32` as the capsule RMS-input role, and leaves QKV/DSA primary consumers on
+`rms.output`. Replay SHA is `0f1930c0...313d`; it cannot select the tombstoned tuple candidate.
+
+New default-off producer `produce_gate_d_compensated_auxiliary_capsule.py`, SHA
+`039997b9...d19f`, retains the already audited sealed-input, two-CPU, dependency/source snapshot,
+mount authority, append-only and SUCCESS-last machinery. Its fixed future installed path and all
+candidate/source/plan/StableHLO identities are compensated-specific. Two hostile source suites
+pass 8/8 and prove that the producer's executable functions differ from the audited tuple producer
+only by declared candidate identity/replay substitutions. No producer installation/invocation,
+JAX import, CPU replay, compilation, model/cloud/TPU work, admission or Gate-D closure occurred.
+Exact next after review/persistence is candidate-specific offline authority-builder/admission
+support; this source batch does not authorize installing or running the producer.
+
+Fable remains at its recorded 100% limit/no opinion. The goal-authorized existing Sol reviewer
+returned `APPROVE SOURCE PERSISTENCE` for staged diff `4566728c...ef72`, with no P0--P2 and
+explicitly no installation, invocation, JAX or successor authorization.

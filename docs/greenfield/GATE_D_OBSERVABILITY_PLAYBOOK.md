@@ -172,6 +172,10 @@ Do not weaken v1 or rewrite its historical evidence. The append-only repair now 
   `docs/artifacts/gate-d-precompile-admission-v2-compensated-stablehlo-source.json`;
 - current compensated causal-StableHLO admission report:
   `docs/artifacts/gate-d-precompile-admission-v2-compensated-stablehlo.json`;
+- compensated coherent-replay source:
+  `glm_tpu/greenfield/benchmarking/gate_d_compensated_capsule.py`;
+- compensated capsule producer source (not installed or run):
+  `scripts/greenfield/produce_gate_d_compensated_auxiliary_capsule.py`;
 - current real-HLO report: `docs/artifacts/gate-d-precompile-admission-v2-stablehlo.json`.
 
 V2 authenticates committed blob/AST identity for concrete or declarative source authority, a

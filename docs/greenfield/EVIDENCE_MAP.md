@@ -2301,3 +2301,22 @@ remains open and no TPU successor is authorized.
 - Fable remained at its recorded hard usage limit/no opinion. The goal-authorized existing Sol
   reviewer returned `APPROVE PERSISTENCE` for staged evidence diff `005590a5...6bf8`, with no
   P0--P2 and no successor authorization.
+
+## Compensated coherent-capsule producer source; no process start
+
+- `glm_tpu/greenfield/benchmarking/gate_d_compensated_capsule.py`, SHA
+  `0f1930c0...313d`, is a distinct two-owner replay. It calls only the compensated RMS boundary,
+  exposes `restored_rms_input_fp32` as the rooted capsule value and keeps both QKV and DSA primary
+  inputs on accepted `rms.output`.
+- `scripts/greenfield/produce_gate_d_compensated_auxiliary_capsule.py`, SHA
+  `039997b9...d19f`, binds candidate `compensated_auxiliary_dependency`, source pin `e16d74f`,
+  source/plan/StableHLO authorities `c38492a0...b4c3`, `eb2c050b...b6dc` and
+  `e1b2e410...0185`, plus a distinct future root-owned installed path. Its execution/security
+  machinery is normalized-AST identical to the previously reviewed tuple producer while its
+  candidate and replay identities cannot select that tombstoned path.
+- New hostile source tests pass 8/8. No installation, producer invocation, JAX import, replay,
+  compilation, numerical/model/cloud/TPU work or admission occurred. Separate review/persistence
+  precedes candidate-specific authority-builder/admission support; no process start is authorized.
+- Fable remains at its recorded 100% limit/no opinion. Existing Sol returned
+  `APPROVE SOURCE PERSISTENCE` for staged diff `4566728c...ef72`, with no P0--P2 and no
+  installation/invocation/successor authority.
