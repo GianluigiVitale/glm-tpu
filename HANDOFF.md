@@ -8870,9 +8870,9 @@ Python 3.12 runtime. Build artifact is
 installed/no network/JAX/TPU work.
 
 Builder/driver/storage-builder/publisher/wrapper/test SHAs are `a75b6eeb...e54fc`,
-`526aad55...748e4`, `b7f4f869...4c5989`, `2d83ab19...59d874`, `792af5af...b561eb` and
-`8c3b896d...e080b2`; focused hostile/static tests pass 43/43 and the adjacent compensated/reuse
-slice passes 65/65. A final local audit caught that the sealed publisher PATH had accidentally
+`526aad55...748e4`, `b7f4f869...4c5989`, `2d83ab19...59d874`, `013eb69d...9fc35d` and
+`8d7fa965...4232c5`; focused hostile/static tests pass 45/45 and the adjacent compensated/reuse
+slice passes 67/67. A final local audit caught that the sealed publisher PATH had accidentally
 propagated into the expected compiler environment; the correction now binds the publisher to
 `/usr/bin:/bin` and the compiler to `/home/gianl/vllm-env/bin:/usr/bin:/bin`, exactly matching the
 wrapper's distinct invocations. No storage capsule installation, JAX
@@ -8903,3 +8903,26 @@ No HLO launcher, JAX/backend/cloud/TPU process, numerical execution or Gate-D su
 next is adversarial review of one literal fresh-tag compile-only start. Only optimized-HLO
 acquisition and locality/policy adjudication may authorize the later protected layer-1 replay;
 exact 8K remains forbidden.
+
+## 2026-08-31 first PP16 compile-only start failed before pre-census
+
+Sol approved exactly one compile-only start for fresh tag
+`gate_d_compensated_pp16_hlo_20260831T191040789252844Z`. It exited in about 23 seconds before a
+census command, JAX import, backend or compiler start: under `set -u`, wrapper line 141 declared
+`label` and dependent `member` in one `local` command, so Bash expanded `${label}` before assigning
+it. The exit trap called the same function and produced the same error instead of a diagnostic.
+
+The burned tag is preserved and must never be retried. Its local directory contains only exact
+publisher runtime, vacancy raw/canonical records, mirror ledger and two-line orchestrator log plus
+an empty `hlo/`; the remote prefix remains vacant. Both leases were independently free, no local
+acquisition process remained, and all eight hosts were `CENSUS_OK`. Artifact
+`gate-d-compensated-pp16-hlo-pre-census-failure.json` (`fbc6d04a...5293f2`) binds the five file
+hashes, empty/terminal
+states, root cause and cleanup. Read-only cloud describe/vacancy/mirror checks did occur; no cloud
+mutation, HLO, JAX/backend/compiler, executable or TPU work occurred.
+
+The minimal correction splits `local label=$1` from dependent `member`. Tests now bind that exact
+order, execute the semantics under `/usr/bin/bash -u`, and reject any same-command local dependency
+across the wrapper. Fable remains usage-blocked; the same Sol reviewer confirmed the diagnosis and
+no additional P0--P2. Exact next is correction review, commit/push/locked mirror, then a separately
+reviewed fresh-tag start. Gate D and protected layer-1/8K execution remain open/forbidden.

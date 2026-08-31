@@ -6,6 +6,7 @@ import importlib.util
 import json
 import os
 import re
+import shlex
 import stat
 import subprocess
 import zipfile
@@ -500,6 +501,57 @@ def test_reviewed_entry_command_clears_hostile_bash_env(tmp_path: Path) -> None:
     assert completed.returncode == 2
     assert "default-off" in completed.stderr
     assert not marker.exists()
+
+
+def test_wrapper_local_assignments_have_no_same_command_dependency() -> None:
+    unsafe: list[tuple[int, str, str]] = []
+    for line_number, line in enumerate(WRAPPER.read_text().splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped.startswith("local "):
+            continue
+        declared: list[str] = []
+        for token in shlex.split(stripped)[1:]:
+            match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)=(.*)", token)
+            if match is None:
+                continue
+            name, value = match.groups()
+            for earlier in declared:
+                reference = re.compile(
+                    rf"\$(?:{re.escape(earlier)}\b|\{{{re.escape(earlier)}(?:\}}|[:[]))"
+                )
+                if reference.search(value):
+                    unsafe.append((line_number, name, earlier))
+            declared.append(name)
+    assert unsafe == []
+
+
+def test_strict_census_label_is_bound_before_member_under_nounset() -> None:
+    wrapper = WRAPPER.read_text()
+    fragment = (
+        "strict_census() {\n"
+        "  local label=$1\n"
+        '  local member="census_${label}.txt"\n'
+    )
+    assert fragment in wrapper
+    completed = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            "-uc",
+            (
+                'f(){ local label=$1; local member="census_${label}.txt"; '
+                'printf "%s\\n" "$member"; }; f pre'
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        env={},
+        text=True,
+    )
+    assert completed.returncode == 0
+    assert completed.stdout == "census_pre.txt\n"
+    assert completed.stderr == ""
 
 
 def test_wrapper_pins_current_builder_driver_and_publisher_bytes() -> None:

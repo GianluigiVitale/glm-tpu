@@ -2397,6 +2397,22 @@ remains open and no TPU successor is authorized.
   execution, performance claim or Gate-D closure. A fresh, separate process-start review remains
   mandatory.
 
+## First compensated PP16 HLO start failed before census/JAX; tag burned
+
+- The separately approved tag `gate_d_compensated_pp16_hlo_20260831T191040789252844Z` failed in
+  `strict_census pre` because Bash nounset expanded `${label}` before a combined `local` command
+  assigned it. The exit trap repeated the same failure. This is a wrapper P1, not a model/HLO
+  result; no census command, JAX import, backend, compiler, executable or TPU work started.
+- The partial directory is preserved with five hashed files and an empty `hlo/`; the remote prefix
+  remains vacant and has no terminal. Both leases were free and a separate post-failure census was
+  8/8 clean. Exact evidence is
+  `gate-d-compensated-pp16-hlo-pre-census-failure.json` (`fbc6d04a...5293f2`); this tag must never
+  be retried.
+- The narrow correction splits `label` and dependent `member` declarations. New tests bind exact
+  ordering, exercise the pattern under `/usr/bin/bash -u`, and scan every wrapper `local` line for
+  a same-command dependency. A fresh tag still requires reviewed persistence and separate start
+  approval.
+
 ## Bounded PP16 compensated-HLO acquisition source prepared; no process start
 
 - A new TPU-only builder is normalized-AST identical to the admitted sealed CPU replay except for
@@ -2409,10 +2425,10 @@ remains open and no TPU successor is authorized.
   is itself committed-blob authenticated and isolated from mutable worktree import paths.
 - Publisher `2d83ab19...59d874` uses component-wise no-follow and direct exclusive local writes,
   generation-zero remote creation, generation/size/CRC32C/SHA ledgers, generation-qualified replay,
-  exact preterminal inventory and a final-operation terminal upload. Wrapper `792af5af...b561eb`
+  exact preterminal inventory and a final-operation terminal upload. Wrapper `013eb69d...9fc35d`
   remains default-off, serialized and 8/8-census protected; diagnostics use a separate fresh
   generation-zero subprefix and never publish a success terminal.
-- Test `8c3b896d...e080b2` passes 43/43 (65/65 with adjacent compensated/reuse suites), including
+- Test `8d7fa965...4232c5` passes 45/45 (67/67 with adjacent compensated/reuse suites), including
   hostile authority/shape/hash mutations, AST
   equivalence, exactly one compile and no executable call, local final races, intermediate/final
   symlinks, mutable-worktree replacement after source sealing, concurrent remote insertion,

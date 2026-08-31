@@ -1037,3 +1037,11 @@ At pushed/mirrored pin `bbe6714`, a separate install-only review approved the co
 SHA `d94fd4c3...1b510`; `gate-d-compensated-pp16-storage-site-install.json` records the exact
 manifest, provisioner, three matching builds and post-install runtime identities. This installs
 dependencies only and does not authorize the HLO process start or any numerical claim.
+
+The first reviewed process start burned its tag before pre-census: a combined Bash `local`
+declaration referenced `label` before nounset considered it assigned, and the exit trap repeated
+the same failure. Preserve
+`gate-d-compensated-pp16-hlo-pre-census-failure.json` and its partial local directory as exact
+negative operational evidence; the remote prefix is vacant and independent cleanup is 8/8 clean.
+The corrected wrapper uses two declarations, and tests enforce the exact order, Bash `-u` behavior
+and a general ban on same-command local dependencies. Never reuse the failed tag.
