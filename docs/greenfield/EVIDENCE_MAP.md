@@ -2230,3 +2230,20 @@ remains open and no TPU successor is authorized.
   observability playbook. After the metadata-only correction, Sol returned `APPROVE PERSISTENCE`
   with no remaining P0--P2. Approval is limited to commit, push and locked same-region mirror; it
   grants no installation, process-start, admission or Gate-D-successor authority.
+
+## Compensated causal-StableHLO producer immutable installation; not invoked
+
+- At clean local/origin and byte-mirrored pin `361a573668e1414c384d7d9cdcca6619cb6d3798`, Sol
+  approved only the exact immutable-provisioning procedure. Fable 5 Max remained hard
+  usage-limited and supplied no opinion.
+- Sealed provisioner `2b9c8c2b...0594` installed the one-file canonical-safe tree
+  `06c2a601...5f60f` at versioned path
+  `/opt/glm-tpu/gate-d-compensated-stablehlo-producer-a9431e8e`. The producer was hard-linked
+  without replacement into the fixed bin path; both entries are the same root:root mode-0555,
+  xattr-free inode with link count two and exact SHA `a9431e8e...eed9`.
+- Canonical local-install evidence is
+  `docs/artifacts/gate-d-compensated-stablehlo-producer-install.json`, SHA `531c7876...51cd`.
+  No producer invocation,
+  JAX import, output, lowering, compilation, model/cloud/TPU work, admission or Gate-D closure
+  occurred. One fresh-tag forced-CPU abstract lowering requires a separate review after this
+  install evidence is persisted.

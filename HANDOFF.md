@@ -8636,3 +8636,20 @@ and withheld only on ambiguous current/historical validator wording in the obser
 After that metadata-only correction, Sol returned `APPROVE PERSISTENCE` with no remaining P0--P2.
 The approval covers only commit, push and locked same-region mirror; it does not authorize install,
 producer invocation, lowering, JAX/model/cloud/TPU work, admission or Gate D closure.
+
+## 2026-08-31 compensated StableHLO producer provisioned; not invoked
+
+After source persistence at clean local/origin pin `361a573668e1414c384d7d9cdcca6619cb6d3798`
+and byte verification in the locked US-CENTRAL2 mirror, the goal-authorized Sol fallback approved
+only the exact immutable installation procedure. The sealed provisioner installed one-file tree
+`06c2a601...5f60f` at versioned path
+`/opt/glm-tpu/gate-d-compensated-stablehlo-producer-a9431e8e`; its mode-0555 producer was then
+hard-linked without replacement into the fixed bin path. Both paths are root:root, xattr-free,
+the same inode with link count two and exact source SHA `a9431e8e...eed9`.
+
+Canonical install evidence is
+`docs/artifacts/gate-d-compensated-stablehlo-producer-install.json`, SHA `531c7876...51cd`.
+Fable 5 Max remained hard
+usage-limited and supplied no opinion; Sol found no P0--P2. No producer invocation, JAX import,
+output creation, lowering, compilation, model/cloud/TPU work, admission or Gate-D closure occurred.
+One fresh-tag forced-CPU abstract lowering remains a separate review and persistence boundary.
