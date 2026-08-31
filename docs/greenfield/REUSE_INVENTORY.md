@@ -1055,7 +1055,10 @@ adapt the existing sealed-JAX-site builder pattern through
 independent builds produced the same 719,846,262-byte tree
 `db7598c8...8eca` and manifest `d34064f4...7efa`; build evidence is
 `gate-d-libtpu-site-build.json`. The target `/opt/glm-tpu/gate-d-libtpu-site-db7598c867f3` is
-deliberately absent pending the reviewed install-only command. This capsule build imported no JAX,
-started no backend, touched no TPU and authorizes no HLO retry. A later compiler correction must
+was deliberately absent in the build evidence. At clean pushed and same-region mirrored pin
+`e922f96`, the reviewed absolute install-only command published that target without replacement;
+`gate-d-libtpu-site-install.json` binds its root ownership, 13 files, 719,846,262 bytes, complete
+tree and manifest. The build and install imported no JAX, started no backend, touched no TPU and
+authorize no HLO retry. A later compiler correction must
 bind both the existing sealed JAX tree and this separately sealed `libtpu` tree before import and
 after compile, constrain native mappings to sealed/system roots, and use `/usr/bin:/bin` as PATH.

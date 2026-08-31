@@ -750,6 +750,7 @@
         "scripts/greenfield/build_gate_d_libtpu_site_capsule.py",
         "scripts/greenfield/provision_gate_d_python_runtime.py",
         "docs/artifacts/gate-d-libtpu-site-build.json",
+        "docs/artifacts/gate-d-libtpu-site-install.json",
         "tests/greenfield/validation/test_gate_d_libtpu_site_capsule.py"
       ],
       "disposition": "adapted",
@@ -757,7 +758,7 @@
         "future sealed PP16 compile-only dependency boundary"
       ],
       "gate": "D diagnostic prerequisite",
-      "reason": "The protected HLO attempt used a mutable vllm-env interpreter resolving a user-writable UV Python and stdlib. Review of the first root-owned-interpreter correction then proved it still selected JAX/libtpu from the mutable venv site, so it was withheld. This minimal allowlisted builder adapts the sealed dependency-capsule and fixed no-replacement provisioning pattern to libtpu only. Two unprivileged builds produced the same 13-file, 719846262-byte tree and manifest; the historical build record says the target was absent and no installation, import, backend, cloud or TPU work occurred. The existing same-scope Sol reviewer approved only the exact absolute install command plus read-only verification. This source authorizes no compiler or HLO retry; a later reviewed driver must bind the sealed JAX and libtpu trees before import and after compile, reject native mappings outside sealed/system roots, and strip mutable PATH entries."
+      "reason": "The protected HLO attempt used a mutable vllm-env interpreter resolving a user-writable UV Python and stdlib. Review of the first root-owned-interpreter correction then proved it still selected JAX/libtpu from the mutable venv site, so it was withheld. This minimal allowlisted builder adapts the sealed dependency-capsule and fixed no-replacement provisioning pattern to libtpu only. Two unprivileged builds produced the same 13-file, 719846262-byte tree and manifest; the historical build record says the target was absent and no installation, import, backend, cloud or TPU work occurred. At pushed/mirrored pin e922f96 the exact reviewed absolute command installed the target without replacement; separate install evidence binds root ownership, complete tree/manifest and read-only verification. The install imported no JAX, started no backend and touched no TPU. This source and install authorize no compiler or HLO retry; a later reviewed driver must bind the sealed JAX and libtpu trees before import and after compile, reject native mappings outside sealed/system roots, and strip mutable PATH entries."
     },
     {
       "id": "legacy-execution-stack",

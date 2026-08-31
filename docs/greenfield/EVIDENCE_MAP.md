@@ -2457,3 +2457,22 @@ remains open and no TPU successor is authorized.
   network, JAX/backend or TPU work. Same-scope correction review and durable persistence remain
   mandatory before a separately reviewed immutable install or process start; no numerical or
   Gate-D successor exists.
+
+## Root-owned libtpu compiler supplement installed; no HLO retry
+
+- The failed protected HLO start used mutable `vllm-env/bin/python`, resolving a user-writable UV
+  Python/stdlib. Review withheld the first root-owned-interpreter correction because JAX and
+  `libtpu` still came from the mutable venv site; no lowering or compilation had occurred.
+- Minimal stdlib-only builder `eb0d34b0...8e37` copied exactly `libtpu` and its pinned distribution
+  metadata. Two independent unprivileged builds produced the same 13-file / 719,846,262-byte tree
+  `db7598c8...8eca` and manifest `d34064f4...7efa`. Hostile tests cover escaping symlinks, special
+  files, hardlinks, source drift and no-clobber publication.
+- At clean pushed and byte-mirrored pin `e922f96`, the separately approved absolute root-owned
+  provisioner installed `/opt/glm-tpu/gate-d-libtpu-site-db7598c867f3` without replacement. A
+  second invocation verified the existing complete tree, ownership and safe modes. Exact evidence
+  is `gate-d-libtpu-site-install.json`.
+- Build/install imported no JAX, started no backend, used no cloud/network and touched no TPU. This
+  closes only the immutable `libtpu` storage prerequisite. The withheld compiler correction must
+  still bind sealed Python, JAX and `libtpu` before import and after compile, reject unauthorized
+  native mappings and strip mutable PATH entries before any fresh HLO start is reviewed. Gate D is
+  open.
