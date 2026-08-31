@@ -102,6 +102,151 @@ _EXPECTED_LOWERING_DEPENDENCY_MANIFESTS = {
         "sha256": "a37beeaec7baa7c78acc15efa75395bd3b6071d4519ed7bd22662653b5eb66d8",
     },
 }
+_EXPECTED_CAPSULE_PRODUCER_CLAIM_SCOPE = (
+    "Bounded forced-two-CPU candidate-coherent layer-1/event-1 replay only; "
+    "sealed real inputs are explicit, no full decoder or model load runs, and no "
+    "TPU, cloud, performance or Gate-D claim is made. Local SUCCESS-last "
+    "publication is provisional until an independent protected archive/seal."
+)
+_EXPECTED_CAPSULE_EXECUTION = {
+    "cloud_workflow": False,
+    "contract_valid": True,
+    "decoder_executed": False,
+    "jax_plugins_loaded": False,
+    "libtpu_loaded": False,
+    "model_loaded": False,
+    "scope": "bounded.layer1.event1.candidate.replay",
+    "tpus_used": 0,
+}
+_EXPECTED_CAPSULE_ENVIRONMENT = {
+    "JAX_PLATFORMS": "cpu",
+    "XLA_FLAGS": "--xla_force_host_platform_device_count=2",
+    "jax_version": "0.10.1",
+    "jaxlib_version": "0.10.1",
+    "ml_dtypes_version": "0.5.4",
+    "numpy_version": "2.3.5",
+    "python_executable": (
+        "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12"
+    ),
+    "python_runtime_root": "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95",
+    "python_runtime_tree_sha256": (
+        "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616"
+    ),
+    "python_sha256": (
+        "021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7"
+    ),
+    "site_root": "/opt/glm-tpu/gate-d-jax-site-55233c63939e",
+    "site_tree_sha256": (
+        "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df"
+    ),
+}
+_EXPECTED_CAPSULE_INSTALLED_PRODUCER = (
+    "/opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_capsule.py"
+)
+_EXPECTED_CAPSULE_PRODUCER_SOURCE = {
+    "git_object_id": "94e9a00a4feaaf02066d5f638a607da690b77352",
+    "repo_path": "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py",
+    "sha256": "2cbf8ed9d0ca9387187b790d7f81bb95b46637fa8c5b53f62b5fa26f2d08268d",
+}
+_EXPECTED_CAPSULE_REPLAY_SOURCE = {
+    "git_object_id": "7476af8c6ace4472d9c39faf1e7155b328d9e230",
+    "repo_path": "glm_tpu/greenfield/benchmarking/gate_d_tuple_capsule.py",
+    "sha256": "9b9d11d0f312a173a8014a81f9b8fd957b9eefe2148bf327da0d57d82fed03b4",
+}
+# The admission module is the verifier, not part of the sealed replay import
+# closure.  Excluding it avoids a self-referential digest while binding every
+# other committed glm_tpu blob, including package initializers and all
+# transitive kernel imports available to the replay.
+_CAPSULE_EXECUTION_MANIFEST_EXCLUDED_PATHS = frozenset(
+    {"glm_tpu/greenfield/gate_d_precompile_admission.py"}
+)
+_EXPECTED_CAPSULE_EXECUTION_SOURCE_MANIFEST = {
+    "count": 139,
+    "sha256": "f3683029a4c3eaa12e0673c0e1d84ff13ff2c42fb7a475323e8d099ac156c0b0",
+}
+_EXPECTED_CAPSULE_TENSOR_NAMES = (
+    "attention.slot_01.input_norm",
+    "attention.slot_01.qkv_a.weight_bits",
+    "attention.slot_01.qkv_a.scale_inv",
+    "attention.slot_01.q_a_norm",
+    "indexer.slot_01.wq_b.weight_bits",
+    "indexer.slot_01.wq_b.scale_inv",
+    "indexer.slot_01.wk.weight_bits",
+    "indexer.slot_01.wk.scale_inv",
+    "indexer.slot_01.key_norm_weight",
+    "indexer.slot_01.key_norm_bias",
+    "indexer.slot_01.head_weight",
+)
+_CAPSULE_RUNTIME_INPUT_SOURCES = {
+    "head_weight_bf16_bits": ("indexer.slot_01.head_weight", (0, 1)),
+    "key_norm_bias_bf16_bits": ("indexer.slot_01.key_norm_bias", (0, 1)),
+    "key_norm_weight_bf16_bits": ("indexer.slot_01.key_norm_weight", (0, 1)),
+    "q_a_norm_bf16_bits": ("attention.slot_01.q_a_norm", (0,)),
+    "qkv_a_scale_inv": ("attention.slot_01.qkv_a.scale_inv", (0,)),
+    "qkv_a_weight_bits": ("attention.slot_01.qkv_a.weight_bits", (0,)),
+    "rms_weight_bf16_bits": ("attention.slot_01.input_norm", (0,)),
+    "wk_scale_inv": ("indexer.slot_01.wk.scale_inv", (0, 1)),
+    "wk_weight_bits": ("indexer.slot_01.wk.weight_bits", (0, 1)),
+    "wq_b_scale_inv": ("indexer.slot_01.wq_b.scale_inv", (0, 1)),
+    "wq_b_weight_bits": ("indexer.slot_01.wq_b.weight_bits", (0, 1)),
+}
+_EXPECTED_CAPSULE_ACCEPTED_OUTPUTS = {
+    "event1_positions_sha256": (
+        "e55e66c6dcb35de94b9dce54d8fff602704cf26ae92d4afb333bd2501ab88ad7"
+    ),
+    "event1_scores_sha256": (
+        "a61587a9d18bd169c1697ecb0060b39e8f1aad1caf532bca835b15a426c0b0e7"
+    ),
+    "event1_valid_count": 2048,
+    "rms_hidden_update_sha256": (
+        "efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc"
+    ),
+    "rms_residual_sha256": (
+        "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e"
+    ),
+}
+_EXPECTED_CAPSULE_UPSTREAM_INPUTS = {
+    "db518_comparison": (
+        "/home/gianl/glm-run/greenfield_pp16_feature2_layer0_db518_numerical_"
+        "20260829T115022665987633Z/comparison.json",
+        "06ee82b9d487e3fdf8f9f19d4e824e33f1f9d453738a0090ace5e2cac7272a4d",
+    ),
+    "db518_result": (
+        "/home/gianl/glm-run/greenfield_pp16_feature2_layer0_db518_numerical_"
+        "20260829T115022665987633Z/result.npz",
+        "534bacc54d74992f5a8ab4d422f9fa0947523d59325b4bfa272d4fbeb56262f0",
+    ),
+    "db550_boundary": (
+        "/home/gianl/gcs-models/results/greenfield_layer0_dense_partial_capture_"
+        "20260813T200736889447458Z/dense_partial_capture.npz",
+        "f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298",
+    ),
+    "plan_authority": (
+        "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+        "gate-d-tuple-auxiliary-pp16-plan-authority.json",
+        "98b4fa21272e0bb019af1ad99abedee35593f9a1c8067a15983e9023c01f7880",
+    ),
+    "runtime_manifest": (
+        "/home/gianl/glm-run/greenfield_runtime_feature_qkv_direct_pp16_"
+        "20260827T164842844148623Z/final/runtime_manifest.json",
+        "e13ccefb7341756cd68d85e51209eaa8516ea506eac7ace3b4fd0a1d56828032",
+    ),
+    "runtime_success": (
+        "/home/gianl/glm-run/greenfield_runtime_feature_qkv_direct_pp16_"
+        "20260827T164842844148623Z/final/SUCCESS",
+        "dbef7e366e2fdf2a4815b0b58d1645667580d55fc5926133d48c838929f7ee7e",
+    ),
+    "source_authority": (
+        "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+        "gate-d-tuple-auxiliary-source-authority.json",
+        "c95c8aa188e2eda77270022128d121dc3693a899607b1ab2f9977ddb45def0e1",
+    ),
+    "stablehlo_authority": (
+        "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+        "gate-d-tuple-auxiliary-stablehlo-authority.json",
+        "8cc45b81c3a85ad6131790e82eb73f0839cab7eefd13a634db7ff5a697b0338b",
+    ),
+}
 _EXPECTED_STABLEHLO_CERTIFICATE_CLAIM_SCOPE = (
     "Forced-CPU abstract-lowering structural StableHLO authority only; no executable "
     "compilation, numerical execution, model, TPU, performance or Gate-D closure claim."
@@ -206,10 +351,47 @@ _EXPECTED_AUXILIARY_SLICE_SHA256 = {
 }
 _DTYPE_BYTES = {
     "|b1": 1,
+    "|u1": 1,
     "<u2": 2,
     "<u4": 4,
     "<i4": 4,
     "<f4": 4,
+}
+_CAPSULE_INPUT_SCHEMA: dict[str, tuple[str, tuple[int, ...]]] = {
+    "head_weight_bf16_bits": ("<u2", (2, 16, 6144)),
+    "key_norm_bias_bf16_bits": ("<u2", (2, 128)),
+    "key_norm_weight_bf16_bits": ("<u2", (2, 128)),
+    "prompt_cache_bf16_bits": ("<u2", (2, 16, 256, 128)),
+    "q_a_norm_bf16_bits": ("<u2", (2048,)),
+    "qkv_a_scale_inv": ("<f4", (32, 48, 82)),
+    "qkv_a_weight_bits": ("|u1", (32, 6144, 82)),
+    "rms_hidden_update_bf16_bits": ("<u2", (6144,)),
+    "rms_residual_bf16_bits": ("<u2", (6144,)),
+    "rms_weight_bf16_bits": ("<u2", (6144,)),
+    "wk_scale_inv": ("<f4", (2, 1, 48)),
+    "wk_weight_bits": ("|u1", (2, 128, 6144)),
+    "wq_b_scale_inv": ("<f4", (2, 16, 16)),
+    "wq_b_weight_bits": ("|u1", (2, 2048, 2048)),
+}
+_CAPSULE_DEVICE_EVIDENCE_SCHEMA: dict[
+    str, tuple[str, tuple[int, ...], str, tuple[int, ...]]
+] = {
+    "contract_valid_owners": ("|u1", (2,), "", ()),
+    "current_key_owners": ("<f4", (2, 1, 128), "current_key", (0, 0)),
+    "rms_input_fp32_owners": ("<f4", (2, 1, 6144), "rms_input", (0, 0)),
+    "selected_positions_owners": (
+        "<i4",
+        (2, 1, 2048),
+        "event1_positions",
+        (0,),
+    ),
+    "selected_scores_owners": (
+        "<f4",
+        (2, 1, 2048),
+        "event1_scores",
+        (0,),
+    ),
+    "valid_counts_owners": ("<i4", (2, 1), "event1_valid_count", (0,)),
 }
 _SEMANTIC_DTYPES = {
     "bf16_bits",
@@ -717,6 +899,16 @@ def _snapshot(
     if digest.hexdigest() != expected_sha256:
         raise BenchmarkValidationError(f"{label} SHA-256 drifted: {path}")
     return b"".join(blocks)
+
+
+def _regular_file_identity(path: Path, label: str) -> tuple[int, str]:
+    digest = sha256()
+    total = 0
+    with _open_regular_file(path, label) as stream:
+        while block := stream.read(8 * 1024 * 1024):
+            total += len(block)
+            digest.update(block)
+    return total, digest.hexdigest()
 
 
 def _load_json(raw: bytes, label: str) -> dict[str, Any]:
@@ -3663,11 +3855,1168 @@ def _derive_fp32_sum_from_bf16_bits(hidden: bytes, residual: bytes) -> bytes:
     return bytes(result)
 
 
+def _bf16_bits_from_fp32(raw: bytes) -> bytes:
+    """Round finite IEEE binary32 bytes to BF16 using ties-to-even."""
+
+    if len(raw) % 4:
+        raise BenchmarkValidationError("FP32 value byte count is invalid")
+    result = bytearray(len(raw) // 2)
+    for index, (bits,) in enumerate(struct.iter_unpack("<I", raw)):
+        if bits & 0x7F800000 == 0x7F800000:
+            raise BenchmarkValidationError("FP32 values must be finite")
+        upper = bits >> 16
+        lower = bits & 0xFFFF
+        if lower > 0x8000 or (lower == 0x8000 and upper & 1):
+            upper = (upper + 1) & 0xFFFF
+        result[index * 2 : (index + 1) * 2] = struct.pack("<H", upper)
+    return bytes(result)
+
+
+def _verify_capsule_producer_blob(
+    value: Any,
+    base: Path,
+    implementation: Mapping[str, Any],
+) -> dict[str, str]:
+    if not isinstance(value, dict):
+        raise BenchmarkValidationError("capsule producer identity must be an object")
+    _exact_keys(
+        value,
+        {"git_object_id", "repo_path", "repository", "sha256"},
+        "capsule producer identity",
+    )
+    repository = value["repository"]
+    if not isinstance(repository, dict):
+        raise BenchmarkValidationError("capsule producer repository must be an object")
+    _exact_keys(repository, {"commit", "root"}, "capsule producer repository")
+    code_pin = _code_pin(repository["commit"], "capsule producer code pin")
+    repository_root = _resolve(base, repository["root"], "capsule producer root")
+    repo_path = _canonical_repo_path(value["repo_path"], "capsule producer repo path")
+    expected_sha = _sha(value["sha256"], "capsule producer SHA-256")
+    expected_object = _string(value["git_object_id"], "capsule producer Git object")
+    if _GIT_OBJECT_ID.fullmatch(expected_object) is None:
+        raise BenchmarkValidationError("capsule producer Git object is invalid")
+    with _open_directory_no_symlinks(
+        repository_root, "capsule producer repository"
+    ) as repository_fd:
+        commit = _git_output(
+            repository_fd,
+            Path(implementation["git_path"]),
+            implementation["git_sha256"],
+            ["rev-parse", "--verify", f"{code_pin}^{{commit}}"],
+            "capsule producer commit",
+            limit=1024,
+        ).decode("ascii", errors="strict").strip()
+        tree_entry = _git_output(
+            repository_fd,
+            Path(implementation["git_path"]),
+            implementation["git_sha256"],
+            ["ls-tree", "-z", code_pin, "--", repo_path],
+            "capsule producer tree entry",
+            limit=4096,
+        )
+        try:
+            metadata, listed_path = tree_entry[:-1].split(b"\t", 1)
+            mode, object_type, raw_object_id = metadata.split(b" ", 2)
+            listed = listed_path.decode("utf-8", errors="strict")
+            object_id = raw_object_id.decode("ascii", errors="strict")
+        except (UnicodeDecodeError, ValueError) as error:
+            raise BenchmarkValidationError(
+                "capsule producer tree entry is invalid"
+            ) from error
+        blob = _git_output(
+            repository_fd,
+            Path(implementation["git_path"]),
+            implementation["git_sha256"],
+            ["cat-file", "blob", object_id],
+            "capsule producer blob",
+            limit=_MAX_SOURCE_BYTES,
+        )
+    if (
+        commit != code_pin
+        or not tree_entry.endswith(b"\0")
+        or tree_entry.count(b"\0") != 1
+        or listed != repo_path
+        or mode not in {b"100644", b"100755"}
+        or object_type != b"blob"
+        or object_id != expected_object
+        or sha256(blob).hexdigest() != expected_sha
+    ):
+        raise BenchmarkValidationError("committed capsule producer drifted")
+    return {
+        "code_pin": code_pin,
+        "git_object_id": object_id,
+        "repo_path": repo_path,
+        "repository_root": str(repository_root),
+        "sha256": expected_sha,
+    }
+
+
+def _verify_real_capsule_execution_source(
+    producer: Mapping[str, str],
+    source_records: Sequence[Mapping[str, str]],
+    replay_blob: bytes,
+) -> dict[str, Any]:
+    """Bind the real producer and complete replay-visible committed source tree."""
+
+    producer_identity = {
+        key: producer.get(key) for key in ("git_object_id", "repo_path", "sha256")
+    }
+    if producer_identity != _EXPECTED_CAPSULE_PRODUCER_SOURCE:
+        raise BenchmarkValidationError(
+            "real capsule producer is not the independently reviewed blob"
+        )
+    execution_records = sorted(
+        (
+            {
+                "git_object_id": _string(
+                    record.get("git_object_id"), "capsule execution Git object"
+                ),
+                "mode": _string(record.get("mode"), "capsule execution source mode"),
+                "path": _canonical_repo_path(
+                    record.get("path"), "capsule execution source path"
+                ),
+            }
+            for record in source_records
+            if record.get("path") not in _CAPSULE_EXECUTION_MANIFEST_EXCLUDED_PATHS
+        ),
+        key=lambda item: item["path"],
+    )
+    if any(
+        record["mode"] not in {"100644", "100755"}
+        or _GIT_OBJECT_ID.fullmatch(record["git_object_id"]) is None
+        for record in execution_records
+    ):
+        raise BenchmarkValidationError("real capsule execution source entry drifted")
+    execution_manifest = {
+        "count": len(execution_records),
+        "sha256": sha256(
+            _canonical_json(execution_records).encode("ascii")
+        ).hexdigest(),
+    }
+    replay = _EXPECTED_CAPSULE_REPLAY_SOURCE
+    replay_records = [
+        record for record in execution_records if record["path"] == replay["repo_path"]
+    ]
+    if (
+        execution_manifest != _EXPECTED_CAPSULE_EXECUTION_SOURCE_MANIFEST
+        or len(replay_records) != 1
+        or replay_records[0]["git_object_id"] != replay["git_object_id"]
+        or sha256(replay_blob).hexdigest() != replay["sha256"]
+    ):
+        raise BenchmarkValidationError(
+            "real capsule replay/import source closure drifted"
+        )
+    return {
+        "execution_manifest": execution_manifest,
+        "producer": producer_identity,
+        "replay": dict(replay),
+    }
+
+
+def _manifest_summary(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise BenchmarkValidationError(f"{label} must be an object")
+    _exact_keys(value, {"count", "sha256"}, label)
+    return {
+        "count": _nonnegative_int(value["count"], f"{label} count"),
+        "sha256": _sha(value["sha256"], f"{label} SHA-256"),
+    }
+
+
+def _require_immutable_dependency(path: Path, label: str) -> None:
+    """Require a pathname and every parent to be outside same-UID mutation."""
+
+    normalized = Path(os.path.abspath(os.fspath(path)))
+    _require_root_owned_immutable_directory(normalized.parent, f"{label} parent")
+    with _open_regular_file(normalized, label) as stream:
+        metadata = os.fstat(stream.fileno())
+        if metadata.st_uid != 0 or metadata.st_gid != 0 or metadata.st_mode & (
+            stat.S_IWGRP
+            | stat.S_IWOTH
+            | stat.S_ISUID
+            | stat.S_ISGID
+            | stat.S_ISVTX
+        ):
+            raise BenchmarkValidationError(
+                f"immutable {label} is not root-owned read-only: {normalized}"
+            )
+    try:
+        attributes = os.listxattr(normalized, follow_symlinks=False)
+    except OSError as error:
+        raise BenchmarkValidationError(
+            f"cannot inspect immutable {label} attributes: {normalized}"
+        ) from error
+    if attributes:
+        raise BenchmarkValidationError(
+            f"immutable {label} has extended attributes: {normalized}"
+        )
+
+
+def _require_finite_raw(raw: bytes, storage_dtype: str, label: str) -> None:
+    """Reject IEEE BF16/FP32 NaN and infinity without importing NumPy."""
+
+    if storage_dtype == "<u2":
+        if len(raw) % 2:
+            raise BenchmarkValidationError(f"{label} BF16 byte count drifted")
+        if any((value & 0x7F80) == 0x7F80 for (value,) in struct.iter_unpack("<H", raw)):
+            raise BenchmarkValidationError(f"{label} contains non-finite BF16 values")
+        return
+    if storage_dtype == "<f4":
+        if len(raw) % 4:
+            raise BenchmarkValidationError(f"{label} FP32 byte count drifted")
+        if any(
+            (value & 0x7F800000) == 0x7F800000
+            for (value,) in struct.iter_unpack("<I", raw)
+        ):
+            raise BenchmarkValidationError(f"{label} contains non-finite FP32 values")
+        return
+    raise BenchmarkValidationError(f"{label} has no finite-value contract")
+
+
+def _verify_capsule_tensor_receipts(
+    value: Any,
+    *,
+    real_source: bool,
+    runtime_manifest_raw: bytes | None,
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    if not isinstance(value, list):
+        raise BenchmarkValidationError("capsule tensor receipts must be a list")
+    receipts: list[dict[str, Any]] = []
+    for index, record in enumerate(value):
+        if not isinstance(record, dict):
+            raise BenchmarkValidationError("capsule tensor receipt is invalid")
+        label = f"capsule tensor receipt {index}"
+        _exact_keys(
+            record,
+            {
+                "byte_count",
+                "device_slot",
+                "file_bytes",
+                "file_path",
+                "name",
+                "offset",
+                "sha256",
+                "shape",
+            },
+            label,
+        )
+        shape = record["shape"]
+        if not isinstance(shape, list) or not shape or any(
+            not isinstance(item, int) or isinstance(item, bool) or item <= 0
+            for item in shape
+        ):
+            raise BenchmarkValidationError(f"{label} shape is invalid")
+        path = Path(_string(record["file_path"], f"{label} file path"))
+        if not path.is_absolute():
+            raise BenchmarkValidationError(f"{label} file path is not absolute")
+        receipt = {
+            "byte_count": _positive_int(record["byte_count"], f"{label} bytes"),
+            "device_slot": _nonnegative_int(
+                record["device_slot"], f"{label} device slot"
+            ),
+            "file_bytes": _positive_int(record["file_bytes"], f"{label} file bytes"),
+            "file_path": str(path),
+            "name": _string(record["name"], f"{label} name"),
+            "offset": _nonnegative_int(record["offset"], f"{label} offset"),
+            "sha256": _sha(record["sha256"], f"{label} SHA-256"),
+            "shape": shape,
+        }
+        receipts.append(receipt)
+    if receipts != sorted(
+        receipts, key=lambda item: (item["device_slot"], item["name"])
+    ) or len({(item["device_slot"], item["name"]) for item in receipts}) != len(
+        receipts
+    ):
+        raise BenchmarkValidationError("capsule tensor receipt catalogue is not canonical")
+    if not real_source:
+        return receipts, {}
+    if runtime_manifest_raw is None:
+        raise BenchmarkValidationError("real capsule runtime manifest snapshot is absent")
+    expected_pairs = {
+        (slot, name) for slot in (0, 1) for name in _EXPECTED_CAPSULE_TENSOR_NAMES
+    }
+    if {(item["device_slot"], item["name"]) for item in receipts} != expected_pairs:
+        raise BenchmarkValidationError("real capsule tensor receipt catalogue drifted")
+    manifest = _load_json(runtime_manifest_raw, "capsule runtime manifest")
+    files = manifest.get("files")
+    if not isinstance(files, list):
+        raise BenchmarkValidationError("capsule runtime manifest files are invalid")
+    owner_records: dict[int, Mapping[str, Any]] = {}
+    for record in files:
+        if (
+            isinstance(record, dict)
+            and record.get("stage_id") == 0
+            and record.get("device_slot") in (0, 1)
+        ):
+            slot = int(record["device_slot"])
+            if slot in owner_records:
+                raise BenchmarkValidationError("capsule runtime owner is duplicated")
+            owner_records[slot] = record
+    if set(owner_records) != {0, 1}:
+        raise BenchmarkValidationError("capsule runtime stage-zero owners drifted")
+    runtime_root = Path(_EXPECTED_CAPSULE_UPSTREAM_INPUTS["runtime_manifest"][0]).parent
+    by_slot = {
+        slot: [item for item in receipts if item["device_slot"] == slot]
+        for slot in (0, 1)
+    }
+    dtype_bytes = {"BF16": 2, "F32": 4, "U8": 1}
+    storage_dtypes = {"BF16": "<u2", "F32": "<f4", "U8": "|u1"}
+    payloads: dict[tuple[int, str], bytes] = {}
+    payload_shapes: dict[tuple[int, str], list[int]] = {}
+    payload_dtypes: dict[tuple[int, str], str] = {}
+    for slot in (0, 1):
+        owner = owner_records[slot]
+        required_keys = {
+            "destination_filename",
+            "file_bytes",
+            "header_bytes",
+            "header_sha256",
+            "tensors",
+        }
+        if not required_keys <= set(owner):
+            raise BenchmarkValidationError("capsule runtime owner manifest is incomplete")
+        expected_path = runtime_root / _string(
+            owner["destination_filename"], "capsule runtime destination"
+        )
+        tensor_records = owner["tensors"]
+        if not isinstance(tensor_records, list):
+            raise BenchmarkValidationError("capsule runtime tensor manifest is invalid")
+        manifest_tensors = {
+            item.get("name"): item for item in tensor_records if isinstance(item, dict)
+        }
+        with _open_regular_file(expected_path, f"capsule runtime owner {slot}") as stream:
+            metadata = os.fstat(stream.fileno())
+            header_bytes = _positive_int(
+                owner["header_bytes"], f"capsule runtime owner {slot} header bytes"
+            )
+            raw_header = stream.read(header_bytes)
+            if (
+                metadata.st_size != owner["file_bytes"]
+                or len(raw_header) != header_bytes
+                or sha256(raw_header).hexdigest() != owner["header_sha256"]
+                or header_bytes < 8
+                or struct.unpack("<Q", raw_header[:8])[0] + 8 != header_bytes
+            ):
+                raise BenchmarkValidationError("capsule runtime owner/header drifted")
+            header = _load_json(raw_header[8:], f"capsule runtime owner {slot} header")
+            for receipt in by_slot[slot]:
+                tensor = manifest_tensors.get(receipt["name"])
+                layout = header.get(receipt["name"])
+                if not isinstance(tensor, dict) or not isinstance(layout, dict):
+                    raise BenchmarkValidationError("capsule runtime tensor authority is absent")
+                offsets = layout.get("data_offsets")
+                shape = layout.get("shape")
+                item_size = dtype_bytes.get(layout.get("dtype"))
+                if (
+                    not isinstance(offsets, list)
+                    or len(offsets) != 2
+                    or not all(isinstance(item, int) for item in offsets)
+                    or not isinstance(shape, list)
+                    or item_size is None
+                ):
+                    raise BenchmarkValidationError("capsule runtime tensor layout drifted")
+                start, end = offsets
+                expected_bytes = end - start
+                element_count = 1
+                for dimension in shape:
+                    if not isinstance(dimension, int) or dimension <= 0:
+                        raise BenchmarkValidationError(
+                            "capsule runtime tensor shape drifted"
+                        )
+                    element_count *= dimension
+                if (
+                    receipt["file_path"] != str(expected_path)
+                    or receipt["file_bytes"] != metadata.st_size
+                    or receipt["offset"] != header_bytes + start
+                    or receipt["byte_count"] != expected_bytes
+                    or receipt["byte_count"] != element_count * item_size
+                    or receipt["shape"] != shape
+                    or tensor.get("byte_count") != expected_bytes
+                    or tensor.get("sha256") != receipt["sha256"]
+                ):
+                    raise BenchmarkValidationError("capsule runtime tensor receipt drifted")
+                stream.seek(receipt["offset"])
+                payload = stream.read(receipt["byte_count"])
+                if (
+                    len(payload) != receipt["byte_count"]
+                    or sha256(payload).hexdigest() != receipt["sha256"]
+                ):
+                    raise BenchmarkValidationError(
+                        "capsule runtime tensor payload drifted"
+                    )
+                key = (slot, receipt["name"])
+                payloads[key] = payload
+                payload_shapes[key] = shape
+                payload_dtypes[key] = storage_dtypes[layout["dtype"]]
+    runtime_inputs: dict[str, dict[str, Any]] = {}
+    for input_name, (tensor_name, slots) in _CAPSULE_RUNTIME_INPUT_SOURCES.items():
+        expected_dtype, expected_shape = _CAPSULE_INPUT_SCHEMA[input_name]
+        source_keys = [(slot, tensor_name) for slot in slots]
+        owner_shape = payload_shapes[source_keys[0]]
+        observed_shape = (
+            [len(slots), *owner_shape] if len(slots) > 1 else owner_shape
+        )
+        if (
+            observed_shape != list(expected_shape)
+            or any(payload_shapes[key] != owner_shape for key in source_keys)
+            or any(payload_dtypes[key] != expected_dtype for key in source_keys)
+        ):
+            raise BenchmarkValidationError(
+                f"capsule runtime-derived input layout drifted: {input_name}"
+            )
+        raw = b"".join(payloads[key] for key in source_keys)
+        runtime_inputs[input_name] = {
+            "array_sha256": sha256(raw).hexdigest(),
+            "shape": observed_shape,
+            "storage_dtype": expected_dtype,
+        }
+    return receipts, runtime_inputs
+
+
+def _verify_capsule_execution_authority(
+    value: Any,
+    base: Path,
+    *,
+    candidate_id: str,
+    implementation: Mapping[str, Any],
+    source: Mapping[str, Any],
+) -> dict[str, Any]:
+    path, authority_sha, raw = _binding(
+        base, value, "capsule execution authority", limit=_MAX_JSON_BYTES
+    )
+    authority = _load_json(raw, "capsule execution authority")
+    if raw != (_canonical_json(authority) + "\n").encode("ascii"):
+        raise BenchmarkValidationError("capsule execution authority is not canonical JSON")
+    _exact_keys(
+        authority,
+        {
+            "authority_kind",
+            "candidate_id",
+            "environment",
+            "expected_outputs",
+            "input_arrays",
+            "installed_producer",
+            "loaded_dependencies",
+            "producer",
+            "schema_version",
+            "source_snapshot",
+            "tensor_receipts",
+            "upstream_inputs",
+        },
+        "capsule execution authority",
+    )
+    if (
+        authority["schema_version"] != 1
+        or authority["authority_kind"] != "gate.d.capsule.execution.v1"
+        or authority["candidate_id"] != candidate_id
+    ):
+        raise BenchmarkValidationError("capsule execution authority identity drifted")
+    real_source = source.get("executable_source_authority") is True
+    producer = _verify_capsule_producer_blob(
+        authority["producer"], path.parent, implementation
+    )
+    installed = authority["installed_producer"]
+    if not isinstance(installed, dict):
+        raise BenchmarkValidationError("installed capsule producer is invalid")
+    _exact_keys(
+        installed,
+        {"bytes", "gid", "mode", "path", "sha256", "uid"},
+        "installed capsule producer",
+    )
+    installed_path = _resolve(
+        path.parent, installed["path"], "installed capsule producer"
+    )
+    installed_metadata = installed_path.lstat()
+    installed_bytes, installed_sha = _regular_file_identity(
+        installed_path, "installed capsule producer"
+    )
+    installed_report = {
+        "bytes": installed_bytes,
+        "gid": _nonnegative_int(installed["gid"], "installed capsule producer gid"),
+        "mode": _nonnegative_int(installed["mode"], "installed capsule producer mode"),
+        "path": str(installed_path),
+        "sha256": _sha(installed["sha256"], "installed capsule producer SHA-256"),
+        "uid": _nonnegative_int(installed["uid"], "installed capsule producer uid"),
+    }
+    if (
+        installed_report["bytes"] != installed_metadata.st_size
+        or installed_report["mode"] != stat.S_IMODE(installed_metadata.st_mode)
+        or installed_report["uid"] != installed_metadata.st_uid
+        or installed_report["gid"] != installed_metadata.st_gid
+        or installed_report["sha256"] != installed_sha
+        or installed_sha != producer["sha256"]
+        or installed_metadata.st_mode
+        & (stat.S_IWGRP | stat.S_IWOTH | stat.S_ISUID | stat.S_ISGID | stat.S_ISVTX)
+    ):
+        raise BenchmarkValidationError("installed capsule producer drifted")
+    if real_source:
+        if (
+            installed_path != Path(_EXPECTED_CAPSULE_INSTALLED_PRODUCER)
+            or installed_report["uid"] != 0
+            or installed_report["gid"] != 0
+            or installed_report["mode"] != 0o555
+        ):
+            raise BenchmarkValidationError(
+                "real installed capsule producer authority drifted"
+            )
+        _require_immutable_dependency(
+            installed_path, "real installed capsule producer"
+        )
+    environment = authority["environment"]
+    if not isinstance(environment, dict):
+        raise BenchmarkValidationError("capsule execution environment is invalid")
+    _exact_keys(
+        environment,
+        set(_EXPECTED_CAPSULE_ENVIRONMENT) | {"python_version"},
+        "capsule execution environment",
+    )
+    if any(
+        environment[key] != expected
+        for key, expected in _EXPECTED_CAPSULE_ENVIRONMENT.items()
+    ):
+        raise BenchmarkValidationError("capsule execution environment drifted")
+    _string(environment["python_version"], "capsule execution Python version")
+    python_runtime_root = _require_root_owned_immutable_directory(
+        Path(environment["python_runtime_root"]), "capsule Python runtime root"
+    )
+    site_root = _require_root_owned_immutable_directory(
+        Path(environment["site_root"]), "capsule JAX site root"
+    )
+    python_path = Path(environment["python_executable"])
+    _require_root_owned_immutable_file(
+        python_path,
+        "capsule Python executable",
+        beneath=python_runtime_root,
+    )
+    if _regular_file_identity(python_path, "capsule Python executable")[1] != environment[
+        "python_sha256"
+    ]:
+        raise BenchmarkValidationError("capsule Python executable drifted")
+    for runtime_root, expected_tree, label in (
+        (
+            python_runtime_root,
+            environment["python_runtime_tree_sha256"],
+            "capsule Python runtime",
+        ),
+        (site_root, environment["site_tree_sha256"], "capsule JAX site"),
+    ):
+        runtime_key = (str(runtime_root), expected_tree)
+        if runtime_key not in _VERIFIED_RUNTIME_TREES:
+            if _runtime_tree_sha256(runtime_root) != expected_tree:
+                raise BenchmarkValidationError(f"{label} tree SHA-256 drifted")
+            _VERIFIED_RUNTIME_TREES.add(runtime_key)
+    source_snapshot = authority["source_snapshot"]
+    if not isinstance(source_snapshot, dict):
+        raise BenchmarkValidationError("capsule source snapshot is invalid")
+    _exact_keys(
+        source_snapshot,
+        {"archive_sha256", "file_manifest", "repository"},
+        "capsule source snapshot",
+    )
+    repository = source_snapshot["repository"]
+    if not isinstance(repository, dict):
+        raise BenchmarkValidationError("capsule source repository is invalid")
+    _exact_keys(repository, {"commit", "root"}, "capsule source repository")
+    source_repository = {
+        "commit": _code_pin(repository["commit"], "capsule source snapshot commit"),
+        "root": str(_resolve(path.parent, repository["root"], "capsule source root")),
+    }
+    source_report = {
+        "archive_sha256": _sha(
+            source_snapshot["archive_sha256"], "capsule source archive SHA-256"
+        ),
+        "file_manifest": _manifest_summary(
+            source_snapshot["file_manifest"], "capsule source file manifest"
+        ),
+        "repository": source_repository,
+    }
+    if (
+        source_repository["commit"] != producer["code_pin"]
+        or source_repository["root"] != producer["repository_root"]
+    ):
+        raise BenchmarkValidationError(
+            "capsule source snapshot is not the producer repository"
+        )
+    with _open_directory_no_symlinks(
+        Path(source_repository["root"]), "capsule source repository"
+    ) as repository_fd:
+        source_tree = _git_output(
+            repository_fd,
+            Path(implementation["git_path"]),
+            implementation["git_sha256"],
+            ["ls-tree", "-r", "-z", source_repository["commit"], "--", "glm_tpu"],
+            "capsule source tree",
+            limit=_MAX_SOURCE_BYTES,
+        )
+        source_archive = _git_output(
+            repository_fd,
+            Path(implementation["git_path"]),
+            implementation["git_sha256"],
+            ["archive", "--format=zip", source_repository["commit"], "glm_tpu"],
+            "capsule source archive",
+            limit=_MAX_ARTIFACT_BYTES,
+        )
+        replay_blob = b""
+        if real_source:
+            replay_blob = _git_output(
+                repository_fd,
+                Path(implementation["git_path"]),
+                implementation["git_sha256"],
+                [
+                    "cat-file",
+                    "blob",
+                    _EXPECTED_CAPSULE_REPLAY_SOURCE["git_object_id"],
+                ],
+                "capsule replay blob",
+                limit=_MAX_SOURCE_BYTES,
+            )
+    source_records = []
+    for raw_entry in source_tree.split(b"\0"):
+        if not raw_entry:
+            continue
+        try:
+            metadata, raw_path = raw_entry.split(b"\t", 1)
+            mode, kind, object_id = metadata.split(b" ", 2)
+            source_path = raw_path.decode("utf-8", errors="strict")
+        except (UnicodeDecodeError, ValueError) as error:
+            raise BenchmarkValidationError("capsule source tree is invalid") from error
+        if kind != b"blob" or mode not in {b"100644", b"100755"}:
+            raise BenchmarkValidationError(
+                f"capsule source tree entry is unsupported: {source_path}"
+            )
+        source_records.append(
+            {
+                "git_object_id": object_id.decode("ascii", errors="strict"),
+                "mode": mode.decode("ascii", errors="strict"),
+                "path": source_path,
+            }
+        )
+    observed_source_manifest = {
+        "count": len(source_records),
+        "sha256": sha256(_canonical_json(source_records).encode("ascii")).hexdigest(),
+    }
+    if (
+        not source_records
+        or source_records != sorted(source_records, key=lambda item: item["path"])
+        or observed_source_manifest != source_report["file_manifest"]
+        or sha256(source_archive).hexdigest() != source_report["archive_sha256"]
+    ):
+        raise BenchmarkValidationError("capsule committed source snapshot drifted")
+    independently_reviewed_execution = None
+    if real_source:
+        independently_reviewed_execution = _verify_real_capsule_execution_source(
+            producer, source_records, replay_blob
+        )
+    source_objects = {
+        record["path"]: record["git_object_id"] for record in source_records
+    }
+    if real_source and any(
+        source_objects.get(record["repo_path"]) != record["git_object_id"]
+        for record in source.get("files", ())
+    ):
+        raise BenchmarkValidationError(
+            "capsule replay source is not the reviewed candidate source"
+        )
+    loaded = authority["loaded_dependencies"]
+    if not isinstance(loaded, dict):
+        raise BenchmarkValidationError("capsule loaded dependencies are invalid")
+    _exact_keys(
+        loaded,
+        {"native_mappings", "python_modules"},
+        "capsule loaded dependencies",
+    )
+    loaded_report: dict[str, list[dict[str, Any]]] = {}
+    python_roots = (
+        Path(environment["python_runtime_root"]),
+        Path(environment["site_root"]),
+    )
+    for category in ("native_mappings", "python_modules"):
+        records = loaded[category]
+        if not isinstance(records, list):
+            raise BenchmarkValidationError(f"capsule loaded {category} must be a list")
+        normalized_records = []
+        for index, record in enumerate(records):
+            if not isinstance(record, dict):
+                raise BenchmarkValidationError(
+                    f"capsule loaded {category} record is invalid"
+                )
+            _exact_keys(
+                record,
+                {"bytes", "path", "sha256"},
+                f"capsule loaded {category} record {index}",
+            )
+            dependency_path = _resolve(
+                path.parent,
+                record["path"],
+                f"capsule loaded {category} record {index}",
+            )
+            dependency_bytes, dependency_sha = _regular_file_identity(
+                dependency_path, f"capsule loaded {category} record {index}"
+            )
+            normalized = {
+                "bytes": _nonnegative_int(
+                    record["bytes"], f"capsule loaded {category} bytes"
+                ),
+                "path": str(dependency_path),
+                "sha256": _sha(
+                    record["sha256"], f"capsule loaded {category} SHA-256"
+                ),
+            }
+            if (
+                normalized["bytes"] != dependency_bytes
+                or normalized["sha256"] != dependency_sha
+            ):
+                raise BenchmarkValidationError(
+                    f"capsule loaded dependency drifted: {dependency_path}"
+                )
+            if category == "python_modules" and dependency_path != installed_path:
+                if not any(
+                    dependency_path == root or root in dependency_path.parents
+                    for root in python_roots
+                ):
+                    raise BenchmarkValidationError(
+                        f"capsule Python dependency escaped sealed roots: {dependency_path}"
+                    )
+            if real_source:
+                _require_immutable_dependency(
+                    dependency_path, f"real capsule loaded {category}"
+                )
+            normalized_records.append(normalized)
+        if normalized_records != sorted(
+            normalized_records, key=lambda item: item["path"]
+        ) or len({item["path"] for item in normalized_records}) != len(
+            normalized_records
+        ):
+            raise BenchmarkValidationError(
+                f"capsule loaded {category} catalogue is not canonical"
+            )
+        loaded_report[category] = normalized_records
+    raw_tensor_receipts = authority["tensor_receipts"]
+    input_arrays = authority["input_arrays"]
+    if not isinstance(input_arrays, dict) or set(input_arrays) != set(
+        _CAPSULE_INPUT_SCHEMA
+    ):
+        raise BenchmarkValidationError("capsule authority input catalogue drifted")
+    input_report: dict[str, dict[str, Any]] = {}
+    for name, (expected_dtype, expected_shape) in _CAPSULE_INPUT_SCHEMA.items():
+        record = input_arrays[name]
+        if not isinstance(record, dict):
+            raise BenchmarkValidationError("capsule authority input record is invalid")
+        _exact_keys(
+            record,
+            {"array_sha256", "shape", "storage_dtype"},
+            f"capsule authority input {name}",
+        )
+        normalized = {
+            "array_sha256": _sha(
+                record["array_sha256"], f"capsule authority input {name} SHA-256"
+            ),
+            "shape": record["shape"],
+            "storage_dtype": record["storage_dtype"],
+        }
+        if normalized["shape"] != list(expected_shape) or normalized[
+            "storage_dtype"
+        ] != expected_dtype:
+            raise BenchmarkValidationError(
+                f"capsule authority input array drifted: {name}"
+            )
+        input_report[name] = normalized
+    upstream = authority["upstream_inputs"]
+    if not isinstance(upstream, dict) or not upstream:
+        raise BenchmarkValidationError("capsule upstream input authority is absent")
+    upstream_report: dict[str, dict[str, Any]] = {}
+    upstream_raw: dict[str, bytes] = {}
+    for name, record in sorted(upstream.items()):
+        _identifier(name, "capsule upstream input id")
+        if not isinstance(record, dict):
+            raise BenchmarkValidationError("capsule upstream input record is invalid")
+        _exact_keys(record, {"bytes", "path", "sha256"}, f"capsule upstream {name}")
+        upstream_path = _resolve(path.parent, record["path"], f"capsule upstream {name}")
+        expected_bytes = _nonnegative_int(
+            record["bytes"], f"capsule upstream {name} bytes"
+        )
+        expected_sha = _sha(record["sha256"], f"capsule upstream {name} SHA-256")
+        try:
+            observed_raw = _snapshot(
+                upstream_path,
+                expected_sha,
+                f"capsule upstream {name}",
+                limit=_MAX_ARTIFACT_BYTES,
+            )
+        except BenchmarkValidationError as error:
+            raise BenchmarkValidationError(
+                f"capsule upstream input drifted: {name}"
+            ) from error
+        if len(observed_raw) != expected_bytes:
+            raise BenchmarkValidationError(f"capsule upstream input drifted: {name}")
+        upstream_raw[name] = observed_raw
+        upstream_report[name] = {
+            "bytes": len(observed_raw),
+            "path": str(upstream_path),
+            "sha256": expected_sha,
+        }
+    if real_source:
+        if set(upstream_report) != set(_EXPECTED_CAPSULE_UPSTREAM_INPUTS):
+            raise BenchmarkValidationError("real capsule upstream catalogue drifted")
+        for name, (expected_path, expected_sha) in _EXPECTED_CAPSULE_UPSTREAM_INPUTS.items():
+            if upstream_report[name] != {
+                "bytes": len(upstream_raw[name]),
+                "path": expected_path,
+                "sha256": expected_sha,
+            }:
+                raise BenchmarkValidationError(
+                    f"real capsule upstream authority drifted: {name}"
+                )
+    tensor_receipts, runtime_input_arrays = _verify_capsule_tensor_receipts(
+        raw_tensor_receipts,
+        real_source=real_source,
+        runtime_manifest_raw=upstream_raw.get("runtime_manifest"),
+    )
+    if real_source:
+        db518_arrays = _inspect_npz(upstream_raw["db518_result"])
+        cache_key = "layer1_index_cache_owners_bfloat16_bits"
+        if cache_key not in db518_arrays:
+            raise BenchmarkValidationError("real capsule DB518 cache authority is absent")
+        cache_array = db518_arrays[cache_key]
+        if (
+            cache_array["storage_dtype"] != "<u2"
+            or cache_array["shape"] != (2, 16, 256, 128)
+        ):
+            raise BenchmarkValidationError("real capsule DB518 cache geometry drifted")
+        expected_cache = bytearray(cache_array["raw"])
+        current_offset = (((1 * 16 + 15) * 256 + 219) * 128) * 2
+        expected_cache[current_offset : current_offset + 128 * 2] = bytes(128 * 2)
+        expected_cache_record = {
+            "array_sha256": sha256(expected_cache).hexdigest(),
+            "shape": [2, 16, 256, 128],
+            "storage_dtype": "<u2",
+        }
+        if input_report["prompt_cache_bf16_bits"] != expected_cache_record:
+            raise BenchmarkValidationError(
+                "real capsule prompt cache is not the sealed DB518 history"
+            )
+    outputs = authority["expected_outputs"]
+    if not isinstance(outputs, dict):
+        raise BenchmarkValidationError("capsule expected outputs are invalid")
+    _exact_keys(
+        outputs,
+        {
+            "event1_positions_sha256",
+            "event1_scores_sha256",
+            "event1_valid_count",
+            "rms_hidden_update_sha256",
+            "rms_residual_sha256",
+        },
+        "capsule expected outputs",
+    )
+    output_report = {
+        "event1_positions_sha256": _sha(
+            outputs["event1_positions_sha256"], "accepted event-1 positions SHA-256"
+        ),
+        "event1_scores_sha256": _sha(
+            outputs["event1_scores_sha256"], "accepted event-1 scores SHA-256"
+        ),
+        "event1_valid_count": _positive_int(
+            outputs["event1_valid_count"], "accepted event-1 valid count"
+        ),
+        "rms_hidden_update_sha256": _sha(
+            outputs["rms_hidden_update_sha256"], "accepted RMS hidden update SHA-256"
+        ),
+        "rms_residual_sha256": _sha(
+            outputs["rms_residual_sha256"], "accepted RMS residual SHA-256"
+        ),
+    }
+    if output_report["event1_valid_count"] != 2048:
+        raise BenchmarkValidationError("accepted event-1 valid count drifted")
+    if real_source and output_report != _EXPECTED_CAPSULE_ACCEPTED_OUTPUTS:
+        raise BenchmarkValidationError("real capsule accepted output authority drifted")
+    return {
+        "authority_path": str(path),
+        "authority_sha256": authority_sha,
+        "environment": dict(environment),
+        "expected_outputs": output_report,
+        "input_arrays": input_report,
+        "installed_producer": installed_report,
+        "loaded_dependencies": loaded_report,
+        "producer": producer,
+        "independently_reviewed_execution": independently_reviewed_execution,
+        "source_snapshot": source_report,
+        "tensor_receipts": tensor_receipts,
+        "runtime_input_arrays": runtime_input_arrays,
+        "upstream_inputs": upstream_report,
+    }
+
+
+def _verify_capsule_producer_receipt(
+    *,
+    artifact_raw: bytes,
+    artifact_sha: str,
+    base: Path,
+    candidate_id: str,
+    capsule: Mapping[str, Any],
+    execution_authority: Mapping[str, Any],
+    implementation: Mapping[str, Any],
+    device_evidence_binding: Any,
+    input_binding: Any,
+    plan: Mapping[str, Any],
+    producer_binding: Any,
+    records: Sequence[Mapping[str, Any]],
+    source: Mapping[str, Any],
+    stablehlo: Mapping[str, Any],
+    success_binding: Any,
+) -> dict[str, Any]:
+    receipt_path, receipt_sha, receipt_raw = _binding(
+        base, producer_binding, "capsule producer receipt", limit=_MAX_JSON_BYTES
+    )
+    receipt = _load_json(receipt_raw, "capsule producer receipt")
+    if receipt_raw != (_canonical_json(receipt) + "\n").encode("ascii"):
+        raise BenchmarkValidationError("capsule producer receipt is not canonical JSON")
+    _exact_keys(
+        receipt,
+        {
+            "artifact",
+            "backend",
+            "candidate",
+            "claim_scope",
+            "coherence_id",
+            "device_evidence",
+            "environment",
+            "execution",
+            "input_arrays",
+            "installed_producer",
+            "loaded_dependencies",
+            "producer",
+            "schema_version",
+            "source_snapshot",
+            "tensor_receipts",
+            "upstream_inputs",
+            "watchpoint_manifest_sha256",
+        },
+        "capsule producer receipt",
+    )
+    if receipt["schema_version"] != 1:
+        raise BenchmarkValidationError("capsule producer receipt schema drifted")
+    if receipt["claim_scope"] != _EXPECTED_CAPSULE_PRODUCER_CLAIM_SCOPE:
+        raise BenchmarkValidationError("capsule producer claim scope drifted")
+    if receipt["coherence_id"] != capsule["coherence_id"]:
+        raise BenchmarkValidationError("capsule producer coherence id drifted")
+    candidate = receipt["candidate"]
+    expected_candidate = {
+        "code_pin": source["code_pin"],
+        "id": candidate_id,
+        "plan_sha256": plan["plan_sha256"],
+        "source_authority_sha256": source["authority_sha256"],
+        "stablehlo_authority_sha256": stablehlo["authority_sha256"],
+    }
+    if candidate != expected_candidate:
+        raise BenchmarkValidationError("capsule producer candidate tuple drifted")
+    if receipt["backend"] != {
+        "device_count": 2,
+        "device_ids": [0, 1],
+        "platform": "cpu",
+    }:
+        raise BenchmarkValidationError("capsule producer backend was not forced CPU")
+    environment = receipt["environment"]
+    if not isinstance(environment, dict):
+        raise BenchmarkValidationError("capsule producer environment is invalid")
+    _exact_keys(
+        environment,
+        set(_EXPECTED_CAPSULE_ENVIRONMENT) | {"python_version"},
+        "capsule producer environment",
+    )
+    if any(
+        environment[key] != expected
+        for key, expected in _EXPECTED_CAPSULE_ENVIRONMENT.items()
+    ):
+        raise BenchmarkValidationError("capsule producer environment drifted")
+    _string(environment["python_version"], "capsule producer Python version")
+    if environment != execution_authority["environment"]:
+        raise BenchmarkValidationError(
+            "capsule environment is not the pinned execution authority"
+        )
+    if receipt["execution"] != _EXPECTED_CAPSULE_EXECUTION:
+        raise BenchmarkValidationError("capsule producer execution scope drifted")
+    artifact = receipt["artifact"]
+    if artifact != {"bytes": len(artifact_raw), "sha256": artifact_sha}:
+        raise BenchmarkValidationError("capsule producer output artifact drifted")
+    device_path, device_sha, device_raw = _binding(
+        receipt_path.parent,
+        device_evidence_binding,
+        "capsule producer device evidence",
+        limit=_MAX_ARTIFACT_BYTES,
+    )
+    if receipt["device_evidence"] != {
+        "bytes": len(device_raw),
+        "sha256": device_sha,
+    }:
+        raise BenchmarkValidationError("capsule producer device evidence drifted")
+    device_arrays = _inspect_npz(device_raw)
+    if set(device_arrays) != set(_CAPSULE_DEVICE_EVIDENCE_SCHEMA):
+        raise BenchmarkValidationError("capsule device evidence catalogue drifted")
+    state_arrays = _inspect_npz(artifact_raw)
+    device_records: dict[str, dict[str, Any]] = {}
+    for name, (expected_dtype, expected_shape, state_key, state_prefix) in (
+        _CAPSULE_DEVICE_EVIDENCE_SCHEMA.items()
+    ):
+        observed = device_arrays[name]
+        if (
+            observed["storage_dtype"] != expected_dtype
+            or observed["shape"] != expected_shape
+        ):
+            raise BenchmarkValidationError(
+                f"capsule device evidence array drifted: {name}"
+            )
+        if name == "contract_valid_owners":
+            if observed["raw"] != b"\x01\x01":
+                raise BenchmarkValidationError(
+                    "capsule device contracts did not agree on success"
+                )
+        else:
+            owner0, _ = _selected_array(
+                observed, [0], f"capsule device evidence {name} owner0"
+            )
+            owner1, _ = _selected_array(
+                observed, [1], f"capsule device evidence {name} owner1"
+            )
+            if owner0 != owner1:
+                raise BenchmarkValidationError(
+                    f"capsule replicated device owners disagree: {name}"
+                )
+            canonical, _ = _selected_array(
+                observed,
+                list(state_prefix),
+                f"capsule device evidence {name} canonical",
+            )
+            if state_key not in state_arrays or canonical != state_arrays[state_key]["raw"]:
+                raise BenchmarkValidationError(
+                    f"capsule device evidence is not the canonical state: {name}"
+                )
+        device_records[name] = {
+            "array_sha256": sha256(observed["raw"]).hexdigest(),
+            "shape": list(observed["shape"]),
+            "storage_dtype": observed["storage_dtype"],
+        }
+    producer = _verify_capsule_producer_blob(
+        receipt["producer"], receipt_path.parent, implementation
+    )
+    if producer != execution_authority["producer"]:
+        raise BenchmarkValidationError(
+            "capsule producer is not the pinned execution authority"
+        )
+    if receipt["installed_producer"] != execution_authority["installed_producer"]:
+        raise BenchmarkValidationError(
+            "installed capsule producer is not the pinned execution authority"
+        )
+    if receipt["source_snapshot"] != execution_authority["source_snapshot"]:
+        raise BenchmarkValidationError(
+            "capsule source snapshot is not the pinned execution authority"
+        )
+    if receipt["loaded_dependencies"] != execution_authority["loaded_dependencies"]:
+        raise BenchmarkValidationError(
+            "capsule dependencies are not the pinned execution authority"
+        )
+    if receipt["tensor_receipts"] != execution_authority["tensor_receipts"]:
+        raise BenchmarkValidationError(
+            "capsule tensor receipts are not the pinned execution authority"
+        )
+    if receipt["upstream_inputs"] != execution_authority["upstream_inputs"]:
+        raise BenchmarkValidationError(
+            "capsule upstream inputs are not the pinned execution authority"
+        )
+    input_path, input_sha, input_raw = _binding(
+        receipt_path.parent,
+        input_binding,
+        "capsule producer input artifact",
+        limit=_MAX_ARTIFACT_BYTES,
+    )
+    input_arrays = _inspect_npz(input_raw)
+    if set(input_arrays) != set(_CAPSULE_INPUT_SCHEMA):
+        raise BenchmarkValidationError("capsule producer input array catalogue drifted")
+    declared_inputs = receipt["input_arrays"]
+    if not isinstance(declared_inputs, dict) or set(declared_inputs) != set(input_arrays):
+        raise BenchmarkValidationError("capsule producer input manifest drifted")
+    input_records: dict[str, dict[str, Any]] = {}
+    for name, (expected_dtype, expected_shape) in _CAPSULE_INPUT_SCHEMA.items():
+        observed = input_arrays[name]
+        declared = declared_inputs[name]
+        if not isinstance(declared, dict):
+            raise BenchmarkValidationError("capsule producer input record is invalid")
+        _exact_keys(
+            declared,
+            {"array_sha256", "shape", "storage_dtype"},
+            f"capsule producer input {name}",
+        )
+        record = {
+            "array_sha256": sha256(observed["raw"]).hexdigest(),
+            "shape": list(observed["shape"]),
+            "storage_dtype": observed["storage_dtype"],
+        }
+        if (
+            observed["storage_dtype"] != expected_dtype
+            or observed["shape"] != expected_shape
+            or declared != record
+        ):
+            raise BenchmarkValidationError(
+                f"capsule producer input array drifted: {name}"
+            )
+        if expected_dtype in {"<u2", "<f4"}:
+            _require_finite_raw(
+                observed["raw"], expected_dtype, f"capsule producer input {name}"
+            )
+        input_records[name] = record
+    if input_records != execution_authority["input_arrays"]:
+        raise BenchmarkValidationError(
+            "capsule inputs are not the pinned execution authority"
+        )
+    for name, expected in execution_authority.get("runtime_input_arrays", {}).items():
+        if input_records.get(name) != expected:
+            raise BenchmarkValidationError(
+                f"capsule input is not its sealed runtime tensor payload: {name}"
+            )
+    watchpoint_manifest_sha = sha256(
+        _canonical_json({"watchpoints": list(records)}).encode("ascii")
+    ).hexdigest()
+    if receipt["watchpoint_manifest_sha256"] != watchpoint_manifest_sha:
+        raise BenchmarkValidationError("capsule producer watchpoint manifest drifted")
+    success_path, success_sha, success_raw = _binding(
+        base, success_binding, "capsule producer SUCCESS", limit=_MAX_JSON_BYTES
+    )
+    success = _load_json(success_raw, "capsule producer SUCCESS")
+    if success_raw != (_canonical_json(success) + "\n").encode("ascii"):
+        raise BenchmarkValidationError("capsule producer SUCCESS is not canonical JSON")
+    expected_success = {
+        "artifact_sha256": artifact_sha,
+        "device_evidence_sha256": device_sha,
+        "input_artifact_sha256": input_sha,
+        "producer_receipt_sha256": receipt_sha,
+        "schema_version": 1,
+    }
+    if success != expected_success:
+        raise BenchmarkValidationError("capsule producer SUCCESS drifted")
+    return {
+        "backend": dict(receipt["backend"]),
+        "device_evidence_arrays": device_records,
+        "device_evidence_path": str(device_path),
+        "device_evidence_sha256": device_sha,
+        "input_arrays": input_records,
+        "input_artifact_path": str(input_path),
+        "input_artifact_sha256": input_sha,
+        "producer": producer,
+        "producer_receipt_path": str(receipt_path),
+        "producer_receipt_sha256": receipt_sha,
+        "success_path": str(success_path),
+        "success_sha256": success_sha,
+        "watchpoint_manifest_sha256": watchpoint_manifest_sha,
+    }
+
+
 def _verify_capsule(
     value: Any,
     base: Path,
     *,
     candidate_id: str,
+    implementation: Mapping[str, Any],
+    execution_authority: Mapping[str, Any],
     source: Mapping[str, Any],
     stablehlo: Mapping[str, Any],
     plan: Mapping[str, Any],
@@ -3686,6 +5035,10 @@ def _verify_capsule(
             "code_pin",
             "coherence_id",
             "plan_sha256",
+            "producer_input_artifact",
+            "producer_device_evidence",
+            "producer_receipt",
+            "producer_success",
             "schema_version",
             "source_authority_sha256",
             "stablehlo_authority_sha256",
@@ -3899,6 +5252,14 @@ def _verify_capsule(
             selected, selected_shape = _selected_array(
                 arrays[key], index_prefix, f"watchpoint {watchpoint_id}"
             )
+            if semantic_dtype == "bf16_bits":
+                _require_finite_raw(
+                    selected, "<u2", f"watchpoint {watchpoint_id}.{role}"
+                )
+            elif semantic_dtype == "float32":
+                _require_finite_raw(
+                    selected, "<f4", f"watchpoint {watchpoint_id}.{role}"
+                )
             selected_values[(watchpoint_id, role)] = selected
             expected_storage_shape = (
                 tuple([len(owner_ids), 1, *shape])
@@ -3981,6 +5342,119 @@ def _verify_capsule(
         raise BenchmarkValidationError(
             "candidate RMS FP32 input is not derived from its sealed BF16 operands"
         )
+    normalized_roles = sorted(
+        role for watchpoint_id, role in selected_values if watchpoint_id == "layer1.normalized"
+    )
+    normalized_values = [
+        selected_values[("layer1.normalized", role)] for role in normalized_roles
+    ]
+    if not normalized_values or any(
+        value != normalized_values[0] for value in normalized_values[1:]
+    ):
+        raise BenchmarkValidationError("candidate normalized owner values differ")
+    current_key = selected_values[("layer1.current_key", "value")]
+    rounded_key = _bf16_bits_from_fp32(current_key)
+    cache = selected_values[("layer1.cache_history", "value")]
+    cache_shape = tuple(
+        required_watchpoints["layer1.cache_history"]["arrays"]["value"]["shape"]
+    )
+    if cache_shape not in {(2, 16, 256, 128), (4, 16, 256, 128)}:
+        raise BenchmarkValidationError("candidate cache geometry drifted")
+    current_position = 8155
+    logical_page_size = cache_shape[0] * cache_shape[2]
+    page = current_position // logical_page_size
+    page_row = current_position % logical_page_size
+    owner_slot = page_row // cache_shape[2]
+    local_row = page_row % cache_shape[2]
+    cache_key_offset = (
+        ((owner_slot * cache_shape[1] + page) * cache_shape[2] + local_row)
+        * cache_shape[3]
+        * 2
+    )
+    if cache[cache_key_offset : cache_key_offset + len(rounded_key)] != rounded_key:
+        raise BenchmarkValidationError(
+            "candidate cache current row is not the BF16 round of its current key"
+        )
+    positions_raw = selected_values[("layer1.scorer_event1", "positions")]
+    scores_raw = selected_values[("layer1.scorer_event1", "scores")]
+    valid_count_raw = selected_values[("layer1.scorer_event1", "valid_count")]
+    positions = [item[0] for item in struct.iter_unpack("<i", positions_raw)]
+    scores = [item[0] for item in struct.iter_unpack("<f", scores_raw)]
+    valid_count = struct.unpack("<i", valid_count_raw)[0]
+    expected_outputs = execution_authority["expected_outputs"]
+    if (
+        valid_count != 2048
+        or len(positions) != 2048
+        or len(set(positions)) != 2048
+        or any(position < 0 or position > current_position for position in positions)
+        or any(
+            struct.unpack("<I", scores_raw[index * 4 : (index + 1) * 4])[0]
+            & 0x7F800000
+            == 0x7F800000
+            for index in range(len(scores))
+        )
+        or any(scores[index] < scores[index + 1] for index in range(2047))
+        or any(
+            scores[index] == scores[index + 1]
+            and positions[index] >= positions[index + 1]
+            for index in range(2047)
+        )
+    ):
+        raise BenchmarkValidationError(
+            "candidate scorer event is not one exact ordered cutoff-active set"
+        )
+    if (
+        sha256(positions_raw).hexdigest()
+        != expected_outputs["event1_positions_sha256"]
+        or sha256(scores_raw).hexdigest()
+        != expected_outputs["event1_scores_sha256"]
+        or valid_count != expected_outputs["event1_valid_count"]
+        or sha256(
+            selected_values[("layer1.rms_operands_bf16", "hidden_update")]
+        ).hexdigest()
+        != expected_outputs["rms_hidden_update_sha256"]
+        or sha256(
+            selected_values[("layer1.rms_operands_bf16", "residual")]
+        ).hexdigest()
+        != expected_outputs["rms_residual_sha256"]
+    ):
+        raise BenchmarkValidationError(
+            "candidate output does not match the pinned accepted authority"
+        )
+    producer = _verify_capsule_producer_receipt(
+        artifact_raw=artifact_raw,
+        artifact_sha=artifact_sha,
+        base=path.parent,
+        candidate_id=candidate_id,
+        capsule=capsule,
+        execution_authority=execution_authority,
+        implementation=implementation,
+        device_evidence_binding=capsule["producer_device_evidence"],
+        input_binding=capsule["producer_input_artifact"],
+        plan=plan,
+        producer_binding=capsule["producer_receipt"],
+        records=sorted(records, key=lambda item: item["id"]),
+        source=source,
+        stablehlo=stablehlo,
+        success_binding=capsule["producer_success"],
+    )
+    input_arrays = _inspect_npz(
+        _binding(
+            path.parent,
+            capsule["producer_input_artifact"],
+            "candidate producer input cross-check",
+            limit=_MAX_ARTIFACT_BYTES,
+        )[2]
+    )
+    if (
+        input_arrays["rms_hidden_update_bf16_bits"]["raw"]
+        != selected_values[("layer1.rms_operands_bf16", "hidden_update")]
+        or input_arrays["rms_residual_bf16_bits"]["raw"]
+        != selected_values[("layer1.rms_operands_bf16", "residual")]
+    ):
+        raise BenchmarkValidationError(
+            "candidate RMS operands are not the sealed producer inputs"
+        )
     return {
         "artifact_path": str(artifact_path),
         "artifact_sha256": artifact_sha,
@@ -3988,10 +5462,12 @@ def _verify_capsule(
         "capsule_sha256": capsule_sha,
         "coherence_id": coherence_id,
         "derived_rms_input_sha256": sha256(derived_rms_input).hexdigest(),
-        "producer_provenance_verified": False,
+        "producer": producer,
+        "producer_provenance_verified": True,
         "validation_scope": (
-            "typed capsule schema and BF16-derived FP32 invariant only; "
-            "no pinned producer or candidate-execution receipt"
+            "typed candidate-coherent bounded CPU replay, pinned Git producer/input/"
+            "SUCCESS, exact RMS derivation, cache-current-key and scorer-order invariants; "
+            "no TPU, performance or Gate-D claim"
         ),
         "watchpoints": sorted(records, key=lambda item: item["id"]),
     }
@@ -4170,6 +5646,7 @@ def admit_gate_d_precompile_candidates(
             candidate,
             {
                 "causal_frontier_action",
+                "capsule_execution_authority",
                 "coherent_state_capsule",
                 "evidence_ids",
                 "host_effect",
@@ -4247,6 +5724,7 @@ def admit_gate_d_precompile_candidates(
         source_report: dict[str, Any] | None = None
         plan_report: dict[str, Any] | None = None
         stablehlo_report: dict[str, Any] | None = None
+        execution_report: dict[str, Any] | None = None
         capsule_report: dict[str, Any] | None = None
         if candidate["source_authority"] is None:
             reasons.append("MISSING_SOURCE_AST_AUTHORITY")
@@ -4307,6 +5785,20 @@ def admit_gate_d_precompile_candidates(
             except BenchmarkValidationError as error:
                 reasons.append("INVALID_CAUSAL_STABLEHLO_AUTHORITY")
                 stablehlo_report = {"refusal": str(error)}
+        if candidate["capsule_execution_authority"] is None:
+            reasons.append("MISSING_PINNED_COHERENT_CAPSULE_PRODUCER")
+        else:
+            try:
+                execution_report = _verify_capsule_execution_authority(
+                    candidate["capsule_execution_authority"],
+                    base,
+                    candidate_id=candidate_id,
+                    implementation=implementation,
+                    source=source_report or {},
+                )
+            except BenchmarkValidationError as error:
+                reasons.append("INVALID_CAPSULE_EXECUTION_AUTHORITY")
+                execution_report = {"refusal": str(error)}
         if candidate["coherent_state_capsule"] is None:
             reasons.append("MISSING_CANDIDATE_COHERENT_CAPSULE")
         elif (
@@ -4316,6 +5808,8 @@ def admit_gate_d_precompile_candidates(
             or "refusal" in plan_report
             or stablehlo_report is None
             or "refusal" in stablehlo_report
+            or execution_report is None
+            or "refusal" in execution_report
         ):
             reasons.append("UNVERIFIABLE_CANDIDATE_COHERENT_CAPSULE")
         else:
@@ -4324,12 +5818,15 @@ def admit_gate_d_precompile_candidates(
                     candidate["coherent_state_capsule"],
                     base,
                     candidate_id=candidate_id,
+                    implementation=implementation,
+                    execution_authority=execution_report,
                     source=source_report,
                     stablehlo=stablehlo_report,
                     plan=plan_report,
                     required_watchpoints=plan_report["watchpoint_schema"],
                 )
-                reasons.append("MISSING_PINNED_COHERENT_CAPSULE_PRODUCER")
+                if capsule_report["producer_provenance_verified"] is not True:
+                    reasons.append("MISSING_PINNED_COHERENT_CAPSULE_PRODUCER")
             except BenchmarkValidationError as error:
                 reasons.append("INVALID_CANDIDATE_COHERENT_CAPSULE")
                 capsule_report = {"refusal": str(error)}
@@ -4337,6 +5834,7 @@ def admit_gate_d_precompile_candidates(
             {
                 "admitted_precompile": not reasons,
                 "capsule": capsule_report,
+                "capsule_execution_authority": execution_report,
                 "evidence_sha256s": {
                     item: evidence_shas[item] for item in candidate_evidence
                 },
@@ -4361,16 +5859,21 @@ def admit_gate_d_precompile_candidates(
             "distinct survivors reuse one candidate StableHLO implementation"
         )
     admitted = [item["id"] for item in results if item["admitted_precompile"]]
-    if admitted:
+    if admitted not in ([], ["auxiliary_device_tuple_dependency"]):
         raise BenchmarkValidationError(
-            "schema-fixture admission v2 cannot authorize a precompile candidate"
+            "unexpected candidate set passed precompile admission v2"
         )
+    classification = (
+        "PRECOMPILE_CANDIDATE_ADMITTED;COMPILE_ONLY_REVIEW_REQUIRED;"
+        "GATE_D_OPEN;NO_TPU_SUCCESSOR"
+        if admitted
+        else "NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR"
+    )
     return {
         "admitted_candidate_ids": admitted,
         "candidate_results": results,
         "claim_scope": claim_scope,
-        "classification": "NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;"
-        "NO_JAX_OR_TPU_SUCCESSOR",
+        "classification": classification,
         "compile_only_review_required": True,
         "contract_id": contract_id,
         "contract_sha256": expected_contract_sha256,

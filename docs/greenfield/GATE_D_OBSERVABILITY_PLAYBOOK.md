@@ -424,6 +424,8 @@ A failed discriminator is useful if it is bounded, coherent and sealed. Never re
 | Omitting generated runtime version files | Reconstructed runtime imported a different semantic version | Pin/import `_version.py` and runtime identity on every host before model work |
 | Using `find | wc` under `set -euo pipefail` as existence proof | Missing/empty roots were misclassified | Classify missing, link, type, readability and nonempty state explicitly |
 | Publishing `SUCCESS` too early | Later diagnostics mutated a supposedly terminal archive | Replay full inventory; publish terminal marker alone and last |
+| Reopening inputs by pathname after preflight | A same-name replacement can mix histories across one replay | Snapshot every upstream before execution; retain/revalidate file descriptors and inode/size/hash identities |
+| Letting an execution receipt choose its own producer/import closure | A hostile committed replay can fabricate coherent-looking exact outputs | Independently pin producer/replay blobs and the complete replay-visible committed source manifest |
 | Letting offline tests discover TPU | An adjacent run initialized the local TPU client | Set `JAX_PLATFORMS=cpu` explicitly; use `python -S` when JAX is unnecessary |
 | Claiming profiler/HLO/device-only speed | Does not establish clean user-visible latency | Require profiler-free wall, fresh XPlanes, correctness, HBM, DB/archive/cleanup |
 | Syncing through EU/gcsfuse | Added transfer cost and unreliable POSIX rename behavior | Use locked `gsutil` mirror only to `gs://driftbench-dsv4-uc` after location check |
@@ -439,6 +441,8 @@ The observability work produced concrete progress that blind retries could not:
   stories without another numerical run;
 - coherent event-1 replay rejected the LP2 K-half arm before metal;
 - structured admission closed renamed formula/layout/Pallas/ownership families without recompiling;
+- retained-fd tensor receipts and independent executable-closure pins closed TOCTOU and
+  self-selected-producer substitution before any replay;
 - all-host HLO auditing corrected the false one-owner dump assumption;
 - append-only publication, exact lifecycle ownership and cleanup turned failures into reusable
   evidence rather than lost time.

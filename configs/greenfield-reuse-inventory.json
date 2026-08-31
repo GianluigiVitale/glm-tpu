@@ -631,6 +631,25 @@
       "reason": "Default-off forced-CPU abstract compiler lowering only. The first approved start of installed producer 2513a305...2182 failed before JAX import and output creation because sealed CPython omits fcntl.F_ADD_SEALS; the burned output remains absent and no retry is authorized. Linux UAPI values 1033/1034 plus exact mask 15 are source-bound and dynamically exercised under the sealed runtime. Sol approved exact correction staged SHA d0bea1d5...2620; producer 7292477b...0b6e was provisioned from one-file tree 4bf3edb4...a5d0a and atomically installed root:root 0555, retaining the old immutable source inode. Expanded hostile coverage passes 82/82; the corrected producer has not been invoked. The no-libtpu/no-plugin site tree 55233c63...a0df remains exact and root-owned; blocked tree 561118be...d151 remains forbidden. No StableHLO, executable compilation, JAX numerical execution, TPU or Gate-D evidence exists until persistence, separate invocation approval, one new tag and independent parsing."
     },
     {
+      "id": "gate-d-tuple-auxiliary-coherent-capsule-source",
+      "category": "Gate-D bounded replay source and admission trust boundary",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "producer 2cbf8ed9d0ca9387187b790d7f81bb95b46637fa8c5b53f62b5fa26f2d08268d / replay 9b9d11d0f312a173a8014a81f9b8fd957b9eefe2148bf327da0d57d82fed03b4 / replay-visible 139-blob manifest f3683029a4c3eaa12e0673c0e1d84ff13ff2c42fb7a475323e8d099ac156c0b0 / admission core 250f41c294c5f5fbc77da30c0bc891e23e60c42987b4ddba53768c2393e63568 / contract 9d9ede40562d5cbad30300961317937e1d7561296665e65b331f7d281eeef539",
+      "source_paths": [
+        "glm_tpu/greenfield/benchmarking/gate_d_tuple_capsule.py",
+        "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py",
+        "glm_tpu/greenfield/gate_d_precompile_admission.py",
+        "configs/greenfield-gate-d-precompile-admission-v2.json",
+        "tests/greenfield/validation/test_gate_d_precompile_admission.py"
+      ],
+      "disposition": "research_candidate",
+      "greenfield_consumers": [
+        "future separately reviewed two-CPU candidate-coherent capsule replay and offline admission"
+      ],
+      "gate": "D precompile admission",
+      "reason": "Source-only, default-off bounded replay. It snapshots eight exact upstreams before execution, binds 22 stage-zero runtime tensor slices through retained-fd identities, independently derives 11 runtime-backed inputs and DB518 cache, checks explicit two-owner evidence and nonfinite values, and treats local SUCCESS-last publication as provisional. Admission independently pins the exact producer/replay blobs and the full replay-visible committed source manifest, closing outer-authority executable substitution. Offline validation passes 119/119 plus 69/69 adjacent tests. Same-scope Sol approves persistence only with no P0-P2; no install, invocation, JAX compile/execution, cloud/TPU, candidate-admission or Gate-D authorization exists."
+    },
+    {
       "id": "legacy-execution-stack",
       "category": "forbidden dependency",
       "source_repo": "tpu-inference/vLLM",

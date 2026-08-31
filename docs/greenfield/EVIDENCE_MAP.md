@@ -2013,3 +2013,32 @@ remains open and no TPU successor is authorized.
 - Exact next is one pinned replayable PP16 stage-zero eight-watchpoint producer/capsule under this
   source/plan/StableHLO identity, offline admission, then same-scope adversarial review. No
   compile-only optimized-HLO acquisition or TPU action is authorized yet.
+
+## Tuple-auxiliary coherent-capsule source and trust-boundary hardening
+
+- Default-off replay `glm_tpu/greenfield/benchmarking/gate_d_tuple_capsule.py` has SHA
+  `9b9d11d0...03b4`; source-only producer
+  `scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py` has SHA `2cbf8ed9...8268`.
+  Exactly two CPU owners execute the real stage-local layer-1/event-1 path and return explicit
+  owner-axis evidence for every replicated critical value. Nothing in this batch was installed or
+  invoked.
+- The producer takes same-fd snapshots of all eight upstream authorities before execution, reads
+  safetensors through retained descriptors, emits 22 exact tensor receipts and revalidates
+  path/inode/size/slice/source/dependency identities before provisional `SUCCESS`-last local
+  publication. Admission independently reconstructs runtime-backed inputs and DB518 cache,
+  derives the FP32 RMS input from its two sealed BF16 operands, fixes the accepted event/RMS hashes,
+  requires two agreeing device owners and rejects nonfinite BF16/FP32 values.
+- The first same-scope Sol review withheld because the outer execution authority could select a
+  different producer/replay closure. The correction independently pins producer path/blob/SHA,
+  replay path/blob/SHA and every replay-visible committed `glm_tpu` blob except the separately
+  contract-bound admission verifier. The reproduced 139-blob manifest SHA is
+  `f3683029...c0b0`; hostile producer-path/blob, replay-blob and imported-kernel substitutions fail
+  closed.
+- Core/contract/test SHAs are `250f41c2...3568`, `9d9ede40...f539` and
+  `99f877d5...7e26`. Full admission coverage is 119/119 and adjacent constructability/admission/
+  observability/shadow coverage is 69/69. Fable-max was usage-blocked; corrected Sol verdict is
+  `APPROVE PERSISTENCE` with no P0--P2 and explicitly no installation, invocation, JAX/compile,
+  cloud/TPU, admission or Gate-D authorization.
+- Gate D remains open. Exact next after durable persistence is a separate review of trusted manual
+  installation and exactly one bounded protected replay; its output must then be independently
+  archived/sealed and pass offline admission before any compile-only successor is considered.

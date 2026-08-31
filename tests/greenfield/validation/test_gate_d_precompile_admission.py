@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import runpy
 import stat
+import struct
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -29,7 +30,7 @@ from glm_tpu.greenfield.gate_d_precompile_admission import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CURRENT_CONTRACT = REPO_ROOT / "configs/greenfield-gate-d-precompile-admission-v2.json"
-CURRENT_CONTRACT_SHA256 = "9006a42bf24ae957cf0b14160d68b40ebc9ba6073bf01b7990e2ab6b37d067d6"
+CURRENT_CONTRACT_SHA256 = "9d9ede40562d5cbad30300961317937e1d7561296665e65b331f7d281eeef539"
 
 
 def _sha(path: Path) -> str:
@@ -109,11 +110,93 @@ def _current_concrete_source_nodes() -> tuple[
     )
 
 
+def _current_capsule_execution_records() -> list[dict[str, str]]:
+    raw = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(REPO_ROOT),
+            "ls-tree",
+            "-r",
+            "-z",
+            "HEAD",
+            "--",
+            "glm_tpu",
+        ],
+        check=True,
+        capture_output=True,
+    ).stdout
+    records = []
+    for entry in raw.split(b"\0"):
+        if not entry:
+            continue
+        metadata, raw_path = entry.split(b"\t", 1)
+        mode, kind, object_id = metadata.split(b" ", 2)
+        assert kind == b"blob"
+        path = raw_path.decode("utf-8")
+        if path in admission_module._CAPSULE_EXECUTION_MANIFEST_EXCLUDED_PATHS:
+            continue
+        records.append(
+            {
+                "git_object_id": object_id.decode("ascii"),
+                "mode": mode.decode("ascii"),
+                "path": path,
+            }
+        )
+    replay = admission_module._EXPECTED_CAPSULE_REPLAY_SOURCE
+    records.append(
+        {
+            "git_object_id": replay["git_object_id"],
+            "mode": "100644",
+            "path": replay["repo_path"],
+        }
+    )
+    return sorted(records, key=lambda item: item["path"])
+
+
 def test_current_concrete_tuple_source_semantics_are_bound() -> None:
     nodes, imports = _current_concrete_source_nodes()
     report = admission_module._concrete_tuple_source_semantics(nodes, imports)
     assert report["authority_scope"] == "concrete.committed.jax.source"
     assert report["frontier"] == "layer1.rms_input_fp32"
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("producer_path", "producer_blob", "replay_blob", "imported_kernel"),
+)
+def test_real_capsule_execution_implementation_attacks_fail_closed(
+    mutation: str,
+) -> None:
+    producer = dict(admission_module._EXPECTED_CAPSULE_PRODUCER_SOURCE)
+    records = _current_capsule_execution_records()
+    replay_blob = (
+        REPO_ROOT / admission_module._EXPECTED_CAPSULE_REPLAY_SOURCE["repo_path"]
+    ).read_bytes()
+    report = admission_module._verify_real_capsule_execution_source(
+        producer, records, replay_blob
+    )
+    assert report["execution_manifest"] == (
+        admission_module._EXPECTED_CAPSULE_EXECUTION_SOURCE_MANIFEST
+    )
+    if mutation == "producer_path":
+        producer["repo_path"] = "scripts/greenfield/hostile_capsule.py"
+    elif mutation == "producer_blob":
+        producer["git_object_id"] = "0" * 40
+        producer["sha256"] = "0" * 64
+    elif mutation == "replay_blob":
+        replay_blob += b"\n# hostile replay\n"
+    elif mutation == "imported_kernel":
+        kernel = next(
+            item
+            for item in records
+            if item["path"] == "glm_tpu/greenfield/kernels/reference/rmsnorm.py"
+        )
+        kernel["git_object_id"] = "0" * 40
+    with pytest.raises(BenchmarkValidationError, match="independently reviewed|closure drifted"):
+        admission_module._verify_real_capsule_execution_source(
+            producer, records, replay_blob
+        )
 
 
 def test_concrete_tuple_source_refuses_precision_drift() -> None:
@@ -212,9 +295,68 @@ def _run_git(repository: Path, *arguments: str) -> str:
     ).stdout.strip()
 
 
+def _synthetic_source_snapshot(repository: Path, code_pin: str) -> dict[str, Any]:
+    environment = {"LANG": "C", "LC_ALL": "C", "PATH": "/usr/bin:/bin"}
+    tree = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "ls-tree",
+            "-r",
+            "-z",
+            code_pin,
+            "--",
+            "glm_tpu",
+        ],
+        check=True,
+        capture_output=True,
+        env=environment,
+    ).stdout
+    records = []
+    for raw_entry in tree.split(b"\0"):
+        if not raw_entry:
+            continue
+        metadata, raw_path = raw_entry.split(b"\t", 1)
+        mode, kind, object_id = metadata.split(b" ", 2)
+        assert kind == b"blob"
+        records.append(
+            {
+                "git_object_id": object_id.decode("ascii"),
+                "mode": mode.decode("ascii"),
+                "path": raw_path.decode("utf-8"),
+            }
+        )
+    archive = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repository),
+            "archive",
+            "--format=zip",
+            code_pin,
+            "glm_tpu",
+        ],
+        check=True,
+        capture_output=True,
+        env=environment,
+    ).stdout
+    return {
+        "archive_sha256": sha256(archive).hexdigest(),
+        "file_manifest": {
+            "count": len(records),
+            "sha256": sha256(_canonical(records).encode("ascii")).hexdigest(),
+        },
+        "repository": {"commit": code_pin, "root": str(repository)},
+    }
+
+
 def _absolute_current_contract() -> dict[str, Any]:
     contract = json.loads(CURRENT_CONTRACT.read_text())
     base = CURRENT_CONTRACT.parent
+    contract["implementation"]["core"]["sha256"] = _sha(
+        REPO_ROOT / "glm_tpu/greenfield/gate_d_precompile_admission.py"
+    )
     for name in ("contract", "core", "frontier"):
         binding = contract["inherited_v1"][name]
         binding["path"] = str((base / binding["path"]).resolve())
@@ -266,7 +408,22 @@ def _source_authority(
         source.symlink_to(target)
     else:
         source.write_text(source_text)
-    _run_git(repository, "add", "candidate.py")
+    producer_repo_path = "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py"
+    producer_path = repository / producer_repo_path
+    producer_path.parent.mkdir(parents=True)
+    producer_raw = b"#!/usr/bin/env python3\n# Synthetic capsule producer fixture.\n"
+    producer_path.write_bytes(producer_raw)
+    producer_path.chmod(0o644)
+    package = repository / "glm_tpu/__init__.py"
+    package.parent.mkdir()
+    package.write_text('"""Synthetic sealed source package."""\n')
+    _run_git(
+        repository,
+        "add",
+        "candidate.py",
+        producer_repo_path,
+        "glm_tpu/__init__.py",
+    )
     _run_git(repository, "commit", "-q", "-m", "fixture")
     code_pin = _run_git(repository, "rev-parse", "HEAD")
     raw = source_text.encode("utf-8")
@@ -285,6 +442,9 @@ def _source_authority(
     candidate_ast_sha = ast_sha(node)
     callsite_ast_sha = ast_sha(callsite)
     object_id = _run_git(repository, "rev-parse", f"{code_pin}:candidate.py")
+    producer_object_id = _run_git(
+        repository, "rev-parse", f"{code_pin}:{producer_repo_path}"
+    )
     files = [
         {
             "id": "candidate.source",
@@ -411,6 +571,11 @@ def _source_authority(
         "files": files,
         "source_semantic_sha256": source_semantic_sha,
         "source_set_sha256": source_set_sha,
+        "producer_code_pin": code_pin,
+        "producer_git_object_id": producer_object_id,
+        "producer_repo_path": producer_repo_path,
+        "producer_repository_root": str(repository),
+        "producer_sha256": sha256(producer_raw).hexdigest(),
     }
 
 
@@ -946,24 +1111,55 @@ def _capsule(
 ) -> tuple[dict[str, Any], Path, Path]:
     owner_ids = plan["owner_group"]
     owner_count = len(owner_ids)
+    current_key = np.full((128,), 4.0, dtype=np.float32)
+    cache_history = np.full(
+        (owner_count, 16, 256, 128), 0x4000, dtype=np.uint16
+    )
+    logical_page_size = owner_count * 256
+    current_page = 8155 // logical_page_size
+    current_page_row = 8155 % logical_page_size
+    current_owner_slot = current_page_row // 256
+    current_local_row = current_page_row % 256
+    cache_history[current_owner_slot, current_page, current_local_row] = current_key.astype(
+        np.dtype("<f4"), copy=False
+    ).view(np.uint32).__rshift__(16).astype(np.uint16)
     values: dict[str, np.ndarray] = {
         "rms_hidden_update": np.full((6144,), 0x3F80, dtype=np.uint16),
         "rms_residual": np.full((6144,), 0x4000, dtype=np.uint16),
         "rms_input": np.full((6144,), 3.0, dtype=np.float32),
         "normalized": np.full((owner_count, 1, 6144), 0x3F80, dtype=np.uint16),
-        "cache_history": np.full(
-            (owner_count, 16, 256, 128), 0x4000, dtype=np.uint16
-        ),
+        "cache_history": cache_history,
         "query": np.full((owner_count, 1, 32, 128), 2.0, dtype=np.float32),
         "head_weights": np.full((owner_count, 1, 32), 3.0, dtype=np.float32),
-        "current_key": np.full((128,), 4.0, dtype=np.float32),
-        "event1_positions": np.full((1, 2048), 7, dtype=np.int32),
-        "event1_scores": np.full((1, 2048), 5.0, dtype=np.float32),
-        "event1_valid_count": np.array([1], dtype=np.int32),
+        "current_key": current_key,
+        "event1_positions": np.arange(2048, dtype=np.int32)[None, :],
+        "event1_scores": np.arange(2048, 0, -1, dtype=np.float32)[None, :],
+        "event1_valid_count": np.array([2048], dtype=np.int32),
     }
     artifact = root / "candidate-state.npz"
     np.savez(artifact, **values)
     artifact_sha = _sha(artifact)
+    device_values: dict[str, np.ndarray] = {
+        "contract_valid_owners": np.ones((2,), dtype=np.uint8),
+        "current_key_owners": np.stack(
+            [values["current_key"][None, :], values["current_key"][None, :]]
+        ),
+        "rms_input_fp32_owners": np.stack(
+            [values["rms_input"][None, :], values["rms_input"][None, :]]
+        ),
+        "selected_positions_owners": np.stack(
+            [values["event1_positions"], values["event1_positions"]]
+        ),
+        "selected_scores_owners": np.stack(
+            [values["event1_scores"], values["event1_scores"]]
+        ),
+        "valid_counts_owners": np.stack(
+            [values["event1_valid_count"], values["event1_valid_count"]]
+        ),
+    }
+    device_artifact = root / "candidate-device-evidence.npz"
+    np.savez(device_artifact, **device_values)
+    device_artifact_sha = _sha(device_artifact)
     descriptions = {
         "layer1.rms_operands_bf16": [
             ("hidden_update", "rms_hidden_update", "bf16_bits", [], None),
@@ -1035,6 +1231,126 @@ def _capsule(
                 "position": 8155,
             }
         )
+    input_values: dict[str, np.ndarray] = {
+        "head_weight_bf16_bits": np.zeros((2, 16, 6144), dtype=np.uint16),
+        "key_norm_bias_bf16_bits": np.zeros((2, 128), dtype=np.uint16),
+        "key_norm_weight_bf16_bits": np.zeros((2, 128), dtype=np.uint16),
+        "prompt_cache_bf16_bits": np.zeros((2, 16, 256, 128), dtype=np.uint16),
+        "q_a_norm_bf16_bits": np.zeros((2048,), dtype=np.uint16),
+        "qkv_a_scale_inv": np.zeros((32, 48, 82), dtype=np.float32),
+        "qkv_a_weight_bits": np.zeros((32, 6144, 82), dtype=np.uint8),
+        "rms_hidden_update_bf16_bits": values["rms_hidden_update"],
+        "rms_residual_bf16_bits": values["rms_residual"],
+        "rms_weight_bf16_bits": np.zeros((6144,), dtype=np.uint16),
+        "wk_scale_inv": np.zeros((2, 1, 48), dtype=np.float32),
+        "wk_weight_bits": np.zeros((2, 128, 6144), dtype=np.uint8),
+        "wq_b_scale_inv": np.zeros((2, 16, 16), dtype=np.float32),
+        "wq_b_weight_bits": np.zeros((2, 2048, 2048), dtype=np.uint8),
+    }
+    input_artifact = root / "candidate-inputs.npz"
+    np.savez_compressed(input_artifact, **input_values)
+    input_artifact_sha = _sha(input_artifact)
+    input_records = {
+        name: {
+            "array_sha256": sha256(
+                np.ascontiguousarray(value).tobytes(order="C")
+            ).hexdigest(),
+            "shape": list(value.shape),
+            "storage_dtype": storage.get(value.dtype, "|u1"),
+        }
+        for name, value in sorted(input_values.items())
+    }
+    source_snapshot = _synthetic_source_snapshot(
+        Path(source["producer_repository_root"]), source["producer_code_pin"]
+    )
+    loaded_dependencies: dict[str, list[dict[str, Any]]] = {
+        "native_mappings": [],
+        "python_modules": [],
+    }
+    installed_path = (
+        Path(source["producer_repository_root"]) / source["producer_repo_path"]
+    )
+    installed_metadata = installed_path.stat()
+    installed_producer = {
+        "bytes": installed_metadata.st_size,
+        "gid": installed_metadata.st_gid,
+        "mode": stat.S_IMODE(installed_metadata.st_mode),
+        "path": str(installed_path),
+        "sha256": source["producer_sha256"],
+        "uid": installed_metadata.st_uid,
+    }
+    tensor_receipts: list[dict[str, Any]] = []
+    upstream_inputs = {
+        "synthetic_input_artifact": {
+            "bytes": input_artifact.stat().st_size,
+            "path": str(input_artifact),
+            "sha256": input_artifact_sha,
+        }
+    }
+    manifest_records = sorted(
+        (
+            {
+                **watchpoint,
+                "arrays": sorted(
+                    watchpoint["arrays"], key=lambda item: item["role"]
+                ),
+            }
+            for watchpoint in watchpoints
+        ),
+        key=lambda item: item["id"],
+    )
+    receipt = {
+        "artifact": {"bytes": artifact.stat().st_size, "sha256": artifact_sha},
+        "backend": {"device_count": 2, "device_ids": [0, 1], "platform": "cpu"},
+        "candidate": {
+            "code_pin": source["code_pin"],
+            "id": candidate["id"],
+            "plan_sha256": plan["plan_sha256"],
+            "source_authority_sha256": source["authority_sha256"],
+            "stablehlo_authority_sha256": stablehlo["authority_sha256"],
+        },
+        "claim_scope": admission_module._EXPECTED_CAPSULE_PRODUCER_CLAIM_SCOPE,
+        "coherence_id": "synthetic.gate.d.precompile",
+        "device_evidence": {
+            "bytes": device_artifact.stat().st_size,
+            "sha256": device_artifact_sha,
+        },
+        "environment": {
+            **admission_module._EXPECTED_CAPSULE_ENVIRONMENT,
+            "python_version": sys.version,
+        },
+        "execution": admission_module._EXPECTED_CAPSULE_EXECUTION,
+        "input_arrays": input_records,
+        "installed_producer": installed_producer,
+        "loaded_dependencies": loaded_dependencies,
+        "producer": {
+            "git_object_id": source["producer_git_object_id"],
+            "repo_path": source["producer_repo_path"],
+            "repository": {
+                "commit": source["producer_code_pin"],
+                "root": source["producer_repository_root"],
+            },
+            "sha256": source["producer_sha256"],
+        },
+        "schema_version": 1,
+        "source_snapshot": source_snapshot,
+        "tensor_receipts": tensor_receipts,
+        "upstream_inputs": upstream_inputs,
+        "watchpoint_manifest_sha256": sha256(
+            _canonical({"watchpoints": manifest_records}).encode("ascii")
+        ).hexdigest(),
+    }
+    receipt_path = root / "capsule-producer-receipt.json"
+    receipt_sha = _write_canonical_json(receipt_path, receipt)
+    success = {
+        "artifact_sha256": artifact_sha,
+        "device_evidence_sha256": device_artifact_sha,
+        "input_artifact_sha256": input_artifact_sha,
+        "producer_receipt_sha256": receipt_sha,
+        "schema_version": 1,
+    }
+    success_path = root / "capsule-SUCCESS"
+    success_sha = _write_canonical_json(success_path, success)
     document = {
         "artifact": {"path": str(artifact), "sha256": artifact_sha},
         "candidate_id": candidate["id"],
@@ -1042,6 +1358,16 @@ def _capsule(
         "code_pin": source["code_pin"],
         "coherence_id": "synthetic.gate.d.precompile",
         "plan_sha256": plan["plan_sha256"],
+        "producer_input_artifact": {
+            "path": str(input_artifact),
+            "sha256": input_artifact_sha,
+        },
+        "producer_device_evidence": {
+            "path": str(device_artifact),
+            "sha256": device_artifact_sha,
+        },
+        "producer_receipt": {"path": str(receipt_path), "sha256": receipt_sha},
+        "producer_success": {"path": str(success_path), "sha256": success_sha},
         "schema_version": 2,
         "source_authority_sha256": source["authority_sha256"],
         "stablehlo_authority_sha256": stablehlo["authority_sha256"],
@@ -1050,6 +1376,49 @@ def _capsule(
     path = root / "capsule.json"
     capsule_sha = _write_json(path, document)
     return {"path": str(path), "sha256": capsule_sha}, path, artifact
+
+
+def _capsule_execution_authority(
+    root: Path,
+    candidate: dict[str, Any],
+    capsule_path: Path,
+    artifact: Path,
+) -> dict[str, str]:
+    capsule = json.loads(capsule_path.read_text())
+    receipt_path = _binding_path(
+        capsule_path.parent, capsule["producer_receipt"]["path"]
+    )
+    receipt = json.loads(receipt_path.read_text())
+    with np.load(artifact, allow_pickle=False) as archive:
+        positions = np.ascontiguousarray(archive["event1_positions"])
+        scores = np.ascontiguousarray(archive["event1_scores"])
+        valid_count = int(np.asarray(archive["event1_valid_count"]).reshape(-1)[0])
+        hidden_update = np.ascontiguousarray(archive["rms_hidden_update"])
+        residual = np.ascontiguousarray(archive["rms_residual"])
+    authority = {
+        "authority_kind": "gate.d.capsule.execution.v1",
+        "candidate_id": candidate["id"],
+        "environment": receipt["environment"],
+        "expected_outputs": {
+            "event1_positions_sha256": sha256(positions.tobytes(order="C")).hexdigest(),
+            "event1_scores_sha256": sha256(scores.tobytes(order="C")).hexdigest(),
+            "event1_valid_count": valid_count,
+            "rms_hidden_update_sha256": sha256(
+                hidden_update.tobytes(order="C")
+            ).hexdigest(),
+            "rms_residual_sha256": sha256(residual.tobytes(order="C")).hexdigest(),
+        },
+        "input_arrays": receipt["input_arrays"],
+        "installed_producer": receipt["installed_producer"],
+        "loaded_dependencies": receipt["loaded_dependencies"],
+        "producer": receipt["producer"],
+        "schema_version": 1,
+        "source_snapshot": receipt["source_snapshot"],
+        "tensor_receipts": receipt["tensor_receipts"],
+        "upstream_inputs": receipt["upstream_inputs"],
+    }
+    path = root / "capsule-execution-authority.json"
+    return {"path": str(path), "sha256": _write_canonical_json(path, authority)}
 
 
 def _prepared_contract(
@@ -1118,6 +1487,9 @@ def _prepared_contract(
     candidate["source_authority"] = source_authority
     candidate["plan_authority"] = plan_authority
     candidate["stablehlo_authority"] = stablehlo_authority
+    candidate["capsule_execution_authority"] = _capsule_execution_authority(
+        root, candidate, capsule_path, artifact
+    )
     candidate["coherent_state_capsule"] = capsule_binding
     path = root / "contract.json"
     _write_json(path, contract)
@@ -1148,6 +1520,84 @@ def _rebind_capsule(
     _write_json(contract_path, contract)
 
 
+def _rebind_capsule_execution_authority(
+    contract_path: Path, contract: dict[str, Any], authority_path: Path
+) -> None:
+    contract["candidates"][0]["capsule_execution_authority"]["sha256"] = _sha(
+        authority_path
+    )
+    _write_json(contract_path, contract)
+
+
+def _binding_path(parent: Path, value: str) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else parent / path
+
+
+def _refresh_watchpoint_array_hashes(
+    capsule: dict[str, Any], values: dict[str, np.ndarray], array_key: str
+) -> None:
+    for watchpoint in capsule["watchpoints"]:
+        for array in watchpoint["arrays"]:
+            if array["array_key"] != array_key:
+                continue
+            value = values[array_key]
+            prefix = tuple(array["index_prefix"])
+            selected = value[prefix] if prefix else value
+            array["array_sha256"] = sha256(
+                np.ascontiguousarray(selected).tobytes(order="C")
+            ).hexdigest()
+
+
+def _rebind_capsule_producer_chain(
+    contract_path: Path,
+    contract: dict[str, Any],
+    capsule_path: Path,
+    capsule: dict[str, Any],
+    *,
+    artifact: Path | None = None,
+) -> None:
+    receipt_path = _binding_path(
+        capsule_path.parent, capsule["producer_receipt"]["path"]
+    )
+    receipt = json.loads(receipt_path.read_text())
+    if artifact is not None:
+        artifact_sha = _sha(artifact)
+        capsule["artifact"]["sha256"] = artifact_sha
+        receipt["artifact"] = {
+            "bytes": artifact.stat().st_size,
+            "sha256": artifact_sha,
+        }
+    manifest_records = sorted(
+        (
+            {
+                **watchpoint,
+                "arrays": sorted(
+                    watchpoint["arrays"], key=lambda item: item["role"]
+                ),
+            }
+            for watchpoint in capsule["watchpoints"]
+        ),
+        key=lambda item: item["id"],
+    )
+    receipt["watchpoint_manifest_sha256"] = sha256(
+        _canonical({"watchpoints": manifest_records}).encode("ascii")
+    ).hexdigest()
+    receipt_sha = _write_canonical_json(receipt_path, receipt)
+    capsule["producer_receipt"]["sha256"] = receipt_sha
+    success_path = _binding_path(
+        capsule_path.parent, capsule["producer_success"]["path"]
+    )
+    success = json.loads(success_path.read_text())
+    success["producer_receipt_sha256"] = receipt_sha
+    if artifact is not None:
+        success["artifact_sha256"] = capsule["artifact"]["sha256"]
+    capsule["producer_success"]["sha256"] = _write_canonical_json(
+        success_path, success
+    )
+    _rebind_capsule(contract_path, contract, capsule_path, capsule)
+
+
 def test_current_contract_fails_closed_without_jax() -> None:
     before = set(sys.modules)
     report = admit_gate_d_precompile_candidates(
@@ -1165,12 +1615,14 @@ def test_current_contract_fails_closed_without_jax() -> None:
         item["id"]: item["reasons"] for item in report["candidate_results"]
     } == {
         "auxiliary_device_tuple_dependency": [
+            "MISSING_PINNED_COHERENT_CAPSULE_PRODUCER",
             "MISSING_CANDIDATE_COHERENT_CAPSULE",
         ],
         "compensated_auxiliary_dependency": [
             "MISSING_SOURCE_AST_AUTHORITY",
             "MISSING_PLAN_AUTHORITY",
             "MISSING_CAUSAL_STABLEHLO_AUTHORITY",
+            "MISSING_PINNED_COHERENT_CAPSULE_PRODUCER",
             "MISSING_CANDIDATE_COHERENT_CAPSULE",
         ],
     }
@@ -1210,14 +1662,13 @@ def test_complete_synthetic_fixture_never_admits_precompile(tmp_path: Path) -> N
     candidate = report["candidate_results"][0]
     assert candidate["reasons"] == [
         "MISSING_EXECUTABLE_SOURCE_AUTHORITY",
-        "MISSING_PINNED_COHERENT_CAPSULE_PRODUCER",
     ]
     assert candidate["source_authority"]["executable_source_authority"] is False
     assert (
         candidate["stablehlo_authority"]["immutable_parser_authority"]
         is True
     )
-    assert candidate["capsule"]["producer_provenance_verified"] is False
+    assert candidate["capsule"]["producer_provenance_verified"] is True
     assert report["compile_only_review_required"] is True
     assert report["gate_d_closed"] is False
     assert report["tpu_successor_authorized"] is False
@@ -1233,6 +1684,362 @@ def test_complete_pp8_authority_uses_four_real_owners(tmp_path: Path) -> None:
     assert candidate["capsule"]["derived_rms_input_sha256"] == sha256(
         np.full((6144,), 3.0, dtype=np.float32).tobytes()
     ).hexdigest()
+
+
+@pytest.mark.parametrize(
+    ("mutation", "detail"),
+    [
+        ("source_archive", "committed source snapshot drifted"),
+        ("upstream_file", "upstream input drifted"),
+        ("installed_producer", "installed capsule producer drifted"),
+        ("python_dependency_escape", "escaped sealed roots"),
+    ],
+)
+def test_capsule_execution_authority_attacks_fail_closed(
+    tmp_path: Path, mutation: str, detail: str
+) -> None:
+    path, contract, _, _ = _prepared_contract(tmp_path)
+    binding = contract["candidates"][0]["capsule_execution_authority"]
+    authority_path = Path(binding["path"])
+    authority = json.loads(authority_path.read_text())
+    if mutation == "source_archive":
+        authority["source_snapshot"]["archive_sha256"] = "0" * 64
+        _write_canonical_json(authority_path, authority)
+    elif mutation == "upstream_file":
+        upstream = Path(
+            authority["upstream_inputs"]["synthetic_input_artifact"]["path"]
+        )
+        with upstream.open("ab") as stream:
+            stream.write(b"hostile")
+    elif mutation == "installed_producer":
+        installed = Path(authority["installed_producer"]["path"])
+        installed.write_bytes(installed.read_bytes() + b"# hostile\n")
+        installed.chmod(0o644)
+    elif mutation == "python_dependency_escape":
+        escaped = tmp_path / "hostile.py"
+        escaped.write_bytes(b"x = 1\n")
+        escaped.chmod(0o644)
+        authority["loaded_dependencies"]["python_modules"] = [
+            {
+                "bytes": escaped.stat().st_size,
+                "path": str(escaped),
+                "sha256": _sha(escaped),
+            }
+        ]
+        _write_canonical_json(authority_path, authority)
+    _rebind_capsule_execution_authority(path, contract, authority_path)
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][0]
+    assert "INVALID_CAPSULE_EXECUTION_AUTHORITY" in candidate["reasons"]
+    assert detail in candidate["capsule_execution_authority"]["refusal"]
+
+
+def test_real_capsule_tensor_receipts_bind_manifest_header_and_payload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path = tmp_path / "runtime_manifest.json"
+    files = []
+    receipts = []
+    for slot in (0, 1):
+        payload = struct.pack("<ff", float(slot + 1), float(slot + 2))
+        header_document = {
+            "tensor": {
+                "data_offsets": [0, len(payload)],
+                "dtype": "F32",
+                "shape": [2],
+            }
+        }
+        header_json = _canonical(header_document).encode("ascii")
+        raw_header = struct.pack("<Q", len(header_json)) + header_json
+        owner_path = tmp_path / f"owner-{slot}.safetensors"
+        owner_path.write_bytes(raw_header + payload)
+        payload_sha = sha256(payload).hexdigest()
+        files.append(
+            {
+                "destination_filename": owner_path.name,
+                "device_slot": slot,
+                "file_bytes": owner_path.stat().st_size,
+                "header_bytes": len(raw_header),
+                "header_sha256": sha256(raw_header).hexdigest(),
+                "stage_id": 0,
+                "tensors": [
+                    {
+                        "byte_count": len(payload),
+                        "name": "tensor",
+                        "sha256": payload_sha,
+                    }
+                ],
+            }
+        )
+        receipts.append(
+            {
+                "byte_count": len(payload),
+                "device_slot": slot,
+                "file_bytes": owner_path.stat().st_size,
+                "file_path": str(owner_path),
+                "name": "tensor",
+                "offset": len(raw_header),
+                "sha256": payload_sha,
+                "shape": [2],
+            }
+        )
+    manifest_raw = (_canonical({"files": files}) + "\n").encode("ascii")
+    manifest_path.write_bytes(manifest_raw)
+    monkeypatch.setattr(
+        admission_module, "_EXPECTED_CAPSULE_TENSOR_NAMES", ("tensor",)
+    )
+    monkeypatch.setattr(
+        admission_module,
+        "_CAPSULE_RUNTIME_INPUT_SOURCES",
+        {"runtime_input": ("tensor", (0, 1))},
+    )
+    monkeypatch.setattr(
+        admission_module,
+        "_CAPSULE_INPUT_SCHEMA",
+        {"runtime_input": ("<f4", (2, 2))},
+    )
+    monkeypatch.setattr(
+        admission_module,
+        "_EXPECTED_CAPSULE_UPSTREAM_INPUTS",
+        {"runtime_manifest": (str(manifest_path), sha256(manifest_raw).hexdigest())},
+    )
+    observed_receipts, observed_inputs = (
+        admission_module._verify_capsule_tensor_receipts(
+            receipts, real_source=True, runtime_manifest_raw=manifest_raw
+        )
+    )
+    assert observed_receipts == receipts
+    assert observed_inputs == {
+        "runtime_input": {
+            "array_sha256": sha256(
+                struct.pack("<ffff", 1.0, 2.0, 2.0, 3.0)
+            ).hexdigest(),
+            "shape": [2, 2],
+            "storage_dtype": "<f4",
+        }
+    }
+    hostile = json.loads(json.dumps(receipts))
+    hostile[0]["offset"] += 1
+    with pytest.raises(BenchmarkValidationError, match="tensor receipt drifted"):
+        admission_module._verify_capsule_tensor_receipts(
+            hostile, real_source=True, runtime_manifest_raw=manifest_raw
+        )
+
+
+def test_capsule_producer_uses_pre_execution_snapshots_and_retained_fds() -> None:
+    source_path = (
+        REPO_ROOT / "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py"
+    )
+    tree = ast.parse(source_path.read_text())
+    functions = {
+        item.name: item for item in tree.body if isinstance(item, ast.FunctionDef)
+    }
+    main = functions["main"]
+    snapshot_lines = [
+        node.lineno
+        for node in ast.walk(main)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_snapshot_regular"
+    ]
+    execute_lines = [
+        node.lineno
+        for node in ast.walk(main)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_execute"
+    ]
+    assert snapshot_lines and execute_lines
+    assert max(snapshot_lines) < min(execute_lines)
+    input_source = ast.unparse(functions["_input_values"])
+    runtime_source = ast.unparse(functions["_read_runtime"])
+    assert "_file_sha256" not in input_source
+    assert "read_text" not in input_source
+    assert "BytesIO(snapshots" in input_source
+    assert "os.pread" in runtime_source
+    assert ".open(" not in runtime_source
+    assert "_revalidate_snapshot" in functions
+    assert "_revalidate_tensor_receipts" in functions
+
+
+@pytest.mark.parametrize(
+    ("mutation", "detail"),
+    [
+        ("backend", "not forced CPU"),
+        ("environment", "environment drifted"),
+        ("execution", "execution scope drifted"),
+        ("producer_object", "committed capsule producer drifted"),
+        ("input_manifest", "input array drifted"),
+        ("source_snapshot", "not the pinned execution authority"),
+        ("dependencies", "not the pinned execution authority"),
+        ("upstream_inputs", "not the pinned execution authority"),
+        ("tensor_receipts", "not the pinned execution authority"),
+        ("success", "SUCCESS drifted"),
+    ],
+)
+def test_capsule_producer_receipt_attacks_fail_closed(
+    tmp_path: Path, mutation: str, detail: str
+) -> None:
+    path, contract, capsule_path, _ = _prepared_contract(tmp_path)
+    capsule = json.loads(capsule_path.read_text())
+    receipt_path = _binding_path(
+        capsule_path.parent, capsule["producer_receipt"]["path"]
+    )
+    receipt = json.loads(receipt_path.read_text())
+    if mutation == "backend":
+        receipt["backend"]["device_count"] = 1
+    elif mutation == "environment":
+        receipt["environment"]["jax_version"] = "0.0.0"
+    elif mutation == "execution":
+        receipt["execution"]["tpus_used"] = 1
+    elif mutation == "producer_object":
+        receipt["producer"]["git_object_id"] = "0" * 40
+    elif mutation == "input_manifest":
+        receipt["input_arrays"]["qkv_a_weight_bits"]["array_sha256"] = "0" * 64
+    elif mutation == "source_snapshot":
+        receipt["source_snapshot"]["archive_sha256"] = "0" * 64
+    elif mutation == "dependencies":
+        receipt["loaded_dependencies"]["python_modules"].append(
+            {"bytes": 1, "path": "/tmp/hostile.py", "sha256": "0" * 64}
+        )
+    elif mutation == "upstream_inputs":
+        receipt["upstream_inputs"]["synthetic_input_artifact"]["sha256"] = "0" * 64
+    elif mutation == "tensor_receipts":
+        receipt["tensor_receipts"] = [{"hostile": True}]
+    elif mutation == "success":
+        success_path = _binding_path(
+            capsule_path.parent, capsule["producer_success"]["path"]
+        )
+        success = json.loads(success_path.read_text())
+        success["schema_version"] = 2
+        _write_canonical_json(success_path, success)
+    _write_canonical_json(receipt_path, receipt)
+    _rebind_capsule_producer_chain(path, contract, capsule_path, capsule)
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][0]
+    assert "INVALID_CANDIDATE_COHERENT_CAPSULE" in candidate["reasons"]
+    assert detail in candidate["capsule"]["refusal"]
+
+
+@pytest.mark.parametrize(
+    ("mutation", "detail"),
+    [
+        ("normalized_owner", "normalized owner values differ"),
+        ("cache_current_key", "not the BF16 round of its current key"),
+        ("duplicate_position", "not one exact ordered cutoff-active set"),
+        ("ascending_score", "not one exact ordered cutoff-active set"),
+    ],
+)
+def test_capsule_coherence_attacks_fail_closed_after_full_rebinding(
+    tmp_path: Path, mutation: str, detail: str
+) -> None:
+    path, contract, capsule_path, artifact = _prepared_contract(tmp_path)
+    capsule = json.loads(capsule_path.read_text())
+    with np.load(artifact, allow_pickle=False) as archive:
+        values = {name: archive[name].copy() for name in archive.files}
+    if mutation == "normalized_owner":
+        values["normalized"][1, 0, 2795] ^= np.uint16(1)
+        changed_keys = ("normalized",)
+    elif mutation == "cache_current_key":
+        values["cache_history"][1, 15, 219] = np.uint16(0)
+        changed_keys = ("cache_history",)
+    elif mutation == "duplicate_position":
+        values["event1_positions"][0, 1] = values["event1_positions"][0, 0]
+        changed_keys = ("event1_positions",)
+    else:
+        values["event1_scores"][0, 100] = np.float32(-1.0)
+        changed_keys = ("event1_scores",)
+    np.savez(artifact, **values)
+    for key in changed_keys:
+        _refresh_watchpoint_array_hashes(capsule, values, key)
+    _rebind_capsule_producer_chain(
+        path, contract, capsule_path, capsule, artifact=artifact
+    )
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][0]
+    assert "INVALID_CANDIDATE_COHERENT_CAPSULE" in candidate["reasons"]
+    assert detail in candidate["capsule"]["refusal"]
+
+
+@pytest.mark.parametrize(
+    ("array_key", "hostile_value"),
+    [
+        ("normalized", np.uint16(0x7F80)),
+        ("query", np.float32(np.inf)),
+        ("head_weights", np.float32(np.nan)),
+    ],
+)
+def test_capsule_nonfinite_watchpoints_fail_closed_after_rebinding(
+    tmp_path: Path, array_key: str, hostile_value: Any
+) -> None:
+    path, contract, capsule_path, artifact = _prepared_contract(tmp_path)
+    capsule = json.loads(capsule_path.read_text())
+    with np.load(artifact, allow_pickle=False) as archive:
+        values = {name: archive[name].copy() for name in archive.files}
+    values[array_key].reshape(-1)[0] = hostile_value
+    if array_key in {"normalized", "query", "head_weights"}:
+        owner_width = values[array_key][0].size
+        values[array_key].reshape(-1)[owner_width] = hostile_value
+    np.savez(artifact, **values)
+    _refresh_watchpoint_array_hashes(capsule, values, array_key)
+    _rebind_capsule_producer_chain(
+        path, contract, capsule_path, capsule, artifact=artifact
+    )
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][0]
+    assert "INVALID_CANDIDATE_COHERENT_CAPSULE" in candidate["reasons"]
+    assert "contains non-finite" in candidate["capsule"]["refusal"]
+
+
+def test_capsule_nonfinite_input_scale_fails_after_full_authority_rebinding(
+    tmp_path: Path,
+) -> None:
+    path, contract, capsule_path, _ = _prepared_contract(tmp_path)
+    capsule = json.loads(capsule_path.read_text())
+    input_path = _binding_path(
+        capsule_path.parent, capsule["producer_input_artifact"]["path"]
+    )
+    with np.load(input_path, allow_pickle=False) as archive:
+        inputs = {name: archive[name].copy() for name in archive.files}
+    inputs["qkv_a_scale_inv"][0, 0, 0] = np.float32(np.inf)
+    np.savez_compressed(input_path, **inputs)
+    input_sha = _sha(input_path)
+    input_array_sha = sha256(
+        np.ascontiguousarray(inputs["qkv_a_scale_inv"]).tobytes(order="C")
+    ).hexdigest()
+    capsule["producer_input_artifact"]["sha256"] = input_sha
+    receipt_path = _binding_path(
+        capsule_path.parent, capsule["producer_receipt"]["path"]
+    )
+    receipt = json.loads(receipt_path.read_text())
+    receipt["input_arrays"]["qkv_a_scale_inv"]["array_sha256"] = input_array_sha
+    receipt["upstream_inputs"]["synthetic_input_artifact"] = {
+        "bytes": input_path.stat().st_size,
+        "path": str(input_path),
+        "sha256": input_sha,
+    }
+    receipt_sha = _write_canonical_json(receipt_path, receipt)
+    capsule["producer_receipt"]["sha256"] = receipt_sha
+    success_path = _binding_path(
+        capsule_path.parent, capsule["producer_success"]["path"]
+    )
+    success = json.loads(success_path.read_text())
+    success["input_artifact_sha256"] = input_sha
+    success["producer_receipt_sha256"] = receipt_sha
+    capsule["producer_success"]["sha256"] = _write_canonical_json(
+        success_path, success
+    )
+    authority_binding = contract["candidates"][0]["capsule_execution_authority"]
+    authority_path = Path(authority_binding["path"])
+    authority = json.loads(authority_path.read_text())
+    authority["input_arrays"] = receipt["input_arrays"]
+    authority["upstream_inputs"] = receipt["upstream_inputs"]
+    authority_binding["sha256"] = _write_canonical_json(authority_path, authority)
+    _rebind_capsule(path, contract, capsule_path, capsule)
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][0]
+    assert "INVALID_CANDIDATE_COHERENT_CAPSULE" in candidate["reasons"]
+    assert "contains non-finite FP32 values" in candidate["capsule"]["refusal"]
 
 
 def test_complete_compensated_authority_is_distinct_and_offline_only(
@@ -1883,6 +2690,85 @@ def test_rms_input_must_equal_sum_derived_from_bf16_operands(tmp_path: Path) -> 
     candidate = report["candidate_results"][0]
     assert "INVALID_CANDIDATE_COHERENT_CAPSULE" in candidate["reasons"]
     assert "not derived from its sealed BF16 operands" in candidate["capsule"]["refusal"]
+
+
+def test_capsule_rejects_replicated_device_owner_disagreement(tmp_path: Path) -> None:
+    path, contract, capsule_path, _ = _prepared_contract(tmp_path)
+    capsule = json.loads(capsule_path.read_text())
+    device_path = _binding_path(
+        capsule_path.parent, capsule["producer_device_evidence"]["path"]
+    )
+    with np.load(device_path, allow_pickle=False) as archive:
+        values = {name: archive[name].copy() for name in archive.files}
+    values["rms_input_fp32_owners"][1, 0, 2795] += np.float32(1.0)
+    np.savez(device_path, **values)
+    device_sha = _sha(device_path)
+    capsule["producer_device_evidence"]["sha256"] = device_sha
+    receipt_path = _binding_path(
+        capsule_path.parent, capsule["producer_receipt"]["path"]
+    )
+    receipt = json.loads(receipt_path.read_text())
+    receipt["device_evidence"] = {
+        "bytes": device_path.stat().st_size,
+        "sha256": device_sha,
+    }
+    _write_canonical_json(receipt_path, receipt)
+    success_path = _binding_path(
+        capsule_path.parent, capsule["producer_success"]["path"]
+    )
+    success = json.loads(success_path.read_text())
+    success["device_evidence_sha256"] = device_sha
+    _write_canonical_json(success_path, success)
+    _rebind_capsule_producer_chain(path, contract, capsule_path, capsule)
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][0]
+    assert "INVALID_CANDIDATE_COHERENT_CAPSULE" in candidate["reasons"]
+    assert "replicated device owners disagree" in candidate["capsule"]["refusal"]
+
+
+def test_capsule_cannot_reseal_wrong_event_against_outer_authority(
+    tmp_path: Path,
+) -> None:
+    path, contract, capsule_path, artifact = _prepared_contract(tmp_path)
+    capsule = json.loads(capsule_path.read_text())
+    with np.load(artifact, allow_pickle=False) as archive:
+        state = {name: archive[name].copy() for name in archive.files}
+    state["event1_scores"] += np.float32(1.0)
+    np.savez(artifact, **state)
+    _refresh_watchpoint_array_hashes(capsule, state, "event1_scores")
+    device_path = _binding_path(
+        capsule_path.parent, capsule["producer_device_evidence"]["path"]
+    )
+    with np.load(device_path, allow_pickle=False) as archive:
+        device = {name: archive[name].copy() for name in archive.files}
+    device["selected_scores_owners"] += np.float32(1.0)
+    np.savez(device_path, **device)
+    device_sha = _sha(device_path)
+    capsule["producer_device_evidence"]["sha256"] = device_sha
+    receipt_path = _binding_path(
+        capsule_path.parent, capsule["producer_receipt"]["path"]
+    )
+    receipt = json.loads(receipt_path.read_text())
+    receipt["device_evidence"] = {
+        "bytes": device_path.stat().st_size,
+        "sha256": device_sha,
+    }
+    _write_canonical_json(receipt_path, receipt)
+    success_path = _binding_path(
+        capsule_path.parent, capsule["producer_success"]["path"]
+    )
+    success = json.loads(success_path.read_text())
+    success["device_evidence_sha256"] = device_sha
+    _write_canonical_json(success_path, success)
+    _rebind_capsule_producer_chain(
+        path, contract, capsule_path, capsule, artifact=artifact
+    )
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][0]
+    assert "INVALID_CANDIDATE_COHERENT_CAPSULE" in candidate["reasons"]
+    assert "does not match the pinned accepted authority" in candidate["capsule"][
+        "refusal"
+    ]
 
 
 def test_capsule_rejects_unreferenced_owner_storage_rows(tmp_path: Path) -> None:

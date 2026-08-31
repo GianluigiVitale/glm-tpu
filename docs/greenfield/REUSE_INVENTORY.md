@@ -898,3 +898,25 @@ Sol approved exact staged correction `d0bea1d5...2620` for install only. One-fil
 source/fixed path share SHA/inode, mode 0555 and link count two; old `2513a305...2182` remains
 immutable at link count one. Expanded hostile coverage passes 82/82. The correction is not committed
 or invoked; the old producer and burned tag are tombstoned.
+
+## Gate-D tuple capsule producer and admission hardening; source only
+
+Reuse default-off `glm_tpu/greenfield/benchmarking/gate_d_tuple_capsule.py` and
+`scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py` only for the separately reviewed
+bounded two-CPU replay. The replay carries explicit owner axes for the eight typed watchpoints and
+uses the real stage-local DSA composition. The producer snapshots all eight upstream authorities
+before execution, reads runtime tensors through retained file descriptors, records all 22 exact
+stage-zero tensor slices, rejects nonfinite inputs/state, and publishes local `SUCCESS` last. Its
+local publication is deliberately provisional until independent protected archive/seal.
+
+Admission v2 independently binds the exact producer (`2cbf8ed9...8268`), replay
+(`9b9d11d0...03b4`) and the canonical 139-blob replay-visible `glm_tpu` closure
+(`f3683029...c0b0`). It derives the 11 runtime-backed inputs from manifest/header/payload bytes,
+derives prompt cache from sealed DB518 state, fixes accepted event/RMS hashes, verifies replicated
+owners and rejects fully rebound nonfinite or implementation-substitution attacks. Core/contract/
+test SHAs are `250f41c2...3568`, `9d9ede40...f539` and `99f877d5...7e26`.
+
+Offline validation passes 119/119 plus 69/69 adjacent Gate-D tests. Fable-max was usage-blocked;
+the same-scope Sol correction review first withheld on executable-closure substitution, then
+approved the exact correction for persistence with no P0--P2. This batch authorizes no install,
+invocation, JAX compilation/execution, cloud/TPU work, candidate admission or Gate-D closure.

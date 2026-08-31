@@ -2,6 +2,7 @@
   "candidates": [
     {
       "causal_frontier_action": "resolve",
+      "capsule_execution_authority": null,
       "coherent_state_capsule": null,
       "evidence_ids": [
         "constructability",
@@ -115,6 +116,7 @@
     },
     {
       "causal_frontier_action": "resolve",
+      "capsule_execution_authority": null,
       "coherent_state_capsule": null,
       "evidence_ids": [
         "constructability",
@@ -186,7 +188,7 @@
     },
     "core": {
       "path": "../glm_tpu/greenfield/gate_d_precompile_admission.py",
-      "sha256": "2325cbd6d84820223e2cbecfd612a32c19af8eb3d802d1d89f2d803f7366ef23"
+      "sha256": "250f41c294c5f5fbc77da30c0bc891e23e60c42987b4ddba53768c2393e63568"
     },
     "git": {
       "path": "/usr/bin/git",

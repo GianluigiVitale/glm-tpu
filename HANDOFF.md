@@ -8433,3 +8433,33 @@ operands, their independently derived FP32 sum, normalized output, cache history
 weights, current key and scorer event-1 state under the same candidate identity. Admit it offline
 and obtain same-scope adversarial review before considering any compile-only optimized-HLO
 acquisition. No TPU action is authorized.
+
+## 2026-08-31 tuple-capsule source is persistence-approved; replay remains unrun
+
+The default-off bounded replay and producer now exist at
+`glm_tpu/greenfield/benchmarking/gate_d_tuple_capsule.py` (`9b9d11d0...03b4`) and
+`scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py` (`2cbf8ed9...8268`). They target
+exactly two forced CPU owners, the committed layer-1 tuple candidate and real stage-local event-1
+DSA composition. No producer install, JAX compile/array execution, model, cloud or TPU workflow
+occurred in this source batch.
+
+The producer snapshots all eight exact upstream inputs before execution, reads 22 runtime tensor
+slices through retained file descriptors, revalidates inode/path/size/slice/source/dependency
+identities, rejects nonfinite input/state and publishes local `SUCCESS` last. Admission derives all
+11 runtime-backed input records from manifest/header/payload bytes, reconstructs the DB518 prompt
+cache authority, fixes accepted event/RMS hashes and checks explicit two-owner device agreement.
+Local publication remains provisional until a separate protected archive/seal.
+
+Sol initially withheld because an outer authority could select a hostile producer/replay while
+preserving reviewed RMS/layer blobs. The correction independently pins the producer and replay Git
+objects/SHAs plus the complete replay-visible 139-blob committed `glm_tpu` manifest
+(`f3683029...c0b0`); hostile producer path/blob, replay blob and imported-kernel replacements fail
+closed. Fable-max was usage-blocked. Same-scope Sol then returned `APPROVE PERSISTENCE` with no
+P0--P2 and no install/invocation/compile/cloud/TPU/admission authorization.
+
+Core/contract/test SHAs are `250f41c2...3568`, `9d9ede40...f539` and
+`99f877d5...7e26`. Full admission validation passes 119/119; adjacent constructability/admission/
+observability/shadow validation passes 69/69; py_compile and diff checks pass. Gate D is open.
+After commit/push/same-region mirror, exact next is a separate install/invocation review for one
+bounded protected replay, independent archive/seal, then offline admission. Do not infer a
+candidate, compile-only successor or Gate-D result from persistence approval.
