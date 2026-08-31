@@ -144,9 +144,9 @@ _EXPECTED_CAPSULE_INSTALLED_PRODUCER = (
     "/opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_capsule.py"
 )
 _EXPECTED_CAPSULE_PRODUCER_SOURCE = {
-    "git_object_id": "6f0d31ee016de2192af3dbdd7a9470ed00bd14f0",
+    "git_object_id": "d82cfff69dc5a167a894716182fb0e95c807e5b1",
     "repo_path": "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py",
-    "sha256": "d3082c2ef398d406031ddbf94143b4aa0e5eb712324af49bc1b85fc250ef869b",
+    "sha256": "a81fd59ea2b32f27a102666e24a35827b251560d4df52dc04276325aafa1794a",
 }
 _EXPECTED_CAPSULE_REPLAY_SOURCE = {
     "git_object_id": "7476af8c6ace4472d9c39faf1e7155b328d9e230",
@@ -247,6 +247,12 @@ _EXPECTED_CAPSULE_UPSTREAM_INPUTS = {
         "8cc45b81c3a85ad6131790e82eb73f0839cab7eefd13a634db7ff5a697b0338b",
     ),
 }
+_EXPECTED_CAPSULE_RUNTIME_DATA_ROOT = Path(
+    "/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/"
+    "greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z"
+)
+_EXPECTED_CAPSULE_RUNTIME_MOUNT_POINT = "/home/gianl/gcs-models"
+_EXPECTED_CAPSULE_RUNTIME_MOUNT_SOURCE = "driftbench-dsv4-uc"
 _EXPECTED_STABLEHLO_CERTIFICATE_CLAIM_SCOPE = (
     "Forced-CPU abstract-lowering structural StableHLO authority only; no executable "
     "compilation, numerical execution, model, TPU, performance or Gate-D closure claim."
@@ -4073,11 +4079,190 @@ def _require_finite_raw(raw: bytes, storage_dtype: str, label: str) -> None:
     raise BenchmarkValidationError(f"{label} has no finite-value contract")
 
 
+def _capsule_mountinfo_path(raw: str, *, require_absolute: bool = True) -> Path:
+    value = raw
+    for encoded, decoded in (
+        ("\\040", " "),
+        ("\\011", "\t"),
+        ("\\012", "\n"),
+        ("\\134", "\\"),
+    ):
+        value = value.replace(encoded, decoded)
+    if "\x00" in value or (require_absolute and not value.startswith("/")):
+        raise BenchmarkValidationError("capsule runtime mountinfo path is invalid")
+    return Path(value)
+
+
+def _verify_capsule_runtime_data_mount(
+    mountinfo_raw: bytes, payload_paths: tuple[Path, ...]
+) -> dict[str, Any]:
+    """Bind real tensor payloads to the exact read-only same-region GCS mount."""
+
+    normalized_data_root = Path(os.path.abspath(_EXPECTED_CAPSULE_RUNTIME_DATA_ROOT))
+    normalized_mount_point = Path(
+        os.path.abspath(_EXPECTED_CAPSULE_RUNTIME_MOUNT_POINT)
+    )
+    if normalized_mount_point not in normalized_data_root.parents:
+        raise BenchmarkValidationError(
+            "capsule runtime data root escaped its mount authority"
+        )
+    records: list[dict[str, Any]] = []
+    for raw_line in mountinfo_raw.splitlines():
+        try:
+            left, right = raw_line.decode("utf-8", errors="strict").split(" - ", 1)
+        except (UnicodeDecodeError, ValueError) as error:
+            raise BenchmarkValidationError("capsule runtime mountinfo is invalid") from error
+        left_fields = left.split()
+        right_fields = right.split()
+        if len(left_fields) < 6 or len(right_fields) < 3:
+            raise BenchmarkValidationError(
+                "capsule runtime mountinfo record is invalid"
+            )
+        try:
+            mount_id = int(left_fields[0])
+            major, minor = (int(item) for item in left_fields[2].split(":", 1))
+            mount_root = _capsule_mountinfo_path(
+                left_fields[3], require_absolute=False
+            )
+            mount_point = _capsule_mountinfo_path(left_fields[4])
+        except (TypeError, ValueError) as error:
+            raise BenchmarkValidationError(
+                "capsule runtime mountinfo identity is invalid"
+            ) from error
+        records.append(
+            {
+                "major": major,
+                "minor": minor,
+                "mount_id": mount_id,
+                "mount_options": set(left_fields[5].split(",")),
+                "mount_point": mount_point,
+                "mount_root": mount_root,
+                "raw_record": raw_line,
+                "source": right_fields[1],
+                "super_options": set(right_fields[2].split(",")),
+                "type": right_fields[0],
+            }
+        )
+    matches = [
+        record for record in records if record["mount_point"] == normalized_mount_point
+    ]
+    if len(matches) != 1:
+        raise BenchmarkValidationError(
+            "capsule runtime data mount authority is absent or duplicated"
+        )
+    authority = matches[0]
+    if (
+        authority["mount_root"] != Path("/")
+        or not {"ro", "nosuid", "nodev"} <= authority["mount_options"]
+        or authority["type"] != "fuse.gcsfuse"
+        or authority["source"] != _EXPECTED_CAPSULE_RUNTIME_MOUNT_SOURCE
+        or "ro" not in authority["super_options"]
+    ):
+        raise BenchmarkValidationError("capsule runtime data mount authority drifted")
+    for path in (normalized_data_root, *payload_paths):
+        normalized = Path(os.path.abspath(path))
+        if normalized != normalized_data_root and normalized_data_root not in normalized.parents:
+            raise BenchmarkValidationError(
+                "capsule runtime payload escaped its data root"
+            )
+        covering = [
+            record
+            for record in records
+            if normalized == record["mount_point"]
+            or record["mount_point"] in normalized.parents
+        ]
+        if not covering:
+            raise BenchmarkValidationError(
+                "capsule runtime payload has no covering mount"
+            )
+        longest = max(len(record["mount_point"].parts) for record in covering)
+        visible = [
+            record
+            for record in covering
+            if len(record["mount_point"].parts) == longest
+        ]
+        if len(visible) != 1 or visible[0]["mount_id"] != authority["mount_id"]:
+            raise BenchmarkValidationError(
+                "capsule runtime payload is covered by a nested mount"
+            )
+    return {
+        "major": authority["major"],
+        "minor": authority["minor"],
+        "mount_id": authority["mount_id"],
+        "raw_record": authority["raw_record"],
+    }
+
+
+def _verify_capsule_payload_descriptor_mount(
+    descriptor: int,
+    metadata: os.stat_result,
+    authority: Mapping[str, Any],
+) -> None:
+    try:
+        fields = {}
+        for line in Path(f"/proc/self/fdinfo/{descriptor}").read_text().splitlines():
+            if ":" in line:
+                key, value = line.split(":", 1)
+                fields[key] = value.strip()
+        mount_id = int(fields["mnt_id"])
+    except (KeyError, OSError, ValueError) as error:
+        raise BenchmarkValidationError(
+            "capsule runtime payload descriptor mount is unavailable"
+        ) from error
+    if (
+        mount_id != authority["mount_id"]
+        or os.major(metadata.st_dev) != authority["major"]
+        or os.minor(metadata.st_dev) != authority["minor"]
+    ):
+        raise BenchmarkValidationError(
+            "capsule runtime payload descriptor escaped mount authority"
+        )
+
+
+def _capsule_runtime_owner_paths(runtime_manifest_raw: bytes) -> tuple[Path, ...]:
+    manifest = _load_json(runtime_manifest_raw, "capsule runtime manifest")
+    files = manifest.get("files")
+    if not isinstance(files, list):
+        raise BenchmarkValidationError("capsule runtime manifest files are invalid")
+    records = [
+        record
+        for record in files
+        if isinstance(record, dict)
+        and record.get("stage_id") == 0
+        and record.get("device_slot") in (0, 1)
+    ]
+    if len(records) != 2 or {int(record["device_slot"]) for record in records} != {
+        0,
+        1,
+    }:
+        raise BenchmarkValidationError("capsule runtime stage-zero owners drifted")
+    paths = []
+    for record in sorted(records, key=lambda item: int(item["device_slot"])):
+        raw = record.get("destination_filename")
+        if not isinstance(raw, str):
+            raise BenchmarkValidationError(
+                "capsule runtime destination filename is invalid"
+            )
+        relative = PurePosixPath(raw)
+        if (
+            relative.is_absolute()
+            or relative.as_posix() != raw
+            or any(part in ("", ".", "..") for part in relative.parts)
+        ):
+            raise BenchmarkValidationError(
+                "capsule runtime destination escaped its data root"
+            )
+        paths.append(_EXPECTED_CAPSULE_RUNTIME_DATA_ROOT.joinpath(*relative.parts))
+    return tuple(paths)
+
+
 def _verify_capsule_tensor_receipts(
     value: Any,
     *,
     real_source: bool,
     runtime_manifest_raw: bytes | None,
+    runtime_paths: tuple[Path, ...] | None = None,
+    runtime_mount_authority: Mapping[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
     if not isinstance(value, list):
         raise BenchmarkValidationError("capsule tensor receipts must be a list")
@@ -4132,6 +4317,8 @@ def _verify_capsule_tensor_receipts(
         return receipts, {}
     if runtime_manifest_raw is None:
         raise BenchmarkValidationError("real capsule runtime manifest snapshot is absent")
+    if runtime_paths is None or runtime_mount_authority is None:
+        raise BenchmarkValidationError("real capsule runtime mount authority is absent")
     expected_pairs = {
         (slot, name) for slot in (0, 1) for name in _EXPECTED_CAPSULE_TENSOR_NAMES
     }
@@ -4154,7 +4341,6 @@ def _verify_capsule_tensor_receipts(
             owner_records[slot] = record
     if set(owner_records) != {0, 1}:
         raise BenchmarkValidationError("capsule runtime stage-zero owners drifted")
-    runtime_root = Path(_EXPECTED_CAPSULE_UPSTREAM_INPUTS["runtime_manifest"][0]).parent
     by_slot = {
         slot: [item for item in receipts if item["device_slot"] == slot]
         for slot in (0, 1)
@@ -4175,9 +4361,7 @@ def _verify_capsule_tensor_receipts(
         }
         if not required_keys <= set(owner):
             raise BenchmarkValidationError("capsule runtime owner manifest is incomplete")
-        expected_path = runtime_root / _string(
-            owner["destination_filename"], "capsule runtime destination"
-        )
+        expected_path = runtime_paths[slot]
         tensor_records = owner["tensors"]
         if not isinstance(tensor_records, list):
             raise BenchmarkValidationError("capsule runtime tensor manifest is invalid")
@@ -4186,6 +4370,9 @@ def _verify_capsule_tensor_receipts(
         }
         with _open_regular_file(expected_path, f"capsule runtime owner {slot}") as stream:
             metadata = os.fstat(stream.fileno())
+            _verify_capsule_payload_descriptor_mount(
+                stream.fileno(), metadata, runtime_mount_authority
+            )
             header_bytes = _positive_int(
                 owner["header_bytes"], f"capsule runtime owner {slot} header bytes"
             )
@@ -4667,11 +4854,28 @@ def _verify_capsule_execution_authority(
                 raise BenchmarkValidationError(
                     f"real capsule upstream authority drifted: {name}"
                 )
+    runtime_paths = None
+    runtime_mount_authority = None
+    if real_source:
+        runtime_paths = _capsule_runtime_owner_paths(
+            upstream_raw["runtime_manifest"]
+        )
+        runtime_mount_authority = _verify_capsule_runtime_data_mount(
+            Path("/proc/self/mountinfo").read_bytes(), runtime_paths
+        )
     tensor_receipts, runtime_input_arrays = _verify_capsule_tensor_receipts(
         raw_tensor_receipts,
         real_source=real_source,
         runtime_manifest_raw=upstream_raw.get("runtime_manifest"),
+        runtime_paths=runtime_paths,
+        runtime_mount_authority=runtime_mount_authority,
     )
+    if real_source and _verify_capsule_runtime_data_mount(
+        Path("/proc/self/mountinfo").read_bytes(), runtime_paths
+    ) != runtime_mount_authority:
+        raise BenchmarkValidationError(
+            "capsule runtime data mount changed during verification"
+        )
     if real_source:
         db518_arrays = _inspect_npz(upstream_raw["db518_result"])
         cache_key = "layer1_index_cache_owners_bfloat16_bits"

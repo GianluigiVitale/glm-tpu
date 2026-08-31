@@ -30,7 +30,7 @@ from glm_tpu.greenfield.gate_d_precompile_admission import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CURRENT_CONTRACT = REPO_ROOT / "configs/greenfield-gate-d-precompile-admission-v2.json"
-CURRENT_CONTRACT_SHA256 = "ae00f0add19d4dd7a6d2c464067bf9c0d22448c94f126df8c6466ead23a47f5d"
+CURRENT_CONTRACT_SHA256 = "228bbfe697b269678d3fc1c4762ce3024dfe78e8d6d3a8210e98493352eee4ea"
 
 
 def _sha(path: Path) -> str:
@@ -1804,9 +1804,31 @@ def test_real_capsule_tensor_receipts_bind_manifest_header_and_payload(
         "_EXPECTED_CAPSULE_UPSTREAM_INPUTS",
         {"runtime_manifest": (str(manifest_path), sha256(manifest_raw).hexdigest())},
     )
+    monkeypatch.setattr(
+        admission_module, "_EXPECTED_CAPSULE_RUNTIME_DATA_ROOT", tmp_path
+    )
+    runtime_paths = tuple(tmp_path / f"owner-{slot}.safetensors" for slot in (0, 1))
+    with runtime_paths[0].open("rb") as stream:
+        metadata = os.fstat(stream.fileno())
+        descriptor_fields = dict(
+            line.split(":", 1)
+            for line in Path(f"/proc/self/fdinfo/{stream.fileno()}")
+            .read_text()
+            .splitlines()
+            if ":" in line
+        )
+    runtime_mount_authority = {
+        "major": os.major(metadata.st_dev),
+        "minor": os.minor(metadata.st_dev),
+        "mount_id": int(descriptor_fields["mnt_id"].strip()),
+    }
     observed_receipts, observed_inputs = (
         admission_module._verify_capsule_tensor_receipts(
-            receipts, real_source=True, runtime_manifest_raw=manifest_raw
+            receipts,
+            real_source=True,
+            runtime_manifest_raw=manifest_raw,
+            runtime_paths=runtime_paths,
+            runtime_mount_authority=runtime_mount_authority,
         )
     )
     assert observed_receipts == receipts
@@ -1823,7 +1845,11 @@ def test_real_capsule_tensor_receipts_bind_manifest_header_and_payload(
     hostile[0]["offset"] += 1
     with pytest.raises(BenchmarkValidationError, match="tensor receipt drifted"):
         admission_module._verify_capsule_tensor_receipts(
-            hostile, real_source=True, runtime_manifest_raw=manifest_raw
+            hostile,
+            real_source=True,
+            runtime_manifest_raw=manifest_raw,
+            runtime_paths=runtime_paths,
+            runtime_mount_authority=runtime_mount_authority,
         )
 
 
@@ -1850,7 +1876,16 @@ def test_capsule_producer_uses_pre_execution_snapshots_and_retained_fds() -> Non
         and isinstance(node.func, ast.Name)
         and node.func.id == "_execute"
     ]
+    mount_lines = [
+        node.lineno
+        for node in ast.walk(main)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_verify_runtime_data_mount"
+    ]
     assert snapshot_lines and execute_lines
+    assert mount_lines
+    assert min(mount_lines) < min(execute_lines)
     assert max(snapshot_lines) < min(execute_lines)
     input_source = ast.unparse(functions["_input_values"])
     runtime_source = ast.unparse(functions["_read_runtime"])
@@ -1861,6 +1896,185 @@ def test_capsule_producer_uses_pre_execution_snapshots_and_retained_fds() -> Non
     assert ".open(" not in runtime_source
     assert "_revalidate_snapshot" in functions
     assert "_revalidate_tensor_receipts" in functions
+
+    admission_tree = ast.parse(
+        (REPO_ROOT / "glm_tpu/greenfield/gate_d_precompile_admission.py").read_text()
+    )
+    execution_authority = next(
+        item
+        for item in admission_tree.body
+        if isinstance(item, ast.FunctionDef)
+        and item.name == "_verify_capsule_execution_authority"
+    )
+    admission_mount_lines = [
+        node.lineno
+        for node in ast.walk(execution_authority)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_verify_capsule_runtime_data_mount"
+    ]
+    receipt_lines = [
+        node.lineno
+        for node in ast.walk(execution_authority)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_verify_capsule_tensor_receipts"
+    ]
+    assert len(admission_mount_lines) == 2
+    assert len(receipt_lines) == 1
+    assert min(admission_mount_lines) < receipt_lines[0] < max(admission_mount_lines)
+
+
+_EXACT_RUNTIME_MOUNTINFO = (
+    b"535 516 0:4 mnt:[4026532862] /run/snapd/ns/lxd.mnt rw - nsfs nsfs rw\n"
+    b"44 73 0:43 / /home/gianl/gcs-models ro,nosuid,nodev,relatime shared:49 - "
+    b"fuse.gcsfuse driftbench-dsv4-uc "
+    b"ro,user_id=2001,group_id=2001,default_permissions\n"
+)
+_RUNTIME_DATA_ROOT = Path(
+    "/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/"
+    "greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z"
+)
+_RUNTIME_PAYLOAD_PATHS = tuple(
+    _RUNTIME_DATA_ROOT
+    / "base_decoder_runtime_feature"
+    / "stage_00"
+    / f"device_slot_{slot:02d}.safetensors"
+    for slot in (0, 1)
+)
+
+
+@pytest.mark.parametrize(
+    "hostile_mountinfo",
+    (
+        _EXACT_RUNTIME_MOUNTINFO.replace(b"ro,nosuid", b"rw,nosuid", 1),
+        _EXACT_RUNTIME_MOUNTINFO.replace(
+            b"driftbench-dsv4-uc", b"driftbench-storage"
+        ),
+        _EXACT_RUNTIME_MOUNTINFO.replace(
+            b"/home/gianl/gcs-models", b"/home/gianl/gcs-models-other"
+        ),
+        _EXACT_RUNTIME_MOUNTINFO + _EXACT_RUNTIME_MOUNTINFO,
+    ),
+)
+def test_capsule_runtime_data_mount_authority_fails_closed(
+    hostile_mountinfo: bytes,
+) -> None:
+    producer = runpy.run_path(
+        REPO_ROOT / "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py",
+        run_name="gate_d_capsule_mount_test",
+    )
+    assert producer["RUNTIME_AUTHORITY_ROOT"] != producer["RUNTIME_DATA_ROOT"]
+    expected = {
+        "major": 0,
+        "minor": 43,
+        "mount_id": 44,
+        "raw_record": _EXACT_RUNTIME_MOUNTINFO.splitlines()[1],
+    }
+    assert producer["_verify_runtime_data_mount"](
+        _EXACT_RUNTIME_MOUNTINFO, _RUNTIME_PAYLOAD_PATHS
+    ) == expected
+    assert admission_module._verify_capsule_runtime_data_mount(
+        _EXACT_RUNTIME_MOUNTINFO, _RUNTIME_PAYLOAD_PATHS
+    ) == expected
+    with pytest.raises(RuntimeError, match="runtime data mount authority"):
+        producer["_verify_runtime_data_mount"](
+            hostile_mountinfo, _RUNTIME_PAYLOAD_PATHS
+        )
+    with pytest.raises(
+        BenchmarkValidationError, match="runtime data mount authority"
+    ):
+        admission_module._verify_capsule_runtime_data_mount(
+            hostile_mountinfo, _RUNTIME_PAYLOAD_PATHS
+        )
+
+
+def test_capsule_runtime_payload_nested_mount_fails_closed() -> None:
+    nested = (
+        b"99 44 0:99 / "
+        + str(_RUNTIME_DATA_ROOT / "base_decoder_runtime_feature").encode("ascii")
+        + b" rw,nosuid,nodev,relatime - tmpfs hostile rw\n"
+    )
+    hostile_mountinfo = _EXACT_RUNTIME_MOUNTINFO + nested
+    producer = runpy.run_path(
+        REPO_ROOT / "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py",
+        run_name="gate_d_capsule_nested_mount_test",
+    )
+    with pytest.raises(RuntimeError, match="covered by a nested mount"):
+        producer["_verify_runtime_data_mount"](
+            hostile_mountinfo, _RUNTIME_PAYLOAD_PATHS
+        )
+    with pytest.raises(BenchmarkValidationError, match="covered by a nested mount"):
+        admission_module._verify_capsule_runtime_data_mount(
+            hostile_mountinfo, _RUNTIME_PAYLOAD_PATHS
+        )
+
+
+def test_capsule_payload_descriptor_binds_mount_identity(tmp_path: Path) -> None:
+    payload = tmp_path / "payload"
+    payload.write_bytes(b"payload")
+    producer = runpy.run_path(
+        REPO_ROOT / "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py",
+        run_name="gate_d_capsule_descriptor_mount_test",
+    )
+    with payload.open("rb") as stream:
+        metadata = os.fstat(stream.fileno())
+        fields = dict(
+            line.split(":", 1)
+            for line in Path(f"/proc/self/fdinfo/{stream.fileno()}")
+            .read_text()
+            .splitlines()
+            if ":" in line
+        )
+        authority = {
+            "major": os.major(metadata.st_dev),
+            "minor": os.minor(metadata.st_dev),
+            "mount_id": int(fields["mnt_id"].strip()),
+        }
+        producer["_verify_payload_descriptor_mount"](
+            stream.fileno(), metadata, authority
+        )
+        admission_module._verify_capsule_payload_descriptor_mount(
+            stream.fileno(), metadata, authority
+        )
+        for key in ("mount_id", "major", "minor"):
+            hostile = dict(authority)
+            hostile[key] += 1
+            with pytest.raises(RuntimeError, match="escaped mount authority"):
+                producer["_verify_payload_descriptor_mount"](
+                    stream.fileno(), metadata, hostile
+                )
+            with pytest.raises(
+                BenchmarkValidationError, match="escaped mount authority"
+            ):
+                admission_module._verify_capsule_payload_descriptor_mount(
+                    stream.fileno(), metadata, hostile
+                )
+
+
+def test_capsule_runtime_data_root_cannot_escape_mount(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    producer = runpy.run_path(
+        REPO_ROOT / "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py",
+        run_name="gate_d_capsule_mount_escape_test",
+    )
+    producer["_verify_runtime_data_mount"].__globals__["RUNTIME_DATA_ROOT"] = Path(
+        "/tmp/hostile-runtime-root"
+    )
+    with pytest.raises(RuntimeError, match="data root escaped"):
+        producer["_verify_runtime_data_mount"](
+            _EXACT_RUNTIME_MOUNTINFO, _RUNTIME_PAYLOAD_PATHS
+        )
+    monkeypatch.setattr(
+        admission_module,
+        "_EXPECTED_CAPSULE_RUNTIME_DATA_ROOT",
+        Path("/tmp/hostile-runtime-root"),
+    )
+    with pytest.raises(BenchmarkValidationError, match="data root escaped"):
+        admission_module._verify_capsule_runtime_data_mount(
+            _EXACT_RUNTIME_MOUNTINFO, _RUNTIME_PAYLOAD_PATHS
+        )
 
 
 @pytest.mark.parametrize(

@@ -1,0 +1,54 @@
+{
+  "artifact_kind": "gate_d_tuple_capsule_runtime_data_root_failure",
+  "classification": "PRE_EXECUTION_RUNTIME_DATA_ROOT_FAILURE;OUTPUT_ABSENT;ONE_SHOT_SPENT;NO_RETRY_AUTHORITY",
+  "claim_scope": "One reviewed forced-two-CPU producer process start failed after sealed JAX imports but before _execute, array execution, output-directory creation, archive, admission, cloud/TPU work or Gate-D evidence.",
+  "code_pin": "3a60012132a16f5e6b9b642842c2382737713465",
+  "error": {
+    "exception": "FileNotFoundError",
+    "message": "[Errno 2] No such file or directory: 'base_decoder_runtime_feature'",
+    "source_function": "_open_regular_componentwise",
+    "source_line": 380
+  },
+  "execution": {
+    "array_or_model_executed": false,
+    "cloud_workflow": false,
+    "jax_imported": true,
+    "output_created": false,
+    "producer_process_starts": 1,
+    "tpus_used": 0
+  },
+  "invocation": "/usr/bin/flock -n /home/gianl/.gate-d-tuple-capsule-one-shot.lock /usr/bin/env -i LANG=C LC_ALL=C PATH=/usr/bin:/bin /opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12 -I -S /opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_capsule.py --output /home/gianl/gate-d-runs/greenfield_gate_d_tuple_auxiliary_capsule_20260831T022000Z --expected-code-pin 3a60012132a16f5e6b9b642842c2382737713465 --expected-producer-sha256 d3082c2ef398d406031ddbf94143b4aa0e5eb712324af49bc1b85fc250ef869b",
+  "observed_at_utc": "2026-08-31T02:19:47Z",
+  "output_path": "/home/gianl/gate-d-runs/greenfield_gate_d_tuple_auxiliary_capsule_20260831T022000Z",
+  "producer": {
+    "installed_path": "/opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_capsule.py",
+    "mode": "0555",
+    "sha256": "d3082c2ef398d406031ddbf94143b4aa0e5eb712324af49bc1b85fc250ef869b",
+    "uid_gid": "root:root"
+  },
+  "review": {
+    "fable_max": "usage-blocked after local diagnosis; supplied no opinion",
+    "invocation_scope": "APPROVE INSTALL + EXACTLY ONE NEW-TAG INVOCATION; no retry"
+  },
+  "root_cause": {
+    "authority_root": "/home/gianl/glm-run/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/final",
+    "data_mount": {
+      "filesystem": "fuse.gcsfuse",
+      "mount_options": "ro,nosuid,nodev",
+      "mount_point": "/home/gianl/gcs-models",
+      "source": "driftbench-dsv4-uc"
+    },
+    "data_root": "/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z",
+    "manifest_sha256_both_roots": "e13ccefb7341756cd68d85e51209eaa8516ea506eac7ace3b4fd0a1d56828032",
+    "owner_payload_bytes_each": 27176812872,
+    "owner_payloads": [
+      "base_decoder_runtime_feature/stage_00/device_slot_00.safetensors",
+      "base_decoder_runtime_feature/stage_00/device_slot_01.safetensors"
+    ],
+    "producer_assumption": "Resolve manifest destination_filename entries beneath the local manifest/SUCCESS authority directory.",
+    "resolution": "Keep manifest and SUCCESS snapshots on their exact local authority paths; derive canonical tensor paths beneath the exact read-only same-region data root; reject any longer-covering nested mount; bind every opened payload descriptor to the approved mount ID and device major/minor; and revalidate the same gcsfuse source, options and mount identity before publication in both producer and admission.",
+    "success_sha256_both_roots": "dbef7e366e2fdf2a4815b0b58d1645667580d55fc5926133d48c838929f7ee7e"
+  },
+  "schema_version": 1,
+  "tpu_successor_authorized": false
+}

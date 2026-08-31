@@ -2061,3 +2061,28 @@ remains open and no TPU successor is authorized.
 - Admission coverage passes 124/124 and adjacent Gate-D coverage passes 69/69. Fable-max was
   usage-blocked; same-scope Sol approved persistence only with no P0--P2. No reinstall/retry,
   archive/admission, compile, cloud/TPU or Gate-D successor is authorized by this correction.
+
+## Second coherent-capsule start: pre-execution runtime-data-root failure
+
+- Persisted pin `3a60012` and corrected installed producer `d3082c2e...f869b` were independently
+  reviewed for one fresh-tag process start. The exact tag was
+  `greenfield_gate_d_tuple_auxiliary_capsule_20260831T022000Z`.
+- The process imported sealed JAX, then failed before `_execute`, numerical arrays, output creation,
+  model, cloud or TPU work. The local authority root has the exact manifest and SUCCESS but no
+  payload tree; its destination filenames resolve under the exact read-only same-region gcsfuse
+  root instead. Both stage-zero payload files are present there at 27,176,812,872 bytes each. The
+  burned output remains absent. Failure artifact
+  `gate-d-tuple-capsule-runtime-data-root-failure.json` is `651cc1ba...c65cee`.
+- The source correction independently binds the local manifest/SUCCESS authority and mounted
+  payload root. Producer and admission require exactly one `/home/gianl/gcs-models` mount with
+  `fuse.gcsfuse`, source `driftbench-dsv4-uc`, root `/`, and `ro,nosuid,nodev`; the exact mount
+  record must survive payload verification unchanged. The longest covering mount for the data root
+  and both owner payloads must be that authority; every opened descriptor must match its mount ID
+  and device major/minor. Writable, wrong-source, wrong-path, duplicate and nested mount records
+  fail closed.
+- Corrected producer/blob are `a81fd59e...1794a`/`d82cfff6...e5b1`; admission core/contract/test
+  SHAs are `a7818911...d4ce`, `228bbfe6...e4ea` and `41c6d1df...4069`. Full admission passes
+  131/131 plus 69/69 adjacent Gate-D tests. A live descriptor-only preflight bound both
+  27,176,812,872-byte payloads to mount ID 73 and device 0:43 without reading tensor payloads.
+  No install, retry, archive/admission, compile,
+  cloud/TPU or Gate-D authorization follows from this source correction.

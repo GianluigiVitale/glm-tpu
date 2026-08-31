@@ -8490,3 +8490,33 @@ Sol approved the exact correction for persistence with no P0--P2 and explicitly 
 retry, archive/admission, cloud/TPU or Gate-D authorization. Exact next is commit/push/same-region
 mirror, then a separately reviewed corrected producer installation and one new output tag. Never
 retry the installed old producer or burned tag.
+
+## 2026-08-31 second tuple-capsule start failed before replay; data-root correction source only
+
+After durable pin `3a60012`, exact corrected producer `d3082c2e...f869b` was installed root:root
+0555 without changing the old immutable copy. A separate Sol review approved one fresh-tag
+forced-two-CPU process start. Tag
+`greenfield_gate_d_tuple_auxiliary_capsule_20260831T022000Z` failed after sealed JAX imports but
+before `_execute`, arrays, output creation, model, cloud or TPU work. The burned path remains
+absent and has no retry authority.
+
+Root cause is exact: local runtime authority contains the byte-identical manifest and SUCCESS but
+not `base_decoder_runtime_feature/`; the two 27,176,812,872-byte stage-zero payloads live beneath
+the read-only `driftbench-dsv4-uc` gcsfuse root. Canonical failure artifact
+`docs/artifacts/gate-d-tuple-capsule-runtime-data-root-failure.json` is `651cc1ba...c65cee`.
+
+The source correction separates local `RUNTIME_AUTHORITY_ROOT` from mounted `RUNTIME_DATA_ROOT`.
+Both producer and independent admission require exactly one `/home/gianl/gcs-models`
+`fuse.gcsfuse` mount sourced from `driftbench-dsv4-uc`, rooted at `/`, with
+`ro,nosuid,nodev`; they reject any longer-covering nested mount, bind every opened payload FD to
+the approved mount ID and device major/minor, and verify unchanged mount authority after reads.
+Wrong bucket, writable, wrong path, duplicate and nested records fail closed. A live descriptor-only
+preflight bound both 27,176,812,872-byte payloads to mount ID 73/device 0:43 without reading tensor
+payloads. Corrected producer/blob are `a81fd59e...1794a`/`d82cfff6...e5b1`; core/contract/test SHAs
+are `a7818911...d4ce`, `228bbfe6...e4ea` and `41c6d1df...4069`; full admission passes 131/131 plus
+69/69 adjacent Gate-D tests.
+
+Fable-max diagnosis for the failure was usage-blocked. Exact next is same-scope adversarial source
+review, then commit/push/US-CENTRAL2 mirror. Only after persistence may a separate review consider
+installing producer `a81fd59e...1794a` and exactly one new output tag. Never reuse `...020400Z` or
+`...022000Z`; no compile, cloud/TPU or Gate-D successor is authorized.

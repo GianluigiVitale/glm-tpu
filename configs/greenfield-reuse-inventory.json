@@ -634,21 +634,22 @@
       "id": "gate-d-tuple-auxiliary-coherent-capsule-source",
       "category": "Gate-D bounded replay source and admission trust boundary",
       "source_repo": "glm-tpu greenfield",
-      "source_pin": "corrected producer d3082c2ef398d406031ddbf94143b4aa0e5eb712324af49bc1b85fc250ef869b / spent installed producer 2cbf8ed9d0ca9387187b790d7f81bb95b46637fa8c5b53f62b5fa26f2d08268d / replay 9b9d11d0f312a173a8014a81f9b8fd957b9eefe2148bf327da0d57d82fed03b4 / replay-visible 139-blob manifest f3683029a4c3eaa12e0673c0e1d84ff13ff2c42fb7a475323e8d099ac156c0b0 / admission core 49d0d8682bf7a60c45e9bdab6a380dc5390637212591551bb71d191c793f6713 / contract ae00f0add19d4dd7a6d2c464067bf9c0d22448c94f126df8c6466ead23a47f5d / pre-execution failure 382ff46a8026ea7f11af5755cbea973da6412badeff56c40b15d6f758ace31e0",
+      "source_pin": "corrected producer a81fd59ea2b32f27a102666e24a35827b251560d4df52dc04276325aafa1794a / producer blob d82cfff69dc5a167a894716182fb0e95c807e5b1 / spent installed producers d3082c2ef398d406031ddbf94143b4aa0e5eb712324af49bc1b85fc250ef869b and 2cbf8ed9d0ca9387187b790d7f81bb95b46637fa8c5b53f62b5fa26f2d08268d / replay 9b9d11d0f312a173a8014a81f9b8fd957b9eefe2148bf327da0d57d82fed03b4 / replay-visible 139-blob manifest f3683029a4c3eaa12e0673c0e1d84ff13ff2c42fb7a475323e8d099ac156c0b0 / admission core a78189110bb4734d44240268b4096df220567e4b6deed80a80654da7281dd4ce / contract 228bbfe697b269678d3fc1c4762ce3024dfe78e8d6d3a8210e98493352eee4ea / pre-execution failures 382ff46a8026ea7f11af5755cbea973da6412badeff56c40b15d6f758ace31e0 and 651cc1ba908580886c7daffaf50362dc8e3c225f1049590f16e46f5d60c65cee",
       "source_paths": [
         "glm_tpu/greenfield/benchmarking/gate_d_tuple_capsule.py",
         "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py",
         "glm_tpu/greenfield/gate_d_precompile_admission.py",
         "configs/greenfield-gate-d-precompile-admission-v2.json",
         "tests/greenfield/validation/test_gate_d_precompile_admission.py",
-        "docs/artifacts/gate-d-tuple-capsule-runtime-success-format-failure.json"
+        "docs/artifacts/gate-d-tuple-capsule-runtime-success-format-failure.json",
+        "docs/artifacts/gate-d-tuple-capsule-runtime-data-root-failure.json"
       ],
       "disposition": "research_candidate",
       "greenfield_consumers": [
         "future separately reviewed two-CPU candidate-coherent capsule replay and offline admission"
       ],
       "gate": "D precompile admission",
-      "reason": "Source-only, default-off bounded replay. It snapshots eight exact upstreams before execution, binds 22 stage-zero runtime tensor slices through retained-fd identities, independently derives 11 runtime-backed inputs and DB518 cache, checks explicit two-owner evidence and nonfinite values, and treats local SUCCESS-last publication as provisional. Admission independently pins the exact producer/replay blobs and the full replay-visible committed source manifest, closing outer-authority executable substitution. The first reviewed start at e82fe83 imported sealed JAX then failed before _execute/output because the pinned 88-byte sha256sum SUCCESS was incorrectly parsed as JSON; that one-shot and tag are burned. Corrected producer d3082c2e...f869b binds exact bytes and hostile formats. Offline validation passes 124/124 plus 69/69 adjacent tests. Same-scope Sol approves correction persistence only with no P0-P2; no reinstall, retry, archive/admission, cloud/TPU or Gate-D authorization exists."
+      "reason": "Source-only, default-off bounded replay. It snapshots eight exact upstreams before execution, binds 22 stage-zero runtime tensor slices through retained-fd identities, independently derives 11 runtime-backed inputs and DB518 cache, checks explicit two-owner evidence and nonfinite values, and treats local SUCCESS-last publication as provisional. Admission independently pins the exact producer/replay blobs and the full replay-visible committed source manifest. Two reviewed starts are burned: e82fe83 exposed the sha256sum SUCCESS format, and 3a60012 exposed that local manifest authority and mounted payload residency are distinct. The correction independently binds the local authority root and exact read-only same-region driftbench-dsv4-uc gcsfuse data root before and after payload access, rejects longer-covering nested mounts, and binds opened payload descriptors to mount ID and device. Full admission passes 131/131 plus 69/69 adjacent Gate-D tests. No install, retry, archive/admission, cloud/TPU or Gate-D authorization exists."
     },
     {
       "id": "legacy-execution-stack",

@@ -19,7 +19,7 @@ import importlib.util
 from io import BytesIO
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import stat
 import struct
 import subprocess
@@ -38,10 +38,16 @@ PRODUCER_SOURCE = (
 SITE_ROOT = Path("/opt/glm-tpu/gate-d-jax-site-55233c63939e")
 PYTHON_RUNTIME_ROOT = Path("/opt/glm-tpu/gate-d-python-3.12.13-021044895e95")
 PYTHON = PYTHON_RUNTIME_ROOT / "bin/python3.12"
-RUNTIME_ROOT = Path(
+RUNTIME_AUTHORITY_ROOT = Path(
     "/home/gianl/glm-run/"
     "greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/final"
 )
+RUNTIME_DATA_ROOT = Path(
+    "/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/"
+    "greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z"
+)
+RUNTIME_DATA_MOUNT_POINT = Path("/home/gianl/gcs-models")
+RUNTIME_DATA_MOUNT_SOURCE = "driftbench-dsv4-uc"
 DB518_RESULT = Path(
     "/home/gianl/glm-run/"
     "greenfield_pp16_feature2_layer0_db518_numerical_20260829T115022665987633Z/"
@@ -297,6 +303,151 @@ def _beneath(path: Path, root: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _mountinfo_path(raw: str, *, require_absolute: bool = True) -> Path:
+    value = raw
+    for encoded, decoded in (
+        ("\\040", " "),
+        ("\\011", "\t"),
+        ("\\012", "\n"),
+        ("\\134", "\\"),
+    ):
+        value = value.replace(encoded, decoded)
+    if "\x00" in value or (require_absolute and not value.startswith("/")):
+        raise RuntimeError("runtime mountinfo path is invalid")
+    return Path(value)
+
+
+def _verify_runtime_data_mount(
+    mountinfo_raw: bytes, payload_paths: tuple[Path, ...]
+) -> dict[str, Any]:
+    normalized_data_root = Path(os.path.abspath(RUNTIME_DATA_ROOT))
+    normalized_mount_point = Path(os.path.abspath(RUNTIME_DATA_MOUNT_POINT))
+    if normalized_mount_point not in normalized_data_root.parents:
+        raise RuntimeError("runtime data root escaped its mount authority")
+    records = []
+    for raw_line in mountinfo_raw.splitlines():
+        try:
+            left, right = raw_line.decode("utf-8", errors="strict").split(" - ", 1)
+        except (UnicodeDecodeError, ValueError) as error:
+            raise RuntimeError("runtime mountinfo is invalid") from error
+        left_fields = left.split()
+        right_fields = right.split()
+        if len(left_fields) < 6 or len(right_fields) < 3:
+            raise RuntimeError("runtime mountinfo record is invalid")
+        try:
+            mount_id = int(left_fields[0])
+            major, minor = (int(item) for item in left_fields[2].split(":", 1))
+            mount_root = _mountinfo_path(
+                left_fields[3], require_absolute=False
+            )
+            mount_point = _mountinfo_path(left_fields[4])
+        except (TypeError, ValueError) as error:
+            raise RuntimeError("runtime mountinfo identity is invalid") from error
+        records.append(
+            {
+                "major": major,
+                "minor": minor,
+                "mount_id": mount_id,
+                "mount_options": set(left_fields[5].split(",")),
+                "mount_point": mount_point,
+                "mount_root": mount_root,
+                "raw_record": raw_line,
+                "source": right_fields[1],
+                "super_options": set(right_fields[2].split(",")),
+                "type": right_fields[0],
+            }
+        )
+    matches = [
+        record for record in records if record["mount_point"] == normalized_mount_point
+    ]
+    if len(matches) != 1:
+        raise RuntimeError("runtime data mount authority is absent or duplicated")
+    authority = matches[0]
+    if (
+        authority["mount_root"] != Path("/")
+        or not {"ro", "nosuid", "nodev"} <= authority["mount_options"]
+        or authority["type"] != "fuse.gcsfuse"
+        or authority["source"] != RUNTIME_DATA_MOUNT_SOURCE
+        or "ro" not in authority["super_options"]
+    ):
+        raise RuntimeError("runtime data mount authority drifted")
+    for path in (normalized_data_root, *payload_paths):
+        normalized = Path(os.path.abspath(path))
+        if normalized != normalized_data_root and normalized_data_root not in normalized.parents:
+            raise RuntimeError("runtime payload escaped its data root")
+        covering = [
+            record
+            for record in records
+            if normalized == record["mount_point"]
+            or record["mount_point"] in normalized.parents
+        ]
+        if not covering:
+            raise RuntimeError("runtime payload has no covering mount")
+        longest = max(len(record["mount_point"].parts) for record in covering)
+        visible = [
+            record
+            for record in covering
+            if len(record["mount_point"].parts) == longest
+        ]
+        if len(visible) != 1 or visible[0]["mount_id"] != authority["mount_id"]:
+            raise RuntimeError("runtime payload is covered by a nested mount")
+    return {
+        "major": authority["major"],
+        "minor": authority["minor"],
+        "mount_id": authority["mount_id"],
+        "raw_record": authority["raw_record"],
+    }
+
+
+def _verify_payload_descriptor_mount(
+    descriptor: int, metadata: os.stat_result, authority: dict[str, Any]
+) -> None:
+    try:
+        fields = {}
+        for line in Path(f"/proc/self/fdinfo/{descriptor}").read_text().splitlines():
+            if ":" in line:
+                key, value = line.split(":", 1)
+                fields[key] = value.strip()
+        mount_id = int(fields["mnt_id"])
+    except (KeyError, OSError, ValueError) as error:
+        raise RuntimeError("runtime payload descriptor mount is unavailable") from error
+    if (
+        mount_id != authority["mount_id"]
+        or os.major(metadata.st_dev) != authority["major"]
+        or os.minor(metadata.st_dev) != authority["minor"]
+    ):
+        raise RuntimeError("runtime payload descriptor escaped mount authority")
+
+
+def _runtime_owner_paths(manifest_raw: bytes, success_raw: bytes) -> tuple[Path, ...]:
+    manifest = json.loads(manifest_raw)
+    _verify_runtime_success(manifest, success_raw)
+    records = [
+        record
+        for record in manifest.get("files", ())
+        if record.get("stage_id") == 0 and record.get("device_slot") in (0, 1)
+    ]
+    if len(records) != 2 or {int(record["device_slot"]) for record in records} != {
+        0,
+        1,
+    }:
+        raise RuntimeError("runtime lacks exact stage-zero LP2 owners")
+    paths = []
+    for record in sorted(records, key=lambda item: int(item["device_slot"])):
+        raw = record.get("destination_filename")
+        if not isinstance(raw, str):
+            raise RuntimeError("runtime destination filename is invalid")
+        relative = PurePosixPath(raw)
+        if (
+            relative.is_absolute()
+            or relative.as_posix() != raw
+            or any(part in ("", ".", "..") for part in relative.parts)
+        ):
+            raise RuntimeError("runtime destination filename escaped its data root")
+        paths.append(RUNTIME_DATA_ROOT.joinpath(*relative.parts))
+    return tuple(paths)
 
 
 def _immutable_file_record(path: Path) -> dict[str, Any]:
@@ -582,6 +733,8 @@ def _read_runtime(
     ml_dtypes: Any,
     manifest_raw: bytes,
     success_raw: bytes,
+    runtime_paths: tuple[Path, ...],
+    mount_authority: dict[str, Any],
 ) -> tuple[
     list[dict[str, Any]],
     list[dict[str, Any]],
@@ -606,10 +759,11 @@ def _read_runtime(
     owner_identities: dict[int, tuple[int, int]] = {}
     for slot in (0, 1):
         record = records[slot]
-        path = RUNTIME_ROOT / str(record["destination_filename"])
+        path = runtime_paths[slot]
         descriptor, metadata = _open_regular_componentwise(
             path, f"runtime owner {slot}"
         )
+        _verify_payload_descriptor_mount(descriptor, metadata, mount_authority)
         owner_identities[slot] = (metadata.st_dev, metadata.st_ino)
         try:
             if metadata.st_size != int(record["file_bytes"]):
@@ -675,7 +829,9 @@ def _read_runtime(
 
 
 def _revalidate_tensor_receipts(
-    receipts: list[dict[str, Any]], owner_identities: dict[int, tuple[int, int]]
+    receipts: list[dict[str, Any]],
+    owner_identities: dict[int, tuple[int, int]],
+    mount_authority: dict[str, Any],
 ) -> None:
     for receipt in receipts:
         path = Path(receipt["file_path"])
@@ -683,6 +839,7 @@ def _revalidate_tensor_receipts(
             path, f"runtime tensor {receipt['name']}"
         )
         try:
+            _verify_payload_descriptor_mount(descriptor, metadata, mount_authority)
             payload = os.pread(descriptor, receipt["byte_count"], receipt["offset"])
         finally:
             os.close(descriptor)
@@ -1016,10 +1173,13 @@ def main() -> int:
         "db550_boundary": (DB550_BOUNDARY, DB550_BOUNDARY_SHA256),
         "plan_authority": (PLAN_AUTHORITY, PLAN_AUTHORITY_FILE_SHA256),
         "runtime_manifest": (
-            RUNTIME_ROOT / "runtime_manifest.json",
+            RUNTIME_AUTHORITY_ROOT / "runtime_manifest.json",
             RUNTIME_MANIFEST_FILE_SHA256,
         ),
-        "runtime_success": (RUNTIME_ROOT / "SUCCESS", RUNTIME_SUCCESS_SHA256),
+        "runtime_success": (
+            RUNTIME_AUTHORITY_ROOT / "SUCCESS",
+            RUNTIME_SUCCESS_SHA256,
+        ),
         "source_authority": (SOURCE_AUTHORITY, SOURCE_AUTHORITY_FILE_SHA256),
         "stablehlo_authority": (
             STABLEHLO_AUTHORITY,
@@ -1035,6 +1195,13 @@ def main() -> int:
         )
         for name, (path, expected_sha) in snapshot_specs.items()
     }
+    runtime_owner_paths = _runtime_owner_paths(
+        snapshots["runtime_manifest"]["raw"],
+        snapshots["runtime_success"]["raw"],
+    )
+    runtime_mount_authority = _verify_runtime_data_mount(
+        Path("/proc/self/mountinfo").read_bytes(), runtime_owner_paths
+    )
 
     source_archive_fd, source_archive_path, source_snapshot = (
         _sealed_git_source_archive(code_pin)
@@ -1074,6 +1241,8 @@ def main() -> int:
         ml_dtypes,
         snapshots["runtime_manifest"]["raw"],
         snapshots["runtime_success"]["raw"],
+        runtime_owner_paths,
+        runtime_mount_authority,
     )
     inputs = _input_values(np, ml_dtypes, owners, snapshots)
     _require_finite_inputs(np, inputs)
@@ -1241,7 +1410,9 @@ def main() -> int:
             _verify_output_member(output_fd, name, payload)
         for name, snapshot in snapshots.items():
             _revalidate_snapshot(snapshot, f"upstream input {name}")
-        _revalidate_tensor_receipts(tensor_receipts, runtime_owner_identities)
+        _revalidate_tensor_receipts(
+            tensor_receipts, runtime_owner_identities, runtime_mount_authority
+        )
         if (
             _git("rev-parse", "HEAD") != code_pin
             or _git("status", "--porcelain")
@@ -1249,6 +1420,10 @@ def main() -> int:
             or _file_sha256(PRODUCER_SOURCE) != args.expected_producer_sha256
             or _loaded_dependency_records(producer, source_archive_path)
             != loaded_dependencies
+            or _verify_runtime_data_mount(
+                Path("/proc/self/mountinfo").read_bytes(), runtime_owner_paths
+            )
+            != runtime_mount_authority
         ):
             raise RuntimeError("capsule execution identity changed before publication")
         _verify_output_identity(

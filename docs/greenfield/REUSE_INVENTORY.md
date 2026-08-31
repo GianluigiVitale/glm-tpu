@@ -929,3 +929,18 @@ negative evidence. Corrected producer `d3082c2e...f869b` now binds the exact lin
 spacing/tab/hash/suffix drift; admission repins its exact object. Core/contract/test SHAs are
 `49d0d868...f6713`, `ae00f0ad...47f5d` and `e6d63e08...3ebd7`; offline coverage is 124/124 plus
 69/69 adjacent. Persistence approval is not retry authorization.
+
+The separately reviewed corrected start at persisted pin `3a60012` spent tag
+`greenfield_gate_d_tuple_auxiliary_capsule_20260831T022000Z` before `_execute`: the manifest's
+destination filenames were incorrectly resolved beneath the local manifest/SUCCESS authority
+directory, while the exact 27,176,812,872-byte owner payloads reside beneath the read-only
+`driftbench-dsv4-uc` gcsfuse mount. The output remains absent. Preserve
+`docs/artifacts/gate-d-tuple-capsule-runtime-data-root-failure.json` (`651cc1ba...c65cee`). The
+source correction separates the local authority root from the exact mounted data root; producer
+and admission independently require the unique `fuse.gcsfuse` source plus `ro,nosuid,nodev` before
+and after payload access. It rejects any longer-covering nested mount and binds each opened payload
+descriptor to the approved mount ID and device major/minor. Corrected producer/blob are
+`a81fd59e...1794a`/`d82cfff6...e5b1`; core/contract/test SHAs are `a7818911...d4ce`,
+`228bbfe6...e4ea` and `41c6d1df...4069`. Full admission coverage passes 131/131 plus 69/69
+adjacent Gate-D tests. This source batch authorizes no installation, retry, archive/admission,
+compile, cloud/TPU or Gate-D claim.

@@ -544,6 +544,11 @@ WS32 adjudication and speculation.
 - Preserve immutable evidence and tombstones; never silently rewrite a report or DB row.
 - Update this playbook when a failure changes a permanent rule, not for transient status.
 - Put current status and exact next action in `HANDOFF.md`, not here.
+- Treat metadata authority and payload residency as separate identities. A local manifest/SUCCESS
+  copy does not imply its multi-GB destination files are beneath the same directory. Bind the
+  payload root independently and, for mounted object storage, require one exact filesystem/source,
+  read-only mount options, no longer-covering nested mount, opened-descriptor mount-ID/device
+  binding, and unchanged mount authority before and after retained-fd payload reads.
 
 ## 10. Minimal incident packet
 

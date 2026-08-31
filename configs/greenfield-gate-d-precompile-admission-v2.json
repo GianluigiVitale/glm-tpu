@@ -188,7 +188,7 @@
     },
     "core": {
       "path": "../glm_tpu/greenfield/gate_d_precompile_admission.py",
-      "sha256": "49d0d8682bf7a60c45e9bdab6a380dc5390637212591551bb71d191c793f6713"
+      "sha256": "a78189110bb4734d44240268b4096df220567e4b6deed80a80654da7281dd4ce"
     },
     "git": {
       "path": "/usr/bin/git",
