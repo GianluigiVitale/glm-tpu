@@ -8881,3 +8881,25 @@ this correction. Fable remains at its recorded 100% limit and supplied no opinio
 same-scope Sol correction review, then commit/push/locked US-CENTRAL2 mirror. Only a separate
 post-persistence review may authorize the immutable storage-site install and later one fresh-tag
 compile-only start; protected layer-1 numerical execution and exact 8K remain forbidden.
+
+## 2026-08-31 PP16 HLO source persisted; storage site installed only
+
+Sol approved exact staged diff `67229acf...15a96d85` for persistence with no P0--P2. Commit
+`bbe67146ce03daad9c6a1aa1b608434332d1069d` matches origin; the locked mirror reported exact
+`US-CENTRAL2`, and all 11 changed local/object pairs were independently SHA-256 equal under
+`gs://driftbench-dsv4-uc/repos/glm-tpu-topology-rewrite/`.
+
+The separate install-only review first withheld a literal command using bare `sudo`; nothing ran.
+After correction to absolute `/usr/bin/sudo`, Sol approved only the exact immutable provisioning
+command. The existing root-owned provisioner `2b9c8c2b...0594` installed 1,593 files /
+44,929,742 bytes without replacement at
+`/opt/glm-tpu/gate-d-storage-site-d94fd4c3e0ff`. Three independent source trees match complete
+safe-mode tree SHA `d94fd4c3...1b510`; manifest SHA is `67b485a5...6e3a`. The production
+publisher's read-only sealed-runtime validator then accepted its Python SHA/runtime tree, all 47
+dependency roots, manifest and tree. Install artifact is
+`gate-d-compensated-pp16-storage-site-install.json`.
+
+No HLO launcher, JAX/backend/cloud/TPU process, numerical execution or Gate-D successor ran. Exact
+next is adversarial review of one literal fresh-tag compile-only start. Only optimized-HLO
+acquisition and locality/policy adjudication may authorize the later protected layer-1 replay;
+exact 8K remains forbidden.

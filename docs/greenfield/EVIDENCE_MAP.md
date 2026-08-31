@@ -2382,6 +2382,21 @@ remains open and no TPU successor is authorized.
   Only after that HLO passes may a separately reviewed protected layer-1 exact replay run; a full
   exact 8K decoder remains later. Gate D is open.
 
+## Compensated PP16 publisher storage site installed; no HLO start
+
+- Sol approved only the exact absolute `/usr/bin/sudo` immutable-provisioning command after first
+  withholding the bare-`sudo` draft. At clean pushed and byte-mirrored pin `bbe6714`, the reviewed
+  root-owned provisioner `2b9c8c2b...0594` installed the no-replacement target
+  `/opt/glm-tpu/gate-d-storage-site-d94fd4c3e0ff`.
+- Install evidence `gate-d-compensated-pp16-storage-site-install.json` binds 1,593 files /
+  44,929,742 bytes, manifest `67b485a5...6e3a`, complete sealed tree `d94fd4c3...1b510`, three
+  matching source builds and the exact target ownership/mode. The production publisher's own
+  read-only post-install validator accepted the sealed Python runtime, 47 dependency roots,
+  manifest and tree.
+- The install performed no JAX/backend/cloud/TPU work and authorizes no HLO launch, numerical
+  execution, performance claim or Gate-D closure. A fresh, separate process-start review remains
+  mandatory.
+
 ## Bounded PP16 compensated-HLO acquisition source prepared; no process start
 
 - A new TPU-only builder is normalized-AST identical to the admitted sealed CPU replay except for

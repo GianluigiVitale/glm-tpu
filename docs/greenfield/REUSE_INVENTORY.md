@@ -1030,3 +1030,10 @@ The only admissible process entry is a separately reviewed literal absolute `env
 not a pre-start trust boundary. It authenticates and locks one initialization inode as inherited
 dirfd 7; every publisher and compiler write stays bound to it, and both wrapper write modes share a
 serialized preterminal guard.
+
+At pushed/mirrored pin `bbe6714`, a separate install-only review approved the corrected absolute
+`/usr/bin/sudo` provisioning command. The no-replacement target
+`/opt/glm-tpu/gate-d-storage-site-d94fd4c3e0ff` is now root-owned and publisher-validated at tree
+SHA `d94fd4c3...1b510`; `gate-d-compensated-pp16-storage-site-install.json` records the exact
+manifest, provisioner, three matching builds and post-install runtime identities. This installs
+dependencies only and does not authorize the HLO process start or any numerical claim.
