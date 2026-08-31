@@ -8689,3 +8689,26 @@ validator refusal with compact expected/observed mismatch fields. Core/test/cont
 pass 8/8 and the complete compensated subset passes 32/32. Fable remained hard usage-limited/no
 opinion. No real-parser retry is authorized before
 adversarial review, commit/push and locked US-CENTRAL2 mirror.
+
+## 2026-08-31 compensated causal StableHLO admitted; Gate D remains open
+
+After commit `cb71b39e5a1f2c5c36fd74be5c2e62e516b9fb09` was clean, pushed and all eight
+changed files were byte-identical in the locked US-CENTRAL2 mirror, the separately reviewed
+sealed-Python parser run executed exactly once. It used Python 3.12.13 with `-I -S`, contract SHA
+`aeb2f45a...0071`, and wrote fresh append-only report
+`gate-d-precompile-admission-v2-compensated-stablehlo.json`, SHA `973c6f95...b8db`.
+
+The immutable parser accepts compensated causal StableHLO authority `e1b2e410...0185`: accepted
+and candidate primary slices both hash `5037b5a7...5610`; the candidate-only auxiliary slice hashes
+`b0afe414...18ce6` and contains exactly `optimization_barrier`, `add`, `convert`, `convert`,
+`optimization_barrier`, `subtract`. It contains no collectives. The result admits no precompile
+candidate and keeps `GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`. The compensated candidate now fails
+only `MISSING_PINNED_COHERENT_CAPSULE_PRODUCER` and `MISSING_CANDIDATE_COHERENT_CAPSULE`.
+Numerical cancellation and coherent eight-watchpoint replay remain unproven. No JAX import,
+backend/device initialization, compilation, numerical/model/cloud or TPU work occurred. Exact
+next is a separately reviewed source-only design for a candidate-bound coherent-capsule producer;
+this parser success itself authorizes no producer execution or successor work.
+
+Fable 5 Max remains at its recorded hard usage limit and supplied no opinion. The goal-authorized
+existing Sol reviewer approved exact staged evidence diff `005590a5...6bf8` for persistence with no
+P0--P2; its verdict explicitly authorizes no successor work.

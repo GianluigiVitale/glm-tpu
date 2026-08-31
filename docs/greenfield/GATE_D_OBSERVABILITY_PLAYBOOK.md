@@ -170,14 +170,17 @@ Do not weaken v1 or rewrite its historical evidence. The append-only repair now 
   `docs/artifacts/gate-d-precompile-admission-v2-compensated-plan.json`;
 - current compensated StableHLO-source report:
   `docs/artifacts/gate-d-precompile-admission-v2-compensated-stablehlo-source.json`;
+- current compensated causal-StableHLO admission report:
+  `docs/artifacts/gate-d-precompile-admission-v2-compensated-stablehlo.json`;
 - current real-HLO report: `docs/artifacts/gate-d-precompile-admission-v2-stablehlo.json`.
 
 V2 authenticates committed blob/AST identity for concrete or declarative source authority, a
 content-derived plan, structural StableHLO and typed eight-watchpoint capsule invariants. The tuple
 survivor binds concrete commit `c8b2200` and exact sealed PP16 plan/watchpoint authority. The
-compensated survivor binds distinct concrete default-off source at `e16d74f` plus its own
-candidate-bound PP16 plan/watchpoint authority, but has no causal StableHLO, pinned producer or
-coherent capsule authority. Declarative fixtures remain non-admissible.
+compensated survivor binds distinct concrete default-off source at `e16d74f`, its own
+candidate-bound PP16 plan/watchpoint authority and immutable-parser-backed causal StableHLO. It
+still has no pinned coherent-capsule producer or candidate-coherent capsule. Declarative fixtures
+remain non-admissible.
 Its parent process remains
 stdlib-only; HLO fixture validation runs in a SHA-bound offline child using jaxlib MLIR without
 importing `jax`, compiling or initializing a backend. The child uses an exact
@@ -196,17 +199,19 @@ frontier and closed fingerprints rather than resetting history. The current repo
 tuple candidate's concrete source, PP16 plan and exact real causal StableHLO authority. Its capsule
 bindings remain deliberately null because coherent event replay already rejected the tuple;
 reported capsule gaps are schema-state only, not authority for a new capsule or admission rerun.
-The compensated candidate now has a candidate-bound PP16 plan/watchpoint authority and retains
-three gaps: causal StableHLO, pinned producer and coherent capsule. A distinct default-off
-StableHLO producer/parser source contract now exists but has not been installed or run. Its plan binding maps the
+The compensated candidate now has a candidate-bound PP16 plan/watchpoint authority and accepted
+causal StableHLO. It retains exactly two gaps: a pinned coherent-capsule producer and a coherent
+candidate capsule. The distinct default-off StableHLO producer was installed immutably and run
+once with abstract CPU inputs; it performed no executable compilation or numerical/model/TPU
+work. Its plan binding maps the
 source result `restored_input_rms_fp32[2,1,6144]` to
 `layer1.rms_input_fp32.value[6144]`, requiring bitwise owner agreement before prefix `[0,0]`
 selection; future capsule bytes must independently derive from both sealed BF16 operands. V2
 always leaves candidate admission and TPU
 authorization false. Exact module/function metadata and the complete 533-Python/46-native lowering
 dependency manifests are bound by canonical digest/count, not trusted labels. Current
-core/contract/report SHAs are `5403069b...b6e7`, `3f1c817c...55f4` and
-`f495209a...02f1`; compensated certificate and plan-file/content SHAs are
+core/contract/report SHAs are `fa939326...a837`, `aeb2f45a...0071` and
+`973c6f95...b8db`; compensated certificate and plan-file/content SHAs are
 `237095c7...6fb0`, `7d0a5615...dbdf` and `eb2c050b...b6dc`. Historical tuple PP16 plan
 authority remains `98b4fa21...7880`. Current validator SHA is `17fadedf...0c19`;
 historical tuple-report validator SHA remains `4338229a...6b6d`. Installed/source

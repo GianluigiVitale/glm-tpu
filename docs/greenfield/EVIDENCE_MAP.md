@@ -2278,3 +2278,26 @@ remains open and no TPU successor is authorized.
   `fa939326...aa837`, `a11cda4b...077f` and `aeb2f45a...60071`; focused authority/attack checks pass
   8/8 and the compensated subset passes 32/32. No real-parser retry is authorized before separate
   review and persistence.
+
+## Compensated causal-StableHLO admission; capsule frontier remains
+
+- At clean, pushed and byte-mirrored commit `cb71b39e5a1f2c5c36fd74be5c2e62e516b9fb09`, one
+  separately reviewed sealed-Python 3.12.13 `-I -S` admission run consumed exact contract
+  `aeb2f45a...0071`. It created fresh append-only report
+  `docs/artifacts/gate-d-precompile-admission-v2-compensated-stablehlo.json`, SHA
+  `973c6f95...b8db`.
+- Immutable-parser authority `e1b2e410...0185` accepts exact compensated candidate-only slice
+  `b0afe414...18ce6`, with operations `optimization_barrier`, `add`, `convert`, `convert`,
+  `optimization_barrier`, `subtract`. Accepted/candidate primary slices are identical at
+  `5037b5a7...5610`; the candidate slice contains no collectives.
+- Classification remains
+  `NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`. Compensated reasons are
+  now exactly `MISSING_PINNED_COHERENT_CAPSULE_PRODUCER` and
+  `MISSING_CANDIDATE_COHERENT_CAPSULE`. StableHLO graph identity is proven; numerical cancellation
+  and candidate-coherent eight-watchpoint replay are not.
+- The parent admission run imported no JAX and initialized no backend/device; no compilation,
+  numerical/model/cloud or TPU work occurred. This result does not authorize a producer run or
+  successor. Exact next is a separately reviewed source-only coherent-capsule producer design.
+- Fable remained at its recorded hard usage limit/no opinion. The goal-authorized existing Sol
+  reviewer returned `APPROVE PERSISTENCE` for staged evidence diff `005590a5...6bf8`, with no
+  P0--P2 and no successor authorization.
