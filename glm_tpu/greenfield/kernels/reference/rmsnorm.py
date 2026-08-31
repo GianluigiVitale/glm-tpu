@@ -23,6 +23,14 @@ class FusedAddRmsNormAuxiliaryResult(NamedTuple):
     rms_input_fp32: jax.Array
 
 
+class FusedAddRmsNormCompensatedAuxiliaryResult(NamedTuple):
+    """Device-resident compensated value pending frontier cross-binding."""
+
+    output: jax.Array
+    carried_residual: jax.Array
+    restored_rms_input_fp32: jax.Array
+
+
 def rms_norm(
     hidden_states: jax.Array,
     weight: jax.Array,
@@ -161,6 +169,79 @@ def fused_add_rms_norm_with_auxiliary(
         output,
         carried_residual,
         rms_input_fp32,
+    )
+
+
+def fused_add_rms_norm_with_compensated_auxiliary(
+    hidden_states: jax.Array,
+    residual: jax.Array,
+    weight: jax.Array,
+    *,
+    epsilon: float,
+) -> FusedAddRmsNormCompensatedAuxiliaryResult:
+    """Default-off compensated dependency at the fused RMS boundary.
+
+    The accepted primary arithmetic continues to consume ``rms_input_fp32``.
+    Independently, the BF16 recurrent value is widened, its discarded FP32
+    correction is recovered, and the two are recombined behind explicit
+    optimization barriers.  The restored value is returned only as a rooted
+    device auxiliary; it is never substituted into either primary output.
+
+    This source spelling declares a graph identity, not a numerical proof.
+    Candidate-coherent replay must independently prove that the restored value
+    equals the exact FP32 RMS input before any compile or TPU successor exists.
+    """
+
+    if hidden_states.shape != residual.shape:
+        raise ValueError(
+            "fused compensated RMSNorm hidden and residual shapes must match"
+        )
+    if hidden_states.dtype != residual.dtype:
+        raise ValueError(
+            "fused compensated RMSNorm hidden and residual dtypes must match"
+        )
+    if hidden_states.ndim < 1:
+        raise ValueError(
+            "fused compensated RMSNorm inputs must have at least one dimension"
+        )
+    if weight.shape != (hidden_states.shape[-1],):
+        raise ValueError(
+            "fused compensated RMSNorm weight must match the final hidden dimension"
+        )
+    if (
+        not isinstance(epsilon, (int, float))
+        or isinstance(epsilon, bool)
+        or epsilon <= 0
+    ):
+        raise ValueError("fused compensated RMSNorm epsilon must be positive")
+    if not jnp.issubdtype(hidden_states.dtype, jnp.inexact):
+        raise ValueError(
+            "fused compensated RMSNorm activations must have an inexact dtype"
+        )
+    if not jnp.issubdtype(weight.dtype, jnp.inexact):
+        raise ValueError(
+            "fused compensated RMSNorm weight must have an inexact dtype"
+        )
+
+    activation_dtype = hidden_states.dtype
+    rms_input_fp32 = hidden_states.astype(jnp.float32) + residual.astype(
+        jnp.float32
+    )
+    carried_residual = rms_input_fp32.astype(activation_dtype)
+    rounded_fp32 = carried_residual.astype(jnp.float32)
+    correction_fp32 = lax.optimization_barrier(rms_input_fp32 - rounded_fp32)
+    restored_rms_input_fp32 = lax.optimization_barrier(
+        rounded_fp32 + correction_fp32
+    )
+    variance = jnp.mean(lax.square(rms_input_fp32), axis=-1, keepdims=True)
+    normalized = rms_input_fp32 * lax.rsqrt(variance + jnp.float32(epsilon))
+    output = (
+        normalized.astype(weight.dtype) * weight
+    ).astype(activation_dtype)
+    return FusedAddRmsNormCompensatedAuxiliaryResult(
+        output,
+        carried_residual,
+        restored_rms_input_fp32,
     )
 
 

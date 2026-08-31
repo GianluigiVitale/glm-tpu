@@ -21,6 +21,8 @@ from .reference.rmsnorm import (
     fused_add_rms_norm_with_auxiliary,
     rms_norm,
 )
+# Keep the sealed tuple-candidate import statement unchanged for its AST authority.
+from .reference.rmsnorm import fused_add_rms_norm_with_compensated_auxiliary
 from .stage_local import (
     STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
     StageLocalDenseFp8Ingredients,
@@ -145,6 +147,13 @@ class StageLocalSplitLayerFp8AuxiliaryResult(NamedTuple):
 
     result: StageLocalSplitLayerFp8Result
     input_rms_fp32: Any
+
+
+class StageLocalSplitLayerFp8CompensatedAuxiliaryResult(NamedTuple):
+    """Layer result plus reconstructed FP32 value pending equality proof."""
+
+    result: StageLocalSplitLayerFp8Result
+    restored_input_rms_fp32: Any
 
 
 def _empty_dsa_internals(
@@ -603,10 +612,12 @@ def stage_local_transformer_layer_fp8_split_mapped(
     dense_final_layout_convolution: bool = False,
     capture_ingredients: bool = False,
     retain_input_rms_auxiliary: bool = False,
+    retain_input_rms_compensated_auxiliary: bool = False,
 ) -> (
     StageLocalSplitLayerFp8Result
     | StageLocalSplitLayerFp8ObservedResult
     | StageLocalSplitLayerFp8AuxiliaryResult
+    | StageLocalSplitLayerFp8CompensatedAuxiliaryResult
 ):
     """Execute one layer while preserving legacy hidden/residual association."""
 
@@ -632,7 +643,15 @@ def stage_local_transformer_layer_fp8_split_mapped(
         raise ValueError("layer ingredient-capture flag must be boolean")
     if not isinstance(retain_input_rms_auxiliary, bool):
         raise ValueError("layer RMS auxiliary-retention flag must be boolean")
-    if retain_input_rms_auxiliary and capture_ingredients:
+    if not isinstance(retain_input_rms_compensated_auxiliary, bool):
+        raise ValueError(
+            "layer compensated RMS auxiliary-retention flag must be boolean"
+        )
+    if retain_input_rms_auxiliary and retain_input_rms_compensated_auxiliary:
+        raise ValueError("layer RMS auxiliary modes are mutually exclusive")
+    if (
+        retain_input_rms_auxiliary or retain_input_rms_compensated_auxiliary
+    ) and capture_ingredients:
         raise ValueError(
             "layer RMS auxiliary retention must remain isolated from ingredient capture"
         )
@@ -752,6 +771,18 @@ def stage_local_transformer_layer_fp8_split_mapped(
         normalized_input = rms_candidate.output
         combined_residual = rms_candidate.carried_residual
         input_rms_fp32 = rms_candidate.rms_input_fp32
+        restored_input_rms_fp32 = None
+    elif retain_input_rms_compensated_auxiliary:
+        rms_candidate = fused_add_rms_norm_with_compensated_auxiliary(
+            hidden_states,
+            residual,
+            input_norm_weight,
+            epsilon=rms_norm_epsilon,
+        )
+        normalized_input = rms_candidate.output
+        combined_residual = rms_candidate.carried_residual
+        input_rms_fp32 = None
+        restored_input_rms_fp32 = rms_candidate.restored_rms_input_fp32
     else:
         normalized_input, combined_residual = fused_add_rms_norm(
             hidden_states,
@@ -760,6 +791,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
             epsilon=rms_norm_epsilon,
         )
         input_rms_fp32 = None
+        restored_input_rms_fp32 = None
     q_residual, current_kv = _project_attention_qkv_a(
         normalized_input,
         attention,
@@ -988,6 +1020,12 @@ def stage_local_transformer_layer_fp8_split_mapped(
     if retain_input_rms_auxiliary:
         assert input_rms_fp32 is not None
         return StageLocalSplitLayerFp8AuxiliaryResult(result, input_rms_fp32)
+    if retain_input_rms_compensated_auxiliary:
+        assert restored_input_rms_fp32 is not None
+        return StageLocalSplitLayerFp8CompensatedAuxiliaryResult(
+            result,
+            restored_input_rms_fp32,
+        )
     if not capture_ingredients:
         return result
     assert attention_ingredients is not None

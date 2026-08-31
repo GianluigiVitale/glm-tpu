@@ -174,8 +174,12 @@ def test_real_layer_callsite_is_default_off_and_device_returned() -> None:
             strict=True,
         )
     )
-    default = keyword_defaults["retain_input_rms_auxiliary"]
-    assert isinstance(default, ast.Constant) and default.value is False
+    for flag in (
+        "retain_input_rms_auxiliary",
+        "retain_input_rms_compensated_auxiliary",
+    ):
+        default = keyword_defaults[flag]
+        assert isinstance(default, ast.Constant) and default.value is False
     candidate_calls = [
         node
         for node in ast.walk(layer)
@@ -199,7 +203,11 @@ def test_real_layer_callsite_is_default_off_and_device_returned() -> None:
         and ast.unparse(node.test) == "retain_input_rms_auxiliary"
     ]
     assert len(candidate_branches) == 2
-    first_branch = candidate_branches[0]
+    first_branch = next(
+        node
+        for node in candidate_branches
+        if candidate_calls[0] in set(ast.walk(node))
+    )
     expected_enabled = ast.parse(
         """rms_candidate = fused_add_rms_norm_with_auxiliary(
     hidden_states, residual, input_norm_weight, epsilon=rms_norm_epsilon
@@ -207,6 +215,7 @@ def test_real_layer_callsite_is_default_off_and_device_returned() -> None:
 normalized_input = rms_candidate.output
 combined_residual = rms_candidate.carried_residual
 input_rms_fp32 = rms_candidate.rms_input_fp32
+restored_input_rms_fp32 = None
 """
     ).body
     expected_default = ast.parse(
@@ -214,14 +223,34 @@ input_rms_fp32 = rms_candidate.rms_input_fp32
     hidden_states, residual, input_norm_weight, epsilon=rms_norm_epsilon
 )
 input_rms_fp32 = None
+restored_input_rms_fp32 = None
 """
     ).body
     assert ast.dump(ast.Module(body=first_branch.body, type_ignores=[])) == ast.dump(
         ast.Module(body=expected_enabled, type_ignores=[])
     )
-    assert ast.dump(ast.Module(body=first_branch.orelse, type_ignores=[])) == ast.dump(
-        ast.Module(body=expected_default, type_ignores=[])
+    assert len(first_branch.orelse) == 1
+    compensated_branch = first_branch.orelse[0]
+    assert isinstance(compensated_branch, ast.If)
+    assert ast.unparse(compensated_branch.test) == (
+        "retain_input_rms_compensated_auxiliary"
     )
+    expected_compensated = ast.parse(
+        """rms_candidate = fused_add_rms_norm_with_compensated_auxiliary(
+    hidden_states, residual, input_norm_weight, epsilon=rms_norm_epsilon
+)
+normalized_input = rms_candidate.output
+combined_residual = rms_candidate.carried_residual
+input_rms_fp32 = None
+restored_input_rms_fp32 = rms_candidate.restored_rms_input_fp32
+"""
+    ).body
+    assert ast.dump(
+        ast.Module(body=compensated_branch.body, type_ignores=[])
+    ) == ast.dump(ast.Module(body=expected_compensated, type_ignores=[]))
+    assert ast.dump(
+        ast.Module(body=compensated_branch.orelse, type_ignores=[])
+    ) == ast.dump(ast.Module(body=expected_default, type_ignores=[]))
     wrapper_returns = [
         node
         for node in ast.walk(layer)
@@ -236,12 +265,198 @@ input_rms_fp32 = None
     ]
     return_branch = next(
         node
-        for node in candidate_branches
-        if any(item is wrapper_returns[0] for item in node.body)
+        for node in ast.walk(layer)
+        if isinstance(node, ast.If)
+        and any(item is wrapper_returns[0] for item in node.body)
     )
+    assert ast.unparse(return_branch.test) == "retain_input_rms_auxiliary"
     assert [type(item) for item in return_branch.body] == [ast.Assert, ast.Return]
     assert ast.unparse(return_branch.body[0].test) == "input_rms_fp32 is not None"
     assert all(
-        marker not in ast.unparse(layer)
+        "callback" not in _call_name(node)
+        for node in ast.walk(layer)
+        if isinstance(node, ast.Call)
+    )
+
+
+def test_compensated_auxiliary_source_is_primary_exact_and_rooted() -> None:
+    tree = _tree(RMS_SOURCE)
+    result_type = _named_tuple(
+        tree, "FusedAddRmsNormCompensatedAuxiliaryResult"
+    )
+    assert [
+        (statement.target.id, ast.unparse(statement.annotation))
+        for statement in result_type.body
+        if isinstance(statement, ast.AnnAssign)
+        and isinstance(statement.target, ast.Name)
+    ] == [
+        ("output", "jax.Array"),
+        ("carried_residual", "jax.Array"),
+        ("restored_rms_input_fp32", "jax.Array"),
+    ]
+    accepted = _function(tree, "fused_add_rms_norm")
+    candidate = _function(
+        tree, "fused_add_rms_norm_with_compensated_auxiliary"
+    )
+    accepted_assignments = _assignments(accepted)
+    candidate_assignments = _assignments(candidate)
+    assert set(candidate_assignments) == {
+        "activation_dtype",
+        "rms_input_fp32",
+        "carried_residual",
+        "rounded_fp32",
+        "correction_fp32",
+        "restored_rms_input_fp32",
+        "variance",
+        "normalized",
+        "output",
+    }
+    for accepted_name, candidate_name in (
+        ("activation_dtype", "activation_dtype"),
+        ("summed", "rms_input_fp32"),
+        ("carried_residual", "carried_residual"),
+        ("variance", "variance"),
+        ("normalized", "normalized"),
+        ("output", "output"),
+    ):
+        assert _canonical_expression(accepted_assignments[accepted_name]) == (
+            _canonical_expression(
+                candidate_assignments[candidate_name],
+                rename=("rms_input_fp32", "summed"),
+            )
+        )
+    assert ast.unparse(candidate_assignments["rounded_fp32"]) == (
+        "carried_residual.astype(jnp.float32)"
+    )
+    assert ast.unparse(candidate_assignments["correction_fp32"]) == (
+        "lax.optimization_barrier(rms_input_fp32 - rounded_fp32)"
+    )
+    assert ast.unparse(candidate_assignments["restored_rms_input_fp32"]) == (
+        "lax.optimization_barrier(rounded_fp32 + correction_fp32)"
+    )
+    expected_computation = ast.parse(
+        """activation_dtype = hidden_states.dtype
+rms_input_fp32 = hidden_states.astype(jnp.float32) + residual.astype(jnp.float32)
+carried_residual = rms_input_fp32.astype(activation_dtype)
+rounded_fp32 = carried_residual.astype(jnp.float32)
+correction_fp32 = lax.optimization_barrier(rms_input_fp32 - rounded_fp32)
+restored_rms_input_fp32 = lax.optimization_barrier(
+    rounded_fp32 + correction_fp32
+)
+variance = jnp.mean(lax.square(rms_input_fp32), axis=-1, keepdims=True)
+normalized = rms_input_fp32 * lax.rsqrt(variance + jnp.float32(epsilon))
+output = (normalized.astype(weight.dtype) * weight).astype(activation_dtype)
+return FusedAddRmsNormCompensatedAuxiliaryResult(
+    output, carried_residual, restored_rms_input_fp32
+)
+"""
+    ).body
+    assert len(candidate.body) == 8 + len(expected_computation)
+    assert all(isinstance(item, ast.If) for item in candidate.body[1:8])
+    assert ast.dump(
+        ast.Module(body=candidate.body[8:], type_ignores=[])
+    ) == ast.dump(ast.Module(body=expected_computation, type_ignores=[]))
+    calls = {
+        _call_name(node) for node in ast.walk(candidate) if isinstance(node, ast.Call)
+    }
+    assert calls == {
+        "FusedAddRmsNormCompensatedAuxiliaryResult",
+        "ValueError",
+        "astype",
+        "carried_residual.astype",
+        "hidden_states.astype",
+        "isinstance",
+        "jnp.float32",
+        "jnp.issubdtype",
+        "jnp.mean",
+        "lax.optimization_barrier",
+        "lax.rsqrt",
+        "lax.square",
+        "normalized.astype",
+        "residual.astype",
+        "rms_input_fp32.astype",
+    }
+    assert all(
+        marker not in ast.unparse(candidate)
         for marker in ("device_get", "host_callback", "np.asarray", "pure_callback")
+    )
+
+
+def test_compensated_layer_call_is_single_guarded_and_typed() -> None:
+    tree = _tree(LAYER_SOURCE)
+    result_type = _named_tuple(
+        tree, "StageLocalSplitLayerFp8CompensatedAuxiliaryResult"
+    )
+    assert [
+        (statement.target.id, ast.unparse(statement.annotation))
+        for statement in result_type.body
+        if isinstance(statement, ast.AnnAssign)
+        and isinstance(statement.target, ast.Name)
+    ] == [
+        ("result", "StageLocalSplitLayerFp8Result"),
+        ("restored_input_rms_fp32", "Any"),
+    ]
+    layer = _function(tree, "stage_local_transformer_layer_fp8_split_mapped")
+    compensated_calls = [
+        node
+        for node in ast.walk(layer)
+        if isinstance(node, ast.Call)
+        and _call_name(node)
+        == "fused_add_rms_norm_with_compensated_auxiliary"
+    ]
+    assert len(compensated_calls) == 1
+    guarded_branches = [
+        node
+        for node in ast.walk(layer)
+        if isinstance(node, ast.If)
+        and ast.unparse(node.test)
+        == "retain_input_rms_compensated_auxiliary"
+    ]
+    assert len(guarded_branches) == 2
+    compute_branch = next(
+        node
+        for node in guarded_branches
+        if compensated_calls[0] in set(ast.walk(node))
+    )
+    orelse_nodes = {
+        node
+        for statement in compute_branch.orelse
+        for node in ast.walk(statement)
+    }
+    assert compensated_calls[0] not in orelse_nodes
+    guard_tests = [
+        ast.unparse(node.test)
+        for node in layer.body
+        if isinstance(node, ast.If)
+    ]
+    assert guard_tests.count(
+        "not isinstance(retain_input_rms_compensated_auxiliary, bool)"
+    ) == 1
+    assert guard_tests.count(
+        "retain_input_rms_auxiliary and retain_input_rms_compensated_auxiliary"
+    ) == 1
+    assert guard_tests.count(
+        "(retain_input_rms_auxiliary or retain_input_rms_compensated_auxiliary) and capture_ingredients"
+    ) == 1
+    wrapper_returns = [
+        node
+        for node in ast.walk(layer)
+        if isinstance(node, ast.Return)
+        and isinstance(node.value, ast.Call)
+        and _call_name(node.value)
+        == "StageLocalSplitLayerFp8CompensatedAuxiliaryResult"
+    ]
+    assert len(wrapper_returns) == 1
+    assert [ast.unparse(item) for item in wrapper_returns[0].value.args] == [
+        "result",
+        "restored_input_rms_fp32",
+    ]
+    return_branch = next(
+        node
+        for node in guarded_branches
+        if wrapper_returns[0] in node.body
+    )
+    assert [type(item) for item in return_branch.body] == [ast.Assert, ast.Return]
+    assert ast.unparse(return_branch.body[0].test) == (
+        "restored_input_rms_fp32 is not None"
     )
