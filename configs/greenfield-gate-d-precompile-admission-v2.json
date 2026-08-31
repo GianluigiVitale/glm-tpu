@@ -192,8 +192,41 @@
           "sha256": "237095c7ac9acdd7a37383b951b061752ee83f591722c3a2e2d3bede59326fb0"
         }
       },
-      "stablehlo_authority": null,
-      "summary": "Preserve accepted BF16 primary arithmetic while a declared FP32 add/sub auxiliary remains live on device; its graph identity is checked and numerical cancellation is explicitly unproven."
+      "stablehlo_authority": {
+        "accepted_primary": {
+          "path": "/home/gianl/gate-d-runs/greenfield_gate_d_compensated_auxiliary_stablehlo_20260831T061500Z/accepted.raw.stablehlo",
+          "sha256": "649cdc9ed5aef5e2fc4822e750ed3284255f3bfba438a755b48ade828658cc82"
+        },
+        "candidate": {
+          "path": "/home/gianl/gate-d-runs/greenfield_gate_d_compensated_auxiliary_stablehlo_20260831T061500Z/candidate.stablehlo",
+          "sha256": "baaf85721bf341dc521d3e003a3e70bc64de2e8c3d3185b267b7fd36c93feea6"
+        },
+        "candidate_raw": {
+          "path": "/home/gianl/gate-d-runs/greenfield_gate_d_compensated_auxiliary_stablehlo_20260831T061500Z/candidate.raw.stablehlo",
+          "sha256": "c93f0e2d9da8047744790cc7f9e50017bd9a8fa20c682dc2c3a0f1373b2679ef"
+        },
+        "certificate": {
+          "path": "../docs/artifacts/gate-d-compensated-auxiliary-stablehlo-authority.json",
+          "sha256": "af109e0f7d4d355373212028fd958af9e8566c302183b2fd5482e96805c8eb90"
+        },
+        "producer_receipt": {
+          "path": "/home/gianl/gate-d-runs/greenfield_gate_d_compensated_auxiliary_stablehlo_20260831T061500Z/producer_receipt.json",
+          "sha256": "a68b9ec9c6a4e0390134df326fce54c7126f76075c3aa49535ecb0d618435f03"
+        },
+        "producer_repository": {
+          "commit": "8333222fb1ed05b6307641eb20f32b2385dc55f5",
+          "root": ".."
+        },
+        "producer_source": {
+          "path": "../scripts/greenfield/produce_gate_d_compensated_auxiliary_stablehlo.py",
+          "sha256": "a9431e8eca5b0405190cb2cc8cee863e4f613ca712e212201ea1a7fbebdeeed9"
+        },
+        "success": {
+          "path": "/home/gianl/gate-d-runs/greenfield_gate_d_compensated_auxiliary_stablehlo_20260831T061500Z/SUCCESS",
+          "sha256": "fa4b12c3930144560d75cc525c922d1871ac8b7047780a6b4371e96c17fd7432"
+        }
+      },
+      "summary": "Preserve accepted BF16 primary arithmetic while a declared FP32 add/sub auxiliary remains live on device; immutable parsing must prove the exact compensated slice while numerical cancellation remains explicitly unproven until a coherent capsule exists."
     }
   ],
   "causal_frontier": {
@@ -201,7 +234,7 @@
     "id": "layer1.rms_input_fp32",
     "order": 0
   },
-  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates each candidate's distinct concrete committed default-off JAX source/callsite. The tuple candidate additionally has exact PP16_LP2 physical plan/watchpoint authority and forced-CPU immutable-parser-backed causal StableHLO, but its capsule fields remain deliberately null because separately sealed coherent event replay rejected the mechanism; its reported capsule gaps are schema-state only and authorize no capsule build, admission rerun or successor. The compensated candidate now has candidate-bound PP16_LP2 physical plan/watchpoint authority mapping its restored FP32 source result to the independently derived capsule RMS-input role; graph identity is proved, numerical cancellation is not, and StableHLO plus capsule authority remain absent. It never authorizes executable compilation, numerical execution, TPU work, performance claims or Gate-D closure.",
+  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates each candidate's distinct concrete committed default-off JAX source/callsite. The tuple candidate additionally has exact PP16_LP2 physical plan/watchpoint authority and forced-CPU immutable-parser-backed causal StableHLO, but its capsule fields remain deliberately null because separately sealed coherent event replay rejected the mechanism; its reported capsule gaps are schema-state only and authorize no capsule build, admission rerun or successor. The compensated candidate now has candidate-bound PP16_LP2 physical plan/watchpoint authority and a forced-CPU acquisition whose immutable parser must prove that the restored FP32 source result is an exact candidate-only local auxiliary slice mapped to the independently derived capsule RMS-input role; numerical cancellation and capsule coherence remain unproven. It never authorizes executable compilation, numerical execution, TPU work, performance claims or Gate-D closure.",
   "contract_id": "gate.d.precompile.admission.v2.20260830",
   "evidence": [
     {

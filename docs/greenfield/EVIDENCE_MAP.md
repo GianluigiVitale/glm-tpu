@@ -2247,3 +2247,22 @@ remains open and no TPU successor is authorized.
   JAX import, output, lowering, compilation, model/cloud/TPU work, admission or Gate-D closure
   occurred. One fresh-tag forced-CPU abstract lowering requires a separate review after this
   install evidence is persisted.
+
+## Compensated causal-StableHLO acquisition/archive and pre-parser launcher failure
+
+- One reviewed forced-CPU abstract-lowering start at clean pin `8333222` succeeded in 4.35 seconds:
+  CPU/one device, 533 Python and 46 native dependencies, no executable/array/model/libtpu/plugin/
+  cloud/TPU work. Accepted/candidate-raw/candidate-annotated/receipt/SUCCESS SHAs are
+  `649cdc9e...cc82`, `c93f0e2d...79ef`, `baaf8572...eea6`, `a68b9ec9...5f03` and
+  `fa4b12c3...7432`.
+- Same-region archive publication was corrected before mutation: four generation-zero
+  nonterminals were size/CRC32C/generation/SHA verified, then `SUCCESS` was published alone and
+  last as generation `1788156932667954`. The final inventory is exactly five objects.
+- Certificate `gate-d-compensated-auxiliary-stablehlo-authority.json` is `af109e0f...eb90`; bound
+  contract draft is `f694a535...7c81`. Neither claims parser success.
+- The first approved offline parser parent used `/usr/bin/python3` 3.10.12 and failed during package
+  import on missing `enum.StrEnum`, before argparse, output creation, parser child or JAX. Failure
+  artifact `gate-d-compensated-stablehlo-admission-launcher-failure.json`, SHA `8cbd49fb...57fd`,
+  records no output/no retry.
+  The fix is launcher-only: use the existing sealed Python 3.12.13 after separate persistence and
+  review. Fable session `d525bf0a-7f03-4b4d-9ed3-07eb3cadf7d3` was hard usage-limited/no opinion.

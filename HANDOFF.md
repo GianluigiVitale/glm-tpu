@@ -8653,3 +8653,23 @@ Fable 5 Max remained hard
 usage-limited and supplied no opinion; Sol found no P0--P2. No producer invocation, JAX import,
 output creation, lowering, compilation, model/cloud/TPU work, admission or Gate-D closure occurred.
 One fresh-tag forced-CPU abstract lowering remains a separate review and persistence boundary.
+
+## 2026-08-31 compensated StableHLO acquired and archived; first parser launcher failed
+
+One Sol-approved forced-CPU abstract-lowering start at clean pin `8333222` succeeded in 4.35
+seconds. It produced exact accepted/candidate/annotated StableHLO plus receipt and terminal local
+`SUCCESS`; backend is CPU/one device, dependencies are 533 Python and 46 native, and no executable,
+array/model, libtpu/plugin, cloud or TPU work ran. The protected US-CENTRAL2 archive published four
+generation-zero nonterminal objects, verified each size/CRC32C/generation/SHA, then published
+`SUCCESS` alone and last as generation `1788156932667954`. Candidate raw/annotated SHAs are
+`c93f0e2d...79ef`/`baaf8572...eea6`; receipt/SUCCESS are `a68b9ec9...5f03`/`fa4b12c3...7432`.
+
+Certificate `gate-d-compensated-auxiliary-stablehlo-authority.json` is `af109e0f...eb90`; contract
+draft `f694a535...7c81` binds it but makes no parser-success claim. The first approved offline parser
+attempt used system Python 3.10 and failed before argument parsing on missing `enum.StrEnum`; no
+output, parser child or JAX process exists and no retry is authorized. Canonical failure artifact
+is `gate-d-compensated-stablehlo-admission-launcher-failure.json`, SHA `8cbd49fb...57fd`.
+Local diagnosis requires the
+already sealed Python 3.12.13 launcher, not a code workaround. Narrow Fable session
+`d525bf0a-7f03-4b4d-9ed3-07eb3cadf7d3` was hard usage-limited and supplied no opinion. Exact next is
+Sol review, persistence, then a separately approved fresh-tag launcher-only retry.
