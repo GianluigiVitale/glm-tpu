@@ -674,7 +674,26 @@
         "future separately reviewed compensated plan, causal StableHLO and candidate-coherent capsule authority"
       ],
       "gate": "D precompile admission",
-      "reason": "The concrete verifier binds distinct committed source and real caller symbols, exact primary arithmetic, false defaults, mutual-exclusion/capture guards, the barrier-fenced restoration graph, rooted device-only return and absence of host effects. It explicitly classifies the auxiliary as graph.identity.only;numeric.cancellation.unproven. Historical tuple source and capsule tests read their original Git commits rather than today's files. Current admission remains empty and fail-closed: the compensated candidate still lacks plan, causal StableHLO, pinned producer and coherent capsule authority. This source-only asset authorizes no JAX lowering, compilation, numerical execution, cloud/TPU action, performance claim or Gate-D closure."
+      "reason": "The concrete verifier binds distinct committed source and real caller symbols, exact primary arithmetic, false defaults, mutual-exclusion/capture guards, the barrier-fenced restoration graph, rooted device-only return and absence of host effects. It explicitly classifies the auxiliary as graph.identity.only;numeric.cancellation.unproven. Historical tuple source and capsule tests read their original Git commits rather than today's files. At this source-only milestone admission remained empty and the compensated candidate still lacked plan, causal StableHLO, pinned producer and coherent capsule authority; the later separately indexed plan batch removes only that plan gap. This source-only asset authorizes no JAX lowering, compilation, numerical execution, cloud/TPU action, performance claim or Gate-D closure."
+    },
+    {
+      "id": "gate-d-compensated-auxiliary-pp16-plan-authority",
+      "category": "Gate-D candidate-bound physical plan and watchpoint authority",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "compensated source e16d74fcc025f5ffb910d9cbab1c4fa06df887ad / source authority c38492a0c058273b0e3d14aa464cd5fd77d61f88a8f4f9577d161f07a6b4b4c3 / plan file 7d0a5615ff4744801ac6a6598a52ea80e17d431788e4ef21a9d889e81772dbdf / content plan eb2c050b14a6125c1bfb59a7ce0021d7c6c30714834f324e8a18a1a4db57b6dc / admission core 206fd203625aa87dcd47c0f31590e8b9a744e4e8a8184e8c7f62d90a5e90eb97 / contract 6559939a5fbc399d8de898de4d0c2357db57e9c867ab2fc6ef7e3b52a9740a25 / report 3281afeceb8213527e6dbecebbb4a705187d2a92534dc3528575aac4a0a18540 / tests d82ebb748a6fe0ed19c846d4ee27b38ce74417b50c99013607e1377a2bda680f",
+      "source_paths": [
+        "docs/artifacts/gate-d-compensated-auxiliary-pp16-plan-authority.json",
+        "glm_tpu/greenfield/gate_d_precompile_admission.py",
+        "configs/greenfield-gate-d-precompile-admission-v2.json",
+        "tests/greenfield/validation/test_gate_d_precompile_admission.py",
+        "docs/artifacts/gate-d-precompile-admission-v2-compensated-plan.json"
+      ],
+      "disposition": "adapted",
+      "greenfield_consumers": [
+        "future separately reviewed compensated causal StableHLO and candidate-coherent capsule authority"
+      ],
+      "gate": "D precompile admission",
+      "reason": "Reuses the sealed PP16_LP2 physical group order and stage-zero owners while binding that topology to the compensated candidate id, mechanism fingerprint, verified source-authority hash/code pin, and an exact frontier-role map from restored_input_rms_fp32 to layer1.rms_input_fp32.value. The future capsule must independently derive those 6,144 FP32 bytes from its two sealed BF16 operands. Eight hostile candidate/source/frontier/derivation rebinding attacks and tuple migration fail closed. Admission remains empty with exactly three compensated gaps: causal StableHLO, pinned producer, and coherent capsule. No JAX lowering, numerical execution, model, cloud/TPU action, performance claim or Gate-D closure is authorized."
     },
     {
       "id": "legacy-execution-stack",

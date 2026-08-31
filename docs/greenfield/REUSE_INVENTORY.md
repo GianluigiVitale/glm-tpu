@@ -852,15 +852,16 @@ separately, and the parent independently derives the full FP32 addition before a
 `layer1.rms_input_fp32`. Reuse this invariant for new candidates; DB518 lacks these candidate
 operands and the rejected callback remains perturbation evidence only.
 
-Canonical report `docs/artifacts/gate-d-precompile-admission-v2.json` binds the tuple candidate's
+Historical source-only report `docs/artifacts/gate-d-precompile-admission-v2.json` binds the tuple candidate's
 concrete source/callsite at `c8b2200`, exact sealed PP16 plan/watchpoint authority and causal
 StableHLO. Its capsule bindings are deliberately null because later coherent replay rejected the
 tuple; reported capsule gaps are schema-state only and not a successor. The compensated candidate
-now binds concrete source at `e16d74f` and retains plan, causal StableHLO, pinned-producer and
-coherent-capsule gaps.
-This report is the correct offline starting point; do not modify v1, relabel DB518 state, compile a
+at that milestone bound concrete source at `e16d74f` and retained plan, causal StableHLO,
+pinned-producer and coherent-capsule gaps. The later separately indexed plan batch removes only the
+plan gap. This historical report remains a valid offline starting point; do not modify v1, relabel DB518 state, compile a
 placeholder or infer TPU causality from structural synthetic fixtures. V2 has no positive path for
-the tombstoned tuple. The compensated candidate next needs its own plan/watchpoint authority.
+the tombstoned tuple. At that historical milestone, the compensated candidate's next step was its
+own plan/watchpoint authority; the completed result is indexed below.
 The canonical core/contract/report/locality SHAs are `fde1847f...b252`, `0ce578d5...ddeb`,
 `9e2f3b5e...594c` and `49cf6bb1...25eb`; validator SHA is `2f4e73b0...c37a7`;
 installed/source provisioner and runtime-tree SHAs are `2b9c8c2b...0594` and
@@ -975,7 +976,7 @@ operand hashes and valid count match, but event-1 positions (`bb199543...aeeec`)
 the tuple-auxiliary numerical mechanism. Do not bind the contract or run redundant admission;
 there is no compile/TPU/Gate-D successor.
 
-## Gate-D compensated auxiliary source authority
+## Gate-D compensated auxiliary source and PP16 plan authority
 
 Reuse compensated source pin `e16d74f`, certificate
 `docs/artifacts/gate-d-compensated-auxiliary-source-authority.json` (`237095c7...6fb0`) and the
@@ -984,9 +985,18 @@ It binds exact accepted-primary arithmetic, false defaults, real caller guards, 
 barrier-fenced restoration graph and no host effects. Its declared result is deliberately narrow:
 `graph.identity.only;numeric.cancellation.unproven`.
 
-Current admission core/contract/report SHAs are `fde1847f...b252`, `0ce578d5...ddeb` and
-`9e2f3b5e...594c`; all 140 admission tests pass. The compensated candidate is still refused for
-missing plan, causal StableHLO, pinned producer and coherent capsule authority. Do not reuse the
+The separate plan-authority batch binds the exact sealed PP16 group order to the compensated
+candidate id, mechanism fingerprint, verified source authority/code pin and the exact mapping from
+`restored_input_rms_fp32[2,1,6144]` to
+`layer1.rms_input_fp32.value[6144]`, requires bitwise agreement across owner axis 0 and then
+selects prefix `[0,0]`. The future value must byte-match the independent binary32 sum of the two
+sealed BF16 operands. Plan-file/content SHAs are `7d0a5615...dbdf` and `eb2c050b...b6dc`.
+
+Current admission core/contract/report SHAs are `206fd203...eb97`, `6559939a...0a25` and
+`3281afec...8540`; all 158 admission tests and 69 adjacent Gate-D tests pass. The compensated
+candidate is still refused for missing causal StableHLO, pinned producer and coherent capsule
+authority. Do not reuse the
 old tuple numerical capsule—it is coherent negative evidence—or relabel declarative compensated
 fixtures as executable source. No JAX, compilation, execution, cloud/TPU or Gate-D successor is
-authorized. Exact next is a separately reviewed compensated plan-authority batch.
+authorized. Exact next after persistence is a separately reviewed compensated causal-StableHLO
+source batch; no lowering process may start from plan persistence alone.

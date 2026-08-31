@@ -548,13 +548,20 @@ at AST level and returns a distinct rooted device auxiliary. Its certificate
 `gate-d-compensated-auxiliary-source-authority.json` is `237095c7...6fb0` and deliberately claims
 only `graph.identity.only;numeric.cancellation.unproven`.
 
-Admission core/contract/current-report SHAs are `fde1847f...b252`, `0ce578d5...ddeb` and
-`9e2f3b5e...594c`; 140/140 admission tests pass, including hostile primary, restoration,
-barrier/return, import and caller-control mutations. Classification remains
-`NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`. The compensated candidate
-still lacks plan, causal StableHLO, pinned producer and candidate-coherent capsule authority.
+The subsequent plan-authority batch binds the sealed PP16 group order to this exact candidate,
+mechanism fingerprint, source authority/code pin and frontier role mapping
+`restored_input_rms_fp32[2,1,6144] -> layer1.rms_input_fp32.value[6144]`. It requires bitwise
+agreement across source owners `[0,1]` before selecting prefix `[0,0]`. Plan-file/content SHAs are
+`7d0a5615...dbdf` and `eb2c050b...b6dc`; the future capsule still must independently derive the
+6,144 FP32 values from both sealed BF16 operands.
 
-Exact next after this source-only batch is persisted is a separate compensated plan-authority
-batch. It may reuse PP16 physical topology evidence only after binding the new candidate's exact
-watchpoint/owner semantics. Do not lower, compile, execute JAX, load a model or run TPU from this
-source certificate.
+Admission core/contract/current-report SHAs are `206fd203...eb97`, `6559939a...0a25` and
+`3281afec...8540`; 158/158 admission tests and 69/69 adjacent Gate-D tests pass, including hostile
+candidate/source/frontier/derivation, plan-rebinding and exact-integer schema mutations.
+Classification remains
+`NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`. The compensated candidate
+still lacks causal StableHLO, pinned producer and candidate-coherent capsule authority.
+
+Exact next after review/persistence is a separate compensated causal-StableHLO source batch. Do
+not lower from the plan batch, compile, execute JAX, load a model or run TPU; a separately reviewed
+process start remains mandatory.

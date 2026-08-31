@@ -2013,8 +2013,9 @@ remains open and no TPU successor is authorized.
   Classification remains
   `NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`.
 - The historical exact next was one pinned replayable PP16 capsule. That action is complete and
-  rejected; do not rerun it. Current exact next is compensated candidate-specific plan/watchpoint
-  authority. No compile-only optimized-HLO acquisition or TPU action is authorized yet.
+  rejected; do not rerun it. At this historical StableHLO milestone, the next step was compensated
+  candidate-specific plan/watchpoint authority; that later batch is recorded below. No compile-only
+  optimized-HLO acquisition or TPU action was authorized here.
 
 ## Tuple-auxiliary coherent-capsule source and trust-boundary hardening
 
@@ -2164,3 +2165,37 @@ remains open and no TPU successor is authorized.
   Exact next after persistence is a separate source-exact plan-authority batch, reusing the sealed
   PP16 physical topology only after proving that reuse is semantically applicable; causal
   StableHLO remains a later separately reviewed batch.
+
+## Compensated-auxiliary PP16 plan/watchpoint authority; offline only
+
+- `gate-d-compensated-auxiliary-pp16-plan-authority.json` has file SHA
+  `7d0a5615...dbdf` and content-derived plan SHA `eb2c050b...b6dc`. It reuses the complete sealed
+  PP16 physical group order/topology and exact stage-zero owners, but unlike the historical tuple
+  plan it additionally binds candidate id, mechanism fingerprint, verified compensated source
+  authority SHA `c38492a0...b4c3` and source pin `e16d74f`.
+- The candidate-specific frontier map is exact: mapped source result
+  `restored_input_rms_fp32[2,1,6144]`, source owner axis 0 with ids `[0,1]`, required bitwise owner
+  agreement and selection prefix `[0,0]` map to capsule
+  `layer1.rms_input_fp32.value[6144]`, storage `<f4`. It binds ordered operands `hidden_update`,
+  `residual` and the later independent derivation `binary32.rne.add_after_exact_bf16_widen`. This
+  names what a future coherent capsule must prove; it does not assert that the current source graph
+  numerically cancels after lowering.
+- The verifier rejects fully rebound candidate id, claim scope, source authority/code pin,
+  mechanism fingerprint, source-result, operand-order and derivation mutations. It also rejects
+  migration of the compensated binding into the tuple plan, PP8 rebinding, extra binding keys and
+  bool/float substitutions for exact integer and schema-version fields. Admission passes 158/158; adjacent
+  Gate-D suites pass 69/69; the append-only report reproduces byte-identically.
+- Core/contract/test/report SHAs are `206fd203...eb97`, `6559939a...0a25`,
+  `d82ebb74...680f` and `3281afec...8540`. Classification remains
+  `NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`. The compensated reasons
+  are now exactly `MISSING_CAUSAL_STABLEHLO_AUTHORITY`,
+  `MISSING_PINNED_COHERENT_CAPSULE_PRODUCER` and `MISSING_CANDIDATE_COHERENT_CAPSULE`.
+- No JAX import/lowering, numerical execution, model, cloud workflow or TPU action occurred. Exact
+  next after review/persistence is a separate compensated causal-StableHLO source batch. Plan
+  persistence alone cannot authorize its process start.
+- Fable 5 Max returned a hard usage-limit refusal and supplied no opinion. Same-scope Sol initially
+  withheld persistence on PP8 rebinding, permissive frontier types, ambiguous mapped-owner
+  selection, stale prose and permissive JSON schema-version equality. After all findings were
+  corrected and the complete suites rerun, Sol returned `APPROVE PERSISTENCE` for staged diff
+  `b4f6d3cf...aced1` with no remaining P0--P2. Authorization is commit/push/locked same-region
+  mirror only; no lowering, JAX, model, cloud/TPU, admission or Gate-D successor is authorized.

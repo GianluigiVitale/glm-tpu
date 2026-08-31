@@ -1,0 +1,82 @@
+{
+  "candidate_binding": {
+    "candidate_id": "compensated_auxiliary_dependency",
+    "claim_scope": "Candidate-specific PP16_LP2 physical-owner and watchpoint-role authority only; the restored compensated source result is named as the capsule RMS-input role whose bytes must later equal an independent binary32 derivation from the two sealed BF16 operands. No StableHLO, numerical equality, producer, capsule, compilation, TPU, performance or Gate-D claim is made.",
+    "frontier_binding": {
+      "capsule_watchpoint": "layer1.rms_input_fp32",
+      "capsule_role": "value",
+      "capsule_selected_shape": [6144],
+      "derivation": "binary32.rne.add_after_exact_bf16_widen",
+      "owner_agreement": "bitwise.equal.owner_axis.before_selection",
+      "operand_roles": [
+        "layer1.rms_operands_bf16.hidden_update",
+        "layer1.rms_operands_bf16.residual"
+      ],
+      "source_index_prefix": [0, 0],
+      "source_mapped_shape": [2, 1, 6144],
+      "source_owner_axis": 0,
+      "source_owner_ids": [0, 1],
+      "source_result": "restored_input_rms_fp32",
+      "storage_dtype": "<f4"
+    },
+    "mechanism_fingerprint_sha256": "3c820af70ab0a5bbd9b3e5d6139887ce53425d9f5499e3291f2708901bbd9513",
+    "source_authority_sha256": "c38492a0c058273b0e3d14aa464cd5fd77d61f88a8f4f9577d161f07a6b4b4c3",
+    "source_code_pin": "e16d74fcc025f5ffb910d9cbab1c4fa06df887ad"
+  },
+  "local_device_groups": [
+    [0, 1],
+    [8, 9],
+    [16, 17],
+    [24, 25],
+    [26, 27],
+    [2, 3],
+    [10, 11],
+    [18, 19],
+    [20, 21],
+    [12, 13],
+    [4, 5],
+    [28, 29],
+    [30, 31],
+    [22, 23],
+    [14, 15],
+    [6, 7]
+  ],
+  "plan": "PP16_LP2",
+  "plan_sha256": "eb2c050b14a6125c1bfb59a7ce0021d7c6c30714834f324e8a18a1a4db57b6dc",
+  "schema_version": 2,
+  "topology_hash": "294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559",
+  "watchpoints": {
+    "layer1.cache_history": {
+      "layout": "lp2.local",
+      "owner_ids": [0, 1]
+    },
+    "layer1.current_key": {
+      "layout": "lp2.local",
+      "owner_ids": [0, 1]
+    },
+    "layer1.head_weights": {
+      "layout": "lp2.local",
+      "owner_ids": [0, 1]
+    },
+    "layer1.normalized": {
+      "layout": "lp2.local",
+      "owner_ids": [0, 1]
+    },
+    "layer1.query": {
+      "layout": "lp2.local",
+      "owner_ids": [0, 1]
+    },
+    "layer1.rms_input_fp32": {
+      "layout": "lp2.local",
+      "owner_ids": [0, 1]
+    },
+    "layer1.rms_operands_bf16": {
+      "layout": "lp2.local",
+      "owner_ids": [0, 1]
+    },
+    "layer1.scorer_event1": {
+      "layout": "lp2.local",
+      "owner_ids": [0, 1]
+    }
+  }
+}

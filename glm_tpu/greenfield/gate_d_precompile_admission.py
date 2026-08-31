@@ -108,6 +108,30 @@ _EXPECTED_CAPSULE_PRODUCER_CLAIM_SCOPE = (
     "TPU, cloud, performance or Gate-D claim is made. Local SUCCESS-last "
     "publication is provisional until an independent protected archive/seal."
 )
+_EXPECTED_COMPENSATED_PLAN_CLAIM_SCOPE = (
+    "Candidate-specific PP16_LP2 physical-owner and watchpoint-role authority only; "
+    "the restored compensated source result is named as the capsule RMS-input role "
+    "whose bytes must later equal an independent binary32 derivation from the two "
+    "sealed BF16 operands. No StableHLO, numerical equality, producer, capsule, "
+    "compilation, TPU, performance or Gate-D claim is made."
+)
+_EXPECTED_COMPENSATED_PLAN_FRONTIER_BINDING = {
+    "capsule_watchpoint": "layer1.rms_input_fp32",
+    "capsule_role": "value",
+    "capsule_selected_shape": [6144],
+    "derivation": "binary32.rne.add_after_exact_bf16_widen",
+    "owner_agreement": "bitwise.equal.owner_axis.before_selection",
+    "operand_roles": [
+        "layer1.rms_operands_bf16.hidden_update",
+        "layer1.rms_operands_bf16.residual",
+    ],
+    "source_index_prefix": [0, 0],
+    "source_mapped_shape": [2, 1, 6144],
+    "source_owner_axis": 0,
+    "source_owner_ids": [0, 1],
+    "source_result": "restored_input_rms_fp32",
+    "storage_dtype": "<f4",
+}
 _EXPECTED_CAPSULE_EXECUTION = {
     "cloud_workflow": False,
     "contract_valid": True,
@@ -3000,6 +3024,10 @@ def _verify_plan_authority(
     value: Any,
     base: Path,
     physical_locality: Mapping[str, Any],
+    *,
+    candidate_id: str,
+    mechanism_fingerprint_sha256: str,
+    source: Mapping[str, Any],
 ) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise BenchmarkValidationError("plan authority must be an object")
@@ -3009,19 +3037,21 @@ def _verify_plan_authority(
     document = _load_json(
         raw, "plan authority"
     )
-    _exact_keys(
-        document,
-        {
-            "local_device_groups",
-            "plan",
-            "plan_sha256",
-            "schema_version",
-            "topology_hash",
-            "watchpoints",
-        },
-        "plan authority document",
+    document_keys = {
+        "local_device_groups",
+        "plan",
+        "plan_sha256",
+        "schema_version",
+        "topology_hash",
+        "watchpoints",
+    }
+    if candidate_id == "compensated_auxiliary_dependency":
+        document_keys.add("candidate_binding")
+    _exact_keys(document, document_keys, "plan authority document")
+    schema_version = _positive_int(
+        document["schema_version"], "plan authority schema version"
     )
-    if document["schema_version"] != GATE_D_PRECOMPILE_ADMISSION_SCHEMA_VERSION:
+    if schema_version != GATE_D_PRECOMPILE_ADMISSION_SCHEMA_VERSION:
         raise BenchmarkValidationError("plan authority schema drifted")
     expected_plan = _sha(document["plan_sha256"], "plan SHA-256")
     plan_name = _string(document["plan"], "plan name")
@@ -3093,9 +3123,133 @@ def _verify_plan_authority(
         "topology_hash": physical_locality["topology_hash"],
         "watchpoints": normalized_watchpoints,
     }
+    candidate_binding_report: dict[str, Any] | None = None
+    if candidate_id == "compensated_auxiliary_dependency":
+        candidate_binding = document["candidate_binding"]
+        if not isinstance(candidate_binding, dict):
+            raise BenchmarkValidationError("candidate plan binding must be an object")
+        _exact_keys(
+            candidate_binding,
+            {
+                "candidate_id",
+                "claim_scope",
+                "frontier_binding",
+                "mechanism_fingerprint_sha256",
+                "source_authority_sha256",
+                "source_code_pin",
+            },
+            "candidate plan binding",
+        )
+        claim_scope = _string(
+            candidate_binding["claim_scope"], "candidate plan claim scope"
+        )
+        frontier_binding = candidate_binding["frontier_binding"]
+        if not isinstance(frontier_binding, dict):
+            raise BenchmarkValidationError(
+                "candidate plan frontier binding must be an object"
+            )
+        _exact_keys(
+            frontier_binding,
+            set(_EXPECTED_COMPENSATED_PLAN_FRONTIER_BINDING),
+            "candidate plan frontier binding",
+        )
+
+        def exact_int_list(
+            item: Any, label: str, *, positive: bool
+        ) -> list[int]:
+            if not isinstance(item, list):
+                raise BenchmarkValidationError(f"{label} must be a list")
+            converter = _positive_int if positive else _nonnegative_int
+            return [
+                converter(member, f"{label}[{index}]")
+                for index, member in enumerate(item)
+            ]
+
+        normalized_frontier_binding = {
+            "capsule_watchpoint": _identifier(
+                frontier_binding["capsule_watchpoint"],
+                "candidate plan capsule watchpoint",
+            ),
+            "capsule_role": _identifier(
+                frontier_binding["capsule_role"],
+                "candidate plan capsule role",
+            ),
+            "capsule_selected_shape": exact_int_list(
+                frontier_binding["capsule_selected_shape"],
+                "candidate plan capsule selected shape",
+                positive=True,
+            ),
+            "derivation": _identifier(
+                frontier_binding["derivation"],
+                "candidate plan frontier derivation",
+            ),
+            "owner_agreement": _identifier(
+                frontier_binding["owner_agreement"],
+                "candidate plan owner agreement",
+            ),
+            "operand_roles": [
+                _string(item, f"candidate plan operand role {index}")
+                for index, item in enumerate(
+                    frontier_binding["operand_roles"]
+                    if isinstance(frontier_binding["operand_roles"], list)
+                    else []
+                )
+            ],
+            "source_index_prefix": exact_int_list(
+                frontier_binding["source_index_prefix"],
+                "candidate plan source index prefix",
+                positive=False,
+            ),
+            "source_mapped_shape": exact_int_list(
+                frontier_binding["source_mapped_shape"],
+                "candidate plan source mapped shape",
+                positive=True,
+            ),
+            "source_owner_axis": _nonnegative_int(
+                frontier_binding["source_owner_axis"],
+                "candidate plan source owner axis",
+            ),
+            "source_owner_ids": exact_int_list(
+                frontier_binding["source_owner_ids"],
+                "candidate plan source owner ids",
+                positive=False,
+            ),
+            "source_result": _identifier(
+                frontier_binding["source_result"],
+                "candidate plan source result",
+            ),
+            "storage_dtype": _string(
+                frontier_binding["storage_dtype"],
+                "candidate plan frontier storage dtype",
+            ),
+        }
+        if (
+            plan_name != "PP16_LP2"
+            or candidate_binding["candidate_id"] != candidate_id
+            or candidate_binding["mechanism_fingerprint_sha256"]
+            != mechanism_fingerprint_sha256
+            or candidate_binding["source_authority_sha256"]
+            != source.get("authority_sha256")
+            or candidate_binding["source_code_pin"] != source.get("code_pin")
+            or claim_scope != _EXPECTED_COMPENSATED_PLAN_CLAIM_SCOPE
+            or normalized_frontier_binding
+            != _EXPECTED_COMPENSATED_PLAN_FRONTIER_BINDING
+        ):
+            raise BenchmarkValidationError(
+                "candidate plan/source/watchpoint binding drifted"
+            )
+        candidate_binding_report = {
+            "candidate_id": candidate_id,
+            "claim_scope": claim_scope,
+            "frontier_binding": normalized_frontier_binding,
+            "mechanism_fingerprint_sha256": mechanism_fingerprint_sha256,
+            "source_authority_sha256": source["authority_sha256"],
+            "source_code_pin": source["code_pin"],
+        }
+        payload["candidate_binding"] = candidate_binding_report
     if sha256(_canonical_json(payload).encode("ascii")).hexdigest() != expected_plan:
         raise BenchmarkValidationError("plan SHA-256 is not content-derived")
-    return {
+    report = {
         "authority_file_sha256": expected_file,
         "authority_path": str(path),
         "local_device_groups": local_groups,
@@ -3107,6 +3261,9 @@ def _verify_plan_authority(
         "watchpoints": normalized_watchpoints,
         "watchpoint_schema": _required_watchpoint_schema(local_group_size),
     }
+    if candidate_binding_report is not None:
+        report["candidate_binding"] = candidate_binding_report
+    return report
 
 
 def _sealed_parser_memfd(
@@ -6361,7 +6518,12 @@ def admit_gate_d_precompile_candidates(
         else:
             try:
                 plan_report = _verify_plan_authority(
-                    candidate["plan_authority"], base, physical_locality
+                    candidate["plan_authority"],
+                    base,
+                    physical_locality,
+                    candidate_id=candidate_id,
+                    mechanism_fingerprint_sha256=fingerprint,
+                    source=source_report or {},
                 )
             except BenchmarkValidationError as error:
                 reasons.append("INVALID_PLAN_AUTHORITY")

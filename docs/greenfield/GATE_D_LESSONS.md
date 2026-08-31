@@ -1058,11 +1058,11 @@ normalized-state cause.
 - Bound total NPZ decompression before reading members, reject non-stored/deflated compression,
   traverse every parent with no-follow directory descriptors and make append-only publication safe
   against concurrent replacement.
-- The current v2 report binds concrete tuple-candidate source/callsite and exact PP16 plan authority
+- At the historical source-only milestone, v2 bound concrete tuple-candidate source/callsite and exact PP16 plan authority
   plus causal StableHLO. Its null capsule bindings are deliberate tombstone state after coherent
   event replay rejected the tuple mechanism, not a missing successor task. The compensated variant now binds
-  distinct concrete committed source at `e16d74f`, but still lacks plan, causal StableHLO, pinned
-  producer and coherent capsule authority. It
+  distinct concrete committed source at `e16d74f`; at that milestone it still lacked plan, causal
+  StableHLO, pinned producer and coherent capsule authority. It
   always leaves compilation/TPU authorization false. This is an honest sequencing result, not
   Gate-D progress through execution.
 - Never validate historical source authority against the moving worktree. Read the exact Git blobs
@@ -1072,3 +1072,10 @@ normalized-state cause.
   `BF16(BF16(sum*inverse)*weight)`, so an interval for only `BF16(sum*inverse)` omits a sealed
   per-element operand and cannot adjudicate the boundary. Keep the useful BF16-input derivation;
   do not revive tombstoned global-scalar or variance-tree searches from an incomplete inversion.
+- A physical plan can be shared while its watchpoint meaning cannot. The compensated candidate
+  legitimately reuses the sealed PP16 group order, but its plan document must additionally bind
+  candidate id, mechanism fingerprint, verified source authority/code pin and the exact mapping
+  `restored_input_rms_fp32 -> layer1.rms_input_fp32.value`. Include the independently enforced
+  binary32 sum derivation and operand order in the content-derived plan hash. A copied tuple plan
+  or fully rehashed source/frontier/derivation mutation must fail closed. This removes only plan
+  authority; it does not prove cancellation, StableHLO causality or coherent numerical output.

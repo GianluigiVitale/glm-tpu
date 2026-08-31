@@ -141,7 +141,10 @@
         "normalization_input": "persistent.shadow",
         "primary_recurrence": "bf16.rounded"
       },
-      "plan_authority": null,
+      "plan_authority": {
+        "path": "../docs/artifacts/gate-d-compensated-auxiliary-pp16-plan-authority.json",
+        "sha256": "7d0a5615ff4744801ac6a6598a52ea80e17d431788e4ef21a9d889e81772dbdf"
+      },
       "reconstructs_full_pod_hidden": false,
       "source_authority": {
         "files": [
@@ -198,7 +201,7 @@
     "id": "layer1.rms_input_fp32",
     "order": 0
   },
-  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates each candidate's distinct concrete committed default-off JAX source/callsite. The tuple candidate additionally has exact PP16_LP2 physical plan/watchpoint authority and forced-CPU immutable-parser-backed causal StableHLO, but its capsule fields remain deliberately null because separately sealed coherent event replay rejected the mechanism; its reported capsule gaps are schema-state only and authorize no capsule build, admission rerun or successor. The compensated candidate's source authority proves graph identity only, explicitly not numerical cancellation, and it still lacks plan, StableHLO and capsule authority. It never authorizes executable compilation, numerical execution, TPU work, performance claims or Gate-D closure.",
+  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates each candidate's distinct concrete committed default-off JAX source/callsite. The tuple candidate additionally has exact PP16_LP2 physical plan/watchpoint authority and forced-CPU immutable-parser-backed causal StableHLO, but its capsule fields remain deliberately null because separately sealed coherent event replay rejected the mechanism; its reported capsule gaps are schema-state only and authorize no capsule build, admission rerun or successor. The compensated candidate now has candidate-bound PP16_LP2 physical plan/watchpoint authority mapping its restored FP32 source result to the independently derived capsule RMS-input role; graph identity is proved, numerical cancellation is not, and StableHLO plus capsule authority remain absent. It never authorizes executable compilation, numerical execution, TPU work, performance claims or Gate-D closure.",
   "contract_id": "gate.d.precompile.admission.v2.20260830",
   "evidence": [
     {
@@ -233,7 +236,7 @@
     },
     "core": {
       "path": "../glm_tpu/greenfield/gate_d_precompile_admission.py",
-      "sha256": "fde1847fb58e9592524a4992a745342e2b4f80322533c517929d89023852b252"
+      "sha256": "206fd203625aa87dcd47c0f31590e8b9a744e4e8a8184e8c7f62d90a5e90eb97"
     },
     "git": {
       "path": "/usr/bin/git",

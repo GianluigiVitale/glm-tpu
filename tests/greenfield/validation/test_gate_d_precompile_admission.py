@@ -30,7 +30,7 @@ from glm_tpu.greenfield.gate_d_precompile_admission import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CURRENT_CONTRACT = REPO_ROOT / "configs/greenfield-gate-d-precompile-admission-v2.json"
-CURRENT_CONTRACT_SHA256 = "0ce578d5af4ce2ddc37c3d7bbe5ea6665f25a897a9f3f945ad4c9401167addeb"
+CURRENT_CONTRACT_SHA256 = "6559939a5fbc399d8de898de4d0c2357db57e9c867ab2fc6ef7e3b52a9740a25"
 
 
 def _sha(path: Path) -> str:
@@ -799,7 +799,11 @@ def _source_authority(
 
 
 def _plan_authority(
-    root: Path, plan_name: str = "PP16_LP2"
+    root: Path,
+    plan_name: str = "PP16_LP2",
+    *,
+    candidate: dict[str, Any] | None = None,
+    source: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     locality = json.loads(
         (REPO_ROOT / "docs/artifacts/gate-d-runtime-locality-authority.json").read_text()
@@ -819,6 +823,22 @@ def _plan_authority(
         "topology_hash": locality["topology_hash"],
         "watchpoints": watchpoints,
     }
+    candidate_binding = None
+    if candidate is not None and candidate["id"] == "compensated_auxiliary_dependency":
+        assert source is not None
+        candidate_binding = {
+            "candidate_id": candidate["id"],
+            "claim_scope": admission_module._EXPECTED_COMPENSATED_PLAN_CLAIM_SCOPE,
+            "frontier_binding": dict(
+                admission_module._EXPECTED_COMPENSATED_PLAN_FRONTIER_BINDING
+            ),
+            "mechanism_fingerprint_sha256": admission_module._mechanism_fingerprint(
+                candidate["mechanism_fingerprint"], "test candidate fingerprint"
+            ),
+            "source_authority_sha256": source["authority_sha256"],
+            "source_code_pin": source["code_pin"],
+        }
+        payload["candidate_binding"] = candidate_binding
     plan_sha = sha256(_canonical(payload).encode("ascii")).hexdigest()
     plan = {**payload, "plan_sha256": plan_sha, "schema_version": 2}
     path = root / "plan.json"
@@ -839,6 +859,11 @@ def _plan_authority(
             "topology_hash": locality["topology_hash"],
             "watchpoints": watchpoints,
             "watchpoint_schema": watchpoint_schema,
+            **(
+                {"candidate_binding": candidate_binding}
+                if candidate_binding is not None
+                else {}
+            ),
         },
     )
 
@@ -1676,7 +1701,9 @@ def _prepared_contract(
         committed_symlink=committed_symlink,
         source_hlo_mismatch=source_hlo_mismatch,
     )
-    plan_authority, plan = _plan_authority(root, plan_name)
+    plan_authority, plan = _plan_authority(
+        root, plan_name, candidate=candidate, source=source
+    )
     stablehlo_authority, stablehlo = _stablehlo_authority(
         root,
         candidate,
@@ -1838,7 +1865,6 @@ def test_current_contract_fails_closed_without_jax() -> None:
             "MISSING_CANDIDATE_COHERENT_CAPSULE",
         ],
         "compensated_auxiliary_dependency": [
-            "MISSING_PLAN_AUTHORITY",
             "MISSING_CAUSAL_STABLEHLO_AUTHORITY",
             "MISSING_PINNED_COHERENT_CAPSULE_PRODUCER",
             "MISSING_CANDIDATE_COHERENT_CAPSULE",
@@ -1857,6 +1883,26 @@ def test_current_contract_fails_closed_without_jax() -> None:
     assert compensated_source["compensation_claim"] == (
         "graph.identity.only;numeric.cancellation.unproven"
     )
+    compensated_plan = report["candidate_results"][1]["plan_authority"]
+    assert compensated_plan["plan"] == "PP16_LP2"
+    assert compensated_plan["owner_group"] == [0, 1]
+    assert compensated_plan["plan_sha256"] == (
+        "eb2c050b14a6125c1bfb59a7ce0021d7c6c30714834f324e8a18a1a4db57b6dc"
+    )
+    assert compensated_plan["candidate_binding"] == {
+        "candidate_id": "compensated_auxiliary_dependency",
+        "claim_scope": admission_module._EXPECTED_COMPENSATED_PLAN_CLAIM_SCOPE,
+        "frontier_binding": (
+            admission_module._EXPECTED_COMPENSATED_PLAN_FRONTIER_BINDING
+        ),
+        "mechanism_fingerprint_sha256": (
+            "3c820af70ab0a5bbd9b3e5d6139887ce53425d9f5499e3291f2708901bbd9513"
+        ),
+        "source_authority_sha256": (
+            "c38492a0c058273b0e3d14aa464cd5fd77d61f88a8f4f9577d161f07a6b4b4c3"
+        ),
+        "source_code_pin": "e16d74fcc025f5ffb910d9cbab1c4fa06df887ad",
+    }
     plan = report["candidate_results"][0]["plan_authority"]
     assert plan["plan"] == "PP16_LP2"
     assert plan["local_group_size"] == 2
@@ -3129,6 +3175,147 @@ def test_self_declared_plan_owner_stage_is_rejected(tmp_path: Path) -> None:
     candidate = report["candidate_results"][0]
     assert "INVALID_PLAN_AUTHORITY" in candidate["reasons"]
     assert "stage-zero owner group" in candidate["plan_authority"]["refusal"]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "candidate_id",
+        "claim_scope",
+        "derivation",
+        "mechanism_fingerprint",
+        "operand_order",
+        "source_authority",
+        "source_code_pin",
+        "source_result",
+    ],
+)
+def test_compensated_plan_binding_attacks_fail_closed(
+    tmp_path: Path, mutation: str
+) -> None:
+    path, contract, _, _ = _prepared_contract(tmp_path, candidate_index=1)
+    binding = contract["candidates"][1]["plan_authority"]
+    plan_path = Path(binding["path"])
+    plan = json.loads(plan_path.read_text())
+    candidate_binding = plan["candidate_binding"]
+    if mutation == "candidate_id":
+        candidate_binding["candidate_id"] = "auxiliary_device_tuple_dependency"
+    elif mutation == "claim_scope":
+        candidate_binding["claim_scope"] += " forged"
+    elif mutation == "derivation":
+        candidate_binding["frontier_binding"]["derivation"] = "binary64.add"
+    elif mutation == "mechanism_fingerprint":
+        candidate_binding["mechanism_fingerprint_sha256"] = "0" * 64
+    elif mutation == "operand_order":
+        candidate_binding["frontier_binding"]["operand_roles"].reverse()
+    elif mutation == "source_authority":
+        candidate_binding["source_authority_sha256"] = "0" * 64
+    elif mutation == "source_code_pin":
+        candidate_binding["source_code_pin"] = "0" * 40
+    elif mutation == "source_result":
+        candidate_binding["frontier_binding"]["source_result"] = "rms_input_fp32"
+    payload = {
+        "candidate_binding": candidate_binding,
+        "local_device_groups": plan["local_device_groups"],
+        "plan": plan["plan"],
+        "topology_hash": plan["topology_hash"],
+        "watchpoints": plan["watchpoints"],
+    }
+    plan["plan_sha256"] = sha256(_canonical(payload).encode("ascii")).hexdigest()
+    binding["sha256"] = _write_json(plan_path, plan)
+    _write_json(path, contract)
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][1]
+    assert "INVALID_PLAN_AUTHORITY" in candidate["reasons"]
+    assert "candidate plan/source/watchpoint binding drifted" in candidate[
+        "plan_authority"
+    ]["refusal"]
+
+
+def test_compensated_candidate_cannot_rebind_to_pp8(tmp_path: Path) -> None:
+    path, _, _, _ = _prepared_contract(
+        tmp_path, candidate_index=1, plan_name="PP8_LP4"
+    )
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][1]
+    assert "INVALID_PLAN_AUTHORITY" in candidate["reasons"]
+    assert "candidate plan/source/watchpoint binding drifted" in candidate[
+        "plan_authority"
+    ]["refusal"]
+
+
+@pytest.mark.parametrize("schema_version", [2.0, True])
+def test_compensated_plan_schema_version_type_fails_closed(
+    tmp_path: Path, schema_version: Any
+) -> None:
+    path, contract, _, _ = _prepared_contract(tmp_path, candidate_index=1)
+    binding = contract["candidates"][1]["plan_authority"]
+    plan_path = Path(binding["path"])
+    plan = json.loads(plan_path.read_text())
+    plan["schema_version"] = schema_version
+    binding["sha256"] = _write_json(plan_path, plan)
+    _write_json(path, contract)
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][1]
+    assert "INVALID_PLAN_AUTHORITY" in candidate["reasons"]
+    assert "plan authority schema version must be a positive integer" in candidate[
+        "plan_authority"
+    ]["refusal"]
+
+
+@pytest.mark.parametrize(
+    ("mutation", "detail"),
+    [
+        ("capsule_shape_float", "must be a positive integer"),
+        ("capsule_shape_bool", "must be a positive integer"),
+        ("extra_key", "keys drifted"),
+        ("owner_axis_bool", "must be a non-negative integer"),
+        ("owner_id_float", "must be a non-negative integer"),
+        ("source_prefix_bool", "must be a non-negative integer"),
+    ],
+)
+def test_compensated_plan_frontier_types_fail_closed(
+    tmp_path: Path, mutation: str, detail: str
+) -> None:
+    path, contract, _, _ = _prepared_contract(tmp_path, candidate_index=1)
+    binding = contract["candidates"][1]["plan_authority"]
+    plan_path = Path(binding["path"])
+    plan = json.loads(plan_path.read_text())
+    frontier = plan["candidate_binding"]["frontier_binding"]
+    if mutation == "capsule_shape_float":
+        frontier["capsule_selected_shape"] = [6144.0]
+    elif mutation == "capsule_shape_bool":
+        frontier["capsule_selected_shape"] = [True]
+    elif mutation == "extra_key":
+        frontier["forged"] = "value"
+    elif mutation == "owner_axis_bool":
+        frontier["source_owner_axis"] = False
+    elif mutation == "owner_id_float":
+        frontier["source_owner_ids"] = [0, 1.0]
+    elif mutation == "source_prefix_bool":
+        frontier["source_index_prefix"] = [0, False]
+    binding["sha256"] = _write_json(plan_path, plan)
+    _write_json(path, contract)
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][1]
+    assert "INVALID_PLAN_AUTHORITY" in candidate["reasons"]
+    assert detail in candidate["plan_authority"]["refusal"]
+
+
+def test_tuple_candidate_cannot_accept_compensated_plan_binding(tmp_path: Path) -> None:
+    path, contract, _, _ = _prepared_contract(tmp_path)
+    binding = contract["candidates"][0]["plan_authority"]
+    plan_path = Path(binding["path"])
+    plan = json.loads(plan_path.read_text())
+    plan["candidate_binding"] = {
+        "candidate_id": "compensated_auxiliary_dependency"
+    }
+    binding["sha256"] = _write_json(plan_path, plan)
+    _write_json(path, contract)
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][0]
+    assert "INVALID_PLAN_AUTHORITY" in candidate["reasons"]
+    assert "keys drifted" in candidate["plan_authority"]["refusal"]
 
 
 def test_mutated_candidate_array_is_rejected_even_with_new_artifact_sha(

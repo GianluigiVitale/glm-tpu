@@ -8578,3 +8578,32 @@ than `e55e66c6...8ad7` and scores are `6e666fe9...e05c` rather than `a61587a9...
 the contract or run admission: `auxiliary_device_tuple_dependency` is rejected by its own bounded
 candidate-coherent output. Preserve the capsule, authority and producer as negative evidence and
 reusable observability infrastructure. Gate D remains open; no compile or TPU successor exists.
+
+## 2026-08-31 compensated PP16 plan/watchpoint authority; offline only
+
+The compensated source at pin `e16d74f` is now bound to the existing sealed PP16 physical group
+order without borrowing the tuple candidate's watchpoint meaning. New plan authority
+`gate-d-compensated-auxiliary-pp16-plan-authority.json` has file/content SHAs
+`7d0a5615...dbdf`/`eb2c050b...b6dc`; it binds candidate id, mechanism fingerprint, verified
+source-authority SHA `c38492a0...b4c3`, source pin and the exact role map
+`restored_input_rms_fp32[2,1,6144] -> layer1.rms_input_fp32.value[6144]`. It requires bitwise
+agreement across source owner axis 0, then selects prefix `[0,0]`. A future coherent capsule must
+still byte-match that value to the independent binary32 sum of its ordered BF16 hidden-update and
+residual operands.
+
+Core/contract/test/append-only-report SHAs are `206fd203...eb97`, `6559939a...0a25`,
+`d82ebb74...680f` and `3281afec...8540`. Full admission passes 158/158, adjacent Gate-D suites
+69/69, and report regeneration is byte-identical. Fully rebound candidate/source/frontier/
+derivation attacks and tuple-plan migration fail closed. Classification remains
+`NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`; compensated gaps are now
+exactly causal StableHLO, pinned producer and coherent capsule.
+
+No JAX import/lowering, numerical execution, model, cloud workflow or TPU action occurred. After
+adversarial review, commit/push and locked US-CENTRAL2 mirror, exact next is a separate compensated
+causal-StableHLO source batch. Plan persistence cannot authorize a lowering process start.
+
+Fable 5 Max returned a hard usage-limit refusal and supplied no opinion. Same-scope Sol first
+withheld persistence on PP8 rebinding, permissive frontier types, ambiguous owner/selection shape,
+stale prose and permissive JSON schema-version equality. After correction and complete
+re-verification, Sol approved staged diff `b4f6d3cf...aced1` with no remaining P0--P2. That verdict
+authorizes only commit, push and locked same-region mirror; it does not authorize a process start.

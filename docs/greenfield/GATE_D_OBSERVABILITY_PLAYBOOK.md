@@ -165,14 +165,17 @@ Do not weaken v1 or rewrite its historical evidence. The append-only repair now 
 - contract: `configs/greenfield-gate-d-precompile-admission-v2.json`;
 - CLI: `scripts/greenfield/admit_gate_d_precompile.py`;
 - hostile tests: `tests/greenfield/validation/test_gate_d_precompile_admission.py`;
-- current source-authority report: `docs/artifacts/gate-d-precompile-admission-v2.json`;
+- source-authority report: `docs/artifacts/gate-d-precompile-admission-v2.json`;
+- current compensated-plan report:
+  `docs/artifacts/gate-d-precompile-admission-v2-compensated-plan.json`;
 - current real-HLO report: `docs/artifacts/gate-d-precompile-admission-v2-stablehlo.json`.
 
 V2 authenticates committed blob/AST identity for concrete or declarative source authority, a
 content-derived plan, structural StableHLO and typed eight-watchpoint capsule invariants. The tuple
-survivor binds concrete commit `c8b2200` and exact sealed PP16 plan/watchpoint authority; the
-compensated survivor binds distinct concrete default-off source at `e16d74f` but has no plan,
-causal StableHLO or coherent capsule authority. Declarative fixtures remain non-admissible.
+survivor binds concrete commit `c8b2200` and exact sealed PP16 plan/watchpoint authority. The
+compensated survivor binds distinct concrete default-off source at `e16d74f` plus its own
+candidate-bound PP16 plan/watchpoint authority, but has no causal StableHLO, pinned producer or
+coherent capsule authority. Declarative fixtures remain non-admissible.
 Its parent process remains
 stdlib-only; HLO fixture validation runs in a SHA-bound offline child using jaxlib MLIR without
 importing `jax`, compiling or initializing a backend. The child uses an exact
@@ -191,15 +194,20 @@ frontier and closed fingerprints rather than resetting history. The current repo
 tuple candidate's concrete source, PP16 plan and exact real causal StableHLO authority. Its capsule
 bindings remain deliberately null because coherent event replay already rejected the tuple;
 reported capsule gaps are schema-state only, not authority for a new capsule or admission rerun.
-The compensated candidate now retains the four post-source gaps: plan, causal StableHLO, pinned
-producer and coherent capsule. V2 always leaves candidate admission and TPU
+The compensated candidate now has a candidate-bound PP16 plan/watchpoint authority and retains
+three gaps: causal StableHLO, pinned producer and coherent capsule. Its plan binding maps the
+source result `restored_input_rms_fp32[2,1,6144]` to
+`layer1.rms_input_fp32.value[6144]`, requiring bitwise owner agreement before prefix `[0,0]`
+selection; future capsule bytes must independently derive from both sealed BF16 operands. V2
+always leaves candidate admission and TPU
 authorization false. Exact module/function metadata and the complete 533-Python/46-native lowering
 dependency manifests are bound by canonical digest/count, not trusted labels. Current
-source-only core/contract/report SHAs are `fde1847f...b252`, `0ce578d5...ddeb` and
-`9e2f3b5e...594c`; compensated certificate is `237095c7...6fb0`. Historical tuple PP16 plan
+plan-authority core/contract/report SHAs are `206fd203...eb97`, `6559939a...0a25` and
+`3281afec...8540`; compensated certificate and plan-file/content SHAs are
+`237095c7...6fb0`, `7d0a5615...dbdf` and `eb2c050b...b6dc`. Historical tuple PP16 plan
 authority remains `98b4fa21...7880`; validator SHA is `4338229a...6b6d`; installed/source
 provisioner and runtime-tree SHAs remain `2b9c8c2b...0594` and `308748a9...d616`. Full admission
-coverage is 140/140. Historical authority tests must read exact pinned Git blobs, never current
+coverage is 158/158; adjacent Gate-D suites pass 69/69. Historical authority tests must read exact pinned Git blobs, never current
 worktree files.
 
 ### 3.5 Domain-specific state readers
