@@ -944,3 +944,14 @@ descriptor to the approved mount ID and device major/minor. Corrected producer/b
 `228bbfe6...e4ea` and `41c6d1df...4069`. Full admission coverage passes 131/131 plus 69/69
 adjacent Gate-D tests. This source batch authorizes no installation, retry, archive/admission,
 compile, cloud/TPU or Gate-D claim.
+
+At pushed/mirrored pin `17a3518`, the producer was authenticated through one-file tree
+`4b8a9180...d5613`, installed root-owned 0555 by the fixed no-replace provisioner, and invoked once
+under its reviewed forced-two-CPU lock at fresh tag `...20260831T031000Z`. The 12.5-second run
+published SUCCESS last with eight coherent watchpoints and 22 runtime receipts; read-only
+postflight verified state/input/device/receipt SHAs `68ee47b1...f236`, `dd5f1cbb...8b1b`,
+`ca7c2b9c...bd68`, `afbc4a94...21a1`, plus capsule/SUCCESS `aa7425fd...7ef5`/
+`c8c5fb84...3b24`. No plugin, libtpu, model, decoder or TPU ran. Read-only same-region gcsfuse
+payload access occurred, with no cloud workflow or infrastructure mutation. The no-JAX outer-authority
+builder/test (`fc0de9a2...ecbe2`/`26148da4...8b1c`) passes 4/4 and remains source-only pending
+review/persistence/separate invocation; the admission contract still has null capsule bindings.

@@ -2086,3 +2086,25 @@ remains open and no TPU successor is authorized.
   27,176,812,872-byte payloads to mount ID 73 and device 0:43 without reading tensor payloads.
   No install, retry, archive/admission, compile,
   cloud/TPU or Gate-D authorization follows from this source correction.
+
+## Successful corrected tuple-capsule replay; outer authority still pending
+
+- At pushed and byte-mirrored pin `17a3518`, the corrected producer was provisioned from sealed
+  one-file tree `4b8a9180...d5613` using the fixed no-replace runtime provisioner. The new current
+  and versioned paths are the same root-owned 0555 inode with SHA `a81fd59e...1794a`; spent
+  `d3082c2e...f869b` remains preserved by its versioned inode.
+- One separately reviewed start at fresh tag
+  `greenfield_gate_d_tuple_auxiliary_capsule_20260831T031000Z` passed in 12.5 seconds. It is a
+  forced-two-CPU bounded replay only: no JAX plugin, libtpu, model, decoder or TPU work. Read-only
+  same-region gcsfuse payload access occurred; no cloud workflow or infrastructure mutation did.
+  SUCCESS-last publication contains eight watchpoints and 22 exact tensor receipts. State/input/
+  device/receipt SHAs are `68ee47b1...f236`, `dd5f1cbb...8b1b`, `ca7c2b9c...bd68` and
+  `afbc4a94...21a1`; capsule/SUCCESS SHAs are `aa7425fd...7ef5`/`c8c5fb84...3b24`.
+- Read-only postflight rehashed all six files, verified the SUCCESS tuple, checked all three NPZs,
+  confirmed the process gone and left Git clean. This is candidate-coherent local evidence, not
+  admission or numerical acceptance.
+- New no-JAX outer-authority builder/test SHAs are `fc0de9a2...ecbe2` and
+  `26148da4...8b1c`; hostile receipt, shape and canonical-JSON coverage passes 4/4. It remains
+  source-only pending adversarial review, persistence and separate execution authorization. The
+  admission contract still contains null capsule bindings; no archive, admission, compile, TPU or
+  Gate-D successor is authorized.

@@ -8520,3 +8520,27 @@ Fable-max diagnosis for the failure was usage-blocked. Exact next is same-scope 
 review, then commit/push/US-CENTRAL2 mirror. Only after persistence may a separate review consider
 installing producer `a81fd59e...1794a` and exactly one new output tag. Never reuse `...020400Z` or
 `...022000Z`; no compile, cloud/TPU or Gate-D successor is authorized.
+
+## 2026-08-31 corrected tuple capsule succeeded; outer authority source pending
+
+Sol approved authenticated install plus exactly one invocation after two install-review findings
+were fixed: use a hashed one-file staging tree and the sealed no-replace provisioner, never direct
+privileged copy from a mutable user path. At clean pushed/mirrored pin `17a3518`, tree
+`4b8a9180...d5613` provisioned producer `a81fd59e...1794a` root:root 0555; current/versioned are
+inode 39313/link-count 2, while spent `d3082c2e...f869b` remains preserved at inode 39311.
+
+The single fresh forced-two-CPU replay at
+`greenfield_gate_d_tuple_auxiliary_capsule_20260831T031000Z` exited 0 in 12.5 seconds and published
+SUCCESS last. Read-only postflight proves eight watchpoints, 22 tensor receipts, internally matching
+SUCCESS, valid NPZ containers, process gone and clean Git. State/input/device/receipt SHAs are
+`68ee47b1...f236`, `dd5f1cbb...8b1b`, `ca7c2b9c...bd68`, `afbc4a94...21a1`; capsule/SUCCESS are
+`aa7425fd...7ef5`/`c8c5fb84...3b24`. Receipt proves CPU2 and no plugin, libtpu, model, decoder or
+TPU work. Read-only same-region gcsfuse payload access occurred; there was no cloud workflow or
+infrastructure mutation.
+
+New source-only no-JAX authority builder/test SHAs are `fc0de9a2...ecbe2`/
+`26148da4...8b1c`; 4/4 focused tests pass. It derives only the outer authority from the sealed
+capsule while admission independently reopens every input/runtime payload. Exact next is adversarial
+source review, commit/push/US-CENTRAL2 mirror, then a separate review may authorize one authority
+build and contract binding. The current contract remains null-bound; no archive/admission, compile,
+cloud/TPU, numerical acceptance or Gate-D closure is authorized.

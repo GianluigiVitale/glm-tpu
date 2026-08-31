@@ -638,9 +638,11 @@
       "source_paths": [
         "glm_tpu/greenfield/benchmarking/gate_d_tuple_capsule.py",
         "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py",
+        "scripts/greenfield/build_gate_d_tuple_capsule_execution_authority.py",
         "glm_tpu/greenfield/gate_d_precompile_admission.py",
         "configs/greenfield-gate-d-precompile-admission-v2.json",
         "tests/greenfield/validation/test_gate_d_precompile_admission.py",
+        "tests/greenfield/validation/test_gate_d_tuple_capsule_execution_authority_builder.py",
         "docs/artifacts/gate-d-tuple-capsule-runtime-success-format-failure.json",
         "docs/artifacts/gate-d-tuple-capsule-runtime-data-root-failure.json"
       ],
@@ -649,7 +651,7 @@
         "future separately reviewed two-CPU candidate-coherent capsule replay and offline admission"
       ],
       "gate": "D precompile admission",
-      "reason": "Source-only, default-off bounded replay. It snapshots eight exact upstreams before execution, binds 22 stage-zero runtime tensor slices through retained-fd identities, independently derives 11 runtime-backed inputs and DB518 cache, checks explicit two-owner evidence and nonfinite values, and treats local SUCCESS-last publication as provisional. Admission independently pins the exact producer/replay blobs and the full replay-visible committed source manifest. Two reviewed starts are burned: e82fe83 exposed the sha256sum SUCCESS format, and 3a60012 exposed that local manifest authority and mounted payload residency are distinct. The correction independently binds the local authority root and exact read-only same-region driftbench-dsv4-uc gcsfuse data root before and after payload access, rejects longer-covering nested mounts, and binds opened payload descriptors to mount ID and device. Full admission passes 131/131 plus 69/69 adjacent Gate-D tests. No install, retry, archive/admission, cloud/TPU or Gate-D authorization exists."
+      "reason": "Default-off bounded replay and offline authority construction. It snapshots eight exact upstreams before execution, binds 22 stage-zero runtime tensor slices through retained-fd identities, independently derives 11 runtime-backed inputs and DB518 cache, checks explicit two-owner evidence and nonfinite values, and treats local SUCCESS-last publication as provisional. Admission independently pins the exact producer/replay blobs and the full replay-visible committed source manifest. Two reviewed starts are burned: e82fe83 exposed the sha256sum SUCCESS format, and 3a60012 exposed that local manifest authority and mounted payload residency are distinct. The corrected producer binds the exact read-only same-region driftbench-dsv4-uc gcsfuse data root, rejects longer-covering nested mounts, and binds opened payload descriptors to mount ID/device. At pushed/mirrored pin 17a3518, one separately reviewed forced-two-CPU replay succeeded at tag 20260831T031000Z: SUCCESS-last publication has eight watchpoints, 22 receipts and no JAX plugin, libtpu, model, decoder or TPU work; read-only same-region gcsfuse payload access occurred, with no cloud workflow or infrastructure mutation. The new no-JAX authority builder (fc0de9a2...ecbe2; tests 26148da4...8b1c) is source-only and passes 4/4; it has not been run. Full admission remains 131/131 plus 69/69 adjacent Gate-D tests. No archive/admission, compile, cloud/TPU or Gate-D authorization exists."
     },
     {
       "id": "legacy-execution-stack",

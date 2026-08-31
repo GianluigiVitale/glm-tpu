@@ -549,6 +549,9 @@ WS32 adjudication and speculation.
   payload root independently and, for mounted object storage, require one exact filesystem/source,
   read-only mount options, no longer-covering nested mount, opened-descriptor mount-ID/device
   binding, and unchanged mount authority before and after retained-fd payload reads.
+- Never copy reviewed bytes into a privileged executable location directly from a same-UID mutable
+  path. Stage a one-file/tree capsule, bind its tree SHA, and use the sealed no-replace provisioner;
+  only then hardlink and atomically replace the named executable before checking inode/SHA/mode.
 
 ## 10. Minimal incident packet
 
