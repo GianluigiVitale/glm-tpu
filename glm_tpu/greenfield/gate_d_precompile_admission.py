@@ -404,8 +404,19 @@ _EXPECTED_AUXILIARY_SLICE_SHA256 = {
         "02eee1d7a84fd447396577c21c1d2988f23d9b6312b8fa0df4838a9b41642f7c"
     ),
     "compensated_auxiliary_dependency": (
-        "d55e5f45120080dd0a6f81d3f3dddb9c8a738b59e2454ec1f9d87b9bce5d9a43"
+        "b0afe414605e6c98a5b5c2edc0252d90e2a9f279f2ce2f73647c8ff521118ce6"
     ),
+}
+_EXPECTED_AUXILIARY_PATH_OPERATIONS = {
+    "auxiliary_device_tuple_dependency": [],
+    "compensated_auxiliary_dependency": [
+        "stablehlo.optimization_barrier",
+        "stablehlo.add",
+        "stablehlo.convert",
+        "stablehlo.convert",
+        "stablehlo.optimization_barrier",
+        "stablehlo.subtract",
+    ],
 }
 _DTYPE_BYTES = {
     "|b1": 1,
@@ -4241,28 +4252,42 @@ def _verify_stablehlo_authority(
         if source.get("executable_source_authority") is True
         else _EXPECTED_SOURCE_SEMANTIC_SHA256[candidate_id]
     )
-    if (
-        validator.get("accepted_stablehlo_sha256") != accepted_sha
-        or validator.get("candidate_stablehlo_sha256") != candidate_sha
-        or validator.get("local_device_groups") != plan["local_device_groups"]
-        or validator.get("weighted_output_result_index")
-        != indices["weighted_output_result_index"]
-        or validator.get("carried_residual_result_index")
-        != indices["carried_residual_result_index"]
-        or validator.get("auxiliary_result_index")
-        != indices["auxiliary_result_index"]
-        or validator.get("accepted_primary_slice_sha256")
-        != validator.get("candidate_primary_slice_sha256")
-        or validator.get("accepted_primary_slice_sha256")
-        != _EXPECTED_ACCEPTED_PRIMARY_SLICE_SHA256
-        or source["source_semantic_sha256"]
-        != expected_source_semantic_sha256
-        or validator.get("auxiliary_slice_sha256")
-        != _EXPECTED_AUXILIARY_SLICE_SHA256[candidate_id]
-        or not isinstance(auxiliary_operations, list)
-        or any(not isinstance(item, str) for item in auxiliary_operations)
-    ):
-        raise BenchmarkValidationError("StableHLO validator result drifted")
+    expected_validator_fields = {
+        "accepted_stablehlo_sha256": accepted_sha,
+        "auxiliary_path_operations": _EXPECTED_AUXILIARY_PATH_OPERATIONS[
+            candidate_id
+        ],
+        "auxiliary_result_index": indices["auxiliary_result_index"],
+        "auxiliary_slice_sha256": _EXPECTED_AUXILIARY_SLICE_SHA256[candidate_id],
+        "candidate_primary_slice_sha256": _EXPECTED_ACCEPTED_PRIMARY_SLICE_SHA256,
+        "candidate_stablehlo_sha256": candidate_sha,
+        "carried_residual_result_index": indices["carried_residual_result_index"],
+        "local_device_groups": plan["local_device_groups"],
+        "weighted_output_result_index": indices["weighted_output_result_index"],
+    }
+    observed_validator_fields = {
+        key: validator.get(key) for key in expected_validator_fields
+    }
+    observed_validator_fields["accepted_primary_slice_sha256"] = validator.get(
+        "accepted_primary_slice_sha256"
+    )
+    expected_validator_fields["accepted_primary_slice_sha256"] = (
+        _EXPECTED_ACCEPTED_PRIMARY_SLICE_SHA256
+    )
+    mismatches = {
+        key: {"expected": expected_validator_fields[key], "observed": observed}
+        for key, observed in observed_validator_fields.items()
+        if observed != expected_validator_fields[key]
+    }
+    if source["source_semantic_sha256"] != expected_source_semantic_sha256:
+        mismatches["source_semantic_sha256"] = {
+            "expected": expected_source_semantic_sha256,
+            "observed": source["source_semantic_sha256"],
+        }
+    if mismatches:
+        raise BenchmarkValidationError(
+            "StableHLO validator result drifted: " + _canonical_json(mismatches)
+        )
     validator_sha = sha256(_canonical_json(validator).encode("ascii")).hexdigest()
     report = {
         "accepted_primary_path": str(accepted_path),

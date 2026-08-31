@@ -8673,3 +8673,19 @@ Local diagnosis requires the
 already sealed Python 3.12.13 launcher, not a code workaround. Narrow Fable session
 `d525bf0a-7f03-4b4d-9ed3-07eb3cadf7d3` was hard usage-limited and supplied no opinion. Exact next is
 Sol review, persistence, then a separately approved fresh-tag launcher-only retry.
+
+The sealed-Python retry ran the immutable parser but the parent correctly refused the result as
+`INVALID_CAUSAL_STABLEHLO_AUTHORITY`; no JAX/backend/device work occurred. Root cause is a stale
+synthetic expected graph: hash `d55e5f45...d9a43` exactly describes a fixture ending in
+`restored - correction`, while committed lowering returns a two-barrier restored result. Pure
+canonical reconstruction reproduces the stale hash and predicts real-graph hash
+`b0afe414...18ce6`; this hypothesis is not authority until the immutable parser reruns.
+Failure artifact `gate-d-compensated-stablehlo-parser-result-drift.json` is `7fbc5c76...40d0`.
+
+Source-only correction aligns the synthetic fixture with the committed two-barrier graph, pins its
+six exact auxiliary operations, updates the expected slice hash, and replaces the aggregate
+validator refusal with compact expected/observed mismatch fields. Core/test/contract SHAs are
+`fa939326...aa837`, `a11cda4b...077f` and `aeb2f45a...60071`; focused authority and hostile checks
+pass 8/8 and the complete compensated subset passes 32/32. Fable remained hard usage-limited/no
+opinion. No real-parser retry is authorized before
+adversarial review, commit/push and locked US-CENTRAL2 mirror.

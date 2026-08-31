@@ -30,7 +30,7 @@ from glm_tpu.greenfield.gate_d_precompile_admission import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CURRENT_CONTRACT = REPO_ROOT / "configs/greenfield-gate-d-precompile-admission-v2.json"
-CURRENT_CONTRACT_SHA256 = "3f1c817c6400fa3db89998b92519a10f8e26d7cc55707afb564230274dfe55f4"
+CURRENT_CONTRACT_SHA256 = "aeb2f45a2fa560ce26ea8d763783cba0acec4478b44d9b8f11f3cec8fe060071"
 
 
 def _sha(path: Path) -> str:
@@ -597,6 +597,12 @@ def _absolute_current_contract() -> dict[str, Any]:
         evidence["path"] = str((base / evidence["path"]).resolve())
     locality = contract["physical_locality_authority"]
     locality["path"] = str((base / locality["path"]).resolve())
+    # Synthetic/hostile fixtures replace only their selected candidate authority.
+    # Keep the real compensated acquisition out of those unrelated tests so one
+    # complete suite does not repeatedly invoke the immutable parser on it.
+    for candidate in contract["candidates"]:
+        if candidate["id"] == "compensated_auxiliary_dependency":
+            candidate["stablehlo_authority"] = None
     return contract
 
 
@@ -961,18 +967,22 @@ def _stablehlo_authority(
         candidate["id"] == "compensated_auxiliary_dependency"
         and not force_tuple_implementation
     ):
-        final_operator = (
-            "stablehlo.add"
+        restore_operator = (
+            "stablehlo.subtract"
             if non_cancelling_compensation
-            else "stablehlo.subtract"
+            else "stablehlo.add"
         )
         auxiliary_operation = (
             "    %rounded = stablehlo.convert %carried : "
             "(tensor<1x6144xbf16>) -> tensor<1x6144xf32>\n"
             f"    %correction = stablehlo.subtract {auxiliary_base}, %rounded : "
             "tensor<1x6144xf32>\n"
-            "    %restored = stablehlo.add %rounded, %correction : tensor<1x6144xf32>\n"
-            f"    %aux = {final_operator} %restored, %correction : tensor<1x6144xf32>\n"
+            "    %correction_barrier = stablehlo.optimization_barrier %correction : "
+            "tensor<1x6144xf32>\n"
+            f"    %restored = {restore_operator} %rounded, %correction_barrier : "
+            "tensor<1x6144xf32>\n"
+            "    %aux = stablehlo.optimization_barrier %restored : "
+            "tensor<1x6144xf32>\n"
         )
         auxiliary_value = "%aux"
     else:
@@ -1929,7 +1939,6 @@ def test_current_contract_fails_closed_without_jax() -> None:
             "MISSING_CANDIDATE_COHERENT_CAPSULE",
         ],
         "compensated_auxiliary_dependency": [
-            "MISSING_CAUSAL_STABLEHLO_AUTHORITY",
             "MISSING_PINNED_COHERENT_CAPSULE_PRODUCER",
             "MISSING_CANDIDATE_COHERENT_CAPSULE",
         ],
@@ -2637,6 +2646,11 @@ def test_complete_compensated_authority_is_distinct_and_offline_only(
             "compensated_auxiliary_dependency"
         ]
     )
+    assert candidate["stablehlo_authority"]["auxiliary_path_operations"] == (
+        admission_module._EXPECTED_AUXILIARY_PATH_OPERATIONS[
+            "compensated_auxiliary_dependency"
+        ]
+    )
     assert report["tpu_successor_authorized"] is False
 
 
@@ -2650,6 +2664,7 @@ def test_compensated_survivor_cannot_reuse_tuple_implementation(tmp_path: Path) 
     candidate = report["candidate_results"][1]
     assert "INVALID_CAUSAL_STABLEHLO_AUTHORITY" in candidate["reasons"]
     assert "validator result drifted" in candidate["stablehlo_authority"]["refusal"]
+    assert "auxiliary_slice_sha256" in candidate["stablehlo_authority"]["refusal"]
 
 
 def test_non_cancelling_add_sub_is_not_compensated_authority(tmp_path: Path) -> None:
@@ -2662,6 +2677,7 @@ def test_non_cancelling_add_sub_is_not_compensated_authority(tmp_path: Path) -> 
     candidate = report["candidate_results"][1]
     assert "INVALID_CAUSAL_STABLEHLO_AUTHORITY" in candidate["reasons"]
     assert "validator result drifted" in candidate["stablehlo_authority"]["refusal"]
+    assert "auxiliary_slice_sha256" in candidate["stablehlo_authority"]["refusal"]
 
 
 def test_rehashed_source_cannot_reuse_unrelated_hlo(tmp_path: Path) -> None:

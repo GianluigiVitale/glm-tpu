@@ -2266,3 +2266,15 @@ remains open and no TPU successor is authorized.
   records no output/no retry.
   The fix is launcher-only: use the existing sealed Python 3.12.13 after separate persistence and
   review. Fable session `d525bf0a-7f03-4b4d-9ed3-07eb3cadf7d3` was hard usage-limited/no opinion.
+- The sealed-Python retry reached the immutable parser, but the parent fail-closed with
+  `INVALID_CAUSAL_STABLEHLO_AUTHORITY`. Artifact
+  `gate-d-compensated-stablehlo-parser-result-drift.json` (`7fbc5c76...40d0`) records no
+  JAX/backend/device successor. The stale expected hash `d55e5f45...d9a43` exactly matches a
+  synthetic `restored - correction` fixture, not the committed two-optimization-barrier restored
+  result. Pure canonical reconstruction predicts `b0afe414...18ce6`; only a later immutable-parser
+  run can promote that hypothesis.
+- Source-only correction aligns the fixture to committed graph structure, pins all six auxiliary
+  operations and emits compact expected/observed mismatch fields. Core/test/contract SHAs are
+  `fa939326...aa837`, `a11cda4b...077f` and `aeb2f45a...60071`; focused authority/attack checks pass
+  8/8 and the compensated subset passes 32/32. No real-parser retry is authorized before separate
+  review and persistence.

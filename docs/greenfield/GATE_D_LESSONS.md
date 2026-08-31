@@ -1084,3 +1084,12 @@ normalized-state cause.
   pass candidate id into the immutable parser rather than inferring it from a generic tuple label.
   Preserve the historical tuple contract exactly. Also validate receipt, SUCCESS and certificate
   schema versions as strict integers: JSON floats and bools compare equal to integers in Python.
+- Preflight the literal parent CLI interpreter before spending a reviewed parser start. Package
+  import requirements such as `enum.StrEnum` are launcher requirements even when the eventual
+  child parser has its own sealed runtime. Record a pre-argparse failure as a burned attempt; fix
+  only the launcher under a fresh tag after persistence and review.
+- A synthetic causal-slice fixture is not authority for the committed lowering. Reconstruct its
+  canonical hash to diagnose drift, then align the fixture to exact real operations—including
+  optimization barriers—and require the immutable parser to reproduce the new expectation. Emit
+  compact expected/observed fields instead of one aggregate `validator result drifted` message so
+  the first failed bounded run identifies the precise stale invariant.

@@ -592,6 +592,13 @@ without rerunning:
 
 If any item was never produced, record it as absent. Never fill an evidence gap with inference.
 
+For offline parser acquisitions, preflight the exact parent interpreter against repository import
+requirements before consuming the reviewed start. Keep fixture and real-lowering slice hashes
+separate: a fixture hash must be reproducible from its declared operation graph, while only the
+sealed immutable parser can promote the committed graph hash. Parent comparison failures must name
+each mismatched field with expected and observed compact values; a single aggregate drift string is
+insufficient observability and causes unnecessary protected retries.
+
 ## 11. Definition of an observable mechanism
 
 A mechanism is eligible to request a separate compile-only review only when all of the following
