@@ -1074,3 +1074,17 @@ Current driver/publisher/wrapper/test SHAs are `3842d06d...1f88`, `f481c610...4c
 no-import probe validates both trees and resolves `jax`, `jaxlib` and `libtpu` only from their
 root-owned sites. This is source/read-only evidence only: no JAX import, backend, HLO compilation,
 cloud or TPU work occurred, and a fresh process start remains separately reviewed.
+
+The first start after that persistence still produced no HLO: five of eight concurrent GitHub SSH
+fetches inside the protected wrapper reported transport corruption while three workers advanced
+cleanly; concurrency causality is unproven. Preserve
+`gate-d-compensated-pp16-hlo-concurrent-git-sync-failure.json` and its diagnostic prefix; both
+censuses are 8/8 clean, HLO is empty and the tag is burned. Repository mutation is now removed from
+the compile boundary. Wrapper `f093aea4...a1b3d3` verifies workers 0--7 sequentially under an
+isolated no-lock/no-lazy-fetch environment: direct canonical repository/worktree, strict passive
+config, clean exact HEAD without special index/sparse state, complete non-shallow closure, no
+alternate/promisor/graft/replace/symlink backing, and eight unique markers. Test
+`32c24967...84a335` proves no repository metadata write or fsmonitor/filter/diff invocation;
+redirected worktrees, hidden dirty content and missing closure reject.
+Recover all repositories separately to the final corrected pin with a reviewed SHA-bound immutable
+transfer and preserved old repository; no HLO successor is authorized by this correction.

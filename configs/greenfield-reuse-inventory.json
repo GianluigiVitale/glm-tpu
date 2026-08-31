@@ -720,7 +720,7 @@
       "id": "gate-d-compensated-pp16-hlo-protection",
       "category": "Gate-D compile-only HLO acquisition protection",
       "source_repo": "glm-tpu greenfield",
-      "source_pin": "compensated capsule sealed-source machinery / accepted DB485 generation-zero publisher / PP16 HLO builder a75b6eeb21ca94cd70910553f5804b8f1127ac88ca3c8b5545bec993adae54fc / driver 3842d06dd27dead13e485df48df82f49c8ce5aea99ef9603fab3eb0852681f88 / storage-site builder b7f4f869ae9b98edf5195185bf49fffcf61ef6800a2b707127694b66424c5989 / storage tree d94fd4c3e0ffbf024a0b53faff4565d28900b64fc5dd9944bff316f47db1b510 / JAX tree 55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df / libtpu tree db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca / publisher f481c6104c44b878f5eec14b65b699b40021f6e31d136a00e37107e136f14c15 / wrapper 7a7abfae00325b30620f5526c655a06ad47761c072d18f15766c5c81747d2a14 / tests bf6556a78306984d53028d696dbea16008cc4dda4d831768e8e70f3735fbe5c7",
+      "source_pin": "compensated capsule sealed-source machinery / accepted DB485 generation-zero publisher / PP16 HLO builder a75b6eeb21ca94cd70910553f5804b8f1127ac88ca3c8b5545bec993adae54fc / driver 3842d06dd27dead13e485df48df82f49c8ce5aea99ef9603fab3eb0852681f88 / storage-site builder b7f4f869ae9b98edf5195185bf49fffcf61ef6800a2b707127694b66424c5989 / storage tree d94fd4c3e0ffbf024a0b53faff4565d28900b64fc5dd9944bff316f47db1b510 / JAX tree 55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df / libtpu tree db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca / publisher f481c6104c44b878f5eec14b65b699b40021f6e31d136a00e37107e136f14c15 / wrapper f093aea4b4b7ffb221bbea935d3d1ae8ae8f64d37542ed8ff5d2e06127a1b3d3 / tests 32c24967ea68fc92b4752c2d614b60f9ac3b06b920fbee983f0a15c78b84a335",
       "source_paths": [
         "scripts/greenfield/produce_gate_d_compensated_auxiliary_capsule.py",
         "scripts/greenfield/publish_accepted_db485_compile_only_hlo.py",
@@ -732,6 +732,7 @@
         "docs/artifacts/gate-d-compensated-pp16-storage-site-build.json",
         "docs/artifacts/gate-d-compensated-pp16-storage-site-install.json",
         "docs/artifacts/gate-d-compensated-pp16-hlo-pre-census-failure.json",
+        "docs/artifacts/gate-d-compensated-pp16-hlo-concurrent-git-sync-failure.json",
         "tests/greenfield/validation/test_gate_d_compensated_pp16_hlo_acquisition.py"
       ],
       "disposition": "adapted",
@@ -740,6 +741,23 @@
       ],
       "gate": "D diagnostic",
       "reason": "Every project import is derived from exact committed Git blobs and sealed in a memfd. After a later protected start exposed a mutable vllm-env/UV interpreter and review withheld a partial correction that still selected mutable JAX/libtpu, the current source binds the root-owned Python runtime plus exact sealed JAX and libtpu trees/manifests before import and after compilation. Compiler sys.path contains only the memfd archive, two sealed sites and root stdlib; compiler PATH is /usr/bin:/bin. Driver and publisher reject Python/native dependencies outside exact sealed/system roots, except the independently Git-authenticated driver file, and byte-bind accepted dependencies before/after compile with one ordering. The publisher requires exact canonical realpaths and reopens every dependency O_NOFOLLOW to verify regular/single-link identity, device, inode, size, stable metadata and SHA before remote publication. Publication uses sealed Python plus the root-owned storage-client capsule. The nounset and later provenance failures are preserved with vacant remote prefixes and 8/8 cleanup; an intervening repository-sync failure is separate operational evidence. None is model/HLO evidence and no burned tag may be reused. The required pre-start boundary remains a separately reviewed absolute env-i plus /usr/bin/bash --noprofile --norc command. Admission/topology JSON comes from single identity-checked snapshots; the wrapper holds one private run inode as inherited dirfd 7. Local writes are no-follow, exclusive, fsynced and exact-inventoried. Remote payloads are generation-zero created, generation/size/CRC32C/SHA bound, generation-qualified replayed and terminal-last; both terminal classes forbid later writes. Focused tests and a no-import sealed-runtime probe validate this boundary. This source/read-only evidence authorizes no process start, TPU numerical execution, performance claim or Gate-D closure before separate review and persistence."
+    },
+    {
+      "id": "gate-d-read-only-worker-pin-verification",
+      "category": "Gate-D protected-run repository boundary",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "failure evidence 2c911054145cc20c0d770972f212f9cc3b974527ad09e5ac4c07f379e8b6bd48 at 508aaa373147988ff597dfd94a02fddff1778be6 / corrected wrapper f093aea4b4b7ffb221bbea935d3d1ae8ae8f64d37542ed8ff5d2e06127a1b3d3 / tests 32c24967ea68fc92b4752c2d614b60f9ac3b06b920fbee983f0a15c78b84a335",
+      "source_paths": [
+        "scripts/greenfield/run_gate_d_compensated_pp16_hlo.sh",
+        "tests/greenfield/validation/test_gate_d_compensated_pp16_hlo_acquisition.py",
+        "docs/artifacts/gate-d-compensated-pp16-hlo-concurrent-git-sync-failure.json"
+      ],
+      "disposition": "adapted",
+      "greenfield_consumers": [
+        "future protected PP16 compile-only HLO start"
+      ],
+      "gate": "D diagnostic prerequisite",
+      "reason": "A protected tag failed before JAX when five of eight concurrent GitHub SSH fetches reported transport corruption and only three workers advanced; concurrency causality is unproven. Both censuses are 8/8 clean, HLO is empty, diagnostics are terminal and the tag is burned. Repository mutation is removed from the protected fleet-verification block. The corrected wrapper checks workers 0-7 sequentially under an isolated no-lock/no-lazy-fetch environment for a direct canonical worktree/repository, strict passive local config, exact clean HEAD without special index/sparse state, non-shallow complete object closure and no alternates, promisor/partial-clone state, grafts, replacement refs or object symlinks; it fails on the first nonzero result and requires eight unique markers. A behavioral test proves no repository byte/metadata writes or fsmonitor/filter/diff invocation and rejects redirected worktrees, hidden dirty state and missing closure. Recovery is a separate reviewed SHA-bound immutable transfer under both leases; this source authorizes no recovery or HLO start."
     },
     {
       "id": "gate-d-libtpu-site-capsule",

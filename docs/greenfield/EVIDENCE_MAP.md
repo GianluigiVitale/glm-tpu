@@ -2496,3 +2496,25 @@ remains open and no TPU successor is authorized.
 - No JAX import, backend initialization, cloud operation, HLO lowering/compile or TPU work occurred.
   This source batch requires review, commit/push and same-region mirror before a distinct fresh HLO
   start can be considered. Gate D remains open.
+
+## Fresh PP16 HLO start refused during concurrent Git transport; sync removed from run
+
+- The separately approved fresh tag `gate_d_compensated_pp16_hlo_20260831T222752715835766Z` passed
+  vacancy, mirror and authenticated 8/8 pre-census, then failed before JAX when five of eight
+  concurrent GitHub SSH fetches reported MAC/pack corruption. Concurrency causality is unproven.
+  Workers 0/2/6 reached clean pin `508aaa3`;
+  workers 1/3/4/5/7 remained clean at `4a44f58`. The HLO directory is empty, no runner log exists,
+  the failure-exit census is 8/8 clean and both leases are free.
+- Append-only diagnostics contain exactly ten remote objects and no `HLO_ACQUIRED`; exact evidence
+  is `gate-d-compensated-pp16-hlo-concurrent-git-sync-failure.json`. The tag is burned. This is
+  repository transport evidence only, not a compiler, HLO, numerical or Gate-D result.
+- Corrected wrapper `f093aea4...a1b3d3` performs no fetch, clone, checkout or mutation in its fleet
+  verification block. Under an isolated no-lock/no-lazy-fetch Git environment, it sequentially
+  requires a direct canonical worktree/repository, strict passive config, clean exact HEAD without
+  special index/sparse state, non-shallow complete closure, and no alternates, promisor state,
+  grafts, replacement refs or object symlinks. It fails on the first nonzero worker, then requires
+  eight unique `SYNC_OK` markers. Test `32c24967...84a335` proves the exact verifier does not invoke
+  hostile fsmonitor/filter/diff commands or change repository bytes/metadata; redirected worktrees,
+  hidden dirty files and missing objects reject. Recovery to the final
+  corrected pin must occur separately under both leases through a reviewed SHA-bound immutable
+  transfer and preserved-old/atomic publication; only then may a new HLO tag be reviewed.

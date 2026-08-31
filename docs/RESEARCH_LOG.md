@@ -5,6 +5,33 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-31 22:27--22:53 UTC — protected HLO start fails in Git transport; mutation removed
+
+At pushed and same-region-mirrored pin `508aaa373147988ff597dfd94a02fddff1778be6`, the separately
+approved tag `gate_d_compensated_pp16_hlo_20260831T222752715835766Z` passed vacancy, mirror and 8/8
+pre-census, then failed before JAX while eight GitHub SSH fetches ran concurrently. Five workers
+reported MAC/pack/EOF failures; three reached the pin. Concurrency causality is unproven. Both
+censuses are 8/8 clean, leases are free, HLO count is zero, no runner log or success terminal
+exists, and the ten-object diagnostic is terminal. The tag is burned. Evidence SHA is
+`2c911054...b6bd48`; no compiler/backend, numerical, performance, DB or Gate-D claim exists.
+
+The correction removes fetch/clone/checkout from the protected fleet boundary. Wrapper
+`f093aea4...a1b3d3` verifies workers 0--7 sequentially under empty environment, absolute tools,
+`GIT_OPTIONAL_LOCKS=0`, disabled fsmonitor/untracked-cache refresh, disabled lazy fetch/replacement
+objects and no SSH. It requires a direct canonical repository/worktree, strict passive config,
+exact clean HEAD without special index/sparse state, complete non-shallow connectivity and no
+alternate/promisor/graft/replace/symlink backing. Test `32c24967...84a335` proves no hostile
+fsmonitor/filter/diff invocation or repository byte/stat change, and rejects redirected worktrees,
+assume-unchanged/skip-worktree dirt, promisor state, alternates, replace refs and a missing blob.
+The complete test file passes 62/62 with its actual offline dependencies; Ruff and
+Bash syntax pass, while ShellCheck is unavailable.
+
+No repository recovery, JAX, cloud mutation or TPU work occurred while preparing the correction.
+Exact next is same-scope review, persistence, then a separate repository-only review for one
+SHA-bound complete-bundle or fresh-sibling/atomic-swap recovery under both global leases. Preserve
+old repositories and require eight unique clean closure markers before reviewing any fresh HLO
+tag. Protected layer-1 numerical execution and exact 8K remain forbidden; Gate D is open.
+
 ## 2026-08-29 04:40--05:05 UTC — strict PP16 numerical launcher corrected offline
 
 The separately default-off numerical wrapper now requires explicit full-width-rounded-then-slice

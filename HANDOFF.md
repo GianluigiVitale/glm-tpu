@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-29 UTC
+**Updated:** 2026-08-31 UTC
 
 ## 2026-08-29 accepted DB485 compile-only discriminator corrected after Sol block
 
@@ -8926,3 +8926,31 @@ order, execute the semantics under `/usr/bin/bash -u`, and reject any same-comma
 across the wrapper. Fable remains usage-blocked; the same Sol reviewer confirmed the diagnosis and
 no additional P0--P2. Exact next is correction review, commit/push/locked mirror, then a separately
 reviewed fresh-tag start. Gate D and protected layer-1/8K execution remain open/forbidden.
+
+## 2026-08-31 second PP16 HLO start exposed repository transport failure; recovery source only
+
+The nounset correction and fully sealed compiler boundary were persisted at
+`508aaa373147988ff597dfd94a02fddff1778be6`. The separately approved fresh tag
+`gate_d_compensated_pp16_hlo_20260831T222752715835766Z` passed remote vacancy, exact mirror and
+authenticated 8/8 pre-census, then failed before JAX while eight GitHub SSH fetches ran
+concurrently. Five workers reported MAC/pack/EOF failures; workers 0/2/6 reached `508aaa3` and
+1/3/4/5/7 remained clean at `4a44f58`. Concurrency causality is unproven. Both censuses are 8/8
+clean, both leases are free, `hlo/` is empty, no runner log or `HLO_ACQUIRED` exists and the
+ten-object diagnostic is terminal. The tag is burned. Failure evidence SHA is
+`2c911054...b6bd48`; there is no compiler, numerical, performance, DB or Gate-D result.
+
+Repository mutation is removed from the protected fleet-verification block. Wrapper
+`f093aea4...a1b3d3` now verifies workers sequentially under an isolated no-lock/no-lazy-fetch Git
+environment. It requires a direct canonical repository/worktree, strict passive config, exact
+clean HEAD without special index/sparse state, complete non-shallow closure, and no alternate,
+promisor, graft, replacement-ref or object-symlink backing. Test `32c24967...84a335` runs that exact
+verifier against hostile fsmonitor/filter/diff config, proves repository bytes and complete stat
+metadata are unchanged, and rejects redirected worktrees, assume-unchanged/skip-worktree dirt,
+promisor state, alternates, replace refs and a missing reachable blob. The full file passes 62/62 with
+pytest/numpy/google-crc32c; Ruff and Bash syntax pass, ShellCheck is unavailable.
+
+This batch authorizes no recovery or HLO start. Exact next is same-scope adversarial review,
+commit/push/locked same-region mirror, then a separately reviewed repository-only SHA-bound
+complete bundle or fresh-sibling/atomic-swap recovery under both leases. Preserve old repositories
+until eight unique clean closure markers pass. Only afterward may a new HLO tag be reviewed;
+protected layer-1 numerical execution and exact 8K remain forbidden.

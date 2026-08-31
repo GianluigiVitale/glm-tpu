@@ -735,6 +735,271 @@ def test_strict_census_label_is_bound_before_member_under_nounset() -> None:
     assert completed.stderr == ""
 
 
+def test_repository_verification_is_read_only_serial_and_fail_fast() -> None:
+    wrapper = WRAPPER.read_text()
+    block = wrapper.split(
+        'say "verifying exact pushed pin read-only across all eight hosts"', 1
+    )[1].split(
+        'say "lowering and compiling one abstract-input PP16 stage-zero graph', 1
+    )[0]
+    assert "--worker=all" not in block
+    assert "for worker in 0 1 2 3 4 5 6 7; do" in block
+    assert '--worker="$worker"' in block
+    assert "git fetch" not in block
+    assert "git checkout" not in block
+    assert "git clone" not in block
+    assert "git reset" not in block
+    assert "status --porcelain" not in block
+    assert "/usr/bin/env -i" in block
+    assert "GIT_CONFIG_GLOBAL=/dev/null" in block
+    assert "GIT_CONFIG_NOSYSTEM=1" in block
+    assert "GIT_NO_LAZY_FETCH=1" in block
+    assert "GIT_NO_REPLACE_OBJECTS=1" in block
+    assert "GIT_OPTIONAL_LOCKS=0" in block
+    assert "GIT_PROTOCOL_FROM_USER=0" in block
+    assert "GIT_SSH_COMMAND=/bin/false" in block
+    assert "/usr/bin/git" in block
+    assert "-c core.fsmonitor=false" in block
+    assert "-c core.untrackedCache=false" in block
+    assert "-c core.preloadIndex=false" in block
+    assert 'rev-parse --verify "$pin^{commit}"' in block
+    assert 'cat-file -t "$pin"' in block
+    assert '[[ -d "$wt/.git" && ! -L "$wt/.git" ]]' in block
+    assert "config_not_allowlisted" in block
+    assert "rev-parse --show-toplevel" in block
+    assert '[[ "$toplevel" == "$wt" ]]' in block
+    assert '[[ "$git_dir" == "$wt/.git" ]]' in block
+    assert '[[ "$common_dir" == "$wt/.git" ]]' in block
+    assert "rev-parse --is-shallow-repository" in block
+    assert '"$object_dir/info/alternates"' in block
+    assert '"$common_dir/info/grafts"' in block
+    assert '"$common_dir/info/sparse-checkout"' in block
+    assert "-name '*.promisor'" in block
+    assert "for-each-ref --format='%(refname)' refs/replace" in block
+    assert "ls-files -v -z" in block
+    assert "special_index_flag" in block
+    assert 'diff-index --quiet --no-ext-diff --no-textconv "$pin" --' in block
+    assert "ls-files --others --exclude-standard" in block
+    assert 'fsck --connectivity-only --strict --no-dangling "$pin"' in block
+    assert "if [[ $worker_status -ne 0 ]]; then" in block
+    assert "break" in block
+
+
+def _worker_repo_verify_script() -> str:
+    source = WRAPPER.read_text()
+    return source.split("<<'WORKER_REPO_VERIFY_EOF' || true\n", 1)[1].split(
+        "\nWORKER_REPO_VERIFY_EOF", 1
+    )[0]
+
+
+def _run_worker_repo_verify(
+    repo: Path, pin: str, origin: str
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            "/usr/bin/env",
+            "-i",
+            "HOME=/home/gianl",
+            "LANG=C",
+            "LC_ALL=C",
+            "PATH=/usr/bin:/bin",
+            "GIT_CONFIG_GLOBAL=/dev/null",
+            "GIT_CONFIG_NOSYSTEM=1",
+            "GIT_NO_LAZY_FETCH=1",
+            "GIT_NO_REPLACE_OBJECTS=1",
+            "GIT_OPTIONAL_LOCKS=0",
+            "GIT_PROTOCOL_FROM_USER=0",
+            "GIT_TERMINAL_PROMPT=0",
+            "GIT_SSH_COMMAND=/bin/false",
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            _worker_repo_verify_script(),
+            "gate-d-worker-repo-verify-test",
+            pin,
+            str(repo),
+            origin,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _repository_metadata_snapshot(root: Path) -> dict[str, tuple[object, ...]]:
+    records: dict[str, tuple[object, ...]] = {}
+    for path in sorted((root, *root.rglob("*")), key=lambda item: str(item)):
+        metadata = path.lstat()
+        kind = stat.S_IFMT(metadata.st_mode)
+        payload = ""
+        if stat.S_ISREG(metadata.st_mode):
+            payload = sha256(path.read_bytes()).hexdigest()
+        elif stat.S_ISLNK(metadata.st_mode):
+            payload = os.readlink(path)
+        records[str(path.relative_to(root))] = (
+            kind,
+            stat.S_IMODE(metadata.st_mode),
+            metadata.st_size,
+            metadata.st_ino,
+            metadata.st_nlink,
+            metadata.st_uid,
+            metadata.st_gid,
+            metadata.st_mtime_ns,
+            metadata.st_ctime_ns,
+            payload,
+        )
+    return records
+
+
+def test_exact_worker_repo_verifier_is_no_write_and_fails_hostile_closure(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git_environment = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "Gate D Test",
+        "GIT_AUTHOR_EMAIL": "gate-d@example.invalid",
+        "GIT_COMMITTER_NAME": "Gate D Test",
+        "GIT_COMMITTER_EMAIL": "gate-d@example.invalid",
+    }
+
+    def git(*arguments: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["/usr/bin/git", "-C", str(repo), *arguments],
+            check=True,
+            capture_output=True,
+            env=git_environment,
+            text=True,
+        )
+
+    git("init", "-q")
+    origin = "git@example.invalid:owner/repo.git"
+    git("remote", "add", "origin", origin)
+    (repo / "tracked.txt").write_text("sealed worker repository\n")
+    (repo / ".gitattributes").write_text("tracked.txt filter=hostile diff=hostile\n")
+    git("add", "tracked.txt", ".gitattributes")
+    git("commit", "-q", "-m", "seed")
+    pin = git("rev-parse", "HEAD").stdout.strip()
+
+    sentinel = tmp_path / "fsmonitor-invoked"
+    fsmonitor = tmp_path / "hostile-fsmonitor"
+    fsmonitor.write_text(f"#!/usr/bin/bash\n/usr/bin/touch {sentinel}\n")
+    fsmonitor.chmod(0o755)
+    git("config", "core.fsmonitor", str(fsmonitor))
+    git("config", "core.untrackedCache", "true")
+
+    before = _repository_metadata_snapshot(repo)
+    completed = _run_worker_repo_verify(repo, pin, origin)
+    after = _repository_metadata_snapshot(repo)
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.startswith("SYNC_OK ")
+    assert completed.stderr == ""
+    assert not sentinel.exists()
+    assert after == before
+
+    external = tmp_path / "hostile-filter-diff"
+    external.write_text(f"#!/usr/bin/bash\n/usr/bin/touch {sentinel}\n/bin/cat\n")
+    external.chmod(0o755)
+    git("config", "filter.hostile.clean", str(external))
+    git("config", "filter.hostile.smudge", str(external))
+    git("config", "diff.hostile.command", str(external))
+    completed = _run_worker_repo_verify(repo, pin, origin)
+    assert completed.returncode != 0
+    assert "config_not_allowlisted" in completed.stderr
+    assert not sentinel.exists()
+    git("config", "--unset-all", "filter.hostile.clean")
+    git("config", "--unset-all", "filter.hostile.smudge")
+    git("config", "--unset-all", "diff.hostile.command")
+
+    redirected = tmp_path / "redirected-worktree"
+    redirected.mkdir()
+    git("config", "core.worktree", str(redirected))
+    completed = _run_worker_repo_verify(repo, pin, origin)
+    assert completed.returncode != 0
+    assert "config_not_allowlisted" in completed.stderr
+    git("config", "--unset-all", "core.worktree")
+
+    git("update-index", "--assume-unchanged", "tracked.txt")
+    (repo / "tracked.txt").write_text("dirty but assumed unchanged\n")
+    completed = _run_worker_repo_verify(repo, pin, origin)
+    assert completed.returncode != 0
+    assert "special_index_flag" in completed.stderr
+    git("update-index", "--no-assume-unchanged", "tracked.txt")
+    (repo / "tracked.txt").write_text("sealed worker repository\n")
+
+    git("update-index", "--skip-worktree", "tracked.txt")
+    (repo / "tracked.txt").write_text("dirty but skipped\n")
+    completed = _run_worker_repo_verify(repo, pin, origin)
+    assert completed.returncode != 0
+    assert "special_index_flag" in completed.stderr
+    git("update-index", "--no-skip-worktree", "tracked.txt")
+    (repo / "tracked.txt").write_text("sealed worker repository\n")
+
+    git("config", "remote.origin.promisor", "true")
+    completed = _run_worker_repo_verify(repo, pin, origin)
+    assert completed.returncode != 0
+    assert "config_not_allowlisted" in completed.stderr
+    git("config", "--unset", "remote.origin.promisor")
+
+    git("config", "core.repositoryFormatVersion", "1")
+    git("config", "extensions.PartialClone", "origin")
+    completed = _run_worker_repo_verify(repo, pin, origin)
+    assert completed.returncode != 0
+    assert "config_not_allowlisted" in completed.stderr
+    git("config", "--unset", "extensions.PartialClone")
+    git("config", "core.repositoryFormatVersion", "0")
+
+    alternates = repo / ".git/objects/info/alternates"
+    alternates.write_text("/tmp/not-an-authority\n")
+    completed = _run_worker_repo_verify(repo, pin, origin)
+    assert completed.returncode != 0
+    assert "alternates" in completed.stderr
+    alternates.unlink()
+
+    promisor = repo / ".git/objects/pack/hostile.promisor"
+    promisor.write_text("")
+    completed = _run_worker_repo_verify(repo, pin, origin)
+    assert completed.returncode != 0
+    assert "promisor_pack" in completed.stderr
+    promisor.unlink()
+
+    sparse = repo / ".git/info/sparse-checkout"
+    sparse.write_text("/*\n")
+    completed = _run_worker_repo_verify(repo, pin, origin)
+    assert completed.returncode != 0
+    assert "sparse_checkout" in completed.stderr
+    sparse.unlink()
+
+    blob = git("rev-parse", "HEAD:tracked.txt").stdout.strip()
+    replacement_payload = tmp_path / "replacement-payload"
+    replacement_payload.write_text("replacement blob\n")
+    replacement = git("hash-object", "-w", str(replacement_payload)).stdout.strip()
+    git("replace", blob, replacement)
+    completed = _run_worker_repo_verify(repo, pin, origin)
+    assert completed.returncode != 0
+    assert "replace_refs" in completed.stderr
+    git("replace", "-d", blob)
+
+    git_directory = repo / ".git"
+    parked_git_directory = tmp_path / "parked.git"
+    git_directory.rename(parked_git_directory)
+    git_directory.write_text(f"gitdir: {parked_git_directory}\n")
+    completed = _run_worker_repo_verify(repo, pin, origin)
+    assert completed.returncode != 0
+    assert "git_boundary" in completed.stderr
+    git_directory.unlink()
+    parked_git_directory.rename(git_directory)
+
+    blob_path = repo / ".git/objects" / blob[:2] / blob[2:]
+    assert blob_path.is_file()
+    blob_path.unlink()
+    completed = _run_worker_repo_verify(repo, pin, origin)
+    assert completed.returncode != 0
+    assert "object_closure" in completed.stderr
+
+
 def test_wrapper_pins_current_builder_driver_and_publisher_bytes() -> None:
     source = WRAPPER.read_text()
     for name, path in (

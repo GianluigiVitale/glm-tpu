@@ -230,22 +230,112 @@ strict_census pre || {
   exit 1
 }
 
-say "synchronizing exact pushed pin across all eight hosts"
-# shellcheck disable=SC2016
-sync_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$ORIGIN"'; wt='"$WORKTREE"'; if [[ $idx == 0 ]]; then [[ -e "$wt/.git" && $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; else if [[ -e "$wt/.git" ]]; then [[ -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q "$origin" "$branch"; git -C "$wt" checkout -q --detach "$pin"; else git clone -q --filter=blob:none --no-checkout --single-branch --branch "$branch" "$origin" "$wt"; git -C "$wt" checkout -q --detach "$pin"; fi; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; echo "SYNC_OK $(hostname) $pin"'
-set +e
-sync_output=$(timeout --signal=TERM --kill-after=10 300 \
-  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-    --command="$sync_command" 2>&1)
-sync_status=$?
-set -e
-printf '%s\n' "$sync_output" | publish_member sync.txt
+say "verifying exact pushed pin read-only across all eight hosts"
+read -r -d '' WORKER_REPO_VERIFY_SCRIPT <<'WORKER_REPO_VERIFY_EOF' || true
+set -euo pipefail
+pin=$1
+wt=$2
+origin=$3
+fail() {
+  printf 'REPO_VERIFY_BAD %s %s\n' "$(/usr/bin/hostname)" "$1" >&2
+  exit 1
+}
+git_cmd=(
+  /usr/bin/git
+  -c core.fsmonitor=false
+  -c core.untrackedCache=false
+  -c core.preloadIndex=false
+  -c fsck.skipList=/dev/null
+)
+[[ -d "$wt" && ! -L "$wt" && "$(/usr/bin/readlink -f -- "$wt")" == "$wt" ]] || fail worktree_boundary
+[[ -d "$wt/.git" && ! -L "$wt/.git" ]] || fail git_boundary
+[[ -f "$wt/.git/config" && ! -L "$wt/.git/config" ]] || fail config_boundary
+config_status=0
+config_names=$("${git_cmd[@]}" -C "$wt" config --local --name-only --get-regexp '.*') || config_status=$?
+[[ "$config_status" -eq 0 || "$config_status" -eq 1 ]] || fail config_read
+while IFS= read -r config_name; do
+  case "${config_name,,}" in
+    core.bare | core.filemode | core.fsmonitor | core.logallrefupdates | \
+      core.repositoryformatversion | core.untrackedcache | remote.origin.fetch | \
+      remote.origin.url | branch.*.merge | branch.*.remote) ;;
+    *) fail config_not_allowlisted ;;
+  esac
+done <<<"$config_names"
+[[ "$("${git_cmd[@]}" -C "$wt" config --local --get core.repositoryformatversion)" == 0 ]] || fail repository_format
+[[ "$("${git_cmd[@]}" -C "$wt" config --local --bool --get core.bare)" == false ]] || fail bare_repository
+[[ "$("${git_cmd[@]}" -C "$wt" config --local --bool --get core.filemode)" == true ]] || fail filemode_config
+[[ "$("${git_cmd[@]}" -C "$wt" config --local --bool --get core.logallrefupdates)" == true ]] || fail reflog_config
+[[ "$("${git_cmd[@]}" -C "$wt" config --local --get remote.origin.url)" == "$origin" ]] || fail origin_config
+toplevel=$("${git_cmd[@]}" -C "$wt" rev-parse --show-toplevel) || fail toplevel
+[[ "$toplevel" == "$wt" ]] || fail redirected_worktree
+git_dir=$("${git_cmd[@]}" -C "$wt" rev-parse --path-format=absolute --git-dir) || fail git_dir
+[[ "$git_dir" == "$wt/.git" ]] || fail git_dir_rebind
+head=$("${git_cmd[@]}" -C "$wt" rev-parse --verify HEAD) || fail head_read
+[[ "$head" == "$pin" ]] || fail wrong_head
+commit=$("${git_cmd[@]}" -C "$wt" rev-parse --verify "$pin^{commit}") || fail commit_read
+[[ "$commit" == "$pin" ]] || fail wrong_commit
+[[ "$("${git_cmd[@]}" -C "$wt" cat-file -t "$pin")" == commit ]] || fail commit_type
+[[ "$("${git_cmd[@]}" -C "$wt" rev-parse --is-shallow-repository)" == false ]] || fail shallow
+common_dir=$("${git_cmd[@]}" -C "$wt" rev-parse --path-format=absolute --git-common-dir) || fail common_dir
+object_dir=$("${git_cmd[@]}" -C "$wt" rev-parse --path-format=absolute --git-path objects) || fail object_dir
+[[ -d "$common_dir" && ! -L "$common_dir" ]] || fail common_dir_boundary
+[[ -d "$object_dir" && ! -L "$object_dir" ]] || fail object_dir_boundary
+[[ "$common_dir" == "$wt/.git" ]] || fail common_dir_rebind
+[[ "$(/usr/bin/readlink -f -- "$object_dir")" == "$(/usr/bin/readlink -f -- "$common_dir/objects")" ]] || fail object_dir_rebind
+[[ ! -e "$object_dir/info/alternates" && ! -L "$object_dir/info/alternates" ]] || fail alternates
+[[ ! -e "$common_dir/info/grafts" && ! -L "$common_dir/info/grafts" ]] || fail grafts
+[[ ! -e "$common_dir/info/sparse-checkout" && ! -L "$common_dir/info/sparse-checkout" ]] || fail sparse_checkout
+[[ -z "$(/usr/bin/find "$object_dir" -type l -print -quit)" ]] || fail object_symlink
+[[ -z "$(/usr/bin/find "$object_dir" -type f -name '*.promisor' -print -quit)" ]] || fail promisor_pack
+[[ -z "$("${git_cmd[@]}" -C "$wt" for-each-ref --format='%(refname)' refs/replace)" ]] || fail replace_refs
+while IFS= read -r -d '' index_record; do
+  [[ ${index_record:0:1} == H ]] || fail special_index_flag
+done < <("${git_cmd[@]}" -C "$wt" ls-files -v -z)
+"${git_cmd[@]}" -C "$wt" diff-index --quiet --no-ext-diff --no-textconv "$pin" -- || fail tracked_state
+[[ -z "$("${git_cmd[@]}" -C "$wt" ls-files --others --exclude-standard)" ]] || fail untracked_state
+"${git_cmd[@]}" -C "$wt" fsck --connectivity-only --strict --no-dangling "$pin" \
+  >/dev/null || fail object_closure
+printf 'SYNC_OK %s %s\n' "$(/usr/bin/hostname)" "$pin"
+WORKER_REPO_VERIFY_EOF
+readonly WORKER_REPO_VERIFY_SCRIPT
+printf -v sync_command '%q ' \
+  /usr/bin/env -i \
+  HOME=/home/gianl \
+  LANG=C \
+  LC_ALL=C \
+  PATH=/usr/bin:/bin \
+  GIT_CONFIG_GLOBAL=/dev/null \
+  GIT_CONFIG_NOSYSTEM=1 \
+  GIT_NO_LAZY_FETCH=1 \
+  GIT_NO_REPLACE_OBJECTS=1 \
+  GIT_OPTIONAL_LOCKS=0 \
+  GIT_PROTOCOL_FROM_USER=0 \
+  GIT_TERMINAL_PROMPT=0 \
+  GIT_SSH_COMMAND=/bin/false \
+  /usr/bin/bash --noprofile --norc -c "$WORKER_REPO_VERIFY_SCRIPT" \
+  gate-d-worker-repo-verify "$PIN" "$WORKTREE" "$ORIGIN"
+sync_output=
+sync_status=0
+for worker in 0 1 2 3 4 5 6 7; do
+  set +e
+  worker_output=$(/usr/bin/timeout --signal=TERM --kill-after=10 60 \
+    /snap/bin/gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker="$worker" \
+      --command="$sync_command" 2>&1)
+  worker_status=$?
+  set -e
+  sync_output+="$worker_output"$'\n'
+  if [[ $worker_status -ne 0 ]]; then
+    sync_status=$worker_status
+    break
+  fi
+done
+printf '%s' "$sync_output" | publish_member sync.txt
 [[ $sync_status -eq 0 ]] || {
-  say "ABORT: exact eight-host code synchronization command failed"
+  say "ABORT: exact eight-host read-only code verification failed"
   exit 1
 }
 has_eight_unique_markers /proc/self/fd/7/sync.txt SYNC_OK || {
-  say "ABORT: exact eight-host code synchronization failed"
+  say "ABORT: exact eight-host read-only code verification failed"
   exit 1
 }
 
