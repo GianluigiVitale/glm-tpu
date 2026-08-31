@@ -86,20 +86,40 @@ _EXPECTED_LOWERING_INPUTS = {
     "weight_dtype": "bf16",
     "weight_shape": [6144],
 }
-_EXPECTED_LOWERING_PRODUCER_INSTALLED_PATH = (
-    "/opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_stablehlo.py"
-)
-_EXPECTED_LOWERING_PRODUCER_SOURCE_PATH = (
-    "scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py"
-)
-_EXPECTED_LOWERING_DEPENDENCY_MANIFESTS = {
-    "native_mappings": {
-        "count": 46,
-        "sha256": "bf8f246cdec213e86988c6b224a920ad7244f3e232092f97e912c5ab0ec086a6",
+_EXPECTED_LOWERING_PRODUCER_IDENTITIES = {
+    "auxiliary_device_tuple_dependency": {
+        "installed_path": "/opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_stablehlo.py",
+        "source_path": "scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py",
     },
-    "python_modules": {
-        "count": 533,
-        "sha256": "a37beeaec7baa7c78acc15efa75395bd3b6071d4519ed7bd22662653b5eb66d8",
+    "compensated_auxiliary_dependency": {
+        "installed_path": (
+            "/opt/glm-tpu/bin/produce_gate_d_compensated_auxiliary_stablehlo.py"
+        ),
+        "source_path": (
+            "scripts/greenfield/produce_gate_d_compensated_auxiliary_stablehlo.py"
+        ),
+    },
+}
+_EXPECTED_LOWERING_DEPENDENCY_MANIFESTS = {
+    "auxiliary_device_tuple_dependency": {
+        "native_mappings": {
+            "count": 46,
+            "sha256": "bf8f246cdec213e86988c6b224a920ad7244f3e232092f97e912c5ab0ec086a6",
+        },
+        "python_modules": {
+            "count": 533,
+            "sha256": "a37beeaec7baa7c78acc15efa75395bd3b6071d4519ed7bd22662653b5eb66d8",
+        },
+    },
+    "compensated_auxiliary_dependency": {
+        "native_mappings": {
+            "count": 46,
+            "sha256": "bf8f246cdec213e86988c6b224a920ad7244f3e232092f97e912c5ab0ec086a6",
+        },
+        "python_modules": {
+            "count": 533,
+            "sha256": "61b343c37990b6d0d4c09f5f9357ef72b396563aad5d3ff4653cc26c424f7cc1",
+        },
     },
 }
 _EXPECTED_CAPSULE_PRODUCER_CLAIM_SCOPE = (
@@ -3731,6 +3751,7 @@ def _verify_lowering_receipt(
     candidate_annotated_sha: str,
     candidate_raw: bytes,
     candidate_raw_sha: str,
+    candidate_id: str,
     implementation: Mapping[str, Any],
     plan: Mapping[str, Any],
     producer_receipt_raw: bytes,
@@ -3743,6 +3764,7 @@ def _verify_lowering_receipt(
     success_raw: bytes,
     success_sha: str,
 ) -> dict[str, Any]:
+    producer_identity = _EXPECTED_LOWERING_PRODUCER_IDENTITIES[candidate_id]
     receipt = _load_json(producer_receipt_raw, "StableHLO producer receipt")
     if producer_receipt_raw != (_canonical_json(receipt) + "\n").encode("ascii"):
         raise BenchmarkValidationError("StableHLO producer receipt is not canonical JSON")
@@ -3763,7 +3785,9 @@ def _verify_lowering_receipt(
         },
         "StableHLO producer receipt",
     )
-    if receipt["schema_version"] != 1:
+    if _positive_int(
+        receipt["schema_version"], "StableHLO producer receipt schema version"
+    ) != 1:
         raise BenchmarkValidationError("StableHLO producer receipt schema drifted")
     artifacts = receipt["artifacts"]
     if not isinstance(artifacts, dict):
@@ -3834,8 +3858,8 @@ def _verify_lowering_receipt(
     )
     producer_code_pin = _code_pin(producer["code_pin"], "producer code pin")
     if (
-        producer["installed_path"] != _EXPECTED_LOWERING_PRODUCER_INSTALLED_PATH
-        or producer["source_path"] != _EXPECTED_LOWERING_PRODUCER_SOURCE_PATH
+        producer["installed_path"] != producer_identity["installed_path"]
+        or producer["source_path"] != producer_identity["source_path"]
         or _sha(producer["sha256"], "producer SHA-256") != producer_source_sha
     ):
         raise BenchmarkValidationError("StableHLO producer identity drifted")
@@ -3855,7 +3879,7 @@ def _verify_lowering_receipt(
         base, producer_repository["root"], "producer repository root"
     )
     expected_source_path = Path(
-        os.path.abspath(repository / _EXPECTED_LOWERING_PRODUCER_SOURCE_PATH)
+        os.path.abspath(repository / producer_identity["source_path"])
     )
     if Path(os.path.abspath(producer_source_path)) != expected_source_path:
         raise BenchmarkValidationError("producer source path drifted")
@@ -3875,7 +3899,7 @@ def _verify_lowering_receipt(
             [
                 "rev-parse",
                 "--verify",
-                f"{producer_code_pin}:{_EXPECTED_LOWERING_PRODUCER_SOURCE_PATH}",
+                f"{producer_code_pin}:{producer_identity['source_path']}",
             ],
             "producer source object",
             limit=1024,
@@ -3971,7 +3995,7 @@ def _verify_lowering_receipt(
     dependency_manifest_sha256s: dict[str, str] = {}
     for name, records in dependency_records.items():
         digest = sha256(_canonical_json(records).encode("ascii")).hexdigest()
-        expected = _EXPECTED_LOWERING_DEPENDENCY_MANIFESTS[name]
+        expected = _EXPECTED_LOWERING_DEPENDENCY_MANIFESTS[candidate_id][name]
         if len(records) != expected["count"] or digest != expected["sha256"]:
             raise BenchmarkValidationError(
                 f"producer {name.replace('_', ' ')} manifest drifted"
@@ -3990,10 +4014,17 @@ def _verify_lowering_receipt(
         {"producer_receipt_sha256", "schema_version"},
         "StableHLO producer SUCCESS",
     )
-    if success != {
-        "producer_receipt_sha256": producer_receipt_sha,
-        "schema_version": 1,
-    }:
+    success_schema_version = _positive_int(
+        success["schema_version"], "StableHLO producer SUCCESS schema version"
+    )
+    if (
+        _sha(
+            success["producer_receipt_sha256"],
+            "StableHLO producer SUCCESS receipt SHA-256",
+        )
+        != producer_receipt_sha
+        or success_schema_version != 1
+    ):
         raise BenchmarkValidationError("StableHLO producer SUCCESS drifted")
     return {
         "backend": dict(backend),
@@ -4106,7 +4137,10 @@ def _verify_stablehlo_authority(
         },
         "StableHLO causal certificate",
     )
-    if certificate["schema_version"] != GATE_D_PRECOMPILE_ADMISSION_SCHEMA_VERSION:
+    if _positive_int(
+        certificate["schema_version"],
+        "StableHLO causal certificate schema version",
+    ) != GATE_D_PRECOMPILE_ADMISSION_SCHEMA_VERSION:
         raise BenchmarkValidationError("StableHLO causal certificate schema drifted")
     if (
         certificate["accepted_primary_stablehlo_sha256"] != accepted_sha
@@ -4134,6 +4168,7 @@ def _verify_stablehlo_authority(
         candidate_annotated_sha=candidate_sha,
         candidate_raw=candidate_raw,
         candidate_raw_sha=candidate_raw_sha,
+        candidate_id=candidate_id,
         implementation=implementation,
         plan=plan,
         producer_receipt_raw=producer_receipt_raw,
@@ -4179,6 +4214,7 @@ def _verify_stablehlo_authority(
         "auxiliary_result_index": indices["auxiliary_result_index"],
         "callsite_ast_sha256": source["callsite_symbol"]["ast_sha256"],
         "candidate_ast_sha256": source["candidate_symbol"]["ast_sha256"],
+        "candidate_id": candidate_id,
         "candidate_stablehlo_base64": base64.b64encode(candidate_annotated_raw).decode("ascii"),
         "candidate_stablehlo_sha256": candidate_sha,
         "carried_residual_result_index": indices[

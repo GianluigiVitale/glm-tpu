@@ -1079,3 +1079,8 @@ normalized-state cause.
   binary32 sum derivation and operand order in the content-derived plan hash. A copied tuple plan
   or fully rehashed source/frontier/derivation mutation must fail closed. This removes only plan
   authority; it does not prove cancellation, StableHLO causality or coherent numerical output.
+- A lowering environment may be shared while producer identity cannot. Give each candidate its own
+  fixed installed/source path, module symbol, named auxiliary result and dependency-manifest digest;
+  pass candidate id into the immutable parser rather than inferring it from a generic tuple label.
+  Preserve the historical tuple contract exactly. Also validate receipt, SUCCESS and certificate
+  schema versions as strict integers: JSON floats and bools compare equal to integers in Python.

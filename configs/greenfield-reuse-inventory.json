@@ -696,6 +696,27 @@
       "reason": "Reuses the sealed PP16_LP2 physical group order and stage-zero owners while binding that topology to the compensated candidate id, mechanism fingerprint, verified source-authority hash/code pin, and an exact frontier-role map from restored_input_rms_fp32 to layer1.rms_input_fp32.value. The future capsule must independently derive those 6,144 FP32 bytes from its two sealed BF16 operands. Eight hostile candidate/source/frontier/derivation rebinding attacks and tuple migration fail closed. Admission remains empty with exactly three compensated gaps: causal StableHLO, pinned producer, and coherent capsule. No JAX lowering, numerical execution, model, cloud/TPU action, performance claim or Gate-D closure is authorized."
     },
     {
+      "id": "gate-d-compensated-auxiliary-stablehlo-source-contract",
+      "category": "Gate-D candidate-specific forced-CPU abstract-lowering source and immutable parser contract",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "producer a9431e8eca5b0405190cb2cc8cee863e4f613ca712e212201ea1a7fbebdeeed9 / validator 17fadedfe9a62d15ad71ad4081b60d7631d74637d9d1bd8d997ffa8be6bd0c19 / admission core 5403069b1e9d4111edf1643cfb7b5bcf5a6881f790a3dd1215e65b7da93fb6e7 / contract 3f1c817c6400fa3db89998b92519a10f8e26d7cc55707afb564230274dfe55f4 / report f495209a4dc4d6427cc4ca67e55eca1452f4ee7ae5d5cd3f21b031c390ee02f1 / admission tests da6e29bfaec31fbcd05be6ab5a81f24d7c0b146597fe7f87ed7de650a28224a2 / producer tests 286cd38d6df8c06cef50a0bcb0056ffe3c77e90165caac3b3f4b50dd31008259",
+      "source_paths": [
+        "scripts/greenfield/produce_gate_d_compensated_auxiliary_stablehlo.py",
+        "scripts/greenfield/validate_gate_d_stablehlo.py",
+        "glm_tpu/greenfield/gate_d_precompile_admission.py",
+        "configs/greenfield-gate-d-precompile-admission-v2.json",
+        "tests/greenfield/validation/test_gate_d_precompile_admission.py",
+        "tests/greenfield/validation/test_gate_d_compensated_stablehlo_producer_source.py",
+        "docs/artifacts/gate-d-precompile-admission-v2-compensated-stablehlo-source.json"
+      ],
+      "disposition": "adapted",
+      "greenfield_consumers": [
+        "future separately reviewed immutable producer provision and one-shot forced-CPU abstract lowering"
+      ],
+      "gate": "D precompile admission",
+      "reason": "Defines a distinct compensated producer path, module symbol, restored-result metadata and loaded-dependency manifest while preserving the sealed tuple producer and real tuple StableHLO. The immutable parser receives exact candidate identity; module/result cross-rebinding and bool/float schema-version aliases fail closed. The producer remains uninstalled and unrun. No JAX import, lowering, compilation, numerical/model execution, cloud/TPU action, performance claim or Gate-D closure is authorized."
+    },
+    {
       "id": "legacy-execution-stack",
       "category": "forbidden dependency",
       "source_repo": "tpu-inference/vLLM",

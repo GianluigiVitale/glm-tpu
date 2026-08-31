@@ -161,10 +161,10 @@ authority and still does not prove numerical or optimized-TPU behavior.
 ## 5. Historical sequence and current exact next
 
 The original tuple sequence is complete and rejected by coherent replay. The distinct compensated
-candidate now has concrete source and candidate-bound PP16 plan/watchpoint authority. Compass M1
-remains rejected. The current exact next is a separate source-and-contract batch for compensated
-causal StableHLO; no lowering process is authorized by the plan batch. After reviewed persistence
-and a separately reviewed forced-CPU lowering, one pinned replayable candidate identity must still
+candidate now has concrete source, candidate-bound PP16 plan/watchpoint authority and a separately
+defined causal-StableHLO producer/parser source contract. Compass M1 remains rejected. No lowering
+process is authorized by those source batches. After reviewed persistence and a separately
+reviewed immutable provision plus forced-CPU lowering, one pinned replayable candidate identity must still
 produce all eight coherent watchpoints, including both BF16 RMS operands and their independently
 derived FP32 sum. Only successful offline admission and separate review may consider one
 compile-only TPU acquisition; only exact optimized TPU HLO may then allow the smallest one-row
@@ -222,7 +222,8 @@ The A--H report contributes useful hardening and diagnostic reminders, not a new
 - formal FP tools may adjudicate a future small, concrete expression, but do not recover missing
   runtime values or an unknown accepted physical tree.
 
-The useful next action remains the smallest one: define and adversarially verify the compensated
-causal-StableHLO source/contract without starting JAX. The later capsule must contain all eight
-watchpoints, including both BF16 RMS operands and their independently derived FP32 sum, before any
-compile-only TPU consideration.
+The useful next action remains the smallest one: adversarially review and persist the compensated
+causal-StableHLO source/contract without starting JAX, then separately review one immutable
+provisioning/lowering action. The later capsule must contain all eight watchpoints, including both
+BF16 RMS operands and their independently derived FP32 sum, before any compile-only TPU
+consideration.

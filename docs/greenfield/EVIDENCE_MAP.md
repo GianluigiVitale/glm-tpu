@@ -2199,3 +2199,34 @@ remains open and no TPU successor is authorized.
   corrected and the complete suites rerun, Sol returned `APPROVE PERSISTENCE` for staged diff
   `b4f6d3cf...aced1` with no remaining P0--P2. Authorization is commit/push/locked same-region
   mirror only; no lowering, JAX, model, cloud/TPU, admission or Gate-D successor is authorized.
+
+## Compensated causal-StableHLO producer source and parser contract; offline only
+
+- `scripts/greenfield/produce_gate_d_compensated_auxiliary_stablehlo.py` is a distinct default-off
+  producer, SHA `a9431e8e...eed9`. It binds compensated source pin `e16d74f`, certificate
+  `237095c7...6fb0`, PP16 plan file `7d0a5615...dbdf`, exact committed source blobs/ASTs, sealed
+  interpreter/site identities, fixed future installed path and forced-CPU abstract lowering only.
+  It names module `jit_gate_d_compensated_auxiliary_rms` and third result
+  `result.restored_rms_input_fp32`; it cannot silently reuse the tuple producer identity.
+- The immutable parser request now includes exact candidate id. Tuple and compensated candidates
+  have separate allowed module/result metadata, producer source/installed paths and Python
+  dependency-manifest digests. Hostile compensated module-symbol/result-name changes fail closed;
+  the historical real tuple StableHLO still validates exactly.
+- StableHLO producer receipt, SUCCESS and causal-certificate schema versions now pass strict
+  integer validation. JSON `1.0`/`2.0` and bool aliases fail closed instead of comparing equal to
+  integers in Python.
+- Validator/core/contract/admission-test/new-producer-test SHAs are `17fadedf...0c19`,
+  `5403069b...b6e7`, `3f1c817c...55f4`, `da6e29bf...24a2` and `286cd38d...8259`. Admission passes
+  166/166; adjacent plus both producer-source and tuple-source suites pass 83/83. Canonical report
+  `gate-d-precompile-admission-v2-compensated-stablehlo-source.json` is `f495209a...02f1` and still
+  reports no admitted candidate, Gate D open and no JAX/TPU successor.
+- No install, JAX import, lowering, compilation, numerical/model execution, cloud workflow or TPU
+  action occurred. After review/persistence, immutable provisioning and one fresh-tag forced-CPU
+  abstract lowering require a separate explicit review. This batch supplies no process-start
+  authority.
+- Fable 5 Max was attempted once with the exact batch context but returned a hard usage-limit
+  refusal and supplied no opinion. The existing independent Sol reviewer found no code-side
+  P0--P2 and initially withheld only on ambiguous current/historical validator wording in the
+  observability playbook. After the metadata-only correction, Sol returned `APPROVE PERSISTENCE`
+  with no remaining P0--P2. Approval is limited to commit, push and locked same-region mirror; it
+  grants no installation, process-start, admission or Gate-D-successor authority.

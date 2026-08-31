@@ -236,7 +236,7 @@
     },
     "core": {
       "path": "../glm_tpu/greenfield/gate_d_precompile_admission.py",
-      "sha256": "206fd203625aa87dcd47c0f31590e8b9a744e4e8a8184e8c7f62d90a5e90eb97"
+      "sha256": "5403069b1e9d4111edf1643cfb7b5bcf5a6881f790a3dd1215e65b7da93fb6e7"
     },
     "git": {
       "path": "/usr/bin/git",
@@ -244,7 +244,7 @@
     },
     "stablehlo_validator": {
       "path": "../scripts/greenfield/validate_gate_d_stablehlo.py",
-      "sha256": "4338229ac7f67449e2afe592c486235f4caf546cc5ebac2483e30911635c6b6d"
+      "sha256": "17fadedfe9a62d15ad71ad4081b60d7631d74637d9d1bd8d997ffa8be6bd0c19"
     },
     "validator_imports": [
       {

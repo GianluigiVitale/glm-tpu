@@ -992,11 +992,13 @@ candidate id, mechanism fingerprint, verified source authority/code pin and the 
 selects prefix `[0,0]`. The future value must byte-match the independent binary32 sum of the two
 sealed BF16 operands. Plan-file/content SHAs are `7d0a5615...dbdf` and `eb2c050b...b6dc`.
 
-Current admission core/contract/report SHAs are `206fd203...eb97`, `6559939a...0a25` and
-`3281afec...8540`; all 158 admission tests and 69 adjacent Gate-D tests pass. The compensated
+Current admission core/contract/report SHAs are `5403069b...b6e7`, `3f1c817c...55f4` and
+`f495209a...02f1`; all 166 admission tests and 83 adjacent/producer-source tests pass. The compensated
 candidate is still refused for missing causal StableHLO, pinned producer and coherent capsule
 authority. Do not reuse the
 old tuple numerical capsule—it is coherent negative evidence—or relabel declarative compensated
 fixtures as executable source. No JAX, compilation, execution, cloud/TPU or Gate-D successor is
-authorized. Exact next after persistence is a separately reviewed compensated causal-StableHLO
-source batch; no lowering process may start from plan persistence alone.
+authorized. Distinct compensated producer source `a9431e8e...eed9` and candidate-aware validator
+`17fadedf...0c19` now exist but are uninstalled/unrun. Exact next after persistence is a separate
+immutable-provisioning and one-shot forced-CPU lowering review; no process may start from source
+persistence alone.

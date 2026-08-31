@@ -8607,3 +8607,32 @@ withheld persistence on PP8 rebinding, permissive frontier types, ambiguous owne
 stale prose and permissive JSON schema-version equality. After correction and complete
 re-verification, Sol approved staged diff `b4f6d3cf...aced1` with no remaining P0--P2. That verdict
 authorizes only commit, push and locked same-region mirror; it does not authorize a process start.
+
+## 2026-08-31 compensated causal-StableHLO source/contract; no process start
+
+New default-off producer `produce_gate_d_compensated_auxiliary_stablehlo.py` is distinct from the
+sealed tuple producer. It binds compensated source pin `e16d74f`, source certificate
+`237095c7...6fb0`, PP16 plan `7d0a5615...dbdf`, exact source blobs/ASTs and fixed future installed
+path. Its candidate module symbol is `jit_gate_d_compensated_auxiliary_rms`; the third result is
+`result.restored_rms_input_fp32`. Producer SHA is `a9431e8e...eed9`.
+
+The offline validator now receives exact candidate identity and preserves the historical tuple
+symbol/result contract separately. Admission selects candidate-specific producer paths and loaded
+dependency manifests; receipt, SUCCESS and causal-certificate schema versions reject bool/float
+numeric aliases. Validator/core/contract/admission-test/new-producer-test SHAs are
+`17fadedf...0c19`, `5403069b...b6e7`, `3f1c817c...55f4`, `da6e29bf...24a2` and
+`286cd38d...8259`. Full admission passes 166/166; adjacent plus producer-source suites pass 83/83.
+Canonical source-contract report `gate-d-precompile-admission-v2-compensated-stablehlo-source.json`
+is `f495209a...02f1` and remains empty/open/no-successor with the same three compensated gaps.
+
+No producer installation, JAX import, lowering, compilation, numerical/model execution, cloud
+workflow or TPU action occurred. Exact next after adversarial review and persistence is a separate
+review of immutable provisioning plus at most one forced-CPU abstract-lowering invocation under a
+fresh output tag. This source batch does not authorize that process start.
+
+Fable 5 Max was attempted once with the exact source-batch context but returned a hard usage-limit
+refusal and supplied no opinion. The existing independent Sol reviewer found no code-side P0--P2
+and withheld only on ambiguous current/historical validator wording in the observability playbook.
+After that metadata-only correction, Sol returned `APPROVE PERSISTENCE` with no remaining P0--P2.
+The approval covers only commit, push and locked same-region mirror; it does not authorize install,
+producer invocation, lowering, JAX/model/cloud/TPU work, admission or Gate D closure.

@@ -30,7 +30,7 @@ from glm_tpu.greenfield.gate_d_precompile_admission import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CURRENT_CONTRACT = REPO_ROOT / "configs/greenfield-gate-d-precompile-admission-v2.json"
-CURRENT_CONTRACT_SHA256 = "6559939a5fbc399d8de898de4d0c2357db57e9c867ab2fc6ef7e3b52a9740a25"
+CURRENT_CONTRACT_SHA256 = "3f1c817c6400fa3db89998b92519a10f8e26d7cc55707afb564230274dfe55f4"
 
 
 def _sha(path: Path) -> str:
@@ -893,6 +893,17 @@ def _stablehlo_authority(
     metadata_attack: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     comment = "\n    // xla_python_cpu_callback" if host_effect else ""
+    compensated = candidate["id"] == "compensated_auxiliary_dependency"
+    candidate_module_name = (
+        "jit_gate_d_compensated_auxiliary_rms"
+        if compensated
+        else "jit_gate_d_tuple_auxiliary_rms"
+    )
+    auxiliary_result_name = (
+        "result.restored_rms_input_fp32"
+        if compensated
+        else "result.rms_input_fp32"
+    )
     collective = ""
     auxiliary_base = "%sum"
     if group_size > 1 or nonlocal_pair:
@@ -919,7 +930,7 @@ def _stablehlo_authority(
         'gate_d.unexpected = "%sum", ' if string_edge else ""
     ) + "mhlo.num_partitions = 1 : i32, mhlo.num_replicas = 1 : i32"
     module_header = (
-        "module @jit_gate_d_tuple_auxiliary_rms attributes {"
+        f"module @{candidate_module_name} attributes {{"
         + module_attributes
         + "} {\n"
     )
@@ -973,7 +984,7 @@ def _stablehlo_authority(
         "%arg1: tensor<1x6144xbf16>, %arg2: tensor<6144xbf16>) "
         "-> (tensor<1x6144xbf16> {jax.result_info = \"result.output\"}, "
         "tensor<1x6144xbf16> {jax.result_info = \"result.carried_residual\"}, "
-        "tensor<1x6144xf32> {jax.result_info = \"result.rms_input_fp32\"}) {\n"
+        f"tensor<1x6144xf32> {{jax.result_info = \"{auxiliary_result_name}\"}}) {{\n"
         "    %hidden = stablehlo.convert %arg0 : "
         "(tensor<1x6144xbf16>) -> tensor<1x6144xf32>\n"
         "    %residual = stablehlo.convert %arg1 : "
@@ -1058,6 +1069,16 @@ def _stablehlo_authority(
         )
     elif metadata_attack == "function_name":
         candidate_text = candidate_text.replace("public @main", "public @hostile", 1)
+    elif metadata_attack == "candidate_symbol":
+        candidate_text = candidate_text.replace(
+            f"module @{candidate_module_name}", "module @hostile_candidate", 1
+        )
+    elif metadata_attack == "auxiliary_result_name":
+        candidate_text = candidate_text.replace(
+            f'jax.result_info = "{auxiliary_result_name}"',
+            'jax.result_info = "result.hostile"',
+            1,
+        )
     elif metadata_attack == "function_visibility":
         candidate_text = candidate_text.replace("func.func public", "func.func private", 1)
     elif metadata_attack == "arg_sharding":
@@ -1158,13 +1179,43 @@ def _stablehlo_authority(
         "carried_residual_result_index": 1,
         "weighted_output_result_index": 0,
     }
-    producer_source_path = (
-        REPO_ROOT
-        / "scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py"
-    )
+    producer_identity = admission_module._EXPECTED_LOWERING_PRODUCER_IDENTITIES[
+        candidate["id"]
+    ]
+    producer_source_path = REPO_ROOT / producer_identity["source_path"]
     producer_source_sha = _sha(producer_source_path)
+    producer_repository = REPO_ROOT
     producer_code_pin = "6a95811d6f0e6c8f51a38a59e36c2a2b2149bead"
+    if compensated:
+        producer_repository = root / "stablehlo-producer-repo"
+        producer_repository.mkdir()
+        _run_git(producer_repository, "init", "-q")
+        _run_git(producer_repository, "config", "user.email", "gate-d@example.invalid")
+        _run_git(producer_repository, "config", "user.name", "Gate D fixture")
+        fixture_source = producer_repository / producer_identity["source_path"]
+        fixture_source.parent.mkdir(parents=True)
+        fixture_source.write_bytes(producer_source_path.read_bytes())
+        _run_git(producer_repository, "add", producer_identity["source_path"])
+        _run_git(producer_repository, "commit", "-q", "-m", "fixture")
+        producer_code_pin = _run_git(producer_repository, "rev-parse", "HEAD")
+        producer_source_path = fixture_source
     loaded_dependencies = _current_lowering_dependencies()
+    if compensated:
+        producer_records = [
+            item
+            for item in loaded_dependencies["python_modules"]
+            if item["path"]
+            == "/opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_stablehlo.py"
+        ]
+        assert len(producer_records) == 1
+        producer_records[0].update(
+            {
+                "bytes": producer_source_path.stat().st_size,
+                "path": producer_identity["installed_path"],
+                "sha256": producer_source_sha,
+            }
+        )
+        loaded_dependencies["python_modules"].sort(key=lambda item: item["path"])
     receipt = {
         "artifacts": {
             "accepted.raw.stablehlo": {
@@ -1192,9 +1243,9 @@ def _stablehlo_authority(
         "plan_authority_sha256": plan["file_sha256"],
         "producer": {
             "code_pin": producer_code_pin,
-            "installed_path": admission_module._EXPECTED_LOWERING_PRODUCER_INSTALLED_PATH,
+            "installed_path": producer_identity["installed_path"],
             "sha256": producer_source_sha,
-            "source_path": admission_module._EXPECTED_LOWERING_PRODUCER_SOURCE_PATH,
+            "source_path": producer_identity["source_path"],
         },
         "schema_version": 1,
         "source": {
@@ -1230,6 +1281,10 @@ def _stablehlo_authority(
         receipt["source"]["source_set_sha256"] = "0" * 64
     elif producer_attack == "producer_identity":
         receipt["producer"]["installed_path"] = "/tmp/hostile-producer.py"
+    elif producer_attack == "receipt_schema_float":
+        receipt["schema_version"] = 1.0
+    elif producer_attack == "receipt_schema_bool":
+        receipt["schema_version"] = True
     producer_receipt_path = root / "producer_receipt.json"
     producer_receipt_sha = _write_canonical_json(producer_receipt_path, receipt)
     success = {
@@ -1238,6 +1293,10 @@ def _stablehlo_authority(
     }
     if producer_attack == "success":
         success["schema_version"] = 2
+    elif producer_attack == "success_schema_float":
+        success["schema_version"] = 1.0
+    elif producer_attack == "success_schema_bool":
+        success["schema_version"] = True
     success_path = root / "SUCCESS"
     success_sha = _write_canonical_json(success_path, success)
     certificate = {
@@ -1266,6 +1325,10 @@ def _stablehlo_authority(
     }
     if producer_attack == "certificate_claim":
         certificate["claim_scope"] = "Hostile overclaim."
+    elif producer_attack == "certificate_schema_float":
+        certificate["schema_version"] = 2.0
+    elif producer_attack == "certificate_schema_bool":
+        certificate["schema_version"] = True
     certificate_path = root / "stablehlo-certificate.json"
     certificate_sha = _write_json(certificate_path, certificate)
     authority = {
@@ -1285,7 +1348,7 @@ def _stablehlo_authority(
         },
         "producer_repository": {
             "commit": producer_code_pin,
-            "root": str(REPO_ROOT),
+            "root": str(producer_repository),
         },
         "producer_source": {
             "path": str(producer_source_path),
@@ -1301,6 +1364,7 @@ def _stablehlo_authority(
         "auxiliary_result_index": 2,
         "callsite_ast_sha256": source["callsite_symbol"]["ast_sha256"],
         "candidate_ast_sha256": source["candidate_symbol"]["ast_sha256"],
+        "candidate_id": candidate["id"],
         "candidate_stablehlo_base64": base64.b64encode(
             candidate_text.encode("utf-8")
         ).decode("ascii"),
@@ -2655,9 +2719,21 @@ def test_authority_attacks_fail_closed(
         ("dependency_rebind", "native mappings manifest drifted"),
         ("dependency_dotdot", "unsafe or duplicated"),
         ("producer_identity", "producer identity drifted"),
+        ("receipt_schema_float", "receipt schema version must be a positive integer"),
+        ("receipt_schema_bool", "receipt schema version must be a positive integer"),
         ("source_tuple", "producer source tuple drifted"),
         ("success", "SUCCESS drifted"),
+        ("success_schema_float", "SUCCESS schema version must be a positive integer"),
+        ("success_schema_bool", "SUCCESS schema version must be a positive integer"),
         ("certificate_claim", "certificate claim scope drifted"),
+        (
+            "certificate_schema_float",
+            "causal certificate schema version must be a positive integer",
+        ),
+        (
+            "certificate_schema_bool",
+            "causal certificate schema version must be a positive integer",
+        ),
     ],
 )
 def test_producer_authority_attacks_fail_closed(
@@ -2696,6 +2772,22 @@ def test_compilation_metadata_attacks_fail_closed(
     assert candidate["admitted_precompile"] is False
     assert "INVALID_CAUSAL_STABLEHLO_AUTHORITY" in candidate["reasons"]
     assert refusal in candidate["stablehlo_authority"]["refusal"]
+
+
+@pytest.mark.parametrize(
+    "metadata_attack", ["candidate_symbol", "auxiliary_result_name"]
+)
+def test_compensated_candidate_metadata_attacks_fail_closed(
+    tmp_path: Path, metadata_attack: str
+) -> None:
+    path, _, _, _ = _prepared_contract(
+        tmp_path, candidate_index=1, metadata_attack=metadata_attack
+    )
+    report = admit_gate_d_precompile_candidates(path, _sha(path))
+    candidate = report["candidate_results"][1]
+    assert "INVALID_CAUSAL_STABLEHLO_AUTHORITY" in candidate["reasons"]
+    assert "candidate" in candidate["stablehlo_authority"]["refusal"]
+    assert "metadata drifted" in candidate["stablehlo_authority"]["refusal"]
 
 
 def test_source_blob_sha_cannot_be_relabelled(tmp_path: Path) -> None:

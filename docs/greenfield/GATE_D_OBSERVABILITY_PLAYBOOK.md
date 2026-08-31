@@ -168,6 +168,8 @@ Do not weaken v1 or rewrite its historical evidence. The append-only repair now 
 - source-authority report: `docs/artifacts/gate-d-precompile-admission-v2.json`;
 - current compensated-plan report:
   `docs/artifacts/gate-d-precompile-admission-v2-compensated-plan.json`;
+- current compensated StableHLO-source report:
+  `docs/artifacts/gate-d-precompile-admission-v2-compensated-stablehlo-source.json`;
 - current real-HLO report: `docs/artifacts/gate-d-precompile-admission-v2-stablehlo.json`.
 
 V2 authenticates committed blob/AST identity for concrete or declarative source authority, a
@@ -195,19 +197,21 @@ tuple candidate's concrete source, PP16 plan and exact real causal StableHLO aut
 bindings remain deliberately null because coherent event replay already rejected the tuple;
 reported capsule gaps are schema-state only, not authority for a new capsule or admission rerun.
 The compensated candidate now has a candidate-bound PP16 plan/watchpoint authority and retains
-three gaps: causal StableHLO, pinned producer and coherent capsule. Its plan binding maps the
+three gaps: causal StableHLO, pinned producer and coherent capsule. A distinct default-off
+StableHLO producer/parser source contract now exists but has not been installed or run. Its plan binding maps the
 source result `restored_input_rms_fp32[2,1,6144]` to
 `layer1.rms_input_fp32.value[6144]`, requiring bitwise owner agreement before prefix `[0,0]`
 selection; future capsule bytes must independently derive from both sealed BF16 operands. V2
 always leaves candidate admission and TPU
 authorization false. Exact module/function metadata and the complete 533-Python/46-native lowering
 dependency manifests are bound by canonical digest/count, not trusted labels. Current
-plan-authority core/contract/report SHAs are `206fd203...eb97`, `6559939a...0a25` and
-`3281afec...8540`; compensated certificate and plan-file/content SHAs are
+core/contract/report SHAs are `5403069b...b6e7`, `3f1c817c...55f4` and
+`f495209a...02f1`; compensated certificate and plan-file/content SHAs are
 `237095c7...6fb0`, `7d0a5615...dbdf` and `eb2c050b...b6dc`. Historical tuple PP16 plan
-authority remains `98b4fa21...7880`; validator SHA is `4338229a...6b6d`; installed/source
+authority remains `98b4fa21...7880`. Current validator SHA is `17fadedf...0c19`;
+historical tuple-report validator SHA remains `4338229a...6b6d`. Installed/source
 provisioner and runtime-tree SHAs remain `2b9c8c2b...0594` and `308748a9...d616`. Full admission
-coverage is 158/158; adjacent Gate-D suites pass 69/69. Historical authority tests must read exact pinned Git blobs, never current
+coverage is 166/166; adjacent and producer-source suites pass 83/83. Historical authority tests must read exact pinned Git blobs, never current
 worktree files.
 
 ### 3.5 Domain-specific state readers

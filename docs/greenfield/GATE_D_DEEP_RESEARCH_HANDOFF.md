@@ -555,13 +555,19 @@ agreement across source owners `[0,1]` before selecting prefix `[0,0]`. Plan-fil
 `7d0a5615...dbdf` and `eb2c050b...b6dc`; the future capsule still must independently derive the
 6,144 FP32 values from both sealed BF16 operands.
 
-Admission core/contract/current-report SHAs are `206fd203...eb97`, `6559939a...0a25` and
-`3281afec...8540`; 158/158 admission tests and 69/69 adjacent Gate-D tests pass, including hostile
-candidate/source/frontier/derivation, plan-rebinding and exact-integer schema mutations.
-Classification remains
+The next source-only batch adds distinct compensated StableHLO producer
+`produce_gate_d_compensated_auxiliary_stablehlo.py` (`a9431e8e...eed9`) and candidate-aware parser
+metadata. It binds module `jit_gate_d_compensated_auxiliary_rms`, result
+`result.restored_rms_input_fp32`, separate producer paths/manifests and strict receipt/SUCCESS/
+certificate schema integers while preserving the sealed tuple authority.
+
+Admission core/contract/current-report SHAs are `5403069b...b6e7`, `3f1c817c...55f4` and
+`f495209a...02f1`; 166/166 admission tests and 83/83 adjacent/producer-source tests pass, including
+hostile candidate/source/frontier/derivation, plan rebinding, exact-integer schema and compensated
+module/result identity mutations. Classification remains
 `NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`. The compensated candidate
 still lacks causal StableHLO, pinned producer and candidate-coherent capsule authority.
 
-Exact next after review/persistence is a separate compensated causal-StableHLO source batch. Do
-not lower from the plan batch, compile, execute JAX, load a model or run TPU; a separately reviewed
-process start remains mandatory.
+No JAX import or lowering occurred. Exact next after review/persistence is a separately reviewed
+immutable producer provision and at most one fresh-tag forced-CPU abstract lowering. Do not
+install, lower, compile, execute arrays, load a model or run TPU from this source batch.

@@ -424,6 +424,7 @@ def _load_request() -> dict[str, Any]:
         "auxiliary_result_index",
         "callsite_ast_sha256",
         "candidate_ast_sha256",
+        "candidate_id",
         "candidate_stablehlo_base64",
         "candidate_stablehlo_sha256",
         "carried_residual_result_index",
@@ -883,13 +884,27 @@ def _program_metadata_contract(
     request: Mapping[str, Any],
 ) -> None:
     if candidate:
+        candidate_metadata = {
+            "auxiliary_device_tuple_dependency": (
+                '"jit_gate_d_tuple_auxiliary_rms"',
+                "result.rms_input_fp32",
+            ),
+            "compensated_auxiliary_dependency": (
+                '"jit_gate_d_compensated_auxiliary_rms"',
+                "result.restored_rms_input_fp32",
+            ),
+        }
+        candidate_id = request["candidate_id"]
+        if candidate_id not in candidate_metadata:
+            raise ValidationError("candidate identity is unsupported")
+        module_symbol, auxiliary_result_name = candidate_metadata[candidate_id]
         expected_module = {
             "gate_d.callsite_ast_sha256": f'"{request["callsite_ast_sha256"]}"',
             "gate_d.candidate_ast_sha256": f'"{request["candidate_ast_sha256"]}"',
             "gate_d.source_set_sha256": f'"{request["source_set_sha256"]}"',
             "mhlo.num_partitions": "1 : i32",
             "mhlo.num_replicas": "1 : i32",
-            "sym_name": '"jit_gate_d_tuple_auxiliary_rms"',
+            "sym_name": module_symbol,
         }
         expected_function = {
             "function_type": (
@@ -899,7 +914,7 @@ def _program_metadata_contract(
             "res_attrs": (
                 '[{jax.result_info = "result.output"}, '
                 '{jax.result_info = "result.carried_residual"}, '
-                '{jax.result_info = "result.rms_input_fp32"}]'
+                f'{{jax.result_info = "{auxiliary_result_name}"}}]'
             ),
             "sym_name": '"main"',
             "sym_visibility": '"public"',
@@ -964,6 +979,12 @@ def _parse(raw: bytes, label: str) -> tuple[ir.Context, ir.Module]:
 
 
 def validate(request: Mapping[str, Any]) -> dict[str, Any]:
+    candidate_id = request["candidate_id"]
+    if candidate_id not in {
+        "auxiliary_device_tuple_dependency",
+        "compensated_auxiliary_dependency",
+    }:
+        raise ValidationError("candidate identity is unsupported")
     candidate_raw = _bytes(
         request["candidate_stablehlo_base64"],
         request["candidate_stablehlo_sha256"],
