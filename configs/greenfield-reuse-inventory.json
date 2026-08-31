@@ -742,6 +742,24 @@
       "reason": "Every project import is derived from exact committed Git blobs and sealed in a memfd; compiler dependencies are byte-bound before and after compilation with one bytewise path order. Publication uses the sealed root-owned Python 3.12 runtime plus a reproducible 1,593-file root-owned storage-client capsule whose complete manifest/tree hashes are embedded in each run. The capsule is installed without replacement at the exact root-owned target and accepted by the production publisher's sealed-runtime validator; the separate install artifact binds the review and post-install identities. The first protected start burned its tag before pre-census because a same-command Bash local dependency failed under nounset; its partial local inventory, vacant remote prefix and independent 8/8 cleanup are preserved, and the correction splits dependent declarations with static and executable regressions. The required pre-start boundary is a separately reviewed absolute env-i plus /usr/bin/bash --noprofile --norc command; in-script environment checks are fail-fast only. Admission/topology JSON is parsed from each file's single identity-checked hashed snapshot. The wrapper authenticates and locks one private-0700 initialization inode as inherited dirfd 7 across all publisher/compiler children, so outputs cannot mix across tag-directory substitutions. All local generated/wrapper artifacts are component-wise no-follow, direct-exclusive, fsynced and exact-inventoried; raw vacancy evidence is preserved separately, and write/log modes share a serialized preterminal guard. Remote payloads are generation-zero created, generation/size/CRC32C/SHA bound, generation-qualified downloaded and exact-inventoried before the final-operation HLO_ACQUIRED upload; success and diagnostic terminal receipts are append-only. Success and diagnostic terminal states both reject all later wrapper writes/appends. This protection source authorizes no process start, TPU numerical execution, performance claim or Gate-D closure before separate review and persistence."
     },
     {
+      "id": "gate-d-libtpu-site-capsule",
+      "category": "Gate-D root-owned TPU compiler dependency supplement",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "builder eb0d34b08cc51e4cf673388a097897b168c39aa71582d68a95df33ce0ef93e37 / tree db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca / manifest d34064f4a0dfcdcd9ec13288ce967ae060a4650b3e86e53bc47e49756c0e97fa / provisioner 2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594",
+      "source_paths": [
+        "scripts/greenfield/build_gate_d_libtpu_site_capsule.py",
+        "scripts/greenfield/provision_gate_d_python_runtime.py",
+        "docs/artifacts/gate-d-libtpu-site-build.json",
+        "tests/greenfield/validation/test_gate_d_libtpu_site_capsule.py"
+      ],
+      "disposition": "adapted",
+      "greenfield_consumers": [
+        "future sealed PP16 compile-only dependency boundary"
+      ],
+      "gate": "D diagnostic prerequisite",
+      "reason": "The protected HLO attempt used a mutable vllm-env interpreter resolving a user-writable UV Python and stdlib. Review of the first root-owned-interpreter correction then proved it still selected JAX/libtpu from the mutable venv site, so it was withheld. This minimal allowlisted builder adapts the sealed dependency-capsule and fixed no-replacement provisioning pattern to libtpu only. Two unprivileged builds produced the same 13-file, 719846262-byte tree and manifest; the historical build record says the target was absent and no installation, import, backend, cloud or TPU work occurred. The existing same-scope Sol reviewer approved only the exact absolute install command plus read-only verification. This source authorizes no compiler or HLO retry; a later reviewed driver must bind the sealed JAX and libtpu trees before import and after compile, reject native mappings outside sealed/system roots, and strip mutable PATH entries."
+    },
+    {
       "id": "legacy-execution-stack",
       "category": "forbidden dependency",
       "source_repo": "tpu-inference/vLLM",

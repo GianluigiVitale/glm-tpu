@@ -1045,3 +1045,17 @@ the same failure. Preserve
 negative operational evidence; the remote prefix is vacant and independent cleanup is 8/8 clean.
 The corrected wrapper uses two declarations, and tests enforce the exact order, Bash `-u` behavior
 and a general ban on same-command local dependencies. Never reuse the failed tag.
+
+The next protected start exposed a distinct provenance refusal before lowering: its
+`vllm-env/bin/python` interpreter resolved to a user-writable UV Python and stdlib. A proposed
+root-owned-interpreter correction was therefore withheld when review found that it still selected
+JAX and `libtpu` from the same mutable venv site. Reuse the fixed no-replacement provisioner and
+adapt the existing sealed-JAX-site builder pattern through
+`build_gate_d_libtpu_site_capsule.py` only for the exact 13-file `libtpu` supplement. Two
+independent builds produced the same 719,846,262-byte tree
+`db7598c8...8eca` and manifest `d34064f4...7efa`; build evidence is
+`gate-d-libtpu-site-build.json`. The target `/opt/glm-tpu/gate-d-libtpu-site-db7598c867f3` is
+deliberately absent pending the reviewed install-only command. This capsule build imported no JAX,
+started no backend, touched no TPU and authorizes no HLO retry. A later compiler correction must
+bind both the existing sealed JAX tree and this separately sealed `libtpu` tree before import and
+after compile, constrain native mappings to sealed/system roots, and use `/usr/bin:/bin` as PATH.
