@@ -2042,3 +2042,22 @@ remains open and no TPU successor is authorized.
 - Gate D remains open. Exact next after durable persistence is a separate review of trusted manual
   installation and exactly one bounded protected replay; its output must then be independently
   archived/sealed and pass offline admission before any compile-only successor is considered.
+
+## First coherent-capsule start: pre-execution SUCCESS-format failure
+
+- Persisted pin `e82fe83` was pushed and mirrored in `US-CENTRAL2`; reviewed producer
+  `2cbf8ed9...8268` was installed root:root mode 0555. Exactly one serialized process start used a
+  clean environment and the now-burned tag
+  `greenfield_gate_d_tuple_auxiliary_capsule_20260831T020400Z`.
+- The process imported the sealed JAX stack, then failed before `_execute`, numerical arrays,
+  output creation, model, cloud or TPU work. Runtime `SUCCESS` is an exact 88-byte sha256sum-format
+  line with SHA `dbef7e36...ee7e`; the producer wrongly treated it as JSON. The output path remains
+  absent. Failure artifact `gate-d-tuple-capsule-runtime-success-format-failure.json` is
+  `382ff46a...31e0` and the one-shot has no retry authority.
+- Corrected producer `d3082c2e...f869b` checks the exact line bytes and manifest self SHA. Hostile
+  JSON, spacing, tab, hash and suffix variants are rejected. Admission repins exact producer Git
+  object `6f0d31ee...14f0`; core/contract/test SHAs are `49d0d868...f6713`,
+  `ae00f0ad...47f5d` and `e6d63e08...3ebd7`.
+- Admission coverage passes 124/124 and adjacent Gate-D coverage passes 69/69. Fable-max was
+  usage-blocked; same-scope Sol approved persistence only with no P0--P2. No reinstall/retry,
+  archive/admission, compile, cloud/TPU or Gate-D successor is authorized by this correction.

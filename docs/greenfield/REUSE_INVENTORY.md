@@ -920,3 +920,12 @@ Offline validation passes 119/119 plus 69/69 adjacent Gate-D tests. Fable-max wa
 the same-scope Sol correction review first withheld on executable-closure substitution, then
 approved the exact correction for persistence with no P0--P2. This batch authorizes no install,
 invocation, JAX compilation/execution, cloud/TPU work, candidate admission or Gate-D closure.
+
+The first separately reviewed process start at persisted pin `e82fe83` spent its authorization on
+an input-format failure: the pinned runtime `SUCCESS` is an 88-byte sha256sum line, not JSON.
+`_execute` and output creation were never reached; the burned tag remains absent. Preserve
+`docs/artifacts/gate-d-tuple-capsule-runtime-success-format-failure.json` (`382ff46a...31e0`) as
+negative evidence. Corrected producer `d3082c2e...f869b` now binds the exact line and rejects JSON,
+spacing/tab/hash/suffix drift; admission repins its exact object. Core/contract/test SHAs are
+`49d0d868...f6713`, `ae00f0ad...47f5d` and `e6d63e08...3ebd7`; offline coverage is 124/124 plus
+69/69 adjacent. Persistence approval is not retry authorization.

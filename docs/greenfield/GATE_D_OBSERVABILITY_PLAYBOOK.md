@@ -426,6 +426,7 @@ A failed discriminator is useful if it is bounded, coherent and sealed. Never re
 | Publishing `SUCCESS` too early | Later diagnostics mutated a supposedly terminal archive | Replay full inventory; publish terminal marker alone and last |
 | Reopening inputs by pathname after preflight | A same-name replacement can mix histories across one replay | Snapshot every upstream before execution; retain/revalidate file descriptors and inode/size/hash identities |
 | Letting an execution receipt choose its own producer/import closure | A hostile committed replay can fabricate coherent-looking exact outputs | Independently pin producer/replay blobs and the complete replay-visible committed source manifest |
+| Assuming a sentinel format from its filename | A pinned `SUCCESS` was sha256sum text, not JSON, and spent a reviewed start before replay | Inspect and hostile-test exact sentinel bytes during source-only preflight |
 | Letting offline tests discover TPU | An adjacent run initialized the local TPU client | Set `JAX_PLATFORMS=cpu` explicitly; use `python -S` when JAX is unnecessary |
 | Claiming profiler/HLO/device-only speed | Does not establish clean user-visible latency | Require profiler-free wall, fresh XPlanes, correctness, HBM, DB/archive/cleanup |
 | Syncing through EU/gcsfuse | Added transfer cost and unreliable POSIX rename behavior | Use locked `gsutil` mirror only to `gs://driftbench-dsv4-uc` after location check |

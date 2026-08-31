@@ -8463,3 +8463,30 @@ observability/shadow validation passes 69/69; py_compile and diff checks pass. G
 After commit/push/same-region mirror, exact next is a separate install/invocation review for one
 bounded protected replay, independent archive/seal, then offline admission. Do not infer a
 candidate, compile-only successor or Gate-D result from persistence approval.
+
+## 2026-08-31 first tuple-capsule start failed before replay; format correction source only
+
+Commit `e82fe83` was pushed and byte-verified in the `US-CENTRAL2` mirror. After a literal-command
+Sol review, the exact producer `2cbf8ed9...8268` was provisioned root:root mode 0555 and one
+serialized forced-two-CPU process start was approved. The start failed after sealed JAX imports but
+before `_execute`, numerical arrays, output-directory creation, model, cloud or TPU work. The
+burned path `greenfield_gate_d_tuple_auxiliary_capsule_20260831T020400Z` remains absent and may not
+be reused.
+
+Root cause is exact and local: runtime `SUCCESS` is the pinned 88-byte sha256sum line
+`b385458f...6bab  runtime_manifest.json\n`, SHA `dbef7e36...ee7e`; `_read_runtime` incorrectly
+called `json.loads` on it. Canonical failure artifact
+`docs/artifacts/gate-d-tuple-capsule-runtime-success-format-failure.json` is
+`382ff46a...31e0` and records the spent one-shot and absent output.
+
+Corrected producer `d3082c2e...f869b` binds the manifest self SHA and exact `SUCCESS` bytes.
+JSON, one-space, tab, wrong-hash and trailing-data variants fail closed. Admission independently
+repins its Git object/SHA. Core/contract/test SHAs are `49d0d868...f6713`,
+`ae00f0ad...47f5d` and `e6d63e08...3ebd7`; full admission passes 124/124 and adjacent Gate-D
+coverage passes 69/69.
+
+The required narrow Fable-max diagnosis chat was usage-blocked and supplied no opinion. Same-scope
+Sol approved the exact correction for persistence with no P0--P2 and explicitly no reinstall,
+retry, archive/admission, cloud/TPU or Gate-D authorization. Exact next is commit/push/same-region
+mirror, then a separately reviewed corrected producer installation and one new output tag. Never
+retry the installed old producer or burned tag.

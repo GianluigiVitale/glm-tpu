@@ -66,6 +66,9 @@ RUNTIME_MANIFEST_SELF_SHA256 = (
 RUNTIME_SUCCESS_SHA256 = (
     "dbef7e366e2fdf2a4815b0b58d1645667580d55fc5926133d48c838929f7ee7e"
 )
+RUNTIME_SUCCESS_PAYLOAD = (
+    f"{RUNTIME_MANIFEST_SELF_SHA256}  runtime_manifest.json\n".encode("ascii")
+)
 DB518_RESULT_SHA256 = "534bacc54d74992f5a8ab4d422f9fa0947523d59325b4bfa272d4fbeb56262f0"
 DB518_COMPARISON_SHA256 = (
     "06ee82b9d487e3fdf8f9f19d4e824e33f1f9d453738a0090ace5e2cac7272a4d"
@@ -567,6 +570,13 @@ def _deterministic_npz(values: dict[str, Any]) -> bytes:
     return output.getvalue()
 
 
+def _verify_runtime_success(manifest: dict[str, Any], success_raw: bytes) -> None:
+    if manifest.get("manifest_sha256") != RUNTIME_MANIFEST_SELF_SHA256:
+        raise RuntimeError("runtime manifest self identity drifted")
+    if success_raw != RUNTIME_SUCCESS_PAYLOAD:
+        raise RuntimeError("runtime SUCCESS contract drifted")
+
+
 def _read_runtime(
     np: Any,
     ml_dtypes: Any,
@@ -578,11 +588,7 @@ def _read_runtime(
     dict[int, tuple[int, int]],
 ]:
     manifest = json.loads(manifest_raw)
-    success = json.loads(success_raw)
-    if manifest.get("manifest_sha256") != RUNTIME_MANIFEST_SELF_SHA256:
-        raise RuntimeError("runtime manifest self identity drifted")
-    if not isinstance(success, dict) or not success:
-        raise RuntimeError("runtime SUCCESS contract drifted")
+    _verify_runtime_success(manifest, success_raw)
     records = {
         int(record["device_slot"]): record
         for record in manifest.get("files", ())

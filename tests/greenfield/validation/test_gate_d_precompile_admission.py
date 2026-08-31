@@ -30,7 +30,7 @@ from glm_tpu.greenfield.gate_d_precompile_admission import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CURRENT_CONTRACT = REPO_ROOT / "configs/greenfield-gate-d-precompile-admission-v2.json"
-CURRENT_CONTRACT_SHA256 = "9d9ede40562d5cbad30300961317937e1d7561296665e65b331f7d281eeef539"
+CURRENT_CONTRACT_SHA256 = "ae00f0add19d4dd7a6d2c464067bf9c0d22448c94f126df8c6466ead23a47f5d"
 
 
 def _sha(path: Path) -> str:
@@ -144,13 +144,14 @@ def _current_capsule_execution_records() -> list[dict[str, str]]:
             }
         )
     replay = admission_module._EXPECTED_CAPSULE_REPLAY_SOURCE
-    records.append(
-        {
-            "git_object_id": replay["git_object_id"],
-            "mode": "100644",
-            "path": replay["repo_path"],
-        }
-    )
+    if not any(item["path"] == replay["repo_path"] for item in records):
+        records.append(
+            {
+                "git_object_id": replay["git_object_id"],
+                "mode": "100644",
+                "path": replay["repo_path"],
+            }
+        )
     return sorted(records, key=lambda item: item["path"])
 
 
@@ -1860,6 +1861,38 @@ def test_capsule_producer_uses_pre_execution_snapshots_and_retained_fds() -> Non
     assert ".open(" not in runtime_source
     assert "_revalidate_snapshot" in functions
     assert "_revalidate_tensor_receipts" in functions
+
+
+@pytest.mark.parametrize(
+    "hostile_success",
+    (
+        b'{"runtime_manifest": true}\n',
+        (
+            b"b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab "
+            b"runtime_manifest.json\n"
+        ),
+        (
+            b"b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab\t"
+            b"runtime_manifest.json\n"
+        ),
+        b"0" * 64 + b"  runtime_manifest.json\n",
+        (
+            b"b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab  "
+            b"runtime_manifest.json\nextra\n"
+        ),
+    ),
+)
+def test_capsule_producer_binds_exact_runtime_success_format(
+    hostile_success: bytes,
+) -> None:
+    scope = runpy.run_path(
+        REPO_ROOT / "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py",
+        run_name="gate_d_capsule_producer_test",
+    )
+    manifest = {"manifest_sha256": scope["RUNTIME_MANIFEST_SELF_SHA256"]}
+    scope["_verify_runtime_success"](manifest, scope["RUNTIME_SUCCESS_PAYLOAD"])
+    with pytest.raises(RuntimeError, match="runtime SUCCESS contract drifted"):
+        scope["_verify_runtime_success"](manifest, hostile_success)
 
 
 @pytest.mark.parametrize(

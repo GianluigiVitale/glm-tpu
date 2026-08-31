@@ -144,9 +144,9 @@ _EXPECTED_CAPSULE_INSTALLED_PRODUCER = (
     "/opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_capsule.py"
 )
 _EXPECTED_CAPSULE_PRODUCER_SOURCE = {
-    "git_object_id": "94e9a00a4feaaf02066d5f638a607da690b77352",
+    "git_object_id": "6f0d31ee016de2192af3dbdd7a9470ed00bd14f0",
     "repo_path": "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py",
-    "sha256": "2cbf8ed9d0ca9387187b790d7f81bb95b46637fa8c5b53f62b5fa26f2d08268d",
+    "sha256": "d3082c2ef398d406031ddbf94143b4aa0e5eb712324af49bc1b85fc250ef869b",
 }
 _EXPECTED_CAPSULE_REPLAY_SOURCE = {
     "git_object_id": "7476af8c6ace4472d9c39faf1e7155b328d9e230",

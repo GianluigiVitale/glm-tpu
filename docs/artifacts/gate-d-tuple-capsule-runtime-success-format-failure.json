@@ -1,0 +1,42 @@
+{
+  "artifact_kind": "gate_d_tuple_capsule_runtime_success_format_failure",
+  "classification": "PRE_EXECUTION_INPUT_FORMAT_FAILURE;OUTPUT_ABSENT;ONE_SHOT_SPENT;NO_RETRY_AUTHORITY",
+  "claim_scope": "One reviewed forced-two-CPU producer process start failed after sealed JAX imports but before _execute, array execution, output-directory creation, archive, admission, cloud/TPU work or Gate-D evidence.",
+  "code_pin": "e82fe83d5ef7a49452f25279282bc1364651c5cc",
+  "error": {
+    "exception": "json.decoder.JSONDecodeError",
+    "message": "Expecting value: line 1 column 1 (char 0)",
+    "source_function": "_read_runtime",
+    "source_line": 581
+  },
+  "execution": {
+    "array_or_model_executed": false,
+    "cloud_workflow": false,
+    "jax_imported": true,
+    "output_created": false,
+    "producer_process_starts": 1,
+    "tpus_used": 0
+  },
+  "invocation": "/usr/bin/flock -n /home/gianl/.gate-d-tuple-capsule-one-shot.lock /usr/bin/env -i LANG=C LC_ALL=C PATH=/usr/bin:/bin /opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12 -I -S /opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_capsule.py --output /home/gianl/gate-d-runs/greenfield_gate_d_tuple_auxiliary_capsule_20260831T020400Z --expected-code-pin e82fe83d5ef7a49452f25279282bc1364651c5cc --expected-producer-sha256 2cbf8ed9d0ca9387187b790d7f81bb95b46637fa8c5b53f62b5fa26f2d08268d",
+  "observed_at_utc": "2026-08-31T02:06:53Z",
+  "output_path": "/home/gianl/gate-d-runs/greenfield_gate_d_tuple_auxiliary_capsule_20260831T020400Z",
+  "producer": {
+    "installed_path": "/opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_capsule.py",
+    "mode": "0555",
+    "sha256": "2cbf8ed9d0ca9387187b790d7f81bb95b46637fa8c5b53f62b5fa26f2d08268d",
+    "uid_gid": "root:root"
+  },
+  "review": {
+    "fable_max": "usage-blocked after local diagnosis; supplied no opinion",
+    "invocation_scope": "APPROVE INSTALL + EXACTLY ONE INVOCATION; no retry"
+  },
+  "root_cause": {
+    "actual_runtime_success_ascii": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab  runtime_manifest.json\n",
+    "actual_runtime_success_bytes": 88,
+    "actual_runtime_success_sha256": "dbef7e366e2fdf2a4815b0b58d1645667580d55fc5926133d48c838929f7ee7e",
+    "producer_assumption": "json.loads(success_raw)",
+    "resolution": "Bind the exact pinned sha256sum-style SUCCESS payload as bytes; reject alternate spacing, tab, hash, path and trailing data."
+  },
+  "schema_version": 1,
+  "tpu_successor_authorized": false
+}
