@@ -8733,3 +8733,34 @@ support; this source batch does not authorize installing or running the producer
 Fable remains at its recorded 100% limit/no opinion. The goal-authorized existing Sol reviewer
 returned `APPROVE SOURCE PERSISTENCE` for staged diff `4566728c...ef72`, with no P0--P2 and
 explicitly no installation, invocation, JAX or successor authorization.
+
+## 2026-08-31 compensated capsule execution-authority contract; offline source only
+
+New stdlib-only builder `build_gate_d_compensated_capsule_execution_authority.py`, SHA
+`dce8084d...51d2`, derives only five candidate-observed output hashes (pending independent
+accepted-output comparison) and sealed producer provenance from
+a canonical compensated capsule. It neither imports JAX nor trusts numerical labels.
+
+Admission core `46fa2382...010c` now uses exact two-candidate implementation and upstream-input
+catalogues. Tuple
+and compensated candidates have distinct installed paths, producer/replay Git blobs and complete
+replay-visible source-manifest hashes; unknown candidates and cross-candidate bindings fail closed.
+The candidate-indexed upstream bindings also prevent tuple plan/source/StableHLO authority from
+being accepted for the compensated candidate. The compensated entries bind persisted
+producer/replay commit `f340ead5`, blob IDs
+`15f05ad3...349d`/`ad38b591...00ca`, and 140-file manifest `286cac1c...7295`. Contract SHA is
+`81ceb19b...43bc`; capsule fields remain null and no current report has been regenerated. Focused
+builder/catalogue/cross-binding and hostile schema tests passed 41/41 in 120.52 seconds. An
+independent direct-file check then caught three copied compensated authority SHA literals; after
+replacing them with the actual file SHA-256 values and adding a regression assertion, the exact
+changed-path slice passed 4/4 in 14.21 seconds. The first
+run exposed and then closed a Python `1.0 == 1`/`True == 1` hole in capsule SUCCESS validation;
+receipt, SUCCESS, capsule and execution-authority schemas now require actual positive integers.
+No producer installation/invocation, JAX import,
+parser/admission run, compilation, model/cloud/TPU work or Gate-D claim occurred. Exact next after
+review/persistence is the complete offline admission suite and a separately reviewed immutable
+producer installation; this batch authorizes no process start.
+
+Fable remains at its recorded 100% limit/no opinion. Existing Sol re-reviewed corrected staged
+diff `3133f3b2...d4f4` and returned `APPROVE SOURCE PERSISTENCE`, with no remaining P0--P2.
+The approval is persistence-only and grants no process-start or successor authority.

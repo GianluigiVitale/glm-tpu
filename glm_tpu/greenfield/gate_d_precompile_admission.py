@@ -184,18 +184,61 @@ _EXPECTED_CAPSULE_ENVIRONMENT = {
         "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df"
     ),
 }
-_EXPECTED_CAPSULE_INSTALLED_PRODUCER = (
-    "/opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_capsule.py"
-)
-_EXPECTED_CAPSULE_PRODUCER_SOURCE = {
-    "git_object_id": "d82cfff69dc5a167a894716182fb0e95c807e5b1",
-    "repo_path": "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py",
-    "sha256": "a81fd59ea2b32f27a102666e24a35827b251560d4df52dc04276325aafa1794a",
-}
-_EXPECTED_CAPSULE_REPLAY_SOURCE = {
-    "git_object_id": "7476af8c6ace4472d9c39faf1e7155b328d9e230",
-    "repo_path": "glm_tpu/greenfield/benchmarking/gate_d_tuple_capsule.py",
-    "sha256": "9b9d11d0f312a173a8014a81f9b8fd957b9eefe2148bf327da0d57d82fed03b4",
+_EXPECTED_CAPSULE_EXECUTION_IMPLEMENTATIONS = {
+    "auxiliary_device_tuple_dependency": {
+        "installed_producer": (
+            "/opt/glm-tpu/bin/produce_gate_d_tuple_auxiliary_capsule.py"
+        ),
+        "producer_source": {
+            "git_object_id": "d82cfff69dc5a167a894716182fb0e95c807e5b1",
+            "repo_path": "scripts/greenfield/produce_gate_d_tuple_auxiliary_capsule.py",
+            "sha256": (
+                "a81fd59ea2b32f27a102666e24a35827b251560d4df52dc04276325aafa1794a"
+            ),
+        },
+        "replay_source": {
+            "git_object_id": "7476af8c6ace4472d9c39faf1e7155b328d9e230",
+            "repo_path": "glm_tpu/greenfield/benchmarking/gate_d_tuple_capsule.py",
+            "sha256": (
+                "9b9d11d0f312a173a8014a81f9b8fd957b9eefe2148bf327da0d57d82fed03b4"
+            ),
+        },
+        "source_manifest": {
+            "count": 139,
+            "sha256": (
+                "f3683029a4c3eaa12e0673c0e1d84ff13ff2c42fb7a475323e8d099ac156c0b0"
+            ),
+        },
+    },
+    "compensated_auxiliary_dependency": {
+        "installed_producer": (
+            "/opt/glm-tpu/bin/produce_gate_d_compensated_auxiliary_capsule.py"
+        ),
+        "producer_source": {
+            "git_object_id": "15f05ad3391437458e86c90cc6008c26b2f3349d",
+            "repo_path": (
+                "scripts/greenfield/produce_gate_d_compensated_auxiliary_capsule.py"
+            ),
+            "sha256": (
+                "039997b9ad8c60423024c11f19996bc57690ed5639602ddbae22292a1a17d19f"
+            ),
+        },
+        "replay_source": {
+            "git_object_id": "ad38b5915184e17127637516d2f99a87a83d00ca",
+            "repo_path": (
+                "glm_tpu/greenfield/benchmarking/gate_d_compensated_capsule.py"
+            ),
+            "sha256": (
+                "0f1930c079bd7244452e84dca6d0bbf9da077ea133c685f0f908760379e5313d"
+            ),
+        },
+        "source_manifest": {
+            "count": 140,
+            "sha256": (
+                "286cac1c76dda5386e7e3833521fe5b2cd5e827711436c883f360857c0e87295"
+            ),
+        },
+    },
 }
 # The admission module is the verifier, not part of the sealed replay import
 # closure.  Excluding it avoids a self-referential digest while binding every
@@ -204,10 +247,6 @@ _EXPECTED_CAPSULE_REPLAY_SOURCE = {
 _CAPSULE_EXECUTION_MANIFEST_EXCLUDED_PATHS = frozenset(
     {"glm_tpu/greenfield/gate_d_precompile_admission.py"}
 )
-_EXPECTED_CAPSULE_EXECUTION_SOURCE_MANIFEST = {
-    "count": 139,
-    "sha256": "f3683029a4c3eaa12e0673c0e1d84ff13ff2c42fb7a475323e8d099ac156c0b0",
-}
 _EXPECTED_CAPSULE_TENSOR_NAMES = (
     "attention.slot_01.input_norm",
     "attention.slot_01.qkv_a.weight_bits",
@@ -249,7 +288,7 @@ _EXPECTED_CAPSULE_ACCEPTED_OUTPUTS = {
         "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e"
     ),
 }
-_EXPECTED_CAPSULE_UPSTREAM_INPUTS = {
+_EXPECTED_CAPSULE_SHARED_UPSTREAM_INPUTS = {
     "db518_comparison": (
         "/home/gianl/glm-run/greenfield_pp16_feature2_layer0_db518_numerical_"
         "20260829T115022665987633Z/comparison.json",
@@ -265,11 +304,6 @@ _EXPECTED_CAPSULE_UPSTREAM_INPUTS = {
         "20260813T200736889447458Z/dense_partial_capture.npz",
         "f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298",
     ),
-    "plan_authority": (
-        "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
-        "gate-d-tuple-auxiliary-pp16-plan-authority.json",
-        "98b4fa21272e0bb019af1ad99abedee35593f9a1c8067a15983e9023c01f7880",
-    ),
     "runtime_manifest": (
         "/home/gianl/glm-run/greenfield_runtime_feature_qkv_direct_pp16_"
         "20260827T164842844148623Z/final/runtime_manifest.json",
@@ -280,16 +314,42 @@ _EXPECTED_CAPSULE_UPSTREAM_INPUTS = {
         "20260827T164842844148623Z/final/SUCCESS",
         "dbef7e366e2fdf2a4815b0b58d1645667580d55fc5926133d48c838929f7ee7e",
     ),
-    "source_authority": (
-        "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
-        "gate-d-tuple-auxiliary-source-authority.json",
-        "c95c8aa188e2eda77270022128d121dc3693a899607b1ab2f9977ddb45def0e1",
-    ),
-    "stablehlo_authority": (
-        "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
-        "gate-d-tuple-auxiliary-stablehlo-authority.json",
-        "8cc45b81c3a85ad6131790e82eb73f0839cab7eefd13a634db7ff5a697b0338b",
-    ),
+}
+_EXPECTED_CAPSULE_CANDIDATE_UPSTREAM_INPUTS = {
+    "auxiliary_device_tuple_dependency": {
+        "plan_authority": (
+            "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+            "gate-d-tuple-auxiliary-pp16-plan-authority.json",
+            "98b4fa21272e0bb019af1ad99abedee35593f9a1c8067a15983e9023c01f7880",
+        ),
+        "source_authority": (
+            "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+            "gate-d-tuple-auxiliary-source-authority.json",
+            "c95c8aa188e2eda77270022128d121dc3693a899607b1ab2f9977ddb45def0e1",
+        ),
+        "stablehlo_authority": (
+            "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+            "gate-d-tuple-auxiliary-stablehlo-authority.json",
+            "8cc45b81c3a85ad6131790e82eb73f0839cab7eefd13a634db7ff5a697b0338b",
+        ),
+    },
+    "compensated_auxiliary_dependency": {
+        "plan_authority": (
+            "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+            "gate-d-compensated-auxiliary-pp16-plan-authority.json",
+            "7d0a5615ff4744801ac6a6598a52ea80e17d431788e4ef21a9d889e81772dbdf",
+        ),
+        "source_authority": (
+            "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+            "gate-d-compensated-auxiliary-source-authority.json",
+            "237095c7ac9acdd7a37383b951b061752ee83f591722c3a2e2d3bede59326fb0",
+        ),
+        "stablehlo_authority": (
+            "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+            "gate-d-compensated-auxiliary-stablehlo-authority.json",
+            "af109e0f7d4d355373212028fd958af9e8566c302183b2fd5482e96805c8eb90",
+        ),
+    },
 }
 _EXPECTED_CAPSULE_RUNTIME_DATA_ROOT = Path(
     "/home/gianl/gcs-models/checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/"
@@ -4581,17 +4641,65 @@ def _verify_capsule_producer_blob(
     }
 
 
+def _expected_capsule_execution_implementation(
+    candidate_id: str,
+) -> Mapping[str, Any]:
+    expected = _EXPECTED_CAPSULE_EXECUTION_IMPLEMENTATIONS.get(candidate_id)
+    if expected is None:
+        raise BenchmarkValidationError(
+            "candidate has no independently reviewed capsule implementation"
+        )
+    return expected
+
+
+def _expected_capsule_upstream_inputs(
+    candidate_id: str,
+) -> dict[str, tuple[str, str]]:
+    candidate_inputs = _EXPECTED_CAPSULE_CANDIDATE_UPSTREAM_INPUTS.get(candidate_id)
+    if candidate_inputs is None:
+        raise BenchmarkValidationError(
+            "candidate has no independently reviewed capsule upstream authority"
+        )
+    if set(_EXPECTED_CAPSULE_SHARED_UPSTREAM_INPUTS) & set(candidate_inputs):
+        raise BenchmarkValidationError("capsule upstream authority catalogue overlaps")
+    return {**_EXPECTED_CAPSULE_SHARED_UPSTREAM_INPUTS, **candidate_inputs}
+
+
+def _verify_real_capsule_upstream_catalogue(
+    candidate_id: str,
+    upstream_report: Mapping[str, Mapping[str, Any]],
+    upstream_raw: Mapping[str, bytes],
+) -> None:
+    expected_inputs = _expected_capsule_upstream_inputs(candidate_id)
+    if set(upstream_report) != set(expected_inputs) or set(upstream_raw) != set(
+        expected_inputs
+    ):
+        raise BenchmarkValidationError("real capsule upstream catalogue drifted")
+    for name, (expected_path, expected_sha) in expected_inputs.items():
+        if upstream_report[name] != {
+            "bytes": len(upstream_raw[name]),
+            "path": expected_path,
+            "sha256": expected_sha,
+        }:
+            raise BenchmarkValidationError(
+                f"real capsule upstream authority drifted: {name}"
+            )
+
+
 def _verify_real_capsule_execution_source(
     producer: Mapping[str, str],
     source_records: Sequence[Mapping[str, str]],
     replay_blob: bytes,
+    *,
+    candidate_id: str = "auxiliary_device_tuple_dependency",
 ) -> dict[str, Any]:
     """Bind the real producer and complete replay-visible committed source tree."""
 
+    expected = _expected_capsule_execution_implementation(candidate_id)
     producer_identity = {
         key: producer.get(key) for key in ("git_object_id", "repo_path", "sha256")
     }
-    if producer_identity != _EXPECTED_CAPSULE_PRODUCER_SOURCE:
+    if producer_identity != expected["producer_source"]:
         raise BenchmarkValidationError(
             "real capsule producer is not the independently reviewed blob"
         )
@@ -4623,12 +4731,12 @@ def _verify_real_capsule_execution_source(
             _canonical_json(execution_records).encode("ascii")
         ).hexdigest(),
     }
-    replay = _EXPECTED_CAPSULE_REPLAY_SOURCE
+    replay = expected["replay_source"]
     replay_records = [
         record for record in execution_records if record["path"] == replay["repo_path"]
     ]
     if (
-        execution_manifest != _EXPECTED_CAPSULE_EXECUTION_SOURCE_MANIFEST
+        execution_manifest != expected["source_manifest"]
         or len(replay_records) != 1
         or replay_records[0]["git_object_id"] != replay["git_object_id"]
         or sha256(replay_blob).hexdigest() != replay["sha256"]
@@ -5117,12 +5225,20 @@ def _verify_capsule_execution_authority(
         "capsule execution authority",
     )
     if (
-        authority["schema_version"] != 1
+        _positive_int(
+            authority["schema_version"], "capsule execution authority schema version"
+        )
+        != 1
         or authority["authority_kind"] != "gate.d.capsule.execution.v1"
         or authority["candidate_id"] != candidate_id
     ):
         raise BenchmarkValidationError("capsule execution authority identity drifted")
     real_source = source.get("executable_source_authority") is True
+    expected_real_implementation = (
+        _expected_capsule_execution_implementation(candidate_id)
+        if real_source
+        else None
+    )
     producer = _verify_capsule_producer_blob(
         authority["producer"], path.parent, implementation
     )
@@ -5161,8 +5277,10 @@ def _verify_capsule_execution_authority(
     ):
         raise BenchmarkValidationError("installed capsule producer drifted")
     if real_source:
+        assert expected_real_implementation is not None
         if (
-            installed_path != Path(_EXPECTED_CAPSULE_INSTALLED_PRODUCER)
+            installed_path
+            != Path(expected_real_implementation["installed_producer"])
             or installed_report["uid"] != 0
             or installed_report["gid"] != 0
             or installed_report["mode"] != 0o555
@@ -5269,6 +5387,7 @@ def _verify_capsule_execution_authority(
         )
         replay_blob = b""
         if real_source:
+            assert expected_real_implementation is not None
             replay_blob = _git_output(
                 repository_fd,
                 Path(implementation["git_path"]),
@@ -5276,7 +5395,7 @@ def _verify_capsule_execution_authority(
                 [
                     "cat-file",
                     "blob",
-                    _EXPECTED_CAPSULE_REPLAY_SOURCE["git_object_id"],
+                    expected_real_implementation["replay_source"]["git_object_id"],
                 ],
                 "capsule replay blob",
                 limit=_MAX_SOURCE_BYTES,
@@ -5316,7 +5435,10 @@ def _verify_capsule_execution_authority(
     independently_reviewed_execution = None
     if real_source:
         independently_reviewed_execution = _verify_real_capsule_execution_source(
-            producer, source_records, replay_blob
+            producer,
+            source_records,
+            replay_blob,
+            candidate_id=candidate_id,
         )
     source_objects = {
         record["path"]: record["git_object_id"] for record in source_records
@@ -5467,17 +5589,9 @@ def _verify_capsule_execution_authority(
             "sha256": expected_sha,
         }
     if real_source:
-        if set(upstream_report) != set(_EXPECTED_CAPSULE_UPSTREAM_INPUTS):
-            raise BenchmarkValidationError("real capsule upstream catalogue drifted")
-        for name, (expected_path, expected_sha) in _EXPECTED_CAPSULE_UPSTREAM_INPUTS.items():
-            if upstream_report[name] != {
-                "bytes": len(upstream_raw[name]),
-                "path": expected_path,
-                "sha256": expected_sha,
-            }:
-                raise BenchmarkValidationError(
-                    f"real capsule upstream authority drifted: {name}"
-                )
+        _verify_real_capsule_upstream_catalogue(
+            candidate_id, upstream_report, upstream_raw
+        )
     runtime_paths = None
     runtime_mount_authority = None
     if real_source:
@@ -5622,7 +5736,9 @@ def _verify_capsule_producer_receipt(
         },
         "capsule producer receipt",
     )
-    if receipt["schema_version"] != 1:
+    if _positive_int(
+        receipt["schema_version"], "capsule producer receipt schema version"
+    ) != 1:
         raise BenchmarkValidationError("capsule producer receipt schema drifted")
     if receipt["claim_scope"] != _EXPECTED_CAPSULE_PRODUCER_CLAIM_SCOPE:
         raise BenchmarkValidationError("capsule producer claim scope drifted")
@@ -5819,6 +5935,8 @@ def _verify_capsule_producer_receipt(
         "producer_receipt_sha256": receipt_sha,
         "schema_version": 1,
     }
+    _exact_keys(success, set(expected_success), "capsule producer SUCCESS")
+    _positive_int(success["schema_version"], "capsule producer SUCCESS schema version")
     if success != expected_success:
         raise BenchmarkValidationError("capsule producer SUCCESS drifted")
     return {
@@ -5874,7 +5992,10 @@ def _verify_capsule(
         },
         "candidate coherent capsule",
     )
-    if capsule["schema_version"] != GATE_D_PRECOMPILE_ADMISSION_SCHEMA_VERSION:
+    if (
+        _positive_int(capsule["schema_version"], "candidate capsule schema version")
+        != GATE_D_PRECOMPILE_ADMISSION_SCHEMA_VERSION
+    ):
         raise BenchmarkValidationError("candidate capsule schema drifted")
     if (
         capsule["candidate_id"] != candidate_id
@@ -6692,7 +6813,11 @@ def admit_gate_d_precompile_candidates(
             "distinct survivors reuse one candidate StableHLO implementation"
         )
     admitted = [item["id"] for item in results if item["admitted_precompile"]]
-    if admitted not in ([], ["auxiliary_device_tuple_dependency"]):
+    if admitted not in (
+        [],
+        ["auxiliary_device_tuple_dependency"],
+        ["compensated_auxiliary_dependency"],
+    ):
         raise BenchmarkValidationError(
             "unexpected candidate set passed precompile admission v2"
         )

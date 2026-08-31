@@ -176,6 +176,8 @@ Do not weaken v1 or rewrite its historical evidence. The append-only repair now 
   `glm_tpu/greenfield/benchmarking/gate_d_compensated_capsule.py`;
 - compensated capsule producer source (not installed or run):
   `scripts/greenfield/produce_gate_d_compensated_auxiliary_capsule.py`;
+- compensated stdlib execution-authority builder:
+  `scripts/greenfield/build_gate_d_compensated_capsule_execution_authority.py`;
 - current real-HLO report: `docs/artifacts/gate-d-precompile-admission-v2-stablehlo.json`.
 
 V2 authenticates committed blob/AST identity for concrete or declarative source authority, a

@@ -30,7 +30,7 @@ from glm_tpu.greenfield.gate_d_precompile_admission import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CURRENT_CONTRACT = REPO_ROOT / "configs/greenfield-gate-d-precompile-admission-v2.json"
-CURRENT_CONTRACT_SHA256 = "aeb2f45a2fa560ce26ea8d763783cba0acec4478b44d9b8f11f3cec8fe060071"
+CURRENT_CONTRACT_SHA256 = "81ceb19bffc2ec996c819c0c6dbe903c9585a201037db4c7825e2c95c43243bc"
 
 
 def _sha(path: Path) -> str:
@@ -149,8 +149,9 @@ def _committed_concrete_compensated_source_nodes() -> tuple[
     )
 
 
-def _historical_capsule_execution_records() -> list[dict[str, str]]:
-    code_pin = "17a35181b65e4357f92c140e202239419f0262e9"
+def _capsule_execution_records(
+    code_pin: str, candidate_id: str
+) -> list[dict[str, str]]:
     raw = subprocess.run(
         [
             "/usr/bin/git",
@@ -183,7 +184,9 @@ def _historical_capsule_execution_records() -> list[dict[str, str]]:
                 "path": path,
             }
         )
-    replay = admission_module._EXPECTED_CAPSULE_REPLAY_SOURCE
+    replay = admission_module._EXPECTED_CAPSULE_EXECUTION_IMPLEMENTATIONS[
+        candidate_id
+    ]["replay_source"]
     if not any(item["path"] == replay["repo_path"] for item in records):
         records.append(
             {
@@ -193,6 +196,20 @@ def _historical_capsule_execution_records() -> list[dict[str, str]]:
             }
         )
     return sorted(records, key=lambda item: item["path"])
+
+
+def _historical_capsule_execution_records() -> list[dict[str, str]]:
+    return _capsule_execution_records(
+        "17a35181b65e4357f92c140e202239419f0262e9",
+        "auxiliary_device_tuple_dependency",
+    )
+
+
+def _compensated_capsule_execution_records() -> list[dict[str, str]]:
+    return _capsule_execution_records(
+        "f340ead5a08a96e76b9aa639e954cddef649050e",
+        "compensated_auxiliary_dependency",
+    )
 
 
 def test_historical_concrete_tuple_source_semantics_are_bound() -> None:
@@ -209,7 +226,10 @@ def test_historical_concrete_tuple_source_semantics_are_bound() -> None:
 def test_real_capsule_execution_implementation_attacks_fail_closed(
     mutation: str,
 ) -> None:
-    producer = dict(admission_module._EXPECTED_CAPSULE_PRODUCER_SOURCE)
+    expected = admission_module._EXPECTED_CAPSULE_EXECUTION_IMPLEMENTATIONS[
+        "auxiliary_device_tuple_dependency"
+    ]
+    producer = dict(expected["producer_source"])
     records = _historical_capsule_execution_records()
     replay_blob = subprocess.run(
         [
@@ -218,7 +238,7 @@ def test_real_capsule_execution_implementation_attacks_fail_closed(
             str(REPO_ROOT),
             "cat-file",
             "blob",
-            admission_module._EXPECTED_CAPSULE_REPLAY_SOURCE["git_object_id"],
+            expected["replay_source"]["git_object_id"],
         ],
         check=True,
         capture_output=True,
@@ -226,9 +246,7 @@ def test_real_capsule_execution_implementation_attacks_fail_closed(
     report = admission_module._verify_real_capsule_execution_source(
         producer, records, replay_blob
     )
-    assert report["execution_manifest"] == (
-        admission_module._EXPECTED_CAPSULE_EXECUTION_SOURCE_MANIFEST
-    )
+    assert report["execution_manifest"] == expected["source_manifest"]
     if mutation == "producer_path":
         producer["repo_path"] = "scripts/greenfield/hostile_capsule.py"
     elif mutation == "producer_blob":
@@ -247,6 +265,122 @@ def test_real_capsule_execution_implementation_attacks_fail_closed(
         admission_module._verify_real_capsule_execution_source(
             producer, records, replay_blob
         )
+
+
+def test_compensated_real_capsule_execution_implementation_is_bound() -> None:
+    candidate_id = "compensated_auxiliary_dependency"
+    expected = admission_module._EXPECTED_CAPSULE_EXECUTION_IMPLEMENTATIONS[
+        candidate_id
+    ]
+    producer = dict(expected["producer_source"])
+    records = _compensated_capsule_execution_records()
+    replay_blob = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(REPO_ROOT),
+            "cat-file",
+            "blob",
+            expected["replay_source"]["git_object_id"],
+        ],
+        check=True,
+        capture_output=True,
+    ).stdout
+    report = admission_module._verify_real_capsule_execution_source(
+        producer,
+        records,
+        replay_blob,
+        candidate_id=candidate_id,
+    )
+    assert report == {
+        "execution_manifest": expected["source_manifest"],
+        "producer": expected["producer_source"],
+        "replay": expected["replay_source"],
+    }
+    with pytest.raises(BenchmarkValidationError, match="independently reviewed"):
+        admission_module._verify_real_capsule_execution_source(
+            producer,
+            records,
+            replay_blob,
+            candidate_id="auxiliary_device_tuple_dependency",
+        )
+    with pytest.raises(BenchmarkValidationError, match="closure drifted"):
+        admission_module._verify_real_capsule_execution_source(
+            producer,
+            records,
+            replay_blob + b"\n# hostile\n",
+            candidate_id=candidate_id,
+        )
+
+
+def test_capsule_execution_implementation_catalogue_is_exact() -> None:
+    expected = admission_module._EXPECTED_CAPSULE_EXECUTION_IMPLEMENTATIONS
+    assert set(expected) == {
+        "auxiliary_device_tuple_dependency",
+        "compensated_auxiliary_dependency",
+    }
+    assert expected["auxiliary_device_tuple_dependency"]["installed_producer"].endswith(
+        "/produce_gate_d_tuple_auxiliary_capsule.py"
+    )
+    assert expected["compensated_auxiliary_dependency"][
+        "installed_producer"
+    ].endswith("/produce_gate_d_compensated_auxiliary_capsule.py")
+    assert (
+        expected["auxiliary_device_tuple_dependency"]["producer_source"]
+        != expected["compensated_auxiliary_dependency"]["producer_source"]
+    )
+    assert (
+        expected["auxiliary_device_tuple_dependency"]["replay_source"]
+        != expected["compensated_auxiliary_dependency"]["replay_source"]
+    )
+    with pytest.raises(BenchmarkValidationError, match="no independently reviewed"):
+        admission_module._expected_capsule_execution_implementation(
+            "unknown_candidate"
+        )
+
+
+def test_capsule_upstream_catalogue_is_candidate_bound_and_cross_binding_fails() -> None:
+    candidate_ids = (
+        "auxiliary_device_tuple_dependency",
+        "compensated_auxiliary_dependency",
+    )
+    catalogues = {
+        candidate_id: admission_module._expected_capsule_upstream_inputs(candidate_id)
+        for candidate_id in candidate_ids
+    }
+    assert set(catalogues[candidate_ids[0]]) == set(catalogues[candidate_ids[1]])
+    for authority_name in (
+        "plan_authority",
+        "source_authority",
+        "stablehlo_authority",
+    ):
+        assert catalogues[candidate_ids[0]][authority_name] != catalogues[
+            candidate_ids[1]
+        ][authority_name]
+        for candidate_id in candidate_ids:
+            authority_path, authority_sha = catalogues[candidate_id][authority_name]
+            assert sha256(Path(authority_path).read_bytes()).hexdigest() == authority_sha
+
+    raw = {name: b"x" for name in catalogues[candidate_ids[1]]}
+    report = {
+        name: {"bytes": 1, "path": path, "sha256": digest}
+        for name, (path, digest) in catalogues[candidate_ids[1]].items()
+    }
+    admission_module._verify_real_capsule_upstream_catalogue(
+        candidate_ids[1], report, raw
+    )
+    tuple_plan_path, tuple_plan_sha = catalogues[candidate_ids[0]]["plan_authority"]
+    report["plan_authority"] = {
+        "bytes": 1,
+        "path": tuple_plan_path,
+        "sha256": tuple_plan_sha,
+    }
+    with pytest.raises(BenchmarkValidationError, match="plan_authority"):
+        admission_module._verify_real_capsule_upstream_catalogue(
+            candidate_ids[1], report, raw
+        )
+    with pytest.raises(BenchmarkValidationError, match="no independently reviewed"):
+        admission_module._expected_capsule_upstream_inputs("unknown_candidate")
 
 
 def test_concrete_tuple_source_refuses_precision_drift() -> None:
@@ -2039,6 +2173,8 @@ def test_complete_pp8_authority_uses_four_real_owners(tmp_path: Path) -> None:
         ("upstream_file", "upstream input drifted"),
         ("installed_producer", "installed capsule producer drifted"),
         ("python_dependency_escape", "escaped sealed roots"),
+        ("authority_schema_float", "positive integer"),
+        ("authority_schema_bool", "positive integer"),
     ],
 )
 def test_capsule_execution_authority_attacks_fail_closed(
@@ -2072,6 +2208,12 @@ def test_capsule_execution_authority_attacks_fail_closed(
                 "sha256": _sha(escaped),
             }
         ]
+        _write_canonical_json(authority_path, authority)
+    elif mutation == "authority_schema_float":
+        authority["schema_version"] = 1.0
+        _write_canonical_json(authority_path, authority)
+    elif mutation == "authority_schema_bool":
+        authority["schema_version"] = True
         _write_canonical_json(authority_path, authority)
     _rebind_capsule_execution_authority(path, contract, authority_path)
     report = admit_gate_d_precompile_candidates(path, _sha(path))
@@ -2143,11 +2285,6 @@ def test_real_capsule_tensor_receipts_bind_manifest_header_and_payload(
         admission_module,
         "_CAPSULE_INPUT_SCHEMA",
         {"runtime_input": ("<f4", (2, 2))},
-    )
-    monkeypatch.setattr(
-        admission_module,
-        "_EXPECTED_CAPSULE_UPSTREAM_INPUTS",
-        {"runtime_manifest": (str(manifest_path), sha256(manifest_raw).hexdigest())},
     )
     monkeypatch.setattr(
         admission_module, "_EXPECTED_CAPSULE_RUNTIME_DATA_ROOT", tmp_path
@@ -2467,6 +2604,10 @@ def test_capsule_producer_binds_exact_runtime_success_format(
         ("upstream_inputs", "not the pinned execution authority"),
         ("tensor_receipts", "not the pinned execution authority"),
         ("success", "SUCCESS drifted"),
+        ("receipt_schema_float", "positive integer"),
+        ("receipt_schema_bool", "positive integer"),
+        ("success_schema_float", "positive integer"),
+        ("success_schema_bool", "positive integer"),
     ],
 )
 def test_capsule_producer_receipt_attacks_fail_closed(
@@ -2504,6 +2645,19 @@ def test_capsule_producer_receipt_attacks_fail_closed(
         )
         success = json.loads(success_path.read_text())
         success["schema_version"] = 2
+        _write_canonical_json(success_path, success)
+    elif mutation == "receipt_schema_float":
+        receipt["schema_version"] = 1.0
+    elif mutation == "receipt_schema_bool":
+        receipt["schema_version"] = True
+    elif mutation in {"success_schema_float", "success_schema_bool"}:
+        success_path = _binding_path(
+            capsule_path.parent, capsule["producer_success"]["path"]
+        )
+        success = json.loads(success_path.read_text())
+        success["schema_version"] = (
+            1.0 if mutation == "success_schema_float" else True
+        )
         _write_canonical_json(success_path, success)
     _write_canonical_json(receipt_path, receipt)
     _rebind_capsule_producer_chain(path, contract, capsule_path, capsule)
@@ -3589,6 +3743,8 @@ def test_missing_compound_scorer_role_is_rejected(tmp_path: Path) -> None:
         ("swapped_owner_prefixes", "owner-axis prefix drifted"),
         ("reversed_cache_owner_axis", "owner-axis mapping drifted"),
         ("forged_layout", "not sealed plan authority"),
+        ("capsule_schema_float", "positive integer"),
+        ("capsule_schema_bool", "positive integer"),
     ],
 )
 def test_capsule_gate_d_schema_attacks_are_rejected(
@@ -3624,6 +3780,10 @@ def test_capsule_gate_d_schema_attacks_are_rejected(
         cache["arrays"][0]["owner_axis_ids"] = [1, 0]
     elif mutation == "forged_layout":
         capsule["watchpoints"][0]["layout"] = "lp4.local"
+    elif mutation == "capsule_schema_float":
+        capsule["schema_version"] = 2.0
+    elif mutation == "capsule_schema_bool":
+        capsule["schema_version"] = True
     _rebind_capsule(path, contract, capsule_path, capsule)
     report = admit_gate_d_precompile_candidates(path, _sha(path))
     candidate = report["candidate_results"][0]

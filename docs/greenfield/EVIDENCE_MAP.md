@@ -2320,3 +2320,29 @@ remains open and no TPU successor is authorized.
 - Fable remains at its recorded 100% limit/no opinion. Existing Sol returned
   `APPROVE SOURCE PERSISTENCE` for staged diff `4566728c...ef72`, with no P0--P2 and no
   installation/invocation/successor authority.
+
+## Compensated capsule execution-authority builder and admission bindings
+
+- `scripts/greenfield/build_gate_d_compensated_capsule_execution_authority.py`, SHA
+  `dce8084d...51d2`, is stdlib-only and derives a canonical outer authority from a bound compensated
+  capsule/receipt/SUCCESS tuple. It exposes only candidate-observed event-1/RMS operand hashes,
+  pending independent accepted-output comparison, plus exact
+  producer environment/source/dependency provenance; it does not import JAX or accept extra keys.
+- Admission core `46fa2382...010c` replaces the tuple-only implementation and upstream-input
+  singletons with exact two-candidate catalogues. Compensated producer/replay Git blobs are
+  `15f05ad3...349d` and
+  `ad38b591...00ca`; their complete replay-visible 140-file source manifest is
+  `286cac1c...7295`. Installed paths, producer/replay sources, manifests and plan/source/StableHLO
+  upstream authorities are candidate-specific; unknown or cross-candidate bindings fail closed.
+- Contract `81ceb19b...43bc` binds the new core but deliberately retains null capsule fields.
+  Focused builder/catalogue/cross-binding and hostile schema checks passed 41/41 in 120.52 seconds.
+  A direct-file check then caught and corrected three copied compensated authority SHA literals;
+  the post-correction changed-path slice passed 4/4 in 14.21 seconds and now asserts every
+  candidate-specific authority file hash. The checks also caught and closed float/boolean schema
+  acceptance in the capsule publication chain. No
+  current admission report was regenerated
+  and no installation, invocation, JAX/parser, compilation, model/cloud/TPU or successor work ran.
+  Full offline validation and any immutable install remain separately reviewed steps.
+- Fable remains at its recorded 100% limit/no opinion. Existing Sol approved source persistence
+  for corrected staged diff `3133f3b2...d4f4`, with no remaining P0--P2 and explicitly no
+  process-start or successor authorization.
