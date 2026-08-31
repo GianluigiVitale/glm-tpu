@@ -1,0 +1,39 @@
+{
+  "artifact_kind": "gate_d_tuple_authority_builder_python_version_failure",
+  "classification": "PRE_ARGUMENT_PYTHON_VERSION_FAILURE;OUTPUT_ABSENT;ONE_SHOT_SPENT;NO_RETRY_AUTHORITY",
+  "claim_scope": "One reviewed no-JAX authority-builder process start failed during local package import, before argument parsing, capsule reads, output creation, admission, archive, compilation, cloud workflow, infrastructure mutation or TPU work.",
+  "code_pin": "85c187e0b58daf659b9b18e01363e918d38c59c2",
+  "error": {
+    "exception": "ImportError",
+    "message": "cannot import name 'StrEnum' from 'enum' (/usr/lib/python3.10/enum.py)",
+    "source": "glm_tpu/greenfield/types.py imports enum.StrEnum"
+  },
+  "execution": {
+    "argument_parsing_reached": false,
+    "capsule_read": false,
+    "cloud_workflow": false,
+    "infrastructure_mutation": false,
+    "jax_imported": false,
+    "output_created": false,
+    "process_starts": 1,
+    "tpus_used": 0
+  },
+  "invocation": "/usr/bin/env -i LANG=C LC_ALL=C PATH=/usr/bin:/bin /usr/bin/python3 -I -S /home/gianl/glm-tpu-topology-rewrite/scripts/greenfield/build_gate_d_tuple_capsule_execution_authority.py --capsule /home/gianl/gate-d-runs/greenfield_gate_d_tuple_auxiliary_capsule_20260831T031000Z/capsule.json --expected-capsule-sha256 aa7425fd4c896791dc8086dd7c884cfb13176d30be982051a0b709bc3d5d7ef5 --output /home/gianl/glm-tpu-topology-rewrite/docs/artifacts/gate-d-tuple-auxiliary-capsule-execution-authority.json",
+  "observed_at_utc": "2026-08-31T03:20:53Z",
+  "output_path": "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/gate-d-tuple-auxiliary-capsule-execution-authority.json",
+  "review": {
+    "fable_max": "usage-blocked after local diagnosis; supplied no opinion",
+    "invocation_scope": "APPROVE EXACTLY ONE AUTHORITY BUILD; no retry"
+  },
+  "root_cause": {
+    "reviewed_launcher": "/usr/bin/python3",
+    "reviewed_launcher_sha256": "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86",
+    "reviewed_launcher_version": "3.10.12",
+    "required_language_feature": "enum.StrEnum (Python >=3.11)",
+    "sealed_successor_launcher": "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12",
+    "sealed_successor_launcher_sha256": "021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7",
+    "sealed_successor_launcher_version": "3.12.13"
+  },
+  "schema_version": 1,
+  "tpu_successor_authorized": false
+}

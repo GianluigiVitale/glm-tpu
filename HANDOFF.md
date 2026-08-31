@@ -8544,3 +8544,21 @@ capsule while admission independently reopens every input/runtime payload. Exact
 source review, commit/push/US-CENTRAL2 mirror, then a separate review may authorize one authority
 build and contract binding. The current contract remains null-bound; no archive/admission, compile,
 cloud/TPU, numerical acceptance or Gate-D closure is authorized.
+
+## 2026-08-31 first outer-authority build failed before arguments; launcher correction only
+
+At clean pushed/mirrored pin `85c187e`, Sol approved exactly one no-JAX outer-authority build. The
+literal command used `/usr/bin/python3 -I -S`, which is Python 3.10.12. Importing
+`glm_tpu.greenfield.types` requires `enum.StrEnum`, so the process exited 1 during import before
+argument parsing, capsule reads, output creation, JAX, admission, archive, cloud workflow,
+infrastructure mutation or TPU. The intended output remains absent and the start is burned.
+
+Canonical failure artifact is
+`docs/artifacts/gate-d-tuple-authority-builder-python-version-failure.json` (`e27e2721...87bc0`).
+Fable-max diagnosis was
+attempted narrowly but usage-blocked and supplied no opinion. Local diagnosis proves the exact
+sealed `/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12` is Python 3.12.13 with SHA
+`02104489...acec7`; builder tests already pass there. No code change is needed. Exact next is Sol
+review of this evidence and launcher-only correction, then commit/push/US-CENTRAL2 mirror. Only a
+separate post-persistence review may approve one fresh builder start with the sealed launcher; the
+contract remains null-bound and no admission/archive/compile/cloud/TPU/Gate-D action is authorized.

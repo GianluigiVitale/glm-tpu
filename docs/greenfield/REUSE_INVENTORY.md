@@ -955,3 +955,12 @@ postflight verified state/input/device/receipt SHAs `68ee47b1...f236`, `dd5f1cbb
 payload access occurred, with no cloud workflow or infrastructure mutation. The no-JAX outer-authority
 builder/test (`fc0de9a2...ecbe2`/`26148da4...8b1c`) passes 4/4 and remains source-only pending
 review/persistence/separate invocation; the admission contract still has null capsule bindings.
+
+The first approved no-JAX authority-builder start at clean pushed/mirrored `85c187e` is burned. It
+used `/usr/bin/python3 -I -S`; that interpreter is 3.10.12 and failed importing `enum.StrEnum`
+before argument parsing, capsule reads or output. Preserve
+`docs/artifacts/gate-d-tuple-authority-builder-python-version-failure.json` (`e27e2721...87bc0`);
+no JAX, admission,
+archive, cloud workflow, infrastructure mutation or TPU occurred. Fable-max was usage-blocked. The
+existing sealed Python 3.12.13 launcher (`02104489...acec7`) is the launcher-only successor pending
+review/persistence and a separately authorized new start. The intended authority output is absent.

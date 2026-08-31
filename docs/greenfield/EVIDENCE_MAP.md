@@ -2108,3 +2108,17 @@ remains open and no TPU successor is authorized.
   source-only pending adversarial review, persistence and separate execution authorization. The
   admission contract still contains null capsule bindings; no archive, admission, compile, TPU or
   Gate-D successor is authorized.
+
+## First outer-authority build: pre-argument Python-version failure
+
+- At clean pushed/mirrored pin `85c187e`, one separately reviewed no-JAX builder start used
+  `/usr/bin/python3 -I -S`. That launcher is Python 3.10.12, while importing the greenfield package
+  requires `enum.StrEnum` (Python >=3.11). It failed during import before arguments, capsule reads,
+  output creation, admission, archive, cloud workflow, infrastructure mutation or TPU work.
+- The intended output remains absent and the one-shot is burned. Canonical negative artifact
+  `gate-d-tuple-authority-builder-python-version-failure.json` (`e27e2721...87bc0`) records the
+  exact invocation, launcher hashes and scope. Fable-max was usage-blocked and supplied no opinion.
+- No code correction is implied: the builder's tests run under Python 3.12.13. The launcher-only
+  successor is the existing sealed Python 3.12.13 executable SHA `02104489...acec7`, but it has no
+  retry authority until the negative evidence is reviewed, committed, pushed and mirrored and a
+  separate review approves one new process start. The contract remains null-bound.
