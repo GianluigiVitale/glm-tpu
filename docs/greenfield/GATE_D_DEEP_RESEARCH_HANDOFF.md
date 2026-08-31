@@ -539,3 +539,22 @@ either change semantics, perturb codegen, use illegal topology, or lack coherent
 research contribution is a **new, mechanically precise, one-row local dependency/reduction
 mechanism with a cheap falsification path**. Once that exists, the existing observability and
 protection stack can test it without repeating the previous two weeks of expensive failures.
+
+## 15. Current implementation status — 2026-08-31
+
+The earlier staged/pre-fix status in §6 is historical. Concrete compensated source now exists at
+commit `e16d74f`; it is default off, preserves the accepted primary RMS expressions byte-for-byte
+at AST level and returns a distinct rooted device auxiliary. Its certificate
+`gate-d-compensated-auxiliary-source-authority.json` is `237095c7...6fb0` and deliberately claims
+only `graph.identity.only;numeric.cancellation.unproven`.
+
+Admission core/contract/current-report SHAs are `fde1847f...b252`, `0ce578d5...ddeb` and
+`9e2f3b5e...594c`; 140/140 admission tests pass, including hostile primary, restoration,
+barrier/return, import and caller-control mutations. Classification remains
+`NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`. The compensated candidate
+still lacks plan, causal StableHLO, pinned producer and candidate-coherent capsule authority.
+
+Exact next after this source-only batch is persisted is a separate compensated plan-authority
+batch. It may reuse PP16 physical topology evidence only after binding the new candidate's exact
+watchpoint/owner semantics. Do not lower, compile, execute JAX, load a model or run TPU from this
+source certificate.

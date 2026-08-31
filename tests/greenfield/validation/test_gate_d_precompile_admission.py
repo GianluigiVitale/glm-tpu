@@ -30,7 +30,7 @@ from glm_tpu.greenfield.gate_d_precompile_admission import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CURRENT_CONTRACT = REPO_ROOT / "configs/greenfield-gate-d-precompile-admission-v2.json"
-CURRENT_CONTRACT_SHA256 = "228bbfe697b269678d3fc1c4762ce3024dfe78e8d6d3a8210e98493352eee4ea"
+CURRENT_CONTRACT_SHA256 = "0ce578d5af4ce2ddc37c3d7bbe5ea6665f25a897a9f3f945ad4c9401167addeb"
 
 
 def _sha(path: Path) -> str:
@@ -67,31 +67,52 @@ def _current_lowering_dependencies() -> dict[str, list[dict[str, Any]]]:
     return json.loads(json.dumps(receipt["loaded_dependencies"]))
 
 
-def _current_concrete_source_nodes() -> tuple[
+def _committed_concrete_source_nodes(
+    code_pin: str, *, compensated: bool
+) -> tuple[
     dict[str, ast.AST], dict[str, ast.Module]
 ]:
-    rms_tree = ast.parse(
-        (REPO_ROOT / "glm_tpu/greenfield/kernels/reference/rmsnorm.py").read_text()
+    def committed_tree(path: str) -> ast.Module:
+        raw = subprocess.run(
+            ["/usr/bin/git", "-C", str(REPO_ROOT), "show", f"{code_pin}:{path}"],
+            check=True,
+            capture_output=True,
+        ).stdout
+        return ast.parse(raw.decode("utf-8"))
+
+    rms_tree = committed_tree("glm_tpu/greenfield/kernels/reference/rmsnorm.py")
+    layer_tree = committed_tree("glm_tpu/greenfield/kernels/layer.py")
+    result_name = (
+        "FusedAddRmsNormCompensatedAuxiliaryResult"
+        if compensated
+        else "FusedAddRmsNormAuxiliaryResult"
     )
-    layer_tree = ast.parse(
-        (REPO_ROOT / "glm_tpu/greenfield/kernels/layer.py").read_text()
+    function_name = (
+        "fused_add_rms_norm_with_compensated_auxiliary"
+        if compensated
+        else "fused_add_rms_norm_with_auxiliary"
+    )
+    layer_result_name = (
+        "StageLocalSplitLayerFp8CompensatedAuxiliaryResult"
+        if compensated
+        else "StageLocalSplitLayerFp8AuxiliaryResult"
     )
     names = {
-        "candidate.source:FusedAddRmsNormAuxiliaryResult": (
+        f"candidate.source:{result_name}": (
             rms_tree,
-            "FusedAddRmsNormAuxiliaryResult",
+            result_name,
         ),
         "candidate.source:fused_add_rms_norm": (
             rms_tree,
             "fused_add_rms_norm",
         ),
-        "candidate.source:fused_add_rms_norm_with_auxiliary": (
+        f"candidate.source:{function_name}": (
             rms_tree,
-            "fused_add_rms_norm_with_auxiliary",
+            function_name,
         ),
-        "candidate.callsite:StageLocalSplitLayerFp8AuxiliaryResult": (
+        f"candidate.callsite:{layer_result_name}": (
             layer_tree,
-            "StageLocalSplitLayerFp8AuxiliaryResult",
+            layer_result_name,
         ),
         "candidate.callsite:stage_local_transformer_layer_fp8_split_mapped": (
             layer_tree,
@@ -110,7 +131,26 @@ def _current_concrete_source_nodes() -> tuple[
     )
 
 
-def _current_capsule_execution_records() -> list[dict[str, str]]:
+def _historical_concrete_tuple_source_nodes() -> tuple[
+    dict[str, ast.AST], dict[str, ast.Module]
+]:
+    return _committed_concrete_source_nodes(
+        admission_module._EXPECTED_CONCRETE_TUPLE_SOURCE["code_pin"],
+        compensated=False,
+    )
+
+
+def _committed_concrete_compensated_source_nodes() -> tuple[
+    dict[str, ast.AST], dict[str, ast.Module]
+]:
+    return _committed_concrete_source_nodes(
+        admission_module._EXPECTED_CONCRETE_COMPENSATED_SOURCE["code_pin"],
+        compensated=True,
+    )
+
+
+def _historical_capsule_execution_records() -> list[dict[str, str]]:
+    code_pin = "17a35181b65e4357f92c140e202239419f0262e9"
     raw = subprocess.run(
         [
             "/usr/bin/git",
@@ -119,7 +159,7 @@ def _current_capsule_execution_records() -> list[dict[str, str]]:
             "ls-tree",
             "-r",
             "-z",
-            "HEAD",
+            code_pin,
             "--",
             "glm_tpu",
         ],
@@ -155,8 +195,8 @@ def _current_capsule_execution_records() -> list[dict[str, str]]:
     return sorted(records, key=lambda item: item["path"])
 
 
-def test_current_concrete_tuple_source_semantics_are_bound() -> None:
-    nodes, imports = _current_concrete_source_nodes()
+def test_historical_concrete_tuple_source_semantics_are_bound() -> None:
+    nodes, imports = _historical_concrete_tuple_source_nodes()
     report = admission_module._concrete_tuple_source_semantics(nodes, imports)
     assert report["authority_scope"] == "concrete.committed.jax.source"
     assert report["frontier"] == "layer1.rms_input_fp32"
@@ -170,10 +210,19 @@ def test_real_capsule_execution_implementation_attacks_fail_closed(
     mutation: str,
 ) -> None:
     producer = dict(admission_module._EXPECTED_CAPSULE_PRODUCER_SOURCE)
-    records = _current_capsule_execution_records()
-    replay_blob = (
-        REPO_ROOT / admission_module._EXPECTED_CAPSULE_REPLAY_SOURCE["repo_path"]
-    ).read_bytes()
+    records = _historical_capsule_execution_records()
+    replay_blob = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(REPO_ROOT),
+            "cat-file",
+            "blob",
+            admission_module._EXPECTED_CAPSULE_REPLAY_SOURCE["git_object_id"],
+        ],
+        check=True,
+        capture_output=True,
+    ).stdout
     report = admission_module._verify_real_capsule_execution_source(
         producer, records, replay_blob
     )
@@ -201,7 +250,7 @@ def test_real_capsule_execution_implementation_attacks_fail_closed(
 
 
 def test_concrete_tuple_source_refuses_precision_drift() -> None:
-    nodes, imports = _current_concrete_source_nodes()
+    nodes, imports = _historical_concrete_tuple_source_nodes()
     candidate_id = "candidate.source:fused_add_rms_norm_with_auxiliary"
     candidate = ast.parse(ast.unparse(nodes[candidate_id])).body[0]
     assert isinstance(candidate, ast.FunctionDef)
@@ -220,7 +269,7 @@ def test_concrete_tuple_source_refuses_precision_drift() -> None:
 
 
 def test_concrete_tuple_source_refuses_shared_baseline_precision_drift() -> None:
-    nodes, imports = _current_concrete_source_nodes()
+    nodes, imports = _historical_concrete_tuple_source_nodes()
     for candidate_id in (
         "candidate.source:fused_add_rms_norm",
         "candidate.source:fused_add_rms_norm_with_auxiliary",
@@ -259,14 +308,14 @@ def test_concrete_tuple_source_refuses_shared_baseline_precision_drift() -> None
 def test_concrete_tuple_source_refuses_global_rebinding(
     module_id: str, statement: str, message: str
 ) -> None:
-    nodes, modules = _current_concrete_source_nodes()
+    nodes, modules = _historical_concrete_tuple_source_nodes()
     modules[module_id].body.extend(ast.parse(statement).body)
     with pytest.raises(BenchmarkValidationError, match=message):
         admission_module._concrete_tuple_source_semantics(nodes, modules)
 
 
 def test_concrete_tuple_source_refuses_hidden_executable_statement() -> None:
-    nodes, modules = _current_concrete_source_nodes()
+    nodes, modules = _historical_concrete_tuple_source_nodes()
     candidate_id = "candidate.source:fused_add_rms_norm_with_auxiliary"
     candidate = ast.parse(ast.unparse(nodes[candidate_id])).body[0]
     assert isinstance(candidate, ast.FunctionDef)
@@ -277,7 +326,7 @@ def test_concrete_tuple_source_refuses_hidden_executable_statement() -> None:
 
 
 def test_concrete_tuple_source_refuses_named_tuple_behavior() -> None:
-    nodes, modules = _current_concrete_source_nodes()
+    nodes, modules = _historical_concrete_tuple_source_nodes()
     result_id = "candidate.source:FusedAddRmsNormAuxiliaryResult"
     result = ast.parse(ast.unparse(nodes[result_id])).body[0]
     assert isinstance(result, ast.ClassDef)
@@ -285,6 +334,175 @@ def test_concrete_tuple_source_refuses_named_tuple_behavior() -> None:
     nodes[result_id] = result
     with pytest.raises(BenchmarkValidationError, match="not one exact NamedTuple"):
         admission_module._concrete_tuple_source_semantics(nodes, modules)
+
+
+def _replace_simple_assignment(
+    function: ast.FunctionDef, target_name: str, expression: str
+) -> None:
+    for statement in function.body:
+        if (
+            isinstance(statement, ast.Assign)
+            and len(statement.targets) == 1
+            and isinstance(statement.targets[0], ast.Name)
+            and statement.targets[0].id == target_name
+        ):
+            statement.value = ast.parse(expression, mode="eval").body
+            return
+    raise AssertionError(f"missing assignment: {target_name}")
+
+
+def test_committed_concrete_compensated_source_semantics_are_bound() -> None:
+    nodes, modules = _committed_concrete_compensated_source_nodes()
+    report = admission_module._concrete_compensated_source_semantics(nodes, modules)
+    assert report == {
+        "authority_scope": "concrete.committed.jax.source",
+        "auxiliary": "graph.identity.only;numeric.cancellation.unproven",
+        "callsite": (
+            "stage_local_transformer_layer_fp8_split_mapped."
+            "default_off_device_compensated_tuple"
+        ),
+        "carried_residual": "bf16.round(transient.fp32.sum)",
+        "frontier": "layer1.restored_rms_input_fp32",
+        "normalization_input": "transient.fp32.sum",
+        "restoration": (
+            "barrier(float32(carried_residual)+"
+            "barrier(transient.fp32.sum-float32(carried_residual)))"
+        ),
+        "weighted_output": (
+            "bf16.round(bf16.round(transient*"
+            "rsqrt(mean(square(transient))+epsilon))*weight)"
+        ),
+    }
+
+
+def test_concrete_compensated_source_refuses_primary_precision_drift() -> None:
+    nodes, modules = _committed_concrete_compensated_source_nodes()
+    candidate_id = (
+        "candidate.source:fused_add_rms_norm_with_compensated_auxiliary"
+    )
+    candidate = ast.parse(ast.unparse(nodes[candidate_id])).body[0]
+    assert isinstance(candidate, ast.FunctionDef)
+    _replace_simple_assignment(
+        candidate,
+        "rms_input_fp32",
+        "hidden_states.astype(jnp.float16) + residual.astype(jnp.float32)",
+    )
+    nodes[candidate_id] = candidate
+    with pytest.raises(BenchmarkValidationError, match="primary arithmetic drifted"):
+        admission_module._concrete_compensated_source_semantics(nodes, modules)
+
+
+@pytest.mark.parametrize(
+    ("target_name", "expression"),
+    [
+        (
+            "correction_fp32",
+            "lax.optimization_barrier(rms_input_fp32 + rounded_fp32)",
+        ),
+        (
+            "restored_rms_input_fp32",
+            "rounded_fp32 + correction_fp32",
+        ),
+    ],
+)
+def test_concrete_compensated_source_refuses_restoration_drift(
+    target_name: str, expression: str
+) -> None:
+    nodes, modules = _committed_concrete_compensated_source_nodes()
+    candidate_id = (
+        "candidate.source:fused_add_rms_norm_with_compensated_auxiliary"
+    )
+    candidate = ast.parse(ast.unparse(nodes[candidate_id])).body[0]
+    assert isinstance(candidate, ast.FunctionDef)
+    _replace_simple_assignment(candidate, target_name, expression)
+    nodes[candidate_id] = candidate
+    with pytest.raises(BenchmarkValidationError, match="restoration graph drifted"):
+        admission_module._concrete_compensated_source_semantics(nodes, modules)
+
+
+def test_concrete_compensated_source_refuses_auxiliary_return_drift() -> None:
+    nodes, modules = _committed_concrete_compensated_source_nodes()
+    candidate_id = (
+        "candidate.source:fused_add_rms_norm_with_compensated_auxiliary"
+    )
+    candidate = ast.parse(ast.unparse(nodes[candidate_id])).body[0]
+    assert isinstance(candidate, ast.FunctionDef)
+    returned = candidate.body[-1]
+    assert isinstance(returned, ast.Return)
+    assert isinstance(returned.value, ast.Call)
+    returned.value.args[-1] = ast.Name(id="correction_fp32", ctx=ast.Load())
+    nodes[candidate_id] = candidate
+    with pytest.raises(BenchmarkValidationError, match="return drifted"):
+        admission_module._concrete_compensated_source_semantics(nodes, modules)
+
+
+@pytest.mark.parametrize(
+    ("module_id", "statement", "message"),
+    [
+        ("candidate.source", "lax = object()", "global import was rebound"),
+        (
+            "candidate.callsite",
+            "fused_add_rms_norm_with_compensated_auxiliary = fused_add_rms_norm",
+            "caller import was rebound",
+        ),
+    ],
+)
+def test_concrete_compensated_source_refuses_import_rebinding(
+    module_id: str, statement: str, message: str
+) -> None:
+    nodes, modules = _committed_concrete_compensated_source_nodes()
+    modules[module_id].body.extend(ast.parse(statement).body)
+    with pytest.raises(BenchmarkValidationError, match=message):
+        admission_module._concrete_compensated_source_semantics(nodes, modules)
+
+
+@pytest.mark.parametrize(
+    ("original_test", "message"),
+    [
+        (
+            "retain_input_rms_auxiliary and retain_input_rms_compensated_auxiliary",
+            "caller guards drifted",
+        ),
+        (
+            "retain_input_rms_compensated_auxiliary",
+            "caller selection drifted",
+        ),
+    ],
+)
+def test_concrete_compensated_source_refuses_caller_control_drift(
+    original_test: str, message: str
+) -> None:
+    nodes, modules = _committed_concrete_compensated_source_nodes()
+    caller_id = (
+        "candidate.callsite:stage_local_transformer_layer_fp8_split_mapped"
+    )
+    caller = ast.parse(ast.unparse(nodes[caller_id])).body[0]
+    assert isinstance(caller, ast.FunctionDef)
+    matches = [
+        item
+        for item in ast.walk(caller)
+        if isinstance(item, ast.If) and ast.unparse(item.test) == original_test
+    ]
+    assert matches
+    target = matches[0]
+    if original_test == "retain_input_rms_compensated_auxiliary":
+        target = next(
+            item
+            for item in matches
+            if any(
+                isinstance(statement, ast.Assign)
+                and any(
+                    isinstance(assigned, ast.Name)
+                    and assigned.id == "rms_candidate"
+                    for assigned in statement.targets
+                )
+                for statement in item.body
+            )
+        )
+    target.test = ast.Constant(value=False)
+    nodes[caller_id] = caller
+    with pytest.raises(BenchmarkValidationError, match=message):
+        admission_module._concrete_compensated_source_semantics(nodes, modules)
 
 
 def _run_git(repository: Path, *arguments: str) -> str:
@@ -1620,7 +1838,6 @@ def test_current_contract_fails_closed_without_jax() -> None:
             "MISSING_CANDIDATE_COHERENT_CAPSULE",
         ],
         "compensated_auxiliary_dependency": [
-            "MISSING_SOURCE_AST_AUTHORITY",
             "MISSING_PLAN_AUTHORITY",
             "MISSING_CAUSAL_STABLEHLO_AUTHORITY",
             "MISSING_PINNED_COHERENT_CAPSULE_PRODUCER",
@@ -1631,6 +1848,15 @@ def test_current_contract_fails_closed_without_jax() -> None:
     assert source["authority_kind"] == "concrete.committed.jax.source"
     assert source["executable_source_authority"] is True
     assert source["code_pin"] == "c8b220067577004ddfb824667eadc746642baaca"
+    compensated_source = report["candidate_results"][1]["source_authority"]
+    assert compensated_source["authority_kind"] == "concrete.committed.jax.source"
+    assert compensated_source["executable_source_authority"] is True
+    assert compensated_source["code_pin"] == (
+        "e16d74fcc025f5ffb910d9cbab1c4fa06df887ad"
+    )
+    assert compensated_source["compensation_claim"] == (
+        "graph.identity.only;numeric.cancellation.unproven"
+    )
     plan = report["candidate_results"][0]["plan_authority"]
     assert plan["plan"] == "PP16_LP2"
     assert plan["local_group_size"] == 2

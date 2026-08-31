@@ -853,18 +853,19 @@ separately, and the parent independently derives the full FP32 addition before a
 operands and the rejected callback remains perturbation evidence only.
 
 Canonical report `docs/artifacts/gate-d-precompile-admission-v2.json` binds the tuple candidate's
-concrete source/callsite at `c8b2200` and exact sealed PP16 plan/watchpoint authority, and refuses it
-only for causal StableHLO and a coherent capsule; the compensated candidate retains all four gaps.
+concrete source/callsite at `c8b2200`, exact sealed PP16 plan/watchpoint authority and causal
+StableHLO. Its capsule bindings are deliberately null because later coherent replay rejected the
+tuple; reported capsule gaps are schema-state only and not a successor. The compensated candidate
+now binds concrete source at `e16d74f` and retains plan, causal StableHLO, pinned-producer and
+coherent-capsule gaps.
 This report is the correct offline starting point; do not modify v1, relabel DB518 state, compile a
-placeholder or infer TPU causality from structural synthetic fixtures. V2 has no positive admission
-path for the tuple candidate until source-produced causal StableHLO and a pinned capsule
-producer/execution receipt exist; the compensated candidate also needs concrete source/callsite and
-plan authority.
-The canonical core/contract/report/locality SHAs are `1d434b0f...cee23`, `72673fbc...fb48`,
-`e1fcf314...aff7` and `49cf6bb1...25eb`; validator SHA is `2f4e73b0...c37a7`;
+placeholder or infer TPU causality from structural synthetic fixtures. V2 has no positive path for
+the tombstoned tuple. The compensated candidate next needs its own plan/watchpoint authority.
+The canonical core/contract/report/locality SHAs are `fde1847f...b252`, `0ce578d5...ddeb`,
+`9e2f3b5e...594c` and `49cf6bb1...25eb`; validator SHA is `2f4e73b0...c37a7`;
 installed/source provisioner and runtime-tree SHAs are `2b9c8c2b...0594` and
-`308748a9...d616`; focused/source-plus-adjacent offline coverage is 72/72
-and 71/71. PP16 plan authority is `98b4fa21...7880`, content SHA `d824c19c...5833`.
+`308748a9...d616`; full admission coverage is 140/140. PP16 plan authority is
+`98b4fa21...7880`, content SHA `d824c19c...5833`.
 
 For the missing real causal-HLO authority, reuse the source/plan pins above through the default-off
 `scripts/greenfield/build_gate_d_jax_site_capsule.py` (`5334dd1e...00d2`) and
@@ -973,3 +974,19 @@ operand hashes and valid count match, but event-1 positions (`bb199543...aeeec`)
 `a61587a9...b0e7`). Preserve the producer/capsule as reusable observability machinery, but reject
 the tuple-auxiliary numerical mechanism. Do not bind the contract or run redundant admission;
 there is no compile/TPU/Gate-D successor.
+
+## Gate-D compensated auxiliary source authority
+
+Reuse compensated source pin `e16d74f`, certificate
+`docs/artifacts/gate-d-compensated-auxiliary-source-authority.json` (`237095c7...6fb0`) and the
+candidate-specific concrete verifier in `gate_d_precompile_admission.py` only as source authority.
+It binds exact accepted-primary arithmetic, false defaults, real caller guards, a rooted
+barrier-fenced restoration graph and no host effects. Its declared result is deliberately narrow:
+`graph.identity.only;numeric.cancellation.unproven`.
+
+Current admission core/contract/report SHAs are `fde1847f...b252`, `0ce578d5...ddeb` and
+`9e2f3b5e...594c`; all 140 admission tests pass. The compensated candidate is still refused for
+missing plan, causal StableHLO, pinned producer and coherent capsule authority. Do not reuse the
+old tuple numerical capsule—it is coherent negative evidence—or relabel declarative compensated
+fixtures as executable source. No JAX, compilation, execution, cloud/TPU or Gate-D successor is
+authorized. Exact next is a separately reviewed compensated plan-authority batch.

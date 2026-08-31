@@ -2006,13 +2006,15 @@ remains open and no TPU successor is authorized.
   adjudication `docs/artifacts/gate-d-tuple-auxiliary-stablehlo-parser-adjudication.json` is
   `0e3c6259...5c3c`. StableHLO authority hash is `19f43f39...6d88` and contract/core/parser SHAs are
   `9006a42b...67d6`, `2325cbd6...ef23` and `4338229a...6b6d`.
-- Focused plus hostile admission passes 89/89. The tuple candidate now has exactly one remaining
-  reason, `MISSING_CANDIDATE_COHERENT_CAPSULE`; the compensated declaration retains all four gaps.
+- At this historical StableHLO milestone, focused plus hostile admission passed 89/89. The tuple
+  reported one remaining capsule reason and the compensated declaration retained all four gaps.
+  Later coherent tuple replay closed that historical next step with a numerical rejection; current
+  compensated source authority independently removes only its source gap.
   Classification remains
   `NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`.
-- Exact next is one pinned replayable PP16 stage-zero eight-watchpoint producer/capsule under this
-  source/plan/StableHLO identity, offline admission, then same-scope adversarial review. No
-  compile-only optimized-HLO acquisition or TPU action is authorized yet.
+- The historical exact next was one pinned replayable PP16 capsule. That action is complete and
+  rejected; do not rerun it. Current exact next is compensated candidate-specific plan/watchpoint
+  authority. No compile-only optimized-HLO acquisition or TPU action is authorized yet.
 
 ## Tuple-auxiliary coherent-capsule source and trust-boundary hardening
 
@@ -2131,7 +2133,34 @@ remains open and no TPU successor is authorized.
 - The authority preserves matching accepted RMS operand hashes and event-1 valid count 2048, but
   candidate event positions `bb199543...aeeec` differ from accepted `e55e66c6...8ad7`, and
   candidate scores `6e666fe9...e05c` differ from accepted `a61587a9...b0e7`.
-- This is immutable coherent negative evidence. The independent admission check at
-  `gate_d_precompile_admission.py:4935` must reject it. Do not bind the null contract or run a
+- This is immutable coherent negative evidence. The independent accepted-output equality check in
+  `gate_d_precompile_admission.py` must reject it. Do not bind the null contract or run a
   redundant admission. The tuple-auxiliary mechanism has no compile/TPU successor and does not
   close Gate D; retain its capsule/producer only as observability infrastructure and a tombstone.
+
+## Compensated-auxiliary concrete source authority; source only
+
+- Committed source pin `e16d74f` adds a distinct false-default compensated auxiliary without
+  changing the accepted primary RMS arithmetic. The rooted auxiliary graph widens the BF16
+  carried residual, subtracts it from the original FP32 transient behind a barrier, then adds the
+  correction behind a second barrier. This is a graph identity hypothesis only; exact numerical
+  cancellation under lowering/execution is explicitly unproved.
+- `gate-d-compensated-auxiliary-source-authority.json` (`237095c7...6fb0`) binds both committed
+  files, five exact symbols, real caller imports/guards/selection/return and source semantic SHA
+  `33d98c89...fd5`. Host effects, primary drift, import rebinding, restoration/operator/barrier,
+  result and caller-control mutations fail closed.
+- Admission core/contract/current-report SHAs are `fde1847f...b252`, `0ce578d5...ddeb` and
+  `9e2f3b5e...594c`. The report remains
+  `NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR`: compensated source is
+  authenticated, while plan, causal StableHLO, pinned producer and candidate-coherent capsule
+  authority remain absent. Historical tuple source/capsule tests now read their original Git
+  commits rather than silently rebasing sealed authority onto current files. Full admission
+  coverage passes 140/140.
+- Fable 5 Max returned a hard usage-limit refusal and supplied no opinion. The same-scope Sol
+  fallback first withheld persistence on misleading tuple-tombstone wording and two stale
+  references. After correction and complete re-verification, Sol returned `APPROVE PERSISTENCE`
+  with no P0--P2; authorized scope is source-only persistence.
+- No JAX lowering, compilation, numerical execution, model, cloud workflow or TPU action occurred.
+  Exact next after persistence is a separate source-exact plan-authority batch, reusing the sealed
+  PP16 physical topology only after proving that reuse is semantically applicable; causal
+  StableHLO remains a later separately reviewed batch.

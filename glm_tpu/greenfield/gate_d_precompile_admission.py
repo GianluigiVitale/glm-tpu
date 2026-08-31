@@ -287,6 +287,14 @@ _EXPECTED_CONCRETE_TUPLE_SOURCE = {
     "semantic_sha256": "49c2854b8c2e5a1dee760e22a647e45ba1a345fd031b6a1c14f1e732aa048ef3",
     "source_set_sha256": "f1055660a97389ecd4700eff40d679657c8f274153cde5fe19e567b6435323bc",
 }
+_EXPECTED_CONCRETE_COMPENSATED_SOURCE = {
+    "candidate_ast_sha256": "451f4fe010ffd38046ae5716742cb756ce54853bb46b8d6199af2e854946df2a",
+    "callsite_ast_sha256": "ac08b3c776e80c1c0510401dbd6cb58f2fdc8c008df2b8605c707a5e954e1eec",
+    "certificate_sha256": "237095c7ac9acdd7a37383b951b061752ee83f591722c3a2e2d3bede59326fb0",
+    "code_pin": "e16d74fcc025f5ffb910d9cbab1c4fa06df887ad",
+    "semantic_sha256": "33d98c897bcf74a2ac485dff3a068b1e3641358fe37fe1363cbe99b4de7a4fd5",
+    "source_set_sha256": "5434644b42325393df94169755ad9bf510b95749e907668006e50375bf73feb5",
+}
 _EXPECTED_VALIDATOR_IMPORTS = {
     "jaxlib/__init__.py": (629, "2a5b37b2bc9802769f45ca43de7cdc1a8b532f0afd2bf9542131ab68f649c4a3"),
     "jaxlib/libjax_common.so": (
@@ -2086,6 +2094,388 @@ def _concrete_tuple_source_semantics(
     }
 
 
+def _concrete_compensated_source_semantics(
+    symbols: Mapping[str, ast.AST],
+    modules: Mapping[str, ast.Module],
+) -> dict[str, Any]:
+    required = {
+        "candidate.source:FusedAddRmsNormCompensatedAuxiliaryResult",
+        "candidate.source:fused_add_rms_norm",
+        "candidate.source:fused_add_rms_norm_with_compensated_auxiliary",
+        "candidate.callsite:StageLocalSplitLayerFp8CompensatedAuxiliaryResult",
+        "candidate.callsite:stage_local_transformer_layer_fp8_split_mapped",
+    }
+    if not required.issubset(symbols):
+        raise BenchmarkValidationError(
+            "concrete compensated source symbol set is incomplete"
+        )
+    rms_module = modules.get("candidate.source")
+    layer_module = modules.get("candidate.callsite")
+    if not isinstance(rms_module, ast.Module) or not isinstance(
+        layer_module, ast.Module
+    ):
+        raise BenchmarkValidationError(
+            "concrete compensated source modules are absent"
+        )
+    expected_rms_imports = _module_imports(
+        ast.parse(
+            "from __future__ import annotations\n"
+            "from typing import NamedTuple\n"
+            "import jax\n"
+            "from jax import lax\n"
+            "import jax.numpy as jnp\n"
+        )
+    )
+    expected_layer_import_node = ast.parse(
+        "from .reference.rmsnorm import "
+        "fused_add_rms_norm_with_compensated_auxiliary\n"
+    ).body[0]
+    expected_layer_import = ast.dump(
+        expected_layer_import_node,
+        annotate_fields=True,
+        include_attributes=False,
+    )
+    if (
+        not expected_rms_imports.issubset(_module_imports(rms_module))
+        or expected_layer_import not in _module_imports(layer_module)
+    ):
+        raise BenchmarkValidationError(
+            "concrete compensated source imports are not bound"
+        )
+    rms_bindings = _top_level_bindings(rms_module)
+    expected_rms_bindings = _top_level_bindings(
+        ast.parse(
+            "from typing import NamedTuple\n"
+            "import jax\n"
+            "from jax import lax\n"
+            "import jax.numpy as jnp\n"
+        )
+    )
+    for name in ("NamedTuple", "jax", "lax", "jnp"):
+        if rms_bindings.get(name) != expected_rms_bindings[name]:
+            raise BenchmarkValidationError(
+                "concrete compensated source global import was rebound"
+            )
+    if any(
+        name in rms_bindings
+        for name in ("ValueError", "isinstance", "int", "float", "bool")
+    ):
+        raise BenchmarkValidationError(
+            "concrete compensated source builtin was rebound"
+        )
+    layer_bindings = _top_level_bindings(layer_module)
+    if layer_bindings.get(
+        "fused_add_rms_norm_with_compensated_auxiliary"
+    ) != [expected_layer_import]:
+        raise BenchmarkValidationError(
+            "concrete compensated source caller import was rebound"
+        )
+    _refuse_sensitive_rebinding(
+        rms_module,
+        {
+            "NamedTuple",
+            "ValueError",
+            "bool",
+            "float",
+            "int",
+            "isinstance",
+            "jax",
+            "jnp",
+            "lax",
+        },
+        label="concrete compensated source global import",
+    )
+    _refuse_sensitive_rebinding(
+        layer_module,
+        {"fused_add_rms_norm_with_compensated_auxiliary"},
+        label="concrete compensated source caller import",
+    )
+    if _named_tuple_fields(
+        symbols["candidate.source:FusedAddRmsNormCompensatedAuxiliaryResult"],
+        "candidate compensated RMS result",
+    ) != [
+        ("output", "jax.Array"),
+        ("carried_residual", "jax.Array"),
+        ("restored_rms_input_fp32", "jax.Array"),
+    ]:
+        raise BenchmarkValidationError(
+            "candidate compensated RMS result fields drifted"
+        )
+    if _named_tuple_fields(
+        symbols[
+            "candidate.callsite:StageLocalSplitLayerFp8CompensatedAuxiliaryResult"
+        ],
+        "candidate compensated layer result",
+    ) != [
+        ("result", "StageLocalSplitLayerFp8Result"),
+        ("restored_input_rms_fp32", "Any"),
+    ]:
+        raise BenchmarkValidationError(
+            "candidate compensated layer result fields drifted"
+        )
+    accepted = symbols["candidate.source:fused_add_rms_norm"]
+    candidate = symbols[
+        "candidate.source:fused_add_rms_norm_with_compensated_auxiliary"
+    ]
+    caller = symbols[
+        "candidate.callsite:stage_local_transformer_layer_fp8_split_mapped"
+    ]
+    if not all(
+        isinstance(item, ast.FunctionDef)
+        for item in (accepted, candidate, caller)
+    ):
+        raise BenchmarkValidationError(
+            "concrete compensated source functions are invalid"
+        )
+    if (
+        accepted.decorator_list
+        or candidate.decorator_list
+        or ast.dump(accepted.args) != ast.dump(candidate.args)
+    ):
+        raise BenchmarkValidationError(
+            "concrete compensated source function signature drifted"
+        )
+    expected_guard_tests = [
+        ast.parse(f"if {expression}:\n    pass\n").body[0].test
+        for expression in (
+            "hidden_states.shape != residual.shape",
+            "hidden_states.dtype != residual.dtype",
+            "hidden_states.ndim < 1",
+            "weight.shape != (hidden_states.shape[-1],)",
+            "not isinstance(epsilon, (int, float)) or isinstance(epsilon, bool) or epsilon <= 0",
+            "not jnp.issubdtype(hidden_states.dtype, jnp.inexact)",
+            "not jnp.issubdtype(weight.dtype, jnp.inexact)",
+        )
+    ]
+    if [ast.dump(item.test) for item in _validation_guards(candidate)] != [
+        ast.dump(item) for item in expected_guard_tests
+    ]:
+        raise BenchmarkValidationError(
+            "concrete compensated source validation conditions drifted"
+        )
+    accepted_assignments = _simple_assignments(accepted)
+    candidate_assignments = _simple_assignments(candidate)
+    primary_pairs = (
+        ("activation_dtype", "activation_dtype"),
+        ("summed", "rms_input_fp32"),
+        ("carried_residual", "carried_residual"),
+        ("variance", "variance"),
+        ("normalized", "normalized"),
+        ("output", "output"),
+    )
+    if set(accepted_assignments) != {left for left, _ in primary_pairs} or set(
+        candidate_assignments
+    ) != {
+        "activation_dtype",
+        "rms_input_fp32",
+        "carried_residual",
+        "rounded_fp32",
+        "correction_fp32",
+        "restored_rms_input_fp32",
+        "variance",
+        "normalized",
+        "output",
+    }:
+        raise BenchmarkValidationError(
+            "concrete compensated source arithmetic assignments drifted"
+        )
+    for accepted_name, candidate_name in primary_pairs:
+        if _normalized_expression(
+            accepted_assignments[accepted_name], "summed", "summed"
+        ) != _normalized_expression(
+            candidate_assignments[candidate_name],
+            "rms_input_fp32",
+            "summed",
+        ):
+            raise BenchmarkValidationError(
+                "concrete compensated source primary arithmetic drifted"
+            )
+    expected_auxiliary = {
+        "rounded_fp32": "carried_residual.astype(jnp.float32)",
+        "correction_fp32": (
+            "lax.optimization_barrier(rms_input_fp32 - rounded_fp32)"
+        ),
+        "restored_rms_input_fp32": (
+            "lax.optimization_barrier(rounded_fp32 + correction_fp32)"
+        ),
+    }
+    for name, expression in expected_auxiliary.items():
+        if ast.dump(candidate_assignments[name]) != ast.dump(
+            ast.parse(expression, mode="eval").body
+        ):
+            raise BenchmarkValidationError(
+                "concrete compensated source restoration graph drifted"
+            )
+    if [type(item) for item in candidate.body] != (
+        [ast.Expr] + [ast.If] * 7 + [ast.Assign] * 9 + [ast.Return]
+    ):
+        raise BenchmarkValidationError(
+            "concrete compensated source executable body drifted"
+        )
+    returned = candidate.body[-1]
+    if (
+        not isinstance(returned, ast.Return)
+        or not isinstance(returned.value, ast.Call)
+        or ast.unparse(returned.value.func)
+        != "FusedAddRmsNormCompensatedAuxiliaryResult"
+        or [ast.unparse(item) for item in returned.value.args]
+        != ["output", "carried_residual", "restored_rms_input_fp32"]
+        or returned.value.keywords
+    ):
+        raise BenchmarkValidationError(
+            "concrete compensated source return drifted"
+        )
+    keyword_defaults = dict(
+        zip(
+            (argument.arg for argument in caller.args.kwonlyargs),
+            caller.args.kw_defaults,
+            strict=True,
+        )
+    )
+    for flag in (
+        "retain_input_rms_auxiliary",
+        "retain_input_rms_compensated_auxiliary",
+    ):
+        default = keyword_defaults.get(flag)
+        if not isinstance(default, ast.Constant) or default.value is not False:
+            raise BenchmarkValidationError(
+                "concrete compensated source flag is not default off"
+            )
+    caller_guards = [
+        ast.unparse(item.test)
+        for item in caller.body
+        if isinstance(item, ast.If)
+    ]
+    for guard in (
+        "not isinstance(retain_input_rms_compensated_auxiliary, bool)",
+        "retain_input_rms_auxiliary and retain_input_rms_compensated_auxiliary",
+        "(retain_input_rms_auxiliary or retain_input_rms_compensated_auxiliary) and capture_ingredients",
+    ):
+        if caller_guards.count(guard) != 1:
+            raise BenchmarkValidationError(
+                "concrete compensated source caller guards drifted"
+            )
+    tuple_branches = [
+        item
+        for item in caller.body
+        if isinstance(item, ast.If)
+        and ast.unparse(item.test) == "retain_input_rms_auxiliary"
+    ]
+    if len(tuple_branches) != 2:
+        raise BenchmarkValidationError(
+            "concrete compensated source tuple branches drifted"
+        )
+    selector = next((item for item in tuple_branches if item.orelse), None)
+    compensated = (
+        selector.orelse[0]
+        if selector is not None
+        and len(selector.orelse) == 1
+        and isinstance(selector.orelse[0], ast.If)
+        else None
+    )
+    expected_tuple = ast.parse(
+        "rms_candidate = fused_add_rms_norm_with_auxiliary("
+        "hidden_states, residual, input_norm_weight, epsilon=rms_norm_epsilon)\n"
+        "normalized_input = rms_candidate.output\n"
+        "combined_residual = rms_candidate.carried_residual\n"
+        "input_rms_fp32 = rms_candidate.rms_input_fp32\n"
+        "restored_input_rms_fp32 = None\n"
+    ).body
+    expected_compensated = ast.parse(
+        "rms_candidate = fused_add_rms_norm_with_compensated_auxiliary("
+        "hidden_states, residual, input_norm_weight, epsilon=rms_norm_epsilon)\n"
+        "normalized_input = rms_candidate.output\n"
+        "combined_residual = rms_candidate.carried_residual\n"
+        "input_rms_fp32 = None\n"
+        "restored_input_rms_fp32 = rms_candidate.restored_rms_input_fp32\n"
+    ).body
+    expected_default = ast.parse(
+        "normalized_input, combined_residual = fused_add_rms_norm("
+        "hidden_states, residual, input_norm_weight, epsilon=rms_norm_epsilon)\n"
+        "input_rms_fp32 = None\n"
+        "restored_input_rms_fp32 = None\n"
+    ).body
+    if (
+        selector is None
+        or ast.dump(ast.Module(body=selector.body, type_ignores=[]))
+        != ast.dump(ast.Module(body=expected_tuple, type_ignores=[]))
+        or compensated is None
+        or ast.unparse(compensated.test)
+        != "retain_input_rms_compensated_auxiliary"
+        or ast.dump(ast.Module(body=compensated.body, type_ignores=[]))
+        != ast.dump(ast.Module(body=expected_compensated, type_ignores=[]))
+        or ast.dump(ast.Module(body=compensated.orelse, type_ignores=[]))
+        != ast.dump(ast.Module(body=expected_default, type_ignores=[]))
+    ):
+        raise BenchmarkValidationError(
+            "concrete compensated source caller selection drifted"
+        )
+    return_branches = [
+        item
+        for item in caller.body
+        if isinstance(item, ast.If)
+        and ast.unparse(item.test)
+        == "retain_input_rms_compensated_auxiliary"
+    ]
+    if len(return_branches) != 1:
+        raise BenchmarkValidationError(
+            "concrete compensated source device return branch drifted"
+        )
+    return_branch = return_branches[0]
+    if (
+        return_branch.orelse
+        or len(return_branch.body) != 2
+        or not isinstance(return_branch.body[0], ast.Assert)
+        or ast.unparse(return_branch.body[0].test)
+        != "restored_input_rms_fp32 is not None"
+        or not isinstance(return_branch.body[1], ast.Return)
+        or not isinstance(return_branch.body[1].value, ast.Call)
+        or ast.unparse(return_branch.body[1].value.func)
+        != "StageLocalSplitLayerFp8CompensatedAuxiliaryResult"
+        or [ast.unparse(item) for item in return_branch.body[1].value.args]
+        != ["result", "restored_input_rms_fp32"]
+        or return_branch.body[1].value.keywords
+    ):
+        raise BenchmarkValidationError(
+            "concrete compensated source device return drifted"
+        )
+    text = ast.unparse(candidate) + ast.unparse(caller)
+    if any(
+        marker in text
+        for marker in (
+            "debug.callback",
+            "debug.print",
+            "device_get",
+            "host_callback",
+            "io_callback",
+            "np.asarray",
+            "pure_callback",
+        )
+    ):
+        raise BenchmarkValidationError(
+            "concrete compensated source contains a host effect"
+        )
+    return {
+        "authority_scope": "concrete.committed.jax.source",
+        "auxiliary": "graph.identity.only;numeric.cancellation.unproven",
+        "callsite": (
+            "stage_local_transformer_layer_fp8_split_mapped."
+            "default_off_device_compensated_tuple"
+        ),
+        "carried_residual": "bf16.round(transient.fp32.sum)",
+        "frontier": "layer1.restored_rms_input_fp32",
+        "normalization_input": "transient.fp32.sum",
+        "restoration": (
+            "barrier(float32(carried_residual)+"
+            "barrier(transient.fp32.sum-float32(carried_residual)))"
+        ),
+        "weighted_output": (
+            "bf16.round(bf16.round(transient*"
+            "rsqrt(mean(square(transient))+epsilon))*weight)"
+        ),
+    }
+
+
 def _accepted_semantics_from_evidence(document: Mapping[str, Any]) -> dict[str, Any]:
     authority = document.get("accepted_authority")
     logical_hlo = document.get("accepted_logical_hlo_authority")
@@ -2465,30 +2855,41 @@ def _verify_source_authority(
         or callsite_symbol == candidate_symbol
     ):
         raise BenchmarkValidationError("source symbol authority is incomplete")
+    reviewed_concrete_source: Mapping[str, str] | None = None
     if authority_kind == "concrete.committed.jax.source":
+        if candidate_id == "auxiliary_device_tuple_dependency":
+            expected_candidate_symbol = (
+                "candidate.source:fused_add_rms_norm_with_auxiliary"
+            )
+            reviewed_concrete_source = _EXPECTED_CONCRETE_TUPLE_SOURCE
+            concrete_semantics = _concrete_tuple_source_semantics
+        elif candidate_id == "compensated_auxiliary_dependency":
+            expected_candidate_symbol = (
+                "candidate.source:fused_add_rms_norm_with_compensated_auxiliary"
+            )
+            reviewed_concrete_source = _EXPECTED_CONCRETE_COMPENSATED_SOURCE
+            concrete_semantics = _concrete_compensated_source_semantics
+        else:
+            raise BenchmarkValidationError("concrete source identity drifted")
         if (
-            candidate_id != "auxiliary_device_tuple_dependency"
-            or candidate_symbol
-            != "candidate.source:fused_add_rms_norm_with_auxiliary"
+            candidate_symbol != expected_candidate_symbol
             or callsite_symbol
             != "candidate.callsite:stage_local_transformer_layer_fp8_split_mapped"
         ):
             raise BenchmarkValidationError("concrete source identity drifted")
         if (
-            code_pin != _EXPECTED_CONCRETE_TUPLE_SOURCE["code_pin"]
+            code_pin != reviewed_concrete_source["code_pin"]
             or source_set_sha
-            != _EXPECTED_CONCRETE_TUPLE_SOURCE["source_set_sha256"]
+            != reviewed_concrete_source["source_set_sha256"]
             or certificate_sha
-            != _EXPECTED_CONCRETE_TUPLE_SOURCE["certificate_sha256"]
+            != reviewed_concrete_source["certificate_sha256"]
             or available_symbols[candidate_symbol]
-            != _EXPECTED_CONCRETE_TUPLE_SOURCE["candidate_ast_sha256"]
+            != reviewed_concrete_source["candidate_ast_sha256"]
             or available_symbols[callsite_symbol]
-            != _EXPECTED_CONCRETE_TUPLE_SOURCE["callsite_ast_sha256"]
+            != reviewed_concrete_source["callsite_ast_sha256"]
         ):
             raise BenchmarkValidationError("concrete source reviewed authority drifted")
-        source_semantics = _concrete_tuple_source_semantics(
-            symbol_nodes, file_modules
-        )
+        source_semantics = concrete_semantics(symbol_nodes, file_modules)
     else:
         source_semantics = _candidate_source_semantics(
             symbol_nodes[candidate_symbol], symbol_nodes[callsite_symbol], candidate_id
@@ -2501,7 +2902,7 @@ def _verify_source_authority(
     if (
         authority_kind == "concrete.committed.jax.source"
         and source_semantic_sha
-        != _EXPECTED_CONCRETE_TUPLE_SOURCE["semantic_sha256"]
+        != reviewed_concrete_source["semantic_sha256"]
     ):
         raise BenchmarkValidationError("concrete source reviewed semantics drifted")
     claim_scope = _string(
@@ -3636,10 +4037,15 @@ def _verify_stablehlo_authority(
     }
     validator = _run_stablehlo_validator(request, implementation)
     auxiliary_operations = validator.get("auxiliary_path_operations")
+    reviewed_source_semantics = {
+        "auxiliary_device_tuple_dependency": _EXPECTED_CONCRETE_TUPLE_SOURCE,
+        "compensated_auxiliary_dependency": (
+            _EXPECTED_CONCRETE_COMPENSATED_SOURCE
+        ),
+    }
     expected_source_semantic_sha256 = (
-        _EXPECTED_CONCRETE_TUPLE_SOURCE["semantic_sha256"]
-        if candidate_id == "auxiliary_device_tuple_dependency"
-        and source.get("executable_source_authority") is True
+        reviewed_source_semantics[candidate_id]["semantic_sha256"]
+        if source.get("executable_source_authority") is True
         else _EXPECTED_SOURCE_SEMANTIC_SHA256[candidate_id]
     )
     if (

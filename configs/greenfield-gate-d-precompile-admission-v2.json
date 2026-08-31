@@ -112,7 +112,7 @@
           "sha256": "0839d98fe9cbf78e3dc496390e90c77a42592e81340d0538d312e65286d58979"
         }
       },
-      "summary": "Carry accepted BF16 primary state plus a semantically isolated FP32 auxiliary through a device-only tuple dependency."
+      "summary": "Historical tuple candidate retained only for schema and authority regression. Its coherent event replay is rejected; null capsule bindings are deliberate tombstone state, not a successor task."
     },
     {
       "causal_frontier_action": "resolve",
@@ -143,7 +143,52 @@
       },
       "plan_authority": null,
       "reconstructs_full_pod_hidden": false,
-      "source_authority": null,
+      "source_authority": {
+        "files": [
+          {
+            "id": "candidate.source",
+            "repo_path": "glm_tpu/greenfield/kernels/reference/rmsnorm.py",
+            "sha256": "b707ddaa4208a58c7a1a999fc0d40b8a2b460d64c15943569c03444a71e3edfd",
+            "symbols": [
+              {
+                "ast_sha256": "8cf2511fe719e6df1ae65178ca348034b05c8d49898b6dcd73ae2227b135d335",
+                "qualified_name": "FusedAddRmsNormCompensatedAuxiliaryResult"
+              },
+              {
+                "ast_sha256": "18e283baeefab51a577fa38afe6314b548420374579ae6a047efda546d36c9e7",
+                "qualified_name": "fused_add_rms_norm"
+              },
+              {
+                "ast_sha256": "451f4fe010ffd38046ae5716742cb756ce54853bb46b8d6199af2e854946df2a",
+                "qualified_name": "fused_add_rms_norm_with_compensated_auxiliary"
+              }
+            ]
+          },
+          {
+            "id": "candidate.callsite",
+            "repo_path": "glm_tpu/greenfield/kernels/layer.py",
+            "sha256": "47c48b20564c0338de2bca70c5e01a9305748010e0f28f94e525176c1b882a0c",
+            "symbols": [
+              {
+                "ast_sha256": "de0e32a3a645944debaa1d7ad01ade6b649ad2cc15be1e3e76ab62213ac6d140",
+                "qualified_name": "StageLocalSplitLayerFp8CompensatedAuxiliaryResult"
+              },
+              {
+                "ast_sha256": "ac08b3c776e80c1c0510401dbd6cb58f2fdc8c008df2b8605c707a5e954e1eec",
+                "qualified_name": "stage_local_transformer_layer_fp8_split_mapped"
+              }
+            ]
+          }
+        ],
+        "repository": {
+          "commit": "e16d74fcc025f5ffb910d9cbab1c4fa06df887ad",
+          "root": ".."
+        },
+        "semantics_certificate": {
+          "path": "../docs/artifacts/gate-d-compensated-auxiliary-source-authority.json",
+          "sha256": "237095c7ac9acdd7a37383b951b061752ee83f591722c3a2e2d3bede59326fb0"
+        }
+      },
       "stablehlo_authority": null,
       "summary": "Preserve accepted BF16 primary arithmetic while a declared FP32 add/sub auxiliary remains live on device; its graph identity is checked and numerical cancellation is explicitly unproven."
     }
@@ -153,7 +198,7 @@
     "id": "layer1.rms_input_fp32",
     "order": 0
   },
-  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates the tuple candidate's concrete committed JAX source/callsite, exact PP16_LP2 physical plan/watchpoint authority, and forced-CPU immutable-parser-backed causal StableHLO. The tuple candidate remains unadmitted until a pinned replayable candidate-coherent capsule producer/execution receipt exists; the compensated candidate also lacks concrete source, plan and StableHLO authority. It never authorizes executable compilation, numerical execution, TPU work, performance claims or Gate-D closure.",
+  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates each candidate's distinct concrete committed default-off JAX source/callsite. The tuple candidate additionally has exact PP16_LP2 physical plan/watchpoint authority and forced-CPU immutable-parser-backed causal StableHLO, but its capsule fields remain deliberately null because separately sealed coherent event replay rejected the mechanism; its reported capsule gaps are schema-state only and authorize no capsule build, admission rerun or successor. The compensated candidate's source authority proves graph identity only, explicitly not numerical cancellation, and it still lacks plan, StableHLO and capsule authority. It never authorizes executable compilation, numerical execution, TPU work, performance claims or Gate-D closure.",
   "contract_id": "gate.d.precompile.admission.v2.20260830",
   "evidence": [
     {
@@ -188,7 +233,7 @@
     },
     "core": {
       "path": "../glm_tpu/greenfield/gate_d_precompile_admission.py",
-      "sha256": "a78189110bb4734d44240268b4096df220567e4b6deed80a80654da7281dd4ce"
+      "sha256": "fde1847fb58e9592524a4992a745342e2b4f80322533c517929d89023852b252"
     },
     "git": {
       "path": "/usr/bin/git",

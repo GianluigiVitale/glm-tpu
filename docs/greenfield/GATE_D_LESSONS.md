@@ -1059,10 +1059,15 @@ normalized-state cause.
   traverse every parent with no-follow directory descriptors and make append-only publication safe
   against concurrent replacement.
 - The current v2 report binds concrete tuple-candidate source/callsite and exact PP16 plan authority
-  and refuses it for StableHLO and producer-bound capsule gaps; the compensated variant retains all
-  four gaps. It
+  plus causal StableHLO. Its null capsule bindings are deliberate tombstone state after coherent
+  event replay rejected the tuple mechanism, not a missing successor task. The compensated variant now binds
+  distinct concrete committed source at `e16d74f`, but still lacks plan, causal StableHLO, pinned
+  producer and coherent capsule authority. It
   always leaves compilation/TPU authorization false. This is an honest sequencing result, not
   Gate-D progress through execution.
+- Never validate historical source authority against the moving worktree. Read the exact Git blobs
+  from the authority's pinned commit; otherwise an unrelated later source addition can make a
+  correct sealed manifest appear stale or tempt a reviewer to weaken historical evidence.
 - A scalar inversion must target the actual retained program edge. Here qkv-a consumes
   `BF16(BF16(sum*inverse)*weight)`, so an interval for only `BF16(sum*inverse)` omits a sealed
   per-element operand and cannot adjudicate the boundary. Keep the useful BF16-input derivation;
