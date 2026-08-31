@@ -8771,3 +8771,37 @@ authorized only the exact complete offline test process. The two changed validat
 installed/invoked no producer, imported no JAX for a successor, wrote no persistent admission
 report, and performed no model/cloud/TPU work. Gate D remains open. Exact next is separate review
 of one immutable compensated-producer installation and the smallest coherent CPU replay.
+
+## 2026-08-31 compensated capsule compile-only admission; Gate D still open
+
+The compensated capsule replay and its outer execution authority are now authenticated against
+the independent accepted TPU event-1/tie-order tensors, exact RMS operands and the complete
+eight-watchpoint PP16 state. CPU output is deliberately non-oracular; protected TPU equality is
+still deferred and mandatory.
+
+The immutable StableHLO verifier gained four fail-closed non-interference fields. Because its full
+report hash participates in derived authority, the unchanged graph moved from authority
+`e1b2e410...0185` to `2f13a564...b8b1`. Rather than rewrite the sealed capsule, one exact
+parentless metadata transition (`gate-d-compensated-stablehlo-authority-transition.json`,
+`017e05f5...19a84`) binds both validator sources/reports, immutable parser/toolchain, every common
+graph/source/plan/producer identity, capsule `5b7ad71f...c1a4` and execution authority
+`8b8c9cc7...a660`. It cannot chain, rebind paths, cross candidates or authorize another capsule.
+Historical evidence bytes are unchanged.
+
+Current core/config/validator/test SHAs are `30ff4ce5...ade53`, `6a2d913f...b01a5`,
+`762dcb6c...4c4a` and `3f026066...2073`. The current 235-node admission file is proportionally
+covered by the 210-pass full-run prefix, corrected outer-authority node, complete unexecuted tail,
+focused transition/coherence/current-contract checks and strict top-level `2.0`/`true` attacks.
+Sol's final audit reported no P0--P2.
+
+One reviewed sealed-Python `-I -S -B` run wrote append-only report
+`docs/artifacts/gate-d-precompile-admission-v2-compensated-capsule.json`, SHA
+`7cd7e569...6b37d`. It admits exactly `compensated_auxiliary_dependency` only for compile/HLO
+review. Classification is `PRECOMPILE_LOGICAL_POLICY_PASSED;COMPILE_ONLY_REVIEW_ELIGIBLE;`
+`TPU_NUMERICAL_UNPROVEN;NO_TPU_EXECUTION_AUTHORIZED;GATE_D_OPEN`; Gate D, JAX/TPU-work and
+TPU-successor flags are false. No compilation, backend, model, cloud or TPU work occurred.
+
+Exact next after commit/push/locked `gs://driftbench-dsv4-uc` persistence is a separate review of
+one optimized PP16 TPU-HLO acquisition and locality/numerical-policy inspection. It is not yet
+authorized. Protected layer-1 exact replay follows only after HLO acceptance; full exact 8K is
+later. Never rerun the tuple capsule or reinterpret CPU logical equality as TPU numerical proof.

@@ -1,0 +1,91 @@
+{
+  "artifact_kind": "gate_d_compensated_stablehlo_authority_transition",
+  "candidate": {
+    "candidate_id": "compensated_auxiliary_dependency",
+    "mechanism_fingerprint_sha256": "3c820af70ab0a5bbd9b3e5d6139887ce53425d9f5499e3291f2708901bbd9513"
+  },
+  "capsule": {
+    "path": "/home/gianl/gate-d-runs/greenfield_gate_d_compensated_capsule_20260831T124838Z/capsule.json",
+    "sha256": "5b7ad71f37dbbcda0ee36a9fc0c42a7ca45d619a9e741307386755e68e87c1a4"
+  },
+  "claim_scope": "Single-use metadata-only StableHLO authority transition for one exact compensated forced-CPU capsule. The historical capsule remains byte-immutable and produced under the historical parser authority; the current immutable parser independently revalidates the same graph under a monotonically enriched report. This transition authorizes no JAX compilation, TPU execution, numerical claim, performance claim or Gate-D closure.",
+  "classification": "METADATA_ONLY_STABLEHLO_AUTHORITY_TRANSITION;HISTORICAL_CAPSULE_IMMUTABLE;NO_JAX_OR_TPU_SUCCESSOR;GATE_D_OPEN",
+  "enrichments": {
+    "auxiliary_result": "result.restored_rms_input_fp32",
+    "candidate_primary_slice_sha256": "5037b5a7ef21226f8405d0175c83bc7528fadf588811755e719d20a75f295610",
+    "forbidden_operations": [
+      "func.call",
+      "stablehlo.after_all",
+      "stablehlo.custom_call",
+      "stablehlo.infeed",
+      "stablehlo.outfeed",
+      "stablehlo.recv",
+      "stablehlo.send"
+    ],
+    "rooted_device_result": true
+  },
+  "execution_authority": {
+    "path": "/home/gianl/gate-d-runs/greenfield_gate_d_compensated_capsule_20260831T124838Z-execution-authority.json",
+    "sha256": "8b8c9cc79a18679628582a66c418a7f63e06553091928df58defbdde3971a660"
+  },
+  "historical_report": {
+    "path": "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/gate-d-precompile-admission-v2-compensated-stablehlo.json",
+    "sha256": "973c6f95573d855bc3faebca000e818f4a9f015b94935cd93c3020c31db2b8db"
+  },
+  "immutable_parser": {
+    "import_manifest_sha256": "cc5efd7255229d3417eb22556a0cfddac260a256f849b17277444109d70a024e",
+    "python_path": "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12",
+    "python_sha256": "021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7",
+    "pythonpath": "/home/gianl/vllm-env/lib/python3.12/site-packages",
+    "provisioner_path": "/opt/glm-tpu/bin/provision_gate_d_python_runtime.py",
+    "provisioner_sha256": "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594",
+    "provisioner_source_path": "/home/gianl/glm-tpu-topology-rewrite/scripts/greenfield/provision_gate_d_python_runtime.py",
+    "provisioner_source_sha256": "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594",
+    "runtime_root": "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95",
+    "runtime_sha256": "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616"
+  },
+  "invariants": {
+    "plan": {
+      "authority_file_sha256": "7d0a5615ff4744801ac6a6598a52ea80e17d431788e4ef21a9d889e81772dbdf",
+      "plan_sha256": "eb2c050b14a6125c1bfb59a7ce0021d7c6c30714834f324e8a18a1a4db57b6dc",
+      "topology_hash": "294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559"
+    },
+    "producer_repository": {
+      "commit": "8333222fb1ed05b6307641eb20f32b2385dc55f5",
+      "root": "/home/gianl/glm-tpu-topology-rewrite"
+    },
+    "source": {
+      "authority_sha256": "c38492a0c058273b0e3d14aa464cd5fd77d61f88a8f4f9577d161f07a6b4b4c3",
+      "code_pin": "e16d74fcc025f5ffb910d9cbab1c4fa06df887ad",
+      "source_semantic_sha256": "33d98c897bcf74a2ac485dff3a068b1e3641358fe37fe1363cbe99b4de7a4fd5",
+      "source_set_sha256": "5434644b42325393df94169755ad9bf510b95749e907668006e50375bf73feb5"
+    },
+    "stablehlo": {
+      "accepted_primary_sha256": "649cdc9ed5aef5e2fc4822e750ed3284255f3bfba438a755b48ade828658cc82",
+      "accepted_primary_slice_sha256": "5037b5a7ef21226f8405d0175c83bc7528fadf588811755e719d20a75f295610",
+      "candidate_raw_sha256": "c93f0e2d9da8047744790cc7f9e50017bd9a8fa20c682dc2c3a0f1373b2679ef",
+      "candidate_sha256": "baaf85721bf341dc521d3e003a3e70bc64de2e8c3d3185b267b7fd36c93feea6",
+      "certificate_sha256": "af109e0f7d4d355373212028fd958af9e8566c302183b2fd5482e96805c8eb90",
+      "producer_receipt_sha256": "a68b9ec9c6a4e0390134df326fce54c7126f76075c3aa49535ecb0d618435f03",
+      "producer_source_sha256": "a9431e8eca5b0405190cb2cc8cee863e4f613ca712e212201ea1a7fbebdeeed9",
+      "success_sha256": "fa4b12c3930144560d75cc525c922d1871ac8b7047780a6b4371e96c17fd7432"
+    }
+  },
+  "schema_version": 1,
+  "transition": {
+    "depth": 1,
+    "parent": null,
+    "produced_under": "e1b2e4105f247beb6af46325b76bd359df84666911959a7960b4179947d90185",
+    "validated_under": "2f13a564ec7c5eb50ecb85c3af6347d936be1847d49cf338645e062ec18eb8b1"
+  },
+  "validators": {
+    "current": {
+      "report_sha256": "f21861982f56d23e2dd955fb78df38727d7f54ef3b9994770675a3b71a705dd2",
+      "source_sha256": "762dcb6ceaec5ba261dc6abdea646661205404222105e3bb926ffc265d534c4a"
+    },
+    "historical": {
+      "report_sha256": "d94c0c9187d76927cfd710d41909005708700750a584d11a97af5306d85f8e48",
+      "source_sha256": "17fadedfe9a62d15ad71ad4081b60d7631d74637d9d1bd8d997ffa8be6bd0c19"
+    }
+  }
+}

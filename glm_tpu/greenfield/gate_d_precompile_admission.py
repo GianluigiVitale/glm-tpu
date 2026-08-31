@@ -42,6 +42,7 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _CODE_PIN = re.compile(r"^[0-9a-f]{40}$")
 _GIT_OBJECT_ID = re.compile(r"^[0-9a-f]{40}(?:[0-9a-f]{24})?$")
 _IDENTIFIER = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
+_COHERENCE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 _MAX_JSON_BYTES = 4 * 1024 * 1024
 _MAX_SOURCE_BYTES = 16 * 1024 * 1024
 _MAX_STABLEHLO_BYTES = 32 * 1024 * 1024
@@ -287,6 +288,333 @@ _EXPECTED_CAPSULE_ACCEPTED_OUTPUTS = {
     "rms_residual_sha256": (
         "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e"
     ),
+}
+_EXPECTED_CAPSULE_LOGICAL_BASELINE_OUTPUTS = {
+    "event1_positions_sha256": (
+        "bb199543bea3c24789fd556e75b3054d7c3f95e28a4def1dd346d1115feaeeec"
+    ),
+    "event1_scores_sha256": (
+        "6e666fe928bd2d4e0f5078ba8edc3635139cac35105e79a443a165bbb501e05c"
+    ),
+    "event1_valid_count": 2048,
+    "rms_hidden_update_sha256": (
+        "efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc"
+    ),
+    "rms_residual_sha256": (
+        "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e"
+    ),
+}
+_EXPECTED_PRECOMPILE_NUMERICAL_POLICY_CLAIM_SCOPE = (
+    "Fail-closed precompile sequencing authority only. Forced-CPU evidence may "
+    "prove same-input logical non-interference and auxiliary integrity, but is not "
+    "a TPU numerical oracle. Optimized PP16 TPU HLO and a later protected TPU "
+    "numerical replay require separate reviews; this authority permits neither "
+    "process and cannot close Gate D."
+)
+_EXPECTED_PRECOMPILE_NUMERICAL_POLICY_CLASSIFICATION = (
+    "PRECOMPILE_NUMERICAL_POLICY_SEQUENCING_GAP;"
+    "CPU_LOGICAL_EQUIVALENCE_ONLY;TPU_NUMERICAL_UNPROVEN"
+)
+_TOMBSTONED_PRECOMPILE_CANDIDATES = frozenset(
+    {"auxiliary_device_tuple_dependency"}
+)
+_EXPECTED_LOGICAL_COMPARISON_BASELINE = {
+    "capsule_path": (
+        "/home/gianl/gate-d-runs/"
+        "greenfield_gate_d_tuple_auxiliary_capsule_20260831T031000Z/capsule.json"
+    ),
+    "capsule_sha256": (
+        "aa7425fd4c896791dc8086dd7c884cfb13176d30be982051a0b709bc3d5d7ef5"
+    ),
+    "execution_authority_path": (
+        "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+        "gate-d-tuple-auxiliary-capsule-execution-authority.json"
+    ),
+    "execution_authority_sha256": (
+        "ab0840bf39846ab5aae3f8d3b7c013f0c23e9963ecbd2a197ec4c74a6e1915a0"
+    ),
+    "tombstone_authority_path": (
+        "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+        "gate-d-tuple-auxiliary-capsule-tombstone.json"
+    ),
+    "tombstone_authority_sha256": (
+        "0497b2bddb583d667c6c8eef52d8979ba4cdc78e21422099d52197fddf775b18"
+    ),
+}
+_EXPECTED_COMPENSATED_CAPSULE_AUTHORITY = {
+    "capsule_path": (
+        "/home/gianl/gate-d-runs/"
+        "greenfield_gate_d_compensated_capsule_20260831T124838Z/capsule.json"
+    ),
+    "capsule_sha256": (
+        "5b7ad71f37dbbcda0ee36a9fc0c42a7ca45d619a9e741307386755e68e87c1a4"
+    ),
+    "execution_authority_path": (
+        "/home/gianl/gate-d-runs/"
+        "greenfield_gate_d_compensated_capsule_20260831T124838Z-"
+        "execution-authority.json"
+    ),
+    "execution_authority_sha256": (
+        "8b8c9cc79a18679628582a66c418a7f63e06553091928df58defbdde3971a660"
+    ),
+}
+_EXPECTED_COMPENSATED_STABLEHLO_TRANSITION = {
+    "path": (
+        "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+        "gate-d-compensated-stablehlo-authority-transition.json"
+    ),
+    "sha256": (
+        "017e05f590a197906d703ca0ae12393a1ed2285f162e47537df7828380519a84"
+    ),
+}
+_EXPECTED_STABLEHLO_TRANSITION_CLAIM_SCOPE = (
+    "Single-use metadata-only StableHLO authority transition for one exact "
+    "compensated forced-CPU capsule. The historical capsule remains byte-immutable "
+    "and produced under the historical parser authority; the current immutable "
+    "parser independently revalidates the same graph under a monotonically enriched "
+    "report. This transition authorizes no JAX compilation, TPU execution, numerical "
+    "claim, performance claim or Gate-D closure."
+)
+_EXPECTED_STABLEHLO_TRANSITION_CLASSIFICATION = (
+    "METADATA_ONLY_STABLEHLO_AUTHORITY_TRANSITION;"
+    "HISTORICAL_CAPSULE_IMMUTABLE;NO_JAX_OR_TPU_SUCCESSOR;GATE_D_OPEN"
+)
+_EXPECTED_STABLEHLO_TRANSITION_AUTHORITIES = {
+    "produced_under": (
+        "e1b2e4105f247beb6af46325b76bd359df84666911959a7960b4179947d90185"
+    ),
+    "validated_under": (
+        "2f13a564ec7c5eb50ecb85c3af6347d936be1847d49cf338645e062ec18eb8b1"
+    ),
+}
+_EXPECTED_STABLEHLO_TRANSITION_VALIDATORS = {
+    "current": {
+        "report_sha256": (
+            "f21861982f56d23e2dd955fb78df38727d7f54ef3b9994770675a3b71a705dd2"
+        ),
+        "source_sha256": (
+            "762dcb6ceaec5ba261dc6abdea646661205404222105e3bb926ffc265d534c4a"
+        ),
+    },
+    "historical": {
+        "report_sha256": (
+            "d94c0c9187d76927cfd710d41909005708700750a584d11a97af5306d85f8e48"
+        ),
+        "source_sha256": (
+            "17fadedfe9a62d15ad71ad4081b60d7631d74637d9d1bd8d997ffa8be6bd0c19"
+        ),
+    },
+}
+_EXPECTED_STABLEHLO_TRANSITION_ENRICHMENTS = {
+    "auxiliary_result": "result.restored_rms_input_fp32",
+    "candidate_primary_slice_sha256": (
+        "5037b5a7ef21226f8405d0175c83bc7528fadf588811755e719d20a75f295610"
+    ),
+    "forbidden_operations": sorted(
+        {
+            "func.call",
+            "stablehlo.after_all",
+            "stablehlo.custom_call",
+            "stablehlo.infeed",
+            "stablehlo.outfeed",
+            "stablehlo.recv",
+            "stablehlo.send",
+        }
+    ),
+    "rooted_device_result": True,
+}
+_EXPECTED_STABLEHLO_TRANSITION_HISTORICAL_REPORT = {
+    "path": (
+        "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+        "gate-d-precompile-admission-v2-compensated-stablehlo.json"
+    ),
+    "sha256": (
+        "973c6f95573d855bc3faebca000e818f4a9f015b94935cd93c3020c31db2b8db"
+    ),
+}
+_EXPECTED_STABLEHLO_TRANSITION_PARSER = {
+    "import_manifest_sha256": (
+        "cc5efd7255229d3417eb22556a0cfddac260a256f849b17277444109d70a024e"
+    ),
+    "python_path": (
+        "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12"
+    ),
+    "python_sha256": (
+        "021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7"
+    ),
+    "pythonpath": "/home/gianl/vllm-env/lib/python3.12/site-packages",
+    "provisioner_path": "/opt/glm-tpu/bin/provision_gate_d_python_runtime.py",
+    "provisioner_sha256": (
+        "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594"
+    ),
+    "provisioner_source_path": (
+        "/home/gianl/glm-tpu-topology-rewrite/scripts/greenfield/"
+        "provision_gate_d_python_runtime.py"
+    ),
+    "provisioner_source_sha256": (
+        "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594"
+    ),
+    "runtime_root": "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95",
+    "runtime_sha256": (
+        "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616"
+    ),
+}
+_EXPECTED_CPU_NON_ORACLE_EVIDENCE = {
+    "path": (
+        "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+        "pp16-feature2-qkv-khalf-event1-cpu-rejection.json"
+    ),
+    "sha256": (
+        "b7f5e43284fcbc2160cefc94d7aa95a7ce9ecbb19bbd60d3fa8d9178a5a1f9ec"
+    ),
+}
+_EXPECTED_CPU_NON_ORACLE_MISMATCHES = {
+    "accepted_current_row_sensitivity": {
+        "accepted_event": (1881, 2048, 18),
+        "accepted_internals": (109, 19, 3290),
+        "db518_event": (1709, 2048, 4),
+        "db518_internals": (31, 4095),
+    },
+    "db518_captured_q_control": {
+        "accepted_event": (1892, 2048, 18),
+        "accepted_internals": (126, 32, 4096),
+        "db518_event": (1723, 2048, 4),
+        "db518_internals": (22, 3303),
+    },
+    "intended_split_k_association": {
+        "accepted_event": (1892, 2048, 18),
+        "accepted_internals": (126, 32, 4094),
+        "db518_event": (1722, 2048, 4),
+        "db518_internals": (22, 4031),
+    },
+}
+_EXPECTED_ACCEPTED_TPU_BINDINGS = {
+    "dsa_manifest": {
+        "path": (
+            "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/"
+            "8k/greenfield_short_context_dsa_oracle_8k_"
+            "recovery_20260807T174904381704076Z/oracle/manifest.json"
+        ),
+        "sha256": (
+            "62c3fc2ad45d368c91cc41901947a69abf7a8c7abb57fb56b088871e90e5f1d3"
+        ),
+    },
+    "dsa_source_row": {
+        "path": (
+            "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/"
+            "8k/greenfield_short_context_dsa_oracle_8k_"
+            "recovery_20260807T174904381704076Z/oracle/source_row.json"
+        ),
+        "sha256": (
+            "8809666972d60303a8a46a598b12ab499790135dc4dc339b79d880b9f377d395"
+        ),
+    },
+    "dsa_tensors": {
+        "path": (
+            "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/"
+            "8k/greenfield_short_context_dsa_oracle_8k_"
+            "recovery_20260807T174904381704076Z/oracle/dsa_events.safetensors"
+        ),
+        "sha256": (
+            "b591a4622a8c646799989f235bc98bcf8ae99e9e04d2ad55a982d70ba00dde82"
+        ),
+    },
+    "internals": {
+        "path": (
+            "/home/gianl/gcs-models/oracles/greenfield/glm52/dsa_internals/8k/"
+            "layer1/greenfield_layer1_dsa_internal_comparison_"
+            "20260808T115135394251231Z/internals.npz"
+        ),
+        "sha256": (
+            "79b813daa8e194b6c9a9ad883a0199f4a938ca4d4ab7277d20a291b480349054"
+        ),
+    },
+    "internals_comparison": {
+        "path": (
+            "/home/gianl/gcs-models/oracles/greenfield/glm52/dsa_internals/8k/"
+            "layer1/greenfield_layer1_dsa_internal_comparison_"
+            "20260808T115135394251231Z/comparison.json"
+        ),
+        "sha256": (
+            "1bc43a8e231323c85b6782926182f2999f3014b8adbafa6f4db18b74e3419ad5"
+        ),
+    },
+    "rms_boundary": {
+        "path": (
+            "/home/gianl/gcs-models/results/"
+            "greenfield_layer0_dense_partial_capture_20260813T200736889447458Z/"
+            "dense_partial_capture.npz"
+        ),
+        "sha256": (
+            "f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298"
+        ),
+    },
+    "rms_hidden_update_replay": {
+        "path": (
+            "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/"
+            "pp16-feature2-real-leaf-replay.json"
+        ),
+        "sha256": (
+            "3fe848003ba320b52af06a6b3f73c66e319cfeb69000da68b1c43728232dcf44"
+        ),
+    },
+}
+_EXPECTED_ACCEPTED_DSA_ARRAYS = {
+    "decode_positions": {
+        "manifest_dtype": "int32",
+        "safetensors_dtype": "I32",
+        "shape": [14],
+        "sha256": (
+            "e501529862515d5176a426f8037277b759742a38e65080e0a27b78a2d32e6778"
+        ),
+    },
+    "producer_layer_ids": {
+        "manifest_dtype": "int32",
+        "safetensors_dtype": "I32",
+        "shape": [21],
+        "sha256": (
+            "ad1e0b90910142508ceb0fc42e3a9fe68ac228e03bbfbd1f1baa0b3a83301b73"
+        ),
+    },
+    "selected_positions": {
+        "manifest_dtype": "int32",
+        "safetensors_dtype": "I32",
+        "shape": [14, 21, 2048],
+        "sha256": (
+            "e57d061eefa4d2e0e1bc529d0f8efc356e38ac87f089570176fd06a23820f5d0"
+        ),
+    },
+    "selected_scores": {
+        "manifest_dtype": "float32",
+        "safetensors_dtype": "F32",
+        "shape": [14, 21, 2048],
+        "sha256": (
+            "7025272d6faaf4bac75ee18cbb485dda007bf3aa4a1db6c0fcf957bab992fc76"
+        ),
+    },
+    "valid_counts": {
+        "manifest_dtype": "int32",
+        "safetensors_dtype": "I32",
+        "shape": [14, 21],
+        "sha256": (
+            "ae68b16f5aab6e9b786a9b6157b4cd5fb48ca9ec1504ba9ec24e65556f13fefe"
+        ),
+    },
+}
+_EXPECTED_ACCEPTED_INTERNALS = {
+    "accepted__current_key": ("<f4", (128,), "c23d385314391992267ab6c016940260f902928eea779b2ab0a529e7d248f793"),
+    "accepted__head_weights": ("<f4", (32,), "c84d8126dfb7b43d0c34093b0f2592e414f54c3a41a3c40eaa5ad2479f15e5eb"),
+    "accepted__normalized_hidden": ("<u2", (6144,), "9936ee1e19049b297fd205292ebc378aee41d59401bbf56497004356998d3039"),
+    "accepted__q_a_state": ("<u2", (2048,), "8e3dc61e24591cef1979e10b4a79613505f92f45df1e25e4fde844fc61255d85"),
+    "accepted__query": ("<f4", (32, 128), "2314cf8cdcc49d8351041e5faa739f22263eec9913fce3d8b3196a45ce6bd7c8"),
+    "event_index": ("<i4", (), "67abdd721024f0ff4e0b3f4c2fc13bc5bad42d0b7851d456d88d203d15aaa450"),
+    "greenfield__current_key": ("<f4", (128,), "8a9bf9837689c99ef40e1177c9cf4b4cbf91ec05f583052346c3c99adca5eddf"),
+    "greenfield__head_weights": ("<f4", (32,), "214a1603eaf84edd3b4923b6f8de30984928b9f2730c2c8c6c6d6d0e4ef51247"),
+    "greenfield__normalized_hidden": ("<u2", (6144,), "e60062028c6f978414f24631ee7773023cd28b0f0228ced46ace4740d6dd833f"),
+    "greenfield__q_a_state": ("<u2", (2048,), "00b6ebcd06d7afff46d99933fbe2c19abadbed6857f2f58ad3a817f13ebe37a3"),
+    "greenfield__query": ("<f4", (32, 128), "7282306508c0e51bebdb5747eed040f67effe0f2eabcac4acde305c08fdb282b"),
+    "layer_id": ("<i4", (), "67abdd721024f0ff4e0b3f4c2fc13bc5bad42d0b7851d456d88d203d15aaa450"),
+    "position": ("<i4", (), "3369abcb97b3bcd3bad56a378c968aaad080314d197e8553628812c397ecf04c"),
 }
 _EXPECTED_CAPSULE_SHARED_UPSTREAM_INPUTS = {
     "db518_comparison": (
@@ -1078,6 +1406,14 @@ def _code_pin(value: Any, label: str) -> str:
 def _identifier(value: Any, label: str) -> str:
     if not isinstance(value, str) or _IDENTIFIER.fullmatch(value) is None:
         raise BenchmarkValidationError(f"{label} is not a canonical identifier")
+    return value
+
+
+def _coherence_id(value: Any, label: str) -> str:
+    """Validate an ASCII run tag, whose UTC suffix intentionally uses T/Z."""
+
+    if not isinstance(value, str) or _COHERENCE_ID.fullmatch(value) is None:
+        raise BenchmarkValidationError(f"{label} is not a canonical run tag")
     return value
 
 
@@ -4314,6 +4650,10 @@ def _verify_stablehlo_authority(
     )
     expected_validator_fields = {
         "accepted_stablehlo_sha256": accepted_sha,
+        "auxiliary_result": {
+            "auxiliary_device_tuple_dependency": "result.rms_input_fp32",
+            "compensated_auxiliary_dependency": "result.restored_rms_input_fp32",
+        }[candidate_id],
         "auxiliary_path_operations": _EXPECTED_AUXILIARY_PATH_OPERATIONS[
             candidate_id
         ],
@@ -4322,7 +4662,19 @@ def _verify_stablehlo_authority(
         "candidate_primary_slice_sha256": _EXPECTED_ACCEPTED_PRIMARY_SLICE_SHA256,
         "candidate_stablehlo_sha256": candidate_sha,
         "carried_residual_result_index": indices["carried_residual_result_index"],
+        "forbidden_operations": sorted(
+            {
+                "func.call",
+                "stablehlo.after_all",
+                "stablehlo.custom_call",
+                "stablehlo.infeed",
+                "stablehlo.outfeed",
+                "stablehlo.recv",
+                "stablehlo.send",
+            }
+        ),
         "local_device_groups": plan["local_device_groups"],
+        "rooted_device_result": True,
         "weighted_output_result_index": indices["weighted_output_result_index"],
     }
     observed_validator_fields = {
@@ -4355,6 +4707,9 @@ def _verify_stablehlo_authority(
         "accepted_primary_slice_sha256": validator[
             "accepted_primary_slice_sha256"
         ],
+        "candidate_primary_slice_sha256": validator[
+            "candidate_primary_slice_sha256"
+        ],
         "candidate_path": str(candidate_path),
         "candidate_raw_path": str(candidate_raw_path),
         "candidate_raw_sha256": candidate_raw_sha,
@@ -4362,8 +4717,10 @@ def _verify_stablehlo_authority(
         "certificate_path": str(certificate_path),
         "certificate_sha256": certificate_sha,
         "collectives": validator["collectives"],
+        "auxiliary_result": validator["auxiliary_result"],
         "auxiliary_path_operations": auxiliary_operations,
         "auxiliary_slice_sha256": validator["auxiliary_slice_sha256"],
+        "forbidden_operations": validator["forbidden_operations"],
         "local_device_groups": plan["local_device_groups"],
         "immutable_parser_authority": validator["immutable_parser_authority"],
         "parser_authority_scope": validator["parser_authority_scope"],
@@ -4371,6 +4728,7 @@ def _verify_stablehlo_authority(
         "producer_receipt_sha256": producer_receipt_sha,
         "producer_source_path": str(producer_source_path),
         "producer_source_sha256": producer_source_sha,
+        "rooted_device_result": validator["rooted_device_result"],
         "lowering_receipt": lowering_receipt,
         "success_path": str(success_path),
         "success_sha256": success_sha,
@@ -5192,17 +5550,1052 @@ def _verify_capsule_tensor_receipts(
     return receipts, runtime_inputs
 
 
+def _declared_capsule_watchpoint_manifest(
+    capsule: Mapping[str, Any], *, label: str
+) -> list[dict[str, Any]]:
+    """Normalize the exact ordered selected-array declarations of one capsule."""
+
+    watchpoints = capsule.get("watchpoints")
+    if not isinstance(watchpoints, list) or not watchpoints:
+        raise BenchmarkValidationError(f"{label} watchpoints are absent")
+    manifest: list[dict[str, Any]] = []
+    for watchpoint_index, watchpoint in enumerate(watchpoints):
+        if not isinstance(watchpoint, dict):
+            raise BenchmarkValidationError(f"{label} watchpoint is invalid")
+        watchpoint_id = _identifier(
+            watchpoint.get("id"), f"{label} watchpoint {watchpoint_index} id"
+        )
+        arrays = watchpoint.get("arrays")
+        if not isinstance(arrays, list) or not arrays:
+            raise BenchmarkValidationError(f"{label} watchpoint arrays are absent")
+        for array_index, array in enumerate(arrays):
+            if not isinstance(array, dict):
+                raise BenchmarkValidationError(f"{label} watchpoint array is invalid")
+            role = _identifier(
+                array.get("role"),
+                f"{label} watchpoint {watchpoint_index} array {array_index} role",
+            )
+            owner_axis = array.get("owner_axis")
+            if owner_axis is not None and (
+                not isinstance(owner_axis, int)
+                or isinstance(owner_axis, bool)
+                or owner_axis < 0
+            ):
+                raise BenchmarkValidationError(f"{label} owner axis is invalid")
+            owner_id = array.get("owner_id")
+            owner_axis_ids = array.get("owner_axis_ids")
+            if not isinstance(owner_axis_ids, list):
+                raise BenchmarkValidationError(f"{label} owner ids are invalid")
+            owner_ids = owner_axis_ids if owner_axis is not None else (
+                [] if owner_id is None else [owner_id]
+            )
+            if any(
+                not isinstance(owner, int)
+                or isinstance(owner, bool)
+                or owner < 0
+                or owner > 31
+                for owner in owner_ids
+            ):
+                raise BenchmarkValidationError(f"{label} owner ids are invalid")
+            shape = array.get("shape")
+            index_prefix = array.get("index_prefix")
+            if (
+                not isinstance(shape, list)
+                or not shape
+                or any(
+                    not isinstance(item, int)
+                    or isinstance(item, bool)
+                    or item <= 0
+                    for item in shape
+                )
+                or not isinstance(index_prefix, list)
+                or any(
+                    not isinstance(item, int)
+                    or isinstance(item, bool)
+                    or item < 0
+                    for item in index_prefix
+                )
+            ):
+                raise BenchmarkValidationError(f"{label} selected schema is invalid")
+            if watchpoint_id == "layer1.rms_operands_bf16":
+                kind = "operand"
+            elif watchpoint_id == "layer1.rms_input_fp32":
+                kind = "auxiliary_witness"
+            else:
+                kind = "primary"
+            manifest.append(
+                {
+                    "id": f"{watchpoint_id}.{role}",
+                    "index_prefix": index_prefix,
+                    "kind": kind,
+                    "npz_member": _string(
+                        array.get("array_key"), f"{label} NPZ member"
+                    ),
+                    "owner_axis": owner_axis,
+                    "owner_ids": owner_ids,
+                    "raw_sha256": _sha(
+                        array.get("array_sha256"), f"{label} selected-array SHA-256"
+                    ),
+                    "semantic_dtype": _identifier(
+                        array.get("semantic_dtype"), f"{label} semantic dtype"
+                    ),
+                    "shape": shape,
+                    "storage_dtype": _string(
+                        array.get("storage_dtype"), f"{label} storage dtype"
+                    ),
+                }
+            )
+    return manifest
+
+
+def _require_exact_binding(
+    path: Path, digest: str, expected: Mapping[str, str], label: str
+) -> None:
+    """Require a resolved path and digest to equal an independent hard pin."""
+
+    normalized = os.path.abspath(os.fspath(path))
+    expected_path = os.path.abspath(expected["path"])
+    if normalized != expected_path or digest != expected["sha256"]:
+        raise BenchmarkValidationError(f"{label} binding drifted")
+
+
+def _accepted_dsa_event1(
+    raw: bytes, *, event_index: int, layer_id: int, position: int
+) -> dict[str, Any]:
+    """Derive one accepted event from sealed metadata and exact tensor spans."""
+
+    if len(raw) < 8:
+        raise BenchmarkValidationError("accepted DSA safetensors header is truncated")
+    header_bytes = struct.unpack("<Q", raw[:8])[0]
+    if header_bytes <= 0 or header_bytes > len(raw) - 8:
+        raise BenchmarkValidationError("accepted DSA safetensors header is invalid")
+    header = _load_json(raw[8 : 8 + header_bytes], "accepted DSA safetensors header")
+    expected_metadata = {
+        "artifact_kind": "greenfield_short_context_legacy_dsa_oracle",
+        "format_version": "2",
+        "model_id": "zai-org/GLM-5.2-FP8",
+        "tie_policy": "descending_score_then_lowest_global_position",
+    }
+    if (
+        set(header) != set(_EXPECTED_ACCEPTED_DSA_ARRAYS) | {"__metadata__"}
+        or header.get("__metadata__") != expected_metadata
+    ):
+        raise BenchmarkValidationError("accepted DSA tensor catalogue drifted")
+    data_start = 8 + header_bytes
+
+    tensors: dict[str, bytes] = {}
+    for name, expected in _EXPECTED_ACCEPTED_DSA_ARRAYS.items():
+        record = header.get(name)
+        if not isinstance(record, dict):
+            raise BenchmarkValidationError(f"accepted DSA tensor is absent: {name}")
+        _exact_keys(record, {"data_offsets", "dtype", "shape"}, f"accepted DSA {name}")
+        offsets = record["data_offsets"]
+        item_bytes = 4
+        expected_bytes = _product(expected["shape"]) * item_bytes
+        if (
+            record["dtype"] != expected["safetensors_dtype"]
+            or record["shape"] != expected["shape"]
+            or not isinstance(offsets, list)
+            or len(offsets) != 2
+            or any(
+                not isinstance(item, int) or isinstance(item, bool) or item < 0
+                for item in offsets
+            )
+            or offsets[1] - offsets[0] != expected_bytes
+            or data_start + offsets[1] > len(raw)
+        ):
+            raise BenchmarkValidationError(f"accepted DSA tensor drifted: {name}")
+        tensor = raw[data_start + offsets[0] : data_start + offsets[1]]
+        if len(tensor) != expected_bytes or sha256(tensor).hexdigest() != expected["sha256"]:
+            raise BenchmarkValidationError(f"accepted DSA tensor bytes drifted: {name}")
+        tensors[name] = tensor
+
+    decode_positions = [
+        item[0] for item in struct.iter_unpack("<i", tensors["decode_positions"])
+    ]
+    producer_layers = [
+        item[0] for item in struct.iter_unpack("<i", tensors["producer_layer_ids"])
+    ]
+    decode_indices = [
+        index for index, observed in enumerate(decode_positions) if observed == position
+    ]
+    event_indices = [
+        index for index, observed in enumerate(producer_layers) if observed == layer_id
+    ]
+    if (
+        len(decode_indices) != 1
+        or len(event_indices) != 1
+        or event_indices[0] != event_index
+    ):
+        raise BenchmarkValidationError("accepted DSA event identity drifted")
+    row_index = decode_indices[0] * len(producer_layers) + event_indices[0]
+    row_bytes = 2048 * 4
+    row_offset = row_index * row_bytes
+    positions_raw = tensors["selected_positions"][row_offset : row_offset + row_bytes]
+    scores_raw = tensors["selected_scores"][row_offset : row_offset + row_bytes]
+    valid_offset = row_index * 4
+    valid_raw = tensors["valid_counts"][valid_offset : valid_offset + 4]
+    if len(positions_raw) != row_bytes or len(scores_raw) != row_bytes or len(valid_raw) != 4:
+        raise BenchmarkValidationError("accepted DSA event tensor span drifted")
+
+    positions = [item[0] for item in struct.iter_unpack("<i", positions_raw)]
+    scores = [item[0] for item in struct.iter_unpack("<f", scores_raw)]
+    valid_count = struct.unpack("<i", valid_raw)[0]
+    if (
+        valid_count != 2048
+        or len(positions) != 2048
+        or len(set(positions)) != 2048
+        or any(item < 0 or item > position for item in positions)
+        or any(
+            struct.unpack("<I", scores_raw[index * 4 : (index + 1) * 4])[0]
+            & 0x7F800000
+            == 0x7F800000
+            for index in range(len(scores))
+        )
+        or any(scores[index] < scores[index + 1] for index in range(2047))
+        or any(
+            scores[index] == scores[index + 1]
+            and positions[index] >= positions[index + 1]
+            for index in range(2047)
+        )
+    ):
+        raise BenchmarkValidationError("accepted DSA event ordering drifted")
+    return {
+        "positions_sha256": sha256(positions_raw).hexdigest(),
+        "scores_sha256": sha256(scores_raw).hexdigest(),
+        "valid_count": valid_count,
+    }
+
+
+def _verify_precompile_numerical_policy(
+    value: Any, base: Path
+) -> dict[str, Any]:
+    """Authenticate CPU logical equivalence without treating CPU as a TPU oracle."""
+
+    path, authority_sha, raw = _binding(
+        base, value, "precompile numerical policy", limit=_MAX_JSON_BYTES
+    )
+    authority = _load_json(raw, "precompile numerical policy")
+    _exact_keys(
+        authority,
+        {
+            "accepted_tpu_authority",
+            "authority_kind",
+            "candidate",
+            "claim_scope",
+            "classification",
+            "cpu_non_oracle_evidence",
+            "logical_comparison_baseline",
+            "replay_equivalence",
+            "schema_version",
+            "stablehlo_noninterference",
+            "watchpoint_manifest",
+        },
+        "precompile numerical policy",
+    )
+    if (
+        _positive_int(authority["schema_version"], "numerical policy schema version")
+        != 1
+        or authority["authority_kind"] != "gate.d.precompile.numerical.policy.v1"
+        or authority["claim_scope"]
+        != _EXPECTED_PRECOMPILE_NUMERICAL_POLICY_CLAIM_SCOPE
+        or authority["classification"]
+        != _EXPECTED_PRECOMPILE_NUMERICAL_POLICY_CLASSIFICATION
+    ):
+        raise BenchmarkValidationError("precompile numerical policy identity drifted")
+
+    baseline = authority["logical_comparison_baseline"]
+    candidate = authority["candidate"]
+    if not isinstance(baseline, dict) or not isinstance(candidate, dict):
+        raise BenchmarkValidationError("numerical policy participants are invalid")
+    _exact_keys(
+        baseline,
+        {
+            "candidate_catalogue_eligible",
+            "candidate_id",
+            "capsule",
+            "disposition",
+            "execution_authority",
+            "successor_eligible",
+            "tombstone_authority",
+        },
+        "logical comparison baseline",
+    )
+    _exact_keys(candidate, {"capsule", "execution_authority", "id"}, "policy candidate")
+    if (
+        baseline["candidate_id"] != "auxiliary_device_tuple_dependency"
+        or baseline["disposition"] != "rejected.tombstoned.comparison_only"
+        or _boolean(
+            baseline["candidate_catalogue_eligible"], "baseline catalogue eligibility"
+        )
+        or _boolean(baseline["successor_eligible"], "baseline successor eligibility")
+        or candidate["id"] != "compensated_auxiliary_dependency"
+    ):
+        raise BenchmarkValidationError("numerical policy participant disposition drifted")
+
+    baseline_capsule_path, baseline_capsule_sha, baseline_capsule_raw = _binding(
+        path.parent, baseline["capsule"], "logical comparison capsule", limit=_MAX_JSON_BYTES
+    )
+    candidate_capsule_path, candidate_capsule_sha, candidate_capsule_raw = _binding(
+        path.parent, candidate["capsule"], "policy candidate capsule", limit=_MAX_JSON_BYTES
+    )
+    baseline_execution_path, baseline_execution_sha, baseline_execution_raw = _binding(
+        path.parent,
+        baseline["execution_authority"],
+        "logical comparison execution authority",
+        limit=_MAX_JSON_BYTES,
+    )
+    candidate_execution_path, candidate_execution_sha, candidate_execution_raw = _binding(
+        path.parent,
+        candidate["execution_authority"],
+        "policy candidate execution authority",
+        limit=_MAX_JSON_BYTES,
+    )
+    tombstone_path, tombstone_sha, tombstone_raw = _binding(
+        path.parent,
+        baseline["tombstone_authority"],
+        "logical comparison tombstone authority",
+        limit=_MAX_JSON_BYTES,
+    )
+    for observed_path, observed_sha, expected, label in (
+        (
+            baseline_capsule_path,
+            baseline_capsule_sha,
+            {
+                "path": _EXPECTED_LOGICAL_COMPARISON_BASELINE["capsule_path"],
+                "sha256": _EXPECTED_LOGICAL_COMPARISON_BASELINE["capsule_sha256"],
+            },
+            "logical comparison capsule",
+        ),
+        (
+            baseline_execution_path,
+            baseline_execution_sha,
+            {
+                "path": _EXPECTED_LOGICAL_COMPARISON_BASELINE[
+                    "execution_authority_path"
+                ],
+                "sha256": _EXPECTED_LOGICAL_COMPARISON_BASELINE[
+                    "execution_authority_sha256"
+                ],
+            },
+            "logical comparison execution authority",
+        ),
+        (
+            tombstone_path,
+            tombstone_sha,
+            {
+                "path": _EXPECTED_LOGICAL_COMPARISON_BASELINE[
+                    "tombstone_authority_path"
+                ],
+                "sha256": _EXPECTED_LOGICAL_COMPARISON_BASELINE[
+                    "tombstone_authority_sha256"
+                ],
+            },
+            "logical comparison tombstone authority",
+        ),
+        (
+            candidate_capsule_path,
+            candidate_capsule_sha,
+            {
+                "path": _EXPECTED_COMPENSATED_CAPSULE_AUTHORITY["capsule_path"],
+                "sha256": _EXPECTED_COMPENSATED_CAPSULE_AUTHORITY[
+                    "capsule_sha256"
+                ],
+            },
+            "policy candidate capsule",
+        ),
+        (
+            candidate_execution_path,
+            candidate_execution_sha,
+            {
+                "path": _EXPECTED_COMPENSATED_CAPSULE_AUTHORITY[
+                    "execution_authority_path"
+                ],
+                "sha256": _EXPECTED_COMPENSATED_CAPSULE_AUTHORITY[
+                    "execution_authority_sha256"
+                ],
+            },
+            "policy candidate execution authority",
+        ),
+    ):
+        _require_exact_binding(observed_path, observed_sha, expected, label)
+    baseline_capsule = _load_json(baseline_capsule_raw, "logical comparison capsule")
+    candidate_capsule = _load_json(candidate_capsule_raw, "policy candidate capsule")
+    baseline_execution = _load_json(
+        baseline_execution_raw, "logical comparison execution authority"
+    )
+    candidate_execution = _load_json(
+        candidate_execution_raw, "policy candidate execution authority"
+    )
+    tombstone = _load_json(tombstone_raw, "logical comparison tombstone authority")
+    if (
+        baseline_capsule.get("candidate_id") != baseline["candidate_id"]
+        or baseline_execution.get("candidate_id") != baseline["candidate_id"]
+        or candidate_capsule.get("candidate_id") != candidate["id"]
+        or candidate_execution.get("candidate_id") != candidate["id"]
+    ):
+        raise BenchmarkValidationError("numerical policy participant binding drifted")
+    expected_tombstone = {
+        "accepted_tpu_event1_outputs": {
+            key: _EXPECTED_CAPSULE_ACCEPTED_OUTPUTS[key]
+            for key in (
+                "event1_positions_sha256",
+                "event1_scores_sha256",
+                "event1_valid_count",
+            )
+        },
+        "authority_kind": "gate.d.logical.comparison.baseline.tombstone.v1",
+        "baseline_candidate_id": baseline["candidate_id"],
+        "candidate_catalogue_eligible": False,
+        "capsule": {
+            "path": os.path.abspath(os.fspath(baseline_capsule_path)),
+            "sha256": baseline_capsule_sha,
+        },
+        "classification": (
+            "CPU_LOGICAL_COMPARISON_BASELINE_ONLY;TOMBSTONED;NO_SUCCESSOR"
+        ),
+        "execution_authority": {
+            "path": os.path.abspath(os.fspath(baseline_execution_path)),
+            "sha256": baseline_execution_sha,
+        },
+        "observed_cpu_outputs": {
+            key: _EXPECTED_CAPSULE_LOGICAL_BASELINE_OUTPUTS[key]
+            for key in (
+                "event1_positions_sha256",
+                "event1_scores_sha256",
+                "event1_valid_count",
+            )
+        },
+        "reason": (
+            "The exact sealed tuple CPU replay is useful only as a same-input "
+            "logical comparison baseline. Its event-1 selected positions and scores "
+            "differ from the independently sealed accepted TPU oracle, so it cannot "
+            "enter candidate admission or authorize a successor."
+        ),
+        "schema_version": 1,
+        "successor_eligible": False,
+    }
+    if tombstone != expected_tombstone:
+        raise BenchmarkValidationError("logical comparison tombstone authority drifted")
+
+    equivalence = authority["replay_equivalence"]
+    if not isinstance(equivalence, dict):
+        raise BenchmarkValidationError("replay equivalence policy is invalid")
+    _exact_keys(
+        equivalence,
+        {
+            "candidate_specific_fields_must_differ",
+            "device_evidence_sha256",
+            "input_artifact_sha256",
+            "required_equal_authority_fields",
+            "required_equal_capsule_fields",
+            "required_equal_shared_upstream_ids",
+            "state_artifact_sha256",
+        },
+        "replay equivalence policy",
+    )
+    expected_equal_capsule = [
+        "artifact",
+        "producer_device_evidence",
+        "producer_input_artifact",
+        "watchpoints",
+    ]
+    expected_equal_authority = ["environment", "input_arrays", "tensor_receipts"]
+    expected_shared_upstream = sorted(_EXPECTED_CAPSULE_SHARED_UPSTREAM_INPUTS)
+    expected_different = [
+        "candidate_id",
+        "installed_producer",
+        "producer",
+        "source_snapshot",
+        "plan_authority",
+        "source_authority",
+        "stablehlo_authority",
+    ]
+    if (
+        equivalence["required_equal_capsule_fields"] != expected_equal_capsule
+        or equivalence["required_equal_authority_fields"] != expected_equal_authority
+        or equivalence["required_equal_shared_upstream_ids"] != expected_shared_upstream
+        or equivalence["candidate_specific_fields_must_differ"] != expected_different
+    ):
+        raise BenchmarkValidationError("replay equivalence field policy drifted")
+    if any(
+        baseline_capsule.get(field) != candidate_capsule.get(field)
+        for field in expected_equal_capsule
+    ) or any(
+        baseline_execution.get(field) != candidate_execution.get(field)
+        for field in expected_equal_authority
+    ):
+        raise BenchmarkValidationError("logical comparison replay inputs drifted")
+    for field in ("artifact", "producer_input_artifact", "producer_device_evidence"):
+        expected_sha = {
+            "artifact": equivalence["state_artifact_sha256"],
+            "producer_input_artifact": equivalence["input_artifact_sha256"],
+            "producer_device_evidence": equivalence["device_evidence_sha256"],
+        }[field]
+        if baseline_capsule[field].get("sha256") != _sha(
+            expected_sha, f"policy {field} SHA-256"
+        ):
+            raise BenchmarkValidationError("logical comparison payload identity drifted")
+    for field in ("installed_producer", "producer", "source_snapshot"):
+        if baseline_execution.get(field) == candidate_execution.get(field):
+            raise BenchmarkValidationError("candidate-specific execution identity was reused")
+    baseline_upstream = baseline_execution.get("upstream_inputs")
+    candidate_upstream = candidate_execution.get("upstream_inputs")
+    if not isinstance(baseline_upstream, dict) or not isinstance(candidate_upstream, dict):
+        raise BenchmarkValidationError("policy upstream authority is invalid")
+    if any(
+        baseline_upstream.get(key) != candidate_upstream.get(key)
+        for key in expected_shared_upstream
+    ):
+        raise BenchmarkValidationError("logical comparison shared upstream drifted")
+    for key in ("plan_authority", "source_authority", "stablehlo_authority"):
+        if baseline_upstream.get(key) == candidate_upstream.get(key):
+            raise BenchmarkValidationError("candidate-specific upstream identity was reused")
+
+    baseline_manifest = _declared_capsule_watchpoint_manifest(
+        baseline_capsule, label="logical comparison capsule"
+    )
+    candidate_manifest = _declared_capsule_watchpoint_manifest(
+        candidate_capsule, label="policy candidate capsule"
+    )
+    manifest = authority["watchpoint_manifest"]
+    if (
+        not isinstance(manifest, list)
+        or manifest != baseline_manifest
+        or manifest != candidate_manifest
+        or [item["kind"] for item in manifest].count("operand") != 2
+        or [item["kind"] for item in manifest].count("auxiliary_witness") != 1
+        or [item["kind"] for item in manifest].count("primary") != 11
+    ):
+        raise BenchmarkValidationError("logical comparison watchpoint manifest drifted")
+
+    baseline_outputs = baseline_execution.get("expected_outputs")
+    candidate_outputs = candidate_execution.get("expected_outputs")
+    if (
+        baseline_outputs != _EXPECTED_CAPSULE_LOGICAL_BASELINE_OUTPUTS
+        or candidate_outputs != baseline_outputs
+        or baseline_outputs == _EXPECTED_CAPSULE_ACCEPTED_OUTPUTS
+    ):
+        raise BenchmarkValidationError("CPU logical output authority drifted")
+
+    cpu_binding = authority["cpu_non_oracle_evidence"]
+    if not isinstance(cpu_binding, dict):
+        raise BenchmarkValidationError("CPU non-oracle evidence binding is invalid")
+    _exact_keys(
+        cpu_binding,
+        {"classification", "path", "sha256"},
+        "CPU non-oracle evidence binding",
+    )
+    cpu_file_binding = {
+        "path": cpu_binding["path"],
+        "sha256": cpu_binding["sha256"],
+    }
+    _, cpu_sha, cpu_raw = _binding(
+        path.parent,
+        cpu_file_binding,
+        "CPU non-oracle evidence",
+        limit=_MAX_ARTIFACT_BYTES,
+    )
+    cpu_path = _resolve(
+        path.parent, cpu_binding["path"], "CPU non-oracle evidence path"
+    )
+    _require_exact_binding(
+        cpu_path,
+        cpu_sha,
+        _EXPECTED_CPU_NON_ORACLE_EVIDENCE,
+        "CPU non-oracle evidence",
+    )
+    cpu_document = _load_json(cpu_raw, "CPU non-oracle evidence")
+    cpu_tpus_used = _nonnegative_int(
+        cpu_document.get("tpus_used"), "CPU non-oracle TPU count"
+    )
+    if (
+        cpu_binding["classification"]
+        != "CPU_EVENT1_ADMISSION_REJECTED;NO_TPU_SUCCESSOR"
+        or cpu_document.get("classification") != cpu_binding["classification"]
+        or cpu_document.get("cpu_control_exact") is not False
+        or cpu_document.get("artifact_kind")
+        != "pp16_feature2_qkv_khalf_event1_cpu_admission_v2"
+        or cpu_document.get("status") != "SUCCESS"
+        or cpu_document.get("cpu_backend") != "cpu"
+        or cpu_document.get("cpu_device_count") != 2
+        or cpu_document.get("gate_d_closed") is not False
+        or cpu_document.get("performance_claim") is not False
+        or cpu_document.get("protected_tpu_evidence") is not False
+        or cpu_document.get("tpu_execution_authorized") is not False
+        or cpu_tpus_used != 0
+    ):
+        raise BenchmarkValidationError("CPU non-oracle evidence drifted")
+    cpu_arms = cpu_document.get("arms")
+    if (
+        not isinstance(cpu_arms, dict)
+        or set(cpu_arms) != set(_EXPECTED_CPU_NON_ORACLE_MISMATCHES)
+        or cpu_document.get("arms_sha256")
+        != sha256(_canonical_json(cpu_arms).encode("ascii")).hexdigest()
+    ):
+        raise BenchmarkValidationError("CPU non-oracle mismatch authority drifted")
+    for arm_id, expected in _EXPECTED_CPU_NON_ORACLE_MISMATCHES.items():
+        arm = cpu_arms.get(arm_id)
+        if not isinstance(arm, dict):
+            raise BenchmarkValidationError("CPU non-oracle mismatch authority drifted")
+        try:
+            observed = {
+                "accepted_event": (
+                    arm["accepted_event"]["positions"]["mismatch_count"],
+                    arm["accepted_event"]["scores"]["mismatch_count"],
+                    arm["accepted_event"]["symmetric_set_difference_count"],
+                ),
+                "accepted_internals": tuple(
+                    arm["accepted_internals"][name]["mismatch_count"]
+                    for name in ("current_key", "head_weights", "query")
+                ),
+                "db518_event": (
+                    arm["db518_event"]["positions"]["mismatch_count"],
+                    arm["db518_event"]["scores"]["mismatch_count"],
+                    arm["db518_event"]["symmetric_set_difference_count"],
+                ),
+                "db518_internals": tuple(
+                    arm["db518_internals"][name]["mismatch_count"]
+                    for name in ("head_weights", "query")
+                ),
+            }
+            valid_counts = (
+                arm["accepted_event"]["valid_counts"]["mismatch_count"],
+                arm["db518_event"]["valid_counts"]["mismatch_count"],
+            )
+            cache_counts = (
+                arm["current_cache_key_vs_accepted"]["mismatch_count"],
+                arm["current_cache_key_vs_replay_round"]["mismatch_count"],
+            )
+        except (KeyError, TypeError):
+            raise BenchmarkValidationError(
+                "CPU non-oracle mismatch authority drifted"
+            ) from None
+        if observed != expected or valid_counts != (0, 0) or cache_counts != (5, 0):
+            raise BenchmarkValidationError("CPU non-oracle mismatch authority drifted")
+
+    accepted = authority["accepted_tpu_authority"]
+    if not isinstance(accepted, dict):
+        raise BenchmarkValidationError("accepted TPU authority is invalid")
+    _exact_keys(
+        accepted,
+        {
+            "available_layer1_internals",
+            "dsa_oracle",
+            "event1_outputs",
+            "layer1_cache_history_status",
+            "required_future_checks",
+            "rms_operands",
+            "status",
+        },
+        "accepted TPU authority",
+    )
+    expected_future_checks = [
+        "identical_protected_input_and_event_identity",
+        "exact_event1_selected_positions",
+        "exact_event1_selected_scores",
+        "exact_event1_valid_count",
+        "descending_score_then_lowest_global_position_tie_order",
+        "raw_tokens_and_quality",
+        "state_load_and_cache_integrity",
+        "per_chip_hbm_and_locality",
+        "fresh_xplanes_and_profiler_free_wall",
+        "results_db_archive_and_clean_fleet",
+    ]
+    if (
+        accepted["status"] != "deferred.mandatory.protected_tpu_numerical_replay"
+        or accepted["layer1_cache_history_status"]
+        != "not_available_in_sealed_accepted_layer1_internal_authority;"
+        "future_protected_state_cache_integrity_required"
+        or accepted["required_future_checks"] != expected_future_checks
+    ):
+        raise BenchmarkValidationError("deferred TPU criterion drifted")
+    dsa = accepted["dsa_oracle"]
+    if not isinstance(dsa, dict):
+        raise BenchmarkValidationError("accepted DSA oracle is invalid")
+    _exact_keys(
+        dsa,
+        {
+            "capture_code_pin",
+            "event_contract",
+            "legacy_repository_pin",
+            "manifest",
+            "source_row",
+            "tensors",
+        },
+        "accepted DSA oracle",
+    )
+    event_contract = dsa["event_contract"]
+    if not isinstance(event_contract, dict):
+        raise BenchmarkValidationError("accepted DSA event contract is invalid")
+    _exact_keys(
+        event_contract,
+        {"event_index", "layer_id", "position", "selected_width", "tie_policy"},
+        "accepted DSA event contract",
+    )
+    normalized_event_contract = {
+        "event_index": _nonnegative_int(
+            event_contract["event_index"], "accepted DSA event index"
+        ),
+        "layer_id": _nonnegative_int(
+            event_contract["layer_id"], "accepted DSA layer id"
+        ),
+        "position": _nonnegative_int(
+            event_contract["position"], "accepted DSA position"
+        ),
+        "selected_width": _positive_int(
+            event_contract["selected_width"], "accepted DSA selected width"
+        ),
+        "tie_policy": _identifier(
+            event_contract["tie_policy"], "accepted DSA tie policy"
+        ),
+    }
+    expected_event_contract = {
+        "event_index": 1,
+        "layer_id": 1,
+        "position": 8155,
+        "selected_width": 2048,
+        "tie_policy": "descending_score_then_lowest_global_position",
+    }
+    if (
+        dsa["capture_code_pin"] != "89a4363caaf93edd8abbf7fc6608f6edddb825df"
+        or dsa["legacy_repository_pin"] != "b3c25df47ac98783912dc658878181ec0a8ae16d"
+        or normalized_event_contract != expected_event_contract
+    ):
+        raise BenchmarkValidationError("accepted DSA identity drifted")
+    dsa_manifest_path, dsa_manifest_sha, dsa_manifest_raw = _binding(
+        path.parent, dsa["manifest"], "accepted DSA manifest", limit=_MAX_JSON_BYTES
+    )
+    dsa_tensor_path, dsa_tensor_sha, dsa_tensor_raw = _binding(
+        path.parent, dsa["tensors"], "accepted DSA tensors", limit=_MAX_ARTIFACT_BYTES
+    )
+    source_row_path, source_row_sha, source_row_raw = _binding(
+        path.parent, dsa["source_row"], "accepted DSA source row", limit=_MAX_JSON_BYTES
+    )
+    for observed_path, observed_sha, binding_name in (
+        (dsa_manifest_path, dsa_manifest_sha, "dsa_manifest"),
+        (dsa_tensor_path, dsa_tensor_sha, "dsa_tensors"),
+        (source_row_path, source_row_sha, "dsa_source_row"),
+    ):
+        _require_exact_binding(
+            observed_path,
+            observed_sha,
+            _EXPECTED_ACCEPTED_TPU_BINDINGS[binding_name],
+            f"accepted TPU {binding_name}",
+        )
+    dsa_manifest = _load_json(dsa_manifest_raw, "accepted DSA manifest")
+    source_row = _load_json(source_row_raw, "accepted DSA source row")
+    expected_source_row_identity = {
+        "benchmark": "passkey_L8192_d0.5",
+        "correct": 1,
+        "extracted": "881446",
+        "fork_git": "b3c25df47",
+        "gold": "881446",
+        "harness_git": "a4a17ac",
+        "id": 1769,
+        "item_id": "t0",
+        "model": "gs://driftbench-dsv4-uc/models/GLM-5.2-FP8",
+        "n_gen_tokens": 20,
+        "n_prompt_tokens": 8155,
+        "pod": "db-v4-64-od",
+    }
+    observed_source_row_identity = {
+        "benchmark": _string(source_row.get("benchmark"), "source row benchmark"),
+        "correct": _nonnegative_int(source_row.get("correct"), "source row correct"),
+        "extracted": _string(source_row.get("extracted"), "source row extracted"),
+        "fork_git": _identifier(source_row.get("fork_git"), "source row fork pin"),
+        "gold": _string(source_row.get("gold"), "source row gold"),
+        "harness_git": _identifier(
+            source_row.get("harness_git"), "source row harness pin"
+        ),
+        "id": _positive_int(source_row.get("id"), "source row id"),
+        "item_id": _identifier(source_row.get("item_id"), "source row item id"),
+        "model": _string(source_row.get("model"), "source row model"),
+        "n_gen_tokens": _positive_int(
+            source_row.get("n_gen_tokens"), "source row generated tokens"
+        ),
+        "n_prompt_tokens": _positive_int(
+            source_row.get("n_prompt_tokens"), "source row prompt tokens"
+        ),
+        "pod": _identifier(source_row.get("pod"), "source row pod"),
+    }
+    expected_manifest_arrays = {
+        name: {
+            "dtype": expected["manifest_dtype"],
+            "sha256": expected["sha256"],
+            "shape": expected["shape"],
+        }
+        for name, expected in _EXPECTED_ACCEPTED_DSA_ARRAYS.items()
+    }
+    if (
+        observed_source_row_identity != expected_source_row_identity
+        or dsa_manifest.get("arrays") != expected_manifest_arrays
+        or dsa_manifest.get("artifact_kind")
+        != "greenfield_short_context_legacy_dsa_oracle"
+        or dsa_manifest.get("format_version") != 2
+        or dsa_manifest.get("model_id") != "zai-org/GLM-5.2-FP8"
+        or dsa_manifest.get("capture_code_hash") != dsa["capture_code_pin"]
+        or dsa_manifest.get("legacy_repository_pin_at_capture")
+        != dsa["legacy_repository_pin"]
+        or dsa_manifest.get("event_contract", {}).get("tie_policy")
+        != event_contract["tie_policy"]
+        or dsa_manifest.get("event_contract", {}).get("selected_width") != 2048
+        or dsa_manifest.get("files", {}).get("tensors", {}).get("sha256")
+        != dsa["tensors"]["sha256"]
+        or dsa_manifest.get("files", {}).get("source_row", {}).get("sha256")
+        != dsa["source_row"]["sha256"]
+    ):
+        raise BenchmarkValidationError("accepted DSA manifest drifted")
+    accepted_event = _accepted_dsa_event1(
+        dsa_tensor_raw,
+        event_index=normalized_event_contract["event_index"],
+        layer_id=normalized_event_contract["layer_id"],
+        position=normalized_event_contract["position"],
+    )
+    declared_event = accepted["event1_outputs"]
+    if not isinstance(declared_event, dict):
+        raise BenchmarkValidationError("accepted DSA event-1 declaration is invalid")
+    _exact_keys(
+        declared_event,
+        {"positions_sha256", "scores_sha256", "valid_count"},
+        "accepted DSA event-1 declaration",
+    )
+    normalized_declared_event = {
+        "positions_sha256": _sha(
+            declared_event["positions_sha256"], "accepted event-1 positions SHA-256"
+        ),
+        "scores_sha256": _sha(
+            declared_event["scores_sha256"], "accepted event-1 scores SHA-256"
+        ),
+        "valid_count": _positive_int(
+            declared_event["valid_count"], "accepted event-1 valid count"
+        ),
+    }
+    if accepted_event != normalized_declared_event or accepted_event != {
+        "positions_sha256": _EXPECTED_CAPSULE_ACCEPTED_OUTPUTS[
+            "event1_positions_sha256"
+        ],
+        "scores_sha256": _EXPECTED_CAPSULE_ACCEPTED_OUTPUTS[
+            "event1_scores_sha256"
+        ],
+        "valid_count": _EXPECTED_CAPSULE_ACCEPTED_OUTPUTS["event1_valid_count"],
+    }:
+        raise BenchmarkValidationError("accepted DSA event-1 authority drifted")
+
+    internals = accepted["available_layer1_internals"]
+    if not isinstance(internals, dict):
+        raise BenchmarkValidationError("accepted layer-1 internals are invalid")
+    _exact_keys(
+        internals,
+        {"code_pin", "coherence_id", "comparison", "internals"},
+        "accepted layer-1 internals",
+    )
+    internals_path, internals_sha, internals_raw = _binding(
+        path.parent, internals["internals"], "accepted layer-1 internals", limit=_MAX_ARTIFACT_BYTES
+    )
+    comparison_path, comparison_sha, comparison_raw = _binding(
+        path.parent, internals["comparison"], "accepted internals comparison", limit=_MAX_JSON_BYTES
+    )
+    _require_exact_binding(
+        internals_path,
+        internals_sha,
+        _EXPECTED_ACCEPTED_TPU_BINDINGS["internals"],
+        "accepted layer-1 internals",
+    )
+    _require_exact_binding(
+        comparison_path,
+        comparison_sha,
+        _EXPECTED_ACCEPTED_TPU_BINDINGS["internals_comparison"],
+        "accepted layer-1 internals comparison",
+    )
+    comparison = _load_json(comparison_raw, "accepted internals comparison")
+    arrays = _inspect_npz(internals_raw)
+    normalized_internal_schema = {
+        name: (
+            observed["storage_dtype"],
+            observed["shape"],
+            sha256(observed["raw"]).hexdigest(),
+        )
+        for name, observed in arrays.items()
+    }
+    expected_internal_schema = {
+        name: (
+            storage_dtype,
+            shape,
+            _sha(digest, f"accepted internal {name} SHA-256"),
+        )
+        for name, (storage_dtype, shape, digest) in _EXPECTED_ACCEPTED_INTERNALS.items()
+    }
+    if (
+        internals["code_pin"] != "83ff4a3576602ca844ea090550139a2ff00b0bb1"
+        or internals["coherence_id"]
+        != "greenfield_legacy_layer1_dsa_internals_20260808T081617553654576Z"
+        or comparison.get("artifact_kind")
+        != "glm52_accepted_greenfield_dsa_internal_observer_comparison"
+        or comparison.get("accepted_run_tag") != internals["coherence_id"]
+        or comparison.get("event_index") != 1
+        or comparison.get("layer_id") != 1
+        or comparison.get("position") != 8155
+        or comparison.get("legacy_code_hash") != internals["code_pin"]
+        or comparison.get("tensor_file", {}).get("sha256")
+        != internals["internals"]["sha256"]
+        or normalized_internal_schema != expected_internal_schema
+        or struct.unpack("<i", arrays["event_index"]["raw"])[0] != 1
+        or struct.unpack("<i", arrays["layer_id"]["raw"])[0] != 1
+        or struct.unpack("<i", arrays["position"]["raw"])[0] != 8155
+    ):
+        raise BenchmarkValidationError("accepted layer-1 internals drifted")
+
+    rms_operands = accepted["rms_operands"]
+    if not isinstance(rms_operands, dict):
+        raise BenchmarkValidationError("accepted RMS operand authority is invalid")
+    _exact_keys(
+        rms_operands,
+        {
+            "boundary",
+            "hidden_update_replay",
+            "hidden_update_sha256",
+            "residual_sha256",
+        },
+        "accepted RMS operand authority",
+    )
+    boundary_path, boundary_sha, boundary_raw = _binding(
+        path.parent, rms_operands["boundary"], "accepted RMS boundary", limit=_MAX_ARTIFACT_BYTES
+    )
+    replay_path, replay_sha, replay_raw = _binding(
+        path.parent,
+        rms_operands["hidden_update_replay"],
+        "accepted RMS hidden-update replay",
+        limit=_MAX_JSON_BYTES,
+    )
+    _require_exact_binding(
+        boundary_path,
+        boundary_sha,
+        _EXPECTED_ACCEPTED_TPU_BINDINGS["rms_boundary"],
+        "accepted RMS boundary",
+    )
+    _require_exact_binding(
+        replay_path,
+        replay_sha,
+        _EXPECTED_ACCEPTED_TPU_BINDINGS["rms_hidden_update_replay"],
+        "accepted RMS hidden-update replay",
+    )
+    boundary_arrays = _inspect_npz(boundary_raw)
+    replay = _load_json(replay_raw, "accepted RMS hidden-update replay")
+    dense_partials = boundary_arrays.get("dense_virtual_partials_bfloat16_bits")
+    residual = boundary_arrays.get("post_attention_residual_bfloat16_bits")
+    if (
+        rms_operands["hidden_update_sha256"]
+        != _EXPECTED_CAPSULE_ACCEPTED_OUTPUTS["rms_hidden_update_sha256"]
+        or rms_operands["residual_sha256"]
+        != _EXPECTED_CAPSULE_ACCEPTED_OUTPUTS["rms_residual_sha256"]
+        or dense_partials is None
+        or dense_partials["storage_dtype"] != "<u2"
+        or dense_partials["shape"] != (4, 8, 1, 6144)
+        or sha256(dense_partials["raw"]).hexdigest()
+        != "9d9f65dddc7b622875872a33a6522c330c8fb5490c8cba14526553c211516e35"
+        or residual is None
+        or residual["storage_dtype"] != "<u2"
+        or residual["shape"] != (1, 6144)
+        or sha256(residual["raw"]).hexdigest()
+        != rms_operands["residual_sha256"]
+        or replay.get("artifact_kind")
+        != "greenfield_pp16_feature2_real_db550_half_reducer_replay"
+        or replay.get("status") != "EXACT"
+        or replay.get("source_file_sha256") != boundary_sha
+        or replay.get("source_dense_partials_sha256")
+        != sha256(dense_partials["raw"]).hexdigest()
+        or replay.get("source_residual_sha256")
+        != sha256(residual["raw"]).hexdigest()
+        or replay.get("dense")
+        != {
+            "actual_sha256": rms_operands["hidden_update_sha256"],
+            "expected_sha256": rms_operands["hidden_update_sha256"],
+            "full_replay_sha256": rms_operands["hidden_update_sha256"],
+            "mismatch_count": 0,
+        }
+        or replay.get("gate_d_passed") is not False
+        or replay.get("performance_claim") is not False
+    ):
+        raise BenchmarkValidationError("accepted RMS operand authority drifted")
+
+    noninterference = authority["stablehlo_noninterference"]
+    expected_noninterference = {
+        "accepted_primary_slice_sha256": _EXPECTED_ACCEPTED_PRIMARY_SLICE_SHA256,
+        "auxiliary_path_operations": _EXPECTED_AUXILIARY_PATH_OPERATIONS[
+            "compensated_auxiliary_dependency"
+        ],
+        "auxiliary_result": "result.restored_rms_input_fp32",
+        "auxiliary_slice_sha256": _EXPECTED_AUXILIARY_SLICE_SHA256[
+            "compensated_auxiliary_dependency"
+        ],
+        "candidate_primary_slice_sha256": _EXPECTED_ACCEPTED_PRIMARY_SLICE_SHA256,
+        "forbidden_operations": [
+            "func.call",
+            "stablehlo.after_all",
+            "stablehlo.custom_call",
+            "stablehlo.infeed",
+            "stablehlo.outfeed",
+            "stablehlo.recv",
+            "stablehlo.send",
+        ],
+        "required_collectives": [],
+        "rooted_device_result": True,
+    }
+    if noninterference != expected_noninterference:
+        raise BenchmarkValidationError("StableHLO non-interference policy drifted")
+
+    return {
+        "accepted_tpu_equality": {
+            "event1_outputs": accepted_event,
+            "required_future_checks": expected_future_checks,
+            "status": accepted["status"],
+        },
+        "authority_path": str(path),
+        "authority_sha256": authority_sha,
+        "candidate_capsule": {
+            "path": str(candidate_capsule_path),
+            "sha256": candidate_capsule_sha,
+        },
+        "candidate_execution_authority": {
+            "path": str(candidate_execution_path),
+            "sha256": candidate_execution_sha,
+        },
+        "classification": authority["classification"],
+        "cpu_non_oracle_evidence_sha256": cpu_sha,
+        "logical_comparison_baseline": {
+            "capsule_path": str(baseline_capsule_path),
+            "capsule_sha256": baseline_capsule_sha,
+            "disposition": baseline["disposition"],
+            "execution_authority_path": str(baseline_execution_path),
+            "execution_authority_sha256": baseline_execution_sha,
+        },
+        "logical_output_authority": dict(baseline_outputs),
+        "stablehlo_noninterference": dict(noninterference),
+        "watchpoint_manifest": list(manifest),
+    }
+
+
 def _verify_capsule_execution_authority(
     value: Any,
     base: Path,
     *,
     candidate_id: str,
     implementation: Mapping[str, Any],
+    numerical_policy: Mapping[str, Any],
     source: Mapping[str, Any],
 ) -> dict[str, Any]:
     path, authority_sha, raw = _binding(
         base, value, "capsule execution authority", limit=_MAX_JSON_BYTES
     )
+    if candidate_id == "compensated_auxiliary_dependency":
+        policy_execution = numerical_policy.get("candidate_execution_authority")
+        if not isinstance(policy_execution, Mapping) or (
+            str(path), authority_sha
+        ) != (policy_execution.get("path"), policy_execution.get("sha256")):
+            raise BenchmarkValidationError(
+                "capsule execution authority is not the numerical-policy candidate"
+            )
     authority = _load_json(raw, "capsule execution authority")
     if raw != (_canonical_json(authority) + "\n").encode("ascii"):
         raise BenchmarkValidationError("capsule execution authority is not canonical JSON")
@@ -5516,7 +6909,7 @@ def _verify_capsule_execution_authority(
                 )
             normalized_records.append(normalized)
         if normalized_records != sorted(
-            normalized_records, key=lambda item: item["path"]
+            normalized_records, key=lambda item: PurePosixPath(item["path"])
         ) or len({item["path"] for item in normalized_records}) != len(
             normalized_records
         ):
@@ -5670,8 +7063,15 @@ def _verify_capsule_execution_authority(
     }
     if output_report["event1_valid_count"] != 2048:
         raise BenchmarkValidationError("accepted event-1 valid count drifted")
-    if real_source and output_report != _EXPECTED_CAPSULE_ACCEPTED_OUTPUTS:
-        raise BenchmarkValidationError("real capsule accepted output authority drifted")
+    if real_source:
+        if candidate_id != "compensated_auxiliary_dependency":
+            raise BenchmarkValidationError(
+                "tombstoned capsule execution authority cannot enter admission"
+            )
+        if output_report != numerical_policy["logical_output_authority"]:
+            raise BenchmarkValidationError(
+                "real capsule logical output authority drifted"
+            )
     return {
         "authority_path": str(path),
         "authority_sha256": authority_sha,
@@ -5705,6 +7105,7 @@ def _verify_capsule_producer_receipt(
     records: Sequence[Mapping[str, Any]],
     source: Mapping[str, Any],
     stablehlo: Mapping[str, Any],
+    stablehlo_transition: Mapping[str, Any] | None,
     success_binding: Any,
 ) -> dict[str, Any]:
     receipt_path, receipt_sha, receipt_raw = _binding(
@@ -5745,12 +7146,18 @@ def _verify_capsule_producer_receipt(
     if receipt["coherence_id"] != capsule["coherence_id"]:
         raise BenchmarkValidationError("capsule producer coherence id drifted")
     candidate = receipt["candidate"]
+    expected_stablehlo_authority = (
+        stablehlo_transition["produced_under"]
+        if candidate_id == "compensated_auxiliary_dependency"
+        and isinstance(stablehlo_transition, Mapping)
+        else stablehlo["authority_sha256"]
+    )
     expected_candidate = {
         "code_pin": source["code_pin"],
         "id": candidate_id,
         "plan_sha256": plan["plan_sha256"],
         "source_authority_sha256": source["authority_sha256"],
-        "stablehlo_authority_sha256": stablehlo["authority_sha256"],
+        "stablehlo_authority_sha256": expected_stablehlo_authority,
     }
     if candidate != expected_candidate:
         raise BenchmarkValidationError("capsule producer candidate tuple drifted")
@@ -5956,6 +7363,417 @@ def _verify_capsule_producer_receipt(
     }
 
 
+def _verify_policy_stablehlo_noninterference(
+    numerical_policy: Mapping[str, Any], stablehlo: Mapping[str, Any]
+) -> None:
+    """Cross-bind the logical policy to the independently parsed graph report."""
+
+    policy = numerical_policy.get("stablehlo_noninterference")
+    if not isinstance(policy, Mapping):
+        raise BenchmarkValidationError("numerical-policy StableHLO report is absent")
+    observed = {
+        "accepted_primary_slice_sha256": stablehlo.get(
+            "accepted_primary_slice_sha256"
+        ),
+        "auxiliary_path_operations": stablehlo.get("auxiliary_path_operations"),
+        "auxiliary_result": stablehlo.get("auxiliary_result"),
+        "auxiliary_slice_sha256": stablehlo.get("auxiliary_slice_sha256"),
+        "candidate_primary_slice_sha256": stablehlo.get(
+            "candidate_primary_slice_sha256"
+        ),
+        "forbidden_operations": stablehlo.get("forbidden_operations"),
+        "required_collectives": stablehlo.get("collectives"),
+        "rooted_device_result": stablehlo.get("rooted_device_result"),
+    }
+    if observed != dict(policy):
+        raise BenchmarkValidationError(
+            "numerical policy is not the parsed StableHLO non-interference report"
+        )
+
+
+def _transition_path(value: Any) -> str:
+    """Canonicalize a sealed report path without following it during comparison."""
+
+    path = Path(_string(value, "StableHLO transition path"))
+    if not path.is_absolute():
+        path = Path("/home/gianl/glm-tpu-topology-rewrite") / path
+    return os.path.abspath(os.fspath(path))
+
+
+def _transition_parser_identity(implementation: Mapping[str, Any]) -> dict[str, Any]:
+    """Project the exact immutable parser/toolchain identity used by admission."""
+
+    imports = implementation.get("validator_imports")
+    if not isinstance(imports, list) or not imports:
+        raise BenchmarkValidationError("StableHLO transition parser imports are absent")
+    return {
+        "import_manifest_sha256": sha256(
+            _canonical_json(imports).encode("ascii")
+        ).hexdigest(),
+        "python_path": _transition_path(implementation.get("validator_python_path")),
+        "python_sha256": _sha(
+            implementation.get("validator_python_sha256"),
+            "StableHLO transition Python SHA-256",
+        ),
+        "pythonpath": _transition_path(implementation.get("validator_pythonpath")),
+        "provisioner_path": _transition_path(
+            implementation.get("validator_python_provisioner_path")
+        ),
+        "provisioner_sha256": _sha(
+            implementation.get("validator_python_provisioner_sha256"),
+            "StableHLO transition provisioner SHA-256",
+        ),
+        "provisioner_source_path": _transition_path(
+            implementation.get("validator_python_provisioner_source_path")
+        ),
+        "provisioner_source_sha256": _sha(
+            implementation.get("validator_python_provisioner_source_sha256"),
+            "StableHLO transition provisioner-source SHA-256",
+        ),
+        "runtime_root": _transition_path(
+            implementation.get("validator_python_runtime_root")
+        ),
+        "runtime_sha256": _sha(
+            implementation.get("validator_python_runtime_sha256"),
+            "StableHLO transition runtime SHA-256",
+        ),
+    }
+
+
+def _stablehlo_transition_common_fields(
+    report: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Normalize only path spellings; every other common field stays exact."""
+
+    excluded = {
+        "authority_sha256",
+        "validator_report_sha256",
+        *_EXPECTED_STABLEHLO_TRANSITION_ENRICHMENTS,
+    }
+    path_fields = {
+        "accepted_primary_path",
+        "candidate_path",
+        "candidate_raw_path",
+        "certificate_path",
+        "producer_receipt_path",
+        "producer_source_path",
+        "success_path",
+    }
+    normalized: dict[str, Any] = {}
+    for key, item in report.items():
+        if key in excluded:
+            continue
+        normalized[key] = _transition_path(item) if key in path_fields else item
+    return normalized
+
+
+def _verify_stablehlo_authority_transition(
+    value: Any,
+    base: Path,
+    *,
+    candidate_id: str,
+    mechanism_fingerprint_sha256: str,
+    source: Mapping[str, Any],
+    plan: Mapping[str, Any],
+    stablehlo: Mapping[str, Any],
+    stablehlo_binding: Mapping[str, Any],
+    implementation: Mapping[str, Any],
+    capsule_binding: Any,
+    execution_authority_binding: Any,
+) -> dict[str, Any]:
+    """Verify one parentless, metadata-only old-to-current parser transition."""
+
+    path, transition_sha, raw = _binding(
+        base, value, "StableHLO authority transition", limit=_MAX_JSON_BYTES
+    )
+    _require_exact_binding(
+        path,
+        transition_sha,
+        _EXPECTED_COMPENSATED_STABLEHLO_TRANSITION,
+        "StableHLO authority transition",
+    )
+    transition = _load_json(raw, "StableHLO authority transition")
+    _exact_keys(
+        transition,
+        {
+            "artifact_kind",
+            "candidate",
+            "capsule",
+            "claim_scope",
+            "classification",
+            "enrichments",
+            "execution_authority",
+            "historical_report",
+            "immutable_parser",
+            "invariants",
+            "schema_version",
+            "transition",
+            "validators",
+        },
+        "StableHLO authority transition",
+    )
+    if (
+        _positive_int(
+            transition["schema_version"], "StableHLO transition schema version"
+        )
+        != 1
+        or transition["artifact_kind"]
+        != "gate_d_compensated_stablehlo_authority_transition"
+        or transition["claim_scope"] != _EXPECTED_STABLEHLO_TRANSITION_CLAIM_SCOPE
+        or transition["classification"]
+        != _EXPECTED_STABLEHLO_TRANSITION_CLASSIFICATION
+    ):
+        raise BenchmarkValidationError("StableHLO transition identity drifted")
+
+    candidate = transition["candidate"]
+    if not isinstance(candidate, dict):
+        raise BenchmarkValidationError("StableHLO transition candidate is invalid")
+    _exact_keys(
+        candidate,
+        {"candidate_id", "mechanism_fingerprint_sha256"},
+        "StableHLO transition candidate",
+    )
+    if candidate != {
+        "candidate_id": candidate_id,
+        "mechanism_fingerprint_sha256": mechanism_fingerprint_sha256,
+    } or candidate_id != "compensated_auxiliary_dependency":
+        raise BenchmarkValidationError("StableHLO transition candidate drifted")
+
+    edge = transition["transition"]
+    if not isinstance(edge, dict):
+        raise BenchmarkValidationError("StableHLO transition edge is invalid")
+    _exact_keys(
+        edge,
+        {"depth", "parent", "produced_under", "validated_under"},
+        "StableHLO transition edge",
+    )
+    if (
+        _positive_int(edge["depth"], "StableHLO transition depth") != 1
+        or edge["parent"] is not None
+        or edge != {"depth": 1, "parent": None, **_EXPECTED_STABLEHLO_TRANSITION_AUTHORITIES}
+    ):
+        raise BenchmarkValidationError("StableHLO transition is not parentless depth one")
+
+    validators = transition["validators"]
+    if not isinstance(validators, dict):
+        raise BenchmarkValidationError("StableHLO transition validators are invalid")
+    _exact_keys(validators, {"current", "historical"}, "transition validators")
+    for label, record in validators.items():
+        if not isinstance(record, dict):
+            raise BenchmarkValidationError(f"transition {label} validator is invalid")
+        _exact_keys(
+            record,
+            {"report_sha256", "source_sha256"},
+            f"transition {label} validator",
+        )
+        _sha(record["report_sha256"], f"transition {label} report SHA-256")
+        _sha(record["source_sha256"], f"transition {label} source SHA-256")
+    if validators != _EXPECTED_STABLEHLO_TRANSITION_VALIDATORS:
+        raise BenchmarkValidationError("StableHLO transition validator identity drifted")
+
+    enrichments = transition["enrichments"]
+    if not isinstance(enrichments, dict):
+        raise BenchmarkValidationError("StableHLO transition enrichments are invalid")
+    _exact_keys(
+        enrichments,
+        set(_EXPECTED_STABLEHLO_TRANSITION_ENRICHMENTS),
+        "StableHLO transition enrichments",
+    )
+    _boolean(enrichments["rooted_device_result"], "transition rooted device result")
+    if enrichments != _EXPECTED_STABLEHLO_TRANSITION_ENRICHMENTS:
+        raise BenchmarkValidationError("StableHLO transition enrichments drifted")
+
+    historical_path, historical_sha, historical_raw = _binding(
+        path.parent,
+        transition["historical_report"],
+        "historical StableHLO admission report",
+        limit=_MAX_JSON_BYTES,
+    )
+    _require_exact_binding(
+        historical_path,
+        historical_sha,
+        _EXPECTED_STABLEHLO_TRANSITION_HISTORICAL_REPORT,
+        "historical StableHLO admission report",
+    )
+    historical = _load_json(historical_raw, "historical StableHLO admission report")
+    historical_candidates = historical.get("candidate_results")
+    if not isinstance(historical_candidates, list):
+        raise BenchmarkValidationError("historical candidate results are absent")
+    historical_matches = [
+        item
+        for item in historical_candidates
+        if isinstance(item, dict) and item.get("id") == candidate_id
+    ]
+    if (
+        len(historical_matches) != 1
+        or historical.get("gate_d_closed") is not False
+        or historical.get("tpu_successor_authorized") is not False
+    ):
+        raise BenchmarkValidationError("historical transition report drifted")
+    historical_stablehlo = historical_matches[0].get("stablehlo_authority")
+    if not isinstance(historical_stablehlo, dict):
+        raise BenchmarkValidationError("historical StableHLO authority is absent")
+
+    historical_validator_keys = set(historical_stablehlo)
+    current_validator_keys = set(stablehlo)
+    if current_validator_keys != historical_validator_keys | set(enrichments):
+        raise BenchmarkValidationError(
+            "StableHLO transition did not add exactly the reviewed enrichments"
+        )
+    if _stablehlo_transition_common_fields(
+        historical_stablehlo
+    ) != _stablehlo_transition_common_fields(stablehlo):
+        raise BenchmarkValidationError("StableHLO transition common fields drifted")
+    if (
+        historical_stablehlo.get("authority_sha256") != edge["produced_under"]
+        or historical_stablehlo.get("validator_report_sha256")
+        != validators["historical"]["report_sha256"]
+        or stablehlo.get("authority_sha256") != edge["validated_under"]
+        or stablehlo.get("validator_report_sha256")
+        != validators["current"]["report_sha256"]
+        or {key: stablehlo.get(key) for key in enrichments} != enrichments
+    ):
+        raise BenchmarkValidationError("StableHLO transition authority edge drifted")
+
+    historical_implementation = historical.get("implementation")
+    if not isinstance(historical_implementation, dict):
+        raise BenchmarkValidationError("historical parser implementation is absent")
+    if (
+        historical_implementation.get("stablehlo_validator_sha256")
+        != validators["historical"]["source_sha256"]
+        or implementation.get("stablehlo_validator_sha256")
+        != validators["current"]["source_sha256"]
+    ):
+        raise BenchmarkValidationError("StableHLO transition validator source drifted")
+    parser = transition["immutable_parser"]
+    if not isinstance(parser, dict):
+        raise BenchmarkValidationError("StableHLO transition parser is invalid")
+    _exact_keys(
+        parser,
+        set(_EXPECTED_STABLEHLO_TRANSITION_PARSER),
+        "StableHLO transition parser",
+    )
+    if (
+        parser != _EXPECTED_STABLEHLO_TRANSITION_PARSER
+        or _transition_parser_identity(historical_implementation) != parser
+        or _transition_parser_identity(implementation) != parser
+    ):
+        raise BenchmarkValidationError("StableHLO transition parser identity drifted")
+
+    invariants = transition["invariants"]
+    if not isinstance(invariants, dict):
+        raise BenchmarkValidationError("StableHLO transition invariants are invalid")
+    _exact_keys(
+        invariants,
+        {"plan", "producer_repository", "source", "stablehlo"},
+        "StableHLO transition invariants",
+    )
+    expected_source = {
+        key: source[key]
+        for key in (
+            "authority_sha256",
+            "code_pin",
+            "source_semantic_sha256",
+            "source_set_sha256",
+        )
+    }
+    expected_plan = {
+        key: plan[key]
+        for key in ("authority_file_sha256", "plan_sha256", "topology_hash")
+    }
+    stablehlo_invariant_keys = {
+        "accepted_primary_sha256",
+        "accepted_primary_slice_sha256",
+        "candidate_raw_sha256",
+        "candidate_sha256",
+        "certificate_sha256",
+        "producer_receipt_sha256",
+        "producer_source_sha256",
+        "success_sha256",
+    }
+    expected_stablehlo = {key: stablehlo[key] for key in stablehlo_invariant_keys}
+    producer_repository = stablehlo_binding.get("producer_repository")
+    if not isinstance(producer_repository, dict):
+        raise BenchmarkValidationError("StableHLO producer repository is absent")
+    _exact_keys(
+        producer_repository, {"commit", "root"}, "StableHLO producer repository"
+    )
+    expected_repository = {
+        "commit": _code_pin(
+            producer_repository["commit"], "StableHLO producer repository commit"
+        ),
+        "root": _transition_path(
+            os.fspath(
+                _resolve(base, producer_repository["root"], "producer repository root")
+            )
+        ),
+    }
+    if (
+        invariants.get("source") != expected_source
+        or invariants.get("plan") != expected_plan
+        or invariants.get("stablehlo") != expected_stablehlo
+        or invariants.get("producer_repository") != expected_repository
+        or historical_stablehlo.get("lowering_receipt", {}).get("producer_code_pin")
+        != expected_repository["commit"]
+        or stablehlo.get("lowering_receipt", {}).get("producer_code_pin")
+        != expected_repository["commit"]
+    ):
+        raise BenchmarkValidationError("StableHLO transition invariant identity drifted")
+
+    scoped_bindings = (
+        (
+            transition["capsule"],
+            capsule_binding,
+            _EXPECTED_COMPENSATED_CAPSULE_AUTHORITY["capsule_path"],
+            _EXPECTED_COMPENSATED_CAPSULE_AUTHORITY["capsule_sha256"],
+            "transition capsule",
+        ),
+        (
+            transition["execution_authority"],
+            execution_authority_binding,
+            _EXPECTED_COMPENSATED_CAPSULE_AUTHORITY["execution_authority_path"],
+            _EXPECTED_COMPENSATED_CAPSULE_AUTHORITY[
+                "execution_authority_sha256"
+            ],
+            "transition execution authority",
+        ),
+    )
+    scoped_reports: dict[str, dict[str, str]] = {}
+    for declared, configured, expected_path, expected_sha, label in scoped_bindings:
+        declared_path, declared_sha, _ = _binding(
+            path.parent, declared, label, limit=_MAX_JSON_BYTES
+        )
+        configured_path, configured_sha, _ = _binding(
+            base, configured, f"configured {label}", limit=_MAX_JSON_BYTES
+        )
+        expected_binding = {"path": expected_path, "sha256": expected_sha}
+        _require_exact_binding(declared_path, declared_sha, expected_binding, label)
+        _require_exact_binding(
+            configured_path, configured_sha, expected_binding, f"configured {label}"
+        )
+        scoped_reports[label] = {
+            "path": os.path.abspath(os.fspath(declared_path)),
+            "sha256": declared_sha,
+        }
+
+    return {
+        "authority_path": os.path.abspath(os.fspath(path)),
+        "authority_sha256": transition_sha,
+        "capsule": scoped_reports["transition capsule"],
+        "depth": 1,
+        "execution_authority": scoped_reports["transition execution authority"],
+        "historical_report_path": os.path.abspath(os.fspath(historical_path)),
+        "historical_report_sha256": historical_sha,
+        "metadata_only": True,
+        "produced_under": edge["produced_under"],
+        "validated_under": edge["validated_under"],
+        "validator_report_sha256s": {
+            "produced_under": validators["historical"]["report_sha256"],
+            "validated_under": validators["current"]["report_sha256"],
+        },
+    }
+
+
 def _verify_capsule(
     value: Any,
     base: Path,
@@ -5963,14 +7781,25 @@ def _verify_capsule(
     candidate_id: str,
     implementation: Mapping[str, Any],
     execution_authority: Mapping[str, Any],
+    numerical_policy: Mapping[str, Any],
     source: Mapping[str, Any],
     stablehlo: Mapping[str, Any],
+    stablehlo_transition: Mapping[str, Any] | None,
     plan: Mapping[str, Any],
     required_watchpoints: Mapping[str, Mapping[str, Any]],
 ) -> dict[str, Any]:
     path, capsule_sha, raw = _binding(
         base, value, "candidate coherent capsule", limit=_MAX_JSON_BYTES
     )
+    if candidate_id == "compensated_auxiliary_dependency":
+        policy_capsule = numerical_policy.get("candidate_capsule")
+        if not isinstance(policy_capsule, Mapping) or (str(path), capsule_sha) != (
+            policy_capsule.get("path"),
+            policy_capsule.get("sha256"),
+        ):
+            raise BenchmarkValidationError(
+                "candidate coherent capsule is not the numerical-policy candidate"
+            )
     capsule = _load_json(raw, "candidate coherent capsule")
     _exact_keys(
         capsule,
@@ -5997,15 +7826,67 @@ def _verify_capsule(
         != GATE_D_PRECOMPILE_ADMISSION_SCHEMA_VERSION
     ):
         raise BenchmarkValidationError("candidate capsule schema drifted")
-    if (
-        capsule["candidate_id"] != candidate_id
-        or capsule["code_pin"] != source["code_pin"]
-        or capsule["plan_sha256"] != plan["plan_sha256"]
-        or capsule["source_authority_sha256"] != source["authority_sha256"]
-        or capsule["stablehlo_authority_sha256"] != stablehlo["authority_sha256"]
-    ):
-        raise BenchmarkValidationError("candidate capsule authority tuple drifted")
-    coherence_id = _identifier(capsule["coherence_id"], "capsule coherence id")
+    if candidate_id == "compensated_auxiliary_dependency":
+        if (
+            not isinstance(stablehlo_transition, Mapping)
+            or stablehlo_transition.get("authority_path")
+            != _EXPECTED_COMPENSATED_STABLEHLO_TRANSITION["path"]
+            or stablehlo_transition.get("authority_sha256")
+            != _EXPECTED_COMPENSATED_STABLEHLO_TRANSITION["sha256"]
+            or stablehlo_transition.get("depth") != 1
+            or stablehlo_transition.get("metadata_only") is not True
+            or stablehlo_transition.get("produced_under")
+            != _EXPECTED_STABLEHLO_TRANSITION_AUTHORITIES["produced_under"]
+            or stablehlo_transition.get("validated_under")
+            != _EXPECTED_STABLEHLO_TRANSITION_AUTHORITIES["validated_under"]
+        ):
+            raise BenchmarkValidationError(
+                "candidate capsule lacks its exact StableHLO authority transition"
+            )
+        expected_stablehlo_authority = stablehlo_transition["produced_under"]
+    else:
+        if stablehlo_transition is not None:
+            raise BenchmarkValidationError(
+                "non-compensated capsule received a StableHLO authority transition"
+            )
+        expected_stablehlo_authority = stablehlo["authority_sha256"]
+    observed_authority_tuple = {
+        "candidate_id": capsule["candidate_id"],
+        "code_pin": capsule["code_pin"],
+        "plan_sha256": capsule["plan_sha256"],
+        "source_authority_sha256": capsule["source_authority_sha256"],
+        "stablehlo_authority_sha256": capsule["stablehlo_authority_sha256"],
+    }
+    expected_authority_tuple = {
+        "candidate_id": candidate_id,
+        "code_pin": source["code_pin"],
+        "plan_sha256": plan["plan_sha256"],
+        "source_authority_sha256": source["authority_sha256"],
+        "stablehlo_authority_sha256": expected_stablehlo_authority,
+    }
+    authority_mismatches = {
+        key: {"expected": expected, "observed": observed_authority_tuple[key]}
+        for key, expected in expected_authority_tuple.items()
+        if observed_authority_tuple[key] != expected
+    }
+    if authority_mismatches:
+        raise BenchmarkValidationError(
+            "candidate capsule authority tuple drifted: "
+            + _canonical_json(authority_mismatches)
+        )
+    if candidate_id == "compensated_auxiliary_dependency":
+        assert isinstance(stablehlo_transition, Mapping)
+        if (
+            stablehlo_transition.get("metadata_only") is not True
+            or stablehlo_transition.get("validated_under")
+            != stablehlo["authority_sha256"]
+            or stablehlo_transition.get("capsule")
+            != {"path": os.path.abspath(os.fspath(path)), "sha256": capsule_sha}
+        ):
+            raise BenchmarkValidationError(
+                "candidate capsule is outside its StableHLO authority transition"
+            )
+    coherence_id = _coherence_id(capsule["coherence_id"], "capsule coherence id")
     _string(capsule["claim_scope"], "capsule claim scope")
     artifact_path, artifact_sha, artifact_raw = _binding(
         path.parent,
@@ -6283,6 +8164,16 @@ def _verify_capsule(
             "candidate NPZ contains unreferenced arrays: "
             f"{sorted(set(arrays) - referenced_array_keys)}"
         )
+    observed_manifest = _declared_capsule_watchpoint_manifest(
+        capsule, label="candidate coherent capsule"
+    )
+    if (
+        candidate_id == "compensated_auxiliary_dependency"
+        and observed_manifest != numerical_policy["watchpoint_manifest"]
+    ):
+        raise BenchmarkValidationError(
+            "candidate logical comparison watchpoint manifest drifted"
+        )
     derived_rms_input = _derive_fp32_sum_from_bf16_bits(
         selected_values[("layer1.rms_operands_bf16", "hidden_update")],
         selected_values[("layer1.rms_operands_bf16", "residual")],
@@ -6368,7 +8259,7 @@ def _verify_capsule(
         != expected_outputs["rms_residual_sha256"]
     ):
         raise BenchmarkValidationError(
-            "candidate output does not match the pinned accepted authority"
+            "candidate output does not match its pinned execution authority"
         )
     producer = _verify_capsule_producer_receipt(
         artifact_raw=artifact_raw,
@@ -6385,6 +8276,7 @@ def _verify_capsule(
         records=sorted(records, key=lambda item: item["id"]),
         source=source,
         stablehlo=stablehlo,
+        stablehlo_transition=stablehlo_transition,
         success_binding=capsule["producer_success"],
     )
     input_arrays = _inspect_npz(
@@ -6413,6 +8305,28 @@ def _verify_capsule(
         "derived_rms_input_sha256": sha256(derived_rms_input).hexdigest(),
         "producer": producer,
         "producer_provenance_verified": True,
+        "stablehlo_authority_transition": (
+            {
+                "authority_path": stablehlo_transition["authority_path"],
+                "authority_sha256": stablehlo_transition["authority_sha256"],
+                "produced_under": stablehlo_transition["produced_under"],
+                "validated_under": stablehlo_transition["validated_under"],
+            }
+            if isinstance(stablehlo_transition, Mapping)
+            else None
+        ),
+        "precompile_numerical_policy": (
+            {
+                "accepted_tpu_equality_status": numerical_policy[
+                    "accepted_tpu_equality"
+                ]["status"],
+                "authority_sha256": numerical_policy["authority_sha256"],
+                "cpu_logical_equivalence": True,
+                "tpu_numerical_proven": False,
+            }
+            if candidate_id == "compensated_auxiliary_dependency"
+            else None
+        ),
         "validation_scope": (
             "typed candidate-coherent bounded CPU replay, pinned Git producer/input/"
             "SUCCESS, exact RMS derivation, cache-current-key and scorer-order invariants; "
@@ -6448,12 +8362,18 @@ def admit_gate_d_precompile_candidates(
             "inherited_v1",
             "locality_contract",
             "physical_locality_authority",
+            "precompile_numerical_policy",
             "required_coherent_watchpoints",
             "schema_version",
         },
         "Gate-D precompile admission contract",
     )
-    if contract["schema_version"] != GATE_D_PRECOMPILE_ADMISSION_SCHEMA_VERSION:
+    if (
+        _positive_int(
+            contract["schema_version"], "Gate-D admission schema version"
+        )
+        != GATE_D_PRECOMPILE_ADMISSION_SCHEMA_VERSION
+    ):
         raise BenchmarkValidationError("Gate-D precompile admission schema drifted")
     contract_id = _identifier(contract["contract_id"], "contract id")
     claim_scope = _string(contract["claim_scope"], "claim scope")
@@ -6462,6 +8382,9 @@ def admit_gate_d_precompile_candidates(
     inherited, closed_fingerprints = _verify_inherited_v1(contract["inherited_v1"], base)
     physical_locality = _verify_physical_locality(
         contract["physical_locality_authority"], base
+    )
+    numerical_policy = _verify_precompile_numerical_policy(
+        contract["precompile_numerical_policy"], base
     )
 
     frontier = contract["causal_frontier"]
@@ -6608,6 +8531,7 @@ def admit_gate_d_precompile_candidates(
                 "reconstructs_full_pod_hidden",
                 "source_authority",
                 "stablehlo_authority",
+                "stablehlo_authority_transition",
                 "summary",
             },
             f"candidate {index}",
@@ -6651,6 +8575,7 @@ def admit_gate_d_precompile_candidates(
             candidate["mechanism_fingerprint"], f"candidate {candidate_id} fingerprint"
         )
         reasons: list[str] = []
+        tombstoned = False
         if fingerprint in closed_fingerprints:
             reasons.append("DUPLICATES_V1_CLOSED_FAMILY")
         if _positive_int(candidate["logical_rows"], f"candidate {candidate_id} rows") != 1:
@@ -6673,6 +8598,7 @@ def admit_gate_d_precompile_candidates(
         source_report: dict[str, Any] | None = None
         plan_report: dict[str, Any] | None = None
         stablehlo_report: dict[str, Any] | None = None
+        stablehlo_transition_report: dict[str, Any] | None = None
         execution_report: dict[str, Any] | None = None
         capsule_report: dict[str, Any] | None = None
         if candidate["source_authority"] is None:
@@ -6695,6 +8621,21 @@ def admit_gate_d_precompile_candidates(
             except BenchmarkValidationError as error:
                 reasons.append("INVALID_SOURCE_AST_AUTHORITY")
                 source_report = {"refusal": str(error)}
+        tombstoned = (
+            candidate_id in _TOMBSTONED_PRECOMPILE_CANDIDATES
+            and isinstance(source_report, dict)
+            and source_report.get("executable_source_authority") is True
+        )
+        if tombstoned:
+            reasons.append("TOMBSTONED_COMPARISON_ONLY")
+            if (
+                candidate["capsule_execution_authority"] is not None
+                or candidate["coherent_state_capsule"] is not None
+                or candidate["stablehlo_authority_transition"] is not None
+            ):
+                raise BenchmarkValidationError(
+                    "tombstoned comparison capsule entered candidate admission"
+                )
         if candidate["plan_authority"] is None:
             reasons.append("MISSING_PLAN_AUTHORITY")
         else:
@@ -6736,10 +8677,62 @@ def admit_gate_d_precompile_candidates(
                 )
                 if stablehlo_report["immutable_parser_authority"] is not True:
                     reasons.append("MISSING_IMMUTABLE_STABLEHLO_PARSER_AUTHORITY")
+                if candidate_id == "compensated_auxiliary_dependency":
+                    _verify_policy_stablehlo_noninterference(
+                        numerical_policy, stablehlo_report
+                    )
             except BenchmarkValidationError as error:
                 reasons.append("INVALID_CAUSAL_STABLEHLO_AUTHORITY")
                 stablehlo_report = {"refusal": str(error)}
-        if candidate["capsule_execution_authority"] is None:
+        if tombstoned:
+            stablehlo_transition_report = None
+        elif candidate_id != "compensated_auxiliary_dependency":
+            if candidate["stablehlo_authority_transition"] is not None:
+                reasons.append("UNEXPECTED_STABLEHLO_AUTHORITY_TRANSITION")
+                stablehlo_transition_report = {
+                    "refusal": (
+                        "non-compensated candidate declared a StableHLO "
+                        "authority transition"
+                    )
+                }
+            else:
+                stablehlo_transition_report = None
+        elif candidate["stablehlo_authority_transition"] is None:
+            reasons.append("MISSING_STABLEHLO_AUTHORITY_TRANSITION")
+        elif (
+            source_report is None
+            or "refusal" in source_report
+            or plan_report is None
+            or "refusal" in plan_report
+            or stablehlo_report is None
+            or "refusal" in stablehlo_report
+        ):
+            reasons.append("UNVERIFIABLE_STABLEHLO_AUTHORITY_TRANSITION")
+        else:
+            try:
+                stablehlo_transition_report = (
+                    _verify_stablehlo_authority_transition(
+                        candidate["stablehlo_authority_transition"],
+                        base,
+                        candidate_id=candidate_id,
+                        mechanism_fingerprint_sha256=fingerprint,
+                        source=source_report,
+                        plan=plan_report,
+                        stablehlo=stablehlo_report,
+                        stablehlo_binding=candidate["stablehlo_authority"],
+                        implementation=implementation,
+                        capsule_binding=candidate["coherent_state_capsule"],
+                        execution_authority_binding=candidate[
+                            "capsule_execution_authority"
+                        ],
+                    )
+                )
+            except BenchmarkValidationError as error:
+                reasons.append("INVALID_STABLEHLO_AUTHORITY_TRANSITION")
+                stablehlo_transition_report = {"refusal": str(error)}
+        if tombstoned:
+            execution_report = None
+        elif candidate["capsule_execution_authority"] is None:
             reasons.append("MISSING_PINNED_COHERENT_CAPSULE_PRODUCER")
         else:
             try:
@@ -6748,12 +8741,15 @@ def admit_gate_d_precompile_candidates(
                     base,
                     candidate_id=candidate_id,
                     implementation=implementation,
+                    numerical_policy=numerical_policy,
                     source=source_report or {},
                 )
             except BenchmarkValidationError as error:
                 reasons.append("INVALID_CAPSULE_EXECUTION_AUTHORITY")
                 execution_report = {"refusal": str(error)}
-        if candidate["coherent_state_capsule"] is None:
+        if tombstoned:
+            capsule_report = None
+        elif candidate["coherent_state_capsule"] is None:
             reasons.append("MISSING_CANDIDATE_COHERENT_CAPSULE")
         elif (
             source_report is None
@@ -6762,6 +8758,13 @@ def admit_gate_d_precompile_candidates(
             or "refusal" in plan_report
             or stablehlo_report is None
             or "refusal" in stablehlo_report
+            or (
+                candidate_id == "compensated_auxiliary_dependency"
+                and (
+                    stablehlo_transition_report is None
+                    or "refusal" in stablehlo_transition_report
+                )
+            )
             or execution_report is None
             or "refusal" in execution_report
         ):
@@ -6774,8 +8777,10 @@ def admit_gate_d_precompile_candidates(
                     candidate_id=candidate_id,
                     implementation=implementation,
                     execution_authority=execution_report,
+                    numerical_policy=numerical_policy,
                     source=source_report,
                     stablehlo=stablehlo_report,
+                    stablehlo_transition=stablehlo_transition_report,
                     plan=plan_report,
                     required_watchpoints=plan_report["watchpoint_schema"],
                 )
@@ -6798,6 +8803,7 @@ def admit_gate_d_precompile_candidates(
                 "reasons": reasons,
                 "source_authority": source_report,
                 "stablehlo_authority": stablehlo_report,
+                "stablehlo_authority_transition": stablehlo_transition_report,
             }
         )
     if candidate_ids != set(unresolved):
@@ -6813,17 +8819,13 @@ def admit_gate_d_precompile_candidates(
             "distinct survivors reuse one candidate StableHLO implementation"
         )
     admitted = [item["id"] for item in results if item["admitted_precompile"]]
-    if admitted not in (
-        [],
-        ["auxiliary_device_tuple_dependency"],
-        ["compensated_auxiliary_dependency"],
-    ):
+    if admitted not in ([], ["compensated_auxiliary_dependency"]):
         raise BenchmarkValidationError(
             "unexpected candidate set passed precompile admission v2"
         )
     classification = (
-        "PRECOMPILE_CANDIDATE_ADMITTED;COMPILE_ONLY_REVIEW_REQUIRED;"
-        "GATE_D_OPEN;NO_TPU_SUCCESSOR"
+        "PRECOMPILE_LOGICAL_POLICY_PASSED;COMPILE_ONLY_REVIEW_ELIGIBLE;"
+        "TPU_NUMERICAL_UNPROVEN;NO_TPU_EXECUTION_AUTHORIZED;GATE_D_OPEN"
         if admitted
         else "NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;NO_JAX_OR_TPU_SUCCESSOR"
     )
@@ -6841,6 +8843,7 @@ def admit_gate_d_precompile_candidates(
         "implementation": implementation,
         "jax_compile_or_tpu_work_performed": False,
         "physical_locality_authority": physical_locality,
+        "precompile_numerical_policy": numerical_policy,
         "required_coherent_watchpoints": expected_required,
         "schema_version": GATE_D_PRECOMPILE_ADMISSION_SCHEMA_VERSION,
         "tpu_successor_authorized": False,

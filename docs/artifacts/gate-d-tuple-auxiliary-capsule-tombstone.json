@@ -1,0 +1,27 @@
+{
+  "accepted_tpu_event1_outputs": {
+    "event1_positions_sha256": "e55e66c6dcb35de94b9dce54d8fff602704cf26ae92d4afb333bd2501ab88ad7",
+    "event1_scores_sha256": "a61587a9d18bd169c1697ecb0060b39e8f1aad1caf532bca835b15a426c0b0e7",
+    "event1_valid_count": 2048
+  },
+  "authority_kind": "gate.d.logical.comparison.baseline.tombstone.v1",
+  "baseline_candidate_id": "auxiliary_device_tuple_dependency",
+  "candidate_catalogue_eligible": false,
+  "capsule": {
+    "path": "/home/gianl/gate-d-runs/greenfield_gate_d_tuple_auxiliary_capsule_20260831T031000Z/capsule.json",
+    "sha256": "aa7425fd4c896791dc8086dd7c884cfb13176d30be982051a0b709bc3d5d7ef5"
+  },
+  "classification": "CPU_LOGICAL_COMPARISON_BASELINE_ONLY;TOMBSTONED;NO_SUCCESSOR",
+  "execution_authority": {
+    "path": "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/gate-d-tuple-auxiliary-capsule-execution-authority.json",
+    "sha256": "ab0840bf39846ab5aae3f8d3b7c013f0c23e9963ecbd2a197ec4c74a6e1915a0"
+  },
+  "observed_cpu_outputs": {
+    "event1_positions_sha256": "bb199543bea3c24789fd556e75b3054d7c3f95e28a4def1dd346d1115feaeeec",
+    "event1_scores_sha256": "6e666fe928bd2d4e0f5078ba8edc3635139cac35105e79a443a165bbb501e05c",
+    "event1_valid_count": 2048
+  },
+  "reason": "The exact sealed tuple CPU replay is useful only as a same-input logical comparison baseline. Its event-1 selected positions and scores differ from the independently sealed accepted TPU oracle, so it cannot enter candidate admission or authorize a successor.",
+  "schema_version": 1,
+  "successor_eligible": false
+}

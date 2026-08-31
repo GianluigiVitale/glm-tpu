@@ -112,12 +112,19 @@
           "sha256": "0839d98fe9cbf78e3dc496390e90c77a42592e81340d0538d312e65286d58979"
         }
       },
+      "stablehlo_authority_transition": null,
       "summary": "Historical tuple candidate retained only for schema and authority regression. Its coherent event replay is rejected; null capsule bindings are deliberate tombstone state, not a successor task."
     },
     {
       "causal_frontier_action": "resolve",
-      "capsule_execution_authority": null,
-      "coherent_state_capsule": null,
+      "capsule_execution_authority": {
+        "path": "/home/gianl/gate-d-runs/greenfield_gate_d_compensated_capsule_20260831T124838Z-execution-authority.json",
+        "sha256": "8b8c9cc79a18679628582a66c418a7f63e06553091928df58defbdde3971a660"
+      },
+      "coherent_state_capsule": {
+        "path": "/home/gianl/gate-d-runs/greenfield_gate_d_compensated_capsule_20260831T124838Z/capsule.json",
+        "sha256": "5b7ad71f37dbbcda0ee36a9fc0c42a7ca45d619a9e741307386755e68e87c1a4"
+      },
       "evidence_ids": [
         "constructability",
         "direct_shadow_rejection",
@@ -226,6 +233,10 @@
           "sha256": "fa4b12c3930144560d75cc525c922d1871ac8b7047780a6b4371e96c17fd7432"
         }
       },
+      "stablehlo_authority_transition": {
+        "path": "../docs/artifacts/gate-d-compensated-stablehlo-authority-transition.json",
+        "sha256": "017e05f590a197906d703ca0ae12393a1ed2285f162e47537df7828380519a84"
+      },
       "summary": "Preserve accepted BF16 primary arithmetic while a declared FP32 add/sub auxiliary remains live on device; immutable parsing must prove the exact compensated slice while numerical cancellation remains explicitly unproven until a coherent capsule exists."
     }
   ],
@@ -234,7 +245,7 @@
     "id": "layer1.rms_input_fp32",
     "order": 0
   },
-  "claim_scope": "Fail-closed offline schema validation for exactly two declared Gate-D auxiliary-device variants. It authenticates each candidate's distinct concrete committed default-off JAX source/callsite. The tuple candidate additionally has exact PP16_LP2 physical plan/watchpoint authority and forced-CPU immutable-parser-backed causal StableHLO, but its capsule fields remain deliberately null because separately sealed coherent event replay rejected the mechanism; its reported capsule gaps are schema-state only and authorize no capsule build, admission rerun or successor. The compensated candidate now has candidate-bound PP16_LP2 physical plan/watchpoint authority and a forced-CPU acquisition whose immutable parser must prove that the restored FP32 source result is an exact candidate-only local auxiliary slice mapped to the independently derived capsule RMS-input role; numerical cancellation and capsule coherence remain unproven. It never authorizes executable compilation, numerical execution, TPU work, performance claims or Gate-D closure.",
+  "claim_scope": "Fail-closed offline admission for exactly one live compensated Gate-D candidate plus one null-bound tombstoned tuple descriptor retained for schema regression. Candidate-specific source, PP16 plan, causal StableHLO and coherent forced-CPU replay prove only same-input logical non-interference and independently derived auxiliary integrity. CPU scheduling output is explicitly not a TPU oracle. Admission makes the candidate eligible only for a separately reviewed optimized PP16 TPU-HLO inspection; it authorizes no compilation process, TPU numerical execution, performance claim or Gate-D closure. Exact accepted DSA, tokens, state/cache, HBM, trace, wall, archive and cleanup remain mandatory in a later separately reviewed protected TPU replay.",
   "contract_id": "gate.d.precompile.admission.v2.20260830",
   "evidence": [
     {
@@ -269,7 +280,7 @@
     },
     "core": {
       "path": "../glm_tpu/greenfield/gate_d_precompile_admission.py",
-      "sha256": "46fa2382e6e4d8f979255ac711872336723eeccbb704fe23980930dfe693010c"
+      "sha256": "30ff4ce5d37658637ec388bd0de2be7d3f0f30cbeb785239eaa0b39f90fade53"
     },
     "git": {
       "path": "/usr/bin/git",
@@ -277,7 +288,7 @@
     },
     "stablehlo_validator": {
       "path": "../scripts/greenfield/validate_gate_d_stablehlo.py",
-      "sha256": "17fadedfe9a62d15ad71ad4081b60d7631d74637d9d1bd8d997ffa8be6bd0c19"
+      "sha256": "762dcb6ceaec5ba261dc6abdea646661205404222105e3bb926ffc265d534c4a"
     },
     "validator_imports": [
       {
@@ -391,6 +402,10 @@
   "physical_locality_authority": {
     "path": "../docs/artifacts/gate-d-runtime-locality-authority.json",
     "sha256": "49cf6bb1a553985855556d1401ad85918669df52d12f8dc5150f247d18b325eb"
+  },
+  "precompile_numerical_policy": {
+    "path": "../docs/artifacts/gate-d-precompile-numerical-policy-sequencing-gap.json",
+    "sha256": "45b9f2c452ffd735bb3b76d5646f8eed2ff7d9325e8e03ec01b185bddf068b22"
   },
   "required_coherent_watchpoints": {
     "PP16_LP2": [

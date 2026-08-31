@@ -30,7 +30,7 @@ from glm_tpu.greenfield.gate_d_precompile_admission import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CURRENT_CONTRACT = REPO_ROOT / "configs/greenfield-gate-d-precompile-admission-v2.json"
-CURRENT_CONTRACT_SHA256 = "81ceb19bffc2ec996c819c0c6dbe903c9585a201037db4c7825e2c95c43243bc"
+CURRENT_CONTRACT_SHA256 = "6a2d913f0a34a6f47f20bf21ee6366ec55c5ae153d145c40108945125e6b01a5"
 
 
 def _sha(path: Path) -> str:
@@ -710,6 +710,9 @@ def _absolute_current_contract() -> dict[str, Any]:
     contract["implementation"]["core"]["sha256"] = _sha(
         REPO_ROOT / "glm_tpu/greenfield/gate_d_precompile_admission.py"
     )
+    contract["implementation"]["stablehlo_validator"]["sha256"] = _sha(
+        REPO_ROOT / "scripts/greenfield/validate_gate_d_stablehlo.py"
+    )
     for name in ("contract", "core", "frontier"):
         binding = contract["inherited_v1"][name]
         binding["path"] = str((base / binding["path"]).resolve())
@@ -731,12 +734,47 @@ def _absolute_current_contract() -> dict[str, Any]:
         evidence["path"] = str((base / evidence["path"]).resolve())
     locality = contract["physical_locality_authority"]
     locality["path"] = str((base / locality["path"]).resolve())
+    policy = contract["precompile_numerical_policy"]
+    policy["path"] = str((base / policy["path"]).resolve())
+    for candidate in contract["candidates"]:
+        source = candidate["source_authority"]
+        source["repository"]["root"] = str(
+            (base / source["repository"]["root"]).resolve()
+        )
+        certificate = source["semantics_certificate"]
+        certificate["path"] = str((base / certificate["path"]).resolve())
+        plan = candidate["plan_authority"]
+        if plan is not None:
+            plan["path"] = str((base / plan["path"]).resolve())
+        stablehlo = candidate["stablehlo_authority"]
+        if stablehlo is not None:
+            for name in (
+                "accepted_primary",
+                "candidate",
+                "candidate_raw",
+                "certificate",
+                "producer_receipt",
+                "producer_source",
+                "success",
+            ):
+                stablehlo[name]["path"] = str(
+                    (base / stablehlo[name]["path"]).resolve()
+                )
+            stablehlo["producer_repository"]["root"] = str(
+                (base / stablehlo["producer_repository"]["root"]).resolve()
+            )
+        transition = candidate["stablehlo_authority_transition"]
+        if transition is not None:
+            transition["path"] = str((base / transition["path"]).resolve())
     # Synthetic/hostile fixtures replace only their selected candidate authority.
     # Keep the real compensated acquisition out of those unrelated tests so one
     # complete suite does not repeatedly invoke the immutable parser on it.
     for candidate in contract["candidates"]:
         if candidate["id"] == "compensated_auxiliary_dependency":
             candidate["stablehlo_authority"] = None
+            candidate["stablehlo_authority_transition"] = None
+            candidate["capsule_execution_authority"] = None
+            candidate["coherent_state_capsule"] = None
     return contract
 
 
@@ -2052,15 +2090,28 @@ def _rebind_capsule_producer_chain(
     _rebind_capsule(contract_path, contract, capsule_path, capsule)
 
 
-def test_current_contract_fails_closed_without_jax() -> None:
+def test_current_contract_admits_compile_only_review_without_tpu_authority() -> None:
     before = set(sys.modules)
     report = admit_gate_d_precompile_candidates(
         CURRENT_CONTRACT, CURRENT_CONTRACT_SHA256
     )
-    assert report["admitted_candidate_ids"] == []
+    compensated_diagnostic = next(
+        item
+        for item in report["candidate_results"]
+        if item["id"] == "compensated_auxiliary_dependency"
+    )
+    assert report["admitted_candidate_ids"] == [
+        "compensated_auxiliary_dependency"
+    ], (
+        compensated_diagnostic["reasons"],
+        (compensated_diagnostic["capsule_execution_authority"] or {}).get(
+            "refusal"
+        ),
+        (compensated_diagnostic["capsule"] or {}).get("refusal"),
+    )
     assert report["classification"] == (
-        "NO_PRECOMPILE_CANDIDATE_ADMITTED;GATE_D_OPEN;"
-        "NO_JAX_OR_TPU_SUCCESSOR"
+        "PRECOMPILE_LOGICAL_POLICY_PASSED;COMPILE_ONLY_REVIEW_ELIGIBLE;"
+        "TPU_NUMERICAL_UNPROVEN;NO_TPU_EXECUTION_AUTHORIZED;GATE_D_OPEN"
     )
     assert report["tpu_successor_authorized"] is False
     assert report["jax_compile_or_tpu_work_performed"] is False
@@ -2069,13 +2120,9 @@ def test_current_contract_fails_closed_without_jax() -> None:
         item["id"]: item["reasons"] for item in report["candidate_results"]
     } == {
         "auxiliary_device_tuple_dependency": [
-            "MISSING_PINNED_COHERENT_CAPSULE_PRODUCER",
-            "MISSING_CANDIDATE_COHERENT_CAPSULE",
+            "TOMBSTONED_COMPARISON_ONLY",
         ],
-        "compensated_auxiliary_dependency": [
-            "MISSING_PINNED_COHERENT_CAPSULE_PRODUCER",
-            "MISSING_CANDIDATE_COHERENT_CAPSULE",
-        ],
+        "compensated_auxiliary_dependency": [],
     }
     source = report["candidate_results"][0]["source_authority"]
     assert source["authority_kind"] == "concrete.committed.jax.source"
@@ -2129,6 +2176,665 @@ def test_current_contract_fails_closed_without_jax() -> None:
         "device_count": 1,
         "platform": "cpu",
     }
+    policy = report["precompile_numerical_policy"]
+    assert policy["classification"] == (
+        "PRECOMPILE_NUMERICAL_POLICY_SEQUENCING_GAP;"
+        "CPU_LOGICAL_EQUIVALENCE_ONLY;TPU_NUMERICAL_UNPROVEN"
+    )
+    assert policy["accepted_tpu_equality"]["status"] == (
+        "deferred.mandatory.protected_tpu_numerical_replay"
+    )
+    assert policy["logical_comparison_baseline"]["disposition"] == (
+        "rejected.tombstoned.comparison_only"
+    )
+    compensated = report["candidate_results"][1]
+    assert compensated["admitted_precompile"] is True
+    assert compensated["capsule"]["precompile_numerical_policy"] == {
+        "accepted_tpu_equality_status": (
+            "deferred.mandatory.protected_tpu_numerical_replay"
+        ),
+        "authority_sha256": policy["authority_sha256"],
+        "cpu_logical_equivalence": True,
+        "tpu_numerical_proven": False,
+    }
+
+
+@pytest.mark.parametrize("schema_version", [2.0, True])
+def test_current_contract_schema_version_is_strict_integer(
+    tmp_path: Path, schema_version: Any
+) -> None:
+    contract = json.loads(CURRENT_CONTRACT.read_text())
+    contract["schema_version"] = schema_version
+    path = tmp_path / "contract.json"
+    _write_json(path, contract)
+    with pytest.raises(
+        BenchmarkValidationError,
+        match="Gate-D admission schema version must be a positive integer",
+    ):
+        admit_gate_d_precompile_candidates(path, _sha(path))
+
+
+def _copied_numerical_policy(root: Path) -> tuple[Path, dict[str, Any]]:
+    source = (
+        REPO_ROOT
+        / "docs/artifacts/gate-d-precompile-numerical-policy-sequencing-gap.json"
+    )
+    policy = json.loads(source.read_text())
+    policy["cpu_non_oracle_evidence"]["path"] = str(
+        REPO_ROOT
+        / "docs/artifacts/pp16-feature2-qkv-khalf-event1-cpu-rejection.json"
+    )
+    policy["logical_comparison_baseline"]["execution_authority"]["path"] = str(
+        REPO_ROOT
+        / "docs/artifacts/gate-d-tuple-auxiliary-capsule-execution-authority.json"
+    )
+    policy["logical_comparison_baseline"]["tombstone_authority"]["path"] = str(
+        REPO_ROOT
+        / "docs/artifacts/gate-d-tuple-auxiliary-capsule-tombstone.json"
+    )
+    policy["accepted_tpu_authority"]["rms_operands"]["hidden_update_replay"][
+        "path"
+    ] = str(REPO_ROOT / "docs/artifacts/pp16-feature2-real-leaf-replay.json")
+    path = root / "numerical-policy.json"
+    _write_json(path, policy)
+    return path, policy
+
+
+@pytest.mark.parametrize(
+    ("mutation", "detail"),
+    [
+        ("self_selected_baseline", "logical comparison capsule binding drifted"),
+        ("fully_rebound_baseline_clone", "logical comparison capsule binding drifted"),
+        ("tuple_revival", "participant disposition drifted"),
+        ("input_drift", "payload identity drifted"),
+        ("primary_watchpoint_drift", "watchpoint manifest drifted"),
+        ("auxiliary_watchpoint_drift", "watchpoint manifest drifted"),
+        ("accepted_output_drift", "accepted DSA event-1 authority drifted"),
+        ("event_index_bool", "accepted DSA event index must be a non-negative integer"),
+        ("selected_width_float", "accepted DSA selected width must be a positive integer"),
+        ("accepted_valid_count_float", "accepted event-1 valid count must be a positive integer"),
+        ("tpu_count_bool", "CPU non-oracle evidence binding drifted"),
+        ("cpu_evidence_rebound", "CPU non-oracle evidence binding drifted"),
+        ("tombstone_rebound", "logical comparison tombstone authority binding drifted"),
+        ("hidden_update_replay_rebound", "accepted RMS hidden-update replay binding drifted"),
+        ("deferred_criterion_removed", "deferred TPU criterion drifted"),
+        ("extra_field", "keys drifted"),
+    ],
+)
+def test_precompile_numerical_policy_attacks_fail_closed(
+    tmp_path: Path, mutation: str, detail: str
+) -> None:
+    path, policy = _copied_numerical_policy(tmp_path)
+    if mutation == "self_selected_baseline":
+        policy["logical_comparison_baseline"]["capsule"] = policy["candidate"][
+            "capsule"
+        ]
+        policy["logical_comparison_baseline"]["execution_authority"] = policy[
+            "candidate"
+        ]["execution_authority"]
+    elif mutation == "fully_rebound_baseline_clone":
+        source_capsule = Path(policy["candidate"]["capsule"]["path"])
+        clone_capsule = json.loads(source_capsule.read_text())
+        clone_capsule["candidate_id"] = "auxiliary_device_tuple_dependency"
+        clone_capsule_path = tmp_path / "cloned-baseline-capsule.json"
+        _write_json(clone_capsule_path, clone_capsule)
+        policy["logical_comparison_baseline"]["capsule"] = {
+            "path": str(clone_capsule_path),
+            "sha256": _sha(clone_capsule_path),
+        }
+    elif mutation == "tuple_revival":
+        policy["logical_comparison_baseline"]["candidate_catalogue_eligible"] = True
+    elif mutation == "input_drift":
+        policy["replay_equivalence"]["input_artifact_sha256"] = "0" * 64
+    elif mutation == "primary_watchpoint_drift":
+        primary = next(
+            item for item in policy["watchpoint_manifest"] if item["kind"] == "primary"
+        )
+        primary["raw_sha256"] = "0" * 64
+    elif mutation == "auxiliary_watchpoint_drift":
+        auxiliary = next(
+            item
+            for item in policy["watchpoint_manifest"]
+            if item["kind"] == "auxiliary_witness"
+        )
+        auxiliary["raw_sha256"] = "0" * 64
+    elif mutation == "accepted_output_drift":
+        policy["accepted_tpu_authority"]["event1_outputs"][
+            "positions_sha256"
+        ] = "0" * 64
+    elif mutation == "event_index_bool":
+        policy["accepted_tpu_authority"]["dsa_oracle"]["event_contract"][
+            "event_index"
+        ] = True
+    elif mutation == "selected_width_float":
+        policy["accepted_tpu_authority"]["dsa_oracle"]["event_contract"][
+            "selected_width"
+        ] = 2048.0
+    elif mutation == "accepted_valid_count_float":
+        policy["accepted_tpu_authority"]["event1_outputs"]["valid_count"] = 2048.0
+    elif mutation == "tpu_count_bool":
+        cpu_path = Path(policy["cpu_non_oracle_evidence"]["path"])
+        cpu_document = json.loads(cpu_path.read_text())
+        cpu_document["tpus_used"] = False
+        rebound_cpu = tmp_path / "rebound-cpu-evidence.json"
+        _write_json(rebound_cpu, cpu_document)
+        policy["cpu_non_oracle_evidence"] = {
+            "classification": cpu_document["classification"],
+            "path": str(rebound_cpu),
+            "sha256": _sha(rebound_cpu),
+        }
+    elif mutation == "cpu_evidence_rebound":
+        cpu_path = Path(policy["cpu_non_oracle_evidence"]["path"])
+        rebound_cpu = tmp_path / "rebound-cpu-evidence.json"
+        rebound_cpu.write_bytes(cpu_path.read_bytes())
+        policy["cpu_non_oracle_evidence"] = {
+            "classification": policy["cpu_non_oracle_evidence"]["classification"],
+            "path": str(rebound_cpu),
+            "sha256": _sha(rebound_cpu),
+        }
+    elif mutation == "tombstone_rebound":
+        tombstone_path = Path(
+            policy["logical_comparison_baseline"]["tombstone_authority"]["path"]
+        )
+        rebound_tombstone = tmp_path / "rebound-tombstone.json"
+        rebound_tombstone.write_bytes(tombstone_path.read_bytes())
+        policy["logical_comparison_baseline"]["tombstone_authority"]["path"] = str(
+            rebound_tombstone
+        )
+    elif mutation == "hidden_update_replay_rebound":
+        replay_path = Path(
+            policy["accepted_tpu_authority"]["rms_operands"][
+                "hidden_update_replay"
+            ]["path"]
+        )
+        rebound_replay = tmp_path / "rebound-hidden-update-replay.json"
+        rebound_replay.write_bytes(replay_path.read_bytes())
+        policy["accepted_tpu_authority"]["rms_operands"]["hidden_update_replay"][
+            "path"
+        ] = str(rebound_replay)
+    elif mutation == "deferred_criterion_removed":
+        policy["accepted_tpu_authority"]["required_future_checks"].remove(
+            "state_load_and_cache_integrity"
+        )
+    elif mutation == "extra_field":
+        policy["hostile"] = True
+    _write_json(path, policy)
+    with pytest.raises(BenchmarkValidationError, match=detail):
+        admission_module._verify_precompile_numerical_policy(
+            {"path": str(path), "sha256": _sha(path)}, tmp_path
+        )
+
+
+def test_precompile_numerical_policy_rejects_environment_rebinding(
+    tmp_path: Path,
+) -> None:
+    path, policy = _copied_numerical_policy(tmp_path)
+    source_authority = Path(policy["candidate"]["execution_authority"]["path"])
+    authority = json.loads(source_authority.read_text())
+    authority["environment"]["JAX_PLATFORMS"] = "tpu"
+    rebound = tmp_path / "rebound-execution-authority.json"
+    _write_canonical_json(rebound, authority)
+    policy["candidate"]["execution_authority"] = {
+        "path": str(rebound),
+        "sha256": _sha(rebound),
+    }
+    _write_json(path, policy)
+    with pytest.raises(
+        BenchmarkValidationError,
+        match="policy candidate execution authority binding drifted",
+    ):
+        admission_module._verify_precompile_numerical_policy(
+            {"path": str(path), "sha256": _sha(path)}, tmp_path
+        )
+
+
+@pytest.mark.parametrize("binding_kind", ["execution_authority", "capsule"])
+def test_policy_and_candidate_bindings_cannot_be_mixed(binding_kind: str) -> None:
+    contract = json.loads(CURRENT_CONTRACT.read_text())
+    candidate = next(
+        item
+        for item in contract["candidates"]
+        if item["id"] == "compensated_auxiliary_dependency"
+    )
+    numerical_policy = {
+        "candidate_execution_authority": {"path": "/wrong/authority", "sha256": "0" * 64},
+        "candidate_capsule": {"path": "/wrong/capsule", "sha256": "0" * 64},
+    }
+    if binding_kind == "execution_authority":
+        with pytest.raises(
+            BenchmarkValidationError,
+            match="capsule execution authority is not the numerical-policy candidate",
+        ):
+            admission_module._verify_capsule_execution_authority(
+                candidate["capsule_execution_authority"],
+                CURRENT_CONTRACT.parent,
+                candidate_id=candidate["id"],
+                implementation={},
+                numerical_policy=numerical_policy,
+                source={},
+            )
+    else:
+        with pytest.raises(
+            BenchmarkValidationError,
+            match="candidate coherent capsule is not the numerical-policy candidate",
+        ):
+            admission_module._verify_capsule(
+                candidate["coherent_state_capsule"],
+                CURRENT_CONTRACT.parent,
+                candidate_id=candidate["id"],
+                implementation={},
+                execution_authority={},
+                numerical_policy=numerical_policy,
+                source={},
+                stablehlo={},
+                stablehlo_transition={},
+                plan={},
+                required_watchpoints={},
+            )
+
+
+@pytest.mark.parametrize("tensor_name", ["decode_positions", "producer_layer_ids"])
+def test_accepted_dsa_event_identity_rejects_reordered_metadata(
+    tensor_name: str,
+) -> None:
+    tensor_path = Path(
+        admission_module._EXPECTED_ACCEPTED_TPU_BINDINGS["dsa_tensors"]["path"]
+    )
+    raw = bytearray(tensor_path.read_bytes())
+    header_bytes = struct.unpack("<Q", raw[:8])[0]
+    header = json.loads(raw[8 : 8 + header_bytes])
+    start = 8 + header_bytes + header[tensor_name]["data_offsets"][0]
+    first = raw[start : start + 4]
+    second = raw[start + 4 : start + 8]
+    raw[start : start + 4] = second
+    raw[start + 4 : start + 8] = first
+    with pytest.raises(
+        BenchmarkValidationError,
+        match=f"accepted DSA tensor bytes drifted: {tensor_name}",
+    ):
+        admission_module._accepted_dsa_event1(
+            bytes(raw), event_index=1, layer_id=1, position=8155
+        )
+
+
+def test_numerical_policy_must_equal_parsed_stablehlo_report() -> None:
+    policy = {
+        "stablehlo_noninterference": {
+            "accepted_primary_slice_sha256": "a" * 64,
+            "auxiliary_path_operations": [],
+            "auxiliary_result": "result.restored_rms_input_fp32",
+            "auxiliary_slice_sha256": "b" * 64,
+            "candidate_primary_slice_sha256": "a" * 64,
+            "forbidden_operations": [],
+            "required_collectives": [],
+            "rooted_device_result": True,
+        }
+    }
+    stablehlo = {
+        "accepted_primary_slice_sha256": "a" * 64,
+        "auxiliary_path_operations": [],
+        "auxiliary_result": "result.restored_rms_input_fp32",
+        "auxiliary_slice_sha256": "b" * 64,
+        "candidate_primary_slice_sha256": "c" * 64,
+        "forbidden_operations": [],
+        "collectives": [],
+        "rooted_device_result": True,
+    }
+    with pytest.raises(
+        BenchmarkValidationError,
+        match="not the parsed StableHLO non-interference report",
+    ):
+        admission_module._verify_policy_stablehlo_noninterference(
+            policy, stablehlo
+        )
+
+
+def test_tombstoned_tuple_capsule_cannot_enter_current_candidate_catalogue(
+    tmp_path: Path,
+) -> None:
+    contract = _absolute_current_contract()
+    tuple_candidate = contract["candidates"][0]
+    policy_path = Path(contract["precompile_numerical_policy"]["path"])
+    policy = json.loads(policy_path.read_text())
+    tuple_candidate["capsule_execution_authority"] = policy[
+        "logical_comparison_baseline"
+    ]["execution_authority"]
+    tuple_candidate["coherent_state_capsule"] = policy[
+        "logical_comparison_baseline"
+    ]["capsule"]
+    path = tmp_path / "contract.json"
+    _write_json(path, contract)
+    with pytest.raises(
+        BenchmarkValidationError,
+        match="tombstoned comparison capsule entered candidate admission",
+    ):
+        admit_gate_d_precompile_candidates(path, _sha(path))
+
+
+def test_tombstoned_tuple_cannot_reuse_compensated_transition(
+    tmp_path: Path,
+) -> None:
+    contract = _absolute_current_contract()
+    tuple_candidate = contract["candidates"][0]
+    tuple_candidate["stablehlo_authority_transition"] = {
+        "path": admission_module._EXPECTED_COMPENSATED_STABLEHLO_TRANSITION[
+            "path"
+        ],
+        "sha256": admission_module._EXPECTED_COMPENSATED_STABLEHLO_TRANSITION[
+            "sha256"
+        ],
+    }
+    path = tmp_path / "contract.json"
+    _write_json(path, contract)
+    with pytest.raises(
+        BenchmarkValidationError,
+        match="tombstoned comparison capsule entered candidate admission",
+    ):
+        admit_gate_d_precompile_candidates(path, _sha(path))
+
+
+def _stablehlo_transition_fixture() -> dict[str, Any]:
+    historical_path = (
+        REPO_ROOT
+        / "docs/artifacts/gate-d-precompile-admission-v2-compensated-stablehlo.json"
+    )
+    historical = json.loads(historical_path.read_text())
+    historical_candidate = next(
+        item
+        for item in historical["candidate_results"]
+        if item["id"] == "compensated_auxiliary_dependency"
+    )
+    current_contract = json.loads(CURRENT_CONTRACT.read_text())
+    current_candidate = next(
+        item
+        for item in current_contract["candidates"]
+        if item["id"] == "compensated_auxiliary_dependency"
+    )
+    stablehlo = json.loads(
+        json.dumps(historical_candidate["stablehlo_authority"])
+    )
+    stablehlo.update(
+        admission_module._EXPECTED_STABLEHLO_TRANSITION_ENRICHMENTS
+    )
+    stablehlo["authority_sha256"] = (
+        admission_module._EXPECTED_STABLEHLO_TRANSITION_AUTHORITIES[
+            "validated_under"
+        ]
+    )
+    stablehlo["validator_report_sha256"] = (
+        admission_module._EXPECTED_STABLEHLO_TRANSITION_VALIDATORS["current"][
+            "report_sha256"
+        ]
+    )
+    implementation = json.loads(json.dumps(historical["implementation"]))
+    implementation["stablehlo_validator_sha256"] = (
+        admission_module._EXPECTED_STABLEHLO_TRANSITION_VALIDATORS["current"][
+            "source_sha256"
+        ]
+    )
+    return {
+        "base": CURRENT_CONTRACT.parent,
+        "candidate": current_candidate,
+        "implementation": implementation,
+        "mechanism_fingerprint_sha256": historical_candidate[
+            "mechanism_fingerprint_sha256"
+        ],
+        "plan": historical_candidate["plan_authority"],
+        "source": historical_candidate["source_authority"],
+        "stablehlo": stablehlo,
+    }
+
+
+def _verify_transition_fixture(
+    fixture: dict[str, Any], binding: dict[str, str]
+) -> dict[str, Any]:
+    candidate = fixture["candidate"]
+    return admission_module._verify_stablehlo_authority_transition(
+        binding,
+        fixture["base"],
+        candidate_id=candidate["id"],
+        mechanism_fingerprint_sha256=fixture[
+            "mechanism_fingerprint_sha256"
+        ],
+        source=fixture["source"],
+        plan=fixture["plan"],
+        stablehlo=fixture["stablehlo"],
+        stablehlo_binding=candidate["stablehlo_authority"],
+        implementation=fixture["implementation"],
+        capsule_binding=candidate["coherent_state_capsule"],
+        execution_authority_binding=candidate[
+            "capsule_execution_authority"
+        ],
+    )
+
+
+def test_stablehlo_authority_transition_verifies_exact_metadata_only_edge() -> None:
+    fixture = _stablehlo_transition_fixture()
+    report = _verify_transition_fixture(
+        fixture, fixture["candidate"]["stablehlo_authority_transition"]
+    )
+    assert report["depth"] == 1
+    assert report["metadata_only"] is True
+    assert report["produced_under"] == (
+        "e1b2e4105f247beb6af46325b76bd359df84666911959a7960b4179947d90185"
+    )
+    assert report["validated_under"] == (
+        "2f13a564ec7c5eb50ecb85c3af6347d936be1847d49cf338645e062ec18eb8b1"
+    )
+
+
+def test_stablehlo_authority_transition_copy_and_symlink_fail_closed(
+    tmp_path: Path,
+) -> None:
+    fixture = _stablehlo_transition_fixture()
+    original = Path(
+        admission_module._EXPECTED_COMPENSATED_STABLEHLO_TRANSITION["path"]
+    )
+    copied = tmp_path / "copied-transition.json"
+    copied.write_bytes(original.read_bytes())
+    with pytest.raises(
+        BenchmarkValidationError, match="authority transition binding drifted"
+    ):
+        _verify_transition_fixture(
+            fixture, {"path": str(copied), "sha256": _sha(copied)}
+        )
+    linked = tmp_path / "linked-transition.json"
+    linked.symlink_to(original)
+    with pytest.raises(BenchmarkValidationError, match="cannot open"):
+        _verify_transition_fixture(
+            fixture, {"path": str(linked), "sha256": _sha(original)}
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "detail"),
+    [
+        ("swap_edge", "parentless depth one"),
+        ("old_hash", "parentless depth one"),
+        ("new_hash", "parentless depth one"),
+        ("candidate", "candidate drifted"),
+        ("capsule", "transition capsule binding drifted"),
+        ("execution_authority", "transition execution authority binding drifted"),
+        ("source", "invariant identity drifted"),
+        ("plan", "invariant identity drifted"),
+        ("stablehlo", "invariant identity drifted"),
+        ("enrichment_false", "enrichments drifted"),
+        ("enrichment_missing", "enrichments keys drifted"),
+        ("enrichment_extra", "enrichments keys drifted"),
+        ("parent", "parentless depth one"),
+        ("depth_bool", "depth must be a positive integer"),
+        ("schema_bool", "schema version must be a positive integer"),
+        ("validator_source", "validator identity drifted"),
+        ("validator_report", "validator identity drifted"),
+        ("parser", "parser identity drifted"),
+    ],
+)
+def test_stablehlo_authority_transition_attacks_fail_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+    detail: str,
+) -> None:
+    fixture = _stablehlo_transition_fixture()
+    transition = json.loads(
+        Path(
+            admission_module._EXPECTED_COMPENSATED_STABLEHLO_TRANSITION["path"]
+        ).read_text()
+    )
+    if mutation == "swap_edge":
+        edge = transition["transition"]
+        edge["produced_under"], edge["validated_under"] = (
+            edge["validated_under"],
+            edge["produced_under"],
+        )
+    elif mutation == "old_hash":
+        transition["transition"]["produced_under"] = "0" * 64
+    elif mutation == "new_hash":
+        transition["transition"]["validated_under"] = "0" * 64
+    elif mutation == "candidate":
+        transition["candidate"]["candidate_id"] = (
+            "auxiliary_device_tuple_dependency"
+        )
+    elif mutation == "capsule":
+        transition["capsule"] = transition["historical_report"]
+    elif mutation == "execution_authority":
+        transition["execution_authority"] = transition["historical_report"]
+    elif mutation == "source":
+        transition["invariants"]["source"]["authority_sha256"] = "0" * 64
+    elif mutation == "plan":
+        transition["invariants"]["plan"]["plan_sha256"] = "0" * 64
+    elif mutation == "stablehlo":
+        transition["invariants"]["stablehlo"]["candidate_sha256"] = "0" * 64
+    elif mutation == "enrichment_false":
+        transition["enrichments"]["rooted_device_result"] = False
+    elif mutation == "enrichment_missing":
+        del transition["enrichments"]["auxiliary_result"]
+    elif mutation == "enrichment_extra":
+        transition["enrichments"]["other"] = True
+    elif mutation == "parent":
+        transition["transition"]["parent"] = "e1b2e410"
+    elif mutation == "depth_bool":
+        transition["transition"]["depth"] = True
+    elif mutation == "schema_bool":
+        transition["schema_version"] = True
+    elif mutation == "validator_source":
+        transition["validators"]["current"]["source_sha256"] = "0" * 64
+    elif mutation == "validator_report":
+        transition["validators"]["current"]["report_sha256"] = "0" * 64
+    elif mutation == "parser":
+        transition["immutable_parser"]["runtime_sha256"] = "0" * 64
+    path = tmp_path / "transition.json"
+    _write_json(path, transition)
+    monkeypatch.setattr(
+        admission_module,
+        "_EXPECTED_COMPENSATED_STABLEHLO_TRANSITION",
+        {"path": str(path), "sha256": _sha(path)},
+    )
+    with pytest.raises(BenchmarkValidationError, match=detail):
+        _verify_transition_fixture(
+            fixture, {"path": str(path), "sha256": _sha(path)}
+        )
+
+
+def test_stablehlo_transition_rejects_common_field_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = _stablehlo_transition_fixture()
+    historical_source = Path(
+        admission_module._EXPECTED_STABLEHLO_TRANSITION_HISTORICAL_REPORT["path"]
+    )
+    historical = json.loads(historical_source.read_text())
+    candidate = next(
+        item
+        for item in historical["candidate_results"]
+        if item["id"] == "compensated_auxiliary_dependency"
+    )
+    candidate["stablehlo_authority"]["candidate_raw_sha256"] = "0" * 64
+    historical_path = tmp_path / "historical.json"
+    _write_json(historical_path, historical)
+    transition_source = Path(
+        admission_module._EXPECTED_COMPENSATED_STABLEHLO_TRANSITION["path"]
+    )
+    transition = json.loads(transition_source.read_text())
+    transition["historical_report"] = {
+        "path": str(historical_path),
+        "sha256": _sha(historical_path),
+    }
+    transition_path = tmp_path / "transition.json"
+    _write_json(transition_path, transition)
+    monkeypatch.setattr(
+        admission_module,
+        "_EXPECTED_COMPENSATED_STABLEHLO_TRANSITION",
+        {"path": str(transition_path), "sha256": _sha(transition_path)},
+    )
+    monkeypatch.setattr(
+        admission_module,
+        "_EXPECTED_STABLEHLO_TRANSITION_HISTORICAL_REPORT",
+        {"path": str(historical_path), "sha256": _sha(historical_path)},
+    )
+    with pytest.raises(BenchmarkValidationError, match="common fields drifted"):
+        _verify_transition_fixture(
+            fixture,
+            {"path": str(transition_path), "sha256": _sha(transition_path)},
+        )
+
+
+def test_stablehlo_transition_rejects_recomputed_current_authority_mismatch() -> None:
+    fixture = _stablehlo_transition_fixture()
+    fixture["stablehlo"]["authority_sha256"] = "0" * 64
+    with pytest.raises(BenchmarkValidationError, match="authority edge drifted"):
+        _verify_transition_fixture(
+            fixture, fixture["candidate"]["stablehlo_authority_transition"]
+        )
+
+
+def test_historical_capsule_authority_is_rejected_without_exact_transition() -> None:
+    candidate = next(
+        item
+        for item in json.loads(CURRENT_CONTRACT.read_text())["candidates"]
+        if item["id"] == "compensated_auxiliary_dependency"
+    )
+    capsule_binding = candidate["coherent_state_capsule"]
+    with pytest.raises(
+        BenchmarkValidationError,
+        match="lacks its exact StableHLO authority transition",
+    ):
+        admission_module._verify_capsule(
+            capsule_binding,
+            CURRENT_CONTRACT.parent,
+            candidate_id=candidate["id"],
+            implementation={},
+            execution_authority={},
+            numerical_policy={"candidate_capsule": capsule_binding},
+            source={},
+            stablehlo={},
+            stablehlo_transition={},
+            plan={},
+            required_watchpoints={},
+        )
+
+
+def test_capsule_coherence_id_accepts_exact_utc_run_tag() -> None:
+    value = "greenfield_gate_d_compensated_capsule_20260831T124838Z"
+    assert admission_module._coherence_id(value, "capsule coherence id") == value
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        ".leading",
+        "-leading",
+        "contains/slash",
+        r"contains\backslash",
+        "contains space",
+        "contains\nnewline",
+        "unicodé",
+    ],
+)
+def test_capsule_coherence_id_rejects_noncanonical_run_tags(value: str) -> None:
+    with pytest.raises(BenchmarkValidationError, match="canonical run tag"):
+        admission_module._coherence_id(value, "capsule coherence id")
 
 
 def test_complete_synthetic_fixture_never_admits_precompile(tmp_path: Path) -> None:
@@ -2143,6 +2849,7 @@ def test_complete_synthetic_fixture_never_admits_precompile(tmp_path: Path) -> N
     assert candidate["reasons"] == [
         "MISSING_EXECUTABLE_SOURCE_AUTHORITY",
     ]
+    assert candidate["capsule"]["precompile_numerical_policy"] is None
     assert candidate["source_authority"]["executable_source_authority"] is False
     assert (
         candidate["stablehlo_authority"]["immutable_parser_authority"]
@@ -2161,6 +2868,7 @@ def test_complete_pp8_authority_uses_four_real_owners(tmp_path: Path) -> None:
     candidate = report["candidate_results"][0]
     assert candidate["plan_authority"]["local_group_size"] == 4
     assert candidate["plan_authority"]["owner_group"] == [0, 2, 1, 3]
+    assert candidate["capsule"]["precompile_numerical_policy"] is None
     assert candidate["capsule"]["derived_rms_input_sha256"] == sha256(
         np.full((6144,), 3.0, dtype=np.float32).tobytes()
     ).hexdigest()
@@ -3688,7 +4396,7 @@ def test_capsule_cannot_reseal_wrong_event_against_outer_authority(
     report = admit_gate_d_precompile_candidates(path, _sha(path))
     candidate = report["candidate_results"][0]
     assert "INVALID_CANDIDATE_COHERENT_CAPSULE" in candidate["reasons"]
-    assert "does not match the pinned accepted authority" in candidate["capsule"][
+    assert "does not match its pinned execution authority" in candidate["capsule"][
         "refusal"
     ]
 
@@ -3858,20 +4566,33 @@ def test_unsupported_npz_compression_is_rejected(
 def test_aggregate_npz_budget_is_checked_before_member_reads(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    path, contract, capsule_path, artifact = _prepared_contract(tmp_path)
+    artifact = tmp_path / "oversized.npz"
     payload = io.BytesIO()
     np.save(payload, np.zeros(64, dtype=np.float32), allow_pickle=False)
     with zipfile.ZipFile(artifact, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("rms_input.npy", payload.getvalue())
-    _rebind_artifact(path, contract, capsule_path, artifact)
     monkeypatch.setattr(admission_module, "_MAX_TOTAL_UNCOMPRESSED_BYTES", 64)
-    report = admit_gate_d_precompile_candidates(path, _sha(path))
-    refusal = report["candidate_results"][0]["capsule"]["refusal"]
-    assert "uncompressed bytes exceed limit" in refusal
+    member_opened = False
+
+    def refuse_member_read(*args: Any, **kwargs: Any) -> Any:
+        nonlocal member_opened
+        member_opened = True
+        raise AssertionError("NPZ member read occurred before aggregate admission")
+
+    monkeypatch.setattr(zipfile.ZipFile, "open", refuse_member_read)
+    with pytest.raises(
+        BenchmarkValidationError, match="uncompressed bytes exceed limit"
+    ):
+        admission_module._inspect_npz(artifact.read_bytes())
+    assert member_opened is False
 
 
 def test_python_s_cli_is_byte_stable_and_does_not_import_jax(tmp_path: Path) -> None:
     outputs = [tmp_path / "one.json", tmp_path / "two.json"]
+    classification = (
+        "PRECOMPILE_LOGICAL_POLICY_PASSED;COMPILE_ONLY_REVIEW_ELIGIBLE;"
+        "TPU_NUMERICAL_UNPROVEN;NO_TPU_EXECUTION_AUTHORIZED;GATE_D_OPEN"
+    )
     for output in outputs:
         completed = subprocess.run(
             [
@@ -3890,7 +4611,15 @@ def test_python_s_cli_is_byte_stable_and_does_not_import_jax(tmp_path: Path) -> 
             text=True,
             cwd=REPO_ROOT,
         )
-        assert "NO_PRECOMPILE_CANDIDATE_ADMITTED" in completed.stdout
+        assert classification in completed.stdout
+        report = json.loads(output.read_text())
+        assert report["classification"] == classification
+        assert report["admitted_candidate_ids"] == [
+            "compensated_auxiliary_dependency"
+        ]
+        assert report["jax_compile_or_tpu_work_performed"] is False
+        assert report["tpu_successor_authorized"] is False
+        assert report["gate_d_closed"] is False
     assert outputs[0].read_bytes() == outputs[1].read_bytes()
 
 

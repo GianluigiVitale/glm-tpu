@@ -2350,3 +2350,34 @@ remains open and no TPU successor is authorized.
   only the complete offline test command. The admission-core and compensated-builder files passed
   187/187 in 393.54 seconds. It produced no tracked change or persistent report and performed no
   producer installation/invocation, JAX successor, model/cloud/TPU work or Gate-D closure.
+
+## Compensated capsule admitted for compile-only review; TPU numerical proof remains
+
+- The exact compensated forced-CPU capsule is now cross-bound to the accepted TPU event-1/tie
+  oracle, RMS operands, cache/query/head/key/scorer watchpoints, producer receipt/SUCCESS,
+  execution environment and replay-visible source catalogue. CPU replay is explicitly classified
+  as logical non-interference only; protected TPU equality remains deferred and mandatory.
+- Strengthening the immutable StableHLO report added exactly four independently checked fields:
+  candidate primary slice, rooted auxiliary result, forbidden-operation catalogue and rooted
+  device-result status. This changed derived parser authority from historical
+  `e1b2e410...0185` to current `2f13a564...b8b1` without changing accepted/candidate StableHLO,
+  certificate, source, plan, producer or runtime identities. Parentless transition authority
+  `gate-d-compensated-stablehlo-authority-transition.json`, SHA `017e05f5...19a84`, permits the
+  old hash only for capsule `5b7ad71f...c1a4` and execution authority `8b8c9cc7...a660`; copied,
+  chained, cross-candidate, parser/toolchain-drifted and common-field-drifted bridges fail closed.
+- Current core/config/validator/test SHAs are `30ff4ce5...ade53`, `6a2d913f...b01a5`,
+  `762dcb6c...4c4a` and `3f026066...2073`. Proportional coverage spans the current 235-node
+  admission file: a 210-pass prefix, the corrected fail-closed outer-authority node, the complete
+  remaining tail, the transition 23/23 slice, and the new strict `2.0`/`true` schema attacks.
+  The exact current-contract integration passes; no TPU/JAX/backend work occurs.
+- One reviewed sealed-Python `-I -S -B` append-only run wrote
+  `gate-d-precompile-admission-v2-compensated-capsule.json`, SHA
+  `7cd7e569...6b37d`. It admits exactly `compensated_auxiliary_dependency` with classification
+  `PRECOMPILE_LOGICAL_POLICY_PASSED;COMPILE_ONLY_REVIEW_ELIGIBLE;TPU_NUMERICAL_UNPROVEN;`
+  `NO_TPU_EXECUTION_AUTHORIZED;GATE_D_OPEN`. `gate_d_closed`, JAX/TPU-work and TPU-successor flags
+  are false. Fable remained usage-limited; the existing same-scope Sol reviewer found no P0--P2
+  and approved source persistence plus this one report generation.
+- Exact next after commit/push/locked same-region persistence is a separately reviewed optimized
+  PP16 TPU-HLO acquisition and locality/numerical-policy inspection. It is not yet authorized.
+  Only after that HLO passes may a separately reviewed protected layer-1 exact replay run; a full
+  exact 8K decoder remains later. Gate D is open.

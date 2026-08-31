@@ -1,0 +1,181 @@
+{
+  "accepted_tpu_authority": {
+    "available_layer1_internals": {
+      "comparison": {
+        "path": "/home/gianl/gcs-models/oracles/greenfield/glm52/dsa_internals/8k/layer1/greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z/comparison.json",
+        "sha256": "1bc43a8e231323c85b6782926182f2999f3014b8adbafa6f4db18b74e3419ad5"
+      },
+      "code_pin": "83ff4a3576602ca844ea090550139a2ff00b0bb1",
+      "coherence_id": "greenfield_legacy_layer1_dsa_internals_20260808T081617553654576Z",
+      "internals": {
+        "path": "/home/gianl/gcs-models/oracles/greenfield/glm52/dsa_internals/8k/layer1/greenfield_layer1_dsa_internal_comparison_20260808T115135394251231Z/internals.npz",
+        "sha256": "79b813daa8e194b6c9a9ad883a0199f4a938ca4d4ab7277d20a291b480349054"
+      }
+    },
+    "dsa_oracle": {
+      "capture_code_pin": "89a4363caaf93edd8abbf7fc6608f6edddb825df",
+      "event_contract": {
+        "event_index": 1,
+        "layer_id": 1,
+        "position": 8155,
+        "selected_width": 2048,
+        "tie_policy": "descending_score_then_lowest_global_position"
+      },
+      "legacy_repository_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d",
+      "manifest": {
+        "path": "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle/manifest.json",
+        "sha256": "62c3fc2ad45d368c91cc41901947a69abf7a8c7abb57fb56b088871e90e5f1d3"
+      },
+      "source_row": {
+        "path": "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle/source_row.json",
+        "sha256": "8809666972d60303a8a46a598b12ab499790135dc4dc339b79d880b9f377d395"
+      },
+      "tensors": {
+        "path": "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle/dsa_events.safetensors",
+        "sha256": "b591a4622a8c646799989f235bc98bcf8ae99e9e04d2ad55a982d70ba00dde82"
+      }
+    },
+    "event1_outputs": {
+      "positions_sha256": "e55e66c6dcb35de94b9dce54d8fff602704cf26ae92d4afb333bd2501ab88ad7",
+      "scores_sha256": "a61587a9d18bd169c1697ecb0060b39e8f1aad1caf532bca835b15a426c0b0e7",
+      "valid_count": 2048
+    },
+    "layer1_cache_history_status": "not_available_in_sealed_accepted_layer1_internal_authority;future_protected_state_cache_integrity_required",
+    "required_future_checks": [
+      "identical_protected_input_and_event_identity",
+      "exact_event1_selected_positions",
+      "exact_event1_selected_scores",
+      "exact_event1_valid_count",
+      "descending_score_then_lowest_global_position_tie_order",
+      "raw_tokens_and_quality",
+      "state_load_and_cache_integrity",
+      "per_chip_hbm_and_locality",
+      "fresh_xplanes_and_profiler_free_wall",
+      "results_db_archive_and_clean_fleet"
+    ],
+    "rms_operands": {
+      "boundary": {
+        "path": "/home/gianl/gcs-models/results/greenfield_layer0_dense_partial_capture_20260813T200736889447458Z/dense_partial_capture.npz",
+        "sha256": "f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298"
+      },
+      "hidden_update_replay": {
+        "path": "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts/pp16-feature2-real-leaf-replay.json",
+        "sha256": "3fe848003ba320b52af06a6b3f73c66e319cfeb69000da68b1c43728232dcf44"
+      },
+      "hidden_update_sha256": "efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc",
+      "residual_sha256": "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e"
+    },
+    "status": "deferred.mandatory.protected_tpu_numerical_replay"
+  },
+  "authority_kind": "gate.d.precompile.numerical.policy.v1",
+  "candidate": {
+    "capsule": {
+      "path": "/home/gianl/gate-d-runs/greenfield_gate_d_compensated_capsule_20260831T124838Z/capsule.json",
+      "sha256": "5b7ad71f37dbbcda0ee36a9fc0c42a7ca45d619a9e741307386755e68e87c1a4"
+    },
+    "execution_authority": {
+      "path": "/home/gianl/gate-d-runs/greenfield_gate_d_compensated_capsule_20260831T124838Z-execution-authority.json",
+      "sha256": "8b8c9cc79a18679628582a66c418a7f63e06553091928df58defbdde3971a660"
+    },
+    "id": "compensated_auxiliary_dependency"
+  },
+  "claim_scope": "Fail-closed precompile sequencing authority only. Forced-CPU evidence may prove same-input logical non-interference and auxiliary integrity, but is not a TPU numerical oracle. Optimized PP16 TPU HLO and a later protected TPU numerical replay require separate reviews; this authority permits neither process and cannot close Gate D.",
+  "classification": "PRECOMPILE_NUMERICAL_POLICY_SEQUENCING_GAP;CPU_LOGICAL_EQUIVALENCE_ONLY;TPU_NUMERICAL_UNPROVEN",
+  "cpu_non_oracle_evidence": {
+    "classification": "CPU_EVENT1_ADMISSION_REJECTED;NO_TPU_SUCCESSOR",
+    "path": "pp16-feature2-qkv-khalf-event1-cpu-rejection.json",
+    "sha256": "b7f5e43284fcbc2160cefc94d7aa95a7ce9ecbb19bbd60d3fa8d9178a5a1f9ec"
+  },
+  "logical_comparison_baseline": {
+    "candidate_catalogue_eligible": false,
+    "candidate_id": "auxiliary_device_tuple_dependency",
+    "capsule": {
+      "path": "/home/gianl/gate-d-runs/greenfield_gate_d_tuple_auxiliary_capsule_20260831T031000Z/capsule.json",
+      "sha256": "aa7425fd4c896791dc8086dd7c884cfb13176d30be982051a0b709bc3d5d7ef5"
+    },
+    "disposition": "rejected.tombstoned.comparison_only",
+    "execution_authority": {
+      "path": "gate-d-tuple-auxiliary-capsule-execution-authority.json",
+      "sha256": "ab0840bf39846ab5aae3f8d3b7c013f0c23e9963ecbd2a197ec4c74a6e1915a0"
+    },
+    "successor_eligible": false,
+    "tombstone_authority": {
+      "path": "gate-d-tuple-auxiliary-capsule-tombstone.json",
+      "sha256": "0497b2bddb583d667c6c8eef52d8979ba4cdc78e21422099d52197fddf775b18"
+    }
+  },
+  "replay_equivalence": {
+    "candidate_specific_fields_must_differ": [
+      "candidate_id",
+      "installed_producer",
+      "producer",
+      "source_snapshot",
+      "plan_authority",
+      "source_authority",
+      "stablehlo_authority"
+    ],
+    "device_evidence_sha256": "ca7c2b9c88743e4e391b49a0363b424e91b4f91ba8c981efefaec7d89aadbd68",
+    "input_artifact_sha256": "dd5f1cbb37b722591531635a21cfa9f1d6d0157997a4f70138900d0000be8b1b",
+    "required_equal_authority_fields": [
+      "environment",
+      "input_arrays",
+      "tensor_receipts"
+    ],
+    "required_equal_capsule_fields": [
+      "artifact",
+      "producer_device_evidence",
+      "producer_input_artifact",
+      "watchpoints"
+    ],
+    "required_equal_shared_upstream_ids": [
+      "db518_comparison",
+      "db518_result",
+      "db550_boundary",
+      "runtime_manifest",
+      "runtime_success"
+    ],
+    "state_artifact_sha256": "68ee47b1fcbf317fd41da51aa26c9ba1a8dafe0e3e95ccbbfa73285f4e46f236"
+  },
+  "schema_version": 1,
+  "stablehlo_noninterference": {
+    "accepted_primary_slice_sha256": "5037b5a7ef21226f8405d0175c83bc7528fadf588811755e719d20a75f295610",
+    "auxiliary_path_operations": [
+      "stablehlo.optimization_barrier",
+      "stablehlo.add",
+      "stablehlo.convert",
+      "stablehlo.convert",
+      "stablehlo.optimization_barrier",
+      "stablehlo.subtract"
+    ],
+    "auxiliary_result": "result.restored_rms_input_fp32",
+    "auxiliary_slice_sha256": "b0afe414605e6c98a5b5c2edc0252d90e2a9f279f2ce2f73647c8ff521118ce6",
+    "candidate_primary_slice_sha256": "5037b5a7ef21226f8405d0175c83bc7528fadf588811755e719d20a75f295610",
+    "forbidden_operations": [
+      "func.call",
+      "stablehlo.after_all",
+      "stablehlo.custom_call",
+      "stablehlo.infeed",
+      "stablehlo.outfeed",
+      "stablehlo.recv",
+      "stablehlo.send"
+    ],
+    "required_collectives": [],
+    "rooted_device_result": true
+  },
+  "watchpoint_manifest": [
+    {"id": "layer1.rms_operands_bf16.hidden_update", "index_prefix": [], "kind": "operand", "npz_member": "rms_hidden_update", "owner_axis": null, "owner_ids": [], "raw_sha256": "efde853254c03dd18a5f5f22733630ce0e785dfbb4eba09c41eea9085e47b4fc", "semantic_dtype": "bf16_bits", "shape": [6144], "storage_dtype": "<u2"},
+    {"id": "layer1.rms_operands_bf16.residual", "index_prefix": [], "kind": "operand", "npz_member": "rms_residual", "owner_axis": null, "owner_ids": [], "raw_sha256": "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e", "semantic_dtype": "bf16_bits", "shape": [6144], "storage_dtype": "<u2"},
+    {"id": "layer1.rms_input_fp32.value", "index_prefix": [], "kind": "auxiliary_witness", "npz_member": "rms_input", "owner_axis": null, "owner_ids": [], "raw_sha256": "96459ad328e9ce13f32495c342e8c6ea338442206fa96eadfbf5c5d2f40e76b2", "semantic_dtype": "float32", "shape": [6144], "storage_dtype": "<f4"},
+    {"id": "layer1.normalized.owner0", "index_prefix": [0, 0], "kind": "primary", "npz_member": "normalized", "owner_axis": null, "owner_ids": [0], "raw_sha256": "28b7db466b74f462b5cd3109cb052bcce0c8be185d3f24199239f75136b22c20", "semantic_dtype": "bf16_bits", "shape": [6144], "storage_dtype": "<u2"},
+    {"id": "layer1.normalized.owner1", "index_prefix": [1, 0], "kind": "primary", "npz_member": "normalized", "owner_axis": null, "owner_ids": [1], "raw_sha256": "28b7db466b74f462b5cd3109cb052bcce0c8be185d3f24199239f75136b22c20", "semantic_dtype": "bf16_bits", "shape": [6144], "storage_dtype": "<u2"},
+    {"id": "layer1.cache_history.value", "index_prefix": [], "kind": "primary", "npz_member": "cache_history", "owner_axis": 0, "owner_ids": [0, 1], "raw_sha256": "ca028648b603dd91b8bb35e0abde1bc75e4a1fe071d1062af767c456401a593e", "semantic_dtype": "bf16_bits", "shape": [2, 16, 256, 128], "storage_dtype": "<u2"},
+    {"id": "layer1.query.owner0", "index_prefix": [0, 0], "kind": "primary", "npz_member": "query", "owner_axis": null, "owner_ids": [0], "raw_sha256": "ebaa0b9d420f9bb41c5cc5454236056e6dce0d18501bfb5081f2c04c6a94988a", "semantic_dtype": "float32", "shape": [32, 128], "storage_dtype": "<f4"},
+    {"id": "layer1.query.owner1", "index_prefix": [1, 0], "kind": "primary", "npz_member": "query", "owner_axis": null, "owner_ids": [1], "raw_sha256": "ebaa0b9d420f9bb41c5cc5454236056e6dce0d18501bfb5081f2c04c6a94988a", "semantic_dtype": "float32", "shape": [32, 128], "storage_dtype": "<f4"},
+    {"id": "layer1.head_weights.owner0", "index_prefix": [0, 0], "kind": "primary", "npz_member": "head_weights", "owner_axis": null, "owner_ids": [0], "raw_sha256": "8e885479d63c0263a92bda4078fc79a993055aa9e214f25e02289609987cf6fe", "semantic_dtype": "float32", "shape": [32], "storage_dtype": "<f4"},
+    {"id": "layer1.head_weights.owner1", "index_prefix": [1, 0], "kind": "primary", "npz_member": "head_weights", "owner_axis": null, "owner_ids": [1], "raw_sha256": "8e885479d63c0263a92bda4078fc79a993055aa9e214f25e02289609987cf6fe", "semantic_dtype": "float32", "shape": [32], "storage_dtype": "<f4"},
+    {"id": "layer1.current_key.value", "index_prefix": [], "kind": "primary", "npz_member": "current_key", "owner_axis": null, "owner_ids": [], "raw_sha256": "5006ad4f7224047652bbc46e6275b4c82bec0dead13f5f2b5f91494a2415329b", "semantic_dtype": "float32", "shape": [128], "storage_dtype": "<f4"},
+    {"id": "layer1.scorer_event1.positions", "index_prefix": [], "kind": "primary", "npz_member": "event1_positions", "owner_axis": null, "owner_ids": [], "raw_sha256": "bb199543bea3c24789fd556e75b3054d7c3f95e28a4def1dd346d1115feaeeec", "semantic_dtype": "int32", "shape": [1, 2048], "storage_dtype": "<i4"},
+    {"id": "layer1.scorer_event1.scores", "index_prefix": [], "kind": "primary", "npz_member": "event1_scores", "owner_axis": null, "owner_ids": [], "raw_sha256": "6e666fe928bd2d4e0f5078ba8edc3635139cac35105e79a443a165bbb501e05c", "semantic_dtype": "float32", "shape": [1, 2048], "storage_dtype": "<f4"},
+    {"id": "layer1.scorer_event1.valid_count", "index_prefix": [], "kind": "primary", "npz_member": "event1_valid_count", "owner_axis": null, "owner_ids": [], "raw_sha256": "cbfd218787df784c39fbc4f4fad92a8f28e2a880430c210b6d0d8dc133c07e66", "semantic_dtype": "int32", "shape": [1], "storage_dtype": "<i4"}
+  ]
+}

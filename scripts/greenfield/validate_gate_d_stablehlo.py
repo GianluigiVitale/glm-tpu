@@ -377,6 +377,7 @@ _COLLECTIVES_WITH_GROUPS = {
 _COLLECTIVE_PERMUTE = "stablehlo.collective_permute"
 _FORBIDDEN_OPERATIONS = {
     "func.call",
+    "stablehlo.after_all",
     "stablehlo.custom_call",
     "stablehlo.infeed",
     "stablehlo.outfeed",
@@ -1117,6 +1118,10 @@ def validate(request: Mapping[str, Any]) -> dict[str, Any]:
             "accepted_primary_slice_sha256s": accepted_signature_shas,
             "accepted_stablehlo_sha256": request["accepted_stablehlo_sha256"],
             "auxiliary_result_index": auxiliary_index,
+            "auxiliary_result": {
+                "auxiliary_device_tuple_dependency": "result.rms_input_fp32",
+                "compensated_auxiliary_dependency": "result.restored_rms_input_fp32",
+            }[request["candidate_id"]],
             "auxiliary_path_operations": auxiliary_operations,
             "auxiliary_slice_sha256": auxiliary_signature_sha,
             "auxiliary_source_operation_index": source_operation_index,
@@ -1125,6 +1130,7 @@ def validate(request: Mapping[str, Any]) -> dict[str, Any]:
             "candidate_primary_slice_sha256s": candidate_signature_shas,
             "candidate_stablehlo_sha256": request["candidate_stablehlo_sha256"],
             "collectives": candidate_collectives,
+            "forbidden_operations": sorted(_FORBIDDEN_OPERATIONS),
             "jax_imported": "jax" in sys.modules,
             "jaxlib_version": jaxlib.__version__,
             "loaded_parser_files": loaded_parser_files,
@@ -1136,6 +1142,7 @@ def validate(request: Mapping[str, Any]) -> dict[str, Any]:
                 "and mapped-inode native authority"
             ),
             "parser_runtime_authority": parser_runtime_authority,
+            "rooted_device_result": True,
             "carried_residual_result_index": carried_residual_index,
             "weighted_output_result_index": weighted_output_index,
             "stablehlo_version": stablehlo.get_current_version(),
