@@ -28,18 +28,18 @@ CONTROLLER_RELATIVE = "scripts/greenfield/recover_gate_d_worker_repositories.py"
 WORKER_RELATIVE = "scripts/greenfield/gate_d_worker_repository_transaction.py"
 WRAPPER_RELATIVE = "scripts/greenfield/run_gate_d_compensated_pp16_hlo.sh"
 INVENTORY_RELATIVE = (
-    "docs/artifacts/gate-d-worker-repository-recovered-prestate-inventory.json"
+    "docs/artifacts/gate-d-worker-repository-recovered-prestate-inventory-v2.json"
 )
-INVENTORY_SHA256 = "c4c3fd86111be9e7e0f5afd52e2cc5dab462fa9bf7b0cd710e75a4cd79a950cf"
+INVENTORY_SHA256 = "753ba1370a7d12d9ca6c86c248d084f0ff3072bfe7b17f343f88037c3de903e1"
 PRESTATE_AUTHORITY_RELATIVE = (
-    "docs/artifacts/gate-d-worker-repository-recovery-v4-complete.json"
+    "docs/artifacts/gate-d-worker-repository-recovery-v5-complete.json"
 )
 PRESTATE_AUTHORITY_SHA256 = (
-    "5f9e7ffc37e59a2d0d14879071c55b24ab1abceb7fb8f7fdb3caff364e5150d2"
+    "70a7f21e69e9e21dc7d1dc8f227046220dab972812d74b39f2ca598d3cf16ebd"
 )
-PRESTATE_PIN = "dc9ec468ad1529b09c4dd06005849ee70e0fa7c7"
+PRESTATE_PIN = "87dc6e3370290ac6378ef6c70bdac5f2a5783059"
 INSTALLED_CONTROLLER = Path(
-    "/opt/glm-tpu/gate-d-worker-recovery-v5/recover_gate_d_worker_repositories.py"
+    "/opt/glm-tpu/gate-d-worker-recovery-v6/recover_gate_d_worker_repositories.py"
 )
 LINKED_COMMON = Path("/home/gianl/glm-tpu/.git")
 LINKED_GIT_DIR = LINKED_COMMON / "worktrees/glm-tpu-topology-rewrite"
@@ -127,11 +127,13 @@ def _validate_inventory_artifact(raw: bytes, authority_raw: bytes) -> None:
         ):
             raise RecoveryError("repository inventory worker count mismatch")
         workers = {int(record["worker"]): record for record in worker_records}
-        authority = artifact["recovery_v4_authority"]
+        authority = artifact["recovery_v5_authority"]
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
         raise RecoveryError("repository inventory schema mismatch") from error
     if (
-        set(workers) != set(ALL_WORKERS)
+        artifact.get("artifact_kind")
+        != "gate_d_worker_repository_recovered_prestate_inventory_v2"
+        or set(workers) != set(ALL_WORKERS)
         or workers[0].get("kind") != "linked_worktree"
         or artifact.get("promisor_record_format")
         != "git_object_dir_relative_path_nul_size_nul_sorted_v1"

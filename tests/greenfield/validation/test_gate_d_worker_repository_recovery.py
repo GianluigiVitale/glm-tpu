@@ -147,7 +147,11 @@ def test_source_contract_is_descriptor_bound_timeout_and_terminal_last() -> None
     controller = CONTROLLER_PATH.read_text()
     worker = WORKER_PATH.read_text()
     assert CONTROLLER.INSTALLED_CONTROLLER == Path(
-        "/opt/glm-tpu/gate-d-worker-recovery-v5/recover_gate_d_worker_repositories.py"
+        "/opt/glm-tpu/gate-d-worker-recovery-v6/recover_gate_d_worker_repositories.py"
+    )
+    assert CONTROLLER.PRESTATE_PIN == "87dc6e3370290ac6378ef6c70bdac5f2a5783059"
+    assert CONTROLLER.PRESTATE_AUTHORITY_RELATIVE.endswith(
+        "gate-d-worker-repository-recovery-v5-complete.json"
     )
     assert "controller must run from the reviewed /opt path" in controller
     assert "os.O_NOFOLLOW" in controller
@@ -339,10 +343,10 @@ def test_recovery_inventory_is_hash_bound_and_exactly_matches_prestates(
 ) -> None:
     inventory = (
         ROOT
-        / "docs/artifacts/gate-d-worker-repository-recovered-prestate-inventory.json"
+        / "docs/artifacts/gate-d-worker-repository-recovered-prestate-inventory-v2.json"
     ).read_bytes()
     authority = (
-        ROOT / "docs/artifacts/gate-d-worker-repository-recovery-v4-complete.json"
+        ROOT / "docs/artifacts/gate-d-worker-repository-recovery-v5-complete.json"
     ).read_bytes()
     CONTROLLER._validate_inventory_artifact(inventory, authority)
 
@@ -376,6 +380,24 @@ def test_recovery_inventory_is_hash_bound_and_exactly_matches_prestates(
     )
     with pytest.raises(CONTROLLER.RecoveryError, match="inventory contract mismatch"):
         CONTROLLER._validate_inventory_artifact(wrong_format_raw, authority)
+
+    wrong_kind = json.loads(inventory)
+    wrong_kind["artifact_kind"] = "stale_v1_inventory"
+    wrong_kind_raw = (json.dumps(wrong_kind, sort_keys=True) + "\n").encode()
+    monkeypatch.setattr(
+        CONTROLLER, "INVENTORY_SHA256", sha256(wrong_kind_raw).hexdigest()
+    )
+    with pytest.raises(CONTROLLER.RecoveryError, match="inventory contract mismatch"):
+        CONTROLLER._validate_inventory_artifact(wrong_kind_raw, authority)
+
+    wrong_authority = json.loads(inventory)
+    wrong_authority["recovery_v5_authority"]["code_pin"] = "c" * 40
+    wrong_authority_raw = (json.dumps(wrong_authority, sort_keys=True) + "\n").encode()
+    monkeypatch.setattr(
+        CONTROLLER, "INVENTORY_SHA256", sha256(wrong_authority_raw).hexdigest()
+    )
+    with pytest.raises(CONTROLLER.RecoveryError, match="inventory contract mismatch"):
+        CONTROLLER._validate_inventory_artifact(wrong_authority_raw, authority)
 
 
 def test_prepare_exchange_and_final_preserve_exact_old_repository(

@@ -1,0 +1,137 @@
+{
+  "artifact_kind": "gate_d_worker_repository_recovered_prestate_inventory_v2",
+  "branch": "rewrite/topology-first-decode",
+  "conclusion": {
+    "recovery_required": true,
+    "recovery_workers": [1, 2, 3, 4, 5, 6, 7],
+    "reason": "the recovery-v5 terminal proves workers 1-7 are complete standalone repositories at 87dc6e3; the reviewed accelerator-census correction advanced only worker 0's linked execution worktree",
+    "untouched_workers": [0]
+  },
+  "evidence_class": "sealed_recovery_terminal_plus_serialized_read_only_pin_replay",
+  "fresh_read_only_replay": {
+    "global_locks_free": [
+      "/opt/glm-tpu/locks/glm_pod_workload.lock",
+      "/opt/glm-tpu/locks/glm_tpu_rsync.lock",
+      "/home/gianl/glm-run/.glm_pod_workload.lock",
+      "/home/gianl/.glm-tpu-rsync.lock"
+    ],
+    "observed_utc_end": "2026-09-01T06:42:59.131115125Z",
+    "observed_utc_start": "2026-09-01T06:42:54.806763Z",
+    "result": "worker 0 at pushed correction pin; workers 1-7 remain at the exact recovery-v5 terminal pin; no repository mutation",
+    "worker_zero_pin": "5b16f2c62242e00cd40f465cb929f83c1e132965",
+    "workers_one_through_seven_pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059"
+  },
+  "hlo_work": false,
+  "local_head_at_observation": "5b16f2c62242e00cd40f465cb929f83c1e132965",
+  "mutation": false,
+  "origin": "git@github.com:GianluigiVitale/glm-tpu.git",
+  "pod": {
+    "accelerator_type": "v4-64",
+    "health": "HEALTHY",
+    "name": "db-v4-64-od",
+    "state": "READY",
+    "zone": "us-central2-b"
+  },
+  "promisor_record_format": "git_object_dir_relative_path_nul_size_nul_sorted_v1",
+  "recovery_v5_authority": {
+    "code_pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059",
+    "fleet_verify_post_sha256": "825254e3481c6a38af657ce79b855258748bb25607c4b535851934060a2b04ac",
+    "path": "docs/artifacts/gate-d-worker-repository-recovery-v5-complete.json",
+    "sha256": "70a7f21e69e9e21dc7d1dc8f227046220dab972812d74b39f2ca598d3cf16ebd",
+    "tag": "gate_d_repo_recovery_20260901T053342580648681Z",
+    "terminal_generation": "1788241051773911",
+    "terminal_sha256": "21aafb5dc66c81c4edc327565f8d22fb63b8d30b1851d3b37a1523c938b14793"
+  },
+  "recorded_utc_date": "2026-09-01",
+  "tpu_work": false,
+  "workers": [
+    {
+      "host": "t1v-n-ae271d05-w-0",
+      "kind": "linked_worktree",
+      "missing_count": 0,
+      "missing_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "pin": "5b16f2c62242e00cd40f465cb929f83c1e132965",
+      "promisor_count": 0,
+      "promisor_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "repository_format": 0,
+      "worker": 0
+    },
+    {
+      "host": "t1v-n-ae271d05-w-1",
+      "kind": "standalone",
+      "missing_count": 0,
+      "missing_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059",
+      "promisor_count": 0,
+      "promisor_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "repository_format": 0,
+      "worker": 1
+    },
+    {
+      "host": "t1v-n-ae271d05-w-2",
+      "kind": "standalone",
+      "missing_count": 0,
+      "missing_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059",
+      "promisor_count": 0,
+      "promisor_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "repository_format": 0,
+      "worker": 2
+    },
+    {
+      "host": "t1v-n-ae271d05-w-3",
+      "kind": "standalone",
+      "missing_count": 0,
+      "missing_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059",
+      "promisor_count": 0,
+      "promisor_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "repository_format": 0,
+      "worker": 3
+    },
+    {
+      "host": "t1v-n-ae271d05-w-4",
+      "kind": "standalone",
+      "missing_count": 0,
+      "missing_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059",
+      "promisor_count": 0,
+      "promisor_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "repository_format": 0,
+      "worker": 4
+    },
+    {
+      "host": "t1v-n-ae271d05-w-5",
+      "kind": "standalone",
+      "missing_count": 0,
+      "missing_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059",
+      "promisor_count": 0,
+      "promisor_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "repository_format": 0,
+      "worker": 5
+    },
+    {
+      "host": "t1v-n-ae271d05-w-6",
+      "kind": "standalone",
+      "missing_count": 0,
+      "missing_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059",
+      "promisor_count": 0,
+      "promisor_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "repository_format": 0,
+      "worker": 6
+    },
+    {
+      "host": "t1v-n-ae271d05-w-7",
+      "kind": "standalone",
+      "missing_count": 0,
+      "missing_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059",
+      "promisor_count": 0,
+      "promisor_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "repository_format": 0,
+      "worker": 7
+    }
+  ]
+}
