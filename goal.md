@@ -36,20 +36,20 @@ When stuck reread
 `docs/greenfield/compass_artifact_wf-f6f3c189-f49a-5169-bc82-8adefac958df_text_markdown.md`
 in full and adjudicate it against local evidence.
 
-## Resume checkpoint — 2026-09-01 23:30Z
+## Resume checkpoint — 2026-09-01 23:40Z
 
 Worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`, branch
-`tooling/gate-d-compensated-pp16-numerical`; parent `f762a28899b812b43f321c4e56bfc2f94f0a9811` is on
-origin and the same-region mirror. This batch persists corrected numerical orchestration/install
-sources, tests and docs: the immutable publisher prints the only `NUMERICAL_RESULT` status authority
-after terminal replay; the wrapper dispatches only from it, local terminal/receipt is a supplementary
-check; substitution regressions executed; publisher→wrapper→launcher→installer→analyzer repinned;
-Bash/Ruff/74 focused tests pass; Sol closed both P1s.
+`tooling/gate-d-compensated-pp16-numerical`. Commit `7902b4c9517d55959151088ca43429d57bb486c5` (Sol
+`APPROVE PERSISTENCE`) is on origin and the replayed `US-CENTRAL2` mirror: corrected numerical
+orchestration/install sources, publisher-direct `NUMERICAL_RESULT` authority, substitution
+regressions, repinned chain, 74 focused tests. This batch persists the analyzer certificate
+`gate-d-projection-contraction-pp16-numerical-orchestration-install-source.json`
+(SHA `1c75e761…e38`, code hash `7902b4c9`) plus docs.
 
-**STOP: no install/launcher/TPU run is authorized.** Exact next after commit/push/mirror: generate
-and persist the orchestration source certificate from the analyzer; separately review the literal
-install-only commands, install without launch; separately review one fresh tag/command; then
-run/adjudicate the bounded discriminator once.
+**STOP: no install/launcher/TPU run is authorized.** Exact next after this commit/push/mirror:
+separately review the literal immutable install-only commands (paths in HANDOFF), install without
+launch; separately review one fresh tag/command; then run/adjudicate the bounded discriminator once.
+Sol reviewer = Codex sub-agent thread 01a05206… via `codex exec fork`.
 
 ## Proof and finish
 

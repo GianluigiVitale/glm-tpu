@@ -3399,3 +3399,15 @@ persistence only; review and persistence precede any v2 installation.
   `59b8552b…7d5e`.
 - Classification unchanged: `NUMERICAL_ORCHESTRATION_CORRECTED;REVIEW_PENDING;INSTALL_UNAUTHORIZED;
   TPU_EXECUTION_UNAUTHORIZED;FULL_DSA_8K_UNAUTHORIZED;GATE_D_OPEN`.
+
+## 2026-09-01 numerical orchestration persisted at 7902b4c9; certificate generated
+
+- Sol: P2 (stale goal checkpoint) corrected, then `APPROVE PERSISTENCE` for staged diff
+  `4f4486d4…1315` = commit `7902b4c9517d55959151088ca43429d57bb486c5`, on origin and replayed from
+  the locked `US-CENTRAL2` mirror (fsck true, checkout archive `d5c3483f…add8`).
+- Certificate `docs/artifacts/gate-d-projection-contraction-pp16-numerical-orchestration-install-source.json`
+  SHA-256 `1c75e761be61bf9e9043f29098ddf15f962d37657409d05f77a10b2aee358e38`, code hash
+  `7902b4c9…86c5`; persistence only.
+- Classification: `NUMERICAL_ORCHESTRATION_PERSISTED;CERTIFICATE_GENERATED;INSTALL_UNAUTHORIZED;
+  TPU_EXECUTION_UNAUTHORIZED;FULL_DSA_8K_UNAUTHORIZED;GATE_D_OPEN`. Next: separate install-only
+  command review; never launch from that review.

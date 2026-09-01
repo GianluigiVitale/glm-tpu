@@ -9943,3 +9943,29 @@ clean on all nine batch files, focused suite 74/74 passed. Source-batch staged d
 source/test files, docs excluded) is `59b8552be522b7791c544ae1fa2ab780489b87a3fa973c66c00c72b668a87d5e`.
 This is source correction only: no install, launcher, compile, TPU execution, full DSA/8K, numerical,
 performance or Gate-D claim. Persistence requires the Sol delta verdict recorded below.
+
+## 2026-09-01 numerical orchestration persisted; source certificate generated; install still unauthorized
+
+The Sol delta review (forked from the existing reviewer thread) closed both code P1s, then blocked
+once at P2 because the `goal.md` resume checkpoint still described the pre-correction WIP. After the
+checkpoint was rewritten to the staged state and next boundary, Sol returned `APPROVE PERSISTENCE`
+for exact staged diff `4f4486d4246ec62ba7e1cfd9d07dd342a1f56d98c77eb4ac7cb2200bf5371315`. That index
+is commit `7902b4c9517d55959151088ca43429d57bb486c5`, pushed to origin
+(`ls-remote` exact) and replayed from the locked `US-CENTRAL2` mirror by
+`verify_gate_d_same_region_git_mirror.py`: commit connectivity fsck true, origin remote exact record,
+checkout archive SHA-256 `d5c3483f7f29f27b3ebc2b47417edd532489c6c94f07e5ad1ef3c60b883cadd8`.
+
+The reviewed analyzer, run CPU-pinned with `python3 -I -S -B` against the committed blobs, produced
+`docs/artifacts/gate-d-projection-contraction-pp16-numerical-orchestration-install-source.json`
+(3,326 bytes, SHA-256 `1c75e761be61bf9e9043f29098ddf15f962d37657409d05f77a10b2aee358e38`,
+`code_hash` `7902b4c9…86c5`), classification
+`PROJECTION_NUMERICAL_ORCHESTRATION_INSTALL_SOURCE_ACCEPTED;INSTALL_UNAUTHORIZED;
+TPU_NUMERICAL_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`, binding the seven audited source hashes and five
+predecessor artifacts. It authorizes persistence only. Exact next: persist this certificate, then a
+separate review of the literal immutable install-only commands (installer at
+`/opt/glm-tpu/gate-d-projection-contraction-numerical-install-v1`, capsule
+`/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v1`, launcher
+`/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v1.py`), install without
+launch, a separate review of one fresh tag/command, then one bounded execution and adjudication.
+**No install, launch, compile, TPU execution, full DSA/8K, numerical, performance or Gate-D claim
+exists.**
