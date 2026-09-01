@@ -12222,3 +12222,33 @@ Corrected certificate SHA-256 is
 orchestration coverage passes 54/54 and the adjacent preserved-source/security suite passes
 208/208. Corrected adversarial persistence review is still required; no launcher/capsule install or
 execution is authorized by this source batch.
+
+## 2026-09-01 forced-round PP16 HLO immutable install source; no privileged install
+
+The second-stage installer closes the remaining user-writable execution boundary without granting
+execution authority. Its input is one exact root-owned source capsule installed separately by the
+existing fixed provisioner. It validates exact membership, root ownership, modes, link count,
+xattrs, stable inode identity and hard-coded SHA-256 for the launcher, driver, publisher and mirror
+verifier. It publishes the immutable three-file child capsule first and launcher last using
+`renameat2(RENAME_NOREPLACE)`, fsyncs files/directories, accepts only byte-exact idempotent targets
+and refuses hostile files or symlinks without replacement. The installer imports no JAX/cloud
+library, starts no child process and reports `launcher_invoked=false`.
+
+Certificate `gate-d-forced-round-pp16-hlo-install-source.json` is persistence-only and binds base
+`a012b93`, orchestration evidence `f4fcba84...e18847c`, the installer AST and the exact committed
+payload blobs. Hostile tests cover exact/idempotent publication, mode/membership integrity, wrong
+hashes, links and occupied targets. No privileged install, launcher start, JAX import, HLO, TPU,
+cloud mutation, numerical/performance work or 8K occurred. Gate D remains open; install and one
+fresh compile-only tag each require their own later review.
+
+The historical orchestration auditor is also commit-exact: all audited inputs and its exact delta
+come from Git objects at `a012b93`, so the existing `f4fcba84...e18847c` certificate continues to
+regenerate byte-for-byte after this successor batch. No historical claim or artifact is rewritten.
+
+The first Sol review withheld persistence because exception cleanup was name-based rather than
+creation-owned, replacement refs could redirect historical `git show`, and a path-validation loop
+was a no-op. The corrected publisher tracks created inode identities and whether rename completed;
+cleanup reopens and matches only the owned unpublished inode, rejects foreign contents, and never
+touches a pre-existing PID-collision file, symlink or directory. Both Git auditors run with replace
+objects/lazy fetches/protocol-from-user disabled and explicitly reject `refs/replace`; a hostile
+temporary-repository test exercises that refusal. The no-op validation is removed.

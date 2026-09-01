@@ -9393,3 +9393,32 @@ Corrected certificate SHA-256 is
 orchestration coverage passes 54/54 and the adjacent preserved-source/security suite passes
 208/208. Corrected adversarial persistence review is still required; no launcher/capsule install or
 execution is authorized by this source batch.
+
+## 2026-09-01 forced-round PP16 HLO immutable install source; no privileged install
+
+The reviewed orchestration commit `a012b93fdbd7c6fe1f84db2260708ba55b38e8f6` matches origin and
+its complete checkout is independently mirrored in `US-CENTRAL2`. A new second-stage installer is
+source-only. It accepts only the exact root-owned provisioned source capsule, verifies exact
+membership, root ownership, read-only modes, no links/xattrs and four hard-coded payload hashes,
+then publishes the three-child runtime capsule before the launcher. Every final publication uses
+`renameat2(RENAME_NOREPLACE)`; an existing exact target is accepted idempotently and any other
+regular file, directory or symlink is refused. The launcher is published last and is never invoked.
+
+The persistence-only certificate
+`gate-d-forced-round-pp16-hlo-install-source.json` binds the base commit, prior orchestration
+certificate, installer AST, exact payload blobs and hostile tests. It authorizes no privileged
+install, launcher invocation, JAX import, HLO acquisition, TPU compile/execution, bucket write,
+numerical/performance work or 8K. Gate D remains open. Exact next is adversarial persistence review,
+commit/push/locked same-region mirror, then a separate review of the literal no-replace install-only
+commands. A later fresh-tag compile-only start remains separately gated.
+
+The prior orchestration auditor now regenerates its unchanged certificate from exact Git blobs at
+`a012b93` rather than reopening later worktree state. This preserves its original artifact and SHA
+while preventing unrelated successor batches from breaking historical reproducibility.
+
+Sol withheld the first staged installer snapshot on two P1s and one P2: PID-reused staging cleanup
+could remove an object not created by this invocation; commit-exact `git show` did not disable or
+reject replacement refs; and one path-check loop silently passed. The correction records the exact
+created inode, cleans only that owned unpublished object, preserves every pre-existing staging
+file/symlink/directory in hostile tests, disables replacement/lazy fetches, rejects `refs/replace`,
+and removes the dead check. Corrected persistence review is still required.

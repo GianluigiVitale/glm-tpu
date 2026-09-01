@@ -7,7 +7,6 @@ import ast
 import json
 import os
 import re
-import stat
 import subprocess
 import sys
 from hashlib import sha256
@@ -48,6 +47,7 @@ MIRROR_VERIFIER = WORKTREE / (
 )
 BASE_CODE_PIN = "2f2408d7f63c747beaa8776aa6faa8b1872478ea"
 BASE_TREE_ID = "3541fbf1b9e8861705c77ff7f6128c65d2ecee4f"
+HISTORICAL_CODE_PIN = "a012b93fdbd7c6fe1f84db2260708ba55b38e8f6"
 BASE_PUBLISHER_SHA256 = (
     "75c296a2b46aef1b878a95ee7b1dfabdaf062687bfc496416ffca102f1180ee3"
 )
@@ -114,39 +114,11 @@ def _loaded_jax_modules() -> list[str]:
 
 
 def _snapshot(path: Path) -> bytes:
-    descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
     try:
-        before = os.fstat(descriptor)
-        named = os.stat(path, follow_symlinks=False)
-        if (
-            not stat.S_ISREG(before.st_mode)
-            or before.st_nlink != 1
-            or (before.st_dev, before.st_ino) != (named.st_dev, named.st_ino)
-        ):
-            raise RuntimeError(f"unsafe orchestration source input: {path}")
-        raw = bytearray()
-        while block := os.read(descriptor, 8 * 1024 * 1024):
-            raw.extend(block)
-        after = os.fstat(descriptor)
-
-        def identity(value: os.stat_result) -> tuple[int, ...]:
-            return (
-                value.st_dev,
-                value.st_ino,
-                value.st_mode,
-                value.st_nlink,
-                value.st_uid,
-                value.st_gid,
-                value.st_size,
-                value.st_mtime_ns,
-                value.st_ctime_ns,
-            )
-
-        if len(raw) != before.st_size or identity(before) != identity(after):
-            raise RuntimeError(f"orchestration source changed while reading: {path}")
-        return bytes(raw)
-    finally:
-        os.close(descriptor)
+        relative = path.relative_to(WORKTREE).as_posix()
+    except ValueError as error:
+        raise RuntimeError(f"orchestration source escapes worktree: {path}") from error
+    return _git(["show", f"{HISTORICAL_CODE_PIN}:{relative}"])
 
 
 def _git(arguments: list[str]) -> bytes:
@@ -167,7 +139,10 @@ def _git(arguments: list[str]) -> bytes:
         env={
             "GIT_CONFIG_GLOBAL": "/dev/null",
             "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_NO_LAZY_FETCH": "1",
+            "GIT_NO_REPLACE_OBJECTS": "1",
             "GIT_OPTIONAL_LOCKS": "0",
+            "GIT_PROTOCOL_FROM_USER": "0",
             "HOME": "/home/gianl",
             "LANG": "C",
             "LC_ALL": "C",
@@ -184,6 +159,11 @@ def _git(arguments: list[str]) -> bytes:
     return result.stdout
 
 
+def _reject_replace_refs() -> None:
+    if _git(["for-each-ref", "--format=%(refname)", "refs/replace"]):
+        raise RuntimeError("orchestration repository has forbidden replacement refs")
+
+
 def _nul_paths(raw: bytes) -> set[str]:
     if not raw:
         return set()
@@ -196,15 +176,26 @@ def _nul_paths(raw: bytes) -> set[str]:
 
 
 def _verify_repository_authority() -> dict[str, Any]:
+    _reject_replace_refs()
     if _git(["rev-parse", f"{BASE_CODE_PIN}^{{tree}}"]) != f"{BASE_TREE_ID}\n".encode(
         "ascii"
     ):
         raise RuntimeError("forced-round orchestration base tree drifted")
-    _git(["merge-base", "--is-ancestor", BASE_CODE_PIN, "HEAD"])
+    _git(["merge-base", "--is-ancestor", BASE_CODE_PIN, HISTORICAL_CODE_PIN])
     tracked = _nul_paths(
-        _git(["diff", "--no-ext-diff", "--name-only", "-z", BASE_CODE_PIN, "--"])
+        _git(
+            [
+                "diff",
+                "--no-ext-diff",
+                "--name-only",
+                "-z",
+                BASE_CODE_PIN,
+                HISTORICAL_CODE_PIN,
+                "--",
+            ]
+        )
     )
-    untracked = _nul_paths(_git(["ls-files", "--others", "--exclude-standard", "-z"]))
+    untracked: set[str] = set()
     if tracked & untracked or tracked | untracked != ALLOWED_DELTA_PATHS:
         raise RuntimeError(
             "forced-round orchestration repository delta drifted: "

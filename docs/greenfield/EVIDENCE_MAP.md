@@ -2851,3 +2851,23 @@ Corrected certificate SHA-256 is
 orchestration coverage passes 54/54 and the adjacent preserved-source/security suite passes
 208/208. Corrected adversarial persistence review is still required; no launcher/capsule install or
 execution is authorized by this source batch.
+
+## 2026-09-01 forced-round PP16 HLO immutable install source
+
+- Source: `scripts/greenfield/install_gate_d_forced_round_pp16_hlo_runtime.py`.
+- Auditor: `scripts/greenfield/analyze_gate_d_forced_round_pp16_hlo_install_source.py`.
+- Certificate: `docs/artifacts/gate-d-forced-round-pp16-hlo-install-source.json`.
+- Tests: `tests/greenfield/validation/test_install_gate_d_forced_round_pp16_hlo_runtime.py`.
+- Authority: persistence only. No privileged install, launcher invocation, JAX/HLO/TPU/cloud,
+  numerical/performance or Gate-D claim.
+- Boundary: exact root-owned source membership and payload hashes; capsule first, launcher last;
+  atomic `RENAME_NOREPLACE`; byte-exact idempotency; hostile existing targets never replaced.
+- Predecessors: commit `a012b93fdbd7c6fe1f84db2260708ba55b38e8f6`, orchestration certificate
+  `f4fcba8497599dd19f94ec8ded2566ad3d27a412a04adad584fc22417e18847c`.
+- Historical reproducibility: the orchestration auditor reads all audited inputs and its exact delta
+  from Git objects at `a012b93`; its existing certificate remains byte-identical.
+- Review corrections: cleanup is created-inode/publish-state bound and preserves hostile
+  PID-collision staging objects; Git disables replacement/lazy fetches and rejects `refs/replace`;
+  the prior no-op path loop is removed. Corrected persistence review remains pending.
+- Exact next after validation/review/persistence: separately review the literal install-only
+  commands; only then prepare a separately reviewed fresh compile-only tag.
