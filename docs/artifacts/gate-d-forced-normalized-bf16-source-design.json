@@ -1,0 +1,60 @@
+{
+  "artifact_kind": "gate_d_forced_normalized_bf16_source_design",
+  "authorization": {
+    "full_8k": false,
+    "persistence_only": true,
+    "tpu_compile_or_hlo_acquisition": false,
+    "tpu_execution": false
+  },
+  "bf16_boundary_semantics": {
+    "case_count": 14,
+    "explicit_cast_widen_matches_e8m7": true,
+    "includes_max_finite_and_overflow_to_infinity": true,
+    "includes_signed_zero_subnormal_normal_and_ties": true,
+    "input_f32_bits_sha256": "5a27e37cc3ebed6e28ed46b61812142f770f10666c2544e3a3908f06a8be0a61",
+    "weighted_bf16_outputs_exact": true,
+    "weighted_output_bits_sha256": "46f97a00cfcf8fa1f42a0e00f8b811423bfeed23df196a536656f8acc79593db"
+  },
+  "candidate_id": "forced_normalized_bf16_boundary",
+  "classification": "DEFAULT_OFF;SOURCE_EXACT;CPU_ACCEPTED_BITS_EXACT;EXPLICIT_E8M7_DATA_DEPENDENCY;PHYSICAL_CAUSE_UNPROVEN;GATE_D_OPEN",
+  "cpu_exactness": {
+    "accepted_output_sha256": "2b45b71e8722e9b51774358e9f6eddf6679d93e8fcf76c85ab69e6944e4a7437",
+    "candidate_matches_accepted": true,
+    "candidate_output_sha256": "2b45b71e8722e9b51774358e9f6eddf6679d93e8fcf76c85ab69e6944e4a7437",
+    "candidate_vs_observed_mismatch_count": 1622,
+    "carried_residual_matches_strict_source": true,
+    "mismatch_indices_int32_sha256": "2aaa7d3d2dea46495ab43419feaae9e969934f19c0e1e6690706c0d909e2bb8c"
+  },
+  "default_off": true,
+  "evidence_authority": {
+    "capsule_input_sha256": "dd5f1cbb37b722591531635a21cfa9f1d6d0157997a4f70138900d0000be8b1b",
+    "capsule_state_sha256": "68ee47b1fcbf317fd41da51aa26c9ba1a8dafe0e3e95ccbbfa73285f4e46f236",
+    "protected_output_sha256": "bd017d4c7e3f42b3f60fb4b918811ea028447656227c361c84fffae2544dc1a3",
+    "scalar_frontier_artifact_sha256": "8ee468ebddd8fc0f7c594e90fd463a6582379aea5969f59859900e2ccec170ce"
+  },
+  "jaxpr": {
+    "explicit_hlo_lowering_performed": false,
+    "final_bf16_convert_count": 1,
+    "jaxpr_sha256": "d33bf29ef119d62e311bf06dfd78815f4b8e4d47ec718855b0e1ea69ba4e1450",
+    "reduce_precision_count": 1,
+    "reduce_precision_exponent_bits": 8,
+    "reduce_precision_feeds_weight_multiply": true,
+    "reduce_precision_mantissa_bits": 7,
+    "trace_kind": "jax.make_jaxpr",
+    "weight_input_bf16_to_fp32_lineage_exact": true,
+    "weighted_value_single_final_consumer": true
+  },
+  "next_authorized_action": "Persist this source design after review. Compile/HLO acquisition and any bounded PP16 numerical start each require a separate fresh review, tag, and exact authority.",
+  "performance_claim": false,
+  "physical_cause_claim": false,
+  "source_authority": {
+    "analysis_module_path": "glm_tpu/greenfield/benchmarking/gate_d_forced_round_source.py",
+    "analysis_module_sha256": "2b6c24b9b43404f116508a4a75f4d05a898d9e36a5f992aa29ce0b83803f706c",
+    "function": "fused_add_rms_norm_with_forced_bf16_boundary",
+    "function_module_path": "glm_tpu/greenfield/kernels/reference/rmsnorm.py",
+    "function_module_sha256": "d6fca18425fb851c2ba3e1a12dacd45c8dadef43b33d6a1e6da72dbfb2eb6276",
+    "function_source_sha256": "d73eaf1f9c8d485769513abe835bbb5ce72d61f4d495a4dedc65b7cfeb0e7a2b"
+  },
+  "status": "SOURCE_DESIGN_CPU_EXACT_PERSISTENCE_ONLY",
+  "tpu_rerun_performed": false
+}

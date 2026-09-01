@@ -2745,3 +2745,26 @@ a source-exact causal challenger that forces the existing post-normalization BF1
 weight multiplication (`reduce_precision(e8m7)` first; excess-precision-disabled comparator).
 Compile/HLO acquisition and any bounded PP16 numerical start remain unauthorized; each requires
 its own fresh review, tag and exact execution authority. Full 8K remains forbidden.
+
+## 2026-09-01 forced normalized-BF16 boundary source design; CPU-only
+
+The scalar-frontier certificate `8ee468eb...c170ce` motivated one default-off causal challenger,
+`fused_add_rms_norm_with_forced_bf16_boundary`. It leaves the FP32 residual sum, variance and
+normalization unchanged, applies explicit `reduce_precision(e8m7)` to the normalized FP32 value,
+widens the exact BF16 weight to FP32 for multiplication, and performs the final BF16 conversion.
+The normal decoder has no caller for this function.
+
+CPU-only certificate `gate-d-forced-normalized-bf16-source-design.json` (SHA-256
+`54bb2750...d3100`) binds the sealed capsule, protected output and scalar-frontier evidence. On the
+real 6,144-element layer-1 row, the candidate and carried residual match accepted bits exactly; its
+1,622 differences from the protected TPU row have the exact prior mismatch-index hash. Three
+additional BF16 row families match the accepted reference bitwise. Fourteen exact signed-zero,
+subnormal, normal, tie, max-finite and overflow cases prove e8m7 equals explicit BF16 cast/widen
+before weighting. A `jax.make_jaxpr` trace—not HLO lowering—proves one e8m7 edge solely feeds a
+multiply whose other operand is the sole BF16-weight-to-FP32 lineage, then one final BF16 output.
+
+This proves source and CPU exactness only. Physical causality, optimized-HLO preservation,
+performance and Gate-D closure remain unproved. No TPU compile, HLO acquisition, cloud write,
+numerical run or full 8K occurred. Persistence is the only authority in this batch. A future
+compile/HLO acquisition and any bounded PP16 numerical start each require a separate fresh review,
+tag and exact authority; full 8K remains forbidden.

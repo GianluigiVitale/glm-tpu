@@ -8,6 +8,7 @@ functions in this module are native JAX and have no legacy-engine dependency.
 
 from __future__ import annotations
 
+import math
 from typing import NamedTuple
 
 import jax
@@ -243,6 +244,64 @@ def fused_add_rms_norm_with_compensated_auxiliary(
         carried_residual,
         restored_rms_input_fp32,
     )
+
+
+def fused_add_rms_norm_with_forced_bf16_boundary(
+    hidden_states: jax.Array,
+    residual: jax.Array,
+    weight: jax.Array,
+    *,
+    epsilon: float,
+) -> tuple[jax.Array, jax.Array]:
+    """Default-off causal challenger for the normalized BF16 boundary.
+
+    GLM stores all three inputs in BF16.  The residual sum and RMS reduction
+    remain FP32, matching :func:`fused_add_rms_norm`.  ``reduce_precision``
+    then gives the intermediate normalized value explicit BF16 semantics while
+    retaining an FP32 container.  Multiplication by the exactly widened BF16
+    weight and the final BF16 conversion are source-exact to the accepted
+    double-round contract.
+
+    This source form is not physical proof.  Whether a TPU executable preserves
+    the explicit precision edge is a separate optimized-HLO and numerical A/B
+    question requiring separately reviewed execution authority.
+    """
+
+    if hidden_states.shape != residual.shape:
+        raise ValueError(
+            "forced-boundary RMSNorm hidden and residual shapes must match"
+        )
+    if hidden_states.dtype != residual.dtype:
+        raise ValueError(
+            "forced-boundary RMSNorm hidden and residual dtypes must match"
+        )
+    if hidden_states.ndim < 1:
+        raise ValueError("forced-boundary RMSNorm inputs must have a dimension")
+    if weight.shape != (hidden_states.shape[-1],):
+        raise ValueError(
+            "forced-boundary RMSNorm weight must match the hidden dimension"
+        )
+    if (
+        not isinstance(epsilon, (int, float))
+        or isinstance(epsilon, bool)
+        or not math.isfinite(epsilon)
+        or epsilon <= 0
+    ):
+        raise ValueError("forced-boundary RMSNorm epsilon must be positive")
+    if hidden_states.dtype != jnp.bfloat16 or weight.dtype != jnp.bfloat16:
+        raise ValueError("forced-boundary RMSNorm requires BF16 inputs and weight")
+
+    rms_input_fp32 = hidden_states.astype(jnp.float32) + residual.astype(jnp.float32)
+    carried_residual = rms_input_fp32.astype(jnp.bfloat16)
+    variance = jnp.mean(lax.square(rms_input_fp32), axis=-1, keepdims=True)
+    normalized_fp32 = rms_input_fp32 * lax.rsqrt(variance + jnp.float32(epsilon))
+    normalized_bf16_fp32 = lax.reduce_precision(
+        normalized_fp32,
+        exponent_bits=8,
+        mantissa_bits=7,
+    )
+    output = (normalized_bf16_fp32 * weight.astype(jnp.float32)).astype(jnp.bfloat16)
+    return output, carried_residual
 
 
 def final_norm(
