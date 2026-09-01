@@ -3149,3 +3149,28 @@ execution is authorized by this source batch.
   TPU_COMPILE_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`. Persistence only is
   authorized. Exact next is a separately reviewed append-only publisher/wrapper and immutable
   installer/launcher; no compile, execution, full DSA/8K or Gate-D closure exists.
+
+## 2026-09-01 projection-contraction HLO orchestration/install source certificate
+
+- Reviewed source correction `d4288831edbd4f08ea61ef8faf6edbe65eabfb4d` is exact on origin.
+  The locked `US-CENTRAL2` mirror passed connectivity, fsck and full-checkout equality; checkout
+  archive SHA-256 is `77ac64a219f8819c9c569bcdd31c729b44fcf546e4cefb14729f36cc1acc5323`.
+- The default-off publisher, wrapper, descriptor launcher and no-replacement installer bind the
+  exact compile-only acquirer. The launcher snapshots the committed wrapper into sealed FD 10;
+  the wrapper inherits already-held root workload/rsync locks as FDs 11/12. The installer publishes
+  the exact read-only capsule before the launcher and has zero launcher invocations.
+- Canonical certificate
+  `docs/artifacts/gate-d-projection-contraction-pp16-hlo-orchestration-install-source.json` is
+  3,026 bytes, SHA-256
+  `f6d1736105e67dbbe9b336b727ca015a3bf7506231aa8ae7dcd407a81cbe666e`. It binds all seven
+  source hashes, the three predecessor certificates and an empty loaded-JAX module set.
+- Exact-source replay and the complete projection-HLO source/security set pass 108/108 in an
+  isolated CPU-only environment. Sol approved staged correction
+  `4d4077dc0519ce1e821d87cee0e6fd047b07eed8934d83f6f23c200ea9ccbe1d` with no P0--P2;
+  it independently reviewed the exact certificate/test/docs batch and returned
+  `APPROVE PERSISTENCE` with no P0--P2.
+- Classification: `PROJECTION_HLO_ORCHESTRATION_INSTALL_SOURCE_ACCEPTED;
+  INSTALL_UNAUTHORIZED;TPU_COMPILE_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`.
+  No privileged install, launcher, JAX/backend, lowering, compile, bucket write, numerical work,
+  full DSA/8K or performance claim occurred. Exact next after review/persistence is a separate
+  literal immutable install-only review; compilation and executable invocation remain unauthorized.

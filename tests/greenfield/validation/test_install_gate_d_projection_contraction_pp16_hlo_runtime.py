@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import stat
+import subprocess
 from hashlib import sha256
 from pathlib import Path
 
@@ -16,6 +18,11 @@ ANALYZER = ROOT / (
     "scripts/greenfield/"
     "analyze_gate_d_projection_contraction_pp16_hlo_orchestration_source.py"
 )
+ARTIFACT = ROOT / (
+    "docs/artifacts/"
+    "gate-d-projection-contraction-pp16-hlo-orchestration-install-source.json"
+)
+ARTIFACT_SHA256 = "f6d1736105e67dbbe9b336b727ca015a3bf7506231aa8ae7dcd407a81cbe666e"
 
 
 def _load(path: Path, name: str):  # type: ignore[no-untyped-def]
@@ -243,3 +250,67 @@ def test_orchestration_source_audits_all_exact_sources_and_predecessors() -> Non
         == 1
     )
     assert ANALYZER_MODULE._predecessor_authority() == (ANALYZER_MODULE.REFERENCE_PATHS)
+
+
+def test_orchestration_source_artifact_replays_from_descendant_commit() -> None:
+    artifact = ARTIFACT.read_bytes()
+    assert len(artifact) == 3026
+    assert sha256(artifact).hexdigest() == ARTIFACT_SHA256
+    parsed = json.loads(artifact)
+    assert parsed["code_hash"] == "d4288831edbd4f08ea61ef8faf6edbe65eabfb4d"
+    assert parsed["authorization"] == {
+        "cloud_write": False,
+        "compile_only_hlo_acquisition": False,
+        "full_dsa_or_8k": False,
+        "launcher_invocation": False,
+        "persistence_only": True,
+        "privileged_install": False,
+        "tpu_compile": False,
+        "tpu_execution": False,
+    }
+    assert parsed["gate_d_closed"] is False
+    environment = {
+        **os.environ,
+        "GLM_GATE_D_PROJECTION_CONTRACTION_HLO_ORCHESTRATION_SOURCE": "1",
+        "JAX_PLATFORMS": "cpu",
+        "JAX_PLATFORM_NAME": "cpu",
+    }
+    result = subprocess.run(
+        ["/usr/bin/python3", "-I", "-S", "-B", str(ANALYZER)],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr.decode()
+    replay = json.loads(result.stdout)
+    current_pin = subprocess.check_output(
+        ["/usr/bin/git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True
+    ).strip()
+    assert replay["code_hash"] == current_pin
+    ancestry = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(ROOT),
+            "merge-base",
+            "--is-ancestor",
+            parsed["code_hash"],
+            current_pin,
+        ],
+        check=False,
+    )
+    assert ancestry.returncode == 0
+    replay["code_hash"] = parsed["code_hash"]
+    normalized = (
+        json.dumps(
+            replay,
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("ascii")
+    assert normalized == artifact

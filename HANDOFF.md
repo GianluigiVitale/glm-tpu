@@ -9728,3 +9728,25 @@ TPU_COMPILE_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`. No JAX/backend
 TPU/cloud/model/numerical/performance/full-DSA/8K work occurred. Exact next is source-only design,
 hostile validation and persistence of a separate append-only publisher/wrapper plus immutable
 installer/launcher. Do not compile or execute before that boundary is independently approved.
+
+## 2026-09-01 projection-contraction HLO orchestration/install source persisted
+
+Commit `d4288831edbd4f08ea61ef8faf6edbe65eabfb4d` is exact on origin and its locked
+`US-CENTRAL2` mirror replay produced checkout archive SHA-256
+`77ac64a219f8819c9c569bcdd31c729b44fcf546e4cefb14729f36cc1acc5323`. The isolated
+publisher/wrapper, sealed-FD launcher and atomic no-replacement installer bind the exact compile-only
+acquirer without invoking it. The installer publishes the read-only capsule before the launcher;
+the launcher retains sealed wrapper FD 10 and the two already-held workload/rsync locks as FDs
+11/12.
+
+Canonical certificate
+`docs/artifacts/gate-d-projection-contraction-pp16-hlo-orchestration-install-source.json` is 3,026
+bytes, SHA-256 `f6d1736105e67dbbe9b336b727ca015a3bf7506231aa8ae7dcd407a81cbe666e`.
+Exact replay and the complete projection-HLO source/security set pass 108/108 under CPU-only
+isolation. Sol approved the source-audit correction and independently returned
+`APPROVE PERSISTENCE` for the exact certificate/test/docs batch, with no P0--P2.
+
+This is persistence-only evidence. No privileged installation, launcher, JAX/backend, lowering,
+compile, cloud write, TPU execution, numerical/performance, full-DSA/8K or Gate-D closure claim
+exists. Exact next after adversarial review, commit/push and locked mirror replay is a separate
+review of literal immutable install-only commands. Do not compile or invoke the executable.
