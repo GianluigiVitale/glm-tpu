@@ -20,6 +20,12 @@ FAILURE_ARTIFACT = ROOT / (
 FAILURE_ARTIFACT_SHA256 = (
     "14de62b52fbdde659c6d222442d2e737a417b3d84893cefdd3d0476cbcfc4086"
 )
+V2_LOCK_FAILURE_ARTIFACT = ROOT / (
+    "docs/artifacts/gate-d-projection-contraction-pp16-hlo-v2-root-lock-failure.json"
+)
+V2_LOCK_FAILURE_ARTIFACT_SHA256 = (
+    "b1bafcf9ee2608cb1de75c114781b2ec3c2c5d6232c12f4303b616f1fcfa3159"
+)
 SPEC = importlib.util.spec_from_file_location(
     "gate_d_projection_contraction_hlo_launcher", SOURCE
 )
@@ -444,3 +450,57 @@ def test_launcher_environment_is_exact_and_excludes_oldpwd() -> None:
     )
     source = SOURCE.read_text(encoding="ascii")
     assert "set(os.environ) != INPUT_ENVIRONMENT_KEYS" in source
+
+
+def test_v2_root_lock_failure_is_exact_nonexclusive_and_burns_tag() -> None:
+    raw = V2_LOCK_FAILURE_ARTIFACT.read_bytes()
+    assert len(raw) == 3471
+    assert sha256(raw).hexdigest() == V2_LOCK_FAILURE_ARTIFACT_SHA256
+    parsed = json.loads(raw)
+    assert parsed["classification"] == (
+        "PRE_WRAPPER_CANONICAL_ROOT_LOCK_CONTENTION;"
+        "CRON_ROOT_RSYNC_OVERLAP_OBSERVED;NO_RUN_DIRECTORY;"
+        "NO_CLOUD_MUTATION;PROTECTED_WORKFLOW_NO_JAX_OR_TPU_WORK;"
+        "TAG_BURNED;GATE_D_OPEN"
+    )
+    assert parsed["failure"]["specific_failed_lock_proven"] is False
+    assert parsed["failure"]["wrapper_exec_reached"] is False
+    assert parsed["observed_overlap"]["root_rsync_overlap_observed"] is True
+    assert parsed["failure_boundary"] == {
+        "cloud_mutation_performed": False,
+        "compiler_started": False,
+        "jax_imported_by_protected_workflow": False,
+        "local_run_directory_created": False,
+        "protected_wrapper_executed": False,
+        "remote_host_command_started": False,
+        "tpu_backend_initialized": False,
+    }
+    assert parsed["postconditions"]["local_run_path_absent"] is True
+    assert parsed["postconditions"]["launcher_or_acquirer_process_present"] is False
+    vacancy = parsed["postconditions"]["remote_vacancy"]
+    assert set(vacancy) == {"live", "all_versions", "soft_deleted_exhaustive"}
+    assert all(
+        record == {"canonical_no_objects": True, "returncode": 1}
+        for record in vacancy.values()
+    )
+    lease_recheck = parsed["postconditions"]["lease_recheck"]
+    assert lease_recheck["simultaneously_held_by_auditor"] is True
+    assert len(lease_recheck["leases"]) == 4
+    assert all(record["free"] is True for record in lease_recheck["leases"])
+    assert parsed["review"]["sol_corrected_classification"] is True
+    assert "Never reuse this tag" in parsed["exact_next"]
+    code_hash = parsed["authority"]["code_hash"]
+    launcher_object = (
+        f"{code_hash}:scripts/greenfield/"
+        "launch_gate_d_projection_contraction_pp16_hlo.py"
+    )
+    launcher_raw = subprocess.check_output(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(ROOT),
+            "show",
+            launcher_object,
+        ]
+    )
+    assert sha256(launcher_raw).hexdigest() == parsed["authority"]["launcher_sha256"]

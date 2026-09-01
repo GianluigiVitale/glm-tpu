@@ -3246,3 +3246,25 @@ persistence only; review and persistence precede any v2 installation.
   TPU/numerical/performance/full-DSA/8K work occurred. Exact next after review and persistence is a
   separately reviewed fresh-tag compile-only launcher command; numerical execution remains
   forbidden.
+
+## 2026-09-01 projection-contraction HLO v2 pre-wrapper root-lock failure
+
+- Approved fresh tag `gate_d_projection_contraction_pp16_hlo_20260901T203408107762365Z` failed
+  closed at the launcher's nonblocking canonical root-lock loop before protected-wrapper execution.
+  The cron sync session ran from `20:35:01Z` through `20:35:23Z` with the exact root/user rsync-lock
+  chain and completed all four repository mirrors during the overlap.
+- The shared traceback line cannot prove which root-lock iteration failed. Sol blocked the initial
+  root-rsync-specific interpretation as P1. Canonical artifact
+  `gate-d-projection-contraction-pp16-hlo-v2-root-lock-failure.json` therefore classifies
+  non-exclusive `PRE_WRAPPER_CANONICAL_ROOT_LOCK_CONTENTION` plus observed cron root-rsync overlap.
+  It is 3,471 bytes, SHA-256
+  `b1bafcf9ee2608cb1de75c114781b2ec3c2c5d6232c12f4303b616f1fcfa3159`.
+- Local run state and live/all-version/soft-deleted remote histories remain vacant. No wrapper,
+  cloud, JAX/backend/compiler, remote-host or TPU work occurred. A later observation simultaneously
+  acquired all four canonical leases and found no launcher/acquirer process. The tag is burned.
+- Classification: `PRE_WRAPPER_CANONICAL_ROOT_LOCK_CONTENTION;CRON_ROOT_RSYNC_OVERLAP_OBSERVED;
+  NO_RUN_DIRECTORY;NO_CLOUD_MUTATION;PROTECTED_WORKFLOW_NO_JAX_OR_TPU_WORK;TAG_BURNED;
+  GATE_D_OPEN`. Exact next after review/persistence is a separately reviewed new tag outside the
+  cron window; numerical execution and full 8K remain forbidden. Sol verified corrected staged diff
+  `d1515c3bbf73aeba716124737520aed449b0132267c65144f316ba3cacbc93d0` and returned
+  `APPROVE PERSISTENCE` with no P0--P2.

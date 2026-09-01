@@ -9824,3 +9824,26 @@ This is installation evidence only. No launcher, JAX/backend, HLO acquisition, c
 TPU/numerical/performance/full-DSA/8K or Gate-D claim exists. Exact next after adversarial review,
 commit/push and locked mirror replay is a separate execution-only review of one fresh-tag
 compile-only launcher command. Numerical execution and full 8K remain forbidden.
+
+## 2026-09-01 projection-contraction HLO v2 start blocked by canonical root lock
+
+The separately approved fresh tag
+`gate_d_projection_contraction_pp16_hlo_20260901T203408107762365Z` failed closed in the installed
+launcher at nonblocking root-lock acquisition, before the protected wrapper. The cron sync opened at
+`20:35:01Z`, ran the exact root/user rsync-lock chain, completed all four repository syncs, and
+closed at `20:35:23Z`, overlapping the failed start. The shared launcher traceback line does not
+identify which loop iteration failed; Sol correctly blocked the initial root-rsync-specific claim as
+P1. The accepted classification is non-exclusive canonical root-lock contention with observed cron
+root-rsync overlap.
+
+Canonical artifact
+`docs/artifacts/gate-d-projection-contraction-pp16-hlo-v2-root-lock-failure.json` is 3,471 bytes,
+SHA-256 `b1bafcf9ee2608cb1de75c114781b2ec3c2c5d6232c12f4303b616f1fcfa3159`.
+The local run directory and all live/versioned/soft-deleted remote histories are vacant; no wrapper,
+cloud mutation, JAX/backend/compiler, remote command or TPU work occurred. At
+`2026-09-01T20:36:13.968467216Z`, all four canonical leases were simultaneously free and no
+launcher/acquirer process remained. The tag is burned. Exact next after review and durable
+persistence is one separately reviewed new tag outside the cron window; numerical execution and
+full 8K remain forbidden. Sol verified corrected staged diff
+`d1515c3bbf73aeba716124737520aed449b0132267c65144f316ba3cacbc93d0` and returned
+`APPROVE PERSISTENCE` with no P0--P2.
