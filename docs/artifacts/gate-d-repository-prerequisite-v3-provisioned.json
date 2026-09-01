@@ -1,0 +1,237 @@
+{
+  "controller": {
+    "controller": {
+      "bytes": 44013,
+      "dev": 2049,
+      "gid": 0,
+      "ino": 49172,
+      "mode": "0555",
+      "name": "recover_gate_d_worker_repositories.py",
+      "sha256": "fd8950de504df483a3d86420b489406dbf93c3f68de04faf230bc85f402b2225",
+      "uid": 0
+    },
+    "host": "t1v-n-ae271d05-w-0",
+    "marker": "PREREQUISITE_CONTROLLER_OK"
+  },
+  "controller_output_sha256": "38b58a1e6c1001d8f18f2098ac16afa78a81e0f2028084d206ac243a59d7043a",
+  "controller_sha256": "fd8950de504df483a3d86420b489406dbf93c3f68de04faf230bc85f402b2225",
+  "cron_after": "*/5 * * * * /usr/bin/flock -n /opt/glm-tpu/locks/glm_tpu_rsync.lock /usr/bin/flock -n /home/gianl/.glm-tpu-rsync.lock /home/gianl/bin/sync-glm.sh >> /home/gianl/sync-glm-tpu.log 2>&1\n",
+  "cron_before_sha256": "8edf19b2dfab7f9d3a0eeb0c2779f4a3d47dbf249a1734a2004d302fe719b643",
+  "cron_disposition": "existing",
+  "held_lock_identities": [
+    {
+      "dev": 2049,
+      "ino": 1868606,
+      "mode": "0664",
+      "name": "/home/gianl/glm-run/.glm_pod_workload.lock",
+      "parent_dev": 2049,
+      "parent_ino": 1868609
+    },
+    {
+      "dev": 2049,
+      "ino": 1580034,
+      "mode": "0664",
+      "name": "/home/gianl/.glm-tpu-rsync.lock",
+      "parent_dev": 2049,
+      "parent_ino": 1591959
+    },
+    {
+      "dev": 2049,
+      "ino": 49169,
+      "mode": "0666",
+      "name": "/opt/glm-tpu/locks/glm_pod_workload.lock",
+      "parent_dev": 2049,
+      "parent_ino": 49168
+    },
+    {
+      "dev": 2049,
+      "ino": 49170,
+      "mode": "0666",
+      "name": "/opt/glm-tpu/locks/glm_tpu_rsync.lock",
+      "parent_dev": 2049,
+      "parent_ino": 49168
+    }
+  ],
+  "hlo_work": false,
+  "installed_root": "/opt/glm-tpu/gate-d-repository-prerequisites-v3",
+  "installed_root_helper_dev": 2049,
+  "installed_root_helper_ino": 49174,
+  "installed_self_dev": 2049,
+  "installed_self_ino": 49175,
+  "local_lock_output_sha256": "a558f97eb02271b26cfda837bb741037785857863314005a9d1d91d7459365a9",
+  "local_locks": {
+    "host": "t1v-n-ae271d05-w-0",
+    "locks": [
+      {
+        "dev": 2049,
+        "gid": 0,
+        "ino": 49169,
+        "mode": "0666",
+        "name": "glm_pod_workload.lock",
+        "nlink": 1,
+        "size": 0,
+        "uid": 0
+      },
+      {
+        "dev": 2049,
+        "gid": 0,
+        "ino": 49170,
+        "mode": "0666",
+        "name": "glm_tpu_rsync.lock",
+        "nlink": 1,
+        "size": 0,
+        "uid": 0
+      },
+      {
+        "dev": 2049,
+        "gid": 0,
+        "ino": 49171,
+        "mode": "0666",
+        "name": "gate_d_repo_recovery.lock",
+        "nlink": 1,
+        "size": 0,
+        "uid": 0
+      }
+    ],
+    "marker": "PREREQUISITE_LOCKS_OK"
+  },
+  "pin": "844ff36bc8ad47c20af20f6ca87305be92973c23",
+  "remote_lock_output_sha256": "c0eb920393f02cd296a53e103628bf967e9b74a0b7f1f3eabaac5208e7caebb2",
+  "remote_locks": {
+    "0": {
+      "host": "t1v-n-ae271d05-w-0",
+      "locks": [
+        {
+          "dev": 2049,
+          "gid": 0,
+          "ino": 49171,
+          "mode": "0666",
+          "name": "gate_d_repo_recovery.lock",
+          "nlink": 1,
+          "size": 0,
+          "uid": 0
+        }
+      ],
+      "marker": "PREREQUISITE_LOCKS_OK"
+    },
+    "1": {
+      "host": "t1v-n-ae271d05-w-1",
+      "locks": [
+        {
+          "dev": 2049,
+          "gid": 0,
+          "ino": 1291514,
+          "mode": "0666",
+          "name": "gate_d_repo_recovery.lock",
+          "nlink": 1,
+          "size": 0,
+          "uid": 0
+        }
+      ],
+      "marker": "PREREQUISITE_LOCKS_OK"
+    },
+    "2": {
+      "host": "t1v-n-ae271d05-w-2",
+      "locks": [
+        {
+          "dev": 2049,
+          "gid": 0,
+          "ino": 1559322,
+          "mode": "0666",
+          "name": "gate_d_repo_recovery.lock",
+          "nlink": 1,
+          "size": 0,
+          "uid": 0
+        }
+      ],
+      "marker": "PREREQUISITE_LOCKS_OK"
+    },
+    "3": {
+      "host": "t1v-n-ae271d05-w-3",
+      "locks": [
+        {
+          "dev": 2049,
+          "gid": 0,
+          "ino": 778948,
+          "mode": "0666",
+          "name": "gate_d_repo_recovery.lock",
+          "nlink": 1,
+          "size": 0,
+          "uid": 0
+        }
+      ],
+      "marker": "PREREQUISITE_LOCKS_OK"
+    },
+    "4": {
+      "host": "t1v-n-ae271d05-w-4",
+      "locks": [
+        {
+          "dev": 2049,
+          "gid": 0,
+          "ino": 291828,
+          "mode": "0666",
+          "name": "gate_d_repo_recovery.lock",
+          "nlink": 1,
+          "size": 0,
+          "uid": 0
+        }
+      ],
+      "marker": "PREREQUISITE_LOCKS_OK"
+    },
+    "5": {
+      "host": "t1v-n-ae271d05-w-5",
+      "locks": [
+        {
+          "dev": 2049,
+          "gid": 0,
+          "ino": 1849201,
+          "mode": "0666",
+          "name": "gate_d_repo_recovery.lock",
+          "nlink": 1,
+          "size": 0,
+          "uid": 0
+        }
+      ],
+      "marker": "PREREQUISITE_LOCKS_OK"
+    },
+    "6": {
+      "host": "t1v-n-ae271d05-w-6",
+      "locks": [
+        {
+          "dev": 2049,
+          "gid": 0,
+          "ino": 292554,
+          "mode": "0666",
+          "name": "gate_d_repo_recovery.lock",
+          "nlink": 1,
+          "size": 0,
+          "uid": 0
+        }
+      ],
+      "marker": "PREREQUISITE_LOCKS_OK"
+    },
+    "7": {
+      "host": "t1v-n-ae271d05-w-7",
+      "locks": [
+        {
+          "dev": 2049,
+          "gid": 0,
+          "ino": 290109,
+          "mode": "0666",
+          "name": "gate_d_repo_recovery.lock",
+          "nlink": 1,
+          "size": 0,
+          "uid": 0
+        }
+      ],
+      "marker": "PREREQUISITE_LOCKS_OK"
+    }
+  },
+  "root_helper_sha256": "13dc4f85768edbf66733ba0b4592361d1f938ecadf3871341b945f56a385f68f",
+  "script_sha256": "a8753a8265dc8b8c132218dfcbb9328340f991c82b2d2d53ae47a8c092c9ee19",
+  "status": "PREREQUISITES_PROVISIONED",
+  "tag": "gate_d_repo_prerequisite_20260901T013157641110677Z",
+  "threat_boundary": "same_uid_is_trusted_passwordless_sudo_administrator",
+  "tpu_work": false,
+  "workers": 8
+}

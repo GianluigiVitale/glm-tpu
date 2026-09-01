@@ -2,7 +2,30 @@
 
 **Updated:** 2026-09-01 UTC
 
-## 2026-09-01 Gate-D prerequisite v2 materialized state but receipt root rejected; v3 pending
+## 2026-09-01 Gate-D repository prerequisites fully receipted; recovery pending review
+
+- Sol approved exact v3 persistence SHA `9200901b...`; commit
+  `844ff36bc8ad47c20af20f6ca87305be92973c23` is pushed and all six changed files replay from the
+  locked `US-CENTRAL2` mirror. Sol separately approved install-only tree `67187acf...ec2`; it is
+  atomically installed root-owned at `/opt/glm-tpu/gate-d-repository-prerequisites-v3` with exact
+  two-file membership, 0755 modes, zero xattrs and no staging residue.
+- After Sol rejected one bare-`sudo` draft and one inaccurate read-open claim before execution, the
+  corrected exact invocation used fresh tag
+  `gate_d_repo_prerequisite_20260901T013157641110677Z`. It terminally returned
+  `PREREQUISITES_PROVISIONED` in 24.29534 s at pin `844ff36...3c23`; exact private receipt bytes are
+  `docs/artifacts/gate-d-repository-prerequisite-v3-provisioned.json`, 6,027 bytes, SHA
+  `b95eaec18910a0b536b74ca9065e3155597788a40af78062ba9fd9a0aa9830da`.
+- Independent replay validates the owner-only 0700 parent, O_EXCL 0600 receipt/inode/hash, exact
+  installed source/controller identities, four held lease identities, unchanged reviewed cron with
+  disposition `existing`, and eight unique live root-owned recovery-lock identities matching the
+  receipt. The repository remains clean at origin; no repository mutation, recovery, JAX/HLO,
+  model, TPU or bucket-write work ran.
+- This closes prerequisite materialization and receipt only. Exact next is a separate adversarial
+  review of the already persisted root-owned recovery controller, followed by at most one
+  repository-only eight-worker recovery. HLO work remains unauthorized until recovery evidence is
+  independently persisted and reviewed. V1/v2 and both burned tags must never run again.
+
+## 2026-09-01 Gate-D prerequisite v2 materialized state but receipt root rejected
 
 - Sol approved v2 persistence staged `13ee096b...`; commit
   `2e528474cf2de48edfe641b0ac2eb9348ef098da` is pushed and exact-mirrored. Sol separately approved
@@ -17,11 +40,11 @@
   validated these before `_write_evidence`; repositories remain untouched and no JAX/HLO/model/TPU
   work ran. Terminal artifact:
   `docs/artifacts/gate-d-repository-prerequisite-v2-evidence-root-failure.json`.
-- V3 writes O_EXCL receipts beneath existing owner-only `/home/gianl/gate-d-runs` and requires its
+- V3 was designed to write O_EXCL receipts beneath owner-only `/home/gianl/gate-d-runs` and require its
   exact uid/gid/mode 0700/no-xattr boundary. It uses a fresh no-replace v3 install path; v1/v2 and
-  both burned tags must never run again. Current unreviewed identities: tree `67187acf...ec2`,
+  both burned tags must never run again. At this boundary its unreviewed identities were tree `67187acf...ec2`,
   controller `a8753a82...ee19`, unchanged helper `13dc4f85...f68f`, tests `4595f7b1...e61a`.
-  Focused tests pass 24/24 and the adjacent boundary passes 104/104. Exact next is review/persist
+  Focused tests passed 24/24 and the adjacent boundary passed 104/104. Exact next was review/persist
   only this v3 correction/evidence, then separately review v3 install and fresh-tag idempotent
   receipt completion. Repository recovery and HLO remain unauthorized.
 

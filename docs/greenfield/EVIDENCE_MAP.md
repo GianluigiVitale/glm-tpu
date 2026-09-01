@@ -2577,9 +2577,15 @@ non-group-writable parent contract. Exact live reconstruction is recorded in
 `docs/artifacts/gate-d-repository-prerequisite-v2-evidence-root-failure.json`; no repository,
 JAX/HLO/model or TPU work ran.
 
-The unreviewed v3 tree `67187acf...ec2`, controller `a8753a82...ee19`, unchanged helper
-`13dc4f85...f68f` and tests `4595f7b1...e61a` move the O_EXCL receipt to existing owner-only
-`/home/gianl/gate-d-runs` and require its exact uid/gid/mode 0700/no-xattr boundary. Focused tests
-pass 24/24 and the adjacent boundary passes 104/104. V3 remains uncommitted/uninstalled. Existing
-prerequisites are materialized but unreceipted; repository recovery and HLO work remain
-unauthorized.
+Sol approved v3 persistence and install separately. Commit `844ff36...3c23` is pushed and its six
+changed files exact-hash replay from `US-CENTRAL2`; immutable v3 tree `67187acf...ec2` is installed
+root-owned with exact 0755 two-file membership and zero xattrs. The separately approved invocation
+under fresh tag `gate_d_repo_prerequisite_20260901T013157641110677Z` returned
+`PREREQUISITES_PROVISIONED` in 24.29534 s. Exact receipt
+`docs/artifacts/gate-d-repository-prerequisite-v3-provisioned.json` is 6,027 bytes and SHA
+`b95eaec1...30da`; it binds the 0700 private parent, 0600 O_EXCL receipt, installed FDs, exact
+controller/source hashes, four held leases, unchanged reviewed cron (`existing`), and eight unique
+worker recovery locks. Independent live stat replay matches all eight lock identities; the local
+repository remains clean at origin. No repository mutation/recovery, JAX/HLO, model, TPU or bucket
+write ran. Prerequisites are now materialized and receipted; repository recovery requires its own
+review, and HLO remains unauthorized.
