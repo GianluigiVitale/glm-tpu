@@ -9644,3 +9644,28 @@ workload and rsync locks free, no v2 process and no local libtpu holder. Artifac
 only. No JAX/backend/HLO/TPU/cloud/network, numerical/performance work or 8K occurred. Gate D is
 open. Exact next after adversarial evidence review, commit/push and locked same-region mirror is a
 separate execution-only review of one fresh, append-only protected tag.
+
+## 2026-09-01 forced-round PP16 numerical rejection authenticated
+
+Protected tag `gate_d_forced_round_pp16_numerical_20260901T164835192240185Z` compiled and invoked
+the exact two-chip stage-zero executable once, transferred one bounded nine-array result tree and
+returned `NUMERICAL_REJECTED`. The success publisher then failed before terminal publication because
+its shared Python dependency policy omitted the exact committed forced-HLO acquisition helper. The
+wrapper preserved a terminal-last diagnostic instead; the tag is burned and must never be rerun.
+
+Committed read-only adjudicator pin `b13a4eeddb17eb5757535297778c1c7610841056` is exact on origin
+and the locked `US-CENTRAL2` Git mirror (checkout archive `f55f63db...33e6`). It authenticates the
+helper at both run and HLO-acquisition pins without widening shared roots, replays all 18
+generation-qualified objects, proves exhaustive soft-deleted count zero and reclassifies all nine
+raw arrays against the sealed accepted capsule. Artifact
+`docs/artifacts/gate-d-forced-round-pp16-numerical-diagnostic-adjudication.json` is 5,977 bytes,
+SHA-256 `edb358db9671a979e7d50b8b82aa8e5d834072c927cd82b63be923e4284d4e29`.
+
+RMS BF16 operands, RMS FP32 input and both normalized BF16 owners are exact. Both query owners and
+the current key differ; therefore forced normalized-BF16 materialization is rejected as sufficient,
+and the first observed frontier is the query projection output. This does not yet identify the
+causal dot algorithm, accumulation precision or layout. Classification is
+`BOUNDED_TPU_NUMERICAL_REJECTED;SUCCESS_PUBLICATION_POLICY_FAILURE;DIAGNOSTIC_ARCHIVE_AUTHENTICATED;
+PROJECTION_FRONTIER_LOCALIZED;GATE_D_OPEN`. No performance, decoder, 8K or closure authority exists.
+Exact next is a CPU-only explicit projection-arithmetic analyzer; no further TPU run until a
+genuinely distinct mechanism passes offline and HLO admission.

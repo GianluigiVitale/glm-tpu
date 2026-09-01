@@ -11,6 +11,10 @@ from types import ModuleType
 import pytest
 
 ROOT = Path(__file__).parents[3]
+ARTIFACT = ROOT / (
+    "docs/artifacts/"
+    "gate-d-forced-round-pp16-numerical-diagnostic-adjudication.json"
+)
 
 
 def _load(relative: str, name: str) -> ModuleType:
@@ -77,6 +81,36 @@ def test_local_diagnostic_is_independently_reclassified(
         "layer1.normalized:owner0"
     ]
     assert not numerical["candidate_watchpoint_matches"]["layer1.query:owner0"]
+
+
+def test_tracked_adjudication_binds_committed_validator_and_rejection() -> None:
+    raw = ARTIFACT.read_bytes()
+    report = json.loads(raw)
+    assert raw == MODULE._canonical_json(report)
+    assert MODULE._sha256(raw) == (
+        "edb358db9671a979e7d50b8b82aa8e5d834072c927cd82b63be923e4284d4e29"
+    )
+    assert report["artifact_kind"] == (
+        "gate_d_forced_round_pp16_numerical_diagnostic_adjudication"
+    )
+    assert report["adjudicator_code_hash"] == (
+        "b13a4eeddb17eb5757535297778c1c7610841056"
+    )
+    assert report["adjudicator_source_sha256"] == MODULE._sha256(
+        (ROOT / MODULE.SOURCE_PATH).read_bytes()
+    )
+    assert report["classification"] == MODULE.FINAL_CLASSIFICATION
+    assert report["diagnostic_ledger_sha256"] == MODULE.LEDGER_SHA256
+    assert report["run_code_hash"] == MODULE.RUN_PIN
+    assert report["run_tag"] == MODULE.RUN_TAG
+    assert report["exact_remote_object_count"] == 18
+    assert len(report["remote_manifest"]) == 18
+    assert report["soft_deleted_object_count"] == 0
+    assert report["terminal_generation"] == "1788281509956605"
+    assert report["tpu_numerical_execution_performed"] is True
+    assert report["tpu_rerun_performed"] is False
+    assert report["performance_claim"] is False
+    assert report["gate_d_closed"] is False
 
 
 def test_ledger_bytes_are_fixed(tmp_path: Path) -> None:

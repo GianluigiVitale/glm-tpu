@@ -3051,3 +3051,31 @@ execution is authorized by this source batch.
 - Authority: installation only. No launcher/JAX/backend/HLO/TPU/cloud/network, numerical,
   performance or 8K claim. Gate D remains open. Exact next after review/persistence is a separate
   execution-only review for one fresh append-only protected tag.
+
+## 2026-09-01 forced-round PP16 numerical diagnostic adjudication
+
+- Burned tag: `gate_d_forced_round_pp16_numerical_20260901T164835192240185Z`; exactly one compiled
+  executable invocation and one bounded nine-array host transfer completed. The numerical result is
+  `NUMERICAL_REJECTED`; success publication alone failed on an overly narrow caller dependency rule.
+- Adjudicator: `scripts/greenfield/adjudicate_gate_d_forced_round_pp16_numerical_diagnostic.py`,
+  committed pin `b13a4eeddb17eb5757535297778c1c7610841056`, source SHA-256
+  `cbb47b6262c1a7251558f061744bad4482701732dc69403b16bf316c76d496db`. Origin and locked
+  `US-CENTRAL2` mirror are exact; checkout archive SHA-256 is
+  `f55f63dbc22816bc040f907f219892c40f602e291a75d4a15ebc4b1e9ca833e6`.
+- Artifact: `docs/artifacts/gate-d-forced-round-pp16-numerical-diagnostic-adjudication.json`, 5,977
+  bytes, SHA-256 `edb358db9671a979e7d50b8b82aa8e5d834072c927cd82b63be923e4284d4e29`.
+  It replays 18 exact generation-qualified objects, requires terminal generation
+  `1788281509956605` after every payload, proves exhaustive soft-deleted count zero, validates both
+  8-host clean censuses, exact StableHLO/optimized HLO, runtime/mirror/dependencies and independently
+  reclassifies all nine output arrays against the sealed accepted capsule.
+- Scientific result: RMS operands/input and both normalized BF16 owners match exactly; both query
+  owners and current key differ. Forced normalized-BF16 materialization is therefore rejected as
+  sufficient. The first observed divergence is the query projection output; the exact dot
+  algorithm/precision/layout cause remains unproven.
+- Verification: Sol first withheld two P1s (non-exhaustive soft-delete query and missing dual-pin
+  helper binding); both were fixed and the re-review returned `APPROVE` with no P0--P2. Final suites
+  pass 73/73 focused and 435/435 adjacent CPU-only tests with one immutable historical certificate
+  regeneration assertion intentionally deselected; Ruff, Python compilation and diff-check pass.
+- Authority: bounded numerical rejection and authenticated diagnostic only. Gate D, decoder, 8K,
+  performance and causality remain open. Exact next is the smallest CPU-only explicit
+  projection-product/rounding/accumulation/association analyzer; do not rerun this tag or mechanism.
