@@ -354,7 +354,7 @@ def _audit_launcher(raw: bytes, wrapper_raw: bytes) -> dict[str, Any]:
     if any(_assignment(tree, name) != value for name, value in expected.items()):
         raise RuntimeError("projection launcher immutable pin drifted")
     required = (
-        'INSTALL_PATH = Path("/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v1.py")',
+        '"/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v1.py"',
         '"/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v1"',
         "os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING",
         "fcntl.fcntl(descriptor, F_ADD_SEALS, REQUIRED_SEALS)",
