@@ -16,6 +16,7 @@ from copy import deepcopy
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -25,9 +26,7 @@ TPU_REPLAY = ROOT / "glm_tpu/greenfield/benchmarking/gate_d_compensated_pp16_hlo
 DRIVER = ROOT / "scripts/greenfield/acquire_gate_d_compensated_pp16_hlo.py"
 WRAPPER = ROOT / "scripts/greenfield/run_gate_d_compensated_pp16_hlo.sh"
 PUBLISHER = ROOT / "scripts/greenfield/publish_gate_d_compensated_pp16_hlo.py"
-STORAGE_SITE_BUILDER = (
-    ROOT / "scripts/greenfield/build_gate_d_storage_site_capsule.py"
-)
+STORAGE_SITE_BUILDER = ROOT / "scripts/greenfield/build_gate_d_storage_site_capsule.py"
 STORAGE_SITE_BUILD = (
     ROOT / "docs/artifacts/gate-d-compensated-pp16-storage-site-build.json"
 )
@@ -68,6 +67,27 @@ TEST_PUBLICATION_RUNTIME_RAW = PUBLISHER_MODULE._canonical(
         "python_runtime_tree_sha256": "c" * 64,
     }
 )
+
+
+def _accelerator_device_record(
+    path: str = "/dev/accel2",
+) -> dict[str, int | str]:
+    suffix = int(path[-1])
+    node_device = os.makedev(0, 5)
+    return {
+        "gid": 0,
+        "mapped_device_major": 0,
+        "mapped_device_minor": 5,
+        "mapped_inode": 373,
+        "mode": 0o666,
+        "nlink": 1,
+        "node_device": node_device,
+        "node_inode": 373,
+        "path": path,
+        "rdev_major": 121,
+        "rdev_minor": suffix,
+        "uid": 0,
+    }
 
 
 def _function(path: Path, name: str) -> ast.FunctionDef:
@@ -230,9 +250,9 @@ def test_driver_compiles_once_and_contains_no_executable_invocation() -> None:
     assert "_verify_running_source" in source
     assert "_compiler_dependency_records" in source
     assert "_validate_python_runtime" in source
-    assert source.index("dependency_sites = _validate_dependency_sites()") < source.index(
-        "import jax"
-    )
+    assert source.index(
+        "dependency_sites = _validate_dependency_sites()"
+    ) < source.index("import jax")
     assert source.rindex("_validate_dependency_sites()") > source.index(
         "compiled = lowered.compile()"
     )
@@ -317,6 +337,189 @@ def test_compiler_dependency_roots_exclude_mutable_uv_runtime() -> None:
         )
 
 
+def _fake_accelerator_metadata(**changes: int) -> SimpleNamespace:
+    values = {
+        "st_dev": os.makedev(0, 5),
+        "st_gid": 0,
+        "st_ino": 373,
+        "st_mode": stat.S_IFCHR | 0o666,
+        "st_nlink": 1,
+        "st_rdev": os.makedev(121, 2),
+        "st_uid": 0,
+    }
+    values.update(changes)
+    return SimpleNamespace(**values)
+
+
+def _fake_accelerator_directory_metadata(**changes: int) -> SimpleNamespace:
+    values = {
+        "st_dev": os.makedev(0, 5),
+        "st_gid": 0,
+        "st_ino": 101,
+        "st_mode": stat.S_IFDIR | 0o755,
+        "st_uid": 0,
+    }
+    values.update(changes)
+    return SimpleNamespace(**values)
+
+
+@pytest.fixture
+def mocked_accelerator_directory_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        DRIVER_MODULE,
+        "_verify_accelerator_device_directory_named",
+        lambda **kwargs: None,
+    )
+
+
+def test_accelerator_device_mapping_is_raw_exact_and_identity_bound(
+    monkeypatch: pytest.MonkeyPatch,
+    mocked_accelerator_directory_identity: None,
+) -> None:
+    metadata = _fake_accelerator_metadata()
+    monkeypatch.setattr(DRIVER_MODULE.os, "stat", lambda *args, **kwargs: metadata)
+    assert (
+        DRIVER_MODULE._accelerator_device_mapping_record(
+            "/dev/accel2",
+            (0, 5, 373),
+            root_directory_fd=16,
+            device_directory_fd=17,
+        )
+        == _accelerator_device_record()
+    )
+
+
+@pytest.mark.parametrize(
+    ("raw_path", "mapped_identity"),
+    (
+        ("/tmp/accel2", (0, 5, 373)),
+        ("/dev/accel2 (deleted)", (0, 5, 373)),
+        ("/dev/accel4", (0, 5, 373)),
+        ("/dev/accel2", (0, 5, 999)),
+    ),
+)
+def test_accelerator_device_mapping_alias_deleted_suffix_and_map_drift_reject(
+    raw_path: str,
+    mapped_identity: tuple[int, int, int],
+    monkeypatch: pytest.MonkeyPatch,
+    mocked_accelerator_directory_identity: None,
+) -> None:
+    metadata = _fake_accelerator_metadata()
+    monkeypatch.setattr(DRIVER_MODULE.os, "stat", lambda *args, **kwargs: metadata)
+    with pytest.raises(RuntimeError, match="unsupported non-regular|identity drifted"):
+        DRIVER_MODULE._accelerator_device_mapping_record(
+            raw_path,
+            mapped_identity,
+            root_directory_fd=16,
+            device_directory_fd=17,
+        )
+
+
+def test_accelerator_device_mapping_symlink_normalization_rejects(
+    monkeypatch: pytest.MonkeyPatch,
+    mocked_accelerator_directory_identity: None,
+) -> None:
+    monkeypatch.setattr(
+        DRIVER_MODULE.os.path,
+        "realpath",
+        lambda path: "/dev/accel1" if path == "/dev/accel2" else path,
+    )
+    with pytest.raises(RuntimeError, match="unsupported non-regular"):
+        DRIVER_MODULE._accelerator_device_mapping_record(
+            "/dev/accel2",
+            (0, 5, 373),
+            root_directory_fd=16,
+            device_directory_fd=17,
+        )
+
+
+@pytest.mark.parametrize(
+    "changes",
+    (
+        {"st_mode": stat.S_IFREG | 0o666},
+        {"st_uid": 1},
+        {"st_gid": 1},
+        {"st_mode": stat.S_IFCHR | 0o660},
+        {"st_nlink": 2},
+        {"st_rdev": os.makedev(120, 2)},
+        {"st_rdev": os.makedev(121, 1)},
+    ),
+)
+def test_accelerator_device_mapping_type_owner_mode_and_rdev_reject(
+    changes: dict[str, int],
+    monkeypatch: pytest.MonkeyPatch,
+    mocked_accelerator_directory_identity: None,
+) -> None:
+    metadata = _fake_accelerator_metadata(**changes)
+    monkeypatch.setattr(DRIVER_MODULE.os, "stat", lambda *args, **kwargs: metadata)
+    with pytest.raises(RuntimeError, match="identity drifted"):
+        DRIVER_MODULE._accelerator_device_mapping_record(
+            "/dev/accel2",
+            (0, 5, 373),
+            root_directory_fd=16,
+            device_directory_fd=17,
+        )
+
+
+def test_accelerator_device_mapping_named_node_replacement_rejects(
+    monkeypatch: pytest.MonkeyPatch,
+    mocked_accelerator_directory_identity: None,
+) -> None:
+    snapshots = iter(
+        (_fake_accelerator_metadata(), _fake_accelerator_metadata(st_ino=374))
+    )
+    monkeypatch.setattr(
+        DRIVER_MODULE.os, "stat", lambda *args, **kwargs: next(snapshots)
+    )
+    with pytest.raises(RuntimeError, match="mapping changed"):
+        DRIVER_MODULE._accelerator_device_mapping_record(
+            "/dev/accel2",
+            (0, 5, 373),
+            root_directory_fd=16,
+            device_directory_fd=17,
+        )
+
+
+def test_arbitrary_nonregular_compiler_mapping_rejects() -> None:
+    metadata = Path("/dev/null").stat()
+    mapped_identity = (
+        os.major(metadata.st_dev),
+        os.minor(metadata.st_dev),
+        metadata.st_ino,
+    )
+    root_directory_fd, device_directory_fd = (
+        DRIVER_MODULE._open_accelerator_device_directory()
+    )
+    try:
+        with pytest.raises(RuntimeError, match="unsupported non-regular"):
+            DRIVER_MODULE._classify_compiler_mapping(
+                "/dev/null",
+                mapped_identity,
+                root_directory_fd=root_directory_fd,
+                device_directory_fd=device_directory_fd,
+            )
+    finally:
+        os.close(device_directory_fd)
+        os.close(root_directory_fd)
+
+
+@pytest.mark.parametrize("module", (DRIVER_MODULE, PUBLISHER_MODULE))
+def test_accelerator_device_directory_named_substitution_rejects(
+    module: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    held = _fake_accelerator_directory_metadata()
+    named_replacement = _fake_accelerator_directory_metadata(st_ino=102)
+    monkeypatch.setattr(module.os, "fstat", lambda descriptor: held)
+    monkeypatch.setattr(module.os, "stat", lambda *args, **kwargs: named_replacement)
+    with pytest.raises(RuntimeError, match="directory identity drifted"):
+        module._verify_accelerator_device_directory_named(
+            root_directory_fd=16,
+            device_directory_fd=17,
+        )
+
+
 def test_compiler_import_path_and_dependency_sites_fail_closed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -382,10 +585,12 @@ def test_authority_json_is_parsed_from_the_single_hashed_snapshot(
 
 def test_dependency_prefix_requires_prior_files_to_remain_identical() -> None:
     before = {
+        "accelerator_device_nodes_observed_mapped": [_accelerator_device_record()],
         "native_mappings": [{"path": "/usr/lib/a", "sha256": "1" * 64}],
         "python_modules": [{"path": "/usr/lib/b", "sha256": "2" * 64}],
     }
     after = {
+        "accelerator_device_nodes_observed_mapped": [_accelerator_device_record()],
         "native_mappings": [
             {"path": "/usr/lib/a", "sha256": "1" * 64},
             {"path": "/usr/lib/new", "sha256": "3" * 64},
@@ -394,6 +599,14 @@ def test_dependency_prefix_requires_prior_files_to_remain_identical() -> None:
     }
     DRIVER_MODULE._require_dependency_prefix_stable(before, after)
     after["python_modules"][0]["sha256"] = "4" * 64
+    with pytest.raises(RuntimeError, match="changed during compile"):
+        DRIVER_MODULE._require_dependency_prefix_stable(before, after)
+    after = deepcopy(before)
+    after["accelerator_device_nodes_observed_mapped"] = []
+    with pytest.raises(RuntimeError, match="changed during compile"):
+        DRIVER_MODULE._require_dependency_prefix_stable(before, after)
+    after = deepcopy(before)
+    after["accelerator_device_nodes_observed_mapped"][0]["node_inode"] = 374
     with pytest.raises(RuntimeError, match="changed during compile"):
         DRIVER_MODULE._require_dependency_prefix_stable(before, after)
 
@@ -431,6 +644,16 @@ def test_dependency_path_order_is_identical_for_numpy_and_numpy_libs() -> None:
         )
 
 
+def test_accelerator_device_digest_projection_matches_producer_and_publisher() -> None:
+    records = [_accelerator_device_record()]
+    assert DRIVER_MODULE._accelerator_device_nodes_sha256(
+        records
+    ) == PUBLISHER_MODULE._accelerator_device_nodes_sha256(records)
+    assert (DRIVER_MODULE._canonical(records) + "\n").encode(
+        "ascii"
+    ) == PUBLISHER_MODULE._canonical(records)
+
+
 def test_publisher_rejects_mutable_compiler_dependency_root() -> None:
     record = {
         "bytes": 1,
@@ -441,6 +664,81 @@ def test_publisher_rejects_mutable_compiler_dependency_root() -> None:
     }
     with pytest.raises(RuntimeError, match="dependency escaped allowed roots"):
         PUBLISHER_MODULE._validate_dependency_records([record], "native_mappings")
+
+
+def test_publisher_accepts_exact_accelerator_device_node_record() -> None:
+    PUBLISHER_MODULE._validate_accelerator_device_mapping_records(
+        [_accelerator_device_record()]
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("uid", 1),
+        ("gid", 1),
+        ("mode", 0o660),
+        ("nlink", 2),
+        ("rdev_major", 120),
+        ("rdev_minor", 1),
+        ("mapped_inode", True),
+        ("mapped_inode", 0),
+        ("node_inode", 374),
+        ("mapped_device_minor", 6),
+        ("path", "/dev/accel2 (deleted)"),
+        ("path", "/tmp/accel2"),
+    ),
+)
+def test_publisher_rejects_accelerator_device_node_schema_drift(
+    field: str, value: object
+) -> None:
+    record = _accelerator_device_record()
+    record[field] = value
+    with pytest.raises(RuntimeError, match="mapping identity drifted"):
+        PUBLISHER_MODULE._validate_accelerator_device_mapping_records([record])
+
+
+def test_publisher_rejects_accelerator_extra_key_duplicates_and_order() -> None:
+    extra = {**_accelerator_device_record(), "unexpected": 1}
+    with pytest.raises(RuntimeError, match="mapping record drifted"):
+        PUBLISHER_MODULE._validate_accelerator_device_mapping_records([extra])
+    duplicate = [_accelerator_device_record(), _accelerator_device_record()]
+    with pytest.raises(
+        RuntimeError, match="mapping identity is duplicated|order drifted"
+    ):
+        PUBLISHER_MODULE._validate_accelerator_device_mapping_records(duplicate)
+    first = _accelerator_device_record("/dev/accel1")
+    first["mapped_inode"] = first["node_inode"] = 372
+    second = _accelerator_device_record("/dev/accel2")
+    with pytest.raises(RuntimeError, match="mapping order drifted"):
+        PUBLISHER_MODULE._validate_accelerator_device_mapping_records([second, first])
+    duplicate_identity = _accelerator_device_record("/dev/accel1")
+    with pytest.raises(RuntimeError, match="identity is duplicated"):
+        PUBLISHER_MODULE._validate_accelerator_device_mapping_records(
+            [duplicate_identity, second]
+        )
+
+
+def test_publisher_rejects_live_accelerator_node_replacement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    snapshots = iter(
+        (_fake_accelerator_metadata(), _fake_accelerator_metadata(st_ino=374))
+    )
+    monkeypatch.setattr(
+        PUBLISHER_MODULE.os, "stat", lambda *args, **kwargs: next(snapshots)
+    )
+    monkeypatch.setattr(
+        PUBLISHER_MODULE,
+        "_verify_accelerator_device_directory_named",
+        lambda **kwargs: None,
+    )
+    with pytest.raises(RuntimeError, match="mapping changed"):
+        PUBLISHER_MODULE._verify_accelerator_device_mapping_record_live(
+            _accelerator_device_record(),
+            root_directory_fd=16,
+            device_directory_fd=17,
+        )
 
 
 @pytest.mark.parametrize(
@@ -492,9 +790,7 @@ def test_publisher_requires_exact_sha_string_and_live_record() -> None:
     )
     integer_sha = {**record, "sha256": int("1" * 64)}
     with pytest.raises(RuntimeError, match="dependency identity drifted"):
-        PUBLISHER_MODULE._validate_dependency_records(
-            [integer_sha], "native_mappings"
-        )
+        PUBLISHER_MODULE._validate_dependency_records([integer_sha], "native_mappings")
     wrong_sha = {**record, "sha256": "0" * 64}
     with pytest.raises(RuntimeError, match="live bytes drifted"):
         PUBLISHER_MODULE._validate_dependency_records(
@@ -601,12 +897,15 @@ def test_storage_publication_capsule_replacement_fails_closed(tmp_path: Path) ->
     (root / "CAPSULE_MANIFEST.json").write_bytes(manifest_raw)
     tree_sha = PUBLISHER_MODULE._tree_sha256(root, require_sealed=False)
     manifest_sha = sha256(manifest_raw).hexdigest()
-    assert PUBLISHER_MODULE._validate_storage_site(
-        root,
-        expected_tree_sha256=tree_sha,
-        expected_manifest_sha256=manifest_sha,
-        require_sealed=False,
-    ) == manifest
+    assert (
+        PUBLISHER_MODULE._validate_storage_site(
+            root,
+            expected_tree_sha256=tree_sha,
+            expected_manifest_sha256=manifest_sha,
+            require_sealed=False,
+        )
+        == manifest
+    )
     dependency.write_text("VALUE = 'hostile replacement'\n")
     with pytest.raises(RuntimeError, match="dependency tree drifted"):
         PUBLISHER_MODULE._validate_storage_site(
@@ -710,9 +1009,7 @@ def test_wrapper_local_assignments_have_no_same_command_dependency() -> None:
 def test_strict_census_label_is_bound_before_member_under_nounset() -> None:
     wrapper = WRAPPER.read_text()
     fragment = (
-        "strict_census() {\n"
-        "  local label=$1\n"
-        '  local member="census_${label}.txt"\n'
+        'strict_census() {\n  local label=$1\n  local member="census_${label}.txt"\n'
     )
     assert fragment in wrapper
     completed = subprocess.run(
@@ -772,7 +1069,7 @@ def test_repository_verification_is_read_only_serial_and_fail_fast() -> None:
         in block
     )
     assert '[[ "$expected_layout" == linked ]]' in block
-    assert '[[ $worker -eq 0 ]] && expected_layout=linked' in block
+    assert "[[ $worker -eq 0 ]] && expected_layout=linked" in block
     assert "linked_pointer_bytes" in block
     assert "linked_backpointer_bytes" in block
     assert "linked_commondir_bytes" in block
@@ -795,8 +1092,8 @@ def test_repository_verification_is_read_only_serial_and_fail_fast() -> None:
     assert "value.st_nlink != 1" in block
     assert "value.st_size != 0" in block
     assert "catalogue.append(0)" in block
-    assert 'expected_missing_count=$7' in block
-    assert 'expected_promisor_sha=${10}' in block
+    assert "expected_missing_count=$7" in block
+    assert "expected_promisor_sha=${10}" in block
     assert '[[ "$missing_count" == "$expected_missing_count" ]]' in block
     assert '[[ "$promisor_sha" == "$expected_promisor_sha" ]]' in block
     assert "for-each-ref --format='%(refname)' refs/replace" in block
@@ -951,9 +1248,7 @@ def test_exact_worker_repo_verifier_is_no_write_and_fails_hostile_closure(
     assert not sentinel.exists()
     assert after == before
 
-    completed = _run_worker_repo_verify(
-        repo, pin, origin, expected_layout="linked"
-    )
+    completed = _run_worker_repo_verify(repo, pin, origin, expected_layout="linked")
     assert completed.returncode != 0
     assert "unexpected_layout" in completed.stderr
 
@@ -1329,12 +1624,12 @@ def test_exact_worker_repo_verifier_accepts_only_bound_linked_worktree(
         pin,
     )
     common = Path(
-        git(linked, "rev-parse", "--path-format=absolute", "--git-common-dir")
-        .stdout.strip()
+        git(
+            linked, "rev-parse", "--path-format=absolute", "--git-common-dir"
+        ).stdout.strip()
     )
     admin = Path(
-        git(linked, "rev-parse", "--path-format=absolute", "--git-dir")
-        .stdout.strip()
+        git(linked, "rev-parse", "--path-format=absolute", "--git-dir").stdout.strip()
     )
     for path in (
         linked / ".git",
@@ -1736,6 +2031,11 @@ def _fake_success_run(
     monkeypatch.setattr(
         PUBLISHER_MODULE, "_verify_dependency_record_live", lambda record: None
     )
+    monkeypatch.setattr(
+        PUBLISHER_MODULE,
+        "_verify_accelerator_device_mapping_record_live",
+        lambda record, **kwargs: None,
+    )
     run_root = tmp_path / "glm-run"
     run_root.mkdir(mode=0o700)
     monkeypatch.setattr(PUBLISHER_MODULE, "RUN_ROOT", run_root)
@@ -1747,6 +2047,10 @@ def _fake_success_run(
     optimized = b"HloModule test\n"
     stable = b"module @test {}\n"
     dependencies = {
+        "accelerator_device_observation_scope": (
+            PUBLISHER_MODULE._ACCELERATOR_DEVICE_OBSERVATION_SCOPE
+        ),
+        "accelerator_device_nodes_observed_mapped": [_accelerator_device_record()],
         "artifact_kind": "gate_d_compensated_pp16_compiler_dependencies",
         "code_hash": "1" * 40,
         "dependency_sites": {
@@ -1774,9 +2078,7 @@ def _fake_success_run(
         "python_runtime": {
             "python_executable": str(PUBLISHER_MODULE.PYTHON),
             "python_runtime_root": str(PUBLISHER_MODULE.PYTHON_RUNTIME_ROOT),
-            "python_runtime_tree_sha256": (
-                PUBLISHER_MODULE.PYTHON_RUNTIME_TREE_SHA256
-            ),
+            "python_runtime_tree_sha256": (PUBLISHER_MODULE.PYTHON_RUNTIME_TREE_SHA256),
             "python_sha256": PUBLISHER_MODULE.PYTHON_SHA256,
         },
         "python_modules": [
@@ -1801,6 +2103,12 @@ def _fake_success_run(
         "code_hash": "1" * 40,
         "compile_only": True,
         "compiler_dependency_manifest": {
+            "accelerator_device_node_count": 1,
+            "accelerator_device_nodes_sha256": (
+                DRIVER_MODULE._accelerator_device_nodes_sha256(
+                    dependencies["accelerator_device_nodes_observed_mapped"]
+                )
+            ),
             "byte_count": len(dependencies_raw),
             "filename": "dependencies.json",
             "native_mapping_count": 1,
@@ -1920,6 +2228,69 @@ def test_compiler_site_rebinding_refuses_before_remote_publication(
     dependencies["dependency_sites"]["libtpu"]["root"] = (
         "/home/gianl/vllm-env/lib/python3.12/site-packages"
     )
+    dependencies_raw = PUBLISHER_MODULE._canonical(dependencies)
+    dependencies_path.write_bytes(dependencies_raw)
+    runner_path = run / "runner.json"
+    runner = json.loads(runner_path.read_bytes())
+    runner["compiler_dependency_manifest"]["byte_count"] = len(dependencies_raw)
+    runner["compiler_dependency_manifest"]["sha256"] = sha256(
+        dependencies_raw
+    ).hexdigest()
+    runner_path.write_bytes(PUBLISHER_MODULE._canonical(runner))
+    bucket = _FakeBucket()
+    with pytest.raises(RuntimeError, match="compiler dependency manifest drifted"):
+        PUBLISHER_MODULE.publish_success(
+            run,
+            remote,
+            code_pin="1" * 40,
+            elapsed=7,
+            publication_runtime_raw=TEST_PUBLICATION_RUNTIME_RAW,
+            storage_bucket=bucket,
+        )
+    assert not bucket.mutations
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("accelerator_device_node_count", 0),
+        ("accelerator_device_node_count", True),
+        ("accelerator_device_nodes_sha256", "0" * 64),
+        ("accelerator_device_nodes_sha256", 1),
+    ),
+)
+def test_accelerator_device_manifest_rebinding_refuses_before_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    value: object,
+) -> None:
+    run, remote = _fake_success_run(tmp_path, monkeypatch)
+    runner_path = run / "runner.json"
+    runner = json.loads(runner_path.read_bytes())
+    runner["compiler_dependency_manifest"][field] = value
+    runner_path.write_bytes(PUBLISHER_MODULE._canonical(runner))
+    bucket = _FakeBucket()
+    with pytest.raises(RuntimeError, match="compiler dependency manifest drifted"):
+        PUBLISHER_MODULE.publish_success(
+            run,
+            remote,
+            code_pin="1" * 40,
+            elapsed=7,
+            publication_runtime_raw=TEST_PUBLICATION_RUNTIME_RAW,
+            storage_bucket=bucket,
+        )
+    assert not bucket.mutations
+
+
+def test_accelerator_device_scope_or_extra_manifest_key_refuses_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run, remote = _fake_success_run(tmp_path, monkeypatch)
+    dependencies_path = run / "dependencies.json"
+    dependencies = json.loads(dependencies_path.read_bytes())
+    dependencies["accelerator_device_observation_scope"] = "overclaimed VMA ledger"
+    dependencies["unexpected"] = True
     dependencies_raw = PUBLISHER_MODULE._canonical(dependencies)
     dependencies_path.write_bytes(dependencies_raw)
     runner_path = run / "runner.json"

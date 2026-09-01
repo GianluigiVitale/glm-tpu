@@ -60,10 +60,20 @@ STORAGE_SITE_BUILDER_SOURCE_SHA256 = (
     "b7f4f869ae9b98edf5195185bf49fffcf61ef6800a2b707127694b66424c5989"
 )
 SOURCE_PATH = "scripts/greenfield/publish_gate_d_compensated_pp16_hlo.py"
-COMPILER_DRIVER_PATH = REPO / "scripts/greenfield/acquire_gate_d_compensated_pp16_hlo.py"
+COMPILER_DRIVER_PATH = (
+    REPO / "scripts/greenfield/acquire_gate_d_compensated_pp16_hlo.py"
+)
 BUCKET_NAME = "driftbench-dsv4-uc"
 REMOTE_ROOT = "results/greenfield/glm52/gate_d_pp16_hlo/"
 TAG_PATTERN = re.compile(r"gate_d_compensated_pp16_hlo_[0-9]{8}T[0-9]{15}Z")
+_ACCELERATOR_DEVICE_PATTERN = re.compile(r"/dev/accel([0-3])")
+_ACCELERATOR_DEVICE_DIRECTORY_MODE = 0o755
+_ACCELERATOR_DEVICE_MODE = 0o666
+_ACCELERATOR_RDEV_MAJOR = 121
+_ACCELERATOR_DEVICE_OBSERVATION_SCOPE = (
+    "Unique canonical /dev/accel node paths observed mapped in the compiler "
+    "process, deduplicated by path; not a complete VMA catalogue."
+)
 SUCCESS_PAYLOAD = (
     "census_post.txt",
     "census_pre.txt",
@@ -217,10 +227,7 @@ def _validate_storage_site(
     expected_manifest_sha256: str,
     require_sealed: bool,
 ) -> dict[str, Any]:
-    if (
-        _tree_sha256(root, require_sealed=require_sealed)
-        != expected_tree_sha256
-    ):
+    if _tree_sha256(root, require_sealed=require_sealed) != expected_tree_sha256:
         raise RuntimeError("PP16 HLO publisher storage dependency tree drifted")
     manifest_raw = _snapshot_path(root / "CAPSULE_MANIFEST.json")
     if sha256(manifest_raw).hexdigest() != expected_manifest_sha256:
@@ -780,7 +787,9 @@ def _verify_dependency_record_live(record: Mapping[str, Any]) -> None:
             or metadata.st_dev != record["device"]
             or metadata.st_ino != record["inode"]
         ):
-            raise RuntimeError(f"PP16 HLO compiler dependency live identity drifted: {path}")
+            raise RuntimeError(
+                f"PP16 HLO compiler dependency live identity drifted: {path}"
+            )
         digest = sha256()
         while block := os.read(descriptor, 8 * 1024 * 1024):
             digest.update(block)
@@ -798,9 +807,231 @@ def _verify_dependency_record_live(record: Mapping[str, Any]) -> None:
             metadata.st_mtime_ns,
             metadata.st_ctime_ns,
         ) or digest.hexdigest() != record["sha256"]:
-            raise RuntimeError(f"PP16 HLO compiler dependency live bytes drifted: {path}")
+            raise RuntimeError(
+                f"PP16 HLO compiler dependency live bytes drifted: {path}"
+            )
     finally:
         os.close(descriptor)
+
+
+def _verify_accelerator_device_directory_named(
+    *, root_directory_fd: int, device_directory_fd: int
+) -> None:
+    held = os.fstat(device_directory_fd)
+    try:
+        named = os.stat("dev", dir_fd=root_directory_fd, follow_symlinks=False)
+    except OSError as error:
+        raise RuntimeError("accelerator device directory vanished") from error
+    if (
+        not stat.S_ISDIR(held.st_mode)
+        or not stat.S_ISDIR(named.st_mode)
+        or held.st_uid != 0
+        or held.st_gid != 0
+        or stat.S_IMODE(held.st_mode) != _ACCELERATOR_DEVICE_DIRECTORY_MODE
+        or (
+            held.st_mode,
+            held.st_uid,
+            held.st_gid,
+            held.st_dev,
+            held.st_ino,
+        )
+        != (
+            named.st_mode,
+            named.st_uid,
+            named.st_gid,
+            named.st_dev,
+            named.st_ino,
+        )
+    ):
+        raise RuntimeError("accelerator device directory identity drifted")
+
+
+def _open_accelerator_device_directory() -> tuple[int, int]:
+    root_directory_fd = os.open(
+        "/", os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
+    )
+    try:
+        device_directory_fd = os.open(
+            "dev",
+            os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW,
+            dir_fd=root_directory_fd,
+        )
+    except BaseException:
+        os.close(root_directory_fd)
+        raise
+    try:
+        _verify_accelerator_device_directory_named(
+            root_directory_fd=root_directory_fd,
+            device_directory_fd=device_directory_fd,
+        )
+    except BaseException:
+        os.close(device_directory_fd)
+        os.close(root_directory_fd)
+        raise
+    return root_directory_fd, device_directory_fd
+
+
+def _verify_accelerator_device_mapping_record_live(
+    record: Mapping[str, Any], *, root_directory_fd: int, device_directory_fd: int
+) -> None:
+    path = record["path"]
+    suffix = int(_ACCELERATOR_DEVICE_PATTERN.fullmatch(path).group(1))
+    _verify_accelerator_device_directory_named(
+        root_directory_fd=root_directory_fd,
+        device_directory_fd=device_directory_fd,
+    )
+
+    def named_metadata() -> os.stat_result:
+        try:
+            return os.stat(
+                f"accel{suffix}",
+                dir_fd=device_directory_fd,
+                follow_symlinks=False,
+            )
+        except OSError as error:
+            raise RuntimeError(
+                f"PP16 HLO accelerator device mapping vanished: {path}"
+            ) from error
+
+    before = named_metadata()
+    expected = {
+        "gid": int(before.st_gid),
+        "mapped_device_major": os.major(before.st_dev),
+        "mapped_device_minor": os.minor(before.st_dev),
+        "mapped_inode": int(before.st_ino),
+        "mode": stat.S_IMODE(before.st_mode),
+        "nlink": int(before.st_nlink),
+        "node_device": int(before.st_dev),
+        "node_inode": int(before.st_ino),
+        "path": path,
+        "rdev_major": os.major(before.st_rdev),
+        "rdev_minor": os.minor(before.st_rdev),
+        "uid": int(before.st_uid),
+    }
+    if (
+        not stat.S_ISCHR(before.st_mode)
+        or before.st_nlink != 1
+        or dict(record) != expected
+    ):
+        raise RuntimeError(
+            f"PP16 HLO accelerator device mapping live identity drifted: {path}"
+        )
+    after = named_metadata()
+    if (
+        after.st_mode,
+        after.st_uid,
+        after.st_gid,
+        after.st_nlink,
+        after.st_dev,
+        after.st_ino,
+        after.st_rdev,
+    ) != (
+        before.st_mode,
+        before.st_uid,
+        before.st_gid,
+        before.st_nlink,
+        before.st_dev,
+        before.st_ino,
+        before.st_rdev,
+    ):
+        raise RuntimeError(f"PP16 HLO accelerator device mapping changed: {path}")
+    _verify_accelerator_device_directory_named(
+        root_directory_fd=root_directory_fd,
+        device_directory_fd=device_directory_fd,
+    )
+
+
+def _validate_accelerator_device_mapping_records(
+    records: Any, *, verify_live: bool = False
+) -> None:
+    if not isinstance(records, list) or not records:
+        raise RuntimeError("PP16 HLO accelerator device mapping records are absent")
+    expected_keys = {
+        "gid",
+        "mapped_device_major",
+        "mapped_device_minor",
+        "mapped_inode",
+        "mode",
+        "nlink",
+        "node_device",
+        "node_inode",
+        "path",
+        "rdev_major",
+        "rdev_minor",
+        "uid",
+    }
+    paths: list[str] = []
+    identities: set[tuple[int, int, int]] = set()
+    directory_fds = _open_accelerator_device_directory() if verify_live else None
+    root_directory_fd = directory_fds[0] if directory_fds is not None else None
+    device_directory_fd = directory_fds[1] if directory_fds is not None else None
+    try:
+        for record in records:
+            if not isinstance(record, Mapping) or set(record) != expected_keys:
+                raise RuntimeError("PP16 HLO accelerator device mapping record drifted")
+            path = record["path"]
+            match = (
+                _ACCELERATOR_DEVICE_PATTERN.fullmatch(path)
+                if type(path) is str
+                else None
+            )
+            integers = tuple(record[key] for key in expected_keys - {"path"})
+            if (
+                match is None
+                or os.path.realpath(path) != path
+                or any(type(value) is not int or value < 0 for value in integers)
+            ):
+                raise RuntimeError(
+                    "PP16 HLO accelerator device mapping identity drifted"
+                )
+            suffix = int(match.group(1))
+            if (
+                record["uid"] != 0
+                or record["gid"] != 0
+                or record["mode"] != _ACCELERATOR_DEVICE_MODE
+                or record["nlink"] != 1
+                or record["rdev_major"] != _ACCELERATOR_RDEV_MAJOR
+                or record["rdev_minor"] != suffix
+                or record["mapped_inode"] <= 0
+                or record["node_inode"] != record["mapped_inode"]
+                or record["mapped_device_major"] != os.major(record["node_device"])
+                or record["mapped_device_minor"] != os.minor(record["node_device"])
+            ):
+                raise RuntimeError(
+                    "PP16 HLO accelerator device mapping identity drifted"
+                )
+            if verify_live:
+                _verify_accelerator_device_mapping_record_live(
+                    record,
+                    root_directory_fd=root_directory_fd,
+                    device_directory_fd=device_directory_fd,
+                )
+            paths.append(path)
+            identity = (
+                record["mapped_device_major"],
+                record["mapped_device_minor"],
+                record["mapped_inode"],
+            )
+            if identity in identities:
+                raise RuntimeError(
+                    "PP16 HLO accelerator device mapping identity is duplicated"
+                )
+            identities.add(identity)
+        if verify_live:
+            _verify_accelerator_device_directory_named(
+                root_directory_fd=root_directory_fd,
+                device_directory_fd=device_directory_fd,
+            )
+    finally:
+        if directory_fds is not None:
+            os.close(device_directory_fd)
+            os.close(root_directory_fd)
+    if paths != sorted(set(paths), key=_canonical_path_key):
+        raise RuntimeError("PP16 HLO accelerator device mapping order drifted")
+
+
+def _accelerator_device_nodes_sha256(records: Any) -> str:
+    return sha256(_canonical(records)).hexdigest()
 
 
 def _validate_dependency_records(
@@ -853,9 +1084,7 @@ def _validate_dependency_records(
         )
         if not any(
             resolved == root or root in resolved.parents for root in allowed_roots
-        ) and not (
-            category == "python_modules" and resolved == COMPILER_DRIVER_PATH
-        ):
+        ) and not (category == "python_modules" and resolved == COMPILER_DRIVER_PATH):
             raise RuntimeError(
                 f"PP16 HLO compiler dependency escaped allowed roots: {category}"
             )
@@ -890,22 +1119,71 @@ def _prepare_success(
         or runner.get("performance_claim") is not False
     ):
         raise RuntimeError("PP16 HLO runner claim boundary drifted")
+    if not isinstance(dependencies, Mapping):
+        raise RuntimeError("PP16 HLO compiler dependency manifest drifted")
     dependency_identity = runner.get("compiler_dependency_manifest", {})
+    accelerator_device_nodes = dependencies.get(
+        "accelerator_device_nodes_observed_mapped"
+    )
     native_mappings = dependencies.get("native_mappings")
     python_modules = dependencies.get("python_modules")
-    _validate_dependency_records(
-        native_mappings, "native_mappings", verify_live=True
+    _validate_accelerator_device_mapping_records(
+        accelerator_device_nodes, verify_live=True
     )
-    _validate_dependency_records(
-        python_modules, "python_modules", verify_live=True
-    )
+    _validate_dependency_records(native_mappings, "native_mappings", verify_live=True)
+    _validate_dependency_records(python_modules, "python_modules", verify_live=True)
     dependency_source = dependencies.get("sealed_project_source")
     compiler_python_runtime = dependencies.get("python_runtime")
     compiler_dependency_sites = dependencies.get("dependency_sites")
     runner_source = runner.get("sealed_project_source")
+    dependency_identity_keys = {
+        "accelerator_device_node_count",
+        "accelerator_device_nodes_sha256",
+        "byte_count",
+        "filename",
+        "native_mapping_count",
+        "python_module_count",
+        "sha256",
+    }
+    dependency_count_fields = (
+        "accelerator_device_node_count",
+        "byte_count",
+        "native_mapping_count",
+        "python_module_count",
+    )
     if (
-        dependencies.get("artifact_kind")
+        not isinstance(dependencies, Mapping)
+        or set(dependencies)
+        != {
+            "accelerator_device_observation_scope",
+            "accelerator_device_nodes_observed_mapped",
+            "artifact_kind",
+            "code_hash",
+            "dependency_sites",
+            "environment",
+            "native_mappings",
+            "python_modules",
+            "python_runtime",
+            "sealed_project_source",
+        }
+        or not isinstance(dependency_identity, Mapping)
+        or set(dependency_identity) != dependency_identity_keys
+        or any(
+            type(dependency_identity.get(name)) is not int
+            or dependency_identity[name] < 0
+            for name in dependency_count_fields
+        )
+        or type(dependency_identity.get("accelerator_device_nodes_sha256")) is not str
+        or not re.fullmatch(
+            r"[0-9a-f]{64}",
+            dependency_identity["accelerator_device_nodes_sha256"],
+        )
+        or type(dependency_identity.get("sha256")) is not str
+        or not re.fullmatch(r"[0-9a-f]{64}", dependency_identity["sha256"])
+        or dependencies.get("artifact_kind")
         != "gate_d_compensated_pp16_compiler_dependencies"
+        or dependencies.get("accelerator_device_observation_scope")
+        != _ACCELERATOR_DEVICE_OBSERVATION_SCOPE
         or dependencies.get("code_hash") != code_pin
         or dependencies.get("environment") != _EXPECTED_COMPILER_ENVIRONMENT
         or compiler_python_runtime
@@ -939,6 +1217,10 @@ def _prepare_success(
         or dependency_identity.get("filename") != "dependencies.json"
         or dependency_identity.get("byte_count") != len(dependencies_raw)
         or dependency_identity.get("sha256") != sha256(dependencies_raw).hexdigest()
+        or dependency_identity.get("accelerator_device_node_count")
+        != len(accelerator_device_nodes)
+        or dependency_identity.get("accelerator_device_nodes_sha256")
+        != _accelerator_device_nodes_sha256(accelerator_device_nodes)
         or dependency_identity.get("native_mapping_count") != len(native_mappings)
         or dependency_identity.get("python_module_count") != len(python_modules)
     ):

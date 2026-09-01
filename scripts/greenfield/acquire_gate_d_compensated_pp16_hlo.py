@@ -119,6 +119,14 @@ _COLLECTIVE_NAMES = (
 _F_ADD_SEALS = 1033
 _F_GET_SEALS = 1034
 _MEMFD_SEALS = 0x0001 | 0x0002 | 0x0004 | 0x0008
+_ACCELERATOR_DEVICE_PATTERN = r"/dev/accel([0-3])"
+_ACCELERATOR_DEVICE_DIRECTORY_MODE = 0o755
+_ACCELERATOR_DEVICE_MODE = 0o666
+_ACCELERATOR_RDEV_MAJOR = 121
+_ACCELERATOR_DEVICE_OBSERVATION_SCOPE = (
+    "Unique canonical /dev/accel node paths observed mapped in the compiler "
+    "process, deduplicated by path; not a complete VMA catalogue."
+)
 TAG_PATTERN = r"gate_d_compensated_pp16_hlo_[0-9]{8}T[0-9]{15}Z"
 _EXPECTED_ENVIRONMENT = {
     "HOME": "/home/gianl",
@@ -723,6 +731,182 @@ def _validate_native_mapping_root(path: Path) -> None:
         raise RuntimeError(f"compiler native mapping escaped allowed roots: {path}")
 
 
+def _verify_accelerator_device_directory_named(
+    *, root_directory_fd: int, device_directory_fd: int
+) -> None:
+    held = os.fstat(device_directory_fd)
+    try:
+        named = os.stat("dev", dir_fd=root_directory_fd, follow_symlinks=False)
+    except OSError as error:
+        raise RuntimeError("accelerator device directory vanished") from error
+    if (
+        not stat.S_ISDIR(held.st_mode)
+        or not stat.S_ISDIR(named.st_mode)
+        or held.st_uid != 0
+        or held.st_gid != 0
+        or stat.S_IMODE(held.st_mode) != _ACCELERATOR_DEVICE_DIRECTORY_MODE
+        or (
+            held.st_mode,
+            held.st_uid,
+            held.st_gid,
+            held.st_dev,
+            held.st_ino,
+        )
+        != (
+            named.st_mode,
+            named.st_uid,
+            named.st_gid,
+            named.st_dev,
+            named.st_ino,
+        )
+    ):
+        raise RuntimeError("accelerator device directory identity drifted")
+
+
+def _open_accelerator_device_directory() -> tuple[int, int]:
+    root_directory_fd = os.open(
+        "/", os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
+    )
+    try:
+        device_directory_fd = os.open(
+            "dev",
+            os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW,
+            dir_fd=root_directory_fd,
+        )
+    except BaseException:
+        os.close(root_directory_fd)
+        raise
+    try:
+        _verify_accelerator_device_directory_named(
+            root_directory_fd=root_directory_fd,
+            device_directory_fd=device_directory_fd,
+        )
+    except BaseException:
+        os.close(device_directory_fd)
+        os.close(root_directory_fd)
+        raise
+    return root_directory_fd, device_directory_fd
+
+
+def _accelerator_device_mapping_record(
+    raw_path: str,
+    mapped_identity: tuple[int, int, int],
+    *,
+    root_directory_fd: int,
+    device_directory_fd: int,
+) -> dict[str, int | str]:
+    match = re.fullmatch(_ACCELERATOR_DEVICE_PATTERN, raw_path)
+    if match is None or os.path.realpath(raw_path) != raw_path:
+        raise RuntimeError(f"unsupported non-regular compiler mapping: {raw_path}")
+    suffix = int(match.group(1))
+    _verify_accelerator_device_directory_named(
+        root_directory_fd=root_directory_fd,
+        device_directory_fd=device_directory_fd,
+    )
+
+    def named_metadata() -> os.stat_result:
+        try:
+            return os.stat(
+                f"accel{suffix}",
+                dir_fd=device_directory_fd,
+                follow_symlinks=False,
+            )
+        except OSError as error:
+            raise RuntimeError(
+                f"accelerator device mapping vanished: {raw_path}"
+            ) from error
+
+    before = named_metadata()
+    expected_mapping_identity = (
+        os.major(before.st_dev),
+        os.minor(before.st_dev),
+        before.st_ino,
+    )
+    if (
+        not stat.S_ISCHR(before.st_mode)
+        or before.st_uid != 0
+        or before.st_gid != 0
+        or before.st_nlink != 1
+        or stat.S_IMODE(before.st_mode) != _ACCELERATOR_DEVICE_MODE
+        or os.major(before.st_rdev) != _ACCELERATOR_RDEV_MAJOR
+        or os.minor(before.st_rdev) != suffix
+        or mapped_identity != expected_mapping_identity
+    ):
+        raise RuntimeError(f"accelerator device mapping identity drifted: {raw_path}")
+    after = named_metadata()
+    if (
+        after.st_mode,
+        after.st_uid,
+        after.st_gid,
+        after.st_nlink,
+        after.st_dev,
+        after.st_ino,
+        after.st_rdev,
+    ) != (
+        before.st_mode,
+        before.st_uid,
+        before.st_gid,
+        before.st_nlink,
+        before.st_dev,
+        before.st_ino,
+        before.st_rdev,
+    ):
+        raise RuntimeError(f"accelerator device mapping changed: {raw_path}")
+    _verify_accelerator_device_directory_named(
+        root_directory_fd=root_directory_fd,
+        device_directory_fd=device_directory_fd,
+    )
+    return {
+        "gid": int(before.st_gid),
+        "mapped_device_major": mapped_identity[0],
+        "mapped_device_minor": mapped_identity[1],
+        "mapped_inode": mapped_identity[2],
+        "mode": stat.S_IMODE(before.st_mode),
+        "nlink": int(before.st_nlink),
+        "node_device": int(before.st_dev),
+        "node_inode": int(before.st_ino),
+        "path": raw_path,
+        "rdev_major": os.major(before.st_rdev),
+        "rdev_minor": os.minor(before.st_rdev),
+        "uid": int(before.st_uid),
+    }
+
+
+def _classify_compiler_mapping(
+    raw_path: str,
+    mapped_identity: tuple[int, int, int],
+    *,
+    root_directory_fd: int,
+    device_directory_fd: int,
+) -> tuple[str, Path | dict[str, int | str]]:
+    if re.fullmatch(_ACCELERATOR_DEVICE_PATTERN, raw_path) is not None:
+        return (
+            "accelerator_device_node",
+            _accelerator_device_mapping_record(
+                raw_path,
+                mapped_identity,
+                root_directory_fd=root_directory_fd,
+                device_directory_fd=device_directory_fd,
+            ),
+        )
+    path = Path(os.path.realpath(raw_path))
+    try:
+        metadata = path.stat()
+    except OSError as error:
+        raise RuntimeError(f"loaded compiler dependency vanished: {path}") from error
+    if not stat.S_ISREG(metadata.st_mode):
+        raise RuntimeError(f"unsupported non-regular compiler mapping: {raw_path}")
+    _validate_native_mapping_root(path)
+    path_identity = (
+        os.major(metadata.st_dev),
+        os.minor(metadata.st_dev),
+        metadata.st_ino,
+    )
+    if mapped_identity != path_identity:
+        raise RuntimeError(f"compiler native mapping path was replaced: {path}")
+    return "native_file", path
+
+
 def _compiler_dependency_records(source_archive_path: str) -> dict[str, Any]:
     python_paths = {Path(__file__), Path(sys.executable)}
     source_prefix = source_archive_path + "/"
@@ -743,44 +927,66 @@ def _compiler_dependency_records(source_archive_path: str) -> dict[str, Any]:
                 f"compiler Python module escaped allowed roots: {resolved}"
             )
         python_paths.add(resolved)
+    accelerator_device_nodes: dict[str, dict[str, int | str]] = {}
     native_mappings: dict[Path, tuple[int, int, int]] = {}
-    for line in Path("/proc/self/maps").read_text().splitlines():
-        fields = line.split(maxsplit=5)
-        if len(fields) != 6 or not fields[5].startswith("/"):
-            continue
-        raw_path = fields[5]
-        if raw_path.endswith(" (deleted)"):
-            raise RuntimeError(f"loaded compiler dependency was deleted: {raw_path}")
-        path = Path(os.path.realpath(raw_path))
-        _validate_native_mapping_root(path)
-        try:
-            metadata = path.stat()
-        except OSError as error:
-            raise RuntimeError(
-                f"loaded compiler dependency vanished: {path}"
-            ) from error
-        if not stat.S_ISREG(metadata.st_mode):
-            continue
-        try:
-            major_hex, minor_hex = fields[3].split(":", 1)
-            mapped_identity = (
-                int(major_hex, 16),
-                int(minor_hex, 16),
-                int(fields[4]),
+    root_directory_fd, device_directory_fd = _open_accelerator_device_directory()
+    try:
+        for line in Path("/proc/self/maps").read_text().splitlines():
+            fields = line.split(maxsplit=5)
+            if len(fields) != 6 or not fields[5].startswith("/"):
+                continue
+            raw_path = fields[5]
+            if raw_path.endswith(" (deleted)"):
+                raise RuntimeError(
+                    f"loaded compiler dependency was deleted: {raw_path}"
+                )
+            try:
+                major_hex, minor_hex = fields[3].split(":", 1)
+                mapped_identity = (
+                    int(major_hex, 16),
+                    int(minor_hex, 16),
+                    int(fields[4]),
+                )
+            except ValueError as error:
+                raise RuntimeError(
+                    "compiler native mapping identity is invalid"
+                ) from error
+            kind, classified = _classify_compiler_mapping(
+                raw_path,
+                mapped_identity,
+                root_directory_fd=root_directory_fd,
+                device_directory_fd=device_directory_fd,
             )
-        except ValueError as error:
-            raise RuntimeError("compiler native mapping identity is invalid") from error
-        path_identity = (
-            os.major(metadata.st_dev),
-            os.minor(metadata.st_dev),
-            metadata.st_ino,
+            if kind == "accelerator_device_node":
+                if not isinstance(classified, dict):
+                    raise AssertionError("accelerator mapping classifier drifted")
+                record = classified
+                previous_record = accelerator_device_nodes.setdefault(raw_path, record)
+                if previous_record != record:
+                    raise RuntimeError(
+                        f"accelerator device mapping identity split: {raw_path}"
+                    )
+                continue
+            if kind != "native_file" or not isinstance(classified, Path):
+                raise AssertionError("native mapping classifier drifted")
+            path = classified
+            previous = native_mappings.setdefault(path, mapped_identity)
+            if previous != mapped_identity:
+                raise RuntimeError(f"compiler native mapping identity split: {path}")
+        _verify_accelerator_device_directory_named(
+            root_directory_fd=root_directory_fd,
+            device_directory_fd=device_directory_fd,
         )
-        if mapped_identity != path_identity:
-            raise RuntimeError(f"compiler native mapping path was replaced: {path}")
-        previous = native_mappings.setdefault(path, mapped_identity)
-        if previous != mapped_identity:
-            raise RuntimeError(f"compiler native mapping identity split: {path}")
+    finally:
+        os.close(device_directory_fd)
+        os.close(root_directory_fd)
     return {
+        "accelerator_device_nodes_observed_mapped": [
+            accelerator_device_nodes[path]
+            for path in sorted(
+                accelerator_device_nodes, key=lambda value: value.encode("utf-8")
+            )
+        ],
         "native_mappings": [
             _dependency_file_record(path)
             for path in sorted(native_mappings, key=_canonical_path_key)
@@ -795,7 +1001,11 @@ def _compiler_dependency_records(source_archive_path: str) -> dict[str, Any]:
 def _require_dependency_prefix_stable(
     before: Mapping[str, Any], after: Mapping[str, Any]
 ) -> None:
-    for category in ("native_mappings", "python_modules"):
+    for category in (
+        "accelerator_device_nodes_observed_mapped",
+        "native_mappings",
+        "python_modules",
+    ):
         before_by_path = {item["path"]: item for item in before[category]}
         after_by_path = {item["path"]: item for item in after[category]}
         if any(
@@ -804,6 +1014,10 @@ def _require_dependency_prefix_stable(
             raise RuntimeError(
                 f"compiler dependency changed during compile: {category}"
             )
+
+
+def _accelerator_device_nodes_sha256(records: Any) -> str:
+    return sha256((_canonical(records) + "\n").encode("ascii")).hexdigest()
 
 
 def validate_admission_and_topology(
@@ -1080,6 +1294,8 @@ def main() -> int:
     replay = build_gate_d_compensated_pp16_hlo_replay(devices=devices)
     abstract_outputs = _abstract_record(jax.eval_shape(replay, *arguments), jax)
     dependencies_before = _compiler_dependency_records(source_archive_path)
+    if not dependencies_before["accelerator_device_nodes_observed_mapped"]:
+        raise RuntimeError("TPU compiler accelerator device mapping is absent")
     memory_before = [_memory_stats(device) for device in devices]
     lowering_started = time.monotonic()
     lowered = replay.lower(*arguments)
@@ -1111,8 +1327,14 @@ def main() -> int:
     if _validate_dependency_sites() != dependency_sites:
         raise RuntimeError("Gate-D sealed compiler dependency sites changed")
     dependencies_after = _compiler_dependency_records(source_archive_path)
+    if not dependencies_after["accelerator_device_nodes_observed_mapped"]:
+        raise RuntimeError("TPU compiler accelerator device mapping is absent")
     _require_dependency_prefix_stable(dependencies_before, dependencies_after)
     dependency_manifest = {
+        "accelerator_device_observation_scope": (_ACCELERATOR_DEVICE_OBSERVATION_SCOPE),
+        "accelerator_device_nodes_observed_mapped": dependencies_after[
+            "accelerator_device_nodes_observed_mapped"
+        ],
         "artifact_kind": "gate_d_compensated_pp16_compiler_dependencies",
         "code_hash": args.expected_code_hash,
         "dependency_sites": dependency_sites,
@@ -1151,6 +1373,12 @@ def main() -> int:
         "compile_seconds": compile_seconds,
         "compiler_dependency_manifest": {
             **dependency_identity,
+            "accelerator_device_node_count": len(
+                dependencies_after["accelerator_device_nodes_observed_mapped"]
+            ),
+            "accelerator_device_nodes_sha256": _accelerator_device_nodes_sha256(
+                dependencies_after["accelerator_device_nodes_observed_mapped"]
+            ),
             "filename": "dependencies.json",
             "native_mapping_count": len(dependencies_after["native_mappings"]),
             "python_module_count": len(dependencies_after["python_modules"]),
