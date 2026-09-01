@@ -1,0 +1,84 @@
+{
+  "artifact_kind": "gate_d_forced_round_pp16_hlo_orchestration_source",
+  "authorization": {
+    "cloud_write": false,
+    "full_8k": false,
+    "hlo_acquisition": false,
+    "persistence_only": true,
+    "tpu_compile": false,
+    "tpu_execution": false
+  },
+  "claim_scope": "Static launcher/publisher/wrapper audit only. No JAX import, HLO acquisition, TPU compile/execution, cloud write, numerical, performance or Gate-D claim.",
+  "orchestration_audit": {
+    "launcher": {
+      "launcher_ast_sha256": "d727634a8736d4a1013de97f2b81dfb949f0235f807063f0fa334a56d91b7252",
+      "launcher_sha256": "6e2d0457a3a72ec81a30501bb3e8e7dc9b6235d6fa0e8f4faa77b1bbb2d1c6cd",
+      "retained_lock_fds": [
+        11,
+        12
+      ],
+      "retained_wrapper_fd": 10,
+      "wrapper_sha256": "aee64a2c7549e923817ffc5ab5d37f8960823751bd10c419c7fbb77b36f14fec"
+    },
+    "publisher": {
+      "base_publisher_sha256": "75c296a2b46aef1b878a95ee7b1dfabdaf062687bfc496416ffca102f1180ee3",
+      "hardened_common_function_count": 45,
+      "new_helper_count": 3,
+      "publisher_ast_sha256": "d40e31776ab24c8538816971dcfd6fb65b7058c374802540916b66c0dda0fbad",
+      "publisher_sha256": "ec67de6d29ba3a3e15a0853b6ef78eb3e0e34dfd2783ab46f101ca4c75dde0db",
+      "runner_input_spec_count": 16,
+      "runner_output_spec_count": 9
+    },
+    "wrapper": {
+      "mirror_replay_count": 2,
+      "protected_compile_process_count": 1,
+      "runtime_boundary_sha256": "9d9c11c22dbe92edea8c9ca22dfe695116abddfe91ebe883a999ce2f62078de6",
+      "wrapper_sha256": "aee64a2c7549e923817ffc5ab5d37f8960823751bd10c419c7fbb77b36f14fec"
+    }
+  },
+  "predecessors": {
+    "acquisition_source_sha256": "efe04d98267fc5265952b28ee386a4894d028b39f2d62d0a1554f24591e73196",
+    "admission_sha256": "7cd7e569ed9ed5fd978d933efd4229d65906ae28312e264863b8336e4cc6b37d",
+    "forced_round_source_sha256": "518be87b650729d365dd09aba20b5f5a03d4bcddccc81978357cdbb02cbe02c6",
+    "mirror_verifier_sha256": "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b",
+    "topology_sha256": "49cf6bb1a553985855556d1401ad85918669df52d12f8dc5150f247d18b325eb"
+  },
+  "process_contract": {
+    "loaded_jax_modules": []
+  },
+  "repository_authority": {
+    "allowed_delta_paths": [
+      "HANDOFF.md",
+      "docs/RESEARCH_LOG.md",
+      "docs/artifacts/gate-d-forced-round-pp16-hlo-orchestration-source.json",
+      "docs/greenfield/EVIDENCE_MAP.md",
+      "scripts/greenfield/analyze_gate_d_forced_round_pp16_hlo_orchestration_source.py",
+      "scripts/greenfield/launch_gate_d_forced_round_pp16_hlo.py",
+      "scripts/greenfield/publish_gate_d_forced_round_pp16_hlo.py",
+      "scripts/greenfield/run_gate_d_forced_round_pp16_hlo.sh",
+      "tests/greenfield/validation/test_gate_d_forced_round_pp16_hlo_acquisition.py",
+      "tests/greenfield/validation/test_launch_gate_d_forced_round_pp16_hlo.py",
+      "tests/greenfield/validation/test_publish_gate_d_forced_round_pp16_hlo.py"
+    ],
+    "base_code_pin": "2f2408d7f63c747beaa8776aa6faa8b1872478ea",
+    "base_tree_id": "3541fbf1b9e8861705c77ff7f6128c65d2ecee4f",
+    "unexpected_delta_paths": []
+  },
+  "source_authority": {
+    "analyzer_path": "scripts/greenfield/analyze_gate_d_forced_round_pp16_hlo_orchestration_source.py",
+    "analyzer_sha256": "5550776121774d216cc3b61372ef0f8f04d7562d36a410d93b656793a006ed8a",
+    "historical_acquisition_test_path": "tests/greenfield/validation/test_gate_d_forced_round_pp16_hlo_acquisition.py",
+    "historical_acquisition_test_sha256": "b7e2399133d92690c8572707a5d6b1be22797df1484f5fc9ad894c4848a2a0ca",
+    "launcher_path": "scripts/greenfield/launch_gate_d_forced_round_pp16_hlo.py",
+    "launcher_sha256": "6e2d0457a3a72ec81a30501bb3e8e7dc9b6235d6fa0e8f4faa77b1bbb2d1c6cd",
+    "launcher_test_path": "tests/greenfield/validation/test_launch_gate_d_forced_round_pp16_hlo.py",
+    "launcher_test_sha256": "99a31186234f79350d1999fcd3fdbd7bd063bdba3c08b4ea547dcf3a2a6599f5",
+    "publisher_path": "scripts/greenfield/publish_gate_d_forced_round_pp16_hlo.py",
+    "publisher_sha256": "ec67de6d29ba3a3e15a0853b6ef78eb3e0e34dfd2783ab46f101ca4c75dde0db",
+    "test_path": "tests/greenfield/validation/test_publish_gate_d_forced_round_pp16_hlo.py",
+    "test_sha256": "e44b9bc29c1e93250ae59799787065bfb31274a6acd4920589677a3fbb80a149",
+    "wrapper_path": "scripts/greenfield/run_gate_d_forced_round_pp16_hlo.sh",
+    "wrapper_sha256": "aee64a2c7549e923817ffc5ab5d37f8960823751bd10c419c7fbb77b36f14fec"
+  },
+  "status": "FORCED_ROUND_HLO_ORCHESTRATION_SOURCE_PERSISTENCE_ONLY"
+}

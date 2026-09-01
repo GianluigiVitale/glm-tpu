@@ -9364,3 +9364,32 @@ tag.
 Fable remained at its recorded 100% usage limit. The goal-authorized Sol fallback reviewed exact
 staged diff `7d22104a...6457`, found no P0--P2 and returned `APPROVE PERSISTENCE`; it authorized no
 HLO acquisition or TPU work.
+
+## 2026-09-01 forced-round PP16 HLO orchestration source; no HLO/TPU
+
+An isolated default-off wrapper and generation-bound publisher target only the forced-round PP16
+compile-only driver. Sol withheld the first source snapshot on two P1s: `cd /` exported `OLDPWD`
+before a mutable-path self-reexec, making the second allowlist fail deterministically, and reopening
+that user-writable wrapper left a same-UID substitution window. The corrected source removes the
+self-reexec. A dedicated root-owned launcher authenticates exact committed bytes, snapshots the
+wrapper into a fully sealed memfd retained as FD 10, inherits already-held root-owned lock FDs
+11/12, and binds driver/publisher/mirror-verifier execution to a root-owned immutable capsule. The
+wrapper verifies those descriptors and launcher before `cd /`, then closes FD 10. An executed
+hostile regression replaces the named wrapper after snapshot and proves Bash executes only the
+sealed original; a separate launcher-to-Bash regression proves `OLDPWD` is absent before the sole
+`cd`. Authenticated eight-host census and terminal-last generation binding remain unchanged. The
+compiled executable remains uninvoked and compilation caching remains off.
+
+The source-only certificate
+`gate-d-forced-round-pp16-hlo-orchestration-source.json` authorizes persistence only. No wrapper
+start, JAX import, lowering, HLO, TPU compile/execution, bucket write, numerical/performance work or
+8K occurred; Gate D remains open. Exact next after hostile validation, adversarial review,
+commit/push and locked same-region mirror replay is a separately reviewed literal fresh-tag command
+for exactly one compile-only acquisition, followed by offline HLO adjudication before any numerical
+A/B.
+
+Corrected certificate SHA-256 is
+`f4fcba8497599dd19f94ec8ded2566ad3d27a412a04adad584fc22417e18847c`; focused launcher and
+orchestration coverage passes 54/54 and the adjacent preserved-source/security suite passes
+208/208. Corrected adversarial persistence review is still required; no launcher/capsule install or
+execution is authorized by this source batch.

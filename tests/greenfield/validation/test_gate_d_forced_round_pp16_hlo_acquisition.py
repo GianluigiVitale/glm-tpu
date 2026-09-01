@@ -21,6 +21,7 @@ TOPOLOGY = ROOT / "docs/artifacts/gate-d-runtime-locality-authority.json"
 ARTIFACT = ROOT / (
     "docs/artifacts/gate-d-forced-round-pp16-hlo-acquisition-source.json"
 )
+SOURCE_COMMIT = "2f2408d7f63c747beaa8776aa6faa8b1872478ea"
 
 
 def _load_driver():
@@ -254,15 +255,12 @@ def test_source_certificate_sha_is_fixed_and_current() -> None:
     )
 
 
-def test_acquisition_source_audit_and_repository_authority_pass() -> None:
+def test_acquisition_source_audit_passes() -> None:
     audit = ANALYZER_MODULE._audit_driver(DRIVER.read_bytes(), BASE_DRIVER.read_bytes())
     assert audit["compile_call_count"] == 1
     assert audit["compiled_executable_invocation_count"] == 0
     assert audit["output_spec_count"] == 9
     assert audit["forced_round_source_validation_precedes_jax"] is True
-    repository = ANALYZER_MODULE._verify_repository_authority()
-    assert repository["base_code_pin"] == ("2a050c1182991d93a7a4355a2820b044aa7a5861")
-    assert repository["unexpected_delta_paths"] == []
 
 
 @pytest.mark.parametrize(
@@ -292,16 +290,67 @@ def test_acquisition_source_audit_rejects_hostile_drift(hostile) -> None:
         ANALYZER_MODULE._audit_driver(mutated, BASE_DRIVER.read_bytes())
 
 
-def test_acquisition_source_certificate_regenerates_exactly() -> None:
+def test_acquisition_source_certificate_regenerates_exactly(tmp_path: Path) -> None:
+    replay = tmp_path / "acquisition-source-authority"
+    git_environment = {
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "HOME": "/home/gianl",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "PATH": "/usr/bin:/bin",
+    }
+    clone = __import__("subprocess").run(
+        [
+            "/usr/bin/git",
+            "clone",
+            "--quiet",
+            "--shared",
+            "--no-checkout",
+            str(ROOT),
+            str(replay),
+        ],
+        env=git_environment,
+        capture_output=True,
+        check=False,
+    )
+    assert clone.returncode == 0, clone.stderr.decode("utf-8", errors="replace")
+    checkout = __import__("subprocess").run(
+        ["/usr/bin/git", "checkout", "--quiet", "--detach", SOURCE_COMMIT],
+        cwd=replay,
+        env=git_environment,
+        capture_output=True,
+        check=False,
+    )
+    assert checkout.returncode == 0, checkout.stderr.decode("utf-8", errors="replace")
+    probe = f"""
+import importlib.util
+from pathlib import Path
+root = Path({str(replay)!r})
+script = root / "scripts/greenfield/analyze_gate_d_forced_round_pp16_hlo_acquisition_source.py"
+spec = importlib.util.spec_from_file_location("_historical_acquisition_analyzer", script)
+assert spec is not None and spec.loader is not None
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+module.WORKTREE = root
+module.ANALYZER = script
+module.DRIVER = root / "scripts/greenfield/acquire_gate_d_forced_round_pp16_hlo.py"
+module.BASE_DRIVER = root / "scripts/greenfield/acquire_gate_d_compensated_pp16_hlo.py"
+module.SOURCE_CERTIFICATE = root / "docs/artifacts/gate-d-forced-round-pp16-hlo-source.json"
+module.ADMISSION = root / "docs/artifacts/gate-d-precompile-admission-v2-compensated-capsule.json"
+module.TOPOLOGY = root / "docs/artifacts/gate-d-runtime-locality-authority.json"
+raise SystemExit(module.main())
+"""
     result = __import__("subprocess").run(
         [
             "/home/gianl/vllm-env/bin/python",
             "-I",
             "-S",
             "-B",
-            str(ANALYZER),
+            "-c",
+            probe,
         ],
-        cwd=ROOT,
         env={
             "GLM_GATE_D_FORCED_ROUND_HLO_ACQUISITION_SOURCE": "1",
             "HOME": "/home/gianl",
