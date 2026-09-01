@@ -9463,3 +9463,19 @@ is last. Sol found no cleanup gap and classified structured census reason codes 
 not a retry prerequisite. Exact next is persistence review/commit/push/mirror, then a separately
 reviewed fresh-tag compile-only start from unchanged source. Numerical execution and 8K remain
 forbidden; Gate D is open.
+
+## 2026-09-01 fresh HLO tag stopped in root launcher on transient lock contention
+
+The separately approved fresh tag `gate_d_forced_round_pp16_hlo_20260901T140358476702832Z`
+failed in root launcher `_open_locked_fds` with `EAGAIN` before the protected wrapper, run-directory
+creation, JAX, HLO, TPU or cloud mutation. The launcher did not identify whether the pod or rsync
+root lock was contended, so the exact lock and owner remain unknown. The attempt at 14:05:12 UTC
+temporally overlapped the known five-minute sync cron, whose log has successful writes from
+14:05:10 through 14:05:22; this is overlap evidence, not causal attribution.
+
+The tag is burned. Both local tag paths and all live/versioned/soft-deleted remote histories remain
+vacant; all four locks were subsequently free and no launcher/acquirer remained. Exact next after
+review/persistence is a new tag and separately reviewed one-start command outside the cron window.
+Artifact `gate-d-forced-round-pp16-hlo-launcher-lock-failure.json` has SHA-256
+`60ae6ba504f8c6ad06f1ed8b30fa04550f8cd123586c38a7b4f0638f093f2c66`. No numerical/8K
+authority exists and Gate D remains open.

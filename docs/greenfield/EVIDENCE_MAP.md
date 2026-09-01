@@ -2900,3 +2900,17 @@ execution is authorized by this source batch.
   `1788270441162145` is terminal-last.
 - Exact next: after persistence review, use unchanged source and a separately reviewed fresh tag for
   one compile-only HLO acquisition. Gate D remains open; numerical execution and 8K are forbidden.
+
+## 2026-09-01 forced-round PP16 root-launcher lock failure
+
+- Burned tag: `gate_d_forced_round_pp16_hlo_20260901T140358476702832Z`; source pin `0d1d2f8`.
+- Artifact: `docs/artifacts/gate-d-forced-round-pp16-hlo-launcher-lock-failure.json`, SHA-256
+  `60ae6ba504f8c6ad06f1ed8b30fa04550f8cd123586c38a7b4f0638f093f2c66`.
+- Boundary: root launcher `_open_locked_fds` returned `EAGAIN` before wrapper/run directory/JAX/HLO/
+  TPU/cloud work. The launcher did not expose which root lock failed, so its identity is unknown.
+- A five-minute sync cron logged work from 14:05:10--14:05:22, overlapping the 14:05:12 attempt;
+  causality is not claimed.
+- Post-audit: both local tag paths absent, live/versioned/soft-deleted remote histories vacant, four
+  locks free and zero launcher/acquirer processes.
+- Exact next after persistence: one new reviewed fresh tag outside the cron window. Numerical and 8K
+  remain forbidden; Gate D is open.

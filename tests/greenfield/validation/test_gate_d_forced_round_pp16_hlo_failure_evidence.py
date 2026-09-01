@@ -8,6 +8,9 @@ ROOT = Path(__file__).resolve().parents[3]
 ARTIFACT = ROOT / (
     "docs/artifacts/gate-d-forced-round-pp16-hlo-pre-census-busy-failure.json"
 )
+LOCK_ARTIFACT = ROOT / (
+    "docs/artifacts/gate-d-forced-round-pp16-hlo-launcher-lock-failure.json"
+)
 
 
 def test_pre_census_busy_failure_evidence_is_fail_closed() -> None:
@@ -115,3 +118,46 @@ def test_holder_attribution_and_post_failure_audit_are_bounded() -> None:
     assert audit["unique_clean_hosts"] == [
         f"t1v-n-ae271d05-w-{worker}" for worker in range(8)
     ]
+
+
+def test_launcher_lock_failure_does_not_overclaim_causality() -> None:
+    evidence = json.loads(LOCK_ARTIFACT.read_text())
+
+    assert evidence["classification"] == (
+        "PRE_WRAPPER_LOCK_CONTENTION;PROTECTED_WORKFLOW_NO_JAX_OR_HLO;"
+        "PROTECTED_WORKFLOW_NO_TPU_COMPILE_OR_EXECUTION;GATE_D_OPEN"
+    )
+    assert evidence["authorization"] == {
+        "cloud_write": False,
+        "full_8k": False,
+        "hlo_acquisition": False,
+        "numerical_execution": False,
+        "persistence_only": True,
+        "tpu_compile": False,
+        "tpu_execution": False,
+    }
+    assert evidence["failure"] == {
+        "exception": "BlockingIOError: [Errno 11] Resource temporarily unavailable",
+        "exact_contended_lock": "unknown",
+        "launcher_function": "_open_locked_fds",
+        "launcher_source_line": 220,
+        "launcher_started_before_utc": "2026-09-01T14:05:13Z",
+        "local_run_directory_created": False,
+        "protected_wrapper_started": False,
+        "remote_write_performed": False,
+    }
+    assert evidence["no_retry_same_tag"] is True
+    assert evidence["temporal_overlap_evidence"]["causality_claimed"] is False
+    assert len(evidence["temporal_overlap_evidence"]["sync_log_lines"]) == 4
+    audit = evidence["post_failure_audit"]
+    assert all(audit["remote_history_vacant"].values())
+    assert all(
+        audit[key]
+        for key in (
+            "root_pod_lease_free",
+            "root_rsync_lease_free",
+            "user_pod_lease_free",
+            "user_rsync_lease_free",
+        )
+    )
+    assert audit["local_launcher_or_acquirer_processes"] == 0
