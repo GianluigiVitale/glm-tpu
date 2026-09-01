@@ -12,16 +12,16 @@ from collections.abc import Mapping
 from hashlib import sha256
 from pathlib import Path
 
-SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-projection-contraction-hlo-install-v2")
+SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-projection-contraction-hlo-install-v3")
 INSTALLER_PATH = (
     SOURCE_ROOT / "install_gate_d_projection_contraction_pp16_hlo_runtime.py"
 )
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
 LAUNCHER_TARGET = (
-    LAUNCHER_PARENT / "launch_gate_d_projection_contraction_pp16_hlo_v2.py"
+    LAUNCHER_PARENT / "launch_gate_d_projection_contraction_pp16_hlo_v3.py"
 )
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-projection-contraction-pp16-hlo-v2"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-projection-contraction-pp16-hlo-v3"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -34,10 +34,10 @@ PAYLOADS = {
         "c660d50eb60054c9b267840230fb69bbf7259104416dc96c7b2ee01a2a14934a"
     ),
     "launch_gate_d_projection_contraction_pp16_hlo.py": (
-        "b3b6ff7ca9e76028aab98b8806547ff09d8538aa37d37f43396628a792389a23"
+        "e6fceb3aa42f566f5fdece58d20928e4d26377d079a916769e530263c65c6772"
     ),
     "publish_gate_d_projection_contraction_pp16_hlo.py": (
-        "2ad2b8bd3ef9fdb1797546c3ddf1797b56facfa488a5d999b8ab9444fff335d8"
+        "f3f20a01fd37bb82988cd77f69fa7b0a780d120568bab0db4162f42e7855bc97"
     ),
     "verify_gate_d_same_region_git_mirror.py": (
         "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"

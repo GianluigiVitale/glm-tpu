@@ -13,7 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 
 INSTALL_PATH = Path(
-    "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v2.py"
+    "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v3.py"
 )
 PYTHON = Path("/usr/bin/python3.10")
 PYTHON_SHA256 = "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
@@ -23,9 +23,9 @@ WRAPPER_PATH = (
     WORKTREE / "scripts/greenfield/run_gate_d_projection_contraction_pp16_hlo.sh"
 )
 WRAPPER_SOURCE_PATH = "scripts/greenfield/run_gate_d_projection_contraction_pp16_hlo.sh"
-WRAPPER_SHA256 = "058338a174e1746b4fe231cb23fbac3a8abe1260d687337551885e4c98a14992"
+WRAPPER_SHA256 = "4dd06dcb57fdb5a43d0eec0f7a6754724d7534637bda539eb36831359e1b1c70"
 IMMUTABLE_CAPSULE_ROOT = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v2"
+    "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v3"
 )
 DRIVER_PATH = (
     IMMUTABLE_CAPSULE_ROOT / "acquire_gate_d_projection_contraction_pp16_hlo.py"
@@ -40,7 +40,7 @@ PUBLISHER_PATH = (
 PUBLISHER_SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_projection_contraction_pp16_hlo.py"
 )
-PUBLISHER_SHA256 = "2ad2b8bd3ef9fdb1797546c3ddf1797b56facfa488a5d999b8ab9444fff335d8"
+PUBLISHER_SHA256 = "f3f20a01fd37bb82988cd77f69fa7b0a780d120568bab0db4162f42e7855bc97"
 MIRROR_VERIFIER_PATH = (
     IMMUTABLE_CAPSULE_ROOT / "verify_gate_d_same_region_git_mirror.py"
 )

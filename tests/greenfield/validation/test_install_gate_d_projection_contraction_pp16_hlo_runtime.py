@@ -77,13 +77,13 @@ def test_payload_hashes_and_install_targets_are_exact() -> None:
         "launch_gate_d_projection_contraction_pp16_hlo.py"
     }
     assert str(MODULE.SOURCE_ROOT) == (
-        "/opt/glm-tpu/gate-d-projection-contraction-hlo-install-v2"
+        "/opt/glm-tpu/gate-d-projection-contraction-hlo-install-v3"
     )
     assert str(MODULE.LAUNCHER_TARGET) == (
-        "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v2.py"
+        "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v3.py"
     )
     assert str(MODULE.CAPSULE_TARGET) == (
-        "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v2"
+        "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v3"
     )
 
 
@@ -230,7 +230,7 @@ def test_installer_source_audit_accepts_exact_source_and_rejects_mutations() -> 
     assert audit["launcher_invocation_count"] == 0
     mutations = (
         raw.replace(b"c660d50e", b"d660d50e", 1),
-        raw.replace(b"install-v2", b"install-v9", 1),
+        raw.replace(b"install-v3", b"install-v9", 1),
         raw.replace(b"_publish_capsule(", b"_publish_capsule_removed(", 1),
         raw.replace(b'"launcher_invoked": False', b'"launcher_invoked": True', 1),
     )
@@ -315,32 +315,15 @@ def test_historical_orchestration_source_artifact_binds_its_exact_commit() -> No
         assert sha256(raw).hexdigest() == expected_sha256
 
 
-def test_v2_orchestration_source_artifact_replays_exactly() -> None:
+def test_v2_orchestration_source_artifact_binds_its_exact_commit() -> None:
     artifact = V2_ARTIFACT.read_bytes()
     assert len(artifact) == 3026
     assert sha256(artifact).hexdigest() == V2_ARTIFACT_SHA256
     parsed = json.loads(artifact)
     assert parsed["code_hash"] == "efe99ba87c1e1a7163f436fb7cc55bcd46e395ae"
-    environment = {
-        **os.environ,
-        "GLM_GATE_D_PROJECTION_CONTRACTION_HLO_ORCHESTRATION_SOURCE": "1",
-        "JAX_PLATFORMS": "cpu",
-        "JAX_PLATFORM_NAME": "cpu",
-    }
-    result = subprocess.run(
-        ["/usr/bin/python3", "-I", "-S", "-B", str(ANALYZER)],
-        cwd=ROOT,
-        env=environment,
-        capture_output=True,
-        check=False,
-        timeout=60,
-    )
-    assert result.returncode == 0, result.stderr.decode()
-    replay = json.loads(result.stdout)
     current_pin = subprocess.check_output(
         ["/usr/bin/git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True
     ).strip()
-    assert replay["code_hash"] == current_pin
     ancestry = subprocess.run(
         [
             "/usr/bin/git",
@@ -354,18 +337,17 @@ def test_v2_orchestration_source_artifact_replays_exactly() -> None:
         check=False,
     )
     assert ancestry.returncode == 0
-    replay["code_hash"] = parsed["code_hash"]
-    normalized = (
-        json.dumps(
-            replay,
-            allow_nan=False,
-            ensure_ascii=True,
-            separators=(",", ":"),
-            sort_keys=True,
+    for relative, expected_sha256 in parsed["source_sha256s"].items():
+        raw = subprocess.check_output(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(ROOT),
+                "show",
+                f"{parsed['code_hash']}:{relative}",
+            ]
         )
-        + "\n"
-    ).encode("ascii")
-    assert normalized == artifact
+        assert sha256(raw).hexdigest() == expected_sha256
 
 
 def test_runtime_install_artifact_binds_exact_persisted_sources() -> None:

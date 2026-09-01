@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import os
@@ -32,6 +33,12 @@ HLO_SOURCE_CERTIFICATE = ROOT / (
     "docs/artifacts/gate-d-projection-contraction-hlo-acquisition-source.json"
 )
 TOPOLOGY = ROOT / "docs/artifacts/gate-d-runtime-locality-authority.json"
+V2_PUBLICATION_FAILURE = ROOT / (
+    "docs/artifacts/gate-d-projection-contraction-pp16-hlo-v2-publication-failure.json"
+)
+V2_PUBLICATION_FAILURE_SHA256 = (
+    "d38c43afdd6c87d671c39e8f71448d73ac71290fee2bfc8fb207647d3e9010aa"
+)
 
 
 def _load(path: Path, name: str) -> ModuleType:
@@ -639,14 +646,14 @@ def test_wrapper_requires_retained_sealed_descriptor_and_immutable_children() ->
     assert "F_GET_SEALS" in verifier
     assert "wrapper_fd != 10" in verifier
     assert "GLM_GATE_D_WRAPPER_SHA256" in verifier
-    assert "launch_gate_d_projection_contraction_pp16_hlo_v2.py" in verifier
+    assert "launch_gate_d_projection_contraction_pp16_hlo_v3.py" in verifier
     assert "IMMUTABLE_LOCK_BROKER" not in source
     assert "WRAPPER_ABS" not in source
     assert "GLM_GATE_D_IMMUTABLE_LOCKS_HELD" in source
     assert "exec 10<&-" in source
     assert (
         "readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/"
-        "gate-d-projection-contraction-pp16-hlo-v2"
+        "gate-d-projection-contraction-pp16-hlo-v3"
     ) in source
     assert (
         "$WORKTREE/scripts/greenfield/acquire_gate_d_projection_contraction_pp16_hlo.py"
@@ -713,9 +720,70 @@ def test_wrapper_has_one_compile_process_and_no_executable_invocation() -> None:
     assert "TPU_VISIBLE_DEVICES=0,1,2,3" in source
     assert "execution_count=0" in source
     assert "strict_census pre" in source
+
+
+def test_compiler_environment_contract_matches_acquirer_publisher_and_wrapper() -> None:
+    assert DRIVER_MODULE._EXPECTED_ENVIRONMENT == (
+        PUBLISHER_MODULE._EXPECTED_COMPILER_ENVIRONMENT
+    )
+    source = WRAPPER.read_text(encoding="ascii")
+    compile_block = source.split(
+        'say "lowering and compiling one abstract-input PP16 stage-zero graph; '
+        'invocation forbidden"',
+        1,
+    )[1].split('"$DRIVER_PYTHON" -I -S -B -u "$DRIVER"', 1)[0]
+    for name, value in DRIVER_MODULE._EXPECTED_ENVIRONMENT.items():
+        assert f"{name}={value} \\" in compile_block
     assert "strict_census post" in source
     assert "--worker=all" in source
     subprocess.run(["/usr/bin/bash", "-n", str(WRAPPER)], check=True)
+
+
+def test_v2_publication_failure_is_append_only_diagnostic_evidence() -> None:
+    raw = V2_PUBLICATION_FAILURE.read_bytes()
+    assert len(raw) == 3141
+    assert sha256(raw).hexdigest() == V2_PUBLICATION_FAILURE_SHA256
+    artifact = json.loads(raw)
+    assert artifact["status"] == "DIAGNOSTIC_ONLY_NOT_HLO_ACQUIRED"
+    assert artifact["failure"]["hlo_acquired_terminal_present"] is False
+    assert artifact["compile_evidence"]["compiled_executable_invocation_count"] == 0
+    assert artifact["compile_evidence"]["tpu_numerical_execution_performed"] is False
+    assert artifact["fleet"] == {
+        "post_census_clean_hosts": 8,
+        "pre_census_clean_hosts": 8,
+    }
+    old_publisher = _git(
+        "show",
+        f"{artifact['authority']['code_hash']}:"
+        "scripts/greenfield/publish_gate_d_projection_contraction_pp16_hlo.py",
+    )
+    old_tree = compile(old_publisher, "old_publisher.py", "exec", ast.PyCF_ONLY_AST)
+    old_environment = next(
+        node.value
+        for node in old_tree.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name)
+            and target.id == "_EXPECTED_COMPILER_ENVIRONMENT"
+            for target in node.targets
+        )
+    )
+    assert isinstance(old_environment, ast.Dict)
+    assert (
+        "GLM_GATE_D_PROJECTION_CONTRACTION_HLO"
+        not in old_publisher.decode("ascii")
+        .split("_EXPECTED_COMPILER_ENVIRONMENT = {", 1)[1]
+        .split("}", 1)[0]
+    )
+    assert (
+        PUBLISHER_MODULE._EXPECTED_COMPILER_ENVIRONMENT[
+            "GLM_GATE_D_PROJECTION_CONTRACTION_HLO"
+        ]
+        == "1"
+    )
+    assert artifact["failure"]["root_cause"]["corrected_publisher_sha256"] == (
+        sha256(PUBLISHER.read_bytes()).hexdigest()
+    )
 
 
 def test_orchestration_source_analyzer_is_default_off() -> None:

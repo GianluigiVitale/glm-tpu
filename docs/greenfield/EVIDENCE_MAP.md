@@ -3268,3 +3268,36 @@ persistence only; review and persistence precede any v2 installation.
   cron window; numerical execution and full 8K remain forbidden. Sol verified corrected staged diff
   `d1515c3bbf73aeba716124737520aed449b0132267c65144f316ba3cacbc93d0` and returned
   `APPROVE PERSISTENCE` with no P0--P2.
+
+## 2026-09-01 projection-contraction HLO v2 compile and publication failure
+
+- Fresh tag `gate_d_projection_contraction_pp16_hlo_20260901T204123954066730Z` completed one
+  abstract-input PP16 TPU-v4 compile in 0.424247954 seconds. The executable invocation count is
+  zero, numerical execution is false, and both fleet censuses are 8/8 clean. The optimized HLO is
+  31,857 bytes, SHA-256 `7f678b10...84f4d`; StableHLO is 7,420 bytes, SHA-256
+  `4b3fa252...e2e3`.
+- Success publication failed closed because the compiler dependency manifest contained required
+  flag `GLM_GATE_D_PROJECTION_CONTRACTION_HLO=1` while the publisher's expected environment omitted
+  it. The bounded diagnostic ledger is generation `1788295391457443`, SHA-256
+  `16ce098c...40bc`; no `HLO_ACQUIRED` terminal exists and the tag is burned. Canonical failure
+  artifact `gate-d-projection-contraction-pp16-hlo-v2-publication-failure.json` is 3,141 bytes,
+  SHA-256 `d38c43af...10aa`.
+- Independent read-only replay downloaded all 15 exact generations, proved the diagnostic ledger
+  last, found 15 unique live paths and zero exhaustive soft-deleted generations. Replay artifact
+  `gate-d-projection-contraction-pp16-hlo-diagnostic-remote-replay.json` is 4,819 bytes, SHA-256
+  `5d6583be...8b61`. The validator cross-checks every diagnostic-ledger member and every locally
+  consumed byte string, including runner and HLO, against that generation-qualified catalogue.
+- Offline fail-closed adjudication binds the remote replay, runner, absent success terminal, exact
+  owner shapes and complete contraction-to-both-rooted-outputs lineage. It proves one live row per
+  each of two owners, BF16-hidden-to-FP32 conversion, an FP32 `128x6144` multiply reduced over width
+  6144, and zero collectives or host effects. An isolated `python -I -S -B` CLI authenticates and
+  directly loads only the leaf validator/parser/error sources through synthetic packages; hostile
+  package initializers, forbidden modules and accelerator FDs are rejected. Exact report
+  `gate-d-projection-contraction-pp16-diagnostic-hlo-adjudication.json` is 2,318 bytes, SHA-256
+  `c36af80c...8150`. This is diagnostic structural evidence only: numerical and Gate-D closure
+  remain unproven.
+- V3 adds the missing publisher flag and a non-circular acquirer/publisher/wrapper environment
+  regression, while preserving immutable v1/v2 targets. V3 publisher/wrapper/launcher/installer
+  SHA-256 values are `f3f20a01...bc97`, `4dd06dcb...1c70`, `e6fceb3a...6772` and
+  `7125172b...ab03`. Exact next is adversarial source review, commit/push/locked same-region mirror,
+  a regenerated V3 source certificate, separate install-only review, and a fresh compile-only tag.

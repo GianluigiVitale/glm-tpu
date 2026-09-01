@@ -41,11 +41,11 @@ AUDITED_SOURCE_PATHS = (
 )
 EXPECTED_SOURCE_SHA256S = {
     ACQUIRER_PATH: "c660d50eb60054c9b267840230fb69bbf7259104416dc96c7b2ee01a2a14934a",
-    INSTALLER_PATH: "21a14f20b135623e21d7b4ad969efbe85eb0b6acf3668614c29a1358355631be",
-    LAUNCHER_PATH: "b3b6ff7ca9e76028aab98b8806547ff09d8538aa37d37f43396628a792389a23",
+    INSTALLER_PATH: "7125172b4a726ac00161212f8f96fed1a3b310b8f6c8724f903dee71d873ab03",
+    LAUNCHER_PATH: "e6fceb3aa42f566f5fdece58d20928e4d26377d079a916769e530263c65c6772",
     MIRROR_VERIFIER_PATH: "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b",
-    PUBLISHER_PATH: "2ad2b8bd3ef9fdb1797546c3ddf1797b56facfa488a5d999b8ab9444fff335d8",
-    WRAPPER_PATH: "058338a174e1746b4fe231cb23fbac3a8abe1260d687337551885e4c98a14992",
+    PUBLISHER_PATH: "f3f20a01fd37bb82988cd77f69fa7b0a780d120568bab0db4162f42e7855bc97",
+    WRAPPER_PATH: "4dd06dcb57fdb5a43d0eec0f7a6754724d7534637bda539eb36831359e1b1c70",
 }
 PROJECTION_SOURCE_PATH = "docs/artifacts/gate-d-projection-contraction-pp16-source.json"
 PROJECTION_SOURCE_SHA256 = (
@@ -318,7 +318,7 @@ def _audit_wrapper(raw: bytes) -> dict[str, Any]:
         '/usr/bin/python3 -I -S -B -c "$GIT_AUTHORITY_VERIFIER"',
         "compile_host_only=1 sealed_source_archive=1",
         "HLO_ACQUIRED_UNADJUDICATED",
-        "gate-d-projection-contraction-pp16-hlo-v2",
+        "gate-d-projection-contraction-pp16-hlo-v3",
         "wrapper_fd != 10",
     )
     forbidden = (
@@ -356,8 +356,8 @@ def _audit_launcher(raw: bytes, wrapper_raw: bytes) -> dict[str, Any]:
     if any(_assignment(tree, name) != value for name, value in expected.items()):
         raise RuntimeError("projection launcher immutable pin drifted")
     required = (
-        '"/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v2.py"',
-        '"/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v2"',
+        '"/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v3.py"',
+        '"/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v3"',
         "os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING",
         "fcntl.fcntl(descriptor, F_ADD_SEALS, REQUIRED_SEALS)",
         'f"/proc/self/fd/{WRAPPER_FD}"',
@@ -389,9 +389,9 @@ def _audit_installer(raw: bytes) -> dict[str, Any]:
     if _assignment(tree, "PAYLOADS") != EXPECTED_PAYLOADS:
         raise RuntimeError("projection installer payload map drifted")
     required = (
-        "SOURCE_ROOT = Path('/opt/glm-tpu/gate-d-projection-contraction-hlo-install-v2')",
-        "LAUNCHER_TARGET = LAUNCHER_PARENT / 'launch_gate_d_projection_contraction_pp16_hlo_v2.py'",
-        "CAPSULE_TARGET = CAPSULE_PARENT / 'gate-d-projection-contraction-pp16-hlo-v2'",
+        "SOURCE_ROOT = Path('/opt/glm-tpu/gate-d-projection-contraction-hlo-install-v3')",
+        "LAUNCHER_TARGET = LAUNCHER_PARENT / 'launch_gate_d_projection_contraction_pp16_hlo_v3.py'",
+        "CAPSULE_TARGET = CAPSULE_PARENT / 'gate-d-projection-contraction-pp16-hlo-v3'",
         "os.geteuid() != 0",
         "dict(os.environ) != EXPECTED_ENVIRONMENT",
         "sys.argv != [str(INSTALLER_PATH)]",
