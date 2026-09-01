@@ -23,6 +23,8 @@ from glm_tpu.greenfield.validation.gate_d_projection_contraction_source import (
 ROOT = Path(__file__).parents[3]
 BUILDER = ROOT / "glm_tpu/greenfield/benchmarking/gate_d_projection_contraction_pp16.py"
 SCRIPT = ROOT / "scripts/greenfield/analyze_gate_d_projection_contraction_source.py"
+ARTIFACT = ROOT / "docs/artifacts/gate-d-projection-contraction-pp16-source.json"
+ARTIFACT_SHA256 = "5744eee0ef2cf35a4566cc0de165be1338160daaae3f4dd133554b2aa8280e9f"
 PREDECESSOR = (
     ROOT / "docs/artifacts/gate-d-projection-arithmetic-frontier-analysis.json"
 )
@@ -424,3 +426,35 @@ def test_source_analyzer_is_default_off_cpu_only_and_nonmutating() -> None:
     )
     assert result.returncode != 0
     assert "CPU-pinned" in result.stderr
+
+
+def test_source_artifact_exactly_replays_committed_analyzer() -> None:
+    artifact = ARTIFACT.read_bytes()
+    assert len(artifact) == 4176
+    assert sha256(artifact).hexdigest() == ARTIFACT_SHA256
+    parsed = json.loads(artifact)
+    assert parsed["code_hash"] == "e3af2ca776ba5a789c6b2c0cc7bbd42258bbdc32"
+    assert parsed["gate_d_closed"] is False
+    assert parsed["authorization"] == {
+        "full_dsa_or_8k": False,
+        "hlo_acquisition": False,
+        "persistence_only": True,
+        "tpu_compile": False,
+        "tpu_execution": False,
+    }
+    environment = {
+        **os.environ,
+        "GLM_GATE_D_PROJECTION_CONTRACTION_SOURCE": "1",
+        "JAX_PLATFORMS": "cpu",
+        "JAX_PLATFORM_NAME": "cpu",
+    }
+    result = subprocess.run(
+        ["/home/gianl/vllm-env/bin/python", str(SCRIPT)],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr.decode()
+    assert result.stdout == artifact

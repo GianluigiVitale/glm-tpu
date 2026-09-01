@@ -9685,3 +9685,24 @@ experiment but does not prove TPU causality or a general fix. Gate D, full DSA a
 Exact next after this artifact is committed/pushed/mirrored: review a default-off source/compile-only
 design for the smallest one-row TPU F32 projection-contraction discriminator. Do not rerun the
 burned forced-round path or the complete decoder.
+
+## 2026-09-01 PP16 projection-contraction source admitted; compile unauthorized
+
+The default-off builder at source pin `e3af2ca776ba5a789c6b2c0cc7bbd42258bbdc32` binds exact
+PP16 stage-zero devices `[0,1]`, one live BF16 hidden row per owner, one FP32/highest-precision key
+projection and the unchanged divide-sqrt key suffix. It roots the normalized input, raw projection
+and current key with owner-preserving rank-3 outputs. Its forced two-CPU-device `jax.eval_shape`
+test proves global shapes `[2,1,6144]`, `[2,1,128]`, `[2,1,128]`; the source contains zero
+collectives, callbacks, lowering, compile or execution.
+
+Canonical certificate `docs/artifacts/gate-d-projection-contraction-pp16-source.json` is 4,176
+bytes, SHA-256 `5744eee0ef2cf35a4566cc0de165be1338160daaae3f4dd133554b2aa8280e9f`.
+The analyzer pins the complete builder AST and all direct dependency bytes, forces the authenticated
+repository root ahead of hostile import paths, rejects preloaded `glm_tpu` modules and verifies the
+resolved validator path/bytes. Sol's final re-review returned `APPROVE` with no P0--P2 after these
+import-provenance attacks were added. The source pin is exact on origin and the locked
+`US-CENTRAL2` mirror checkout archive is `fdb39dab...859a2`.
+
+This is source/persistence evidence only: HLO acquisition, TPU compile/execution, full DSA/8K,
+performance and Gate-D closure remain false. Exact next is a separately reviewed compile-only HLO
+acquisition design for this projection-only callable; do not execute it or the complete decoder.

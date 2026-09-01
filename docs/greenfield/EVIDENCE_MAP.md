@@ -3105,3 +3105,26 @@ execution is authorized by this source batch.
   performance, mechanism, full DSA or 8K authority exists. Exact next after artifact persistence is
   a separately reviewed default-off source/compile-only design for the smallest one-row TPU F32
   projection-contraction discriminator; do not rerun the full DSA path or 8K decoder.
+
+## 2026-09-01 PP16 projection-contraction source certificate
+
+- Source pin `e3af2ca776ba5a789c6b2c0cc7bbd42258bbdc32` is exact on origin; its locked
+  `US-CENTRAL2` mirror replay passed strict connectivity and full checkout comparison with archive
+  SHA-256 `fdb39dabd574eff131c85204916b08cfdbbce2325df28ae08cc060d0fe5859a2`.
+- Builder `glm_tpu/greenfield/benchmarking/gate_d_projection_contraction_pp16.py` is default-off
+  and source-only. It accepts only physical PP16 stage zero `[0,1]`, carries one local BF16 row,
+  performs one FP32 projection under highest matmul precision, preserves the divide-sqrt suffix,
+  roots normalized/projection/current-key owners, and contains no collective or execution action.
+- Certificate `docs/artifacts/gate-d-projection-contraction-pp16-source.json` is 4,176 bytes,
+  SHA-256 `5744eee0ef2cf35a4566cc0de165be1338160daaae3f4dd133554b2aa8280e9f`.
+  Its complete builder AST is `58d6f008...c00704`; exact direct dependency hashes and the accepted
+  projection/topology predecessors are bound.
+- A forced two-CPU-device abstract replay proves owner-preserving output shapes
+  `[2,1,6144]`, `[2,1,128]`, `[2,1,128]`. Hostile tests reject AST aliases/getattr/top-level
+  effects, dependency drift, path-shadow packages and spoofed preloaded validators. Sol returned
+  final `APPROVE` with no P0--P2; focused validation is 26/26 and the adjacent causal boundary is
+  74/74 after exact artifact binding.
+- Classification: `PROJECTION_ONLY_PP16_SOURCE_ACCEPTED;COMPILE_UNPROVEN;
+  TPU_CAUSALITY_UNPROVEN;GATE_D_OPEN`. It authorizes persistence only, not HLO acquisition, TPU
+  compile/execution, performance, full DSA/8K or Gate-D closure. Exact next is a separately reviewed
+  compile-only HLO acquisition boundary for this callable; no executable invocation is authorized.
