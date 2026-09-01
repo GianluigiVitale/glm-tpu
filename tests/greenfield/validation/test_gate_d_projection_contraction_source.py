@@ -280,8 +280,122 @@ def test_direct_dependency_drift_fails_closed() -> None:
         )
 
 
+def test_source_analyzer_forces_authenticated_root_before_shadow_package(
+    tmp_path: Path,
+) -> None:
+    shadow = tmp_path / "shadow"
+    package = shadow / "glm_tpu"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text(
+        'raise RuntimeError("hostile shadow glm_tpu imported")\n'
+    )
+    code = f"""
+import importlib.util
+import json
+import os
+import sys
+from hashlib import sha256
+from pathlib import Path
+
+script = Path({str(SCRIPT)!r})
+spec = importlib.util.spec_from_file_location('projection_source_analyzer', script)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+module._committed_sources = lambda: (
+    '0' * 40,
+    {{
+        relative: sha256((module.ROOT / relative).read_bytes()).hexdigest()
+        for relative in (module.SOURCE_PATH, module.BUILDER_PATH, module.VALIDATOR_PATH)
+    }},
+    dict(module.DIRECT_DEPENDENCY_SHA256S),
+)
+os.environ['GLM_GATE_D_PROJECTION_CONTRACTION_SOURCE'] = '1'
+os.environ['JAX_PLATFORMS'] = 'cpu'
+os.environ['JAX_PLATFORM_NAME'] = 'cpu'
+result = module.analyze()
+validator = sys.modules['glm_tpu.greenfield.validation.gate_d_projection_contraction_source']
+print(json.dumps({{
+    'classification': result['classification'],
+    'import_root': sys.path[0],
+    'validator_path': str(Path(validator.__file__).resolve(strict=True)),
+}}))
+"""
+    environment = {
+        **os.environ,
+        "PYTHONPATH": f"{shadow}:{ROOT}",
+    }
+    result = subprocess.run(
+        ["/home/gianl/vllm-env/bin/python", "-c", code],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    observed = json.loads(result.stdout)
+    assert observed == {
+        "classification": (
+            "PROJECTION_ONLY_PP16_SOURCE_ACCEPTED;COMPILE_UNPROVEN;"
+            "TPU_CAUSALITY_UNPROVEN;GATE_D_OPEN"
+        ),
+        "import_root": str(ROOT),
+        "validator_path": str(
+            (
+                ROOT / "glm_tpu/greenfield/validation/"
+                "gate_d_projection_contraction_source.py"
+            ).resolve(strict=True)
+        ),
+    }
+
+
+def test_source_analyzer_rejects_preloaded_validator_module(tmp_path: Path) -> None:
+    code = f"""
+import importlib.util
+import os
+import sys
+import types
+from pathlib import Path
+
+script = Path({str(SCRIPT)!r})
+spec = importlib.util.spec_from_file_location('projection_source_analyzer', script)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+hostile = types.ModuleType('glm_tpu')
+hostile.__file__ = str(module.ROOT / 'glm_tpu/__init__.py')
+hostile.__path__ = [str(module.ROOT / 'glm_tpu')]
+sys.modules['glm_tpu'] = hostile
+spoofed = types.ModuleType(
+    'glm_tpu.greenfield.validation.gate_d_projection_contraction_source'
+)
+spoofed.__file__ = str(module.ROOT / module.VALIDATOR_PATH)
+sys.modules[spoofed.__name__] = spoofed
+os.environ['GLM_GATE_D_PROJECTION_CONTRACTION_SOURCE'] = '1'
+os.environ['JAX_PLATFORMS'] = 'cpu'
+os.environ['JAX_PLATFORM_NAME'] = 'cpu'
+module.analyze()
+"""
+    result = subprocess.run(
+        ["/home/gianl/vllm-env/bin/python", "-S", "-c", code],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode != 0
+    assert "rejects preloaded glm_tpu modules" in result.stderr
+
+
 def test_source_analyzer_is_default_off_cpu_only_and_nonmutating() -> None:
     source = SCRIPT.read_text()
+    assert "sys.path[:] = [entry for entry in sys.path if entry != ROOT_TEXT]" in source
+    assert "sys.path.insert(0, ROOT_TEXT)" in source
+    assert "validator_path != expected_validator_path" in source
+    assert source.count("_reject_preloaded_glm_tpu()") == 3
     assert "gcloud" not in source
     assert "jax.distributed" not in source
     assert "libtpu" not in source.lower()

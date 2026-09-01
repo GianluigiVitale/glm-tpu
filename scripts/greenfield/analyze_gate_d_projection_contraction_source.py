@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Emit the source-only certificate for the PP16 projection discriminator."""
+"""Emit the source-only certificate for the PP16 projection discriminator.
+
+The CLI requires a clean interpreter with no preloaded ``glm_tpu`` modules.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +15,23 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
-ROOT = Path(__file__).parents[2]
+
+def _reject_preloaded_glm_tpu() -> None:
+    preloaded = sorted(
+        name for name in sys.modules if name == "glm_tpu" or name.startswith("glm_tpu.")
+    )
+    if preloaded:
+        raise RuntimeError(
+            "projection source analyzer rejects preloaded glm_tpu modules"
+        )
+
+
+_reject_preloaded_glm_tpu()
+ROOT = Path(__file__).resolve(strict=True).parents[2]
+ROOT_TEXT = str(ROOT)
+sys.path[:] = [entry for entry in sys.path if entry != ROOT_TEXT]
+sys.path.insert(0, ROOT_TEXT)
+
 SOURCE_PATH = "scripts/greenfield/analyze_gate_d_projection_contraction_source.py"
 BUILDER_PATH = "glm_tpu/greenfield/benchmarking/gate_d_projection_contraction_pp16.py"
 VALIDATOR_PATH = "glm_tpu/greenfield/validation/gate_d_projection_contraction_source.py"
@@ -141,6 +160,7 @@ def analyze() -> dict[str, Any]:
         "JAX_PLATFORM_NAME"
     ) not in (None, "cpu"):
         raise RuntimeError("projection source analysis must be CPU-pinned")
+    _reject_preloaded_glm_tpu()
     pin, sources, dependencies = _committed_sources()
     predecessor_raw = _snapshot(PREDECESSOR)
     topology_raw = _snapshot(TOPOLOGY)
@@ -148,11 +168,21 @@ def analyze() -> dict[str, Any]:
         raise RuntimeError("projection predecessor bytes drifted")
     if sha256(topology_raw).hexdigest() != TOPOLOGY_SHA256:
         raise RuntimeError("projection topology bytes drifted")
-    from glm_tpu.greenfield.validation.gate_d_projection_contraction_source import (
-        audit_projection_contraction_pp16_source,
+    if not sys.path or sys.path[0] != ROOT_TEXT:
+        raise RuntimeError("projection source import root drifted")
+    from glm_tpu.greenfield.validation import (
+        gate_d_projection_contraction_source as validator,
     )
 
-    audit = audit_projection_contraction_pp16_source(
+    validator_path = Path(validator.__file__).resolve(strict=True)
+    expected_validator_path = (ROOT / VALIDATOR_PATH).resolve(strict=True)
+    if (
+        validator_path != expected_validator_path
+        or sha256(_snapshot(validator_path)).hexdigest() != sources[VALIDATOR_PATH]
+    ):
+        raise RuntimeError("projection source validator import drifted")
+
+    audit = validator.audit_projection_contraction_pp16_source(
         _snapshot(ROOT / BUILDER_PATH),
         dependency_sha256s=dependencies,
         predecessor=json.loads(predecessor_raw),
