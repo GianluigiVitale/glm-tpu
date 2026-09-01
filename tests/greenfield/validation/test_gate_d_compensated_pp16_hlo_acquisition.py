@@ -35,6 +35,7 @@ ADMISSION = (
     ROOT / "docs/artifacts/gate-d-precompile-admission-v2-compensated-capsule.json"
 )
 TOPOLOGY = ROOT / "docs/artifacts/gate-d-runtime-locality-authority.json"
+EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 
 def _load_driver():
@@ -766,7 +767,10 @@ def test_repository_verification_is_read_only_serial_and_fail_fast() -> None:
     assert 'cat-file -t "$pin"' in block
     assert '[[ -d "$wt/.git" && ! -L "$wt/.git" ]]' in block
     assert '[[ -f "$wt/.git" && ! -L "$wt/.git" ]]' in block
-    assert '[[ "$expected_layout" == standalone ]]' in block
+    assert (
+        '[[ "$expected_layout" == standalone || "$expected_layout" == standalone_promisor ]]'
+        in block
+    )
     assert '[[ "$expected_layout" == linked ]]' in block
     assert '[[ $worker -eq 0 ]] && expected_layout=linked' in block
     assert "linked_pointer_bytes" in block
@@ -785,6 +789,10 @@ def test_repository_verification_is_read_only_serial_and_fail_fast() -> None:
     assert '"$object_dir/info/alternates"' in block
     assert '[[ "$grafts_path" == "$common_dir/info/grafts" ]]' in block
     assert "-name '*.promisor'" in block
+    assert 'expected_missing_count=$7' in block
+    assert 'expected_promisor_sha=${10}' in block
+    assert '[[ "$missing_count" == "$expected_missing_count" ]]' in block
+    assert '[[ "$promisor_sha" == "$expected_promisor_sha" ]]' in block
     assert "for-each-ref --format='%(refname)' refs/replace" in block
     assert "ls-files -v -z" in block
     assert "special_index_flag" in block
@@ -810,6 +818,10 @@ def _run_worker_repo_verify(
     linked_common: Path | None = None,
     linked_git_dir: Path | None = None,
     expected_layout: str | None = None,
+    expected_missing_count: int = 0,
+    expected_missing_sha: str = EMPTY_SHA256,
+    expected_promisor_count: int = 0,
+    expected_promisor_sha: str = EMPTY_SHA256,
 ) -> subprocess.CompletedProcess[str]:
     common = linked_common if linked_common is not None else repo / ".git"
     admin = (
@@ -850,6 +862,10 @@ def _run_worker_repo_verify(
             str(common),
             str(admin),
             layout,
+            str(expected_missing_count),
+            expected_missing_sha,
+            str(expected_promisor_count),
+            expected_promisor_sha,
         ],
         check=False,
         capture_output=True,
@@ -998,7 +1014,7 @@ def test_exact_worker_repo_verifier_is_no_write_and_fails_hostile_closure(
     promisor.write_text("")
     completed = _run_worker_repo_verify(repo, pin, origin)
     assert completed.returncode != 0
-    assert "promisor_pack" in completed.stderr
+    assert "promisor_count" in completed.stderr
     promisor.unlink()
 
     sparse = repo / ".git/info/sparse-checkout"
@@ -1033,12 +1049,175 @@ def test_exact_worker_repo_verifier_is_no_write_and_fails_hostile_closure(
     blob_path.unlink()
     completed = _run_worker_repo_verify(repo, pin, origin)
     assert completed.returncode != 0
-    # Depending on Git's cache state, the missing reachable object can be
-    # discovered by diff-index or by the immediately following fsck. Both
-    # reviewed reasons are fail-closed and no hostile hook may run.
+    # The bound missing-object inventory normally catches this first. Git may
+    # instead expose it through tracked-state or fsck depending on cache state.
     assert re.fullmatch(
-        r"REPO_VERIFY_BAD \S+ (tracked_state|object_closure)\n", completed.stderr
+        r"REPO_VERIFY_BAD \S+ (missing_count|tracked_state|object_closure)\n",
+        completed.stderr,
     )
+
+
+def test_exact_worker_repo_verifier_accepts_only_exact_promisor_prestate(
+    tmp_path: Path,
+) -> None:
+    environment = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "Gate D Test",
+        "GIT_AUTHOR_EMAIL": "gate-d@example.invalid",
+        "GIT_COMMITTER_NAME": "Gate D Test",
+        "GIT_COMMITTER_EMAIL": "gate-d@example.invalid",
+    }
+
+    seed = tmp_path / "seed"
+    seed.mkdir()
+
+    def seed_git(*arguments: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["/usr/bin/git", "-C", str(seed), *arguments],
+            check=True,
+            capture_output=True,
+            env=environment,
+            text=True,
+        )
+
+    seed_git("init", "-q")
+    (seed / "tracked.txt").write_text("historical blob that remains promised\n")
+    seed_git("add", "tracked.txt")
+    seed_git("commit", "-q", "-m", "historical")
+    (seed / "tracked.txt").write_text("current checked-out blob\n")
+    seed_git("commit", "-q", "-am", "current")
+
+    bare = tmp_path / "origin.git"
+    subprocess.run(
+        ["/usr/bin/git", "clone", "-q", "--bare", str(seed), str(bare)],
+        check=True,
+        env=environment,
+    )
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(bare),
+            "config",
+            "uploadpack.allowFilter",
+            "true",
+        ],
+        check=True,
+        env=environment,
+    )
+    origin = bare.as_uri()
+    repo = tmp_path / "promisor-repo"
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "clone",
+            "-q",
+            "--filter=blob:none",
+            "--no-checkout",
+            origin,
+            str(repo),
+        ],
+        check=True,
+        env=environment,
+    )
+    subprocess.run(
+        ["/usr/bin/git", "-C", str(repo), "checkout", "-q", "--detach", "HEAD"],
+        check=True,
+        env=environment,
+    )
+    pin = subprocess.run(
+        ["/usr/bin/git", "-C", str(repo), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+    ).stdout.strip()
+    passive_environment = {**environment, "GIT_NO_LAZY_FETCH": "1"}
+    missing_output = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(repo),
+            "rev-list",
+            "--objects",
+            "--missing=print",
+            pin,
+        ],
+        check=True,
+        capture_output=True,
+        env=passive_environment,
+        text=True,
+    ).stdout
+    missing = sorted(
+        line.split()[0][1:]
+        for line in missing_output.splitlines()
+        if line.startswith("?")
+    )
+    assert missing
+    missing_sha = sha256(("\n".join(missing) + "\n").encode()).hexdigest()
+    object_dir = repo / ".git/objects"
+    promisor_records = sorted(
+        f"{path.relative_to(object_dir)}:{path.stat().st_size}\n"
+        for path in object_dir.rglob("*.promisor")
+    )
+    assert promisor_records
+    promisor_sha = sha256("".join(promisor_records).encode()).hexdigest()
+
+    strict = _run_worker_repo_verify(repo, pin, origin)
+    assert strict.returncode != 0
+    assert "config_not_allowlisted" in strict.stderr
+
+    accepted = _run_worker_repo_verify(
+        repo,
+        pin,
+        origin,
+        expected_layout="standalone_promisor",
+        expected_missing_count=len(missing),
+        expected_missing_sha=missing_sha,
+        expected_promisor_count=len(promisor_records),
+        expected_promisor_sha=promisor_sha,
+    )
+    assert accepted.returncode == 0, accepted.stderr
+    assert accepted.stdout.startswith("SYNC_OK ")
+
+    tampered_count = _run_worker_repo_verify(
+        repo,
+        pin,
+        origin,
+        expected_layout="standalone_promisor",
+        expected_missing_count=len(missing),
+        expected_missing_sha=missing_sha,
+        expected_promisor_count=len(promisor_records) + 1,
+        expected_promisor_sha=promisor_sha,
+    )
+    assert tampered_count.returncode != 0
+    assert "promisor_count" in tampered_count.stderr
+
+    tampered_sha = _run_worker_repo_verify(
+        repo,
+        pin,
+        origin,
+        expected_layout="standalone_promisor",
+        expected_missing_count=len(missing),
+        expected_missing_sha=missing_sha,
+        expected_promisor_count=len(promisor_records),
+        expected_promisor_sha="0" * 64,
+    )
+    assert tampered_sha.returncode != 0
+    assert "promisor_sha" in tampered_sha.stderr
+
+    tampered_missing = _run_worker_repo_verify(
+        repo,
+        pin,
+        origin,
+        expected_layout="standalone_promisor",
+        expected_missing_count=len(missing),
+        expected_missing_sha="0" * 64,
+        expected_promisor_count=len(promisor_records),
+        expected_promisor_sha=promisor_sha,
+    )
+    assert tampered_missing.returncode != 0
+    assert "missing_sha" in tampered_missing.stderr
 
 
 def test_exact_worker_repo_verifier_accepts_only_bound_linked_worktree(

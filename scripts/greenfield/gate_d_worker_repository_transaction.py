@@ -25,6 +25,7 @@ _RENAME_EXCHANGE = 2
 _PARENT = Path("/home/gianl")
 _LOCK_PARENT = Path("/opt/glm-tpu/locks")
 _LOCK_NAME = "gate_d_repo_recovery.lock"
+_EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 _GIT_ENV = {
     "HOME": "/home/gianl",
     "LANG": "C",
@@ -122,6 +123,10 @@ def _verify(
     linked_common: str,
     linked_git_dir: str,
     expected_layout: str,
+    expected_missing_count: int,
+    expected_missing_sha: str,
+    expected_promisor_count: int,
+    expected_promisor_sha: str,
 ) -> None:
     environment = dict(_GIT_ENV)
     environment["GLM_GATE_D_REPO_RECOVERY_CARRIER"] = os.environ[
@@ -141,6 +146,10 @@ def _verify(
             linked_common,
             linked_git_dir,
             expected_layout,
+            str(expected_missing_count),
+            expected_missing_sha,
+            str(expected_promisor_count),
+            expected_promisor_sha,
         ],
         check=False,
         capture_output=True,
@@ -150,7 +159,40 @@ def _verify(
         timeout=120,
     )
     if result.returncode or not result.stdout.startswith("SYNC_OK "):
-        _fail("repository_verify")
+        reason = result.stderr.strip().splitlines()[-1] if result.stderr.strip() else ""
+        _fail("repository_verify:" + reason)
+
+
+def _verify_old(arguments: argparse.Namespace, pin: str, path: str) -> None:
+    _verify(
+        arguments.verifier,
+        pin,
+        path,
+        arguments.origin,
+        arguments.linked_common,
+        arguments.linked_git_dir,
+        arguments.old_layout,
+        arguments.old_missing_count,
+        arguments.old_missing_sha,
+        arguments.old_promisor_count,
+        arguments.old_promisor_sha,
+    )
+
+
+def _verify_target(arguments: argparse.Namespace, pin: str, path: str) -> None:
+    _verify(
+        arguments.verifier,
+        pin,
+        path,
+        arguments.origin,
+        arguments.linked_common,
+        arguments.linked_git_dir,
+        arguments.target_layout,
+        arguments.target_missing_count,
+        arguments.target_missing_sha,
+        arguments.target_promisor_count,
+        arguments.target_promisor_sha,
+    )
 
 
 def _renameat2(
@@ -265,15 +307,10 @@ def preflight(arguments: argparse.Namespace, parent_fd: int) -> dict[str, object
     try:
         canonical_identity = _directory_identity(canonical_fd)
         old_pin = _repository_pin(_canonical_path(arguments.worktree))
-        _verify(
-            arguments.verifier,
-            old_pin,
-            _canonical_path(arguments.worktree),
-            arguments.origin,
-            arguments.linked_common,
-            arguments.linked_git_dir,
-            arguments.expected_layout,
-        )
+        if old_pin == arguments.pin:
+            _verify_target(arguments, old_pin, _canonical_path(arguments.worktree))
+        else:
+            _verify_old(arguments, old_pin, _canonical_path(arguments.worktree))
         _revalidate(parent_fd, arguments.worktree, canonical_identity)
     finally:
         os.close(canonical_fd)
@@ -334,15 +371,7 @@ def receive_prepare(
         old_pin = _repository_pin(_canonical_path(arguments.worktree))
         if old_pin != arguments.old_pin:
             _fail("canonical_pin")
-        _verify(
-            arguments.verifier,
-            old_pin,
-            _canonical_path(arguments.worktree),
-            arguments.origin,
-            arguments.linked_common,
-            arguments.linked_git_dir,
-            arguments.expected_layout,
-        )
+        _verify_old(arguments, old_pin, _canonical_path(arguments.worktree))
         _revalidate(parent_fd, arguments.worktree, old_identity)
 
         os.set_inheritable(bundle_fd, True)
@@ -373,15 +402,7 @@ def receive_prepare(
         new_fd = _open_directory(parent_fd, arguments.new)
         try:
             new_identity = _directory_identity(new_fd)
-            _verify(
-                arguments.verifier,
-                arguments.pin,
-                _canonical_path(arguments.new),
-                arguments.origin,
-                arguments.linked_common,
-                arguments.linked_git_dir,
-                arguments.expected_layout,
-            )
+            _verify_target(arguments, arguments.pin, _canonical_path(arguments.new))
             _revalidate(parent_fd, arguments.new, new_identity)
             if _regular_identity(bundle_fd) != bundle_identity:
                 _fail("bundle_identity_drift")
@@ -397,15 +418,7 @@ def receive_prepare(
             parent_fd, arguments.new, parent_fd, arguments.old, _RENAME_NOREPLACE
         )
         os.fsync(parent_fd)
-        _verify(
-            arguments.verifier,
-            arguments.pin,
-            _canonical_path(arguments.old),
-            arguments.origin,
-            arguments.linked_common,
-            arguments.linked_git_dir,
-            arguments.expected_layout,
-        )
+        _verify_target(arguments, arguments.pin, _canonical_path(arguments.old))
         _revalidate(parent_fd, arguments.old, new_identity)
     finally:
         os.close(bundle_fd)
@@ -434,24 +447,8 @@ def _rollback_after_exchange(
         parent_fd, arguments.worktree, parent_fd, arguments.old, _RENAME_EXCHANGE
     )
     os.fsync(parent_fd)
-    _verify(
-        arguments.verifier,
-        arguments.old_pin,
-        _canonical_path(arguments.worktree),
-        arguments.origin,
-        arguments.linked_common,
-        arguments.linked_git_dir,
-        arguments.expected_layout,
-    )
-    _verify(
-        arguments.verifier,
-        arguments.pin,
-        _canonical_path(arguments.old),
-        arguments.origin,
-        arguments.linked_common,
-        arguments.linked_git_dir,
-        arguments.expected_layout,
-    )
+    _verify_old(arguments, arguments.old_pin, _canonical_path(arguments.worktree))
+    _verify_target(arguments, arguments.pin, _canonical_path(arguments.old))
     _revalidate(parent_fd, arguments.worktree, old_identity)
     _revalidate(parent_fd, arguments.old, new_identity)
 
@@ -476,24 +473,8 @@ def swap(arguments: argparse.Namespace, parent_fd: int) -> dict[str, object]:
             _fail("canonical_prestate")
         if new_identity != (arguments.new_dev, arguments.new_ino):
             _fail("prepared_prestate")
-        _verify(
-            arguments.verifier,
-            arguments.old_pin,
-            _canonical_path(arguments.worktree),
-            arguments.origin,
-            arguments.linked_common,
-            arguments.linked_git_dir,
-            arguments.expected_layout,
-        )
-        _verify(
-            arguments.verifier,
-            arguments.pin,
-            _canonical_path(arguments.old),
-            arguments.origin,
-            arguments.linked_common,
-            arguments.linked_git_dir,
-            arguments.expected_layout,
-        )
+        _verify_old(arguments, arguments.old_pin, _canonical_path(arguments.worktree))
+        _verify_target(arguments, arguments.pin, _canonical_path(arguments.old))
         _revalidate(parent_fd, arguments.worktree, old_identity)
         _revalidate(parent_fd, arguments.old, new_identity)
         bundle_sha, bundle_bytes = _sha256_fd(bundle_fd)
@@ -506,24 +487,10 @@ def swap(arguments: argparse.Namespace, parent_fd: int) -> dict[str, object]:
         exchanged = True
         try:
             os.fsync(parent_fd)
-            _verify(
-                arguments.verifier,
-                arguments.pin,
-                _canonical_path(arguments.worktree),
-                arguments.origin,
-                arguments.linked_common,
-                arguments.linked_git_dir,
-                arguments.expected_layout,
+            _verify_target(
+                arguments, arguments.pin, _canonical_path(arguments.worktree)
             )
-            _verify(
-                arguments.verifier,
-                arguments.old_pin,
-                _canonical_path(arguments.old),
-                arguments.origin,
-                arguments.linked_common,
-                arguments.linked_git_dir,
-                arguments.expected_layout,
-            )
+            _verify_old(arguments, arguments.old_pin, _canonical_path(arguments.old))
             _revalidate(parent_fd, arguments.worktree, new_identity)
             _revalidate(parent_fd, arguments.old, old_identity)
         except BaseException:
@@ -570,24 +537,8 @@ def final(arguments: argparse.Namespace, parent_fd: int) -> dict[str, object]:
             _fail("final_current_identity")
         if _directory_identity(old_fd) != (arguments.old_dev, arguments.old_ino):
             _fail("final_old_identity")
-        _verify(
-            arguments.verifier,
-            arguments.pin,
-            _canonical_path(arguments.worktree),
-            arguments.origin,
-            arguments.linked_common,
-            arguments.linked_git_dir,
-            arguments.expected_layout,
-        )
-        _verify(
-            arguments.verifier,
-            arguments.old_pin,
-            _canonical_path(arguments.old),
-            arguments.origin,
-            arguments.linked_common,
-            arguments.linked_git_dir,
-            arguments.expected_layout,
-        )
+        _verify_target(arguments, arguments.pin, _canonical_path(arguments.worktree))
+        _verify_old(arguments, arguments.old_pin, _canonical_path(arguments.old))
         _revalidate(
             parent_fd, arguments.worktree, (arguments.new_dev, arguments.new_ino)
         )
@@ -618,7 +569,22 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--origin", required=True)
     parser.add_argument("--linked-common", required=True)
     parser.add_argument("--linked-git-dir", required=True)
-    parser.add_argument("--expected-layout", choices=("standalone",), required=True)
+    parser.add_argument(
+        "--old-layout", choices=("standalone", "standalone_promisor"), required=True
+    )
+    parser.add_argument("--old-missing-count", type=int, required=True)
+    parser.add_argument("--old-missing-sha", required=True)
+    parser.add_argument("--old-promisor-count", type=int, required=True)
+    parser.add_argument("--old-promisor-sha", required=True)
+    parser.add_argument("--target-layout", choices=("standalone",), required=True)
+    parser.add_argument("--target-missing-count", type=int, choices=(0,), required=True)
+    parser.add_argument("--target-missing-sha", choices=(_EMPTY_SHA256,), required=True)
+    parser.add_argument(
+        "--target-promisor-count", type=int, choices=(0,), required=True
+    )
+    parser.add_argument(
+        "--target-promisor-sha", choices=(_EMPTY_SHA256,), required=True
+    )
     parser.add_argument("--verifier", required=True)
     parser.add_argument("--old-pin", default="")
     parser.add_argument("--old-dev", type=int, default=-1)

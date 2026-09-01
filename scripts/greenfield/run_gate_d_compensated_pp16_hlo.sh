@@ -307,6 +307,10 @@ origin=$3
 linked_common_expected=$4
 linked_git_dir_expected=$5
 expected_layout=$6
+expected_missing_count=$7
+expected_missing_sha=$8
+expected_promisor_count=$9
+expected_promisor_sha=${10}
 fail() {
   printf 'REPO_VERIFY_BAD %s %s\n' "$(/usr/bin/hostname)" "$1" >&2
   exit 1
@@ -347,9 +351,13 @@ git_cmd=(
   -c core.preloadIndex=false
   -c fsck.skipList=/dev/null
 )
+[[ "$expected_missing_count" =~ ^[0-9]+$ ]] || fail invalid_missing_count
+[[ "$expected_promisor_count" =~ ^[0-9]+$ ]] || fail invalid_promisor_count
+[[ "$expected_missing_sha" =~ ^[0-9a-f]{64}$ ]] || fail invalid_missing_sha
+[[ "$expected_promisor_sha" =~ ^[0-9a-f]{64}$ ]] || fail invalid_promisor_sha
 [[ -d "$wt" && ! -L "$wt" && "$(/usr/bin/readlink -f -- "$wt")" == "$wt" ]] || fail worktree_boundary
 if [[ -d "$wt/.git" && ! -L "$wt/.git" ]]; then
-  [[ "$expected_layout" == standalone ]] || fail unexpected_layout
+  [[ "$expected_layout" == standalone || "$expected_layout" == standalone_promisor ]] || fail unexpected_layout
   expected_git_dir=$wt/.git
   expected_common_dir=$wt/.git
   expected_index=$wt/.git/index
@@ -388,10 +396,18 @@ while IFS= read -r config_name; do
       core.repositoryformatversion | core.untrackedcache | remote.origin.fetch | \
       remote.origin.url | branch.*.merge | branch.*.remote | \
       branch.*.vscode-merge-base) ;;
+    remote.origin.promisor | remote.origin.partialclonefilter)
+      [[ "$expected_layout" == standalone_promisor ]] || fail config_not_allowlisted ;;
     *) fail config_not_allowlisted ;;
   esac
 done <<<"$config_names"
-[[ "$("${git_cmd[@]}" -C "$wt" config --local --get core.repositoryformatversion)" == 0 ]] || fail repository_format
+if [[ "$expected_layout" == standalone_promisor ]]; then
+  [[ "$("${git_cmd[@]}" -C "$wt" config --local --get core.repositoryformatversion)" == 1 ]] || fail repository_format
+  [[ "$("${git_cmd[@]}" -C "$wt" config --local --get remote.origin.promisor)" == true ]] || fail promisor_config
+  [[ "$("${git_cmd[@]}" -C "$wt" config --local --get remote.origin.partialclonefilter)" == blob:none ]] || fail partial_clone_filter
+else
+  [[ "$("${git_cmd[@]}" -C "$wt" config --local --get core.repositoryformatversion)" == 0 ]] || fail repository_format
+fi
 [[ "$("${git_cmd[@]}" -C "$wt" config --local --bool --get core.bare)" == false ]] || fail bare_repository
 [[ "$("${git_cmd[@]}" -C "$wt" config --local --bool --get core.filemode)" == true ]] || fail filemode_config
 [[ "$("${git_cmd[@]}" -C "$wt" config --local --bool --get core.logallrefupdates)" == true ]] || fail reflog_config
@@ -422,7 +438,19 @@ sparse_checkout_path=$("${git_cmd[@]}" -C "$wt" rev-parse --path-format=absolute
 [[ "$sparse_checkout_path" == "$expected_sparse_checkout" ]] || fail sparse_checkout_rebind
 [[ ! -e "$sparse_checkout_path" && ! -L "$sparse_checkout_path" ]] || fail sparse_checkout
 [[ -z "$(/usr/bin/find "$object_dir" -type l -print -quit)" ]] || fail object_symlink
-[[ -z "$(/usr/bin/find "$object_dir" -type f -name '*.promisor' -print -quit)" ]] || fail promisor_pack
+missing_count=$("${git_cmd[@]}" -C "$wt" rev-list --objects --missing=print "$pin" | \
+  /usr/bin/awk '/^\?/ {print substr($1,2)}' | /usr/bin/wc -l | /usr/bin/tr -d '[:space:]') || fail missing_inventory
+missing_sha=$("${git_cmd[@]}" -C "$wt" rev-list --objects --missing=print "$pin" | \
+  /usr/bin/awk '/^\?/ {print substr($1,2)}' | /usr/bin/sort | /usr/bin/sha256sum | \
+  /usr/bin/awk '{print $1}') || fail missing_inventory
+promisor_count=$(/usr/bin/find "$object_dir" -type f -name '*.promisor' -printf '%P:%s\n' | \
+  /usr/bin/wc -l | /usr/bin/tr -d '[:space:]') || fail promisor_inventory
+promisor_sha=$(/usr/bin/find "$object_dir" -type f -name '*.promisor' -printf '%P:%s\n' | \
+  /usr/bin/sort | /usr/bin/sha256sum | /usr/bin/awk '{print $1}') || fail promisor_inventory
+[[ "$missing_count" == "$expected_missing_count" ]] || fail missing_count
+[[ "$missing_sha" == "$expected_missing_sha" ]] || fail missing_sha
+[[ "$promisor_count" == "$expected_promisor_count" ]] || fail promisor_count
+[[ "$promisor_sha" == "$expected_promisor_sha" ]] || fail promisor_sha
 [[ -z "$("${git_cmd[@]}" -C "$wt" for-each-ref --format='%(refname)' refs/replace)" ]] || fail replace_refs
 while IFS= read -r -d '' index_record; do
   [[ ${index_record:0:1} == H ]] || fail special_index_flag
@@ -455,7 +483,9 @@ for worker in 0 1 2 3 4 5 6 7; do
     GIT_SSH_COMMAND=/bin/false \
     /usr/bin/bash --noprofile --norc -c "$WORKER_REPO_VERIFY_SCRIPT" \
     gate-d-worker-repo-verify "$PIN" "$WORKTREE" "$ORIGIN" "$LINKED_COMMON" \
-    "$LINKED_GIT_DIR" "$expected_layout"
+    "$LINKED_GIT_DIR" "$expected_layout" 0 \
+    e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 0 \
+    e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
   set +e
   worker_output=$(/usr/bin/timeout --signal=TERM --kill-after=10 60 \
     /snap/bin/gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker="$worker" \

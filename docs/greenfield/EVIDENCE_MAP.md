@@ -2497,6 +2497,29 @@ remains open and no TPU successor is authorized.
   This source batch requires review, commit/push and same-region mirror before a distinct fresh HLO
   start can be considered. Gate D remains open.
 
+## Gate-D recovery v2 promisor-preflight failure and strict v3 correction
+
+- Burned tag `gate_d_repo_recovery_20260901T022519340652102Z` failed closed at worker 1
+  `config_not_allowlisted` before clone/prepare/exchange or repository/JAX/HLO/model/TPU mutation.
+  `gate-d-worker-repository-recovery-v2-promisor-preflight-failure.json` binds unchanged 8-host
+  pins/paths, 8/8 quiescence, the nonterminal 12-object prefix and local evidence hashes. It is
+  failure evidence, not permission to rerun v2.
+- `gate-d-worker-repository-promisor-inventory.json` (SHA `67bd8b76...b7f4f`) supersedes only the
+  inaccurate full-local-closure interpretation of the earlier census. Workers 1/3/4/5/7 are exact
+  format-1 `blob:none` promisor prestates; workers 2/6 are complete format-0 prestates; worker 0 is
+  the current linked worktree. Successful `fsck` on a partial clone does not prove every promised
+  object is locally present.
+- The v3 source keeps two independent contracts. Historical old repositories may use an exact
+  worker-specific standalone/promisor contract bound to pin, format, missing-object count/hash and
+  promisor-sidecar count/hash. Every prepared/current target remains strict format-0 standalone,
+  zero-missing and zero-promisor. A worker already at the target pin is checked against the target
+  contract, so fresh-tag partial resume cannot be rejected by its obsolete old-state contract.
+- Current controller/worker/wrapper hashes are `2a992618...b13e`, `a0bf5ca9...c572` and
+  `efb94572...9701`; complete recovery/acquisition tests pass 82/82. No v3 persistence, install or
+  execution is yet evidence. Exact next is persistence-only review, then a separately reviewed
+  no-replace immutable install and fresh recovery tag. PP16 HLO remains unauthorized before a
+  persisted exact-pin unique-host 8/8 closure.
+
 ## Gate-D repository fleet heterogeneity and targeted recovery correction
 
 - `docs/artifacts/gate-d-worker-repository-heterogeneous-inventory.json` records the corrected

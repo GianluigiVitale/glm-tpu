@@ -27,12 +27,10 @@ ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 CONTROLLER_RELATIVE = "scripts/greenfield/recover_gate_d_worker_repositories.py"
 WORKER_RELATIVE = "scripts/greenfield/gate_d_worker_repository_transaction.py"
 WRAPPER_RELATIVE = "scripts/greenfield/run_gate_d_compensated_pp16_hlo.sh"
-INVENTORY_RELATIVE = (
-    "docs/artifacts/gate-d-worker-repository-heterogeneous-inventory.json"
-)
-INVENTORY_SHA256 = "8767b52a678a5084e7d584c58f66100786eacff0e4914df37a8776ed66b60294"
+INVENTORY_RELATIVE = "docs/artifacts/gate-d-worker-repository-promisor-inventory.json"
+INVENTORY_SHA256 = "67bd8b76ccb759b17aba1d357ea5559be736862a4c7535ce3bf5e63fce3b7f4f"
 INSTALLED_CONTROLLER = Path(
-    "/opt/glm-tpu/gate-d-worker-recovery-v2/recover_gate_d_worker_repositories.py"
+    "/opt/glm-tpu/gate-d-worker-recovery-v3/recover_gate_d_worker_repositories.py"
 )
 LINKED_COMMON = Path("/home/gianl/glm-tpu/.git")
 LINKED_GIT_DIR = LINKED_COMMON / "worktrees/glm-tpu-topology-rewrite"
@@ -57,6 +55,7 @@ LOCAL_REMOTE_TIMEOUT_SECONDS = 240
 ALL_WORKERS = tuple(range(8))
 RECOVERY_WORKERS = tuple(range(1, 8))
 UNTOUCHED_WORKERS = (0,)
+EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 RECOVERY_PRESTATE_PINS = {
     1: "4a44f583697896bddf6f4b88526fdbe517e3ba95",
     2: "508aaa373147988ff597dfd94a02fddff1778be6",
@@ -65,6 +64,45 @@ RECOVERY_PRESTATE_PINS = {
     5: "4a44f583697896bddf6f4b88526fdbe517e3ba95",
     6: "508aaa373147988ff597dfd94a02fddff1778be6",
     7: "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+}
+RECOVERY_PRESTATE_CONTRACTS = {
+    1: (
+        "standalone_promisor",
+        3230,
+        "a79e5bc240843b5630eb1242a13bf89b85e2bd9e7d6a3ed2a3b44d858fba8b46",
+        29,
+        "2633dfb96b86574b8b2cade9ae9f094afa2eb7aedbc0e47c5182e6602c1f124f",
+    ),
+    2: ("standalone", 0, EMPTY_SHA256, 0, EMPTY_SHA256),
+    3: (
+        "standalone_promisor",
+        3230,
+        "a79e5bc240843b5630eb1242a13bf89b85e2bd9e7d6a3ed2a3b44d858fba8b46",
+        29,
+        "2633dfb96b86574b8b2cade9ae9f094afa2eb7aedbc0e47c5182e6602c1f124f",
+    ),
+    4: (
+        "standalone_promisor",
+        3225,
+        "0c14fb538da0f9d7b575b66327b9577d04ede69583472528720b4fa2707c65e4",
+        31,
+        "2218dcf579e7807a46684bfaa53b7ea0b5e7ee9e2f885431a1c10a8dcc277129",
+    ),
+    5: (
+        "standalone_promisor",
+        3230,
+        "a79e5bc240843b5630eb1242a13bf89b85e2bd9e7d6a3ed2a3b44d858fba8b46",
+        29,
+        "2633dfb96b86574b8b2cade9ae9f094afa2eb7aedbc0e47c5182e6602c1f124f",
+    ),
+    6: ("standalone", 0, EMPTY_SHA256, 0, EMPTY_SHA256),
+    7: (
+        "standalone_promisor",
+        3230,
+        "a79e5bc240843b5630eb1242a13bf89b85e2bd9e7d6a3ed2a3b44d858fba8b46",
+        29,
+        "3ce6cd7a940513b12ee35c258f72ee18fd3f193b14fe02f2116fa978010845bc",
+    ),
 }
 
 _BASE_ENV = {
@@ -120,8 +158,24 @@ def _validate_inventory_artifact(raw: bytes) -> None:
         raise RecoveryError("repository inventory contract mismatch")
     for worker, expected_pin in RECOVERY_PRESTATE_PINS.items():
         record = workers[worker]
-        if record.get("kind") != "standalone" or record.get("pin") != expected_pin:
+        layout, missing_count, missing_sha, promisor_count, promisor_sha = (
+            RECOVERY_PRESTATE_CONTRACTS[worker]
+        )
+        expected_format = 1 if layout == "standalone_promisor" else 0
+        if (
+            record.get("kind") != layout
+            or record.get("pin") != expected_pin
+            or record.get("repository_format") != expected_format
+            or record.get("missing_count") != missing_count
+            or record.get("missing_sha256") != missing_sha
+            or record.get("promisor_count") != promisor_count
+            or record.get("promisor_sha256") != promisor_sha
+        ):
             raise RecoveryError("repository inventory prestate mismatch")
+        if layout == "standalone_promisor" and (
+            record.get("promisor") != "true" or record.get("filter") != "blob:none"
+        ):
+            raise RecoveryError("repository inventory promisor mismatch")
 
 
 def _run(
@@ -483,6 +537,10 @@ def _verify_local_repository(pin: str, verifier: str) -> bytes:
             str(LINKED_COMMON),
             str(LINKED_GIT_DIR),
             "linked",
+            "0",
+            EMPTY_SHA256,
+            "0",
+            EMPTY_SHA256,
         ],
         environment=_GIT_ENV,
         timeout=180,
@@ -671,6 +729,10 @@ def _verify_remote_workers(
                 str(LINKED_COMMON),
                 str(LINKED_GIT_DIR),
                 expected_layout,
+                "0",
+                EMPTY_SHA256,
+                "0",
+                EMPTY_SHA256,
             ]
         )
         result = _run(
@@ -991,10 +1053,36 @@ def _common_worker_arguments(
         str(LINKED_COMMON),
         "--linked-git-dir",
         str(LINKED_GIT_DIR),
-        "--expected-layout",
+        "--target-layout",
         "standalone",
+        "--target-missing-count",
+        "0",
+        "--target-missing-sha",
+        EMPTY_SHA256,
+        "--target-promisor-count",
+        "0",
+        "--target-promisor-sha",
+        EMPTY_SHA256,
         "--verifier",
         verifier,
+    ]
+
+
+def _prestate_arguments(worker: int) -> list[str]:
+    layout, missing_count, missing_sha, promisor_count, promisor_sha = (
+        RECOVERY_PRESTATE_CONTRACTS[worker]
+    )
+    return [
+        "--old-layout",
+        layout,
+        "--old-missing-count",
+        str(missing_count),
+        "--old-missing-sha",
+        missing_sha,
+        "--old-promisor-count",
+        str(promisor_count),
+        "--old-promisor-sha",
+        promisor_sha,
     ]
 
 
@@ -1295,7 +1383,10 @@ def main() -> int:
         preflight_records: dict[int, dict[str, object]] = {}
         preflight_output = bytearray()
         for worker in RECOVERY_WORKERS:
-            record, raw = _run_worker(worker_source, "preflight", tag, worker, common)
+            arguments = [*common, *_prestate_arguments(worker)]
+            record, raw = _run_worker(
+                worker_source, "preflight", tag, worker, arguments
+            )
             preflight_records[worker] = record
             preflight_output.extend(raw)
         _ensure_worker_hosts(preflight_records, "preflight", RECOVERY_WORKERS)
@@ -1308,6 +1399,7 @@ def main() -> int:
             previous = preflight_records[worker]
             arguments = [
                 *common,
+                *_prestate_arguments(worker),
                 "--bundle-sha",
                 bundle_sha,
                 "--bundle-bytes",
@@ -1336,6 +1428,7 @@ def main() -> int:
             previous = prepare_records[worker]
             arguments = [
                 *common,
+                *_prestate_arguments(worker),
                 "--bundle-sha",
                 bundle_sha,
                 "--bundle-bytes",
@@ -1352,7 +1445,11 @@ def main() -> int:
         final_output = bytearray()
         for worker in recovery_workers:
             previous = swap_records[worker]
-            arguments = [*common, *_record_arguments(previous)]
+            arguments = [
+                *common,
+                *_prestate_arguments(worker),
+                *_record_arguments(previous),
+            ]
             record, raw = _run_worker(worker_source, "final", tag, worker, arguments)
             final_records[worker] = record
             final_output.extend(raw)

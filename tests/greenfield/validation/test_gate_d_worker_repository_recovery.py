@@ -20,6 +20,7 @@ CONTROLLER_PATH = ROOT / "scripts/greenfield/recover_gate_d_worker_repositories.
 WORKER_PATH = ROOT / "scripts/greenfield/gate_d_worker_repository_transaction.py"
 WRAPPER = ROOT / "scripts/greenfield/run_gate_d_compensated_pp16_hlo.sh"
 ORIGIN = "git@example.invalid:owner/repo.git"
+EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 
 def _load(path: Path, name: str):
@@ -109,7 +110,16 @@ def _make_transaction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "origin": ORIGIN,
         "linked_common": str(source / ".git"),
         "linked_git_dir": str(source / ".git/worktrees/canonical"),
-        "expected_layout": "standalone",
+        "old_layout": "standalone",
+        "old_missing_count": 0,
+        "old_missing_sha": EMPTY_SHA256,
+        "old_promisor_count": 0,
+        "old_promisor_sha": EMPTY_SHA256,
+        "target_layout": "standalone",
+        "target_missing_count": 0,
+        "target_missing_sha": EMPTY_SHA256,
+        "target_promisor_count": 0,
+        "target_promisor_sha": EMPTY_SHA256,
         "verifier": _worker_verifier(),
         "old_pin": "",
         "old_dev": -1,
@@ -137,7 +147,7 @@ def test_source_contract_is_descriptor_bound_timeout_and_terminal_last() -> None
     controller = CONTROLLER_PATH.read_text()
     worker = WORKER_PATH.read_text()
     assert CONTROLLER.INSTALLED_CONTROLLER == Path(
-        "/opt/glm-tpu/gate-d-worker-recovery-v2/recover_gate_d_worker_repositories.py"
+        "/opt/glm-tpu/gate-d-worker-recovery-v3/recover_gate_d_worker_repositories.py"
     )
     assert "controller must run from the reviewed /opt path" in controller
     assert "os.O_NOFOLLOW" in controller
@@ -158,7 +168,10 @@ def test_source_contract_is_descriptor_bound_timeout_and_terminal_last() -> None
     assert '"recovered_workers": list(recovery_workers)' in controller
     assert '"recovery_candidates": list(RECOVERY_WORKERS)' in controller
     assert '"protected_linked_workers": list(UNTOUCHED_WORKERS)' in controller
-    assert '"untouched_workers": sorted(set(ALL_WORKERS) - set(recovery_workers))' in controller
+    assert (
+        '"untouched_workers": sorted(set(ALL_WORKERS) - set(recovery_workers))'
+        in controller
+    )
     assert (
         '"/usr/bin/python3",\n            "-I",\n            "-S",\n            "-B"'
         in controller
@@ -188,7 +201,18 @@ def test_source_contract_is_descriptor_bound_timeout_and_terminal_last() -> None
     assert '_LOCK_NAME = "gate_d_repo_recovery.lock"' in worker
     assert 'parser.add_argument("--linked-common", required=True)' in worker
     assert 'parser.add_argument("--linked-git-dir", required=True)' in worker
-    assert 'parser.add_argument("--expected-layout", choices=("standalone",), required=True)' in worker
+    assert (
+        '"--old-layout", choices=("standalone", "standalone_promisor"), required=True'
+        in worker
+    )
+    assert (
+        'parser.add_argument("--target-layout", choices=("standalone",), required=True)'
+        in worker
+    )
+    assert (
+        'parser.add_argument("--old-missing-count", type=int, required=True)' in worker
+    )
+    assert '"--target-promisor-count", type=int, choices=(0,), required=True' in worker
 
     wrapper = WRAPPER.read_text()
     assert 'root = "/opt/glm-tpu/locks"' in wrapper
@@ -234,7 +258,14 @@ def test_remote_fleet_verifier_targets_exact_workers_and_binds_linked_paths(
         assert str(CONTROLLER.LINKED_COMMON) in remote
         assert str(CONTROLLER.LINKED_GIT_DIR) in remote
         assert "GIT_SSH_COMMAND=/bin/false" in remote
-        assert shlex.split(remote.removeprefix("--command="))[-1] == expected_layout
+        verifier_arguments = shlex.split(remote.removeprefix("--command="))
+        assert verifier_arguments[-5] == expected_layout
+        assert verifier_arguments[-4:] == [
+            "0",
+            EMPTY_SHA256,
+            "0",
+            EMPTY_SHA256,
+        ]
 
     def duplicate_host(command: list[str], **_kwargs):
         return subprocess.CompletedProcess(
@@ -287,12 +318,27 @@ def test_recovery_worker_selection_resumes_partial_success_and_refuses_noop() ->
         CONTROLLER._select_recovery_workers(unauthorized, pin)
 
 
+def test_recovery_prestate_arguments_bind_each_worker_fingerprint() -> None:
+    for worker in (1, 2, 4, 7):
+        arguments = CONTROLLER._prestate_arguments(worker)
+        parsed = dict(zip(arguments[::2], arguments[1::2], strict=True))
+        layout, missing_count, missing_sha, promisor_count, promisor_sha = (
+            CONTROLLER.RECOVERY_PRESTATE_CONTRACTS[worker]
+        )
+        assert parsed == {
+            "--old-layout": layout,
+            "--old-missing-count": str(missing_count),
+            "--old-missing-sha": missing_sha,
+            "--old-promisor-count": str(promisor_count),
+            "--old-promisor-sha": promisor_sha,
+        }
+
+
 def test_recovery_inventory_is_hash_bound_and_exactly_matches_prestates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     inventory = (
-        ROOT
-        / "docs/artifacts/gate-d-worker-repository-heterogeneous-inventory.json"
+        ROOT / "docs/artifacts/gate-d-worker-repository-promisor-inventory.json"
     ).read_bytes()
     CONTROLLER._validate_inventory_artifact(inventory)
 
@@ -357,6 +403,10 @@ def test_post_exchange_verifier_failure_rolls_back_canonical(
         linked_common: str,
         linked_git_dir: str,
         expected_layout: str,
+        expected_missing_count: int,
+        expected_missing_sha: str,
+        expected_promisor_count: int,
+        expected_promisor_sha: str,
     ) -> None:
         if pin == transaction["pin"] and path == str(transaction["canonical"]):
             raise WORKER.TransactionError("injected_post_exchange_failure")
@@ -368,6 +418,10 @@ def test_post_exchange_verifier_failure_rolls_back_canonical(
             linked_common,
             linked_git_dir,
             expected_layout,
+            expected_missing_count,
+            expected_missing_sha,
+            expected_promisor_count,
+            expected_promisor_sha,
         )
 
     monkeypatch.setattr(WORKER, "_verify", injected_verify)
@@ -450,6 +504,11 @@ def test_fresh_tag_can_resume_after_partial_fleet_success(
             new="next-tag.new",
             old="next-tag.old",
             bundle=".next-tag.bundle",
+            old_layout="standalone_promisor",
+            old_missing_count=999,
+            old_missing_sha="0" * 64,
+            old_promisor_count=999,
+            old_promisor_sha="0" * 64,
             old_pin="",
             old_dev=-1,
             old_ino=-1,

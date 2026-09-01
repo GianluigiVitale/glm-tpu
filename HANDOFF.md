@@ -2,6 +2,32 @@
 
 **Updated:** 2026-09-01 UTC
 
+## 2026-09-01 Gate-D recovery v2 failed closed on sealed partial-clone prestates
+
+- The separately approved v2 invocation used burned tag
+  `gate_d_repo_recovery_20260901T022519340652102Z` and stopped on worker 1 at exact
+  `config_not_allowlisted`, before clone, prepare, exchange, repository mutation, JAX/HLO, model or
+  TPU work. Failure cleanup proves eight `RECOVERY_QUIESCENT` markers; all worker pins and paths are
+  unchanged. The 12-object diagnostic prefix has no success marker. Append-only failure evidence is
+  `docs/artifacts/gate-d-worker-repository-recovery-v2-promisor-preflight-failure.json`, SHA
+  `67498594...d039`; v2 and its tag must never run again.
+- Root cause is now directly observed: workers 1/3/4/5/7 are Git format-1 `blob:none` partial
+  clones with exact promisor sidecars and 3,225/3,230 promised missing objects; workers 2/6 are
+  complete format-0 standalone repositories. `git fsck` success under promisor semantics did not
+  prove full local closure. The exact read-only eight-worker census is
+  `gate-d-worker-repository-promisor-inventory.json`, SHA `67bd8b76...b7f4f`.
+- The default-off v3 correction does not weaken the final verifier. It permits
+  `standalone_promisor` only as an exact historical old-state contract, bound per worker to layout,
+  format, pin, missing-object count/hash and promisor-sidecar count/hash. Prepared/current targets
+  remain strict format-0 standalone repositories with zero missing/promisor state. Partial resume
+  selects the strict target contract whenever the current pin already equals the target.
+- Controller/worker/wrapper hashes are `2a992618...b13e`, `a0bf5ca9...c572` and
+  `efb94572...9701`; focused and complete recovery/acquisition validation passes 22/22 and 82/82,
+  including fingerprint tampering, strict-target rejection, rollback and target-pin resume.
+  This is unreviewed source preparation only. Exact next is one Sol persistence review, then
+  commit/push/locked same-region mirror; v3 install and one fresh tagged invocation require
+  separate reviews. HLO remains unauthorized until clean exact-pin 8/8 recovery is persisted.
+
 ## 2026-09-01 Gate-D repository heterogeneity root-caused; target only stale workers
 
 - The first full recovery diagnostic under burned tag
