@@ -344,6 +344,63 @@ require_exact_bytes() {
   expected_sha=$(/usr/bin/printf '%s' "$expected" | /usr/bin/sha256sum | /usr/bin/awk '{print $1}') || fail "$reason"
   [[ "$actual_sha" == "$expected_sha" ]] || fail "$reason"
 }
+canonical_promisor_catalogue() {
+  /usr/bin/python3 -I -S -B - "$1" <<'PROMISOR_CATALOGUE_EOF'
+import hashlib
+import os
+import re
+import stat
+import sys
+
+root = sys.argv[1]
+pattern = re.compile(r"pack/pack-[0-9a-f]{40}[.]promisor")
+records = []
+for current, directories, files, current_fd in os.fwalk(
+    root, topdown=True, follow_symlinks=False
+):
+    directories.sort()
+    files.sort()
+    for name in [*directories, *files]:
+        if not name.endswith(".promisor"):
+            continue
+        path = os.path.join(current, name)
+        relative = os.path.relpath(path, root)
+        try:
+            encoded = relative.encode("ascii")
+        except UnicodeEncodeError:
+            raise SystemExit("non_ascii_promisor_path")
+        descriptor = os.open(
+            name, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=current_fd
+        )
+        try:
+            value = os.fstat(descriptor)
+            named = os.stat(name, dir_fd=current_fd, follow_symlinks=False)
+            empty = os.read(descriptor, 1)
+            replayed = os.stat(name, dir_fd=current_fd, follow_symlinks=False)
+            if (
+                os.path.normpath(relative) != relative
+                or pattern.fullmatch(relative) is None
+                or not stat.S_ISREG(value.st_mode)
+                or value.st_nlink != 1
+                or value.st_size != 0
+                or (value.st_dev, value.st_ino) != (named.st_dev, named.st_ino)
+                or (value.st_dev, value.st_ino) != (replayed.st_dev, replayed.st_ino)
+                or empty != b""
+            ):
+                raise SystemExit("invalid_promisor_record")
+            records.append((encoded, value.st_size))
+        finally:
+            os.close(descriptor)
+records.sort()
+catalogue = bytearray()
+for relative, size in records:
+    catalogue.extend(relative)
+    catalogue.append(0)
+    catalogue.extend(str(size).encode("ascii"))
+    catalogue.append(0)
+print(len(records), hashlib.sha256(catalogue).hexdigest())
+PROMISOR_CATALOGUE_EOF
+}
 git_cmd=(
   /usr/bin/git
   -c core.fsmonitor=false
@@ -443,10 +500,9 @@ missing_count=$("${git_cmd[@]}" -C "$wt" rev-list --objects --missing=print "$pi
 missing_sha=$("${git_cmd[@]}" -C "$wt" rev-list --objects --missing=print "$pin" | \
   /usr/bin/awk '/^\?/ {print substr($1,2)}' | /usr/bin/sort | /usr/bin/sha256sum | \
   /usr/bin/awk '{print $1}') || fail missing_inventory
-promisor_count=$(/usr/bin/find "$object_dir" -type f -name '*.promisor' -printf '%P:%s\n' | \
-  /usr/bin/wc -l | /usr/bin/tr -d '[:space:]') || fail promisor_inventory
-promisor_sha=$(/usr/bin/find "$object_dir" -type f -name '*.promisor' -printf '%P:%s\n' | \
-  /usr/bin/sort | /usr/bin/sha256sum | /usr/bin/awk '{print $1}') || fail promisor_inventory
+promisor_catalogue=$(canonical_promisor_catalogue "$object_dir") || fail promisor_catalogue
+read -r promisor_count promisor_sha promisor_extra <<<"$promisor_catalogue"
+[[ -n "$promisor_count" && -n "$promisor_sha" && -z "$promisor_extra" ]] || fail promisor_catalogue_shape
 [[ "$missing_count" == "$expected_missing_count" ]] || fail missing_count
 [[ "$missing_sha" == "$expected_missing_sha" ]] || fail missing_sha
 [[ "$promisor_count" == "$expected_promisor_count" ]] || fail promisor_count

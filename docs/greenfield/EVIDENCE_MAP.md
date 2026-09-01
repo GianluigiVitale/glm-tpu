@@ -2497,6 +2497,28 @@ remains open and no TPU successor is authorized.
   This source batch requires review, commit/push and same-region mirror before a distinct fresh HLO
   start can be considered. Gate D remains open.
 
+## Gate-D recovery v3 canonical-catalogue failure and strict v4 correction
+
+- Burned tag `gate_d_repo_recovery_20260901T030059438894459Z` failed closed on worker 1
+  `promisor_sha` before receive/prepare/exchange or repository/JAX/HLO/model/TPU mutation. Exact
+  failure evidence is
+  `gate-d-worker-repository-recovery-v3-promisor-path-preflight-failure.json` (SHA
+  `7370ccfb...6ff7f`): eight unique quiescence markers, unchanged pins, no tag paths, four free
+  leases and exactly 12 nonterminal diagnostic objects. It authorizes no retry.
+- The old inventory and verifier used different catalogue encodings. The same worker-1 sidecars
+  produce basename-newline SHA `2633dfb9...f124f` and object-relative-newline SHA
+  `95035d91...a9211`; unchanged missing-object hashes and pre-attempt sidecar mtimes reject the
+  drift hypothesis. Historical evidence remains append-only.
+- `gate-d-worker-repository-promisor-path-inventory.json` (SHA `03be218c...fd70b`) defines canonical
+  sorted `relative-path NUL size NUL` bytes and binds all worker-specific values. The verifier
+  opens each entry `O_NOFOLLOW` and requires regular, single-link, zero-byte exact
+  `pack/pack-<40 lowercase hex>.promisor` identity. Invalid paths/types/links/sizes and ambiguous
+  encodings fail. One serialized live replay returned 7/7 target-worker `REPO_PREFLIGHT_OK` without
+  mutation or tag paths; focused recovery/acquisition tests pass 82/82.
+- The default-off corrected controller targets a fresh v4 immutable path. Persistence, installation
+  and invocation remain three separately reviewed boundaries. PP16 HLO stays unauthorized until a
+  clean, persisted, exact-pin, unique-host 8/8 recovery terminal exists.
+
 ## Gate-D recovery v2 promisor-preflight failure and strict v3 correction
 
 - Burned tag `gate_d_repo_recovery_20260901T022519340652102Z` failed closed at worker 1

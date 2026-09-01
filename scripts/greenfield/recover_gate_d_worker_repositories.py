@@ -27,10 +27,12 @@ ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 CONTROLLER_RELATIVE = "scripts/greenfield/recover_gate_d_worker_repositories.py"
 WORKER_RELATIVE = "scripts/greenfield/gate_d_worker_repository_transaction.py"
 WRAPPER_RELATIVE = "scripts/greenfield/run_gate_d_compensated_pp16_hlo.sh"
-INVENTORY_RELATIVE = "docs/artifacts/gate-d-worker-repository-promisor-inventory.json"
-INVENTORY_SHA256 = "67bd8b76ccb759b17aba1d357ea5559be736862a4c7535ce3bf5e63fce3b7f4f"
+INVENTORY_RELATIVE = (
+    "docs/artifacts/gate-d-worker-repository-promisor-path-inventory.json"
+)
+INVENTORY_SHA256 = "03be218ce0b7cc1b33c12c871aaa85f5e3e772a8dcd2fd72a693ff3f916fd70b"
 INSTALLED_CONTROLLER = Path(
-    "/opt/glm-tpu/gate-d-worker-recovery-v3/recover_gate_d_worker_repositories.py"
+    "/opt/glm-tpu/gate-d-worker-recovery-v4/recover_gate_d_worker_repositories.py"
 )
 LINKED_COMMON = Path("/home/gianl/glm-tpu/.git")
 LINKED_GIT_DIR = LINKED_COMMON / "worktrees/glm-tpu-topology-rewrite"
@@ -71,7 +73,7 @@ RECOVERY_PRESTATE_CONTRACTS = {
         3230,
         "a79e5bc240843b5630eb1242a13bf89b85e2bd9e7d6a3ed2a3b44d858fba8b46",
         29,
-        "2633dfb96b86574b8b2cade9ae9f094afa2eb7aedbc0e47c5182e6602c1f124f",
+        "c0a8650f6cde62bfd15ce2acdc70ec28aeb8a8ee758eb96cffe95ea1f6122ecf",
     ),
     2: ("standalone", 0, EMPTY_SHA256, 0, EMPTY_SHA256),
     3: (
@@ -79,21 +81,21 @@ RECOVERY_PRESTATE_CONTRACTS = {
         3230,
         "a79e5bc240843b5630eb1242a13bf89b85e2bd9e7d6a3ed2a3b44d858fba8b46",
         29,
-        "2633dfb96b86574b8b2cade9ae9f094afa2eb7aedbc0e47c5182e6602c1f124f",
+        "c0a8650f6cde62bfd15ce2acdc70ec28aeb8a8ee758eb96cffe95ea1f6122ecf",
     ),
     4: (
         "standalone_promisor",
         3225,
         "0c14fb538da0f9d7b575b66327b9577d04ede69583472528720b4fa2707c65e4",
         31,
-        "2218dcf579e7807a46684bfaa53b7ea0b5e7ee9e2f885431a1c10a8dcc277129",
+        "d356729e41a423c2858996c728532237b2c7d8a686c425f57e01adb49cf612ae",
     ),
     5: (
         "standalone_promisor",
         3230,
         "a79e5bc240843b5630eb1242a13bf89b85e2bd9e7d6a3ed2a3b44d858fba8b46",
         29,
-        "2633dfb96b86574b8b2cade9ae9f094afa2eb7aedbc0e47c5182e6602c1f124f",
+        "c0a8650f6cde62bfd15ce2acdc70ec28aeb8a8ee758eb96cffe95ea1f6122ecf",
     ),
     6: ("standalone", 0, EMPTY_SHA256, 0, EMPTY_SHA256),
     7: (
@@ -101,7 +103,7 @@ RECOVERY_PRESTATE_CONTRACTS = {
         3230,
         "a79e5bc240843b5630eb1242a13bf89b85e2bd9e7d6a3ed2a3b44d858fba8b46",
         29,
-        "3ce6cd7a940513b12ee35c258f72ee18fd3f193b14fe02f2116fa978010845bc",
+        "8edfc0f6b01aa75db7df7dd5617a55c91d81261223fb6783902ef31c585cc4b7",
     ),
 }
 
@@ -151,6 +153,8 @@ def _validate_inventory_artifact(raw: bytes) -> None:
     if (
         set(workers) != set(ALL_WORKERS)
         or workers[0].get("kind") != "linked_worktree"
+        or artifact.get("promisor_record_format")
+        != "git_object_dir_relative_path_nul_size_nul_sorted_v1"
         or artifact.get("mutation") is not False
         or artifact.get("hlo_work") is not False
         or artifact.get("tpu_work") is not False

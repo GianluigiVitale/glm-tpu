@@ -788,7 +788,13 @@ def test_repository_verification_is_read_only_serial_and_fail_fast() -> None:
     assert "rev-parse --is-shallow-repository" in block
     assert '"$object_dir/info/alternates"' in block
     assert '[[ "$grafts_path" == "$common_dir/info/grafts" ]]' in block
-    assert "-name '*.promisor'" in block
+    assert "canonical_promisor_catalogue" in block
+    assert 're.compile(r"pack/pack-[0-9a-f]{40}[.]promisor")' in block
+    assert "os.fwalk(" in block
+    assert "follow_symlinks=False" in block
+    assert "value.st_nlink != 1" in block
+    assert "value.st_size != 0" in block
+    assert "catalogue.append(0)" in block
     assert 'expected_missing_count=$7' in block
     assert 'expected_promisor_sha=${10}' in block
     assert '[[ "$missing_count" == "$expected_missing_count" ]]' in block
@@ -1014,7 +1020,7 @@ def test_exact_worker_repo_verifier_is_no_write_and_fails_hostile_closure(
     promisor.write_text("")
     completed = _run_worker_repo_verify(repo, pin, origin)
     assert completed.returncode != 0
-    assert "promisor_count" in completed.stderr
+    assert "promisor_catalogue" in completed.stderr
     promisor.unlink()
 
     sparse = repo / ".git/info/sparse-checkout"
@@ -1156,12 +1162,19 @@ def test_exact_worker_repo_verifier_accepts_only_exact_promisor_prestate(
     assert missing
     missing_sha = sha256(("\n".join(missing) + "\n").encode()).hexdigest()
     object_dir = repo / ".git/objects"
+    promisor_paths = sorted(object_dir.rglob("*.promisor"))
+    assert promisor_paths
+    for path in promisor_paths:
+        path.write_bytes(b"")
     promisor_records = sorted(
-        f"{path.relative_to(object_dir)}:{path.stat().st_size}\n"
-        for path in object_dir.rglob("*.promisor")
+        (str(path.relative_to(object_dir)), path.stat().st_size)
+        for path in promisor_paths
     )
-    assert promisor_records
-    promisor_sha = sha256("".join(promisor_records).encode()).hexdigest()
+    catalogue = b"".join(
+        relative.encode("ascii") + b"\0" + str(size).encode("ascii") + b"\0"
+        for relative, size in promisor_records
+    )
+    promisor_sha = sha256(catalogue).hexdigest()
 
     strict = _run_worker_repo_verify(repo, pin, origin)
     assert strict.returncode != 0
@@ -1179,6 +1192,53 @@ def test_exact_worker_repo_verifier_accepts_only_exact_promisor_prestate(
     )
     assert accepted.returncode == 0, accepted.stderr
     assert accepted.stdout.startswith("SYNC_OK ")
+
+    promisor_paths[0].write_bytes(b"not-zero")
+    nonzero = _run_worker_repo_verify(
+        repo,
+        pin,
+        origin,
+        expected_layout="standalone_promisor",
+        expected_missing_count=len(missing),
+        expected_missing_sha=missing_sha,
+        expected_promisor_count=len(promisor_records),
+        expected_promisor_sha=promisor_sha,
+    )
+    assert nonzero.returncode != 0
+    assert "promisor_catalogue" in nonzero.stderr
+    promisor_paths[0].write_bytes(b"")
+
+    invalid_path = object_dir / "invalid.promisor"
+    invalid_path.write_bytes(b"")
+    invalid = _run_worker_repo_verify(
+        repo,
+        pin,
+        origin,
+        expected_layout="standalone_promisor",
+        expected_missing_count=len(missing),
+        expected_missing_sha=missing_sha,
+        expected_promisor_count=len(promisor_records),
+        expected_promisor_sha=promisor_sha,
+    )
+    assert invalid.returncode != 0
+    assert "promisor_catalogue" in invalid.stderr
+    invalid_path.unlink()
+
+    hardlink = object_dir / "pack" / ("pack-" + "f" * 40 + ".promisor")
+    os.link(promisor_paths[0], hardlink)
+    linked = _run_worker_repo_verify(
+        repo,
+        pin,
+        origin,
+        expected_layout="standalone_promisor",
+        expected_missing_count=len(missing),
+        expected_missing_sha=missing_sha,
+        expected_promisor_count=len(promisor_records),
+        expected_promisor_sha=promisor_sha,
+    )
+    assert linked.returncode != 0
+    assert "promisor_catalogue" in linked.stderr
+    hardlink.unlink()
 
     tampered_count = _run_worker_repo_verify(
         repo,

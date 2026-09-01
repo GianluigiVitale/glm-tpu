@@ -1,0 +1,37 @@
+{
+  "artifact_kind": "gate_d_worker_repository_recovery_v3_promisor_path_preflight_failure",
+  "bucket_location": "US-CENTRAL2",
+  "code_pin": "c36f29da61a95231842c5c05bc7b308086b8f065",
+  "controller_sha256": "2a992618a8e67e9e9bfda80e50f8536204ff1a1dff63ec3f8797586d6194b13e",
+  "failure": {
+    "first_worker": 1,
+    "phase": "preflight",
+    "transaction_reason": "repository_verify",
+    "verifier_reason": "promisor_sha"
+  },
+  "fleet_postfailure": {
+    "all_pins_unchanged": true,
+    "quiescence_markers": 8,
+    "tag_derived_paths": 0,
+    "worker_repositories_mutated": false
+  },
+  "hlo_or_jax_or_model_or_tpu_work": false,
+  "local_evidence": {
+    "FAILURE.json": "e48e4370b2ce864ca8acfac33f2a113954c61d776ba668994cf9f0e4974f9d9a",
+    "recovery_quiescence_failure.txt": "65d9b8861fea4031e02f1ea9f6a8a12a8df12d0012bc8136e29810db2b8a1976",
+    "repository.bundle": "f654eb46e4f26830e474dc1553a72278f954eb4f5c8d6f692d37a670ada24bbb",
+    "source_identity.json": "44f12c0ec2d8bca4373f38c25bc636f5bcdf30cec15f5fbcf5ece40aefbb9128"
+  },
+  "promisor_path_inventory": "docs/artifacts/gate-d-worker-repository-promisor-path-inventory.json",
+  "promisor_path_inventory_sha256": "03be218ce0b7cc1b33c12c871aaa85f5e3e772a8dcd2fd72a693ff3f916fd70b",
+  "remote_evidence": {
+    "bytes": 18101410,
+    "object_count": 12,
+    "prefix": "gs://driftbench-dsv4-uc/results/greenfield/glm52/gate_d_repo_recovery/gate_d_repo_recovery_20260901T030059438894459Z"
+  },
+  "root_cause": "the historical inventory hashed basename:size records while the verifier hashes git-object-directory-relative-path:size records; worker 1's unchanged 29 zero-byte sidecars reproduce the sealed basename hash 2633dfb96b86574b8b2cade9ae9f094afa2eb7aedbc0e47c5182e6602c1f124f and the runtime relative-path hash 95035d91c0b91e6850fb4d09493d49da712fe3b5b38b592513ee4d0e0eea9211",
+  "sidecar_latest_mtime_utc": "2026-08-31T19:31:39.598444+00:00",
+  "schema_version": 1,
+  "status": "RECOVERY_FAILED_BEFORE_MUTATION",
+  "tag": "gate_d_repo_recovery_20260901T030059438894459Z"
+}

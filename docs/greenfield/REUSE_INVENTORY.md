@@ -17,7 +17,7 @@ and vLLM model execution stays oracle-only. A unit test scans every Python modul
 | Provenance | `bench/provenance.py`, `bench/results.db` | Accepted numerical/performance runs link append-only DB rows and a DB snapshot. Explicit compile-only acquisitions instead seal `performance_claim=false`, `numerical_claim=false`, and no DB id. |
 | Wall/trace truth | `parse_xplane.py`, `extract_steady_decode.py`, preserved 256K trace, and DB516 | Fresh fleet XPlanes, exact step selection, source/shape attribution, separate profiler-free wall. DB516 directly reuses the parser and proves logical M2048 lowers to 32 physical M64 shards; the old one-host trace remains negative evidence only. |
 | Fleet safety | E0/resume ownership guards | Lease, exact pin, authenticated census, archive-before-success and clean failure exits in greenfield wrappers. |
-| Fleet repository recovery | Complete Git bundle, strict passive verifier, descriptor-bound Python transaction and generation-zero publisher | The reviewed base retains immutable/shared and per-worker leases, O_EXCL transfer, timeouts, fail-closed `/proc` quiescence, inode/pin-bound exchange/rollback, retained-FD evidence and terminal-last publication. A protected v2 preflight proved five stale workers are sealed `blob:none` partial clones, not full local closures; it failed before mutation and is burned. V3 binds each historical old state to exact pin/layout/format/missing/promisor fingerprints while every prepared/current target remains strict format-0, zero-missing, zero-promisor standalone. Worker 0 stays untouched and exact-pin unique-host 8/8 closure remains mandatory. V3 source is pushed/mirrored and separately installed no-replace with exact evidence; invocation still requires its own review before HLO resumes. |
+| Fleet repository recovery | Complete Git bundle, strict passive verifier, descriptor-bound Python transaction and generation-zero publisher | The reviewed base retains immutable/shared and per-worker leases, O_EXCL transfer, timeouts, fail-closed `/proc` quiescence, inode/pin-bound exchange/rollback, retained-FD evidence and terminal-last publication. V2 exposed five sealed `blob:none` old states; v3 then failed before mutation because inventory and verifier used different sidecar-path encodings. V4 preserves both failures and binds one sorted relative-path-NUL-size-NUL catalogue whose entries must be `O_NOFOLLOW`-opened, regular, single-link, zero-byte exact pack sidecars. Every prepared/current target remains strict format-0, zero-missing, zero-promisor standalone. Worker 0 stays untouched and exact-pin unique-host 8/8 closure remains mandatory. Persistence, no-replace install and invocation are separate review boundaries before HLO resumes. |
 | Quality/long context | `moe-tpu` DSV4 harness and GLM benchmark suite | GLM-specific generation passkey ladder, prompt-length correction, raw output and per-trial provenance. |
 | Model truth | local HF config/modeling and vLLM GLM class | Geometry, names, dtypes and numerical semantics only; no class import into execution. |
 | Checkpoint protection | legacy checksum/NaN/state-hash/write-probe failure classes | Independent final-owner checksums, finite scans, manifests, device round trips and cache-health refusal. |
@@ -1091,11 +1091,14 @@ Recover all repositories separately to the final corrected pin with a reviewed S
 transfer and preserved old repository; no HLO successor is authorized by this correction.
 
 The first targeted v2 recovery then failed before transfer because its strict verifier correctly
-rejected worker 1's promisor configuration. The new read-only census proves workers 1/3/4/5/7 are
+rejected worker 1's promisor configuration. The next read-only census proved workers 1/3/4/5/7 are
 format-1 `blob:none` partial clones with exact promised-missing and sidecar fingerprints, while
-workers 2/6 are complete format-0 repositories. V3 reuses the same transaction and publication
-machinery but separates the exact historical old-state contract from the strict clean target. It
-never admits promisor state for a prepared/current repository. Preserve burned tag
-`gate_d_repo_recovery_20260901T022519340652102Z` and its failure artifact; do not rerun v2. V3 is
-pushed/mirrored and exact-installed with append-only evidence, but not invoked. PP16 HLO remains
-unauthorized until exact 8/8 closure is persisted.
+workers 2/6 are complete format-0 repositories. V3 separated exact historical old-state contracts
+from strict clean targets, but its first invocation failed before transfer because the inventory
+hashed `basename:size` and the verifier hashed object-root-relative `path:size`. The same unchanged
+sidecars reproduce both digests, and all eight hosts quiesced. V4 uses one boundary-unambiguous
+sorted `relative-path NUL size NUL` catalogue, opening each exact
+`pack/pack-<40 lowercase hex>.promisor` with `O_NOFOLLOW` and requiring regular/single-link/zero-byte
+identity. A serialized live read-only replay passes all seven recovery candidates. Preserve both
+burned tags and failure artifacts. V4 still requires persistence, no-replace install and a fresh
+invocation review; PP16 HLO remains unauthorized until exact 8/8 closure is persisted.

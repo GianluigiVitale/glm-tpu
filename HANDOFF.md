@@ -2,6 +2,35 @@
 
 **Updated:** 2026-09-01 UTC
 
+## 2026-09-01 Gate-D recovery v3 failed closed; canonical v4 correction prepared
+
+- The separately approved v3 invocation used burned tag
+  `gate_d_repo_recovery_20260901T030059438894459Z` and stopped at worker 1 preflight with exact
+  `promisor_sha`, before receive/prepare/exchange or repository/JAX/HLO/model/TPU mutation. The
+  failed prefix contains exactly 12 diagnostic objects / 18,101,410 bytes and no success terminal;
+  all four leases are free and `recovery_quiescence_failure.txt` proves eight unique
+  `RECOVERY_QUIESCENT` hosts. Failure artifact
+  `gate-d-worker-repository-recovery-v3-promisor-path-preflight-failure.json` has SHA
+  `7370ccfb...6ff7f`; v3 and its tag must never run again.
+- This was deterministic evidence-algorithm mismatch, not repository drift. The prior inventory
+  hashed each promisor basename plus size, while the verifier hashed object-root-relative `%P`
+  plus size. Worker 1's same 29 zero-byte sidecars reproduce both the sealed basename SHA
+  `2633dfb9...f124f` and runtime relative-path SHA `95035d91...a9211`; missing-object fingerprints
+  remain exact and the newest sidecar predates the attempt by over seven hours.
+- The append-only replacement inventory
+  `gate-d-worker-repository-promisor-path-inventory.json` (SHA `03be218c...fd70b`) defines one
+  canonical `relative-path NUL size NUL`, sorted catalogue. Every entry must be an
+  `O_NOFOLLOW`-opened, single-link, regular, zero-byte
+  `pack/pack-<40 lowercase hex>.promisor`; path, type, link, size or identity drift refuses.
+  Canonical live SHAs are `c0a8650f...2ecf` (workers 1/3/5), `d356729e...12ae` (worker 4) and
+  `8edfc0f6...c4b7` (worker 7). One serialized read-only replay returned seven of seven
+  `REPO_PREFLIGHT_OK`; it created no tag paths.
+- The default-off source now targets fresh immutable v4 path
+  `/opt/glm-tpu/gate-d-worker-recovery-v4`. Recovery/acquisition validation passes 82/82, including
+  nonzero, invalid-path, hardlink, fingerprint, rollback and partial-resume attacks. This batch
+  still needs final validation, Sol persistence review, commit/push/same-region mirror, then
+  separately reviewed no-replace install and fresh invocation. HLO remains unauthorized.
+
 ## 2026-09-01 Gate-D recovery v2 failed closed on sealed partial-clone prestates
 
 - The separately approved v2 invocation used burned tag
