@@ -2914,3 +2914,42 @@ execution is authorized by this source batch.
   locks free and zero launcher/acquirer processes.
 - Exact next after persistence: one new reviewed fresh tag outside the cron window. Numerical and 8K
   remain forbidden; Gate D is open.
+
+## 2026-09-01 forced-round PP16 causal HLO adjudication
+
+- Successful compile-only tag:
+  `gate_d_forced_round_pp16_hlo_20260901T141137500138602Z`; source pin `b8bdeb1`.
+- Immutable graph identities: optimized TPU HLO
+  `a0b87e2b43ba81bfe1549fbcc13434d2fbdca91b11c8b2f9a317ff9a9dbd9d45` (263,868 bytes),
+  StableHLO `45eae705b60783bf8b65a1d3d209c79e8d43685cec0aa912b3141caf36fb19e1`
+  (76,529 bytes).
+- Archive closure: 15 byte/hash-verified payloads, generation-qualified remote ledger and terminal
+  marker; terminal generation `1788272143585315` is last. Independent read-only all-version
+  catalogue plus generation-qualified downloads prove exactly 17 unique live objects, zero
+  soft-deleted objects and exact size/SHA replay. The soft-deleted query is explicitly exhaustive
+  and binds its exact no-object exit/output semantics. Replay artifact
+  `gate-d-forced-round-pp16-hlo-remote-replay.json` has SHA-256
+  `85bcd02c9b112ef3e21d065ebfae04f0d06e4a922f1d15c0f971fb669992e1d8`. Executable invocation
+  count is zero; pre/post census is 8/8 clean.
+- Validator: `glm_tpu/greenfield/validation/gate_d_forced_round_hlo.py`; CLI:
+  `scripts/greenfield/adjudicate_gate_d_forced_round_pp16_hlo.py`; hostile/exact tests:
+  `tests/greenfield/validation/test_gate_d_forced_round_hlo_adjudication.py` (32/32).
+- Accepted causal chain: two BF16 RMS inputs -> FP32 add/RMS inverse -> sole e8m7 edge -> BF16
+  weight multiply -> BF16 boundary; that boundary is QKV carrier index 4, roots output 0 and is the
+  sole source of both DSA projection consumers. No competing unrounded primary edge exists.
+- Locality: exactly three all-gathers, channels 2/3/4, each physical group `[0,1]`; no forbidden
+  host/send/recv/global operation or unexpected custom-call target.
+- Report: `docs/artifacts/gate-d-forced-round-pp16-hlo-causal-adjudication.json`, SHA-256
+  `4db0ea2bfd8f34ec631213b6724d220038c08b23da788164c62e75efacbbab74`.
+- Verification: focused hostile/exact coverage is 32/32; the CPU-pinned adjacent admitted suite is
+  198/198. One immutable historical installer-certificate regeneration assertion is deliberately
+  deselected because it correctly rejects these four successor paths; its allowlist remains sealed.
+- Safety incident: an earlier adjacent command omitted `JAX_PLATFORMS=cpu`, reached real JAX
+  arithmetic, opened worker-0 TPU devices and stalled. Whether any TPU numerical operation completed
+  is unproven; no accepted output exists and it is excluded from evidence. The owned pytest was
+  terminated; no protected launcher, model or cloud action ran. Fresh census is 8/8 `CENSUS_OK`
+  and local holders are empty.
+- Classification: `HLO_CAUSAL_STRUCTURE_ACCEPTED;PP16_LOCALITY_ACCEPTED;TPU_NUMERICAL_UNPROVEN;
+  GATE_D_OPEN`. Persistence only; numerical execution, performance, 8K and closure remain false.
+- Exact next after review/persistence: separately authorize the smallest one-row protected
+  numerical A/B. Do not start the complete decoder until that result is accepted.

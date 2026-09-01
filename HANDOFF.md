@@ -9479,3 +9479,46 @@ review/persistence is a new tag and separately reviewed one-start command outsid
 Artifact `gate-d-forced-round-pp16-hlo-launcher-lock-failure.json` has SHA-256
 `60ae6ba504f8c6ad06f1ed8b30fa04550f8cd123586c38a7b4f0638f093f2c66`. No numerical/8K
 authority exists and Gate D remains open.
+
+## 2026-09-01 forced-round PP16 causal HLO accepted; numerical unproven
+
+Fresh tag `gate_d_forced_round_pp16_hlo_20260901T141137500138602Z` completed one reviewed
+compile-only acquisition outside the sync-cron window. The executable invocation count is zero.
+The generation-bound `US-CENTRAL2` archive contains 15 payload objects, its remote ledger and the
+terminal `HLO_ACQUIRED`; terminal generation `1788272143585315` is last. An independent read-only
+all-version catalogue found exactly those 17 unique live generations and zero soft-deleted objects,
+then generation-qualified downloads reproduced every recorded size and SHA-256. A fresh
+`--soft-deleted --exhaustive` query returned the exact no-object status (exit 1, empty stdout).
+Replay artifact `gate-d-forced-round-pp16-hlo-remote-replay.json` is 5,121 bytes, SHA-256
+`85bcd02c9b112ef3e21d065ebfae04f0d06e4a922f1d15c0f971fb669992e1d8`. Pre/post census is
+exactly 8/8 clean and the four workload locks are free.
+
+The optimized TPU HLO is 263,868 bytes, SHA-256
+`a0b87e2b43ba81bfe1549fbcc13434d2fbdca91b11c8b2f9a317ff9a9dbd9d45`; StableHLO is 76,529
+bytes, SHA-256 `45eae705b60783bf8b65a1d3d209c79e8d43685cec0aa912b3141caf36fb19e1`.
+The offline graph-aware adjudicator proves the sole e8m7 `reduce-precision` edge is rooted in the
+forced normalized-BF16 fusion, receives exactly the two BF16 RMS operands and scalar inverse,
+feeds the BF16-weight multiply, remains QKV while-loop carrier index 4, roots output 0 and widens
+into both DSA query/head and current-key consumers. Both raw inputs have no competing unrounded
+primary consumer. The graph has exactly three all-gathers, channels 2/3/4, all group `{0,1}`;
+forbidden host/send/recv/global operations and unexpected custom calls are absent.
+
+Artifact `docs/artifacts/gate-d-forced-round-pp16-hlo-causal-adjudication.json` is 2,560 bytes,
+SHA-256 `4db0ea2bfd8f34ec631213b6724d220038c08b23da788164c62e75efacbbab74`, and classifies
+`HLO_CAUSAL_STRUCTURE_ACCEPTED;PP16_LOCALITY_ACCEPTED;TPU_NUMERICAL_UNPROVEN;GATE_D_OPEN`.
+Thirty-two hostile and exact-regeneration tests pass. Run the CLI with the repository Python 3.12
+environment explicitly; system Python 3.10 cannot import the package's `StrEnum` API.
+
+One first adjacent-suite command omitted `JAX_PLATFORMS=cpu` despite the existing playbook rule.
+At the first real JAX arithmetic test it initialized the local TPU client, opened all four worker-0
+accelerators and stalled; owned pytest PID 406515 was terminated. Whether a TPU numerical operation
+completed before the stall is unproven; the attempt produced no accepted output and is excluded
+from evidence. No protected launcher, model or cloud action ran. A fresh read-only fleet census
+immediately returned eight unique `CENSUS_OK` hosts and all four local accelerator holders are empty. The corrected CPU-pinned
+suite passes 198/198 with one exact deselection: the immutable historical installer-certificate test
+correctly rejects the four new successor files. That historical allowlist was not weakened.
+
+This accepts physical causal structure and locality only. It authorizes persistence, not numerical
+execution, performance, 8K or Gate-D closure. Exact next is adversarial review of this batch,
+commit/push/locked same-region mirror, then a separately reviewed smallest one-row protected
+numerical A/B using the exact acquired candidate. Full short-context decode remains later.
