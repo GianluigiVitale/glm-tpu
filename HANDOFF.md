@@ -9847,3 +9847,34 @@ persistence is one separately reviewed new tag outside the cron window; numerica
 full 8K remain forbidden. Sol verified corrected staged diff
 `d1515c3bbf73aeba716124737520aed449b0132267c65144f316ba3cacbc93d0` and returned
 `APPROVE PERSISTENCE` with no P0--P2.
+
+## 2026-09-01 projection-contraction HLO V3 success approved for persistence
+
+Fresh tag `gate_d_projection_contraction_pp16_hlo_20260901T213605719107105Z` completed one
+compile-only abstract PP16 stage-zero TPU-v4 acquisition on adjacent devices `[0,1]`; the compiled
+executable was never invoked and both fleet censuses are clean. Optimized HLO SHA-256 is
+`817ba2ed87c33ec928f834fcf3a003ce63d3dedf4061a7c64fe354a26ac498ea`; StableHLO SHA-256 is
+`4b3fa252e837d381208453b06d7e369947fa4c6c58c795edc8ff5a8ea8c9e2e3`.
+
+Independent read-only replay downloaded all 17 exact generations, found no exhaustive
+soft-deleted generation, and proved `HLO_ACQUIRED` generation `1788298702037876` last. Artifact
+`docs/artifacts/gate-d-projection-contraction-pp16-hlo-success-remote-replay.json` is 5,219 bytes,
+SHA-256 `9c809a939c93ab6b5081665d6c20598a1ed80c47dfd868c4e8f0e6be08767085`.
+
+The separate offline success adjudicator cross-binds all local/remote bytes, ledger, self-bound
+terminal marker, receipt, runner/source/topology hashes and complete causal HLO. Its isolated
+`python -I -S -B` entry point loads only exact source bytes and no JAX or accelerator state. Report
+`docs/artifacts/gate-d-projection-contraction-pp16-success-hlo-adjudication.json` is 2,301 bytes,
+SHA-256 `54eb6105b81d9ffdbdd3b90735059fb324701509fe8efd003033bb3cff7e0ad7`; 42 focused CPU-only
+tests pass. Classification is `HLO_CAUSAL_STRUCTURE_ACCEPTED;PP16_OWNER_LOCALITY_ACCEPTED;
+TPU_NUMERICAL_UNPROVEN;HLO_ACQUIRED_TERMINAL_VERIFIED;GATE_D_OPEN`.
+
+Sol first blocked persistence because authenticated runner/summary/evidence claim fields and
+duplicate evidence paths were not all rejected. The corrected adjudicator requires exact schemas,
+all closure/numerical/performance claims false and exact unique evidence records; hostile tests
+cover every counterexample. Sol verified staged diff `d056bb92...0250` and returned
+`APPROVE PERSISTENCE` with no remaining P0--P2.
+
+No numerical, performance, full DSA/8K or Gate-D closure authority exists. Exact next is
+commit/push and locked `US-CENTRAL2` mirror; only then separately review and run the bounded
+numerical discriminator.

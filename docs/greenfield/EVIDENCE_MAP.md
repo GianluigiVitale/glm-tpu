@@ -3335,3 +3335,34 @@ persistence only; review and persistence precede any v2 installation.
   TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`. Exact next after review/persistence is a separate fresh
   tag and literal compile-only launcher review. Numerical execution and full DSA/8K remain
   forbidden.
+
+## 2026-09-01 projection-contraction HLO V3 successful compile adjudicated
+
+- Fresh tag `gate_d_projection_contraction_pp16_hlo_20260901T213605719107105Z` completed one
+  abstract-input compile on adjacent PP16 stage-zero TPU-v4 devices `[0,1]`. The compiled
+  executable invocation count is zero; numerical execution, performance and Gate-D claims are
+  false. Both fleet censuses are clean.
+- The optimized HLO is 31,857 bytes, SHA-256 `817ba2ed...98ea`; StableHLO is 7,420 bytes,
+  SHA-256 `4b3fa252...e2e3`. Exact causal adjudication proves one BF16 live row per each of two
+  owners, BF16-to-FP32 conversion, the FP32 width-6144 projection reduction, both complete
+  current-key fusion branches, rooted projection/current-key outputs, and zero collectives or host
+  effects.
+- Independent read-only replay downloaded all 17 exact generation-qualified objects from the
+  `US-CENTRAL2` bucket, found zero exhaustive soft-deleted generations, and proved
+  `HLO_ACQUIRED` generation `1788298702037876` is last. Replay artifact
+  `gate-d-projection-contraction-pp16-hlo-success-remote-replay.json` is 5,219 bytes, SHA-256
+  `9c809a93...7085`.
+- The isolated `python -I -S -B` adjudicator loads only hash-pinned parser/error/validator bytes,
+  executes no package initializer, imports no JAX and opens no accelerator descriptor. It binds
+  every local remote member, the 15-member ledger, self-bound success marker and terminal receipt.
+  Exact report `gate-d-projection-contraction-pp16-success-hlo-adjudication.json` is 2,301 bytes,
+  SHA-256 `54eb6105...ad7`; 42 focused CPU-only tests pass, including hostile terminal, replay,
+  fusion-lineage and import-boundary attacks.
+- Sol first blocked persistence on ignored authenticated claim fields and duplicate evidence paths.
+  The corrected validator requires exact runner/summary/evidence schemas, all closure/numerical/
+  performance claims false, and exact unique evidence records. Sol verified staged diff
+  `d056bb92...0250` and returned `APPROVE PERSISTENCE` with no remaining P0--P2.
+- Classification: `HLO_CAUSAL_STRUCTURE_ACCEPTED;PP16_OWNER_LOCALITY_ACCEPTED;
+  TPU_NUMERICAL_UNPROVEN;HLO_ACQUIRED_TERMINAL_VERIFIED;GATE_D_OPEN`. This authorizes persistence
+  only. Exact next after commit/push and locked same-region mirror is a separately reviewed bounded
+  numerical discriminator; full DSA/8K and performance remain unauthorized.
