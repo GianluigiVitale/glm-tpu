@@ -36,8 +36,14 @@ generation-zero terminal upload occur, followed solely by replay and exact-set c
 substitution, unexpected-object refusal, real privileged kernel-lock observation and signal-resistant
 quiescence plus a hostile-PATH production-launcher regression. Adjacent wrapper and inventory tests
 bring the focused total to 80/80. Ruff/format,
-compile, Bash syntax and diff checks pass. Corrected source remains unreviewed/uninstalled; root lock
-provisioning, cron adoption, recovery and HLO are separately reviewed future mutations.
+compile, Bash syntax and diff checks pass. Sol withheld staged `9c260108...` only because the first
+privileged token was PATH-resolved and its test reconstructed a stronger command; documentation also
+blurred shared controller/HLO leases with the distinct worker lock. Exact `/usr/bin/sudo`, the
+production-command hostile-PATH regression and precise wording closed all three. Sol approved
+persistence-only staged `257ac5ce...`; commit `6066bca31e6d4bebfe7038eb52dda9a3fc851915` is pushed
+and locked-mirrored to verified `US-CENTRAL2`, with exact source hash replay. Source is reviewed and
+persisted but uninstalled. Root lock/controller provisioning, cron adoption, recovery and HLO remain
+separately reviewed future mutations.
 
 ## 2026-08-31 22:27--22:53 UTC — protected HLO start fails in Git transport; mutation removed
 

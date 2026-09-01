@@ -23,9 +23,13 @@
   80/80. They include a hostile-PATH proof for the absolute privileged quiescence launcher. Ruff,
   formatting, compilation, Bash syntax and diff checks pass. Root lock/controller
   provisioning and cron adoption are deliberately not performed in this source batch.
-- Corrected source remains unreviewed and uninstalled. No worker repository, bucket, JAX/backend,
-  compiler/HLO, model or TPU was touched. Exact next is Sol review, then persistence; provisioning,
-  repository recovery and any fresh HLO start remain separate literal reviews.
+- Sol withheld staged snapshot `9c260108...` solely for its PATH-resolved privileged launcher and
+  ambiguous lock wording. The absolute-launcher/hostile-PATH correction passed 14/14 and Sol then
+  approved persistence-only snapshot `257ac5ce...`. Commit `6066bca31e6d4bebfe7038eb52dda9a3fc851915`
+  is pushed; the locked `US-CENTRAL2` mirror replay matches controller/worker/test hashes.
+- Source is reviewed and persisted but uninstalled. No worker repository, recovery-result prefix,
+  JAX/backend, compiler/HLO, model or TPU was touched. Exact next is separate review of immutable
+  lock/controller provisioning and cron adoption; recovery and fresh HLO remain later reviews.
 
 ## 2026-08-29 accepted DB485 compile-only discriminator corrected after Sol block
 

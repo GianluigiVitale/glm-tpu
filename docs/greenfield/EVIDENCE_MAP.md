@@ -2544,6 +2544,9 @@ remains open and no TPU successor is authorized.
   read-only replay/exact-set verification.
 - Test `16cd0dcd...5b91` passes 14/14, including the absolute `/usr/bin/sudo` hostile-PATH
   regression; adjacent wrapper/inventory tests make 80/80. Ruff/format,
-  compilation, Bash syntax and diff checks pass. Root-lock/controller provisioning and cron adoption
-  are not performed. Corrected source is unreviewed/uninstalled and authorizes no recovery, bucket
-  mutation, JAX/backend, HLO, model or TPU work.
+  compilation, Bash syntax and diff checks pass. Sol withheld `9c260108...` for the PATH-resolved
+  privileged token/test gap and ambiguous lock wording, then approved persistence-only corrected
+  `257ac5ce...`. Commit `6066bca31e6d4bebfe7038eb52dda9a3fc851915` is pushed and its exact
+  source hashes replay from the locked `US-CENTRAL2` mirror. Source is reviewed/persisted but
+  uninstalled. Root-lock/controller provisioning and cron adoption are not performed; no recovery,
+  JAX/backend, HLO, model or TPU work is authorized.
