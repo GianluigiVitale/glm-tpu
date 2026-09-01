@@ -1,0 +1,63 @@
+{
+  "artifact_kind": "gate_d_worker_repository_recovery_v6_complete",
+  "classification": "REPOSITORY_RECOVERY_COMPLETE;NO_HLO;NO_JAX;NO_TPU_WORK;GATE_D_OPEN",
+  "code_pin": "94518b7d4ce788157afa98b7bc1f8144613852d5",
+  "controller_sha256": "3f6d76c708f595841c837ecc537bb191fe23846a836dfa057593f97f0f975ee1",
+  "controller_postflight": {
+    "all_workers_clean_complete_exact_pin": true,
+    "fleet_census": "8/8 CENSUS_OK",
+    "recovery_lock_quiescence": "8/8 RECOVERY_QUIESCENT",
+    "workers": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ]
+  },
+  "install_authority": {
+    "path": "docs/artifacts/gate-d-worker-repository-recovery-v6-install.json",
+    "sha256": "3af488ace0c0040db5e59b22341190e76182966ac2f21e5414eb27942d8bd09f"
+  },
+  "invocation_review": {
+    "reviewer": "sol_gate_d_observability_review",
+    "verdict": "APPROVE ONE RECOVERY INVOCATION; no P0/P1/P2"
+  },
+  "local_evidence": {
+    "directory": "/home/gianl/gate-d-repo-recovery/gate_d_repo_recovery_20260901T064813415079883Z"
+  },
+  "process_exit_code": 0,
+  "recovered_workers": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "remote_evidence": {
+    "bytes": 9239860,
+    "controller_generation_bound_upload_and_exact_object_set": true,
+    "object_count": 19,
+    "prefix": "gs://driftbench-dsv4-uc/results/greenfield/glm52/gate_d_repo_recovery/gate_d_repo_recovery_20260901T064813415079883Z",
+    "terminal": {
+      "generation": "1788245573776045",
+      "last_write": true,
+      "sha256": "1d256172a593b28b0212ef9ea467e78bcf4e3cae328cddfdbbb0344d3f6a4dd8",
+      "size": 5319
+    }
+  },
+  "retained_old_repository_name": "glm-tpu-topology-rewrite.pre-recovery-gate_d_repo_recovery_20260901T064813415079883Z",
+  "schema_version": 1,
+  "status": "RECOVERY_COMPLETE",
+  "tag": "gate_d_repo_recovery_20260901T064813415079883Z",
+  "timestamp_utc": "2026-09-01T06:54:42Z",
+  "tpu_or_successor_work_performed": false,
+  "untouched_workers": [
+    0
+  ]
+}
