@@ -9534,15 +9534,19 @@ derived from the accepted preimage by only three single-occurrence runtime sourc
 substitutions, then permits exactly one invocation and one bounded output-tree transfer.
 
 The derived numerical optimized HLO is 263,876 bytes, SHA-256
-`df0a193ecc34851b801e72a6470f3f6fb9dc8bcecc34eb8902db73d54912640d`; the acquired graph body
+`6ec8989d40802344cd846ca0f871b62dfe1a46b2816e78e007bd37e4274f1dfa`; the acquired graph body
 remains `a0b87e2b...d9d45`. Driver SHA-256 is
-`160eb38f414fa2aed5df2a03714edb05214ffadcd2c92ccef3ed140ef03d204b`. Acceptance now requires
+`5e1c1f704c12f1a65947a1265e80d64e6404a0bdc473d883cc095e082e7f2187`. The orchestration audit
+caught a guaranteed pre-invocation mismatch: the derived runtime optimized HLO was compared to the
+acquired preimage hash. The corrected typed validator separately binds the acquired StableHLO,
+acquired optimized authority and metadata-derived runtime optimized bytes; hostile tests reject
+both a preimage/runtime substitution and a drifted acquisition authority. Acceptance also requires
 the exact eleven non-scorer causal watchpoints in addition to owner agreement, contract bits,
 tie order and the independently accepted TPU event; the three CPU scorer watchpoints remain
 diagnostic only. Git reads ignore user/system configuration, replacements and network transports.
 Source certificate `gate-d-forced-round-pp16-numerical-source.json` is 3,807 bytes, SHA-256
-`5938c0318e3ba20c4e5c8b883b9e9606e5d4f9fa66d6e079a8860d59cf026cea`; focused CPU-only hostile
-coverage passes 22/22 and the adjacent slice passes 220/220 with one sealed-history deselection and
+`17fe23a0641ddb93ed3b46eb63d13fa0d875054262fbe148ee41f4d83c616c2d`; focused CPU-only hostile
+coverage passes 23/23 and the adjacent slice passes 221/221 with one sealed-history deselection and
 one intentional duplicate-ZIP warning. Ruff 0.16.5 and Python compilation pass. No launcher/runtime install,
 JAX backend initialization, compile, TPU execution, cloud write or numerical result occurred.
 Gate D remains open. Exact next is adversarial source review and persistence, then a separately

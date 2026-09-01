@@ -84,7 +84,7 @@ EXPECTED_OPTIMIZED_HLO_SHA256 = (
 EXPECTED_STABLEHLO_BYTES = 76529
 EXPECTED_OPTIMIZED_HLO_BYTES = 263868
 EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256 = (
-    "df0a193ecc34851b801e72a6470f3f6fb9dc8bcecc34eb8902db73d54912640d"
+    "6ec8989d40802344cd846ca0f871b62dfe1a46b2816e78e007bd37e4274f1dfa"
 )
 EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES = 263876
 EXPECTED_ACCEPTED_POSITIONS_SHA256 = (
@@ -412,6 +412,37 @@ def derive_numerical_optimized_hlo(
         "source_byte_count": len(acquired_hlo_raw),
         "source_sha256": EXPECTED_OPTIMIZED_HLO_SHA256,
     }
+
+
+def validate_runtime_hlo_identity(
+    stablehlo_raw: bytes,
+    optimized_hlo_raw: bytes,
+    acquired_stablehlo_raw: bytes,
+    derived_optimized_hlo_raw: bytes,
+    hlo_authority: Mapping[str, str],
+) -> dict[str, str]:
+    """Bind the acquired StableHLO and metadata-derived runtime optimized HLO."""
+
+    if hlo_authority != {
+        "optimized_hlo_sha256": EXPECTED_OPTIMIZED_HLO_SHA256,
+        "stablehlo_sha256": EXPECTED_STABLEHLO_SHA256,
+    }:
+        raise RuntimeError("Gate-D acquired HLO authority drifted before execution")
+    observed = {
+        "stablehlo_sha256": sha256(stablehlo_raw).hexdigest(),
+        "optimized_hlo_sha256": sha256(optimized_hlo_raw).hexdigest(),
+    }
+    expected_runtime = {
+        "stablehlo_sha256": EXPECTED_STABLEHLO_SHA256,
+        "optimized_hlo_sha256": EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256,
+    }
+    if (
+        observed != expected_runtime
+        or stablehlo_raw != acquired_stablehlo_raw
+        or optimized_hlo_raw != derived_optimized_hlo_raw
+    ):
+        raise RuntimeError(f"Gate-D executable HLO identity drifted: {observed}")
+    return observed
 
 
 def validate_numerical_policy(admission: Mapping[str, Any]) -> dict[str, Any]:
@@ -1078,16 +1109,13 @@ def main() -> int:
         "hlo/forced_round_pp16_stage0.optimized_hlo.txt",
         optimized_hlo.encode("utf-8"),
     )
-    observed_hlo = {
-        "stablehlo_sha256": sha256(stablehlo.encode("utf-8")).hexdigest(),
-        "optimized_hlo_sha256": sha256(optimized_hlo.encode("utf-8")).hexdigest(),
-    }
-    if (
-        observed_hlo != hlo_authority
-        or stablehlo.encode("utf-8") != acquired_stablehlo_raw
-        or optimized_hlo.encode("utf-8") != derived_optimized_hlo_raw
-    ):
-        raise RuntimeError(f"Gate-D executable HLO identity drifted: {observed_hlo}")
+    observed_hlo = validate_runtime_hlo_identity(
+        stablehlo.encode("utf-8"),
+        optimized_hlo.encode("utf-8"),
+        acquired_stablehlo_raw,
+        derived_optimized_hlo_raw,
+        hlo_authority,
+    )
     memory_after_compile = [helper._memory_stats(device) for device in devices]
 
     invocation_count = 0

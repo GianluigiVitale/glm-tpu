@@ -467,9 +467,9 @@ def test_source_orders_hlo_authentication_before_exactly_one_invocation_and_tran
     source = SOURCE.read_text()
     assert source.count("result = compiled(*arguments)") == 1
     assert source.count("transferred = jax.device_get(result)") == 1
-    assert source.index(
-        'optimized_hlo.encode("utf-8") != derived_optimized_hlo_raw'
-    ) < source.index("result = compiled(*arguments)")
+    assert source.index("observed_hlo = validate_runtime_hlo_identity(") < source.index(
+        "result = compiled(*arguments)"
+    )
     assert source.index("invocation_count += 1") < source.index(
         "result = compiled(*arguments)"
     )
@@ -562,8 +562,8 @@ def test_source_certificate_binds_driver_predecessors_and_execution_boundary() -
         "scorer_cpu_watchpoints_diagnostic_only": True,
         "tie_order_required": True,
     }
-    assert certificate["verification"]["focused_tests_passed"] == 22
-    assert certificate["verification"]["adjacent_tests_passed"] == 220
+    assert certificate["verification"]["focused_tests_passed"] == 23
+    assert certificate["verification"]["adjacent_tests_passed"] == 221
     assert certificate["verification"]["sealed_history_tests_deselected"] == 1
     assert certificate["verification"]["ruff_version"] == "0.16.5"
 
@@ -588,6 +588,61 @@ def test_source_location_derivation_replays_real_accepted_hlo_bytes_exactly() ->
             1,
         )
     assert restored == accepted
+
+
+def test_runtime_hlo_identity_distinguishes_acquired_and_derived_optimized_hashes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stablehlo = b"exact stablehlo"
+    acquired_optimized = b"accepted optimized preimage"
+    derived_optimized = b"metadata-derived optimized runtime"
+    monkeypatch.setattr(
+        MODULE, "EXPECTED_STABLEHLO_SHA256", sha256(stablehlo).hexdigest()
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "EXPECTED_OPTIMIZED_HLO_SHA256",
+        sha256(acquired_optimized).hexdigest(),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256",
+        sha256(derived_optimized).hexdigest(),
+    )
+    authority = {
+        "stablehlo_sha256": sha256(stablehlo).hexdigest(),
+        "optimized_hlo_sha256": sha256(acquired_optimized).hexdigest(),
+    }
+    assert MODULE.validate_runtime_hlo_identity(
+        stablehlo,
+        derived_optimized,
+        stablehlo,
+        derived_optimized,
+        authority,
+    ) == {
+        "stablehlo_sha256": sha256(stablehlo).hexdigest(),
+        "optimized_hlo_sha256": sha256(derived_optimized).hexdigest(),
+    }
+
+    with pytest.raises(RuntimeError, match="executable HLO identity"):
+        MODULE.validate_runtime_hlo_identity(
+            stablehlo,
+            acquired_optimized,
+            stablehlo,
+            derived_optimized,
+            authority,
+        )
+    with pytest.raises(RuntimeError, match="acquired HLO authority"):
+        MODULE.validate_runtime_hlo_identity(
+            stablehlo,
+            derived_optimized,
+            stablehlo,
+            derived_optimized,
+            {
+                "stablehlo_sha256": authority["stablehlo_sha256"],
+                "optimized_hlo_sha256": authority["stablehlo_sha256"],
+            },
+        )
 
 
 def test_source_location_derivation_rejects_preimage_and_callsite_mutation() -> None:
