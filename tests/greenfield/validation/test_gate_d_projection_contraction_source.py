@@ -428,7 +428,7 @@ def test_source_analyzer_is_default_off_cpu_only_and_nonmutating() -> None:
     assert "CPU-pinned" in result.stderr
 
 
-def test_source_artifact_exactly_replays_committed_analyzer() -> None:
+def test_source_artifact_replays_from_unchanged_descendant_source() -> None:
     artifact = ARTIFACT.read_bytes()
     assert len(artifact) == 4176
     assert sha256(artifact).hexdigest() == ARTIFACT_SHA256
@@ -457,4 +457,33 @@ def test_source_artifact_exactly_replays_committed_analyzer() -> None:
         timeout=60,
     )
     assert result.returncode == 0, result.stderr.decode()
-    assert result.stdout == artifact
+    replay = json.loads(result.stdout)
+    current_pin = subprocess.check_output(
+        ["/usr/bin/git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True
+    ).strip()
+    assert replay["code_hash"] == current_pin
+    ancestry = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(ROOT),
+            "merge-base",
+            "--is-ancestor",
+            parsed["code_hash"],
+            current_pin,
+        ],
+        check=False,
+    )
+    assert ancestry.returncode == 0
+    replay["code_hash"] = parsed["code_hash"]
+    normalized = (
+        json.dumps(
+            replay,
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("ascii")
+    assert normalized == artifact
