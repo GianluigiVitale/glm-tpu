@@ -19,6 +19,10 @@ from glm_tpu.greenfield.validation.gate_d_projection_contraction_hlo_acquisition
 
 ROOT = Path(__file__).parents[3]
 ACQUIRER = ROOT / "scripts/greenfield/acquire_gate_d_projection_contraction_pp16_hlo.py"
+ANALYZER = (
+    ROOT / "scripts/greenfield/"
+    "analyze_gate_d_projection_contraction_hlo_acquisition_source.py"
+)
 SOURCE_AUTHORITY = (
     ROOT / "docs/artifacts/gate-d-projection-contraction-pp16-source.json"
 )
@@ -314,3 +318,108 @@ print(int('jax' in sys.modules))
 def test_authority_files_have_exact_bytes() -> None:
     assert sha256(SOURCE_AUTHORITY.read_bytes()).hexdigest() == SOURCE_AUTHORITY_SHA256
     assert sha256(TOPOLOGY.read_bytes()).hexdigest() == TOPOLOGY_SHA256
+
+
+def test_source_analyzer_is_default_off_cpu_only_and_imports_no_jax() -> None:
+    source = ANALYZER.read_text()
+    assert "import jax" not in source
+    assert "libtpu" not in source.lower()
+    assert "gcloud" not in source
+    result = subprocess.run(
+        ["/home/gianl/vllm-env/bin/python", str(ANALYZER)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode != 0
+    assert "requires python -I -S" in result.stderr
+    result = subprocess.run(
+        ["/home/gianl/vllm-env/bin/python", "-I", "-S", str(ANALYZER)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode != 0
+    assert "default-off" in result.stderr
+    environment = {**os.environ, "GLM_GATE_D_PROJECTION_HLO_SOURCE": "1"}
+    environment.pop("JAX_PLATFORMS", None)
+    result = subprocess.run(
+        ["/home/gianl/vllm-env/bin/python", "-I", "-S", str(ANALYZER)],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode != 0
+    assert "CPU-pinned" in result.stderr
+
+
+def test_source_analyzer_rejects_preloaded_spoof(tmp_path: Path) -> None:
+    code = f"""
+import importlib.util
+import os
+import sys
+import types
+from pathlib import Path
+path = Path({str(ANALYZER)!r})
+spec = importlib.util.spec_from_file_location('projection_hlo_source_analyzer', path)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+spoof = types.ModuleType('glm_tpu')
+spoof.__file__ = str(module.ROOT / 'glm_tpu/__init__.py')
+spoof.__path__ = [str(module.ROOT / 'glm_tpu')]
+sys.modules['glm_tpu'] = spoof
+os.environ['GLM_GATE_D_PROJECTION_HLO_SOURCE'] = '1'
+os.environ['JAX_PLATFORMS'] = 'cpu'
+os.environ['JAX_PLATFORM_NAME'] = 'cpu'
+module.analyze()
+"""
+    result = subprocess.run(
+        ["/home/gianl/vllm-env/bin/python", "-I", "-S", "-c", code],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode != 0
+    assert "rejects preloaded glm_tpu" in result.stderr
+
+
+def test_source_analyzer_rejects_hostile_import_hook(tmp_path: Path) -> None:
+    code = f"""
+import importlib.util
+import os
+import sys
+from pathlib import Path
+path = Path({str(ANALYZER)!r})
+spec = importlib.util.spec_from_file_location('projection_hlo_source_analyzer', path)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+class HostileFinder:
+    def find_spec(self, fullname, path=None, target=None):
+        return None
+sys.meta_path.insert(0, HostileFinder())
+os.environ['GLM_GATE_D_PROJECTION_HLO_SOURCE'] = '1'
+os.environ['JAX_PLATFORMS'] = 'cpu'
+os.environ['JAX_PLATFORM_NAME'] = 'cpu'
+module.analyze()
+"""
+    result = subprocess.run(
+        ["/home/gianl/vllm-env/bin/python", "-I", "-S", "-c", code],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode != 0
+    assert "rejects noncanonical import hooks" in result.stderr
