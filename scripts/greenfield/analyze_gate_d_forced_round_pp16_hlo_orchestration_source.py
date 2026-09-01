@@ -29,6 +29,9 @@ LAUNCHER_TEST = WORKTREE / (
 HISTORICAL_ACQUISITION_TEST = WORKTREE / (
     "tests/greenfield/validation/test_gate_d_forced_round_pp16_hlo_acquisition.py"
 )
+BASE_ACQUISITION_TEST = WORKTREE / (
+    "tests/greenfield/validation/test_gate_d_compensated_pp16_hlo_acquisition.py"
+)
 BASE_PUBLISHER = WORKTREE / (
     "scripts/greenfield/publish_gate_d_compensated_pp16_hlo.py"
 )
@@ -45,9 +48,9 @@ TOPOLOGY = WORKTREE / "docs/artifacts/gate-d-runtime-locality-authority.json"
 MIRROR_VERIFIER = WORKTREE / (
     "scripts/greenfield/verify_gate_d_same_region_git_mirror.py"
 )
-BASE_CODE_PIN = "2f2408d7f63c747beaa8776aa6faa8b1872478ea"
-BASE_TREE_ID = "3541fbf1b9e8861705c77ff7f6128c65d2ecee4f"
-HISTORICAL_CODE_PIN = "a012b93fdbd7c6fe1f84db2260708ba55b38e8f6"
+BASE_CODE_PIN = "2dbc7df5add2f4fea1afcce4193082402cb4a5e3"
+BASE_TREE_ID = "21894dc230c9983ad55b0da7bdb8925979d9cf94"
+HISTORICAL_CODE_PIN = "8bd33239d74e5aad084bbb807d68128a396fdcbe"
 BASE_PUBLISHER_SHA256 = (
     "75c296a2b46aef1b878a95ee7b1dfabdaf062687bfc496416ffca102f1180ee3"
 )
@@ -110,10 +113,6 @@ PUBLISHER_CHANGED_COMMON = frozenset(
 ARTIFACT_PATH = "docs/artifacts/gate-d-forced-round-pp16-hlo-orchestration-source.json"
 ALLOWED_DELTA_PATHS = frozenset(
     {
-        "HANDOFF.md",
-        "docs/RESEARCH_LOG.md",
-        ARTIFACT_PATH,
-        "docs/greenfield/EVIDENCE_MAP.md",
         (
             "scripts/greenfield/"
             "analyze_gate_d_forced_round_pp16_hlo_orchestration_source.py"
@@ -123,7 +122,7 @@ ALLOWED_DELTA_PATHS = frozenset(
         "scripts/greenfield/run_gate_d_forced_round_pp16_hlo.sh",
         (
             "tests/greenfield/validation/"
-            "test_gate_d_forced_round_pp16_hlo_acquisition.py"
+            "test_gate_d_compensated_pp16_hlo_acquisition.py"
         ),
         ("tests/greenfield/validation/test_launch_gate_d_forced_round_pp16_hlo.py"),
         ("tests/greenfield/validation/test_publish_gate_d_forced_round_pp16_hlo.py"),
@@ -459,6 +458,7 @@ def main() -> int:
         "wrapper": _snapshot(WRAPPER),
         "test": _snapshot(TEST),
         "historical_acquisition_test": _snapshot(HISTORICAL_ACQUISITION_TEST),
+        "base_acquisition_test": _snapshot(BASE_ACQUISITION_TEST),
         "base_publisher": _snapshot(BASE_PUBLISHER),
         "acquisition_source": _snapshot(ACQUISITION_SOURCE),
         "forced_round_source": _snapshot(FORCED_ROUND_SOURCE),
@@ -557,6 +557,12 @@ def main() -> int:
             ),
             "historical_acquisition_test_sha256": sha256(
                 snapshots["historical_acquisition_test"]
+            ).hexdigest(),
+            "base_acquisition_test_path": str(
+                BASE_ACQUISITION_TEST.relative_to(WORKTREE)
+            ),
+            "base_acquisition_test_sha256": sha256(
+                snapshots["base_acquisition_test"]
             ).hexdigest(),
             "test_path": str(TEST.relative_to(WORKTREE)),
             "test_sha256": sha256(snapshots["test"]).hexdigest(),

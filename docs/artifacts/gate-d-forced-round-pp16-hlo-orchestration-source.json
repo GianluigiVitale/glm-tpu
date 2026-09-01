@@ -11,29 +11,30 @@
   "claim_scope": "Static launcher/publisher/wrapper audit only. No JAX import, HLO acquisition, TPU compile/execution, cloud write, numerical, performance or Gate-D claim.",
   "orchestration_audit": {
     "launcher": {
-      "launcher_ast_sha256": "d727634a8736d4a1013de97f2b81dfb949f0235f807063f0fa334a56d91b7252",
-      "launcher_sha256": "6e2d0457a3a72ec81a30501bb3e8e7dc9b6235d6fa0e8f4faa77b1bbb2d1c6cd",
+      "launcher_ast_sha256": "3af41e75575847bf9ed1d540f76f46a350b7078a0249aa65797064914549856d",
+      "launcher_sha256": "7df72ff370fbbc40ede42aa833bd071cc113dc4a343fbc444d3e6b25ae522a5b",
       "retained_lock_fds": [
         11,
         12
       ],
       "retained_wrapper_fd": 10,
-      "wrapper_sha256": "aee64a2c7549e923817ffc5ab5d37f8960823751bd10c419c7fbb77b36f14fec"
+      "wrapper_sha256": "965acf6e59eb2c278eec048fe6eea872aea3a860ed5c0d4ba7413bee4da688fd"
     },
     "publisher": {
       "base_publisher_sha256": "75c296a2b46aef1b878a95ee7b1dfabdaf062687bfc496416ffca102f1180ee3",
+      "changed_common_function_count": 4,
       "hardened_common_function_count": 45,
-      "new_helper_count": 3,
-      "publisher_ast_sha256": "d40e31776ab24c8538816971dcfd6fb65b7058c374802540916b66c0dda0fbad",
-      "publisher_sha256": "ec67de6d29ba3a3e15a0853b6ef78eb3e0e34dfd2783ab46f101ca4c75dde0db",
+      "new_helper_count": 5,
+      "publisher_ast_sha256": "f9e891e89477f90777aafc8e47e3243c6b97ae14c3bb6fbfbbe6908f1d17357a",
+      "publisher_sha256": "0a643e8c307a0f2b6c026a749956099ddae724da280ae7d7995be68a0a275607",
       "runner_input_spec_count": 16,
       "runner_output_spec_count": 9
     },
     "wrapper": {
       "mirror_replay_count": 2,
       "protected_compile_process_count": 1,
-      "runtime_boundary_sha256": "9d9c11c22dbe92edea8c9ca22dfe695116abddfe91ebe883a999ce2f62078de6",
-      "wrapper_sha256": "aee64a2c7549e923817ffc5ab5d37f8960823751bd10c419c7fbb77b36f14fec"
+      "runtime_boundary_sha256": "a25743cd922852287f8185f33954f95397ea9814651d3d24295c9f4d60d783f0",
+      "wrapper_sha256": "965acf6e59eb2c278eec048fe6eea872aea3a860ed5c0d4ba7413bee4da688fd"
     }
   },
   "predecessors": {
@@ -48,37 +49,35 @@
   },
   "repository_authority": {
     "allowed_delta_paths": [
-      "HANDOFF.md",
-      "docs/RESEARCH_LOG.md",
-      "docs/artifacts/gate-d-forced-round-pp16-hlo-orchestration-source.json",
-      "docs/greenfield/EVIDENCE_MAP.md",
       "scripts/greenfield/analyze_gate_d_forced_round_pp16_hlo_orchestration_source.py",
       "scripts/greenfield/launch_gate_d_forced_round_pp16_hlo.py",
       "scripts/greenfield/publish_gate_d_forced_round_pp16_hlo.py",
       "scripts/greenfield/run_gate_d_forced_round_pp16_hlo.sh",
-      "tests/greenfield/validation/test_gate_d_forced_round_pp16_hlo_acquisition.py",
+      "tests/greenfield/validation/test_gate_d_compensated_pp16_hlo_acquisition.py",
       "tests/greenfield/validation/test_launch_gate_d_forced_round_pp16_hlo.py",
       "tests/greenfield/validation/test_publish_gate_d_forced_round_pp16_hlo.py"
     ],
-    "base_code_pin": "2f2408d7f63c747beaa8776aa6faa8b1872478ea",
-    "base_tree_id": "3541fbf1b9e8861705c77ff7f6128c65d2ecee4f",
+    "base_code_pin": "2dbc7df5add2f4fea1afcce4193082402cb4a5e3",
+    "base_tree_id": "21894dc230c9983ad55b0da7bdb8925979d9cf94",
     "unexpected_delta_paths": []
   },
   "source_authority": {
     "analyzer_path": "scripts/greenfield/analyze_gate_d_forced_round_pp16_hlo_orchestration_source.py",
-    "analyzer_sha256": "5550776121774d216cc3b61372ef0f8f04d7562d36a410d93b656793a006ed8a",
+    "analyzer_sha256": "4bd45cf018ebd35339e60b0103abc1096e1b6f2f9dc6c82e7d777696c1f16c6a",
+    "base_acquisition_test_path": "tests/greenfield/validation/test_gate_d_compensated_pp16_hlo_acquisition.py",
+    "base_acquisition_test_sha256": "b80bf066bc3e7014a0381862145b8557c6badb1f454752a527e4f59adb0c4419",
     "historical_acquisition_test_path": "tests/greenfield/validation/test_gate_d_forced_round_pp16_hlo_acquisition.py",
     "historical_acquisition_test_sha256": "b7e2399133d92690c8572707a5d6b1be22797df1484f5fc9ad894c4848a2a0ca",
     "launcher_path": "scripts/greenfield/launch_gate_d_forced_round_pp16_hlo.py",
-    "launcher_sha256": "6e2d0457a3a72ec81a30501bb3e8e7dc9b6235d6fa0e8f4faa77b1bbb2d1c6cd",
+    "launcher_sha256": "7df72ff370fbbc40ede42aa833bd071cc113dc4a343fbc444d3e6b25ae522a5b",
     "launcher_test_path": "tests/greenfield/validation/test_launch_gate_d_forced_round_pp16_hlo.py",
-    "launcher_test_sha256": "99a31186234f79350d1999fcd3fdbd7bd063bdba3c08b4ea547dcf3a2a6599f5",
+    "launcher_test_sha256": "fab9a2f9d730c203f8d6592f43e65fa054f3a0becac67c4ef2de69717e918a1a",
     "publisher_path": "scripts/greenfield/publish_gate_d_forced_round_pp16_hlo.py",
-    "publisher_sha256": "ec67de6d29ba3a3e15a0853b6ef78eb3e0e34dfd2783ab46f101ca4c75dde0db",
+    "publisher_sha256": "0a643e8c307a0f2b6c026a749956099ddae724da280ae7d7995be68a0a275607",
     "test_path": "tests/greenfield/validation/test_publish_gate_d_forced_round_pp16_hlo.py",
-    "test_sha256": "e44b9bc29c1e93250ae59799787065bfb31274a6acd4920589677a3fbb80a149",
+    "test_sha256": "cba5fca19f15f7a1fb7aa28a3f5e819173305b71e4e6ede8501875ed2e9c3895",
     "wrapper_path": "scripts/greenfield/run_gate_d_forced_round_pp16_hlo.sh",
-    "wrapper_sha256": "aee64a2c7549e923817ffc5ab5d37f8960823751bd10c419c7fbb77b36f14fec"
+    "wrapper_sha256": "965acf6e59eb2c278eec048fe6eea872aea3a860ed5c0d4ba7413bee4da688fd"
   },
   "status": "FORCED_ROUND_HLO_ORCHESTRATION_SOURCE_PERSISTENCE_ONLY"
 }
