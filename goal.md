@@ -1,6 +1,6 @@
 # Goal — GLM-5.2-FP8 TPU v4 topology-first greenfield engine
 
-FULL ACCESS: autonomous work. Keep <4000 chars. At start/compaction read this and
+FULL ACCESS: autonomous. Keep <4000 chars. At start/compaction read this and
 `docs/glm-tpu-revolution.md` and `docs/suggestions.md` **in full**; inspect live evidence.
 
 ## Scope/precedence
@@ -44,7 +44,7 @@ Oracle: `docs/10-observability.md`. Indexes:
 `scripts/greenfield/{audit_observability,admit_gate_d_mechanisms}.py`. Search
 `glm_tpu/greenfield/{validation,benchmarking,sharding}/`, `scripts/greenfield/{capture,compare,inspect,probe,trace}*` and
 `tests/greenfield/`. Evidence: `docs/artifacts/`, `HANDOFF.md`, `bench/results.db`, bucket
-`oracles/`/`results/`. Read/register first. On any stall/failure, reread
+`oracles/`/`results/`. Read/register first. When stuck/failing, reread
 `docs/greenfield/compass_artifact_wf-f6f3c189-f49a-5169-bc82-8adefac958df_text_markdown.md`
 in full; adjudicate against local evidence before acting.
 
