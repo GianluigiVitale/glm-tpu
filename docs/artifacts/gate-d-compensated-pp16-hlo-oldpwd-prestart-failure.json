@@ -1,0 +1,40 @@
+{
+  "artifact_kind": "gate_d_compensated_pp16_hlo_oldpwd_prestart_failure",
+  "burned_tag": true,
+  "classification": "PRE_RUN_DIRECTORY_WRAPPER_ENVIRONMENT_FAILURE;NO_CENSUS_IN_WRAPPER;NO_JAX;NO_BACKEND;NO_COMPILER;NO_HLO;NO_EXECUTABLE;NO_TPU_WORK;GATE_D_OPEN",
+  "code_pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059",
+  "failure": {
+    "exit_code": 2,
+    "stage": "immutable_lock_self_reexec_environment_allowlist",
+    "stderr": "unexpected wrapper environment name: OLDPWD"
+  },
+  "independent_post_failure": {
+    "canonical_leases_exact_and_free": 4,
+    "external_fleet_census": "8/8 CENSUS_OK",
+    "local_acquisition_processes": 0,
+    "local_run_path_vacant": true,
+    "remote_live_or_noncurrent_generations": 0,
+    "remote_soft_deleted_generations": 0
+  },
+  "invocation_review": {
+    "reviewer": "sol_gate_d_observability_review",
+    "verdict": "APPROVE HLO START; no P0/P1/P2"
+  },
+  "no_retry_same_tag": true,
+  "remote_prefix": "gs://driftbench-dsv4-uc/results/greenfield/glm52/gate_d_pp16_hlo/gate_d_compensated_pp16_hlo_20260901T054222331264003Z",
+  "root_cause": {
+    "description": "The first sanitized Bash pass changed directory to / before its immutable-lock broker re-executed the wrapper. Bash exported OLDPWD=/home/gianl during cd. The broker preserved that exact environment, so the second wrapper pass rejected OLDPWD before tag validation, run-directory creation, census, JAX import or TPU work.",
+    "reproduced_locally_without_tpu": true,
+    "reproduction_after_cd": {
+      "OLDPWD": "/home/gianl",
+      "PWD": "/"
+    },
+    "reproduction_before_cd_oldpwd_absent": true
+  },
+  "schema_version": 1,
+  "success_or_diagnostic_terminal_written": false,
+  "tag": "gate_d_compensated_pp16_hlo_20260901T054222331264003Z",
+  "timestamp_utc": "2026-09-01T05:44:35Z",
+  "tpu_successor_authorized": false,
+  "wrapper_sha256": "700519374081813174538e4f89a7c31c02dd039979d067aa46f66a70a827de0d"
+}
