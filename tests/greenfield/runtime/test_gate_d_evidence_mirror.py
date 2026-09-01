@@ -85,6 +85,22 @@ def _listing(destination: str) -> list[dict[str, object]]:
     ]
 
 
+def _tooling_authority(head: str = "a" * 40) -> dict[str, object]:
+    return {
+        "base_execution_pin": "b" * 40,
+        "commits": [head],
+        "helper_git_blob": "c" * 40,
+        "helper_sha256": "d" * 64,
+        "remote_tooling_head": head,
+        "root_authority_sha256": "e" * 64,
+        "status": "GATE_D_EVIDENCE_MIRROR_TOOLING_VALID",
+        "tooling_branch": MODULE.TOOLING_BRANCH,
+        "tooling_head": head,
+        "tooling_tree": "f" * 40,
+        "tracked_files": 840,
+    }
+
+
 def test_real_export_matches_git_catalogue_before_append_only_sync(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -538,6 +554,163 @@ def test_receipt_writer_refuses_short_write_before_sync(
     monkeypatch.setattr(MODULE.os, "write", lambda *_args: 0)
     with pytest.raises(MODULE.EvidenceMirrorError, match="short authority"):
         MODULE._write_receipt(tree, _receipt("a" * 40))
+
+
+def test_tooling_source_controller_creates_exact_receipt_and_two_objects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    authority = _tooling_authority()
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    monkeypatch.setattr(MODULE, "EXPECTED_EXPORT_PARENT", tmp_path)
+    monkeypatch.setattr(MODULE, "EXPECTED_TOOLING_REPOSITORY", repository)
+    monkeypatch.setattr(MODULE, "_require_tooling_authority", lambda: authority)
+    catalogue = {"base.txt": MODULE.Blob(0o100644, "1" * 40)}
+    monkeypatch.setattr(
+        MODULE, "_catalogue", lambda *_args: (catalogue, b"catalogue\0")
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_write_archive",
+        lambda _repository, _head, path: path.write_bytes(b"archive"),
+    )
+    monkeypatch.setattr(MODULE, "_verify_local_archive", lambda *_args: None)
+    captured: list[tuple[tuple[object, ...], str, object]] = []
+
+    def publish(local_objects, destination, *, catalogue=None, **_kwargs):
+        captured.append((local_objects, destination, catalogue))
+        return (
+            tuple(
+                MODULE.RemoteObject(
+                    local.name,
+                    destination + "/" + local.name,
+                    str(index + 10),
+                    local.size,
+                    local.md5,
+                )
+                for index, local in enumerate(local_objects)
+            ),
+            True,
+        )
+
+    monkeypatch.setattr(MODULE, "_publish_objects", publish)
+    output_root = tmp_path / "gate-d-tooling-source-mirror.aaaaaaaa"
+    report = MODULE.mirror_tooling_source(output_root)
+
+    assert report["status"] == "GATE_D_TOOLING_SOURCE_MIRRORED"
+    assert report["published"] is True
+    assert report["destination"] == (
+        MODULE.TOOLING_SOURCE_ROOT + "/" + "a" * 40
+    )
+    assert stat.S_IMODE(output_root.stat().st_mode) == 0o700
+    receipt = output_root / MODULE.TOOLING_SOURCE_RECEIPT_NAME
+    assert stat.S_IMODE(receipt.stat().st_mode) == 0o600
+    raw = receipt.read_bytes()
+    value = json.loads(raw)
+    assert raw == (
+        json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode()
+    assert value["tooling_authority"] == authority
+    assert value["object_names"] == [
+        "repository.tar",
+        MODULE.TOOLING_SOURCE_RECEIPT_NAME,
+    ]
+    assert len(captured) == 1
+    assert [item.name for item in captured[0][0]] == [
+        "repository.tar",
+        MODULE.TOOLING_SOURCE_RECEIPT_NAME,
+    ]
+    assert captured[0][2] == catalogue
+
+
+@pytest.mark.parametrize("kind", ["wrong-head", "wrong-tree", "wrong-objects"])
+def test_tooling_source_receipt_rejects_authority_rebinding(
+    tmp_path: Path, kind: str
+) -> None:
+    path = tmp_path / "repository.tar"
+    path.write_bytes(b"archive")
+    archive = MODULE._local_object("repository.tar", path)
+    authority = _tooling_authority()
+    destination = MODULE.TOOLING_SOURCE_ROOT + "/" + "a" * 40
+    catalogue_sha = "9" * 64
+    value = MODULE._expected_tooling_source_receipt(
+        authority, archive, destination, catalogue_sha
+    )
+    if kind == "wrong-head":
+        value["tooling_authority"]["tooling_head"] = "0" * 40
+    elif kind == "wrong-tree":
+        value["tooling_authority"]["tooling_tree"] = "0" * 40
+    else:
+        value["object_names"] = ["repository.tar"]
+    raw = (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    with pytest.raises(MODULE.EvidenceMirrorError, match="authority contract"):
+        MODULE._validate_tooling_source_receipt(
+            raw, authority, archive, destination, catalogue_sha
+        )
+
+
+def test_tooling_source_destination_and_output_path_are_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(MODULE, "TOOLING_SOURCE_ROOT", "gs://wrong/prefix")
+    with pytest.raises(MODULE.EvidenceMirrorError, match="destination authority"):
+        MODULE._tooling_source_destination("a" * 40)
+    monkeypatch.setattr(
+        MODULE,
+        "TOOLING_SOURCE_ROOT",
+        "gs://driftbench-dsv4-uc/repos/glm-tpu-gate-d-mirror-tooling",
+    )
+    monkeypatch.setattr(MODULE, "EXPECTED_EXPORT_PARENT", tmp_path)
+    wrong = tmp_path / "gate-d-tooling-source-mirror.wrong000"
+    with pytest.raises(MODULE.EvidenceMirrorError, match="unexpected.*path"):
+        MODULE._create_tooling_source_output_root(wrong, "a" * 40)
+    existing = tmp_path / "gate-d-tooling-source-mirror.aaaaaaaa"
+    existing.mkdir()
+    with pytest.raises(MODULE.EvidenceMirrorError, match="exclusively create"):
+        MODULE._create_tooling_source_output_root(existing, "a" * 40)
+
+
+def test_tooling_source_controller_refuses_published_false(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    authority = _tooling_authority()
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    monkeypatch.setattr(MODULE, "EXPECTED_EXPORT_PARENT", tmp_path)
+    monkeypatch.setattr(MODULE, "EXPECTED_TOOLING_REPOSITORY", repository)
+    monkeypatch.setattr(MODULE, "_require_tooling_authority", lambda: authority)
+    monkeypatch.setattr(
+        MODULE,
+        "_catalogue",
+        lambda *_args: ({"base.txt": MODULE.Blob(0o100644, "1" * 40)}, b"cat"),
+    )
+    monkeypatch.setattr(
+        MODULE,
+        "_write_archive",
+        lambda _repository, _head, path: path.write_bytes(b"archive"),
+    )
+    monkeypatch.setattr(MODULE, "_verify_local_archive", lambda *_args: None)
+
+    def replayed(local_objects, destination, **_kwargs):
+        return (
+            tuple(
+                MODULE.RemoteObject(
+                    local.name,
+                    destination + "/" + local.name,
+                    str(index + 20),
+                    local.size,
+                    local.md5,
+                )
+                for index, local in enumerate(local_objects)
+            ),
+            False,
+        )
+
+    monkeypatch.setattr(MODULE, "_publish_objects", replayed)
+    with pytest.raises(MODULE.EvidenceMirrorError, match="not newly published"):
+        MODULE.mirror_tooling_source(
+            tmp_path / "gate-d-tooling-source-mirror.aaaaaaaa"
+        )
 
 
 def test_tooling_authority_binds_clean_pushed_branch_and_running_helper(

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import copy
 import hashlib
 import json
 import os
@@ -25,8 +26,12 @@ EXPECTED_TOOLING_GIT_DIR = (
 EXPECTED_EXPORT_PARENT = Path("/home/gianl/glm-run")
 EXPORT_NAME = re.compile(r"gate-d-evidence-mirror\.[A-Za-z0-9]{8}")
 DESTINATION_ROOT = "gs://driftbench-dsv4-uc/repos/glm-tpu-gate-d-evidence"
+TOOLING_SOURCE_ROOT = (
+    "gs://driftbench-dsv4-uc/repos/glm-tpu-gate-d-mirror-tooling"
+)
 GCLOUD = Path("/snap/bin/gcloud")
 RECEIPT_NAME = ".gate-d-evidence-mirror-authority.json"
+TOOLING_SOURCE_RECEIPT_NAME = ".gate-d-tooling-source-mirror-authority.json"
 BASE_EXECUTION_PIN = "87dc6e3370290ac6378ef6c70bdac5f2a5783059"
 EXECUTION_BRANCH = "refs/heads/rewrite/topology-first-decode"
 TOOLING_BRANCH = "refs/heads/tooling/gate-d-evidence-mirror"
@@ -1089,6 +1094,228 @@ def _remote_report(remote: RemoteObject, local: LocalObject) -> dict[str, object
     }
 
 
+def _tooling_source_destination(head: str) -> str:
+    if (
+        TOOLING_SOURCE_ROOT
+        != "gs://driftbench-dsv4-uc/repos/glm-tpu-gate-d-mirror-tooling"
+        or PIN.fullmatch(head) is None
+    ):
+        raise EvidenceMirrorError("tooling source destination authority mismatch")
+    return f"{TOOLING_SOURCE_ROOT}/{head}"
+
+
+def _create_tooling_source_output_root(output_root: Path, head: str) -> Path:
+    expected = EXPECTED_EXPORT_PARENT / f"gate-d-tooling-source-mirror.{head[:8]}"
+    if output_root != expected or output_root.is_symlink():
+        raise EvidenceMirrorError("unexpected tooling source export path")
+    try:
+        parent = EXPECTED_EXPORT_PARENT.resolve(strict=True)
+        parent_value = EXPECTED_EXPORT_PARENT.lstat()
+    except OSError as error:
+        raise EvidenceMirrorError("tooling source export parent is unavailable") from error
+    if (
+        parent != EXPECTED_EXPORT_PARENT
+        or not stat.S_ISDIR(parent_value.st_mode)
+        or parent_value.st_uid != os.getuid()
+    ):
+        raise EvidenceMirrorError("unsafe tooling source export parent")
+    parent_fd = os.open(
+        EXPECTED_EXPORT_PARENT,
+        os.O_RDONLY | os.O_DIRECTORY | _NOFOLLOW | os.O_CLOEXEC,
+    )
+    try:
+        try:
+            os.mkdir(output_root.name, 0o700, dir_fd=parent_fd)
+        except OSError as error:
+            raise EvidenceMirrorError(
+                "cannot exclusively create tooling source export"
+            ) from error
+        os.fsync(parent_fd)
+        directory_fd = os.open(
+            output_root.name,
+            os.O_RDONLY | os.O_DIRECTORY | _NOFOLLOW | os.O_CLOEXEC,
+            dir_fd=parent_fd,
+        )
+        try:
+            os.fchmod(directory_fd, 0o700)
+            os.fsync(directory_fd)
+            value = os.fstat(directory_fd)
+            if (
+                not stat.S_ISDIR(value.st_mode)
+                or stat.S_IMODE(value.st_mode) != 0o700
+                or value.st_uid != os.getuid()
+                or value.st_nlink < 2
+            ):
+                raise EvidenceMirrorError("unsafe tooling source export identity")
+        finally:
+            os.close(directory_fd)
+    finally:
+        os.close(parent_fd)
+    if output_root.resolve(strict=True) != expected or any(output_root.iterdir()):
+        raise EvidenceMirrorError("tooling source export postcondition failed")
+    return output_root
+
+
+def _write_exclusive_verified(path: Path, raw: bytes) -> None:
+    flags = os.O_RDWR | os.O_CREAT | os.O_EXCL | _NOFOLLOW | os.O_CLOEXEC
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except OSError as error:
+        raise EvidenceMirrorError("cannot create tooling source authority") from error
+    try:
+        os.fchmod(descriptor, 0o600)
+        _write_all(descriptor, raw)
+        os.fsync(descriptor)
+        before = os.fstat(descriptor)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 64 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        after = os.fstat(descriptor)
+        if (
+            b"".join(chunks) != raw
+            or not stat.S_ISREG(before.st_mode)
+            or stat.S_IMODE(before.st_mode) != 0o600
+            or before.st_uid != os.getuid()
+            or before.st_nlink != 1
+            or _descriptor_identity(before) != _descriptor_identity(after)
+        ):
+            raise EvidenceMirrorError("tooling source authority readback mismatch")
+    finally:
+        os.close(descriptor)
+    _fsync_directory(path.parent)
+
+
+def _expected_tooling_source_receipt(
+    tooling_authority: dict[str, object],
+    archive: LocalObject,
+    destination: str,
+    catalogue_sha256: str,
+) -> dict[str, object]:
+    return {
+        "archive": {
+            "md5": archive.md5,
+            "sha256": archive.sha256,
+            "size": archive.size,
+        },
+        "artifact_kind": "gate_d_tooling_source_mirror_authority_v1",
+        "bucket": "gs://driftbench-dsv4-uc",
+        "catalogue_sha256": catalogue_sha256,
+        "destination": destination,
+        "object_names": ["repository.tar", TOOLING_SOURCE_RECEIPT_NAME],
+        "schema_version": 1,
+        "status": "TOOLING_SOURCE_MIRROR_AUTHORITY",
+        "tooling_authority": copy.deepcopy(tooling_authority),
+        "tpu_work": False,
+    }
+
+
+def _validate_tooling_source_receipt(
+    raw: bytes,
+    tooling_authority: dict[str, object],
+    archive: LocalObject,
+    destination: str,
+    catalogue_sha256: str,
+) -> None:
+    try:
+        value = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise EvidenceMirrorError("tooling source authority is not JSON") from error
+    expected = _expected_tooling_source_receipt(
+        tooling_authority, archive, destination, catalogue_sha256
+    )
+    canonical = (
+        json.dumps(expected, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("ascii")
+    archive_value = value.get("archive") if type(value) is dict else None
+    authority_value = (
+        value.get("tooling_authority") if type(value) is dict else None
+    )
+    if (
+        type(value) is not dict
+        or value != expected
+        or raw != canonical
+        or type(value.get("schema_version")) is not int
+        or type(value.get("tpu_work")) is not bool
+        or type(archive_value) is not dict
+        or type(archive_value.get("size")) is not int
+        or type(authority_value) is not dict
+        or value.get("destination") != _tooling_source_destination(
+            str(tooling_authority.get("tooling_head"))
+        )
+        or value.get("object_names")
+        != ["repository.tar", TOOLING_SOURCE_RECEIPT_NAME]
+    ):
+        raise EvidenceMirrorError("tooling source authority contract mismatch")
+
+
+def mirror_tooling_source(output_root: Path) -> dict[str, object]:
+    tooling_authority = _require_tooling_authority()
+    head = tooling_authority.get("tooling_head")
+    tree = tooling_authority.get("tooling_tree")
+    if (
+        not isinstance(head, str)
+        or PIN.fullmatch(head) is None
+        or not isinstance(tree, str)
+        or PIN.fullmatch(tree) is None
+    ):
+        raise EvidenceMirrorError("tooling source commit authority mismatch")
+    output_root = _create_tooling_source_output_root(output_root, head)
+    destination = _tooling_source_destination(head)
+    catalogue, catalogue_raw = _catalogue(EXPECTED_TOOLING_REPOSITORY, head)
+    archive_path = output_root / "repository.tar"
+    _write_archive(EXPECTED_TOOLING_REPOSITORY, head, archive_path)
+    archive = _local_object("repository.tar", archive_path)
+    _verify_local_archive(archive, catalogue)
+    catalogue_sha256 = hashlib.sha256(catalogue_raw).hexdigest()
+    receipt_value = _expected_tooling_source_receipt(
+        tooling_authority, archive, destination, catalogue_sha256
+    )
+    receipt_raw = (
+        json.dumps(receipt_value, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("ascii")
+    _validate_tooling_source_receipt(
+        receipt_raw,
+        tooling_authority,
+        archive,
+        destination,
+        catalogue_sha256,
+    )
+    receipt_path = output_root / TOOLING_SOURCE_RECEIPT_NAME
+    _write_exclusive_verified(receipt_path, receipt_raw)
+    receipt = _local_object(TOOLING_SOURCE_RECEIPT_NAME, receipt_path)
+    local_objects = (archive, receipt)
+    if [item.name for item in local_objects] != [
+        "repository.tar",
+        TOOLING_SOURCE_RECEIPT_NAME,
+    ]:
+        raise EvidenceMirrorError("tooling source object names changed")
+    remote_objects, published = _publish_objects(
+        local_objects, destination, catalogue=catalogue
+    )
+    if published is not True:
+        raise EvidenceMirrorError("tooling source mirror was not newly published")
+    return {
+        "archive_sha256": archive.sha256,
+        "catalogue_sha256": catalogue_sha256,
+        "destination": destination,
+        "published": published,
+        "receipt_sha256": receipt.sha256,
+        "remote_objects": [
+            _remote_report(remote, local)
+            for remote, local in zip(remote_objects, local_objects, strict=True)
+        ],
+        "status": "GATE_D_TOOLING_SOURCE_MIRRORED",
+        "tooling_authority": tooling_authority,
+        "tooling_head": head,
+        "tooling_tree": tree,
+        "tracked_files": len(catalogue),
+    }
+
+
 def mirror(
     repository: Path,
     output_root: Path,
@@ -1146,10 +1373,26 @@ def mirror(
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--repository", type=Path, required=True)
+    parser.add_argument("--repository", type=Path)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--require-existing-replay", action="store_true")
+    parser.add_argument("--mirror-tooling-source", action="store_true")
     arguments = parser.parse_args()
+    if arguments.mirror_tooling_source:
+        if arguments.repository is not None or arguments.require_existing_replay:
+            parser.error(
+                "tooling source mode forbids evidence repository/replay arguments"
+            )
+        print(
+            json.dumps(
+                mirror_tooling_source(arguments.output_root),
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        return 0
+    if arguments.repository is None:
+        parser.error("evidence mirror mode requires --repository")
     tooling_authority = _require_tooling_authority()
     receipt = sys.stdin.buffer.read(1_048_577)
     report = mirror(
