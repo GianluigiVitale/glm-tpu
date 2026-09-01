@@ -2796,3 +2796,29 @@ performance run occurred. This remains persistence-only source evidence: physica
 Gate D are open; full 8K is forbidden. Sol's corrected-scope re-review found no P0--P2 and returned
 `APPROVE PERSISTENCE`. After commit/push/mirror, exact next is a separately reviewed bounded HLO
 acquisition proving the e8m7 edge survives optimization before any numerical A/B.
+
+## 2026-09-01 forced-round PP16 HLO acquisition source; no HLO/TPU
+
+A new isolated driver, `acquire_gate_d_forced_round_pp16_hlo.py`, copies the already hardened
+compile-only boundary without changing the historically pinned compensated driver. It binds the
+exact source certificate `518be87b...e02c6`, compensated capsule-input admission
+`7cd7e569...6b37d`, topology `49cf6bb1...25eb`, exact stage zero and all eight committed
+builder/runtime dependency blobs before opening the inherited run directory or importing JAX.
+Its abstract contract has 16 inputs, one live row and nine rooted two-owner outputs. The only
+compiled object is never invoked; compilation caching stays disabled.
+
+The source auditor compares every inherited helper AST with base driver
+`a4599e0d...b5dd15`, permits only two new validation helpers, and requires exactly one lower and
+one compile call with zero executable calls. The older source certificate now regenerates from its
+exact commit `2a050c1`, preserving it after later repository changes. The
+persistence-only certificate `gate-d-forced-round-pp16-hlo-acquisition-source.json` has SHA-256
+`efe04d98267fc5265952b28ee386a4894d028b39f2d62d0a1554f24591e73196`; focused and adjacent
+source/security coverage passes 154/154. This batch authorizes
+persistence only: no wrapper/start, JAX import, lowering, HLO, TPU compile/execution, cloud write,
+numerical/performance work or 8K occurred. Gate D remains open. Exact next after validation and
+review is commit/push/mirror, then a separate execution-authority review for one fresh compile-only
+tag.
+
+Fable remained at its recorded 100% usage limit. The goal-authorized Sol fallback reviewed exact
+staged diff `7d22104a...6457`, found no P0--P2 and returned `APPROVE PERSISTENCE`; it authorized no
+HLO acquisition or TPU work.

@@ -25,6 +25,7 @@ ROOT = Path(__file__).parents[3]
 BUILDER = ROOT / "glm_tpu/greenfield/benchmarking/gate_d_forced_round_pp16_hlo.py"
 SCRIPT = ROOT / "scripts/greenfield/analyze_gate_d_forced_round_pp16_hlo_source.py"
 ARTIFACT = ROOT / "docs/artifacts/gate-d-forced-round-pp16-hlo-source.json"
+SOURCE_COMMIT = "2a050c1182991d93a7a4355a2820b044aa7a5861"
 PREDECESSOR = ROOT / "docs/artifacts/gate-d-forced-normalized-bf16-source-design.json"
 TOPOLOGY = ROOT / "docs/artifacts/gate-d-runtime-locality-authority.json"
 RMSNORM = ROOT / "glm_tpu/greenfield/kernels/reference/rmsnorm.py"
@@ -293,17 +294,85 @@ def test_analyzer_rejects_repository_delta_outside_batch(
 
 
 @pytest.mark.skipif(not ARTIFACT.is_file(), reason="tracked certificate absent")
-def test_cli_regenerates_tracked_certificate_exactly() -> None:
-    environment = {
-        **os.environ,
-        "GLM_GATE_D_FORCED_ROUND_HLO_SOURCE": "1",
-        "JAX_PLATFORMS": "cpu",
-        "PYTHONDONTWRITEBYTECODE": "1",
-    }
+def test_cli_regenerates_tracked_certificate_exactly(
+    tmp_path: Path,
+) -> None:
+    replay = tmp_path / "source-authority"
+    clone = subprocess.run(
+        [
+            "/usr/bin/git",
+            "clone",
+            "--quiet",
+            "--shared",
+            "--no-checkout",
+            str(ROOT),
+            str(replay),
+        ],
+        env={
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_OPTIONAL_LOCKS": "0",
+            "HOME": "/home/gianl",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+        },
+        capture_output=True,
+        check=False,
+    )
+    assert clone.returncode == 0, clone.stderr.decode("utf-8", errors="replace")
+    checkout = subprocess.run(
+        ["/usr/bin/git", "checkout", "--quiet", "--detach", SOURCE_COMMIT],
+        cwd=replay,
+        env={
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_OPTIONAL_LOCKS": "0",
+            "HOME": "/home/gianl",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+        },
+        capture_output=True,
+        check=False,
+    )
+    assert checkout.returncode == 0, checkout.stderr.decode("utf-8", errors="replace")
+    probe = f"""
+import importlib.util
+from pathlib import Path
+root = Path({str(replay)!r})
+script = root / "scripts/greenfield/analyze_gate_d_forced_round_pp16_hlo_source.py"
+spec = importlib.util.spec_from_file_location("_historical_source_analyzer", script)
+assert spec is not None and spec.loader is not None
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+module.WORKTREE = root
+module.ANALYZER = script
+module.BUILDER = root / "glm_tpu/greenfield/benchmarking/gate_d_forced_round_pp16_hlo.py"
+module.AUDITOR = root / "glm_tpu/greenfield/validation/gate_d_forced_round_hlo_source.py"
+module.SOURCE_DESIGN_ARTIFACT = root / "docs/artifacts/gate-d-forced-normalized-bf16-source-design.json"
+module.TOPOLOGY_AUTHORITY = root / "docs/artifacts/gate-d-runtime-locality-authority.json"
+module.RMSNORM_MODULE = root / "glm_tpu/greenfield/kernels/reference/rmsnorm.py"
+raise SystemExit(module.main())
+"""
     result = subprocess.run(
-        ["/home/gianl/vllm-env/bin/python", str(SCRIPT)],
-        cwd=ROOT,
-        env=environment,
+        [
+            "/home/gianl/vllm-env/bin/python",
+            "-I",
+            "-S",
+            "-B",
+            "-c",
+            probe,
+        ],
+        env={
+            "GLM_GATE_D_FORCED_ROUND_HLO_SOURCE": "1",
+            "HOME": "/home/gianl",
+            "JAX_PLATFORMS": "cpu",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "PYTHONDONTWRITEBYTECODE": "1",
+        },
         capture_output=True,
         check=False,
     )
