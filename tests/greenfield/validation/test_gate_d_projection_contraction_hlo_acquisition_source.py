@@ -23,6 +23,10 @@ ANALYZER = (
     ROOT / "scripts/greenfield/"
     "analyze_gate_d_projection_contraction_hlo_acquisition_source.py"
 )
+ANALYZER_VALIDATOR = (
+    ROOT / "glm_tpu/greenfield/validation/"
+    "gate_d_projection_contraction_hlo_acquisition_source.py"
+)
 SOURCE_AUTHORITY = (
     ROOT / "docs/artifacts/gate-d-projection-contraction-pp16-source.json"
 )
@@ -423,3 +427,35 @@ module.analyze()
     )
     assert result.returncode != 0
     assert "rejects noncanonical import hooks" in result.stderr
+
+
+def test_source_analyzer_loads_validator_without_package_import(tmp_path: Path) -> None:
+    code = f"""
+import importlib.util
+import sys
+from pathlib import Path
+path = Path({str(ANALYZER)!r})
+spec = importlib.util.spec_from_file_location('projection_hlo_source_analyzer', path)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+validator_path = module.ROOT / module.VALIDATOR_PATH
+audit = module._load_validator_audit(validator_path.read_bytes())
+print(audit.__module__)
+print(audit.__code__.co_filename)
+print(int('glm_tpu' in sys.modules))
+"""
+    result = subprocess.run(
+        ["/home/gianl/vllm-env/bin/python", "-I", "-S", "-c", code],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == (
+        "_gate_d_projection_contraction_hlo_acquisition_source\n"
+        f"{ANALYZER_VALIDATOR}\n"
+        "0\n"
+    )

@@ -154,6 +154,35 @@ def _committed_sources() -> tuple[str, dict[str, str]]:
     return pin, identities
 
 
+def _load_validator_audit(validator_raw: bytes) -> Any:
+    expected_validator = (ROOT / VALIDATOR_PATH).resolve(strict=True)
+    namespace: dict[str, Any] = {
+        "__builtins__": __builtins__,
+        "__file__": str(expected_validator),
+        "__name__": "_gate_d_projection_contraction_hlo_acquisition_source",
+        "__package__": None,
+    }
+    code = compile(
+        validator_raw,
+        str(expected_validator),
+        "exec",
+        flags=0,
+        dont_inherit=True,
+        optimize=0,
+    )
+    # The executed bytes were snapshotted and matched to the committed validator blob.
+    exec(code, namespace, namespace)  # noqa: S102
+    audit = namespace.get("audit_projection_contraction_hlo_acquisition_source")
+    if (
+        not callable(audit)
+        or getattr(audit, "__module__", None) != namespace["__name__"]
+        or getattr(getattr(audit, "__code__", None), "co_filename", None)
+        != str(expected_validator)
+    ):
+        raise RuntimeError("projection HLO source validator callable drifted")
+    return audit
+
+
 def analyze() -> dict[str, Any]:
     if os.environ.get("GLM_GATE_D_PROJECTION_HLO_SOURCE") != "1":
         raise RuntimeError("projection HLO source analysis is default-off")
@@ -172,18 +201,11 @@ def analyze() -> dict[str, Any]:
         raise RuntimeError("projection topology authority bytes drifted")
     if tuple(sys.path) != EXPECTED_IMPORT_PATH:
         raise RuntimeError("projection HLO source import root drifted")
-    from glm_tpu.greenfield.validation import (
-        gate_d_projection_contraction_hlo_acquisition_source as validator,
-    )
-
-    validator_path = Path(validator.__file__).resolve(strict=True)
-    expected_validator = (ROOT / VALIDATOR_PATH).resolve(strict=True)
-    if (
-        validator_path != expected_validator
-        or sha256(_snapshot(validator_path)).hexdigest() != sources[VALIDATOR_PATH]
-    ):
+    validator_raw = _snapshot(ROOT / VALIDATOR_PATH)
+    if sha256(validator_raw).hexdigest() != sources[VALIDATOR_PATH]:
         raise RuntimeError("projection HLO source validator import drifted")
-    audit = validator.audit_projection_contraction_hlo_acquisition_source(
+    validator_audit = _load_validator_audit(validator_raw)
+    audit = validator_audit(
         _snapshot(ROOT / ACQUIRER_PATH),
         source_authority=json.loads(source_authority_raw),
         source_authority_sha256=SOURCE_AUTHORITY_SHA256,
