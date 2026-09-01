@@ -32,7 +32,7 @@ EXPECTED_STABLEHLO_SHA256 = (
     "45eae705b60783bf8b65a1d3d209c79e8d43685cec0aa912b3141caf36fb19e1"
 )
 EXPECTED_OPTIMIZED_HLO_SHA256 = (
-    "6ec8989d40802344cd846ca0f871b62dfe1a46b2816e78e007bd37e4274f1dfa"
+    "ccd6ffb4909b1bc4dca5a36f106cde4a84304b230161afb484afb5667bb7206c"
 )
 EXPECTED_ACQUIRED_OPTIMIZED_HLO_SHA256 = (
     "a0b87e2b43ba81bfe1549fbcc13434d2fbdca91b11c8b2f9a317ff9a9dbd9d45"
@@ -104,7 +104,7 @@ EXPECTED_HLO_SOURCE_LOCATION_METADATA = {
         {
             "new": (
                 "/usr/local/libexec/glm-tpu/"
-                "gate-d-forced-round-pp16-numerical-v1/"
+                "gate-d-forced-round-pp16-numerical-v2/"
                 "run_gate_d_forced_round_pp16_numerical.py"
             ),
             "old": (
@@ -115,7 +115,7 @@ EXPECTED_HLO_SOURCE_LOCATION_METADATA = {
             "surface": "FileNames",
         },
         {
-            "new": "line=1272 end_line=1272",
+            "new": "line=1273 end_line=1273",
             "old": "line=1568 end_line=1568",
             "occurrence_count": 1,
             "surface": "FileLocations module call",

@@ -18,11 +18,16 @@ CAUSAL_REPORT = ROOT / (
     "docs/artifacts/gate-d-forced-round-pp16-hlo-causal-adjudication.json"
 )
 SOURCE_CERTIFICATE = ROOT / (
-    "docs/artifacts/gate-d-forced-round-pp16-numerical-source.json"
+    "docs/artifacts/gate-d-forced-round-pp16-numerical-source-v2.json"
 )
 ACQUIRED_OPTIMIZED_HLO = Path(
     "/home/gianl/gate-d-runs/"
     "gate_d_forced_round_pp16_hlo_20260901T141137500138602Z/"
+    "hlo/forced_round_pp16_stage0.optimized_hlo.txt"
+)
+FAILED_V1_RUNTIME_OPTIMIZED_HLO = Path(
+    "/home/gianl/gate-d-runs/"
+    "gate_d_forced_round_pp16_numerical_20260901T161156923004972Z/"
     "hlo/forced_round_pp16_stage0.optimized_hlo.txt"
 )
 SPEC = importlib.util.spec_from_file_location(
@@ -562,9 +567,10 @@ def test_source_certificate_binds_driver_predecessors_and_execution_boundary() -
         "scorer_cpu_watchpoints_diagnostic_only": True,
         "tie_order_required": True,
     }
-    assert certificate["verification"]["focused_tests_passed"] == 23
-    assert certificate["verification"]["adjacent_tests_passed"] == 221
-    assert certificate["verification"]["sealed_history_tests_deselected"] == 1
+    assert certificate["verification"]["focused_tests_passed"] == 24
+    assert certificate["verification"]["adjacent_tests_passed"] == 0
+    assert certificate["verification"]["historical_v1_adjacent_tests_reused"] == 221
+    assert certificate["verification"]["sealed_history_tests_deselected"] == 0
     assert certificate["verification"]["ruff_version"] == "0.16.5"
 
 
@@ -588,6 +594,30 @@ def test_source_location_derivation_replays_real_accepted_hlo_bytes_exactly() ->
             1,
         )
     assert restored == accepted
+
+
+def test_source_location_derivation_matches_failed_runtime_after_v2_path_rebind() -> (
+    None
+):
+    accepted = ACQUIRED_OPTIMIZED_HLO.read_bytes()
+    failed_v1 = FAILED_V1_RUNTIME_OPTIMIZED_HLO.read_bytes()
+    derived_v2, binding = MODULE.derive_numerical_optimized_hlo(
+        accepted, SOURCE.read_bytes()
+    )
+    old_path = (
+        b"/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-numerical-v1/"
+        b"run_gate_d_forced_round_pp16_numerical.py"
+    )
+    new_path = str(MODULE.INSTALLED_DRIVER_PATH).encode("ascii")
+    assert failed_v1.count(old_path) == 1
+    assert failed_v1.count(new_path) == 0
+    assert derived_v2 == failed_v1.replace(old_path, new_path, 1)
+    module_call = next(
+        item
+        for item in binding["replacements"]
+        if item["surface"] == "FileLocations module call"
+    )
+    assert module_call["new"] == "line=1273 end_line=1273"
 
 
 def test_runtime_hlo_identity_distinguishes_acquired_and_derived_optimized_hashes(

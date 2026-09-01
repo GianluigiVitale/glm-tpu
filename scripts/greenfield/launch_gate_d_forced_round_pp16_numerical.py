@@ -13,7 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 
 INSTALL_PATH = Path(
-    "/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_numerical_v1.py"
+    "/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_numerical_v2.py"
 )
 PYTHON = Path("/usr/bin/python3.10")
 PYTHON_SHA256 = "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
@@ -21,18 +21,18 @@ WORKTREE = Path("/home/gianl/glm-tpu-gate-d-pp16-numerical")
 SOURCE_PATH = "scripts/greenfield/launch_gate_d_forced_round_pp16_numerical.py"
 WRAPPER_PATH = WORKTREE / "scripts/greenfield/run_gate_d_forced_round_pp16_numerical.sh"
 WRAPPER_SOURCE_PATH = "scripts/greenfield/run_gate_d_forced_round_pp16_numerical.sh"
-WRAPPER_SHA256 = "d3a687c373e1a3bfa56efc74f03048957798544cf2e76c30e6b328ad3a05521c"
+WRAPPER_SHA256 = "f8ee9e21fbce1f1515806ce80c3bd23e8575e63ec93ff69e37f7f9cf2ffb113d"
 IMMUTABLE_CAPSULE_ROOT = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-numerical-v1"
+    "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-numerical-v2"
 )
 DRIVER_PATH = IMMUTABLE_CAPSULE_ROOT / "run_gate_d_forced_round_pp16_numerical.py"
 DRIVER_SOURCE_PATH = "scripts/greenfield/run_gate_d_forced_round_pp16_numerical.py"
-DRIVER_SHA256 = "5e1c1f704c12f1a65947a1265e80d64e6404a0bdc473d883cc095e082e7f2187"
+DRIVER_SHA256 = "a5e38c7d8a4d14c32300ac3687ebaa365bcfeb312fe4bb687f9c99babe7d4b57"
 PUBLISHER_PATH = IMMUTABLE_CAPSULE_ROOT / "publish_gate_d_forced_round_pp16_numerical.py"
 PUBLISHER_SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_forced_round_pp16_numerical.py"
 )
-PUBLISHER_SHA256 = "bca06fbbe7297c3d2ecfe03eeac00f23730673b2eff96aae6ca533ed3b5460d8"
+PUBLISHER_SHA256 = "b4024f3127a5f2e01128fec71d058fda5645d704fdd277e9ee0e3d1340da6405"
 MIRROR_VERIFIER_PATH = (
     IMMUTABLE_CAPSULE_ROOT / "verify_gate_d_same_region_git_mirror.py"
 )

@@ -74,7 +74,7 @@ def test_wrapper_binds_all_numerical_authorities_before_driver_invocation() -> N
     assert f"readonly MIRROR_VERIFIER_SHA={mirror_verifier_sha}" in source
     assert (
         "readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/"
-        "gate-d-forced-round-pp16-numerical-v1"
+        "gate-d-forced-round-pp16-numerical-v2"
     ) in source
     assert (
         "$WORKTREE/scripts/greenfield/run_gate_d_forced_round_pp16_numerical.py"

@@ -12,7 +12,7 @@ from pathlib import Path
 
 root = Path("/opt/glm-tpu/locks")
 names = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")
-launcher = Path("/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_numerical_v1.py")
+launcher = Path("/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_numerical_v2.py")
 parent_fd = os.open(
     root, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
 )
@@ -149,11 +149,11 @@ readonly CAPSULE_EXECUTION_AUTHORITY=/home/gianl/gate-d-runs/greenfield_gate_d_c
 readonly CAPSULE_EXECUTION_AUTHORITY_SHA=8b8c9cc79a18679628582a66c418a7f63e06553091928df58defbdde3971a660
 readonly HOST_MATERIALIZATION_AUTHORITY=$WORKTREE/docs/artifacts/gate-d-pp16-numerical-host-materialization-equivalence.json
 readonly HOST_MATERIALIZATION_AUTHORITY_SHA=a7e5b393f7c61181f6b2aab9531d788fb27594d9cf980055c165b6f278ba4f99
-readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-numerical-v1
+readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-numerical-v2
 readonly DRIVER=$IMMUTABLE_CAPSULE_ROOT/run_gate_d_forced_round_pp16_numerical.py
-readonly DRIVER_SHA=5e1c1f704c12f1a65947a1265e80d64e6404a0bdc473d883cc095e082e7f2187
+readonly DRIVER_SHA=a5e38c7d8a4d14c32300ac3687ebaa365bcfeb312fe4bb687f9c99babe7d4b57
 readonly PUBLISHER=$IMMUTABLE_CAPSULE_ROOT/publish_gate_d_forced_round_pp16_numerical.py
-readonly PUBLISHER_SHA=bca06fbbe7297c3d2ecfe03eeac00f23730673b2eff96aae6ca533ed3b5460d8
+readonly PUBLISHER_SHA=b4024f3127a5f2e01128fec71d058fda5645d704fdd277e9ee0e3d1340da6405
 readonly MIRROR_VERIFIER=$IMMUTABLE_CAPSULE_ROOT/verify_gate_d_same_region_git_mirror.py
 readonly MIRROR_VERIFIER_SHA=091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b
 readonly DRIVER_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12

@@ -13,7 +13,7 @@ ROOT = Path(__file__).parents[3]
 SOURCE = ROOT / "scripts/greenfield/install_gate_d_forced_round_pp16_numerical_runtime.py"
 SOURCE_CERTIFICATE = ROOT / (
     "docs/artifacts/"
-    "gate-d-forced-round-pp16-numerical-orchestration-install-source.json"
+    "gate-d-forced-round-pp16-numerical-orchestration-install-source-v2.json"
 )
 SPEC = importlib.util.spec_from_file_location(
     "gate_d_forced_round_hlo_installer", SOURCE
@@ -46,13 +46,13 @@ def test_payload_hashes_and_install_targets_are_exact() -> None:
         "launch_gate_d_forced_round_pp16_numerical.py"
     }
     assert str(MODULE.SOURCE_ROOT) == (
-        "/opt/glm-tpu/gate-d-forced-round-numerical-install-v1"
+        "/opt/glm-tpu/gate-d-forced-round-numerical-install-v2"
     )
     assert str(MODULE.LAUNCHER_TARGET) == (
-        "/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_numerical_v1.py"
+        "/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_numerical_v2.py"
     )
     assert str(MODULE.CAPSULE_TARGET) == (
-        "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-numerical-v1"
+        "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-numerical-v2"
     )
 
 
@@ -67,15 +67,16 @@ def test_source_certificate_binds_every_runtime_source_without_authority() -> No
         "tpu_execution": False,
     }
     assert certificate["predecessors"]["code_pin"] == (
-        "c3d8758cf0b41adee6a71b3d0b986c5c6c3d00e1"
+        "2e401e3ed4afefdc5cc748270895f374415bf9c1"
     )
     for record in certificate["sources"].values():
         path = ROOT / record["path"]
         assert record["byte_count"] == path.stat().st_size
         assert record["sha256"] == sha256(path.read_bytes()).hexdigest()
-    assert certificate["verification"]["focused_tests_passed"] == 52
-    assert certificate["verification"]["adjacent_tests_passed"] == 273
-    assert certificate["verification"]["sealed_history_tests_deselected"] == 1
+    assert certificate["verification"]["focused_tests_passed"] == 76
+    assert certificate["verification"]["adjacent_tests_passed"] == 0
+    assert certificate["verification"]["historical_v1_adjacent_tests_reused"] == 273
+    assert certificate["verification"]["sealed_history_tests_deselected"] == 0
     assert certificate["verification"]["ruff_version"] == "0.16.5"
 
 

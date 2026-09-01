@@ -12,12 +12,12 @@ from collections.abc import Mapping
 from hashlib import sha256
 from pathlib import Path
 
-SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-forced-round-numerical-install-v1")
+SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-forced-round-numerical-install-v2")
 INSTALLER_PATH = SOURCE_ROOT / "install_gate_d_forced_round_pp16_numerical_runtime.py"
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
-LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_forced_round_pp16_numerical_v1.py"
+LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_forced_round_pp16_numerical_v2.py"
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-forced-round-pp16-numerical-v1"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-forced-round-pp16-numerical-v2"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -27,13 +27,13 @@ EXPECTED_ENVIRONMENT = {
 }
 PAYLOADS = {
     "run_gate_d_forced_round_pp16_numerical.py": (
-        "5e1c1f704c12f1a65947a1265e80d64e6404a0bdc473d883cc095e082e7f2187"
+        "a5e38c7d8a4d14c32300ac3687ebaa365bcfeb312fe4bb687f9c99babe7d4b57"
     ),
     "launch_gate_d_forced_round_pp16_numerical.py": (
-        "44ef41189562f9c1462d755c95a0e56f106d41e2dc501668c8787fe122bf8709"
+        "ecff3088b73b12aea5e5f7163fc5727929fae79ea11412fd65ee902400445a8d"
     ),
     "publish_gate_d_forced_round_pp16_numerical.py": (
-        "bca06fbbe7297c3d2ecfe03eeac00f23730673b2eff96aae6ca533ed3b5460d8"
+        "b4024f3127a5f2e01128fec71d058fda5645d704fdd277e9ee0e3d1340da6405"
     ),
     "verify_gate_d_same_region_git_mirror.py": (
         "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"

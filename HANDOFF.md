@@ -9591,3 +9591,37 @@ checks found both locks free and no launcher process. Artifact:
 cloud, numerical/performance work or 8K occurred. Gate D remains open. Exact next is a separate
 fresh-tag execution-only review of the installed launcher command; only approval may authorize one
 protected discriminator.
+
+## 2026-09-01 numerical v1 protected HLO-metadata failure; v2 source prepared
+
+Protected tag `gate_d_forced_round_pp16_numerical_20260901T161156923004972Z` compiled but stopped
+before the sole executable invocation. StableHLO was byte-exact (`45eae705...19e1`). Runtime
+optimized HLO was `31f2a46d...b5aa`; the v1 certificate expected `6ec8989d...1dfa`. Exact diff
+proved graph semantics were unchanged: v1 derived the module call from enclosing `ast.If` line
+1272, while XLA recorded the nested `main()` `ast.Call` at line 1273. Lower call line 1098 and the
+installed v1 filename were exact. Pre/failure censuses were 8/8 clean and the generation-bound
+diagnostic ledger `4594e9d...d323` was terminal-last. Artifact
+`gate-d-forced-round-pp16-numerical-v1-hlo-metadata-failure.json` is 2,521 bytes, SHA-256
+`6bc2f475...f7c78`. No executable invocation, numerical result, performance claim or Gate-D
+closure occurred; the tag is permanently burned.
+
+The append-only v2 successor catalogs the exact `ast.Call`, preserves all source line counts and
+uses new immutable v2 paths. Its accepted-preimage derivation exactly equals the archived v1
+runtime HLO after changing only the installed filename from v1 to v2; expected v2 optimized HLO is
+263,876 bytes, SHA-256 `ccd6ffb4...7206c`. Driver/publisher/wrapper/launcher/installer hashes are
+respectively `a5e38c7d...4b57`, `b4024f31...6405`, `f8ee9e21...113d`, `ecff3088...5a8d`, and
+`73ba8f49...e12a`. Source certificates are
+`gate-d-forced-round-pp16-numerical-source-v2.json` (`4caef2af...4932`, 4,453 bytes) and
+`gate-d-forced-round-pp16-numerical-orchestration-install-source-v2.json`
+(`a8790efd...e609`, 3,027 bytes). Focused CPU-only coverage passes 76/76; Ruff 0.16.5,
+Python compilation and Bash syntax pass. Historical v1 adjacent evidence is referenced, not
+misreported as a fresh pass.
+
+One over-broad adjacent attempt accidentally initialized worker-0 TPU before it was stopped; no
+protected launcher ran and its output is invalidated. A forced-CPU retry was also invalid for broad
+claims because legacy tests intentionally bind their original environment/worktree. Neither run is
+counted. A subsequent four-lock authenticated census returned eight unique `CENSUS_OK` hosts.
+No v2 install, launcher, cloud mutation, protected numerical execution or 8K occurred. Sol reviewed
+the current v2 diff/evidence and returned `APPROVE` with no P0/P1/P2 findings; that approval grants
+no install or execution authority. Exact next: commit/push/locked same-region mirror, then a
+separate literal install-only review.

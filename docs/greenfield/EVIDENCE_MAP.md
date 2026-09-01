@@ -3007,3 +3007,30 @@ execution is authorized by this source batch.
 - State: `launcher_invoked=false`; both locks free; no launcher process. No JAX/backend/HLO/TPU,
   cloud, numerical, performance or Gate-D claim. One fresh-tag protected execution requires its own
   literal-command review.
+
+## 2026-09-01 forced-round PP16 numerical v1 failure and v2 source
+
+- Failed protected tag: `gate_d_forced_round_pp16_numerical_20260901T161156923004972Z`; stopped at
+  runtime HLO identity before executable invocation. StableHLO remained `45eae705...19e1`; actual
+  optimized HLO was `31f2a46d...b5aa`.
+- Root cause: source metadata derivation selected enclosing `ast.If` line 1272 instead of exact
+  nested `main()` `ast.Call` line 1273. The optimized-HLO graph body did not differ.
+- Failure artifact: `docs/artifacts/gate-d-forced-round-pp16-numerical-v1-hlo-metadata-failure.json`,
+  SHA-256 `6bc2f475328f77dbe89e3ee8d5636a0a3182638cd2567e1244fa118561ef7c78`.
+  Generation-bound diagnostic archive and 8/8 pre/failure cleanup are bound; no numerical or
+  performance claim exists and the tag is burned.
+- V2 driver derives the exact call node and uses immutable
+  `/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-numerical-v2`; expected optimized HLO is
+  `ccd6ffb4909b1bc4dca5a36f106cde4a84304b230161afb484afb5667bb7206c` (263,876 bytes).
+- V2 source certificate: `docs/artifacts/gate-d-forced-round-pp16-numerical-source-v2.json`, SHA-256
+  `4caef2af207f21edf10597881d29d48303b7de3fd61ecc961b1f4e396db84932`.
+- V2 orchestration/install certificate:
+  `docs/artifacts/gate-d-forced-round-pp16-numerical-orchestration-install-source-v2.json`, SHA-256
+  `a8790efd54bd82370e2ac27dc53cb8d1995ab9630b6d3a92cbb2206796e0e609`.
+- Verification: 76/76 focused CPU-only tests, Ruff 0.16.5, Python compilation and Bash syntax.
+  Historical v1 adjacent counts are referenced separately; two invalid broad attempts are excluded.
+  The accidental default-backend attempt was terminated and followed by an authenticated four-lock
+  eight-host census with eight unique `CENSUS_OK` results.
+- Authority: source persistence only. No v2 install/launcher/cloud/protected numerical/8K authority.
+  Sol returned `APPROVE` with no P0/P1/P2 findings and explicitly granted no install/execution
+  authority. Exact next is commit/push/mirror and a separate install-only review.

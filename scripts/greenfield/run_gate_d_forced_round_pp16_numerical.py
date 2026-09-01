@@ -35,7 +35,7 @@ WORKTREE = Path("/home/gianl/glm-tpu-gate-d-pp16-numerical")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 DRIVER_REPOSITORY_PATH = "scripts/greenfield/run_gate_d_forced_round_pp16_numerical.py"
 INSTALLED_DRIVER_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-numerical-v1/"
+    "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-numerical-v2/"
     "run_gate_d_forced_round_pp16_numerical.py"
 )
 COMPILE_HELPER_REPOSITORY_PATH = (
@@ -84,7 +84,7 @@ EXPECTED_OPTIMIZED_HLO_SHA256 = (
 EXPECTED_STABLEHLO_BYTES = 76529
 EXPECTED_OPTIMIZED_HLO_BYTES = 263868
 EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256 = (
-    "6ec8989d40802344cd846ca0f871b62dfe1a46b2816e78e007bd37e4274f1dfa"
+    "ccd6ffb4909b1bc4dca5a36f106cde4a84304b230161afb484afb5667bb7206c"
 )
 EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES = 263876
 EXPECTED_ACCEPTED_POSITIONS_SHA256 = (
@@ -351,15 +351,15 @@ def derive_numerical_optimized_hlo(
         else []
     )
     module_calls = [
-        item
+        child
         for item in tree.body
         if isinstance(item, ast.If)
-        and any(
-            isinstance(child, ast.Call)
-            and isinstance(child.func, ast.Name)
-            and child.func.id == "main"
-            for child in ast.walk(item)
-        )
+        for child in ast.walk(item)
+        if isinstance(child, ast.Call)
+        and isinstance(child.func, ast.Name)
+        and child.func.id == "main"
+        # Bind the exact call node recorded by XLA, not its enclosing ast.If.
+        # Keep this catalogue narrow: exactly one module-level main() call.
     ]
     if len(lower_calls) != 1 or len(module_calls) != 1:
         raise RuntimeError("Gate-D numerical driver callsite catalogue drifted")
