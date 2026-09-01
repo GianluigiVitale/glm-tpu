@@ -1,0 +1,69 @@
+{
+  "artifact_kind": "gate_d_compensated_pp16_hlo_prelauncher_s1_install",
+  "classification": "IMMUTABLE_PRELAUNCHER_INSTALLED;NO_PRELAUNCHER_INVOCATION;NO_WRAPPER_INVOCATION;NO_JAX;NO_BACKEND;NO_COMPILER;NO_HLO;NO_EXECUTABLE;NO_TPU_WORK;GATE_D_OPEN",
+  "execution_code_pin": "94518b7d4ce788157afa98b7bc1f8144613852d5",
+  "installed_at_utc": "2026-09-01T07:17:32.536371667Z",
+  "install_review": {
+    "reviewer": "sol_gate_d_observability_review",
+    "verdict": "APPROVE INSTALL ONLY; no P0/P1/P2"
+  },
+  "postinstall": {
+    "canonical_leases_exact_and_free": 4,
+    "related_processes": 0,
+    "staging_residue_present": false
+  },
+  "provisioner": {
+    "path": "/opt/glm-tpu/bin/provision_gate_d_python_runtime.py",
+    "sha256": "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594"
+  },
+  "source": {
+    "directory": "/home/gianl/glm-run/gate-d-pp16-hlo-prelauncher-s1-source.OsHhqvil",
+    "directory_dev": 2049,
+    "directory_gid": 2001,
+    "directory_ino": 2614125,
+    "directory_mode": "0755",
+    "directory_uid": 2001,
+    "file": "prelaunch_gate_d_compensated_pp16_hlo.py",
+    "file_bytes": 5131,
+    "file_dev": 2049,
+    "file_gid": 2001,
+    "file_ino": 2614126,
+    "file_mode": "0555",
+    "file_nlink": 1,
+    "file_sha256": "72468e66fc2e9eeb15a7d260d3bcb19f2f9878898b9a54869885334f1163ac98",
+    "file_uid": 2001,
+    "tree_sha256": "75c8a4dc02014affc68c456e108bea7254a642d3a7da28cd700298211374d678",
+    "xattrs": []
+  },
+  "target": {
+    "directory": "/opt/glm-tpu/gate-d-pp16-hlo-prelauncher-s1",
+    "directory_dev": 2049,
+    "directory_gid": 0,
+    "directory_ino": 10903,
+    "directory_mode": "0755",
+    "directory_nlink": 2,
+    "directory_uid": 0,
+    "file": "/opt/glm-tpu/gate-d-pp16-hlo-prelauncher-s1/prelaunch_gate_d_compensated_pp16_hlo.py",
+    "file_bytes": 5131,
+    "file_dev": 2049,
+    "file_gid": 0,
+    "file_ino": 10912,
+    "file_mode": "0555",
+    "file_nlink": 1,
+    "file_sha256": "72468e66fc2e9eeb15a7d260d3bcb19f2f9878898b9a54869885334f1163ac98",
+    "file_uid": 0,
+    "one_file_only": true,
+    "tree_sha256": "75c8a4dc02014affc68c456e108bea7254a642d3a7da28cd700298211374d678",
+    "xattrs": []
+  },
+  "tooling_authority": {
+    "branch": "tooling/gate-d-pp16-hlo-prelauncher",
+    "commit": "684f064a3173302898bfb4cde15cd50409ce91cc",
+    "git_blob": "aaa7cafe9f52c3f8a4a567706e3c531d7453c90f",
+    "mirror_ref_exact": true,
+    "path": "scripts/greenfield/prelaunch_gate_d_compensated_pp16_hlo.py",
+    "source_review": "APPROVE SOURCE PERSISTENCE; no P0/P1/P2"
+  },
+  "schema_version": 1,
+  "successor_authorized": false
+}
