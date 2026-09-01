@@ -213,3 +213,33 @@ def test_installer_source_audit_accepts_exact_source_and_rejects_mutations() -> 
     for mutation in mutations:
         with pytest.raises((RuntimeError, KeyError, ValueError, SyntaxError)):
             ANALYZER_MODULE._audit_installer(mutation)
+
+
+def test_orchestration_source_audits_all_exact_sources_and_predecessors() -> None:
+    snapshots = {
+        relative: (ROOT / relative).read_bytes()
+        for relative in ANALYZER_MODULE.AUDITED_SOURCE_PATHS
+    }
+    assert (
+        ANALYZER_MODULE._audit_installer(snapshots[ANALYZER_MODULE.INSTALLER_PATH])[
+            "launcher_invocation_count"
+        ]
+        == 0
+    )
+    assert ANALYZER_MODULE._audit_launcher(
+        snapshots[ANALYZER_MODULE.LAUNCHER_PATH],
+        snapshots[ANALYZER_MODULE.WRAPPER_PATH],
+    )["retained_lock_fds"] == [11, 12]
+    assert (
+        ANALYZER_MODULE._audit_publisher(snapshots[ANALYZER_MODULE.PUBLISHER_PATH])[
+            "input_spec_count"
+        ]
+        == 4
+    )
+    assert (
+        ANALYZER_MODULE._audit_wrapper(snapshots[ANALYZER_MODULE.WRAPPER_PATH])[
+            "protected_compile_process_count"
+        ]
+        == 1
+    )
+    assert ANALYZER_MODULE._predecessor_authority() == (ANALYZER_MODULE.REFERENCE_PATHS)

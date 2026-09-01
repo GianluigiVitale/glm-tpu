@@ -246,7 +246,7 @@ def _audit_publisher(raw: bytes) -> dict[str, Any]:
     tree = ast.parse(source)
     required = (
         "gate_d_projection_contraction_pp16_hlo/",
-        "projection_contraction_pp16_stage0.stablehlo.txt",
+        "projection_contraction_pp16_stage0.stablehlo.mlir",
         "projection_contraction_pp16_stage0.optimized_hlo.txt",
         "_projection_contraction_source_authority(code_pin)",
         "_hlo_acquisition_source_authority(code_pin)",
@@ -318,7 +318,7 @@ def _audit_wrapper(raw: bytes) -> dict[str, Any]:
         "compile_host_only=1 sealed_source_archive=1",
         "HLO_ACQUIRED_UNADJUDICATED",
         "gate-d-projection-contraction-pp16-hlo-v1",
-        "/proc/self/fd/10",
+        "wrapper_fd != 10",
     )
     forbidden = (
         "decode_8k",
@@ -424,13 +424,16 @@ def _predecessor_authority() -> dict[str, str]:
             raise RuntimeError(
                 f"projection orchestration predecessor drifted: {relative}"
             )
-        document = json.loads(raw)
-        if document.get("gate_d_closed") is not False:
-            raise RuntimeError(
-                f"projection predecessor Gate-D policy drifted: {relative}"
-            )
         observed[relative] = expected
     hlo_source = json.loads(_snapshot(WORKTREE / HLO_SOURCE_PATH))
+    projection_source = json.loads(_snapshot(WORKTREE / PROJECTION_SOURCE_PATH))
+    topology = json.loads(_snapshot(WORKTREE / TOPOLOGY_PATH))
+    if (
+        hlo_source.get("gate_d_closed") is not False
+        or projection_source.get("gate_d_closed") is not False
+        or topology.get("tpu_successor_authorized") is not False
+    ):
+        raise RuntimeError("projection orchestration predecessor policy drifted")
     if hlo_source.get("authorization") != {
         "compile_only_hlo_acquisition": False,
         "full_dsa_or_8k": False,
