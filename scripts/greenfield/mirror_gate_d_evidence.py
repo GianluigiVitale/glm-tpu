@@ -17,11 +17,29 @@ from pathlib import Path, PurePosixPath
 from typing import NamedTuple
 
 EXPECTED_REPOSITORY = Path("/home/gianl/glm-tpu-gate-d-evidence")
+EXPECTED_TOOLING_REPOSITORY = Path("/home/gianl/glm-tpu-gate-d-mirror-tooling")
+EXPECTED_COMMON_DIR = Path("/home/gianl/glm-tpu/.git")
+EXPECTED_TOOLING_GIT_DIR = (
+    EXPECTED_COMMON_DIR / "worktrees/glm-tpu-gate-d-mirror-tooling"
+)
 EXPECTED_EXPORT_PARENT = Path("/home/gianl/glm-run")
 EXPORT_NAME = re.compile(r"gate-d-evidence-mirror\.[A-Za-z0-9]{8}")
 DESTINATION_ROOT = "gs://driftbench-dsv4-uc/repos/glm-tpu-gate-d-evidence"
 GCLOUD = Path("/snap/bin/gcloud")
 RECEIPT_NAME = ".gate-d-evidence-mirror-authority.json"
+BASE_EXECUTION_PIN = "87dc6e3370290ac6378ef6c70bdac5f2a5783059"
+EXECUTION_BRANCH = "refs/heads/rewrite/topology-first-decode"
+TOOLING_BRANCH = "refs/heads/tooling/gate-d-evidence-mirror"
+EXPECTED_ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
+TOOLING_ROOT_AUTHORITY = (
+    "docs/artifacts/gate-d-evidence-mirror-tooling-root.json"
+)
+HELPER_RELATIVE = "scripts/greenfield/mirror_gate_d_evidence.py"
+TOOLING_TEST_RELATIVE = "tests/greenfield/runtime/test_gate_d_evidence_mirror.py"
+TOOLING_ALLOWED_PATHS = frozenset(
+    {HELPER_RELATIVE, TOOLING_TEST_RELATIVE, TOOLING_ROOT_AUTHORITY}
+)
+RUNNING_HELPER = Path(__file__)
 MIN_TRACKED_FILES = 50
 MAX_OBJECT_BYTES = 64 * 1024 * 1024
 PIN = re.compile(r"[0-9a-f]{40}")
@@ -33,10 +51,13 @@ _GIT_ENV = {
     "PATH": "/usr/bin:/bin",
     "GIT_CONFIG_GLOBAL": "/dev/null",
     "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_ALLOW_PROTOCOL": "ssh:file",
     "GIT_NO_LAZY_FETCH": "1",
     "GIT_NO_REPLACE_OBJECTS": "1",
     "GIT_OPTIONAL_LOCKS": "0",
     "GIT_PROTOCOL_FROM_USER": "0",
+    "GIT_SSH_COMMAND": "/usr/bin/ssh -o BatchMode=yes",
+    "GIT_TERMINAL_PROMPT": "0",
 }
 _GCLOUD_ENV = {
     "CLOUDSDK_CORE_DISABLE_PROMPTS": "1",
@@ -141,19 +162,311 @@ def _canonical_receipt(raw: bytes) -> tuple[dict[str, object], bytes]:
     return value, canonical
 
 
-def _git(repository: Path, *arguments: str) -> bytes:
+def _git(repository: Path, *arguments: str, check: bool = True) -> bytes:
     result = subprocess.run(
         ["/usr/bin/git", "-C", str(repository), *arguments],
         check=False,
         capture_output=True,
         env=_GIT_ENV,
     )
-    if result.returncode:
+    if check and result.returncode:
         raise EvidenceMirrorError(
             f"git {' '.join(arguments)} failed: "
             + result.stderr.decode("utf-8", "replace")[-1000:]
         )
     return result.stdout
+
+
+def _expected_tooling_root() -> dict[str, object]:
+    return {
+        "artifact_kind": "gate_d_evidence_mirror_tooling_root_v1",
+        "base_execution_pin": BASE_EXECUTION_PIN,
+        "evidence_branch": "evidence/gate-d-topology-first",
+        "helper_path": HELPER_RELATIVE,
+        "hlo_work": False,
+        "origin": EXPECTED_ORIGIN,
+        "schema_version": 1,
+        "tooling_branch": TOOLING_BRANCH.removeprefix("refs/heads/"),
+        "tpu_work": False,
+    }
+
+
+def _canonical_git_path(repository: Path, *arguments: str) -> Path:
+    raw = _git(repository, *arguments).decode("utf-8").strip()
+    if not raw:
+        raise EvidenceMirrorError("empty tooling repository identity")
+    try:
+        return Path(raw).resolve(strict=True)
+    except OSError as error:
+        raise EvidenceMirrorError("unresolvable tooling repository identity") from error
+
+
+def _parse_tooling_remote_refs(raw: bytes) -> dict[str, str]:
+    if not raw.isascii() or not raw.endswith(b"\n") or b"\r" in raw or b"\0" in raw:
+        raise EvidenceMirrorError("malformed tooling remote refs")
+    records: dict[str, str] = {}
+    for line in raw[:-1].split(b"\n"):
+        if not line or line.count(b"\t") != 1:
+            raise EvidenceMirrorError("malformed tooling remote ref record")
+        pin_raw, ref_raw = line.split(b"\t")
+        pin = pin_raw.decode("ascii")
+        ref = ref_raw.decode("ascii")
+        if (
+            ref not in {EXECUTION_BRANCH, TOOLING_BRANCH}
+            or PIN.fullmatch(pin) is None
+            or ref in records
+        ):
+            raise EvidenceMirrorError("unexpected tooling remote ref record")
+        records[ref] = pin
+    if set(records) != {EXECUTION_BRANCH, TOOLING_BRANCH}:
+        raise EvidenceMirrorError("tooling remote refs are incomplete")
+    return records
+
+
+def _require_tooling_config(repository: Path) -> None:
+    keys = _git(repository, "config", "--local", "--name-only", "--list").decode().split()
+    fixed = {
+        "core.repositoryformatversion",
+        "core.filemode",
+        "core.bare",
+        "core.logallrefupdates",
+        "remote.origin.url",
+        "remote.origin.fetch",
+    }
+    suffixes = (".remote", ".merge", ".vscode-merge-base")
+    unexpected = sorted(
+        key
+        for key in keys
+        if key not in fixed
+        and not (key.startswith("branch.") and key.endswith(suffixes))
+    )
+    if unexpected:
+        raise EvidenceMirrorError(f"unexpected tooling Git config: {unexpected}")
+    expected = {
+        "core.repositoryformatversion": ["0"],
+        "core.filemode": ["true"],
+        "core.bare": ["false"],
+        "core.logallrefupdates": ["true"],
+        "remote.origin.url": [EXPECTED_ORIGIN],
+        "remote.origin.fetch": ["+refs/heads/*:refs/remotes/origin/*"],
+        "branch.tooling/gate-d-evidence-mirror.remote": ["origin"],
+        "branch.tooling/gate-d-evidence-mirror.merge": [TOOLING_BRANCH],
+    }
+    for key, wanted in expected.items():
+        actual = _git(repository, "config", "--local", "--get-all", key).decode().splitlines()
+        if actual != wanted:
+            raise EvidenceMirrorError(f"tooling Git config mismatch: {key}")
+
+
+def _require_complete_tooling_worktree(repository: Path) -> int:
+    if _git(repository, "status", "--porcelain=v1"):
+        raise EvidenceMirrorError("tooling worktree is not clean")
+    if _git(repository, "rev-parse", "--is-shallow-repository").strip() != b"false":
+        raise EvidenceMirrorError("shallow tooling repository is forbidden")
+    if _git(repository, "replace", "-l"):
+        raise EvidenceMirrorError("tooling replacement refs are forbidden")
+    for key in ("core.sparseCheckout", "core.sparseCheckoutCone"):
+        value = _git(
+            repository,
+            "config",
+            "--local",
+            "--bool",
+            "--get",
+            key,
+            check=False,
+        ).strip()
+        if value not in {b"", b"false"}:
+            raise EvidenceMirrorError(f"sparse tooling worktree is forbidden: {key}")
+    records = _git(repository, "ls-files", "-v", "-z").decode("utf-8").split("\0")
+    if records and records[-1] == "":
+        records.pop()
+    if len(records) < MIN_TRACKED_FILES:
+        raise EvidenceMirrorError("tooling tracked-file floor is not met")
+    for record in records:
+        if not record.startswith("H "):
+            raise EvidenceMirrorError("nonordinary tooling index flag is forbidden")
+        path = repository / record[2:]
+        try:
+            value = path.lstat()
+        except OSError as error:
+            raise EvidenceMirrorError("tracked tooling path is absent") from error
+        if not stat.S_ISREG(value.st_mode):
+            raise EvidenceMirrorError("tracked tooling path is not regular")
+    return len(records)
+
+
+def _require_tooling_history(repository: Path, head: str) -> tuple[list[str], str]:
+    merge_base = _git(repository, "merge-base", BASE_EXECUTION_PIN, head).decode().strip()
+    if merge_base != BASE_EXECUTION_PIN:
+        raise EvidenceMirrorError("tooling branch is not rooted at the execution pin")
+    commits = _git(
+        repository, "rev-list", "--reverse", f"{BASE_EXECUTION_PIN}..{head}"
+    ).decode().split()
+    if not commits:
+        raise EvidenceMirrorError("tooling branch has no correction commit")
+    changed: set[str] = set()
+    root_additions = 0
+    for commit in commits:
+        parents = _git(repository, "show", "-s", "--format=%P", commit).decode().split()
+        if len(parents) != 1:
+            raise EvidenceMirrorError("merge/root tooling commits are forbidden")
+        fields = _git(
+            repository,
+            "diff-tree",
+            "--no-commit-id",
+            "--no-renames",
+            "--name-status",
+            "-r",
+            "-z",
+            commit,
+        ).decode("utf-8").split("\0")
+        if fields and fields[-1] == "":
+            fields.pop()
+        if len(fields) % 2:
+            raise EvidenceMirrorError("malformed tooling history")
+        for offset in range(0, len(fields), 2):
+            status, path = fields[offset : offset + 2]
+            if status not in {"A", "M"} or path not in TOOLING_ALLOWED_PATHS:
+                raise EvidenceMirrorError(f"forbidden tooling history path: {path}")
+            if path == TOOLING_ROOT_AUTHORITY:
+                if status != "A":
+                    raise EvidenceMirrorError("tooling root authority is immutable")
+                root_additions += 1
+            mode = _git(repository, "ls-tree", commit, "--", path).decode().split()
+            if not mode or mode[0] != "100644":
+                raise EvidenceMirrorError("tooling changes must be mode-100644 blobs")
+            changed.add(path)
+    if changed != TOOLING_ALLOWED_PATHS or root_additions != 1:
+        raise EvidenceMirrorError("tooling history path set is incomplete")
+    tree = _git(repository, "rev-parse", f"{head}^{{tree}}").decode().strip()
+    if PIN.fullmatch(tree) is None:
+        raise EvidenceMirrorError("invalid tooling tree identity")
+    return commits, tree
+
+
+def _read_bound_helper(repository: Path, head: str) -> tuple[str, str]:
+    expected = (repository / HELPER_RELATIVE).resolve(strict=True)
+    try:
+        actual = RUNNING_HELPER.resolve(strict=True)
+        value = RUNNING_HELPER.lstat()
+        descriptor = os.open(RUNNING_HELPER, os.O_RDONLY | _NOFOLLOW)
+    except OSError as error:
+        raise EvidenceMirrorError("running tooling helper is unavailable") from error
+    try:
+        before = os.fstat(descriptor)
+        chunks: list[bytes] = []
+        size = 0
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            size += len(chunk)
+            if size > 2 * 1024 * 1024:
+                raise EvidenceMirrorError("running tooling helper is oversized")
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    if (
+        actual != expected
+        or RUNNING_HELPER.is_symlink()
+        or not stat.S_ISREG(value.st_mode)
+        or value.st_uid != os.getuid()
+        or value.st_nlink != 1
+        or _descriptor_identity(before) != _descriptor_identity(after)
+    ):
+        raise EvidenceMirrorError("unsafe running tooling helper identity")
+    raw = b"".join(chunks)
+    committed = _git(repository, "show", f"{head}:{HELPER_RELATIVE}")
+    if raw != committed:
+        raise EvidenceMirrorError("running helper differs from tooling commit")
+    listing = _git(repository, "ls-tree", head, "--", HELPER_RELATIVE).decode().split()
+    digest = hashlib.sha1()
+    digest.update(f"blob {len(raw)}\0".encode("ascii"))
+    digest.update(raw)
+    blob = digest.hexdigest()
+    if len(listing) < 3 or listing[0] != "100644" or listing[1] != "blob" or listing[2] != blob:
+        raise EvidenceMirrorError("running helper Git blob mismatch")
+    return blob, hashlib.sha256(raw).hexdigest()
+
+
+def _require_tooling_authority() -> dict[str, object]:
+    hostile = sorted(name for name in os.environ if name.startswith("GIT_"))
+    if hostile:
+        raise EvidenceMirrorError(f"ambient Git environment is forbidden: {hostile}")
+    repository = EXPECTED_TOOLING_REPOSITORY
+    try:
+        value = repository.lstat()
+    except OSError as error:
+        raise EvidenceMirrorError("tooling repository is absent") from error
+    if (
+        repository.is_symlink()
+        or not stat.S_ISDIR(value.st_mode)
+        or value.st_uid != os.getuid()
+        or repository.resolve(strict=True) != EXPECTED_TOOLING_REPOSITORY
+    ):
+        raise EvidenceMirrorError("unsafe tooling repository identity")
+    identities = {
+        "toplevel": _canonical_git_path(
+            repository, "rev-parse", "--path-format=absolute", "--show-toplevel"
+        ),
+        "git_dir": _canonical_git_path(
+            repository, "rev-parse", "--path-format=absolute", "--git-dir"
+        ),
+        "common_dir": _canonical_git_path(
+            repository, "rev-parse", "--path-format=absolute", "--git-common-dir"
+        ),
+    }
+    if identities != {
+        "toplevel": EXPECTED_TOOLING_REPOSITORY,
+        "git_dir": EXPECTED_TOOLING_GIT_DIR,
+        "common_dir": EXPECTED_COMMON_DIR,
+    }:
+        raise EvidenceMirrorError("tooling repository administrative identity mismatch")
+    _require_tooling_config(repository)
+    branch = _git(repository, "symbolic-ref", "-q", "HEAD").decode().strip()
+    head = _git(repository, "rev-parse", "HEAD").decode().strip()
+    if branch != TOOLING_BRANCH or PIN.fullmatch(head) is None:
+        raise EvidenceMirrorError("tooling branch identity mismatch")
+    if _git(repository, "rev-parse", EXECUTION_BRANCH).decode().strip() != BASE_EXECUTION_PIN:
+        raise EvidenceMirrorError("local execution ref drift")
+    remote_refs = _parse_tooling_remote_refs(
+        _git(repository, "ls-remote", "--refs", "origin", EXECUTION_BRANCH, TOOLING_BRANCH)
+    )
+    if remote_refs[EXECUTION_BRANCH] != BASE_EXECUTION_PIN or remote_refs[TOOLING_BRANCH] != head:
+        raise EvidenceMirrorError("remote tooling/execution ref drift")
+    commits, tree = _require_tooling_history(repository, head)
+    tracked_files = _require_complete_tooling_worktree(repository)
+    root_raw = _git(repository, "show", f"{head}:{TOOLING_ROOT_AUTHORITY}")
+    try:
+        root = json.loads(root_raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise EvidenceMirrorError("tooling root authority is not JSON") from error
+    expected_root = _expected_tooling_root()
+    canonical_root = (
+        json.dumps(expected_root, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("ascii")
+    if (
+        type(root) is not dict
+        or root != expected_root
+        or root_raw != canonical_root
+        or type(root.get("schema_version")) is not int
+    ):
+        raise EvidenceMirrorError("tooling root authority mismatch")
+    helper_blob, helper_sha256 = _read_bound_helper(repository, head)
+    return {
+        "base_execution_pin": BASE_EXECUTION_PIN,
+        "commits": commits,
+        "helper_git_blob": helper_blob,
+        "helper_sha256": helper_sha256,
+        "remote_tooling_head": remote_refs[TOOLING_BRANCH],
+        "root_authority_sha256": hashlib.sha256(root_raw).hexdigest(),
+        "status": "GATE_D_EVIDENCE_MIRROR_TOOLING_VALID",
+        "tooling_branch": TOOLING_BRANCH,
+        "tooling_head": head,
+        "tooling_tree": tree,
+        "tracked_files": tracked_files,
+    }
 
 
 def _safe_tree_path(raw: bytes) -> str:
@@ -638,19 +951,23 @@ def _publish_one(
         source.close()
 
 
-def _parse_listing(raw: bytes) -> dict[str, RemoteObject]:
+def _parse_listing(raw: bytes, destination: str) -> dict[str, RemoteObject]:
     try:
         values = json.loads(raw)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise EvidenceMirrorError("remote prefix listing is not JSON") from error
     if type(values) is not list:
         raise EvidenceMirrorError("remote prefix listing is not an array")
+    expected_prefix = {"type": "prefix", "url": destination + "/"}
+    if len(values) != 3 or values[0] != expected_prefix:
+        raise EvidenceMirrorError("remote prefix marker or object count mismatch")
     records: dict[str, RemoteObject] = {}
-    for value in values:
+    for value in values[1:]:
         metadata = value.get("metadata") if type(value) is dict else None
         url_with_generation = value.get("url") if type(value) is dict else None
         if (
             type(value) is not dict
+            or set(value) != {"metadata", "type", "url"}
             or value.get("type") != "cloud_object"
             or type(metadata) is not dict
             or not isinstance(url_with_generation, str)
@@ -683,6 +1000,8 @@ def _parse_listing(raw: bytes) -> dict[str, RemoteObject]:
             size=int(size),
             md5=md5,
         )
+    if len(records) != 2:
+        raise EvidenceMirrorError("remote prefix object identities are not unique")
     return records
 
 
@@ -700,7 +1019,7 @@ def _list_prefix(
             "remote prefix vacancy check failed: "
             + result.stderr.decode("utf-8", "replace")[-1000:]
         )
-    return _parse_listing(result.stdout)
+    return _parse_listing(result.stdout, destination)
 
 
 def _verify_remote_catalogue(
@@ -731,6 +1050,7 @@ def _publish_objects(
     destination: str,
     *,
     catalogue: dict[str, Blob] | None = None,
+    require_existing_replay: bool = False,
 ) -> tuple[tuple[RemoteObject, ...], bool]:
     if catalogue is not None:
         _verify_local_archive(local_objects[0], catalogue)
@@ -738,7 +1058,14 @@ def _publish_objects(
         raise EvidenceMirrorError("remote prefix has soft-deleted prior objects")
     existing = _list_prefix(destination)
     if existing:
-        return _verify_remote_catalogue(existing, local_objects, destination), False
+        verified = _verify_remote_catalogue(existing, local_objects, destination)
+        if _list_prefix(destination, soft_deleted=True):
+            raise EvidenceMirrorError("remote prefix gained soft-deleted objects")
+        if _list_prefix(destination) != existing:
+            raise EvidenceMirrorError("remote prefix changed during replay")
+        return verified, False
+    if require_existing_replay:
+        raise EvidenceMirrorError("replay-only remote prefix is vacant")
     for local in local_objects:
         _publish_one(
             local,
@@ -762,7 +1089,14 @@ def _remote_report(remote: RemoteObject, local: LocalObject) -> dict[str, object
     }
 
 
-def mirror(repository: Path, output_root: Path, receipt_raw: bytes) -> dict[str, object]:
+def mirror(
+    repository: Path,
+    output_root: Path,
+    receipt_raw: bytes,
+    *,
+    tooling_authority: dict[str, object] | None = None,
+    require_existing_replay: bool = False,
+) -> dict[str, object]:
     repository = _safe_repository(repository)
     output_root = _safe_output_root(output_root)
     receipt, canonical = _canonical_receipt(receipt_raw)
@@ -785,20 +1119,27 @@ def mirror(repository: Path, output_root: Path, receipt_raw: bytes) -> dict[str,
     if local_objects[1].sha256 != receipt_sha256:
         raise EvidenceMirrorError("authority receipt changed before publication")
     remote_objects, published = _publish_objects(
-        local_objects, destination, catalogue=catalogue
+        local_objects,
+        destination,
+        catalogue=catalogue,
+        require_existing_replay=require_existing_replay,
     )
+    if require_existing_replay and published:
+        raise EvidenceMirrorError("replay-only mirror unexpectedly published")
     return {
         "archive_sha256": local_objects[0].sha256,
         "catalogue_sha256": hashlib.sha256(catalogue_raw).hexdigest(),
         "destination": destination,
         "evidence_head": head,
         "published": published,
+        "replay_only": require_existing_replay,
         "receipt_sha256": receipt_sha256,
         "remote_objects": [
             _remote_report(remote, local)
             for remote, local in zip(remote_objects, local_objects, strict=True)
         ],
         "status": "GATE_D_EVIDENCE_MIRRORED",
+        "tooling_authority": tooling_authority,
         "tracked_files": len(catalogue),
     }
 
@@ -807,9 +1148,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--require-existing-replay", action="store_true")
     arguments = parser.parse_args()
+    tooling_authority = _require_tooling_authority()
     receipt = sys.stdin.buffer.read(1_048_577)
-    report = mirror(arguments.repository, arguments.output_root, receipt)
+    report = mirror(
+        arguments.repository,
+        arguments.output_root,
+        receipt,
+        tooling_authority=tooling_authority,
+        require_existing_replay=arguments.require_existing_replay,
+    )
     print(json.dumps(report, sort_keys=True, separators=(",", ":")))
     return 0
 

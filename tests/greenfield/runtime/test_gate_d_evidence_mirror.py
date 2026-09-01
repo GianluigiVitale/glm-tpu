@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import os
 import stat
@@ -53,6 +54,35 @@ def _receipt(head: str) -> bytes:
     return (
         json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n"
     ).encode()
+
+
+def _listing(destination: str) -> list[dict[str, object]]:
+    return [
+        {"type": "prefix", "url": destination + "/"},
+        {
+            "metadata": {
+                "generation": "10",
+                "md5Hash": "receipt-md5",
+                "name": destination.removeprefix("gs://driftbench-dsv4-uc/")
+                + "/"
+                + MODULE.RECEIPT_NAME,
+                "size": "7",
+            },
+            "type": "cloud_object",
+            "url": destination + "/" + MODULE.RECEIPT_NAME + "#10",
+        },
+        {
+            "metadata": {
+                "generation": "11",
+                "md5Hash": "archive-md5",
+                "name": destination.removeprefix("gs://driftbench-dsv4-uc/")
+                + "/repository.tar",
+                "size": "9",
+            },
+            "type": "cloud_object",
+            "url": destination + "/repository.tar#11",
+        },
+    ]
 
 
 def test_real_export_matches_git_catalogue_before_append_only_sync(
@@ -365,10 +395,41 @@ def test_complete_existing_prefix_is_generation_replayed_without_upload(
         "_publish_one",
         lambda *_args: (_ for _ in ()).throw(AssertionError("must not upload")),
     )
-    verified, published = MODULE._publish_objects(local_objects, destination)
+    verified, published = MODULE._publish_objects(
+        local_objects, destination, require_existing_replay=True
+    )
     assert published is False
     assert [item.generation for item in verified] == ["10", "11"]
     assert downloads == ["10", "11"]
+
+
+def test_replay_only_vacancy_refuses_before_any_upload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "repository.tar"
+    path.write_bytes(b"archive")
+    local = MODULE._local_object("repository.tar", path)
+    calls: list[bool] = []
+
+    def vacant(_destination, *, soft_deleted=False):
+        calls.append(soft_deleted)
+        return {}
+
+    monkeypatch.setattr(MODULE, "_list_prefix", vacant)
+    monkeypatch.setattr(
+        MODULE,
+        "_publish_one",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("replay-only mode must not upload")
+        ),
+    )
+    with pytest.raises(MODULE.EvidenceMirrorError, match="replay-only.*vacant"):
+        MODULE._publish_objects(
+            (local,),
+            MODULE.DESTINATION_ROOT + "/" + "a" * 40,
+            require_existing_replay=True,
+        )
+    assert calls == [True, False]
 
 
 def test_soft_deleted_prior_prefix_is_refused_before_live_listing_or_upload(
@@ -418,6 +479,57 @@ def test_prefix_vacancy_requires_exact_no_objects_response(
         MODULE._list_prefix(MODULE.DESTINATION_ROOT + "/" + "a" * 40)
 
 
+def test_actual_gcloud_prefix_schema_is_accepted_exactly() -> None:
+    destination = MODULE.DESTINATION_ROOT + "/" + "a" * 40
+    records = MODULE._parse_listing(
+        json.dumps(_listing(destination)).encode(), destination
+    )
+    assert sorted(records) == [
+        destination + "/" + MODULE.RECEIPT_NAME,
+        destination + "/repository.tar",
+    ]
+    assert records[destination + "/repository.tar"].generation == "11"
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda values, _destination: values.pop(0),
+        lambda values, _destination: values.insert(1, dict(values[0])),
+        lambda values, _destination: values.__setitem__(
+            slice(None), [values[1], values[0], values[2]]
+        ),
+        lambda values, destination: values[0].__setitem__(
+            "url", destination + "/wrong/"
+        ),
+        lambda values, _destination: values[0].__setitem__("metadata", {}),
+        lambda values, _destination: values.append(dict(values[-1])),
+    ],
+    ids=(
+        "missing-prefix",
+        "duplicate-prefix",
+        "misordered-prefix",
+        "wrong-prefix",
+        "metadata-bearing-prefix",
+        "extra-object",
+    ),
+)
+def test_prefix_schema_variants_fail_closed(mutate) -> None:
+    destination = MODULE.DESTINATION_ROOT + "/" + "a" * 40
+    values = _listing(destination)
+    mutate(values, destination)
+    with pytest.raises(MODULE.EvidenceMirrorError, match="prefix marker|object"):
+        MODULE._parse_listing(json.dumps(values).encode(), destination)
+
+
+def test_duplicate_cloud_object_identity_is_rejected() -> None:
+    destination = MODULE.DESTINATION_ROOT + "/" + "a" * 40
+    values = _listing(destination)
+    values[2] = json.loads(json.dumps(values[1]))
+    with pytest.raises(MODULE.EvidenceMirrorError, match="duplicate"):
+        MODULE._parse_listing(json.dumps(values).encode(), destination)
+
+
 def test_receipt_writer_refuses_short_write_before_sync(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -426,3 +538,81 @@ def test_receipt_writer_refuses_short_write_before_sync(
     monkeypatch.setattr(MODULE.os, "write", lambda *_args: 0)
     with pytest.raises(MODULE.EvidenceMirrorError, match="short authority"):
         MODULE._write_receipt(tree, _receipt("a" * 40))
+
+
+def test_tooling_authority_binds_clean_pushed_branch_and_running_helper(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    origin = tmp_path / "origin.git"
+    repository = tmp_path / "tooling"
+    origin.mkdir()
+    repository.mkdir()
+    _git(origin, "init", "--bare", "-q")
+    _git(repository, "init", "-q")
+    _git(repository, "remote", "add", "origin", str(origin))
+    (repository / "base.txt").write_text("base\n")
+    _git(repository, "add", "--", "base.txt")
+    _git(repository, "commit", "-q", "-m", "base")
+    _git(repository, "branch", "-M", "rewrite/topology-first-decode")
+    _git(
+        repository,
+        "push",
+        "-q",
+        "-u",
+        "origin",
+        "refs/heads/rewrite/topology-first-decode:refs/heads/rewrite/topology-first-decode",
+    )
+    base = _git(repository, "rev-parse", "HEAD")
+    _git(repository, "checkout", "-q", "-b", "tooling/gate-d-evidence-mirror")
+
+    monkeypatch.setattr(MODULE, "EXPECTED_TOOLING_REPOSITORY", repository)
+    monkeypatch.setattr(MODULE, "EXPECTED_COMMON_DIR", repository / ".git")
+    monkeypatch.setattr(MODULE, "EXPECTED_TOOLING_GIT_DIR", repository / ".git")
+    monkeypatch.setattr(MODULE, "EXPECTED_ORIGIN", str(origin))
+    monkeypatch.setattr(MODULE, "BASE_EXECUTION_PIN", base)
+    monkeypatch.setattr(MODULE, "MIN_TRACKED_FILES", 1)
+
+    helper = repository / MODULE.HELPER_RELATIVE
+    test_path = repository / MODULE.TOOLING_TEST_RELATIVE
+    root = repository / MODULE.TOOLING_ROOT_AUTHORITY
+    helper.parent.mkdir(parents=True)
+    test_path.parent.mkdir(parents=True)
+    root.parent.mkdir(parents=True)
+    helper.write_text("# bound helper\n")
+    test_path.write_text("# focused test\n")
+    root.write_text(
+        json.dumps(MODULE._expected_tooling_root(), sort_keys=True, separators=(",", ":"))
+        + "\n"
+    )
+    _git(
+        repository,
+        "add",
+        "--",
+        MODULE.HELPER_RELATIVE,
+        MODULE.TOOLING_TEST_RELATIVE,
+        MODULE.TOOLING_ROOT_AUTHORITY,
+    )
+    _git(repository, "commit", "-q", "-m", "tooling")
+    _git(
+        repository,
+        "push",
+        "-q",
+        "-u",
+        "origin",
+        "refs/heads/tooling/gate-d-evidence-mirror:refs/heads/tooling/gate-d-evidence-mirror",
+    )
+    monkeypatch.setattr(MODULE, "RUNNING_HELPER", helper)
+    for name in tuple(os.environ):
+        if name.startswith("GIT_"):
+            monkeypatch.delenv(name, raising=False)
+
+    report = MODULE._require_tooling_authority()
+    assert report["status"] == "GATE_D_EVIDENCE_MIRROR_TOOLING_VALID"
+    assert report["base_execution_pin"] == base
+    assert report["tooling_head"] == _git(repository, "rev-parse", "HEAD")
+    assert report["remote_tooling_head"] == report["tooling_head"]
+    assert report["helper_sha256"] == hashlib.sha256(helper.read_bytes()).hexdigest()
+
+    helper.write_text("hostile worktree replacement\n")
+    with pytest.raises(MODULE.EvidenceMirrorError, match="not clean"):
+        MODULE._require_tooling_authority()
