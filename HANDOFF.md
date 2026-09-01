@@ -9522,3 +9522,29 @@ This accepts physical causal structure and locality only. It authorizes persiste
 execution, performance, 8K or Gate-D closure. Exact next is adversarial review of this batch,
 commit/push/locked same-region mirror, then a separately reviewed smallest one-row protected
 numerical A/B using the exact acquired candidate. Full short-context decode remains later.
+
+## 2026-09-01 forced-round PP16 numerical source; execution unauthorized
+
+The default-off driver `run_gate_d_forced_round_pp16_numerical.py` prepares the smallest legal
+one-row/two-chip causal discriminator without rerunning the tombstoned compensated graph. It binds
+the accepted causal-HLO report, exact forced-round graph-source blobs, PP16 stage-zero topology,
+sealed capsule inputs, independent accepted DSA hashes and CPU-only derived-weight authority before
+JAX import. It lowers from abstract shapes, requires exact acquired StableHLO and an optimized HLO
+derived from the accepted preimage by only three single-occurrence runtime source-location metadata
+substitutions, then permits exactly one invocation and one bounded output-tree transfer.
+
+The derived numerical optimized HLO is 263,876 bytes, SHA-256
+`df0a193ecc34851b801e72a6470f3f6fb9dc8bcecc34eb8902db73d54912640d`; the acquired graph body
+remains `a0b87e2b...d9d45`. Driver SHA-256 is
+`160eb38f414fa2aed5df2a03714edb05214ffadcd2c92ccef3ed140ef03d204b`. Acceptance now requires
+the exact eleven non-scorer causal watchpoints in addition to owner agreement, contract bits,
+tie order and the independently accepted TPU event; the three CPU scorer watchpoints remain
+diagnostic only. Git reads ignore user/system configuration, replacements and network transports.
+Source certificate `gate-d-forced-round-pp16-numerical-source.json` is 3,807 bytes, SHA-256
+`5938c0318e3ba20c4e5c8b883b9e9606e5d4f9fa66d6e079a8860d59cf026cea`; focused CPU-only hostile
+coverage passes 22/22 and the adjacent slice passes 220/220 with one sealed-history deselection and
+one intentional duplicate-ZIP warning. Ruff 0.16.5 and Python compilation pass. No launcher/runtime install,
+JAX backend initialization, compile, TPU execution, cloud write or numerical result occurred.
+Gate D remains open. Exact next is adversarial source review and persistence, then a separately
+reviewed immutable install/orchestration batch; only that later review may consider one fresh-tag
+execution.

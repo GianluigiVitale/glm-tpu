@@ -2953,3 +2953,25 @@ execution is authorized by this source batch.
   GATE_D_OPEN`. Persistence only; numerical execution, performance, 8K and closure remain false.
 - Exact next after review/persistence: separately authorize the smallest one-row protected
   numerical A/B. Do not start the complete decoder until that result is accepted.
+
+## 2026-09-01 forced-round PP16 numerical source
+
+- Driver: `scripts/greenfield/run_gate_d_forced_round_pp16_numerical.py`, SHA-256
+  `160eb38f414fa2aed5df2a03714edb05214ffadcd2c92ccef3ed140ef03d204b`.
+- Certificate: `docs/artifacts/gate-d-forced-round-pp16-numerical-source.json`, 3,807 bytes,
+  SHA-256 `5938c0318e3ba20c4e5c8b883b9e9606e5d4f9fa66d6e079a8860d59cf026cea`.
+- Scope: one logical row, PP16 stage zero `[0,1]`, exact sealed input/DSA authorities, one compiled
+  invocation and one bounded output-tree host transfer. Both acceptance and rejection keep Gate D
+  open and make no decoder/performance claim.
+- HLO boundary: exact acquired StableHLO; optimized HLO is the accepted `a0b87e2b...d9d45`
+  preimage after only three exact path/callsite metadata replacements. Expected numerical HLO is
+  263,876 bytes, SHA-256 `df0a193e...12640d`; graph-source blobs remain bound to the acquisition.
+- Numerical acceptance additionally requires exact equality at all eleven non-scorer causal
+  watchpoint records. The CPU scorer records remain diagnostic because the independent accepted
+  TPU event hashes are authoritative. Git reads are isolated from user/system configuration,
+  replacement objects and network transports.
+- Verification: 22/22 focused and 220/220 adjacent CPU-only tests with one sealed-history
+  deselection; Ruff 0.16.5 and Python compilation pass. No install, JAX
+  backend initialization, compile, TPU/cloud work or numerical evidence occurred.
+- Authority: persistence only. Adversarial review precedes commit/push/mirror; immutable
+  install/orchestration and any fresh-tag TPU execution require separate review.
