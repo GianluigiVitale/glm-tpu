@@ -9422,3 +9422,19 @@ reject replacement refs; and one path-check loop silently passed. The correction
 created inode, cleans only that owned unpublished object, preserves every pre-existing staging
 file/symlink/directory in hostile tests, disables replacement/lazy fetches, rejects `refs/replace`,
 and removes the dead check. Corrected persistence review is still required.
+
+## 2026-09-01 forced-round PP16 HLO runtime installed; launcher not invoked
+
+Sol approved corrected staged SHA `826627f4...0f294f1` for persistence with no P0--P2 and explicitly
+authorized no install/execution. Commit `102a75fe9ba9ccf2efc3fabdc6ec249a6c568ec5` matches origin;
+the locked mirror is `US-CENTRAL2`, connectivity fsck passed and checkout archive SHA is
+`8116f8da...9fb9bc`.
+
+A separate Sol review approved only two literal install commands. The fixed provisioner
+`2b9c8c2b...0594` installed the five-file source tree `ab902d62...c919c` without replacement. The
+second-stage installer published the three-file root-owned 0555 runtime capsule first and the
+root-owned 0555 launcher last. All members have exact committed hashes, nlink 1 and no xattrs. Its
+report says `launcher_invoked=false`; independent checks found both locks free and no launcher
+process. Artifact: `gate-d-forced-round-pp16-hlo-runtime-install.json`. No JAX/HLO/TPU/cloud,
+numerical/performance work or 8K occurred. Gate D remains open. Exact next after evidence review and
+persistence is a separately reviewed literal fresh-tag compile-only launcher invocation.

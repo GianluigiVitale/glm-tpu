@@ -2868,6 +2868,18 @@ execution is authorized by this source batch.
   from Git objects at `a012b93`; its existing certificate remains byte-identical.
 - Review corrections: cleanup is created-inode/publish-state bound and preserves hostile
   PID-collision staging objects; Git disables replacement/lazy fetches and rejects `refs/replace`;
-  the prior no-op path loop is removed. Corrected persistence review remains pending.
+  the prior no-op path loop is removed. Corrected staged SHA `826627f4...0f294f1` received Sol
+  `APPROVE PERSISTENCE` and is commit `102a75f`.
 - Exact next after validation/review/persistence: separately review the literal install-only
   commands; only then prepare a separately reviewed fresh compile-only tag.
+
+## 2026-09-01 forced-round PP16 HLO runtime install
+
+- Artifact: `docs/artifacts/gate-d-forced-round-pp16-hlo-runtime-install.json`.
+- Source authority: commit `102a75f`, reviewed diff `826627f4...0f294f1`, fixed provisioner
+  `2b9c8c2b...0594`, source tree `ab902d62...c919c`.
+- Installed: root-owned/read-only exact source capsule, three-file runtime capsule, launcher last;
+  exact membership/hashes, nlink 1 files and empty xattrs.
+- State: `launcher_invoked=false`; both locks free; no launcher process.
+- Claim: installation only. No JAX/HLO/TPU/cloud, numerical/performance or Gate-D evidence.
+- Exact next: review/persist this evidence, then separately review one fresh-tag compile-only start.

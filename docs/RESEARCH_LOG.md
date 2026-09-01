@@ -12252,3 +12252,18 @@ cleanup reopens and matches only the owned unpublished inode, rejects foreign co
 touches a pre-existing PID-collision file, symlink or directory. Both Git auditors run with replace
 objects/lazy fetches/protocol-from-user disabled and explicitly reject `refs/replace`; a hostile
 temporary-repository test exercises that refusal. The no-op validation is removed.
+
+## 2026-09-01 forced-round PP16 HLO immutable runtime install
+
+Corrected installer persistence SHA `826627f4...0f294f1` received Sol `APPROVE PERSISTENCE` with no
+P0--P2 and became commit `102a75f`; origin and the US-CENTRAL2 Git mirror reproduce it exactly. A
+separate install-only review then approved the exact fixed-provisioner and second-stage commands,
+not the launcher.
+
+Source capsule tree `ab902d62...c919c` contains five exact committed mode-0555 files. The root-owned
+source target preserves that tree SHA. The root-owned mode-0555 runtime capsule contains only the
+driver, publisher and mirror verifier at their pinned hashes; the separately published launcher is
+mode 0555, nlink 1 and hash `6e2d0457...d1c6cd`. All installed files are root:root, nlink 1 and have
+no xattrs. Installer output and independent checks prove `launcher_invoked=false`, free workload/
+rsync locks and no live launcher. No JAX import, HLO, TPU, cloud mutation, numerical/performance or
+8K work occurred. Install evidence is `gate-d-forced-round-pp16-hlo-runtime-install.json`.

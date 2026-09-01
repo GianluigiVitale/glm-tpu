@@ -1,0 +1,71 @@
+{
+  "artifact_kind": "gate_d_forced_round_pp16_hlo_runtime_install",
+  "authorization": {
+    "cloud_write": false,
+    "full_8k": false,
+    "hlo_acquisition": false,
+    "launcher_invocation": false,
+    "persistence_only": true,
+    "tpu_compile": false,
+    "tpu_execution": false
+  },
+  "claim_scope": "Local immutable runtime installation only. No launcher invocation, JAX import, HLO acquisition, TPU compile/execution, cloud mutation, numerical, performance or Gate-D claim.",
+  "install": {
+    "completed_at_utc": "2026-09-01T13:14:16Z",
+    "installer_report_artifact_kind": "gate_d_forced_round_pp16_hlo_runtime_installed",
+    "launcher_invoked": false,
+    "source_capsule": "/home/gianl/glm-run/gate-d-forced-round-hlo-install-source.UWKrnP",
+    "source_capsule_tree_sha256": "ab902d6274b7173eeecf125763c34c7ae2659c473f646dda2ad18745bfac919c",
+    "source_commit": "102a75fe9ba9ccf2efc3fabdc6ec249a6c568ec5"
+  },
+  "installed_objects": {
+    "launcher": {
+      "gid": 0,
+      "mode": "0555",
+      "nlink": 1,
+      "path": "/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo.py",
+      "sha256": "6e2d0457a3a72ec81a30501bb3e8e7dc9b6235d6fa0e8f4faa77b1bbb2d1c6cd",
+      "uid": 0,
+      "xattrs": []
+    },
+    "runtime_capsule": {
+      "gid": 0,
+      "members": {
+        "acquire_gate_d_forced_round_pp16_hlo.py": "046040d382567ccef94792b97e160b0f79b673ab1f0f1d46bfd20c57e884faf7",
+        "publish_gate_d_forced_round_pp16_hlo.py": "ec67de6d29ba3a3e15a0853b6ef78eb3e0e34dfd2783ab46f101ca4c75dde0db",
+        "verify_gate_d_same_region_git_mirror.py": "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"
+      },
+      "mode": "0555",
+      "path": "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo",
+      "uid": 0,
+      "xattrs": []
+    },
+    "source_capsule": {
+      "gid": 0,
+      "members": {
+        "acquire_gate_d_forced_round_pp16_hlo.py": "046040d382567ccef94792b97e160b0f79b673ab1f0f1d46bfd20c57e884faf7",
+        "install_gate_d_forced_round_pp16_hlo_runtime.py": "527aec2f2ede77faf80e12803946b0a9caa15ed4a22503b5e5fc225f3cde1061",
+        "launch_gate_d_forced_round_pp16_hlo.py": "6e2d0457a3a72ec81a30501bb3e8e7dc9b6235d6fa0e8f4faa77b1bbb2d1c6cd",
+        "publish_gate_d_forced_round_pp16_hlo.py": "ec67de6d29ba3a3e15a0853b6ef78eb3e0e34dfd2783ab46f101ca4c75dde0db",
+        "verify_gate_d_same_region_git_mirror.py": "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"
+      },
+      "mode": "0755",
+      "path": "/opt/glm-tpu/gate-d-forced-round-hlo-install-v1",
+      "tree_sha256": "ab902d6274b7173eeecf125763c34c7ae2659c473f646dda2ad18745bfac919c",
+      "uid": 0,
+      "xattrs": []
+    }
+  },
+  "preconditions": {
+    "install_source_certificate_sha256": "65eca829529b440791449e2cd4982aac94a7e04ff57ce7a17899d4a65e6a30fe",
+    "persisted_diff_sha256": "826627f4679166b2f944eaf2d2488a604efff1dbd6a20db3bcd146bcc0f294f1",
+    "provisioner_sha256": "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594",
+    "sol_install_only_review": "APPROVE INSTALL ONLY"
+  },
+  "postconditions": {
+    "launcher_process_present": false,
+    "pod_workload_lock_free": true,
+    "rsync_lock_free": true
+  },
+  "status": "IMMUTABLE_RUNTIME_INSTALLED_NOT_INVOKED"
+}
