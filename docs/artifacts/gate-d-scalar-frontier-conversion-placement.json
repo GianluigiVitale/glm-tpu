@@ -1,0 +1,52 @@
+{
+  "artifact_kind": "gate_d_scalar_frontier_conversion_placement",
+  "claim_scope": "Offline exact adjudication of the already-completed protected PP16 layer-1 RMS output; no JAX, TPU rerun, performance, DB, token, or Gate-D closure claim.",
+  "classification": "RMS_INPUT_EXACT;ACCEPTED_STRICT_DOUBLE_ROUND_EXACT;TPU_RETAINED_FP32_EXPLANATION_EXACT;UNIFORM_STRICT_SCALAR_IMPOSSIBLE;PHYSICAL_CAUSE_UNPROVEN;GATE_D_OPEN",
+  "evidence_authority": {
+    "capsule_input_sha256": "dd5f1cbb37b722591531635a21cfa9f1d6d0157997a4f70138900d0000be8b1b",
+    "capsule_state_sha256": "68ee47b1fcbf317fd41da51aa26c9ba1a8dafe0e3e95ccbbfa73285f4e46f236",
+    "protected_output_sha256": "bd017d4c7e3f42b3f60fb4b918811ea028447656227c361c84fffae2544dc1a3",
+    "recovery_authentication_sha256": "679e4a7354aa3a0afe716a5e183afb7a93a5cbfe27beed16f27e1aba0aa51433",
+    "recovery_remote_objects_sha256": "0fda2ed70ee7257ba33f5bf49c557f3b45a59a846febb4349826c06fdc8a8adc",
+    "recovery_terminal_generation": "1788258353080631",
+    "recovery_terminal_sha256": "a3a4a0ec674eb3cd9f74abff72c3a4f1b8803b5c51726c267b98482943aad959"
+  },
+  "first_divergence": {
+    "accepted_vs_observed_mismatch_count": 1622,
+    "mismatch_indices_int32_sha256": "2aaa7d3d2dea46495ab43419feaae9e969934f19c0e1e6690706c0d909e2bb8c",
+    "retained_fp32_round_matches_observed_tpu": true,
+    "rms_input_fp32_exact": true,
+    "strict_double_round_matches_accepted": true
+  },
+  "next_mechanism": "Causally test the exact conversion-placement hypothesis by forcing the existing normalized-f32 to BF16 rounding edge before the RMS weight multiply (local reduce_precision first; excess-precision-disabled comparator); inspect optimized HLO, then run only the bounded PP16 layer.",
+  "observed_tpu_strict_scalar_preimage": {
+    "constrained_elements": 0,
+    "empty_at_index": 0,
+    "reason": "target_skipped_by_double_round",
+    "status": "EMPTY",
+    "target_bf16_bits": "0x3c18"
+  },
+  "performance_claim": false,
+  "reference_scale": {
+    "accepted_strict_preimage": {
+      "constrained_elements": 6139,
+      "lower": 178.5946044921875,
+      "lower_bits": "0x43329838",
+      "status": "NONEMPTY",
+      "upper_inclusive": 178.5952606201172,
+      "upper_inclusive_bits": "0x43329863",
+      "width_f32_values": 44
+    },
+    "bits": "0x4332984c",
+    "float32": 178.59490966796875,
+    "variance_bits": "0x37b31c8b"
+  },
+  "source_arrays": {
+    "accepted_output_sha256": "2b45b71e8722e9b51774358e9f6eddf6679d93e8fcf76c85ab69e6944e4a7437",
+    "derived_rms_input_sha256": "4d7c6a06541e12b191ebd45303199d349f0a1f0b6f118853bc89c247f92b3d2d",
+    "observed_output_sha256": "a5d47fc7d2d451e34015c5a055575144f161d0ba2f96dc9ee63f867e655fa6c3",
+    "rms_weight_bits_sha256": "bd090c7ddfce1e1c4dda8b2033432ddc0c9d259523b4c6b062356811fc828615"
+  },
+  "status": "EXACT_EXPLANATION_PROVED_PHYSICAL_CAUSE_UNPROVEN",
+  "tpu_rerun_performed": false
+}

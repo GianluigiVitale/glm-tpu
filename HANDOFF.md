@@ -9250,3 +9250,40 @@ commit/push/locked same-region mirror, then a separately reviewed repository-onl
 complete bundle or fresh-sibling/atomic-swap recovery under both leases. Preserve old repositories
 until eight unique clean closure markers pass. Only afterward may a new HLO tag be reviewed;
 protected layer-1 numerical execution and exact 8K remain forbidden.
+
+
+## 2026-09-01 compensated PP16 rejection recovered; exact conversion-placement explanation
+
+The one completed protected tag
+`gate_d_compensated_pp16_numerical_20260901T094622505067868Z` invoked its compiled TPU
+executable exactly once and returned `NUMERICAL_REJECTED`. Its historical publisher then failed
+only because one exact Git-authenticated HLO helper lay outside the old dependency-root policy.
+No TPU retry occurred. CPU-only recovery commit `5c4297c6cbfca0f6363276249aa116db25a7e724`
+passed 158 focused tests and final Sol review. A fresh validate-only replay made zero remote writes.
+Fresh seal tag `gate_d_compensated_pp16_recovery_20260901T102415964684137Z` then published 12
+exact objects terminal-last in `US-CENTRAL2`; terminal generation is `1788258353080631`,
+CRC32C `ZmPYCw==`, SHA-256 `a3a4a0ec...aad959`. The source diagnostic remains untouched.
+
+The recovered arrays close the prior operand ambiguity. Both BF16 operand rows independently widen
+and add to the accepted and both TPU-owner FP32 RMS inputs byte-for-byte. Offline certificate
+`gate-d-scalar-frontier-conversion-placement.json` (SHA-256 `8ee468eb...c170ce`) compares the
+accepted strict model (normalized-BF16 round, widened per-element weight multiply, final BF16
+round) with the retained-FP32-through-weight-multiply model:
+
+- strict double rounding reproduces all 6,144 accepted output bits;
+- one-round `bf16((x*scale)*weight)` reproduces all 6,144 protected TPU output bits;
+- their 1,622 differing indices exactly equal accepted-versus-TPU mismatches;
+- accepted strict-scale preimage is the 44-f32-value interval
+  `0x43329838..0x43329863`, containing reference scale `0x4332984c`;
+- TPU output bit `0x3c18` at index 0 is skipped by strict double rounding for every positive
+  finite FP32 scalar, so no uniform RMS scalar can explain the protected row.
+
+This proves retained FP32 through the weight multiply is an exact explanation and rules out the
+FP32 RMS input or any uniform strict-double-round scalar. It does not yet prove the physical cause;
+conversion placement/excess precision remains the leading hypothesis pending causal A/B evidence.
+The compensated auxiliary mechanism itself is tombstoned, but alternative physical causes are not.
+Gate D remains open. Exact next is default-off source design and CPU-only validation/persistence of
+a source-exact causal challenger that forces the existing post-normalization BF16 round before
+weight multiplication (`reduce_precision(e8m7)` first; excess-precision-disabled comparator).
+Compile/HLO acquisition and any bounded PP16 numerical start remain unauthorized; each requires
+its own fresh review, tag and exact execution authority. Full 8K remains forbidden.
