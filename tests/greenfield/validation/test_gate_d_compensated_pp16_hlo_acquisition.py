@@ -997,7 +997,12 @@ def test_exact_worker_repo_verifier_is_no_write_and_fails_hostile_closure(
     blob_path.unlink()
     completed = _run_worker_repo_verify(repo, pin, origin)
     assert completed.returncode != 0
-    assert "object_closure" in completed.stderr
+    # Depending on Git's cache state, the missing reachable object can be
+    # discovered by diff-index or by the immediately following fsck. Both
+    # reviewed reasons are fail-closed and no hostile hook may run.
+    assert re.fullmatch(
+        r"REPO_VERIFY_BAD \S+ (tracked_state|object_closure)\n", completed.stderr
+    )
 
 
 def test_wrapper_pins_current_builder_driver_and_publisher_bytes() -> None:

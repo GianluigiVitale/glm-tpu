@@ -34,7 +34,7 @@ ROOT_HELPER_RELATIVE = (
     "gate_d_repository_prerequisite_root.py"
 )
 CONTROLLER_RELATIVE = "scripts/greenfield/recover_gate_d_worker_repositories.py"
-INSTALLED_ROOT = Path("/opt/glm-tpu/gate-d-repository-prerequisites-v1")
+INSTALLED_ROOT = Path("/opt/glm-tpu/gate-d-repository-prerequisites-v2")
 INSTALLED_SELF = INSTALLED_ROOT / "provision_gate_d_repository_prerequisites.py"
 INSTALLED_ROOT_HELPER = INSTALLED_ROOT / "gate_d_repository_prerequisite_root.py"
 RECOVERY_CONTROLLER_SHA256 = (
@@ -46,7 +46,8 @@ ZONE = "us-central2-b"
 GCLOUD = "/snap/bin/gcloud"
 LOCK_ROOT = Path("/opt/glm-tpu/locks")
 TAG_PATTERN = re.compile(r"gate_d_repo_prerequisite_[0-9]{8}T[0-9]{15}Z")
-SHA_PATTERN = re.compile(r"[0-9a-f]{64}")
+SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
+GIT_OID_PATTERN = rb"[0-9a-f]{40}"
 OLD_CRONTAB = (
     "*/5 * * * * flock -n /home/gianl/.glm-tpu-rsync.lock "
     "/home/gianl/bin/sync-glm.sh >> /home/gianl/sync-glm-tpu.log 2>&1\n"
@@ -275,7 +276,7 @@ def _validate_environment() -> tuple[str, str, str, str]:
     root_sha = os.environ["GLM_GATE_D_PREREQUISITE_ROOT_SHA256"]
     controller_sha = os.environ["GLM_GATE_D_PREREQUISITE_CONTROLLER_SHA256"]
     if TAG_PATTERN.fullmatch(tag) is None or any(
-        SHA_PATTERN.fullmatch(value) is None
+        SHA256_PATTERN.fullmatch(value) is None
         for value in (script_sha, root_sha, controller_sha)
     ):
         raise ProvisionError("invalid tag or SHA-256")
@@ -728,32 +729,39 @@ def _validate_repository_sources(
 
 
 def _remote_branch_pin() -> str:
-    fields = (
-        _run(
-            [
-                "/usr/bin/env",
-                "-i",
-                "HOME=/home/gianl",
-                "LANG=C",
-                "LC_ALL=C",
-                "PATH=/usr/bin:/bin",
-                "GIT_CONFIG_GLOBAL=/dev/null",
-                "GIT_CONFIG_NOSYSTEM=1",
-                "GIT_TERMINAL_PROMPT=0",
-                "GIT_SSH_COMMAND=/usr/bin/ssh",
-                "/usr/bin/git",
-                "ls-remote",
-                ORIGIN,
-                f"refs/heads/{BRANCH}",
-            ],
-            timeout=60,
-        )
-        .stdout.decode()
-        .split()
+    expected_ref = f"refs/heads/{BRANCH}"
+    raw = _run(
+        [
+            "/usr/bin/env",
+            "-i",
+            "HOME=/home/gianl",
+            "LANG=C",
+            "LC_ALL=C",
+            "PATH=/usr/bin:/bin",
+            "GIT_CONFIG_GLOBAL=/dev/null",
+            "GIT_CONFIG_NOSYSTEM=1",
+            "GIT_TERMINAL_PROMPT=0",
+            "GIT_SSH_COMMAND=/usr/bin/ssh",
+            "/usr/bin/git",
+            "ls-remote",
+            ORIGIN,
+            expected_ref,
+        ],
+        timeout=60,
+    ).stdout
+    exact_record = re.compile(
+        b"("
+        + GIT_OID_PATTERN
+        + b")\t"
+        + re.escape(expected_ref.encode("ascii"))
+        + b"\n"
     )
-    if len(fields) != 2 or SHA_PATTERN.fullmatch(fields[0]) is None:
-        raise ProvisionError("invalid origin pin response")
-    return fields[0]
+    match = exact_record.fullmatch(raw)
+    if match is None:
+        raise ProvisionError(
+            f"invalid origin pin response bytes={len(raw)} sha256={_sha256(raw)}"
+        )
+    return match.group(1).decode("ascii")
 
 
 def _lock_evidence(lock: HeldLock) -> dict[str, int | str]:

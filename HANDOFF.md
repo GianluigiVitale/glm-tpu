@@ -2,6 +2,37 @@
 
 **Updated:** 2026-09-01 UTC
 
+## 2026-09-01 Gate-D prerequisite v1 failed closed; exact Git-OID correction pending review
+
+- Sol approved persistence-only staged `314329c9...`; commit
+  `fdca1b5bf4ed722280cb9895379838cd77aa80c9` is pushed and its exact source bytes replay from the
+  locked `US-CENTRAL2` mirror. Sol separately approved install-only tree `457e7933...3aad`; v1 is
+  installed root-owned at `/opt/glm-tpu/gate-d-repository-prerequisites-v1` with exact 0755 modes,
+  zero xattrs and no staging residue.
+- The separately approved prerequisite invocation used burned tag
+  `gate_d_repo_prerequisite_20260901T005642867190721Z` and failed closed in 0.55892 s at
+  `invalid origin pin response`, before pod description or any lock/controller/cron/evidence work.
+  Postflight proves old cron exact, lock root/controller/evidence absent, clean repository and zero
+  JAX/HLO/model/TPU work. Artifact:
+  `docs/artifacts/gate-d-repository-prerequisite-v1-git-oid-parser-failure.json`.
+- Root cause is exact: v1 reused its 64-hex SHA-256 regex for GitHub's valid 40-hex SHA-1 object ID.
+  Five sanitized replays return the identical 82-byte exact-ref response at pin `fdca1b5...80c9`;
+  this was not transport failure. Never rerun v1 or reuse its tag.
+- The default-off v2 correction separates 64-hex content SHA-256 from 40-hex Git OIDs, requires one
+  tab-delimited line and the exact branch ref, and emits bounded byte-count/digest diagnostics for
+  malformed output. It targets no-replace install root
+  `/opt/glm-tpu/gate-d-repository-prerequisites-v2`; installed v1 remains inert.
+- Current unreviewed v2 identities: tree `70bd0197...9d32`, controller `532c2dec...3298`, unchanged
+  root helper `13dc4f85...f68f`, tests `7202aab6...1841`. Its byte parser accepts only exact
+  `<40hex><TAB><exact-ref><LF>`; missing LF, CRLF, CR, VT, FF and malformed records reject with
+  bounded diagnostics. Focused parser/boundary coverage passes 23/23; one first adjacent run was
+  97/98 because an unrelated hostile Git-object test reported its
+  earlier valid `tracked_state` stop rather than later `object_closure`. Test `94e30c10...d384` now
+  requires the exact allowed fail-closed reason set; five consecutive focused replays and the full
+  adjacent boundary pass 103/103. Exact next is review only the v2 correction/evidence,
+  persist/mirror, and separately review v2 installation and a fresh-tag invocation. No recovery
+  or HLO is authorized.
+
 ## 2026-09-01 Gate-D recovery prerequisite correction after Sol block; no execution
 
 - Live read-only preflight confirms `/opt/glm-tpu/locks` and the installed recovery controller are
@@ -24,11 +55,10 @@
   hard-binds recovery controller `fd8950de...b2225` at
   exactly 44,013 bytes; caller-rebound arbitrary bytes reject. Evidence uses a retained validated
   parent and created FD, exact named inode/hash replay and parent fsync.
-- Focused tests `b150ea6a...3a5c` pass 11/11; the recovery, HLO-wrapper and inventory suite passes
-  91/91. Ruff, formatting, compilation, JSON and diff checks pass. This corrected batch remains
-  unreviewed source only: no root path, crontab, repository, bucket, JAX/backend, HLO, model or TPU
-  changed. Exact next is same-scope Sol correction review because Fable remains usage-blocked;
-  source persistence, immutable-bundle installation and invocation remain separate boundaries.
+- Focused tests `b150ea6a...3a5c` passed 11/11; the recovery, HLO-wrapper and inventory suite passed
+  91/91. Ruff, formatting, compilation, JSON and diff checks passed. Sol subsequently approved and
+  the source was persisted as `fdca1b5...80c9`; the later v1 install/failure and v2 correction are
+  recorded above.
 
 ## 2026-08-31 Gate-D repository recovery corrected after two Sol blocks; no execution
 

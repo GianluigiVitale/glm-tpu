@@ -197,6 +197,9 @@ def test_production_root_boundary_and_scope_are_exact() -> None:
     assert "libtpu" not in root_source + controller_source
     assert "checkout" not in root_source + controller_source
     assert "--expected-sha256" not in root_source
+    assert CONTROLLER.INSTALLED_ROOT == Path(
+        "/opt/glm-tpu/gate-d-repository-prerequisites-v2"
+    )
     assert str(CONTROLLER.INSTALLED_ROOT) in controller_source
     assert ROOT_HELPER.CONTROLLER_SHA256 == CONTROLLER.RECOVERY_CONTROLLER_SHA256
     assert ROOT_HELPER.CONTROLLER_BYTES == CONTROLLER.RECOVERY_CONTROLLER_BYTES
@@ -235,6 +238,58 @@ def test_privileged_boundary_rejects_missing_bytecode_flag(
         ROOT_HELPER._validate_privileged_boundary()
     fake_sys.dont_write_bytecode = True
     ROOT_HELPER._validate_privileged_boundary()
+
+
+def test_remote_branch_pin_accepts_exact_git_oid_and_ref(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    oid = "f" * 40
+    expected_ref = f"refs/heads/{CONTROLLER.BRANCH}"
+
+    def fake_run(command: list[str], **_kwargs) -> subprocess.CompletedProcess[bytes]:
+        assert command[-2:] == [CONTROLLER.ORIGIN, expected_ref]
+        return subprocess.CompletedProcess(
+            command, 0, stdout=f"{oid}\t{expected_ref}\n".encode(), stderr=b""
+        )
+
+    monkeypatch.setattr(CONTROLLER, "_run", fake_run)
+    assert CONTROLLER._remote_branch_pin() == oid
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        f"{'f' * 64}\trefs/heads/{CONTROLLER.BRANCH}\n".encode(),
+        f"{'f' * 40}\trefs/heads/wrong-branch\n".encode(),
+        f"{'f' * 40} refs/heads/{CONTROLLER.BRANCH}\n".encode(),
+        f"{'f' * 40}\trefs/heads/{CONTROLLER.BRANCH}".encode(),
+        f"{'f' * 40}\trefs/heads/{CONTROLLER.BRANCH}\r\n".encode(),
+        f"{'f' * 40}\trefs/heads/{CONTROLLER.BRANCH}\r".encode(),
+        f"{'f' * 40}\trefs/heads/{CONTROLLER.BRANCH}\v".encode(),
+        f"{'f' * 40}\trefs/heads/{CONTROLLER.BRANCH}\f".encode(),
+        (
+            f"{'f' * 40}\trefs/heads/{CONTROLLER.BRANCH}\n"
+            f"{'e' * 40}\trefs/heads/{CONTROLLER.BRANCH}\n"
+        ).encode(),
+        b"\xff\n",
+        b"",
+    ],
+)
+def test_remote_branch_pin_rejects_sha256_wrong_ref_and_malformed_output(
+    monkeypatch: pytest.MonkeyPatch, raw: bytes
+) -> None:
+    monkeypatch.setattr(
+        CONTROLLER,
+        "_run",
+        lambda command, **_kwargs: subprocess.CompletedProcess(
+            command, 0, stdout=raw, stderr=b""
+        ),
+    )
+    with pytest.raises(
+        CONTROLLER.ProvisionError,
+        match=rf"invalid origin pin response bytes={len(raw)} sha256=[0-9a-f]{{64}}",
+    ):
+        CONTROLLER._remote_branch_pin()
 
 
 def test_privileged_receipts_fail_closed_on_semantic_drift() -> None:

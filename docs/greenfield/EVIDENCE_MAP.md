@@ -2553,13 +2553,22 @@ remains open and no TPU successor is authorized.
 
 Sol withheld first prerequisite snapshot `8697ef1e...` before persistence or execution because its
 running source, legacy handoff, privileged install allowlist and evidence parent/name were not
-strong enough. The corrected two-file install bundle `457e7933...3aad` remains unreviewed and
-uninstalled. Root helper `13dc4f85...f68f`, default-off controller `b3cf1f72...e969a` and tests
-`b150ea6a...3a5c` hard-bind the 44,013-byte recovery controller, require an exact root-owned
-installed source/cwd/interpreter/environment with retained source FDs, retain and revalidate every
-lock parent/name/inode around exact cron adoption, and publish evidence through retained validated
-FDs with named-inode/hash replay and parent fsync. The same passwordless-sudo UID is explicitly a
-trusted administrator, not a hostile boundary. The helper explicitly enforces `-B` through
-`sys.dont_write_bytecode`. Focused tests pass 11/11 and the adjacent protected boundary passes
-91/91. These are source/test facts, not review approval or runtime evidence; no
-root path, cron, repository, bucket, JAX/backend, HLO, model or TPU state changed.
+strong enough. Sol later approved corrected two-file v1 bundle `457e7933...3aad` for persistence
+and, separately, installation only. Commit `fdca1b5...80c9` is pushed/exact-mirrored and v1 is
+installed root-owned at its no-replace path. Its approved invocation under burned tag
+`gate_d_repo_prerequisite_20260901T005642867190721Z` failed closed before mutation because v1
+applied a 64-hex SHA-256 regex to the valid 40-hex Git commit returned by `ls-remote`. Exact
+postflight leaves legacy cron, repositories, lock/controller/evidence absence and zero TPU/JAX/HLO
+work unchanged. The terminal record is
+`docs/artifacts/gate-d-repository-prerequisite-v1-git-oid-parser-failure.json`.
+
+The unreviewed v2 bundle `70bd0197...9d32` targets a fresh immutable v2 root. Controller
+`532c2dec...3298`, unchanged helper `13dc4f85...f68f` and tests `7202aab6...1841` separate Git OID
+and SHA-256 types, accept only exact `<40hex><TAB><exact-ref><LF>` bytes, reject missing LF, CRLF,
+CR, VT, FF and malformed records, and add bounded malformed-response diagnostics. Focused coverage
+passes 23/23. One adjacent run stopped 97/98 on a pre-existing
+hostile-object test's earlier `tracked_state` result. Test `94e30c10...d384` now requires the exact
+allowed fail-closed reason set; five consecutive focused replays and the complete adjacent boundary
+pass 103/103. V2 remains unreviewed, uncommitted and uninstalled. V1 remains installed but inert;
+root locks, recovery controller and new cron remain absent. No repository recovery or HLO work is
+authorized.
