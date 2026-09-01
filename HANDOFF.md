@@ -9792,3 +9792,9 @@ focused coverage passes 80/80 and the complete slice passes 111/111, plus Ruff a
 Sol returned `APPROVE PERSISTENCE` for staged diff `a0eddcbb...9740` with no P0--P2. This is source
 only: no v2 install, launcher, compile, cloud, TPU, numerical or 8K authority. Exact next is
 persistence, then regeneration of the v2 source certificate.
+
+The regenerated v2 source certificate is
+`docs/artifacts/gate-d-projection-contraction-pp16-hlo-orchestration-install-source-v2.json`, 3,026
+canonical bytes with SHA-256 `b0e58ea7c5a5e3bb0158f936442a67336d279b9f991c2247adfe9f2629759c79`.
+It binds committed pin `efe99ba87c1e1a7163f436fb7cc55bcd46e395ae` and replays byte-for-byte from
+descendants. This remains persistence only; adversarial review precedes v2 installation.

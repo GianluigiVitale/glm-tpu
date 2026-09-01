@@ -23,6 +23,11 @@ ARTIFACT = ROOT / (
     "gate-d-projection-contraction-pp16-hlo-orchestration-install-source.json"
 )
 ARTIFACT_SHA256 = "f6d1736105e67dbbe9b336b727ca015a3bf7506231aa8ae7dcd407a81cbe666e"
+V2_ARTIFACT = ROOT / (
+    "docs/artifacts/"
+    "gate-d-projection-contraction-pp16-hlo-orchestration-install-source-v2.json"
+)
+V2_ARTIFACT_SHA256 = "b0e58ea7c5a5e3bb0158f936442a67336d279b9f991c2247adfe9f2629759c79"
 INSTALL_ARTIFACT = ROOT / (
     "docs/artifacts/gate-d-projection-contraction-pp16-hlo-runtime-install.json"
 )
@@ -302,6 +307,59 @@ def test_historical_orchestration_source_artifact_binds_its_exact_commit() -> No
             ]
         )
         assert sha256(raw).hexdigest() == expected_sha256
+
+
+def test_v2_orchestration_source_artifact_replays_exactly() -> None:
+    artifact = V2_ARTIFACT.read_bytes()
+    assert len(artifact) == 3026
+    assert sha256(artifact).hexdigest() == V2_ARTIFACT_SHA256
+    parsed = json.loads(artifact)
+    assert parsed["code_hash"] == "efe99ba87c1e1a7163f436fb7cc55bcd46e395ae"
+    environment = {
+        **os.environ,
+        "GLM_GATE_D_PROJECTION_CONTRACTION_HLO_ORCHESTRATION_SOURCE": "1",
+        "JAX_PLATFORMS": "cpu",
+        "JAX_PLATFORM_NAME": "cpu",
+    }
+    result = subprocess.run(
+        ["/usr/bin/python3", "-I", "-S", "-B", str(ANALYZER)],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr.decode()
+    replay = json.loads(result.stdout)
+    current_pin = subprocess.check_output(
+        ["/usr/bin/git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True
+    ).strip()
+    assert replay["code_hash"] == current_pin
+    ancestry = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(ROOT),
+            "merge-base",
+            "--is-ancestor",
+            parsed["code_hash"],
+            current_pin,
+        ],
+        check=False,
+    )
+    assert ancestry.returncode == 0
+    replay["code_hash"] = parsed["code_hash"]
+    normalized = (
+        json.dumps(
+            replay,
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("ascii")
+    assert normalized == artifact
 
 
 def test_runtime_install_artifact_binds_exact_persisted_sources() -> None:

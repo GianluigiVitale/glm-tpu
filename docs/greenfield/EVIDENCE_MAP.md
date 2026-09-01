@@ -3216,3 +3216,10 @@ execution is authorized by this source batch.
 - Authority remains source persistence only. No v2 install/launcher/HLO/TPU/cloud/numerical/full
   DSA/8K action is authorized. Exact next is commit/push/mirror, regenerated v2 source certificate,
   then separate install-only and fresh-tag compile-only reviews.
+
+The regenerated v2 source certificate
+`gate-d-projection-contraction-pp16-hlo-orchestration-install-source-v2.json` is 3,026 canonical
+bytes, SHA-256 `b0e58ea7c5a5e3bb0158f936442a67336d279b9f991c2247adfe9f2629759c79`.
+It binds commit `efe99ba87c1e1a7163f436fb7cc55bcd46e395ae`, all seven exact sources, the v2
+immutable targets, the supported Git flag and the unchanged predecessor authorities. It authorizes
+persistence only; review and persistence precede any v2 installation.
