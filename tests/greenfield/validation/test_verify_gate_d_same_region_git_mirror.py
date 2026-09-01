@@ -61,6 +61,13 @@ def test_exact_mirror_proves_ref_checkout_closure_and_bound_blob(
     assert evidence["bound_blobs"][0]["path"] == "runtime.txt"  # type: ignore[index]
 
 
+def test_protected_mirror_closure_includes_hlo_source_location_bridge() -> None:
+    assert (
+        "docs/artifacts/gate-d-compensated-pp16-hlo-source-location-bridge.json"
+        in MODULE.BOUND_PATHS
+    )
+
+
 @pytest.mark.parametrize("replacement", ["0" * 40 + "\n", "malformed\n"])
 def test_mirror_rejects_stale_or_malformed_ref(
     tmp_path: Path, replacement: str

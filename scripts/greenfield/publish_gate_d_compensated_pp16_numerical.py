@@ -32,7 +32,13 @@ EXPECTED_STABLEHLO_SHA256 = (
     "55d7940c2aa9f0f7cda463cb816f3a5475985aab89050a5aafc22c2c88792a83"
 )
 EXPECTED_OPTIMIZED_HLO_SHA256 = (
+    "fc6384d8b266518b95bf38fbbbc188325b88bfcb781da2532d40ab05348d4305"
+)
+EXPECTED_ACQUIRED_OPTIMIZED_HLO_SHA256 = (
     "b63623498d82f67824b3be8998c09448440870b753cc1aa95d7a7765422c692b"
+)
+EXPECTED_HLO_SOURCE_LOCATION_BRIDGE_SHA256 = (
+    "1f793179e6559db9898ae3274dfef34b2517dcc09ea3c8193c5a87fab69d8885"
 )
 EXPECTED_POSITIONS_SHA256 = (
     "e55e66c6dcb35de94b9dce54d8fff602704cf26ae92d4afb333bd2501ab88ad7"
@@ -89,6 +95,8 @@ SUCCESS_PAYLOAD = {
     "evidence.json",
     "hlo/compensated_pp16_stage0.optimized_hlo.txt",
     "hlo/compensated_pp16_stage0.stablehlo.mlir",
+    "hlo/acquired_preimage.optimized_hlo.txt",
+    "hlo/source_location_bridge.json",
     "mirror.sha256",
     "orchestrator.sealed.log",
     "outputs.npz",
@@ -376,6 +384,7 @@ def _validate_runner(runner: Mapping[str, Any], code_pin: str) -> str:
             "compiled_executable_invocation_count",
             "gate_d_closed",
             "hlo",
+            "hlo_source_location_bridge",
             "host_materialization",
             "host_transfer_count",
             "memory_after_compile",
@@ -417,6 +426,22 @@ def _validate_runner(runner: Mapping[str, Any], code_pin: str) -> str:
         != {
             "optimized_hlo_sha256": EXPECTED_OPTIMIZED_HLO_SHA256,
             "stablehlo_sha256": EXPECTED_STABLEHLO_SHA256,
+        }
+        or runner.get("hlo_source_location_bridge")
+        != {
+            "artifact_sha256": EXPECTED_HLO_SOURCE_LOCATION_BRIDGE_SHA256,
+            "derived_numerical_hlo": {
+                "byte_count": 267330,
+                "sha256": EXPECTED_OPTIMIZED_HLO_SHA256,
+            },
+            "replacement_count": 3,
+            "source_hlo": {
+                "byte_count": 267335,
+                "run_tag": (
+                    "gate_d_compensated_pp16_hlo_20260901T070612366187759Z"
+                ),
+                "sha256": EXPECTED_ACQUIRED_OPTIMIZED_HLO_SHA256,
+            },
         }
         or runner.get("physical_group")
         != {
@@ -592,6 +617,20 @@ def _prepare_success(
     }:
         raise RuntimeError("Gate-D numerical output artifact identity drifted")
     _validate_output_archive(outputs_raw, runner["output_arrays"])
+    acquired_hlo_raw = primitives.snapshot_member(
+        run_fd, "hlo/acquired_preimage.optimized_hlo.txt", limit=256 << 20
+    )
+    if (
+        len(acquired_hlo_raw) != 267335
+        or sha256(acquired_hlo_raw).hexdigest()
+        != EXPECTED_ACQUIRED_OPTIMIZED_HLO_SHA256
+    ):
+        raise RuntimeError("Gate-D accepted optimized-HLO preimage bytes drifted")
+    bridge_raw = primitives.snapshot_member(
+        run_fd, "hlo/source_location_bridge.json", limit=1 << 20
+    )
+    if sha256(bridge_raw).hexdigest() != EXPECTED_HLO_SOURCE_LOCATION_BRIDGE_SHA256:
+        raise RuntimeError("Gate-D HLO source-location bridge bytes drifted")
     hlo_payload: dict[str, bytes] = {}
     for kind, relative in (
         ("optimized_hlo_sha256", "hlo/compensated_pp16_stage0.optimized_hlo.txt"),
@@ -616,6 +655,9 @@ def _prepare_success(
             "code_hash": code_pin,
             "elapsed_seconds_diagnostic_only": elapsed,
             "gate_d_closed": False,
+            "hlo_source_location_bridge_sha256": (
+                EXPECTED_HLO_SOURCE_LOCATION_BRIDGE_SHA256
+            ),
             "performance_claim": False,
             "remote_prefix": remote,
             "run_tag": run_tag,
@@ -628,6 +670,8 @@ def _prepare_success(
         "census_post.txt": census_post,
         "census_pre.txt": census_pre,
         "dependencies.json": dependencies_raw,
+        "hlo/acquired_preimage.optimized_hlo.txt": acquired_hlo_raw,
+        "hlo/source_location_bridge.json": bridge_raw,
         **hlo_payload,
         "orchestrator.sealed.log": orchestrator,
         "outputs.npz": outputs_raw,
@@ -651,6 +695,9 @@ def _prepare_success(
                 primitives._record(name, payload[name]) for name in sorted(payload)
             ],
             "gate_d_closed": False,
+            "hlo_source_location_bridge_sha256": (
+                EXPECTED_HLO_SOURCE_LOCATION_BRIDGE_SHA256
+            ),
             "performance_claim": False,
             "run_tag": run_tag,
             "status": status,
@@ -721,6 +768,9 @@ def publish_success(
                 "artifact_kind": "gate_d_compensated_pp16_numerical_terminal",
                 "evidence_sha256": sha256(payload["evidence.json"]).hexdigest(),
                 "gate_d_closed": False,
+                "hlo_source_location_bridge_sha256": (
+                    EXPECTED_HLO_SOURCE_LOCATION_BRIDGE_SHA256
+                ),
                 "performance_claim": False,
                 "remote_ledger": ledger,
                 "run_tag": run_tag,

@@ -43,6 +43,9 @@ HLO_SOURCE_CODE_HASH = "94518b7d4ce788157afa98b7bc1f8144613852d5"
 HLO_ADJUDICATION_SHA256 = (
     "bb04e959fd752fed8c5e8befd94875d5f81086dba5820d43212e87e3628cac04"
 )
+HLO_SOURCE_LOCATION_BRIDGE_SHA256 = (
+    "1f793179e6559db9898ae3274dfef34b2517dcc09ea3c8193c5a87fab69d8885"
+)
 ADMISSION_SHA256 = "7cd7e569ed9ed5fd978d933efd4229d65906ae28312e264863b8336e4cc6b37d"
 TOPOLOGY_SHA256 = "49cf6bb1a553985855556d1401ad85918669df52d12f8dc5150f247d18b325eb"
 CAPSULE_SHA256 = "5b7ad71f37dbbcda0ee36a9fc0c42a7ca45d619a9e741307386755e68e87c1a4"
@@ -70,9 +73,11 @@ EXPECTED_HOST_MATERIALIZATION_RECORDED_AT_UTC = "2026-09-01T08:20:15.649219275Z"
 EXPECTED_STABLEHLO_SHA256 = (
     "55d7940c2aa9f0f7cda463cb816f3a5475985aab89050a5aafc22c2c88792a83"
 )
-EXPECTED_OPTIMIZED_HLO_SHA256 = (
-    "b63623498d82f67824b3be8998c09448440870b753cc1aa95d7a7765422c692b"
-)
+EXPECTED_ACQUIRED_OPTIMIZED_HLO_SHA256 = "b63623498d82f67824b3be8998c09448440870b753cc1aa95d7a7765422c692b"
+EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256 = "fc6384d8b266518b95bf38fbbbc188325b88bfcb781da2532d40ab05348d4305"
+# The two hashes differ only in authenticated driver source-location metadata.
+EXPECTED_ACQUIRED_OPTIMIZED_HLO_BYTES = 267335
+EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES = 267330
 EXPECTED_ACCEPTED_POSITIONS_SHA256 = (
     "e55e66c6dcb35de94b9dce54d8fff602704cf26ae92d4afb333bd2501ab88ad7"
 )
@@ -205,7 +210,7 @@ def _load_bound_json(path: Path, expected_sha256: str, label: str) -> Any:
 
 
 def validate_hlo_adjudication(report: Mapping[str, Any]) -> dict[str, str]:
-    """Fail closed unless the exact non-numerical HLO boundary was accepted."""
+    """Bridge the accepted HLO to its exact numerical-driver metadata identity."""
 
     expected_classification = (
         "HLO_LOCALITY_POLICY_ACCEPTED;TPU_NUMERICAL_UNPROVEN;"
@@ -249,7 +254,7 @@ def validate_hlo_adjudication(report: Mapping[str, Any]) -> dict[str, str]:
         or report.get("tpu_successor_authorized") is not False
         or not isinstance(optimized, Mapping)
         or not isinstance(stablehlo, Mapping)
-        or optimized.get("sha256") != EXPECTED_OPTIMIZED_HLO_SHA256
+        or optimized.get("sha256") != EXPECTED_ACQUIRED_OPTIMIZED_HLO_SHA256
         or stablehlo.get("sha256") != EXPECTED_STABLEHLO_SHA256
         or type(optimized.get("collective_count")) is not int
         or optimized.get("collective_count") != 3
@@ -275,8 +280,119 @@ def validate_hlo_adjudication(report: Mapping[str, Any]) -> dict[str, str]:
     ):
         raise RuntimeError("Gate-D PP16 HLO locality catalogue drifted")
     return {
-        "optimized_hlo_sha256": EXPECTED_OPTIMIZED_HLO_SHA256,
+        "optimized_hlo_sha256": EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256,
         "stablehlo_sha256": EXPECTED_STABLEHLO_SHA256,
+    }
+
+
+def validate_hlo_source_location_bridge(
+    report: Mapping[str, Any], acquired_hlo_raw: bytes
+) -> tuple[bytes, dict[str, Any]]:
+    """Derive the numerical-driver HLO from the exact accepted preimage."""
+
+    expected_replacements = [
+        {
+            "new": (
+                "/usr/local/libexec/glm-tpu/gate-d-pp16-numerical/"
+                "run_gate_d_compensated_pp16_numerical.py"
+            ),
+            "old": (
+                "/home/gianl/glm-tpu-topology-rewrite/scripts/greenfield/"
+                "acquire_gate_d_compensated_pp16_hlo.py"
+            ),
+            "occurrence_count": 1,
+            "surface": "FileNames",
+        },
+        {
+            "new": "line=1197 end_line=1197",
+            "old": "line=1442 end_line=1442",
+            "occurrence_count": 1,
+            "surface": "FileLocations module call",
+        },
+        {
+            "new": "line=1023 end_line=1023",
+            "old": "line=1301 end_line=1301",
+            "occurrence_count": 1,
+            "surface": "FileLocations lower call",
+        },
+    ]
+    expected = {
+        "artifact_kind": "gate_d_compensated_pp16_hlo_source_location_bridge",
+        "classification": (
+            "SOURCE_LOCATION_METADATA_ONLY_HASH_DRIFT;"
+            "GRAPH_BODY_UNCHANGED_BY_EXACT_PREIMAGE_DERIVATION;"
+            "TPU_EXECUTABLE_NOT_INVOKED;NUMERICAL_UNPROVEN;"
+            "NO_PERFORMANCE_CLAIM;GATE_D_OPEN"
+        ),
+        "derived_numerical_hlo": {
+            "byte_count": EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES,
+            "sha256": EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256,
+        },
+        "derivation": {
+            "method": (
+                "Apply exactly the three listed single-occurrence UTF-8 "
+                "substitutions to the accepted optimized-HLO bytes, with no "
+                "normalization or other mutation, then hash the complete result."
+            ),
+            "replacement_count": 3,
+            "replacements": expected_replacements,
+        },
+        "gate_d_closed": False,
+        "numerical_claim": False,
+        "observed_failure": {
+            "compiled_executable_invocation_count": 0,
+            "optimized_hlo_bytes_preserved": False,
+            "optimized_hlo_sha256_from_fail_closed_exception": (
+                "a9733e22aa4c69859400eebb036f13c0b5c9591c0a5ae7a61d21576e48fc2fe2"
+            ),
+            "run_tag": (
+                "gate_d_compensated_pp16_numerical_"
+                "20260901T092524000000000Z"
+            ),
+            "stablehlo_sha256": EXPECTED_STABLEHLO_SHA256,
+        },
+        "performance_claim": False,
+        "schema_version": 1,
+        "source_hlo": {
+            "byte_count": EXPECTED_ACQUIRED_OPTIMIZED_HLO_BYTES,
+            "run_tag": "gate_d_compensated_pp16_hlo_20260901T070612366187759Z",
+            "sha256": EXPECTED_ACQUIRED_OPTIMIZED_HLO_SHA256,
+        },
+        "verification_scope": (
+            "Under SHA-256 collision resistance, the failed compiler text hash "
+            "equals the exact accepted HLO preimage after only authenticated "
+            "source-path and call-site line metadata substitutions. This "
+            "authorizes only the exact numerical-driver raw HLO hash; it does "
+            "not relax StableHLO, HLO locality, numerical, performance, or "
+            "Gate-D gates."
+        ),
+        "tpu_numerical_execution_performed": False,
+    }
+    if report != expected:
+        raise RuntimeError("Gate-D HLO source-location bridge schema drifted")
+    if (
+        len(acquired_hlo_raw) != EXPECTED_ACQUIRED_OPTIMIZED_HLO_BYTES
+        or sha256(acquired_hlo_raw).hexdigest()
+        != EXPECTED_ACQUIRED_OPTIMIZED_HLO_SHA256
+    ):
+        raise RuntimeError("Gate-D accepted optimized-HLO preimage drifted")
+    derived = acquired_hlo_raw
+    for replacement in expected_replacements:
+        old = replacement["old"].encode("ascii")
+        new = replacement["new"].encode("ascii")
+        if derived.count(old) != 1 or derived.count(new) != 0:
+            raise RuntimeError("Gate-D HLO source-location occurrence drifted")
+        derived = derived.replace(old, new, 1)
+    if (
+        len(derived) != EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES
+        or sha256(derived).hexdigest() != EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256
+    ):
+        raise RuntimeError("Gate-D derived numerical optimized-HLO drifted")
+    return derived, {
+        "artifact_sha256": HLO_SOURCE_LOCATION_BRIDGE_SHA256,
+        "derived_numerical_hlo": expected["derived_numerical_hlo"],
+        "replacement_count": 3,
+        "source_hlo": expected["source_hlo"],
     }
 
 
@@ -771,6 +887,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--expected-driver-sha256", required=True)
     parser.add_argument("--hlo-adjudication", type=Path, required=True)
+    parser.add_argument("--hlo-source-location-bridge", type=Path, required=True)
+    parser.add_argument("--accepted-optimized-hlo", type=Path, required=True)
     parser.add_argument("--admission-report", type=Path, required=True)
     parser.add_argument("--topology-authority", type=Path, required=True)
     parser.add_argument("--capsule", type=Path, required=True)
@@ -812,6 +930,17 @@ def main() -> int:
         args.hlo_adjudication, HLO_ADJUDICATION_SHA256, "HLO adjudication"
     )
     hlo_authority = validate_hlo_adjudication(hlo_report)
+    hlo_bridge_raw = _snapshot_regular(args.hlo_source_location_bridge)
+    if sha256(hlo_bridge_raw).hexdigest() != HLO_SOURCE_LOCATION_BRIDGE_SHA256:
+        raise RuntimeError("Gate-D HLO source-location bridge bytes drifted")
+    hlo_bridge_report = json.loads(hlo_bridge_raw.decode("ascii", errors="strict"))
+    # The strict whole-object validator rejects every non-object schema.
+    acquired_optimized_hlo_raw = _snapshot_regular(args.accepted_optimized_hlo)
+    derived_optimized_hlo_raw, hlo_bridge_binding = (
+        validate_hlo_source_location_bridge(
+            hlo_bridge_report, acquired_optimized_hlo_raw
+        )
+    )
     capsule = _load_bound_json(args.capsule, CAPSULE_SHA256, "capsule")
     authority = _load_bound_json(
         args.capsule_execution_authority,
@@ -834,6 +963,16 @@ def main() -> int:
     if sha256(state_raw).hexdigest() != CAPSULE_STATE_SHA256:
         raise RuntimeError("Gate-D capsule state bytes drifted")
     run_fd = helper._open_inherited_run_dir(args.run_dir, args.run_dir_fd)
+    helper._write_run_member_exclusive(
+        run_fd,
+        "hlo/acquired_preimage.optimized_hlo.txt",
+        acquired_optimized_hlo_raw,
+    )
+    helper._write_run_member_exclusive(
+        run_fd,
+        "hlo/source_location_bridge.json",
+        hlo_bridge_raw,
+    )
 
     source_fd, source_path, source_snapshot = helper._sealed_git_source_archive(
         args.expected_code_hash, repo=WORKTREE
@@ -885,12 +1024,6 @@ def main() -> int:
     stablehlo = lowered.as_text()
     compiled = lowered.compile()
     optimized_hlo = compiled.as_text()
-    observed_hlo = {
-        "stablehlo_sha256": sha256(stablehlo.encode("utf-8")).hexdigest(),
-        "optimized_hlo_sha256": sha256(optimized_hlo.encode("utf-8")).hexdigest(),
-    }
-    if observed_hlo != hlo_authority:
-        raise RuntimeError(f"Gate-D executable HLO identity drifted: {observed_hlo}")
     helper._write_run_member_exclusive(
         run_fd, "hlo/compensated_pp16_stage0.stablehlo.mlir", stablehlo.encode("utf-8")
     )
@@ -899,6 +1032,15 @@ def main() -> int:
         "hlo/compensated_pp16_stage0.optimized_hlo.txt",
         optimized_hlo.encode("utf-8"),
     )
+    observed_hlo = {
+        "stablehlo_sha256": sha256(stablehlo.encode("utf-8")).hexdigest(),
+        "optimized_hlo_sha256": sha256(optimized_hlo.encode("utf-8")).hexdigest(),
+    }
+    if (
+        observed_hlo != hlo_authority
+        or optimized_hlo.encode("utf-8") != derived_optimized_hlo_raw
+    ):
+        raise RuntimeError(f"Gate-D executable HLO identity drifted: {observed_hlo}")
     memory_after_compile = [helper._memory_stats(device) for device in devices]
 
     invocation_count = 0
@@ -1005,6 +1147,7 @@ def main() -> int:
         "compiled_executable_invocation_count": invocation_count,
         "gate_d_closed": False,
         "hlo": observed_hlo,
+        "hlo_source_location_bridge": hlo_bridge_binding,
         "host_materialization": {
             **host_materialization_authority,
             "observed_derived_weights": derived_weights,

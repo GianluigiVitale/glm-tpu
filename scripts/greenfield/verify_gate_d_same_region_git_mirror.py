@@ -25,6 +25,7 @@ ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 TEMP_ROOT = Path("/home/gianl/glm-run")
 BOUND_PATHS = (
     "docs/artifacts/gate-d-pp16-numerical-host-materialization-equivalence.json",
+    "docs/artifacts/gate-d-compensated-pp16-hlo-source-location-bridge.json",
     "docs/artifacts/gate-d-precompile-admission-v2-compensated-capsule.json",
     "docs/artifacts/gate-d-runtime-locality-authority.json",
     "scripts/greenfield/acquire_gate_d_compensated_pp16_hlo.py",

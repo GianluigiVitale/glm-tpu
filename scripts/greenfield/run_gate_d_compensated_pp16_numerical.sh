@@ -132,6 +132,10 @@ readonly TOPOLOGY=$WORKTREE/docs/artifacts/gate-d-runtime-locality-authority.jso
 readonly TOPOLOGY_SHA=49cf6bb1a553985855556d1401ad85918669df52d12f8dc5150f247d18b325eb
 readonly HLO_ADJUDICATION=/home/gianl/glm-tpu-gate-d-hlo-adjudication/docs/artifacts/gate-d-compensated-pp16-hlo-adjudication.json
 readonly HLO_ADJUDICATION_SHA=bb04e959fd752fed8c5e8befd94875d5f81086dba5820d43212e87e3628cac04
+readonly HLO_SOURCE_LOCATION_BRIDGE=$WORKTREE/docs/artifacts/gate-d-compensated-pp16-hlo-source-location-bridge.json
+readonly HLO_SOURCE_LOCATION_BRIDGE_SHA=1f793179e6559db9898ae3274dfef34b2517dcc09ea3c8193c5a87fab69d8885
+readonly ACCEPTED_OPTIMIZED_HLO=/home/gianl/gate-d-runs/gate_d_compensated_pp16_hlo_20260901T070612366187759Z/hlo/compensated_pp16_stage0.optimized_hlo.txt
+readonly ACCEPTED_OPTIMIZED_HLO_SHA=b63623498d82f67824b3be8998c09448440870b753cc1aa95d7a7765422c692b
 readonly CAPSULE_ROOT=/home/gianl/gate-d-runs/greenfield_gate_d_compensated_capsule_20260831T124838Z
 readonly CAPSULE=$CAPSULE_ROOT/capsule.json
 readonly CAPSULE_SHA=5b7ad71f37dbbcda0ee36a9fc0c42a7ca45d619a9e741307386755e68e87c1a4
@@ -145,11 +149,11 @@ readonly HOST_MATERIALIZATION_AUTHORITY=$WORKTREE/docs/artifacts/gate-d-pp16-num
 readonly HOST_MATERIALIZATION_AUTHORITY_SHA=a7e5b393f7c61181f6b2aab9531d788fb27594d9cf980055c165b6f278ba4f99
 readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/gate-d-pp16-numerical
 readonly DRIVER=$IMMUTABLE_CAPSULE_ROOT/run_gate_d_compensated_pp16_numerical.py
-readonly DRIVER_SHA=b0d1902765e33fdc7e7d5dd7306552c414418c874df23e3d3c82048937435140
+readonly DRIVER_SHA=03d25f209a2aa28a94a577905c7c3ac0dac31b96386768e6e3a4f21eceef34cf
 readonly PUBLISHER=$IMMUTABLE_CAPSULE_ROOT/publish_gate_d_compensated_pp16_numerical.py
-readonly PUBLISHER_SHA=1fab71bf6c64fb72134e0ce9934c93a42fc6e59a0f582ac098a1306831c556ca
+readonly PUBLISHER_SHA=2bb44eba989cb47cd05dca3f09a2091565b0a845b45654175c41cb97a833ed56
 readonly MIRROR_VERIFIER=$IMMUTABLE_CAPSULE_ROOT/verify_gate_d_same_region_git_mirror.py
-readonly MIRROR_VERIFIER_SHA=86bab7c5f509e044588d3aca689a4a06eb132cd579e50bd8450d6bacd2b50c55
+readonly MIRROR_VERIFIER_SHA=091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b
 readonly DRIVER_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12
 readonly PUBLISHER_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12
 
@@ -185,6 +189,8 @@ readonly REMOTE_PREFIX=$BUCKET/results/greenfield/glm52/gate_d_pp16_numerical/$T
 [[ $(/usr/bin/sha256sum "$ADMISSION" | /usr/bin/awk '{print $1}') == "$ADMISSION_SHA" ]]
 [[ $(/usr/bin/sha256sum "$TOPOLOGY" | /usr/bin/awk '{print $1}') == "$TOPOLOGY_SHA" ]]
 [[ $(/usr/bin/sha256sum "$HLO_ADJUDICATION" | /usr/bin/awk '{print $1}') == "$HLO_ADJUDICATION_SHA" ]]
+[[ $(/usr/bin/sha256sum "$HLO_SOURCE_LOCATION_BRIDGE" | /usr/bin/awk '{print $1}') == "$HLO_SOURCE_LOCATION_BRIDGE_SHA" ]]
+[[ $(/usr/bin/sha256sum "$ACCEPTED_OPTIMIZED_HLO" | /usr/bin/awk '{print $1}') == "$ACCEPTED_OPTIMIZED_HLO_SHA" ]]
 [[ $(/usr/bin/sha256sum "$CAPSULE" | /usr/bin/awk '{print $1}') == "$CAPSULE_SHA" ]]
 [[ $(/usr/bin/sha256sum "$CAPSULE_INPUTS" | /usr/bin/awk '{print $1}') == "$CAPSULE_INPUTS_SHA" ]]
 [[ $(/usr/bin/sha256sum "$CAPSULE_STATE" | /usr/bin/awk '{print $1}') == "$CAPSULE_STATE_SHA" ]]
@@ -368,6 +374,8 @@ set +e
         --expected-code-hash "$PIN" \
         --expected-driver-sha256 "$DRIVER_SHA" \
         --hlo-adjudication "$HLO_ADJUDICATION" \
+        --hlo-source-location-bridge "$HLO_SOURCE_LOCATION_BRIDGE" \
+        --accepted-optimized-hlo "$ACCEPTED_OPTIMIZED_HLO" \
         --admission-report "$ADMISSION" \
         --topology-authority "$TOPOLOGY" \
         --capsule "$CAPSULE" \

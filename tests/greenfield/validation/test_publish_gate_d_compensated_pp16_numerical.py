@@ -92,6 +92,21 @@ def _runner(*, accepted: bool = True) -> dict[str, object]:
             "optimized_hlo_sha256": MODULE.EXPECTED_OPTIMIZED_HLO_SHA256,
             "stablehlo_sha256": MODULE.EXPECTED_STABLEHLO_SHA256,
         },
+        "hlo_source_location_bridge": {
+            "artifact_sha256": MODULE.EXPECTED_HLO_SOURCE_LOCATION_BRIDGE_SHA256,
+            "derived_numerical_hlo": {
+                "byte_count": 267330,
+                "sha256": MODULE.EXPECTED_OPTIMIZED_HLO_SHA256,
+            },
+            "replacement_count": 3,
+            "source_hlo": {
+                "byte_count": 267335,
+                "run_tag": (
+                    "gate_d_compensated_pp16_hlo_20260901T070612366187759Z"
+                ),
+                "sha256": MODULE.EXPECTED_ACQUIRED_OPTIMIZED_HLO_SHA256,
+            },
+        },
         "host_materialization": {
             **expected_host,
             "observed_derived_weights": {
@@ -160,6 +175,7 @@ def test_runner_accepts_exact_accepted_and_rejected_boundaries() -> None:
         (("schema_version",), True),
         (("performance_claim",), True),
         (("hlo", "optimized_hlo_sha256"), "0" * 64),
+        (("hlo_source_location_bridge", "artifact_sha256"), "0" * 64),
         (("host_materialization", "authority_sha256"), "0" * 64),
         (("numerical", "owner_agreement", "query_owners"), 1),
         (

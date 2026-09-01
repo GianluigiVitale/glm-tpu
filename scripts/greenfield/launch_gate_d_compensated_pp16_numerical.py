@@ -19,16 +19,16 @@ WORKTREE = Path("/home/gianl/glm-tpu-gate-d-pp16-numerical")
 SOURCE_PATH = "scripts/greenfield/launch_gate_d_compensated_pp16_numerical.py"
 WRAPPER_PATH = WORKTREE / "scripts/greenfield/run_gate_d_compensated_pp16_numerical.sh"
 WRAPPER_SOURCE_PATH = "scripts/greenfield/run_gate_d_compensated_pp16_numerical.sh"
-WRAPPER_SHA256 = "038bd31fb6153d28aad47b22e427318773c6740457620e339211f896706c7044"
+WRAPPER_SHA256 = "1f14411435f870ffb5b5aca9f0fb1e31bd0a65fabd1428ba839d82c224428e27"
 IMMUTABLE_CAPSULE_ROOT = Path("/usr/local/libexec/glm-tpu/gate-d-pp16-numerical")
 DRIVER_PATH = IMMUTABLE_CAPSULE_ROOT / "run_gate_d_compensated_pp16_numerical.py"
 DRIVER_SOURCE_PATH = "scripts/greenfield/run_gate_d_compensated_pp16_numerical.py"
-DRIVER_SHA256 = "b0d1902765e33fdc7e7d5dd7306552c414418c874df23e3d3c82048937435140"
+DRIVER_SHA256 = "03d25f209a2aa28a94a577905c7c3ac0dac31b96386768e6e3a4f21eceef34cf"
 PUBLISHER_PATH = IMMUTABLE_CAPSULE_ROOT / "publish_gate_d_compensated_pp16_numerical.py"
 PUBLISHER_SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_compensated_pp16_numerical.py"
 )
-PUBLISHER_SHA256 = "1fab71bf6c64fb72134e0ce9934c93a42fc6e59a0f582ac098a1306831c556ca"
+PUBLISHER_SHA256 = "2bb44eba989cb47cd05dca3f09a2091565b0a845b45654175c41cb97a833ed56"
 MIRROR_VERIFIER_PATH = (
     IMMUTABLE_CAPSULE_ROOT / "verify_gate_d_same_region_git_mirror.py"
 )
@@ -36,7 +36,7 @@ MIRROR_VERIFIER_SOURCE_PATH = (
     "scripts/greenfield/verify_gate_d_same_region_git_mirror.py"
 )
 MIRROR_VERIFIER_SHA256 = (
-    "86bab7c5f509e044588d3aca689a4a06eb132cd579e50bd8450d6bacd2b50c55"
+    "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"
 )
 LOCK_ROOT = Path("/opt/glm-tpu/locks")
 LOCK_NAMES = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")

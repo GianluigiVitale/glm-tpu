@@ -14,6 +14,14 @@ import pytest
 
 ROOT = Path(__file__).parents[3]
 SOURCE = ROOT / "scripts/greenfield/run_gate_d_compensated_pp16_numerical.py"
+SOURCE_LOCATION_BRIDGE = ROOT / (
+    "docs/artifacts/gate-d-compensated-pp16-hlo-source-location-bridge.json"
+)
+ACQUIRED_OPTIMIZED_HLO = Path(
+    "/home/gianl/gate-d-runs/"
+    "gate_d_compensated_pp16_hlo_20260901T070612366187759Z/"
+    "hlo/compensated_pp16_stage0.optimized_hlo.txt"
+)
 SPEC = importlib.util.spec_from_file_location("gate_d_pp16_numerical", SOURCE)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -50,7 +58,7 @@ def _hlo_report() -> dict[str, object]:
                 "num_partitions": 2,
                 "primary_noninterference": True,
                 "rooted_compensated_witness": True,
-                "sha256": MODULE.EXPECTED_OPTIMIZED_HLO_SHA256,
+                "sha256": MODULE.EXPECTED_ACQUIRED_OPTIMIZED_HLO_SHA256,
             },
             "stablehlo": {
                 "logical_rows": 1,
@@ -249,7 +257,7 @@ def _host_outputs() -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
 
 def test_hlo_adjudication_accepts_exact_boundary() -> None:
     assert MODULE.validate_hlo_adjudication(_hlo_report()) == {
-        "optimized_hlo_sha256": MODULE.EXPECTED_OPTIMIZED_HLO_SHA256,
+        "optimized_hlo_sha256": MODULE.EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256,
         "stablehlo_sha256": MODULE.EXPECTED_STABLEHLO_SHA256,
     }
 
@@ -488,7 +496,7 @@ def test_source_orders_hlo_authentication_before_exactly_one_invocation_and_tran
     source = SOURCE.read_text()
     assert source.count("result = compiled(*arguments)") == 1
     assert source.count("transferred = jax.device_get(result)") == 1
-    assert source.index("if observed_hlo != hlo_authority:") < source.index(
+    assert source.index('optimized_hlo.encode("utf-8") != derived_optimized_hlo_raw') < source.index(
         "result = compiled(*arguments)"
     )
     assert source.index("invocation_count += 1") < source.index(
@@ -509,4 +517,53 @@ def test_source_and_compile_helper_have_expected_hash_and_no_unreviewed_graph_ch
     assert sha256(helper.read_bytes()).hexdigest() == MODULE.COMPILE_HELPER_SHA256
     assert MODULE.HLO_SOURCE_CODE_HASH == "94518b7d4ce788157afa98b7bc1f8144613852d5"
     assert MODULE.EXPECTED_STABLEHLO_SHA256.startswith("55d7940c")
-    assert MODULE.EXPECTED_OPTIMIZED_HLO_SHA256.startswith("b6362349")
+    assert MODULE.EXPECTED_ACQUIRED_OPTIMIZED_HLO_SHA256.startswith("b6362349")
+    assert MODULE.EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256.startswith("fc6384d8")
+
+
+def test_source_location_hlo_bridge_is_exact_and_bound_to_current_call_sites() -> None:
+    bridge = json.loads(SOURCE_LOCATION_BRIDGE.read_bytes())
+    assert bridge["source_hlo"]["sha256"] == (
+        MODULE.EXPECTED_ACQUIRED_OPTIMIZED_HLO_SHA256
+    )
+    assert bridge["derived_numerical_hlo"]["sha256"] == (
+        MODULE.EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256
+    )
+    assert bridge["derivation"]["replacement_count"] == 3
+    assert [item["occurrence_count"] for item in bridge["derivation"]["replacements"]] == [
+        1,
+        1,
+        1,
+    ]
+    source_lines = SOURCE.read_text(encoding="ascii").splitlines()
+    assert source_lines[1022].strip() == "lowered = replay.lower(*arguments)"
+    assert source_lines[1196].strip() == "raise SystemExit(main())"
+
+
+def test_source_location_bridge_replays_real_accepted_hlo_bytes_exactly() -> None:
+    bridge_raw = SOURCE_LOCATION_BRIDGE.read_bytes()
+    assert sha256(bridge_raw).hexdigest() == MODULE.HLO_SOURCE_LOCATION_BRIDGE_SHA256
+    bridge = json.loads(bridge_raw)
+    accepted = ACQUIRED_OPTIMIZED_HLO.read_bytes()
+    derived, binding = MODULE.validate_hlo_source_location_bridge(bridge, accepted)
+    assert len(derived) == MODULE.EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES
+    assert sha256(derived).hexdigest() == (
+        MODULE.EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256
+    )
+    assert binding["artifact_sha256"] == MODULE.HLO_SOURCE_LOCATION_BRIDGE_SHA256
+    for replacement in bridge["derivation"]["replacements"]:
+        assert accepted.count(replacement["old"].encode("ascii")) == 1
+        assert accepted.count(replacement["new"].encode("ascii")) == 0
+
+
+def test_source_location_bridge_rejects_schema_and_preimage_mutation() -> None:
+    bridge = json.loads(SOURCE_LOCATION_BRIDGE.read_bytes())
+    accepted = ACQUIRED_OPTIMIZED_HLO.read_bytes()
+    attacked = deepcopy(bridge)
+    attacked["derivation"]["replacement_count"] = 2
+    with pytest.raises(RuntimeError, match="schema drifted"):
+        MODULE.validate_hlo_source_location_bridge(attacked, accepted)
+    corrupted = bytearray(accepted)
+    corrupted[-1] ^= 1
+    with pytest.raises(RuntimeError, match="preimage drifted"):
+        MODULE.validate_hlo_source_location_bridge(bridge, bytes(corrupted))

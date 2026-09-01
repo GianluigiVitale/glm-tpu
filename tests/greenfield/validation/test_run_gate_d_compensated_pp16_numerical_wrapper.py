@@ -44,6 +44,8 @@ def test_wrapper_binds_all_numerical_authorities_before_driver_invocation() -> N
         'sha256sum "$ADMISSION"',
         'sha256sum "$TOPOLOGY"',
         'sha256sum "$HLO_ADJUDICATION"',
+        'sha256sum "$HLO_SOURCE_LOCATION_BRIDGE"',
+        'sha256sum "$ACCEPTED_OPTIMIZED_HLO"',
         'sha256sum "$CAPSULE"',
         'sha256sum "$CAPSULE_INPUTS"',
         'sha256sum "$CAPSULE_STATE"',
@@ -53,6 +55,8 @@ def test_wrapper_binds_all_numerical_authorities_before_driver_invocation() -> N
         'sha256sum "$PUBLISHER"',
     ):
         assert source.index(authority) < driver
+    assert '--hlo-source-location-bridge "$HLO_SOURCE_LOCATION_BRIDGE"' in source
+    assert '--accepted-optimized-hlo "$ACCEPTED_OPTIMIZED_HLO"' in source
     assert source.index("strict_census pre") < driver
     assert source.index('"$PUBLISHER_PYTHON" -I -S -B "$MIRROR_VERIFIER"') < driver
     publisher = ROOT / "scripts/greenfield/publish_gate_d_compensated_pp16_numerical.py"
