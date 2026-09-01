@@ -6,6 +6,29 @@ The cross-repository reuse decisions and pinned implementation candidates are in
 adapted, oracle-only, rejected, or reserved for a later gate; they do not weaken the evidence rules
 below.
 
+## Gate-D frozen execution pin and append-only evidence ref (prepared)
+
+Recovery-v4 succeeded at `dc9ec46`, but persisting its required evidence advanced only worker 0's
+linked execution branch to `edb12a5`; workers 1--7 remain clean complete standalone repositories at
+the sealed target. The PP16 wrapper correctly refuses this mismatch before HLO work. Recovery v5
+binds `gate-d-worker-repository-recovered-prestate-inventory.json` to the SHA-pinned v4 terminal and
+accepts only that exact worker-1--7 state.
+
+To avoid advancing executable `HEAD` after the next recovery, executable source freezes on
+`rewrite/topology-first-decode` and install/recovery/HLO evidence is committed to the separate
+`evidence/gate-d-topology-first` branch. `validate_gate_d_evidence_ref.py` sanitizes Git execution,
+binds the canonical linked worktree and exact origin, authenticates actual remote heads, validates
+all prior commits even in staged mode, and permits only new regular
+`docs/artifacts/gate-d-*.json` blobs. It rejects merges, rewrites, sparse/index hiding, incomplete
+or dirty trees and non-fast-forward history. The evidence mirror uses an immutable export verified
+path-for-path, mode-for-mode and blob-for-blob against the authenticated commit, then writes and
+rereads an exclusive canonical authority receipt. It publishes the verified archive and receipt to
+a commit-keyed same-region prefix only with generation match zero and content MD5 from retained
+no-follow descriptors. Generation-qualified byte replay and the exact two-object remote catalogue
+must pass; live, noncurrent and soft-deleted generations are checked, and an existing
+partial/different prefix is preserved and refused without overwrite. This is a prepared authority
+only: no v5 install/recovery or PP16 HLO has run.
+
 ## Accepted protected greenfield evidence
 
 Every accepted run has a local directory under `/home/gianl/glm-run`, a same-tag archive under

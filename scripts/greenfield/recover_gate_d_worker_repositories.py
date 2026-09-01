@@ -28,11 +28,18 @@ CONTROLLER_RELATIVE = "scripts/greenfield/recover_gate_d_worker_repositories.py"
 WORKER_RELATIVE = "scripts/greenfield/gate_d_worker_repository_transaction.py"
 WRAPPER_RELATIVE = "scripts/greenfield/run_gate_d_compensated_pp16_hlo.sh"
 INVENTORY_RELATIVE = (
-    "docs/artifacts/gate-d-worker-repository-promisor-path-inventory.json"
+    "docs/artifacts/gate-d-worker-repository-recovered-prestate-inventory.json"
 )
-INVENTORY_SHA256 = "03be218ce0b7cc1b33c12c871aaa85f5e3e772a8dcd2fd72a693ff3f916fd70b"
+INVENTORY_SHA256 = "c4c3fd86111be9e7e0f5afd52e2cc5dab462fa9bf7b0cd710e75a4cd79a950cf"
+PRESTATE_AUTHORITY_RELATIVE = (
+    "docs/artifacts/gate-d-worker-repository-recovery-v4-complete.json"
+)
+PRESTATE_AUTHORITY_SHA256 = (
+    "5f9e7ffc37e59a2d0d14879071c55b24ab1abceb7fb8f7fdb3caff364e5150d2"
+)
+PRESTATE_PIN = "dc9ec468ad1529b09c4dd06005849ee70e0fa7c7"
 INSTALLED_CONTROLLER = Path(
-    "/opt/glm-tpu/gate-d-worker-recovery-v4/recover_gate_d_worker_repositories.py"
+    "/opt/glm-tpu/gate-d-worker-recovery-v5/recover_gate_d_worker_repositories.py"
 )
 LINKED_COMMON = Path("/home/gianl/glm-tpu/.git")
 LINKED_GIT_DIR = LINKED_COMMON / "worktrees/glm-tpu-topology-rewrite"
@@ -59,52 +66,22 @@ RECOVERY_WORKERS = tuple(range(1, 8))
 UNTOUCHED_WORKERS = (0,)
 EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 RECOVERY_PRESTATE_PINS = {
-    1: "4a44f583697896bddf6f4b88526fdbe517e3ba95",
-    2: "508aaa373147988ff597dfd94a02fddff1778be6",
-    3: "4a44f583697896bddf6f4b88526fdbe517e3ba95",
-    4: "4a44f583697896bddf6f4b88526fdbe517e3ba95",
-    5: "4a44f583697896bddf6f4b88526fdbe517e3ba95",
-    6: "508aaa373147988ff597dfd94a02fddff1778be6",
-    7: "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+    1: PRESTATE_PIN,
+    2: PRESTATE_PIN,
+    3: PRESTATE_PIN,
+    4: PRESTATE_PIN,
+    5: PRESTATE_PIN,
+    6: PRESTATE_PIN,
+    7: PRESTATE_PIN,
 }
 RECOVERY_PRESTATE_CONTRACTS = {
-    1: (
-        "standalone_promisor",
-        3230,
-        "a79e5bc240843b5630eb1242a13bf89b85e2bd9e7d6a3ed2a3b44d858fba8b46",
-        29,
-        "c0a8650f6cde62bfd15ce2acdc70ec28aeb8a8ee758eb96cffe95ea1f6122ecf",
-    ),
+    1: ("standalone", 0, EMPTY_SHA256, 0, EMPTY_SHA256),
     2: ("standalone", 0, EMPTY_SHA256, 0, EMPTY_SHA256),
-    3: (
-        "standalone_promisor",
-        3230,
-        "a79e5bc240843b5630eb1242a13bf89b85e2bd9e7d6a3ed2a3b44d858fba8b46",
-        29,
-        "c0a8650f6cde62bfd15ce2acdc70ec28aeb8a8ee758eb96cffe95ea1f6122ecf",
-    ),
-    4: (
-        "standalone_promisor",
-        3225,
-        "0c14fb538da0f9d7b575b66327b9577d04ede69583472528720b4fa2707c65e4",
-        31,
-        "d356729e41a423c2858996c728532237b2c7d8a686c425f57e01adb49cf612ae",
-    ),
-    5: (
-        "standalone_promisor",
-        3230,
-        "a79e5bc240843b5630eb1242a13bf89b85e2bd9e7d6a3ed2a3b44d858fba8b46",
-        29,
-        "c0a8650f6cde62bfd15ce2acdc70ec28aeb8a8ee758eb96cffe95ea1f6122ecf",
-    ),
+    3: ("standalone", 0, EMPTY_SHA256, 0, EMPTY_SHA256),
+    4: ("standalone", 0, EMPTY_SHA256, 0, EMPTY_SHA256),
+    5: ("standalone", 0, EMPTY_SHA256, 0, EMPTY_SHA256),
     6: ("standalone", 0, EMPTY_SHA256, 0, EMPTY_SHA256),
-    7: (
-        "standalone_promisor",
-        3230,
-        "a79e5bc240843b5630eb1242a13bf89b85e2bd9e7d6a3ed2a3b44d858fba8b46",
-        29,
-        "8edfc0f6b01aa75db7df7dd5617a55c91d81261223fb6783902ef31c585cc4b7",
-    ),
+    7: ("standalone", 0, EMPTY_SHA256, 0, EMPTY_SHA256),
 }
 
 _BASE_ENV = {
@@ -137,9 +114,11 @@ def _sha256(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _validate_inventory_artifact(raw: bytes) -> None:
+def _validate_inventory_artifact(raw: bytes, authority_raw: bytes) -> None:
     if _sha256(raw) != INVENTORY_SHA256:
         raise RecoveryError("repository inventory hash mismatch")
+    if _sha256(authority_raw) != PRESTATE_AUTHORITY_SHA256:
+        raise RecoveryError("repository prestate authority hash mismatch")
     try:
         artifact = json.loads(raw)
         worker_records = artifact["workers"]
@@ -148,6 +127,7 @@ def _validate_inventory_artifact(raw: bytes) -> None:
         ):
             raise RecoveryError("repository inventory worker count mismatch")
         workers = {int(record["worker"]): record for record in worker_records}
+        authority = artifact["recovery_v4_authority"]
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
         raise RecoveryError("repository inventory schema mismatch") from error
     if (
@@ -158,6 +138,9 @@ def _validate_inventory_artifact(raw: bytes) -> None:
         or artifact.get("mutation") is not False
         or artifact.get("hlo_work") is not False
         or artifact.get("tpu_work") is not False
+        or authority.get("path") != PRESTATE_AUTHORITY_RELATIVE
+        or authority.get("sha256") != PRESTATE_AUTHORITY_SHA256
+        or authority.get("code_pin") != PRESTATE_PIN
     ):
         raise RecoveryError("repository inventory contract mismatch")
     for worker, expected_pin in RECOVERY_PRESTATE_PINS.items():
@@ -1229,19 +1212,23 @@ def main() -> int:
         inventory_blob = _git(
             "-C", str(WORKTREE), "show", f"{pin}:{INVENTORY_RELATIVE}"
         )
+        prestate_authority_blob = _git(
+            "-C", str(WORKTREE), "show", f"{pin}:{PRESTATE_AUTHORITY_RELATIVE}"
+        )
         if (
             controller_blob != installed_source
             or _sha256(controller_blob) != expected_source_sha
         ):
             raise RecoveryError("installed controller does not match committed blob")
         verifier = _extract_verifier(wrapper_blob)
-        _validate_inventory_artifact(inventory_blob)
+        _validate_inventory_artifact(inventory_blob, prestate_authority_blob)
         local_verify = _verify_local_repository(pin, verifier)
         evidence.write("local_repo_verify.txt", local_verify)
         source_identity = {
             "controller_sha256": _sha256(controller_blob),
             "inventory_sha256": _sha256(inventory_blob),
             "pin": pin,
+            "prestate_authority_sha256": _sha256(prestate_authority_blob),
             "recovery_workers": list(RECOVERY_WORKERS),
             "protected_linked_workers": list(UNTOUCHED_WORKERS),
             "verifier_sha256": _sha256(verifier.encode()),

@@ -2,6 +2,42 @@
 
 **Updated:** 2026-09-01 UTC
 
+## 2026-09-01 Gate-D exact-pin recursion isolated; recovery v5 source prepared only
+
+- Required recovery-v4 evidence advanced the linked execution branch to `edb12a5`, while recovered
+  workers 1--7 correctly remained at the recovery target `dc9ec46`. A fresh read-only replay proves
+  worker 0 is clean at `edb12a5`, workers 1--7 are clean format-0 standalone repositories at
+  `dc9ec46`, all promisor counts are zero, the pod is READY/HEALTHY, the approved bucket is
+  `US-CENTRAL2`, and all global/per-worker leases are free. Starting PP16 now would deterministically
+  fail its exact-eight-host-pin admission; no HLO/JAX/model/TPU attempt ran. A later expanded replay
+  command had a shell parse error before its remote body and caused no mutation.
+- Recovery v5 is being prepared against append-only inventory
+  `gate-d-worker-repository-recovered-prestate-inventory.json`. It binds the sealed v4 completion
+  artifact and accepts only the exact complete `dc9ec46` worker-1--7 prestate; worker 0 remains the
+  protected linked worktree. The controller targets a fresh immutable v5 path and retains all
+  descriptor, lock, bundle, transaction, terminal-last and quiescence protections.
+- Sol withheld deferring recovery evidence until after HLO: that would cross the required durable
+  recovery-review boundary. The correction therefore freezes the executable branch at one source
+  pin and uses `evidence/gate-d-topology-first` in a separate worktree for non-executable evidence.
+  `validate_gate_d_evidence_ref.py` uses a sanitized Git environment, canonical linked-worktree and
+  exact-origin identity, actual `ls-remote` heads and full-prefix validation; it permits only new
+  regular `gate-d-*.json` artifacts and rejects execution-ref drift, merges, rewrites, sparse/index
+  hiding, incomplete/unclean state and non-fast-forward remote history. The same-region mirror gains
+  a distinct commit-keyed `repos/glm-tpu-gate-d-evidence/<evidence-head>` target. Its helper creates
+  the Git archive through an exclusive file, rejects a partial/nonzero producer, compares every
+  extracted path/mode/blob hash with the authenticated commit's full `ls-tree`, exclusively writes
+  and rereads a canonical fsynced authority receipt, and publishes only that archive plus receipt.
+  The exact commit prefix must have no live, noncurrent or soft-deleted prior objects, or its sole
+  current versions must already be byte-identical; new objects use generation match zero and
+  content MD5 from retained no-follow descriptors, then generation-qualified remote replay and an
+  exact two-object catalogue. Partial/colliding prefixes remain untouched. Hostile
+  archive, receipt, collision and post-verification path-substitution tests prove no unverified byte
+  can be reported mirrored. None of this source is reviewed, committed, installed or invoked yet.
+- Exact next: focused validation and adversarial persistence review; commit/push/mirror one frozen
+  source pin; create and validate the evidence worktree; separately review/install v5; recover all
+  workers to the frozen pin; persist and review terminal evidence on the evidence branch; only then
+  independently review one PP16 compile-only HLO start at the unchanged pin.
+
 ## 2026-09-01 Gate-D repository fleet recovered exactly; PP16 HLO still not started
 
 - The separately approved one-shot v4 invocation used terminal tag

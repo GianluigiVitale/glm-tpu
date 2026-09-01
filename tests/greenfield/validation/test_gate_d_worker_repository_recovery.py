@@ -147,7 +147,7 @@ def test_source_contract_is_descriptor_bound_timeout_and_terminal_last() -> None
     controller = CONTROLLER_PATH.read_text()
     worker = WORKER_PATH.read_text()
     assert CONTROLLER.INSTALLED_CONTROLLER == Path(
-        "/opt/glm-tpu/gate-d-worker-recovery-v4/recover_gate_d_worker_repositories.py"
+        "/opt/glm-tpu/gate-d-worker-recovery-v5/recover_gate_d_worker_repositories.py"
     )
     assert "controller must run from the reviewed /opt path" in controller
     assert "os.O_NOFOLLOW" in controller
@@ -338,18 +338,26 @@ def test_recovery_inventory_is_hash_bound_and_exactly_matches_prestates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     inventory = (
-        ROOT / "docs/artifacts/gate-d-worker-repository-promisor-path-inventory.json"
+        ROOT
+        / "docs/artifacts/gate-d-worker-repository-recovered-prestate-inventory.json"
     ).read_bytes()
-    CONTROLLER._validate_inventory_artifact(inventory)
+    authority = (
+        ROOT / "docs/artifacts/gate-d-worker-repository-recovery-v4-complete.json"
+    ).read_bytes()
+    CONTROLLER._validate_inventory_artifact(inventory, authority)
 
     with pytest.raises(CONTROLLER.RecoveryError, match="inventory hash mismatch"):
-        CONTROLLER._validate_inventory_artifact(inventory + b"\n")
+        CONTROLLER._validate_inventory_artifact(inventory + b"\n", authority)
 
-    expected = CONTROLLER.RECOVERY_PRESTATE_PINS[5].encode()
-    tampered = inventory.replace(expected, b"c" * 40, 1)
+    with pytest.raises(CONTROLLER.RecoveryError, match="authority hash mismatch"):
+        CONTROLLER._validate_inventory_artifact(inventory, authority + b"\n")
+
+    tampered_document = json.loads(inventory)
+    tampered_document["workers"][5]["pin"] = "c" * 40
+    tampered = (json.dumps(tampered_document, sort_keys=True) + "\n").encode()
     monkeypatch.setattr(CONTROLLER, "INVENTORY_SHA256", sha256(tampered).hexdigest())
     with pytest.raises(CONTROLLER.RecoveryError, match="inventory prestate mismatch"):
-        CONTROLLER._validate_inventory_artifact(tampered)
+        CONTROLLER._validate_inventory_artifact(tampered, authority)
 
     duplicate = json.loads(inventory)
     duplicate["workers"][-1] = duplicate["workers"][0]
@@ -358,7 +366,7 @@ def test_recovery_inventory_is_hash_bound_and_exactly_matches_prestates(
         CONTROLLER, "INVENTORY_SHA256", sha256(duplicate_raw).hexdigest()
     )
     with pytest.raises(CONTROLLER.RecoveryError, match="inventory contract mismatch"):
-        CONTROLLER._validate_inventory_artifact(duplicate_raw)
+        CONTROLLER._validate_inventory_artifact(duplicate_raw, authority)
 
     wrong_format = json.loads(inventory)
     wrong_format["promisor_record_format"] = "ambiguous"
@@ -367,7 +375,7 @@ def test_recovery_inventory_is_hash_bound_and_exactly_matches_prestates(
         CONTROLLER, "INVENTORY_SHA256", sha256(wrong_format_raw).hexdigest()
     )
     with pytest.raises(CONTROLLER.RecoveryError, match="inventory contract mismatch"):
-        CONTROLLER._validate_inventory_artifact(wrong_format_raw)
+        CONTROLLER._validate_inventory_artifact(wrong_format_raw, authority)
 
 
 def test_prepare_exchange_and_final_preserve_exact_old_repository(
