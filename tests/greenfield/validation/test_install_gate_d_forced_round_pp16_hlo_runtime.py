@@ -62,13 +62,13 @@ def test_payload_hashes_and_install_targets_are_exact() -> None:
         "launch_gate_d_forced_round_pp16_hlo.py"
     }
     assert str(MODULE.SOURCE_ROOT) == (
-        "/opt/glm-tpu/gate-d-forced-round-hlo-install-v1"
+        "/opt/glm-tpu/gate-d-forced-round-hlo-install-v2"
     )
     assert str(MODULE.LAUNCHER_TARGET) == (
-        "/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo.py"
+        "/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo_v2.py"
     )
     assert str(MODULE.CAPSULE_TARGET) == (
-        "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo"
+        "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo-v2"
     )
 
 

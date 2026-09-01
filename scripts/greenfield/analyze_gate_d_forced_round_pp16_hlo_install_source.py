@@ -30,13 +30,13 @@ ORCHESTRATION_SOURCE = WORKTREE / (
     "docs/artifacts/gate-d-forced-round-pp16-hlo-orchestration-source.json"
 )
 ARTIFACT_PATH = "docs/artifacts/gate-d-forced-round-pp16-hlo-install-source.json"
-BASE_CODE_PIN = "a012b93fdbd7c6fe1f84db2260708ba55b38e8f6"
-BASE_TREE_ID = "0cd885775ea6e200b17c50efe2e051d6f1ebbaf0"
+BASE_CODE_PIN = "20272f747dda09c99e6f63bfde22899c9623e4a4"
+BASE_TREE_ID = "b97844ba2d66821635f38992c5ac15414b705b7d"
 ORCHESTRATION_SOURCE_SHA256 = (
-    "f4fcba8497599dd19f94ec8ded2566ad3d27a412a04adad584fc22417e18847c"
+    "75751a7c09c9abea8cc7442270ca2cc9de4d77a077229d37449295a133e68a04"
 )
 INSTALLER_AST_SHA256 = (
-    "0556fce5e09104aacbeed4ef222d6cefb2728280ad0d8de9b1186933b9501a90"
+    "836ffdb66db6ee1f59a200cdf61c51aa7754da4f2b99ebbfd2adb4c6b62e91fb"
 )
 PAYLOAD_PATHS = {
     "acquire_gate_d_forced_round_pp16_hlo.py": (
@@ -54,15 +54,8 @@ PAYLOAD_PATHS = {
 }
 ALLOWED_DELTA_PATHS = frozenset(
     {
-        "HANDOFF.md",
-        "docs/RESEARCH_LOG.md",
         ARTIFACT_PATH,
-        "docs/greenfield/EVIDENCE_MAP.md",
         str(ANALYZER.relative_to(WORKTREE)),
-        (
-            "scripts/greenfield/"
-            "analyze_gate_d_forced_round_pp16_hlo_orchestration_source.py"
-        ),
         str(INSTALLER.relative_to(WORKTREE)),
         str(TEST.relative_to(WORKTREE)),
     }
@@ -213,7 +206,7 @@ def _audit_installer(raw: bytes, payloads: dict[str, bytes]) -> dict[str, Any]:
     assignments = _literal_assignments(tree)
     required = (
         "#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n",
-        'SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-forced-round-hlo-install-v1")',
+        'SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-forced-round-hlo-install-v2")',
         'LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")',
         'CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")',
         "os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW",
@@ -288,10 +281,10 @@ def _audit_installer(raw: bytes, payloads: dict[str, bytes]) -> dict[str, Any]:
         "atomic_publish": "renameat2_RENAME_NOREPLACE",
         "capsule_published_before_launcher": True,
         "destination_capsule": (
-            "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo"
+            "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo-v2"
         ),
         "destination_launcher": (
-            "/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo.py"
+            "/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo_v2.py"
         ),
         "installer_ast_sha256": ast_sha,
         "installer_sha256": sha256(raw).hexdigest(),

@@ -12,12 +12,12 @@ from collections.abc import Mapping
 from hashlib import sha256
 from pathlib import Path
 
-SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-forced-round-hlo-install-v1")
+SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-forced-round-hlo-install-v2")
 INSTALLER_PATH = SOURCE_ROOT / "install_gate_d_forced_round_pp16_hlo_runtime.py"
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
-LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_forced_round_pp16_hlo.py"
+LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_forced_round_pp16_hlo_v2.py"
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-forced-round-pp16-hlo"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-forced-round-pp16-hlo-v2"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -30,10 +30,10 @@ PAYLOADS = {
         "046040d382567ccef94792b97e160b0f79b673ab1f0f1d46bfd20c57e884faf7"
     ),
     "launch_gate_d_forced_round_pp16_hlo.py": (
-        "6e2d0457a3a72ec81a30501bb3e8e7dc9b6235d6fa0e8f4faa77b1bbb2d1c6cd"
+        "7df72ff370fbbc40ede42aa833bd071cc113dc4a343fbc444d3e6b25ae522a5b"
     ),
     "publish_gate_d_forced_round_pp16_hlo.py": (
-        "ec67de6d29ba3a3e15a0853b6ef78eb3e0e34dfd2783ab46f101ca4c75dde0db"
+        "0a643e8c307a0f2b6c026a749956099ddae724da280ae7d7995be68a0a275607"
     ),
     "verify_gate_d_same_region_git_mirror.py": (
         "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"
