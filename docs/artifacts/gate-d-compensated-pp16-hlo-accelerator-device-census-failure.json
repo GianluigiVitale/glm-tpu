@@ -1,0 +1,76 @@
+{
+  "artifact_kind": "gate_d_compensated_pp16_hlo_accelerator_device_census_failure",
+  "burned_tag": true,
+  "classification": "TPU_BACKEND_INITIALIZED;COMPILER_DEPENDENCY_CENSUS_REFUSAL;NO_LOWERED_STABLEHLO;NO_COMPILE;NO_HLO;NO_EXECUTABLE_INVOCATION;NO_NUMERICAL_WORK;GATE_D_OPEN",
+  "code_pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059",
+  "correction_closure": {
+    "acquisition_driver_sha256": "a4599e0d88a1ef8a2df897d1677196e8cd0db5009f12b866e7316ecaadb5dd15",
+    "adjacent_cpu_tests_passed": 128,
+    "code_pin": "5b16f2c62242e00cd40f465cb929f83c1e132965",
+    "focused_cpu_tests_passed": 102,
+    "launch_authorized_by_review": false,
+    "publisher_sha256": "75c296a2b46aef1b878a95ee7b1dfabdaf062687bfc496416ffca102f1180ee3",
+    "reviewer": "sol_gate_d_observability_review",
+    "reviewer_verdict": "APPROVE; no blocking P0/P1 findings",
+    "wrapper_sha256": "802d7731c70a3e7a06307754ded2e16fc4e321a7293e01d2a8c4256973bfc0b6"
+  },
+  "diagnostic_archive": {
+    "all_generation_qualified_remote_bytes_match_local_sha256": true,
+    "diagnostic_ledger_generation": "1788242623650109",
+    "diagnostic_ledger_sha256": "b786ec76fee2ff1f835468f61a5be654afe947e1f43ffe89c8f15d30ab77fa58",
+    "diagnostic_payload_object_count": 10,
+    "diagnostic_receipt_sha256": "36ee1137526745c55465e286c6c092ff2995b84d07a1e22f19aff5706dc651ed",
+    "remote_generation_count": 11,
+    "terminal_ledger_uploaded_after_every_payload": true
+  },
+  "failure": {
+    "compiler_dependency_census_completed": false,
+    "exit_status": 1,
+    "hlo_directory_empty": true,
+    "jax_backend_initialized": true,
+    "mapped_accelerator_path": "/dev/accel2",
+    "message": "compiler native mapping escaped allowed roots: /dev/accel2",
+    "stage": "dependencies_before.compiler_native_mapping_census",
+    "stablehlo_or_optimized_hlo_files": 0,
+    "tpu_executable_invocation_count": 0
+  },
+  "finished_at_utc": "2026-09-01T06:03:43Z",
+  "gate_d_closed": false,
+  "invocation_review": {
+    "reviewer": "sol_gate_d_observability_review",
+    "verdict": "APPROVE HLO START; no P0/P1/P2"
+  },
+  "local_run_directory": "/home/gianl/gate-d-runs/gate_d_compensated_pp16_hlo_20260901T060043153044762Z",
+  "no_retry_same_tag": true,
+  "post_failure_audit": {
+    "canonical_leases_exact_and_free": 4,
+    "execution_ref_clean_and_remote_equal": true,
+    "external_fleet_census": "8/8 CENSUS_OK",
+    "local_gate_d_jax_libtpu_processes": 0,
+    "pod_accelerator_type": "v4-64",
+    "pod_health": "HEALTHY",
+    "pod_state": "READY",
+    "remote_terminal_success_present": false
+  },
+  "pre_and_failure_census": {
+    "failure_exit_sha256": "33b12cfaad2d914c5c16c5c928f87cd5770cdba9ebd12d5fe57fd16af984c0d8",
+    "failure_exit_unique_clean_hosts": 8,
+    "pre_sha256": "43cc267dba548c45939cd341f85d849fa9addad9c76027a8d99ab00c8913acb8",
+    "pre_unique_clean_hosts": 8
+  },
+  "remote_prefix": "gs://driftbench-dsv4-uc/results/greenfield/glm52/gate_d_pp16_hlo/gate_d_compensated_pp16_hlo_20260901T060043153044762Z",
+  "root_cause": {
+    "description": "The regular-file compiler dependency allowlist was applied before file-type classification. JAX TPU initialization legitimately mapped the TPU character device /dev/accel2, so the regular executable-mapping policy rejected the hardware device node before lowering.",
+    "silent_skip_all_nonregular_mappings_rejected": true,
+    "sol_reviewed_correction_direction": "Record exact canonical /dev/accel0..3 character-device nodes observed mapped in a separate fail-closed category; authenticate raw path, map/node identity, ownership, mode and rdev; reject every other non-regular mapping."
+  },
+  "schema_version": 1,
+  "source_identities": {
+    "acquisition_driver_sha256": "3842d06dd27dead13e485df48df82f49c8ce5aea99ef9603fab3eb0852681f88",
+    "installed_wrapper_sha256": "700519374081813174538e4f89a7c31c02dd039979d067aa46f66a70a827de0d",
+    "publisher_sha256": "f481c6104c44b878f5eec14b65b699b40021f6e31d136a00e37107e136f14c15"
+  },
+  "started_at_utc": "2026-09-01T06:02:41Z",
+  "tag": "gate_d_compensated_pp16_hlo_20260901T060043153044762Z",
+  "tpu_successor_authorized": false
+}
