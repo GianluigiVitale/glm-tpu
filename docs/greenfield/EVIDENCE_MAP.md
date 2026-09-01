@@ -3411,3 +3411,14 @@ persistence only; review and persistence precede any v2 installation.
 - Classification: `NUMERICAL_ORCHESTRATION_PERSISTED;CERTIFICATE_GENERATED;INSTALL_UNAUTHORIZED;
   TPU_EXECUTION_UNAUTHORIZED;FULL_DSA_8K_UNAUTHORIZED;GATE_D_OPEN`. Next: separate install-only
   command review; never launch from that review.
+
+## 2026-09-01 numerical V1 runtime installed, not invoked; batched review requested
+
+- Sol `APPROVE INSTALL ONLY`; provisioner + installer ran as two literal `/usr/bin/sudo -n` commands
+  from staging tree `9488e9c3…1c8d`; capsule/launcher installed root 0555 with exact hashes;
+  `launcher_invoked=false`; leases free; no process. Artifact
+  `gate-d-projection-contraction-pp16-numerical-runtime-install.json` SHA-256 `9be45200eacd8076e4a25a78da2a97599ee80432c1ab1aab6111cd82e6b1a042`.
+- Owner instruction: batch Sol reviews. Next single review = persistence of this batch + literal
+  fresh-tag command for `gate_d_projection_contraction_pp16_numerical_20260901T233855937688834Z`.
+- Classification: `NUMERICAL_RUNTIME_V1_INSTALLED_NOT_INVOKED;TPU_EXECUTION_UNAUTHORIZED;
+  FULL_DSA_8K_UNAUTHORIZED;GATE_D_OPEN`.

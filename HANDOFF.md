@@ -9969,3 +9969,30 @@ separate review of the literal immutable install-only commands (installer at
 launch, a separate review of one fresh tag/command, then one bounded execution and adjudication.
 **No install, launch, compile, TPU execution, full DSA/8K, numerical, performance or Gate-D claim
 exists.**
+
+## 2026-09-01 projection-contraction numerical V1 runtime installed; launcher not invoked
+
+Commit `a57cca4e0ebd07a2f7e68c42d018aa14a46eec70` (certificate) is exact on origin and its locked
+`US-CENTRAL2` mirror replay produced checkout archive SHA-256
+`f5935421fbdc4bda367df7c32de7895524de58a640c80effcad300800d78516b`. Sol independently returned
+`APPROVE INSTALL ONLY` for exactly two literal `/usr/bin/sudo -n` commands. The fixed provisioner
+`2b9c8c2b…0594` copied the five exact 0555 files from staging tree
+`9488e9c31c53afb37e22fd36046a85c6a299122b74f16eb3029057a40d091c8d` into root-owned 0755
+`/opt/glm-tpu/gate-d-projection-contraction-numerical-install-v1`; the install-only program then
+published the root-owned 0555 three-file runtime capsule
+`/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v1` before launcher
+`/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v1.py` (`755c60fb…1cc6`) and
+reported `launcher_invoked=false`. Read-back: every installed file has its exact committed hash,
+root ownership, mode 0555, nlink 1, no xattrs; all four canonical leases were simultaneously free
+and identity-bound; no launcher/driver process existed; the pod read READY/HEALTHY.
+
+Canonical artifact `docs/artifacts/gate-d-projection-contraction-pp16-numerical-runtime-install.json`
+has SHA-256 `9be45200eacd8076e4a25a78da2a97599ee80432c1ab1aab6111cd82e6b1a042`. This is installation evidence only: no launcher, JAX,
+compile, cloud, TPU/numerical/performance, full-DSA/8K or Gate-D claim.
+
+Owner instruction at 23:36Z: batch Sol reviews rather than one review per step. Accordingly the
+next Sol request covers, in one review, persistence of this artifact/docs batch and the literal
+fresh-tag execute-once command
+`/usr/bin/env -i GLM_GATE_D_PROJECTION_CONTRACTION_PP16_NUMERICAL=1 GLM_GATE_D_PROJECTION_CONTRACTION_PP16_NUMERICAL_MODE=execute_once GLM_GATE_D_PROJECTION_CONTRACTION_PP16_NUMERICAL_TAG=gate_d_projection_contraction_pp16_numerical_20260901T233855937688834Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin:/home/gianl/vllm-env/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v1.py`,
+to be run only after this batch is committed, pushed and mirror-replayed (the wrapper itself
+requires a clean pushed pin, mirror replay, canonical vacancy and an authenticated 8/8 census).

@@ -36,20 +36,18 @@ When stuck reread
 `docs/greenfield/compass_artifact_wf-f6f3c189-f49a-5169-bc82-8adefac958df_text_markdown.md`
 in full and adjudicate it against local evidence.
 
-## Resume checkpoint — 2026-09-01 23:40Z
+## Resume checkpoint — 2026-09-01 23:45Z
 
 Worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`, branch
-`tooling/gate-d-compensated-pp16-numerical`. Commit `7902b4c9517d55959151088ca43429d57bb486c5` (Sol
-`APPROVE PERSISTENCE`) is on origin and the replayed `US-CENTRAL2` mirror: corrected numerical
-orchestration/install sources, publisher-direct `NUMERICAL_RESULT` authority, substitution
-regressions, repinned chain, 74 focused tests. This batch persists the analyzer certificate
-`gate-d-projection-contraction-pp16-numerical-orchestration-install-source.json`
-(SHA `1c75e761…e38`, code hash `7902b4c9`) plus docs.
+`tooling/gate-d-compensated-pp16-numerical`. Commits `7902b4c9` (corrected orchestration, Sol
+approved) and `a57cca4e` (certificate `1c75e761…e38`) are on origin and the replayed `US-CENTRAL2`
+mirror. Sol `APPROVE INSTALL ONLY`; numerical V1 runtime is installed root 0555, launcher not
+invoked (artifact `gate-d-projection-contraction-pp16-numerical-runtime-install.json`).
 
-**STOP: no install/launcher/TPU run is authorized.** Exact next after this commit/push/mirror:
-separately review the literal immutable install-only commands (paths in HANDOFF), install without
-launch; separately review one fresh tag/command; then run/adjudicate the bounded discriminator once.
-Sol reviewer = Codex sub-agent thread 01a05206… via `codex exec fork`.
+Owner: batch Sol reviews, not one per step. This batch persists the install artifact/docs; the same
+Sol review covers the literal fresh-tag command for `gate_d_projection_contraction_pp16_numerical_20260901T233855937688834Z` (in HANDOFF). Exact next after
+commit/push/mirror: run that one command, adjudicate `NUMERICAL_RESULT`, persist evidence.
+**Until then no TPU run.** Sol reviewer = Codex sub-agent 01a05206… via `codex exec fork`.
 
 ## Proof and finish
 
