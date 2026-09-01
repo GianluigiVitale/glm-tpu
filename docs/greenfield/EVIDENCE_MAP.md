@@ -2497,6 +2497,28 @@ remains open and no TPU successor is authorized.
   This source batch requires review, commit/push and same-region mirror before a distinct fresh HLO
   start can be considered. Gate D remains open.
 
+## Gate-D repository fleet heterogeneity and targeted recovery correction
+
+- `docs/artifacts/gate-d-worker-repository-heterogeneous-inventory.json` records the corrected
+  read-only 8-host census. Worker 0 is the clean current linked worktree; workers 1--7 are clean,
+  full-object-closure standalone repositories split across two stale pins. This directly rejects
+  both "no recovery needed" and the unchanged all-eight exchange.
+- Burned diagnostic tag `gate_d_repo_recovery_20260901T014300000000001Z` performed no clone,
+  rename, upload, JAX/HLO, model or TPU work. Its first failure was `git_boundary`: the old exact
+  verifier incorrectly required `.git` to be a directory and therefore rejected worker 0's valid
+  linked-worktree pointer.
+- The correction binds worker 0 to the exact linked common/admin/pointer/backpointer/commondir/
+  config/object/index structure and workers 1--7 to the strict standalone path. It hash-binds the
+  eight-record inventory and per-worker observed stale pins, rejecting layout drift, duplicate IDs
+  and any third pin. Recovery mutates only the still-stale subset so partial success can resume,
+  refuses a no-op, pre-verifies untouched worker 0, and requires unique-host exact-pin 8/8
+  post-verification before terminal publication. Complete inventory, recovery and HLO-acquisition
+  validation passes 84/84.
+- This is source/read-only diagnostic evidence only. Recovery still requires adversarial review,
+  persistence, a no-replace `/opt/glm-tpu/gate-d-worker-recovery-v2` installation and a separately
+  reviewed fresh invocation. The historical controller remains intact/inert. Gate D and HLO
+  acquisition remain open.
+
 ## Fresh PP16 HLO start refused during concurrent Git transport; sync removed from run
 
 - The separately approved fresh tag `gate_d_compensated_pp16_hlo_20260831T222752715835766Z` passed

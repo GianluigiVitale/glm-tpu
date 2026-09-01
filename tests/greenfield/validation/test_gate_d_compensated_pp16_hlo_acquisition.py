@@ -765,15 +765,25 @@ def test_repository_verification_is_read_only_serial_and_fail_fast() -> None:
     assert 'rev-parse --verify "$pin^{commit}"' in block
     assert 'cat-file -t "$pin"' in block
     assert '[[ -d "$wt/.git" && ! -L "$wt/.git" ]]' in block
+    assert '[[ -f "$wt/.git" && ! -L "$wt/.git" ]]' in block
+    assert '[[ "$expected_layout" == standalone ]]' in block
+    assert '[[ "$expected_layout" == linked ]]' in block
+    assert '[[ $worker -eq 0 ]] && expected_layout=linked' in block
+    assert "linked_pointer_bytes" in block
+    assert "linked_backpointer_bytes" in block
+    assert "linked_commondir_bytes" in block
+    assert "linked_config_boundary" in block
+    assert "linked_index_boundary" in block
     assert "config_not_allowlisted" in block
     assert "rev-parse --show-toplevel" in block
     assert '[[ "$toplevel" == "$wt" ]]' in block
-    assert '[[ "$git_dir" == "$wt/.git" ]]' in block
-    assert '[[ "$common_dir" == "$wt/.git" ]]' in block
+    assert '[[ "$git_dir" == "$expected_git_dir" ]]' in block
+    assert '[[ "$common_dir" == "$expected_common_dir" ]]' in block
+    assert '[[ "$index_path" == "$expected_index" ]]' in block
+    assert '[[ "$sparse_checkout_path" == "$expected_sparse_checkout" ]]' in block
     assert "rev-parse --is-shallow-repository" in block
     assert '"$object_dir/info/alternates"' in block
-    assert '"$common_dir/info/grafts"' in block
-    assert '"$common_dir/info/sparse-checkout"' in block
+    assert '[[ "$grafts_path" == "$common_dir/info/grafts" ]]' in block
     assert "-name '*.promisor'" in block
     assert "for-each-ref --format='%(refname)' refs/replace" in block
     assert "ls-files -v -z" in block
@@ -793,8 +803,25 @@ def _worker_repo_verify_script() -> str:
 
 
 def _run_worker_repo_verify(
-    repo: Path, pin: str, origin: str
+    repo: Path,
+    pin: str,
+    origin: str,
+    *,
+    linked_common: Path | None = None,
+    linked_git_dir: Path | None = None,
+    expected_layout: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    common = linked_common if linked_common is not None else repo / ".git"
+    admin = (
+        linked_git_dir
+        if linked_git_dir is not None
+        else common / "worktrees" / repo.name
+    )
+    layout = (
+        expected_layout
+        if expected_layout is not None
+        else ("linked" if linked_common is not None else "standalone")
+    )
     return subprocess.run(
         [
             "/usr/bin/env",
@@ -820,6 +847,9 @@ def _run_worker_repo_verify(
             pin,
             str(repo),
             origin,
+            str(common),
+            str(admin),
+            layout,
         ],
         check=False,
         capture_output=True,
@@ -898,6 +928,12 @@ def test_exact_worker_repo_verifier_is_no_write_and_fails_hostile_closure(
     assert completed.stderr == ""
     assert not sentinel.exists()
     assert after == before
+
+    completed = _run_worker_repo_verify(
+        repo, pin, origin, expected_layout="linked"
+    )
+    assert completed.returncode != 0
+    assert "unexpected_layout" in completed.stderr
 
     external = tmp_path / "hostile-filter-diff"
     external.write_text(f"#!/usr/bin/bash\n/usr/bin/touch {sentinel}\n/bin/cat\n")
@@ -988,7 +1024,7 @@ def test_exact_worker_repo_verifier_is_no_write_and_fails_hostile_closure(
     git_directory.write_text(f"gitdir: {parked_git_directory}\n")
     completed = _run_worker_repo_verify(repo, pin, origin)
     assert completed.returncode != 0
-    assert "git_boundary" in completed.stderr
+    assert "unexpected_layout" in completed.stderr
     git_directory.unlink()
     parked_git_directory.rename(git_directory)
 
@@ -1003,6 +1039,154 @@ def test_exact_worker_repo_verifier_is_no_write_and_fails_hostile_closure(
     assert re.fullmatch(
         r"REPO_VERIFY_BAD \S+ (tracked_state|object_closure)\n", completed.stderr
     )
+
+
+def test_exact_worker_repo_verifier_accepts_only_bound_linked_worktree(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    linked = tmp_path / "linked"
+    primary.mkdir()
+    environment = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "Gate D Test",
+        "GIT_AUTHOR_EMAIL": "gate-d@example.invalid",
+        "GIT_COMMITTER_NAME": "Gate D Test",
+        "GIT_COMMITTER_EMAIL": "gate-d@example.invalid",
+    }
+
+    def git(repo: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["/usr/bin/git", "-C", str(repo), *arguments],
+            check=True,
+            capture_output=True,
+            env=environment,
+            text=True,
+        )
+
+    git(primary, "init", "-q")
+    git(primary, "switch", "-q", "-c", "main")
+    origin = "git@example.invalid:owner/repo.git"
+    git(primary, "remote", "add", "origin", origin)
+    (primary / "tracked.txt").write_text("linked authority\n")
+    git(primary, "add", "tracked.txt")
+    git(primary, "commit", "-q", "-m", "seed")
+    git(
+        primary,
+        "worktree",
+        "add",
+        "-q",
+        "-b",
+        "rewrite/topology-first-decode",
+        str(linked),
+        "HEAD",
+    )
+    pin = git(linked, "rev-parse", "HEAD").stdout.strip()
+    git(primary, "config", "branch.main.vscode-merge-base", pin)
+    git(
+        primary,
+        "config",
+        "branch.rewrite/topology-first-decode.vscode-merge-base",
+        pin,
+    )
+    common = Path(
+        git(linked, "rev-parse", "--path-format=absolute", "--git-common-dir")
+        .stdout.strip()
+    )
+    admin = Path(
+        git(linked, "rev-parse", "--path-format=absolute", "--git-dir")
+        .stdout.strip()
+    )
+    for path in (
+        linked / ".git",
+        admin / "gitdir",
+        admin / "commondir",
+        admin / "HEAD",
+        admin / "index",
+        common / "config",
+    ):
+        path.chmod(0o664)
+    admin.chmod(0o775)
+    common.chmod(0o755)
+    (common / "objects").chmod(0o755)
+
+    completed = _run_worker_repo_verify(
+        linked,
+        pin,
+        origin,
+        linked_common=common,
+        linked_git_dir=admin,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.startswith("SYNC_OK ")
+
+    completed = _run_worker_repo_verify(
+        linked,
+        pin,
+        origin,
+        linked_common=common,
+        linked_git_dir=admin,
+        expected_layout="standalone",
+    )
+    assert completed.returncode != 0
+    assert "unexpected_layout" in completed.stderr
+
+    pointer = linked / ".git"
+    pointer.chmod(0o600)
+    completed = _run_worker_repo_verify(
+        linked, pin, origin, linked_common=common, linked_git_dir=admin
+    )
+    assert completed.returncode != 0
+    assert "linked_pointer_boundary" in completed.stderr
+    pointer.chmod(0o664)
+
+    pointer_bytes = pointer.read_bytes()
+    pointer.write_text("gitdir: ../hostile-admin\n")
+    completed = _run_worker_repo_verify(
+        linked, pin, origin, linked_common=common, linked_git_dir=admin
+    )
+    assert completed.returncode != 0
+    assert "linked_pointer_bytes" in completed.stderr
+    pointer.write_bytes(pointer_bytes)
+
+    backpointer = admin / "gitdir"
+    backpointer_bytes = backpointer.read_bytes()
+    backpointer.write_text("/tmp/hostile/.git\n")
+    completed = _run_worker_repo_verify(
+        linked, pin, origin, linked_common=common, linked_git_dir=admin
+    )
+    assert completed.returncode != 0
+    assert "linked_backpointer_bytes" in completed.stderr
+    backpointer.write_bytes(backpointer_bytes)
+
+    try:
+        os.setxattr(pointer, b"user.gate_d_test", b"1", follow_symlinks=False)
+    except OSError:
+        pass
+    else:
+        completed = _run_worker_repo_verify(
+            linked, pin, origin, linked_common=common, linked_git_dir=admin
+        )
+        assert completed.returncode != 0
+        assert "linked_pointer_boundary_xattr" in completed.stderr
+        os.removexattr(pointer, b"user.gate_d_test", follow_symlinks=False)
+
+    sparse = admin / "info/sparse-checkout"
+    sparse.parent.mkdir(exist_ok=True)
+    sparse.write_text("/*\n")
+    completed = _run_worker_repo_verify(
+        linked, pin, origin, linked_common=common, linked_git_dir=admin
+    )
+    assert completed.returncode != 0
+    assert "sparse_checkout" in completed.stderr
+    sparse.unlink()
+
+    git(primary, "config", "core.hooksPath", "/tmp/hostile-hooks")
+    completed = _run_worker_repo_verify(
+        linked, pin, origin, linked_common=common, linked_git_dir=admin
+    )
+    assert completed.returncode != 0
+    assert "config_not_allowlisted" in completed.stderr
 
 
 def test_wrapper_pins_current_builder_driver_and_publisher_bytes() -> None:

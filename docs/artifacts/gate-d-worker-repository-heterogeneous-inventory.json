@@ -1,0 +1,101 @@
+{
+  "branch": "rewrite/topology-first-decode",
+  "conclusion": {
+    "recovery_required": true,
+    "recovery_workers": [1, 2, 3, 4, 5, 6, 7],
+    "reason": "worker 0 is current and structurally valid; workers 1-7 are structurally valid but stale",
+    "untouched_workers": [0]
+  },
+  "evidence_class": "read_only_repository_inventory",
+  "hlo_work": false,
+  "local_head_at_observation": "8b7d41d23dfca0a8d6a672b9cd8cfeba0a4e854e",
+  "mutation": false,
+  "origin": "git@github.com:GianluigiVitale/glm-tpu.git",
+  "pod": {
+    "health": "HEALTHY",
+    "name": "db-v4-64-od",
+    "state": "READY",
+    "zone": "us-central2-b"
+  },
+  "recorded_utc_date": "2026-09-01",
+  "tpu_work": false,
+  "verification": {
+    "full_fsck_no_dangling": true,
+    "tracked_and_untracked_clean": true
+  },
+  "workers": [
+    {
+      "branch": "rewrite/topology-first-decode",
+      "common_dir": "/home/gianl/glm-tpu/.git",
+      "git_boundary": {
+        "gid": 2001,
+        "kind": "regular_file",
+        "mode": "0664",
+        "nlink": 1,
+        "uid": 2001
+      },
+      "git_dir": "/home/gianl/glm-tpu/.git/worktrees/glm-tpu-topology-rewrite",
+      "host": "t1v-n-ae271d05-w-0",
+      "kind": "linked_worktree",
+      "pin": "8b7d41d23dfca0a8d6a672b9cd8cfeba0a4e854e",
+      "pointer": "gitdir: /home/gianl/glm-tpu/.git/worktrees/glm-tpu-topology-rewrite",
+      "worker": 0
+    },
+    {
+      "branch": "detached",
+      "git_boundary": {"gid": 2001, "kind": "directory", "mode": "0775", "nlink": 8, "uid": 2001},
+      "host": "t1v-n-ae271d05-w-1",
+      "kind": "standalone",
+      "pin": "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+      "worker": 1
+    },
+    {
+      "branch": "detached",
+      "git_boundary": {"gid": 2001, "kind": "directory", "mode": "0755", "nlink": 8, "uid": 2001},
+      "host": "t1v-n-ae271d05-w-2",
+      "kind": "standalone",
+      "pin": "508aaa373147988ff597dfd94a02fddff1778be6",
+      "worker": 2
+    },
+    {
+      "branch": "detached",
+      "git_boundary": {"gid": 2001, "kind": "directory", "mode": "0775", "nlink": 8, "uid": 2001},
+      "host": "t1v-n-ae271d05-w-3",
+      "kind": "standalone",
+      "pin": "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+      "worker": 3
+    },
+    {
+      "branch": "detached",
+      "git_boundary": {"gid": 2001, "kind": "directory", "mode": "0775", "nlink": 8, "uid": 2001},
+      "host": "t1v-n-ae271d05-w-4",
+      "kind": "standalone",
+      "pin": "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+      "worker": 4
+    },
+    {
+      "branch": "detached",
+      "git_boundary": {"gid": 2001, "kind": "directory", "mode": "0775", "nlink": 8, "uid": 2001},
+      "host": "t1v-n-ae271d05-w-5",
+      "kind": "standalone",
+      "pin": "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+      "worker": 5
+    },
+    {
+      "branch": "detached",
+      "git_boundary": {"gid": 2001, "kind": "directory", "mode": "0755", "nlink": 8, "uid": 2001},
+      "host": "t1v-n-ae271d05-w-6",
+      "kind": "standalone",
+      "pin": "508aaa373147988ff597dfd94a02fddff1778be6",
+      "worker": 6
+    },
+    {
+      "branch": "detached",
+      "git_boundary": {"gid": 2001, "kind": "directory", "mode": "0775", "nlink": 8, "uid": 2001},
+      "host": "t1v-n-ae271d05-w-7",
+      "kind": "standalone",
+      "pin": "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+      "worker": 7
+    }
+  ]
+}

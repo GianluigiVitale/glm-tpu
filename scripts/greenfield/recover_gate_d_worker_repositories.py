@@ -27,7 +27,15 @@ ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 CONTROLLER_RELATIVE = "scripts/greenfield/recover_gate_d_worker_repositories.py"
 WORKER_RELATIVE = "scripts/greenfield/gate_d_worker_repository_transaction.py"
 WRAPPER_RELATIVE = "scripts/greenfield/run_gate_d_compensated_pp16_hlo.sh"
-INSTALLED_CONTROLLER = Path("/opt/glm-tpu/bin/recover_gate_d_worker_repositories.py")
+INVENTORY_RELATIVE = (
+    "docs/artifacts/gate-d-worker-repository-heterogeneous-inventory.json"
+)
+INVENTORY_SHA256 = "8767b52a678a5084e7d584c58f66100786eacff0e4914df37a8776ed66b60294"
+INSTALLED_CONTROLLER = Path(
+    "/opt/glm-tpu/gate-d-worker-recovery-v2/recover_gate_d_worker_repositories.py"
+)
+LINKED_COMMON = Path("/home/gianl/glm-tpu/.git")
+LINKED_GIT_DIR = LINKED_COMMON / "worktrees/glm-tpu-topology-rewrite"
 POD = "db-v4-64-od"
 ZONE = "us-central2-b"
 BUCKET = "gs://driftbench-dsv4-uc"
@@ -46,6 +54,18 @@ LEGACY_RSYNC_LOCK_ROOT = Path("/home/gianl")
 LEGACY_RSYNC_LOCK = ".glm-tpu-rsync.lock"
 REMOTE_TIMEOUT_SECONDS = 180
 LOCAL_REMOTE_TIMEOUT_SECONDS = 240
+ALL_WORKERS = tuple(range(8))
+RECOVERY_WORKERS = tuple(range(1, 8))
+UNTOUCHED_WORKERS = (0,)
+RECOVERY_PRESTATE_PINS = {
+    1: "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+    2: "508aaa373147988ff597dfd94a02fddff1778be6",
+    3: "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+    4: "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+    5: "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+    6: "508aaa373147988ff597dfd94a02fddff1778be6",
+    7: "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+}
 
 _BASE_ENV = {
     "HOME": "/home/gianl",
@@ -75,6 +95,33 @@ class RecoveryError(RuntimeError):
 
 def _sha256(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
+
+
+def _validate_inventory_artifact(raw: bytes) -> None:
+    if _sha256(raw) != INVENTORY_SHA256:
+        raise RecoveryError("repository inventory hash mismatch")
+    try:
+        artifact = json.loads(raw)
+        worker_records = artifact["workers"]
+        if not isinstance(worker_records, list) or len(worker_records) != len(
+            ALL_WORKERS
+        ):
+            raise RecoveryError("repository inventory worker count mismatch")
+        workers = {int(record["worker"]): record for record in worker_records}
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+        raise RecoveryError("repository inventory schema mismatch") from error
+    if (
+        set(workers) != set(ALL_WORKERS)
+        or workers[0].get("kind") != "linked_worktree"
+        or artifact.get("mutation") is not False
+        or artifact.get("hlo_work") is not False
+        or artifact.get("tpu_work") is not False
+    ):
+        raise RecoveryError("repository inventory contract mismatch")
+    for worker, expected_pin in RECOVERY_PRESTATE_PINS.items():
+        record = workers[worker]
+        if record.get("kind") != "standalone" or record.get("pin") != expected_pin:
+            raise RecoveryError("repository inventory prestate mismatch")
 
 
 def _run(
@@ -433,6 +480,9 @@ def _verify_local_repository(pin: str, verifier: str) -> bytes:
             pin,
             str(WORKTREE),
             ORIGIN,
+            str(LINKED_COMMON),
+            str(LINKED_GIT_DIR),
+            "linked",
         ],
         environment=_GIT_ENV,
         timeout=180,
@@ -574,6 +624,82 @@ def _run_worker(
     }[phase]
     record = _parse_remote_record(result.stdout, marker)
     return record, result.stdout + result.stderr
+
+
+def _verify_remote_workers(
+    verifier: str,
+    pin: str,
+    tag: str,
+    workers: tuple[int, ...],
+    label: str,
+) -> bytes:
+    records: dict[int, dict[str, object]] = {}
+    output = bytearray()
+    for worker in workers:
+        carrier = f"{tag}_verify_{label}_{worker}"
+        expected_layout = "linked" if worker in UNTOUCHED_WORKERS else "standalone"
+        command = shlex.join(
+            [
+                "/usr/bin/env",
+                "-i",
+                "HOME=/home/gianl",
+                "LANG=C",
+                "LC_ALL=C",
+                "PATH=/usr/bin:/bin",
+                "GIT_CONFIG_GLOBAL=/dev/null",
+                "GIT_CONFIG_NOSYSTEM=1",
+                "GIT_NO_LAZY_FETCH=1",
+                "GIT_NO_REPLACE_OBJECTS=1",
+                "GIT_OPTIONAL_LOCKS=0",
+                "GIT_PROTOCOL_FROM_USER=0",
+                "GIT_TERMINAL_PROMPT=0",
+                "GIT_SSH_COMMAND=/bin/false",
+                f"GLM_GATE_D_REPO_RECOVERY_CARRIER={carrier}",
+                "/usr/bin/timeout",
+                "--signal=TERM",
+                "--kill-after=15",
+                str(REMOTE_TIMEOUT_SECONDS),
+                "/usr/bin/bash",
+                "--noprofile",
+                "--norc",
+                "-c",
+                verifier,
+                "gate-d-recovery-fleet-verify",
+                pin,
+                str(WORKTREE),
+                ORIGIN,
+                str(LINKED_COMMON),
+                str(LINKED_GIT_DIR),
+                expected_layout,
+            ]
+        )
+        result = _run(
+            [
+                GCLOUD,
+                "compute",
+                "tpus",
+                "tpu-vm",
+                "ssh",
+                POD,
+                "--zone",
+                ZONE,
+                f"--worker={worker}",
+                f"--command={command}",
+            ],
+            timeout=LOCAL_REMOTE_TIMEOUT_SECONDS,
+        )
+        markers = [
+            line.split()
+            for line in result.stdout.decode("utf-8", "replace").splitlines()
+            if line.startswith("SYNC_OK ")
+        ]
+        if len(markers) != 1 or len(markers[0]) != 3 or markers[0][2] != pin:
+            raise RecoveryError(f"{label}: worker {worker} verifier marker mismatch")
+        records[worker] = {"host": markers[0][1], "pin": markers[0][2]}
+        output.extend(result.stdout)
+        output.extend(result.stderr)
+    _ensure_worker_hosts(records, label, workers)
+    return bytes(output)
 
 
 def _quiescence_audit_code() -> str:
@@ -861,6 +987,12 @@ def _common_worker_arguments(
         bundle_name,
         "--origin",
         ORIGIN,
+        "--linked-common",
+        str(LINKED_COMMON),
+        "--linked-git-dir",
+        str(LINKED_GIT_DIR),
+        "--expected-layout",
+        "standalone",
         "--verifier",
         verifier,
     ]
@@ -881,12 +1013,31 @@ def _record_arguments(record: dict[str, object]) -> list[str]:
     ]
 
 
-def _ensure_eight_hosts(records: dict[int, dict[str, object]], marker: str) -> None:
-    if set(records) != set(range(8)):
+def _ensure_worker_hosts(
+    records: dict[int, dict[str, object]],
+    marker: str,
+    expected_workers: tuple[int, ...],
+) -> None:
+    if set(records) != set(expected_workers):
         raise RecoveryError(f"{marker}: worker set mismatch")
     hosts = {str(record.get("host", "")) for record in records.values()}
-    if len(hosts) != 8 or "" in hosts:
+    if len(hosts) != len(expected_workers) or "" in hosts:
         raise RecoveryError(f"{marker}: host identity mismatch")
+
+
+def _select_recovery_workers(
+    preflight_records: dict[int, dict[str, object]], pin: str
+) -> tuple[int, ...]:
+    workers: list[int] = []
+    for worker in RECOVERY_WORKERS:
+        old_pin = preflight_records[worker].get("old_pin")
+        if old_pin not in {RECOVERY_PRESTATE_PINS[worker], pin}:
+            raise RecoveryError(f"worker {worker} has unauthorized repository prestate")
+        if old_pin != pin:
+            workers.append(worker)
+    if not workers:
+        raise RecoveryError("no stale recovery targets")
+    return tuple(workers)
 
 
 def _install_signal_handlers() -> None:
@@ -983,17 +1134,24 @@ def main() -> int:
         )
         worker_blob = _git("-C", str(WORKTREE), "show", f"{pin}:{WORKER_RELATIVE}")
         wrapper_blob = _git("-C", str(WORKTREE), "show", f"{pin}:{WRAPPER_RELATIVE}")
+        inventory_blob = _git(
+            "-C", str(WORKTREE), "show", f"{pin}:{INVENTORY_RELATIVE}"
+        )
         if (
             controller_blob != installed_source
             or _sha256(controller_blob) != expected_source_sha
         ):
             raise RecoveryError("installed controller does not match committed blob")
         verifier = _extract_verifier(wrapper_blob)
+        _validate_inventory_artifact(inventory_blob)
         local_verify = _verify_local_repository(pin, verifier)
         evidence.write("local_repo_verify.txt", local_verify)
         source_identity = {
             "controller_sha256": _sha256(controller_blob),
+            "inventory_sha256": _sha256(inventory_blob),
             "pin": pin,
+            "recovery_workers": list(RECOVERY_WORKERS),
+            "protected_linked_workers": list(UNTOUCHED_WORKERS),
             "verifier_sha256": _sha256(verifier.encode()),
             "worker_sha256": _sha256(worker_blob),
             "wrapper_sha256": _sha256(wrapper_blob),
@@ -1070,6 +1228,15 @@ def main() -> int:
 
         census_pre = _strict_census(tag, "pre")
         evidence.write("census_pre.txt", census_pre)
+        remote_started = True
+        untouched_verify_pre = _verify_remote_workers(
+            verifier,
+            pin,
+            tag,
+            UNTOUCHED_WORKERS,
+            "untouched_pre",
+        )
+        evidence.write("untouched_verify_pre.txt", untouched_verify_pre)
 
         evidence.log(
             "building one complete bundle into a descriptor-bound evidence file"
@@ -1127,17 +1294,17 @@ def main() -> int:
         )
         preflight_records: dict[int, dict[str, object]] = {}
         preflight_output = bytearray()
-        remote_started = True
-        for worker in range(8):
+        for worker in RECOVERY_WORKERS:
             record, raw = _run_worker(worker_source, "preflight", tag, worker, common)
             preflight_records[worker] = record
             preflight_output.extend(raw)
-        _ensure_eight_hosts(preflight_records, "preflight")
+        _ensure_worker_hosts(preflight_records, "preflight", RECOVERY_WORKERS)
+        recovery_workers = _select_recovery_workers(preflight_records, pin)
         evidence.write("preflight.txt", bytes(preflight_output))
 
         prepare_records: dict[int, dict[str, object]] = {}
         prepare_output = bytearray()
-        for worker in range(8):
+        for worker in recovery_workers:
             previous = preflight_records[worker]
             arguments = [
                 *common,
@@ -1157,7 +1324,7 @@ def main() -> int:
             )
             prepare_records[worker] = record
             prepare_output.extend(raw)
-        _ensure_eight_hosts(prepare_records, "prepare")
+        _ensure_worker_hosts(prepare_records, "prepare", recovery_workers)
         evidence.write("prepare.txt", bytes(prepare_output))
 
         census_pre_swap = _strict_census(tag, "pre_swap")
@@ -1165,7 +1332,7 @@ def main() -> int:
 
         swap_records: dict[int, dict[str, object]] = {}
         swap_output = bytearray()
-        for worker in range(8):
+        for worker in recovery_workers:
             previous = prepare_records[worker]
             arguments = [
                 *common,
@@ -1178,19 +1345,28 @@ def main() -> int:
             record, raw = _run_worker(worker_source, "swap", tag, worker, arguments)
             swap_records[worker] = record
             swap_output.extend(raw)
-        _ensure_eight_hosts(swap_records, "swap")
+        _ensure_worker_hosts(swap_records, "swap", recovery_workers)
         evidence.write("swap.txt", bytes(swap_output))
 
         final_records: dict[int, dict[str, object]] = {}
         final_output = bytearray()
-        for worker in range(8):
+        for worker in recovery_workers:
             previous = swap_records[worker]
             arguments = [*common, *_record_arguments(previous)]
             record, raw = _run_worker(worker_source, "final", tag, worker, arguments)
             final_records[worker] = record
             final_output.extend(raw)
-        _ensure_eight_hosts(final_records, "final")
+        _ensure_worker_hosts(final_records, "final", recovery_workers)
         evidence.write("final.txt", bytes(final_output))
+
+        fleet_verify_post = _verify_remote_workers(
+            verifier,
+            pin,
+            tag,
+            ALL_WORKERS,
+            "fleet_post",
+        )
+        evidence.write("fleet_verify_post.txt", fleet_verify_post)
 
         census_post = _strict_census(tag, "post")
         evidence.write("census_post.txt", census_post)
@@ -1247,9 +1423,12 @@ def main() -> int:
             "ledger_sha256": ledger_record["sha256"],
             "pin": pin,
             "preterminal_objects": preterminal_objects,
+            "recovered_workers": list(recovery_workers),
+            "recovery_candidates": list(RECOVERY_WORKERS),
             "status": "RECOVERY_COMPLETE",
             "tag": tag,
             "tpu_work": False,
+            "untouched_workers": sorted(set(ALL_WORKERS) - set(recovery_workers)),
             "workers": 8,
         }
         terminal_raw = (

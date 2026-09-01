@@ -2,6 +2,35 @@
 
 **Updated:** 2026-09-01 UTC
 
+## 2026-09-01 Gate-D repository heterogeneity root-caused; target only stale workers
+
+- The first full recovery diagnostic under burned tag
+  `gate_d_repo_recovery_20260901T014300000000001Z` failed before clone/rename/upload at
+  `REPO_VERIFY_BAD ... git_boundary`. Root cause is verifier policy, not corruption: worker 0's
+  mandated worktree has a regular `.git` pointer into
+  `/home/gianl/glm-tpu/.git/worktrees/glm-tpu-topology-rewrite`, while the old verifier required a
+  direct `.git` directory. Running the unchanged all-worker exchange would also break that linked
+  worktree's preserved path/backpointer. It is forbidden.
+- A corrected read-only 8-host inventory is durable at
+  `docs/artifacts/gate-d-worker-repository-heterogeneous-inventory.json`. Worker 0 was clean/current
+  at `8b7d41d...854e` and is the sole linked worktree. Workers 1/3/4/5/7 are clean standalone
+  repositories at `4a44f58...ba95`; workers 2/6 are clean standalone repositories at
+  `508aaa3...8be6`. Every worker passed full no-dangling fsck. Recovery is therefore required only
+  for workers 1--7; worker 0 must remain untouched.
+- The default-off correction requires worker 0's known linked pointer/common/admin/backpointer
+  structure and workers 1--7's strict standalone structure; layout drift cannot switch branches.
+  Linked paths, owner/mode/nlink, zero
+  xattrs, exact pointer/commondir/backpointer bytes, config/object/index binding, clean state and
+  object closure all fail closed. The controller hash-binds the eight-record inventory and each
+  candidate's observed stale pin, refuses any third pin, pre-verifies untouched worker 0, mutates
+  only the still-stale subset (so partial success is resumable), then requires unique-host exact-pin
+  8/8 post-verification before terminal evidence. The complete inventory/recovery/acquisition
+  boundary passes 84/84.
+- No recovery, repository mutation, bucket write, JAX/HLO, model or TPU work ran. Exact next is
+  adversarial review of this correction/evidence, then commit/push/locked same-region mirror. Only
+  a separately reviewed no-replace install at `/opt/glm-tpu/gate-d-worker-recovery-v2` and one fresh
+  tagged targeted recovery may follow; the historical installed controller remains intact/inert.
+
 ## 2026-09-01 Gate-D repository prerequisites fully receipted; recovery pending review
 
 - Sol approved exact v3 persistence SHA `9200901b...`; commit

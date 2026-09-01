@@ -3,6 +3,7 @@ from __future__ import annotations
 import fcntl
 import importlib.util
 import io
+import json
 import os
 import shlex
 import signal
@@ -106,6 +107,9 @@ def _make_transaction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         "bundle_sha": sha256(bundle).hexdigest(),
         "bundle_bytes": len(bundle),
         "origin": ORIGIN,
+        "linked_common": str(source / ".git"),
+        "linked_git_dir": str(source / ".git/worktrees/canonical"),
+        "expected_layout": "standalone",
         "verifier": _worker_verifier(),
         "old_pin": "",
         "old_dev": -1,
@@ -132,6 +136,9 @@ def _make_transaction(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 def test_source_contract_is_descriptor_bound_timeout_and_terminal_last() -> None:
     controller = CONTROLLER_PATH.read_text()
     worker = WORKER_PATH.read_text()
+    assert CONTROLLER.INSTALLED_CONTROLLER == Path(
+        "/opt/glm-tpu/gate-d-worker-recovery-v2/recover_gate_d_worker_repositories.py"
+    )
     assert "controller must run from the reviewed /opt path" in controller
     assert "os.O_NOFOLLOW" in controller
     assert "os.O_EXCL" in controller
@@ -141,6 +148,17 @@ def test_source_contract_is_descriptor_bound_timeout_and_terminal_last() -> None
     assert '"--kill-after=15"' in controller
     assert '"/opt/glm-tpu/locks"' in controller
     assert 'REMOTE_LOCK = "/opt/glm-tpu/locks/gate_d_repo_recovery.lock"' in controller
+    assert "RECOVERY_WORKERS = tuple(range(1, 8))" in controller
+    assert "RECOVERY_PRESTATE_PINS = {" in controller
+    assert "UNTOUCHED_WORKERS = (0,)" in controller
+    assert controller.count("for worker in RECOVERY_WORKERS:") == 2
+    assert controller.count("for worker in recovery_workers:") == 3
+    assert 'evidence.write("untouched_verify_pre.txt"' in controller
+    assert 'evidence.write("fleet_verify_post.txt"' in controller
+    assert '"recovered_workers": list(recovery_workers)' in controller
+    assert '"recovery_candidates": list(RECOVERY_WORKERS)' in controller
+    assert '"protected_linked_workers": list(UNTOUCHED_WORKERS)' in controller
+    assert '"untouched_workers": sorted(set(ALL_WORKERS) - set(recovery_workers))' in controller
     assert (
         '"/usr/bin/python3",\n            "-I",\n            "-S",\n            "-B"'
         in controller
@@ -168,12 +186,133 @@ def test_source_contract_is_descriptor_bound_timeout_and_terminal_last() -> None
     assert "bundle_identity_drift" in worker
     assert '_LOCK_PARENT = Path("/opt/glm-tpu/locks")' in worker
     assert '_LOCK_NAME = "gate_d_repo_recovery.lock"' in worker
+    assert 'parser.add_argument("--linked-common", required=True)' in worker
+    assert 'parser.add_argument("--linked-git-dir", required=True)' in worker
+    assert 'parser.add_argument("--expected-layout", choices=("standalone",), required=True)' in worker
 
     wrapper = WRAPPER.read_text()
     assert 'root = "/opt/glm-tpu/locks"' in wrapper
     assert 'names = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")' in wrapper
     assert "os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW" in wrapper
     assert "held.st_uid != 0" in wrapper and "held.st_gid != 0" in wrapper
+
+
+def test_remote_fleet_verifier_targets_exact_workers_and_binds_linked_paths(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pin = "a" * 40
+    commands: list[list[str]] = []
+
+    def verified_run(command: list[str], **_kwargs):
+        commands.append(command)
+        worker_token = next(item for item in command if item.startswith("--worker="))
+        worker = int(worker_token.split("=", 1)[1])
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=f"SYNC_OK host-{worker} {pin}\n".encode(),
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(CONTROLLER, "_run", verified_run)
+    output = CONTROLLER._verify_remote_workers(
+        "printf 'SYNC_OK host pin\\n'",
+        pin,
+        "gate_d_repo_recovery_20260901T020000000000000Z",
+        (0, 2, 6),
+        "unit",
+    )
+    assert output.count(b"SYNC_OK ") == 3
+    assert [
+        next(item for item in command if item.startswith("--worker="))
+        for command in commands
+    ] == ["--worker=0", "--worker=2", "--worker=6"]
+    for command, expected_layout in zip(
+        commands, ("linked", "standalone", "standalone"), strict=True
+    ):
+        remote = next(item for item in command if item.startswith("--command="))
+        assert str(CONTROLLER.LINKED_COMMON) in remote
+        assert str(CONTROLLER.LINKED_GIT_DIR) in remote
+        assert "GIT_SSH_COMMAND=/bin/false" in remote
+        assert shlex.split(remote.removeprefix("--command="))[-1] == expected_layout
+
+    def duplicate_host(command: list[str], **_kwargs):
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=f"SYNC_OK duplicate {pin}\n".encode(),
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(CONTROLLER, "_run", duplicate_host)
+    with pytest.raises(CONTROLLER.RecoveryError, match="host identity mismatch"):
+        CONTROLLER._verify_remote_workers(
+            "true",
+            pin,
+            "gate_d_repo_recovery_20260901T020000000000001Z",
+            (0, 1),
+            "duplicate",
+        )
+
+
+def test_recovery_worker_selection_resumes_partial_success_and_refuses_noop() -> None:
+    pin = "a" * 40
+    all_stale = {
+        worker: {"old_pin": CONTROLLER.RECOVERY_PRESTATE_PINS[worker]}
+        for worker in range(1, 8)
+    }
+    assert CONTROLLER._select_recovery_workers(all_stale, pin) == tuple(range(1, 8))
+
+    partial = {
+        worker: {
+            "old_pin": (
+                pin
+                if worker in {1, 4, 7}
+                else CONTROLLER.RECOVERY_PRESTATE_PINS[worker]
+            )
+        }
+        for worker in range(1, 8)
+    }
+    assert CONTROLLER._select_recovery_workers(partial, pin) == (2, 3, 5, 6)
+
+    complete = {worker: {"old_pin": pin} for worker in range(1, 8)}
+    with pytest.raises(CONTROLLER.RecoveryError, match="no stale recovery targets"):
+        CONTROLLER._select_recovery_workers(complete, pin)
+
+    unauthorized = dict(all_stale)
+    unauthorized[5] = {"old_pin": "c" * 40}
+    with pytest.raises(
+        CONTROLLER.RecoveryError, match="worker 5 has unauthorized repository prestate"
+    ):
+        CONTROLLER._select_recovery_workers(unauthorized, pin)
+
+
+def test_recovery_inventory_is_hash_bound_and_exactly_matches_prestates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inventory = (
+        ROOT
+        / "docs/artifacts/gate-d-worker-repository-heterogeneous-inventory.json"
+    ).read_bytes()
+    CONTROLLER._validate_inventory_artifact(inventory)
+
+    with pytest.raises(CONTROLLER.RecoveryError, match="inventory hash mismatch"):
+        CONTROLLER._validate_inventory_artifact(inventory + b"\n")
+
+    expected = CONTROLLER.RECOVERY_PRESTATE_PINS[5].encode()
+    tampered = inventory.replace(expected, b"c" * 40, 1)
+    monkeypatch.setattr(CONTROLLER, "INVENTORY_SHA256", sha256(tampered).hexdigest())
+    with pytest.raises(CONTROLLER.RecoveryError, match="inventory prestate mismatch"):
+        CONTROLLER._validate_inventory_artifact(tampered)
+
+    duplicate = json.loads(inventory)
+    duplicate["workers"][-1] = duplicate["workers"][0]
+    duplicate_raw = (json.dumps(duplicate, sort_keys=True) + "\n").encode()
+    monkeypatch.setattr(
+        CONTROLLER, "INVENTORY_SHA256", sha256(duplicate_raw).hexdigest()
+    )
+    with pytest.raises(CONTROLLER.RecoveryError, match="inventory contract mismatch"):
+        CONTROLLER._validate_inventory_artifact(duplicate_raw)
 
 
 def test_prepare_exchange_and_final_preserve_exact_old_repository(
@@ -210,10 +349,26 @@ def test_post_exchange_verifier_failure_rolls_back_canonical(
     transaction = _make_transaction(tmp_path, monkeypatch)
     original_verify = WORKER._verify
 
-    def injected_verify(verifier: str, pin: str, path: str, origin: str) -> None:
+    def injected_verify(
+        verifier: str,
+        pin: str,
+        path: str,
+        origin: str,
+        linked_common: str,
+        linked_git_dir: str,
+        expected_layout: str,
+    ) -> None:
         if pin == transaction["pin"] and path == str(transaction["canonical"]):
             raise WORKER.TransactionError("injected_post_exchange_failure")
-        original_verify(verifier, pin, path, origin)
+        original_verify(
+            verifier,
+            pin,
+            path,
+            origin,
+            linked_common,
+            linked_git_dir,
+            expected_layout,
+        )
 
     monkeypatch.setattr(WORKER, "_verify", injected_verify)
     try:

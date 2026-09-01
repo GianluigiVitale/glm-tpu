@@ -95,6 +95,8 @@ readonly ZONE=us-central2-b
 readonly BRANCH=rewrite/topology-first-decode
 readonly ORIGIN=git@github.com:GianluigiVitale/glm-tpu.git
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
+readonly LINKED_COMMON=/home/gianl/glm-tpu/.git
+readonly LINKED_GIT_DIR=/home/gianl/glm-tpu/.git/worktrees/glm-tpu-topology-rewrite
 readonly BUCKET=gs://driftbench-dsv4-uc
 readonly LOCATION=US-CENTRAL2
 readonly ADMISSION=$WORKTREE/docs/artifacts/gate-d-precompile-admission-v2-compensated-capsule.json
@@ -302,9 +304,41 @@ set -euo pipefail
 pin=$1
 wt=$2
 origin=$3
+linked_common_expected=$4
+linked_git_dir_expected=$5
+expected_layout=$6
 fail() {
   printf 'REPO_VERIFY_BAD %s %s\n' "$(/usr/bin/hostname)" "$1" >&2
   exit 1
+}
+require_regular() {
+  local path=$1 mode=$2 reason=$3
+  [[ -f "$path" && ! -L "$path" ]] || fail "$reason"
+  [[ "$(/usr/bin/stat -c '%F:%a:%u:%g:%h' -- "$path")" == \
+    "regular file:$mode:2001:2001:1" ]] || fail "$reason"
+  local xattrs=
+  xattrs=$(/usr/bin/python3 -I -S -B -c \
+    'import os,sys; print("\\n".join(os.listxattr(sys.argv[1], follow_symlinks=False)))' \
+    "$path") || fail "${reason}_xattr_read"
+  [[ -z "$xattrs" ]] || fail "${reason}_xattr"
+}
+require_directory() {
+  local path=$1 mode=$2 reason=$3
+  [[ -d "$path" && ! -L "$path" ]] || fail "$reason"
+  [[ "$(/usr/bin/stat -c '%F:%a:%u:%g' -- "$path")" == \
+    "directory:$mode:2001:2001" ]] || fail "$reason"
+  [[ "$(/usr/bin/readlink -f -- "$path")" == "$path" ]] || fail "$reason"
+  local xattrs=
+  xattrs=$(/usr/bin/python3 -I -S -B -c \
+    'import os,sys; print("\\n".join(os.listxattr(sys.argv[1], follow_symlinks=False)))' \
+    "$path") || fail "${reason}_xattr_read"
+  [[ -z "$xattrs" ]] || fail "${reason}_xattr"
+}
+require_exact_bytes() {
+  local path=$1 expected=$2 reason=$3 actual_sha expected_sha
+  actual_sha=$(/usr/bin/sha256sum -- "$path" | /usr/bin/awk '{print $1}') || fail "$reason"
+  expected_sha=$(/usr/bin/printf '%s' "$expected" | /usr/bin/sha256sum | /usr/bin/awk '{print $1}') || fail "$reason"
+  [[ "$actual_sha" == "$expected_sha" ]] || fail "$reason"
 }
 git_cmd=(
   /usr/bin/git
@@ -314,16 +348,46 @@ git_cmd=(
   -c fsck.skipList=/dev/null
 )
 [[ -d "$wt" && ! -L "$wt" && "$(/usr/bin/readlink -f -- "$wt")" == "$wt" ]] || fail worktree_boundary
-[[ -d "$wt/.git" && ! -L "$wt/.git" ]] || fail git_boundary
-[[ -f "$wt/.git/config" && ! -L "$wt/.git/config" ]] || fail config_boundary
+if [[ -d "$wt/.git" && ! -L "$wt/.git" ]]; then
+  [[ "$expected_layout" == standalone ]] || fail unexpected_layout
+  expected_git_dir=$wt/.git
+  expected_common_dir=$wt/.git
+  expected_index=$wt/.git/index
+  expected_sparse_checkout=$wt/.git/info/sparse-checkout
+  config_file=$wt/.git/config
+elif [[ -f "$wt/.git" && ! -L "$wt/.git" ]]; then
+  [[ "$expected_layout" == linked ]] || fail unexpected_layout
+  [[ "$linked_git_dir_expected" == "$linked_common_expected/worktrees/${wt##*/}" ]] || fail linked_expectation
+  require_directory "$linked_common_expected" 755 linked_common_boundary
+  require_directory "$linked_git_dir_expected" 775 linked_git_dir_boundary
+  require_regular "$wt/.git" 664 linked_pointer_boundary
+  require_regular "$linked_git_dir_expected/gitdir" 664 linked_backpointer_boundary
+  require_regular "$linked_git_dir_expected/commondir" 664 linked_commondir_boundary
+  require_regular "$linked_git_dir_expected/HEAD" 664 linked_head_boundary
+  require_regular "$linked_git_dir_expected/index" 664 linked_index_boundary
+  require_regular "$linked_common_expected/config" 664 linked_config_boundary
+  require_directory "$linked_common_expected/objects" 755 linked_objects_boundary
+  require_exact_bytes "$wt/.git" "gitdir: $linked_git_dir_expected"$'\n' linked_pointer_bytes
+  require_exact_bytes "$linked_git_dir_expected/gitdir" "$wt/.git"$'\n' linked_backpointer_bytes
+  require_exact_bytes "$linked_git_dir_expected/commondir" $'../..\n' linked_commondir_bytes
+  expected_git_dir=$linked_git_dir_expected
+  expected_common_dir=$linked_common_expected
+  expected_index=$linked_git_dir_expected/index
+  expected_sparse_checkout=$linked_git_dir_expected/info/sparse-checkout
+  config_file=$linked_common_expected/config
+else
+  fail git_boundary
+fi
+[[ -f "$config_file" && ! -L "$config_file" ]] || fail config_boundary
 config_status=0
 config_names=$("${git_cmd[@]}" -C "$wt" config --local --name-only --get-regexp '.*') || config_status=$?
 [[ "$config_status" -eq 0 || "$config_status" -eq 1 ]] || fail config_read
 while IFS= read -r config_name; do
   case "${config_name,,}" in
-    core.bare | core.filemode | core.fsmonitor | core.logallrefupdates | \
+      core.bare | core.filemode | core.fsmonitor | core.logallrefupdates | \
       core.repositoryformatversion | core.untrackedcache | remote.origin.fetch | \
-      remote.origin.url | branch.*.merge | branch.*.remote) ;;
+      remote.origin.url | branch.*.merge | branch.*.remote | \
+      branch.*.vscode-merge-base) ;;
     *) fail config_not_allowlisted ;;
   esac
 done <<<"$config_names"
@@ -335,7 +399,7 @@ done <<<"$config_names"
 toplevel=$("${git_cmd[@]}" -C "$wt" rev-parse --show-toplevel) || fail toplevel
 [[ "$toplevel" == "$wt" ]] || fail redirected_worktree
 git_dir=$("${git_cmd[@]}" -C "$wt" rev-parse --path-format=absolute --git-dir) || fail git_dir
-[[ "$git_dir" == "$wt/.git" ]] || fail git_dir_rebind
+[[ "$git_dir" == "$expected_git_dir" ]] || fail git_dir_rebind
 head=$("${git_cmd[@]}" -C "$wt" rev-parse --verify HEAD) || fail head_read
 [[ "$head" == "$pin" ]] || fail wrong_head
 commit=$("${git_cmd[@]}" -C "$wt" rev-parse --verify "$pin^{commit}") || fail commit_read
@@ -346,11 +410,17 @@ common_dir=$("${git_cmd[@]}" -C "$wt" rev-parse --path-format=absolute --git-com
 object_dir=$("${git_cmd[@]}" -C "$wt" rev-parse --path-format=absolute --git-path objects) || fail object_dir
 [[ -d "$common_dir" && ! -L "$common_dir" ]] || fail common_dir_boundary
 [[ -d "$object_dir" && ! -L "$object_dir" ]] || fail object_dir_boundary
-[[ "$common_dir" == "$wt/.git" ]] || fail common_dir_rebind
+[[ "$common_dir" == "$expected_common_dir" ]] || fail common_dir_rebind
 [[ "$(/usr/bin/readlink -f -- "$object_dir")" == "$(/usr/bin/readlink -f -- "$common_dir/objects")" ]] || fail object_dir_rebind
+index_path=$("${git_cmd[@]}" -C "$wt" rev-parse --path-format=absolute --git-path index) || fail index_path
+[[ "$index_path" == "$expected_index" ]] || fail index_rebind
 [[ ! -e "$object_dir/info/alternates" && ! -L "$object_dir/info/alternates" ]] || fail alternates
-[[ ! -e "$common_dir/info/grafts" && ! -L "$common_dir/info/grafts" ]] || fail grafts
-[[ ! -e "$common_dir/info/sparse-checkout" && ! -L "$common_dir/info/sparse-checkout" ]] || fail sparse_checkout
+grafts_path=$("${git_cmd[@]}" -C "$wt" rev-parse --path-format=absolute --git-path info/grafts) || fail grafts_path
+[[ "$grafts_path" == "$common_dir/info/grafts" ]] || fail grafts_rebind
+[[ ! -e "$grafts_path" && ! -L "$grafts_path" ]] || fail grafts
+sparse_checkout_path=$("${git_cmd[@]}" -C "$wt" rev-parse --path-format=absolute --git-path info/sparse-checkout) || fail sparse_checkout_path
+[[ "$sparse_checkout_path" == "$expected_sparse_checkout" ]] || fail sparse_checkout_rebind
+[[ ! -e "$sparse_checkout_path" && ! -L "$sparse_checkout_path" ]] || fail sparse_checkout
 [[ -z "$(/usr/bin/find "$object_dir" -type l -print -quit)" ]] || fail object_symlink
 [[ -z "$(/usr/bin/find "$object_dir" -type f -name '*.promisor' -print -quit)" ]] || fail promisor_pack
 [[ -z "$("${git_cmd[@]}" -C "$wt" for-each-ref --format='%(refname)' refs/replace)" ]] || fail replace_refs
@@ -364,25 +434,28 @@ done < <("${git_cmd[@]}" -C "$wt" ls-files -v -z)
 printf 'SYNC_OK %s %s\n' "$(/usr/bin/hostname)" "$pin"
 WORKER_REPO_VERIFY_EOF
 readonly WORKER_REPO_VERIFY_SCRIPT
-printf -v sync_command '%q ' \
-  /usr/bin/env -i \
-  HOME=/home/gianl \
-  LANG=C \
-  LC_ALL=C \
-  PATH=/usr/bin:/bin \
-  GIT_CONFIG_GLOBAL=/dev/null \
-  GIT_CONFIG_NOSYSTEM=1 \
-  GIT_NO_LAZY_FETCH=1 \
-  GIT_NO_REPLACE_OBJECTS=1 \
-  GIT_OPTIONAL_LOCKS=0 \
-  GIT_PROTOCOL_FROM_USER=0 \
-  GIT_TERMINAL_PROMPT=0 \
-  GIT_SSH_COMMAND=/bin/false \
-  /usr/bin/bash --noprofile --norc -c "$WORKER_REPO_VERIFY_SCRIPT" \
-  gate-d-worker-repo-verify "$PIN" "$WORKTREE" "$ORIGIN"
 sync_output=
 sync_status=0
 for worker in 0 1 2 3 4 5 6 7; do
+  expected_layout=standalone
+  [[ $worker -eq 0 ]] && expected_layout=linked
+  printf -v sync_command '%q ' \
+    /usr/bin/env -i \
+    HOME=/home/gianl \
+    LANG=C \
+    LC_ALL=C \
+    PATH=/usr/bin:/bin \
+    GIT_CONFIG_GLOBAL=/dev/null \
+    GIT_CONFIG_NOSYSTEM=1 \
+    GIT_NO_LAZY_FETCH=1 \
+    GIT_NO_REPLACE_OBJECTS=1 \
+    GIT_OPTIONAL_LOCKS=0 \
+    GIT_PROTOCOL_FROM_USER=0 \
+    GIT_TERMINAL_PROMPT=0 \
+    GIT_SSH_COMMAND=/bin/false \
+    /usr/bin/bash --noprofile --norc -c "$WORKER_REPO_VERIFY_SCRIPT" \
+    gate-d-worker-repo-verify "$PIN" "$WORKTREE" "$ORIGIN" "$LINKED_COMMON" \
+    "$LINKED_GIT_DIR" "$expected_layout"
   set +e
   worker_output=$(/usr/bin/timeout --signal=TERM --kill-after=10 60 \
     /snap/bin/gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker="$worker" \

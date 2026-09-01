@@ -114,7 +114,15 @@ def _run_git(*arguments: str, pass_fds: tuple[int, ...] = ()) -> str:
     return result.stdout.strip()
 
 
-def _verify(verifier: str, pin: str, path: str, origin: str) -> None:
+def _verify(
+    verifier: str,
+    pin: str,
+    path: str,
+    origin: str,
+    linked_common: str,
+    linked_git_dir: str,
+    expected_layout: str,
+) -> None:
     environment = dict(_GIT_ENV)
     environment["GLM_GATE_D_REPO_RECOVERY_CARRIER"] = os.environ[
         "GLM_GATE_D_REPO_RECOVERY_CARRIER"
@@ -130,6 +138,9 @@ def _verify(verifier: str, pin: str, path: str, origin: str) -> None:
             pin,
             path,
             origin,
+            linked_common,
+            linked_git_dir,
+            expected_layout,
         ],
         check=False,
         capture_output=True,
@@ -259,6 +270,9 @@ def preflight(arguments: argparse.Namespace, parent_fd: int) -> dict[str, object
             old_pin,
             _canonical_path(arguments.worktree),
             arguments.origin,
+            arguments.linked_common,
+            arguments.linked_git_dir,
+            arguments.expected_layout,
         )
         _revalidate(parent_fd, arguments.worktree, canonical_identity)
     finally:
@@ -325,6 +339,9 @@ def receive_prepare(
             old_pin,
             _canonical_path(arguments.worktree),
             arguments.origin,
+            arguments.linked_common,
+            arguments.linked_git_dir,
+            arguments.expected_layout,
         )
         _revalidate(parent_fd, arguments.worktree, old_identity)
 
@@ -361,6 +378,9 @@ def receive_prepare(
                 arguments.pin,
                 _canonical_path(arguments.new),
                 arguments.origin,
+                arguments.linked_common,
+                arguments.linked_git_dir,
+                arguments.expected_layout,
             )
             _revalidate(parent_fd, arguments.new, new_identity)
             if _regular_identity(bundle_fd) != bundle_identity:
@@ -382,6 +402,9 @@ def receive_prepare(
             arguments.pin,
             _canonical_path(arguments.old),
             arguments.origin,
+            arguments.linked_common,
+            arguments.linked_git_dir,
+            arguments.expected_layout,
         )
         _revalidate(parent_fd, arguments.old, new_identity)
     finally:
@@ -416,12 +439,18 @@ def _rollback_after_exchange(
         arguments.old_pin,
         _canonical_path(arguments.worktree),
         arguments.origin,
+        arguments.linked_common,
+        arguments.linked_git_dir,
+        arguments.expected_layout,
     )
     _verify(
         arguments.verifier,
         arguments.pin,
         _canonical_path(arguments.old),
         arguments.origin,
+        arguments.linked_common,
+        arguments.linked_git_dir,
+        arguments.expected_layout,
     )
     _revalidate(parent_fd, arguments.worktree, old_identity)
     _revalidate(parent_fd, arguments.old, new_identity)
@@ -452,12 +481,18 @@ def swap(arguments: argparse.Namespace, parent_fd: int) -> dict[str, object]:
             arguments.old_pin,
             _canonical_path(arguments.worktree),
             arguments.origin,
+            arguments.linked_common,
+            arguments.linked_git_dir,
+            arguments.expected_layout,
         )
         _verify(
             arguments.verifier,
             arguments.pin,
             _canonical_path(arguments.old),
             arguments.origin,
+            arguments.linked_common,
+            arguments.linked_git_dir,
+            arguments.expected_layout,
         )
         _revalidate(parent_fd, arguments.worktree, old_identity)
         _revalidate(parent_fd, arguments.old, new_identity)
@@ -476,12 +511,18 @@ def swap(arguments: argparse.Namespace, parent_fd: int) -> dict[str, object]:
                 arguments.pin,
                 _canonical_path(arguments.worktree),
                 arguments.origin,
+                arguments.linked_common,
+                arguments.linked_git_dir,
+                arguments.expected_layout,
             )
             _verify(
                 arguments.verifier,
                 arguments.old_pin,
                 _canonical_path(arguments.old),
                 arguments.origin,
+                arguments.linked_common,
+                arguments.linked_git_dir,
+                arguments.expected_layout,
             )
             _revalidate(parent_fd, arguments.worktree, new_identity)
             _revalidate(parent_fd, arguments.old, old_identity)
@@ -534,12 +575,18 @@ def final(arguments: argparse.Namespace, parent_fd: int) -> dict[str, object]:
             arguments.pin,
             _canonical_path(arguments.worktree),
             arguments.origin,
+            arguments.linked_common,
+            arguments.linked_git_dir,
+            arguments.expected_layout,
         )
         _verify(
             arguments.verifier,
             arguments.old_pin,
             _canonical_path(arguments.old),
             arguments.origin,
+            arguments.linked_common,
+            arguments.linked_git_dir,
+            arguments.expected_layout,
         )
         _revalidate(
             parent_fd, arguments.worktree, (arguments.new_dev, arguments.new_ino)
@@ -569,6 +616,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--bundle-sha", default="")
     parser.add_argument("--bundle-bytes", type=int, default=0)
     parser.add_argument("--origin", required=True)
+    parser.add_argument("--linked-common", required=True)
+    parser.add_argument("--linked-git-dir", required=True)
+    parser.add_argument("--expected-layout", choices=("standalone",), required=True)
     parser.add_argument("--verifier", required=True)
     parser.add_argument("--old-pin", default="")
     parser.add_argument("--old-dev", type=int, default=-1)
