@@ -78,8 +78,10 @@ def test_launcher_binds_all_python_children_to_root_owned_immutable_capsule(
     tmp_path: Path,
 ) -> None:
     assert str(MODULE.IMMUTABLE_CAPSULE_ROOT) == (
-        "/opt/glm-tpu/libexec/gate-d-pp16-numerical"
+        "/usr/local/libexec/glm-tpu/gate-d-pp16-numerical"
     )
+    assert Path("/usr") in MODULE.IMMUTABLE_CAPSULE_ROOT.parents
+    assert Path("/opt") not in MODULE.IMMUTABLE_CAPSULE_ROOT.parents
     expected = {
         "DRIVER": "scripts/greenfield/run_gate_d_compensated_pp16_numerical.py",
         "PUBLISHER": (
