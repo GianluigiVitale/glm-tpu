@@ -2,7 +2,30 @@
 
 **Updated:** 2026-09-01 UTC
 
-## 2026-09-01 Gate-D prerequisite v1 failed closed; exact Git-OID correction pending review
+## 2026-09-01 Gate-D prerequisite v2 materialized state but receipt root rejected; v3 pending
+
+- Sol approved v2 persistence staged `13ee096b...`; commit
+  `2e528474cf2de48edfe641b0ac2eb9348ef098da` is pushed and exact-mirrored. Sol separately approved
+  immutable v2 install tree `70bd0197...9d32`; v1 and v2 both replay exact, root-owned and inert.
+- The separately approved v2 invocation under burned tag
+  `gate_d_repo_prerequisite_20260901T011459146872151Z` reached final receipt publication, then
+  failed closed in 24.57702 s at `unsafe evidence root identity`. V2 selected repository path
+  `docs/artifacts`, live mode 0775, while its writer correctly rejects group/other-writable roots.
+- The missing receipt does not erase materialized state. Exact postflight proves local root-owned
+  lock root plus three 0666 locks, exact 44,013-byte controller `fd8950de...b2225`, reviewed new
+  cron, and eight unique host/recovery-lock identities. The controller control flow had already
+  validated these before `_write_evidence`; repositories remain untouched and no JAX/HLO/model/TPU
+  work ran. Terminal artifact:
+  `docs/artifacts/gate-d-repository-prerequisite-v2-evidence-root-failure.json`.
+- V3 writes O_EXCL receipts beneath existing owner-only `/home/gianl/gate-d-runs` and requires its
+  exact uid/gid/mode 0700/no-xattr boundary. It uses a fresh no-replace v3 install path; v1/v2 and
+  both burned tags must never run again. Current unreviewed identities: tree `67187acf...ec2`,
+  controller `a8753a82...ee19`, unchanged helper `13dc4f85...f68f`, tests `4595f7b1...e61a`.
+  Focused tests pass 24/24 and the adjacent boundary passes 104/104. Exact next is review/persist
+  only this v3 correction/evidence, then separately review v3 install and fresh-tag idempotent
+  receipt completion. Repository recovery and HLO remain unauthorized.
+
+## 2026-09-01 Gate-D prerequisite v1 failed closed; exact Git-OID correction persisted as v2
 
 - Sol approved persistence-only staged `314329c9...`; commit
   `fdca1b5bf4ed722280cb9895379838cd77aa80c9` is pushed and its exact source bytes replay from the
@@ -29,9 +52,7 @@
   97/98 because an unrelated hostile Git-object test reported its
   earlier valid `tracked_state` stop rather than later `object_closure`. Test `94e30c10...d384` now
   requires the exact allowed fail-closed reason set; five consecutive focused replays and the full
-  adjacent boundary pass 103/103. Exact next is review only the v2 correction/evidence,
-  persist/mirror, and separately review v2 installation and a fresh-tag invocation. No recovery
-  or HLO is authorized.
+  adjacent boundary pass 103/103. V2 was then reviewed, persisted and exercised as recorded above.
 
 ## 2026-09-01 Gate-D recovery prerequisite correction after Sol block; no execution
 

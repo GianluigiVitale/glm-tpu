@@ -198,8 +198,9 @@ def test_production_root_boundary_and_scope_are_exact() -> None:
     assert "checkout" not in root_source + controller_source
     assert "--expected-sha256" not in root_source
     assert CONTROLLER.INSTALLED_ROOT == Path(
-        "/opt/glm-tpu/gate-d-repository-prerequisites-v2"
+        "/opt/glm-tpu/gate-d-repository-prerequisites-v3"
     )
+    assert CONTROLLER.EVIDENCE_ROOT == Path("/home/gianl/gate-d-runs")
     assert str(CONTROLLER.INSTALLED_ROOT) in controller_source
     assert ROOT_HELPER.CONTROLLER_SHA256 == CONTROLLER.RECOVERY_CONTROLLER_SHA256
     assert ROOT_HELPER.CONTROLLER_BYTES == CONTROLLER.RECOVERY_CONTROLLER_BYTES
@@ -450,6 +451,24 @@ def test_evidence_publication_is_fd_bound_exclusive_and_replayable(
         CONTROLLER._write_evidence(
             "../escape", {"status": "unsafe"}, artifact_root=artifact_root
         )
+
+
+def test_default_evidence_root_requires_exact_private_mode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    evidence_root = tmp_path / "private-evidence"
+    evidence_root.mkdir(mode=0o755)
+    evidence_root.chmod(0o755)
+    monkeypatch.setattr(CONTROLLER, "EVIDENCE_ROOT", evidence_root)
+    tag = "gate_d_repo_prerequisite_20260901T020304123456789Z"
+    with pytest.raises(
+        CONTROLLER.ProvisionError, match="unsafe evidence root identity"
+    ):
+        CONTROLLER._write_evidence(tag, {"status": "unsafe-mode"})
+    evidence_root.chmod(0o700)
+    path, receipt = CONTROLLER._write_evidence(tag, {"status": "private"})
+    assert path.parent == evidence_root
+    assert receipt["sha256"] == CONTROLLER._sha256(path.read_bytes())
 
 
 def test_default_off_and_static_syntax() -> None:

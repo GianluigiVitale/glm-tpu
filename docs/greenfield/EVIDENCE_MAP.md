@@ -2562,13 +2562,24 @@ postflight leaves legacy cron, repositories, lock/controller/evidence absence an
 work unchanged. The terminal record is
 `docs/artifacts/gate-d-repository-prerequisite-v1-git-oid-parser-failure.json`.
 
-The unreviewed v2 bundle `70bd0197...9d32` targets a fresh immutable v2 root. Controller
+The reviewed v2 bundle `70bd0197...9d32` targets a fresh immutable v2 root. Controller
 `532c2dec...3298`, unchanged helper `13dc4f85...f68f` and tests `7202aab6...1841` separate Git OID
 and SHA-256 types, accept only exact `<40hex><TAB><exact-ref><LF>` bytes, reject missing LF, CRLF,
 CR, VT, FF and malformed records, and add bounded malformed-response diagnostics. Focused coverage
 passes 23/23. One adjacent run stopped 97/98 on a pre-existing
 hostile-object test's earlier `tracked_state` result. Test `94e30c10...d384` now requires the exact
 allowed fail-closed reason set; five consecutive focused replays and the complete adjacent boundary
-pass 103/103. V2 remains unreviewed, uncommitted and uninstalled. V1 remains installed but inert;
-root locks, recovery controller and new cron remain absent. No repository recovery or HLO work is
-authorized.
+pass 103/103. Commit `2e52847...98da` is pushed/exact-mirrored and v2 is installed exact. Its
+approved invocation under burned tag `gate_d_repo_prerequisite_20260901T011459146872151Z`
+materialized the reviewed local/8-host locks, exact recovery controller and new cron, then failed
+closed before receipt because live repository `docs/artifacts` mode 0775 violates the writer's
+non-group-writable parent contract. Exact live reconstruction is recorded in
+`docs/artifacts/gate-d-repository-prerequisite-v2-evidence-root-failure.json`; no repository,
+JAX/HLO/model or TPU work ran.
+
+The unreviewed v3 tree `67187acf...ec2`, controller `a8753a82...ee19`, unchanged helper
+`13dc4f85...f68f` and tests `4595f7b1...e61a` move the O_EXCL receipt to existing owner-only
+`/home/gianl/gate-d-runs` and require its exact uid/gid/mode 0700/no-xattr boundary. Focused tests
+pass 24/24 and the adjacent boundary passes 104/104. V3 remains uncommitted/uninstalled. Existing
+prerequisites are materialized but unreceipted; repository recovery and HLO work remain
+unauthorized.

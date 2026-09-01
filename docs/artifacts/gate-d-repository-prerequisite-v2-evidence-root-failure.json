@@ -1,0 +1,140 @@
+{
+  "attempt": {
+    "command_scope": "prerequisite_provisioning_only",
+    "exit_code": 1,
+    "installed_tree_sha256": "70bd019729316c940a905999a6b1b6351f9d155506e6c1c0a2746a923c079d32",
+    "pin": "2e528474cf2de48edfe641b0ac2eb9348ef098da",
+    "tag": "gate_d_repo_prerequisite_20260901T011459146872151Z",
+    "terminal_error": "ProvisionError: unsafe evidence root identity",
+    "wall_seconds": 24.57702
+  },
+  "classification": "TERMINAL_POSTMUTATION_PREREQUISITE_FAILURE",
+  "correction": {
+    "evidence_root": "/home/gianl/gate-d-runs",
+    "evidence_root_contract": {
+      "gid": 2001,
+      "mode": "0700",
+      "uid": 2001,
+      "xattrs": 0
+    },
+    "installed_target": "/opt/glm-tpu/gate-d-repository-prerequisites-v3",
+    "root_helper_sha256": "13dc4f85768edbf66733ba0b4592361d1f938ecadf3871341b945f56a385f68f",
+    "script_sha256": "a8753a8265dc8b8c132218dfcbb9328340f991c82b2d2d53ae47a8c092c9ee19",
+    "tests_sha256": "4595f7b1c7e0d053d2c6c41aa921698ff5b3178cdd2ca905b6c0d2a45fc0e61a",
+    "tree_sha256": "67187acf07839e2f41a4225bb5ef51f8e32de87f72fb13868b4c813096191ec2"
+  },
+  "failed_tag_burned": true,
+  "materialized_state": {
+    "cron": {
+      "disposition_before_failure": "updated",
+      "exact_current_text": "*/5 * * * * /usr/bin/flock -n /opt/glm-tpu/locks/glm_tpu_rsync.lock /usr/bin/flock -n /home/gianl/.glm-tpu-rsync.lock /home/gianl/bin/sync-glm.sh >> /home/gianl/sync-glm-tpu.log 2>&1\n"
+    },
+    "local_controller": {
+      "bytes": 44013,
+      "dev": 2049,
+      "gid": 0,
+      "ino": 49172,
+      "mode": "0555",
+      "path": "/opt/glm-tpu/bin/recover_gate_d_worker_repositories.py",
+      "sha256": "fd8950de504df483a3d86420b489406dbf93c3f68de04faf230bc85f402b2225",
+      "uid": 0
+    },
+    "local_locks": [
+      {
+        "dev": 2049,
+        "ino": 49169,
+        "mode": "0666",
+        "name": "glm_pod_workload.lock"
+      },
+      {
+        "dev": 2049,
+        "ino": 49170,
+        "mode": "0666",
+        "name": "glm_tpu_rsync.lock"
+      },
+      {
+        "dev": 2049,
+        "ino": 49171,
+        "mode": "0666",
+        "name": "gate_d_repo_recovery.lock"
+      }
+    ],
+    "lock_root": {
+      "dev": 2049,
+      "gid": 0,
+      "ino": 49168,
+      "mode": "0755",
+      "uid": 0
+    },
+    "remote_recovery_locks": [
+      {
+        "dev": 2049,
+        "host": "t1v-n-ae271d05-w-0",
+        "ino": 49171,
+        "worker": 0
+      },
+      {
+        "dev": 2049,
+        "host": "t1v-n-ae271d05-w-1",
+        "ino": 1291514,
+        "worker": 1
+      },
+      {
+        "dev": 2049,
+        "host": "t1v-n-ae271d05-w-2",
+        "ino": 1559322,
+        "worker": 2
+      },
+      {
+        "dev": 2049,
+        "host": "t1v-n-ae271d05-w-3",
+        "ino": 778948,
+        "worker": 3
+      },
+      {
+        "dev": 2049,
+        "host": "t1v-n-ae271d05-w-4",
+        "ino": 291828,
+        "worker": 4
+      },
+      {
+        "dev": 2049,
+        "host": "t1v-n-ae271d05-w-5",
+        "ino": 1849201,
+        "worker": 5
+      },
+      {
+        "dev": 2049,
+        "host": "t1v-n-ae271d05-w-6",
+        "ino": 292554,
+        "worker": 6
+      },
+      {
+        "dev": 2049,
+        "host": "t1v-n-ae271d05-w-7",
+        "ino": 290109,
+        "worker": 7
+      }
+    ]
+  },
+  "missing_terminal_receipt": true,
+  "root_cause": {
+    "actual_evidence_root": "/home/gianl/glm-tpu-topology-rewrite/docs/artifacts",
+    "actual_mode": "0775",
+    "defect": "v2 selected the repository artifact directory while its writer forbids group or other write permission",
+    "expected_by_v2_writer": "mode with no 0022 bits"
+  },
+  "status_date": "2026-09-01",
+  "work_not_performed": [
+    "bucket_mutation",
+    "hlo_work",
+    "jax_or_model_work",
+    "repository_mutation_or_recovery",
+    "tpu_work"
+  ],
+  "worktree_after_failure": {
+    "evidence_file": "absent",
+    "pin": "2e528474cf2de48edfe641b0ac2eb9348ef098da",
+    "status": "clean"
+  }
+}

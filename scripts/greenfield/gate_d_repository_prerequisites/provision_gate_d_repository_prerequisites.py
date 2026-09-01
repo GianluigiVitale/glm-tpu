@@ -34,9 +34,10 @@ ROOT_HELPER_RELATIVE = (
     "gate_d_repository_prerequisite_root.py"
 )
 CONTROLLER_RELATIVE = "scripts/greenfield/recover_gate_d_worker_repositories.py"
-INSTALLED_ROOT = Path("/opt/glm-tpu/gate-d-repository-prerequisites-v2")
+INSTALLED_ROOT = Path("/opt/glm-tpu/gate-d-repository-prerequisites-v3")
 INSTALLED_SELF = INSTALLED_ROOT / "provision_gate_d_repository_prerequisites.py"
 INSTALLED_ROOT_HELPER = INSTALLED_ROOT / "gate_d_repository_prerequisite_root.py"
+EVIDENCE_ROOT = Path("/home/gianl/gate-d-runs")
 RECOVERY_CONTROLLER_SHA256 = (
     "fd8950de504df483a3d86420b489406dbf93c3f68de04faf230bc85f402b2225"
 )
@@ -616,7 +617,8 @@ def _write_evidence(
 ) -> tuple[Path, dict[str, int | str]]:
     if TAG_PATTERN.fullmatch(tag) is None:
         raise ProvisionError("invalid evidence tag")
-    root = WORKTREE / "docs" / "artifacts" if artifact_root is None else artifact_root
+    exact_private_root = artifact_root is None
+    root = EVIDENCE_ROOT if exact_private_root else artifact_root
     if Path(os.path.abspath(root)) != root or Path(os.path.realpath(root)) != root:
         raise ProvisionError("unsafe evidence root path")
     parent_fd = os.open(
@@ -627,6 +629,7 @@ def _write_evidence(
         not stat.S_ISDIR(parent.st_mode)
         or parent.st_uid != os.getuid()
         or parent.st_gid != os.getgid()
+        or (exact_private_root and stat.S_IMODE(parent.st_mode) != 0o700)
         or stat.S_IMODE(parent.st_mode) & 0o022
         or os.listxattr(parent_fd)
     ):
