@@ -3223,3 +3223,26 @@ bytes, SHA-256 `b0e58ea7c5a5e3bb0158f936442a67336d279b9f991c2247adfe9f2629759c79
 It binds commit `efe99ba87c1e1a7163f436fb7cc55bcd46e395ae`, all seven exact sources, the v2
 immutable targets, the supported Git flag and the unchanged predecessor authorities. It authorizes
 persistence only; review and persistence precede any v2 installation.
+
+## 2026-09-01 projection-contraction HLO v2 immutable runtime installed
+
+- Certificate commit `f9fa964b61ce51a8e2e0452a3603b7e9c9d30093` is exact on origin; locked
+  `US-CENTRAL2` mirror replay passed with checkout archive SHA-256
+  `cd10f198240a75aec827919afb739fa664341ef1cb3302929109d3412a768057`.
+- Sol returned `APPROVE INSTALL ONLY` for exactly two literal absolute-`/usr/bin/sudo` commands.
+  The fixed provisioner copied exact five-file tree
+  `49409ba79045fa402ff9957c25ed6a658b6fb15b803dccda7f61d7d941930145` to the root-owned
+  0755 v2 source capsule. The installer published the root-owned 0555 three-file runtime capsule
+  before launcher `b3b6ff7c...9a23` and reported `launcher_invoked=false`.
+- Artifact `gate-d-projection-contraction-pp16-hlo-runtime-install-v2.json` is 3,699 canonical
+  bytes, SHA-256 `6a10743f80b924e5fe025f97b51f62359193653f73b83b65809cfbd8c42a951c`.
+  Every installed file is root-owned, exact, mode 0555, nlink 1 and xattr-free. One read-only
+  observation at `2026-09-01T20:28:18.971859772Z` simultaneously acquired all four identity-bound
+  canonical leases and found no launcher/acquirer process. Sol independently verified staged diff
+  `ccfe3c149b22f4c5af35376cbd1d32f31cd61d6a65fbd22ccab717dc9571c100` against live objects and
+  returned `APPROVE PERSISTENCE` with no P0--P2.
+- Classification: `IMMUTABLE_RUNTIME_V2_INSTALLED_NOT_INVOKED;TPU_COMPILE_UNAUTHORIZED;
+  TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`. No launcher, JAX/backend, HLO acquisition, bucket write,
+  TPU/numerical/performance/full-DSA/8K work occurred. Exact next after review and persistence is a
+  separately reviewed fresh-tag compile-only launcher command; numerical execution remains
+  forbidden.
