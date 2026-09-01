@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import fcntl
 import importlib.util
+import json
 import os
 import subprocess
 from hashlib import sha256
@@ -13,6 +14,12 @@ import pytest
 ROOT = Path(__file__).parents[3]
 SOURCE = ROOT / "scripts/greenfield/launch_gate_d_projection_contraction_pp16_hlo.py"
 WRAPPER = ROOT / "scripts/greenfield/run_gate_d_projection_contraction_pp16_hlo.sh"
+FAILURE_ARTIFACT = ROOT / (
+    "docs/artifacts/gate-d-projection-contraction-pp16-hlo-v1-git-config-failure.json"
+)
+FAILURE_ARTIFACT_SHA256 = (
+    "14de62b52fbdde659c6d222442d2e737a417b3d84893cefdd3d0476cbcfc4086"
+)
 SPEC = importlib.util.spec_from_file_location(
     "gate_d_projection_contraction_hlo_launcher", SOURCE
 )
@@ -137,7 +144,7 @@ def _install_hostile_local_git_config(worktree: Path, tmp_path: Path) -> Path:
 def test_launcher_binds_committed_sources_and_root_owned_installation() -> None:
     source = SOURCE.read_text(encoding="ascii")
     assert str(MODULE.INSTALL_PATH) == (
-        "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v1.py"
+        "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v2.py"
     )
     assert source.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
     assert "expected_uid=0, expected_gid=0, expected_mode=0o555" in source
@@ -206,6 +213,93 @@ def test_git_authority_verifier_rejects_replacement_ref_before_remote(
     assert completed.returncode != 0
     assert "forbidden replacement refs" in completed.stderr
     assert not marker.exists()
+
+
+def test_git_authority_verifier_accepts_clean_pushed_production_clone(
+    tmp_path: Path,
+) -> None:
+    branch = _git(ROOT, "branch", "--show-current")
+    pin = _git(ROOT, "rev-parse", "HEAD")
+    worktree = tmp_path / "production-clone"
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "clone",
+            "-q",
+            "--shared",
+            "--branch",
+            branch,
+            str(ROOT),
+            str(worktree),
+        ],
+        check=True,
+        env={
+            "HOME": str(tmp_path),
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+        },
+    )
+    production_origin = "git@github.com:GianluigiVitale/glm-tpu.git"
+    _git(worktree, "remote", "set-url", "origin", production_origin)
+    completed = subprocess.run(
+        [
+            "/usr/bin/python3",
+            "-I",
+            "-S",
+            "-B",
+            "-c",
+            GIT_AUTHORITY_VERIFIER,
+            str(worktree),
+            branch,
+            production_origin,
+            pin,
+        ],
+        cwd="/",
+        env={"LANG": "C", "LC_ALL": "C", "PATH": "/usr/bin:/bin"},
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout == ""
+
+
+def test_v1_git_config_failure_artifact_is_exact_and_fail_closed() -> None:
+    raw = FAILURE_ARTIFACT.read_bytes()
+    assert len(raw) == 2240
+    assert sha256(raw).hexdigest() == FAILURE_ARTIFACT_SHA256
+    parsed = json.loads(raw)
+    assert parsed["classification"] == (
+        "PRE_JAX_GIT_AUTHORITY_FAILURE;NO_RUN_DIRECTORY;NO_CLOUD_MUTATION;"
+        "NO_TPU_WORK;TAG_BURNED;GATE_D_OPEN"
+    )
+    assert parsed["failure_boundary"] == {
+        "cloud_mutation_performed": False,
+        "compiler_started": False,
+        "executable_invocation_count": 0,
+        "jax_imported": False,
+        "local_run_directory_created": False,
+        "remote_host_command_started": False,
+        "tpu_backend_initialized": False,
+    }
+    assert parsed["root_cause"]["invalid_argument"] == "--includes=false"
+    assert parsed["root_cause"]["replacement"] == "--no-includes"
+    assert len(parsed["postconditions"]["lease_recheck"]["leases"]) == 4
+    for field, path in (
+        (
+            "runtime_install_artifact_sha256",
+            ROOT / "docs/artifacts/"
+            "gate-d-projection-contraction-pp16-hlo-runtime-install.json",
+        ),
+        (
+            "source_artifact_sha256",
+            ROOT / "docs/artifacts/"
+            "gate-d-projection-contraction-pp16-hlo-orchestration-install-source.json",
+        ),
+    ):
+        assert parsed["authority"][field] == sha256(path.read_bytes()).hexdigest()
 
 
 def test_sealed_snapshot_executes_original_after_named_path_substitution(
@@ -312,7 +406,7 @@ def test_launcher_binds_all_executed_python_to_immutable_capsule(
     tmp_path: Path,
 ) -> None:
     assert str(MODULE.IMMUTABLE_CAPSULE_ROOT) == (
-        "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v1"
+        "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v2"
     )
     expected = {
         "DRIVER": "scripts/greenfield/acquire_gate_d_projection_contraction_pp16_hlo.py",

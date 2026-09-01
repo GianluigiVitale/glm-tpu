@@ -66,13 +66,13 @@ def test_payload_hashes_and_install_targets_are_exact() -> None:
         "launch_gate_d_projection_contraction_pp16_hlo.py"
     }
     assert str(MODULE.SOURCE_ROOT) == (
-        "/opt/glm-tpu/gate-d-projection-contraction-hlo-install-v1"
+        "/opt/glm-tpu/gate-d-projection-contraction-hlo-install-v2"
     )
     assert str(MODULE.LAUNCHER_TARGET) == (
-        "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v1.py"
+        "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v2.py"
     )
     assert str(MODULE.CAPSULE_TARGET) == (
-        "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v1"
+        "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v2"
     )
 
 
@@ -219,7 +219,7 @@ def test_installer_source_audit_accepts_exact_source_and_rejects_mutations() -> 
     assert audit["launcher_invocation_count"] == 0
     mutations = (
         raw.replace(b"c660d50e", b"d660d50e", 1),
-        raw.replace(b"install-v1", b"install-v9", 1),
+        raw.replace(b"install-v2", b"install-v9", 1),
         raw.replace(b"_publish_capsule(", b"_publish_capsule_removed(", 1),
         raw.replace(b'"launcher_invoked": False', b'"launcher_invoked": True', 1),
     )
@@ -258,7 +258,7 @@ def test_orchestration_source_audits_all_exact_sources_and_predecessors() -> Non
     assert ANALYZER_MODULE._predecessor_authority() == (ANALYZER_MODULE.REFERENCE_PATHS)
 
 
-def test_orchestration_source_artifact_replays_from_descendant_commit() -> None:
+def test_historical_orchestration_source_artifact_binds_its_exact_commit() -> None:
     artifact = ARTIFACT.read_bytes()
     assert len(artifact) == 3026
     assert sha256(artifact).hexdigest() == ARTIFACT_SHA256
@@ -275,26 +275,9 @@ def test_orchestration_source_artifact_replays_from_descendant_commit() -> None:
         "tpu_execution": False,
     }
     assert parsed["gate_d_closed"] is False
-    environment = {
-        **os.environ,
-        "GLM_GATE_D_PROJECTION_CONTRACTION_HLO_ORCHESTRATION_SOURCE": "1",
-        "JAX_PLATFORMS": "cpu",
-        "JAX_PLATFORM_NAME": "cpu",
-    }
-    result = subprocess.run(
-        ["/usr/bin/python3", "-I", "-S", "-B", str(ANALYZER)],
-        cwd=ROOT,
-        env=environment,
-        capture_output=True,
-        check=False,
-        timeout=60,
-    )
-    assert result.returncode == 0, result.stderr.decode()
-    replay = json.loads(result.stdout)
     current_pin = subprocess.check_output(
         ["/usr/bin/git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True
     ).strip()
-    assert replay["code_hash"] == current_pin
     ancestry = subprocess.run(
         [
             "/usr/bin/git",
@@ -308,18 +291,17 @@ def test_orchestration_source_artifact_replays_from_descendant_commit() -> None:
         check=False,
     )
     assert ancestry.returncode == 0
-    replay["code_hash"] = parsed["code_hash"]
-    normalized = (
-        json.dumps(
-            replay,
-            allow_nan=False,
-            ensure_ascii=True,
-            separators=(",", ":"),
-            sort_keys=True,
+    for relative, expected_sha256 in parsed["source_sha256s"].items():
+        raw = subprocess.check_output(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(ROOT),
+                "show",
+                f"{parsed['code_hash']}:{relative}",
+            ]
         )
-        + "\n"
-    ).encode("ascii")
-    assert normalized == artifact
+        assert sha256(raw).hexdigest() == expected_sha256
 
 
 def test_runtime_install_artifact_binds_exact_persisted_sources() -> None:
@@ -349,15 +331,25 @@ def test_runtime_install_artifact_binds_exact_persisted_sources() -> None:
     ]
     assert all(record["free"] is True for record in lease_recheck["leases"])
     assert parsed["status"] == "IMMUTABLE_RUNTIME_INSTALLED_NOT_INVOKED"
-    expected_members = {
-        name: sha256((ROOT / "scripts/greenfield" / name).read_bytes()).hexdigest()
-        for name in MODULE.SOURCE_NAMES
-    }
+    source_commit = parsed["install"]["source_commit"]
+    expected_members = {}
+    for name in parsed["installed_objects"]["source_capsule"]["members"]:
+        raw = subprocess.check_output(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(ROOT),
+                "show",
+                f"{source_commit}:scripts/greenfield/{name}",
+            ]
+        )
+        expected_members[name] = sha256(raw).hexdigest()
     assert parsed["installed_objects"]["source_capsule"]["members"] == (
         expected_members
     )
     assert parsed["installed_objects"]["runtime_capsule"]["members"] == {
-        name: expected_members[name] for name in MODULE.CAPSULE_NAMES
+        name: expected_members[name]
+        for name in parsed["installed_objects"]["runtime_capsule"]["members"]
     }
     assert (
         parsed["installed_objects"]["launcher"]["sha256"]

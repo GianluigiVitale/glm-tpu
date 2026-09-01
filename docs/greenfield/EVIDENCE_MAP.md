@@ -3193,3 +3193,26 @@ execution is authorized by this source batch.
   TPU/numerical/performance/full-DSA/8K work occurred. Exact next after adversarial review and
   persistence is a separately reviewed literal fresh-tag compile-only launcher command; executable
   invocation remains forbidden.
+
+## 2026-09-01 projection-contraction HLO v1 pre-JAX failure; v2 source correction
+
+- Approved tag `gate_d_projection_contraction_pp16_hlo_20260901T201007969634980Z` failed closed in
+  0.2 seconds inside the embedded Git authority verifier: `git config --includes=false` returned
+  129 because `--includes` takes no value. No run directory, JAX import, backend/compiler, remote
+  host command, cloud mutation or TPU work began; executable invocation count is zero and the tag is
+  burned. Canonical failure artifact
+  `gate-d-projection-contraction-pp16-hlo-v1-git-config-failure.json` is 2,240 bytes, SHA-256
+  `14de62b52fbdde659c6d222442d2e737a417b3d84893cefdd3d0476cbcfc4086`. Later read-only
+  checks prove local/live/all-version/exhaustive-soft-deleted vacancy and simultaneously acquire all
+  four identity-bound canonical leases.
+- V2 source uses supported `--no-includes` and adds a complete success-path regression against a
+  clean pushed production-origin clone; the prior tests had exercised only the helper and a
+  replacement-ref failure before this argument. Immutable v1 targets remain untouched. New source,
+  capsule and launcher targets are versioned v2. Wrapper, launcher and installer SHA-256 values are
+  `058338a1...992`, `b3b6ff7c...9a23` and `21a14f20...31be`; focused source/security coverage passes
+  80/80 and the complete projection-HLO source/security slice passes 111/111, with Bash syntax and
+  Ruff checks. Sol independently reviewed staged diff `a0eddcbb...9740` and returned
+  `APPROVE PERSISTENCE` with no P0--P2.
+- Authority remains source persistence only. No v2 install/launcher/HLO/TPU/cloud/numerical/full
+  DSA/8K action is authorized. Exact next is commit/push/mirror, regenerated v2 source certificate,
+  then separate install-only and fresh-tag compile-only reviews.

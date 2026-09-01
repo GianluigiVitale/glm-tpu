@@ -12,7 +12,7 @@ from pathlib import Path
 
 root = Path("/opt/glm-tpu/locks")
 names = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")
-launcher = Path("/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v1.py")
+launcher = Path("/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v2.py")
 parent_fd = os.open(
     root, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
 )
@@ -186,7 +186,7 @@ if git(
     worktree,
     "config",
     "--local",
-    "--includes=false",
+    "--no-includes",
     "--get-regexp",
     r"^remote\.origin\.(url|pushurl)$",
 ) != f"remote.origin.url {origin}\n".encode():
@@ -237,7 +237,7 @@ readonly PROJECTION_SOURCE=$WORKTREE/docs/artifacts/gate-d-projection-contractio
 readonly PROJECTION_SOURCE_SHA=5744eee0ef2cf35a4566cc0de165be1338160daaae3f4dd133554b2aa8280e9f
 readonly HLO_SOURCE=$WORKTREE/docs/artifacts/gate-d-projection-contraction-hlo-acquisition-source.json
 readonly HLO_SOURCE_SHA=a94395ef13f5cfa7de7bc221fdc33d4498637a02ffc55d3cba985834dd99b93a
-readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v1
+readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v2
 readonly DRIVER=$IMMUTABLE_CAPSULE_ROOT/acquire_gate_d_projection_contraction_pp16_hlo.py
 readonly DRIVER_SHA=c660d50eb60054c9b267840230fb69bbf7259104416dc96c7b2ee01a2a14934a
 readonly PUBLISHER=$IMMUTABLE_CAPSULE_ROOT/publish_gate_d_projection_contraction_pp16_hlo.py

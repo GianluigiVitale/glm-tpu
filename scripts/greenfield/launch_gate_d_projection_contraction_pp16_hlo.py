@@ -13,7 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 
 INSTALL_PATH = Path(
-    "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v1.py"
+    "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_hlo_v2.py"
 )
 PYTHON = Path("/usr/bin/python3.10")
 PYTHON_SHA256 = "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
@@ -23,9 +23,9 @@ WRAPPER_PATH = (
     WORKTREE / "scripts/greenfield/run_gate_d_projection_contraction_pp16_hlo.sh"
 )
 WRAPPER_SOURCE_PATH = "scripts/greenfield/run_gate_d_projection_contraction_pp16_hlo.sh"
-WRAPPER_SHA256 = "a8c9a770cb4649180af8ff56a55d25697fd1be2ef40f0254f527a6a7f39fb6b8"
+WRAPPER_SHA256 = "058338a174e1746b4fe231cb23fbac3a8abe1260d687337551885e4c98a14992"
 IMMUTABLE_CAPSULE_ROOT = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v1"
+    "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v2"
 )
 DRIVER_PATH = (
     IMMUTABLE_CAPSULE_ROOT / "acquire_gate_d_projection_contraction_pp16_hlo.py"

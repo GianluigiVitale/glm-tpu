@@ -639,14 +639,14 @@ def test_wrapper_requires_retained_sealed_descriptor_and_immutable_children() ->
     assert "F_GET_SEALS" in verifier
     assert "wrapper_fd != 10" in verifier
     assert "GLM_GATE_D_WRAPPER_SHA256" in verifier
-    assert "launch_gate_d_projection_contraction_pp16_hlo_v1.py" in verifier
+    assert "launch_gate_d_projection_contraction_pp16_hlo_v2.py" in verifier
     assert "IMMUTABLE_LOCK_BROKER" not in source
     assert "WRAPPER_ABS" not in source
     assert "GLM_GATE_D_IMMUTABLE_LOCKS_HELD" in source
     assert "exec 10<&-" in source
     assert (
         "readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/"
-        "gate-d-projection-contraction-pp16-hlo-v1"
+        "gate-d-projection-contraction-pp16-hlo-v2"
     ) in source
     assert (
         "$WORKTREE/scripts/greenfield/acquire_gate_d_projection_contraction_pp16_hlo.py"

@@ -9770,3 +9770,25 @@ This is installation evidence only. No launcher, JAX/backend, HLO acquisition, c
 TPU/numerical/performance, full-DSA/8K or Gate-D claim exists. After this artifact receives its own
 adversarial persistence review and is committed/pushed/mirrored, exact next is a separately reviewed
 literal fresh-tag compile-only launcher command. Executable invocation remains forbidden.
+
+## 2026-09-01 projection-contraction HLO v1 failed before JAX; v2 source prepared
+
+The separately approved tag
+`gate_d_projection_contraction_pp16_hlo_20260901T201007969634980Z` failed closed in 0.2 seconds.
+The embedded Git verifier passed the invalid value-form `git config --includes=false`; local Git
+returned 129 because `--includes` is a flag. This occurred before run-directory creation, JAX,
+backend/compiler initialization, any remote-host command or cloud mutation. The executable was never
+invoked and the tag is burned. Canonical artifact
+`docs/artifacts/gate-d-projection-contraction-pp16-hlo-v1-git-config-failure.json` is 2,240 bytes,
+SHA-256 `14de62b52fbdde659c6d222442d2e737a417b3d84893cefdd3d0476cbcfc4086`.
+Later read-only checks prove the local and all three remote history surfaces vacant and all four
+canonical leases simultaneously free with bound identities.
+
+The v2 correction uses `--no-includes` and adds an executed full success-path verifier regression
+against a clean clone whose origin is the pushed production remote. It preserves all immutable v1
+objects and moves the source capsule/runtime capsule/launcher to v2 targets. Current wrapper,
+launcher and installer hashes are `058338a1...992`, `b3b6ff7c...9a23` and `21a14f20...31be`;
+focused coverage passes 80/80 and the complete slice passes 111/111, plus Ruff and Bash syntax.
+Sol returned `APPROVE PERSISTENCE` for staged diff `a0eddcbb...9740` with no P0--P2. This is source
+only: no v2 install, launcher, compile, cloud, TPU, numerical or 8K authority. Exact next is
+persistence, then regeneration of the v2 source certificate.
