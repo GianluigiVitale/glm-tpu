@@ -1,0 +1,78 @@
+{
+  "artifact_kind": "gate_d_compensated_pp16_hlo_wrapper_s1_install",
+  "classification": "IMMUTABLE_WRAPPER_INSTALLED;NO_WRAPPER_INVOCATION;NO_JAX;NO_BACKEND;NO_COMPILER;NO_HLO;NO_EXECUTABLE;NO_TPU_WORK;GATE_D_OPEN",
+  "code_pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059",
+  "installed_at_utc": "2026-09-01T05:56:18Z",
+  "install_review": {
+    "direction": "APPROVE DIRECTION B ONLY",
+    "exact_command": "APPROVE INSTALL ONLY; no P0/P1/P2",
+    "reviewer": "sol_gate_d_observability_review"
+  },
+  "preinstall_live_state": {
+    "canonical_leases_exact_and_free": 4,
+    "execution_ref_clean_and_remote_equal": true,
+    "fleet_census": "8/8 CENSUS_OK",
+    "pod": "db-v4-64-od",
+    "pod_accelerator_type": "v4-64",
+    "pod_health": "HEALTHY",
+    "pod_state": "READY",
+    "target_and_staging_vacant": true,
+    "workers_clean_complete_exact_pin": 8
+  },
+  "provisioner": {
+    "path": "/opt/glm-tpu/bin/provision_gate_d_python_runtime.py",
+    "sha256": "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594"
+  },
+  "source": {
+    "directory": "/home/gianl/glm-run/gate-d-pp16-hlo-wrapper-s1-source.wEISqh",
+    "directory_dev": 2049,
+    "directory_gid": 2001,
+    "directory_ino": 2612963,
+    "directory_mode": "0755",
+    "directory_uid": 2001,
+    "file": "run_gate_d_compensated_pp16_hlo.sh",
+    "file_bytes": 28381,
+    "file_dev": 2049,
+    "file_gid": 2001,
+    "file_ino": 2612964,
+    "file_mode": "0555",
+    "file_nlink": 1,
+    "file_sha256": "700519374081813174538e4f89a7c31c02dd039979d067aa46f66a70a827de0d",
+    "file_uid": 2001,
+    "git_blob": "02395411f5f1ddfd894f6f06a141834a56e792c8",
+    "git_blob_exact_match": true,
+    "tree_sha256": "4528f121e6a87f2f21ba10c74e73efb972573b244a57c9dbdb80db33a4edd5be",
+    "xattrs": []
+  },
+  "target": {
+    "directory": "/opt/glm-tpu/gate-d-pp16-hlo-wrapper-s1",
+    "directory_dev": 2049,
+    "directory_gid": 0,
+    "directory_ino": 48231,
+    "directory_mode": "0755",
+    "directory_nlink": 2,
+    "directory_uid": 0,
+    "file": "/opt/glm-tpu/gate-d-pp16-hlo-wrapper-s1/run_gate_d_compensated_pp16_hlo.sh",
+    "file_bytes": 28381,
+    "file_dev": 2049,
+    "file_gid": 0,
+    "file_ino": 49187,
+    "file_mode": "0555",
+    "file_nlink": 1,
+    "file_sha256": "700519374081813174538e4f89a7c31c02dd039979d067aa46f66a70a827de0d",
+    "file_uid": 0,
+    "one_file_only": true,
+    "staging_residue_present": false,
+    "tree_sha256": "4528f121e6a87f2f21ba10c74e73efb972573b244a57c9dbdb80db33a4edd5be",
+    "xattrs": []
+  },
+  "postinstall_live_state": {
+    "canonical_leases_exact_and_free": 4,
+    "fleet_census": "8/8 CENSUS_OK",
+    "local_wrapper_or_acquisition_processes": 0,
+    "pod_health": "HEALTHY",
+    "pod_state": "READY"
+  },
+  "schema_version": 1,
+  "successor_authorized": false
+}
