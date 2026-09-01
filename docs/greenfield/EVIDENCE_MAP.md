@@ -3079,3 +3079,29 @@ execution is authorized by this source batch.
 - Authority: bounded numerical rejection and authenticated diagnostic only. Gate D, decoder, 8K,
   performance and causality remain open. Exact next is the smallest CPU-only explicit
   projection-product/rounding/accumulation/association analyzer; do not rerun this tag or mechanism.
+
+## 2026-09-01 projection-arithmetic frontier analysis
+
+- Analyzer `scripts/greenfield/analyze_gate_d_projection_arithmetic_frontier.py` is committed at
+  `2e8528c023aee9354610651fbf28b742760e5b5c`, source SHA-256
+  `02a82800eee81e9822f91c9c962568d85242f1fdce56e3e5e6275a2ba672ed4f`; origin is exact and the
+  locked `US-CENTRAL2` mirror checkout archive is
+  `32982b1b8633bd16ccf3fcefa27b7e09ceeb29abe98ab54b986871141c156d6b`.
+- Canonical artifact `docs/artifacts/gate-d-projection-arithmetic-frontier-analysis.json` is 24,001
+  bytes, SHA-256 `4a6be0f33f221df46f384cd2047da1aa664ae4c45763e68f0f1df05f8644e20c`.
+  Its exact sealed CPU runtime binds 532 loaded module files and 11/49 before/after native mapped
+  files to fixed byte manifests, strictly parses the 22-entry JAX and two-entry libtpu capsule
+  allowlists, uses one CPU device and opens no accelerator file descriptor.
+- The CPU FP32 JAX `dot_general` control followed by the identical one-row LayerNorm/RoPE suffix
+  reproduces the accepted 128-float current key bit-for-bit (0/128 mismatches; SHA-256
+  `5006ad4f...329b`). All 27 explicit reduction probes are rejected; the best direct 48x128
+  tile/lane association still misses 100/128 values. This is one captured position-8155 witness,
+  not a general TPU arithmetic identity or root-cause proof.
+- Sol returned `APPROVE` with no P0--P2 after the loaded-byte/capsule hardening. Current validation
+  passes 23/23 focused and 99/99 causal-boundary CPU-only tests, Ruff 0.16.5, formatting, Python
+  compilation and canonical rerun comparison.
+- Classification: `CPU_F32_DOT_CONTROL_EXACT_ACCEPTED_KEY_CAPTURED_INPUT;
+  ENUMERATED_REDUCTION_PROBES_REJECTED;TPU_CAUSALITY_UNPROVEN;GATE_D_OPEN`. No TPU compile/run,
+  performance, mechanism, full DSA or 8K authority exists. Exact next after artifact persistence is
+  a separately reviewed default-off source/compile-only design for the smallest one-row TPU F32
+  projection-contraction discriminator; do not rerun the full DSA path or 8K decoder.

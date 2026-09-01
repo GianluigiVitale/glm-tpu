@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import zipfile
+from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 from types import ModuleType
@@ -332,6 +333,28 @@ def test_full_offline_analysis_is_cpu_only_and_fail_closed(
     )
     assert len(report["variants_ranked_by_accepted_key"]) == 27
     assert json.loads(MODULE._canonical_json(report)) == report
+
+
+def test_persisted_analysis_is_canonical_and_exactly_bound() -> None:
+    path = ROOT / "docs/artifacts/gate-d-projection-arithmetic-frontier-analysis.json"
+    raw = path.read_bytes()
+    assert len(raw) == 24_001
+    assert sha256(raw).hexdigest() == (
+        "4a6be0f33f221df46f384cd2047da1aa664ae4c45763e68f0f1df05f8644e20c"
+    )
+    report = json.loads(raw)
+    assert MODULE._canonical_json(report) == raw
+    assert report["code_pin"] == "2e8528c023aee9354610651fbf28b742760e5b5c"
+    assert report["source_sha256"] == (
+        "02a82800eee81e9822f91c9c962568d85242f1fdce56e3e5e6275a2ba672ed4f"
+    )
+    assert report["cpu_jax_dot_control"]["accepted"]["bit_mismatch_count"] == 0
+    assert (
+        report["best_explicit_reduction_probe"]["accepted"]["bit_mismatch_count"] == 100
+    )
+    assert report["root_cause_proven"] is False
+    assert report["tpu_compile_or_execution_performed"] is False
+    assert report["gate_d_closed"] is False
 
 
 def test_sealed_runtime_boundary_rejects_ambient_test_interpreter() -> None:

@@ -9669,3 +9669,19 @@ causal dot algorithm, accumulation precision or layout. Classification is
 PROJECTION_FRONTIER_LOCALIZED;GATE_D_OPEN`. No performance, decoder, 8K or closure authority exists.
 Exact next is a CPU-only explicit projection-arithmetic analyzer; no further TPU run until a
 genuinely distinct mechanism passes offline and HLO admission.
+
+## 2026-09-01 projection-arithmetic frontier persisted
+
+Committed analyzer pin `2e8528c023aee9354610651fbf28b742760e5b5c` is exact on origin and the
+locked `US-CENTRAL2` mirror (checkout archive `32982b1b...56d6b`). Its canonical 24,001-byte report
+is `docs/artifacts/gate-d-projection-arithmetic-frontier-analysis.json`, SHA-256
+`4a6be0f3...4e20c`. The isolated CPU runtime binds every loaded module and native mapping to fixed
+byte manifests and opens no accelerator descriptor. Sol approved the corrected analyzer/test diff
+with no P0--P2.
+
+The CPU FP32 JAX dot control reproduces the accepted position-8155 128-float current key bit-for-bit.
+None of 27 explicit reduction probes is exact; the best misses 100/128 values. This narrows the next
+experiment but does not prove TPU causality or a general fix. Gate D, full DSA and 8K remain open.
+Exact next after this artifact is committed/pushed/mirrored: review a default-off source/compile-only
+design for the smallest one-row TPU F32 projection-contraction discriminator. Do not rerun the
+burned forced-round path or the complete decoder.
