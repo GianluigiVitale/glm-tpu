@@ -9573,3 +9573,21 @@ or cloud mutation occurred. This batch authorizes persistence only; exact next i
 review, commit/push/locked mirror, then a separately reviewed literal install command. Remote tag
 vacancy is bound across live, all-version and exhaustive soft-deleted namespaces before local
 run-directory creation and again immediately before either success or diagnostic upload.
+
+## 2026-09-01 forced-round PP16 numerical runtime installed; launcher not invoked
+
+Sol approved corrected staged SHA `487d3646...94fd6d` for persistence after its live/versioned/
+soft-deleted vacancy P1 was fixed. Commit `d26e83f21fddbc325529974d2d0f16ab84a5e45b` matches origin;
+the locked `US-CENTRAL2` mirror replay passed connectivity fsck with checkout archive SHA
+`f763b787...1b9b6b`.
+
+A separate install-only review first withheld ambient `sudo` resolution, then approved the two
+literal commands with absolute `/usr/bin/sudo`. The fixed provisioner installed exact five-file
+source tree `038355c9...a575f`; the second-stage installer published the root-owned 0555 three-file
+runtime capsule first and root-owned 0555 launcher `44ef4118...bf8709` last. Every member has exact
+committed bytes, nlink 1 and no xattrs. The installer reported `launcher_invoked=false`; independent
+checks found both locks free and no launcher process. Artifact:
+`gate-d-forced-round-pp16-numerical-runtime-install.json`. No launcher, JAX/backend, HLO/TPU,
+cloud, numerical/performance work or 8K occurred. Gate D remains open. Exact next is a separate
+fresh-tag execution-only review of the installed launcher command; only approval may authorize one
+protected discriminator.

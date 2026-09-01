@@ -2995,3 +2995,15 @@ execution is authorized by this source batch.
 - Verification: 52/52 focused and 273/273 adjacent CPU-only hostile tests with one sealed-history
   deselection; Ruff 0.16.5 and Python/Bash compilation pass. No install, launcher, backend, compile, TPU
   or cloud action occurred. Persistence only; literal install and execution need separate reviews.
+
+## 2026-09-01 forced-round PP16 numerical immutable runtime install
+
+- Artifact: `docs/artifacts/gate-d-forced-round-pp16-numerical-runtime-install.json`.
+- Persisted authority: reviewed diff `487d3646...94fd6d`, commit `d26e83f...5e45b`, origin exact;
+  locked `US-CENTRAL2` mirror connectivity/fsck and checkout archive `f763b787...1b9b6b` pass.
+- Install: separately reviewed absolute-`/usr/bin/sudo` commands provisioned exact source tree
+  `038355c9...a575f`, then published root-owned/read-only runtime capsule
+  `954ff083...9a869d` before launcher `44ef4118...bf8709`; all files have nlink 1 and no xattrs.
+- State: `launcher_invoked=false`; both locks free; no launcher process. No JAX/backend/HLO/TPU,
+  cloud, numerical, performance or Gate-D claim. One fresh-tag protected execution requires its own
+  literal-command review.
