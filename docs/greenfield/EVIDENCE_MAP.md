@@ -2527,6 +2527,19 @@ remains open and no TPU successor is authorized.
   staging absence, lock release and process absence pass. Install artifact
   `gate-d-worker-repository-recovery-v4-install.json` has SHA `eaf702da...159db`. No controller
   invocation, recovery/repository mutation, cloud/network, JAX/HLO, model or TPU work occurred.
+- Sol then approved one invocation only under fresh tag
+  `gate_d_repo_recovery_20260901T033629027256215Z`. Seven workers passed every preflight, prepare,
+  swap and final record; worker 0 remained the protected linked worktree. Exact final verifier,
+  pre/pre-swap/post census and quiescence evidence each contains eight unique hosts at pin
+  `dc9ec468ad1529b09c4dd06005849ee70e0fa7c7`. Seven retained old paths replay their sealed old pins;
+  new/bundle paths are absent and all per-worker/global leases are free. Independent replay matched
+  all 19 remote objects / 9,152,508 bytes to local evidence and proves terminal generation
+  `1788234096347915` last with terminal SHA `491fe58f...7067`.
+- The external local-vacancy probe named historical root `gate-d-runs`, not controller root
+  `/home/gianl/gate-d-repo-recovery`. The controller's O_EXCL tag-directory creation nevertheless
+  proved actual vacancy before recovery work; no collision occurred. Complete artifact
+  `gate-d-worker-repository-recovery-v4-complete.json` has SHA `5f9e7ffc...150d2`. This closes only
+  repository recovery. No JAX/HLO/model/TPU work ran; any PP16 HLO start remains separately reviewed.
 
 ## Gate-D recovery v2 promisor-preflight failure and strict v3 correction
 

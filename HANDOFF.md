@@ -2,6 +2,27 @@
 
 **Updated:** 2026-09-01 UTC
 
+## 2026-09-01 Gate-D repository fleet recovered exactly; PP16 HLO still not started
+
+- The separately approved one-shot v4 invocation used terminal tag
+  `gate_d_repo_recovery_20260901T033629027256215Z` exactly once. It recovered workers 1--7 and
+  preserved worker 0's linked worktree. All eight current repositories are clean strict target
+  pin `dc9ec468ad1529b09c4dd06005849ee70e0fa7c7`; seven retained old repositories replay their exact
+  sealed prestates. New/bundle paths are absent and all eight per-worker locks are free.
+- Sealed evidence has 7/7 preflight, prepare, swap and final records; exact unique-host 8/8 final
+  verifier, pre/pre-swap/post census and quiescence records; no JAX/HLO/model/TPU work. The
+  19-object / 9,152,508-byte `US-CENTRAL2` prefix was independently reread byte-for-byte. Terminal
+  generation `1788234096347915` is later than every preterminal generation and terminal SHA is
+  `491fe58f...7067`.
+- The external preflight checked the wrong historical local root (`gate-d-runs`). The controller's
+  actual root is `/home/gianl/gate-d-repo-recovery`; its O_EXCL tag-directory creation succeeded
+  before recovery work, so the real path was vacant and no collision occurred. This gap is recorded
+  rather than hidden. Canonical success artifact
+  `gate-d-worker-repository-recovery-v4-complete.json` has SHA `5f9e7ffc...150d2`.
+- This closes repository recovery only. PP16 HLO, JAX/backend/model/TPU work did not run. Exact next
+  is persistence review/commit/push/locked mirror of this evidence, then a distinct review of the
+  already prepared compile-only PP16 HLO command.
+
 ## 2026-09-01 Gate-D recovery v4 installed immutably; not invoked
 
 - The canonical-catalogue correction is persisted as commit `39b4059cacc88ba16a7a493e83afd042460517a5`,
@@ -16,8 +37,7 @@
   byte-equal to Git, with zero xattrs, no staging residue and canonical tree SHA
   `bd80291e...98d0`. All four leases are released and no controller process exists. Install evidence
   is `gate-d-worker-repository-recovery-v4-install.json` (SHA `eaf702da...159db`). No recovery,
-  repository, cloud/network, JAX/HLO, model or TPU work ran. Exact next is persistence review of
-  this install evidence, then separate review of one fresh-tag repository-only invocation.
+  repository, cloud/network, JAX/HLO, model or TPU work ran at that installation boundary.
 
 ## 2026-09-01 Gate-D recovery v3 failed closed; canonical v4 correction prepared
 

@@ -1,0 +1,108 @@
+{
+  "archive": {
+    "bucket_location": "US-CENTRAL2",
+    "exact_object_set": true,
+    "max_preterminal_generation": "1788234091332012",
+    "object_count": 19,
+    "prefix": "gs://driftbench-dsv4-uc/results/greenfield/glm52/gate_d_repo_recovery/gate_d_repo_recovery_20260901T033629027256215Z",
+    "remote_bytes_equal_local": true,
+    "terminal_generation": "1788234096347915",
+    "terminal_last": true,
+    "total_bytes": 9152508
+  },
+  "artifact_kind": "gate_d_worker_repository_recovery_v4_complete",
+  "code_pin": "dc9ec468ad1529b09c4dd06005849ee70e0fa7c7",
+  "controller_sha256": "fa637dd17861e19bc178260c65b90c6d01d8b877c150a6abb6758ea21691c353",
+  "evidence_sha256s": {
+    "RECOVERY_COMPLETE": "491fe58fd0970a36f1ce062cb8550648ddfbe01530c5dbe33c38aeb3fb707067",
+    "census_post.txt": "bae1ce0735fa8722163afb601ee4e2fdf13c4da2fd7538a75a62a562dafb52d8",
+    "census_pre.txt": "61e2035d527d624edef7b9bae0ff41f2b00c98e6f5e48995cf67c71e516a170e",
+    "census_pre_swap.txt": "c9e6b9e97c753efccebcac04eacfc16186f7c9c15b3723631c0ebb16370ade59",
+    "final.txt": "594c23c78d92fadc0541e6f408fe7791259f5028df3bf199e7f69ac3429a9cd5",
+    "fleet_verify_post.txt": "6fa930731206deb290e1368bd5aeaa580db462ea1f38bfb17ef1eabff7637bca",
+    "local_repo_verify.txt": "88e1a52afa5272223aa93631d1be5155bbe11b03056ccdc7ba66c6abfdb190f6",
+    "preflight.txt": "3d1d5964dbbe1a61005111dd7c08fa55ee7c79916940c0ebca90820eae33412d",
+    "prepare.txt": "8a8aaa95e9d33004ce9c6f3bcebd0ba8635da7c8ac56b7047ad43d5190e6d481",
+    "recovery_quiescence.txt": "12d99f09102bbda51f0a2b2f8f6271ad6d8b4cf398677a6183fed350c0d242fb",
+    "remote_ledger.tsv": "bb37d47208b6800c4dd696b5064b7b24fc3e1183e62d6f72d3202a9a5ad555de",
+    "repository.bundle": "11547ae9f7f56ffcf97dad175686cdb4c7f30e0a979339acba18bc3315633362",
+    "source_identity.json": "0ec997d3500c2ef6c6bd49005faa0431c09fb7031f198683031850e99003a45b",
+    "swap.txt": "205acc04b807a9929094da50bbe6af2334a1f0fea117007a731351882ae31e69"
+  },
+  "fleet_postflight": {
+    "canonical_leases_released": true,
+    "census_post_unique_hosts": 8,
+    "current_pin_by_worker": {
+      "0": "dc9ec468ad1529b09c4dd06005849ee70e0fa7c7",
+      "1": "dc9ec468ad1529b09c4dd06005849ee70e0fa7c7",
+      "2": "dc9ec468ad1529b09c4dd06005849ee70e0fa7c7",
+      "3": "dc9ec468ad1529b09c4dd06005849ee70e0fa7c7",
+      "4": "dc9ec468ad1529b09c4dd06005849ee70e0fa7c7",
+      "5": "dc9ec468ad1529b09c4dd06005849ee70e0fa7c7",
+      "6": "dc9ec468ad1529b09c4dd06005849ee70e0fa7c7",
+      "7": "dc9ec468ad1529b09c4dd06005849ee70e0fa7c7"
+    },
+    "exact_sync_ok_unique_hosts": 8,
+    "new_and_bundle_paths_absent": true,
+    "old_pin_by_worker": {
+      "0": null,
+      "1": "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+      "2": "508aaa373147988ff597dfd94a02fddff1778be6",
+      "3": "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+      "4": "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+      "5": "4a44f583697896bddf6f4b88526fdbe517e3ba95",
+      "6": "508aaa373147988ff597dfd94a02fddff1778be6",
+      "7": "4a44f583697896bddf6f4b88526fdbe517e3ba95"
+    },
+    "old_repositories_retained_for_recovery_workers": true,
+    "per_worker_recovery_leases_released": 8,
+    "quiescent_unique_hosts": 8,
+    "recovery_controller_process_present": false,
+    "worker_zero_linked_worktree_preserved": true
+  },
+  "invocation_review": {
+    "reviewer": "sol_gate_d_observability_review",
+    "verdict": "APPROVE ONE INVOCATION ONLY"
+  },
+  "local_evidence": {
+    "file_count": 19,
+    "root_dev": 2049,
+    "root_gid": 2001,
+    "root_ino": 1564205,
+    "root_mode": "0700",
+    "root_path": "/home/gianl/gate-d-repo-recovery/gate_d_repo_recovery_20260901T033629027256215Z",
+    "root_uid": 2001,
+    "terminal_created_at_utc": "2026-09-01T03:41:35.215863136Z",
+    "total_bytes": 9152508
+  },
+  "mutation_summary": {
+    "final_records": 7,
+    "preflight_records": 7,
+    "prepare_records": 7,
+    "recovered_workers": [1, 2, 3, 4, 5, 6, 7],
+    "swap_records": 7,
+    "untouched_workers": [0]
+  },
+  "non_model_scope": {
+    "hlo_work": false,
+    "jax_work": false,
+    "model_work": false,
+    "tpu_work": false
+  },
+  "preflight_path_correction": {
+    "controller_actual_root": "/home/gianl/gate-d-repo-recovery",
+    "controller_actual_tag_creation": "O_EXCL mkdir succeeded before recovery work",
+    "external_check_incorrect_root": "/home/gianl/gate-d-runs",
+    "impact": "external local-vacancy check was non-authoritative; controller-enforced creation proved actual vacancy and no collision occurred"
+  },
+  "schema_version": 1,
+  "source_identity": {
+    "inventory_sha256": "03be218ce0b7cc1b33c12c871aaa85f5e3e772a8dcd2fd72a693ff3f916fd70b",
+    "verifier_sha256": "741e15282f2fff8340d92f7b3fec148c47754aa2cd6c06b143dfd8ccbe05f0f9",
+    "worker_sha256": "a0bf5ca95da21cba92e2fc7c5acc0f434585c2dddc89ab3a648c1bf872c9c572",
+    "wrapper_sha256": "700519374081813174538e4f89a7c31c02dd039979d067aa46f66a70a827de0d"
+  },
+  "status": "RECOVERY_COMPLETE",
+  "tag": "gate_d_repo_recovery_20260901T033629027256215Z",
+  "tag_reuse_forbidden": true
+}
