@@ -12139,3 +12139,31 @@ performance and Gate-D closure remain unproved. No TPU compile, HLO acquisition,
 numerical run or full 8K occurred. Persistence is the only authority in this batch. A future
 compile/HLO acquisition and any bounded PP16 numerical start each require a separate fresh review,
 tag and exact authority; full 8K remains forbidden.
+
+## 2026-09-01 forced-round PP16 HLO integration source; no HLO/TPU
+
+The default-off builder `build_gate_d_forced_round_pp16_hlo_replay` composes the forced
+normalized-BF16 edge into the sealed one-row QKV/DSA form. It now refuses any runtime pair except
+the topology-authorized PP16 stage zero: ordered device ids `[0,1]`, TPU v4, process 0,
+coordinates `[(0,0,0),(1,0,0)]`, core 0, and axis `feature`. The exact local group is passed to
+DSA; all 16 input specs, nine rooted output specs, cache layout, aliases and the single
+`jit(shard_map(...))` wrapper are structurally bound.
+
+Fable returned only its hard usage-limit refusal. Sol initially withheld persistence because
+dependency bytes, arbitrary source effects and exact PP16 sharding/topology were not closed. The
+corrected analyzer binds predecessor `54bb2750...d3100`, the forced-function module/function
+hashes, topology artifact `49cf6bb1...25eb`, base commit/tree, the complete eight-path delta and
+seven direct runtime dependency hashes. The auditor has an exact normalized whole-module AST lock
+plus targeted lineage/sharding checks, so added imports/calls, indirect execution, group/spec drift
+and non-stage-zero devices fail hostile tests. Certificate generation bypasses the broad validation
+initializer and proves zero loaded `jax`, `jaxlib` or `jax_plugins` modules.
+
+Certificate `gate-d-forced-round-pp16-hlo-source.json` has SHA-256
+`518be87b650729d365dd09aba20b5f5a03d4bcddccc81978357cdbb02cbe02c6`. Focused hostile coverage
+passes 25/25 and the bounded adjacent CPU/source suite passes 156/156; Ruff, Python compilation,
+sanitized exact regeneration, JSON and diff checks pass. CPU tests may import JAX, but no valid
+builder call, lowering, HLO acquisition, TPU compile/execution, cloud write, numerical or
+performance run occurred. This remains persistence-only source evidence: physical causality and
+Gate D are open; full 8K is forbidden. Sol's corrected-scope re-review found no P0--P2 and returned
+`APPROVE PERSISTENCE`. After commit/push/mirror, exact next is a separately reviewed bounded HLO
+acquisition proving the e8m7 edge survives optimization before any numerical A/B.
