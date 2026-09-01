@@ -1,0 +1,84 @@
+{
+  "approval_scope": "install_command_only_plus_read_only_postflight",
+  "approval_verdict": "APPROVE INSTALL ONLY; no P0/P1/P2",
+  "artifact_kind": "gate_d_worker_repository_recovery_v6_install",
+  "code_pin": "94518b7d4ce788157afa98b7bc1f8144613852d5",
+  "installed_at_utc": "2026-09-01T06:46:01.907800618Z",
+  "invocation": {
+    "argv": [
+      "/usr/bin/sudo",
+      "-n",
+      "/usr/bin/python3",
+      "-I",
+      "-S",
+      "/opt/glm-tpu/bin/provision_gate_d_python_runtime.py",
+      "--source",
+      "/home/gianl/glm-run/gate-d-worker-recovery-v6-source-94518b7.5HtFXCAO",
+      "--target",
+      "/opt/glm-tpu/gate-d-worker-recovery-v6",
+      "--expected-tree-sha256",
+      "1a3474d20d02753af31fdc124c2a50a2ff41a32a46e66f96ba18b2e09ce48886"
+    ],
+    "exit_code": 0,
+    "stdout": "provisioned immutable runtime /opt/glm-tpu/gate-d-worker-recovery-v6 1a3474d20d02753af31fdc124c2a50a2ff41a32a46e66f96ba18b2e09ce48886"
+  },
+  "postflight": {
+    "canonical_leases_exact_and_free": 4,
+    "committed_blob_match": true,
+    "controller_processes": 0,
+    "entry_count_below_root": 1,
+    "staging_residue_present": false,
+    "target": {
+      "dev": 2049,
+      "gid": 0,
+      "ino": 1596,
+      "mode": "0755",
+      "nlink": 2,
+      "uid": 0,
+      "xattrs": []
+    },
+    "target_file": {
+      "bytes": 53995,
+      "dev": 2049,
+      "gid": 0,
+      "ino": 1922,
+      "mode": "0555",
+      "nlink": 1,
+      "path": "/opt/glm-tpu/gate-d-worker-recovery-v6/recover_gate_d_worker_repositories.py",
+      "sha256": "3f6d76c708f595841c837ecc537bb191fe23846a836dfa057593f97f0f975ee1",
+      "uid": 0,
+      "xattrs": []
+    },
+    "tree_sha256": "1a3474d20d02753af31fdc124c2a50a2ff41a32a46e66f96ba18b2e09ce48886",
+    "verified_at_utc": "2026-09-01T06:46:36.920269418Z"
+  },
+  "postflight_observation_correction": {
+    "impact": "none on installation or target identity",
+    "initial_probe_defects": [
+      "the first pgrep matched its own shell command",
+      "the first xattr helper omitted the os import and produced no xattr result"
+    ],
+    "resolution": "reran an ancestor-excluding /proc census and a corrected isolated xattr reader; controller process set and both xattr lists were empty"
+  },
+  "preinstall": {
+    "provisioner_sha256": "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594",
+    "staging_residue_present": false,
+    "target_present": false
+  },
+  "recovery_invocation_performed": false,
+  "reviewer": "sol_gate_d_observability_review",
+  "schema_version": 1,
+  "source": {
+    "bytes": 53995,
+    "dev": 2049,
+    "directory_ino": 2613955,
+    "directory_mode": "0755",
+    "file_ino": 2613956,
+    "file_mode": "0555",
+    "file_nlink": 1,
+    "path": "/home/gianl/glm-run/gate-d-worker-recovery-v6-source-94518b7.5HtFXCAO",
+    "sha256": "3f6d76c708f595841c837ecc537bb191fe23846a836dfa057593f97f0f975ee1",
+    "tree_sha256": "1a3474d20d02753af31fdc124c2a50a2ff41a32a46e66f96ba18b2e09ce48886"
+  },
+  "tpu_jax_hlo_model_cloud_or_network_work_performed": false
+}
