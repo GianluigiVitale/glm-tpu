@@ -28,6 +28,11 @@ V2_ARTIFACT = ROOT / (
     "gate-d-projection-contraction-pp16-hlo-orchestration-install-source-v2.json"
 )
 V2_ARTIFACT_SHA256 = "b0e58ea7c5a5e3bb0158f936442a67336d279b9f991c2247adfe9f2629759c79"
+V3_ARTIFACT = ROOT / (
+    "docs/artifacts/"
+    "gate-d-projection-contraction-pp16-hlo-orchestration-install-source-v3.json"
+)
+V3_ARTIFACT_SHA256 = "1983aa1510db95e4ea3f770ef030f44d3a069ba249bd40fefd04729bcaf32fff"
 INSTALL_ARTIFACT = ROOT / (
     "docs/artifacts/gate-d-projection-contraction-pp16-hlo-runtime-install.json"
 )
@@ -348,6 +353,81 @@ def test_v2_orchestration_source_artifact_binds_its_exact_commit() -> None:
             ]
         )
         assert sha256(raw).hexdigest() == expected_sha256
+
+
+def test_v3_orchestration_source_artifact_regenerates_and_binds_exact_commit() -> None:
+    artifact = V3_ARTIFACT.read_bytes()
+    assert len(artifact) == 3026
+    assert sha256(artifact).hexdigest() == V3_ARTIFACT_SHA256
+    parsed = json.loads(artifact)
+    assert parsed["code_hash"] == "986378238ac6458307aea69ef1f5e12bf82bc020"
+    current_pin = subprocess.check_output(
+        ["/usr/bin/git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True
+    ).strip()
+    ancestry = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(ROOT),
+            "merge-base",
+            "--is-ancestor",
+            parsed["code_hash"],
+            current_pin,
+        ],
+        check=False,
+    )
+    assert ancestry.returncode == 0
+    completed = subprocess.run(
+        [
+            "/usr/bin/python3",
+            "-I",
+            "-S",
+            "-B",
+            str(ANALYZER),
+        ],
+        cwd=ROOT,
+        env={
+            "GLM_GATE_D_PROJECTION_CONTRACTION_HLO_ORCHESTRATION_SOURCE": "1",
+            "HOME": "/nonexistent",
+            "JAX_PLATFORMS": "cpu",
+            "JAX_PLATFORM_NAME": "cpu",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "PYTHONDONTWRITEBYTECODE": "1",
+        },
+        check=False,
+        capture_output=True,
+    )
+    assert completed.returncode == 0
+    assert completed.stderr == b""
+    regenerated = json.loads(completed.stdout)
+    assert regenerated["code_hash"] == current_pin
+    for relative, expected_sha256 in parsed["source_sha256s"].items():
+        for pin in (parsed["code_hash"], current_pin):
+            raw = subprocess.check_output(
+                [
+                    "/usr/bin/git",
+                    "-C",
+                    str(ROOT),
+                    "show",
+                    f"{pin}:{relative}",
+                ]
+            )
+            assert sha256(raw).hexdigest() == expected_sha256
+        assert sha256((ROOT / relative).read_bytes()).hexdigest() == expected_sha256
+    regenerated["code_hash"] = parsed["code_hash"]
+    canonical = (
+        json.dumps(
+            regenerated,
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("ascii")
+    assert canonical == artifact
 
 
 def test_runtime_install_artifact_binds_exact_persisted_sources() -> None:

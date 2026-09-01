@@ -3301,3 +3301,19 @@ persistence only; review and persistence precede any v2 installation.
   SHA-256 values are `f3f20a01...bc97`, `4dd06dcb...1c70`, `e6fceb3a...6772` and
   `7125172b...ab03`. Exact next is adversarial source review, commit/push/locked same-region mirror,
   a regenerated V3 source certificate, separate install-only review, and a fresh compile-only tag.
+
+## 2026-09-01 projection-contraction HLO V3 source certificate; install unauthorized
+
+- Sol verified staged diff `dab4e9c8...a8145e`, including exact parameter-to-root lineage inside
+  all five current-key fusion bodies and hostile internal-bypass tests, and returned
+  `APPROVE PERSISTENCE` with no P0--P2. Commit `9863782` is exact on origin and the locked
+  `US-CENTRAL2` repository mirror completed successfully.
+- Offline artifact
+  `gate-d-projection-contraction-pp16-hlo-orchestration-install-source-v3.json` is 3,026 canonical
+  bytes, SHA-256 `1983aa15...2fff`. It regenerates from committed code pin `9863782`, binds all
+  seven exact V3 sources and predecessor authorities, loads no JAX, and retains the default-off
+  install/compile/execution boundary.
+- Classification: `PROJECTION_HLO_ORCHESTRATION_INSTALL_SOURCE_ACCEPTED;
+  INSTALL_UNAUTHORIZED;TPU_COMPILE_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`.
+  Exact next after adversarial review and persistence is a separately reviewed literal install-only
+  command. No launcher, compile, TPU, numerical, full DSA/8K or performance authority exists.
