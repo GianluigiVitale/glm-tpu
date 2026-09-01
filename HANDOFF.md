@@ -9438,3 +9438,28 @@ report says `launcher_invoked=false`; independent checks found both locks free a
 process. Artifact: `gate-d-forced-round-pp16-hlo-runtime-install.json`. No JAX/HLO/TPU/cloud,
 numerical/performance work or 8K occurred. Gate D remains open. Exact next after evidence review and
 persistence is a separately reviewed literal fresh-tag compile-only launcher invocation.
+
+## 2026-09-01 v2 compile-only start stopped on pre-existing worker-0 contention
+
+Fresh-history enforcement, the repinned source certificates and immutable v2 runtime were reviewed,
+committed and mirrored through commit `878f9689d1d939257d31097e1cc86d224ddcab4d`. The separately
+approved tag `gate_d_forced_round_pp16_hlo_20260901T134523411363994Z` passed canonical live,
+versioned and soft-deleted vacancy plus exact same-region mirror replay, then failed closed at the
+pre-run census. Worker 0 was busy and workers 1--7 were clean, so the driver never started: no JAX
+import by the protected workflow, lowering, compile, HLO, executable invocation, numerical work or
+8K occurred. The tag is burned.
+
+Read-only diagnosis found a sole worker-0 `libtpu` holder, PID 304691: an abandoned one-line Python
+environment/device probe that started at 13:42:01 UTC, before the protected launcher at 13:46:50,
+and held `/tmp/libtpu_lockfile` plus all four accelerator devices. Its origin is unknown; only its
+pre-existence and direct satisfaction of the census holder branch are proven. It exited without
+intervention. A subsequent exact census was 8/8 clean, PID 304691 was absent, both root and user
+leases were free, and the pod was READY/HEALTHY.
+
+Artifact `gate-d-forced-round-pp16-hlo-pre-census-busy-failure.json` has SHA-256
+`a6b2aedfe43cf9c97d0288686192736a12d0917d0e98766ff23cc09bb24d22aa`. It binds all ten
+generation-qualified `US-CENTRAL2` diagnostic objects; terminal generation `1788270441162145`
+is last. Sol found no cleanup gap and classified structured census reason codes as useful P2 work,
+not a retry prerequisite. Exact next is persistence review/commit/push/mirror, then a separately
+reviewed fresh-tag compile-only start from unchanged source. Numerical execution and 8K remain
+forbidden; Gate D is open.

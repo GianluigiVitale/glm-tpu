@@ -2883,3 +2883,20 @@ execution is authorized by this source batch.
 - State: `launcher_invoked=false`; both locks free; no launcher process.
 - Claim: installation only. No JAX/HLO/TPU/cloud, numerical/performance or Gate-D evidence.
 - Exact next: review/persist this evidence, then separately review one fresh-tag compile-only start.
+
+## 2026-09-01 forced-round PP16 HLO pre-census contention failure
+
+- V2 source/runtime persistence chain ends at commit `878f9689d1d939257d31097e1cc86d224ddcab4d`.
+- Burned tag: `gate_d_forced_round_pp16_hlo_20260901T134523411363994Z`.
+- Artifact: `docs/artifacts/gate-d-forced-round-pp16-hlo-pre-census-busy-failure.json`, SHA-256
+  `a6b2aedfe43cf9c97d0288686192736a12d0917d0e98766ff23cc09bb24d22aa`.
+- Failure boundary: worker 0 `CENSUS_BUSY`, workers 1--7 `CENSUS_OK`; the protected workflow's
+  driver/JAX/lowering/compile/HLO/executable/numerical/8K never started.
+- Directly observed holder: PID 304691, pre-launch environment/device probe, `libtpu` lock and four
+  accelerators open. Its origin is unknown. It later exited without intervention.
+- Recovery evidence: PID absent, exact 8/8 clean census, four leases free, pod READY/HEALTHY, bucket
+  `US-CENTRAL2`; no cleanup mutation was required.
+- Archive: ten generation-qualified objects verified byte-for-byte; diagnostic ledger generation
+  `1788270441162145` is terminal-last.
+- Exact next: after persistence review, use unchanged source and a separately reviewed fresh tag for
+  one compile-only HLO acquisition. Gate D remains open; numerical execution and 8K are forbidden.
