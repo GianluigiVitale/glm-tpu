@@ -23,10 +23,15 @@
   selects the strict target contract whenever the current pin already equals the target.
 - Controller/worker/wrapper hashes are `2a992618...b13e`, `a0bf5ca9...c572` and
   `efb94572...9701`; focused and complete recovery/acquisition validation passes 22/22 and 82/82,
-  including fingerprint tampering, strict-target rejection, rollback and target-pin resume.
-  This is unreviewed source preparation only. Exact next is one Sol persistence review, then
-  commit/push/locked same-region mirror; v3 install and one fresh tagged invocation require
-  separate reviews. HLO remains unauthorized until clean exact-pin 8/8 recovery is persisted.
+  including a real missing-object `blob:none` clone, fingerprint tampering, strict-target rejection,
+  rollback and target-pin resume. Sol approved exact staged SHA `3c4fd23f...ac93` for persistence;
+  commit `9a7b45100bbbfca77b6a1257007c4a3ae56f2811` is pushed and locked same-region mirrored.
+- Sol separately approved the exact no-replace install command. V3 is installed at
+  `/opt/glm-tpu/gate-d-worker-recovery-v3`: root-owned, one mode-0555 controller, zero xattrs,
+  controller SHA `2a992618...b13e`, tree SHA `fb01c9f1...66df` and byte-equal to Git. Install
+  evidence is `gate-d-worker-repository-recovery-v3-install.json`, SHA `e4bef8d5...e206`.
+  No controller invocation ran. Exact next is one separate review of a fresh-tag invocation; HLO
+  remains unauthorized until clean exact-pin unique-host 8/8 recovery evidence is persisted.
 
 ## 2026-09-01 Gate-D repository heterogeneity root-caused; target only stale workers
 

@@ -2515,10 +2515,14 @@ remains open and no TPU successor is authorized.
   zero-missing and zero-promisor. A worker already at the target pin is checked against the target
   contract, so fresh-tag partial resume cannot be rejected by its obsolete old-state contract.
 - Current controller/worker/wrapper hashes are `2a992618...b13e`, `a0bf5ca9...c572` and
-  `efb94572...9701`; complete recovery/acquisition tests pass 82/82. No v3 persistence, install or
-  execution is yet evidence. Exact next is persistence-only review, then a separately reviewed
-  no-replace immutable install and fresh recovery tag. PP16 HLO remains unauthorized before a
-  persisted exact-pin unique-host 8/8 closure.
+  `efb94572...9701`; complete recovery/acquisition tests pass 82/82, including a real local
+  missing-object `blob:none` clone. Sol approved exact persistence SHA `3c4fd23f...ac93`; commit
+  `9a7b451` is pushed and same-region mirrored. A separate install-only review approved the exact
+  no-replace command. `gate-d-worker-repository-recovery-v3-install.json` (SHA
+  `e4bef8d5...e206`) proves the one-file root-owned 0555 install, zero xattrs, tree
+  `fb01c9f1...66df` and exact Git bytes. No invocation ran. Exact next is one separately reviewed
+  fresh recovery tag. PP16 HLO remains unauthorized before persisted exact-pin unique-host 8/8
+  closure.
 
 ## Gate-D repository fleet heterogeneity and targeted recovery correction
 
