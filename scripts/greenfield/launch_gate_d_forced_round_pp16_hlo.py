@@ -12,21 +12,23 @@ import sys
 from hashlib import sha256
 from pathlib import Path
 
-INSTALL_PATH = Path("/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo.py")
+INSTALL_PATH = Path("/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo_v2.py")
 PYTHON = Path("/usr/bin/python3.10")
 PYTHON_SHA256 = "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
 WORKTREE = Path("/home/gianl/glm-tpu-gate-d-pp16-numerical")
 SOURCE_PATH = "scripts/greenfield/launch_gate_d_forced_round_pp16_hlo.py"
 WRAPPER_PATH = WORKTREE / "scripts/greenfield/run_gate_d_forced_round_pp16_hlo.sh"
 WRAPPER_SOURCE_PATH = "scripts/greenfield/run_gate_d_forced_round_pp16_hlo.sh"
-WRAPPER_SHA256 = "aee64a2c7549e923817ffc5ab5d37f8960823751bd10c419c7fbb77b36f14fec"
-IMMUTABLE_CAPSULE_ROOT = Path("/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo")
+WRAPPER_SHA256 = "965acf6e59eb2c278eec048fe6eea872aea3a860ed5c0d4ba7413bee4da688fd"
+IMMUTABLE_CAPSULE_ROOT = Path(
+    "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo-v2"
+)
 DRIVER_PATH = IMMUTABLE_CAPSULE_ROOT / "acquire_gate_d_forced_round_pp16_hlo.py"
 DRIVER_SOURCE_PATH = "scripts/greenfield/acquire_gate_d_forced_round_pp16_hlo.py"
 DRIVER_SHA256 = "046040d382567ccef94792b97e160b0f79b673ab1f0f1d46bfd20c57e884faf7"
 PUBLISHER_PATH = IMMUTABLE_CAPSULE_ROOT / "publish_gate_d_forced_round_pp16_hlo.py"
 PUBLISHER_SOURCE_PATH = "scripts/greenfield/publish_gate_d_forced_round_pp16_hlo.py"
-PUBLISHER_SHA256 = "ec67de6d29ba3a3e15a0853b6ef78eb3e0e34dfd2783ab46f101ca4c75dde0db"
+PUBLISHER_SHA256 = "0a643e8c307a0f2b6c026a749956099ddae724da280ae7d7995be68a0a275607"
 MIRROR_VERIFIER_PATH = (
     IMMUTABLE_CAPSULE_ROOT / "verify_gate_d_same_region_git_mirror.py"
 )

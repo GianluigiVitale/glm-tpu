@@ -774,8 +774,59 @@ def _bucket_and_prefix(remote: str, storage_bucket: Any | None) -> tuple[Any, st
     return storage_bucket, REMOTE_ROOT + suffix + "/"
 
 
-def _observed_names(bucket: Any, prefix: str) -> set[str]:
-    return {blob.name.removeprefix(prefix) for blob in bucket.list_blobs(prefix=prefix)}
+def _observed_names(
+    bucket: Any,
+    prefix: str,
+    *,
+    versions: bool = False,
+    soft_deleted: bool = False,
+) -> set[str]:
+    if versions and soft_deleted:
+        raise RuntimeError("incompatible PP16 HLO history listing scopes")
+    blobs = bucket.list_blobs(
+        prefix=prefix,
+        versions=versions or None,
+        soft_deleted=soft_deleted or None,
+    )
+    names = set()
+    for blob in blobs:
+        if not blob.name.startswith(prefix):
+            raise RuntimeError("PP16 HLO history listing escaped its exact prefix")
+        names.add(blob.name.removeprefix(prefix))
+    return names
+
+
+def _require_never_used_prefix(bucket: Any, prefix: str) -> None:
+    observations = {
+        "live": _observed_names(bucket, prefix),
+        "all_versions": _observed_names(bucket, prefix, versions=True),
+        "soft_deleted": _observed_names(bucket, prefix, soft_deleted=True),
+    }
+    occupied = {scope: names for scope, names in observations.items() if names}
+    if occupied:
+        raise RuntimeError(
+            "PP16 HLO remote prefix has prior live/versioned/soft-deleted history: "
+            + ",".join(sorted(occupied))
+        )
+
+
+def _validate_remote_vacancy_evidence(raw: bytes, summary: bytes, remote: str) -> None:
+    no_objects = "ERROR: (gcloud.storage.ls) One or more URLs matched no objects."
+    expected_raw = (
+        "scope=live flags=none returncode=1\n"
+        f"{no_objects}\n"
+        "scope=all_versions flags=--all-versions returncode=1\n"
+        f"{no_objects}\n"
+        "scope=soft_deleted flags=--soft-deleted,--exhaustive returncode=1\n"
+        f"{no_objects}\n"
+    ).encode("ascii")
+    expected_summary = (
+        f"VACANT live {remote}\n"
+        f"VACANT all_versions {remote}\n"
+        f"VACANT soft_deleted {remote}\n"
+    ).encode("ascii")
+    if raw != expected_raw or summary != expected_summary:
+        raise RuntimeError("PP16 HLO canonical remote vacancy evidence drifted")
 
 
 def _upload_bound(bucket: Any, name: str, raw: bytes) -> dict[str, Any]:
@@ -1318,6 +1369,9 @@ def _prepare_success(
         or runner.get("output_spec") != _EXPECTED_OUTPUT_SPEC
     ):
         raise RuntimeError("PP16 HLO runner claim boundary drifted")
+    vacancy_raw = snapshot_member(run_fd, "remote_vacancy.raw.txt", limit=1 << 20)
+    vacancy_summary = snapshot_member(run_fd, "remote_vacancy.txt", limit=1 << 20)
+    _validate_remote_vacancy_evidence(vacancy_raw, vacancy_summary, remote)
     if not isinstance(dependencies, Mapping):
         raise RuntimeError("PP16 HLO compiler dependency manifest drifted")
     dependency_identity = runner.get("compiler_dependency_manifest", {})
@@ -1533,8 +1587,7 @@ def publish_success(
             elapsed=elapsed,
         )
         bucket, prefix = _bucket_and_prefix(remote, storage_bucket)
-        if _observed_names(bucket, prefix):
-            raise RuntimeError("PP16 HLO remote prefix is not vacant")
+        _require_never_used_prefix(bucket, prefix)
         records = []
         for relative in sorted(payload):
             record = _upload_bound(bucket, prefix + relative, payload[relative])
@@ -1656,8 +1709,12 @@ def publish_diagnostic(
         payload = {name: snapshot_member(run_fd, name) for name in members}
         bucket, prefix = _bucket_and_prefix(remote, storage_bucket)
         diagnostic_prefix = prefix + "diagnostic/"
-        if _observed_names(bucket, diagnostic_prefix):
-            raise RuntimeError("PP16 HLO diagnostic prefix is not vacant")
+        vacancy_raw = snapshot_member(
+            run_fd, "remote_vacancy.raw.txt", limit=1 << 20
+        )
+        vacancy_summary = snapshot_member(run_fd, "remote_vacancy.txt", limit=1 << 20)
+        _validate_remote_vacancy_evidence(vacancy_raw, vacancy_summary, remote)
+        _require_never_used_prefix(bucket, prefix)
         records = []
         for relative in sorted(payload):
             record = _upload_bound(

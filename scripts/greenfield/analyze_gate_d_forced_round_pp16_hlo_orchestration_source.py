@@ -51,9 +51,9 @@ HISTORICAL_CODE_PIN = "a012b93fdbd7c6fe1f84db2260708ba55b38e8f6"
 BASE_PUBLISHER_SHA256 = (
     "75c296a2b46aef1b878a95ee7b1dfabdaf062687bfc496416ffca102f1180ee3"
 )
-LAUNCHER_AST_SHA256 = "d727634a8736d4a1013de97f2b81dfb949f0235f807063f0fa334a56d91b7252"
+LAUNCHER_AST_SHA256 = "3af41e75575847bf9ed1d540f76f46a350b7078a0249aa65797064914549856d"
 WRAPPER_RUNTIME_BOUNDARY_SHA256 = (
-    "9d9c11c22dbe92edea8c9ca22dfe695116abddfe91ebe883a999ce2f62078de6"
+    "a25743cd922852287f8185f33954f95397ea9814651d3d24295c9f4d60d783f0"
 )
 ACQUISITION_SOURCE_SHA256 = (
     "efe04d98267fc5265952b28ee386a4894d028b39f2d62d0a1554f24591e73196"
@@ -67,11 +67,17 @@ MIRROR_VERIFIER_SHA256 = (
     "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"
 )
 PUBLISHER_HELPER_AST_SHA256S = {
+    "_observed_names": (
+        "b798360b079178dc374d6b9ca3c2ddbdddb4931acbddd52b34c90b435ca1ea08"
+    ),
     "_forced_round_source_authority": (
         "8a40e6cf886a5ae6724176477e2e8b2810e4799373591a1c62b983330523c663"
     ),
     "_prepare_success": (
-        "df6246ae07853e464b47775454ae09cfbae4ae310866b2b69f2d66d71944f918"
+        "d57f67ebf9f9c65875b82fef5af70dfe114e26927371b93a76b32201e473118a"
+    ),
+    "_require_never_used_prefix": (
+        "5275699c51cd2fe7070aa46b677ef66fbc7613b7e9d93302aa23f13f7bf25d54"
     ),
     "_validate_compile_host_authority": (
         "5eeff7e4953d48dd8274e804f61f6bb157726a1d0dcf678e23f0126b12d307fe"
@@ -79,7 +85,28 @@ PUBLISHER_HELPER_AST_SHA256S = {
     "_validate_mirror_replay": (
         "16a9ea8cbda3fe7ba56713648d0c887540b97a65292bcf736f1b234c1e3c5042"
     ),
+    "_validate_remote_vacancy_evidence": (
+        "ff7dd46456ee84e0837acdd80fddff080396e1436d770af1fe26daa009441f7e"
+    ),
+    "publish_diagnostic": (
+        "ff11f44796190cab2ef07542831b8cf33d5478e8613ab1b6ceda9693c42bdaa2"
+    ),
+    "publish_success": (
+        "30cda4d650f0086e29feecb7653151e1fb2580ef17f82a580c8cb4dedb416173"
+    ),
 }
+PUBLISHER_NEW_HELPERS = frozenset(
+    {
+        "_forced_round_source_authority",
+        "_require_never_used_prefix",
+        "_validate_compile_host_authority",
+        "_validate_mirror_replay",
+        "_validate_remote_vacancy_evidence",
+    }
+)
+PUBLISHER_CHANGED_COMMON = frozenset(
+    {"_observed_names", "_prepare_success", "publish_diagnostic", "publish_success"}
+)
 ARTIFACT_PATH = "docs/artifacts/gate-d-forced-round-pp16-hlo-orchestration-source.json"
 ALLOWED_DELTA_PATHS = frozenset(
     {
@@ -243,12 +270,13 @@ def _audit_publisher(raw: bytes, base_raw: bytes) -> dict[str, Any]:
     source = raw.decode("utf-8", errors="strict")
     functions = _normalized_functions(raw)
     base_functions = _normalized_functions(base_raw)
-    new_helpers = set(PUBLISHER_HELPER_AST_SHA256S) - {"_prepare_success"}
-    if set(functions) - set(base_functions) != new_helpers or set(base_functions) - set(
+    new_helpers = set(functions) - set(base_functions)
+    changed_common = PUBLISHER_CHANGED_COMMON
+    if new_helpers != PUBLISHER_NEW_HELPERS or set(base_functions) - set(
         functions
     ):
         raise RuntimeError("forced-round HLO publisher function surface drifted")
-    for name in sorted(set(base_functions) - {"_prepare_success"}):
+    for name in sorted(set(base_functions) - changed_common):
         if ast.dump(functions[name], include_attributes=False) != ast.dump(
             base_functions[name], include_attributes=False
         ):
@@ -283,6 +311,7 @@ def _audit_publisher(raw: bytes, base_raw: bytes) -> dict[str, Any]:
         "base_publisher_sha256": BASE_PUBLISHER_SHA256,
         "hardened_common_function_count": len(base_functions) - 1,
         "new_helper_count": len(new_helpers),
+        "changed_common_function_count": len(changed_common),
         "publisher_ast_sha256": sha256(
             ast.dump(original_tree, include_attributes=False).encode()
         ).hexdigest(),
@@ -310,8 +339,8 @@ def _audit_launcher(
     if observed_ast != LAUNCHER_AST_SHA256:
         raise RuntimeError("forced-round descriptor launcher AST drifted")
     required = (
-        'INSTALL_PATH = Path("/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo.py")',
-        '"/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo"',
+        'INSTALL_PATH = Path("/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo_v2.py")',
+        '"/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo-v2"',
         "os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING",
         "fcntl.fcntl(descriptor, F_ADD_SEALS, REQUIRED_SEALS)",
         "set(os.environ) != INPUT_ENVIRONMENT_KEYS",
@@ -380,7 +409,7 @@ def _audit_wrapper(raw: bytes, expected: dict[str, str]) -> dict[str, Any]:
         "exec 10<&-",
         (
             "readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/"
-            "gate-d-forced-round-pp16-hlo"
+            "gate-d-forced-round-pp16-hlo-v2"
         ),
     )
     forbidden = (

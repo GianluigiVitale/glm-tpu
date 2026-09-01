@@ -2008,6 +2008,8 @@ class _FakeBucket:
 
     def __init__(self) -> None:
         self.objects: dict[str, tuple[bytes, str, str]] = {}
+        self.noncurrent_objects: dict[str, tuple[bytes, str, str]] = {}
+        self.soft_deleted_objects: dict[str, tuple[bytes, str, str]] = {}
         self.operations: list[str] = []
         self.mutations: list[str] = []
         self.next_generation = 100
@@ -2018,10 +2020,22 @@ class _FakeBucket:
     def blob(self, name: str) -> _FakeBlob:
         return _FakeBlob(self, name)
 
-    def list_blobs(self, *, prefix: str) -> list[_FakeBlob]:
-        self.operations.append(f"list:{prefix}")
+    def list_blobs(
+        self,
+        *,
+        prefix: str,
+        versions: bool | None = None,
+        soft_deleted: bool | None = None,
+    ) -> list[_FakeBlob]:
+        assert not (versions and soft_deleted)
+        scope = "soft_deleted" if soft_deleted else "all_versions" if versions else "live"
+        self.operations.append(f"list:{scope}:{prefix}")
+        scoped = self.soft_deleted_objects if soft_deleted else self.objects
+        names = set(scoped)
+        if versions:
+            names.update(self.noncurrent_objects)
         return [
-            self.blob(name) for name in sorted(self.objects) if name.startswith(prefix)
+            self.blob(name) for name in sorted(names) if name.startswith(prefix)
         ]
 
 

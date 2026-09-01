@@ -12,7 +12,7 @@ from pathlib import Path
 
 root = Path("/opt/glm-tpu/locks")
 names = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")
-launcher = Path("/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo.py")
+launcher = Path("/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo_v2.py")
 parent_fd = os.open(
     root, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
 )
@@ -140,11 +140,11 @@ readonly SEALED_CPU_REPLAY=$WORKTREE/glm_tpu/greenfield/benchmarking/gate_d_comp
 readonly SEALED_CPU_REPLAY_SHA=0f1930c079bd7244452e84dca6d0bbf9da077ea133c685f0f908760379e5313d
 readonly TPU_REPLAY=$WORKTREE/glm_tpu/greenfield/benchmarking/gate_d_forced_round_pp16_hlo.py
 readonly TPU_REPLAY_SHA=4f5934dee8532294f67f77cca8b3e41f8ce00d29b23c3fc6996ab1cd886abefe
-readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo
+readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo-v2
 readonly DRIVER=$IMMUTABLE_CAPSULE_ROOT/acquire_gate_d_forced_round_pp16_hlo.py
 readonly DRIVER_SHA=046040d382567ccef94792b97e160b0f79b673ab1f0f1d46bfd20c57e884faf7
 readonly PUBLISHER=$IMMUTABLE_CAPSULE_ROOT/publish_gate_d_forced_round_pp16_hlo.py
-readonly PUBLISHER_SHA=ec67de6d29ba3a3e15a0853b6ef78eb3e0e34dfd2783ab46f101ca4c75dde0db
+readonly PUBLISHER_SHA=0a643e8c307a0f2b6c026a749956099ddae724da280ae7d7995be68a0a275607
 readonly MIRROR_VERIFIER=$IMMUTABLE_CAPSULE_ROOT/verify_gate_d_same_region_git_mirror.py
 readonly MIRROR_VERIFIER_SHA=091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b
 readonly STORAGE_SITE_BUILDER=$WORKTREE/scripts/greenfield/build_gate_d_storage_site_capsule.py
@@ -171,6 +171,7 @@ readonly TAG=${GLM_GATE_D_FORCED_ROUND_PP16_TAG:-}
 cd /
 readonly RUN_DIR=/home/gianl/gate-d-runs/$TAG
 readonly REMOTE_PREFIX=$BUCKET/results/greenfield/glm52/gate_d_forced_round_pp16_hlo/$TAG
+readonly VACANCY_EXPECTED='ERROR: (gcloud.storage.ls) One or more URLs matched no objects.'
 
 [[ $(git -C "$WORKTREE" rev-parse --show-toplevel) == "$WORKTREE" ]]
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]]
@@ -188,6 +189,39 @@ readonly REMOTE_PREFIX=$BUCKET/results/greenfield/glm52/gate_d_forced_round_pp16
 [[ $(sha256sum "$STORAGE_SITE_BUILDER" | awk '{print $1}') == "$STORAGE_SITE_BUILDER_SHA" ]]
 [[ $(gcloud storage buckets describe "$BUCKET" --format='value(location)') == "$LOCATION" ]]
 [[ $(gcloud compute tpus tpu-vm describe "$POD" --zone "$ZONE" --format='value(state)') == READY ]]
+
+# Prove that the append-only tag has never existed before creating its local
+# run directory.  Live, noncurrent, and soft-deleted namespaces are separate
+# Cloud Storage listing surfaces and all three must be canonically vacant.
+set +e
+vacancy_live_output=$(PYTHONWARNINGS=ignore timeout --signal=TERM --kill-after=10 60 \
+  gcloud storage ls "$REMOTE_PREFIX/**" 2>&1)
+vacancy_live_rc=$?
+vacancy_versions_output=$(PYTHONWARNINGS=ignore timeout --signal=TERM --kill-after=10 60 \
+  gcloud storage ls --all-versions "$REMOTE_PREFIX/**" 2>&1)
+vacancy_versions_rc=$?
+vacancy_soft_deleted_output=$(PYTHONWARNINGS=ignore \
+  timeout --signal=TERM --kill-after=10 60 \
+  gcloud storage ls --soft-deleted --exhaustive "$REMOTE_PREFIX/**" 2>&1)
+vacancy_soft_deleted_rc=$?
+set -e
+if [[ $vacancy_live_rc -ne 1 || $vacancy_live_output != "$VACANCY_EXPECTED" || \
+      $vacancy_versions_rc -ne 1 || \
+      $vacancy_versions_output != "$VACANCY_EXPECTED" || \
+      $vacancy_soft_deleted_rc -ne 1 || \
+      $vacancy_soft_deleted_output != "$VACANCY_EXPECTED" ]]; then
+  echo "ABORT: append-only remote-prefix history is not canonically vacant" >&2
+  exit 2
+fi
+readonly VACANCY_RAW=$(printf '%s\n' \
+  'scope=live flags=none returncode=1' "$vacancy_live_output" \
+  'scope=all_versions flags=--all-versions returncode=1' \
+  "$vacancy_versions_output" \
+  'scope=soft_deleted flags=--soft-deleted,--exhaustive returncode=1' \
+  "$vacancy_soft_deleted_output")
+readonly VACANCY_SUMMARY=$(printf 'VACANT %s %s\n' \
+  live "$REMOTE_PREFIX" all_versions "$REMOTE_PREFIX" \
+  soft_deleted "$REMOTE_PREFIX")
 
 publisher() {
   /usr/bin/env -i \
@@ -297,18 +331,8 @@ flock 8
 trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR PIN=$PIN mode=compile_only devices=0,1"
-set +e
-vacancy_output=$(timeout --signal=TERM --kill-after=10 60 \
-  gcloud storage ls "$REMOTE_PREFIX/**" 2>&1)
-vacancy_rc=$?
-set -e
-printf '%s\n' "$vacancy_output" | publish_member remote_vacancy.raw.txt
-if [[ $vacancy_rc -eq 0 || $vacancy_rc -ne 1 ]] ||
-   ! grep -q 'matched no objects' <<<"$vacancy_output"; then
-  say "ABORT: append-only remote-prefix vacancy check failed"
-  exit 2
-fi
-printf 'VACANT %s\n' "$REMOTE_PREFIX" | publish_member remote_vacancy.txt
+printf '%s\n' "$VACANCY_RAW" | publish_member remote_vacancy.raw.txt
+printf '%s\n' "$VACANCY_SUMMARY" | publish_member remote_vacancy.txt
 remote_vacant=1
 
 say "replaying the complete locked US-CENTRAL2 Git mirror and exact origin pin"

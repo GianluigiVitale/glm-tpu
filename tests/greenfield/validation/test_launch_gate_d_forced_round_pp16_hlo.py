@@ -23,7 +23,7 @@ SPEC.loader.exec_module(MODULE)
 def test_launcher_binds_committed_sources_and_root_owned_installation() -> None:
     source = SOURCE.read_text(encoding="ascii")
     assert str(MODULE.INSTALL_PATH) == (
-        "/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo.py"
+        "/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo_v2.py"
     )
     assert source.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
     assert "expected_uid=0, expected_gid=0, expected_mode=0o555" in source
@@ -140,7 +140,7 @@ def test_launcher_binds_all_executed_python_to_immutable_capsule(
     tmp_path: Path,
 ) -> None:
     assert str(MODULE.IMMUTABLE_CAPSULE_ROOT) == (
-        "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo"
+        "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo-v2"
     )
     expected = {
         "DRIVER": "scripts/greenfield/acquire_gate_d_forced_round_pp16_hlo.py",

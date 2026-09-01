@@ -283,8 +283,6 @@ def _complete_success_run(
     members["census_post.txt"] = census
     for name in (
         "orchestrator.log",
-        "remote_vacancy.raw.txt",
-        "remote_vacancy.txt",
         "runner.log",
     ):
         members[name] = f"{name}\n".encode()
@@ -294,6 +292,24 @@ def _complete_success_run(
         "gs://driftbench-dsv4-uc/results/greenfield/glm52/"
         f"gate_d_forced_round_pp16_hlo/{tag}"
     )
+    no_objects = "ERROR: (gcloud.storage.ls) One or more URLs matched no objects."
+    members = {
+        "remote_vacancy.raw.txt": (
+            "scope=live flags=none returncode=1\n"
+            f"{no_objects}\n"
+            "scope=all_versions flags=--all-versions returncode=1\n"
+            f"{no_objects}\n"
+            "scope=soft_deleted flags=--soft-deleted,--exhaustive returncode=1\n"
+            f"{no_objects}\n"
+        ).encode("ascii"),
+        "remote_vacancy.txt": (
+            f"VACANT live {remote}\n"
+            f"VACANT all_versions {remote}\n"
+            f"VACANT soft_deleted {remote}\n"
+        ).encode("ascii"),
+    }
+    for relative, raw in members.items():
+        (run / relative).write_bytes(raw)
     return run, remote, pin
 
 
@@ -446,6 +462,51 @@ def test_complete_publication_is_generation_bound_and_terminal_last(
     assert (run / "terminal_upload_receipt.json").is_file()
 
 
+@pytest.mark.parametrize("scope", ("live", "all_versions", "soft_deleted"))
+def test_prior_remote_history_refuses_publication_before_any_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scope: str
+) -> None:
+    run, remote, pin = _complete_success_run(tmp_path, monkeypatch)
+    bucket = BASE_TEST_MODULE._FakeBucket()
+    prefix = remote.removeprefix("gs://driftbench-dsv4-uc/") + "/"
+    target = prefix + "prior"
+    record = (b"prior", "99", "AAAAAA==")
+    if scope == "live":
+        bucket.objects[target] = record
+    elif scope == "all_versions":
+        bucket.noncurrent_objects[target] = record
+    else:
+        bucket.soft_deleted_objects[target] = record
+    with pytest.raises(RuntimeError, match="prior live/versioned/soft-deleted history"):
+        PUBLISHER_MODULE.publish_success(
+            run,
+            remote,
+            code_pin=pin,
+            elapsed=7,
+            publication_runtime_raw=TEST_PUBLICATION_RUNTIME_RAW,
+            storage_bucket=bucket,
+        )
+    assert bucket.mutations == []
+
+
+def test_remote_vacancy_evidence_is_exact_and_bound_to_prefix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run, remote, pin = _complete_success_run(tmp_path, monkeypatch)
+    (run / "remote_vacancy.txt").write_text(
+        (run / "remote_vacancy.txt").read_text().replace(remote, remote + "-other")
+    )
+    with pytest.raises(RuntimeError, match="canonical remote vacancy evidence"):
+        PUBLISHER_MODULE.publish_success(
+            run,
+            remote,
+            code_pin=pin,
+            elapsed=7,
+            publication_runtime_raw=TEST_PUBLICATION_RUNTIME_RAW,
+            storage_bucket=BASE_TEST_MODULE._FakeBucket(),
+        )
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     (
@@ -542,14 +603,14 @@ def test_wrapper_requires_retained_sealed_descriptor_and_immutable_children() ->
     assert "F_GET_SEALS" in verifier
     assert "wrapper_fd != 10" in verifier
     assert "GLM_GATE_D_WRAPPER_SHA256" in verifier
-    assert "launch_gate_d_forced_round_pp16_hlo.py" in verifier
+    assert "launch_gate_d_forced_round_pp16_hlo_v2.py" in verifier
     assert "IMMUTABLE_LOCK_BROKER" not in source
     assert "WRAPPER_ABS" not in source
     assert "GLM_GATE_D_IMMUTABLE_LOCKS_HELD" in source
     assert "exec 10<&-" in source
     assert (
         "readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/"
-        "gate-d-forced-round-pp16-hlo"
+        "gate-d-forced-round-pp16-hlo-v2"
     ) in source
     assert (
         "$WORKTREE/scripts/greenfield/acquire_gate_d_forced_round_pp16_hlo.py"
@@ -595,6 +656,27 @@ def test_wrapper_uses_complete_mirror_replay_and_compile_host_only_authority() -
     assert "repos/glm-tpu-topology-rewrite" not in source
     assert '--forced-round-source "$SOURCE_CERTIFICATE"' in source
     assert '--forced-round-source-sha256 "$SOURCE_CERTIFICATE_SHA"' in source
+
+
+def test_wrapper_proves_all_remote_history_scopes_before_run_directory() -> None:
+    source = WRAPPER.read_text()
+    history = source.index("vacancy_live_output=")
+    initialize = source.index("publisher_init init --run-dir")
+    compile_start = source.index("lowering and compiling one abstract-input")
+    assert history < initialize < compile_start
+    assert 'gcloud storage ls "$REMOTE_PREFIX/**"' in source
+    assert 'gcloud storage ls --all-versions "$REMOTE_PREFIX/**"' in source
+    assert (
+        'gcloud storage ls --soft-deleted --exhaustive "$REMOTE_PREFIX/**"'
+        in source
+    )
+    assert source.count('!= "$VACANCY_EXPECTED"') == 3
+    assert "PYTHONWARNINGS=ignore" in source
+    assert "scope=all_versions flags=--all-versions returncode=1" in source
+    assert (
+        "scope=soft_deleted flags=--soft-deleted,--exhaustive returncode=1"
+        in source
+    )
 
 
 def test_wrapper_has_one_compile_process_and_no_executable_invocation() -> None:
