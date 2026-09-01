@@ -1,0 +1,96 @@
+{
+  "approval_scope": "install_command_only_plus_read_only_postflight",
+  "approval_verdict": "APPROVE INSTALL ONLY",
+  "artifact_kind": "gate_d_worker_repository_recovery_v5_install",
+  "cloud_or_network_work_performed_during_install": false,
+  "code_pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059",
+  "controller": {
+    "bytes": 53881,
+    "dev": 2049,
+    "gid": 0,
+    "ino": 49184,
+    "mode": "0555",
+    "nlink": 1,
+    "sha256": "cfded43c951e7ad6f32fdd4eb3a57b78b6f1b463f233500fbad1b73d8d2927ef",
+    "uid": 0,
+    "xattrs": []
+  },
+  "installed_at_utc": "2026-09-01T05:30:22Z",
+  "postinstall_verification": {
+    "canonical_leases": [
+      {
+        "dev": 2049,
+        "exact": true,
+        "free": true,
+        "ino": 49169,
+        "path": "/opt/glm-tpu/locks/glm_pod_workload.lock"
+      },
+      {
+        "dev": 2049,
+        "exact": true,
+        "free": true,
+        "ino": 49170,
+        "path": "/opt/glm-tpu/locks/glm_tpu_rsync.lock"
+      },
+      {
+        "dev": 2049,
+        "exact": true,
+        "free": true,
+        "ino": 1868606,
+        "path": "/home/gianl/glm-run/.glm_pod_workload.lock"
+      },
+      {
+        "dev": 2049,
+        "exact": true,
+        "free": true,
+        "ino": 1580034,
+        "path": "/home/gianl/.glm-tpu-rsync.lock"
+      }
+    ],
+    "controller_process_present": false,
+    "entry_count_below_root": 1,
+    "exact_committed_blob_match": true,
+    "staging_residue_present": false,
+    "target_dev": 2049,
+    "target_gid": 0,
+    "target_ino": 48252,
+    "target_mode": "0755",
+    "target_nlink": 2,
+    "target_uid": 0,
+    "target_xattrs": [],
+    "tree_sha256": "18d8df1e321cb423a3c1a3f1afca99e884626469822ea2170352ab1e23cff892",
+    "verified_at_utc": "2026-09-01T05:30:52Z"
+  },
+  "preinstall_live_state": {
+    "canonical_leases_exact_and_free": 4,
+    "fleet_census": "8/8 CENSUS_OK",
+    "pod": "db-v4-64-od",
+    "pod_health": "HEALTHY",
+    "pod_state": "READY",
+    "recovery_lock_quiescence": "8/8 RECOVERY_QUIESCENT",
+    "worker_0_pin": "87dc6e3370290ac6378ef6c70bdac5f2a5783059",
+    "workers_1_7_layout": "clean complete standalone",
+    "workers_1_7_pin": "dc9ec468ad1529b09c4dd06005849ee70e0fa7c7"
+  },
+  "provisioner": {
+    "path": "/opt/glm-tpu/bin/provision_gate_d_python_runtime.py",
+    "sha256": "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594"
+  },
+  "recovery_or_hlo_invocation_performed": false,
+  "review": {
+    "corrected_install": "APPROVE INSTALL ONLY; no P0/P1/P2",
+    "first_install_attempted": false,
+    "first_review": "WITHHOLD P2: lock pathname and parent identities were not retained and revalidated",
+    "reviewer": "sol_gate_d_observability_review"
+  },
+  "schema_version": 1,
+  "source": {
+    "controller_mode": "0555",
+    "controller_sha256": "cfded43c951e7ad6f32fdd4eb3a57b78b6f1b463f233500fbad1b73d8d2927ef",
+    "path": "/home/gianl/glm-run/gate-d-worker-recovery-v5-source-87dc6e3.I9LqXT",
+    "root_mode": "0755",
+    "tree_sha256": "18d8df1e321cb423a3c1a3f1afca99e884626469822ea2170352ab1e23cff892",
+    "xattrs": []
+  },
+  "target_path": "/opt/glm-tpu/gate-d-worker-recovery-v5"
+}
