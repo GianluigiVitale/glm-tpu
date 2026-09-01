@@ -2,6 +2,31 @@
 
 **Updated:** 2026-08-31 UTC
 
+## 2026-08-31 Gate-D repository recovery corrected after two Sol blocks; no execution
+
+- Fable returned its hard limit/no opinion. Sol withheld the first shell draft for six P1/P2 path,
+  lifetime, rollback, transfer and evidence defects; it was deleted without persistence or use.
+  Sol then withheld replacement snapshot `35741224...` because locks could be pathname-replaced,
+  quiescence trusted mutable/fail-open tools, evidence reopened unbound names, and terminal preceded
+  proof of archive completeness. Neither withheld snapshot was installed or run.
+- Corrected controller `fd8950de...b2225` requires its exact committed root-owned mode-0555 blob
+  under an immutable parent. Controller and HLO wrapper share root:root mode-0666 nofollow
+  workload/rsync locks; each worker uses a distinct root-owned `gate_d_repo_recovery.lock`.
+  Legacy leases remain held for compatibility. Worker `47d65f03...9beb0` retains the O_EXCL stream,
+  hard timeout/carrier, inode/pin prestates,
+  `RENAME_NOREPLACE`, atomic exchange, exact old/new verification and rollback.
+- Quiescence now uses sanitized root system Python to scan `/proc/*/environ` and `/proc/locks`,
+  fails on permission/read/parse errors, and ignores TERM/INT until 8/8 absence is proven. Evidence
+  retains and hashes created FDs, refuses same-name substitution, seals its log before publication,
+  and proves the exact generation/size/SHA-bound 16-object preterminal set before the 17th terminal.
+- Recovery tests `16cd0dcd...5b91` pass 14/14; the adjacent HLO wrapper and inventory suites make
+  80/80. They include a hostile-PATH proof for the absolute privileged quiescence launcher. Ruff,
+  formatting, compilation, Bash syntax and diff checks pass. Root lock/controller
+  provisioning and cron adoption are deliberately not performed in this source batch.
+- Corrected source remains unreviewed and uninstalled. No worker repository, bucket, JAX/backend,
+  compiler/HLO, model or TPU was touched. Exact next is Sol review, then persistence; provisioning,
+  repository recovery and any fresh HLO start remain separate literal reviews.
+
 ## 2026-08-29 accepted DB485 compile-only discriminator corrected after Sol block
 
 - Independent Sol review blocked the first frozen batch before persistence or TPU work. It found

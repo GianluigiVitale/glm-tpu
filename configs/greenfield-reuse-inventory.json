@@ -760,6 +760,24 @@
       "reason": "A protected tag failed before JAX when five of eight concurrent GitHub SSH fetches reported transport corruption and only three workers advanced; concurrency causality is unproven. Both censuses are 8/8 clean, HLO is empty, diagnostics are terminal and the tag is burned. Repository mutation is removed from the protected fleet-verification block. The corrected wrapper checks workers 0-7 sequentially under an isolated no-lock/no-lazy-fetch environment for a direct canonical worktree/repository, strict passive local config, exact clean HEAD without special index/sparse state, non-shallow complete object closure and no alternates, promisor/partial-clone state, grafts, replacement refs or object symlinks; it fails on the first nonzero result and requires eight unique markers. A behavioral test proves no repository byte/metadata writes or fsmonitor/filter/diff invocation and rejects redirected worktrees, hidden dirty state and missing closure. Recovery is a separate reviewed SHA-bound immutable transfer under both leases; this source authorizes no recovery or HLO start."
     },
     {
+      "id": "gate-d-worker-repository-recovery",
+      "category": "Gate-D repository-only fleet recovery",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "controller fd8950de504df483a3d86420b489406dbf93c3f68de04faf230bc85f402b2225 / worker transaction 47d65f03f1316523c10827f1f048f8ae8a598366af3fcea4280e89d526f9beb0 / tests 16cd0dcd7a48bcf9b24a68cc060359ea14ade35a588aa9858de6015897ab5b91 / immutable-lock HLO wrapper 69da1fd5746671f795167562c075cc01dcd9f56da94aafca39591766af9096c4",
+      "source_paths": [
+        "scripts/greenfield/recover_gate_d_worker_repositories.py",
+        "scripts/greenfield/gate_d_worker_repository_transaction.py",
+        "tests/greenfield/validation/test_gate_d_worker_repository_recovery.py",
+        "scripts/greenfield/run_gate_d_compensated_pp16_hlo.sh"
+      ],
+      "disposition": "adapted",
+      "greenfield_consumers": [
+        "one separately reviewed repository-only eight-worker recovery"
+      ],
+      "gate": "D diagnostic prerequisite",
+      "reason": "The first shell draft and replacement snapshot 35741224 were both withheld by Sol and never persisted or run. The corrected design requires a root-owned mode-0555 controller matching the exact committed blob beneath an immutable parent. Controller and HLO wrapper share root-owned workload/rsync locks; each worker uses a distinct root-owned recovery lock; all are read-only/nofollow under a non-writable /opt parent, and legacy leases remain held. It streams the complete bundle through an O_EXCL receiver and runs every sequential remote phase under the per-worker lock, carrier and hard timeout. The worker binds canonical/prepared dev+inode and exact verifier pins, publishes with RENAME_NOREPLACE, atomically exchanges, verifies new and preserved-old repositories, and rolls back on failure. An exact /usr/bin/sudo launcher enters a sanitized system-Python /proc audit, fails on uncertainty and ignores TERM/INT until 8/8 quiescence. Retained evidence FDs reject same-name substitution. The exact generation/size/SHA-bound 16-object preterminal set is verified and embedded before the 17th terminal upload; later work is read-only replay/exact-set verification. Fourteen adversarial recovery tests plus 62 adjacent wrapper and four inventory tests pass. Root lock/controller provisioning and cron adoption are not performed. This source remains unreviewed/uninstalled and authorizes no recovery, cloud write, JAX, HLO, model or TPU work."
+    },
+    {
       "id": "gate-d-libtpu-site-capsule",
       "category": "Gate-D root-owned TPU compiler dependency supplement",
       "source_repo": "glm-tpu greenfield",

@@ -2518,3 +2518,32 @@ remains open and no TPU successor is authorized.
   hidden dirty files and missing objects reject. Recovery to the final
   corrected pin must occur separately under both leases through a reviewed SHA-bound immutable
   transfer and preserved-old/atomic publication; only then may a new HLO tag be reviewed.
+
+## Gate-D worker repository recovery corrected after two review blocks; no fleet mutation
+
+- Fable session `9152fb51-b797-4887-afc2-8250989a3c05` returned its hard usage limit without an
+  opinion. Sol withheld the first shell draft on six P1/P2 classes: remote work could outlive local
+  leases; canonical/preserved identities and rollback were weak; SCP could overwrite a raced path;
+  local locks/evidence were pathname-raceable; the exit trap wrote after terminal start; and two
+  happy/static tests overstated guarantees. That draft was never committed, mirrored or run.
+- Sol also withheld replacement snapshot `35741224...`: lock names remained replaceable,
+  quiescence trusted mutable/fail-open tools, evidence reopened names, terminal preceded exact
+  archive completeness, and tests/docs overstated this. It too was never installed or run.
+- Corrected controller `fd8950de...b2225` must be root-owned mode 0555 beneath an immutable parent
+  and byte-match its committed blob. Controller and HLO wrapper share immutable workload/rsync
+  locks; each worker uses a distinct root-owned `gate_d_repo_recovery.lock`. Every lock is
+  nofollow/identity-corroborated under `/opt/glm-tpu/locks`; legacy leases remain held. Worker
+  `47d65f03...9beb0` retains the O_EXCL stream, unique carrier and hard timeout.
+- The worker records canonical/prepared device+inode and exact verifier pins, moves the verified
+  prepared clone into its vacant final preservation slot with `RENAME_NOREPLACE`, exchanges that
+  slot atomically with the canonical repository, verifies both resulting repositories and rolls
+  back on any post-exchange failure. A sanitized privileged `/proc` audit fails closed on
+  process/lock read or parse uncertainty; TERM/INT cannot release local leases before 8/8 proof.
+  Retained evidence FDs reject name substitution. Exact generation/size/SHA records for the
+  16-object preterminal set are checked and embedded before the 17th terminal object; later work is
+  read-only replay/exact-set verification.
+- Test `16cd0dcd...5b91` passes 14/14, including the absolute `/usr/bin/sudo` hostile-PATH
+  regression; adjacent wrapper/inventory tests make 80/80. Ruff/format,
+  compilation, Bash syntax and diff checks pass. Root-lock/controller provisioning and cron adoption
+  are not performed. Corrected source is unreviewed/uninstalled and authorizes no recovery, bucket
+  mutation, JAX/backend, HLO, model or TPU work.

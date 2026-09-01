@@ -7,6 +7,68 @@
 set -euo pipefail
 
 readonly WRAPPER_ABS=/home/gianl/glm-tpu-topology-rewrite/scripts/greenfield/run_gate_d_compensated_pp16_hlo.sh
+read -r -d '' IMMUTABLE_LOCK_BROKER <<'IMMUTABLE_LOCK_BROKER_EOF' || true
+import fcntl
+import os
+import stat
+import sys
+
+root = "/opt/glm-tpu/locks"
+names = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")
+parent_fd = os.open(root, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW)
+parent = os.fstat(parent_fd)
+if (
+    not stat.S_ISDIR(parent.st_mode)
+    or parent.st_uid != 0
+    or parent.st_gid != 0
+    or stat.S_IMODE(parent.st_mode) & 0o022
+):
+    raise SystemExit("unsafe immutable lock parent")
+
+
+def validate(fd, name):
+    held = os.fstat(fd)
+    named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    if (
+        not stat.S_ISREG(held.st_mode)
+        or held.st_nlink != 1
+        or held.st_uid != 0
+        or held.st_gid != 0
+        or stat.S_IMODE(held.st_mode) != 0o666
+        or (held.st_dev, held.st_ino) != (named.st_dev, named.st_ino)
+    ):
+        raise SystemExit("unsafe immutable lock identity: " + name)
+
+
+if sys.argv[1] == "acquire":
+    descriptors = []
+    for name in names:
+        descriptor = os.open(
+            name, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW, dir_fd=parent_fd
+        )
+        validate(descriptor, name)
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        descriptors.append(descriptor)
+    for descriptor, target in zip(descriptors, (11, 12), strict=True):
+        os.dup2(descriptor, target, inheritable=True)
+    for descriptor in descriptors:
+        if descriptor not in (11, 12):
+            os.close(descriptor)
+    environment = dict(os.environ)
+    environment["GLM_GATE_D_IMMUTABLE_LOCKS_HELD"] = "1"
+    os.execve(
+        "/usr/bin/bash",
+        ["/usr/bin/bash", "--noprofile", "--norc", sys.argv[2]],
+        environment,
+    )
+elif sys.argv[1] == "verify":
+    for descriptor, name in zip((11, 12), names, strict=True):
+        validate(descriptor, name)
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+else:
+    raise SystemExit("invalid immutable-lock broker mode")
+IMMUTABLE_LOCK_BROKER_EOF
+
 [[ ${GLM_GATE_D_WRAPPER_SANITIZED:-0} == 1 ]] || {
   echo "invoke only through the reviewed absolute env-i/bash entry command" >&2
   exit 2
@@ -19,7 +81,7 @@ while IFS='=' read -r environment_name _; do
   case "$environment_name" in
     GLM_GATE_D_COMPENSATED_PP16_HLO_ACQUIRE | GLM_GATE_D_COMPENSATED_PP16_MODE | \
       GLM_GATE_D_COMPENSATED_PP16_TAG | GLM_GATE_D_WRAPPER_SANITIZED | HOME | LANG | \
-      LC_ALL | PATH | PWD | PYTHONDONTWRITEBYTECODE | SHLVL | _) ;;
+      GLM_GATE_D_IMMUTABLE_LOCKS_HELD | LC_ALL | PATH | PWD | PYTHONDONTWRITEBYTECODE | SHLVL | _) ;;
     *)
       echo "unexpected wrapper environment name: $environment_name" >&2
       exit 2
@@ -67,6 +129,10 @@ readonly TAG=${GLM_GATE_D_COMPENSATED_PP16_TAG:-}
   echo "unsafe Gate-D PP16 HLO tag: $TAG" >&2
   exit 2
 }
+if [[ ${GLM_GATE_D_IMMUTABLE_LOCKS_HELD:-0} != 1 ]]; then
+  exec /usr/bin/python3 -I -S -B -c "$IMMUTABLE_LOCK_BROKER" acquire "$WRAPPER_ABS"
+fi
+/usr/bin/python3 -I -S -B -c "$IMMUTABLE_LOCK_BROKER" verify
 readonly RUN_DIR=/home/gianl/gate-d-runs/$TAG
 readonly REMOTE_PREFIX=$BUCKET/results/greenfield/glm52/gate_d_pp16_hlo/$TAG
 

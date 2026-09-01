@@ -5,6 +5,40 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-08-31 23:00--2026-09-01 00:40 UTC — two recovery drafts blocked; third correction tested
+
+Fable session `9152fb51-b797-4887-afc2-8250989a3c05` returned a hard usage-limit refusal/no opinion.
+Sol withheld the frozen shell draft for six P1/P2 classes: remote descendants could outlive local
+leases, canonical/preserved identity and rollback were insufficient, SCP could overwrite a raced
+path, controller locks/evidence were same-UID pathname-raceable, the exit trap wrote locally after
+terminal start, and two tests overstated the contract. The draft was never committed, mirrored or
+run; no cloud/worker/TPU state changed.
+
+Sol withheld replacement snapshot `35741224...` too: held lock names remained replaceable; its
+quiescence check used mutable `psutil` plus fail-open `fuser`; evidence closed and reopened names;
+and success terminal upload preceded exact archive completeness. Documentation/static tests
+overstated those properties. That snapshot also remained uninstalled and unexecuted.
+
+The third correction splits root-installed controller `fd8950de...b2225` from transported worker
+`47d65f03...9beb0`. Controller and HLO wrapper share root-owned immutable workload/rsync locks;
+each worker transaction uses its own distinct root-owned `gate_d_repo_recovery.lock`. All are opened
+read-only/nofollow under a non-writable `/opt` parent, flocked and held/name-corroborated; legacy
+compatibility leases remain held. Quiescence begins with exact `/usr/bin/sudo`, then uses sanitized
+`/usr/bin/python3 -I -S -B` to audit exact
+carrier entries in `/proc/*/environ` and exact kernel lock identity in `/proc/locks`; only vanished
+processes are ignored. TERM/INT are ignored until all eight hosts prove absence.
+
+Created evidence FDs remain retained and SHA/size/inode-bound, same-name regular substitution
+rejects, and the log seals before upload. Bundle plus evidence plus ledger form an exact 16-object
+preterminal set whose generations/sizes/hashes are embedded in the terminal; only then may the 17th
+generation-zero terminal upload occur, followed solely by replay and exact-set checking. Test
+`16cd0dcd...5b91` passes 14/14, including installed-source auth, held-lock replacement, evidence
+substitution, unexpected-object refusal, real privileged kernel-lock observation and signal-resistant
+quiescence plus a hostile-PATH production-launcher regression. Adjacent wrapper and inventory tests
+bring the focused total to 80/80. Ruff/format,
+compile, Bash syntax and diff checks pass. Corrected source remains unreviewed/uninstalled; root lock
+provisioning, cron adoption, recovery and HLO are separately reviewed future mutations.
+
 ## 2026-08-31 22:27--22:53 UTC — protected HLO start fails in Git transport; mutation removed
 
 At pushed and same-region-mirrored pin `508aaa373147988ff597dfd94a02fddff1778be6`, the separately
