@@ -3174,3 +3174,22 @@ execution is authorized by this source batch.
   No privileged install, launcher, JAX/backend, lowering, compile, bucket write, numerical work,
   full DSA/8K or performance claim occurred. Exact next after review/persistence is a separate
   literal immutable install-only review; compilation and executable invocation remain unauthorized.
+
+## 2026-09-01 projection-contraction HLO immutable runtime installed
+
+- Sol separately returned `APPROVE INSTALL ONLY` for exactly two literal absolute-`/usr/bin/sudo`
+  commands. The fixed provisioner copied exact five-file tree
+  `9c157b99e7e67cc01ea8b1209155a6203269b0bd11438463a4fda0bc48c679cc` to the root-owned
+  0755 source capsule. The install-only program then published the root-owned 0555 three-file
+  runtime capsule before launcher `082b44f9...023e`; it reported `launcher_invoked=false`.
+- Artifact `docs/artifacts/gate-d-projection-contraction-pp16-hlo-runtime-install.json` is 3,761
+  canonical bytes, SHA-256
+  `99a134c400629c936b761bf738873f2a81a41512f8c1823d26d5232b0648abc6`. Every file has exact
+  reviewed bytes, uid/gid 0, mode 0555, nlink 1 and empty xattrs. A later read-only observation at
+  `2026-09-01T20:06:27.167677Z` simultaneously acquired and identity-bound all four canonical
+  leases: root/user workload and root/user rsync. No launcher/acquirer process was present.
+- Classification: `IMMUTABLE_RUNTIME_INSTALLED_NOT_INVOKED;TPU_COMPILE_UNAUTHORIZED;
+  TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`. No launcher, JAX/backend, HLO acquisition, bucket write,
+  TPU/numerical/performance/full-DSA/8K work occurred. Exact next after adversarial review and
+  persistence is a separately reviewed literal fresh-tag compile-only launcher command; executable
+  invocation remains forbidden.

@@ -23,6 +23,12 @@ ARTIFACT = ROOT / (
     "gate-d-projection-contraction-pp16-hlo-orchestration-install-source.json"
 )
 ARTIFACT_SHA256 = "f6d1736105e67dbbe9b336b727ca015a3bf7506231aa8ae7dcd407a81cbe666e"
+INSTALL_ARTIFACT = ROOT / (
+    "docs/artifacts/gate-d-projection-contraction-pp16-hlo-runtime-install.json"
+)
+INSTALL_ARTIFACT_SHA256 = (
+    "99a134c400629c936b761bf738873f2a81a41512f8c1823d26d5232b0648abc6"
+)
 
 
 def _load(path: Path, name: str):  # type: ignore[no-untyped-def]
@@ -314,3 +320,59 @@ def test_orchestration_source_artifact_replays_from_descendant_commit() -> None:
         + "\n"
     ).encode("ascii")
     assert normalized == artifact
+
+
+def test_runtime_install_artifact_binds_exact_persisted_sources() -> None:
+    artifact = INSTALL_ARTIFACT.read_bytes()
+    assert len(artifact) == 3761
+    assert sha256(artifact).hexdigest() == INSTALL_ARTIFACT_SHA256
+    parsed = json.loads(artifact)
+    assert parsed["authorization"] == {
+        "cloud_write": False,
+        "full_dsa_or_8k": False,
+        "hlo_acquisition": False,
+        "launcher_invocation": False,
+        "persistence_only": True,
+        "tpu_compile": False,
+        "tpu_execution": False,
+    }
+    assert parsed["install"]["launcher_invoked"] is False
+    postconditions = parsed["postconditions"]
+    assert postconditions["launcher_process_present"] is False
+    lease_recheck = postconditions["lease_recheck"]
+    assert lease_recheck["simultaneously_held_by_auditor"] is True
+    assert [record["path"] for record in lease_recheck["leases"]] == [
+        "/opt/glm-tpu/locks/glm_pod_workload.lock",
+        "/opt/glm-tpu/locks/glm_tpu_rsync.lock",
+        "/home/gianl/glm-run/.glm_pod_workload.lock",
+        "/home/gianl/.glm-tpu-rsync.lock",
+    ]
+    assert all(record["free"] is True for record in lease_recheck["leases"])
+    assert parsed["status"] == "IMMUTABLE_RUNTIME_INSTALLED_NOT_INVOKED"
+    expected_members = {
+        name: sha256((ROOT / "scripts/greenfield" / name).read_bytes()).hexdigest()
+        for name in MODULE.SOURCE_NAMES
+    }
+    assert parsed["installed_objects"]["source_capsule"]["members"] == (
+        expected_members
+    )
+    assert parsed["installed_objects"]["runtime_capsule"]["members"] == {
+        name: expected_members[name] for name in MODULE.CAPSULE_NAMES
+    }
+    assert (
+        parsed["installed_objects"]["launcher"]["sha256"]
+        == expected_members["launch_gate_d_projection_contraction_pp16_hlo.py"]
+    )
+    ancestry = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(ROOT),
+            "merge-base",
+            "--is-ancestor",
+            parsed["install"]["source_commit"],
+            parsed["install"]["authority_commit"],
+        ],
+        check=False,
+    )
+    assert ancestry.returncode == 0

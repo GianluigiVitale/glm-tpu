@@ -9750,3 +9750,23 @@ This is persistence-only evidence. No privileged installation, launcher, JAX/bac
 compile, cloud write, TPU execution, numerical/performance, full-DSA/8K or Gate-D closure claim
 exists. Exact next after adversarial review, commit/push and locked mirror replay is a separate
 review of literal immutable install-only commands. Do not compile or invoke the executable.
+
+## 2026-09-01 projection-contraction HLO runtime installed; launcher not invoked
+
+Sol independently approved exactly two install-only commands with absolute `/usr/bin/sudo`. The
+root-owned fixed provisioner copied five exact 0555 files from staging tree
+`9c157b99e7e67cc01ea8b1209155a6203269b0bd11438463a4fda0bc48c679cc` into the root-owned
+0755 source capsule. The second-stage installer atomically published the 0555 three-file runtime
+capsule before launcher `082b44f9...023e` and reported `launcher_invoked=false`.
+
+Canonical artifact `docs/artifacts/gate-d-projection-contraction-pp16-hlo-runtime-install.json` is
+3,761 bytes, SHA-256 `99a134c400629c936b761bf738873f2a81a41512f8c1823d26d5232b0648abc6`.
+All installed files have exact reviewed bytes, root ownership, mode 0555, nlink 1 and no xattrs.
+A later read-only observation at `2026-09-01T20:06:27.167677Z` simultaneously acquired and
+identity-bound all four canonical leases—root/user workload and root/user rsync. No
+launcher/acquirer process was present.
+
+This is installation evidence only. No launcher, JAX/backend, HLO acquisition, compile, cloud,
+TPU/numerical/performance, full-DSA/8K or Gate-D claim exists. After this artifact receives its own
+adversarial persistence review and is committed/pushed/mirrored, exact next is a separately reviewed
+literal fresh-tag compile-only launcher command. Executable invocation remains forbidden.
