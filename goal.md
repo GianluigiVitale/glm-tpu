@@ -9,7 +9,7 @@ Default-off native JAX `zai-org/GLM-5.2-FP8` on `db-v4-64-od` (8 hosts/32 chips)
 protected 256K latency. Preserve legacy evidence/oracles/tools only. No new infra; only
 `gs://driftbench-dsv4-uc`; serialize TPU work.
 
-## Required architecture search
+## Architecture search
 
 - `PP8_LP4`: host-aligned 8×4 first.
 - `PP16_LP2`: adjacent 16×2 mandatory.
@@ -19,7 +19,7 @@ protected 256K latency. Preserve legacy evidence/oracles/tools only. No new infr
 Evidence chooses. Distribute weights by depth; communicate locally; move live state; no 32-chip hidden
 reconstruction/layer. `decode_batch1`: one row, no dead rows.
 
-## Mandatory order
+## Order
 
 Worktree; pin. Pre-model prove
 topology/groups; device-only PP8/PP16 chains with exact HLO, no host/Ray/Python dispatch/inactive
@@ -28,7 +28,7 @@ Pass Gates A–H: plan/memory/HLO; final-layout manifest/packer/loader; referenc
 dense/DSA/IndexShare/MoE; complete cutoff-active short decoder; protected 128K;
 protected 256K E0; identical plan adjudication; then speculation.
 
-## Priority: observe Gate D; find/fix root cause
+## Gate D: observe; find/fix root cause
 
 Gate D open; `context<=top_k` is not ranking proof; never rerun tombstoned graphs. Build
 default-off typed snapshots/watchpoints, first-divergence bisection, bits/dtypes/shapes/layouts/
@@ -44,9 +44,9 @@ Oracle: `docs/10-observability.md`. Indexes:
 `scripts/greenfield/{audit_observability,admit_gate_d_mechanisms}.py`. Search
 `glm_tpu/greenfield/{validation,benchmarking,sharding}/`, `scripts/greenfield/{capture,compare,inspect,probe,trace}*` and
 `tests/greenfield/`. Evidence: `docs/artifacts/`, `HANDOFF.md`, `bench/results.db`, bucket
-`oracles/`/`results/`. Read/register first. If stuck, read
+`oracles/`/`results/`. Read/register first. On any stall/failure, reread
 `docs/greenfield/compass_artifact_wf-f6f3c189-f49a-5169-bc82-8adefac958df_text_markdown.md`
-in full; adjudicate evidence before acting.
+in full; adjudicate against local evidence before acting.
 
 Localize first causal divergence; define/falsify a legal one-row local mechanism on the smallest
 coherent state; compile/run only if it passes. Gate D requires root cause/fix.
