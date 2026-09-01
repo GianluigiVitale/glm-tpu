@@ -2978,3 +2978,20 @@ execution is authorized by this source batch.
   backend initialization, compile, TPU/cloud work or numerical evidence occurred.
 - Authority: persistence only. Adversarial review precedes commit/push/mirror; immutable
   install/orchestration and any fresh-tag TPU execution require separate review.
+
+## 2026-09-01 forced-round PP16 numerical orchestration/install source
+
+- Certificate: `docs/artifacts/gate-d-forced-round-pp16-numerical-orchestration-install-source.json`,
+  2,873 bytes, SHA-256 `fe53ef872a34b3a08dec26d50678beb0b228df1c27eef7becf4a1d7fcef21ce5`.
+- Sources: isolated publisher `bca06fbb...5460d8`, wrapper `d3a687c3...05521c`, root-owned
+  descriptor launcher `44ef4118...bf8709`, and atomic no-replacement installer
+  `46de88be...cf89d6`; the corrected driver remains `5e1c1f70...7f2187`.
+- Boundary: default-off, both global locks, pushed-pin and same-region mirror replay,
+  authenticated 8/8 zero-work censuses, one row/two chips, one invocation/transfer, exact HLO and
+  causal/event output validation, append-only evidence and terminal-last archive. Live,
+  all-version and exhaustive soft-deleted vacancy is proven before local run creation and repeated
+  immediately before either upload path. Installer
+  publishes the 0555 capsule before the 0555 launcher and never invokes it.
+- Verification: 52/52 focused and 273/273 adjacent CPU-only hostile tests with one sealed-history
+  deselection; Ruff 0.16.5 and Python/Bash compilation pass. No install, launcher, backend, compile, TPU
+  or cloud action occurred. Persistence only; literal install and execution need separate reviews.

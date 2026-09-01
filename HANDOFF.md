@@ -9552,3 +9552,24 @@ JAX backend initialization, compile, TPU execution, cloud write or numerical res
 Gate D remains open. Exact next is adversarial source review and persistence, then a separately
 reviewed immutable install/orchestration batch; only that later review may consider one fresh-tag
 execution.
+
+## 2026-09-01 forced-round PP16 numerical orchestration/install source; not installed
+
+The isolated forced-round wrapper, publisher, root-owned descriptor launcher and atomic
+no-replacement installer are now source-complete. The wrapper is default-off, binds the corrected
+driver/HLO/source/capsule/topology authorities, holds both protected locks, requires authenticated
+8/8 zero-work pre/post censuses, replays the pushed pin and `US-CENTRAL2` mirror, permits one
+two-chip invocation and uploads either outcome terminal last. The publisher validates the nine
+output arrays, acquired StableHLO/optimized preimage, derived optimized executable, exact eleven
+causal watchpoints and independent event authority before archiving. The installer publishes a
+root-owned 0555 three-file capsule before its 0555 launcher and never invokes it.
+
+Combined source certificate
+`gate-d-forced-round-pp16-numerical-orchestration-install-source.json` is 2,873 bytes, SHA-256
+`fe53ef872a34b3a08dec26d50678beb0b228df1c27eef7becf4a1d7fcef21ce5`; focused CPU-only hostile
+coverage passes 52/52 and the adjacent slice passes 273/273 with one sealed-history deselection.
+Ruff 0.16.5 and Python/Bash compilation pass. No privileged install, launcher invocation, JAX backend, compile, TPU work
+or cloud mutation occurred. This batch authorizes persistence only; exact next is adversarial
+review, commit/push/locked mirror, then a separately reviewed literal install command. Remote tag
+vacancy is bound across live, all-version and exhaustive soft-deleted namespaces before local
+run-directory creation and again immediately before either success or diagnostic upload.
