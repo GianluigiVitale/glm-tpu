@@ -1,64 +1,57 @@
-# Goal — GLM-5.2-FP8 TPU v4 topology-first greenfield engine
+# Goal — GLM-5.2-FP8 TPU v4 topology-first engine: close Gate D, then finish §18
 
-FULL ACCESS: autonomous. Keep <4000 chars. At start/compaction read this,
-`docs/glm-tpu-revolution.md`, and `docs/suggestions.md` **in full**; then inspect live evidence.
+FULL ACCESS: autonomous. Keep this file <4000 chars; it is the compaction-safe authority. At
+start/compaction read this file and `docs/glm-tpu-revolution.md` in full, then only the **last
+~300 lines** of `HANDOFF.md` and the last entries of `docs/greenfield/{EVIDENCE_MAP,GATE_D_LESSONS}.md`;
+never reread whole histories. Then inspect live state (git, run dirs, leases, pod).
 
-## Scope and architecture
+## Priority
 
-Build a default-off native-JAX `zai-org/GLM-5.2-FP8` engine on `db-v4-64-od` (8 hosts/32 chips),
-minimizing protected 256K latency. Legacy is oracle only; never import execution.
-Never create infra. Use only
-`gs://driftbench-dsv4-uc` and serialize TPU work.
+Close **Gate D**: complete 78-layer greenfield decoder at short context (8K) with correct raw tokens,
+exact DSA selected sets/tie order, state/cache integrity, no repeated 32-chip layer collective,
+measured HBM, fresh trace, steady wall. Everything else (PP8/PP16/WS32 adjudication, 128K/256K,
+speculation, §18 finish) comes after and must not consume effort now.
 
-Plans: `PP8_LP4` (8 host-aligned stages ×4, first), `PP16_LP2` (16 adjacent stages ×2),
-`WS32_2D` (protected result or evidence rejection), and `LEGACY_TP32_DCP8` (oracle only).
-Distribute weights by depth; keep repeated communication in the smallest local group; move live
-state only; no 32-chip hidden reconstruction/layer. `decode_batch1` has one row/no dead rows.
+## Hard invariants (never relax)
 
-## Mandatory order
+Native JAX greenfield tree only; legacy `tpu-inference` is oracle/utilities only. Use only
+`db-v4-64-od` and `gs://driftbench-dsv4-uc`; never create infra. Serialize TPU work under the pod
+lease; every protected run ends with an authenticated 8/8 zero-work census. Append-only evidence,
+fail closed, exact SHA binding of code/plan/artifacts. Proof = exact DSA + tokens + integrity on
+real hardware; CPU/HLO/labels/throughput alone are not proof. Never modify historical evidence.
+Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, stretch `<=100`.
 
-Worktree/pins. Pre-model prove topology/groups; device-only PP8/PP16 chains with exact HLO/no host
-dispatch/inactive compute; one exact real MoE local combine. Gates A–H: plan/memory/HLO; packed
-manifest/loader; references; exact layers; complete short decoder; protected 128K/256K E0; plan
-adjudication; then speculation.
+## Efficiency contract (owner, 2026-09-01)
 
-## Gate D: observe, find and fix root cause
+- **Batch reviews.** One Sol review per milestone covering source + tests + certificate + install
+  commands + fresh-tag run command together. Do not request a review per file or per step.
+- Sol = Codex `gpt-5.6-sol` sub-agent thread `01a05206-57b1-7dc3-a49c-a913529b3937`; invoke
+  `codex exec fork <id> --skip-git-repo-check -c 'sandbox_mode="read-only"' -o <verdict> "<prompt>"`
+  (binary under `~/.vscode-server/extensions/openai.chatgpt-*/bin/linux-x86_64/codex`). Ask for
+  exact verdict lines. Fable CLI review may substitute when Sol is unavailable.
+- Mirror = cron `sync-glm.sh` every 5 min; do not add ceremony. Verify with
+  `verify_gate_d_same_region_git_mirror.py` only before a protected run.
+- Root-cause work first: reuse the installed immutable V1 numerical runtime and existing wrappers;
+  add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
+- Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-Gate D open. `context<=top_k` is not ranking proof; never rerun tombstoned graphs. Use typed
-snapshots/watchpoints, first-divergence bisection, bits/dtypes/shapes/layouts/owners, coherent
-cache/query/head/key/scorer state, HLO fingerprints and one bounded host transfer. Bind source/code/
-plan SHAs; append-only, fail closed, offline-first; attack-test every authority boundary.
-
-Read/register first: `docs/10-observability.md`, `HANDOFF.md`, `bench/results.db`, `docs/artifacts/`,
-and `docs/greenfield/{REUSE_INVENTORY,EVIDENCE_MAP,GATE_D_LESSONS,GATE_D_OBSERVABILITY_PLAYBOOK}.md`;
-inspect observability/admission core, scripts, configs and validation/benchmarking/sharding tools.
-When stuck reread
-`docs/greenfield/compass_artifact_wf-f6f3c189-f49a-5169-bc82-8adefac958df_text_markdown.md`
-in full and adjudicate it against local evidence.
-
-## Resume checkpoint — 2026-09-01 23:45Z
+## Resume checkpoint — 2026-09-01 23:50Z
 
 Worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`, branch
-`tooling/gate-d-compensated-pp16-numerical`. Commits `7902b4c9` (corrected orchestration, Sol
-approved) and `a57cca4e` (certificate `1c75e761…e38`) are on origin and the replayed `US-CENTRAL2`
-mirror. Sol `APPROVE INSTALL ONLY`; numerical V1 runtime is installed root 0555, launcher not
-invoked (artifact `gate-d-projection-contraction-pp16-numerical-runtime-install.json`).
+`tooling/gate-d-compensated-pp16-numerical`, HEAD `f36c060981e78320164fa9a39e29c415468ff2cf` on
+origin + mirror. Numerical V1 runtime installed root 0555 (launcher
+`/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v1.py`). Sol-approved tag
+`gate_d_projection_contraction_pp16_numerical_20260901T233855937688834Z` ran and **failed closed**
+in the driver: `Gate-D projection numerical executable HLO drifted` (driver line ~510: compiled HLO
+differs from the accepted compile-only HLO `4b3fa252…`/`817ba2ed…`). Diagnostic archived under the
+tag's `diagnostic/` prefix; no TPU executable was invoked; census 8/8 clean. Tag is burned.
 
-Owner: batch Sol reviews, not one per step. This batch persists the install artifact/docs; the same
-Sol review covers the literal fresh-tag command for `gate_d_projection_contraction_pp16_numerical_20260901T233855937688834Z` (in HANDOFF). Exact next after
-commit/push/mirror: run that one command, adjudicate `NUMERICAL_RESULT`, persist evidence.
-**Until then no TPU run.** Sol reviewer = Codex sub-agent 01a05206… via `codex exec fork`.
+Exact next: diagnose the HLO drift (compare acquired vs accepted optimized HLO/StableHLO bytes;
+identify nondeterministic or environment-dependent fields; decide whether the identity check must
+bind a normalized fingerprint or the compile environment differs), fix root cause, then one batched
+Sol review (fix + tests + certificate + install + fresh tag) and one run. Record the outcome here.
 
-## Proof and finish
+## Finish (after Gate D)
 
-Optimizations off. Require exact DSA/tokens/quality; state/load/cache/checkpoint integrity; per-chip
-HBM; code/plan hashes; groups/counts; fresh 8-host XPlanes; wall; DB/archive and 8/8 cleanup.
-CPU/synthetic/HLO/labels/throughput alone are not proof.
-Stop on global repeated collectives, host staging, dead rows, unknown HBM, DSA drift or wall
-regression. Useful `<=200 ms/token, >=4.5 tok/s`; strong `<=125 ms, >=8`; stretch `<=100 ms, >=10`.
-
-Finish only with §18 evidence: independent 256K service, packed checkpoint, exactness/integrity,
-local collectives, PP8/PP16 measurements, WS32 adjudication, 128K/256K, DB/archive, clean fleet.
-Review new batches in Fable 5 Max CLI; when unavailable/100% use the one existing Sol on the same
-scope. Never Opus, workflows or extra subagents. Use smallest tests; verify, commit/push, then locked
-same-region sync.
+§18 of the spec: PP8/PP16 protected measurements, WS32 result or evidence-backed rejection, 128K
+four-depth, 256K E0, DB/archive, clean fleet, base vs speculative throughput reported separately.
