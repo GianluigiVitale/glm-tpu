@@ -1,0 +1,95 @@
+{
+  "approval_scope": "install_command_only_plus_read_only_postflight",
+  "approval_verdict": "APPROVE INSTALL COMMAND ONLY",
+  "artifact_kind": "gate_d_worker_repository_recovery_v4_install",
+  "cloud_or_network_work_performed_during_install": false,
+  "code_pin": "39b4059cacc88ba16a7a493e83afd042460517a5",
+  "controller": {
+    "bytes": 54037,
+    "dev": 2049,
+    "git_object_id": "8909102091d56de91f61a56447ea96da61a1286d",
+    "gid": 0,
+    "ino": 49181,
+    "mode": "0555",
+    "nlink": 1,
+    "sha256": "fa637dd17861e19bc178260c65b90c6d01d8b877c150a6abb6758ea21691c353",
+    "uid": 0
+  },
+  "installed_at_utc": "2026-09-01T03:28:50.193250068Z",
+  "postinstall_verification": {
+    "canonical_lease_identities": [
+      {
+        "dev": 2049,
+        "ino": 49169,
+        "mode": "0666",
+        "name": "/opt/glm-tpu/locks/glm_pod_workload.lock"
+      },
+      {
+        "dev": 2049,
+        "ino": 49170,
+        "mode": "0666",
+        "name": "/opt/glm-tpu/locks/glm_tpu_rsync.lock"
+      },
+      {
+        "dev": 2049,
+        "ino": 1868606,
+        "mode": "0664",
+        "name": "/home/gianl/glm-run/.glm_pod_workload.lock"
+      },
+      {
+        "dev": 2049,
+        "ino": 1580034,
+        "mode": "0664",
+        "name": "/home/gianl/.glm-tpu-rsync.lock"
+      }
+    ],
+    "canonical_leases_released": true,
+    "controller_process_present": false,
+    "entry_count_below_root": 1,
+    "exact_git_blob_match": true,
+    "extended_attribute_count": 0,
+    "staging_residue_present": false,
+    "target_dev": 2049,
+    "target_gid": 0,
+    "target_ino": 49180,
+    "target_mode": "0755",
+    "target_nlink": 2,
+    "target_uid": 0,
+    "tree_sha256": "bd80291e15d3008bb3dc1a4f4b47197424ae5dae79ee7d40e0d5542d294698d0"
+  },
+  "preflight_correction": {
+    "accidental_lock_birth_utc": "2026-09-01T03:27:07.949435583Z",
+    "accidental_lock_path": "/opt/glm-tpu/locks/glm_tpu_workload.lock",
+    "accidental_lock_state": "root:root mode 0644 nlink 1 size 0; unlocked; removed while flock-held; postflight lstat-vacant",
+    "install_attempted_before_correction": false,
+    "preexisting_unrelated_path": "/home/gianl/.glm-tpu-workload.lock",
+    "preexisting_unrelated_path_disposition": "left untouched and unused",
+    "review_disposition": "first draft withheld P1 for two wrong workload-lock names; corrected command approved"
+  },
+  "provisioner": {
+    "git_object_id": "39577557c964422001a49d573b833fe06a059b0e",
+    "path": "/opt/glm-tpu/bin/provision_gate_d_python_runtime.py",
+    "sha256": "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594"
+  },
+  "recovery_or_hlo_invocation_performed": false,
+  "reviewer": "sol_gate_d_observability_review",
+  "schema_version": 1,
+  "source": {
+    "controller_dev": 2049,
+    "controller_gid": 2001,
+    "controller_ino": 2607099,
+    "controller_mode": "0555",
+    "controller_nlink": 1,
+    "controller_uid": 2001,
+    "path": "/home/gianl/glm-run/gate-d-worker-recovery-v4-source-39b4059.DMmuHf",
+    "root_dev": 2049,
+    "root_gid": 2001,
+    "root_ino": 2607098,
+    "root_mode": "0755",
+    "root_nlink": 2,
+    "root_uid": 2001,
+    "tree_sha256": "bd80291e15d3008bb3dc1a4f4b47197424ae5dae79ee7d40e0d5542d294698d0"
+  },
+  "target_path": "/opt/glm-tpu/gate-d-worker-recovery-v4",
+  "verified_at_utc": "2026-09-01T03:30:39Z"
+}

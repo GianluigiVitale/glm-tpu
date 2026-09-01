@@ -2,6 +2,23 @@
 
 **Updated:** 2026-09-01 UTC
 
+## 2026-09-01 Gate-D recovery v4 installed immutably; not invoked
+
+- The canonical-catalogue correction is persisted as commit `39b4059cacc88ba16a7a493e83afd042460517a5`,
+  pushed and locked-mirrored in `US-CENTRAL2`. Its exact one-file source tree is
+  `bd80291e...98d0`; controller SHA is `fa637dd1...c353`.
+- Sol withheld the first install draft because two no-op preflight lock names were wrong. No install
+  ran. The probe-created root-owned zero-byte wrong lock was verified unlocked and removed while
+  flock-held; its path is vacant. The older unrelated user lock remains untouched and unused. The
+  corrected command replayed the four canonical lease identities from the sealed prerequisite
+  receipt and received install-only approval with no P0--P2.
+- `/opt/glm-tpu/gate-d-worker-recovery-v4` now contains exactly one root-owned mode-0555 controller,
+  byte-equal to Git, with zero xattrs, no staging residue and canonical tree SHA
+  `bd80291e...98d0`. All four leases are released and no controller process exists. Install evidence
+  is `gate-d-worker-repository-recovery-v4-install.json` (SHA `eaf702da...159db`). No recovery,
+  repository, cloud/network, JAX/HLO, model or TPU work ran. Exact next is persistence review of
+  this install evidence, then separate review of one fresh-tag repository-only invocation.
+
 ## 2026-09-01 Gate-D recovery v3 failed closed; canonical v4 correction prepared
 
 - The separately approved v3 invocation used burned tag
@@ -27,9 +44,9 @@
   `REPO_PREFLIGHT_OK`; it created no tag paths.
 - The default-off source now targets fresh immutable v4 path
   `/opt/glm-tpu/gate-d-worker-recovery-v4`. Recovery/acquisition validation passes 82/82, including
-  nonzero, invalid-path, hardlink, fingerprint, rollback and partial-resume attacks. This batch
-  still needs final validation, Sol persistence review, commit/push/same-region mirror, then
-  separately reviewed no-replace install and fresh invocation. HLO remains unauthorized.
+  nonzero, invalid-path, hardlink, fingerprint, rollback and partial-resume attacks. The source
+  correction was persisted as `39b4059`; installation and invocation remained separate review
+  boundaries. HLO remains unauthorized until clean recovery evidence is persisted.
 
 ## 2026-09-01 Gate-D recovery v2 failed closed on sealed partial-clone prestates
 

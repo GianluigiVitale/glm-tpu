@@ -2518,6 +2518,15 @@ remains open and no TPU successor is authorized.
 - The default-off corrected controller targets a fresh v4 immutable path. Persistence, installation
   and invocation remain three separately reviewed boundaries. PP16 HLO stays unauthorized until a
   clean, persisted, exact-pin, unique-host 8/8 recovery terminal exists.
+- Source persistence is commit `39b4059cacc88ba16a7a493e83afd042460517a5`. After Sol withheld a
+  first draft using two wrong workload-lock names, no install ran; the no-op probe's newly created
+  root-owned zero-byte wrong lock was removed while flock-held and is lstat-vacant. The corrected
+  install-only command replayed all four canonical lease identities and installed exactly one
+  root-owned mode-0555 controller at `/opt/glm-tpu/gate-d-worker-recovery-v4`. Controller/tree SHAs
+  are `fa637dd1...c353` / `bd80291e...98d0`; Git bytes, membership, ownership, modes, links, xattrs,
+  staging absence, lock release and process absence pass. Install artifact
+  `gate-d-worker-repository-recovery-v4-install.json` has SHA `eaf702da...159db`. No controller
+  invocation, recovery/repository mutation, cloud/network, JAX/HLO, model or TPU work occurred.
 
 ## Gate-D recovery v2 promisor-preflight failure and strict v3 correction
 
