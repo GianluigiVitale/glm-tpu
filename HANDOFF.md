@@ -9625,3 +9625,22 @@ No v2 install, launcher, cloud mutation, protected numerical execution or 8K occ
 the current v2 diff/evidence and returned `APPROVE` with no P0/P1/P2 findings; that approval grants
 no install or execution authority. Exact next: commit/push/locked same-region mirror, then a
 separate literal install-only review.
+
+## 2026-09-01 forced-round PP16 numerical v2 runtime installed; launcher not invoked
+
+Commit `ed40021a54d8ff420997a3089eff5f52f1b0d7a7` matched origin and its locked
+`US-CENTRAL2` mirror replay produced checkout archive SHA
+`a9436b24746146a93ef4b77d142694c778682ced5290403014a1313367fcd5f6`. Sol separately
+approved only the two literal absolute-`/usr/bin/sudo` installation commands with no P0--P2.
+The fixed provisioner installed the exact five-file v2 source tree
+`1c71f032105a2666ee3ef2f9acc2a233c4c43b0a4c3cc52dac4901a159970a09`; the second-stage
+installer published the root-owned 0555 runtime capsule
+`5dff4dbb19d4e1af24363d83a842454dc7a19a298a6ecf58e5a38b32bc6e5851` before launcher
+`ecff3088...5a8d`. Every file is root-owned, mode 0555, nlink 1 and xattr-free.
+
+The installer reported `launcher_invoked=false`; independent verification found all four root/user
+workload and rsync locks free, no v2 process and no local libtpu holder. Artifact
+`docs/artifacts/gate-d-forced-round-pp16-numerical-runtime-install-v2.json` records installation
+only. No JAX/backend/HLO/TPU/cloud/network, numerical/performance work or 8K occurred. Gate D is
+open. Exact next after adversarial evidence review, commit/push and locked same-region mirror is a
+separate execution-only review of one fresh, append-only protected tag.

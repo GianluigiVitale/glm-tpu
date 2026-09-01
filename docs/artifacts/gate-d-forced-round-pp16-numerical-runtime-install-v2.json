@@ -1,0 +1,79 @@
+{
+  "artifact_kind": "gate_d_forced_round_pp16_numerical_runtime_install_v2",
+  "authorization": {
+    "cloud_write": false,
+    "full_8k": false,
+    "jax_backend": false,
+    "launcher_invocation": false,
+    "persistence_only": true,
+    "tpu_compile": false,
+    "tpu_execution": false
+  },
+  "claim_scope": "Local immutable v2 numerical runtime installation only. No launcher invocation, JAX import/backend, HLO acquisition, TPU compile/execution, cloud/network mutation, numerical, performance or Gate-D claim.",
+  "install": {
+    "completed_at_utc": "2026-09-01T16:42:49Z",
+    "installer_report_artifact_kind": "gate_d_forced_round_pp16_numerical_runtime_installed",
+    "launcher_invoked": false,
+    "mutable_staging_source": "/home/gianl/glm-run/gate-d-forced-round-numerical-install-source-v2.wVvHEi8b",
+    "source_capsule_tree_sha256": "1c71f032105a2666ee3ef2f9acc2a233c4c43b0a4c3cc52dac4901a159970a09",
+    "source_commit": "ed40021a54d8ff420997a3089eff5f52f1b0d7a7"
+  },
+  "installed_objects": {
+    "launcher": {
+      "gid": 0,
+      "mode": "0555",
+      "nlink": 1,
+      "path": "/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_numerical_v2.py",
+      "sha256": "ecff3088b73b12aea5e5f7163fc5727929fae79ea11412fd65ee902400445a8d",
+      "uid": 0,
+      "xattrs": []
+    },
+    "runtime_capsule": {
+      "gid": 0,
+      "members": {
+        "publish_gate_d_forced_round_pp16_numerical.py": "b4024f3127a5f2e01128fec71d058fda5645d704fdd277e9ee0e3d1340da6405",
+        "run_gate_d_forced_round_pp16_numerical.py": "a5e38c7d8a4d14c32300ac3687ebaa365bcfeb312fe4bb687f9c99babe7d4b57",
+        "verify_gate_d_same_region_git_mirror.py": "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"
+      },
+      "mode": "0555",
+      "path": "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-numerical-v2",
+      "tree_sha256": "5dff4dbb19d4e1af24363d83a842454dc7a19a298a6ecf58e5a38b32bc6e5851",
+      "uid": 0,
+      "xattrs": []
+    },
+    "source_capsule": {
+      "gid": 0,
+      "members": {
+        "install_gate_d_forced_round_pp16_numerical_runtime.py": "73ba8f496a1649364f8f31d01b97e952bbfa074406acc13956f5d0e3f5eee12a",
+        "launch_gate_d_forced_round_pp16_numerical.py": "ecff3088b73b12aea5e5f7163fc5727929fae79ea11412fd65ee902400445a8d",
+        "publish_gate_d_forced_round_pp16_numerical.py": "b4024f3127a5f2e01128fec71d058fda5645d704fdd277e9ee0e3d1340da6405",
+        "run_gate_d_forced_round_pp16_numerical.py": "a5e38c7d8a4d14c32300ac3687ebaa365bcfeb312fe4bb687f9c99babe7d4b57",
+        "verify_gate_d_same_region_git_mirror.py": "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"
+      },
+      "mode": "0755",
+      "path": "/opt/glm-tpu/gate-d-forced-round-numerical-install-v2",
+      "tree_sha256": "1c71f032105a2666ee3ef2f9acc2a233c4c43b0a4c3cc52dac4901a159970a09",
+      "uid": 0,
+      "xattrs": []
+    }
+  },
+  "preconditions": {
+    "absolute_privilege_boundary": "/usr/bin/sudo",
+    "absolute_privilege_boundary_sha256": "1e000f41739201f030cdc588fbe50d5438570f5386104c9521543824827fb985",
+    "install_source_certificate_sha256": "a8790efd54bd82370e2ac27dc53cb8d1995ab9630b6d3a92cbb2206796e0e609",
+    "local_origin_commit_exact": true,
+    "provisioner_sha256": "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594",
+    "same_region_mirror_checkout_sha256": "a9436b24746146a93ef4b77d142694c778682ced5290403014a1313367fcd5f6",
+    "sol_install_only_review": "APPROVE INSTALL ONLY; no P0/P1/P2"
+  },
+  "postconditions": {
+    "launcher_process_present": false,
+    "libtpu_holder_present": false,
+    "root_pod_workload_lock_free": true,
+    "root_rsync_lock_free": true,
+    "user_pod_workload_lock_free": true,
+    "user_rsync_lock_free": true
+  },
+  "schema_version": 2,
+  "status": "IMMUTABLE_NUMERICAL_RUNTIME_V2_INSTALLED_NOT_INVOKED"
+}

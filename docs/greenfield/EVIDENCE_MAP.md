@@ -3034,3 +3034,20 @@ execution is authorized by this source batch.
 - Authority: source persistence only. No v2 install/launcher/cloud/protected numerical/8K authority.
   Sol returned `APPROVE` with no P0/P1/P2 findings and explicitly granted no install/execution
   authority. Exact next is commit/push/mirror and a separate install-only review.
+
+## 2026-09-01 forced-round PP16 numerical v2 immutable runtime install
+
+- Artifact: `docs/artifacts/gate-d-forced-round-pp16-numerical-runtime-install-v2.json`.
+- Persisted source pin: local/origin commit `ed40021a54d8ff420997a3089eff5f52f1b0d7a7`;
+  locked `US-CENTRAL2` mirror checkout SHA
+  `a9436b24746146a93ef4b77d142694c778682ced5290403014a1313367fcd5f6`.
+- A separate Sol review approved only the two literal absolute-`/usr/bin/sudo` install commands
+  with no P0--P2. The fixed provisioner installed exact source tree
+  `1c71f032105a2666ee3ef2f9acc2a233c4c43b0a4c3cc52dac4901a159970a09`; the second-stage
+  installer published exact capsule tree `5dff4dbb19d4e1af24363d83a842454dc7a19a298a6ecf58e5a38b32bc6e5851`
+  before launcher `ecff3088...5a8d` and reported `launcher_invoked=false`.
+- Independent postconditions: exact membership/hashes, root ownership, modes, nlink 1 and empty
+  xattrs; four root/user workload and rsync locks free; no v2 process; no local libtpu holder.
+- Authority: installation only. No launcher/JAX/backend/HLO/TPU/cloud/network, numerical,
+  performance or 8K claim. Gate D remains open. Exact next after review/persistence is a separate
+  execution-only review for one fresh append-only protected tag.
