@@ -26,10 +26,13 @@
   only the still-stale subset (so partial success is resumable), then requires unique-host exact-pin
   8/8 post-verification before terminal evidence. The complete inventory/recovery/acquisition
   boundary passes 84/84.
-- No recovery, repository mutation, bucket write, JAX/HLO, model or TPU work ran. Exact next is
-  adversarial review of this correction/evidence, then commit/push/locked same-region mirror. Only
-  a separately reviewed no-replace install at `/opt/glm-tpu/gate-d-worker-recovery-v2` and one fresh
-  tagged targeted recovery may follow; the historical installed controller remains intact/inert.
+- Sol approved persistence only; exact staged SHA `b965001a...925a` is committed/pushed/mirrored as
+  `652f16e`. The separately approved no-replace command installed the exact controller at
+  `/opt/glm-tpu/gate-d-worker-recovery-v2`: root-owned mode 0555, controller SHA `f1f16f60...65c8`,
+  one-entry tree SHA `862f8943...b80f`, no xattrs and byte-equal to Git. Compact install evidence is
+  `docs/artifacts/gate-d-worker-repository-recovery-v2-install.json`. No recovery, worker repository
+  mutation, recovery-prefix bucket write, JAX/HLO, model or TPU work ran. Exact next is separate
+  adversarial review of one fresh tagged targeted invocation; historical controllers remain inert.
 
 ## 2026-09-01 Gate-D repository prerequisites fully receipted; recovery pending review
 

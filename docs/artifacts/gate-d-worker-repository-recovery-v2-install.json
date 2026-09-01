@@ -1,0 +1,37 @@
+{
+  "approval_scope": "install_command_only_plus_read_only_postflight",
+  "approval_verdict": "APPROVE INSTALL COMMAND ONLY",
+  "artifact_kind": "gate_d_worker_repository_recovery_v2_install",
+  "cloud_or_network_work_performed_during_install": false,
+  "code_pin": "652f16e173c49edf28cb13dc141c66b344b64178",
+  "controller": {
+    "bytes": 50677,
+    "dev": 2049,
+    "gid": 0,
+    "ino": 49177,
+    "mode": "0555",
+    "sha256": "f1f16f604e4ad2ae07c87f989c054a03a3a2c3d5b7ff9bba7d2629e679c65c8a",
+    "uid": 0
+  },
+  "installed_at_utc": "2026-09-01T02:21:06.176686905Z",
+  "postinstall_verification": {
+    "entry_count_below_root": 1,
+    "exact_git_blob_match": true,
+    "extended_attribute_count": 0,
+    "target_dev": 2049,
+    "target_gid": 0,
+    "target_ino": 49176,
+    "target_mode": "0555",
+    "target_uid": 0,
+    "tree_sha256": "862f89431ea4f36233ab866fe2abef037563169def01c41876721cd4f48eb80f"
+  },
+  "provisioner_path": "/opt/glm-tpu/bin/provision_gate_d_python_runtime.py",
+  "provisioner_sha256": "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594",
+  "recovery_or_hlo_invocation_performed": false,
+  "reviewer": "sol_gate_d_observability_review",
+  "schema_version": 1,
+  "source_path": "/home/gianl/glm-run/gate-d-worker-recovery-v2-source-652f16e.TpeFPs",
+  "source_tree_sha256": "862f89431ea4f36233ab866fe2abef037563169def01c41876721cd4f48eb80f",
+  "target_path": "/opt/glm-tpu/gate-d-worker-recovery-v2",
+  "verified_at_utc": "2026-09-01T02:21:47Z"
+}

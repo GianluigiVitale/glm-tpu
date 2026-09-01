@@ -2514,9 +2514,12 @@ remains open and no TPU successor is authorized.
   refuses a no-op, pre-verifies untouched worker 0, and requires unique-host exact-pin 8/8
   post-verification before terminal publication. Complete inventory, recovery and HLO-acquisition
   validation passes 84/84.
-- This is source/read-only diagnostic evidence only. Recovery still requires adversarial review,
-  persistence, a no-replace `/opt/glm-tpu/gate-d-worker-recovery-v2` installation and a separately
-  reviewed fresh invocation. The historical controller remains intact/inert. Gate D and HLO
+- Sol approved persistence only; staged SHA `b965001a...925a` is commit `652f16e`, pushed and
+  same-region mirrored. A separate install-only review approved the no-replace provisioner command.
+  `docs/artifacts/gate-d-worker-repository-recovery-v2-install.json` proves the resulting exact
+  root-owned 0555 controller (`f1f16f60...65c8`) and one-entry tree (`862f8943...b80f`) match Git
+  with no xattrs. No recovery invocation or worker mutation ran. Recovery still requires a separate
+  review of one fresh tag and exact command; historical controllers remain inert. Gate D and HLO
   acquisition remain open.
 
 ## Fresh PP16 HLO start refused during concurrent Git transport; sync removed from run
