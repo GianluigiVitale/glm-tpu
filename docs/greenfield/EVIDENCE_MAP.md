@@ -3317,3 +3317,21 @@ persistence only; review and persistence precede any v2 installation.
   INSTALL_UNAUTHORIZED;TPU_COMPILE_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`.
   Exact next after adversarial review and persistence is a separately reviewed literal install-only
   command. No launcher, compile, TPU, numerical, full DSA/8K or performance authority exists.
+
+## 2026-09-01 projection-contraction HLO V3 immutable runtime installed
+
+- Sol independently verified the two literal privileged commands, exact five-member staging tree
+  `286c3e3e...e9d6`, fixed provisioner `2b9c8c2b...0594`, absent targets and no-launch boundary,
+  then returned `APPROVE INSTALL ONLY` with no P0--P2.
+- The root-owned source tree, three-member runtime capsule and launcher are versioned V3, mode
+  0755/0555, xattr-free and exact to their certificate hashes. The installer reported
+  `launcher_invoked=false`; no launcher/acquirer process or local TPU owner remained. At
+  `2026-09-01T21:32:40.839444364Z`, one read-only auditor simultaneously held all four canonical
+  leases.
+- Artifact `gate-d-projection-contraction-pp16-hlo-runtime-install-v3.json` is 3,699 canonical
+  bytes, SHA-256 `964329c0...c1c8`. Origin and the locked `US-CENTRAL2` mirror are exact at authority
+  commit `4a786ec`; replayed checkout archive SHA-256 is `feab9bf7...b2de`.
+- Classification: `IMMUTABLE_RUNTIME_V3_INSTALLED_NOT_INVOKED;TPU_COMPILE_UNAUTHORIZED;
+  TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`. Exact next after review/persistence is a separate fresh
+  tag and literal compile-only launcher review. Numerical execution and full DSA/8K remain
+  forbidden.

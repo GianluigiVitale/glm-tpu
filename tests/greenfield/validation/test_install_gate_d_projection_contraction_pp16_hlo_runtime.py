@@ -45,6 +45,12 @@ V2_INSTALL_ARTIFACT = ROOT / (
 V2_INSTALL_ARTIFACT_SHA256 = (
     "6a10743f80b924e5fe025f97b51f62359193653f73b83b65809cfbd8c42a951c"
 )
+V3_INSTALL_ARTIFACT = ROOT / (
+    "docs/artifacts/gate-d-projection-contraction-pp16-hlo-runtime-install-v3.json"
+)
+V3_INSTALL_ARTIFACT_SHA256 = (
+    "964329c05ec887c9acec583da6f9bb86fc76b0320b0f6a01291705e0532fc1c8"
+)
 
 
 def _load(path: Path, name: str):  # type: ignore[no-untyped-def]
@@ -559,6 +565,92 @@ def test_v2_runtime_install_artifact_binds_exact_persisted_sources() -> None:
         == expected_members["launch_gate_d_projection_contraction_pp16_hlo.py"]
     )
     assert parsed["installed_objects"]["launcher"]["path"].endswith("hlo_v2.py")
+    ancestry = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(ROOT),
+            "merge-base",
+            "--is-ancestor",
+            parsed["install"]["source_commit"],
+            parsed["install"]["authority_commit"],
+        ],
+        check=False,
+    )
+    assert ancestry.returncode == 0
+
+
+def test_v3_runtime_install_artifact_binds_exact_persisted_sources() -> None:
+    artifact = V3_INSTALL_ARTIFACT.read_bytes()
+    assert len(artifact) == 3699
+    assert sha256(artifact).hexdigest() == V3_INSTALL_ARTIFACT_SHA256
+    parsed = json.loads(artifact)
+    assert parsed["authorization"] == {
+        "cloud_write": False,
+        "full_dsa_or_8k": False,
+        "hlo_acquisition": False,
+        "launcher_invocation": False,
+        "persistence_only": True,
+        "tpu_compile": False,
+        "tpu_execution": False,
+    }
+    assert parsed["install"]["launcher_invoked"] is False
+    assert parsed["install"]["source_commit"] == (
+        "986378238ac6458307aea69ef1f5e12bf82bc020"
+    )
+    assert parsed["install"]["authority_commit"] == (
+        "4a786ecc01619dbe345114fa5cc47b83aa6469cb"
+    )
+    assert parsed["preconditions"] == {
+        "absolute_privilege_boundary": "/usr/bin/sudo",
+        "install_source_certificate_sha256": V3_ARTIFACT_SHA256,
+        "mirror_checkout_archive_sha256": (
+            "feab9bf7f6eee709a6ff16279e227f4870bc4f7e5357e36b387a95520364b2de"
+        ),
+        "provisioner_sha256": (
+            "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594"
+        ),
+        "sol_install_only_review": "APPROVE INSTALL ONLY",
+    }
+    postconditions = parsed["postconditions"]
+    assert postconditions["launcher_process_present"] is False
+    lease_recheck = postconditions["lease_recheck"]
+    assert lease_recheck["simultaneously_held_by_auditor"] is True
+    assert [record["path"] for record in lease_recheck["leases"]] == [
+        "/opt/glm-tpu/locks/glm_pod_workload.lock",
+        "/opt/glm-tpu/locks/glm_tpu_rsync.lock",
+        "/home/gianl/glm-run/.glm_pod_workload.lock",
+        "/home/gianl/.glm-tpu-rsync.lock",
+    ]
+    assert all(record["free"] is True for record in lease_recheck["leases"])
+    assert parsed["status"] == "IMMUTABLE_RUNTIME_V3_INSTALLED_NOT_INVOKED"
+    source_commit = parsed["install"]["source_commit"]
+    expected_members = {}
+    for name in parsed["installed_objects"]["source_capsule"]["members"]:
+        raw = subprocess.check_output(
+            [
+                "/usr/bin/git",
+                "-C",
+                str(ROOT),
+                "show",
+                f"{source_commit}:scripts/greenfield/{name}",
+            ]
+        )
+        expected_members[name] = sha256(raw).hexdigest()
+    assert parsed["installed_objects"]["source_capsule"]["members"] == (
+        expected_members
+    )
+    assert parsed["installed_objects"]["source_capsule"]["path"].endswith("install-v3")
+    assert parsed["installed_objects"]["runtime_capsule"]["members"] == {
+        name: expected_members[name]
+        for name in parsed["installed_objects"]["runtime_capsule"]["members"]
+    }
+    assert parsed["installed_objects"]["runtime_capsule"]["path"].endswith("hlo-v3")
+    assert (
+        parsed["installed_objects"]["launcher"]["sha256"]
+        == (expected_members["launch_gate_d_projection_contraction_pp16_hlo.py"])
+    )
+    assert parsed["installed_objects"]["launcher"]["path"].endswith("hlo_v3.py")
     ancestry = subprocess.run(
         [
             "/usr/bin/git",
