@@ -27,6 +27,10 @@ ANALYZER_VALIDATOR = (
     ROOT / "glm_tpu/greenfield/validation/"
     "gate_d_projection_contraction_hlo_acquisition_source.py"
 )
+ARTIFACT = (
+    ROOT / "docs/artifacts/gate-d-projection-contraction-hlo-acquisition-source.json"
+)
+ARTIFACT_SHA256 = "a94395ef13f5cfa7de7bc221fdc33d4498637a02ffc55d3cba985834dd99b93a"
 SOURCE_AUTHORITY = (
     ROOT / "docs/artifacts/gate-d-projection-contraction-pp16-source.json"
 )
@@ -459,3 +463,64 @@ print(int('glm_tpu' in sys.modules))
         f"{ANALYZER_VALIDATOR}\n"
         "0\n"
     )
+
+
+def test_source_artifact_replays_from_unchanged_descendant_source() -> None:
+    artifact = ARTIFACT.read_bytes()
+    assert len(artifact) == 2217
+    assert sha256(artifact).hexdigest() == ARTIFACT_SHA256
+    parsed = json.loads(artifact)
+    assert parsed["code_hash"] == "c686e6491387ae46ebfc468f401f79c7177ca0f5"
+    assert parsed["authorization"] == {
+        "compile_only_hlo_acquisition": False,
+        "full_dsa_or_8k": False,
+        "orchestration_or_install": False,
+        "persistence_only": True,
+        "tpu_execution": False,
+    }
+    assert parsed["gate_d_closed"] is False
+    environment = {
+        **os.environ,
+        "GLM_GATE_D_PROJECTION_HLO_SOURCE": "1",
+        "JAX_PLATFORMS": "cpu",
+        "JAX_PLATFORM_NAME": "cpu",
+    }
+    result = subprocess.run(
+        ["/home/gianl/vllm-env/bin/python", "-I", "-S", str(ANALYZER)],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stderr.decode()
+    replay = json.loads(result.stdout)
+    current_pin = subprocess.check_output(
+        ["/usr/bin/git", "-C", str(ROOT), "rev-parse", "HEAD"], text=True
+    ).strip()
+    assert replay["code_hash"] == current_pin
+    ancestry = subprocess.run(
+        [
+            "/usr/bin/git",
+            "-C",
+            str(ROOT),
+            "merge-base",
+            "--is-ancestor",
+            parsed["code_hash"],
+            current_pin,
+        ],
+        check=False,
+    )
+    assert ancestry.returncode == 0
+    replay["code_hash"] = parsed["code_hash"]
+    normalized = (
+        json.dumps(
+            replay,
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("ascii")
+    assert normalized == artifact

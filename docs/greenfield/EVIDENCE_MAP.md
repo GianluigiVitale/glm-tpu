@@ -3128,3 +3128,24 @@ execution is authorized by this source batch.
   TPU_CAUSALITY_UNPROVEN;GATE_D_OPEN`. It authorizes persistence only, not HLO acquisition, TPU
   compile/execution, performance, full DSA/8K or Gate-D closure. Exact next is a separately reviewed
   compile-only HLO acquisition boundary for this callable; no executable invocation is authorized.
+
+## 2026-09-01 projection-contraction HLO acquirer source certificate
+
+- Commit `c686e6491387ae46ebfc468f401f79c7177ca0f5` is exact on origin. The locked
+  `US-CENTRAL2` mirror passed strict connectivity and full-checkout equality with archive SHA-256
+  `6730f25458d88c343864488be28bd46d5e47cefe572370221e39a1f574966b23`.
+- The default-off acquirer has four abstract PP16 stage-zero inputs, three owner-preserving rooted
+  outputs, one `eval_shape`, one lowering and one compilation call. Its complete source audit finds
+  zero executable invocations and grants no numerical-execution authority.
+- The first committed analyzer at `afd54dc` failed before validator execution because an ordinary
+  package import reached `validation/__init__.py` and unavailable `ml_dtypes` under `python -I -S`.
+  No JAX/backend/TPU/cloud action occurred. The successor executes only the already snapshotted,
+  commit-matched validator bytes in a private namespace under exact canonical import finders.
+- Canonical certificate
+  `docs/artifacts/gate-d-projection-contraction-hlo-acquisition-source.json` is 2,217 bytes,
+  SHA-256 `a94395ef13f5cfa7de7bc221fdc33d4498637a02ffc55d3cba985834dd99b93a`.
+  Sol approved the import-boundary correction with no P0--P2.
+- Classification: `PROJECTION_HLO_ACQUIRER_SOURCE_ACCEPTED;ORCHESTRATION_UNPROVEN;
+  TPU_COMPILE_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`. Persistence only is
+  authorized. Exact next is a separately reviewed append-only publisher/wrapper and immutable
+  installer/launcher; no compile, execution, full DSA/8K or Gate-D closure exists.

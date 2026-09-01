@@ -9706,3 +9706,25 @@ import-provenance attacks were added. The source pin is exact on origin and the 
 This is source/persistence evidence only: HLO acquisition, TPU compile/execution, full DSA/8K,
 performance and Gate-D closure remain false. Exact next is a separately reviewed compile-only HLO
 acquisition design for this projection-only callable; do not execute it or the complete decoder.
+
+## 2026-09-01 projection-contraction HLO acquirer source persisted
+
+The default-off compile-only acquirer and its persistence analyzer are committed at
+`c686e6491387ae46ebfc468f401f79c7177ca0f5`, exact on origin and on the locked `US-CENTRAL2`
+mirror (full-checkout archive SHA-256 `6730f25458d88c343864488be28bd46d5e47cefe572370221e39a1f574966b23`).
+It binds four abstract PP16 stage-zero inputs and three owner-preserving outputs, with exactly one
+`eval_shape`, lower and compile call and zero executable invocations.
+
+An initial isolated analyzer invocation at predecessor `afd54dc` stopped before validator/JAX/backend
+work because importing the validation package required unavailable `ml_dtypes` under `-I -S`.
+The corrected analyzer directly executes only the snapshotted, commit-matched validator bytes in a
+private namespace and requires the exact canonical import finders. Sol approved the correction with
+no P0--P2. Canonical artifact
+`docs/artifacts/gate-d-projection-contraction-hlo-acquisition-source.json` is 2,217 bytes, SHA-256
+`a94395ef13f5cfa7de7bc221fdc33d4498637a02ffc55d3cba985834dd99b93a`.
+
+Classification is `PROJECTION_HLO_ACQUIRER_SOURCE_ACCEPTED;ORCHESTRATION_UNPROVEN;
+TPU_COMPILE_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`. No JAX/backend/HLO acquisition,
+TPU/cloud/model/numerical/performance/full-DSA/8K work occurred. Exact next is source-only design,
+hostile validation and persistence of a separate append-only publisher/wrapper plus immutable
+installer/launcher. Do not compile or execute before that boundary is independently approved.
