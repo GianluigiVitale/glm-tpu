@@ -1,6 +1,34 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-08-31 UTC
+**Updated:** 2026-09-01 UTC
+
+## 2026-09-01 Gate-D recovery prerequisite correction after Sol block; no execution
+
+- Live read-only preflight confirms `/opt/glm-tpu/locks` and the installed recovery controller are
+  absent; `/opt/glm-tpu/bin` is root-owned mode 0755. The sole user crontab entry is still the
+  exact legacy rsync command using `/home/gianl/.glm-tpu-rsync.lock`. The pod host is worker 0.
+- Sol withheld frozen snapshot `8697ef1e...` before persistence: its provisioner executed from the
+  writable worktree, legacy pathname identities were not retained through cron handoff, privileged
+  install accepted a caller-rebound hash, and evidence publication did not retain its parent/name.
+  That snapshot was never installed or run.
+- Corrected default-off controller `b3cf1f72...e969a` must execute from exact root-owned two-file
+  bundle `457e7933...3aad` at `/opt/glm-tpu/gate-d-repository-prerequisites-v1`, with system Python
+  `-I -S -B`, exact cwd/environment and retained source FDs matching the clean committed/origin pin.
+  It holds and repeatedly revalidates both legacy parent/name/inode leases, creates/acquires the
+  root-owned immutable leases, authenticates worker 0 plus eight unique worker receipts, and adopts
+  only the exact known cron state. The passwordless-sudo same UID is explicitly a trusted admin,
+  not a hostile security boundary; descriptor checks protect operational races and drift.
+- The controller invokes root helper `13dc4f85...f68f` only through exact sanitized
+  `/usr/bin/sudo /usr/bin/env -i /usr/bin/python3 -I -S -B`; the helper validates root,
+  interpreter, every stated flag including `sys.dont_write_bytecode`, and environment. It
+  hard-binds recovery controller `fd8950de...b2225` at
+  exactly 44,013 bytes; caller-rebound arbitrary bytes reject. Evidence uses a retained validated
+  parent and created FD, exact named inode/hash replay and parent fsync.
+- Focused tests `b150ea6a...3a5c` pass 11/11; the recovery, HLO-wrapper and inventory suite passes
+  91/91. Ruff, formatting, compilation, JSON and diff checks pass. This corrected batch remains
+  unreviewed source only: no root path, crontab, repository, bucket, JAX/backend, HLO, model or TPU
+  changed. Exact next is same-scope Sol correction review because Fable remains usage-blocked;
+  source persistence, immutable-bundle installation and invocation remain separate boundaries.
 
 ## 2026-08-31 Gate-D repository recovery corrected after two Sol blocks; no execution
 

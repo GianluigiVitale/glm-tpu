@@ -2550,3 +2550,16 @@ remains open and no TPU successor is authorized.
   source hashes replay from the locked `US-CENTRAL2` mirror. Source is reviewed/persisted but
   uninstalled. Root-lock/controller provisioning and cron adoption are not performed; no recovery,
   JAX/backend, HLO, model or TPU work is authorized.
+
+Sol withheld first prerequisite snapshot `8697ef1e...` before persistence or execution because its
+running source, legacy handoff, privileged install allowlist and evidence parent/name were not
+strong enough. The corrected two-file install bundle `457e7933...3aad` remains unreviewed and
+uninstalled. Root helper `13dc4f85...f68f`, default-off controller `b3cf1f72...e969a` and tests
+`b150ea6a...3a5c` hard-bind the 44,013-byte recovery controller, require an exact root-owned
+installed source/cwd/interpreter/environment with retained source FDs, retain and revalidate every
+lock parent/name/inode around exact cron adoption, and publish evidence through retained validated
+FDs with named-inode/hash replay and parent fsync. The same passwordless-sudo UID is explicitly a
+trusted administrator, not a hostile boundary. The helper explicitly enforces `-B` through
+`sys.dont_write_bytecode`. Focused tests pass 11/11 and the adjacent protected boundary passes
+91/91. These are source/test facts, not review approval or runtime evidence; no
+root path, cron, repository, bucket, JAX/backend, HLO, model or TPU state changed.
