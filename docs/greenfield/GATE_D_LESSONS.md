@@ -1093,3 +1093,10 @@ normalized-state cause.
   optimization barriers—and require the immutable parser to reproduce the new expectation. Emit
   compact expected/observed fields instead of one aggregate `validator result drifted` message so
   the first failed bounded run identifies the precise stale invariant.
+- A canonical, self-hashed local terminal is not status authority after its trusted publisher exits
+  when the run directory remains same-UID mutable: both terminal and receipt can be replaced with a
+  self-consistent opposite result. Cross the status and remote terminal identity directly from the
+  immutable publisher process after final upload/replay (or retain an authenticated descriptor),
+  then treat reopened local names as supplementary consistency checks only. Attack-test local
+  substitution after publisher return; it may cause fail-closed denial but must never flip the
+  remote accepted/rejected result.

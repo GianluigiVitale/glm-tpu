@@ -657,6 +657,28 @@ def _prepare_success(
     return payload
 
 
+def _result_authority_line(
+    status: str,
+    marker_sha256: str,
+    terminal_record: Mapping[str, Any],
+) -> str:
+    generation = terminal_record.get("generation")
+    terminal_sha256 = terminal_record.get("sha256")
+    if (
+        status not in {"NUMERICAL_ACCEPTED", "NUMERICAL_REJECTED"}
+        or not re.fullmatch(r"[0-9a-f]{64}", marker_sha256)
+        or type(generation) is not str
+        or not re.fullmatch(r"[0-9]+", generation)
+        or type(terminal_sha256) is not str
+        or not re.fullmatch(r"[0-9a-f]{64}", terminal_sha256)
+    ):
+        raise RuntimeError("projection numerical result authority drifted")
+    return (
+        f"NUMERICAL_RESULT status={status} marker_sha256={marker_sha256} "
+        f"terminal_generation={generation} terminal_sha256={terminal_sha256}"
+    )
+
+
 def _publish_success(
     base: Any,
     run_dir: Path,
@@ -666,7 +688,7 @@ def _publish_success(
     elapsed: int,
     publication_runtime_raw: bytes,
     run_dir_fd: int,
-) -> None:
+) -> str:
     run_tag = base.validate_run_dir(run_dir)
     run_fd = base._run_fd(run_dir, run_dir_fd)
     try:
@@ -757,6 +779,11 @@ def _publish_success(
             raise RuntimeError(
                 "projection numerical terminal receipt inventory drifted"
             )
+        return _result_authority_line(
+            runner["status"],
+            marker["marker_payload_sha256"],
+            terminal_record,
+        )
     finally:
         os.close(run_fd)
 
@@ -905,14 +932,17 @@ def main() -> int:
             flush=True,
         )
     elif arguments.mode == "success":
-        _publish_success(
-            base,
-            arguments.run_dir,
-            arguments.remote_prefix,
-            code_pin=arguments.expected_code_hash,
-            elapsed=arguments.elapsed,
-            publication_runtime_raw=publication_runtime_raw,
-            run_dir_fd=arguments.run_dir_fd,
+        print(
+            _publish_success(
+                base,
+                arguments.run_dir,
+                arguments.remote_prefix,
+                code_pin=arguments.expected_code_hash,
+                elapsed=arguments.elapsed,
+                publication_runtime_raw=publication_runtime_raw,
+                run_dir_fd=arguments.run_dir_fd,
+            ),
+            flush=True,
         )
     elif arguments.mode == "diagnostic":
         _publish_diagnostic(

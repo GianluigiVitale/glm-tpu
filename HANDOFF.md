@@ -9878,3 +9878,68 @@ cover every counterexample. Sol verified staged diff `d056bb92...0250` and retur
 No numerical, performance, full DSA/8K or Gate-D closure authority exists. Exact next is
 commit/push and locked `US-CENTRAL2` mirror; only then separately review and run the bounded
 numerical discriminator.
++
+## 2026-09-01 immediate-stop checkpoint: numerical launch boundary remains unreviewed
+
+Commit `f762a28899b812b43f321c4e56bfc2f94f0a9811` is exact on HEAD/origin and the locked
+`US-CENTRAL2` repository mirror. It persists the independently reviewed numerical publisher;
+the numerical discriminator runner was already persisted at `0f31735929d11d9346890ca7b53c7c4f46635e64`.
+No numerical launcher was installed or invoked and no TPU work followed the HLO compile.
+
+A seven-file orchestration/install source batch exists only as staged/uncommitted work. Sol blocked
+it twice: first because the wrapper expected obsolete `NUMERICAL_ACCEPTED/REJECTED` filenames
+while the publisher writes `NUMERICAL_RESULT`; after that was fixed, Sol found the wrapper could
+reopen status from replaceable user-owned local terminal names after the trusted publisher exited.
+Neither blocked review grants persistence, install or execution authority.
+
+At the user-requested stop, unstaged WIP changes the immutable publisher to emit one exact stdout
+authority containing status, marker SHA-256, remote terminal generation and terminal SHA-256 after
+remote replay/receipt creation. The wrapper captures that authority and requires its supplementary
+local terminal/receipt verifier to match. This last change is **unreviewed and untested**. Current
+worktree source hashes are publisher `a53f051b...d962` and wrapper `ea06e4d5...d58`; the staged
+launcher/installer/analyzer still pin older hashes and are deliberately stale. Cached diff SHA
+`756a01b5...1a8f` and unstaged diff SHA `d897b3ff...14b2` are diagnostic only, not approved
+authorities.
+
+Exact resume: add a substitution regression proving replaced local names cannot flip the direct
+publisher authority; finish publisher/wrapper tests; repin wrapper→launcher→installer/analyzer;
+run Bash/Ruff and the complete focused suite; stage one exact diff and obtain Sol delta approval.
+Only then commit/push/locked same-region mirror, generate/persist the source certificate, and begin
+separate install-only and fresh-tag reviews. **Do not install, launch, compile, execute full DSA/8K,
+or claim Gate D/performance from this checkpoint.**
+The complete tracked/untracked-index WIP diff is backed up at `gs://driftbench-dsv4-uc/repos/wip/glm-tpu-gate-d-pp16-numerical/paused-20260901T225431Z.patch`;
+it is recovery evidence only and carries no review or execution authority.
+
+## 2026-09-01 numerical orchestration correction: direct publisher authority and substitution regression
+
+Correction to both Sol P1 blocks on the seven-file numerical orchestration batch. The immutable
+publisher's `success` mode now returns, and `main` prints, exactly one line
+`NUMERICAL_RESULT status=<ACCEPTED|REJECTED> marker_sha256=<64hex> terminal_generation=<ASCII digits>
+terminal_sha256=<64hex>` only after the remote terminal replay and local receipt inventory check;
+`_result_authority_line` refuses any other status, non-hex identity, or non-ASCII-digit generation.
+The wrapper captures that stdout as the only status authority (`readonly result_status` from the
+anchored `BASH_REMATCH`), exits 2 with `publisher authority drifted` on any other output (bare
+legacy status, empty, extra/prefix lines, case drift), then runs the local terminal/receipt
+verifier only as a supplementary consistency check and exits 2 with `local/remote authority
+mismatch` when it disagrees. No reopened local filename feeds the dispatched status.
+
+Executed regressions (`test_run_gate_d_projection_contraction_pp16_numerical_wrapper.py`) run the
+wrapper's exact dispatch segment under `bash --noprofile --norc` with a stubbed publisher and fd 7 on
+a fixture directory: same-UID replacement of `NUMERICAL_RESULT` plus receipt with a self-consistent
+opposite status (both directions) is accepted by the local verifier alone yet denied by the wrapper
+with no dispatch; receipt-generation substitution is denied; both genuine outcomes dispatch; a
+failing publisher exits 1. Publisher unit tests cover `_result_authority_line` acceptance for both
+statuses and eleven unbound-identity rejections, and a source-order test binds the authority return
+after the receipt inventory check and `print(_publish_success(...))`.
+
+Hash cascade repinned publisher→wrapper→launcher→installer→analyzer: publisher
+`6ead9e1358b00a1349ba46d08dbd0d4b304fd783d7da5991cb54e87ae34de0ff`, wrapper
+`16e348e36faa95d022ec21d8eed03c34451bc772d6b911a7d8c609ba749d6250`, launcher
+`755c60fb3a878d0a22f708325130e4deaf9982d7b88ad4bf3ef1e854039d1cc6`, installer
+`72c1bb1fb4fe8b71f102e02f99d74e3bd663fdae1e2d8448c27cc3f42448d538`, analyzer
+`508b95c92a0790e64806aefb6bc20a491d7c31a76cbdfdda0e76a44715c9fd84`; no prior pin remains anywhere
+in tracked py/sh/json/md. Validation: `bash -n` wrapper OK, `ruff format --check` and `ruff check`
+clean on all nine batch files, focused suite 74/74 passed. Source-batch staged diff SHA-256 (nine
+source/test files, docs excluded) is `59b8552be522b7791c544ae1fa2ab780489b87a3fa973c66c00c72b668a87d5e`.
+This is source correction only: no install, launcher, compile, TPU execution, full DSA/8K, numerical,
+performance or Gate-D claim. Persistence requires the Sol delta verdict recorded below.

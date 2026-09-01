@@ -3366,3 +3366,36 @@ persistence only; review and persistence precede any v2 installation.
   TPU_NUMERICAL_UNPROVEN;HLO_ACQUIRED_TERMINAL_VERIFIED;GATE_D_OPEN`. This authorizes persistence
   only. Exact next after commit/push and locked same-region mirror is a separately reviewed bounded
   numerical discriminator; full DSA/8K and performance remain unauthorized.
++
+## 2026-09-01 immediate-stop numerical-orchestration checkpoint
+
+- Persisted authority is commit `f762a28899b812b43f321c4e56bfc2f94f0a9811`, exact on origin
+  and the locked `US-CENTRAL2` mirror; it contains the reviewed numerical publisher. No numerical
+  launcher/install/TPU execution exists.
+- The orchestration/install source batch is staged but uncommitted. Sol blocked obsolete local
+  terminal filenames, then blocked mutable post-publisher local-terminal substitution. Both are P1;
+  no prior review/hash authorizes persistence or execution.
+- Unreviewed WIP now has the immutable publisher emit status plus marker/remote-terminal identity
+  directly on stdout and makes the local terminal/receipt verifier supplementary. Publisher SHA is
+  `a53f051b...d962`; wrapper SHA is `ea06e4d5...d58`. Downstream launcher/installer/analyzer pins
+  are stale, and the last correction has not run tests or review.
+- Exact next: substitution attack test; full hash cascade; Bash/Ruff/focused tests; one exact staged
+  Sol delta review; commit/push/mirror; certificate; separate install-only review; install without
+  launch; separate fresh-tag review; one bounded execution and adjudication.
+- Classification: `NUMERICAL_ORCHESTRATION_WIP_UNREVIEWED;INSTALL_UNAUTHORIZED;
+  TPU_EXECUTION_UNAUTHORIZED;FULL_DSA_8K_UNAUTHORIZED;GATE_D_OPEN`.
+- Recovery-only WIP patch: `gs://driftbench-dsv4-uc/repos/wip/glm-tpu-gate-d-pp16-numerical/paused-20260901T225431Z.patch`; never treat it as an approved source pin.
+
+## 2026-09-01 numerical-orchestration correction awaiting delta review
+
+- Publisher `success` emits one anchored `NUMERICAL_RESULT status=… marker_sha256=…
+  terminal_generation=… terminal_sha256=…` authority line after terminal replay/receipt; the wrapper
+  dispatches only from it and treats the reopened local terminal/receipt as a supplementary check
+  that can deny but never flip. Executed substitution regressions (opposite-status replacement both
+  directions, receipt-generation replacement, seven non-authority publisher outputs, publisher
+  failure) and publisher unit tests pass; focused suite 74/74; Ruff and `bash -n` clean.
+- Hash chain: publisher `6ead9e13…e0ff`, wrapper `16e348e3…6250`, launcher `755c60fb…1cc6`,
+  installer `72c1bb1f…d538`, analyzer `508b95c9…fd84`. Source-batch staged diff
+  `59b8552b…7d5e`.
+- Classification unchanged: `NUMERICAL_ORCHESTRATION_CORRECTED;REVIEW_PENDING;INSTALL_UNAUTHORIZED;
+  TPU_EXECUTION_UNAUTHORIZED;FULL_DSA_8K_UNAUTHORIZED;GATE_D_OPEN`.

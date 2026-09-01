@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import zipfile
 from hashlib import sha256
 from pathlib import Path
@@ -203,3 +204,62 @@ def test_exact_hardened_base_loads_from_current_commit() -> None:
 def test_npy_parser_rejects_non_npy() -> None:
     with pytest.raises(RuntimeError, match="header"):
         MODULE._parse_npy(b"not-npy")
+
+
+def _terminal_record(**overrides: object) -> dict[str, object]:
+    record: dict[str, object] = {
+        "crc32c": "AAAAAA==",
+        "generation": "1788300000000001",
+        "path": "NUMERICAL_RESULT",
+        "sha256": "2" * 64,
+        "size": 512,
+    }
+    record.update(overrides)
+    return record
+
+
+def test_result_authority_line_binds_status_marker_and_terminal_identity() -> None:
+    for status in ("NUMERICAL_ACCEPTED", "NUMERICAL_REJECTED"):
+        line = MODULE._result_authority_line(status, "1" * 64, _terminal_record())
+        assert line == (
+            f"NUMERICAL_RESULT status={status} marker_sha256={'1' * 64} "
+            f"terminal_generation=1788300000000001 terminal_sha256={'2' * 64}"
+        )
+        assert "\n" not in line
+        assert line.isascii()
+
+
+@pytest.mark.parametrize(
+    ("status", "marker_sha256", "record"),
+    [
+        ("NUMERICAL_UNKNOWN", "1" * 64, _terminal_record()),
+        ("", "1" * 64, _terminal_record()),
+        ("NUMERICAL_ACCEPTED", "1" * 63, _terminal_record()),
+        ("NUMERICAL_ACCEPTED", "A" * 64, _terminal_record()),
+        ("NUMERICAL_ACCEPTED", "1" * 64, _terminal_record(generation="")),
+        ("NUMERICAL_ACCEPTED", "1" * 64, _terminal_record(generation="12a")),
+        ("NUMERICAL_ACCEPTED", "1" * 64, _terminal_record(generation="١٢")),
+        ("NUMERICAL_ACCEPTED", "1" * 64, _terminal_record(generation=1788300000000001)),
+        ("NUMERICAL_ACCEPTED", "1" * 64, _terminal_record(sha256="g" * 64)),
+        ("NUMERICAL_ACCEPTED", "1" * 64, _terminal_record(sha256=None)),
+        ("NUMERICAL_ACCEPTED", "1" * 64, {}),
+    ],
+)
+def test_result_authority_line_rejects_unbound_identity(
+    status: str, marker_sha256: str, record: dict[str, object]
+) -> None:
+    with pytest.raises(RuntimeError, match="result authority drifted"):
+        MODULE._result_authority_line(status, marker_sha256, record)
+
+
+def test_success_mode_prints_direct_authority_after_terminal_receipt() -> None:
+    source = PUBLISHER.read_text(encoding="utf-8")
+    receipt = source.index('"terminal_upload_receipt.json"')
+    inventory = source.index(
+        "projection numerical terminal receipt inventory drifted", receipt
+    )
+    authority = source.index("return _result_authority_line(", inventory)
+    assert receipt < inventory < authority
+    assert source.count("return _result_authority_line(") == 1
+    assert re.search(r"print\(\s*_publish_success\(", source) is not None
+    assert source.count("_publish_success(") == 2
