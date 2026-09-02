@@ -3512,3 +3512,11 @@ persistence only; review and persistence precede any v2 installation.
   analyzer + package modules; tests 70/2 skipped; certificate
   `gate-d-layer1-rms-schedule-orchestration-certificate.json`. Classification
   `…INSTALL_SOURCE_ACCEPTED;INSTALL_UNAUTHORIZED;TPU_NUMERICAL_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`.
+
+## 2026-09-02 bounded TPU: accepted RMS schedule arm exact (diagnostic archive)
+
+- Tag `gate_d_layer1_rms_schedule_20260902T061305905714981Z`, pin `839c8fb7`: `runner.json` `aa1970dcf0607ee988fed26705b2ba3c20526633adb5fb19985c894764cda281`, `outputs.npz` `a8ef84f16bf80f5bddc6ba1002bbe6b02ed4db831e90eaa2f08d663a58a0f59b`;
+  control == DB548 `9b52a04e…`, schedule arm == accepted `9936ee1e…` (0/6,144), schedule vs DB548 one
+  mismatch at 2795; both HLO contracts passed; censuses 8/8; remote `diagnostic/` terminal only.
+- Classification: `BOUNDED_TPU_LAYER1_RMS_SCHEDULE_ARM_EXACT;DIAGNOSTIC_ARCHIVE_ONLY;
+  PUBLICATION_REFUSED_BY_STALE_PUBLISHER_CONSTANT;DECODER_UNPROVEN;GATE_D_OPEN`.

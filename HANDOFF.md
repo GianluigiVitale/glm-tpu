@@ -10524,3 +10524,39 @@ and
 literal execute-once command (mid-window, after lease/vacancy recheck):
 `/usr/bin/env -i GLM_GATE_D_LAYER1_RMS_SCHEDULE=1 GLM_GATE_D_LAYER1_RMS_SCHEDULE_MODE=execute_once GLM_GATE_D_LAYER1_RMS_SCHEDULE_TAG=gate_d_layer1_rms_schedule_20260902T061305905714981Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin:/home/gianl/vllm-env/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v2.py`
 The v1 capsule and launcher remain installed, unused and inert.
+
+## 2026-09-02 BOUNDED TPU RESULT: the accepted RMS reduce schedule reproduces the accepted layer-1 row exactly
+
+Sol approved v2 (`APPROVE PERSISTENCE 839c8fb7`, `APPROVE INSTALL ONLY`, `APPROVE EXECUTE ONCE gate_d_layer1_rms_schedule_20260902T061305905714981Z
+839c8fb7`). Both install commands exited 0 (capsule `gate-d-layer1-rms-schedule-v2`: driver
+`48b3e383…`, publisher `b3ec837e…`, verifier `09120816…`; launcher `169c4385…`; identities verified
+against the committed blobs). Launched mid-window at 06:20:5xZ: the root-owned launcher sealed the
+wrapper, held the four leases, replayed the mirror closure of pin `839c8fb7`, passed pre-census 8/8,
+and the immutable driver compiled and executed both arms on the four local TPU-v4 chips in 17 s.
+
+**Result (`runner.json` SHA `aa1970dcf0607ee988fed26705b2ba3c20526633adb5fb19985c894764cda281`, `outputs.npz` SHA `a8ef84f16bf80f5bddc6ba1002bbe6b02ed4db831e90eaa2f08d663a58a0f59b`):**
+`status=SCHEDULE_ARM_EXACT`. Control arm output SHA `9b52a04e…` == DB548 (0/6,144 mismatches);
+accepted-schedule arm output SHA `9936ee1e…` == the accepted legacy row (0/6,144 mismatches);
+schedule arm vs DB548: exactly one mismatch at 2795. Both arms passed the StableHLO and optimized-HLO
+contracts; the schedule arm carries exactly one `f32[32]` scheduled reduction with the accepted
+backend window. On real hardware, feeding the same FP32 carry through the accepted
+`f32[32,6144]{T(8,128)} -> f32[32]` variance reduce lands the scale in the accepted window and
+removes the layer-1 one-ULP miss that has blocked exact DSA at event 1 since 2026-08-13.
+
+Publication then failed closed: the cloned publisher's `EXPECTED_COMPILER_ENVIRONMENT` still named
+the V3 driver flag (`GLM_GATE_D_PROJECTION_CONTRACTION_NUMERICAL`) while the driver's environment
+carries `GLM_GATE_D_LAYER1_RMS_SCHEDULE`, so `_validate_dependencies` raised "dependency authority
+drifted" before the SUCCESS-last upload. The wrapper published the bounded diagnostic instead
+(`diagnostic/` under the tag: runner.json, outputs.npz, dependencies.json, both arms' HLO, censuses,
+mirror, vacancy, sync, failure_status.json, orchestrator.failure.log; `diagnostic_objects.json` is
+the remote terminal). Post-census 8/8 clean. There is no `NUMERICAL_RESULT`, no SUCCESS, no DB row,
+no performance claim; the tag `gate_d_layer1_rms_schedule_20260902T061305905714981Z` is burned. Classification:
+`BOUNDED_TPU_LAYER1_RMS_SCHEDULE_ARM_EXACT;DIAGNOSTIC_ARCHIVE_ONLY;PUBLICATION_REFUSED_BY_STALE_PUBLISHER_CONSTANT;
+DECODER_UNPROVEN;GATE_D_OPEN`.
+
+Consequence for Gate D: the production fix is now concrete and general — compute every decoder RMS
+variance with the accepted schedule (FP32 carry, M32 operand behind an FP32 barrier, reduce dims={1},
+row 0), default-off behind a flag, with an HLO contract counting `f32[32]` scheduled reductions, and
+rerun the 8K exact-DSA run. Next: fix the publisher constant with a regression test against these real
+run records, repin as v3 for a sealed SUCCESS re-run if Sol requires it, and in parallel implement the
+decoder change.

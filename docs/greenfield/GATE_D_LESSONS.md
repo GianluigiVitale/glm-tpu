@@ -1146,3 +1146,10 @@ normalized-state cause.
   residual stream is carried in FP32 (no BF16 rounding between attention and MLP) and
   `normalized.astype(bf16) * weight` is emitted with a single rounding. A CPU replay that rounds
   where the source says to round is 1,000–2,000 elements off and proves nothing.
+- The layer-1 one-ULP miss was the variance-reduce schedule, not the data: on TPU the same FP32 carry
+  reduced as `f32[32,6144]{T(8,128)} -> f32[32]` (the accepted program's shape) reproduces the
+  accepted row bit-for-bit, while the single-row `f32[1,1,6144] -> f32[]` reduce lands 1–4 ulps low.
+  Match the accepted program's reduce *shape and layout*, not just its arithmetic.
+- When cloning a hardened chain, every constant that encodes identity (environment maps, install
+  paths, version suffixes, expected dependency records) must be covered by a cross-file consistency
+  test or a test against real run records; two approved starts were lost to literals no test read.
