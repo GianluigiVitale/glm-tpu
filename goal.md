@@ -36,20 +36,20 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-02 16:00Z
+## Resume checkpoint — 2026-09-02 23:00Z
 
-Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical` HEAD `b8549a03`; run pin = rewrite merge
-`906f3810` (pushed, mirrored, rewrite goal.md byte-identical to ba7d1e72). Flag
-`GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1`: hidden-width (157) + kv-a (78) norms on the proven
-`f32[32,W]->f32[32]` schedule; fused q-a norm keeps the legacy sharded reduction (its [32,2048]
-version flipped DSA event 0). Contracts bind every `rsqrt` lineage, the census (235/78), lineage-bound
-dead-row carry allowances, on all three programs. Today: 3 runs refused before execution (fixed), 1
-executed — token at 8155 exact, DSA event 0 one swap (q-a cause), event 1 = 9 (baseline 6); 1 sync
-transient. Launch: `env -i … RMS_ACCEPTED_SCHEDULE=1 DSA_ROPE_TABLE=0 SHORT_DECODER_TAG=<Sol-approved
-fresh tag> bash scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from the rewrite worktree,
-mid-window, after mirror verifier + fleet/lease/vacancy/health; every tag needs Sol `APPROVE EXECUTE
-ONCE`. Running: tag `…_ras_…_20260902T155131089617216Z`. Accept only exact tokens + all DSA
-contracts + protections + 8/8 cleanup.
+Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical`; run pin = rewrite merge `086d459a` (pushed,
+mirrored; rewrite goal.md byte-identical to ba7d1e72). `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1` = 157
+hidden-width norms on the proven `f32[32,W]->f32[32]` schedule; q-a sharded, kv-a single-row (own
+contract kinds, N82 DAG bound); census 157/78/78 mandatory. Three executed 8K runs: token at 8155 exact
+each time; event 0 exact with sharded q-a; **event 1 = 7 mismatches (same set) with hidden-width only
+or +kv-a, baseline 6** → the schedule fix is not sufficient. Do NOT launch on this hypothesis. Next
+(offline, CPU): (a) size event-1 score deltas (observer npz `bf3ff47e…` vs legacy dsa_events oracle);
+(b) diff live layer-1 RMS reduce fusions (archived HLO of tag …213510823966642Z) vs the bounded arm
+`%multiply_reduce_fusion`. Then one Sol batch (incl. staged runner fetch retry) and one run. Launch:
+`env -i … RMS_ACCEPTED_SCHEDULE=1 DSA_ROPE_TABLE=0 SHORT_DECODER_TAG=<approved tag> bash
+scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from the rewrite worktree after mirror verifier
++ fleet/lease/vacancy/health; pre-fetch workers first.
 
 ## Finish (after Gate D)
 
