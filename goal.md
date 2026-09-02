@@ -43,17 +43,15 @@ REFUTED at engine level**: protected 8K run `…mainrope_dr_…_20260902T0213460
 `ba7d1e72`, `GLM_GREENFIELD_DSA_ROPE_TABLE=1`) failed closed at exact DSA. Without the table
 (2026-08-28 run) event 0/layer 0 was bit-exact vs the legacy oracle; with it, layer-0 scores move
 ≤2.6e-3 (query, position 0 too) while event 1/layer 1 is unchanged (6 swaps, mean |Δscore| 0.0148
-in both runs). Legacy indexer computes `jnp.cos/sin` on device (`glm_dsa_indexer.py:1078`).
-Artifact `gate-d-dsa-rope-table-8k-refusal-adjudication.json` `0f7c36d2…`. Censuses 8/8; no
-SUCCESS/DB. `dsa_rope_table` stays default-off; never relaunch with it.
+in both runs). Legacy indexer computes `jnp.cos/sin` on device (`glm_dsa_indexer.py:1078`). Artifact
+`gate-d-dsa-rope-table-8k-refusal-adjudication.json` `0f7c36d2…`. `dsa_rope_table` stays off.
 
-Consequence: the layer-1 divergence arises between the exact layer-0 DSA event and the layer-1
-indexer input (layer-0 attention output / MoE / residual), at bf16-rounding scale (~1e-3 rel).
+Consequence: the layer-1 divergence arises in the layer-0 output path (attention output / MoE /
+residual) at bf16-rounding scale (~1e-3 rel), not in rotary.
 
 Exact next (no TPU launch): reread the Compass artifact; adjudicate its hidden-state hypotheses
-against existing layer-0 discriminator/ingredient artifacts, DSA internal observer and layer-1
-internal reference; pick one discriminator isolating the layer-0→1 hidden-state delta; one batched
-Sol review of this refusal record plus that plan before any run.
+against existing layer-0 discriminator/ingredient artifacts and the layer-1 internal reference;
+pick one discriminator isolating the layer-0→1 delta; batched Sol review before any run.
 
 ## Finish (after Gate D)
 
