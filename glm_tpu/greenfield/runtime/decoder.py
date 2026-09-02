@@ -2712,86 +2712,71 @@ def _rms_schedule_resolve_structural(
     return None
 
 
-_N82_OPERAND_PASSTHROUGH = frozenset(
-    {
-        "bitcast",
-        "bitcast-convert",
-        "reshape",
-        "copy",
-        "convert",
-        "broadcast",
-        "multiply",
-        "dynamic-slice",
-        "slice",
-        "get-tuple-element",
-        "transpose",
-    }
-)
-
-
-def _rms_schedule_operand_leaves(
+def _rms_schedule_body_element(
     module: HloModule,
     by_key: dict[tuple[str, str], HloInstruction],
     value: HloInstruction | None,
     *,
     body_id: str,
-    limit: int = 64,
-) -> tuple[list[HloInstruction], list[str]]:
-    """Collect the body-parameter loop elements an operand is computed from.
+    passthrough: frozenset[str],
+) -> tuple[HloInstruction | None, int | None]:
+    """Resolve to a loop-carried element (gte of the body parameter) or (None, None)."""
 
-    The walk crosses the dequant/structural opcodes of the N82 primitive and
-    fusion boundaries; constants are dropped; every other opcode is reported as
-    a foreign source.  Leaves are ``get-tuple-element`` instructions of the loop
-    body parameter (loop-carried elements).
+    leaf = _rms_schedule_resolve_structural(
+        module, by_key, value, passthrough=passthrough, stop=frozenset({"get-tuple-element"})
+    )
+    if leaf is None or leaf.opcode != "get-tuple-element" or not leaf.operand_names:
+        return None, None
+    source = by_key.get((leaf.computation, leaf.operand_names[0]))
+    index_match = re.search(r"\bindex=([0-9]+)", leaf.raw_line)
+    if (
+        source is None
+        or source.opcode != "parameter"
+        or _rms_schedule_computation_id(source.computation) != body_id
+        or index_match is None
+    ):
+        return None, None
+    return leaf, int(index_match.group(1))
+
+
+def _rms_schedule_indexed_loop_slice(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    value: HloInstruction | None,
+    *,
+    body_id: str,
+    passthrough: frozenset[str],
+    element_shape: tuple[str, tuple[int, ...]],
+) -> tuple[int | None, int | None, str | None]:
+    """Resolve to ``dynamic-slice(loop element, loop index, 0, 0)``.
+
+    Returns (element index, loop index element, problem).
     """
 
-    leaves: list[HloInstruction] = []
-    foreign: list[str] = []
-    seen: set[int] = set()
-    stack = [value]
-    steps = 0
-    while stack and steps < limit:
-        steps += 1
-        current = stack.pop()
-        if current is None:
-            foreign.append("unresolved")
-            continue
-        if current.index in seen:
-            continue
-        seen.add(current.index)
-        opcode = current.opcode
-        if opcode == "constant":
-            continue
-        if opcode == "get-tuple-element" and current.operand_names:
-            source = by_key.get((current.computation, current.operand_names[0]))
-            if source is not None and source.opcode == "parameter" and _rms_schedule_computation_id(source.computation) == body_id:
-                leaves.append(current)
-                continue
-            stack.append(source)
-            continue
-        if opcode == "parameter":
-            index_match = re.search(r"\bparameter\(([0-9]+)\)", current.raw_line)
-            caller = _rms_schedule_caller(module, current.computation)
-            if caller is None or index_match is None:
-                foreign.append(f"parameter:{current.name}")
-                continue
-            index = int(index_match.group(1))
-            if index >= len(caller.operand_names):
-                foreign.append(f"parameter:{current.name}")
-                continue
-            stack.append(by_key.get((caller.computation, caller.operand_names[index])))
-            continue
-        if opcode == "fusion":
-            stack.append(_rms_schedule_callee_root(module, current))
-            continue
-        if opcode in _N82_OPERAND_PASSTHROUGH:
-            for name in current.operand_names:
-                stack.append(by_key.get((current.computation, name)))
-            continue
-        foreign.append(f"{opcode}:{current.name}")
-    if steps >= limit:
-        foreign.append("depth")
-    return leaves, foreign
+    sliced = _rms_schedule_resolve_structural(
+        module, by_key, value, passthrough=passthrough, stop=frozenset({"dynamic-slice"})
+    )
+    if sliced is None or sliced.opcode != "dynamic-slice" or len(sliced.operand_names) < 2:
+        return None, None, f"not a dynamic slice ({sliced.opcode if sliced is not None else None})"
+    element, element_index = _rms_schedule_body_element(
+        module, by_key, by_key.get((sliced.computation, sliced.operand_names[0])),
+        body_id=body_id, passthrough=frozenset({"bitcast", "reshape", "copy"}),
+    )
+    if element is None or not any(
+        (shape.dtype, shape.dimensions) == element_shape for shape in element.result_shapes
+    ):
+        return None, None, f"slice source is not the loop-carried {element_shape[0]}{list(element_shape[1])} element"
+    counter, counter_index = _rms_schedule_body_element(
+        module, by_key, by_key.get((sliced.computation, sliced.operand_names[1])),
+        body_id=body_id, passthrough=frozenset({"bitcast", "reshape", "copy", "convert"}),
+    )
+    if counter is None or not any(shape.dtype == "s32" for shape in counter.result_shapes):
+        return element_index, None, "slice index is not the loop-carried s32 counter"
+    for name in sliced.operand_names[2:]:
+        operand = by_key.get((sliced.computation, name))
+        if operand is None or operand.opcode != "constant" or "constant(0)" not in operand.raw_line:
+            return element_index, counter_index, "slice trailing indices are not zero constants"
+    return element_index, counter_index, None
 
 
 def _rms_schedule_n82_operand_problems(
@@ -2801,8 +2786,18 @@ def _rms_schedule_n82_operand_problems(
     *,
     body_id: str,
     hidden_size: int,
+    accumulator_index: int,
 ) -> list[str]:
-    """Bind the N82 convolution operands to the loop's hidden and packed-weight elements."""
+    """Bind the N82 convolution operands to the exact loop DAGs.
+
+    hidden operand: structural ops only (bitcast/reshape/copy, fusion parameters
+    and roots) down to the loop-carried ``bf16[1,H]`` element.
+    weight operand: ``convert`` -> ``multiply`` of exactly
+    ``convert(bitcast-convert(dynamic-slice(loop u8[32,H,82], counter, 0, 0)))``
+    and ``reshape(broadcast(dynamic-slice(loop f32[32,H/128,82], counter, 0, 0)))``
+    (either operand order), with the same loop counter element on both slices,
+    all four loop elements distinct and none of them the accumulator.
+    """
 
     shards = FUSED_QKV_A_VIRTUAL_SHARDS
     packed = FUSED_QKV_A_Q_WIDTH_PER_SHARD + FUSED_QKV_A_KV_WIDTH_PER_SHARD
@@ -2810,28 +2805,56 @@ def _rms_schedule_n82_operand_problems(
     problems: list[str] = []
     if len(convolution.operand_names) < 2:
         return ["N82 convolution lacks two operands"]
-
-    def shapes(leaves: list[HloInstruction]) -> list[tuple[str, tuple[int, ...]]]:
-        return sorted({(shape.dtype, shape.dimensions) for leaf in leaves for shape in leaf.result_shapes})
-
-    hidden_leaves, hidden_foreign = _rms_schedule_operand_leaves(
-        module, by_key, by_key.get((convolution.computation, convolution.operand_names[0])), body_id=body_id
+    hidden, hidden_index = _rms_schedule_body_element(
+        module, by_key, by_key.get((convolution.computation, convolution.operand_names[0])),
+        body_id=body_id, passthrough=frozenset({"bitcast", "reshape", "copy"}),
     )
-    if hidden_foreign or shapes(hidden_leaves) != [("bf16", (1, hidden_size))]:
+    if hidden is None or not any(
+        (shape.dtype, shape.dimensions) == ("bf16", (1, hidden_size)) for shape in hidden.result_shapes
+    ):
         problems.append(
-            f"N82 convolution hidden operand is not the loop-carried bf16[1,{hidden_size}] element: "
-            f"leaves={shapes(hidden_leaves)} foreign={hidden_foreign[:3]}"
+            f"N82 convolution hidden operand is not structurally the loop-carried bf16[1,{hidden_size}] element"
         )
-    weight_leaves, weight_foreign = _rms_schedule_operand_leaves(
-        module, by_key, by_key.get((convolution.computation, convolution.operand_names[1])), body_id=body_id
+    product = _rms_schedule_resolve_structural(
+        module, by_key, by_key.get((convolution.computation, convolution.operand_names[1])),
+        passthrough=frozenset({"convert", "bitcast", "reshape", "copy"}), stop=frozenset({"multiply"}),
     )
-    expected_weight = sorted(
-        {("u8", (shards, hidden_size, packed)), ("f32", (shards, scale_rows, packed)), ("s32", ())}
-    )
-    if weight_foreign or shapes(weight_leaves) != expected_weight:
+    if product is None or product.opcode != "multiply" or len(product.operand_names) != 2:
+        problems.append("N82 convolution weight operand is not the FP8 dequant multiply")
+        return problems
+    operands = [by_key.get((product.computation, name)) for name in product.operand_names]
+    weight_result = None
+    scale_result = None
+    for candidate in (operands, operands[::-1]):
+        w_index, w_counter, w_problem = _rms_schedule_indexed_loop_slice(
+            module, by_key, candidate[0], body_id=body_id,
+            passthrough=frozenset({"convert", "bitcast-convert", "bitcast", "reshape", "copy"}),
+            element_shape=("u8", (shards, hidden_size, packed)),
+        )
+        s_index, s_counter, s_problem = _rms_schedule_indexed_loop_slice(
+            module, by_key, candidate[1], body_id=body_id,
+            passthrough=frozenset({"reshape", "broadcast", "bitcast", "copy"}),
+            element_shape=("f32", (shards, scale_rows, packed)),
+        )
+        if w_problem is None and s_problem is None:
+            weight_result, scale_result = (w_index, w_counter), (s_index, s_counter)
+            break
+        weight_result, scale_result = (w_index, w_counter, w_problem), (s_index, s_counter, s_problem)
+    if len(weight_result) == 3 or len(scale_result) == 3:
         problems.append(
-            f"N82 convolution weight operand is not the dequant of the loop-carried u8[{shards},{hidden_size},{packed}] "
-            f"weights and f32[{shards},{scale_rows},{packed}] scales: leaves={shapes(weight_leaves)} foreign={weight_foreign[:3]}"
+            f"N82 convolution weight operand is not dequant(dynamic-slice(loop u8[{shards},{hidden_size},{packed}], counter) x "
+            f"dynamic-slice(loop f32[{shards},{scale_rows},{packed}], counter)): weights={weight_result[2] if len(weight_result) == 3 else 'ok'}; "
+            f"scales={scale_result[2] if len(scale_result) == 3 else 'ok'}"
+        )
+        return problems
+    (w_index, w_counter), (s_index, s_counter) = weight_result, scale_result
+    if w_counter != s_counter:
+        problems.append("N82 weight and scale slices are not indexed by the same loop counter")
+    indices = {hidden_index, w_index, s_index, w_counter, accumulator_index}
+    if None in indices or len(indices) != 5:
+        problems.append(
+            f"N82 loop elements are not distinct (hidden={hidden_index}, weights={w_index}, scales={s_index}, "
+            f"counter={w_counter}, accumulator={accumulator_index})"
         )
     return problems
 
@@ -2956,7 +2979,8 @@ def _rms_schedule_fused_projection_loop(
     else:
         problems.extend(
             _rms_schedule_n82_operand_problems(
-                module, by_key, convolution, body_id=body_id, hidden_size=hidden_size
+                module, by_key, convolution, body_id=body_id, hidden_size=hidden_size,
+                accumulator_index=result_index,
             )
         )
     return problems
@@ -3811,7 +3835,33 @@ def _stablehlo_fused_projection_loop(
             "\n".join(definitions.lines),
             re.S,
         )
-        return helper_function is not None and "stablehlo.dynamic_slice %arg0, %arg1" in helper_function.group(0)
+        if helper_function is None:
+            return False
+        helper_text = helper_function.group(0)
+        returned = re.search(r"return (%[\w#]+) :", helper_text)
+        current = returned.group(1) if returned else None
+        for _ in range(4):
+            if current is None:
+                return False
+            definition = re.search(rf"^\s*{re.escape(current)} = ([\w.]+)(.*)$", helper_text, re.M)
+            if definition is None:
+                return False
+            opcode, rest_line = definition.group(1), definition.group(2)
+            if opcode == "stablehlo.reshape":
+                names = _stablehlo_operands(rest_line)
+                current = names[0] if names else None
+                continue
+            if opcode == "stablehlo.dynamic_slice":
+                names = _stablehlo_operands(rest_line)
+                if len(names) < 2 or names[0] != "%arg0" or names[1] != "%arg1":
+                    return False
+                for name in names[2:]:
+                    constant = re.search(rf"^\s*{re.escape(name)} = stablehlo\.constant dense<0> : tensor<i32>", helper_text, re.M)
+                    if constant is None:
+                        return False
+                return True
+            return False
+        return False
 
     if not _indexed_from_iterarg(args[1], f"tensor<{shards}x{hidden_size}x{packed}xui8>", f"tensor<{hidden_size}x{packed}xui8>"):
         problems.append(f"fused qkv-a packed-weight argument {args[1]} is not the per-shard dynamic slice of the loop-carried tensor<{shards}x{hidden_size}x{packed}xui8> iterArg")
@@ -3853,36 +3903,40 @@ def _stablehlo_fused_projection_loop(
         problems.append("fused qkv-a projection convolution operands are unreadable")
         return problems
 
-    def _leaves(name: str) -> tuple[set[str], list[str]]:
-        leaves: set[str] = set()
-        foreign: list[str] = []
-        stack = [name]
-        for _ in range(32):
-            if not stack:
-                break
-            current_name = stack.pop()
-            if current_name in ("%arg0", "%arg1", "%arg2"):
-                leaves.add(current_name)
-                continue
-            definition = re.search(rf"^\s*{re.escape(current_name)} = ([\w.]+)(.*)$", function_text, re.M)
-            if definition is None:
-                foreign.append(current_name)
-                continue
-            opcode, rest_line = definition.group(1), definition.group(2)
-            if opcode == "stablehlo.constant":
-                continue
-            if opcode in {"stablehlo.bitcast_convert", "stablehlo.broadcast_in_dim", "stablehlo.reshape", "stablehlo.convert", "stablehlo.multiply"}:
-                stack.extend(_stablehlo_operands(rest_line))
-                continue
-            foreign.append(f"{opcode}:{current_name}")
-        return leaves, foreign
+    def _define(name: str) -> tuple[str, str] | None:
+        definition = re.search(rf"^\s*{re.escape(name)} = ([\w.]+)(.*)$", function_text, re.M)
+        return (definition.group(1), definition.group(2)) if definition else None
 
-    hidden_leaves, hidden_foreign = _leaves(conv_operands.group(1))
-    if hidden_foreign or hidden_leaves != {"%arg0"}:
-        problems.append(f"fused qkv-a convolution hidden operand is not the callee's hidden parameter %arg0: leaves={sorted(hidden_leaves)} foreign={hidden_foreign[:3]}")
-    weight_leaves, weight_foreign = _leaves(conv_operands.group(2))
-    if weight_foreign or weight_leaves != {"%arg1", "%arg2"}:
-        problems.append(f"fused qkv-a convolution weight operand is not the dequant of the callee's %arg1/%arg2: leaves={sorted(weight_leaves)} foreign={weight_foreign[:3]}")
+    def _through(name: str, opcodes: set[str], limit: int = 6) -> str:
+        current_name = name
+        for _ in range(limit):
+            definition = _define(current_name)
+            if definition is None or definition[0] not in opcodes:
+                return current_name
+            names = _stablehlo_operands(definition[1])
+            if len(names) != 1:
+                return current_name
+            current_name = names[0]
+        return current_name
+
+    # hidden operand: %arg0 directly (reshape allowed), no arithmetic
+    if _through(conv_operands.group(1), {"stablehlo.reshape"}) != "%arg0":
+        problems.append("fused qkv-a convolution hidden operand is not structurally the callee's hidden parameter %arg0")
+    # weight operand: convert(multiply(A, B)) with A = convert(bitcast_convert(%arg1)) and B = reshape(broadcast_in_dim(%arg2))
+    product_name = _through(conv_operands.group(2), {"stablehlo.convert", "stablehlo.reshape"})
+    product = _define(product_name)
+    if product is None or product[0] != "stablehlo.multiply":
+        problems.append("fused qkv-a convolution weight operand is not the FP8 dequant multiply")
+        return problems
+    factors = _stablehlo_operands(product[1])
+    def _is_weights(name: str) -> bool:
+        return _through(name, {"stablehlo.convert", "stablehlo.bitcast_convert", "stablehlo.reshape"}) == "%arg1"
+    def _is_scales(name: str) -> bool:
+        return _through(name, {"stablehlo.reshape", "stablehlo.broadcast_in_dim"}) == "%arg2"
+    if len(factors) != 2 or not (
+        (_is_weights(factors[0]) and _is_scales(factors[1])) or (_is_weights(factors[1]) and _is_scales(factors[0]))
+    ):
+        problems.append("fused qkv-a convolution weight operand is not dequant(bitcast_convert(%arg1)) x broadcast(%arg2)")
     return problems
 
 

@@ -11087,3 +11087,20 @@ refused in both representations: an alternate hidden operand (constant), an alte
 callee convolution over same-shaped constants, a call-site hidden argument that is not the iterArg, and
 packed weights indexed from a foreign same-typed buffer. Baseline archive: 78/78 kv-a rows bind
 (hidden = loop element 4, weights = elements 2/3 + index 0).
+
+## 2026-09-02 Sol BLOCK on 2a867b4a (operand sets, not DAGs) — exact operand DAGs and helper return chains
+
+Sol demonstrated two passes: a zero-multiplied hidden operand (leaf sets ignored the multiply) and a
+helper whose dead `dynamic_slice` sat beside a constant return. Both binders now bind exact DAGs. HLO:
+the hidden operand resolves through bitcast/reshape/copy and fusion boundaries only (no arithmetic) to
+the loop-carried `bf16[1,H]` element; the weight operand is `convert → multiply` of exactly
+`convert(bitcast-convert(dynamic-slice(loop u8[32,H,82], counter, 0, 0)))` and
+`reshape(broadcast(dynamic-slice(loop f32[32,H/128,82], counter, 0, 0)))` in either order, both slices
+indexed by the same loop-carried `s32` counter with zero trailing indices; the hidden, weights, scales,
+counter and accumulator loop elements must be five distinct tuple indices. StableHLO: the helper's
+`return` must root exclusively in `reshape(dynamic_slice %arg0, %arg1, 0, 0)`; the callee's convolution
+hidden operand must be `%arg0` (reshape only) and its weight operand `convert(multiply(
+convert(bitcast_convert(%arg1)), reshape(broadcast_in_dim(%arg2))))`. Attacks refused: zero-multiplied
+hidden (both representations), weights sliced by a constant index, scales built from the hidden element,
+dead dynamic_slice helper returning a constant, plus every earlier attack. Baseline archive: 78/78 kv-a
+rows bind in both representations.
