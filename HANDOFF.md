@@ -10905,3 +10905,16 @@ representations; the second archive (q-a wrongly scheduled) reads 313 accepted /
 
 Expectation for the next run: event 0 returns to exact if the q-a inference was the only fault; event 1
 then measures the hidden-width schedule against the 6-mismatch baseline. Not proof until run.
+
+## 2026-09-02 Sol BLOCK on 5ca7b85a (census not bound) — exact lineage census
+
+Sol refused the sharded-q-a kind because the enabled contract accepted any count of it, so the
+known-wrong 313-accepted/0-sharded module still passed. Both binders now take
+`expected_accepted_count` / `expected_sharded_qa_count`, computed in `validate_decoder_step_hlo` by
+`expected_rms_schedule_census(layers, attention_projection_backend)`: fused N82 → (3·layers+1, layers)
+= (235, 78) for the 78-layer profile; separate → (4·layers+1, 0). A census drift is a violation in each
+representation. Tests: the second archive (313/0) is now REFUSED in both representations with the two
+census violations; the first archive (235/78) passes; wrong expectations are refused on the first
+archive; synthetic missing/extra/substituted-lineage attacks are refused; the decoder-step validator's
+source is bound to forward both expectations to both binders; the forced-CPU decoder test binds the
+census from the plan (`4·layers+1`, 0 sharded, separate layout).

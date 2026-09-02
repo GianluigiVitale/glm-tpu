@@ -3293,6 +3293,8 @@ def _validate_rms_accepted_schedule_stablehlo(
     *,
     enabled: bool,
     layernorm_width: int = 128,
+    expected_accepted_count: int | None = None,
+    expected_sharded_qa_count: int | None = None,
 ) -> dict[str, Any]:
     """Bind the pre-fusion RMS lineage, including the FP32 barrier.
 
@@ -3336,6 +3338,15 @@ def _validate_rms_accepted_schedule_stablehlo(
     if enabled:
         if not rms_lineages:
             violations.append("StableHLO carries no RMS rsqrt scale")
+        violations.extend(
+            _rms_schedule_census_violations(
+                representation="StableHLO",
+                conforming=len(conforming),
+                sharded_qa=len(sharded_qa),
+                expected_accepted_count=expected_accepted_count,
+                expected_sharded_qa_count=expected_sharded_qa_count,
+            )
+        )
         for record in nonconforming:
             violations.append(
                 f"StableHLO rsqrt {record['name']} is not an accepted-schedule RMS "
@@ -3356,6 +3367,46 @@ def _validate_rms_accepted_schedule_stablehlo(
         "rsqrt_count": len(lineages),
         "violations": violations,
     }
+
+
+def expected_rms_schedule_census(
+    *, layers: int, attention_projection_backend: str
+) -> tuple[int, int]:
+    """(accepted RMS lineages, sharded q-a lineages) the enabled contract must find.
+
+    Every layer carries an input norm, a post-attention norm, a q-a norm and a
+    kv-a norm, plus one final norm.  With the fused N82 qkv-a projection the q-a
+    norm is the legacy-faithful virtual-TP32 sharded reduction (its own kind);
+    with the separate projection it is a plain RMS norm on the accepted schedule.
+    """
+
+    if not isinstance(layers, int) or isinstance(layers, bool) or layers < 0:
+        raise ValueError("layer count must be a non-negative integer")
+    if attention_projection_backend == "fused_n82_convolution":
+        return 3 * layers + 1, layers
+    return 4 * layers + 1, 0
+
+
+def _rms_schedule_census_violations(
+    *,
+    representation: str,
+    conforming: int,
+    sharded_qa: int,
+    expected_accepted_count: int | None,
+    expected_sharded_qa_count: int | None,
+) -> list[str]:
+    violations: list[str] = []
+    if expected_accepted_count is not None and conforming != expected_accepted_count:
+        violations.append(
+            f"{representation} accepted-schedule RMS census drifted: "
+            f"expected {expected_accepted_count}, found {conforming}"
+        )
+    if expected_sharded_qa_count is not None and sharded_qa != expected_sharded_qa_count:
+        violations.append(
+            f"{representation} virtual-TP32 sharded q-a census drifted: "
+            f"expected {expected_sharded_qa_count}, found {sharded_qa}"
+        )
+    return violations
 
 
 def _rms_schedule_lineages(
@@ -3565,6 +3616,8 @@ def _validate_rms_accepted_schedule_hlo(
     *,
     enabled: bool,
     layernorm_width: int = 128,
+    expected_accepted_count: int | None = None,
+    expected_sharded_qa_count: int | None = None,
 ) -> dict[str, Any]:
     """Pin the accepted decode-step RMS variance schedule.
 
@@ -3602,6 +3655,15 @@ def _validate_rms_accepted_schedule_hlo(
     if enabled:
         if not rms_lineages:
             violations.append("accepted-schedule RMS reductions are absent")
+        violations.extend(
+            _rms_schedule_census_violations(
+                representation="optimized HLO",
+                conforming=len(conforming),
+                sharded_qa=len(sharded_qa),
+                expected_accepted_count=expected_accepted_count,
+                expected_sharded_qa_count=expected_sharded_qa_count,
+            )
+        )
         for record in nonconforming:
             violations.append(
                 f"rsqrt {record['name']} in {record['computation']} is not an "
@@ -3633,6 +3695,8 @@ def _validate_rms_accepted_schedule_hlo(
         "nonconforming": nonconforming[:8],
         "passed": not violations,
         "rsqrt_count": len(rsqrts),
+        "expected_accepted_count": expected_accepted_count,
+        "expected_sharded_qa_count": expected_sharded_qa_count,
         "sharded_qa_rsqrt_count": len(sharded_qa),
         "tiled_module": module_uses_tiling(module),
         "violations": violations,
@@ -5368,10 +5432,15 @@ def validate_decoder_step_hlo(
         violations.extend(complete_token_collective_contract["violations"])
     if not isinstance(rms_accepted_schedule, bool):
         raise PlanValidationError("decoder RMS accepted-schedule HLO flag must be boolean")
+    expected_accepted_count, expected_sharded_qa_count = expected_rms_schedule_census(
+        layers=layers, attention_projection_backend=attention_projection_backend
+    )
     rms_accepted_schedule_contract = _validate_rms_accepted_schedule_hlo(
         module,
         enabled=rms_accepted_schedule,
         layernorm_width=config.index_key_width,
+        expected_accepted_count=expected_accepted_count,
+        expected_sharded_qa_count=expected_sharded_qa_count,
     )
     if stablehlo is not None:
         rms_accepted_schedule_contract["stablehlo"] = (
@@ -5379,6 +5448,8 @@ def validate_decoder_step_hlo(
                 stablehlo,
                 enabled=rms_accepted_schedule,
                 layernorm_width=config.index_key_width,
+                expected_accepted_count=expected_accepted_count,
+                expected_sharded_qa_count=expected_sharded_qa_count,
             )
         )
         rms_accepted_schedule_contract["violations"] = [
