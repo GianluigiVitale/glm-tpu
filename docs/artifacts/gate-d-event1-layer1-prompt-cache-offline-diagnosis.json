@@ -1,6 +1,6 @@
 {
   "artifact_kind": "gate_d_event1_layer1_prompt_cache_offline_diagnosis",
-  "classification": "EVENT0_CALIBRATION_EXACT;EVENT1_LEGACY_DECODE_SIDE_OVER_GREENFIELD_PROMPT_CACHE_REPRODUCES_DEVICE_SELECTION;EVENT1_DEVIATION_LOCALIZED_TO_LAYER1_PROMPT_INDEX_CACHE;CPU_EVIDENCE_ONLY;NO_FIX_PROVEN;NO_GATE_D_NO_DECODER_NO_DB_NO_PERFORMANCE_CLAIM;GATE_D_OPEN",
+  "classification": "EVENT0_CALIBRATION_EXACT;EVENT1_LEGACY_DECODE_SIDE_OVER_GREENFIELD_PROMPT_CACHE_REPRODUCES_DEVICE_SELECTION;EVENT1_LAYER1_PROMPT_INDEX_CACHE_SUFFICIENT_FOR_OBSERVED_SET_MISMATCH;DECODE_SIDE_EXACTNESS_NOT_PROVEN;CPU_EVIDENCE_ONLY;NO_FIX_PROVEN;NO_GATE_D_NO_DECODER_NO_DB_NO_PERFORMANCE_CLAIM;GATE_D_OPEN",
   "decode_position": 8155,
   "events": {
     "event_0": {
@@ -148,7 +148,7 @@
       "sha256": "17f0916de291be472437319c848f3f4331d5bdd6dac325755ef1f4ecbaf8bd7e"
     }
   },
-  "interpretation": "Event 1 recomputed from the legacy layer-1 query, head weights and current key over the greenfield DB518 layer-1 prompt index cache reproduces the protected accepted-schedule run's selection exactly and the oracle's swapped positions exactly; the layer-1 decode side is therefore no longer the cause and the deviation is carried by the layer-1 prompt index cache that the teacher-forced prefill builds. The greenfield prompt rows use the single-token decode arithmetic, while the legacy oracle's prompt rows came from its batched prefill. The layer-0 prompt index cache is already proven exact; layer-0 prompt main-cache rows differed only in the main-RoPE suffix (DB530/DB531).",
+  "interpretation": "Event 1 recomputed from the legacy layer-1 query, head weights and current key over the greenfield DB518 layer-1 prompt index cache reproduces the protected accepted-schedule run's selection exactly and the oracle's swapped positions exactly. The greenfield layer-1 prompt cache is therefore sufficient, on its own, to produce the observed event-1 set mismatch; substituting legacy decode-side tensors does not change the selection. This does not prove the protected run's own query/head weights/current key are legacy-exact and does not exclude smaller decode-side deviations below the selection threshold; it identifies the layer-1 prompt cache built by the teacher-forced prefill (single-token decode arithmetic per prompt row, versus the legacy's batched prefill) as the first boundary that must be made exact. The layer-0 prompt index cache is already proven exact; layer-0 prompt main-cache rows differed only in the main-RoPE suffix (DB530/DB531).",
   "method": {
     "prompt_cache_layout": "owner=(p%512)//256, page=p//512, row=p%256; current position key from legacy internals rounded to bf16",
     "score_emulation": "bf16 operands, fp64 products/accumulate rounded once to fp32, fp32 128**-0.5 scale, relu, signed head weights",

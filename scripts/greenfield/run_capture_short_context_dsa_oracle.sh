@@ -805,6 +805,26 @@ PY
       exit 2
     }
   fi
+  if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
+    # Sealing binds the prompt token identity through the sealed layer-0 DSA
+    # input; verify it before any TPU work instead of failing after the run.
+    PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+      "$LAYER0_INPUT_DIR" "$LAYER0_INPUT_MANIFEST_SHA" <<'PY' || {
+import sys
+from pathlib import Path
+
+from glm_tpu.greenfield.validation.layer0_dsa_association import (
+    inspect_layer0_dsa_association_input,
+)
+
+inspect_layer0_dsa_association_input(
+    Path(sys.argv[1]), expected_manifest_sha256=sys.argv[2]
+)
+PY
+      echo "sealed layer-0 DSA input required by prompt-cache sealing is unavailable" >&2
+      exit 2
+    }
+  fi
 fi
 exec 9>/home/gianl/glm-run/.glm_pod_workload.lock
 flock -n 9 || {

@@ -104,12 +104,14 @@ def test_slot_derivation_follows_sealed_registration_order():
     assert expected_prompt_cache_slot(0) == 0
     assert expected_prompt_cache_slot(1) == 2
     assert expected_prompt_cache_slot(2) == 4
-    assert expected_prompt_cache_slot(6) == 9
-    assert expected_prompt_cache_slot(10) == 14
+    assert expected_prompt_cache_slot(6) == 12
+    assert expected_prompt_cache_slot(3) == 6  # skip-top-k layers register an indexer cache too
+    assert expected_prompt_cache_slot(77) == 154
     assert FULL_INDEXER_LAYERS == frozenset({0, 1, 2} | set(range(6, 78, 4)))
-    for layer in (3, 4, 5, 7, 78, -1):
+    for layer in (78, -1, True):
         with pytest.raises(ValueError):
             expected_prompt_cache_slot(layer)
+    for layer in (3, 4, 5, 7, 78, -1):
         with pytest.raises(ValueError):
             prompt_index_cache_artifact_kind(layer)
     assert prompt_index_cache_artifact_kind(0) == ARTIFACT_KIND
@@ -222,24 +224,43 @@ def test_compare_uses_sealed_artifact_and_owner_layout(compare_module, tmp_path:
         owners[local // 256, position // 512, local % 256] = legacy_rows[position]
     owners[0, 0, 5, 2] ^= 1  # perturb position 5
     np.savez(tmp_path / "capture.npz", layer1_index_cache_owners_bfloat16_bits=owners)
+    # Layer 1 additionally requires the byte-pinned legacy internals and oracle,
+    # which unit tests do not ship; exercise the row map through layer 2 and keep
+    # the layer-1 rejection path as a static contract below.
+    _write_source(tmp_path / "slot4", slot=4, bits=bits)
+    manifest2 = capture_legacy_prompt_index_cache(
+        _config(tmp_path / "slot4", tmp_path / "artifact2", layer_id=2)
+    )
+    np.savez(tmp_path / "capture2.npz", layer2_index_cache_owners_bfloat16_bits=owners)
     result = compare_module.compare(
-        legacy_artifact_dir=tmp_path / "artifact",
-        layer_id=1,
-        greenfield_capture=tmp_path / "capture.npz",
-        expected_manifest_sha256=manifest["manifest_sha256"],
-        with_event1_check=False,
+        legacy_artifact_dir=tmp_path / "artifact2",
+        layer_id=2,
+        greenfield_capture=tmp_path / "capture2.npz",
+        expected_manifest_sha256=manifest2["manifest_sha256"],
     )
     assert result["bitwise"]["mismatch_count"] == 1
+    assert result["authenticated"] is True
+    assert "NO_EVENT_AUTHENTICATION_AVAILABLE_FOR_THIS_LAYER" in result["classification"]
     assert result["row_map"]["mismatched_positions_first_64"] == [5]
-    assert result["classification"].startswith("LAYER1_PROMPT_INDEX_CACHE_1_OF_66_ROWS_MISMATCH")
+    assert result["classification"].startswith("LAYER2_PROMPT_INDEX_CACHE_1_OF_66_ROWS_MISMATCH")
     with pytest.raises(ValueError):
         compare_module.compare(
             legacy_artifact_dir=tmp_path / "artifact",
             layer_id=0,
             greenfield_capture=tmp_path / "capture.npz",
             expected_manifest_sha256=None,
-            with_event1_check=False,
         )
+
+
+def test_compare_script_rejects_unauthenticated_layer1_capture():
+    source = COMPARE.read_text()
+    assert 'if internals_sha != diagnose.LEGACY_INTERNALS_SHA256[1]:' in source
+    assert 'diagnose.load_oracle_events()' in source  # byte-pinned oracle
+    assert 'if not result["authenticated"]:' in source
+    assert "raise SystemExit(" in source
+    assert "--skip-event1-check" not in source
+    diagnose = (REPO / "scripts/greenfield/diagnose_event1_prompt_index_cache_offline.py").read_text()
+    assert "if sha256_file(DSA_EVENTS_ORACLE) != DSA_EVENTS_ORACLE_SHA256:" in diagnose
 
 
 def test_wrapper_launcher_and_sealer_thread_the_layer():
@@ -252,6 +273,10 @@ def test_wrapper_launcher_and_sealer_thread_the_layer():
     assert 'GLM_DCP_CACHE_DUMP_LAYERS=0"' not in wrapper
     assert "$PROMPT_CACHE_LAYER_ID == 0 && \\" in wrapper  # prompt-key capture stays layer 0
     assert 'if [[ $PROMPT_CACHE_LAYER_ID != 0 ]]; then' in wrapper  # one-host probe stays layer 0
+    # The sealed layer-0 DSA input is verified before any TPU work in prompt-cache mode.
+    assert "sealed layer-0 DSA input required by prompt-cache sealing is unavailable" in wrapper
+    preflight = wrapper.index("inspect_layer0_dsa_association_input(\n    Path(sys.argv[1])")
+    assert preflight < wrapper.index("exec 9>/home/gianl/glm-run/.glm_pod_workload.lock")
     launcher = LAUNCHER.read_text()
     assert "greenfield_legacy_layer${PROMPT_CACHE_LAYER_ID}_prompt_index_cache_" in launcher
     assert "export GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID=$PROMPT_CACHE_LAYER_ID" in launcher

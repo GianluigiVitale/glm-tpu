@@ -9,11 +9,13 @@ exact BF16 delta (``compare_prompt_index_key_bits``) plus a row-level map:
 mismatched positions, their distribution over the legacy 2,048-token prefill
 chunks and over 512-row logical pages, and the first/last mismatched position.
 
-When the legacy layer-1 DSA internals are available it also recomputes event 1
-from the legacy query, head weights and current key over the *legacy* cache
-under the TPU default-precision score emulation; that selection must equal the
-sealed oracle's event-1 set, which authenticates the capture independently of
-its manifest.  CPU evidence only: no Gate-D, decoder, DB or performance claim.
+For layer 1 it also recomputes event 1 from the sealed legacy query, head
+weights and current key (byte-pinned internals) over the *legacy* cache under
+the TPU default-precision score emulation; that selection must equal the sealed
+(byte-pinned) oracle's event-1 set.  A capture that fails this authentication
+is rejected: the comparison JSON is still written for the record, but the
+script raises and exits non-zero.  CPU evidence only: no Gate-D, decoder, DB or
+performance claim.
 """
 
 from __future__ import annotations
@@ -99,7 +101,6 @@ def compare(
     layer_id: int,
     greenfield_capture: Path,
     expected_manifest_sha256: str | None,
-    with_event1_check: bool,
 ) -> dict[str, Any]:
     from glm_tpu.greenfield.validation.prompt_index_cache import (
         compare_prompt_index_key_bits,
@@ -136,10 +137,13 @@ def compare(
         "row_map": row_map,
         "performance_claim": False,
     }
-    if with_event1_check and layer_id == 1:
+    if layer_id == 1:
         internals_path = diagnose.legacy_internals_path(1)
+        internals_sha = diagnose.sha256_file(internals_path)
+        if internals_sha != diagnose.LEGACY_INTERNALS_SHA256[1]:
+            raise RuntimeError("legacy layer-1 internals differ from the sealed capture")
         internals = np.load(internals_path)
-        oracle_positions, _ = diagnose.load_oracle_events()
+        oracle_positions, _ = diagnose.load_oracle_events()  # byte-pinned oracle
         keys = np.concatenate(
             [
                 diagnose.bf16_bits_to_f32(legacy_bits),
@@ -153,7 +157,8 @@ def compare(
         oracle_set = set(oracle_positions[1].tolist())
         recomputed = diagnose.top_set(scores, len(oracle_set))
         result["event1_over_legacy_cache_vs_oracle"] = {
-            "legacy_internals_sha256": diagnose.sha256_file(internals_path),
+            "legacy_internals_sha256": internals_sha,
+            "dsa_events_oracle_sha256": diagnose.DSA_EVENTS_ORACLE_SHA256,
             "expected_only": sorted(oracle_set - recomputed),
             "observed_only": sorted(recomputed - oracle_set),
         }
@@ -169,8 +174,13 @@ def compare(
             if not event1["expected_only"] and not event1["observed_only"]
             else "LEGACY_CACHE_DOES_NOT_REPRODUCE_ORACLE_EVENT1"
         )
+    else:
+        parts.append("NO_EVENT_AUTHENTICATION_AVAILABLE_FOR_THIS_LAYER")
     parts.append("CPU_EVIDENCE_ONLY;NO_GATE_D_NO_DECODER_NO_DB_NO_PERFORMANCE_CLAIM;GATE_D_OPEN")
     result["classification"] = ";".join(parts)
+    result["authenticated"] = event1 is None or (
+        not event1["expected_only"] and not event1["observed_only"]
+    )
     return result
 
 
@@ -181,7 +191,6 @@ def main() -> int:
     parser.add_argument("--expected-manifest-sha256", default=None)
     parser.add_argument("--greenfield-capture", type=Path, default=None)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--skip-event1-check", action="store_true")
     args = parser.parse_args()
     diagnose = _load_diagnose_module()
     capture = args.greenfield_capture or diagnose.DB518_RESULT
@@ -190,11 +199,14 @@ def main() -> int:
         layer_id=args.layer_id,
         greenfield_capture=capture,
         expected_manifest_sha256=args.expected_manifest_sha256,
-        with_event1_check=not args.skip_event1_check,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     print(result["classification"])
+    if not result["authenticated"]:
+        raise SystemExit(
+            "legacy prompt cache capture rejected: it does not reproduce the sealed oracle event-1 set"
+        )
     print(json.dumps({k: result["row_map"][k] for k in ("mismatched_row_count", "first_mismatched_position", "per_legacy_prefill_chunk")}, sort_keys=True))
     return 0
 

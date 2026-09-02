@@ -3608,3 +3608,10 @@ persistence only; review and persistence precede any v2 installation.
   EVENT1_LEGACY_DECODE_SIDE_OVER_GREENFIELD_PROMPT_CACHE_REPRODUCES_DEVICE_SELECTION;
   EVENT1_DEVIATION_LOCALIZED_TO_LAYER1_PROMPT_INDEX_CACHE;CPU_EVIDENCE_ONLY;NO_FIX_PROVEN;
   NO_GATE_D_NO_DECODER_NO_DB_NO_PERFORMANCE_CLAIM;GATE_D_OPEN`.
+- Correction after Sol round 24: the capsule above is regenerated with classification
+  `EVENT0_CALIBRATION_EXACT;EVENT1_LEGACY_DECODE_SIDE_OVER_GREENFIELD_PROMPT_CACHE_REPRODUCES_DEVICE_SELECTION;
+  EVENT1_LAYER1_PROMPT_INDEX_CACHE_SUFFICIENT_FOR_OBSERVED_SET_MISMATCH;DECODE_SIDE_EXACTNESS_NOT_PROVEN;
+  CPU_EVIDENCE_ONLY;NO_FIX_PROVEN;NO_GATE_D_NO_DECODER_NO_DB_NO_PERFORMANCE_CLAIM;GATE_D_OPEN` — the
+  greenfield layer-1 prompt cache is a sufficient cause of the observed event-1 set mismatch; the decode
+  side's exactness is not proven by it. Sealed layer-0 DSA input restored from the published probe inputs
+  (tensor `be643e339cd7…d7f9`, manifest `574f3553…73141`).

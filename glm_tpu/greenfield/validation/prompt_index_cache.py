@@ -69,21 +69,29 @@ def prompt_index_cache_artifact_kind(layer_id: int) -> str:
     return f"glm52_legacy_layer{int(layer_id)}_prompt_index_cache"
 
 
+MLA_LAYER_COUNT = 78
+
+
 def expected_prompt_cache_slot(layer_id: int) -> int:
     """Legacy runner ``kv_caches`` slot holding ``layer_id``'s indexer cache.
 
-    The legacy runner orders cache slots by module registration: every layer
-    registers one main-attention cache, and each full-indexer layer registers
-    its indexer key cache immediately before it (the sealed layer-0 captures
-    dumped slot 0 as the 128-wide index cache and slot 1 as the 640-wide main
-    cache).  Layer 0 -> 0, layer 1 -> 2, layer 2 -> 4, layer 6 -> 9.  A wrong
-    slot cannot seal: the loader refuses any shape other than the index cache.
+    The legacy runner orders cache slots by module registration.  In the pinned
+    vLLM ``DeepseekV2MLAAttention`` every MLA layer constructs an ``Indexer``
+    (which registers its ``DeepseekV32IndexerCache``) before its
+    ``MultiHeadLatentAttentionWrapper`` registers the main cache; skip-top-k
+    layers register the indexer cache too.  So layer ``L`` owns slots ``2L``
+    (index cache, 128 lanes) and ``2L + 1`` (main cache, 640 lanes); the sealed
+    layer-0 captures dumped slot 0 as the index cache and slot 1 as the main
+    cache.  A wrong slot cannot seal: the loader refuses any other geometry.
     """
 
-    if layer_id not in FULL_INDEXER_LAYERS:
-        raise ValueError(f"layer {layer_id} owns no DSA prompt index cache")
-    indexer_layers_before = sum(1 for layer in FULL_INDEXER_LAYERS if layer < layer_id)
-    return int(layer_id) + indexer_layers_before
+    if (
+        not isinstance(layer_id, int)
+        or isinstance(layer_id, bool)
+        or not 0 <= layer_id < MLA_LAYER_COUNT
+    ):
+        raise ValueError(f"layer {layer_id} is not an MLA layer")
+    return 2 * int(layer_id)
 
 
 def _sha256_file(path: Path) -> str:
