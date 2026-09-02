@@ -11119,3 +11119,17 @@ weight operand exactly `convert(multiply(convert(bitcast_convert(%arg1) : ui8→
 broadcast_in_dim(%arg2, dims=[0, 2]))))` with all types bound. Attacks refused in both representations:
 direct u8/ui8→f32 convert, wrong broadcast dimensions, dequant output not converted, helper returning
 the slice directly, plus all earlier ones. Baseline archive: 78/78 kv-a rows bind in both representations.
+
+## 2026-09-02 approved run `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T211600121108599Z` (pin 086d459a): failed closed at the eight-host sync again (GitHub fetch SSH fault on workers 1, 5, 6, 7 …)
+
+Sol approved 47a9e91b / 086d459a / execute once; all reconfirmations passed; launched 21:26:57Z. The
+eight-host sync failed on at least four workers with the same transient as at 15:46Z:
+`ssh_dispatch_run_fatal: Connection to 140.82.114.x port 22: message authentication code incorrect`,
+`fetch-pack: unexpected disconnect`, `fatal: protocol error: bad pack header` / `fatal: early EOF`
+during `git fetch origin` from GitHub (worker 0 SYNC_OK). No TPU process started; failure-exit census
+8/8; the tag is burned; no claim. Two of the last three launches were lost to this fault (the pod's SSH
+egress to GitHub corrupts large pack transfers intermittently). Mitigation without a code change:
+pre-fetch the pin onto every worker with retries (`git fetch` up to six attempts, then
+`checkout --detach <pin>`), so the protected sync's own fetch transfers almost nothing; the runner still
+verifies HEAD == pin and a clean tree on each worker. A fetch retry inside the runner is the durable fix
+and is proposed for the next persistence review.

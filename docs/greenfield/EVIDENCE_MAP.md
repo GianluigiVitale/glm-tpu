@@ -3589,3 +3589,6 @@ persistence only; review and persistence precede any v2 installation.
   mandatory when enabled, proven on three archived TPU modules (baseline default, first `_ras`, second
   `_ras`) and synthetic attacks. Flag scope: hidden-width norms only. Classification:
   `RMS_SCHEDULE_SCOPE_HIDDEN_WIDTH_ONLY;CENSUS_BOUND_THREE_KINDS;REVIEW_PENDING;GATE_D_OPEN`.
+- Protected 8K tag `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T211600121108599Z` (pin 086d459a): failed closed at the eight-host sync — recurring GitHub fetch
+  SSH fault on four or more workers; no TPU; censuses 8/8. Classification:
+  `FAILED_CLOSED_AT_SYNC;TRANSIENT_ORIGIN_FETCH_FAULT_RECURRING;TAG_BURNED;NO_CLAIM;GATE_D_OPEN`.
