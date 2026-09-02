@@ -3577,3 +3577,6 @@ persistence only; review and persistence precede any v2 installation.
   Classification: `EXECUTED_ON_TPU;TOKEN_EXACT_AT_8155;DSA_EVENT0_REGRESSED_ONE_SWAP;
   QA_NORM_SCHEDULE_INFERENCE_REFUTED;TAG_BURNED;NO_CLAIM;GATE_D_OPEN`. Decision: fused q-a norm back to
   the sharded legacy form (own contract kind); hidden-width and kv-a norms keep the accepted schedule.
+- Protected 8K tag `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T154017247157875Z` (pin 906f3810): failed closed at the eight-host sync — transient GitHub
+  fetch SSH fault on worker 6 (7/8 SYNC_OK); no TPU; censuses 8/8. Classification:
+  `FAILED_CLOSED_AT_SYNC;TRANSIENT_ORIGIN_FETCH_FAULT_WORKER6;TAG_BURNED;NO_CLAIM;GATE_D_OPEN`.

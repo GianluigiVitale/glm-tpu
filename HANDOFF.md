@@ -10935,3 +10935,13 @@ refused in both representations with the census violations named; the first arch
 and substituted lineages are refused in both representations; the decoder-step validator's source is
 bound to compute and forward both expectations. Lesson: after any multi-file patch script, diff the
 files it claims to have written before describing them to a reviewer.
+
+## 2026-09-02 approved run `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T154017247157875Z` (pin 906f3810): failed closed at the eight-host sync (transient GitHub fetch fault on worker 6)
+
+Sol approved (ccc9291c / 906f3810 / execute once); all reconfirmations passed; launched 15:46:56Z. The
+runner passed vacancy, leases and pre-census 8/8, then the eight-host sync failed on worker 6:
+`git fetch origin` from GitHub (140.82.113.4) aborted with `ssh_dispatch_run_fatal: … message
+authentication code incorrect` / `fetch-pack: unexpected disconnect` / `fatal: protocol error: bad pack
+header` (exit 128); the other seven workers reported `SYNC_OK 906f3810`. No TPU process was started;
+failure-exit census 8/8; the tag is burned (never retried); no claim. Cause: a transient SSH/network
+fault on the worker-6 → GitHub fetch, not code. Worker 6 stayed at its previous pin, clean.
