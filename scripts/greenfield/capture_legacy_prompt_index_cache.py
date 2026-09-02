@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Seal the accepted layer-0 logical prompt-key cache from host dumps."""
+"""Seal one layer's accepted logical prompt-key cache from legacy host dumps.
+
+``--layer-id`` selects the full-indexer layer (default 0); the legacy
+``kv_caches`` slot is derived, never supplied, and a wrong slot fails closed.
+"""
 
 from __future__ import annotations
 
@@ -25,6 +29,7 @@ def main() -> None:
     parser.add_argument("--source-item-row-id", type=int, required=True)
     parser.add_argument("--layer0-input-dir", type=Path, required=True)
     parser.add_argument("--layer0-input-manifest-sha256", required=True)
+    parser.add_argument("--layer-id", type=int, default=0)
     args = parser.parse_args()
 
     from glm_tpu.greenfield.validation.layer0_dsa_association import (
@@ -53,11 +58,14 @@ def main() -> None:
                 "prompt_token_ids"
             ]["sha256"],
             expected_prompt_tokens=int(input_arrays["prompt_token_ids"].size),
+            layer_id=args.layer_id,
         )
     )
     print(
         json.dumps(
             {
+                "artifact_kind": manifest["artifact_kind"],
+                "layer_id": args.layer_id,
                 "manifest_sha256": manifest["manifest_sha256"],
                 "prompt_index_key_bfloat16_sha256": manifest[
                     "prompt_index_key_bfloat16_sha256"

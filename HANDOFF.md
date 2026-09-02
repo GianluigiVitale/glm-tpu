@@ -11213,3 +11213,26 @@ that currently pins slot zero) and capture the legacy layer-1 prompt cache once;
 with the DB518 greenfield layer-1 cache and, if needed, a live full-decoder capture, to obtain the row-level
 mismatch map (all rows vs chunk-boundary rows) before any prefill redesign. No protected 8K decoder launch
 until that map exists. CPU evidence only; no claim.
+
+### Tooling for the next admissible evidence: layer-selectable legacy prompt-cache capture (CPU-tested)
+
+- `glm_tpu/greenfield/validation/prompt_index_cache.py`: `FULL_INDEXER_LAYERS`, `prompt_index_cache_artifact_kind`,
+  `expected_prompt_cache_slot` (legacy `kv_caches` slot = layer id + number of full-indexer layers before it:
+  0→0, 1→2, 2→4, 6→9; order verified in the pinned vLLM `deepseek_v2.py`: `Indexer` (which registers
+  `DeepseekV32IndexerCache`) is constructed before `MultiHeadLatentAttentionWrapper` in every MLA layer, and
+  the sealed layer-0 dumps showed slot 0 = 128-wide index cache, slot 1 = 640-wide main cache);
+  `LegacyPromptIndexCacheConfig.layer_id` (default 0, layer-0 manifest bytes unchanged); the loader requires
+  `layer_indices == [slot]` and `layer{slot}__*` keys, so a wrong slot cannot seal (shape/width refused);
+  deeper-layer manifests bind `layer_id`/`cache_slot`/`layer_name`; the inspector verifies the binding.
+- `scripts/greenfield/capture_legacy_prompt_index_cache.py --layer-id`; wrapper
+  `run_capture_short_context_dsa_oracle.sh`: `GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID` → derived
+  `PROMPT_CACHE_SLOT` (python, single source of truth) → `GLM_DCP_CACHE_DUMP_LAYERS=$PROMPT_CACHE_SLOT`, raylet
+  env check on the same value, `--layer-id` at sealing, one-host layer-0 production probe and prompt-key
+  capture stay layer-0 only; launcher `run_capture_legacy_prompt_index_cache.sh` tags
+  `greenfield_legacy_layer<L>_prompt_index_cache_<ts>`.
+- `scripts/greenfield/compare_layer1_prompt_index_cache_offline.py`: sealed legacy artifact vs DB518 greenfield
+  rows → bitwise delta + row map (per legacy 2,048-token chunk, per 512-row page, first/last row) and, for
+  layer 1, the legacy cache under legacy query/head weights/current key must reproduce the oracle event-1 set.
+- Tests: `tests/greenfield/validation/test_prompt_index_cache_layer_selection.py` (9) plus the existing
+  prompt-cache/oracle-wrapper/internals/prefill-index/association/position-113 suites: 79 passed
+  (`JAX_PLATFORMS=cpu`). No TPU action; nothing captured yet.
