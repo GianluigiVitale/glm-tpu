@@ -36,23 +36,20 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-02 12:30Z
+## Resume checkpoint — 2026-09-02 16:00Z
 
-Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. Bounded TPU result (tag
-`gate_d_layer1_rms_schedule_20260902T061305905714981Z`, archive adjudicated in
-`docs/artifacts/gate-d-layer1-rms-schedule-diagnostic-adjudication.json`): the accepted
-`f32[32,6144]{T(8,128)} -> f32[32]` reduce on a materialized FP32 carry reproduces the accepted
-layer-1 row bit-for-bit. DSA rotary table refuted.
-
-Staged: decoder flag `rms_accepted_schedule` (default off) reaches every RMS call; HLO+StableHLO
-contracts bind the full lineage per `rsqrt` (materialized carry → square → 32-row last-axis
-add-reduce → 1/W → +1e-5 → rsqrt; barrier in StableHLO), DSA key LayerNorm classified apart;
-17 hostile tests on archived TPU bytes; forced-CPU decoder 33/33. Chain v3 (not installed).
-Next: commit/push; one batched Sol review; merge →
-rewrite (keep rewrite goal.md), mirror, no-TPU preflight; Sol execute review with exact merged pin
-+ fresh tag; one protected run `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1 bash
-scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from the rewrite worktree; accept only
-exact tokens + all DSA contracts + protections + 8/8 cleanup.
+Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical` HEAD `b8549a03`; run pin = rewrite merge
+`906f3810` (pushed, mirrored, rewrite goal.md byte-identical to ba7d1e72). Flag
+`GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1`: hidden-width (157) + kv-a (78) norms on the proven
+`f32[32,W]->f32[32]` schedule; fused q-a norm keeps the legacy sharded reduction (its [32,2048]
+version flipped DSA event 0). Contracts bind every `rsqrt` lineage, the census (235/78), lineage-bound
+dead-row carry allowances, on all three programs. Today: 3 runs refused before execution (fixed), 1
+executed — token at 8155 exact, DSA event 0 one swap (q-a cause), event 1 = 9 (baseline 6); 1 sync
+transient. Launch: `env -i … RMS_ACCEPTED_SCHEDULE=1 DSA_ROPE_TABLE=0 SHORT_DECODER_TAG=<Sol-approved
+fresh tag> bash scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from the rewrite worktree,
+mid-window, after mirror verifier + fleet/lease/vacancy/health; every tag needs Sol `APPROVE EXECUTE
+ONCE`. Running: tag `…_ras_…_20260902T155131089617216Z`. Accept only exact tokens + all DSA
+contracts + protections + 8/8 cleanup.
 
 ## Finish (after Gate D)
 
