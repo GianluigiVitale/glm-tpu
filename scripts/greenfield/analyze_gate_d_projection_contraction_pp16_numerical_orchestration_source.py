@@ -44,12 +44,12 @@ AUDITED_SOURCE_PATHS = (
     WRAPPER_PATH,
 )
 EXPECTED_SOURCE_SHA256S = {
-    DRIVER_PATH: "a38bb8b89bb8cf70568c8562b2013f188b7c8ed17f1e41edad37a40332156404",
-    INSTALLER_PATH: "8b60c832fe70c6ca917f0b8f6090d5a4f8525218f068ab3d79edfb2e7b5b3970",
-    LAUNCHER_PATH: "80c9116fcf9397995bb26bb14e660d5982213b7c5d4be01afa576168b188d191",
+    DRIVER_PATH: "f519ce4041d6bd3ed47f85044003edba6ce546f31ade64ee5033881e72a205be",
+    INSTALLER_PATH: "22dc77e7c6721774e72fc4b9e5c678dfce7218cc292433b5f8f386949a975939",
+    LAUNCHER_PATH: "61a45b6dc0608c1626e371bfead471afbcddd2448fab21410504da9bfdc07514",
     MIRROR_VERIFIER_PATH: "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b",
-    PUBLISHER_PATH: "5c5e58afa2c36e46377512a777df6a00669419f9f1c93e3504f71ea1334f6665",
-    WRAPPER_PATH: "a5a5a5ffc1d012944c48b16e433906a6506441836f66c88f4115d8b2e70598d9",
+    PUBLISHER_PATH: "5a8d30cf398a26a480c72b300ac6d01eeb22e3e8a792947d5ba835262b710c83",
+    WRAPPER_PATH: "92bcb109051bba5adc06f7144729c2daa1aa7c6920b0445db35d779ea83b23b3",
 }
 PROJECTION_SOURCE_PATH = "docs/artifacts/gate-d-projection-contraction-pp16-source.json"
 PROJECTION_SOURCE_SHA256 = (
@@ -68,14 +68,9 @@ HOST_MATERIALIZATION_SHA256 = (
     "a7e5b393f7c61181f6b2aab9531d788fb27594d9cf980055c165b6f278ba4f99"
 )
 TOPOLOGY_PATH = "docs/artifacts/gate-d-runtime-locality-authority.json"
-HLO_BRIDGE_PATH = (
-    "docs/artifacts/gate-d-projection-contraction-pp16-hlo-source-location-bridge.json"
-)
-HLO_BRIDGE_SHA256 = "c2732f7184416cce87839b4cadf552b94d983aba06fa56b687eaacc03ca26bea"
 TOPOLOGY_SHA256 = "49cf6bb1a553985855556d1401ad85918669df52d12f8dc5150f247d18b325eb"
 REFERENCE_PATHS = {
     FRONTIER_PATH: FRONTIER_SHA256,
-    HLO_BRIDGE_PATH: HLO_BRIDGE_SHA256,
     HLO_SUCCESS_PATH: HLO_SUCCESS_SHA256,
     HOST_MATERIALIZATION_PATH: HOST_MATERIALIZATION_SHA256,
     PROJECTION_SOURCE_PATH: PROJECTION_SOURCE_SHA256,
@@ -308,7 +303,6 @@ def _audit_wrapper(raw: bytes) -> dict[str, Any]:
     expected = {
         "DRIVER_SHA": EXPECTED_SOURCE_SHA256S[DRIVER_PATH],
         "FRONTIER_AUTHORITY_SHA": FRONTIER_SHA256,
-        "HLO_SOURCE_LOCATION_BRIDGE_SHA": HLO_BRIDGE_SHA256,
         "HLO_SUCCESS_AUTHORITY_SHA": HLO_SUCCESS_SHA256,
         "HOST_MATERIALIZATION_AUTHORITY_SHA": HOST_MATERIALIZATION_SHA256,
         "MIRROR_VERIFIER_SHA": EXPECTED_SOURCE_SHA256S[MIRROR_VERIFIER_PATH],
@@ -344,8 +338,8 @@ def _audit_wrapper(raw: bytes) -> dict[str, Any]:
         'parse_canonical("terminal_upload_receipt.json")',
         "! -e /proc/self/fd/7/NUMERICAL_RESULT",
         'case "$result_status" in',
-        "gate-d-projection-contraction-pp16-numerical-v2",
-        "--hlo-source-location-bridge",
+        "gate-d-projection-contraction-pp16-numerical-v3",
+        "--hlo-success-authority",
         "wrapper_fd != 10",
     )
     forbidden = (
@@ -389,8 +383,8 @@ def _audit_launcher(raw: bytes, wrapper_raw: bytes) -> dict[str, Any]:
     if any(_assignment(tree, name) != value for name, value in expected.items()):
         raise RuntimeError("projection launcher immutable pin drifted")
     required = (
-        '"/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v2.py"',
-        '"/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v2"',
+        '"/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v3.py"',
+        '"/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v3"',
         "os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING",
         "fcntl.fcntl(descriptor, F_ADD_SEALS, REQUIRED_SEALS)",
         'f"/proc/self/fd/{WRAPPER_FD}"',
@@ -422,9 +416,9 @@ def _audit_installer(raw: bytes) -> dict[str, Any]:
     if _assignment(tree, "PAYLOADS") != EXPECTED_PAYLOADS:
         raise RuntimeError("projection installer payload map drifted")
     required = (
-        "SOURCE_ROOT = Path('/opt/glm-tpu/gate-d-projection-contraction-numerical-install-v2')",
-        "LAUNCHER_TARGET = LAUNCHER_PARENT / 'launch_gate_d_projection_contraction_pp16_numerical_v2.py'",
-        "CAPSULE_TARGET = CAPSULE_PARENT / 'gate-d-projection-contraction-pp16-numerical-v2'",
+        "SOURCE_ROOT = Path('/opt/glm-tpu/gate-d-projection-contraction-numerical-install-v3')",
+        "LAUNCHER_TARGET = LAUNCHER_PARENT / 'launch_gate_d_projection_contraction_pp16_numerical_v3.py'",
+        "CAPSULE_TARGET = CAPSULE_PARENT / 'gate-d-projection-contraction-pp16-numerical-v3'",
         "os.geteuid() != 0",
         "dict(os.environ) != EXPECTED_ENVIRONMENT",
         "sys.argv != [str(INSTALLER_PATH)]",

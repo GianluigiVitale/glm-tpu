@@ -247,10 +247,7 @@ def test_wrapper_binds_all_numerical_authorities_before_driver_invocation() -> N
     for authority in (
         'sha256sum "$TOPOLOGY"',
         'sha256sum "$HLO_SUCCESS_AUTHORITY"',
-        'sha256sum "$ACCEPTED_STABLEHLO"',
-        'sha256sum "$ACCEPTED_OPTIMIZED_HLO"',
         'sha256sum "$PROJECTION_SOURCE"',
-        'sha256sum "$HLO_SOURCE_LOCATION_BRIDGE"',
         'sha256sum "$FRONTIER_AUTHORITY"',
         'sha256sum "$CAPSULE"',
         'sha256sum "$CAPSULE_INPUTS"',
@@ -261,9 +258,10 @@ def test_wrapper_binds_all_numerical_authorities_before_driver_invocation() -> N
         'sha256sum "$PUBLISHER"',
     ):
         assert source.index(authority) < driver
-    assert '--accepted-stablehlo "$ACCEPTED_STABLEHLO"' in source
-    assert '--accepted-optimized-hlo "$ACCEPTED_OPTIMIZED_HLO"' in source
-    assert '--hlo-source-location-bridge "$HLO_SOURCE_LOCATION_BRIDGE"' in source
+    assert "--accepted-stablehlo" not in source
+    assert "--accepted-optimized-hlo" not in source
+    assert "--hlo-source-location-bridge" not in source
+    assert "ACCEPTED_OPTIMIZED_HLO" not in source
     assert '--projection-source "$PROJECTION_SOURCE"' in source
     assert '--frontier-authority "$FRONTIER_AUTHORITY"' in source
     assert '--hlo-success-authority "$HLO_SUCCESS_AUTHORITY"' in source
@@ -287,7 +285,7 @@ def test_wrapper_binds_all_numerical_authorities_before_driver_invocation() -> N
     assert f"readonly MIRROR_VERIFIER_SHA={mirror_verifier_sha}" in source
     assert (
         "readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/"
-        "gate-d-projection-contraction-pp16-numerical-v2"
+        "gate-d-projection-contraction-pp16-numerical-v3"
     ) in source
     assert (
         "$WORKTREE/scripts/greenfield/run_gate_d_projection_contraction_pp16_numerical.py"

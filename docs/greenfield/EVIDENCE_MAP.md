@@ -3431,3 +3431,24 @@ persistence only; review and persistence precede any v2 installation.
   driver/publisher compare against derived bytes; V2 install targets; chain repinned; 79/79 tests.
 - Classification: `NUMERICAL_V1_TAG_BURNED_HLO_METADATA;V2_BRIDGE_SOURCE_READY;REVIEW_PENDING;
   TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`.
+
+## 2026-09-02 V2 discriminator NUMERICAL_REJECTED; rotary root cause candidate
+
+- Run `…235818944668679Z` executed once on chips {0,1}; HLO bridged byte-exact; result REJECTED
+  (normalized exact; projected/current key not). Publisher failed closed on the `sync.txt`
+  wrapper/publisher mismatch; 18-object diagnostic archived (terminal generation `1788307624494629`).
+- Adjudication artifact `gate-d-projection-numerical-v2-rejection-adjudication.json` SHA
+  `25908caf…1ef7`: projection f32-accurate (≤4.8e-7), key LayerNorm bit-exact, all large errors in
+  rotary dims; TPU implied cos error up to 9.9e-3 vs accepted 7.1e-5 → on-device TPU cos/sin at
+  large angles. Classification: `V2_NUMERICAL_REJECTED_ADJUDICATED;ROOT_CAUSE_CANDIDATE_TPU_ON_DEVICE_ROTARY_COS_SIN;TPU_FIX_UNPROVEN;GATE_D_OPEN`.
+
+## 2026-09-02 V3 host-rope batch ready for one batched review
+
+- New `rotary_table.py`/`dsa_host_rope.py`/host-rope builder/validation; V3 driver+publisher use a
+  structural HLO contract (no transcendentals, no collectives) and tolerance faithfulness; archived V2
+  bytes rejected for rotary only, CPU-rotated TPU projection accepted. Chain driver `f519ce40…`,
+  publisher `092175d8…`, wrapper `8f1522e5…`, launcher `6d3288dc…`, installer `d9ef0757…`.
+- Classification: `V3_HOST_ROPE_SOURCE_READY;REVIEW_PENDING;TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`.
+- Sol P1 corrections (publisher binds all metrics + source/row identities; CPU-only adjudicator;
+  goal no longer jumps to 8K). Chain: publisher `5a8d30cf…`, wrapper `92bcb109…`, launcher
+  `61a45b6d…`, installer `22dc77e7…`, analyzer `f1010452…`; 131/131 tests.

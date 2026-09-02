@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Append-only publisher for the bounded PP16 projection numerical replay."""
+"""Append-only publisher for the bounded PP16 host-rope projection numerical replay (V3)."""
 
 from __future__ import annotations
 
@@ -33,29 +33,77 @@ BUCKET_NAME = "driftbench-dsv4-uc"
 REMOTE_ROOT = "results/greenfield/glm52/gate_d_projection_contraction_pp16_numerical/"
 TAG_PATTERN_TEXT = r"gate_d_projection_contraction_pp16_numerical_[0-9]{8}T[0-9]{15}Z"
 TAG_PATTERN = re.compile(TAG_PATTERN_TEXT)
-EXPECTED_STABLEHLO_SHA256 = (
-    "4b3fa252e837d381208453b06d7e369947fa4c6c58c795edc8ff5a8ea8c9e2e3"
+# V3 binds HLO structure (audited by the immutable driver from the sealed
+# validation module) and re-checks the archived texts here without a parser.
+HLO_MODULE_NAME = "jit__projection_host_rope_local"
+HLO_FORBIDDEN_TEXT = (
+    " cosine(",
+    " sine(",
+    " power(",
+    "all-gather",
+    "all-reduce",
+    "all-to-all",
+    "collective-permute",
+    "reduce-scatter",
+    "custom-call",
+    "infeed",
+    "outfeed",
+    "host_callback",
+    "outside_compilation",
 )
-EXPECTED_OPTIMIZED_HLO_SHA256 = (
-    "817ba2ed87c33ec928f834fcf3a003ce63d3dedf4061a7c64fe354a26ac498ea"
+STABLEHLO_FORBIDDEN_TEXT = (
+    "stablehlo.cosine",
+    "stablehlo.sine",
+    "stablehlo.power",
+    "stablehlo.all_",
+    "stablehlo.collective_",
+    "stablehlo.custom_call",
+    "stablehlo.infeed",
+    "stablehlo.outfeed",
 )
-# Numerical-driver optimized HLO is the accepted preimage after the exact
-# source-location substitutions pinned by the reviewed bridge artifact.
-EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256 = (
-    "70485b066b44233d82c2a728f09753f8a71306074fdd8b856112e46ab1f60564"
+STABLEHLO_REQUIRED_TEXT = (
+    "mhlo.num_partitions = 2",
+    'sdy.mesh @mesh = <["feature"=2]>',
+    "tensor<2x1x6144xbf16>",
+    "tensor<2x128x6144xf32>",
+    "tensor<2x64xf32>",
+    "stablehlo.dot_general",
 )
-EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES = 31861
-HLO_SOURCE_LOCATION_BRIDGE_SHA256 = (
-    "c2732f7184416cce87839b4cadf552b94d983aba06fa56b687eaacc03ca26bea"
+CAPSULE_INPUTS_PATH = Path(
+    "/home/gianl/gate-d-runs/greenfield_gate_d_compensated_capsule_20260831T124838Z/"
+    "candidate-inputs.npz"
 )
+DSA_ROPE_POSITION = 8155
+DSA_ROTARY_DIM = 64
+DSA_ROTARY_THETA = 8_000_000.0
+EXPECTED_DSA_ROPE_ROW_SHA256 = (
+    "748aa6122b8d83cfcf65928d33d1ac10392b7cc968617f324a75a62168d3a9c0"
+)
+PROJECTION_TOLERANCE = 1e-6
+KEY_TOLERANCE = 1e-6
+IMPLIED_COS_SIN_TOLERANCE = 1e-6
+EXPECTED_NORMALIZED_OWNER_SHA256 = (
+    "28b7db466b74f462b5cd3109cb052bcce0c8be185d3f24199239f75136b22c20"
+)
+# Exact committed sources of the host-rope graph and its validation, as pinned
+# by the immutable driver; the runner report must carry the same identities.
+HOST_ROPE_SOURCE_SHA256S = {
+    "glm_tpu/greenfield/benchmarking/gate_d_projection_contraction_pp16_host_rope.py": (
+        "29f8b72340f316b04504e21e5aa4554ce8836ad5592494753a880fababb739bf"
+    ),
+    "glm_tpu/greenfield/kernels/reference/dsa_host_rope.py": (
+        "74ead92ca1f73cfeac2b58f95ab9ba08e2fae50a0d1bbad3b4b66eda42e615d4"
+    ),
+    "glm_tpu/greenfield/kernels/reference/rotary_table.py": (
+        "82fce9e3e1bc64aa8d1c48fcfe2041a34887922bd329e90aeb3d477f401d7e58"
+    ),
+    "glm_tpu/greenfield/validation/gate_d_projection_host_rope_numerical.py": (
+        "e8640f930913b4bb598bbc4fbfd61eb651a691b7a8a674f03bcd82a60c24bb5b"
+    ),
+}
 EXPECTED_WK_WEIGHT_FP32_SHA256 = (
     "b2c67e0fdf4d7292494778233e9813d8256f2fb88b6f7376870379832fbab24b"
 )
-EXPECTED_OWNER_SHA256 = {
-    "current_key_owners": "5006ad4f7224047652bbc46e6275b4c82bec0dead13f5f2b5f91494a2415329b",
-    "normalized_hidden_owners": "28b7db466b74f462b5cd3109cb052bcce0c8be185d3f24199239f75136b22c20",
-    "projected_key_owners": "f16ad9903c6d219c9796f2a1aac32b0fd7b09135ecdfadb9a19dbef5cc1a9aa6",
-}
 EXPECTED_OUTPUT_LAYOUT = {
     "current_key_owners": ((2, 1, 128), "<f4", 4),
     "normalized_hidden_owners": ((2, 1, 6144), "<u2", 2),
@@ -96,12 +144,10 @@ SUCCESS_PAYLOAD = (
     "census_post.txt",
     "census_pre.txt",
     "dependencies.json",
+    "dsa_rope_row.f32le",
     "evidence.json",
-    "hlo/acquired_preimage.optimized_hlo.txt",
-    "hlo/acquired_preimage.stablehlo.mlir",
     "hlo/projection_contraction_pp16_stage0.optimized_hlo.txt",
     "hlo/projection_contraction_pp16_stage0.stablehlo.mlir",
-    "hlo/source_location_bridge.json",
     "mirror.sha256",
     "orchestrator.sealed.log",
     "outputs.npz",
@@ -227,7 +273,7 @@ def _require_preterminal(base: Any, run_fd: int) -> None:
 def _expected_status(runner: Mapping[str, Any]) -> tuple[bool, str, str]:
     numerical = runner.get("numerical")
     accepted = (
-        numerical.get("accepted_tpu_projection_match")
+        numerical.get("accepted_tpu_host_rope_faithful")
         if isinstance(numerical, Mapping)
         else None
     )
@@ -235,9 +281,10 @@ def _expected_status(runner: Mapping[str, Any]) -> tuple[bool, str, str]:
         raise RuntimeError("projection numerical classification is absent")
     status = "NUMERICAL_ACCEPTED" if accepted else "NUMERICAL_REJECTED"
     classification = (
-        "BOUNDED_TPU_PROJECTION_NUMERICAL_ACCEPTED;ROOT_CAUSE_FIX_UNPROVEN;GATE_D_OPEN"
+        "BOUNDED_TPU_HOST_ROPE_KEY_FAITHFUL;ROTARY_ROOT_CAUSE_FIX_BOUNDED_PROOF;"
+        "DECODER_UNPROVEN;GATE_D_OPEN"
         if accepted
-        else "BOUNDED_TPU_PROJECTION_NUMERICAL_REJECTED;PROJECTION_CONTRACTION_MISMATCH;GATE_D_OPEN"
+        else "BOUNDED_TPU_HOST_ROPE_KEY_UNFAITHFUL;ROTARY_FIX_REJECTED;GATE_D_OPEN"
     )
     return accepted, status, classification
 
@@ -275,9 +322,123 @@ def _parse_npy(raw: bytes) -> tuple[tuple[int, ...], str, bytes]:
     return header["shape"], header["descr"], raw[header_end:]
 
 
+def _f32_list(payload: bytes) -> list[float]:
+    return [value for (value,) in struct.iter_unpack("<f", payload)]
+
+
+def _bf16_bits_to_float(bits: int) -> float:
+    return struct.unpack("<f", struct.pack("<I", bits << 16))[0]
+
+
+def _fp8_e4m3_value(bits: int) -> float:
+    sign = -1.0 if bits & 0x80 else 1.0
+    exponent = (bits >> 3) & 0xF
+    mantissa = bits & 0x7
+    if exponent == 0:
+        value = mantissa * (2.0**-9)
+    elif exponent == 15 and mantissa == 7:
+        value = float("nan")
+    else:
+        value = (1.0 + mantissa / 8.0) * (2.0 ** (exponent - 7))
+    return sign * value
+
+
+def _f32(value: float) -> float:
+    return struct.unpack("<f", struct.pack("<f", value))[0]
+
+
+def _round_to_bf16(value: float) -> float:
+    """Round one finite FP32 value to the nearest BF16 (ties to even), as float."""
+
+    bits = struct.unpack("<I", struct.pack("<f", value))[0]
+    lower = bits & 0xFFFF
+    upper = bits >> 16
+    if lower > 0x8000 or (lower == 0x8000 and (upper & 1)):
+        upper += 1
+    return struct.unpack("<f", struct.pack("<I", (upper & 0xFFFF) << 16))[0]
+
+
+def _capsule_inputs() -> dict[str, tuple[tuple[int, ...], str, bytes]]:
+    raw = _snapshot(CAPSULE_INPUTS_PATH)
+    if sha256(raw).hexdigest() != EXPECTED_PREDECESSORS["capsule_input_sha256"]:
+        raise RuntimeError("projection numerical capsule inputs drifted")
+    members = {}
+    with zipfile.ZipFile(BytesIO(raw)) as archive:
+        for name in (
+            "wk_weight_bits",
+            "wk_scale_inv",
+            "key_norm_weight_bf16_bits",
+            "key_norm_bias_bf16_bits",
+        ):
+            members[name] = _parse_npy(archive.read(f"{name}.npy"))
+    return members
+
+
+def _materialize_wk_owner0(
+    inputs: Mapping[str, tuple[tuple[int, ...], str, bytes]],
+) -> list[list[float]]:
+    """FP32 wk rows of owner 0 from the pinned FP8 capsule inputs (pure Python)."""
+
+    bits_shape, bits_dtype, bits_payload = inputs["wk_weight_bits"]
+    scale_shape, scale_dtype, scale_payload = inputs["wk_scale_inv"]
+    if bits_shape != (2, 128, 6144) or bits_dtype != "|u1":
+        raise RuntimeError("projection numerical wk bits layout drifted")
+    if scale_shape != (2, 1, 48) or scale_dtype != "<f4":
+        raise RuntimeError("projection numerical wk scale layout drifted")
+    scales = _f32_list(scale_payload)[:48]
+    lookup = [_fp8_e4m3_value(code) for code in range(256)]
+    owner_bits = bits_payload[: 128 * 6144]
+    rows: list[list[float]] = []
+    for row in range(128):
+        start = row * 6144
+        rows.append(
+            [
+                _round_to_bf16(
+                    _f32(lookup[owner_bits[start + column]] * scales[column // 128])
+                )
+                for column in range(6144)
+            ]
+        )
+    return rows
+
+
+def _reference_key_f64(
+    projected: list[float],
+    weight: list[float],
+    bias: list[float],
+    rope_row: list[float],
+) -> list[float]:
+    width = len(projected)
+    mean = math.fsum(projected) / width
+    variance = math.fsum((value - mean) ** 2 for value in projected) / width
+    scale = 1.0 / math.sqrt(variance + 1e-6)
+    normalized = [
+        (value - mean) * scale * w + b
+        for value, w, b in zip(projected, weight, bias, strict=True)
+    ]
+    half = DSA_ROTARY_DIM // 2
+    rotated = list(normalized)
+    for pair in range(half):
+        a, b = normalized[2 * pair], normalized[2 * pair + 1]
+        rotated[2 * pair] = a * rope_row[pair] - b * rope_row[half + pair]
+        rotated[2 * pair + 1] = a * rope_row[half + pair] + b * rope_row[pair]
+    return rotated
+
+
 def _validate_output_npz(
-    raw: bytes, runner: Mapping[str, Any], numerical: Mapping[str, Any]
+    raw: bytes,
+    runner: Mapping[str, Any],
+    numerical: Mapping[str, Any],
+    rope_row_raw: bytes,
 ) -> bool:
+    """Re-derive the V3 faithfulness verdict from archived bytes alone."""
+
+    if (
+        len(rope_row_raw) != 4 * DSA_ROTARY_DIM
+        or sha256(rope_row_raw).hexdigest() != EXPECTED_DSA_ROPE_ROW_SHA256
+    ):
+        raise RuntimeError("projection numerical host rotary row bytes drifted")
+
     expected_names = {f"{name}.npy" for name in EXPECTED_OUTPUT_LAYOUT}
     runner_arrays = runner.get("output_arrays")
     numerical_arrays = numerical.get("outputs")
@@ -286,8 +447,10 @@ def _validate_output_npz(
         or set(runner_arrays) != set(EXPECTED_OUTPUT_LAYOUT)
         or not isinstance(numerical_arrays, Mapping)
         or set(numerical_arrays) != set(EXPECTED_OUTPUT_LAYOUT)
+        or numerical.get("structural") is not True
     ):
         raise RuntimeError("projection numerical output array catalogue drifted")
+    arrays: dict[str, bytes] = {}
     with zipfile.ZipFile(BytesIO(raw)) as archive:
         infos = archive.infolist()
         names = archive.namelist()
@@ -301,58 +464,19 @@ def _validate_output_npz(
         for name, (shape, dtype, item_size) in EXPECTED_OUTPUT_LAYOUT.items():
             member = archive.read(f"{name}.npy")
             observed_shape, observed_dtype, payload = _parse_npy(member)
-            owner_size = (len(payload) // 2) if observed_shape == shape else -1
-            owner_hashes = [
-                sha256(
-                    payload[index * owner_size : (index + 1) * owner_size]
-                ).hexdigest()
-                if owner_size >= 0
-                else None
-                for index in range(2)
-            ]
+            owner_size = len(payload) // 2
+            if (
+                observed_shape != shape
+                or observed_dtype != dtype
+                or len(payload) != item_size * shape[0] * shape[1] * shape[2]
+                or payload[:owner_size] != payload[owner_size:]
+            ):
+                raise RuntimeError(f"projection numerical output bytes drifted: {name}")
+            owner_hash = sha256(payload[:owner_size]).hexdigest()
             runner_record = runner_arrays[name]
             numerical_record = numerical_arrays[name]
-            shape_exact = observed_shape == shape
-            dtype_exact = observed_dtype == dtype
-            payload_size_exact = (
-                len(payload) == item_size * shape[0] * shape[1] * shape[2]
-            )
-            if dtype == "<f4" and payload_size_exact:
-                finite = all(
-                    math.isfinite(value)
-                    for (value,) in struct.iter_unpack("<f", payload)
-                )
-            elif dtype == "<u2" and payload_size_exact:
-                finite = all(
-                    int.from_bytes(payload[offset : offset + 2], "little") & 0x7F80
-                    != 0x7F80
-                    for offset in range(0, len(payload), 2)
-                )
-            else:
-                finite = False
-            owners_equal = (
-                shape_exact
-                and dtype_exact
-                and payload_size_exact
-                and payload[:owner_size] == payload[owner_size:]
-            )
-            witness_exact = owner_hashes == [
-                EXPECTED_OWNER_SHA256[name],
-                EXPECTED_OWNER_SHA256[name],
-            ]
-            derived_record = {
-                "dtype_exact": dtype_exact,
-                "finite": finite,
-                "owner_sha256": owner_hashes,
-                "owners_equal": owners_equal,
-                "shape_exact": shape_exact,
-                "witness_exact": witness_exact,
-            }
             if (
-                not shape_exact
-                or not dtype_exact
-                or not payload_size_exact
-                or not isinstance(runner_record, Mapping)
+                not isinstance(runner_record, Mapping)
                 or runner_record
                 != {
                     "array_sha256": sha256(payload).hexdigest(),
@@ -360,79 +484,128 @@ def _validate_output_npz(
                     "storage_dtype": dtype,
                 }
                 or not isinstance(numerical_record, Mapping)
-                or numerical_record != derived_record
+                or numerical_record.get("owner_sha256") != [owner_hash, owner_hash]
+                or numerical_record.get("owners_equal") is not True
+                or numerical_record.get("shape_exact") is not True
+                or numerical_record.get("dtype_exact") is not True
+                or numerical_record.get("finite") is not True
             ):
-                raise RuntimeError(f"projection numerical output bytes drifted: {name}")
-    derived_accepted = all(
-        all(
-            record.get(flag) is True
-            for flag in (
-                "dtype_exact",
-                "finite",
-                "owners_equal",
-                "shape_exact",
-                "witness_exact",
-            )
-        )
-        for record in numerical_arrays.values()
+                raise RuntimeError(
+                    f"projection numerical output record drifted: {name}"
+                )
+            arrays[name] = payload[:owner_size]
+    normalized_exact = (
+        sha256(arrays["normalized_hidden_owners"]).hexdigest()
+        == EXPECTED_NORMALIZED_OWNER_SHA256
     )
-    if numerical.get("accepted_tpu_projection_match") is not derived_accepted:
+    if (
+        numerical_arrays["normalized_hidden_owners"].get("witness_exact")
+        is not normalized_exact
+    ):
+        raise RuntimeError("projection numerical normalized witness flag drifted")
+    hidden = [
+        _bf16_bits_to_float(bits)
+        for (bits,) in struct.iter_unpack("<H", arrays["normalized_hidden_owners"])
+    ]
+    projected = _f32_list(arrays["projected_key_owners"])
+    key = _f32_list(arrays["current_key_owners"])
+    if any(not math.isfinite(v) for v in (*hidden, *projected, *key)):
+        raise RuntimeError("projection numerical outputs are not finite")
+    inputs = _capsule_inputs()
+    wk_rows = _materialize_wk_owner0(inputs)
+    reference_projection = [
+        math.fsum(w * h for w, h in zip(row, hidden, strict=True)) for row in wk_rows
+    ]
+    projection_error = max(
+        abs(a - b) for a, b in zip(projected, reference_projection, strict=True)
+    )
+    projection_ok = projection_error <= PROJECTION_TOLERANCE
+    rope_row = _f32_list(rope_row_raw)
+    if any(not math.isfinite(v) for v in rope_row):
+        raise RuntimeError("projection numerical host rotary row is not finite")
+    if runner.get("dsa_rope_row") != {
+        "array_sha256": sha256(rope_row_raw + rope_row_raw).hexdigest(),
+        "position": DSA_ROPE_POSITION,
+        "row_sha256": EXPECTED_DSA_ROPE_ROW_SHA256,
+        "rotary_dim": DSA_ROTARY_DIM,
+        "shape": [2, DSA_ROTARY_DIM],
+        "storage_dtype": "<f4",
+        "theta": DSA_ROTARY_THETA,
+    }:
+        raise RuntimeError("projection numerical host rotary row record drifted")
+    _, _, weight_payload = inputs["key_norm_weight_bf16_bits"]
+    _, _, bias_payload = inputs["key_norm_bias_bf16_bits"]
+    weight = [
+        _bf16_bits_to_float(b)
+        for (b,) in struct.iter_unpack("<H", weight_payload[:256])
+    ]
+    bias = [
+        _bf16_bits_to_float(b) for (b,) in struct.iter_unpack("<H", bias_payload[:256])
+    ]
+    reference_key = _reference_key_f64(projected, weight, bias, rope_row)
+    key_errors = [abs(a - b) for a, b in zip(key, reference_key, strict=True)]
+    key_ok = max(key_errors) <= KEY_TOLERANCE
+    pre_rotation = _reference_key_f64(projected, weight, bias, [1.0] * 32 + [0.0] * 32)
+    worst_cos = worst_sin = 0.0
+    half = DSA_ROTARY_DIM // 2
+    for pair in range(half):
+        a, b = pre_rotation[2 * pair], pre_rotation[2 * pair + 1]
+        ap, bp = key[2 * pair], key[2 * pair + 1]
+        radius = a * a + b * b
+        if radius <= 0.0:
+            continue
+        worst_cos = max(worst_cos, abs((a * ap + b * bp) / radius - rope_row[pair]))
+        worst_sin = max(
+            worst_sin, abs((a * bp - b * ap) / radius - rope_row[half + pair])
+        )
+    implied_ok = (
+        worst_cos <= IMPLIED_COS_SIN_TOLERANCE
+        and worst_sin <= IMPLIED_COS_SIN_TOLERANCE
+    )
+    projection_record = numerical_arrays["projected_key_owners"]
+    key_record = numerical_arrays["current_key_owners"]
+    implied_record = key_record.get("implied_rotary")
+
+    def _metric_matches(record: Any, name: str, expected: float) -> bool:
+        value = record.get(name) if isinstance(record, Mapping) else None
+        return (
+            type(value) is float
+            and math.isfinite(value)
+            and abs(value - expected) <= 1e-9
+        )
+
+    if (
+        projection_record.get("within_tolerance") is not projection_ok
+        or projection_record.get("tolerance") != PROJECTION_TOLERANCE
+        or not _metric_matches(
+            projection_record, "max_abs_error_vs_f64_reference", projection_error
+        )
+        or key_record.get("within_tolerance") is not key_ok
+        or key_record.get("tolerance") != KEY_TOLERANCE
+        or key_record.get("implied_rotary_within_tolerance") is not implied_ok
+        or not _metric_matches(
+            key_record, "max_abs_error_vs_f64_reference", max(key_errors)
+        )
+        or not _metric_matches(
+            key_record, "rotary_max_abs_error", max(key_errors[:DSA_ROTARY_DIM])
+        )
+        or not _metric_matches(
+            key_record, "nonrotary_max_abs_error", max(key_errors[DSA_ROTARY_DIM:])
+        )
+        or not isinstance(implied_record, Mapping)
+        or set(implied_record) != {"max_abs_cos_error", "max_abs_sin_error"}
+        or not _metric_matches(implied_record, "max_abs_cos_error", worst_cos)
+        or not _metric_matches(implied_record, "max_abs_sin_error", worst_sin)
+    ):
+        raise RuntimeError(
+            "projection numerical faithfulness flags differ from output bytes"
+        )
+    derived_accepted = all((normalized_exact, projection_ok, key_ok, implied_ok))
+    if numerical.get("accepted_tpu_host_rope_faithful") is not derived_accepted:
         raise RuntimeError(
             "projection numerical acceptance flag differs from output bytes"
         )
     return derived_accepted
-
-
-def _bridge_replacements(report: Any) -> list[dict[str, Any]]:
-    derivation = report.get("derivation") if isinstance(report, Mapping) else None
-    replacements = (
-        derivation.get("replacements") if isinstance(derivation, Mapping) else None
-    )
-    if (
-        not isinstance(report, Mapping)
-        or report.get("artifact_kind")
-        != "gate_d_projection_contraction_pp16_hlo_source_location_bridge"
-        or report.get("derived_numerical_hlo")
-        != {
-            "byte_count": EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES,
-            "sha256": EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256,
-        }
-        or report.get("source_hlo", {}).get("sha256") != EXPECTED_OPTIMIZED_HLO_SHA256
-        or report.get("gate_d_closed") is not False
-        or report.get("numerical_claim") is not False
-        or report.get("performance_claim") is not False
-        or not isinstance(replacements, list)
-        or len(replacements) != 3
-        or derivation.get("replacement_count") != 3
-        or any(
-            not isinstance(item, Mapping)
-            or set(item) != {"new", "occurrence_count", "old", "surface"}
-            or type(item["new"]) is not str
-            or type(item["old"]) is not str
-            or not item["new"].isascii()
-            or not item["old"].isascii()
-            or item["occurrence_count"] != 1
-            for item in replacements
-        )
-    ):
-        raise RuntimeError("projection numerical HLO bridge schema drifted")
-    return [dict(item) for item in replacements]
-
-
-def _derive_bridged_hlo(preimage: bytes, replacements: list[dict[str, Any]]) -> bytes:
-    derived = preimage
-    for item in replacements:
-        old = item["old"].encode("ascii")
-        new = item["new"].encode("ascii")
-        if derived.count(old) != 1 or derived.count(new) != 0:
-            raise RuntimeError("projection numerical HLO bridge occurrence drifted")
-        derived = derived.replace(old, new, 1)
-    if (
-        len(derived) != EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES
-        or sha256(derived).hexdigest() != EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256
-    ):
-        raise RuntimeError("projection numerical derived HLO drifted")
-    return derived
 
 
 def _validate_dependencies(
@@ -518,7 +691,9 @@ def _prepare_success(
         "code_hash",
         "compiled_executable_invocation_count",
         "compiler_dependency_manifest",
+        "dsa_rope_row",
         "gate_d_closed",
+        "host_rope_source_sha256s",
         "host_transfer_count",
         "hlo",
         "memory_after_compile",
@@ -543,13 +718,13 @@ def _prepare_success(
     if (
         set(runner) != expected_keys
         or runner.get("artifact_kind")
-        != "gate_d_projection_contraction_pp16_numerical_replay"
-        or runner.get("schema_version") != 1
+        != "gate_d_projection_host_rope_pp16_numerical_replay"
+        or runner.get("schema_version") != 2
         or runner.get("code_hash") != code_pin
         or runner.get("status") != status
         or runner.get("classification") != classification
         or runner.get("claim_scope")
-        != "One exact-input, one-invocation, two-chip PP16 projection/current-key witness only. No decoder, 8K, token, performance, or Gate-D closure claim."
+        != "One exact-input, one-invocation, two-chip PP16 projection/current-key witness with a host FP32 rotary row only. No decoder, 8K, token, performance, or Gate-D closure claim."
         or runner.get("compiled_executable_invocation_count") != 1
         or runner.get("host_transfer_count") != 1
         or runner.get("tpu_numerical_execution_performed") is not True
@@ -558,6 +733,7 @@ def _prepare_success(
         or runner.get("performance_claim") is not False
         or runner.get("physical_group") != EXPECTED_PHYSICAL_GROUP
         or runner.get("predecessors") != EXPECTED_PREDECESSORS
+        or runner.get("host_rope_source_sha256s") != HOST_ROPE_SOURCE_SHA256S
         or runner.get("projection_source_authority")
         != base._projection_contraction_source_authority(code_pin)
         or runner.get("wk_weight")
@@ -573,8 +749,16 @@ def _prepare_success(
     _validate_dependencies(base, runner, dependencies_raw, code_pin)
     numerical = runner["numerical"]
     numerical_outputs = numerical.get("outputs")
+    base_flags = {
+        "dtype_exact",
+        "finite",
+        "owner_sha256",
+        "owners_equal",
+        "shape_exact",
+    }
     if (
-        set(numerical) != {"accepted_tpu_projection_match", "outputs"}
+        set(numerical) != {"accepted_tpu_host_rope_faithful", "outputs", "structural"}
+        or numerical.get("structural") is not True
         or not isinstance(numerical_outputs, Mapping)
         or set(numerical_outputs)
         != {
@@ -583,31 +767,35 @@ def _prepare_success(
             "projected_key_owners",
         }
         or not all(isinstance(record, Mapping) for record in numerical_outputs.values())
-        or any(
-            set(record)
-            != {
-                "dtype_exact",
-                "finite",
-                "owner_sha256",
-                "owners_equal",
-                "shape_exact",
-                "witness_exact",
-            }
-            for record in numerical_outputs.values()
-        )
+        or set(numerical_outputs["normalized_hidden_owners"])
+        != base_flags | {"witness_exact"}
+        or set(numerical_outputs["projected_key_owners"])
+        != base_flags
+        | {"max_abs_error_vs_f64_reference", "tolerance", "within_tolerance"}
+        or set(numerical_outputs["current_key_owners"])
+        != base_flags
+        | {
+            "implied_rotary",
+            "implied_rotary_within_tolerance",
+            "max_abs_error_vs_f64_reference",
+            "nonrotary_max_abs_error",
+            "rotary_max_abs_error",
+            "tolerance",
+            "within_tolerance",
+        }
         or accepted
         != all(
-            all(
-                record.get(flag) is True
-                for flag in (
-                    "dtype_exact",
-                    "finite",
-                    "owners_equal",
-                    "shape_exact",
-                    "witness_exact",
+            (
+                numerical_outputs["normalized_hidden_owners"].get("witness_exact")
+                is True,
+                numerical_outputs["projected_key_owners"].get("within_tolerance")
+                is True,
+                numerical_outputs["current_key_owners"].get("within_tolerance") is True,
+                numerical_outputs["current_key_owners"].get(
+                    "implied_rotary_within_tolerance"
                 )
+                is True,
             )
-            for record in numerical_outputs.values()
         )
     ):
         raise RuntimeError("projection numerical output classification drifted")
@@ -616,61 +804,46 @@ def _prepare_success(
         "stablehlo": "hlo/projection_contraction_pp16_stage0.stablehlo.mlir",
     }
     hlo_payload: dict[str, bytes] = {}
-    bridge_raw = base.snapshot_member(
-        run_fd, "hlo/source_location_bridge.json", limit=1 << 20
-    )
-    if sha256(bridge_raw).hexdigest() != HLO_SOURCE_LOCATION_BRIDGE_SHA256:
-        raise RuntimeError("projection numerical HLO bridge bytes drifted")
-    bridge_replacements = _bridge_replacements(json.loads(bridge_raw))
-    hlo_payload["hlo/source_location_bridge.json"] = bridge_raw
     runner_hlo = runner.get("hlo")
     if not isinstance(runner_hlo, Mapping) or set(runner_hlo) != {
         "optimized_hlo",
-        "source_location_bridge",
         "stablehlo",
     }:
         raise RuntimeError("projection numerical HLO identity catalogue drifted")
-    if runner_hlo["source_location_bridge"] != {
-        "artifact_sha256": HLO_SOURCE_LOCATION_BRIDGE_SHA256,
-        "derived_numerical_hlo": {
-            "byte_count": EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES,
-            "sha256": EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256,
-        },
-        "replacement_count": 3,
-        "source_hlo": {
-            "byte_count": 31857,
-            "run_tag": "gate_d_projection_contraction_pp16_hlo_20260901T213605719107105Z",
-            "sha256": EXPECTED_OPTIMIZED_HLO_SHA256,
-        },
-    }:
-        raise RuntimeError("projection numerical HLO bridge binding drifted")
     for kind, relative in hlo_files.items():
         raw = base.snapshot_member(run_fd, relative)
-        preimage = base.snapshot_member(
-            run_fd,
-            "hlo/acquired_preimage."
-            + ("optimized_hlo.txt" if kind == "optimized_hlo" else "stablehlo.mlir"),
-        )
-        if kind == "optimized_hlo":
-            preimage_sha = EXPECTED_OPTIMIZED_HLO_SHA256
-            expected_sha = EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256
-            expected_raw = _derive_bridged_hlo(preimage, bridge_replacements)
-        else:
-            preimage_sha = expected_sha = EXPECTED_STABLEHLO_SHA256
-            expected_raw = preimage
+        text = raw.decode("utf-8", errors="strict")
+        lowered = text.lower()
         identity = runner_hlo.get(kind, {})
+        structure = identity.get("structure") if isinstance(identity, Mapping) else None
         if (
-            sha256(preimage).hexdigest() != preimage_sha
-            or raw != expected_raw
-            or sha256(raw).hexdigest() != expected_sha
-            or identity != {"byte_count": len(raw), "sha256": expected_sha}
+            not isinstance(identity, Mapping)
+            or identity.get("byte_count") != len(raw)
+            or identity.get("sha256") != sha256(raw).hexdigest()
+            or not isinstance(structure, Mapping)
+            or structure.get("collective_count") != 0
+            or structure.get("transcendental_count") != 0
+            or structure.get("owner_count") != 2
+            or structure.get("live_rows_per_owner") != 1
         ):
             raise RuntimeError(f"projection numerical {kind} identity drifted")
+        if kind == "optimized_hlo":
+            if (
+                not text.startswith(f"HloModule {HLO_MODULE_NAME},")
+                or "num_partitions=2" not in text
+                or any(token in lowered for token in HLO_FORBIDDEN_TEXT)
+                or structure.get("module_name") != HLO_MODULE_NAME
+                or structure.get("entry_parameter_count") != 5
+                or structure.get("contraction_input_width") != 6144
+            ):
+                raise RuntimeError(
+                    "projection numerical optimized HLO contract drifted"
+                )
+        elif any(item not in text for item in STABLEHLO_REQUIRED_TEXT) or any(
+            token in lowered for token in STABLEHLO_FORBIDDEN_TEXT
+        ):
+            raise RuntimeError("projection numerical StableHLO contract drifted")
         hlo_payload[relative] = raw
-        hlo_payload[
-            "hlo/acquired_preimage."
-            + ("optimized_hlo.txt" if kind == "optimized_hlo" else "stablehlo.mlir")
-        ] = preimage
     output_raw = base.snapshot_member(run_fd, "outputs.npz")
     if runner.get("output_artifact") != {
         "byte_count": len(output_raw),
@@ -678,14 +851,17 @@ def _prepare_success(
         "sha256": sha256(output_raw).hexdigest(),
     }:
         raise RuntimeError("projection numerical output artifact drifted")
-    if _validate_output_npz(output_raw, runner, numerical) is not accepted:
+    rope_row_raw = base.snapshot_member(run_fd, "dsa_rope_row.f32le", limit=4096)
+    if (
+        _validate_output_npz(output_raw, runner, numerical, rope_row_raw)
+        is not accepted
+    ):
         raise RuntimeError("projection numerical status differs from output bytes")
     mirror_raw = base.snapshot_member(run_fd, "mirror.sha256", limit=2 << 20)
     base._validate_mirror_replay(mirror_raw, code_pin)
     sync_raw = base.snapshot_member(run_fd, "sync.txt", limit=1 << 20)
     expected_sync = (
-        f"SYNC_OK {os.uname().nodename} {code_pin} numerical_host_only=1 "
-        "sealed_source_archive=1\n"
+        f"SYNC_OK {os.uname().nodename} {code_pin} origin_and_same_region_mirror\n"
     ).encode("ascii")
     if sync_raw != expected_sync:
         raise RuntimeError("projection numerical host code authority drifted")
@@ -717,6 +893,7 @@ def _prepare_success(
         "census_post.txt": census_post,
         "census_pre.txt": census_pre,
         "dependencies.json": dependencies_raw,
+        "dsa_rope_row.f32le": rope_row_raw,
         **hlo_payload,
         "mirror.sha256": mirror_raw,
         "orchestrator.sealed.log": orchestrator,

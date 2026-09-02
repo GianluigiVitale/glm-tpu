@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Run one protected two-chip Gate-D projection numerical discriminator.
+"""Run one protected two-chip Gate-D host-rope projection numerical replay (V3).
 
-The default-off driver authenticates the successful compile-only predecessor,
-loads only the sealed layer-1 normalized/key operands, recompiles the identical
-PP16 stage-zero callable, invokes it exactly once, and performs one bounded
-host transfer.  Acceptance proves only this projection/current-key witness;
-Gate D, the decoder, 8K, and performance remain open.
+The default-off driver authenticates the accepted predecessors, loads only the
+sealed layer-1 normalized/key operands plus one host-evaluated FP32 rotary
+row, compiles the host-rope PP16 stage-zero callable, audits its HLO structure
+(no communication, no on-device transcendentals, exact I/O), invokes it exactly
+once, and performs one bounded host transfer.  Acceptance proves only that the
+bounded key path is FP32-faithful once rotary leaves the accelerator; Gate D,
+the decoder, 8K, and performance remain open.
 """
 
 from __future__ import annotations
@@ -71,31 +73,27 @@ EXPECTED_OPTIMIZED_HLO_SHA256 = (
 )
 EXPECTED_STABLEHLO_BYTES = 7420
 EXPECTED_OPTIMIZED_HLO_BYTES = 31857
-# The compile-only acquisition driver and this numerical driver are different
-# installed files, so XLA's optimized-HLO debug metadata (FileNames entry and
-# two call-site FileLocations) differs while the graph body and StableHLO are
-# byte-identical.  The reviewed bridge artifact pins exactly those three
-# substitutions; the expected numerical HLO is derived from the accepted
-# preimage and nothing else is normalized.
-HLO_SOURCE_LOCATION_BRIDGE_SHA256 = (
-    "c2732f7184416cce87839b4cadf552b94d983aba06fa56b687eaacc03ca26bea"
-)
-EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256 = (
-    "70485b066b44233d82c2a728f09753f8a71306074fdd8b856112e46ab1f60564"
-)
-EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES = 31861
-HLO_ACQUIRER_INSTALL_PATH = (
-    "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v3/"
-    "acquire_gate_d_projection_contraction_pp16_hlo.py"
-)
 NUMERICAL_DRIVER_INSTALL_PATH = (
-    "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v2/"
+    "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v3/"
     "run_gate_d_projection_contraction_pp16_numerical.py"
 )
-HLO_ACQUIRER_MODULE_CALL_LINE = 1506
-HLO_ACQUIRER_LOWER_CALL_LINE = 1365
-NUMERICAL_DRIVER_MODULE_CALL_LINE = 837
-NUMERICAL_DRIVER_LOWER_CALL_LINE = 676
+# Exact committed sources of the host-rope graph and its validation.  The sealed
+# source archive already derives from the pinned commit; these pins add
+# fail-closed identity for the modules that define the bounded claim.
+HOST_ROPE_SOURCE_SHA256S = {
+    "glm_tpu/greenfield/benchmarking/gate_d_projection_contraction_pp16_host_rope.py": (
+        "29f8b72340f316b04504e21e5aa4554ce8836ad5592494753a880fababb739bf"
+    ),
+    "glm_tpu/greenfield/kernels/reference/dsa_host_rope.py": (
+        "74ead92ca1f73cfeac2b58f95ab9ba08e2fae50a0d1bbad3b4b66eda42e615d4"
+    ),
+    "glm_tpu/greenfield/kernels/reference/rotary_table.py": (
+        "82fce9e3e1bc64aa8d1c48fcfe2041a34887922bd329e90aeb3d477f401d7e58"
+    ),
+    "glm_tpu/greenfield/validation/gate_d_projection_host_rope_numerical.py": (
+        "e8640f930913b4bb598bbc4fbfd61eb651a691b7a8a674f03bcd82a60c24bb5b"
+    ),
+}
 TAG_PATTERN = r"gate_d_projection_contraction_pp16_numerical_[0-9]{8}T[0-9]{15}Z"
 _MAX_NPZ_MEMBER_BYTES = 64 * 1024 * 1024
 _MAX_NPZ_TOTAL_BYTES = 32 * 1024 * 1024
@@ -344,145 +342,19 @@ def _host_outputs(result: Any, jax: Any, np: Any) -> dict[str, Any]:
     }
 
 
-def expected_hlo_source_location_replacements() -> list[dict[str, Any]]:
-    return [
-        {
-            "new": NUMERICAL_DRIVER_INSTALL_PATH,
-            "old": HLO_ACQUIRER_INSTALL_PATH,
-            "occurrence_count": 1,
-            "surface": "FileNames",
-        },
-        {
-            "new": (
-                f"line={NUMERICAL_DRIVER_MODULE_CALL_LINE} "
-                f"end_line={NUMERICAL_DRIVER_MODULE_CALL_LINE}"
-            ),
-            "old": (
-                f"line={HLO_ACQUIRER_MODULE_CALL_LINE} "
-                f"end_line={HLO_ACQUIRER_MODULE_CALL_LINE}"
-            ),
-            "occurrence_count": 1,
-            "surface": "FileLocations module call",
-        },
-        {
-            "new": (
-                f"line={NUMERICAL_DRIVER_LOWER_CALL_LINE} "
-                f"end_line={NUMERICAL_DRIVER_LOWER_CALL_LINE}"
-            ),
-            "old": (
-                f"line={HLO_ACQUIRER_LOWER_CALL_LINE} "
-                f"end_line={HLO_ACQUIRER_LOWER_CALL_LINE}"
-            ),
-            "occurrence_count": 1,
-            "surface": "FileLocations lower call",
-        },
-    ]
-
-
-def derive_hlo_from_source_location_replacements(
-    accepted_optimized_hlo: bytes, replacements: list[dict[str, Any]]
-) -> bytes:
-    """Apply the exact single-occurrence substitutions; nothing else changes."""
-
-    derived = accepted_optimized_hlo
-    for replacement in replacements:
-        old = replacement["old"].encode("ascii")
-        new = replacement["new"].encode("ascii")
-        if (
-            replacement["occurrence_count"] != 1
-            or derived.count(old) != 1
-            or derived.count(new) != 0
-        ):
-            raise RuntimeError("Gate-D HLO source-location occurrence drifted")
-        derived = derived.replace(old, new, 1)
-    return derived
-
-
-def validate_hlo_source_location_bridge(
-    report: Mapping[str, Any], accepted_optimized_hlo: bytes
-) -> tuple[bytes, dict[str, Any]]:
-    """Derive the numerical-driver optimized HLO from the accepted preimage."""
-
-    replacements = expected_hlo_source_location_replacements()
-    expected = {
-        "artifact_kind": (
-            "gate_d_projection_contraction_pp16_hlo_source_location_bridge"
-        ),
-        "classification": (
-            "SOURCE_LOCATION_METADATA_ONLY_HASH_DRIFT;"
-            "GRAPH_BODY_UNCHANGED_BY_EXACT_PREIMAGE_DERIVATION;"
-            "STABLEHLO_BYTE_IDENTICAL;TPU_EXECUTABLE_NOT_INVOKED;"
-            "NUMERICAL_UNPROVEN;NO_PERFORMANCE_CLAIM;GATE_D_OPEN"
-        ),
-        "derived_numerical_hlo": {
-            "byte_count": EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES,
-            "sha256": EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256,
-        },
-        "derivation": {
-            "method": (
-                "Apply exactly the three listed single-occurrence UTF-8 "
-                "substitutions to the accepted optimized-HLO bytes, with no "
-                "normalization or other mutation, then hash the complete result."
-            ),
-            "replacement_count": 3,
-            "replacements": replacements,
-        },
-        "gate_d_closed": False,
-        "numerical_claim": False,
-        "observed_failure": {
-            "compiled_executable_invocation_count": 0,
-            "driver_install_path": (
-                "/usr/local/libexec/glm-tpu/"
-                "gate-d-projection-contraction-pp16-numerical-v1/"
-                "run_gate_d_projection_contraction_pp16_numerical.py"
-            ),
-            "optimized_hlo_bytes_preserved": True,
-            "optimized_hlo_sha256": (
-                "f783a7d8096cd29855ddab01cbb154ede69aee505a5ca34d3b6c255fc8635158"
-            ),
-            "run_tag": (
-                "gate_d_projection_contraction_pp16_numerical_20260901T233855937688834Z"
-            ),
-            "stablehlo_sha256": EXPECTED_STABLEHLO_SHA256,
-        },
-        "performance_claim": False,
-        "schema_version": 1,
-        "source_hlo": {
-            "byte_count": EXPECTED_OPTIMIZED_HLO_BYTES,
-            "run_tag": "gate_d_projection_contraction_pp16_hlo_20260901T213605719107105Z",
-            "sha256": EXPECTED_OPTIMIZED_HLO_SHA256,
-        },
-        "verification_scope": (
-            "Under SHA-256 collision resistance, the numerical driver's compiler "
-            "text equals the exact accepted optimized-HLO preimage after only the "
-            "authenticated installed-path and call-site line metadata "
-            "substitutions. This authorizes only the exact numerical-driver raw "
-            "HLO hash; it does not relax StableHLO identity, HLO locality, "
-            "numerical, performance, or Gate-D gates."
-        ),
-        "tpu_numerical_execution_performed": False,
-    }
-    if report != expected:
-        raise RuntimeError("Gate-D HLO source-location bridge schema drifted")
-    if (
-        len(accepted_optimized_hlo) != EXPECTED_OPTIMIZED_HLO_BYTES
-        or sha256(accepted_optimized_hlo).hexdigest() != EXPECTED_OPTIMIZED_HLO_SHA256
-    ):
-        raise RuntimeError("Gate-D accepted optimized-HLO preimage drifted")
-    derived = derive_hlo_from_source_location_replacements(
-        accepted_optimized_hlo, replacements
-    )
-    if (
-        len(derived) != EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES
-        or sha256(derived).hexdigest() != EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256
-    ):
-        raise RuntimeError("Gate-D derived numerical optimized-HLO drifted")
-    return derived, {
-        "artifact_sha256": HLO_SOURCE_LOCATION_BRIDGE_SHA256,
-        "derived_numerical_hlo": expected["derived_numerical_hlo"],
-        "replacement_count": 3,
-        "source_hlo": expected["source_hlo"],
-    }
+def _verify_host_rope_sources(code_pin: str) -> dict[str, str]:
+    observed: dict[str, str] = {}
+    for relative, expected in sorted(HOST_ROPE_SOURCE_SHA256S.items()):
+        raw = _snapshot_regular(WORKTREE / relative)
+        if raw != _git_bytes("show", f"{code_pin}:{relative}"):
+            raise RuntimeError(
+                f"Gate-D host-rope source is not the committed blob: {relative}"
+            )
+        digest = sha256(raw).hexdigest()
+        if digest != expected:
+            raise RuntimeError(f"Gate-D host-rope source hash drifted: {relative}")
+        observed[relative] = digest
+    return observed
 
 
 def parse_args() -> argparse.Namespace:
@@ -492,9 +364,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--topology-authority", type=Path, required=True)
     parser.add_argument("--projection-source", type=Path, required=True)
     parser.add_argument("--hlo-success-authority", type=Path, required=True)
-    parser.add_argument("--accepted-stablehlo", type=Path, required=True)
-    parser.add_argument("--accepted-optimized-hlo", type=Path, required=True)
-    parser.add_argument("--hlo-source-location-bridge", type=Path, required=True)
     parser.add_argument("--frontier-authority", type=Path, required=True)
     parser.add_argument("--host-materialization-authority", type=Path, required=True)
     parser.add_argument("--capsule", type=Path, required=True)
@@ -554,24 +423,9 @@ def main() -> int:
         HLO_SUCCESS_AUTHORITY_SHA256,
         "HLO success authority",
     )
-    accepted_stablehlo = _snapshot_regular(args.accepted_stablehlo)
-    accepted_optimized_hlo = _snapshot_regular(args.accepted_optimized_hlo)
-    if (
-        len(accepted_stablehlo) != EXPECTED_STABLEHLO_BYTES
-        or sha256(accepted_stablehlo).hexdigest() != EXPECTED_STABLEHLO_SHA256
-        or len(accepted_optimized_hlo) != EXPECTED_OPTIMIZED_HLO_BYTES
-        or sha256(accepted_optimized_hlo).hexdigest() != EXPECTED_OPTIMIZED_HLO_SHA256
-    ):
-        raise RuntimeError("Gate-D accepted projection HLO bytes drifted")
     if Path(__file__) != Path(NUMERICAL_DRIVER_INSTALL_PATH):
-        raise RuntimeError("Gate-D numerical driver is not the bridged installed path")
-    hlo_bridge_raw = _snapshot_regular(args.hlo_source_location_bridge)
-    if sha256(hlo_bridge_raw).hexdigest() != HLO_SOURCE_LOCATION_BRIDGE_SHA256:
-        raise RuntimeError("Gate-D HLO source-location bridge bytes drifted")
-    derived_optimized_hlo, hlo_bridge_binding = validate_hlo_source_location_bridge(
-        json.loads(hlo_bridge_raw.decode("ascii", errors="strict")),
-        accepted_optimized_hlo,
-    )
+        raise RuntimeError("Gate-D numerical driver is not the V3 installed path")
+    host_rope_sources = _verify_host_rope_sources(args.expected_code_hash)
     input_raw = _snapshot_regular(args.capsule_inputs)
     state_raw = _snapshot_regular(args.capsule_state)
     if (
@@ -580,15 +434,6 @@ def main() -> int:
     ):
         raise RuntimeError("Gate-D projection capsule NPZ bytes drifted")
     run_fd = helper._open_inherited_run_dir(args.run_dir, args.run_dir_fd)
-    helper._write_run_member_exclusive(
-        run_fd, "hlo/acquired_preimage.stablehlo.mlir", accepted_stablehlo
-    )
-    helper._write_run_member_exclusive(
-        run_fd, "hlo/acquired_preimage.optimized_hlo.txt", accepted_optimized_hlo
-    )
-    helper._write_run_member_exclusive(
-        run_fd, "hlo/source_location_bridge.json", hlo_bridge_raw
-    )
     source_fd, source_path, source_snapshot = helper._sealed_git_source_archive(
         args.expected_code_hash, repo=WORKTREE
     )
@@ -599,14 +444,20 @@ def main() -> int:
     import ml_dtypes
     import numpy as np
 
-    from glm_tpu.greenfield.benchmarking.gate_d_projection_contraction_pp16 import (
-        build_gate_d_projection_contraction_pp16,
+    from glm_tpu.greenfield.benchmarking.gate_d_projection_contraction_pp16_host_rope import (
+        build_gate_d_projection_host_rope_pp16,
     )
     from glm_tpu.greenfield.validation.gate_d_projection_contraction_numerical import (
-        classify_projection_outputs,
         projection_state_records,
         validate_predecessors,
         validate_wk_weight,
+    )
+    from glm_tpu.greenfield.validation.gate_d_projection_host_rope_numerical import (
+        audit_host_rope_optimized_hlo,
+        audit_host_rope_stablehlo,
+        classify_host_rope_outputs,
+        dsa_rope_row_identity,
+        materialize_dsa_rope_row,
     )
 
     project_modules = helper._verify_project_imports(source_path)
@@ -659,13 +510,21 @@ def main() -> int:
     normalized = normalized_bits.view(ml_dtypes.bfloat16)
     wk_weight = _materialize_wk(inputs, np, ml_dtypes)
     wk_identity = validate_wk_weight(wk_weight, np)
+    rope_row = materialize_dsa_rope_row(np)
+    rope_identity = dsa_rope_row_identity(rope_row, np)
+    # Archive the exact FP32 row fed to the device so the publisher and any
+    # offline adjudication reuse these bytes instead of re-deriving libm values.
+    helper._write_run_member_exclusive(
+        run_fd, "dsa_rope_row.f32le", np.ascontiguousarray(rope_row[0]).tobytes()
+    )
     arguments = (
         normalized,
         wk_weight,
         inputs["key_norm_weight_bf16_bits"].view(ml_dtypes.bfloat16),
         inputs["key_norm_bias_bf16_bits"].view(ml_dtypes.bfloat16),
+        rope_row,
     )
-    replay = build_gate_d_projection_contraction_pp16(devices=devices)
+    replay = build_gate_d_projection_host_rope_pp16(devices=devices)
     dependencies_before = helper._compiler_dependency_records(source_path)
     if not dependencies_before["accelerator_device_nodes_observed_mapped"]:
         raise RuntimeError("TPU accelerator device mapping is absent before compile")
@@ -685,8 +544,14 @@ def main() -> int:
         "hlo/projection_contraction_pp16_stage0.optimized_hlo.txt",
         optimized_hlo,
     )
-    if stablehlo != accepted_stablehlo or optimized_hlo != derived_optimized_hlo:
-        raise RuntimeError("Gate-D projection numerical executable HLO drifted")
+    hlo_structure = {
+        "optimized_hlo": audit_host_rope_optimized_hlo(
+            optimized_hlo.decode("utf-8", errors="strict")
+        ),
+        "stablehlo": audit_host_rope_stablehlo(
+            stablehlo.decode("utf-8", errors="strict")
+        ),
+    }
     memory_after_compile = [helper._memory_stats(device) for device in devices]
 
     invocation_count = 0
@@ -698,7 +563,15 @@ def main() -> int:
     host = _host_outputs(result, jax, np)
     if invocation_count != 1:
         raise AssertionError("Gate-D projection executable invocation count drifted")
-    classification = classify_projection_outputs(host, np)
+    classification = classify_host_rope_outputs(
+        host,
+        np,
+        wk_weight=wk_weight,
+        key_norm_weight_bits=inputs["key_norm_weight_bf16_bits"],
+        key_norm_bias_bits=inputs["key_norm_bias_bf16_bits"],
+        rope_row=rope_row,
+        ml_dtypes=ml_dtypes,
+    )
     archived = {
         name: (
             np.ascontiguousarray(value).view(np.uint16)
@@ -754,18 +627,22 @@ def main() -> int:
     dependency_identity = helper._write_run_member_exclusive(
         run_fd, "dependencies.json", dependency_raw
     )
-    accepted = classification["accepted_tpu_projection_match"]
+    accepted = classification["accepted_tpu_host_rope_faithful"]
     report = {
-        "artifact_kind": "gate_d_projection_contraction_pp16_numerical_replay",
+        "artifact_kind": "gate_d_projection_host_rope_pp16_numerical_replay",
         "claim_scope": (
             "One exact-input, one-invocation, two-chip PP16 projection/current-key "
-            "witness only. No decoder, 8K, token, performance, or Gate-D closure claim."
+            "witness with a host FP32 rotary row only. No decoder, 8K, token, "
+            "performance, or Gate-D closure claim."
         ),
         "classification": (
-            "BOUNDED_TPU_PROJECTION_NUMERICAL_ACCEPTED;ROOT_CAUSE_FIX_UNPROVEN;GATE_D_OPEN"
+            "BOUNDED_TPU_HOST_ROPE_KEY_FAITHFUL;ROTARY_ROOT_CAUSE_FIX_BOUNDED_PROOF;"
+            "DECODER_UNPROVEN;GATE_D_OPEN"
             if accepted
-            else "BOUNDED_TPU_PROJECTION_NUMERICAL_REJECTED;PROJECTION_CONTRACTION_MISMATCH;GATE_D_OPEN"
+            else "BOUNDED_TPU_HOST_ROPE_KEY_UNFAITHFUL;ROTARY_FIX_REJECTED;GATE_D_OPEN"
         ),
+        "dsa_rope_row": rope_identity,
+        "host_rope_source_sha256s": host_rope_sources,
         "code_hash": args.expected_code_hash,
         "compiled_executable_invocation_count": invocation_count,
         "compiler_dependency_manifest": {
@@ -788,11 +665,12 @@ def main() -> int:
             "optimized_hlo": {
                 "byte_count": len(optimized_hlo),
                 "sha256": sha256(optimized_hlo).hexdigest(),
+                "structure": hlo_structure["optimized_hlo"],
             },
-            "source_location_bridge": hlo_bridge_binding,
             "stablehlo": {
                 "byte_count": len(stablehlo),
                 "sha256": sha256(stablehlo).hexdigest(),
+                "structure": hlo_structure["stablehlo"],
             },
         },
         "memory_after_compile": memory_after_compile,
@@ -813,7 +691,7 @@ def main() -> int:
             "ml_dtypes": version("ml_dtypes"),
             "numpy": version("numpy"),
         },
-        "schema_version": 1,
+        "schema_version": 2,
         "sealed_project_source": source_snapshot,
         "status": "NUMERICAL_ACCEPTED" if accepted else "NUMERICAL_REJECTED",
         "tpu_execution_elapsed_ns_diagnostic_only": completed_ns - started_ns,
@@ -826,7 +704,7 @@ def main() -> int:
     os.close(run_fd)
     os.close(source_fd)
     print(
-        "GATE_D_PROJECTION_CONTRACTION_PP16_"
+        "GATE_D_PROJECTION_HOST_ROPE_PP16_"
         f"{report['status']} execution_count=1 gate_d_open=true",
         flush=True,
     )

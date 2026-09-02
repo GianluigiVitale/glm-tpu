@@ -12,16 +12,16 @@ from collections.abc import Mapping
 from hashlib import sha256
 from pathlib import Path
 
-SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-projection-contraction-numerical-install-v2")
+SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-projection-contraction-numerical-install-v3")
 INSTALLER_PATH = (
     SOURCE_ROOT / "install_gate_d_projection_contraction_pp16_numerical_runtime.py"
 )
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
 LAUNCHER_TARGET = (
-    LAUNCHER_PARENT / "launch_gate_d_projection_contraction_pp16_numerical_v2.py"
+    LAUNCHER_PARENT / "launch_gate_d_projection_contraction_pp16_numerical_v3.py"
 )
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-projection-contraction-pp16-numerical-v2"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-projection-contraction-pp16-numerical-v3"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -31,13 +31,13 @@ EXPECTED_ENVIRONMENT = {
 }
 PAYLOADS = {
     "run_gate_d_projection_contraction_pp16_numerical.py": (
-        "a38bb8b89bb8cf70568c8562b2013f188b7c8ed17f1e41edad37a40332156404"
+        "f519ce4041d6bd3ed47f85044003edba6ce546f31ade64ee5033881e72a205be"
     ),
     "launch_gate_d_projection_contraction_pp16_numerical.py": (
-        "80c9116fcf9397995bb26bb14e660d5982213b7c5d4be01afa576168b188d191"
+        "61a45b6dc0608c1626e371bfead471afbcddd2448fab21410504da9bfdc07514"
     ),
     "publish_gate_d_projection_contraction_pp16_numerical.py": (
-        "5c5e58afa2c36e46377512a777df6a00669419f9f1c93e3504f71ea1334f6665"
+        "5a8d30cf398a26a480c72b300ac6d01eeb22e3e8a792947d5ba835262b710c83"
     ),
     "verify_gate_d_same_region_git_mirror.py": (
         "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"

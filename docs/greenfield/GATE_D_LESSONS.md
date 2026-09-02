@@ -1108,3 +1108,13 @@ normalized-state cause.
   source-location bridge (path + call-site lines, single-occurrence substitutions, derived hash) and
   compare against the derived bytes. Pin the call-site line constants with a test against the driver
   source, because formatters shift them.
+- TPU on-device `jnp.cos`/`jnp.sin` of large rotary angles (position × inverse frequency up to
+  ~8155 rad at position 8155, theta 8e6) deviate from the true values by up to ~1e-2, while a host
+  f32 table (vLLM/legacy) is accurate to the f32 argument-rounding level (~7e-5). The DSA indexer
+  key/query rotary evaluated on device therefore diverges from the accepted keys by ~2e-3 per
+  element while projection (f32-accurate) and key LayerNorm (bit-exact) are innocent. Evaluate
+  rotary tables on the host with the accepted f32 formula and gather rows by position on device;
+  never trust on-device transcendental range reduction for exactness.
+- A rejected bounded discriminator is still decisive evidence when its outputs are archived: the
+  V2 rejection was fully adjudicated on CPU from `outputs.npz` alone (implied cos/sin from
+  pre-/post-rotation pairs) without another TPU run.

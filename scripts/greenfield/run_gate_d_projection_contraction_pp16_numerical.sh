@@ -12,7 +12,7 @@ from pathlib import Path
 
 root = Path("/opt/glm-tpu/locks")
 names = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")
-launcher = Path("/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v2.py")
+launcher = Path("/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v3.py")
 parent_fd = os.open(
     root, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
 )
@@ -425,12 +425,6 @@ readonly TOPOLOGY=$WORKTREE/docs/artifacts/gate-d-runtime-locality-authority.jso
 readonly TOPOLOGY_SHA=49cf6bb1a553985855556d1401ad85918669df52d12f8dc5150f247d18b325eb
 readonly HLO_SUCCESS_AUTHORITY=$WORKTREE/docs/artifacts/gate-d-projection-contraction-pp16-success-hlo-adjudication.json
 readonly HLO_SUCCESS_AUTHORITY_SHA=54eb6105b81d9ffdbdd3b90735059fb324701509fe8efd003033bb3cff7e0ad7
-readonly ACCEPTED_STABLEHLO=/home/gianl/gate-d-runs/gate_d_projection_contraction_pp16_hlo_20260901T213605719107105Z/hlo/projection_contraction_pp16_stage0.stablehlo.mlir
-readonly ACCEPTED_STABLEHLO_SHA=4b3fa252e837d381208453b06d7e369947fa4c6c58c795edc8ff5a8ea8c9e2e3
-readonly ACCEPTED_OPTIMIZED_HLO=/home/gianl/gate-d-runs/gate_d_projection_contraction_pp16_hlo_20260901T213605719107105Z/hlo/projection_contraction_pp16_stage0.optimized_hlo.txt
-readonly ACCEPTED_OPTIMIZED_HLO_SHA=817ba2ed87c33ec928f834fcf3a003ce63d3dedf4061a7c64fe354a26ac498ea
-readonly HLO_SOURCE_LOCATION_BRIDGE=$WORKTREE/docs/artifacts/gate-d-projection-contraction-pp16-hlo-source-location-bridge.json
-readonly HLO_SOURCE_LOCATION_BRIDGE_SHA=c2732f7184416cce87839b4cadf552b94d983aba06fa56b687eaacc03ca26bea
 readonly PROJECTION_SOURCE=$WORKTREE/docs/artifacts/gate-d-projection-contraction-pp16-source.json
 readonly PROJECTION_SOURCE_SHA=5744eee0ef2cf35a4566cc0de165be1338160daaae3f4dd133554b2aa8280e9f
 readonly FRONTIER_AUTHORITY=$WORKTREE/docs/artifacts/gate-d-projection-arithmetic-frontier-analysis.json
@@ -446,11 +440,11 @@ readonly CAPSULE_EXECUTION_AUTHORITY=/home/gianl/gate-d-runs/greenfield_gate_d_c
 readonly CAPSULE_EXECUTION_AUTHORITY_SHA=8b8c9cc79a18679628582a66c418a7f63e06553091928df58defbdde3971a660
 readonly HOST_MATERIALIZATION_AUTHORITY=$WORKTREE/docs/artifacts/gate-d-pp16-numerical-host-materialization-equivalence.json
 readonly HOST_MATERIALIZATION_AUTHORITY_SHA=a7e5b393f7c61181f6b2aab9531d788fb27594d9cf980055c165b6f278ba4f99
-readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v2
+readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v3
 readonly DRIVER=$IMMUTABLE_CAPSULE_ROOT/run_gate_d_projection_contraction_pp16_numerical.py
-readonly DRIVER_SHA=a38bb8b89bb8cf70568c8562b2013f188b7c8ed17f1e41edad37a40332156404
+readonly DRIVER_SHA=f519ce4041d6bd3ed47f85044003edba6ce546f31ade64ee5033881e72a205be
 readonly PUBLISHER=$IMMUTABLE_CAPSULE_ROOT/publish_gate_d_projection_contraction_pp16_numerical.py
-readonly PUBLISHER_SHA=5c5e58afa2c36e46377512a777df6a00669419f9f1c93e3504f71ea1334f6665
+readonly PUBLISHER_SHA=5a8d30cf398a26a480c72b300ac6d01eeb22e3e8a792947d5ba835262b710c83
 readonly MIRROR_VERIFIER=$IMMUTABLE_CAPSULE_ROOT/verify_gate_d_same_region_git_mirror.py
 readonly MIRROR_VERIFIER_SHA=091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b
 readonly DRIVER_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12
@@ -508,9 +502,6 @@ readonly VACANCY_EXPECTED='ERROR: (gcloud.storage.ls) One or more URLs matched n
 [[ -z $(git_local status --porcelain) ]]
 [[ $(/usr/bin/sha256sum "$TOPOLOGY" | /usr/bin/awk '{print $1}') == "$TOPOLOGY_SHA" ]]
 [[ $(/usr/bin/sha256sum "$HLO_SUCCESS_AUTHORITY" | /usr/bin/awk '{print $1}') == "$HLO_SUCCESS_AUTHORITY_SHA" ]]
-[[ $(/usr/bin/sha256sum "$ACCEPTED_STABLEHLO" | /usr/bin/awk '{print $1}') == "$ACCEPTED_STABLEHLO_SHA" ]]
-[[ $(/usr/bin/sha256sum "$ACCEPTED_OPTIMIZED_HLO" | /usr/bin/awk '{print $1}') == "$ACCEPTED_OPTIMIZED_HLO_SHA" ]]
-[[ $(/usr/bin/sha256sum "$HLO_SOURCE_LOCATION_BRIDGE" | /usr/bin/awk '{print $1}') == "$HLO_SOURCE_LOCATION_BRIDGE_SHA" ]]
 [[ $(/usr/bin/sha256sum "$PROJECTION_SOURCE" | /usr/bin/awk '{print $1}') == "$PROJECTION_SOURCE_SHA" ]]
 [[ $(/usr/bin/sha256sum "$FRONTIER_AUTHORITY" | /usr/bin/awk '{print $1}') == "$FRONTIER_AUTHORITY_SHA" ]]
 [[ $(/usr/bin/sha256sum "$CAPSULE" | /usr/bin/awk '{print $1}') == "$CAPSULE_SHA" ]]
@@ -722,9 +713,6 @@ set +e
         --expected-code-hash "$PIN" \
         --expected-driver-sha256 "$DRIVER_SHA" \
         --hlo-success-authority "$HLO_SUCCESS_AUTHORITY" \
-        --accepted-stablehlo "$ACCEPTED_STABLEHLO" \
-        --accepted-optimized-hlo "$ACCEPTED_OPTIMIZED_HLO" \
-        --hlo-source-location-bridge "$HLO_SOURCE_LOCATION_BRIDGE" \
         --projection-source "$PROJECTION_SOURCE" \
         --frontier-authority "$FRONTIER_AUTHORITY" \
         --topology-authority "$TOPOLOGY" \

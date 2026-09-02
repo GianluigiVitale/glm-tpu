@@ -10038,3 +10038,82 @@ Sol batched review approved persistence (`618d1222…0e5f`), the two V2 install-
 execute-once tag. Commit `79dd3e38de4e90288700f27a37052484871a0d79` carries the bridge fix. The reviewed analyzer regenerated the V2
 certificate `docs/artifacts/gate-d-projection-contraction-pp16-numerical-orchestration-install-source-v2.json`
 (SHA-256 `47326e292e67a1968886bba9cf35cf1fb1d969afccd3673f1243a14e881a3171`, code hash `79dd3e38de4e90288700f27a37052484871a0d79`); persistence only. Next: mirror replay, V2 install, one run.
+
+## 2026-09-02 V2 numerical discriminator executed: NUMERICAL_REJECTED; root cause localized to on-device rotary
+
+Tag `gate_d_projection_contraction_pp16_numerical_20260901T235818944668679Z` (pin `f926bebf…`) passed
+vacancy, mirror replay and 8/8 pre-census; the V2 driver compiled the bridged HLO byte-exactly
+(StableHLO `4b3fa252…`, optimized `70485b06…`), invoked the executable exactly once on chips {0,1}
+(3.45 ms), performed one bounded host transfer and reported `NUMERICAL_REJECTED`: both owners agree
+bit-for-bit; `normalized_hidden_owners` matches the witness exactly; `projected_key_owners` and
+`current_key_owners` do not. The publisher then failed closed on a pre-existing wrapper/publisher
+contract mismatch (`sync.txt` is `SYNC_OK <host> <pin> origin_and_same_region_mirror` while the
+publisher expected `numerical_host_only=1 sealed_source_archive=1`), so the terminal `NUMERICAL_RESULT`
+was not written; the 18-object bounded diagnostic (including `runner.json`, `outputs.npz`, both
+HLOs and the bridge) was archived under the tag's `diagnostic/` prefix, terminal generation
+`1788307624494629`. Post-census 8/8 clean. The tag is burned.
+
+CPU-only adjudication (`scripts/greenfield/adjudicate_gate_d_projection_numerical_v2_rejection.py`,
+SHA-256 `d23b6893…2d90`; artifact `docs/artifacts/gate-d-projection-numerical-v2-rejection-adjudication.json`,
+SHA-256 `25908caf48e19e64f94270c5eaeda64d6c34732f0b07f105741f2a3baf181ef7`) localizes the divergence:
+TPU projection vs f64-accumulated reference max 4.8e-7 (f32-accurate; accumulation order differs
+from CPU by ≤1 ulp on 103/128 lanes); TPU key non-rotary dims equal the CPU key LayerNorm of the
+TPU projection bit-for-bit (0/64 mismatches); all 52 large mismatches (max 2.293e-3, the same
+statistics as the previously rejected engine key) lie in the 64 rotary dims. The cosine/sine the
+TPU effectively applied, recovered from pre-/post-rotation pairs, deviate from f64 truth by up to
+9.9e-3 (cos, angle 4962.5 rad) and 4.0e-3 (sin), whereas the accepted key's implied cos/sin match
+an accurately evaluated f32 table to 7.1e-5, identical to jax-CPU f32. Root cause candidate:
+`rotary_cos_sin` evaluates `jnp.cos/sin(position * inv_freq)` on the TPU inside the DSA key and
+query paths (`kernels/reference/dsa.py`, `kernels/stage_local.py`), where TPU range reduction at
+large arguments is inaccurate; the legacy indexer consumes a host-computed vLLM f32 cos/sin cache.
+The main MLA path already has a host `main_rope_table_row`; DSA does not. Fix direction: host f32
+DSA rotary table (accepted formula), device gather by position, apply in f32; then re-run the
+bounded discriminator expecting rotary dims bit-exact to the CPU key of the TPU projection, and fix
+the publisher `sync.txt` expectation. Gate D remains open; no performance claim.
+
+## 2026-09-02 V3 host-rope numerical replay sources: rotary leaves the accelerator
+
+New modules keep every historical byte pin intact: `kernels/reference/rotary_table.py` builds the
+FP32 DSA `cos|sin` table on the host (negative-power FP32 inverse frequencies bit-identical to the
+on-device form; FP32 angle products; libm FP32 cos/sin within one ulp of XLA-CPU; full 256K table
+SHA-256 `29592282…b934e`, 64 MiB) and `kernels/reference/dsa_host_rope.py` normalizes/rotates FP32
+keys and queries from supplied rows. Builder
+`benchmarking/gate_d_projection_contraction_pp16_host_rope.py` adds one `(2,64)` FP32 row input and
+contains no on-device transcendental; CPU lowering shows no `stablehlo.cosine/sine`, no collective,
+outputs unchanged. Validation `gate_d_projection_host_rope_numerical.py` pins the position-8155 row
+(`748aa612…a9c0`), audits HLO structure (module `jit__projection_host_rope_local`, 5 parameters,
+zero collectives/transcendentals/host effects, FP32 6144 contraction) and classifies faithfulness:
+normalized witness exact; projection within 1e-6 of an F64-accumulated reference; current key within
+1e-6 of an F64 reference built from the TPU's own projection and the archived row; implied cos/sin
+within 1e-6 of the row. Byte identity with the legacy key is deliberately not a criterion (a pure CPU
+replica differs by one ulp on 45 dims); the archived V2 bytes are rejected by this classifier for
+rotary only (implied cos error 9.9e-3) and the same TPU projection rotated on CPU with the row is
+accepted (`test_gate_d_projection_host_rope_numerical.py`).
+
+Driver V3 (`run_gate_d_projection_contraction_pp16_numerical.py`, installed path
+`…/gate-d-projection-contraction-pp16-numerical-v3/…`) drops the accepted-HLO byte identity and the
+bridge, pins the four host-rope source blobs, archives the exact row bytes (`dsa_rope_row.f32le`),
+audits HLO before the single invocation and classifies with the new module (runner schema 2).
+Publisher V3 re-derives the verdict from archived bytes in pure Python (FP8→BF16→FP32 wk
+materialization, F64 projection and key references, implied rotary), re-checks HLO text contracts,
+consumes the archived row bytes (pinned SHA), and fixes the `sync.txt` expectation to the wrapper's
+`origin_and_same_region_mirror`. Wrapper/launcher/installer/analyzer moved to V3 targets and drop
+the accepted-HLO/bridge authorities. Chain: driver `f519ce40…05be`, publisher `092175d8…d912`,
+wrapper `8f1522e5…2ae3`, launcher `6d3288dc…4f89`, installer `d9ef0757…64c4`, analyzer
+`cd7efb5c…f23f`. Focused suite 129/129 (incl. kernel, builder, validation, publisher byte
+re-derivation on the archived V2 outputs); Ruff and `bash -n` clean. Per the owner's batching
+instruction, one Sol review covers persistence, the V3 install commands and the fresh tag.
+
+Sol's first batched review of the V3 batch blocked at P1 on three points, all corrected before
+persistence: (1) the publisher now binds every runner faithfulness metric (rotary/non-rotary max
+errors, implied cos/sin errors as exact-type finite floats within 1e-9 of its own re-derivation,
+tolerance fields equal to the pinned constants), the full `dsa_rope_row` identity (array/row SHA,
+position, rotary dim, shape, dtype, theta) and the four `host_rope_source_sha256s` pinned identically
+to the driver; (2) the CPU adjudication script forces `JAX_PLATFORMS=cpu` unconditionally, drops
+`TPU_VISIBLE_DEVICES`, and refuses any non-CPU backend after import (artifact bytes unchanged,
+regenerated SHA `25908caf…1ef7`); (3) the goal checkpoint no longer advances directly to 8K: after a
+faithful V3 witness the next step is carrying host rows into the decoder DSA key/query paths and
+proving DSA selection exactness on a bounded captured witness, with separate authority before any 8K
+run. Repinned chain: driver `f519ce40…05be`, publisher `5a8d30cf…0c83`, wrapper `92bcb109…23b3`,
+launcher `61a45b6d…7514`, installer `22dc77e7…5939`, analyzer `f1010452…6b58`. Focused suite
+131/131 including metric/identity attack tests.
