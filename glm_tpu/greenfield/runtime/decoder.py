@@ -2653,6 +2653,14 @@ def _rms_schedule_carry_terminal(
 # mean) and its epsilon, and reported separately from the RMS schedule.
 DSA_KEY_LAYERNORM_EPSILON = 1e-6
 
+# The fused qkv-a q-a norm is the legacy-faithful virtual-TP32 sharded RMS:
+# per-shard sums over 64 lanes, then the sum over 32 shards, scaled by 1/2048
+# (DB502 geometry: q_lora_rank 2048 over 32 virtual shards).  It is bound as
+# its own lineage kind; the 32-row accepted schedule does not apply to it.
+FUSED_QKV_A_VIRTUAL_SHARDS = 32
+FUSED_QKV_A_Q_LORA_RANK = 2048
+FUSED_QKV_A_Q_WIDTH_PER_SHARD = FUSED_QKV_A_Q_LORA_RANK // FUSED_QKV_A_VIRTUAL_SHARDS
+
 
 def _rms_schedule_arithmetic_terminal(
     module: HloModule,
@@ -2957,6 +2965,25 @@ def _rms_schedule_lineage(
         problems.append("reduce operand is not a square")
     if not combiner_is_add:
         problems.append("reduce combiner is not an addition")
+    sharded_shape = (FUSED_QKV_A_VIRTUAL_SHARDS, 1, FUSED_QKV_A_Q_WIDTH_PER_SHARD)
+    if (
+        operand_shape is not None
+        and operand_shape.dtype == "f32"
+        and operand_shape.dimensions == sharded_shape
+    ):
+        record["kind"] = "virtual_tp32_sharded_qa"
+        if reduce_dims != (0, 1, 2) or reduce_result != ():
+            problems.append("sharded q-a reduce is not the full f32[32,1,64] -> f32[] reduction")
+        if epsilon is None or abs(epsilon - 1e-5) > 1e-12:
+            problems.append(f"sharded q-a epsilon is not 1e-05: {epsilon}")
+        if not result_f32 or result_dims not in ((), (1,)):
+            problems.append("sharded q-a rsqrt is not a scalar scale")
+        if not _rms_schedule_scale_matches(mean.opcode, width_scale, FUSED_QKV_A_Q_LORA_RANK):
+            problems.append(f"sharded q-a mean scale {width_scale} does not match 1/{FUSED_QKV_A_Q_LORA_RANK}")
+        if arithmetic != "convert":
+            problems.append(f"sharded q-a square operand is not the converted projection ({arithmetic})")
+        record["problems"] = problems
+        return record
     if reduce_dims != (1,) or not operand_2d or reduce_result != (rows,):
         problems.append("reduce is not a last-axis f32[R,W] -> f32[R] reduction")
     if arithmetic == "subtract":
@@ -3143,6 +3170,55 @@ def _stablehlo_rsqrt_lineage(
     if current is None or current[0] != "stablehlo.reduce":
         return _refuse("rsqrt is not fed by a reduce")
     reduce_rest = current[1]
+    sharded = re.search(
+        r"across dimensions = \[0\] : \(tensor<([0-9]+)x1xf32>, tensor<f32>\) -> tensor<1xf32>",
+        reduce_rest,
+    )
+    if sharded is not None:
+        record["kind"] = "virtual_tp32_sharded_qa"
+        problems: list[str] = []
+        shards = int(sharded.group(1))
+        if shards != FUSED_QKV_A_VIRTUAL_SHARDS or "applies stablehlo.add" not in reduce_rest:
+            problems.append("sharded q-a shard reduce is not the 32-shard add-reduce")
+        outer_operands = _stablehlo_operands(reduce_rest)
+        inner = definitions.lookup(outer_operands[0]) if outer_operands else None
+        inner_rest = inner[1] if inner is not None and inner[0] == "stablehlo.reduce" else ""
+        expected_inner = (
+            f"across dimensions = [2] : (tensor<{FUSED_QKV_A_VIRTUAL_SHARDS}x1x"
+            f"{FUSED_QKV_A_Q_WIDTH_PER_SHARD}xf32>, tensor<f32>) -> tensor<{FUSED_QKV_A_VIRTUAL_SHARDS}x1xf32>"
+        )
+        if expected_inner not in inner_rest or "applies stablehlo.add" not in inner_rest:
+            problems.append("sharded q-a lane reduce is not the per-shard 64-lane add-reduce")
+        inner_operands = _stablehlo_operands(inner_rest)
+        square = definitions.lookup(inner_operands[0]) if inner_operands else None
+        square_operands = _stablehlo_operands(square[1]) if square is not None else []
+        if square is not None and square[0] == "chlo.square" and len(square_operands) == 1:
+            carried_name = square_operands[0]
+        elif (
+            square is not None
+            and square[0] == "stablehlo.multiply"
+            and len(square_operands) == 2
+            and square_operands[0] == square_operands[1]
+        ):
+            carried_name = square_operands[0]
+        else:
+            carried_name = None
+            problems.append("sharded q-a reduce operand is not a square")
+        carried = definitions.lookup(carried_name) if carried_name else None
+        if carried is None or carried[0] != "stablehlo.convert" or not carried[1].rstrip().endswith(
+            f"(tensor<{FUSED_QKV_A_VIRTUAL_SHARDS}x1x{FUSED_QKV_A_Q_WIDTH_PER_SHARD}xbf16>) -> "
+            f"tensor<{FUSED_QKV_A_VIRTUAL_SHARDS}x1x{FUSED_QKV_A_Q_WIDTH_PER_SHARD}xf32>"
+        ):
+            problems.append("sharded q-a square operand is not the converted BF16 projection")
+        if epsilon is None or abs(epsilon - 1e-5) > 1e-11:
+            problems.append(f"sharded q-a epsilon is not 1e-05: {epsilon}")
+        if not _rms_schedule_scale_matches(mean[0], width_scale, FUSED_QKV_A_Q_LORA_RANK):
+            problems.append(f"sharded q-a mean scale {width_scale} does not match 1/{FUSED_QKV_A_Q_LORA_RANK}")
+        if record["type"] not in ("tensor<1xf32>", "tensor<1x1xf32>"):
+            problems.append("sharded q-a rsqrt is not a scalar-row scale")
+        record.update({"shards": shards, "width_scale": width_scale, "epsilon": epsilon})
+        record["problems"] = problems
+        return record
     shape = re.search(
         r":\s*\(tensor<([0-9]+)x([0-9]+)xf32>,\s*tensor<f32>\)\s*->\s*tensor<([0-9]+)xf32>",
         reduce_rest,
@@ -3246,7 +3322,14 @@ def _validate_rms_accepted_schedule_stablehlo(
         for record in lineages
         if record.get("kind") == "centered_layernorm" and not record["problems"]
     ]
-    rms_lineages = [record for record in lineages if record not in layernorms]
+    sharded_qa = [
+        record
+        for record in lineages
+        if record.get("kind") == "virtual_tp32_sharded_qa" and not record["problems"]
+    ]
+    rms_lineages = [
+        record for record in lineages if record not in layernorms and record not in sharded_qa
+    ]
     conforming = [record for record in rms_lineages if not record["problems"]]
     nonconforming = [record for record in rms_lineages if record["problems"]]
     violations: list[str] = []
@@ -3267,6 +3350,7 @@ def _validate_rms_accepted_schedule_stablehlo(
         "conforming_rsqrt_count": len(conforming),
         "layernorm_rsqrt_count": len(layernorms),
         "nonconforming_rsqrt_count": len(nonconforming),
+        "sharded_qa_rsqrt_count": len(sharded_qa),
         "nonconforming": nonconforming[:8],
         "passed": not violations,
         "rsqrt_count": len(lineages),
@@ -3504,7 +3588,14 @@ def _validate_rms_accepted_schedule_hlo(
         for record in lineages
         if record.get("kind") == "centered_layernorm" and not record["problems"]
     ]
-    rms_lineages = [record for record in lineages if record not in layernorms]
+    sharded_qa = [
+        record
+        for record in lineages
+        if record.get("kind") == "virtual_tp32_sharded_qa" and not record["problems"]
+    ]
+    rms_lineages = [
+        record for record in lineages if record not in layernorms and record not in sharded_qa
+    ]
     conforming = [record for record in rms_lineages if not record["problems"]]
     nonconforming = [record for record in rms_lineages if record["problems"]]
     violations: list[str] = []
@@ -3542,6 +3633,7 @@ def _validate_rms_accepted_schedule_hlo(
         "nonconforming": nonconforming[:8],
         "passed": not violations,
         "rsqrt_count": len(rsqrts),
+        "sharded_qa_rsqrt_count": len(sharded_qa),
         "tiled_module": module_uses_tiling(module),
         "violations": violations,
     }

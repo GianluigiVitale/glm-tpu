@@ -22,6 +22,7 @@ from glm_tpu.greenfield.runtime.decoder import (
     _rms_schedule_lineages,
     _validate_fused_qkv_a_decoder_association,
     _validate_rms_accepted_schedule_hlo,
+    _validate_rms_accepted_schedule_stablehlo,
 )
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 from tests.greenfield.runtime.test_decoder import _real_8k_decoder_config
@@ -165,9 +166,19 @@ def test_archived_tpu_decoder_carries_are_all_explained_by_conforming_lineages()
     module = parse_hlo_module(gzip.open(ARCHIVE, "rt").read())
     config = _real_8k_decoder_config(dsa_score_default_precision=True)
     rms = _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=config.index_key_width)
-    # This archive predates the fused q-a norm fix: 78 sharded q-a norms are still unbound.
-    assert (rms["rsqrt_count"], rms["conforming_rsqrt_count"], rms["nonconforming_rsqrt_count"]) == (313, 235, 78)
+    # First run (pin a49e3ba1): the 78 fused q-a norms carry the legacy-faithful virtual-TP32 sharded
+    # reduction, bound as their own kind; the 235 hidden/kv-a norms carry the accepted schedule.
+    assert (rms["rsqrt_count"], rms["conforming_rsqrt_count"], rms["nonconforming_rsqrt_count"]) == (313, 235, 0)
+    assert rms["sharded_qa_rsqrt_count"] == 78 and rms["layernorm_rsqrt_count"] == 0
+    assert rms["passed"], rms["violations"][:3]
     assert rms["carry_summary"]["carry_count"] == 235
+    stable = _validate_rms_accepted_schedule_stablehlo(
+        gzip.open(ARCHIVE.with_name("decoder_78layer_8k_token.stablehlo.mlir.gz"), "rt").read(),
+        enabled=True,
+        layernorm_width=config.index_key_width,
+    )
+    assert stable["passed"], stable["violations"][:3]
+    assert (stable["rsqrt_count"], stable["conforming_rsqrt_count"], stable["sharded_qa_rsqrt_count"], stable["barrier_count"]) == (313, 235, 78, 235)
     assert rms["carry_summary"]["widths"] == {"512": 78, "6144": 157}
     allowances = rms["carry_allowances"]
     common = dict(
@@ -210,6 +221,7 @@ def test_second_archived_tpu_decoder_schedules_all_313_norms_and_admits_the_bf16
     rms = _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=config.index_key_width)
     assert rms["passed"], rms["violations"][:3]
     assert (rms["rsqrt_count"], rms["conforming_rsqrt_count"], rms["nonconforming_rsqrt_count"]) == (313, 313, 0)
+    assert rms["sharded_qa_rsqrt_count"] == 0  # this run wrongly scheduled the q-a norm (event 0 flipped)
     assert rms["carry_summary"]["carry_count"] == 313
     assert rms["carry_summary"]["widths"] == {"2048": 78, "512": 78, "6144": 157}
     allowances = rms["carry_allowances"]

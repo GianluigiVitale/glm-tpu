@@ -1192,3 +1192,8 @@ normalized-state cause.
 - A decoder flag fans out to every compiled program's contract (decode step, DSA observer, teacher-
   forced prefill). Enumerate the fan-out from the compile script's `validate_*` calls when adding a
   flag; the third program cost an approved tag.
+- Do not generalize a proven schedule beyond its evidence: the [32,W] row reduce was proven for the
+  hidden-width norm; applying it to the TP32-sharded q-a norm (whose oracle reduction is per-shard
+  sums then a cross-chip sum) broke the previously exact DSA event 0. Read the oracle's sharding for
+  every norm before choosing its schedule, and keep each norm's proven formulation as its own bound
+  contract kind.

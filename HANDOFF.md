@@ -10863,3 +10863,45 @@ flag); `tests/greenfield/runtime/test_prefill.py` asserts the captured kwarg on 
 test and binds the source line and the `DecoderStepProgram` field. Lesson: a per-program contract
 fan-out (decode step, observer, prefill) must be enumerated when a flag is added; the first two were
 covered, the third was not.
+
+## 2026-09-02 approved run `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T130949040481337Z` (pin fdddeadf): first full 78-layer execution with the accepted schedule — token exact, exact-DSA refused from event 0
+
+Sol approved (23ecbdeb / fdddeadf / execute once, sanitized command); launched 13:26:57Z after all
+reconfirmations. **All three programs' contracts passed on TPU** (decode step, DSA observer, prefill: RMS
+313/313 with the fused q-a norm on the [32,2048] schedule, carries admitted, fused qkv-a clean) and the
+decoder **executed**: prefill teacher-forced token exact (220), decode position 8155 produced the
+oracle token (101252 == expected, rank 1, top-1/top-2 margin 6.5, lane replication and tie order
+valid; `token_observation.passed = true`). The exact-DSA observer contract then refused:
+`exact_selected_set_and_tail = false`, **event 0: one element swapped** (expected position 4879,
+observed 2540), event 1: 9, event 2: 12, event 3: 13, event 4: 19, event 5: 45, event 6: 55, … over 21
+events; `legacy_order_mismatch_count` 41,502; device score order/ties valid; no count/producer/lane/
+padded-slot mismatches. Failure-exit census 8/8; tag burned; no claim; observer capture
+`dsa_observer/step_00_position_8155.npz` (SHA `f32ae99a…`), all HLO/contracts archived.
+
+Reading: event 0 was bit-exact in both earlier 8K runs with the **default** norms, and event 1 had 6
+set mismatches. This run changed every norm's schedule: the 157 hidden-width norms (proven for
+layer 1 on TPU), the 78 kv-a norms (inferred) and the 78 fused q-a norms (inferred). Event 0 depends
+only on layer 0's input norm and the q-a norm feeding the indexer, and it regressed from exact to one
+boundary flip, so at least one of those two schedules is not the oracle's. The legacy source
+(`tpu-inference` `deepseek_v3.py`, pin b3c25df47) applies plain `JaxRmsNorm` modules whose reduction
+follows the input sharding: `q_a_layernorm` runs on the TP32-sharded `q_a_proj` output, i.e. per-shard
+partial sums over 64 lanes then the cross-chip sum — exactly the greenfield default
+(`one_row_fused_qkv_a_convolution`, `norm_mode="shard_sum"`, bit-exact at event 0 in every run).
+Replacing it with a [32,2048] row reduce changed the summation order and is the most likely event-0
+cause. `kv_a_layernorm` runs on the replicated `kv_a_proj` output (full-row reduce), consistent with
+the [32,512] accepted schedule; the hidden-width schedule is the one proven on TPU.
+
+Decision (this commit): the fused q-a norm **reverts to the sharded legacy formulation** and is no
+longer touched by the flag (`qkv_a.py`, kwarg removed; `layer.py` call reverted;
+`tests/greenfield/kernels/test_qkv_a_sharded_norm.py` binds the two-stage sharded lowering and the
+absence of a schedule switch). The contract binds it as its own lineage kind
+`virtual_tp32_sharded_qa` in both representations — optimized HLO: `convert(bf16 projection) → square →
+reduce f32[32,1,64] dims={0,1,2} → f32[]`, add combiner, ×1/2048 (per opcode), +1e-05, scalar rsqrt;
+StableHLO: `convert → chlo.square → reduce dims=[2] (32x1x64→32x1) → reduce dims=[0] (32x1→1) → ÷2048 →
++1e-05 → rsqrt tensor<1xf32>` — reported as `sharded_qa_rsqrt_count`; every fact mutated is refused
+(`test_rms_schedule_sharded_qa_classification.py`, 18 cases). The first archived TPU module now
+classifies (313 rsqrt: 235 accepted, 78 sharded q-a, 0 nonconforming) and passes in both
+representations; the second archive (q-a wrongly scheduled) reads 313 accepted / 0 sharded.
+
+Expectation for the next run: event 0 returns to exact if the q-a inference was the only fault; event 1
+then measures the hidden-width schedule against the 6-mismatch baseline. Not proof until run.
