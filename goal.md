@@ -36,21 +36,19 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-02 04:40Z
+## Resume checkpoint — 2026-09-02 04:55Z
 
-Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. DSA host-rotary table refuted, tombstoned
-(`…8k-refusal-adjudication.json` `2a7c8fb5…`). **Layer-1 frontier certified on CPU**
-(`gate-d-layer1-scale-frontier-certificate.json` `e8abfb9b…`): DB548 row `9b52a04e…` and accepted
-row `9936ee1e…` are exact functions of the SAME FP32 RMS input (`dense + attention_update +
-combined_residual`, unrounded), weight `10e34f4f…`, eps 1e-5, one rounding; they differ
-only in `s=rsqrt(mean+eps)`: greenfield s0−4…s0−1 ulps, legacy s0…s0+14. Legacy
-reduces RMS variance over `f32[32,6144]{T(8,128)}` dims={1}; greenfield over `f32[1,1,6144]`.
+Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. DSA rotary table refuted.
+**Layer-1 frontier certified on CPU** (`gate-d-layer1-scale-frontier-certificate.json`
+`980bbb39…`): DB548 row `9b52a04e…` and accepted row `9936ee1e…` are exact functions of the same
+FP32 RMS input (dense + attention + combined residual, unrounded) and differ only in the FP32
+scale `rsqrt(mean+eps)` by 1–4 ulps. Legacy reduces the variance over
+`f32[32,6144]{T(8,128)}` dims={1}; greenfield over `f32[1,1,6144]`.
 
-Committed: captured-RMS probe `accepted_split` arm = FP32-carry accepted-schedule arm (FP32 sum,
-one FP32 barrier on `[32,6144]`, reduce dims={1}); matcher `fp32_carry_schedule`; launcher
-canonical (literal tag, sanitized Git, mirror replay, 3-scope vacancy, 4 leases; runs from the
-tooling worktree); tests pass. Reserved tag `greenfield_layer0_captured_rms_replay_20260902T045006596197989Z`.
-Next: Sol EXECUTE review of the literal invocation; then, from this worktree at the reviewed pin,
+Committed: captured-RMS probe `accepted_split` arm = FP32-carry accepted-schedule arm (one FP32
+barrier on `[32,6144]`, reduce dims={1}); launcher canonical (literal tag, sanitized Git, mirror
+replay, 3-scope vacancy, 4 leases; runs from this worktree). Reserved tag `greenfield_layer0_captured_rms_replay_20260902T045006596197989Z`.
+Next: Sol EXECUTE review, then from this worktree at the reviewed pin
 `GLM_GREENFIELD_CAPTURED_RMS_REPLAY=1 GLM_GREENFIELD_CAPTURED_RMS_TAG=<tag> bash
 scripts/greenfield/run_layer0_projection_reduction_probe.sh`. Control must equal DB548; arm exact ⇔
 accepted row; then decoder change, one 8K run.
