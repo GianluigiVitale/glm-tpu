@@ -36,22 +36,22 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-02 04:20Z
+## Resume checkpoint — 2026-09-02 05:30Z
 
-Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. **Host-rotary-table hypothesis
-REFUTED at engine level**: protected 8K run `…mainrope_dr_…_20260902T021346091708582Z` (pin
-`ba7d1e72`, `GLM_GREENFIELD_DSA_ROPE_TABLE=1`) failed closed at exact DSA. Without the table
-(2026-08-28 run) event 0/layer 0 was bit-exact vs the legacy oracle; with it, layer-0 scores move
-≤2.6e-3 (query, position 0 too) while event 1/layer 1 is unchanged (6 swaps, mean |Δscore| 0.0148
-in both runs). Legacy indexer computes `jnp.cos/sin` on device (`glm_dsa_indexer.py:1078`). Artifact
-`gate-d-dsa-rope-table-8k-refusal-adjudication.json` `0f7c36d2…`. `dsa_rope_table` stays off.
+Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. **Host-rotary-table refuted as a
+legacy-faithfulness fix** (Sol-confirmed): 8K run `…mainrope_dr_…_20260902T021346091708582Z` (pin
+`ba7d1e72`, table on) failed closed at exact DSA; the 2026-08-28 run (pin `570cc453`, table off)
+had event 0 bit-exact vs the legacy oracle; event 1 fails identically in both (6 swaps). Legacy
+indexer computes `jnp.cos/sin` on device (`glm_dsa_indexer.py:1078`). Artifact
+`gate-d-dsa-rope-table-8k-refusal-adjudication.json` `2a7c8fb5…`. `dsa_rope_table` tombstoned.
+Event-1 mechanism undetermined.
 
-Consequence: the layer-1 divergence arises in the layer-0 output path (attention output / MoE /
-residual) at bf16-rounding scale (~1e-3 rel), not in rotary.
-
-Exact next (no TPU launch): reread the Compass artifact; adjudicate its hidden-state hypotheses
-against existing layer-0 discriminator/ingredient artifacts and the layer-1 internal reference;
-pick one discriminator isolating the layer-0→1 delta; batched Sol review before any run.
+Exact next (no TPU): CPU-only hash-bound certificate over the layer-0→1 carry from sealed
+provenance-coherent inputs (accepted 32 BF16 dense partials `9d9f65dd…` == DB548; DB548
+post-attention residual `a105fdbd…` == legacy bytes; accepted normalized row `9936ee1e…`):
+compare exact final-carry variants (f32 partial sum + one BF16 round vs materialized/double-round
+vs per-node-rounded tree) over all 6,144 bits. `INCONCLUSIVE` if lineage cannot be proven; then a
+single-output layer-0 carried-state tap, never a blind 8K run. Batched Sol review before any run.
 
 ## Finish (after Gate D)
 

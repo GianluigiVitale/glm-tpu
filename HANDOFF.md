@@ -10254,3 +10254,25 @@ produced between the exact layer-0 DSA event and the layer-1 indexer input, i.e.
 attention output, MoE, or residual path, not in rotary. `dsa_rope_table_enabled` stays default-off
 and must not be launched again; the code remains as a documented, refuted experiment. Gate D remains
 open; no performance claim.
+
+Sol's batched review of this record (verdict `BLOCK — P1/P1/P2`, observations independently
+confirmed: event-0 positions and score bits exact without the table, four identical replicas per
+producer row, legacy `b3c25df47` on-device `jnp.cos/jnp.sin`) required three corrections, all
+applied. (1) The adjudicator now binds both runs' pins (`570cc453` without table, `ba7d1e72` with
+table, 183 commits apart), orchestrator/sync/HLO-contract/rank-0 log SHAs, the HLO contract's
+`dsa_rope_table_enabled` flag, and the legacy source blob (`glm_dsa_indexer.py` SHA `d44225e3…`,
+`rope_cos_sin` body checked), and enforces the observer schema: exact producer set, exactly four
+bit-identical replicas per producer, int32 rows, raw-bit score equality. Artifact SHA is now
+`2a7c8fb5df041cad1dc57bbd312694d932b46f0ad6cb76d99ffd51e0869f5c97`. (2) Scope: because the two runs
+are at different pins, the event-0 delta is *consistent with* the table but not attributed to the
+table alone; the refutation rests on event 0 being bit-exact without the table plus the legacy
+formulation, and the classification is now
+`HOST_ROTARY_TABLE_REFUTED_AS_LEGACY_FAITHFULNESS_FIX;EVENT_0_DELTA_ATTRIBUTION_TO_TABLE_ALONE_NOT_PROVEN;EVENT_1_MECHANISM_UNDETERMINED`.
+(3) The earlier sentence localizing the event-1 cause to a BF16 hidden-state perturbation in the
+layer-0 output path over-localized: equal event-1 error magnitudes do not prove that mechanism nor
+exclude a layer-1-local association effect; the mechanism is undetermined. Sol's recommended next
+is a CPU-only, hash-bound certificate comparing exact final-carry variants (FP32 residual add then
+one BF16 round versus materialized/double-round alternatives) over all 6,144 bits using
+provenance-coherent layer-0 post-attention residual, layer-0 dense update and the accepted layer-1
+RMS-input reference, returning `INCONCLUSIVE` if lineage cannot be proven, and otherwise a
+single-output layer-0 carried-state tap rather than another 8K run. The table stays tombstoned.

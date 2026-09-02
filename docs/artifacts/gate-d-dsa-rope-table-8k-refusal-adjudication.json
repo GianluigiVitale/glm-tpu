@@ -1,6 +1,6 @@
 {
   "artifact_kind": "gate_d_dsa_rope_table_8k_refusal_adjudication",
-  "classification": "HOST_ROTARY_TABLE_HYPOTHESIS_REFUTED_AT_ENGINE_LEVEL;PROTECTED_8K_REFUSED_TWICE_AT_EVENT_1;GATE_D_OPEN",
+  "classification": "HOST_ROTARY_TABLE_REFUTED_AS_LEGACY_FAITHFULNESS_FIX;EVENT_0_DELTA_ATTRIBUTION_TO_TABLE_ALONE_NOT_PROVEN;EVENT_1_MECHANISM_UNDETERMINED;PROTECTED_8K_REFUSED_TWICE_AT_EVENT_1;GATE_D_OPEN",
   "decode_position": 8155,
   "findings": {
     "event0_bit_exact_with_table": false,
@@ -13,12 +13,27 @@
     "event1_set_mismatch_without_table": 6
   },
   "inputs_sha256": {
+    "legacy_glm_dsa_indexer_py": "d44225e3a1952ef81d57eb30f6bd466d46e3e2cd0288d4cc798d182cf7a2e626",
     "oracle_events": "b591a4622a8c646799989f235bc98bcf8ae99e9e04d2ad55a982d70ba00dde82",
     "with_table_20260902": "dfc21a7b7bc22db0fb66c1e84673cef4d3c887d5432e7b9e162b87eee5bad6de",
     "without_table_20260828": "17f0916de291be472437319c848f3f4331d5bdd6dac325755ef1f4ecbaf8bd7e"
   },
+  "legacy_source": {
+    "git_pin": "b3c25df47ac98783912dc658878181ec0a8ae16d",
+    "path": "/home/gianl/tpu-inference/tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py",
+    "rope_cos_sin_uses_on_device_jnp_cos_sin": true,
+    "sha256": "d44225e3a1952ef81d57eb30f6bd466d46e3e2cd0288d4cc798d182cf7a2e626"
+  },
   "runs": {
     "with_table_20260902": {
+      "bound_files_sha256": {
+        "decoder.rank0.log": "e451581eb3370858cb3437581250064bb8c043d707c445b0a9b986588eee65b7",
+        "hlo/decoder_78layer_8k_token.hlo_contract.json": "895296468d6eb5bdf32db0460d8f48050916ce1de0a2ef93e198afb37e96c399",
+        "hlo/decoder_78layer_8k_token_dsa_observer.hlo_contract.json": "2f2c92088a017ed310405fba15e75f15c9fb84e7e027a441cb96e0c578334b04",
+        "orchestrator.log": "b48324ef2f74ff7500ee0c73d58909cefea311f402145247d381fcae0fcb6c7c",
+        "sync.txt": "224705cb3f20f6308ada0f2f4af79b4c84d53aa3eb1e1143fabca2d0c06e8dae"
+      },
+      "dsa_rope_table": 1,
       "event0_bit_exact": false,
       "event0_position_zero_score_delta": 0.0020093917846679688,
       "events": [
@@ -34,6 +49,7 @@
           "observed_only_count": 0,
           "order_mismatch_count": 1165,
           "producer_layer_id": 0,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -48,6 +64,7 @@
           "observed_only_count": 6,
           "order_mismatch_count": 1878,
           "producer_layer_id": 1,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -62,6 +79,7 @@
           "observed_only_count": 13,
           "order_mismatch_count": 1845,
           "producer_layer_id": 2,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -76,6 +94,7 @@
           "observed_only_count": 10,
           "order_mismatch_count": 1870,
           "producer_layer_id": 6,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -90,6 +109,7 @@
           "observed_only_count": 23,
           "order_mismatch_count": 1933,
           "producer_layer_id": 10,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -104,6 +124,7 @@
           "observed_only_count": 43,
           "order_mismatch_count": 1966,
           "producer_layer_id": 14,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -118,6 +139,7 @@
           "observed_only_count": 55,
           "order_mismatch_count": 1981,
           "producer_layer_id": 18,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -132,6 +154,7 @@
           "observed_only_count": 53,
           "order_mismatch_count": 1999,
           "producer_layer_id": 22,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -146,6 +169,7 @@
           "observed_only_count": 105,
           "order_mismatch_count": 2017,
           "producer_layer_id": 26,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -160,6 +184,7 @@
           "observed_only_count": 189,
           "order_mismatch_count": 2016,
           "producer_layer_id": 30,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -174,6 +199,7 @@
           "observed_only_count": 352,
           "order_mismatch_count": 2034,
           "producer_layer_id": 34,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -188,6 +214,7 @@
           "observed_only_count": 402,
           "order_mismatch_count": 2034,
           "producer_layer_id": 38,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -202,6 +229,7 @@
           "observed_only_count": 436,
           "order_mismatch_count": 2037,
           "producer_layer_id": 42,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -216,6 +244,7 @@
           "observed_only_count": 423,
           "order_mismatch_count": 2032,
           "producer_layer_id": 46,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -230,6 +259,7 @@
           "observed_only_count": 475,
           "order_mismatch_count": 2035,
           "producer_layer_id": 50,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -244,6 +274,7 @@
           "observed_only_count": 455,
           "order_mismatch_count": 2030,
           "producer_layer_id": 54,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -258,6 +289,7 @@
           "observed_only_count": 448,
           "order_mismatch_count": 2032,
           "producer_layer_id": 58,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -272,6 +304,7 @@
           "observed_only_count": 595,
           "order_mismatch_count": 2040,
           "producer_layer_id": 62,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -286,6 +319,7 @@
           "observed_only_count": 517,
           "order_mismatch_count": 2037,
           "producer_layer_id": 66,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -300,6 +334,7 @@
           "observed_only_count": 458,
           "order_mismatch_count": 2032,
           "producer_layer_id": 70,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -314,15 +349,26 @@
           "observed_only_count": 343,
           "order_mismatch_count": 2034,
           "producer_layer_id": 74,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         }
       ],
       "first_event_with_set_mismatch": 1,
+      "main_rope_table_enabled": true,
       "observation_sha256": "dfc21a7b7bc22db0fb66c1e84673cef4d3c887d5432e7b9e162b87eee5bad6de",
+      "pin": "ba7d1e7240125d75119769784d12aada5a2cfa84",
       "tag": "greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_dr_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T021346091708582Z",
       "total_order_mismatch_count": 41047
     },
     "without_table_20260828": {
+      "bound_files_sha256": {
+        "decoder.rank0.log": "b337184c8a63939c0c6da3930dccbb1e6709bbb081934048158fd6b04e67058e",
+        "hlo/decoder_78layer_8k_token.hlo_contract.json": "f0fcb1f5065e187283e0120862327380bb93f9498ad6d5a2a3cb83962c7db561",
+        "hlo/decoder_78layer_8k_token_dsa_observer.hlo_contract.json": "0e5b733fd2381965733e06cbb888604f0b4054df04ec9cc135dae9a314eddda7",
+        "orchestrator.log": "8a2f66043dab98a4cd0953a74eb4431c0fd71eaa6395b0fbadb563ebb3cc0ccb",
+        "sync.txt": "c5ee268ab6e498d4ce1caa1d029be4683aed554b484e0ad845a1980cfc374c8c"
+      },
+      "dsa_rope_table": 0,
       "event0_bit_exact": true,
       "event0_position_zero_score_delta": 0.0,
       "events": [
@@ -338,6 +384,7 @@
           "observed_only_count": 0,
           "order_mismatch_count": 0,
           "producer_layer_id": 0,
+          "raw_bits_equal_to_oracle": true,
           "valid_count": 2048
         },
         {
@@ -352,6 +399,7 @@
           "observed_only_count": 6,
           "order_mismatch_count": 1859,
           "producer_layer_id": 1,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -366,6 +414,7 @@
           "observed_only_count": 11,
           "order_mismatch_count": 1888,
           "producer_layer_id": 2,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -380,6 +429,7 @@
           "observed_only_count": 9,
           "order_mismatch_count": 1901,
           "producer_layer_id": 6,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -394,6 +444,7 @@
           "observed_only_count": 21,
           "order_mismatch_count": 1937,
           "producer_layer_id": 10,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -408,6 +459,7 @@
           "observed_only_count": 48,
           "order_mismatch_count": 1983,
           "producer_layer_id": 14,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -422,6 +474,7 @@
           "observed_only_count": 71,
           "order_mismatch_count": 1993,
           "producer_layer_id": 18,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -436,6 +489,7 @@
           "observed_only_count": 56,
           "order_mismatch_count": 1997,
           "producer_layer_id": 22,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -450,6 +504,7 @@
           "observed_only_count": 112,
           "order_mismatch_count": 2015,
           "producer_layer_id": 26,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -464,6 +519,7 @@
           "observed_only_count": 181,
           "order_mismatch_count": 2018,
           "producer_layer_id": 30,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -478,6 +534,7 @@
           "observed_only_count": 347,
           "order_mismatch_count": 2023,
           "producer_layer_id": 34,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -492,6 +549,7 @@
           "observed_only_count": 383,
           "order_mismatch_count": 2037,
           "producer_layer_id": 38,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -506,6 +564,7 @@
           "observed_only_count": 468,
           "order_mismatch_count": 2036,
           "producer_layer_id": 42,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -520,6 +579,7 @@
           "observed_only_count": 428,
           "order_mismatch_count": 2040,
           "producer_layer_id": 46,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -534,6 +594,7 @@
           "observed_only_count": 464,
           "order_mismatch_count": 2029,
           "producer_layer_id": 50,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -548,6 +609,7 @@
           "observed_only_count": 459,
           "order_mismatch_count": 2036,
           "producer_layer_id": 54,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -562,6 +624,7 @@
           "observed_only_count": 432,
           "order_mismatch_count": 2037,
           "producer_layer_id": 58,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -576,6 +639,7 @@
           "observed_only_count": 554,
           "order_mismatch_count": 2036,
           "producer_layer_id": 62,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -590,6 +654,7 @@
           "observed_only_count": 515,
           "order_mismatch_count": 2031,
           "producer_layer_id": 66,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -604,6 +669,7 @@
           "observed_only_count": 454,
           "order_mismatch_count": 2037,
           "producer_layer_id": 70,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         },
         {
@@ -618,14 +684,18 @@
           "observed_only_count": 327,
           "order_mismatch_count": 2031,
           "producer_layer_id": 74,
+          "raw_bits_equal_to_oracle": false,
           "valid_count": 2048
         }
       ],
       "first_event_with_set_mismatch": 1,
+      "main_rope_table_enabled": true,
       "observation_sha256": "17f0916de291be472437319c848f3f4331d5bdd6dac325755ef1f4ecbaf8bd7e",
+      "pin": "570cc453f58a27ac0d06b129076c78e2f187ddd6",
       "tag": "greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260828T111624599159951Z",
       "total_order_mismatch_count": 39964
     }
   },
-  "schema_version": 1
+  "schema_version": 1,
+  "scope_note": "The two runs are at different pins (570cc453 vs ba7d1e72, 183 commits apart); the event-0 delta is consistent with the table but is not attributed to the table alone. The decisive facts are (a) event 0 bit-exact against the legacy oracle without the table and (b) the legacy indexer evaluating cos/sin on device, which together refute the table as a faithfulness fix. The location and mechanism of the event-1 divergence are not determined by this artifact."
 }

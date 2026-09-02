@@ -3481,3 +3481,7 @@ persistence only; review and persistence precede any v2 installation.
   (`glm_dsa_indexer.py:1078`, `b3c25df47`).
 - Classification: `HOST_ROTARY_TABLE_HYPOTHESIS_REFUTED_AT_ENGINE_LEVEL;PROTECTED_8K_REFUSED_TWICE_AT_EVENT_1;
   DSA_ROPE_TABLE_DEFAULT_OFF_DO_NOT_RELAUNCH;GATE_D_OPEN`.
+- Sol corrections applied: adjudicator binds run pins/HLO contracts/logs/legacy source and enforces
+  observer schema; artifact SHA `2a7c8fb5df041cad1dc57bbd312694d932b46f0ad6cb76d99ffd51e0869f5c97`;
+  classification `HOST_ROTARY_TABLE_REFUTED_AS_LEGACY_FAITHFULNESS_FIX;EVENT_0_DELTA_ATTRIBUTION_TO_TABLE_ALONE_NOT_PROVEN;
+  EVENT_1_MECHANISM_UNDETERMINED;PROTECTED_8K_REFUSED_TWICE_AT_EVENT_1;GATE_D_OPEN`.
