@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from pathlib import Path
 
 from glm_tpu.greenfield.errors import PlanValidationError
 from glm_tpu.greenfield.runtime import (
@@ -130,6 +131,9 @@ def test_prefill_hlo_forwards_exact_head_key_contract(
     assert captured["dsa_head_key_exact_association"] is True
     assert captured["stablehlo"] == "module @prefill {}"
     assert captured["main_rope_table_enabled"] is False
+    # The accepted RMS schedule flag reaches the prefill contract exactly as the
+    # decode step's (the 2026-09-02 run was refused at prefill with it defaulting off).
+    assert captured["rms_accepted_schedule"] is False
     assert (
         captured["pregathered_b512_attention"]
         is pregathered_b512_attention
@@ -459,3 +463,16 @@ def test_physical_m64_prefill_repair_hlo_is_exact_and_fail_closed() -> None:
     )
     assert cpu["passed"] is True
     assert cpu["exact_projection_operand_count"] == 1
+
+
+def test_prefill_hlo_forwards_the_accepted_rms_schedule_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    import re as _re
+    from types import SimpleNamespace
+    from glm_tpu.greenfield.runtime import prefill as prefill_module
+
+    source = Path(prefill_module.__file__).read_text()
+    body = source[source.index("def validate_teacher_forced_prefill_hlo(") :]
+    assert 'rms_accepted_schedule=getattr(decoder, "rms_accepted_schedule", False),' in body
+    from glm_tpu.greenfield.runtime.decoder import DecoderStepProgram
+
+    assert "rms_accepted_schedule" in DecoderStepProgram.__dataclass_fields__

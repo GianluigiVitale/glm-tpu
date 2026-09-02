@@ -3564,3 +3564,9 @@ persistence only; review and persistence precede any v2 installation.
   records inside the q-a carry producers; censuses 8/8; archived under the tag. Classification:
   `FAILED_CLOSED_AT_HLO_CONTRACT_BEFORE_EXECUTION;ALL_313_RMS_SCHEDULED_ON_TPU;QA_CARRY_BF16_PAD_REFUSED;
   TAG_BURNED;NO_CLAIM;GATE_D_OPEN`. Fix: BF16 admission inside the producer slice only.
+- Protected 8K tag `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T121803168061440Z` (pin 66d32efa, `_ras`, sanitized launch): **decode-step and DSA-observer
+  programs passed all contracts on TPU** (RMS 313/313, 313 barriers, live-tensor and fused qkv-a clean
+  with lineage-bound carries); refused at the prefill contract (flag not forwarded); censuses 8/8;
+  archived. Classification: `DECODE_STEP_CONTRACTS_PASSED_ON_TPU;PREFILL_CONTRACT_FLAG_NOT_FORWARDED;
+  FAILED_CLOSED_BEFORE_EXECUTION;TAG_BURNED;NO_CLAIM;GATE_D_OPEN`. Fix: forward the flag in
+  `validate_teacher_forced_prefill_hlo`.
