@@ -14,6 +14,10 @@ import numpy as np
 
 
 ARTIFACT_KIND = "glm52_legacy_layer0_prompt_index_cache"
+# GLM-5.2 layers whose DSA indexer owns a prompt index cache: the three dense
+# layers and every fourth layer from six.
+FULL_INDEXER_LAYERS = frozenset({0, 1, 2} | set(range(6, 78, 4)))
+LEGACY_ATTENTION_LAYER_NAME = "model.layers.{layer}.self_attn.attn"
 PROMPT_KEY_INTERNAL_ARTIFACT_KIND = (
     "glm52_legacy_dsa_prompt_key_internal_state"
 )
@@ -55,6 +59,31 @@ _PROMPT_KEY_CAPTURE_KIND_BY_MODE = {
 _SLICE_RE = re.compile(
     r"slice\((None|-?[0-9]+), (None|-?[0-9]+), (None|-?[0-9]+)\)"
 )
+
+
+def prompt_index_cache_artifact_kind(layer_id: int) -> str:
+    """Artifact kind of the sealed legacy prompt index cache of one layer."""
+
+    if layer_id not in FULL_INDEXER_LAYERS:
+        raise ValueError(f"layer {layer_id} owns no DSA prompt index cache")
+    return f"glm52_legacy_layer{int(layer_id)}_prompt_index_cache"
+
+
+def expected_prompt_cache_slot(layer_id: int) -> int:
+    """Legacy runner ``kv_caches`` slot holding ``layer_id``'s indexer cache.
+
+    The legacy runner orders cache slots by module registration: every layer
+    registers one main-attention cache, and each full-indexer layer registers
+    its indexer key cache immediately before it (the sealed layer-0 captures
+    dumped slot 0 as the 128-wide index cache and slot 1 as the 640-wide main
+    cache).  Layer 0 -> 0, layer 1 -> 2, layer 2 -> 4, layer 6 -> 9.  A wrong
+    slot cannot seal: the loader refuses any shape other than the index cache.
+    """
+
+    if layer_id not in FULL_INDEXER_LAYERS:
+        raise ValueError(f"layer {layer_id} owns no DSA prompt index cache")
+    indexer_layers_before = sum(1 for layer in FULL_INDEXER_LAYERS if layer < layer_id)
+    return int(layer_id) + indexer_layers_before
 
 
 def _sha256_file(path: Path) -> str:
@@ -120,10 +149,17 @@ class LegacyPromptIndexCacheConfig:
     expected_physical_pages: int = 24
     expected_logical_page_size: int = 512
     expected_head_dim: int = 128
+    layer_id: int = 0
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "source_dump_dir", Path(self.source_dump_dir))
         object.__setattr__(self, "output_dir", Path(self.output_dir))
+        if (
+            not isinstance(self.layer_id, int)
+            or isinstance(self.layer_id, bool)
+            or self.layer_id not in FULL_INDEXER_LAYERS
+        ):
+            raise ValueError("prompt-cache layer must own a DSA prompt index cache")
         for name in (
             "capture_code_hash",
             "legacy_repository_pin",
@@ -165,6 +201,18 @@ class LegacyPromptIndexCacheConfig:
             raise ValueError("prompt-cache logical page must preserve packing 32")
         if not self.run_tag:
             raise ValueError("prompt-cache run tag must be non-empty")
+
+    @property
+    def cache_slot(self) -> int:
+        return expected_prompt_cache_slot(self.layer_id)
+
+    @property
+    def layer_name(self) -> str:
+        return LEGACY_ATTENTION_LAYER_NAME.format(layer=self.layer_id)
+
+    @property
+    def artifact_kind(self) -> str:
+        return prompt_index_cache_artifact_kind(self.layer_id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -549,8 +597,12 @@ def _load_source_cache(
                 config.expected_last_chunk_tokens
             ):
                 raise ValueError("prompt-cache final prefill chunk drifted")
-            if payload["layer_indices"].tolist() != [0]:
-                raise ValueError("prompt-cache source must contain slot zero only")
+            if payload["layer_indices"].tolist() != [config.cache_slot]:
+                raise ValueError(
+                    "prompt-cache source must contain exactly the layer's "
+                    f"indexer cache slot {config.cache_slot}"
+                )
+            slot_key = f"layer{config.cache_slot}"
             try:
                 mesh = ast.literal_eval(str(payload["mesh_shape"]))
             except (SyntaxError, ValueError) as error:
@@ -565,10 +617,10 @@ def _load_source_cache(
             }
             if mesh != expected_mesh:
                 raise ValueError("prompt-cache source mesh drifted")
-            if str(payload["layer0__dtype"]) != "bfloat16":
+            if str(payload[f"{slot_key}__dtype"]) != "bfloat16":
                 raise ValueError("prompt-cache source dtype drifted")
 
-            shape = tuple(int(value) for value in payload["layer0__shape"])
+            shape = tuple(int(value) for value in payload[f"{slot_key}__shape"])
             expected_shape = (
                 config.expected_physical_pages,
                 config.expected_logical_page_size // 32,
@@ -586,11 +638,11 @@ def _load_source_cache(
                 raise ValueError("prompt-cache shape differs across processes")
 
             assert replica_counts is not None
-            shard_count = int(payload["layer0__nshards"])
+            shard_count = int(payload[f"{slot_key}__nshards"])
             if shard_count != config.expected_local_replication:
                 raise ValueError("prompt-cache local replica coverage drifted")
             for shard_index in range(shard_count):
-                key = f"layer0__shard{shard_index}"
+                key = f"{slot_key}__shard{shard_index}"
                 shard = np.asarray(payload[f"{key}__data"])
                 if shard.dtype != np.uint16:
                     raise ValueError("prompt-cache shard is not BF16 bits")
@@ -711,7 +763,7 @@ def _load_source_cache(
 def capture_legacy_prompt_index_cache(
     config: LegacyPromptIndexCacheConfig,
 ) -> dict[str, Any]:
-    """Reconstruct and seal logical layer-0 BF16 prompt keys from DCP dumps."""
+    """Reconstruct and seal one layer's logical BF16 prompt keys from DCP dumps."""
 
     from safetensors.numpy import save_file
 
@@ -727,12 +779,12 @@ def capture_legacy_prompt_index_cache(
         },
         str(tensor_path),
         metadata={
-            "artifact_kind": ARTIFACT_KIND,
+            "artifact_kind": config.artifact_kind,
             "format_version": str(FORMAT_VERSION),
         },
     )
     manifest: dict[str, Any] = {
-        "artifact_kind": ARTIFACT_KIND,
+        "artifact_kind": config.artifact_kind,
         "capture_code_hash": config.capture_code_hash,
         "diagnostic_only": True,
         "format_version": FORMAT_VERSION,
@@ -762,6 +814,12 @@ def capture_legacy_prompt_index_cache(
             "sha256": _sha256_file(tensor_path),
         },
     }
+    if config.layer_id != 0:
+        # Layer-0 manifests keep their sealed byte format; deeper layers bind
+        # the layer identity and the legacy cache slot they were dumped from.
+        manifest["layer_id"] = config.layer_id
+        manifest["cache_slot"] = config.cache_slot
+        manifest["layer_name"] = config.layer_name
     manifest["manifest_sha256"] = _manifest_hash(manifest)
     (config.output_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n"
@@ -780,10 +838,24 @@ def inspect_legacy_prompt_index_cache(
 
     artifact_dir = Path(artifact_dir)
     manifest = json.loads((artifact_dir / "manifest.json").read_text())
-    if manifest.get("artifact_kind") != ARTIFACT_KIND or (
+    layer_id = manifest.get("layer_id", 0)
+    if (
+        not isinstance(layer_id, int)
+        or isinstance(layer_id, bool)
+        or layer_id not in FULL_INDEXER_LAYERS
+    ):
+        raise ValueError("unsupported prompt index-cache layer")
+    artifact_kind = prompt_index_cache_artifact_kind(layer_id)
+    if manifest.get("artifact_kind") != artifact_kind or (
         manifest.get("format_version") != FORMAT_VERSION
     ):
         raise ValueError("unsupported prompt index-cache artifact")
+    if layer_id != 0 and (
+        manifest.get("cache_slot") != expected_prompt_cache_slot(layer_id)
+        or manifest.get("layer_name")
+        != LEGACY_ATTENTION_LAYER_NAME.format(layer=layer_id)
+    ):
+        raise ValueError("prompt index-cache layer binding drifted")
     if manifest.get("model_id") != MODEL_ID or (
         manifest.get("diagnostic_only") is not True
     ):
@@ -804,7 +876,7 @@ def inspect_legacy_prompt_index_cache(
     shape = (contract["prompt_token_count"], contract["head_dim"])
     with safe_open(tensor_path, framework="np") as handle:
         if handle.metadata() != {
-            "artifact_kind": ARTIFACT_KIND,
+            "artifact_kind": artifact_kind,
             "format_version": str(FORMAT_VERSION),
         }:
             raise ValueError("prompt index-cache tensor metadata drifted")

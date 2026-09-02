@@ -339,6 +339,9 @@ def test_pp8_runner_supports_default_off_metadata_parent_lineage() -> None:
     assert 'cd "$wt";' not in runner
     assert "export GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION=" not in runner
     assert '"$src/scripts/greenfield/compile_short_decoder.py"' in runner
+    # 2026-09-02: two approved launches were lost to transient GitHub fetch faults on the pod workers;
+    # the worker fetch retries (six attempts) and still fails closed when none succeeds.
+    assert 'for attempt in 1 2 3 4 5 6; do if git -C "$wt" fetch -q origin "$branch"; then fetched=1; break; fi; sleep 8; done; [[ $fetched == 1 ]]; git -C "$wt" checkout -q --detach "$pin";' in runner
     assert "METADATA_SOURCE_SUFFIX=_metaparent" in runner
 
 

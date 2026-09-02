@@ -3589,3 +3589,22 @@ persistence only; review and persistence precede any v2 installation.
   mandatory when enabled, proven on three archived TPU modules (baseline default, first `_ras`, second
   `_ras`) and synthetic attacks. Flag scope: hidden-width norms only. Classification:
   `RMS_SCHEDULE_SCOPE_HIDDEN_WIDTH_ONLY;CENSUS_BOUND_THREE_KINDS;REVIEW_PENDING;GATE_D_OPEN`.
+- Protected 8K tag `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T211600121108599Z` (pin 086d459a): failed closed at the eight-host sync — recurring GitHub fetch
+  SSH fault on four or more workers; no TPU; censuses 8/8. Classification:
+  `FAILED_CLOSED_AT_SYNC;TRANSIENT_ORIGIN_FETCH_FAULT_RECURRING;TAG_BURNED;NO_CLAIM;GATE_D_OPEN`.
+- Protected 8K tag `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T213510823966642Z` (pin 086d459a, `_ras`, hidden-width schedule only): executed; prefill +
+  decode token exact; event 0 exact; **event 1 = 7 mismatches, identical set to the hidden+kv-a run**;
+  censuses 8/8; observer `bf3ff47e…`. Classification: `EXECUTED_ON_TPU;TOKEN_EXACT_AT_8155;
+  DSA_EVENT0_EXACT;EVENT1_7_MISMATCHES_SAME_SET;KV_A_SCHEDULE_IRRELEVANT;
+  HIDDEN_WIDTH_SCHEDULE_DOES_NOT_CLOSE_EVENT1;TAG_BURNED;NO_CLAIM;GATE_D_OPEN`.
+- CPU-only capsule `docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-diagnosis.json`
+  (`scripts/greenfield/diagnose_event1_prompt_index_cache_offline.py`): inputs DB518 `result.npz`
+  `534bacc5…`, legacy layer-0/1 `dsa_internals` recovery internals `212eb4cc…`/`eb7a2500…`, sealed 8K
+  `dsa_events` oracle, observer captures of tags `…20260902T213510823966642Z` (`cb3b53f0…`) and
+  `…20260828T111624599159951Z`. Event 0 calibration exact (0/0, residual 5.5e-7). Event 1 recomputed from
+  the legacy query/head weights/current key over the greenfield DB518 layer-1 prompt cache reproduces the
+  accepted run's device selection exactly (0/0) and the oracle's 7/7 swapped positions exactly. Live and
+  bounded RMS reduce fusions are byte-identical. Classification: `EVENT0_CALIBRATION_EXACT;
+  EVENT1_LEGACY_DECODE_SIDE_OVER_GREENFIELD_PROMPT_CACHE_REPRODUCES_DEVICE_SELECTION;
+  EVENT1_DEVIATION_LOCALIZED_TO_LAYER1_PROMPT_INDEX_CACHE;CPU_EVIDENCE_ONLY;NO_FIX_PROVEN;
+  NO_GATE_D_NO_DECODER_NO_DB_NO_PERFORMANCE_CLAIM;GATE_D_OPEN`.

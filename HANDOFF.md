@@ -11119,3 +11119,120 @@ weight operand exactly `convert(multiply(convert(bitcast_convert(%arg1) : ui8→
 broadcast_in_dim(%arg2, dims=[0, 2]))))` with all types bound. Attacks refused in both representations:
 direct u8/ui8→f32 convert, wrong broadcast dimensions, dequant output not converted, helper returning
 the slice directly, plus all earlier ones. Baseline archive: 78/78 kv-a rows bind in both representations.
+
+## 2026-09-02 approved run `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T211600121108599Z` (pin 086d459a): failed closed at the eight-host sync again (GitHub fetch SSH fault on workers 1, 5, 6, 7 …)
+
+Sol approved 47a9e91b / 086d459a / execute once; all reconfirmations passed; launched 21:26:57Z. The
+eight-host sync failed on at least four workers with the same transient as at 15:46Z:
+`ssh_dispatch_run_fatal: Connection to 140.82.114.x port 22: message authentication code incorrect`,
+`fetch-pack: unexpected disconnect`, `fatal: protocol error: bad pack header` / `fatal: early EOF`
+during `git fetch origin` from GitHub (worker 0 SYNC_OK). No TPU process started; failure-exit census
+8/8; the tag is burned; no claim. Two of the last three launches were lost to this fault (the pod's SSH
+egress to GitHub corrupts large pack transfers intermittently). Mitigation without a code change:
+pre-fetch the pin onto every worker with retries (`git fetch` up to six attempts, then
+`checkout --detach <pin>`), so the protected sync's own fetch transfers almost nothing; the runner still
+verifies HEAD == pin and a clean tree on each worker. A fetch retry inside the runner is the durable fix
+and is proposed for the next persistence review.
+
+## 2026-09-02 approved run `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T213510823966642Z` (pin 086d459a): hidden-width schedule only — event 1 still 7, identical set; hypothesis exhausted
+
+Sol approved execute-once on the unchanged pin after the pre-fetch mitigation; the eight-host sync passed
+(the fetch had nothing to transfer); launched 21:41:41Z; all three programs' contracts passed on TPU
+(census 157 accepted / 78 sharded q-a / 78 kv-a rows, every kv-a row bound through the exact N82 dequant
+DAG); the decoder executed. Prefill token exact (220); decode token at 8155 exact (101252, margin 6.5);
+event 0 exact (`max_abs 0.0` over 2,048 aligned scores). Exact-DSA refused at **event 1 with 7
+selected-set mismatches — the identical sets as the 15:56Z run** (expected-only 1052 1143 1841 2066 2436
+7473 7575; observed-only 1026 3889 6642 6690 6738 6810 7463; first order mismatch offset 11, 8136 vs
+8150), then 13, 10, 21, 48, 54, 61, 107, … (39,909 order mismatches). Failure-exit census 8/8; tag
+burned; no claim; observer npz `bf3ff47e…`; all HLO/contracts archived.
+
+Reading (the three executed runs together):
+- baseline, every norm default: event 0 exact, event 1 = 6 mismatches (a certified legacy-exact layer-1
+  RMS input `x`; the frontier certificate showed the layer-1 row differing by 1–4 ulps of scale);
+- hidden-width + kv-a accepted: event 1 = 7; hidden-width only: event 1 = 7, **same set** → the kv-a
+  schedule changed nothing at event 1; the kv-a inference was harmless and unnecessary;
+- q-a on the [32,2048] schedule: event 0 broke (refuted, reverted).
+So the 157 hidden-width norms on the proven `f32[32,6144]{T(8,128)} -> f32[32]` schedule do **not**
+reproduce the legacy at event 1 inside the full decoder, although the bounded TPU replay reproduced the
+legacy layer-1 row bit-for-bit for the same `x`. Either `x` at layer 1 is no longer identical to the
+certified one in the full program (something upstream of the layer-1 input norm differs between the
+bounded capture and the live decoder), or the live reduce fusion for these norms has a different
+accumulation order than the bounded arm's (`%multiply_reduce_fusion`), which the lineage contract binds
+by shape/layout/lineage but not by codegen. Both are testable offline first: (a) compare the event-1
+device scores in `dsa_observer/step_00_position_8155.npz` against the legacy `dsa_events` oracle to
+size the deltas (ulp-level vs structural); (b) diff the live decoder's layer-1 RMS reduce fusions
+(archived optimized HLO of this run) against the bounded arm's fusion (`%multiply_reduce_fusion`,
+iteration bounds and backend window config) — no TPU needed for either.
+
+Decision: no further protected launches on this hypothesis. Next: the two offline diagnoses above; the
+runner's worker fetch retry (six attempts, still fail-closed) is staged for the next persistence review
+together with whatever the diagnosis yields.
+
+## 2026-09-03 00:40Z — offline diagnosis: event 1 is carried by the layer-1 prompt index cache, not by the decode side
+
+Both offline diagnoses announced above ran on CPU from sealed bytes (`scripts/greenfield/diagnose_event1_prompt_index_cache_offline.py`,
+capsule `docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-diagnosis.json`; tests
+`tests/greenfield/validation/test_event1_prompt_cache_offline_diagnosis.py`, 6 passed).
+
+(b) Codegen: the live decoder's 157 hidden-width reduce fusions (`f32[32,6144]{1,0:T(8,128)} -> f32[32]`,
+archived optimized HLO of tag `…20260902T213510823966642Z`) and the bounded arm's `%multiply_reduce_fusion`
+have byte-identical bodies and backend configs (kLoop, iteration bounds 2×1, output window 2×48). The
+accepted schedule is compiled identically inside the full program; codegen is closed.
+
+(a) Scores: event 0 device scores equal the oracle bitwise (2,048/2,048). Event 1: **all 2,040 common
+device scores differ from the oracle** (mean |Δ| 0.0138, median ≈1,350 FP32 ulps at scores ≈80) — a broad
+upstream perturbation, not a boundary rounding. The baseline (default-norm) run shows the same profile
+(mean |Δ| 0.0148) and its per-position deltas correlate 0.80 with the accepted run's: the dominant
+perturbation is shared by both runs and was never the decode-side norm.
+
+Localization: recomputing event 1 with the **legacy** layer-1 query, head weights and current key (sealed
+`dsa_internals` recovery oracle, position 8155) over the **greenfield** layer-1 prompt index cache captured
+by the executed DB518 run (`result.npz` `534bacc5…`, owner/page/row layout of the position-113 comparison)
+under the TPU default-precision score emulation reproduces the accepted run's device selection **exactly
+(0/0 swaps, mean |Δ| 1.3e-4)** and the oracle's swapped positions **exactly** (expected-only 1052 1143 1841
+2066 2436 7473 7575 / observed-only 1026 3889 6642 6690 6738 6810 7463). Event 0 calibrates the method (set
+exact, residual 5.5e-7 over the proven-exact layer-0 prompt cache). Hence the layer-1 decode side is now
+legacy-exact and the whole event-1 deviation lives in the **layer-1 prompt index cache built by prefill**.
+The DB518 full-width comparison agrees: at layer 1 the current key was already exact (0/128) while the
+oracle-side prompt cache for layer 1 has never existed (only layer 0 was ever captured and proven exact).
+
+Cause hypothesis (not yet proven on TPU): the greenfield prefill is a teacher-forced scan that pushes each
+prompt token through the single-token decode step, so every prompt row's residual from layer 1 onward is
+produced with the decode arithmetic (single-row projections, decode attention, StrategyND, M32 forms),
+while the legacy oracle's prompt rows came from its batched 2,048-token prefill (M-row matmuls, ragged
+prefill attention). Layer-0 prompt keys are exact only because they depend on embeddings alone and use the
+physical-M64 prompt-key repair; the layer-0 prompt main cache differed only in the main-RoPE suffix
+(DB530, 1 latent element in 2,048×512), since fixed (DB531). Every deeper layer's prompt keys inherit the
+prompt-row residual stream, which no decode-faithful kernel can reproduce.
+
+Consequence for Gate D: exact DSA selected sets at 8K require legacy-prefill-exact prompt caches for all
+21 indexer layers, i.e. a prefill whose per-row arithmetic matches the legacy's batched prefill — a
+different target from everything the decode-side campaign proved. Next admissible evidence (one Sol
+batch): (1) generalize the legacy prompt-index-cache capture to layer 1 (`INTERNAL_LAYER_ID=1`, sealing
+that currently pins slot zero) and capture the legacy layer-1 prompt cache once; (2) compare it offline
+with the DB518 greenfield layer-1 cache and, if needed, a live full-decoder capture, to obtain the row-level
+mismatch map (all rows vs chunk-boundary rows) before any prefill redesign. No protected 8K decoder launch
+until that map exists. CPU evidence only; no claim.
+
+### Tooling for the next admissible evidence: layer-selectable legacy prompt-cache capture (CPU-tested)
+
+- `glm_tpu/greenfield/validation/prompt_index_cache.py`: `FULL_INDEXER_LAYERS`, `prompt_index_cache_artifact_kind`,
+  `expected_prompt_cache_slot` (legacy `kv_caches` slot = layer id + number of full-indexer layers before it:
+  0→0, 1→2, 2→4, 6→9; order verified in the pinned vLLM `deepseek_v2.py`: `Indexer` (which registers
+  `DeepseekV32IndexerCache`) is constructed before `MultiHeadLatentAttentionWrapper` in every MLA layer, and
+  the sealed layer-0 dumps showed slot 0 = 128-wide index cache, slot 1 = 640-wide main cache);
+  `LegacyPromptIndexCacheConfig.layer_id` (default 0, layer-0 manifest bytes unchanged); the loader requires
+  `layer_indices == [slot]` and `layer{slot}__*` keys, so a wrong slot cannot seal (shape/width refused);
+  deeper-layer manifests bind `layer_id`/`cache_slot`/`layer_name`; the inspector verifies the binding.
+- `scripts/greenfield/capture_legacy_prompt_index_cache.py --layer-id`; wrapper
+  `run_capture_short_context_dsa_oracle.sh`: `GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID` → derived
+  `PROMPT_CACHE_SLOT` (python, single source of truth) → `GLM_DCP_CACHE_DUMP_LAYERS=$PROMPT_CACHE_SLOT`, raylet
+  env check on the same value, `--layer-id` at sealing, one-host layer-0 production probe and prompt-key
+  capture stay layer-0 only; launcher `run_capture_legacy_prompt_index_cache.sh` tags
+  `greenfield_legacy_layer<L>_prompt_index_cache_<ts>`.
+- `scripts/greenfield/compare_layer1_prompt_index_cache_offline.py`: sealed legacy artifact vs DB518 greenfield
+  rows → bitwise delta + row map (per legacy 2,048-token chunk, per 512-row page, first/last row) and, for
+  layer 1, the legacy cache under legacy query/head weights/current key must reproduce the oracle event-1 set.
+- Tests: `tests/greenfield/validation/test_prompt_index_cache_layer_selection.py` (9) plus the existing
+  prompt-cache/oracle-wrapper/internals/prefill-index/association/position-113 suites: 79 passed
+  (`JAX_PLATFORMS=cpu`). No TPU action; nothing captured yet.

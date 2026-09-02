@@ -16,6 +16,9 @@ readonly INTERNAL_CAPTURE=${GLM_GREENFIELD_DSA_INTERNALS_CAPTURE:-0}
 readonly INTERNAL_MODE=${GLM_GREENFIELD_DSA_INTERNALS_MODE:-scorer}
 readonly INTERNAL_POSITION_OVERRIDE=${GLM_GREENFIELD_DSA_INTERNALS_POSITION:-}
 readonly PROMPT_CACHE_CAPTURE=${GLM_GREENFIELD_PROMPT_CACHE_CAPTURE:-0}
+# Full-indexer layer whose prompt index cache the legacy dump captures; the
+# legacy kv_caches slot is derived from the sealed registration order.
+readonly PROMPT_CACHE_LAYER_ID=${GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID:-0}
 readonly PREFILL_PROJECTION_CAPTURE=${GLM_GREENFIELD_ACCEPTED_PREFILL_PROJECTION_CAPTURE:-0}
 readonly DECODE_PROJECTION_CAPTURE=${GLM_GREENFIELD_ACCEPTED_DECODE_PROJECTION_CAPTURE:-0}
 readonly MAIN_CACHE_CAPTURE=${GLM_GREENFIELD_MAIN_CACHE_CAPTURE:-0}
@@ -114,6 +117,19 @@ case "$INTERNAL_MODE" in
     exit 2
     ;;
 esac
+[[ $PROMPT_CACHE_LAYER_ID =~ ^[0-9]+$ ]] || {
+  echo "GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID must be a nonnegative integer" >&2
+  exit 2
+}
+PROMPT_CACHE_SLOT=$(PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python -c '
+import sys
+from glm_tpu.greenfield.validation.prompt_index_cache import expected_prompt_cache_slot
+print(expected_prompt_cache_slot(int(sys.argv[1])))
+' "$PROMPT_CACHE_LAYER_ID") || {
+  echo "GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID=$PROMPT_CACHE_LAYER_ID owns no DSA prompt index cache" >&2
+  exit 2
+}
+readonly PROMPT_CACHE_SLOT
 [[ $PROMPT_CACHE_CAPTURE == 0 || $PROMPT_CACHE_CAPTURE == 1 ]] || {
   echo "GLM_GREENFIELD_PROMPT_CACHE_CAPTURE must be 0 or 1" >&2
   exit 2
@@ -331,9 +347,9 @@ INTERNAL_TARGET_POSITION=${INTERNAL_POSITION_OVERRIDE:-$FIRST_DECODE_POSITION}
 }
 if [[ $PROMPT_KEY_CAPTURE == 1 ]]; then
   [[ $INTERNAL_CAPTURE == 1 && $INTERNAL_LAYER_ID == 0 && \
-     $PROFILE == 8k && $PROMPT_CACHE_CAPTURE == 1 && \
+     $PROFILE == 8k && $PROMPT_CACHE_CAPTURE == 1 && $PROMPT_CACHE_LAYER_ID == 0 && \
      $INTERNAL_TARGET_POSITION -lt $EXPECTED_PROMPT_TOKENS ]] || {
-    echo "prompt-key capture requires layer 0, 8K, prompt cache, and a prompt position" >&2
+    echo "prompt-key capture requires layer 0, 8K, layer-0 prompt cache, and a prompt position" >&2
     exit 2
   }
 fi
@@ -1090,6 +1106,7 @@ trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR GREENFIELD_PIN=$PIN HARNESS_PIN=$HARNESS_PIN LEGACY_PIN=$LEGACY_PIN"
 say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX INTERNAL_LAYER=$INTERNAL_LAYER INTERNAL_MODE=$INTERNAL_MODE INTERNAL_POSITION=$INTERNAL_TARGET_POSITION PROMPT_CACHE_CAPTURE=$PROMPT_CACHE_CAPTURE PREFILL_PROJECTION_CAPTURE=$PREFILL_PROJECTION_CAPTURE DECODE_PROJECTION_CAPTURE=$DECODE_PROJECTION_CAPTURE MAIN_CACHE_CAPTURE=$MAIN_CACHE_CAPTURE"
+say "PROMPT_CACHE_LAYER_ID=$PROMPT_CACHE_LAYER_ID PROMPT_CACHE_SLOT=$PROMPT_CACHE_SLOT"
 if [[ $PROMPT_CACHE_CAPTURE == 1 && $PROFILE != 8k ]]; then
   say "ABORT: prompt index-cache capture is defined only for the sealed 8K profile"
   exit 2
@@ -1297,7 +1314,7 @@ fi
 
 COMMON_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_DCP_SCATTER_IMPL=flat GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"' GLM_DSA_DUMP_TOPK_EVENTS=all GLM_DSA_DUMP_TOPK_SKIP_WARMUP=1 GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"
 if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
-  COMMON_ENVS="$COMMON_ENVS GLM_DCP_CACHE_DUMP=$PROMPT_CACHE_DUMP_PREFIX GLM_DCP_CACHE_DUMP_LAYERS=0"
+  COMMON_ENVS="$COMMON_ENVS GLM_DCP_CACHE_DUMP=$PROMPT_CACHE_DUMP_PREFIX GLM_DCP_CACHE_DUMP_LAYERS=$PROMPT_CACHE_SLOT"
 fi
 if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
   COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO $COMMON_ENVS GLM_DCP_CACHE_DUMP=$MAIN_CACHE_DUMP_PREFIX GLM_DCP_CACHE_DUMP_LAYERS=1 GLM_DCP_CACHE_DUMP_STEPS=4,5"
@@ -1366,7 +1383,7 @@ has_eight_unique_markers "$RUN_DIR/raylet_env.txt" ENV_OK || {
 }
 if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
   # shellcheck disable=SC2016
-  cache_env_check='p=$(pgrep -x raylet | head -1); f=/tmp/prompt_cache_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_DCP_CACHE_DUMP='"$PROMPT_CACHE_DUMP_PREFIX"'" "$f" && grep -qx "GLM_DCP_CACHE_DUMP_LAYERS=0" "$f"; then echo "CACHE_ENV_OK $(hostname)"; else echo "CACHE_ENV_BAD $(hostname)"; fi; rm -f "$f"'
+  cache_env_check='p=$(pgrep -x raylet | head -1); f=/tmp/prompt_cache_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_DCP_CACHE_DUMP='"$PROMPT_CACHE_DUMP_PREFIX"'" "$f" && grep -qx "GLM_DCP_CACHE_DUMP_LAYERS='"$PROMPT_CACHE_SLOT"'" "$f"; then echo "CACHE_ENV_OK $(hostname)"; else echo "CACHE_ENV_BAD $(hostname)"; fi; rm -f "$f"'
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$cache_env_check" >"$RUN_DIR/raylet_cache_env.txt" 2>&1
   has_eight_unique_markers "$RUN_DIR/raylet_cache_env.txt" CACHE_ENV_OK || {
@@ -1483,7 +1500,7 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$cache_integrity" >"$RUN_DIR/fleet_prompt_cache_integrity.txt" 2>&1
   has_eight_unique_markers "$RUN_DIR/fleet_prompt_cache_integrity.txt" CACHE_OK || {
-    say "ABORT: layer-0 prompt-cache observer coverage is incomplete"
+    say "ABORT: layer-$PROMPT_CACHE_LAYER_ID prompt-cache observer coverage is incomplete"
     exit 1
   }
 fi
@@ -1734,7 +1751,7 @@ print(json.dumps(value, indent=2, sort_keys=True))
 PY
 fi
 if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
-  say "sealing accepted logical layer-0 prompt index cache"
+  say "sealing accepted logical layer-$PROMPT_CACHE_LAYER_ID prompt index cache (legacy slot $PROMPT_CACHE_SLOT)"
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
     "$WORKTREE/scripts/greenfield/capture_legacy_prompt_index_cache.py" \
     --source-dump-dir "$SOURCE_DIR" \
@@ -1746,6 +1763,7 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
     --source-item-row-id "$item_row_id" \
     --layer0-input-dir "$LAYER0_INPUT_DIR" \
     --layer0-input-manifest-sha256 "$LAYER0_INPUT_MANIFEST_SHA" \
+    --layer-id "$PROMPT_CACHE_LAYER_ID" \
     >"$RUN_DIR/prompt_index_cache_capture.json"
 fi
 
@@ -1806,7 +1824,12 @@ if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
   prompt_cache_manifest_sha=$(/home/gianl/vllm-env/bin/python -c \
     'import json,sys; print(json.load(open(sys.argv[1]))["manifest_sha256"])' \
     "$PROMPT_CACHE_RESULT_DIR/manifest.json")
-  if [[ $PROMPT_KEY_CAPTURE != 1 ]]; then
+  if [[ $PROMPT_CACHE_LAYER_ID != 0 ]]; then
+    # The one-host production probe recomputes layer-0 keys from the sealed
+    # layer-0 input; deeper layers are compared offline against the executed
+    # DB518 greenfield capture (compare_layer1_prompt_index_cache_offline.py).
+    say "layer-$PROMPT_CACHE_LAYER_ID prompt cache sealed; production comparison is offline only"
+  elif [[ $PROMPT_KEY_CAPTURE != 1 ]]; then
     say "comparing production one-row layer-0 prompt keys on one local TPU host"
     env JAX_PLATFORMS=tpu \
       TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \

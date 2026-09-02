@@ -941,7 +941,7 @@ def test_protected_prompt_cache_probe_reuses_capture_and_production_path() -> No
         assert forbidden not in probe_source
     for required in (
         "GLM_DCP_CACHE_DUMP=$PROMPT_CACHE_DUMP_PREFIX",
-        "GLM_DCP_CACHE_DUMP_LAYERS=0",
+        "GLM_DCP_CACHE_DUMP_LAYERS=$PROMPT_CACHE_SLOT",
         "prompt_cache_source_count -eq 32",
         "capture_legacy_prompt_index_cache.py",
         "probe_layer0_prompt_index_cache.py",

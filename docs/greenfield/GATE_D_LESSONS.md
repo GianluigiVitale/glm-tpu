@@ -1200,3 +1200,16 @@ normalized-state cause.
 - A patch script that asserts mid-way leaves the earlier writes in place and the later ones missing;
   verify with `git diff --stat` that every file you describe to a reviewer actually changed, and never
   describe a test as present from memory of the script rather than from the tree.
+- A bounded proof of a kernel's numerics ("same input → identical row") does not transfer to the full
+  program until the input equality and the emitted codegen are both proven inside that program; three
+  full runs were needed to learn that the layer-1 schedule fix is necessary-looking but not sufficient.
+  Before the next protected run, close the gap offline: size the event-1 score deltas against the oracle
+  and diff the live reduce fusions against the bounded arm.
+- When a selected set mismatches, separate the two inputs of the score before touching either: recompute
+  the scores offline from the *oracle's* decode-side tensors over the *candidate's* prompt cache (and vice
+  versa when possible). Here that single CPU computation reproduced the device selection exactly and moved
+  the fault from the decode-side norm, chased through three full runs, to the prompt cache built by prefill.
+- A teacher-forced scan through the decode step is an exact reference only for the decode arithmetic. The
+  legacy oracle's prompt rows come from its batched prefill, so prompt caches of every layer past the first
+  inherit prefill-arithmetic residuals that decode-faithful kernels cannot reproduce; prove each layer's
+  prompt cache against a legacy capture before treating a decode-side boundary as the cause.

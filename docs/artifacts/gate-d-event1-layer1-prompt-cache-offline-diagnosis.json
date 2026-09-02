@@ -1,0 +1,158 @@
+{
+  "artifact_kind": "gate_d_event1_layer1_prompt_cache_offline_diagnosis",
+  "classification": "EVENT0_CALIBRATION_EXACT;EVENT1_LEGACY_DECODE_SIDE_OVER_GREENFIELD_PROMPT_CACHE_REPRODUCES_DEVICE_SELECTION;EVENT1_DEVIATION_LOCALIZED_TO_LAYER1_PROMPT_INDEX_CACHE;CPU_EVIDENCE_ONLY;NO_FIX_PROVEN;NO_GATE_D_NO_DECODER_NO_DB_NO_PERFORMANCE_CLAIM;GATE_D_OPEN",
+  "decode_position": 8155,
+  "events": {
+    "event_0": {
+      "device_accepted_hidden_width_schedule_vs_oracle": {
+        "expected_only": [],
+        "observed_only": []
+      },
+      "device_baseline_default_schedule_vs_oracle": {
+        "expected_only": [],
+        "observed_only": []
+      },
+      "keys": "legacy_decode_side_over_greenfield_db518_prompt_cache",
+      "producer_layer_id": 0,
+      "vs_device_accepted_hidden_width_schedule": {
+        "expected_only": [],
+        "observed_only": [],
+        "score_delta_max_abs": 2.267935109045993e-06,
+        "score_delta_mean_abs": 5.533530954846336e-07,
+        "score_delta_nonzero": 2048
+      },
+      "vs_device_baseline_default_schedule": {
+        "expected_only": [],
+        "observed_only": [],
+        "score_delta_max_abs": 2.267935109045993e-06,
+        "score_delta_mean_abs": 5.533530954846336e-07,
+        "score_delta_nonzero": 2048
+      },
+      "vs_oracle": {
+        "expected_only": [],
+        "observed_only": [],
+        "score_delta_max_abs": 2.267935109045993e-06,
+        "score_delta_mean_abs": 5.533530954846336e-07,
+        "score_delta_nonzero": 2048
+      }
+    },
+    "event_1": {
+      "device_accepted_hidden_width_schedule_vs_oracle": {
+        "expected_only": [
+          1052,
+          1143,
+          1841,
+          2066,
+          2436,
+          7473,
+          7575
+        ],
+        "observed_only": [
+          1026,
+          3889,
+          6642,
+          6690,
+          6738,
+          6810,
+          7463
+        ]
+      },
+      "device_baseline_default_schedule_vs_oracle": {
+        "expected_only": [
+          680,
+          1052,
+          1143,
+          1841,
+          2436,
+          7575
+        ],
+        "observed_only": [
+          1026,
+          6642,
+          6690,
+          6738,
+          6810,
+          7463
+        ]
+      },
+      "keys": "legacy_decode_side_over_greenfield_db518_prompt_cache",
+      "producer_layer_id": 1,
+      "vs_device_accepted_hidden_width_schedule": {
+        "expected_only": [],
+        "observed_only": [],
+        "score_delta_max_abs": 0.03570307304249809,
+        "score_delta_mean_abs": 0.00012849348275556505,
+        "score_delta_nonzero": 2048
+      },
+      "vs_device_baseline_default_schedule": {
+        "expected_only": [
+          2066,
+          7473
+        ],
+        "observed_only": [
+          680,
+          3889
+        ],
+        "score_delta_max_abs": 0.07926742606014159,
+        "score_delta_mean_abs": 0.009525191369080893,
+        "score_delta_nonzero": 2048
+      },
+      "vs_oracle": {
+        "expected_only": [
+          1052,
+          1143,
+          1841,
+          2066,
+          2436,
+          7473,
+          7575
+        ],
+        "observed_only": [
+          1026,
+          3889,
+          6642,
+          6690,
+          6738,
+          6810,
+          7463
+        ],
+        "score_delta_max_abs": 0.07565382823845823,
+        "score_delta_mean_abs": 0.013878068139764305,
+        "score_delta_nonzero": 2048
+      }
+    }
+  },
+  "inputs": {
+    "db518_result_npz": {
+      "path": "/home/gianl/glm-run/greenfield_pp16_feature2_layer0_db518_numerical_20260829T115022665987633Z/result.npz",
+      "sha256": "534bacc54d74992f5a8ab4d422f9fa0947523d59325b4bfa272d4fbeb56262f0"
+    },
+    "dsa_events_oracle": {
+      "path": "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle/dsa_events.safetensors",
+      "sha256": "b591a4622a8c646799989f235bc98bcf8ae99e9e04d2ad55a982d70ba00dde82"
+    },
+    "legacy_layer0_internals": {
+      "path": "dsa_internals/8k/recovery/greenfield_legacy_layer0_dsa_internals_recovery_20260808T030853085141329Z/source_dumps/w2/internals.model_layers_0_self_attn_attn.position8155.proc0.npz",
+      "sha256": "212eb4cc9e76f865bac71f1c75635a19620b70d3ccb9e95d30e2c45f6f4aa835"
+    },
+    "legacy_layer1_internals": {
+      "path": "dsa_internals/8k/recovery/greenfield_legacy_layer1_dsa_internals_recovery_20260808T093405285628860Z/source_dumps/w2/internals.model_layers_1_self_attn_attn.position8155.proc0.npz",
+      "sha256": "eb7a250072d23531707130deaabb6906590c6661e70637fe2cedf8069d35a9da"
+    },
+    "observer_accepted": {
+      "run_tag": "greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T213510823966642Z",
+      "sha256": "cb3b53f00d654ac3c851834342e26c47b282077ed57599e4a2709514c6bb938f"
+    },
+    "observer_baseline": {
+      "run_tag": "greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260828T111624599159951Z",
+      "sha256": "17f0916de291be472437319c848f3f4331d5bdd6dac325755ef1f4ecbaf8bd7e"
+    }
+  },
+  "interpretation": "Event 1 recomputed from the legacy layer-1 query, head weights and current key over the greenfield DB518 layer-1 prompt index cache reproduces the protected accepted-schedule run's selection exactly and the oracle's swapped positions exactly; the layer-1 decode side is therefore no longer the cause and the deviation is carried by the layer-1 prompt index cache that the teacher-forced prefill builds. The greenfield prompt rows use the single-token decode arithmetic, while the legacy oracle's prompt rows came from its batched prefill. The layer-0 prompt index cache is already proven exact; layer-0 prompt main-cache rows differed only in the main-RoPE suffix (DB530/DB531).",
+  "method": {
+    "prompt_cache_layout": "owner=(p%512)//256, page=p//512, row=p%256; current position key from legacy internals rounded to bf16",
+    "score_emulation": "bf16 operands, fp64 products/accumulate rounded once to fp32, fp32 128**-0.5 scale, relu, signed head weights",
+    "selected_width": 2048
+  },
+  "performance_claim": false
+}
