@@ -99,7 +99,7 @@ def host(values):
     return [np.asarray(jax.device_get(value)) for value in values]
 default_out, schedule_out = host(first), host(schedule_first)
 expected_accepted, expected_sharded, expected_kv = expected_rms_schedule_census(layers=schedule.layer_count, attention_projection_backend=decoder.attention_projection_backend)
-census = dict(expected_accepted_count=expected_accepted, expected_sharded_qa_count=expected_sharded, expected_kv_a_count=expected_kv, kv_a_width=int(plan.geometry.kv_lora_rank), kv_a_projection_width=int(plan.geometry.kv_lora_rank + plan.geometry.qk_rope_head_dim))
+census = dict(expected_accepted_count=expected_accepted, expected_sharded_qa_count=expected_sharded, expected_kv_a_count=expected_kv, kv_a_width=int(plan.geometry.kv_lora_rank), kv_a_projection_width=int(plan.geometry.kv_lora_rank + plan.geometry.qk_rope_head_dim), attention_projection_backend=decoder.attention_projection_backend)
 default_module = parse_hlo_module(default_compiled.as_text())
 schedule_module = parse_hlo_module(schedule_compiled.as_text())
 report = {
@@ -112,11 +112,11 @@ report = {
     'expected_census': [expected_accepted, expected_sharded, expected_kv],
     'index_max_abs': float(np.abs(default_out[2].astype(np.float32) - schedule_out[2].astype(np.float32)).max()),
     'residual_max_abs': float(np.abs(default_out[0].astype(np.float32) - schedule_out[0].astype(np.float32)).max()),
-    'default_contract': _validate_rms_accepted_schedule_hlo(default_module, enabled=False, layernorm_width=decoder.config.index_key_width, kv_a_width=int(plan.geometry.kv_lora_rank), kv_a_projection_width=int(plan.geometry.kv_lora_rank + plan.geometry.qk_rope_head_dim)),
+    'default_contract': _validate_rms_accepted_schedule_hlo(default_module, enabled=False, layernorm_width=decoder.config.index_key_width, kv_a_width=int(plan.geometry.kv_lora_rank), kv_a_projection_width=int(plan.geometry.kv_lora_rank + plan.geometry.qk_rope_head_dim), attention_projection_backend=decoder.attention_projection_backend),
     'schedule_contract': _validate_rms_accepted_schedule_hlo(schedule_module, enabled=True, layernorm_width=decoder.config.index_key_width, **census),
     'default_as_schedule': _validate_rms_accepted_schedule_hlo(default_module, enabled=True, layernorm_width=decoder.config.index_key_width, **census)['passed'],
     'schedule_as_default': _validate_rms_accepted_schedule_hlo(schedule_module, enabled=False, layernorm_width=decoder.config.index_key_width)['passed'],
-    'default_stablehlo': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=False, layernorm_width=decoder.config.index_key_width, kv_a_width=int(plan.geometry.kv_lora_rank), kv_a_projection_width=int(plan.geometry.kv_lora_rank + plan.geometry.qk_rope_head_dim)),
+    'default_stablehlo': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=False, layernorm_width=decoder.config.index_key_width, kv_a_width=int(plan.geometry.kv_lora_rank), kv_a_projection_width=int(plan.geometry.kv_lora_rank + plan.geometry.qk_rope_head_dim), attention_projection_backend=decoder.attention_projection_backend),
     'schedule_stablehlo': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=True, layernorm_width=decoder.config.index_key_width, **census),
     'default_stablehlo_as_schedule': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=True, layernorm_width=decoder.config.index_key_width, **census)['passed'],
     'schedule_stablehlo_as_default': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=False, layernorm_width=decoder.config.index_key_width)['passed'],

@@ -11009,3 +11009,19 @@ bounds, an unrelated 512-wide lineage (`add` between convert and square), a seco
 archive still binds all 78 kv-a row norms (its emitted `slice.92468 = bf16[1,512] slice(param
 bf16[1,576]), slice={[0:1], [0:512]}` → convert); the two `_ras` archives are refused as before; the
 forced-CPU decoder binds its plan's 4 + 2 = 6-wide projection.
+
+## 2026-09-02 Sol BLOCK on eaa906bc (kv-a projection producer unbound) — producer binding
+
+Sol refused because a correctly shaped unrelated 576-wide value satisfied the slice/convert check. Both
+binders now resolve the P-wide operand to its producer, per attention backend. Fused N82 (the 8K
+profile): through structural ops only (reshape/bitcast/copy/transpose/tuple access, size-1 squeezing
+`reduce`, fusion roots and fusion parameters) to the lane slice `[0:32], [0:1], [64:82]` of the
+`bf16[32,1,82]` fused qkv-a projection buffer — the baseline archive emits
+`reshape(fusion(reduce(slice(param bf16[32,1,82]) [0:32],[0:1],[64:82]))) → bf16[1,576]` and StableHLO
+`reshape(transpose(slice %proj [0:32, 0:1, 64:82]))`. Separate layout (forced-CPU plan): through
+converts to a `dot`/`convolution` carrying P elements (the kv-a linear). Synthetic modules now model
+the real producer; refused in both representations: an unrelated 576-wide parameter, a caller
+substitution (`add` of the projection), a wrong lane slice (`[46:64]`), a wrong projection buffer
+(`bf16[32,1,90]`), the earlier direct-parameter / wrong-parent-width / wrong-bounds / unrelated-512 /
+second-slice cases. All three archives re-validated (baseline: 78 kv-a rows bound through the
+producer; both `_ras` archives refused as before); forced-CPU decoder binds its `dot` producer.

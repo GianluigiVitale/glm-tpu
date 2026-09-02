@@ -2672,6 +2672,100 @@ QK_ROPE_HEAD_DIM = 64
 KV_A_PROJECTION_WIDTH = KV_A_LORA_RANK + QK_ROPE_HEAD_DIM
 
 
+FUSED_QKV_A_KV_WIDTH_PER_SHARD = KV_A_PROJECTION_WIDTH // FUSED_QKV_A_VIRTUAL_SHARDS
+
+
+def _rms_schedule_kv_a_projection_producer(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    value: HloInstruction | None,
+    *,
+    projection_width: int,
+    attention_projection_backend: str,
+) -> list[str]:
+    """Bind the P-wide kv-a projection value to its producer.
+
+    Fused N82 layout: the value must resolve, through structural ops only
+    (reshape/bitcast/copy/transpose/tuple access, size-1 squeezing reduces,
+    fusion roots and fusion parameters), to the lane slice
+    ``[0:S], [0:1], [Q:Q+K]`` of the ``bf16[S,1,Q+K]`` fused qkv-a projection
+    buffer (S=32 virtual shards, Q=64 q lanes, K=18 kv lanes per shard).
+    Separate layout: the value must resolve, additionally through converts, to a
+    ``dot``/``convolution`` whose result carries P elements (the kv-a linear).
+    """
+
+    problems: list[str] = []
+    fused = attention_projection_backend == "fused_n82_convolution"
+    shards = FUSED_QKV_A_VIRTUAL_SHARDS
+    q_lanes = FUSED_QKV_A_Q_WIDTH_PER_SHARD
+    kv_lanes = projection_width // shards if shards else 0
+    current = value
+    for _ in range(16):
+        if current is None:
+            problems.append("kv-a projection producer is unresolved")
+            return problems
+        opcode = current.opcode
+        if opcode in {"reshape", "bitcast", "copy", "transpose", "get-tuple-element"} and current.operand_names:
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if opcode == "convert" and not fused and current.operand_names:
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if opcode == "reduce" and current.operand_names and current.operand_shapes and current.result_shapes:
+            operand_dims = current.operand_shapes[0].dimensions
+            result_dims = current.result_shapes[0].dimensions
+            dims = re.search(r"\bdimensions=\{([0-9,]*)\}", current.raw_line)
+            reduced = tuple(int(v) for v in dims.group(1).split(",")) if dims and dims.group(1) else ()
+            squeeze = len(reduced) == 1 and len(operand_dims) == len(result_dims) + 1 and operand_dims[reduced[0]] == 1
+            if not squeeze:
+                problems.append("kv-a projection chain carries a non-squeeze reduce")
+                return problems
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if opcode == "parameter":
+            index_match = re.search(r"\bparameter\(([0-9]+)\)", current.raw_line)
+            caller = _rms_schedule_caller(module, current.computation)
+            if caller is None or index_match is None:
+                problems.append("kv-a projection resolves to an entry parameter, not the projection")
+                return problems
+            index = int(index_match.group(1))
+            if index >= len(caller.operand_names):
+                problems.append("kv-a projection parameter index escapes its caller")
+                return problems
+            current = by_key.get((caller.computation, caller.operand_names[index]))
+            continue
+        if opcode == "fusion":
+            current = _rms_schedule_callee_root(module, current)
+            continue
+        if fused and opcode == "slice":
+            bounds = re.search(r"\bslice=\{([^}]*)\}", current.raw_line)
+            expected = f"[0:{shards}], [0:1], [{q_lanes}:{q_lanes + kv_lanes}]"
+            operand_shape = current.operand_shapes[0] if current.operand_shapes else None
+            if bounds is None or bounds.group(1).strip() != expected:
+                problems.append(f"kv-a projection lane slice is not {{{expected}}}: {bounds.group(1) if bounds else None}")
+            if (
+                operand_shape is None
+                or operand_shape.dtype != "bf16"
+                or operand_shape.dimensions != (shards, 1, q_lanes + kv_lanes)
+            ):
+                problems.append(
+                    f"kv-a projection lane slice operand is not the bf16[{shards},1,{q_lanes + kv_lanes}] "
+                    f"fused qkv-a projection: {operand_shape.to_dict() if operand_shape else None}"
+                )
+            return problems
+        if not fused and opcode in {"dot", "convolution"}:
+            elements = 1
+            for value_dim in (current.result_shapes[0].dimensions if current.result_shapes else ()):
+                elements *= value_dim
+            if elements != projection_width:
+                problems.append(f"kv-a projection linear carries {elements} elements, expected {projection_width}")
+            return problems
+        problems.append(f"kv-a projection producer is {opcode}, not the kv-a projection")
+        return problems
+    problems.append("kv-a projection producer chain is too deep")
+    return problems
+
+
 def _rms_schedule_kv_a_provenance(
     module: HloModule,
     by_key: dict[tuple[str, str], HloInstruction],
@@ -2679,6 +2773,7 @@ def _rms_schedule_kv_a_provenance(
     *,
     kv_a_width: int,
     projection_width: int,
+    attention_projection_backend: str = "fused_n82_convolution",
 ) -> list[str]:
     """Bind the kv-a latent to ``convert``/``slice([0:1],[0:W])`` of the P-wide projection.
 
@@ -2692,6 +2787,8 @@ def _rms_schedule_kv_a_provenance(
     problems: list[str] = []
     converts = 0
     slices = 0
+    projection_value: HloInstruction | None = None
+    fused_is_irrelevant = False
     current = carrier
     for _ in range(12):
         if current is None:
@@ -2720,6 +2817,7 @@ def _rms_schedule_kv_a_provenance(
                 )
             slices += 1
             current = by_key.get((current.computation, current.operand_names[0]))
+            projection_value = current
             continue
         if opcode in {"bitcast", "reshape", "copy", "get-tuple-element"} and current.operand_names:
             current = by_key.get((current.computation, current.operand_names[0]))
@@ -2742,6 +2840,21 @@ def _rms_schedule_kv_a_provenance(
         problems.append(f"kv-a latent provenance carries {converts} converts, expected exactly one")
     if slices != 1:
         problems.append(f"kv-a latent provenance carries {slices} projection slices, expected exactly one")
+    if not problems:
+        # In the convert(slice(...)) order the slice operand is the projection; in the
+        # slice(convert(...)) order the convert operand is: strip a leading convert.
+        value = projection_value
+        if value is not None and value.opcode == "convert" and value.operand_names and not fused_is_irrelevant:
+            value = by_key.get((value.computation, value.operand_names[0]))
+        problems.extend(
+            _rms_schedule_kv_a_projection_producer(
+                module,
+                by_key,
+                value,
+                projection_width=projection_width,
+                attention_projection_backend=attention_projection_backend,
+            )
+        )
     return problems
 
 
@@ -2937,6 +3050,7 @@ def _rms_schedule_lineage(
     layernorm_width: int,
     kv_a_width: int = KV_A_LORA_RANK,
     kv_a_projection_width: int = KV_A_PROJECTION_WIDTH,
+    attention_projection_backend: str = "fused_n82_convolution",
 ) -> dict[str, Any]:
     """Bind one rsqrt to square -> last-axis reduce -> 1/W -> +eps -> rsqrt.
 
@@ -3093,6 +3207,7 @@ def _rms_schedule_lineage(
                 carrier,
                 kv_a_width=kv_a_width,
                 projection_width=kv_a_projection_width,
+                attention_projection_backend=attention_projection_backend,
             )
         )
         record["problems"] = problems
@@ -3236,6 +3351,60 @@ def _stablehlo_constant(definitions: _StablehloScope, name: str) -> float | None
     return None
 
 
+def _stablehlo_kv_a_projection_producer(
+    definitions: _StablehloScope,
+    name: str | None,
+    *,
+    projection_width: int,
+    attention_projection_backend: str,
+) -> list[str]:
+    """StableHLO twin of ``_rms_schedule_kv_a_projection_producer``.
+
+    Fused: ``reshape``/``transpose`` chain ending in
+    ``stablehlo.slice %x [0:S, 0:1, Q:Q+K] : (tensor<Sx1x(Q+K)xbf16>) -> tensor<Sx1xKxbf16>``.
+    Separate: ``convert``/``reshape``/``bitcast`` chain ending in a
+    ``stablehlo.dot_general``/``stablehlo.convolution`` producing P elements.
+    """
+
+    fused = attention_projection_backend == "fused_n82_convolution"
+    shards = FUSED_QKV_A_VIRTUAL_SHARDS
+    q_lanes = FUSED_QKV_A_Q_WIDTH_PER_SHARD
+    kv_lanes = projection_width // shards if shards else 0
+    current_name = name
+    for _ in range(12):
+        entry = definitions.lookup(current_name) if current_name else None
+        if entry is None:
+            return ["kv-a projection producer is unresolved in StableHLO"]
+        opcode, rest = entry
+        if opcode in {"stablehlo.reshape", "stablehlo.transpose", "stablehlo.bitcast_convert"} or (
+            opcode == "stablehlo.convert" and not fused
+        ):
+            names = _stablehlo_operands(rest)
+            current_name = names[0] if names else None
+            continue
+        if fused and opcode == "stablehlo.slice":
+            pattern = (
+                rf"\[0:{shards}, 0:1, {q_lanes}:{q_lanes + kv_lanes}\] : "
+                rf"\(tensor<{shards}x1x{q_lanes + kv_lanes}xbf16>\) -> tensor<{shards}x1x{kv_lanes}xbf16>\s*$"
+            )
+            if re.search(pattern, rest) is None:
+                return [
+                    f"kv-a projection lane slice is not [0:{shards}, 0:1, {q_lanes}:{q_lanes + kv_lanes}] of the "
+                    f"tensor<{shards}x1x{q_lanes + kv_lanes}xbf16> fused qkv-a projection"
+                ]
+            return []
+        if not fused and opcode in {"stablehlo.dot_general", "stablehlo.convolution"}:
+            shape = re.search(r"-> tensor<([0-9x]+)xf32>\s*$", rest) or re.search(r"-> tensor<([0-9x]+)xbf16>\s*$", rest)
+            elements = 1
+            for value_dim in (shape.group(1).split("x") if shape else []):
+                elements *= int(value_dim)
+            if elements != projection_width:
+                return [f"kv-a projection linear carries {elements} elements, expected {projection_width}"]
+            return []
+        return [f"kv-a projection producer is {opcode}, not the kv-a projection"]
+    return ["kv-a projection producer chain is too deep"]
+
+
 def _stablehlo_rsqrt_lineage(
     definitions: _StablehloScope,
     name: str,
@@ -3244,6 +3413,7 @@ def _stablehlo_rsqrt_lineage(
     layernorm_width: int,
     kv_a_width: int = KV_A_LORA_RANK,
     kv_a_projection_width: int = KV_A_PROJECTION_WIDTH,
+    attention_projection_backend: str = "fused_n82_convolution",
 ) -> dict[str, Any]:
     """Bind one StableHLO rsqrt (see ``_rms_schedule_lineage`` for the two kinds)."""
 
@@ -3371,6 +3541,7 @@ def _stablehlo_rsqrt_lineage(
         P = kv_a_projection_width
         W = kv_a_width
         provenance_ok = False
+        projection_name: str | None = None
         if carried is not None and carried[0] == "stablehlo.convert" and carried[1].rstrip().endswith(
             f"(tensor<1x{W}xbf16>) -> tensor<1x{W}xf32>"
         ):
@@ -3384,6 +3555,9 @@ def _stablehlo_rsqrt_lineage(
                 )
                 is not None
             )
+            if provenance_ok:
+                slice_names = _stablehlo_operands(sliced[1])
+                projection_name = slice_names[0] if slice_names else None
         elif carried is not None and carried[0] == "stablehlo.slice" and re.search(
             rf"\[0:1, 0:{W}\] : \(tensor<1x{P}xf32>\) -> tensor<1x{W}xf32>\s*$", carried[1]
         ):
@@ -3394,10 +3568,22 @@ def _stablehlo_rsqrt_lineage(
                 and converted[0] == "stablehlo.convert"
                 and converted[1].rstrip().endswith(f"(tensor<1x{P}xbf16>) -> tensor<1x{P}xf32>")
             )
+            if provenance_ok:
+                convert_names = _stablehlo_operands(converted[1])
+                projection_name = convert_names[0] if convert_names else None
         if not provenance_ok:
             problems.append(
                 f"kv-a row norm square operand is not the [0:1, 0:{W}] slice of the "
                 f"converted {P}-wide BF16 kv-a projection"
+            )
+        else:
+            problems.extend(
+                _stablehlo_kv_a_projection_producer(
+                    definitions,
+                    projection_name,
+                    projection_width=P,
+                    attention_projection_backend=attention_projection_backend,
+                )
             )
         if epsilon is None or abs(epsilon - 1e-5) > 1e-11:
             problems.append(f"kv-a row norm epsilon is not 1e-05: {epsilon}")
@@ -3462,6 +3648,7 @@ def _validate_rms_accepted_schedule_stablehlo(
     layernorm_width: int = 128,
     kv_a_width: int = KV_A_LORA_RANK,
     kv_a_projection_width: int = KV_A_PROJECTION_WIDTH,
+    attention_projection_backend: str = "fused_n82_convolution",
     expected_accepted_count: int | None = None,
     expected_sharded_qa_count: int | None = None,
     expected_kv_a_count: int | None = None,
@@ -3492,6 +3679,7 @@ def _validate_rms_accepted_schedule_stablehlo(
                         layernorm_width=layernorm_width,
                         kv_a_width=kv_a_width,
                         kv_a_projection_width=kv_a_projection_width,
+                        attention_projection_backend=attention_projection_backend,
                     )
                 )
             elif opcode == "stablehlo.optimization_barrier" and re.search(
@@ -3631,6 +3819,7 @@ def _rms_schedule_lineages(
     layernorm_width: int,
     kv_a_width: int = KV_A_LORA_RANK,
     kv_a_projection_width: int = KV_A_PROJECTION_WIDTH,
+    attention_projection_backend: str = "fused_n82_convolution",
 ) -> tuple[dict[tuple[str, str], HloInstruction], list[dict[str, Any]]]:
     by_key = _rms_schedule_by_key(module)
     rsqrts = tuple(item for item in module.instructions if item.opcode == "rsqrt")
@@ -3642,6 +3831,7 @@ def _rms_schedule_lineages(
             layernorm_width=layernorm_width,
             kv_a_width=kv_a_width,
             kv_a_projection_width=kv_a_projection_width,
+            attention_projection_backend=attention_projection_backend,
         )
         for item in rsqrts
     ]
@@ -3845,6 +4035,7 @@ def _validate_rms_accepted_schedule_hlo(
     layernorm_width: int = 128,
     kv_a_width: int = KV_A_LORA_RANK,
     kv_a_projection_width: int = KV_A_PROJECTION_WIDTH,
+    attention_projection_backend: str = "fused_n82_convolution",
     expected_accepted_count: int | None = None,
     expected_sharded_qa_count: int | None = None,
     expected_kv_a_count: int | None = None,
@@ -3873,6 +4064,7 @@ def _validate_rms_accepted_schedule_hlo(
         layernorm_width=layernorm_width,
         kv_a_width=kv_a_width,
         kv_a_projection_width=kv_a_projection_width,
+        attention_projection_backend=attention_projection_backend,
     )
     rsqrts = tuple(item for item in module.instructions if item.opcode == "rsqrt")
     layernorms = [
@@ -5695,6 +5887,7 @@ def validate_decoder_step_hlo(
         layernorm_width=config.index_key_width,
         kv_a_width=kv_lora_rank,
         kv_a_projection_width=kv_lora_rank + qk_rope_head_dim,
+        attention_projection_backend=attention_projection_backend,
         expected_accepted_count=expected_accepted_count,
         expected_sharded_qa_count=expected_sharded_qa_count,
         expected_kv_a_count=expected_kv_a_count,
@@ -5707,6 +5900,7 @@ def validate_decoder_step_hlo(
                 layernorm_width=config.index_key_width,
                 kv_a_width=kv_lora_rank,
                 kv_a_projection_width=kv_lora_rank + qk_rope_head_dim,
+                attention_projection_backend=attention_projection_backend,
                 expected_accepted_count=expected_accepted_count,
                 expected_sharded_qa_count=expected_sharded_qa_count,
                 expected_kv_a_count=expected_kv_a_count,
