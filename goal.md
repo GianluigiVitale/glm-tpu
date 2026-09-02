@@ -35,21 +35,20 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-02 01:35Z
+## Resume checkpoint — 2026-09-02 01:10Z
 
 Worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`, branch
-`tooling/gate-d-compensated-pp16-numerical`, parent HEAD `f926bebf…`. V2 run `…235818944668679Z`
-executed once: `NUMERICAL_REJECTED`; CPU adjudication localized the divergence to on-device
-cos/sin at large rotary angles (projection f32-accurate, key LayerNorm bit-exact). **Fix staged as
-V3:** host FP32 DSA rotary table (`rotary_table.py`, `dsa_host_rope.py`, host-rope builder),
-structural HLO contract, tolerance-based faithfulness, publisher `sync.txt` fix, V3 install targets,
-129/129 tests. This batch also carries the V2 rejection artifact and docs.
+`tooling/gate-d-compensated-pp16-numerical`, HEAD `ecf723d7…` (+ evidence commit) on origin+mirror.
+**Root cause proven at bounded scope:** V3 tag `…004306002075694Z` executed once with a host FP32
+DSA rotary row: `NUMERICAL_ACCEPTED`; key within 4.99e-7 of the F64 reference (rotary 1.25e-7 vs
+2.29e-3 in V2; implied cos/sin error 9.9e-3 → 6.5e-7); HLO has 0 transcendentals/0 collectives.
+On-device cos/sin at large rotary angles was the DSA key divergence. Artifact
+`gate-d-projection-host-rope-pp16-numerical-success-adjudication.json`.
 
-Exact next (one batched Sol review, then act): commit/push/mirror; analyzer certificate; provision
-staging tree to `/opt/glm-tpu/gate-d-projection-contraction-numerical-install-v3`, install; run
-launcher `…_v3.py` once with tag `gate_d_projection_contraction_pp16_numerical_20260902T004306002075694Z`;
-adjudicate; if faithful, carry host rows into the decoder DSA key/query paths, prove DSA selection
-exactness on a bounded captured witness, then seek separate authority before any 8K run.
+Exact next: carry host FP32 DSA rotary rows into the decoder (`dsa_host_rope.py` keys/queries at
+stage_local key/query sites, `prefill_index.py`, decoder plumbing mirroring `main_rope_table`),
+prove DSA selection exactness on a bounded captured witness (one batched Sol review), then seek
+separate authority before any 8K run. Gate D remains open; no performance claim.
 
 ## Finish (after Gate D)
 

@@ -10124,3 +10124,26 @@ Sol approved persistence (`4cfd1d66…19f4`), the V3 install-only commands and o
 tag. Commit `b3d6a175685bc45096c50266c1da802d5e4b39f0` carries the host-rope fix. The analyzer regenerated
 `docs/artifacts/gate-d-projection-contraction-pp16-numerical-orchestration-install-source-v3.json`
 (SHA-256 `b8dfebf8d2a232b5079fefb323bc1345840410f95ba094fd670cc8886feac622`, code hash `b3d6a175685bc45096c50266c1da802d5e4b39f0`); persistence only. Next: mirror replay, V3 install, one run.
+
+## 2026-09-02 V3 host-rope replay executed: NUMERICAL_ACCEPTED — bounded proof of the rotary fix
+
+Tag `gate_d_projection_contraction_pp16_numerical_20260902T004306002075694Z` (pin `ecf723d7…d178`)
+passed vacancy, mirror replay and 8/8 pre-census; the V3 driver compiled the host-rope graph, audited
+its HLO (module `jit__projection_host_rope_local`, 5 parameters, 0 collectives, 0 transcendentals,
+FP32 6144 contraction; optimized SHA `49a86320…`, StableHLO `0dcc02dd…`), invoked the executable
+exactly once on chips {0,1} (3.23 ms), performed one bounded host transfer and reported
+`NUMERICAL_ACCEPTED`: normalized witness exact; projection within 4.40e-7 of the F64 reference;
+current key within 4.99e-7 of the F64 reference built from the TPU's own projection and the archived
+host row (rotary dims 1.25e-7, non-rotary 4.99e-7); implied cos/sin error 4.4e-7 / 6.5e-7 versus
+9.9e-3 / 4.0e-3 in V2 — a ~18,000× reduction of the rotary error. The publisher re-derived the verdict
+from archived bytes, both owners agreed bit-for-bit, post-census 8/8 clean, and the terminal
+`NUMERICAL_RESULT` (marker `f26cde1a…064b`, generation `1788310923525951`) was the final remote
+mutation. Adjudication artifact
+`docs/artifacts/gate-d-projection-host-rope-pp16-numerical-success-adjudication.json` (SHA-256
+`c4fca0a667ca5928ec10f04c741e331bae5ce0bf86ff24c4b5a412476ed40461`).
+
+Claim scope: the bounded layer-1 key path is FP32-faithful once rotary leaves the accelerator. This
+does not close Gate D and proves nothing about the decoder, DSA selection, 8K or performance. Exact
+next: carry host FP32 DSA rotary rows into the decoder DSA key/query paths (stage_local key and
+query sites, prefill_index, decoder plumbing mirroring `main_rope_table`), prove DSA selection
+exactness on a bounded captured witness, then seek separate authority before any 8K run.

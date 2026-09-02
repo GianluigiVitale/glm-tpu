@@ -3452,3 +3452,10 @@ persistence only; review and persistence precede any v2 installation.
 - Sol P1 corrections (publisher binds all metrics + source/row identities; CPU-only adjudicator;
   goal no longer jumps to 8K). Chain: publisher `5a8d30cf…`, wrapper `92bcb109…`, launcher
   `61a45b6d…`, installer `22dc77e7…`, analyzer `f1010452…`; 131/131 tests.
+
+## 2026-09-02 V3 host-rope replay NUMERICAL_ACCEPTED (bounded rotary-fix proof)
+
+- Tag `…004306002075694Z`, pin `ecf723d7…`: one invocation, HLO 0 collectives/0 transcendentals,
+  key within 4.99e-7 of F64 reference (rotary 1.25e-7 vs 2.29e-3 in V2), implied cos/sin ≤6.5e-7,
+  terminal generation `1788310923525951`. Artifact SHA `c4fca0a667ca5928ec10f04c741e331bae5ce0bf86ff24c4b5a412476ed40461`.
+- Classification: `BOUNDED_TPU_HOST_ROPE_KEY_FAITHFUL_TERMINAL_VERIFIED;ROTARY_ROOT_CAUSE_FIX_BOUNDED_PROOF;DECODER_UNPROVEN;GATE_D_OPEN`.
