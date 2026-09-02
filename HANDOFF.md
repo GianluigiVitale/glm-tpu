@@ -10442,3 +10442,26 @@ literal invocation with the still-vacant tag `greenfield_layer0_captured_rms_rep
 hours for a ten-second bounded diagnostic with no DB row or Gate-D claim; the alternative is an
 explicit owner waiver of Sol's same-UID TOCTOU concern for this bounded probe under the current
 canonical protections. Without a waiver the chain is built.
+
+## 2026-09-02 sealed-launcher chain for the layer-1 RMS schedule probe (V1) built; unexecuted
+
+Commit `5207c406` adds the chain Sol required, cloned from the PP16 numerical V3 chain with the
+schedule discriminator as its driver: `glm_tpu/greenfield/benchmarking/gate_d_layer1_rms_schedule.py`
+(the two arms; the captured-RMS probe now delegates to it), `glm_tpu/greenfield/validation/
+gate_d_layer1_rms_schedule.py` (optimized-HLO contract with the accepted `f32[32]` schedule
+fingerprint, StableHLO contract delegation, output classification bound to the DB548 and accepted
+row SHAs) and `validation/hlo_dependency.py` (verbatim HLO dependency helpers), all importable from
+the sealed `glm_tpu` archive; `scripts/greenfield/run_gate_d_layer1_rms_schedule.py` (driver: four
+local TPU-v4 chips, sealed DB548 capture `f194d757…` and envelope `6cb76623…`, both arms compiled,
+audited and executed once each, fail-closed when the control arm does not reproduce DB548);
+`publish_gate_d_layer1_rms_schedule.py` (pure-Python rederivation of both rows from archived bytes,
+statuses `SCHEDULE_ARM_EXACT`/`SCHEDULE_ARM_NONEXACT`, SUCCESS-last); `run_gate_d_layer1_rms_schedule.sh`
+(literal tag `gate_d_layer1_rms_schedule_<ts>`, sanitized Git authority, mirror replay, three-scope
+vacancy, four leases, census, remote root `results/greenfield/glm52/gate_d_layer1_rms_schedule/`);
+`launch_gate_d_layer1_rms_schedule.py` (root-owned launcher: sealed memfd wrapper, immutable
+children, `env -i bash --noprofile --norc /proc/self/fd/10`); `install_gate_d_layer1_rms_schedule_runtime.py`
+(install-only); `analyze_gate_d_layer1_rms_schedule_orchestration_source.py` (certificate). Tests:
+70 passed / 2 skipped across the new and adjacent suites. The orchestration certificate at the
+committed head `5207c406` is `docs/artifacts/gate-d-layer1-rms-schedule-orchestration-certificate.json`
+(classification `LAYER1_RMS_SCHEDULE_ORCHESTRATION_INSTALL_SOURCE_ACCEPTED;INSTALL_UNAUTHORIZED;
+TPU_NUMERICAL_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`). Nothing is installed; no TPU work.

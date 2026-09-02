@@ -3508,3 +3508,7 @@ persistence only; review and persistence precede any v2 installation.
   vacancy, four leases; runs from the tooling worktree); probe takes `--expected-worktree`. Reserved
   tag `greenfield_layer0_captured_rms_replay_20260902T045006596197989Z` (vacant). Classification:
   `RMS_SCHEDULE_PROBE_LAUNCHER_CANONICAL;EXECUTE_REVIEW_PENDING;TPU_UNAUTHORIZED;GATE_D_OPEN`.
+- Layer-1 RMS schedule chain V1 (commit `5207c406`): driver/publisher/wrapper/launcher/installer/
+  analyzer + package modules; tests 70/2 skipped; certificate
+  `gate-d-layer1-rms-schedule-orchestration-certificate.json`. Classification
+  `…INSTALL_SOURCE_ACCEPTED;INSTALL_UNAUTHORIZED;TPU_NUMERICAL_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`.
