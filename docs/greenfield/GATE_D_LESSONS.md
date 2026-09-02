@@ -1174,3 +1174,7 @@ normalized-state cause.
 - Untracked files and inherited environments are code paths: a protected launch must fail on
   untracked files on every worker, list all three remote namespaces, and run committed bytes from
   a fresh detached worktree of the pin under `env -i`.
+- Every change to a protected launch boundary must be dry-run end to end on CPU before it meets a
+  tag: replay the exact worker prologue (worktree creation, clean check, `env -i` interpreter start,
+  the script's own self-checks) as a test. String-matching the runner text proved nothing and cost a
+  Sol-approved tag.

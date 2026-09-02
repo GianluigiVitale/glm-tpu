@@ -3546,3 +3546,8 @@ persistence only; review and persistence precede any v2 installation.
   1e-06, rows) + 21 synthetic hostile tests; merge redone with ba7d1e72 goal.md byte-identical;
   runner rejects untracked files, three-scope vacancy, detached pin worktree under `env -i`.
   Classification unchanged: `REVIEW_PENDING;PROTECTED_8K_UNAUTHORIZED;GATE_D_OPEN`.
+- Protected 8K tag `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T092557993413054Z` (pin 7498e31b, `_ras`): failed closed at worker process start
+  (`wrong greenfield worktree` from the new detached-source boundary); no TPU init; censuses 8/8;
+  diagnostics under its `diagnostic_local/`. Classification:
+  `FAILED_CLOSED_BEFORE_TPU;WORKTREE_BINDING_REFUSED_DETACHED_SOURCE;TAG_BURNED;NO_CLAIM;GATE_D_OPEN`.
+  Fix: `_worktree_binding` in `compile_short_decoder.py` + worktree/prologue tests.

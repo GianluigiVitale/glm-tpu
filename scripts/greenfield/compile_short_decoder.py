@@ -102,6 +102,55 @@ def _git_head() -> str:
     ).strip()
 
 
+CANONICAL_WORKTREE = Path("/home/gianl/glm-tpu-topology-rewrite")
+RUN_ROOT = Path("/home/gianl/glm-run")
+
+
+def _worktree_binding(
+    repo: Path,
+    run_tag: str | None,
+    *,
+    canonical: Path = CANONICAL_WORKTREE,
+    run_root: Path = RUN_ROOT,
+) -> str:
+    """Bind the executing source tree to the canonical repository.
+
+    Two locations are accepted: the canonical worktree itself, or the protected
+    runner's detached worktree of the pin at ``<run_root>/<run_tag>/source``.
+    The detached tree must be a linked worktree of the canonical repository
+    (same ``--git-common-dir``) and clean including ignored files, so the bytes
+    executed are exactly the committed bytes of the pin (the caller separately
+    binds ``HEAD`` to ``--expected-code-hash``).
+    """
+
+    if repo == canonical:
+        return "canonical_worktree"
+    if not run_tag or repo != run_root / run_tag / "source":
+        raise RuntimeError(f"wrong greenfield worktree: {repo}")
+    def _common_dir(tree: Path) -> Path:
+        # ``--git-common-dir`` names the shared repository for both a main
+        # checkout (``<tree>/.git``) and a linked worktree (worker 0 keeps the
+        # canonical tree as a linked worktree of the main repository).
+        common = Path(
+            subprocess.check_output(
+                ["git", "-C", str(tree), "rev-parse", "--git-common-dir"], text=True
+            ).strip()
+        )
+        return (common if common.is_absolute() else tree / common).resolve()
+
+    if _common_dir(repo) != _common_dir(canonical):
+        raise RuntimeError(
+            "detached source worktree is not linked to the canonical repository: "
+            f"{_common_dir(repo)} != {_common_dir(canonical)}"
+        )
+    status = subprocess.check_output(
+        ["git", "-C", str(repo), "status", "--porcelain", "--ignored"], text=True
+    )
+    if status.strip():
+        raise RuntimeError("detached source worktree is not clean")
+    return "detached_pin_worktree"
+
+
 def _atomic_json(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
@@ -2218,8 +2267,9 @@ def main() -> int:
         raise RuntimeError(
             f"stale code hash: expected {args.expected_code_hash}, found {code_hash}"
         )
-    if REPO != Path("/home/gianl/glm-tpu-topology-rewrite"):
-        raise RuntimeError(f"wrong greenfield worktree: {REPO}")
+    worktree_binding = _worktree_binding(
+        REPO, os.environ.get("GLM_GREENFIELD_RUN_TAG", "").strip() or None
+    )
     runtime_manifest = json.loads(
         (args.runtime_root / "runtime_manifest.json").read_text()
     )
@@ -4507,6 +4557,7 @@ def main() -> int:
             ingredients_contract.update(
                 {
                     "code_hash": code_hash,
+                    "worktree_binding": worktree_binding,
                     "compile_seconds": layer0_ingredients_compile_seconds,
                     "decode_position": decode_position,
                     "fleet_hlo_hashes": fleet_layer0_ingredients_hlo_hashes,
