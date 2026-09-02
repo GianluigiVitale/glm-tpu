@@ -11025,3 +11025,25 @@ substitution (`add` of the projection), a wrong lane slice (`[46:64]`), a wrong 
 (`bf16[32,1,90]`), the earlier direct-parameter / wrong-parent-width / wrong-bounds / unrelated-512 /
 second-slice cases. All three archives re-validated (baseline: 78 kv-a rows bound through the
 producer; both `_ras` archives refused as before); forced-CPU decoder binds its `dot` producer.
+
+## 2026-09-02 Sol BLOCK on a0333266 (projection buffer / dot not bound to the projection op) — loop and contraction binding
+
+Sol refused because a same-shape unrelated `bf16[32,1,82]` entry buffer (or any P-element dot) satisfied
+the producer check. Both binders now bind the producer operation itself:
+- fused N82: the `bf16[32,1,82]` buffer must resolve (tuple access, copies, fusion parameters/roots) to a
+  `while` whose body accumulates `bf16[32,1,82]` and evaluates the one-row N82 convolution
+  `f32[1,82] = convolution(bf16[1,H], bf16[H,82])` with `dim_labels=bf_io->bf` (directly or inside a
+  body fusion), H = `config.hidden_size`; StableHLO: a `stablehlo.while` result whose body calls the
+  projection function `(tensor<1xHxbf16>, tensor<Hx82xui8>, tensor<(H/128)x82xf32>) -> tensor<1x82xbf16>`
+  and accumulates `tensor<32x1x82xbf16>`, and whose callee carries the `[b, f]x[i, o]->[b, f]`
+  convolution (multi-result definitions `%N:k` and `%N#k` references are now resolved; region bodies
+  are scanned by brace depth).
+- separate: the `dot`/`convolution` must contract exactly H on both operands (`lhs/rhs_contracting_dims`
+  sizes; StableHLO `contracting_dims = [k] x [j]` against the operand types) and produce P elements.
+The latent provenance walk now stops once the slice and the single bf16→f32 convert are both found, so
+the projection's own f32→bf16 convert is no longer miscounted. Synthetic modules carry the real loop
+(HLO `while` with body convolution + dynamic-update-slice; StableHLO `%700:5 = stablehlo.while` with
+`@closed_call`); refused in both representations: a same-shape unrelated `bf16[32,1,82]` entry buffer,
+a loop without the N82 convolution / call, a loop over the wrong hidden size, and for the separate
+layout a dot contracting 6000 instead of 6144 and an `add` between the dot and the projection. All
+three archives re-validated; forced-CPU decoder binds its `dot` over the small plan's hidden size 8.

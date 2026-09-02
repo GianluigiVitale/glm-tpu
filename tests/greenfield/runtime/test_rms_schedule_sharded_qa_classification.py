@@ -58,8 +58,38 @@ HLO = RMS_HLO.replace("ENTRY %main (carry: f32[32,128], key: f32[1,128]) -> (f32
   ROOT %krs = f32[] rsqrt(%kvar)
 }
 
-ENTRY %main (carry: f32[32,128], key: f32[1,128], qproj: bf16[32,1,82]) -> (f32[32], f32[1]) {
-  %qproj = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} parameter(2)
+%n82_body (bp: (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82])) -> (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82]) {
+  %bp = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0}) parameter(0)
+  %bi = s32[] get-tuple-element(%bp), index=0
+  %bacc = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%bp), index=1
+  %bh = bf16[1,6144]{1,0} get-tuple-element(%bp), index=2
+  %bw = bf16[6144,82]{1,0} get-tuple-element(%bp), index=3
+  %bconv = f32[1,82]{1,0} convolution(%bh, %bw), dim_labels=bf_io->bf
+  %brow = bf16[1,82]{1,0} convert(%bconv)
+  %brow3 = bf16[1,1,82]{2,1,0} reshape(%brow)
+  %bzero = s32[] constant(0)
+  %bacc2 = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} dynamic-update-slice(%bacc, %brow3, %bi, %bzero, %bzero)
+  %bone = s32[] constant(1)
+  %bi2 = s32[] add(%bi, %bone)
+  ROOT %bout = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0}) tuple(%bi2, %bacc2, %bh, %bw)
+}
+
+%n82_cond (cp: (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82])) -> pred[] {
+  %cp = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0}) parameter(0)
+  %ci = s32[] get-tuple-element(%cp), index=0
+  %climit = s32[] constant(32)
+  ROOT %clt = pred[] compare(%ci, %climit), direction=LT
+}
+
+ENTRY %main (carry: f32[32,128], key: f32[1,128], hidden: bf16[1,6144], packed: bf16[6144,82]) -> (f32[32], f32[1]) {
+  %hidden = bf16[1,6144]{1,0} parameter(2)
+  %packed = bf16[6144,82]{1,0} parameter(3)
+  %izero = s32[] constant(0)
+  %accz = bf16[] constant(0)
+  %acc0 = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} broadcast(%accz), dimensions={}
+  %init = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0}) tuple(%izero, %acc0, %hidden, %packed)
+  %loop = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0}) while(%init), condition=%n82_cond, body=%n82_body
+  %qproj = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%loop), index=1
   %kvlanes = bf16[32,1,18]{2,1,0:T(2,128)(2,1)} slice(%qproj), slice={[0:32], [0:1], [64:82]}
   %kvt = bf16[1,32,18]{2,1,0:T(2,128)(2,1)} transpose(%kvlanes), dimensions={1,0,2}
   %kvproj = bf16[1,576]{1,0:T(2,128)(2,1)} reshape(%kvt)
@@ -68,7 +98,23 @@ ENTRY %main (carry: f32[32,128], key: f32[1,128], qproj: bf16[32,1,82]) -> (f32[
   %qa_sum = f32[] fusion(%qproj), kind=kLoop, calls=%qa_reduce
   %qa_scale.1 = f32[] fusion(%qa_sum), kind=kLoop, calls=%qa_scale""")
 
-QA_STABLE = """    %201 = stablehlo.slice %arg2 [0:32, 0:1, 0:64] : (tensor<32x1x82xbf16>) -> tensor<32x1x64xbf16>
+QA_STABLE = """    %c_53 = stablehlo.constant dense<0> : tensor<i32>
+    %206 = stablehlo.constant dense<0.000000e+00> : tensor<32x1x82xbf16>
+    %700:5 = stablehlo.while(%iterArg = %arg2, %iterArg_2438 = %arg3, %iterArg_2439 = %arg4, %iterArg_2440 = %c_53, %iterArg_2441 = %206) : tensor<32x6144x82xui8>, tensor<32x48x82xf32>, tensor<1x6144xbf16>, tensor<i32>, tensor<32x1x82xbf16>
+    cond {
+      %c_2442 = stablehlo.constant dense<32> : tensor<i32>
+      %17674 = stablehlo.compare LT, %iterArg_2440, %c_2442, SIGNED : (tensor<i32>, tensor<i32>) -> tensor<i1>
+      stablehlo.return %17674 : tensor<i1>
+    } do {
+      %17674 = func.call @dynamic_index_in_dim(%iterArg, %iterArg_2440) : (tensor<32x6144x82xui8>, tensor<i32>) -> tensor<6144x82xui8>
+      %17675 = func.call @dynamic_index_in_dim_56(%iterArg_2438, %iterArg_2440) : (tensor<32x48x82xf32>, tensor<i32>) -> tensor<48x82xf32>
+      %17676 = func.call @closed_call(%iterArg_2439, %17674, %17675) : (tensor<1x6144xbf16>, tensor<6144x82xui8>, tensor<48x82xf32>) -> tensor<1x82xbf16>
+      %17677 = func.call @dynamic_update_index_in_dim(%iterArg_2441, %17676, %iterArg_2440) : (tensor<32x1x82xbf16>, tensor<1x82xbf16>, tensor<i32>) -> tensor<32x1x82xbf16>
+      %c_2443 = stablehlo.constant dense<1> : tensor<i32>
+      %17678 = stablehlo.add %iterArg_2440, %c_2443 : tensor<i32>
+      stablehlo.return %iterArg, %iterArg_2438, %iterArg_2439, %17678, %17677 : tensor<32x6144x82xui8>, tensor<32x48x82xf32>, tensor<1x6144xbf16>, tensor<i32>, tensor<32x1x82xbf16>
+    }
+    %201 = stablehlo.slice %700#4 [0:32, 0:1, 0:64] : (tensor<32x1x82xbf16>) -> tensor<32x1x64xbf16>
     %202 = stablehlo.convert %201 : (tensor<32x1x64xbf16>) -> tensor<32x1x64xf32>
     %203 = chlo.square %202 : tensor<32x1x64xf32> -> tensor<32x1x64xf32>
     %cst_46 = stablehlo.constant dense<0.000000e+00> : tensor<f32>
@@ -82,7 +128,7 @@ QA_STABLE = """    %201 = stablehlo.slice %arg2 [0:32, 0:1, 0:64] : (tensor<32x1
     %209 = stablehlo.add %207, %208 : tensor<1xf32>
     %210 = stablehlo.rsqrt %209 : tensor<1xf32>
 """
-KV_STABLE = """    %227 = stablehlo.slice %arg2 [0:32, 0:1, 64:82] : (tensor<32x1x82xbf16>) -> tensor<32x1x18xbf16>
+KV_STABLE = """    %227 = stablehlo.slice %700#4 [0:32, 0:1, 64:82] : (tensor<32x1x82xbf16>) -> tensor<32x1x18xbf16>
     %228 = stablehlo.transpose %227, dims = [1, 0, 2] : (tensor<32x1x18xbf16>) -> tensor<1x32x18xbf16>
     %arg3 = stablehlo.reshape %228 : (tensor<1x32x18xbf16>) -> tensor<1x576xbf16>
     %604 = stablehlo.slice %arg3 [0:1, 0:512] : (tensor<1x576xbf16>) -> tensor<1x512xbf16>
@@ -101,8 +147,17 @@ KV_STABLE = """    %227 = stablehlo.slice %arg2 [0:32, 0:1, 64:82] : (tensor<32x
 """
 STABLEHLO = RMS_STABLEHLO.replace(
     "  func.func public @main(%arg0: tensor<32x128xf32>, %arg1: tensor<1x128xf32>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {\n",
-    "  func.func public @main(%arg0: tensor<32x128xf32>, %arg1: tensor<1x128xf32>, %arg2: tensor<32x1x82xbf16>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {\n" + QA_STABLE + KV_STABLE,
+    "  func.func public @main(%arg0: tensor<32x128xf32>, %arg1: tensor<1x128xf32>, %arg2: tensor<32x6144x82xui8>, %arg3: tensor<32x48x82xf32>, %arg4: tensor<1x6144xbf16>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {\n" + QA_STABLE + KV_STABLE,
+).replace(
+    "    return %8, %21 : tensor<32x1xf32>, tensor<1x1xf32>\n  }\n}\n",
+    "    return %8, %21 : tensor<32x1xf32>, tensor<1x1xf32>\n  }\n"
+    "  func.func private @closed_call(%arg0: tensor<1x6144xbf16>, %arg1: tensor<6144x82xui8>, %arg2: tensor<48x82xf32>) -> tensor<1x82xbf16> {\n"
+    "    %0 = stablehlo.convert %arg1 : (tensor<6144x82xui8>) -> tensor<6144x82xbf16>\n"
+    "    %6 = stablehlo.convolution(%arg0, %0) dim_numbers = [b, f]x[i, o]->[b, f], window = {stride = [], pad = [], lhs_dilate = [], rhs_dilate = [], reverse = []} {batch_group_count = 1 : i64, feature_group_count = 1 : i64} : (tensor<1x6144xbf16>, tensor<6144x82xbf16>) -> tensor<1x82xf32>\n"
+    "    %7 = stablehlo.convert %6 : (tensor<1x82xf32>) -> tensor<1x82xbf16>\n"
+    "    return %7 : tensor<1x82xbf16>\n  }\n}\n",
 )
+assert "@closed_call(%arg0" in STABLEHLO
 
 
 CENSUS = dict(expected_accepted_count=1, expected_sharded_qa_count=1, expected_kv_a_count=1)
@@ -310,6 +365,9 @@ def test_kv_a_provenance_accepts_both_emitted_orders() -> None:
         ("caller_substitution_add", "  %kv_sum = f32[] fusion(%kvproj), kind=kLoop, calls=%kv_reduce", "  %kvsum2 = bf16[1,576]{1,0:T(2,128)(2,1)} add(%kvproj, %kvproj)\n  %kv_sum = f32[] fusion(%kvsum2), kind=kLoop, calls=%kv_reduce"),
         ("wrong_lane_slice", "slice(%qproj), slice={[0:32], [0:1], [64:82]}", "slice(%qproj), slice={[0:32], [0:1], [46:64]}"),
         ("wrong_projection_buffer", "  %kvlanes = bf16[32,1,18]{2,1,0:T(2,128)(2,1)} slice(%qproj), slice={[0:32], [0:1], [64:82]}\n", "  %kvlanes = bf16[32,1,18]{2,1,0:T(2,128)(2,1)} slice(%qother), slice={[0:32], [0:1], [64:82]}\n"),
+        ("same_shape_entry_buffer", "  %kvlanes = bf16[32,1,18]{2,1,0:T(2,128)(2,1)} slice(%qproj), slice={[0:32], [0:1], [64:82]}\n", "  %kvlanes = bf16[32,1,18]{2,1,0:T(2,128)(2,1)} slice(%qsame), slice={[0:32], [0:1], [64:82]}\n"),
+        ("loop_without_n82_convolution", "  %bconv = f32[1,82]{1,0} convolution(%bh, %bw), dim_labels=bf_io->bf\n  %brow = bf16[1,82]{1,0} convert(%bconv)\n", "  %bslice = bf16[1,82]{1,0} slice(%bw), slice={[0:1], [0:82]}\n  %brow = bf16[1,82]{1,0} copy(%bslice)\n"),
+        ("loop_wrong_hidden", "6000", "6000"),
         ("wrong_parent_width", "%kp = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(0)", "%kp = bf16[1,640]{1,0:T(2,128)(2,1)} parameter(0)"),
         ("wrong_slice_bounds", "slice(%kp), slice={[0:1], [0:512]}", "slice(%kp), slice={[0:1], [64:576]}"),
         ("unrelated_512_lineage", "  %kc = f32[1,512]{1,0:T(1,128)} convert(%ks)\n", "  %kc0 = f32[1,512]{1,0:T(1,128)} convert(%ks)\n  %kc = f32[1,512]{1,0:T(1,128)} add(%kc0, %kc0)\n"),
@@ -318,17 +376,23 @@ def test_kv_a_provenance_accepts_both_emitted_orders() -> None:
 )
 def test_hlo_kv_a_provenance_substitutions_are_refused(label: str, old: str, new: str) -> None:
     text = HLO
+    ENTRY_SIG = "packed: bf16[6144,82]) -> (f32[32], f32[1]) {"
     if label == "direct_parameter_no_slice":
         text = text.replace("%kv_reduce (kp: bf16[1,576]) -> f32[] {\n  %kp = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(0)\n",
                             "%kv_reduce (kp: bf16[1,576], kdirect: bf16[1,512]) -> f32[] {\n  %kp = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(0)\n  %kdirect = bf16[1,512]{1,0:T(2,128)(2,1)} parameter(1)\n")
-        text = text.replace("%kv_sum = f32[] fusion(%kvproj), kind=kLoop, calls=%kv_reduce", "%kdirect_in = bf16[1,512]{1,0:T(2,128)(2,1)} parameter(3)\n  %kv_sum = f32[] fusion(%kvproj, %kdirect_in), kind=kLoop, calls=%kv_reduce")
-        text = text.replace("qproj: bf16[32,1,82]) -> (f32[32], f32[1]) {", "qproj: bf16[32,1,82], kdirect_in: bf16[1,512]) -> (f32[32], f32[1]) {")
+        text = text.replace("%kv_sum = f32[] fusion(%kvproj), kind=kLoop, calls=%kv_reduce", "%kdirect_in = bf16[1,512]{1,0:T(2,128)(2,1)} parameter(4)\n  %kv_sum = f32[] fusion(%kvproj, %kdirect_in), kind=kLoop, calls=%kv_reduce")
+        text = text.replace(ENTRY_SIG, "packed: bf16[6144,82], kdirect_in: bf16[1,512]) -> (f32[32], f32[1]) {")
     if label == "unrelated_576_parameter":
-        text = text.replace("qproj: bf16[32,1,82]) -> (f32[32], f32[1]) {", "qproj: bf16[32,1,82], kvparam: bf16[1,576]) -> (f32[32], f32[1]) {")
-        text = text.replace("  %qproj = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} parameter(2)\n", "  %qproj = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} parameter(2)\n  %kvparam = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(3)\n")
+        text = text.replace(ENTRY_SIG, "packed: bf16[6144,82], kvparam: bf16[1,576]) -> (f32[32], f32[1]) {")
+        text = text.replace("  %packed = bf16[6144,82]{1,0} parameter(3)\n", "  %packed = bf16[6144,82]{1,0} parameter(3)\n  %kvparam = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(4)\n")
     if label == "wrong_projection_buffer":
-        text = text.replace("qproj: bf16[32,1,82]) -> (f32[32], f32[1]) {", "qproj: bf16[32,1,82], qother: bf16[32,1,90]) -> (f32[32], f32[1]) {")
-        text = text.replace("  %qproj = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} parameter(2)\n", "  %qproj = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} parameter(2)\n  %qother = bf16[32,1,90]{2,1,0:T(2,128)(2,1)} parameter(3)\n")
+        text = text.replace(ENTRY_SIG, "packed: bf16[6144,82], qother: bf16[32,1,90]) -> (f32[32], f32[1]) {")
+        text = text.replace("  %packed = bf16[6144,82]{1,0} parameter(3)\n", "  %packed = bf16[6144,82]{1,0} parameter(3)\n  %qother = bf16[32,1,90]{2,1,0:T(2,128)(2,1)} parameter(4)\n")
+    if label == "same_shape_entry_buffer":
+        text = text.replace(ENTRY_SIG, "packed: bf16[6144,82], qsame: bf16[32,1,82]) -> (f32[32], f32[1]) {")
+        text = text.replace("  %packed = bf16[6144,82]{1,0} parameter(3)\n", "  %packed = bf16[6144,82]{1,0} parameter(3)\n  %qsame = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} parameter(4)\n")
+    if label == "loop_wrong_hidden":
+        text = text.replace("6144", "6000")
     assert old in text, label
     result = _hlo(text.replace(old, new, 1))
     assert not result["passed"], (label, result)
@@ -339,11 +403,14 @@ def test_hlo_kv_a_provenance_substitutions_are_refused(label: str, old: str, new
     ("label", "old", "new"),
     (
         ("direct_parameter_no_slice", "    %604 = stablehlo.slice %arg3 [0:1, 0:512] : (tensor<1x576xbf16>) -> tensor<1x512xbf16>\n    %605 = stablehlo.convert %604 : (tensor<1x512xbf16>) -> tensor<1x512xf32>\n",
-         "    %605 = stablehlo.convert %arg4 : (tensor<1x512xbf16>) -> tensor<1x512xf32>\n"),
+         "    %605 = stablehlo.convert %arg7 : (tensor<1x512xbf16>) -> tensor<1x512xf32>\n"),
+        ("same_shape_entry_buffer", "%227 = stablehlo.slice %700#4 [0:32, 0:1, 64:82]", "%227 = stablehlo.slice %arg8 [0:32, 0:1, 64:82]"),
+        ("loop_without_n82_call", "%17676 = func.call @closed_call(%iterArg_2439, %17674, %17675) : (tensor<1x6144xbf16>, tensor<6144x82xui8>, tensor<48x82xf32>) -> tensor<1x82xbf16>", "%17676 = func.call @other_call(%iterArg_2439) : (tensor<1x6144xbf16>) -> tensor<1x82xbf16>"),
+        ("loop_wrong_hidden", "6000", "6000"),
         ("unrelated_576_parameter", "    %604 = stablehlo.slice %arg3 [0:1, 0:512]", "    %604 = stablehlo.slice %arg5 [0:1, 0:512]"),
         ("caller_substitution_add", "    %604 = stablehlo.slice %arg3 [0:1, 0:512]", "    %arg3b = stablehlo.add %arg3, %arg3 : tensor<1x576xbf16>\n    %604 = stablehlo.slice %arg3b [0:1, 0:512]"),
-        ("wrong_lane_slice", "%227 = stablehlo.slice %arg2 [0:32, 0:1, 64:82]", "%227 = stablehlo.slice %arg2 [0:32, 0:1, 46:64]"),
-        ("wrong_projection_buffer", "%227 = stablehlo.slice %arg2 [0:32, 0:1, 64:82] : (tensor<32x1x82xbf16>)", "%227 = stablehlo.slice %arg6 [0:32, 0:1, 64:82] : (tensor<32x1x90xbf16>)"),
+        ("wrong_lane_slice", "%227 = stablehlo.slice %700#4 [0:32, 0:1, 64:82]", "%227 = stablehlo.slice %700#4 [0:32, 0:1, 46:64]"),
+        ("wrong_projection_buffer", "%227 = stablehlo.slice %700#4 [0:32, 0:1, 64:82] : (tensor<32x1x82xbf16>)", "%227 = stablehlo.slice %arg6 [0:32, 0:1, 64:82] : (tensor<32x1x90xbf16>)"),
         ("wrong_parent_width", "(tensor<1x576xbf16>) -> tensor<1x512xbf16>", "(tensor<1x640xbf16>) -> tensor<1x512xbf16>"),
         ("wrong_slice_bounds", "%arg3 [0:1, 0:512] : (tensor<1x576xbf16>)", "%arg3 [0:1, 64:576] : (tensor<1x576xbf16>)"),
         ("unrelated_512_lineage", "    %606 = chlo.square %605 : tensor<1x512xf32> -> tensor<1x512xf32>\n", "    %605b = stablehlo.add %605, %605 : tensor<1x512xf32>\n    %606 = chlo.square %605b : tensor<1x512xf32> -> tensor<1x512xf32>\n"),
@@ -351,10 +418,70 @@ def test_hlo_kv_a_provenance_substitutions_are_refused(label: str, old: str, new
 )
 def test_stablehlo_kv_a_provenance_substitutions_are_refused(label: str, old: str, new: str) -> None:
     text = STABLEHLO.replace(
-        "%arg2: tensor<32x1x82xbf16>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {",
-        "%arg2: tensor<32x1x82xbf16>, %arg4: tensor<1x512xbf16>, %arg5: tensor<1x576xbf16>, %arg6: tensor<32x1x90xbf16>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {",
-    )
+        "%arg4: tensor<1x6144xbf16>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {",
+        "%arg4: tensor<1x6144xbf16>, %arg7: tensor<1x512xbf16>, %arg5: tensor<1x576xbf16>, %arg6: tensor<32x1x90xbf16>, %arg8: tensor<32x1x82xbf16>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {",
+    ).replace("%605 = stablehlo.convert %arg4 : (tensor<1x512xbf16>)", "%605 = stablehlo.convert %arg7 : (tensor<1x512xbf16>)")
+    if label == "loop_wrong_hidden":
+        text = text.replace("6144", "6000")
     assert old in text, label
     result = _stable(text.replace(old, new, 1))
     assert not result["passed"], (label, result)
     assert result["kv_a_rsqrt_count"] == 0, (label, result)
+
+
+# --- separate layout: the kv-a projection is a dot contracting the hidden size ---
+HLO_SEPARATE = RMS_HLO.replace(
+    "ENTRY %main (carry: f32[32,128], key: f32[1,128]) -> (f32[32], f32[1]) {",
+    """%kv_reduce_s (kp: bf16[1,576]) -> f32[] {
+  %kp = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(0)
+  %ks = bf16[1,512]{1,0:T(2,128)(2,1)} slice(%kp), slice={[0:1], [0:512]}
+  %kc = f32[1,512]{1,0:T(1,128)} convert(%ks)
+  %ksq = f32[1,512]{1,0:T(1,128)} multiply(%kc, %kc)
+  %kz = f32[] constant(0)
+  ROOT %ksum = f32[] reduce(%ksq, %kz), dimensions={0,1}, to_apply=%add_combiner
+}
+
+%kv_scale_s (kq: f32[]) -> f32[] {
+  %kq = f32[] parameter(0)
+  %kinv2 = f32[] constant(0.001953125)
+  %kmean2 = f32[] multiply(%kq, %kinv2)
+  %keps = f32[] constant(1e-05)
+  %kvar = f32[] add(%kmean2, %keps)
+  ROOT %krs = f32[] rsqrt(%kvar)
+}
+
+ENTRY %main (carry: f32[32,128], key: f32[1,128], hidden_row: f32[6144], kvw: f32[576,6144]) -> (f32[32], f32[1]) {
+  %hidden_row = f32[6144]{0} parameter(2)
+  %kvw = f32[576,6144]{1,0} parameter(3)
+  %kvdot = f32[576]{0} dot(%hidden_row, %kvw), lhs_contracting_dims={0}, rhs_contracting_dims={1}
+  %kvbf = bf16[576]{0} convert(%kvdot)
+  %kvproj = bf16[1,576]{1,0:T(2,128)(2,1)} reshape(%kvbf)
+  %kv_sum = f32[] fusion(%kvproj), kind=kLoop, calls=%kv_reduce_s
+  %kv_scale.1 = f32[] fusion(%kv_sum), kind=kLoop, calls=%kv_scale_s""",
+)
+SEPARATE_CENSUS = dict(expected_accepted_count=1, expected_sharded_qa_count=0, expected_kv_a_count=1)
+
+
+def _hlo_separate(text: str) -> dict:
+    return _validate_rms_accepted_schedule_hlo(
+        parse_hlo_module(text), enabled=True, layernorm_width=128, attention_projection_backend="separate", **SEPARATE_CENSUS
+    )
+
+
+def test_separate_layout_kv_a_dot_is_bound_by_its_hidden_contraction() -> None:
+    assert HLO_SEPARATE != RMS_HLO
+    result = _hlo_separate(HLO_SEPARATE)
+    assert result["passed"], result["violations"]
+    assert result["kv_a_rsqrt_count"] == 1
+    # unrelated P-wide dot: wrong contraction size, or wrong operand rank arrangement
+    wrong_contraction = HLO_SEPARATE.replace("f32[6144]", "f32[6000]").replace("f32[576,6144]", "f32[576,6000]")
+    assert wrong_contraction != HLO_SEPARATE
+    refused = _hlo_separate(wrong_contraction)
+    assert not refused["passed"] and refused["kv_a_rsqrt_count"] == 0
+    assert any("does not contract the hidden size 6144" in v for v in refused["violations"])
+    unrelated_dot = HLO_SEPARATE.replace("%kvdot = f32[576]{0} dot(%hidden_row, %kvw), lhs_contracting_dims={0}, rhs_contracting_dims={1}", "%kvdot0 = f32[576]{0} dot(%hidden_row, %kvw), lhs_contracting_dims={0}, rhs_contracting_dims={1}\n  %kvdot = f32[576]{0} add(%kvdot0, %kvdot0)")
+    refused = _hlo_separate(unrelated_dot)
+    assert not refused["passed"] and refused["kv_a_rsqrt_count"] == 0
+    # the fused rule refuses a dot-produced projection and the separate rule refuses the fused loop
+    assert not _hlo(HLO_SEPARATE, expected_accepted_count=1, expected_sharded_qa_count=0, expected_kv_a_count=1)["passed"]
+    assert not _validate_rms_accepted_schedule_hlo(parse_hlo_module(HLO), enabled=True, layernorm_width=128, attention_projection_backend="separate", expected_accepted_count=1, expected_sharded_qa_count=1, expected_kv_a_count=1)["passed"]
