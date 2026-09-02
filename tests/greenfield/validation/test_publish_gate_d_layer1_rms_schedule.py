@@ -33,13 +33,27 @@ def _rows() -> tuple[np.ndarray, np.ndarray]:
     return db548, accepted
 
 
+DRIVER = REPO / "scripts/greenfield/run_gate_d_layer1_rms_schedule.py"
+DRIVER_SPEC = importlib.util.spec_from_file_location("run_layer1_rms_schedule", DRIVER)
+DRIVER_MODULE = importlib.util.module_from_spec(DRIVER_SPEC)
+assert DRIVER_SPEC.loader is not None
+DRIVER_SPEC.loader.exec_module(DRIVER_MODULE)
+
+
 def _npz(arrays: dict[str, np.ndarray]) -> bytes:
+    """Use the production driver writer so the publisher is tested against real bytes."""
+
+    return DRIVER_MODULE._deterministic_npz(arrays, np)
+
+
+def _npz_stored(arrays: dict[str, np.ndarray]) -> bytes:
     buffer = BytesIO()
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_STORED) as archive:
         for name in sorted(arrays):
             member = BytesIO()
             np.lib.format.write_array(member, np.ascontiguousarray(arrays[name]), allow_pickle=False)
             info = zipfile.ZipInfo(f"{name}.npy", date_time=(1980, 1, 1, 0, 0, 0))
+            info.external_attr = 0o100400 << 16
             archive.writestr(info, member.getvalue())
     return buffer.getvalue()
 
@@ -92,6 +106,11 @@ def test_output_npz_rederives_exact_and_nonexact_from_bytes() -> None:
     runner, numerical = _records(nonexact_arrays, exact=True)
     with pytest.raises(RuntimeError, match="disagree with bytes"):
         MODULE._validate_output_npz(_npz(nonexact_arrays), runner, numerical)
+    # The publisher binds the driver's exact deterministic container: a stored
+    # (or otherwise re-encoded) archive of the same arrays is refused.
+    runner, numerical = _records(exact_arrays, exact=True)
+    with pytest.raises(RuntimeError, match="output member is unsafe"):
+        MODULE._validate_output_npz(_npz_stored(exact_arrays), runner, numerical)
     # A control arm that does not reproduce DB548 is refused.
     refused_arrays = dict(exact_arrays, control_layer1_normalized_bfloat16_bits=accepted)
     runner, numerical = _records(refused_arrays, exact=True)

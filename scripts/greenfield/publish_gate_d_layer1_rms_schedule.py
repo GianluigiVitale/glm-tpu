@@ -334,9 +334,20 @@ def _validate_output_npz(raw: bytes, runner: Mapping[str, Any], numerical: Mappi
         names = archive.namelist()
         if set(names) != expected_names or len(names) != len(expected_names):
             raise RuntimeError("layer-1 RMS schedule output NPZ members drifted")
-        for name in sorted(names):
+        if names != sorted(names):
+            raise RuntimeError("layer-1 RMS schedule output NPZ member order drifted")
+        for name in names:
             member = archive.getinfo(name)
-            if member.file_size > 1 << 20 or member.compress_type != zipfile.ZIP_STORED:
+            # The driver's deterministic writer: deflated members, no encryption,
+            # fixed 1980 timestamp, mode 0400, bounded size.
+            if (
+                member.file_size > 1 << 20
+                or member.compress_size > 1 << 20
+                or member.compress_type != zipfile.ZIP_DEFLATED
+                or member.flag_bits & 0x1
+                or member.date_time != (1980, 1, 1, 0, 0, 0)
+                or member.external_attr != 0o100400 << 16
+            ):
                 raise RuntimeError("layer-1 RMS schedule output member is unsafe")
             shape, dtype, payload = _parse_npy(archive.read(name))
             key = name[: -len(".npy")]

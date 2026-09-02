@@ -27,7 +27,7 @@ WRAPPER_PATH = (
 WRAPPER_SOURCE_PATH = (
     "scripts/greenfield/run_gate_d_layer1_rms_schedule.sh"
 )
-WRAPPER_SHA256 = "cfebba1f242e3ead2b3b4b721b9e7d5506e08af4be0258766e973b02085f83bc"
+WRAPPER_SHA256 = "cdca95b7fec864d4f1bec874622748d610ecc146d6ff496ce2f690fdd1d9c964"
 IMMUTABLE_CAPSULE_ROOT = Path(
     "/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v1"
 )
@@ -44,7 +44,7 @@ PUBLISHER_PATH = (
 PUBLISHER_SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_layer1_rms_schedule.py"
 )
-PUBLISHER_SHA256 = "28ec7d1c279ac38aa5598c64f97c322b4aad48212f2f684e9ed7b6bd6dcdb1b8"
+PUBLISHER_SHA256 = "b3ec837e8535d70d15982790cb8a94f4f36e49fe4b7a115ddbd097ff47be8b24"
 MIRROR_VERIFIER_PATH = (
     IMMUTABLE_CAPSULE_ROOT / "verify_gate_d_same_region_git_mirror.py"
 )
