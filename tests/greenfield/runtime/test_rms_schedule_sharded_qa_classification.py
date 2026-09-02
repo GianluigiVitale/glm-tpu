@@ -58,12 +58,24 @@ HLO = RMS_HLO.replace("ENTRY %main (carry: f32[32,128], key: f32[1,128]) -> (f32
   ROOT %krs = f32[] rsqrt(%kvar)
 }
 
-%n82_body (bp: (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82])) -> (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82]) {
-  %bp = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0}) parameter(0)
+%n82_body (bp: (s32[], bf16[32,1,82], bf16[1,6144], u8[32,6144,82], f32[32,48,82])) -> (s32[], bf16[32,1,82], bf16[1,6144], u8[32,6144,82], f32[32,48,82]) {
+  %bp = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, u8[32,6144,82]{2,1,0}, f32[32,48,82]{2,1,0}) parameter(0)
   %bi = s32[] get-tuple-element(%bp), index=0
   %bacc = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%bp), index=1
   %bh = bf16[1,6144]{1,0} get-tuple-element(%bp), index=2
-  %bw = bf16[6144,82]{1,0} get-tuple-element(%bp), index=3
+  %bpacked = u8[32,6144,82]{2,1,0} get-tuple-element(%bp), index=3
+  %bscales = f32[32,48,82]{2,1,0} get-tuple-element(%bp), index=4
+  %bzero_i = s32[] constant(0)
+  %bwsl = u8[1,6144,82]{2,1,0} dynamic-slice(%bpacked, %bi, %bzero_i, %bzero_i), dynamic_slice_sizes={1,6144,82}
+  %bwu8 = u8[6144,82]{1,0} reshape(%bwsl)
+  %bwf8 = f8e4m3fn[6144,82]{1,0} bitcast-convert(%bwu8)
+  %bwf32 = f32[6144,82]{1,0} convert(%bwf8)
+  %bssl = f32[1,48,82]{2,1,0} dynamic-slice(%bscales, %bi, %bzero_i, %bzero_i), dynamic_slice_sizes={1,48,82}
+  %bs2 = f32[48,82]{1,0} reshape(%bssl)
+  %bsb = f32[48,128,82]{2,1,0} broadcast(%bs2), dimensions={0,2}
+  %bsw = f32[6144,82]{1,0} reshape(%bsb)
+  %bwdq = f32[6144,82]{1,0} multiply(%bwf32, %bsw)
+  %bw = bf16[6144,82]{1,0} convert(%bwdq)
   %bconv = f32[1,82]{1,0} convolution(%bh, %bw), dim_labels=bf_io->bf
   %brow = bf16[1,82]{1,0} convert(%bconv)
   %brow3 = bf16[1,1,82]{2,1,0} reshape(%brow)
@@ -71,24 +83,25 @@ HLO = RMS_HLO.replace("ENTRY %main (carry: f32[32,128], key: f32[1,128]) -> (f32
   %bacc2 = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} dynamic-update-slice(%bacc, %brow3, %bi, %bzero, %bzero)
   %bone = s32[] constant(1)
   %bi2 = s32[] add(%bi, %bone)
-  ROOT %bout = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0}) tuple(%bi2, %bacc2, %bh, %bw)
+  ROOT %bout = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, u8[32,6144,82]{2,1,0}, f32[32,48,82]{2,1,0}) tuple(%bi2, %bacc2, %bh, %bpacked, %bscales)
 }
 
-%n82_cond (cp: (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82])) -> pred[] {
-  %cp = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0}) parameter(0)
+%n82_cond (cp: (s32[], bf16[32,1,82], bf16[1,6144], u8[32,6144,82], f32[32,48,82])) -> pred[] {
+  %cp = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, u8[32,6144,82]{2,1,0}, f32[32,48,82]{2,1,0}) parameter(0)
   %ci = s32[] get-tuple-element(%cp), index=0
   %climit = s32[] constant(32)
   ROOT %clt = pred[] compare(%ci, %climit), direction=LT
 }
 
-ENTRY %main (carry: f32[32,128], key: f32[1,128], hidden: bf16[1,6144], packed: bf16[6144,82]) -> (f32[32], f32[1]) {
+ENTRY %main (carry: f32[32,128], key: f32[1,128], hidden: bf16[1,6144], packed: u8[32,6144,82], scales: f32[32,48,82]) -> (f32[32], f32[1]) {
   %hidden = bf16[1,6144]{1,0} parameter(2)
-  %packed = bf16[6144,82]{1,0} parameter(3)
+  %packed = u8[32,6144,82]{2,1,0} parameter(3)
+  %scales = f32[32,48,82]{2,1,0} parameter(4)
   %izero = s32[] constant(0)
   %accz = bf16[] constant(0)
   %acc0 = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} broadcast(%accz), dimensions={}
-  %init = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0}) tuple(%izero, %acc0, %hidden, %packed)
-  %loop = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0}) while(%init), condition=%n82_cond, body=%n82_body
+  %init = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, u8[32,6144,82]{2,1,0}, f32[32,48,82]{2,1,0}) tuple(%izero, %acc0, %hidden, %packed, %scales)
+  %loop = (s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, u8[32,6144,82]{2,1,0}, f32[32,48,82]{2,1,0}) while(%init), condition=%n82_cond, body=%n82_body
   %qproj = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%loop), index=1
   %kvlanes = bf16[32,1,18]{2,1,0:T(2,128)(2,1)} slice(%qproj), slice={[0:32], [0:1], [64:82]}
   %kvt = bf16[1,32,18]{2,1,0:T(2,128)(2,1)} transpose(%kvlanes), dimensions={1,0,2}
@@ -152,10 +165,25 @@ STABLEHLO = RMS_STABLEHLO.replace(
     "    return %8, %21 : tensor<32x1xf32>, tensor<1x1xf32>\n  }\n}\n",
     "    return %8, %21 : tensor<32x1xf32>, tensor<1x1xf32>\n  }\n"
     "  func.func private @closed_call(%arg0: tensor<1x6144xbf16>, %arg1: tensor<6144x82xui8>, %arg2: tensor<48x82xf32>) -> tensor<1x82xbf16> {\n"
-    "    %0 = stablehlo.convert %arg1 : (tensor<6144x82xui8>) -> tensor<6144x82xbf16>\n"
-    "    %6 = stablehlo.convolution(%arg0, %0) dim_numbers = [b, f]x[i, o]->[b, f], window = {stride = [], pad = [], lhs_dilate = [], rhs_dilate = [], reverse = []} {batch_group_count = 1 : i64, feature_group_count = 1 : i64} : (tensor<1x6144xbf16>, tensor<6144x82xbf16>) -> tensor<1x82xf32>\n"
+    "    %0 = stablehlo.bitcast_convert %arg1 : (tensor<6144x82xui8>) -> tensor<6144x82xf8E4M3FN>\n"
+    "    %1 = stablehlo.broadcast_in_dim %arg2, dims = [0, 2] : (tensor<48x82xf32>) -> tensor<48x128x82xf32>\n"
+    "    %2 = stablehlo.reshape %1 : (tensor<48x128x82xf32>) -> tensor<6144x82xf32>\n"
+    "    %3 = stablehlo.convert %0 : (tensor<6144x82xf8E4M3FN>) -> tensor<6144x82xf32>\n"
+    "    %4 = stablehlo.multiply %3, %2 : tensor<6144x82xf32>\n"
+    "    %5 = stablehlo.convert %4 : (tensor<6144x82xf32>) -> tensor<6144x82xbf16>\n"
+    "    %6 = stablehlo.convolution(%arg0, %5) dim_numbers = [b, f]x[i, o]->[b, f], window = {stride = [], pad = [], lhs_dilate = [], rhs_dilate = [], reverse = []} {batch_group_count = 1 : i64, feature_group_count = 1 : i64} : (tensor<1x6144xbf16>, tensor<6144x82xbf16>) -> tensor<1x82xf32>\n"
     "    %7 = stablehlo.convert %6 : (tensor<1x82xf32>) -> tensor<1x82xbf16>\n"
-    "    return %7 : tensor<1x82xbf16>\n  }\n}\n",
+    "    return %7 : tensor<1x82xbf16>\n  }\n"
+    "  func.func private @dynamic_index_in_dim(%arg0: tensor<32x6144x82xui8>, %arg1: tensor<i32>) -> tensor<6144x82xui8> {\n"
+    "    %c = stablehlo.constant dense<0> : tensor<i32>\n"
+    "    %0 = stablehlo.dynamic_slice %arg0, %arg1, %c, %c, sizes = [1, 6144, 82] : (tensor<32x6144x82xui8>, tensor<i32>, tensor<i32>, tensor<i32>) -> tensor<1x6144x82xui8>\n"
+    "    %1 = stablehlo.reshape %0 : (tensor<1x6144x82xui8>) -> tensor<6144x82xui8>\n"
+    "    return %1 : tensor<6144x82xui8>\n  }\n"
+    "  func.func private @dynamic_index_in_dim_56(%arg0: tensor<32x48x82xf32>, %arg1: tensor<i32>) -> tensor<48x82xf32> {\n"
+    "    %c = stablehlo.constant dense<0> : tensor<i32>\n"
+    "    %0 = stablehlo.dynamic_slice %arg0, %arg1, %c, %c, sizes = [1, 48, 82] : (tensor<32x48x82xf32>, tensor<i32>, tensor<i32>, tensor<i32>) -> tensor<1x48x82xf32>\n"
+    "    %1 = stablehlo.reshape %0 : (tensor<1x48x82xf32>) -> tensor<48x82xf32>\n"
+    "    return %1 : tensor<48x82xf32>\n  }\n}\n",
 )
 assert "@closed_call(%arg0" in STABLEHLO
 
@@ -373,7 +401,11 @@ def test_kv_a_provenance_accepts_both_emitted_orders() -> None:
         ("accumulator_not_loop_carried", "  %bacc2 = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} dynamic-update-slice(%bacc, %brow3, %bi, %bzero, %bzero)\n",
          "  %bfresh = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} broadcast(%bzero_b), dimensions={}\n  %bacc2 = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} dynamic-update-slice(%bfresh, %brow3, %bi, %bzero, %bzero)\n"),
         ("result_index_not_the_accumulator", "  %qproj = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%loop), index=1\n",
-         "  %qproj0 = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%loop), index=1\n  %qproj = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%loop), index=4\n"),
+         "  %qproj0 = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%loop), index=1\n  %qproj = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%loop), index=5\n"),
+        ("alternate_hidden_operand", "  %bconv = f32[1,82]{1,0} convolution(%bh, %bw), dim_labels=bf_io->bf\n", "  %bhz = bf16[] constant(1)\n  %bhalt = bf16[1,6144]{1,0} broadcast(%bhz), dimensions={}\n  %bconv = f32[1,82]{1,0} convolution(%bhalt, %bw), dim_labels=bf_io->bf\n"),
+        ("alternate_weight_operand", "  %bconv = f32[1,82]{1,0} convolution(%bh, %bw), dim_labels=bf_io->bf\n", "  %bwz = bf16[] constant(1)\n  %bwalt = bf16[6144,82]{1,0} broadcast(%bwz), dimensions={}\n  %bconv = f32[1,82]{1,0} convolution(%bh, %bwalt), dim_labels=bf_io->bf\n"),
+        ("weight_from_undequantized_scales_only", "  %bwdq = f32[6144,82]{1,0} multiply(%bwf32, %bsw)\n", "  %bwdq = f32[6144,82]{1,0} multiply(%bsw, %bsw)\n"),
+        ("hidden_from_wrong_loop_element", "  %bconv = f32[1,82]{1,0} convolution(%bh, %bw), dim_labels=bf_io->bf\n", "  %bhw = bf16[1,6144]{1,0} slice(%bwt), slice={[0:1], [0:6144]}\n  %bconv = f32[1,82]{1,0} convolution(%bhw, %bw), dim_labels=bf_io->bf\n"),
         ("wrong_parent_width", "%kp = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(0)", "%kp = bf16[1,640]{1,0:T(2,128)(2,1)} parameter(0)"),
         ("wrong_slice_bounds", "slice(%kp), slice={[0:1], [0:512]}", "slice(%kp), slice={[0:1], [64:576]}"),
         ("unrelated_512_lineage", "  %kc = f32[1,512]{1,0:T(1,128)} convert(%ks)\n", "  %kc0 = f32[1,512]{1,0:T(1,128)} convert(%ks)\n  %kc = f32[1,512]{1,0:T(1,128)} add(%kc0, %kc0)\n"),
@@ -382,32 +414,35 @@ def test_kv_a_provenance_accepts_both_emitted_orders() -> None:
 )
 def test_hlo_kv_a_provenance_substitutions_are_refused(label: str, old: str, new: str) -> None:
     text = HLO
-    ENTRY_SIG = "packed: bf16[6144,82]) -> (f32[32], f32[1]) {"
+    ENTRY_SIG = "scales: f32[32,48,82]) -> (f32[32], f32[1]) {"
     if label == "direct_parameter_no_slice":
         text = text.replace("%kv_reduce (kp: bf16[1,576]) -> f32[] {\n  %kp = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(0)\n",
                             "%kv_reduce (kp: bf16[1,576], kdirect: bf16[1,512]) -> f32[] {\n  %kp = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(0)\n  %kdirect = bf16[1,512]{1,0:T(2,128)(2,1)} parameter(1)\n")
         text = text.replace("%kv_sum = f32[] fusion(%kvproj), kind=kLoop, calls=%kv_reduce", "%kdirect_in = bf16[1,512]{1,0:T(2,128)(2,1)} parameter(4)\n  %kv_sum = f32[] fusion(%kvproj, %kdirect_in), kind=kLoop, calls=%kv_reduce")
-        text = text.replace(ENTRY_SIG, "packed: bf16[6144,82], kdirect_in: bf16[1,512]) -> (f32[32], f32[1]) {")
+        text = text.replace(ENTRY_SIG, "scales: f32[32,48,82], kdirect_in: bf16[1,512]) -> (f32[32], f32[1]) {")
     if label == "unrelated_576_parameter":
-        text = text.replace(ENTRY_SIG, "packed: bf16[6144,82], kvparam: bf16[1,576]) -> (f32[32], f32[1]) {")
-        text = text.replace("  %packed = bf16[6144,82]{1,0} parameter(3)\n", "  %packed = bf16[6144,82]{1,0} parameter(3)\n  %kvparam = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(4)\n")
+        text = text.replace(ENTRY_SIG, "scales: f32[32,48,82], kvparam: bf16[1,576]) -> (f32[32], f32[1]) {")
+        text = text.replace("  %scales = f32[32,48,82]{2,1,0} parameter(4)\n", "  %scales = f32[32,48,82]{2,1,0} parameter(4)\n  %kvparam = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(5)\n")
     if label == "wrong_projection_buffer":
-        text = text.replace(ENTRY_SIG, "packed: bf16[6144,82], qother: bf16[32,1,90]) -> (f32[32], f32[1]) {")
-        text = text.replace("  %packed = bf16[6144,82]{1,0} parameter(3)\n", "  %packed = bf16[6144,82]{1,0} parameter(3)\n  %qother = bf16[32,1,90]{2,1,0:T(2,128)(2,1)} parameter(4)\n")
+        text = text.replace(ENTRY_SIG, "scales: f32[32,48,82], qother: bf16[32,1,90]) -> (f32[32], f32[1]) {")
+        text = text.replace("  %scales = f32[32,48,82]{2,1,0} parameter(4)\n", "  %scales = f32[32,48,82]{2,1,0} parameter(4)\n  %qother = bf16[32,1,90]{2,1,0:T(2,128)(2,1)} parameter(5)\n")
     if label == "same_shape_entry_buffer":
-        text = text.replace(ENTRY_SIG, "packed: bf16[6144,82], qsame: bf16[32,1,82]) -> (f32[32], f32[1]) {")
-        text = text.replace("  %packed = bf16[6144,82]{1,0} parameter(3)\n", "  %packed = bf16[6144,82]{1,0} parameter(3)\n  %qsame = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} parameter(4)\n")
+        text = text.replace(ENTRY_SIG, "scales: f32[32,48,82], qsame: bf16[32,1,82]) -> (f32[32], f32[1]) {")
+        text = text.replace("  %scales = f32[32,48,82]{2,1,0} parameter(4)\n", "  %scales = f32[32,48,82]{2,1,0} parameter(4)\n  %qsame = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} parameter(5)\n")
     if label == "loop_wrong_hidden":
         text = text.replace("6144", "6000")
     if label == "accumulator_not_loop_carried":
         text = text.replace("  %bzero = s32[] constant(0)\n", "  %bzero = s32[] constant(0)\n  %bzero_b = bf16[] constant(0)\n")
+    if label == "hidden_from_wrong_loop_element":
+        text = text.replace("  %bconv = f32[1,82]{1,0} convolution(%bh, %bw), dim_labels=bf_io->bf\n", "  %bwt0 = bf16[82,6144]{1,0} transpose(%bw), dimensions={1,0}\n  %bwt = bf16[82,6144]{1,0} copy(%bwt0)\n  %bconv = f32[1,82]{1,0} convolution(%bh, %bw), dim_labels=bf_io->bf\n")
     if label == "result_index_not_the_accumulator":
-        text = text.replace("(s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0})", "(s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0}, bf16[32,1,82]{2,1,0:T(2,128)(2,1)})")
-        text = text.replace("(bp: (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82])) -> (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82])", "(bp: (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82], bf16[32,1,82])) -> (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82], bf16[32,1,82])")
-        text = text.replace("(cp: (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82])) -> pred[]", "(cp: (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82], bf16[32,1,82])) -> pred[]")
-        text = text.replace("  %bw = bf16[6144,82]{1,0} get-tuple-element(%bp), index=3\n", "  %bw = bf16[6144,82]{1,0} get-tuple-element(%bp), index=3\n  %bextra = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%bp), index=4\n")
-        text = text.replace("tuple(%bi2, %bacc2, %bh, %bw)", "tuple(%bi2, %bacc2, %bh, %bw, %bextra)")
-        text = text.replace("tuple(%izero, %acc0, %hidden, %packed)", "tuple(%izero, %acc0, %hidden, %packed, %acc0)")
+        text = text.replace("(s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, u8[32,6144,82]{2,1,0}, f32[32,48,82]{2,1,0})", "(s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, u8[32,6144,82]{2,1,0}, f32[32,48,82]{2,1,0}, bf16[32,1,82]{2,1,0:T(2,128)(2,1)})")
+        text = text.replace("(bp: (s32[], bf16[32,1,82], bf16[1,6144], u8[32,6144,82], f32[32,48,82])) -> (s32[], bf16[32,1,82], bf16[1,6144], u8[32,6144,82], f32[32,48,82])", "(bp: (s32[], bf16[32,1,82], bf16[1,6144], u8[32,6144,82], f32[32,48,82], bf16[32,1,82])) -> (s32[], bf16[32,1,82], bf16[1,6144], u8[32,6144,82], f32[32,48,82], bf16[32,1,82])")
+        text = text.replace("(cp: (s32[], bf16[32,1,82], bf16[1,6144], u8[32,6144,82], f32[32,48,82])) -> pred[]", "(cp: (s32[], bf16[32,1,82], bf16[1,6144], u8[32,6144,82], f32[32,48,82], bf16[32,1,82])) -> pred[]")
+        text = text.replace("  %bscales = f32[32,48,82]{2,1,0} get-tuple-element(%bp), index=4\n", "  %bscales = f32[32,48,82]{2,1,0} get-tuple-element(%bp), index=4\n  %bextra = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%bp), index=5\n")
+        text = text.replace("tuple(%bi2, %bacc2, %bh, %bpacked, %bscales)", "tuple(%bi2, %bacc2, %bh, %bpacked, %bscales, %bextra)")
+        text = text.replace("tuple(%izero, %acc0, %hidden, %packed, %scales)", "tuple(%izero, %acc0, %hidden, %packed, %scales, %acc0)")
+        text = text.replace("get-tuple-element(%loop), index=4\n", "get-tuple-element(%loop), index=5\n")
     assert old in text, label
     result = _hlo(text.replace(old, new, 1))
     assert not result["passed"], (label, result)
@@ -425,6 +460,11 @@ def test_hlo_kv_a_provenance_substitutions_are_refused(label: str, old: str, new
         ("dead_call_unrelated_update", "DEAD_CALL_PLACEHOLDER", "DEAD_CALL_PLACEHOLDER"),
         ("accumulator_not_the_iterarg", "func.call @dynamic_update_index_in_dim(%iterArg_2441, %17676, %iterArg_2440)", "func.call @dynamic_update_index_in_dim(%206, %17676, %iterArg_2440)"),
         ("callee_return_not_rooted_in_convolution", "    return %7 : tensor<1x82xbf16>\n", "    %8 = stablehlo.convert %arg2 : (tensor<48x82xf32>) -> tensor<48x82xbf16>\n    %9 = stablehlo.slice %8 [0:1, 0:82] : (tensor<48x82xbf16>) -> tensor<1x82xbf16>\n    return %9 : tensor<1x82xbf16>\n"),
+        ("callee_alternate_hidden_operand", "    %6 = stablehlo.convolution(%arg0, %5)", "    %h0 = stablehlo.constant dense<1.000000e+00> : tensor<1x6144xbf16>\n    %6 = stablehlo.convolution(%h0, %5)"),
+        ("callee_alternate_weight_operand", "    %6 = stablehlo.convolution(%arg0, %5)", "    %w0 = stablehlo.constant dense<1.000000e+00> : tensor<6144x82xbf16>\n    %6 = stablehlo.convolution(%arg0, %w0)"),
+        ("callee_weight_without_packed_argument", "    %4 = stablehlo.multiply %3, %2 : tensor<6144x82xf32>\n", "    %4 = stablehlo.multiply %2, %2 : tensor<6144x82xf32>\n"),
+        ("call_hidden_not_iterarg", "func.call @closed_call(%iterArg_2439, %17674, %17675)", "func.call @closed_call(%hz, %17674, %17675)"),
+        ("call_weight_not_from_packed_iterarg", "%17674 = func.call @dynamic_index_in_dim(%iterArg, %iterArg_2440)", "%17674 = func.call @dynamic_index_in_dim(%arg9, %iterArg_2440)"),
         ("unrelated_576_parameter", "    %604 = stablehlo.slice %arg3 [0:1, 0:512]", "    %604 = stablehlo.slice %arg5 [0:1, 0:512]"),
         ("caller_substitution_add", "    %604 = stablehlo.slice %arg3 [0:1, 0:512]", "    %arg3b = stablehlo.add %arg3, %arg3 : tensor<1x576xbf16>\n    %604 = stablehlo.slice %arg3b [0:1, 0:512]"),
         ("wrong_lane_slice", "%227 = stablehlo.slice %700#4 [0:32, 0:1, 64:82]", "%227 = stablehlo.slice %700#4 [0:32, 0:1, 46:64]"),
@@ -441,6 +481,10 @@ def test_stablehlo_kv_a_provenance_substitutions_are_refused(label: str, old: st
     ).replace("%605 = stablehlo.convert %arg4 : (tensor<1x512xbf16>)", "%605 = stablehlo.convert %arg7 : (tensor<1x512xbf16>)")
     if label == "loop_wrong_hidden":
         text = text.replace("6144", "6000")
+    if label == "call_hidden_not_iterarg":
+        text = text.replace("    } do {\n", "    } do {\n      %hz = stablehlo.constant dense<1.000000e+00> : tensor<1x6144xbf16>\n")
+    if label == "call_weight_not_from_packed_iterarg":
+        text = text.replace("%arg8: tensor<32x1x82xbf16>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {", "%arg8: tensor<32x1x82xbf16>, %arg9: tensor<32x6144x82xui8>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {")
     if label == "dead_call_unrelated_update":
         text = text.replace("      %c_2443 = stablehlo.constant dense<1> : tensor<i32>\n", "      %17679 = stablehlo.slice %17675 [0:1, 0:82] : (tensor<48x82xf32>) -> tensor<1x82xf32>\n      %17679b = stablehlo.convert %17679 : (tensor<1x82xf32>) -> tensor<1x82xbf16>\n      %c_2443 = stablehlo.constant dense<1> : tensor<i32>\n")
         old = "func.call @dynamic_update_index_in_dim(%iterArg_2441, %17676, %iterArg_2440)"

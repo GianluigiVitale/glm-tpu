@@ -11067,3 +11067,23 @@ element, a dead projection call replaced by a slice of the scales, and a callee 
 rooted in the convolution. Baseline archive: all 78 kv-a rows bind through `%while.1166` (accumulator =
 loop-carried element 1, update value rooted in `%conv_general_dilated.930`); both `_ras` archives refused
 by census as before; forced-CPU decoder binds its `dot`.
+
+## 2026-09-02 Sol BLOCK on 00f90465 (convolution operands unbound) — operand provenance to the loop elements
+
+Sol refused because same-shaped unrelated hidden/weight values could feed the carried update. Both
+binders now bind the N82 convolution operands. Optimized HLO: the hidden operand's source set (through
+bitcast/bitcast-convert/reshape/copy/convert/broadcast/multiply/dynamic-slice/slice/transpose, fusion
+parameters and roots, constants dropped) must be exactly the loop-carried `bf16[1,H]` element of the body
+parameter; the weight operand's source set must be exactly the loop-carried `u8[32,H,82]` packed weights,
+the `f32[32,H/128,82]` scales and the `s32[]` loop index (the FP8 dequant `convert(bitcast-convert(
+dynamic-slice(weights))) × reshape(broadcast(dynamic-slice(scales)))`); any foreign source refuses.
+StableHLO: the projection call's arguments must be the loop-carried `tensor<1xHxbf16>` iterArg and the
+per-shard `dynamic_slice` helpers of the `tensor<32xHx82xui8>` / `tensor<32x(H/128)x82xf32>` iterArgs
+(helper signature and body bound); the callee must carry the exact N82 signature and its convolution's
+hidden operand must be `%arg0` while its weight operand's sources (through bitcast_convert/broadcast_in_dim/
+reshape/convert/multiply) must be exactly `{%arg1, %arg2}`. Synthetic modules model the real dequant;
+refused in both representations: an alternate hidden operand (constant), an alternate weight operand
+(constant), a weight built from the scales alone, a hidden operand carved from the weight element, a
+callee convolution over same-shaped constants, a call-site hidden argument that is not the iterArg, and
+packed weights indexed from a foreign same-typed buffer. Baseline archive: 78/78 kv-a rows bind
+(hidden = loop element 4, weights = elements 2/3 + index 0).
