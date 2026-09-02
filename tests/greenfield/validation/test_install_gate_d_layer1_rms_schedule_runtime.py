@@ -55,13 +55,13 @@ def test_payload_hashes_and_install_targets_are_exact() -> None:
         "launch_gate_d_layer1_rms_schedule.py"
     }
     assert str(MODULE.SOURCE_ROOT) == (
-        "/opt/glm-tpu/gate-d-layer1-rms-schedule-install-v2"
+        "/opt/glm-tpu/gate-d-layer1-rms-schedule-install-v3"
     )
     assert str(MODULE.LAUNCHER_TARGET) == (
-        "/opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v2.py"
+        "/opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v3.py"
     )
     assert str(MODULE.CAPSULE_TARGET) == (
-        "/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v2"
+        "/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v3"
     )
 
 

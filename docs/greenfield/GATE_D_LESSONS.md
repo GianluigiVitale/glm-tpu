@@ -1153,3 +1153,15 @@ normalized-state cause.
 - When cloning a hardened chain, every constant that encodes identity (environment maps, install
   paths, version suffixes, expected dependency records) must be covered by a cross-file consistency
   test or a test against real run records; two approved starts were lost to literals no test read.
+- A shape/count HLO contract can be satisfied by the schedule it is meant to exclude: the DB548
+  control arm reduces the same `f32[32,6144]{T(8,128)} -> f32[32]` as the accepted arm; the only
+  emitted difference is whether the reduce fusion squares a materialized carry or an `add` fused
+  into it. Bind lineage (what is squared, where it was materialized), not shapes.
+- Turning a flag on for "the norm" is not coverage: the decode step reaches RMS norms through five
+  kernels; three were still on the default schedule after the first integration. Enumerate every
+  `rsqrt` in the compiled step and classify each one (the only legitimate non-RMS `rsqrt` is the
+  DSA key LayerNorm), instead of trusting the call sites you edited.
+- Printed StableHLO restarts `%N` numbering inside nested regions; a flat name→definition map
+  silently drops every copy after the first (5 of 10 `rsqrt` vanished). Scope SSA names per region.
+- Every SHA cascade must be re-run after *any* edit to a pinned file, including a two-line constant
+  fix; the chain tests exist to catch this and did.

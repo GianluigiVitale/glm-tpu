@@ -3524,3 +3524,20 @@ persistence only; review and persistence precede any v2 installation.
   (`_ras`), unit/forced-CPU/static tests (rmsnorm 5/5, decoder 1/1, compile 67/67, kernel suites
   32/32). Classification: `RMS_ACCEPTED_SCHEDULE_INTEGRATED_DEFAULT_OFF;REVIEW_PENDING;
   PROTECTED_8K_UNAUTHORIZED;GATE_D_OPEN`.
+
+## 2026-09-02 RMS schedule contract lineage-bound; diagnostic archive adjudicated; chain v3
+
+- `docs/artifacts/gate-d-layer1-rms-schedule-diagnostic-adjudication.json` SHA `e504b795b31690bda4ff2084a7d4316f0d5bd87c53c308f294415eec027e5767`
+  (offline replay of the bounded run's diagnostic archive: 18 objects + ledger, local SHAs, remote
+  generation/CRC32C, three-scope vacancy of claim objects). Classification
+  `BOUNDED_TPU_LAYER1_RMS_SCHEDULE_ARM_EXACT;DIAGNOSTIC_ARCHIVE_ADJUDICATED;GENERATION_BOUND_LEDGER_REPLAYED;
+  NO_SUCCESS_NO_DB_NO_PERFORMANCE_NO_GATE_D_CLAIM;DECODER_UNPROVEN;GATE_D_OPEN`.
+- Decoder contract `_validate_rms_accepted_schedule_hlo` / `_validate_rms_accepted_schedule_stablehlo`
+  bind the full lineage (materialized carry → square → `f32[32,W]->f32[32]` dims={1} add-reduce,
+  T(8,128) → 1/W → +1e-05 → rsqrt; StableHLO from the FP32 barrier) and classify the DSA key
+  LayerNorm separately; `rms_accepted_schedule` threaded to every reachable RMS call. Tests on the
+  archived TPU bytes (17 hostile cases) and forced-CPU decoder (33/33 conforming). Classification:
+  `RMS_ACCEPTED_SCHEDULE_CONTRACT_LINEAGE_BOUND;FLAG_COVERS_ALL_RMS;REVIEW_PENDING;
+  PROTECTED_8K_UNAUTHORIZED;GATE_D_OPEN`.
+- Chain re-pinned v3 (publisher `a53f3fc2…`, driver `5f5fa802…`, wrapper `f52e5334…`, launcher
+  `33c0a696…`, installer `83f72f20…`); not installed; no rerun planned.

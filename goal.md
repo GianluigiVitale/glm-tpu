@@ -36,22 +36,23 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-02 07:00Z
+## Resume checkpoint — 2026-09-02 12:30Z
 
-Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. **Bounded TPU result** (tag
-`gate_d_layer1_rms_schedule_20260902T061305905714981Z`, diagnostic archive; HANDOFF): with the
-accepted `f32[32,6144]{T(8,128)} -> f32[32]` variance reduce and an FP32 carry, the greenfield
-layer-1 row equals the accepted legacy row bit-for-bit; the layer-1 one-ULP miss was the
-single-row reduce schedule. DSA rotary table refuted and tombstoned.
+Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. Bounded TPU result (tag
+`gate_d_layer1_rms_schedule_20260902T061305905714981Z`, archive adjudicated in
+`docs/artifacts/gate-d-layer1-rms-schedule-diagnostic-adjudication.json`): the accepted
+`f32[32,6144]{T(8,128)} -> f32[32]` reduce on a materialized FP32 carry reproduces the accepted
+layer-1 row bit-for-bit. DSA rotary table refuted.
 
-Staged: decoder flag `rms_accepted_schedule` (default off): every decode-step RMS variance over a
-32-row barrier-carried operand; HLO contract (all `rsqrt` 32-row, none scalar);
-`--rms-accepted-schedule`; runner env `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE`, suffix `_ras`. Tests:
-rmsnorm unit, forced-CPU decoder, compile/runner static pass; kernel suites pending.
-Next: commit/push; one batched Sol review (decoder change + tests + 8K launch); merge → rewrite,
-mirror, preflight; one protected 8K run `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1 bash
+Staged: decoder flag `rms_accepted_schedule` (default off) reaches every RMS call; HLO+StableHLO
+contracts bind the full lineage per `rsqrt` (materialized carry → square → 32-row last-axis
+add-reduce → 1/W → +1e-5 → rsqrt; barrier in StableHLO), DSA key LayerNorm classified apart;
+17 hostile tests on archived TPU bytes; forced-CPU decoder 33/33. Chain v3 (not installed).
+Next: commit/push; one batched Sol review; merge →
+rewrite (keep rewrite goal.md), mirror, no-TPU preflight; Sol execute review with exact merged pin
++ fresh tag; one protected run `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1 bash
 scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from the rewrite worktree; accept only
-exact tokens + all DSA contracts + protections + 8/8 cleanup. Then Gate D evidence.
+exact tokens + all DSA contracts + protections + 8/8 cleanup.
 
 ## Finish (after Gate D)
 

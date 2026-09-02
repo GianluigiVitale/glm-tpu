@@ -44,12 +44,12 @@ AUDITED_SOURCE_PATHS = (
     WRAPPER_PATH,
 )
 EXPECTED_SOURCE_SHA256S = {
-    DRIVER_PATH: "48b3e383dccfdd6c1202ce45448cc7fa9c2443e536026194062448a71d82dac5",
-    INSTALLER_PATH: "1a7cee63fb174cc951b6b2f2fedf238ce59963d30f20b52894465cea504e3dc8",
-    LAUNCHER_PATH: "169c4385868fa00c4f86d72488dc9d128d6bdbd9e1fccbbfb7b93746d9d61c0d",
+    DRIVER_PATH: "5f5fa802652487a9c3c4ef070f70baa15050338e2799d20d060633587230f972",
+    INSTALLER_PATH: "83f72f20c2cab5385c0a95fee675a8ec76dee3930342f506111083c4c032ea3f",
+    LAUNCHER_PATH: "33c0a696e02fbf7fc11fd6e0c812ea79a0b37d9bae1a2faa252fdb1a7052899b",
     MIRROR_VERIFIER_PATH: "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b",
-    PUBLISHER_PATH: "b3ec837e8535d70d15982790cb8a94f4f36e49fe4b7a115ddbd097ff47be8b24",
-    WRAPPER_PATH: "ee6fc1ac554fcffd26aed2544d75a2ebbff082ed42f17de899d89c4384cb0970",
+    PUBLISHER_PATH: "a53f3fc22d8a507994b470ce2453c521db218221c66aa02e3fd35a80ef15ea9c",
+    WRAPPER_PATH: "f52e5334da1e1b6d576a5aab501218ee5cf47d8cd965ae0804b67da82d6c280b",
 }
 FRONTIER_CERTIFICATE_PATH = "docs/artifacts/gate-d-layer1-scale-frontier-certificate.json"
 FRONTIER_CERTIFICATE_SHA256 = (
@@ -361,7 +361,7 @@ def _audit_wrapper(raw: bytes) -> dict[str, Any]:
         'parse_canonical("terminal_upload_receipt.json")',
         "! -e /proc/self/fd/7/NUMERICAL_RESULT",
         'case "$result_status" in',
-        "gate-d-layer1-rms-schedule-v2",
+        "gate-d-layer1-rms-schedule-v3",
         "--db548-capture",
         "wrapper_fd != 10",
     )
@@ -406,8 +406,8 @@ def _audit_launcher(raw: bytes, wrapper_raw: bytes) -> dict[str, Any]:
     if any(_assignment(tree, name) != value for name, value in expected.items()):
         raise RuntimeError("layer-1 RMS schedule launcher immutable pin drifted")
     required = (
-        '"/opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v2.py"',
-        '"/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v2"',
+        '"/opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v3.py"',
+        '"/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v3"',
         "os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING",
         "fcntl.fcntl(descriptor, F_ADD_SEALS, REQUIRED_SEALS)",
         'f"/proc/self/fd/{WRAPPER_FD}"',
@@ -439,9 +439,9 @@ def _audit_installer(raw: bytes) -> dict[str, Any]:
     if _assignment(tree, "PAYLOADS") != EXPECTED_PAYLOADS:
         raise RuntimeError("layer-1 RMS schedule installer payload map drifted")
     required = (
-        "SOURCE_ROOT = Path('/opt/glm-tpu/gate-d-layer1-rms-schedule-install-v2')",
-        "LAUNCHER_TARGET = LAUNCHER_PARENT / 'launch_gate_d_layer1_rms_schedule_v2.py'",
-        "CAPSULE_TARGET = CAPSULE_PARENT / 'gate-d-layer1-rms-schedule-v2'",
+        "SOURCE_ROOT = Path('/opt/glm-tpu/gate-d-layer1-rms-schedule-install-v3')",
+        "LAUNCHER_TARGET = LAUNCHER_PARENT / 'launch_gate_d_layer1_rms_schedule_v3.py'",
+        "CAPSULE_TARGET = CAPSULE_PARENT / 'gate-d-layer1-rms-schedule-v3'",
         "os.geteuid() != 0",
         "dict(os.environ) != EXPECTED_ENVIRONMENT",
         "sys.argv != [str(INSTALLER_PATH)]",

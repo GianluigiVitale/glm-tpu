@@ -28,7 +28,7 @@ import numpy as np
 from jax.sharding import NamedSharding
 from glm_tpu.greenfield.model import build_decoder_runtime_weight_layout, build_decoder_state_layout, build_pipeline_schedule
 from glm_tpu.greenfield.runtime import build_decoder_step_program
-from glm_tpu.greenfield.runtime.decoder import _validate_rms_accepted_schedule_hlo
+from glm_tpu.greenfield.runtime.decoder import _validate_rms_accepted_schedule_hlo, _validate_rms_accepted_schedule_stablehlo
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 from tests.greenfield.checkpoint.test_runtime_pack import _small_plan
 
@@ -87,8 +87,11 @@ inputs = (
     put(np.asarray([[0]], np.int32), decoder.input_specs[7]),
     put(np.asarray([6], np.int32), decoder.input_specs[8]),
 )
-default_compiled = jax.jit(decoder.execute).lower(*inputs).compile()
-schedule_compiled = jax.jit(schedule_decoder.execute).lower(*inputs).compile()
+default_lowered = jax.jit(decoder.execute).lower(*inputs)
+schedule_lowered = jax.jit(schedule_decoder.execute).lower(*inputs)
+default_stablehlo, schedule_stablehlo = default_lowered.as_text(), schedule_lowered.as_text()
+default_compiled = default_lowered.compile()
+schedule_compiled = schedule_lowered.compile()
 first = default_compiled(*inputs)
 schedule_first = schedule_compiled(*inputs)
 
@@ -107,6 +110,10 @@ report = {
     'schedule_contract': _validate_rms_accepted_schedule_hlo(schedule_module, enabled=True),
     'default_as_schedule': _validate_rms_accepted_schedule_hlo(default_module, enabled=True)['passed'],
     'schedule_as_default': _validate_rms_accepted_schedule_hlo(schedule_module, enabled=False)['passed'],
+    'default_stablehlo': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=False),
+    'schedule_stablehlo': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=True),
+    'default_stablehlo_as_schedule': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=True)['passed'],
+    'schedule_stablehlo_as_default': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=False)['passed'],
 }
 print(json.dumps(report))
 """
@@ -131,9 +138,21 @@ print(json.dumps(report))
     assert report["residual_max_abs"] <= 2.0**-6
     assert report["default_contract"]["passed"], report["default_contract"]
     assert report["schedule_contract"]["passed"], report["schedule_contract"]
-    assert report["schedule_contract"]["scalar_rsqrt_count"] == 0
-    assert report["schedule_contract"]["rowwise_rsqrt_count"] >= 1
-    assert report["default_contract"]["rowwise_rsqrt_count"] == 0
-    assert report["default_contract"]["scalar_rsqrt_count"] >= 1
+    assert report["schedule_contract"]["nonconforming_rsqrt_count"] == 0
+    assert report["schedule_contract"]["conforming_rsqrt_count"] >= 1
+    assert report["default_contract"]["conforming_rsqrt_count"] == 0
+    assert report["default_contract"]["nonconforming_rsqrt_count"] >= 1
     assert report["default_as_schedule"] is False
     assert report["schedule_as_default"] is False
+    assert report["default_stablehlo"]["passed"], report["default_stablehlo"]
+    assert report["schedule_stablehlo"]["passed"], report["schedule_stablehlo"]
+    assert report["schedule_stablehlo"]["conforming_rsqrt_count"] == report["schedule_contract"]["conforming_rsqrt_count"]
+    assert report["schedule_stablehlo"]["barrier_count"] >= report["schedule_stablehlo"]["conforming_rsqrt_count"]
+    assert report["default_stablehlo"]["conforming_rsqrt_count"] == 0
+    assert report["default_stablehlo_as_schedule"] is False
+    assert report["schedule_stablehlo_as_default"] is False
+    # The DSA indexer key LayerNorm is the only non-RMS rsqrt and is unchanged by the flag.
+    assert report["schedule_contract"]["layernorm_rsqrt_count"] >= 1
+    assert report["schedule_contract"]["layernorm_rsqrt_count"] == report["default_contract"]["layernorm_rsqrt_count"]
+    assert report["schedule_stablehlo"]["layernorm_rsqrt_count"] == report["default_stablehlo"]["layernorm_rsqrt_count"] >= 1
+    assert report["schedule_contract"]["rsqrt_count"] == report["schedule_contract"]["conforming_rsqrt_count"] + report["schedule_contract"]["layernorm_rsqrt_count"]

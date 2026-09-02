@@ -13,7 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 
 INSTALL_PATH = Path(
-    "/opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v2.py"
+    "/opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v3.py"
 )
 PYTHON = Path("/usr/bin/python3.10")
 PYTHON_SHA256 = "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
@@ -27,9 +27,9 @@ WRAPPER_PATH = (
 WRAPPER_SOURCE_PATH = (
     "scripts/greenfield/run_gate_d_layer1_rms_schedule.sh"
 )
-WRAPPER_SHA256 = "ee6fc1ac554fcffd26aed2544d75a2ebbff082ed42f17de899d89c4384cb0970"
+WRAPPER_SHA256 = "f52e5334da1e1b6d576a5aab501218ee5cf47d8cd965ae0804b67da82d6c280b"
 IMMUTABLE_CAPSULE_ROOT = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v2"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v3"
 )
 DRIVER_PATH = (
     IMMUTABLE_CAPSULE_ROOT / "run_gate_d_layer1_rms_schedule.py"
@@ -37,14 +37,14 @@ DRIVER_PATH = (
 DRIVER_SOURCE_PATH = (
     "scripts/greenfield/run_gate_d_layer1_rms_schedule.py"
 )
-DRIVER_SHA256 = "48b3e383dccfdd6c1202ce45448cc7fa9c2443e536026194062448a71d82dac5"
+DRIVER_SHA256 = "5f5fa802652487a9c3c4ef070f70baa15050338e2799d20d060633587230f972"
 PUBLISHER_PATH = (
     IMMUTABLE_CAPSULE_ROOT / "publish_gate_d_layer1_rms_schedule.py"
 )
 PUBLISHER_SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_layer1_rms_schedule.py"
 )
-PUBLISHER_SHA256 = "b3ec837e8535d70d15982790cb8a94f4f36e49fe4b7a115ddbd097ff47be8b24"
+PUBLISHER_SHA256 = "a53f3fc22d8a507994b470ce2453c521db218221c66aa02e3fd35a80ef15ea9c"
 MIRROR_VERIFIER_PATH = (
     IMMUTABLE_CAPSULE_ROOT / "verify_gate_d_same_region_git_mirror.py"
 )

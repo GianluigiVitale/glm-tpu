@@ -10581,3 +10581,67 @@ gating as the DSA table. Tests: `test_rmsnorm_accepted_schedule.py` (CPU equival
 rounding for 1/3/40 rows, 32-row barrier lowering, boolean flag), forced-CPU decoder test (tokens
 and metadata equal, state within BF16 rounding, HLO contract both ways), compile-script/runner
 static test. The publisher of the bounded chain is fixed for a sealed re-run if required.
+
+## 2026-09-02 lineage-bound RMS schedule contract, full flag coverage, diagnostic archive adjudicated, chain v3
+
+Sol's P1 on the staged decoder flag was that the HLO contract (count 32-row `rsqrt`, forbid scalar)
+did not prove its stated invariant. Diagnosis on the archived TPU bytes of the bounded run showed why:
+the **control arm also reduces `f32[32,6144]{T(8,128)} -> f32[32]` over dims={1}**; the two arms
+differ only in what the reduce fusion squares. The accepted arm squares a materialized FP32 carry
+(the reduce fusion's parameter, produced by a separate `%convert_add_fusion`); the refuted DB548
+arm squares an `add` fused into the reduce fusion (`%fused_computation` carries pad/convert/add/
+square/reduce together). A shape/count contract cannot see that; a lineage contract can.
+
+`runtime/decoder.py` now binds, for **every** `rsqrt` in the optimized module:
+`square(carry) -> reduce(dims={1}, add combiner, f32[32,W] -> f32[32], T(8,128) operand when the
+module is tiled) -> multiply/divide by 1/W -> add 1e-05 -> rsqrt(f32[32]|f32[32,1])`, resolving
+fusion parameters, callee roots, tuples and bitcasts, and requires the square operand to be a
+materialized carry (fusion parameter/buffer/opt-barrier), not fused arithmetic. The StableHLO
+binder (`_validate_rms_accepted_schedule_stablehlo`, region-scoped because printed StableHLO
+restarts `%N` numbering inside manual-computation bodies) binds the same chain from the FP32
+`optimization_barrier` on `tensor<32xWxf32>` through `chlo.square`/`stablehlo.reduce` to
+`stablehlo.rsqrt : tensor<32x1xf32>`. The 128-wide DSA indexer key LayerNorm is the only non-RMS
+`rsqrt` in the step (centred by a `subtract`, epsilon 1e-6); both binders classify it separately and
+report `layernorm_rsqrt_count`. Flag on: every RMS `rsqrt` must conform; flag off: none may.
+
+Coverage gap closed by the same diagnosis: on the forced-CPU small decoder the flag left eleven
+`rsqrt` unscheduled — the input norm and q-a norm inside `stage_local_index_share_fp8_mapped` and
+`stage_local_dsa_fp8_mapped`, and the dense kernel's own norm in `stage_local_dense_fp8_mapped` —
+so `rms_accepted_schedule` is now threaded to every RMS call the decode step can reach (kernels/
+stage_local.py, kernels/layer.py). The legacy m32 program schedules all 313 RMS variances this way;
+a partial flag would have reproduced the layer-1 row and missed the next one.
+
+Tests on real TPU bytes (`tests/greenfield/runtime/test_rms_accepted_schedule_hlo_contract.py`,
+17): the archived schedule arm passes enabled and fails disabled, the control arm fails enabled and
+passes disabled (both HLO and StableHLO); hostile mutations of the real schedule arm are refused —
+mixed 16-row scale, row-40 module, wrong reduce axis, wrong epsilon, non-square operand, `T(1,128)`
+operand, fused producer, dummy 32-row `rsqrt` beside an unscheduled norm, lineage-less 32-row
+`rsqrt`; StableHLO: stripped barrier, wrong axis, wrong epsilon, wrong width, mixed shape, `maximum`
+combiner. Forced-CPU decoder test extended: tokens/metadata equal, state within BF16 rounding,
+33/33 `rsqrt` conforming with 33 barriers in StableHLO, LayerNorm count equal across flags,
+`rsqrt_count == conforming + layernorm`. Suites: kernels + validation + runtime subsets 258 passed
+(one pre-existing chain SHA failure fixed below), compile-script/runtime 96 passed.
+
+Diagnostic archive adjudicated offline (Sol accepted this instead of a sealed v3 rerun):
+`scripts/greenfield/adjudicate_gate_d_layer1_rms_schedule_diagnostic.py` →
+`docs/artifacts/gate-d-layer1-rms-schedule-diagnostic-adjudication.json` (SHA `e504b795b31690bda4ff2084a7d4316f0d5bd87c53c308f294415eec027e5767`): local
+bytes/SHAs of all 18 archived objects, expected identities (runner/outputs/dependencies/HLO),
+remote generation/size/CRC32C of every object and the ledger against the receipt (`crc32c_hash`
+field of `gcloud storage objects describe`), live set == ledger, no SUCCESS/result/ledger claim
+objects in `--all-versions`, no noncurrent versions. Classification
+`BOUNDED_TPU_LAYER1_RMS_SCHEDULE_ARM_EXACT;DIAGNOSTIC_ARCHIVE_ADJUDICATED;GENERATION_BOUND_LEDGER_REPLAYED;
+NO_SUCCESS_NO_DB_NO_PERFORMANCE_NO_GATE_D_CLAIM;DECODER_UNPROVEN;GATE_D_OPEN`.
+
+Chain consistency: commit `72c289cd` fixed the publisher constant (publisher SHA `a53f3fc2…`) but
+left the wrapper/launcher/installer/analyzer pinned to the executed publisher `b3ec837e…`, which the
+chain tests caught. The chain is re-pinned as **v3** (driver `5f5fa802…` — capsule path literal
+only —, wrapper `f52e5334…`, launcher `33c0a696…`, installer `83f72f20…`, publisher `a53f3fc2…`;
+paths `launch_gate_d_layer1_rms_schedule_v3.py`, `gate-d-layer1-rms-schedule-v3`,
+`…-install-v3`). Nothing is installed for v3; the v1/v2 installs stay inert; no rerun is planned.
+
+Not proof: CPU HLO/StableHLO and archived-byte tests bind the contract, not the decoder on TPU.
+Next: commit/push; one batched Sol review (contract + coverage + tests + adjudication + v3 pin +
+the 8K launch command); merge into `rewrite/topology-first-decode` keeping the rewrite's goal.md;
+mirror; no-TPU preflight; resubmit the exact merged pin and a fresh composed tag for one 8K
+execution review; then one protected run `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1 bash
+scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from the rewrite worktree.
