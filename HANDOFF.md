@@ -10685,3 +10685,40 @@ passed; forced-CPU decoder 1 passed (33/33 conforming, LayerNorm counts equal, k
 The submitted tag `..._ras_..._trace2_20260902T090858464221531Z` is abandoned unstarted (Sol: a tag
 submitted under a rejected boundary must not be started). Next: push, redo the merge, preflight,
 compose a new tag, resubmit the exact pin/tag to Sol.
+
+## 2026-09-02 Sol APPROVE (a4af0b4e / merge 7498e31b / execute once) → run failed closed at process start; tag burned
+
+Sol approved the resubmitted batch (`APPROVE PERSISTENCE a4af0b4e…`, `APPROVE MERGE PUSH 7498e31b…`,
+`APPROVE EXECUTE ONCE greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T092557993413054Z 7498e31b…`). Pre-launch reconfirmations all passed: merge pushed
+(rewrite goal.md blob identical to ba7d1e72), cron mirror synced, sealed mirror verifier exit 0 for
+the tooling pin a4af0b4e, mirror ref `refs/heads/rewrite/topology-first-decode` == 7498e31b, all
+eight rewrite worktrees clean including untracked, four leases free, pod READY/HEALTHY, tag vacant in
+all three scopes, worker 0 idle. Launched 09:37:30Z mid-window.
+
+The runner passed vacancy, leases, pre-census 8/8 and the hardened eight-host sync, created the
+detached pin worktree on every worker (`$run/source` at 7498e31b, clean), and started the sanitized
+`env -i` process on all eight hosts — which **failed closed at once on every worker** with
+`RuntimeError: wrong greenfield worktree: /home/gianl/glm-run/<tag>/source`:
+`compile_short_decoder.py` bound its own location to the canonical path
+`/home/gianl/glm-tpu-topology-rewrite` (line ~2221), a check my boundary change did not exercise
+(the static runner tests only matched strings; no dry run of the worker prologue was performed).
+No JAX/TPU initialization happened (rank logs carry no JAX output; `execute.txt` 0/8
+`DECODER_HOST_OK`); failure-exit census 8/8 `CENSUS_OK`; the runner uploaded the diagnostics to
+`greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T092557993413054Z/diagnostic_local/`. **The tag is burned, never to be retried**; no claim.
+
+Fix (this commit): `compile_short_decoder.py` gains `_worktree_binding(repo, run_tag)` — accepts the
+canonical worktree, or exactly `/home/gianl/glm-run/<GLM_GREENFIELD_RUN_TAG>/source` when it is a
+linked worktree of the canonical repository (`git rev-parse --git-common-dir` ==
+canonical `.git`) and clean including ignored files; the binding is recorded as `worktree_binding`
+next to `code_hash` in the output. Tests
+(`tests/greenfield/runtime/test_compile_short_decoder_worktree_binding.py`): real git worktrees
+(canonical accepted; detached pin accepted; missing/wrong tag, foreign path, foreign repository at
+the right path, untracked and ignored files refused) and a replay of the runner's exact worker
+prologue on this repository's HEAD — `git worktree add --detach`, clean check, `/usr/bin/env -i
+HOME PATH LANG LC_ALL PYTHONDONTWRITEBYTECODE GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION
+JAX_PLATFORMS PYTHONPATH=$src GLM_GREENFIELD_RUN_TAG python -u $src/scripts/greenfield/
+compile_short_decoder.py --help` exits 0 (imports resolve inside the sanitized environment).
+Static + binding suites: 64 passed.
+
+Next: push; redo the merge (byte-identical rewrite goal.md); preflight; compose a fresh tag; one Sol
+review of this fix + pin + tag; one launch.
