@@ -11277,3 +11277,14 @@ plumbing and branch order. Sealed same-region mirror verifier note: its `WORKTRE
 the tooling worktree/branch, so it certifies the tooling HEAD pin (not the rewrite merge); run it as
 `env -i HOME LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 <gate-d python> -I -S -B
 <installed verifier> --expected-code-hash <tooling HEAD> --expected-source-sha256 0912081651…`.
+
+### Sol round 26: APPROVE PERSISTENCE `210e3460…` + APPROVE EXECUTE ONCE — legacy layer-1 prompt-cache capture launched
+
+- Sealed same-region mirror verifier replayed for tooling HEAD `810da7f2` (checkout archive
+  `d5201d0d29618a5223d3ce1bd6f82db09a795f82f2b6b06682b0628a9aa408b8`, fsck true, origin exact record);
+  mirror also carries the rewrite merge `547b26f8` (run pin); pod `db-v4-64-od` READY/HEALTHY; cron tick
+  23:50:23Z; launched 23:51:40Z mid-window from `/home/gianl/glm-tpu-topology-rewrite` at `547b26f8`:
+  `env -i … GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID=1 GLM_GREENFIELD_PROMPT_CACHE_TAG=
+  greenfield_legacy_layer1_prompt_index_cache_20260902T234756900756989Z bash
+  scripts/greenfield/run_capture_legacy_prompt_index_cache.sh`. Legacy oracle run only; expected legacy
+  `kv_caches` slot 2; sealing fails closed on any other geometry. Result pending below.
