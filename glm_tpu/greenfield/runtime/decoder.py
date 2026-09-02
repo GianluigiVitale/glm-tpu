@@ -32,6 +32,10 @@ from ..kernels.reference.prefill_index import (
     repair_stage_local_prompt_index_cache,
 )
 from ..kernels.reference.rmsnorm import final_norm, fused_add_rms_norm
+from ..kernels.reference.rotary_table import (
+    build_dsa_rotary_table_host,
+    dsa_rotary_table_sha256,
+)
 from ..kernels.reference.rotary import (
     build_rotary_table_host,
     rotary_table_sha256,
@@ -518,6 +522,7 @@ class DecoderStepConfig:
     vocab_size: int
     dsa_score_default_precision: bool = False
     main_rope_table_width: int = 64
+    dsa_rope_table_width: int = 64
 
     def __post_init__(self) -> None:
         for field in (
@@ -535,6 +540,7 @@ class DecoderStepConfig:
             "dsa_indexer_heads",
             "vocab_size",
             "main_rope_table_width",
+            "dsa_rope_table_width",
         ):
             value = getattr(self, field)
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
@@ -550,6 +556,10 @@ class DecoderStepConfig:
         if self.main_rope_table_width % 2:
             raise PlanValidationError(
                 "decoder main-RoPE table width must be even"
+            )
+        if self.dsa_rope_table_width % 2:
+            raise PlanValidationError(
+                "decoder DSA host rotary table width must be even"
             )
         if not isinstance(self.dsa_score_default_precision, bool):
             raise PlanValidationError(
@@ -648,6 +658,10 @@ class DecoderStepProgram:
     layer0_residual_discriminator_kind: Layer0ResidualDiscriminatorKind
     layer0_ingredients_observer: Any | None
     split_residual_state: bool
+    dsa_rope_table_enabled: bool = False
+    dsa_rope_table_host: Any | None = None
+    dsa_rope_table_sha256: str | None = None
+    dsa_rope_table_bytes_per_device: int = 0
 
 
 def _validate_pallas_feature_decoder_calls(
@@ -2500,6 +2514,73 @@ def _validate_complete_token_collective_lowering(
     }
 
 
+def _validate_dsa_rope_table_hlo(
+    module: HloModule,
+    *,
+    config: DecoderStepConfig,
+    enabled: bool,
+    main_rope_table_enabled: bool,
+) -> dict[str, Any]:
+    """Pin the explicit FP32 DSA table input and its position lookup.
+
+    When both host tables are enabled no ``cosine``/``sine``/``power`` may
+    remain anywhere in the decoder step: every rotary angle is then a host
+    value.  When only the DSA table is enabled the main-MLA rotary may still
+    evaluate transcendentals on device, so only the table dataflow is pinned.
+    """
+
+    table_shape = (config.context_capacity, config.dsa_rope_table_width)
+    table_parameters = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction.computation.startswith("ENTRY ")
+        and instruction.opcode == "parameter"
+        and any(
+            shape.dtype == "f32" and shape.dimensions == table_shape
+            for shape in instruction.result_shapes
+        )
+    )
+    lookups = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction.op_name is not None
+        and "greenfield_dsa_rope_table_lookup" in instruction.op_name
+        and instruction.opcode in {"dynamic-slice", "gather"}
+    )
+    transcendental = tuple(
+        instruction.raw_line
+        for instruction in module.instructions
+        if instruction.opcode in {"cosine", "sine", "power"}
+    )
+    violations: list[str] = []
+    if enabled:
+        if len(table_parameters) != 1:
+            violations.append(
+                "DSA host rotary table must enter as exactly one FP32 entry parameter"
+            )
+        if not lookups:
+            violations.append("DSA host rotary table lookup is absent")
+        if main_rope_table_enabled and transcendental:
+            violations.append(
+                "decoder still evaluates transcendentals on device with both host "
+                f"rotary tables enabled: {len(transcendental)} instructions"
+            )
+    else:
+        if table_parameters:
+            violations.append("default decoder carries a DSA host rotary table input")
+        if lookups:
+            violations.append("default decoder performs a DSA host rotary table lookup")
+    return {
+        "applicable": enabled,
+        "enabled": enabled,
+        "lookup_count": len(lookups),
+        "passed": not violations,
+        "table_parameter_count": len(table_parameters),
+        "transcendental_count": len(transcendental),
+        "violations": violations,
+    }
+
+
 def _validate_main_rope_table_hlo(
     module: HloModule,
     *,
@@ -3844,6 +3925,7 @@ def validate_decoder_step_hlo(
     pregathered_b512_attention: bool = False,
     strategy_nd_attention_projection: bool = False,
     dense_final_layout_convolution: bool = False,
+    dsa_rope_table_enabled: bool = False,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -3867,6 +3949,8 @@ def validate_decoder_step_hlo(
         raise PlanValidationError("prefill index-repair flag must be boolean")
     if not isinstance(main_rope_table_enabled, bool):
         raise PlanValidationError("main-RoPE table HLO flag must be boolean")
+    if not isinstance(dsa_rope_table_enabled, bool):
+        raise PlanValidationError("DSA host rotary table HLO flag must be boolean")
     if not isinstance(pregathered_b512_attention, bool):
         raise PlanValidationError(
             "pregathered-B512 attention HLO flag must be boolean"
@@ -4359,6 +4443,13 @@ def validate_decoder_step_hlo(
         enabled=main_rope_table_enabled,
     )
     violations.extend(main_rope_table_contract["violations"])
+    dsa_rope_table_contract = _validate_dsa_rope_table_hlo(
+        module,
+        config=config,
+        enabled=dsa_rope_table_enabled,
+        main_rope_table_enabled=main_rope_table_enabled,
+    )
+    violations.extend(dsa_rope_table_contract["violations"])
     pregathered_attention_contract = (
         _validate_pregathered_b512_attention_hlo(
             optimized_hlo,
@@ -4456,6 +4547,8 @@ def validate_decoder_step_hlo(
         "attention_projection_backend": attention_projection_backend,
         "main_rope_table_enabled": main_rope_table_enabled,
         "main_rope_table_contract": main_rope_table_contract,
+        "dsa_rope_table_enabled": dsa_rope_table_enabled,
+        "dsa_rope_table_contract": dsa_rope_table_contract,
         "pregathered_b512_attention": pregathered_b512_attention,
         "strategy_nd_attention_projection": (
             strategy_nd_attention_projection
@@ -5435,6 +5528,7 @@ def _execute_stage(
     strategy_nd_attention_projection: bool,
     dense_final_layout_convolution: bool,
     main_rope_table_row: Any | None = None,
+    dsa_rope_table_row: Any | None = None,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
@@ -5555,6 +5649,7 @@ def _execute_stage(
             attention_projection_backend=attention_projection_backend,
             pregathered_b512_attention=pregathered_b512_attention,
             main_rope_table_row=main_rope_table_row,
+            dsa_rope_table_row=dsa_rope_table_row,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
             prefill_index_inputs = prefill_index_inputs.at[
@@ -5670,6 +5765,7 @@ def _execute_stage_split(
     strategy_nd_attention_projection: bool,
     dense_final_layout_convolution: bool,
     main_rope_table_row: Any | None = None,
+    dsa_rope_table_row: Any | None = None,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
@@ -5810,6 +5906,7 @@ def _execute_stage_split(
                 strategy_nd_attention_projection
             ),
             main_rope_table_row=main_rope_table_row,
+            dsa_rope_table_row=dsa_rope_table_row,
             dense_final_layout_convolution=dense_final_layout_convolution,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
@@ -5937,6 +6034,7 @@ def build_decoder_step_program(
     ) = "combine_precision",
     build_layer0_ingredients_observer: bool = False,
     split_residual_state: bool = False,
+    dsa_rope_table_enabled: bool = False,
 ) -> DecoderStepProgram:
     """Build, but do not compile, one all-stage decoder step.
 
@@ -6024,6 +6122,14 @@ def build_decoder_step_program(
         )
     if not isinstance(main_rope_table_enabled, bool):
         raise PlanValidationError("decoder main-RoPE table flag must be boolean")
+    if not isinstance(dsa_rope_table_enabled, bool):
+        raise PlanValidationError("decoder DSA host rotary table flag must be boolean")
+    if dsa_rope_table_enabled and (
+        build_layer0_residual_discriminator or build_layer0_ingredients_observer
+    ):
+        raise PlanValidationError(
+            "DSA host rotary table is not plumbed through layer-0 discriminators"
+        )
     if not isinstance(pregathered_b512_attention, bool):
         raise PlanValidationError(
             "decoder pregathered-B512 attention flag must be boolean"
@@ -6262,6 +6368,7 @@ def build_decoder_step_program(
         dsa_indexer_heads=geometry.dsa_indexer_heads,
         vocab_size=geometry.vocab_size,
         main_rope_table_width=geometry.qk_rope_head_dim,
+        dsa_rope_table_width=geometry.qk_rope_head_dim,
         dsa_score_default_precision=dsa_score_default_precision,
     )
     skeleton = PipelineSkeletonConfig(
@@ -6344,6 +6451,20 @@ def build_decoder_step_program(
         )
         main_rope_table_digest = rotary_table_sha256(main_rope_table_host)
         main_rope_table_bytes = int(main_rope_table_host.nbytes)
+    dsa_rope_table_host = None
+    dsa_rope_table_digest = None
+    dsa_rope_table_bytes = 0
+    if dsa_rope_table_enabled:
+        # Host FP32 DSA cos|sin rows: on-device cos/sin at large rotary angles
+        # are inaccurate on TPU (protected V2/V3 replays); rows are gathered by
+        # position on device and applied in FP32.
+        dsa_rope_table_host = build_dsa_rotary_table_host(
+            config.context_capacity,
+            rotary_dim=dsa_contract.rotary_dim,
+            theta=dsa_contract.theta,
+        )
+        dsa_rope_table_digest = dsa_rotary_table_sha256(dsa_rope_table_host)
+        dsa_rope_table_bytes = int(dsa_rope_table_host.nbytes)
 
     local_vocab = geometry.vocab_size // config.local_parallel_size
 
@@ -6359,6 +6480,7 @@ def build_decoder_step_program(
         block_tables: Any,
         context_lengths: Any,
         local_main_rope_table: Any | None,
+        local_dsa_rope_table: Any | None = None,
     ) -> tuple[Any, ...]:
         rank = lax.axis_index(axis_name)
         stage_id = stage_map[rank]
@@ -6395,6 +6517,28 @@ def build_decoder_step_program(
         elif local_main_rope_table is not None:
             raise PlanValidationError(
                 "default decoder cannot consume a main-RoPE table"
+            )
+        dsa_rope_table_row = None
+        if dsa_rope_table_enabled:
+            if (
+                local_dsa_rope_table is None
+                or local_dsa_rope_table.shape
+                != (config.context_capacity, dsa_contract.rotary_dim)
+                or local_dsa_rope_table.dtype != jnp.float32
+            ):
+                raise PlanValidationError(
+                    "decoder DSA host rotary table asset is invalid"
+                )
+            safe_dsa_rope_position = jnp.clip(
+                position[0],
+                jnp.int32(0),
+                jnp.int32(config.context_capacity - 1),
+            )
+            with jax.named_scope("greenfield_dsa_rope_table_lookup"):
+                dsa_rope_table_row = local_dsa_rope_table[safe_dsa_rope_position]
+        elif local_dsa_rope_table is not None:
+            raise PlanValidationError(
+                "default decoder cannot consume a DSA host rotary table"
             )
         if observe_prefill_index_inputs:
             prefill_index_inputs = jnp.zeros(
@@ -6641,6 +6785,7 @@ def build_decoder_step_program(
                                 dense_final_layout_convolution
                             ),
                             main_rope_table_row=main_rope_table_row,
+            dsa_rope_table_row=dsa_rope_table_row,
                             dsa_observation=values[4],
                             layer_residual_observation=values[5],
                         ),
@@ -6710,6 +6855,7 @@ def build_decoder_step_program(
                                 dense_final_layout_convolution
                             ),
                             main_rope_table_row=main_rope_table_row,
+            dsa_rope_table_row=dsa_rope_table_row,
                             dsa_observation=values[4],
                             dsa_internal_observation=values[5],
                         ),
@@ -6777,6 +6923,7 @@ def build_decoder_step_program(
                                 dense_final_layout_convolution
                             ),
                             main_rope_table_row=main_rope_table_row,
+            dsa_rope_table_row=dsa_rope_table_row,
                             dsa_observation=values[4],
                         ),
                         lambda values: values,
@@ -6839,6 +6986,7 @@ def build_decoder_step_program(
                             dense_final_layout_convolution
                         ),
                         main_rope_table_row=main_rope_table_row,
+            dsa_rope_table_row=dsa_rope_table_row,
                         prefill_index_inputs=values[4],
                     ),
                     lambda values: values,
@@ -6894,6 +7042,7 @@ def build_decoder_step_program(
                             dense_final_layout_convolution
                         ),
                         main_rope_table_row=main_rope_table_row,
+            dsa_rope_table_row=dsa_rope_table_row,
                     ),
                     lambda values: values,
                     (residual, kv_cache, index_cache, metadata),
@@ -7148,6 +7297,7 @@ def build_decoder_step_program(
         position: Any,
         block_tables: Any,
         context_lengths: Any,
+        local_dsa_rope_table: Any | None = None,
     ) -> tuple[Any, Any, Any, Any]:
         values = mapped_impl(
             local_weights,
@@ -7161,6 +7311,7 @@ def build_decoder_step_program(
             block_tables,
             context_lengths,
             None,
+            local_dsa_rope_table,
         )
         return values[:4]
 
@@ -7174,6 +7325,7 @@ def build_decoder_step_program(
         position: Any,
         block_tables: Any,
         context_lengths: Any,
+        local_dsa_rope_table: Any | None = None,
     ) -> tuple[Any, ...]:
         return mapped_impl(
             local_weights,
@@ -7187,6 +7339,7 @@ def build_decoder_step_program(
             block_tables,
             context_lengths,
             None,
+            local_dsa_rope_table,
         )
 
     def mapped_body_exact_query(
@@ -7199,6 +7352,7 @@ def build_decoder_step_program(
         position: Any,
         block_tables: Any,
         context_lengths: Any,
+        local_dsa_rope_table: Any | None = None,
     ) -> tuple[Any, Any, Any, Any]:
         values = mapped_impl(
             local_weights,
@@ -7212,6 +7366,7 @@ def build_decoder_step_program(
             block_tables,
             context_lengths,
             None,
+            local_dsa_rope_table,
         )
         return values[:4]
 
@@ -7226,6 +7381,7 @@ def build_decoder_step_program(
         position: Any,
         block_tables: Any,
         context_lengths: Any,
+        local_dsa_rope_table: Any | None = None,
     ) -> tuple[Any, ...]:
         return mapped_impl(
             local_weights,
@@ -7239,6 +7395,7 @@ def build_decoder_step_program(
             block_tables,
             context_lengths,
             None,
+            local_dsa_rope_table,
         )
 
     def mapped_body_main_rope(
@@ -7251,6 +7408,7 @@ def build_decoder_step_program(
         block_tables: Any,
         context_lengths: Any,
         local_main_rope_table: Any,
+        local_dsa_rope_table: Any | None = None,
     ) -> tuple[Any, Any, Any, Any]:
         values = mapped_impl(
             local_weights,
@@ -7264,6 +7422,7 @@ def build_decoder_step_program(
             block_tables,
             context_lengths,
             local_main_rope_table,
+            local_dsa_rope_table,
         )
         return values[:4]
 
@@ -7278,6 +7437,7 @@ def build_decoder_step_program(
         block_tables: Any,
         context_lengths: Any,
         local_main_rope_table: Any,
+        local_dsa_rope_table: Any | None = None,
     ) -> tuple[Any, ...]:
         return mapped_impl(
             local_weights,
@@ -7291,6 +7451,7 @@ def build_decoder_step_program(
             block_tables,
             context_lengths,
             local_main_rope_table,
+            local_dsa_rope_table,
         )
 
     def mapped_body_exact_query_main_rope(
@@ -7304,6 +7465,7 @@ def build_decoder_step_program(
         block_tables: Any,
         context_lengths: Any,
         local_main_rope_table: Any,
+        local_dsa_rope_table: Any | None = None,
     ) -> tuple[Any, Any, Any, Any]:
         values = mapped_impl(
             local_weights,
@@ -7317,6 +7479,7 @@ def build_decoder_step_program(
             block_tables,
             context_lengths,
             local_main_rope_table,
+            local_dsa_rope_table,
         )
         return values[:4]
 
@@ -7332,6 +7495,7 @@ def build_decoder_step_program(
         block_tables: Any,
         context_lengths: Any,
         local_main_rope_table: Any,
+        local_dsa_rope_table: Any | None = None,
     ) -> tuple[Any, ...]:
         return mapped_impl(
             local_weights,
@@ -7345,6 +7509,7 @@ def build_decoder_step_program(
             block_tables,
             context_lengths,
             local_main_rope_table,
+            local_dsa_rope_table,
         )
 
     def mapped_layer0_residual_discriminator_impl(
@@ -8008,7 +8173,12 @@ def build_decoder_step_program(
         local_index_container: Any,
         local_history_container: Any,
         block_tables: Any,
+        local_dsa_rope_table: Any | None = None,
     ) -> Any:
+        if dsa_rope_table_enabled != (local_dsa_rope_table is not None):
+            raise PlanValidationError(
+                "prefill index repair DSA host rotary table state drifted"
+            )
         rank = lax.axis_index(axis_name)
         stage_id = stage_map[rank]
         local_slot = slot_map[rank]
@@ -8039,6 +8209,7 @@ def build_decoder_step_program(
                         local_rows_per_page=config.local_rows_per_page,
                         prompt_chunk=2048,
                         physical_rows=64,
+                        dsa_rope_table=local_dsa_rope_table,
                     )
                     repaired = repaired.at[full_slot].set(layer_cache)
                     full_slot += 1
@@ -8227,6 +8398,8 @@ def build_decoder_step_program(
         output_specs = (residual_spec, kv_spec, index_spec, metadata_spec)
     if main_rope_table_enabled:
         input_specs = (*input_specs, P())
+    if dsa_rope_table_enabled:
+        input_specs = (*input_specs, P())
     execute = jax.shard_map(
         mapped,
         mesh=mesh,
@@ -8354,16 +8527,19 @@ def build_decoder_step_program(
             out_specs=materialized_wk_specs,
             check_vma=False,
         )
+        repair_specs: tuple[Any, ...] = (
+            weight_specs,
+            materialized_wk_specs,
+            index_spec,
+            P(None, axis_name, None, None),
+            P(),
+        )
+        if dsa_rope_table_enabled:
+            repair_specs = (*repair_specs, P())
         repair_prefill_index_cache = jax.shard_map(
             mapped_prefill_index_repair,
             mesh=mesh,
-            in_specs=(
-                weight_specs,
-                materialized_wk_specs,
-                index_spec,
-                P(None, axis_name, None, None),
-                P(),
-            ),
+            in_specs=repair_specs,
             out_specs=index_spec,
             check_vma=False,
         )
@@ -8399,6 +8575,10 @@ def build_decoder_step_program(
         main_rope_table_host=main_rope_table_host,
         main_rope_table_sha256=main_rope_table_digest,
         main_rope_table_bytes_per_device=main_rope_table_bytes,
+        dsa_rope_table_enabled=dsa_rope_table_enabled,
+        dsa_rope_table_host=dsa_rope_table_host,
+        dsa_rope_table_sha256=dsa_rope_table_digest,
+        dsa_rope_table_bytes_per_device=dsa_rope_table_bytes,
         complete_token_path=complete_token_path,
         observe_dsa_events=observe_dsa_events,
         observe_dsa_internals=observe_dsa_internals,

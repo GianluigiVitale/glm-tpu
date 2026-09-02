@@ -40,6 +40,10 @@ from .reference.attention import (
     gather_stage_local_selected_kv,
     gather_stage_local_selected_kv_aligned,
 )
+from .reference.dsa_host_rope import (
+    dsa_index_keys_from_projection_host_rope,
+    rotary_cos_sin_from_rows,
+)
 from .reference.dsa import (
     DsaNumericalContract,
     SelectedPositions,
@@ -1602,6 +1606,38 @@ def _require_decode_metadata(
     )
 
 
+def _local_dsa_current_key_from_projection(
+    projected_key: Any,
+    key_norm_weight: Any,
+    key_norm_bias: Any,
+    position: Any,
+    *,
+    contract: DsaNumericalContract,
+    key_norm_mode: Literal["divide_sqrt", "multiply_rsqrt"],
+    dsa_rope_table_row: Any | None,
+) -> Any:
+    """Normalize/rotate one FP32 key; rotate from the host row when supplied."""
+
+    if dsa_rope_table_row is None:
+        return dsa_index_keys_from_projection(
+            projected_key,
+            key_norm_weight,
+            key_norm_bias,
+            position,
+            contract=contract,
+            key_norm_mode=key_norm_mode,
+        ).astype(jnp.float32)
+    return dsa_index_keys_from_projection_host_rope(
+        projected_key,
+        key_norm_weight,
+        key_norm_bias,
+        position,
+        dsa_rope_table_row[None, :],
+        contract=contract,
+        key_norm_mode=key_norm_mode,
+    ).astype(jnp.float32)
+
+
 def _local_dsa_query_from_projection(
     projected_query: Any,
     normalized: Any,
@@ -1609,6 +1645,7 @@ def _local_dsa_query_from_projection(
     position: Any,
     *,
     contract: DsaNumericalContract,
+    dsa_rope_table_row: Any | None = None,
 ) -> tuple[Any, Any]:
     if projected_query.ndim != 2 or projected_query.shape[0] != 1:
         raise ValueError("local DSA query projection must contain one row")
@@ -1624,12 +1661,19 @@ def _local_dsa_query_from_projection(
         weights = linear(
             normalized, head_weight, output_dtype=jnp.float32
         ) * jnp.float32(contract.num_heads**-0.5)
-    cos, sin = rotary_cos_sin(
-        position,
-        rotary_dim=contract.rotary_dim,
-        theta=contract.theta,
-        dtype=jnp.float32,
-    )
+    if dsa_rope_table_row is None:
+        cos, sin = rotary_cos_sin(
+            position,
+            rotary_dim=contract.rotary_dim,
+            theta=contract.theta,
+            dtype=jnp.float32,
+        )
+    else:
+        # Host FP32 cos|sin row for this position: on-device cos/sin at large
+        # rotary angles are inaccurate on TPU (protected V2/V3 replays).
+        cos, sin = rotary_cos_sin_from_rows(
+            dsa_rope_table_row[None, :], position, rotary_dim=contract.rotary_dim
+        )
     rotated = apply_rotary(
         query[..., : contract.rotary_dim],
         cos[:, None, :],
@@ -1652,6 +1696,7 @@ def _local_dsa_query(
     position: Any,
     *,
     contract: DsaNumericalContract,
+    dsa_rope_table_row: Any | None = None,
 ) -> tuple[Any, Any]:
     local_heads = query_weight.shape[0] // contract.head_dim
     if query_weight.shape != (
@@ -1669,6 +1714,7 @@ def _local_dsa_query(
         head_weight,
         position,
         contract=contract,
+        dsa_rope_table_row=dsa_rope_table_row,
     )
 
 
@@ -1680,6 +1726,7 @@ def _local_dsa_query_tuple4_exact(
     position: Any,
     *,
     contract: DsaNumericalContract,
+    dsa_rope_table_row: Any | None = None,
 ) -> tuple[Any, Any]:
     """Preserve the accepted TPU-v4 four-reduction query association."""
 
@@ -1760,6 +1807,7 @@ def _local_dsa_query_tuple4_exact(
         head_weight,
         position,
         contract=contract,
+        dsa_rope_table_row=dsa_rope_table_row,
     )
 
 
@@ -1810,6 +1858,7 @@ def stage_local_dsa_fp8_mapped(
     dsa_head_key_exact_association: bool = False,
     dsa_score_precision: Literal["default", "highest"] = "highest",
     linear_interpret: bool = False,
+    dsa_rope_table_row: Any | None = None,
 ) -> StageLocalDsaFp8Result:
     """Write one BF16 index key, score local pages, and merge exact top-k.
 
@@ -1959,6 +2008,7 @@ def stage_local_dsa_fp8_mapped(
             head_weight,
             position,
             contract=contract,
+            dsa_rope_table_row=dsa_rope_table_row,
         )
     elif query_backend == "reference":
         # DB499 proves the accepted M=1 association only when the complete
@@ -1981,6 +2031,7 @@ def stage_local_dsa_fp8_mapped(
             head_weight,
             position,
             contract=contract,
+            dsa_rope_table_row=dsa_rope_table_row,
         )
     elif query_backend == "pallas":
         projected_query = fp8_block_matmul_f32(
@@ -2000,6 +2051,7 @@ def stage_local_dsa_fp8_mapped(
             head_weight,
             position,
             contract=contract,
+            dsa_rope_table_row=dsa_rope_table_row,
         )
     query_width = local_heads * contract.head_dim
     packed_query = jnp.concatenate(
@@ -2028,26 +2080,42 @@ def stage_local_dsa_fp8_mapped(
             precomputed_wk_weight,
             output_dtype=jnp.float32,
         )
-        current_key_f32 = dsa_index_keys_from_projection(
+        current_key_f32 = _local_dsa_current_key_from_projection(
             projected_key,
             key_norm_weight,
             key_norm_bias,
             position,
             contract=contract,
             key_norm_mode="divide_sqrt",
-        ).astype(jnp.float32)
+            dsa_rope_table_row=dsa_rope_table_row,
+        )
     elif linear_backend == "reference":
         wk_weight = dequantize_fp8_bits_block_weight(
             wk_bits, wk_scale, block_shape=block_shape
         )
-        current_key_f32 = dsa_index_keys(
-            indexer_normalized,
-            wk_weight,
-            key_norm_weight,
-            key_norm_bias,
-            position,
-            contract=contract,
-        ).astype(jnp.float32)
+        if dsa_rope_table_row is None:
+            current_key_f32 = dsa_index_keys(
+                indexer_normalized,
+                wk_weight,
+                key_norm_weight,
+                key_norm_bias,
+                position,
+                contract=contract,
+            ).astype(jnp.float32)
+        else:
+            with jax.default_matmul_precision("highest"):
+                projected_key = linear(
+                    indexer_normalized, wk_weight, output_dtype=jnp.float32
+                )
+            current_key_f32 = _local_dsa_current_key_from_projection(
+                projected_key,
+                key_norm_weight,
+                key_norm_bias,
+                position,
+                contract=contract,
+                key_norm_mode="multiply_rsqrt",
+                dsa_rope_table_row=dsa_rope_table_row,
+            )
     else:
         projected_key = fp8_block_matmul_f32(
             indexer_normalized,
@@ -2060,13 +2128,15 @@ def stage_local_dsa_fp8_mapped(
             ),
             interpret=linear_interpret,
         )
-        current_key_f32 = dsa_index_keys_from_projection(
+        current_key_f32 = _local_dsa_current_key_from_projection(
             projected_key,
             key_norm_weight,
             key_norm_bias,
             position,
             contract=contract,
-        ).astype(jnp.float32)
+            key_norm_mode="multiply_rsqrt",
+            dsa_rope_table_row=dsa_rope_table_row,
+        )
     current_key = current_key_f32.astype(index_cache.dtype)
 
     def write_current(value: Any) -> Any:

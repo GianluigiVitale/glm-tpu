@@ -1549,6 +1549,16 @@ def parse_args() -> argparse.Namespace:
         default=0,
     )
     parser.add_argument(
+        "--dsa-rope-table",
+        type=int,
+        choices=(0, 1),
+        default=0,
+        help=(
+            "Feed host FP32 DSA rotary rows gathered by position instead of "
+            "evaluating cos/sin on the accelerator (default off)."
+        ),
+    )
+    parser.add_argument(
         "--pregathered-b512-attention",
         type=int,
         choices=(0, 1),
@@ -1667,6 +1677,7 @@ def main() -> int:
         args.dsa_score_default_precision
     )
     args.main_rope_table = bool(args.main_rope_table)
+    args.dsa_rope_table = bool(args.dsa_rope_table)
     args.pregathered_b512_attention = bool(
         args.pregathered_b512_attention
     )
@@ -1717,6 +1728,12 @@ def main() -> int:
         or args.observe_layer0_attention_output_association_variants
         or args.observe_layer0_strategy_nd_row0_association
     )
+    if args.dsa_rope_table and (
+        args.observe_layer0_ingredients or observe_layer0_discriminator
+    ):
+        raise ValueError(
+            "DSA host rotary table is not plumbed through layer-0 discriminators"
+        )
     if args.observe_layer0_subshard_variants:
         layer0_discriminator_kind = "virtual_tp32"
     elif args.observe_layer0_attention_schedule_variants:
@@ -2377,6 +2394,8 @@ def main() -> int:
     dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None = None
     main_rope_table = None
     main_rope_table_local_hashes: list[str] = []
+    dsa_rope_table = None
+    dsa_rope_table_local_hashes: list[str] = []
     try:
         if (
             jax.process_count() != 8
@@ -2442,6 +2461,7 @@ def main() -> int:
                 args.dsa_score_default_precision
             ),
             main_rope_table_enabled=args.main_rope_table,
+            dsa_rope_table_enabled=args.dsa_rope_table,
             pregathered_b512_attention=(
                 args.pregathered_b512_attention
             ),
@@ -2494,6 +2514,7 @@ def main() -> int:
                     args.dsa_score_default_precision
                 ),
                 main_rope_table_enabled=args.main_rope_table,
+                dsa_rope_table_enabled=args.dsa_rope_table,
                 pregathered_b512_attention=(
                     args.pregathered_b512_attention
                 ),
@@ -2546,6 +2567,7 @@ def main() -> int:
                         args.dsa_score_default_precision
                     ),
                     main_rope_table_enabled=args.main_rope_table,
+                    dsa_rope_table_enabled=args.dsa_rope_table,
                     pregathered_b512_attention=(
                         args.pregathered_b512_attention
                     ),
@@ -2622,6 +2644,53 @@ def main() -> int:
             )
         ) or decoder.main_rope_table_bytes_per_device != 0:
             raise RuntimeError("default decoder materialized a main-RoPE table")
+
+        if args.dsa_rope_table:
+            if (
+                decoder.dsa_rope_table_host is None
+                or decoder.dsa_rope_table_sha256 is None
+                or decoder.dsa_rope_table_bytes_per_device <= 0
+            ):
+                raise RuntimeError("decoder DSA host rotary table asset is unavailable")
+            for related in (dsa_observer, prefill_decoder):
+                if related is not None and (
+                    not related.dsa_rope_table_enabled
+                    or related.dsa_rope_table_sha256
+                    != decoder.dsa_rope_table_sha256
+                    or related.dsa_rope_table_host is None
+                    or related.dsa_rope_table_host.shape
+                    != decoder.dsa_rope_table_host.shape
+                    or related.dsa_rope_table_bytes_per_device
+                    != decoder.dsa_rope_table_bytes_per_device
+                ):
+                    raise RuntimeError(
+                        "decoder DSA host rotary table identities disagree"
+                    )
+            dsa_rope_table = jax.device_put(
+                decoder.dsa_rope_table_host,
+                NamedSharding(decoder.mesh, P()),
+            )
+            dsa_rope_table.block_until_ready()
+            dsa_rope_table_local_hashes = [
+                sha256(
+                    np.ascontiguousarray(
+                        np.asarray(jax.device_get(shard.data))
+                    ).astype(np.float32).tobytes()
+                ).hexdigest()
+                for shard in dsa_rope_table.addressable_shards
+            ]
+            if set(dsa_rope_table_local_hashes) != {
+                decoder.dsa_rope_table_sha256
+            }:
+                raise RuntimeError("device DSA host rotary table identity drifted")
+        elif any(
+            value is not None
+            for value in (
+                decoder.dsa_rope_table_host,
+                decoder.dsa_rope_table_sha256,
+            )
+        ) or decoder.dsa_rope_table_bytes_per_device != 0:
+            raise RuntimeError("default decoder materialized a DSA host rotary table")
 
         dsa_query_materialization_compile_seconds = None
         dsa_query_materialization_execute_seconds = None
@@ -3040,7 +3109,7 @@ def main() -> int:
             )
         auxiliary_values = tuple(
             value
-            for value in (token, prompt, main_rope_table)
+            for value in (token, prompt, main_rope_table, dsa_rope_table)
             if value is not None
         ) + (
             tuple(materialized_prefill_index_weights)
@@ -3143,6 +3212,12 @@ def main() -> int:
             if main_rope_table is None:
                 raise RuntimeError("main-RoPE table input was not materialized")
             inputs = (*inputs, main_rope_table)
+        if args.dsa_rope_table:
+            if dsa_rope_table is None:
+                raise RuntimeError(
+                    "DSA host rotary table input was not materialized"
+                )
+            inputs = (*inputs, dsa_rope_table)
         prefill_inputs = None
         if oracle_mode:
             assert prefill is not None and prompt is not None
@@ -3187,6 +3262,22 @@ def main() -> int:
                 if not args.dsa_query_exact_association:
                     prefill_inputs = (*prefill_inputs, None)
                 prefill_inputs = (*prefill_inputs, main_rope_table)
+            if args.dsa_rope_table:
+                if dsa_rope_table is None:
+                    raise RuntimeError("prefill DSA host rotary table is unavailable")
+                # Positional optional prefill inputs: materialized wk, query
+                # aliases, main table, then the DSA table.
+                if not args.prefill_index_repair and not (
+                    args.dsa_query_exact_association or args.main_rope_table
+                ):
+                    prefill_inputs = (*prefill_inputs, None)
+                if not args.dsa_query_exact_association and not (
+                    args.main_rope_table
+                ):
+                    prefill_inputs = (*prefill_inputs, None)
+                if not args.main_rope_table:
+                    prefill_inputs = (*prefill_inputs, None)
+                prefill_inputs = (*prefill_inputs, dsa_rope_table)
         multihost_utils.sync_global_devices("greenfield-short-decoder-compile-start")
         compile_started = time.monotonic()
         lowered = jax.jit(
@@ -3240,6 +3331,7 @@ def main() -> int:
             complete_token_path=decoder.complete_token_path,
             split_residual_state=decoder.split_residual_state,
             main_rope_table_enabled=decoder.main_rope_table_enabled,
+            dsa_rope_table_enabled=decoder.dsa_rope_table_enabled,
             pregathered_b512_attention=(
                 decoder.pregathered_b512_attention
             ),
@@ -3358,6 +3450,7 @@ def main() -> int:
                 main_rope_table_enabled=(
                     dsa_observer.main_rope_table_enabled
                 ),
+                dsa_rope_table_enabled=dsa_observer.dsa_rope_table_enabled,
                 pregathered_b512_attention=(
                     dsa_observer.pregathered_b512_attention
                 ),
@@ -4452,6 +4545,8 @@ def main() -> int:
                     observer_inputs = (*runtime_prefix, *observer_current)
                     if args.main_rope_table:
                         observer_inputs = (*observer_inputs, main_rope_table)
+                    if args.dsa_rope_table:
+                        observer_inputs = (*observer_inputs, dsa_rope_table)
                     observer_result = compiled_dsa_observer(*observer_inputs)
                     observer_result[8].block_until_ready()
                     observation_host = _materialize_global_array(
@@ -4953,6 +5048,8 @@ def main() -> int:
                 )
             if args.main_rope_table:
                 step_inputs = (*step_inputs, main_rope_table)
+            if args.dsa_rope_table:
+                step_inputs = (*step_inputs, dsa_rope_table)
             return compiled(*step_inputs)
 
         def materialize_active_token(
@@ -5315,6 +5412,35 @@ def main() -> int:
             ),
             "main_rope_table_local_device_sha256": (
                 main_rope_table_local_hashes
+            ),
+            "dsa_rope_table_enabled": decoder.dsa_rope_table_enabled,
+            "dsa_rope_table_sha256": decoder.dsa_rope_table_sha256,
+            "dsa_rope_table_shape": (
+                list(decoder.dsa_rope_table_host.shape)
+                if decoder.dsa_rope_table_host is not None
+                else None
+            ),
+            "dsa_rope_table_bytes_per_device": (
+                decoder.dsa_rope_table_bytes_per_device
+            ),
+            "dsa_rope_table_local_device_sha256": (
+                dsa_rope_table_local_hashes
+            ),
+            "dsa_rope_table_prerequisite": (
+                {
+                    "bounded_proof_run_tag": (
+                        "gate_d_projection_contraction_pp16_numerical_"
+                        "20260902T004306002075694Z"
+                    ),
+                    "position_8155_row_sha256": (
+                        "748aa6122b8d83cfcf65928d33d1ac10392b7cc968617f324a75a62168d3a9c0"
+                    ),
+                    "terminal_marker_sha256": (
+                        "f26cde1a4ebe459cb038d06c2c1afc39db4416537d8f1f50c2a3bf648d48064b"
+                    ),
+                }
+                if decoder.dsa_rope_table_enabled
+                else None
             ),
             "main_rope_table_prerequisite": (
                 {

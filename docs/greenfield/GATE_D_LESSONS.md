@@ -1118,3 +1118,10 @@ normalized-state cause.
 - A rejected bounded discriminator is still decisive evidence when its outputs are archived: the
   V2 rejection was fully adjudicated on CPU from `outputs.npz` alone (implied cos/sin from
   pre-/post-rotation pairs) without another TPU run.
+- Injecting archived TPU keys into the capsule's CPU stage-local DSA replay is a cheap, exact
+  selection witness: the V3 host-row key reproduced the accepted layer-1/position-8155 event
+  bit-for-bit (positions and scores) while the V2 on-device-rotary key perturbed every score by up
+  to 4.2e-3 without flipping that event. A single-key witness cannot reproduce the protected 8K
+  failure (seven swapped positions at the same event) because there every cached prompt key and the
+  query carried their own position-dependent rotary error; only the full decoder with host rows for
+  keys, queries and prefill can answer that.

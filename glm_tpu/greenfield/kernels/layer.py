@@ -276,6 +276,7 @@ def stage_local_transformer_layer_fp8_mapped(
     lora_norm_epsilon: float = 1e-5,
     rope_theta: float = 8_000_000.0,
     main_rope_table_row: Any | None = None,
+    dsa_rope_table_row: Any | None = None,
     sparse_moe_backend: SparseMoeBackend = "reference",
     pallas_moe_config: Fp8BlockMatmulConfig | None = None,
     pallas_moe_fuse_route_weighting: bool = False,
@@ -328,6 +329,11 @@ def stage_local_transformer_layer_fp8_mapped(
         raise ValueError("layer DSA query backend is unknown")
     if not isinstance(dsa_head_key_exact_association, bool):
         raise ValueError("layer exact DSA head/key flag must be boolean")
+    if dsa_rope_table_row is not None and (
+        dsa_rope_table_row.shape != (dsa_contract.rotary_dim,)
+        or dsa_rope_table_row.dtype != jnp.float32
+    ):
+        raise ValueError("layer DSA host rotary row is invalid")
     if indexer_kind == "full" and (
         dsa_head_key_exact_association
         != (dsa_precomputed_wk_weight is not None)
@@ -407,6 +413,7 @@ def stage_local_transformer_layer_fp8_mapped(
             ),
             dsa_score_precision=dsa_score_precision,
             linear_interpret=linear_interpret,
+            dsa_rope_table_row=dsa_rope_table_row,
         )
         index_cache = dsa_result.index_cache
         selected_positions = dsa_result.selected_positions
@@ -589,6 +596,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
     lora_norm_epsilon: float = 1e-5,
     rope_theta: float = 8_000_000.0,
     main_rope_table_row: Any | None = None,
+    dsa_rope_table_row: Any | None = None,
     sparse_moe_backend: SparseMoeBackend = "reference",
     pallas_moe_config: Fp8BlockMatmulConfig | None = None,
     pallas_moe_fuse_route_weighting: bool = False,
@@ -732,6 +740,11 @@ def stage_local_transformer_layer_fp8_split_mapped(
         raise ValueError("layer DSA query backend is unknown")
     if not isinstance(dsa_head_key_exact_association, bool):
         raise ValueError("layer exact DSA head/key flag must be boolean")
+    if dsa_rope_table_row is not None and (
+        dsa_rope_table_row.shape != (dsa_contract.rotary_dim,)
+        or dsa_rope_table_row.dtype != jnp.float32
+    ):
+        raise ValueError("layer DSA host rotary row is invalid")
     if indexer_kind == "full" and (
         dsa_head_key_exact_association
         != (dsa_precomputed_wk_weight is not None)
@@ -842,6 +855,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
             ),
             dsa_score_precision=dsa_score_precision,
             linear_interpret=linear_interpret,
+            dsa_rope_table_row=dsa_rope_table_row,
         )
         index_cache = dsa_result.index_cache
         selected_positions = dsa_result.selected_positions

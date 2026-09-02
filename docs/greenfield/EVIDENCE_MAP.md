@@ -3459,3 +3459,13 @@ persistence only; review and persistence precede any v2 installation.
   key within 4.99e-7 of F64 reference (rotary 1.25e-7 vs 2.29e-3 in V2), implied cos/sin ≤6.5e-7,
   terminal generation `1788310923525951`. Artifact SHA `c4fca0a667ca5928ec10f04c741e331bae5ce0bf86ff24c4b5a412476ed40461`.
 - Classification: `BOUNDED_TPU_HOST_ROPE_KEY_FAITHFUL_TERMINAL_VERIFIED;ROTARY_ROOT_CAUSE_FIX_BOUNDED_PROOF;DECODER_UNPROVEN;GATE_D_OPEN`.
+
+## 2026-09-02 DSA host rotary rows in the decoder (default off) + selection witness
+
+- Kernel/layer/prefill/decoder/prefill-runtime/compile-script/runner plumbing for
+  `dsa_rope_table_enabled`; HLO contract pins table param + lookup and zero transcendentals with
+  both tables; forced-CPU equivalence and zero-transcendental compile pass; 126/126 regression.
+- Witness artifact `gate-d-dsa-selection-witness-layer1-position8155.json` SHA `514d6e5f6e5ba8f6c7c4382a262bc5cc85547ba0e1217872a5942987ec9fc4b1`: V3 key
+  reproduces the accepted event exactly; V2 key perturbs scores 4.2e-3 without flipping it.
+- Classification: `DSA_HOST_ROPE_DECODER_INTEGRATED_DEFAULT_OFF;SELECTION_WITNESS_V3_EXACT;
+  MERGE_TO_REWRITE_PENDING;PROTECTED_8K_UNAUTHORIZED;GATE_D_OPEN`.

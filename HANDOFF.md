@@ -10147,3 +10147,57 @@ does not close Gate D and proves nothing about the decoder, DSA selection, 8K or
 next: carry host FP32 DSA rotary rows into the decoder DSA key/query paths (stage_local key and
 query sites, prefill_index, decoder plumbing mirroring `main_rope_table`), prove DSA selection
 exactness on a bounded captured witness, then seek separate authority before any 8K run.
+
+## 2026-09-02 host FP32 DSA rotary rows integrated into the decoder (default off); bounded selection witness
+
+Batch 2 carries the V3-proven fix into the decoder without touching any historical byte pin:
+`stage_local_dsa_fp8_mapped` and its query helpers accept `dsa_rope_table_row` (FP32 `[64]`),
+rotating the indexer query and current key from the host row (`dsa_host_rope.py`) and otherwise
+following the established path; both layer functions validate and forward the row;
+`prefill_index.py` gathers rows by position for prompt keys and the prompt-cache repair.
+`build_decoder_step_program(..., dsa_rope_table_enabled=False)` builds the host FP32 table
+(`rotary_table.py`, SHA-256 recorded per program), adds one replicated `(context_capacity, 64)`
+input after the main-RoPE table, gathers the row per step under `greenfield_dsa_rope_table_lookup`,
+threads it through both stage executors and the prefill repair program, and records
+`dsa_rope_table_host/sha256/bytes_per_device`; layer-0 discriminators refuse the flag. The HLO
+contract `_validate_dsa_rope_table_hlo` pins exactly one FP32 table parameter and its lookup and,
+with both host tables enabled, zero `cosine/sine/power` instructions in the whole step.
+`compile_short_decoder.py --dsa-rope-table`, `run_short_decoder_compile_pp8.sh`
+(`GLM_GREENFIELD_DSA_ROPE_TABLE`, requires the 8K token/DSA profile and the proven main-RoPE table,
+tag suffix `_dsarope`) and the pinned `run_short_decoder_gate_d_pp8_8k.sh` (passthrough, default 0)
+are plumbed. Forced-CPU evidence: the tiny 32-device decoder with the table reproduces the default
+step's metadata/tokens exactly, index keys within BF16 rounding, and the both-tables step compiles
+with zero transcendentals (`test_decoder_dsa_rope_table.py`); stage-local query/key paths are
+bit-identical when rows come from the same formula (`test_stage_local_dsa_host_rope.py`).
+Regression: 126/126 across decoder, compile-script, prefill and stage-local suites; every touched
+file keeps its HEAD formatting (only semantic hunks).
+
+Bounded DSA selection witness (`scripts/greenfield/adjudicate_gate_d_dsa_selection_witness.py`,
+SHA-256 `cf43c322128c25961f26013334465d45152206826b6f89840e4a0670eb89609f`; artifact
+`docs/artifacts/gate-d-dsa-selection-witness-layer1-position8155.json`, SHA-256 `514d6e5f6e5ba8f6c7c4382a262bc5cc85547ba0e1217872a5942987ec9fc4b1`): the
+accepted capsule replayed on two forced CPU devices through the real stage-local DSA reproduces the
+recorded layer-1/position-8155 event exactly; injecting the archived V3 TPU key (host row) also
+reproduces positions and scores bit-for-bit; injecting the archived V2 TPU key (on-device rotary)
+keeps this event's positions but perturbs scores by up to 4.2e-3. The 2026-08-26 protected exact-DSA
+8K run failed exactly at this event with seven swapped positions while tokens were exact 20/20 and
+p50 127.36 ms/token; there every cached prompt key and the query carried position-dependent rotary
+error, which the single-key witness cannot reproduce. The decisive test is the full decoder with
+host rows for keys, queries and prefill.
+
+Operational path: `run_short_decoder_compile_pp8.sh` is bound to worktree
+`/home/gianl/glm-tpu-topology-rewrite` on `rewrite/topology-first-decode` and workers fetch the pin
+from origin on that branch. `tooling/gate-d-compensated-pp16-numerical` is 60 commits ahead of it;
+a merge dry-run conflicts only in `goal.md`; resolve it by keeping the tooling checkpoint together
+with the owner's Compass recovery instruction (retained by rewrite commit `59fc3e4`), under 4,000
+bytes. Exact next after the batched review: commit/push this batch; merge the tooling branch into
+`rewrite/topology-first-decode` with that goal.md resolution, push, mirror; then one serialized protected launch
+`GLM_GREENFIELD_DSA_ROPE_TABLE=1 bash scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from
+the rewrite worktree under the global locks, accepted only with exact tokens, all DSA contracts,
+HLO/HBM/state/cache protections, trace, archive and 8/8 cleanup. Gate D remains open; no performance
+claim.
+
+Sol's first review of this batch blocked on two points, both corrected: the goal checkpoint and the
+merge plan now retain the owner's Compass recovery instruction (goal.md reinstates the "if stuck,
+reread the Compass artifact in full and adjudicate it against local evidence" rule; the goal.md merge
+resolution keeps it), and the forced-CPU decoder test now asserts token equality for the table-on
+and both-tables steps instead of only recording it (1/1 rerun passed).
