@@ -45,11 +45,11 @@ set)** — decode-side norm hypothesis exhausted. CPU capsule
 byte-identical; legacy layer-1 query/head-weights/current-key over the greenfield DB518 layer-1 prompt
 cache reproduces the device selection exactly (0/0) and the oracle's 7/7 swaps → the **layer-1 prompt
 index cache built by the teacher-forced prefill is a sufficient cause of the event-1 mismatch** (decode-side
-exactness not proven). Do NOT launch the 8K decoder. Next: Sol re-review of the four round-24 fixes, then
-one legacy oracle capture `GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID=1 bash
+exactness not proven). Do NOT launch the 8K decoder. Next: Sol re-review of the round-24 fixes, then one
+legacy oracle capture `GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID=1 bash
 scripts/greenfield/run_capture_legacy_prompt_index_cache.sh` (legacy slot 2 = 2·layer; sealing fails
 closed on any other geometry), then `compare_layer1_prompt_index_cache_offline.py` against DB518
-`result.npz` `534bacc5…` → row-level mismatch map → decide the prefill plan. Sealed layer-0 DSA input restored (HANDOFF).
+`result.npz` `534bacc5…` → row mismatch map → prefill plan. Sealed layer-0 DSA input restored (HANDOFF).
 
 ## Finish (after Gate D)
 
