@@ -10031,3 +10031,10 @@ bound to source, artifact/schema pinned, single-occurrence derivation attacks, v
 reproduction, publisher bridge schema attacks; focused suite 79/79; Ruff and `bash -n` clean.
 Per the owner's batching instruction, one Sol review covers this source batch, the failure and
 bridge artifacts, the V2 install commands and the fresh V2 tag. No run has occurred.
+
+## 2026-09-02 V2 numerical orchestration persisted at 79dd3e38de4e90288700f27a37052484871a0d79; certificate v2
+
+Sol batched review approved persistence (`618d1222…0e5f`), the two V2 install-only commands and one
+execute-once tag. Commit `79dd3e38de4e90288700f27a37052484871a0d79` carries the bridge fix. The reviewed analyzer regenerated the V2
+certificate `docs/artifacts/gate-d-projection-contraction-pp16-numerical-orchestration-install-source-v2.json`
+(SHA-256 `47326e292e67a1968886bba9cf35cf1fb1d969afccd3673f1243a14e881a3171`, code hash `79dd3e38de4e90288700f27a37052484871a0d79`); persistence only. Next: mirror replay, V2 install, one run.
