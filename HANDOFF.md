@@ -10722,3 +10722,18 @@ Static + binding suites: 64 passed.
 
 Next: push; redo the merge (byte-identical rewrite goal.md); preflight; compose a fresh tag; one Sol
 review of this fix + pin + tag; one launch.
+
+## 2026-09-02 Sol BLOCK on 2e6cf1f0 (the `--help` probe never reached the binding) — fixed
+
+Sol refused the prologue test because `--help` exits in argparse before `main()` reaches
+`_worktree_binding`, so the fix was unexercised. Replaced by `env -i` subprocesses that load the
+**detached commit's own** `compile_short_decoder.py` from `$src`, assert its resolved `REPO` is the
+detached path, and call `_worktree_binding(REPO, tag, ...)` expecting `detached_pin_worktree`, in
+both fleet layouts: worker 0, where the canonical tree is a linked worktree of
+`/home/gianl/glm-tpu/.git`, and workers 1–7, where it is a main clone. That test exposed a second
+production fault: the binding compared the detached tree's `--git-common-dir` with
+`<canonical>/.git`, which on worker 0 is a gitdir *file*, so the approved launch would have failed
+closed again on worker 0. The binding now compares the two trees' `--git-common-dir`. Wrong tag and
+a foreign canonical are refused inside the same `env -i` path; a static test binds that `main()`
+calls the binding right after the exact HEAD check and that the constants are the production paths.
+Suites: 66 passed. The fresh tag `..._ras_..._trace2_20260902T094725673772375Z` remains unstarted.
