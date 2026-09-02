@@ -3558,3 +3558,9 @@ persistence only; review and persistence precede any v2 installation.
   TPU_HLO_ARCHIVED;QA_NORM_UNSCHEDULED;CARRIES_REFUSED_AS_DEAD_ROWS;TAG_BURNED;NO_CLAIM;GATE_D_OPEN`.
   Fixes: fused q-a norm on the accepted schedule; lineage-bound carry allowances in the live-tensor
   and fused qkv-a contracts, proven on the archived bytes (1,570 → 0).
+- Protected 8K tag `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T113001516858996Z` (pin 978dc3a9, `_ras`): decoder compiled on TPU; RMS contract 313/313
+  conforming with 313 barriers (first full-decoder proof that every norm carries the accepted
+  schedule); fused qkv-a passed; live-tensor classifier refused 156 `bf16[32,2048]` pad/convert
+  records inside the q-a carry producers; censuses 8/8; archived under the tag. Classification:
+  `FAILED_CLOSED_AT_HLO_CONTRACT_BEFORE_EXECUTION;ALL_313_RMS_SCHEDULED_ON_TPU;QA_CARRY_BF16_PAD_REFUSED;
+  TAG_BURNED;NO_CLAIM;GATE_D_OPEN`. Fix: BF16 admission inside the producer slice only.
