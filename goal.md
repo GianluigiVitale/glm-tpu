@@ -38,9 +38,9 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
 
 ## Resume checkpoint — 2026-09-03 01:10Z
 
-Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical`; run pin = rewrite merge (see HANDOFF tail). Three
-executed 8K runs with `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1`: token exact, event 0 exact, **event 1 = 7
-mismatches (same set)** — decode-side norm hypothesis exhausted. Offline CPU capsule
+Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical`; run pin = rewrite merge (HANDOFF tail). Three 8K runs
+with `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1`: token exact, event 0 exact, **event 1 = 7 mismatches (same
+set)** — decode-side norm hypothesis exhausted. CPU capsule
 `docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-diagnosis.json`: live/bounded reduce fusions
 byte-identical; legacy layer-1 query/head-weights/current-key over the greenfield DB518 layer-1 prompt
 cache reproduces the device selection exactly (0/0) and the oracle's 7/7 swaps → the **layer-1 prompt
@@ -49,8 +49,7 @@ exactness not proven). Do NOT launch the 8K decoder. Next: Sol re-review of the 
 one legacy oracle capture `GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID=1 bash
 scripts/greenfield/run_capture_legacy_prompt_index_cache.sh` (legacy slot 2 = 2·layer; sealing fails
 closed on any other geometry), then `compare_layer1_prompt_index_cache_offline.py` against DB518
-`result.npz` `534bacc5…` → row-level mismatch map → decide the prefill plan. Sealed layer-0 DSA input
-restored to `/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z`.
+`result.npz` `534bacc5…` → row-level mismatch map → decide the prefill plan. Sealed layer-0 DSA input restored (HANDOFF).
 
 ## Finish (after Gate D)
 
