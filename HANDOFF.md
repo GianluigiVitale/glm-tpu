@@ -10117,3 +10117,10 @@ proving DSA selection exactness on a bounded captured witness, with separate aut
 run. Repinned chain: driver `f519ce40…05be`, publisher `5a8d30cf…0c83`, wrapper `92bcb109…23b3`,
 launcher `61a45b6d…7514`, installer `22dc77e7…5939`, analyzer `f1010452…6b58`. Focused suite
 131/131 including metric/identity attack tests.
+
+## 2026-09-02 V3 host-rope sources persisted at b3d6a175685bc45096c50266c1da802d5e4b39f0; certificate v3
+
+Sol approved persistence (`4cfd1d66…19f4`), the V3 install-only commands and one execute-once
+tag. Commit `b3d6a175685bc45096c50266c1da802d5e4b39f0` carries the host-rope fix. The analyzer regenerated
+`docs/artifacts/gate-d-projection-contraction-pp16-numerical-orchestration-install-source-v3.json`
+(SHA-256 `b8dfebf8d2a232b5079fefb323bc1345840410f95ba094fd670cc8886feac622`, code hash `b3d6a175685bc45096c50266c1da802d5e4b39f0`); persistence only. Next: mirror replay, V3 install, one run.
