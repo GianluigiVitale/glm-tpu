@@ -222,6 +222,7 @@ def test_lineage_census_is_bound_exactly_in_both_representations() -> None:
     assert source.count("expected_sharded_qa_count=expected_sharded_qa_count") == 2
     assert source.count("expected_kv_a_count=expected_kv_a_count") == 2
     assert source.count("kv_a_width=kv_lora_rank") == 2
+    assert source.count("kv_a_projection_width=kv_lora_rank + qk_rope_head_dim") == 2
 
 
 @pytest.mark.parametrize(
@@ -260,5 +261,80 @@ def test_hlo_kv_a_row_norm_mutations_are_refused(label: str, old: str, new: str)
 def test_stablehlo_kv_a_row_norm_mutations_are_refused(label: str, old: str, new: str) -> None:
     assert old in STABLEHLO, label
     result = _stable(STABLEHLO.replace(old, new, 1))
+    assert not result["passed"], (label, result)
+    assert result["kv_a_rsqrt_count"] == 0, (label, result)
+
+
+# --- kv-a provenance: the latent must be the [0:1, 0:512] slice of the 576-wide projection ---
+HLO_KV_SLICE_AFTER_CONVERT = HLO.replace(
+    """  %ks = bf16[1,512]{1,0:T(2,128)(2,1)} slice(%kp), slice={[0:1], [0:512]}
+  %kc = f32[1,512]{1,0:T(1,128)} convert(%ks)
+""",
+    """  %kcf = f32[1,576]{1,0:T(1,128)} convert(%kp)
+  %kc = f32[1,512]{1,0:T(1,128)} slice(%kcf), slice={[0:1], [0:512]}
+""",
+)
+STABLE_KV_SLICE_AFTER_CONVERT = STABLEHLO.replace(
+    """    %604 = stablehlo.slice %arg3 [0:1, 0:512] : (tensor<1x576xbf16>) -> tensor<1x512xbf16>
+    %605 = stablehlo.convert %604 : (tensor<1x512xbf16>) -> tensor<1x512xf32>
+""",
+    """    %604 = stablehlo.convert %arg3 : (tensor<1x576xbf16>) -> tensor<1x576xf32>
+    %605 = stablehlo.slice %604 [0:1, 0:512] : (tensor<1x576xf32>) -> tensor<1x512xf32>
+""",
+)
+
+
+def test_kv_a_provenance_accepts_both_emitted_orders() -> None:
+    assert HLO_KV_SLICE_AFTER_CONVERT != HLO and STABLE_KV_SLICE_AFTER_CONVERT != STABLEHLO
+    for text in (HLO, HLO_KV_SLICE_AFTER_CONVERT):
+        result = _hlo(text)
+        assert result["passed"], result["violations"]
+        assert result["kv_a_rsqrt_count"] == 1
+    for text in (STABLEHLO, STABLE_KV_SLICE_AFTER_CONVERT):
+        result = _stable(text)
+        assert result["passed"], result["violations"]
+        assert result["kv_a_rsqrt_count"] == 1
+
+
+@pytest.mark.parametrize(
+    ("label", "old", "new"),
+    (
+        ("direct_parameter_no_slice", "  %ks = bf16[1,512]{1,0:T(2,128)(2,1)} slice(%kp), slice={[0:1], [0:512]}\n  %kc = f32[1,512]{1,0:T(1,128)} convert(%ks)\n",
+         "  %kc = f32[1,512]{1,0:T(1,128)} convert(%kdirect)\n"),
+        ("wrong_parent_width", "%kp = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(0)", "%kp = bf16[1,640]{1,0:T(2,128)(2,1)} parameter(0)"),
+        ("wrong_slice_bounds", "slice(%kp), slice={[0:1], [0:512]}", "slice(%kp), slice={[0:1], [64:576]}"),
+        ("unrelated_512_lineage", "  %kc = f32[1,512]{1,0:T(1,128)} convert(%ks)\n", "  %kc0 = f32[1,512]{1,0:T(1,128)} convert(%ks)\n  %kc = f32[1,512]{1,0:T(1,128)} add(%kc0, %kc0)\n"),
+        ("second_slice", "  %kc = f32[1,512]{1,0:T(1,128)} convert(%ks)\n", "  %ks2 = bf16[1,512]{1,0:T(2,128)(2,1)} slice(%ks), slice={[0:1], [0:512]}\n  %kc = f32[1,512]{1,0:T(1,128)} convert(%ks2)\n"),
+    ),
+)
+def test_hlo_kv_a_provenance_substitutions_are_refused(label: str, old: str, new: str) -> None:
+    text = HLO
+    if label == "direct_parameter_no_slice":
+        text = text.replace("%kv_reduce (kp: bf16[1,576]) -> f32[] {\n  %kp = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(0)\n",
+                            "%kv_reduce (kp: bf16[1,576], kdirect: bf16[1,512]) -> f32[] {\n  %kp = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(0)\n  %kdirect = bf16[1,512]{1,0:T(2,128)(2,1)} parameter(1)\n")
+        text = text.replace("%kv_sum = f32[] fusion(%kvproj), kind=kLoop, calls=%kv_reduce", "%kdirect_in = bf16[1,512]{1,0:T(2,128)(2,1)} parameter(4)\n  %kv_sum = f32[] fusion(%kvproj, %kdirect_in), kind=kLoop, calls=%kv_reduce")
+        text = text.replace("kvproj: bf16[1,576]) -> (f32[32], f32[1]) {", "kvproj: bf16[1,576], kdirect_in: bf16[1,512]) -> (f32[32], f32[1]) {")
+    assert old in text, label
+    result = _hlo(text.replace(old, new, 1))
+    assert not result["passed"], (label, result)
+    assert result["kv_a_rsqrt_count"] == 0, (label, result)
+
+
+@pytest.mark.parametrize(
+    ("label", "old", "new"),
+    (
+        ("direct_parameter_no_slice", "    %604 = stablehlo.slice %arg3 [0:1, 0:512] : (tensor<1x576xbf16>) -> tensor<1x512xbf16>\n    %605 = stablehlo.convert %604 : (tensor<1x512xbf16>) -> tensor<1x512xf32>\n",
+         "    %605 = stablehlo.convert %arg4 : (tensor<1x512xbf16>) -> tensor<1x512xf32>\n"),
+        ("wrong_parent_width", "(tensor<1x576xbf16>) -> tensor<1x512xbf16>", "(tensor<1x640xbf16>) -> tensor<1x512xbf16>"),
+        ("wrong_slice_bounds", "%arg3 [0:1, 0:512] : (tensor<1x576xbf16>)", "%arg3 [0:1, 64:576] : (tensor<1x576xbf16>)"),
+        ("unrelated_512_lineage", "    %606 = chlo.square %605 : tensor<1x512xf32> -> tensor<1x512xf32>\n", "    %605b = stablehlo.add %605, %605 : tensor<1x512xf32>\n    %606 = chlo.square %605b : tensor<1x512xf32> -> tensor<1x512xf32>\n"),
+    ),
+)
+def test_stablehlo_kv_a_provenance_substitutions_are_refused(label: str, old: str, new: str) -> None:
+    text = STABLEHLO
+    if label == "direct_parameter_no_slice":
+        text = text.replace("%arg3: tensor<1x576xbf16>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {", "%arg3: tensor<1x576xbf16>, %arg4: tensor<1x512xbf16>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {")
+    assert old in text, label
+    result = _stable(text.replace(old, new, 1))
     assert not result["passed"], (label, result)
     assert result["kv_a_rsqrt_count"] == 0, (label, result)

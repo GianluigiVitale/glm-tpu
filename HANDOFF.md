@@ -10994,3 +10994,18 @@ refused. Synthetic module carries all four kinds (4 rsqrt: 1/1/1/1) and passes i
 latent, row-shaped scale) and the missing/extra/substituted census attacks are refused. The
 arithmetic-terminal walk now crosses `slice`/`dynamic-slice` (structural) so the CPU decoder's
 `convert(slice(...))` order binds the same kind as TPU's `slice(convert(...))`.
+
+## 2026-09-02 Sol BLOCK on 446bff46 (kv-a provenance unbound) — slice-of-projection binding
+
+Sol refused the kv-a kind because any converted `bf16[1,512]` value satisfied it. Both binders now bind
+the latent's provenance: exactly one `convert` (bf16 → f32) and exactly one `slice` with bounds
+`[0:1], [0:kv_lora_rank]` whose operand is the `[1, kv_lora_rank + qk_rope_head_dim]` (576-wide)
+kv-a projection, reached through structural ops and fusion parameters only, in either emitted order —
+TPU's `convert(slice(projection))` and CPU's `slice(convert(projection))`.
+`validate_decoder_step_hlo(kv_lora_rank=512, qk_rope_head_dim=64)` forwards the projection width to
+both binders. Tests: both orders accepted (HLO and StableHLO synthetic modules); refused in both
+representations — a direct 512-wide parameter without the slice, a 640-wide parent, `[64:576]` slice
+bounds, an unrelated 512-wide lineage (`add` between convert and square), a second slice. The baseline
+archive still binds all 78 kv-a row norms (its emitted `slice.92468 = bf16[1,512] slice(param
+bf16[1,576]), slice={[0:1], [0:512]}` → convert); the two `_ras` archives are refused as before; the
+forced-CPU decoder binds its plan's 4 + 2 = 6-wide projection.
