@@ -36,21 +36,23 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-02 07:10Z
+## Resume checkpoint — 2026-09-02 08:40Z
 
 Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. DSA host-rotary table refuted and
 tombstoned (`…8k-refusal-adjudication.json` `2a7c8fb5…`). **Layer-1 frontier certified on CPU**
 (`gate-d-layer1-scale-frontier-certificate.json` `e8abfb9b…`): DB548 row `9b52a04e…` and accepted
 row `9936ee1e…` are exact functions of the SAME FP32 RMS input (`dense + attention_update +
-combined_residual`, unrounded FP32 residual carry), weight `10e34f4f…`, eps 1e-5, single output
-rounding; they differ only in the FP32 scale `s=rsqrt(mean+eps)`: greenfield s0−4…s0−1 ulps,
-legacy admits s0…s0+14 (s0=0x433295db). Dense update 47808 is right.
+combined_residual`, unrounded), weight `10e34f4f…`, eps 1e-5, single output rounding; they differ
+only in `s=rsqrt(mean+eps)`: greenfield s0−4…s0−1 ulps, legacy s0…s0+14 (s0=0x433295db). Legacy
+m32 HLO reduces all 313 RMS variances over `f32[32,6144]{T(8,128)}` dims={1}; greenfield reduces
+`f32[1,1,6144]{T(1,128)}`. Dense update 47808 is right.
 
-Exact next (no TPU launch): compare the layer-1 variance reduce in the sealed accepted HLO
-(`accepted_db485_compile_only_hlo_20260830T025924791267740Z/hlo`, m32 module) with the
-greenfield's (fused reduce over `f32[1,1,6144]{T(1,128)}`, `multiply 1/6144`, `add eps`, `rsqrt`);
-make the greenfield reduce structurally identical (shape, layout, fusion) so the emitter order
-matches for every row/layer; CPU checks, one bounded TPU probe, one 8K run. Sol review first.
+Batch committed: captured-RMS probe `accepted_split` arm = FP32-carry accepted-schedule arm (FP32
+three-term sum, one FP32 barrier on `[32,6144]`, reduce dims={1}); matcher `fp32_carry_schedule`;
+tests pass; 08-13 wrapper sources restored. Exact next: batched Sol review; then merge → rewrite,
+push, mirror, and one sub-minute protected probe `GLM_GREENFIELD_CAPTURED_RMS_REPLAY=1 bash
+scripts/greenfield/run_layer0_projection_reduction_probe.sh` from `/home/gianl/glm-tpu-topology-rewrite`.
+Control must equal DB548; arm exact ⇔ accepted row. Only then the decoder change and one 8K run.
 
 ## Finish (after Gate D)
 

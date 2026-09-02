@@ -806,13 +806,23 @@ def _build_arm(mesh: Any, *, split_layer1_rms: bool) -> Any:
             ).astype(jnp.bfloat16)
         with jax.named_scope("greenfield_captured_rms_layer1"):
             if split_layer1_rms:
+                # Accepted-schedule arm with an FP32 carry.  The certificate
+                # `gate-d-layer1-scale-frontier-certificate.json` proved that
+                # the DB548 and accepted rows are exact functions of the same
+                # FP32 sum dense + attention + combined_residual (no BF16
+                # rounding of the post-attention residual, which XLA elides in
+                # the compiled decoder and in the legacy) and differ only in
+                # the FP32 rsqrt(mean+eps) scale.  The FP32 barrier keeps the
+                # [32,6144] operand alive so the variance reduce takes the
+                # accepted f32[32,6144] -> f32[32] schedule instead of the
+                # folded single-row reduce; it introduces no rounding.
                 with jax.named_scope("split_reduction"):
-                    reduction_dense = lax.optimization_barrier(dense_m32)
-                    reduction_residual = lax.optimization_barrier(residual_m32)
-                    reduction_sum = (
-                        reduction_dense.astype(jnp.float32)
-                        + reduction_residual.astype(jnp.float32)
+                    summed = (
+                        dense_m32.astype(jnp.float32)
+                        + attention_m32.astype(jnp.float32)
+                        + residual_source_m32.astype(jnp.float32)
                     )
+                    reduction_sum = lax.optimization_barrier(summed)
                     inverse = lax.rsqrt(
                         jnp.mean(
                             lax.square(reduction_sum), axis=-1, keepdims=True
@@ -820,12 +830,8 @@ def _build_arm(mesh: Any, *, split_layer1_rms: bool) -> Any:
                         + jnp.float32(1e-5)
                     )
                 with jax.named_scope("split_recompute"):
-                    output_sum = (
-                        dense_m32.astype(jnp.float32)
-                        + residual_m32.astype(jnp.float32)
-                    )
                     layer1 = (
-                        (output_sum * inverse).astype(layer1_norm.dtype)
+                        (reduction_sum * inverse).astype(layer1_norm.dtype)
                         * layer1_norm
                     ).astype(dense_m32.dtype)
             else:

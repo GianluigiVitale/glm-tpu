@@ -142,6 +142,13 @@ for name, split in (('control', False), ('accepted_split', True)):
         )
         residual_operands = re.findall(r"%[0-9]+", residual_add_line)[:3]
         assert len(residual_operands) == 3
+        barrier_line = next(
+            line
+            for line in text.splitlines()
+            if "stablehlo.optimization_barrier" in line
+            and "tensor<32x6144xf32>" in line
+        )
+        barrier_operand = re.findall(r"%[0-9]+", barrier_line)[1]
         mutations = {{
             'wrong_reducer': text.replace('applies stablehlo.add', 'applies stablehlo.maximum', 1),
             'wrong_group': text.replace(
@@ -157,6 +164,13 @@ for name, split in (('control', False), ('accepted_split', True)):
             'wrong_outer_return': text.replace(
                 '    return %0 : tensor<1x6144xbf16>',
                 '    return %arg0 : tensor<1x6144xbf16>',
+                1,
+            ),
+            'rounded_carry': text.replace(
+                barrier_line,
+                f'      %rc_b = stablehlo.convert {{barrier_operand}} : (tensor<32x6144xf32>) -> tensor<32x6144xbf16>\\n'
+                f'      %rc_r = stablehlo.convert %rc_b : (tensor<32x6144xbf16>) -> tensor<32x6144xf32>\\n'
+                + barrier_line.replace(f'{{barrier_operand}} :', '%rc_r :', 1),
                 1,
             ),
             'duplicate_residual_source': text.replace(

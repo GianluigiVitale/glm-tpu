@@ -3494,3 +3494,7 @@ persistence only; review and persistence precede any v2 installation.
   single output rounding; scale windows s0−4…s0−1 (DB548) vs s0…s0+14 (accepted), s0=`0x433295db`.
 - Classification: `LAYER1_SCALE_FRONTIER_CERTIFIED;SAME_FP32_RMS_INPUT;FRONTIER_IS_ONE_FP32_SCALAR;
   REDUCTION_STRUCTURE_NOT_IDENTIFIED;GATE_D_OPEN`.
+- Legacy m32 module: 313 RMS reduces over `f32[32,6144]{T(8,128)}` dims={1} → `f32[32]`; greenfield:
+  `f32[1,1,6144]{T(1,128)}` → scalar. Captured-RMS probe `accepted_split` arm redesigned as FP32-carry
+  accepted-schedule arm (default-off, unexecuted); matcher `fp32_carry_schedule`; tests 5/5 (+2 skips),
+  16/16 adjacent. Classification: `RMS_SCHEDULE_ARM_READY;REVIEW_PENDING;TPU_UNAUTHORIZED;GATE_D_OPEN`.

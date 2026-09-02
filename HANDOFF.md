@@ -10319,3 +10319,40 @@ shape/layout/fusion, compare with the greenfield's, and design the smallest chan
 greenfield variance reduce structurally identical (same operand shape, layout and fusion) so the
 emitter's order matches for every row and layer; validate on CPU where possible, then one bounded
 single-row TPU probe (seconds), then the 8K run. Batched Sol review first. Gate D open.
+
+## 2026-09-02 accepted-schedule FP32-carry arm for the bounded layer-1 RMS probe (default-off, unexecuted)
+
+The sealed accepted compile-only HLO (m32 module) computes every one of its 313 RMS variances as a
+fused `convert→square→reduce(dimensions={1})` over `f32[32,6144]{1,0:T(8,128)}` producing `f32[32]`,
+then `multiply(sum, 1/6144)`, `add(1e-5)`, `rsqrt` on `f32[32]` (fusions `fused_computation.11824`/
+`.18521`). The greenfield decoder reduces `f32[1,1,6144]{T(1,128)}` to a scalar (`multiply_reduce_fusion`)
+with the same scalar arithmetic. The frontier certificate localizes the layer-1 divergence to that
+reduce's FP32 result (1–4 ulps of `s`), so the smallest decisive test is the existing bounded
+captured-RMS probe with its challenger arm replaced:
+
+- `scripts/greenfield/probe_layer0_captured_rms.py` `accepted_split` arm now sums the three sealed
+  BF16 rows in FP32 (`dense + attention_update + combined_residual`, no BF16 rounding of the
+  post-attention residual), places one FP32 `optimization_barrier` on the `[32,6144]` sum so XLA
+  cannot fold the padded rows into a single-row reduce, and computes `rsqrt(mean(x²)+1e-5)` and the
+  weighted output from that barrier value. The 2026-08-13 split arm had barriers on the BF16 dense
+  and residual, which forced the residual rounding the compiler otherwise elides; the certificate
+  shows that rounding alone costs ≥1,050 mismatches, so DB549's 1,073 never tested the schedule.
+- `validate_captured_dense_rms_stablehlo(split_layer1_rms=True)` now matches this FP32-carry
+  structure (`_match_rmsnorm(fp32_carry_schedule=True)`: two FP32 adds from converts of the three
+  M32 pads, one FP32 barrier consumed by both the reduce and the output, no BF16 round on the carry,
+  residual sources bound to `%arg5`/`%arg6`); the BF16 split matcher used by the dense-convolution
+  probes is untouched. The optimized-HLO contract (one `f32[32]` scheduled reduction with the
+  accepted backend window `["2","48"]`, bound to the output edge) is unchanged and must be met by
+  the new arm at run time. Live-arm test adds a `rounded_carry` refusal (a BF16 round-trip before
+  the barrier) and keeps the source/gather/return refusals; 5 passed, 2 skipped (archived failed-run
+  HLO fixtures not local); dense replay/isolated probe validator tests 16/16.
+- The wrapper's sealed 2026-08-13 sources (`greenfield_layer0_dense_partial_capture_…200736…` and
+  `greenfield_layer0_dense_envelope_cross_layer_…120703…`) were restored under `/home/gianl/glm-run`
+  from the byte-identical archived copies; all nine pinned SHAs verify.
+
+Expected outcomes on TPU (seconds, under the global lock, 8/8 census, SUCCESS-last): control must
+reproduce DB548 `9b52a04e…` (harness); the new arm reproduces the accepted row `9936ee1e…` if and
+only if the `f32[32,6144]` reduce lands `s` in `0x433295db…0x433295e9`. A nonexact result with an
+exact control is still decisive: it rejects "same shape/layout ⇒ same emitter order" and the
+remaining candidates are the 32-row emitter schedule on the real decode batch or the reduce's
+fusion context. No TPU work is authorized before the batched Sol review.
