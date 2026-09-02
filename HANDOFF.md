@@ -10405,3 +10405,14 @@ soft-deleted listings are vacant. Launch command (after Sol's EXECUTE approval, 
 worktree at the reviewed pin):
 `GLM_GREENFIELD_CAPTURED_RMS_REPLAY=1 GLM_GREENFIELD_CAPTURED_RMS_TAG=greenfield_layer0_captured_rms_replay_20260902T045006596197989Z bash scripts/greenfield/run_layer0_projection_reduction_probe.sh`.
 No TPU work has occurred.
+
+Sol re-review: `APPROVE PERSISTENCE b43d9c138ca31eaa2db5bdc8d440f0002eac9d32`; `BLOCK EXECUTE — P1`:
+the literal command inherits the ambient environment and PATH, resolves `bash` relatively, and
+executes mutable worktree shell/Python sources after only point-in-time Git checks, so a same-UID
+modification after verification could change the incrementally read shell, the probe source or the
+`PYTHONPATH` imports without changing the verified HEAD. Required for execution: snapshot the exact
+committed wrapper into a sealed memfd through a root-owned immutable launcher, authenticate/install
+immutable Python children and dependencies, and invoke through an exact
+`/usr/bin/env -i … /usr/bin/bash --noprofile --norc /proc/self/fd/<fd>` boundary — the chain the
+PP16 numerical capsules (V1–V3) already use. The reserved tag `greenfield_layer0_captured_rms_replay_20260902T045006596197989Z` had no start and stays
+reserved for the re-review of that invocation. No TPU work has occurred.
