@@ -1137,3 +1137,12 @@ normalized-state cause.
 - Compare the two protected runs (with and without a change) event by event before believing a
   bounded discriminator: a change that leaves the first failing event's error statistics unchanged
   (six swaps, mean |Δscore| 0.0148 in both) did not touch the cause, whatever it did elsewhere.
+- Before hunting a row cause, invert the accepted row for its admissible scalar window (Compass v2
+  T2). At layer 1/position 8155 the accepted and greenfield normalized rows are exact functions of
+  the *same* FP32 input and differ only in the FP32 `rsqrt(mean+eps)` scale by 1–4 ulps; a
+  one-element BF16 flip is the expected signature of that, and weeks of partial/contraction/tree
+  challengers were chasing a value that was already right.
+- Replay the carry exactly as the compiled program does, not as the source reads: on TPU the
+  residual stream is carried in FP32 (no BF16 rounding between attention and MLP) and
+  `normalized.astype(bf16) * weight` is emitted with a single rounding. A CPU replay that rounds
+  where the source says to round is 1,000–2,000 elements off and proves nothing.

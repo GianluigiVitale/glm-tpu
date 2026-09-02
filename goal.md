@@ -36,22 +36,21 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-02 05:30Z
+## Resume checkpoint — 2026-09-02 07:10Z
 
-Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. **Host-rotary-table refuted as a
-legacy-faithfulness fix** (Sol-confirmed): 8K run `…mainrope_dr_…_20260902T021346091708582Z` (pin
-`ba7d1e72`, table on) failed closed at exact DSA; the 2026-08-28 run (pin `570cc453`, table off)
-had event 0 bit-exact vs the legacy oracle; event 1 fails identically in both (6 swaps). Legacy
-indexer computes `jnp.cos/sin` on device (`glm_dsa_indexer.py:1078`). Artifact
-`gate-d-dsa-rope-table-8k-refusal-adjudication.json` `2a7c8fb5…`. `dsa_rope_table` tombstoned.
-Event-1 mechanism undetermined.
+Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. DSA host-rotary table refuted and
+tombstoned (`…8k-refusal-adjudication.json` `2a7c8fb5…`). **Layer-1 frontier certified on CPU**
+(`gate-d-layer1-scale-frontier-certificate.json` `e8abfb9b…`): DB548 row `9b52a04e…` and accepted
+row `9936ee1e…` are exact functions of the SAME FP32 RMS input (`dense + attention_update +
+combined_residual`, unrounded FP32 residual carry), weight `10e34f4f…`, eps 1e-5, single output
+rounding; they differ only in the FP32 scale `s=rsqrt(mean+eps)`: greenfield s0−4…s0−1 ulps,
+legacy admits s0…s0+14 (s0=0x433295db). Dense update 47808 is right.
 
-Exact next (no TPU): CPU-only hash-bound certificate over the layer-0→1 carry from sealed
-provenance-coherent inputs (accepted 32 BF16 dense partials `9d9f65dd…` == DB548; DB548
-post-attention residual `a105fdbd…` == legacy bytes; accepted normalized row `9936ee1e…`):
-compare exact final-carry variants (f32 partial sum + one BF16 round vs materialized/double-round
-vs per-node-rounded tree) over all 6,144 bits. `INCONCLUSIVE` if lineage cannot be proven; then a
-single-output layer-0 carried-state tap, never a blind 8K run. Batched Sol review before any run.
+Exact next (no TPU launch): compare the layer-1 variance reduce in the sealed accepted HLO
+(`accepted_db485_compile_only_hlo_20260830T025924791267740Z/hlo`, m32 module) with the
+greenfield's (fused reduce over `f32[1,1,6144]{T(1,128)}`, `multiply 1/6144`, `add eps`, `rsqrt`);
+make the greenfield reduce structurally identical (shape, layout, fusion) so the emitter order
+matches for every row/layer; CPU checks, one bounded TPU probe, one 8K run. Sol review first.
 
 ## Finish (after Gate D)
 

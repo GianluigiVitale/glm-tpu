@@ -10276,3 +10276,46 @@ one BF16 round versus materialized/double-round alternatives) over all 6,144 bit
 provenance-coherent layer-0 post-attention residual, layer-0 dense update and the accepted layer-1
 RMS-input reference, returning `INCONCLUSIVE` if lineage cannot be proven, and otherwise a
 single-output layer-0 carried-state tap rather than another 8K run. The table stays tombstoned.
+
+## 2026-09-02 layer-1 scale frontier certified on CPU: same FP32 RMS input, rows differ by one FP32 scalar
+
+Following Sol's recommendation, `scripts/greenfield/adjudicate_gate_d_layer1_scale_frontier.py`
+replays the layer-0→1 carry from sealed bytes only (no JAX, no TPU, no model), bound by SHA to the
+DB548 dense-partial capture (`attention_update` `68afed86…`, `combined_residual` `02d045b9…`,
+`post_attention_residual` `a105fdbd…`, `layer1_input_norm` `10e34f4f…`), the DB533/StrategyND dense
+row `efde8532…`, the accepted legacy partials `9d9f65dd…` (== DB548), the DB548 layer-1 row
+`9b52a04e…` and the accepted legacy layer-1 row `9936ee1e…`. Artifact
+`docs/artifacts/gate-d-layer1-scale-frontier-certificate.json` SHA
+`e8abfb9b55496ba7c2e58c8b8ac1bec2f7dc58c74b5096db101db5961b740982`.
+
+Findings (all exact, all 6,144 bits):
+
+- The layer-1 RMS input that reproduces both rows is the FP32 three-term sum
+  `x = f32(dense) + f32(attention_update) + f32(combined_residual)` with **no** BF16 rounding of the
+  post-attention residual (the split/FP32 residual carry), variance from `x`, epsilon `1e-5`, and a
+  **single** BF16 rounding of `(x * s) * w`. The historically assumed carry (materialized BF16
+  post-attention residual) is at best 1,050 mismatches from either row; a double-rounded output
+  (`bf16(bf16(x*s)*w)`) is at best 1,597. The three FP32 associations of the sum are bit-identical.
+- With that input, the DB548 greenfield row is reproduced exactly for every scale
+  `s ∈ {0x433295d7…0x433295da}` (s0−4…s0−1 ulps) and the accepted legacy row for every
+  `s ∈ {0x433295db…0x433295e9}` (s0…s0+14 ulps), where `s0 = 0x433295db` is the correctly rounded
+  `rsqrt(mean_f64(x²)+eps)`. The windows are disjoint and adjacent (gap 1 ulp). The two rows'
+  only differing element is 2795. The frontier is therefore one FP32 scalar: greenfield's TPU
+  computes the layer-1 variance/rsqrt 1–4 ulps below every value the legacy admits, and the dense
+  update `47808` at 2795 is not wrong.
+- Candidate FP32 reduction structures land on both sides (e.g. 128-lane accumulation followed by a
+  cross-lane tree, or 8/256/512/1024-lane trees, land in the accepted window; a plain pairwise tree,
+  contiguous-block trees, sequential lane finish and the FP32-rounded-variance-then-rsqrt land in
+  the DB548 window). One row cannot identify the structure; this is exactly Compass v2 §4/T4.
+
+Consequences: the DSA-table detour and the dense-partial/contraction/RMS-scheduling challengers
+are all closed; the only open layer-1 quantity is the FP32 scale. The greenfield optimized HLO
+(`decoder_78layer_8k_token`) computes the variance as a fused `multiply_reduce_fusion` over
+`f32[1,1,6144]{T(1,128)}` followed by `multiply(sum, 1/6144)`, `add(eps)`, `rsqrt`, and a fused
+`bitcast_multiply_fusion` producing `bf16[1,6144]` (the single output rounding the certificate
+found). Exact next: read the sealed accepted compile-only HLO
+(`accepted_db485_compile_only_hlo_20260830T025924791267740Z`) for the legacy's variance reduce
+shape/layout/fusion, compare with the greenfield's, and design the smallest change that makes the
+greenfield variance reduce structurally identical (same operand shape, layout and fusion) so the
+emitter's order matches for every row and layer; validate on CPU where possible, then one bounded
+single-row TPU probe (seconds), then the 8K run. Batched Sol review first. Gate D open.

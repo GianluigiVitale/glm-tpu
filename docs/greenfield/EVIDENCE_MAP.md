@@ -3485,3 +3485,12 @@ persistence only; review and persistence precede any v2 installation.
   observer schema; artifact SHA `2a7c8fb5df041cad1dc57bbd312694d932b46f0ad6cb76d99ffd51e0869f5c97`;
   classification `HOST_ROTARY_TABLE_REFUTED_AS_LEGACY_FAITHFULNESS_FIX;EVENT_0_DELTA_ATTRIBUTION_TO_TABLE_ALONE_NOT_PROVEN;
   EVENT_1_MECHANISM_UNDETERMINED;PROTECTED_8K_REFUSED_TWICE_AT_EVENT_1;GATE_D_OPEN`.
+
+## 2026-09-02 layer-1 scale frontier certificate (CPU, sealed bytes)
+
+- `gate-d-layer1-scale-frontier-certificate.json` SHA `e8abfb9b55496ba7c2e58c8b8ac1bec2f7dc58c74b5096db101db5961b740982`:
+  DB548 row `9b52a04e…` and accepted row `9936ee1e…` are both exact functions of the same FP32 RMS
+  input (`dense + attention_update + combined_residual`, unrounded), weight `10e34f4f…`, eps 1e-5 and a
+  single output rounding; scale windows s0−4…s0−1 (DB548) vs s0…s0+14 (accepted), s0=`0x433295db`.
+- Classification: `LAYER1_SCALE_FRONTIER_CERTIFIED;SAME_FP32_RMS_INPUT;FRONTIER_IS_ONE_FP32_SCALAR;
+  REDUCTION_STRUCTURE_NOT_IDENTIFIED;GATE_D_OPEN`.
