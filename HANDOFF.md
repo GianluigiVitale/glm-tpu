@@ -10465,3 +10465,22 @@ children, `env -i bash --noprofile --norc /proc/self/fd/10`); `install_gate_d_la
 committed head `5207c406` is `docs/artifacts/gate-d-layer1-rms-schedule-orchestration-certificate.json`
 (classification `LAYER1_RMS_SCHEDULE_ORCHESTRATION_INSTALL_SOURCE_ACCEPTED;INSTALL_UNAUTHORIZED;
 TPU_NUMERICAL_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`). Nothing is installed; no TPU work.
+
+Sol's batched review of the chain returned `BLOCK — P1` (publisher required stored NPZ members while
+the driver writes the V3 deterministic deflated container, so every successful run would have failed
+publication; the test fixture masked it), `BLOCK INSTALL` and `BLOCK EXECUTE` (and the stated HEAD had
+moved by a goal commit). Fixed in `f9fb434c`: the publisher binds the driver's exact container
+(deflated, unencrypted, 1980 timestamp, mode 0400, bounded, sorted members), the test builds NPZ bytes
+with the production writer and adds a compression-mismatch refusal; publisher→wrapper→launcher→
+installer→analyzer repinned (driver `0c6755f4…`, publisher `b3ec837e…`, wrapper `cdca95b7…`,
+launcher `4bb4b1df…`, installer `39439c7d…`); 70 passed / 2 skipped. Certificate regenerated at
+`f9fb434c` (`61e4c050`, SHA `fc4d1c2290408b5bba5f6b4768edac5bf0f74f524c2331e1ba14bc415f0ac761`).
+Staging tree `/home/gianl/gate-d-runs/gate-d-layer1-rms-schedule-install-v1-staging` rebuilt from the
+`f9fb434c` blobs (tree SHA `da82b46ff583e57e02c8daf6f50cc0b74053df0e8207f506b5ea7fa3d931021c`). Fresh
+vacant tag `gate_d_layer1_rms_schedule_20260902T055846533543663Z`. Literal install commands:
+`/usr/bin/sudo -n /usr/bin/python3 -I -S /opt/glm-tpu/bin/provision_gate_d_python_runtime.py --source /home/gianl/gate-d-runs/gate-d-layer1-rms-schedule-install-v1-staging --target /opt/glm-tpu/gate-d-layer1-rms-schedule-install-v1 --expected-tree-sha256 da82b46ff583e57e02c8daf6f50cc0b74053df0e8207f506b5ea7fa3d931021c`
+and
+`/usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/gate-d-layer1-rms-schedule-install-v1/install_gate_d_layer1_rms_schedule_runtime.py`;
+literal execute-once command:
+`/usr/bin/env -i GLM_GATE_D_LAYER1_RMS_SCHEDULE=1 GLM_GATE_D_LAYER1_RMS_SCHEDULE_MODE=execute_once GLM_GATE_D_LAYER1_RMS_SCHEDULE_TAG=gate_d_layer1_rms_schedule_20260902T055846533543663Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin:/home/gianl/vllm-env/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v1.py`.
+Nothing installed; no TPU work; awaiting Sol's re-review.
