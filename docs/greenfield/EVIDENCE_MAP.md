@@ -3504,3 +3504,7 @@ persistence only; review and persistence precede any v2 installation.
   Classification `LAYER1_SCALE_FRONTIER_CERTIFIED;…;EFFECTIVE_SCALE_IS_THE_ONLY_FREE_QUANTITY;
   REDUCTION_STRUCTURE_NOT_IDENTIFIED;NO_PHYSICAL_CAUSALITY_CLAIM;GATE_D_OPEN`. Probe execution blocked
   pending canonical protections in the launcher.
+- Captured-RMS launcher hardened (literal tag, sanitized Git authority, mirror replay, three-scope
+  vacancy, four leases; runs from the tooling worktree); probe takes `--expected-worktree`. Reserved
+  tag `greenfield_layer0_captured_rms_replay_20260902T045006596197989Z` (vacant). Classification:
+  `RMS_SCHEDULE_PROBE_LAUNCHER_CANONICAL;EXECUTE_REVIEW_PENDING;TPU_UNAUTHORIZED;GATE_D_OPEN`.

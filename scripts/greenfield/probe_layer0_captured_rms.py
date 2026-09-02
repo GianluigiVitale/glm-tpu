@@ -856,6 +856,7 @@ def _build_arm(mesh: Any, *, split_layer1_rms: bool) -> Any:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--expected-code-hash", required=True)
+    parser.add_argument("--expected-worktree", type=Path, required=True)
     for prefix in ("capture", "db548"):
         parser.add_argument(f"--{prefix}-tensor", type=Path, required=True)
         parser.add_argument(f"--{prefix}-tensor-sha256", required=True)
@@ -885,8 +886,14 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    if REPO != Path("/home/gianl/glm-tpu-topology-rewrite"):
-        raise RuntimeError(f"wrong greenfield worktree: {REPO}")
+    allowed_worktrees = (
+        Path("/home/gianl/glm-tpu-topology-rewrite"),
+        Path("/home/gianl/glm-tpu-gate-d-pp16-numerical"),
+    )
+    if args.expected_worktree not in allowed_worktrees or REPO != args.expected_worktree:
+        raise RuntimeError(
+            f"wrong greenfield worktree: running={REPO} expected={args.expected_worktree}"
+        )
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
         raise RuntimeError(

@@ -10376,3 +10376,32 @@ without sanitized origin/mirror verification, and holds only the workload lease;
 literal fresh tag and pin, canonical live/all-version/soft-deleted vacancy, sanitized origin and
 mirror verification, and simultaneous retention of the four canonical workload/rsync leases before a
 second review of that exact invocation.
+
+## 2026-09-02 canonical protections for the captured-RMS probe launcher (default-off, unexecuted)
+
+Per Sol's execute-block, `scripts/greenfield/run_layer0_projection_reduction_probe.sh` in the
+captured-RMS mode now: requires a literal reviewed `GLM_GREENFIELD_CAPTURED_RMS_TAG` matching
+`^greenfield_layer0_captured_rms_replay_[0-9]{8}T[0-9]{15}Z$` (no auto-generated tag); derives the
+pin from the tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical` on
+`tooling/gate-d-compensated-pp16-numerical` through a sanitized `env -i` Git (top-level, branch,
+origin URL, clean tree with untracked files, no replacement refs, `ls-remote` of the origin branch
+equal to the pin) using the same verifier program as the PP16 capsule wrappers; verifies the
+immutable same-region mirror verifier's hash (`091208165a…`) and replays the mirror closure with the
+immutable Python `-I -S -B` into `mirror.sha256`; requires canonical three-scope vacancy (live,
+`--all-versions`, `--soft-deleted --exhaustive`) of the append-only prefix, recorded in
+`remote_vacancy.raw.txt`/`remote_vacancy.txt`; and holds the four leases simultaneously
+(`/home/gianl/glm-run/.glm_pod_workload.lock` non-blocking, `/home/gianl/.glm-tpu-rsync.lock`,
+and the root-owned `/opt/glm-tpu/locks/{glm_pod_workload,glm_tpu_rsync}.lock` through the identity-
+checked immutable lock verifier), recorded in `leases.txt`. The probe itself
+(`probe_layer0_captured_rms.py`) now takes `--expected-worktree` and refuses unless it runs from
+that allow-listed worktree; the launcher passes the tooling worktree, as the PP16 capsules do,
+because the immutable mirror verifier is bound to that worktree and branch (a dry run at the rewrite
+pin correctly refused with "verifier is not the committed blob"). Dry runs at the current tooling
+head passed the Git-authority and immutable-lease verifiers. Tests: 14 passed / 2 skipped
+(captured-RMS + isolated dense).
+
+Literal fresh tag reserved for the reviewed invocation: `greenfield_layer0_captured_rms_replay_20260902T045006596197989Z`; its live, all-versions and
+soft-deleted listings are vacant. Launch command (after Sol's EXECUTE approval, from the tooling
+worktree at the reviewed pin):
+`GLM_GREENFIELD_CAPTURED_RMS_REPLAY=1 GLM_GREENFIELD_CAPTURED_RMS_TAG=greenfield_layer0_captured_rms_replay_20260902T045006596197989Z bash scripts/greenfield/run_layer0_projection_reduction_probe.sh`.
+No TPU work has occurred.

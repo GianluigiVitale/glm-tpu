@@ -47,9 +47,13 @@ only in `s=rsqrt(mean+eps)`: greenfield s0−4…s0−1 ulps, legacy s0…s0+14.
 reduces RMS variance over `f32[32,6144]{T(8,128)}` dims={1}; greenfield over `f32[1,1,6144]`.
 
 Committed: captured-RMS probe `accepted_split` arm = FP32-carry accepted-schedule arm (FP32 sum,
-one FP32 barrier on `[32,6144]`, reduce dims={1}); matcher `fp32_carry_schedule`; tests 7/7. Next: Sol review; merge → rewrite, push, mirror; one sub-minute protected
-probe `GLM_GREENFIELD_CAPTURED_RMS_REPLAY=1 bash scripts/greenfield/run_layer0_projection_reduction_probe.sh`
-from the rewrite worktree. Control must equal DB548; arm exact ⇔ accepted row; then decoder change, one 8K run.
+one FP32 barrier on `[32,6144]`, reduce dims={1}); matcher `fp32_carry_schedule`; launcher
+canonical (literal tag, sanitized Git, mirror replay, 3-scope vacancy, 4 leases; runs from the
+tooling worktree); tests pass. Reserved tag `greenfield_layer0_captured_rms_replay_20260902T045006596197989Z`.
+Next: Sol EXECUTE review of the literal invocation; then, from this worktree at the reviewed pin,
+`GLM_GREENFIELD_CAPTURED_RMS_REPLAY=1 GLM_GREENFIELD_CAPTURED_RMS_TAG=<tag> bash
+scripts/greenfield/run_layer0_projection_reduction_probe.sh`. Control must equal DB548; arm exact ⇔
+accepted row; then decoder change, one 8K run.
 
 ## Finish (after Gate D)
 
