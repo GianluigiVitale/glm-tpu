@@ -368,6 +368,12 @@ def test_kv_a_provenance_accepts_both_emitted_orders() -> None:
         ("same_shape_entry_buffer", "  %kvlanes = bf16[32,1,18]{2,1,0:T(2,128)(2,1)} slice(%qproj), slice={[0:32], [0:1], [64:82]}\n", "  %kvlanes = bf16[32,1,18]{2,1,0:T(2,128)(2,1)} slice(%qsame), slice={[0:32], [0:1], [64:82]}\n"),
         ("loop_without_n82_convolution", "  %bconv = f32[1,82]{1,0} convolution(%bh, %bw), dim_labels=bf_io->bf\n  %brow = bf16[1,82]{1,0} convert(%bconv)\n", "  %bslice = bf16[1,82]{1,0} slice(%bw), slice={[0:1], [0:82]}\n  %brow = bf16[1,82]{1,0} copy(%bslice)\n"),
         ("loop_wrong_hidden", "6000", "6000"),
+        ("dead_convolution_unrelated_update", "  %bacc2 = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} dynamic-update-slice(%bacc, %brow3, %bi, %bzero, %bzero)\n",
+         "  %bother = bf16[1,82]{1,0} slice(%bw), slice={[0:1], [0:82]}\n  %bother3 = bf16[1,1,82]{2,1,0} reshape(%bother)\n  %bacc2 = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} dynamic-update-slice(%bacc, %bother3, %bi, %bzero, %bzero)\n"),
+        ("accumulator_not_loop_carried", "  %bacc2 = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} dynamic-update-slice(%bacc, %brow3, %bi, %bzero, %bzero)\n",
+         "  %bfresh = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} broadcast(%bzero_b), dimensions={}\n  %bacc2 = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} dynamic-update-slice(%bfresh, %brow3, %bi, %bzero, %bzero)\n"),
+        ("result_index_not_the_accumulator", "  %qproj = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%loop), index=1\n",
+         "  %qproj0 = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%loop), index=1\n  %qproj = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%loop), index=4\n"),
         ("wrong_parent_width", "%kp = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(0)", "%kp = bf16[1,640]{1,0:T(2,128)(2,1)} parameter(0)"),
         ("wrong_slice_bounds", "slice(%kp), slice={[0:1], [0:512]}", "slice(%kp), slice={[0:1], [64:576]}"),
         ("unrelated_512_lineage", "  %kc = f32[1,512]{1,0:T(1,128)} convert(%ks)\n", "  %kc0 = f32[1,512]{1,0:T(1,128)} convert(%ks)\n  %kc = f32[1,512]{1,0:T(1,128)} add(%kc0, %kc0)\n"),
@@ -393,6 +399,15 @@ def test_hlo_kv_a_provenance_substitutions_are_refused(label: str, old: str, new
         text = text.replace("  %packed = bf16[6144,82]{1,0} parameter(3)\n", "  %packed = bf16[6144,82]{1,0} parameter(3)\n  %qsame = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} parameter(4)\n")
     if label == "loop_wrong_hidden":
         text = text.replace("6144", "6000")
+    if label == "accumulator_not_loop_carried":
+        text = text.replace("  %bzero = s32[] constant(0)\n", "  %bzero = s32[] constant(0)\n  %bzero_b = bf16[] constant(0)\n")
+    if label == "result_index_not_the_accumulator":
+        text = text.replace("(s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0})", "(s32[], bf16[32,1,82]{2,1,0:T(2,128)(2,1)}, bf16[1,6144]{1,0}, bf16[6144,82]{1,0}, bf16[32,1,82]{2,1,0:T(2,128)(2,1)})")
+        text = text.replace("(bp: (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82])) -> (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82])", "(bp: (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82], bf16[32,1,82])) -> (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82], bf16[32,1,82])")
+        text = text.replace("(cp: (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82])) -> pred[]", "(cp: (s32[], bf16[32,1,82], bf16[1,6144], bf16[6144,82], bf16[32,1,82])) -> pred[]")
+        text = text.replace("  %bw = bf16[6144,82]{1,0} get-tuple-element(%bp), index=3\n", "  %bw = bf16[6144,82]{1,0} get-tuple-element(%bp), index=3\n  %bextra = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} get-tuple-element(%bp), index=4\n")
+        text = text.replace("tuple(%bi2, %bacc2, %bh, %bw)", "tuple(%bi2, %bacc2, %bh, %bw, %bextra)")
+        text = text.replace("tuple(%izero, %acc0, %hidden, %packed)", "tuple(%izero, %acc0, %hidden, %packed, %acc0)")
     assert old in text, label
     result = _hlo(text.replace(old, new, 1))
     assert not result["passed"], (label, result)
@@ -407,6 +422,9 @@ def test_hlo_kv_a_provenance_substitutions_are_refused(label: str, old: str, new
         ("same_shape_entry_buffer", "%227 = stablehlo.slice %700#4 [0:32, 0:1, 64:82]", "%227 = stablehlo.slice %arg8 [0:32, 0:1, 64:82]"),
         ("loop_without_n82_call", "%17676 = func.call @closed_call(%iterArg_2439, %17674, %17675) : (tensor<1x6144xbf16>, tensor<6144x82xui8>, tensor<48x82xf32>) -> tensor<1x82xbf16>", "%17676 = func.call @other_call(%iterArg_2439) : (tensor<1x6144xbf16>) -> tensor<1x82xbf16>"),
         ("loop_wrong_hidden", "6000", "6000"),
+        ("dead_call_unrelated_update", "DEAD_CALL_PLACEHOLDER", "DEAD_CALL_PLACEHOLDER"),
+        ("accumulator_not_the_iterarg", "func.call @dynamic_update_index_in_dim(%iterArg_2441, %17676, %iterArg_2440)", "func.call @dynamic_update_index_in_dim(%206, %17676, %iterArg_2440)"),
+        ("callee_return_not_rooted_in_convolution", "    return %7 : tensor<1x82xbf16>\n", "    %8 = stablehlo.convert %arg2 : (tensor<48x82xf32>) -> tensor<48x82xbf16>\n    %9 = stablehlo.slice %8 [0:1, 0:82] : (tensor<48x82xbf16>) -> tensor<1x82xbf16>\n    return %9 : tensor<1x82xbf16>\n"),
         ("unrelated_576_parameter", "    %604 = stablehlo.slice %arg3 [0:1, 0:512]", "    %604 = stablehlo.slice %arg5 [0:1, 0:512]"),
         ("caller_substitution_add", "    %604 = stablehlo.slice %arg3 [0:1, 0:512]", "    %arg3b = stablehlo.add %arg3, %arg3 : tensor<1x576xbf16>\n    %604 = stablehlo.slice %arg3b [0:1, 0:512]"),
         ("wrong_lane_slice", "%227 = stablehlo.slice %700#4 [0:32, 0:1, 64:82]", "%227 = stablehlo.slice %700#4 [0:32, 0:1, 46:64]"),
@@ -423,6 +441,10 @@ def test_stablehlo_kv_a_provenance_substitutions_are_refused(label: str, old: st
     ).replace("%605 = stablehlo.convert %arg4 : (tensor<1x512xbf16>)", "%605 = stablehlo.convert %arg7 : (tensor<1x512xbf16>)")
     if label == "loop_wrong_hidden":
         text = text.replace("6144", "6000")
+    if label == "dead_call_unrelated_update":
+        text = text.replace("      %c_2443 = stablehlo.constant dense<1> : tensor<i32>\n", "      %17679 = stablehlo.slice %17675 [0:1, 0:82] : (tensor<48x82xf32>) -> tensor<1x82xf32>\n      %17679b = stablehlo.convert %17679 : (tensor<1x82xf32>) -> tensor<1x82xbf16>\n      %c_2443 = stablehlo.constant dense<1> : tensor<i32>\n")
+        old = "func.call @dynamic_update_index_in_dim(%iterArg_2441, %17676, %iterArg_2440)"
+        new = "func.call @dynamic_update_index_in_dim(%iterArg_2441, %17679b, %iterArg_2440)"
     assert old in text, label
     result = _stable(text.replace(old, new, 1))
     assert not result["passed"], (label, result)

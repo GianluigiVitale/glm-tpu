@@ -2675,6 +2675,43 @@ KV_A_PROJECTION_WIDTH = KV_A_LORA_RANK + QK_ROPE_HEAD_DIM
 FUSED_QKV_A_KV_WIDTH_PER_SHARD = KV_A_PROJECTION_WIDTH // FUSED_QKV_A_VIRTUAL_SHARDS
 
 
+def _rms_schedule_resolve_structural(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    value: HloInstruction | None,
+    *,
+    passthrough: frozenset[str],
+    stop: frozenset[str],
+    limit: int = 16,
+) -> HloInstruction | None:
+    """Follow ``passthrough`` ops, fusion parameters and fusion roots until a ``stop`` opcode."""
+
+    current = value
+    for _ in range(limit):
+        if current is None:
+            return None
+        if current.opcode in stop:
+            return current
+        if current.opcode in passthrough and current.operand_names:
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if current.opcode == "parameter":
+            index_match = re.search(r"\bparameter\(([0-9]+)\)", current.raw_line)
+            caller = _rms_schedule_caller(module, current.computation)
+            if caller is None or index_match is None:
+                return current
+            index = int(index_match.group(1))
+            if index >= len(caller.operand_names):
+                return None
+            current = by_key.get((caller.computation, caller.operand_names[index]))
+            continue
+        if current.opcode == "fusion":
+            current = _rms_schedule_callee_root(module, current)
+            continue
+        return current
+    return None
+
+
 def _rms_schedule_fused_projection_loop(
     module: HloModule,
     by_key: dict[tuple[str, str], HloInstruction],
@@ -2682,23 +2719,32 @@ def _rms_schedule_fused_projection_loop(
     *,
     hidden_size: int,
 ) -> list[str]:
-    """Bind a ``bf16[32,1,82]`` value to the fused qkv-a N82 projection loop.
+    """Bind a ``bf16[32,1,82]`` value to the fused qkv-a N82 projection loop by dataflow.
 
-    The value must resolve (tuple access, copies, fusion parameters/roots) to a
-    ``while`` whose body accumulates ``bf16[32,1,82]`` and evaluates the
-    one-row N82 convolution ``f32[1,82] convolution(bf16[1,H], bf16[H,82])``
-    with ``dim_labels=bf_io->bf`` (DB502's primitive), directly or inside a
-    body fusion.
+    The value must be loop-carried result ``k`` of a ``while`` (reached through
+    tuple access, copies, fusion parameters/roots).  In the body, root tuple
+    element ``k`` must be a ``dynamic-update-slice`` whose accumulator operand is
+    loop-carried element ``k`` of the body parameter and whose update value
+    resolves (converts, reshapes, bitcasts, copies, fusion parameters/roots) to
+    the one-row N82 convolution ``f32[1,82] = convolution(bf16[1,H], bf16[H,82])``
+    with ``dim_labels=bf_io->bf``.  A dead convolution beside an unrelated
+    accumulator is refused.
     """
 
     shards = FUSED_QKV_A_VIRTUAL_SHARDS
     packed = FUSED_QKV_A_Q_WIDTH_PER_SHARD + FUSED_QKV_A_KV_WIDTH_PER_SHARD
     current = value
+    result_index: int | None = None
     for _ in range(12):
         if current is None:
             return ["fused qkv-a projection buffer producer is unresolved"]
         opcode = current.opcode
-        if opcode in {"copy", "bitcast", "reshape", "get-tuple-element"} and current.operand_names:
+        if opcode == "get-tuple-element" and current.operand_names:
+            index_match = re.search(r"\bindex=([0-9]+)", current.raw_line)
+            result_index = int(index_match.group(1)) if index_match else None
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if opcode in {"copy", "bitcast", "reshape"} and current.operand_names:
             current = by_key.get((current.computation, current.operand_names[0]))
             continue
         if opcode == "parameter":
@@ -2719,6 +2765,8 @@ def _rms_schedule_fused_projection_loop(
         return [f"fused qkv-a projection buffer producer is {opcode}, not the N82 projection loop"]
     else:
         return ["fused qkv-a projection buffer producer chain is too deep"]
+    if result_index is None:
+        return ["fused qkv-a projection buffer is not a loop-carried tuple element"]
     body_match = re.search(r"\bbody=%?([^,\s}]+)", current.raw_line)
     if body_match is None:
         return ["fused qkv-a projection loop carries no body"]
@@ -2726,22 +2774,48 @@ def _rms_schedule_fused_projection_loop(
     body = [item for item in module.instructions if _rms_schedule_computation_id(item.computation) == body_id]
     if not body:
         return ["fused qkv-a projection loop body is absent"]
-    accumulates = any(
-        shape.dtype == "bf16" and shape.dimensions == (shards, 1, packed)
-        for item in body
-        if item.opcode in {"dynamic-update-slice", "fusion"}
-        for shape in item.result_shapes
+    root = next((item for item in body if item.raw_line.lstrip().startswith("ROOT ")), None)
+    if root is None or root.opcode != "tuple" or result_index >= len(root.operand_names):
+        return ["fused qkv-a projection loop body root is not a tuple carrying the result index"]
+    carried = by_key.get((root.computation, root.operand_names[result_index]))
+    update = _rms_schedule_resolve_structural(
+        module, by_key, carried,
+        passthrough=frozenset({"copy", "bitcast", "reshape", "get-tuple-element"}),
+        stop=frozenset({"dynamic-update-slice"}),
     )
-    convolutions = [item for item in body if item.opcode == "convolution"]
-    for item in body:
-        if item.opcode == "fusion":
-            root = _rms_schedule_callee_root(module, item)
-            if root is not None:
-                convolutions.extend(
-                    nested for nested in module.instructions
-                    if nested.computation == root.computation and nested.opcode == "convolution"
-                )
-    def _n82(instruction: HloInstruction) -> bool:
+    if update is None or update.opcode != "dynamic-update-slice" or len(update.operand_names) < 2:
+        return [f"fused qkv-a loop result {result_index} is not produced by a dynamic-update-slice accumulator"]
+    if not any(shape.dtype == "bf16" and shape.dimensions == (shards, 1, packed) for shape in update.result_shapes):
+        return [f"fused qkv-a loop accumulator is not bf16[{shards},1,{packed}]"]
+    problems: list[str] = []
+    # accumulator operand must be loop-carried element result_index of the body parameter
+    accumulator = _rms_schedule_resolve_structural(
+        module, by_key, by_key.get((update.computation, update.operand_names[0])),
+        passthrough=frozenset({"copy", "bitcast", "reshape"}),
+        stop=frozenset({"get-tuple-element"}),
+    )
+    carried_ok = False
+    if accumulator is not None and accumulator.opcode == "get-tuple-element":
+        index_match = re.search(r"\bindex=([0-9]+)", accumulator.raw_line)
+        source = by_key.get((accumulator.computation, accumulator.operand_names[0])) if accumulator.operand_names else None
+        carried_ok = (
+            index_match is not None
+            and int(index_match.group(1)) == result_index
+            and source is not None
+            and source.opcode == "parameter"
+            and _rms_schedule_computation_id(source.computation) == body_id
+        )
+    if not carried_ok:
+        problems.append(f"fused qkv-a loop accumulator is not loop-carried element {result_index} of the body parameter")
+    # update value must root in the N82 convolution
+    convolution = _rms_schedule_resolve_structural(
+        module, by_key, by_key.get((update.computation, update.operand_names[1])),
+        passthrough=frozenset({"convert", "copy", "bitcast", "reshape", "get-tuple-element", "broadcast"}),
+        stop=frozenset({"convolution"}),
+    )
+    def _n82(instruction: HloInstruction | None) -> bool:
+        if instruction is None or instruction.opcode != "convolution":
+            return False
         shapes = [(shape.dtype, shape.dimensions) for shape in instruction.operand_shapes]
         return (
             "dim_labels=bf_io->bf" in instruction.raw_line
@@ -2749,13 +2823,11 @@ def _rms_schedule_fused_projection_loop(
             and ("bf16", (1, hidden_size)) in shapes
             and ("bf16", (hidden_size, packed)) in shapes
         )
-    problems: list[str] = []
-    if not accumulates:
-        problems.append(f"fused qkv-a projection loop does not accumulate bf16[{shards},1,{packed}]")
-    if not any(_n82(item) for item in convolutions):
+    if not _n82(convolution):
         problems.append(
-            f"fused qkv-a projection loop carries no N82 convolution f32[1,{packed}] = "
-            f"bf16[1,{hidden_size}] x bf16[{hidden_size},{packed}] (dim_labels=bf_io->bf)"
+            f"fused qkv-a loop update value does not root in the N82 convolution f32[1,{packed}] = "
+            f"bf16[1,{hidden_size}] x bf16[{hidden_size},{packed}] (dim_labels=bf_io->bf): "
+            f"{convolution.opcode if convolution is not None else None}"
         )
     return problems
 
@@ -3516,20 +3588,27 @@ def _stablehlo_constant(definitions: _StablehloScope, name: str) -> float | None
 def _stablehlo_fused_projection_loop(
     definitions: _StablehloScope, name: str | None, *, hidden_size: int
 ) -> list[str]:
-    """StableHLO twin of ``_rms_schedule_fused_projection_loop``.
+    """StableHLO twin of ``_rms_schedule_fused_projection_loop`` (dataflow bound).
 
-    The ``tensor<32x1x82xbf16>`` value must be a result of a ``stablehlo.while``
-    whose body calls the one-row N82 projection function
-    ``(tensor<1xHxbf16>, tensor<Hx82xui8>, tensor<(H/128)x82xf32>) -> tensor<1x82xbf16>``
-    and accumulates ``tensor<32x1x82xbf16>``; the called function must carry the
+    ``%N#k`` must be result ``k`` of a ``stablehlo.while``; in its ``do`` region the
+    ``k``-th returned value must be an update call
+    ``(tensor<32x1x82xbf16>, tensor<1x82xbf16>, tensor<i32>) -> tensor<32x1x82xbf16>``
+    whose accumulator is the ``k``-th iterArg and whose update value is the
+    projection call ``(tensor<1xHxbf16>, tensor<Hx82xui8>, tensor<(H/128)x82xf32>) -> tensor<1x82xbf16>``;
+    the projection callee's return must root (through converts) in the
     ``[b, f]x[i, o]->[b, f]`` convolution.
     """
 
     shards = FUSED_QKV_A_VIRTUAL_SHARDS
     packed = FUSED_QKV_A_Q_WIDTH_PER_SHARD + FUSED_QKV_A_KV_WIDTH_PER_SHARD
+    result_index: int | None = None
     current_name = name
     for _ in range(8):
-        entry = definitions.lookup(current_name) if current_name else None
+        if current_name is None:
+            return ["fused qkv-a projection buffer producer is unresolved in StableHLO"]
+        if "#" in current_name:
+            result_index = int(current_name.split("#", 1)[1])
+        entry = definitions.lookup(current_name)
         if entry is None:
             return ["fused qkv-a projection buffer producer is unresolved in StableHLO"]
         opcode, rest = entry
@@ -3542,27 +3621,65 @@ def _stablehlo_fused_projection_loop(
         return [f"fused qkv-a projection buffer producer is {opcode}, not the N82 projection loop"]
     else:
         return ["fused qkv-a projection buffer producer chain is too deep"]
-    body = "\n".join(definitions.region_lines(current_name))
+    if result_index is None:
+        return ["fused qkv-a projection buffer is not an indexed while result"]
+    iter_args = re.findall(r"(%iterArg[\w]*) = %", rest)
+    if result_index >= len(iter_args):
+        return ["fused qkv-a while result index escapes its iterArgs"]
+    region = definitions.region_lines(current_name)
+    body_text = "\n".join(region)
+    returns = re.findall(r"stablehlo\.return ([^:]+) :", body_text)
+    if not returns:
+        return ["fused qkv-a while carries no return"]
+    returned = [token.strip() for token in returns[-1].split(",")]
+    if result_index >= len(returned):
+        return ["fused qkv-a while return does not carry the result index"]
     scale_rows = hidden_size // 128
-    call = re.search(
-        rf"func\.call @([\w.]+)\([^)]*\) : \(tensor<1x{hidden_size}xbf16>, tensor<{hidden_size}x{packed}xui8>, "
-        rf"tensor<{scale_rows}x{packed}xf32>\) -> tensor<1x{packed}xbf16>",
-        body,
+    update_pattern = (
+        rf"^\s*{re.escape(returned[result_index])} = func\.call @[\w.]+\((%[\w#]+), (%[\w#]+), (%[\w#]+)\) : "
+        rf"\(tensor<{shards}x1x{packed}xbf16>, tensor<1x{packed}xbf16>, tensor<i32>\) -> tensor<{shards}x1x{packed}xbf16>"
     )
+    update = re.search(update_pattern, body_text, re.M)
     problems: list[str] = []
+    if update is None:
+        return [f"fused qkv-a while result {result_index} is not produced by a tensor<{shards}x1x{packed}xbf16> update call"]
+    if update.group(1) != iter_args[result_index]:
+        problems.append(f"fused qkv-a loop accumulator is not iterArg {result_index} ({iter_args[result_index]}): {update.group(1)}")
+    call_pattern = (
+        rf"^\s*{re.escape(update.group(2))} = func\.call @([\w.]+)\([^)]*\) : \(tensor<1x{hidden_size}xbf16>, "
+        rf"tensor<{hidden_size}x{packed}xui8>, tensor<{scale_rows}x{packed}xf32>\) -> tensor<1x{packed}xbf16>"
+    )
+    call = re.search(call_pattern, body_text, re.M)
     if call is None:
         problems.append(
-            f"fused qkv-a projection loop body does not call the N82 projection "
+            f"fused qkv-a loop update value {update.group(2)} is not the N82 projection call "
             f"(tensor<1x{hidden_size}xbf16>, tensor<{hidden_size}x{packed}xui8>, tensor<{scale_rows}x{packed}xf32>) -> tensor<1x{packed}xbf16>"
         )
-    if f"-> tensor<{shards}x1x{packed}xbf16>" not in body:
-        problems.append(f"fused qkv-a projection loop body does not accumulate tensor<{shards}x1x{packed}xbf16>")
-    if call is not None:
-        function = re.search(
-            rf"func\.func private @{re.escape(call.group(1))}\(.*?\n\s*\}}", "\n".join(definitions.lines), re.S
-        )
-        if function is None or "stablehlo.convolution(" not in function.group(0) or "[b, f]x[i, o]->[b, f]" not in function.group(0):
-            problems.append(f"fused qkv-a projection function @{call.group(1)} carries no [b, f]x[i, o]->[b, f] convolution")
+        return problems
+    text = "\n".join(definitions.lines)
+    function = re.search(rf"func\.func private @{re.escape(call.group(1))}\(.*?\n\s*\}}", text, re.S)
+    if function is None:
+        problems.append(f"fused qkv-a projection function @{call.group(1)} is absent")
+        return problems
+    function_text = function.group(0)
+    returned_name = re.search(r"return (%[\w#]+) :", function_text)
+    current = returned_name.group(1) if returned_name else None
+    rooted = False
+    for _ in range(6):
+        if current is None:
+            break
+        definition = re.search(rf"^\s*{re.escape(current)} = ([\w.]+)(.*)$", function_text, re.M)
+        if definition is None:
+            break
+        opcode, rest_line = definition.group(1), definition.group(2)
+        if opcode in {"stablehlo.convert", "stablehlo.reshape"}:
+            names = _stablehlo_operands(rest_line)
+            current = names[0] if names else None
+            continue
+        rooted = opcode == "stablehlo.convolution" and "[b, f]x[i, o]->[b, f]" in rest_line
+        break
+    if not rooted:
+        problems.append(f"fused qkv-a projection function @{call.group(1)} return does not root in the [b, f]x[i, o]->[b, f] convolution")
     return problems
 
 

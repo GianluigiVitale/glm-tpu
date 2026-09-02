@@ -11047,3 +11047,23 @@ the projection's own f32→bf16 convert is no longer miscounted. Synthetic modul
 a loop without the N82 convolution / call, a loop over the wrong hidden size, and for the separate
 layout a dot contracting 6000 instead of 6144 and an `add` between the dot and the projection. All
 three archives re-validated; forced-CPU decoder binds its `dot` over the small plan's hidden size 8.
+
+## 2026-09-02 Sol BLOCK on fa283010 (loop check not dataflow-bound) — end-to-end producer dataflow
+
+Sol refused because the loop check accepted any accumulator beside any N82 convolution. Both binders
+now bind the dataflow: the buffer must be loop-carried result k of the `while` (index taken from the
+tuple access that reaches it); in the body, root tuple element k must resolve to a
+`dynamic-update-slice` whose accumulator operand is loop-carried element k of the body parameter (through
+fusion parameters/roots and copies) and whose update value resolves through converts, reshapes,
+bitcasts, copies and fusion boundaries to the N82 convolution `f32[1,82] = convolution(bf16[1,H],
+bf16[H,82])` with `dim_labels=bf_io->bf`. StableHLO: `%N#k` must be result k of a `stablehlo.while`;
+the k-th value of the region's `stablehlo.return` must be an update call `(tensor<32x1x82xbf16>,
+tensor<1x82xbf16>, tensor<i32>) -> tensor<32x1x82xbf16>` whose accumulator is the k-th iterArg and whose
+update value is the projection call with the N82 signature; the projection callee's `return` must root
+(through converts/reshapes) in the `[b, f]x[i, o]->[b, f]` convolution. Attacks refused in both
+representations: a dead convolution beside an unrelated update value, an accumulator that is not the
+loop-carried element (fresh buffer / wrong iterArg), a result index carrying a same-shape non-accumulator
+element, a dead projection call replaced by a slice of the scales, and a callee returning a value not
+rooted in the convolution. Baseline archive: all 78 kv-a rows bind through `%while.1166` (accumulator =
+loop-carried element 1, update value rooted in `%conv_general_dilated.930`); both `_ras` archives refused
+by census as before; forced-CPU decoder binds its `dot`.
