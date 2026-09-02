@@ -1178,3 +1178,11 @@ normalized-state cause.
   tag: replay the exact worker prologue (worktree creation, clean check, `env -i` interpreter start,
   the script's own self-checks) as a test. String-matching the runner text proved nothing and cost a
   Sol-approved tag.
+- A fail-closed contract refusal on TPU is evidence, not a loss: the archived TPU HLO of a refused run
+  diagnosed two faults offline in under an hour (an unscheduled norm hidden in a fused kernel, and
+  older one-live-row contracts refusing a deliberate 32-row operand) with zero further TPU time.
+- When a flag changes a tensor shape on purpose, every older shape-only contract that encoded the
+  opposite intent must be re-bound by lineage, not loosened by shape; and the flag's coverage must be
+  counted on the real program (313 `rsqrt`), not on the call sites you edited.
+- Helpers that scan all instructions per lookup are fine on a probe module and take >10 min on a
+  232k-instruction decoder; index once per module.

@@ -847,6 +847,7 @@ def _validate_fused_qkv_a_decoder_association(
     prefill_index_repair: bool = False,
     dsa_head_key_exact_association: bool = False,
     module: HloModule | None = None,
+    rms_accepted_schedule_carry_allowances: Mapping[int, set[str]] | None = None,
 ) -> dict[str, Any]:
     """Require DB502's physical one-row N82 primitive in every layer."""
 
@@ -890,6 +891,15 @@ def _validate_fused_qkv_a_decoder_association(
             exact_wk_feature_slice_indices,
             exact_wk_feature_slice_contract,
         ) = _exact_wk_feature_slice_instructions(module)
+    instruction_allowed_signatures: dict[int, set[str]] = {
+        index: {"f32[32,6144]"} for index in exact_wk_feature_slice_indices
+    }
+    rms_carry_allowed_count = 0
+    for index, signatures in (rms_accepted_schedule_carry_allowances or {}).items():
+        admitted = set(signatures) & forbidden_candidates
+        if admitted:
+            instruction_allowed_signatures.setdefault(index, set()).update(admitted)
+            rms_carry_allowed_count += 1
     (
         allowed_repair_shapes,
         allowed_exact_wk_feature_slices,
@@ -900,10 +910,7 @@ def _validate_fused_qkv_a_decoder_association(
         forbidden_signatures=forbidden_candidates,
         repair_allowed_signatures={"f32[32,6144]"},
         prefill_index_repair=prefill_index_repair,
-        instruction_allowed_signatures={
-            index: {"f32[32,6144]"}
-            for index in exact_wk_feature_slice_indices
-        },
+        instruction_allowed_signatures=instruction_allowed_signatures,
     )
     forbidden_shapes = tuple(forbidden_shape_counts)
     violations = []
@@ -927,6 +934,9 @@ def _validate_fused_qkv_a_decoder_association(
         "allowed_prefill_index_repair_shape_counts": allowed_repair_shapes,
         "allowed_exact_wk_feature_slice_shape_counts": (
             allowed_exact_wk_feature_slices
+        ),
+        "allowed_rms_accepted_schedule_carry_instruction_count": (
+            rms_carry_allowed_count
         ),
         "exact_wk_feature_slice_contract": (
             exact_wk_feature_slice_contract
@@ -2002,6 +2012,7 @@ def _classify_decoder_live_tensor_shapes(
     prefill_index_repair: bool = False,
     dsa_head_key_exact_association: bool = False,
     strategy_nd_attention_projection: bool = False,
+    rms_accepted_schedule_carry_allowances: Mapping[int, set[str]] | None = None,
 ) -> dict[str, Any]:
     """Separate pinned DSA head scores from forbidden batch/full-pod tensors.
 
@@ -2238,7 +2249,9 @@ def _classify_decoder_live_tensor_shapes(
     allowed_exact_wk_feature_slices = []
     allowed_dsa_score_shapes = []
     allowed_strategy_nd_virtual_partials = []
+    allowed_rms_accepted_schedule_carries = []
     forbidden_shapes = []
+    carry_allowances = rms_accepted_schedule_carry_allowances or {}
     hard_forbidden_dimensions = {
         (config.total_devices, config.hidden_size),
         (config.total_devices, 1, config.hidden_size),
@@ -2318,6 +2331,13 @@ def _classify_decoder_live_tensor_shapes(
                 and instruction.computation in repair_computations
             ):
                 allowed_prefill_index_repair_shapes.append(record)
+            elif _shape_signature(shape) in carry_allowances.get(
+                instruction.index, set()
+            ):
+                # A conforming accepted-schedule RMS carry (rows padded to the
+                # M32 operand) or its bounded consumer cone; see
+                # _rms_accepted_schedule_carry_allowances.
+                allowed_rms_accepted_schedule_carries.append(record)
             else:
                 forbidden_shapes.append(record)
 
@@ -2341,6 +2361,12 @@ def _classify_decoder_live_tensor_shapes(
         ),
         "allowed_exact_wk_feature_slices": (
             allowed_exact_wk_feature_slices
+        ),
+        "allowed_rms_accepted_schedule_carries": (
+            allowed_rms_accepted_schedule_carries
+        ),
+        "allowed_rms_accepted_schedule_carry_count": len(
+            allowed_rms_accepted_schedule_carries
         ),
         "body_records": body_records,
         "expected_score_body_count": expected_body_count,
@@ -2672,32 +2698,53 @@ def _rms_schedule_arithmetic_terminal(
     return current.opcode if current is not None else None
 
 
+_RMS_SCHEDULE_INDEX_CACHE: dict[int, tuple[Any, dict[str, HloInstruction], dict[str, list[HloInstruction]]]] = {}
+_RMS_SCHEDULE_CALLS_RE = re.compile(r"\bcalls=%?([^,\s}\]]+)")
+
+
+def _rms_schedule_index(
+    module: HloModule,
+) -> tuple[dict[str, HloInstruction], dict[str, list[HloInstruction]]]:
+    """Roots by computation id and fusion callers by callee id, built once per module.
+
+    ``HloModule`` is a frozen slots dataclass, so the index lives in a small
+    process cache keyed by identity and verified against the instructions tuple.
+    """
+
+    cached = _RMS_SCHEDULE_INDEX_CACHE.get(id(module))
+    if cached is not None and cached[0] is module.instructions:
+        return cached[1], cached[2]
+    roots: dict[str, HloInstruction] = {}
+    callers: dict[str, list[HloInstruction]] = {}
+    for item in module.instructions:
+        if item.raw_line.lstrip().startswith("ROOT "):
+            roots.setdefault(_rms_schedule_computation_id(item.computation), item)
+        if item.opcode == "fusion":
+            match = _RMS_SCHEDULE_CALLS_RE.search(item.raw_line)
+            if match is not None:
+                callers.setdefault(match.group(1), []).append(item)
+    while len(_RMS_SCHEDULE_INDEX_CACHE) >= 4:
+        _RMS_SCHEDULE_INDEX_CACHE.pop(next(iter(_RMS_SCHEDULE_INDEX_CACHE)))
+    _RMS_SCHEDULE_INDEX_CACHE[id(module)] = (module.instructions, roots, callers)
+    return roots, callers
+
+
 def _rms_schedule_callee_root(
     module: HloModule, fusion: HloInstruction
 ) -> HloInstruction | None:
-    match = re.search(r"\bcalls=%?([^,\s}\]]+)", fusion.raw_line)
+    match = _RMS_SCHEDULE_CALLS_RE.search(fusion.raw_line)
     if match is None:
         return None
-    callee = match.group(1)
-    for item in module.instructions:
-        if _rms_schedule_computation_id(item.computation) == callee and (
-            item.raw_line.lstrip().startswith("ROOT ")
-        ):
-            return item
-    return None
+    roots, _ = _rms_schedule_index(module)
+    return roots.get(match.group(1))
 
 
 def _rms_schedule_caller(
     module: HloModule, computation: str
 ) -> HloInstruction | None:
-    callee = _rms_schedule_computation_id(computation)
-    callers = [
-        item
-        for item in module.instructions
-        if item.opcode == "fusion"
-        and re.search(r"\bcalls=%?" + re.escape(callee) + r"(?![\w.])", item.raw_line)
-    ]
-    return callers[0] if len(callers) == 1 else None
+    _, callers = _rms_schedule_index(module)
+    candidates = callers.get(_rms_schedule_computation_id(computation), [])
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def _rms_schedule_constant_value(
@@ -2871,17 +2918,10 @@ def _rms_schedule_lineage(
     width = operand_shape.dimensions[1] if operand_2d else None
     reduce_result = reduce.result_shapes[0].dimensions if reduce.result_shapes else None
     combiner = re.search(r"\bto_apply=%?([^,\s}\]]+)", reduce.raw_line)
-    combiner_roots = (
-        [
-            item
-            for item in module.instructions
-            if _rms_schedule_computation_id(item.computation) == combiner.group(1)
-            and item.raw_line.lstrip().startswith("ROOT ")
-        ]
-        if combiner is not None
-        else []
+    combiner_root = (
+        _rms_schedule_index(module)[0].get(combiner.group(1)) if combiner is not None else None
     )
-    combiner_is_add = bool(combiner_roots) and combiner_roots[0].opcode == "add"
+    combiner_is_add = combiner_root is not None and combiner_root.opcode == "add"
     operand_instruction = (
         by_key.get((reduce.computation, reduce.operand_names[0])) if reduce.operand_names else None
     )
@@ -2901,10 +2941,13 @@ def _rms_schedule_lineage(
     record.update(
         {
             "reduce": reduce.name,
+            "reduce_key": [reduce.computation, reduce.name],
             "reduce_dimensions": list(reduce_dims),
             "reduce_operand": operand_shape.to_dict() if operand_shape else None,
+            "width": width,
             "width_scale": width_scale,
             "epsilon": epsilon,
+            "square_key": [square.computation, square.name] if square_ok else None,
             "square_operand_opcode": terminal,
             "square_arithmetic_opcode": arithmetic,
         }
@@ -3231,6 +3274,198 @@ def _validate_rms_accepted_schedule_stablehlo(
     }
 
 
+def _rms_schedule_lineages(
+    module: HloModule, *, layernorm_width: int
+) -> tuple[dict[tuple[str, str], HloInstruction], list[dict[str, Any]]]:
+    by_key = _rms_schedule_by_key(module)
+    rsqrts = tuple(item for item in module.instructions if item.opcode == "rsqrt")
+    return by_key, [
+        _rms_schedule_lineage(module, by_key, item, layernorm_width=layernorm_width)
+        for item in rsqrts
+    ]
+
+
+def _shape_signature(shape: HloShape) -> str:
+    return f"{shape.dtype}[" + ",".join(str(value) for value in shape.dimensions) + "]"
+
+
+# Opcodes through which an accepted-schedule carry may flow to its live-row
+# consumers (the reduce fusion, the normalize fusion, the row slice, async
+# copies between memory spaces).  Anything else consuming the carry keeps the
+# dead-row shape forbidden.
+_RMS_CARRY_CONSUMER_OPCODES = frozenset(
+    {
+        "fusion",
+        "slice",
+        "dynamic-slice",
+        "multiply",
+        "copy",
+        "copy-start",
+        "copy-done",
+        "bitcast",
+        "reshape",
+        "convert",
+        "get-tuple-element",
+        "tuple",
+    }
+)
+
+
+def _rms_schedule_resolve_carry(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    item: HloInstruction | None,
+) -> HloInstruction | None:
+    """Follow the square operand to the materialized carry in its computation."""
+
+    current = item
+    for _ in range(8):
+        if current is None:
+            return None
+        if current.opcode in {"bitcast", "reshape", "copy", "get-tuple-element"} and current.operand_names:
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if current.opcode == "parameter":
+            index_match = re.search(r"\bparameter\(([0-9]+)\)", current.raw_line)
+            caller = _rms_schedule_caller(module, current.computation)
+            if caller is None:
+                # An entry/uncalled computation parameter is itself the
+                # materialized carry (synthetic modules; CPU reference HLO).
+                return current
+            if index_match is None:
+                return None
+            index = int(index_match.group(1))
+            if index >= len(caller.operand_names):
+                return None
+            current = by_key.get((caller.computation, caller.operand_names[index]))
+            continue
+        return current
+    return None
+
+
+def _rms_ssa_backward_slice(
+    by_key: dict[tuple[str, str], HloInstruction], root: HloInstruction
+) -> set[int]:
+    """Instruction indices feeding ``root`` inside its own computation."""
+
+    seen: set[int] = set()
+    stack = [root]
+    while stack:
+        item = stack.pop()
+        if item.index in seen:
+            continue
+        seen.add(item.index)
+        for name in item.operand_names:
+            operand = by_key.get((item.computation, name))
+            if operand is not None:
+                stack.append(operand)
+    return seen
+
+
+def _rms_accepted_schedule_carry_allowances(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    lineages: Sequence[dict[str, Any]],
+) -> tuple[dict[int, set[str]], dict[str, Any]]:
+    """Admit ``f32[32,W]`` only on exact SSA slices of a conforming lineage.
+
+    The accepted schedule deliberately materializes one 32-row FP32 operand per
+    RMS norm (rows padded to the M32 operand); the one-live-row contracts would
+    otherwise refuse every one of them as a dead-row tensor.  For each
+    conforming ``rms`` lineage the admitted set is, restricted to the lineage's
+    own ``f32[32,W]`` signature:
+
+    * the backward SSA slice of the reduce inside its computation (square,
+      the carry parameter);
+    * the carry producer in the parent computation and, when it is a fusion,
+      the backward SSA slice of its root (the fused pad/convert/add body);
+    * the carry's consumers within three hops in the parent computation through
+      {fusion, slice, dynamic-slice, multiply, copy, copy-start/done, bitcast,
+      reshape, convert, get-tuple-element, tuple}; for a consumer fusion only the
+      backward SSA slice of its root (the normalize multiply, the inverse
+      broadcast and the row slice), never a dead-end tensor in the same body.
+
+    Instructions colocated in those computations but off the slices, other
+    widths, and other 32-row tensors stay forbidden.
+    """
+
+    allowances: dict[int, set[str]] = {}
+    by_index: dict[int, HloInstruction] = {item.index: item for item in module.instructions}
+    consumers: dict[tuple[str, str], list[HloInstruction]] = {}
+    for item in module.instructions:
+        for name in item.operand_names:
+            consumers.setdefault((item.computation, name), []).append(item)
+
+    def has_signature(item: HloInstruction, signature: str) -> bool:
+        return any(
+            _shape_signature(shape) == signature
+            for shape in item.operand_shapes + item.result_shapes
+        )
+
+    def allow(item: HloInstruction, signature: str) -> None:
+        if has_signature(item, signature):
+            allowances.setdefault(item.index, set()).add(signature)
+
+    def allow_indices(indices: set[int], signature: str) -> None:
+        for index in indices:
+            allow(by_index[index], signature)
+
+    widths: Counter[int] = Counter()
+    carry_count = 0
+    for record in lineages:
+        if record.get("kind") != "rms" or record.get("problems") or not record.get("square_key"):
+            continue
+        width = record.get("width")
+        if not isinstance(width, int):
+            continue
+        signature = f"f32[32,{width}]"
+        square = by_key.get(tuple(record["square_key"]))
+        reduce = by_key.get(tuple(record["reduce_key"]))
+        if square is None or reduce is None:
+            continue
+        allow_indices(_rms_ssa_backward_slice(by_key, reduce), signature)
+        if square.computation != reduce.computation:
+            allow_indices(_rms_ssa_backward_slice(by_key, square), signature)
+        carrier = by_key.get((square.computation, square.operand_names[0]))
+        carry = _rms_schedule_resolve_carry(module, by_key, carrier)
+        if carry is None:
+            continue
+        carry_count += 1
+        widths[width] += 1
+        allow(carry, signature)
+        if carry.opcode == "fusion":
+            root = _rms_schedule_callee_root(module, carry)
+            if root is not None:
+                allow_indices(_rms_ssa_backward_slice(by_key, root), signature)
+        frontier = [carry]
+        for _ in range(3):
+            next_frontier: list[HloInstruction] = []
+            for value in frontier:
+                for consumer in consumers.get((value.computation, value.name), ()):
+                    if consumer.opcode not in _RMS_CARRY_CONSUMER_OPCODES:
+                        continue
+                    if not has_signature(consumer, signature):
+                        continue
+                    if signature in allowances.get(consumer.index, set()):
+                        continue
+                    allow(consumer, signature)
+                    if consumer.opcode == "fusion":
+                        # Only the backward SSA slice of the consumer's root: the
+                        # normalize multiply, the inverse broadcast and the row
+                        # slice; a dead-end tensor in the same body stays forbidden.
+                        root = _rms_schedule_callee_root(module, consumer)
+                        if root is not None:
+                            allow_indices(_rms_ssa_backward_slice(by_key, root), signature)
+                    if any(_shape_signature(shape) == signature for shape in consumer.result_shapes):
+                        next_frontier.append(consumer)
+            frontier = next_frontier
+    return allowances, {
+        "carry_count": carry_count,
+        "allowed_instruction_count": len(allowances),
+        "widths": {str(key): value for key, value in sorted(widths.items())},
+    }
+
+
 def module_uses_tiling(module: HloModule) -> bool:
     return any("{" in item.raw_line and ":T(" in item.raw_line for item in module.instructions)
 
@@ -3256,12 +3491,8 @@ def _validate_rms_accepted_schedule_hlo(
     arm carries none), so the barrier is bound in StableHLO.
     """
 
-    by_key = _rms_schedule_by_key(module)
+    by_key, lineages = _rms_schedule_lineages(module, layernorm_width=layernorm_width)
     rsqrts = tuple(item for item in module.instructions if item.opcode == "rsqrt")
-    lineages = [
-        _rms_schedule_lineage(module, by_key, item, layernorm_width=layernorm_width)
-        for item in rsqrts
-    ]
     layernorms = [
         record
         for record in lineages
@@ -3284,8 +3515,20 @@ def _validate_rms_accepted_schedule_hlo(
             "default decoder carries accepted-schedule RMS reductions: "
             f"{len(conforming)} bound 32-row rsqrt instructions"
         )
+    carry_allowances, carry_summary = (
+        _rms_accepted_schedule_carry_allowances(module, by_key, lineages)
+        if enabled
+        else ({}, {"carry_count": 0, "allowed_instruction_count": 0, "widths": {}})
+    )
+    if enabled and carry_summary["carry_count"] != len(conforming):
+        violations.append(
+            "accepted-schedule carries are not all materialized: "
+            f"carries={carry_summary['carry_count']} conforming={len(conforming)}"
+        )
     return {
         "applicable": enabled,
+        "carry_allowances": carry_allowances,
+        "carry_summary": carry_summary,
         "conforming_rsqrt_count": len(conforming),
         "enabled": enabled,
         "layernorm_rsqrt_count": len(layernorms),
@@ -5025,6 +5268,30 @@ def validate_decoder_step_hlo(
             )
         )
         violations.extend(complete_token_collective_contract["violations"])
+    if not isinstance(rms_accepted_schedule, bool):
+        raise PlanValidationError("decoder RMS accepted-schedule HLO flag must be boolean")
+    rms_accepted_schedule_contract = _validate_rms_accepted_schedule_hlo(
+        module,
+        enabled=rms_accepted_schedule,
+        layernorm_width=config.index_key_width,
+    )
+    if stablehlo is not None:
+        rms_accepted_schedule_contract["stablehlo"] = (
+            _validate_rms_accepted_schedule_stablehlo(
+                stablehlo,
+                enabled=rms_accepted_schedule,
+                layernorm_width=config.index_key_width,
+            )
+        )
+        rms_accepted_schedule_contract["violations"] = [
+            *rms_accepted_schedule_contract["violations"],
+            *rms_accepted_schedule_contract["stablehlo"]["violations"],
+        ]
+        rms_accepted_schedule_contract["passed"] = not rms_accepted_schedule_contract[
+            "violations"
+        ]
+    violations.extend(rms_accepted_schedule_contract["violations"])
+    rms_carry_allowances = rms_accepted_schedule_contract.get("carry_allowances", {})
     live_tensor_contract = _classify_decoder_live_tensor_shapes(
         module,
         config=config,
@@ -5037,6 +5304,7 @@ def validate_decoder_step_hlo(
         strategy_nd_attention_projection=(
             strategy_nd_attention_projection
         ),
+        rms_accepted_schedule_carry_allowances=rms_carry_allowances,
     )
     forbidden_shapes = live_tensor_contract["forbidden_shapes"]
     violations.extend(live_tensor_contract["violations"])
@@ -5152,6 +5420,7 @@ def validate_decoder_step_hlo(
                 dsa_head_key_exact_association
             ),
             module=module,
+            rms_accepted_schedule_carry_allowances=rms_carry_allowances,
         )
         violations.extend(fused_qkv_a_contract["violations"])
     main_rope_table_contract = _validate_main_rope_table_hlo(
@@ -5168,29 +5437,6 @@ def validate_decoder_step_hlo(
         main_rope_table_enabled=main_rope_table_enabled,
     )
     violations.extend(dsa_rope_table_contract["violations"])
-    if not isinstance(rms_accepted_schedule, bool):
-        raise PlanValidationError("decoder RMS accepted-schedule HLO flag must be boolean")
-    rms_accepted_schedule_contract = _validate_rms_accepted_schedule_hlo(
-        module,
-        enabled=rms_accepted_schedule,
-        layernorm_width=config.index_key_width,
-    )
-    if stablehlo is not None:
-        rms_accepted_schedule_contract["stablehlo"] = (
-            _validate_rms_accepted_schedule_stablehlo(
-                stablehlo,
-                enabled=rms_accepted_schedule,
-                layernorm_width=config.index_key_width,
-            )
-        )
-        rms_accepted_schedule_contract["violations"] = [
-            *rms_accepted_schedule_contract["violations"],
-            *rms_accepted_schedule_contract["stablehlo"]["violations"],
-        ]
-        rms_accepted_schedule_contract["passed"] = not rms_accepted_schedule_contract[
-            "violations"
-        ]
-    violations.extend(rms_accepted_schedule_contract["violations"])
     pregathered_attention_contract = (
         _validate_pregathered_b512_attention_hlo(
             optimized_hlo,
@@ -5291,7 +5537,11 @@ def validate_decoder_step_hlo(
         "dsa_rope_table_enabled": dsa_rope_table_enabled,
         "dsa_rope_table_contract": dsa_rope_table_contract,
         "rms_accepted_schedule": rms_accepted_schedule,
-        "rms_accepted_schedule_contract": rms_accepted_schedule_contract,
+        "rms_accepted_schedule_contract": {
+            key: value
+            for key, value in rms_accepted_schedule_contract.items()
+            if key != "carry_allowances"
+        },
         "pregathered_b512_attention": pregathered_b512_attention,
         "strategy_nd_attention_projection": (
             strategy_nd_attention_projection

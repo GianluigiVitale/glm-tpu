@@ -10737,3 +10737,75 @@ closed again on worker 0. The binding now compares the two trees' `--git-common-
 a foreign canonical are refused inside the same `env -i` path; a static test binds that `main()`
 calls the binding right after the exact HEAD check and that the constants are the production paths.
 Suites: 66 passed. The fresh tag `..._ras_..._trace2_20260902T094725673772375Z` remains unstarted.
+
+## 2026-09-02 approved run `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T094725673772375Z` (pin a49e3ba1): full decoder compiled on TPU, HLO contracts failed closed before execution
+
+Sol approved execution with the rotary table off after I put the refusal evidence to him (adjudication
+`2a7c8fb5…`: event 0 bit-exact without the table, not with it). All reconfirmations passed (mirror
+verifier exit 0 for a1487c65, mirror ref == a49e3ba1, eight worktrees clean, four leases free, pod
+READY/HEALTHY, three-scope vacancy, worker 0 idle). Launched 10:06:21Z; the hardened boundary worked
+end to end on all eight workers (detached pin worktree `$run/source` at a49e3ba1, `env -i` process,
+`worktree_binding == detached_pin_worktree`); the 78-layer 8K decoder loaded and **compiled on TPU**;
+`validate_decoder_step_hlo` then **refused before execution** with 158 violations; failure-exit census
+8/8; the run's TPU HLO (`hlo/decoder_78layer_8k_token.optimized_hlo.txt.gz`, 79 MB inflated,
+232,093 instructions), StableHLO and contract JSON are archived locally and under the tag's remote
+prefix. No tokens were produced; the tag is burned; no claim.
+
+Diagnosis on the archived TPU bytes (CPU only):
+1. `rms_accepted_schedule_contract`: 313 `rsqrt` (the legacy count), 235 conforming with the bound
+   lineage (157 × 6144-wide input/post-attention/final norms, 78 × 512-wide kv-a norms), **78
+   nonconforming**: the q-a norm of the fused qkv-a N82 path
+   (`kernels/reference/qkv_a.py::one_row_fused_qkv_a_convolution`) computes its own
+   `sum(square(local_q f32[32,1,64])) / 2048` → scalar `rsqrt`, bypassing `rms_norm`, so the flag
+   never reached it. The forced-CPU decoder test could not see it (the small plan uses the separate
+   qkv-a layout).
+2. `live_tensor_contract` / `fused_qkv_a_contract`: 1,570 `f32[32,6144]` occurrences refused as
+   dead-row tensors — every one of them an accepted-schedule carry (157 pads, 157 reduce-fusion
+   parameters + squares, 157 reduce fusions, normalize fusions and their row slices, one final-norm
+   convert). The one-live-row contracts predate a deliberate 32-row operand.
+
+Fixes (this commit):
+- `qkv_a.py`: `accepted_schedule` keyword; the logical q row is assembled in FP32 (transpose/reshape,
+  pure data movement) and normalized through `_accepted_schedule_normalized` (M32 pad, FP32
+  barrier, `f32[32,2048] -> f32[32]` last-axis reduce, same `x * inverse` product and single BF16
+  rounding); `kernels/layer.py::_project_attention_qkv_a` threads `rms_accepted_schedule`.
+  Tests `tests/greenfield/kernels/test_qkv_a_accepted_schedule.py`: default unchanged bit-for-bit,
+  accepted within BF16 rounding, kv-a companion identical, StableHLO carries the
+  `tensor<32x64xf32>` barrier and `tensor<32x1xf32>` rsqrt only when enabled.
+- `runtime/decoder.py`: `_rms_accepted_schedule_carry_allowances` — for each conforming `rms`
+  lineage, admit the lineage's own `f32[32,W]` signature on: the reduce fusion body, the carry
+  producer and its fused pad/convert/add body, and the carry's consumers within three hops in the
+  same computation through {fusion, slice, dynamic-slice, multiply, copy, copy-start/done, bitcast,
+  reshape, convert, get-tuple-element, tuple} (reduce fusion, normalize fusion + row slice, async
+  copies). `_classify_decoder_live_tensor_shapes` and `_validate_fused_qkv_a_decoder_association`
+  take the allowance map (reported as `allowed_rms_accepted_schedule_carries` /
+  `allowed_rms_accepted_schedule_carry_instruction_count`); the RMS contract now runs first and
+  additionally requires `carry_count == conforming` (every conforming lineage has a materialized
+  carry). Lineage lookups use a per-module index of fusion callers and computation roots (the
+  archive contract dropped from >10 min to 0.9 s after a 14 s parse).
+- Tests `tests/greenfield/runtime/test_rms_accepted_schedule_carry_allowances.py`: synthetic module —
+  the carry cone is admitted, a rogue `f32[32,128]` parameter and its square stay forbidden (4
+  occurrences); **archived TPU module** (skip-if-absent) — (313, 235, 78), carries 235 with widths
+  {512: 78, 6144: 157}, live-tensor forbidden 1,570 → 0 with `allowed_rms_accepted_schedule_carry_count
+  == 1570`, wk feature slices (256) and StrategyND partials unchanged, fused qkv-a
+  `['f32[32,6144]']` → `[]`, and removing one lineage's allowance re-exposes 1–4 records.
+
+Not proof: the q-a schedule for W=2048 is inferred from the legacy program's structure (all 313
+variances reduced as `f32[32]`), not separately replayed on TPU; the run itself is the test.
+Next: regression suites, commit/push, merge (rewrite goal.md byte-identical), preflight, fresh tag,
+one Sol review, one launch.
+
+## 2026-09-02 Sol BLOCK on ded62f86 (whole-fusion allowance) — exact SSA slices
+
+Sol refused `allow_computation`: admitting every `f32[32,W]` in a lineage's fusion bodies could hide a
+dead-row tensor colocated with the lineage. The allowance is now exact SSA slices: the backward slice
+of the reduce (square, carry parameter), the carry producer and the backward slice of its fused root
+(pad/convert/add), and for each consumer fusion within three hops only the backward slice of its
+root (normalize multiply, inverse broadcast, row slice). New synthetic module with a fused carry
+producer, a two-operand reduce fusion and a normalize fusion carrying off-slice rogues in every body:
+`%rogue_body`, `%r`/`%rogue_sq2`, `%rogue_n` and the entry `%rogue` stay forbidden while the admitted
+set is exactly the lineage (`%cv %carry_add %carry %rms_sum %p %sq %rsum %normalized %n0 %nb %nmul
+%nslice`). The archived TPU module still resolves 1,570 → 0 with the exact slices. (The classifier
+counts allowances per instruction and signature, so a rogue operand on a *fusion call* that also
+carries the lineage's carry is admitted at the call site only; its parameter and every use inside the
+body remain forbidden.)
