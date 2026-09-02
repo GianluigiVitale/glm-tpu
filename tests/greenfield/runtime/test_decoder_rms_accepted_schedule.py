@@ -28,7 +28,7 @@ import numpy as np
 from jax.sharding import NamedSharding
 from glm_tpu.greenfield.model import build_decoder_runtime_weight_layout, build_decoder_state_layout, build_pipeline_schedule
 from glm_tpu.greenfield.runtime import build_decoder_step_program
-from glm_tpu.greenfield.runtime.decoder import _validate_rms_accepted_schedule_hlo, _validate_rms_accepted_schedule_stablehlo
+from glm_tpu.greenfield.runtime.decoder import _validate_rms_accepted_schedule_hlo, _validate_rms_accepted_schedule_stablehlo, expected_rms_schedule_census
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 from tests.greenfield.checkpoint.test_runtime_pack import _small_plan
 
@@ -98,6 +98,8 @@ schedule_first = schedule_compiled(*inputs)
 def host(values):
     return [np.asarray(jax.device_get(value)) for value in values]
 default_out, schedule_out = host(first), host(schedule_first)
+expected_accepted, expected_sharded = expected_rms_schedule_census(layers=schedule.layer_count, attention_projection_backend=decoder.attention_projection_backend)
+census = dict(expected_accepted_count=expected_accepted, expected_sharded_qa_count=expected_sharded)
 default_module = parse_hlo_module(default_compiled.as_text())
 schedule_module = parse_hlo_module(schedule_compiled.as_text())
 report = {
@@ -105,15 +107,18 @@ report = {
     'metadata_equal': bool(np.array_equal(default_out[3], schedule_out[3])),
     'tokens_equal': bool(np.array_equal(default_out[4], schedule_out[4])) if len(default_out) > 4 else None,
     'index_key_width': int(decoder.config.index_key_width),
+    'layer_count': int(schedule.layer_count),
+    'attention_projection_backend': decoder.attention_projection_backend,
+    'expected_census': [expected_accepted, expected_sharded],
     'index_max_abs': float(np.abs(default_out[2].astype(np.float32) - schedule_out[2].astype(np.float32)).max()),
     'residual_max_abs': float(np.abs(default_out[0].astype(np.float32) - schedule_out[0].astype(np.float32)).max()),
     'default_contract': _validate_rms_accepted_schedule_hlo(default_module, enabled=False, layernorm_width=decoder.config.index_key_width),
-    'schedule_contract': _validate_rms_accepted_schedule_hlo(schedule_module, enabled=True, layernorm_width=decoder.config.index_key_width),
-    'default_as_schedule': _validate_rms_accepted_schedule_hlo(default_module, enabled=True, layernorm_width=decoder.config.index_key_width)['passed'],
+    'schedule_contract': _validate_rms_accepted_schedule_hlo(schedule_module, enabled=True, layernorm_width=decoder.config.index_key_width, **census),
+    'default_as_schedule': _validate_rms_accepted_schedule_hlo(default_module, enabled=True, layernorm_width=decoder.config.index_key_width, **census)['passed'],
     'schedule_as_default': _validate_rms_accepted_schedule_hlo(schedule_module, enabled=False, layernorm_width=decoder.config.index_key_width)['passed'],
     'default_stablehlo': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=False, layernorm_width=decoder.config.index_key_width),
-    'schedule_stablehlo': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=True, layernorm_width=decoder.config.index_key_width),
-    'default_stablehlo_as_schedule': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=True, layernorm_width=decoder.config.index_key_width)['passed'],
+    'schedule_stablehlo': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=True, layernorm_width=decoder.config.index_key_width, **census),
+    'default_stablehlo_as_schedule': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=True, layernorm_width=decoder.config.index_key_width, **census)['passed'],
     'schedule_stablehlo_as_default': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=False, layernorm_width=decoder.config.index_key_width)['passed'],
 }
 for key in ('default_contract', 'schedule_contract'):
@@ -156,6 +161,9 @@ print(json.dumps(report))
     assert report["schedule_stablehlo_as_default"] is False
     # The DSA indexer key LayerNorm is the only non-RMS rsqrt and is unchanged by the flag.
     assert report["index_key_width"] >= 1
+    assert report["expected_census"][0] == report["schedule_contract"]["conforming_rsqrt_count"]
+    assert report["expected_census"][1] == report["schedule_contract"]["sharded_qa_rsqrt_count"] == 0
+    assert report["attention_projection_backend"] == "separate"
     assert report["schedule_contract"]["layernorm_rsqrt_count"] >= 1
     assert report["schedule_contract"]["layernorm_rsqrt_count"] == report["default_contract"]["layernorm_rsqrt_count"]
     assert report["schedule_stablehlo"]["layernorm_rsqrt_count"] == report["default_stablehlo"]["layernorm_rsqrt_count"] >= 1

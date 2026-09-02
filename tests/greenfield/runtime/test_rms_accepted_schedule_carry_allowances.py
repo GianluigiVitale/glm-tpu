@@ -22,6 +22,8 @@ from glm_tpu.greenfield.runtime.decoder import (
     _rms_schedule_lineages,
     _validate_fused_qkv_a_decoder_association,
     _validate_rms_accepted_schedule_hlo,
+    _validate_rms_accepted_schedule_stablehlo,
+    expected_rms_schedule_census,
 )
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 from tests.greenfield.runtime.test_decoder import _real_8k_decoder_config
@@ -128,7 +130,7 @@ def test_synthetic_carry_is_admitted_and_a_rogue_dead_row_tensor_is_not() -> Non
     # ... the rogue parameter and its square (operand + result shapes) are not.
     assert forbidden == {"f32[32,128]": 4}
     assert _unallowed_names(module, allowances, "f32[32,128]") == {"%rogue", "%rogue_sq"}
-    assert _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=128)["passed"]
+    assert _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=128, expected_accepted_count=1, expected_sharded_qa_count=0)["passed"]
 
 
 def test_rogues_colocated_inside_admitted_fusion_bodies_stay_forbidden() -> None:
@@ -136,7 +138,7 @@ def test_rogues_colocated_inside_admitted_fusion_bodies_stay_forbidden() -> None
     normalize fusion are refused even though they share those computations with the lineage."""
 
     module = parse_hlo_module(FUSED_HLO)
-    contract = _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=128)
+    contract = _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=128, expected_accepted_count=1, expected_sharded_qa_count=0)
     assert contract["passed"], contract["violations"]
     assert contract["carry_summary"] == {"carry_count": 1, "allowed_instruction_count": contract["carry_summary"]["allowed_instruction_count"], "widths": {"128": 1}}
     by_key, lineages = _rms_schedule_lineages(module, layernorm_width=128)
@@ -164,10 +166,25 @@ def test_rogues_colocated_inside_admitted_fusion_bodies_stay_forbidden() -> None
 def test_archived_tpu_decoder_carries_are_all_explained_by_conforming_lineages() -> None:
     module = parse_hlo_module(gzip.open(ARCHIVE, "rt").read())
     config = _real_8k_decoder_config(dsa_score_default_precision=True)
-    rms = _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=config.index_key_width)
-    # This archive predates the fused q-a norm fix: 78 sharded q-a norms are still unbound.
-    assert (rms["rsqrt_count"], rms["conforming_rsqrt_count"], rms["nonconforming_rsqrt_count"]) == (313, 235, 78)
+    expected_accepted, expected_sharded = expected_rms_schedule_census(layers=78, attention_projection_backend="fused_n82_convolution")
+    assert (expected_accepted, expected_sharded) == (235, 78)
+    census = dict(expected_accepted_count=expected_accepted, expected_sharded_qa_count=expected_sharded)
+    rms = _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=config.index_key_width, **census)
+    # First run (pin a49e3ba1): the 78 fused q-a norms carry the legacy-faithful virtual-TP32 sharded
+    # reduction, bound as their own kind; the 235 hidden/kv-a norms carry the accepted schedule.
+    assert (rms["rsqrt_count"], rms["conforming_rsqrt_count"], rms["nonconforming_rsqrt_count"]) == (313, 235, 0)
+    assert rms["sharded_qa_rsqrt_count"] == 78 and rms["layernorm_rsqrt_count"] == 0
+    assert rms["passed"], rms["violations"][:3]
     assert rms["carry_summary"]["carry_count"] == 235
+    stable_text = gzip.open(ARCHIVE.with_name("decoder_78layer_8k_token.stablehlo.mlir.gz"), "rt").read()
+    stable = _validate_rms_accepted_schedule_stablehlo(
+        stable_text, enabled=True, layernorm_width=config.index_key_width, **census
+    )
+    assert stable["passed"], stable["violations"][:3]
+    # A wrong census expectation is refused in both representations on the real module.
+    assert not _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=config.index_key_width, expected_accepted_count=236, expected_sharded_qa_count=78)["passed"]
+    assert not _validate_rms_accepted_schedule_stablehlo(stable_text, enabled=True, layernorm_width=config.index_key_width, expected_accepted_count=235, expected_sharded_qa_count=77)["passed"]
+    assert (stable["rsqrt_count"], stable["conforming_rsqrt_count"], stable["sharded_qa_rsqrt_count"], stable["barrier_count"]) == (313, 235, 78, 235)
     assert rms["carry_summary"]["widths"] == {"512": 78, "6144": 157}
     allowances = rms["carry_allowances"]
     common = dict(
@@ -207,9 +224,20 @@ def test_second_archived_tpu_decoder_schedules_all_313_norms_and_admits_the_bf16
     text = gzip.open(ARCHIVE_2, "rt").read()
     module = parse_hlo_module(text)
     config = _real_8k_decoder_config(dsa_score_default_precision=True)
-    rms = _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=config.index_key_width)
-    assert rms["passed"], rms["violations"][:3]
-    assert (rms["rsqrt_count"], rms["conforming_rsqrt_count"], rms["nonconforming_rsqrt_count"]) == (313, 313, 0)
+    # This run wrongly scheduled the q-a norm (event 0 flipped): with the bound census the
+    # 313-accepted / 0-sharded module must be REFUSED in both representations.
+    census = dict(expected_accepted_count=235, expected_sharded_qa_count=78)
+    rms = _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=config.index_key_width, **census)
+    assert not rms["passed"]
+    assert any("optimized HLO accepted-schedule RMS census drifted: expected 235, found 313" in v for v in rms["violations"])
+    assert any("optimized HLO virtual-TP32 sharded q-a census drifted: expected 78, found 0" in v for v in rms["violations"])
+    assert (rms["rsqrt_count"], rms["conforming_rsqrt_count"], rms["nonconforming_rsqrt_count"], rms["sharded_qa_rsqrt_count"]) == (313, 313, 0, 0)
+    stable = _validate_rms_accepted_schedule_stablehlo(
+        gzip.open(ARCHIVE_2.with_name("decoder_78layer_8k_token.stablehlo.mlir.gz"), "rt").read(),
+        enabled=True, layernorm_width=config.index_key_width, **census,
+    )
+    assert not stable["passed"] and stable["sharded_qa_rsqrt_count"] == 0 and stable["conforming_rsqrt_count"] == 313
+    assert any("StableHLO accepted-schedule RMS census drifted: expected 235, found 313" in v for v in stable["violations"])
     assert rms["carry_summary"]["carry_count"] == 313
     assert rms["carry_summary"]["widths"] == {"2048": 78, "512": 78, "6144": 157}
     allowances = rms["carry_allowances"]

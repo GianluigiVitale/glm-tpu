@@ -3570,3 +3570,10 @@ persistence only; review and persistence precede any v2 installation.
   archived. Classification: `DECODE_STEP_CONTRACTS_PASSED_ON_TPU;PREFILL_CONTRACT_FLAG_NOT_FORWARDED;
   FAILED_CLOSED_BEFORE_EXECUTION;TAG_BURNED;NO_CLAIM;GATE_D_OPEN`. Fix: forward the flag in
   `validate_teacher_forced_prefill_hlo`.
+- Protected 8K tag `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T130949040481337Z` (pin fdddeadf, `_ras`, sanitized launch): **first full execution with the
+  accepted schedule** — all three programs' contracts passed on TPU; prefill token exact; decode token
+  at 8155 exact (101252, margin 6.5); exact-DSA refused: event 0 one swap (4879→2540), event 1: 9,
+  event 2: 12, … (21 events, 41,502 order mismatches); censuses 8/8; observer npz `f32ae99a…`.
+  Classification: `EXECUTED_ON_TPU;TOKEN_EXACT_AT_8155;DSA_EVENT0_REGRESSED_ONE_SWAP;
+  QA_NORM_SCHEDULE_INFERENCE_REFUTED;TAG_BURNED;NO_CLAIM;GATE_D_OPEN`. Decision: fused q-a norm back to
+  the sharded legacy form (own contract kind); hidden-width and kv-a norms keep the accepted schedule.

@@ -243,7 +243,6 @@ def _project_attention_qkv_a(
             ),
             epsilon=epsilon,
         ),
-        accepted_schedule=rms_accepted_schedule,
     )
     return projected.q_residual, projected.kv_a_projection
 

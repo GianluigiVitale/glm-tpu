@@ -20,8 +20,11 @@ CONTROL_STABLE = RUN / "layer1_rms_schedule_control.stablehlo.mlir"
 pytestmark = pytest.mark.skipif(not SCHEDULE.exists(), reason="archived TPU HLO unavailable")
 
 
+CENSUS = dict(expected_accepted_count=1, expected_sharded_qa_count=0)
+
+
 def _contract(text: str, enabled: bool) -> dict:
-    return _validate_rms_accepted_schedule_hlo(parse_hlo_module(text), enabled=enabled)
+    return _validate_rms_accepted_schedule_hlo(parse_hlo_module(text), enabled=enabled, **CENSUS)
 
 
 def test_real_schedule_arm_passes_and_control_arm_fails_when_enabled() -> None:
@@ -84,11 +87,11 @@ def test_dummy_32_row_rsqrt_does_not_excuse_an_unscheduled_rms() -> None:
 
 
 def test_stablehlo_binding_requires_barrier_carried_32_row_scales() -> None:
-    schedule = _validate_rms_accepted_schedule_stablehlo(SCHEDULE_STABLE.read_text(), enabled=True)
+    schedule = _validate_rms_accepted_schedule_stablehlo(SCHEDULE_STABLE.read_text(), enabled=True, **CENSUS)
     assert schedule["passed"], schedule
     assert schedule["conforming_rsqrt_count"] == 1 and schedule["barrier_count"] == 1
     # The control arm reduces the same 32 rows but squares an unbarriered add.
-    control = _validate_rms_accepted_schedule_stablehlo(CONTROL_STABLE.read_text(), enabled=True)
+    control = _validate_rms_accepted_schedule_stablehlo(CONTROL_STABLE.read_text(), enabled=True, **CENSUS)
     assert not control["passed"]
     assert control["barrier_count"] == 0 and control["nonconforming_rsqrt_count"] == 1
     assert _validate_rms_accepted_schedule_stablehlo(CONTROL_STABLE.read_text(), enabled=False)["passed"]
@@ -109,5 +112,5 @@ def test_stablehlo_binding_requires_barrier_carried_32_row_scales() -> None:
 def test_hostile_stablehlo_mutations_are_refused(label: str, old: str, new: str) -> None:
     text = SCHEDULE_STABLE.read_text()
     assert old in text, label
-    result = _validate_rms_accepted_schedule_stablehlo(text.replace(old, new, 1), enabled=True)
+    result = _validate_rms_accepted_schedule_stablehlo(text.replace(old, new, 1), enabled=True, **CENSUS)
     assert not result["passed"], (label, result)
