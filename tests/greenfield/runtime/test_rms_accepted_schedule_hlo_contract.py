@@ -20,7 +20,7 @@ CONTROL_STABLE = RUN / "layer1_rms_schedule_control.stablehlo.mlir"
 pytestmark = pytest.mark.skipif(not SCHEDULE.exists(), reason="archived TPU HLO unavailable")
 
 
-CENSUS = dict(expected_accepted_count=1, expected_sharded_qa_count=0)
+CENSUS = dict(expected_accepted_count=1, expected_sharded_qa_count=0, expected_kv_a_count=0)
 
 
 def _contract(text: str, enabled: bool) -> dict:

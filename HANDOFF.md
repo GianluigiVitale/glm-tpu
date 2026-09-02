@@ -10945,3 +10945,52 @@ authentication code incorrect` / `fetch-pack: unexpected disconnect` / `fatal: p
 header` (exit 128); the other seven workers reported `SYNC_OK 906f3810`. No TPU process was started;
 failure-exit census 8/8; the tag is burned (never retried); no claim. Cause: a transient SSH/network
 fault on the worker-6 → GitHub fetch, not code. Worker 6 stayed at its previous pin, clean.
+
+## 2026-09-02 approved run `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T155131089617216Z` (pin 906f3810): event 0 exact again; event 1 = 7 (baseline 6)
+
+Sol approved execute-once on the unchanged pin after the transient sync fault; launched 15:56:55Z; all
+eight workers synced; all three programs' contracts passed on TPU (census 235 accepted / 78 sharded
+q-a bound); the decoder executed. Results: prefill token exact (220); decode token at 8155 exact
+(101252, rank 1, margin 6.19); **event 0 exact** — no selected-set mismatch, bounded score comparison
+over all 2,048 aligned positions `max_abs = 0.0` — so the q-a inference was the event-0 cause and the
+sharded legacy q-a norm is confirmed. Exact-DSA still refused: first mismatch at **event 1**
+(producer layer 1, offset 11, expected 8136, observed 8150), **7 selected-set mismatches at event 1**
+(expected-only 1052 1143 1841 2066 2436 7473 7575; observed-only 1026 3889 6642 6690 6738 6810 7463),
+then 12, 12, 23, 48, 58, 57, 110, … over 20 events; 39,897 order mismatches. Failure-exit census 8/8;
+tag burned; no claim; observer npz `eae3ca24…` and all HLO/contracts archived.
+
+Reading: with the default norms event 1 had 6 mismatches and the layer-1 RMS input `x` was certified
+identical to the legacy's (frontier certificate). This run changes two things upstream of event 1: the
+157 hidden-width norms (accepted schedule, proven to reproduce the legacy layer-1 row **given the same
+x**) and the 78 kv-a norms (accepted schedule, inferred). Event 0's scores are bit-identical, so the
+layer-0 input norm did not move `x`; the only other layer-0 change is the kv-a norm, which feeds the
+layer-0 attention output and therefore `x`. If `x` had stayed legacy-exact, the proven layer-1 schedule
+should have made event 1 exact; it did not (7 ≠ 0), so the kv-a change most plausibly moved `x`. The
+legacy `kv_a_layernorm` input (`kv_a_proj_with_mqa` output, `kv_da_sharding`) is produced by a
+contraction over the sharded hidden dimension; whether XLA reduces the norm before or after the
+cross-chip sum is not visible in the source, so the [32,512] inference has no evidence, while the
+default single-row kv-a norm produced a legacy-exact `x` in the baseline. Decision: kv-a norm back to
+the default single-row reduction (its own bound contract kind), accepted schedule only on the 157
+hidden-width norms; census becomes (157 accepted, 78 sharded q-a, 78 kv-a row norms).
+
+## 2026-09-02 kv-a norm back to its default single-row reduction; three-kind lineage census
+
+Implementation of the decision above. `stage_local_index_share_fp8_mapped` no longer passes the flag to
+the kv-a latent norm (it keeps `rms_norm`'s default single-row reduce); the flag now reaches only the
+157 hidden-width norms. The contract binds the default kv-a norm as kind `kv_a_row_norm` in both
+representations exactly as the baseline TPU archive (02:13Z run, every norm default) emits it —
+optimized HLO: `slice(bf16[1,576]) → convert f32[1,512] → square → reduce dims={0,1} → f32[]`, ×1/512
+per opcode, +1e-05, scalar rsqrt, square operand's arithmetic terminal `convert`; StableHLO:
+`slice → convert (1x512 bf16→f32) → chlo.square → reduce dims=[1] (1x512→1) → ÷512 → +1e-05 → rsqrt
+tensor<1x1xf32>` — on the configured kv width (`validate_decoder_step_hlo(kv_lora_rank=512)`, the
+forced-CPU test passes the small plan's 4). `expected_rms_schedule_census` returns (accepted, sharded
+q-a, kv-a rows): fused N82 → (2·L+1, L, L) = (157, 78, 78); separate → (3·L+1, 0, L); all three are
+mandatory when enabled and each drift is a violation. Archive evidence: the baseline module classifies
+(313 rsqrt: 78 sharded q-a, 78 kv-a rows, 0 accepted, 157 default hidden norms) and is refused in
+enabled mode / passes disabled; the first `_ras` archive (kv-a on the inferred [32,512]) is refused by
+the census (235 accepted / 0 kv-a rows) while passing every per-lineage check; the second archive is
+refused. Synthetic module carries all four kinds (4 rsqrt: 1/1/1/1) and passes in both representations;
+16 kv-a mutations (width, axis, combiner, scale, scale opcode, epsilon, non-square, non-converted
+latent, row-shaped scale) and the missing/extra/substituted census attacks are refused. The
+arithmetic-terminal walk now crosses `slice`/`dynamic-slice` (structural) so the CPU decoder's
+`convert(slice(...))` order binds the same kind as TPU's `slice(convert(...))`.

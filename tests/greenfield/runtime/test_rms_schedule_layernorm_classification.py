@@ -110,7 +110,7 @@ STABLEHLO = """module @synthetic {
 """
 
 
-CENSUS = dict(expected_accepted_count=1, expected_sharded_qa_count=0)
+CENSUS = dict(expected_accepted_count=1, expected_sharded_qa_count=0, expected_kv_a_count=0)
 
 
 def _hlo(text: str, *, enabled: bool = True, width: int = 128) -> dict:

@@ -40,8 +40,29 @@ QA_FUSION = """
 """
 
 HLO = RMS_HLO.replace("ENTRY %main (carry: f32[32,128], key: f32[1,128]) -> (f32[32], f32[1]) {", QA_FUSION + """
-ENTRY %main (carry: f32[32,128], key: f32[1,128], qproj: bf16[32,1,82]) -> (f32[32], f32[1]) {
+%kv_reduce (kp: bf16[1,576]) -> f32[] {
+  %kp = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(0)
+  %ks = bf16[1,512]{1,0:T(2,128)(2,1)} slice(%kp), slice={[0:1], [0:512]}
+  %kc = f32[1,512]{1,0:T(1,128)} convert(%ks)
+  %ksq = f32[1,512]{1,0:T(1,128)} multiply(%kc, %kc)
+  %kz = f32[] constant(0)
+  ROOT %ksum = f32[] reduce(%ksq, %kz), dimensions={0,1}, to_apply=%add_combiner
+}
+
+%kv_scale (kq: f32[]) -> f32[] {
+  %kq = f32[] parameter(0)
+  %kinv2 = f32[] constant(0.001953125)
+  %kmean2 = f32[] multiply(%kq, %kinv2)
+  %keps = f32[] constant(1e-05)
+  %kvar = f32[] add(%kmean2, %keps)
+  ROOT %krs = f32[] rsqrt(%kvar)
+}
+
+ENTRY %main (carry: f32[32,128], key: f32[1,128], qproj: bf16[32,1,82], kvproj: bf16[1,576]) -> (f32[32], f32[1]) {
   %qproj = bf16[32,1,82]{2,1,0:T(2,128)(2,1)} parameter(2)
+  %kvproj = bf16[1,576]{1,0:T(2,128)(2,1)} parameter(3)
+  %kv_sum = f32[] fusion(%kvproj), kind=kLoop, calls=%kv_reduce
+  %kv_scale.1 = f32[] fusion(%kv_sum), kind=kLoop, calls=%kv_scale
   %qa_sum = f32[] fusion(%qproj), kind=kLoop, calls=%qa_reduce
   %qa_scale.1 = f32[] fusion(%qa_sum), kind=kLoop, calls=%qa_scale""")
 
@@ -59,13 +80,27 @@ QA_STABLE = """    %201 = stablehlo.slice %arg2 [0:32, 0:1, 0:64] : (tensor<32x1
     %209 = stablehlo.add %207, %208 : tensor<1xf32>
     %210 = stablehlo.rsqrt %209 : tensor<1xf32>
 """
+KV_STABLE = """    %604 = stablehlo.slice %arg3 [0:1, 0:512] : (tensor<1x576xbf16>) -> tensor<1x512xbf16>
+    %605 = stablehlo.convert %604 : (tensor<1x512xbf16>) -> tensor<1x512xf32>
+    %606 = chlo.square %605 : tensor<1x512xf32> -> tensor<1x512xf32>
+    %cst_170 = stablehlo.constant dense<0.000000e+00> : tensor<f32>
+    %607 = stablehlo.reduce(%606 init: %cst_170) applies stablehlo.add across dimensions = [1] : (tensor<1x512xf32>, tensor<f32>) -> tensor<1xf32>
+    %608 = stablehlo.broadcast_in_dim %607, dims = [0] : (tensor<1xf32>) -> tensor<1x1xf32>
+    %cst_171 = stablehlo.constant dense<5.120000e+02> : tensor<f32>
+    %609 = stablehlo.broadcast_in_dim %cst_171, dims = [] : (tensor<f32>) -> tensor<1x1xf32>
+    %610 = stablehlo.divide %608, %609 : tensor<1x1xf32>
+    %cst_172 = stablehlo.constant dense<9.99999974E-6> : tensor<f32>
+    %611 = stablehlo.broadcast_in_dim %cst_172, dims = [] : (tensor<f32>) -> tensor<1x1xf32>
+    %612 = stablehlo.add %610, %611 : tensor<1x1xf32>
+    %613 = stablehlo.rsqrt %612 : tensor<1x1xf32>
+"""
 STABLEHLO = RMS_STABLEHLO.replace(
     "  func.func public @main(%arg0: tensor<32x128xf32>, %arg1: tensor<1x128xf32>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {\n",
-    "  func.func public @main(%arg0: tensor<32x128xf32>, %arg1: tensor<1x128xf32>, %arg2: tensor<32x1x82xbf16>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {\n" + QA_STABLE,
+    "  func.func public @main(%arg0: tensor<32x128xf32>, %arg1: tensor<1x128xf32>, %arg2: tensor<32x1x82xbf16>, %arg3: tensor<1x576xbf16>) -> (tensor<32x1xf32>, tensor<1x1xf32>) {\n" + QA_STABLE + KV_STABLE,
 )
 
 
-CENSUS = dict(expected_accepted_count=1, expected_sharded_qa_count=1)
+CENSUS = dict(expected_accepted_count=1, expected_sharded_qa_count=1, expected_kv_a_count=1)
 
 
 def _hlo(text: str, **census) -> dict:
@@ -80,13 +115,13 @@ def test_exact_sharded_qa_norm_is_classified_apart() -> None:
     assert HLO != RMS_HLO and STABLEHLO != RMS_STABLEHLO
     hlo = _hlo(HLO)
     assert hlo["passed"], hlo["violations"]
-    assert (hlo["rsqrt_count"], hlo["conforming_rsqrt_count"], hlo["layernorm_rsqrt_count"], hlo["sharded_qa_rsqrt_count"]) == (3, 1, 1, 1)
+    assert (hlo["rsqrt_count"], hlo["conforming_rsqrt_count"], hlo["layernorm_rsqrt_count"], hlo["sharded_qa_rsqrt_count"], hlo["kv_a_rsqrt_count"]) == (4, 1, 1, 1, 1)
     stable = _stable(STABLEHLO)
     assert stable["passed"], stable["violations"]
-    assert (stable["rsqrt_count"], stable["conforming_rsqrt_count"], stable["layernorm_rsqrt_count"], stable["sharded_qa_rsqrt_count"]) == (3, 1, 1, 1)
+    assert (stable["rsqrt_count"], stable["conforming_rsqrt_count"], stable["layernorm_rsqrt_count"], stable["sharded_qa_rsqrt_count"], stable["kv_a_rsqrt_count"]) == (4, 1, 1, 1, 1)
     # Flag off: the sharded q-a norm is not an accepted-schedule lineage and never trips the default contract by itself.
     default_only = _validate_rms_accepted_schedule_hlo(parse_hlo_module(HLO.replace("ROOT %rs = f32[32]{0} rsqrt(%var)", "ROOT %rs = f32[32]{0} add(%var, %var)")), enabled=False, layernorm_width=128)
-    assert default_only["passed"] and default_only["sharded_qa_rsqrt_count"] == 1
+    assert default_only["passed"] and default_only["sharded_qa_rsqrt_count"] == 1 and default_only["kv_a_rsqrt_count"] == 1
 
 
 @pytest.mark.parametrize(
@@ -134,7 +169,7 @@ def test_enabled_binders_refuse_omitted_census_expectations() -> None:
     from glm_tpu.greenfield.runtime.decoder import PlanValidationError
 
     module = parse_hlo_module(HLO)
-    for kwargs in ({}, {"expected_accepted_count": 1}, {"expected_sharded_qa_count": 1}, {"expected_accepted_count": -1, "expected_sharded_qa_count": 1}, {"expected_accepted_count": True, "expected_sharded_qa_count": 1}):
+    for kwargs in ({}, {"expected_accepted_count": 1}, {"expected_sharded_qa_count": 1}, {"expected_accepted_count": 1, "expected_sharded_qa_count": 1}, {"expected_accepted_count": -1, "expected_sharded_qa_count": 1, "expected_kv_a_count": 1}, {"expected_accepted_count": True, "expected_sharded_qa_count": 1, "expected_kv_a_count": 1}):
         with pytest.raises(PlanValidationError):
             _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=128, **kwargs)
         with pytest.raises(PlanValidationError):
@@ -145,8 +180,8 @@ def test_enabled_binders_refuse_omitted_census_expectations() -> None:
 
 
 def test_lineage_census_is_bound_exactly_in_both_representations() -> None:
-    assert expected_rms_schedule_census(layers=78, attention_projection_backend="fused_n82_convolution") == (235, 78)
-    assert expected_rms_schedule_census(layers=8, attention_projection_backend="separate") == (33, 0)
+    assert expected_rms_schedule_census(layers=78, attention_projection_backend="fused_n82_convolution") == (157, 78, 78)
+    assert expected_rms_schedule_census(layers=8, attention_projection_backend="separate") == (25, 0, 8)
     with pytest.raises(ValueError):
         expected_rms_schedule_census(layers=-1, attention_projection_backend="separate")
     # missing sharded lineage
@@ -163,15 +198,67 @@ def test_lineage_census_is_bound_exactly_in_both_representations() -> None:
     missing_rms_stable = STABLEHLO.replace("%8 = stablehlo.rsqrt %7 : tensor<32x1xf32>", "%8 = stablehlo.abs %7 : tensor<32x1xf32>")
     result = _stable(missing_rms_stable)
     assert not result["passed"] and any("accepted-schedule RMS census drifted: expected 1, found 0" in v for v in result["violations"])
+    # missing kv-a row norm
+    missing_kv = HLO.replace("ROOT %krs = f32[] rsqrt(%kvar)", "ROOT %krs = f32[] add(%kvar, %kvar)")
+    result = _hlo(missing_kv)
+    assert not result["passed"] and any("kv-a row-norm census drifted: expected 1, found 0" in v for v in result["violations"])
+    missing_kv_stable = STABLEHLO.replace("%613 = stablehlo.rsqrt %612 : tensor<1x1xf32>", "%613 = stablehlo.abs %612 : tensor<1x1xf32>")
+    result = _stable(missing_kv_stable)
+    assert not result["passed"] and any("kv-a row-norm census drifted: expected 1, found 0" in v for v in result["violations"])
     # extra lineages (expectation lower than found) and substitution (counts shifted between kinds)
-    assert not _hlo(HLO, expected_accepted_count=1, expected_sharded_qa_count=0)["passed"]
-    assert not _hlo(HLO, expected_accepted_count=0, expected_sharded_qa_count=1)["passed"]
-    assert not _hlo(HLO, expected_accepted_count=2, expected_sharded_qa_count=0)["passed"]
-    assert not _stable(STABLEHLO, expected_accepted_count=1, expected_sharded_qa_count=0)["passed"]
-    assert not _stable(STABLEHLO, expected_accepted_count=0, expected_sharded_qa_count=2)["passed"]
+    assert not _hlo(HLO, expected_accepted_count=1, expected_sharded_qa_count=0, expected_kv_a_count=1)["passed"]
+    assert not _hlo(HLO, expected_accepted_count=0, expected_sharded_qa_count=1, expected_kv_a_count=1)["passed"]
+    assert not _hlo(HLO, expected_accepted_count=2, expected_sharded_qa_count=0, expected_kv_a_count=1)["passed"]
+    assert not _hlo(HLO, expected_accepted_count=1, expected_sharded_qa_count=1, expected_kv_a_count=0)["passed"]
+    assert not _stable(STABLEHLO, expected_accepted_count=1, expected_sharded_qa_count=0, expected_kv_a_count=1)["passed"]
+    assert not _stable(STABLEHLO, expected_accepted_count=0, expected_sharded_qa_count=2, expected_kv_a_count=1)["passed"]
+    assert not _stable(STABLEHLO, expected_accepted_count=1, expected_sharded_qa_count=1, expected_kv_a_count=2)["passed"]
     # the decoder-step validator computes the census from its layer count and backend and forwards it to both binders
     import inspect
     source = inspect.getsource(validate_decoder_step_hlo)
-    assert "expected_rms_schedule_census(\n        layers=layers, attention_projection_backend=attention_projection_backend\n    )" in source
+    assert "expected_accepted_count, expected_sharded_qa_count, expected_kv_a_count = (" in source
+    assert "layers=layers, attention_projection_backend=attention_projection_backend" in source
     assert source.count("expected_accepted_count=expected_accepted_count") == 2
     assert source.count("expected_sharded_qa_count=expected_sharded_qa_count") == 2
+    assert source.count("expected_kv_a_count=expected_kv_a_count") == 2
+    assert source.count("kv_a_width=kv_lora_rank") == 2
+
+
+@pytest.mark.parametrize(
+    ("label", "old", "new"),
+    (
+        ("wrong_width", "f32[1,512]", "f32[1,256]"),
+        ("partial_reduce_axis", "reduce(%ksq, %kz), dimensions={0,1}", "reduce(%ksq, %kz), dimensions={0}"),
+        ("max_combiner", "reduce(%ksq, %kz), dimensions={0,1}, to_apply=%add_combiner", "reduce(%ksq, %kz), dimensions={0,1}, to_apply=%max_combiner"),
+        ("wrong_scale", "constant(0.001953125)", "constant(0.00390625)"),
+        ("wrong_epsilon", "%keps = f32[] constant(1e-05)", "%keps = f32[] constant(1e-06)"),
+        ("not_a_square", "%ksq = f32[1,512]{1,0:T(1,128)} multiply(%kc, %kc)", "%ksq = f32[1,512]{1,0:T(1,128)} add(%kc, %kc)"),
+        ("not_the_converted_latent", "%ksq = f32[1,512]{1,0:T(1,128)} multiply(%kc, %kc)", "%kneg = f32[1,512]{1,0:T(1,128)} negate(%kc)\n  %ksq = f32[1,512]{1,0:T(1,128)} multiply(%kneg, %kneg)"),
+        ("row_scale", "ROOT %krs = f32[] rsqrt(%kvar)", "ROOT %krs = f32[2] rsqrt(%kvar)"),
+    ),
+)
+def test_hlo_kv_a_row_norm_mutations_are_refused(label: str, old: str, new: str) -> None:
+    assert old in HLO, label
+    result = _hlo(HLO.replace(old, new))
+    assert not result["passed"], (label, result)
+    assert result["kv_a_rsqrt_count"] == 0, (label, result)
+
+
+@pytest.mark.parametrize(
+    ("label", "old", "new"),
+    (
+        ("wrong_width", "across dimensions = [1] : (tensor<1x512xf32>", "across dimensions = [1] : (tensor<1x256xf32>"),
+        ("wrong_axis", "across dimensions = [1] : (tensor<1x512xf32>", "across dimensions = [0] : (tensor<1x512xf32>"),
+        ("max_combiner", "applies stablehlo.add across dimensions = [1] : (tensor<1x512xf32>", "applies stablehlo.maximum across dimensions = [1] : (tensor<1x512xf32>"),
+        ("wrong_scale", "dense<5.120000e+02>", "dense<2.560000e+02>"),
+        ("scale_opcode_swapped", "%610 = stablehlo.divide %608, %609", "%610 = stablehlo.multiply %608, %609"),
+        ("wrong_epsilon", "%cst_172 = stablehlo.constant dense<9.99999974E-6>", "%cst_172 = stablehlo.constant dense<9.99999997E-7>"),
+        ("not_converted_latent", "%606 = chlo.square %605", "%606 = chlo.square %604"),
+        ("row_scale", "%613 = stablehlo.rsqrt %612 : tensor<1x1xf32>", "%613 = stablehlo.rsqrt %612 : tensor<2x1xf32>"),
+    ),
+)
+def test_stablehlo_kv_a_row_norm_mutations_are_refused(label: str, old: str, new: str) -> None:
+    assert old in STABLEHLO, label
+    result = _stable(STABLEHLO.replace(old, new, 1))
+    assert not result["passed"], (label, result)
+    assert result["kv_a_rsqrt_count"] == 0, (label, result)

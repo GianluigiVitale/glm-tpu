@@ -2661,6 +2661,12 @@ FUSED_QKV_A_VIRTUAL_SHARDS = 32
 FUSED_QKV_A_Q_LORA_RANK = 2048
 FUSED_QKV_A_Q_WIDTH_PER_SHARD = FUSED_QKV_A_Q_LORA_RANK // FUSED_QKV_A_VIRTUAL_SHARDS
 
+# The kv-a latent norm keeps the default single-row reduction: the baseline
+# runs with it produced a legacy-exact layer-1 RMS input, and the inferred
+# [32,512] schedule did not (2026-09-02).  It is bound as its own kind on the
+# configured kv-lora width (512 on the real model).
+KV_A_LORA_RANK = 512
+
 
 def _rms_schedule_arithmetic_terminal(
     module: HloModule,
@@ -2674,7 +2680,12 @@ def _rms_schedule_arithmetic_terminal(
         if current is None:
             return None
         opcode = current.opcode
-        if opcode in {"bitcast", "reshape", "copy", "opt-barrier"} and current.operand_names:
+        # Structural ops (including row/lane slices, which move no arithmetic)
+        # are crossed; the first arithmetic opcode names the lineage.
+        if (
+            opcode in {"bitcast", "reshape", "copy", "opt-barrier", "slice", "dynamic-slice"}
+            and current.operand_names
+        ):
             current = by_key.get((current.computation, current.operand_names[0]))
             continue
         if opcode == "get-tuple-element" and current.operand_names:
@@ -2847,6 +2858,7 @@ def _rms_schedule_lineage(
     rsqrt: HloInstruction,
     *,
     layernorm_width: int,
+    kv_a_width: int = KV_A_LORA_RANK,
 ) -> dict[str, Any]:
     """Bind one rsqrt to square -> last-axis reduce -> 1/W -> +eps -> rsqrt.
 
@@ -2982,6 +2994,20 @@ def _rms_schedule_lineage(
             problems.append(f"sharded q-a mean scale {width_scale} does not match 1/{FUSED_QKV_A_Q_LORA_RANK}")
         if arithmetic != "convert":
             problems.append(f"sharded q-a square operand is not the converted projection ({arithmetic})")
+        record["problems"] = problems
+        return record
+    if operand_2d and operand_shape.dimensions == (1, kv_a_width) and arithmetic != "subtract":
+        record["kind"] = "kv_a_row_norm"
+        if reduce_dims not in ((0, 1), (1,)) or reduce_result not in ((), (1,)):
+            problems.append("kv-a row norm reduce is not the single-row f32[1,W] reduction")
+        if epsilon is None or abs(epsilon - 1e-5) > 1e-12:
+            problems.append(f"kv-a row norm epsilon is not 1e-05: {epsilon}")
+        if not result_f32 or result_dims not in ((), (1,), (1, 1)):
+            problems.append("kv-a row norm rsqrt is not a scalar-row scale")
+        if not _rms_schedule_scale_matches(mean.opcode, width_scale, kv_a_width):
+            problems.append(f"kv-a row norm mean scale {width_scale} does not match 1/{kv_a_width}")
+        if arithmetic != "convert":
+            problems.append(f"kv-a row norm square operand is not the converted latent ({arithmetic})")
         record["problems"] = problems
         return record
     if reduce_dims != (1,) or not operand_2d or reduce_result != (rows,):
@@ -3124,7 +3150,12 @@ def _stablehlo_constant(definitions: _StablehloScope, name: str) -> float | None
 
 
 def _stablehlo_rsqrt_lineage(
-    definitions: _StablehloScope, name: str, rest: str, *, layernorm_width: int
+    definitions: _StablehloScope,
+    name: str,
+    rest: str,
+    *,
+    layernorm_width: int,
+    kv_a_width: int = KV_A_LORA_RANK,
 ) -> dict[str, Any]:
     """Bind one StableHLO rsqrt (see ``_rms_schedule_lineage`` for the two kinds)."""
 
@@ -3241,6 +3272,26 @@ def _stablehlo_rsqrt_lineage(
     else:
         carried_name = None
     carried = definitions.lookup(carried_name) if carried_name else None
+    if rows == 1 and width == kv_a_width and not (carried is not None and carried[0] == "stablehlo.subtract"):
+        record["kind"] = "kv_a_row_norm"
+        problems: list[str] = []
+        if "applies stablehlo.add" not in reduce_rest or "dimensions = [1]" not in reduce_rest or reduced_rows != 1:
+            problems.append("kv-a row norm reduce is not the single-row last-axis add-reduce")
+        if carried_name is None:
+            problems.append("kv-a row norm reduce operand is not a square")
+        if carried is None or carried[0] != "stablehlo.convert" or not carried[1].rstrip().endswith(
+            f"(tensor<1x{kv_a_width}xbf16>) -> tensor<1x{kv_a_width}xf32>"
+        ):
+            problems.append("kv-a row norm square operand is not the converted BF16 latent")
+        if epsilon is None or abs(epsilon - 1e-5) > 1e-11:
+            problems.append(f"kv-a row norm epsilon is not 1e-05: {epsilon}")
+        if not _rms_schedule_scale_matches(mean[0], width_scale, kv_a_width):
+            problems.append(f"kv-a row norm mean scale {width_scale} does not match 1/{kv_a_width}")
+        if record["type"] not in ("tensor<1xf32>", "tensor<1x1xf32>"):
+            problems.append("kv-a row norm rsqrt is not a scalar-row scale")
+        record.update({"width": width, "width_scale": width_scale, "epsilon": epsilon})
+        record["problems"] = problems
+        return record
     record.update(
         {
             "rows": rows,
@@ -3293,8 +3344,10 @@ def _validate_rms_accepted_schedule_stablehlo(
     *,
     enabled: bool,
     layernorm_width: int = 128,
+    kv_a_width: int = KV_A_LORA_RANK,
     expected_accepted_count: int | None = None,
     expected_sharded_qa_count: int | None = None,
+    expected_kv_a_count: int | None = None,
 ) -> dict[str, Any]:
     """Bind the pre-fusion RMS lineage, including the FP32 barrier.
 
@@ -3306,7 +3359,9 @@ def _validate_rms_accepted_schedule_stablehlo(
     """
 
     if enabled:
-        _require_rms_schedule_census(expected_accepted_count, expected_sharded_qa_count)
+        _require_rms_schedule_census(
+            expected_accepted_count, expected_sharded_qa_count, expected_kv_a_count
+        )
     lineages: list[dict[str, Any]] = []
     barrier_count = 0
     for definitions in _stablehlo_scopes(stablehlo):
@@ -3314,7 +3369,11 @@ def _validate_rms_accepted_schedule_stablehlo(
             if opcode == "stablehlo.rsqrt":
                 lineages.append(
                     _stablehlo_rsqrt_lineage(
-                        definitions, name, rest, layernorm_width=layernorm_width
+                        definitions,
+                        name,
+                        rest,
+                        layernorm_width=layernorm_width,
+                        kv_a_width=kv_a_width,
                     )
                 )
             elif opcode == "stablehlo.optimization_barrier" and re.search(
@@ -3331,8 +3390,15 @@ def _validate_rms_accepted_schedule_stablehlo(
         for record in lineages
         if record.get("kind") == "virtual_tp32_sharded_qa" and not record["problems"]
     ]
+    kv_a_rows = [
+        record
+        for record in lineages
+        if record.get("kind") == "kv_a_row_norm" and not record["problems"]
+    ]
     rms_lineages = [
-        record for record in lineages if record not in layernorms and record not in sharded_qa
+        record
+        for record in lineages
+        if record not in layernorms and record not in sharded_qa and record not in kv_a_rows
     ]
     conforming = [record for record in rms_lineages if not record["problems"]]
     nonconforming = [record for record in rms_lineages if record["problems"]]
@@ -3345,8 +3411,10 @@ def _validate_rms_accepted_schedule_stablehlo(
                 representation="StableHLO",
                 conforming=len(conforming),
                 sharded_qa=len(sharded_qa),
+                kv_a=len(kv_a_rows),
                 expected_accepted_count=expected_accepted_count,
                 expected_sharded_qa_count=expected_sharded_qa_count,
+                expected_kv_a_count=expected_kv_a_count,
             )
         )
         for record in nonconforming:
@@ -3364,6 +3432,7 @@ def _validate_rms_accepted_schedule_stablehlo(
         "layernorm_rsqrt_count": len(layernorms),
         "nonconforming_rsqrt_count": len(nonconforming),
         "sharded_qa_rsqrt_count": len(sharded_qa),
+        "kv_a_rsqrt_count": len(kv_a_rows),
         "nonconforming": nonconforming[:8],
         "passed": not violations,
         "rsqrt_count": len(lineages),
@@ -3373,30 +3442,35 @@ def _validate_rms_accepted_schedule_stablehlo(
 
 def expected_rms_schedule_census(
     *, layers: int, attention_projection_backend: str
-) -> tuple[int, int]:
-    """(accepted RMS lineages, sharded q-a lineages) the enabled contract must find.
+) -> tuple[int, int, int]:
+    """(accepted RMS, sharded q-a, kv-a row-norm) lineages the enabled contract must find.
 
     Every layer carries an input norm, a post-attention norm, a q-a norm and a
-    kv-a norm, plus one final norm.  With the fused N82 qkv-a projection the q-a
-    norm is the legacy-faithful virtual-TP32 sharded reduction (its own kind);
-    with the separate projection it is a plain RMS norm on the accepted schedule.
+    kv-a norm, plus one final norm.  The input, post-attention and final norms
+    carry the accepted schedule.  The kv-a norm keeps its default single-row
+    reduction (its own kind).  With the fused N82 qkv-a projection the q-a norm
+    is the legacy-faithful virtual-TP32 sharded reduction (its own kind); with
+    the separate projection it is a plain RMS norm on the accepted schedule.
     """
 
     if not isinstance(layers, int) or isinstance(layers, bool) or layers < 0:
         raise ValueError("layer count must be a non-negative integer")
     if attention_projection_backend == "fused_n82_convolution":
-        return 3 * layers + 1, layers
-    return 4 * layers + 1, 0
+        return 2 * layers + 1, layers, layers
+    return 3 * layers + 1, 0, layers
 
 
 def _require_rms_schedule_census(
-    expected_accepted_count: int | None, expected_sharded_qa_count: int | None
+    expected_accepted_count: int | None,
+    expected_sharded_qa_count: int | None,
+    expected_kv_a_count: int | None,
 ) -> None:
-    """The enabled contract refuses to run without both census expectations."""
+    """The enabled contract refuses to run without all three census expectations."""
 
     for label, value in (
         ("expected_accepted_count", expected_accepted_count),
         ("expected_sharded_qa_count", expected_sharded_qa_count),
+        ("expected_kv_a_count", expected_kv_a_count),
     ):
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             raise PlanValidationError(
@@ -3409,10 +3483,17 @@ def _rms_schedule_census_violations(
     representation: str,
     conforming: int,
     sharded_qa: int,
+    kv_a: int,
     expected_accepted_count: int | None,
     expected_sharded_qa_count: int | None,
+    expected_kv_a_count: int | None,
 ) -> list[str]:
     violations: list[str] = []
+    if expected_kv_a_count is not None and kv_a != expected_kv_a_count:
+        violations.append(
+            f"{representation} kv-a row-norm census drifted: "
+            f"expected {expected_kv_a_count}, found {kv_a}"
+        )
     if expected_accepted_count is not None and conforming != expected_accepted_count:
         violations.append(
             f"{representation} accepted-schedule RMS census drifted: "
@@ -3427,12 +3508,14 @@ def _rms_schedule_census_violations(
 
 
 def _rms_schedule_lineages(
-    module: HloModule, *, layernorm_width: int
+    module: HloModule, *, layernorm_width: int, kv_a_width: int = KV_A_LORA_RANK
 ) -> tuple[dict[tuple[str, str], HloInstruction], list[dict[str, Any]]]:
     by_key = _rms_schedule_by_key(module)
     rsqrts = tuple(item for item in module.instructions if item.opcode == "rsqrt")
     return by_key, [
-        _rms_schedule_lineage(module, by_key, item, layernorm_width=layernorm_width)
+        _rms_schedule_lineage(
+            module, by_key, item, layernorm_width=layernorm_width, kv_a_width=kv_a_width
+        )
         for item in rsqrts
     ]
 
@@ -3633,8 +3716,10 @@ def _validate_rms_accepted_schedule_hlo(
     *,
     enabled: bool,
     layernorm_width: int = 128,
+    kv_a_width: int = KV_A_LORA_RANK,
     expected_accepted_count: int | None = None,
     expected_sharded_qa_count: int | None = None,
+    expected_kv_a_count: int | None = None,
 ) -> dict[str, Any]:
     """Pin the accepted decode-step RMS variance schedule.
 
@@ -3652,8 +3737,12 @@ def _validate_rms_accepted_schedule_hlo(
     """
 
     if enabled:
-        _require_rms_schedule_census(expected_accepted_count, expected_sharded_qa_count)
-    by_key, lineages = _rms_schedule_lineages(module, layernorm_width=layernorm_width)
+        _require_rms_schedule_census(
+            expected_accepted_count, expected_sharded_qa_count, expected_kv_a_count
+        )
+    by_key, lineages = _rms_schedule_lineages(
+        module, layernorm_width=layernorm_width, kv_a_width=kv_a_width
+    )
     rsqrts = tuple(item for item in module.instructions if item.opcode == "rsqrt")
     layernorms = [
         record
@@ -3665,8 +3754,15 @@ def _validate_rms_accepted_schedule_hlo(
         for record in lineages
         if record.get("kind") == "virtual_tp32_sharded_qa" and not record["problems"]
     ]
+    kv_a_rows = [
+        record
+        for record in lineages
+        if record.get("kind") == "kv_a_row_norm" and not record["problems"]
+    ]
     rms_lineages = [
-        record for record in lineages if record not in layernorms and record not in sharded_qa
+        record
+        for record in lineages
+        if record not in layernorms and record not in sharded_qa and record not in kv_a_rows
     ]
     conforming = [record for record in rms_lineages if not record["problems"]]
     nonconforming = [record for record in rms_lineages if record["problems"]]
@@ -3679,8 +3775,10 @@ def _validate_rms_accepted_schedule_hlo(
                 representation="optimized HLO",
                 conforming=len(conforming),
                 sharded_qa=len(sharded_qa),
+                kv_a=len(kv_a_rows),
                 expected_accepted_count=expected_accepted_count,
                 expected_sharded_qa_count=expected_sharded_qa_count,
+                expected_kv_a_count=expected_kv_a_count,
             )
         )
         for record in nonconforming:
@@ -3717,6 +3815,8 @@ def _validate_rms_accepted_schedule_hlo(
         "expected_accepted_count": expected_accepted_count,
         "expected_sharded_qa_count": expected_sharded_qa_count,
         "sharded_qa_rsqrt_count": len(sharded_qa),
+        "kv_a_rsqrt_count": len(kv_a_rows),
+        "expected_kv_a_count": expected_kv_a_count,
         "tiled_module": module_uses_tiling(module),
         "violations": violations,
     }
@@ -5068,6 +5168,7 @@ def validate_decoder_step_hlo(
     dense_final_layout_convolution: bool = False,
     dsa_rope_table_enabled: bool = False,
     rms_accepted_schedule: bool = False,
+    kv_lora_rank: int = KV_A_LORA_RANK,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -5451,15 +5552,19 @@ def validate_decoder_step_hlo(
         violations.extend(complete_token_collective_contract["violations"])
     if not isinstance(rms_accepted_schedule, bool):
         raise PlanValidationError("decoder RMS accepted-schedule HLO flag must be boolean")
-    expected_accepted_count, expected_sharded_qa_count = expected_rms_schedule_census(
-        layers=layers, attention_projection_backend=attention_projection_backend
+    expected_accepted_count, expected_sharded_qa_count, expected_kv_a_count = (
+        expected_rms_schedule_census(
+            layers=layers, attention_projection_backend=attention_projection_backend
+        )
     )
     rms_accepted_schedule_contract = _validate_rms_accepted_schedule_hlo(
         module,
         enabled=rms_accepted_schedule,
         layernorm_width=config.index_key_width,
+        kv_a_width=kv_lora_rank,
         expected_accepted_count=expected_accepted_count,
         expected_sharded_qa_count=expected_sharded_qa_count,
+        expected_kv_a_count=expected_kv_a_count,
     )
     if stablehlo is not None:
         rms_accepted_schedule_contract["stablehlo"] = (
@@ -5467,8 +5572,10 @@ def validate_decoder_step_hlo(
                 stablehlo,
                 enabled=rms_accepted_schedule,
                 layernorm_width=config.index_key_width,
+                kv_a_width=kv_lora_rank,
                 expected_accepted_count=expected_accepted_count,
                 expected_sharded_qa_count=expected_sharded_qa_count,
+                expected_kv_a_count=expected_kv_a_count,
             )
         )
         rms_accepted_schedule_contract["violations"] = [
