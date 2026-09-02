@@ -44,14 +44,13 @@ table refuted. **Layer-1 frontier certified on CPU** (`gate-d-layer1-scale-front
 FP32 RMS input and differ only in the FP32 scale `rsqrt(mean+eps)` by 1–4 ulps. Legacy reduces the
 variance over `f32[32,6144]{T(8,128)}` dims={1}; greenfield over `f32[1,1,6144]`.
 
-Ready (Sol: APPROVE PERSISTENCE b43d9c13): captured-RMS probe `accepted_split` arm = FP32-carry
-accepted-schedule arm; launcher canonical (literal tag, sanitized Git, mirror replay, 3-scope
-vacancy, 4 leases). Sol BLOCKS EXECUTE until it runs via a V3-style sealed launcher (root-owned
-launcher → sealed memfd wrapper → immutable Python/JAX children → `env -i bash --noprofile --norc
-/proc/self/fd/N`). Next: owner waiver for this 10-second bounded probe, or build chain
-`gate-d-layer1-rms-schedule-probe-v1` (HANDOFF plan), Sol review, sudo provision, then the
-invocation with the reserved tag (HANDOFF). Control must equal DB548; arm exact ⇔ accepted row;
-then decoder change, one 8K run.
+Built (commits 5207c406/68809f8d): sealed-launcher chain `gate-d-layer1-rms-schedule-v1`
+(driver/publisher/wrapper/launcher/installer/analyzer + package modules), tests 70/2 skipped,
+certificate `gate-d-layer1-rms-schedule-orchestration-certificate.json`. Staging tree
+`/home/gianl/gate-d-runs/gate-d-layer1-rms-schedule-install-v1-staging` (tree sha `f0e1fbc1…`).
+Reserved tag `gate_d_layer1_rms_schedule_20260902T055253369372668Z` (vacant). Next: Sol batched verdict (persistence, install-only, execute-once);
+then the two literal sudo install commands (HANDOFF), then the literal launcher invocation. Control
+must equal DB548; arm exact ⇔ accepted row; then decoder change, one 8K run.
 
 ## Finish (after Gate D)
 
