@@ -10416,3 +10416,29 @@ immutable Python children and dependencies, and invoke through an exact
 `/usr/bin/env -i … /usr/bin/bash --noprofile --norc /proc/self/fd/<fd>` boundary — the chain the
 PP16 numerical capsules (V1–V3) already use. The reserved tag `greenfield_layer0_captured_rms_replay_20260902T045006596197989Z` had no start and stays
 reserved for the re-review of that invocation. No TPU work has occurred.
+
+## 2026-09-02 status: layer-1 RMS schedule probe is ready but execution needs the sealed-launcher chain
+
+State: tooling head pushed and mirrored; certificate, FP32-carry schedule arm, matcher, tests and the
+canonical-protection launcher are persisted (Sol: `APPROVE PERSISTENCE b43d9c13`). Sol blocks
+execution of the literal invocation until it goes through the PP16-style boundary: a root-owned
+immutable launcher that snapshots the committed wrapper into a sealed memfd, verifies root-owned
+immutable Python children and dependencies against the committed blobs, and execs
+`/usr/bin/env -i … /usr/bin/bash --noprofile --norc /proc/self/fd/<fd>`. A free CPU pre-test
+(inverting the 2026-08-13 accepted-schedule arm's recorded row 229dc8ac… with its own rounded input)
+is inconclusive: its effective scale window is s0'−11…s0'+20 and straddles the exact value, so only
+the TPU probe decides.
+
+Build plan for the chain (clone of V3, `gate-d-layer1-rms-schedule-probe-v1`): (1) root-owned
+launcher pinning the wrapper blob SHA, the probe/driver SHA and a `git archive` tree SHA of
+`glm_tpu/` plus the probe's script imports at the pin, materialized into a root-owned 0555 snapshot
+so no mutable worktree source is executed; (2) installer cloned from
+`install_gate_d_projection_contraction_pp16_numerical_runtime.py` with the snapshot payload;
+(3) wrapper adaptations: run from `/proc/self/fd/10`, `PYTHONPATH`/probe path from the snapshot,
+immutable Python `-I -S -B` with the immutable JAX/libtpu site capsules
+(`/opt/glm-tpu/gate-d-jax-site-55233c63939e`, `gate-d-libtpu-site-db7598c867f3`) instead of
+`/home/gianl/vllm-env`; (4) tests, one batched Sol review, provisioning with `sudo -n`, then the
+literal invocation with the still-vacant tag `greenfield_layer0_captured_rms_replay_20260902T045006596197989Z`. Owner decision offered: this chain costs
+hours for a ten-second bounded diagnostic with no DB row or Gate-D claim; the alternative is an
+explicit owner waiver of Sol's same-UID TOCTOU concern for this bounded probe under the current
+canonical protections. Without a waiver the chain is built.
