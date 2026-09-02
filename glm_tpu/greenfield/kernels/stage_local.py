@@ -2568,11 +2568,13 @@ def stage_local_index_share_fp8_mapped(
             contract.kv_lora_rank + contract.qk_rope_head_dim,
         ) or current_kv.dtype != state_dtype:
             raise ValueError("IndexShare precomputed kv_a projection is invalid")
+    # The kv-a latent norm keeps its default single-row reduction: the baseline
+    # runs with it produced a legacy-exact layer-1 RMS input, and the inferred
+    # 32-row schedule did not (2026-09-02); the flag applies to hidden-width norms.
     current_latent = rms_norm(
         current_kv[..., : contract.kv_lora_rank],
         kv_a_norm_weight,
         epsilon=lora_norm_epsilon,
-        accepted_schedule=rms_accepted_schedule,
     )
     current_rope_input = current_kv[
         ...,

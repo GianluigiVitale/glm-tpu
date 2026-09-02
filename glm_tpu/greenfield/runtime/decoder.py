@@ -2661,6 +2661,614 @@ FUSED_QKV_A_VIRTUAL_SHARDS = 32
 FUSED_QKV_A_Q_LORA_RANK = 2048
 FUSED_QKV_A_Q_WIDTH_PER_SHARD = FUSED_QKV_A_Q_LORA_RANK // FUSED_QKV_A_VIRTUAL_SHARDS
 
+# The kv-a latent norm keeps the default single-row reduction: the baseline
+# runs with it produced a legacy-exact layer-1 RMS input, and the inferred
+# [32,512] schedule did not (2026-09-02).  It is bound as its own kind on the
+# configured kv-lora width (512 on the real model).
+KV_A_LORA_RANK = 512
+# The kv-a latent is the ``[0:1, 0:512]`` slice of the 576-wide kv-a projection
+# (``kv_lora_rank + qk_rope_head_dim``); the norm's provenance is bound to it.
+QK_ROPE_HEAD_DIM = 64
+KV_A_PROJECTION_WIDTH = KV_A_LORA_RANK + QK_ROPE_HEAD_DIM
+
+
+FUSED_QKV_A_KV_WIDTH_PER_SHARD = KV_A_PROJECTION_WIDTH // FUSED_QKV_A_VIRTUAL_SHARDS
+
+
+def _rms_schedule_resolve_structural(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    value: HloInstruction | None,
+    *,
+    passthrough: frozenset[str],
+    stop: frozenset[str],
+    limit: int = 16,
+) -> HloInstruction | None:
+    """Follow ``passthrough`` ops, fusion parameters and fusion roots until a ``stop`` opcode."""
+
+    current = value
+    for _ in range(limit):
+        if current is None:
+            return None
+        if current.opcode in stop:
+            return current
+        if current.opcode in passthrough and current.operand_names:
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if current.opcode == "parameter":
+            index_match = re.search(r"\bparameter\(([0-9]+)\)", current.raw_line)
+            caller = _rms_schedule_caller(module, current.computation)
+            if caller is None or index_match is None:
+                return current
+            index = int(index_match.group(1))
+            if index >= len(caller.operand_names):
+                return None
+            current = by_key.get((caller.computation, caller.operand_names[index]))
+            continue
+        if current.opcode == "fusion":
+            current = _rms_schedule_callee_root(module, current)
+            continue
+        return current
+    return None
+
+
+def _rms_schedule_body_element(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    value: HloInstruction | None,
+    *,
+    body_id: str,
+    passthrough: frozenset[str],
+) -> tuple[HloInstruction | None, int | None]:
+    """Resolve to a loop-carried element (gte of the body parameter) or (None, None)."""
+
+    leaf = _rms_schedule_resolve_structural(
+        module, by_key, value, passthrough=passthrough, stop=frozenset({"get-tuple-element"})
+    )
+    if leaf is None or leaf.opcode != "get-tuple-element" or not leaf.operand_names:
+        return None, None
+    source = by_key.get((leaf.computation, leaf.operand_names[0]))
+    index_match = re.search(r"\bindex=([0-9]+)", leaf.raw_line)
+    if (
+        source is None
+        or source.opcode != "parameter"
+        or _rms_schedule_computation_id(source.computation) != body_id
+        or index_match is None
+    ):
+        return None, None
+    return leaf, int(index_match.group(1))
+
+
+_RMS_STRUCTURAL_NOISE = frozenset({"bitcast", "reshape", "copy"})
+
+
+def _rms_schedule_next_semantic(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    value: HloInstruction | None,
+) -> HloInstruction | None:
+    """Skip XLA's data-movement noise (bitcast/reshape/copy, fusion boundaries) to the next op."""
+
+    return _rms_schedule_resolve_structural(
+        module, by_key, value, passthrough=_RMS_STRUCTURAL_NOISE, stop=frozenset()
+    )
+
+
+def _rms_schedule_match_chain(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    value: HloInstruction | None,
+    steps: Sequence[tuple[str, Any, str]],
+) -> tuple[HloInstruction | None, str | None]:
+    """Match an exact sequence of semantic ops (opcode + predicate), noise allowed between.
+
+    Returns (instruction reached after the last step's first operand, problem).
+    """
+
+    current = value
+    for opcode, predicate, label in steps:
+        instruction = _rms_schedule_next_semantic(module, by_key, current)
+        if instruction is None or instruction.opcode != opcode:
+            return None, f"expected {label} ({opcode}), found {instruction.opcode if instruction is not None else None}"
+        if not predicate(instruction):
+            return None, f"{label} does not carry the required arity/dtypes: {instruction.raw_line[:120]}"
+        if not instruction.operand_names:
+            return None, f"{label} has no operand"
+        current = by_key.get((instruction.computation, instruction.operand_names[0]))
+        last = instruction
+    return last, None
+
+
+def _rms_dtype(instruction: HloInstruction | None, *, operand: int | None = None) -> str | None:
+    if instruction is None:
+        return None
+    shapes = instruction.operand_shapes if operand is not None else instruction.result_shapes
+    if operand is not None:
+        return shapes[operand].dtype if len(shapes) > operand else None
+    return shapes[0].dtype if shapes else None
+
+
+def _rms_schedule_loop_slice(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    sliced: HloInstruction,
+    *,
+    body_id: str,
+    element_shape: tuple[str, tuple[int, ...]],
+) -> tuple[int | None, int | None, str | None]:
+    """``dynamic-slice(loop element, loop counter, 0, 0)`` with exact operand roles."""
+
+    if len(sliced.operand_names) != 4:
+        return None, None, "dynamic slice arity is not (source, counter, 0, 0)"
+    element, element_index = _rms_schedule_body_element(
+        module, by_key, by_key.get((sliced.computation, sliced.operand_names[0])),
+        body_id=body_id, passthrough=_RMS_STRUCTURAL_NOISE,
+    )
+    if element is None or not any(
+        (shape.dtype, shape.dimensions) == element_shape for shape in element.result_shapes
+    ):
+        return None, None, f"slice source is not the loop-carried {element_shape[0]}{list(element_shape[1])} element"
+    counter, counter_index = _rms_schedule_body_element(
+        module, by_key, by_key.get((sliced.computation, sliced.operand_names[1])),
+        body_id=body_id, passthrough=_RMS_STRUCTURAL_NOISE,
+    )
+    if counter is None or not any(shape.dtype == "s32" for shape in counter.result_shapes):
+        return element_index, None, "slice index is not the loop-carried s32 counter"
+    for name in sliced.operand_names[2:]:
+        operand = by_key.get((sliced.computation, name))
+        if operand is None or operand.opcode != "constant" or "constant(0)" not in operand.raw_line:
+            return element_index, counter_index, "slice trailing indices are not zero constants"
+    return element_index, counter_index, None
+
+
+def _rms_schedule_n82_operand_problems(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    convolution: HloInstruction,
+    *,
+    body_id: str,
+    hidden_size: int,
+    accumulator_index: int,
+) -> list[str]:
+    """Bind the N82 convolution operands as exact, position-specific DAGs.
+
+    hidden: noise only (bitcast/reshape/copy, fusion boundaries) to the
+    loop-carried ``bf16[1,H]`` element.
+    weight: ``convert(f32->bf16)`` <- ``multiply`` <- factors, in either order:
+      A = ``convert(f8e4m3fn->f32)`` <- ``bitcast-convert(u8->f8e4m3fn)`` <-
+          ``dynamic-slice(loop u8[32,H,82], counter, 0, 0)``
+      B = ``broadcast(dimensions={0,2}, f32)`` <-
+          ``dynamic-slice(loop f32[32,H/128,82], counter, 0, 0)``
+    Every semantic node is required at its position; only data-movement noise
+    may sit between them.  The hidden, weights, scales, counter and accumulator
+    elements must be five distinct loop tuple indices.
+    """
+
+    shards = FUSED_QKV_A_VIRTUAL_SHARDS
+    packed = FUSED_QKV_A_Q_WIDTH_PER_SHARD + FUSED_QKV_A_KV_WIDTH_PER_SHARD
+    scale_rows = hidden_size // 128
+    problems: list[str] = []
+    if len(convolution.operand_names) != 2:
+        return ["N82 convolution arity is not two operands"]
+    hidden, hidden_index = _rms_schedule_body_element(
+        module, by_key, by_key.get((convolution.computation, convolution.operand_names[0])),
+        body_id=body_id, passthrough=_RMS_STRUCTURAL_NOISE,
+    )
+    if hidden is None or not any(
+        (shape.dtype, shape.dimensions) == ("bf16", (1, hidden_size)) for shape in hidden.result_shapes
+    ):
+        problems.append(
+            f"N82 convolution hidden operand is not structurally the loop-carried bf16[1,{hidden_size}] element"
+        )
+    outer, problem = _rms_schedule_match_chain(
+        module, by_key, by_key.get((convolution.computation, convolution.operand_names[1])),
+        [
+            ("convert", lambda i: _rms_dtype(i) == "bf16" and _rms_dtype(i, operand=0) == "f32" and len(i.operand_names) == 1, "dequant output convert"),
+            ("multiply", lambda i: _rms_dtype(i) == "f32" and len(i.operand_names) == 2, "dequant multiply"),
+        ],
+    )
+    if problem is not None:
+        return problems + [f"N82 convolution weight operand: {problem}"]
+    factors = [by_key.get((outer.computation, name)) for name in outer.operand_names]
+    weight_steps = [
+        ("convert", lambda i: _rms_dtype(i) == "f32" and _rms_dtype(i, operand=0) == "f8e4m3fn" and len(i.operand_names) == 1, "FP8 -> f32 convert"),
+        ("bitcast-convert", lambda i: _rms_dtype(i) == "f8e4m3fn" and _rms_dtype(i, operand=0) == "u8" and len(i.operand_names) == 1, "u8 -> FP8 bitcast-convert"),
+        ("dynamic-slice", lambda i: _rms_dtype(i) == "u8", "packed-weight dynamic slice"),
+    ]
+    scale_steps = [
+        ("broadcast", lambda i: _rms_dtype(i) == "f32" and "dimensions={0,2}" in i.raw_line and len(i.operand_names) == 1, "scale broadcast"),
+        ("dynamic-slice", lambda i: _rms_dtype(i) == "f32", "scale dynamic slice"),
+    ]
+    best: tuple[list[str], int | None, int | None, int | None, int | None] | None = None
+    for a, b in (factors, factors[::-1]):
+        local: list[str] = []
+        w_slice, w_problem = _rms_schedule_match_chain(module, by_key, a, weight_steps)
+        s_slice, s_problem = _rms_schedule_match_chain(module, by_key, b, scale_steps)
+        if w_problem:
+            local.append(f"weights: {w_problem}")
+        if s_problem:
+            local.append(f"scales: {s_problem}")
+        w_index = w_counter = s_index = s_counter = None
+        if w_slice is not None and not w_problem:
+            w_index, w_counter, w_slice_problem = _rms_schedule_loop_slice(
+                module, by_key, w_slice, body_id=body_id, element_shape=("u8", (shards, hidden_size, packed))
+            )
+            if w_slice_problem:
+                local.append(f"weights: {w_slice_problem}")
+        if s_slice is not None and not s_problem:
+            s_index, s_counter, s_slice_problem = _rms_schedule_loop_slice(
+                module, by_key, s_slice, body_id=body_id, element_shape=("f32", (shards, scale_rows, packed))
+            )
+            if s_slice_problem:
+                local.append(f"scales: {s_slice_problem}")
+        if best is None or len(local) < len(best[0]):
+            best = (local, w_index, w_counter, s_index, s_counter)
+        if not local:
+            break
+    local, w_index, w_counter, s_index, s_counter = best
+    if local:
+        problems.append("N82 convolution weight operand is not the exact FP8 dequant DAG: " + "; ".join(local))
+        return problems
+    if w_counter != s_counter:
+        problems.append("N82 weight and scale slices are not indexed by the same loop counter")
+    indices = {hidden_index, w_index, s_index, w_counter, accumulator_index}
+    if None in indices or len(indices) != 5:
+        problems.append(
+            f"N82 loop elements are not distinct (hidden={hidden_index}, weights={w_index}, scales={s_index}, "
+            f"counter={w_counter}, accumulator={accumulator_index})"
+        )
+    return problems
+
+
+def _rms_schedule_fused_projection_loop(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    value: HloInstruction | None,
+    *,
+    hidden_size: int,
+) -> list[str]:
+    """Bind a ``bf16[32,1,82]`` value to the fused qkv-a N82 projection loop by dataflow.
+
+    The value must be loop-carried result ``k`` of a ``while`` (reached through
+    tuple access, copies, fusion parameters/roots).  In the body, root tuple
+    element ``k`` must be a ``dynamic-update-slice`` whose accumulator operand is
+    loop-carried element ``k`` of the body parameter and whose update value
+    resolves (converts, reshapes, bitcasts, copies, fusion parameters/roots) to
+    the one-row N82 convolution ``f32[1,82] = convolution(bf16[1,H], bf16[H,82])``
+    with ``dim_labels=bf_io->bf``.  A dead convolution beside an unrelated
+    accumulator is refused.
+    """
+
+    shards = FUSED_QKV_A_VIRTUAL_SHARDS
+    packed = FUSED_QKV_A_Q_WIDTH_PER_SHARD + FUSED_QKV_A_KV_WIDTH_PER_SHARD
+    current = value
+    result_index: int | None = None
+    for _ in range(12):
+        if current is None:
+            return ["fused qkv-a projection buffer producer is unresolved"]
+        opcode = current.opcode
+        if opcode == "get-tuple-element" and current.operand_names:
+            index_match = re.search(r"\bindex=([0-9]+)", current.raw_line)
+            result_index = int(index_match.group(1)) if index_match else None
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if opcode in {"copy", "bitcast", "reshape"} and current.operand_names:
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if opcode == "parameter":
+            index_match = re.search(r"\bparameter\(([0-9]+)\)", current.raw_line)
+            caller = _rms_schedule_caller(module, current.computation)
+            if caller is None or index_match is None:
+                return ["fused qkv-a projection buffer resolves to an entry parameter, not the projection loop"]
+            index = int(index_match.group(1))
+            if index >= len(caller.operand_names):
+                return ["fused qkv-a projection buffer parameter index escapes its caller"]
+            current = by_key.get((caller.computation, caller.operand_names[index]))
+            continue
+        if opcode == "fusion":
+            current = _rms_schedule_callee_root(module, current)
+            continue
+        if opcode == "while":
+            break
+        return [f"fused qkv-a projection buffer producer is {opcode}, not the N82 projection loop"]
+    else:
+        return ["fused qkv-a projection buffer producer chain is too deep"]
+    if result_index is None:
+        return ["fused qkv-a projection buffer is not a loop-carried tuple element"]
+    body_match = re.search(r"\bbody=%?([^,\s}]+)", current.raw_line)
+    if body_match is None:
+        return ["fused qkv-a projection loop carries no body"]
+    body_id = body_match.group(1)
+    body = [item for item in module.instructions if _rms_schedule_computation_id(item.computation) == body_id]
+    if not body:
+        return ["fused qkv-a projection loop body is absent"]
+    root = next((item for item in body if item.raw_line.lstrip().startswith("ROOT ")), None)
+    if root is None or root.opcode != "tuple" or result_index >= len(root.operand_names):
+        return ["fused qkv-a projection loop body root is not a tuple carrying the result index"]
+    carried = by_key.get((root.computation, root.operand_names[result_index]))
+    update = _rms_schedule_resolve_structural(
+        module, by_key, carried,
+        passthrough=frozenset({"copy", "bitcast", "reshape", "get-tuple-element"}),
+        stop=frozenset({"dynamic-update-slice"}),
+    )
+    if update is None or update.opcode != "dynamic-update-slice" or len(update.operand_names) < 2:
+        return [f"fused qkv-a loop result {result_index} is not produced by a dynamic-update-slice accumulator"]
+    if not any(shape.dtype == "bf16" and shape.dimensions == (shards, 1, packed) for shape in update.result_shapes):
+        return [f"fused qkv-a loop accumulator is not bf16[{shards},1,{packed}]"]
+    problems: list[str] = []
+    # accumulator operand must be loop-carried element result_index of the body parameter
+    accumulator = _rms_schedule_resolve_structural(
+        module, by_key, by_key.get((update.computation, update.operand_names[0])),
+        passthrough=frozenset({"copy", "bitcast", "reshape"}),
+        stop=frozenset({"get-tuple-element"}),
+    )
+    carried_ok = False
+    if accumulator is not None and accumulator.opcode == "get-tuple-element":
+        index_match = re.search(r"\bindex=([0-9]+)", accumulator.raw_line)
+        source = by_key.get((accumulator.computation, accumulator.operand_names[0])) if accumulator.operand_names else None
+        carried_ok = (
+            index_match is not None
+            and int(index_match.group(1)) == result_index
+            and source is not None
+            and source.opcode == "parameter"
+            and _rms_schedule_computation_id(source.computation) == body_id
+        )
+    if not carried_ok:
+        problems.append(f"fused qkv-a loop accumulator is not loop-carried element {result_index} of the body parameter")
+    # update value must root in the N82 convolution
+    convolution = _rms_schedule_resolve_structural(
+        module, by_key, by_key.get((update.computation, update.operand_names[1])),
+        passthrough=frozenset({"convert", "copy", "bitcast", "reshape", "get-tuple-element", "broadcast"}),
+        stop=frozenset({"convolution"}),
+    )
+    def _n82(instruction: HloInstruction | None) -> bool:
+        if instruction is None or instruction.opcode != "convolution":
+            return False
+        shapes = [(shape.dtype, shape.dimensions) for shape in instruction.operand_shapes]
+        return (
+            "dim_labels=bf_io->bf" in instruction.raw_line
+            and any(shape.dimensions == (1, packed) and shape.dtype == "f32" for shape in instruction.result_shapes)
+            and ("bf16", (1, hidden_size)) in shapes
+            and ("bf16", (hidden_size, packed)) in shapes
+        )
+    if not _n82(convolution):
+        problems.append(
+            f"fused qkv-a loop update value does not root in the N82 convolution f32[1,{packed}] = "
+            f"bf16[1,{hidden_size}] x bf16[{hidden_size},{packed}] (dim_labels=bf_io->bf): "
+            f"{convolution.opcode if convolution is not None else None}"
+        )
+    else:
+        problems.extend(
+            _rms_schedule_n82_operand_problems(
+                module, by_key, convolution, body_id=body_id, hidden_size=hidden_size,
+                accumulator_index=result_index,
+            )
+        )
+    return problems
+
+
+def _rms_schedule_separate_kv_linear(
+    instruction: HloInstruction, *, projection_width: int, hidden_size: int
+) -> list[str]:
+    """Bind a separate-layout kv-a ``dot``/``convolution`` by its contraction."""
+
+    problems: list[str] = []
+    elements = 1
+    for value_dim in (instruction.result_shapes[0].dimensions if instruction.result_shapes else ()):
+        elements *= value_dim
+    if elements != projection_width:
+        problems.append(f"kv-a projection linear carries {elements} elements, expected {projection_width}")
+    if len(instruction.operand_shapes) < 2:
+        return problems + ["kv-a projection linear lacks two operands"]
+    lhs, rhs = instruction.operand_shapes[0], instruction.operand_shapes[1]
+    if instruction.opcode == "dot":
+        lhs_dims = re.search(r"\blhs_contracting_dims=\{([0-9,]*)\}", instruction.raw_line)
+        rhs_dims = re.search(r"\brhs_contracting_dims=\{([0-9,]*)\}", instruction.raw_line)
+        try:
+            lhs_sizes = [lhs.dimensions[int(v)] for v in lhs_dims.group(1).split(",")] if lhs_dims and lhs_dims.group(1) else []
+            rhs_sizes = [rhs.dimensions[int(v)] for v in rhs_dims.group(1).split(",")] if rhs_dims and rhs_dims.group(1) else []
+        except (IndexError, ValueError):
+            lhs_sizes, rhs_sizes = [], []
+        if lhs_sizes != [hidden_size] or rhs_sizes != [hidden_size]:
+            problems.append(
+                f"kv-a projection dot does not contract the hidden size {hidden_size}: "
+                f"lhs {lhs_sizes} rhs {rhs_sizes}"
+            )
+    else:
+        if hidden_size not in lhs.dimensions or hidden_size not in rhs.dimensions:
+            problems.append(f"kv-a projection convolution does not contract the hidden size {hidden_size}")
+    return problems
+
+
+def _rms_schedule_kv_a_projection_producer(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    value: HloInstruction | None,
+    *,
+    projection_width: int,
+    attention_projection_backend: str,
+    hidden_size: int = 6144,
+) -> list[str]:
+    """Bind the P-wide kv-a projection value to its producer.
+
+    Fused N82 layout: the value must resolve, through structural ops only
+    (reshape/bitcast/copy/transpose/tuple access, size-1 squeezing reduces,
+    fusion roots and fusion parameters), to the lane slice
+    ``[0:S], [0:1], [Q:Q+K]`` of the ``bf16[S,1,Q+K]`` fused qkv-a projection
+    buffer (S=32 virtual shards, Q=64 q lanes, K=18 kv lanes per shard).
+    Separate layout: the value must resolve, additionally through converts, to a
+    ``dot``/``convolution`` whose result carries P elements (the kv-a linear).
+    """
+
+    problems: list[str] = []
+    fused = attention_projection_backend == "fused_n82_convolution"
+    shards = FUSED_QKV_A_VIRTUAL_SHARDS
+    q_lanes = FUSED_QKV_A_Q_WIDTH_PER_SHARD
+    kv_lanes = projection_width // shards if shards else 0
+    current = value
+    for _ in range(16):
+        if current is None:
+            problems.append("kv-a projection producer is unresolved")
+            return problems
+        opcode = current.opcode
+        if opcode in {"reshape", "bitcast", "copy", "transpose", "get-tuple-element"} and current.operand_names:
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if opcode == "convert" and not fused and current.operand_names:
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if opcode == "reduce" and current.operand_names and current.operand_shapes and current.result_shapes:
+            operand_dims = current.operand_shapes[0].dimensions
+            result_dims = current.result_shapes[0].dimensions
+            dims = re.search(r"\bdimensions=\{([0-9,]*)\}", current.raw_line)
+            reduced = tuple(int(v) for v in dims.group(1).split(",")) if dims and dims.group(1) else ()
+            squeeze = len(reduced) == 1 and len(operand_dims) == len(result_dims) + 1 and operand_dims[reduced[0]] == 1
+            if not squeeze:
+                problems.append("kv-a projection chain carries a non-squeeze reduce")
+                return problems
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if opcode == "parameter":
+            index_match = re.search(r"\bparameter\(([0-9]+)\)", current.raw_line)
+            caller = _rms_schedule_caller(module, current.computation)
+            if caller is None or index_match is None:
+                problems.append("kv-a projection resolves to an entry parameter, not the projection")
+                return problems
+            index = int(index_match.group(1))
+            if index >= len(caller.operand_names):
+                problems.append("kv-a projection parameter index escapes its caller")
+                return problems
+            current = by_key.get((caller.computation, caller.operand_names[index]))
+            continue
+        if opcode == "fusion":
+            current = _rms_schedule_callee_root(module, current)
+            continue
+        if fused and opcode == "slice":
+            bounds = re.search(r"\bslice=\{([^}]*)\}", current.raw_line)
+            expected = f"[0:{shards}], [0:1], [{q_lanes}:{q_lanes + kv_lanes}]"
+            operand_shape = current.operand_shapes[0] if current.operand_shapes else None
+            if bounds is None or bounds.group(1).strip() != expected:
+                problems.append(f"kv-a projection lane slice is not {{{expected}}}: {bounds.group(1) if bounds else None}")
+            if (
+                operand_shape is None
+                or operand_shape.dtype != "bf16"
+                or operand_shape.dimensions != (shards, 1, q_lanes + kv_lanes)
+            ):
+                problems.append(
+                    f"kv-a projection lane slice operand is not the bf16[{shards},1,{q_lanes + kv_lanes}] "
+                    f"fused qkv-a projection: {operand_shape.to_dict() if operand_shape else None}"
+                )
+                return problems
+            buffer = by_key.get((current.computation, current.operand_names[0]))
+            problems.extend(
+                _rms_schedule_fused_projection_loop(module, by_key, buffer, hidden_size=hidden_size)
+            )
+            return problems
+        if not fused and opcode in {"dot", "convolution"}:
+            problems.extend(
+                _rms_schedule_separate_kv_linear(
+                    current, projection_width=projection_width, hidden_size=hidden_size
+                )
+            )
+            return problems
+        problems.append(f"kv-a projection producer is {opcode}, not the kv-a projection")
+        return problems
+    problems.append("kv-a projection producer chain is too deep")
+    return problems
+
+
+def _rms_schedule_kv_a_provenance(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    carrier: HloInstruction | None,
+    *,
+    kv_a_width: int,
+    projection_width: int,
+    attention_projection_backend: str = "fused_n82_convolution",
+    hidden_size: int = 6144,
+) -> list[str]:
+    """Bind the kv-a latent to ``convert``/``slice([0:1],[0:W])`` of the P-wide projection.
+
+    Both emitted orders are accepted — TPU's ``convert(slice(projection))`` and
+    CPU's ``slice(convert(projection))`` — through structural ops and fusion
+    parameters only.  Exactly one ``convert`` (bf16 -> f32) and exactly one
+    ``slice`` with bounds ``[0:1], [0:kv_a_width]`` whose operand is
+    ``[1, projection_width]`` must appear before the projection producer.
+    """
+
+    problems: list[str] = []
+    converts = 0
+    slices = 0
+    projection_value: HloInstruction | None = None
+    current = carrier
+    for _ in range(12):
+        if current is None:
+            problems.append("kv-a latent provenance is unresolved")
+            break
+        if converts == 1 and slices == 1:
+            break
+        opcode = current.opcode
+        if opcode == "convert" and current.operand_names:
+            operand = by_key.get((current.computation, current.operand_names[0]))
+            operand_dtype = operand.result_shapes[0].dtype if operand is not None and operand.result_shapes else None
+            result_dtype = current.result_shapes[0].dtype if current.result_shapes else None
+            if operand_dtype not in (None, "bf16") or result_dtype != "f32":
+                problems.append(f"kv-a latent convert is not bf16 -> f32 ({operand_dtype} -> {result_dtype})")
+            converts += 1
+            current = operand
+            projection_value = current
+            continue
+        if opcode == "slice" and current.operand_names:
+            bounds = re.search(r"\bslice=\{([^}]*)\}", current.raw_line)
+            expected = f"[0:1], [0:{kv_a_width}]"
+            if bounds is None or bounds.group(1).strip() != expected:
+                problems.append(f"kv-a latent slice bounds are not {{{expected}}}: {bounds.group(1) if bounds else None}")
+            operand_shape = current.operand_shapes[0] if current.operand_shapes else None
+            if operand_shape is None or operand_shape.dimensions != (1, projection_width):
+                problems.append(
+                    "kv-a latent slice operand is not the [1, "
+                    f"{projection_width}] kv-a projection: {operand_shape.to_dict() if operand_shape else None}"
+                )
+            slices += 1
+            current = by_key.get((current.computation, current.operand_names[0]))
+            projection_value = current
+            continue
+        if opcode in {"bitcast", "reshape", "copy", "get-tuple-element"} and current.operand_names:
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if opcode == "parameter":
+            index_match = re.search(r"\bparameter\(([0-9]+)\)", current.raw_line)
+            caller = _rms_schedule_caller(module, current.computation)
+            if caller is None or index_match is None:
+                break
+            index = int(index_match.group(1))
+            if index >= len(caller.operand_names):
+                break
+            current = by_key.get((caller.computation, caller.operand_names[index]))
+            continue
+        if opcode == "fusion":
+            current = _rms_schedule_callee_root(module, current)
+            continue
+        break
+    if converts != 1:
+        problems.append(f"kv-a latent provenance carries {converts} converts, expected exactly one")
+    if slices != 1:
+        problems.append(f"kv-a latent provenance carries {slices} projection slices, expected exactly one")
+    if not problems:
+        # projection_value is the operand after the last of {slice, convert}: the
+        # P-wide projection value in either emitted order.
+        problems.extend(
+            _rms_schedule_kv_a_projection_producer(
+                module,
+                by_key,
+                projection_value,
+                projection_width=projection_width,
+                attention_projection_backend=attention_projection_backend,
+                hidden_size=hidden_size,
+            )
+        )
+    return problems
+
 
 def _rms_schedule_arithmetic_terminal(
     module: HloModule,
@@ -2674,7 +3282,12 @@ def _rms_schedule_arithmetic_terminal(
         if current is None:
             return None
         opcode = current.opcode
-        if opcode in {"bitcast", "reshape", "copy", "opt-barrier"} and current.operand_names:
+        # Structural ops (including row/lane slices, which move no arithmetic)
+        # are crossed; the first arithmetic opcode names the lineage.
+        if (
+            opcode in {"bitcast", "reshape", "copy", "opt-barrier", "slice", "dynamic-slice"}
+            and current.operand_names
+        ):
             current = by_key.get((current.computation, current.operand_names[0]))
             continue
         if opcode == "get-tuple-element" and current.operand_names:
@@ -2847,6 +3460,10 @@ def _rms_schedule_lineage(
     rsqrt: HloInstruction,
     *,
     layernorm_width: int,
+    kv_a_width: int = KV_A_LORA_RANK,
+    kv_a_projection_width: int = KV_A_PROJECTION_WIDTH,
+    attention_projection_backend: str = "fused_n82_convolution",
+    hidden_size: int = 6144,
 ) -> dict[str, Any]:
     """Bind one rsqrt to square -> last-axis reduce -> 1/W -> +eps -> rsqrt.
 
@@ -2984,6 +3601,31 @@ def _rms_schedule_lineage(
             problems.append(f"sharded q-a square operand is not the converted projection ({arithmetic})")
         record["problems"] = problems
         return record
+    if operand_2d and operand_shape.dimensions == (1, kv_a_width) and arithmetic != "subtract":
+        record["kind"] = "kv_a_row_norm"
+        if reduce_dims not in ((0, 1), (1,)) or reduce_result not in ((), (1,)):
+            problems.append("kv-a row norm reduce is not the single-row f32[1,W] reduction")
+        if epsilon is None or abs(epsilon - 1e-5) > 1e-12:
+            problems.append(f"kv-a row norm epsilon is not 1e-05: {epsilon}")
+        if not result_f32 or result_dims not in ((), (1,), (1, 1)):
+            problems.append("kv-a row norm rsqrt is not a scalar-row scale")
+        if not _rms_schedule_scale_matches(mean.opcode, width_scale, kv_a_width):
+            problems.append(f"kv-a row norm mean scale {width_scale} does not match 1/{kv_a_width}")
+        if arithmetic != "convert":
+            problems.append(f"kv-a row norm square operand is not the converted latent ({arithmetic})")
+        problems.extend(
+            _rms_schedule_kv_a_provenance(
+                module,
+                by_key,
+                carrier,
+                kv_a_width=kv_a_width,
+                projection_width=kv_a_projection_width,
+                attention_projection_backend=attention_projection_backend,
+                hidden_size=hidden_size,
+            )
+        )
+        record["problems"] = problems
+        return record
     if reduce_dims != (1,) or not operand_2d or reduce_result != (rows,):
         problems.append("reduce is not a last-axis f32[R,W] -> f32[R] reduction")
     if arithmetic == "subtract":
@@ -3048,7 +3690,13 @@ def _rms_schedule_resolve_square(
     return None
 
 
-_STABLEHLO_DEFINITION = re.compile(r"^\s*(%[\w#.]+)\s*=\s*([\w.]+)(.*)$")
+_STABLEHLO_DEFINITION = re.compile(r"^\s*(%[\w#.]+)(?::[0-9]+)?\s*=\s*([\w.]+)(.*)$")
+
+
+def _stablehlo_base_name(name: str) -> str:
+    """``%207#4`` (result 4 of a multi-result op) is defined as ``%207``."""
+
+    return name.split("#", 1)[0]
 
 
 class _StablehloScope(dict):
@@ -3061,11 +3709,14 @@ class _StablehloScope(dict):
     lookups fall back through the enclosing scopes for captured values.
     """
 
-    def __init__(self, parent: "_StablehloScope | None") -> None:
+    def __init__(self, parent: "_StablehloScope | None", lines: list[str] | None = None) -> None:
         super().__init__()
         self.parent = parent
+        self.lines: list[str] = lines if lines is not None else (parent.lines if parent is not None else [])
+        self.line_of: dict[str, int] = {}
 
     def lookup(self, name: str) -> tuple[str, str] | None:
+        name = _stablehlo_base_name(name)
         scope: _StablehloScope | None = self
         while scope is not None:
             if name in scope:
@@ -3073,13 +3724,38 @@ class _StablehloScope(dict):
             scope = scope.parent
         return None
 
+    def line_index(self, name: str) -> int | None:
+        name = _stablehlo_base_name(name)
+        scope: _StablehloScope | None = self
+        while scope is not None:
+            if name in scope.line_of:
+                return scope.line_of[name]
+            scope = scope.parent
+        return None
+
+    def region_lines(self, name: str) -> list[str]:
+        """Lines of the region-carrying op ``name`` (e.g. a while) up to its closing brace."""
+
+        start = self.line_index(name)
+        if start is None:
+            return []
+        depth = 0
+        collected: list[str] = []
+        for line in self.lines[start:]:
+            collected.append(line)
+            depth += line.count("{") - line.count("}")
+            if depth <= 0 and len(collected) > 1:
+                break
+        return collected
+
 
 def _stablehlo_scopes(text: str) -> list[_StablehloScope]:
+    lines = text.splitlines()
     scopes: list[_StablehloScope] = []
     current: _StablehloScope | None = None
-    for line in text.splitlines():
+    for index, line in enumerate(lines):
         if re.match(r"^\s*func\.func\b", line):
-            current = _StablehloScope(None)
+            current = _StablehloScope(None, lines)
             scopes.append(current)
             continue
         match = _STABLEHLO_DEFINITION.match(line)
@@ -3087,9 +3763,10 @@ def _stablehlo_scopes(text: str) -> list[_StablehloScope]:
             continue
         name = match.group(1)
         if current is None or name in current:
-            current = _StablehloScope(current)
+            current = _StablehloScope(current, lines)
             scopes.append(current)
         current[name] = (match.group(2), match.group(3))
+        current.line_of[name] = index
     return scopes
 
 
@@ -3123,8 +3800,289 @@ def _stablehlo_constant(definitions: _StablehloScope, name: str) -> float | None
     return None
 
 
+def _stablehlo_fused_projection_loop(
+    definitions: _StablehloScope, name: str | None, *, hidden_size: int
+) -> list[str]:
+    """StableHLO twin of ``_rms_schedule_fused_projection_loop`` (dataflow bound).
+
+    ``%N#k`` must be result ``k`` of a ``stablehlo.while``; in its ``do`` region the
+    ``k``-th returned value must be an update call
+    ``(tensor<32x1x82xbf16>, tensor<1x82xbf16>, tensor<i32>) -> tensor<32x1x82xbf16>``
+    whose accumulator is the ``k``-th iterArg and whose update value is the
+    projection call ``(tensor<1xHxbf16>, tensor<Hx82xui8>, tensor<(H/128)x82xf32>) -> tensor<1x82xbf16>``;
+    the projection callee's return must root (through converts) in the
+    ``[b, f]x[i, o]->[b, f]`` convolution.
+    """
+
+    shards = FUSED_QKV_A_VIRTUAL_SHARDS
+    packed = FUSED_QKV_A_Q_WIDTH_PER_SHARD + FUSED_QKV_A_KV_WIDTH_PER_SHARD
+    result_index: int | None = None
+    current_name = name
+    for _ in range(8):
+        if current_name is None:
+            return ["fused qkv-a projection buffer producer is unresolved in StableHLO"]
+        if "#" in current_name:
+            result_index = int(current_name.split("#", 1)[1])
+        entry = definitions.lookup(current_name)
+        if entry is None:
+            return ["fused qkv-a projection buffer producer is unresolved in StableHLO"]
+        opcode, rest = entry
+        if opcode in {"stablehlo.reshape", "stablehlo.bitcast_convert", "stablehlo.optimization_barrier"}:
+            names = _stablehlo_operands(rest)
+            current_name = names[0] if names else None
+            continue
+        if opcode == "stablehlo.while":
+            break
+        return [f"fused qkv-a projection buffer producer is {opcode}, not the N82 projection loop"]
+    else:
+        return ["fused qkv-a projection buffer producer chain is too deep"]
+    if result_index is None:
+        return ["fused qkv-a projection buffer is not an indexed while result"]
+    iter_args = re.findall(r"(%iterArg[\w]*) = %", rest)
+    if result_index >= len(iter_args):
+        return ["fused qkv-a while result index escapes its iterArgs"]
+    region = definitions.region_lines(current_name)
+    body_text = "\n".join(region)
+    returns = re.findall(r"stablehlo\.return ([^:]+) :", body_text)
+    if not returns:
+        return ["fused qkv-a while carries no return"]
+    returned = [token.strip() for token in returns[-1].split(",")]
+    if result_index >= len(returned):
+        return ["fused qkv-a while return does not carry the result index"]
+    scale_rows = hidden_size // 128
+    update_pattern = (
+        rf"^\s*{re.escape(returned[result_index])} = func\.call @[\w.]+\((%[\w#]+), (%[\w#]+), (%[\w#]+)\) : "
+        rf"\(tensor<{shards}x1x{packed}xbf16>, tensor<1x{packed}xbf16>, tensor<i32>\) -> tensor<{shards}x1x{packed}xbf16>"
+    )
+    update = re.search(update_pattern, body_text, re.M)
+    problems: list[str] = []
+    if update is None:
+        return [f"fused qkv-a while result {result_index} is not produced by a tensor<{shards}x1x{packed}xbf16> update call"]
+    if update.group(1) != iter_args[result_index]:
+        problems.append(f"fused qkv-a loop accumulator is not iterArg {result_index} ({iter_args[result_index]}): {update.group(1)}")
+    call_pattern = (
+        rf"^\s*{re.escape(update.group(2))} = func\.call @([\w.]+)\([^)]*\) : \(tensor<1x{hidden_size}xbf16>, "
+        rf"tensor<{hidden_size}x{packed}xui8>, tensor<{scale_rows}x{packed}xf32>\) -> tensor<1x{packed}xbf16>"
+    )
+    call = re.search(call_pattern, body_text, re.M)
+    if call is None:
+        problems.append(
+            f"fused qkv-a loop update value {update.group(2)} is not the N82 projection call "
+            f"(tensor<1x{hidden_size}xbf16>, tensor<{hidden_size}x{packed}xui8>, tensor<{scale_rows}x{packed}xf32>) -> tensor<1x{packed}xbf16>"
+        )
+        return problems
+    # call-site arguments: (hidden iterArg, packed weights indexed from their iterArg, scales indexed from theirs)
+    header_types = re.search(r"\) : (tensor<[^\n]*)$", rest)
+    iter_types = [t.strip() for t in header_types.group(1).split(", ")] if header_types else []
+    typed = dict(zip(iter_args, iter_types))
+    call_args = re.search(rf"^\s*{re.escape(update.group(2))} = func\.call @[\w.]+\(([^)]*)\)", body_text, re.M)
+    args = [a.strip() for a in call_args.group(1).split(",")] if call_args else []
+    if len(args) != 3:
+        problems.append("fused qkv-a projection call does not take (hidden, packed weights, scales)")
+        return problems
+    if typed.get(args[0]) != f"tensor<1x{hidden_size}xbf16>":
+        problems.append(f"fused qkv-a projection hidden argument {args[0]} is not the loop-carried tensor<1x{hidden_size}xbf16> iterArg")
+
+    def _indexed_from_iterarg(arg: str, iter_type: str, result_type: str) -> bool:
+        helper = re.search(
+            rf"^\s*{re.escape(arg)} = func\.call @([\w.]+)\((%[\w#]+), (%[\w#]+)\) : \({re.escape(iter_type)}, tensor<i32>\) -> {re.escape(result_type)}",
+            body_text,
+            re.M,
+        )
+        if helper is None or typed.get(helper.group(2)) != iter_type or typed.get(helper.group(3)) != "tensor<i32>":
+            return False
+        helper_function = re.search(
+            rf"func\.func private @{re.escape(helper.group(1))}\(%arg0: {re.escape(iter_type)}, %arg1: tensor<i32>\) -> {re.escape(result_type)} \{{.*?\n\s*\}}",
+            "\n".join(definitions.lines),
+            re.S,
+        )
+        if helper_function is None:
+            return False
+        helper_text = helper_function.group(0)
+        returned = re.search(r"return (%[\w#]+) :", helper_text)
+        if returned is None:
+            return False
+        # exact: return <- reshape(1xAxB -> AxB) <- dynamic_slice(%arg0, %arg1, 0, 0, sizes=[1, A, B])
+        reshape = re.search(
+            rf"^\s*{re.escape(returned.group(1))} = stablehlo\.reshape (%[\w#]+) : \(tensor<1x([0-9x]+)x(\w+)>\) -> {re.escape(result_type)}\s*$",
+            helper_text, re.M,
+        )
+        if reshape is None:
+            return False
+        sliced = re.search(
+            rf"^\s*{re.escape(reshape.group(1))} = stablehlo\.dynamic_slice %arg0, %arg1, (%[\w#]+), (%[\w#]+), sizes = \[1, {reshape.group(2).replace('x', ', ')}\] : "
+            rf"\({re.escape(iter_type)}, tensor<i32>, tensor<i32>, tensor<i32>\) -> tensor<1x{reshape.group(2)}x{reshape.group(3)}>\s*$",
+            helper_text, re.M,
+        )
+        if sliced is None:
+            return False
+        for name in (sliced.group(1), sliced.group(2)):
+            if re.search(rf"^\s*{re.escape(name)} = stablehlo\.constant dense<0> : tensor<i32>\s*$", helper_text, re.M) is None:
+                return False
+        return True
+
+    if not _indexed_from_iterarg(args[1], f"tensor<{shards}x{hidden_size}x{packed}xui8>", f"tensor<{hidden_size}x{packed}xui8>"):
+        problems.append(f"fused qkv-a packed-weight argument {args[1]} is not the per-shard dynamic slice of the loop-carried tensor<{shards}x{hidden_size}x{packed}xui8> iterArg")
+    if not _indexed_from_iterarg(args[2], f"tensor<{shards}x{scale_rows}x{packed}xf32>", f"tensor<{scale_rows}x{packed}xf32>"):
+        problems.append(f"fused qkv-a scale argument {args[2]} is not the per-shard dynamic slice of the loop-carried tensor<{shards}x{scale_rows}x{packed}xf32> iterArg")
+    text = "\n".join(definitions.lines)
+    function = re.search(
+        rf"func\.func private @{re.escape(call.group(1))}\(%arg0: tensor<1x{hidden_size}xbf16>, %arg1: tensor<{hidden_size}x{packed}xui8>, "
+        rf"%arg2: tensor<{scale_rows}x{packed}xf32>\) -> tensor<1x{packed}xbf16> \{{.*?\n\s*\}}",
+        text,
+        re.S,
+    )
+    if function is None:
+        problems.append(f"fused qkv-a projection function @{call.group(1)} is absent or does not carry the exact N82 signature")
+        return problems
+    function_text = function.group(0)
+    returned_name = re.search(r"return (%[\w#]+) :", function_text)
+    current = returned_name.group(1) if returned_name else None
+    convolution_line = None
+    for _ in range(6):
+        if current is None:
+            break
+        definition = re.search(rf"^\s*{re.escape(current)} = ([\w.]+)(.*)$", function_text, re.M)
+        if definition is None:
+            break
+        opcode, rest_line = definition.group(1), definition.group(2)
+        if opcode in {"stablehlo.convert", "stablehlo.reshape"}:
+            names = _stablehlo_operands(rest_line)
+            current = names[0] if names else None
+            continue
+        if opcode == "stablehlo.convolution" and "[b, f]x[i, o]->[b, f]" in rest_line:
+            convolution_line = rest_line
+        break
+    if convolution_line is None:
+        problems.append(f"fused qkv-a projection function @{call.group(1)} return does not root in the [b, f]x[i, o]->[b, f] convolution")
+        return problems
+    conv_operands = re.match(r"\((%[\w#]+), (%[\w#]+)\)", convolution_line.strip())
+    if conv_operands is None:
+        problems.append("fused qkv-a projection convolution operands are unreadable")
+        return problems
+
+    H, P, R = hidden_size, packed, scale_rows
+
+    def _line(name: str) -> str | None:
+        definition = re.search(rf"^\s*{re.escape(name)} = (.*)$", function_text, re.M)
+        return definition.group(1).strip() if definition else None
+
+    def _exact(name: str, pattern: str) -> re.Match | None:
+        line = _line(name)
+        return re.fullmatch(pattern, line) if line is not None else None
+
+    # hidden operand: %arg0 itself
+    if conv_operands.group(1) != "%arg0":
+        problems.append("fused qkv-a convolution hidden operand is not the callee's hidden parameter %arg0")
+    # weight operand: %5 = convert %4 : (HxPxf32) -> (HxPxbf16)
+    outer = _exact(conv_operands.group(2), rf"stablehlo\.convert (%[\w#]+) : \(tensor<{H}x{P}xf32>\) -> tensor<{H}x{P}xbf16>")
+    product = _exact(outer.group(1), rf"stablehlo\.multiply (%[\w#]+), (%[\w#]+) : tensor<{H}x{P}xf32>") if outer else None
+    if outer is None or product is None:
+        problems.append("fused qkv-a convolution weight operand is not convert(multiply(...)) over tensor<HxPxf32>")
+        return problems
+
+    def _weights(name: str) -> bool:
+        step = _exact(name, rf"stablehlo\.convert (%[\w#]+) : \(tensor<{H}x{P}xf8E4M3FN>\) -> tensor<{H}x{P}xf32>")
+        return step is not None and _exact(step.group(1), rf"stablehlo\.bitcast_convert %arg1 : \(tensor<{H}x{P}xui8>\) -> tensor<{H}x{P}xf8E4M3FN>") is not None
+
+    def _scales(name: str) -> bool:
+        step = _exact(name, rf"stablehlo\.reshape (%[\w#]+) : \(tensor<{R}x128x{P}xf32>\) -> tensor<{H}x{P}xf32>")
+        return step is not None and _exact(step.group(1), rf"stablehlo\.broadcast_in_dim %arg2, dims = \[0, 2\] : \(tensor<{R}x{P}xf32>\) -> tensor<{R}x128x{P}xf32>") is not None
+
+    a, b = product.group(1), product.group(2)
+    if not ((_weights(a) and _scales(b)) or (_weights(b) and _scales(a))):
+        problems.append(
+            "fused qkv-a convolution weight operand is not exactly convert(bitcast_convert(%arg1)) x reshape(broadcast_in_dim(%arg2))"
+        )
+    return problems
+
+
+def _stablehlo_kv_a_projection_producer(
+    definitions: _StablehloScope,
+    name: str | None,
+    *,
+    projection_width: int,
+    attention_projection_backend: str,
+    hidden_size: int = 6144,
+) -> list[str]:
+    """StableHLO twin of ``_rms_schedule_kv_a_projection_producer``.
+
+    Fused: ``reshape``/``transpose`` chain ending in
+    ``stablehlo.slice %x [0:S, 0:1, Q:Q+K] : (tensor<Sx1x(Q+K)xbf16>) -> tensor<Sx1xKxbf16>``.
+    Separate: ``convert``/``reshape``/``bitcast`` chain ending in a
+    ``stablehlo.dot_general``/``stablehlo.convolution`` producing P elements.
+    """
+
+    fused = attention_projection_backend == "fused_n82_convolution"
+    shards = FUSED_QKV_A_VIRTUAL_SHARDS
+    q_lanes = FUSED_QKV_A_Q_WIDTH_PER_SHARD
+    kv_lanes = projection_width // shards if shards else 0
+    current_name = name
+    for _ in range(12):
+        entry = definitions.lookup(current_name) if current_name else None
+        if entry is None:
+            return ["kv-a projection producer is unresolved in StableHLO"]
+        opcode, rest = entry
+        if opcode in {"stablehlo.reshape", "stablehlo.transpose", "stablehlo.bitcast_convert"} or (
+            opcode == "stablehlo.convert" and not fused
+        ):
+            names = _stablehlo_operands(rest)
+            current_name = names[0] if names else None
+            continue
+        if fused and opcode == "stablehlo.slice":
+            pattern = (
+                rf"\[0:{shards}, 0:1, {q_lanes}:{q_lanes + kv_lanes}\] : "
+                rf"\(tensor<{shards}x1x{q_lanes + kv_lanes}xbf16>\) -> tensor<{shards}x1x{kv_lanes}xbf16>\s*$"
+            )
+            if re.search(pattern, rest) is None:
+                return [
+                    f"kv-a projection lane slice is not [0:{shards}, 0:1, {q_lanes}:{q_lanes + kv_lanes}] of the "
+                    f"tensor<{shards}x1x{q_lanes + kv_lanes}xbf16> fused qkv-a projection"
+                ]
+            names = _stablehlo_operands(rest)
+            return _stablehlo_fused_projection_loop(
+                definitions, names[0] if names else None, hidden_size=hidden_size
+            )
+        if not fused and opcode in {"stablehlo.dot_general", "stablehlo.convolution"}:
+            shape = re.search(r"-> tensor<([0-9x]+)xf32>\s*$", rest) or re.search(r"-> tensor<([0-9x]+)xbf16>\s*$", rest)
+            elements = 1
+            for value_dim in (shape.group(1).split("x") if shape else []):
+                elements *= int(value_dim)
+            problems: list[str] = []
+            if elements != projection_width:
+                problems.append(f"kv-a projection linear carries {elements} elements, expected {projection_width}")
+            operand_types = re.search(r": \((tensor<[^>]+>), (tensor<[^>]+>)\)", rest)
+            contracting = re.search(r"contracting_dims = \[([0-9, ]*)\] x \[([0-9, ]*)\]", rest)
+            if operand_types is None or contracting is None:
+                problems.append("kv-a projection dot_general lacks operand types or contracting dims")
+                return problems
+            def dims(tensor: str) -> list[int]:
+                return [int(v) for v in re.search(r"tensor<([0-9x]+)x", tensor).group(1).split("x")]
+            try:
+                lhs_sizes = [dims(operand_types.group(1))[int(v)] for v in contracting.group(1).split(",") if v.strip()]
+                rhs_sizes = [dims(operand_types.group(2))[int(v)] for v in contracting.group(2).split(",") if v.strip()]
+            except (AttributeError, IndexError, ValueError):
+                lhs_sizes, rhs_sizes = [], []
+            if lhs_sizes != [hidden_size] or rhs_sizes != [hidden_size]:
+                problems.append(
+                    f"kv-a projection dot_general does not contract the hidden size {hidden_size}: "
+                    f"lhs {lhs_sizes} rhs {rhs_sizes}"
+                )
+            return problems
+        return [f"kv-a projection producer is {opcode}, not the kv-a projection"]
+    return ["kv-a projection producer chain is too deep"]
+
+
 def _stablehlo_rsqrt_lineage(
-    definitions: _StablehloScope, name: str, rest: str, *, layernorm_width: int
+    definitions: _StablehloScope,
+    name: str,
+    rest: str,
+    *,
+    layernorm_width: int,
+    kv_a_width: int = KV_A_LORA_RANK,
+    kv_a_projection_width: int = KV_A_PROJECTION_WIDTH,
+    attention_projection_backend: str = "fused_n82_convolution",
+    hidden_size: int = 6144,
 ) -> dict[str, Any]:
     """Bind one StableHLO rsqrt (see ``_rms_schedule_lineage`` for the two kinds)."""
 
@@ -3241,6 +4199,71 @@ def _stablehlo_rsqrt_lineage(
     else:
         carried_name = None
     carried = definitions.lookup(carried_name) if carried_name else None
+    if rows == 1 and width == kv_a_width and not (carried is not None and carried[0] == "stablehlo.subtract"):
+        record["kind"] = "kv_a_row_norm"
+        problems: list[str] = []
+        if "applies stablehlo.add" not in reduce_rest or "dimensions = [1]" not in reduce_rest or reduced_rows != 1:
+            problems.append("kv-a row norm reduce is not the single-row last-axis add-reduce")
+        if carried_name is None:
+            problems.append("kv-a row norm reduce operand is not a square")
+        # Provenance: convert(slice(P-wide bf16 projection)) or slice(convert(P-wide projection)).
+        P = kv_a_projection_width
+        W = kv_a_width
+        provenance_ok = False
+        projection_name: str | None = None
+        if carried is not None and carried[0] == "stablehlo.convert" and carried[1].rstrip().endswith(
+            f"(tensor<1x{W}xbf16>) -> tensor<1x{W}xf32>"
+        ):
+            names = _stablehlo_operands(carried[1])
+            sliced = definitions.lookup(names[0]) if names else None
+            provenance_ok = (
+                sliced is not None
+                and sliced[0] == "stablehlo.slice"
+                and re.search(
+                    rf"\[0:1, 0:{W}\] : \(tensor<1x{P}xbf16>\) -> tensor<1x{W}xbf16>\s*$", sliced[1]
+                )
+                is not None
+            )
+            if provenance_ok:
+                slice_names = _stablehlo_operands(sliced[1])
+                projection_name = slice_names[0] if slice_names else None
+        elif carried is not None and carried[0] == "stablehlo.slice" and re.search(
+            rf"\[0:1, 0:{W}\] : \(tensor<1x{P}xf32>\) -> tensor<1x{W}xf32>\s*$", carried[1]
+        ):
+            names = _stablehlo_operands(carried[1])
+            converted = definitions.lookup(names[0]) if names else None
+            provenance_ok = (
+                converted is not None
+                and converted[0] == "stablehlo.convert"
+                and converted[1].rstrip().endswith(f"(tensor<1x{P}xbf16>) -> tensor<1x{P}xf32>")
+            )
+            if provenance_ok:
+                convert_names = _stablehlo_operands(converted[1])
+                projection_name = convert_names[0] if convert_names else None
+        if not provenance_ok:
+            problems.append(
+                f"kv-a row norm square operand is not the [0:1, 0:{W}] slice of the "
+                f"converted {P}-wide BF16 kv-a projection"
+            )
+        else:
+            problems.extend(
+                _stablehlo_kv_a_projection_producer(
+                    definitions,
+                    projection_name,
+                    projection_width=P,
+                    attention_projection_backend=attention_projection_backend,
+                    hidden_size=hidden_size,
+                )
+            )
+        if epsilon is None or abs(epsilon - 1e-5) > 1e-11:
+            problems.append(f"kv-a row norm epsilon is not 1e-05: {epsilon}")
+        if not _rms_schedule_scale_matches(mean[0], width_scale, kv_a_width):
+            problems.append(f"kv-a row norm mean scale {width_scale} does not match 1/{kv_a_width}")
+        if record["type"] not in ("tensor<1xf32>", "tensor<1x1xf32>"):
+            problems.append("kv-a row norm rsqrt is not a scalar-row scale")
+        record.update({"width": width, "width_scale": width_scale, "epsilon": epsilon})
+        record["problems"] = problems
+        return record
     record.update(
         {
             "rows": rows,
@@ -3293,8 +4316,13 @@ def _validate_rms_accepted_schedule_stablehlo(
     *,
     enabled: bool,
     layernorm_width: int = 128,
+    kv_a_width: int = KV_A_LORA_RANK,
+    kv_a_projection_width: int = KV_A_PROJECTION_WIDTH,
+    attention_projection_backend: str = "fused_n82_convolution",
+    hidden_size: int = 6144,
     expected_accepted_count: int | None = None,
     expected_sharded_qa_count: int | None = None,
+    expected_kv_a_count: int | None = None,
 ) -> dict[str, Any]:
     """Bind the pre-fusion RMS lineage, including the FP32 barrier.
 
@@ -3306,7 +4334,9 @@ def _validate_rms_accepted_schedule_stablehlo(
     """
 
     if enabled:
-        _require_rms_schedule_census(expected_accepted_count, expected_sharded_qa_count)
+        _require_rms_schedule_census(
+            expected_accepted_count, expected_sharded_qa_count, expected_kv_a_count
+        )
     lineages: list[dict[str, Any]] = []
     barrier_count = 0
     for definitions in _stablehlo_scopes(stablehlo):
@@ -3314,7 +4344,14 @@ def _validate_rms_accepted_schedule_stablehlo(
             if opcode == "stablehlo.rsqrt":
                 lineages.append(
                     _stablehlo_rsqrt_lineage(
-                        definitions, name, rest, layernorm_width=layernorm_width
+                        definitions,
+                        name,
+                        rest,
+                        layernorm_width=layernorm_width,
+                        kv_a_width=kv_a_width,
+                        kv_a_projection_width=kv_a_projection_width,
+                        attention_projection_backend=attention_projection_backend,
+                        hidden_size=hidden_size,
                     )
                 )
             elif opcode == "stablehlo.optimization_barrier" and re.search(
@@ -3331,8 +4368,15 @@ def _validate_rms_accepted_schedule_stablehlo(
         for record in lineages
         if record.get("kind") == "virtual_tp32_sharded_qa" and not record["problems"]
     ]
+    kv_a_rows = [
+        record
+        for record in lineages
+        if record.get("kind") == "kv_a_row_norm" and not record["problems"]
+    ]
     rms_lineages = [
-        record for record in lineages if record not in layernorms and record not in sharded_qa
+        record
+        for record in lineages
+        if record not in layernorms and record not in sharded_qa and record not in kv_a_rows
     ]
     conforming = [record for record in rms_lineages if not record["problems"]]
     nonconforming = [record for record in rms_lineages if record["problems"]]
@@ -3345,8 +4389,10 @@ def _validate_rms_accepted_schedule_stablehlo(
                 representation="StableHLO",
                 conforming=len(conforming),
                 sharded_qa=len(sharded_qa),
+                kv_a=len(kv_a_rows),
                 expected_accepted_count=expected_accepted_count,
                 expected_sharded_qa_count=expected_sharded_qa_count,
+                expected_kv_a_count=expected_kv_a_count,
             )
         )
         for record in nonconforming:
@@ -3364,6 +4410,7 @@ def _validate_rms_accepted_schedule_stablehlo(
         "layernorm_rsqrt_count": len(layernorms),
         "nonconforming_rsqrt_count": len(nonconforming),
         "sharded_qa_rsqrt_count": len(sharded_qa),
+        "kv_a_rsqrt_count": len(kv_a_rows),
         "nonconforming": nonconforming[:8],
         "passed": not violations,
         "rsqrt_count": len(lineages),
@@ -3373,30 +4420,35 @@ def _validate_rms_accepted_schedule_stablehlo(
 
 def expected_rms_schedule_census(
     *, layers: int, attention_projection_backend: str
-) -> tuple[int, int]:
-    """(accepted RMS lineages, sharded q-a lineages) the enabled contract must find.
+) -> tuple[int, int, int]:
+    """(accepted RMS, sharded q-a, kv-a row-norm) lineages the enabled contract must find.
 
     Every layer carries an input norm, a post-attention norm, a q-a norm and a
-    kv-a norm, plus one final norm.  With the fused N82 qkv-a projection the q-a
-    norm is the legacy-faithful virtual-TP32 sharded reduction (its own kind);
-    with the separate projection it is a plain RMS norm on the accepted schedule.
+    kv-a norm, plus one final norm.  The input, post-attention and final norms
+    carry the accepted schedule.  The kv-a norm keeps its default single-row
+    reduction (its own kind).  With the fused N82 qkv-a projection the q-a norm
+    is the legacy-faithful virtual-TP32 sharded reduction (its own kind); with
+    the separate projection it is a plain RMS norm on the accepted schedule.
     """
 
     if not isinstance(layers, int) or isinstance(layers, bool) or layers < 0:
         raise ValueError("layer count must be a non-negative integer")
     if attention_projection_backend == "fused_n82_convolution":
-        return 3 * layers + 1, layers
-    return 4 * layers + 1, 0
+        return 2 * layers + 1, layers, layers
+    return 3 * layers + 1, 0, layers
 
 
 def _require_rms_schedule_census(
-    expected_accepted_count: int | None, expected_sharded_qa_count: int | None
+    expected_accepted_count: int | None,
+    expected_sharded_qa_count: int | None,
+    expected_kv_a_count: int | None,
 ) -> None:
-    """The enabled contract refuses to run without both census expectations."""
+    """The enabled contract refuses to run without all three census expectations."""
 
     for label, value in (
         ("expected_accepted_count", expected_accepted_count),
         ("expected_sharded_qa_count", expected_sharded_qa_count),
+        ("expected_kv_a_count", expected_kv_a_count),
     ):
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             raise PlanValidationError(
@@ -3409,10 +4461,17 @@ def _rms_schedule_census_violations(
     representation: str,
     conforming: int,
     sharded_qa: int,
+    kv_a: int,
     expected_accepted_count: int | None,
     expected_sharded_qa_count: int | None,
+    expected_kv_a_count: int | None,
 ) -> list[str]:
     violations: list[str] = []
+    if expected_kv_a_count is not None and kv_a != expected_kv_a_count:
+        violations.append(
+            f"{representation} kv-a row-norm census drifted: "
+            f"expected {expected_kv_a_count}, found {kv_a}"
+        )
     if expected_accepted_count is not None and conforming != expected_accepted_count:
         violations.append(
             f"{representation} accepted-schedule RMS census drifted: "
@@ -3427,12 +4486,27 @@ def _rms_schedule_census_violations(
 
 
 def _rms_schedule_lineages(
-    module: HloModule, *, layernorm_width: int
+    module: HloModule,
+    *,
+    layernorm_width: int,
+    kv_a_width: int = KV_A_LORA_RANK,
+    kv_a_projection_width: int = KV_A_PROJECTION_WIDTH,
+    attention_projection_backend: str = "fused_n82_convolution",
+    hidden_size: int = 6144,
 ) -> tuple[dict[tuple[str, str], HloInstruction], list[dict[str, Any]]]:
     by_key = _rms_schedule_by_key(module)
     rsqrts = tuple(item for item in module.instructions if item.opcode == "rsqrt")
     return by_key, [
-        _rms_schedule_lineage(module, by_key, item, layernorm_width=layernorm_width)
+        _rms_schedule_lineage(
+            module,
+            by_key,
+            item,
+            layernorm_width=layernorm_width,
+            kv_a_width=kv_a_width,
+            kv_a_projection_width=kv_a_projection_width,
+            attention_projection_backend=attention_projection_backend,
+            hidden_size=hidden_size,
+        )
         for item in rsqrts
     ]
 
@@ -3633,8 +4707,13 @@ def _validate_rms_accepted_schedule_hlo(
     *,
     enabled: bool,
     layernorm_width: int = 128,
+    kv_a_width: int = KV_A_LORA_RANK,
+    kv_a_projection_width: int = KV_A_PROJECTION_WIDTH,
+    attention_projection_backend: str = "fused_n82_convolution",
+    hidden_size: int = 6144,
     expected_accepted_count: int | None = None,
     expected_sharded_qa_count: int | None = None,
+    expected_kv_a_count: int | None = None,
 ) -> dict[str, Any]:
     """Pin the accepted decode-step RMS variance schedule.
 
@@ -3652,8 +4731,17 @@ def _validate_rms_accepted_schedule_hlo(
     """
 
     if enabled:
-        _require_rms_schedule_census(expected_accepted_count, expected_sharded_qa_count)
-    by_key, lineages = _rms_schedule_lineages(module, layernorm_width=layernorm_width)
+        _require_rms_schedule_census(
+            expected_accepted_count, expected_sharded_qa_count, expected_kv_a_count
+        )
+    by_key, lineages = _rms_schedule_lineages(
+        module,
+        layernorm_width=layernorm_width,
+        kv_a_width=kv_a_width,
+        kv_a_projection_width=kv_a_projection_width,
+        attention_projection_backend=attention_projection_backend,
+        hidden_size=hidden_size,
+    )
     rsqrts = tuple(item for item in module.instructions if item.opcode == "rsqrt")
     layernorms = [
         record
@@ -3665,8 +4753,15 @@ def _validate_rms_accepted_schedule_hlo(
         for record in lineages
         if record.get("kind") == "virtual_tp32_sharded_qa" and not record["problems"]
     ]
+    kv_a_rows = [
+        record
+        for record in lineages
+        if record.get("kind") == "kv_a_row_norm" and not record["problems"]
+    ]
     rms_lineages = [
-        record for record in lineages if record not in layernorms and record not in sharded_qa
+        record
+        for record in lineages
+        if record not in layernorms and record not in sharded_qa and record not in kv_a_rows
     ]
     conforming = [record for record in rms_lineages if not record["problems"]]
     nonconforming = [record for record in rms_lineages if record["problems"]]
@@ -3679,8 +4774,10 @@ def _validate_rms_accepted_schedule_hlo(
                 representation="optimized HLO",
                 conforming=len(conforming),
                 sharded_qa=len(sharded_qa),
+                kv_a=len(kv_a_rows),
                 expected_accepted_count=expected_accepted_count,
                 expected_sharded_qa_count=expected_sharded_qa_count,
+                expected_kv_a_count=expected_kv_a_count,
             )
         )
         for record in nonconforming:
@@ -3717,6 +4814,8 @@ def _validate_rms_accepted_schedule_hlo(
         "expected_accepted_count": expected_accepted_count,
         "expected_sharded_qa_count": expected_sharded_qa_count,
         "sharded_qa_rsqrt_count": len(sharded_qa),
+        "kv_a_rsqrt_count": len(kv_a_rows),
+        "expected_kv_a_count": expected_kv_a_count,
         "tiled_module": module_uses_tiling(module),
         "violations": violations,
     }
@@ -5068,6 +6167,8 @@ def validate_decoder_step_hlo(
     dense_final_layout_convolution: bool = False,
     dsa_rope_table_enabled: bool = False,
     rms_accepted_schedule: bool = False,
+    kv_lora_rank: int = KV_A_LORA_RANK,
+    qk_rope_head_dim: int = QK_ROPE_HEAD_DIM,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -5451,15 +6552,22 @@ def validate_decoder_step_hlo(
         violations.extend(complete_token_collective_contract["violations"])
     if not isinstance(rms_accepted_schedule, bool):
         raise PlanValidationError("decoder RMS accepted-schedule HLO flag must be boolean")
-    expected_accepted_count, expected_sharded_qa_count = expected_rms_schedule_census(
-        layers=layers, attention_projection_backend=attention_projection_backend
+    expected_accepted_count, expected_sharded_qa_count, expected_kv_a_count = (
+        expected_rms_schedule_census(
+            layers=layers, attention_projection_backend=attention_projection_backend
+        )
     )
     rms_accepted_schedule_contract = _validate_rms_accepted_schedule_hlo(
         module,
         enabled=rms_accepted_schedule,
         layernorm_width=config.index_key_width,
+        kv_a_width=kv_lora_rank,
+        kv_a_projection_width=kv_lora_rank + qk_rope_head_dim,
+        attention_projection_backend=attention_projection_backend,
+        hidden_size=config.hidden_size,
         expected_accepted_count=expected_accepted_count,
         expected_sharded_qa_count=expected_sharded_qa_count,
+        expected_kv_a_count=expected_kv_a_count,
     )
     if stablehlo is not None:
         rms_accepted_schedule_contract["stablehlo"] = (
@@ -5467,8 +6575,13 @@ def validate_decoder_step_hlo(
                 stablehlo,
                 enabled=rms_accepted_schedule,
                 layernorm_width=config.index_key_width,
+                kv_a_width=kv_lora_rank,
+                kv_a_projection_width=kv_lora_rank + qk_rope_head_dim,
+                attention_projection_backend=attention_projection_backend,
+                hidden_size=config.hidden_size,
                 expected_accepted_count=expected_accepted_count,
                 expected_sharded_qa_count=expected_sharded_qa_count,
+                expected_kv_a_count=expected_kv_a_count,
             )
         )
         rms_accepted_schedule_contract["violations"] = [

@@ -10935,3 +10935,187 @@ refused in both representations with the census violations named; the first arch
 and substituted lineages are refused in both representations; the decoder-step validator's source is
 bound to compute and forward both expectations. Lesson: after any multi-file patch script, diff the
 files it claims to have written before describing them to a reviewer.
+
+## 2026-09-02 approved run `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T154017247157875Z` (pin 906f3810): failed closed at the eight-host sync (transient GitHub fetch fault on worker 6)
+
+Sol approved (ccc9291c / 906f3810 / execute once); all reconfirmations passed; launched 15:46:56Z. The
+runner passed vacancy, leases and pre-census 8/8, then the eight-host sync failed on worker 6:
+`git fetch origin` from GitHub (140.82.113.4) aborted with `ssh_dispatch_run_fatal: … message
+authentication code incorrect` / `fetch-pack: unexpected disconnect` / `fatal: protocol error: bad pack
+header` (exit 128); the other seven workers reported `SYNC_OK 906f3810`. No TPU process was started;
+failure-exit census 8/8; the tag is burned (never retried); no claim. Cause: a transient SSH/network
+fault on the worker-6 → GitHub fetch, not code. Worker 6 stayed at its previous pin, clean.
+
+## 2026-09-02 approved run `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T155131089617216Z` (pin 906f3810): event 0 exact again; event 1 = 7 (baseline 6)
+
+Sol approved execute-once on the unchanged pin after the transient sync fault; launched 15:56:55Z; all
+eight workers synced; all three programs' contracts passed on TPU (census 235 accepted / 78 sharded
+q-a bound); the decoder executed. Results: prefill token exact (220); decode token at 8155 exact
+(101252, rank 1, margin 6.19); **event 0 exact** — no selected-set mismatch, bounded score comparison
+over all 2,048 aligned positions `max_abs = 0.0` — so the q-a inference was the event-0 cause and the
+sharded legacy q-a norm is confirmed. Exact-DSA still refused: first mismatch at **event 1**
+(producer layer 1, offset 11, expected 8136, observed 8150), **7 selected-set mismatches at event 1**
+(expected-only 1052 1143 1841 2066 2436 7473 7575; observed-only 1026 3889 6642 6690 6738 6810 7463),
+then 12, 12, 23, 48, 58, 57, 110, … over 20 events; 39,897 order mismatches. Failure-exit census 8/8;
+tag burned; no claim; observer npz `eae3ca24…` and all HLO/contracts archived.
+
+Reading: with the default norms event 1 had 6 mismatches and the layer-1 RMS input `x` was certified
+identical to the legacy's (frontier certificate). This run changes two things upstream of event 1: the
+157 hidden-width norms (accepted schedule, proven to reproduce the legacy layer-1 row **given the same
+x**) and the 78 kv-a norms (accepted schedule, inferred). Event 0's scores are bit-identical, so the
+layer-0 input norm did not move `x`; the only other layer-0 change is the kv-a norm, which feeds the
+layer-0 attention output and therefore `x`. If `x` had stayed legacy-exact, the proven layer-1 schedule
+should have made event 1 exact; it did not (7 ≠ 0), so the kv-a change most plausibly moved `x`. The
+legacy `kv_a_layernorm` input (`kv_a_proj_with_mqa` output, `kv_da_sharding`) is produced by a
+contraction over the sharded hidden dimension; whether XLA reduces the norm before or after the
+cross-chip sum is not visible in the source, so the [32,512] inference has no evidence, while the
+default single-row kv-a norm produced a legacy-exact `x` in the baseline. Decision: kv-a norm back to
+the default single-row reduction (its own bound contract kind), accepted schedule only on the 157
+hidden-width norms; census becomes (157 accepted, 78 sharded q-a, 78 kv-a row norms).
+
+## 2026-09-02 kv-a norm back to its default single-row reduction; three-kind lineage census
+
+Implementation of the decision above. `stage_local_index_share_fp8_mapped` no longer passes the flag to
+the kv-a latent norm (it keeps `rms_norm`'s default single-row reduce); the flag now reaches only the
+157 hidden-width norms. The contract binds the default kv-a norm as kind `kv_a_row_norm` in both
+representations exactly as the baseline TPU archive (02:13Z run, every norm default) emits it —
+optimized HLO: `slice(bf16[1,576]) → convert f32[1,512] → square → reduce dims={0,1} → f32[]`, ×1/512
+per opcode, +1e-05, scalar rsqrt, square operand's arithmetic terminal `convert`; StableHLO:
+`slice → convert (1x512 bf16→f32) → chlo.square → reduce dims=[1] (1x512→1) → ÷512 → +1e-05 → rsqrt
+tensor<1x1xf32>` — on the configured kv width (`validate_decoder_step_hlo(kv_lora_rank=512)`, the
+forced-CPU test passes the small plan's 4). `expected_rms_schedule_census` returns (accepted, sharded
+q-a, kv-a rows): fused N82 → (2·L+1, L, L) = (157, 78, 78); separate → (3·L+1, 0, L); all three are
+mandatory when enabled and each drift is a violation. Archive evidence: the baseline module classifies
+(313 rsqrt: 78 sharded q-a, 78 kv-a rows, 0 accepted, 157 default hidden norms) and is refused in
+enabled mode / passes disabled; the first `_ras` archive (kv-a on the inferred [32,512]) is refused by
+the census (235 accepted / 0 kv-a rows) while passing every per-lineage check; the second archive is
+refused. Synthetic module carries all four kinds (4 rsqrt: 1/1/1/1) and passes in both representations;
+16 kv-a mutations (width, axis, combiner, scale, scale opcode, epsilon, non-square, non-converted
+latent, row-shaped scale) and the missing/extra/substituted census attacks are refused. The
+arithmetic-terminal walk now crosses `slice`/`dynamic-slice` (structural) so the CPU decoder's
+`convert(slice(...))` order binds the same kind as TPU's `slice(convert(...))`.
+
+## 2026-09-02 Sol BLOCK on 446bff46 (kv-a provenance unbound) — slice-of-projection binding
+
+Sol refused the kv-a kind because any converted `bf16[1,512]` value satisfied it. Both binders now bind
+the latent's provenance: exactly one `convert` (bf16 → f32) and exactly one `slice` with bounds
+`[0:1], [0:kv_lora_rank]` whose operand is the `[1, kv_lora_rank + qk_rope_head_dim]` (576-wide)
+kv-a projection, reached through structural ops and fusion parameters only, in either emitted order —
+TPU's `convert(slice(projection))` and CPU's `slice(convert(projection))`.
+`validate_decoder_step_hlo(kv_lora_rank=512, qk_rope_head_dim=64)` forwards the projection width to
+both binders. Tests: both orders accepted (HLO and StableHLO synthetic modules); refused in both
+representations — a direct 512-wide parameter without the slice, a 640-wide parent, `[64:576]` slice
+bounds, an unrelated 512-wide lineage (`add` between convert and square), a second slice. The baseline
+archive still binds all 78 kv-a row norms (its emitted `slice.92468 = bf16[1,512] slice(param
+bf16[1,576]), slice={[0:1], [0:512]}` → convert); the two `_ras` archives are refused as before; the
+forced-CPU decoder binds its plan's 4 + 2 = 6-wide projection.
+
+## 2026-09-02 Sol BLOCK on eaa906bc (kv-a projection producer unbound) — producer binding
+
+Sol refused because a correctly shaped unrelated 576-wide value satisfied the slice/convert check. Both
+binders now resolve the P-wide operand to its producer, per attention backend. Fused N82 (the 8K
+profile): through structural ops only (reshape/bitcast/copy/transpose/tuple access, size-1 squeezing
+`reduce`, fusion roots and fusion parameters) to the lane slice `[0:32], [0:1], [64:82]` of the
+`bf16[32,1,82]` fused qkv-a projection buffer — the baseline archive emits
+`reshape(fusion(reduce(slice(param bf16[32,1,82]) [0:32],[0:1],[64:82]))) → bf16[1,576]` and StableHLO
+`reshape(transpose(slice %proj [0:32, 0:1, 64:82]))`. Separate layout (forced-CPU plan): through
+converts to a `dot`/`convolution` carrying P elements (the kv-a linear). Synthetic modules now model
+the real producer; refused in both representations: an unrelated 576-wide parameter, a caller
+substitution (`add` of the projection), a wrong lane slice (`[46:64]`), a wrong projection buffer
+(`bf16[32,1,90]`), the earlier direct-parameter / wrong-parent-width / wrong-bounds / unrelated-512 /
+second-slice cases. All three archives re-validated (baseline: 78 kv-a rows bound through the
+producer; both `_ras` archives refused as before); forced-CPU decoder binds its `dot` producer.
+
+## 2026-09-02 Sol BLOCK on a0333266 (projection buffer / dot not bound to the projection op) — loop and contraction binding
+
+Sol refused because a same-shape unrelated `bf16[32,1,82]` entry buffer (or any P-element dot) satisfied
+the producer check. Both binders now bind the producer operation itself:
+- fused N82: the `bf16[32,1,82]` buffer must resolve (tuple access, copies, fusion parameters/roots) to a
+  `while` whose body accumulates `bf16[32,1,82]` and evaluates the one-row N82 convolution
+  `f32[1,82] = convolution(bf16[1,H], bf16[H,82])` with `dim_labels=bf_io->bf` (directly or inside a
+  body fusion), H = `config.hidden_size`; StableHLO: a `stablehlo.while` result whose body calls the
+  projection function `(tensor<1xHxbf16>, tensor<Hx82xui8>, tensor<(H/128)x82xf32>) -> tensor<1x82xbf16>`
+  and accumulates `tensor<32x1x82xbf16>`, and whose callee carries the `[b, f]x[i, o]->[b, f]`
+  convolution (multi-result definitions `%N:k` and `%N#k` references are now resolved; region bodies
+  are scanned by brace depth).
+- separate: the `dot`/`convolution` must contract exactly H on both operands (`lhs/rhs_contracting_dims`
+  sizes; StableHLO `contracting_dims = [k] x [j]` against the operand types) and produce P elements.
+The latent provenance walk now stops once the slice and the single bf16→f32 convert are both found, so
+the projection's own f32→bf16 convert is no longer miscounted. Synthetic modules carry the real loop
+(HLO `while` with body convolution + dynamic-update-slice; StableHLO `%700:5 = stablehlo.while` with
+`@closed_call`); refused in both representations: a same-shape unrelated `bf16[32,1,82]` entry buffer,
+a loop without the N82 convolution / call, a loop over the wrong hidden size, and for the separate
+layout a dot contracting 6000 instead of 6144 and an `add` between the dot and the projection. All
+three archives re-validated; forced-CPU decoder binds its `dot` over the small plan's hidden size 8.
+
+## 2026-09-02 Sol BLOCK on fa283010 (loop check not dataflow-bound) — end-to-end producer dataflow
+
+Sol refused because the loop check accepted any accumulator beside any N82 convolution. Both binders
+now bind the dataflow: the buffer must be loop-carried result k of the `while` (index taken from the
+tuple access that reaches it); in the body, root tuple element k must resolve to a
+`dynamic-update-slice` whose accumulator operand is loop-carried element k of the body parameter (through
+fusion parameters/roots and copies) and whose update value resolves through converts, reshapes,
+bitcasts, copies and fusion boundaries to the N82 convolution `f32[1,82] = convolution(bf16[1,H],
+bf16[H,82])` with `dim_labels=bf_io->bf`. StableHLO: `%N#k` must be result k of a `stablehlo.while`;
+the k-th value of the region's `stablehlo.return` must be an update call `(tensor<32x1x82xbf16>,
+tensor<1x82xbf16>, tensor<i32>) -> tensor<32x1x82xbf16>` whose accumulator is the k-th iterArg and whose
+update value is the projection call with the N82 signature; the projection callee's `return` must root
+(through converts/reshapes) in the `[b, f]x[i, o]->[b, f]` convolution. Attacks refused in both
+representations: a dead convolution beside an unrelated update value, an accumulator that is not the
+loop-carried element (fresh buffer / wrong iterArg), a result index carrying a same-shape non-accumulator
+element, a dead projection call replaced by a slice of the scales, and a callee returning a value not
+rooted in the convolution. Baseline archive: all 78 kv-a rows bind through `%while.1166` (accumulator =
+loop-carried element 1, update value rooted in `%conv_general_dilated.930`); both `_ras` archives refused
+by census as before; forced-CPU decoder binds its `dot`.
+
+## 2026-09-02 Sol BLOCK on 00f90465 (convolution operands unbound) — operand provenance to the loop elements
+
+Sol refused because same-shaped unrelated hidden/weight values could feed the carried update. Both
+binders now bind the N82 convolution operands. Optimized HLO: the hidden operand's source set (through
+bitcast/bitcast-convert/reshape/copy/convert/broadcast/multiply/dynamic-slice/slice/transpose, fusion
+parameters and roots, constants dropped) must be exactly the loop-carried `bf16[1,H]` element of the body
+parameter; the weight operand's source set must be exactly the loop-carried `u8[32,H,82]` packed weights,
+the `f32[32,H/128,82]` scales and the `s32[]` loop index (the FP8 dequant `convert(bitcast-convert(
+dynamic-slice(weights))) × reshape(broadcast(dynamic-slice(scales)))`); any foreign source refuses.
+StableHLO: the projection call's arguments must be the loop-carried `tensor<1xHxbf16>` iterArg and the
+per-shard `dynamic_slice` helpers of the `tensor<32xHx82xui8>` / `tensor<32x(H/128)x82xf32>` iterArgs
+(helper signature and body bound); the callee must carry the exact N82 signature and its convolution's
+hidden operand must be `%arg0` while its weight operand's sources (through bitcast_convert/broadcast_in_dim/
+reshape/convert/multiply) must be exactly `{%arg1, %arg2}`. Synthetic modules model the real dequant;
+refused in both representations: an alternate hidden operand (constant), an alternate weight operand
+(constant), a weight built from the scales alone, a hidden operand carved from the weight element, a
+callee convolution over same-shaped constants, a call-site hidden argument that is not the iterArg, and
+packed weights indexed from a foreign same-typed buffer. Baseline archive: 78/78 kv-a rows bind
+(hidden = loop element 4, weights = elements 2/3 + index 0).
+
+## 2026-09-02 Sol BLOCK on 2a867b4a (operand sets, not DAGs) — exact operand DAGs and helper return chains
+
+Sol demonstrated two passes: a zero-multiplied hidden operand (leaf sets ignored the multiply) and a
+helper whose dead `dynamic_slice` sat beside a constant return. Both binders now bind exact DAGs. HLO:
+the hidden operand resolves through bitcast/reshape/copy and fusion boundaries only (no arithmetic) to
+the loop-carried `bf16[1,H]` element; the weight operand is `convert → multiply` of exactly
+`convert(bitcast-convert(dynamic-slice(loop u8[32,H,82], counter, 0, 0)))` and
+`reshape(broadcast(dynamic-slice(loop f32[32,H/128,82], counter, 0, 0)))` in either order, both slices
+indexed by the same loop-carried `s32` counter with zero trailing indices; the hidden, weights, scales,
+counter and accumulator loop elements must be five distinct tuple indices. StableHLO: the helper's
+`return` must root exclusively in `reshape(dynamic_slice %arg0, %arg1, 0, 0)`; the callee's convolution
+hidden operand must be `%arg0` (reshape only) and its weight operand `convert(multiply(
+convert(bitcast_convert(%arg1)), reshape(broadcast_in_dim(%arg2))))`. Attacks refused: zero-multiplied
+hidden (both representations), weights sliced by a constant index, scales built from the hidden element,
+dead dynamic_slice helper returning a constant, plus every earlier attack. Baseline archive: 78/78 kv-a
+rows bind in both representations.
+
+## 2026-09-02 Sol BLOCK on c1ec9efd (permissive traversal) — position-specific chain matchers
+
+Sol demonstrated three passes (direct u8→f32 convert without the FP8 bitcast-convert in HLO and
+StableHLO; a helper returning the dynamic_slice directly). Both binders now match every semantic node at
+its position. Optimized HLO: the weight operand is `convert(f32→bf16)` ← `multiply` (arity 2) ← factors
+`convert(f8e4m3fn→f32)` ← `bitcast-convert(u8→f8e4m3fn)` ← `dynamic-slice(loop u8[32,H,82], counter,
+0, 0)` and `broadcast(dimensions={0,2}, f32)` ← `dynamic-slice(loop f32[32,H/128,82], counter, 0, 0)`;
+only bitcast/reshape/copy and fusion boundaries may sit between nodes; the hidden operand is noise-only
+to the loop-carried `bf16[1,H]` element. StableHLO: helper `return` ← `reshape((1xAxB) → AxB)` ←
+`dynamic_slice %arg0, %arg1, 0, 0, sizes=[1, A, B]` exactly; callee hidden operand is `%arg0` itself;
+weight operand exactly `convert(multiply(convert(bitcast_convert(%arg1) : ui8→f8E4M3FN), reshape(
+broadcast_in_dim(%arg2, dims=[0, 2]))))` with all types bound. Attacks refused in both representations:
+direct u8/ui8→f32 convert, wrong broadcast dimensions, dequant output not converted, helper returning
+the slice directly, plus all earlier ones. Baseline archive: 78/78 kv-a rows bind in both representations.
