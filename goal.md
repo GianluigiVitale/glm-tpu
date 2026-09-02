@@ -40,18 +40,17 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
 
 Worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`, branch
 `tooling/gate-d-compensated-pp16-numerical`, HEAD `fa970b09…` on origin+mirror. **Root cause proven
-at bounded scope** (V3 tag `…004306002075694Z`: host FP32 rotary row → key faithful to 5e-7; V2
-on-device rotary → 2.3e-3). **Batch 2 staged:** host DSA rotary rows in the decoder
+at bounded scope** (V3 `…004306002075694Z`: host row → key faithful to 5e-7; V2: 2.3e-3). **Batch 2 staged:** host DSA rotary rows in the decoder
 (`dsa_rope_table_enabled`, default off; kernels/decoder/prefill/compile script/runners), HLO
-contract (one FP32 table param + lookup, zero transcendentals with both tables), forced-CPU
-equivalence incl. tokens, 126/126 regression, CPU selection witness (V3 key reproduces the accepted
+contract (1 table param + lookup, 0 transcendentals with both tables), forced-CPU equivalence, 126/126 regression, CPU selection witness (V3 key reproduces the accepted
 layer-1/8155 event exactly; the 2026-08-26 8K run failed at that event with 7 swaps).
 
 Exact next (one batched Sol review): commit/push batch 2; merge tooling →
 `rewrite/topology-first-decode` keeping this checkpoint plus the Compass rule, push, mirror; then one
 serialized protected launch `GLM_GREENFIELD_DSA_ROPE_TABLE=1 bash
 scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from `/home/gianl/glm-tpu-topology-rewrite`;
-accept only exact tokens + all DSA contracts + full protections + 8/8 cleanup. Gate D open.
+accept only exact tokens + all DSA contracts + full protections + 8/8 cleanup. First launch
+refused at `mkdir` (tag > NAME_MAX); suffix now `_dr`; no TPU work. Gate D open.
 
 ## Finish (after Gate D)
 

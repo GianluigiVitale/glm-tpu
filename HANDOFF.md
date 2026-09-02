@@ -10201,3 +10201,17 @@ merge plan now retain the owner's Compass recovery instruction (goal.md reinstat
 reread the Compass artifact in full and adjudicate it against local evidence" rule; the goal.md merge
 resolution keeps it), and the forced-CPU decoder test now asserts token equality for the table-on
 and both-tables steps instead of only recording it (1/1 rerun passed).
+
+## 2026-09-02 first DSA-table 8K launch refused at tag creation; no TPU work
+
+Batch 2 is committed as tooling `23de8018…52ed`, merged into `rewrite/topology-first-decode` as
+`03284448…bbca` (goal.md resolved to the tooling checkpoint carrying the Compass rule; tree identical
+to the tooling head), pushed and mirrored by the cron sync. The no-TPU preflight passed
+(`SHORT_DECODER_PREFLIGHT_OK pin=03284448… profile=8k runtime=5b48a1f6…`). The approved launch
+`GLM_GREENFIELD_DSA_ROPE_TABLE=1 bash scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` then
+failed closed on all eight workers at `mkdir` of the run directory: the composed tag
+`…_mainrope_dsarope_pregatheredb512_…_trace2_20260902T015854743347450Z` is 258 bytes, over the
+255-byte NAME_MAX (the same profile without the suffix is 250). No Python, JAX, TPU compile or
+execution occurred; the remote result prefix has no objects; the rewrite worktree is clean. The tag
+suffix is shortened to `_dr` (253 bytes total). Exact next: persist, re-merge, mirror, preflight and
+one launch of the same command.

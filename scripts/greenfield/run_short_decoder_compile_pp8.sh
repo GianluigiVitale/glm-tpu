@@ -2082,7 +2082,8 @@ fi
 readonly MAIN_ROPE_SUFFIX
 DSA_ROPE_SUFFIX=
 if [[ $DSA_ROPE_TABLE == 1 ]]; then
-  DSA_ROPE_SUFFIX=_dsarope
+  # Short on purpose: the composed tag must stay within the 255-byte NAME_MAX.
+  DSA_ROPE_SUFFIX=_dr
 fi
 readonly DSA_ROPE_SUFFIX
 PREGATHERED_ATTENTION_SUFFIX=
