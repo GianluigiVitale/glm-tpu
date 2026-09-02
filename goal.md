@@ -38,21 +38,18 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
 
 ## Resume checkpoint — 2026-09-02 08:40Z
 
-Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. DSA host-rotary table refuted and
-tombstoned (`…8k-refusal-adjudication.json` `2a7c8fb5…`). **Layer-1 frontier certified on CPU**
+Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. DSA host-rotary table refuted, tombstoned
+(`…8k-refusal-adjudication.json` `2a7c8fb5…`). **Layer-1 frontier certified on CPU**
 (`gate-d-layer1-scale-frontier-certificate.json` `e8abfb9b…`): DB548 row `9b52a04e…` and accepted
 row `9936ee1e…` are exact functions of the SAME FP32 RMS input (`dense + attention_update +
-combined_residual`, unrounded), weight `10e34f4f…`, eps 1e-5, single output rounding; they differ
-only in `s=rsqrt(mean+eps)`: greenfield s0−4…s0−1 ulps, legacy s0…s0+14 (s0=0x433295db). Legacy
-m32 HLO reduces all 313 RMS variances over `f32[32,6144]{T(8,128)}` dims={1}; greenfield reduces
-`f32[1,1,6144]{T(1,128)}`. Dense update 47808 is right.
+combined_residual`, unrounded), weight `10e34f4f…`, eps 1e-5, one rounding; they differ
+only in `s=rsqrt(mean+eps)`: greenfield s0−4…s0−1 ulps, legacy s0…s0+14. Legacy
+reduces RMS variance over `f32[32,6144]{T(8,128)}` dims={1}; greenfield over `f32[1,1,6144]`.
 
-Batch committed: captured-RMS probe `accepted_split` arm = FP32-carry accepted-schedule arm (FP32
-three-term sum, one FP32 barrier on `[32,6144]`, reduce dims={1}); matcher `fp32_carry_schedule`;
-tests pass; 08-13 wrapper sources restored. Exact next: batched Sol review; then merge → rewrite,
-push, mirror, and one sub-minute protected probe `GLM_GREENFIELD_CAPTURED_RMS_REPLAY=1 bash
-scripts/greenfield/run_layer0_projection_reduction_probe.sh` from `/home/gianl/glm-tpu-topology-rewrite`.
-Control must equal DB548; arm exact ⇔ accepted row. Only then the decoder change and one 8K run.
+Committed: captured-RMS probe `accepted_split` arm = FP32-carry accepted-schedule arm (FP32 sum,
+one FP32 barrier on `[32,6144]`, reduce dims={1}); matcher `fp32_carry_schedule`; tests 7/7. Next: Sol review; merge → rewrite, push, mirror; one sub-minute protected
+probe `GLM_GREENFIELD_CAPTURED_RMS_REPLAY=1 bash scripts/greenfield/run_layer0_projection_reduction_probe.sh`
+from the rewrite worktree. Control must equal DB548; arm exact ⇔ accepted row; then decoder change, one 8K run.
 
 ## Finish (after Gate D)
 
