@@ -10484,3 +10484,18 @@ and
 literal execute-once command:
 `/usr/bin/env -i GLM_GATE_D_LAYER1_RMS_SCHEDULE=1 GLM_GATE_D_LAYER1_RMS_SCHEDULE_MODE=execute_once GLM_GATE_D_LAYER1_RMS_SCHEDULE_TAG=gate_d_layer1_rms_schedule_20260902T055846533543663Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin:/home/gianl/vllm-env/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v1.py`.
 Nothing installed; no TPU work; awaiting Sol's re-review.
+
+## 2026-09-02 chain installed; first approved start refused by a lease collision; tag burned
+
+Sol: `APPROVE PERSISTENCE 36878ce2`, `APPROVE INSTALL ONLY`, `APPROVE EXECUTE ONCE gate_d_layer1_rms_schedule_20260902T055846533543663Z 36878ce2`.
+Both literal install commands exited 0 (provisioned `/opt/glm-tpu/gate-d-layer1-rms-schedule-install-v1`
+tree `da82b46f…`; capsule `/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v1` with publisher
+`b3ec837e…`, driver `0c6755f4…`, verifier `09120816…`; launcher
+`/opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v1.py` `4bb4b1df…`; `launcher_invoked=false`).
+Pre-launch rechecks passed (mirror replay of `36878ce2` exact, tag vacant in three scopes, four
+leases free, pod READY). The approved invocation at 06:05:02Z was refused by the root-owned launcher
+at `_open_locked_fds` (`BlockingIOError`): the cron mirror sync holds
+`/opt/glm-tpu/locks/glm_tpu_rsync.lock` during its :00/:05 runs. No run directory, no remote
+object, no JAX/TPU work. Sol: `BLOCK EXECUTE — the tag was attempted and should remain burned`; the
+tag `gate_d_layer1_rms_schedule_20260902T055846533543663Z` is burned. Lesson: launch mid-window (:01–:04, :06–:09) and recheck the four leases
+immediately before the invocation.
