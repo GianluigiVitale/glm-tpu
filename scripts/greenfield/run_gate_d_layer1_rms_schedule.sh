@@ -12,7 +12,7 @@ from pathlib import Path
 
 root = Path("/opt/glm-tpu/locks")
 names = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")
-launcher = Path("/opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v3.py")
+launcher = Path("/opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v2.py")
 parent_fd = os.open(
     root, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
 )
@@ -427,9 +427,9 @@ readonly DB548_ENVELOPE=/home/gianl/glm-run/greenfield_layer0_dense_envelope_cro
 readonly DB548_ENVELOPE_SHA=6cb76623bd79e1712b6c323fa786e516abd05f6f0ca51a367bc871c4a920480f
 readonly FRONTIER_CERTIFICATE=$WORKTREE/docs/artifacts/gate-d-layer1-scale-frontier-certificate.json
 readonly FRONTIER_CERTIFICATE_SHA=980bbb3933866ebc0228882d9c2f76d0b212e6347f268821a71f5bcab219db3f
-readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v1
+readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v2
 readonly DRIVER=$IMMUTABLE_CAPSULE_ROOT/run_gate_d_layer1_rms_schedule.py
-readonly DRIVER_SHA=0c6755f4df3cb7949348ac8de28998219a0b5a0201039bdcce164c765ad069cb
+readonly DRIVER_SHA=48b3e383dccfdd6c1202ce45448cc7fa9c2443e536026194062448a71d82dac5
 readonly PUBLISHER=$IMMUTABLE_CAPSULE_ROOT/publish_gate_d_layer1_rms_schedule.py
 readonly PUBLISHER_SHA=b3ec837e8535d70d15982790cb8a94f4f36e49fe4b7a115ddbd097ff47be8b24
 readonly MIRROR_VERIFIER=$IMMUTABLE_CAPSULE_ROOT/verify_gate_d_same_region_git_mirror.py

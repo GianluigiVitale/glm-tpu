@@ -21,7 +21,7 @@ SPEC.loader.exec_module(MODULE)
 def test_launcher_binds_committed_sources_and_root_owned_installation() -> None:
     source = SOURCE.read_text(encoding="ascii")
     assert str(MODULE.INSTALL_PATH) == (
-        "/opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v1.py"
+        "/opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v2.py"
     )
     assert "expected_uid=0, expected_gid=0, expected_mode=0o555" in source
     assert source.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
@@ -80,7 +80,7 @@ def test_launcher_binds_all_python_children_to_root_owned_immutable_capsule(
     tmp_path: Path,
 ) -> None:
     assert str(MODULE.IMMUTABLE_CAPSULE_ROOT) == (
-        "/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v1"
+        "/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v2"
     )
     assert Path("/usr") in MODULE.IMMUTABLE_CAPSULE_ROOT.parents
     assert Path("/opt") not in MODULE.IMMUTABLE_CAPSULE_ROOT.parents

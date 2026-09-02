@@ -280,7 +280,7 @@ def test_wrapper_binds_all_numerical_authorities_before_driver_invocation() -> N
     assert f"readonly MIRROR_VERIFIER_SHA={mirror_verifier_sha}" in source
     assert (
         "readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/"
-        "gate-d-layer1-rms-schedule-v1"
+        "gate-d-layer1-rms-schedule-v2"
     ) in source
     assert (
         "$WORKTREE/scripts/greenfield/run_gate_d_layer1_rms_schedule.py"
@@ -570,3 +570,15 @@ def test_wrapper_git_reads_ignore_configuration_replacements_and_network() -> No
     assert source.count("git_local ") == 5
     assert "GIT_AUTHORITY_VERIFIER" in source
     assert 'ls-remote", "--refs", origin, expected_ref' in source
+
+
+def test_wrapper_runtime_boundary_names_the_installed_launcher_exactly() -> None:
+    source = WRAPPER.read_text(encoding="ascii")
+    launcher = (WRAPPER.parent / "launch_gate_d_layer1_rms_schedule.py").read_text()
+    install_path = re.search(r'INSTALL_PATH = Path\(\s*"([^"]+)"', launcher).group(1)
+    assert install_path == "/opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v2.py"
+    assert f'launcher = Path("{install_path}")' in source
+    capsule_root = re.search(r'IMMUTABLE_CAPSULE_ROOT = Path\(\s*"([^"]+)"', launcher).group(1)
+    assert f"readonly IMMUTABLE_CAPSULE_ROOT={capsule_root}" in source
+    for stale in ("_v1.py", "_v3.py", "-v1\n", "-v1/", "-v3", "projection_contraction", "projection-contraction"):
+        assert stale not in source, stale

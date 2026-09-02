@@ -81,7 +81,7 @@ ENVELOPE_ARRAY_NAMES = {
 }
 DB548_ROW_SHA256 = "9b52a04e2852719237f4465b28665cbc213b635763303b554bb12345e99a4005"
 NUMERICAL_DRIVER_INSTALL_PATH = (
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v1/"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v2/"
     "run_gate_d_layer1_rms_schedule.py"
 )
 # Exact committed sources that define the bounded claim; the sealed archive

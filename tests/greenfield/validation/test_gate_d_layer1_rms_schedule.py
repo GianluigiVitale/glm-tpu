@@ -84,7 +84,7 @@ def test_driver_is_default_off_bounded_and_binds_sealed_inputs() -> None:
         'DB548_ENVELOPE_SHA256 = (\n    "6cb76623bd79e1712b6c323fa786e516abd05f6f0ca51a367bc871c4a920480f"',
         '"gate_d_layer1_rms_schedule_[0-9]{8}T[0-9]{15}Z"',
         '"GLM_GATE_D_LAYER1_RMS_SCHEDULE": "1"',
-        "gate-d-layer1-rms-schedule-v1",
+        "gate-d-layer1-rms-schedule-v2",
         '"gate_d_closed": False',
         '"performance_claim": False',
         "if invocation_count != 2:",

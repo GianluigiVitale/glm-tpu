@@ -12,16 +12,16 @@ from collections.abc import Mapping
 from hashlib import sha256
 from pathlib import Path
 
-SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-layer1-rms-schedule-install-v1")
+SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-layer1-rms-schedule-install-v2")
 INSTALLER_PATH = (
     SOURCE_ROOT / "install_gate_d_layer1_rms_schedule_runtime.py"
 )
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
 LAUNCHER_TARGET = (
-    LAUNCHER_PARENT / "launch_gate_d_layer1_rms_schedule_v1.py"
+    LAUNCHER_PARENT / "launch_gate_d_layer1_rms_schedule_v2.py"
 )
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-rms-schedule-v1"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-rms-schedule-v2"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -31,10 +31,10 @@ EXPECTED_ENVIRONMENT = {
 }
 PAYLOADS = {
     "run_gate_d_layer1_rms_schedule.py": (
-        "0c6755f4df3cb7949348ac8de28998219a0b5a0201039bdcce164c765ad069cb"
+        "48b3e383dccfdd6c1202ce45448cc7fa9c2443e536026194062448a71d82dac5"
     ),
     "launch_gate_d_layer1_rms_schedule.py": (
-        "4bb4b1dfcdc3ee5001bb3ed6b671873221d32e9657ac06bdeaaa861009768d93"
+        "169c4385868fa00c4f86d72488dc9d128d6bdbd9e1fccbbfb7b93746d9d61c0d"
     ),
     "publish_gate_d_layer1_rms_schedule.py": (
         "b3ec837e8535d70d15982790cb8a94f4f36e49fe4b7a115ddbd097ff47be8b24"
