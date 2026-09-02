@@ -10831,3 +10831,13 @@ as `bf16[32,W]` (nowhere else). Tests: synthetic fused module asserts the BF16 a
 module** (skip-if-absent): RMS (313, 313, 0), carries 313 with widths {2048: 78, 512: 78, 6144: 157},
 live-tensor forbidden > 1,570 → 0 and `passed` (21 score bodies), fused qkv-a passed. The first archive
 still resolves 1,570 → 0.
+
+## 2026-09-02 authorship note
+
+Commits 6592368 … 9170f879 on this branch and the merge commits 7498e31b, a49e3ba1, 978dc3a9, 66d32efa on
+`rewrite/topology-first-decode` were authored as "Gianpaolo Vitale <gianpaolo.vitale@icar.cnr.it>" by
+the assistant passing explicit `-c user.name/-c user.email` overrides taken from the session context,
+not the repository's configured identity ("Gianluigi Vitale <gianluigi.vitale11@gmail.com>", used by
+every earlier commit). The owner asked why. The commits stay as they are because their SHAs are bound
+in Sol approvals, this file, the same-region mirror and the orchestration certificate; all later
+commits use the configured identity without overrides.
