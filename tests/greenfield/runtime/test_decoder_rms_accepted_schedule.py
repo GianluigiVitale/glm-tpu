@@ -116,6 +116,8 @@ report = {
     'default_stablehlo_as_schedule': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=True, layernorm_width=decoder.config.index_key_width)['passed'],
     'schedule_stablehlo_as_default': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=False, layernorm_width=decoder.config.index_key_width)['passed'],
 }
+for key in ('default_contract', 'schedule_contract'):
+    report[key] = {k: v for k, v in report[key].items() if k != 'carry_allowances'}
 print(json.dumps(report))
 """
     environment = dict(os.environ)

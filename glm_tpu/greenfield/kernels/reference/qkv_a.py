@@ -9,6 +9,8 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
+from .rmsnorm import _accepted_schedule_normalized
+
 
 @dataclass(frozen=True, slots=True)
 class FusedQkvAContract:
@@ -76,6 +78,7 @@ def one_row_fused_qkv_a_convolution(
     q_a_norm_weight: Any,
     *,
     contract: FusedQkvAContract = FusedQkvAContract(),
+    accepted_schedule: bool = False,
 ) -> FusedQkvAProjection:
     """Project one live row through the protected shard-major N82 boundary.
 
@@ -144,20 +147,34 @@ def one_row_fused_qkv_a_convolution(
         projected = lax.map(project, (packed_weight_bits, packed_scale))
 
     local_q = projected[:, :, : contract.q_width_per_shard]
-    local_square_sum = jnp.sum(
-        jnp.square(local_q.astype(jnp.float32)), axis=-1
-    )
-    global_square_sum = jnp.sum(local_square_sum, axis=0)
-    inverse_rms = lax.rsqrt(
-        global_square_sum / jnp.float32(contract.q_lora_rank)
-        + jnp.float32(contract.epsilon)
-    )
-    local_normalized = (
-        local_q.astype(jnp.float32) * inverse_rms[None, :, None]
-    ).astype(jnp.bfloat16)
-    logical_q = jnp.transpose(local_normalized, (1, 0, 2)).reshape(
-        1, contract.q_lora_rank
-    )
+    if not isinstance(accepted_schedule, bool):
+        raise TypeError("accepted_schedule must be a bool")
+    if accepted_schedule:
+        # Accepted decode-step RMS schedule (see rmsnorm._accepted_schedule_normalized):
+        # assemble the logical q row in FP32 (pure data movement), pad it to the
+        # M32 operand behind an FP32 barrier and reduce f32[32,W] -> f32[32]
+        # over the last axis; same x * inverse product and single BF16 rounding.
+        logical_q_f32 = jnp.transpose(
+            local_q.astype(jnp.float32), (1, 0, 2)
+        ).reshape(1, contract.q_lora_rank)
+        logical_q = _accepted_schedule_normalized(
+            logical_q_f32, contract.epsilon
+        ).astype(jnp.bfloat16)
+    else:
+        local_square_sum = jnp.sum(
+            jnp.square(local_q.astype(jnp.float32)), axis=-1
+        )
+        global_square_sum = jnp.sum(local_square_sum, axis=0)
+        inverse_rms = lax.rsqrt(
+            global_square_sum / jnp.float32(contract.q_lora_rank)
+            + jnp.float32(contract.epsilon)
+        )
+        local_normalized = (
+            local_q.astype(jnp.float32) * inverse_rms[None, :, None]
+        ).astype(jnp.bfloat16)
+        logical_q = jnp.transpose(local_normalized, (1, 0, 2)).reshape(
+            1, contract.q_lora_rank
+        )
     q_residual = (logical_q * q_a_norm_weight).astype(jnp.bfloat16)
     kv_a_projection = jnp.transpose(
         projected[:, :, contract.q_width_per_shard :], (1, 0, 2)
