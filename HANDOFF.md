@@ -11104,3 +11104,18 @@ convert(bitcast_convert(%arg1)), reshape(broadcast_in_dim(%arg2))))`. Attacks re
 hidden (both representations), weights sliced by a constant index, scales built from the hidden element,
 dead dynamic_slice helper returning a constant, plus every earlier attack. Baseline archive: 78/78 kv-a
 rows bind in both representations.
+
+## 2026-09-02 Sol BLOCK on c1ec9efd (permissive traversal) — position-specific chain matchers
+
+Sol demonstrated three passes (direct u8→f32 convert without the FP8 bitcast-convert in HLO and
+StableHLO; a helper returning the dynamic_slice directly). Both binders now match every semantic node at
+its position. Optimized HLO: the weight operand is `convert(f32→bf16)` ← `multiply` (arity 2) ← factors
+`convert(f8e4m3fn→f32)` ← `bitcast-convert(u8→f8e4m3fn)` ← `dynamic-slice(loop u8[32,H,82], counter,
+0, 0)` and `broadcast(dimensions={0,2}, f32)` ← `dynamic-slice(loop f32[32,H/128,82], counter, 0, 0)`;
+only bitcast/reshape/copy and fusion boundaries may sit between nodes; the hidden operand is noise-only
+to the loop-carried `bf16[1,H]` element. StableHLO: helper `return` ← `reshape((1xAxB) → AxB)` ←
+`dynamic_slice %arg0, %arg1, 0, 0, sizes=[1, A, B]` exactly; callee hidden operand is `%arg0` itself;
+weight operand exactly `convert(multiply(convert(bitcast_convert(%arg1) : ui8→f8E4M3FN), reshape(
+broadcast_in_dim(%arg2, dims=[0, 2]))))` with all types bound. Attacks refused in both representations:
+direct u8/ui8→f32 convert, wrong broadcast dimensions, dequant output not converted, helper returning
+the slice directly, plus all earlier ones. Baseline archive: 78/78 kv-a rows bind in both representations.
