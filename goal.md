@@ -36,21 +36,22 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-02 05:20Z
+## Resume checkpoint — 2026-09-02 07:00Z
 
-Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`, head pushed+mirrored. DSA rotary
-table refuted. **Layer-1 frontier certified on CPU** (`gate-d-layer1-scale-frontier-certificate.json`
-`980bbb39…`): DB548 row `9b52a04e…` and accepted row `9936ee1e…` are exact functions of the same
-FP32 RMS input and differ only in the FP32 scale `rsqrt(mean+eps)` by 1–4 ulps. Legacy reduces the
-variance over `f32[32,6144]{T(8,128)}` dims={1}; greenfield over `f32[1,1,6144]`.
+Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. **Bounded TPU result** (tag
+`gate_d_layer1_rms_schedule_20260902T061305905714981Z`, diagnostic archive; HANDOFF): with the
+accepted `f32[32,6144]{T(8,128)} -> f32[32]` variance reduce and an FP32 carry, the greenfield
+layer-1 row equals the accepted legacy row bit-for-bit; the layer-1 one-ULP miss was the
+single-row reduce schedule. DSA rotary table refuted and tombstoned.
 
-Built: sealed-launcher chain v2 `gate-d-layer1-rms-schedule-v2` (commit 68b8eb96; v1 refused on a
-stale launcher literal, tag burned), tests 55/2 skipped, certificate `f4cfeb88`. Staging tree
-`/home/gianl/gate-d-runs/gate-d-layer1-rms-schedule-install-v2-staging` (tree sha `a8cc784f…`).
-Reserved tag `gate_d_layer1_rms_schedule_20260902T061305905714981Z` (vacant). Next: Sol batched verdict (persistence, install-only,
-execute-once); then the two literal sudo install commands and the literal launcher invocation
-(HANDOFF), launched mid-window (:01–:04/:06–:09) after a lease/vacancy recheck. Control must equal
-DB548; arm exact ⇔ accepted row; then decoder change, one 8K run.
+Staged: decoder flag `rms_accepted_schedule` (default off): every decode-step RMS variance over a
+32-row barrier-carried operand; HLO contract (all `rsqrt` 32-row, none scalar);
+`--rms-accepted-schedule`; runner env `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE`, suffix `_ras`. Tests:
+rmsnorm unit, forced-CPU decoder, compile/runner static pass; kernel suites pending.
+Next: commit/push; one batched Sol review (decoder change + tests + 8K launch); merge → rewrite,
+mirror, preflight; one protected 8K run `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1 bash
+scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from the rewrite worktree; accept only
+exact tokens + all DSA contracts + protections + 8/8 cleanup. Then Gate D evidence.
 
 ## Finish (after Gate D)
 

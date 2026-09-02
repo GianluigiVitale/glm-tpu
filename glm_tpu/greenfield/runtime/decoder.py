@@ -662,6 +662,7 @@ class DecoderStepProgram:
     dsa_rope_table_host: Any | None = None
     dsa_rope_table_sha256: str | None = None
     dsa_rope_table_bytes_per_device: int = 0
+    rms_accepted_schedule: bool = False
 
 
 def _validate_pallas_feature_decoder_calls(
@@ -2581,6 +2582,70 @@ def _validate_dsa_rope_table_hlo(
     }
 
 
+def _validate_rms_accepted_schedule_hlo(
+    module: HloModule,
+    *,
+    enabled: bool,
+) -> dict[str, Any]:
+    """Pin the accepted decode-step RMS variance schedule.
+
+    With the flag on every RMS scale must come from a 32-row reduce (an
+    ``rsqrt`` whose result carries 32 rows) and no scalar ``rsqrt`` may remain;
+    with the flag off no 32-row ``rsqrt`` may appear (default path intact).
+    The FP32 ``optimization_barrier`` is consumed by the compiler and is not
+    present in optimized HLO (the bounded TPU replay's schedule arm carries
+    none), so its count is reported but never required.
+    """
+
+    rsqrts = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction.opcode == "rsqrt"
+    )
+    scalar = tuple(
+        instruction
+        for instruction in rsqrts
+        if all(shape.dimensions == () for shape in instruction.result_shapes)
+    )
+    rowwise = tuple(
+        instruction
+        for instruction in rsqrts
+        if any(
+            shape.dimensions and shape.dimensions[0] == 32
+            for shape in instruction.result_shapes
+        )
+    )
+    barriers = tuple(
+        instruction
+        for instruction in module.instructions
+        if instruction.opcode == "opt-barrier"
+    )
+    violations: list[str] = []
+    if enabled:
+        if scalar:
+            violations.append(
+                "decoder still evaluates an RMS scale from a single-row reduce: "
+                f"{len(scalar)} scalar rsqrt instructions"
+            )
+        if not rowwise:
+            violations.append("accepted-schedule RMS reductions are absent")
+    elif rowwise:
+        violations.append(
+            "default decoder carries accepted-schedule RMS reductions: "
+            f"{len(rowwise)} row-wise rsqrt instructions"
+        )
+    return {
+        "applicable": enabled,
+        "barrier_count": len(barriers),
+        "enabled": enabled,
+        "passed": not violations,
+        "rowwise_rsqrt_count": len(rowwise),
+        "rsqrt_count": len(rsqrts),
+        "scalar_rsqrt_count": len(scalar),
+        "violations": violations,
+    }
+
+
 def _validate_main_rope_table_hlo(
     module: HloModule,
     *,
@@ -3926,6 +3991,7 @@ def validate_decoder_step_hlo(
     strategy_nd_attention_projection: bool = False,
     dense_final_layout_convolution: bool = False,
     dsa_rope_table_enabled: bool = False,
+    rms_accepted_schedule: bool = False,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -4450,6 +4516,13 @@ def validate_decoder_step_hlo(
         main_rope_table_enabled=main_rope_table_enabled,
     )
     violations.extend(dsa_rope_table_contract["violations"])
+    if not isinstance(rms_accepted_schedule, bool):
+        raise PlanValidationError("decoder RMS accepted-schedule HLO flag must be boolean")
+    rms_accepted_schedule_contract = _validate_rms_accepted_schedule_hlo(
+        module,
+        enabled=rms_accepted_schedule,
+    )
+    violations.extend(rms_accepted_schedule_contract["violations"])
     pregathered_attention_contract = (
         _validate_pregathered_b512_attention_hlo(
             optimized_hlo,
@@ -4549,6 +4622,8 @@ def validate_decoder_step_hlo(
         "main_rope_table_contract": main_rope_table_contract,
         "dsa_rope_table_enabled": dsa_rope_table_enabled,
         "dsa_rope_table_contract": dsa_rope_table_contract,
+        "rms_accepted_schedule": rms_accepted_schedule,
+        "rms_accepted_schedule_contract": rms_accepted_schedule_contract,
         "pregathered_b512_attention": pregathered_b512_attention,
         "strategy_nd_attention_projection": (
             strategy_nd_attention_projection
@@ -5529,6 +5604,7 @@ def _execute_stage(
     dense_final_layout_convolution: bool,
     main_rope_table_row: Any | None = None,
     dsa_rope_table_row: Any | None = None,
+    rms_accepted_schedule: bool = False,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
@@ -5650,6 +5726,7 @@ def _execute_stage(
             pregathered_b512_attention=pregathered_b512_attention,
             main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
             prefill_index_inputs = prefill_index_inputs.at[
@@ -5766,6 +5843,7 @@ def _execute_stage_split(
     dense_final_layout_convolution: bool,
     main_rope_table_row: Any | None = None,
     dsa_rope_table_row: Any | None = None,
+    rms_accepted_schedule: bool = False,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
@@ -5907,6 +5985,7 @@ def _execute_stage_split(
             ),
             main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
             dense_final_layout_convolution=dense_final_layout_convolution,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
@@ -6035,6 +6114,7 @@ def build_decoder_step_program(
     build_layer0_ingredients_observer: bool = False,
     split_residual_state: bool = False,
     dsa_rope_table_enabled: bool = False,
+    rms_accepted_schedule: bool = False,
 ) -> DecoderStepProgram:
     """Build, but do not compile, one all-stage decoder step.
 
@@ -6124,6 +6204,14 @@ def build_decoder_step_program(
         raise PlanValidationError("decoder main-RoPE table flag must be boolean")
     if not isinstance(dsa_rope_table_enabled, bool):
         raise PlanValidationError("decoder DSA host rotary table flag must be boolean")
+    if not isinstance(rms_accepted_schedule, bool):
+        raise PlanValidationError("decoder RMS accepted-schedule flag must be boolean")
+    if rms_accepted_schedule and (
+        build_layer0_residual_discriminator or build_layer0_ingredients_observer
+    ):
+        raise PlanValidationError(
+            "RMS accepted schedule is not plumbed through layer-0 discriminators"
+        )
     if dsa_rope_table_enabled and (
         build_layer0_residual_discriminator or build_layer0_ingredients_observer
     ):
@@ -6653,12 +6741,14 @@ def build_decoder_step_program(
                     final_residual[1],
                     weight("global.final_norm"),
                     epsilon=1e-5,
+                    accepted_schedule=rms_accepted_schedule,
                 )
                 return normalized
             return final_norm(
                 final_residual,
                 weight("global.final_norm"),
                 epsilon=1e-5,
+                accepted_schedule=rms_accepted_schedule,
             )
 
         next_token = jnp.full((1,), -1, dtype=jnp.int32)
@@ -6786,6 +6876,7 @@ def build_decoder_step_program(
                             ),
                             main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
                             dsa_observation=values[4],
                             layer_residual_observation=values[5],
                         ),
@@ -6856,6 +6947,7 @@ def build_decoder_step_program(
                             ),
                             main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
                             dsa_observation=values[4],
                             dsa_internal_observation=values[5],
                         ),
@@ -6924,6 +7016,7 @@ def build_decoder_step_program(
                             ),
                             main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
                             dsa_observation=values[4],
                         ),
                         lambda values: values,
@@ -6987,6 +7080,7 @@ def build_decoder_step_program(
                         ),
                         main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
                         prefill_index_inputs=values[4],
                     ),
                     lambda values: values,
@@ -7043,6 +7137,7 @@ def build_decoder_step_program(
                         ),
                         main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
                     ),
                     lambda values: values,
                     (residual, kv_cache, index_cache, metadata),
@@ -8579,6 +8674,7 @@ def build_decoder_step_program(
         dsa_rope_table_host=dsa_rope_table_host,
         dsa_rope_table_sha256=dsa_rope_table_digest,
         dsa_rope_table_bytes_per_device=dsa_rope_table_bytes,
+        rms_accepted_schedule=rms_accepted_schedule,
         complete_token_path=complete_token_path,
         observe_dsa_events=observe_dsa_events,
         observe_dsa_internals=observe_dsa_internals,

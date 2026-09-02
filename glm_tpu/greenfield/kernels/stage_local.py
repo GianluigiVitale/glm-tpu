@@ -2263,6 +2263,7 @@ def stage_local_index_share_fp8_mapped(
     sparse_attention_interpret: bool = False,
     linear_backend: StageLinearBackend = "reference",
     linear_interpret: bool = False,
+    rms_accepted_schedule: bool = False,
     add_residual: bool = True,
     reconstruct_output_fp32: bool = False,
     virtual_tp32_reduction_association: (
@@ -2560,6 +2561,7 @@ def stage_local_index_share_fp8_mapped(
         current_kv[..., : contract.kv_lora_rank],
         kv_a_norm_weight,
         epsilon=lora_norm_epsilon,
+        accepted_schedule=rms_accepted_schedule,
     )
     current_rope_input = current_kv[
         ...,

@@ -3520,3 +3520,7 @@ persistence only; review and persistence precede any v2 installation.
   mismatch at 2795; both HLO contracts passed; censuses 8/8; remote `diagnostic/` terminal only.
 - Classification: `BOUNDED_TPU_LAYER1_RMS_SCHEDULE_ARM_EXACT;DIAGNOSTIC_ARCHIVE_ONLY;
   PUBLICATION_REFUSED_BY_STALE_PUBLISHER_CONSTANT;DECODER_UNPROVEN;GATE_D_OPEN`.
+- Decoder flag `rms_accepted_schedule` (default off) staged with HLO contract, CLI/runner plumbing
+  (`_ras`), unit/forced-CPU/static tests (rmsnorm 5/5, decoder 1/1, compile 67/67, kernel suites
+  32/32). Classification: `RMS_ACCEPTED_SCHEDULE_INTEGRATED_DEFAULT_OFF;REVIEW_PENDING;
+  PROTECTED_8K_UNAUTHORIZED;GATE_D_OPEN`.

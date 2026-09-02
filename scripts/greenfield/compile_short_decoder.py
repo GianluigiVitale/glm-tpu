@@ -1559,6 +1559,17 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--rms-accepted-schedule",
+        type=int,
+        choices=(0, 1),
+        default=0,
+        help=(
+            "Reduce every decode-step RMS variance over the accepted 32-row "
+            "f32[32,W] operand behind an FP32 barrier instead of a single-row "
+            "reduce (default off)."
+        ),
+    )
+    parser.add_argument(
         "--pregathered-b512-attention",
         type=int,
         choices=(0, 1),
@@ -1678,6 +1689,7 @@ def main() -> int:
     )
     args.main_rope_table = bool(args.main_rope_table)
     args.dsa_rope_table = bool(args.dsa_rope_table)
+    args.rms_accepted_schedule = bool(args.rms_accepted_schedule)
     args.pregathered_b512_attention = bool(
         args.pregathered_b512_attention
     )
@@ -1733,6 +1745,12 @@ def main() -> int:
     ):
         raise ValueError(
             "DSA host rotary table is not plumbed through layer-0 discriminators"
+        )
+    if args.rms_accepted_schedule and (
+        args.observe_layer0_ingredients or observe_layer0_discriminator
+    ):
+        raise ValueError(
+            "RMS accepted schedule is not plumbed through layer-0 discriminators"
         )
     if args.observe_layer0_subshard_variants:
         layer0_discriminator_kind = "virtual_tp32"
@@ -2462,6 +2480,7 @@ def main() -> int:
             ),
             main_rope_table_enabled=args.main_rope_table,
             dsa_rope_table_enabled=args.dsa_rope_table,
+            rms_accepted_schedule=args.rms_accepted_schedule,
             pregathered_b512_attention=(
                 args.pregathered_b512_attention
             ),
@@ -2515,6 +2534,7 @@ def main() -> int:
                 ),
                 main_rope_table_enabled=args.main_rope_table,
                 dsa_rope_table_enabled=args.dsa_rope_table,
+            rms_accepted_schedule=args.rms_accepted_schedule,
                 pregathered_b512_attention=(
                     args.pregathered_b512_attention
                 ),
@@ -2568,6 +2588,7 @@ def main() -> int:
                     ),
                     main_rope_table_enabled=args.main_rope_table,
                     dsa_rope_table_enabled=args.dsa_rope_table,
+            rms_accepted_schedule=args.rms_accepted_schedule,
                     pregathered_b512_attention=(
                         args.pregathered_b512_attention
                     ),
@@ -3332,6 +3353,7 @@ def main() -> int:
             split_residual_state=decoder.split_residual_state,
             main_rope_table_enabled=decoder.main_rope_table_enabled,
             dsa_rope_table_enabled=decoder.dsa_rope_table_enabled,
+            rms_accepted_schedule=decoder.rms_accepted_schedule,
             pregathered_b512_attention=(
                 decoder.pregathered_b512_attention
             ),
@@ -3451,6 +3473,7 @@ def main() -> int:
                     dsa_observer.main_rope_table_enabled
                 ),
                 dsa_rope_table_enabled=dsa_observer.dsa_rope_table_enabled,
+                rms_accepted_schedule=dsa_observer.rms_accepted_schedule,
                 pregathered_b512_attention=(
                     dsa_observer.pregathered_b512_attention
                 ),
@@ -5412,6 +5435,13 @@ def main() -> int:
             ),
             "main_rope_table_local_device_sha256": (
                 main_rope_table_local_hashes
+            ),
+            "rms_accepted_schedule": decoder.rms_accepted_schedule,
+            "rms_accepted_schedule_prerequisite": (
+                "bounded TPU replay gate_d_layer1_rms_schedule_20260902T061305905714981Z: "
+                "accepted-schedule arm reproduced the accepted layer-1 row exactly"
+                if decoder.rms_accepted_schedule
+                else None
             ),
             "dsa_rope_table_enabled": decoder.dsa_rope_table_enabled,
             "dsa_rope_table_sha256": decoder.dsa_rope_table_sha256,

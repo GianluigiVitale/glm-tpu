@@ -159,3 +159,37 @@ def test_result_authority_line_binds_status_marker_and_terminal_identity() -> No
     assert line.startswith("NUMERICAL_RESULT status=SCHEDULE_ARM_EXACT marker_sha256=")
     with pytest.raises(RuntimeError):
         MODULE._result_authority_line("NUMERICAL_ACCEPTED", "a" * 64, {"generation": "1", "sha256": "b" * 64})
+
+
+def test_publisher_compiler_environment_equals_driver_environment() -> None:
+    assert MODULE.EXPECTED_COMPILER_ENVIRONMENT == DRIVER_MODULE._EXPECTED_ENVIRONMENT
+
+
+REAL_RUN = Path(
+    "/home/gianl/gate-d-runs/gate_d_layer1_rms_schedule_20260902T061305905714981Z"
+)
+
+
+@pytest.mark.skipif(not REAL_RUN.exists(), reason="archived real run records unavailable")
+def test_real_run_records_satisfy_dependency_authority_and_output_rederivation() -> None:
+    """The 2026-09-02 TPU run's archived records must pass the publisher checks that refused them."""
+
+    import json
+
+    runner = json.loads((REAL_RUN / "runner.json").read_text())
+    dependencies_raw = (REAL_RUN / "dependencies.json").read_bytes()
+    dependencies = json.loads(dependencies_raw)
+    assert dependencies["environment"] == MODULE.EXPECTED_COMPILER_ENVIRONMENT
+    assert dependencies["artifact_kind"] == "gate_d_layer1_rms_schedule_dependencies"
+    identity = runner["compiler_dependency_manifest"]
+    assert identity["sha256"] == sha256(dependencies_raw).hexdigest()
+    assert identity["byte_count"] == len(dependencies_raw)
+    exact, status, classification = MODULE._expected_status(runner)
+    assert exact and status == "SCHEDULE_ARM_EXACT" and runner["status"] == status
+    assert runner["classification"] == classification
+    output_raw = (REAL_RUN / "outputs.npz").read_bytes()
+    assert MODULE._validate_output_npz(output_raw, runner, runner["numerical"]) is True
+    assert runner["physical_group"] == MODULE.EXPECTED_PHYSICAL_GROUP
+    assert runner["schedule_source_sha256s"] == MODULE.SCHEDULE_SOURCE_SHA256S
+    assert runner["input_arrays"] == MODULE.INPUT_ARRAY_SHA256S
+    assert runner["claim_scope"] == MODULE.CLAIM_SCOPE

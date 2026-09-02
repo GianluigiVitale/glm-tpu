@@ -130,7 +130,7 @@ CLAIM_SCOPE = (
     "sealed DB548 bytes. No decoder, 8K, token, performance, or Gate-D closure claim."
 )
 EXPECTED_COMPILER_ENVIRONMENT = {
-    "GLM_GATE_D_PROJECTION_CONTRACTION_NUMERICAL": "1",
+    "GLM_GATE_D_LAYER1_RMS_SCHEDULE": "1",
     "HOME": "/home/gianl",
     "JAX_ENABLE_COMPILATION_CACHE": "0",
     "JAX_PLATFORMS": "tpu",

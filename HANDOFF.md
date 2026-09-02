@@ -10560,3 +10560,24 @@ row 0), default-off behind a flag, with an HLO contract counting `f32[32]` sched
 rerun the 8K exact-DSA run. Next: fix the publisher constant with a regression test against these real
 run records, repin as v3 for a sealed SUCCESS re-run if Sol requires it, and in parallel implement the
 decoder change.
+
+## 2026-09-02 production fix staged: `rms_accepted_schedule` (default off) in the decoder
+
+Following the bounded TPU result, the decoder gains a default-off flag that makes every decode-step
+RMS variance use the accepted schedule: `kernels/reference/rmsnorm.py` adds
+`_accepted_schedule_normalized` (rows padded to the M32 operand, one FP32 `optimization_barrier`,
+`mean(square(...))` over the last axis → `f32[32,1]`, `rsqrt`, row 0) and an `accepted_schedule`
+keyword on `rms_norm`, `fused_add_rms_norm` and `final_norm`; `kernels/layer.py` threads
+`rms_accepted_schedule` through both stage layer functions into the input norm, the post-attention
+norm, the q-a norm (`_project_attention_qkv_a`) and the kv-a latent norm
+(`stage_local_index_share_fp8_mapped`); `runtime/decoder.py` threads it through
+`build_decoder_step_program`, both execute-stage wrappers, the final norm, `DecoderStepProgram`,
+and adds `_validate_rms_accepted_schedule_hlo` to `validate_decoder_step_hlo` (flag on: every
+`rsqrt` carries 32 rows and none is scalar; flag off: no 32-row `rsqrt`; the barrier is consumed by
+the compiler and is reported, not required — the bounded replay's TPU HLO carries none);
+`compile_short_decoder.py` adds `--rms-accepted-schedule` (bound to the bounded-proof tag), the
+runners add `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE` with tag suffix `_ras` and the same 8K/oracle
+gating as the DSA table. Tests: `test_rmsnorm_accepted_schedule.py` (CPU equivalence within BF16
+rounding for 1/3/40 rows, 32-row barrier lowering, boolean flag), forced-CPU decoder test (tokens
+and metadata equal, state within BF16 rounding, HLO contract both ways), compile-script/runner
+static test. The publisher of the bounded chain is fixed for a sealed re-run if required.

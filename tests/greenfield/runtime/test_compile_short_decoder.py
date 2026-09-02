@@ -1909,3 +1909,30 @@ def test_dsa_rope_table_is_default_off_and_bounded_proof_bound() -> None:
     assert "build_dsa_rotary_table_host(" in runtime
     prefill = (REPO / "glm_tpu/greenfield/runtime/prefill.py").read_text()
     assert 'getattr(decoder, "dsa_rope_table_enabled", False)' in prefill
+
+
+def test_rms_accepted_schedule_is_default_off_and_bounded_proof_bound() -> None:
+    compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
+    assert '"--rms-accepted-schedule"' in compiler
+    assert "args.rms_accepted_schedule = bool(args.rms_accepted_schedule)" in compiler
+    assert compiler.count("rms_accepted_schedule=args.rms_accepted_schedule") == 3
+    assert "rms_accepted_schedule=decoder.rms_accepted_schedule" in compiler
+    assert "rms_accepted_schedule=dsa_observer.rms_accepted_schedule" in compiler
+    assert '"rms_accepted_schedule": decoder.rms_accepted_schedule' in compiler
+    assert "gate_d_layer1_rms_schedule_20260902T061305905714981Z" in compiler
+    assert "RMS accepted schedule is not plumbed through layer-0 discriminators" in compiler
+    runtime = (REPO / "glm_tpu/greenfield/runtime/decoder.py").read_text()
+    assert "rms_accepted_schedule: bool = False" in runtime
+    assert "def _validate_rms_accepted_schedule_hlo(" in runtime
+    assert runtime.count("rms_accepted_schedule=rms_accepted_schedule,") >= 6
+    rmsnorm = (REPO / "glm_tpu/greenfield/kernels/reference/rmsnorm.py").read_text()
+    assert "ACCEPTED_SCHEDULE_ROWS = 32" in rmsnorm
+    assert "lax.optimization_barrier(rows_2d)" in rmsnorm
+    runner = (REPO / "scripts/greenfield/run_short_decoder_compile_pp8.sh").read_text()
+    assert "readonly RMS_ACCEPTED_SCHEDULE=${GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE:-0}" in runner
+    assert "RMS accepted schedule requires the protected 8K token/DSA Gate-D profile" in runner
+    assert "RMS_SCHEDULE_SUFFIX=_ras" in runner
+    assert "${DSA_ROPE_SUFFIX}${RMS_SCHEDULE_SUFFIX}${PREGATHERED_ATTENTION_SUFFIX}" in runner
+    assert '--rms-accepted-schedule "$rms_accepted_schedule"' in runner
+    gate_d = (REPO / "scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh").read_text()
+    assert "export GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=${GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE:-0}" in gate_d
