@@ -1165,3 +1165,12 @@ normalized-state cause.
   silently drops every copy after the first (5 of 10 `rsqrt` vanished). Scope SSA names per region.
 - Every SHA cascade must be re-run after *any* edit to a pinned file, including a two-line constant
   fix; the chain tests exist to catch this and did.
+- An exemption in a fail-closed contract is itself a contract: "looks like a LayerNorm" (subtract +
+  epsilon) exempted anything centred; bind every fact of the exempted op (width from the plan,
+  axis, scale per opcode, combiner, rows) or the exemption becomes the hole.
+- `git checkout --ours -- <path>` only acts on conflicted paths; a cleanly merged file silently takes
+  the merge result. To keep one branch's file, `git checkout <commit> -- <path>` and verify the
+  bytes before committing.
+- Untracked files and inherited environments are code paths: a protected launch must fail on
+  untracked files on every worker, list all three remote namespaces, and run committed bytes from
+  a fresh detached worktree of the pin under `env -i`.

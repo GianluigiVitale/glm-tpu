@@ -104,16 +104,17 @@ report = {
     'output_count': len(default_out),
     'metadata_equal': bool(np.array_equal(default_out[3], schedule_out[3])),
     'tokens_equal': bool(np.array_equal(default_out[4], schedule_out[4])) if len(default_out) > 4 else None,
+    'index_key_width': int(decoder.config.index_key_width),
     'index_max_abs': float(np.abs(default_out[2].astype(np.float32) - schedule_out[2].astype(np.float32)).max()),
     'residual_max_abs': float(np.abs(default_out[0].astype(np.float32) - schedule_out[0].astype(np.float32)).max()),
-    'default_contract': _validate_rms_accepted_schedule_hlo(default_module, enabled=False),
-    'schedule_contract': _validate_rms_accepted_schedule_hlo(schedule_module, enabled=True),
-    'default_as_schedule': _validate_rms_accepted_schedule_hlo(default_module, enabled=True)['passed'],
-    'schedule_as_default': _validate_rms_accepted_schedule_hlo(schedule_module, enabled=False)['passed'],
-    'default_stablehlo': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=False),
-    'schedule_stablehlo': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=True),
-    'default_stablehlo_as_schedule': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=True)['passed'],
-    'schedule_stablehlo_as_default': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=False)['passed'],
+    'default_contract': _validate_rms_accepted_schedule_hlo(default_module, enabled=False, layernorm_width=decoder.config.index_key_width),
+    'schedule_contract': _validate_rms_accepted_schedule_hlo(schedule_module, enabled=True, layernorm_width=decoder.config.index_key_width),
+    'default_as_schedule': _validate_rms_accepted_schedule_hlo(default_module, enabled=True, layernorm_width=decoder.config.index_key_width)['passed'],
+    'schedule_as_default': _validate_rms_accepted_schedule_hlo(schedule_module, enabled=False, layernorm_width=decoder.config.index_key_width)['passed'],
+    'default_stablehlo': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=False, layernorm_width=decoder.config.index_key_width),
+    'schedule_stablehlo': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=True, layernorm_width=decoder.config.index_key_width),
+    'default_stablehlo_as_schedule': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=True, layernorm_width=decoder.config.index_key_width)['passed'],
+    'schedule_stablehlo_as_default': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=False, layernorm_width=decoder.config.index_key_width)['passed'],
 }
 print(json.dumps(report))
 """
@@ -152,6 +153,7 @@ print(json.dumps(report))
     assert report["default_stablehlo_as_schedule"] is False
     assert report["schedule_stablehlo_as_default"] is False
     # The DSA indexer key LayerNorm is the only non-RMS rsqrt and is unchanged by the flag.
+    assert report["index_key_width"] >= 1
     assert report["schedule_contract"]["layernorm_rsqrt_count"] >= 1
     assert report["schedule_contract"]["layernorm_rsqrt_count"] == report["default_contract"]["layernorm_rsqrt_count"]
     assert report["schedule_stablehlo"]["layernorm_rsqrt_count"] == report["default_stablehlo"]["layernorm_rsqrt_count"] >= 1

@@ -10645,3 +10645,43 @@ the 8K launch command); merge into `rewrite/topology-first-decode` keeping the r
 mirror; no-TPU preflight; resubmit the exact merged pin and a fresh composed tag for one 8K
 execution review; then one protected run `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1 bash
 scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from the rewrite worktree.
+
+## 2026-09-02 Sol batch verdict on 1ad426ed: BLOCK (three P1) — fixed in this commit
+
+Sol reviewed the whole batch (contract + coverage + tests + adjudication + v3 pin + merge + preflight
++ launch) and returned three P1s:
+
+1. **LayerNorm exemption unbound** (`decoder.py` HLO and StableHLO binders): classifying by
+   "subtract + epsilon 1e-6" cleared every prior lineage violation. Fixed: both binders now bind
+   the DSA key LayerNorm exactly — centred `subtract`, reduce operand `f32[R,index_key_width]`
+   (`config.index_key_width`, 128 on the real model, threaded from `validate_decoder_step_hlo`),
+   last axis only, `add` combiner, per-opcode scale (`divide` by W / `multiply` by 1/W — the
+   RMS path is bound per opcode too, closing a multiply-by-W hole), epsilon 1e-06, rsqrt rows
+   equal to the reduced rows. A centred lineage missing any fact is nonconforming and fails the
+   enabled contract. New `tests/greenfield/runtime/test_rms_schedule_layernorm_classification.py`
+   (21): synthetic module with one accepted RMS lineage + one exact LayerNorm passes; mutations
+   of width, axis, scale, scale opcode, combiner, epsilon, rows, centring, squaring are refused in
+   both representations; the flag-off case and a wrong decoder key width are refused.
+2. **Merge overwrote the rewrite goal.md**: `git checkout --ours -- goal.md` is a no-op on a path
+   git merged cleanly, so 96ca1153 carried the tooling goal.md (17+/15−). The local merge commit is
+   discarded (never pushed); the merge is redone as `merge --no-commit` + `git checkout ba7d1e72 --
+   goal.md` and verified byte-identical before commit.
+3. **8K runner launch boundary** (`run_short_decoder_compile_pp8.sh`): the worker sync ignored
+   untracked files, the remote vacancy checked live objects only, and the workers executed the
+   mutable worktree through `PYTHONPATH="$wt"` with an inherited environment. Fixed: untracked
+   files fail the eight-host sync (all eight rewrite worktrees were verified clean, including
+   untracked, before the change); vacancy is three-scope (live, `--all-versions`, `--soft-deleted
+   --exhaustive`, recorded in `remote_vacancy.raw.txt` / `remote_vacancy.txt`); each worker
+   re-verifies `HEAD == pin` and a clean status, creates a fresh detached `git worktree` of the pin
+   under the append-only run directory (`$run/source`, verified `HEAD == pin` and clean including
+   ignored files) and runs `compile_short_decoder.py` from it under `/usr/bin/env -i` with only
+   HOME/PATH/LANG/LC_ALL/PYTHONDONTWRITEBYTECODE, the StrategyND flag, JAX_PLATFORMS,
+   XLA_PYTHON_CLIENT_MEM_FRACTION, PYTHONPATH=$src and GLM_GREENFIELD_RUN_TAG. The compile
+   script's `git rev-parse HEAD == --expected-code-hash` check keeps working because the source
+   is a real worktree. Static tests updated (`test_compile_short_decoder.py`).
+
+Suites after the fixes (CPU-pinned): contract/LayerNorm/runner/recover/attention-operand 111
+passed; forced-CPU decoder 1 passed (33/33 conforming, LayerNorm counts equal, key width bound).
+The submitted tag `..._ras_..._trace2_20260902T090858464221531Z` is abandoned unstarted (Sol: a tag
+submitted under a rejected boundary must not be started). Next: push, redo the merge, preflight,
+compose a new tag, resubmit the exact pin/tag to Sol.

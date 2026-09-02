@@ -3541,3 +3541,8 @@ persistence only; review and persistence precede any v2 installation.
   PROTECTED_8K_UNAUTHORIZED;GATE_D_OPEN`.
 - Chain re-pinned v3 (publisher `a53f3fc2…`, driver `5f5fa802…`, wrapper `f52e5334…`, launcher
   `33c0a696…`, installer `83f72f20…`); not installed; no rerun planned.
+- Sol BLOCK on 1ad426ed (LayerNorm exemption unbound; merge overwrote rewrite goal.md; 8K runner
+  boundary). Fixed: exact LayerNorm binding (`index_key_width`, axis, per-opcode scale, add,
+  1e-06, rows) + 21 synthetic hostile tests; merge redone with ba7d1e72 goal.md byte-identical;
+  runner rejects untracked files, three-scope vacancy, detached pin worktree under `env -i`.
+  Classification unchanged: `REVIEW_PENDING;PROTECTED_8K_UNAUTHORIZED;GATE_D_OPEN`.

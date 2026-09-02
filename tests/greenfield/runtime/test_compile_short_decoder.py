@@ -324,7 +324,21 @@ def test_pp8_runner_supports_default_off_metadata_parent_lineage() -> None:
         "--feature-source-metadata-only $FEATURE_SOURCE_METADATA_ONLY "
         "--feature-output-tile" in runner
     )
-    assert "status --porcelain --untracked-files=no" in runner
+    # Sol P1 (2026-09-02): untracked files fail the sync on every worker; the
+    # remote prefix must be vacant in all three listing scopes; committed bytes
+    # execute from a fresh detached worktree of the pin under a sanitized env.
+    assert "--untracked-files=no" not in runner
+    assert 'gcloud storage ls --all-versions "$REMOTE_PREFIX/**"' in runner
+    assert 'gcloud storage ls --soft-deleted --exhaustive "$REMOTE_PREFIX/**"' in runner
+    assert "remote_vacancy.raw.txt" in runner and "remote_vacancy.txt" in runner
+    assert 'git -C "$wt" worktree add -q --detach "$src" ' in runner
+    assert '[[ -z $(git -C "$src" status --porcelain --ignored) ]]' in runner
+    assert '/usr/bin/env -i HOME=/home/gianl PATH=/usr/bin:/bin LANG=C LC_ALL=C PYTHONDONTWRITEBYTECODE=1' in runner
+    assert 'PYTHONPATH="$src" GLM_GREENFIELD_RUN_TAG="$tag"' in runner
+    assert 'PYTHONPATH="$wt"' not in runner
+    assert 'cd "$wt";' not in runner
+    assert "export GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION=" not in runner
+    assert '"$src/scripts/greenfield/compile_short_decoder.py"' in runner
     assert "METADATA_SOURCE_SUFFIX=_metaparent" in runner
 
 
@@ -601,9 +615,10 @@ def test_strategy_nd_attention_projection_is_default_off_and_db539_protected() -
         "readonly STRATEGY_ND_ATTENTION_PROJECTION="
         "${GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION:-0}" in runner
     )
+    # The worker process receives the flag inside the sanitized env -i boundary.
     assert (
-        "export GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION="
-        "$STRATEGY_ND_ATTENTION_PROJECTION" in runner
+        "GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION="
+        "'\"$STRATEGY_ND_ATTENTION_PROJECTION\"' JAX_PLATFORMS=tpu" in runner
     )
     assert "StrategyND attention projection requires the protected 8K" in runner
     assert "STRATEGY_ND_ATTENTION_PREREQUISITE_TAG" in runner
