@@ -1125,3 +1125,15 @@ normalized-state cause.
   failure (seven swapped positions at the same event) because there every cached prompt key and the
   query carried their own position-dependent rotary error; only the full decoder with host rows for
   keys, queries and prefill can answer that.
+- Correction to the rotary lesson above: accuracy against the F64 truth is not the acceptance
+  criterion; identity with the legacy oracle is. The legacy `tpu-inference` GLM DSA indexer evaluates
+  `jnp.cos`/`jnp.sin` on device (`glm_dsa_indexer.py:rope_cos_sin`), so the greenfield on-device
+  rotary already matched it bit-for-bit at layer 0 (2,048/2,048 scores, zero delta) and the host
+  FP32 table moved every layer-0 score by up to 2.6e-3 while leaving the layer-1 divergence untouched.
+  Before proposing a numerical "fix", read the oracle engine's source for the exact formulation and
+  check the discriminator against the oracle's own outputs at the *first exact* event, not against an
+  F64 reference; a bounded proof of faithfulness to the truth can be a proof of unfaithfulness to the
+  oracle.
+- Compare the two protected runs (with and without a change) event by event before believing a
+  bounded discriminator: a change that leaves the first failing event's error statistics unchanged
+  (six swaps, mean |Δscore| 0.0148 in both) did not touch the cause, whatever it did elsewhere.

@@ -10215,3 +10215,42 @@ failed closed on all eight workers at `mkdir` of the run directory: the composed
 execution occurred; the remote result prefix has no objects; the rewrite worktree is clean. The tag
 suffix is shortened to `_dr` (253 bytes total). Exact next: persist, re-merge, mirror, preflight and
 one launch of the same command.
+
+## 2026-09-02 DSA-table protected 8K run refused at exact DSA; host-rotary-table hypothesis refuted at engine level
+
+Tooling `7dcf0890` (tag suffix `_dr`) was merged into `rewrite/topology-first-decode` as `ba7d1e72`,
+pushed, mirrored (`02:10:10Z OK`), and the no-TPU preflight passed at that pin. The single approved
+launch `GLM_GREENFIELD_DSA_ROPE_TABLE=1 bash scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh`
+ran as tag `…mainrope_dr_…_trace2_20260902T021346091708582Z` (02:13:46Z–03:24:29Z): sync, real
+78-layer 8K load and compile on all eight workers, HLO contracts passed (DSA table: one FP32 entry
+parameter, one lookup, zero transcendentals with both tables), first decode token exact (`220`), and
+then the exact-DSA observer contract failed closed at decode position 8155 on 8/8 workers. Pre and
+failure censuses are 8/8 clean (`f5fbcd2f…`, `494a67ed…`); the remote prefix holds only the
+diagnostic host records, HLO and observer objects (59 objects, no `SUCCESS`, no DB row, no trace or
+performance claim). The rewrite worktree was not touched during the run.
+
+Diagnosis, from archived bytes only (`scripts/greenfield/adjudicate_gate_d_dsa_rope_table_8k_refusal.py`,
+artifact `docs/artifacts/gate-d-dsa-rope-table-8k-refusal-adjudication.json` SHA
+`0f7c36d28d748dc5754ef5dcc829b88961c5713bcf8a6db4ff4667e8960c27e0`, inputs bound to the legacy 8K DSA
+oracle `b591a462…` and the observer tensors `17f0916d…` (2026-08-28, no table) and `dfc21a7b…`
+(2026-09-02, table)):
+
+- Without the table (2026-08-28 pp8 run, same program family) event 0/layer 0 was bit-exact against
+  the legacy oracle: all 2,048 selected positions, their order and all 2,048 scores (zero delta).
+- With the table, event 0 keeps the exact selected set but 2,046/2,048 scores move (max 2.6e-3,
+  first order mismatch at offset 49) including position 0, whose key rotary is the identity: the
+  host-table query at 8155 differs from what legacy computes.
+- Event 1/layer 1 is unchanged: six swapped positions in both runs, position-aligned mean
+  |Δscore| 0.01481 vs 0.01480, max 0.098 vs 0.101. Totals: 39,964 vs 41,047 order mismatches.
+- Legacy `tpu-inference` (`b3c25df47`, `tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py:1078`)
+  evaluates the indexer rotary as `jnp.cos`/`jnp.sin` of `positions * inv_freq` inside its JAX
+  program, on device, for prefill keys, cached keys and queries alike. It does not use a host table.
+
+Conclusion: the V2/V3 finding that on-device cos/sin deviate from the F64 truth by ~1e-2 is correct
+but irrelevant to the oracle, because the accepted legacy engine carries the same on-device values;
+the greenfield device rotary already matched it bit-for-bit at layer 0. The layer-1 divergence
+(scores off by ~1e-3 relative, a bf16-rounding-scale perturbation of the layer-1 indexer input) is
+produced between the exact layer-0 DSA event and the layer-1 indexer input, i.e. in the layer-0
+attention output, MoE, or residual path, not in rotary. `dsa_rope_table_enabled` stays default-off
+and must not be launched again; the code remains as a documented, refuted experiment. Gate D remains
+open; no performance claim.

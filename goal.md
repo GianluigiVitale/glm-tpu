@@ -36,21 +36,24 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-02 02:40Z
+## Resume checkpoint — 2026-09-02 04:20Z
 
-Worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`, branch
-`tooling/gate-d-compensated-pp16-numerical`, HEAD `fa970b09…` on origin+mirror. **Root cause proven
-at bounded scope** (V3 `…004306002075694Z`: host row → key faithful to 5e-7; V2: 2.3e-3). **Batch 2 staged:** host DSA rotary rows in the decoder
-(`dsa_rope_table_enabled`, default off; kernels/decoder/prefill/compile script/runners), HLO
-contract (1 table param + lookup, 0 transcendentals with both tables), forced-CPU equivalence, 126/126 regression, CPU selection witness (V3 key reproduces the accepted
-layer-1/8155 event exactly; the 2026-08-26 8K run failed at that event with 7 swaps).
+Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. **Host-rotary-table hypothesis
+REFUTED at engine level**: protected 8K run `…mainrope_dr_…_20260902T021346091708582Z` (pin
+`ba7d1e72`, `GLM_GREENFIELD_DSA_ROPE_TABLE=1`) failed closed at exact DSA. Without the table
+(2026-08-28 run) event 0/layer 0 was bit-exact vs the legacy oracle; with it, layer-0 scores move
+≤2.6e-3 (query, position 0 too) while event 1/layer 1 is unchanged (6 swaps, mean |Δscore| 0.0148
+in both runs). Legacy indexer computes `jnp.cos/sin` on device (`glm_dsa_indexer.py:1078`).
+Artifact `gate-d-dsa-rope-table-8k-refusal-adjudication.json` `0f7c36d2…`. Censuses 8/8; no
+SUCCESS/DB. `dsa_rope_table` stays default-off; never relaunch with it.
 
-Exact next (one batched Sol review): commit/push batch 2; merge tooling →
-`rewrite/topology-first-decode` keeping this checkpoint plus the Compass rule, push, mirror; then one
-serialized protected launch `GLM_GREENFIELD_DSA_ROPE_TABLE=1 bash
-scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from `/home/gianl/glm-tpu-topology-rewrite`;
-accept only exact tokens + all DSA contracts + full protections + 8/8 cleanup. First launch
-refused at `mkdir` (tag > NAME_MAX); suffix now `_dr`; no TPU work. Gate D open.
+Consequence: the layer-1 divergence arises between the exact layer-0 DSA event and the layer-1
+indexer input (layer-0 attention output / MoE / residual), at bf16-rounding scale (~1e-3 rel).
+
+Exact next (no TPU launch): reread the Compass artifact; adjudicate its hidden-state hypotheses
+against existing layer-0 discriminator/ingredient artifacts, DSA internal observer and layer-1
+internal reference; pick one discriminator isolating the layer-0→1 hidden-state delta; one batched
+Sol review of this refusal record plus that plan before any run.
 
 ## Finish (after Gate D)
 

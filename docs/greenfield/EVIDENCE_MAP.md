@@ -3469,3 +3469,15 @@ persistence only; review and persistence precede any v2 installation.
   reproduces the accepted event exactly; V2 key perturbs scores 4.2e-3 without flipping it.
 - Classification: `DSA_HOST_ROPE_DECODER_INTEGRATED_DEFAULT_OFF;SELECTION_WITNESS_V3_EXACT;
   MERGE_TO_REWRITE_PENDING;PROTECTED_8K_UNAUTHORIZED;GATE_D_OPEN`.
+
+## 2026-09-02 DSA-table protected 8K run refused; host-rotary-table hypothesis refuted
+
+- Run `…mainrope_dr_…_trace2_20260902T021346091708582Z`, pin `ba7d1e72`, fail-closed at the exact-DSA
+  contract (event 0 order offset 49, event 1 six swaps); censuses 8/8 (`f5fbcd2f…`/`494a67ed…`);
+  HLO DSA-table contract passed; first token exact; no SUCCESS/DB/trace/performance claim.
+- Adjudication `gate-d-dsa-rope-table-8k-refusal-adjudication.json` SHA `0f7c36d28d748dc5754ef5dcc829b88961c5713bcf8a6db4ff4667e8960c27e0`
+  (CPU, archived bytes): event 0 bit-exact without table, perturbed 2.6e-3 with it (position 0 too);
+  event 1 unchanged (mean |Δ| 0.0148 both). Legacy indexer uses on-device `jnp.cos/sin`
+  (`glm_dsa_indexer.py:1078`, `b3c25df47`).
+- Classification: `HOST_ROTARY_TABLE_HYPOTHESIS_REFUTED_AT_ENGINE_LEVEL;PROTECTED_8K_REFUSED_TWICE_AT_EVENT_1;
+  DSA_ROPE_TABLE_DEFAULT_OFF_DO_NOT_RELAUNCH;GATE_D_OPEN`.
