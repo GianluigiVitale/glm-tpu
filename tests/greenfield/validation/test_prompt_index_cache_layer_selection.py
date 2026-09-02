@@ -273,6 +273,12 @@ def test_wrapper_launcher_and_sealer_thread_the_layer():
     assert 'GLM_DCP_CACHE_DUMP_LAYERS=0"' not in wrapper
     assert "$PROMPT_CACHE_LAYER_ID == 0 && \\" in wrapper  # prompt-key capture stays layer 0
     assert 'if [[ $PROMPT_CACHE_LAYER_ID != 0 ]]; then' in wrapper  # one-host probe stays layer 0
+    # Finalization branches on the layer: deeper layers bind the sealed identity
+    # instead of reading the layer-0 production comparison.
+    assert '"${OBSERVER_BRANCH:-none}" "$PROMPT_CACHE_LAYER_ID" <<\'PY\'' in wrapper
+    assert 'elif sys.argv[39] != "0":' in wrapper
+    assert 'raise SystemExit("prompt index-cache layer binding drifted")' in wrapper
+    assert wrapper.index('elif sys.argv[39] != "0":') < wrapper.index('/ "prompt_index_cache_comparison"')
     # The sealed layer-0 DSA input is verified before any TPU work in prompt-cache mode.
     assert "sealed layer-0 DSA input required by prompt-cache sealing is unavailable" in wrapper
     preflight = wrapper.index("inspect_layer0_dsa_association_input(\n    Path(sys.argv[1])")
