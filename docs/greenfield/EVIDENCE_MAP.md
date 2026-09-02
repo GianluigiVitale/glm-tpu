@@ -3498,3 +3498,9 @@ persistence only; review and persistence precede any v2 installation.
   `f32[1,1,6144]{T(1,128)}` → scalar. Captured-RMS probe `accepted_split` arm redesigned as FP32-carry
   accepted-schedule arm (default-off, unexecuted); matcher `fp32_carry_schedule`; tests 5/5 (+2 skips),
   16/16 adjacent. Classification: `RMS_SCHEDULE_ARM_READY;REVIEW_PENDING;TPU_UNAUTHORIZED;GATE_D_OPEN`.
+- Certificate hardened per Sol (fail-closed invariants, third association, global windows by
+  monotonicity, generator provenance, effective-scale wording): artifact SHA
+  `980bbb3933866ebc0228882d9c2f76d0b212e6347f268821a71f5bcab219db3f`, script `d9499821…`.
+  Classification `LAYER1_SCALE_FRONTIER_CERTIFIED;…;EFFECTIVE_SCALE_IS_THE_ONLY_FREE_QUANTITY;
+  REDUCTION_STRUCTURE_NOT_IDENTIFIED;NO_PHYSICAL_CAUSALITY_CLAIM;GATE_D_OPEN`. Probe execution blocked
+  pending canonical protections in the launcher.

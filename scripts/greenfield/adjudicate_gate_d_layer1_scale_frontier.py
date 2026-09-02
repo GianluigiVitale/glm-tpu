@@ -16,11 +16,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import platform
 import struct
+import sys
 from pathlib import Path
 
 import ml_dtypes
 import numpy as np
+
+SEARCH_ULPS = 256
 
 BF16 = ml_dtypes.bfloat16
 HIDDEN = 6144
@@ -153,18 +157,43 @@ def main() -> int:
     x_orders = {
         "(dense+attention)+combined": ((dense + attention).astype(np.float32) + combined).astype(np.float32),
         "dense+(attention+combined)": (dense + (attention + combined).astype(np.float32)).astype(np.float32),
+        "(dense+combined)+attention": ((dense + combined).astype(np.float32) + attention).astype(np.float32),
     }
-    associations_agree = bool(np.array_equal(x_orders["(dense+attention)+combined"], x_orders["dense+(attention+combined)"]))
-    x = x_orders["(dense+attention)+combined"]
+    reference_order = x_orders["(dense+attention)+combined"]
+    associations_agree = all(np.array_equal(reference_order, value) for value in x_orders.values())
+    x = reference_order
     var64 = float(np.mean(x.astype(np.float64) ** 2))
     s0 = np.float32(1.0 / np.sqrt(var64 + EPSILON))
     ulp = np.spacing(s0)
 
     def window(target: np.ndarray) -> list[int]:
-        return [k for k in range(-256, 257) if np.array_equal(output_row(x, np.float32(s0 + k * ulp), weight), target)]
+        return [
+            k
+            for k in range(-SEARCH_ULPS, SEARCH_ULPS + 1)
+            if np.array_equal(output_row(x, np.float32(s0 + k * ulp), weight), target)
+        ]
+
+    def window_is_global(offsets: list[int]) -> bool:
+        """A contiguous window whose neighbours mismatch is the whole admissible set.
+
+        For fixed x_i and w_i the value bf16((x_i*s)*w_i) is monotone in s (the
+        products are monotone and every rounding is monotone), so the set of s
+        reproducing one element is an interval and the intersection over the
+        6,144 elements is an interval.  If the search finds a contiguous run of
+        matches and both neighbours inside the search range mismatch, the run is
+        that interval, hence global.
+        """
+        if not offsets:
+            return False
+        lo, hi = min(offsets), max(offsets)
+        contiguous = offsets == list(range(lo, hi + 1))
+        inside = lo > -SEARCH_ULPS and hi < SEARCH_ULPS
+        return bool(contiguous and inside)
 
     accepted_window = window(accepted_row)
     db548_window = window(db548_row)
+    accepted_global = window_is_global(accepted_window)
+    db548_global = window_is_global(db548_window)
     # Alternative carries that must NOT reproduce either row (materialized BF16 residual, double rounding).
     x_bf16_residual = (dense + f32_of_bf16_bits(post_attention)).astype(np.float32)
     var_alt = float(np.mean(x_bf16_residual.astype(np.float64) ** 2))
@@ -224,10 +253,12 @@ def main() -> int:
         "artifact_kind": "gate_d_layer1_scale_frontier_certificate",
         "schema_version": 1,
         "claim_scope": (
-            "CPU-only replay from sealed bytes. Proves that both the DB548 greenfield and the accepted "
-            "legacy layer-1 normalized rows at position 8155 are exact functions of the same FP32 RMS input "
-            "vector, weight and epsilon under a single output rounding, differing only in the FP32 scale; "
-            "reports the admissible scale windows. No Gate-D, performance or reduction-structure-identity claim."
+            "CPU-only replay from sealed bytes. Shows that both the DB548 greenfield and the accepted legacy "
+            "layer-1 normalized rows at position 8155 are reproduced exactly from the same FP32 RMS input vector, "
+            "weight and epsilon under a single output rounding, with effective FP32 scales in two disjoint adjacent "
+            "windows. The windows describe the effective scale each row is consistent with; the certificate does "
+            "not observe how either TPU program physically computed its scale. No Gate-D, performance or "
+            "reduction-structure-identity claim."
         ),
         "position": 8155,
         "layer": 1,
@@ -248,23 +279,58 @@ def main() -> int:
             "ulp": float(ulp),
         },
         "output_formula": "bf16((x * s) * w) with one rounding (materialized bf16(x*s) does not reproduce either row)",
+        "generator": {
+            "script_sha256": sha256_file(Path(__file__).resolve()),
+            "python": sys.version.split()[0],
+            "platform": platform.platform(),
+            "numpy": np.__version__,
+            "ml_dtypes": ml_dtypes.__version__,
+            "search_ulps": SEARCH_ULPS,
+        },
         "windows": {
+            "search_ulps": SEARCH_ULPS,
             "accepted_ulp_offsets": accepted_window,
             "accepted_s_hex": [hex_f32(s0 + k * ulp) for k in accepted_window],
+            "accepted_window_global_by_monotonicity": accepted_global,
             "db548_ulp_offsets": db548_window,
             "db548_s_hex": [hex_f32(s0 + k * ulp) for k in db548_window],
+            "db548_window_global_by_monotonicity": db548_global,
             "disjoint": not set(accepted_window) & set(db548_window),
             "gap_ulps": (min(accepted_window) - max(db548_window)) if accepted_window and db548_window else None,
         },
         "rejected_carry_alternatives": alt_best,
         "variance_structures": structures,
     }
-    exact_both = bool(accepted_window) and bool(db548_window)
+    invariants = {
+        "lineage_residual_identity": residual_identity,
+        "lineage_partials_equal": True,
+        "rows_differ_only_at_2795": row_mismatch_indices == [2795],
+        "three_associations_bit_identical": associations_agree,
+        "accepted_window_nonempty": bool(accepted_window),
+        "db548_window_nonempty": bool(db548_window),
+        "accepted_window_global": accepted_global,
+        "db548_window_global": db548_global,
+        "windows_disjoint": result["windows"]["disjoint"],
+        "windows_adjacent_gap_1": result["windows"]["gap_ulps"] == 1,
+        "s0_inside_accepted_window": 0 in accepted_window,
+        "materialized_bf16_residual_rejected_for_both": all(
+            value["materialized_bf16_residual_single_round_min_mismatch"] > 0 for value in alt_best.values()
+        ),
+        "double_round_output_rejected_for_both": all(
+            value["fp32_residual_double_round_min_mismatch"] > 0 for value in alt_best.values()
+        ),
+    }
+    result["invariants"] = invariants
+    result["failed_invariants"] = sorted(name for name, ok in invariants.items() if not ok)
+    certified = not result["failed_invariants"]
     result["classification"] = (
-        ("LAYER1_SCALE_FRONTIER_CERTIFIED;SAME_FP32_RMS_INPUT;ACCEPTED_AND_DB548_ROWS_EXACT_UNDER_SCALE_WINDOWS;"
-         "FRONTIER_IS_ONE_FP32_SCALAR;" if exact_both else "INCONCLUSIVE;")
-        + "REDUCTION_STRUCTURE_NOT_IDENTIFIED;GATE_D_OPEN"
+        ("LAYER1_SCALE_FRONTIER_CERTIFIED;SAME_FP32_RMS_INPUT;ACCEPTED_AND_DB548_ROWS_EXACT_UNDER_DISJOINT_ADJACENT_SCALE_WINDOWS;"
+         "EFFECTIVE_SCALE_IS_THE_ONLY_FREE_QUANTITY;" if certified else "INCONCLUSIVE;")
+        + "REDUCTION_STRUCTURE_NOT_IDENTIFIED;NO_PHYSICAL_CAUSALITY_CLAIM;GATE_D_OPEN"
     )
+    if not certified:
+        args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+        raise SystemExit(f"certificate refused: {result['failed_invariants']}")
     args.output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     print(result["classification"])
     print(json.dumps({k: result["windows"][k] for k in ("accepted_ulp_offsets", "db548_ulp_offsets", "gap_ulps")}))

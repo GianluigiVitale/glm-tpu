@@ -10,9 +10,33 @@
     "post_attention_residual": "a105fdbd429adb1d06a70bf71598a72a91d7b6faa83360005487ce11ce099f8e"
   },
   "artifact_kind": "gate_d_layer1_scale_frontier_certificate",
-  "claim_scope": "CPU-only replay from sealed bytes. Proves that both the DB548 greenfield and the accepted legacy layer-1 normalized rows at position 8155 are exact functions of the same FP32 RMS input vector, weight and epsilon under a single output rounding, differing only in the FP32 scale; reports the admissible scale windows. No Gate-D, performance or reduction-structure-identity claim.",
-  "classification": "LAYER1_SCALE_FRONTIER_CERTIFIED;SAME_FP32_RMS_INPUT;ACCEPTED_AND_DB548_ROWS_EXACT_UNDER_SCALE_WINDOWS;FRONTIER_IS_ONE_FP32_SCALAR;REDUCTION_STRUCTURE_NOT_IDENTIFIED;GATE_D_OPEN",
+  "claim_scope": "CPU-only replay from sealed bytes. Shows that both the DB548 greenfield and the accepted legacy layer-1 normalized rows at position 8155 are reproduced exactly from the same FP32 RMS input vector, weight and epsilon under a single output rounding, with effective FP32 scales in two disjoint adjacent windows. The windows describe the effective scale each row is consistent with; the certificate does not observe how either TPU program physically computed its scale. No Gate-D, performance or reduction-structure-identity claim.",
+  "classification": "LAYER1_SCALE_FRONTIER_CERTIFIED;SAME_FP32_RMS_INPUT;ACCEPTED_AND_DB548_ROWS_EXACT_UNDER_DISJOINT_ADJACENT_SCALE_WINDOWS;EFFECTIVE_SCALE_IS_THE_ONLY_FREE_QUANTITY;REDUCTION_STRUCTURE_NOT_IDENTIFIED;NO_PHYSICAL_CAUSALITY_CLAIM;GATE_D_OPEN",
   "epsilon": 1e-05,
+  "failed_invariants": [],
+  "generator": {
+    "ml_dtypes": "0.5.4",
+    "numpy": "2.3.5",
+    "platform": "Linux-5.19.0-1022-gcp-x86_64-with-glibc2.35",
+    "python": "3.12.13",
+    "script_sha256": "d94998212e9e128675859bc59bb9e1d7f2455a34a5bd18eea5c0254c3f6ac48a",
+    "search_ulps": 256
+  },
+  "invariants": {
+    "accepted_window_global": true,
+    "accepted_window_nonempty": true,
+    "db548_window_global": true,
+    "db548_window_nonempty": true,
+    "double_round_output_rejected_for_both": true,
+    "lineage_partials_equal": true,
+    "lineage_residual_identity": true,
+    "materialized_bf16_residual_rejected_for_both": true,
+    "rows_differ_only_at_2795": true,
+    "s0_inside_accepted_window": true,
+    "three_associations_bit_identical": true,
+    "windows_adjacent_gap_1": true,
+    "windows_disjoint": true
+  },
   "layer": 1,
   "lineage": {
     "accepted_dense_partials_equal_db548_partials": true,
@@ -726,6 +750,7 @@
       13,
       14
     ],
+    "accepted_window_global_by_monotonicity": true,
     "db548_s_hex": [
       "433295d7",
       "433295d8",
@@ -738,7 +763,9 @@
       -2,
       -1
     ],
+    "db548_window_global_by_monotonicity": true,
     "disjoint": true,
-    "gap_ulps": 1
+    "gap_ulps": 1,
+    "search_ulps": 256
   }
 }

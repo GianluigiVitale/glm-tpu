@@ -10356,3 +10356,23 @@ only if the `f32[32,6144]` reduce lands `s` in `0x433295db…0x433295e9`. A none
 exact control is still decisive: it rejects "same shape/layout ⇒ same emitter order" and the
 remaining candidates are the 32-row emitter schedule on the real decode batch or the reduce's
 fusion context. No TPU work is authorized before the batched Sol review.
+
+Sol's batched review of the certificate and the schedule arm returned `BLOCK — P1/P2` and
+`BLOCK EXECUTE`. Corrections applied to the certificate
+(`scripts/greenfield/adjudicate_gate_d_layer1_scale_frontier.py`, artifact SHA now
+`980bbb3933866ebc0228882d9c2f76d0b212e6347f268821a71f5bcab219db3f`): it now fails closed unless every
+claimed invariant holds (residual lineage identity, accepted == DB548 partials, rows differing only
+at 2795, all three FP32 associations bit-identical, both windows nonempty, contiguous with
+mismatching neighbours inside the ±256-ulp search and therefore global by monotonicity of each
+element's rounding in `s`, disjoint, adjacent with gap 1, `s0` inside the accepted window, and the
+materialized-BF16-residual and double-rounded-output alternatives rejected for both rows); it records
+generator provenance (script SHA, Python/numpy/ml_dtypes versions, search bound). Wording
+correction to the sections above: the windows are the *effective* scales each TPU row is consistent
+with; the certificate does not observe how either TPU program physically computed its scale, and
+the earlier "three associations agree" sentence was true only after adding the third
+parenthesization (now tested). Execution of the probe remains unauthorized: the 2026-08-13 wrapper
+auto-generates its tag, checks only live objects for vacancy, derives its pin from the worktree
+without sanitized origin/mirror verification, and holds only the workload lease; Sol requires a
+literal fresh tag and pin, canonical live/all-version/soft-deleted vacancy, sanitized origin and
+mirror verification, and simultaneous retention of the four canonical workload/rsync leases before a
+second review of that exact invocation.
