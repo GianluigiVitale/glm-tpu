@@ -10499,3 +10499,28 @@ at `_open_locked_fds` (`BlockingIOError`): the cron mirror sync holds
 object, no JAX/TPU work. Sol: `BLOCK EXECUTE — the tag was attempted and should remain burned`; the
 tag `gate_d_layer1_rms_schedule_20260902T055846533543663Z` is burned. Lesson: launch mid-window (:01–:04, :06–:09) and recheck the four leases
 immediately before the invocation.
+
+## 2026-09-02 second approved start refused by a stale literal; chain bumped to v2
+
+Sol approved the relaunch (`APPROVE EXECUTE ONCE gate_d_layer1_rms_schedule_20260902T060639649625079Z 77165c8f`). Launched mid-window at
+06:10:4xZ, the root-owned launcher accepted the environment, sealed the wrapper into the memfd and
+exec'd it; the wrapper's embedded runtime-boundary verifier then refused with
+`FileNotFoundError: /opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v3.py`: the clone had
+rewritten every other launcher literal but the verifier's path kept the V3 suffix, and no test
+covered that literal. No lease was taken, no census, no run directory, no remote object, no JAX/TPU
+work; tag `gate_d_layer1_rms_schedule_20260902T060639649625079Z` is burned. Fix in `68b8eb96`: chain bumped to v2 (launcher
+`launch_gate_d_layer1_rms_schedule_v2.py`, capsule `gate-d-layer1-rms-schedule-v2`, install root
+`gate-d-layer1-rms-schedule-install-v2`; installs never replace existing targets), the literal
+fixed, a new test asserting the wrapper names exactly the launcher install path and capsule root and
+carries no stale version literals; cascade repinned (driver `48b3e383…`, publisher `b3ec837e…`,
+wrapper `ee6fc1ac…`, launcher `169c4385…`, installer `1a7cee63…`); 55 passed / 2 skipped.
+Certificate at `68b8eb96` committed as `f4cfeb88` (SHA `d3f3c4f4f308307c78612fcfd7c4ab693cb923034988e3e02ae9e72b9fc8c463`).
+Staging tree `/home/gianl/gate-d-runs/gate-d-layer1-rms-schedule-install-v2-staging` (tree SHA
+`a8cc784f00559a5d197597cf54615124b300e4905c92ee246ede95e97953d392`). Fresh vacant tag `gate_d_layer1_rms_schedule_20260902T061305905714981Z`.
+Literal install commands:
+`/usr/bin/sudo -n /usr/bin/python3 -I -S /opt/glm-tpu/bin/provision_gate_d_python_runtime.py --source /home/gianl/gate-d-runs/gate-d-layer1-rms-schedule-install-v2-staging --target /opt/glm-tpu/gate-d-layer1-rms-schedule-install-v2 --expected-tree-sha256 a8cc784f00559a5d197597cf54615124b300e4905c92ee246ede95e97953d392`
+and
+`/usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/gate-d-layer1-rms-schedule-install-v2/install_gate_d_layer1_rms_schedule_runtime.py`;
+literal execute-once command (mid-window, after lease/vacancy recheck):
+`/usr/bin/env -i GLM_GATE_D_LAYER1_RMS_SCHEDULE=1 GLM_GATE_D_LAYER1_RMS_SCHEDULE_MODE=execute_once GLM_GATE_D_LAYER1_RMS_SCHEDULE_TAG=gate_d_layer1_rms_schedule_20260902T061305905714981Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin:/home/gianl/vllm-env/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v2.py`
+The v1 capsule and launcher remain installed, unused and inert.
