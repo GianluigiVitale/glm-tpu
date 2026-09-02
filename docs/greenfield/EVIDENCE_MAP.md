@@ -3615,3 +3615,7 @@ persistence only; review and persistence precede any v2 installation.
   greenfield layer-1 prompt cache is a sufficient cause of the observed event-1 set mismatch; the decode
   side's exactness is not proven by it. Sealed layer-0 DSA input restored from the published probe inputs
   (tensor `be643e339cd7…d7f9`, manifest `574f3553…73141`).
+- Legacy oracle tag `greenfield_legacy_layer1_prompt_index_cache_20260902T234756900756989Z` (rewrite pin
+  `547b26f8`, layer 1, slot 2): failed closed at the eight-host legacy-tree prerequisite (workers 1–7 lack
+  `/home/gianl/tpu-inference`; recreated pod of 2026-08-26); no TPU/legacy work; censuses recorded.
+  Classification: `FAILED_CLOSED_AT_PREREQ;RECREATED_POD_LEGACY_BASE_CHECKOUT_ABSENT;TAG_BURNED;NO_CLAIM;GATE_D_OPEN`.

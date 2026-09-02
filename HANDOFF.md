@@ -11288,3 +11288,18 @@ the tooling worktree/branch, so it certifies the tooling HEAD pin (not the rewri
   greenfield_legacy_layer1_prompt_index_cache_20260902T234756900756989Z bash
   scripts/greenfield/run_capture_legacy_prompt_index_cache.sh`. Legacy oracle run only; expected legacy
   `kv_caches` slot 2; sealing fails closed on any other geometry. Result pending below.
+
+### Legacy layer-1 prompt-cache capture `…20260902T234756900756989Z`: failed closed at the eight-host prerequisite (no TPU, tag burned)
+
+Launched 23:51:40Z; disk preflight 8/8 OK; golden manifest sync OK; then `prereq.txt` reported `PREREQ_OK`
+only on worker 0 and `PREREQ_BAD … fatal: cannot change to '/home/gianl/tpu-inference'` on workers 1,2,3,4,6,7
+(worker 5 returned no receipt line). Abort at 23:51:58Z, `FAILED status=1`, no legacy process, Ray or TPU
+work; failure-exit census recorded. Cause: the prompt-cache mode (no internal capture) selects the default
+legacy runtime `LEGACY_REPO=/home/gianl/tpu-inference` at `ORACLE_PIN b3c25df47`, which exists only on
+worker 0. The pod was recreated on 2026-08-26 and workers 1–7 never received that base checkout; every
+legacy capture since (e.g. the 08-29 layer-1 RMS-input oracles) ran through the transported observer
+runtime `/home/gianl/tpu-inference-dsa-internal-8dc7d20fe` (pin `8dc7d20f`, 12 commits over `b3c25df47`;
+its `tpu_inference/runner/dcp_cache_dump.py` is byte-identical to the accepted pin's), which is present on
+all eight hosts. The layer-0 prompt-cache captures of 08-08 predate the pod recreation. Tag burned; no claim.
+Next: route the prompt-cache mode through the fleet-present observer runtime (same bundle transport and
+distance/pin prerequisites as the layer-1 RMS-input mode), Sol review, one fresh tag.
