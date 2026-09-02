@@ -701,6 +701,11 @@ def validate_teacher_forced_prefill_hlo(
         prefill_index_repair=index_repair_enabled,
         main_rope_table_enabled=decoder.main_rope_table_enabled,
         dsa_rope_table_enabled=getattr(decoder, "dsa_rope_table_enabled", False),
+        # The prefill program is built from the same layer kernels, so the
+        # accepted RMS schedule (and its carry allowances) apply to it exactly
+        # as to the decode step; the 2026-09-02 run was refused here because
+        # this contract ran with the flag defaulting to off.
+        rms_accepted_schedule=getattr(decoder, "rms_accepted_schedule", False),
         pregathered_b512_attention=(
             decoder.pregathered_b512_attention
         ),

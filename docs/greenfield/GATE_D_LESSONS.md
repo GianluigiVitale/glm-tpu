@@ -1189,3 +1189,6 @@ normalized-state cause.
 - XLA reorders `pad` and `convert` freely; a dtype-and-shape allowance derived from the source order
   (`convert -> pad`) misses the emitted order (`pad -> convert`). Bind allowances to the SSA slice and
   the rows, not to the dtype the source happened to pad in.
+- A decoder flag fans out to every compiled program's contract (decode step, DSA observer, teacher-
+  forced prefill). Enumerate the fan-out from the compile script's `validate_*` calls when adding a
+  flag; the third program cost an approved tag.

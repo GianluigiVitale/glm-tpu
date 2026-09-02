@@ -10831,3 +10831,35 @@ as `bf16[32,W]` (nowhere else). Tests: synthetic fused module asserts the BF16 a
 module** (skip-if-absent): RMS (313, 313, 0), carries 313 with widths {2048: 78, 512: 78, 6144: 157},
 live-tensor forbidden > 1,570 → 0 and `passed` (21 score bodies), fused qkv-a passed. The first archive
 still resolves 1,570 → 0.
+
+## 2026-09-02 authorship note
+
+Commits 6592368 … 9170f879 on this branch and the merge commits 7498e31b, a49e3ba1, 978dc3a9, 66d32efa on
+`rewrite/topology-first-decode` were authored as "Gianpaolo Vitale <gianpaolo.vitale@icar.cnr.it>" by
+the assistant passing explicit `-c user.name/-c user.email` overrides taken from the session context,
+not the repository's configured identity ("Gianluigi Vitale <gianluigi.vitale11@gmail.com>", used by
+every earlier commit). The owner asked why. The commits stay as they are because their SHAs are bound
+in Sol approvals, this file, the same-region mirror and the orchestration certificate; all later
+commits use the configured identity without overrides.
+
+## 2026-09-02 approved run `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T121803168061440Z` (pin 66d32efa): decode-step contracts PASSED on TPU; refused at the prefill contract
+
+Sol approved execution with the sanitized launch (`env -i … GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1
+GLM_GREENFIELD_DSA_ROPE_TABLE=0 GLM_GREENFIELD_SHORT_DECODER_TAG=<tag> bash …`), tooling records-only
+commit 5715ca7b (correct author identity), run pin 66d32efa pushed, mirror verified. Launched 12:31:31Z.
+On TPU the **decode-step program passed every contract** (`decoder_78layer_8k_token.hlo_contract.json`:
+0 violations; RMS 313/313 conforming, StableHLO 313 barriers, live-tensor passed with the carry
+allowances, fused qkv-a passed) and so did the DSA-observer program (0 violations). The runner then
+compiled the teacher-forced **prefill** program and `validate_teacher_forced_prefill_hlo` refused it
+(4 violations: "default decoder carries accepted-schedule RMS reductions: 313 bound 32-row rsqrt",
+the StableHLO twin, dead-row live tensors, fused qkv-a dead-row state): the prefill validator forwards
+every decoder flag to `validate_decoder_step_hlo` except the new one, so the contract ran with
+`rms_accepted_schedule=False` against a prefill program that (correctly) carries the accepted schedule
+in all 313 norms. Failure-exit census 8/8; no tokens; tag burned; no claim; all HLO/contracts archived.
+
+Fix (this commit): `runtime/prefill.py::validate_teacher_forced_prefill_hlo` forwards
+`rms_accepted_schedule=getattr(decoder, "rms_accepted_schedule", False)` (same pattern as the rotary
+flag); `tests/greenfield/runtime/test_prefill.py` asserts the captured kwarg on the existing forwarding
+test and binds the source line and the `DecoderStepProgram` field. Lesson: a per-program contract
+fan-out (decode step, observer, prefill) must be enumerated when a flag is added; the first two were
+covered, the third was not.
