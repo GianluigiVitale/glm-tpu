@@ -3343,29 +3343,56 @@ def _rms_schedule_resolve_carry(
     return None
 
 
+def _rms_ssa_backward_slice(
+    by_key: dict[tuple[str, str], HloInstruction], root: HloInstruction
+) -> set[int]:
+    """Instruction indices feeding ``root`` inside its own computation."""
+
+    seen: set[int] = set()
+    stack = [root]
+    while stack:
+        item = stack.pop()
+        if item.index in seen:
+            continue
+        seen.add(item.index)
+        for name in item.operand_names:
+            operand = by_key.get((item.computation, name))
+            if operand is not None:
+                stack.append(operand)
+    return seen
+
+
 def _rms_accepted_schedule_carry_allowances(
     module: HloModule,
     by_key: dict[tuple[str, str], HloInstruction],
     lineages: Sequence[dict[str, Any]],
 ) -> tuple[dict[int, set[str]], dict[str, Any]]:
-    """Admit ``f32[32,W]`` only where it is a conforming lineage's carry.
+    """Admit ``f32[32,W]`` only on exact SSA slices of a conforming lineage.
 
     The accepted schedule deliberately materializes one 32-row FP32 operand per
     RMS norm (rows padded to the M32 operand); the one-live-row contracts would
     otherwise refuse every one of them as a dead-row tensor.  For each
-    conforming ``rms`` lineage this collects: the reduce fusion's instructions,
-    the carry producer and its fused pad/convert/add body, and the carry's
-    consumers within three hops in the same computation (the reduce fusion,
-    the normalize fusion with its row slice, async copies), restricted to the
-    lineage's own ``f32[32,W]`` signature.  Unrelated 32-row tensors, other
-    widths, and consumers outside that cone stay forbidden.
+    conforming ``rms`` lineage the admitted set is, restricted to the lineage's
+    own ``f32[32,W]`` signature:
+
+    * the backward SSA slice of the reduce inside its computation (square,
+      the carry parameter);
+    * the carry producer in the parent computation and, when it is a fusion,
+      the backward SSA slice of its root (the fused pad/convert/add body);
+    * the carry's consumers within three hops in the parent computation through
+      {fusion, slice, dynamic-slice, multiply, copy, copy-start/done, bitcast,
+      reshape, convert, get-tuple-element, tuple}; for a consumer fusion only the
+      backward SSA slice of its root (the normalize multiply, the inverse
+      broadcast and the row slice), never a dead-end tensor in the same body.
+
+    Instructions colocated in those computations but off the slices, other
+    widths, and other 32-row tensors stay forbidden.
     """
 
     allowances: dict[int, set[str]] = {}
-    by_computation: dict[str, list[HloInstruction]] = {}
+    by_index: dict[int, HloInstruction] = {item.index: item for item in module.instructions}
     consumers: dict[tuple[str, str], list[HloInstruction]] = {}
     for item in module.instructions:
-        by_computation.setdefault(item.computation, []).append(item)
         for name in item.operand_names:
             consumers.setdefault((item.computation, name), []).append(item)
 
@@ -3379,9 +3406,9 @@ def _rms_accepted_schedule_carry_allowances(
         if has_signature(item, signature):
             allowances.setdefault(item.index, set()).add(signature)
 
-    def allow_computation(computation: str, signature: str) -> None:
-        for item in by_computation.get(computation, ()):
-            allow(item, signature)
+    def allow_indices(indices: set[int], signature: str) -> None:
+        for index in indices:
+            allow(by_index[index], signature)
 
     widths: Counter[int] = Counter()
     carry_count = 0
@@ -3396,8 +3423,9 @@ def _rms_accepted_schedule_carry_allowances(
         reduce = by_key.get(tuple(record["reduce_key"]))
         if square is None or reduce is None:
             continue
-        allow_computation(reduce.computation, signature)
-        allow_computation(square.computation, signature)
+        allow_indices(_rms_ssa_backward_slice(by_key, reduce), signature)
+        if square.computation != reduce.computation:
+            allow_indices(_rms_ssa_backward_slice(by_key, square), signature)
         carrier = by_key.get((square.computation, square.operand_names[0]))
         carry = _rms_schedule_resolve_carry(module, by_key, carrier)
         if carry is None:
@@ -3408,7 +3436,7 @@ def _rms_accepted_schedule_carry_allowances(
         if carry.opcode == "fusion":
             root = _rms_schedule_callee_root(module, carry)
             if root is not None:
-                allow_computation(root.computation, signature)
+                allow_indices(_rms_ssa_backward_slice(by_key, root), signature)
         frontier = [carry]
         for _ in range(3):
             next_frontier: list[HloInstruction] = []
@@ -3422,9 +3450,12 @@ def _rms_accepted_schedule_carry_allowances(
                         continue
                     allow(consumer, signature)
                     if consumer.opcode == "fusion":
+                        # Only the backward SSA slice of the consumer's root: the
+                        # normalize multiply, the inverse broadcast and the row
+                        # slice; a dead-end tensor in the same body stays forbidden.
                         root = _rms_schedule_callee_root(module, consumer)
                         if root is not None:
-                            allow_computation(root.computation, signature)
+                            allow_indices(_rms_ssa_backward_slice(by_key, root), signature)
                     if any(_shape_signature(shape) == signature for shape in consumer.result_shapes):
                         next_frontier.append(consumer)
             frontier = next_frontier

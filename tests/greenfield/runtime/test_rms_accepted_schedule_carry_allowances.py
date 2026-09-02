@@ -35,6 +35,75 @@ ARCHIVE = Path(
 )
 
 
+FUSED_HLO = """HloModule synthetic_fused_carry, entry_computation_layout={(bf16[1,128]{1,0}, f32[32,128]{1,0:T(8,128)})->f32[1,128]{1,0}}
+
+%add_combiner (a: f32[], b: f32[]) -> f32[] {
+  %a = f32[] parameter(0)
+  %b = f32[] parameter(1)
+  ROOT %s = f32[] add(%a, %b)
+}
+
+%carry_body (xp: bf16[1,128]) -> f32[32,128] {
+  %xp = bf16[1,128]{1,0} parameter(0)
+  %zero_b = bf16[] constant(0)
+  %pad.1 = bf16[32,128]{1,0:T(8,128)(2,1)} pad(%xp, %zero_b), padding=0_31x0_0
+  %cv = f32[32,128]{1,0:T(8,128)} convert(%pad.1)
+  %rogue_body_c = f32[] constant(3)
+  %rogue_body = f32[32,128]{1,0:T(8,128)} broadcast(%rogue_body_c), dimensions={}
+  ROOT %carry_add = f32[32,128]{1,0:T(8,128)} add(%cv, %cv)
+}
+
+%rms_reduce (p: f32[32,128], r: f32[32,128]) -> f32[32] {
+  %p = f32[32,128]{1,0:T(8,128)} parameter(0)
+  %r = f32[32,128]{1,0:T(8,128)} parameter(1)
+  %rogue_sq2 = f32[32,128]{1,0:T(8,128)} multiply(%r, %r)
+  %sq = f32[32,128]{1,0:T(8,128)} multiply(%p, %p)
+  %z = f32[] constant(0)
+  ROOT %rsum = f32[32]{0} reduce(%sq, %z), dimensions={1}, to_apply=%add_combiner
+}
+
+%rms_scale (q: f32[32]) -> f32[32] {
+  %q = f32[32]{0} parameter(0)
+  %invw = f32[] constant(0.0078125)
+  %invw_b = f32[32]{0} broadcast(%invw), dimensions={}
+  %mean = f32[32]{0} multiply(%q, %invw_b)
+  %eps = f32[] constant(1e-05)
+  %eps_b = f32[32]{0} broadcast(%eps), dimensions={}
+  %var = f32[32]{0} add(%mean, %eps_b)
+  ROOT %rs = f32[32]{0} rsqrt(%var)
+}
+
+%norm_body (n0: f32[32,128], n1: f32[32]) -> f32[1,128] {
+  %n0 = f32[32,128]{1,0:T(8,128)} parameter(0)
+  %n1 = f32[32]{0} parameter(1)
+  %nb = f32[32,128]{1,0:T(8,128)} broadcast(%n1), dimensions={0}
+  %rogue_n = f32[32,128]{1,0:T(8,128)} multiply(%n0, %n0)
+  %nmul = f32[32,128]{1,0:T(8,128)} multiply(%n0, %nb)
+  ROOT %nslice = f32[1,128]{1,0} slice(%nmul), slice={[0:1], [0:128]}
+}
+
+ENTRY %main (x: bf16[1,128], rogue: f32[32,128]) -> f32[1,128] {
+  %x = bf16[1,128]{1,0} parameter(0)
+  %rogue = f32[32,128]{1,0:T(8,128)} parameter(1)
+  %carry = f32[32,128]{1,0:T(8,128)} fusion(%x), kind=kLoop, calls=%carry_body
+  %rms_sum = f32[32]{0} fusion(%carry, %rogue), kind=kLoop, calls=%rms_reduce
+  %rms_scale.1 = f32[32]{0} fusion(%rms_sum), kind=kLoop, calls=%rms_scale
+  ROOT %normalized = f32[1,128]{1,0} fusion(%carry, %rms_scale.1), kind=kLoop, calls=%norm_body
+}
+"""
+
+
+def _unallowed_names(module, allowances: dict, signature: str) -> set[str]:
+    names = set()
+    for item in module.instructions:
+        for shape in item.operand_shapes + item.result_shapes:
+            if f"{shape.dtype}[" + ",".join(str(v) for v in shape.dimensions) + "]" != signature:
+                continue
+            if signature not in allowances.get(item.index, set()):
+                names.add(item.name)
+    return names
+
+
 def test_synthetic_carry_is_admitted_and_a_rogue_dead_row_tensor_is_not() -> None:
     rogue = SYNTHETIC_HLO.replace(
         "ENTRY %main (carry: f32[32,128], key: f32[1,128]) -> (f32[32], f32[1]) {\n  %carry = f32[32,128]{1,0:T(8,128)} parameter(0)\n",
@@ -56,7 +125,25 @@ def test_synthetic_carry_is_admitted_and_a_rogue_dead_row_tensor_is_not() -> Non
     assert allowed_instruction["f32[32,128]"] >= 4
     # ... the rogue parameter and its square (operand + result shapes) are not.
     assert forbidden == {"f32[32,128]": 4}
+    assert _unallowed_names(module, allowances, "f32[32,128]") == {"%rogue", "%rogue_sq"}
     assert _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=128)["passed"]
+
+
+def test_rogues_colocated_inside_admitted_fusion_bodies_stay_forbidden() -> None:
+    """Exact SSA slices: off-slice tensors inside the carry producer, the reduce fusion and the
+    normalize fusion are refused even though they share those computations with the lineage."""
+
+    module = parse_hlo_module(FUSED_HLO)
+    contract = _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=128)
+    assert contract["passed"], contract["violations"]
+    assert contract["carry_summary"] == {"carry_count": 1, "allowed_instruction_count": contract["carry_summary"]["allowed_instruction_count"], "widths": {"128": 1}}
+    by_key, lineages = _rms_schedule_lineages(module, layernorm_width=128)
+    allowances, _ = _rms_accepted_schedule_carry_allowances(module, by_key, lineages)
+    unallowed = _unallowed_names(module, allowances, "f32[32,128]")
+    assert unallowed == {"%rogue", "%r", "%rogue_sq2", "%rogue_body", "%rogue_n"}, unallowed
+    # The admitted set is exactly the lineage: carry body slice, carry, reduce slice, normalize slice.
+    admitted = {module.instructions[i].name for i, sigs in allowances.items() if "f32[32,128]" in sigs}
+    assert admitted == {"%cv", "%carry_add", "%carry", "%rms_sum", "%p", "%sq", "%rsum", "%normalized", "%n0", "%nb", "%nmul", "%nslice"}, admitted
 
 
 @pytest.mark.skipif(not ARCHIVE.exists(), reason="archived TPU decoder HLO unavailable")

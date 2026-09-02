@@ -10794,3 +10794,18 @@ Not proof: the q-a schedule for W=2048 is inferred from the legacy program's str
 variances reduced as `f32[32]`), not separately replayed on TPU; the run itself is the test.
 Next: regression suites, commit/push, merge (rewrite goal.md byte-identical), preflight, fresh tag,
 one Sol review, one launch.
+
+## 2026-09-02 Sol BLOCK on ded62f86 (whole-fusion allowance) — exact SSA slices
+
+Sol refused `allow_computation`: admitting every `f32[32,W]` in a lineage's fusion bodies could hide a
+dead-row tensor colocated with the lineage. The allowance is now exact SSA slices: the backward slice
+of the reduce (square, carry parameter), the carry producer and the backward slice of its fused root
+(pad/convert/add), and for each consumer fusion within three hops only the backward slice of its
+root (normalize multiply, inverse broadcast, row slice). New synthetic module with a fused carry
+producer, a two-operand reduce fusion and a normalize fusion carrying off-slice rogues in every body:
+`%rogue_body`, `%r`/`%rogue_sq2`, `%rogue_n` and the entry `%rogue` stay forbidden while the admitted
+set is exactly the lineage (`%cv %carry_add %carry %rms_sum %p %sq %rsum %normalized %n0 %nb %nmul
+%nslice`). The archived TPU module still resolves 1,570 → 0 with the exact slices. (The classifier
+counts allowances per instruction and signature, so a rogue operand on a *fusion call* that also
+carries the lineage's carry is admitted at the call site only; its parameter and every use inside the
+body remain forbidden.)
