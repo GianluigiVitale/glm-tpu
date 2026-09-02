@@ -700,6 +700,7 @@ def validate_teacher_forced_prefill_hlo(
         split_residual_state=decoder.split_residual_state,
         prefill_index_repair=index_repair_enabled,
         main_rope_table_enabled=decoder.main_rope_table_enabled,
+        dsa_rope_table_enabled=getattr(decoder, "dsa_rope_table_enabled", False),
         pregathered_b512_attention=(
             decoder.pregathered_b512_attention
         ),
@@ -882,6 +883,7 @@ def build_teacher_forced_prefill_program(
         materialized_index_wk: tuple[Any, ...] | None = None,
         dsa_query_weight_aliases: tuple[tuple[Any, ...], ...] | None = None,
         main_rope_table: Any | None = None,
+        dsa_rope_table: Any | None = None,
     ) -> tuple[Any, Any, Any, Any, Any, Any, Any, Any]:
         if tuple(prompt_tokens.shape) != (prompt_length,):
             raise PlanValidationError(
@@ -894,6 +896,11 @@ def build_teacher_forced_prefill_program(
         if decoder.main_rope_table_enabled != (main_rope_table is not None):
             raise PlanValidationError(
                 "teacher-forced prefill main-RoPE table state drifted"
+            )
+        dsa_rope_table_enabled = getattr(decoder, "dsa_rope_table_enabled", False)
+        if dsa_rope_table_enabled != (dsa_rope_table is not None):
+            raise PlanValidationError(
+                "teacher-forced prefill DSA host rotary table state drifted"
             )
         initial_prediction = jnp.full(
             (total_devices, 1), -1, dtype=jnp.int32
@@ -961,6 +968,8 @@ def build_teacher_forced_prefill_program(
                 )
                 if decoder.main_rope_table_enabled:
                     decoder_inputs = (*decoder_inputs, main_rope_table)
+                if dsa_rope_table_enabled:
+                    decoder_inputs = (*decoder_inputs, dsa_rope_table)
                 output = decoder.execute(*decoder_inputs)
             else:
                 if dsa_query_weight_aliases is not None:
@@ -970,6 +979,8 @@ def build_teacher_forced_prefill_program(
                 decoder_inputs = (weights, *decoder_state)
                 if decoder.main_rope_table_enabled:
                     decoder_inputs = (*decoder_inputs, main_rope_table)
+                if dsa_rope_table_enabled:
+                    decoder_inputs = (*decoder_inputs, dsa_rope_table)
                 output = decoder.execute(*decoder_inputs)
             next_carry = (
                 output[0],
@@ -1009,6 +1020,7 @@ def build_teacher_forced_prefill_program(
                     final[2],
                     prompt_index_inputs,
                     final[5],
+                    *((dsa_rope_table,) if dsa_rope_table_enabled else ()),
                 ),
                 final[3],
                 final[4],

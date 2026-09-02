@@ -1,0 +1,90 @@
+{
+  "artifact_kind": "gate_d_forced_round_pp16_hlo_causal_adjudication",
+  "authorization": {
+    "full_8k": false,
+    "numerical_execution": false,
+    "performance_claim": false,
+    "persistence_only": true
+  },
+  "classification": "HLO_CAUSAL_STRUCTURE_ACCEPTED;PP16_LOCALITY_ACCEPTED;TPU_NUMERICAL_UNPROVEN;GATE_D_OPEN",
+  "code_hash": "b8bdeb14c12a3742f3cc27ef91a4a2e406d412a5",
+  "gate_d_closed": false,
+  "optimized_hlo": {
+    "boundary_computation": "%fused_computation.40",
+    "boundary_output_dtype": "bf16",
+    "boundary_output_shape": [
+      1,
+      6144
+    ],
+    "collective_channels": [
+      2,
+      3,
+      4
+    ],
+    "collective_count": 3,
+    "collective_groups": [
+      [
+        0,
+        1
+      ]
+    ],
+    "custom_call_targets": {
+      "AllocateBuffer": 2,
+      "AssumeGatherIndicesInBound": 7,
+      "ConcatBitcast": 1
+    },
+    "dsa_consumers": [
+      "head_weight_projection",
+      "current_key_projection"
+    ],
+    "entry_instruction_count": 236,
+    "entry_output_count": 9,
+    "instruction_count": 1114,
+    "module_name": "jit_mapped",
+    "num_partitions": 2,
+    "qkv_loop_carried_index": 4,
+    "reduce_precision": {
+      "count": 1,
+      "exponent_bits": 8,
+      "mantissa_bits": 7
+    },
+    "rooted_primary_output_index": 0,
+    "sha256": "a0b87e2b43ba81bfe1549fbcc13434d2fbdca91b11c8b2f9a317ff9a9dbd9d45",
+    "unrounded_primary_bypass_count": 0
+  },
+  "remote_archive": {
+    "object_count_including_ledger_and_terminal": 17,
+    "payload_generation_count": 15,
+    "prefix": "gs://driftbench-dsv4-uc/results/greenfield/glm52/gate_d_forced_round_pp16_hlo/gate_d_forced_round_pp16_hlo_20260901T141137500138602Z",
+    "remote_replay": {
+      "all_versions_live_generation_count": 17,
+      "bucket_location": "US-CENTRAL2",
+      "generation_download_count": 17,
+      "sha256": "85bcd02c9b112ef3e21d065ebfae04f0d06e4a922f1d15c0f971fb669992e1d8",
+      "soft_deleted_generation_count": 0
+    },
+    "terminal_generation": "1788272143585315",
+    "terminal_last": true
+  },
+  "run_tag": "gate_d_forced_round_pp16_hlo_20260901T141137500138602Z",
+  "schema_version": 1,
+  "stablehlo": {
+    "collective_count": 3,
+    "collective_groups": [
+      [
+        0,
+        1
+      ]
+    ],
+    "input_count_after_dce": 12,
+    "manual_axis": "feature",
+    "mesh_size": 2,
+    "output_count": 9,
+    "reduce_precision": {
+      "count": 1,
+      "format": "e8m7"
+    },
+    "sha256": "45eae705b60783bf8b65a1d3d209c79e8d43685cec0aa912b3141caf36fb19e1"
+  },
+  "status": "HLO_ACCEPTED_NUMERICAL_UNPROVEN"
+}

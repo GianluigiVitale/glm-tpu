@@ -1,0 +1,83 @@
+{
+  "artifact_kind": "gate_d_projection_contraction_pp16_success_hlo_adjudication",
+  "authorization": {
+    "full_8k": false,
+    "numerical_execution": false,
+    "performance_claim": false,
+    "persistence_only": true
+  },
+  "classification": "HLO_CAUSAL_STRUCTURE_ACCEPTED;PP16_OWNER_LOCALITY_ACCEPTED;TPU_NUMERICAL_UNPROVEN;HLO_ACQUIRED_TERMINAL_VERIFIED;GATE_D_OPEN",
+  "code_hash": "d5da766f26b882ca47ba686745631ffc67e122b7",
+  "gate_d_closed": false,
+  "optimized_hlo": {
+    "sha256": "817ba2ed87c33ec928f834fcf3a003ce63d3dedf4061a7c64fe354a26ac498ea",
+    "structure": {
+      "collective_count": 0,
+      "contraction_accumulation_dtype": "f32",
+      "contraction_input_width": 6144,
+      "entry_instruction_count": 41,
+      "host_effect_count": 0,
+      "instruction_count": 124,
+      "live_rows_per_owner": 1,
+      "module_name": "jit__projection_contraction_local",
+      "num_partitions": 2,
+      "output_shapes": [
+        [
+          1,
+          1,
+          6144
+        ],
+        [
+          1,
+          1,
+          128
+        ],
+        [
+          1,
+          1,
+          128
+        ]
+      ],
+      "owner_count": 2,
+      "projection_width": 128
+    }
+  },
+  "process_contract": {
+    "accelerator_fds_after": [],
+    "accelerator_fds_before": [],
+    "forbidden_modules_after": [],
+    "forbidden_modules_before": [],
+    "package_initializers_executed": [],
+    "python_flags": [
+      "-I",
+      "-S",
+      "-B"
+    ]
+  },
+  "remote_replay": {
+    "all_versions_live_generation_count": 17,
+    "generation_download_count": 17,
+    "sha256": "9c809a939c93ab6b5081665d6c20598a1ed80c47dfd868c4e8f0e6be08767085",
+    "soft_deleted_generation_count": 0,
+    "terminal_last": true
+  },
+  "run_tag": "gate_d_projection_contraction_pp16_hlo_20260901T213605719107105Z",
+  "schema_version": 1,
+  "stablehlo": {
+    "sha256": "4b3fa252e837d381208453b06d7e369947fa4c6c58c795edc8ff5a8ea8c9e2e3",
+    "structure": {
+      "collective_count": 0,
+      "contraction_dtype": "f32",
+      "contraction_width": 6144,
+      "live_rows_per_owner": 1,
+      "manual_axis": {
+        "feature": 2
+      },
+      "owner_count": 2
+    }
+  },
+  "terminal": {
+    "generation": "1788298702037876",
+    "sha256": "bbeca36401beaf7e3df585b6701b9c35d8477ef2b2ce6f60c1d524059f2dcffe"
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "artifact_kind": "gate_d_forced_round_pp16_numerical_source",
+  "authorization": {
+    "cloud_mutation": false,
+    "full_decoder": false,
+    "persistence_only": true,
+    "tpu_execution": false
+  },
+  "classification": "SOURCE_READY_FOR_ADVERSARIAL_REVIEW;HLO_METADATA_DERIVATION_CORRECTED;TPU_EXECUTION_UNAUTHORIZED;FULL_DECODER_UNPROVEN;GATE_D_OPEN",
+  "driver": {
+    "byte_count": 50822,
+    "installed_path": "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-numerical-v2/run_gate_d_forced_round_pp16_numerical.py",
+    "repository_path": "scripts/greenfield/run_gate_d_forced_round_pp16_numerical.py",
+    "sha256": "a5e38c7d8a4d14c32300ac3687ebaa365bcfeb312fe4bb687f9c99babe7d4b57"
+  },
+  "execution_contract": {
+    "compiled_executable_invocation_count": 1,
+    "host_output_transfer_count": 1,
+    "input_logical_rows": 1,
+    "persistent_compilation_cache": false,
+    "physical_device_ids": [
+      0,
+      1
+    ],
+    "plan": "PP16_LP2",
+    "stage_id": 0
+  },
+  "failure_lineage": {
+    "classification": "PRE_EXECUTION_HLO_SOURCE_LOCATION_METADATA_MISMATCH;NO_EXECUTABLE_INVOCATION;GATE_D_OPEN",
+    "diagnostic_receipt_sha256": "8c99e99963ac7433ff4fb5626aef4917f3de4b6e0fe71d3170f57b1c45be040b",
+    "failed_code_pin": "2e401e3ed4afefdc5cc748270895f374415bf9c1",
+    "failed_runtime_optimized_hlo_sha256": "31f2a46db5d7d6ea75a3190546439137987ddb3e244def3c730cc591bd9ab5aa",
+    "run_tag": "gate_d_forced_round_pp16_numerical_20260901T161156923004972Z"
+  },
+  "hlo_contract": {
+    "acquired_optimized": {
+      "byte_count": 263868,
+      "sha256": "a0b87e2b43ba81bfe1549fbcc13434d2fbdca91b11c8b2f9a317ff9a9dbd9d45"
+    },
+    "acquired_stablehlo": {
+      "byte_count": 76529,
+      "sha256": "45eae705b60783bf8b65a1d3d209c79e8d43685cec0aa912b3141caf36fb19e1"
+    },
+    "derived_numerical_optimized": {
+      "byte_count": 263876,
+      "sha256": "ccd6ffb4909b1bc4dca5a36f106cde4a84304b230161afb484afb5667bb7206c"
+    },
+    "source_location_replacements": [
+      {
+        "new": "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-numerical-v2/run_gate_d_forced_round_pp16_numerical.py",
+        "old": "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo-v2/acquire_gate_d_forced_round_pp16_hlo.py",
+        "surface": "FileNames"
+      },
+      {
+        "new": "line=1273 end_line=1273",
+        "old": "line=1568 end_line=1568",
+        "surface": "FileLocations module call"
+      },
+      {
+        "new": "line=1098 end_line=1098",
+        "old": "line=1425 end_line=1425",
+        "surface": "FileLocations lower call"
+      }
+    ]
+  },
+  "numerical_acceptance": {
+    "independent_event1_authority_required": true,
+    "owner_agreement_required": true,
+    "protected_causal_watchpoints_required": [
+      "layer1.cache_history:value",
+      "layer1.current_key:value",
+      "layer1.head_weights:owner0",
+      "layer1.head_weights:owner1",
+      "layer1.normalized:owner0",
+      "layer1.normalized:owner1",
+      "layer1.query:owner0",
+      "layer1.query:owner1",
+      "layer1.rms_input_fp32:value",
+      "layer1.rms_operands_bf16:hidden_update",
+      "layer1.rms_operands_bf16:residual"
+    ],
+    "scorer_cpu_watchpoints_diagnostic_only": true,
+    "tie_order_required": true
+  },
+  "predecessors": {
+    "admission_sha256": "7cd7e569ed9ed5fd978d933efd4229d65906ae28312e264863b8336e4cc6b37d",
+    "capsule_execution_authority_sha256": "8b8c9cc79a18679628582a66c418a7f63e06553091928df58defbdde3971a660",
+    "capsule_input_sha256": "dd5f1cbb37b722591531635a21cfa9f1d6d0157997a4f70138900d0000be8b1b",
+    "capsule_sha256": "5b7ad71f37dbbcda0ee36a9fc0c42a7ca45d619a9e741307386755e68e87c1a4",
+    "causal_hlo_adjudication_sha256": "4db0ea2bfd8f34ec631213b6724d220038c08b23da788164c62e75efacbbab74",
+    "forced_round_source_sha256": "518be87b650729d365dd09aba20b5f5a03d4bcddccc81978357cdbb02cbe02c6",
+    "host_materialization_authority_sha256": "a7e5b393f7c61181f6b2aab9531d788fb27594d9cf980055c165b6f278ba4f99",
+    "source_code_pin": "2e401e3ed4afefdc5cc748270895f374415bf9c1",
+    "topology_sha256": "49cf6bb1a553985855556d1401ad85918669df52d12f8dc5150f247d18b325eb"
+  },
+  "schema_version": 2,
+  "verification": {
+    "adjacent_tests_passed": 0,
+    "cpu_only": true,
+    "focused_tests_passed": 24,
+    "historical_v1_adjacent_tests_reused": 221,
+    "jax_backend_initialized": false,
+    "ruff_version": "0.16.5",
+    "sealed_history_tests_deselected": 0,
+    "tpu_work_performed": false
+  }
+}

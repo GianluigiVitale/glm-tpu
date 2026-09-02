@@ -1,0 +1,157 @@
+{
+  "artifact_kind": "gate_d_forced_round_pp16_hlo_pre_census_busy_failure",
+  "authorization": {
+    "cloud_write": false,
+    "full_8k": false,
+    "hlo_acquisition": false,
+    "numerical_execution": false,
+    "persistence_only": true,
+    "tpu_compile": false,
+    "tpu_execution": false
+  },
+  "classification": "PRE_DRIVER_CENSUS_CONTENTION;PROTECTED_WORKFLOW_NO_JAX_OR_HLO;PROTECTED_WORKFLOW_NO_TPU_COMPILE_OR_EXECUTION;GATE_D_OPEN",
+  "code_pin": "878f9689d1d939257d31097e1cc86d224ddcab4d",
+  "diagnostic_archive": {
+    "bucket_location": "US-CENTRAL2",
+    "generation_qualified_bytes_verified_before_utc": "2026-09-01T13:56:09Z",
+    "objects": [
+      {
+        "crc32c": "7XvzGg==",
+        "generation": "1788270439877292",
+        "path": "census_failure_exit.txt",
+        "sha256": "f45ffb9625f8d6f7053c63c85ee790ce86b2d0f712a53255f26cdcaa1ebb6094",
+        "size": 655
+      },
+      {
+        "crc32c": "ZBvcwg==",
+        "generation": "1788270439958200",
+        "path": "census_pre.txt",
+        "sha256": "37cd2647c2f6030624320ab3849c9c6e8bf3d4c1214507ae4b29683575334c12",
+        "size": 655
+      },
+      {
+        "crc32c": "M7woFw==",
+        "generation": "1788270440039361",
+        "path": "failure_status.json",
+        "sha256": "89cc8d5a27204d0068cef1b46b26426eb6a24f4c69e8b3298b8dc679e0f17eee",
+        "size": 250
+      },
+      {
+        "crc32c": "j3xiEw==",
+        "generation": "1788270440120991",
+        "path": "mirror.sha256",
+        "sha256": "603551dbcf6e66b141e45f6a3a877730f42ee310dfeecc019a8f3b9d71b5b8f4",
+        "size": 2921
+      },
+      {
+        "crc32c": "ZxLgAA==",
+        "generation": "1788270440211180",
+        "path": "orchestrator.failure.log",
+        "sha256": "d84dfa98fc36c63dbcf920cb6fa5f2fb8b675f02a9d39d35eb8403d0dcd7605c",
+        "size": 521
+      },
+      {
+        "crc32c": "bk53fw==",
+        "generation": "1788270440308088",
+        "path": "publisher_runtime.json",
+        "sha256": "651ea242d98dda0c7941cda031a5d5a9c6c8f229e9bba415bdb17cfd1105efdd",
+        "size": 878
+      },
+      {
+        "crc32c": "w8uC4g==",
+        "generation": "1788270440401141",
+        "path": "remote_vacancy.raw.txt",
+        "sha256": "06adceaeeeda14547ee896c26fe5d7a3f4ea81d2ff3348d36657ff9f9eb4f4da",
+        "size": 346
+      },
+      {
+        "crc32c": "RkC+aw==",
+        "generation": "1788270440482528",
+        "path": "remote_vacancy.txt",
+        "sha256": "1a88f033df988ce6c1f8fc615e0300d7073dd6df4b5446469bf77986d75553cf",
+        "size": 451
+      },
+      {
+        "crc32c": "XSZMmw==",
+        "generation": "1788270440575090",
+        "path": "sync.txt",
+        "sha256": "3767af145a5608fc819f379cec7a0b4bde762df7543621e9eeaaeb714ec9e2e5",
+        "size": 112
+      },
+      {
+        "crc32c": "qkcMNg==",
+        "generation": "1788270441162145",
+        "path": "diagnostic_objects.json",
+        "sha256": "a69b27062d804bb6595bb30f3bfdf46790a1948bff76f9e9a832cb61e1ce4fdf",
+        "size": 1669
+      }
+    ],
+    "remote_prefix": "gs://driftbench-dsv4-uc/results/greenfield/glm52/gate_d_forced_round_pp16_hlo/gate_d_forced_round_pp16_hlo_20260901T134523411363994Z/diagnostic",
+    "terminal_generation": "1788270441162145",
+    "terminal_last": true
+  },
+  "failure": {
+    "driver_started": false,
+    "failure_stage": "strict_census.pre",
+    "hlo_acquired_terminal_present": false,
+    "hlo_directory_empty": true,
+    "jax_imported_by_protected_workflow": false,
+    "launcher_started_at_utc": "2026-09-01T13:46:50Z",
+    "reason": "worker 0 reported CENSUS_BUSY while workers 1-7 reported CENSUS_OK",
+    "success_terminal_present": false
+  },
+  "local_evidence": {
+    "diagnostic_upload_receipt_sha256": "c6d0c6968ad64a3dce5ba3d38ba8c12b8bdb2cb734d3bdc4d24d1c867ba655ab",
+    "local_run_directory": "/home/gianl/gate-d-runs/gate_d_forced_round_pp16_hlo_20260901T134523411363994Z",
+    "orchestrator_log_sha256": "d84dfa98fc36c63dbcf920cb6fa5f2fb8b675f02a9d39d35eb8403d0dcd7605c"
+  },
+  "no_retry_same_tag": true,
+  "post_failure_audit": {
+    "completed_before_utc": "2026-09-01T13:56:09Z",
+    "bucket_location": "US-CENTRAL2",
+    "libtpu_holders_worker_0": [],
+    "pid_304691_absent": true,
+    "pod_health": "HEALTHY",
+    "pod_state": "READY",
+    "root_pod_lease_free": true,
+    "root_rsync_lease_free": true,
+    "unique_clean_hosts": [
+      "t1v-n-ae271d05-w-0",
+      "t1v-n-ae271d05-w-1",
+      "t1v-n-ae271d05-w-2",
+      "t1v-n-ae271d05-w-3",
+      "t1v-n-ae271d05-w-4",
+      "t1v-n-ae271d05-w-5",
+      "t1v-n-ae271d05-w-6",
+      "t1v-n-ae271d05-w-7"
+    ],
+    "user_pod_lease_free": true,
+    "user_rsync_lease_free": true
+  },
+  "pre_existing_holder": {
+    "accelerator_devices_open": [
+      "/dev/accel0",
+      "/dev/accel1",
+      "/dev/accel2",
+      "/dev/accel3"
+    ],
+    "command_class": "one-line Python environment/version/device probe importing jax, pytest and torch and calling jax.devices()",
+    "directly_satisfied_libtpu_holder_branch": true,
+    "exited_without_intervention": true,
+    "libtpu_lockfile_open": true,
+    "main_thread_wchan": "futex_wait_queue",
+    "may_have_initialized_tpu_backend": true,
+    "origin": "unknown",
+    "pid": 304691,
+    "ppid_when_observed": 1,
+    "predated_protected_launcher": true,
+    "session_scope": "session-2624.scope",
+    "ssh_session_closed_at_utc": "2026-09-01T13:43:18Z",
+    "started_at_utc": "2026-09-01T13:42:01Z",
+    "threads_when_observed": 573,
+    "worker": "t1v-n-ae271d05-w-0"
+  },
+  "scope_note": "No-JAX, no-HLO and no-TPU-work claims apply only to the protected workflow. The unrelated holder imported JAX, called jax.devices(), may have initialized the TPU backend and has unknown provenance.",
+  "schema_version": 1,
+  "tag": "gate_d_forced_round_pp16_hlo_20260901T134523411363994Z"
+}

@@ -1,0 +1,157 @@
+{
+  "all_versions_catalogue": {
+    "live_generation_count": 17,
+    "soft_deleted_generation_count": 0,
+    "unique_path_count": 17
+  },
+  "artifact_kind": "gate_d_projection_contraction_pp16_hlo_independent_success_remote_replay",
+  "bucket": {
+    "location": "US-CENTRAL2",
+    "name": "driftbench-dsv4-uc"
+  },
+  "captured_at_utc": "2026-09-01T21:44:25.523890Z",
+  "claims": {
+    "cloud_mutation_performed": false,
+    "generation_downloads_verified": true,
+    "read_only": true,
+    "soft_deleted_query_exhaustive": true,
+    "soft_deleted_query_matched_no_objects": true,
+    "success_terminal_last": true
+  },
+  "gcloud_version": "582.0.0",
+  "objects": [
+    {
+      "crc32c": "6B0KjQ==",
+      "generation": "1788298702037876",
+      "path": "HLO_ACQUIRED",
+      "sha256": "bbeca36401beaf7e3df585b6701b9c35d8477ef2b2ce6f60c1d524059f2dcffe",
+      "size": 764
+    },
+    {
+      "crc32c": "saWCgg==",
+      "generation": "1788298699990190",
+      "path": "census_post.txt",
+      "sha256": "30a31b276d1c32eff707bd937bad4e8e115d0cea0ea2c58c8349605672ac2fae",
+      "size": 653
+    },
+    {
+      "crc32c": "TloQkg==",
+      "generation": "1788298700068794",
+      "path": "census_pre.txt",
+      "sha256": "3a5c96d8ccbe92366bdfefcedd7c5e5057a99bf9eb9fdabe9213d2c1b9b77936",
+      "size": 653
+    },
+    {
+      "crc32c": "M8657g==",
+      "generation": "1788298700152445",
+      "path": "dependencies.json",
+      "sha256": "f52ce669ec61945aa1d1ff681fdefb4dcc04446cb426b31123f7999f80f9e0c3",
+      "size": 150170
+    },
+    {
+      "crc32c": "UlSRFw==",
+      "generation": "1788298700224328",
+      "path": "evidence.json",
+      "sha256": "8b3d3fc2b607d3ee49b8b459b7c15fdf89986e4b8bb0936408728db272c5794a",
+      "size": 2099
+    },
+    {
+      "crc32c": "/uVcUA==",
+      "generation": "1788298700299060",
+      "path": "hlo/projection_contraction_pp16_stage0.optimized_hlo.txt",
+      "sha256": "817ba2ed87c33ec928f834fcf3a003ce63d3dedf4061a7c64fe354a26ac498ea",
+      "size": 31857
+    },
+    {
+      "crc32c": "7zgeEA==",
+      "generation": "1788298700368906",
+      "path": "hlo/projection_contraction_pp16_stage0.stablehlo.mlir",
+      "sha256": "4b3fa252e837d381208453b06d7e369947fa4c6c58c795edc8ff5a8ea8c9e2e3",
+      "size": 7420
+    },
+    {
+      "crc32c": "caRBUw==",
+      "generation": "1788298700441542",
+      "path": "mirror.sha256",
+      "sha256": "d6537ccaea2eebd53de1efd7f1690d0662c31922b3a59b4b2b3b78d407eb9419",
+      "size": 2921
+    },
+    {
+      "crc32c": "glmgcg==",
+      "generation": "1788298700521309",
+      "path": "orchestrator.sealed.log",
+      "sha256": "ec9bf02020c2cecbeb80ed50e83a6c1d6fcf65a66ee1eeb1a3970deec1878708",
+      "size": 705
+    },
+    {
+      "crc32c": "7APNdg==",
+      "generation": "1788298700595517",
+      "path": "publisher_runtime.json",
+      "sha256": "b74cae4a0b0497b02e8cf6ec08117bda3966058f518d0e1e58e8ecb9ccd1164c",
+      "size": 888
+    },
+    {
+      "crc32c": "WPC0lQ==",
+      "generation": "1788298701112785",
+      "path": "remote_objects.json",
+      "sha256": "5924d3f248b20bb5bf6042e9145bb31feb96c314c49b98e7d6aae2c8f68edb25",
+      "size": 2744
+    },
+    {
+      "crc32c": "w8uC4g==",
+      "generation": "1788298700667707",
+      "path": "remote_vacancy.raw.txt",
+      "sha256": "06adceaeeeda14547ee896c26fe5d7a3f4ea81d2ff3348d36657ff9f9eb4f4da",
+      "size": 346
+    },
+    {
+      "crc32c": "VL8O9Q==",
+      "generation": "1788298700733682",
+      "path": "remote_vacancy.txt",
+      "sha256": "51d7e40a69ec9807a17ed32698e8d4a6c61aa7c0c953ae1556ef7ddfa425b5d1",
+      "size": 511
+    },
+    {
+      "crc32c": "zZPAEA==",
+      "generation": "1788298700809451",
+      "path": "runner.json",
+      "sha256": "466f4838e7c48dd3dbae5db21cc2bf686dd7fe648afd965dcb09bb93d2faa4cb",
+      "size": 6702
+    },
+    {
+      "crc32c": "XBVzZw==",
+      "generation": "1788298700892946",
+      "path": "runner.log",
+      "sha256": "c57e27c510e18eedccc26d6d52e31334f40ae120fd82bec771c80cd3349b7245",
+      "size": 166
+    },
+    {
+      "crc32c": "cU3RPw==",
+      "generation": "1788298700969010",
+      "path": "summary.json",
+      "sha256": "f8c15581888050fd93f7c8be4a337730d6618169175fcf3dec9e013abd350ac3",
+      "size": 1605
+    },
+    {
+      "crc32c": "aDWagw==",
+      "generation": "1788298701042234",
+      "path": "sync.txt",
+      "sha256": "5a1125b081dbc09fe36126030e9caf7558b86ff28745418d8f89270256446526",
+      "size": 112
+    }
+  ],
+  "prefix": "gs://driftbench-dsv4-uc/results/greenfield/glm52/gate_d_projection_contraction_pp16_hlo/gate_d_projection_contraction_pp16_hlo_20260901T213605719107105Z",
+  "queries": {
+    "all_versions": "gcloud storage ls --all-versions --json PREFIX/**",
+    "bucket": "gcloud storage buckets describe gs://driftbench-dsv4-uc",
+    "generation_replay": "gcloud storage cp PREFIX/PATH#GENERATION LOCAL_FILE",
+    "soft_deleted": "PYTHONWARNINGS=ignore gcloud storage ls --soft-deleted --exhaustive --json PREFIX/**"
+  },
+  "run_tag": "gate_d_projection_contraction_pp16_hlo_20260901T213605719107105Z",
+  "schema_version": 1,
+  "soft_deleted_result": {
+    "exit_code": 1,
+    "stderr": "ERROR: (gcloud.storage.ls) One or more URLs matched no objects.\n",
+    "stdout_bytes": 0
+  }
+}

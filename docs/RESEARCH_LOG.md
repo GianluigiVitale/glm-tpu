@@ -12079,3 +12079,191 @@ define the exact fusion/value-flow mutations before a separately reviewed numeri
   `d1651110...65e8` for the overbroad interpretation, unbound BF16 premise and missing machine
   supersession. Corrected SHA `0045e9b8...2154` closes all three and received
   `APPROVE PERSISTENCE`, no P0--P2 and no execution authorization.
+
+
+## 2026-09-01 compensated PP16 rejection recovered; exact conversion-placement explanation
+
+The one completed protected tag
+`gate_d_compensated_pp16_numerical_20260901T094622505067868Z` invoked its compiled TPU
+executable exactly once and returned `NUMERICAL_REJECTED`. Its historical publisher then failed
+only because one exact Git-authenticated HLO helper lay outside the old dependency-root policy.
+No TPU retry occurred. CPU-only recovery commit `5c4297c6cbfca0f6363276249aa116db25a7e724`
+passed 158 focused tests and final Sol review. A fresh validate-only replay made zero remote writes.
+Fresh seal tag `gate_d_compensated_pp16_recovery_20260901T102415964684137Z` then published 12
+exact objects terminal-last in `US-CENTRAL2`; terminal generation is `1788258353080631`,
+CRC32C `ZmPYCw==`, SHA-256 `a3a4a0ec...aad959`. The source diagnostic remains untouched.
+
+The recovered arrays close the prior operand ambiguity. Both BF16 operand rows independently widen
+and add to the accepted and both TPU-owner FP32 RMS inputs byte-for-byte. Offline certificate
+`gate-d-scalar-frontier-conversion-placement.json` (SHA-256 `8ee468eb...c170ce`) compares the
+accepted strict model (normalized-BF16 round, widened per-element weight multiply, final BF16
+round) with the retained-FP32-through-weight-multiply model:
+
+- strict double rounding reproduces all 6,144 accepted output bits;
+- one-round `bf16((x*scale)*weight)` reproduces all 6,144 protected TPU output bits;
+- their 1,622 differing indices exactly equal accepted-versus-TPU mismatches;
+- accepted strict-scale preimage is the 44-f32-value interval
+  `0x43329838..0x43329863`, containing reference scale `0x4332984c`;
+- TPU output bit `0x3c18` at index 0 is skipped by strict double rounding for every positive
+  finite FP32 scalar, so no uniform RMS scalar can explain the protected row.
+
+This proves retained FP32 through the weight multiply is an exact explanation and rules out the
+FP32 RMS input or any uniform strict-double-round scalar. It does not yet prove the physical cause;
+conversion placement/excess precision remains the leading hypothesis pending causal A/B evidence.
+The compensated auxiliary mechanism itself is tombstoned, but alternative physical causes are not.
+Gate D remains open. Exact next is default-off source design and CPU-only validation/persistence of
+a source-exact causal challenger that forces the existing post-normalization BF16 round before
+weight multiplication (`reduce_precision(e8m7)` first; excess-precision-disabled comparator).
+Compile/HLO acquisition and any bounded PP16 numerical start remain unauthorized; each requires
+its own fresh review, tag and exact execution authority. Full 8K remains forbidden.
+
+## 2026-09-01 forced normalized-BF16 boundary source design; CPU-only
+
+The scalar-frontier certificate `8ee468eb...c170ce` motivated one default-off causal challenger,
+`fused_add_rms_norm_with_forced_bf16_boundary`. It leaves the FP32 residual sum, variance and
+normalization unchanged, applies explicit `reduce_precision(e8m7)` to the normalized FP32 value,
+widens the exact BF16 weight to FP32 for multiplication, and performs the final BF16 conversion.
+The normal decoder has no caller for this function.
+
+CPU-only certificate `gate-d-forced-normalized-bf16-source-design.json` (SHA-256
+`54bb2750...d3100`) binds the sealed capsule, protected output and scalar-frontier evidence. On the
+real 6,144-element layer-1 row, the candidate and carried residual match accepted bits exactly; its
+1,622 differences from the protected TPU row have the exact prior mismatch-index hash. Three
+additional BF16 row families match the accepted reference bitwise. Fourteen exact signed-zero,
+subnormal, normal, tie, max-finite and overflow cases prove e8m7 equals explicit BF16 cast/widen
+before weighting. A `jax.make_jaxpr` trace—not HLO lowering—proves one e8m7 edge solely feeds a
+multiply whose other operand is the sole BF16-weight-to-FP32 lineage, then one final BF16 output.
+
+This proves source and CPU exactness only. Physical causality, optimized-HLO preservation,
+performance and Gate-D closure remain unproved. No TPU compile, HLO acquisition, cloud write,
+numerical run or full 8K occurred. Persistence is the only authority in this batch. A future
+compile/HLO acquisition and any bounded PP16 numerical start each require a separate fresh review,
+tag and exact authority; full 8K remains forbidden.
+
+## 2026-09-01 forced-round PP16 HLO integration source; no HLO/TPU
+
+The default-off builder `build_gate_d_forced_round_pp16_hlo_replay` composes the forced
+normalized-BF16 edge into the sealed one-row QKV/DSA form. It now refuses any runtime pair except
+the topology-authorized PP16 stage zero: ordered device ids `[0,1]`, TPU v4, process 0,
+coordinates `[(0,0,0),(1,0,0)]`, core 0, and axis `feature`. The exact local group is passed to
+DSA; all 16 input specs, nine rooted output specs, cache layout, aliases and the single
+`jit(shard_map(...))` wrapper are structurally bound.
+
+Fable returned only its hard usage-limit refusal. Sol initially withheld persistence because
+dependency bytes, arbitrary source effects and exact PP16 sharding/topology were not closed. The
+corrected analyzer binds predecessor `54bb2750...d3100`, the forced-function module/function
+hashes, topology artifact `49cf6bb1...25eb`, base commit/tree, the complete eight-path delta and
+seven direct runtime dependency hashes. The auditor has an exact normalized whole-module AST lock
+plus targeted lineage/sharding checks, so added imports/calls, indirect execution, group/spec drift
+and non-stage-zero devices fail hostile tests. Certificate generation bypasses the broad validation
+initializer and proves zero loaded `jax`, `jaxlib` or `jax_plugins` modules.
+
+Certificate `gate-d-forced-round-pp16-hlo-source.json` has SHA-256
+`518be87b650729d365dd09aba20b5f5a03d4bcddccc81978357cdbb02cbe02c6`. Focused hostile coverage
+passes 25/25 and the bounded adjacent CPU/source suite passes 156/156; Ruff, Python compilation,
+sanitized exact regeneration, JSON and diff checks pass. CPU tests may import JAX, but no valid
+builder call, lowering, HLO acquisition, TPU compile/execution, cloud write, numerical or
+performance run occurred. This remains persistence-only source evidence: physical causality and
+Gate D are open; full 8K is forbidden. Sol's corrected-scope re-review found no P0--P2 and returned
+`APPROVE PERSISTENCE`. After commit/push/mirror, exact next is a separately reviewed bounded HLO
+acquisition proving the e8m7 edge survives optimization before any numerical A/B.
+
+## 2026-09-01 forced-round PP16 HLO acquisition source; no HLO/TPU
+
+A new isolated driver, `acquire_gate_d_forced_round_pp16_hlo.py`, copies the already hardened
+compile-only boundary without changing the historically pinned compensated driver. It binds the
+exact source certificate `518be87b...e02c6`, compensated capsule-input admission
+`7cd7e569...6b37d`, topology `49cf6bb1...25eb`, exact stage zero and all eight committed
+builder/runtime dependency blobs before opening the inherited run directory or importing JAX.
+Its abstract contract has 16 inputs, one live row and nine rooted two-owner outputs. The only
+compiled object is never invoked; compilation caching stays disabled.
+
+The source auditor compares every inherited helper AST with base driver
+`a4599e0d...b5dd15`, permits only two new validation helpers, and requires exactly one lower and
+one compile call with zero executable calls. The older source certificate now regenerates from its
+exact commit `2a050c1`, preserving it after later repository changes. The
+persistence-only certificate `gate-d-forced-round-pp16-hlo-acquisition-source.json` has SHA-256
+`efe04d98267fc5265952b28ee386a4894d028b39f2d62d0a1554f24591e73196`; focused and adjacent
+source/security coverage passes 154/154. This batch authorizes
+persistence only: no wrapper/start, JAX import, lowering, HLO, TPU compile/execution, cloud write,
+numerical/performance work or 8K occurred. Gate D remains open. Exact next after validation and
+review is commit/push/mirror, then a separate execution-authority review for one fresh compile-only
+tag.
+
+Fable remained at its recorded 100% usage limit. The goal-authorized Sol fallback reviewed exact
+staged diff `7d22104a...6457`, found no P0--P2 and returned `APPROVE PERSISTENCE`; it authorized no
+HLO acquisition or TPU work.
+
+## 2026-09-01 forced-round PP16 HLO orchestration source; no HLO/TPU
+
+An isolated default-off wrapper and generation-bound publisher target only the forced-round PP16
+compile-only driver. Sol withheld the first source snapshot on two P1s: `cd /` exported `OLDPWD`
+before a mutable-path self-reexec, making the second allowlist fail deterministically, and reopening
+that user-writable wrapper left a same-UID substitution window. The corrected source removes the
+self-reexec. A dedicated root-owned launcher authenticates exact committed bytes, snapshots the
+wrapper into a fully sealed memfd retained as FD 10, inherits already-held root-owned lock FDs
+11/12, and binds driver/publisher/mirror-verifier execution to a root-owned immutable capsule. The
+wrapper verifies those descriptors and launcher before `cd /`, then closes FD 10. An executed
+hostile regression replaces the named wrapper after snapshot and proves Bash executes only the
+sealed original; a separate launcher-to-Bash regression proves `OLDPWD` is absent before the sole
+`cd`. Authenticated eight-host census and terminal-last generation binding remain unchanged. The
+compiled executable remains uninvoked and compilation caching remains off.
+
+The source-only certificate
+`gate-d-forced-round-pp16-hlo-orchestration-source.json` authorizes persistence only. No wrapper
+start, JAX import, lowering, HLO, TPU compile/execution, bucket write, numerical/performance work or
+8K occurred; Gate D remains open. Exact next after hostile validation, adversarial review,
+commit/push and locked same-region mirror replay is a separately reviewed literal fresh-tag command
+for exactly one compile-only acquisition, followed by offline HLO adjudication before any numerical
+A/B.
+
+Corrected certificate SHA-256 is
+`f4fcba8497599dd19f94ec8ded2566ad3d27a412a04adad584fc22417e18847c`; focused launcher and
+orchestration coverage passes 54/54 and the adjacent preserved-source/security suite passes
+208/208. Corrected adversarial persistence review is still required; no launcher/capsule install or
+execution is authorized by this source batch.
+
+## 2026-09-01 forced-round PP16 HLO immutable install source; no privileged install
+
+The second-stage installer closes the remaining user-writable execution boundary without granting
+execution authority. Its input is one exact root-owned source capsule installed separately by the
+existing fixed provisioner. It validates exact membership, root ownership, modes, link count,
+xattrs, stable inode identity and hard-coded SHA-256 for the launcher, driver, publisher and mirror
+verifier. It publishes the immutable three-file child capsule first and launcher last using
+`renameat2(RENAME_NOREPLACE)`, fsyncs files/directories, accepts only byte-exact idempotent targets
+and refuses hostile files or symlinks without replacement. The installer imports no JAX/cloud
+library, starts no child process and reports `launcher_invoked=false`.
+
+Certificate `gate-d-forced-round-pp16-hlo-install-source.json` is persistence-only and binds base
+`a012b93`, orchestration evidence `f4fcba84...e18847c`, the installer AST and the exact committed
+payload blobs. Hostile tests cover exact/idempotent publication, mode/membership integrity, wrong
+hashes, links and occupied targets. No privileged install, launcher start, JAX import, HLO, TPU,
+cloud mutation, numerical/performance work or 8K occurred. Gate D remains open; install and one
+fresh compile-only tag each require their own later review.
+
+The historical orchestration auditor is also commit-exact: all audited inputs and its exact delta
+come from Git objects at `a012b93`, so the existing `f4fcba84...e18847c` certificate continues to
+regenerate byte-for-byte after this successor batch. No historical claim or artifact is rewritten.
+
+The first Sol review withheld persistence because exception cleanup was name-based rather than
+creation-owned, replacement refs could redirect historical `git show`, and a path-validation loop
+was a no-op. The corrected publisher tracks created inode identities and whether rename completed;
+cleanup reopens and matches only the owned unpublished inode, rejects foreign contents, and never
+touches a pre-existing PID-collision file, symlink or directory. Both Git auditors run with replace
+objects/lazy fetches/protocol-from-user disabled and explicitly reject `refs/replace`; a hostile
+temporary-repository test exercises that refusal. The no-op validation is removed.
+
+## 2026-09-01 forced-round PP16 HLO immutable runtime install
+
+Corrected installer persistence SHA `826627f4...0f294f1` received Sol `APPROVE PERSISTENCE` with no
+P0--P2 and became commit `102a75f`; origin and the US-CENTRAL2 Git mirror reproduce it exactly. A
+separate install-only review then approved the exact fixed-provisioner and second-stage commands,
+not the launcher.
+
+Source capsule tree `ab902d62...c919c` contains five exact committed mode-0555 files. The root-owned
+source target preserves that tree SHA. The root-owned mode-0555 runtime capsule contains only the
+driver, publisher and mirror verifier at their pinned hashes; the separately published launcher is
+mode 0555, nlink 1 and hash `6e2d0457...d1c6cd`. All installed files are root:root, nlink 1 and have
+no xattrs. Installer output and independent checks prove `launcher_invoked=false`, free workload/
+rsync locks and no live launcher. No JAX import, HLO, TPU, cloud mutation, numerical/performance or
+8K work occurred. Install evidence is `gate-d-forced-round-pp16-hlo-runtime-install.json`.

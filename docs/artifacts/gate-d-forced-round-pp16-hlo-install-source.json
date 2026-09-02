@@ -1,0 +1,59 @@
+{
+  "artifact_kind": "gate_d_forced_round_pp16_hlo_install_source",
+  "authorization": {
+    "cloud_write": false,
+    "full_8k": false,
+    "hlo_acquisition": false,
+    "launcher_invocation": false,
+    "persistence_only": true,
+    "privileged_install": false,
+    "tpu_compile": false,
+    "tpu_execution": false
+  },
+  "claim_scope": "Static installer/no-replace audit only. No privileged install, launcher invocation, JAX import, HLO acquisition, TPU compile/execution, cloud write, numerical, performance or Gate-D claim.",
+  "install_audit": {
+    "atomic_publish": "renameat2_RENAME_NOREPLACE",
+    "capsule_published_before_launcher": true,
+    "destination_capsule": "/usr/local/libexec/glm-tpu/gate-d-forced-round-pp16-hlo-v2",
+    "destination_launcher": "/opt/glm-tpu/bin/launch_gate_d_forced_round_pp16_hlo_v2.py",
+    "installer_ast_sha256": "836ffdb66db6ee1f59a200cdf61c51aa7754da4f2b99ebbfd2adb4c6b62e91fb",
+    "installer_sha256": "69c46831b367429c412e42ac554789b367b31cdaac7d8e5a6ccba4b1d8c93301",
+    "launcher_invocation_count": 0,
+    "owned_staging_cleanup_only": true,
+    "payload_sha256s": {
+      "acquire_gate_d_forced_round_pp16_hlo.py": "046040d382567ccef94792b97e160b0f79b673ab1f0f1d46bfd20c57e884faf7",
+      "launch_gate_d_forced_round_pp16_hlo.py": "7df72ff370fbbc40ede42aa833bd071cc113dc4a343fbc444d3e6b25ae522a5b",
+      "publish_gate_d_forced_round_pp16_hlo.py": "0a643e8c307a0f2b6c026a749956099ddae724da280ae7d7995be68a0a275607",
+      "verify_gate_d_same_region_git_mirror.py": "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"
+    }
+  },
+  "predecessors": {
+    "base_code_pin": "20272f747dda09c99e6f63bfde22899c9623e4a4",
+    "orchestration_source_sha256": "75751a7c09c9abea8cc7442270ca2cc9de4d77a077229d37449295a133e68a04"
+  },
+  "process_contract": {
+    "loaded_jax_modules": []
+  },
+  "repository_authority": {
+    "allowed_delta_paths": [
+      "docs/artifacts/gate-d-forced-round-pp16-hlo-install-source.json",
+      "scripts/greenfield/analyze_gate_d_forced_round_pp16_hlo_install_source.py",
+      "scripts/greenfield/install_gate_d_forced_round_pp16_hlo_runtime.py",
+      "tests/greenfield/validation/test_install_gate_d_forced_round_pp16_hlo_runtime.py"
+    ],
+    "base_code_pin": "20272f747dda09c99e6f63bfde22899c9623e4a4",
+    "base_tree_id": "b97844ba2d66821635f38992c5ac15414b705b7d",
+    "unexpected_delta_paths": []
+  },
+  "source_authority": {
+    "analyzer_path": "scripts/greenfield/analyze_gate_d_forced_round_pp16_hlo_install_source.py",
+    "analyzer_sha256": "3f55f1c3263a4853d2b8005d152f660e37cdcb3753b30809105df08f77093ff5",
+    "installer_path": "scripts/greenfield/install_gate_d_forced_round_pp16_hlo_runtime.py",
+    "installer_sha256": "69c46831b367429c412e42ac554789b367b31cdaac7d8e5a6ccba4b1d8c93301",
+    "orchestration_analyzer_path": "scripts/greenfield/analyze_gate_d_forced_round_pp16_hlo_orchestration_source.py",
+    "orchestration_analyzer_sha256": "edf6ef8b9e7d39fe05cf8a3ed27ba6c6acfebcb8b655b74784a6144a5d6a561f",
+    "test_path": "tests/greenfield/validation/test_install_gate_d_forced_round_pp16_hlo_runtime.py",
+    "test_sha256": "9869f2d2fd1d9a14b11473794206174aa78bd468f463520f550fe402fffbc8d9"
+  },
+  "status": "FORCED_ROUND_HLO_INSTALL_SOURCE_PERSISTENCE_ONLY"
+}

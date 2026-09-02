@@ -10,6 +10,7 @@ import jax.numpy as jnp
 from .dsa import DsaNumericalContract
 from .dsa_association import affine_key_layer_norm
 from .fp8 import dequantize_fp8_bits_block_weight
+from .dsa_host_rope import rotary_cos_sin_from_rows
 from .rotary import apply_rotary, rotary_cos_sin
 
 
@@ -88,6 +89,7 @@ def physical_m64_prompt_index_key_chunk(
     *,
     contract: DsaNumericalContract = DsaNumericalContract(),
     physical_rows: int = 64,
+    rope_table_rows: Any | None = None,
 ) -> Any:
     """Project exact normalized inputs with the accepted M64 association.
 
@@ -155,12 +157,19 @@ def physical_m64_prompt_index_key_chunk(
     keys = lax.map(project_and_normalize, partitions).reshape(
         chunk_rows, contract.head_dim
     )
-    cos, sin = rotary_cos_sin(
-        positions,
-        rotary_dim=contract.rotary_dim,
-        theta=contract.theta,
-        dtype=jnp.float32,
-    )
+    if rope_table_rows is None:
+        cos, sin = rotary_cos_sin(
+            positions,
+            rotary_dim=contract.rotary_dim,
+            theta=contract.theta,
+            dtype=jnp.float32,
+        )
+    else:
+        # Host FP32 cos|sin rows gathered by position: on-device cos/sin at
+        # large rotary angles are inaccurate on TPU (protected V2/V3 replays).
+        cos, sin = rotary_cos_sin_from_rows(
+            rope_table_rows, positions, rotary_dim=contract.rotary_dim
+        )
     rotated = apply_rotary(
         keys[:, : contract.rotary_dim],
         cos,
@@ -189,6 +198,7 @@ def repair_stage_local_prompt_index_cache(
     local_parallel_size: int = 4,
     position_offset: int = 0,
     valid_rows: int | None = None,
+    dsa_rope_table: Any | None = None,
 ) -> Any:
     """Overwrite one final-owner cache with exact prompt keys.
 
@@ -255,6 +265,20 @@ def repair_stage_local_prompt_index_cache(
         normalized_chunk = jnp.take(
             prompt_normalized_inputs, safe_positions, axis=0
         )
+        rope_table_rows = None
+        if dsa_rope_table is not None:
+            if (
+                dsa_rope_table.ndim != 2
+                or dsa_rope_table.shape[1] != contract.rotary_dim
+                or dsa_rope_table.dtype != jnp.float32
+            ):
+                raise ValueError("prompt repair DSA host rotary table is invalid")
+            safe_table_positions = jnp.clip(
+                positions, jnp.int32(0), jnp.int32(dsa_rope_table.shape[0] - 1)
+            )
+            rope_table_rows = jnp.take(
+                dsa_rope_table, safe_table_positions, axis=0
+            )
         keys = physical_m64_prompt_index_key_chunk(
             normalized_chunk,
             positions,
@@ -263,6 +287,7 @@ def repair_stage_local_prompt_index_cache(
             key_norm_bias,
             contract=contract,
             physical_rows=physical_rows,
+            rope_table_rows=rope_table_rows,
         )
 
         logical_pages = positions // jnp.int32(logical_page_size)

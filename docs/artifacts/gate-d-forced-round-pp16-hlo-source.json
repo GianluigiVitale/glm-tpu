@@ -1,0 +1,113 @@
+{
+  "artifact_kind": "gate_d_forced_round_pp16_hlo_source_integration",
+  "authorization": {
+    "full_8k": false,
+    "hlo_acquisition": false,
+    "persistence_only": true,
+    "tpu_compile": false,
+    "tpu_execution": false
+  },
+  "candidate_id": "forced_normalized_bf16_boundary",
+  "claim_scope": "Static source and lineage audit only; certificate generation loads no JAX and performs no lowering, HLO, compile, TPU execution, cloud write, numerical, performance, or Gate-D closure claim.",
+  "classification": "ISOLATED_PP16_SOURCE;FORCED_ROUND_PRIMARY_LINEAGE;NO_LOWER_COMPILE_EXECUTE_CALLS;PERSISTENCE_ONLY;GATE_D_OPEN",
+  "predecessor": {
+    "artifact": "docs/artifacts/gate-d-forced-normalized-bf16-source-design.json",
+    "sha256": "54bb2750de8b4261229cd8e38b53a0df00083689eda478e94196e7b2ad7d3100"
+  },
+  "process_contract": {
+    "loaded_jax_modules": []
+  },
+  "repository_authority": {
+    "allowed_delta_paths": [
+      "HANDOFF.md",
+      "docs/RESEARCH_LOG.md",
+      "docs/artifacts/gate-d-forced-round-pp16-hlo-source.json",
+      "docs/greenfield/EVIDENCE_MAP.md",
+      "glm_tpu/greenfield/benchmarking/gate_d_forced_round_pp16_hlo.py",
+      "glm_tpu/greenfield/validation/gate_d_forced_round_hlo_source.py",
+      "scripts/greenfield/analyze_gate_d_forced_round_pp16_hlo_source.py",
+      "tests/greenfield/validation/test_gate_d_forced_round_pp16_hlo_source.py"
+    ],
+    "base_code_pin": "fc0381688bcdb03c95021f397c6fac43443c21ba",
+    "base_tree_id": "691f16dc9dfd6d1fb8cc13ed56a49ef9be760b4b",
+    "direct_runtime_dependency_sha256s": {
+      "glm_tpu/greenfield/benchmarking/gate_d_compensated_capsule.py": "0f1930c079bd7244452e84dca6d0bbf9da077ea133c685f0f908760379e5313d",
+      "glm_tpu/greenfield/errors.py": "f7b8a079ba16f6114714124598d03ae871a2c21d365de4417b934f00cddaae64",
+      "glm_tpu/greenfield/kernels/reference/attention.py": "0314931e50dedb9b40b2570c7716b38b32421a8c8749eb36bb5636717787c54a",
+      "glm_tpu/greenfield/kernels/reference/dsa.py": "c4b451ab7ca2bf79b7cc7b148a7b1b146996051891c1c82f1952d8ab9ef53fac",
+      "glm_tpu/greenfield/kernels/reference/qkv_a.py": "1e6d2cb6464d1733708c227283898f0687c965e1883cbea4c441ece2a40d3bb3",
+      "glm_tpu/greenfield/kernels/reference/rmsnorm.py": "d6fca18425fb851c2ba3e1a12dacd45c8dadef43b33d6a1e6da72dbfb2eb6276",
+      "glm_tpu/greenfield/kernels/stage_local.py": "0fa80ae74390a79bb63e6ac82357a08770b644bc07093139a825eb68b82ac490"
+    },
+    "unexpected_delta_paths": []
+  },
+  "runtime_authority": {
+    "forced_function_module_sha256": "d6fca18425fb851c2ba3e1a12dacd45c8dadef43b33d6a1e6da72dbfb2eb6276",
+    "forced_function_source_sha256": "d73eaf1f9c8d485769513abe835bbb5ce72d61f4d495a4dedc65b7cfeb0e7a2b",
+    "pp16_plan_hash": "6383e57c81478ac0d6de4525a4675f2a0d7cbc7aa73bd67bc662dc4e05840f21",
+    "pp16_stage_zero": {
+      "coordinates": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "device_ids": [
+        0,
+        1
+      ],
+      "process_index": 0,
+      "stage_id": 0
+    },
+    "topology_artifact": "docs/artifacts/gate-d-runtime-locality-authority.json",
+    "topology_artifact_sha256": "49cf6bb1a553985855556d1401ad85918669df52d12f8dc5150f247d18b325eb",
+    "topology_hash": "294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559"
+  },
+  "source_audit": {
+    "builder": "build_gate_d_forced_round_pp16_hlo_replay",
+    "builder_source_sha256": "e943ef21803aba1d266b06c00e4320d2c7be2477255c228e179d35638813def3",
+    "forced_round_call_count": 1,
+    "hlo_lowering_or_compile_call_count": 0,
+    "in_spec_count": 16,
+    "module_ast_sha256": "6c52174e0f69f8c33203f8ae42e4f9da86f33d3ca53eea31b266186b761e814f",
+    "normalized_feeds_dsa": true,
+    "normalized_feeds_qkv": true,
+    "normalized_is_rooted": true,
+    "output_field_count": 9,
+    "pp16_group": [
+      0,
+      1
+    ],
+    "pp16_stage_coordinates": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        0
+      ]
+    ],
+    "pp16_stage_id": 0,
+    "pp16_stage_process_index": 0,
+    "source_sha256": "4f5934dee8532294f67f77cca8b3e41f8ce00d29b23c3fc6996ab1cd886abefe",
+    "tpu_device_count_required": 2
+  },
+  "source_authority": {
+    "analyzer_path": "scripts/greenfield/analyze_gate_d_forced_round_pp16_hlo_source.py",
+    "analyzer_sha256": "1c04766a9a0a373dd16eed9c01268be4fbd007595d0d1c8e81d9defcd3329812",
+    "auditor_path": "glm_tpu/greenfield/validation/gate_d_forced_round_hlo_source.py",
+    "auditor_sha256": "fb0dd69e0762ab0e1e9f2fed537f6dd8a34246ef019ec59c17ac1808786000bd",
+    "builder_path": "glm_tpu/greenfield/benchmarking/gate_d_forced_round_pp16_hlo.py",
+    "builder_sha256": "4f5934dee8532294f67f77cca8b3e41f8ce00d29b23c3fc6996ab1cd886abefe"
+  },
+  "status": "PP16_HLO_INTEGRATION_SOURCE_PERSISTENCE_ONLY"
+}

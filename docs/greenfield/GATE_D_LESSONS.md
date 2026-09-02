@@ -1093,3 +1093,35 @@ normalized-state cause.
   optimization barriers—and require the immutable parser to reproduce the new expectation. Emit
   compact expected/observed fields instead of one aggregate `validator result drifted` message so
   the first failed bounded run identifies the precise stale invariant.
+- A canonical, self-hashed local terminal is not status authority after its trusted publisher exits
+  when the run directory remains same-UID mutable: both terminal and receipt can be replaced with a
+  self-consistent opposite result. Cross the status and remote terminal identity directly from the
+  immutable publisher process after final upload/replay (or retain an authenticated descriptor),
+  then treat reopened local names as supplementary consistency checks only. Attack-test local
+  substitution after publisher return; it may cause fail-closed denial but must never flip the
+  remote accepted/rejected result.
+- XLA optimized-HLO text embeds the calling Python file path and call-site line numbers in its
+  FileNames/FileLocations tables. A numerical driver that is a different installed file from the
+  compile-only acquisition driver can never pass a raw byte comparison against the accepted HLO,
+  even when StableHLO and the graph body are byte-identical (v1 numerical tag burned 2026-09-01).
+  Either acquire the HLO from the exact file that will execute it, or bind an exact reviewed
+  source-location bridge (path + call-site lines, single-occurrence substitutions, derived hash) and
+  compare against the derived bytes. Pin the call-site line constants with a test against the driver
+  source, because formatters shift them.
+- TPU on-device `jnp.cos`/`jnp.sin` of large rotary angles (position × inverse frequency up to
+  ~8155 rad at position 8155, theta 8e6) deviate from the true values by up to ~1e-2, while a host
+  f32 table (vLLM/legacy) is accurate to the f32 argument-rounding level (~7e-5). The DSA indexer
+  key/query rotary evaluated on device therefore diverges from the accepted keys by ~2e-3 per
+  element while projection (f32-accurate) and key LayerNorm (bit-exact) are innocent. Evaluate
+  rotary tables on the host with the accepted f32 formula and gather rows by position on device;
+  never trust on-device transcendental range reduction for exactness.
+- A rejected bounded discriminator is still decisive evidence when its outputs are archived: the
+  V2 rejection was fully adjudicated on CPU from `outputs.npz` alone (implied cos/sin from
+  pre-/post-rotation pairs) without another TPU run.
+- Injecting archived TPU keys into the capsule's CPU stage-local DSA replay is a cheap, exact
+  selection witness: the V3 host-row key reproduced the accepted layer-1/position-8155 event
+  bit-for-bit (positions and scores) while the V2 on-device-rotary key perturbed every score by up
+  to 4.2e-3 without flipping that event. A single-key witness cannot reproduce the protected 8K
+  failure (seven swapped positions at the same event) because there every cached prompt key and the
+  query carried their own position-dependent rotary error; only the full decoder with host rows for
+  keys, queries and prefill can answer that.

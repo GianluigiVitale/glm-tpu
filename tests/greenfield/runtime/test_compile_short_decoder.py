@@ -1885,3 +1885,27 @@ def test_observer_hlo_isolation_requires_no_alias_callback_or_collective_drift(
         observer_contract=drifted,
     )
     assert not collective["passed"]
+
+
+def test_dsa_rope_table_is_default_off_and_bounded_proof_bound() -> None:
+    compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
+    assert '"--dsa-rope-table"' in compiler
+    assert "args.dsa_rope_table = bool(args.dsa_rope_table)" in compiler
+    assert compiler.count("dsa_rope_table_enabled=args.dsa_rope_table") == 3
+    assert '"dsa_rope_table_enabled": decoder.dsa_rope_table_enabled' in compiler
+    assert '"dsa_rope_table_sha256": decoder.dsa_rope_table_sha256' in compiler
+    assert "decoder DSA host rotary table asset is unavailable" in compiler
+    assert "device DSA host rotary table identity drifted" in compiler
+    assert "default decoder materialized a DSA host rotary table" in compiler
+    assert (
+        "DSA host rotary table is not plumbed through layer-0 discriminators"
+        in compiler
+    )
+    assert "gate_d_projection_contraction_pp16_numerical_" in compiler
+    assert "748aa6122b8d83cfcf65928d33d1ac10392b7cc968617f324a75a62168d3a9c0" in compiler
+    runtime = (REPO / "glm_tpu/greenfield/runtime/decoder.py").read_text()
+    assert "dsa_rope_table_enabled: bool = False," in runtime
+    assert "greenfield_dsa_rope_table_lookup" in runtime
+    assert "build_dsa_rotary_table_host(" in runtime
+    prefill = (REPO / "glm_tpu/greenfield/runtime/prefill.py").read_text()
+    assert 'getattr(decoder, "dsa_rope_table_enabled", False)' in prefill

@@ -1,71 +1,59 @@
-# Goal — GLM-5.2-FP8 TPU v4 topology-first greenfield engine
+# Goal — GLM-5.2-FP8 TPU v4 topology-first engine: close Gate D, then finish §18
 
-FULL ACCESS: autonomous. Keep <4000 chars. At start/compaction read this and
-`docs/glm-tpu-revolution.md` and `docs/suggestions.md` **in full**; inspect live evidence.
+FULL ACCESS: autonomous. Keep this file <4000 chars; it is the compaction-safe authority. At
+start/compaction read this file and `docs/glm-tpu-revolution.md` in full, then only the **last
+~300 lines** of `HANDOFF.md` and the last entries of `docs/greenfield/{EVIDENCE_MAP,GATE_D_LESSONS}.md`;
+never reread whole histories. Then inspect live state (git, run dirs, leases, pod). If stuck or
+failing, reread `docs/greenfield/compass_artifact_wf-f6f3c189-f49a-5169-bc82-8adefac958df_text_markdown.md`
+in full and adjudicate its hypotheses against local evidence.
 
-## Scope/precedence
+## Priority
 
-Default-off native JAX `zai-org/GLM-5.2-FP8` on `db-v4-64-od` (8 hosts/32 chips); minimize
-protected 256K latency. Preserve legacy evidence/oracles/tools only. No new infra; only
-`gs://driftbench-dsv4-uc`; serialize TPU work.
+Close **Gate D**: complete 78-layer greenfield decoder at short context (8K) with correct raw tokens,
+exact DSA selected sets/tie order, state/cache integrity, no repeated 32-chip layer collective,
+measured HBM, fresh trace, steady wall. Everything else (PP8/PP16/WS32 adjudication, 128K/256K,
+speculation, §18 finish) comes after and must not consume effort now.
 
-## Architecture search
+## Hard invariants (never relax)
 
-- `PP8_LP4`: host-aligned 8×4 first.
-- `PP16_LP2`: adjacent 16×2 mandatory.
-- `WS32_2D`: all-chip 2D; result/rejection evidence.
-- `LEGACY_TP32_DCP8`: oracle only.
+Native JAX greenfield tree only; legacy `tpu-inference` is oracle/utilities only. Use only
+`db-v4-64-od` and `gs://driftbench-dsv4-uc`; never create infra. Serialize TPU work under the pod
+lease; every protected run ends with an authenticated 8/8 zero-work census. Append-only evidence,
+fail closed, exact SHA binding of code/plan/artifacts. Proof = exact DSA + tokens + integrity on
+real hardware; CPU/HLO/labels/throughput alone are not proof. Never modify historical evidence.
+Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, stretch `<=100`.
 
-Evidence chooses. Distribute weights by depth; communicate locally; move live state; no 32-chip hidden
-reconstruction/layer. `decode_batch1`: one row, no dead rows.
+## Efficiency contract (owner, 2026-09-01)
 
-## Order
+- **Batch reviews.** One Sol review per milestone covering source + tests + certificate + install
+  commands + fresh-tag run command together. Do not request a review per file or per step.
+- Sol = Codex `gpt-5.6-sol` sub-agent thread `01a05206-57b1-7dc3-a49c-a913529b3937`; invoke
+  `codex exec fork <id> --skip-git-repo-check -c 'sandbox_mode="read-only"' -o <verdict> "<prompt>"`
+  (binary in the VS Code Codex extension). Ask for exact verdict lines.
+- Mirror = cron `sync-glm.sh` every 5 min; do not add ceremony. Verify with
+  `verify_gate_d_same_region_git_mirror.py` only before a protected run.
+- Root-cause work first: reuse the installed immutable V1 numerical runtime and existing wrappers;
+  add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
+- Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-Worktree; pin. Pre-model prove
-topology/groups; device-only PP8/PP16 chains with exact HLO, no host/Ray/Python dispatch/inactive
-compute, warmed distributions; one exact MoE layer with local 2/4-chip combine.
-Pass Gates A–H: plan/memory/HLO; final-layout manifest/packer/loader; reference kernels; exact
-dense/DSA/IndexShare/MoE; complete cutoff-active short decoder; protected 128K;
-protected 256K E0; identical plan adjudication; then speculation.
+## Resume checkpoint — 2026-09-02 02:40Z
 
-## Gate D: observe; find/fix root cause
+Worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`, branch
+`tooling/gate-d-compensated-pp16-numerical`, HEAD `fa970b09…` on origin+mirror. **Root cause proven
+at bounded scope** (V3 tag `…004306002075694Z`: host FP32 rotary row → key faithful to 5e-7; V2
+on-device rotary → 2.3e-3). **Batch 2 staged:** host DSA rotary rows in the decoder
+(`dsa_rope_table_enabled`, default off; kernels/decoder/prefill/compile script/runners), HLO
+contract (one FP32 table param + lookup, zero transcendentals with both tables), forced-CPU
+equivalence incl. tokens, 126/126 regression, CPU selection witness (V3 key reproduces the accepted
+layer-1/8155 event exactly; the 2026-08-26 8K run failed at that event with 7 swaps).
 
-Gate D open; `context<=top_k` is not ranking proof; never rerun tombstoned graphs. Build
-default-off typed snapshots/watchpoints, first-divergence bisection, bits/dtypes/shapes/layouts/
-owners, coherent cache/query/head/key/scorer state and causal HLO fingerprints/artifact diffs.
-Prefer device buffers plus one bounded transfer. Host use requires unchanged executable/outputs/DSA.
-Bind source/code/plan SHAs; append-only, fail closed, offline-first; test attacks.
+Exact next (one batched Sol review): commit/push batch 2; merge tooling →
+`rewrite/topology-first-decode` keeping this checkpoint plus the Compass rule, push, mirror; then one
+serialized protected launch `GLM_GREENFIELD_DSA_ROPE_TABLE=1 bash
+scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from `/home/gianl/glm-tpu-topology-rewrite`;
+accept only exact tokens + all DSA contracts + full protections + 8/8 cleanup. Gate D open.
 
-Oracle: `docs/10-observability.md`. Indexes:
-`docs/greenfield/{REUSE_INVENTORY,EVIDENCE_MAP,GATE_D_LESSONS,GATE_D_OBSERVABILITY_PLAYBOOK}.md`,
-`configs/greenfield-reuse-inventory.json`. Core/config/CLI:
-`glm_tpu/greenfield/{observability,gate_d_admission}.py`,
-`configs/greenfield-gate-d-{observability,mechanism-admission}.json`,
-`scripts/greenfield/{audit_observability,admit_gate_d_mechanisms}.py`. Search
-`glm_tpu/greenfield/{validation,benchmarking,sharding}/`, `scripts/greenfield/{capture,compare,inspect,probe,trace}*` and
-`tests/greenfield/`. Evidence: `docs/artifacts/`, `HANDOFF.md`, `bench/results.db`, bucket
-`oracles/`/`results/`. Read/register first. If stuck/failing, reread
-`docs/greenfield/compass_artifact_wf-f6f3c189-f49a-5169-bc82-8adefac958df_text_markdown.md`
-in full; adjudicate its hypotheses against local evidence.
+## Finish (after Gate D)
 
-Localize first causal divergence; define/falsify a legal one-row local mechanism on the smallest
-coherent state; compile/run only if it passes. Gate D requires root cause/fix.
-
-## Proof/performance contract
-
-Optimizations off. Require exact DSA sets/ties, tokens/quality, state/load/cache/checkpoint checksums,
-per-chip HBM, code/plan hashes, groups/counts, fresh 8-host XPlanes, profiler-free wall,
-DB/archive/authenticated cleanup. CPU/synthetic/HLO/labels/throughput/contaminated wall are not
-performance proof. Stop on full-pod collectives, host staging, dead rows, unknown HBM, DSA drift or
-wall regression. Useful: `<=200 ms/token`, `>=4.5 tok/s`; strong:
-`<=125 ms`, `>=8 tok/s`; stretch: `<=100 ms`, `>=10 tok/s`. Separate base/speculative throughput.
-
-## Definition/workflow
-
-Finish only with §18 evidence: independent 256K service; packed checkpoint; exactness/integrity,
-HBM/HLO/local collectives; plan adjudication; 128K/256K; DB/archive; clean fleet.
-Log batches/exact next. Review each new batch in Fable 5 Max CLI
-(`--dangerously-skip-permissions`); at 100% use one Sol on the same scope. Fix blockers; don't
-re-review cleared code. Use smallest checks, reuse proof, preflight locks/tags; serialize TPU
-without weakening correctness. Verify, commit/push, then locked same-region sync. Never use Opus,
-workflows or other subagents.
+§18 of the spec: PP8/PP16 protected measurements, WS32 result or evidence-backed rejection, 128K
+four-depth, 256K E0, DB/archive, clean fleet, base vs speculative throughput reported separately.
