@@ -12,6 +12,8 @@ import pytest
 from glm_tpu.greenfield.runtime.decoder import (
     _validate_rms_accepted_schedule_hlo,
     _validate_rms_accepted_schedule_stablehlo,
+    expected_rms_schedule_census,
+    validate_decoder_step_hlo,
 )
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 from tests.greenfield.runtime.test_rms_schedule_layernorm_classification import HLO as RMS_HLO, STABLEHLO as RMS_STABLEHLO
@@ -63,12 +65,15 @@ STABLEHLO = RMS_STABLEHLO.replace(
 )
 
 
-def _hlo(text: str) -> dict:
-    return _validate_rms_accepted_schedule_hlo(parse_hlo_module(text), enabled=True, layernorm_width=128)
+CENSUS = dict(expected_accepted_count=1, expected_sharded_qa_count=1)
 
 
-def _stable(text: str) -> dict:
-    return _validate_rms_accepted_schedule_stablehlo(text, enabled=True, layernorm_width=128)
+def _hlo(text: str, **census) -> dict:
+    return _validate_rms_accepted_schedule_hlo(parse_hlo_module(text), enabled=True, layernorm_width=128, **(census or CENSUS))
+
+
+def _stable(text: str, **census) -> dict:
+    return _validate_rms_accepted_schedule_stablehlo(text, enabled=True, layernorm_width=128, **(census or CENSUS))
 
 
 def test_exact_sharded_qa_norm_is_classified_apart() -> None:
@@ -123,3 +128,50 @@ def test_stablehlo_sharded_qa_mutations_are_refused(label: str, old: str, new: s
     result = _stable(STABLEHLO.replace(old, new, 1))
     assert not result["passed"], (label, result)
     assert result["sharded_qa_rsqrt_count"] == 0, (label, result)
+
+
+def test_enabled_binders_refuse_omitted_census_expectations() -> None:
+    from glm_tpu.greenfield.runtime.decoder import PlanValidationError
+
+    module = parse_hlo_module(HLO)
+    for kwargs in ({}, {"expected_accepted_count": 1}, {"expected_sharded_qa_count": 1}, {"expected_accepted_count": -1, "expected_sharded_qa_count": 1}, {"expected_accepted_count": True, "expected_sharded_qa_count": 1}):
+        with pytest.raises(PlanValidationError):
+            _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=128, **kwargs)
+        with pytest.raises(PlanValidationError):
+            _validate_rms_accepted_schedule_stablehlo(STABLEHLO, enabled=True, layernorm_width=128, **kwargs)
+    # disabled mode does not need the census
+    assert "passed" in _validate_rms_accepted_schedule_hlo(module, enabled=False, layernorm_width=128)
+    assert "passed" in _validate_rms_accepted_schedule_stablehlo(STABLEHLO, enabled=False, layernorm_width=128)
+
+
+def test_lineage_census_is_bound_exactly_in_both_representations() -> None:
+    assert expected_rms_schedule_census(layers=78, attention_projection_backend="fused_n82_convolution") == (235, 78)
+    assert expected_rms_schedule_census(layers=8, attention_projection_backend="separate") == (33, 0)
+    with pytest.raises(ValueError):
+        expected_rms_schedule_census(layers=-1, attention_projection_backend="separate")
+    # missing sharded lineage
+    missing = HLO.replace("ROOT %qrs = f32[] rsqrt(%qvar)", "ROOT %qrs = f32[] add(%qvar, %qvar)")
+    result = _hlo(missing)
+    assert not result["passed"] and any("sharded q-a census drifted: expected 1, found 0" in v for v in result["violations"])
+    missing_stable = STABLEHLO.replace("%210 = stablehlo.rsqrt %209 : tensor<1xf32>", "%210 = stablehlo.abs %209 : tensor<1xf32>")
+    result = _stable(missing_stable)
+    assert not result["passed"] and any("sharded q-a census drifted: expected 1, found 0" in v for v in result["violations"])
+    # missing accepted lineage
+    missing_rms = HLO.replace("ROOT %rs = f32[32]{0} rsqrt(%var)", "ROOT %rs = f32[32]{0} add(%var, %var)")
+    result = _hlo(missing_rms)
+    assert not result["passed"] and any("accepted-schedule RMS census drifted: expected 1, found 0" in v for v in result["violations"])
+    missing_rms_stable = STABLEHLO.replace("%8 = stablehlo.rsqrt %7 : tensor<32x1xf32>", "%8 = stablehlo.abs %7 : tensor<32x1xf32>")
+    result = _stable(missing_rms_stable)
+    assert not result["passed"] and any("accepted-schedule RMS census drifted: expected 1, found 0" in v for v in result["violations"])
+    # extra lineages (expectation lower than found) and substitution (counts shifted between kinds)
+    assert not _hlo(HLO, expected_accepted_count=1, expected_sharded_qa_count=0)["passed"]
+    assert not _hlo(HLO, expected_accepted_count=0, expected_sharded_qa_count=1)["passed"]
+    assert not _hlo(HLO, expected_accepted_count=2, expected_sharded_qa_count=0)["passed"]
+    assert not _stable(STABLEHLO, expected_accepted_count=1, expected_sharded_qa_count=0)["passed"]
+    assert not _stable(STABLEHLO, expected_accepted_count=0, expected_sharded_qa_count=2)["passed"]
+    # the decoder-step validator computes the census from its layer count and backend and forwards it to both binders
+    import inspect
+    source = inspect.getsource(validate_decoder_step_hlo)
+    assert "expected_rms_schedule_census(\n        layers=layers, attention_projection_backend=attention_projection_backend\n    )" in source
+    assert source.count("expected_accepted_count=expected_accepted_count") == 2
+    assert source.count("expected_sharded_qa_count=expected_sharded_qa_count") == 2

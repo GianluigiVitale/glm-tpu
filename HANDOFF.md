@@ -10918,3 +10918,20 @@ census violations; the first archive (235/78) passes; wrong expectations are ref
 archive; synthetic missing/extra/substituted-lineage attacks are refused; the decoder-step validator's
 source is bound to forward both expectations to both binders; the forced-CPU decoder test binds the
 census from the plan (`4·layers+1`, 0 sharded, separate layout).
+
+## 2026-09-02 Sol BLOCK on 68935065 — census expectations optional; claimed tests were not in the commit
+
+Two faults, both mine. (1) The census expectations defaulted to `None`, so an enabled binder without
+them bound nothing. Both binders now raise `PlanValidationError` when `enabled=True` and either
+expectation is missing, negative or a bool; every direct caller passes them (the decoder-step validator
+computes them; the bounded-arm and synthetic tests pass (1, 0) or (1, 1)); a test asserts the refusal
+for omitted/partial/negative/bool expectations in both representations while disabled mode needs none.
+(2) The previous commit's description to Sol claimed the second-archive refusal and the census attack
+tests; the script that wrote those test edits aborted on a later assertion and the files were never
+written, so the commit carried the code change without the tests and the suite "passed" trivially.
+Sol caught it. The edits are now applied with per-substitution count checks: the second archive is
+refused in both representations with the census violations named; the first archive passes with (235,
+78) and is refused with (236, 78) / (235, 77); missing sharded lineage, missing accepted lineage, extra
+and substituted lineages are refused in both representations; the decoder-step validator's source is
+bound to compute and forward both expectations. Lesson: after any multi-file patch script, diff the
+files it claims to have written before describing them to a reviewer.

@@ -1197,3 +1197,6 @@ normalized-state cause.
   sums then a cross-chip sum) broke the previously exact DSA event 0. Read the oracle's sharding for
   every norm before choosing its schedule, and keep each norm's proven formulation as its own bound
   contract kind.
+- A patch script that asserts mid-way leaves the earlier writes in place and the later ones missing;
+  verify with `git diff --stat` that every file you describe to a reviewer actually changed, and never
+  describe a test as present from memory of the script rather than from the tree.

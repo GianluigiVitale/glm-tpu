@@ -3305,6 +3305,8 @@ def _validate_rms_accepted_schedule_stablehlo(
     the flag off no rsqrt may bind that lineage.
     """
 
+    if enabled:
+        _require_rms_schedule_census(expected_accepted_count, expected_sharded_qa_count)
     lineages: list[dict[str, Any]] = []
     barrier_count = 0
     for definitions in _stablehlo_scopes(stablehlo):
@@ -3385,6 +3387,21 @@ def expected_rms_schedule_census(
     if attention_projection_backend == "fused_n82_convolution":
         return 3 * layers + 1, layers
     return 4 * layers + 1, 0
+
+
+def _require_rms_schedule_census(
+    expected_accepted_count: int | None, expected_sharded_qa_count: int | None
+) -> None:
+    """The enabled contract refuses to run without both census expectations."""
+
+    for label, value in (
+        ("expected_accepted_count", expected_accepted_count),
+        ("expected_sharded_qa_count", expected_sharded_qa_count),
+    ):
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise PlanValidationError(
+                f"enabled RMS schedule contract requires {label} as a non-negative int"
+            )
 
 
 def _rms_schedule_census_violations(
@@ -3634,6 +3651,8 @@ def _validate_rms_accepted_schedule_hlo(
     arm carries none), so the barrier is bound in StableHLO.
     """
 
+    if enabled:
+        _require_rms_schedule_census(expected_accepted_count, expected_sharded_qa_count)
     by_key, lineages = _rms_schedule_lineages(module, layernorm_width=layernorm_width)
     rsqrts = tuple(item for item in module.instructions if item.opcode == "rsqrt")
     layernorms = [

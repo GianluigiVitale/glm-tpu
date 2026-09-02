@@ -114,11 +114,11 @@ report = {
     'residual_max_abs': float(np.abs(default_out[0].astype(np.float32) - schedule_out[0].astype(np.float32)).max()),
     'default_contract': _validate_rms_accepted_schedule_hlo(default_module, enabled=False, layernorm_width=decoder.config.index_key_width),
     'schedule_contract': _validate_rms_accepted_schedule_hlo(schedule_module, enabled=True, layernorm_width=decoder.config.index_key_width, **census),
-    'default_as_schedule': _validate_rms_accepted_schedule_hlo(default_module, enabled=True, layernorm_width=decoder.config.index_key_width)['passed'],
+    'default_as_schedule': _validate_rms_accepted_schedule_hlo(default_module, enabled=True, layernorm_width=decoder.config.index_key_width, **census)['passed'],
     'schedule_as_default': _validate_rms_accepted_schedule_hlo(schedule_module, enabled=False, layernorm_width=decoder.config.index_key_width)['passed'],
     'default_stablehlo': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=False, layernorm_width=decoder.config.index_key_width),
     'schedule_stablehlo': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=True, layernorm_width=decoder.config.index_key_width, **census),
-    'default_stablehlo_as_schedule': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=True, layernorm_width=decoder.config.index_key_width)['passed'],
+    'default_stablehlo_as_schedule': _validate_rms_accepted_schedule_stablehlo(default_stablehlo, enabled=True, layernorm_width=decoder.config.index_key_width, **census)['passed'],
     'schedule_stablehlo_as_default': _validate_rms_accepted_schedule_stablehlo(schedule_stablehlo, enabled=False, layernorm_width=decoder.config.index_key_width)['passed'],
 }
 for key in ('default_contract', 'schedule_contract'):
