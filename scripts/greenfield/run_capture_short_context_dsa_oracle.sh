@@ -2314,7 +2314,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$VLLM_RUNTIME_FILE_COUNT" "$VLLM_ARCHIVE_REPO" \
   "$OBSERVER_BUNDLE_SHA" "$OBSERVER_TRACKED_FILE_COUNT" \
   "$GOLDEN_MANIFEST_SHA" "$GOLDEN_MANIFEST_BYTES" \
-  "$LEGACY_SOURCE_REPO" "${OBSERVER_BRANCH:-none}" <<'PY'
+  "$LEGACY_SOURCE_REPO" "${OBSERVER_BRANCH:-none}" "$PROMPT_CACHE_LAYER_ID" <<'PY'
 from hashlib import sha256
 import json
 import math
@@ -3466,6 +3466,28 @@ if sys.argv[11] == "1":
             ),
             "prompt_index_cache_internal_mismatch_count": (
                 prompt_comparison["cache_comparison"]["mismatch_count"]
+            ),
+        })
+    elif sys.argv[39] != "0":
+        # Deeper-layer capture: bind the sealed layer identity. The one-host
+        # layer-0 production comparison does not exist for it; deeper layers
+        # are compared offline against the executed DB518 greenfield capture.
+        layer_id = int(sys.argv[39])
+        if (
+            prompt_cache.get("layer_id") != layer_id
+            or prompt_cache.get("cache_slot") != 2 * layer_id
+            or prompt_cache.get("layer_name")
+            != f"model.layers.{layer_id}.self_attn.attn"
+            or prompt_cache["artifact_kind"]
+            != f"glm52_legacy_layer{layer_id}_prompt_index_cache"
+        ):
+            raise SystemExit("prompt index-cache layer binding drifted")
+        lines.update({
+            "prompt_index_cache_layer_id": str(layer_id),
+            "prompt_index_cache_cache_slot": str(2 * layer_id),
+            "prompt_index_cache_layer_name": prompt_cache["layer_name"],
+            "prompt_index_cache_production_comparison": (
+                "not_applicable_deeper_layer_offline_only"
             ),
         })
     else:

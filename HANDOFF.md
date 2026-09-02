@@ -11265,3 +11265,15 @@ until that map exists. CPU evidence only; no claim.
   byte-identical arrays (all 21 array digests equal) and a different file digest only through the
   safetensors header; that rebuild is kept out of `glm-run`.
 - Tests after fixes: 80 passed (same suites plus `test_compare_script_rejects_unauthenticated_layer1_capture`).
+
+### Sol round 25: one P1 (finalization read the absent layer-0 production comparison) — fixed
+
+The wrapper's terminal finalization block now receives `PROMPT_CACHE_LAYER_ID` (argv 39) and, for a
+deeper-layer capture, binds the sealed manifest identity (`layer_id`, `cache_slot == 2·layer`,
+`layer_name`, artifact kind) and records `prompt_index_cache_production_comparison =
+not_applicable_deeper_layer_offline_only` instead of reading `prompt_index_cache_comparison/comparison.json`
+(which only the layer-0 one-host probe produces). Layer-0 behaviour unchanged. Static test binds the argv
+plumbing and branch order. Sealed same-region mirror verifier note: its `WORKTREE`/`BRANCH` constants are
+the tooling worktree/branch, so it certifies the tooling HEAD pin (not the rewrite merge); run it as
+`env -i HOME LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 <gate-d python> -I -S -B
+<installed verifier> --expected-code-hash <tooling HEAD> --expected-source-sha256 0912081651…`.
