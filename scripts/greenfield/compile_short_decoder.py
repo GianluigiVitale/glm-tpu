@@ -127,17 +127,21 @@ def _worktree_binding(
         return "canonical_worktree"
     if not run_tag or repo != run_root / run_tag / "source":
         raise RuntimeError(f"wrong greenfield worktree: {repo}")
-    common_dir = Path(
-        subprocess.check_output(
-            ["git", "-C", str(repo), "rev-parse", "--git-common-dir"], text=True
-        ).strip()
-    )
-    if not common_dir.is_absolute():
-        common_dir = repo / common_dir
-    if common_dir.resolve() != (canonical / ".git").resolve():
+    def _common_dir(tree: Path) -> Path:
+        # ``--git-common-dir`` names the shared repository for both a main
+        # checkout (``<tree>/.git``) and a linked worktree (worker 0 keeps the
+        # canonical tree as a linked worktree of the main repository).
+        common = Path(
+            subprocess.check_output(
+                ["git", "-C", str(tree), "rev-parse", "--git-common-dir"], text=True
+            ).strip()
+        )
+        return (common if common.is_absolute() else tree / common).resolve()
+
+    if _common_dir(repo) != _common_dir(canonical):
         raise RuntimeError(
             "detached source worktree is not linked to the canonical repository: "
-            f"{common_dir}"
+            f"{_common_dir(repo)} != {_common_dir(canonical)}"
         )
     status = subprocess.check_output(
         ["git", "-C", str(repo), "status", "--porcelain", "--ignored"], text=True
