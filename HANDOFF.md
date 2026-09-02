@@ -11133,3 +11133,37 @@ pre-fetch the pin onto every worker with retries (`git fetch` up to six attempts
 `checkout --detach <pin>`), so the protected sync's own fetch transfers almost nothing; the runner still
 verifies HEAD == pin and a clean tree on each worker. A fetch retry inside the runner is the durable fix
 and is proposed for the next persistence review.
+
+## 2026-09-02 approved run `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T213510823966642Z` (pin 086d459a): hidden-width schedule only — event 1 still 7, identical set; hypothesis exhausted
+
+Sol approved execute-once on the unchanged pin after the pre-fetch mitigation; the eight-host sync passed
+(the fetch had nothing to transfer); launched 21:41:41Z; all three programs' contracts passed on TPU
+(census 157 accepted / 78 sharded q-a / 78 kv-a rows, every kv-a row bound through the exact N82 dequant
+DAG); the decoder executed. Prefill token exact (220); decode token at 8155 exact (101252, margin 6.5);
+event 0 exact (`max_abs 0.0` over 2,048 aligned scores). Exact-DSA refused at **event 1 with 7
+selected-set mismatches — the identical sets as the 15:56Z run** (expected-only 1052 1143 1841 2066 2436
+7473 7575; observed-only 1026 3889 6642 6690 6738 6810 7463; first order mismatch offset 11, 8136 vs
+8150), then 13, 10, 21, 48, 54, 61, 107, … (39,909 order mismatches). Failure-exit census 8/8; tag
+burned; no claim; observer npz `bf3ff47e…`; all HLO/contracts archived.
+
+Reading (the three executed runs together):
+- baseline, every norm default: event 0 exact, event 1 = 6 mismatches (a certified legacy-exact layer-1
+  RMS input `x`; the frontier certificate showed the layer-1 row differing by 1–4 ulps of scale);
+- hidden-width + kv-a accepted: event 1 = 7; hidden-width only: event 1 = 7, **same set** → the kv-a
+  schedule changed nothing at event 1; the kv-a inference was harmless and unnecessary;
+- q-a on the [32,2048] schedule: event 0 broke (refuted, reverted).
+So the 157 hidden-width norms on the proven `f32[32,6144]{T(8,128)} -> f32[32]` schedule do **not**
+reproduce the legacy at event 1 inside the full decoder, although the bounded TPU replay reproduced the
+legacy layer-1 row bit-for-bit for the same `x`. Either `x` at layer 1 is no longer identical to the
+certified one in the full program (something upstream of the layer-1 input norm differs between the
+bounded capture and the live decoder), or the live reduce fusion for these norms has a different
+accumulation order than the bounded arm's (`%multiply_reduce_fusion`), which the lineage contract binds
+by shape/layout/lineage but not by codegen. Both are testable offline first: (a) compare the event-1
+device scores in `dsa_observer/step_00_position_8155.npz` against the legacy `dsa_events` oracle to
+size the deltas (ulp-level vs structural); (b) diff the live decoder's layer-1 RMS reduce fusions
+(archived optimized HLO of this run) against the bounded arm's fusion (`%multiply_reduce_fusion`,
+iteration bounds and backend window config) — no TPU needed for either.
+
+Decision: no further protected launches on this hypothesis. Next: the two offline diagnoses above; the
+runner's worker fetch retry (six attempts, still fail-closed) is staged for the next persistence review
+together with whatever the diagnosis yields.

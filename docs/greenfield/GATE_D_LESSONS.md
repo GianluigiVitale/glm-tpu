@@ -1200,3 +1200,8 @@ normalized-state cause.
 - A patch script that asserts mid-way leaves the earlier writes in place and the later ones missing;
   verify with `git diff --stat` that every file you describe to a reviewer actually changed, and never
   describe a test as present from memory of the script rather than from the tree.
+- A bounded proof of a kernel's numerics ("same input → identical row") does not transfer to the full
+  program until the input equality and the emitted codegen are both proven inside that program; three
+  full runs were needed to learn that the layer-1 schedule fix is necessary-looking but not sufficient.
+  Before the next protected run, close the gap offline: size the event-1 score deltas against the oracle
+  and diff the live reduce fusions against the bounded arm.
