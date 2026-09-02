@@ -662,6 +662,7 @@ class DecoderStepProgram:
     dsa_rope_table_host: Any | None = None
     dsa_rope_table_sha256: str | None = None
     dsa_rope_table_bytes_per_device: int = 0
+    rms_accepted_schedule: bool = False
 
 
 def _validate_pallas_feature_decoder_calls(
@@ -2581,6 +2582,722 @@ def _validate_dsa_rope_table_hlo(
     }
 
 
+def _rms_schedule_by_key(module: HloModule) -> dict[tuple[str, str], HloInstruction]:
+    return {(item.computation, item.name): item for item in module.instructions}
+
+
+def _rms_schedule_computation_id(computation: str) -> str:
+    """Return the bare computation name from ``[ENTRY ]%name (sig) -> result``."""
+
+    name = computation.split(" ", 1)[-1] if computation.startswith("ENTRY ") else computation
+    tokens = name.strip().split()
+    return tokens[0].lstrip("%") if tokens else ""
+
+
+# Opcodes that deliver a materialized buffer to the variance square.  The
+# accepted schedule squares the barrier-carried FP32 rows themselves; the
+# refuted DB548 schedule squares an ``add`` fused into the reduce fusion.
+_RMS_SCHEDULE_CARRY_TERMINALS = frozenset(
+    {"parameter", "fusion", "opt-barrier", "copy-done", "custom-call"}
+)
+_RMS_SCHEDULE_CARRY_PASSTHROUGH = frozenset(
+    {"bitcast", "reshape", "copy", "get-tuple-element"}
+)
+
+
+def _rms_schedule_carry_terminal(
+    by_key: dict[tuple[str, str], HloInstruction], item: HloInstruction | None
+) -> str | None:
+    """Follow structural ops from the square operand to its producing opcode."""
+
+    current = item
+    for _ in range(4):
+        if current is None:
+            return None
+        if current.opcode in _RMS_SCHEDULE_CARRY_PASSTHROUGH and current.operand_names:
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        return current.opcode
+    return current.opcode if current is not None else None
+
+
+# The 128-wide DSA indexer key LayerNorm is the only non-RMS rsqrt in the
+# decode step: FP32 biased variance of mean-centred values, epsilon 1e-6.  It
+# is classified by its centring ``subtract`` (an RMS norm never subtracts a
+# mean) and its epsilon, and reported separately from the RMS schedule.
+DSA_KEY_LAYERNORM_EPSILON = 1e-6
+
+
+def _rms_schedule_arithmetic_terminal(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    item: HloInstruction | None,
+) -> str | None:
+    """Cross structural ops and fusion boundaries to the first arithmetic op."""
+
+    current = item
+    for _ in range(12):
+        if current is None:
+            return None
+        opcode = current.opcode
+        if opcode in {"bitcast", "reshape", "copy", "opt-barrier"} and current.operand_names:
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if opcode == "get-tuple-element" and current.operand_names:
+            index_match = re.search(r"\bindex=([0-9]+)", current.raw_line)
+            producer = by_key.get((current.computation, current.operand_names[0]))
+            if producer is None or index_match is None:
+                return None
+            index = int(index_match.group(1))
+            if producer.opcode == "fusion":
+                producer = _rms_schedule_callee_root(module, producer)
+            if producer is None or producer.opcode != "tuple" or index >= len(producer.operand_names):
+                return producer.opcode if producer is not None else None
+            current = by_key.get((producer.computation, producer.operand_names[index]))
+            continue
+        if opcode == "parameter":
+            index_match = re.search(r"\bparameter\(([0-9]+)\)", current.raw_line)
+            caller = _rms_schedule_caller(module, current.computation)
+            if index_match is None or caller is None:
+                return opcode
+            index = int(index_match.group(1))
+            if index >= len(caller.operand_names):
+                return opcode
+            current = by_key.get((caller.computation, caller.operand_names[index]))
+            continue
+        if opcode == "fusion":
+            current = _rms_schedule_callee_root(module, current)
+            continue
+        return opcode
+    return current.opcode if current is not None else None
+
+
+def _rms_schedule_callee_root(
+    module: HloModule, fusion: HloInstruction
+) -> HloInstruction | None:
+    match = re.search(r"\bcalls=%?([^,\s}\]]+)", fusion.raw_line)
+    if match is None:
+        return None
+    callee = match.group(1)
+    for item in module.instructions:
+        if _rms_schedule_computation_id(item.computation) == callee and (
+            item.raw_line.lstrip().startswith("ROOT ")
+        ):
+            return item
+    return None
+
+
+def _rms_schedule_caller(
+    module: HloModule, computation: str
+) -> HloInstruction | None:
+    callee = _rms_schedule_computation_id(computation)
+    callers = [
+        item
+        for item in module.instructions
+        if item.opcode == "fusion"
+        and re.search(r"\bcalls=%?" + re.escape(callee) + r"(?![\w.])", item.raw_line)
+    ]
+    return callers[0] if len(callers) == 1 else None
+
+
+def _rms_schedule_constant_value(
+    module: HloModule, by_key: dict[tuple[str, str], HloInstruction], item: HloInstruction
+) -> float | None:
+    """Return the scalar literal behind a constant or a broadcast of one."""
+
+    current = item
+    for _ in range(3):
+        if current.opcode == "broadcast" and len(current.operand_names) == 1:
+            producer = by_key.get((current.computation, current.operand_names[0]))
+            if producer is None:
+                return None
+            current = producer
+            continue
+        break
+    if current.opcode != "constant":
+        return None
+    match = re.search(r"\bconstant\(\{?([-+0-9.eE]+)\}?\)", current.raw_line)
+    if match is None:
+        return None
+    try:
+        return float(match.group(1))
+    except ValueError:
+        return None
+
+
+def _rms_schedule_resolve_reduce(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    item: HloInstruction,
+) -> HloInstruction | None:
+    """Follow bitcasts, tuple selection, fusion parameters and callee roots to a reduce."""
+
+    current: HloInstruction | None = item
+    for _ in range(12):
+        if current is None:
+            return None
+        if current.opcode == "reduce":
+            return current
+        if current.opcode in {"bitcast", "copy", "reshape"} and len(current.operand_names) == 1:
+            current = by_key.get((current.computation, current.operand_names[0]))
+            continue
+        if current.opcode == "get-tuple-element" and len(current.operand_names) == 1:
+            index_match = re.search(r"\bindex=([0-9]+)", current.raw_line)
+            producer = by_key.get((current.computation, current.operand_names[0]))
+            if producer is None or index_match is None:
+                return None
+            index = int(index_match.group(1))
+            if producer.opcode == "tuple":
+                if index >= len(producer.operand_names):
+                    return None
+                current = by_key.get((producer.computation, producer.operand_names[index]))
+                continue
+            if producer.opcode == "fusion":
+                root = _rms_schedule_callee_root(module, producer)
+                if root is None or root.opcode != "tuple" or index >= len(root.operand_names):
+                    return None
+                current = by_key.get((root.computation, root.operand_names[index]))
+                continue
+            return None
+        if current.opcode == "parameter":
+            index_match = re.search(r"\bparameter\(([0-9]+)\)", current.raw_line)
+            caller = _rms_schedule_caller(module, current.computation)
+            if index_match is None or caller is None:
+                return None
+            index = int(index_match.group(1))
+            if index >= len(caller.operand_names):
+                return None
+            current = by_key.get((caller.computation, caller.operand_names[index]))
+            continue
+        if current.opcode == "fusion":
+            current = _rms_schedule_callee_root(module, current)
+            continue
+        return None
+    return None
+
+
+def _rms_schedule_scale_matches(opcode: str, scale: float | None, width: int) -> bool:
+    """``divide`` must carry W, ``multiply`` must carry 1/W (per opcode, not either)."""
+
+    if scale is None:
+        return False
+    if opcode in {"divide", "stablehlo.divide"}:
+        return abs(scale - width) < 1e-6
+    return abs(scale * width - 1.0) < 1e-4
+
+
+def _rms_schedule_lineage(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    rsqrt: HloInstruction,
+    *,
+    layernorm_width: int,
+) -> dict[str, Any]:
+    """Bind one rsqrt to square -> last-axis reduce -> 1/W -> +eps -> rsqrt.
+
+    Two lineages are legitimate in the decode step and are classified from
+    the same walk:
+
+    * ``kind == "rms"``: the accepted schedule — the square is applied to a
+      materialized FP32 carry, reduced ``f32[32,W] -> f32[32]`` over the last
+      axis (T(8,128) operand when tiled), scaled by ``1/W``, ``+1e-05``.
+    * ``kind == "centered_layernorm"``: the 128-wide DSA indexer key
+      LayerNorm — the square is applied to a mean-centred ``subtract``,
+      reduced ``f32[R,layernorm_width] -> f32[R]`` over the last axis with an
+      add combiner, scaled by ``1/layernorm_width``, ``+1e-06``, with the
+      rsqrt carrying the same ``R`` rows.  Every one of those facts is
+      required; a centred lineage that misses any of them is nonconforming.
+    """
+
+    record: dict[str, Any] = {
+        "computation": rsqrt.computation,
+        "name": rsqrt.name,
+        "result": [shape.to_dict() for shape in rsqrt.result_shapes],
+    }
+    shapes = rsqrt.result_shapes
+    result_dims = shapes[0].dimensions if len(shapes) == 1 else None
+    result_f32 = len(shapes) == 1 and shapes[0].dtype == "f32"
+
+    def _refuse(problem: str) -> dict[str, Any]:
+        record["kind"] = "unbound"
+        record["problems"] = [problem]
+        return record
+
+    add = by_key.get((rsqrt.computation, rsqrt.operand_names[0])) if rsqrt.operand_names else None
+    if add is None or add.opcode != "add" or len(add.operand_names) != 2:
+        return _refuse("rsqrt operand is not an epsilon addition")
+    epsilon = None
+    mean = None
+    for name in add.operand_names:
+        operand = by_key.get((add.computation, name))
+        if operand is None:
+            continue
+        value = _rms_schedule_constant_value(module, by_key, operand)
+        if value is not None and epsilon is None:
+            epsilon = value
+        else:
+            mean = operand
+    if mean is None or mean.opcode not in {"multiply", "divide"} or len(mean.operand_names) != 2:
+        return _refuse("variance mean is not a multiply/divide of the reduction")
+    width_scale = None
+    total = None
+    for name in mean.operand_names:
+        operand = by_key.get((mean.computation, name))
+        if operand is None:
+            continue
+        value = _rms_schedule_constant_value(module, by_key, operand)
+        if value is not None and width_scale is None:
+            width_scale = value
+        else:
+            total = operand
+    if total is None:
+        return _refuse("variance reduction operand is absent")
+    reduce = _rms_schedule_resolve_reduce(module, by_key, total)
+    if reduce is None:
+        return _refuse("rsqrt is not fed by a reduce")
+    dimensions = re.search(r"\bdimensions=\{([0-9,]*)\}", reduce.raw_line)
+    reduce_dims = (
+        tuple(int(v) for v in dimensions.group(1).split(","))
+        if dimensions and dimensions.group(1)
+        else ()
+    )
+    operand_shape = reduce.operand_shapes[0] if reduce.operand_shapes else None
+    operand_2d = (
+        operand_shape is not None
+        and operand_shape.dtype == "f32"
+        and len(operand_shape.dimensions) == 2
+    )
+    rows = operand_shape.dimensions[0] if operand_2d else None
+    width = operand_shape.dimensions[1] if operand_2d else None
+    reduce_result = reduce.result_shapes[0].dimensions if reduce.result_shapes else None
+    combiner = re.search(r"\bto_apply=%?([^,\s}\]]+)", reduce.raw_line)
+    combiner_roots = (
+        [
+            item
+            for item in module.instructions
+            if _rms_schedule_computation_id(item.computation) == combiner.group(1)
+            and item.raw_line.lstrip().startswith("ROOT ")
+        ]
+        if combiner is not None
+        else []
+    )
+    combiner_is_add = bool(combiner_roots) and combiner_roots[0].opcode == "add"
+    operand_instruction = (
+        by_key.get((reduce.computation, reduce.operand_names[0])) if reduce.operand_names else None
+    )
+    operand_layout_line = operand_instruction.raw_line if operand_instruction is not None else ""
+    square = operand_instruction
+    if square is not None and square.opcode == "parameter":
+        square = _rms_schedule_resolve_square(module, by_key, square)
+    square_ok = (
+        square is not None
+        and square.opcode == "multiply"
+        and len(square.operand_names) == 2
+        and square.operand_names[0] == square.operand_names[1]
+    )
+    carrier = by_key.get((square.computation, square.operand_names[0])) if square_ok else None
+    terminal = _rms_schedule_carry_terminal(by_key, carrier) if square_ok else None
+    arithmetic = _rms_schedule_arithmetic_terminal(module, by_key, carrier) if square_ok else None
+    record.update(
+        {
+            "reduce": reduce.name,
+            "reduce_dimensions": list(reduce_dims),
+            "reduce_operand": operand_shape.to_dict() if operand_shape else None,
+            "width_scale": width_scale,
+            "epsilon": epsilon,
+            "square_operand_opcode": terminal,
+            "square_arithmetic_opcode": arithmetic,
+        }
+    )
+    problems: list[str] = []
+    if not square_ok:
+        problems.append("reduce operand is not a square")
+    if not combiner_is_add:
+        problems.append("reduce combiner is not an addition")
+    if reduce_dims != (1,) or not operand_2d or reduce_result != (rows,):
+        problems.append("reduce is not a last-axis f32[R,W] -> f32[R] reduction")
+    if arithmetic == "subtract":
+        record["kind"] = "centered_layernorm"
+        if epsilon is None or abs(epsilon - DSA_KEY_LAYERNORM_EPSILON) > 1e-13:
+            problems.append(f"LayerNorm epsilon is not 1e-06: {epsilon}")
+        if width != layernorm_width:
+            problems.append(
+                f"LayerNorm width {width} is not the DSA key width {layernorm_width}"
+            )
+        if not result_f32 or result_dims not in ((rows,), (rows, 1)):
+            problems.append("LayerNorm rsqrt rows differ from the reduced rows")
+        if width is not None and not _rms_schedule_scale_matches(mean.opcode, width_scale, width):
+            problems.append(f"LayerNorm mean scale {width_scale} does not match width {width}")
+        record["problems"] = problems
+        return record
+    record["kind"] = "rms"
+    if not result_f32 or result_dims not in ((32,), (32, 1)):
+        problems.append("rsqrt result is not a 32-row f32 scale")
+    if epsilon is None or abs(epsilon - 1e-5) > 1e-12:
+        problems.append(f"epsilon is not 1e-05: {epsilon}")
+    if rows != 32:
+        problems.append("reduce is not f32[32,W] -> f32[32] over the last axis")
+    if width is not None and not _rms_schedule_scale_matches(mean.opcode, width_scale, width):
+        problems.append(f"variance mean scale {width_scale} does not match width {width}")
+    if module_uses_tiling(module) and "T(8,128)" not in operand_layout_line:
+        problems.append("reduce operand does not carry the accepted T(8,128) layout")
+    if square_ok and terminal not in _RMS_SCHEDULE_CARRY_TERMINALS:
+        problems.append(
+            "square operand is produced by fused arithmetic "
+            f"({terminal}), not a materialized FP32 carry"
+        )
+    record["problems"] = problems
+    return record
+
+
+def _rms_schedule_resolve_square(
+    module: HloModule,
+    by_key: dict[tuple[str, str], HloInstruction],
+    parameter: HloInstruction,
+) -> HloInstruction | None:
+    index_match = re.search(r"\bparameter\(([0-9]+)\)", parameter.raw_line)
+    caller = _rms_schedule_caller(module, parameter.computation)
+    if index_match is None or caller is None:
+        return None
+    index = int(index_match.group(1))
+    if index >= len(caller.operand_names):
+        return None
+    producer = by_key.get((caller.computation, caller.operand_names[index]))
+    for _ in range(6):
+        if producer is None:
+            return None
+        if producer.opcode == "multiply":
+            return producer
+        if producer.opcode == "fusion":
+            producer = _rms_schedule_callee_root(module, producer)
+            continue
+        if producer.opcode in {"bitcast", "copy", "reshape"} and len(producer.operand_names) == 1:
+            producer = by_key.get((producer.computation, producer.operand_names[0]))
+            continue
+        return None
+    return None
+
+
+_STABLEHLO_DEFINITION = re.compile(r"^\s*(%[\w#.]+)\s*=\s*([\w.]+)(.*)$")
+
+
+class _StablehloScope(dict):
+    """SSA definitions of one region, chained to the enclosing regions.
+
+    Printed StableHLO restarts ``%N`` numbering inside nested regions
+    (``sdy.manual_computation`` bodies, ``stablehlo.case`` branches), so a flat
+    name -> definition map silently drops every copy after the first.  A scope
+    starts whenever a name already defined in the current scope is redefined;
+    lookups fall back through the enclosing scopes for captured values.
+    """
+
+    def __init__(self, parent: "_StablehloScope | None") -> None:
+        super().__init__()
+        self.parent = parent
+
+    def lookup(self, name: str) -> tuple[str, str] | None:
+        scope: _StablehloScope | None = self
+        while scope is not None:
+            if name in scope:
+                return scope[name]
+            scope = scope.parent
+        return None
+
+
+def _stablehlo_scopes(text: str) -> list[_StablehloScope]:
+    scopes: list[_StablehloScope] = []
+    current: _StablehloScope | None = None
+    for line in text.splitlines():
+        if re.match(r"^\s*func\.func\b", line):
+            current = _StablehloScope(None)
+            scopes.append(current)
+            continue
+        match = _STABLEHLO_DEFINITION.match(line)
+        if match is None:
+            continue
+        name = match.group(1)
+        if current is None or name in current:
+            current = _StablehloScope(current)
+            scopes.append(current)
+        current[name] = (match.group(2), match.group(3))
+    return scopes
+
+
+def _stablehlo_operands(rest: str) -> list[str]:
+    head = rest.split(" : ", 1)[0]
+    return re.findall(r"%[\w#.]+", head)
+
+
+def _stablehlo_constant(definitions: _StablehloScope, name: str) -> float | None:
+    current = name
+    for _ in range(3):
+        entry = definitions.lookup(current)
+        if entry is None:
+            return None
+        opcode, rest = entry
+        if opcode == "stablehlo.broadcast_in_dim":
+            operands = _stablehlo_operands(rest)
+            if not operands:
+                return None
+            current = operands[0]
+            continue
+        if opcode == "stablehlo.constant":
+            match = re.search(r"dense<([-+0-9.eE]+)>", rest)
+            if match is None:
+                return None
+            try:
+                return float(match.group(1))
+            except ValueError:
+                return None
+        return None
+    return None
+
+
+def _stablehlo_rsqrt_lineage(
+    definitions: _StablehloScope, name: str, rest: str, *, layernorm_width: int
+) -> dict[str, Any]:
+    """Bind one StableHLO rsqrt (see ``_rms_schedule_lineage`` for the two kinds)."""
+
+    record: dict[str, Any] = {"name": name, "type": rest.split(" : ", 1)[-1].strip()}
+    result = re.fullmatch(r"tensor<([0-9]+)x1xf32>", record["type"])
+    result_rows = int(result.group(1)) if result else None
+
+    def _refuse(problem: str) -> dict[str, Any]:
+        record["kind"] = "unbound"
+        record["problems"] = [problem]
+        return record
+
+    operands = _stablehlo_operands(rest)
+    add = definitions.lookup(operands[0]) if operands else None
+    if add is None or add[0] != "stablehlo.add":
+        return _refuse("rsqrt operand is not an epsilon addition")
+    epsilon = None
+    mean_name = None
+    for operand in _stablehlo_operands(add[1]):
+        value = _stablehlo_constant(definitions, operand)
+        if value is not None and epsilon is None:
+            epsilon = value
+        else:
+            mean_name = operand
+    mean = definitions.lookup(mean_name) if mean_name else None
+    if mean is None or mean[0] not in {"stablehlo.divide", "stablehlo.multiply"}:
+        return _refuse("variance mean is not a divide/multiply of the reduction")
+    width_scale = None
+    total_name = None
+    for operand in _stablehlo_operands(mean[1]):
+        value = _stablehlo_constant(definitions, operand)
+        if value is not None and width_scale is None:
+            width_scale = value
+        else:
+            total_name = operand
+    current = definitions.lookup(total_name) if total_name else None
+    for _ in range(3):
+        if current is not None and current[0] in {"stablehlo.broadcast_in_dim", "stablehlo.reshape"}:
+            names = _stablehlo_operands(current[1])
+            current = definitions.lookup(names[0]) if names else None
+            continue
+        break
+    if current is None or current[0] != "stablehlo.reduce":
+        return _refuse("rsqrt is not fed by a reduce")
+    reduce_rest = current[1]
+    shape = re.search(
+        r":\s*\(tensor<([0-9]+)x([0-9]+)xf32>,\s*tensor<f32>\)\s*->\s*tensor<([0-9]+)xf32>",
+        reduce_rest,
+    )
+    if shape is None:
+        return _refuse("reduce is not a tensor<RxWxf32> -> tensor<Rxf32> reduction")
+    rows, width, reduced_rows = int(shape.group(1)), int(shape.group(2)), int(shape.group(3))
+    reduce_operands = _stablehlo_operands(reduce_rest)
+    square = definitions.lookup(reduce_operands[0]) if reduce_operands else None
+    square_operands = _stablehlo_operands(square[1]) if square is not None else []
+    if square is not None and square[0] == "chlo.square" and len(square_operands) == 1:
+        carried_name: str | None = square_operands[0]
+    elif (
+        square is not None
+        and square[0] == "stablehlo.multiply"
+        and len(square_operands) == 2
+        and square_operands[0] == square_operands[1]
+    ):
+        carried_name = square_operands[0]
+    else:
+        carried_name = None
+    carried = definitions.lookup(carried_name) if carried_name else None
+    record.update(
+        {
+            "rows": rows,
+            "width": width,
+            "width_scale": width_scale,
+            "epsilon": epsilon,
+            "square_operand_opcode": carried[0] if carried is not None else None,
+        }
+    )
+    problems: list[str] = []
+    if carried_name is None:
+        problems.append("reduce operand is not a square")
+    if "applies stablehlo.add" not in reduce_rest:
+        problems.append("reduce combiner is not an addition")
+    if "dimensions = [1]" not in reduce_rest or reduced_rows != rows:
+        problems.append("reduce is not a last-axis tensor<RxWxf32> -> tensor<Rxf32> reduction")
+    if not _rms_schedule_scale_matches(mean[0], width_scale, width):
+        problems.append(f"variance mean scale {width_scale} does not match width {width}")
+    if carried is not None and carried[0] == "stablehlo.subtract":
+        record["kind"] = "centered_layernorm"
+        if epsilon is None or abs(epsilon - DSA_KEY_LAYERNORM_EPSILON) > 1e-13:
+            problems.append(f"LayerNorm epsilon is not 1e-06: {epsilon}")
+        if width != layernorm_width:
+            problems.append(
+                f"LayerNorm width {width} is not the DSA key width {layernorm_width}"
+            )
+        if result_rows != rows:
+            problems.append("LayerNorm rsqrt rows differ from the reduced rows")
+        record["problems"] = problems
+        return record
+    record["kind"] = "rms"
+    if record["type"] != "tensor<32x1xf32>":
+        problems.append("rsqrt is not a tensor<32x1xf32> scale")
+    if epsilon is None or abs(epsilon - 1e-5) > 1e-11:
+        problems.append(f"epsilon is not 1e-05: {epsilon}")
+    if rows != 32:
+        problems.append("reduce is not a last-axis tensor<32xWxf32> -> tensor<32xf32> add-reduce")
+    if (
+        carried is None
+        or carried[0] != "stablehlo.optimization_barrier"
+        or not carried[1].rstrip().endswith(f"tensor<32x{width}xf32>")
+    ):
+        problems.append("square operand is not the barrier-carried tensor<32xWxf32> rows")
+    record["problems"] = problems
+    return record
+
+
+def _validate_rms_accepted_schedule_stablehlo(
+    stablehlo: str,
+    *,
+    enabled: bool,
+    layernorm_width: int = 128,
+) -> dict[str, Any]:
+    """Bind the pre-fusion RMS lineage, including the FP32 barrier.
+
+    StableHLO still carries the ``optimization_barrier`` on the
+    ``tensor<32xWxf32>`` operand that optimized HLO consumes.  With the flag on
+    every ``rsqrt`` in every function must bind barrier -> square -> last-axis
+    add-reduce -> ``/W`` -> ``+1e-5`` -> ``rsqrt`` on ``tensor<32x1xf32>``; with
+    the flag off no rsqrt may bind that lineage.
+    """
+
+    lineages: list[dict[str, Any]] = []
+    barrier_count = 0
+    for definitions in _stablehlo_scopes(stablehlo):
+        for name, (opcode, rest) in definitions.items():
+            if opcode == "stablehlo.rsqrt":
+                lineages.append(
+                    _stablehlo_rsqrt_lineage(
+                        definitions, name, rest, layernorm_width=layernorm_width
+                    )
+                )
+            elif opcode == "stablehlo.optimization_barrier" and re.search(
+                r"tensor<32x[0-9]+xf32>\s*$", rest
+            ):
+                barrier_count += 1
+    layernorms = [
+        record
+        for record in lineages
+        if record.get("kind") == "centered_layernorm" and not record["problems"]
+    ]
+    rms_lineages = [record for record in lineages if record not in layernorms]
+    conforming = [record for record in rms_lineages if not record["problems"]]
+    nonconforming = [record for record in rms_lineages if record["problems"]]
+    violations: list[str] = []
+    if enabled:
+        if not rms_lineages:
+            violations.append("StableHLO carries no RMS rsqrt scale")
+        for record in nonconforming:
+            violations.append(
+                f"StableHLO rsqrt {record['name']} is not an accepted-schedule RMS "
+                f"scale: {'; '.join(record['problems'])}"
+            )
+    elif conforming:
+        violations.append(
+            f"default StableHLO carries {len(conforming)} barrier-carried 32-row RMS scales"
+        )
+    return {
+        "barrier_count": barrier_count,
+        "conforming_rsqrt_count": len(conforming),
+        "layernorm_rsqrt_count": len(layernorms),
+        "nonconforming_rsqrt_count": len(nonconforming),
+        "nonconforming": nonconforming[:8],
+        "passed": not violations,
+        "rsqrt_count": len(lineages),
+        "violations": violations,
+    }
+
+
+def module_uses_tiling(module: HloModule) -> bool:
+    return any("{" in item.raw_line and ":T(" in item.raw_line for item in module.instructions)
+
+
+def _validate_rms_accepted_schedule_hlo(
+    module: HloModule,
+    *,
+    enabled: bool,
+    layernorm_width: int = 128,
+) -> dict[str, Any]:
+    """Pin the accepted decode-step RMS variance schedule.
+
+    With the flag on every ``rsqrt`` in the module must be a 32-row f32 scale
+    bound through the exact lineage square -> last-axis ``f32[32,W] -> f32[32]``
+    add-reduce (T(8,128) operand where the module is tiled) -> ``1/W`` -> ``+1e-5``
+    -> ``rsqrt``, with the square applied to a materialized carry (fusion
+    parameter or buffer) rather than to arithmetic fused into the reduce fusion;
+    any other ``rsqrt`` is a violation, except the DSA key LayerNorm bound
+    exactly (centred subtract, ``layernorm_width``, last axis, add combiner,
+    1/width, 1e-06, matching rows), which is counted separately.  With the
+    flag off no accepted-schedule lineage may appear.  The FP32 ``optimization_barrier`` itself is consumed by the
+    compiler and is absent from optimized HLO (the bounded TPU replay's schedule
+    arm carries none), so the barrier is bound in StableHLO.
+    """
+
+    by_key = _rms_schedule_by_key(module)
+    rsqrts = tuple(item for item in module.instructions if item.opcode == "rsqrt")
+    lineages = [
+        _rms_schedule_lineage(module, by_key, item, layernorm_width=layernorm_width)
+        for item in rsqrts
+    ]
+    layernorms = [
+        record
+        for record in lineages
+        if record.get("kind") == "centered_layernorm" and not record["problems"]
+    ]
+    rms_lineages = [record for record in lineages if record not in layernorms]
+    conforming = [record for record in rms_lineages if not record["problems"]]
+    nonconforming = [record for record in rms_lineages if record["problems"]]
+    violations: list[str] = []
+    if enabled:
+        if not rms_lineages:
+            violations.append("accepted-schedule RMS reductions are absent")
+        for record in nonconforming:
+            violations.append(
+                f"rsqrt {record['name']} in {record['computation']} is not an "
+                f"accepted-schedule RMS scale: {'; '.join(record['problems'])}"
+            )
+    elif conforming:
+        violations.append(
+            "default decoder carries accepted-schedule RMS reductions: "
+            f"{len(conforming)} bound 32-row rsqrt instructions"
+        )
+    return {
+        "applicable": enabled,
+        "conforming_rsqrt_count": len(conforming),
+        "enabled": enabled,
+        "layernorm_rsqrt_count": len(layernorms),
+        "nonconforming_rsqrt_count": len(nonconforming),
+        "nonconforming": nonconforming[:8],
+        "passed": not violations,
+        "rsqrt_count": len(rsqrts),
+        "tiled_module": module_uses_tiling(module),
+        "violations": violations,
+    }
+
+
 def _validate_main_rope_table_hlo(
     module: HloModule,
     *,
@@ -3926,6 +4643,7 @@ def validate_decoder_step_hlo(
     strategy_nd_attention_projection: bool = False,
     dense_final_layout_convolution: bool = False,
     dsa_rope_table_enabled: bool = False,
+    rms_accepted_schedule: bool = False,
 ) -> dict[str, Any]:
     """Reject non-local collectives, count drift, and dead batch rows."""
 
@@ -4450,6 +5168,29 @@ def validate_decoder_step_hlo(
         main_rope_table_enabled=main_rope_table_enabled,
     )
     violations.extend(dsa_rope_table_contract["violations"])
+    if not isinstance(rms_accepted_schedule, bool):
+        raise PlanValidationError("decoder RMS accepted-schedule HLO flag must be boolean")
+    rms_accepted_schedule_contract = _validate_rms_accepted_schedule_hlo(
+        module,
+        enabled=rms_accepted_schedule,
+        layernorm_width=config.index_key_width,
+    )
+    if stablehlo is not None:
+        rms_accepted_schedule_contract["stablehlo"] = (
+            _validate_rms_accepted_schedule_stablehlo(
+                stablehlo,
+                enabled=rms_accepted_schedule,
+                layernorm_width=config.index_key_width,
+            )
+        )
+        rms_accepted_schedule_contract["violations"] = [
+            *rms_accepted_schedule_contract["violations"],
+            *rms_accepted_schedule_contract["stablehlo"]["violations"],
+        ]
+        rms_accepted_schedule_contract["passed"] = not rms_accepted_schedule_contract[
+            "violations"
+        ]
+    violations.extend(rms_accepted_schedule_contract["violations"])
     pregathered_attention_contract = (
         _validate_pregathered_b512_attention_hlo(
             optimized_hlo,
@@ -4549,6 +5290,8 @@ def validate_decoder_step_hlo(
         "main_rope_table_contract": main_rope_table_contract,
         "dsa_rope_table_enabled": dsa_rope_table_enabled,
         "dsa_rope_table_contract": dsa_rope_table_contract,
+        "rms_accepted_schedule": rms_accepted_schedule,
+        "rms_accepted_schedule_contract": rms_accepted_schedule_contract,
         "pregathered_b512_attention": pregathered_b512_attention,
         "strategy_nd_attention_projection": (
             strategy_nd_attention_projection
@@ -5529,6 +6272,7 @@ def _execute_stage(
     dense_final_layout_convolution: bool,
     main_rope_table_row: Any | None = None,
     dsa_rope_table_row: Any | None = None,
+    rms_accepted_schedule: bool = False,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
@@ -5650,6 +6394,7 @@ def _execute_stage(
             pregathered_b512_attention=pregathered_b512_attention,
             main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
             prefill_index_inputs = prefill_index_inputs.at[
@@ -5766,6 +6511,7 @@ def _execute_stage_split(
     dense_final_layout_convolution: bool,
     main_rope_table_row: Any | None = None,
     dsa_rope_table_row: Any | None = None,
+    rms_accepted_schedule: bool = False,
     dsa_observation: Any | None = None,
     dsa_internal_observation: DsaInternalObservation | None = None,
     layer_residual_observation: Any | None = None,
@@ -5907,6 +6653,7 @@ def _execute_stage_split(
             ),
             main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
             dense_final_layout_convolution=dense_final_layout_convolution,
         )
         if current_full_slot is not None and prefill_index_inputs is not None:
@@ -6035,6 +6782,7 @@ def build_decoder_step_program(
     build_layer0_ingredients_observer: bool = False,
     split_residual_state: bool = False,
     dsa_rope_table_enabled: bool = False,
+    rms_accepted_schedule: bool = False,
 ) -> DecoderStepProgram:
     """Build, but do not compile, one all-stage decoder step.
 
@@ -6124,6 +6872,14 @@ def build_decoder_step_program(
         raise PlanValidationError("decoder main-RoPE table flag must be boolean")
     if not isinstance(dsa_rope_table_enabled, bool):
         raise PlanValidationError("decoder DSA host rotary table flag must be boolean")
+    if not isinstance(rms_accepted_schedule, bool):
+        raise PlanValidationError("decoder RMS accepted-schedule flag must be boolean")
+    if rms_accepted_schedule and (
+        build_layer0_residual_discriminator or build_layer0_ingredients_observer
+    ):
+        raise PlanValidationError(
+            "RMS accepted schedule is not plumbed through layer-0 discriminators"
+        )
     if dsa_rope_table_enabled and (
         build_layer0_residual_discriminator or build_layer0_ingredients_observer
     ):
@@ -6653,12 +7409,14 @@ def build_decoder_step_program(
                     final_residual[1],
                     weight("global.final_norm"),
                     epsilon=1e-5,
+                    accepted_schedule=rms_accepted_schedule,
                 )
                 return normalized
             return final_norm(
                 final_residual,
                 weight("global.final_norm"),
                 epsilon=1e-5,
+                accepted_schedule=rms_accepted_schedule,
             )
 
         next_token = jnp.full((1,), -1, dtype=jnp.int32)
@@ -6786,6 +7544,7 @@ def build_decoder_step_program(
                             ),
                             main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
                             dsa_observation=values[4],
                             layer_residual_observation=values[5],
                         ),
@@ -6856,6 +7615,7 @@ def build_decoder_step_program(
                             ),
                             main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
                             dsa_observation=values[4],
                             dsa_internal_observation=values[5],
                         ),
@@ -6924,6 +7684,7 @@ def build_decoder_step_program(
                             ),
                             main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
                             dsa_observation=values[4],
                         ),
                         lambda values: values,
@@ -6987,6 +7748,7 @@ def build_decoder_step_program(
                         ),
                         main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
                         prefill_index_inputs=values[4],
                     ),
                     lambda values: values,
@@ -7043,6 +7805,7 @@ def build_decoder_step_program(
                         ),
                         main_rope_table_row=main_rope_table_row,
             dsa_rope_table_row=dsa_rope_table_row,
+            rms_accepted_schedule=rms_accepted_schedule,
                     ),
                     lambda values: values,
                     (residual, kv_cache, index_cache, metadata),
@@ -8579,6 +9342,7 @@ def build_decoder_step_program(
         dsa_rope_table_host=dsa_rope_table_host,
         dsa_rope_table_sha256=dsa_rope_table_digest,
         dsa_rope_table_bytes_per_device=dsa_rope_table_bytes,
+        rms_accepted_schedule=rms_accepted_schedule,
         complete_token_path=complete_token_path,
         observe_dsa_events=observe_dsa_events,
         observe_dsa_internals=observe_dsa_internals,

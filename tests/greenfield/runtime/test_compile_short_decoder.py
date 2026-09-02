@@ -324,7 +324,21 @@ def test_pp8_runner_supports_default_off_metadata_parent_lineage() -> None:
         "--feature-source-metadata-only $FEATURE_SOURCE_METADATA_ONLY "
         "--feature-output-tile" in runner
     )
-    assert "status --porcelain --untracked-files=no" in runner
+    # Sol P1 (2026-09-02): untracked files fail the sync on every worker; the
+    # remote prefix must be vacant in all three listing scopes; committed bytes
+    # execute from a fresh detached worktree of the pin under a sanitized env.
+    assert "--untracked-files=no" not in runner
+    assert 'gcloud storage ls --all-versions "$REMOTE_PREFIX/**"' in runner
+    assert 'gcloud storage ls --soft-deleted --exhaustive "$REMOTE_PREFIX/**"' in runner
+    assert "remote_vacancy.raw.txt" in runner and "remote_vacancy.txt" in runner
+    assert 'git -C "$wt" worktree add -q --detach "$src" ' in runner
+    assert '[[ -z $(git -C "$src" status --porcelain --ignored) ]]' in runner
+    assert '/usr/bin/env -i HOME=/home/gianl PATH=/usr/bin:/bin LANG=C LC_ALL=C PYTHONDONTWRITEBYTECODE=1' in runner
+    assert 'PYTHONPATH="$src" GLM_GREENFIELD_RUN_TAG="$tag"' in runner
+    assert 'PYTHONPATH="$wt"' not in runner
+    assert 'cd "$wt";' not in runner
+    assert "export GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION=" not in runner
+    assert '"$src/scripts/greenfield/compile_short_decoder.py"' in runner
     assert "METADATA_SOURCE_SUFFIX=_metaparent" in runner
 
 
@@ -601,9 +615,10 @@ def test_strategy_nd_attention_projection_is_default_off_and_db539_protected() -
         "readonly STRATEGY_ND_ATTENTION_PROJECTION="
         "${GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION:-0}" in runner
     )
+    # The worker process receives the flag inside the sanitized env -i boundary.
     assert (
-        "export GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION="
-        "$STRATEGY_ND_ATTENTION_PROJECTION" in runner
+        "GLM_GREENFIELD_STRATEGY_ND_ATTENTION_PROJECTION="
+        "'\"$STRATEGY_ND_ATTENTION_PROJECTION\"' JAX_PLATFORMS=tpu" in runner
     )
     assert "StrategyND attention projection requires the protected 8K" in runner
     assert "STRATEGY_ND_ATTENTION_PREREQUISITE_TAG" in runner
@@ -1909,3 +1924,30 @@ def test_dsa_rope_table_is_default_off_and_bounded_proof_bound() -> None:
     assert "build_dsa_rotary_table_host(" in runtime
     prefill = (REPO / "glm_tpu/greenfield/runtime/prefill.py").read_text()
     assert 'getattr(decoder, "dsa_rope_table_enabled", False)' in prefill
+
+
+def test_rms_accepted_schedule_is_default_off_and_bounded_proof_bound() -> None:
+    compiler = (REPO / "scripts/greenfield/compile_short_decoder.py").read_text()
+    assert '"--rms-accepted-schedule"' in compiler
+    assert "args.rms_accepted_schedule = bool(args.rms_accepted_schedule)" in compiler
+    assert compiler.count("rms_accepted_schedule=args.rms_accepted_schedule") == 3
+    assert "rms_accepted_schedule=decoder.rms_accepted_schedule" in compiler
+    assert "rms_accepted_schedule=dsa_observer.rms_accepted_schedule" in compiler
+    assert '"rms_accepted_schedule": decoder.rms_accepted_schedule' in compiler
+    assert "gate_d_layer1_rms_schedule_20260902T061305905714981Z" in compiler
+    assert "RMS accepted schedule is not plumbed through layer-0 discriminators" in compiler
+    runtime = (REPO / "glm_tpu/greenfield/runtime/decoder.py").read_text()
+    assert "rms_accepted_schedule: bool = False" in runtime
+    assert "def _validate_rms_accepted_schedule_hlo(" in runtime
+    assert runtime.count("rms_accepted_schedule=rms_accepted_schedule,") >= 6
+    rmsnorm = (REPO / "glm_tpu/greenfield/kernels/reference/rmsnorm.py").read_text()
+    assert "ACCEPTED_SCHEDULE_ROWS = 32" in rmsnorm
+    assert "lax.optimization_barrier(rows_2d)" in rmsnorm
+    runner = (REPO / "scripts/greenfield/run_short_decoder_compile_pp8.sh").read_text()
+    assert "readonly RMS_ACCEPTED_SCHEDULE=${GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE:-0}" in runner
+    assert "RMS accepted schedule requires the protected 8K token/DSA Gate-D profile" in runner
+    assert "RMS_SCHEDULE_SUFFIX=_ras" in runner
+    assert "${DSA_ROPE_SUFFIX}${RMS_SCHEDULE_SUFFIX}${PREGATHERED_ATTENTION_SUFFIX}" in runner
+    assert '--rms-accepted-schedule "$rms_accepted_schedule"' in runner
+    gate_d = (REPO / "scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh").read_text()
+    assert "export GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=${GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE:-0}" in gate_d

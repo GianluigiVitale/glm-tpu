@@ -951,7 +951,19 @@ def _match_rmsnorm(
     residual_is_m32: bool = False,
     return_bitcast_u16: bool = False,
     split_layer1_rms: bool = False,
+    fp32_carry_schedule: bool = False,
 ) -> tuple[str, str, str]:
+    """Match the layer-1 RMSNorm.
+
+    ``fp32_carry_schedule`` matches the accepted-schedule arm with an FP32
+    carry: ``dense + attention + combined`` summed in FP32 with no BF16
+    rounding, one FP32 ``optimization_barrier`` on the [rows,6144] sum, and
+    both the variance reduce and the normalized output consuming that
+    barrier.  It returns the FP32 carry ``add`` as the residual so the caller
+    can bind the two residual sources.
+    """
+    if fp32_carry_schedule and split_layer1_rms:
+        raise ValueError("fp32 carry schedule excludes the BF16 split arm")
     rows = 32 if layer1_only else 1
     row_type = f"tensor<{rows}x6144x"
     scalar_row_type = f"tensor<{rows}x1xf32>"
@@ -992,7 +1004,58 @@ def _match_rmsnorm(
         opcode="convert",
         result_type=f"{row_type}f32>",
     )
-    combined = _only(
+    carry_barrier = None
+    if fp32_carry_schedule:
+        first_add = _only(
+            (
+                node
+                for node in graph.matching_users(
+                    dense_f32.name,
+                    opcode="add",
+                    result_type=f"{row_type}f32>",
+                )
+                if len(node.operands) == 2 and node.operands[0] == dense_f32.name
+            ),
+            "FP32 carry dense+attention addition",
+        )
+        _expect_node(
+            graph,
+            first_add.operands[1],
+            opcode="convert",
+            result_type=f"{row_type}f32>",
+        )
+        carry_add = _only(
+            (
+                node
+                for node in graph.matching_users(
+                    first_add.name,
+                    opcode="add",
+                    result_type=f"{row_type}f32>",
+                )
+                if len(node.operands) == 2 and node.operands[0] == first_add.name
+            ),
+            "FP32 carry +combined addition",
+        )
+        _expect_node(
+            graph,
+            carry_add.operands[1],
+            opcode="convert",
+            result_type=f"{row_type}f32>",
+        )
+        carry_barrier = _expect_unary(
+            graph,
+            carry_add.name,
+            opcode="optimization_barrier",
+            result_type=f"{row_type}f32>",
+        )
+        if graph.users.get(carry_add.name, ()) != [carry_barrier]:
+            raise _MatchError("FP32 carry sum escapes its barrier")
+        if any(
+            node.opcode == "convert" and "bf16" in node.result_type
+            for node in graph.users.get(carry_barrier.name, ())
+        ):
+            raise _MatchError("FP32 carry is rounded to BF16 after the barrier")
+    combined = carry_barrier if carry_barrier is not None else _only(
         (
             node
             for node in graph.matching_users(
@@ -1004,14 +1067,18 @@ def _match_rmsnorm(
         ),
         "dense residual addition",
     )
-    residual_conversion = _expect_node(
-        graph,
-        combined.operands[1],
-        opcode="convert",
-        result_type=f"{row_type}f32>",
-    )
-    reduction_residual_value = residual_conversion.operands[0]
-    residual_value = reduction_residual_value
+    if fp32_carry_schedule:
+        residual_value = carry_add.name
+        reduction_residual_value = residual_value
+    else:
+        residual_conversion = _expect_node(
+            graph,
+            combined.operands[1],
+            opcode="convert",
+            result_type=f"{row_type}f32>",
+        )
+        reduction_residual_value = residual_conversion.operands[0]
+        residual_value = reduction_residual_value
     if split_layer1_rms:
         reduction_residual_barrier = _expect_node(
             graph,
@@ -1026,7 +1093,7 @@ def _match_rmsnorm(
             )
         residual_value = reduction_residual_barrier.operands[0]
     residual = residual_value
-    if layer1_only and not residual_is_m32:
+    if layer1_only and not residual_is_m32 and not fp32_carry_schedule:
         residual_pad = _expect_node(
             graph,
             residual,
@@ -1374,26 +1441,45 @@ def validate_captured_dense_rms_stablehlo(
             dense_output,
             layer1_only=True,
             residual_is_m32=True,
-            split_layer1_rms=split_layer1_rms,
+            fp32_carry_schedule=split_layer1_rms,
         )
-        residual_round = _expect_node(
-            graph,
-            residual,
-            opcode="convert",
-            result_type="tensor<32x6144xbf16>",
-        )
-        if len(residual_round.operands) != 1:
-            raise _MatchError("captured carried-residual round arity drifted")
-        residual_add = _expect_node(
-            graph,
-            residual_round.operands[0],
-            opcode="add",
-            result_type="tensor<32x6144xf32>",
-        )
-        if len(residual_add.operands) != 2:
-            raise _MatchError("captured carried-residual add arity drifted")
+        if split_layer1_rms:
+            # FP32 carry: residual is the `(dense + attention) + combined`
+            # add; bind attention (%arg5) and combined (%arg6) through their
+            # converts and exact M32 pads.  No BF16 round exists on this path.
+            carry_add = _expect_node(
+                graph,
+                residual,
+                opcode="add",
+                result_type="tensor<32x6144xf32>",
+            )
+            first_add = _expect_node(
+                graph,
+                carry_add.operands[0],
+                opcode="add",
+                result_type="tensor<32x6144xf32>",
+            )
+            residual_operands = (first_add.operands[1], carry_add.operands[1])
+        else:
+            residual_round = _expect_node(
+                graph,
+                residual,
+                opcode="convert",
+                result_type="tensor<32x6144xbf16>",
+            )
+            if len(residual_round.operands) != 1:
+                raise _MatchError("captured carried-residual round arity drifted")
+            residual_add = _expect_node(
+                graph,
+                residual_round.operands[0],
+                opcode="add",
+                result_type="tensor<32x6144xf32>",
+            )
+            if len(residual_add.operands) != 2:
+                raise _MatchError("captured carried-residual add arity drifted")
+            residual_operands = tuple(residual_add.operands)
         residual_sources: list[str] = []
-        for operand in residual_add.operands:
+        for operand in residual_operands:
             conversion = _expect_node(
                 graph,
                 operand,

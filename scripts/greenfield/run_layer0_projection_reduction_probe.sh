@@ -130,6 +130,152 @@ readonly CAPTURED_RMS_DB549_SUCCESS_SHA=894f4164b0924a7df100e8989d52c0c010c3588f
 readonly CAPTURED_RMS_DB549_HLO_SHA=faf38fa987d174421d2631bc4921deee88bc30b50d557fbb02046c50fd9741c9
 readonly CAPTURED_RMS_DB549_REMOTE=$APPROVED_BUCKET/results/$CAPTURED_RMS_DB549_TAG
 
+
+# Canonical protections for the captured-RMS replay (Sol, 2026-09-02): the
+# literal fresh tag, sanitized Git authority (top-level, branch, origin, pushed
+# pin, no replacement refs), the same-region mirror replay, three-scope remote
+# vacancy (live, all versions, soft-deleted) and simultaneous retention of the
+# four workload/rsync leases (immutable root-owned pair plus the user pair).
+read -r -d '' CAPTURED_RMS_GIT_AUTHORITY_VERIFIER <<'CAPTURED_RMS_GIT_AUTHORITY_VERIFIER_EOF' || true
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+if len(sys.argv) != 5:
+    raise SystemExit("expected worktree, branch, origin and pin")
+worktree = Path(sys.argv[1])
+branch = sys.argv[2]
+origin = sys.argv[3]
+pin = sys.argv[4]
+if (
+    not worktree.is_absolute()
+    or not re.fullmatch(r"[A-Za-z0-9._/-]+", branch)
+    or not re.fullmatch(r"[0-9a-f]{40}", pin)
+    or origin != "git@github.com:GianluigiVitale/glm-tpu.git"
+):
+    raise SystemExit("invalid Git authority arguments")
+git_environment = (
+    "GIT_CONFIG_GLOBAL=/dev/null",
+    "GIT_CONFIG_NOSYSTEM=1",
+    "GIT_NO_LAZY_FETCH=1",
+    "GIT_NO_REPLACE_OBJECTS=1",
+    "GIT_OPTIONAL_LOCKS=0",
+    "GIT_PROTOCOL_FROM_USER=0",
+    "GIT_SSH_COMMAND=/usr/bin/ssh -oBatchMode=yes -oClearAllForwardings=yes -oForwardAgent=no",
+    "GIT_TERMINAL_PROMPT=0",
+    "HOME=/home/gianl",
+    "LANG=C",
+    "LC_ALL=C",
+    "PATH=/usr/bin:/bin",
+)
+git_command = (
+    "/usr/bin/env", "-i", *git_environment, "/usr/bin/git",
+    "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false",
+    "-c", "core.hooksPath=/dev/null", "-c", "diff.external=",
+    "-c", "core.attributesFile=/dev/null",
+    "-c", "core.sshCommand=/usr/bin/ssh -oBatchMode=yes -oClearAllForwardings=yes -oForwardAgent=no",
+)
+
+
+def git(cwd: Path, *arguments: str) -> bytes:
+    completed = subprocess.run(
+        [*git_command, *arguments], cwd=cwd, env={}, check=False,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    if completed.returncode != 0 or completed.stderr:
+        raise SystemExit(
+            "hardened Git command failed: "
+            f"returncode={completed.returncode} stderr={completed.stderr!r}"
+        )
+    return completed.stdout
+
+
+expected_ref = f"refs/heads/{branch}"
+if git(worktree, "rev-parse", "--show-toplevel") != f"{worktree}\n".encode():
+    raise SystemExit("Git top-level authority drifted")
+if git(worktree, "rev-parse", "HEAD") != f"{pin}\n".encode():
+    raise SystemExit("Git commit authority drifted")
+if git(worktree, "branch", "--show-current") != f"{branch}\n".encode():
+    raise SystemExit("Git branch authority drifted")
+if git(worktree, "status", "--porcelain=v1", "--untracked-files=all"):
+    raise SystemExit("Git worktree is not clean")
+if git(worktree, "for-each-ref", "--format=%(refname)", "refs/replace"):
+    raise SystemExit("Git repository has forbidden replacement refs")
+if git(
+    worktree, "config", "--local", "--no-includes", "--get-regexp",
+    r"^remote\.origin\.(url|pushurl)$",
+) != f"remote.origin.url {origin}\n".encode():
+    raise SystemExit("Git origin configuration drifted")
+if git(Path("/"), "ls-remote", "--refs", origin, expected_ref) != (
+    f"{pin}\t{expected_ref}\n".encode()
+):
+    raise SystemExit("Git origin branch record drifted")
+print(f"GIT_AUTHORITY_OK {pin} {expected_ref}")
+CAPTURED_RMS_GIT_AUTHORITY_VERIFIER_EOF
+
+read -r -d '' CAPTURED_RMS_IMMUTABLE_LOCK_VERIFIER <<'CAPTURED_RMS_IMMUTABLE_LOCK_VERIFIER_EOF' || true
+import fcntl
+import os
+import stat
+from pathlib import Path
+
+root = Path("/opt/glm-tpu/locks")
+names = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")
+parent_fd = os.open(root, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW)
+parent = os.fstat(parent_fd)
+if (
+    not stat.S_ISDIR(parent.st_mode)
+    or parent.st_uid != 0
+    or parent.st_gid != 0
+    or stat.S_IMODE(parent.st_mode) & 0o022
+):
+    raise SystemExit("unsafe immutable lock parent")
+for descriptor, name in zip((11, 12), names, strict=True):
+    held = os.fstat(descriptor)
+    named = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    if (
+        not stat.S_ISREG(held.st_mode)
+        or held.st_nlink != 1
+        or held.st_uid != 0
+        or held.st_gid != 0
+        or stat.S_IMODE(held.st_mode) != 0o666
+        or (held.st_dev, held.st_ino) != (named.st_dev, named.st_ino)
+    ):
+        raise SystemExit("unsafe immutable lock identity: " + name)
+    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+os.close(parent_fd)
+print("IMMUTABLE_LEASES_OK glm_pod_workload.lock glm_tpu_rsync.lock")
+CAPTURED_RMS_IMMUTABLE_LOCK_VERIFIER_EOF
+
+captured_rms_git_local() {
+  /usr/bin/env -i \
+    GIT_CONFIG_GLOBAL=/dev/null \
+    GIT_CONFIG_NOSYSTEM=1 \
+    GIT_NO_LAZY_FETCH=1 \
+    GIT_NO_REPLACE_OBJECTS=1 \
+    GIT_OPTIONAL_LOCKS=0 \
+    GIT_PROTOCOL_FROM_USER=0 \
+    GIT_SSH_COMMAND=/bin/false \
+    GIT_TERMINAL_PROMPT=0 \
+    HOME=/nonexistent \
+    LANG=C \
+    LC_ALL=C \
+    PATH=/usr/bin:/bin \
+    /usr/bin/git -c core.fsmonitor=false -c core.untrackedCache=false \
+      -c core.attributesFile=/dev/null -C "$CAPTURED_RMS_WORKTREE" "$@"
+}
+# The captured-RMS replay is a bounded single-host discriminator like the PP16
+# capsules: it runs from the tooling worktree at its pushed head, the branch the
+# immutable same-region mirror verifier is bound to.
+readonly CAPTURED_RMS_WORKTREE=/home/gianl/glm-tpu-gate-d-pp16-numerical
+readonly CAPTURED_RMS_BRANCH=tooling/gate-d-compensated-pp16-numerical
+readonly CAPTURED_RMS_ORIGIN=git@github.com:GianluigiVitale/glm-tpu.git
+readonly CAPTURED_RMS_MIRROR_VERIFIER=/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v3/verify_gate_d_same_region_git_mirror.py
+readonly CAPTURED_RMS_MIRROR_VERIFIER_SHA=091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b
+readonly CAPTURED_RMS_IMMUTABLE_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12
+readonly CAPTURED_RMS_VACANCY_EXPECTED='ERROR: (gcloud.storage.ls) One or more URLs matched no objects.'
+
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 HARNESS_GIT=$(git -C "$WORKTREE" rev-parse --short HEAD)
 FORK_GIT=$(git -C /home/gianl/tpu-inference rev-parse --short HEAD)
@@ -224,7 +370,11 @@ if [[ $ISOLATED_DENSE_REPLAY == 1 ]]; then
   TAG=${GLM_GREENFIELD_ISOLATED_DENSE_TAG:-greenfield_layer0_isolated_dense_replay_$(date -u +%Y%m%dT%H%M%S%NZ)}
   TENSOR_BASENAME=isolated_dense_replay.npz
 elif [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
-  TAG=${GLM_GREENFIELD_CAPTURED_RMS_TAG:-greenfield_layer0_captured_rms_replay_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  TAG=${GLM_GREENFIELD_CAPTURED_RMS_TAG:-}
+  [[ $TAG =~ ^greenfield_layer0_captured_rms_replay_[0-9]{8}T[0-9]{15}Z$ ]] || {
+    echo "captured RMS replay requires a literal reviewed GLM_GREENFIELD_CAPTURED_RMS_TAG" >&2
+    exit 2
+  }
   TENSOR_BASENAME=captured_rms_replay.npz
 elif [[ $DENSE_CONVOLUTION == 1 ]]; then
   if [[ $DENSE_CAPTURE_PARTIALS == 1 ]]; then
@@ -255,6 +405,28 @@ else
 fi
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
+if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
+  PIN=$(captured_rms_git_local rev-parse HEAD)
+  HARNESS_GIT=$(captured_rms_git_local rev-parse --short HEAD)
+  [[ $PIN =~ ^[0-9a-f]{40}$ ]] || exit 2
+  [[ $(captured_rms_git_local rev-parse --show-toplevel) == "$CAPTURED_RMS_WORKTREE" ]] || exit 2
+  [[ $(captured_rms_git_local branch --show-current) == "$CAPTURED_RMS_BRANCH" ]] || exit 2
+  [[ $(captured_rms_git_local remote get-url origin) == "$CAPTURED_RMS_ORIGIN" ]] || exit 2
+  [[ -z $(captured_rms_git_local status --porcelain --untracked-files=all) ]] || {
+    echo "captured RMS replay: worktree is not clean" >&2
+    exit 2
+  }
+  [[ -x $CAPTURED_RMS_IMMUTABLE_PYTHON ]] || exit 2
+  [[ $(sha256sum "$CAPTURED_RMS_MIRROR_VERIFIER" | awk '{print $1}') == "$CAPTURED_RMS_MIRROR_VERIFIER_SHA" ]] || {
+    echo "captured RMS replay: immutable mirror verifier hash drifted" >&2
+    exit 2
+  }
+  /usr/bin/python3 -I -S -B -c "$CAPTURED_RMS_GIT_AUTHORITY_VERIFIER" \
+    "$CAPTURED_RMS_WORKTREE" "$CAPTURED_RMS_BRANCH" "$CAPTURED_RMS_ORIGIN" "$PIN" || {
+    echo "captured RMS replay: Git origin authority refused" >&2
+    exit 2
+  }
+fi
 m32_probe_args=()
 if [[ $DENSE_COMPILE_ROWS == 32 ]]; then
   m32_probe_args=(
@@ -1082,6 +1254,36 @@ elif [[ $remote_prefix_rc -ne 1 ]] || ! grep -q "matched no objects" \
   say "ABORT: remote-prefix vacancy check failed"
   exit 1
 fi
+if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
+  # Live, noncurrent and soft-deleted namespaces are separate listing surfaces;
+  # all three must be canonically vacant for a fresh append-only tag.
+  set +e
+  vacancy_live_output=$(PYTHONWARNINGS=ignore timeout --signal=TERM --kill-after=10 60 \
+    gcloud storage ls "$REMOTE_PREFIX/**" 2>&1)
+  vacancy_live_rc=$?
+  vacancy_versions_output=$(PYTHONWARNINGS=ignore timeout --signal=TERM --kill-after=10 60 \
+    gcloud storage ls --all-versions "$REMOTE_PREFIX/**" 2>&1)
+  vacancy_versions_rc=$?
+  vacancy_soft_deleted_output=$(PYTHONWARNINGS=ignore timeout --signal=TERM --kill-after=10 60 \
+    gcloud storage ls --soft-deleted --exhaustive "$REMOTE_PREFIX/**" 2>&1)
+  vacancy_soft_deleted_rc=$?
+  set -e
+  printf '%s\n' \
+    'scope=live flags=none returncode='"$vacancy_live_rc" "$vacancy_live_output" \
+    'scope=all_versions flags=--all-versions returncode='"$vacancy_versions_rc" \
+    "$vacancy_versions_output" \
+    'scope=soft_deleted flags=--soft-deleted,--exhaustive returncode='"$vacancy_soft_deleted_rc" \
+    "$vacancy_soft_deleted_output" >"$RUN_DIR/remote_vacancy.raw.txt"
+  if [[ $vacancy_live_rc -ne 1 || $vacancy_live_output != "$CAPTURED_RMS_VACANCY_EXPECTED" || \
+        $vacancy_versions_rc -ne 1 || $vacancy_versions_output != "$CAPTURED_RMS_VACANCY_EXPECTED" || \
+        $vacancy_soft_deleted_rc -ne 1 || \
+        $vacancy_soft_deleted_output != "$CAPTURED_RMS_VACANCY_EXPECTED" ]]; then
+    say "ABORT: append-only remote-prefix history is not canonically vacant"
+    exit 1
+  fi
+  printf 'VACANT %s %s\n' live "$REMOTE_PREFIX" all_versions "$REMOTE_PREFIX" \
+    soft_deleted "$REMOTE_PREFIX" >"$RUN_DIR/remote_vacancy.txt"
+fi
 
 require_sha() {
   local path=$1 expected=$2 label=$3
@@ -1104,6 +1306,39 @@ flock -n 9 || {
   say "ABORT: another protected pod workflow holds the global lease"
   exit 1
 }
+if [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
+  exec 8>/home/gianl/.glm-tpu-rsync.lock
+  flock 8
+  exec 11>/opt/glm-tpu/locks/glm_pod_workload.lock
+  exec 12>/opt/glm-tpu/locks/glm_tpu_rsync.lock
+  /usr/bin/python3 -I -S -B -c "$CAPTURED_RMS_IMMUTABLE_LOCK_VERIFIER" \
+    >"$RUN_DIR/leases.txt" || {
+    say "ABORT: immutable workload/rsync leases are unavailable"
+    exit 1
+  }
+  printf 'LEASE %s\n' /home/gianl/glm-run/.glm_pod_workload.lock \
+    /home/gianl/.glm-tpu-rsync.lock /opt/glm-tpu/locks/glm_pod_workload.lock \
+    /opt/glm-tpu/locks/glm_tpu_rsync.lock >>"$RUN_DIR/leases.txt"
+  say "replaying pushed pin and same-region Git mirror closure"
+  set +e
+  /usr/bin/env -i \
+    HOME=/home/gianl \
+    LANG=C \
+    LC_ALL=C \
+    PATH=/usr/bin:/bin \
+    PYTHONDONTWRITEBYTECODE=1 \
+    "$CAPTURED_RMS_IMMUTABLE_PYTHON" -I -S -B "$CAPTURED_RMS_MIRROR_VERIFIER" \
+      --expected-code-hash "$PIN" \
+      --expected-source-sha256 "$CAPTURED_RMS_MIRROR_VERIFIER_SHA" \
+      >"$RUN_DIR/mirror.sha256" 2>"$RUN_DIR/mirror.stderr.txt"
+  mirror_status=$?
+  set -e
+  if [[ $mirror_status -ne 0 ]]; then
+    say "ABORT: same-region Git mirror replay failed"
+    exit 1
+  fi
+  printf 'SYNC_OK %s %s origin_and_same_region_mirror\n' "$(hostname)" "$PIN" >"$RUN_DIR/sync.txt"
+fi
 
 has_eight_unique_markers() {
   local file=$1 marker=$2
@@ -1863,14 +2098,15 @@ if [[ $ISOLATED_DENSE_REPLAY == 1 ]]; then
 elif [[ $CAPTURED_RMS_REPLAY == 1 ]]; then
   say "replaying sealed dense partials through isolated layer-1 RMS arms"
   (
-    cd "$WORKTREE"
+    cd "$CAPTURED_RMS_WORKTREE"
     JAX_PLATFORMS=tpu \
       TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
       TPU_PROCESS_BOUNDS=1,1,1 \
       TPU_VISIBLE_DEVICES=0,1,2,3 \
-      PYTHONPATH="$WORKTREE" \
+      PYTHONPATH="$CAPTURED_RMS_WORKTREE" \
       /home/gianl/vllm-env/bin/python \
         scripts/greenfield/probe_layer0_captured_rms.py \
+        --expected-worktree "$CAPTURED_RMS_WORKTREE" \
         --expected-code-hash "$PIN" \
         --capture-tensor "$CAPTURED_RMS_SOURCE_TENSOR" \
         --capture-tensor-sha256 "$CAPTURED_RMS_SOURCE_TENSOR_SHA" \

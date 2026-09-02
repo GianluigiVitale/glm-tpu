@@ -1859,6 +1859,7 @@ def stage_local_dsa_fp8_mapped(
     dsa_score_precision: Literal["default", "highest"] = "highest",
     linear_interpret: bool = False,
     dsa_rope_table_row: Any | None = None,
+    rms_accepted_schedule: bool = False,
 ) -> StageLocalDsaFp8Result:
     """Write one BF16 index key, score local pages, and merge exact top-k.
 
@@ -1875,6 +1876,8 @@ def stage_local_dsa_fp8_mapped(
     )
     if query_backend not in ("reference", "pallas"):
         raise ValueError("stage-local DSA query backend is unknown")
+    if not isinstance(rms_accepted_schedule, bool):
+        raise TypeError("rms_accepted_schedule must be a bool")
     if not isinstance(dsa_head_key_exact_association, bool):
         raise ValueError("exact DSA head/key flag must be boolean")
     if dsa_head_key_exact_association != (precomputed_wk_weight is not None):
@@ -1966,7 +1969,10 @@ def stage_local_dsa_fp8_mapped(
         if q_a_bits is None or q_a_scale is None:
             raise ValueError("DSA q_a FP8 state is required without intermediates")
         normalized = rms_norm(
-            residual, input_norm_weight, epsilon=rms_norm_epsilon
+            residual,
+            input_norm_weight,
+            epsilon=rms_norm_epsilon,
+            accepted_schedule=rms_accepted_schedule,
         )
         q_residual = rms_norm(
             _stage_fp8_linear(
@@ -1979,6 +1985,7 @@ def stage_local_dsa_fp8_mapped(
             ),
             q_a_norm_weight,
             epsilon=lora_norm_epsilon,
+            accepted_schedule=rms_accepted_schedule,
         )
     else:
         normalized = precomputed_normalized
@@ -2263,6 +2270,7 @@ def stage_local_index_share_fp8_mapped(
     sparse_attention_interpret: bool = False,
     linear_backend: StageLinearBackend = "reference",
     linear_interpret: bool = False,
+    rms_accepted_schedule: bool = False,
     add_residual: bool = True,
     reconstruct_output_fp32: bool = False,
     virtual_tp32_reduction_association: (
@@ -2474,7 +2482,10 @@ def stage_local_index_share_fp8_mapped(
                 "IndexShare q_a FP8 state is required without intermediates"
             )
         normalized = rms_norm(
-            residual, input_norm_weight, epsilon=rms_norm_epsilon
+            residual,
+            input_norm_weight,
+            epsilon=rms_norm_epsilon,
+            accepted_schedule=rms_accepted_schedule,
         )
         q_residual = rms_norm(
             _stage_fp8_linear(
@@ -2487,6 +2498,7 @@ def stage_local_index_share_fp8_mapped(
             ),
             q_a_norm_weight,
             epsilon=lora_norm_epsilon,
+            accepted_schedule=rms_accepted_schedule,
         )
     else:
         normalized = precomputed_normalized
@@ -2560,6 +2572,7 @@ def stage_local_index_share_fp8_mapped(
         current_kv[..., : contract.kv_lora_rank],
         kv_a_norm_weight,
         epsilon=lora_norm_epsilon,
+        accepted_schedule=rms_accepted_schedule,
     )
     current_rope_input = current_kv[
         ...,
@@ -3047,11 +3060,14 @@ def stage_local_dense_fp8_mapped(
         VirtualTp32ReductionAssociation | None
     ) = None,
     final_layout_convolution: bool = False,
+    rms_accepted_schedule: bool = False,
     capture_ingredients: bool = False,
 ) -> Any | StageLocalDenseFp8ObservedResult:
     """Execute one dense SwiGLU from local raw shards and one local combine."""
 
     groups = _axis_groups(axis_index_groups)
+    if not isinstance(rms_accepted_schedule, bool):
+        raise TypeError("rms_accepted_schedule must be a bool")
     if not isinstance(final_layout_convolution, bool):
         raise ValueError("dense final-layout convolution flag must be boolean")
     if residual.ndim != 2 or residual.shape[0] != 1:
@@ -3118,7 +3134,12 @@ def stage_local_dense_fp8_mapped(
             "dense final-layout convolution requires isolated StrategyND BF16 reduction"
         )
     if precomputed_normalized is None:
-        normalized = rms_norm(residual, norm_weight, epsilon=epsilon)
+        normalized = rms_norm(
+            residual,
+            norm_weight,
+            epsilon=epsilon,
+            accepted_schedule=rms_accepted_schedule,
+        )
     else:
         normalized = precomputed_normalized
         if normalized.shape != residual.shape or (

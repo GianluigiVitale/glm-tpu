@@ -185,6 +185,7 @@ def _project_attention_qkv_a(
     epsilon: float,
     linear_backend: StageLinearBackend,
     linear_interpret: bool,
+    rms_accepted_schedule: bool = False,
 ) -> tuple[Any, Any | None]:
     """Produce q-a and, for the DB502 path, its fused kv-a companion."""
 
@@ -209,6 +210,7 @@ def _project_attention_qkv_a(
             ),
             attention.q_a_norm_weight,
             epsilon=epsilon,
+            accepted_schedule=rms_accepted_schedule,
         )
         return q_residual, None
     if backend != "fused_n82_convolution":
@@ -277,6 +279,7 @@ def stage_local_transformer_layer_fp8_mapped(
     rope_theta: float = 8_000_000.0,
     main_rope_table_row: Any | None = None,
     dsa_rope_table_row: Any | None = None,
+    rms_accepted_schedule: bool = False,
     sparse_moe_backend: SparseMoeBackend = "reference",
     pallas_moe_config: Fp8BlockMatmulConfig | None = None,
     pallas_moe_fuse_route_weighting: bool = False,
@@ -361,7 +364,10 @@ def stage_local_transformer_layer_fp8_mapped(
         raise ValueError("layer norm weights disagree with hidden size")
 
     normalized_input = rms_norm(
-        residual, input_norm_weight, epsilon=rms_norm_epsilon
+        residual,
+        input_norm_weight,
+        epsilon=rms_norm_epsilon,
+        accepted_schedule=rms_accepted_schedule,
     )
     q_residual, current_kv = _project_attention_qkv_a(
         normalized_input,
@@ -373,6 +379,7 @@ def stage_local_transformer_layer_fp8_mapped(
         epsilon=lora_norm_epsilon,
         linear_backend=linear_backend,
         linear_interpret=linear_interpret,
+        rms_accepted_schedule=rms_accepted_schedule,
     )
 
     if indexer_kind == "full":
@@ -403,6 +410,7 @@ def stage_local_transformer_layer_fp8_mapped(
             rms_norm_epsilon=rms_norm_epsilon,
             lora_norm_epsilon=lora_norm_epsilon,
             precomputed_normalized=normalized_input,
+            rms_accepted_schedule=rms_accepted_schedule,
             precomputed_q_residual=q_residual,
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
@@ -468,6 +476,7 @@ def stage_local_transformer_layer_fp8_mapped(
         precomputed_kv_a=current_kv,
         linear_backend=linear_backend,
         linear_interpret=linear_interpret,
+        rms_accepted_schedule=rms_accepted_schedule,
         pregathered_b512_attention=pregathered_b512_attention,
     )
     residual = attention_result.output
@@ -486,6 +495,7 @@ def stage_local_transformer_layer_fp8_mapped(
             axis_index_groups=axis_index_groups,
             block_shape=block_shape,
             epsilon=rms_norm_epsilon,
+            rms_accepted_schedule=rms_accepted_schedule,
             linear_backend=linear_backend,
             linear_interpret=linear_interpret,
         )
@@ -501,6 +511,7 @@ def stage_local_transformer_layer_fp8_mapped(
             residual,
             post_attention_norm_weight,
             epsilon=rms_norm_epsilon,
+            accepted_schedule=rms_accepted_schedule,
         )
         moe_args = (
             normalized,
@@ -597,6 +608,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
     rope_theta: float = 8_000_000.0,
     main_rope_table_row: Any | None = None,
     dsa_rope_table_row: Any | None = None,
+    rms_accepted_schedule: bool = False,
     sparse_moe_backend: SparseMoeBackend = "reference",
     pallas_moe_config: Fp8BlockMatmulConfig | None = None,
     pallas_moe_fuse_route_weighting: bool = False,
@@ -802,6 +814,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
             residual,
             input_norm_weight,
             epsilon=rms_norm_epsilon,
+            accepted_schedule=rms_accepted_schedule,
         )
         input_rms_fp32 = None
         restored_input_rms_fp32 = None
@@ -815,6 +828,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
         epsilon=lora_norm_epsilon,
         linear_backend=linear_backend,
         linear_interpret=linear_interpret,
+        rms_accepted_schedule=rms_accepted_schedule,
     )
 
     if indexer_kind == "full":
@@ -845,6 +859,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
             rms_norm_epsilon=rms_norm_epsilon,
             lora_norm_epsilon=lora_norm_epsilon,
             precomputed_normalized=normalized_input,
+            rms_accepted_schedule=rms_accepted_schedule,
             precomputed_q_residual=q_residual,
             linear_backend=linear_backend,
             dsa_query_backend=dsa_query_backend,
@@ -908,6 +923,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
         precomputed_kv_a=current_kv,
         linear_backend=linear_backend,
         linear_interpret=linear_interpret,
+        rms_accepted_schedule=rms_accepted_schedule,
         add_residual=False,
         reconstruct_output_fp32=reconstruct_attention_output_fp32,
         virtual_tp32_reduction_association=(
@@ -930,6 +946,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
         combined_residual,
         post_attention_norm_weight,
         epsilon=rms_norm_epsilon,
+        accepted_schedule=rms_accepted_schedule,
     )
     if mlp_kind == "dense":
         assert dense is not None
@@ -946,6 +963,7 @@ def stage_local_transformer_layer_fp8_split_mapped(
             axis_index_groups=axis_index_groups,
             block_shape=block_shape,
             epsilon=rms_norm_epsilon,
+            rms_accepted_schedule=rms_accepted_schedule,
             linear_backend=linear_backend,
             linear_interpret=linear_interpret,
             precomputed_normalized=normalized_mlp,

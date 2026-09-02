@@ -1125,3 +1125,52 @@ normalized-state cause.
   failure (seven swapped positions at the same event) because there every cached prompt key and the
   query carried their own position-dependent rotary error; only the full decoder with host rows for
   keys, queries and prefill can answer that.
+- Correction to the rotary lesson above: accuracy against the F64 truth is not the acceptance
+  criterion; identity with the legacy oracle is. The legacy `tpu-inference` GLM DSA indexer evaluates
+  `jnp.cos`/`jnp.sin` on device (`glm_dsa_indexer.py:rope_cos_sin`), so the greenfield on-device
+  rotary already matched it bit-for-bit at layer 0 (2,048/2,048 scores, zero delta) and the host
+  FP32 table moved every layer-0 score by up to 2.6e-3 while leaving the layer-1 divergence untouched.
+  Before proposing a numerical "fix", read the oracle engine's source for the exact formulation and
+  check the discriminator against the oracle's own outputs at the *first exact* event, not against an
+  F64 reference; a bounded proof of faithfulness to the truth can be a proof of unfaithfulness to the
+  oracle.
+- Compare the two protected runs (with and without a change) event by event before believing a
+  bounded discriminator: a change that leaves the first failing event's error statistics unchanged
+  (six swaps, mean |Δscore| 0.0148 in both) did not touch the cause, whatever it did elsewhere.
+- Before hunting a row cause, invert the accepted row for its admissible scalar window (Compass v2
+  T2). At layer 1/position 8155 the accepted and greenfield normalized rows are exact functions of
+  the *same* FP32 input and differ only in the FP32 `rsqrt(mean+eps)` scale by 1–4 ulps; a
+  one-element BF16 flip is the expected signature of that, and weeks of partial/contraction/tree
+  challengers were chasing a value that was already right.
+- Replay the carry exactly as the compiled program does, not as the source reads: on TPU the
+  residual stream is carried in FP32 (no BF16 rounding between attention and MLP) and
+  `normalized.astype(bf16) * weight` is emitted with a single rounding. A CPU replay that rounds
+  where the source says to round is 1,000–2,000 elements off and proves nothing.
+- The layer-1 one-ULP miss was the variance-reduce schedule, not the data: on TPU the same FP32 carry
+  reduced as `f32[32,6144]{T(8,128)} -> f32[32]` (the accepted program's shape) reproduces the
+  accepted row bit-for-bit, while the single-row `f32[1,1,6144] -> f32[]` reduce lands 1–4 ulps low.
+  Match the accepted program's reduce *shape and layout*, not just its arithmetic.
+- When cloning a hardened chain, every constant that encodes identity (environment maps, install
+  paths, version suffixes, expected dependency records) must be covered by a cross-file consistency
+  test or a test against real run records; two approved starts were lost to literals no test read.
+- A shape/count HLO contract can be satisfied by the schedule it is meant to exclude: the DB548
+  control arm reduces the same `f32[32,6144]{T(8,128)} -> f32[32]` as the accepted arm; the only
+  emitted difference is whether the reduce fusion squares a materialized carry or an `add` fused
+  into it. Bind lineage (what is squared, where it was materialized), not shapes.
+- Turning a flag on for "the norm" is not coverage: the decode step reaches RMS norms through five
+  kernels; three were still on the default schedule after the first integration. Enumerate every
+  `rsqrt` in the compiled step and classify each one (the only legitimate non-RMS `rsqrt` is the
+  DSA key LayerNorm), instead of trusting the call sites you edited.
+- Printed StableHLO restarts `%N` numbering inside nested regions; a flat name→definition map
+  silently drops every copy after the first (5 of 10 `rsqrt` vanished). Scope SSA names per region.
+- Every SHA cascade must be re-run after *any* edit to a pinned file, including a two-line constant
+  fix; the chain tests exist to catch this and did.
+- An exemption in a fail-closed contract is itself a contract: "looks like a LayerNorm" (subtract +
+  epsilon) exempted anything centred; bind every fact of the exempted op (width from the plan,
+  axis, scale per opcode, combiner, rows) or the exemption becomes the hole.
+- `git checkout --ours -- <path>` only acts on conflicted paths; a cleanly merged file silently takes
+  the merge result. To keep one branch's file, `git checkout <commit> -- <path>` and verify the
+  bytes before committing.
+- Untracked files and inherited environments are code paths: a protected launch must fail on
+  untracked files on every worker, list all three remote namespaces, and run committed bytes from
+  a fresh detached worktree of the pin under `env -i`.

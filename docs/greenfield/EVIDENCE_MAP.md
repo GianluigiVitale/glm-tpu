@@ -3469,3 +3469,80 @@ persistence only; review and persistence precede any v2 installation.
   reproduces the accepted event exactly; V2 key perturbs scores 4.2e-3 without flipping it.
 - Classification: `DSA_HOST_ROPE_DECODER_INTEGRATED_DEFAULT_OFF;SELECTION_WITNESS_V3_EXACT;
   MERGE_TO_REWRITE_PENDING;PROTECTED_8K_UNAUTHORIZED;GATE_D_OPEN`.
+
+## 2026-09-02 DSA-table protected 8K run refused; host-rotary-table hypothesis refuted
+
+- Run `…mainrope_dr_…_trace2_20260902T021346091708582Z`, pin `ba7d1e72`, fail-closed at the exact-DSA
+  contract (event 0 order offset 49, event 1 six swaps); censuses 8/8 (`f5fbcd2f…`/`494a67ed…`);
+  HLO DSA-table contract passed; first token exact; no SUCCESS/DB/trace/performance claim.
+- Adjudication `gate-d-dsa-rope-table-8k-refusal-adjudication.json` SHA `0f7c36d28d748dc5754ef5dcc829b88961c5713bcf8a6db4ff4667e8960c27e0`
+  (CPU, archived bytes): event 0 bit-exact without table, perturbed 2.6e-3 with it (position 0 too);
+  event 1 unchanged (mean |Δ| 0.0148 both). Legacy indexer uses on-device `jnp.cos/sin`
+  (`glm_dsa_indexer.py:1078`, `b3c25df47`).
+- Classification: `HOST_ROTARY_TABLE_HYPOTHESIS_REFUTED_AT_ENGINE_LEVEL;PROTECTED_8K_REFUSED_TWICE_AT_EVENT_1;
+  DSA_ROPE_TABLE_DEFAULT_OFF_DO_NOT_RELAUNCH;GATE_D_OPEN`.
+- Sol corrections applied: adjudicator binds run pins/HLO contracts/logs/legacy source and enforces
+  observer schema; artifact SHA `2a7c8fb5df041cad1dc57bbd312694d932b46f0ad6cb76d99ffd51e0869f5c97`;
+  classification `HOST_ROTARY_TABLE_REFUTED_AS_LEGACY_FAITHFULNESS_FIX;EVENT_0_DELTA_ATTRIBUTION_TO_TABLE_ALONE_NOT_PROVEN;
+  EVENT_1_MECHANISM_UNDETERMINED;PROTECTED_8K_REFUSED_TWICE_AT_EVENT_1;GATE_D_OPEN`.
+
+## 2026-09-02 layer-1 scale frontier certificate (CPU, sealed bytes)
+
+- `gate-d-layer1-scale-frontier-certificate.json` SHA `e8abfb9b55496ba7c2e58c8b8ac1bec2f7dc58c74b5096db101db5961b740982`:
+  DB548 row `9b52a04e…` and accepted row `9936ee1e…` are both exact functions of the same FP32 RMS
+  input (`dense + attention_update + combined_residual`, unrounded), weight `10e34f4f…`, eps 1e-5 and a
+  single output rounding; scale windows s0−4…s0−1 (DB548) vs s0…s0+14 (accepted), s0=`0x433295db`.
+- Classification: `LAYER1_SCALE_FRONTIER_CERTIFIED;SAME_FP32_RMS_INPUT;FRONTIER_IS_ONE_FP32_SCALAR;
+  REDUCTION_STRUCTURE_NOT_IDENTIFIED;GATE_D_OPEN`.
+- Legacy m32 module: 313 RMS reduces over `f32[32,6144]{T(8,128)}` dims={1} → `f32[32]`; greenfield:
+  `f32[1,1,6144]{T(1,128)}` → scalar. Captured-RMS probe `accepted_split` arm redesigned as FP32-carry
+  accepted-schedule arm (default-off, unexecuted); matcher `fp32_carry_schedule`; tests 5/5 (+2 skips),
+  16/16 adjacent. Classification: `RMS_SCHEDULE_ARM_READY;REVIEW_PENDING;TPU_UNAUTHORIZED;GATE_D_OPEN`.
+- Certificate hardened per Sol (fail-closed invariants, third association, global windows by
+  monotonicity, generator provenance, effective-scale wording): artifact SHA
+  `980bbb3933866ebc0228882d9c2f76d0b212e6347f268821a71f5bcab219db3f`, script `d9499821…`.
+  Classification `LAYER1_SCALE_FRONTIER_CERTIFIED;…;EFFECTIVE_SCALE_IS_THE_ONLY_FREE_QUANTITY;
+  REDUCTION_STRUCTURE_NOT_IDENTIFIED;NO_PHYSICAL_CAUSALITY_CLAIM;GATE_D_OPEN`. Probe execution blocked
+  pending canonical protections in the launcher.
+- Captured-RMS launcher hardened (literal tag, sanitized Git authority, mirror replay, three-scope
+  vacancy, four leases; runs from the tooling worktree); probe takes `--expected-worktree`. Reserved
+  tag `greenfield_layer0_captured_rms_replay_20260902T045006596197989Z` (vacant). Classification:
+  `RMS_SCHEDULE_PROBE_LAUNCHER_CANONICAL;EXECUTE_REVIEW_PENDING;TPU_UNAUTHORIZED;GATE_D_OPEN`.
+- Layer-1 RMS schedule chain V1 (commit `5207c406`): driver/publisher/wrapper/launcher/installer/
+  analyzer + package modules; tests 70/2 skipped; certificate
+  `gate-d-layer1-rms-schedule-orchestration-certificate.json`. Classification
+  `…INSTALL_SOURCE_ACCEPTED;INSTALL_UNAUTHORIZED;TPU_NUMERICAL_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`.
+
+## 2026-09-02 bounded TPU: accepted RMS schedule arm exact (diagnostic archive)
+
+- Tag `gate_d_layer1_rms_schedule_20260902T061305905714981Z`, pin `839c8fb7`: `runner.json` `aa1970dcf0607ee988fed26705b2ba3c20526633adb5fb19985c894764cda281`, `outputs.npz` `a8ef84f16bf80f5bddc6ba1002bbe6b02ed4db831e90eaa2f08d663a58a0f59b`;
+  control == DB548 `9b52a04e…`, schedule arm == accepted `9936ee1e…` (0/6,144), schedule vs DB548 one
+  mismatch at 2795; both HLO contracts passed; censuses 8/8; remote `diagnostic/` terminal only.
+- Classification: `BOUNDED_TPU_LAYER1_RMS_SCHEDULE_ARM_EXACT;DIAGNOSTIC_ARCHIVE_ONLY;
+  PUBLICATION_REFUSED_BY_STALE_PUBLISHER_CONSTANT;DECODER_UNPROVEN;GATE_D_OPEN`.
+- Decoder flag `rms_accepted_schedule` (default off) staged with HLO contract, CLI/runner plumbing
+  (`_ras`), unit/forced-CPU/static tests (rmsnorm 5/5, decoder 1/1, compile 67/67, kernel suites
+  32/32). Classification: `RMS_ACCEPTED_SCHEDULE_INTEGRATED_DEFAULT_OFF;REVIEW_PENDING;
+  PROTECTED_8K_UNAUTHORIZED;GATE_D_OPEN`.
+
+## 2026-09-02 RMS schedule contract lineage-bound; diagnostic archive adjudicated; chain v3
+
+- `docs/artifacts/gate-d-layer1-rms-schedule-diagnostic-adjudication.json` SHA `e504b795b31690bda4ff2084a7d4316f0d5bd87c53c308f294415eec027e5767`
+  (offline replay of the bounded run's diagnostic archive: 18 objects + ledger, local SHAs, remote
+  generation/CRC32C, three-scope vacancy of claim objects). Classification
+  `BOUNDED_TPU_LAYER1_RMS_SCHEDULE_ARM_EXACT;DIAGNOSTIC_ARCHIVE_ADJUDICATED;GENERATION_BOUND_LEDGER_REPLAYED;
+  NO_SUCCESS_NO_DB_NO_PERFORMANCE_NO_GATE_D_CLAIM;DECODER_UNPROVEN;GATE_D_OPEN`.
+- Decoder contract `_validate_rms_accepted_schedule_hlo` / `_validate_rms_accepted_schedule_stablehlo`
+  bind the full lineage (materialized carry → square → `f32[32,W]->f32[32]` dims={1} add-reduce,
+  T(8,128) → 1/W → +1e-05 → rsqrt; StableHLO from the FP32 barrier) and classify the DSA key
+  LayerNorm separately; `rms_accepted_schedule` threaded to every reachable RMS call. Tests on the
+  archived TPU bytes (17 hostile cases) and forced-CPU decoder (33/33 conforming). Classification:
+  `RMS_ACCEPTED_SCHEDULE_CONTRACT_LINEAGE_BOUND;FLAG_COVERS_ALL_RMS;REVIEW_PENDING;
+  PROTECTED_8K_UNAUTHORIZED;GATE_D_OPEN`.
+- Chain re-pinned v3 (publisher `a53f3fc2…`, driver `5f5fa802…`, wrapper `f52e5334…`, launcher
+  `33c0a696…`, installer `83f72f20…`); not installed; no rerun planned.
+- Sol BLOCK on 1ad426ed (LayerNorm exemption unbound; merge overwrote rewrite goal.md; 8K runner
+  boundary). Fixed: exact LayerNorm binding (`index_key_width`, axis, per-opcode scale, add,
+  1e-06, rows) + 21 synthetic hostile tests; merge redone with ba7d1e72 goal.md byte-identical;
+  runner rejects untracked files, three-scope vacancy, detached pin worktree under `env -i`.
+  Classification unchanged: `REVIEW_PENDING;PROTECTED_8K_UNAUTHORIZED;GATE_D_OPEN`.

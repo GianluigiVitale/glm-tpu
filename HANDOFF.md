@@ -10215,3 +10215,473 @@ failed closed on all eight workers at `mkdir` of the run directory: the composed
 execution occurred; the remote result prefix has no objects; the rewrite worktree is clean. The tag
 suffix is shortened to `_dr` (253 bytes total). Exact next: persist, re-merge, mirror, preflight and
 one launch of the same command.
+
+## 2026-09-02 DSA-table protected 8K run refused at exact DSA; host-rotary-table hypothesis refuted at engine level
+
+Tooling `7dcf0890` (tag suffix `_dr`) was merged into `rewrite/topology-first-decode` as `ba7d1e72`,
+pushed, mirrored (`02:10:10Z OK`), and the no-TPU preflight passed at that pin. The single approved
+launch `GLM_GREENFIELD_DSA_ROPE_TABLE=1 bash scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh`
+ran as tag `…mainrope_dr_…_trace2_20260902T021346091708582Z` (02:13:46Z–03:24:29Z): sync, real
+78-layer 8K load and compile on all eight workers, HLO contracts passed (DSA table: one FP32 entry
+parameter, one lookup, zero transcendentals with both tables), first decode token exact (`220`), and
+then the exact-DSA observer contract failed closed at decode position 8155 on 8/8 workers. Pre and
+failure censuses are 8/8 clean (`f5fbcd2f…`, `494a67ed…`); the remote prefix holds only the
+diagnostic host records, HLO and observer objects (59 objects, no `SUCCESS`, no DB row, no trace or
+performance claim). The rewrite worktree was not touched during the run.
+
+Diagnosis, from archived bytes only (`scripts/greenfield/adjudicate_gate_d_dsa_rope_table_8k_refusal.py`,
+artifact `docs/artifacts/gate-d-dsa-rope-table-8k-refusal-adjudication.json` SHA
+`0f7c36d28d748dc5754ef5dcc829b88961c5713bcf8a6db4ff4667e8960c27e0`, inputs bound to the legacy 8K DSA
+oracle `b591a462…` and the observer tensors `17f0916d…` (2026-08-28, no table) and `dfc21a7b…`
+(2026-09-02, table)):
+
+- Without the table (2026-08-28 pp8 run, same program family) event 0/layer 0 was bit-exact against
+  the legacy oracle: all 2,048 selected positions, their order and all 2,048 scores (zero delta).
+- With the table, event 0 keeps the exact selected set but 2,046/2,048 scores move (max 2.6e-3,
+  first order mismatch at offset 49) including position 0, whose key rotary is the identity: the
+  host-table query at 8155 differs from what legacy computes.
+- Event 1/layer 1 is unchanged: six swapped positions in both runs, position-aligned mean
+  |Δscore| 0.01481 vs 0.01480, max 0.098 vs 0.101. Totals: 39,964 vs 41,047 order mismatches.
+- Legacy `tpu-inference` (`b3c25df47`, `tpu_inference/layers/vllm/custom_ops/glm_dsa_indexer.py:1078`)
+  evaluates the indexer rotary as `jnp.cos`/`jnp.sin` of `positions * inv_freq` inside its JAX
+  program, on device, for prefill keys, cached keys and queries alike. It does not use a host table.
+
+Conclusion: the V2/V3 finding that on-device cos/sin deviate from the F64 truth by ~1e-2 is correct
+but irrelevant to the oracle, because the accepted legacy engine carries the same on-device values;
+the greenfield device rotary already matched it bit-for-bit at layer 0. The layer-1 divergence
+(scores off by ~1e-3 relative, a bf16-rounding-scale perturbation of the layer-1 indexer input) is
+produced between the exact layer-0 DSA event and the layer-1 indexer input, i.e. in the layer-0
+attention output, MoE, or residual path, not in rotary. `dsa_rope_table_enabled` stays default-off
+and must not be launched again; the code remains as a documented, refuted experiment. Gate D remains
+open; no performance claim.
+
+Sol's batched review of this record (verdict `BLOCK — P1/P1/P2`, observations independently
+confirmed: event-0 positions and score bits exact without the table, four identical replicas per
+producer row, legacy `b3c25df47` on-device `jnp.cos/jnp.sin`) required three corrections, all
+applied. (1) The adjudicator now binds both runs' pins (`570cc453` without table, `ba7d1e72` with
+table, 183 commits apart), orchestrator/sync/HLO-contract/rank-0 log SHAs, the HLO contract's
+`dsa_rope_table_enabled` flag, and the legacy source blob (`glm_dsa_indexer.py` SHA `d44225e3…`,
+`rope_cos_sin` body checked), and enforces the observer schema: exact producer set, exactly four
+bit-identical replicas per producer, int32 rows, raw-bit score equality. Artifact SHA is now
+`2a7c8fb5df041cad1dc57bbd312694d932b46f0ad6cb76d99ffd51e0869f5c97`. (2) Scope: because the two runs
+are at different pins, the event-0 delta is *consistent with* the table but not attributed to the
+table alone; the refutation rests on event 0 being bit-exact without the table plus the legacy
+formulation, and the classification is now
+`HOST_ROTARY_TABLE_REFUTED_AS_LEGACY_FAITHFULNESS_FIX;EVENT_0_DELTA_ATTRIBUTION_TO_TABLE_ALONE_NOT_PROVEN;EVENT_1_MECHANISM_UNDETERMINED`.
+(3) The earlier sentence localizing the event-1 cause to a BF16 hidden-state perturbation in the
+layer-0 output path over-localized: equal event-1 error magnitudes do not prove that mechanism nor
+exclude a layer-1-local association effect; the mechanism is undetermined. Sol's recommended next
+is a CPU-only, hash-bound certificate comparing exact final-carry variants (FP32 residual add then
+one BF16 round versus materialized/double-round alternatives) over all 6,144 bits using
+provenance-coherent layer-0 post-attention residual, layer-0 dense update and the accepted layer-1
+RMS-input reference, returning `INCONCLUSIVE` if lineage cannot be proven, and otherwise a
+single-output layer-0 carried-state tap rather than another 8K run. The table stays tombstoned.
+
+## 2026-09-02 layer-1 scale frontier certified on CPU: same FP32 RMS input, rows differ by one FP32 scalar
+
+Following Sol's recommendation, `scripts/greenfield/adjudicate_gate_d_layer1_scale_frontier.py`
+replays the layer-0→1 carry from sealed bytes only (no JAX, no TPU, no model), bound by SHA to the
+DB548 dense-partial capture (`attention_update` `68afed86…`, `combined_residual` `02d045b9…`,
+`post_attention_residual` `a105fdbd…`, `layer1_input_norm` `10e34f4f…`), the DB533/StrategyND dense
+row `efde8532…`, the accepted legacy partials `9d9f65dd…` (== DB548), the DB548 layer-1 row
+`9b52a04e…` and the accepted legacy layer-1 row `9936ee1e…`. Artifact
+`docs/artifacts/gate-d-layer1-scale-frontier-certificate.json` SHA
+`e8abfb9b55496ba7c2e58c8b8ac1bec2f7dc58c74b5096db101db5961b740982`.
+
+Findings (all exact, all 6,144 bits):
+
+- The layer-1 RMS input that reproduces both rows is the FP32 three-term sum
+  `x = f32(dense) + f32(attention_update) + f32(combined_residual)` with **no** BF16 rounding of the
+  post-attention residual (the split/FP32 residual carry), variance from `x`, epsilon `1e-5`, and a
+  **single** BF16 rounding of `(x * s) * w`. The historically assumed carry (materialized BF16
+  post-attention residual) is at best 1,050 mismatches from either row; a double-rounded output
+  (`bf16(bf16(x*s)*w)`) is at best 1,597. The three FP32 associations of the sum are bit-identical.
+- With that input, the DB548 greenfield row is reproduced exactly for every scale
+  `s ∈ {0x433295d7…0x433295da}` (s0−4…s0−1 ulps) and the accepted legacy row for every
+  `s ∈ {0x433295db…0x433295e9}` (s0…s0+14 ulps), where `s0 = 0x433295db` is the correctly rounded
+  `rsqrt(mean_f64(x²)+eps)`. The windows are disjoint and adjacent (gap 1 ulp). The two rows'
+  only differing element is 2795. The frontier is therefore one FP32 scalar: greenfield's TPU
+  computes the layer-1 variance/rsqrt 1–4 ulps below every value the legacy admits, and the dense
+  update `47808` at 2795 is not wrong.
+- Candidate FP32 reduction structures land on both sides (e.g. 128-lane accumulation followed by a
+  cross-lane tree, or 8/256/512/1024-lane trees, land in the accepted window; a plain pairwise tree,
+  contiguous-block trees, sequential lane finish and the FP32-rounded-variance-then-rsqrt land in
+  the DB548 window). One row cannot identify the structure; this is exactly Compass v2 §4/T4.
+
+Consequences: the DSA-table detour and the dense-partial/contraction/RMS-scheduling challengers
+are all closed; the only open layer-1 quantity is the FP32 scale. The greenfield optimized HLO
+(`decoder_78layer_8k_token`) computes the variance as a fused `multiply_reduce_fusion` over
+`f32[1,1,6144]{T(1,128)}` followed by `multiply(sum, 1/6144)`, `add(eps)`, `rsqrt`, and a fused
+`bitcast_multiply_fusion` producing `bf16[1,6144]` (the single output rounding the certificate
+found). Exact next: read the sealed accepted compile-only HLO
+(`accepted_db485_compile_only_hlo_20260830T025924791267740Z`) for the legacy's variance reduce
+shape/layout/fusion, compare with the greenfield's, and design the smallest change that makes the
+greenfield variance reduce structurally identical (same operand shape, layout and fusion) so the
+emitter's order matches for every row and layer; validate on CPU where possible, then one bounded
+single-row TPU probe (seconds), then the 8K run. Batched Sol review first. Gate D open.
+
+## 2026-09-02 accepted-schedule FP32-carry arm for the bounded layer-1 RMS probe (default-off, unexecuted)
+
+The sealed accepted compile-only HLO (m32 module) computes every one of its 313 RMS variances as a
+fused `convert→square→reduce(dimensions={1})` over `f32[32,6144]{1,0:T(8,128)}` producing `f32[32]`,
+then `multiply(sum, 1/6144)`, `add(1e-5)`, `rsqrt` on `f32[32]` (fusions `fused_computation.11824`/
+`.18521`). The greenfield decoder reduces `f32[1,1,6144]{T(1,128)}` to a scalar (`multiply_reduce_fusion`)
+with the same scalar arithmetic. The frontier certificate localizes the layer-1 divergence to that
+reduce's FP32 result (1–4 ulps of `s`), so the smallest decisive test is the existing bounded
+captured-RMS probe with its challenger arm replaced:
+
+- `scripts/greenfield/probe_layer0_captured_rms.py` `accepted_split` arm now sums the three sealed
+  BF16 rows in FP32 (`dense + attention_update + combined_residual`, no BF16 rounding of the
+  post-attention residual), places one FP32 `optimization_barrier` on the `[32,6144]` sum so XLA
+  cannot fold the padded rows into a single-row reduce, and computes `rsqrt(mean(x²)+1e-5)` and the
+  weighted output from that barrier value. The 2026-08-13 split arm had barriers on the BF16 dense
+  and residual, which forced the residual rounding the compiler otherwise elides; the certificate
+  shows that rounding alone costs ≥1,050 mismatches, so DB549's 1,073 never tested the schedule.
+- `validate_captured_dense_rms_stablehlo(split_layer1_rms=True)` now matches this FP32-carry
+  structure (`_match_rmsnorm(fp32_carry_schedule=True)`: two FP32 adds from converts of the three
+  M32 pads, one FP32 barrier consumed by both the reduce and the output, no BF16 round on the carry,
+  residual sources bound to `%arg5`/`%arg6`); the BF16 split matcher used by the dense-convolution
+  probes is untouched. The optimized-HLO contract (one `f32[32]` scheduled reduction with the
+  accepted backend window `["2","48"]`, bound to the output edge) is unchanged and must be met by
+  the new arm at run time. Live-arm test adds a `rounded_carry` refusal (a BF16 round-trip before
+  the barrier) and keeps the source/gather/return refusals; 5 passed, 2 skipped (archived failed-run
+  HLO fixtures not local); dense replay/isolated probe validator tests 16/16.
+- The wrapper's sealed 2026-08-13 sources (`greenfield_layer0_dense_partial_capture_…200736…` and
+  `greenfield_layer0_dense_envelope_cross_layer_…120703…`) were restored under `/home/gianl/glm-run`
+  from the byte-identical archived copies; all nine pinned SHAs verify.
+
+Expected outcomes on TPU (seconds, under the global lock, 8/8 census, SUCCESS-last): control must
+reproduce DB548 `9b52a04e…` (harness); the new arm reproduces the accepted row `9936ee1e…` if and
+only if the `f32[32,6144]` reduce lands `s` in `0x433295db…0x433295e9`. A nonexact result with an
+exact control is still decisive: it rejects "same shape/layout ⇒ same emitter order" and the
+remaining candidates are the 32-row emitter schedule on the real decode batch or the reduce's
+fusion context. No TPU work is authorized before the batched Sol review.
+
+Sol's batched review of the certificate and the schedule arm returned `BLOCK — P1/P2` and
+`BLOCK EXECUTE`. Corrections applied to the certificate
+(`scripts/greenfield/adjudicate_gate_d_layer1_scale_frontier.py`, artifact SHA now
+`980bbb3933866ebc0228882d9c2f76d0b212e6347f268821a71f5bcab219db3f`): it now fails closed unless every
+claimed invariant holds (residual lineage identity, accepted == DB548 partials, rows differing only
+at 2795, all three FP32 associations bit-identical, both windows nonempty, contiguous with
+mismatching neighbours inside the ±256-ulp search and therefore global by monotonicity of each
+element's rounding in `s`, disjoint, adjacent with gap 1, `s0` inside the accepted window, and the
+materialized-BF16-residual and double-rounded-output alternatives rejected for both rows); it records
+generator provenance (script SHA, Python/numpy/ml_dtypes versions, search bound). Wording
+correction to the sections above: the windows are the *effective* scales each TPU row is consistent
+with; the certificate does not observe how either TPU program physically computed its scale, and
+the earlier "three associations agree" sentence was true only after adding the third
+parenthesization (now tested). Execution of the probe remains unauthorized: the 2026-08-13 wrapper
+auto-generates its tag, checks only live objects for vacancy, derives its pin from the worktree
+without sanitized origin/mirror verification, and holds only the workload lease; Sol requires a
+literal fresh tag and pin, canonical live/all-version/soft-deleted vacancy, sanitized origin and
+mirror verification, and simultaneous retention of the four canonical workload/rsync leases before a
+second review of that exact invocation.
+
+## 2026-09-02 canonical protections for the captured-RMS probe launcher (default-off, unexecuted)
+
+Per Sol's execute-block, `scripts/greenfield/run_layer0_projection_reduction_probe.sh` in the
+captured-RMS mode now: requires a literal reviewed `GLM_GREENFIELD_CAPTURED_RMS_TAG` matching
+`^greenfield_layer0_captured_rms_replay_[0-9]{8}T[0-9]{15}Z$` (no auto-generated tag); derives the
+pin from the tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical` on
+`tooling/gate-d-compensated-pp16-numerical` through a sanitized `env -i` Git (top-level, branch,
+origin URL, clean tree with untracked files, no replacement refs, `ls-remote` of the origin branch
+equal to the pin) using the same verifier program as the PP16 capsule wrappers; verifies the
+immutable same-region mirror verifier's hash (`091208165a…`) and replays the mirror closure with the
+immutable Python `-I -S -B` into `mirror.sha256`; requires canonical three-scope vacancy (live,
+`--all-versions`, `--soft-deleted --exhaustive`) of the append-only prefix, recorded in
+`remote_vacancy.raw.txt`/`remote_vacancy.txt`; and holds the four leases simultaneously
+(`/home/gianl/glm-run/.glm_pod_workload.lock` non-blocking, `/home/gianl/.glm-tpu-rsync.lock`,
+and the root-owned `/opt/glm-tpu/locks/{glm_pod_workload,glm_tpu_rsync}.lock` through the identity-
+checked immutable lock verifier), recorded in `leases.txt`. The probe itself
+(`probe_layer0_captured_rms.py`) now takes `--expected-worktree` and refuses unless it runs from
+that allow-listed worktree; the launcher passes the tooling worktree, as the PP16 capsules do,
+because the immutable mirror verifier is bound to that worktree and branch (a dry run at the rewrite
+pin correctly refused with "verifier is not the committed blob"). Dry runs at the current tooling
+head passed the Git-authority and immutable-lease verifiers. Tests: 14 passed / 2 skipped
+(captured-RMS + isolated dense).
+
+Literal fresh tag reserved for the reviewed invocation: `greenfield_layer0_captured_rms_replay_20260902T045006596197989Z`; its live, all-versions and
+soft-deleted listings are vacant. Launch command (after Sol's EXECUTE approval, from the tooling
+worktree at the reviewed pin):
+`GLM_GREENFIELD_CAPTURED_RMS_REPLAY=1 GLM_GREENFIELD_CAPTURED_RMS_TAG=greenfield_layer0_captured_rms_replay_20260902T045006596197989Z bash scripts/greenfield/run_layer0_projection_reduction_probe.sh`.
+No TPU work has occurred.
+
+Sol re-review: `APPROVE PERSISTENCE b43d9c138ca31eaa2db5bdc8d440f0002eac9d32`; `BLOCK EXECUTE — P1`:
+the literal command inherits the ambient environment and PATH, resolves `bash` relatively, and
+executes mutable worktree shell/Python sources after only point-in-time Git checks, so a same-UID
+modification after verification could change the incrementally read shell, the probe source or the
+`PYTHONPATH` imports without changing the verified HEAD. Required for execution: snapshot the exact
+committed wrapper into a sealed memfd through a root-owned immutable launcher, authenticate/install
+immutable Python children and dependencies, and invoke through an exact
+`/usr/bin/env -i … /usr/bin/bash --noprofile --norc /proc/self/fd/<fd>` boundary — the chain the
+PP16 numerical capsules (V1–V3) already use. The reserved tag `greenfield_layer0_captured_rms_replay_20260902T045006596197989Z` had no start and stays
+reserved for the re-review of that invocation. No TPU work has occurred.
+
+## 2026-09-02 status: layer-1 RMS schedule probe is ready but execution needs the sealed-launcher chain
+
+State: tooling head pushed and mirrored; certificate, FP32-carry schedule arm, matcher, tests and the
+canonical-protection launcher are persisted (Sol: `APPROVE PERSISTENCE b43d9c13`). Sol blocks
+execution of the literal invocation until it goes through the PP16-style boundary: a root-owned
+immutable launcher that snapshots the committed wrapper into a sealed memfd, verifies root-owned
+immutable Python children and dependencies against the committed blobs, and execs
+`/usr/bin/env -i … /usr/bin/bash --noprofile --norc /proc/self/fd/<fd>`. A free CPU pre-test
+(inverting the 2026-08-13 accepted-schedule arm's recorded row 229dc8ac… with its own rounded input)
+is inconclusive: its effective scale window is s0'−11…s0'+20 and straddles the exact value, so only
+the TPU probe decides.
+
+Build plan for the chain (clone of V3, `gate-d-layer1-rms-schedule-probe-v1`): (1) root-owned
+launcher pinning the wrapper blob SHA, the probe/driver SHA and a `git archive` tree SHA of
+`glm_tpu/` plus the probe's script imports at the pin, materialized into a root-owned 0555 snapshot
+so no mutable worktree source is executed; (2) installer cloned from
+`install_gate_d_projection_contraction_pp16_numerical_runtime.py` with the snapshot payload;
+(3) wrapper adaptations: run from `/proc/self/fd/10`, `PYTHONPATH`/probe path from the snapshot,
+immutable Python `-I -S -B` with the immutable JAX/libtpu site capsules
+(`/opt/glm-tpu/gate-d-jax-site-55233c63939e`, `gate-d-libtpu-site-db7598c867f3`) instead of
+`/home/gianl/vllm-env`; (4) tests, one batched Sol review, provisioning with `sudo -n`, then the
+literal invocation with the still-vacant tag `greenfield_layer0_captured_rms_replay_20260902T045006596197989Z`. Owner decision offered: this chain costs
+hours for a ten-second bounded diagnostic with no DB row or Gate-D claim; the alternative is an
+explicit owner waiver of Sol's same-UID TOCTOU concern for this bounded probe under the current
+canonical protections. Without a waiver the chain is built.
+
+## 2026-09-02 sealed-launcher chain for the layer-1 RMS schedule probe (V1) built; unexecuted
+
+Commit `5207c406` adds the chain Sol required, cloned from the PP16 numerical V3 chain with the
+schedule discriminator as its driver: `glm_tpu/greenfield/benchmarking/gate_d_layer1_rms_schedule.py`
+(the two arms; the captured-RMS probe now delegates to it), `glm_tpu/greenfield/validation/
+gate_d_layer1_rms_schedule.py` (optimized-HLO contract with the accepted `f32[32]` schedule
+fingerprint, StableHLO contract delegation, output classification bound to the DB548 and accepted
+row SHAs) and `validation/hlo_dependency.py` (verbatim HLO dependency helpers), all importable from
+the sealed `glm_tpu` archive; `scripts/greenfield/run_gate_d_layer1_rms_schedule.py` (driver: four
+local TPU-v4 chips, sealed DB548 capture `f194d757…` and envelope `6cb76623…`, both arms compiled,
+audited and executed once each, fail-closed when the control arm does not reproduce DB548);
+`publish_gate_d_layer1_rms_schedule.py` (pure-Python rederivation of both rows from archived bytes,
+statuses `SCHEDULE_ARM_EXACT`/`SCHEDULE_ARM_NONEXACT`, SUCCESS-last); `run_gate_d_layer1_rms_schedule.sh`
+(literal tag `gate_d_layer1_rms_schedule_<ts>`, sanitized Git authority, mirror replay, three-scope
+vacancy, four leases, census, remote root `results/greenfield/glm52/gate_d_layer1_rms_schedule/`);
+`launch_gate_d_layer1_rms_schedule.py` (root-owned launcher: sealed memfd wrapper, immutable
+children, `env -i bash --noprofile --norc /proc/self/fd/10`); `install_gate_d_layer1_rms_schedule_runtime.py`
+(install-only); `analyze_gate_d_layer1_rms_schedule_orchestration_source.py` (certificate). Tests:
+70 passed / 2 skipped across the new and adjacent suites. The orchestration certificate at the
+committed head `5207c406` is `docs/artifacts/gate-d-layer1-rms-schedule-orchestration-certificate.json`
+(classification `LAYER1_RMS_SCHEDULE_ORCHESTRATION_INSTALL_SOURCE_ACCEPTED;INSTALL_UNAUTHORIZED;
+TPU_NUMERICAL_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`). Nothing is installed; no TPU work.
+
+Sol's batched review of the chain returned `BLOCK — P1` (publisher required stored NPZ members while
+the driver writes the V3 deterministic deflated container, so every successful run would have failed
+publication; the test fixture masked it), `BLOCK INSTALL` and `BLOCK EXECUTE` (and the stated HEAD had
+moved by a goal commit). Fixed in `f9fb434c`: the publisher binds the driver's exact container
+(deflated, unencrypted, 1980 timestamp, mode 0400, bounded, sorted members), the test builds NPZ bytes
+with the production writer and adds a compression-mismatch refusal; publisher→wrapper→launcher→
+installer→analyzer repinned (driver `0c6755f4…`, publisher `b3ec837e…`, wrapper `cdca95b7…`,
+launcher `4bb4b1df…`, installer `39439c7d…`); 70 passed / 2 skipped. Certificate regenerated at
+`f9fb434c` (`61e4c050`, SHA `fc4d1c2290408b5bba5f6b4768edac5bf0f74f524c2331e1ba14bc415f0ac761`).
+Staging tree `/home/gianl/gate-d-runs/gate-d-layer1-rms-schedule-install-v1-staging` rebuilt from the
+`f9fb434c` blobs (tree SHA `da82b46ff583e57e02c8daf6f50cc0b74053df0e8207f506b5ea7fa3d931021c`). Fresh
+vacant tag `gate_d_layer1_rms_schedule_20260902T055846533543663Z`. Literal install commands:
+`/usr/bin/sudo -n /usr/bin/python3 -I -S /opt/glm-tpu/bin/provision_gate_d_python_runtime.py --source /home/gianl/gate-d-runs/gate-d-layer1-rms-schedule-install-v1-staging --target /opt/glm-tpu/gate-d-layer1-rms-schedule-install-v1 --expected-tree-sha256 da82b46ff583e57e02c8daf6f50cc0b74053df0e8207f506b5ea7fa3d931021c`
+and
+`/usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/gate-d-layer1-rms-schedule-install-v1/install_gate_d_layer1_rms_schedule_runtime.py`;
+literal execute-once command:
+`/usr/bin/env -i GLM_GATE_D_LAYER1_RMS_SCHEDULE=1 GLM_GATE_D_LAYER1_RMS_SCHEDULE_MODE=execute_once GLM_GATE_D_LAYER1_RMS_SCHEDULE_TAG=gate_d_layer1_rms_schedule_20260902T055846533543663Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin:/home/gianl/vllm-env/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v1.py`.
+Nothing installed; no TPU work; awaiting Sol's re-review.
+
+## 2026-09-02 chain installed; first approved start refused by a lease collision; tag burned
+
+Sol: `APPROVE PERSISTENCE 36878ce2`, `APPROVE INSTALL ONLY`, `APPROVE EXECUTE ONCE gate_d_layer1_rms_schedule_20260902T055846533543663Z 36878ce2`.
+Both literal install commands exited 0 (provisioned `/opt/glm-tpu/gate-d-layer1-rms-schedule-install-v1`
+tree `da82b46f…`; capsule `/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v1` with publisher
+`b3ec837e…`, driver `0c6755f4…`, verifier `09120816…`; launcher
+`/opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v1.py` `4bb4b1df…`; `launcher_invoked=false`).
+Pre-launch rechecks passed (mirror replay of `36878ce2` exact, tag vacant in three scopes, four
+leases free, pod READY). The approved invocation at 06:05:02Z was refused by the root-owned launcher
+at `_open_locked_fds` (`BlockingIOError`): the cron mirror sync holds
+`/opt/glm-tpu/locks/glm_tpu_rsync.lock` during its :00/:05 runs. No run directory, no remote
+object, no JAX/TPU work. Sol: `BLOCK EXECUTE — the tag was attempted and should remain burned`; the
+tag `gate_d_layer1_rms_schedule_20260902T055846533543663Z` is burned. Lesson: launch mid-window (:01–:04, :06–:09) and recheck the four leases
+immediately before the invocation.
+
+## 2026-09-02 second approved start refused by a stale literal; chain bumped to v2
+
+Sol approved the relaunch (`APPROVE EXECUTE ONCE gate_d_layer1_rms_schedule_20260902T060639649625079Z 77165c8f`). Launched mid-window at
+06:10:4xZ, the root-owned launcher accepted the environment, sealed the wrapper into the memfd and
+exec'd it; the wrapper's embedded runtime-boundary verifier then refused with
+`FileNotFoundError: /opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v3.py`: the clone had
+rewritten every other launcher literal but the verifier's path kept the V3 suffix, and no test
+covered that literal. No lease was taken, no census, no run directory, no remote object, no JAX/TPU
+work; tag `gate_d_layer1_rms_schedule_20260902T060639649625079Z` is burned. Fix in `68b8eb96`: chain bumped to v2 (launcher
+`launch_gate_d_layer1_rms_schedule_v2.py`, capsule `gate-d-layer1-rms-schedule-v2`, install root
+`gate-d-layer1-rms-schedule-install-v2`; installs never replace existing targets), the literal
+fixed, a new test asserting the wrapper names exactly the launcher install path and capsule root and
+carries no stale version literals; cascade repinned (driver `48b3e383…`, publisher `b3ec837e…`,
+wrapper `ee6fc1ac…`, launcher `169c4385…`, installer `1a7cee63…`); 55 passed / 2 skipped.
+Certificate at `68b8eb96` committed as `f4cfeb88` (SHA `d3f3c4f4f308307c78612fcfd7c4ab693cb923034988e3e02ae9e72b9fc8c463`).
+Staging tree `/home/gianl/gate-d-runs/gate-d-layer1-rms-schedule-install-v2-staging` (tree SHA
+`a8cc784f00559a5d197597cf54615124b300e4905c92ee246ede95e97953d392`). Fresh vacant tag `gate_d_layer1_rms_schedule_20260902T061305905714981Z`.
+Literal install commands:
+`/usr/bin/sudo -n /usr/bin/python3 -I -S /opt/glm-tpu/bin/provision_gate_d_python_runtime.py --source /home/gianl/gate-d-runs/gate-d-layer1-rms-schedule-install-v2-staging --target /opt/glm-tpu/gate-d-layer1-rms-schedule-install-v2 --expected-tree-sha256 a8cc784f00559a5d197597cf54615124b300e4905c92ee246ede95e97953d392`
+and
+`/usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/gate-d-layer1-rms-schedule-install-v2/install_gate_d_layer1_rms_schedule_runtime.py`;
+literal execute-once command (mid-window, after lease/vacancy recheck):
+`/usr/bin/env -i GLM_GATE_D_LAYER1_RMS_SCHEDULE=1 GLM_GATE_D_LAYER1_RMS_SCHEDULE_MODE=execute_once GLM_GATE_D_LAYER1_RMS_SCHEDULE_TAG=gate_d_layer1_rms_schedule_20260902T061305905714981Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin:/home/gianl/vllm-env/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/launch_gate_d_layer1_rms_schedule_v2.py`
+The v1 capsule and launcher remain installed, unused and inert.
+
+## 2026-09-02 BOUNDED TPU RESULT: the accepted RMS reduce schedule reproduces the accepted layer-1 row exactly
+
+Sol approved v2 (`APPROVE PERSISTENCE 839c8fb7`, `APPROVE INSTALL ONLY`, `APPROVE EXECUTE ONCE gate_d_layer1_rms_schedule_20260902T061305905714981Z
+839c8fb7`). Both install commands exited 0 (capsule `gate-d-layer1-rms-schedule-v2`: driver
+`48b3e383…`, publisher `b3ec837e…`, verifier `09120816…`; launcher `169c4385…`; identities verified
+against the committed blobs). Launched mid-window at 06:20:5xZ: the root-owned launcher sealed the
+wrapper, held the four leases, replayed the mirror closure of pin `839c8fb7`, passed pre-census 8/8,
+and the immutable driver compiled and executed both arms on the four local TPU-v4 chips in 17 s.
+
+**Result (`runner.json` SHA `aa1970dcf0607ee988fed26705b2ba3c20526633adb5fb19985c894764cda281`, `outputs.npz` SHA `a8ef84f16bf80f5bddc6ba1002bbe6b02ed4db831e90eaa2f08d663a58a0f59b`):**
+`status=SCHEDULE_ARM_EXACT`. Control arm output SHA `9b52a04e…` == DB548 (0/6,144 mismatches);
+accepted-schedule arm output SHA `9936ee1e…` == the accepted legacy row (0/6,144 mismatches);
+schedule arm vs DB548: exactly one mismatch at 2795. Both arms passed the StableHLO and optimized-HLO
+contracts; the schedule arm carries exactly one `f32[32]` scheduled reduction with the accepted
+backend window. On real hardware, feeding the same FP32 carry through the accepted
+`f32[32,6144]{T(8,128)} -> f32[32]` variance reduce lands the scale in the accepted window and
+removes the layer-1 one-ULP miss that has blocked exact DSA at event 1 since 2026-08-13.
+
+Publication then failed closed: the cloned publisher's `EXPECTED_COMPILER_ENVIRONMENT` still named
+the V3 driver flag (`GLM_GATE_D_PROJECTION_CONTRACTION_NUMERICAL`) while the driver's environment
+carries `GLM_GATE_D_LAYER1_RMS_SCHEDULE`, so `_validate_dependencies` raised "dependency authority
+drifted" before the SUCCESS-last upload. The wrapper published the bounded diagnostic instead
+(`diagnostic/` under the tag: runner.json, outputs.npz, dependencies.json, both arms' HLO, censuses,
+mirror, vacancy, sync, failure_status.json, orchestrator.failure.log; `diagnostic_objects.json` is
+the remote terminal). Post-census 8/8 clean. There is no `NUMERICAL_RESULT`, no SUCCESS, no DB row,
+no performance claim; the tag `gate_d_layer1_rms_schedule_20260902T061305905714981Z` is burned. Classification:
+`BOUNDED_TPU_LAYER1_RMS_SCHEDULE_ARM_EXACT;DIAGNOSTIC_ARCHIVE_ONLY;PUBLICATION_REFUSED_BY_STALE_PUBLISHER_CONSTANT;
+DECODER_UNPROVEN;GATE_D_OPEN`.
+
+Consequence for Gate D: the production fix is now concrete and general — compute every decoder RMS
+variance with the accepted schedule (FP32 carry, M32 operand behind an FP32 barrier, reduce dims={1},
+row 0), default-off behind a flag, with an HLO contract counting `f32[32]` scheduled reductions, and
+rerun the 8K exact-DSA run. Next: fix the publisher constant with a regression test against these real
+run records, repin as v3 for a sealed SUCCESS re-run if Sol requires it, and in parallel implement the
+decoder change.
+
+## 2026-09-02 production fix staged: `rms_accepted_schedule` (default off) in the decoder
+
+Following the bounded TPU result, the decoder gains a default-off flag that makes every decode-step
+RMS variance use the accepted schedule: `kernels/reference/rmsnorm.py` adds
+`_accepted_schedule_normalized` (rows padded to the M32 operand, one FP32 `optimization_barrier`,
+`mean(square(...))` over the last axis → `f32[32,1]`, `rsqrt`, row 0) and an `accepted_schedule`
+keyword on `rms_norm`, `fused_add_rms_norm` and `final_norm`; `kernels/layer.py` threads
+`rms_accepted_schedule` through both stage layer functions into the input norm, the post-attention
+norm, the q-a norm (`_project_attention_qkv_a`) and the kv-a latent norm
+(`stage_local_index_share_fp8_mapped`); `runtime/decoder.py` threads it through
+`build_decoder_step_program`, both execute-stage wrappers, the final norm, `DecoderStepProgram`,
+and adds `_validate_rms_accepted_schedule_hlo` to `validate_decoder_step_hlo` (flag on: every
+`rsqrt` carries 32 rows and none is scalar; flag off: no 32-row `rsqrt`; the barrier is consumed by
+the compiler and is reported, not required — the bounded replay's TPU HLO carries none);
+`compile_short_decoder.py` adds `--rms-accepted-schedule` (bound to the bounded-proof tag), the
+runners add `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE` with tag suffix `_ras` and the same 8K/oracle
+gating as the DSA table. Tests: `test_rmsnorm_accepted_schedule.py` (CPU equivalence within BF16
+rounding for 1/3/40 rows, 32-row barrier lowering, boolean flag), forced-CPU decoder test (tokens
+and metadata equal, state within BF16 rounding, HLO contract both ways), compile-script/runner
+static test. The publisher of the bounded chain is fixed for a sealed re-run if required.
+
+## 2026-09-02 lineage-bound RMS schedule contract, full flag coverage, diagnostic archive adjudicated, chain v3
+
+Sol's P1 on the staged decoder flag was that the HLO contract (count 32-row `rsqrt`, forbid scalar)
+did not prove its stated invariant. Diagnosis on the archived TPU bytes of the bounded run showed why:
+the **control arm also reduces `f32[32,6144]{T(8,128)} -> f32[32]` over dims={1}**; the two arms
+differ only in what the reduce fusion squares. The accepted arm squares a materialized FP32 carry
+(the reduce fusion's parameter, produced by a separate `%convert_add_fusion`); the refuted DB548
+arm squares an `add` fused into the reduce fusion (`%fused_computation` carries pad/convert/add/
+square/reduce together). A shape/count contract cannot see that; a lineage contract can.
+
+`runtime/decoder.py` now binds, for **every** `rsqrt` in the optimized module:
+`square(carry) -> reduce(dims={1}, add combiner, f32[32,W] -> f32[32], T(8,128) operand when the
+module is tiled) -> multiply/divide by 1/W -> add 1e-05 -> rsqrt(f32[32]|f32[32,1])`, resolving
+fusion parameters, callee roots, tuples and bitcasts, and requires the square operand to be a
+materialized carry (fusion parameter/buffer/opt-barrier), not fused arithmetic. The StableHLO
+binder (`_validate_rms_accepted_schedule_stablehlo`, region-scoped because printed StableHLO
+restarts `%N` numbering inside manual-computation bodies) binds the same chain from the FP32
+`optimization_barrier` on `tensor<32xWxf32>` through `chlo.square`/`stablehlo.reduce` to
+`stablehlo.rsqrt : tensor<32x1xf32>`. The 128-wide DSA indexer key LayerNorm is the only non-RMS
+`rsqrt` in the step (centred by a `subtract`, epsilon 1e-6); both binders classify it separately and
+report `layernorm_rsqrt_count`. Flag on: every RMS `rsqrt` must conform; flag off: none may.
+
+Coverage gap closed by the same diagnosis: on the forced-CPU small decoder the flag left eleven
+`rsqrt` unscheduled — the input norm and q-a norm inside `stage_local_index_share_fp8_mapped` and
+`stage_local_dsa_fp8_mapped`, and the dense kernel's own norm in `stage_local_dense_fp8_mapped` —
+so `rms_accepted_schedule` is now threaded to every RMS call the decode step can reach (kernels/
+stage_local.py, kernels/layer.py). The legacy m32 program schedules all 313 RMS variances this way;
+a partial flag would have reproduced the layer-1 row and missed the next one.
+
+Tests on real TPU bytes (`tests/greenfield/runtime/test_rms_accepted_schedule_hlo_contract.py`,
+17): the archived schedule arm passes enabled and fails disabled, the control arm fails enabled and
+passes disabled (both HLO and StableHLO); hostile mutations of the real schedule arm are refused —
+mixed 16-row scale, row-40 module, wrong reduce axis, wrong epsilon, non-square operand, `T(1,128)`
+operand, fused producer, dummy 32-row `rsqrt` beside an unscheduled norm, lineage-less 32-row
+`rsqrt`; StableHLO: stripped barrier, wrong axis, wrong epsilon, wrong width, mixed shape, `maximum`
+combiner. Forced-CPU decoder test extended: tokens/metadata equal, state within BF16 rounding,
+33/33 `rsqrt` conforming with 33 barriers in StableHLO, LayerNorm count equal across flags,
+`rsqrt_count == conforming + layernorm`. Suites: kernels + validation + runtime subsets 258 passed
+(one pre-existing chain SHA failure fixed below), compile-script/runtime 96 passed.
+
+Diagnostic archive adjudicated offline (Sol accepted this instead of a sealed v3 rerun):
+`scripts/greenfield/adjudicate_gate_d_layer1_rms_schedule_diagnostic.py` →
+`docs/artifacts/gate-d-layer1-rms-schedule-diagnostic-adjudication.json` (SHA `e504b795b31690bda4ff2084a7d4316f0d5bd87c53c308f294415eec027e5767`): local
+bytes/SHAs of all 18 archived objects, expected identities (runner/outputs/dependencies/HLO),
+remote generation/size/CRC32C of every object and the ledger against the receipt (`crc32c_hash`
+field of `gcloud storage objects describe`), live set == ledger, no SUCCESS/result/ledger claim
+objects in `--all-versions`, no noncurrent versions. Classification
+`BOUNDED_TPU_LAYER1_RMS_SCHEDULE_ARM_EXACT;DIAGNOSTIC_ARCHIVE_ADJUDICATED;GENERATION_BOUND_LEDGER_REPLAYED;
+NO_SUCCESS_NO_DB_NO_PERFORMANCE_NO_GATE_D_CLAIM;DECODER_UNPROVEN;GATE_D_OPEN`.
+
+Chain consistency: commit `72c289cd` fixed the publisher constant (publisher SHA `a53f3fc2…`) but
+left the wrapper/launcher/installer/analyzer pinned to the executed publisher `b3ec837e…`, which the
+chain tests caught. The chain is re-pinned as **v3** (driver `5f5fa802…` — capsule path literal
+only —, wrapper `f52e5334…`, launcher `33c0a696…`, installer `83f72f20…`, publisher `a53f3fc2…`;
+paths `launch_gate_d_layer1_rms_schedule_v3.py`, `gate-d-layer1-rms-schedule-v3`,
+`…-install-v3`). Nothing is installed for v3; the v1/v2 installs stay inert; no rerun is planned.
+
+Not proof: CPU HLO/StableHLO and archived-byte tests bind the contract, not the decoder on TPU.
+Next: commit/push; one batched Sol review (contract + coverage + tests + adjudication + v3 pin +
+the 8K launch command); merge into `rewrite/topology-first-decode` keeping the rewrite's goal.md;
+mirror; no-TPU preflight; resubmit the exact merged pin and a fresh composed tag for one 8K
+execution review; then one protected run `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1 bash
+scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from the rewrite worktree.
+
+## 2026-09-02 Sol batch verdict on 1ad426ed: BLOCK (three P1) — fixed in this commit
+
+Sol reviewed the whole batch (contract + coverage + tests + adjudication + v3 pin + merge + preflight
++ launch) and returned three P1s:
+
+1. **LayerNorm exemption unbound** (`decoder.py` HLO and StableHLO binders): classifying by
+   "subtract + epsilon 1e-6" cleared every prior lineage violation. Fixed: both binders now bind
+   the DSA key LayerNorm exactly — centred `subtract`, reduce operand `f32[R,index_key_width]`
+   (`config.index_key_width`, 128 on the real model, threaded from `validate_decoder_step_hlo`),
+   last axis only, `add` combiner, per-opcode scale (`divide` by W / `multiply` by 1/W — the
+   RMS path is bound per opcode too, closing a multiply-by-W hole), epsilon 1e-06, rsqrt rows
+   equal to the reduced rows. A centred lineage missing any fact is nonconforming and fails the
+   enabled contract. New `tests/greenfield/runtime/test_rms_schedule_layernorm_classification.py`
+   (21): synthetic module with one accepted RMS lineage + one exact LayerNorm passes; mutations
+   of width, axis, scale, scale opcode, combiner, epsilon, rows, centring, squaring are refused in
+   both representations; the flag-off case and a wrong decoder key width are refused.
+2. **Merge overwrote the rewrite goal.md**: `git checkout --ours -- goal.md` is a no-op on a path
+   git merged cleanly, so 96ca1153 carried the tooling goal.md (17+/15−). The local merge commit is
+   discarded (never pushed); the merge is redone as `merge --no-commit` + `git checkout ba7d1e72 --
+   goal.md` and verified byte-identical before commit.
+3. **8K runner launch boundary** (`run_short_decoder_compile_pp8.sh`): the worker sync ignored
+   untracked files, the remote vacancy checked live objects only, and the workers executed the
+   mutable worktree through `PYTHONPATH="$wt"` with an inherited environment. Fixed: untracked
+   files fail the eight-host sync (all eight rewrite worktrees were verified clean, including
+   untracked, before the change); vacancy is three-scope (live, `--all-versions`, `--soft-deleted
+   --exhaustive`, recorded in `remote_vacancy.raw.txt` / `remote_vacancy.txt`); each worker
+   re-verifies `HEAD == pin` and a clean status, creates a fresh detached `git worktree` of the pin
+   under the append-only run directory (`$run/source`, verified `HEAD == pin` and clean including
+   ignored files) and runs `compile_short_decoder.py` from it under `/usr/bin/env -i` with only
+   HOME/PATH/LANG/LC_ALL/PYTHONDONTWRITEBYTECODE, the StrategyND flag, JAX_PLATFORMS,
+   XLA_PYTHON_CLIENT_MEM_FRACTION, PYTHONPATH=$src and GLM_GREENFIELD_RUN_TAG. The compile
+   script's `git rev-parse HEAD == --expected-code-hash` check keeps working because the source
+   is a real worktree. Static tests updated (`test_compile_short_decoder.py`).
+
+Suites after the fixes (CPU-pinned): contract/LayerNorm/runner/recover/attention-operand 111
+passed; forced-CPU decoder 1 passed (33/33 conforming, LayerNorm counts equal, key width bound).
+The submitted tag `..._ras_..._trace2_20260902T090858464221531Z` is abandoned unstarted (Sol: a tag
+submitted under a rejected boundary must not be started). Next: push, redo the merge, preflight,
+compose a new tag, resubmit the exact pin/tag to Sol.

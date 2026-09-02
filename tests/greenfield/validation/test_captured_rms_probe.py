@@ -142,6 +142,13 @@ for name, split in (('control', False), ('accepted_split', True)):
         )
         residual_operands = re.findall(r"%[0-9]+", residual_add_line)[:3]
         assert len(residual_operands) == 3
+        barrier_line = next(
+            line
+            for line in text.splitlines()
+            if "stablehlo.optimization_barrier" in line
+            and "tensor<32x6144xf32>" in line
+        )
+        barrier_operand = re.findall(r"%[0-9]+", barrier_line)[1]
         mutations = {{
             'wrong_reducer': text.replace('applies stablehlo.add', 'applies stablehlo.maximum', 1),
             'wrong_group': text.replace(
@@ -157,6 +164,13 @@ for name, split in (('control', False), ('accepted_split', True)):
             'wrong_outer_return': text.replace(
                 '    return %0 : tensor<1x6144xbf16>',
                 '    return %arg0 : tensor<1x6144xbf16>',
+                1,
+            ),
+            'rounded_carry': text.replace(
+                barrier_line,
+                f'      %rc_b = stablehlo.convert {{barrier_operand}} : (tensor<32x6144xf32>) -> tensor<32x6144xbf16>\\n'
+                f'      %rc_r = stablehlo.convert %rc_b : (tensor<32x6144xbf16>) -> tensor<32x6144xf32>\\n'
+                + barrier_line.replace(f'{{barrier_operand}} :', '%rc_r :', 1),
                 1,
             ),
             'duplicate_residual_source': text.replace(
@@ -198,6 +212,50 @@ print(json.dumps(result))
 def test_captured_rms_mode_is_default_off() -> None:
     wrapper = WRAPPER.read_text()
     assert "CAPTURED_RMS_REPLAY=${GLM_GREENFIELD_CAPTURED_RMS_REPLAY:-0}" in wrapper
+
+
+def test_captured_rms_mode_carries_canonical_protections() -> None:
+    wrapper = WRAPPER.read_text()
+    # Literal reviewed tag only: no auto-generated tag in this mode.
+    assert "TAG=${GLM_GREENFIELD_CAPTURED_RMS_TAG:-}" in wrapper
+    assert (
+        "^greenfield_layer0_captured_rms_replay_[0-9]{8}T[0-9]{15}Z$" in wrapper
+    )
+    assert "GLM_GREENFIELD_CAPTURED_RMS_TAG:-greenfield_layer0_captured_rms_replay_$(date" not in wrapper
+    # Sanitized Git authority and mirror replay.
+    for marker in (
+        "CAPTURED_RMS_GIT_AUTHORITY_VERIFIER",
+        'git(Path("/"), "ls-remote", "--refs", origin, expected_ref)',
+        "captured_rms_git_local status --porcelain --untracked-files=all",
+        "verify_gate_d_same_region_git_mirror.py",
+        "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b",
+    ):
+        assert marker in wrapper, marker
+    # Three-scope vacancy.
+    for marker in (
+        "gcloud storage ls --all-versions",
+        "gcloud storage ls --soft-deleted --exhaustive",
+        "append-only remote-prefix history is not canonically vacant",
+    ):
+        assert marker in wrapper, marker
+    # Four leases held simultaneously.
+    for marker in (
+        "exec 9>/home/gianl/glm-run/.glm_pod_workload.lock",
+        "exec 8>/home/gianl/.glm-tpu-rsync.lock",
+        "exec 11>/opt/glm-tpu/locks/glm_pod_workload.lock",
+        "exec 12>/opt/glm-tpu/locks/glm_tpu_rsync.lock",
+        "CAPTURED_RMS_IMMUTABLE_LOCK_VERIFIER",
+    ):
+        assert marker in wrapper, marker
+    # Runs from the tooling worktree the immutable mirror verifier is bound to.
+    for marker in (
+        "readonly CAPTURED_RMS_WORKTREE=/home/gianl/glm-tpu-gate-d-pp16-numerical",
+        "readonly CAPTURED_RMS_BRANCH=tooling/gate-d-compensated-pp16-numerical",
+        '--expected-worktree "$CAPTURED_RMS_WORKTREE"',
+    ):
+        assert marker in wrapper, marker
+    probe = SCRIPT.read_text()
+    assert '"--expected-worktree", type=Path, required=True' in probe
     assert "probe_layer0_captured_rms.py" in wrapper
     assert "NO_PROVISIONAL_DB_RUN" in wrapper
     assert "glm52_layer0_captured_rms_replay" in wrapper
