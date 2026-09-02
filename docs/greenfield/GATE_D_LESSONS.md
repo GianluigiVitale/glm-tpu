@@ -1186,3 +1186,6 @@ normalized-state cause.
   counted on the real program (313 `rsqrt`), not on the call sites you edited.
 - Helpers that scan all instructions per lookup are fine on a probe module and take >10 min on a
   232k-instruction decoder; index once per module.
+- XLA reorders `pad` and `convert` freely; a dtype-and-shape allowance derived from the source order
+  (`convert -> pad`) misses the emitted order (`pad -> convert`). Bind allowances to the SSA slice and
+  the rows, not to the dtype the source happened to pad in.

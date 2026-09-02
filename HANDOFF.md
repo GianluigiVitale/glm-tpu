@@ -10809,3 +10809,25 @@ set is exactly the lineage (`%cv %carry_add %carry %rms_sum %p %sq %rsum %normal
 counts allowances per instruction and signature, so a rogue operand on a *fusion call* that also
 carries the lineage's carry is admitted at the call site only; its parameter and every use inside the
 body remain forbidden.)
+
+## 2026-09-02 approved run `greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T113001516858996Z` (pin 978dc3a9): all 313 norms scheduled on TPU; one dead-row record class left
+
+Sol approved (afa27bb2 / merge 978dc3a9 / execute once); every reconfirmation passed; launched 11:36:56Z
+mid-window. The 78-layer decoder compiled on TPU and the contracts refused before execution with a
+**single** violation (`decoder contains dead-row/full-pod live tensors`); failure-exit census 8/8; no
+tokens; tag burned; no claim; TPU HLO/StableHLO/contract archived under the tag.
+
+What the TPU HLO now proves (contract JSON): `rms_accepted_schedule_contract` **passed — 313/313 `rsqrt`
+conforming** (widths 6144 × 157, 2048 × 78, 512 × 78), StableHLO 313/313 with 313 FP32 barriers,
+`carry_count == 313`; `fused_qkv_a_contract` passed with 1,256 carry instructions admitted; the
+live-tensor classifier admitted 2,428 carry records and refused exactly 156: in each layer's q-a carry
+producer XLA orders **pad → convert**, so the padded live row appears once as `bf16[32,2048]` (the
+`pad` result and the `convert` operand) before becoming the FP32 carry; my allowance admitted only the
+lineage's `f32[32,W]` signature.
+
+Fix (this commit): inside the carry producer's backward SSA slice only, the same rows are also admitted
+as `bf16[32,W]` (nowhere else). Tests: synthetic fused module asserts the BF16 admission is exactly
+`{%pad.1, %cv}` and a rogue `bf16[32,128]` convert in the entry stays forbidden; **second archived TPU
+module** (skip-if-absent): RMS (313, 313, 0), carries 313 with widths {2048: 78, 512: 78, 6144: 157},
+live-tensor forbidden > 1,570 → 0 and `passed` (21 score bodies), fused qkv-a passed. The first archive
+still resolves 1,570 → 0.

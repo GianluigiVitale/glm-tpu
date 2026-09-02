@@ -27,12 +27,14 @@ from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 from tests.greenfield.runtime.test_decoder import _real_8k_decoder_config
 from tests.greenfield.runtime.test_rms_schedule_layernorm_classification import HLO as SYNTHETIC_HLO
 
-ARCHIVE = Path(
+_RUN_PREFIX = (
     "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_8k_pallas_feature_linear_ot256_downf32_"
     "token_splitres_prefill_keyfix_queryexact_headkeyexact_scoredefault_mainrope_ras_pregatheredb512_"
-    "strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_20260902T094725673772375Z/hlo/"
-    "decoder_78layer_8k_token.optimized_hlo.txt.gz"
+    "strategynd_o_densefinalconv_oracle_dsa_metaparent_trace2_"
 )
+ARCHIVE = Path(_RUN_PREFIX + "20260902T094725673772375Z/hlo/decoder_78layer_8k_token.optimized_hlo.txt.gz")
+# Second refused run (pin 978dc3a9): all 313 norms scheduled; only the q-a producer's BF16 pad remained.
+ARCHIVE_2 = Path(_RUN_PREFIX + "20260902T113001516858996Z/hlo/decoder_78layer_8k_token.optimized_hlo.txt.gz")
 
 
 FUSED_HLO = """HloModule synthetic_fused_carry, entry_computation_layout={(bf16[1,128]{1,0}, f32[32,128]{1,0:T(8,128)})->f32[1,128]{1,0}}
@@ -144,6 +146,18 @@ def test_rogues_colocated_inside_admitted_fusion_bodies_stay_forbidden() -> None
     # The admitted set is exactly the lineage: carry body slice, carry, reduce slice, normalize slice.
     admitted = {module.instructions[i].name for i, sigs in allowances.items() if "f32[32,128]" in sigs}
     assert admitted == {"%cv", "%carry_add", "%carry", "%rms_sum", "%p", "%sq", "%rsum", "%normalized", "%n0", "%nb", "%nmul", "%nslice"}, admitted
+    # The producer's BF16 pad of the live row (and the convert consuming it) is admitted only there.
+    admitted_bf16 = {module.instructions[i].name for i, sigs in allowances.items() if "bf16[32,128]" in sigs}
+    assert admitted_bf16 == {"%pad.1", "%cv"}, admitted_bf16
+    assert _unallowed_names(module, allowances, "bf16[32,128]") == set()
+    rogue_bf16 = FUSED_HLO.replace(
+        "  %rogue = f32[32,128]{1,0:T(8,128)} parameter(1)\n",
+        "  %rogue = f32[32,128]{1,0:T(8,128)} parameter(1)\n  %rogue_bf16 = bf16[32,128]{1,0:T(8,128)(2,1)} convert(%rogue)\n",
+    )
+    module_bf16 = parse_hlo_module(rogue_bf16)
+    by_key_bf16, lineages_bf16 = _rms_schedule_lineages(module_bf16, layernorm_width=128)
+    allowances_bf16, _ = _rms_accepted_schedule_carry_allowances(module_bf16, by_key_bf16, lineages_bf16)
+    assert _unallowed_names(module_bf16, allowances_bf16, "bf16[32,128]") == {"%rogue_bf16"}
 
 
 @pytest.mark.skipif(not ARCHIVE.exists(), reason="archived TPU decoder HLO unavailable")
@@ -159,7 +173,7 @@ def test_archived_tpu_decoder_carries_are_all_explained_by_conforming_lineages()
     common = dict(
         module=module,
         config=config,
-        full_indexer_layers=3,
+        full_indexer_layers=21,
         backend_contract="tpu",
         prefill_index_repair=False,
         dsa_head_key_exact_association=True,
@@ -186,3 +200,34 @@ def test_archived_tpu_decoder_carries_are_all_explained_by_conforming_lineages()
     del partial[victim]
     exposed = _classify_decoder_live_tensor_shapes(**common, rms_accepted_schedule_carry_allowances=partial)
     assert 1 <= len(exposed["forbidden_shapes"]) <= 4
+
+
+@pytest.mark.skipif(not ARCHIVE_2.exists(), reason="archived TPU decoder HLO (second run) unavailable")
+def test_second_archived_tpu_decoder_schedules_all_313_norms_and_admits_the_bf16_pad() -> None:
+    text = gzip.open(ARCHIVE_2, "rt").read()
+    module = parse_hlo_module(text)
+    config = _real_8k_decoder_config(dsa_score_default_precision=True)
+    rms = _validate_rms_accepted_schedule_hlo(module, enabled=True, layernorm_width=config.index_key_width)
+    assert rms["passed"], rms["violations"][:3]
+    assert (rms["rsqrt_count"], rms["conforming_rsqrt_count"], rms["nonconforming_rsqrt_count"]) == (313, 313, 0)
+    assert rms["carry_summary"]["carry_count"] == 313
+    assert rms["carry_summary"]["widths"] == {"2048": 78, "512": 78, "6144": 157}
+    allowances = rms["carry_allowances"]
+    common = dict(
+        module=module,
+        config=config,
+        full_indexer_layers=21,
+        backend_contract="tpu",
+        prefill_index_repair=False,
+        dsa_head_key_exact_association=True,
+        strategy_nd_attention_projection=True,
+    )
+    without = _classify_decoder_live_tensor_shapes(**common)
+    with_carries = _classify_decoder_live_tensor_shapes(**common, rms_accepted_schedule_carry_allowances=allowances)
+    assert len(without["forbidden_shapes"]) > 1570
+    assert with_carries["forbidden_shapes"] == [], with_carries["forbidden_shapes"][:3]
+    assert with_carries["passed"]
+    fused = _validate_fused_qkv_a_decoder_association(
+        text, layers=78, dsa_head_key_exact_association=True, module=module, rms_accepted_schedule_carry_allowances=allowances
+    )
+    assert fused["passed"] and fused["forbidden_shapes"] == []

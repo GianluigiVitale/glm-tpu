@@ -3378,7 +3378,8 @@ def _rms_accepted_schedule_carry_allowances(
     * the backward SSA slice of the reduce inside its computation (square,
       the carry parameter);
     * the carry producer in the parent computation and, when it is a fusion,
-      the backward SSA slice of its root (the fused pad/convert/add body);
+      the backward SSA slice of its root (the fused pad/convert/add body,
+      where the padded live row may appear once in BF16 before its convert);
     * the carry's consumers within three hops in the parent computation through
       {fusion, slice, dynamic-slice, multiply, copy, copy-start/done, bitcast,
       reshape, convert, get-tuple-element, tuple}; for a consumer fusion only the
@@ -3436,7 +3437,12 @@ def _rms_accepted_schedule_carry_allowances(
         if carry.opcode == "fusion":
             root = _rms_schedule_callee_root(module, carry)
             if root is not None:
-                allow_indices(_rms_ssa_backward_slice(by_key, root), signature)
+                producer_slice = _rms_ssa_backward_slice(by_key, root)
+                allow_indices(producer_slice, signature)
+                # The producer pads the live row before converting it to FP32
+                # (XLA orders pad -> convert), so the same rows appear once in
+                # BF16 inside this slice only.
+                allow_indices(producer_slice, f"bf16[32,{width}]")
         frontier = [carry]
         for _ in range(3):
             next_frontier: list[HloInstruction] = []
