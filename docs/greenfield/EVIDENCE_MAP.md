@@ -3597,3 +3597,14 @@ persistence only; review and persistence precede any v2 installation.
   censuses 8/8; observer `bf3ff47e…`. Classification: `EXECUTED_ON_TPU;TOKEN_EXACT_AT_8155;
   DSA_EVENT0_EXACT;EVENT1_7_MISMATCHES_SAME_SET;KV_A_SCHEDULE_IRRELEVANT;
   HIDDEN_WIDTH_SCHEDULE_DOES_NOT_CLOSE_EVENT1;TAG_BURNED;NO_CLAIM;GATE_D_OPEN`.
+- CPU-only capsule `docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-diagnosis.json`
+  (`scripts/greenfield/diagnose_event1_prompt_index_cache_offline.py`): inputs DB518 `result.npz`
+  `534bacc5…`, legacy layer-0/1 `dsa_internals` recovery internals `212eb4cc…`/`eb7a2500…`, sealed 8K
+  `dsa_events` oracle, observer captures of tags `…20260902T213510823966642Z` (`cb3b53f0…`) and
+  `…20260828T111624599159951Z`. Event 0 calibration exact (0/0, residual 5.5e-7). Event 1 recomputed from
+  the legacy query/head weights/current key over the greenfield DB518 layer-1 prompt cache reproduces the
+  accepted run's device selection exactly (0/0) and the oracle's 7/7 swapped positions exactly. Live and
+  bounded RMS reduce fusions are byte-identical. Classification: `EVENT0_CALIBRATION_EXACT;
+  EVENT1_LEGACY_DECODE_SIDE_OVER_GREENFIELD_PROMPT_CACHE_REPRODUCES_DEVICE_SELECTION;
+  EVENT1_DEVIATION_LOCALIZED_TO_LAYER1_PROMPT_INDEX_CACHE;CPU_EVIDENCE_ONLY;NO_FIX_PROVEN;
+  NO_GATE_D_NO_DECODER_NO_DB_NO_PERFORMANCE_CLAIM;GATE_D_OPEN`.

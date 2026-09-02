@@ -11167,3 +11167,49 @@ iteration bounds and backend window config) — no TPU needed for either.
 Decision: no further protected launches on this hypothesis. Next: the two offline diagnoses above; the
 runner's worker fetch retry (six attempts, still fail-closed) is staged for the next persistence review
 together with whatever the diagnosis yields.
+
+## 2026-09-03 00:40Z — offline diagnosis: event 1 is carried by the layer-1 prompt index cache, not by the decode side
+
+Both offline diagnoses announced above ran on CPU from sealed bytes (`scripts/greenfield/diagnose_event1_prompt_index_cache_offline.py`,
+capsule `docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-diagnosis.json`; tests
+`tests/greenfield/validation/test_event1_prompt_cache_offline_diagnosis.py`, 6 passed).
+
+(b) Codegen: the live decoder's 157 hidden-width reduce fusions (`f32[32,6144]{1,0:T(8,128)} -> f32[32]`,
+archived optimized HLO of tag `…20260902T213510823966642Z`) and the bounded arm's `%multiply_reduce_fusion`
+have byte-identical bodies and backend configs (kLoop, iteration bounds 2×1, output window 2×48). The
+accepted schedule is compiled identically inside the full program; codegen is closed.
+
+(a) Scores: event 0 device scores equal the oracle bitwise (2,048/2,048). Event 1: **all 2,040 common
+device scores differ from the oracle** (mean |Δ| 0.0138, median ≈1,350 FP32 ulps at scores ≈80) — a broad
+upstream perturbation, not a boundary rounding. The baseline (default-norm) run shows the same profile
+(mean |Δ| 0.0148) and its per-position deltas correlate 0.80 with the accepted run's: the dominant
+perturbation is shared by both runs and was never the decode-side norm.
+
+Localization: recomputing event 1 with the **legacy** layer-1 query, head weights and current key (sealed
+`dsa_internals` recovery oracle, position 8155) over the **greenfield** layer-1 prompt index cache captured
+by the executed DB518 run (`result.npz` `534bacc5…`, owner/page/row layout of the position-113 comparison)
+under the TPU default-precision score emulation reproduces the accepted run's device selection **exactly
+(0/0 swaps, mean |Δ| 1.3e-4)** and the oracle's swapped positions **exactly** (expected-only 1052 1143 1841
+2066 2436 7473 7575 / observed-only 1026 3889 6642 6690 6738 6810 7463). Event 0 calibrates the method (set
+exact, residual 5.5e-7 over the proven-exact layer-0 prompt cache). Hence the layer-1 decode side is now
+legacy-exact and the whole event-1 deviation lives in the **layer-1 prompt index cache built by prefill**.
+The DB518 full-width comparison agrees: at layer 1 the current key was already exact (0/128) while the
+oracle-side prompt cache for layer 1 has never existed (only layer 0 was ever captured and proven exact).
+
+Cause hypothesis (not yet proven on TPU): the greenfield prefill is a teacher-forced scan that pushes each
+prompt token through the single-token decode step, so every prompt row's residual from layer 1 onward is
+produced with the decode arithmetic (single-row projections, decode attention, StrategyND, M32 forms),
+while the legacy oracle's prompt rows came from its batched 2,048-token prefill (M-row matmuls, ragged
+prefill attention). Layer-0 prompt keys are exact only because they depend on embeddings alone and use the
+physical-M64 prompt-key repair; the layer-0 prompt main cache differed only in the main-RoPE suffix
+(DB530, 1 latent element in 2,048×512), since fixed (DB531). Every deeper layer's prompt keys inherit the
+prompt-row residual stream, which no decode-faithful kernel can reproduce.
+
+Consequence for Gate D: exact DSA selected sets at 8K require legacy-prefill-exact prompt caches for all
+21 indexer layers, i.e. a prefill whose per-row arithmetic matches the legacy's batched prefill — a
+different target from everything the decode-side campaign proved. Next admissible evidence (one Sol
+batch): (1) generalize the legacy prompt-index-cache capture to layer 1 (`INTERNAL_LAYER_ID=1`, sealing
+that currently pins slot zero) and capture the legacy layer-1 prompt cache once; (2) compare it offline
+with the DB518 greenfield layer-1 cache and, if needed, a live full-decoder capture, to obtain the row-level
+mismatch map (all rows vs chunk-boundary rows) before any prefill redesign. No protected 8K decoder launch
+until that map exists. CPU evidence only; no claim.

@@ -36,20 +36,19 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-02 23:00Z
+## Resume checkpoint — 2026-09-03 00:40Z
 
-Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical`; run pin = rewrite merge `086d459a` (pushed,
-mirrored; rewrite goal.md byte-identical to ba7d1e72). `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1` = 157
-hidden-width norms on the proven `f32[32,W]->f32[32]` schedule; q-a sharded, kv-a single-row (own
-contract kinds, N82 DAG bound); census 157/78/78 mandatory. Three executed 8K runs: token at 8155 exact
-each time; event 0 exact with sharded q-a; **event 1 = 7 mismatches (same set) with hidden-width only
-or +kv-a, baseline 6** → the schedule fix is not sufficient. Do NOT launch on this hypothesis. Next
-(offline, CPU): (a) size event-1 score deltas (observer npz `bf3ff47e…` vs legacy dsa_events oracle);
-(b) diff live layer-1 RMS reduce fusions (archived HLO of tag …213510823966642Z) vs the bounded arm
-`%multiply_reduce_fusion`. Then one Sol batch (incl. staged runner fetch retry) and one run. Launch:
-`env -i … RMS_ACCEPTED_SCHEDULE=1 DSA_ROPE_TABLE=0 SHORT_DECODER_TAG=<approved tag> bash
-scripts/greenfield/run_short_decoder_gate_d_pp8_8k.sh` from the rewrite worktree after mirror verifier
-+ fleet/lease/vacancy/health; pre-fetch workers first.
+Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical`; run pin = rewrite merge `086d459a`. Three executed 8K runs with `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1`: token exact, event 0
+exact, **event 1 = 7 mismatches (same set)** — decode-side norm hypothesis exhausted. Offline diagnosis
+(CPU capsule `docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-diagnosis.json`): live and bounded
+reduce fusions byte-identical; legacy layer-1 query/head-weights/current-key over the greenfield DB518
+layer-1 prompt cache reproduces the device selection exactly (0/0) and the oracle's 7/7 swaps → **event 1
+is carried by the layer-1 prompt index cache built by prefill**, not by the decode side. Cause hypothesis:
+teacher-forced scan = decode arithmetic per prompt row; legacy prompt rows = batched prefill arithmetic.
+Do NOT launch the 8K decoder. Next (one Sol batch): generalize legacy prompt-cache capture to layer 1
+(`GLM_GREENFIELD_DSA_INTERNALS_LAYER_ID=1`; sealing pins slot zero), capture the legacy layer-1 prompt
+cache once, compare offline with DB518 `result.npz` `534bacc5…` → row-level mismatch map, then decide
+the prefill plan. Runner fetch retry staged (`6ac3dc2`).
 
 ## Finish (after Gate D)
 
