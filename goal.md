@@ -36,7 +36,7 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-02 08:40Z
+## Resume checkpoint — 2026-09-02 04:40Z
 
 Tooling worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`. DSA host-rotary table refuted, tombstoned
 (`…8k-refusal-adjudication.json` `2a7c8fb5…`). **Layer-1 frontier certified on CPU**
