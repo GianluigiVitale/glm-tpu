@@ -39,6 +39,15 @@ EXPECTED_STABLEHLO_SHA256 = (
 EXPECTED_OPTIMIZED_HLO_SHA256 = (
     "817ba2ed87c33ec928f834fcf3a003ce63d3dedf4061a7c64fe354a26ac498ea"
 )
+# Numerical-driver optimized HLO is the accepted preimage after the exact
+# source-location substitutions pinned by the reviewed bridge artifact.
+EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256 = (
+    "70485b066b44233d82c2a728f09753f8a71306074fdd8b856112e46ab1f60564"
+)
+EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES = 31861
+HLO_SOURCE_LOCATION_BRIDGE_SHA256 = (
+    "c2732f7184416cce87839b4cadf552b94d983aba06fa56b687eaacc03ca26bea"
+)
 EXPECTED_WK_WEIGHT_FP32_SHA256 = (
     "b2c67e0fdf4d7292494778233e9813d8256f2fb88b6f7376870379832fbab24b"
 )
@@ -92,6 +101,7 @@ SUCCESS_PAYLOAD = (
     "hlo/acquired_preimage.stablehlo.mlir",
     "hlo/projection_contraction_pp16_stage0.optimized_hlo.txt",
     "hlo/projection_contraction_pp16_stage0.stablehlo.mlir",
+    "hlo/source_location_bridge.json",
     "mirror.sha256",
     "orchestrator.sealed.log",
     "outputs.npz",
@@ -373,6 +383,58 @@ def _validate_output_npz(
     return derived_accepted
 
 
+def _bridge_replacements(report: Any) -> list[dict[str, Any]]:
+    derivation = report.get("derivation") if isinstance(report, Mapping) else None
+    replacements = (
+        derivation.get("replacements") if isinstance(derivation, Mapping) else None
+    )
+    if (
+        not isinstance(report, Mapping)
+        or report.get("artifact_kind")
+        != "gate_d_projection_contraction_pp16_hlo_source_location_bridge"
+        or report.get("derived_numerical_hlo")
+        != {
+            "byte_count": EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES,
+            "sha256": EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256,
+        }
+        or report.get("source_hlo", {}).get("sha256") != EXPECTED_OPTIMIZED_HLO_SHA256
+        or report.get("gate_d_closed") is not False
+        or report.get("numerical_claim") is not False
+        or report.get("performance_claim") is not False
+        or not isinstance(replacements, list)
+        or len(replacements) != 3
+        or derivation.get("replacement_count") != 3
+        or any(
+            not isinstance(item, Mapping)
+            or set(item) != {"new", "occurrence_count", "old", "surface"}
+            or type(item["new"]) is not str
+            or type(item["old"]) is not str
+            or not item["new"].isascii()
+            or not item["old"].isascii()
+            or item["occurrence_count"] != 1
+            for item in replacements
+        )
+    ):
+        raise RuntimeError("projection numerical HLO bridge schema drifted")
+    return [dict(item) for item in replacements]
+
+
+def _derive_bridged_hlo(preimage: bytes, replacements: list[dict[str, Any]]) -> bytes:
+    derived = preimage
+    for item in replacements:
+        old = item["old"].encode("ascii")
+        new = item["new"].encode("ascii")
+        if derived.count(old) != 1 or derived.count(new) != 0:
+            raise RuntimeError("projection numerical HLO bridge occurrence drifted")
+        derived = derived.replace(old, new, 1)
+    if (
+        len(derived) != EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES
+        or sha256(derived).hexdigest() != EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256
+    ):
+        raise RuntimeError("projection numerical derived HLO drifted")
+    return derived
+
+
 def _validate_dependencies(
     base: Any,
     runner: Mapping[str, Any],
@@ -554,6 +616,34 @@ def _prepare_success(
         "stablehlo": "hlo/projection_contraction_pp16_stage0.stablehlo.mlir",
     }
     hlo_payload: dict[str, bytes] = {}
+    bridge_raw = base.snapshot_member(
+        run_fd, "hlo/source_location_bridge.json", limit=1 << 20
+    )
+    if sha256(bridge_raw).hexdigest() != HLO_SOURCE_LOCATION_BRIDGE_SHA256:
+        raise RuntimeError("projection numerical HLO bridge bytes drifted")
+    bridge_replacements = _bridge_replacements(json.loads(bridge_raw))
+    hlo_payload["hlo/source_location_bridge.json"] = bridge_raw
+    runner_hlo = runner.get("hlo")
+    if not isinstance(runner_hlo, Mapping) or set(runner_hlo) != {
+        "optimized_hlo",
+        "source_location_bridge",
+        "stablehlo",
+    }:
+        raise RuntimeError("projection numerical HLO identity catalogue drifted")
+    if runner_hlo["source_location_bridge"] != {
+        "artifact_sha256": HLO_SOURCE_LOCATION_BRIDGE_SHA256,
+        "derived_numerical_hlo": {
+            "byte_count": EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES,
+            "sha256": EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256,
+        },
+        "replacement_count": 3,
+        "source_hlo": {
+            "byte_count": 31857,
+            "run_tag": "gate_d_projection_contraction_pp16_hlo_20260901T213605719107105Z",
+            "sha256": EXPECTED_OPTIMIZED_HLO_SHA256,
+        },
+    }:
+        raise RuntimeError("projection numerical HLO bridge binding drifted")
     for kind, relative in hlo_files.items():
         raw = base.snapshot_member(run_fd, relative)
         preimage = base.snapshot_member(
@@ -561,14 +651,17 @@ def _prepare_success(
             "hlo/acquired_preimage."
             + ("optimized_hlo.txt" if kind == "optimized_hlo" else "stablehlo.mlir"),
         )
-        expected_sha = (
-            EXPECTED_OPTIMIZED_HLO_SHA256
-            if kind == "optimized_hlo"
-            else EXPECTED_STABLEHLO_SHA256
-        )
-        identity = runner.get("hlo", {}).get(kind, {})
+        if kind == "optimized_hlo":
+            preimage_sha = EXPECTED_OPTIMIZED_HLO_SHA256
+            expected_sha = EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256
+            expected_raw = _derive_bridged_hlo(preimage, bridge_replacements)
+        else:
+            preimage_sha = expected_sha = EXPECTED_STABLEHLO_SHA256
+            expected_raw = preimage
+        identity = runner_hlo.get(kind, {})
         if (
-            raw != preimage
+            sha256(preimage).hexdigest() != preimage_sha
+            or raw != expected_raw
             or sha256(raw).hexdigest() != expected_sha
             or identity != {"byte_count": len(raw), "sha256": expected_sha}
         ):

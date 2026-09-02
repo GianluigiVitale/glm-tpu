@@ -263,3 +263,49 @@ def test_success_mode_prints_direct_authority_after_terminal_receipt() -> None:
     assert source.count("return _result_authority_line(") == 1
     assert re.search(r"print\(\s*_publish_success\(", source) is not None
     assert source.count("_publish_success(") == 2
+
+
+BRIDGE = ROOT / (
+    "docs/artifacts/gate-d-projection-contraction-pp16-hlo-source-location-bridge.json"
+)
+ACCEPTED_OPTIMIZED_HLO = Path(
+    "/home/gianl/gate-d-runs/gate_d_projection_contraction_pp16_hlo_"
+    "20260901T213605719107105Z/hlo/projection_contraction_pp16_stage0.optimized_hlo.txt"
+)
+
+
+def test_publisher_pins_bridge_and_derived_hlo_identity() -> None:
+    import json
+
+    raw = BRIDGE.read_bytes()
+    assert sha256(raw).hexdigest() == MODULE.HLO_SOURCE_LOCATION_BRIDGE_SHA256
+    report = json.loads(raw)
+    replacements = MODULE._bridge_replacements(report)
+    assert len(replacements) == 3
+    assert MODULE.EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256 == (
+        RUNNER_MODULE.EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256
+    )
+    assert MODULE.HLO_SOURCE_LOCATION_BRIDGE_SHA256 == (
+        RUNNER_MODULE.HLO_SOURCE_LOCATION_BRIDGE_SHA256
+    )
+    assert "hlo/source_location_bridge.json" in MODULE.SUCCESS_PAYLOAD
+    for mutate in (
+        lambda r: r.__setitem__("gate_d_closed", True),
+        lambda r: r["derivation"]["replacements"].pop(),
+        lambda r: r["derivation"]["replacements"][0].__setitem__("occurrence_count", 2),
+        lambda r: r["derived_numerical_hlo"].__setitem__("sha256", "0" * 64),
+        lambda r: r.__setitem__("artifact_kind", "other"),
+    ):
+        hostile = json.loads(raw)
+        mutate(hostile)
+        with pytest.raises(RuntimeError, match="bridge schema drifted"):
+            MODULE._bridge_replacements(hostile)
+    if ACCEPTED_OPTIMIZED_HLO.exists():
+        accepted = ACCEPTED_OPTIMIZED_HLO.read_bytes()
+        derived = MODULE._derive_bridged_hlo(accepted, replacements)
+        assert (
+            sha256(derived).hexdigest()
+            == MODULE.EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256
+        )
+        with pytest.raises(RuntimeError, match="occurrence drifted"):
+            MODULE._derive_bridged_hlo(derived, replacements)

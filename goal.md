@@ -35,21 +35,20 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-01 23:50Z
+## Resume checkpoint — 2026-09-02 00:05Z
 
 Worktree `/home/gianl/glm-tpu-gate-d-pp16-numerical`, branch
-`tooling/gate-d-compensated-pp16-numerical`, HEAD `f36c060981e78320164fa9a39e29c415468ff2cf` on
-origin + mirror. Numerical V1 runtime installed root 0555 (launcher
-`/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v1.py`). Sol-approved tag
-`gate_d_projection_contraction_pp16_numerical_20260901T233855937688834Z` ran and **failed closed**
-in the driver: `Gate-D projection numerical executable HLO drifted` (driver line ~510: compiled HLO
-differs from the accepted compile-only HLO `4b3fa252…`/`817ba2ed…`). Diagnostic archived under the
-tag's `diagnostic/` prefix; no TPU executable was invoked; census 8/8 clean. Tag is burned.
+`tooling/gate-d-compensated-pp16-numerical`, parent HEAD `990ea60d` on origin+mirror. V1 numerical
+tag `…233855937688834Z` **failed closed** before executable invocation: optimized-HLO debug metadata
+(driver path + two call-site lines) differed from the accepted compile-only HLO; StableHLO identical.
+Root cause: acquisition and numerical drivers are different installed files. Fix staged as V2:
+reviewed source-location bridge `c2732f71…6bea` derives numerical HLO `70485b06…0564` from accepted
+`817ba2ed…`; driver/publisher compare against derived bytes; V2 install targets; chain repinned;
+79/79 tests. This batch also carries the failure artifact and docs.
 
-Exact next: diagnose the HLO drift (compare acquired vs accepted optimized HLO/StableHLO bytes;
-identify nondeterministic or environment-dependent fields; decide whether the identity check must
-bind a normalized fingerprint or the compile environment differs), fix root cause, then one batched
-Sol review (fix + tests + certificate + install + fresh tag) and one run. Record the outcome here.
+Exact next (one batched Sol review, then act): commit/push/mirror; analyzer certificate; provision
+staging tree `af87028e…750a` to `/opt/glm-tpu/gate-d-projection-contraction-numerical-install-v2` and
+run the V2 installer; run launcher `…_v2.py` once with tag `gate_d_projection_contraction_pp16_numerical_20260901T235818944668679Z`; adjudicate `NUMERICAL_RESULT`; record here.
 
 ## Finish (after Gate D)
 

@@ -13,7 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 
 INSTALL_PATH = Path(
-    "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v1.py"
+    "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v2.py"
 )
 PYTHON = Path("/usr/bin/python3.10")
 PYTHON_SHA256 = "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
@@ -27,9 +27,9 @@ WRAPPER_PATH = (
 WRAPPER_SOURCE_PATH = (
     "scripts/greenfield/run_gate_d_projection_contraction_pp16_numerical.sh"
 )
-WRAPPER_SHA256 = "16e348e36faa95d022ec21d8eed03c34451bc772d6b911a7d8c609ba749d6250"
+WRAPPER_SHA256 = "a5a5a5ffc1d012944c48b16e433906a6506441836f66c88f4115d8b2e70598d9"
 IMMUTABLE_CAPSULE_ROOT = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v1"
+    "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v2"
 )
 DRIVER_PATH = (
     IMMUTABLE_CAPSULE_ROOT / "run_gate_d_projection_contraction_pp16_numerical.py"
@@ -37,14 +37,14 @@ DRIVER_PATH = (
 DRIVER_SOURCE_PATH = (
     "scripts/greenfield/run_gate_d_projection_contraction_pp16_numerical.py"
 )
-DRIVER_SHA256 = "23059ef2329980be06e69a7c62a43a449101307ff4b109319e470f6152ebb67c"
+DRIVER_SHA256 = "a38bb8b89bb8cf70568c8562b2013f188b7c8ed17f1e41edad37a40332156404"
 PUBLISHER_PATH = (
     IMMUTABLE_CAPSULE_ROOT / "publish_gate_d_projection_contraction_pp16_numerical.py"
 )
 PUBLISHER_SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_projection_contraction_pp16_numerical.py"
 )
-PUBLISHER_SHA256 = "6ead9e1358b00a1349ba46d08dbd0d4b304fd783d7da5991cb54e87ae34de0ff"
+PUBLISHER_SHA256 = "5c5e58afa2c36e46377512a777df6a00669419f9f1c93e3504f71ea1334f6665"
 MIRROR_VERIFIER_PATH = (
     IMMUTABLE_CAPSULE_ROOT / "verify_gate_d_same_region_git_mirror.py"
 )

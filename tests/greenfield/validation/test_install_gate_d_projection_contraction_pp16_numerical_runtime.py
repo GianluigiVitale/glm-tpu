@@ -55,13 +55,13 @@ def test_payload_hashes_and_install_targets_are_exact() -> None:
         "launch_gate_d_projection_contraction_pp16_numerical.py"
     }
     assert str(MODULE.SOURCE_ROOT) == (
-        "/opt/glm-tpu/gate-d-projection-contraction-numerical-install-v1"
+        "/opt/glm-tpu/gate-d-projection-contraction-numerical-install-v2"
     )
     assert str(MODULE.LAUNCHER_TARGET) == (
-        "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v1.py"
+        "/opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v2.py"
     )
     assert str(MODULE.CAPSULE_TARGET) == (
-        "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v1"
+        "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v2"
     )
 
 

@@ -3422,3 +3422,12 @@ persistence only; review and persistence precede any v2 installation.
   fresh-tag command for `gate_d_projection_contraction_pp16_numerical_20260901T233855937688834Z`.
 - Classification: `NUMERICAL_RUNTIME_V1_INSTALLED_NOT_INVOKED;TPU_EXECUTION_UNAUTHORIZED;
   FULL_DSA_8K_UNAUTHORIZED;GATE_D_OPEN`.
+
+## 2026-09-01 numerical V1 fail-closed (HLO metadata); V2 bridge batch
+
+- Tag `…233855937688834Z` failed closed before executable invocation: optimized-HLO debug metadata
+  (driver path + 2 call-site lines) differed; StableHLO identical. Failure artifact SHA `c07dd4f7fdb558304b4819fe1faedf8a27d39041df71d5c19c6f3f8cc0cc7980`.
+- V2: bridge `c2732f71…6bea` derives numerical HLO `70485b06…0564` from accepted `817ba2ed…`;
+  driver/publisher compare against derived bytes; V2 install targets; chain repinned; 79/79 tests.
+- Classification: `NUMERICAL_V1_TAG_BURNED_HLO_METADATA;V2_BRIDGE_SOURCE_READY;REVIEW_PENDING;
+  TPU_EXECUTION_UNAUTHORIZED;GATE_D_OPEN`.

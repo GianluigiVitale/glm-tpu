@@ -51,7 +51,8 @@ def test_source_is_default_off_bounded_and_projection_only() -> None:
     assert source.count("result = compiled(*arguments)") == 1
     assert source.count("jax.device_get(result)") == 1
     assert "stablehlo != accepted_stablehlo" in source
-    assert "optimized_hlo != accepted_optimized_hlo" in source
+    assert "optimized_hlo != derived_optimized_hlo" in source
+    assert "optimized_hlo != accepted_optimized_hlo" not in source
     assert '"gate_d_closed": False' in source
     assert '"performance_claim": False' in source
     assert '"root_cause_fix_proven": False' in source
@@ -142,4 +143,126 @@ def test_deterministic_npz_is_byte_stable() -> None:
         assert archive.namelist() == ["a.npy", "b.npy"]
         assert all(
             item.date_time == (1980, 1, 1, 0, 0, 0) for item in archive.infolist()
+        )
+
+
+BRIDGE = ROOT / (
+    "docs/artifacts/gate-d-projection-contraction-pp16-hlo-source-location-bridge.json"
+)
+ACCEPTED_OPTIMIZED_HLO = Path(
+    "/home/gianl/gate-d-runs/gate_d_projection_contraction_pp16_hlo_"
+    "20260901T213605719107105Z/hlo/projection_contraction_pp16_stage0.optimized_hlo.txt"
+)
+V1_FAILED_OPTIMIZED_HLO = Path(
+    "/home/gianl/gate-d-runs/gate_d_projection_contraction_pp16_numerical_"
+    "20260901T233855937688834Z/hlo/projection_contraction_pp16_stage0.optimized_hlo.txt"
+)
+
+
+def test_bridge_call_site_lines_match_driver_source_and_installed_path() -> None:
+    module = _module()
+    lines = SOURCE.read_text(encoding="utf-8").splitlines()
+    assert lines[module.NUMERICAL_DRIVER_MODULE_CALL_LINE - 1] == (
+        "    raise SystemExit(main())"
+    )
+    assert lines[module.NUMERICAL_DRIVER_LOWER_CALL_LINE - 1].strip() == (
+        "lowered = replay.lower(*abstract_arguments)"
+    )
+    assert module.NUMERICAL_DRIVER_INSTALL_PATH == (
+        "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v2/"
+        "run_gate_d_projection_contraction_pp16_numerical.py"
+    )
+    source = SOURCE.read_text(encoding="utf-8")
+    assert "Path(__file__) != Path(NUMERICAL_DRIVER_INSTALL_PATH)" in source
+    assert source.index("validate_hlo_source_location_bridge(\n        json.loads") < (
+        source.index("lowered = replay.lower(*abstract_arguments)")
+    )
+    assert '"hlo/source_location_bridge.json"' in source
+
+
+def test_bridge_artifact_bytes_and_schema_are_pinned() -> None:
+    module = _module()
+    from hashlib import sha256
+
+    raw = BRIDGE.read_bytes()
+    assert sha256(raw).hexdigest() == module.HLO_SOURCE_LOCATION_BRIDGE_SHA256
+    report = json.loads(raw)
+    assert report["derivation"]["replacements"] == (
+        module.expected_hlo_source_location_replacements()
+    )
+    assert report["derived_numerical_hlo"] == {
+        "byte_count": module.EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES,
+        "sha256": module.EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256,
+    }
+    assert report["gate_d_closed"] is False
+    assert report["numerical_claim"] is False
+    assert report["tpu_numerical_execution_performed"] is False
+
+
+def test_bridge_derivation_applies_only_single_occurrence_substitutions() -> None:
+    module = _module()
+    replacements = [
+        {"new": "B", "occurrence_count": 1, "old": "A", "surface": "x"},
+        {
+            "new": "line=2 end_line=2",
+            "occurrence_count": 1,
+            "old": "line=1 end_line=1",
+            "surface": "y",
+        },
+    ]
+    preimage = b"head A tail line=1 end_line=1 rest"
+    assert (
+        module.derive_hlo_from_source_location_replacements(preimage, replacements)
+        == b"head B tail line=2 end_line=2 rest"
+    )
+    for hostile in (
+        b"A A line=1 end_line=1",
+        b"line=1 end_line=1",
+        b"A B line=1 end_line=1",
+        b"A line=1 end_line=1 line=2 end_line=2",
+    ):
+        with pytest.raises(RuntimeError, match="occurrence drifted"):
+            module.derive_hlo_from_source_location_replacements(hostile, replacements)
+    with pytest.raises(RuntimeError, match="occurrence drifted"):
+        module.derive_hlo_from_source_location_replacements(
+            preimage, [{**replacements[0], "occurrence_count": 2}, replacements[1]]
+        )
+
+
+def test_bridge_validation_reproduces_failed_v1_hlo_and_pins_v2_hlo() -> None:
+    if not ACCEPTED_OPTIMIZED_HLO.exists() or not V1_FAILED_OPTIMIZED_HLO.exists():
+        pytest.skip("protected HLO run directories are not present on this host")
+    module = _module()
+    from hashlib import sha256
+
+    accepted = ACCEPTED_OPTIMIZED_HLO.read_bytes()
+    assert sha256(accepted).hexdigest() == module.EXPECTED_OPTIMIZED_HLO_SHA256
+    derived, binding = module.validate_hlo_source_location_bridge(
+        json.loads(BRIDGE.read_bytes()), accepted
+    )
+    assert sha256(derived).hexdigest() == module.EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256
+    assert binding["artifact_sha256"] == module.HLO_SOURCE_LOCATION_BRIDGE_SHA256
+    assert derived != accepted
+    # Everything but the three metadata surfaces is byte-identical.
+    assert derived.count(module.NUMERICAL_DRIVER_INSTALL_PATH.encode()) == 1
+    assert accepted.count(module.HLO_ACQUIRER_INSTALL_PATH.encode()) == 1
+    # The v1 fail-closed run's HLO is the same derivation with the v1 path/lines.
+    v1 = [dict(item) for item in module.expected_hlo_source_location_replacements()]
+    v1[0]["new"] = (
+        "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v1/"
+        "run_gate_d_projection_contraction_pp16_numerical.py"
+    )
+    v1[1]["new"] = "line=657 end_line=657"
+    v1[2]["new"] = "line=497 end_line=497"
+    assert (
+        module.derive_hlo_from_source_location_replacements(accepted, v1)
+        == V1_FAILED_OPTIMIZED_HLO.read_bytes()
+    )
+    hostile = json.loads(BRIDGE.read_bytes())
+    hostile["derivation"]["replacements"][1]["new"] = "line=1 end_line=1"
+    with pytest.raises(RuntimeError, match="bridge schema drifted"):
+        module.validate_hlo_source_location_bridge(hostile, accepted)
+    with pytest.raises(RuntimeError, match="preimage drifted"):
+        module.validate_hlo_source_location_bridge(
+            json.loads(BRIDGE.read_bytes()), accepted + b"\n"
         )

@@ -1100,3 +1100,11 @@ normalized-state cause.
   then treat reopened local names as supplementary consistency checks only. Attack-test local
   substitution after publisher return; it may cause fail-closed denial but must never flip the
   remote accepted/rejected result.
+- XLA optimized-HLO text embeds the calling Python file path and call-site line numbers in its
+  FileNames/FileLocations tables. A numerical driver that is a different installed file from the
+  compile-only acquisition driver can never pass a raw byte comparison against the accepted HLO,
+  even when StableHLO and the graph body are byte-identical (v1 numerical tag burned 2026-09-01).
+  Either acquire the HLO from the exact file that will execute it, or bind an exact reviewed
+  source-location bridge (path + call-site lines, single-occurrence substitutions, derived hash) and
+  compare against the derived bytes. Pin the call-site line constants with a test against the driver
+  source, because formatters shift them.

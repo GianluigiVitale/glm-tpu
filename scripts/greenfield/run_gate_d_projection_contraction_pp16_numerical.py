@@ -71,6 +71,31 @@ EXPECTED_OPTIMIZED_HLO_SHA256 = (
 )
 EXPECTED_STABLEHLO_BYTES = 7420
 EXPECTED_OPTIMIZED_HLO_BYTES = 31857
+# The compile-only acquisition driver and this numerical driver are different
+# installed files, so XLA's optimized-HLO debug metadata (FileNames entry and
+# two call-site FileLocations) differs while the graph body and StableHLO are
+# byte-identical.  The reviewed bridge artifact pins exactly those three
+# substitutions; the expected numerical HLO is derived from the accepted
+# preimage and nothing else is normalized.
+HLO_SOURCE_LOCATION_BRIDGE_SHA256 = (
+    "c2732f7184416cce87839b4cadf552b94d983aba06fa56b687eaacc03ca26bea"
+)
+EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256 = (
+    "70485b066b44233d82c2a728f09753f8a71306074fdd8b856112e46ab1f60564"
+)
+EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES = 31861
+HLO_ACQUIRER_INSTALL_PATH = (
+    "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-hlo-v3/"
+    "acquire_gate_d_projection_contraction_pp16_hlo.py"
+)
+NUMERICAL_DRIVER_INSTALL_PATH = (
+    "/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v2/"
+    "run_gate_d_projection_contraction_pp16_numerical.py"
+)
+HLO_ACQUIRER_MODULE_CALL_LINE = 1506
+HLO_ACQUIRER_LOWER_CALL_LINE = 1365
+NUMERICAL_DRIVER_MODULE_CALL_LINE = 837
+NUMERICAL_DRIVER_LOWER_CALL_LINE = 676
 TAG_PATTERN = r"gate_d_projection_contraction_pp16_numerical_[0-9]{8}T[0-9]{15}Z"
 _MAX_NPZ_MEMBER_BYTES = 64 * 1024 * 1024
 _MAX_NPZ_TOTAL_BYTES = 32 * 1024 * 1024
@@ -319,6 +344,147 @@ def _host_outputs(result: Any, jax: Any, np: Any) -> dict[str, Any]:
     }
 
 
+def expected_hlo_source_location_replacements() -> list[dict[str, Any]]:
+    return [
+        {
+            "new": NUMERICAL_DRIVER_INSTALL_PATH,
+            "old": HLO_ACQUIRER_INSTALL_PATH,
+            "occurrence_count": 1,
+            "surface": "FileNames",
+        },
+        {
+            "new": (
+                f"line={NUMERICAL_DRIVER_MODULE_CALL_LINE} "
+                f"end_line={NUMERICAL_DRIVER_MODULE_CALL_LINE}"
+            ),
+            "old": (
+                f"line={HLO_ACQUIRER_MODULE_CALL_LINE} "
+                f"end_line={HLO_ACQUIRER_MODULE_CALL_LINE}"
+            ),
+            "occurrence_count": 1,
+            "surface": "FileLocations module call",
+        },
+        {
+            "new": (
+                f"line={NUMERICAL_DRIVER_LOWER_CALL_LINE} "
+                f"end_line={NUMERICAL_DRIVER_LOWER_CALL_LINE}"
+            ),
+            "old": (
+                f"line={HLO_ACQUIRER_LOWER_CALL_LINE} "
+                f"end_line={HLO_ACQUIRER_LOWER_CALL_LINE}"
+            ),
+            "occurrence_count": 1,
+            "surface": "FileLocations lower call",
+        },
+    ]
+
+
+def derive_hlo_from_source_location_replacements(
+    accepted_optimized_hlo: bytes, replacements: list[dict[str, Any]]
+) -> bytes:
+    """Apply the exact single-occurrence substitutions; nothing else changes."""
+
+    derived = accepted_optimized_hlo
+    for replacement in replacements:
+        old = replacement["old"].encode("ascii")
+        new = replacement["new"].encode("ascii")
+        if (
+            replacement["occurrence_count"] != 1
+            or derived.count(old) != 1
+            or derived.count(new) != 0
+        ):
+            raise RuntimeError("Gate-D HLO source-location occurrence drifted")
+        derived = derived.replace(old, new, 1)
+    return derived
+
+
+def validate_hlo_source_location_bridge(
+    report: Mapping[str, Any], accepted_optimized_hlo: bytes
+) -> tuple[bytes, dict[str, Any]]:
+    """Derive the numerical-driver optimized HLO from the accepted preimage."""
+
+    replacements = expected_hlo_source_location_replacements()
+    expected = {
+        "artifact_kind": (
+            "gate_d_projection_contraction_pp16_hlo_source_location_bridge"
+        ),
+        "classification": (
+            "SOURCE_LOCATION_METADATA_ONLY_HASH_DRIFT;"
+            "GRAPH_BODY_UNCHANGED_BY_EXACT_PREIMAGE_DERIVATION;"
+            "STABLEHLO_BYTE_IDENTICAL;TPU_EXECUTABLE_NOT_INVOKED;"
+            "NUMERICAL_UNPROVEN;NO_PERFORMANCE_CLAIM;GATE_D_OPEN"
+        ),
+        "derived_numerical_hlo": {
+            "byte_count": EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES,
+            "sha256": EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256,
+        },
+        "derivation": {
+            "method": (
+                "Apply exactly the three listed single-occurrence UTF-8 "
+                "substitutions to the accepted optimized-HLO bytes, with no "
+                "normalization or other mutation, then hash the complete result."
+            ),
+            "replacement_count": 3,
+            "replacements": replacements,
+        },
+        "gate_d_closed": False,
+        "numerical_claim": False,
+        "observed_failure": {
+            "compiled_executable_invocation_count": 0,
+            "driver_install_path": (
+                "/usr/local/libexec/glm-tpu/"
+                "gate-d-projection-contraction-pp16-numerical-v1/"
+                "run_gate_d_projection_contraction_pp16_numerical.py"
+            ),
+            "optimized_hlo_bytes_preserved": True,
+            "optimized_hlo_sha256": (
+                "f783a7d8096cd29855ddab01cbb154ede69aee505a5ca34d3b6c255fc8635158"
+            ),
+            "run_tag": (
+                "gate_d_projection_contraction_pp16_numerical_20260901T233855937688834Z"
+            ),
+            "stablehlo_sha256": EXPECTED_STABLEHLO_SHA256,
+        },
+        "performance_claim": False,
+        "schema_version": 1,
+        "source_hlo": {
+            "byte_count": EXPECTED_OPTIMIZED_HLO_BYTES,
+            "run_tag": "gate_d_projection_contraction_pp16_hlo_20260901T213605719107105Z",
+            "sha256": EXPECTED_OPTIMIZED_HLO_SHA256,
+        },
+        "verification_scope": (
+            "Under SHA-256 collision resistance, the numerical driver's compiler "
+            "text equals the exact accepted optimized-HLO preimage after only the "
+            "authenticated installed-path and call-site line metadata "
+            "substitutions. This authorizes only the exact numerical-driver raw "
+            "HLO hash; it does not relax StableHLO identity, HLO locality, "
+            "numerical, performance, or Gate-D gates."
+        ),
+        "tpu_numerical_execution_performed": False,
+    }
+    if report != expected:
+        raise RuntimeError("Gate-D HLO source-location bridge schema drifted")
+    if (
+        len(accepted_optimized_hlo) != EXPECTED_OPTIMIZED_HLO_BYTES
+        or sha256(accepted_optimized_hlo).hexdigest() != EXPECTED_OPTIMIZED_HLO_SHA256
+    ):
+        raise RuntimeError("Gate-D accepted optimized-HLO preimage drifted")
+    derived = derive_hlo_from_source_location_replacements(
+        accepted_optimized_hlo, replacements
+    )
+    if (
+        len(derived) != EXPECTED_NUMERICAL_OPTIMIZED_HLO_BYTES
+        or sha256(derived).hexdigest() != EXPECTED_NUMERICAL_OPTIMIZED_HLO_SHA256
+    ):
+        raise RuntimeError("Gate-D derived numerical optimized-HLO drifted")
+    return derived, {
+        "artifact_sha256": HLO_SOURCE_LOCATION_BRIDGE_SHA256,
+        "derived_numerical_hlo": expected["derived_numerical_hlo"],
+        "replacement_count": 3,
+        "source_hlo": expected["source_hlo"],
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--expected-code-hash", required=True)
@@ -328,6 +494,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hlo-success-authority", type=Path, required=True)
     parser.add_argument("--accepted-stablehlo", type=Path, required=True)
     parser.add_argument("--accepted-optimized-hlo", type=Path, required=True)
+    parser.add_argument("--hlo-source-location-bridge", type=Path, required=True)
     parser.add_argument("--frontier-authority", type=Path, required=True)
     parser.add_argument("--host-materialization-authority", type=Path, required=True)
     parser.add_argument("--capsule", type=Path, required=True)
@@ -396,6 +563,15 @@ def main() -> int:
         or sha256(accepted_optimized_hlo).hexdigest() != EXPECTED_OPTIMIZED_HLO_SHA256
     ):
         raise RuntimeError("Gate-D accepted projection HLO bytes drifted")
+    if Path(__file__) != Path(NUMERICAL_DRIVER_INSTALL_PATH):
+        raise RuntimeError("Gate-D numerical driver is not the bridged installed path")
+    hlo_bridge_raw = _snapshot_regular(args.hlo_source_location_bridge)
+    if sha256(hlo_bridge_raw).hexdigest() != HLO_SOURCE_LOCATION_BRIDGE_SHA256:
+        raise RuntimeError("Gate-D HLO source-location bridge bytes drifted")
+    derived_optimized_hlo, hlo_bridge_binding = validate_hlo_source_location_bridge(
+        json.loads(hlo_bridge_raw.decode("ascii", errors="strict")),
+        accepted_optimized_hlo,
+    )
     input_raw = _snapshot_regular(args.capsule_inputs)
     state_raw = _snapshot_regular(args.capsule_state)
     if (
@@ -409,6 +585,9 @@ def main() -> int:
     )
     helper._write_run_member_exclusive(
         run_fd, "hlo/acquired_preimage.optimized_hlo.txt", accepted_optimized_hlo
+    )
+    helper._write_run_member_exclusive(
+        run_fd, "hlo/source_location_bridge.json", hlo_bridge_raw
     )
     source_fd, source_path, source_snapshot = helper._sealed_git_source_archive(
         args.expected_code_hash, repo=WORKTREE
@@ -506,7 +685,7 @@ def main() -> int:
         "hlo/projection_contraction_pp16_stage0.optimized_hlo.txt",
         optimized_hlo,
     )
-    if stablehlo != accepted_stablehlo or optimized_hlo != accepted_optimized_hlo:
+    if stablehlo != accepted_stablehlo or optimized_hlo != derived_optimized_hlo:
         raise RuntimeError("Gate-D projection numerical executable HLO drifted")
     memory_after_compile = [helper._memory_stats(device) for device in devices]
 
@@ -610,6 +789,7 @@ def main() -> int:
                 "byte_count": len(optimized_hlo),
                 "sha256": sha256(optimized_hlo).hexdigest(),
             },
+            "source_location_bridge": hlo_bridge_binding,
             "stablehlo": {
                 "byte_count": len(stablehlo),
                 "sha256": sha256(stablehlo).hexdigest(),

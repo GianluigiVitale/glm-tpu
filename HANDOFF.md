@@ -9996,3 +9996,38 @@ fresh-tag execute-once command
 `/usr/bin/env -i GLM_GATE_D_PROJECTION_CONTRACTION_PP16_NUMERICAL=1 GLM_GATE_D_PROJECTION_CONTRACTION_PP16_NUMERICAL_MODE=execute_once GLM_GATE_D_PROJECTION_CONTRACTION_PP16_NUMERICAL_TAG=gate_d_projection_contraction_pp16_numerical_20260901T233855937688834Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin:/home/gianl/vllm-env/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/launch_gate_d_projection_contraction_pp16_numerical_v1.py`,
 to be run only after this batch is committed, pushed and mirror-replayed (the wrapper itself
 requires a clean pushed pin, mirror replay, canonical vacancy and an authenticated 8/8 census).
+
+## 2026-09-01 numerical V1 tag failed closed on HLO source-location metadata; V2 bridge prepared
+
+The approved tag `gate_d_projection_contraction_pp16_numerical_20260901T233855937688834Z` passed
+vacancy, mirror replay and the 8/8 pre-census, then failed closed in 13 s at the driver's
+optimized-HLO byte comparison, before `compiled(*arguments)`; the wrapper published the 14-object
+bounded diagnostic (terminal generation `1788306404286398`) and the failure-exit census was 8/8
+clean. StableHLO was byte-identical to the accepted `4b3fa252…`; the optimized HLO differed only in
+FileNames id 3 (acquisition driver path → numerical driver path) and two FileLocations call-site
+lines (1506→657, 1365→497). Applying exactly those three substitutions to the accepted preimage
+reproduces the observed bytes `f783a7d8…5158`. Artifact
+`docs/artifacts/gate-d-projection-contraction-pp16-numerical-v1-hlo-metadata-failure.json`
+(SHA-256 `c07dd4f7fdb558304b4819fe1faedf8a27d39041df71d5c19c6f3f8cc0cc7980`). The tag is burned; the V1 runtime stays installed and unused.
+
+V2 correction (same mechanism Sol accepted for the compensated driver): bridge artifact
+`docs/artifacts/gate-d-projection-contraction-pp16-hlo-source-location-bridge.json` (SHA-256
+`c2732f7184416cce87839b4cadf552b94d983aba06fa56b687eaacc03ca26bea`) pins the three substitutions to
+the V2 installed path `/usr/local/libexec/glm-tpu/gate-d-projection-contraction-pp16-numerical-v2/…`
+and call-site lines 837/676, deriving numerical HLO `70485b066b44233d82c2a728f09753f8a71306074fdd8b856112e46ab1f60564`
+(31,861 bytes) from the accepted `817ba2ed…`. The driver requires `__file__` to be that path,
+validates the bridge schema/bytes, writes `hlo/source_location_bridge.json`, and compares
+`optimized_hlo != derived_optimized_hlo` with StableHLO still byte-exact. The publisher pins the
+bridge and derived hashes, re-derives from the preimage, and adds the bridge member to the payload.
+Wrapper/launcher/installer/analyzer moved to V2 targets (`…-numerical-install-v2`,
+`…-pp16-numerical-v2`, `launch_…_v2.py`) with the bridge as a bound authority. Hash chain: driver
+`a38bb8b89bb8cf70568c8562b2013f188b7c8ed17f1e41edad37a40332156404`, publisher
+`5c5e58afa2c36e46377512a777df6a00669419f9f1c93e3504f71ea1334f6665`, wrapper
+`a5a5a5ffc1d012944c48b16e433906a6506441836f66c88f4115d8b2e70598d9`, launcher
+`80c9116fcf9397995bb26bb14e660d5982213b7c5d4be01afa576168b188d191`, installer
+`8b60c832fe70c6ca917f0b8f6090d5a4f8525218f068ab3d79edfb2e7b5b3970`, analyzer
+`ccb6894482ce4c95b222aaeadccdedd6d3233e1416bbe3ddc2eabb3b0d432e36`. Tests: bridge call-site lines
+bound to source, artifact/schema pinned, single-occurrence derivation attacks, v1-failure
+reproduction, publisher bridge schema attacks; focused suite 79/79; Ruff and `bash -n` clean.
+Per the owner's batching instruction, one Sol review covers this source batch, the failure and
+bridge artifacts, the V2 install commands and the fresh V2 tag. No run has occurred.
