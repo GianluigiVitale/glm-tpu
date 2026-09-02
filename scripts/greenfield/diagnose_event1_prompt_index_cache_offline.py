@@ -24,10 +24,15 @@ exact and its score residual at FP32-ULP level.
 
 If event 1 recomputed from the *legacy* decode-side tensors over the
 *greenfield* prompt cache reproduces the device selection exactly while
-differing from the oracle by the same swapped positions, the decode side of
-layer 1 is no longer the cause and the deviation is entirely in the layer-1
-prompt index cache that prefill builds.  This is CPU evidence: it localizes,
-it proves no fix, and it makes no Gate-D, decoder, DB or performance claim.
+differing from the oracle by the same swapped positions, then the greenfield
+layer-1 prompt cache by itself is sufficient to produce the observed event-1
+set mismatch: substituting the legacy decode-side tensors does not change the
+selection.  This does not prove the protected run's own query, head weights or
+current key are legacy-exact (they are not captured), and it does not exclude
+smaller decode-side deviations below the selection threshold; it identifies
+the prompt cache as the first boundary that must be made exact.  This is CPU
+evidence: it proves no fix and makes no Gate-D, decoder, DB or performance
+claim.
 """
 
 from __future__ import annotations
@@ -53,6 +58,9 @@ DB518_RESULT = Path(
 )
 DB518_RESULT_SHA256 = (
     "534bacc54d74992f5a8ab4d422f9fa0947523d59325b4bfa272d4fbeb56262f0"
+)
+DSA_EVENTS_ORACLE_SHA256 = (
+    "b591a4622a8c646799989f235bc98bcf8ae99e9e04d2ad55a982d70ba00dde82"
 )
 LEGACY_INTERNALS_SHA256 = {
     0: "212eb4cc9e76f865bac71f1c75635a19620b70d3ccb9e95d30e2c45f6f4aa835",
@@ -219,6 +227,8 @@ def legacy_internals_path(layer: int) -> Path:
 def load_oracle_events() -> tuple[np.ndarray, np.ndarray]:
     from safetensors import safe_open
 
+    if sha256_file(DSA_EVENTS_ORACLE) != DSA_EVENTS_ORACLE_SHA256:
+        raise RuntimeError("sealed 8K DSA events oracle differs from the pinned bytes")
     with safe_open(str(DSA_EVENTS_ORACLE), framework="np") as handle:
         positions = np.asarray(handle.get_tensor("selected_positions"))[0]
         scores = np.asarray(handle.get_tensor("selected_scores"))[0].astype(np.float32)
@@ -321,7 +331,7 @@ def diagnose(*, accepted_run: Path, baseline_run: Path) -> dict[str, Any]:
         and event1["vs_oracle"]["observed_only"]
         == event1["device_accepted_hidden_width_schedule_vs_oracle"]["observed_only"]
     )
-    localized = calibration_exact and reproduces_device and same_swaps_as_oracle
+    sufficient = calibration_exact and reproduces_device and same_swaps_as_oracle
     classification = ";".join(
         [
             "EVENT0_CALIBRATION_EXACT" if calibration_exact else "EVENT0_CALIBRATION_FAILED",
@@ -331,11 +341,11 @@ def diagnose(*, accepted_run: Path, baseline_run: Path) -> dict[str, Any]:
                 else "EVENT1_DEVICE_SELECTION_NOT_REPRODUCED"
             ),
             (
-                "EVENT1_DEVIATION_LOCALIZED_TO_LAYER1_PROMPT_INDEX_CACHE"
-                if localized
-                else "EVENT1_DEVIATION_NOT_LOCALIZED"
+                "EVENT1_LAYER1_PROMPT_INDEX_CACHE_SUFFICIENT_FOR_OBSERVED_SET_MISMATCH"
+                if sufficient
+                else "EVENT1_PROMPT_INDEX_CACHE_SUFFICIENCY_NOT_SHOWN"
             ),
-            "CPU_EVIDENCE_ONLY;NO_FIX_PROVEN;NO_GATE_D_NO_DECODER_NO_DB_NO_PERFORMANCE_CLAIM;GATE_D_OPEN",
+            "DECODE_SIDE_EXACTNESS_NOT_PROVEN;CPU_EVIDENCE_ONLY;NO_FIX_PROVEN;NO_GATE_D_NO_DECODER_NO_DB_NO_PERFORMANCE_CLAIM;GATE_D_OPEN",
         ]
     )
     return {
@@ -348,16 +358,20 @@ def diagnose(*, accepted_run: Path, baseline_run: Path) -> dict[str, Any]:
             "Event 1 recomputed from the legacy layer-1 query, head weights and "
             "current key over the greenfield DB518 layer-1 prompt index cache "
             "reproduces the protected accepted-schedule run's selection exactly "
-            "and the oracle's swapped positions exactly; the layer-1 decode side "
-            "is therefore no longer the cause and the deviation is carried by the "
-            "layer-1 prompt index cache that the teacher-forced prefill builds. "
-            "The greenfield prompt rows use the single-token decode arithmetic, "
-            "while the legacy oracle's prompt rows came from its batched prefill. "
-            "The layer-0 prompt index cache is already proven exact; layer-0 "
-            "prompt main-cache rows differed only in the main-RoPE suffix "
-            "(DB530/DB531)."
-            if localized
-            else "Localization criteria not met; see events."
+            "and the oracle's swapped positions exactly. The greenfield layer-1 "
+            "prompt cache is therefore sufficient, on its own, to produce the "
+            "observed event-1 set mismatch; substituting legacy decode-side "
+            "tensors does not change the selection. This does not prove the "
+            "protected run's own query/head weights/current key are legacy-exact "
+            "and does not exclude smaller decode-side deviations below the "
+            "selection threshold; it identifies the layer-1 prompt cache built "
+            "by the teacher-forced prefill (single-token decode arithmetic per "
+            "prompt row, versus the legacy's batched prefill) as the first "
+            "boundary that must be made exact. The layer-0 prompt index cache is "
+            "already proven exact; layer-0 prompt main-cache rows differed only "
+            "in the main-RoPE suffix (DB530/DB531)."
+            if sufficient
+            else "Sufficiency criteria not met; see events."
         ),
         "method": {
             "score_emulation": "bf16 operands, fp64 products/accumulate rounded once to fp32, fp32 128**-0.5 scale, relu, signed head weights",

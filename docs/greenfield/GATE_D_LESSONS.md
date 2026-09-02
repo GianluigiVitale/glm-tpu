@@ -1213,3 +1213,10 @@ normalized-state cause.
   legacy oracle's prompt rows come from its batched prefill, so prompt caches of every layer past the first
   inherit prefill-arithmetic residuals that decode-faithful kernels cannot reproduce; prove each layer's
   prompt cache against a legacy capture before treating a decode-side boundary as the cause.
+- A diagnostic input that lives only in a local run directory is one disk cleanup away from blocking every
+  wrapper that pins it; the sealed layer-0 DSA input survived only because two probe runs copied it into
+  their published `inputs/`. Preflight every pinned local artifact before taking the pod lease, and prefer
+  restoring original bytes from published copies over rebuilding (a rebuild reproduced every array digest
+  but not the file digest, because the safetensors header differs).
+- "Reproduces the selection with the oracle's tensors substituted" proves sufficiency of the remaining
+  input, not exactness of the substituted one; write the weaker claim.

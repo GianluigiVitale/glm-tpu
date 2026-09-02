@@ -11236,3 +11236,32 @@ until that map exists. CPU evidence only; no claim.
 - Tests: `tests/greenfield/validation/test_prompt_index_cache_layer_selection.py` (9) plus the existing
   prompt-cache/oracle-wrapper/internals/prefill-index/association/position-113 suites: 79 passed
   (`JAX_PLATFORMS=cpu`). No TPU action; nothing captured yet.
+
+### Sol round 24 (batched review of a433f76 + 38e658b): four P1 blockers, all fixed offline
+
+- P1 slot derivation: the pinned vLLM constructs an `Indexer` (registering its `DeepseekV32IndexerCache`) in
+  **every** MLA layer, skip-top-k layers included (`deepseek_v2.py` line 1009 under `if self.is_v32`, with
+  `_skip_topk` only steering the forward), so the legacy `kv_caches` slot of layer L's index cache is **2L**
+  (main cache 2L+1); layer 1 → 2 unchanged, layer 6 → 12 (the earlier "6→9" in this file was wrong).
+  `expected_prompt_cache_slot` now returns `2 * layer` for `0 <= layer < 78`; tests updated.
+- P1 overstatement: the diagnosis no longer says the decode side "is legacy-exact" or that the deviation is
+  "localized to" the cache. What the bytes prove: the greenfield layer-1 prompt cache alone, with the legacy
+  decode-side tensors substituted, reproduces the device selection and the oracle's swaps exactly, so it is
+  a **sufficient cause of the observed event-1 set mismatch**; the protected run's own query/head weights/
+  current key were not captured and smaller decode-side deviations below the selection threshold are not
+  excluded. Capsule regenerated; classification now
+  `…EVENT1_LAYER1_PROMPT_INDEX_CACHE_SUFFICIENT_FOR_OBSERVED_SET_MISMATCH;DECODE_SIDE_EXACTNESS_NOT_PROVEN;…`.
+- P1 fail-open authentication: `compare_layer1_prompt_index_cache_offline.py` now pins the legacy layer-1
+  internals (`eb7a2500…`) and the DSA events oracle bytes (`b591a462…`, also pinned in the diagnosis
+  module), has no skip flag, writes the JSON and then **exits non-zero** when the legacy cache does not
+  reproduce the oracle event-1 set.
+- P1 missing preflight: prompt-cache mode now verifies the sealed layer-0 DSA input
+  (`inspect_layer0_dsa_association_input`, manifest `574f3553…`) before the pod lease. That artifact's local
+  directory `/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z` was
+  absent (never uploaded as an oracle; local copy lost); its original bytes survive inside two published
+  probe results (`gs://driftbench-dsv4-uc/results/greenfield_layer0_dsa_scorer_association_20260810T164030202890642Z/inputs/association/`
+  and the WS32 association run) and were restored to the exact path: tensor `be643e339cd7…d7f9`
+  (26,219,180 bytes), manifest `574f3553…73141`, inspector passes. A fresh rebuild at pin 2646a319 produced
+  byte-identical arrays (all 21 array digests equal) and a different file digest only through the
+  safetensors header; that rebuild is kept out of `glm-run`.
+- Tests after fixes: 80 passed (same suites plus `test_compare_script_rejects_unauthenticated_layer1_capture`).
