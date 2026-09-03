@@ -22,12 +22,12 @@ from typing import Any
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v4/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v5/"
     "publish_gate_d_original_db518_prompt_key_chunk0.py")
 SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_original_db518_prompt_key_chunk0.py")
 CONTRACT_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v4/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v5/"
     "original_db518_prompt_key.py")
 CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/original_db518_prompt_key.py")
@@ -320,14 +320,15 @@ def _validate_helper_hlo(parent: Any, optimized: str, stablehlo: str,
         raise RuntimeError(
             f"{kind} helper contains forbidden communication/callback")
     if kind == "decode":
-        expected = sorted((("u8", (128, 6144)), ("f32", (1, 48))))
+        expected = sorted(((("u8", (128, 6144)), ),
+                           (("f32", (1, 48)), )))
         if shapes != expected or nodes[root]["shapes"] != (("bf16",
                                                             (128, 6144)), ):
             raise RuntimeError("wk decode helper boundary drifted")
         if not set(parameters).issubset(live):
             raise RuntimeError("wk decode helper has a dead input")
     elif kind == "promote":
-        if (shapes != [("bf16", (128, 6144))]
+        if (shapes != [(("bf16", (128, 6144)), )]
                 or nodes[root]["opcode"] != "convert"
                 or nodes[root]["shapes"] != (("f32", (128, 6144)), )
                 or tuple(nodes[root]["operands"]) != tuple(parameters)):

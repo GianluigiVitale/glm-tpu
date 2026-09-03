@@ -12,12 +12,12 @@ from collections.abc import Mapping
 from hashlib import sha256
 from pathlib import Path
 
-SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-original-db518-prompt-key-install-v4")
+SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-original-db518-prompt-key-install-v5")
 INSTALLER_PATH = SOURCE_ROOT / "install_gate_d_original_db518_prompt_key_runtime.py"
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
-LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_original_db518_prompt_key_chunk0_v4.py"
+LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_original_db518_prompt_key_chunk0_v5.py"
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-original-db518-prompt-key-v4"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-original-db518-prompt-key-v5"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -29,13 +29,13 @@ PAYLOADS = {
     "original_db518_prompt_key.py":
     "a4f690e4cb3fcda801563f3f297c920857f434411bb3089a15a28f50ab2abdcc",
     "probe_original_db518_prompt_key_chunk0.py":
-    "c695ec61e6647bfbed7ce3bbd2c01d4ad3213a1677f71c7de2cc8be455e4c6ee",
+    "d6363ca7e41bbabebe87f15f380107e565458e092ce9e92fc832017587d97f80",
     "publish_gate_d_original_db518_prompt_key_chunk0.py":
-    "04ff3690d5aad838a198c9f54604f322744ee5272d797fcdaff2971ecccedd6e",
+    "63c1dd202cca3581f1b4515a6b801dec590a9b39b4dacea4466a9c48c5608831",
     "launch_gate_d_original_db518_prompt_key_chunk0.py":
-    "abfac3320aff416479d458a6351c3fa55c919d10b76d4fb7d05fdbc41fd07efa",
+    "2ae9840b8e1170bff545139fdd5ccb4867c353defa96cc2b4113fe60e0dcfb6c",
     "verify_gate_d_original_db518_same_region_git_mirror.py":
-    "ce1cd130173d69fe3639e1249290983620fedc29e75cef6a922b0d6714297966",
+    "288bfa0b707b041467f4b0f0686cc3e29207c0c71ad4b992139e238d29a7c084",
 }
 CAPSULE_NAMES = (
     "original_db518_prompt_key.py",

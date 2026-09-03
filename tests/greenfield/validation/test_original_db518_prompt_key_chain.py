@@ -19,9 +19,10 @@ LAUNCHER = REPO / "scripts/greenfield/launch_gate_d_original_db518_prompt_key_ch
 INSTALLER = REPO / "scripts/greenfield/install_gate_d_original_db518_prompt_key_runtime.py"
 CONTRACT = REPO / "glm_tpu/greenfield/validation/original_db518_prompt_key.py"
 VERIFIER = REPO / "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py"
-CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v4-source.json"
+PUBLISHER_PARENT = REPO / "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
+CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v5-source.json"
 STAGING = Path(
-    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v4-staging"
+    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v5-staging"
 )
 
 
@@ -92,8 +93,10 @@ def test_mirror_verifier_exact_authority_membership():
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v2-source.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v3-source.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v4-source.json",
+        "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v5-source.json",
         "docs/artifacts/gate-d-original-db518-v2-probe-install-path-failure.json",
         "docs/artifacts/gate-d-original-db518-v3-stablehlo-scatter-count-failure.json",
+        "docs/artifacts/gate-d-original-db518-v4-helper-shape-parser-failure.json",
         "glm_tpu/greenfield/benchmarking/numpy_safetensors.py",
         "glm_tpu/greenfield/benchmarking/sealed_runtime.py",
         "glm_tpu/greenfield/kernels/reference/dsa.py",
@@ -251,6 +254,40 @@ def test_publisher_rederives_arrays_and_rejects_inventory_drift():
 
     with pytest.raises(RuntimeError, match="inventory drifted"):
         publisher._parse_npz(Parent, bad.getvalue())
+
+
+def test_publisher_accepts_exact_helper_boundaries_and_rejects_drift():
+    import pytest
+
+    publisher = _load(PUBLISHER)
+    parent = _load(PUBLISHER_PARENT)
+    decode = "\n".join((
+        "HloModule decode",
+        "ENTRY %main (bits: u8[128,6144], scale: f32[1,48]) -> bf16[128,6144] {",
+        "  %bits = u8[128,6144]{1,0} parameter(0)",
+        "  %scale = f32[1,48]{1,0} parameter(1)",
+        "  ROOT %result = bf16[128,6144]{1,0} add(%bits, %scale)",
+        "}",
+    ))
+    promote = "\n".join((
+        "HloModule promote",
+        "ENTRY %main (value: bf16[128,6144]) -> f32[128,6144] {",
+        "  %value = bf16[128,6144]{1,0} parameter(0)",
+        "  ROOT %result = f32[128,6144]{1,0} convert(%value)",
+        "}",
+    ))
+    publisher._validate_helper_hlo(parent, decode, "", "decode")
+    publisher._validate_helper_hlo(parent, promote, "", "promote")
+    with pytest.raises(RuntimeError, match="decode helper boundary drifted"):
+        publisher._validate_helper_hlo(
+            parent, decode.replace("f32[1,48]", "f32[1,47]"), "", "decode")
+    with pytest.raises(RuntimeError, match="dead input"):
+        publisher._validate_helper_hlo(
+            parent, decode.replace("add(%bits, %scale)", "copy(%bits)"), "",
+            "decode")
+    with pytest.raises(RuntimeError, match="forbidden communication"):
+        publisher._validate_helper_hlo(parent, decode, "all-reduce(",
+                                       "decode")
 
 
 def _npy_header(raw: bytes) -> tuple[tuple[int, ...], str]:
