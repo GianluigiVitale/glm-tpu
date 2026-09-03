@@ -11399,3 +11399,31 @@ prefill plan. No protected 8K decoder launch.
   trivial) with the layer-0 block in legacy M=2048 geometry versus the decode form, compared bitwise with the sealed
   legacy row 0 (currently 47 lanes off) — confirms or refutes the geometry mechanism without another legacy capture;
   (3) then rows ≥1, which additionally need the legacy prefill attention arithmetic (Pallas custom call).
+
+### Legacy prefill layer pipeline (from the accepted step HLO) and the decision in front of the owner
+
+Per 2,048-row chunk and per model-parallel owner, one layer of the legacy prefill is: embedding
+`gather_custom_fusion` bf16[2048,6144] → input norm as **sharded partial sums + 32-way all-reduce**
+(`fusion.3122` f32[2048] ← `all-reduce.3`, `add_rsqrt_fusion`, normalized `fusion.3441`) → fused q-a/kv-a
+`bf16[2048,1,82]` (kOutput convolution, M=2048) → sharded q-a norm (`f32[2048]` partial, `all-reduce.4`,
+`bf16[2048,64]`) → all-gather + q-b `bf16[2048,512]` → attention (`f32[2,2048,512]`, `bf16[2,256,2048]`, Pallas
+`tpu_custom_call`) → o_proj `bf16[2048,6144]` per owner → **`psum` all-reduce in BF16** → post-attention norm with
+fused residual (`multiply_reduce_fusion` f32[2048]) → dense gate/up `bf16[2048,1,768]` → down `bf16[2048,6144]` →
+**BF16 all-reduce** → next layer's norm with fused residual adds. Index keys: wk over `bf16[64,6144]` in 64-row
+groups (already reproduced by `physical_m64_chunk`). Versus the greenfield teacher-forced scan (single-row decode
+forms; full-row `f32[32,6144]` norm reduce; f32 StrategyND association for o_proj/down; decode attention), the
+legacy prompt rows differ in norm reduction association, matmul M-geometry (2048 vs 1/32), collective dtype/order
+(BF16 32-way psum), fusion boundaries of the residual adds, and the attention kernel. Each of these can perturb the
+BF16 row at the ulp level — matching the flat ~21-lane deviation.
+
+Options for Gate D's exact-DSA requirement:
+- **A. Legacy-prefill-faithful prompt path in greenfield** (native JAX): reproduce the legacy prefill arithmetic for
+  prompt rows layer by layer (sharded norm + all-reduce order, M=2048 FP8 convs, BF16 32-way psum association on the
+  same 32-chip axis, blocked prefill attention, MoE at the legacy group geometry). Bounded first step: a 32-chip probe
+  that computes the layer-1 prompt key of row 0 (attention over one key is trivial) in legacy geometry and compares
+  bitwise with the sealed legacy row 0 (now 47 lanes off); then rows ≥1 with the prefill attention. Large, but every
+  step is testable against the sealed 8,155-row layer-1 cache without further legacy captures.
+- **B. Re-seal the 8K oracle with a different legacy prefill chunking** (`bench/engine.py` `max_batched_tokens`,
+  default 4096; the sealed oracle used 2,048): would change the oracle definition and still leaves the legacy prefill
+  attention kernel and sharded norms in place for prompt rows, so it is not obviously simpler; owner/Sol decision only.
+Recommendation: A, starting with the row-0 probe. No protected 8K decoder launch until a prompt-row boundary is exact.
