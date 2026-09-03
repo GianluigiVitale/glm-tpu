@@ -11791,3 +11791,29 @@ passes offline; focused CPU is 37/37. Sol found and closed unordered-slice and m
 
 Current work is uncommitted while V7 hashes/certificate/staging are completed. Next: full Sol source/persistence/install
 review; commit/push/mirror; install-only; separate execution review; one chunk0. Never run 8K before exact DB518 control.
+
+## 2026-09-03 21:55Z — original DB518 producer boundary accepted bitwise-exact
+
+The stale V7 path was replaced by the smaller original-producer discriminator. V5 executed the exact producer and
+found 0 mismatched rows/lanes, but its success publisher correctly refused because its inherited mirror-authority
+tuple still named the tooling branch/generic verifier. It published only a generation-bound diagnostic (terminal
+generation `1788470805424006`, SHA `8adadd76…bb6b3`) and ended 8/8 clean. The failure and exact origin/mirror replay
+are preserved in `gate-d-original-db518-v5-mirror-{authority-failure,replay}.json`.
+
+V6 explicitly binds the complete rewrite authority tuple and attack-tests branch/origin/mirror URI/verifier path and
+verifier SHA drift. Sol approved the full correction, tests, staging, install and one execution with no P0–P2. Commit
+`75cbab626f7f2357b05dfab2c988330fabdca484` was pushed and replayed from the US-CENTRAL2 mirror; immutable install
+reported `launcher_invoked=false`. Protected tag
+`greenfield_original_db518_prompt_key_chunk0_20260903T213501747141067Z` returned
+`ORIGINAL_DB518_CHUNK0_EXACT`: all 2,048 × 128 BF16 lanes equal DB518 (candidate/accepted SHA
+`96d261cb…887c`), optimized/StableHLO contracts pass, the remote object set is exactly 21/21, terminal generation is
+`1788472134581783` with SHA `53fe14e4…ca38`, and pre/post censuses are independently 8/8 clean. The independently
+rederived acceptance record is `docs/artifacts/gate-d-original-db518-v6-exact-success.json`.
+
+Claim boundary: `ORIGINAL_DB518_PRODUCER_BOUNDARY_REPRODUCED_BITWISE;CONSUMER_UNPROVEN;DECODER_UNPROVEN;GATE_D_OPEN`.
+This closes the prior layer-0 producer uncertainty, not Gate D. The large chunk program still changes input-RMS
+lowering (`4×3` iteration / `64×16` output window versus the accepted isolated producer's `16×1` / `16×48`). Next,
+compile and complete a separate M2048 normalization helper, feed only its finished BF16 buffer into a separately
+compiled M64 key-control helper, and require DB518 exactness before any layer-0 consumer runs. If exact, feed that same
+device buffer to a consumer whose HLO proves no input-RMS recomputation; otherwise stop at the boundary result. Do not
+run 8K yet.

@@ -1264,3 +1264,10 @@ normalized-state cause.
   true raw bypass. Preserve while condition dependencies in the fixed point.
 - Lossless slice reconstruction is ordered. A set of exact ranges accepts row permutations; require the ordered
   partition. Missing while conditions must fail closed because they can shrink apparent ancestry.
+- A reused publisher base carries authority as well as code. Override and test the complete branch/origin/mirror URI/
+  verifier path/verifier hash tuple, and replay a real prior record through the success path; a generic preflight can
+  pass while final publication correctly refuses a stale inherited authority.
+- Source-equivalent arithmetic inside a larger executable does not preserve a schedule-sensitive TPU reduction. The
+  original M2048 producer is bitwise exact in isolation while the large chunk graph lowers the same RMS reduction with
+  different iteration/output windows and misses 256 rows. Preserve the completed device buffer as an executable
+  boundary, prove it through a separate exact consumer, and reject in-consumer recomputation in HLO before scaling up.

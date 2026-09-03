@@ -28,36 +28,27 @@ weaken history. Optimizations default off. Targets: useful <=200, strong <=125, 
   plus US-CENTRAL2 mirror before protected work. Never use EU.
 - Report result, percentage and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-03 18:32Z
+## Resume checkpoint — 2026-09-03 21:55Z
 
-Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; pushed
-tip `82e33fc8839ce076780161da1af1ab040be00633`. Gate D remains open.
+Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; accepted
+result code pin `75cbab626f7f2357b05dfab2c988330fabdca484`. Gate D remains open.
 
-V6 passed staged Sol reviews, push/full US-CENTRAL2 replay and immutable install
-(`launcher_invoked=false`).
-Protected tag `greenfield_layer1_prompt_chunk0_geometry_20260903T180438114586827Z` compiled once
-but its HLO admission rejected **before `compiled(...)` invocation**. It published a diagnostic and
-ended 8/8 clean. Terminal `1788459348320561`/`00eeae78…ec77`; HLO `b7713bdf…b0ea`, StableHLO
-`d1d97229…bda9`. Artifact:
-`docs/artifacts/gate-d-chunk0-v6-hlo-admission-failure.json`. Tag is burned; no numerical or
-performance claim.
+The original DB518 layer-0 producer uncertainty is closed. After V5 correctly failed publication
+on stale inherited mirror authority, V6 bound and mutation-tested the full rewrite authority tuple.
+Sol approved the batch with no P0–P2; origin and US-CENTRAL2 replay passed; install reported
+`launcher_invoked=false`. Protected tag
+`greenfield_original_db518_prompt_key_chunk0_20260903T213501747141067Z` is bitwise exact across all
+2,048×128 lanes (both SHA `96d261cb…887c`), HLO contracts pass, remote set is 21/21, terminal is
+generation `1788472134581783` / SHA `53fe14e4…ca38`, and pre/post censuses are 8/8 clean. Record:
+`docs/artifacts/gate-d-original-db518-v6-exact-success.json`.
 
-Cause: XLA duplicated exact layer-0 normalization into selected output 1 of a tiled tuple fusion.
-V6 blocked only the standalone node and traversed every tuple output, falsely finding a bypass.
-
-Current uncommitted V7 makes ancestry output-sensitive for fusion `get-tuple-element` and while
-state slots (fixed point including condition), recognizes only exact logical-M2048 32x64 tiled
-normalization with ordered four-slice `ConcatBitcast`, collects every exact normalization witness,
-and requires blocking all witnesses to cut every gather→root5 path. It rejects wrong tuple index/
-output, arithmetic/rounding/extent/caller drift, reordered slices, malformed while, decoys and a
-parallel raw bypass. Exact archived V6 HLO passes offline; targeted mutations reject. Forced-CPU
-suite 37/37. Sol found and closed unordered-slice and missing-condition defects, then returned
-`APPROVE V7 VALIDATOR CORE`, no P0–P2.
-
-Exact next: finish V7 hash chain and append-only source certificate; create immutable install-v7
-staging for launcher-v7/capsule-v6 and a fresh tag. Sol-review full source, persistence and
-install-only; commit/push/mirror; install without launch; separately review preflight/execution;
-run one chunk0. Do not run 8K until DB518 layer-0 control is bitwise exact.
+Classification: `ORIGINAL_DB518_PRODUCER_BOUNDARY_REPRODUCED_BITWISE;CONSUMER_UNPROVEN;
+DECODER_UNPROVEN;GATE_D_OPEN`. The large chunk still lowers input RMS differently and misses 256
+token-374 rows. Exact next: compile/complete a separate M2048 normalization helper, feed only its
+finished BF16 device buffer into a separate M64 key-control helper, and require DB518 exactness. Only
+then feed the same buffer into a consumer whose HLO proves no input-RMS recomputation. Stop on the
+first failed boundary; do not run 8K yet. Review the full source/tests/certificate/install/run batch
+with the same Sol thread before persistence or TPU execution.
 
 ## After Gate D
 

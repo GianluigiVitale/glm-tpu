@@ -3753,3 +3753,18 @@ persistence only; review and persistence precede any v2 installation.
 - Exact normalization was duplicated into selected tuple output 1; V6's non-output-sensitive ancestry false-rejected.
   V7 adds selected fusion/while-slot semantics, exact tiled normalization, ordered four-slice reconstruction and an
   all-witness cut. Archived HLO passes offline; attacks reject; CPU 37/37; Sol core `APPROVE`, no P0–P2. Source only.
+
+## 2026-09-03 — original DB518 producer boundary exact
+
+- V5 numerically completed with zero mismatches but failed closed on a stale inherited mirror-authority tuple; its
+  diagnostic terminal is generation `1788470805424006`, SHA `8adadd76…bb6b3`. V6 binds and mutation-tests the full
+  rewrite branch/origin/mirror/verifier authority tuple. Sol returned no P0–P2; pin `75cbab62…a484` was pushed,
+  same-region replayed and installed without launch.
+- Protected V6 tag `greenfield_original_db518_prompt_key_chunk0_20260903T213501747141067Z` passed: 0/2,048 rows and
+  0/262,144 lanes mismatch; both bit arrays SHA `96d261cb…887c`; HLO/StableHLO `fd89188b…efe0b` /
+  `e3d94a24…296f3`; exact remote set 21/21; terminal generation `1788472134581783`, SHA `53fe14e4…ca38`; pre/post
+  authenticated censuses 8/8 clean. Independent record:
+  `docs/artifacts/gate-d-original-db518-v6-exact-success.json`.
+- Classification: `ORIGINAL_DB518_PRODUCER_BOUNDARY_REPRODUCED_BITWISE;CONSUMER_UNPROVEN;DECODER_UNPROVEN;
+  GATE_D_OPEN`. Next evidence must preserve a completed normalization buffer into a separate key-control/consumer;
+  no 8K execution is authorized by this result.
