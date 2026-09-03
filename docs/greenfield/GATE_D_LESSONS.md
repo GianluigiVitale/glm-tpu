@@ -1227,3 +1227,8 @@ normalized-state cause.
 - When a per-host prerequisite is a local Git checkout, a recreated pod silently invalidates every mode that assumes
   it; route recreated-pod captures through self-contained transported bundles and preflight the controller's own
   pin/branch checks (dev-repo HEAD == branch tip == pin) before asking for execution approval.
+- A bounded diagnostic that runs on the pod needs the same execution-provenance capsule as a protected run. Building
+  it as an ordinary script cost four review rounds (worktree bytes, virtualenv interpreter, mutable pathnames,
+  directory descriptors); the accepted pattern is: root-owned immutable capsule under `/usr/local/libexec/glm-tpu/`,
+  sealed interpreter, committed-blob imports, retained run-directory FD with an identity check, publisher-mediated
+  writes, and vacancy proven both before the run and immediately before publication. Start from that capsule.
