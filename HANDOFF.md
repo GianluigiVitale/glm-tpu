@@ -11505,3 +11505,31 @@ the M=2048 convolutions and the absence of callbacks; results sealed with SHA-25
 - Tests: `tests/greenfield/validation/test_chunk0_geometry_probe_runner.py` (3 static contracts) + updated chunk
   pipeline test (M64-keyed one-row arm); 16 passed across the probe suites. Digest-bound loading dry-run on the real
   checkpoint passes.
+
+### Sol round 30 on the chunk-0 probe: six P1s, all fixed offline (sealed-runtime execution)
+
+- Execution provenance: the probe now runs under the sealed Gate-D interpreter
+  (`/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12`, sha `021044895e95…`, `-I -S -B`) with `sys.path`
+  limited to the run-owned detached source plus the sealed JAX site (`gate-d-jax-site-55233c63939e`, tree
+  `55233c63939e…`, manifest `ef454caa…`) and libtpu site (`gate-d-libtpu-site-db7598c867f3`, tree `db7598c867f3…`,
+  manifest `d34064f4…`), verified by tree digest at start (`glm_tpu/greenfield/benchmarking/sealed_runtime.py`, the
+  accepted acquisition drivers' helpers); the import closure of every `glm_tpu` module is checked to live under the
+  detached source. No virtualenv, no `PYTHONPATH`, no torch, no safetensors library: `numpy_safetensors.py` parses the
+  container directly and digest-binds the layer-0 DSA input (manifest self-hash, file digest, per-array digests), the
+  sealed legacy prompt cache and the checkpoint tensors (pinned index/shard/tensor digests).
+- Git: all local operations sanitized (`GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_NO_LAZY_FETCH=1
+  GIT_NO_REPLACE_OBJECTS=1 …`), replacement refs refused in the runner and in the probe, pin authenticated with a
+  single sanitized `ls-remote` against the pinned origin URL (no fetch into the worktree), detached worktree checked
+  with `status --porcelain=v1 --ignored --untracked-files=all`.
+- Run directory: created with plain `mkdir` (atomic, symlink-safe) only after the pod lease and after the vacancy proof.
+- Vacancy: live, `--all-versions` and `--soft-deleted --exhaustive` surfaces each must return rc 1 with the canonical
+  "matched no objects" message; receipts recorded in `remote_vacancy.txt`.
+- Ledger: built by inline code under the sealed interpreter (no repository import), CRC32C via `gcloud storage hash`,
+  generation per object, sealed as the terminal object with checksum re-read, exact remote set validated against the
+  local run directory (missing/extra/duplicate refused).
+- Evidence freeze: `orchestrator.log` is frozen (`sealed=1`) before the upload; later messages go to
+  `/home/gianl/glm-run/<tag>.post_upload.log`, so local evidence stays byte-identical to the archive.
+- Census: failure-exit census failure logged and marked (`CENSUS_UNVERIFIED`), never discarded.
+- Tests: `test_sealed_runtime.py` (5), `test_numpy_safetensors.py` (4, incl. equality with the reference inspector on
+  the real sealed cache), updated static runner/probe contract (4); 26 passed across the probe suites. Under the sealed
+  interpreter the probe's host stage (bootstrap 2.6 s, digest-bound loads, packing) passes on the real inputs.
