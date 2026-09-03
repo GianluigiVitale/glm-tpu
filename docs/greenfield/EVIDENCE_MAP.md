@@ -3792,3 +3792,19 @@ persistence only; review and persistence precede any v2 installation.
   delta review pending. No persistence, install, TPU execution, numerical claim or Gate-D closure yet.
 - Same Sol delta review returned no P0–P2 and explicitly approved persistence, install-only tree
   `419cc7a2…3d6`, and that execute-once tag conditional on the merged pin. Execution remains pending.
+
+## 2026-09-03 — V8 key mixed-placement refusal and V9 correction
+
+- V8 pin `73074bdd…b13d` was origin/mirror exact and installed without launch. Its one protected tag
+  archived both boundary HLO pairs, then stopped before normalization/key numerical invocation on
+  key StableHLO placement; diagnostic terminal generation `1788478038656464`, SHA `a212559e…a9d5`;
+  pre/failure census 8/8. WK decode/promotion helpers alone executed.
+- Exact key graph: completed-buffer arg0 is unannotated, args1–4 are replicated; canonical SHA remains
+  `a2dbe03f…b33`. Optimized TPU while has one seventh invariant s32 slot. Failure record:
+  `docs/artifacts/gate-d-original-db518-v8-key-placement-failure.json`.
+- V9 binds that mixed placement and 7-slot transition; both captured TPU graphs pass offline; hostile
+  arg0 placement rejects; focused suite 103/103. Staging `5fcb8bde…b1a2`, fresh tag
+  `…20260903T233327590939916Z`; Sol review pending, no V9 persistence/run or numerical claim.
+- The independent Sol V9 batch returned `P0: NONE`, `P1: NONE`, `P2: NONE` and explicitly approved
+  persistence, install-only tree `5fcb8bde…b1a2`, and that execute-once tag conditional on its future
+  merged pin. No V9 persistence, install, execution or numerical claim existed at this record.

@@ -1,0 +1,61 @@
+{
+  "artifact_kind": "gate_d_original_db518_v8_key_mixed_placement_false_rejection",
+  "schema_version": 1,
+  "created_utc": "2026-09-03T23:31:00Z",
+  "classification": "PRE_BOUNDARY_NUMERICAL_KEY_STABLEHLO_MIXED_PLACEMENT_FALSE_REJECTION",
+  "code_hash": "73074bddcb9fe5312f3a369e877019378be6b13d",
+  "run_tag": "greenfield_original_db518_prompt_key_chunk0_20260903T232020879638235Z",
+  "remote_prefix": "gs://driftbench-dsv4-uc/results/greenfield/glm52/original_db518_prompt_key_chunk0/greenfield_original_db518_prompt_key_chunk0_20260903T232020879638235Z/diagnostic/",
+  "diagnostic_terminal": {
+    "generation": "1788478038656464",
+    "sha256": "a212559e2e38c40d1aa2e7cf133f7fd514da6195873271ee75724ae20462a9d5",
+    "object_count_before_terminal": 18
+  },
+  "failure": {
+    "exception": "RuntimeError: completed boundary StableHLO sharding drifted",
+    "source_line": "original_db518_normalized_boundary_hlo.py:280",
+    "wk_decode_and_promotion_helpers_completed": true,
+    "normalization_executable_compiled": true,
+    "key_control_executable_compiled": true,
+    "normalization_numerical_invocation_count": 0,
+    "key_control_numerical_invocation_count": 0,
+    "output_array_present": false
+  },
+  "hlo_evidence": {
+    "normalization_optimized_sha256": "389a5fe3e1f93374fb82ad1426e8260c8adcbc16b927ee2555752bdc53c671af",
+    "normalization_stablehlo_raw_sha256": "87255de0625ad7b9ebd930c13db52df5ab3efcc2a4eb4b5382fcdf62836a683d",
+    "key_control_optimized_sha256": "c9af903da23bc0e6c54ba905e1d11249371a2e13eb5c45ec51756ac6116436f4",
+    "key_control_stablehlo_raw_sha256": "8695b34940fac0ff8474babc20a50888c3501932f220c8881df63f84cc733df5",
+    "key_control_stablehlo_canonical_sha256": "a2dbe03f58456cf7c9195c55251e4e25ddfcc3a08d0badb72eb59b929ab42b33",
+    "key_control_stablehlo_canonical_matches_cpu_seal": true,
+    "observed_argument_placement": [
+      "completed_normalization_buffer: no explicit sdy annotation",
+      "positions: empty-mesh replicated",
+      "wk_fp32: empty-mesh replicated",
+      "key_norm_weight: empty-mesh replicated",
+      "key_norm_bias: empty-mesh replicated"
+    ],
+    "optimized_while_state_slots": 7,
+    "optimized_passthrough_scalar_slot": 6,
+    "corrected_contract_offline_replay": {
+      "normalization_passed": true,
+      "key_control_passed": true,
+      "exact_normalization_chain_rooted": true,
+      "exact_dot_to_root": true,
+      "rooted_rotary_call_count": 1,
+      "selected_while_output_rooted": true
+    }
+  },
+  "integrity": {
+    "origin_and_us_central2_mirror_exact": true,
+    "pre_census_clean_hosts": 8,
+    "failure_exit_census_clean_hosts": 8,
+    "pod_lock_released": true,
+    "rsync_lock_released": true
+  },
+  "claims": {
+    "numerical_exactness_claim": false,
+    "performance_claim": false,
+    "gate_d_closed": false
+  }
+}

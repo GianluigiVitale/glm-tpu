@@ -65,7 +65,9 @@ def _replace_once(text: str, old: str, new: str) -> str:
     return text.replace(old, new, 1)
 
 
-def _with_single_device_sharding(stable: str, axes: tuple[str, ...]) -> str:
+def _with_single_device_sharding(
+    stable: str, axes: tuple[str | None, ...]
+) -> str:
     lines = stable.splitlines(keepends=True)
     assert lines[0].startswith("module @")
     lines.insert(
@@ -79,6 +81,8 @@ def _with_single_device_sharding(stable: str, axes: tuple[str, ...]) -> str:
     )
     main = lines[main_index]
     for argument, sharding in enumerate(axes):
+        if sharding is None:
+            continue
         marker = f"%arg{argument}: "
         start = main.index(marker) + len(marker)
         end = (
@@ -235,22 +239,22 @@ def test_tpu_convolution_lowered_dot_is_exactly_recognized():
 
 
 def test_optimized_tpu_placement_rejects_nonreplicated_argument():
-    axes = ("[{}, {}]", "[{}]")
+    axes = (None, "[{}, {}]", "[{}]")
     nodes = {}
     parameters = {}
     for index, sharding in enumerate(axes):
         name = f"%arg{index}"
         parameters[index] = name
-        nodes[name] = _node(
-            "parameter",
-            (("f32", (2,)),),
-            parameter=index,
-            raw=(
-                "parameter(0), sharding={replicated}, "
+        raw = "parameter(0)"
+        if sharding is not None:
+            raw += (
+                ", sharding={replicated}, "
                 'frontend_attributes={xla.sdy.sharding="'
                 f"#sdy.sharding<@empty_mesh, {sharding}>"
                 '"}'
-            ),
+            )
+        nodes[name] = _node(
+            "parameter", (("f32", (2,)),), parameter=index, raw=raw
         )
     header = (
         "HloModule test, frontend_attributes={xla.sdy.meshes="
@@ -259,7 +263,15 @@ def test_optimized_tpu_placement_rejects_nonreplicated_argument():
     assert _optimized_single_device_placement(
         header, nodes, parameters, axes
     )
-    nodes["%arg1"]["raw"] = nodes["%arg1"]["raw"].replace(
+    nodes["%arg0"]["raw"] += (
+        ', sharding={replicated}, frontend_attributes={xla.sdy.sharding="'
+        '#sdy.sharding<@empty_mesh, [{}, {}]>"}'
+    )
+    assert not _optimized_single_device_placement(
+        header, nodes, parameters, axes
+    )
+    nodes["%arg0"]["raw"] = "parameter(0)"
+    nodes["%arg2"]["raw"] = nodes["%arg2"]["raw"].replace(
         "sharding={replicated}", "sharding={maximal device=0}"
     )
     assert not _optimized_single_device_placement(
@@ -394,7 +406,7 @@ def test_real_boundary_hlo_admits_exact_tpu_single_device_placement(
     _, key_identity = _require_stable_identity(
         _with_single_device_sharding(
             key_stable,
-            ("[{}, {}]", "[{}]", "[{}, {}]", "[{}]", "[{}]"),
+            (None, "[{}]", "[{}, {}]", "[{}]", "[{}]"),
         ),
         module_name=(
             "jit_layer0_prompt_index_key_from_normalized_boundary_chunk"
@@ -408,7 +420,38 @@ def test_real_boundary_hlo_admits_exact_tpu_single_device_placement(
         "stable_sha256"
     ]
     assert key_identity["stable_single_device_sharding_bound"]
-    assert key_identity["stable_parameter_sharding_count"] == 5
+    assert key_identity["stable_parameter_sharding_count"] == 4
+
+
+def test_key_tpu_mixed_placement_rejects_completed_buffer_annotation(
+    real_boundary_hlo,
+):
+    _, _, _, key_stable = real_boundary_hlo
+    placed = _with_single_device_sharding(
+        key_stable, (None, "[{}]", "[{}, {}]", "[{}]", "[{}]")
+    )
+    annotation = " {sdy.sharding = #sdy.sharding<@empty_mesh, [{}]>}"
+    arg0 = "%arg0: tensor<2048x6144xbf16>"
+    arg1 = "%arg1: tensor<2048xi32>"
+    hostile = _replace_once(
+        placed,
+        arg0,
+        arg0 + annotation,
+    )
+    hostile = _replace_once(
+        hostile,
+        arg1 + annotation,
+        arg1,
+    )
+    with pytest.raises(RuntimeError, match="argument 0 sharding drifted"):
+        _require_stable_identity(
+            hostile,
+            module_name=(
+                "jit_layer0_prompt_index_key_from_normalized_boundary_chunk"
+            ),
+            expected_sha256=_KEY_CONTROL_STABLEHLO_SHA256,
+            parameter_shardings=_KEY_CONTROL_PARAMETER_SHARDINGS,
+        )
 
 
 @pytest.mark.parametrize(

@@ -11869,3 +11869,36 @@ and returned `P0: NONE`, `P1: NONE`, `P2: NONE`, `APPROVE PERSISTENCE`,
 `APPROVE INSTALL ONLY 419cc7a252332447200cf4da2a60b30e092cadcfe597fad650ced67271d063d6`,
 and `APPROVE EXECUTE ONCE greenfield_original_db518_prompt_key_chunk0_20260903T232020879638235Z
 <future merged pin condition>`. No persistence, install or execution had occurred at this record.
+
+## 2026-09-03 23:33Z — V8 captured exact key HLO; mixed placement correction V9 CPU-green
+
+Approved commit `73074bddcb9fe5312f3a369e877019378be6b13d` was pushed, replayed exactly from
+origin and the US-CENTRAL2 mirror (39 blobs, fsck true), and immutable V8 installed without launch.
+The one approved tag `greenfield_original_db518_prompt_key_chunk0_20260903T232020879638235Z`
+compiled and archived both boundary HLO pairs, then failed before normalization/key numerical
+invocation. WK decode/promotion helpers had completed. Diagnostic terminal generation
+`1788478038656464`, SHA `a212559e…a9d5`, 18 preceding objects; pre/failure censuses 8/8 clean.
+
+Exact cause: key StableHLO arg0, the completed device-resident normalization buffer, has no explicit
+`sdy` annotation; args1–4 are empty-mesh replicated. Removing exactly those four annotations and
+the mesh produces the sealed CPU graph SHA `a2dbe03f…b33` byte-for-byte. TPU optimized HLO adds an
+exact seventh invariant s32 while slot; all previously reviewed output-live witnesses pass. Record:
+`docs/artifacts/gate-d-original-db518-v8-key-placement-failure.json`.
+
+Local immutable V9 candidate binds placement per argument (including exact annotation absence),
+the 7-slot TPU while transition, and the prior output-sensitive paths. Archived V8 normalization
+and key graphs both pass offline. A hostile arg0 annotation rejects. Focused suite: 103/103 in
+14.65 s. Certificate `docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v9-source.json`;
+staging tree `5fcb8bde7de7bf2057dd75d24e10ae4efa78f27ed9f4b273221819007e1cb1a2`;
+fresh unstarted tag `…20260903T233327590939916Z`. Nothing V9 is committed/installed/executed.
+Exact next: one narrow Sol batch review, then persist/install/run only if P0–P2 are clear.
+
+### V9 adversarial approval
+
+The independent Sol reviewer checked the V8 failure record, per-argument placement parser, exact
+seven-slot TPU while transition, prior output-live chain, certificate hashes, immutable staging and
+vacant install targets. Exact verdict: `P0: NONE`, `P1: NONE`, `P2: NONE`,
+`APPROVE PERSISTENCE`,
+`APPROVE INSTALL ONLY 5fcb8bde7de7bf2057dd75d24e10ae4efa78f27ed9f4b273221819007e1cb1a2`,
+and `APPROVE EXECUTE ONCE greenfield_original_db518_prompt_key_chunk0_20260903T233327590939916Z
+<future merged pin condition>`. No V9 persistence, install or execution had occurred at this record.

@@ -12,12 +12,12 @@ from collections.abc import Mapping
 from hashlib import sha256
 from pathlib import Path
 
-SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-original-db518-prompt-key-install-v8")
+SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-original-db518-prompt-key-install-v9")
 INSTALLER_PATH = SOURCE_ROOT / "install_gate_d_original_db518_prompt_key_runtime.py"
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
-LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_original_db518_prompt_key_chunk0_v8.py"
+LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_original_db518_prompt_key_chunk0_v9.py"
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-original-db518-prompt-key-v8"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-original-db518-prompt-key-v9"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -29,17 +29,17 @@ PAYLOADS = {
     "chunk0_embedding_hlo.py":
     "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757",
     "original_db518_normalized_boundary_hlo.py":
-    "302da0c9651e6c5c199869b122e595c4c586bf5c17fe8cd920ddedffe5ff6a14",
+    "35757aab4a616a2f1073f78503c29075c3e43cb684e4e1faf7d835630876809e",
     "original_db518_prompt_key.py":
     "e86196b39acd075deca1abbfb645ff3264307158b50ce89fcfe60e26c75be95c",
     "probe_original_db518_prompt_key_chunk0.py":
-    "3156371253f1e232dd1c823d259705145a522ed9cc911864e70ada6a187f9b79",
+    "3b6aab0d51bff446576135b7855005ebf8d4d823d9600d40f52373095cdd81d8",
     "publish_gate_d_original_db518_prompt_key_chunk0.py":
-    "86418360335fe55803a9739a4b9dd04b654051db23ccdbba73c67f9c82ae4f85",
+    "a4c418ccf758261f62506067b77200f1b7df0fd748e68a20572bc3c97f33915e",
     "launch_gate_d_original_db518_prompt_key_chunk0.py":
-    "bcd39c7bc9de727bffa8d22c28caf6b4c70d7266f1823f051ba92fe25bbfd5a7",
+    "8f690ddf8393737be88d333ec229dc4e89dfe521ed5d9de9f017fa855a0ce81d",
     "verify_gate_d_original_db518_same_region_git_mirror.py":
-    "44c4a7f806b09c5529c663e83178f230deeaf98556f1ad481771c2a47064db02",
+    "3f69ca0185d18c20a0512e3e6cc092497e49922f3e5ed844570e73b67e8ae388",
 }
 CAPSULE_NAMES = (
     "chunk0_embedding_hlo.py",

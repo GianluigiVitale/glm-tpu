@@ -30,7 +30,7 @@ _EMPTY_SINGLE_DEVICE_MESH = (
 )
 _NORMALIZATION_PARAMETER_SHARDINGS = ("[{}, {}]", "[{}]", "[{}]")
 _KEY_CONTROL_PARAMETER_SHARDINGS = (
-    "[{}, {}]",
+    None,
     "[{}]",
     "[{}, {}]",
     "[{}]",
@@ -244,13 +244,14 @@ def _require_stable_identity(
     *,
     module_name: str,
     expected_sha256: str,
-    parameter_shardings: tuple[str, ...],
+    parameter_shardings: tuple[str | None, ...],
 ) -> tuple[str, dict[str, Any]]:
     """Bind the full graph plus the only admitted single-device placement form."""
 
     raw_sha256 = sha256(stablehlo.encode("utf-8")).hexdigest()
     canonical = stablehlo
     sharding_bound = False
+    sharding_count = 0
     if "sdy." in stablehlo:
         if stablehlo.count(_EMPTY_SINGLE_DEVICE_MESH) != 1:
             raise RuntimeError("completed boundary StableHLO mesh drifted")
@@ -268,8 +269,37 @@ def _require_stable_identity(
         annotations = tuple(
             f" {{sdy.sharding = #sdy.sharding<@empty_mesh, {axes}>}}"
             for axes in parameter_shardings
+            if axes is not None
         )
         main_line = lines[main_index]
+        argument_segments = re.findall(
+            r"%arg([0-9]+): (.*?)(?=, %arg[0-9]+:|\) ->)",
+            main_line,
+        )
+        if (
+            len(argument_segments) != len(parameter_shardings)
+            or tuple(int(number) for number, _ in argument_segments)
+            != tuple(range(len(parameter_shardings)))
+        ):
+            raise RuntimeError("completed boundary StableHLO signature drifted")
+        for (number, segment), axes in zip(
+            argument_segments, parameter_shardings, strict=True
+        ):
+            annotation = (
+                None
+                if axes is None
+                else f" {{sdy.sharding = #sdy.sharding<@empty_mesh, {axes}>}}"
+            )
+            expected_count = (
+                0 if annotation is None else annotation.count("sdy.sharding")
+            )
+            if (
+                segment.count("sdy.sharding") != expected_count
+                or (annotation is not None and segment.count(annotation) != 1)
+            ):
+                raise RuntimeError(
+                    f"completed boundary StableHLO argument {number} sharding drifted"
+                )
         if tuple(
             re.findall(
                 r" \{sdy\.sharding = #sdy\.sharding<@empty_mesh, "
@@ -288,6 +318,7 @@ def _require_stable_identity(
         if "sdy." in canonical:
             raise RuntimeError("completed boundary StableHLO sharding drifted")
         sharding_bound = True
+        sharding_count = len(annotations)
     observed = sha256(canonical.encode("utf-8")).hexdigest()
     if (
         not canonical.startswith(f"module @{module_name} attributes ")
@@ -296,9 +327,7 @@ def _require_stable_identity(
     ):
         raise RuntimeError("completed boundary StableHLO graph identity drifted")
     return canonical, {
-        "stable_parameter_sharding_count": (
-            len(parameter_shardings) if sharding_bound else 0
-        ),
+        "stable_parameter_sharding_count": sharding_count,
         "stable_raw_sha256": raw_sha256,
         "stable_sha256": observed,
         "stable_single_device_sharding_bound": sharding_bound,
@@ -544,7 +573,7 @@ def _optimized_single_device_placement(
     optimized: str,
     nodes: Mapping[str, Mapping[str, Any]],
     parameters: Mapping[int, str],
-    expected_axes: tuple[str, ...],
+    expected_axes: tuple[str | None, ...],
 ) -> bool:
     header = optimized.splitlines()[0] if optimized else ""
     if (
@@ -555,6 +584,10 @@ def _optimized_single_device_placement(
         return False
     for index, axes in enumerate(expected_axes):
         raw = nodes[parameters[index]]["raw"]
+        if axes is None:
+            if "sharding=" in raw or "xla.sdy.sharding" in raw:
+                return False
+            continue
         expected = (
             'sharding={replicated}, frontend_attributes={xla.sdy.sharding="'
             f"#sdy.sharding<@empty_mesh, {axes}>"
@@ -892,6 +925,7 @@ def require_normalized_key_control_boundary_hlo(
             (("f32", (128, 6144)),),
             (("bf16", (128,)),),
             (("bf16", (128,)),),
+            (("s32", ()),),
         )
         if tpu_form
         else (
@@ -911,6 +945,7 @@ def require_normalized_key_control_boundary_hlo(
             frozenset({params[2]}),
             frozenset({params[3]}),
             frozenset({params[4]}),
+            frozenset(),
         )
         if tpu_form
         else (
@@ -920,6 +955,26 @@ def require_normalized_key_control_boundary_hlo(
             frozenset({params[0]}),
             frozenset({params[3]}),
             frozenset({params[4]}),
+        )
+    )
+    expected_body_slot_sources = (
+        (
+            frozenset({0}),
+            frozenset({0, 1, 2, 3, 4, 5}),
+            frozenset({2}),
+            frozenset({3}),
+            frozenset({4}),
+            frozenset({5}),
+            frozenset({6}),
+        )
+        if tpu_form
+        else (
+            frozenset({0}),
+            frozenset({0, 1, 2, 3, 4, 5}),
+            frozenset({2}),
+            frozenset({3}),
+            frozenset({4}),
+            frozenset({5}),
         )
     )
     cpu_root_contract = bool(
@@ -983,15 +1038,7 @@ def require_normalized_key_control_boundary_hlo(
         and while_count == 1
         and initial_shapes == expected_initial_shapes
         and initial_sources == expected_initial_sources
-        and body_slot_sources
-        == (
-            frozenset({0}),
-            frozenset({0, 1, 2, 3, 4, 5}),
-            frozenset({2}),
-            frozenset({3}),
-            frozenset({4}),
-            frozenset({5}),
-        )
+        and body_slot_sources == expected_body_slot_sources
         and len(exact_dot_calls) == 1
         and exact_dot_to_root
         and (tpu_root_contract if tpu_form else cpu_root_contract)

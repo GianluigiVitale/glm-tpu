@@ -24,31 +24,31 @@ BRANCH = "rewrite/topology-first-decode"
 ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v8/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v9/"
     "publish_gate_d_original_db518_prompt_key_chunk0.py")
 SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_original_db518_prompt_key_chunk0.py")
 CONTRACT_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v8/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v9/"
     "original_db518_prompt_key.py")
 CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/original_db518_prompt_key.py")
 CONTRACT_SHA256 = (
     "e86196b39acd075deca1abbfb645ff3264307158b50ce89fcfe60e26c75be95c")
 PARSER_CONTRACT_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v8/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v9/"
     "chunk0_embedding_hlo.py")
 PARSER_CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py")
 PARSER_CONTRACT_SHA256 = (
     "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757")
 BOUNDARY_CONTRACT_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v8/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v9/"
     "original_db518_normalized_boundary_hlo.py")
 BOUNDARY_CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py")
 BOUNDARY_CONTRACT_SHA256 = (
-    "302da0c9651e6c5c199869b122e595c4c586bf5c17fe8cd920ddedffe5ff6a14")
+    "35757aab4a616a2f1073f78503c29075c3e43cb684e4e1faf7d835630876809e")
 PROMPT_CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/prompt_index_cache.py")
 PARENT_PATH = "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"

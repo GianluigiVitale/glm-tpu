@@ -28,30 +28,28 @@ weaken history. Optimizations default off. Targets: useful <=200, strong <=125, 
   plus US-CENTRAL2 mirror before protected work. Never use EU.
 - Report result, percentage and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-03 23:03Z
+## Resume checkpoint — 2026-09-03 23:40Z
 
 Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; current
-pushed V7 pin `d393a3bf948f732c2e62526ee9dfcd1e61b2d7a3`. Gate D is open.
+pushed V8 pin `73074bddcb9fe5312f3a369e877019378be6b13d`. Gate D is open.
 
 Accepted V6 proves the original DB518 layer-0 producer bitwise exact for all 2,048×128 lanes (SHA
 `96d261cb…887c`), with exact remote set and 8/8 cleanup; record
 `docs/artifacts/gate-d-original-db518-v6-exact-success.json`. Classification remains producer exact,
 consumer/decoder unproven.
 
-V7 tag `…20260903T222145752160015Z` compiled once but stopped before numerical invocation. CPU-sealed
-StableHLO expected `3cd10543…a976`; TPU emitted `87255de0…683d`. An exact diff proves the only
-portable-IR changes are one empty `sdy.mesh` plus replicated empty-mesh annotations on the three
-ENTRY arguments; TPU optimized HLO also uses backend-specific fused square/reduce/rsqrt. Diagnostic
-ledger generation `1788475897109185`, SHA `f1d3e3b0…5996`; pre/failure censuses 8/8. Record:
-`docs/artifacts/gate-d-original-db518-v7-tpu-hlo-placement-failure.json`. No numerical/performance claim.
+V7 diagnosed exact empty-mesh placement and TPU-specific fused normalization. V8 pin `73074bdd…b13d`
+then archived both boundary graphs and failed before normalization/key invocation: completed-buffer
+arg0 has no sharding annotation while the four independent key inputs are replicated; optimized TPU
+while also has an exact seventh passthrough scalar slot. Diagnostic terminal generation
+`1788478038656464`, SHA `a212559e…a9d5`; pre/failure censuses 8/8. Records:
+`docs/artifacts/gate-d-original-db518-v{7-tpu-hlo-placement,8-key-placement}-failure.json`.
 
-Sol blocked the first V8 batch because exact optimized normalization and while/dot/rotary witnesses
-could remain dead while an alternate graph fed the root. The local correction now requires the
-inverse chain, selected while slot, exact dot and role-separated live cosine/sine path to reach the
-returned BF16 root. Both demonstrated bypasses reject; archived TPU forms replay; focused suite
-102/102. Sol delta review: no P0–P2; persistence, install-only tree `419cc7a2…3d6` and execute-once
-tag `…20260903T232020879638235Z` approved conditional on the merged pin. Exact next: commit/push,
-same-region mirror, install-only, then the one bounded V8 run. Do not run 8K.
+Local V9 binds mixed placement per argument, the 7-slot TPU while, and the output-live inverse and
+dot→while→rotary paths. Both archived V8 graphs pass offline; hostile placement/bypass tests reject;
+focused suite 103/103. Sol returned no P0–P2 and approved persistence, install-only staging
+`5fcb8bde…b1a2`, and one fresh tag `…20260903T233327590939916Z` after the merged-pin condition.
+Exact next: commit/push/mirror, install-only, then one bounded V9 run. Do not run 8K.
 If exact, build a separate real layer consumer that takes the same completed buffer and whose HLO
 proves no input-RMS recomputation; only then authorize the exact 8K decoder.
 

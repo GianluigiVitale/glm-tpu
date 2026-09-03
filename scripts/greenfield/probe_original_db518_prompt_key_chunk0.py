@@ -29,7 +29,7 @@ import zipfile
 PROBE_REPOSITORY_PATH = (
     "scripts/greenfield/probe_original_db518_prompt_key_chunk0.py")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v8/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v9/"
     "probe_original_db518_prompt_key_chunk0.py")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 TAG_PATTERN = re.compile(

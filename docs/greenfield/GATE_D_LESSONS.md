@@ -1285,3 +1285,8 @@ normalized-state cause.
   a dead exact witness plus an alternate all-input live root. For tuple-producing fusions, map each live
   GTE back to the selected callee root slice; then prove role-separated angle/data ancestry through the
   exact while output and final ENTRY root.
+- Device-resident results passed between separately compiled executables can be deliberately unannotated
+  even when every independently supplied argument is empty-mesh replicated. Bind StableHLO placement per
+  argument, including required absence; removing annotations globally proves graph identity but not which
+  argument carried them. Capture every boundary graph before the first check, because the same failed run
+  also exposed the backend-added invariant while slot and avoided another TPU discriminator.
