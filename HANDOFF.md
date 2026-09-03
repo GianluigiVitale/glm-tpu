@@ -11558,9 +11558,10 @@ the M=2048 convolutions and the absence of callbacks; results sealed with SHA-25
 
 ## 2026-09-03 02:30Z — session end state: probe blocked on execution-provenance hardening (Sol round 32)
 
-Pins now: tooling `c92b24cf94bdcd4b0d0570aa7530c8b2c7194c34` (branch `tooling/gate-d-compensated-pp16-numerical`),
-rewrite merge `f204223e4b8c16f657041da870b91d133e1ef663` (= `086d459a` + tooling `c92b24cf`, rewrite goal.md
-byte-identical to `086d459a`), both pushed and mirrored; sealed same-region mirror verifier passes for `c92b24cf`
+Pins at the last code change: tooling `c92b24cf94bdcd4b0d0570aa7530c8b2c7194c34`, rewrite merge
+`f204223e4b8c16f657041da870b91d133e1ef663`; the records commits after it end at tooling `5e6510b8` / rewrite
+`c5243d20` (records only, no code change; rewrite goal.md byte-identical to `086d459a`). All pushed and mirrored;
+sealed same-region mirror verifier passes for `c92b24cf`
 (checkout archive `781a8244ad6ada98e9e99635adeb29b7423e7964ef2e06010d05d8875e1228a5`, fsck true, origin exact record);
 pod `db-v4-64-od` READY/HEALTHY; no TPU work in flight; no lease held.
 
