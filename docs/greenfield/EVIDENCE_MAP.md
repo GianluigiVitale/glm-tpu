@@ -3664,3 +3664,16 @@ persistence only; review and persistence precede any v2 installation.
   `526efffcf8b6b1e8e46a568fd20d35b64a83b6c7`, pushed to origin. No install/cloud/TPU work at this record.
 - Classification: `ROUND32_PROVENANCE_CLOSED;SOL_APPROVED;SOURCE_PERSISTED;INSTALL_APPROVED_NOT_YET_RUN;
   EXECUTE_ONCE_APPROVED_NOT_YET_RUN;NO_CLAIM;GATE_D_OPEN`.
+
+## 2026-09-03 — pre-install mirror-verifier integration correction
+
+- Read-only pre-install inspection caught that the shared verifier SHA `09120816…` is intentionally hard-coded to
+  the tooling worktree/branch, while this probe passes a rewrite pin. It would fail closed before TPU execution but
+  waste a launch/tag. New immutable adapter `verify_gate_d_rewrite_same_region_git_mirror.py` authenticates its own
+  rewrite-branch committed blob, loads only the exact reviewed base bytes (`09120816…` at `98637823…`), overrides
+  worktree/branch/bound paths, and delegates full origin/ref/fsck/archive/blob replay.
+- Focused forced-CPU suite: 30/30 in 37.90 s. Certificate SHA `736dd1fdfc1befd1915e5b35ed28b0f180e0fee4134c07520f79e614e3986cbb`;
+  staging tree SHA `1c9ac6518b459e3899f20e52d443621114d66a0f49ab565d2783138a0aa1c3b9`. Previously approved tag
+  `…120750596552366Z` is retired because code changed; proposed replacement `…122749038361895Z` is unstarted.
+- Classification: `PREINSTALL_FAIL_CLOSED_INTEGRATION_BUG_FIXED;REWRITE_MIRROR_DELTA_REVIEW_PENDING;
+  INSTALL_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;NO_CLAIM;GATE_D_OPEN`.

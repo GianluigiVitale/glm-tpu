@@ -1,6 +1,6 @@
 # Goal — GLM-5.2-FP8 TPU v4 topology-first engine: close Gate D, then finish §18
 
-FULL ACCESS: autonomous. Keep this file <4000 chars; it is the compaction-safe authority. At
+FULL ACCESS. Keep this <4000 chars; compaction-safe authority. At
 start/compaction read it and `docs/glm-tpu-revolution.md` in full, then only the last ~300 lines of
 `HANDOFF.md` and last entries of `docs/greenfield/{EVIDENCE_MAP,GATE_D_LESSONS}.md`; never reread
 whole histories. Inspect live git/run/lease/pod state. If stuck, reread
@@ -9,7 +9,7 @@ and adjudicate its hypotheses against local evidence.
 
 ## Priority
 
-Close **Gate D**: a correct 78-layer greenfield decoder at 8K with exact raw tokens and DSA
+Close **Gate D**: a correct 78-layer decoder at 8K with exact raw tokens and DSA
 set/tie order, state/cache integrity, local repeated collectives, measured HBM, fresh trace and
 steady wall. PP8/PP16/WS32 adjudication, 128K/256K, speculation and §18 follow; do not divert now.
 
@@ -28,10 +28,10 @@ strong <=125, stretch <=100.
   run an 8K decoder while a row/chunk probe can decide the hypothesis.
 - One batched review covers source, tests, certificate, install and one fresh-tag command. Use Sol
   `gpt-5.6-sol`, thread `01a05206-57b1-7dc3-a49c-a913529b3937`, read-only, with exact verdict lines.
-  A fresh Fable-max audit may replace it when usage is available; when exhausted, Sol is sufficient.
+  Fable-max may replace it when available; otherwise Sol is sufficient.
 - Cron `sync-glm.sh` runs every 5 min. Keep work committed/pushed and same-region mirrored; use
   `verify_gate_d_same_region_git_mirror.py` immediately before protected work. Never sync to EU.
-- Report result, realistic percentage and blockers plainly; never claim unproven.
+- Report result, percentage and blockers plainly; never claim unproven.
 
 ## Resume checkpoint — 2026-09-03
 
@@ -48,10 +48,11 @@ two residual P1s; the delta now creates/retains fd 7 in the launcher and indepen
 three reference slices plus exact layer-0 control. Forced-CPU suite: 29 passed. Nothing installed;
 no TPU run; tags `…022131838688366Z` and `…113530293108901Z` are burned. Gate D open.
 
-Sol delta review: no P0/P1/P2; approved persistence/install/execute-once. Source commit
-`526efffc…` is pushed. Exact next: commit this record, verify origin+US-CENTRAL2 mirror, run the
-reviewed installer only, preflight 8/8 zero work, then execute once with approved fresh tag
-`…120750596552366Z`. If row 0 exact, integrate the proven prefill geometry and
+Sol approved the round-32 delta; source `526efffc…` and record `86455fa…` are pushed. Pre-install
+check caught the reused mirror verifier was hard-coded to the tooling branch. A rewrite-specific
+immutable adapter plus test is CPU-green (30 passed); no install/run. Tag `…120750596552366Z` is
+retired. Exact next: narrow Sol delta review, commit/push/mirror, install, 8/8 preflight, execute
+once with `…122749038361895Z`. If row 0 exact, integrate the proven prefill geometry and
 run the next smallest exactness check before 8K. If nonexact, use archived arrays/HLO to localize it.
 
 ## After Gate D

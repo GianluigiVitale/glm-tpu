@@ -11655,3 +11655,15 @@ and returned no P0/P1/P2 plus exact `APPROVE PERSISTENCE`, `APPROVE INSTALL ONLY
 Approved bytes are commit `526efffcf8b6b1e8e46a568fd20d35b64a83b6c7`, pushed to origin. At this record nothing is
 installed and no cloud or TPU action has occurred. Next is this records-only commit, same-region mirror replay,
 the two literal approved install-only commands, authenticated zero-work preflight, then the one approved launch.
+
+### Pre-install correction: shared mirror verifier targeted the wrong branch
+
+Before privileged installation, direct inspection caught the shared verifier `09120816…` is hard-coded to
+`/home/gianl/glm-tpu-gate-d-pp16-numerical` / `tooling/gate-d-compensated-pp16-numerical`; the new wrapper passed its
+rewrite pin, so the approved launch would have failed closed at mirror replay before TPU work. No installation or
+launch occurred. New `verify_gate_d_rewrite_same_region_git_mirror.py` self-verifies at the rewrite pin, loads the
+unchanged reviewed verifier base from exact committed bytes (`98637823…`, SHA `09120816…`), overrides only rewrite
+worktree/branch/bound paths, and delegates the full origin/ref/fsck/archive/blob proof. Wrapper, launcher, installer,
+certificate and staging tree are repinned. Forced-CPU suite passes 30/30 in 37.90 s; certificate SHA `736dd1fd…`,
+staging tree `1c9ac651…`. Tag `…120750596552366Z` is retired; replacement `…122749038361895Z` is unstarted and
+requires one narrow delta approval. Gate D remains open.

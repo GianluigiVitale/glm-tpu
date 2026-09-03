@@ -24,7 +24,7 @@ ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py"
 WRAPPER_PATH = WORKTREE / "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
 WRAPPER_SOURCE_PATH = "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
-WRAPPER_SHA256 = "99d83cc04de260e270163998f4e6a52b2f3e7e8b4d45a2f2572758a893bf37b8"
+WRAPPER_SHA256 = "e9b2111191444dcb03bc4dad02fdfd5900e6fa49aa6fc2752dd3d7d82af28b0a"
 CAPSULE_ROOT = Path(
     "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v1"
 )
@@ -34,9 +34,9 @@ PROBE_SHA256 = "dd5dfa7a8d9dd2e264648366fbefb1256db6dac7c65931ffd43aaaac1dffc2ed
 PUBLISHER_PATH = CAPSULE_ROOT / "publish_gate_d_layer1_prompt_chunk0_geometry.py"
 PUBLISHER_SOURCE_PATH = "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
 PUBLISHER_SHA256 = "e00b11678dec712d272324a743b41e9c856a1919aec88e47e1249b092ae6cc63"
-MIRROR_VERIFIER_PATH = CAPSULE_ROOT / "verify_gate_d_same_region_git_mirror.py"
-MIRROR_VERIFIER_SOURCE_PATH = "scripts/greenfield/verify_gate_d_same_region_git_mirror.py"
-MIRROR_VERIFIER_SHA256 = "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"
+MIRROR_VERIFIER_PATH = CAPSULE_ROOT / "verify_gate_d_rewrite_same_region_git_mirror.py"
+MIRROR_VERIFIER_SOURCE_PATH = "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
+MIRROR_VERIFIER_SHA256 = "b9fcfc9c9031b6773ebe2a02d18cf584d41badfac460a0e0caebc1889cb87594"
 LOCK_ROOT = Path("/opt/glm-tpu/locks")
 LOCK_NAMES = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")
 LOCK_FDS = (11, 12)

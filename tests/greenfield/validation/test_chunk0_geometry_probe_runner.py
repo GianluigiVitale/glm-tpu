@@ -23,6 +23,7 @@ DIGESTS = REPO / "docs/artifacts/gate-d-chunk0-probe-weight-digests.json"
 PUBLISHER = REPO / "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
 LAUNCHER = REPO / "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py"
 INSTALLER = REPO / "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py"
+REWRITE_MIRROR = REPO / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
 
 
 def test_runner_pins_inputs_digests_and_sealed_interpreter():
@@ -162,8 +163,8 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
         PROBE.name: sha256(PROBE.read_bytes()).hexdigest(),
         PUBLISHER.name: sha256(PUBLISHER.read_bytes()).hexdigest(),
         LAUNCHER.name: sha256(LAUNCHER.read_bytes()).hexdigest(),
-        "verify_gate_d_same_region_git_mirror.py": sha256(
-            (REPO / "scripts/greenfield/verify_gate_d_same_region_git_mirror.py").read_bytes()
+        "verify_gate_d_rewrite_same_region_git_mirror.py": sha256(
+            (REPO / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py").read_bytes()
         ).hexdigest(),
     }
     assert installer_module.PAYLOADS == expected
@@ -176,6 +177,22 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
     assert launcher_module.WRAPPER_SHA256 == sha256(RUNNER.read_bytes()).hexdigest()
     assert "fcntl.LOCK_EX | fcntl.LOCK_NB" in launcher
     assert 'f"/proc/self/fd/{WRAPPER_FD}"' in launcher
+
+
+def test_mirror_verifier_is_bound_to_the_rewrite_branch_and_reviewed_base():
+    verifier = _load_module("chunk0_rewrite_mirror", REWRITE_MIRROR)
+    assert verifier.WORKTREE == REPO
+    assert verifier.BRANCH == "rewrite/topology-first-decode"
+    assert verifier.SOURCE_PATH.endswith(
+        "verify_gate_d_rewrite_same_region_git_mirror.py"
+    )
+    assert sha256((REPO / verifier.BASE_PATH).read_bytes()).hexdigest() == verifier.BASE_SHA256
+    assert set(verifier.BOUND_PATHS) >= {
+        "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py",
+        "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py",
+        "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh",
+        verifier.SOURCE_PATH,
+    }
 
 
 def test_launcher_retains_the_original_run_directory_across_path_substitution(

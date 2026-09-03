@@ -30,15 +30,15 @@ EXPECTED_ENVIRONMENT = {
 PAYLOADS = {
     "probe_layer1_prompt_chunk0_geometry.py": "dd5dfa7a8d9dd2e264648366fbefb1256db6dac7c65931ffd43aaaac1dffc2ed",
     "publish_gate_d_layer1_prompt_chunk0_geometry.py": "e00b11678dec712d272324a743b41e9c856a1919aec88e47e1249b092ae6cc63",
-    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "8fd7ed40d4ab6743fba75ebefc4a0cd77a42a037a9baae05818911a832d16f29",
-    "verify_gate_d_same_region_git_mirror.py": (
-        "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"
+    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "997fc2eed7f737662b8d41e912130c93e1a964c976c6ced525ebd519085dc14c",
+    "verify_gate_d_rewrite_same_region_git_mirror.py": (
+        "b9fcfc9c9031b6773ebe2a02d18cf584d41badfac460a0e0caebc1889cb87594"
     ),
 }
 CAPSULE_NAMES = (
     "probe_layer1_prompt_chunk0_geometry.py",
     "publish_gate_d_layer1_prompt_chunk0_geometry.py",
-    "verify_gate_d_same_region_git_mirror.py",
+    "verify_gate_d_rewrite_same_region_git_mirror.py",
 )
 SOURCE_NAMES = tuple(sorted((*PAYLOADS, INSTALLER_PATH.name)))
 _RENAME_NOREPLACE = 1
