@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import importlib.util
 import json
 import os
 import re
@@ -22,11 +23,12 @@ from typing import Any
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v4/"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v5/"
     "publish_gate_d_layer1_prompt_chunk0_geometry.py"
 )
 SOURCE_PATH = "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
 PROBE_SOURCE_PATH = "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"
+HLO_CONTRACT_SOURCE_PATH = "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py"
 BASE_PATH = "scripts/greenfield/publish_gate_d_projection_contraction_pp16_hlo.py"
 BASE_PIN = "986378238ac6458307aea69ef1f5e12bf82bc020"
 BASE_SHA256 = "f3f20a01fd37bb82988cd77f69fa7b0a780d120568bab0db4162f42e7855bc97"
@@ -543,6 +545,24 @@ def _require_wk_hlo_boundaries(
         raise RuntimeError("chunk-0 wk executable boundary drifted")
 
 
+def _require_embedding_gather_hlo(
+    main_optimized: str, main_stablehlo: str
+) -> dict[str, Any]:
+    """Load the shared stdlib-only whole-module admission implementation."""
+
+    adjacent = Path(__file__).with_name("chunk0_embedding_hlo.py")
+    source = REPO / HLO_CONTRACT_SOURCE_PATH
+    helper = adjacent if adjacent.is_file() else source
+    if Path(__file__) == INSTALL_PATH and helper != adjacent:
+        raise RuntimeError("installed chunk-0 HLO admission helper is absent")
+    spec = importlib.util.spec_from_file_location("_chunk0_embedding_hlo", helper)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("chunk-0 HLO admission helper cannot be loaded")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.require_embedding_gather_hlo(main_optimized, main_stablehlo)
+
+
 def _prepare_success(
     base: Any,
     run_fd: int,
@@ -596,6 +616,7 @@ def _prepare_success(
         or set(hlo)
         != {
             "convolution_lines_with_2048_rows",
+            "embedding_gather_contract",
             "main_fp32_wk_parameters",
             "main_raw_wk_parameters",
             "optimized_byte_count",
@@ -638,6 +659,9 @@ def _prepare_success(
         wk_promote_optimized_text,
         wk_promote_stablehlo_text,
     )
+    embedding_gather_contract = _require_embedding_gather_hlo(
+        optimized_text, stablehlo_text
+    )
     if (
         any(
             token in text
@@ -655,6 +679,7 @@ def _prepare_success(
         or hlo.get("main_fp32_wk_parameters")
         != ["w__wk0__.1: f32[128,6144]", "w__wk1__.1: f32[128,6144]"]
         or hlo.get("main_raw_wk_parameters") != []
+        or hlo.get("embedding_gather_contract") != embedding_gather_contract
         or "w__wk0_bits__" in optimized_text
         or "w__wk1_bits__" in optimized_text
         or hlo.get("convolution_lines_with_2048_rows") != convolution_count

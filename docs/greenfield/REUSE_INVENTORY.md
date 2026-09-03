@@ -1102,3 +1102,12 @@ sorted `relative-path NUL size NUL` catalogue, opening each exact
 identity. A serialized live read-only replay passes all seven recovery candidates. Preserve both
 burned tags and failure artifacts. V4 still requires persistence, no-replace install and a fresh
 invocation review; PP16 HLO remains unauthorized until exact 8/8 closure is persisted.
+
+## 2026-09-03 chunk0 v6 reuse boundary
+
+Reuse the exact v5 checkpoint/input digests, separate-wk helpers, sealed Python/JAX/libtpu sites, append-only
+publisher base, rewrite same-region mirror adapter, launcher/dual-lock/run-FD boundary and census tools. Do not reuse
+v5's host `chunk_embeddings` boundary or its naive ENTRY-only gather check. V6 adds the standalone stdlib
+`chunk0_embedding_hlo.py`; the probe imports its committed bytes from the sealed archive before invocation, while the
+publisher loads the launcher-authenticated adjacent capsule copy and repeats the same whole-module proof. Preserve
+v5's token-374 diagnostic as negative evidence; it is not a reference cache or reusable numerical success.

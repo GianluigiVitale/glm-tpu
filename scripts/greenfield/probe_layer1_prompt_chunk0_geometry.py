@@ -40,7 +40,7 @@ import zipfile
 
 PROBE_REPOSITORY_PATH = "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v4/"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v5/"
     "probe_layer1_prompt_chunk0_geometry.py"
 )
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
@@ -402,6 +402,9 @@ def main() -> int:
         promote_stage_local_prefill_index_wk,
     )
     from glm_tpu.greenfield.kernels.reference.rotary import build_rotary_table_host
+    from glm_tpu.greenfield.validation.chunk0_embedding_hlo import (
+        require_embedding_gather_hlo,
+    )
 
     if jax.default_backend() != "tpu":
         raise RuntimeError(f"probe requires TPU, got {jax.default_backend()}")
@@ -450,7 +453,19 @@ def main() -> int:
     prompt_ids = arrays["prompt_token_ids"]
     if prompt_ids.shape != (PROMPT_ROWS,):
         raise RuntimeError("prompt token geometry drifted")
-    embedding_bits = pk.chunk_embeddings(prompt_ids, arrays["unique_token_ids"], arrays["unique_embedding_bfloat16_bits"], start=0, rows=CHUNK_ROWS).astype(np.uint16)
+    unique_token_ids = arrays["unique_token_ids"]
+    unique_embedding_bits = arrays["unique_embedding_bfloat16_bits"]
+    embedding_lookup = {
+        int(token): index for index, token in enumerate(unique_token_ids.tolist())
+    }
+    embedding_rows = np.asarray(
+        [embedding_lookup[int(token)] for token in prompt_ids[:CHUNK_ROWS]],
+        dtype=np.int32,
+    )
+    if not np.array_equal(
+        unique_token_ids[embedding_rows], prompt_ids[:CHUNK_ROWS]
+    ):
+        raise RuntimeError("prompt embedding-row association drifted")
     qkv_bits, qkv_scale = pk.pack_fused_qkv_a_owners(
         arrays["self_attn__q_a_proj__weight"], arrays["self_attn__q_a_proj__weight_scale_inv"],
         arrays["self_attn__kv_a_proj_with_mqa__weight"], arrays["self_attn__kv_a_proj_with_mqa__weight_scale_inv"],
@@ -535,13 +550,30 @@ def main() -> int:
         "rope_table": bf16(rope_table.view(np.uint16)),
     }
 
-    def pipeline(embedding: Any, positions: Any, w: dict[str, Any]) -> dict[str, Any]:
+    def pipeline(
+        unique_embeddings: Any,
+        prompt_embedding_rows: Any,
+        positions: Any,
+        w: dict[str, Any],
+    ) -> dict[str, Any]:
+        # DB518 proves this physical association: keep the M2048 embedding
+        # gather on device and coupled to the input RMS producer.  A host-side
+        # gather changes the TPU lowering and is not an equivalent control.
+        # The host-built rows are proven in [0, 37).  Clip mode is therefore
+        # numerically identical while preventing an alternate NaN select arm
+        # from entering the RMS fusion.
+        embedding = jnp.take(
+            unique_embeddings, prompt_embedding_rows, axis=0, mode="clip"
+        )
         return legacy_geometry_chunk_pipeline(embedding, positions, w, softmax_scale=args.softmax_scale, contract=contract)
 
     positions_np = np.arange(CHUNK_ROWS, dtype=np.int32)
-    embedding_full = bf16(embedding_bits)
+    unique_embeddings = bf16(unique_embedding_bits)
+    embedding_rows_full = put(embedding_rows)
     positions_full = put(positions_np)
-    lowered = jax.jit(pipeline).lower(embedding_full, positions_full, weights)
+    lowered = jax.jit(pipeline).lower(
+        unique_embeddings, embedding_rows_full, positions_full, weights
+    )
     compiled = lowered.compile()
     hlo_text = compiled.as_text()
     _write_run_member_exclusive(
@@ -555,11 +587,25 @@ def main() -> int:
         "hlo/legacy_geometry_chunk0.stablehlo.mlir",
         stablehlo_text.encode("utf-8"),
     )
-    result_full_device = compiled(embedding_full, positions_full, weights)
+    # Refuse a compiler graph that does not preserve the DB518 gather/RMS
+    # association before spending TPU time invoking it.
+    embedding_gather_contract = require_embedding_gather_hlo(
+        hlo_text, stablehlo_text
+    )
+    result_full_device = compiled(
+        unique_embeddings, embedding_rows_full, positions_full, weights
+    )
     result_full = jax.device_get(result_full_device)
     # One-row block arm: layer-0 block at M=1 for row 0; the layer-1 key projection
     # keeps the accepted physical-M64 geometry (substitute into the chunk arm's first partition).
-    result_row0 = jax.device_get(jax.jit(pipeline)(bf16(embedding_bits[:1]), put(positions_np[:1]), weights))
+    result_row0 = jax.device_get(
+        jax.jit(pipeline)(
+            unique_embeddings,
+            put(embedding_rows[:1]),
+            put(positions_np[:1]),
+            weights,
+        )
+    )
     normalized1_partition = jnp.asarray(result_full_device["normalized1"][:64]).at[0].set(jnp.asarray(result_row0["normalized1"][0]))
     keys1_one_row_m64 = jax.device_get(
         jax.jit(lambda n1, pos, w: layer1_keys_from_normalized(n1, pos, w, contract=contract))(normalized1_partition, put(positions_np[:64]), weights)
@@ -603,6 +649,7 @@ def main() -> int:
         and not forbidden
         and len(main_fp32_wk_parameters) == 2
         and not main_raw_wk_parameters
+        and embedding_gather_contract["passed"]
         else "FAILED"
     )
     summary = {
@@ -616,6 +663,7 @@ def main() -> int:
         "forbidden_hlo_tokens": forbidden,
         "hlo": {
             "convolution_lines_with_2048_rows": hlo_convolution_2048,
+            "embedding_gather_contract": embedding_gather_contract,
             "optimized_byte_count": len(hlo_text.encode("utf-8")),
             "optimized_sha256": sha256(hlo_text.encode("utf-8")).hexdigest(),
             "stablehlo_byte_count": len(stablehlo_text.encode("utf-8")),

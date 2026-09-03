@@ -24,6 +24,7 @@ CHUNK_PIPELINE = (
 )
 DIGESTS = REPO / "docs/artifacts/gate-d-chunk0-probe-weight-digests.json"
 PUBLISHER = REPO / "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
+HLO_CONTRACT = REPO / "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py"
 LAUNCHER = REPO / "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py"
 INSTALLER = REPO / "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py"
 REWRITE_MIRROR = REPO / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
@@ -44,7 +45,7 @@ def test_runner_pins_inputs_digests_and_sealed_interpreter():
     assert 'TAG=${GLM_GATE_D_CHUNK0_GEOMETRY_TAG:-}' in runner
     assert "unsafe Gate-D chunk-0 geometry tag" in runner
     # The only executed probe pathname is the root-owned immutable capsule.
-    assert "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v4" in runner
+    assert "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v5" in runner
     assert '"$SEALED_PYTHON" -I -S -B -u "$PROBE"' in runner
     assert "$PROBE_LOCAL" not in runner and "/source/probe_layer1" not in runner
     assert '--code-pin "$PIN"' in runner and '--repository "$WORKTREE"' in runner
@@ -169,6 +170,9 @@ def test_probe_is_self_verifying_and_imports_from_a_sealed_archive():
     assert "digests_raw = _snapshot_regular(args.weight_digests)" in probe
     assert 'shard_digests={digest_record["shard"]["filename"]: digest_record["shard"]["sha256"]}' in probe
     assert "layer1_keys_from_normalized" in probe and '"one_row_block_m64_keys_vs_legacy_lanes"' in probe
+    assert "embedding = jnp.take(" in probe
+    assert "pk.chunk_embeddings(" not in probe
+    assert '"embedding_gather_contract": embedding_gather_contract' in probe
     record = json.loads(DIGESTS.read_text())
     assert record["artifact_kind"] == "gate_d_chunk0_probe_weight_digests" and len(record["tensors"]) == 19
 
@@ -209,10 +213,12 @@ def test_capsule_hash_chain_and_second_vacancy_check_are_bound():
     publisher = PUBLISHER.read_text()
     probe_sha = sha256(PROBE.read_bytes()).hexdigest()
     publisher_sha = sha256(PUBLISHER.read_bytes()).hexdigest()
+    hlo_contract_sha = sha256(HLO_CONTRACT.read_bytes()).hexdigest()
     wrapper_sha = sha256(RUNNER.read_bytes()).hexdigest()
     launcher_sha = sha256(LAUNCHER.read_bytes()).hexdigest()
     assert probe_sha in runner and probe_sha in launcher and probe_sha in installer
     assert publisher_sha in runner and publisher_sha in launcher and publisher_sha in installer
+    assert hlo_contract_sha in launcher and hlo_contract_sha in installer
     assert wrapper_sha in launcher and launcher_sha in installer
     assert "__PROBE_SHA256__" not in "".join((runner, launcher, installer))
     assert "__PUBLISHER_SHA256__" not in "".join((runner, launcher, installer))
@@ -235,6 +241,7 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
     installer = INSTALLER.read_text()
     launcher = LAUNCHER.read_text()
     expected = {
+        "chunk0_embedding_hlo.py": sha256(HLO_CONTRACT.read_bytes()).hexdigest(),
         PROBE.name: sha256(PROBE.read_bytes()).hexdigest(),
         PUBLISHER.name: sha256(PUBLISHER.read_bytes()).hexdigest(),
         LAUNCHER.name: sha256(LAUNCHER.read_bytes()).hexdigest(),
@@ -245,7 +252,7 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
     assert installer_module.PAYLOADS == expected
     assert str(installer_module.CAPSULE_TARGET).startswith("/usr/local/libexec/glm-tpu/")
     assert str(installer_module.LAUNCHER_TARGET).endswith(
-        "launch_gate_d_layer1_prompt_chunk0_geometry_v5.py"
+        "launch_gate_d_layer1_prompt_chunk0_geometry_v6.py"
     )
     assert str(installer_module.LAUNCHER_TARGET).startswith("/opt/glm-tpu/bin/")
     assert installer.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
@@ -256,6 +263,7 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
     assert f'launcher = Path("{launcher_module.INSTALL_PATH}")' in RUNNER.read_text()
     assert probe_module.INSTALL_PATH == launcher_module.PROBE_PATH
     assert publisher_module.INSTALL_PATH == launcher_module.PUBLISHER_PATH
+    assert launcher_module.HLO_CONTRACT_PATH == launcher_module.CAPSULE_ROOT / "chunk0_embedding_hlo.py"
     assert str(launcher_module.PROBE_PATH) == f"{launcher_module.CAPSULE_ROOT}/{PROBE.name}"
     assert str(launcher_module.PUBLISHER_PATH) == f"{launcher_module.CAPSULE_ROOT}/{PUBLISHER.name}"
     assert launcher_module.WRAPPER_SHA256 == sha256(RUNNER.read_bytes()).hexdigest()
@@ -279,6 +287,7 @@ def test_mirror_verifier_is_bound_to_the_rewrite_branch_and_reviewed_base():
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v3-source.json",
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v4-source.json",
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v5-source.json",
+        "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v6-source.json",
         "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py",
         "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py",
         "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py",
@@ -576,6 +585,185 @@ def test_publisher_mutation_checks_wk_executable_boundaries():
             promote,
             promote_stable,
         )
+
+
+def _device_gather_hlo_fixture() -> tuple[str, str]:
+    main = """HloModule main
+
+%take (table: bf16[37,6144], rows: s32[2048]) -> bf16[2048,6144] {
+  %table = bf16[37,6144] parameter(0)
+  %rows = s32[2048] parameter(1)
+  %rows_copy = s32[2048] copy(%rows)
+  %gather = bf16[2048,6144] gather(%table, %rows_copy), offset_dims={1}, collapsed_slice_dims={0}, start_index_map={0}, index_vector_dim=1, slice_sizes={1,6144}
+  ROOT %gather_copy = bf16[2048,6144] copy(%gather)
+}
+
+%sum (lhs: f32[], rhs: f32[]) -> f32[] {
+  %lhs = f32[] parameter(0)
+  %rhs = f32[] parameter(1)
+  ROOT %sum_root = f32[] add(%lhs, %rhs)
+}
+
+%rms (chunk: bf16[2048,6144]) -> f32[2048] {
+  %chunk = bf16[2048,6144] parameter(0)
+  %chunk_f32 = f32[2048,6144] convert(%chunk)
+  %square = f32[2048,6144] multiply(%chunk_f32, %chunk_f32)
+  %zero = f32[] constant(0)
+  ROOT %sums = f32[2048] reduce(%square, %zero), dimensions={1}, to_apply=%sum
+}
+
+%inverse (sums: f32[2048]) -> f32[2048] {
+  %sums = f32[2048] parameter(0)
+  %reciprocal = f32[] constant(0.000162760422)
+  %reciprocal_broadcast = f32[2048] broadcast(%reciprocal), dimensions={}
+  %mean = f32[2048] multiply(%sums, %reciprocal_broadcast)
+  %epsilon = f32[] constant(1e-05)
+  %epsilon_broadcast = f32[2048] broadcast(%epsilon), dimensions={}
+  %shifted = f32[2048] add(%mean, %epsilon_broadcast)
+  ROOT %inverse_root = f32[2048] rsqrt(%shifted)
+}
+
+%normalize (chunk: bf16[2048,6144], weight: f32[6144], inverse: f32[2048]) -> bf16[2048,6144] {
+  %chunk = bf16[2048,6144] parameter(0)
+  %weight = f32[6144] parameter(1)
+  %inverse = f32[2048] parameter(2)
+  %chunk_f32 = f32[2048,6144] convert(%chunk)
+  %inverse_broadcast = f32[2048,6144] broadcast(%inverse), dimensions={0}
+  %scaled = f32[2048,6144] multiply(%chunk_f32, %inverse_broadcast)
+  %rounded = bf16[2048,6144] convert(%scaled)
+  %rounded_f32 = f32[2048,6144] convert(%rounded)
+  %weight_broadcast = f32[2048,6144] broadcast(%weight), dimensions={1}
+  %weighted = f32[2048,6144] multiply(%rounded_f32, %weight_broadcast)
+  ROOT %normalized = bf16[2048,6144] convert(%weighted)
+}
+
+%key (normalized: bf16[2048,6144], alternate: bf16[2048,6144], positions: s32[2048]) -> bf16[2048,128] {
+  %normalized = bf16[2048,6144] parameter(0)
+  %alternate = bf16[2048,6144] parameter(1)
+  %positions = s32[2048] parameter(2)
+  ROOT %key_slice = bf16[2048,128] slice(%normalized), slice={[0:2048], [0:128]}
+}
+
+ENTRY %main (unique_embeddings.1: bf16[37,6144], prompt_embedding_rows.1: s32[2048], positions.1: s32[2048], w__input_norm0__.1: bf16[6144]) -> (bf16[1], bf16[1], bf16[1], bf16[1], bf16[1], bf16[2048,128], bf16[2048,128], bf16[1], bf16[1], bf16[1], bf16[1], bf16[1]) {
+  %unique_embeddings.1 = bf16[37,6144] parameter(0)
+  %prompt_embedding_rows.1 = s32[2048] parameter(1)
+  %positions.1 = s32[2048] parameter(2)
+  %w__input_norm0__.1 = bf16[6144] parameter(3)
+  %table_copy = bf16[37,6144] copy(%unique_embeddings.1)
+  %row_bitcast = s32[2048] bitcast(%prompt_embedding_rows.1)
+  %gather = bf16[2048,6144] fusion(%table_copy, %row_bitcast), calls=%take
+  %rms = f32[2048] fusion(%gather), kind=kLoop, calls=%rms
+  %inverse = f32[2048] fusion(%rms), kind=kLoop, calls=%inverse
+  %weight_f32 = f32[6144] convert(%w__input_norm0__.1)
+  %normalized = bf16[2048,6144] fusion(%gather, %weight_f32, %inverse), kind=kLoop, calls=%normalize
+  %other = bf16[1] constant(0)
+  %key0 = bf16[2048,128] fusion(%normalized, %gather, %positions.1), calls=%key
+  %key1 = bf16[2048,128] custom-call(%gather, %positions.1)
+  ROOT %out = (bf16[1], bf16[1], bf16[1], bf16[1], bf16[1], bf16[2048,128], bf16[2048,128], bf16[1], bf16[1], bf16[1], bf16[1], bf16[1]) tuple(%other, %other, %other, %other, %other, %key0, %key1, %other, %other, %other, %other, %other)
+}
+"""
+    stable = (
+        "module @main {\n"
+        "  func.func public @main(%arg0: tensor<37x6144xbf16>, "
+        "%arg1: tensor<2048xi32>, %arg2: tensor<2048xi32>, "
+        "%arg3: tensor<6144xbf16>) -> "
+        "tensor<1xbf16> {\n"
+        "  }\n}\n"
+    )
+    return main, stable
+
+
+def test_publisher_requires_called_body_semantics_and_live_device_gather_rms():
+    publisher = _load_publisher()
+    main, stable = _device_gather_hlo_fixture()
+    assert publisher._require_embedding_gather_hlo(main, stable) == {
+        "direct_chunk_parameter_count": 0,
+        "embedding_row_parameter_count": 2,
+        "gather_coupled_input_rms": True,
+        "passed": True,
+        "physical_embedding_gather_count": 1,
+        "unique_embedding_parameter_count": 1,
+    }
+    # Compiler-kind spelling is not semantic, and transparent caller edges are
+    # intentionally present in the accepted fixture.
+    assert "kind=kCustom" not in main
+    hostile = (
+        main.replace("gather(%table, %rows_copy)", "gather(%table, %table)"),
+        main.replace("multiply(%chunk_f32, %chunk_f32)", "multiply(%zero, %zero)"),
+        main.replace("multiply(%chunk_f32, %inverse_broadcast)", "multiply(%chunk_f32, %chunk_f32)"),
+        main.replace("slice(%normalized), slice=", "slice(%alternate), slice=", 1),
+        main.replace("calls=%take", "calls=%missing", 1),
+        main.replace(
+            "  %chunk_f32 = f32[2048,6144] convert(%chunk)\n"
+            "  %square = f32[2048,6144] multiply(%chunk_f32, %chunk_f32)",
+            "  %chunk_direct = f32[2048,6144] convert(%chunk)\n"
+            "  %predicate = pred[2048,6144] constant(false)\n"
+            "  %alternate_value = f32[2048,6144] constant(0)\n"
+            "  %chunk_f32 = f32[2048,6144] select(%predicate, %chunk_direct, %alternate_value)\n"
+            "  %square = f32[2048,6144] multiply(%chunk_f32, %chunk_f32)",
+            1,
+        ),
+        main.replace(
+            "  %mean = f32[2048] multiply(%sums, %reciprocal_broadcast)\n",
+            "  %mean0 = f32[2048] multiply(%sums, %reciprocal_broadcast)\n"
+            "  %mean = f32[2048] add(%mean0, %sums)\n",
+        ),
+        main.replace(
+            "  %chunk_f32 = f32[2048,6144] convert(%chunk)\n",
+            "  %chunk_s32 = s32[2048,6144] convert(%chunk)\n"
+            "  %chunk_f32 = f32[2048,6144] convert(%chunk_s32)\n",
+            1,
+        ),
+        main.replace("constant(0.000162760422)", "constant(0.000162760436)"),
+        main.replace("constant(1e-05)", "constant(1.0000000656873453e-05)"),
+        main.replace(
+            "  %zero = f32[] constant(0)\n"
+            "  ROOT %sums = f32[2048] reduce(%square, %zero)",
+            "  %zero = f32[] constant(0)\n"
+            "  %one = f32[] constant(1)\n"
+            "  %initializer = f32[] add(%zero, %one)\n"
+            "  ROOT %sums = f32[2048] reduce(%square, %initializer)",
+        ),
+        main.replace(
+            "  %chunk_f32 = f32[2048,6144] convert(%chunk)\n"
+            "  %inverse_broadcast = f32[2048,6144] broadcast(%inverse)",
+            "  %chunk_s32 = s32[2048,6144] convert(%chunk)\n"
+            "  %chunk_f32 = f32[2048,6144] convert(%chunk_s32)\n"
+            "  %inverse_broadcast = f32[2048,6144] broadcast(%inverse)",
+        ),
+        main.replace(
+            "  %inverse_broadcast = f32[2048,6144] broadcast(%inverse), dimensions={0}\n",
+            "  %inverse_s32 = s32[2048] convert(%inverse)\n"
+            "  %inverse_broadcast = f32[2048,6144] broadcast(%inverse_s32), dimensions={0}\n",
+        ),
+        main.replace(
+            "  %weight_broadcast = f32[2048,6144] broadcast(%weight), dimensions={1}\n",
+            "  %weight_bf16 = bf16[6144] convert(%weight)\n"
+            "  %weight_restored = f32[6144] convert(%weight_bf16)\n"
+            "  %weight_broadcast = f32[2048,6144] broadcast(%weight_restored), dimensions={1}\n",
+        ),
+        main.replace(
+            "  ROOT %normalized = bf16[2048,6144] convert(%weighted)\n",
+            "  %weighted_s32 = s32[2048,6144] convert(%weighted)\n"
+            "  ROOT %normalized = bf16[2048,6144] convert(%weighted_s32)\n",
+        ),
+        main.replace(
+            "  %normalized = bf16[2048,6144] fusion(%gather, %weight_f32, %inverse)",
+            "  %normalized = f32[2048,6144] fusion(%gather, %weight_f32, %inverse)",
+        ),
+    )
+    for mutated in hostile:
+        with pytest.raises(RuntimeError, match="embedding-gather boundary drifted"):
+            publisher._require_embedding_gather_hlo(mutated, stable)
+    with pytest.raises(RuntimeError, match="embedding-gather boundary drifted"):
+        publisher._require_embedding_gather_hlo(
+            main,
+            stable.replace("tensor<37x6144xbf16>", "tensor<2048x6144xbf16>"),
+        )
+    # Root 6 is intentionally outside this admission claim: it legitimately
+    # carries the raw residual. Its row-0 legacy comparison is interpreted only
+    # after the exact DB518 layer-0 key control at root 5 passes.
+    assert publisher._require_embedding_gather_hlo(main, stable)["passed"] is True
 
 
 def test_sealed_archive_builds_from_committed_blobs_and_imports(tmp_path: Path):

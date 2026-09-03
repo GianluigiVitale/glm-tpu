@@ -16,7 +16,7 @@ BRANCH = "rewrite/topology-first-decode"
 ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v4/"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v5/"
     "verify_gate_d_rewrite_same_region_git_mirror.py"
 )
 BASE_PATH = "scripts/greenfield/verify_gate_d_same_region_git_mirror.py"
@@ -28,6 +28,7 @@ BOUND_PATHS = (
     "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v3-source.json",
     "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v4-source.json",
     "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v5-source.json",
+    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v6-source.json",
     "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py",
     "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py",
     "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py",

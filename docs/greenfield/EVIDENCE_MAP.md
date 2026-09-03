@@ -3732,3 +3732,14 @@ persistence only; review and persistence precede any v2 installation.
   launcher's targets. Boundary 20/20; focused CPU 34/34. Certificate `…geometry-v5-source.json` SHA
   `c84e0496…c19d7ea`, staging `ccda2fe0…e422f`, tag `…165338499173468Z`. Fable-max quota-limited; Sol review pending;
   no claim; Gate D open.
+
+## 2026-09-03 — chunk0 v5 diagnostic and v6 device-gather correction
+
+- V5 tag `…165338499173468Z` executed, published a generation-replayed diagnostic and ended 8/8 clean. DB518 layer-0
+  control: 256/2,048 rows and 1,042 lanes mismatch; row 0 exact. All failure positions are `{4,9,14} mod 24`, all
+  token 374. Ledger generation `1788455638916604`, SHA `ed164a0d…19678`; arrays `1d946006…ff587`; optimized HLO
+  `16b137…f49`. Layer-1 has no standing. Diagnosis artifact `gate-d-chunk0-v5-token374-control-diagnosis.json`.
+- V6 replaces the host embedding gather with one device M2048 gather from 37 unique rows, admitted before invocation
+  by a called-body-aware exact typed HLO validator and rechecked by the publisher. Hostile suite covers 16 bypasses;
+  CPU 35/35. Sol approved source persistence, no P0–P2. Certificate `…geometry-v6-source.json`; staging tree
+  `d4db809e…ced54`; tag `…180438114586827Z`. Install/execution unreviewed; Gate D open.

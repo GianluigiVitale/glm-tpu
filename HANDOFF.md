@@ -11753,3 +11753,21 @@ verifier self-path to exact launcher targets; the verifier mirror-binds the v5 c
 `docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v5-source.json` SHA `c84e0496…c19d7ea`; staging
 `ccda2fe0…e422f`; tag `greenfield_layer1_prompt_chunk0_geometry_20260903T165338499173468Z`.
 Review pending; v5 is not installed/launched.
+
+## 2026-09-03 18:05Z — v5 control localized; v6 device-gather source approved
+
+V5 was subsequently persisted, installed and executed as tag `…165338499173468Z`. It published a diagnostic and
+ended 8/8 clean. The DB518 layer-0 control improved to 256 mismatched rows/1,042 lanes; row 0 is exact. Every failure
+is at positions modulo 24 in `{4,9,14}` and every such prompt token is 374. Ledger generation `1788455638916604`,
+SHA `ed164a0d…19678`; arrays `1d946006…ff587`; HLO `16b137…f49`. Layer-1 remains unadjudicated and Gate D open.
+
+V5 host-gathered the prompt embedding before the large executable, unlike DB518's device-resident M2048 gather.
+V6 passes 37 unique embeddings plus exact in-bounds rows and uses `jnp.take(..., mode="clip")` on device. A shared
+stdlib whole-module validator runs after compile but before invocation and is repeated by the publisher. It proves
+called-body/caller mappings, exact gather/RMS/inverse/BF16 typed paths and semantic dominance into the DB518 layer-0
+key control. Sixteen hostile mutations cover all Sol-found fail-open paths. Focused CPU suite 35/35; independent Sol
+approved source persistence with no remaining P0–P2 after five correction passes.
+
+Certificate `docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v6-source.json`; staging tree `d4db809e…ced54`;
+fresh proposed tag `…180438114586827Z`. No install/execution authority yet. Exact next: certificate/staging/install
+review, persistence and same-region replay, install-only, then a separate preflight/execution review for one chunk0.

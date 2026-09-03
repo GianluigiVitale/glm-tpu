@@ -1,0 +1,66 @@
+{
+  "artifact_kind": "gate_d_chunk0_v5_token374_control_diagnosis",
+  "classification": "LAYER0_CONTROL_NONEXACT;TOKEN374_ONLY;HOST_GATHER_DIFFERS_FROM_DB518_REQUIRED_DEVICE_GATHER_ASSOCIATION;CAUSAL_CORRECTION_UNPROVEN;GATE_D_OPEN",
+  "corrected_boundary_result": {
+    "current_mismatched_lanes": 1042,
+    "current_mismatched_rows": 256,
+    "previous_mismatched_lanes": 74299,
+    "previous_mismatched_rows": 2048,
+    "wk_decode_then_promote_materialization": "accepted structurally and materially reduced the control error"
+  },
+  "diagnosis": {
+    "all_mismatch_token_ids": [374],
+    "mismatch_count_distribution_per_row": {
+      "3": 74,
+      "4": 109,
+      "5": 59,
+      "6": 10,
+      "7": 3,
+      "8": 1
+    },
+    "mismatch_coordinates_int32_sha256": "140bdf0f6c934f215e92904b154b39d4d556229997e8bdbfb21b25c071e37386",
+    "mismatch_rows_int32_sha256": "26d8724d3b17ce223c4a67bddc032c27395069a61599809ee024efee41c6bada",
+    "mismatch_rows_modulo_24": [4, 9, 14],
+    "mismatch_token_ids_int32_sha256": "6d2929c32fd5079a2e0f47f3073f2f1e2ea882b43dacc0511a30b9a9205c9023",
+    "rotated_half_mismatched_lanes": 274,
+    "unrotated_half_mismatched_lanes": 768,
+    "unrotated_lanes_present_in_every_mismatch_row": [70, 79, 86]
+  },
+  "evidence": {
+    "arrays": {
+      "byte_count": 27977290,
+      "sha256": "1d946068d6d2b020d97f0fbaef0bfa8bff9b42680e57043d4026f864f28ff587"
+    },
+    "census_failure_exit_sha256": "8564e86462e0b738e4f58ac8922f06a8be3a6c6d48d1ce117f566e0f072cd85a",
+    "census_pre_sha256": "3543b436f44691d82ca20a817f41fe8355a67f1d10460aa569154acc3651694f",
+    "diagnostic_ledger": {
+      "generation": "1788455638916604",
+      "remote": "gs://driftbench-dsv4-uc/results/greenfield/glm52/layer1_prompt_chunk0_geometry/greenfield_layer1_prompt_chunk0_geometry_20260903T165338499173468Z/diagnostic/diagnostic_objects.json",
+      "sha256": "ed164a1838cd07f30d7d0d881890d0b52f76d443bd237a2b28d8ab9caa419678"
+    },
+    "main_optimized_hlo": {
+      "byte_count": 931926,
+      "sha256": "16b13706b97eda07323ba639b4c6cb0abddc477d994454f15516ecb392104f49"
+    },
+    "main_stablehlo": {
+      "byte_count": 194907,
+      "sha256": "dfc5c19546e13db8a2439532a6fa58fb86475b62dbdb56fc49574c496a9293dc"
+    },
+    "runner": {
+      "byte_count": 5700,
+      "sha256": "7f50af8311c0881a959a19cd392aa0be1b99a2ebabe7ac0021338dd1e89c778e"
+    }
+  },
+  "gate_d_closed": false,
+  "next_authorized_action": "Source-test and adversarially review one append-only v6 bounded probe that restores DB518's single device-side M2048 embedding gather coupled to input RMSNorm and rejects any direct bf16[2048,6144] embedding parameter. Do not run 8K.",
+  "performance_claim": false,
+  "root_cause_reasoning": {
+    "accepted_precedent": "DB518 requires one physical M2048 embedding gather coupled to input RMSNorm and is exact for all 8155 layer-0 cache rows.",
+    "current_difference": "v5 used legacy_prefill_owner_packing.chunk_embeddings on the host and admitted a direct bf16[2048,6144] embedding parameter, so the accepted gather-coupled physical association was absent.",
+    "inference_scope": "The exact token-periodic pattern plus three invariant unrotated lanes localizes the difference before RoPE. Restoring the accepted association is the smallest evidence-backed correction, but TPU causality remains unproven until its control is bitwise exact."
+  },
+  "run": {
+    "code_hash": "9265301ca9e0490a8bcbde560390c2d4004fc442",
+    "tag": "greenfield_layer1_prompt_chunk0_geometry_20260903T165338499173468Z"
+  }
+}

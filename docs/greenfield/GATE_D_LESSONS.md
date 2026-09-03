@@ -1252,3 +1252,10 @@ normalized-state cause.
   exist; prove absence from every unauthorized root. For a one-op promotion helper, require the FP32 root itself to be
   `convert(the sole BF16 parameter)`, not merely that some live convert and parameter exist. Mutation-test leakage,
   dead/alternate lineage, wrong roots, communication and in-consumer rematerialization before requesting TPU time.
+- Numerically equal host preprocessing is not necessarily a valid TPU control. V5 host-gathered the same embedding
+  values but changed the executable boundary and left a token-374-only residue. Preserve the accepted device producer
+  when testing a schedule-sensitive bitwise oracle; validate it before invocation.
+- An ENTRY call site and suggestive metadata do not prove a fusion. Parse called computations and caller/parameter
+  mappings. Bind exact dtypes, scalar initializers, IEEE-f32 constants, BF16 rounding points and final conversions;
+  distinguish semantic from syntactic ancestry so ignored operands cannot satisfy liveness. Attack each rule with a
+  compiler-shaped counterexample before spending TPU time.

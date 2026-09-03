@@ -13,13 +13,13 @@ from hashlib import sha256
 from pathlib import Path
 
 SOURCE_ROOT = Path(
-    "/opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v5"
+    "/opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v6"
 )
 INSTALLER_PATH = SOURCE_ROOT / "install_gate_d_layer1_prompt_chunk0_geometry_runtime.py"
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
-LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_layer1_prompt_chunk0_geometry_v5.py"
+LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_layer1_prompt_chunk0_geometry_v6.py"
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-prompt-chunk0-geometry-v4"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-prompt-chunk0-geometry-v5"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -28,14 +28,16 @@ EXPECTED_ENVIRONMENT = {
     "PYTHONDONTWRITEBYTECODE": "1",
 }
 PAYLOADS = {
-    "probe_layer1_prompt_chunk0_geometry.py": "f1e7b8cd81e7fee7c236957b2a4aba130134bc1bcce098b6be8a2a086b0c9740",
-    "publish_gate_d_layer1_prompt_chunk0_geometry.py": "33ceeb43e6b76794df9508f6eee88847e9dc0b31171a5e3dc1b79e24545f17c1",
-    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "b8b82073bb92ad9c7e3a91d052ef4d3ceaa64e3e8aa3626f68adf5d0d9bb11fa",
+    "chunk0_embedding_hlo.py": "c10fee817fad0ad65e3c90ccdfd3017fcac18bc5fee6e9d4a28f6b319cc2ec0d",
+    "probe_layer1_prompt_chunk0_geometry.py": "32ac0e160017afcbc3928fbd04f3cf31944d16339283c030929adf569a07e158",
+    "publish_gate_d_layer1_prompt_chunk0_geometry.py": "faaeec64303b2a18963a9952f9e93c262b84ab0ac41a23a57b875e0c57ea2b17",
+    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "e879d747d3f32edb66972f00fb1be0790f389c4eb516271896d7dd7a562483c1",
     "verify_gate_d_rewrite_same_region_git_mirror.py": (
-        "e08bbff13075a9a82dd95ba8311c3f96f624c092f6a20ec38be5690612cfbe40"
+        "5b02ee2ed0bbde75b4a96ba52eee14b53795e1c832fcf8ccd626237316fb0be7"
     ),
 }
 CAPSULE_NAMES = (
+    "chunk0_embedding_hlo.py",
     "probe_layer1_prompt_chunk0_geometry.py",
     "publish_gate_d_layer1_prompt_chunk0_geometry.py",
     "verify_gate_d_rewrite_same_region_git_mirror.py",
