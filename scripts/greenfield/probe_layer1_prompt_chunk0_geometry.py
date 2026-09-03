@@ -21,20 +21,34 @@ from __future__ import annotations
 import argparse
 from hashlib import sha256
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
 import time
 from typing import Any
 
-import numpy as np
-
 REPO = Path(__file__).resolve().parents[2]
-if str(REPO) not in sys.path:
-    sys.path.insert(0, str(REPO))
-CANONICAL_WORKTREE = Path("/home/gianl/glm-tpu-topology-rewrite")
 RUN_ROOT = Path("/home/gianl/glm-run")
+CANONICAL_WORKTREE = Path("/home/gianl/glm-tpu-topology-rewrite")
+
+# Sealed runtime boundary: the immutable interpreter under -I -S, the sealed
+# JAX/libtpu sites (tree digests) and a sys.path limited to the detached
+# committed source plus those sites, established before any third-party import.
+# The helper is loaded by file path (standard library only) so no package
+# initializer runs before the sealed sites are on the path.
+import importlib.util  # noqa: E402
+
+_SEALED_RUNTIME_SPEC = importlib.util.spec_from_file_location(
+    "gate_d_sealed_runtime", REPO / "glm_tpu/greenfield/benchmarking/sealed_runtime.py"
+)
+sealed_runtime = importlib.util.module_from_spec(_SEALED_RUNTIME_SPEC)
+assert _SEALED_RUNTIME_SPEC.loader is not None
+_SEALED_RUNTIME_SPEC.loader.exec_module(sealed_runtime)
+sealed_runtime.validate_python_runtime()
+sealed_runtime.validate_dependency_sites()
+sealed_runtime.install_sealed_source_path(REPO)
+
+import numpy as np  # noqa: E402
 ARTIFACT_KIND = "greenfield_layer1_prompt_chunk0_legacy_geometry_probe"
 CHUNK_ROWS = 2048
 PROMPT_ROWS = 8155
@@ -60,10 +74,21 @@ LAYER1_NORMS = {
     "k_norm1_weight": "model.layers.1.self_attn.indexer.k_norm.weight",
     "k_norm1_bias": "model.layers.1.self_attn.indexer.k_norm.bias",
 }
+CHECKPOINT_TENSOR_NAMES = {
+    **LAYER0_NAMES,
+    **LAYER0_NORMS,
+    **LAYER1_NAMES,
+    **LAYER1_NORMS,
+    **{f"{k}_scale": f"{n}_scale_inv" for k, n in {**LAYER0_NAMES, **LAYER1_NAMES}.items()},
+}
+
+
+def _git(*args: str, cwd: Path) -> str:
+    return subprocess.check_output(["/usr/bin/git", "-C", str(cwd), *args], text=True).strip()
 
 
 def _git_head() -> str:
-    return subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True).strip()
+    return _git("rev-parse", "HEAD", cwd=REPO)
 
 
 def _sha256_file(path: Path) -> str:
@@ -114,17 +139,16 @@ def _worktree_binding(repo: Path, run_tag: str) -> dict[str, str]:
     ignored files.
     """
 
-    def git(*args: str, cwd: Path) -> str:
-        return subprocess.check_output(["git", "-C", str(cwd), *args], text=True).strip()
-
     if repo.resolve() != (RUN_ROOT / run_tag / "source").resolve():
         raise RuntimeError(f"wrong greenfield worktree: {repo}")
-    common = Path(git("rev-parse", "--git-common-dir", cwd=repo)).resolve()
-    canonical_common = Path(git("rev-parse", "--git-common-dir", cwd=CANONICAL_WORKTREE)).resolve()
+    common = Path(_git("rev-parse", "--git-common-dir", cwd=repo)).resolve()
+    canonical_common = Path(_git("rev-parse", "--git-common-dir", cwd=CANONICAL_WORKTREE)).resolve()
     if common != canonical_common:
         raise RuntimeError("probe worktree does not share the canonical repository")
-    if git("status", "--porcelain", "--ignored", cwd=repo):
+    if _git("status", "--porcelain", "--ignored", cwd=repo):
         raise RuntimeError("probe worktree is not clean")
+    if _git("for-each-ref", "--format=%(refname)", "refs/replace", cwd=repo):
+        raise RuntimeError("repository has forbidden replacement refs")
     return {"worktree": str(repo.resolve()), "git_common_dir": str(common)}
 
 
@@ -150,31 +174,9 @@ def _verify_weight_digests(
 def _load_checkpoint_tensors(
     root: Path, expected_index_sha256: str, digest_record: dict[str, Any]
 ) -> dict[str, np.ndarray]:
-    import torch
-    from safetensors import safe_open
+    from glm_tpu.greenfield.benchmarking import numpy_safetensors as ns
 
-    index_path = root / "model.safetensors.index.json"
-    if _sha256_file(index_path) != expected_index_sha256:
-        raise RuntimeError("checkpoint index identity drifted")
-    weight_map = json.loads(index_path.read_text())["weight_map"]
-    wanted = {**LAYER0_NAMES, **LAYER0_NORMS, **LAYER1_NAMES, **LAYER1_NORMS}
-    scale_names = {key: f"{name}_scale_inv" for key, name in {**LAYER0_NAMES, **LAYER1_NAMES}.items()}
-    tensors: dict[str, np.ndarray] = {}
-    by_shard: dict[str, list[tuple[str, str]]] = {}
-    for key, name in list(wanted.items()) + [(f"{k}_scale", n) for k, n in scale_names.items()]:
-        by_shard.setdefault(weight_map[name], []).append((key, name))
-    for shard, items in by_shard.items():
-        with safe_open(str(root / shard), framework="pt", device="cpu") as handle:
-            for key, name in items:
-                value = handle.get_tensor(name)
-                if value.dtype == torch.float8_e4m3fn:
-                    tensors[key] = value.view(torch.uint8).numpy().copy()
-                elif value.dtype == torch.bfloat16:
-                    tensors[key] = value.view(torch.uint16).numpy().copy()
-                elif value.dtype == torch.float32:
-                    tensors[key] = value.numpy().copy()
-                else:
-                    raise RuntimeError(f"unexpected checkpoint dtype for {name}: {value.dtype}")
+    tensors = ns.load_checkpoint_tensors(root, CHECKPOINT_TENSOR_NAMES, index_sha256=expected_index_sha256)
     expected = digest_record["tensors"]
     if set(expected) != set(tensors):
         raise RuntimeError("weight digest record covers a different tensor set")
@@ -204,17 +206,12 @@ def main() -> int:
     import jax.numpy as jnp
     import ml_dtypes
 
-    from glm_tpu.greenfield.benchmarking import legacy_prefill_geometry as geo
     from glm_tpu.greenfield.benchmarking import legacy_prefill_owner_packing as pk
+    from glm_tpu.greenfield.benchmarking import numpy_safetensors as ns
     from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
     from glm_tpu.greenfield.kernels.reference.rotary import build_rotary_table_host
-    from glm_tpu.greenfield.validation.layer0_dsa_association import (
-        inspect_layer0_dsa_association_input,
-    )
-    from glm_tpu.greenfield.validation.prompt_index_cache import (
-        inspect_legacy_prompt_index_cache,
-    )
 
+    provenance = sealed_runtime.runtime_provenance(REPO)
     if jax.default_backend() != "tpu":
         raise RuntimeError(f"probe requires TPU, got {jax.default_backend()}")
     if jax.local_device_count() != 4 or jax.device_count() != 4:
@@ -222,10 +219,10 @@ def main() -> int:
     device = jax.local_devices()[0]
 
     started = time.time()
-    input_manifest, arrays = inspect_layer0_dsa_association_input(
+    input_manifest, arrays = ns.load_layer0_dsa_association_input(
         args.input_dir, expected_manifest_sha256=args.input_manifest_sha256
     )
-    legacy_manifest, legacy_layer1_bits = inspect_legacy_prompt_index_cache(
+    legacy_manifest, legacy_layer1_bits = ns.load_legacy_prompt_index_cache(
         args.legacy_layer1_cache_dir, expected_manifest_sha256=args.legacy_layer1_manifest_sha256
     )
     if int(legacy_manifest.get("layer_id", 0)) != 1:
@@ -268,7 +265,9 @@ def main() -> int:
     contract = DsaNumericalContract()
 
     def bf16(bits: np.ndarray) -> Any:
-        return jax.device_put(jnp.asarray(bits.view(ml_dtypes.bfloat16)), device)
+        return jax.device_put(
+            jnp.asarray(np.ascontiguousarray(bits).astype(np.uint16).view(ml_dtypes.bfloat16)), device
+        )
 
     def put(value: np.ndarray) -> Any:
         return jax.device_put(jnp.asarray(value), device)
@@ -335,6 +334,8 @@ def main() -> int:
         )
     )
 
+    import_closure = sealed_runtime.verify_import_closure(REPO)
+
     def bits(value: np.ndarray) -> np.ndarray:
         return np.ascontiguousarray(np.asarray(value)).view(np.uint16)
 
@@ -361,6 +362,8 @@ def main() -> int:
         "artifact_kind": ARTIFACT_KIND,
         "code_hash": code_hash,
         "worktree_binding": worktree_binding,
+        "runtime_provenance": provenance,
+        "import_closure_module_count": len(import_closure),
         "run_tag": args.run_tag,
         "status": status,
         "control_layer0_keys_vs_db518_mismatched_rows": control_mismatch_rows,
@@ -378,7 +381,6 @@ def main() -> int:
             "weight_digests_sha256": args.weight_digests_sha256,
             "checkpoint_shard_sha256": digest_record["shard"]["sha256"],
             "softmax_scale": args.softmax_scale,
-            "checkpoint_tensors": [pk.summarize_bits(k, v) for k, v in sorted(tensors.items())],
         },
         "row0": {
             "legacy_geometry_vs_legacy_lanes": row0_legacy_lanes,
