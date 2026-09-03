@@ -1343,6 +1343,96 @@ def layer0_prompt_normalized_hidden_gather_chunk(
     return normalized.astype(jnp.float32)
 
 
+def layer0_prompt_normalized_hidden_boundary_chunk(
+    unique_embeddings: Any,
+    embedding_rows: Any,
+    input_norm_weight: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+) -> Any:
+    """Produce the completed BF16 M2048 normalization boundary.
+
+    This helper is intentionally narrower than the accepted DB518 producer:
+    it has only the unique embedding table, row mapping and input-norm weight
+    as inputs, and the normalized BF16 chunk as its sole result.  Production
+    diagnostics compile and synchronize it separately before passing the
+    resulting device buffer to any key or layer consumer.
+    """
+
+    if unique_embeddings.ndim != 2 or unique_embeddings.shape[1] != (
+        geometry.hidden_size
+    ):
+        raise ValueError("layer-0 normalization-boundary embeddings drifted")
+    if embedding_rows.shape != (geometry.prompt_chunk,) or (
+        input_norm_weight.shape != (geometry.hidden_size,)
+    ):
+        raise ValueError("layer-0 normalization-boundary geometry drifted")
+    if unique_embeddings.dtype != jnp.bfloat16 or (
+        input_norm_weight.dtype != jnp.bfloat16
+    ):
+        raise ValueError("layer-0 normalization-boundary values must be BF16")
+    if embedding_rows.dtype != jnp.int32:
+        raise ValueError("layer-0 normalization-boundary rows must be int32")
+    hidden_chunk = jnp.take(unique_embeddings, embedding_rows, axis=0)
+    return rms_norm(
+        hidden_chunk,
+        input_norm_weight,
+        epsilon=geometry.rms_norm_epsilon,
+    )
+
+
+def layer0_prompt_index_key_from_normalized_boundary_chunk(
+    normalized_chunk: Any,
+    positions: Any,
+    wk_weight: Any,
+    key_norm_weight: Any,
+    key_norm_bias: Any,
+    *,
+    geometry: Layer0DsaProbeGeometry = Layer0DsaProbeGeometry(),
+) -> Any:
+    """Consume only a completed BF16 normalization buffer for DB518 control."""
+
+    expected_shapes = {
+        "normalized_chunk": (geometry.prompt_chunk, geometry.hidden_size),
+        "positions": (geometry.prompt_chunk,),
+        "wk_weight": (geometry.head_dim, geometry.hidden_size),
+        "key_norm_weight": (geometry.head_dim,),
+        "key_norm_bias": (geometry.head_dim,),
+    }
+    values = {
+        "normalized_chunk": normalized_chunk,
+        "positions": positions,
+        "wk_weight": wk_weight,
+        "key_norm_weight": key_norm_weight,
+        "key_norm_bias": key_norm_bias,
+    }
+    for name, expected in expected_shapes.items():
+        if values[name].shape != expected:
+            raise ValueError(
+                f"layer-0 normalized-boundary key {name} shape drifted: "
+                f"expected={expected} found={values[name].shape}"
+            )
+    if normalized_chunk.dtype != jnp.bfloat16 or (
+        key_norm_weight.dtype != jnp.bfloat16
+    ) or key_norm_bias.dtype != jnp.bfloat16:
+        raise ValueError("layer-0 normalized-boundary key values must be BF16")
+    if positions.dtype != jnp.int32:
+        raise ValueError("layer-0 normalized-boundary positions must be int32")
+    if wk_weight.dtype != jnp.float32:
+        raise ValueError("layer-0 normalized-boundary wk must remain FP32")
+    return _project_keys_f32(
+        normalized_chunk,
+        positions,
+        wk_weight,
+        key_norm_weight,
+        key_norm_bias,
+        geometry=geometry,
+        key_norm_mode="divide_sqrt",
+        rotary_mode="accepted_source",
+        projection_mapping_mode="physical_m64_projection_keynorm_lax_map",
+    ).astype(jnp.bfloat16)
+
+
 def layer0_prompt_index_key_chunk(
     hidden_chunk: Any,
     positions: Any,

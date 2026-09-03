@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Re-run exactly one original-DB518 layer-0 prompt-key chunk producer.
+"""Test one completed normalization-to-key boundary against original DB518.
 
 This bounded discriminator keeps all 2,048 rows because shrinking the row set
-can change TPU lowering.  It completes the accepted adapted-FP32 ``wk`` on
-device, invokes the original device-gather/cache-write producer exactly once,
-synchronizes it, and only then transfers the candidate cache and ``wk`` to the
-host.  It never compiles or invokes a layer-1 consumer or the 8K decoder.
+can change TPU lowering.  It completes the BF16 normalization buffer on device,
+synchronizes it, and passes that same buffer to a separately compiled M64 key
+control.  The normalized buffer never transfers to the host and no layer
+consumer or 8K decoder is compiled or invoked.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ import zipfile
 PROBE_REPOSITORY_PATH = (
     "scripts/greenfield/probe_original_db518_prompt_key_chunk0.py")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v6/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v7/"
     "probe_original_db518_prompt_key_chunk0.py")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 TAG_PATTERN = re.compile(
@@ -59,7 +59,6 @@ GIT_ENVIRONMENT = {
     "GIT_SSH_COMMAND": "/bin/false",
 }
 
-ARTIFACT_KIND = "gate_d_original_db518_prompt_key_chunk0_discriminator"
 CHUNK_ROWS = 2048
 PROMPT_ROWS = 8155
 UNIQUE_ROWS = 37
@@ -375,7 +374,8 @@ def main() -> int:
             DsaNumericalContract, )
         from glm_tpu.greenfield.kernels.reference.dsa_association import (
             Layer0DsaProbeGeometry,
-            layer0_prompt_index_key_gather_cache_chunk,
+            layer0_prompt_index_key_from_normalized_boundary_chunk,
+            layer0_prompt_normalized_hidden_boundary_chunk,
         )
         from glm_tpu.greenfield.kernels.reference.prefill_index import (
             decode_stage_local_prefill_index_wk_bf16,
@@ -386,8 +386,8 @@ def main() -> int:
             ORIGINAL_DB518_CODE_HASH,
             ORIGINAL_DB518_COMPARISON_MANIFEST_SHA256,
             ORIGINAL_DB518_TAG,
-            validate_original_db518_prompt_key_hlo,
-            validate_original_db518_prompt_key_stablehlo,
+            require_completed_normalization_boundary_hlo,
+            require_normalized_key_control_boundary_hlo,
         )
         if jax.default_backend() != "tpu":
             raise RuntimeError(
@@ -434,16 +434,6 @@ def main() -> int:
                               prompt_ids[:CHUNK_ROWS]):
             raise RuntimeError("original DB518 row mapping drifted")
         positions_host = np.arange(CHUNK_ROWS, dtype=np.int32)
-        live_block_table_host = np.asarray(
-            cache_manifest["source_layout"]["live_block_table"],
-            dtype=np.int32,
-        )
-        cache_shape = tuple(
-            cache_manifest["source_layout"]["global_cache_shape"])
-        if (cache_shape != (24, 16, 32, 128) or not np.array_equal(
-                live_block_table_host, np.arange(1, 17, dtype=np.int32))):
-            raise RuntimeError("original DB518 physical cache mapping drifted")
-
         def bf16(bits: Any) -> Any:
             value = (np.ascontiguousarray(bits).astype(np.uint16).view(
                 ml_dtypes.bfloat16))
@@ -462,8 +452,6 @@ def main() -> int:
         raw_wk_scale = put(arrays["self_attn__indexer__wk__weight_scale_inv"])
         key_norm_weight = bf16(arrays["self_attn__indexer__k_norm__weight"])
         key_norm_bias = bf16(arrays["self_attn__indexer__k_norm__bias"])
-        live_block_table = put(live_block_table_host)
-        initial_cache = put(np.zeros(cache_shape, dtype=ml_dtypes.bfloat16))
 
         decode_lowered = jax.jit(
             lambda bits, scale: decode_stage_local_prefill_index_wk_bf16(
@@ -495,70 +483,86 @@ def main() -> int:
         wk_fp32 = promote_compiled(wk_bf16)
         wk_fp32.block_until_ready()
 
-        producer = partial(
-            layer0_prompt_index_key_gather_cache_chunk,
+        normalizer = partial(
+            layer0_prompt_normalized_hidden_boundary_chunk,
             geometry=geometry,
-            key_norm_mode="divide_sqrt",
-            rotary_mode="accepted_source",
-            projection_weight_mode="adapted_fp32",
-            projection_mapping_mode="physical_m64_projection_keynorm_lax_map",
         )
-        arguments = (
-            initial_cache,
-            live_block_table,
+        normalization_arguments = (
             unique_embeddings,
             embedding_rows,
-            positions,
             input_norm_weight,
+        )
+        before_memory = _memory_stats(device)
+        compile_started = time.monotonic()
+        normalized_lowered = jax.jit(normalizer).lower(
+            *normalization_arguments
+        )
+        normalized_compiled = normalized_lowered.compile()
+        normalized_hlo = normalized_compiled.as_text()
+        normalized_stablehlo = normalized_lowered.as_text()
+        _write_run_member_exclusive(
+            run_fd,
+            "hlo/normalized_boundary.optimized_hlo.txt",
+            normalized_hlo.encode(),
+        )
+        _write_run_member_exclusive(
+            run_fd,
+            "hlo/normalized_boundary.stablehlo.mlir",
+            normalized_stablehlo.encode(),
+        )
+        normalization_contract = require_completed_normalization_boundary_hlo(
+            normalized_hlo, normalized_stablehlo
+        )
+
+        key_control = partial(
+            layer0_prompt_index_key_from_normalized_boundary_chunk,
+            geometry=geometry,
+        )
+        key_lowered = jax.jit(key_control).lower(
+            jax.ShapeDtypeStruct(
+                (CHUNK_ROWS, geometry.hidden_size), jnp.bfloat16
+            ),
+            positions,
             wk_fp32,
             key_norm_weight,
             key_norm_bias,
         )
-        before_memory = _memory_stats(device)
-        compile_started = time.monotonic()
-        lowered = jax.jit(producer, donate_argnums=(0, )).lower(*arguments)
-        compiled = lowered.compile()
+        key_compiled = key_lowered.compile()
+        key_hlo = key_compiled.as_text()
+        key_stablehlo = key_lowered.as_text()
+        _write_run_member_exclusive(
+            run_fd,
+            "hlo/normalized_key_control.optimized_hlo.txt",
+            key_hlo.encode(),
+        )
+        _write_run_member_exclusive(
+            run_fd,
+            "hlo/normalized_key_control.stablehlo.mlir",
+            key_stablehlo.encode(),
+        )
+        key_contract = require_normalized_key_control_boundary_hlo(
+            key_hlo, key_stablehlo
+        )
         compile_seconds = time.monotonic() - compile_started
-        optimized_hlo = compiled.as_text()
-        stablehlo = lowered.as_text()
-        _write_run_member_exclusive(
-            run_fd,
-            "hlo/original_db518_chunk0.optimized_hlo.txt",
-            optimized_hlo.encode(),
-        )
-        _write_run_member_exclusive(
-            run_fd,
-            "hlo/original_db518_chunk0.stablehlo.mlir",
-            stablehlo.encode(),
-        )
-        hlo_contract = validate_original_db518_prompt_key_hlo(optimized_hlo)
-        stablehlo_contract = validate_original_db518_prompt_key_stablehlo(
-            stablehlo)
-        if not hlo_contract["passed"] or not stablehlo_contract["passed"]:
-            contract_raw = (json.dumps(
-                {
-                    "optimized_hlo": hlo_contract,
-                    "stablehlo": stablehlo_contract
-                },
-                indent=2,
-                sort_keys=True,
-            ) + "\n").encode("ascii")
-            _write_run_member_exclusive(run_fd, "hlo/contract_failure.json",
-                                        contract_raw)
-            raise RuntimeError("original DB518 producer HLO contract failed")
 
         execute_started = time.monotonic()
-        candidate_cache_device = compiled(*arguments)
-        candidate_cache_device.block_until_ready()
+        normalized_device = normalized_compiled(*normalization_arguments)
+        normalized_device.block_until_ready()
+        boundary_keys_device = key_compiled(
+            normalized_device,
+            positions,
+            wk_fp32,
+            key_norm_weight,
+            key_norm_bias,
+        )
+        boundary_keys_device.block_until_ready()
         import_closure = sealed_runtime.verify_import_closure(
             Path(archive_path))
-        # This is the sole post-computation host transfer.  The completed cache
-        # and already-completed adapted wk move together only after the producer
-        # has synchronized; neither host value can feed the computation.
-        candidate_cache_host, wk_host = jax.device_get(
-            (candidate_cache_device, wk_fp32))
+        # This is the sole host transfer.  The completed normalization buffer is
+        # deliberately absent and cannot feed a host-staged consumer.
+        boundary_keys_host, wk_host = jax.device_get(
+            (boundary_keys_device, wk_fp32))
         execute_seconds = time.monotonic() - execute_started
-        candidate_cache_host = np.ascontiguousarray(candidate_cache_host)
         wk_host = np.ascontiguousarray(wk_host, dtype=np.float32)
         wk_sha256 = _array_sha256(wk_host)
         wk_byte_sum = int(wk_host.view(np.uint8).sum(dtype=np.uint64))
@@ -567,25 +571,20 @@ def main() -> int:
                 or wk_byte_sum != EXPECTED_ADAPTED_WK_BYTE_SUM):
             raise RuntimeError("accepted adapted-FP32 wk identity drifted")
 
-        flat_cache = candidate_cache_host.reshape(
-            cache_shape[0], cache_shape[1] * cache_shape[2], cache_shape[3])
-        logical_blocks = positions_host // (cache_shape[1] * cache_shape[2])
-        physical_pages = live_block_table_host[logical_blocks]
-        candidate_chunk = np.ascontiguousarray(flat_cache[
-            physical_pages,
-            positions_host % (cache_shape[1] * cache_shape[2]),
-        ]).view(np.uint16)
-        mismatch = candidate_chunk != accepted_chunk
+        boundary_chunk = np.ascontiguousarray(boundary_keys_host).view(
+            np.uint16
+        )
+        mismatch = boundary_chunk != accepted_chunk
         mismatched_rows = int(np.count_nonzero(np.any(mismatch, axis=1)))
         mismatched_lanes = int(np.count_nonzero(mismatch))
-        candidate_sha256 = _array_sha256(candidate_chunk)
+        boundary_sha256 = _array_sha256(boundary_chunk)
         exact = (mismatched_rows == 0 and mismatched_lanes == 0
-                 and candidate_sha256 == EXPECTED_CHUNK_BITS_SHA256)
+                 and boundary_sha256 == EXPECTED_CHUNK_BITS_SHA256)
         output = BytesIO()
         np.savez(
             output,
             accepted_chunk_bits=accepted_chunk,
-            candidate_chunk_bits=candidate_chunk,
+            boundary_key_bits=boundary_chunk,
             embedding_rows=embedding_rows_host,
             positions=positions_host,
         )
@@ -607,7 +606,7 @@ def main() -> int:
         }
         summary = {
             "artifact_kind":
-            ARTIFACT_KIND,
+            "gate_d_original_db518_normalized_boundary_chunk0_discriminator",
             "accepted_chunk_bits_sha256":
             EXPECTED_CHUNK_BITS_SHA256,
             "adapted_wk": {
@@ -618,11 +617,12 @@ def main() -> int:
             },
             "backend":
             jax.default_backend(),
-            "candidate_chunk_bits_sha256":
-            candidate_sha256,
+            "boundary_key_bits_sha256":
+            boundary_sha256,
             "claim_scope":
-            ("One original-DB518 layer-0 prompt-key producer chunk only; "
-             "no consumer, decoder, Gate-D or performance claim."),
+            ("One device-resident normalization-to-key composability control; "
+             "no independent normalized-tensor, layer consumer, decoder, "
+             "Gate-D or performance claim."),
             "code_hash":
             args.code_pin,
             "compile_seconds":
@@ -639,14 +639,18 @@ def main() -> int:
             "host_transfer_count_after_completion":
             1,
             "hlo": {
-                "optimized_contract":
-                hlo_contract,
-                "optimized_sha256":
-                sha256(optimized_hlo.encode()).hexdigest(),
-                "stablehlo_contract":
-                stablehlo_contract,
-                "stablehlo_sha256":
-                sha256(stablehlo.encode()).hexdigest(),
+                "normalization_contract":
+                normalization_contract,
+                "normalization_optimized_sha256":
+                sha256(normalized_hlo.encode()).hexdigest(),
+                "normalization_stablehlo_sha256":
+                sha256(normalized_stablehlo.encode()).hexdigest(),
+                "key_control_contract":
+                key_contract,
+                "key_control_optimized_sha256":
+                sha256(key_hlo.encode()).hexdigest(),
+                "key_control_stablehlo_sha256":
+                sha256(key_stablehlo.encode()).hexdigest(),
                 "wk_decode_optimized_sha256":
                 sha256(decode_hlo.encode()).hexdigest(),
                 "wk_decode_stablehlo_sha256":
@@ -684,11 +688,15 @@ def main() -> int:
             mismatched_lanes,
             "mismatched_rows":
             mismatched_rows,
-            "original_db518_chunk0_exact":
+            "normalized_boundary_key_control_exact":
             exact,
+            "normalization_device_to_host_transfer_count":
+            0,
             "performance_claim":
             False,
-            "producer_invocation_count":
+            "normalization_invocation_count":
+            1,
+            "key_control_invocation_count":
             1,
             "provenance":
             provenance,
@@ -701,21 +709,21 @@ def main() -> int:
         }
         summary_raw = (json.dumps(summary, indent=2, sort_keys=True) +
                        "\n").encode("ascii")
-        _write_run_member_exclusive(run_fd, "producer_arrays.npz", output_raw)
+        _write_run_member_exclusive(run_fd, "boundary_arrays.npz", output_raw)
         _write_run_member_exclusive(run_fd, "runner.json", summary_raw)
         print(
             json.dumps(
                 {
-                    "candidate_chunk_bits_sha256": candidate_sha256,
+                    "boundary_key_bits_sha256": boundary_sha256,
                     "mismatched_lanes": mismatched_lanes,
                     "mismatched_rows": mismatched_rows,
                     "status": summary["status"],
                 },
                 sort_keys=True,
             ))
-        # A nonexact producer is a completed discriminator, not infrastructure
-        # failure.  The publisher archives and classifies either numerical
-        # outcome; downstream consumer execution remains out of scope.
+        # A nonexact key control is a completed discriminator, not
+        # infrastructure failure.  Downstream consumer execution remains out
+        # of scope regardless of this result.
         return 0
     finally:
         os.close(run_fd)

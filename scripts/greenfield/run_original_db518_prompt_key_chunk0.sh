@@ -11,7 +11,7 @@ import stat
 from pathlib import Path
 
 root = Path("/opt/glm-tpu/locks")
-launcher = Path("/opt/glm-tpu/bin/launch_gate_d_original_db518_prompt_key_chunk0_v6.py")
+launcher = Path("/opt/glm-tpu/bin/launch_gate_d_original_db518_prompt_key_chunk0_v7.py")
 parent_fd = os.open(root, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW)
 parent = os.fstat(parent_fd)
 if not stat.S_ISDIR(parent.st_mode) or parent.st_uid != 0 or parent.st_gid != 0 or stat.S_IMODE(parent.st_mode) & 0o022:
@@ -137,13 +137,13 @@ readonly ACCEPTED_CACHE_DIR=/home/gianl/gate-d-inputs/original-db518-layer0-prom
 readonly ACCEPTED_CACHE_MANIFEST_SHA=acc631e71148922448eb03c839f71544c80ca00cea47b639bdd80eb34567fdab
 readonly ACCEPTED_CACHE_MANIFEST_FILE_SHA=372d0ad2503860b6fb826045de7d24ca0f22438b8e945af2515e1c8cf3d69c94
 readonly ACCEPTED_CACHE_TENSOR_SHA=36303f0638661b4a56d3c9a1d4023a9b39eb19dbfd6d48e0718c29a45c41c07a
-readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v6
+readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v7
 readonly PROBE=$CAPSULE/probe_original_db518_prompt_key_chunk0.py
-readonly PROBE_SHA=9b9e658f23f5e195645ff2b4d3688cf3ee7b3e85362c1303be2c5e59868bb30d
+readonly PROBE_SHA=46589b8c5471c5b1a9470b34d78f07247e7af934d4b7069118c9f2275c696e4e
 readonly PUBLISHER=$CAPSULE/publish_gate_d_original_db518_prompt_key_chunk0.py
-readonly PUBLISHER_SHA=d9f81aa3dd3118f2b91d6369fca1a8c9accf5e98852655dafed801745ce27a32
+readonly PUBLISHER_SHA=50b0d4ca6e1f59939b5b780bb30a8377eecc73819fca6b71e50b61f3db52117e
 readonly MIRROR_VERIFIER=$CAPSULE/verify_gate_d_original_db518_same_region_git_mirror.py
-readonly MIRROR_VERIFIER_SHA=a36705b4ae261136ecd6ca18b3813f27fcaa78f2530fffb4e28fe0f8c4b83930
+readonly MIRROR_VERIFIER_SHA=00c0bce56b5b9be8a5eb0245c33fc65f77f410333c12bd7d243dc3004e280295
 readonly SEALED_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12
 readonly SEALED_PYTHON_SHA=021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7
 readonly VACANCY_EXPECTED='ERROR: (gcloud.storage.ls) One or more URLs matched no objects.'
@@ -345,7 +345,7 @@ post_census_done=1
 say "publishing generation-bound archive after a fresh three-surface history check"
 result_authority=$(publisher success --run-dir "$RUN_DIR" \
   --remote-prefix "$REMOTE_PREFIX" --elapsed "$elapsed")
-if [[ $result_authority =~ ^PROBE_RESULT\ status=(ORIGINAL_DB518_CHUNK0_EXACT|ORIGINAL_DB518_CHUNK0_NONEXACT)\ marker_sha256=([0-9a-f]{64})\ terminal_generation=([0-9]+)\ terminal_sha256=([0-9a-f]{64})$ ]]; then
+if [[ $result_authority =~ ^PROBE_RESULT\ status=(ORIGINAL_DB518_NORMALIZED_KEY_CONTROL_EXACT|ORIGINAL_DB518_NORMALIZED_KEY_CONTROL_NONEXACT)\ marker_sha256=([0-9a-f]{64})\ terminal_generation=([0-9]+)\ terminal_sha256=([0-9a-f]{64})$ ]]; then
   readonly result_status=${BASH_REMATCH[1]}
 else
   echo "Gate-D chunk-0 publisher authority drifted" >&2; exit 2
@@ -353,10 +353,10 @@ fi
 terminal_written=1
 trap - EXIT
 case "$result_status" in
-  ORIGINAL_DB518_CHUNK0_EXACT)
-    /usr/bin/printf '%s\n' "$result_authority" "DB518_EXACT gate_d_open=true"
+  ORIGINAL_DB518_NORMALIZED_KEY_CONTROL_EXACT)
+    /usr/bin/printf '%s\n' "$result_authority" "DB518_NORMALIZED_KEY_CONTROL_EXACT gate_d_open=true"
     exit 0 ;;
-  ORIGINAL_DB518_CHUNK0_NONEXACT)
-    /usr/bin/printf '%s\n' "$result_authority" "DB518_NONEXACT gate_d_open=true"
+  ORIGINAL_DB518_NORMALIZED_KEY_CONTROL_NONEXACT)
+    /usr/bin/printf '%s\n' "$result_authority" "DB518_NORMALIZED_KEY_CONTROL_NONEXACT gate_d_open=true"
     exit 3 ;;
 esac

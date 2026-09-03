@@ -6,6 +6,10 @@ from hashlib import sha256
 import re
 from typing import Any
 
+from .original_db518_normalized_boundary_hlo import (
+    require_completed_normalization_boundary_hlo,
+    require_normalized_key_control_boundary_hlo,
+)
 from .prompt_index_cache import validate_prompt_index_key_association_hlo
 
 ORIGINAL_DB518_CODE_HASH = "86243115452920fe4244bb77a9bbf4c44110aeab"

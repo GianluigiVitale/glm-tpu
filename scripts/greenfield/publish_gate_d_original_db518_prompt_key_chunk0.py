@@ -24,17 +24,31 @@ BRANCH = "rewrite/topology-first-decode"
 ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v6/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v7/"
     "publish_gate_d_original_db518_prompt_key_chunk0.py")
 SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_original_db518_prompt_key_chunk0.py")
 CONTRACT_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v6/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v7/"
     "original_db518_prompt_key.py")
 CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/original_db518_prompt_key.py")
 CONTRACT_SHA256 = (
-    "a4f690e4cb3fcda801563f3f297c920857f434411bb3089a15a28f50ab2abdcc")
+    "e86196b39acd075deca1abbfb645ff3264307158b50ce89fcfe60e26c75be95c")
+PARSER_CONTRACT_PATH = Path(
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v7/"
+    "chunk0_embedding_hlo.py")
+PARSER_CONTRACT_SOURCE_PATH = (
+    "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py")
+PARSER_CONTRACT_SHA256 = (
+    "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757")
+BOUNDARY_CONTRACT_PATH = Path(
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v7/"
+    "original_db518_normalized_boundary_hlo.py")
+BOUNDARY_CONTRACT_SOURCE_PATH = (
+    "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py")
+BOUNDARY_CONTRACT_SHA256 = (
+    "a8ca4b686723a3cf22943bdd13f3551706acb5031bbd14904f919d30c1fc24e8")
 PROMPT_CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/prompt_index_cache.py")
 PARENT_PATH = "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
@@ -45,16 +59,19 @@ MIRROR_URI = "gs://driftbench-dsv4-uc/repos/glm-tpu/.git"
 MIRROR_VERIFIER_PATH = (
     "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py")
 MIRROR_VERIFIER_SHA256 = (
-    "a36705b4ae261136ecd6ca18b3813f27fcaa78f2530fffb4e28fe0f8c4b83930")
+    "00c0bce56b5b9be8a5eb0245c33fc65f77f410333c12bd7d243dc3004e280295")
 REMOTE_ROOT = "results/greenfield/glm52/original_db518_prompt_key_chunk0/"
 TAG_PATTERN = re.compile(
     r"greenfield_original_db518_prompt_key_chunk0_[0-9]{8}T[0-9]{15}Z")
-STATUS_EXACT = "ORIGINAL_DB518_CHUNK0_EXACT"
-STATUS_NONEXACT = "ORIGINAL_DB518_CHUNK0_NONEXACT"
-CLASSIFICATION_EXACT = ("ORIGINAL_DB518_PRODUCER_BOUNDARY_REPRODUCED_BITWISE;"
-                        "CONSUMER_UNPROVEN;DECODER_UNPROVEN;GATE_D_OPEN")
-CLASSIFICATION_NONEXACT = ("ORIGINAL_DB518_PRODUCER_BOUNDARY_NOT_REPRODUCED;"
-                           "STOP_BEFORE_CONSUMER;DECODER_UNPROVEN;GATE_D_OPEN")
+STATUS_EXACT = "ORIGINAL_DB518_NORMALIZED_KEY_CONTROL_EXACT"
+STATUS_NONEXACT = "ORIGINAL_DB518_NORMALIZED_KEY_CONTROL_NONEXACT"
+CLASSIFICATION_EXACT = (
+    "NORMALIZATION_TO_KEY_BOUNDARY_COMPOSABLE_BITWISE;"
+    "NORMALIZED_TENSOR_INDEPENDENT_EXACTNESS_UNPROVEN;"
+    "LAYER_CONSUMER_UNPROVEN;DECODER_UNPROVEN;GATE_D_OPEN")
+CLASSIFICATION_NONEXACT = (
+    "NORMALIZATION_TO_KEY_BOUNDARY_NONEXACT;STOP_BEFORE_LAYER_CONSUMER;"
+    "DECODER_UNPROVEN;GATE_D_OPEN")
 EXPECTED_CHUNK_BITS_SHA256 = (
     "96d261cbef56bccc20c3d2bee275b995f168e0ff7609713baae21d0a6ea3887c")
 EXPECTED_WK_SHA256 = (
@@ -77,15 +94,17 @@ SUCCESS_PAYLOAD = (
     "census_post.txt",
     "census_pre.txt",
     "evidence.json",
-    "hlo/original_db518_chunk0.optimized_hlo.txt",
-    "hlo/original_db518_chunk0.stablehlo.mlir",
+    "hlo/normalized_boundary.optimized_hlo.txt",
+    "hlo/normalized_boundary.stablehlo.mlir",
+    "hlo/normalized_key_control.optimized_hlo.txt",
+    "hlo/normalized_key_control.stablehlo.mlir",
     "hlo/wk_decode.optimized_hlo.txt",
     "hlo/wk_decode.stablehlo.mlir",
     "hlo/wk_promote.optimized_hlo.txt",
     "hlo/wk_promote.stablehlo.mlir",
     "mirror.sha256",
     "orchestrator.sealed.log",
-    "producer_arrays.npz",
+    "boundary_arrays.npz",
     "publisher_runtime.json",
     "remote_vacancy.raw.txt",
     "remote_vacancy.txt",
@@ -106,7 +125,7 @@ WRAPPER_WRITE_MEMBERS = {
 }
 EXPECTED_OUTPUT_LAYOUT = {
     "accepted_chunk_bits": ((2048, 128), "<u2"),
-    "candidate_chunk_bits": ((2048, 128), "<u2"),
+    "boundary_key_bits": ((2048, 128), "<u2"),
     "embedding_rows": ((2048, ), "<i4"),
     "positions": ((2048, ), "<i4"),
 }
@@ -227,6 +246,16 @@ def _load_contract(code_pin: str) -> types.ModuleType:
     if (sha256(raw).hexdigest() != CONTRACT_SHA256 or raw != _git_bytes(
             "show", f"{code_pin}:{CONTRACT_SOURCE_PATH}")):
         raise RuntimeError("original-DB518 contract bytes drifted")
+    parser_raw = _snapshot(PARSER_CONTRACT_PATH)
+    if (sha256(parser_raw).hexdigest() != PARSER_CONTRACT_SHA256
+            or parser_raw != _git_bytes(
+                "show", f"{code_pin}:{PARSER_CONTRACT_SOURCE_PATH}")):
+        raise RuntimeError("historical chunk parser contract bytes drifted")
+    boundary_raw = _snapshot(BOUNDARY_CONTRACT_PATH)
+    if (sha256(boundary_raw).hexdigest() != BOUNDARY_CONTRACT_SHA256
+            or boundary_raw != _git_bytes(
+                "show", f"{code_pin}:{BOUNDARY_CONTRACT_SOURCE_PATH}")):
+        raise RuntimeError("normalization-boundary contract bytes drifted")
     prompt_raw = _git_bytes("show",
                             f"{code_pin}:{PROMPT_CONTRACT_SOURCE_PATH}")
     package_names = (
@@ -269,6 +298,22 @@ def _load_contract(code_pin: str) -> types.ModuleType:
             sys.modules["numpy"] = prior_numpy
     if prompt.__dict__.get("np") is not forbidden_numpy:
         raise RuntimeError("publisher NumPy sentinel binding drifted")
+    parser_name = "glm_tpu.greenfield.validation.chunk0_embedding_hlo"
+    parser = types.ModuleType(parser_name)
+    parser.__file__ = str(PARSER_CONTRACT_PATH)
+    parser.__package__ = "glm_tpu.greenfield.validation"
+    sys.modules[parser_name] = parser
+    exec(compile(parser_raw, parser.__file__, "exec"),
+         parser.__dict__)  # noqa: S102
+    boundary_name = (
+        "glm_tpu.greenfield.validation.original_db518_normalized_boundary_hlo"
+    )
+    boundary = types.ModuleType(boundary_name)
+    boundary.__file__ = str(BOUNDARY_CONTRACT_PATH)
+    boundary.__package__ = "glm_tpu.greenfield.validation"
+    sys.modules[boundary_name] = boundary
+    exec(compile(boundary_raw, boundary.__file__, "exec"),
+         boundary.__dict__)  # noqa: S102
     contract_name = "glm_tpu.greenfield.validation.original_db518_prompt_key"
     contract = types.ModuleType(contract_name)
     contract.__file__ = str(CONTRACT_PATH)
@@ -379,7 +424,7 @@ def _validate_runner_and_outputs(
         "adapted_wk",
         "artifact_kind",
         "backend",
-        "candidate_chunk_bits_sha256",
+        "boundary_key_bits_sha256",
         "claim_scope",
         "code_hash",
         "compile_seconds",
@@ -393,9 +438,11 @@ def _validate_runner_and_outputs(
         "memory_before",
         "mismatched_lanes",
         "mismatched_rows",
-        "original_db518_chunk0_exact",
+        "normalized_boundary_key_control_exact",
+        "normalization_device_to_host_transfer_count",
         "performance_claim",
-        "producer_invocation_count",
+        "normalization_invocation_count",
+        "key_control_invocation_count",
         "provenance",
         "run_tag",
         "source_sha256",
@@ -415,15 +462,16 @@ def _validate_runner_and_outputs(
             or runner["provenance"].get("probe_sha256") != expected_probe_sha
             or runner.get("source_sha256") != expected_probe_sha
             or runner.get("run_tag") != run_tag or runner.get("claim_scope")
-            != ("One original-DB518 layer-0 prompt-key producer chunk only; "
-                "no consumer, decoder, Gate-D or performance claim.")):
+            != ("One device-resident normalization-to-key composability control; "
+                "no independent normalized-tensor, layer consumer, decoder, "
+                "Gate-D or performance claim.")):
         raise RuntimeError("original-DB518 runner claim boundary drifted")
     arrays_raw = base.snapshot_member(run_fd,
-                                      "producer_arrays.npz",
+                                      "boundary_arrays.npz",
                                       limit=4 << 20)
     payloads = _parse_npz(parent, arrays_raw)
     accepted = payloads["accepted_chunk_bits"]
-    candidate = payloads["candidate_chunk_bits"]
+    candidate = payloads["boundary_key_bits"]
     row_mapping_sha = sha256(payloads["embedding_rows"]).hexdigest()
     positions_sha = sha256(payloads["positions"]).hexdigest()
     rows, lanes = _mismatch_counts(candidate, accepted)
@@ -431,18 +479,20 @@ def _validate_runner_and_outputs(
     exact = rows == 0 and lanes == 0 and candidate_sha == EXPECTED_CHUNK_BITS_SHA256
     if (sha256(accepted).hexdigest() != EXPECTED_CHUNK_BITS_SHA256
             or runner.get("artifact_kind")
-            != "gate_d_original_db518_prompt_key_chunk0_discriminator"
+            != "gate_d_original_db518_normalized_boundary_chunk0_discriminator"
             or runner.get("accepted_chunk_bits_sha256")
             != EXPECTED_CHUNK_BITS_SHA256
-            or runner.get("candidate_chunk_bits_sha256") != candidate_sha
+            or runner.get("boundary_key_bits_sha256") != candidate_sha
             or runner.get("code_hash") != code_pin
             or runner.get("mismatched_rows") != rows
             or runner.get("mismatched_lanes") != lanes
-            or runner.get("producer_invocation_count") != 1
+            or runner.get("normalization_invocation_count") != 1
+            or runner.get("key_control_invocation_count") != 1
+            or runner.get("normalization_device_to_host_transfer_count") != 0
             or runner.get("host_transfer_count_after_completion") != 1
             or runner.get("performance_claim") is not False
             or runner.get("status") != "COMPLETED"
-            or runner.get("original_db518_chunk0_exact") is not exact
+            or runner.get("normalized_boundary_key_control_exact") is not exact
             or runner.get("adapted_wk") != {
                 "byte_sum": 193298069,
                 "dtype": "float32",
@@ -475,8 +525,10 @@ def _validate_runner_and_outputs(
         raise RuntimeError(
             "original-DB518 numerical records disagree with archived arrays")
     hlo_names = (
-        "original_db518_chunk0.optimized_hlo.txt",
-        "original_db518_chunk0.stablehlo.mlir",
+        "normalized_boundary.optimized_hlo.txt",
+        "normalized_boundary.stablehlo.mlir",
+        "normalized_key_control.optimized_hlo.txt",
+        "normalized_key_control.stablehlo.mlir",
         "wk_decode.optimized_hlo.txt",
         "wk_decode.stablehlo.mlir",
         "wk_promote.optimized_hlo.txt",
@@ -493,18 +545,22 @@ def _validate_runner_and_outputs(
             raise RuntimeError(f"empty original-DB518 HLO artifact: {field}")
     hlo = runner.get("hlo")
     if (not isinstance(hlo, Mapping) or set(hlo) != {
-            "optimized_contract",
-            "optimized_sha256",
-            "stablehlo_contract",
-            "stablehlo_sha256",
+            "normalization_contract",
+            "normalization_optimized_sha256",
+            "normalization_stablehlo_sha256",
+            "key_control_contract",
+            "key_control_optimized_sha256",
+            "key_control_stablehlo_sha256",
             "wk_decode_optimized_sha256",
             "wk_decode_stablehlo_sha256",
             "wk_promote_optimized_sha256",
             "wk_promote_stablehlo_sha256",
     }):
         raise RuntimeError("original-DB518 HLO record is absent")
-    main_opt = hlo_raw["original_db518_chunk0.optimized_hlo.txt"]
-    main_stable = hlo_raw["original_db518_chunk0.stablehlo.mlir"]
+    normalized_opt = hlo_raw["normalized_boundary.optimized_hlo.txt"]
+    normalized_stable = hlo_raw["normalized_boundary.stablehlo.mlir"]
+    key_opt = hlo_raw["normalized_key_control.optimized_hlo.txt"]
+    key_stable = hlo_raw["normalized_key_control.stablehlo.mlir"]
     decode_opt = hlo_raw["wk_decode.optimized_hlo.txt"]
     decode_stable = hlo_raw["wk_decode.stablehlo.mlir"]
     promote_opt = hlo_raw["wk_promote.optimized_hlo.txt"]
@@ -513,15 +569,21 @@ def _validate_runner_and_outputs(
                          "decode")
     _validate_helper_hlo(parent, promote_opt.decode(), promote_stable.decode(),
                          "promote")
-    optimized_contract = contract.validate_original_db518_prompt_key_hlo(
-        main_opt.decode("utf-8", errors="strict"))
-    stablehlo_contract = contract.validate_original_db518_prompt_key_stablehlo(
-        main_stable.decode("utf-8", errors="strict"))
-    if not optimized_contract["passed"] or not stablehlo_contract["passed"]:
-        raise RuntimeError("publisher independently rejected producer HLO")
+    normalization_contract = (
+        contract.require_completed_normalization_boundary_hlo(
+            normalized_opt.decode("utf-8", errors="strict"),
+            normalized_stable.decode("utf-8", errors="strict"),
+        )
+    )
+    key_control_contract = contract.require_normalized_key_control_boundary_hlo(
+        key_opt.decode("utf-8", errors="strict"),
+        key_stable.decode("utf-8", errors="strict"),
+    )
     expected_hashes = {
-        "optimized_sha256": sha256(main_opt).hexdigest(),
-        "stablehlo_sha256": sha256(main_stable).hexdigest(),
+        "normalization_optimized_sha256": sha256(normalized_opt).hexdigest(),
+        "normalization_stablehlo_sha256": sha256(normalized_stable).hexdigest(),
+        "key_control_optimized_sha256": sha256(key_opt).hexdigest(),
+        "key_control_stablehlo_sha256": sha256(key_stable).hexdigest(),
         "wk_decode_optimized_sha256": sha256(decode_opt).hexdigest(),
         "wk_decode_stablehlo_sha256": sha256(decode_stable).hexdigest(),
         "wk_promote_optimized_sha256": sha256(promote_opt).hexdigest(),
@@ -529,10 +591,10 @@ def _validate_runner_and_outputs(
     }
     if any(hlo.get(name) != value for name, value in expected_hashes.items()):
         raise RuntimeError("original-DB518 HLO digest record drifted")
-    if (hlo.get("optimized_contract") != optimized_contract
-            or hlo.get("stablehlo_contract") != stablehlo_contract):
+    if (hlo.get("normalization_contract") != normalization_contract
+            or hlo.get("key_control_contract") != key_control_contract):
         raise RuntimeError(
-            "producer HLO contract record disagrees with publisher")
+            "normalized-boundary HLO contract record disagrees with publisher")
     return arrays_raw, runner, exact
 
 
@@ -576,12 +638,12 @@ def _prepare_success(
     base.write_member_exclusive(run_fd, "orchestrator.sealed.log",
                                 orchestrator)
     summary = {
-        "artifact_kind": "gate_d_original_db518_prompt_key_chunk0_summary",
+        "artifact_kind": "gate_d_original_db518_normalized_boundary_chunk0_summary",
         "classification": classification,
         "code_hash": code_pin,
         "elapsed_seconds": elapsed,
         "gate_d_closed": False,
-        "original_db518_chunk0_exact": exact,
+        "normalized_boundary_key_control_exact": exact,
         "performance_claim": False,
         "remote_prefix": remote,
         "run_tag": run_tag,
@@ -595,13 +657,21 @@ def _prepare_success(
         census_post,
         "census_pre.txt":
         census_pre,
-        "hlo/original_db518_chunk0.optimized_hlo.txt":
+        "hlo/normalized_boundary.optimized_hlo.txt":
         base.snapshot_member(run_fd,
-                             "hlo/original_db518_chunk0.optimized_hlo.txt",
+                             "hlo/normalized_boundary.optimized_hlo.txt",
                              limit=256 << 20),
-        "hlo/original_db518_chunk0.stablehlo.mlir":
+        "hlo/normalized_boundary.stablehlo.mlir":
         base.snapshot_member(run_fd,
-                             "hlo/original_db518_chunk0.stablehlo.mlir",
+                             "hlo/normalized_boundary.stablehlo.mlir",
+                             limit=256 << 20),
+        "hlo/normalized_key_control.optimized_hlo.txt":
+        base.snapshot_member(run_fd,
+                             "hlo/normalized_key_control.optimized_hlo.txt",
+                             limit=256 << 20),
+        "hlo/normalized_key_control.stablehlo.mlir":
+        base.snapshot_member(run_fd,
+                             "hlo/normalized_key_control.stablehlo.mlir",
                              limit=256 << 20),
         "hlo/wk_decode.optimized_hlo.txt":
         base.snapshot_member(run_fd,
@@ -623,7 +693,7 @@ def _prepare_success(
         mirror,
         "orchestrator.sealed.log":
         orchestrator,
-        "producer_arrays.npz":
+        "boundary_arrays.npz":
         arrays,
         "publisher_runtime.json":
         base.snapshot_member(run_fd, "publisher_runtime.json", limit=1 << 20),
@@ -642,7 +712,7 @@ def _prepare_success(
     }
     evidence = {
         "artifact_kind":
-        "gate_d_original_db518_prompt_key_chunk0_local_evidence",
+        "gate_d_original_db518_normalized_boundary_chunk0_local_evidence",
         "classification": classification,
         "code_hash": code_pin,
         "files":
@@ -732,11 +802,11 @@ def _publish_success(
         if base._observed_names(bucket, prefix) != expected_remote:
             raise RuntimeError("original-DB518 preterminal remote set drifted")
         marker = {
-            "artifact_kind": "gate_d_original_db518_prompt_key_chunk0_result",
+            "artifact_kind": "gate_d_original_db518_normalized_boundary_chunk0_result",
             "classification": classification,
             "evidence_sha256": sha256(payload["evidence.json"]).hexdigest(),
             "gate_d_closed": False,
-            "original_db518_chunk0_exact": exact,
+            "normalized_boundary_key_control_exact": exact,
             "performance_claim": False,
             "remote_ledger": ledger,
             "run_tag": run_tag,

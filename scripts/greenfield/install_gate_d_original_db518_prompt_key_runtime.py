@@ -12,12 +12,12 @@ from collections.abc import Mapping
 from hashlib import sha256
 from pathlib import Path
 
-SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-original-db518-prompt-key-install-v6")
+SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-original-db518-prompt-key-install-v7")
 INSTALLER_PATH = SOURCE_ROOT / "install_gate_d_original_db518_prompt_key_runtime.py"
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
-LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_original_db518_prompt_key_chunk0_v6.py"
+LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_original_db518_prompt_key_chunk0_v7.py"
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-original-db518-prompt-key-v6"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-original-db518-prompt-key-v7"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -26,18 +26,24 @@ EXPECTED_ENVIRONMENT = {
     "PYTHONDONTWRITEBYTECODE": "1",
 }
 PAYLOADS = {
+    "chunk0_embedding_hlo.py":
+    "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757",
+    "original_db518_normalized_boundary_hlo.py":
+    "a8ca4b686723a3cf22943bdd13f3551706acb5031bbd14904f919d30c1fc24e8",
     "original_db518_prompt_key.py":
-    "a4f690e4cb3fcda801563f3f297c920857f434411bb3089a15a28f50ab2abdcc",
+    "e86196b39acd075deca1abbfb645ff3264307158b50ce89fcfe60e26c75be95c",
     "probe_original_db518_prompt_key_chunk0.py":
-    "9b9e658f23f5e195645ff2b4d3688cf3ee7b3e85362c1303be2c5e59868bb30d",
+    "46589b8c5471c5b1a9470b34d78f07247e7af934d4b7069118c9f2275c696e4e",
     "publish_gate_d_original_db518_prompt_key_chunk0.py":
-    "d9f81aa3dd3118f2b91d6369fca1a8c9accf5e98852655dafed801745ce27a32",
+    "50b0d4ca6e1f59939b5b780bb30a8377eecc73819fca6b71e50b61f3db52117e",
     "launch_gate_d_original_db518_prompt_key_chunk0.py":
-    "c07b0ecf26aa6041edb0c497043c3db3dfd68a0b8e8d7b6691239ebe573c5b28",
+    "e9b9bab1283d8014160616fcf9a2d49d4a06739260b991ab9b2b7341a753b9ed",
     "verify_gate_d_original_db518_same_region_git_mirror.py":
-    "a36705b4ae261136ecd6ca18b3813f27fcaa78f2530fffb4e28fe0f8c4b83930",
+    "00c0bce56b5b9be8a5eb0245c33fc65f77f410333c12bd7d243dc3004e280295",
 }
 CAPSULE_NAMES = (
+    "chunk0_embedding_hlo.py",
+    "original_db518_normalized_boundary_hlo.py",
     "original_db518_prompt_key.py",
     "probe_original_db518_prompt_key_chunk0.py",
     "publish_gate_d_original_db518_prompt_key_chunk0.py",

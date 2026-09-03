@@ -18,15 +18,20 @@ WRAPPER = REPO / "scripts/greenfield/run_original_db518_prompt_key_chunk0.sh"
 LAUNCHER = REPO / "scripts/greenfield/launch_gate_d_original_db518_prompt_key_chunk0.py"
 INSTALLER = REPO / "scripts/greenfield/install_gate_d_original_db518_prompt_key_runtime.py"
 CONTRACT = REPO / "glm_tpu/greenfield/validation/original_db518_prompt_key.py"
+PARSER_CONTRACT = REPO / "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py"
+BOUNDARY_CONTRACT = (
+    REPO / "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py"
+)
 VERIFIER = REPO / "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py"
 PUBLISHER_PARENT = REPO / "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
 V5_MIRROR_REPLAY = REPO / "docs/artifacts/gate-d-original-db518-v5-mirror-replay.json"
+V6_EXACT_SUCCESS = REPO / "docs/artifacts/gate-d-original-db518-v6-exact-success.json"
 V5_PIN = "ae79a3fdcf877a8123f34b08411e4f6d0a5584a7"
 V5_VERIFIER_SHA256 = (
     "288bfa0b707b041467f4b0f0686cc3e29207c0c71ad4b992139e238d29a7c084")
-CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v6-source.json"
+CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v7-source.json"
 STAGING = Path(
-    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v6-staging"
+    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v7-staging"
 )
 
 
@@ -63,11 +68,15 @@ def test_exact_cross_file_hash_chain_and_paths():
     verifier = _load(VERIFIER)
     payloads = installer.PAYLOADS
     assert launcher.WRAPPER_SHA256 == _digest(WRAPPER)
+    assert launcher.PARSER_CONTRACT_SHA256 == _digest(PARSER_CONTRACT)
+    assert launcher.BOUNDARY_CONTRACT_SHA256 == _digest(BOUNDARY_CONTRACT)
     assert launcher.HLO_CONTRACT_SHA256 == _digest(CONTRACT)
     assert launcher.PROBE_SHA256 == _digest(PROBE)
     assert launcher.PUBLISHER_SHA256 == _digest(PUBLISHER)
     assert launcher.MIRROR_VERIFIER_SHA256 == _digest(VERIFIER)
     assert payloads == {
+        "chunk0_embedding_hlo.py": _digest(PARSER_CONTRACT),
+        "original_db518_normalized_boundary_hlo.py": _digest(BOUNDARY_CONTRACT),
         "launch_gate_d_original_db518_prompt_key_chunk0.py": _digest(LAUNCHER),
         "original_db518_prompt_key.py": _digest(CONTRACT),
         "probe_original_db518_prompt_key_chunk0.py": _digest(PROBE),
@@ -84,6 +93,12 @@ def test_exact_cross_file_hash_chain_and_paths():
     assert launcher.CAPSULE_ROOT == installer.CAPSULE_TARGET
     assert probe.INSTALL_PATH == installer.CAPSULE_TARGET / PROBE.name
     assert publisher.INSTALL_PATH == installer.CAPSULE_TARGET / PUBLISHER.name
+    assert publisher.BOUNDARY_CONTRACT_PATH == (
+        installer.CAPSULE_TARGET / BOUNDARY_CONTRACT.name
+    )
+    assert publisher.PARSER_CONTRACT_PATH == (
+        installer.CAPSULE_TARGET / PARSER_CONTRACT.name
+    )
     assert publisher.CONTRACT_PATH == installer.CAPSULE_TARGET / CONTRACT.name
     assert verifier.INSTALL_PATH == installer.CAPSULE_TARGET / VERIFIER.name
 
@@ -99,8 +114,10 @@ def test_mirror_verifier_exact_authority_membership():
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v4-source.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v5-source.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v6-source.json",
+        "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v7-source.json",
         "docs/artifacts/gate-d-original-db518-v5-mirror-authority-failure.json",
         "docs/artifacts/gate-d-original-db518-v5-mirror-replay.json",
+        "docs/artifacts/gate-d-original-db518-v6-exact-success.json",
         "docs/artifacts/gate-d-original-db518-v2-probe-install-path-failure.json",
         "docs/artifacts/gate-d-original-db518-v3-stablehlo-scatter-count-failure.json",
         "docs/artifacts/gate-d-original-db518-v4-helper-shape-parser-failure.json",
@@ -110,6 +127,8 @@ def test_mirror_verifier_exact_authority_membership():
         "glm_tpu/greenfield/kernels/reference/dsa_association.py",
         "glm_tpu/greenfield/kernels/reference/prefill_index.py",
         "glm_tpu/greenfield/validation/original_db518_prompt_key.py",
+        "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py",
+        "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py",
         "glm_tpu/greenfield/validation/prompt_index_cache.py",
         "scripts/greenfield/install_gate_d_original_db518_prompt_key_runtime.py",
         "scripts/greenfield/launch_gate_d_original_db518_prompt_key_chunk0.py",
@@ -123,6 +142,7 @@ def test_mirror_verifier_exact_authority_membership():
         "tests/greenfield/validation/test_original_db518_prompt_key.py",
         "tests/greenfield/validation/test_original_db518_prompt_key_chain.py",
         "tests/greenfield/validation/test_original_db518_prompt_key_probe.py",
+        "tests/greenfield/kernels/test_original_db518_normalized_boundary.py",
     )
 
 
@@ -197,16 +217,24 @@ def test_publisher_contract_loads_in_isolated_no_site_runtime():
         "from pathlib import Path\n"
         f"p=runpy.run_path({str(PUBLISHER)!r})\n"
         f"contract=Path({str(CONTRACT)!r})\n"
+        f"parser=Path({str(PARSER_CONTRACT)!r})\n"
+        f"boundary=Path({str(BOUNDARY_CONTRACT)!r})\n"
         f"prompt=Path({str(prompt_contract)!r})\n"
         f"pin={pin!r}\n"
         "def git_bytes(*args):\n"
         "    if args == ('show', pin + ':' + p['CONTRACT_SOURCE_PATH']):\n"
         "        return contract.read_bytes()\n"
+        "    if args == ('show', pin + ':' + p['PARSER_CONTRACT_SOURCE_PATH']):\n"
+        "        return parser.read_bytes()\n"
         "    if args == ('show', pin + ':' + p['PROMPT_CONTRACT_SOURCE_PATH']):\n"
         "        return prompt.read_bytes()\n"
+        "    if args == ('show', pin + ':' + p['BOUNDARY_CONTRACT_SOURCE_PATH']):\n"
+        "        return boundary.read_bytes()\n"
         "    raise RuntimeError('unexpected isolated test Git query')\n"
         "loader=p['_load_contract']\n"
         "loader.__globals__['CONTRACT_PATH']=contract\n"
+        "loader.__globals__['PARSER_CONTRACT_PATH']=parser\n"
+        "loader.__globals__['BOUNDARY_CONTRACT_PATH']=boundary\n"
         "loader.__globals__['_git_bytes']=git_bytes\n"
         "c=loader(pin)\n"
         "print(c.ORIGINAL_DB518_CODE_HASH)\n"
@@ -233,7 +261,7 @@ def test_publisher_contract_loads_in_isolated_no_site_runtime():
 def test_probe_treats_nonexact_as_completed_discriminator():
     source = PROBE.read_text()
     assert '"COMPLETED"' in source
-    assert '"original_db518_chunk0_exact"' in source
+    assert '"normalized_boundary_key_control_exact"' in source
     assert "return 0\n" in source
     assert "return 0 if exact else 1" not in source
 
@@ -241,6 +269,14 @@ def test_probe_treats_nonexact_as_completed_discriminator():
 def test_certificate_and_staging_are_exact():
     certificate = json.loads(CERTIFICATE.read_text())
     assert certificate["review_status"] == "PENDING_BATCHED_SOL_REVIEW"
+    historical = json.loads(V6_EXACT_SUCCESS.read_text())
+    accepted_sha = historical["numerical_result"]["accepted_chunk_bits_sha256"]
+    assert accepted_sha == historical["numerical_result"][
+        "candidate_chunk_bits_sha256"
+    ]
+    assert certificate["historical_exact_producer"]["bit_sha256"] == accepted_sha
+    assert _load(PROBE).EXPECTED_CHUNK_BITS_SHA256 == accepted_sha
+    assert _load(PUBLISHER).EXPECTED_CHUNK_BITS_SHA256 == accepted_sha
     for record in certificate["source_files"]:
         assert _digest(REPO / record["path"]) == record["sha256"]
     installer = _load(INSTALLER)
@@ -275,13 +311,13 @@ def test_publisher_rederives_arrays_and_rejects_inventory_drift():
     np.savez(
         stream,
         accepted_chunk_bits=accepted,
-        candidate_chunk_bits=candidate,
+        boundary_key_bits=candidate,
         embedding_rows=rows,
         positions=positions,
     )
     payloads = publisher._parse_npz(Parent, stream.getvalue())
     assert set(payloads) == set(publisher.EXPECTED_OUTPUT_LAYOUT)
-    assert publisher._mismatch_counts(payloads["candidate_chunk_bits"],
+    assert publisher._mismatch_counts(payloads["boundary_key_bits"],
                                       payloads["accepted_chunk_bits"]) == (0,
                                                                            0)
 
@@ -289,7 +325,7 @@ def test_publisher_rederives_arrays_and_rejects_inventory_drift():
     np.savez(
         bad,
         accepted_chunk_bits=accepted,
-        candidate_chunk_bits=candidate,
+        boundary_key_bits=candidate,
         embedding_rows=rows,
     )
     import pytest

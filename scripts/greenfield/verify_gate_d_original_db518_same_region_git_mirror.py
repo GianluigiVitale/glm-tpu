@@ -16,7 +16,7 @@ BRANCH = "rewrite/topology-first-decode"
 ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v6/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v7/"
     "verify_gate_d_original_db518_same_region_git_mirror.py")
 BASE_PATH = "scripts/greenfield/verify_gate_d_same_region_git_mirror.py"
 BASE_PIN = "986378238ac6458307aea69ef1f5e12bf82bc020"
@@ -30,8 +30,10 @@ BOUND_PATHS = (
     "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v4-source.json",
     "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v5-source.json",
     "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v6-source.json",
+    "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v7-source.json",
     "docs/artifacts/gate-d-original-db518-v5-mirror-authority-failure.json",
     "docs/artifacts/gate-d-original-db518-v5-mirror-replay.json",
+    "docs/artifacts/gate-d-original-db518-v6-exact-success.json",
     "docs/artifacts/gate-d-original-db518-v2-probe-install-path-failure.json",
     "docs/artifacts/gate-d-original-db518-v3-stablehlo-scatter-count-failure.json",
     "docs/artifacts/gate-d-original-db518-v4-helper-shape-parser-failure.json",
@@ -41,6 +43,8 @@ BOUND_PATHS = (
     "glm_tpu/greenfield/kernels/reference/dsa_association.py",
     "glm_tpu/greenfield/kernels/reference/prefill_index.py",
     "glm_tpu/greenfield/validation/original_db518_prompt_key.py",
+    "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py",
+    "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py",
     "glm_tpu/greenfield/validation/prompt_index_cache.py",
     "scripts/greenfield/install_gate_d_original_db518_prompt_key_runtime.py",
     "scripts/greenfield/launch_gate_d_original_db518_prompt_key_chunk0.py",
@@ -54,6 +58,7 @@ BOUND_PATHS = (
     "tests/greenfield/validation/test_original_db518_prompt_key.py",
     "tests/greenfield/validation/test_original_db518_prompt_key_chain.py",
     "tests/greenfield/validation/test_original_db518_prompt_key_probe.py",
+    "tests/greenfield/kernels/test_original_db518_normalized_boundary.py",
 )
 GIT_ENVIRONMENT = {
     "GIT_CONFIG_GLOBAL": "/dev/null",

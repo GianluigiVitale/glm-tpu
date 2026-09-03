@@ -43,27 +43,36 @@ def test_current_producer_symbols_are_original_db518_source_exact():
         assert _ast_sha256(current[name]) == _ast_sha256(historical[name])
 
 
-def test_probe_has_one_completed_producer_and_one_post_completion_transfer():
+def test_probe_has_two_completed_boundary_stages_and_no_normalized_transfer():
     source = PROBE.read_text()
     tree = ast.parse(source)
     calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
-    compiled_invocations = [
-        node for node in calls
-        if isinstance(node.func, ast.Name) and node.func.id == "compiled"
-    ]
+    compiled_invocations = {
+        node.func.id
+        for node in calls
+        if isinstance(node.func, ast.Name)
+        and node.func.id.endswith("_compiled")
+    }
     device_gets = [
         node for node in calls if isinstance(node.func, ast.Attribute)
         and isinstance(node.func.value, ast.Name)
         and node.func.value.id == "jax" and node.func.attr == "device_get"
     ]
-    assert len(compiled_invocations) == 1
+    assert compiled_invocations == {
+        "decode_compiled",
+        "promote_compiled",
+        "normalized_compiled",
+        "key_compiled",
+    }
     assert len(device_gets) == 1
     assert source.index(
-        "candidate_cache_device.block_until_ready()") < source.index(
-            "candidate_cache_host, wk_host = jax.device_get(")
+        "normalized_device.block_until_ready()") < source.index(
+            "boundary_keys_device = key_compiled(")
     assert source.index(
-        "candidate_cache_device = compiled(*arguments)") < source.index(
-            "candidate_cache_device.block_until_ready()")
+        "boundary_keys_device.block_until_ready()") < source.index(
+            "boundary_keys_host, wk_host = jax.device_get(")
+    assert "normalization_device_to_host_transfer_count" in source
+    assert "(normalized_device," not in source
 
 
 def test_probe_binds_exact_full_chunk_original_db518_configuration():
@@ -72,24 +81,31 @@ def test_probe_binds_exact_full_chunk_original_db518_configuration():
             "CHUNK_ROWS = 2048",
             "UNIQUE_ROWS = 37",
             "np.searchsorted(",
-            'key_norm_mode="divide_sqrt"',
-            'rotary_mode="accepted_source"',
-            'projection_weight_mode="adapted_fp32"',
-            'projection_mapping_mode="physical_m64_projection_keynorm_lax_map"',
+            "layer0_prompt_normalized_hidden_boundary_chunk",
+            "layer0_prompt_index_key_from_normalized_boundary_chunk",
             "EXPECTED_ADAPTED_WK_SHA256",
             "EXPECTED_CHUNK_BITS_SHA256",
-            "validate_original_db518_prompt_key_hlo(optimized_hlo)",
-            "validate_original_db518_prompt_key_stablehlo(",
+            "require_completed_normalization_boundary_hlo(",
+            "require_normalized_key_control_boundary_hlo(",
     ):
         assert required in source
+    assert "layer0_prompt_index_key_gather_cache_chunk" not in source
     assert "legacy_geometry_chunk_pipeline" not in source
     assert "layer1_keys_from_normalized" not in source
     assert "decode_batch1(" not in source
 
 
-def test_probe_writes_both_hlo_forms_before_invocation():
+def test_probe_writes_all_boundary_hlo_before_invocation():
     source = PROBE.read_text()
-    invocation = source.index("candidate_cache_device = compiled(*arguments)")
-    assert source.index("original_db518_chunk0.optimized_hlo.txt") < invocation
-    assert source.index("original_db518_chunk0.stablehlo.mlir") < invocation
-    assert source.index('"hlo/contract_failure.json"') < invocation
+    invocation = source.index("normalized_device = normalized_compiled(")
+    for name in (
+        "normalized_boundary.optimized_hlo.txt",
+        "normalized_boundary.stablehlo.mlir",
+        "normalized_key_control.optimized_hlo.txt",
+        "normalized_key_control.stablehlo.mlir",
+    ):
+        assert source.index(name) < invocation
+    assert source.index(
+        "require_completed_normalization_boundary_hlo(") < invocation
+    assert source.index(
+        "require_normalized_key_control_boundary_hlo(") < invocation
