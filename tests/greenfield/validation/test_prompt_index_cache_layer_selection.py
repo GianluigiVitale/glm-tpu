@@ -287,7 +287,9 @@ def test_wrapper_launcher_and_sealer_thread_the_layer():
     # layer-1 observer bundle; every bundle site keys on BUNDLE_RUNTIME.
     assert 'readonly PROMPT_CACHE_RUNTIME=${GLM_GREENFIELD_PROMPT_CACHE_RUNTIME:-oracle}' in wrapper
     assert 'elif [[ $PROMPT_CACHE_CAPTURE == 1 && $PROMPT_CACHE_RUNTIME == layer1_observer_bundle ]]; then' in wrapper
-    assert 'readonly LEGACY_PIN=8dc7d20fedca5a98c27bfd1774827305973fa4c1' in wrapper
+    assert 'readonly LEGACY_PIN=c7973435aa2fc948da9185ef99938f886613ce2f' in wrapper
+    assert 'readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-c7973435a' in wrapper
+    assert 'or sys.argv[4] != "c7973435aa2fc948da9185ef99938f886613ce2f"' in wrapper
     assert 'if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 || $PROMPT_CACHE_RUNTIME == layer1_observer_bundle ]]; then' in wrapper
     assert wrapper.count("$BUNDLE_RUNTIME == 1") >= 6
     assert 'if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then\n    # The recreated pod' not in wrapper

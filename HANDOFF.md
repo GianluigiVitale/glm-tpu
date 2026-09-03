@@ -11318,3 +11318,12 @@ Finalization (argv 40) verifies the bundle/vLLM identity files and 8/8 fleet rec
 bundle digest and accepted oracle pin in the SUCCESS record. The observer hooks are unarmed in this mode
 (`GLM_DSA_DUMP_INTERNALS` unset); the wrapper's exact DSA-event comparison against the sealed 8K oracle still gates
 the capture, and `dcp_cache_dump.py` is byte-identical between `8dc7d20f` and `b3c25df47`.
+
+Correction before review: the observer dev repo's branch tip is the tombstone commit `c7973435` ("oracle: tombstone
+perturbing layer1 RMS observer", 2026-08-29), not `8dc7d20f`; the rejected armed observer's registration/callback
+were removed there, and `dcp_cache_dump.py`/`tpu_runner.py` remain byte-identical to the accepted oracle
+`b3c25df47` (947 tracked entries, distance 13). The prompt-cache bundle runtime therefore pins `c7973435` (runtime
+dir `/home/gianl/tpu-inference-dsa-internal-c7973435a`, installed by the bundle reconstruction on each host) so the
+controller checks (dev-repo HEAD == branch ref == pin) hold without moving any branch, and no rejected observer
+code path exists in the transported runtime. Also noted: the layer-1 RMS-input mode itself can no longer satisfy
+its own `8dc7d20f` pin against the advanced branch tip; it is not used here.

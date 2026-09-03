@@ -229,13 +229,15 @@ elif [[ $INTERNAL_CAPTURE == 1 ]]; then
   readonly LEGACY_SOURCE_REPO=$OBSERVER_DEV_REPO
 elif [[ $PROMPT_CACHE_CAPTURE == 1 && $PROMPT_CACHE_RUNTIME == layer1_observer_bundle ]]; then
   # Recreated pod: workers 1--7 carry no accepted-oracle checkout. Reuse the
-  # reviewed layer-1 observer bundle (12 commits over the accepted oracle) as
-  # the legacy runtime; the exact DSA-event comparison still gates the result.
+  # reviewed layer-1 observer branch at its tombstone tip (13 commits over the
+  # accepted oracle: the perturbing RMS-input observer registration/callback
+  # removed again; dcp_cache_dump.py and tpu_runner.py byte-identical to the
+  # oracle) as the legacy runtime; the exact DSA-event comparison still gates.
   readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-layer1-rms-input-observer
   readonly OBSERVER_BRANCH=greenfield/legacy-layer1-rms-input-observer
-  readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-8dc7d20fe
-  readonly OBSERVER_COMMIT_DISTANCE=12
-  readonly LEGACY_PIN=8dc7d20fedca5a98c27bfd1774827305973fa4c1
+  readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-c7973435a
+  readonly OBSERVER_COMMIT_DISTANCE=13
+  readonly LEGACY_PIN=c7973435aa2fc948da9185ef99938f886613ce2f
   readonly LEGACY_REPO=$OBSERVER_RUNTIME_REPO
   readonly LEGACY_SOURCE_REPO=$OBSERVER_DEV_REPO
 else
@@ -3597,7 +3599,7 @@ if sys.argv[11] == "1":
             or sys.argv[37]
             != "/home/gianl/tpu-inference-greenfield-layer1-rms-input-observer"
             or sys.argv[38] != "greenfield/legacy-layer1-rms-input-observer"
-            or sys.argv[4] != "8dc7d20fedca5a98c27bfd1774827305973fa4c1"
+            or sys.argv[4] != "c7973435aa2fc948da9185ef99938f886613ce2f"
             or not is_sha256(sys.argv[33])
             or sys.argv[34] != "947"
             or sha256((root / f"observer_{sys.argv[4]}.bundle").read_bytes()).hexdigest()
