@@ -19,9 +19,9 @@ LAUNCHER = REPO / "scripts/greenfield/launch_gate_d_original_db518_prompt_key_ch
 INSTALLER = REPO / "scripts/greenfield/install_gate_d_original_db518_prompt_key_runtime.py"
 CONTRACT = REPO / "glm_tpu/greenfield/validation/original_db518_prompt_key.py"
 VERIFIER = REPO / "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py"
-CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v2-source.json"
+CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v3-source.json"
 STAGING = Path(
-    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v2-staging"
+    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v3-staging"
 )
 
 
@@ -53,6 +53,9 @@ def _digest(path: Path) -> str:
 def test_exact_cross_file_hash_chain_and_paths():
     launcher = _load(LAUNCHER)
     installer = _load(INSTALLER)
+    probe = _load(PROBE)
+    publisher = _load(PUBLISHER)
+    verifier = _load(VERIFIER)
     payloads = installer.PAYLOADS
     assert launcher.WRAPPER_SHA256 == _digest(WRAPPER)
     assert launcher.HLO_CONTRACT_SHA256 == _digest(CONTRACT)
@@ -72,6 +75,12 @@ def test_exact_cross_file_hash_chain_and_paths():
     assert f"readonly PUBLISHER_SHA={_digest(PUBLISHER)}" in wrapper
     assert f"readonly MIRROR_VERIFIER_SHA={_digest(VERIFIER)}" in wrapper
     assert str(launcher.INSTALL_PATH) in wrapper
+    assert launcher.INSTALL_PATH == installer.LAUNCHER_TARGET
+    assert launcher.CAPSULE_ROOT == installer.CAPSULE_TARGET
+    assert probe.INSTALL_PATH == installer.CAPSULE_TARGET / PROBE.name
+    assert publisher.INSTALL_PATH == installer.CAPSULE_TARGET / PUBLISHER.name
+    assert publisher.CONTRACT_PATH == installer.CAPSULE_TARGET / CONTRACT.name
+    assert verifier.INSTALL_PATH == installer.CAPSULE_TARGET / VERIFIER.name
 
 
 def test_mirror_verifier_exact_authority_membership():
@@ -81,6 +90,8 @@ def test_mirror_verifier_exact_authority_membership():
         "docs/artifacts/gate-d-original-db518-publisher-isolated-import-failure.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-source.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v2-source.json",
+        "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v3-source.json",
+        "docs/artifacts/gate-d-original-db518-v2-probe-install-path-failure.json",
         "glm_tpu/greenfield/benchmarking/numpy_safetensors.py",
         "glm_tpu/greenfield/benchmarking/sealed_runtime.py",
         "glm_tpu/greenfield/kernels/reference/dsa.py",
@@ -121,6 +132,8 @@ def test_wrapper_is_one_producer_only_and_binds_rehydrated_input():
 def test_launcher_preflights_exact_publisher_before_tag_directory_creation():
     source = LAUNCHER.read_text()
     assert source.index("_preflight_publisher(pin)") < source.index(
+        "run_fd = _create_retained_run_fd(tag)")
+    assert source.index("_preflight_probe(pin)") < source.index(
         "run_fd = _create_retained_run_fd(tag)")
     launcher = _load(LAUNCHER)
     assert launcher.SEALED_PYTHON == Path(
