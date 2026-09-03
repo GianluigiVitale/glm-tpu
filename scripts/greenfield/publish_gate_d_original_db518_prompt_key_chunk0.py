@@ -24,31 +24,31 @@ BRANCH = "rewrite/topology-first-decode"
 ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v7/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v8/"
     "publish_gate_d_original_db518_prompt_key_chunk0.py")
 SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_original_db518_prompt_key_chunk0.py")
 CONTRACT_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v7/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v8/"
     "original_db518_prompt_key.py")
 CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/original_db518_prompt_key.py")
 CONTRACT_SHA256 = (
     "e86196b39acd075deca1abbfb645ff3264307158b50ce89fcfe60e26c75be95c")
 PARSER_CONTRACT_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v7/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v8/"
     "chunk0_embedding_hlo.py")
 PARSER_CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py")
 PARSER_CONTRACT_SHA256 = (
     "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757")
 BOUNDARY_CONTRACT_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v7/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v8/"
     "original_db518_normalized_boundary_hlo.py")
 BOUNDARY_CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py")
 BOUNDARY_CONTRACT_SHA256 = (
-    "a8ca4b686723a3cf22943bdd13f3551706acb5031bbd14904f919d30c1fc24e8")
+    "302da0c9651e6c5c199869b122e595c4c586bf5c17fe8cd920ddedffe5ff6a14")
 PROMPT_CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/prompt_index_cache.py")
 PARENT_PATH = "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
@@ -59,7 +59,7 @@ MIRROR_URI = "gs://driftbench-dsv4-uc/repos/glm-tpu/.git"
 MIRROR_VERIFIER_PATH = (
     "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py")
 MIRROR_VERIFIER_SHA256 = (
-    "00c0bce56b5b9be8a5eb0245c33fc65f77f410333c12bd7d243dc3004e280295")
+    "44c4a7f806b09c5529c663e83178f230deeaf98556f1ad481771c2a47064db02")
 REMOTE_ROOT = "results/greenfield/glm52/original_db518_prompt_key_chunk0/"
 TAG_PATTERN = re.compile(
     r"greenfield_original_db518_prompt_key_chunk0_[0-9]{8}T[0-9]{15}Z")

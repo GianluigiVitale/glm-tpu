@@ -29,9 +29,9 @@ V6_EXACT_SUCCESS = REPO / "docs/artifacts/gate-d-original-db518-v6-exact-success
 V5_PIN = "ae79a3fdcf877a8123f34b08411e4f6d0a5584a7"
 V5_VERIFIER_SHA256 = (
     "288bfa0b707b041467f4b0f0686cc3e29207c0c71ad4b992139e238d29a7c084")
-CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v7-source.json"
+CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v8-source.json"
 STAGING = Path(
-    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v7-staging"
+    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v8-staging"
 )
 
 
@@ -115,6 +115,8 @@ def test_mirror_verifier_exact_authority_membership():
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v5-source.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v6-source.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v7-source.json",
+        "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v8-source.json",
+        "docs/artifacts/gate-d-original-db518-v7-tpu-hlo-placement-failure.json",
         "docs/artifacts/gate-d-original-db518-v5-mirror-authority-failure.json",
         "docs/artifacts/gate-d-original-db518-v5-mirror-replay.json",
         "docs/artifacts/gate-d-original-db518-v6-exact-success.json",

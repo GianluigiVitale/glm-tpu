@@ -1,0 +1,43 @@
+{
+  "artifact_kind": "gate_d_original_db518_v7_tpu_hlo_placement_failure",
+  "authorization": {
+    "consumer": false,
+    "full_8k": false,
+    "numerical_claim_accepted": false,
+    "performance_claim": false,
+    "probe_invocation_count": 0
+  },
+  "classification": "TPU_COMPILE_COMPLETED;NORMALIZATION_EXECUTABLE_NOT_INVOKED;CPU_SEALED_STABLEHLO_IDENTITY_FALSE_REJECTED_EXACT_TPU_SINGLE_DEVICE_PLACEMENT;DIAGNOSTIC_PUBLISHED;TAG_BURNED;NO_NUMERICAL_CLAIM;GATE_D_OPEN",
+  "code_hash": "d393a3bf948f732c2e62526ee9dfcd1e61b2d7a3",
+  "created_utc": "2026-09-03T23:01:09Z",
+  "diagnostic": {
+    "ledger_generation": "1788475897109185",
+    "ledger_object_count": 16,
+    "ledger_sha256": "f1d3e3b0ceba3bd9ef5f136177f91a842d65f14c243bc30fab66223898205996",
+    "receipt_sha256": "5d58dd5f2df417d90ad34ec999ce05cc56da8c8bdc02bbe8bee10d67fe3b7316",
+    "remote": "gs://driftbench-dsv4-uc/results/greenfield/glm52/original_db518_prompt_key_chunk0/greenfield_original_db518_prompt_key_chunk0_20260903T222145752160015Z/diagnostic/diagnostic_objects.json",
+    "runner_exception": "RuntimeError: completed boundary StableHLO graph identity drifted",
+    "runner_sha256": "fa920c6bdaa29cfec1db5aa910934fc7d20f058a435f9caa6f7272eab519ffd0"
+  },
+  "fleet": {
+    "failure_exit_census_clean_hosts": 8,
+    "failure_exit_census_sha256": "7ecda872f9d0dd6d5cba5b0b0966e605a6b5e48ff057c65487aaaf3a93ace9e5",
+    "pre_census_clean_hosts": 8,
+    "pre_census_sha256": "1f991049c3a307c58b1d9b00bd27a7ae67183354543c18983aeae58990d7058f"
+  },
+  "hlo": {
+    "normalization_optimized_sha256": "88fc6468a2fa3ce4431accac6b6305f362eca05873f81bd24714ea376f5f801a",
+    "normalization_stablehlo_cpu_sha256": "3cd10543ac6ea5142ebdd1424b78a45f0010665e9ceaeb3c394587d0eabda976",
+    "normalization_stablehlo_tpu_sha256": "87255de0625ad7b9ebd930c13db52df5ab3efcc2a4eb4b5382fcdf62836a683d",
+    "observed_diff": "The TPU text adds exactly one empty sdy.mesh declaration and replicated empty-mesh sharding attributes to the three public ENTRY arguments. Removing only those exact placement annotations makes every remaining byte equal to the sealed CPU StableHLO identity.",
+    "optimized_tpu_shape_difference": "The TPU backend fuses square into the row reduction, keeps reciprocal-plus-epsilon rsqrt in a second fusion, and orders the final fusion operands differently from CPU while preserving exact live sources. The archived graph has one exact gather, square reduction, inverse and completed BF16 root."
+  },
+  "repair": {
+    "status": "LOCAL_UNPERSISTED_CANDIDATE",
+    "strategy": "Admit only the exact empty single-device TPU placement decoration, return both raw and canonical StableHLO hashes, bind replicated optimized ENTRY placement, and recognize the exact TPU-v4 fused square/reduce/rsqrt and convolution-lowered-dot forms. Compile and archive both boundary HLO pairs before admission so one future refusal diagnoses both forms.",
+    "scope": "HLO admission and diagnostics only; no numerical algorithm, input, model weight, or accepted result changes."
+  },
+  "run_tag": "greenfield_original_db518_prompt_key_chunk0_20260903T222145752160015Z",
+  "schema_version": 1,
+  "status": "PROTECTED_PRE_NUMERICAL_DIAGNOSTIC"
+}

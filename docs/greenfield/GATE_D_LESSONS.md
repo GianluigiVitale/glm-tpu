@@ -1271,3 +1271,17 @@ normalized-state cause.
   original M2048 producer is bitwise exact in isolation while the large chunk graph lowers the same RMS reduction with
   different iteration/output windows and misses 256 rows. Preserve the completed device buffer as an executable
   boundary, prove it through a separate exact consumer, and reject in-consumer recomputation in HLO before scaling up.
+- StableHLO identity is placement-sensitive when `.lower()` receives device-resident arrays: TPU
+  adds an empty `sdy.mesh` and replicated argument annotations even when the operation graph is
+  byte-identical to CPU. Bind the raw TPU text and the exact placement decoration separately, then
+  hash a canonical graph obtained by removing only that exhaustively validated decoration. Never
+  treat an arbitrary `sdy` difference as portable noise.
+- Optimized HLO structural witnesses are backend-specific: TPU fused square into row reduction and
+  lowered the M64 dot to a precision-tagged convolution, while CPU retained separate multiply/dot
+  forms. Exact StableHLO plus backend-specific optimized lineage is stronger than comparing a TPU
+  graph to CPU fusion topology. Archive all related compiler products before the first admission
+  check so one bounded failure diagnoses the full boundary.
+- Exact subgraphs and module-wide opcode counts do not prove the returned value used them. Mutation-test
+  a dead exact witness plus an alternate all-input live root. For tuple-producing fusions, map each live
+  GTE back to the selected callee root slice; then prove role-separated angle/data ancestry through the
+  exact while output and final ENTRY root.

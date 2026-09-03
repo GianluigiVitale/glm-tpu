@@ -16,7 +16,7 @@ BRANCH = "rewrite/topology-first-decode"
 ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v7/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v8/"
     "verify_gate_d_original_db518_same_region_git_mirror.py")
 BASE_PATH = "scripts/greenfield/verify_gate_d_same_region_git_mirror.py"
 BASE_PIN = "986378238ac6458307aea69ef1f5e12bf82bc020"
@@ -31,6 +31,8 @@ BOUND_PATHS = (
     "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v5-source.json",
     "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v6-source.json",
     "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v7-source.json",
+    "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v8-source.json",
+    "docs/artifacts/gate-d-original-db518-v7-tpu-hlo-placement-failure.json",
     "docs/artifacts/gate-d-original-db518-v5-mirror-authority-failure.json",
     "docs/artifacts/gate-d-original-db518-v5-mirror-replay.json",
     "docs/artifacts/gate-d-original-db518-v6-exact-success.json",

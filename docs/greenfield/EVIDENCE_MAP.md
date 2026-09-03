@@ -3768,3 +3768,27 @@ persistence only; review and persistence precede any v2 installation.
 - Classification: `ORIGINAL_DB518_PRODUCER_BOUNDARY_REPRODUCED_BITWISE;CONSUMER_UNPROVEN;DECODER_UNPROVEN;
   GATE_D_OPEN`. Next evidence must preserve a completed normalization buffer into a separate key-control/consumer;
   no 8K execution is authorized by this result.
+## 2026-09-03 — V7 normalization boundary HLO placement refusal
+
+- Protected V7 tag `greenfield_original_db518_prompt_key_chunk0_20260903T222145752160015Z` reached
+  TPU compilation only and stopped before numerical invocation. Exact US-CENTRAL2 diagnostic ledger:
+  generation `1788475897109185`, SHA `f1d3e3b0…5996`, 16 objects; pre/failure 8/8 clean.
+- CPU/TPU StableHLO differ only by the explicit empty single-device mesh and replicated argument
+  sharding annotations. Raw TPU SHA `87255de0…683d`; canonical graph SHA `3cd10543…a976`; TPU
+  optimized SHA `88fc6468…01a`. Record:
+  `docs/artifacts/gate-d-original-db518-v7-tpu-hlo-placement-failure.json`.
+- V8 candidate exactly binds both placement and canonical graph plus backend-specific fused lineage;
+  100 CPU tests pass. Certificate/staging are pending Sol review. Gate D remains open.
+
+## 2026-09-03 — V8 output-sensitive HLO admission correction
+
+- Initial Sol review found the optimized contracts accepted dead exact witnesses plus alternate live
+  roots; it blocked persistence/install/execution. Demonstrated normalization and key-control bypasses
+  reproduced the finding.
+- Corrected V8 binds exact normalization inverse ancestry and the exact dot→while-slot→live rotary→BF16
+  root chain, including tuple-selected TPU fusion outputs and separated position/data roles. Both bypasses
+  now reject; archived TPU forms replay; focused CPU suite 102/102.
+- Refreshed staging tree `419cc7a2…3d6`, fresh unstarted tag `…20260903T232020879638235Z`; same Sol
+  delta review pending. No persistence, install, TPU execution, numerical claim or Gate-D closure yet.
+- Same Sol delta review returned no P0–P2 and explicitly approved persistence, install-only tree
+  `419cc7a2…3d6`, and that execute-once tag conditional on the merged pin. Execution remains pending.

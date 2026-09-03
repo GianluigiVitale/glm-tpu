@@ -14,6 +14,14 @@ from glm_tpu.greenfield.kernels.reference.dsa_association import (
     layer0_prompt_normalized_hidden_boundary_chunk,
 )
 from glm_tpu.greenfield.validation.original_db518_normalized_boundary_hlo import (
+    _KEY_CONTROL_PARAMETER_SHARDINGS,
+    _KEY_CONTROL_STABLEHLO_SHA256,
+    _NORMALIZATION_PARAMETER_SHARDINGS,
+    _NORMALIZATION_STABLEHLO_SHA256,
+    _exact_dot_callee,
+    _exact_square_callee,
+    _optimized_single_device_placement,
+    _require_stable_identity,
     require_completed_normalization_boundary_hlo,
     require_normalized_key_control_boundary_hlo,
 )
@@ -55,6 +63,208 @@ def _inputs():
 def _replace_once(text: str, old: str, new: str) -> str:
     assert text.count(old) == 1, old
     return text.replace(old, new, 1)
+
+
+def _with_single_device_sharding(stable: str, axes: tuple[str, ...]) -> str:
+    lines = stable.splitlines(keepends=True)
+    assert lines[0].startswith("module @")
+    lines.insert(
+        1,
+        "  sdy.mesh @empty_mesh = <[]> {stablehlo.mesh = {axes = []}}\n",
+    )
+    main_index = next(
+        index
+        for index, line in enumerate(lines)
+        if line.startswith("  func.func public @main(")
+    )
+    main = lines[main_index]
+    for argument, sharding in enumerate(axes):
+        marker = f"%arg{argument}: "
+        start = main.index(marker) + len(marker)
+        end = (
+            main.index(", %arg", start)
+            if argument + 1 < len(axes)
+            else main.index(") ->", start)
+        )
+        main = (
+            main[:end]
+            + f" {{sdy.sharding = #sdy.sharding<@empty_mesh, {sharding}>}}"
+            + main[end:]
+        )
+    lines[main_index] = main
+    return "".join(lines)
+
+
+def _bypass_exact_while_with_all_input_alternate(optimized: str) -> str:
+    """Keep an exact dead while/dot while an alternate all-input graph wins."""
+
+    alternate = """
+%alternate_live (p0: bf16[2048,6144], p1: f32[128,6144], p2: bf16[128], p3: bf16[128]) -> f32[32,64,128] {
+  %p0 = bf16[2048,6144]{1,0} parameter(0)
+  %p1 = f32[128,6144]{1,0} parameter(1)
+  %p2 = bf16[128]{0} parameter(2)
+  %p3 = bf16[128]{0} parameter(3)
+  ROOT %alt = f32[32,64,128]{2,1,0} custom-call(%p0, %p1, %p2, %p3), custom_call_target="adversarial"
+}
+
+"""
+    assert optimized.count("ENTRY %main.8 (") == 1
+    optimized = optimized.replace(
+        "ENTRY %main.8 (", alternate + "ENTRY %main.8 (", 1
+    )
+    marker = "  %concatenate_bitcast_fusion = "
+    assert optimized.count(marker) == 1
+    alternate_call = (
+        "  %alternate_live_call = f32[32,64,128]{2,1,0} "
+        "fusion(%normalized_chunk.1, %wk_weight.1, %key_norm_weight.1, "
+        "%key_norm_bias.1), kind=kLoop, calls=%alternate_live\n"
+    )
+    optimized = optimized.replace(marker, alternate_call + marker, 1)
+    optimized = _replace_once(
+        optimized,
+        "fusion(%multiply_power_fusion, %positions.1, %while.7)",
+        "fusion(%multiply_power_fusion, %positions.1, %alternate_live_call)",
+    )
+    return _replace_once(
+        optimized,
+        "fusion(%while.7), kind=kLoop, calls=%fused_computation.5",
+        "fusion(%alternate_live_call), kind=kLoop, calls=%fused_computation.5",
+    )
+
+
+def _node(
+    opcode,
+    shapes,
+    *,
+    operands=(),
+    parameter=None,
+    raw="",
+):
+    return {
+        "opcode": opcode,
+        "shapes": shapes,
+        "operands": operands,
+        "parameter": parameter,
+        "raw": raw,
+    }
+
+
+def test_tpu_fused_square_reduce_is_exactly_recognized():
+    computation = {
+        "root": "%reduce",
+        "nodes": {
+            "%hidden": _node(
+                "parameter", (("bf16", (2048, 6144)),), parameter=0
+            ),
+            "%valid": _node(
+                "parameter", (("pred", (2048,)),), parameter=1
+            ),
+            "%selected": _node(
+                "select",
+                (("bf16", (2048, 6144)),),
+                operands=("%valid", "%hidden", "%hidden"),
+            ),
+            "%converted": _node(
+                "convert",
+                (("f32", (2048, 6144)),),
+                operands=("%selected",),
+            ),
+            "%square": _node(
+                "multiply",
+                (("f32", (2048, 6144)),),
+                operands=("%converted", "%converted"),
+            ),
+            "%zero": _node("constant", (("f32", ()),), raw="constant(0)"),
+            "%reduce": _node(
+                "reduce",
+                (("f32", (2048,)),),
+                operands=("%square", "%zero"),
+                raw="dimensions={1}",
+            ),
+        },
+    }
+    assert _exact_square_callee(computation)
+    computation["nodes"]["%square"]["opcode"] = "add"
+    assert not _exact_square_callee(computation)
+
+
+def test_tpu_convolution_lowered_dot_is_exactly_recognized():
+    computation = {
+        "root": "%tuple",
+        "nodes": {
+            "%wk": _node(
+                "parameter", (("f32", (128, 6144)),), parameter=0
+            ),
+            "%hidden": _node(
+                "parameter", (("bf16", (32, 64, 6144)),), parameter=1
+            ),
+            "%index": _node("parameter", (("s32", ()),), parameter=2),
+            "%lhs": _node(
+                "fusion",
+                (("f32", (64, 6144)),),
+                operands=("%hidden", "%index"),
+            ),
+            "%rhs": _node(
+                "fusion", (("f32", (128, 6144)),), operands=("%wk",)
+            ),
+            "%dot": _node(
+                "convolution",
+                (("f32", (64, 128)),),
+                operands=("%lhs", "%rhs"),
+                raw=(
+                    "convolution(%lhs, %rhs), dim_labels=bf_oi->bf, "
+                    "operand_precision={default,highest}, "
+                    'metadata={op_name="jit(test)/dot_general"}'
+                ),
+            ),
+            "%sum": _node(
+                "reduce", (("f32", (64,)),), operands=("%dot",)
+            ),
+            "%tuple": _node(
+                "tuple",
+                (("f32", (64,)), ("f32", (64, 128))),
+                operands=("%sum", "%dot"),
+            ),
+        },
+    }
+    assert _exact_dot_callee(computation)
+    computation["nodes"]["%dot"]["raw"] = computation["nodes"]["%dot"][
+        "raw"
+    ].replace("default,highest", "default,default")
+    assert not _exact_dot_callee(computation)
+
+
+def test_optimized_tpu_placement_rejects_nonreplicated_argument():
+    axes = ("[{}, {}]", "[{}]")
+    nodes = {}
+    parameters = {}
+    for index, sharding in enumerate(axes):
+        name = f"%arg{index}"
+        parameters[index] = name
+        nodes[name] = _node(
+            "parameter",
+            (("f32", (2,)),),
+            parameter=index,
+            raw=(
+                "parameter(0), sharding={replicated}, "
+                'frontend_attributes={xla.sdy.sharding="'
+                f"#sdy.sharding<@empty_mesh, {sharding}>"
+                '"}'
+            ),
+        )
+    header = (
+        "HloModule test, frontend_attributes={xla.sdy.meshes="
+        "{empty_mesh = #sdy.mesh<[]>}}\n"
+    )
+    assert _optimized_single_device_placement(
+        header, nodes, parameters, axes
+    )
+    nodes["%arg1"]["raw"] = nodes["%arg1"]["raw"].replace(
+        "sharding={replicated}", "sharding={maximal device=0}"
+    )
+    assert not _optimized_single_device_placement(
+        header, nodes, parameters, axes
+    )
 
 
 def test_completed_boundary_composes_to_original_producer_keys():
@@ -169,6 +379,67 @@ def test_real_boundary_hlo_is_admitted(real_boundary_hlo):
     )["passed"]
 
 
+def test_real_boundary_hlo_admits_exact_tpu_single_device_placement(
+    real_boundary_hlo,
+):
+    _, normalizer_stable, _, key_stable = real_boundary_hlo
+    _, normalizer_identity = _require_stable_identity(
+        _with_single_device_sharding(
+            normalizer_stable, ("[{}, {}]", "[{}]", "[{}]")
+        ),
+        module_name="jit_layer0_prompt_normalized_hidden_boundary_chunk",
+        expected_sha256=_NORMALIZATION_STABLEHLO_SHA256,
+        parameter_shardings=_NORMALIZATION_PARAMETER_SHARDINGS,
+    )
+    _, key_identity = _require_stable_identity(
+        _with_single_device_sharding(
+            key_stable,
+            ("[{}, {}]", "[{}]", "[{}, {}]", "[{}]", "[{}]"),
+        ),
+        module_name=(
+            "jit_layer0_prompt_index_key_from_normalized_boundary_chunk"
+        ),
+        expected_sha256=_KEY_CONTROL_STABLEHLO_SHA256,
+        parameter_shardings=_KEY_CONTROL_PARAMETER_SHARDINGS,
+    )
+    assert normalizer_identity["stable_single_device_sharding_bound"]
+    assert normalizer_identity["stable_parameter_sharding_count"] == 3
+    assert normalizer_identity["stable_raw_sha256"] != normalizer_identity[
+        "stable_sha256"
+    ]
+    assert key_identity["stable_single_device_sharding_bound"]
+    assert key_identity["stable_parameter_sharding_count"] == 5
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda stable: stable.replace("@empty_mesh", "@other_mesh", 1),
+        lambda stable: stable.replace("<[]>", '<["feature"=1]>', 1),
+        lambda stable: stable.replace("{axes = []}", '{axes = ["feature"]}', 1),
+        lambda stable: stable.replace(
+            " {sdy.sharding = #sdy.sharding<@empty_mesh, [{}, {}]>}", "", 1
+        ),
+        lambda stable: stable.replace("[{}, {}]", "[{}]", 1),
+        lambda stable: stable + "  sdy.mesh @extra = <[]>\n",
+    ),
+)
+def test_tpu_single_device_placement_rejects_drift(
+    real_boundary_hlo, mutation
+):
+    _, stable, _, _ = real_boundary_hlo
+    placed = _with_single_device_sharding(
+        stable, ("[{}, {}]", "[{}]", "[{}]")
+    )
+    with pytest.raises(RuntimeError):
+        _require_stable_identity(
+            mutation(placed),
+            module_name="jit_layer0_prompt_normalized_hidden_boundary_chunk",
+            expected_sha256=_NORMALIZATION_STABLEHLO_SHA256,
+            parameter_shardings=_NORMALIZATION_PARAMETER_SHARDINGS,
+        )
+
+
 @pytest.mark.parametrize(
     "mutation",
     (
@@ -189,6 +460,14 @@ def test_real_boundary_hlo_is_admitted(real_boundary_hlo):
                 "fusion(%input_norm_weight.1,",
                 "fusion(%gather_convert_fusion,",
                 1,
+            ),
+            stable,
+        ),
+        lambda optimized, stable: (
+            _replace_once(
+                optimized,
+                "%add_rsqrt_fusion, %gather_convert_fusion",
+                "%ynn_fusion, %gather_convert_fusion",
             ),
             stable,
         ),
@@ -248,6 +527,10 @@ def test_normalization_boundary_hlo_rejects_hostile_mutations(
                 "fusion(%key_norm_weight.1)",
                 1,
             ),
+            stable,
+        ),
+        lambda optimized, stable: (
+            _bypass_exact_while_with_all_input_alternate(optimized),
             stable,
         ),
         lambda optimized, stable: (

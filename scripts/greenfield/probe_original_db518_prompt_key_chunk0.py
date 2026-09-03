@@ -29,7 +29,7 @@ import zipfile
 PROBE_REPOSITORY_PATH = (
     "scripts/greenfield/probe_original_db518_prompt_key_chunk0.py")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v7/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v8/"
     "probe_original_db518_prompt_key_chunk0.py")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 TAG_PATTERN = re.compile(
@@ -510,10 +510,6 @@ def main() -> int:
             "hlo/normalized_boundary.stablehlo.mlir",
             normalized_stablehlo.encode(),
         )
-        normalization_contract = require_completed_normalization_boundary_hlo(
-            normalized_hlo, normalized_stablehlo
-        )
-
         key_control = partial(
             layer0_prompt_index_key_from_normalized_boundary_chunk,
             geometry=geometry,
@@ -539,6 +535,11 @@ def main() -> int:
             run_fd,
             "hlo/normalized_key_control.stablehlo.mlir",
             key_stablehlo.encode(),
+        )
+        # Persist both compiler products before either admission check so one
+        # bounded failure diagnoses both backend forms without another probe.
+        normalization_contract = require_completed_normalization_boundary_hlo(
+            normalized_hlo, normalized_stablehlo
         )
         key_contract = require_normalized_key_control_boundary_hlo(
             key_hlo, key_stablehlo

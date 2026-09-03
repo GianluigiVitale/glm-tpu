@@ -11817,3 +11817,55 @@ compile and complete a separate M2048 normalization helper, feed only its finish
 compiled M64 key-control helper, and require DB518 exactness before any layer-0 consumer runs. If exact, feed that same
 device buffer to a consumer whose HLO proves no input-RMS recomputation; otherwise stop at the boundary result. Do not
 run 8K yet.
+## 2026-09-03 23:03Z — V7 exposed CPU/TPU HLO placement mismatch; V8 candidate CPU-green
+
+Pushed pin `d393a3bf948f732c2e62526ee9dfcd1e61b2d7a3` and its US-CENTRAL2 Git mirror replayed exactly.
+The single Sol-approved V7 tag `greenfield_original_db518_prompt_key_chunk0_20260903T222145752160015Z`
+compiled the normalization helper but failed its first HLO admission before any numerical executable
+invocation. The diagnostic is generation-replayed (16 objects), terminal generation
+`1788475897109185` / SHA `f1d3e3b0…5996`; pre/failure censuses are 8/8 clean. The tag is burned.
+
+Exact diff: CPU StableHLO `3cd10543…a976` and TPU StableHLO `87255de0…683d` differ only by one empty
+single-device `sdy.mesh` line and replicated empty-mesh annotations on the three ENTRY arguments.
+The archived TPU optimized graph also fuses square into reduce, inverse into a second fusion and
+reorders final fusion operands. `docs/artifacts/gate-d-original-db518-v7-tpu-hlo-placement-failure.json`
+is the no-claim record.
+
+V8 locally admits only that exact placement form, records raw and canonical identities, binds the
+TPU optimized ENTRY placement, exact fused square/reduce/inverse lineage and the TPU convolution-
+lowered dot's operands/precision/lineage. Both boundary HLO pairs are archived before admission.
+Mutations of mesh, sharding, arithmetic, constants, operands and precision reject; the archived V7
+TPU normalizer passes, and the convolution recognizer matches the archived V6 TPU projection fusion.
+Full focused suite: 100 passed in 14.90s. Candidate certificate:
+`docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v8-source.json`; immutable staging tree
+`db4f8562…b444`; fresh unstarted tag `…20260903T230151349158445Z`. Review/install/run pending; no 8K.
+
+## 2026-09-03 23:20Z — Sol caught V8 output-liveness hole; corrected batch CPU-green
+
+The first independent Sol V8 batch returned P1/BLOCK for persistence, install and execution: the
+recognized inverse normalization could be dead while the root used a non-inverse reduction, and
+the exact while/dot plus module-wide trigonometric counts did not prove that the returned BF16 key
+used that path. Both attacks were reproduced as optimized-HLO mutations that the old validator
+accepted while the exact StableHLO remained unchanged.
+
+The local correction makes both boundaries output-sensitive. The normalizer requires the exact
+gather→square/reduce→inverse witness to be in semantic ancestry of ENTRY root. The key boundary
+requires one selected while slot 1 (`f32[32,64,128]`) in root ancestry, the exact dot feeding body
+tuple slot 1, and a live cosine/sine fusion whose angle maps only to the positions parameter and
+whose data maps only to the selected while output; direct and tuple-selected fusion outputs are
+handled. The archived V7 TPU normalizer passes, and the archived V6 TPU tuple rotary form identifies
+only the true positions parameter. Dead exact-chain + alternate-live-root attacks now reject.
+
+Focused suite passes 102/102 in 14.67 s; JSON, shell syntax, Python compilation and diff checks pass.
+Refreshed staging tree `419cc7a252332447200cf4da2a60b30e092cadcfe597fad650ced67271d063d6`;
+fresh unstarted tag `greenfield_original_db518_prompt_key_chunk0_20260903T232020879638235Z`.
+Certificate is `docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v8-source.json`. Nothing was
+committed, installed or executed. Exact next: same Sol reviewer delta batch; resolve all P0–P2.
+
+### Sol output-liveness delta approval
+
+The same independent Sol reviewer inspected the correction, certificate, staging and exact commands
+and returned `P0: NONE`, `P1: NONE`, `P2: NONE`, `APPROVE PERSISTENCE`,
+`APPROVE INSTALL ONLY 419cc7a252332447200cf4da2a60b30e092cadcfe597fad650ced67271d063d6`,
+and `APPROVE EXECUTE ONCE greenfield_original_db518_prompt_key_chunk0_20260903T232020879638235Z
+<future merged pin condition>`. No persistence, install or execution had occurred at this record.

@@ -28,27 +28,32 @@ weaken history. Optimizations default off. Targets: useful <=200, strong <=125, 
   plus US-CENTRAL2 mirror before protected work. Never use EU.
 - Report result, percentage and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-03 21:55Z
+## Resume checkpoint — 2026-09-03 23:03Z
 
-Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; accepted
-result code pin `75cbab626f7f2357b05dfab2c988330fabdca484`. Gate D remains open.
+Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; current
+pushed V7 pin `d393a3bf948f732c2e62526ee9dfcd1e61b2d7a3`. Gate D is open.
 
-The original DB518 layer-0 producer uncertainty is closed. After V5 correctly failed publication
-on stale inherited mirror authority, V6 bound and mutation-tested the full rewrite authority tuple.
-Sol approved the batch with no P0–P2; origin and US-CENTRAL2 replay passed; install reported
-`launcher_invoked=false`. Protected tag
-`greenfield_original_db518_prompt_key_chunk0_20260903T213501747141067Z` is bitwise exact across all
-2,048×128 lanes (both SHA `96d261cb…887c`), HLO contracts pass, remote set is 21/21, terminal is
-generation `1788472134581783` / SHA `53fe14e4…ca38`, and pre/post censuses are 8/8 clean. Record:
-`docs/artifacts/gate-d-original-db518-v6-exact-success.json`.
+Accepted V6 proves the original DB518 layer-0 producer bitwise exact for all 2,048×128 lanes (SHA
+`96d261cb…887c`), with exact remote set and 8/8 cleanup; record
+`docs/artifacts/gate-d-original-db518-v6-exact-success.json`. Classification remains producer exact,
+consumer/decoder unproven.
 
-Classification: `ORIGINAL_DB518_PRODUCER_BOUNDARY_REPRODUCED_BITWISE;CONSUMER_UNPROVEN;
-DECODER_UNPROVEN;GATE_D_OPEN`. The large chunk still lowers input RMS differently and misses 256
-token-374 rows. Exact next: compile/complete a separate M2048 normalization helper, feed only its
-finished BF16 device buffer into a separate M64 key-control helper, and require DB518 exactness. Only
-then feed the same buffer into a consumer whose HLO proves no input-RMS recomputation. Stop on the
-first failed boundary; do not run 8K yet. Review the full source/tests/certificate/install/run batch
-with the same Sol thread before persistence or TPU execution.
+V7 tag `…20260903T222145752160015Z` compiled once but stopped before numerical invocation. CPU-sealed
+StableHLO expected `3cd10543…a976`; TPU emitted `87255de0…683d`. An exact diff proves the only
+portable-IR changes are one empty `sdy.mesh` plus replicated empty-mesh annotations on the three
+ENTRY arguments; TPU optimized HLO also uses backend-specific fused square/reduce/rsqrt. Diagnostic
+ledger generation `1788475897109185`, SHA `f1d3e3b0…5996`; pre/failure censuses 8/8. Record:
+`docs/artifacts/gate-d-original-db518-v7-tpu-hlo-placement-failure.json`. No numerical/performance claim.
+
+Sol blocked the first V8 batch because exact optimized normalization and while/dot/rotary witnesses
+could remain dead while an alternate graph fed the root. The local correction now requires the
+inverse chain, selected while slot, exact dot and role-separated live cosine/sine path to reach the
+returned BF16 root. Both demonstrated bypasses reject; archived TPU forms replay; focused suite
+102/102. Sol delta review: no P0–P2; persistence, install-only tree `419cc7a2…3d6` and execute-once
+tag `…20260903T232020879638235Z` approved conditional on the merged pin. Exact next: commit/push,
+same-region mirror, install-only, then the one bounded V8 run. Do not run 8K.
+If exact, build a separate real layer consumer that takes the same completed buffer and whose HLO
+proves no input-RMS recomputation; only then authorize the exact 8K decoder.
 
 ## After Gate D
 
