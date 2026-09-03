@@ -11461,3 +11461,25 @@ q-a-norm weights), checkpoint shard 1 tensors for layer-0 q_b/kv_b/o_proj/post-n
 input norm + indexer wk/k_norm (index-verified), sealed legacy layer-1 cache (target) and layer-0 cache (control:
 the probe's layer-0 keys must be exact). Runs on one isolated 4-chip host under the pod lease; HLO contract binds
 the M=2048 convolutions and the absence of callbacks; results sealed with SHA-256; no decoder/Gate-D claim.
+
+### Probe implementation (CPU-tested, not yet run): chunk-0 legacy-geometry layer-1 prompt keys
+
+- `glm_tpu/greenfield/benchmarking/legacy_prefill_geometry.py`: legacy per-op primitives (dequant `bf16(f32(fp8)*f32
+  (scale))` with block or per-column scales, `bf16[M,K]x bf16[K,N]->f32->bf16` conv at the caller's M, input/post-
+  attention/layer-1 norms with the legacy rounding and residual association, sharded q-a norm with owner-order sum
+  and post-gather weight, FP32 SwiGLU, per-owner partials, pairwise BF16 tree, DB533 row association per row).
+- `legacy_prefill_owner_packing.py`: checkpoint `[out,in]` FP8 → per-owner `[K,N]` operands for the 32 virtual
+  owners (fused q-a/kv-a `[32,6144,82]` with per-column scales; q_b `[32,2048,512]`; absorbed `w_uk_t [32,2,192,512]`
+  / `w_uv [32,2,512,256]` as load-time BF16 dequant with identity post-scale; o_proj `[32,512,6144]`; merged gate/up
+  `[32,6144,768]`; down `[32,384,6144]`), chunk embedding gather.
+- `legacy_prefill_chunk_probe.py`: the composed layer-0 block + layer-0/1 M64 prompt keys for a chunk (rows ≥ 1 use a
+  plain FP32 causal softmax; row 0 exact by construction; softmax scale `256**-0.5`).
+- `scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py` (one 4-chip host; verifies worktree/pin, sealed
+  layer-0 input `574f3553…`, checkpoint index sha, sealed legacy layer-1 cache `d9058cc6…`, DB518 `534bacc5…`;
+  control: layer-0 keys must equal the DB518 layer-0 rows; compares chunk-0 layer-1 keys with the legacy rows and the
+  DB518 greenfield rows; also the one-row variant of row 0; captures optimized HLO/StableHLO; `SUCCESS` only when the
+  control is exact and no callback tokens appear) and `run_probe_layer1_prompt_chunk0_geometry.sh` (lease, 8-host
+  pre/post census, sanitized `env -i` launch, evidence SHA list, append-only upload to `results/<tag>`).
+- Tests: `test_legacy_prefill_geometry.py` (6), `test_legacy_prefill_owner_packing.py` (5),
+  `test_legacy_prefill_chunk_probe.py` (2; CPU run of the full pipeline at real shapes; on CPU the one-row and
+  two-row variants already differ in 5 of 128 lanes of the row-0 layer-1 key — M sensitivity is real).
