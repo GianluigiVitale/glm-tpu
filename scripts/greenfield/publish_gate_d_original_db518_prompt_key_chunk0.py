@@ -22,12 +22,12 @@ from typing import Any
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v1/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v2/"
     "publish_gate_d_original_db518_prompt_key_chunk0.py")
 SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_original_db518_prompt_key_chunk0.py")
 CONTRACT_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v1/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v2/"
     "original_db518_prompt_key.py")
 CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/original_db518_prompt_key.py")
@@ -220,8 +220,30 @@ def _load_contract(code_pin: str) -> types.ModuleType:
     prompt.__file__ = str(REPO / PROMPT_CONTRACT_SOURCE_PATH)
     prompt.__package__ = "glm_tpu.greenfield.validation"
     sys.modules[prompt_name] = prompt
-    exec(compile(prompt_raw, prompt.__file__, "exec"),
-         prompt.__dict__)  # noqa: S102
+    # This publication process uses only the pure-stdlib HLO parser below.
+    # The broader source module imports NumPy for unrelated cache loaders.  Do
+    # not expand the publisher's dependency boundary merely to execute those
+    # definitions: provide a sentinel that makes any accidental numerical use
+    # fail closed while preserving the exact committed parser source.
+    class _ForbiddenPublisherNumpy(types.ModuleType):
+
+        def __getattr__(self, name: str) -> Any:
+            raise RuntimeError(
+                "publisher HLO validation attempted to use NumPy: " + name)
+
+    prior_numpy = sys.modules.get("numpy")
+    forbidden_numpy = _ForbiddenPublisherNumpy("numpy")
+    sys.modules["numpy"] = forbidden_numpy
+    try:
+        exec(compile(prompt_raw, prompt.__file__, "exec"),
+             prompt.__dict__)  # noqa: S102
+    finally:
+        if prior_numpy is None:
+            del sys.modules["numpy"]
+        else:
+            sys.modules["numpy"] = prior_numpy
+    if prompt.__dict__.get("np") is not forbidden_numpy:
+        raise RuntimeError("publisher NumPy sentinel binding drifted")
     contract_name = "glm_tpu.greenfield.validation.original_db518_prompt_key"
     contract = types.ModuleType(contract_name)
     contract.__file__ = str(CONTRACT_PATH)
@@ -828,6 +850,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-source-sha256", required=True)
     parser.add_argument("--run-dir-fd", type=int)
     modes = parser.add_subparsers(dest="mode", required=True)
+    modes.add_parser("preflight")
     init = modes.add_parser("init")
     init.add_argument("--run-dir", type=Path, required=True)
     success = modes.add_parser("success")
@@ -853,7 +876,6 @@ def main() -> int:
     os.umask(0o077)
     arguments = parse_args()
     parent = _load_parent(arguments.expected_code_hash)
-    contract = _load_contract(arguments.expected_code_hash)
     base = parent._load_base(arguments.expected_code_hash)
     base.validate_environment()
     publication_runtime = base.validate_publication_runtime()
@@ -862,6 +884,10 @@ def main() -> int:
     publication_runtime_raw = base._canonical(publication_runtime)
     _verify_running_source(arguments.expected_code_hash,
                            arguments.expected_source_sha256)
+    contract = _load_contract(arguments.expected_code_hash)
+    if arguments.mode == "preflight":
+        print("PUBLISHER_PREFLIGHT_OK", flush=True)
+        return 0
     if arguments.run_dir_fd != 7:
         raise RuntimeError("publisher requires run-directory fd 7")
     if arguments.mode == "init":

@@ -11,7 +11,7 @@ import stat
 from pathlib import Path
 
 root = Path("/opt/glm-tpu/locks")
-launcher = Path("/opt/glm-tpu/bin/launch_gate_d_original_db518_prompt_key_chunk0_v1.py")
+launcher = Path("/opt/glm-tpu/bin/launch_gate_d_original_db518_prompt_key_chunk0_v2.py")
 parent_fd = os.open(root, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW)
 parent = os.fstat(parent_fd)
 if not stat.S_ISDIR(parent.st_mode) or parent.st_uid != 0 or parent.st_gid != 0 or stat.S_IMODE(parent.st_mode) & 0o022:
@@ -137,13 +137,13 @@ readonly ACCEPTED_CACHE_DIR=/home/gianl/gate-d-inputs/original-db518-layer0-prom
 readonly ACCEPTED_CACHE_MANIFEST_SHA=acc631e71148922448eb03c839f71544c80ca00cea47b639bdd80eb34567fdab
 readonly ACCEPTED_CACHE_MANIFEST_FILE_SHA=372d0ad2503860b6fb826045de7d24ca0f22438b8e945af2515e1c8cf3d69c94
 readonly ACCEPTED_CACHE_TENSOR_SHA=36303f0638661b4a56d3c9a1d4023a9b39eb19dbfd6d48e0718c29a45c41c07a
-readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v1
+readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v2
 readonly PROBE=$CAPSULE/probe_original_db518_prompt_key_chunk0.py
 readonly PROBE_SHA=f45025589fad74c08a5b89c2a3c95d5c9b9a097806b53c9a489d5afa7443b71b
 readonly PUBLISHER=$CAPSULE/publish_gate_d_original_db518_prompt_key_chunk0.py
-readonly PUBLISHER_SHA=2f59bcc6d0c2e294689b24f63450dc8981fa56becb8a59cf6c37903d47fc90d6
+readonly PUBLISHER_SHA=1b83edab77aa17eea9607512b2c9474219ccee8f8d16572af64066e4898f3891
 readonly MIRROR_VERIFIER=$CAPSULE/verify_gate_d_original_db518_same_region_git_mirror.py
-readonly MIRROR_VERIFIER_SHA=ba01d5d22d9c449a8b231caa87a147b9fdc128e7efaeff25f179930545d7baf2
+readonly MIRROR_VERIFIER_SHA=44d742e2d8078913128160ee360325454543ae557b48333c2c71ba16cf9d93f3
 readonly SEALED_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12
 readonly SEALED_PYTHON_SHA=021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7
 readonly VACANCY_EXPECTED='ERROR: (gcloud.storage.ls) One or more URLs matched no objects.'

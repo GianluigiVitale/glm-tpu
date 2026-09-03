@@ -6,6 +6,8 @@ import importlib.util
 from io import BytesIO
 import json
 from pathlib import Path
+import subprocess
+import sys
 
 import numpy as np
 
@@ -17,9 +19,9 @@ LAUNCHER = REPO / "scripts/greenfield/launch_gate_d_original_db518_prompt_key_ch
 INSTALLER = REPO / "scripts/greenfield/install_gate_d_original_db518_prompt_key_runtime.py"
 CONTRACT = REPO / "glm_tpu/greenfield/validation/original_db518_prompt_key.py"
 VERIFIER = REPO / "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py"
-CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-source.json"
+CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v2-source.json"
 STAGING = Path(
-    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v1-staging"
+    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v2-staging"
 )
 
 
@@ -76,7 +78,9 @@ def test_mirror_verifier_exact_authority_membership():
     verifier = _load(VERIFIER)
     assert verifier.BOUND_PATHS == (
         "docs/artifacts/gate-d-chunk0-v7-original-db518-boundary-diagnosis.json",
+        "docs/artifacts/gate-d-original-db518-publisher-isolated-import-failure.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-source.json",
+        "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v2-source.json",
         "glm_tpu/greenfield/benchmarking/numpy_safetensors.py",
         "glm_tpu/greenfield/benchmarking/sealed_runtime.py",
         "glm_tpu/greenfield/kernels/reference/dsa.py",
@@ -112,6 +116,46 @@ def test_wrapper_is_one_producer_only_and_binds_rehydrated_input():
     assert "TPU_VISIBLE_DEVICES=0,1,2,3" in source
     assert "strict_census pre" in source and "strict_census post" in source
     assert source.count("vacancy_three_surfaces") == 2
+
+
+def test_launcher_preflights_exact_publisher_before_tag_directory_creation():
+    source = LAUNCHER.read_text()
+    assert source.index("_preflight_publisher(pin)") < source.index(
+        "run_fd = _create_retained_run_fd(tag)")
+    launcher = _load(LAUNCHER)
+    assert launcher.SEALED_PYTHON == Path(
+        "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12")
+    assert "preflight" in source
+
+
+def test_publisher_contract_loads_in_isolated_no_site_runtime():
+    pin = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip()
+    program = (
+        "import runpy; from pathlib import Path; "
+        f"p=runpy.run_path({str(PUBLISHER)!r}); "
+        "p['_load_contract'].__globals__['CONTRACT_PATH']="
+        f"Path({str(CONTRACT)!r}); "
+        f"c=p['_load_contract']({pin!r}); "
+        "print(c.ORIGINAL_DB518_CODE_HASH)"
+    )
+    result = subprocess.run(
+        [sys.executable, "-I", "-S", "-B", "-c", program],
+        cwd="/",
+        env={
+            "HOME": "/home/gianl",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "PYTHONDONTWRITEBYTECODE": "1",
+        },
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert result.stdout == "86243115452920fe4244bb77a9bbf4c44110aeab\n"
+    assert result.stderr == ""
 
 
 def test_probe_treats_nonexact_as_completed_discriminator():

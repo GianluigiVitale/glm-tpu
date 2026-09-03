@@ -13,9 +13,13 @@ from hashlib import sha256
 from pathlib import Path
 
 INSTALL_PATH = Path(
-    "/opt/glm-tpu/bin/launch_gate_d_original_db518_prompt_key_chunk0_v1.py")
+    "/opt/glm-tpu/bin/launch_gate_d_original_db518_prompt_key_chunk0_v2.py")
 PYTHON = Path("/usr/bin/python3.10")
 PYTHON_SHA256 = "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
+SEALED_PYTHON = Path(
+    "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12")
+SEALED_PYTHON_SHA256 = (
+    "021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7")
 WORKTREE = Path("/home/gianl/glm-tpu-topology-rewrite")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 BRANCH = "rewrite/topology-first-decode"
@@ -23,9 +27,9 @@ ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/launch_gate_d_original_db518_prompt_key_chunk0.py"
 WRAPPER_PATH = WORKTREE / "scripts/greenfield/run_original_db518_prompt_key_chunk0.sh"
 WRAPPER_SOURCE_PATH = "scripts/greenfield/run_original_db518_prompt_key_chunk0.sh"
-WRAPPER_SHA256 = "2877f5c7de579327afc2f28fb357490d65146dd5055ffb725c9cf311b268b608"
+WRAPPER_SHA256 = "b08a094c3eebfa21db694833f8210a2bf1cd582474936690286581dfc3eb7f70"
 CAPSULE_ROOT = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v1")
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v2")
 HLO_CONTRACT_PATH = CAPSULE_ROOT / "original_db518_prompt_key.py"
 HLO_CONTRACT_SOURCE_PATH = "glm_tpu/greenfield/validation/original_db518_prompt_key.py"
 HLO_CONTRACT_SHA256 = "056500262426a07b5258c41d8750c09f9eee2301073f884575db794772c4021c"
@@ -34,10 +38,10 @@ PROBE_SOURCE_PATH = "scripts/greenfield/probe_original_db518_prompt_key_chunk0.p
 PROBE_SHA256 = "f45025589fad74c08a5b89c2a3c95d5c9b9a097806b53c9a489d5afa7443b71b"
 PUBLISHER_PATH = CAPSULE_ROOT / "publish_gate_d_original_db518_prompt_key_chunk0.py"
 PUBLISHER_SOURCE_PATH = "scripts/greenfield/publish_gate_d_original_db518_prompt_key_chunk0.py"
-PUBLISHER_SHA256 = "2f59bcc6d0c2e294689b24f63450dc8981fa56becb8a59cf6c37903d47fc90d6"
+PUBLISHER_SHA256 = "1b83edab77aa17eea9607512b2c9474219ccee8f8d16572af64066e4898f3891"
 MIRROR_VERIFIER_PATH = CAPSULE_ROOT / "verify_gate_d_original_db518_same_region_git_mirror.py"
 MIRROR_VERIFIER_SOURCE_PATH = "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py"
-MIRROR_VERIFIER_SHA256 = "ba01d5d22d9c449a8b231caa87a147b9fdc128e7efaeff25f179930545d7baf2"
+MIRROR_VERIFIER_SHA256 = "44d742e2d8078913128160ee360325454543ae557b48333c2c71ba16cf9d93f3"
 LOCK_ROOT = Path("/opt/glm-tpu/locks")
 LOCK_NAMES = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")
 LOCK_FDS = (11, 12)
@@ -181,6 +185,49 @@ def _create_sealed_wrapper(raw: bytes) -> int:
         raise
 
 
+def _preflight_publisher(pin: str) -> None:
+    """Exercise the exact isolated publisher before a tag directory exists."""
+
+    _require_root_boundary(SEALED_PYTHON)
+    if sha256(
+            _read_stable_regular(
+                SEALED_PYTHON,
+                expected_uid=0,
+                expected_gid=0,
+                expected_mode=0o755)).hexdigest() != SEALED_PYTHON_SHA256:
+        raise RuntimeError("publisher preflight Python runtime drifted")
+    result = subprocess.run(
+        [
+            str(SEALED_PYTHON),
+            "-I",
+            "-S",
+            "-B",
+            str(PUBLISHER_PATH),
+            "--expected-code-hash",
+            pin,
+            "--expected-source-sha256",
+            PUBLISHER_SHA256,
+            "preflight",
+        ],
+        cwd="/",
+        env={
+            "HOME": "/home/gianl",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "PYTHONDONTWRITEBYTECODE": "1",
+        },
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=120,
+    )
+    if (result.returncode != 0 or result.stdout != b"PUBLISHER_PREFLIGHT_OK\n"
+            or result.stderr):
+        raise RuntimeError(
+            "publisher isolated-runtime preflight failed: " +
+            result.stderr.decode("utf-8", errors="replace"))
+
+
 def _open_locked_fds() -> list[int]:
     parent_fd = os.open(
         LOCK_ROOT, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW)
@@ -314,6 +361,7 @@ def main() -> int:
             raise RuntimeError(
                 f"protected {label.lower()} is not the expected committed blob"
             )
+    _preflight_publisher(pin)
     wrapper_fd = _create_sealed_wrapper(wrapper_raw)
     lock_fds = _open_locked_fds()
     run_fd = _create_retained_run_fd(tag)
