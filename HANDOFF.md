@@ -11337,3 +11337,44 @@ Mirror verifier for tooling `b37c2926`: checkout archive `7797cb59eeec302355eb4d
 fsck true, origin exact; mirror carries rewrite `4623a4e2`; pod READY/HEALTHY; cron tick 00:05:23Z; launched
 00:07:48Z from the rewrite worktree at `4623a4e2` with `GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID=1
 GLM_GREENFIELD_PROMPT_CACHE_RUNTIME=layer1_observer_bundle`. Result pending below.
+
+## 2026-09-03 01:15Z — legacy layer-1 prompt index cache captured and compared: every greenfield prompt row differs at BF16-ulp level
+
+Legacy oracle tag `greenfield_legacy_layer1_prompt_index_cache_20260903T000356727206404Z` (rewrite pin `4623a4e2`,
+runtime = observer branch tip `c7973435`, slot 2): launched 00:07:48Z, legacy runtime up 00:08:55Z, passkey item
+00:09:33Z, dumps gathered 01:01:39Z (483 top-k + 8 cache files, DB run 566 item 1870), sealed 01:02:26Z, SUCCESS
+01:03:35Z, census post 8/8. Sealed cache: manifest `d9058cc6584aca784212706789e72b4981754cb9880e553122b5e854bc3961ac`,
+tensor `afe683d85e5b62ea4060388279ba833e621eb09be63ef668f7e00b9f762552ec`, bits sha `8d656d71…`, remote
+`gs://driftbench-dsv4-uc/oracles/greenfield/glm52/prompt_index_cache/8k/<tag>/prompt_index_cache/`. SUCCESS
+(`0fcf18e7a42a1db066e0b53940013581ded35098e58978b83f968e78c54a5f69`) records `prompt_index_cache_layer_id=1 cache_slot=2 legacy_runtime=layer1_observer_bundle
+legacy_runtime_pin=c7973435…`. The prompt-cache mode writes no DSA-event exactness field itself; offline,
+`compare_short_context_dsa_oracles(sealed 8K oracle f8154c5f…, this run's fresh oracle ce4cf4e5…)` is **exact: True**
+for all five arrays (all 14 decode steps × 21 events) — `/home/gianl/glm-run/greenfield_legacy_layer1_prompt_index_cache_20260903T000356727206404Z/dsa_exact_comparison_offline.json` (`770415668e5963a9c62c040e8eec1cf927a760b26329f0208dee6660fbbb7b15`) — so the
+tombstone-pin runtime reproduced the accepted oracle bitwise.
+
+Offline comparison (`scripts/greenfield/compare_layer1_prompt_index_cache_offline.py`, capsule
+`docs/artifacts/gate-d-layer1-prompt-cache-legacy-vs-db518.json` sha `e16ccac0c63d04e0e1b32442255d5ae2868605dca8945eb760b6212b2a0058ce`), classification
+`LAYER1_PROMPT_INDEX_CACHE_8155_OF_8155_ROWS_MISMATCH;LEGACY_CACHE_REPRODUCES_ORACLE_EVENT1;CPU_EVIDENCE_ONLY;…`:
+- Authentication: the legacy cache under the legacy layer-1 query/head weights/current key reproduces the sealed
+  oracle's event-1 set exactly (0/0).
+- Legacy vs greenfield (DB518 capture `534bacc5…`) layer-1 prompt cache: **8,155 of 8,155 rows differ**, 173,125 of
+  1,043,840 BF16 lanes (16.6%); per row min 4 / median 21 / max 50 lanes of 128; every legacy prefill chunk
+  (2048/2048, 2048/2048, 2048/2048, 2011/2011) and every 512-row page; first mismatched position 0 (47 lanes),
+  last 8154. Magnitude: 79% of mismatched lanes differ by exactly 1 BF16 ulp, 8.6% by 2, a thin tail reaches
+  hundreds of ulps only where the key value is near zero; max |Δ| 0.03125, mean |Δ| 2.05e-4.
+Reading: a pervasive rounding-level deviation of the layer-1 prompt keys in every row from position 0 onward — not a
+chunk-boundary, attention-window or paging artifact. The same key path (physical-M64 prompt-key repair + k_norm)
+made the layer-0 prompt cache exact for all 8,155 rows, so the prompt-row **residual stream entering layer 1**
+(the layer-0 block computed per prompt row by the teacher-forced scan with decode-step arithmetic, versus the legacy
+batched 2,048-row prefill) is the prime suspect; position 0, where attention reduces to a single key, points at the
+row-wise arithmetic (projections, o_proj/StrategyND, dense MLP, norms, residual adds) rather than at attention over
+many positions. Not yet proven on TPU. The DB518 cache comes from the PP16 feature-2 program; the live decoder's
+layer-1 cache differs from it in at most ~52 positions (score residual analysis), which cannot explain 8,155 rows.
+
+Consequence for Gate D: exact DSA selected sets at 8K require legacy-prefill-exact prompt caches for all 21 indexer
+layers, i.e. a greenfield prefill whose per-row arithmetic matches the legacy batched prefill — the decode-step
+numerics are legacy-exact through layer 1 and are no longer the blocker. Next admissible evidence (bounded, one
+Sol batch): capture legacy layer-1 prompt-row internals at one prompt position (p0 or p113: residual input,
+normalized hidden, key) through the existing legacy internals machinery generalized to layer 1, and compare with the
+greenfield teacher-forced row to localize the first diverging sub-boundary of the layer-0 block; then decide the
+prefill plan. No protected 8K decoder launch.

@@ -36,20 +36,19 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-03 01:10Z
+## Resume checkpoint — 2026-09-03 01:15Z
 
-Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical`; run pin = rewrite merge (HANDOFF tail). Three 8K runs
-with `GLM_GREENFIELD_RMS_ACCEPTED_SCHEDULE=1`: token exact, event 0 exact, **event 1 = 7 mismatches (same
-set)** — decode-side norm hypothesis exhausted. CPU capsule
-`docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-diagnosis.json`: live/bounded reduce fusions
-byte-identical; legacy layer-1 query/head-weights/current-key over the greenfield DB518 layer-1 prompt
-cache reproduces the device selection exactly (0/0) and the oracle's 7/7 swaps → the **layer-1 prompt
-index cache built by the teacher-forced prefill is a sufficient cause of the event-1 mismatch** (decode-side
-exactness not proven). Do NOT launch the 8K decoder. Next: Sol re-review of the round-24 fixes, then one
-legacy oracle capture `GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID=1 bash
-scripts/greenfield/run_capture_legacy_prompt_index_cache.sh` (legacy slot 2 = 2·layer; sealing fails
-closed on any other geometry), then `compare_layer1_prompt_index_cache_offline.py` against DB518
-`result.npz` `534bacc5…` → row mismatch map → prefill plan. Sealed layer-0 DSA input restored (HANDOFF).
+Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical`; run pin = rewrite merge `4623a4e2`. Decode-side norm hypothesis
+exhausted (3 runs, event 1 = 7 mismatches). CPU capsule `docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-
+diagnosis.json`: greenfield layer-1 prompt cache is a sufficient cause of the event-1 mismatch. Legacy layer-1 prompt
+cache captured (tag `…20260903T000356727206404Z`, bundle runtime `c7973435`, fresh DSA events bitwise equal to the
+sealed oracle) and compared (`docs/artifacts/gate-d-layer1-prompt-cache-legacy-vs-db518.json`): **8,155/8,155 rows
+differ, 16.6% of lanes, 79% by one BF16 ulp, from position 0 in every chunk**; legacy cache reproduces the oracle
+event-1 set. Reading: the teacher-forced scan produces prompt-row residuals with decode arithmetic; the legacy used a
+batched 2,048-row prefill. Gate D therefore needs a legacy-prefill-exact prompt residual stream for all indexer layers.
+Do NOT launch the 8K decoder. Next (one Sol batch): generalize the legacy internals capture to layer 1 at a prompt
+position (p0/p113: residual input, normalized hidden, key) and compare with the greenfield teacher-forced row to find
+the first diverging sub-boundary of the layer-0 block; then decide the prefill plan. Sealed layer-0 DSA input restored.
 
 ## Finish (after Gate D)
 
