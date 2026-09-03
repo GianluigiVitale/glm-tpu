@@ -3629,3 +3629,9 @@ persistence only; review and persistence precede any v2 installation.
   them by one BF16 ulp, from position 0 in every chunk. Classification:
   `LAYER1_PROMPT_INDEX_CACHE_8155_OF_8155_ROWS_MISMATCH;LEGACY_CACHE_REPRODUCES_ORACLE_EVENT1;CPU_EVIDENCE_ONLY;
   NO_GATE_D_NO_DECODER_NO_DB_NO_PERFORMANCE_CLAIM;GATE_D_OPEN`.
+- Bounded chunk-0 legacy-geometry probe (source only, **never executed**): tooling `c92b24cf`, rewrite merge
+  `f204223e`; 28 CPU tests; sealed-interpreter boot verified to the TPU gate. Sol rounds 29–31 blockers fixed; round 32
+  leaves three open P1s on execution provenance (mutable launch pathname, vacancy not re-proven before publication,
+  run directory not held by a no-follow FD). Composed tag `…20260903T022131838688366Z` unused and unapproved; compose
+  a fresh tag. Classification: `PROBE_SOURCE_REVIEWED;EXECUTION_BLOCKED_ON_PROVENANCE_CAPSULE;NO_TPU_EXECUTION;
+  NO_CLAIM;GATE_D_OPEN`.

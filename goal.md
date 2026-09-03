@@ -36,18 +36,22 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-03 01:45Z
+## Resume checkpoint — 2026-09-03 02:30Z (then read the HANDOFF tail)
 
-Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical`; run pin = rewrite merge `660d7f6e`. Decode side is legacy-exact
-through layer 1; **the blocker is the prompt-row residual stream**: legacy layer-1 prompt cache (sealed
-`…20260903T000356727206404Z`, events exact vs oracle) differs from the greenfield cache in 8,155/8,155 rows at BF16-ulp
-level, flat from position 0 (`docs/artifacts/gate-d-layer1-prompt-cache-legacy-vs-db518.json`). Legacy prefill HLO
-runs every prompt-row op at M=2048 per owner; greenfield prompt paths use one-row decode forms. Implemented (CPU-
-tested, commit `c8038c30`): legacy-geometry primitives, TP32 owner packing, chunk pipeline, one-host probe
-`scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh` under the sealed Gate-D runtime (row 0 decisive;
-control = layer-0 keys exact). Sol rounds 29/30 blockers fixed. Pending: Sol round 31, mirror verifier, then ONE run
-with tag `greenfield_layer1_prompt_chunk0_geometry_20260903T020752971737986Z`; record row-0 result in HANDOFF. Do NOT launch
-the 8K decoder. Options A (prefill-faithful prompt path) / B (oracle re-seal) are the owner's call (HANDOFF).
+**Gate-D blocker moved from decode to prefill.** Decode numerics are legacy-exact through layer 1 (three 8K runs:
+token exact, event 0 exact, event 1 = 7; the RMS-schedule hypothesis is closed). CPU capsules
+`docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-diagnosis.json` and
+`…/gate-d-layer1-prompt-cache-legacy-vs-db518.json`: the legacy layer-1 prompt cache is captured on TPU (fresh DSA
+events bitwise equal the sealed oracle) and **8,155/8,155 greenfield prompt rows differ**, 16.6% of BF16 lanes, 79%
+by one ulp, flat from position 0. Hypothesis: legacy computes prompt rows at M=2048 per owner; greenfield uses
+one-row decode forms.
+
+Pins: tooling `c92b24cf94bdcd4b0d0570aa7530c8b2c7194c34`, rewrite merge `f204223e4b8c16f657041da870b91d133e1ef663`
+(pushed, mirrored, verifier passed). Pod READY/HEALTHY, no lease, nothing in flight.
+
+Next: finish the bounded **chunk-0 legacy-geometry probe** (row 0 decisive; control = layer-0 keys equal DB518).
+Source + 28 CPU tests done; Sol round 32 leaves three open P1s on execution provenance — fix per HANDOFF
+"2026-09-03 02:30Z". Then one Sol batch and one run with a **fresh** tag. Do NOT launch the 8K decoder.
 
 ## Finish (after Gate D)
 

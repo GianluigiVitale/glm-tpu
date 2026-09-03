@@ -11555,3 +11555,41 @@ the M=2048 convolutions and the absence of callbacks; results sealed with SHA-25
   DB518 `result.npz` loaded from the snapshotted bytes).
 - Tests: 28 passed across the probe suites, including the executed census regression and a regression that builds the
   sealed archive from this repository's HEAD and imports a project module from `/proc/self/fd/<n>`.
+
+## 2026-09-03 02:30Z — session end state: probe blocked on execution-provenance hardening (Sol round 32)
+
+Pins now: tooling `c92b24cf94bdcd4b0d0570aa7530c8b2c7194c34` (branch `tooling/gate-d-compensated-pp16-numerical`),
+rewrite merge `f204223e4b8c16f657041da870b91d133e1ef663` (= `086d459a` + tooling `c92b24cf`, rewrite goal.md
+byte-identical to `086d459a`), both pushed and mirrored; sealed same-region mirror verifier passes for `c92b24cf`
+(checkout archive `781a8244ad6ada98e9e99635adeb29b7423e7964ef2e06010d05d8875e1228a5`, fsck true, origin exact record);
+pod `db-v4-64-od` READY/HEALTHY; no TPU work in flight; no lease held.
+
+Composed tag `greenfield_layer1_prompt_chunk0_geometry_20260903T022131838688366Z` was **never started and never
+approved for execution** (Sol blocked). Per the burned-tag rule do not reuse it: compose a fresh tag for the next
+attempt and obtain `APPROVE EXECUTE ONCE <fresh tag> <merged pin>`.
+
+**Sol round 32 (verbatim, three P1s, all still open):**
+1. `run_probe_layer1_prompt_chunk0_geometry.sh:225` — Python executes the mutable pathname before the probe verifies
+   that pathname; a same-UID swap-and-restore can execute non-committed code while passing the later self-check.
+   Execute authenticated bytes from a sealed retained FD or an immutable root-owned file.
+2. `run_probe_layer1_prompt_chunk0_geometry.sh:118` — remote history vacancy is checked only before the (hour-long)
+   probe and never repeated before upload; concurrent create/delete can introduce noncurrent or soft-deleted
+   generations while the final live-only set check still passes.
+3. `run_probe_layer1_prompt_chunk0_geometry.sh:137` — the run directory is not retained by a no-follow directory FD
+   and later evidence writes/uploads reopen mutable pathnames, permitting same-UID substitution and false publication.
+
+Fix direction (matches the accepted Gate-D capsules, see `scripts/greenfield/run_gate_d_layer1_rms_schedule.sh` and
+`/usr/local/libexec/glm-tpu/gate-d-layer1-rms-schedule-v3/`): install the probe + publisher as a root-owned immutable
+capsule under `/usr/local/libexec/glm-tpu/<name>/` (installer pattern:
+`scripts/greenfield/install_gate_d_layer1_rms_schedule_runtime.py`), launch it by that immutable path with the sealed
+interpreter, retain the run directory with `exec 7<"$RUN_DIR"` plus a `stat -Lc '%d:%i'` identity check and a
+publisher that writes every member through `dir_fd=7` (`publish_gate_d_layer1_rms_schedule.py` is the model), and
+re-run the three-surface vacancy immediately before publication as well as before the run. Sol rounds 29–32 covered
+digest binding, the M64-keyed one-row arm, sealed sites/interpreter, committed-blob imports, census self-matching and
+descriptor-snapshotted inputs; those are done and should not be re-litigated.
+
+Probe science (unchanged and reviewed): `legacy_prefill_geometry.py`, `legacy_prefill_owner_packing.py`,
+`legacy_prefill_chunk_probe.py`, probe `probe_layer1_prompt_chunk0_geometry.py`, runner
+`run_probe_layer1_prompt_chunk0_geometry.sh`; 28 CPU tests pass; the committed probe boots under the sealed
+interpreter through self-verification, sealed archive, runtime/site validation and imports, stopping exactly at
+`probe requires TPU, got cpu`.
