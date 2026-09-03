@@ -11378,3 +11378,24 @@ Sol batch): capture legacy layer-1 prompt-row internals at one prompt position (
 normalized hidden, key) through the existing legacy internals machinery generalized to layer 1, and compare with the
 greenfield teacher-forced row to localize the first diverging sub-boundary of the layer-0 block; then decide the
 prefill plan. No protected 8K decoder launch.
+
+### Deviation profile and the legacy prefill geometry (offline, 01:40Z)
+
+- Per-row mismatch of the layer-1 prompt keys is flat: mean 21 of 128 lanes in every 128-row bin from position 1 to
+  8154, per legacy chunk 21.4/21.3/21.0/21.1, correlation with position or position-within-chunk ≈ 0; only position 0
+  is an outlier (47 lanes). Not an attention-length, chunk-boundary or paging effect → row-wise arithmetic.
+- Accepted legacy prefill step HLO (`prompt_projection_lowering` oracle `…20260809T105858202006975Z`,
+  `jit_step_fun_impl.m64.owner0.after_codegen_hlo.txt.gz`, 84 MB, entry `%main.1792_spmd`, per model-parallel owner):
+  156 convolutions → `f32[2048,6144]`, 78 → `f32[2048,82]` (the fused q-a/kv-a shard width, M=2048 rows), 78 →
+  `f32[2048,512]`, 78 → `f32[2,2048,512]`, 156 → `f32[64,64,512]`, 78 → `f32[2,256,2048]`, 75 → `f32[2048,128]`,
+  75 → `bf16[2048,256]`, 3 → `f32[2048,768]` (dense gate/up per shard), and for the 21 indexer layers `f32[64,128]`
+  (wk over `bf16[64,6144]`), `f32[64,32]`, `f32[64,4096]`, `f32[64,512,32]`; 540 `tpu_custom_call` (Pallas
+  attention/scatter), reduces `f32[2048]` ×235 (norm variances over 2,048 rows), `f32[64,64]` ×156, `f32[64]` ×120.
+  So the legacy computes every prompt-row projection, MLP and norm in 2,048-row batches (index keys in 64-row groups,
+  which the greenfield already reproduces via `physical_m64_chunk`), while the teacher-forced scan uses the
+  single-row decode forms. XLA's tiling/accumulation for M=2048 differs from M=1/M32 at rounding level.
+- Plan: (1) read the layer-0 block of the legacy prefill HLO (op order, fusion boundaries, dtypes) offline; (2) one
+  bounded greenfield TPU probe computing the layer-1 prompt key for prompt row 0 (attention over a single key is
+  trivial) with the layer-0 block in legacy M=2048 geometry versus the decode form, compared bitwise with the sealed
+  legacy row 0 (currently 47 lanes off) — confirms or refutes the geometry mechanism without another legacy capture;
+  (3) then rows ≥1, which additionally need the legacy prefill attention arithmetic (Pallas custom call).
