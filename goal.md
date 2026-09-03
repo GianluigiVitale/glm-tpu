@@ -46,7 +46,7 @@ by one ulp, flat from position 0. Hypothesis: legacy computes prompt rows at M=2
 one-row decode forms.
 
 Pins: tooling `c92b24cf94bdcd4b0d0570aa7530c8b2c7194c34`, rewrite merge `f204223e4b8c16f657041da870b91d133e1ef663`
-(pushed, mirrored, verifier passed). Pod READY/HEALTHY, no lease, nothing in flight.
+(pushed, mirrored, verifier passed). Pod READY/HEALTHY; no lease.
 
 Next: finish the bounded **chunk-0 legacy-geometry probe** (row 0 decisive; control = layer-0 keys equal DB518).
 Source + 28 CPU tests done; Sol round 32 leaves three open P1s on execution provenance — fix per HANDOFF
