@@ -36,24 +36,20 @@ strong <=125, stretch <=100.
 ## Resume checkpoint — 2026-09-03
 
 Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`, last pushed
-tip `a43f6a2…`; pod READY/HEALTHY and no known workload. Three accepted schedule runs exist: only the
-last two keep event 0 exact and leave 7 identical event-1 swaps. Offline substitution proves the
-greenfield layer-1 **prompt cache is sufficient** for those swaps, not that decode-side arithmetic
-is exact (`DECODE_SIDE_EXACTNESS_NOT_PROVEN`). Legacy layer-1 prompt cache differs on 8155/8155 rows.
+tip `d549cdd…`; pod READY/HEALTHY, no TPU work. The last two 8K runs have exact token/event 0 and
+seven identical event-1 swaps. Offline substitution proves the greenfield layer-1 **prompt cache is
+sufficient** for those swaps, not decode-side exactness (`DECODE_SIDE_EXACTNESS_NOT_PROVEN`); the
+legacy layer-1 cache differs on 8155/8155 rows.
 
-Active test: one 4-chip chunk-0 legacy-prefill probe; row 0 is decisive, rows 1+ diagnostic only.
-Sol rounds 29–31 cleared science/input/sealed-runtime/census controls. Round 32
-blocked mutable execution/vacancy/run-dir provenance. The capsule fixes these. First re-review found
-two residual P1s; the delta now creates/retains fd 7 in the launcher and independently hash-binds
-three reference slices plus exact layer-0 control. Forced-CPU suite: 29 passed. Nothing installed;
-no TPU run; tags `…022131838688366Z` and `…113530293108901Z` are burned. Gate D open.
-
-Sol approved the round-32 delta; source `526efffc…` and record `86455fa…` are pushed. Pre-install
-check caught the reused mirror verifier was hard-coded to the tooling branch. A rewrite-specific
-immutable adapter plus test is CPU-green (30 passed); no install/run. Tag `…120750596552366Z` is
-retired. Exact next: narrow Sol delta review, commit/push/mirror, install, 8/8 preflight, execute
-once with `…122749038361895Z`. If row 0 exact, integrate the proven prefill geometry and
-run the next smallest exactness check before 8K. If nonexact, use archived arrays/HLO to localize it.
+Active test is one 4-chip chunk-0 legacy-prefill probe; row 0 decides geometry. Sol cleared its
+science/provenance chain and rewrite-mirror adapter. V1 installed without launch, but tag
+`…122749038361895Z` failed closed before TPU: wrapper confused canonical manifest self-hashes with
+raw JSON SHAs (`574f…` vs `bd06…`; legacy `d905…` vs `c11b…`). Published/local tensors are exact.
+Tag burned; remote vacant. The narrow fix keeps both hash domains, has a real-artifact regression,
+31 CPU tests passing, and preserves v1 while staging launcher v2 (`1eb43b8f…`). Fable-max is
+quota-exhausted. Exact next: one Sol batch; if approved commit/push/mirror, install v2, 8/8 preflight,
+execute fresh tag `…130504318767505Z`. Then integrate only a proven geometry or use archived HLO/
+arrays to localize the next boundary. Do not launch 8K yet. Gate D open.
 
 ## After Gate D
 

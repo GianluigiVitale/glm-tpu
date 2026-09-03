@@ -13,7 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 
 INSTALL_PATH = Path(
-    "/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v1.py"
+    "/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v2.py"
 )
 PYTHON = Path("/usr/bin/python3.10")
 PYTHON_SHA256 = "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
@@ -24,7 +24,7 @@ ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py"
 WRAPPER_PATH = WORKTREE / "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
 WRAPPER_SOURCE_PATH = "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
-WRAPPER_SHA256 = "e9b2111191444dcb03bc4dad02fdfd5900e6fa49aa6fc2752dd3d7d82af28b0a"
+WRAPPER_SHA256 = "b00e22786fc8464c90e505e8d350b27e86539223f2a65fdfa1be67d83e6d1cfb"
 CAPSULE_ROOT = Path(
     "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v1"
 )

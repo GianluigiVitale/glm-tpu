@@ -3677,3 +3677,16 @@ persistence only; review and persistence precede any v2 installation.
   `…120750596552366Z` is retired because code changed; proposed replacement `…122749038361895Z` is unstarted.
 - Classification: `PREINSTALL_FAIL_CLOSED_INTEGRATION_BUG_FIXED;REWRITE_MIRROR_DELTA_REVIEW_PENDING;
   INSTALL_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;NO_CLAIM;GATE_D_OPEN`.
+
+## 2026-09-03 — chunk-0 v1 preflight refusal and manifest hash-domain repair
+
+- Sol approved the rewrite-mirror delta; commit `d549cddac627210e77211d3017b8fa04cc8a74e7` was pushed and mirrored.
+  Install-only completed with `launcher_invoked=false`. Tag `…122749038361895Z` failed closed before TPU because the
+  wrapper used canonical manifest self-hash `574f3553…` as the raw `manifest.json` SHA (`bd06714e…`). The legacy
+  manifest has the analogous domains `d9058cc6…` / `c11b238e…`. Published copies prove the local bytes are exact.
+- The tag is burned; remote prefix remains vacant; no TPU initialized. The repair adds separate raw-file SHA constants
+  while retaining the self-hashes for loader validation, plus a real-artifact regression. Existing v1 stays immutable;
+  proposed v2 staging tree is `1eb43b8fe476b0df1583a23726aa173773e95ed5af2264d98c7bad04ca281ba5` and
+  fresh tag is `greenfield_layer1_prompt_chunk0_geometry_20260903T130504318767505Z`. CPU suite: 31/31, 37.83 s.
+- Fable-max was quota-exhausted; Sol fallback review pending. Classification:
+  `FAILED_CLOSED_BEFORE_TPU;MANIFEST_HASH_DOMAINS_SEPARATED_CPU_VALIDATED;SOL_REVIEW_PENDING;NO_CLAIM;GATE_D_OPEN`.

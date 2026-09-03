@@ -11667,3 +11667,21 @@ worktree/branch/bound paths, and delegates the full origin/ref/fsck/archive/blob
 certificate and staging tree are repinned. Forced-CPU suite passes 30/30 in 37.90 s; certificate SHA `736dd1fd…`,
 staging tree `1c9ac651…`. Tag `…120750596552366Z` is retired; replacement `…122749038361895Z` is unstarted and
 requires one narrow delta approval. Gate D remains open.
+
+### 2026-09-03 13:05Z — first v1 launch failed closed before TPU: manifest hash domains confused
+
+Sol approved the mirror-adapter delta (staged SHA `5c178ef9…`, no P0/P1/P2); commit `d549cdda…` was pushed and the
+US-CENTRAL2 mirror ref matched it. Provision/install succeeded with staging tree `1c9ac651…` and explicitly reported
+`launcher_invoked=false`. The one approved launch with tag `…122749038361895Z` then refused before vacancy, census
+or TPU initialization: the wrapper compared the layer-0 manifest's canonical self-hash `574f3553…` to the raw JSON
+bytes, whose SHA is `bd06714e…`. The legacy layer-1 manifest had the same latent error (`d9058cc6…` self-hash versus
+raw SHA `c11b238e…`) and would have failed next. Two same-region published copies and the local artifact are
+byte-identical (tensor `be643e33…`, raw manifest `bd06714e…`), so this is wrapper integration, not corruption. Tag
+`…122749038361895Z` is burned; its remote prefix stayed vacant and no TPU work occurred.
+
+Narrow repair: preserve both canonical self-hashes for the digest-bound loaders; add distinct raw-file SHA constants
+used only by the wrapper's byte preflight. A real-artifact regression independently recomputes both domains and binds
+the exact wrapper expressions. Preserve installed v1; provision an install-v2 source and new immutable launcher v2
+that reuses the unchanged v1 capsule. Focused CPU suite passes 31/31 in 37.83 s; v2 staging tree `1eb43b8f…`; fresh
+proposed tag `…130504318767505Z`. Fable-max was requested after the failure but was quota-exhausted; one Sol fallback
+batch review is required before persistence/install/launch. Gate D remains open.

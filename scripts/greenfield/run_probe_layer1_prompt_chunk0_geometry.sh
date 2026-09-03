@@ -11,7 +11,7 @@ import stat
 from pathlib import Path
 
 root = Path("/opt/glm-tpu/locks")
-launcher = Path("/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v1.py")
+launcher = Path("/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v2.py")
 parent_fd = os.open(root, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW)
 parent = os.fstat(parent_fd)
 if not stat.S_ISDIR(parent.st_mode) or parent.st_uid != 0 or parent.st_gid != 0 or stat.S_IMODE(parent.st_mode) & 0o022:
@@ -132,12 +132,14 @@ readonly BUCKET=gs://driftbench-dsv4-uc
 readonly LOCATION=US-CENTRAL2
 readonly INPUT_DIR=/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z
 readonly INPUT_MANIFEST_SHA=574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e2a4914b73141
+readonly INPUT_MANIFEST_FILE_SHA=bd06714ebfe5177b8466778e2bc33ef262544dced48adcfc5739be37ac6488b9
 readonly CHECKPOINT_ROOT=/home/gianl/gcs-models/models/GLM-5.2-FP8
 readonly CHECKPOINT_INDEX_SHA=e0fe7f28c1f853d4824e4d796374e3dacf1fe470988773952c79b063768134bf
 readonly WEIGHT_DIGESTS=$WORKTREE/docs/artifacts/gate-d-chunk0-probe-weight-digests.json
 readonly WEIGHT_DIGESTS_SHA=5a49ab9a8c6a6dc7ee41cf104856e4709c849b0c42cb68d00e52c33241552463
 readonly LEGACY_LAYER1_CACHE_DIR=/home/gianl/glm-run/greenfield_legacy_layer1_prompt_index_cache_20260903T000356727206404Z/prompt_index_cache
 readonly LEGACY_LAYER1_MANIFEST_SHA=d9058cc6584aca784212706789e72b4981754cb9880e553122b5e854bc3961ac
+readonly LEGACY_LAYER1_MANIFEST_FILE_SHA=c11b238edfb7efb4f807e397cbf70ea72a7569574029e68afb46a370d4b30193
 readonly DB518_RESULT=/home/gianl/glm-run/greenfield_pp16_feature2_layer0_db518_numerical_20260829T115022665987633Z/result.npz
 readonly DB518_RESULT_SHA=534bacc54d74992f5a8ab4d422f9fa0947523d59325b4bfa272d4fbeb56262f0
 readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v1
@@ -198,9 +200,9 @@ readonly RUN_DIR=$RUN_ROOT/$TAG
 readonly REMOTE_PREFIX=$BUCKET/results/greenfield/glm52/layer1_prompt_chunk0_geometry/$TAG
 
 for binding in \
-  "$INPUT_DIR/manifest.json:$INPUT_MANIFEST_SHA" \
+  "$INPUT_DIR/manifest.json:$INPUT_MANIFEST_FILE_SHA" \
   "$CHECKPOINT_ROOT/model.safetensors.index.json:$CHECKPOINT_INDEX_SHA" \
-  "$LEGACY_LAYER1_CACHE_DIR/manifest.json:$LEGACY_LAYER1_MANIFEST_SHA" \
+  "$LEGACY_LAYER1_CACHE_DIR/manifest.json:$LEGACY_LAYER1_MANIFEST_FILE_SHA" \
   "$DB518_RESULT:$DB518_RESULT_SHA" \
   "$WEIGHT_DIGESTS:$WEIGHT_DIGESTS_SHA" \
   "$PROBE:$PROBE_SHA" \

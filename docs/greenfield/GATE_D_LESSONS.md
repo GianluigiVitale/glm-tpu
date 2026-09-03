@@ -1237,3 +1237,6 @@ normalized-state cause.
   inherited base rejects its own terminal vocabulary. Test both terminal substitutions.
 - Diagnostic uploads need the same generation replay and exact-set checks as success uploads. A diagnostic ledger
   that authenticates only itself does not authenticate every preceding diagnostic object.
+- A manifest's canonical self-hash is not necessarily the SHA of its serialized JSON file. Keep both identities
+  explicitly named: use the raw-file SHA for pathname byte preflight and the canonical self-hash inside the parser.
+  Execute a regression against the real artifacts; string checks let this category error survive multiple reviews.

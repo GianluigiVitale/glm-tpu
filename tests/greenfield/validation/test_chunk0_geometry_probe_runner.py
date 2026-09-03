@@ -24,6 +24,12 @@ PUBLISHER = REPO / "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geome
 LAUNCHER = REPO / "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py"
 INSTALLER = REPO / "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py"
 REWRITE_MIRROR = REPO / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
+LAYER0_INPUT = Path(
+    "/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z"
+)
+LEGACY_LAYER1_CACHE = Path(
+    "/home/gianl/glm-run/greenfield_legacy_layer1_prompt_index_cache_20260903T000356727206404Z/prompt_index_cache"
+)
 
 
 def test_runner_pins_inputs_digests_and_sealed_interpreter():
@@ -43,6 +49,41 @@ def test_runner_pins_inputs_digests_and_sealed_interpreter():
     assert "PYTHONPATH=" not in runner
     # the only vllm-env reference is the remote census enumerator on the pod hosts
     assert runner.count("vllm-env") == 1 and "ray_enum=" in runner
+
+
+@pytest.mark.skipif(
+    not LAYER0_INPUT.exists() or not LEGACY_LAYER1_CACHE.exists(),
+    reason="sealed real manifest artifacts are not present",
+)
+def test_runner_distinguishes_manifest_self_hashes_from_raw_file_hashes():
+    runner = RUNNER.read_text()
+
+    def constant(name: str) -> str:
+        match = re.search(rf"^readonly {name}=([0-9a-f]{{64}})$", runner, re.M)
+        assert match is not None
+        return match.group(1)
+
+    for prefix, path in (
+        ("INPUT", LAYER0_INPUT / "manifest.json"),
+        ("LEGACY_LAYER1", LEGACY_LAYER1_CACHE / "manifest.json"),
+    ):
+        manifest = json.loads(path.read_text())
+        body = dict(manifest)
+        recorded_self_hash = body.pop("manifest_sha256")
+        canonical = json.dumps(
+            body,
+            allow_nan=False,
+            ensure_ascii=True,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+        self_hash = constant(f"{prefix}_MANIFEST_SHA")
+        file_hash = constant(f"{prefix}_MANIFEST_FILE_SHA")
+        assert self_hash == recorded_self_hash == sha256(canonical).hexdigest()
+        assert file_hash == sha256(path.read_bytes()).hexdigest()
+        assert self_hash != file_hash
+        assert f'manifest.json:${prefix}_MANIFEST_FILE_SHA' in runner
+        assert f'manifest.json:${prefix}_MANIFEST_SHA' not in runner
 
 
 def test_runner_git_authentication_vacancy_grammar_and_atomic_run_dir():
@@ -169,11 +210,15 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
     }
     assert installer_module.PAYLOADS == expected
     assert str(installer_module.CAPSULE_TARGET).startswith("/usr/local/libexec/glm-tpu/")
+    assert str(installer_module.LAUNCHER_TARGET).endswith(
+        "launch_gate_d_layer1_prompt_chunk0_geometry_v2.py"
+    )
     assert str(installer_module.LAUNCHER_TARGET).startswith("/opt/glm-tpu/bin/")
     assert installer.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
     assert '"launcher_invoked": False' in installer
     assert "subprocess" not in installer and "execve" not in installer
     assert launcher.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
+    assert str(launcher_module.INSTALL_PATH) == str(installer_module.LAUNCHER_TARGET)
     assert launcher_module.WRAPPER_SHA256 == sha256(RUNNER.read_bytes()).hexdigest()
     assert "fcntl.LOCK_EX | fcntl.LOCK_NB" in launcher
     assert 'f"/proc/self/fd/{WRAPPER_FD}"' in launcher
