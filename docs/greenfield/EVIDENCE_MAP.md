@@ -3635,3 +3635,24 @@ persistence only; review and persistence precede any v2 installation.
   run directory not held by a no-follow FD). Composed tag `…20260903T022131838688366Z` unused and unapproved; compose
   a fresh tag. Classification: `PROBE_SOURCE_REVIEWED;EXECUTION_BLOCKED_ON_PROVENANCE_CAPSULE;NO_TPU_EXECUTION;
   NO_CLAIM;GATE_D_OPEN`.
+
+## 2026-09-03 — chunk-0 probe round-32 corrections ready for adversarial review
+
+- The execution batch now closes all three round-32 provenance findings in source: probe and publisher are exact
+  root-owned `0555` capsule children; a root-owned launcher executes the committed wrapper from sealed memfd 10 and
+  retains both root locks; run-directory fd 7 is opened no-follow, identity checked, locked and used for every probe,
+  wrapper and publisher read/write; success and diagnostic publication repeat live/all-version/soft-deleted vacancy
+  immediately before upload, replay every generation and require the exact remote set. The publisher independently
+  rederives the row-0 verdict from bounded stored NPZ bytes and refuses its own prior terminal markers.
+- First Sol batch correctly blocked on two residual P1s: Bash reopened fd 7 by pathname after publisher creation,
+  and numerical rederivation trusted reference arrays carried in the same NPZ. The delta makes the launcher create
+  and retain fd 7 before Bash, hash-binds all three external reference slices, and requires the independently derived
+  layer-0 control to be zero. Substitution/self-reference/control-mismatch tests cover the counterexamples.
+- Source certificate: `docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-orchestration-source.json`, SHA-256
+  `870f3116780a605b96d5cdb0e6fc88c635c6d08e1e3c8f93832c1be8c06822b9`; install staging tree SHA-256
+  `72a72ad8879a35851034159d34f1b2c0bc601203971bdb92e5bb669506a7be43`.
+- Forced-CPU focused suite: 29/29 passed in 37.93 s. Nothing installed, no cloud write and no TPU execution. Blocked
+  tag `…113530293108901Z` joins `…022131838688366Z` as burned. New proposed tag
+  `greenfield_layer1_prompt_chunk0_geometry_20260903T120750596552366Z` is unstarted and delta-review-pending.
+- Classification: `ROUND32_PROVENANCE_CORRECTIONS_CPU_VALIDATED;SOL_DELTA_REVIEW_PENDING;
+  INSTALL_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;NO_CLAIM;GATE_D_OPEN`.

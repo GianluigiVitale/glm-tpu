@@ -30,6 +30,7 @@ from io import BytesIO
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import subprocess
 import sys
@@ -38,6 +39,14 @@ from typing import Any
 import zipfile
 
 PROBE_REPOSITORY_PATH = "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"
+INSTALL_PATH = Path(
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v1/"
+    "probe_layer1_prompt_chunk0_geometry.py"
+)
+RUN_ROOT = Path("/home/gianl/gate-d-runs")
+TAG_PATTERN = re.compile(
+    r"greenfield_layer1_prompt_chunk0_geometry_[0-9]{8}T[0-9]{15}Z"
+)
 JAX_SITE_ROOT = "/opt/glm-tpu/gate-d-jax-site-55233c63939e"
 LIBTPU_SITE_ROOT = "/opt/glm-tpu/gate-d-libtpu-site-db7598c867f3"
 PYTHON_RUNTIME_ROOT = "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95"
@@ -101,18 +110,137 @@ def _snapshot_regular(path: Path) -> bytes:
         os.close(descriptor)
 
 
-def _verify_running_source(repo: Path, code_pin: str) -> str:
+def _require_root_boundary(path: Path) -> None:
+    if not path.is_absolute() or ".." in path.parts:
+        raise RuntimeError("probe installation path is unsafe")
+    for parent in (path.parent, *path.parent.parents):
+        metadata = os.stat(parent, follow_symlinks=False)
+        if (
+            not stat.S_ISDIR(metadata.st_mode)
+            or metadata.st_uid != 0
+            or metadata.st_gid != 0
+            or stat.S_IMODE(metadata.st_mode) & 0o022
+        ):
+            raise RuntimeError(f"probe installation parent is mutable: {parent}")
+
+
+def _verify_running_source(
+    repo: Path, code_pin: str, expected_source_sha256: str
+) -> str:
     """This file's bytes must equal the committed blob at the approved pin."""
 
     if _git_text(repo, "rev-parse", f"{code_pin}^{{commit}}") != code_pin:
         raise RuntimeError("code pin is not a commit in the repository")
     if _git_bytes(repo, "for-each-ref", "--format=%(refname)", "refs/replace").strip():
         raise RuntimeError("repository has forbidden replacement refs")
-    raw = _snapshot_regular(Path(__file__))
+    if Path(__file__) != INSTALL_PATH:
+        raise RuntimeError("probe is not executing from the immutable capsule")
+    _require_root_boundary(INSTALL_PATH)
+    metadata = os.stat(INSTALL_PATH, follow_symlinks=False)
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or metadata.st_uid != 0
+        or metadata.st_gid != 0
+        or stat.S_IMODE(metadata.st_mode) != 0o555
+        or os.listxattr(INSTALL_PATH, follow_symlinks=False)
+    ):
+        raise RuntimeError("probe installation identity is unsafe")
+    raw = _snapshot_regular(INSTALL_PATH)
     committed = _git_bytes(repo, "show", f"{code_pin}:{PROBE_REPOSITORY_PATH}")
-    if raw != committed:
+    observed_sha256 = sha256(raw).hexdigest()
+    if raw != committed or observed_sha256 != expected_source_sha256:
         raise RuntimeError("probe is not the committed blob at the approved pin")
-    return sha256(raw).hexdigest()
+    return observed_sha256
+
+
+def _open_inherited_run_dir(run_dir: Path, inherited_fd: int) -> int:
+    if (
+        not run_dir.is_absolute()
+        or run_dir.parent != RUN_ROOT
+        or TAG_PATTERN.fullmatch(run_dir.name) is None
+        or inherited_fd != 7
+    ):
+        raise RuntimeError("probe run-directory invocation drifted")
+    root_fd = os.open(
+        RUN_ROOT, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
+    )
+    descriptor = -1
+    try:
+        descriptor = os.dup(inherited_fd)
+        held = os.fstat(descriptor)
+        named = os.stat(run_dir.name, dir_fd=root_fd, follow_symlinks=False)
+        if (
+            not stat.S_ISDIR(held.st_mode)
+            or stat.S_IMODE(held.st_mode) != 0o700
+            or held.st_uid != os.geteuid()
+            or held.st_gid != os.getegid()
+            or os.listxattr(descriptor)
+            or (held.st_dev, held.st_ino) != (named.st_dev, named.st_ino)
+        ):
+            raise RuntimeError("probe run-directory authority drifted")
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return descriptor
+    except BaseException:
+        if descriptor >= 0:
+            os.close(descriptor)
+        raise
+    finally:
+        os.close(root_fd)
+
+
+def _write_run_member_exclusive(run_fd: int, relative: str, raw: bytes) -> None:
+    parts = Path(relative).parts
+    if (
+        not parts
+        or relative.startswith("/")
+        or any(part in {"", ".", ".."} for part in parts)
+        or len(parts) > 2
+        or (len(parts) == 2 and parts[0] != "hlo")
+    ):
+        raise RuntimeError(f"unsafe probe output member: {relative}")
+    parent_fd = run_fd
+    owned_parent = False
+    try:
+        if len(parts) == 2:
+            parent_fd = os.open(
+                parts[0],
+                os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW,
+                dir_fd=run_fd,
+            )
+            owned_parent = True
+        descriptor = os.open(
+            parts[-1],
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW,
+            0o400,
+            dir_fd=parent_fd,
+        )
+        try:
+            before = os.fstat(descriptor)
+            if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1:
+                raise RuntimeError(f"unsafe probe output identity: {relative}")
+            view = memoryview(raw)
+            while view:
+                written = os.write(descriptor, view)
+                if written <= 0:
+                    raise RuntimeError(f"probe output write stalled: {relative}")
+                view = view[written:]
+            os.fchmod(descriptor, 0o400)
+            os.fsync(descriptor)
+            named = os.stat(parts[-1], dir_fd=parent_fd, follow_symlinks=False)
+            if (
+                (before.st_dev, before.st_ino) != (named.st_dev, named.st_ino)
+                or not stat.S_ISREG(named.st_mode)
+                or named.st_nlink != 1
+                or named.st_size != len(raw)
+            ):
+                raise RuntimeError(f"probe output identity changed: {relative}")
+            os.fsync(parent_fd)
+        finally:
+            os.close(descriptor)
+    finally:
+        if owned_parent:
+            os.close(parent_fd)
 
 
 def _sealed_git_source_archive(repo: Path, code_pin: str) -> tuple[str, dict[str, Any]]:
@@ -200,6 +328,7 @@ CHECKPOINT_TENSOR_NAMES = {
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--code-pin", required=True)
+    parser.add_argument("--expected-source-sha256", required=True)
     parser.add_argument("--repository", type=Path, required=True)
     parser.add_argument("--run-tag", required=True)
     parser.add_argument("--input-dir", type=Path, required=True)
@@ -213,8 +342,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--db518-result", type=Path, required=True)
     parser.add_argument("--db518-result-sha256", required=True)
     parser.add_argument("--softmax-scale", type=float, default=256 ** -0.5)
-    parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--hlo-dir", type=Path, required=True)
+    parser.add_argument("--run-dir", type=Path, required=True)
+    parser.add_argument("--run-dir-fd", type=int, choices=(7,), required=True)
     return parser.parse_args()
 
 
@@ -230,9 +359,16 @@ def _cache_rows(owner_bits: Any, rows: int) -> Any:
 
 def main() -> int:
     args = _parse_args()
-    if not (args.code_pin and len(args.code_pin) == 40):
+    if re.fullmatch(r"[0-9a-f]{40}", args.code_pin) is None:
         raise RuntimeError("code pin must be a 40-hex commit")
-    probe_sha256 = _verify_running_source(args.repository, args.code_pin)
+    if re.fullmatch(r"[0-9a-f]{64}", args.expected_source_sha256) is None:
+        raise RuntimeError("expected probe source digest is invalid")
+    if args.run_tag != args.run_dir.name:
+        raise RuntimeError("probe run tag and run-directory identity differ")
+    probe_sha256 = _verify_running_source(
+        args.repository, args.code_pin, args.expected_source_sha256
+    )
+    run_fd = _open_inherited_run_dir(args.run_dir, args.run_dir_fd)
     archive_path, archive_identity = _sealed_git_source_archive(args.repository, args.code_pin)
     _install_sealed_path(archive_path)
 
@@ -263,10 +399,6 @@ def main() -> int:
     from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
     from glm_tpu.greenfield.kernels.reference.rotary import build_rotary_table_host
 
-    if args.output.exists() and any(args.output.iterdir()):
-        raise FileExistsError(args.output)
-    args.output.mkdir(parents=True, exist_ok=True)
-    args.hlo_dir.mkdir(parents=True, exist_ok=True)
     if jax.default_backend() != "tpu":
         raise RuntimeError(f"probe requires TPU, got {jax.default_backend()}")
     if jax.local_device_count() != 4 or jax.device_count() != 4:
@@ -364,8 +496,17 @@ def main() -> int:
     lowered = jax.jit(pipeline).lower(embedding_full, positions_full, weights)
     compiled = lowered.compile()
     hlo_text = compiled.as_text()
-    (args.hlo_dir / "legacy_geometry_chunk0.optimized_hlo.txt").write_text(hlo_text)
-    (args.hlo_dir / "legacy_geometry_chunk0.stablehlo.mlir").write_text(lowered.as_text())
+    _write_run_member_exclusive(
+        run_fd,
+        "hlo/legacy_geometry_chunk0.optimized_hlo.txt",
+        hlo_text.encode("utf-8"),
+    )
+    stablehlo_text = lowered.as_text()
+    _write_run_member_exclusive(
+        run_fd,
+        "hlo/legacy_geometry_chunk0.stablehlo.mlir",
+        stablehlo_text.encode("utf-8"),
+    )
     result_full_device = compiled(embedding_full, positions_full, weights)
     result_full = jax.device_get(result_full_device)
     # One-row block arm: layer-0 block at M=1 for row 0; the layer-1 key projection
@@ -401,7 +542,13 @@ def main() -> int:
         "status": status,
         "control_layer0_keys_vs_db518_mismatched_rows": control_mismatch_rows,
         "forbidden_hlo_tokens": forbidden,
-        "hlo": {"optimized_sha256": sha256(hlo_text.encode()).hexdigest(), "convolution_lines_with_2048_rows": hlo_convolution_2048},
+        "hlo": {
+            "convolution_lines_with_2048_rows": hlo_convolution_2048,
+            "optimized_byte_count": len(hlo_text.encode("utf-8")),
+            "optimized_sha256": sha256(hlo_text.encode("utf-8")).hexdigest(),
+            "stablehlo_byte_count": len(stablehlo_text.encode("utf-8")),
+            "stablehlo_sha256": sha256(stablehlo_text.encode("utf-8")).hexdigest(),
+        },
         "inputs": {
             "layer0_input_manifest_sha256": input_manifest["manifest_sha256"],
             "legacy_layer1_manifest_sha256": legacy_manifest["manifest_sha256"],
@@ -410,6 +557,15 @@ def main() -> int:
             "checkpoint_index_sha256": args.checkpoint_index_sha256,
             "weight_digests_sha256": args.weight_digests_sha256,
             "checkpoint_shard_sha256": digest_record["shard"]["sha256"],
+            "db518_layer0_chunk0_bits_sha256": sha256(
+                np.ascontiguousarray(greenfield_layer0).tobytes()
+            ).hexdigest(),
+            "db518_layer1_chunk0_bits_sha256": sha256(
+                np.ascontiguousarray(greenfield_layer1).tobytes()
+            ).hexdigest(),
+            "legacy_layer1_chunk0_bits_sha256": sha256(
+                np.ascontiguousarray(legacy_layer1).tobytes()
+            ).hexdigest(),
             "softmax_scale": args.softmax_scale,
         },
         "row0": {
@@ -432,10 +588,12 @@ def main() -> int:
         "elapsed_seconds": round(time.time() - started, 1),
         "claim_scope": "Bounded diagnostic of prompt-row geometry; row 0 decisive, rows >= 1 use a non-legacy softmax; no decoder, Gate-D, DB or performance claim.",
     }
+    output_buffer = BytesIO()
     np.savez(
-        args.output / "probe_arrays.npz",
+        output_buffer,
         keys1_bits=keys1_bits,
         keys0_bits=keys0_bits,
+        greenfield_layer0_bits=greenfield_layer0,
         keys1_row0_one_row_block_m64_keys_bits=keys1_row0_m1,
         keys1_row0_one_row_block_one_row_keys_bits=keys1_row0_m1_m1keys,
         legacy_layer1_bits=legacy_layer1,
@@ -444,8 +602,14 @@ def main() -> int:
         **{f"{name}_bits": bits(value) for name, value in result_full.items() if name.endswith("_row0")},
         **{f"one_row_{name}_bits": bits(value) for name, value in result_row0.items() if name.endswith("_row0")},
     )
-    summary["arrays_sha256"] = sha256((args.output / "probe_arrays.npz").read_bytes()).hexdigest()
-    (args.output / "runner.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+    output_raw = output_buffer.getvalue()
+    summary["arrays_sha256"] = sha256(output_raw).hexdigest()
+    _write_run_member_exclusive(run_fd, "probe_arrays.npz", output_raw)
+    _write_run_member_exclusive(
+        run_fd,
+        "runner.json",
+        (json.dumps(summary, indent=2, sort_keys=True) + "\n").encode("ascii"),
+    )
     print(json.dumps({k: summary[k] for k in ("status", "row0", "chunk0_vs_legacy", "control_layer0_keys_vs_db518_mismatched_rows")}, sort_keys=True))
     return 0 if status == "SUCCESS" else 1
 

@@ -1232,3 +1232,8 @@ normalized-state cause.
   directory descriptors); the accepted pattern is: root-owned immutable capsule under `/usr/local/libexec/glm-tpu/`,
   sealed interpreter, committed-blob imports, retained run-directory FD with an identity check, publisher-mediated
   writes, and vacancy proven both before the run and immediately before publication. Start from that capsule.
+- A reused publisher base can have a different terminal filename. Extend its preterminal guard with the new
+  terminal and receipt names; otherwise a second invocation can enter after successful publication even when the
+  inherited base rejects its own terminal vocabulary. Test both terminal substitutions.
+- Diagnostic uploads need the same generation replay and exact-set checks as success uploads. A diagnostic ledger
+  that authenticates only itself does not authenticate every preceding diagnostic object.

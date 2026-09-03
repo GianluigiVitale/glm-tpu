@@ -11608,3 +11608,41 @@ prefill", not "the decode side is proven exact". Also, the three executed 8K run
 the first (all norms, q-a on the 32-row schedule) broke event 0 by one swap with event 1 = 9 and was reverted; only
 the two later runs (hidden-width + kv-a, then hidden-width only) held event 0 exact with event 1 = 7 on the identical
 set. Earlier entries are left unmodified per the append-only rule; this paragraph is the correction of record.
+
+## 2026-09-03 11:35Z — round-32 provenance corrections CPU-green; review/install/run pending
+
+Active worktree is `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`, parent
+`a43f6a2fac60f6fd771df06ef9e0935bee4f9664`. No TPU work was launched and no runtime was installed. The old
+`…022131838688366Z` tag remains burned. Proposed fresh tag
+`greenfield_layer1_prompt_chunk0_geometry_20260903T113530293108901Z` is unstarted and unauthorized.
+
+The round-32 fix is implemented as one source batch:
+
+- `probe_layer1_prompt_chunk0_geometry.py` executes only at its root-owned capsule path, self-verifies the committed
+  blob, inherits and locks run-directory fd 7, and writes NPZ/runner/HLO exclusively relative to that descriptor.
+- `publish_gate_d_layer1_prompt_chunk0_geometry.py` owns initialization and all wrapper writes, validates fd 7,
+  rederives the numerical verdict from exact stored NPZ members, repeats three-surface history vacancy immediately
+  before success or diagnostic upload, generation-replays each object, checks exact sets, writes `PROBE_RESULT` last
+  and rejects its own terminal/receipt on reentry.
+- The new launcher/installer use the accepted root-owned capsule plus sealed-memfd-wrapper pattern. The installer is
+  install-only and reports `launcher_invoked=false`. The wrapper holds root and secondary leases, authenticates origin
+  and the US-CENTRAL2 mirror, requires canonical three-surface vacancy, performs pre/post/failure 8-host census and
+  executes one four-chip bounded probe.
+
+The first Sol batch returned `BLOCK` on two P1s: Bash still opened fd 7 by pathname after publisher creation, and the
+publisher trusted its NPZ-contained reference arrays. The corrected delta creates/opens/locks fd 7 in the launcher
+with `openat` + `O_DIRECTORY|O_NOFOLLOW` and inherits it without Bash reopening; the publisher now hash-binds the
+exact DB518 layer-0/layer-1 and legacy layer-1 chunk-0 slices and requires the independently rederived layer-0 control
+to have zero mismatched rows. Executed tests cover same-UID path substitution, self-referential all-zero references,
+forged exact claims and nonexact controls. Blocked tag `…113530293108901Z` is burned; new proposed tag is
+`greenfield_layer1_prompt_chunk0_geometry_20260903T120750596552366Z`.
+
+Focused forced-CPU suite passes 29/29 in 37.93 s; the boundary file alone passes 16/16. Source certificate
+`docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-orchestration-source.json` SHA
+`870f3116780a605b96d5cdb0e6fc88c635c6d08e1e3c8f93832c1be8c06822b9` binds seven source/test files. Exact staging
+tree `/home/gianl/gate-d-runs/gate-d-layer1-prompt-chunk0-geometry-install-v1-staging` has SHA
+`72a72ad8879a35851034159d34f1b2c0bc601203971bdb92e5bb669506a7be43`.
+
+Next: one batched read-only Sol review of current diff, tests, certificate, literal provision/install commands and the
+fresh-tag command. Correct every P0/P1; only exact approval permits commit/push/mirror, install-only, fresh preflight
+and execute-once. Gate D remains open regardless of the row-0 probe result.
