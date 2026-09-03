@@ -20,14 +20,16 @@ from pathlib import Path
 from typing import Any
 
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
+BRANCH = "rewrite/topology-first-decode"
+ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v5/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v6/"
     "publish_gate_d_original_db518_prompt_key_chunk0.py")
 SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_original_db518_prompt_key_chunk0.py")
 CONTRACT_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v5/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v6/"
     "original_db518_prompt_key.py")
 CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/original_db518_prompt_key.py")
@@ -39,6 +41,11 @@ PARENT_PATH = "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.p
 PARENT_PIN = "d9c624a77590b8933ccdabc55ea937113138835f"
 PARENT_SHA256 = "8b1e05534419661c9e69207c1cfab2794beaec03007f0fcb15a184977a33f15d"
 BUCKET_NAME = "driftbench-dsv4-uc"
+MIRROR_URI = "gs://driftbench-dsv4-uc/repos/glm-tpu/.git"
+MIRROR_VERIFIER_PATH = (
+    "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py")
+MIRROR_VERIFIER_SHA256 = (
+    "a36705b4ae261136ecd6ca18b3813f27fcaa78f2530fffb4e28fe0f8c4b83930")
 REMOTE_ROOT = "results/greenfield/glm52/original_db518_prompt_key_chunk0/"
 TAG_PATTERN = re.compile(
     r"greenfield_original_db518_prompt_key_chunk0_[0-9]{8}T[0-9]{15}Z")
@@ -177,6 +184,24 @@ def _load_parent(code_pin: str) -> types.ModuleType:
     module.REMOTE_ROOT = REMOTE_ROOT
     module.TAG_PATTERN = TAG_PATTERN
     module.WRAPPER_WRITE_MEMBERS = set(WRAPPER_WRITE_MEMBERS)
+    module._git_bytes = lambda *args: _git_bytes(*args)
+    return module
+
+
+def _load_base(parent: types.ModuleType, code_pin: str) -> types.ModuleType:
+    """Bind the inherited publisher base to this repository's authority."""
+
+    module = parent._load_base(code_pin)
+    module.REPO = REPO
+    module.BRANCH = BRANCH
+    module.ORIGIN = ORIGIN
+    module.RUN_ROOT = RUN_ROOT
+    module.BUCKET_NAME = BUCKET_NAME
+    module.MIRROR_URI = MIRROR_URI
+    module.MIRROR_VERIFIER_PATH = MIRROR_VERIFIER_PATH
+    module.MIRROR_VERIFIER_SHA256 = MIRROR_VERIFIER_SHA256
+    module.REMOTE_ROOT = REMOTE_ROOT
+    module.TAG_PATTERN = TAG_PATTERN
     module._git_bytes = lambda *args: _git_bytes(*args)
     return module
 
@@ -877,7 +902,7 @@ def main() -> int:
     os.umask(0o077)
     arguments = parse_args()
     parent = _load_parent(arguments.expected_code_hash)
-    base = parent._load_base(arguments.expected_code_hash)
+    base = _load_base(parent, arguments.expected_code_hash)
     base.validate_environment()
     publication_runtime = base.validate_publication_runtime()
     publication_runtime[

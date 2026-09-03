@@ -1,0 +1,54 @@
+{
+  "artifact_kind": "gate_d_original_db518_v5_mirror_authority_failure",
+  "authorization": {
+    "consumer": false,
+    "full_8k": false,
+    "numerical_claim_accepted": false,
+    "performance_claim": false,
+    "producer_invocation_count": 1
+  },
+  "classification": "PRODUCER_COMPLETED;LOCAL_RUNNER_REPORTED_ZERO_MISMATCH;PUBLISHER_MIRROR_AUTHORITY_FALSE_REFUSAL;DIAGNOSTIC_PUBLISHED;TAG_BURNED;NO_ACCEPTED_NUMERICAL_CLAIM;GATE_D_OPEN",
+  "code_hash": "ae79a3fdcf877a8123f34b08411e4f6d0a5584a7",
+  "created_utc": "2026-09-03T21:31:40Z",
+  "diagnostic": {
+    "ledger_generation": "1788470805424006",
+    "ledger_sha256": "8adadd76b6edcce7d9c7c192527f7c97f178a065d144438cb00910d5022bb6b3",
+    "receipt_sha256": "bf23609a0369b62ed9aebcd9d4f52683edaf3ebce802c59bd56fba92313b7634",
+    "remote": "gs://driftbench-dsv4-uc/results/greenfield/glm52/original_db518_prompt_key_chunk0/greenfield_original_db518_prompt_key_chunk0_20260903T211239854744598Z/diagnostic/diagnostic_objects.json"
+  },
+  "fleet": {
+    "post_census_clean_hosts": 8,
+    "post_census_sha256": "2a7a1a117a8972502ff7d7111fefae1a0e42f3656c01e7a8e2d03cd0355a50cc",
+    "pre_census_clean_hosts": 8,
+    "pre_census_sha256": "76e5cb8232a3faf5d8c0f9f773756379f6c9796038b600257e45be528b8ef9dd"
+  },
+  "local_unaccepted_result": {
+    "accepted_chunk_bits_sha256": "96d261cbef56bccc20c3d2bee275b995f168e0ff7609713baae21d0a6ea3887c",
+    "candidate_chunk_bits_sha256": "96d261cbef56bccc20c3d2bee275b995f168e0ff7609713baae21d0a6ea3887c",
+    "mismatched_lanes": 0,
+    "mismatched_rows": 0,
+    "producer_arrays_sha256": "57c57ce6e9a553752a06dace6a5969da467bbd5915d184bdd40b04f719d1388c",
+    "runner_sha256": "37bab9d0d11d18ac9286cf2f4b74476627f757cd9e290614d2736c30396ffecb",
+    "standing": "DIAGNOSTIC_ONLY_UNTIL_FRESH_GENERATION_REPLAYED_SUCCESS_PUBLICATION"
+  },
+  "mirror_replay": {
+    "bound_blob_count": 29,
+    "fixture_path": "docs/artifacts/gate-d-original-db518-v5-mirror-replay.json",
+    "fixture_sha256": "a1bcb5575b36b1907ddd7c05654fb28c2eab31751867cb2af565c475b30c6812",
+    "origin_remote_exact_record": true,
+    "publisher_exception": "RuntimeError: same-region Git mirror replay authority drifted"
+  },
+  "root_cause": {
+    "actual_branch": "rewrite/topology-first-decode",
+    "actual_verifier_path": "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py",
+    "actual_verifier_sha256": "288bfa0b707b041467f4b0f0686cc3e29207c0c71ad4b992139e238d29a7c084",
+    "inherited_stale_branch": "tooling/gate-d-compensated-pp16-numerical",
+    "inherited_stale_verifier_path": "scripts/greenfield/verify_gate_d_same_region_git_mirror.py",
+    "inherited_stale_verifier_sha256": "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b",
+    "reproduction": "The unmodified inherited base rejects the archived replay; rebinding the complete branch/origin/mirror-URI/verifier-path/verifier-SHA tuple accepts it. Independent hostile mutation of every field rejects."
+  },
+  "run_tag": "greenfield_original_db518_prompt_key_chunk0_20260903T211239854744598Z",
+  "schema_version": 1,
+  "sol_review": "APPROVE MIRROR AUTHORITY FIX DESIGN; P0 none; P1 none; P2 closed by explicit ORIGIN and MIRROR_URI mutations",
+  "status": "PROTECTED_POST_PRODUCER_DIAGNOSTIC"
+}

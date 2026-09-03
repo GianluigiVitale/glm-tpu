@@ -20,9 +20,13 @@ INSTALLER = REPO / "scripts/greenfield/install_gate_d_original_db518_prompt_key_
 CONTRACT = REPO / "glm_tpu/greenfield/validation/original_db518_prompt_key.py"
 VERIFIER = REPO / "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py"
 PUBLISHER_PARENT = REPO / "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
-CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v5-source.json"
+V5_MIRROR_REPLAY = REPO / "docs/artifacts/gate-d-original-db518-v5-mirror-replay.json"
+V5_PIN = "ae79a3fdcf877a8123f34b08411e4f6d0a5584a7"
+V5_VERIFIER_SHA256 = (
+    "288bfa0b707b041467f4b0f0686cc3e29207c0c71ad4b992139e238d29a7c084")
+CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v6-source.json"
 STAGING = Path(
-    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v5-staging"
+    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v6-staging"
 )
 
 
@@ -94,6 +98,9 @@ def test_mirror_verifier_exact_authority_membership():
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v3-source.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v4-source.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v5-source.json",
+        "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v6-source.json",
+        "docs/artifacts/gate-d-original-db518-v5-mirror-authority-failure.json",
+        "docs/artifacts/gate-d-original-db518-v5-mirror-replay.json",
         "docs/artifacts/gate-d-original-db518-v2-probe-install-path-failure.json",
         "docs/artifacts/gate-d-original-db518-v3-stablehlo-scatter-count-failure.json",
         "docs/artifacts/gate-d-original-db518-v4-helper-shape-parser-failure.json",
@@ -117,6 +124,41 @@ def test_mirror_verifier_exact_authority_membership():
         "tests/greenfield/validation/test_original_db518_prompt_key_chain.py",
         "tests/greenfield/validation/test_original_db518_prompt_key_probe.py",
     )
+
+
+def test_publisher_rebinds_complete_mirror_authority_tuple():
+    import pytest
+
+    publisher = _load(PUBLISHER)
+    current_pin = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip()
+    parent = publisher._load_parent(current_pin)
+    raw = V5_MIRROR_REPLAY.read_bytes()
+
+    stale = parent._load_base(current_pin)
+    with pytest.raises(RuntimeError, match="authority drifted"):
+        stale._validate_mirror_replay(raw, V5_PIN)
+
+    base = publisher._load_base(parent, current_pin)
+    assert base.MIRROR_VERIFIER_SHA256 == publisher.MIRROR_VERIFIER_SHA256
+    with pytest.raises(RuntimeError, match="verifier binding drifted"):
+        base._validate_mirror_replay(raw, V5_PIN)
+    base.MIRROR_VERIFIER_SHA256 = V5_VERIFIER_SHA256
+    base._validate_mirror_replay(raw, V5_PIN)
+    expected = {
+        "BRANCH": publisher.BRANCH,
+        "ORIGIN": publisher.ORIGIN,
+        "MIRROR_URI": publisher.MIRROR_URI,
+        "MIRROR_VERIFIER_PATH": publisher.MIRROR_VERIFIER_PATH,
+        "MIRROR_VERIFIER_SHA256": V5_VERIFIER_SHA256,
+    }
+    for name, value in expected.items():
+        assert getattr(base, name) == value
+        setattr(base, name, value + ".hostile")
+        with pytest.raises(RuntimeError):
+            base._validate_mirror_replay(raw, V5_PIN)
+        setattr(base, name, value)
+        base._validate_mirror_replay(raw, V5_PIN)
 
 
 def test_wrapper_is_one_producer_only_and_binds_rehydrated_input():
