@@ -11427,3 +11427,37 @@ Options for Gate D's exact-DSA requirement:
   default 4096; the sealed oracle used 2,048): would change the oracle definition and still leaves the legacy prefill
   attention kernel and sharded norms in place for prompt rows, so it is not obviously simpler; owner/Sol decision only.
 Recommendation: A, starting with the row-0 probe. No protected 8K decoder launch until a prompt-row boundary is exact.
+
+### Specification — bounded probe "layer-1 prompt keys of chunk 0 in legacy prefill geometry" (next milestone)
+
+Goal: compute the layer-1 index keys of prompt rows 0..2047 with the layer-0 block executed in the legacy prefill
+geometry and compare bitwise with the sealed legacy layer-1 cache rows (tag `…20260903T000356727206404Z`,
+manifest `d9058cc6…`). Row 0 is decisive (attention over one key is trivial); rows ≥1 measure how much of the
+deviation remains once projections/norms/MLP are legacy-shaped (the prefill attention kernel is left as is).
+Legacy per-op arithmetic (from `jit_step_fun_impl.m64.owner0.after_codegen_hlo`, one owner of 32):
+- FP8 dequant: `bf16(f32(fp8) * f32(scale_expanded))`, scales pre-expanded to the full `[K,N]`; conv
+  `bf16[M,K] x bf16[K,N] -> f32[M,N] -> bf16`, M = 2048 for q-a/kv-a (N=82/owner), q_b (K=2048,N=512/owner),
+  o_proj (K=512/owner, N=6144), gate/up merged (K=6144, N=768/owner), down (K=384/owner, N=6144); index wk in
+  64-row groups (`physical_m64_chunk`, already exact).
+- Input norm: `sum_f32(x²)` over the full 6144 row (mask: invalid rows → NaN select), `rsqrt(sum*0.000162760422
+  + 1e-5)`, `bf16(bf16(f32(x)*rsqrt) * w)` (two BF16 roundings). q-a norm: per-owner `sum(f32(q[:64])²)` →
+  f32 all-reduce over 32 owners → `rsqrt(sum*0.00048828125 + 1e-5)` → `bf16(f32(q)*rsqrt)`; the weight is applied
+  after the all-gather (`bf16(f32(q_gathered)*f32(w))`, `fused_computation.9309`).
+- o_proj and down partials are `bf16` per owner, then a **BF16 32-way all-reduce** (`replica_groups {0..31}`,
+  `add` in bf16). The greenfield's DB533 row-0 association (`_strategy_nd_row0_bf16_reduce`, phases y→x→z with
+  per-256-lane cross pattern) reproduces this for decode row 0; for M=2048 the ring chunking may assign 64-row
+  blocks different phase orders — verify on rows 0..63 first.
+- Post-attention norm variance input: `f32(attn_psum) + f32(emb)` unrounded; normalized MLP input:
+  `bf16(bf16((f32(attn)+f32(emb)) * rsqrt) * w)`. SwiGLU (`fused_computation.9619`): `g=f32(gate); u=f32(up);
+  bf16(g * (1/(1+exp(-g))) * u)` with the divide `1/(1+exp(-g))` in f32. Layer-1 input norm: `D = bf16(f32(attn) +
+  f32(emb))`; variance over `f32(dense) + f32(D)`; normalized `bf16(bf16((f32(dense)+f32(D))*rsqrt)*w1)`.
+- Attention value path: `conv(W_v_bf16[2,512,256] (pre-dequantized at load), attended_latent bf16[2,M,512]) ->
+  f32[2,256,M] * f32[1,2,256] (program parameter 18) -> bf16`, then o_proj. For row 0 the attended latent is the
+  row's own kv latent. The kv-a latent path for prompt rows (lanes 64:82 per owner → all-gather → kv-a norm → rope →
+  cache) is consumed inside nested computations (`copy-done.1299` → fusions slicing `[64:82]`); trace before build.
+- Embedding: vocab-sharded gather + bf16 all-reduce (exact), `broadcast_select` mask.
+Inputs: layer-0 DSA input artifact (`574f3553…`: embeddings of the prompt's unique tokens, layer-0 norm/q-a/kv-a/
+q-a-norm weights), checkpoint shard 1 tensors for layer-0 q_b/kv_b/o_proj/post-norm/gate/up/down and layer-1
+input norm + indexer wk/k_norm (index-verified), sealed legacy layer-1 cache (target) and layer-0 cache (control:
+the probe's layer-0 keys must be exact). Runs on one isolated 4-chip host under the pod lease; HLO contract binds
+the M=2048 convolutions and the absence of callbacks; results sealed with SHA-256; no decoder/Gate-D claim.
