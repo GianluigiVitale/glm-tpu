@@ -40,9 +40,8 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
 
 **Gate-D blocker moved from decode to prefill.** Decode numerics are legacy-exact through layer 1 (three 8K runs:
 token exact, event 0 exact, event 1 = 7; the RMS-schedule hypothesis is closed). CPU capsules
-`docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-diagnosis.json` and
-`…/gate-d-layer1-prompt-cache-legacy-vs-db518.json`: the legacy layer-1 prompt cache is captured on TPU (fresh DSA
-events bitwise equal the sealed oracle) and **8,155/8,155 greenfield prompt rows differ**, 16.6% of BF16 lanes, 79%
+`docs/artifacts/gate-d-{event1-layer1-prompt-cache-offline-diagnosis,layer1-prompt-cache-legacy-vs-db518}.json`:
+the legacy layer-1 prompt cache is captured on TPU (fresh DSA events bitwise equal the sealed oracle) and **8,155/8,155 greenfield prompt rows differ**, 16.6% of BF16 lanes, 79%
 by one ulp, flat from position 0. Hypothesis: legacy computes prompt rows at M=2048 per owner; greenfield uses
 one-row decode forms.
 
