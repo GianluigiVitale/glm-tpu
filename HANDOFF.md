@@ -11533,3 +11533,25 @@ the M=2048 convolutions and the absence of callbacks; results sealed with SHA-25
 - Tests: `test_sealed_runtime.py` (5), `test_numpy_safetensors.py` (4, incl. equality with the reference inspector on
   the real sealed cache), updated static runner/probe contract (4); 26 passed across the probe suites. Under the sealed
   interpreter the probe's host stage (bootstrap 2.6 s, digest-bound loads, packing) passes on the real inputs.
+
+### Sol round 31 on the chunk-0 probe: five P1s, all fixed offline (committed-blob execution)
+
+- Census: replaced by the protected oracle wrapper's proven eight-host census verbatim (carrier-marked psutil Ray
+  enumeration excluding the carrier and its ancestors, bracketed `pgrep -af` patterns that cannot self-match, docker
+  and libtpu lock holders), extended with the probe's own bracketed pattern. Executed regression
+  `test_executed_census_does_not_match_its_own_shell` runs the exact census snippet locally.
+- Committed bytes: the runner extracts the probe and the digest record from the pin's blobs (`git show`), never from
+  a worktree; the probe verifies its own bytes against `git show <pin>:<path>` through a no-follow snapshot, refuses
+  replacement refs, then builds a sealed in-memory zip of `glm_tpu/` from exact committed blobs (memfd, sealed
+  F_SEAL_*; the accepted acquisition driver's mechanism) and imports every project module from
+  `/proc/self/fd/<n>`; `verify_import_closure` checks the closure against that archive. No detached worktree remains.
+- Probe Git calls use the fixed sanitized environment (`GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+  GIT_NO_LAZY_FETCH=1 GIT_NO_REPLACE_OBJECTS=1 GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND=/bin/false
+  HOME=/nonexistent`, `-c core.fsmonitor=false -c core.untrackedCache=false -c core.attributesFile=/dev/null`).
+- Vacancy: each of the three surfaces must exit 1 with output exactly
+  `ERROR: (gcloud.storage.ls) One or more URLs matched no objects.` under `PYTHONWARNINGS=ignore`.
+- Inputs: every file is read through one no-follow descriptor (`numpy_safetensors.Snapshot`): digest and parse use
+  the same open file (DSA input, legacy cache, checkpoint shard — hashed through the descriptor before parsing — and
+  DB518 `result.npz` loaded from the snapshotted bytes).
+- Tests: 28 passed across the probe suites, including the executed census regression and a regression that builds the
+  sealed archive from this repository's HEAD and imports a project module from `/proc/self/fd/<n>`.
