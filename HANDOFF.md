@@ -11719,3 +11719,19 @@ Exact next: final Sol certificate/staging/command review; commit/push; wait for 
 origin+US-CENTRAL2 mirror; provision/install v3 without launch; then run only that fresh chunk0 tag. Do not run full
 8K. The next TPU result must first make the DB518 layer-0 control exact; only then may row0 adjudicate legacy prefill
 geometry.
+
+## 2026-09-03 16:35Z — pre-install path mismatch caught; no v3 installation or launch
+
+The corrected WK boundary was committed/pushed as `c7ce892e8a2eabe1bbd6944941685b2dfc44855d`. Sol had approved
+persistence and install-only staging `925bbd5e…35e4`, but independent inspection before installation found the new
+capsule target was `…geometry-v2` while its mirror verifier still required its installed `…geometry-v1` path. It
+would have failed closed before mirror replay/TPU initialization. Nothing was installed or launched; tag
+`…144423536909037Z` was only proposed and is retired unused.
+
+The successor chain uses install-v4, launcher-v4 and capsule-v3; the verifier requires that exact capsule path and
+mirror-binds both the append-only v3 predecessor and new v4 source certificate. A regression now proves verifier
+`INSTALL_PATH == launcher.CAPSULE_ROOT / verifier.name`. Hashes: verifier `1994c5f9…c3fa`, wrapper
+`5ceaf8fa…c7311`, launcher `10c47c7b…b48ca`, installer `c5538862…b7648`. Forced-CPU suite passes 34/34 in 38.49 s.
+Append-only v4 certificate `docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v4-source.json` SHA
+`1619b2a6…7c047`; immutable install-v4 staging tree `4892aae1…93ca5`; proposed never-used tag
+`greenfield_layer1_prompt_chunk0_geometry_20260903T163151687489928Z`. No install/TPU authority until final Sol review.

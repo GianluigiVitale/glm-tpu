@@ -3712,3 +3712,11 @@ persistence only; review and persistence precede any v2 installation.
   `25735a95…70e05` binds nine source/test files, 34/34 CPU tests, staging tree `925bbd5e…35e4`, and fresh proposed tag
   `greenfield_layer1_prompt_chunk0_geometry_20260903T144423536909037Z`. Final command review is pending; it grants no
   install, cloud, TPU, numerical or performance authority by itself.
+
+## 2026-09-03 — chunk0 v4 pre-install path correction
+
+- Commit `c7ce892e…855d` was pushed, but no v3 installation/launch occurred. Pre-install inspection found its capsule
+  target `…geometry-v2` disagreed with the verifier's required `…geometry-v1` path; the proposed tag is retired unused.
+- The v4 successor aligns install-v4/launcher-v4/capsule-v3 and directly tests verifier/capsule identity. Forced-CPU
+  suite 34/34. Certificate `docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v4-source.json` SHA
+  `1619b2a6…7c047`; staging tree `4892aae1…93ca5`; tag `…163151687489928Z`. Final Sol review pending; no claim.

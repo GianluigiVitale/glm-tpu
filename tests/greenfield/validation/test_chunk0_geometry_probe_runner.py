@@ -44,7 +44,7 @@ def test_runner_pins_inputs_digests_and_sealed_interpreter():
     assert 'TAG=${GLM_GATE_D_CHUNK0_GEOMETRY_TAG:-}' in runner
     assert "unsafe Gate-D chunk-0 geometry tag" in runner
     # The only executed probe pathname is the root-owned immutable capsule.
-    assert "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v2" in runner
+    assert "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v3" in runner
     assert '"$SEALED_PYTHON" -I -S -B -u "$PROBE"' in runner
     assert "$PROBE_LOCAL" not in runner and "/source/probe_layer1" not in runner
     assert '--code-pin "$PIN"' in runner and '--repository "$WORKTREE"' in runner
@@ -243,7 +243,7 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
     assert installer_module.PAYLOADS == expected
     assert str(installer_module.CAPSULE_TARGET).startswith("/usr/local/libexec/glm-tpu/")
     assert str(installer_module.LAUNCHER_TARGET).endswith(
-        "launch_gate_d_layer1_prompt_chunk0_geometry_v3.py"
+        "launch_gate_d_layer1_prompt_chunk0_geometry_v4.py"
     )
     assert str(installer_module.LAUNCHER_TARGET).startswith("/opt/glm-tpu/bin/")
     assert installer.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
@@ -258,13 +258,21 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
 
 def test_mirror_verifier_is_bound_to_the_rewrite_branch_and_reviewed_base():
     verifier = _load_module("chunk0_rewrite_mirror", REWRITE_MIRROR)
+    launcher = _load_module("chunk0_launcher_for_mirror", LAUNCHER)
     assert verifier.WORKTREE == REPO
     assert verifier.BRANCH == "rewrite/topology-first-decode"
     assert verifier.SOURCE_PATH.endswith(
         "verify_gate_d_rewrite_same_region_git_mirror.py"
     )
     assert sha256((REPO / verifier.BASE_PATH).read_bytes()).hexdigest() == verifier.BASE_SHA256
-    assert set(verifier.BOUND_PATHS) >= {
+    assert verifier.INSTALL_PATH == launcher.CAPSULE_ROOT / REWRITE_MIRROR.name
+    assert set(verifier.BOUND_PATHS) == {
+        "docs/artifacts/gate-d-chunk0-probe-weight-digests.json",
+        "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-orchestration-source.json",
+        "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v3-source.json",
+        "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v4-source.json",
+        "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py",
+        "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py",
         "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py",
         "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py",
         "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh",
