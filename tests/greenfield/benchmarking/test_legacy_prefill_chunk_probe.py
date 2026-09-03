@@ -12,6 +12,7 @@ import jax.numpy as jnp  # noqa: E402
 from glm_tpu.greenfield.benchmarking import legacy_prefill_owner_packing as pk  # noqa: E402
 from glm_tpu.greenfield.benchmarking.legacy_prefill_chunk_probe import (  # noqa: E402
     WEIGHT_KEYS,
+    layer1_keys_from_normalized,
     legacy_geometry_chunk_pipeline,
 )
 from glm_tpu.greenfield.kernels.reference.rotary import build_rotary_table_host  # noqa: E402
@@ -90,6 +91,16 @@ def test_chunk_pipeline_shapes_dtypes_and_finiteness(weights):
     single = legacy_geometry_chunk_pipeline(embedding[:1], positions[:1], weights, softmax_scale=256 ** -0.5)
     lanes = int(jnp.count_nonzero(single["keys1"][0].view(jnp.uint16) != out["keys1"][0].view(jnp.uint16)))
     print(f"CPU row-0 keys1 lanes differing between M=1 and M=2: {lanes}")
+    assert out["normalized1"].shape == (rows, 6144) and out["normalized1"].dtype == jnp.bfloat16
+    # The M64-keyed one-row arm: substituting the one-row normalized row into the
+    # chunk arm's partition and projecting with the same path reproduces the
+    # chunk arm's key when the normalized rows are identical.
+    partition = out["normalized1"]
+    same = layer1_keys_from_normalized(partition, positions, weights, physical_rows=rows)
+    assert bool(jnp.all(same.view(jnp.uint16) == out["keys1"].view(jnp.uint16)))
+    swapped = partition.at[0].set(single["normalized1"][0])
+    keyed = layer1_keys_from_normalized(swapped, positions, weights, physical_rows=rows)
+    assert keyed.shape == (rows, 128) and keyed.dtype == jnp.bfloat16
 
 
 def test_chunk_pipeline_refuses_missing_weights_and_bad_rows(weights):
