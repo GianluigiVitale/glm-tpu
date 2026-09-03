@@ -39,8 +39,8 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
 ## Resume checkpoint — 2026-09-03 01:15Z
 
 Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical`; run pin = rewrite merge `4623a4e2`. Decode-side norm hypothesis
-exhausted (3 runs, event 1 = 7 mismatches). CPU capsule `docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-
-diagnosis.json`: greenfield layer-1 prompt cache is a sufficient cause of the event-1 mismatch. Legacy layer-1 prompt
+exhausted (3 runs, event 1 = 7). Capsule `docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-diagnosis.json`:
+the greenfield layer-1 prompt cache is a sufficient cause of the event-1 mismatch. Legacy layer-1 prompt
 cache captured (tag `…20260903T000356727206404Z`, bundle runtime `c7973435`, fresh DSA events bitwise equal to the
 sealed oracle) and compared (`docs/artifacts/gate-d-layer1-prompt-cache-legacy-vs-db518.json`): **8,155/8,155 rows
 differ, 16.6% of lanes, 79% by one BF16 ulp, from position 0 in every chunk**; legacy cache reproduces the oracle
@@ -48,7 +48,7 @@ event-1 set. Reading: the teacher-forced scan produces prompt-row residuals with
 batched 2,048-row prefill. Gate D therefore needs a legacy-prefill-exact prompt residual stream for all indexer layers.
 Do NOT launch the 8K decoder. Next (one Sol batch): generalize the legacy internals capture to layer 1 at a prompt
 position (p0/p113: residual input, normalized hidden, key) and compare with the greenfield teacher-forced row to find
-the first diverging sub-boundary of the layer-0 block; then decide the prefill plan. Sealed layer-0 DSA input restored.
+the first diverging sub-boundary of the layer-0 block; then decide the prefill plan.
 
 ## Finish (after Gate D)
 
