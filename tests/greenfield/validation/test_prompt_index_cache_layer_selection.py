@@ -275,7 +275,7 @@ def test_wrapper_launcher_and_sealer_thread_the_layer():
     assert 'if [[ $PROMPT_CACHE_LAYER_ID != 0 ]]; then' in wrapper  # one-host probe stays layer 0
     # Finalization branches on the layer: deeper layers bind the sealed identity
     # instead of reading the layer-0 production comparison.
-    assert '"${OBSERVER_BRANCH:-none}" "$PROMPT_CACHE_LAYER_ID" <<\'PY\'' in wrapper
+    assert '"${OBSERVER_BRANCH:-none}" "$PROMPT_CACHE_LAYER_ID" \\' in wrapper
     assert 'elif sys.argv[39] != "0":' in wrapper
     assert 'raise SystemExit("prompt index-cache layer binding drifted")' in wrapper
     assert wrapper.index('elif sys.argv[39] != "0":') < wrapper.index('/ "prompt_index_cache_comparison"')
@@ -283,7 +283,22 @@ def test_wrapper_launcher_and_sealer_thread_the_layer():
     assert "sealed layer-0 DSA input required by prompt-cache sealing is unavailable" in wrapper
     preflight = wrapper.index("inspect_layer0_dsa_association_input(\n    Path(sys.argv[1])")
     assert preflight < wrapper.index("exec 9>/home/gianl/glm-run/.glm_pod_workload.lock")
+    # Recreated-pod legacy runtime: the prompt-cache mode may run on the reviewed
+    # layer-1 observer bundle; every bundle site keys on BUNDLE_RUNTIME.
+    assert 'readonly PROMPT_CACHE_RUNTIME=${GLM_GREENFIELD_PROMPT_CACHE_RUNTIME:-oracle}' in wrapper
+    assert 'elif [[ $PROMPT_CACHE_CAPTURE == 1 && $PROMPT_CACHE_RUNTIME == layer1_observer_bundle ]]; then' in wrapper
+    assert 'readonly LEGACY_PIN=8dc7d20fedca5a98c27bfd1774827305973fa4c1' in wrapper
+    assert 'if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 || $PROMPT_CACHE_RUNTIME == layer1_observer_bundle ]]; then' in wrapper
+    assert wrapper.count("$BUNDLE_RUNTIME == 1") >= 6
+    assert 'if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then\n    # The recreated pod' not in wrapper
+    assert 'COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO:$VLLM_RUNTIME_ROOT $COMMON_ENVS"' in wrapper
+    assert '\'"$prompt_cache_pythonpath_check"\'' in wrapper
+    assert '"$PROMPT_CACHE_LAYER_ID" \\\n  "$PROMPT_CACHE_RUNTIME" <<\'PY\'' in wrapper
+    assert 'if sys.argv[40] == "layer1_observer_bundle":' in wrapper
+    assert 'raise SystemExit("prompt-cache bundle runtime identity drifted")' in wrapper
+    assert 'elif sys.argv[40] != "oracle":' in wrapper
     launcher = LAUNCHER.read_text()
+    assert "export GLM_GREENFIELD_PROMPT_CACHE_RUNTIME=${GLM_GREENFIELD_PROMPT_CACHE_RUNTIME:-oracle}" in launcher
     assert "greenfield_legacy_layer${PROMPT_CACHE_LAYER_ID}_prompt_index_cache_" in launcher
     assert "export GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID=$PROMPT_CACHE_LAYER_ID" in launcher
     sealer = SEALER.read_text()

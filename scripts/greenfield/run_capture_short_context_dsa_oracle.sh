@@ -19,6 +19,16 @@ readonly PROMPT_CACHE_CAPTURE=${GLM_GREENFIELD_PROMPT_CACHE_CAPTURE:-0}
 # Full-indexer layer whose prompt index cache the legacy dump captures; the
 # legacy kv_caches slot is derived from the sealed registration order.
 readonly PROMPT_CACHE_LAYER_ID=${GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID:-0}
+# Legacy runtime for the host-side prompt-cache dump: "oracle" = the accepted
+# checkout /home/gianl/tpu-inference present on every host (original pod);
+# "layer1_observer_bundle" = the reviewed self-contained layer-1 observer
+# bundle transported per run (recreated pod without per-host base checkouts;
+# its dcp_cache_dump module is byte-identical to the accepted oracle's).
+readonly PROMPT_CACHE_RUNTIME=${GLM_GREENFIELD_PROMPT_CACHE_RUNTIME:-oracle}
+[[ $PROMPT_CACHE_RUNTIME == oracle || $PROMPT_CACHE_RUNTIME == layer1_observer_bundle ]] || {
+  echo "GLM_GREENFIELD_PROMPT_CACHE_RUNTIME must be oracle or layer1_observer_bundle" >&2
+  exit 2
+}
 readonly PREFILL_PROJECTION_CAPTURE=${GLM_GREENFIELD_ACCEPTED_PREFILL_PROJECTION_CAPTURE:-0}
 readonly DECODE_PROJECTION_CAPTURE=${GLM_GREENFIELD_ACCEPTED_DECODE_PROJECTION_CAPTURE:-0}
 readonly MAIN_CACHE_CAPTURE=${GLM_GREENFIELD_MAIN_CACHE_CAPTURE:-0}
@@ -217,10 +227,33 @@ elif [[ $INTERNAL_CAPTURE == 1 ]]; then
   fi
   readonly LEGACY_REPO=$OBSERVER_RUNTIME_REPO
   readonly LEGACY_SOURCE_REPO=$OBSERVER_DEV_REPO
+elif [[ $PROMPT_CACHE_CAPTURE == 1 && $PROMPT_CACHE_RUNTIME == layer1_observer_bundle ]]; then
+  # Recreated pod: workers 1--7 carry no accepted-oracle checkout. Reuse the
+  # reviewed layer-1 observer bundle (12 commits over the accepted oracle) as
+  # the legacy runtime; the exact DSA-event comparison still gates the result.
+  readonly OBSERVER_DEV_REPO=/home/gianl/tpu-inference-greenfield-layer1-rms-input-observer
+  readonly OBSERVER_BRANCH=greenfield/legacy-layer1-rms-input-observer
+  readonly OBSERVER_RUNTIME_REPO=/home/gianl/tpu-inference-dsa-internal-8dc7d20fe
+  readonly OBSERVER_COMMIT_DISTANCE=12
+  readonly LEGACY_PIN=8dc7d20fedca5a98c27bfd1774827305973fa4c1
+  readonly LEGACY_REPO=$OBSERVER_RUNTIME_REPO
+  readonly LEGACY_SOURCE_REPO=$OBSERVER_DEV_REPO
 else
   readonly LEGACY_REPO=$ORACLE_REPO
   readonly LEGACY_SOURCE_REPO=$ORACLE_REPO
   readonly LEGACY_PIN=$ORACLE_PIN
+fi
+if [[ $PROMPT_CACHE_RUNTIME == layer1_observer_bundle ]]; then
+  [[ $PROMPT_CACHE_CAPTURE == 1 && $INTERNAL_CAPTURE == 0 && $MAIN_CACHE_CAPTURE == 0 ]] || {
+    echo "the layer-1 observer bundle runtime is defined only for prompt-cache-only capture" >&2
+    exit 2
+  }
+fi
+# Bundle-transported legacy runtime (no per-host base checkout assumed).
+if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 || $PROMPT_CACHE_RUNTIME == layer1_observer_bundle ]]; then
+  readonly BUNDLE_RUNTIME=1
+else
+  readonly BUNDLE_RUNTIME=0
 fi
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
@@ -725,7 +758,8 @@ done
   exit 2
 }
 if [[ $INTERNAL_CAPTURE == 1 || $PREFILL_PROJECTION_CAPTURE == 1 ||
-      $DECODE_PROJECTION_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
+      $DECODE_PROJECTION_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ||
+      $BUNDLE_RUNTIME == 1 ]]; then
   [[ $(git -C "$ORACLE_REPO" rev-parse HEAD) == "$ORACLE_PIN" ]] || {
     echo "accepted legacy oracle pin changed" >&2
     exit 2
@@ -744,7 +778,7 @@ if [[ $INTERNAL_CAPTURE == 1 || $PREFILL_PROJECTION_CAPTURE == 1 ||
       echo "legacy observer commit distance drifted" >&2
       exit 2
     }
-  if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+  if [[ $BUNDLE_RUNTIME == 1 ]]; then
     [[ $(git -C "$LEGACY_SOURCE_REPO" rev-parse "$OBSERVER_BRANCH") == \
        "$LEGACY_PIN" ]] || {
       echo "legacy layer-1 observer branch ref drifted" >&2
@@ -1126,7 +1160,7 @@ trap on_exit EXIT
 
 say "RUN_DIR=$RUN_DIR GREENFIELD_PIN=$PIN HARNESS_PIN=$HARNESS_PIN LEGACY_PIN=$LEGACY_PIN"
 say "PROFILE=$PROFILE DUMP_PREFIX=$DUMP_PREFIX REMOTE_PREFIX=$REMOTE_PREFIX INTERNAL_LAYER=$INTERNAL_LAYER INTERNAL_MODE=$INTERNAL_MODE INTERNAL_POSITION=$INTERNAL_TARGET_POSITION PROMPT_CACHE_CAPTURE=$PROMPT_CACHE_CAPTURE PREFILL_PROJECTION_CAPTURE=$PREFILL_PROJECTION_CAPTURE DECODE_PROJECTION_CAPTURE=$DECODE_PROJECTION_CAPTURE MAIN_CACHE_CAPTURE=$MAIN_CACHE_CAPTURE"
-say "PROMPT_CACHE_LAYER_ID=$PROMPT_CACHE_LAYER_ID PROMPT_CACHE_SLOT=$PROMPT_CACHE_SLOT"
+say "PROMPT_CACHE_LAYER_ID=$PROMPT_CACHE_LAYER_ID PROMPT_CACHE_SLOT=$PROMPT_CACHE_SLOT PROMPT_CACHE_RUNTIME=$PROMPT_CACHE_RUNTIME LEGACY_PIN=$LEGACY_PIN BUNDLE_RUNTIME=$BUNDLE_RUNTIME"
 if [[ $PROMPT_CACHE_CAPTURE == 1 && $PROFILE != 8k ]]; then
   say "ABORT: prompt index-cache capture is defined only for the sealed 8K profile"
   exit 2
@@ -1142,8 +1176,8 @@ MIN_FREE_GB="$DISK_MIN_FREE_GB" WARN_FREE_GB="$DISK_WARN_FREE_GB" \
     exit 1
   }
 
-if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
-  if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 || $BUNDLE_RUNTIME == 1 ]]; then
+  if [[ $BUNDLE_RUNTIME == 1 ]]; then
     # The recreated pod has no accepted-oracle Git checkout on workers 1--7.
     # Build one authenticated self-contained bundle from the already reviewed
     # controller observer instead of fetching or assuming per-host Git state.
@@ -1222,7 +1256,7 @@ if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
     }
   fi
 fi
-if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+if [[ $BUNDLE_RUNTIME == 1 ]]; then
   # The new pod no longer has the old ~/vllm-build worktree targeted by the
   # editable install. Transfer one exact pin-derived source archive from the
   # controller instead of assuming every worker has a complete Git object DB.
@@ -1314,8 +1348,8 @@ has_eight_unique_markers "$RUN_DIR/prereq.txt" PREREQ_OK || {
   say "ABORT: exact legacy/golden/OOB/dump prerequisite failed"
   exit 1
 }
-if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
-  if [[ $LAYER1_RMS_INPUT_CAPTURE == 1 ]]; then
+if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 || $BUNDLE_RUNTIME == 1 ]]; then
+  if [[ $BUNDLE_RUNTIME == 1 ]]; then
     # The self-contained reviewed observer bundle carries and proves the
     # accepted ancestor; no separate per-host oracle checkout is required.
     # shellcheck disable=SC2016
@@ -1333,7 +1367,15 @@ if [[ $INTERNAL_CAPTURE == 1 || $MAIN_CACHE_CAPTURE == 1 ]]; then
 fi
 
 COMMON_ENVS='GLM_MLA_DCP=1 GLM_DSA_MODE=pallas_decode GLM_DSA_DCP=1 GLM_DCP=1 GLM_DCP_SCATTER_IMPL=pageloop GLM_DSA_DCP_SCATTER_IMPL=flat GLM_DSA_SCORER=xla GLM_DSA_DCP_PREFILL_ATTN=segment GLM_DSA_BT_WIDTH=owned GLM_DSA_MERGE_IMPL=v2 GLM_DSA_OWNED_SEG_IMPL=v2 GLM_DSA_SEG_GATHER_IMPL=v2 GLM_WRITE_PROBE=1 GLM_PWAL_NAN_CHECK=1 GLM_LOAD_NAN_CHECK=1 GLM_LOAD_CHECKSUM=1 GLM_STATE_HASH_REF=/tmp/golden.json GLM_WK_OOB_DIR='"$OOB_DIR"' GLM_WK_OOB_GOLDEN=/tmp/golden.json GLM_DSA_DUMP_TOPK='"$DUMP_PREFIX"' GLM_DSA_DUMP_TOPK_EVENTS=all GLM_DSA_DUMP_TOPK_SKIP_WARMUP=1 GLM_EXPECT_CODE_HASH='"$LEGACY_SHORT"
+prompt_cache_pythonpath_check=''
 if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
+  if [[ $BUNDLE_RUNTIME == 1 ]]; then
+    # The legacy workers import the transported observer runtime and the exact
+    # vLLM source archive instead of an editable per-host install.
+    COMMON_ENVS="PYTHONPATH=$OBSERVER_RUNTIME_REPO:$VLLM_RUNTIME_ROOT $COMMON_ENVS"
+    # shellcheck disable=SC2016
+    prompt_cache_pythonpath_check=' && grep -qx "PYTHONPATH='"$OBSERVER_RUNTIME_REPO:$VLLM_RUNTIME_ROOT"'" "$f"'
+  fi
   COMMON_ENVS="$COMMON_ENVS GLM_DCP_CACHE_DUMP=$PROMPT_CACHE_DUMP_PREFIX GLM_DCP_CACHE_DUMP_LAYERS=$PROMPT_CACHE_SLOT"
 fi
 if [[ $MAIN_CACHE_CAPTURE == 1 ]]; then
@@ -1403,7 +1445,7 @@ has_eight_unique_markers "$RUN_DIR/raylet_env.txt" ENV_OK || {
 }
 if [[ $PROMPT_CACHE_CAPTURE == 1 ]]; then
   # shellcheck disable=SC2016
-  cache_env_check='p=$(pgrep -x raylet | head -1); f=/tmp/prompt_cache_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_DCP_CACHE_DUMP='"$PROMPT_CACHE_DUMP_PREFIX"'" "$f" && grep -qx "GLM_DCP_CACHE_DUMP_LAYERS='"$PROMPT_CACHE_SLOT"'" "$f"; then echo "CACHE_ENV_OK $(hostname)"; else echo "CACHE_ENV_BAD $(hostname)"; fi; rm -f "$f"'
+  cache_env_check='p=$(pgrep -x raylet | head -1); f=/tmp/prompt_cache_env_$$; [ -n "$p" ] && tr "\0" "\n" < /proc/$p/environ > "$f"; if grep -qx "GLM_DCP_CACHE_DUMP='"$PROMPT_CACHE_DUMP_PREFIX"'" "$f" && grep -qx "GLM_DCP_CACHE_DUMP_LAYERS='"$PROMPT_CACHE_SLOT"'" "$f"'"$prompt_cache_pythonpath_check"'; then echo "CACHE_ENV_OK $(hostname)"; else echo "CACHE_ENV_BAD $(hostname)"; fi; rm -f "$f"'
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
     --command="$cache_env_check" >"$RUN_DIR/raylet_cache_env.txt" 2>&1
   has_eight_unique_markers "$RUN_DIR/raylet_cache_env.txt" CACHE_ENV_OK || {
@@ -2314,7 +2356,8 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$VLLM_RUNTIME_FILE_COUNT" "$VLLM_ARCHIVE_REPO" \
   "$OBSERVER_BUNDLE_SHA" "$OBSERVER_TRACKED_FILE_COUNT" \
   "$GOLDEN_MANIFEST_SHA" "$GOLDEN_MANIFEST_BYTES" \
-  "$LEGACY_SOURCE_REPO" "${OBSERVER_BRANCH:-none}" "$PROMPT_CACHE_LAYER_ID" <<'PY'
+  "$LEGACY_SOURCE_REPO" "${OBSERVER_BRANCH:-none}" "$PROMPT_CACHE_LAYER_ID" \
+  "$PROMPT_CACHE_RUNTIME" <<'PY'
 from hashlib import sha256
 import json
 import math
@@ -3528,6 +3571,83 @@ if sys.argv[11] == "1":
                 prompt_comparison["hlo"]["optimized_hlo_sha256"]
             ),
         })
+    if sys.argv[40] == "layer1_observer_bundle":
+        # Recreated-pod runtime: the dump ran on the transported reviewed
+        # layer-1 observer bundle. Bind its identity and the fleet receipts.
+        observer_identity = dict(
+            line.split("=", 1)
+            for line in (root / "observer_bundle_identity.txt")
+            .read_text()
+            .splitlines()
+        )
+        vllm_identity = dict(
+            line.split("=", 1)
+            for line in (root / "vllm_archive_identity.txt").read_text().splitlines()
+        )
+        vllm_source_repository = vllm_identity.pop("source_repository", None)
+        if (
+            observer_identity != {
+                "branch": sys.argv[38],
+                "bundle_sha256": sys.argv[33],
+                "oracle_pin": sys.argv[28],
+                "pin": sys.argv[4],
+                "source_repository": sys.argv[37],
+                "tracked_entries": sys.argv[34],
+            }
+            or sys.argv[37]
+            != "/home/gianl/tpu-inference-greenfield-layer1-rms-input-observer"
+            or sys.argv[38] != "greenfield/legacy-layer1-rms-input-observer"
+            or sys.argv[4] != "8dc7d20fedca5a98c27bfd1774827305973fa4c1"
+            or not is_sha256(sys.argv[33])
+            or sys.argv[34] != "947"
+            or sha256((root / f"observer_{sys.argv[4]}.bundle").read_bytes()).hexdigest()
+            != sys.argv[33]
+            or vllm_identity != {
+                "archive_sha256": sys.argv[30],
+                "pin": sys.argv[29],
+                "tracked_entries": sys.argv[31],
+            }
+            or vllm_source_repository != sys.argv[32]
+            or sys.argv[32] != "/home/gianl/vllm-build-a30addc"
+            or not is_sha256(sys.argv[30])
+            or sys.argv[31] != "5493"
+            or sha256((root / f"vllm_{sys.argv[29]}.tar.gz").read_bytes()).hexdigest()
+            != sys.argv[30]
+            or prompt_cache["source"]["legacy_repository_pin"] != sys.argv[4]
+        ):
+            raise SystemExit("prompt-cache bundle runtime identity drifted")
+        for name, marker in (
+            ("observer_bundle_copy.txt", "OBSERVER_BUNDLE_COPY_OK"),
+            ("observer_transport_vacancy.txt", "OBSERVER_TRANSPORT_VACANT_OK"),
+            ("observer_transport_cleanup_post_sync.txt", "OBSERVER_TRANSPORT_CLEAN_OK"),
+            ("sync_observer.txt", "OBSERVER_SYNC_OK"),
+            ("vllm_archive_copy.txt", "VLLM_ARCHIVE_COPY_OK"),
+            ("vllm_vacancy.txt", "VLLM_VACANT_OK"),
+            ("sync_vllm.txt", "VLLM_SYNC_OK"),
+            ("vllm_cleanup_post.txt", "VLLM_CLEAN_OK"),
+        ):
+            records = [
+                line.split()
+                for line in (root / name).read_text().splitlines()
+                if line.strip()
+            ]
+            if (
+                len(records) != 8
+                or any(len(record) < 2 or record[0] != marker for record in records)
+                or len({record[1] for record in records}) != 8
+            ):
+                raise SystemExit(
+                    f"prompt-cache bundle runtime fleet receipt drifted: {name}"
+                )
+        lines.update({
+            "prompt_index_cache_legacy_runtime": "layer1_observer_bundle",
+            "prompt_index_cache_legacy_runtime_pin": sys.argv[4],
+            "prompt_index_cache_legacy_runtime_bundle_sha256": sys.argv[33],
+            "prompt_index_cache_accepted_oracle_pin": sys.argv[28],
+            "prompt_index_cache_vllm_archive_sha256": sys.argv[30],
+        })
+    elif sys.argv[40] != "oracle":
+        raise SystemExit("prompt-cache legacy runtime drifted")
 if sys.argv[14] == "1":
     exact_dsa = json.loads((root / "dsa_exact_comparison.json").read_text())
     lowering_root = root / "accepted_prompt_projection_lowering"

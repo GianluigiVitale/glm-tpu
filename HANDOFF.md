@@ -11277,3 +11277,44 @@ plumbing and branch order. Sealed same-region mirror verifier note: its `WORKTRE
 the tooling worktree/branch, so it certifies the tooling HEAD pin (not the rewrite merge); run it as
 `env -i HOME LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 <gate-d python> -I -S -B
 <installed verifier> --expected-code-hash <tooling HEAD> --expected-source-sha256 0912081651…`.
+
+### Sol round 26: APPROVE PERSISTENCE `210e3460…` + APPROVE EXECUTE ONCE — legacy layer-1 prompt-cache capture launched
+
+- Sealed same-region mirror verifier replayed for tooling HEAD `810da7f2` (checkout archive
+  `d5201d0d29618a5223d3ce1bd6f82db09a795f82f2b6b06682b0628a9aa408b8`, fsck true, origin exact record);
+  mirror also carries the rewrite merge `547b26f8` (run pin); pod `db-v4-64-od` READY/HEALTHY; cron tick
+  23:50:23Z; launched 23:51:40Z mid-window from `/home/gianl/glm-tpu-topology-rewrite` at `547b26f8`:
+  `env -i … GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID=1 GLM_GREENFIELD_PROMPT_CACHE_TAG=
+  greenfield_legacy_layer1_prompt_index_cache_20260902T234756900756989Z bash
+  scripts/greenfield/run_capture_legacy_prompt_index_cache.sh`. Legacy oracle run only; expected legacy
+  `kv_caches` slot 2; sealing fails closed on any other geometry. Result pending below.
+
+### Legacy layer-1 prompt-cache capture `…20260902T234756900756989Z`: failed closed at the eight-host prerequisite (no TPU, tag burned)
+
+Launched 23:51:40Z; disk preflight 8/8 OK; golden manifest sync OK; then `prereq.txt` reported `PREREQ_OK`
+only on worker 0 and `PREREQ_BAD … fatal: cannot change to '/home/gianl/tpu-inference'` on workers 1,2,3,4,6,7
+(worker 5 returned no receipt line). Abort at 23:51:58Z, `FAILED status=1`, no legacy process, Ray or TPU
+work; failure-exit census recorded. Cause: the prompt-cache mode (no internal capture) selects the default
+legacy runtime `LEGACY_REPO=/home/gianl/tpu-inference` at `ORACLE_PIN b3c25df47`, which exists only on
+worker 0. The pod was recreated on 2026-08-26 and workers 1–7 never received that base checkout; every
+legacy capture since (e.g. the 08-29 layer-1 RMS-input oracles) ran through the transported observer
+runtime `/home/gianl/tpu-inference-dsa-internal-8dc7d20fe` (pin `8dc7d20f`, 12 commits over `b3c25df47`;
+its `tpu_inference/runner/dcp_cache_dump.py` is byte-identical to the accepted pin's), which is present on
+all eight hosts. The layer-0 prompt-cache captures of 08-08 predate the pod recreation. Tag burned; no claim.
+Next: route the prompt-cache mode through the fleet-present observer runtime (same bundle transport and
+distance/pin prerequisites as the layer-1 RMS-input mode), Sol review, one fresh tag.
+
+### Prompt-cache mode gains the recreated-pod legacy runtime (`GLM_GREENFIELD_PROMPT_CACHE_RUNTIME=layer1_observer_bundle`)
+
+Default `oracle` keeps the original behaviour (per-host `/home/gianl/tpu-inference` at `b3c25df47`). With
+`layer1_observer_bundle` the prompt-cache-only mode reuses, unchanged, the reviewed recreated-pod path of the
+layer-1 RMS-input mode: self-contained observer bundle (`/home/gianl/tpu-inference-greenfield-layer1-rms-input-observer`
+branch `greenfield/legacy-layer1-rms-input-observer`, pin `8dc7d20f`, 12 commits over `b3c25df47`, 947 tracked
+entries) copied to all eight hosts and reconstructed at `/home/gianl/tpu-inference-dsa-internal-8dc7d20fe`; exact
+vLLM source archive (`a30addc7`, 5,493 entries) at `/tmp/glm_vllm_<tag>`; `PYTHONPATH=<runtime>:<vllm>` for the
+legacy workers (also asserted in the raylet environment check); bundle-ancestry oracle prerequisite; tag-scoped
+transport cleanup. A new `BUNDLE_RUNTIME` flag keys every one of those sites (layer-1 RMS-input or this runtime).
+Finalization (argv 40) verifies the bundle/vLLM identity files and 8/8 fleet receipts and records the runtime pin,
+bundle digest and accepted oracle pin in the SUCCESS record. The observer hooks are unarmed in this mode
+(`GLM_DSA_DUMP_INTERNALS` unset); the wrapper's exact DSA-event comparison against the sealed 8K oracle still gates
+the capture, and `dcp_cache_dump.py` is byte-identical between `8dc7d20f` and `b3c25df47`.
