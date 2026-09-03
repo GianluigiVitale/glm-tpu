@@ -46,9 +46,9 @@ sealed oracle) and compared (`docs/artifacts/gate-d-layer1-prompt-cache-legacy-v
 differ, 16.6% of lanes, 79% by one BF16 ulp, from position 0 in every chunk**; legacy cache reproduces the oracle
 event-1 set. Reading: teacher-forced scan = decode arithmetic per prompt row; legacy = batched 2,048-row prefill. Gate D
 needs a legacy-prefill-exact prompt residual stream for all indexer layers.
-Do NOT launch the 8K decoder. Next (one Sol batch): generalize the legacy internals capture to layer 1 at a prompt
-position (p0/p113: residual input, normalized hidden, key) and compare with the greenfield teacher-forced row to find
-the first diverging sub-boundary of the layer-0 block; then decide the prefill plan.
+Do NOT launch the 8K decoder. Next (one Sol batch): legacy layer-1 internals at a prompt position (p0/p113: residual input,
+normalized hidden, key) vs the greenfield teacher-forced row → first diverging sub-boundary of the layer-0 block;
+then the prefill plan.
 
 ## Finish (after Gate D)
 
