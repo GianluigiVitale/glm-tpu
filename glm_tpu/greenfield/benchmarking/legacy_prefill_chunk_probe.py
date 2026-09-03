@@ -121,6 +121,7 @@ def legacy_geometry_chunk_pipeline(
     return {
         "keys0": keys0.astype(jnp.bfloat16),
         "keys1": keys1.astype(jnp.bfloat16),
+        "normalized1": n1,
         "normalized0_row0": n0[0],
         "q_a_row0": q_a[0],
         "latent_row0": latent[0],
@@ -131,3 +132,30 @@ def legacy_geometry_chunk_pipeline(
         "carried1_row0": carried1[0],
         "normalized1_row0": n1[0],
     }
+
+
+def layer1_keys_from_normalized(
+    normalized1: Any,
+    positions: Any,
+    weights: dict[str, Any],
+    *,
+    contract: DsaNumericalContract = DsaNumericalContract(),
+    physical_rows: int = 64,
+) -> Any:
+    """Accepted physical-M64 layer-1 prompt keys for already-normalized rows.
+
+    Lets a one-row block-geometry arm keep the exact key-projection geometry:
+    substitute its layer-1 normalized row into a 64-row partition and project
+    with the same M64 path as the chunk arm.
+    """
+
+    wk1 = materialize_stage_local_prefill_index_wk(weights["wk1_bits"], weights["wk1_scale"], contract=contract)
+    return physical_m64_prompt_index_key_chunk(
+        normalized1,
+        positions,
+        wk1,
+        weights["k_norm1_weight"],
+        weights["k_norm1_bias"],
+        contract=contract,
+        physical_rows=physical_rows,
+    ).astype(jnp.bfloat16)

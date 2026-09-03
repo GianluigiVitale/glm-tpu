@@ -33,7 +33,8 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
-EXPECTED_WORKTREE = Path("/home/gianl/glm-tpu-topology-rewrite")
+CANONICAL_WORKTREE = Path("/home/gianl/glm-tpu-topology-rewrite")
+RUN_ROOT = Path("/home/gianl/glm-run")
 ARTIFACT_KIND = "greenfield_layer1_prompt_chunk0_legacy_geometry_probe"
 CHUNK_ROWS = 2048
 PROMPT_ROWS = 8155
@@ -93,6 +94,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--input-manifest-sha256", required=True)
     parser.add_argument("--checkpoint-root", type=Path, required=True)
     parser.add_argument("--checkpoint-index-sha256", required=True)
+    parser.add_argument("--weight-digests", type=Path, required=True)
+    parser.add_argument("--weight-digests-sha256", required=True)
     parser.add_argument("--legacy-layer1-cache-dir", type=Path, required=True)
     parser.add_argument("--legacy-layer1-manifest-sha256", required=True)
     parser.add_argument("--db518-result", type=Path, required=True)
@@ -103,7 +106,50 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _load_checkpoint_tensors(root: Path, expected_index_sha256: str) -> dict[str, np.ndarray]:
+def _worktree_binding(repo: Path, run_tag: str) -> dict[str, str]:
+    """Bind execution to the run-owned detached worktree of the canonical repository.
+
+    Only committed bytes checked out at ``/home/gianl/glm-run/<tag>/source`` may
+    execute; the copy must share the canonical repository and be clean including
+    ignored files.
+    """
+
+    def git(*args: str, cwd: Path) -> str:
+        return subprocess.check_output(["git", "-C", str(cwd), *args], text=True).strip()
+
+    if repo.resolve() != (RUN_ROOT / run_tag / "source").resolve():
+        raise RuntimeError(f"wrong greenfield worktree: {repo}")
+    common = Path(git("rev-parse", "--git-common-dir", cwd=repo)).resolve()
+    canonical_common = Path(git("rev-parse", "--git-common-dir", cwd=CANONICAL_WORKTREE)).resolve()
+    if common != canonical_common:
+        raise RuntimeError("probe worktree does not share the canonical repository")
+    if git("status", "--porcelain", "--ignored", cwd=repo):
+        raise RuntimeError("probe worktree is not clean")
+    return {"worktree": str(repo.resolve()), "git_common_dir": str(common)}
+
+
+def _verify_weight_digests(
+    root: Path, digests_path: Path, expected_digests_sha256: str, expected_index_sha256: str
+) -> dict[str, Any]:
+    """Bind the checkpoint index, the source shard file and every consumed tensor to pinned digests."""
+
+    if _sha256_file(digests_path) != expected_digests_sha256:
+        raise RuntimeError("weight digest record identity drifted")
+    record = json.loads(digests_path.read_text())
+    if record.get("artifact_kind") != "gate_d_chunk0_probe_weight_digests" or (
+        record.get("checkpoint_index_sha256") != expected_index_sha256
+        or record.get("diagnostic_only") is not True
+    ):
+        raise RuntimeError("weight digest record contract drifted")
+    shard = root / record["shard"]["filename"]
+    if shard.stat().st_size != record["shard"]["byte_count"] or _sha256_file(shard) != record["shard"]["sha256"]:
+        raise RuntimeError("checkpoint shard bytes drifted from the pinned digest")
+    return record
+
+
+def _load_checkpoint_tensors(
+    root: Path, expected_index_sha256: str, digest_record: dict[str, Any]
+) -> dict[str, np.ndarray]:
     import torch
     from safetensors import safe_open
 
@@ -129,13 +175,23 @@ def _load_checkpoint_tensors(root: Path, expected_index_sha256: str) -> dict[str
                     tensors[key] = value.numpy().copy()
                 else:
                     raise RuntimeError(f"unexpected checkpoint dtype for {name}: {value.dtype}")
+    expected = digest_record["tensors"]
+    if set(expected) != set(tensors):
+        raise RuntimeError("weight digest record covers a different tensor set")
+    for key, array in tensors.items():
+        entry = expected[key]
+        if (
+            entry["shape"] != list(array.shape)
+            or entry["dtype"] != str(array.dtype)
+            or entry["sha256"] != sha256(np.ascontiguousarray(array).tobytes()).hexdigest()
+        ):
+            raise RuntimeError(f"checkpoint tensor drifted from the pinned digest: {key}")
     return tensors
 
 
 def main() -> int:
     args = _parse_args()
-    if REPO != EXPECTED_WORKTREE:
-        raise RuntimeError(f"wrong greenfield worktree: {REPO}")
+    worktree_binding = _worktree_binding(REPO, args.run_tag)
     code_hash = _git_head()
     if code_hash != args.expected_code_hash:
         raise RuntimeError(f"stale code hash: expected={args.expected_code_hash} found={code_hash}")
@@ -180,7 +236,10 @@ def main() -> int:
     greenfield_layer0 = _cache_rows(db518["layer0_index_cache_owners_bfloat16_bits"], CHUNK_ROWS)
     greenfield_layer1 = _cache_rows(db518["layer1_index_cache_owners_bfloat16_bits"], CHUNK_ROWS)
     legacy_layer1 = legacy_layer1_bits[:CHUNK_ROWS]
-    tensors = _load_checkpoint_tensors(args.checkpoint_root, args.checkpoint_index_sha256)
+    digest_record = _verify_weight_digests(
+        args.checkpoint_root, args.weight_digests, args.weight_digests_sha256, args.checkpoint_index_sha256
+    )
+    tensors = _load_checkpoint_tensors(args.checkpoint_root, args.checkpoint_index_sha256, digest_record)
 
     prompt_ids = arrays["prompt_token_ids"]
     if prompt_ids.shape != (PROMPT_ROWS,):
@@ -244,6 +303,7 @@ def main() -> int:
     }
 
     from glm_tpu.greenfield.benchmarking.legacy_prefill_chunk_probe import (
+        layer1_keys_from_normalized,
         legacy_geometry_chunk_pipeline,
     )
 
@@ -260,15 +320,28 @@ def main() -> int:
     hlo_text = compiled.as_text()
     (args.hlo_dir / "legacy_geometry_chunk0.optimized_hlo.txt").write_text(hlo_text)
     (args.hlo_dir / "legacy_geometry_chunk0.stablehlo.mlir").write_text(lowered.as_text())
-    result_full = jax.device_get(compiled(embedding_full, positions_full, weights))
+    result_full_device = compiled(embedding_full, positions_full, weights)
+    result_full = jax.device_get(result_full_device)
+    # One-row block arm: the layer-0 block at M=1 for row 0, but the layer-1
+    # key projection keeps the accepted physical-M64 geometry by substituting
+    # the one-row normalized row into the chunk arm's first 64-row partition.
     result_row0 = jax.device_get(jax.jit(pipeline)(bf16(embedding_bits[:1]), put(positions_np[:1]), weights))
+    normalized1_partition = jnp.asarray(result_full_device["normalized1"][:64]).at[0].set(
+        jnp.asarray(result_row0["normalized1"][0])
+    )
+    keys1_one_row_m64 = jax.device_get(
+        jax.jit(lambda n1, pos, w: layer1_keys_from_normalized(n1, pos, w, contract=contract))(
+            normalized1_partition, put(positions_np[:64]), weights
+        )
+    )
 
     def bits(value: np.ndarray) -> np.ndarray:
         return np.ascontiguousarray(np.asarray(value)).view(np.uint16)
 
     keys1_bits = bits(result_full["keys1"])
     keys0_bits = bits(result_full["keys0"])
-    keys1_row0_m1 = bits(result_row0["keys1"])[0]
+    keys1_row0_m1 = bits(keys1_one_row_m64)[0]
+    keys1_row0_m1_m1keys = bits(result_row0["keys1"])[0]
     control_mismatch_rows = int(np.count_nonzero(np.any(keys0_bits != greenfield_layer0, axis=1)))
     legacy_lane_mismatch = (keys1_bits != legacy_layer1)
     greenfield_lane_mismatch = (keys1_bits != greenfield_layer1)
@@ -287,6 +360,7 @@ def main() -> int:
     summary = {
         "artifact_kind": ARTIFACT_KIND,
         "code_hash": code_hash,
+        "worktree_binding": worktree_binding,
         "run_tag": args.run_tag,
         "status": status,
         "control_layer0_keys_vs_db518_mismatched_rows": control_mismatch_rows,
@@ -301,15 +375,18 @@ def main() -> int:
             "legacy_layer1_bits_sha256": legacy_manifest["prompt_index_key_bfloat16_sha256"],
             "db518_result_sha256": args.db518_result_sha256,
             "checkpoint_index_sha256": args.checkpoint_index_sha256,
+            "weight_digests_sha256": args.weight_digests_sha256,
+            "checkpoint_shard_sha256": digest_record["shard"]["sha256"],
             "softmax_scale": args.softmax_scale,
             "checkpoint_tensors": [pk.summarize_bits(k, v) for k, v in sorted(tensors.items())],
         },
         "row0": {
             "legacy_geometry_vs_legacy_lanes": row0_legacy_lanes,
             "legacy_geometry_vs_greenfield_db518_lanes": int(per_row_greenfield[0]),
-            "one_row_variant_vs_greenfield_db518_lanes": row0_m1_vs_greenfield_lanes,
-            "one_row_variant_vs_legacy_lanes": row0_m1_vs_legacy_lanes,
-            "legacy_geometry_vs_one_row_variant_lanes": row0_m2048_vs_m1_lanes,
+            "one_row_block_m64_keys_vs_greenfield_db518_lanes": row0_m1_vs_greenfield_lanes,
+            "one_row_block_m64_keys_vs_legacy_lanes": row0_m1_vs_legacy_lanes,
+            "legacy_geometry_vs_one_row_block_m64_keys_lanes": row0_m2048_vs_m1_lanes,
+            "one_row_block_one_row_keys_vs_legacy_lanes": int(np.count_nonzero(keys1_row0_m1_m1keys != legacy_layer1[0])),
             "attention_row0_db533_vs_pairwise_lanes": int(
                 np.count_nonzero(bits(result_full["attention_row0"]) != bits(result_full["attention_pairwise_row0"]))
             ),
@@ -335,10 +412,12 @@ def main() -> int:
         args.output / "probe_arrays.npz",
         keys1_bits=keys1_bits,
         keys0_bits=keys0_bits,
-        keys1_row0_one_row_bits=keys1_row0_m1,
+        keys1_row0_one_row_block_m64_keys_bits=keys1_row0_m1,
+        keys1_row0_one_row_block_one_row_keys_bits=keys1_row0_m1_m1keys,
         legacy_layer1_bits=legacy_layer1,
         greenfield_layer1_bits=greenfield_layer1,
         **{f"{name}_bits": bits(value) for name, value in result_full.items() if name.endswith("_row0")},
+        normalized1_chunk_bits=bits(result_full["normalized1"]),
         **{f"one_row_{name}_bits": bits(value) for name, value in result_row0.items() if name.endswith("_row0")},
     )
     summary["arrays_sha256"] = _sha256_file(args.output / "probe_arrays.npz")

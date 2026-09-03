@@ -11483,3 +11483,25 @@ the M=2048 convolutions and the absence of callbacks; results sealed with SHA-25
 - Tests: `test_legacy_prefill_geometry.py` (6), `test_legacy_prefill_owner_packing.py` (5),
   `test_legacy_prefill_chunk_probe.py` (2; CPU run of the full pipeline at real shapes; on CPU the one-row and
   two-row variants already differ in 5 of 128 lanes of the row-0 layer-1 key — M sensitivity is real).
+
+### Sol round 29 on the chunk-0 probe: five blockers, all fixed offline
+
+- P1 checkpoint binding: `docs/artifacts/gate-d-chunk0-probe-weight-digests.json` pins the checkpoint index sha
+  (`e0fe7f28…`), the source shard `model-00001-of-00141.safetensors` (5,363,940,952 bytes, sha `cd4b3893…`) and the
+  19 consumed tensors (name/shard/dtype/shape/sha256). The probe verifies the record's own sha (pinned in the runner
+  and in the static test), the shard bytes and every tensor before use; the runner no longer self-derives the index sha.
+- P1 one-row arm geometry: the one-row block arm now keeps the accepted physical-M64 key projection
+  (`layer1_keys_from_normalized` substitutes its layer-1 normalized row into the chunk arm's first 64-row partition);
+  the one-row-keyed value is still reported separately.
+- P1 mutable bytes / authentication: the runner requires the canonical HEAD to equal `origin/<branch>` after a fetch,
+  creates a run-owned detached worktree of the pin, verifies HEAD and `status --porcelain --ignored`, executes only
+  `<source>/scripts/...` with `PYTHONPATH=<source>` under `env -i`, removes the worktree before sealing; the probe's
+  `_worktree_binding` refuses any path other than `/home/gianl/glm-run/<tag>/source` sharing the canonical repository.
+  The tag must be an approved composed tag (no default). Documented sanitized invocation via `/bin/bash <abs path>`.
+- P1 upload: three-surface vacancy (`ls <prefix>/**` must match no objects) before the lease work; after upload a
+  generation-bound ledger (`objects describe` size/CRC32C/generation per file) is sealed as the terminal object and the
+  remote set is validated exactly with `validate_exact_remote_object_set`.
+- P2 census: failure-exit census failure is recorded (`CENSUS_UNVERIFIED` marker + log line) instead of discarded.
+- Tests: `tests/greenfield/validation/test_chunk0_geometry_probe_runner.py` (3 static contracts) + updated chunk
+  pipeline test (M64-keyed one-row arm); 16 passed across the probe suites. Digest-bound loading dry-run on the real
+  checkpoint passes.
