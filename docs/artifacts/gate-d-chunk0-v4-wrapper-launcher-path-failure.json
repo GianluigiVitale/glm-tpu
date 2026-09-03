@@ -1,0 +1,45 @@
+{
+  "artifact_kind": "gate_d_chunk0_v4_wrapper_launcher_path_failure",
+  "schema_version": 1,
+  "observed_at_utc": "2026-09-03T16:48:00Z",
+  "code_hash": "59a63f8ed311ebe98dca04227601aca4b4610c78",
+  "tag": "greenfield_layer1_prompt_chunk0_geometry_20260903T163151687489928Z",
+  "command_was_adversarially_approved": true,
+  "failure": {
+    "stage": "embedded_runtime_boundary_verifier",
+    "exception": "FileNotFoundError",
+    "message": "[Errno 2] No such file or directory: '/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v3.py'",
+    "required_by_wrapper": "/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v3.py",
+    "actual_immutable_launcher": "/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v4.py",
+    "root_cause": "The runtime-boundary verifier heredoc retained a v3 launcher literal when the outer v4 chain was bumped. Existing tests checked installer-to-launcher and capsule-to-verifier paths but not this embedded pathname."
+  },
+  "effects": {
+    "local_run_directory_created": true,
+    "publisher_initialized": false,
+    "mirror_replay_started": false,
+    "jax_imported": false,
+    "tpu_initialized": false,
+    "tpu_compile_or_execution_performed": false,
+    "cloud_objects_written": false,
+    "numerical_or_performance_claim": false
+  },
+  "cleanup": {
+    "manual_failure_exit_census": "AUTHENTICATED_ZERO_WORK_8_OF_8",
+    "remote_live_vacant": true,
+    "remote_all_versions_vacant": true,
+    "remote_soft_deleted_vacant": true,
+    "tag_burned": true
+  },
+  "correction_plan": {
+    "version_bump": "install-v5/launcher-v5/capsule-v4",
+    "embedded_launcher_path_bound_to_launcher_install_path_by_test": true,
+    "probe_publisher_and_verifier_install_paths_bound_to_capsule_by_test": true,
+    "new_tag_required": true,
+    "protected_fix_proven": false
+  },
+  "review": {
+    "fable_max": "HARD_USAGE_LIMIT_NO_REVIEW",
+    "sol": "PENDING"
+  },
+  "classification": "FAILED_CLOSED_PRE_PUBLISHER_PRE_JAX_PRE_TPU;STALE_EMBEDDED_LAUNCHER_LITERAL;MANUAL_8_OF_8_CLEAN;TAG_BURNED;NO_NUMERICAL_OR_PERFORMANCE_CLAIM;GATE_D_OPEN"
+}

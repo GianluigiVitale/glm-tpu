@@ -13,13 +13,13 @@ from hashlib import sha256
 from pathlib import Path
 
 SOURCE_ROOT = Path(
-    "/opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v4"
+    "/opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v5"
 )
 INSTALLER_PATH = SOURCE_ROOT / "install_gate_d_layer1_prompt_chunk0_geometry_runtime.py"
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
-LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_layer1_prompt_chunk0_geometry_v4.py"
+LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_layer1_prompt_chunk0_geometry_v5.py"
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-prompt-chunk0-geometry-v3"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-prompt-chunk0-geometry-v4"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -28,11 +28,11 @@ EXPECTED_ENVIRONMENT = {
     "PYTHONDONTWRITEBYTECODE": "1",
 }
 PAYLOADS = {
-    "probe_layer1_prompt_chunk0_geometry.py": "0cdc091b4cf25887faec07c62bf3ae47cfb2d1324a1f73fd5320f8c0cc39af01",
-    "publish_gate_d_layer1_prompt_chunk0_geometry.py": "0f1a5b8f18c80ef405e9915455415032b2f798e9b4a57f79a035f9b1489bab97",
-    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "10c47c7b4336bb1762427ccbbf8ee82ffc7a9aa43605e7d009d05d2c67eb48ca",
+    "probe_layer1_prompt_chunk0_geometry.py": "f1e7b8cd81e7fee7c236957b2a4aba130134bc1bcce098b6be8a2a086b0c9740",
+    "publish_gate_d_layer1_prompt_chunk0_geometry.py": "33ceeb43e6b76794df9508f6eee88847e9dc0b31171a5e3dc1b79e24545f17c1",
+    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "b8b82073bb92ad9c7e3a91d052ef4d3ceaa64e3e8aa3626f68adf5d0d9bb11fa",
     "verify_gate_d_rewrite_same_region_git_mirror.py": (
-        "1994c5f9637b63def9814d049d16e8326db8b30d5654c04d34baef0d1e2cc3fa"
+        "e08bbff13075a9a82dd95ba8311c3f96f624c092f6a20ec38be5690612cfbe40"
     ),
 }
 CAPSULE_NAMES = (

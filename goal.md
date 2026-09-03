@@ -36,11 +36,11 @@ strong <=125, stretch <=100.
 ## Resume checkpoint — 2026-09-03
 
 Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; pushed tip
-`c7ce892e…855d`. The v2 four-chip chunk0 run `…130504318767505Z` executed and ended 8/8 clean, but
+`59a63f8e…1c78`. The v2 four-chip chunk0 run `…130504318767505Z` executed and ended 8/8 clean, but
 its DB518 control failed on all 2048 rows (74,299 lanes, median 35/row, max delta 0.03125).
 Diagnostic ledger `fd634ca0…92b54`, arrays `ae2026ec…49da`, HLO `c0398830…76b4`; see
-`docs/artifacts/gate-d-chunk0-v2-internal-wk-materialization-diagnosis.json`. The layer-1 arm has no
-standing and Gate D is open.
+`docs/artifacts/gate-d-chunk0-v2-internal-wk-materialization-diagnosis.json`. Layer-1 has no
+standing; Gate D is open.
 
 High-confidence diagnosis: raw-FP8 wk materialization inside the large executable matched DB519's
 rejected all-row signature; causality and the protected fix remain unproven. The committed WK
@@ -48,13 +48,13 @@ correction separately completes raw→BF16→FP32 for wk0/wk1, then passes FP32 
 Its publisher structurally proves exact ENTRY/root/live-output boundaries and
 rejects raw/scale/BF16 rematerialization; hostile mutations are tested. Forced-CPU suite 34/34;
 boundary suite 20/20. Adversarial Sol approved after two real P1 fixes, with no remaining P0–P2.
-Required narrow Fable-max attempt hit its usage limit without review.
+Required narrow Fable-max attempts hit the usage limit without review.
 
-Pre-install inspection caught v3 requiring its old capsule path; nothing was installed/launched. The
-uncommitted v4 chain aligns install-v4/launcher-v4/capsule-v3, mirror-binds
-its successor certificate, and passes 34/34 CPU tests. Exact next: Sol review, commit/push, same-region
-mirror, install only, then separate execution review after vacancy/locks/pod/8-host preflight. Run one
-fresh chunk0 tag only. Control must be exact before row0 adjudicates geometry; do not launch 8K.
+V4 installed but its launch failed before publisher/JAX/TPU: the wrapper heredoc still named
+launcher-v3. Tag `…163151687489928Z` is burned; remote stayed vacant; manual exit census 8/8 clean.
+The v5 chain binds embedded/child paths to launcher-v5/capsule-v4; 34/34 CPU tests. Exact next:
+Sol review, commit/push/mirror, install only, then separate
+execution review after fresh vacancy/locks/pod/census. Run one fresh chunk0 only; do not launch 8K.
 
 ## After Gate D
 

@@ -3720,3 +3720,15 @@ persistence only; review and persistence precede any v2 installation.
 - The v4 successor aligns install-v4/launcher-v4/capsule-v3 and directly tests verifier/capsule identity. Forced-CPU
   suite 34/34. Certificate `docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v4-source.json` SHA
   `1619b2a6…7c047`; staging tree `4892aae1…93ca5`; tag `…163151687489928Z`. Final Sol review pending; no claim.
+
+## 2026-09-03 — chunk0 v4 launcher-literal failure and v5 source
+
+- Pushed/mirrored pin `59a63f8e…1c78`; exact v4 install-only succeeded. After full admission and Sol approval, launch
+  failed in the wrapper's embedded verifier because it retained launcher-v3 while installed launcher was v4. Only
+  local run/hlo directories were created; no publisher/JAX/TPU/cloud write. Remote live/all-version/soft-deleted
+  histories are vacant and manual exit census is 8/8 clean. Tag is burned. Failure artifact
+  `docs/artifacts/gate-d-chunk0-v4-wrapper-launcher-path-failure.json` SHA `474f755f…785b18`.
+- V5 aligns install-v5/launcher-v5/capsule-v4 and tests the embedded launcher plus all child self-paths against the
+  launcher's targets. Boundary 20/20; focused CPU 34/34. Certificate `…geometry-v5-source.json` SHA
+  `c84e0496…c19d7ea`, staging `ccda2fe0…e422f`, tag `…165338499173468Z`. Fable-max quota-limited; Sol review pending;
+  no claim; Gate D open.

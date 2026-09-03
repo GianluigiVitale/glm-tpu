@@ -11735,3 +11735,21 @@ mirror-binds both the append-only v3 predecessor and new v4 source certificate. 
 Append-only v4 certificate `docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v4-source.json` SHA
 `1619b2a6…7c047`; immutable install-v4 staging tree `4892aae1…93ca5`; proposed never-used tag
 `greenfield_layer1_prompt_chunk0_geometry_20260903T163151687489928Z`. No install/TPU authority until final Sol review.
+
+## 2026-09-03 17:00Z — v4 failed before publisher/JAX/TPU; v5 correction staged
+
+Pin `59a63f8ed311ebe98dca04227601aca4b4610c78` was pushed/mirrored and v4 install-only reported
+`launcher_invoked=false`. Same-region replay, three-scope vacancy, four simultaneous locks, healthy pod and 8/8
+preflight passed; Sol approved execute-once. It failed immediately because the wrapper's embedded verifier still
+opened launcher-v3 while the installed launcher was v4. Only local run/hlo directories were created; publisher,
+mirror replay, JAX and TPU were never reached. Tag `…163151687489928Z` is burned; remote history remains vacant;
+manual exit census is 8/8 clean. Failure artifact `docs/artifacts/gate-d-chunk0-v4-wrapper-launcher-path-failure.json`
+SHA `474f755f…785b18`; no numerical/performance claim. The required narrow Fable-max attempt was quota-limited.
+
+V5 uses install-v5/launcher-v5/capsule-v4. Regressions bind the wrapper heredoc launcher and each probe/publisher/
+verifier self-path to exact launcher targets; the verifier mirror-binds the v5 certificate. Hashes: verifier
+`e08bbff1…fbe40`, probe `f1e7b8cd…c9740`, publisher `33ceeb43…f17c1`, wrapper `4594d0c3…f7314`, launcher
+`b8b82073…b11fa`, installer `fba64b5c…3e885`. Boundary tests 20/20; focused suite 34/34 in 37.95 s. Certificate
+`docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v5-source.json` SHA `c84e0496…c19d7ea`; staging
+`ccda2fe0…e422f`; tag `greenfield_layer1_prompt_chunk0_geometry_20260903T165338499173468Z`.
+Review pending; v5 is not installed/launched.

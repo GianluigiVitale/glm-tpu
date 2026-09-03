@@ -44,7 +44,7 @@ def test_runner_pins_inputs_digests_and_sealed_interpreter():
     assert 'TAG=${GLM_GATE_D_CHUNK0_GEOMETRY_TAG:-}' in runner
     assert "unsafe Gate-D chunk-0 geometry tag" in runner
     # The only executed probe pathname is the root-owned immutable capsule.
-    assert "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v3" in runner
+    assert "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v4" in runner
     assert '"$SEALED_PYTHON" -I -S -B -u "$PROBE"' in runner
     assert "$PROBE_LOCAL" not in runner and "/source/probe_layer1" not in runner
     assert '--code-pin "$PIN"' in runner and '--repository "$WORKTREE"' in runner
@@ -230,6 +230,8 @@ def test_capsule_hash_chain_and_second_vacancy_check_are_bound():
 def test_installer_and_launcher_have_a_strict_install_only_boundary():
     installer_module = _load_module("chunk0_installer", INSTALLER)
     launcher_module = _load_module("chunk0_launcher", LAUNCHER)
+    probe_module = _load_module("chunk0_probe_install_path", PROBE)
+    publisher_module = _load_module("chunk0_publisher_install_path", PUBLISHER)
     installer = INSTALLER.read_text()
     launcher = LAUNCHER.read_text()
     expected = {
@@ -243,7 +245,7 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
     assert installer_module.PAYLOADS == expected
     assert str(installer_module.CAPSULE_TARGET).startswith("/usr/local/libexec/glm-tpu/")
     assert str(installer_module.LAUNCHER_TARGET).endswith(
-        "launch_gate_d_layer1_prompt_chunk0_geometry_v4.py"
+        "launch_gate_d_layer1_prompt_chunk0_geometry_v5.py"
     )
     assert str(installer_module.LAUNCHER_TARGET).startswith("/opt/glm-tpu/bin/")
     assert installer.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
@@ -251,6 +253,11 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
     assert "subprocess" not in installer and "execve" not in installer
     assert launcher.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
     assert str(launcher_module.INSTALL_PATH) == str(installer_module.LAUNCHER_TARGET)
+    assert f'launcher = Path("{launcher_module.INSTALL_PATH}")' in RUNNER.read_text()
+    assert probe_module.INSTALL_PATH == launcher_module.PROBE_PATH
+    assert publisher_module.INSTALL_PATH == launcher_module.PUBLISHER_PATH
+    assert str(launcher_module.PROBE_PATH) == f"{launcher_module.CAPSULE_ROOT}/{PROBE.name}"
+    assert str(launcher_module.PUBLISHER_PATH) == f"{launcher_module.CAPSULE_ROOT}/{PUBLISHER.name}"
     assert launcher_module.WRAPPER_SHA256 == sha256(RUNNER.read_bytes()).hexdigest()
     assert "fcntl.LOCK_EX | fcntl.LOCK_NB" in launcher
     assert 'f"/proc/self/fd/{WRAPPER_FD}"' in launcher
@@ -271,6 +278,7 @@ def test_mirror_verifier_is_bound_to_the_rewrite_branch_and_reviewed_base():
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-orchestration-source.json",
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v3-source.json",
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v4-source.json",
+        "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v5-source.json",
         "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py",
         "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py",
         "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py",
