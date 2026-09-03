@@ -22,17 +22,17 @@ from typing import Any
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v3/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v4/"
     "publish_gate_d_original_db518_prompt_key_chunk0.py")
 SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_original_db518_prompt_key_chunk0.py")
 CONTRACT_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v3/"
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v4/"
     "original_db518_prompt_key.py")
 CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/original_db518_prompt_key.py")
 CONTRACT_SHA256 = (
-    "056500262426a07b5258c41d8750c09f9eee2301073f884575db794772c4021c")
+    "a4f690e4cb3fcda801563f3f297c920857f434411bb3089a15a28f50ab2abdcc")
 PROMPT_CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/prompt_index_cache.py")
 PARENT_PATH = "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"

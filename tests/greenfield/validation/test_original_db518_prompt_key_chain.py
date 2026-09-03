@@ -19,9 +19,9 @@ LAUNCHER = REPO / "scripts/greenfield/launch_gate_d_original_db518_prompt_key_ch
 INSTALLER = REPO / "scripts/greenfield/install_gate_d_original_db518_prompt_key_runtime.py"
 CONTRACT = REPO / "glm_tpu/greenfield/validation/original_db518_prompt_key.py"
 VERIFIER = REPO / "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py"
-CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v3-source.json"
+CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v4-source.json"
 STAGING = Path(
-    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v3-staging"
+    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v4-staging"
 )
 
 
@@ -91,7 +91,9 @@ def test_mirror_verifier_exact_authority_membership():
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-source.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v2-source.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v3-source.json",
+        "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v4-source.json",
         "docs/artifacts/gate-d-original-db518-v2-probe-install-path-failure.json",
+        "docs/artifacts/gate-d-original-db518-v3-stablehlo-scatter-count-failure.json",
         "glm_tpu/greenfield/benchmarking/numpy_safetensors.py",
         "glm_tpu/greenfield/benchmarking/sealed_runtime.py",
         "glm_tpu/greenfield/kernels/reference/dsa.py",
@@ -144,13 +146,25 @@ def test_launcher_preflights_exact_publisher_before_tag_directory_creation():
 def test_publisher_contract_loads_in_isolated_no_site_runtime():
     pin = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=REPO, text=True).strip()
+    prompt_contract = REPO / "glm_tpu/greenfield/validation/prompt_index_cache.py"
     program = (
-        "import runpy; from pathlib import Path; "
-        f"p=runpy.run_path({str(PUBLISHER)!r}); "
-        "p['_load_contract'].__globals__['CONTRACT_PATH']="
-        f"Path({str(CONTRACT)!r}); "
-        f"c=p['_load_contract']({pin!r}); "
-        "print(c.ORIGINAL_DB518_CODE_HASH)"
+        "import runpy\n"
+        "from pathlib import Path\n"
+        f"p=runpy.run_path({str(PUBLISHER)!r})\n"
+        f"contract=Path({str(CONTRACT)!r})\n"
+        f"prompt=Path({str(prompt_contract)!r})\n"
+        f"pin={pin!r}\n"
+        "def git_bytes(*args):\n"
+        "    if args == ('show', pin + ':' + p['CONTRACT_SOURCE_PATH']):\n"
+        "        return contract.read_bytes()\n"
+        "    if args == ('show', pin + ':' + p['PROMPT_CONTRACT_SOURCE_PATH']):\n"
+        "        return prompt.read_bytes()\n"
+        "    raise RuntimeError('unexpected isolated test Git query')\n"
+        "loader=p['_load_contract']\n"
+        "loader.__globals__['CONTRACT_PATH']=contract\n"
+        "loader.__globals__['_git_bytes']=git_bytes\n"
+        "c=loader(pin)\n"
+        "print(c.ORIGINAL_DB518_CODE_HASH)\n"
     )
     result = subprocess.run(
         [sys.executable, "-I", "-S", "-B", "-c", program],

@@ -1,0 +1,37 @@
+{
+  "artifact_kind": "gate_d_original_db518_v3_stablehlo_scatter_count_failure",
+  "authorization": {
+    "consumer": false,
+    "full_8k": false,
+    "numerical_execution": false,
+    "performance_claim": false,
+    "producer_invocation": false
+  },
+  "classification": "OPTIMIZED_HLO_CANONICAL_EXACT;STABLEHLO_VALIDATOR_FALSE_REJECTION_BEFORE_PRODUCER_INVOCATION;DIAGNOSTIC_PUBLISHED;TAG_BURNED;NO_NUMERICAL_CLAIM;GATE_D_OPEN",
+  "code_hash": "b53cb892bb1007d48b204d4e4f4b4a40167640a7",
+  "created_utc": "2026-09-03T20:58:00Z",
+  "diagnostic": {
+    "ledger_generation": "1788468884242790",
+    "ledger_sha256": "150a95ebe9a7d674b448b59e19ba98f54ad80080725accccaf408113641b8493",
+    "receipt_sha256": "1ef6ae02fa42c642571340949d1c640da84cfcb6f1fcfd6ed10769b68ac0a780",
+    "remote": "gs://driftbench-dsv4-uc/results/greenfield/glm52/original_db518_prompt_key_chunk0/greenfield_original_db518_prompt_key_chunk0_20260903T204510395633719Z/diagnostic/diagnostic_objects.json"
+  },
+  "fleet": {
+    "failure_exit_census_clean_hosts": 8,
+    "failure_exit_census_sha256": "bf139620a12d3dac41dfa84325fc94dc4db4b9a891f8587dbe146db45d3766c8",
+    "pre_census_clean_hosts": 8,
+    "pre_census_sha256": "01d12d51e73e43ed7930f443ac4566290933fc535bbde45105bedb6d3e13ddb8"
+  },
+  "hlo": {
+    "contract_failure_sha256": "caa23d0f5f6d7cb84ddf1074e1c669427511d289eeafe96763c7a3f602691763",
+    "optimized_hlo_canonical_passed": true,
+    "optimized_hlo_sha256": "316e6b600e1945d0f6882dc446c24e37c0572d56d85ec285bc4a9ecafaa68b5d",
+    "stablehlo_actual_scatter_operations": 1,
+    "stablehlo_raw_scatter_token_count": 2,
+    "stablehlo_sha256": "e3d94a247545f27aa800bf687b650c346bc248fa850217739d3651061c0296f3"
+  },
+  "root_cause": "The StableHLO validator counted every raw 'stablehlo.scatter' token. The single emitted scatter operation contains both the quoted operation name and a #stablehlo.scatter dimension-number attribute, so the validator observed two and falsely rejected an otherwise exact canonical graph.",
+  "run_tag": "greenfield_original_db518_prompt_key_chunk0_20260903T204510395633719Z",
+  "schema_version": 1,
+  "status": "PROTECTED_PRE_INVOCATION_DIAGNOSTIC"
+}

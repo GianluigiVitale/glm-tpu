@@ -37,6 +37,11 @@ _ENTRY_RE = re.compile(
 )
 _ROOT_RE = re.compile(r"^  ROOT %[\w.-]+ = bf16\[24,16,32,128\][^\n]*$",
                       re.MULTILINE)
+_STABLE_SCATTER_OPERATION_RE = re.compile(
+    r'^\s*%[\w.$#-]+(?:\:[0-9]+)?\s*=\s*'
+    r'(?:(?:"stablehlo\.scatter")|(?:stablehlo\.scatter))(?:\s|\()',
+    re.MULTILINE,
+)
 _STABLE_SIGNATURES = (
     "tensor<24x16x32x128xbf16>",
     "tensor<16xi32>",
@@ -165,7 +170,7 @@ def validate_original_db518_prompt_key_stablehlo(text: str) -> dict[str, Any]:
             f"StableHLO contains forbidden operations: {forbidden}")
     if text.count("stablehlo.while") != 1:
         violations.append("StableHLO must retain exactly one M64 map loop")
-    if text.count("stablehlo.scatter") != 1:
+    if len(_STABLE_SCATTER_OPERATION_RE.findall(text)) != 1:
         violations.append("StableHLO must retain exactly one cache scatter")
     if text.count("stablehlo.cosine") != 1 or text.count(
             "stablehlo.sine") != 1:

@@ -95,7 +95,9 @@ def _stablehlo() -> str:
         "  // tensor<128x6144xf32>",
         "  // tensor<128xbf16>",
         "  %0 = stablehlo.while ...",
-        "  %1 = stablehlo.scatter ...",
+        ('  %1 = "stablehlo.scatter"(%arg0, %arg1, %arg2) '
+         '<{scatter_dimension_numbers = #stablehlo.scatter<update_window_dims '
+         '= [1]>}> ...'),
         "  %2 = stablehlo.cosine ...",
         "  %3 = stablehlo.sine ...",
         "}",
@@ -104,8 +106,11 @@ def _stablehlo() -> str:
 
 def test_stablehlo_contract_accepts_exact_surface_and_rejects_bypasses():
     text = _stablehlo()
+    assert text.count("stablehlo.scatter") == 2
     assert db518.validate_original_db518_prompt_key_stablehlo(text)["passed"]
     assert not db518.validate_original_db518_prompt_key_stablehlo(
         text + "\nstablehlo.all_reduce")["passed"]
     assert not db518.validate_original_db518_prompt_key_stablehlo(
-        text.replace("stablehlo.scatter", "stablehlo.add"))["passed"]
+        text.replace('"stablehlo.scatter"', '"stablehlo.add"'))["passed"]
+    assert not db518.validate_original_db518_prompt_key_stablehlo(
+        text + '\n  %9 = "stablehlo.scatter"(%a, %b, %c) ...')["passed"]
