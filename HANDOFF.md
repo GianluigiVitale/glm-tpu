@@ -11303,3 +11303,18 @@ its `tpu_inference/runner/dcp_cache_dump.py` is byte-identical to the accepted p
 all eight hosts. The layer-0 prompt-cache captures of 08-08 predate the pod recreation. Tag burned; no claim.
 Next: route the prompt-cache mode through the fleet-present observer runtime (same bundle transport and
 distance/pin prerequisites as the layer-1 RMS-input mode), Sol review, one fresh tag.
+
+### Prompt-cache mode gains the recreated-pod legacy runtime (`GLM_GREENFIELD_PROMPT_CACHE_RUNTIME=layer1_observer_bundle`)
+
+Default `oracle` keeps the original behaviour (per-host `/home/gianl/tpu-inference` at `b3c25df47`). With
+`layer1_observer_bundle` the prompt-cache-only mode reuses, unchanged, the reviewed recreated-pod path of the
+layer-1 RMS-input mode: self-contained observer bundle (`/home/gianl/tpu-inference-greenfield-layer1-rms-input-observer`
+branch `greenfield/legacy-layer1-rms-input-observer`, pin `8dc7d20f`, 12 commits over `b3c25df47`, 947 tracked
+entries) copied to all eight hosts and reconstructed at `/home/gianl/tpu-inference-dsa-internal-8dc7d20fe`; exact
+vLLM source archive (`a30addc7`, 5,493 entries) at `/tmp/glm_vllm_<tag>`; `PYTHONPATH=<runtime>:<vllm>` for the
+legacy workers (also asserted in the raylet environment check); bundle-ancestry oracle prerequisite; tag-scoped
+transport cleanup. A new `BUNDLE_RUNTIME` flag keys every one of those sites (layer-1 RMS-input or this runtime).
+Finalization (argv 40) verifies the bundle/vLLM identity files and 8/8 fleet receipts and records the runtime pin,
+bundle digest and accepted oracle pin in the SUCCESS record. The observer hooks are unarmed in this mode
+(`GLM_DSA_DUMP_INTERNALS` unset); the wrapper's exact DSA-event comparison against the sealed 8K oracle still gates
+the capture, and `dcp_cache_dump.py` is byte-identical between `8dc7d20f` and `b3c25df47`.
