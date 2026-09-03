@@ -11327,3 +11327,13 @@ dir `/home/gianl/tpu-inference-dsa-internal-c7973435a`, installed by the bundle 
 controller checks (dev-repo HEAD == branch ref == pin) hold without moving any branch, and no rejected observer
 code path exists in the transported runtime. Also noted: the layer-1 RMS-input mode itself can no longer satisfy
 its own `8dc7d20f` pin against the advanced branch tip; it is not used here.
+
+### Sol rounds 27/28: bundle-runtime prompt-cache capture approved and launched (second attempt)
+
+Round 27 approved the 8dc7d20f variant (not launched: the dev-repo tip is the tombstone, see correction above).
+Round 28: `APPROVE PERSISTENCE ea477c2b…` and `APPROVE EXECUTE ONCE
+greenfield_legacy_layer1_prompt_index_cache_20260903T000356727206404Z 4623a4e2853aa010c4b97d2ee9fc4c0e93b46929`.
+Mirror verifier for tooling `b37c2926`: checkout archive `7797cb59eeec302355eb4d1a82feb49d71a266c479efe43a4052543c45c01a1c`,
+fsck true, origin exact; mirror carries rewrite `4623a4e2`; pod READY/HEALTHY; cron tick 00:05:23Z; launched
+00:07:48Z from the rewrite worktree at `4623a4e2` with `GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID=1
+GLM_GREENFIELD_PROMPT_CACHE_RUNTIME=layer1_observer_bundle`. Result pending below.
