@@ -1220,3 +1220,10 @@ normalized-state cause.
   but not the file digest, because the safetensors header differs).
 - "Reproduces the selection with the oracle's tensors substituted" proves sufficiency of the remaining
   input, not exactness of the substituted one; write the weaker claim.
+- A teacher-forced scan through the decode step reproduces the legacy decode arithmetic, not the legacy batched
+  prefill: the layer-1 prompt keys differ in every one of 8,155 rows at BF16-ulp level, from position 0, while the
+  layer-0 keys (embeddings only) are exact. Any layer's prompt cache must be proven against a legacy capture of that
+  layer before the decode side is blamed; three full 8K runs were spent on a decode-side norm that was never the cause.
+- When a per-host prerequisite is a local Git checkout, a recreated pod silently invalidates every mode that assumes
+  it; route recreated-pod captures through self-contained transported bundles and preflight the controller's own
+  pin/branch checks (dev-repo HEAD == branch tip == pin) before asking for execution approval.

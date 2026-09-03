@@ -11327,3 +11327,159 @@ dir `/home/gianl/tpu-inference-dsa-internal-c7973435a`, installed by the bundle 
 controller checks (dev-repo HEAD == branch ref == pin) hold without moving any branch, and no rejected observer
 code path exists in the transported runtime. Also noted: the layer-1 RMS-input mode itself can no longer satisfy
 its own `8dc7d20f` pin against the advanced branch tip; it is not used here.
+
+### Sol rounds 27/28: bundle-runtime prompt-cache capture approved and launched (second attempt)
+
+Round 27 approved the 8dc7d20f variant (not launched: the dev-repo tip is the tombstone, see correction above).
+Round 28: `APPROVE PERSISTENCE ea477c2b…` and `APPROVE EXECUTE ONCE
+greenfield_legacy_layer1_prompt_index_cache_20260903T000356727206404Z 4623a4e2853aa010c4b97d2ee9fc4c0e93b46929`.
+Mirror verifier for tooling `b37c2926`: checkout archive `7797cb59eeec302355eb4d1a82feb49d71a266c479efe43a4052543c45c01a1c`,
+fsck true, origin exact; mirror carries rewrite `4623a4e2`; pod READY/HEALTHY; cron tick 00:05:23Z; launched
+00:07:48Z from the rewrite worktree at `4623a4e2` with `GLM_GREENFIELD_PROMPT_CACHE_LAYER_ID=1
+GLM_GREENFIELD_PROMPT_CACHE_RUNTIME=layer1_observer_bundle`. Result pending below.
+
+## 2026-09-03 01:15Z — legacy layer-1 prompt index cache captured and compared: every greenfield prompt row differs at BF16-ulp level
+
+Legacy oracle tag `greenfield_legacy_layer1_prompt_index_cache_20260903T000356727206404Z` (rewrite pin `4623a4e2`,
+runtime = observer branch tip `c7973435`, slot 2): launched 00:07:48Z, legacy runtime up 00:08:55Z, passkey item
+00:09:33Z, dumps gathered 01:01:39Z (483 top-k + 8 cache files, DB run 566 item 1870), sealed 01:02:26Z, SUCCESS
+01:03:35Z, census post 8/8. Sealed cache: manifest `d9058cc6584aca784212706789e72b4981754cb9880e553122b5e854bc3961ac`,
+tensor `afe683d85e5b62ea4060388279ba833e621eb09be63ef668f7e00b9f762552ec`, bits sha `8d656d71…`, remote
+`gs://driftbench-dsv4-uc/oracles/greenfield/glm52/prompt_index_cache/8k/<tag>/prompt_index_cache/`. SUCCESS
+(`0fcf18e7a42a1db066e0b53940013581ded35098e58978b83f968e78c54a5f69`) records `prompt_index_cache_layer_id=1 cache_slot=2 legacy_runtime=layer1_observer_bundle
+legacy_runtime_pin=c7973435…`. The prompt-cache mode writes no DSA-event exactness field itself; offline,
+`compare_short_context_dsa_oracles(sealed 8K oracle f8154c5f…, this run's fresh oracle ce4cf4e5…)` is **exact: True**
+for all five arrays (all 14 decode steps × 21 events) — `/home/gianl/glm-run/greenfield_legacy_layer1_prompt_index_cache_20260903T000356727206404Z/dsa_exact_comparison_offline.json` (`770415668e5963a9c62c040e8eec1cf927a760b26329f0208dee6660fbbb7b15`) — so the
+tombstone-pin runtime reproduced the accepted oracle bitwise.
+
+Offline comparison (`scripts/greenfield/compare_layer1_prompt_index_cache_offline.py`, capsule
+`docs/artifacts/gate-d-layer1-prompt-cache-legacy-vs-db518.json` sha `e16ccac0c63d04e0e1b32442255d5ae2868605dca8945eb760b6212b2a0058ce`), classification
+`LAYER1_PROMPT_INDEX_CACHE_8155_OF_8155_ROWS_MISMATCH;LEGACY_CACHE_REPRODUCES_ORACLE_EVENT1;CPU_EVIDENCE_ONLY;…`:
+- Authentication: the legacy cache under the legacy layer-1 query/head weights/current key reproduces the sealed
+  oracle's event-1 set exactly (0/0).
+- Legacy vs greenfield (DB518 capture `534bacc5…`) layer-1 prompt cache: **8,155 of 8,155 rows differ**, 173,125 of
+  1,043,840 BF16 lanes (16.6%); per row min 4 / median 21 / max 50 lanes of 128; every legacy prefill chunk
+  (2048/2048, 2048/2048, 2048/2048, 2011/2011) and every 512-row page; first mismatched position 0 (47 lanes),
+  last 8154. Magnitude: 79% of mismatched lanes differ by exactly 1 BF16 ulp, 8.6% by 2, a thin tail reaches
+  hundreds of ulps only where the key value is near zero; max |Δ| 0.03125, mean |Δ| 2.05e-4.
+Reading: a pervasive rounding-level deviation of the layer-1 prompt keys in every row from position 0 onward — not a
+chunk-boundary, attention-window or paging artifact. The same key path (physical-M64 prompt-key repair + k_norm)
+made the layer-0 prompt cache exact for all 8,155 rows, so the prompt-row **residual stream entering layer 1**
+(the layer-0 block computed per prompt row by the teacher-forced scan with decode-step arithmetic, versus the legacy
+batched 2,048-row prefill) is the prime suspect; position 0, where attention reduces to a single key, points at the
+row-wise arithmetic (projections, o_proj/StrategyND, dense MLP, norms, residual adds) rather than at attention over
+many positions. Not yet proven on TPU. The DB518 cache comes from the PP16 feature-2 program; the live decoder's
+layer-1 cache differs from it in at most ~52 positions (score residual analysis), which cannot explain 8,155 rows.
+
+Consequence for Gate D: exact DSA selected sets at 8K require legacy-prefill-exact prompt caches for all 21 indexer
+layers, i.e. a greenfield prefill whose per-row arithmetic matches the legacy batched prefill — the decode-step
+numerics are legacy-exact through layer 1 and are no longer the blocker. Next admissible evidence (bounded, one
+Sol batch): capture legacy layer-1 prompt-row internals at one prompt position (p0 or p113: residual input,
+normalized hidden, key) through the existing legacy internals machinery generalized to layer 1, and compare with the
+greenfield teacher-forced row to localize the first diverging sub-boundary of the layer-0 block; then decide the
+prefill plan. No protected 8K decoder launch.
+
+### Deviation profile and the legacy prefill geometry (offline, 01:40Z)
+
+- Per-row mismatch of the layer-1 prompt keys is flat: mean 21 of 128 lanes in every 128-row bin from position 1 to
+  8154, per legacy chunk 21.4/21.3/21.0/21.1, correlation with position or position-within-chunk ≈ 0; only position 0
+  is an outlier (47 lanes). Not an attention-length, chunk-boundary or paging effect → row-wise arithmetic.
+- Accepted legacy prefill step HLO (`prompt_projection_lowering` oracle `…20260809T105858202006975Z`,
+  `jit_step_fun_impl.m64.owner0.after_codegen_hlo.txt.gz`, 84 MB, entry `%main.1792_spmd`, per model-parallel owner):
+  156 convolutions → `f32[2048,6144]`, 78 → `f32[2048,82]` (the fused q-a/kv-a shard width, M=2048 rows), 78 →
+  `f32[2048,512]`, 78 → `f32[2,2048,512]`, 156 → `f32[64,64,512]`, 78 → `f32[2,256,2048]`, 75 → `f32[2048,128]`,
+  75 → `bf16[2048,256]`, 3 → `f32[2048,768]` (dense gate/up per shard), and for the 21 indexer layers `f32[64,128]`
+  (wk over `bf16[64,6144]`), `f32[64,32]`, `f32[64,4096]`, `f32[64,512,32]`; 540 `tpu_custom_call` (Pallas
+  attention/scatter), reduces `f32[2048]` ×235 (norm variances over 2,048 rows), `f32[64,64]` ×156, `f32[64]` ×120.
+  So the legacy computes every prompt-row projection, MLP and norm in 2,048-row batches (index keys in 64-row groups,
+  which the greenfield already reproduces via `physical_m64_chunk`), while the teacher-forced scan uses the
+  single-row decode forms. XLA's tiling/accumulation for M=2048 differs from M=1/M32 at rounding level.
+- Plan: (1) read the layer-0 block of the legacy prefill HLO (op order, fusion boundaries, dtypes) offline; (2) one
+  bounded greenfield TPU probe computing the layer-1 prompt key for prompt row 0 (attention over a single key is
+  trivial) with the layer-0 block in legacy M=2048 geometry versus the decode form, compared bitwise with the sealed
+  legacy row 0 (currently 47 lanes off) — confirms or refutes the geometry mechanism without another legacy capture;
+  (3) then rows ≥1, which additionally need the legacy prefill attention arithmetic (Pallas custom call).
+
+### Legacy prefill layer pipeline (from the accepted step HLO) and the decision in front of the owner
+
+Per 2,048-row chunk and per model-parallel owner, one layer of the legacy prefill is: embedding
+`gather_custom_fusion` bf16[2048,6144] → input norm as **sharded partial sums + 32-way all-reduce**
+(`fusion.3122` f32[2048] ← `all-reduce.3`, `add_rsqrt_fusion`, normalized `fusion.3441`) → fused q-a/kv-a
+`bf16[2048,1,82]` (kOutput convolution, M=2048) → sharded q-a norm (`f32[2048]` partial, `all-reduce.4`,
+`bf16[2048,64]`) → all-gather + q-b `bf16[2048,512]` → attention (`f32[2,2048,512]`, `bf16[2,256,2048]`, Pallas
+`tpu_custom_call`) → o_proj `bf16[2048,6144]` per owner → **`psum` all-reduce in BF16** → post-attention norm with
+fused residual (`multiply_reduce_fusion` f32[2048]) → dense gate/up `bf16[2048,1,768]` → down `bf16[2048,6144]` →
+**BF16 all-reduce** → next layer's norm with fused residual adds. Index keys: wk over `bf16[64,6144]` in 64-row
+groups (already reproduced by `physical_m64_chunk`). Versus the greenfield teacher-forced scan (single-row decode
+forms; full-row `f32[32,6144]` norm reduce; f32 StrategyND association for o_proj/down; decode attention), the
+legacy prompt rows differ in norm reduction association, matmul M-geometry (2048 vs 1/32), collective dtype/order
+(BF16 32-way psum), fusion boundaries of the residual adds, and the attention kernel. Each of these can perturb the
+BF16 row at the ulp level — matching the flat ~21-lane deviation.
+
+Options for Gate D's exact-DSA requirement:
+- **A. Legacy-prefill-faithful prompt path in greenfield** (native JAX): reproduce the legacy prefill arithmetic for
+  prompt rows layer by layer (sharded norm + all-reduce order, M=2048 FP8 convs, BF16 32-way psum association on the
+  same 32-chip axis, blocked prefill attention, MoE at the legacy group geometry). Bounded first step: a 32-chip probe
+  that computes the layer-1 prompt key of row 0 (attention over one key is trivial) in legacy geometry and compares
+  bitwise with the sealed legacy row 0 (now 47 lanes off); then rows ≥1 with the prefill attention. Large, but every
+  step is testable against the sealed 8,155-row layer-1 cache without further legacy captures.
+- **B. Re-seal the 8K oracle with a different legacy prefill chunking** (`bench/engine.py` `max_batched_tokens`,
+  default 4096; the sealed oracle used 2,048): would change the oracle definition and still leaves the legacy prefill
+  attention kernel and sharded norms in place for prompt rows, so it is not obviously simpler; owner/Sol decision only.
+Recommendation: A, starting with the row-0 probe. No protected 8K decoder launch until a prompt-row boundary is exact.
+
+### Specification — bounded probe "layer-1 prompt keys of chunk 0 in legacy prefill geometry" (next milestone)
+
+Goal: compute the layer-1 index keys of prompt rows 0..2047 with the layer-0 block executed in the legacy prefill
+geometry and compare bitwise with the sealed legacy layer-1 cache rows (tag `…20260903T000356727206404Z`,
+manifest `d9058cc6…`). Row 0 is decisive (attention over one key is trivial); rows ≥1 measure how much of the
+deviation remains once projections/norms/MLP are legacy-shaped (the prefill attention kernel is left as is).
+Legacy per-op arithmetic (from `jit_step_fun_impl.m64.owner0.after_codegen_hlo`, one owner of 32):
+- FP8 dequant: `bf16(f32(fp8) * f32(scale_expanded))`, scales pre-expanded to the full `[K,N]`; conv
+  `bf16[M,K] x bf16[K,N] -> f32[M,N] -> bf16`, M = 2048 for q-a/kv-a (N=82/owner), q_b (K=2048,N=512/owner),
+  o_proj (K=512/owner, N=6144), gate/up merged (K=6144, N=768/owner), down (K=384/owner, N=6144); index wk in
+  64-row groups (`physical_m64_chunk`, already exact).
+- Input norm: `sum_f32(x²)` over the full 6144 row (mask: invalid rows → NaN select), `rsqrt(sum*0.000162760422
+  + 1e-5)`, `bf16(bf16(f32(x)*rsqrt) * w)` (two BF16 roundings). q-a norm: per-owner `sum(f32(q[:64])²)` →
+  f32 all-reduce over 32 owners → `rsqrt(sum*0.00048828125 + 1e-5)` → `bf16(f32(q)*rsqrt)`; the weight is applied
+  after the all-gather (`bf16(f32(q_gathered)*f32(w))`, `fused_computation.9309`).
+- o_proj and down partials are `bf16` per owner, then a **BF16 32-way all-reduce** (`replica_groups {0..31}`,
+  `add` in bf16). The greenfield's DB533 row-0 association (`_strategy_nd_row0_bf16_reduce`, phases y→x→z with
+  per-256-lane cross pattern) reproduces this for decode row 0; for M=2048 the ring chunking may assign 64-row
+  blocks different phase orders — verify on rows 0..63 first.
+- Post-attention norm variance input: `f32(attn_psum) + f32(emb)` unrounded; normalized MLP input:
+  `bf16(bf16((f32(attn)+f32(emb)) * rsqrt) * w)`. SwiGLU (`fused_computation.9619`): `g=f32(gate); u=f32(up);
+  bf16(g * (1/(1+exp(-g))) * u)` with the divide `1/(1+exp(-g))` in f32. Layer-1 input norm: `D = bf16(f32(attn) +
+  f32(emb))`; variance over `f32(dense) + f32(D)`; normalized `bf16(bf16((f32(dense)+f32(D))*rsqrt)*w1)`.
+- Attention value path: `conv(W_v_bf16[2,512,256] (pre-dequantized at load), attended_latent bf16[2,M,512]) ->
+  f32[2,256,M] * f32[1,2,256] (program parameter 18) -> bf16`, then o_proj. For row 0 the attended latent is the
+  row's own kv latent. The kv-a latent path for prompt rows (lanes 64:82 per owner → all-gather → kv-a norm → rope →
+  cache) is consumed inside nested computations (`copy-done.1299` → fusions slicing `[64:82]`); trace before build.
+- Embedding: vocab-sharded gather + bf16 all-reduce (exact), `broadcast_select` mask.
+Inputs: layer-0 DSA input artifact (`574f3553…`: embeddings of the prompt's unique tokens, layer-0 norm/q-a/kv-a/
+q-a-norm weights), checkpoint shard 1 tensors for layer-0 q_b/kv_b/o_proj/post-norm/gate/up/down and layer-1
+input norm + indexer wk/k_norm (index-verified), sealed legacy layer-1 cache (target) and layer-0 cache (control:
+the probe's layer-0 keys must be exact). Runs on one isolated 4-chip host under the pod lease; HLO contract binds
+the M=2048 convolutions and the absence of callbacks; results sealed with SHA-256; no decoder/Gate-D claim.
+
+### Probe implementation (CPU-tested, not yet run): chunk-0 legacy-geometry layer-1 prompt keys
+
+- `glm_tpu/greenfield/benchmarking/legacy_prefill_geometry.py`: legacy per-op primitives (dequant `bf16(f32(fp8)*f32
+  (scale))` with block or per-column scales, `bf16[M,K]x bf16[K,N]->f32->bf16` conv at the caller's M, input/post-
+  attention/layer-1 norms with the legacy rounding and residual association, sharded q-a norm with owner-order sum
+  and post-gather weight, FP32 SwiGLU, per-owner partials, pairwise BF16 tree, DB533 row association per row).
+- `legacy_prefill_owner_packing.py`: checkpoint `[out,in]` FP8 → per-owner `[K,N]` operands for the 32 virtual
+  owners (fused q-a/kv-a `[32,6144,82]` with per-column scales; q_b `[32,2048,512]`; absorbed `w_uk_t [32,2,192,512]`
+  / `w_uv [32,2,512,256]` as load-time BF16 dequant with identity post-scale; o_proj `[32,512,6144]`; merged gate/up
+  `[32,6144,768]`; down `[32,384,6144]`), chunk embedding gather.
+- `legacy_prefill_chunk_probe.py`: the composed layer-0 block + layer-0/1 M64 prompt keys for a chunk (rows ≥ 1 use a
+  plain FP32 causal softmax; row 0 exact by construction; softmax scale `256**-0.5`).
+- `scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py` (one 4-chip host; verifies worktree/pin, sealed
+  layer-0 input `574f3553…`, checkpoint index sha, sealed legacy layer-1 cache `d9058cc6…`, DB518 `534bacc5…`;
+  control: layer-0 keys must equal the DB518 layer-0 rows; compares chunk-0 layer-1 keys with the legacy rows and the
+  DB518 greenfield rows; also the one-row variant of row 0; captures optimized HLO/StableHLO; `SUCCESS` only when the
+  control is exact and no callback tokens appear) and `run_probe_layer1_prompt_chunk0_geometry.sh` (lease, 8-host
+  pre/post census, sanitized `env -i` launch, evidence SHA list, append-only upload to `results/<tag>`).
+- Tests: `test_legacy_prefill_geometry.py` (6), `test_legacy_prefill_owner_packing.py` (5),
+  `test_legacy_prefill_chunk_probe.py` (2; CPU run of the full pipeline at real shapes; on CPU the one-row and
+  two-row variants already differ in 5 of 128 lanes of the row-0 layer-1 key — M sensitivity is real).

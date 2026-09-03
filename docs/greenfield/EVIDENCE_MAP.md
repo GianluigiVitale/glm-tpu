@@ -3619,3 +3619,13 @@ persistence only; review and persistence precede any v2 installation.
   `547b26f8`, layer 1, slot 2): failed closed at the eight-host legacy-tree prerequisite (workers 1–7 lack
   `/home/gianl/tpu-inference`; recreated pod of 2026-08-26); no TPU/legacy work; censuses recorded.
   Classification: `FAILED_CLOSED_AT_PREREQ;RECREATED_POD_LEGACY_BASE_CHECKOUT_ABSENT;TAG_BURNED;NO_CLAIM;GATE_D_OPEN`.
+- Legacy oracle tag `greenfield_legacy_layer1_prompt_index_cache_20260903T000356727206404Z` (rewrite pin `4623a4e2`,
+  legacy runtime = observer branch tip `c7973435` via bundle, slot 2): SUCCESS 01:03:35Z, censuses 8/8, DB run 566
+  item 1870; sealed layer-1 prompt cache manifest `d9058cc6…`, tensor `afe683d8…`; fresh DSA events bitwise equal to
+  the sealed 8K oracle (offline `compare_short_context_dsa_oracles`, exact True). Classification:
+  `LEGACY_LAYER1_PROMPT_INDEX_CACHE_SEALED;DSA_EVENTS_EXACT_VS_SEALED_ORACLE;BUNDLE_RUNTIME_c7973435;NO_CLAIM;GATE_D_OPEN`.
+- CPU capsule `docs/artifacts/gate-d-layer1-prompt-cache-legacy-vs-db518.json` (`e16ccac0c63d04e0e1b32442255d5ae2868605dca8945eb760b6212b2a0058ce`): legacy cache reproduces the
+  oracle event-1 set (0/0); greenfield DB518 layer-1 prompt cache differs in 8,155/8,155 rows, 16.6% of lanes, 79% of
+  them by one BF16 ulp, from position 0 in every chunk. Classification:
+  `LAYER1_PROMPT_INDEX_CACHE_8155_OF_8155_ROWS_MISMATCH;LEGACY_CACHE_REPRODUCES_ORACLE_EVENT1;CPU_EVIDENCE_ONLY;
+  NO_GATE_D_NO_DECODER_NO_DB_NO_PERFORMANCE_CLAIM;GATE_D_OPEN`.
