@@ -13,7 +13,9 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
+import stat
 import struct
 from typing import Any
 
@@ -38,6 +40,62 @@ _DTYPES = {
 }
 
 
+class Snapshot:
+    """A regular file opened once through a no-follow descriptor.
+
+    All reads and the digest use the same descriptor, so a replacement of the
+    path between hashing and reading cannot change what is parsed.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path)
+        self.fd = os.open(self.path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+        metadata = os.fstat(self.fd)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            os.close(self.fd)
+            raise ValueError(f"input file identity is unsafe: {path}")
+        self.size = metadata.st_size
+        self._identity = (metadata.st_dev, metadata.st_ino, metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns)
+
+    def check_identity(self) -> None:
+        metadata = os.fstat(self.fd)
+        if (metadata.st_dev, metadata.st_ino, metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns) != self._identity:
+            raise ValueError(f"input file changed while in use: {self.path}")
+
+    def pread(self, length: int, offset: int) -> bytes:
+        chunks = []
+        remaining = length
+        position = offset
+        while remaining > 0:
+            block = os.pread(self.fd, min(remaining, 64 << 20), position)
+            if not block:
+                raise ValueError(f"input file truncated: {self.path}")
+            chunks.append(block)
+            remaining -= len(block)
+            position += len(block)
+        return b"".join(chunks)
+
+    def sha256(self) -> str:
+        digest = sha256()
+        position = 0
+        while position < self.size:
+            block = os.pread(self.fd, 64 << 20, position)
+            if not block:
+                break
+            digest.update(block)
+            position += len(block)
+        self.check_identity()
+        return digest.hexdigest()
+
+    def read_all(self) -> bytes:
+        raw = self.pread(self.size, 0)
+        self.check_identity()
+        return raw
+
+    def close(self) -> None:
+        os.close(self.fd)
+
+
 def sha256_file(path: Path) -> str:
     digest = sha256()
     with Path(path).open("rb") as stream:
@@ -50,37 +108,47 @@ def array_sha256(value: np.ndarray) -> str:
     return sha256(np.ascontiguousarray(value).tobytes(order="C")).hexdigest()
 
 
-def read_header(path: Path) -> tuple[dict[str, Any], int]:
-    with Path(path).open("rb") as stream:
-        raw = stream.read(8)
-        if len(raw) != 8:
-            raise ValueError("safetensors header length is truncated")
-        (length,) = struct.unpack("<Q", raw)
-        header = json.loads(stream.read(length).decode("utf-8"))
+def _parse_header(snapshot: Snapshot) -> tuple[dict[str, Any], int]:
+    raw = snapshot.pread(8, 0)
+    (length,) = struct.unpack("<Q", raw)
+    header = json.loads(snapshot.pread(length, 8).decode("utf-8"))
     return header, 8 + length
 
 
-def read_tensors(path: Path, names: list[str] | None = None) -> tuple[dict[str, np.ndarray], dict[str, str]]:
-    """Return ``{name: array}`` (raw bits for FP8/BF16) and the file metadata."""
+def read_header(path: Path) -> tuple[dict[str, Any], int]:
+    snapshot = Snapshot(path)
+    try:
+        return _parse_header(snapshot)
+    finally:
+        snapshot.close()
 
-    header, offset = read_header(path)
+
+def read_tensors_snapshot(snapshot: Snapshot, names: list[str] | None = None) -> tuple[dict[str, np.ndarray], dict[str, str]]:
+    """Return ``{name: array}`` (raw bits for FP8/BF16) and the metadata from one descriptor."""
+
+    header, offset = _parse_header(snapshot)
     metadata = header.pop("__metadata__", {}) or {}
     wanted = names if names is not None else [key for key in header]
     arrays: dict[str, np.ndarray] = {}
-    with Path(path).open("rb") as stream:
-        for name in wanted:
-            entry = header[name]
-            dtype, item = _DTYPES[entry["dtype"]]
-            start, stop = entry["data_offsets"]
-            count = int(np.prod(entry["shape"])) if entry["shape"] else 1
-            if stop - start != count * item:
-                raise ValueError(f"safetensors payload size drifted for {name}")
-            stream.seek(offset + start)
-            payload = stream.read(stop - start)
-            if len(payload) != stop - start:
-                raise ValueError(f"safetensors payload truncated for {name}")
-            arrays[name] = np.frombuffer(payload, dtype=dtype).reshape(entry["shape"]).copy()
+    for name in wanted:
+        entry = header[name]
+        dtype, item = _DTYPES[entry["dtype"]]
+        start, stop = entry["data_offsets"]
+        count = int(np.prod(entry["shape"])) if entry["shape"] else 1
+        if stop - start != count * item:
+            raise ValueError(f"safetensors payload size drifted for {name}")
+        payload = snapshot.pread(stop - start, offset + start)
+        arrays[name] = np.frombuffer(payload, dtype=dtype).reshape(entry["shape"]).copy()
+    snapshot.check_identity()
     return arrays, {str(k): str(v) for k, v in metadata.items()}
+
+
+def read_tensors(path: Path, names: list[str] | None = None) -> tuple[dict[str, np.ndarray], dict[str, str]]:
+    snapshot = Snapshot(path)
+    try:
+        return read_tensors_snapshot(snapshot, names)
+    finally:
+        snapshot.close()
 
 
 def load_layer0_dsa_association_input(artifact_dir: Path, *, expected_manifest_sha256: str) -> tuple[dict[str, Any], dict[str, np.ndarray]]:
@@ -99,10 +167,13 @@ def load_layer0_dsa_association_input(artifact_dir: Path, *, expected_manifest_s
         raise ValueError("layer-0 DSA input manifest identity drifted")
     if manifest.get("artifact_kind") != "greenfield_layer0_dsa_association_input" or manifest.get("diagnostic_only") is not True:
         raise ValueError("layer-0 DSA input artifact kind drifted")
-    tensor_path = artifact_dir / manifest["file"]["filename"]
-    if tensor_path.stat().st_size != manifest["file"]["byte_count"] or sha256_file(tensor_path) != manifest["file"]["sha256"]:
-        raise ValueError("layer-0 DSA input tensor file drifted")
-    arrays, _ = read_tensors(tensor_path)
+    snapshot = Snapshot(artifact_dir / manifest["file"]["filename"])
+    try:
+        if snapshot.size != manifest["file"]["byte_count"] or snapshot.sha256() != manifest["file"]["sha256"]:
+            raise ValueError("layer-0 DSA input tensor file drifted")
+        arrays, _ = read_tensors_snapshot(snapshot)
+    finally:
+        snapshot.close()
     expected = manifest["arrays"]
     if set(expected) != set(arrays):
         raise ValueError("layer-0 DSA input array set drifted")
@@ -127,10 +198,13 @@ def load_legacy_prompt_index_cache(artifact_dir: Path, *, expected_manifest_sha2
     if manifest.get("artifact_kind") != f"glm52_legacy_layer{layer_id}_prompt_index_cache" or manifest.get("diagnostic_only") is not True:
         raise ValueError("prompt index-cache artifact kind drifted")
     record = manifest["tensor_file"]
-    tensor_path = artifact_dir / record["filename"]
-    if tensor_path.stat().st_size != record["byte_count"] or sha256_file(tensor_path) != record["sha256"]:
-        raise ValueError("prompt index-cache tensor file drifted")
-    arrays, metadata = read_tensors(tensor_path)
+    snapshot = Snapshot(artifact_dir / record["filename"])
+    try:
+        if snapshot.size != record["byte_count"] or snapshot.sha256() != record["sha256"]:
+            raise ValueError("prompt index-cache tensor file drifted")
+        arrays, metadata = read_tensors_snapshot(snapshot)
+    finally:
+        snapshot.close()
     if set(arrays) != {"live_block_table", "prompt_index_key_bfloat16_bits"} or metadata.get("artifact_kind") != manifest["artifact_kind"]:
         raise ValueError("prompt index-cache tensor keys/metadata drifted")
     bits = arrays["prompt_index_key_bfloat16_bits"]
@@ -144,8 +218,18 @@ def load_legacy_prompt_index_cache(artifact_dir: Path, *, expected_manifest_sha2
     return manifest, bits.astype(np.uint16, copy=False)
 
 
-def load_checkpoint_tensors(root: Path, names: dict[str, str], *, index_sha256: str) -> dict[str, np.ndarray]:
-    """Read named checkpoint tensors (FP8 as uint8 bits, BF16 as uint16 bits) via the index."""
+def load_checkpoint_tensors(
+    root: Path,
+    names: dict[str, str],
+    *,
+    index_sha256: str,
+    shard_digests: dict[str, str] | None = None,
+) -> dict[str, np.ndarray]:
+    """Read named checkpoint tensors (FP8 as uint8 bits, BF16 as uint16 bits) via the index.
+
+    Each shard is opened once; when ``shard_digests`` maps a shard filename to
+    its expected SHA-256 the same descriptor is hashed before parsing.
+    """
 
     index_path = Path(root) / "model.safetensors.index.json"
     if sha256_file(index_path) != index_sha256:
@@ -156,7 +240,15 @@ def load_checkpoint_tensors(root: Path, names: dict[str, str], *, index_sha256: 
         by_shard.setdefault(weight_map[name], []).append((key, name))
     tensors: dict[str, np.ndarray] = {}
     for shard, items in by_shard.items():
-        arrays, _ = read_tensors(Path(root) / shard, [name for _, name in items])
+        snapshot = Snapshot(Path(root) / shard)
+        try:
+            if shard_digests is not None:
+                expected = shard_digests.get(shard)
+                if expected is None or snapshot.sha256() != expected:
+                    raise ValueError(f"checkpoint shard digest drifted: {shard}")
+            arrays, _ = read_tensors_snapshot(snapshot, [name for _, name in items])
+        finally:
+            snapshot.close()
         for key, name in items:
             tensors[key] = arrays[name]
     return tensors
