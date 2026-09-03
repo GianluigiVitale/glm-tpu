@@ -40,7 +40,7 @@ import zipfile
 
 PROBE_REPOSITORY_PATH = "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v1/"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v2/"
     "probe_layer1_prompt_chunk0_geometry.py"
 )
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
@@ -397,6 +397,10 @@ def main() -> int:
         legacy_geometry_chunk_pipeline,
     )
     from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
+    from glm_tpu.greenfield.kernels.reference.prefill_index import (
+        decode_stage_local_prefill_index_wk_bf16,
+        promote_stage_local_prefill_index_wk,
+    )
     from glm_tpu.greenfield.kernels.reference.rotary import build_rotary_table_host
 
     if jax.default_backend() != "tpu":
@@ -465,6 +469,51 @@ def main() -> int:
     def put(value: Any) -> Any:
         return jax.device_put(jnp.asarray(value), device)
 
+    # DB518/DB519 require each half of wk adaptation to finish as its own
+    # executable.  Keeping raw FP8 wk inside the large chunk computation
+    # changes TPU lowering and was already rejected by the protected DB519
+    # control.  The main pipeline therefore receives only adapted FP32 wk.
+    wk0_bits_device = put(arrays["self_attn__indexer__wk__weight"])
+    wk0_scale_device = put(arrays["self_attn__indexer__wk__weight_scale_inv"])
+    wk1_bits_device = put(tensors["wk1"])
+    wk1_scale_device = put(tensors["wk1_scale"])
+
+    decode_lowered = jax.jit(
+        lambda bits, scale: decode_stage_local_prefill_index_wk_bf16(
+            bits, scale, contract=contract
+        )
+    ).lower(wk0_bits_device, wk0_scale_device)
+    decode_compiled = decode_lowered.compile()
+    decode_hlo = decode_compiled.as_text()
+    decode_stablehlo = decode_lowered.as_text()
+    _write_run_member_exclusive(
+        run_fd, "hlo/wk_decode.optimized_hlo.txt", decode_hlo.encode("utf-8")
+    )
+    _write_run_member_exclusive(
+        run_fd, "hlo/wk_decode.stablehlo.mlir", decode_stablehlo.encode("utf-8")
+    )
+    wk0_bf16 = decode_compiled(wk0_bits_device, wk0_scale_device)
+    wk0_bf16.block_until_ready()
+    wk1_bf16 = decode_compiled(wk1_bits_device, wk1_scale_device)
+    wk1_bf16.block_until_ready()
+
+    promote_lowered = jax.jit(
+        lambda value: promote_stage_local_prefill_index_wk(value, contract=contract)
+    ).lower(wk0_bf16)
+    promote_compiled = promote_lowered.compile()
+    promote_hlo = promote_compiled.as_text()
+    promote_stablehlo = promote_lowered.as_text()
+    _write_run_member_exclusive(
+        run_fd, "hlo/wk_promote.optimized_hlo.txt", promote_hlo.encode("utf-8")
+    )
+    _write_run_member_exclusive(
+        run_fd, "hlo/wk_promote.stablehlo.mlir", promote_stablehlo.encode("utf-8")
+    )
+    wk0 = promote_compiled(wk0_bf16)
+    wk0.block_until_ready()
+    wk1 = promote_compiled(wk1_bf16)
+    wk1.block_until_ready()
+
     weights = {
         "input_norm0": bf16(arrays["input_layernorm__weight"]),
         "q_a_norm": bf16(arrays["self_attn__q_a_layernorm__weight"]),
@@ -481,9 +530,8 @@ def main() -> int:
         "o_bits": put(o_bits), "o_scale": put(o_scale),
         "gu_bits": put(gu_bits), "gu_scale": put(gu_scale),
         "down_bits": put(down_bits), "down_scale": put(down_scale),
-        "wk0_bits": put(arrays["self_attn__indexer__wk__weight"]),
-        "wk0_scale": put(arrays["self_attn__indexer__wk__weight_scale_inv"]),
-        "wk1_bits": put(tensors["wk1"]), "wk1_scale": put(tensors["wk1_scale"]),
+        "wk0": wk0,
+        "wk1": wk1,
         "rope_table": bf16(rope_table.view(np.uint16)),
     }
 
@@ -531,8 +579,32 @@ def main() -> int:
     per_row_legacy = legacy_lane_mismatch.sum(axis=1)
     per_row_greenfield = greenfield_lane_mismatch.sum(axis=1)
     hlo_convolution_2048 = len([line for line in hlo_text.splitlines() if "convolution(" in line and "[2048," in line])
-    forbidden = [token for token in ("host_callback", 'CustomCall("xla_python', "python_callback") if token in hlo_text]
-    status = "SUCCESS" if control_mismatch_rows == 0 and not forbidden else "FAILED"
+    all_hlo_text = "\n".join(
+        (hlo_text, stablehlo_text, decode_hlo, decode_stablehlo, promote_hlo, promote_stablehlo)
+    )
+    forbidden = [
+        token
+        for token in ("host_callback", 'CustomCall("xla_python', "python_callback")
+        if token in all_hlo_text
+    ]
+    main_fp32_wk_parameters = [
+        name
+        for name in ("w__wk0__.1: f32[128,6144]", "w__wk1__.1: f32[128,6144]")
+        if name in hlo_text
+    ]
+    main_raw_wk_parameters = [
+        name
+        for name in ("w__wk0_bits__", "w__wk0_scale__", "w__wk1_bits__", "w__wk1_scale__")
+        if name in hlo_text
+    ]
+    status = (
+        "SUCCESS"
+        if control_mismatch_rows == 0
+        and not forbidden
+        and len(main_fp32_wk_parameters) == 2
+        and not main_raw_wk_parameters
+        else "FAILED"
+    )
     summary = {
         "artifact_kind": ARTIFACT_KIND,
         "code_hash": args.code_pin,
@@ -548,6 +620,16 @@ def main() -> int:
             "optimized_sha256": sha256(hlo_text.encode("utf-8")).hexdigest(),
             "stablehlo_byte_count": len(stablehlo_text.encode("utf-8")),
             "stablehlo_sha256": sha256(stablehlo_text.encode("utf-8")).hexdigest(),
+            "main_fp32_wk_parameters": main_fp32_wk_parameters,
+            "main_raw_wk_parameters": main_raw_wk_parameters,
+            "wk_decode_optimized_byte_count": len(decode_hlo.encode("utf-8")),
+            "wk_decode_optimized_sha256": sha256(decode_hlo.encode("utf-8")).hexdigest(),
+            "wk_decode_stablehlo_byte_count": len(decode_stablehlo.encode("utf-8")),
+            "wk_decode_stablehlo_sha256": sha256(decode_stablehlo.encode("utf-8")).hexdigest(),
+            "wk_promote_optimized_byte_count": len(promote_hlo.encode("utf-8")),
+            "wk_promote_optimized_sha256": sha256(promote_hlo.encode("utf-8")).hexdigest(),
+            "wk_promote_stablehlo_byte_count": len(promote_stablehlo.encode("utf-8")),
+            "wk_promote_stablehlo_sha256": sha256(promote_stablehlo.encode("utf-8")).hexdigest(),
         },
         "inputs": {
             "layer0_input_manifest_sha256": input_manifest["manifest_sha256"],

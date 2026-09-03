@@ -15,6 +15,9 @@ from glm_tpu.greenfield.benchmarking.legacy_prefill_chunk_probe import (  # noqa
     layer1_keys_from_normalized,
     legacy_geometry_chunk_pipeline,
 )
+from glm_tpu.greenfield.kernels.reference.prefill_index import (  # noqa: E402
+    materialize_stage_local_prefill_index_wk,
+)
 from glm_tpu.greenfield.kernels.reference.rotary import build_rotary_table_host  # noqa: E402
 
 
@@ -64,8 +67,12 @@ def weights():
         "o_bits": jnp.asarray(o_bits), "o_scale": jnp.asarray(o_scale),
         "gu_bits": jnp.asarray(gu_bits), "gu_scale": jnp.asarray(gu_scale),
         "down_bits": jnp.asarray(down_bits), "down_scale": jnp.asarray(down_scale),
-        "wk0_bits": jnp.asarray(_fp8(rng, (128, 6144))), "wk0_scale": jnp.asarray(_scale(rng, (1, 48))),
-        "wk1_bits": jnp.asarray(_fp8(rng, (128, 6144))), "wk1_scale": jnp.asarray(_scale(rng, (1, 48))),
+        "wk0": materialize_stage_local_prefill_index_wk(
+            jnp.asarray(_fp8(rng, (128, 6144))), jnp.asarray(_scale(rng, (1, 48)))
+        ),
+        "wk1": materialize_stage_local_prefill_index_wk(
+            jnp.asarray(_fp8(rng, (128, 6144))), jnp.asarray(_scale(rng, (1, 48)))
+        ),
         "rope_table": bf16(table.view(np.uint16)),
     }
     assert set(values) == set(WEIGHT_KEYS)
@@ -111,3 +118,17 @@ def test_chunk_pipeline_refuses_missing_weights_and_bad_rows(weights):
         legacy_geometry_chunk_pipeline(embedding.astype(jnp.float32), jnp.zeros((1,), jnp.int32), weights, softmax_scale=0.0625)
     with pytest.raises(ValueError):
         legacy_geometry_chunk_pipeline(embedding, jnp.zeros((2,), jnp.int32), weights, softmax_scale=0.0625)
+
+
+def test_chunk_pipeline_requires_precompleted_fp32_wk(weights):
+    embedding = jnp.zeros((1, 6144), jnp.bfloat16)
+    raw = dict(weights)
+    raw.pop("wk0")
+    raw.update(
+        wk0_bits=jnp.zeros((128, 6144), jnp.uint8),
+        wk0_scale=jnp.ones((1, 48), jnp.float32),
+    )
+    with pytest.raises(ValueError, match="weights missing"):
+        legacy_geometry_chunk_pipeline(
+            embedding, jnp.zeros((1,), jnp.int32), raw, softmax_scale=0.0625
+        )

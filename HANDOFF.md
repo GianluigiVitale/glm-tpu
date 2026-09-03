@@ -11685,3 +11685,37 @@ the exact wrapper expressions. Preserve installed v1; provision an install-v2 so
 that reuses the unchanged v1 capsule. Focused CPU suite passes 31/31 in 37.83 s; v2 staging tree `1eb43b8f…`; fresh
 proposed tag `…130504318767505Z`. Fable-max was requested after the failure but was quota-exhausted; one Sol fallback
 batch review is required before persistence/install/launch. Gate D remains open.
+
+## 2026-09-03 15:00Z — chunk0 executed; control rejected known DB519 boundary; correction CPU-approved
+
+Commit `4572efae8437a4f6a2931e380c658285e2639fce` was pushed/mirrored and the v2 launcher executed tag
+`greenfield_layer1_prompt_chunk0_geometry_20260903T130504318767505Z` on one isolated four-chip host. The probe
+published a generation-replayed diagnostic under the US-CENTRAL2 bucket and ended 8/8 clean. Terminal diagnostic
+ledger generation is `1788442080000750`, SHA `fd634ca0…92b54`; arrays `ae2026ec…49da`, runner `3784cdc2…241f`,
+optimized HLO `c0398830…76b4`, StableHLO `e97de8be…814e`. The mandatory layer-0/DB518 control failed on all 2,048
+rows (74,299 lanes; median 35/row; 55,370 one-bit-step; max value delta 0.03125), so the layer-1 geometry arm has no
+standing and Gate D remains open.
+
+Offline HLO/source inspection found that the probe had called the CPU-reference combined wk materializer inside the
+large chunk executable. Its ENTRY therefore accepted two raw `u8[128,6144]` weights plus scales, exactly the mechanism
+DB519 rejected on all 8,155 positions (298,532 lanes, same ~36 lanes/row and 0.03125-scale signature). Diagnosis is
+bound in `docs/artifacts/gate-d-chunk0-v2-internal-wk-materialization-diagnosis.json` and deliberately says
+high-confidence mechanism match, not proven fix.
+
+Current uncommitted correction preserves installed v1/v2 and prepares immutable capsule v2 / launcher v3. It compiles
+and completes raw→BF16 decode and BF16→FP32 promotion separately for wk0 and wk1, then supplies only FP32 wk parameters
+to the main pipeline. All six optimized/StableHLO files are archived. The publisher independently parses ENTRY graphs,
+requires exact helper parameters/roots/live lineage/no communication, proves wk0 is live only into `keys0` and wk1 only
+into `keys1`, and rejects raw/scale inputs or live BF16 rematerialization. Metadata-decoy, renamed input, dead-helper,
+wrong-root, leakage, unrelated-convert, communication and in-main-rematerialization mutations are tested. Forced-CPU
+suite: 34/34 in 37.86 s; boundary suite: 20/20. Independent Sol returned `APPROVE`, no P0/P1/P2, after three passes.
+The required narrow Fable-max attempt again hit the account usage limit without a review.
+
+Append-only v3 source certificate `docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v3-source.json` has SHA
+`25735a95…70e05`; its nine file hashes reverify and immutable 0755/0555 install-v3 staging tree is
+`925bbd5e…35e4`. Proposed fresh tag is `greenfield_layer1_prompt_chunk0_geometry_20260903T144423536909037Z`.
+
+Exact next: final Sol certificate/staging/command review; commit/push; wait for same-region cron and verify
+origin+US-CENTRAL2 mirror; provision/install v3 without launch; then run only that fresh chunk0 tag. Do not run full
+8K. The next TPU result must first make the DB518 layer-0 control exact; only then may row0 adjudicate legacy prefill
+geometry.

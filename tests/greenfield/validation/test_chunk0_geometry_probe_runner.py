@@ -19,6 +19,9 @@ import pytest
 REPO = Path(__file__).resolve().parents[3]
 RUNNER = REPO / "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
 PROBE = REPO / "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"
+CHUNK_PIPELINE = (
+    REPO / "glm_tpu/greenfield/benchmarking/legacy_prefill_chunk_probe.py"
+)
 DIGESTS = REPO / "docs/artifacts/gate-d-chunk0-probe-weight-digests.json"
 PUBLISHER = REPO / "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
 LAUNCHER = REPO / "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py"
@@ -41,7 +44,7 @@ def test_runner_pins_inputs_digests_and_sealed_interpreter():
     assert 'TAG=${GLM_GATE_D_CHUNK0_GEOMETRY_TAG:-}' in runner
     assert "unsafe Gate-D chunk-0 geometry tag" in runner
     # The only executed probe pathname is the root-owned immutable capsule.
-    assert "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v1" in runner
+    assert "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v2" in runner
     assert '"$SEALED_PYTHON" -I -S -B -u "$PROBE"' in runner
     assert "$PROBE_LOCAL" not in runner and "/source/probe_layer1" not in runner
     assert '--code-pin "$PIN"' in runner and '--repository "$WORKTREE"' in runner
@@ -170,6 +173,35 @@ def test_probe_is_self_verifying_and_imports_from_a_sealed_archive():
     assert record["artifact_kind"] == "gate_d_chunk0_probe_weight_digests" and len(record["tensors"]) == 19
 
 
+def test_wk_materialization_is_a_completed_executable_boundary():
+    probe = PROBE.read_text()
+    pipeline = CHUNK_PIPELINE.read_text()
+    publisher = PUBLISHER.read_text()
+
+    assert "materialize_stage_local_prefill_index_wk" not in pipeline
+    assert '"wk0", "wk1", "rope_table"' in pipeline
+    assert 'w["wk0"]' in pipeline and 'w["wk1"]' in pipeline
+    assert "decode_stage_local_prefill_index_wk_bf16" in probe
+    assert "promote_stage_local_prefill_index_wk" in probe
+    assert probe.count(".block_until_ready()") >= 4
+    assert probe.index("wk1_bf16.block_until_ready()") < probe.index(
+        "promote_lowered ="
+    )
+    assert probe.index("wk1.block_until_ready()") < probe.index(
+        'weights = {'
+    )
+    assert '"wk0": wk0' in probe and '"wk1": wk1' in probe
+    for name in (
+        "hlo/wk_decode.optimized_hlo.txt",
+        "hlo/wk_decode.stablehlo.mlir",
+        "hlo/wk_promote.optimized_hlo.txt",
+        "hlo/wk_promote.stablehlo.mlir",
+    ):
+        assert name in probe and name in publisher
+    assert 'hlo.get("main_raw_wk_parameters") != []' in publisher
+    assert '"w__wk0_bits__" in optimized_text' in publisher
+
+
 def test_capsule_hash_chain_and_second_vacancy_check_are_bound():
     runner = RUNNER.read_text()
     launcher = LAUNCHER.read_text()
@@ -211,7 +243,7 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
     assert installer_module.PAYLOADS == expected
     assert str(installer_module.CAPSULE_TARGET).startswith("/usr/local/libexec/glm-tpu/")
     assert str(installer_module.LAUNCHER_TARGET).endswith(
-        "launch_gate_d_layer1_prompt_chunk0_geometry_v2.py"
+        "launch_gate_d_layer1_prompt_chunk0_geometry_v3.py"
     )
     assert str(installer_module.LAUNCHER_TARGET).startswith("/opt/glm-tpu/bin/")
     assert installer.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
@@ -375,6 +407,159 @@ def test_publisher_requires_the_rederived_layer0_control_to_be_exact():
     )
     with pytest.raises(RuntimeError, match="disagree with archived arrays"):
         publisher._validate_npz(raw, runner, reference_sha256s=references)
+
+
+def test_publisher_mutation_checks_wk_executable_boundaries():
+    publisher = _load_publisher()
+    main = (
+        "HloModule main\n\n"
+        "ENTRY %main (w__wk0__.1: f32[128,6144], w__wk1__.1: f32[128,6144]) {\n"
+        "  %w__wk0__.1 = f32[128,6144] parameter(0)\n"
+        "  %w__wk1__.1 = f32[128,6144] parameter(1)\n"
+        "  %other = bf16[1] constant(0)\n"
+        "  %key0 = bf16[2048,128] custom-call(%w__wk0__.1)\n"
+        "  %key1 = bf16[2048,128] custom-call(%w__wk1__.1)\n"
+        "  ROOT %out = (bf16[1], bf16[1], bf16[1], bf16[1], bf16[1], "
+        "bf16[2048,128], bf16[2048,128], bf16[1], bf16[1], bf16[1], "
+        "bf16[1], bf16[1]) tuple(%other, %other, %other, %other, %other, "
+        "%key0, %key1, %other, %other, %other, %other, %other)\n"
+        "}\n"
+    )
+    decode = (
+        "HloModule decode\n\n"
+        "ENTRY %decode (bits: u8[128,6144], scale: f32[1,48]) {\n"
+        "  %bits = u8[128,6144] parameter(0)\n"
+        "  %scale = f32[1,48] parameter(1)\n"
+        "  %mixed = f32[128,6144] custom-call(%bits, %scale)\n"
+        "  ROOT %decoded = bf16[128,6144] convert(%mixed)\n"
+        "}\n"
+    )
+    promote = (
+        "HloModule promote\n\n"
+        "ENTRY %promote (value: bf16[128,6144]) {\n"
+        "  %value = bf16[128,6144] parameter(0)\n"
+        "  ROOT %promoted = f32[128,6144] convert(%value)\n"
+        "}\n"
+    )
+    main_stable = (
+        "module @main {\n"
+        "  func.func public @main(%arg0: tensor<128x6144xf32>, "
+        "%arg1: tensor<128x6144xf32>) -> tensor<1xbf16> {\n"
+        "  }\n}\n"
+    )
+    decode_stable = (
+        "module @decode {\n"
+        "  func.func public @main(%arg0: tensor<128x6144xui8>, "
+        "%arg1: tensor<1x48xf32>) -> tensor<128x6144xbf16> {\n"
+        "    %0 = stablehlo.convert %arg0 : tensor<128x6144xui8>\n"
+        "  }\n}\n"
+    )
+    promote_stable = (
+        "module @promote {\n"
+        "  func.func public @main(%arg0: tensor<128x6144xbf16>) "
+        "-> tensor<128x6144xf32> {\n"
+        "    %0 = stablehlo.convert %arg0 : tensor<128x6144xbf16>\n"
+        "  }\n}\n"
+    )
+    arguments = (
+        main,
+        main_stable,
+        decode,
+        decode_stable,
+        promote,
+        promote_stable,
+    )
+    publisher._require_wk_hlo_boundaries(*arguments)
+    # A metadata decoy cannot rescue a renamed raw entry parameter.
+    with pytest.raises(RuntimeError, match="boundary drifted"):
+        publisher._require_wk_hlo_boundaries(
+            main.replace(
+                "%w__wk0__.1 = f32[128,6144] parameter(0)",
+                "%renamed = u8[128,6144] parameter(0), metadata={op_name=\"w__wk0__.1: f32[128,6144]\"}",
+            ).replace("%w__wk0__.1)", "%renamed)"),
+            main_stable,
+            decode,
+            decode_stable,
+            promote,
+            promote_stable,
+        )
+    # Wk may feed only its named key result, never another returned value.
+    leaking_main = main.replace(
+        "%key0, %key1, %other, %other, %other, %other, %other)",
+        "%key0, %key1, %w__wk0__.1, %other, %other, %other, %other)",
+    )
+    with pytest.raises(RuntimeError, match="boundary drifted"):
+        publisher._require_wk_hlo_boundaries(
+            leaking_main,
+            main_stable,
+            decode,
+            decode_stable,
+            promote,
+            promote_stable,
+        )
+    # Decode parameters must both be live ancestors of the BF16 root.
+    with pytest.raises(RuntimeError, match="boundary drifted"):
+        publisher._require_wk_hlo_boundaries(
+            main,
+            main_stable,
+            decode.replace(
+                "ROOT %decoded = bf16[128,6144] convert(%mixed)",
+                "ROOT %decoded = bf16[128,6144] constant(0)",
+            ),
+            decode_stable,
+            promote,
+            promote_stable,
+        )
+    # An unrelated live conversion cannot authenticate an alternate promotion.
+    alternate_promote = promote.replace(
+        "  ROOT %promoted = f32[128,6144] convert(%value)\n",
+        "  %zero = bf16[] constant(0)\n"
+        "  %unrelated = f32[] convert(%zero)\n"
+        "  ROOT %promoted = f32[128,6144] custom-call(%value, %unrelated)\n",
+    )
+    with pytest.raises(RuntimeError, match="boundary drifted"):
+        publisher._require_wk_hlo_boundaries(
+            main,
+            main_stable,
+            decode,
+            decode_stable,
+            alternate_promote,
+            promote_stable,
+        )
+    # Wrong helper root dtype and helper communication both fail closed.
+    with pytest.raises(RuntimeError, match="boundary drifted"):
+        publisher._require_wk_hlo_boundaries(
+            main,
+            main_stable,
+            decode.replace("bf16[128,6144] convert", "f32[128,6144] convert"),
+            decode_stable,
+            promote,
+            promote_stable,
+        )
+    with pytest.raises(RuntimeError, match="boundary drifted"):
+        publisher._require_wk_hlo_boundaries(
+            main,
+            main_stable,
+            decode.replace("custom-call(%bits, %scale)", "all-reduce(%bits)"),
+            decode_stable,
+            promote,
+            promote_stable,
+        )
+    # A live in-main BF16 rematerialization of wk is rejected.
+    rounded_main = main.replace(
+        "  %key0 = bf16[2048,128] custom-call(%w__wk0__.1)\n",
+        "  %rounded = bf16[128,6144] convert(%w__wk0__.1)\n"
+        "  %key0 = bf16[2048,128] custom-call(%rounded)\n",
+    )
+    with pytest.raises(RuntimeError, match="boundary drifted"):
+        publisher._require_wk_hlo_boundaries(
+            rounded_main,
+            main_stable,
+            decode,
+            decode_stable,
+            promote,
+            promote_stable,
+        )
 
 
 def test_sealed_archive_builds_from_committed_blobs_and_imports(tmp_path: Path):

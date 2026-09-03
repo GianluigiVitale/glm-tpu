@@ -13,7 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 
 INSTALL_PATH = Path(
-    "/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v2.py"
+    "/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v3.py"
 )
 PYTHON = Path("/usr/bin/python3.10")
 PYTHON_SHA256 = "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
@@ -24,16 +24,16 @@ ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py"
 WRAPPER_PATH = WORKTREE / "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
 WRAPPER_SOURCE_PATH = "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
-WRAPPER_SHA256 = "b00e22786fc8464c90e505e8d350b27e86539223f2a65fdfa1be67d83e6d1cfb"
+WRAPPER_SHA256 = "966bcae89704b502b9c91ef3a1d62c386ecf2e4faed2a5e6c1bf3c7a08fa5af8"
 CAPSULE_ROOT = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v1"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v2"
 )
 PROBE_PATH = CAPSULE_ROOT / "probe_layer1_prompt_chunk0_geometry.py"
 PROBE_SOURCE_PATH = "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"
-PROBE_SHA256 = "dd5dfa7a8d9dd2e264648366fbefb1256db6dac7c65931ffd43aaaac1dffc2ed"
+PROBE_SHA256 = "0cdc091b4cf25887faec07c62bf3ae47cfb2d1324a1f73fd5320f8c0cc39af01"
 PUBLISHER_PATH = CAPSULE_ROOT / "publish_gate_d_layer1_prompt_chunk0_geometry.py"
 PUBLISHER_SOURCE_PATH = "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
-PUBLISHER_SHA256 = "e00b11678dec712d272324a743b41e9c856a1919aec88e47e1249b092ae6cc63"
+PUBLISHER_SHA256 = "0f1a5b8f18c80ef405e9915455415032b2f798e9b4a57f79a035f9b1489bab97"
 MIRROR_VERIFIER_PATH = CAPSULE_ROOT / "verify_gate_d_rewrite_same_region_git_mirror.py"
 MIRROR_VERIFIER_SOURCE_PATH = "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
 MIRROR_VERIFIER_SHA256 = "b9fcfc9c9031b6773ebe2a02d18cf584d41badfac460a0e0caebc1889cb87594"

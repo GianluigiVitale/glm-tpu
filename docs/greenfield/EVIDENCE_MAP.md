@@ -3690,3 +3690,25 @@ persistence only; review and persistence precede any v2 installation.
   fresh tag is `greenfield_layer1_prompt_chunk0_geometry_20260903T130504318767505Z`. CPU suite: 31/31, 37.83 s.
 - Fable-max was quota-exhausted; Sol fallback review pending. Classification:
   `FAILED_CLOSED_BEFORE_TPU;MANIFEST_HASH_DOMAINS_SEPARATED_CPU_VALIDATED;SOL_REVIEW_PENDING;NO_CLAIM;GATE_D_OPEN`.
+
+## 2026-09-03 — chunk0 v2 diagnostic and separate-wk correction
+
+- Protected tag `greenfield_layer1_prompt_chunk0_geometry_20260903T130504318767505Z`, pin `4572efae…9fce`, executed
+  on one four-chip host and published only a diagnostic. Pre/failure-exit censuses are authenticated 8/8 clean.
+  Diagnostic ledger generation `1788442080000750`, SHA `fd634ca0…92b54`; arrays `ae2026ec…49da`; runner
+  `3784cdc2…241f`; optimized/StableHLO `c0398830…76b4` / `e97de8be…814e`.
+- Mandatory DB518 layer-0 control: 2,048/2,048 rows and 74,299 lanes mismatch; median 35 lanes/row, 55,370 are one raw
+  BF16-bit step, maximum value delta 0.03125. HLO takes raw U8 wk+scale into the main pipeline. This matches the closed
+  DB519 internal-materialization mechanism (298,532 mismatches/8,155 positions, ~36.6 lanes/row). Therefore the run
+  does not adjudicate legacy layer-1 geometry and has no Gate-D/performance standing.
+- Diagnosis artifact: `docs/artifacts/gate-d-chunk0-v2-internal-wk-materialization-diagnosis.json`. The correction
+  separately compiles/completes wk BF16 decode and FP32 promotion, passes only FP32 wk into main, archives all helper
+  HLO/StableHLO, and independently validates exact signatures, roots, all-output liveness and absence of raw/BF16
+  rematerialization. Hostile HLO mutations are covered. Forced-CPU 34/34; Sol verdict `APPROVE`, no P0/P1/P2. Fable
+  attempt returned usage-limit before review. No corrected TPU execution exists yet.
+- Classification: `CHUNK0_CONTROL_REJECTED_KNOWN_DB519_BOUNDARY;SEPARATE_WK_CORRECTION_CPU_VALIDATED_SOL_APPROVED;
+  PROTECTED_FIX_UNPROVEN;LEGACY_GEOMETRY_UNADJUDICATED;NO_GATE_D_NO_PERFORMANCE_CLAIM;GATE_D_OPEN`.
+- Append-only v3 source certificate `docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v3-source.json` SHA
+  `25735a95…70e05` binds nine source/test files, 34/34 CPU tests, staging tree `925bbd5e…35e4`, and fresh proposed tag
+  `greenfield_layer1_prompt_chunk0_geometry_20260903T144423536909037Z`. Final command review is pending; it grants no
+  install, cloud, TPU, numerical or performance authority by itself.

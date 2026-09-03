@@ -1240,3 +1240,15 @@ normalized-state cause.
 - A manifest's canonical self-hash is not necessarily the SHA of its serialized JSON file. Keep both identities
   explicitly named: use the raw-file SHA for pathname byte preflight and the canonical self-hash inside the parser.
   Execute a regression against the real artifacts; string checks let this category error survive multiple reviews.
+- A diagnostic control can accidentally reintroduce a mechanism already rejected by protected evidence. The chunk0
+  probe embedded the CPU-reference raw-FP8→BF16→FP32 wk composition in its large executable; its 2,048-row control
+  then reproduced DB519's all-row, ~36-lane/row, max-0.03125 failure signature. Compare a failed control's ENTRY
+  boundary and error distribution with the negative-evidence registry before inventing a new numerical hypothesis.
+- “Compiled separately” must be visible at the executable boundary. Complete each helper with synchronization, pass
+  only its finished device buffer to the consumer, and archive helper plus consumer HLO/StableHLO. A publisher must
+  parse actual ENTRY parameters, root types and live ancestry; substring/name searches can be satisfied by metadata
+  decoys, renamed raw inputs or dead computations.
+- Liveness proof is output-specific. Showing wk0 reaches `keys0` and not `keys1` is insufficient when ten other roots
+  exist; prove absence from every unauthorized root. For a one-op promotion helper, require the FP32 root itself to be
+  `convert(the sole BF16 parameter)`, not merely that some live convert and parameter exist. Mutation-test leakage,
+  dead/alternate lineage, wrong roots, communication and in-consumer rematerialization before requesting TPU time.

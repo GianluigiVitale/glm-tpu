@@ -20,10 +20,7 @@ import jax.numpy as jnp
 from jax import lax
 
 from ..kernels.reference.dsa import DsaNumericalContract
-from ..kernels.reference.prefill_index import (
-    materialize_stage_local_prefill_index_wk,
-    physical_m64_prompt_index_key_chunk,
-)
+from ..kernels.reference.prefill_index import physical_m64_prompt_index_key_chunk
 from ..kernels.reference.rmsnorm import rms_norm
 from ..kernels.reference.rotary import apply_rotary_fp32_final_round
 from ..kernels.stage_local import _strategy_nd_row0_bf16_reduce
@@ -34,7 +31,7 @@ WEIGHT_KEYS = (
     "k_norm0_weight", "k_norm0_bias", "k_norm1_weight", "k_norm1_bias",
     "qkv_bits", "qkv_scale", "qb_bits", "qb_scale", "w_uk_t", "w_uv",
     "o_bits", "o_scale", "gu_bits", "gu_scale", "down_bits", "down_scale",
-    "wk0_bits", "wk0_scale", "wk1_bits", "wk1_scale", "rope_table",
+    "wk0", "wk1", "rope_table",
 )
 
 
@@ -109,14 +106,12 @@ def legacy_geometry_chunk_pipeline(
     dense_partials = lax.map(owner_dense, (w["gu_bits"], w["gu_scale"], w["down_bits"], w["down_scale"]))
     dense = geo.strategy_nd_row_association_reduce(dense_partials, row_association)
     carried1, n1 = geo.legacy_layer1_input_norm(dense, attention, embedding, w["input_norm1"])
-    wk0 = materialize_stage_local_prefill_index_wk(w["wk0_bits"], w["wk0_scale"], contract=contract)
-    wk1 = materialize_stage_local_prefill_index_wk(w["wk1_bits"], w["wk1_scale"], contract=contract)
     physical_rows = 64 if rows % 64 == 0 else rows
     keys0 = physical_m64_prompt_index_key_chunk(
-        n0, positions, wk0, w["k_norm0_weight"], w["k_norm0_bias"], contract=contract, physical_rows=physical_rows
+        n0, positions, w["wk0"], w["k_norm0_weight"], w["k_norm0_bias"], contract=contract, physical_rows=physical_rows
     )
     keys1 = physical_m64_prompt_index_key_chunk(
-        n1, positions, wk1, w["k_norm1_weight"], w["k_norm1_bias"], contract=contract, physical_rows=physical_rows
+        n1, positions, w["wk1"], w["k_norm1_weight"], w["k_norm1_bias"], contract=contract, physical_rows=physical_rows
     )
     return {
         "keys0": keys0.astype(jnp.bfloat16),
@@ -149,11 +144,10 @@ def layer1_keys_from_normalized(
     with the same M64 path as the chunk arm.
     """
 
-    wk1 = materialize_stage_local_prefill_index_wk(weights["wk1_bits"], weights["wk1_scale"], contract=contract)
     return physical_m64_prompt_index_key_chunk(
         normalized1,
         positions,
-        wk1,
+        weights["wk1"],
         weights["k_norm1_weight"],
         weights["k_norm1_bias"],
         contract=contract,

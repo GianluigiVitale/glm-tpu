@@ -35,21 +35,26 @@ strong <=125, stretch <=100.
 
 ## Resume checkpoint — 2026-09-03
 
-Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`, last pushed
-tip `d549cdd…`; pod READY/HEALTHY, no TPU work. The last two 8K runs have exact token/event 0 and
-seven identical event-1 swaps. Offline substitution proves the greenfield layer-1 **prompt cache is
-sufficient** for those swaps, not decode-side exactness (`DECODE_SIDE_EXACTNESS_NOT_PROVEN`); the
-legacy layer-1 cache differs on 8155/8155 rows.
+Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; pushed tip
+`4572efae…9fce`. The v2 four-chip chunk0 run `…130504318767505Z` executed and ended 8/8 clean, but
+its mandatory DB518 layer-0 control failed on 2048/2048 rows (74,299 lanes, median 35/row, max value
+delta 0.03125). Diagnostic ledger `fd634ca0…92b54`, arrays `ae2026ec…49da`, runner
+`3784cdc2…241f`, HLO `c0398830…76b4`; see
+`docs/artifacts/gate-d-chunk0-v2-internal-wk-materialization-diagnosis.json`. The layer-1 arm has no
+standing and Gate D is open.
 
-Active test is one 4-chip chunk-0 legacy-prefill probe; row 0 decides geometry. Sol cleared its
-science/provenance chain and rewrite-mirror adapter. V1 installed without launch, but tag
-`…122749038361895Z` failed closed before TPU: wrapper confused canonical manifest self-hashes with
-raw JSON SHAs (`574f…` vs `bd06…`; legacy `d905…` vs `c11b…`). Published/local tensors are exact.
-Tag burned; remote vacant. The narrow fix keeps both hash domains, has a real-artifact regression,
-31 CPU tests passing, and preserves v1 while staging launcher v2 (`1eb43b8f…`). Fable-max is
-quota-exhausted. Exact next: one Sol batch; if approved commit/push/mirror, install v2, 8/8 preflight,
-execute fresh tag `…130504318767505Z`. Then integrate only a proven geometry or use archived HLO/
-arrays to localize the next boundary. Do not launch 8K yet. Gate D open.
+High-confidence diagnosis: raw-FP8 wk materialization inside the large executable matched DB519's
+rejected all-row signature; causality and the protected fix remain unproven. The uncommitted v3
+correction separately completes raw→BF16 decode and BF16→FP32 promotion for wk0/wk1, then passes FP32 into
+the main executable. Its publisher structurally proves exact ENTRY/root/live-output boundaries and
+rejects raw/scale/BF16 rematerialization; hostile mutations are tested. Forced-CPU suite 34/34;
+boundary suite 20/20. Adversarial Sol approved after two real P1 fixes, with no remaining P0–P2.
+Required narrow Fable-max attempt hit its usage limit without review.
+
+Exact next: finalize immutable source certificate/staging hashes, one final Sol command/certificate
+check if bytes changed, commit/push, wait for same-region cron, verify origin+US-CENTRAL2 mirror,
+install v3 without launch, verify 8/8 preflight, then execute one fresh never-used chunk0 tag. The
+control must be exact before row0 may adjudicate geometry. Do not launch full 8K yet.
 
 ## After Gate D
 

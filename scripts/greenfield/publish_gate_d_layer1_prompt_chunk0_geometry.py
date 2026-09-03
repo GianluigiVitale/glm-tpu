@@ -22,7 +22,7 @@ from typing import Any
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v1/"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v2/"
     "publish_gate_d_layer1_prompt_chunk0_geometry.py"
 )
 SOURCE_PATH = "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
@@ -68,6 +68,10 @@ SUCCESS_PAYLOAD = (
     "evidence.json",
     "hlo/legacy_geometry_chunk0.optimized_hlo.txt",
     "hlo/legacy_geometry_chunk0.stablehlo.mlir",
+    "hlo/wk_decode.optimized_hlo.txt",
+    "hlo/wk_decode.stablehlo.mlir",
+    "hlo/wk_promote.optimized_hlo.txt",
+    "hlo/wk_promote.stablehlo.mlir",
     "mirror.sha256",
     "orchestrator.sealed.log",
     "probe_arrays.npz",
@@ -355,6 +359,190 @@ def _validate_npz(
     return legacy[0] == 0
 
 
+def _entry_graph(
+    optimized: str,
+) -> tuple[dict[str, dict[str, Any]], str]:
+    """Parse the optimized ENTRY computation needed by the wk boundary audit."""
+
+    lines = optimized.splitlines()
+    try:
+        start = next(index for index, line in enumerate(lines) if line.startswith("ENTRY "))
+    except StopIteration as error:
+        raise RuntimeError("chunk-0 wk ENTRY computation is absent") from error
+    nodes: dict[str, dict[str, Any]] = {}
+    root = ""
+    instruction = re.compile(
+        r"^\s*(?P<root>ROOT )?(?P<name>%[A-Za-z0-9_.-]+) = "
+        r"(?P<result>.*?)\b(?P<opcode>[a-z][a-z0-9-]*)\("
+    )
+    shape = re.compile(r"\b([A-Za-z][A-Za-z0-9_]*)\[([0-9,]*)\]")
+    for line in lines[start + 1 :]:
+        if line == "}":
+            break
+        match = instruction.match(line)
+        if match is None:
+            continue
+        call_start = match.end() - 1
+        depth = 0
+        call_end = -1
+        for index in range(call_start, len(line)):
+            if line[index] == "(":
+                depth += 1
+            elif line[index] == ")":
+                depth -= 1
+                if depth == 0:
+                    call_end = index
+                    break
+        if call_end < 0:
+            raise RuntimeError("chunk-0 wk HLO call syntax is unbalanced")
+        result_shapes = tuple(
+            (
+                item.group(1),
+                tuple(int(value) for value in item.group(2).split(",") if value),
+            )
+            for item in shape.finditer(match.group("result"))
+        )
+        name = match.group("name")
+        nodes[name] = {
+            "opcode": match.group("opcode"),
+            "operands": tuple(
+                re.findall(r"%[A-Za-z0-9_.-]+", line[call_start + 1 : call_end])
+            ),
+            "raw": line,
+            "shapes": result_shapes,
+        }
+        if match.group("root"):
+            if root:
+                raise RuntimeError("chunk-0 wk ENTRY has multiple roots")
+            root = name
+    if not nodes or not root:
+        raise RuntimeError("chunk-0 wk ENTRY graph is incomplete")
+    return nodes, root
+
+
+def _ancestors(nodes: Mapping[str, Mapping[str, Any]], name: str) -> set[str]:
+    pending = [name]
+    visited: set[str] = set()
+    while pending:
+        current = pending.pop()
+        if current in visited:
+            continue
+        if current not in nodes:
+            raise RuntimeError("chunk-0 wk ENTRY operand is unresolved")
+        visited.add(current)
+        pending.extend(nodes[current]["operands"])
+        if len(visited) > 10000:
+            raise RuntimeError("chunk-0 wk ENTRY graph is unbounded")
+    return visited
+
+
+def _stablehlo_main_signature(stablehlo: str) -> str:
+    match = re.search(r"^  func\.func public @main\((.*)\) -> (.*) \{$", stablehlo, re.M)
+    if match is None:
+        raise RuntimeError("chunk-0 wk StableHLO public signature is absent")
+    return match.group(0)
+
+
+def _require_wk_hlo_boundaries(
+    main_optimized: str,
+    main_stablehlo: str,
+    decode_optimized: str,
+    decode_stablehlo: str,
+    promote_optimized: str,
+    promote_stablehlo: str,
+) -> None:
+    """Prove exact helper signatures and live FP32-only main wk lineage."""
+
+    main_nodes, main_root = _entry_graph(main_optimized)
+    decode_nodes, decode_root = _entry_graph(decode_optimized)
+    promote_nodes, promote_root = _entry_graph(promote_optimized)
+    parameter = lambda nodes: {
+        name: node for name, node in nodes.items() if node["opcode"] == "parameter"
+    }
+    main_parameters = parameter(main_nodes)
+    decode_parameters = parameter(decode_nodes)
+    promote_parameters = parameter(promote_nodes)
+    by_shape = lambda nodes, wanted: {
+        name for name, node in nodes.items() if node["shapes"] == (wanted,)
+    }
+    wk_shape = ("f32", (128, 6144))
+    raw_shape = ("u8", (128, 6144))
+    scale_shape = ("f32", (1, 48))
+    bf16_shape = ("bf16", (128, 6144))
+    main_wk = by_shape(main_parameters, wk_shape)
+    raw_main = by_shape(main_parameters, raw_shape)
+    scale_main = by_shape(main_parameters, scale_shape)
+    wk0 = {name for name in main_wk if "wk0" in name}
+    wk1 = {name for name in main_wk if "wk1" in name}
+    root_operands = main_nodes[main_root]["operands"]
+    if main_nodes[main_root]["opcode"] != "tuple" or len(root_operands) != 12:
+        raise RuntimeError("chunk-0 main result boundary drifted")
+    result_live = tuple(_ancestors(main_nodes, operand) for operand in root_operands)
+    key0_live = result_live[5]
+    key1_live = result_live[6]
+    helper_communication = (
+        "all-gather(",
+        "all-reduce(",
+        "all-to-all(",
+        "collective-permute(",
+        "reduce-scatter(",
+    )
+    decode_parameter_shapes = sorted(
+        node["shapes"] for node in decode_parameters.values()
+    )
+    promote_parameter_shapes = sorted(
+        node["shapes"] for node in promote_parameters.values()
+    )
+    decode_live = _ancestors(decode_nodes, decode_root)
+    promote_live = _ancestors(promote_nodes, promote_root)
+    main_signature = _stablehlo_main_signature(main_stablehlo)
+    decode_signature = _stablehlo_main_signature(decode_stablehlo)
+    promote_signature = _stablehlo_main_signature(promote_stablehlo)
+    live_main = key0_live | key1_live
+    forbidden_live_shapes = {raw_shape, scale_shape, bf16_shape}
+    if (
+        len(main_wk) != 2
+        or len(wk0) != 1
+        or len(wk1) != 1
+        or raw_main
+        or scale_main
+        or not wk0 <= key0_live
+        or not wk1 <= key1_live
+        or any(wk0 & live for index, live in enumerate(result_live) if index != 5)
+        or any(wk1 & live for index, live in enumerate(result_live) if index != 6)
+        or any(
+            node["shapes"] and node["shapes"][0] in forbidden_live_shapes
+            for name, node in main_nodes.items()
+            if name in live_main and node["opcode"] != "parameter"
+        )
+        or decode_parameter_shapes != [(("f32", (1, 48)),), (("u8", (128, 6144)),)]
+        or decode_nodes[decode_root]["shapes"] != (bf16_shape,)
+        or decode_nodes[decode_root]["opcode"] != "convert"
+        or len(decode_nodes[decode_root]["operands"]) != 1
+        or not set(decode_parameters) <= decode_live
+        or promote_parameter_shapes != [(bf16_shape,)]
+        or promote_nodes[promote_root]["shapes"] != (wk_shape,)
+        or promote_nodes[promote_root]["opcode"] != "convert"
+        or promote_nodes[promote_root]["operands"] != tuple(promote_parameters)
+        or promote_live != {promote_root, *promote_parameters}
+        or any(
+            token in decode_optimized or token in promote_optimized
+            for token in helper_communication
+        )
+        or main_signature.count("tensor<128x6144xf32>") != 2
+        or "tensor<128x6144xui8>" in main_signature
+        or "tensor<1x48xf32>" in main_signature
+        or decode_signature.count("tensor<128x6144xui8>") != 1
+        or decode_signature.count("tensor<1x48xf32>") != 1
+        or decode_signature.count("tensor<128x6144xbf16>") != 1
+        or promote_signature.count("tensor<128x6144xbf16>") != 1
+        or promote_signature.count("tensor<128x6144xf32>") != 1
+        or "stablehlo.convert" not in decode_stablehlo
+        or "stablehlo.convert" not in promote_stablehlo
+    ):
+        raise RuntimeError("chunk-0 wk executable boundary drifted")
+
+
 def _prepare_success(
     base: Any,
     run_fd: int,
@@ -408,30 +596,80 @@ def _prepare_success(
         or set(hlo)
         != {
             "convolution_lines_with_2048_rows",
+            "main_fp32_wk_parameters",
+            "main_raw_wk_parameters",
             "optimized_byte_count",
             "optimized_sha256",
             "stablehlo_byte_count",
             "stablehlo_sha256",
+            "wk_decode_optimized_byte_count",
+            "wk_decode_optimized_sha256",
+            "wk_decode_stablehlo_byte_count",
+            "wk_decode_stablehlo_sha256",
+            "wk_promote_optimized_byte_count",
+            "wk_promote_optimized_sha256",
+            "wk_promote_stablehlo_byte_count",
+            "wk_promote_stablehlo_sha256",
         }
     ):
         raise RuntimeError("chunk-0 runner claim boundary drifted")
     optimized = base.snapshot_member(run_fd, "hlo/legacy_geometry_chunk0.optimized_hlo.txt", limit=512 << 20)
     stablehlo = base.snapshot_member(run_fd, "hlo/legacy_geometry_chunk0.stablehlo.mlir", limit=512 << 20)
+    wk_decode_optimized = base.snapshot_member(run_fd, "hlo/wk_decode.optimized_hlo.txt", limit=32 << 20)
+    wk_decode_stablehlo = base.snapshot_member(run_fd, "hlo/wk_decode.stablehlo.mlir", limit=32 << 20)
+    wk_promote_optimized = base.snapshot_member(run_fd, "hlo/wk_promote.optimized_hlo.txt", limit=32 << 20)
+    wk_promote_stablehlo = base.snapshot_member(run_fd, "hlo/wk_promote.stablehlo.mlir", limit=32 << 20)
     optimized_text = optimized.decode("utf-8", errors="strict")
     stablehlo_text = stablehlo.decode("utf-8", errors="strict")
+    wk_decode_optimized_text = wk_decode_optimized.decode("utf-8", errors="strict")
+    wk_decode_stablehlo_text = wk_decode_stablehlo.decode("utf-8", errors="strict")
+    wk_promote_optimized_text = wk_promote_optimized.decode("utf-8", errors="strict")
+    wk_promote_stablehlo_text = wk_promote_stablehlo.decode("utf-8", errors="strict")
     forbidden = ("host_callback", 'CustomCall("xla_python', "python_callback")
     convolution_count = sum(
         "convolution(" in line and "[2048," in line
         for line in optimized_text.splitlines()
     )
+    _require_wk_hlo_boundaries(
+        optimized_text,
+        stablehlo_text,
+        wk_decode_optimized_text,
+        wk_decode_stablehlo_text,
+        wk_promote_optimized_text,
+        wk_promote_stablehlo_text,
+    )
     if (
-        any(token in optimized_text or token in stablehlo_text for token in forbidden)
+        any(
+            token in text
+            for token in forbidden
+            for text in (
+                optimized_text,
+                stablehlo_text,
+                wk_decode_optimized_text,
+                wk_decode_stablehlo_text,
+                wk_promote_optimized_text,
+                wk_promote_stablehlo_text,
+            )
+        )
         or convolution_count <= 0
+        or hlo.get("main_fp32_wk_parameters")
+        != ["w__wk0__.1: f32[128,6144]", "w__wk1__.1: f32[128,6144]"]
+        or hlo.get("main_raw_wk_parameters") != []
+        or "w__wk0_bits__" in optimized_text
+        or "w__wk1_bits__" in optimized_text
         or hlo.get("convolution_lines_with_2048_rows") != convolution_count
         or hlo.get("optimized_byte_count") != len(optimized)
         or hlo.get("optimized_sha256") != sha256(optimized).hexdigest()
         or hlo.get("stablehlo_byte_count") != len(stablehlo)
         or hlo.get("stablehlo_sha256") != sha256(stablehlo).hexdigest()
+        or hlo.get("wk_decode_optimized_byte_count") != len(wk_decode_optimized)
+        or hlo.get("wk_decode_optimized_sha256") != sha256(wk_decode_optimized).hexdigest()
+        or hlo.get("wk_decode_stablehlo_byte_count") != len(wk_decode_stablehlo)
+        or hlo.get("wk_decode_stablehlo_sha256") != sha256(wk_decode_stablehlo).hexdigest()
+        or hlo.get("wk_promote_optimized_byte_count") != len(wk_promote_optimized)
+        or hlo.get("wk_promote_optimized_sha256") != sha256(wk_promote_optimized).hexdigest()
+        or hlo.get("wk_promote_stablehlo_byte_count") != len(wk_promote_stablehlo)
+        or hlo.get("wk_promote_stablehlo_sha256") != sha256(wk_promote_stablehlo).hexdigest()
     ):
         raise RuntimeError("chunk-0 HLO evidence drifted")
     arrays = base.snapshot_member(run_fd, "probe_arrays.npz", limit=96 << 20)
@@ -473,6 +711,10 @@ def _prepare_success(
         "census_pre.txt": census_pre,
         "hlo/legacy_geometry_chunk0.optimized_hlo.txt": optimized,
         "hlo/legacy_geometry_chunk0.stablehlo.mlir": stablehlo,
+        "hlo/wk_decode.optimized_hlo.txt": wk_decode_optimized,
+        "hlo/wk_decode.stablehlo.mlir": wk_decode_stablehlo,
+        "hlo/wk_promote.optimized_hlo.txt": wk_promote_optimized,
+        "hlo/wk_promote.stablehlo.mlir": wk_promote_stablehlo,
         "mirror.sha256": mirror,
         "orchestrator.sealed.log": orchestrator,
         "probe_arrays.npz": arrays,
