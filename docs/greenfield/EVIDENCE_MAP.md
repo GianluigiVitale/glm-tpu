@@ -3656,3 +3656,11 @@ persistence only; review and persistence precede any v2 installation.
   `greenfield_layer1_prompt_chunk0_geometry_20260903T120750596552366Z` is unstarted and delta-review-pending.
 - Classification: `ROUND32_PROVENANCE_CORRECTIONS_CPU_VALIDATED;SOL_DELTA_REVIEW_PENDING;
   INSTALL_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;NO_CLAIM;GATE_D_OPEN`.
+
+## 2026-09-03 — Sol delta approval and source persistence
+
+- Same reviewer thread returned no P0/P1/P2 and exact approvals for staged diff `dbe73288…`, install staging tree
+  `72a72ad8…`, and one execution with fresh tag `…120750596552366Z`. Approved source bytes are commit
+  `526efffcf8b6b1e8e46a568fd20d35b64a83b6c7`, pushed to origin. No install/cloud/TPU work at this record.
+- Classification: `ROUND32_PROVENANCE_CLOSED;SOL_APPROVED;SOURCE_PERSISTED;INSTALL_APPROVED_NOT_YET_RUN;
+  EXECUTE_ONCE_APPROVED_NOT_YET_RUN;NO_CLAIM;GATE_D_OPEN`.

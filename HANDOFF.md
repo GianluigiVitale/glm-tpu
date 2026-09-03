@@ -11646,3 +11646,12 @@ tree `/home/gianl/gate-d-runs/gate-d-layer1-prompt-chunk0-geometry-install-v1-st
 Next: one batched read-only Sol review of current diff, tests, certificate, literal provision/install commands and the
 fresh-tag command. Correct every P0/P1; only exact approval permits commit/push/mirror, install-only, fresh preflight
 and execute-once. Gate D remains open regardless of the row-0 probe result.
+
+### Sol delta approval and persistence
+
+The same Sol thread verified staged SHA `dbe73288257cdd77120faac112d1d3f10e0087b38d8068d5d5c2ca5bd73ad6be`
+and returned no P0/P1/P2 plus exact `APPROVE PERSISTENCE`, `APPROVE INSTALL ONLY 72a72ad8…`, and
+`APPROVE EXECUTE ONCE greenfield_layer1_prompt_chunk0_geometry_20260903T120750596552366Z …` verdicts.
+Approved bytes are commit `526efffcf8b6b1e8e46a568fd20d35b64a83b6c7`, pushed to origin. At this record nothing is
+installed and no cloud or TPU action has occurred. Next is this records-only commit, same-region mirror replay,
+the two literal approved install-only commands, authenticated zero-work preflight, then the one approved launch.
