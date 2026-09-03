@@ -1111,3 +1111,9 @@ v5's host `chunk_embeddings` boundary or its naive ENTRY-only gather check. V6 a
 `chunk0_embedding_hlo.py`; the probe imports its committed bytes from the sealed archive before invocation, while the
 publisher loads the launcher-authenticated adjacent capsule copy and repeats the same whole-module proof. Preserve
 v5's token-374 diagnostic as negative evidence; it is not a reference cache or reusable numerical success.
+
+## 2026-09-03 chunk0 v7 reuse boundary
+
+Reuse V6's on-device gather and archived diagnostic HLO only as an offline compiler-shaped regression, never as
+numerical success. Reuse the validator only with V7 output-sensitive GTE/while traversal, ordered four-slice
+reassembly and the all-witness cut. Do not reuse V6 standalone-node dominance or its burned tag.

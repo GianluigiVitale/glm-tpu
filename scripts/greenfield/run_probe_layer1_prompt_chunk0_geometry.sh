@@ -11,7 +11,7 @@ import stat
 from pathlib import Path
 
 root = Path("/opt/glm-tpu/locks")
-launcher = Path("/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v6.py")
+launcher = Path("/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v7.py")
 parent_fd = os.open(root, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW)
 parent = os.fstat(parent_fd)
 if not stat.S_ISDIR(parent.st_mode) or parent.st_uid != 0 or parent.st_gid != 0 or stat.S_IMODE(parent.st_mode) & 0o022:
@@ -142,13 +142,13 @@ readonly LEGACY_LAYER1_MANIFEST_SHA=d9058cc6584aca784212706789e72b4981754cb9880e
 readonly LEGACY_LAYER1_MANIFEST_FILE_SHA=c11b238edfb7efb4f807e397cbf70ea72a7569574029e68afb46a370d4b30193
 readonly DB518_RESULT=/home/gianl/glm-run/greenfield_pp16_feature2_layer0_db518_numerical_20260829T115022665987633Z/result.npz
 readonly DB518_RESULT_SHA=534bacc54d74992f5a8ab4d422f9fa0947523d59325b4bfa272d4fbeb56262f0
-readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v5
+readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v6
 readonly PROBE=$CAPSULE/probe_layer1_prompt_chunk0_geometry.py
-readonly PROBE_SHA=32ac0e160017afcbc3928fbd04f3cf31944d16339283c030929adf569a07e158
+readonly PROBE_SHA=073c6b2a865d1f1936c27ba4dabbb54c9dfc1987e22fcdaa14657c612f5832bc
 readonly PUBLISHER=$CAPSULE/publish_gate_d_layer1_prompt_chunk0_geometry.py
-readonly PUBLISHER_SHA=faaeec64303b2a18963a9952f9e93c262b84ab0ac41a23a57b875e0c57ea2b17
+readonly PUBLISHER_SHA=8b1e05534419661c9e69207c1cfab2794beaec03007f0fcb15a184977a33f15d
 readonly MIRROR_VERIFIER=$CAPSULE/verify_gate_d_rewrite_same_region_git_mirror.py
-readonly MIRROR_VERIFIER_SHA=5b02ee2ed0bbde75b4a96ba52eee14b53795e1c832fcf8ccd626237316fb0be7
+readonly MIRROR_VERIFIER_SHA=dfeaecede526676a08b3deacf3f2e58b8d040f4d7b8542f14eb8db18aef9bcea
 readonly SEALED_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12
 readonly SEALED_PYTHON_SHA=021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7
 readonly VACANCY_EXPECTED='ERROR: (gcloud.storage.ls) One or more URLs matched no objects.'

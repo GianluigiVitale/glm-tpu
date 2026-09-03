@@ -106,16 +106,29 @@ def _module_graph(
                 raise RuntimeError("chunk-0 embedding HLO parameter number is malformed")
             parameter = int(number.group(1))
         called = re.search(r"\b(?:calls|to_apply)=(%[A-Za-z0-9_.-]+)", line[call_end + 1 :])
+        body = re.search(r"\bbody=(%[A-Za-z0-9_.-]+)", line[call_end + 1 :])
+        condition = re.search(
+            r"\bcondition=(%[A-Za-z0-9_.-]+)", line[call_end + 1 :]
+        )
+        tuple_index = None
+        if match.group("opcode") == "get-tuple-element":
+            selected = re.search(r"\bindex=([0-9]+)", line[call_end + 1 :])
+            if selected is None:
+                raise RuntimeError("chunk-0 embedding HLO tuple index is missing")
+            tuple_index = int(selected.group(1))
         nodes = computations[current]["nodes"]
         if name in nodes:
             raise RuntimeError("chunk-0 embedding HLO instruction is duplicated")
         nodes[name] = {
             "called": None if called is None else called.group(1),
+            "body": None if body is None else body.group(1),
+            "condition": None if condition is None else condition.group(1),
             "opcode": match.group("opcode"),
             "operands": _split_operands(line[call_start + 1 : call_end]),
             "parameter": parameter,
             "raw": line,
             "shapes": _shapes(match.group("result")),
+            "tuple_index": tuple_index,
         }
         if match.group("root"):
             if computations[current]["root"]:
@@ -469,7 +482,7 @@ def _semantic_ancestors(
     *,
     blocked: frozenset[str] = frozenset(),
 ) -> set[str]:
-    """ENTRY ancestry with ignored fusion operands removed by callee liveness."""
+    """Output-sensitive ancestry through fusions, tuples and while state slots."""
 
     nodes = computations[computation_name]["nodes"]
     pending = [name]
@@ -480,19 +493,151 @@ def _semantic_ancestors(
             continue
         visited.add(current)
         node = nodes[current]
-        callee = _callee(computations, node)
-        if node["opcode"] == "fusion" and callee is not None:
-            callee_parameters = _parameters(callee)
-            callee_live = _ancestors(callee["nodes"], callee["root"])
-            pending.extend(
-                operand
-                for number, operand in enumerate(node["operands"])
-                if number in callee_parameters
-                and callee_parameters[number] in callee_live
-            )
-        else:
-            pending.extend(node["operands"])
+        pending.extend(
+            _semantic_predecessors(computations, computation_name, current)
+        )
     return visited
+
+
+def _selected_callee_operands(
+    computations: Mapping[str, Mapping[str, Any]],
+    caller: Mapping[str, Any],
+    index: int | None,
+) -> tuple[str, ...]:
+    callee = _callee(computations, caller)
+    if callee is None:
+        raise RuntimeError("chunk-0 embedding HLO selected fusion has no callee")
+    root = callee["nodes"][callee["root"]]
+    if index is None:
+        selected = callee["root"]
+    else:
+        if root["opcode"] != "tuple" or index >= len(root["operands"]):
+            raise RuntimeError("chunk-0 embedding HLO fusion tuple selection is invalid")
+        selected = root["operands"][index]
+    live = _ancestors(callee["nodes"], selected)
+    parameters = _parameters(callee)
+    return tuple(
+        operand
+        for number, operand in enumerate(caller["operands"])
+        if number in parameters and parameters[number] in live
+    )
+
+
+def _body_input_slots(
+    computations: Mapping[str, Mapping[str, Any]],
+    computation_name: str,
+    selected: str,
+    tuple_parameter: str,
+) -> set[int]:
+    nodes = computations[computation_name]["nodes"]
+    pending = [selected]
+    visited: set[str] = set()
+    slots: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if current in visited:
+            continue
+        visited.add(current)
+        node = nodes[current]
+        if (
+            node["opcode"] == "get-tuple-element"
+            and len(node["operands"]) == 1
+            and node["operands"][0] == tuple_parameter
+        ):
+            if node["tuple_index"] is None:
+                raise RuntimeError("chunk-0 embedding HLO body tuple selection is invalid")
+            slots.add(node["tuple_index"])
+            continue
+        pending.extend(
+            _semantic_predecessors(computations, computation_name, current)
+        )
+    return slots
+
+
+def _while_initial_operands(
+    computations: Mapping[str, Mapping[str, Any]],
+    computation_name: str,
+    node: Mapping[str, Any],
+    index: int,
+) -> tuple[str, ...]:
+    nodes = computations[computation_name]["nodes"]
+    if len(node["operands"]) != 1 or node["body"] not in computations:
+        raise RuntimeError("chunk-0 embedding HLO while body is unresolved")
+    initial_name = _transparent_origin(nodes, node["operands"][0])
+    initial = nodes[initial_name]
+    body = computations[node["body"]]
+    body_root = body["nodes"][body["root"]]
+    body_parameters = _parameters(body)
+    if (
+        initial["opcode"] != "tuple"
+        or body_root["opcode"] != "tuple"
+        or len(body_parameters) != 1
+        or len(initial["operands"]) != len(body_root["operands"])
+        or index >= len(initial["operands"])
+    ):
+        raise RuntimeError("chunk-0 embedding HLO while state is malformed")
+    tuple_parameter = body_parameters[0]
+    transitions = tuple(
+        _body_input_slots(computations, node["body"], value, tuple_parameter)
+        for value in body_root["operands"]
+    )
+    if node["condition"] not in computations:
+        raise RuntimeError("chunk-0 embedding HLO while condition is unresolved")
+    condition = computations[node["condition"]]
+    condition_parameters = _parameters(condition)
+    if len(condition_parameters) != 1:
+        raise RuntimeError("chunk-0 embedding HLO while condition is malformed")
+    condition_slots = _body_input_slots(
+        computations,
+        node["condition"],
+        condition["root"],
+        condition_parameters[0],
+    )
+    if any(slot >= len(initial["operands"]) for slot in condition_slots):
+        raise RuntimeError("chunk-0 embedding HLO while condition slot is invalid")
+    required = {index, *condition_slots}
+    while True:
+        expanded = required | {
+            dependency for slot in required for dependency in transitions[slot]
+        }
+        if any(slot >= len(initial["operands"]) for slot in expanded):
+            raise RuntimeError("chunk-0 embedding HLO while transition slot is invalid")
+        if expanded == required:
+            break
+        required = expanded
+    return tuple(initial["operands"][slot] for slot in sorted(required))
+
+
+def _semantic_predecessors(
+    computations: Mapping[str, Mapping[str, Any]],
+    computation_name: str,
+    name: str,
+) -> tuple[str, ...]:
+    nodes = computations[computation_name]["nodes"]
+    node = nodes[name]
+    callee = _callee(computations, node)
+    if node["opcode"] == "fusion" and callee is not None:
+        return _selected_callee_operands(computations, node, None)
+    if node["opcode"] != "get-tuple-element":
+        return tuple(node["operands"])
+    if len(node["operands"]) != 1 or node["tuple_index"] is None:
+        raise RuntimeError("chunk-0 embedding HLO tuple selection is malformed")
+    producer = nodes[node["operands"][0]]
+    index = node["tuple_index"]
+    if producer["opcode"] == "tuple":
+        if index >= len(producer["operands"]):
+            raise RuntimeError("chunk-0 embedding HLO tuple selection is out of range")
+        return (producer["operands"][index],)
+    if producer["opcode"] == "fusion":
+        return _selected_callee_operands(computations, producer, index)
+    if producer["opcode"] == "while":
+        return _while_initial_operands(
+            computations, computation_name, producer, index
+        )
+    # Async and custom calls may also return tuples.  Keeping all their data
+    # operands is conservative; unlike fusion/while they have no HLO body whose
+    # ignored result operands can be proven dead here.
+    return tuple(producer["operands"])
 
 
 def _normalization_body(
@@ -608,6 +753,249 @@ def _normalization_body(
     return {"chunk": chunk[0], "inverse": inverse[0], "weight": weight[0]}
 
 
+def _tiled_normalization_branch(
+    computation: Mapping[str, Any], index: int
+) -> dict[str, int] | None:
+    """Recognize one exact M2048 RMSNorm result inside a tuple fusion."""
+
+    nodes = computation["nodes"]
+    parameters = _parameters(computation)
+    root = nodes[computation["root"]]
+    if root["opcode"] != "tuple" or index >= len(root["operands"]):
+        return None
+    logical = (32, 64)
+    full = (*logical, 6144)
+    representation = frozenset({"bitcast", "copy", "reshape", "transpose"})
+
+    def origin(name: str) -> str:
+        return _transparent_origin(nodes, name, allowed=representation)
+
+    final_name = origin(root["operands"][index])
+    final = nodes[final_name]
+    if (
+        final["opcode"] != "convert"
+        or final["shapes"] != (("bf16", full),)
+        or len(final["operands"]) != 1
+    ):
+        return None
+    weighted_name = origin(final["operands"][0])
+    weighted = nodes[weighted_name]
+    if (
+        weighted["opcode"] != "multiply"
+        or weighted["shapes"] != (("f32", full),)
+        or len(weighted["operands"]) != 2
+    ):
+        return None
+
+    def broadcast_parameter(
+        name: str, shape: tuple[int, ...], dimensions: str
+    ) -> str | None:
+        broadcast_name = origin(name)
+        broadcast = nodes[broadcast_name]
+        if (
+            broadcast["opcode"] != "broadcast"
+            or broadcast["shapes"] != (("f32", full),)
+            or f"dimensions={{{dimensions}}}" not in broadcast["raw"]
+            or len(broadcast["operands"]) != 1
+        ):
+            return None
+        parameter = origin(broadcast["operands"][0])
+        return (
+            parameter
+            if parameter in parameters.values()
+            and nodes[parameter]["shapes"] == (("f32", shape),)
+            else None
+        )
+
+    weight_candidates = [
+        (operand, broadcast_parameter(operand, (6144,), "2"))
+        for operand in weighted["operands"]
+    ]
+    weight_candidates = [item for item in weight_candidates if item[1] is not None]
+    if len(weight_candidates) != 1:
+        return None
+    weight_operand, weight_parameter = weight_candidates[0]
+    rounded_operands = [
+        operand for operand in weighted["operands"] if operand != weight_operand
+    ]
+    if len(rounded_operands) != 1:
+        return None
+    rounded_f32_name = origin(rounded_operands[0])
+    rounded_f32 = nodes[rounded_f32_name]
+    if (
+        rounded_f32["opcode"] != "convert"
+        or rounded_f32["shapes"] != (("f32", full),)
+        or len(rounded_f32["operands"]) != 1
+    ):
+        return None
+    rounded_name = origin(rounded_f32["operands"][0])
+    rounded = nodes[rounded_name]
+    if (
+        rounded["opcode"] != "convert"
+        or rounded["shapes"] != (("bf16", full),)
+        or len(rounded["operands"]) != 1
+    ):
+        return None
+    scaled_name = origin(rounded["operands"][0])
+    scaled = nodes[scaled_name]
+    if (
+        scaled["opcode"] != "multiply"
+        or scaled["shapes"] != (("f32", full),)
+        or len(scaled["operands"]) != 2
+    ):
+        return None
+    inverse_candidates = [
+        (operand, broadcast_parameter(operand, logical, "0,1"))
+        for operand in scaled["operands"]
+    ]
+    inverse_candidates = [item for item in inverse_candidates if item[1] is not None]
+    if len(inverse_candidates) != 1:
+        return None
+    inverse_operand, inverse_parameter = inverse_candidates[0]
+    chunk_operands = [
+        operand for operand in scaled["operands"] if operand != inverse_operand
+    ]
+    if len(chunk_operands) != 1:
+        return None
+    chunk_parameter = origin(chunk_operands[0])
+    if (
+        chunk_parameter not in parameters.values()
+        or nodes[chunk_parameter]["shapes"] != (("f32", full),)
+    ):
+        return None
+    selected_live = _ancestors(nodes, root["operands"][index])
+    live_parameters = set(parameters.values()) & selected_live
+    if live_parameters != {chunk_parameter, inverse_parameter, weight_parameter}:
+        return None
+    by_name = {name: number for number, name in parameters.items()}
+    return {
+        "chunk": by_name[chunk_parameter],
+        "inverse": by_name[inverse_parameter],
+        "weight": by_name[weight_parameter],
+    }
+
+
+def _exact_partitioned_chunk_f32_lineage(
+    nodes: Mapping[str, Mapping[str, Any]], name: str, gather: str
+) -> bool:
+    """Accept only the TPU compiler's lossless four-slice M2048 reassembly."""
+
+    representation = frozenset({"bitcast", "copy", "reshape", "transpose"})
+    converted_name = _transparent_origin(nodes, name, allowed=representation)
+    converted = nodes[converted_name]
+    if (
+        converted["opcode"] != "convert"
+        or converted["shapes"] != (("f32", (2048, 6144)),)
+        or len(converted["operands"]) != 1
+    ):
+        return False
+    source = _transparent_origin(
+        nodes, converted["operands"][0], allowed=representation
+    )
+    if source == gather:
+        return True
+    concat = nodes[source]
+    if (
+        concat["opcode"] != "custom-call"
+        or concat["shapes"] != (("bf16", (2048, 6144)),)
+        or 'custom_call_target="ConcatBitcast"' not in concat["raw"]
+        or len(concat["operands"]) != 4
+    ):
+        return False
+    observed: list[tuple[int, int]] = []
+    for operand in concat["operands"]:
+        done_name = _transparent_origin(
+            nodes, operand, allowed=frozenset({"bitcast", "copy", "reshape", "transpose"})
+        )
+        done = nodes[done_name]
+        # slice-done is deliberately not transparent: the corresponding
+        # slice-start carries the exact range being reconstructed.
+        if done["opcode"] != "slice-done" or len(done["operands"]) != 1:
+            return False
+        start = nodes[done["operands"][0]]
+        match = re.search(
+            r"\bslice=\{\[([0-9]+):([0-9]+)\], \[0:6144\]\}",
+            start["raw"],
+        )
+        if (
+            start["opcode"] != "slice-start"
+            or start["shapes"][:2]
+            != (("bf16", (2048, 6144)), ("bf16", (512, 6144)))
+            or len(start["operands"]) != 1
+            or match is None
+            or _transparent_origin(nodes, start["operands"][0]) != gather
+        ):
+            return False
+        observed.append((int(match.group(1)), int(match.group(2))))
+    return tuple(observed) == (
+        (0, 512),
+        (512, 1024),
+        (1024, 1536),
+        (1536, 2048),
+    )
+
+
+def _exact_bf16_vector_to_f32_lineage(
+    nodes: Mapping[str, Mapping[str, Any]], name: str, parameter: str
+) -> bool:
+    representation = frozenset(
+        {"bitcast", "copy", "copy-done", "copy-start", "reshape", "transpose"}
+    )
+    converted_name = _transparent_origin(nodes, name, allowed=representation)
+    converted = nodes[converted_name]
+    return bool(
+        converted["opcode"] == "convert"
+        and converted["shapes"] == (("f32", (6144,)),)
+        and len(converted["operands"]) == 1
+        and _transparent_origin(
+            nodes, converted["operands"][0], allowed=representation
+        )
+        == parameter
+        and nodes[parameter]["shapes"] == (("bf16", (6144,)),)
+    )
+
+
+def _tiled_normalization_witnesses(
+    computations: Mapping[str, Mapping[str, Any]],
+    entry_name: str,
+    gather: str,
+    inverse: str,
+    input_weight: str,
+) -> set[str]:
+    nodes = computations[entry_name]["nodes"]
+    witnesses: set[str] = set()
+    for name, node in nodes.items():
+        if node["opcode"] != "get-tuple-element" or len(node["operands"]) != 1:
+            continue
+        producer = nodes[node["operands"][0]]
+        if producer["opcode"] != "fusion" or node["tuple_index"] is None:
+            continue
+        callee = _callee(computations, producer)
+        mapping = (
+            None
+            if callee is None
+            else _tiled_normalization_branch(callee, node["tuple_index"])
+        )
+        if mapping is None:
+            continue
+        operands = {
+            role: _mapped_operand(producer, mapping, role) for role in mapping
+        }
+        if any(value is None for value in operands.values()):
+            continue
+        if (
+            _exact_partitioned_chunk_f32_lineage(
+                nodes, operands["chunk"], gather
+            )
+            and _transparent_origin(nodes, operands["inverse"]) == inverse
+            and _exact_bf16_vector_to_f32_lineage(
+                nodes, operands["weight"], input_weight
+            )
+        ):
+            witnesses.add(name)
+    return witnesses
+
+
 def _mapped_operand(
     caller: Mapping[str, Any], mapping: Mapping[str, int], role: str
 ) -> str | None:
@@ -712,6 +1100,18 @@ def require_embedding_gather_hlo(
         # the raw residual path, so normalization cannot dominate that graph;
         # layer-1 evidence receives standing only after this control is exact.
         gather = valid[0][0]
+        inverse = valid[0][2]
+        input_weight = next(iter(input_weights))
+        normalization_witnesses = {
+            norm,
+            *_tiled_normalization_witnesses(
+                computations,
+                entry_name,
+                gather,
+                inverse,
+                input_weight,
+            ),
+        }
         key0_live = _semantic_ancestors(
             computations, entry_name, root["operands"][5]
         )
@@ -719,9 +1119,12 @@ def require_embedding_gather_hlo(
             computations,
             entry_name,
             root["operands"][5],
-            blocked=frozenset({norm}),
+            blocked=frozenset(normalization_witnesses),
         )
-        contract["passed"] = norm in key0_live and gather not in key0_without_norm
+        contract["passed"] = bool(
+            normalization_witnesses & key0_live
+            and gather not in key0_without_norm
+        )
     else:
         contract["passed"] = False
     contract["passed"] = bool(

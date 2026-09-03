@@ -3743,3 +3743,13 @@ persistence only; review and persistence precede any v2 installation.
   by a called-body-aware exact typed HLO validator and rechecked by the publisher. Hostile suite covers 16 bypasses;
   CPU 35/35. Sol approved source persistence, no P0–P2. Certificate `…geometry-v6-source.json`; staging tree
   `d4db809e…ced54`; tag `…180438114586827Z`. Install/execution unreviewed; Gate D open.
+
+## 2026-09-03 — chunk0 v6 admission diagnostic / v7 source
+
+- Pin `82e33fc8…0633`; origin/mirror exact; install reported no launch. After Sol approval, tag
+  `…180438114586827Z` compiled and failed before invocation; both censuses 8/8 clean. Diagnostic terminal
+  `1788459348320561`/`00eeae78…ec77`; HLO/StableHLO `b7713bdf…b0ea`/`d1d97229…bda9`; artifact
+  `gate-d-chunk0-v6-hlo-admission-failure.json`.
+- Exact normalization was duplicated into selected tuple output 1; V6's non-output-sensitive ancestry false-rejected.
+  V7 adds selected fusion/while-slot semantics, exact tiled normalization, ordered four-slice reconstruction and an
+  all-witness cut. Archived HLO passes offline; attacks reject; CPU 37/37; Sol core `APPROVE`, no P0–P2. Source only.

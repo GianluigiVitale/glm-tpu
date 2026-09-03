@@ -2,15 +2,13 @@
 
 FULL ACCESS. Keep this <4000 chars; compaction-safe authority. At start/compaction read it and
 `docs/glm-tpu-revolution.md` in full, then tails of `HANDOFF.md` and
-`docs/greenfield/{EVIDENCE_MAP,GATE_D_LESSONS}.md`. Inspect live git/run/lease/pod state. If stuck, reread
-`docs/greenfield/compass_artifact_wf-f6f3c189-f49a-5169-bc82-8adefac958df_text_markdown.md` in full
-and adjudicate hypotheses against local evidence.
+`docs/greenfield/{EVIDENCE_MAP,GATE_D_LESSONS}.md`; inspect live state. If stuck, reread the full
+`docs/greenfield/compass_artifact_wf-f6f3c189-f49a-5169-bc82-8adefac958df_text_markdown.md`.
 
 ## Priority
 
-Close **Gate D**: correct 78-layer decoder at 8K with exact raw tokens and DSA set/tie order,
-state/cache integrity, local repeated collectives, measured HBM, fresh trace and steady wall.
-PP8/PP16/WS32 adjudication, 128K/256K, speculation and §18 follow; do not divert now.
+Close **Gate D**: correct 78-layer decoder at 8K with exact tokens/DSA order, state/cache integrity,
+local collectives, HBM, trace and wall. Plan adjudication, long contexts and §18 follow.
 
 ## Hard invariants
 
@@ -25,36 +23,41 @@ weaken history. Optimizations default off. Targets: useful <=200, strong <=125, 
 - Smallest decisive test first; instrument boundaries and stop on first invariant failure. Never
   run 8K while a row/chunk probe can decide the hypothesis.
 - Use the independent Sol adversarial reviewer before persistence, install and execution; resolve
-  every P0–P2. Fable-max may replace it when available; otherwise Sol is sufficient.
+  every P0–P2. Fable-max may replace it when available.
 - Cron `/home/gianl/bin/sync-glm.sh` runs every 5 min. Commit/push/same-region mirror; verify origin
   plus US-CENTRAL2 mirror before protected work. Never use EU.
 - Report result, percentage and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-03 18:05Z
+## Resume checkpoint — 2026-09-03 18:32Z
 
-Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; last pushed
-tip `9265301c…c442`. Gate D remains open.
+Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; pushed
+tip `82e33fc8839ce076780161da1af1ab040be00633`. Gate D remains open.
 
-Protected v5 tag `greenfield_layer1_prompt_chunk0_geometry_20260903T165338499173468Z` executed on
-one four-chip host, published a diagnostic and ended 8/8 clean. Ledger generation
-`1788455638916604`, SHA `ed164a0d…19678`; arrays `1d946006…ff587`; HLO `16b137…f49`. DB518 layer-0
-control improved from 2,048 rows/74,299 lanes to 256 rows/1,042 lanes. Row 0 is exact, but all
-failures are positions congruent to {4,9,14} mod 24 carrying token 374, so layer-1 has no
-standing. Diagnosis: `docs/artifacts/gate-d-chunk0-v5-token374-control-diagnosis.json`.
+V6 passed staged Sol reviews, push/full US-CENTRAL2 replay and immutable install
+(`launcher_invoked=false`).
+Protected tag `greenfield_layer1_prompt_chunk0_geometry_20260903T180438114586827Z` compiled once
+but its HLO admission rejected **before `compiled(...)` invocation**. It published a diagnostic and
+ended 8/8 clean. Terminal `1788459348320561`/`00eeae78…ec77`; HLO `b7713bdf…b0ea`, StableHLO
+`d1d97229…bda9`. Artifact:
+`docs/artifacts/gate-d-chunk0-v6-hlo-admission-failure.json`. Tag is burned; no numerical or
+performance claim.
 
-Strongest bounded cause: v5 host-gathered the M2048 embedding and passed a direct BF16 chunk;
-accepted DB518 device-gathered 37 unique embeddings into the input RMS lowering. Current v6 moves
-the exact in-bounds row gather onto device (`jnp.take(..., mode="clip")`) before the unchanged
-pipeline. A whole-module validator runs after compile but **before invocation**; publisher repeats
-it. It proves exact typed gather/RMS/BF16 paths and dominance/no-bypass into root 5 (layer-0 key
-control). Root 6 legitimately has a residual path and is judged only after root 5 is exact.
-Sixteen hostile mutations; CPU 35/35; Sol approved with no P0–P2. No protected-fix claim yet.
+Cause: XLA duplicated exact layer-0 normalization into selected output 1 of a tiled tuple fusion.
+V6 blocked only the standalone node and traversed every tuple output, falsely finding a bypass.
 
-V6 certificate: `docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v6-source.json`; immutable
-staging tree `d4db809e…ced54`; proposed fresh tag `…20260903T180438114586827Z`. Exact next: review
-certificate/staging/install-only; commit/push; replay same-region mirror; provision install-v6 and
-install launcher-v6/capsule-v5 without launch. Then separately review fresh vacancy/locks/pod/
-census and execute one chunk0. Do not run 8K until layer0 control is bitwise exact.
+Current uncommitted V7 makes ancestry output-sensitive for fusion `get-tuple-element` and while
+state slots (fixed point including condition), recognizes only exact logical-M2048 32x64 tiled
+normalization with ordered four-slice `ConcatBitcast`, collects every exact normalization witness,
+and requires blocking all witnesses to cut every gather→root5 path. It rejects wrong tuple index/
+output, arithmetic/rounding/extent/caller drift, reordered slices, malformed while, decoys and a
+parallel raw bypass. Exact archived V6 HLO passes offline; targeted mutations reject. Forced-CPU
+suite 37/37. Sol found and closed unordered-slice and missing-condition defects, then returned
+`APPROVE V7 VALIDATOR CORE`, no P0–P2.
+
+Exact next: finish V7 hash chain and append-only source certificate; create immutable install-v7
+staging for launcher-v7/capsule-v6 and a fresh tag. Sol-review full source, persistence and
+install-only; commit/push/mirror; install without launch; separately review preflight/execution;
+run one chunk0. Do not run 8K until DB518 layer-0 control is bitwise exact.
 
 ## After Gate D
 

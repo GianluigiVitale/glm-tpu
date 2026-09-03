@@ -11771,3 +11771,23 @@ approved source persistence with no remaining P0–P2 after five correction pass
 Certificate `docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v6-source.json`; staging tree `d4db809e…ced54`;
 fresh proposed tag `…180438114586827Z`. No install/execution authority yet. Exact next: certificate/staging/install
 review, persistence and same-region replay, install-only, then a separate preflight/execution review for one chunk0.
+
+## 2026-09-03 18:32Z — v6 HLO false rejection; v7 validator core approved
+
+V6 passed separate Sol source/install/execution reviews, was pushed as `82e33fc8839ce076780161da1af1ab040be00633`,
+replayed from origin and the US-CENTRAL2 mirror, and installed with `launcher_invoked=false`. Protected tag
+`greenfield_layer1_prompt_chunk0_geometry_20260903T180438114586827Z` compiled but failed HLO admission before
+`compiled(...)`; both censuses are 8/8 clean. Diagnostic terminal generation `1788459348320561`, SHA
+`00eeae78dd64ae18339e50deadd752d59e1ecdca81f8f812c127ede7090eec77`; optimized/StableHLO `b7713bdf…b0ea` /
+`d1d97229…bda9`. Preserve `docs/artifacts/gate-d-chunk0-v6-hlo-admission-failure.json`; tag burned, no numerical claim.
+
+XLA duplicated exact layer-0 normalization into selected tuple-fusion output 1. V6 blocked only the standalone node
+and traversed all fusion/while tuple results, falsely finding a raw-gather bypass. V7 parses selected GTE results,
+computes while state-slot/condition closure, recognizes exact tiled 32x64 logical-M2048 normalization and ordered
+four-slice reconstruction, and blocks every admitted witness before the bypass check. It rejects tuple/index,
+arithmetic, rounding, extent, caller, slice-order, condition, decoy and parallel-bypass attacks. Exact archived V6 HLO
+passes offline; focused CPU is 37/37. Sol found and closed unordered-slice and missing-condition edges, then returned
+`APPROVE V7 VALIDATOR CORE`, no P0/P1/P2.
+
+Current work is uncommitted while V7 hashes/certificate/staging are completed. Next: full Sol source/persistence/install
+review; commit/push/mirror; install-only; separate execution review; one chunk0. Never run 8K before exact DB518 control.

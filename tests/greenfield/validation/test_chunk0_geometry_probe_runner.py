@@ -45,7 +45,7 @@ def test_runner_pins_inputs_digests_and_sealed_interpreter():
     assert 'TAG=${GLM_GATE_D_CHUNK0_GEOMETRY_TAG:-}' in runner
     assert "unsafe Gate-D chunk-0 geometry tag" in runner
     # The only executed probe pathname is the root-owned immutable capsule.
-    assert "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v5" in runner
+    assert "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v6" in runner
     assert '"$SEALED_PYTHON" -I -S -B -u "$PROBE"' in runner
     assert "$PROBE_LOCAL" not in runner and "/source/probe_layer1" not in runner
     assert '--code-pin "$PIN"' in runner and '--repository "$WORKTREE"' in runner
@@ -252,7 +252,7 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
     assert installer_module.PAYLOADS == expected
     assert str(installer_module.CAPSULE_TARGET).startswith("/usr/local/libexec/glm-tpu/")
     assert str(installer_module.LAUNCHER_TARGET).endswith(
-        "launch_gate_d_layer1_prompt_chunk0_geometry_v6.py"
+        "launch_gate_d_layer1_prompt_chunk0_geometry_v7.py"
     )
     assert str(installer_module.LAUNCHER_TARGET).startswith("/opt/glm-tpu/bin/")
     assert installer.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
@@ -288,6 +288,7 @@ def test_mirror_verifier_is_bound_to_the_rewrite_branch_and_reviewed_base():
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v4-source.json",
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v5-source.json",
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v6-source.json",
+        "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v7-source.json",
         "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py",
         "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py",
         "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py",
@@ -673,6 +674,52 @@ ENTRY %main (unique_embeddings.1: bf16[37,6144], prompt_embedding_rows.1: s32[20
     return main, stable
 
 
+def _tiled_device_gather_hlo_fixture() -> tuple[str, str]:
+    main, stable = _device_gather_hlo_fixture()
+    tiled = """
+%tiled_normalize (chunk: f32[32,64,6144], weight: f32[6144], inverse: f32[32,64]) -> (bf16[32,64,6144], bf16[32,64,6144]) {
+  %chunk = f32[32,64,6144] parameter(0)
+  %weight = f32[6144] parameter(1)
+  %inverse = f32[32,64] parameter(2)
+  %inverse_broadcast = f32[32,64,6144] broadcast(%inverse), dimensions={0,1}
+  %scaled = f32[32,64,6144] multiply(%chunk, %inverse_broadcast)
+  %rounded = bf16[32,64,6144] convert(%scaled)
+  %rounded_f32 = f32[32,64,6144] convert(%rounded)
+  %weight_broadcast = f32[32,64,6144] broadcast(%weight), dimensions={2}
+  %weighted = f32[32,64,6144] multiply(%rounded_f32, %weight_broadcast)
+  %normalized = bf16[32,64,6144] convert(%weighted)
+  %unused = bf16[32,64,6144] constant(0)
+  ROOT %pair = (bf16[32,64,6144], bf16[32,64,6144]) tuple(%unused, %normalized)
+}
+
+"""
+    main = main.replace("ENTRY %main", tiled + "ENTRY %main")
+    main = main.replace(
+        "  %other = bf16[1] constant(0)\n",
+        "  %slice_start0 = (bf16[2048,6144], bf16[512,6144], s32[]) slice-start(%gather), slice={[0:512], [0:6144]}\n"
+        "  %slice_start1 = (bf16[2048,6144], bf16[512,6144], s32[]) slice-start(%gather), slice={[512:1024], [0:6144]}\n"
+        "  %slice_start2 = (bf16[2048,6144], bf16[512,6144], s32[]) slice-start(%gather), slice={[1024:1536], [0:6144]}\n"
+        "  %slice_start3 = (bf16[2048,6144], bf16[512,6144], s32[]) slice-start(%gather), slice={[1536:2048], [0:6144]}\n"
+        "  %slice_done0 = bf16[512,6144] slice-done(%slice_start0)\n"
+        "  %slice_done1 = bf16[512,6144] slice-done(%slice_start1)\n"
+        "  %slice_done2 = bf16[512,6144] slice-done(%slice_start2)\n"
+        "  %slice_done3 = bf16[512,6144] slice-done(%slice_start3)\n"
+        "  %reassembled = bf16[2048,6144] custom-call(%slice_done0, %slice_done1, %slice_done2, %slice_done3), custom_call_target=\"ConcatBitcast\"\n"
+        "  %chunk_f32_tiled = f32[2048,6144] convert(%reassembled)\n"
+        "  %chunk_tiled = f32[32,64,6144] bitcast(%chunk_f32_tiled)\n"
+        "  %inverse_tiled = f32[32,64] reshape(%inverse)\n"
+        "  %tiled_pair = (bf16[32,64,6144], bf16[32,64,6144]) "
+        "fusion(%chunk_tiled, %weight_f32, %inverse_tiled), calls=%tiled_normalize\n"
+        "  %tiled_selected = bf16[32,64,6144] get-tuple-element(%tiled_pair), index=1\n"
+        "  %tiled_normalized = bf16[2048,6144] bitcast(%tiled_selected)\n"
+        "  %other = bf16[1] constant(0)\n",
+    ).replace(
+        "  %key0 = bf16[2048,128] fusion(%normalized, %gather, %positions.1)",
+        "  %key0 = bf16[2048,128] fusion(%tiled_normalized, %gather, %positions.1)",
+    )
+    return main, stable
+
+
 def test_publisher_requires_called_body_semantics_and_live_device_gather_rms():
     publisher = _load_publisher()
     main, stable = _device_gather_hlo_fixture()
@@ -764,6 +811,93 @@ def test_publisher_requires_called_body_semantics_and_live_device_gather_rms():
     # carries the raw residual. Its row-0 legacy comparison is interpreted only
     # after the exact DB518 layer-0 key control at root 5 passes.
     assert publisher._require_embedding_gather_hlo(main, stable)["passed"] is True
+
+
+def test_publisher_accepts_only_exact_live_tiled_normalization_witnesses():
+    publisher = _load_publisher()
+    main, stable = _tiled_device_gather_hlo_fixture()
+    assert publisher._require_embedding_gather_hlo(main, stable)["passed"] is True
+    both_normalized = main.replace(
+        "  ROOT %key_slice = bf16[2048,128] slice(%normalized), slice=",
+        "  %both_normalized = bf16[2048,6144] add(%normalized, %alternate)\n"
+        "  ROOT %key_slice = bf16[2048,128] slice(%both_normalized), slice=",
+    ).replace(
+        "fusion(%tiled_normalized, %gather, %positions.1)",
+        "fusion(%tiled_normalized, %normalized, %positions.1)",
+    )
+    # Both independently admitted normalization outputs may be live, but all
+    # of them must form the cut that removes gather ancestry from key0.
+    assert publisher._require_embedding_gather_hlo(both_normalized, stable)["passed"] is True
+    hostile = (
+        # The selected tuple result, not merely the fusion body, is semantic.
+        main.replace("get-tuple-element(%tiled_pair), index=1", "get-tuple-element(%tiled_pair), index=0"),
+        main.replace("tuple(%unused, %normalized)", "tuple(%normalized, %unused)"),
+        # Preserve an exact decoy but feed the raw gather to the key control.
+        main.replace("fusion(%tiled_normalized, %gather, %positions.1)", "fusion(%gather, %tiled_normalized, %positions.1)"),
+        # A valid witness cannot conceal a parallel raw-gather dependency.
+        main.replace(
+            "  ROOT %key_slice = bf16[2048,128] slice(%normalized), slice=",
+            "  %raw_bypass = bf16[2048,6144] add(%normalized, %alternate)\n"
+            "  ROOT %key_slice = bf16[2048,128] slice(%raw_bypass), slice=",
+        ),
+        main.replace(
+            "fusion(%chunk_tiled, %weight_f32, %inverse_tiled)",
+            "fusion(%chunk_tiled, %weight_f32, %weight_f32)",
+        ),
+        main.replace(
+            "custom-call(%slice_done0, %slice_done1, %slice_done2, %slice_done3)",
+            "custom-call(%slice_done1, %slice_done0, %slice_done2, %slice_done3)",
+        ),
+        main.replace("multiply(%chunk, %inverse_broadcast)", "multiply(%chunk, %chunk)"),
+        main.replace("%rounded_f32 = f32[32,64,6144] convert(%rounded)", "%rounded_f32 = f32[32,64,6144] add(%chunk, %chunk)"),
+        main.replace("multiply(%rounded_f32, %weight_broadcast)", "multiply(%rounded_f32, %rounded_f32)"),
+        main.replace("%normalized = bf16[32,64,6144] convert(%weighted)", "%normalized = bf16[32,64,6144] convert(%scaled)"),
+        main.replace("[32,64", "[31,64"),
+    )
+    for mutated in hostile:
+        with pytest.raises(RuntimeError, match="embedding-gather boundary drifted"):
+            publisher._require_embedding_gather_hlo(mutated, stable)
+
+
+def test_output_sensitive_while_requires_condition_and_tracks_state_slots():
+    contract = _load_module("chunk0_hlo_while_contract", HLO_CONTRACT)
+    hlo = """HloModule while_test
+
+%condition (state: (s32[], bf16[1])) -> pred[] {
+  %state = (s32[], bf16[1]) parameter(0)
+  %index = s32[] get-tuple-element(%state), index=0
+  %limit = s32[] constant(1)
+  ROOT %continue = pred[] compare(%index, %limit)
+}
+
+%body (state: (s32[], bf16[1])) -> (s32[], bf16[1]) {
+  %state = (s32[], bf16[1]) parameter(0)
+  %index = s32[] get-tuple-element(%state), index=0
+  %value = bf16[1] get-tuple-element(%state), index=1
+  %one = s32[] constant(1)
+  %next = s32[] add(%index, %one)
+  ROOT %updated = (s32[], bf16[1]) tuple(%next, %value)
+}
+
+ENTRY %main (value: bf16[1]) -> bf16[1] {
+  %value = bf16[1] parameter(0)
+  %zero = s32[] constant(0)
+  %initial = (s32[], bf16[1]) tuple(%zero, %value)
+  %loop = (s32[], bf16[1]) while(%initial), condition=%condition, body=%body
+  ROOT %selected = bf16[1] get-tuple-element(%loop), index=1
+}
+"""
+    computations, entry = contract._module_graph(hlo)
+    live = contract._semantic_ancestors(
+        computations, entry, computations[entry]["root"]
+    )
+    assert "%value" in live
+    malformed = hlo.replace("condition=%condition, ", "")
+    computations, entry = contract._module_graph(malformed)
+    with pytest.raises(RuntimeError, match="while condition is unresolved"):
+        contract._semantic_ancestors(
+            computations, entry, computations[entry]["root"]
+        )
 
 
 def test_sealed_archive_builds_from_committed_blobs_and_imports(tmp_path: Path):

@@ -1259,3 +1259,8 @@ normalized-state cause.
   mappings. Bind exact dtypes, scalar initializers, IEEE-f32 constants, BF16 rounding points and final conversions;
   distinguish semantic from syntactic ancestry so ignored operands cannot satisfy liveness. Attack each rule with a
   compiler-shaped counterexample before spending TPU time.
+- Compiler fusion can duplicate an exact producer into tuple outputs. Instruction-name dominance then false-rejects:
+  traverse selected GTE and while state slots, recognize all exact typed witnesses, and block all before testing for a
+  true raw bypass. Preserve while condition dependencies in the fixed point.
+- Lossless slice reconstruction is ordered. A set of exact ranges accepts row permutations; require the ordered
+  partition. Missing while conditions must fail closed because they can shrink apparent ancestry.

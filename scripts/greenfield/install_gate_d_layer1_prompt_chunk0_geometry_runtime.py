@@ -13,13 +13,13 @@ from hashlib import sha256
 from pathlib import Path
 
 SOURCE_ROOT = Path(
-    "/opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v6"
+    "/opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v7"
 )
 INSTALLER_PATH = SOURCE_ROOT / "install_gate_d_layer1_prompt_chunk0_geometry_runtime.py"
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
-LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_layer1_prompt_chunk0_geometry_v6.py"
+LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_layer1_prompt_chunk0_geometry_v7.py"
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-prompt-chunk0-geometry-v5"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-prompt-chunk0-geometry-v6"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -28,12 +28,12 @@ EXPECTED_ENVIRONMENT = {
     "PYTHONDONTWRITEBYTECODE": "1",
 }
 PAYLOADS = {
-    "chunk0_embedding_hlo.py": "c10fee817fad0ad65e3c90ccdfd3017fcac18bc5fee6e9d4a28f6b319cc2ec0d",
-    "probe_layer1_prompt_chunk0_geometry.py": "32ac0e160017afcbc3928fbd04f3cf31944d16339283c030929adf569a07e158",
-    "publish_gate_d_layer1_prompt_chunk0_geometry.py": "faaeec64303b2a18963a9952f9e93c262b84ab0ac41a23a57b875e0c57ea2b17",
-    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "e879d747d3f32edb66972f00fb1be0790f389c4eb516271896d7dd7a562483c1",
+    "chunk0_embedding_hlo.py": "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757",
+    "probe_layer1_prompt_chunk0_geometry.py": "073c6b2a865d1f1936c27ba4dabbb54c9dfc1987e22fcdaa14657c612f5832bc",
+    "publish_gate_d_layer1_prompt_chunk0_geometry.py": "8b1e05534419661c9e69207c1cfab2794beaec03007f0fcb15a184977a33f15d",
+    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "4b0b32fa9756582b06aff767e98cb74dfde88941c610629f5d72bd00af26cb5b",
     "verify_gate_d_rewrite_same_region_git_mirror.py": (
-        "5b02ee2ed0bbde75b4a96ba52eee14b53795e1c832fcf8ccd626237316fb0be7"
+        "dfeaecede526676a08b3deacf3f2e58b8d040f4d7b8542f14eb8db18aef9bcea"
     ),
 }
 CAPSULE_NAMES = (
