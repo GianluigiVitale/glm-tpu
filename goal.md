@@ -38,15 +38,15 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
 
 ## Resume checkpoint — 2026-09-03 01:45Z
 
-Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical`; run pin = rewrite merge `9d217d99`. Decode side is legacy-exact
+Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical`; run pin = rewrite merge `660d7f6e`. Decode side is legacy-exact
 through layer 1; **the blocker is the prompt-row residual stream**: legacy layer-1 prompt cache (sealed
 `…20260903T000356727206404Z`, events exact vs oracle) differs from the greenfield cache in 8,155/8,155 rows at BF16-ulp
 level, flat from position 0 (`docs/artifacts/gate-d-layer1-prompt-cache-legacy-vs-db518.json`). Legacy prefill HLO
 runs every prompt-row op at M=2048 per owner; greenfield prompt paths use one-row decode forms. Implemented (CPU-
-tested, commit `b25b0597`): legacy-geometry primitives, TP32 owner packing, chunk pipeline, one-host probe
-`scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh` (row 0 decisive; control = layer-0 keys exact).
-Pending: Sol round 29 verdict, mirror verifier, then ONE bounded run with tag
-`greenfield_layer1_prompt_chunk0_geometry_20260903T013934618075421Z`; record row-0 result in HANDOFF. Do NOT launch
+tested, commit `c8038c30`): legacy-geometry primitives, TP32 owner packing, chunk pipeline, one-host probe
+`scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh` under the sealed Gate-D runtime (row 0 decisive;
+control = layer-0 keys exact). Sol rounds 29/30 blockers fixed. Pending: Sol round 31, mirror verifier, then ONE run
+with tag `greenfield_layer1_prompt_chunk0_geometry_20260903T020752971737986Z`; record row-0 result in HANDOFF. Do NOT launch
 the 8K decoder. Options A (prefill-faithful prompt path) / B (oracle re-seal) are the owner's call (HANDOFF).
 
 ## Finish (after Gate D)
