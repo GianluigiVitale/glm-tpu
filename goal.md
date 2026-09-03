@@ -36,19 +36,18 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-03 01:15Z
+## Resume checkpoint — 2026-09-03 01:45Z
 
-Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical`; run pin = rewrite merge `4623a4e2`. Decode-side norm hypothesis
-exhausted (3 runs, event 1 = 7). Capsule `docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-diagnosis.json`:
-the greenfield layer-1 prompt cache is a sufficient cause of the event-1 mismatch. Legacy layer-1 prompt
-cache captured (tag `…20260903T000356727206404Z`, bundle runtime `c7973435`, fresh DSA events bitwise equal to the
-sealed oracle) and compared (`docs/artifacts/gate-d-layer1-prompt-cache-legacy-vs-db518.json`): **8,155/8,155 rows
-differ, 16.6% of lanes, 79% by one BF16 ulp, from position 0 in every chunk**; legacy cache reproduces the oracle
-event-1 set. Reading: teacher-forced scan = decode arithmetic per prompt row; legacy = batched 2,048-row prefill. Gate D
-needs a legacy-prefill-exact prompt residual stream for all indexer layers.
-Do NOT launch the 8K decoder. Next (one Sol batch): legacy layer-1 internals at a prompt position (p0/p113: residual input,
-normalized hidden, key) vs the greenfield teacher-forced row → first diverging sub-boundary of the layer-0 block;
-then the prefill plan.
+Tooling `/home/gianl/glm-tpu-gate-d-pp16-numerical`; run pin = rewrite merge `9d217d99`. Decode side is legacy-exact
+through layer 1; **the blocker is the prompt-row residual stream**: legacy layer-1 prompt cache (sealed
+`…20260903T000356727206404Z`, events exact vs oracle) differs from the greenfield cache in 8,155/8,155 rows at BF16-ulp
+level, flat from position 0 (`docs/artifacts/gate-d-layer1-prompt-cache-legacy-vs-db518.json`). Legacy prefill HLO
+runs every prompt-row op at M=2048 per owner; greenfield prompt paths use one-row decode forms. Implemented (CPU-
+tested, commit `b25b0597`): legacy-geometry primitives, TP32 owner packing, chunk pipeline, one-host probe
+`scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh` (row 0 decisive; control = layer-0 keys exact).
+Pending: Sol round 29 verdict, mirror verifier, then ONE bounded run with tag
+`greenfield_layer1_prompt_chunk0_geometry_20260903T013934618075421Z`; record row-0 result in HANDOFF. Do NOT launch
+the 8K decoder. Options A (prefill-faithful prompt path) / B (oracle re-seal) are the owner's call (HANDOFF).
 
 ## Finish (after Gate D)
 
