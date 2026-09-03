@@ -36,21 +36,22 @@ Optimizations default-off. Targets: useful `<=200 ms/token`, strong `<=125`, str
   add new orchestration only when a run demands it. Prefer diagnosis over new hardening.
 - Reports to owner: state result, % and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-03 02:30Z (then read the HANDOFF tail)
+## Resume checkpoint — 2026-09-03 02:30Z (then the HANDOFF tail)
 
-**Gate-D blocker moved from decode to prefill.** Decode numerics are legacy-exact through layer 1 (three 8K runs:
-token exact, event 0 exact, event 1 = 7; the RMS-schedule hypothesis is closed). CPU capsules
-`docs/artifacts/gate-d-{event1-layer1-prompt-cache-offline-diagnosis,layer1-prompt-cache-legacy-vs-db518}.json`:
-the legacy layer-1 prompt cache is captured on TPU (fresh DSA events bitwise equal the sealed oracle) and **8,155/8,155 greenfield prompt rows differ**, 16.6% of BF16 lanes, 79%
-by one ulp, flat from position 0. Hypothesis: legacy computes prompt rows at M=2048 per owner; greenfield uses
-one-row decode forms.
+**The blocker is now prefill, not the decode-side norms.** Three executed 8K runs on the accepted RMS schedule:
+token at 8,155 exact each; the first (q-a on the 32-row schedule) broke event 0 by one swap, event 1 = 9, reverted;
+the two later kept event 0 exact, event 1 = 7, identical set. CPU capsules: the greenfield
+layer-1 prompt cache alone reproduces the device selection and the oracle's 7/7 swaps — a **sufficient cause** only
+(`DECODE_SIDE_EXACTNESS_NOT_PROVEN`) — and the legacy layer-1 prompt cache captured on TPU differs from it in
+**8,155/8,155 rows** (BF16-ulp level, from position 0). Hypothesis: legacy computes prompt rows at
+M=2048/owner; greenfield uses one-row decode forms.
 
-Pins: tooling `c92b24cf94bdcd4b0d0570aa7530c8b2c7194c34`, rewrite merge `f204223e4b8c16f657041da870b91d133e1ef663`
-(pushed, mirrored, verifier passed). Pod READY/HEALTHY; no lease.
+Pins (code): tooling `c92b24cf94bdcd4b0d0570aa7530c8b2c7194c34`, rewrite `f204223e4b8c16f657041da870b91d133e1ef663`;
+later commits are records only. Mirror/verifier pass; pod READY; no lease.
 
 Next: finish the bounded **chunk-0 legacy-geometry probe** (row 0 decisive; control = layer-0 keys equal DB518).
-Source + 28 CPU tests done; Sol round 32 leaves three open P1s on execution provenance — fix per HANDOFF
-"2026-09-03 02:30Z". Then one Sol batch and one run with a **fresh** tag. Do NOT launch the 8K decoder.
+Source + 28 CPU tests pass; Sol round 32 leaves three open provenance P1s — fix per HANDOFF "02:30Z", then one Sol
+batch and one run, **fresh tag**. Do NOT launch the 8K decoder.
 
 ## Finish (after Gate D)
 

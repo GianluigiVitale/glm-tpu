@@ -11595,3 +11595,16 @@ Probe science (unchanged and reviewed): `legacy_prefill_geometry.py`, `legacy_pr
 `run_probe_layer1_prompt_chunk0_geometry.sh`; 28 CPU tests pass; the committed probe boots under the sealed
 interpreter through self-verification, sealed archive, runtime/site validation and imports, stopping exactly at
 `probe requires TPU, got cpu`.
+
+**Claim-boundary correction (supersedes the wording of the 01:15Z and 01:40Z sections above; Sol round 33).** Those
+sections say the decode-step numerics "are legacy-exact through layer 1 and are no longer the blocker". That
+overstates the evidence and contradicts the capsule's own classification. What the bytes support: the greenfield
+layer-1 prompt index cache, with the legacy decode-side tensors substituted, reproduces the protected run's event-1
+selection and the oracle's 7/7 swaps exactly, so it is a **sufficient cause** of the observed event-1 set mismatch;
+`docs/artifacts/gate-d-event1-layer1-prompt-cache-offline-diagnosis.json` is classified
+`DECODE_SIDE_EXACTNESS_NOT_PROVEN` because the protected runs' own query, head weights and current key were never
+captured and decode-side deviations below the selection threshold are not excluded. Read "the next investigation is
+prefill", not "the decode side is proven exact". Also, the three executed 8K runs on the accepted schedule differ:
+the first (all norms, q-a on the 32-row schedule) broke event 0 by one swap with event 1 = 9 and was reverted; only
+the two later runs (hidden-width + kv-a, then hidden-width only) held event 0 exact with event 1 = 7 on the identical
+set. Earlier entries are left unmodified per the append-only rule; this paragraph is the correction of record.
