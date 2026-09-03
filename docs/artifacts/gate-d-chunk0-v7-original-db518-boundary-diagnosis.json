@@ -1,0 +1,84 @@
+{
+  "artifact_kind": "gate_d_chunk0_v7_original_db518_boundary_diagnosis",
+  "authorization": {
+    "full_8k": false,
+    "next_bounded_tpu_run": false,
+    "performance_claim": false
+  },
+  "classification": "LAYER0_CONTROL_NONEXACT;V7_EQUALS_V5_KEYS0;SEMANTIC_DEVICE_GATHER_INSUFFICIENT;ORIGINAL_DB518_PHYSICAL_PRODUCER_BOUNDARY_NOT_PRESERVED;CAUSE_NOT_YET_PROVEN;LEGACY_GEOMETRY_UNADJUDICATED;GATE_D_OPEN",
+  "corrected_diagnosis": {
+    "inference": "V7 proves that adding a live device embedding gather inside the large chunk-0 executable does not reproduce the accepted layer-0 keys. Its input-RMS physical reduction schedule differs from the separately compiled original DB518 producer. This is a boundary-preservation hypothesis, not yet a causal result.",
+    "invalidated_inference": "The later integrated PP16_LP2 DB518 successor does not prove that LP2 half-width RMS is the closest cause of this V7 failure.",
+    "v7_result": {
+      "all_mismatch_positions_modulo_24": [4, 9, 14],
+      "all_mismatch_token_id": 374,
+      "keys0_mismatched_lanes": 1042,
+      "keys0_mismatched_rows": 256,
+      "row0_exact": true
+    },
+    "v5_v7_bit_identity": {
+      "keys0_bits_equal": true,
+      "keys0_bits_sha256": "c84b712f5e3e1b2bfe1b9a5cb1ca04a8bfa78a8aaac162c209cbef5a719a6bb9",
+      "normalized1_chunk_bits_equal": true,
+      "normalized1_chunk_bits_sha256": "217c478610faf9f09ed05566fca6f6c3175166de5714cf99461391b6688306fe"
+    },
+    "v7_input_rms_hlo": {
+      "fusion": "multiply_reduce_fusion.4",
+      "input_shape": "f32[2048,6144]{1,0:T(8,128)}",
+      "iteration_bounds": ["4", "3"],
+      "output_shape": "f32[2048]{0:T(1024)S(3)}",
+      "output_window_bounds": ["64", "16"]
+    }
+  },
+  "original_db518_authority": {
+    "accepted_cache_sha256": "3808d502f3ea1829bf12ab7585d66f15dd83bf640657a17c35daabf5ab1859d1",
+    "code_hash": "86243115452920fe4244bb77a9bbf4c44110aeab",
+    "comparison": {
+      "generation": "1786278038218524",
+      "manifest_sha256": "1d80d088561181a63e734a91cd0124c4011cfc4151198488c052740050d66fe5",
+      "raw_file_sha256": "c9539e2f59016ee800bb452602d01e9680f5960c608f67af1dec6a98686c8ec7"
+    },
+    "configuration": {
+      "projection_mapping_mode": "physical_m64_projection_keynorm_lax_map",
+      "projection_weight_mode": "adapted_fp32",
+      "prompt_chunk_rows": 2048,
+      "physical_partitions": 32,
+      "physical_rows_per_partition": 64
+    },
+    "result": {
+      "cache_elementwise_exact": true,
+      "producer_states_elementwise_exact": true,
+      "results_db_item_row_id": 1803,
+      "results_db_run_id": 518
+    },
+    "success": {
+      "generation": "1786278048203045",
+      "sha256": "a8d370166257622875feafd4d1da3f8d666204a8609baaffef2573b659f6bfee"
+    },
+    "tag": "greenfield_layer0_prompt_key_norm_m64_20260809T122010714691723Z"
+  },
+  "next_discriminator": {
+    "description": "Compile and invoke once a separately completed one-device 2048-row producer preserving the original DB518 device gather, gather-coupled input RMS, physical M64 projection plus key LayerNorm in one lax.map, literal RoPE and rooted BF16 keys. Synchronize before exactly one host transfer and compare through authenticated cache indices against the original sealed DB518 cache. Do not compile or run the consumer.",
+    "failure_action": "Archive output plus optimized HLO and StableHLO, cleanly census 8/8, and stop without a consumer or full decoder.",
+    "sol_verdict": "APPROVE REVISED DISCRIMINATOR DESIGN",
+    "tpu_execution_requires_fresh_source_tests_install_review_and_tag": true
+  },
+  "performance_claim": false,
+  "run": {
+    "arrays_sha256": "29b33ced89577e684c1e4b6a58d03d32d2bb72b3325dc4c512fa8d172abad880",
+    "code_hash": "d9c624a77590b8933ccdabc55ea937113138835f",
+    "diagnostic_ledger": {
+      "generation": "1788461065395353",
+      "remote": "gs://driftbench-dsv4-uc/results/greenfield/glm52/layer1_prompt_chunk0_geometry/greenfield_layer1_prompt_chunk0_geometry_20260903T183451694138579Z/diagnostic/diagnostic_objects.json",
+      "sha256": "547fdd31933ae0eb30130f4e22de1271731975b14499f7f017efcad2bee0fedf"
+    },
+    "failure_status_sha256": "bfbf24aa082a43a7958d503205a9e80ee168da7a8c623d446d9c70fbabc00103",
+    "failure_exit_census_sha256": "19c9ab27421481df4057c70c98673e15950289777241e9a3f5b70e729b2bce3f",
+    "main_optimized_hlo_sha256": "96ba7b0929c5814ff15c315f0c83ed025432c2b4055dcedfdb21b8e91050bc53",
+    "main_stablehlo_sha256": "d1d972296f0228fe6284b406b70288c7fb78bb542d7e8056106a3e6503aabda9",
+    "pre_census_sha256": "cba014eebd9244f5dd3e0cfac19b3e9cf641078a6015dbbf5a6104034c050d15",
+    "runner_sha256": "f6e11b1bf011a1ccd7e33b3889bb0e871d430480b5529bd5777bf096c587bce2",
+    "tag": "greenfield_layer1_prompt_chunk0_geometry_20260903T183451694138579Z"
+  },
+  "schema_version": 1
+}

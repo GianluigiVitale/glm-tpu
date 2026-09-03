@@ -1,0 +1,52 @@
+{
+  "artifact_kind": "gate_d_original_db518_prompt_key_chunk0_source_certificate",
+  "base_commit": "d9c624a77590b8933ccdabc55ea937113138835f",
+  "claim_scope": "Source-only certificate for one 2048-row original-DB518 producer discriminator; no TPU execution, consumer, decoder, Gate-D, or performance claim.",
+  "created_utc": "2026-09-03T19:42:57Z",
+  "historical_authority": {
+    "canonical_optimized_hlo_sha256": "de48587500e5f3a83f06c17fc3a49613ff295186559117c568c7d2a5491b700a",
+    "code_hash": "86243115452920fe4244bb77a9bbf4c44110aeab",
+    "comparison_manifest_sha256": "1d80d088561181a63e734a91cd0124c4011cfc4151198488c052740050d66fe5",
+    "first_chunk_bits_sha256": "96d261cbef56bccc20c3d2bee275b995f168e0ff7609713baae21d0a6ea3887c",
+    "optimized_hlo_sha256": "ecb08493357ada2fa0452b3d5cee7abb8c980d33fbbf5a12679808b3696a7251",
+    "tag": "greenfield_layer0_prompt_key_norm_m64_20260809T122010714691723Z"
+  },
+  "input_authority": {
+    "accepted_cache_manifest_file_sha256": "372d0ad2503860b6fb826045de7d24ca0f22438b8e945af2515e1c8cf3d69c94",
+    "accepted_cache_manifest_sha256": "acc631e71148922448eb03c839f71544c80ca00cea47b639bdd80eb34567fdab",
+    "accepted_cache_tensor_sha256": "36303f0638661b4a56d3c9a1d4023a9b39eb19dbfd6d48e0718c29a45c41c07a",
+    "adapted_fp32_wk_sha256": "d680f7b1c2fed426174c41ee9153d9db47f5db8ec0e803e20d8853ec1f483469",
+    "layer0_input_manifest_file_sha256": "bd06714ebfe5177b8466778e2bc33ef262544dced48adcfc5739be37ac6488b9",
+    "layer0_input_manifest_sha256": "574f3553e6106a997e780b6b2a321bce86ad358b19c38989e84e2a4914b73141"
+  },
+  "proposed_fresh_tag": "greenfield_original_db518_prompt_key_chunk0_20260903T194257911673096Z",
+  "proposed_commands": {
+    "execute_once": "/usr/bin/env -i GLM_GATE_D_ORIGINAL_DB518_CHUNK0=1 GLM_GATE_D_ORIGINAL_DB518_CHUNK0_MODE=execute_once GLM_GATE_D_ORIGINAL_DB518_CHUNK0_TAG=greenfield_original_db518_prompt_key_chunk0_20260903T194257911673096Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/launch_gate_d_original_db518_prompt_key_chunk0_v1.py",
+    "install_only": "/usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/gate-d-original-db518-prompt-key-install-v1/install_gate_d_original_db518_prompt_key_runtime.py",
+    "provision_install_source": "/usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/provision_gate_d_python_runtime.py --source /home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v1-staging --target /opt/glm-tpu/gate-d-original-db518-prompt-key-install-v1 --expected-tree-sha256 d3e62d9098de0f359fedccbd49de68ea7b190b78504c09d6d9fc5108e739a747"
+  },
+  "review_status": "PENDING_BATCHED_SOL_REVIEW",
+  "runtime_staging": {
+    "file_mode": "0555",
+    "path": "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v1-staging",
+    "root_mode": "0755",
+    "tree_sha256": "d3e62d9098de0f359fedccbd49de68ea7b190b78504c09d6d9fc5108e739a747"
+  },
+  "source_files": [
+    {"path": "docs/artifacts/gate-d-chunk0-v7-original-db518-boundary-diagnosis.json", "sha256": "5931fe94ccfd36bd5adddd62e364f8bf91925993de4fc3cbf8bb915c0ad8ed4b"},
+    {"path": "glm_tpu/greenfield/validation/original_db518_prompt_key.py", "sha256": "056500262426a07b5258c41d8750c09f9eee2301073f884575db794772c4021c"},
+    {"path": "scripts/greenfield/install_gate_d_original_db518_prompt_key_runtime.py", "sha256": "a35a716cc2721665cd4b06992bb235c874ea6750e8149ce0d56a5f76de2ff519"},
+    {"path": "scripts/greenfield/launch_gate_d_original_db518_prompt_key_chunk0.py", "sha256": "bea9f8eec12819c9a4a6341447add0d7a4caaa42f4f989352029d2ed9f879ff9"},
+    {"path": "scripts/greenfield/probe_original_db518_prompt_key_chunk0.py", "sha256": "f45025589fad74c08a5b89c2a3c95d5c9b9a097806b53c9a489d5afa7443b71b"},
+    {"path": "scripts/greenfield/publish_gate_d_original_db518_prompt_key_chunk0.py", "sha256": "2f59bcc6d0c2e294689b24f63450dc8981fa56becb8a59cf6c37903d47fc90d6"},
+    {"path": "scripts/greenfield/run_original_db518_prompt_key_chunk0.sh", "sha256": "2877f5c7de579327afc2f28fb357490d65146dd5055ffb725c9cf311b268b608"},
+    {"path": "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py", "sha256": "ba01d5d22d9c449a8b231caa87a147b9fdc128e7efaeff25f179930545d7baf2"},
+    {"path": "tests/greenfield/validation/test_original_db518_prompt_key.py", "sha256": "a1c0daa21f0ef9d43b8136519e86a48b337d9c033d14227f5576986bf3d0dd54"},
+    {"path": "tests/greenfield/validation/test_original_db518_prompt_key_chain.py", "sha256": "5eabb0ba0fda55dc4cac60cfaa00f68048a3ed975a9608811ab26523631170de"},
+    {"path": "tests/greenfield/validation/test_original_db518_prompt_key_probe.py", "sha256": "3fec8fbd23ee8d56d80eb22a27570eff832bf54392280c54fe0c03e59a6af5d3"}
+  ],
+  "test_evidence": {
+    "command": "JAX_PLATFORMS=cpu XLA_PYTHON_CLIENT_PREALLOCATE=false PYTHONDONTWRITEBYTECODE=1 /home/gianl/vllm-env/bin/pytest -q tests/greenfield/validation/test_original_db518_prompt_key.py tests/greenfield/validation/test_original_db518_prompt_key_probe.py tests/greenfield/validation/test_original_db518_prompt_key_chain.py tests/greenfield/validation/test_prompt_index_cache.py tests/greenfield/validation/test_chunk0_geometry_probe_runner.py tests/greenfield/benchmarking/test_sealed_runtime.py",
+    "result": "63 passed in 9.24s"
+  }
+}
