@@ -883,6 +883,13 @@ the original source pathname after sealing and prove the retained payload is imm
 install-only prerequisite and grants no JAX import, TPU execution, numerical, model, performance or
 Gate-D claim.
 
+The original source certificate (`308642ec...efe7`) and its unused proposed tag are preserved.
+Pre-install inspection found that its inherited rewrite-mirror verifier still named the prior
+chunk-0 capsule. Successor certificate `gate-d-m2048-strategy-nd-v2-source.json`
+(`7ae9a607...8f2e`) binds the verifier to the exact M2048 capsule, retains the predecessor in the
+mirror replay set, and adds a cross-file capsule-path regression. This correction is source-only;
+installation and TPU execution remain unauthorized pending independent review and exact-pin replay.
+
 For the missing real causal-HLO authority, reuse the source/plan pins above through the default-off
 `scripts/greenfield/build_gate_d_jax_site_capsule.py` (`5334dd1e...00d2`) and
 `scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py` (`2513a305...2182`). The builder's

@@ -1,0 +1,105 @@
+{
+  "artifact_kind": "gate_d_m2048_strategy_nd_v2_source_certificate",
+  "classification": "EXACT_M2048_MIRROR_CAPSULE_CORRECTED_AND_PROTECTED_HARNESS_CPU_VALIDATED;SOL_REVIEW_PENDING;INSTALL_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;NO_MODEL_OR_GATE_D_CLAIM",
+  "code_pin_before_persistence": "00e64b6f08e49a4b440a854e35aa74af29da8e39",
+  "predecessor_source_certificate": {
+    "path": "docs/artifacts/gate-d-m2048-strategy-nd-source.json",
+    "sha256": "308642ec0234c2d600096c337852c6252c166521e988bb6347bdb318a5e1efe7",
+    "status": "preserved; proposed tag retired unused because pre-install inspection found the inherited mirror verifier capsule path mismatch"
+  },
+  "future_persistence_contract": {
+    "branch": "rewrite/topology-first-decode",
+    "condition": "Every listed source byte and this certificate must be committed together; the resulting full commit must be pushed to origin and replayed by the US-CENTRAL2 mirror before protected execution.",
+    "future_merged_pin_required": true,
+    "origin": "git@github.com:GianluigiVitale/glm-tpu.git"
+  },
+  "install_only_command_after_approved_persistence": "/usr/bin/env -i HOME=/home/gianl LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B -c 'import fcntl,hashlib,os,subprocess,sys; pin=sys.argv[1]; expected=sys.argv[2]; git_env={\"GIT_CONFIG_GLOBAL\":\"/dev/null\",\"GIT_CONFIG_NOSYSTEM\":\"1\",\"GIT_NO_LAZY_FETCH\":\"1\",\"GIT_NO_REPLACE_OBJECTS\":\"1\",\"GIT_OPTIONAL_LOCKS\":\"0\",\"GIT_PROTOCOL_FROM_USER\":\"0\",\"GIT_SSH_COMMAND\":\"/bin/false\",\"GIT_TERMINAL_PROMPT\":\"0\",\"HOME\":\"/nonexistent\",\"LANG\":\"C\",\"LC_ALL\":\"C\",\"PATH\":\"/usr/bin:/bin\"}; result=subprocess.run([\"/usr/bin/git\",\"-c\",\"core.fsmonitor=false\",\"-c\",\"core.untrackedCache=false\",\"-c\",\"core.hooksPath=/dev/null\",\"-c\",\"core.attributesFile=/dev/null\",\"-C\",\"/home/gianl/glm-tpu-topology-rewrite\",\"show\",f\"{pin}:scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh\"],check=False,env=git_env,stderr=subprocess.PIPE,stdout=subprocess.PIPE); assert result.returncode==0 and not result.stderr; raw=result.stdout; assert hashlib.sha256(raw).hexdigest()==expected; fd=os.memfd_create(\"gate-d-m2048-fleet-installer\",os.MFD_CLOEXEC|getattr(os,\"MFD_ALLOW_SEALING\",2)); stream=os.fdopen(os.dup(fd),\"wb\",closefd=True); written=stream.write(raw); stream.flush(); stream.close(); assert written==len(raw); os.fchmod(fd,0o400); seals=getattr(fcntl,\"F_SEAL_SEAL\",1)|getattr(fcntl,\"F_SEAL_SHRINK\",2)|getattr(fcntl,\"F_SEAL_GROW\",4)|getattr(fcntl,\"F_SEAL_WRITE\",8); fcntl.fcntl(fd,getattr(fcntl,\"F_ADD_SEALS\",1033),seals); assert fcntl.fcntl(fd,getattr(fcntl,\"F_GET_SEALS\",1034))==seals; os.set_inheritable(fd,True); path=f\"/proc/self/fd/{fd}\"; os.execve(\"/usr/bin/bash\",[\"/usr/bin/bash\",\"--noprofile\",\"--norc\",path],{\"GLM_GATE_D_M2048_INSTALL\":\"1\",\"GLM_GATE_D_M2048_INSTALL_MODE\":\"install_only\",\"GLM_GATE_D_M2048_INSTALL_PIN\":pin,\"HOME\":\"/home/gianl\",\"LANG\":\"C\",\"LC_ALL\":\"C\",\"PATH\":\"/snap/bin:/usr/bin:/bin\",\"PYTHONDONTWRITEBYTECODE\":\"1\"})' <FUTURE_MERGED_PIN> b2ae11e005826156df1c72aaf174cd37fc043ad6d70cdd4fe7daa40964f5d072",
+  "install_source_tree_sha256": "90eaea39335a7889a81c995bf6c7d962a4abdbf95bb69a877f414f0b5424062d",
+  "protected_run_command_after_approved_install": "/usr/bin/env -i GLM_GATE_D_M2048=1 GLM_GATE_D_M2048_MODE=execute_once GLM_GATE_D_M2048_TAG=greenfield_m2048_strategy_nd_20260904T052811116126986Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v1.py",
+  "proposed_fresh_tag": "greenfield_m2048_strategy_nd_20260904T052811116126986Z",
+  "runtime_recovery": {
+    "existing_worker0_source": true,
+    "install_only": true,
+    "jax_import_or_tpu_initialization": false,
+    "missing_workers_observed_read_only": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "missing_worker_directories_prepared": [
+      "/home/gianl/gate-d-runs",
+      "/opt/glm-tpu/bin",
+      "/usr/local/libexec/glm-tpu"
+    ],
+    "provisioner_bootstrap": "exact committed helper and provisioner Git blobs are independently hash-checked; both are sealed in memfds before root opens proc descriptors; publication is RENAME_NOREPLACE with exact staging-inode cleanup",
+    "same_zone_transfer": "worker0 to workers1-7 inside db-v4-64-od/us-central2-b",
+    "sealed_trees": {
+      "jax": "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df",
+      "libtpu": "db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca",
+      "python": "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616"
+    }
+  },
+  "schema_version": 1,
+  "sources": [
+    {
+      "path": "glm_tpu/greenfield/benchmarking/__init__.py",
+      "sha256": "f72bebb28652bdfc19f192c50d0659f97f3a5a8b67ebd2a4e251786b95bafd75"
+    },
+    {
+      "path": "glm_tpu/greenfield/benchmarking/m2048_association_fingerprint.py",
+      "sha256": "86ad8a1f73ef7ad36e1b4ff5700ec24f805d41d4b51f79161bc478fbc915369f"
+    },
+    {
+      "path": "scripts/greenfield/bootstrap_gate_d_provisioner.py",
+      "sha256": "3c55731464c4c84283522d946a5b01e89282dca7f237be84f0a0794093d9bbd2"
+    },
+    {
+      "path": "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh",
+      "sha256": "b2ae11e005826156df1c72aaf174cd37fc043ad6d70cdd4fe7daa40964f5d072"
+    },
+    {
+      "path": "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py",
+      "sha256": "b12b5bbae02cbb2f63e4aead33fb32167b3e8d9ec9ffd241e630d820014a2f4a"
+    },
+    {
+      "path": "scripts/greenfield/launch_gate_d_m2048_strategy_nd_association.py",
+      "sha256": "26d7199d773a5d16a167deeed16f1d247a830751dec5af9ca161ea59b7903206"
+    },
+    {
+      "path": "scripts/greenfield/probe_m2048_strategy_nd_association.py",
+      "sha256": "1debe946e35311014e667fed863871eed4bf3afeaa9aeb27445f50b2ea233774"
+    },
+    {
+      "path": "scripts/greenfield/publish_gate_d_m2048_strategy_nd_association.py",
+      "sha256": "83602a623fd6392515c63a1017c89f7ed7c06f5d0a7e1ae4e6aca519f99db9be"
+    },
+    {
+      "path": "scripts/greenfield/run_gate_d_m2048_strategy_nd_association.sh",
+      "sha256": "af5cbdf5a82741e6eeafe5b898a28f56c6824629576475fe79ef215890e81019"
+    },
+    {
+      "path": "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py",
+      "sha256": "1f238fd59929ad320913ccd92d9a8dde7542be91b8ae3df6e799c8e7bb7d909e"
+    },
+    {
+      "path": "tests/greenfield/benchmarking/test_m2048_association_fingerprint.py",
+      "sha256": "a17bedd76b2d7b333757145663cda2bcad682bf3f3c17cb902cd15dc76f320e2"
+    },
+    {
+      "path": "tests/greenfield/validation/test_m2048_strategy_nd_protected_harness.py",
+      "sha256": "6f0481b20220e38d979fa96a41111f6790f7cfd0c05f5da2a09b670f2fe3a262"
+    }
+  ],
+  "test_evidence": {
+    "command": "JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_m2048_strategy_nd_protected_harness.py tests/greenfield/benchmarking/test_m2048_association_fingerprint.py",
+    "duration_seconds": 6.48,
+    "passed": 29,
+    "result": "29 passed",
+    "shell_syntax": "python py_compile and bash -n passed for all new protected-harness files"
+  },
+  "validation_scope": "Exact-shape model-free StrategyND row-zero association source, output-sensitive HLO contract, stdout evidence retention, eight-host immutable launcher/installer/wrapper, M2048 capsule-bound same-region mirror verifier, append-only publisher, sealed-descriptor provisioner bootstrap, sealed-runtime fleet restoration, recreated-pod directory preparation, and hostile CPU tests only. No installation, JAX TPU initialization, protected numerical execution, model result, performance result, or Gate-D closure is claimed."
+}

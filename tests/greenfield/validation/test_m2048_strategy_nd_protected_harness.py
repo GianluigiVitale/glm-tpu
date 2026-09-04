@@ -35,7 +35,7 @@ FLEET_INSTALLER = ROOT / (
 )
 BOOTSTRAP = ROOT / "scripts/greenfield/bootstrap_gate_d_provisioner.py"
 MIRROR = ROOT / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
-CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-source.json"
+CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v2-source.json"
 
 
 def _load_publisher():
@@ -318,6 +318,34 @@ def test_launcher_and_installer_preserve_immutable_boundaries() -> None:
     assert "invoke only the exact root-owned isolated M2048 installer" in installer
 
 
+def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
+    def load(name: str, path: Path):
+        specification = importlib.util.spec_from_file_location(name, path)
+        assert specification is not None and specification.loader is not None
+        module = importlib.util.module_from_spec(specification)
+        specification.loader.exec_module(module)
+        return module
+
+    launcher = load("gate_d_m2048_launcher_path_test", LAUNCHER)
+    installer = load("gate_d_m2048_installer_path_test", INSTALLER)
+    mirror = load("gate_d_m2048_mirror_path_test", MIRROR)
+    expected = launcher.CAPSULE_ROOT / MIRROR.name
+    assert installer.CAPSULE_TARGET == launcher.CAPSULE_ROOT
+    assert mirror.INSTALL_PATH == expected
+    assert set(mirror.BOUND_PATHS) >= {
+        "docs/artifacts/gate-d-m2048-strategy-nd-source.json",
+        "docs/artifacts/gate-d-m2048-strategy-nd-v2-source.json",
+        "scripts/greenfield/bootstrap_gate_d_provisioner.py",
+        "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh",
+        "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py",
+        "scripts/greenfield/launch_gate_d_m2048_strategy_nd_association.py",
+        "scripts/greenfield/probe_m2048_strategy_nd_association.py",
+        "scripts/greenfield/publish_gate_d_m2048_strategy_nd_association.py",
+        "scripts/greenfield/run_gate_d_m2048_strategy_nd_association.sh",
+        "tests/greenfield/validation/test_m2048_strategy_nd_protected_harness.py",
+    }
+
+
 def test_fleet_installer_is_install_only_and_restores_exact_runtime_trees() -> None:
     source = FLEET_INSTALLER.read_text(encoding="ascii")
     assert "fleet installation is default-off" in source
@@ -331,7 +359,7 @@ def test_fleet_installer_is_install_only_and_restores_exact_runtime_trees() -> N
         "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616",
         "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df",
         "db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca",
-        "8df7bd9647c2274691e54ea8f3df771b7fc2d1ac135ef684d3799c7ed38d3fe1",
+        "90eaea39335a7889a81c995bf6c7d962a4abdbf95bb69a877f414f0b5424062d",
     ):
         assert value in source
     assert '[[ -d $path && $path == /home/gianl/gate-d-m2048-runtime-source-' in source
@@ -804,7 +832,7 @@ def test_source_certificate_binds_every_listed_file_and_grants_no_authority() ->
     assert record["runtime_recovery"]["missing_workers_observed_read_only"] == list(
         range(1, 8)
     )
-    assert record["test_evidence"]["passed"] == 28
+    assert record["test_evidence"]["passed"] == 29
     assert record["proposed_fresh_tag"] in record[
         "protected_run_command_after_approved_install"
     ]

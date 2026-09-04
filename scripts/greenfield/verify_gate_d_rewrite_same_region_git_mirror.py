@@ -16,32 +16,29 @@ BRANCH = "rewrite/topology-first-decode"
 ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v9/"
+    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v1/"
     "verify_gate_d_rewrite_same_region_git_mirror.py"
 )
 BASE_PATH = "scripts/greenfield/verify_gate_d_same_region_git_mirror.py"
 BASE_PIN = "986378238ac6458307aea69ef1f5e12bf82bc020"
 BASE_SHA256 = "091208165a149989f14c5c9b9d1cbe7ff20537e2c81b16319eea9603984e859b"
 BOUND_PATHS = (
-    "docs/artifacts/gate-d-chunk0-probe-weight-digests.json",
-    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-orchestration-source.json",
-    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v3-source.json",
-    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v4-source.json",
-    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v5-source.json",
-    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v6-source.json",
-    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v7-source.json",
-    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v8-source.json",
-    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v8-rope-capacity-hlo-failure.json",
-    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v9-source.json",
-    "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py",
-    "glm_tpu/greenfield/validation/chunk0_real_layer_consumer_hlo.py",
-    "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py",
-    "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py",
-    "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py",
-    "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py",
-    "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py",
-    "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh",
+    "configs/greenfield-reuse-inventory.json",
+    "docs/artifacts/gate-d-m2048-strategy-nd-source.json",
+    "docs/artifacts/gate-d-m2048-strategy-nd-v2-source.json",
+    "docs/greenfield/REUSE_INVENTORY.md",
+    "glm_tpu/greenfield/benchmarking/__init__.py",
+    "glm_tpu/greenfield/benchmarking/m2048_association_fingerprint.py",
+    "scripts/greenfield/bootstrap_gate_d_provisioner.py",
+    "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh",
+    "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py",
+    "scripts/greenfield/launch_gate_d_m2048_strategy_nd_association.py",
+    "scripts/greenfield/probe_m2048_strategy_nd_association.py",
+    "scripts/greenfield/publish_gate_d_m2048_strategy_nd_association.py",
+    "scripts/greenfield/run_gate_d_m2048_strategy_nd_association.sh",
     SOURCE_PATH,
+    "tests/greenfield/benchmarking/test_m2048_association_fingerprint.py",
+    "tests/greenfield/validation/test_m2048_strategy_nd_protected_harness.py",
 )
 GIT_ENVIRONMENT = {
     "GIT_CONFIG_GLOBAL": "/dev/null",
