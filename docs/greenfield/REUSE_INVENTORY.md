@@ -904,6 +904,16 @@ success/idempotence/dirty-state refusal and prove hostile local include, smudge/
 target `.gitattributes` and a synchronized between-check-and-switch metadata swap cannot execute.
 No installation or TPU authority exists until the V3 batch is independently approved.
 
+The approved V3 install-only command failed at worker 1 before the repository refresher executed:
+the outer single-quoted shell command removed unescaped single quotes from its embedded Python
+loader, and `python3 -c` rejected the rendered source. Failure record
+`gate-d-m2048-v3-install-loader-quoting-failure.json` preserves the report, unused tag and fresh
+8/8 dependency-free zero-work census. V4 certificate
+`gate-d-m2048-strategy-nd-v4-source.json` (`c1f46892...907a3`) escapes double-quoted Python
+literals for the outer command and adds a regression that evaluates the exact shell assignment,
+renders the actual remote loader and compiles it. No installation or TPU authority exists until
+the complete V4 batch is independently approved, committed, pushed and same-region replayed.
+
 For the missing real causal-HLO authority, reuse the source/plan pins above through the default-off
 `scripts/greenfield/build_gate_d_jax_site_capsule.py` (`5334dd1e...00d2`) and
 `scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py` (`2513a305...2182`). The builder's

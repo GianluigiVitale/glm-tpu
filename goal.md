@@ -28,10 +28,11 @@ weaken history. Optimizations default off. Targets: useful <=200, strong <=125, 
   plus US-CENTRAL2 mirror before protected work. Never use EU.
 - Report result, percentage and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-04 02:45Z
+## Resume checkpoint — 2026-09-04 07:01Z
 
-Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; pushed pin
-`b0c333558fd6973f509b0d26b3164b0bef412bcb`. Pod READY; V9 ended authenticated 8/8 clean.
+Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; current
+pushed pin `d7924f2dfc6930ee46be3fb58abc1d67cc6d6d12`. Pod READY and the latest dependency-free
+pgrep/libtpu-lock/container census is 8/8 zero-work; strict Ray/Python census is unavailable until install.
 
 The accepted completed-normalization→key boundary is exact: 0/2,048 rows and 0/262,144 lanes.
 V9 then invoked one normalizer, exact key control and separate real layer consumer with no
@@ -39,17 +40,16 @@ intermediate host transfer. The consumer's layer-1 key differs from legacy in al
 45,519 lanes; decisive row 0 differs 46/128. The first open boundary is therefore inside layer-0
 consumer arithmetic, not input normalization.
 
-V9 publication false-rejected TPU's live reshape→multiply/convert-fusion WK root, so the numerical
-result is diagnostic only. Terminal generation/SHA `1788488319565945`/`cd214775…a456`; arrays
-`3252aa11…dc0d`; record
-`docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v9-wk-publisher-and-consumer-failure.json`.
-Local V10 publisher repair binds the full fused conversion lineage; unreviewed/uncommitted.
-
 Sealed legacy HLO `e7371f48…7216` proves prompt hidden reductions are exact `bf16[2048,6144]`
-global-32 StrategyND. Current probe reused DB533's M32 decode row-zero tree per prompt row; that
-cross-shape association is unproven. Exact next: model-free exact-M2048 fingerprint, row 0 first,
-then merge its result with consumer intermediates. One Sol batch before commit/install/run. Do not
-run 8K until this boundary is exact.
+global-32 StrategyND. The model-free exact-M2048 fingerprint is implemented. Its reviewed V3
+install-only attempt failed before helper/JAX/TPU because shell parsing stripped Python loader
+quotes; preserve `gate-d-m2048-v3-install-loader-quoting-failure.json` and retire its unused tag.
+Append-only V4 fixes that exact boundary and compiles the rendered loader in the test; 31/31 pass,
+all hashes/syntax/history checks pass, and Sol returned no P0–P2 plus approval for persistence,
+post-mirror installation and one fresh-tag execution. V4 cert SHA `c1f46892…907a3`; fresh tag
+`greenfield_m2048_strategy_nd_20260904T064301621229912Z`. Exact next: commit/push/US-CENTRAL2
+replay, install-only, live preflight, then execute that tag once. Do not run 8K until this boundary
+is exact.
 
 ## After Gate D
 

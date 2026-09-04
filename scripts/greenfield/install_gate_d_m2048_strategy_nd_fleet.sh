@@ -40,17 +40,17 @@ readonly JAX_TREE=55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0
 readonly LIBTPU_NAME=gate-d-libtpu-site-db7598c867f3
 readonly LIBTPU_TREE=db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca
 readonly INSTALL_SOURCE_NAME=gate-d-m2048-install-v1
-readonly INSTALL_SOURCE_TREE=0451c126799ffd189d537bd4aab2fe91c3e784d91828449713589a7fddb4a133
+readonly INSTALL_SOURCE_TREE=bdc71d41d3ad1e7d281a3bff487164b0c7ef1a2fa2875a7cb63585ae2647529b
 readonly INSTALLER=install_gate_d_m2048_strategy_nd_runtime.py
 readonly LAUNCHER=launch_gate_d_m2048_strategy_nd_association.py
 readonly PROBE=probe_m2048_strategy_nd_association.py
 readonly PUBLISHER=publish_gate_d_m2048_strategy_nd_association.py
 readonly MIRROR=verify_gate_d_rewrite_same_region_git_mirror.py
-readonly INSTALLER_SHA=ed3e23a015d5943c3f6171cdfec2762a4d74a71f6a333e3cdb16a44daa8d5132
-readonly LAUNCHER_SHA=c2dd843de5ae89bf688b2916f60309f88bbc9a8d3cbfb4914a37505e599d2a74
+readonly INSTALLER_SHA=4a15a701dfd184ca797ef3412f2b2fc45ab67151ceb35442b970b0de246a13fe
+readonly LAUNCHER_SHA=4cf16a65af17a3a8c7ab2cf01ddf6d38f1515c03fe5913b4a4072231ea66fd35
 readonly PROBE_SHA=1debe946e35311014e667fed863871eed4bf3afeaa9aeb27445f50b2ea233774
 readonly PUBLISHER_SHA=83602a623fd6392515c63a1017c89f7ed7c06f5d0a7e1ae4e6aca519f99db9be
-readonly MIRROR_SHA=251266405fe4b881113a34c7cf55e3f9be8273bbf8200e55233bcef17c24b5d6
+readonly MIRROR_SHA=2bdee4a93c48004535463bb003d3c225098b72b81a03b87c449210e48507458b
 
 git_local() {
   /usr/bin/env -i GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
@@ -103,7 +103,7 @@ readonly REPORT=/home/gianl/gate-d-runs/m2048-install-$PIN.log
 readonly REPO_REFRESHER_B64=$(git_local show "$PIN:scripts/greenfield/$REPO_REFRESHER" | /usr/bin/base64 -w0)
 [[ $(/usr/bin/printf '%s' "$REPO_REFRESHER_B64" | /usr/bin/base64 -d | /usr/bin/sha256sum | /usr/bin/awk '{print $1}') == "$REPO_REFRESHER_SHA" ]]
 # shellcheck disable=SC2016
-repo_refresh_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; [[ $idx == "$expected_worker" && $idx =~ ^[1-7]$ ]]; encoded='"$REPO_REFRESHER_B64"'; expected='"$REPO_REFRESHER_SHA"'; target='"$PIN"'; prestate='"$WORKER_REPO_PRESTATE_PIN"'; loader="import fcntl,hashlib,os,sys; raw=sys.stdin.buffer.read(); expected=sys.argv[1]; target=sys.argv[2]; prestate=sys.argv[3]; assert hashlib.sha256(raw).hexdigest()==expected; fd=os.memfd_create('gate-d-m2048-repo-refresher',os.MFD_CLOEXEC|getattr(os,'MFD_ALLOW_SEALING',2)); stream=os.fdopen(os.dup(fd),'wb',closefd=True); written=stream.write(raw); stream.flush(); stream.close(); assert written==len(raw); os.fchmod(fd,0o400); seals=getattr(fcntl,'F_SEAL_SEAL',1)|getattr(fcntl,'F_SEAL_SHRINK',2)|getattr(fcntl,'F_SEAL_GROW',4)|getattr(fcntl,'F_SEAL_WRITE',8); fcntl.fcntl(fd,getattr(fcntl,'F_ADD_SEALS',1033),seals); assert fcntl.fcntl(fd,getattr(fcntl,'F_GET_SEALS',1034))==seals; os.set_inheritable(fd,True); path=f'/proc/self/fd/{fd}'; os.execve('/usr/bin/python3',['/usr/bin/python3','-I','-S','-B',path,'--target-pin',target,'--prestate-pin',prestate],{'HOME':'/home/gianl','LANG':'C','LC_ALL':'C','PATH':'/usr/bin:/bin','PYTHONDONTWRITEBYTECODE':'1'})"; /usr/bin/printf "%s" "$encoded" | /usr/bin/base64 -d | /usr/bin/env -i HOME=/home/gianl LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B -c "$loader" "$expected" "$target" "$prestate"'
+repo_refresh_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; [[ $idx == "$expected_worker" && $idx =~ ^[1-7]$ ]]; encoded='"$REPO_REFRESHER_B64"'; expected='"$REPO_REFRESHER_SHA"'; target='"$PIN"'; prestate='"$WORKER_REPO_PRESTATE_PIN"'; loader="import fcntl,hashlib,os,sys; raw=sys.stdin.buffer.read(); expected=sys.argv[1]; target=sys.argv[2]; prestate=sys.argv[3]; assert hashlib.sha256(raw).hexdigest()==expected; fd=os.memfd_create(\"gate-d-m2048-repo-refresher\",os.MFD_CLOEXEC|getattr(os,\"MFD_ALLOW_SEALING\",2)); stream=os.fdopen(os.dup(fd),\"wb\",closefd=True); written=stream.write(raw); stream.flush(); stream.close(); assert written==len(raw); os.fchmod(fd,0o400); seals=getattr(fcntl,\"F_SEAL_SEAL\",1)|getattr(fcntl,\"F_SEAL_SHRINK\",2)|getattr(fcntl,\"F_SEAL_GROW\",4)|getattr(fcntl,\"F_SEAL_WRITE\",8); fcntl.fcntl(fd,getattr(fcntl,\"F_ADD_SEALS\",1033),seals); assert fcntl.fcntl(fd,getattr(fcntl,\"F_GET_SEALS\",1034))==seals; os.set_inheritable(fd,True); path=f\"/proc/self/fd/{fd}\"; os.execve(\"/usr/bin/python3\",[\"/usr/bin/python3\",\"-I\",\"-S\",\"-B\",path,\"--target-pin\",target,\"--prestate-pin\",prestate],{\"HOME\":\"/home/gianl\",\"LANG\":\"C\",\"LC_ALL\":\"C\",\"PATH\":\"/usr/bin:/bin\",\"PYTHONDONTWRITEBYTECODE\":\"1\"})"; /usr/bin/printf "%s" "$encoded" | /usr/bin/base64 -d | /usr/bin/env -i HOME=/home/gianl LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B -c "$loader" "$expected" "$target" "$prestate"'
 for worker in 1 2 3 4 5 6 7; do
   /snap/bin/gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker="$worker" \
     --command="expected_worker=$worker; $repo_refresh_command" >>"$REPORT" 2>&1

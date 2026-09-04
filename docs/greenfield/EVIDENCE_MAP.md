@@ -3842,3 +3842,17 @@ persistence only; review and persistence precede any v2 installation.
 - Sealed legacy after-codegen HLO `e7371f48…7216` proves exact M2048 hidden reductions, global group
   0--31 and StrategyND, but not the element association. Applying DB533's M32 row-zero tree per
   prompt row is unproven. Next evidence is one model-free exact-shape M2048 fingerprint; no 8K yet.
+
+## 2026-09-04 — exact-M2048 V3 install refusal and V4 source correction
+
+- V3 pin `d7924f2…d12` failed closed on worker 1 before repository refresh/runtime/capsule/JAX/TPU:
+  shell parsing stripped embedded Python loader quotes and `python3 -c` raised `SyntaxError`.
+  Report SHA `fc29d9b4…93ff`; post-failure dependency-free census 8/8 clean; failure record
+  `gate-d-m2048-v3-install-loader-quoting-failure.json` SHA `33bc1876…772c`; tag retired unused.
+- V4 uses escaped double-quoted literals and a regression that renders and compiles the exact remote
+  loader. Full bound SHA chain passes; focused tests 31/31; historical V2/V3 bytes unchanged.
+  Certificate `gate-d-m2048-strategy-nd-v4-source.json` SHA `c1f46892…907a3`; fresh tag
+  `greenfield_m2048_strategy_nd_20260904T064301621229912Z`.
+- Independent Sol returned no P0–P2 and approved persistence, install after future-pin origin plus
+  US-CENTRAL2 replay, and one execution after normal live preflight. No V4 install/execution yet;
+  no numerical, decoder, performance or Gate-D claim.

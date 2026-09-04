@@ -38,7 +38,7 @@ REPO_REFRESHER = ROOT / (
     "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py"
 )
 MIRROR = ROOT / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
-CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v3-source.json"
+CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v4-source.json"
 
 
 def _load_publisher():
@@ -352,7 +352,9 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
         "docs/artifacts/gate-d-m2048-strategy-nd-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v2-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v3-source.json",
+        "docs/artifacts/gate-d-m2048-strategy-nd-v4-source.json",
         "docs/artifacts/gate-d-m2048-v2-install-repository-prestate-failure.json",
+        "docs/artifacts/gate-d-m2048-v3-install-loader-quoting-failure.json",
         "scripts/greenfield/bootstrap_gate_d_provisioner.py",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py",
@@ -378,7 +380,7 @@ def test_fleet_installer_is_install_only_and_restores_exact_runtime_trees() -> N
         "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616",
         "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df",
         "db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca",
-        "0451c126799ffd189d537bd4aab2fe91c3e784d91828449713589a7fddb4a133",
+        "bdc71d41d3ad1e7d281a3bff487164b0c7ef1a2fa2875a7cb63585ae2647529b",
     ):
         assert value in source
     assert '[[ -d $path && $path == /home/gianl/gate-d-m2048-runtime-source-' in source
@@ -400,13 +402,56 @@ def test_fleet_serializes_exact_worker_repository_refresh() -> None:
     source = FLEET_INSTALLER.read_text(encoding="ascii")
     assert "WORKER_REPO_PRESTATE_PIN=086d459a6acf4e3d1ec328e00e3e1b61be29ad2b" in source
     assert "REPO_REFRESHER_B64=$(git_local show" in source
-    assert "os.memfd_create('gate-d-m2048-repo-refresher'" in source
+    assert 'os.memfd_create(\\"gate-d-m2048-repo-refresher\\"' in source
     assert "for worker in 1 2 3 4 5 6 7; do" in source
     assert source.count('--worker="$worker"') == 1
     assert "has_unique_markers \"$REPORT\" REPO_REFRESH_OK 7" in source
     assert source.index("for worker in 1 2 3 4 5 6 7; do") < source.index(
         '--command="$sync_command"'
     )
+    assignment = next(
+        line for line in source.splitlines() if line.startswith("repo_refresh_command=")
+    )
+    rendered = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "REPO_REFRESHER_B64=QQ==; "
+            f"REPO_REFRESHER_SHA={'a' * 64}; PIN={'b' * 40}; "
+            f"WORKER_REPO_PRESTATE_PIN={'c' * 40}; {assignment}; "
+            'printf "%s" "$repo_refresh_command"',
+        ],
+        check=True,
+        capture_output=True,
+        env={"HOME": "/nonexistent", "LANG": "C", "LC_ALL": "C", "PATH": "/usr/bin:/bin"},
+    ).stdout.decode("ascii")
+    prefix, separator, _suffix = rendered.partition(
+        '; /usr/bin/printf "%s" "$encoded"'
+    )
+    assert separator
+    loader = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            f'expected_worker=1; {prefix}; printf "%s" "$loader"',
+        ],
+        check=True,
+        capture_output=True,
+        env={
+            "HOME": "/nonexistent",
+            "HOSTNAME": "test-w-1",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+        },
+    ).stdout.decode("ascii")
+    compile(loader, "gate-d-m2048-remote-loader", "exec")
+    assert 'os.memfd_create("gate-d-m2048-repo-refresher"' in loader
+    assert 'path=f"/proc/self/fd/{fd}"' in loader
 
 
 def test_repository_refresher_moves_only_exact_clean_detached_prestate(

@@ -1,0 +1,36 @@
+{
+  "artifact_kind": "gate_d_m2048_v3_install_loader_quoting_failure",
+  "authorization": {
+    "install_only": true,
+    "jax_import": false,
+    "protected_execution": false,
+    "tpu_initialization": false
+  },
+  "classification": "INSTALL_ONLY_FAILED_CLOSED_IN_WORKER1_REMOTE_LOADER_PARSE;NO_REPOSITORY_REFRESH;NO_RUNTIME_TRANSFER;NO_CAPSULE_INSTALL;NO_JAX;NO_TPU;NO_MODEL_OR_GATE_D_CLAIM",
+  "code_pin": "d7924f2dfc6930ee46be3fb58abc1d67cc6d6d12",
+  "failure": {
+    "boundary": "worker 1 sealed repository-refresher loader parse, before helper invocation",
+    "controller_report": "/home/gianl/gate-d-runs/m2048-install-d7924f2dfc6930ee46be3fb58abc1d67cc6d6d12.log",
+    "controller_report_sha256": "fc29d9b4f70320680d13d7bc026ebaa170ae8fff068d5aeedf707952a0a793ff",
+    "exact_cause": "the single-quoted repo_refresh_command embedded unescaped single-quoted Python string literals; shell concatenation removed those delimiters and python3 -c rejected the resulting loader with SyntaxError",
+    "immutable_capsule_installed": false,
+    "launcher_invoked": false,
+    "repository_refresh_started": false,
+    "runtime_transfer_started": false,
+    "worker_contacted": 1
+  },
+  "post_failure_minimal_census": {
+    "command_class": "gcloud alpha tpu-vm ssh --worker=all --batch-size=8 with dependency-free pgrep, libtpu-lock-holder and container checks",
+    "coverage": "Ray/vLLM, M2048 probe/wrapper/launcher, short decoder and GLM processes; /tmp/libtpu_lockfile holders; vLLM/Gemma/Qwen/rerank/ASPt/GLM containers",
+    "result": "8/8 unique MINIMAL_CENSUS_OK",
+    "sorted_markers_sha256": "42d6f2f5fcf6345821dd3f8ef412756936634bf7b7bedac9cbb12e4c4c107580",
+    "strict_ray_python_census_available": false
+  },
+  "schema_version": 1,
+  "source_certificate": {
+    "path": "docs/artifacts/gate-d-m2048-strategy-nd-v3-source.json",
+    "sha256": "f7502e48967a74f447e4aa3674d430e4e7350448288b4612be81a810c10e5327"
+  },
+  "successor_requirement": "Preserve this failure and the unused v3 tag. Render and compile the exact remote loader produced by the fleet script in a CPU regression, then review, persist and same-region mirror-bind an append-only v4 certificate with a fresh tag before another install-only attempt.",
+  "unused_retired_tag": "greenfield_m2048_strategy_nd_20260904T054343852074458Z"
+}

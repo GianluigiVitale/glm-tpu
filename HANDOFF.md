@@ -11978,3 +11978,25 @@ is `bf16[2048,6144]{1,0:T(8,128)(2,1)S(3)}` with global 0--31
 tree to each prompt row. The identical backend label does not expose payload association. Exact next:
 one model-free exact-M2048 fingerprint, solving row zero first, before altering consumer arithmetic or
 running 8K. No V9 SUCCESS, DB, decoder, performance or Gate-D claim exists.
+
+## 2026-09-04 06:40--07:01Z — V3 install quoting failure preserved; V4 approved locally
+
+Reviewed/pushed pin `d7924f2dfc6930ee46be3fb58abc1d67cc6d6d12` and the US-CENTRAL2 mirror were
+exact. Its V3 install-only attempt contacted only worker 1 and failed before repository refresh,
+runtime transfer, capsule installation, launcher, JAX or TPU: the outer single-quoted shell
+assignment removed embedded single-quoted Python string delimiters, so `python3 -c` raised
+`SyntaxError`. Controller report SHA `fc29d9b4…93ff`; the unused V3 tag is retired. A fresh
+dependency-free pgrep/libtpu-lock/container census is 8/8 `MINIMAL_CENSUS_OK`, normalized SHA
+`42d6f2f5…7580`. Append-only failure record:
+`docs/artifacts/gate-d-m2048-v3-install-loader-quoting-failure.json` (`33bc1876…772c`).
+
+V4 escapes double-quoted Python literals through the outer command and adds an executable
+regression that evaluates the exact assignment, renders the actual remote command, extracts the
+loader and compiles it. The complete verifier→wrapper→launcher→installer→install-tree→fleet SHA
+chain was recomputed; 31/31 focused tests, shell/Python/JSON, source-chain and diff checks pass;
+historical V2/V3 certificate bytes are unchanged. V4 source certificate
+`docs/artifacts/gate-d-m2048-strategy-nd-v4-source.json` SHA `c1f46892…907a3`; fresh tag
+`greenfield_m2048_strategy_nd_20260904T064301621229912Z`. Independent Sol verdict: no P0/P1/P2,
+safe to persist, safe to install after future-pin push/mirror, safe to execute once under normal
+live-preflight conditions. Nothing V4 is yet committed, installed or executed. Exact next:
+commit/push/mirror, install-only, then separately authenticate live preflight and run the fresh tag.
