@@ -1,0 +1,1541 @@
+{
+  "artifact_kind": "greenfield_checkpoint_reproducibility_capsule",
+  "artifacts": [
+    {
+      "bytes": 755663676164,
+      "disposition": "keep",
+      "expected_manifest_sha256": null,
+      "id": "canonical_glm_source",
+      "object_count": 150,
+      "objects": [
+        {
+          "crc32c": "6HZyOw==",
+          "generation": 1783384168989279,
+          "name": "models/GLM-5.2-FP8/.gitattributes",
+          "size": 1682
+        },
+        {
+          "crc32c": "Yov7mA==",
+          "generation": 1783384170973058,
+          "name": "models/GLM-5.2-FP8/LICENSE",
+          "size": 1065
+        },
+        {
+          "crc32c": "Lx6MjQ==",
+          "generation": 1783384161830320,
+          "name": "models/GLM-5.2-FP8/README.md",
+          "size": 10909
+        },
+        {
+          "crc32c": "I0Sqlg==",
+          "generation": 1783384163868537,
+          "name": "models/GLM-5.2-FP8/chat_template.jinja",
+          "size": 5076
+        },
+        {
+          "crc32c": "djQWpg==",
+          "generation": 1783384156632832,
+          "name": "models/GLM-5.2-FP8/config.json",
+          "size": 29464
+        },
+        {
+          "crc32c": "bSGKog==",
+          "generation": 1783384178112268,
+          "name": "models/GLM-5.2-FP8/generation_config.json",
+          "size": 194
+        },
+        {
+          "crc32c": "F4Vk/w==",
+          "generation": 1783382593522370,
+          "name": "models/GLM-5.2-FP8/model-00001-of-00141.safetensors",
+          "size": 5363940952
+        },
+        {
+          "crc32c": "SY7i2A==",
+          "generation": 1783383012200562,
+          "name": "models/GLM-5.2-FP8/model-00002-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "6B3RLA==",
+          "generation": 1783382846118640,
+          "name": "models/GLM-5.2-FP8/model-00003-of-00141.safetensors",
+          "size": 5363339120
+        },
+        {
+          "crc32c": "VMxLXg==",
+          "generation": 1783383416698247,
+          "name": "models/GLM-5.2-FP8/model-00004-of-00141.safetensors",
+          "size": 5361736640
+        },
+        {
+          "crc32c": "VowhVw==",
+          "generation": 1783381955460842,
+          "name": "models/GLM-5.2-FP8/model-00005-of-00141.safetensors",
+          "size": 5366353560
+        },
+        {
+          "crc32c": "UxPtkg==",
+          "generation": 1783383655990591,
+          "name": "models/GLM-5.2-FP8/model-00006-of-00141.safetensors",
+          "size": 5361736504
+        },
+        {
+          "crc32c": "w4jHtw==",
+          "generation": 1783381841761849,
+          "name": "models/GLM-5.2-FP8/model-00007-of-00141.safetensors",
+          "size": 5366353704
+        },
+        {
+          "crc32c": "4xwo5Q==",
+          "generation": 1783383814056313,
+          "name": "models/GLM-5.2-FP8/model-00008-of-00141.safetensors",
+          "size": 5361736368
+        },
+        {
+          "crc32c": "cgSzAQ==",
+          "generation": 1783381741238404,
+          "name": "models/GLM-5.2-FP8/model-00009-of-00141.safetensors",
+          "size": 5366353832
+        },
+        {
+          "crc32c": "KUWkKA==",
+          "generation": 1783384037352826,
+          "name": "models/GLM-5.2-FP8/model-00010-of-00141.safetensors",
+          "size": 5361736232
+        },
+        {
+          "crc32c": "hX+JnA==",
+          "generation": 1783382634944766,
+          "name": "models/GLM-5.2-FP8/model-00011-of-00141.safetensors",
+          "size": 5363339600
+        },
+        {
+          "crc32c": "kYImIQ==",
+          "generation": 1783382271496663,
+          "name": "models/GLM-5.2-FP8/model-00012-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "6A6r3g==",
+          "generation": 1783383016661560,
+          "name": "models/GLM-5.2-FP8/model-00013-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "p/jnpA==",
+          "generation": 1783382180245548,
+          "name": "models/GLM-5.2-FP8/model-00014-of-00141.safetensors",
+          "size": 5366353496
+        },
+        {
+          "crc32c": "ZTssCA==",
+          "generation": 1783383327334340,
+          "name": "models/GLM-5.2-FP8/model-00015-of-00141.safetensors",
+          "size": 5361736680
+        },
+        {
+          "crc32c": "UQGZJw==",
+          "generation": 1783382066038516,
+          "name": "models/GLM-5.2-FP8/model-00016-of-00141.safetensors",
+          "size": 5366353520
+        },
+        {
+          "crc32c": "rcvQ0w==",
+          "generation": 1783383554924928,
+          "name": "models/GLM-5.2-FP8/model-00017-of-00141.safetensors",
+          "size": 5361736544
+        },
+        {
+          "crc32c": "qr75zg==",
+          "generation": 1783382763332881,
+          "name": "models/GLM-5.2-FP8/model-00018-of-00141.safetensors",
+          "size": 5363339264
+        },
+        {
+          "crc32c": "iGifUg==",
+          "generation": 1783383761522537,
+          "name": "models/GLM-5.2-FP8/model-00019-of-00141.safetensors",
+          "size": 5361736408
+        },
+        {
+          "crc32c": "VdxHDg==",
+          "generation": 1783382594453577,
+          "name": "models/GLM-5.2-FP8/model-00020-of-00141.safetensors",
+          "size": 5364805840
+        },
+        {
+          "crc32c": "wS06Lw==",
+          "generation": 1783383883892371,
+          "name": "models/GLM-5.2-FP8/model-00021-of-00141.safetensors",
+          "size": 5361736336
+        },
+        {
+          "crc32c": "IDf/tA==",
+          "generation": 1783381730107452,
+          "name": "models/GLM-5.2-FP8/model-00022-of-00141.safetensors",
+          "size": 5366353872
+        },
+        {
+          "crc32c": "1BdOjw==",
+          "generation": 1783384201761648,
+          "name": "models/GLM-5.2-FP8/model-00023-of-00141.safetensors",
+          "size": 5357948328
+        },
+        {
+          "crc32c": "oEubIg==",
+          "generation": 1783384203419345,
+          "name": "models/GLM-5.2-FP8/model-00024-of-00141.safetensors",
+          "size": 5357555688
+        },
+        {
+          "crc32c": "rvj2AA==",
+          "generation": 1783382877435045,
+          "name": "models/GLM-5.2-FP8/model-00025-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "qImJIQ==",
+          "generation": 1783383099833254,
+          "name": "models/GLM-5.2-FP8/model-00026-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "UH5qzQ==",
+          "generation": 1783382119374212,
+          "name": "models/GLM-5.2-FP8/model-00027-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "rGGiqQ==",
+          "generation": 1783383371517341,
+          "name": "models/GLM-5.2-FP8/model-00028-of-00141.safetensors",
+          "size": 5361736648
+        },
+        {
+          "crc32c": "fNMcQQ==",
+          "generation": 1783382000410180,
+          "name": "models/GLM-5.2-FP8/model-00029-of-00141.safetensors",
+          "size": 5366353560
+        },
+        {
+          "crc32c": "itV8rQ==",
+          "generation": 1783383598240307,
+          "name": "models/GLM-5.2-FP8/model-00030-of-00141.safetensors",
+          "size": 5361736512
+        },
+        {
+          "crc32c": "/JfK9w==",
+          "generation": 1783381849540044,
+          "name": "models/GLM-5.2-FP8/model-00031-of-00141.safetensors",
+          "size": 5366353688
+        },
+        {
+          "crc32c": "yQUrvw==",
+          "generation": 1783383778340964,
+          "name": "models/GLM-5.2-FP8/model-00032-of-00141.safetensors",
+          "size": 5361736376
+        },
+        {
+          "crc32c": "72Xbiw==",
+          "generation": 1783382657063672,
+          "name": "models/GLM-5.2-FP8/model-00033-of-00141.safetensors",
+          "size": 5363339440
+        },
+        {
+          "crc32c": "cYpQmQ==",
+          "generation": 1783384037851770,
+          "name": "models/GLM-5.2-FP8/model-00034-of-00141.safetensors",
+          "size": 5361736240
+        },
+        {
+          "crc32c": "ygslkQ==",
+          "generation": 1783381609768003,
+          "name": "models/GLM-5.2-FP8/model-00035-of-00141.safetensors",
+          "size": 5366353976
+        },
+        {
+          "crc32c": "3FPW4g==",
+          "generation": 1783382286990112,
+          "name": "models/GLM-5.2-FP8/model-00036-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "XbMyOw==",
+          "generation": 1783383055849682,
+          "name": "models/GLM-5.2-FP8/model-00037-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "Ggj7hA==",
+          "generation": 1783382395903345,
+          "name": "models/GLM-5.2-FP8/model-00038-of-00141.safetensors",
+          "size": 5366353304
+        },
+        {
+          "crc32c": "cNIjiQ==",
+          "generation": 1783384099403947,
+          "name": "models/GLM-5.2-FP8/model-00039-of-00141.safetensors",
+          "size": 5361735832
+        },
+        {
+          "crc32c": "t1WXEw==",
+          "generation": 1783382487059867,
+          "name": "models/GLM-5.2-FP8/model-00040-of-00141.safetensors",
+          "size": 5366353016
+        },
+        {
+          "crc32c": "uBlNXQ==",
+          "generation": 1783383549336797,
+          "name": "models/GLM-5.2-FP8/model-00041-of-00141.safetensors",
+          "size": 5361736552
+        },
+        {
+          "crc32c": "MJLmww==",
+          "generation": 1783382802461224,
+          "name": "models/GLM-5.2-FP8/model-00042-of-00141.safetensors",
+          "size": 5363339264
+        },
+        {
+          "crc32c": "Yfgs3Q==",
+          "generation": 1783383706985498,
+          "name": "models/GLM-5.2-FP8/model-00043-of-00141.safetensors",
+          "size": 5361736416
+        },
+        {
+          "crc32c": "Fz7X2Q==",
+          "generation": 1783381839642266,
+          "name": "models/GLM-5.2-FP8/model-00044-of-00141.safetensors",
+          "size": 5366353776
+        },
+        {
+          "crc32c": "Nxwb8g==",
+          "generation": 1783383990128915,
+          "name": "models/GLM-5.2-FP8/model-00045-of-00141.safetensors",
+          "size": 5361736280
+        },
+        {
+          "crc32c": "7fHaqA==",
+          "generation": 1783381611357775,
+          "name": "models/GLM-5.2-FP8/model-00046-of-00141.safetensors",
+          "size": 5366353920
+        },
+        {
+          "crc32c": "AspFWA==",
+          "generation": 1783382192407616,
+          "name": "models/GLM-5.2-FP8/model-00047-of-00141.safetensors",
+          "size": 5366353496
+        },
+        {
+          "crc32c": "QPDRFg==",
+          "generation": 1783383076356326,
+          "name": "models/GLM-5.2-FP8/model-00048-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "MK8FPA==",
+          "generation": 1783382908777387,
+          "name": "models/GLM-5.2-FP8/model-00049-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "82gdfw==",
+          "generation": 1783383121684301,
+          "name": "models/GLM-5.2-FP8/model-00050-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "pmQnqA==",
+          "generation": 1783382072437891,
+          "name": "models/GLM-5.2-FP8/model-00051-of-00141.safetensors",
+          "size": 5366353512
+        },
+        {
+          "crc32c": "iqNmBA==",
+          "generation": 1783383481004888,
+          "name": "models/GLM-5.2-FP8/model-00052-of-00141.safetensors",
+          "size": 5361736584
+        },
+        {
+          "crc32c": "bafxng==",
+          "generation": 1783381945770140,
+          "name": "models/GLM-5.2-FP8/model-00053-of-00141.safetensors",
+          "size": 5366353608
+        },
+        {
+          "crc32c": "6qCZPw==",
+          "generation": 1783383673529125,
+          "name": "models/GLM-5.2-FP8/model-00054-of-00141.safetensors",
+          "size": 5361736448
+        },
+        {
+          "crc32c": "GMGRmA==",
+          "generation": 1783381844289713,
+          "name": "models/GLM-5.2-FP8/model-00055-of-00141.safetensors",
+          "size": 5366353744
+        },
+        {
+          "crc32c": "y4QPCA==",
+          "generation": 1783383921688119,
+          "name": "models/GLM-5.2-FP8/model-00056-of-00141.safetensors",
+          "size": 5361736312
+        },
+        {
+          "crc32c": "L/ymbQ==",
+          "generation": 1783382640996927,
+          "name": "models/GLM-5.2-FP8/model-00057-of-00141.safetensors",
+          "size": 5363339496
+        },
+        {
+          "crc32c": "yNHByw==",
+          "generation": 1783384147524206,
+          "name": "models/GLM-5.2-FP8/model-00058-of-00141.safetensors",
+          "size": 5357950744
+        },
+        {
+          "crc32c": "ZwVreg==",
+          "generation": 1783384231977882,
+          "name": "models/GLM-5.2-FP8/model-00059-of-00141.safetensors",
+          "size": 5357552376
+        },
+        {
+          "crc32c": "e2rJhw==",
+          "generation": 1783382499397792,
+          "name": "models/GLM-5.2-FP8/model-00060-of-00141.safetensors",
+          "size": 5366352776
+        },
+        {
+          "crc32c": "lmyWtw==",
+          "generation": 1783383144111853,
+          "name": "models/GLM-5.2-FP8/model-00061-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "v9EYpg==",
+          "generation": 1783382166226636,
+          "name": "models/GLM-5.2-FP8/model-00062-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "pcozpQ==",
+          "generation": 1783383435442965,
+          "name": "models/GLM-5.2-FP8/model-00063-of-00141.safetensors",
+          "size": 5361736624
+        },
+        {
+          "crc32c": "0aA/oQ==",
+          "generation": 1783381950910441,
+          "name": "models/GLM-5.2-FP8/model-00064-of-00141.safetensors",
+          "size": 5366353576
+        },
+        {
+          "crc32c": "nscigw==",
+          "generation": 1783383657741984,
+          "name": "models/GLM-5.2-FP8/model-00065-of-00141.safetensors",
+          "size": 5361736488
+        },
+        {
+          "crc32c": "lUkVRg==",
+          "generation": 1783382725846897,
+          "name": "models/GLM-5.2-FP8/model-00066-of-00141.safetensors",
+          "size": 5363339320
+        },
+        {
+          "crc32c": "/F54gA==",
+          "generation": 1783383866827676,
+          "name": "models/GLM-5.2-FP8/model-00067-of-00141.safetensors",
+          "size": 5361736360
+        },
+        {
+          "crc32c": "Ylfisw==",
+          "generation": 1783381737908725,
+          "name": "models/GLM-5.2-FP8/model-00068-of-00141.safetensors",
+          "size": 5366353848
+        },
+        {
+          "crc32c": "hMO5lw==",
+          "generation": 1783384039248766,
+          "name": "models/GLM-5.2-FP8/model-00069-of-00141.safetensors",
+          "size": 5361736224
+        },
+        {
+          "crc32c": "SGgmFw==",
+          "generation": 1783381615595016,
+          "name": "models/GLM-5.2-FP8/model-00070-of-00141.safetensors",
+          "size": 5366353992
+        },
+        {
+          "crc32c": "0Hpdqg==",
+          "generation": 1783382280954064,
+          "name": "models/GLM-5.2-FP8/model-00071-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "vnb21Q==",
+          "generation": 1783383149955165,
+          "name": "models/GLM-5.2-FP8/model-00072-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "ZK9s+A==",
+          "generation": 1783382842840702,
+          "name": "models/GLM-5.2-FP8/model-00073-of-00141.safetensors",
+          "size": 5363339112
+        },
+        {
+          "crc32c": "2nX9fQ==",
+          "generation": 1783383338618306,
+          "name": "models/GLM-5.2-FP8/model-00074-of-00141.safetensors",
+          "size": 5361736672
+        },
+        {
+          "crc32c": "Bpi0hg==",
+          "generation": 1783382067272489,
+          "name": "models/GLM-5.2-FP8/model-00075-of-00141.safetensors",
+          "size": 5366353528
+        },
+        {
+          "crc32c": "++vXCQ==",
+          "generation": 1783383571562250,
+          "name": "models/GLM-5.2-FP8/model-00076-of-00141.safetensors",
+          "size": 5361736528
+        },
+        {
+          "crc32c": "ZWbaSQ==",
+          "generation": 1783381846257857,
+          "name": "models/GLM-5.2-FP8/model-00077-of-00141.safetensors",
+          "size": 5366353672
+        },
+        {
+          "crc32c": "R81gwQ==",
+          "generation": 1783383768423478,
+          "name": "models/GLM-5.2-FP8/model-00078-of-00141.safetensors",
+          "size": 5361736392
+        },
+        {
+          "crc32c": "eAH0UA==",
+          "generation": 1783382397049642,
+          "name": "models/GLM-5.2-FP8/model-00079-of-00141.safetensors",
+          "size": 5366353168
+        },
+        {
+          "crc32c": "J1rWTw==",
+          "generation": 1783384141801539,
+          "name": "models/GLM-5.2-FP8/model-00080-of-00141.safetensors",
+          "size": 5361735408
+        },
+        {
+          "crc32c": "7fiFVw==",
+          "generation": 1783381741149905,
+          "name": "models/GLM-5.2-FP8/model-00081-of-00141.safetensors",
+          "size": 5366353872
+        },
+        {
+          "crc32c": "8IOnfA==",
+          "generation": 1783382906486973,
+          "name": "models/GLM-5.2-FP8/model-00082-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "YCjHhQ==",
+          "generation": 1783383217881622,
+          "name": "models/GLM-5.2-FP8/model-00083-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "GXzEoA==",
+          "generation": 1783382260884170,
+          "name": "models/GLM-5.2-FP8/model-00084-of-00141.safetensors",
+          "size": 5366353496
+        },
+        {
+          "crc32c": "R5JGdA==",
+          "generation": 1783383198045921,
+          "name": "models/GLM-5.2-FP8/model-00085-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "pPrj7w==",
+          "generation": 1783382077155975,
+          "name": "models/GLM-5.2-FP8/model-00086-of-00141.safetensors",
+          "size": 5366353512
+        },
+        {
+          "crc32c": "d3z6IQ==",
+          "generation": 1783383487321401,
+          "name": "models/GLM-5.2-FP8/model-00087-of-00141.safetensors",
+          "size": 5361736568
+        },
+        {
+          "crc32c": "69osPA==",
+          "generation": 1783381944689580,
+          "name": "models/GLM-5.2-FP8/model-00088-of-00141.safetensors",
+          "size": 5366353632
+        },
+        {
+          "crc32c": "rmxIew==",
+          "generation": 1783383704666229,
+          "name": "models/GLM-5.2-FP8/model-00089-of-00141.safetensors",
+          "size": 5361736432
+        },
+        {
+          "crc32c": "LZ5h2w==",
+          "generation": 1783382695888107,
+          "name": "models/GLM-5.2-FP8/model-00090-of-00141.safetensors",
+          "size": 5363339376
+        },
+        {
+          "crc32c": "k4v29g==",
+          "generation": 1783383919781532,
+          "name": "models/GLM-5.2-FP8/model-00091-of-00141.safetensors",
+          "size": 5361736296
+        },
+        {
+          "crc32c": "uSQLdw==",
+          "generation": 1783381610512924,
+          "name": "models/GLM-5.2-FP8/model-00092-of-00141.safetensors",
+          "size": 5366353904
+        },
+        {
+          "crc32c": "SiBw7A==",
+          "generation": 1783382286245925,
+          "name": "models/GLM-5.2-FP8/model-00093-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "mAZccA==",
+          "generation": 1783383216703924,
+          "name": "models/GLM-5.2-FP8/model-00094-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "D1KdOA==",
+          "generation": 1783382337394093,
+          "name": "models/GLM-5.2-FP8/model-00095-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "OhB+wg==",
+          "generation": 1783383228093679,
+          "name": "models/GLM-5.2-FP8/model-00096-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "ub/slA==",
+          "generation": 1783382860134613,
+          "name": "models/GLM-5.2-FP8/model-00097-of-00141.safetensors",
+          "size": 5363339112
+        },
+        {
+          "crc32c": "srs3Mw==",
+          "generation": 1783383443187214,
+          "name": "models/GLM-5.2-FP8/model-00098-of-00141.safetensors",
+          "size": 5361736616
+        },
+        {
+          "crc32c": "T6XqKQ==",
+          "generation": 1783382443485355,
+          "name": "models/GLM-5.2-FP8/model-00099-of-00141.safetensors",
+          "size": 5366353168
+        },
+        {
+          "crc32c": "fH/P7w==",
+          "generation": 1783384123012365,
+          "name": "models/GLM-5.2-FP8/model-00100-of-00141.safetensors",
+          "size": 5361735624
+        },
+        {
+          "crc32c": "siMEaA==",
+          "generation": 1783382966124896,
+          "name": "models/GLM-5.2-FP8/model-00101-of-00141.safetensors",
+          "size": 5363339032
+        },
+        {
+          "crc32c": "C+Y4qA==",
+          "generation": 1783383872397287,
+          "name": "models/GLM-5.2-FP8/model-00102-of-00141.safetensors",
+          "size": 5361736344
+        },
+        {
+          "crc32c": "AvL1zA==",
+          "generation": 1783381735876584,
+          "name": "models/GLM-5.2-FP8/model-00103-of-00141.safetensors",
+          "size": 5366353856
+        },
+        {
+          "crc32c": "sE5TuQ==",
+          "generation": 1783382552286262,
+          "name": "models/GLM-5.2-FP8/model-00104-of-00141.safetensors",
+          "size": 5364883208
+        },
+        {
+          "crc32c": "lgviFg==",
+          "generation": 1783382980721252,
+          "name": "models/GLM-5.2-FP8/model-00105-of-00141.safetensors",
+          "size": 5363207032
+        },
+        {
+          "crc32c": "WJrOHw==",
+          "generation": 1783382948721603,
+          "name": "models/GLM-5.2-FP8/model-00106-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "73+6jQ==",
+          "generation": 1783383257400035,
+          "name": "models/GLM-5.2-FP8/model-00107-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "xO+W/w==",
+          "generation": 1783382176785247,
+          "name": "models/GLM-5.2-FP8/model-00108-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "72QVPQ==",
+          "generation": 1783383377789554,
+          "name": "models/GLM-5.2-FP8/model-00109-of-00141.safetensors",
+          "size": 5361736648
+        },
+        {
+          "crc32c": "xSP0qw==",
+          "generation": 1783382056550218,
+          "name": "models/GLM-5.2-FP8/model-00110-of-00141.safetensors",
+          "size": 5366353552
+        },
+        {
+          "crc32c": "L/tmow==",
+          "generation": 1783383602180677,
+          "name": "models/GLM-5.2-FP8/model-00111-of-00141.safetensors",
+          "size": 5361736512
+        },
+        {
+          "crc32c": "0qEzsA==",
+          "generation": 1783381890937959,
+          "name": "models/GLM-5.2-FP8/model-00112-of-00141.safetensors",
+          "size": 5366353688
+        },
+        {
+          "crc32c": "Su2huQ==",
+          "generation": 1783383812611029,
+          "name": "models/GLM-5.2-FP8/model-00113-of-00141.safetensors",
+          "size": 5361736376
+        },
+        {
+          "crc32c": "WaTP1Q==",
+          "generation": 1783382704800650,
+          "name": "models/GLM-5.2-FP8/model-00114-of-00141.safetensors",
+          "size": 5363339432
+        },
+        {
+          "crc32c": "qQXsrg==",
+          "generation": 1783384015541829,
+          "name": "models/GLM-5.2-FP8/model-00115-of-00141.safetensors",
+          "size": 5361736240
+        },
+        {
+          "crc32c": "fd1yNw==",
+          "generation": 1783381613391912,
+          "name": "models/GLM-5.2-FP8/model-00116-of-00141.safetensors",
+          "size": 5366353976
+        },
+        {
+          "crc32c": "h5j6tQ==",
+          "generation": 1783382376791006,
+          "name": "models/GLM-5.2-FP8/model-00117-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "T7wHmg==",
+          "generation": 1783383260304807,
+          "name": "models/GLM-5.2-FP8/model-00118-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "y4c5/Q==",
+          "generation": 1783382391042265,
+          "name": "models/GLM-5.2-FP8/model-00119-of-00141.safetensors",
+          "size": 5366353304
+        },
+        {
+          "crc32c": "Lmbu5w==",
+          "generation": 1783384099157151,
+          "name": "models/GLM-5.2-FP8/model-00120-of-00141.safetensors",
+          "size": 5361735832
+        },
+        {
+          "crc32c": "E4Relg==",
+          "generation": 1783382500455366,
+          "name": "models/GLM-5.2-FP8/model-00121-of-00141.safetensors",
+          "size": 5366353016
+        },
+        {
+          "crc32c": "rWgtFQ==",
+          "generation": 1783383551187436,
+          "name": "models/GLM-5.2-FP8/model-00122-of-00141.safetensors",
+          "size": 5361736552
+        },
+        {
+          "crc32c": "1PEYLw==",
+          "generation": 1783382804149532,
+          "name": "models/GLM-5.2-FP8/model-00123-of-00141.safetensors",
+          "size": 5363339256
+        },
+        {
+          "crc32c": "RyC2Pw==",
+          "generation": 1783383761245181,
+          "name": "models/GLM-5.2-FP8/model-00124-of-00141.safetensors",
+          "size": 5361736416
+        },
+        {
+          "crc32c": "AwOp6A==",
+          "generation": 1783381742955247,
+          "name": "models/GLM-5.2-FP8/model-00125-of-00141.safetensors",
+          "size": 5366353784
+        },
+        {
+          "crc32c": "Z7JGnQ==",
+          "generation": 1783383988451191,
+          "name": "models/GLM-5.2-FP8/model-00126-of-00141.safetensors",
+          "size": 5361736288
+        },
+        {
+          "crc32c": "DWocGg==",
+          "generation": 1783381610904402,
+          "name": "models/GLM-5.2-FP8/model-00127-of-00141.safetensors",
+          "size": 5366353920
+        },
+        {
+          "crc32c": "nlsP3w==",
+          "generation": 1783382379001482,
+          "name": "models/GLM-5.2-FP8/model-00128-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "vp1eJg==",
+          "generation": 1783383308892795,
+          "name": "models/GLM-5.2-FP8/model-00129-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "IVoO4Q==",
+          "generation": 1783382949989727,
+          "name": "models/GLM-5.2-FP8/model-00130-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "i9u42w==",
+          "generation": 1783383329904535,
+          "name": "models/GLM-5.2-FP8/model-00131-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "hOvtpA==",
+          "generation": 1783382173666175,
+          "name": "models/GLM-5.2-FP8/model-00132-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "aaIcxw==",
+          "generation": 1783383456842134,
+          "name": "models/GLM-5.2-FP8/model-00133-of-00141.safetensors",
+          "size": 5361736592
+        },
+        {
+          "crc32c": "mOz5Zg==",
+          "generation": 1783381951985889,
+          "name": "models/GLM-5.2-FP8/model-00134-of-00141.safetensors",
+          "size": 5366353608
+        },
+        {
+          "crc32c": "ifmujA==",
+          "generation": 1783383663663786,
+          "name": "models/GLM-5.2-FP8/model-00135-of-00141.safetensors",
+          "size": 5361736456
+        },
+        {
+          "crc32c": "mLbBdg==",
+          "generation": 1783382502235730,
+          "name": "models/GLM-5.2-FP8/model-00136-of-00141.safetensors",
+          "size": 5366338752
+        },
+        {
+          "crc32c": "8Ri9qQ==",
+          "generation": 1783383898984028,
+          "name": "models/GLM-5.2-FP8/model-00137-of-00141.safetensors",
+          "size": 5361736352
+        },
+        {
+          "crc32c": "YEE88A==",
+          "generation": 1783382605070926,
+          "name": "models/GLM-5.2-FP8/model-00138-of-00141.safetensors",
+          "size": 5363351176
+        },
+        {
+          "crc32c": "mKBIaA==",
+          "generation": 1783384139802935,
+          "name": "models/GLM-5.2-FP8/model-00139-of-00141.safetensors",
+          "size": 5361735376
+        },
+        {
+          "crc32c": "EmQ5Sw==",
+          "generation": 1783382488416547,
+          "name": "models/GLM-5.2-FP8/model-00140-of-00141.safetensors",
+          "size": 5366353160
+        },
+        {
+          "crc32c": "NE3icw==",
+          "generation": 1783384235245206,
+          "name": "models/GLM-5.2-FP8/model-00141-of-00141.safetensors",
+          "size": 4724454592
+        },
+        {
+          "crc32c": "DtboPA==",
+          "generation": 1783384154820062,
+          "name": "models/GLM-5.2-FP8/model.safetensors.index.json",
+          "size": 11359251
+        },
+        {
+          "crc32c": "CJhfpQ==",
+          "generation": 1783384149331440,
+          "name": "models/GLM-5.2-FP8/tokenizer.json",
+          "size": 20217442
+        },
+        {
+          "crc32c": "s6fUuQ==",
+          "generation": 1783384176301056,
+          "name": "models/GLM-5.2-FP8/tokenizer_config.json",
+          "size": 761
+        }
+      ],
+      "prefix": "models/GLM-5.2-FP8/",
+      "preserve_metadata_objects": [],
+      "recipe": {
+        "code_hash": "61475d30a708252bc64aaf50fec2c2ea1ea03c63",
+        "dependencies": [],
+        "entrypoint": "scripts/greenfield/pack_checkpoint_streaming.py"
+      },
+      "terminal_objects": [
+        "model.safetensors.index.json"
+      ]
+    },
+    {
+      "bytes": 11059060,
+      "disposition": "keep",
+      "expected_manifest_sha256": "0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1",
+      "id": "old_pp16_feature_metadata",
+      "object_count": 4,
+      "objects": [
+        {
+          "crc32c": "C3l7fQ==",
+          "generation": 1787831512488772,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/SUCCESS",
+          "size": 88
+        },
+        {
+          "crc32c": "dy9JRw==",
+          "generation": 1787824499109869,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/control.json",
+          "size": 1720
+        },
+        {
+          "crc32c": "c0tPgw==",
+          "generation": 1787824499284395,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/runtime_layout.json",
+          "size": 5640785
+        },
+        {
+          "crc32c": "sKXI5Q==",
+          "generation": 1787831512430298,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/runtime_manifest.json",
+          "size": 5416467
+        }
+      ],
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "runtime_layout.json",
+        "runtime_manifest.json"
+      ],
+      "recipe": {
+        "code_hash": "a973425cd235758142c55c5a0127ddb9a36b45a9",
+        "dependencies": [
+          {
+            "artifact_id": "canonical_glm_source",
+            "required_scope": "full_payload"
+          }
+        ],
+        "entrypoint": "scripts/greenfield/pack_feature_runtime_checkpoint.py"
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "bytes": 869671243535,
+      "disposition": "keep",
+      "expected_manifest_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+      "id": "active_direct_pp16_runtime",
+      "object_count": 68,
+      "objects": [
+        {
+          "crc32c": "gEYRtQ==",
+          "generation": 1787851422189249,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/SUCCESS",
+          "size": 88
+        },
+        {
+          "crc32c": "Nq0a+w==",
+          "generation": 1787849998524258,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "rO/F3Q==",
+          "generation": 1787849998853042,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "pOv6ug==",
+          "generation": 1787850708602863,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "nyEptA==",
+          "generation": 1787850709002263,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "ObMP8w==",
+          "generation": 1787850693469479,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "ZW01LA==",
+          "generation": 1787850693801956,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "+/JYGw==",
+          "generation": 1787850697704541,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "s6OojQ==",
+          "generation": 1787850698199202,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "Ton6bQ==",
+          "generation": 1787851320618630,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "1PtDXw==",
+          "generation": 1787851321134717,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "y92diA==",
+          "generation": 1787850706143452,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "2lZ1fQ==",
+          "generation": 1787850706453375,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "/XYYPA==",
+          "generation": 1787851336925438,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "QSmFDQ==",
+          "generation": 1787851337515763,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "08TQCA==",
+          "generation": 1787851361950356,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "1aCtXw==",
+          "generation": 1787851362396345,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "hV66nA==",
+          "generation": 1787850698925967,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_08/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "sHo5EA==",
+          "generation": 1787850699567031,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_08/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "UicxiA==",
+          "generation": 1787850684434110,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_09/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "XQCJsw==",
+          "generation": 1787850684891845,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_09/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "Kdt1hw==",
+          "generation": 1787850699450409,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_10/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "VpeEQA==",
+          "generation": 1787850700031752,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_10/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "A+1PQQ==",
+          "generation": 1787850694841807,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_11/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "slclXQ==",
+          "generation": 1787850695398986,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_11/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "V/TnLQ==",
+          "generation": 1787851369769861,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_12/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "pSdz4Q==",
+          "generation": 1787851370278074,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_12/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "j4Bh0g==",
+          "generation": 1787851368601124,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_13/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "BdNs6A==",
+          "generation": 1787851368934735,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_13/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "em3Jdg==",
+          "generation": 1787851352563194,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_14/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "uvRtcA==",
+          "generation": 1787851353046429,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_14/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "fHjXRQ==",
+          "generation": 1787851330152937,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_15/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "lL6OwQ==",
+          "generation": 1787851330818130,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_15/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "LFIAvQ==",
+          "generation": 1787849377407332,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/control.json",
+          "size": 2003
+        },
+        {
+          "crc32c": "ik8AAQ==",
+          "generation": 1787849999057560,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+          "size": 150669
+        },
+        {
+          "crc32c": "RDgwxA==",
+          "generation": 1787849999226360,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+          "size": 150669
+        },
+        {
+          "crc32c": "GQy8aA==",
+          "generation": 1787850709185021,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors.json",
+          "size": 125346
+        },
+        {
+          "crc32c": "tHK2EQ==",
+          "generation": 1787850709372345,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors.json",
+          "size": 125346
+        },
+        {
+          "crc32c": "gDuapw==",
+          "generation": 1787850694002821,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "eJinGw==",
+          "generation": 1787850694166058,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "PLB4EQ==",
+          "generation": 1787850698380329,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "kugbjQ==",
+          "generation": 1787850698548186,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "2+GHgA==",
+          "generation": 1787851321360180,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors.json",
+          "size": 111619
+        },
+        {
+          "crc32c": "dHWmRw==",
+          "generation": 1787851321536591,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors.json",
+          "size": 111619
+        },
+        {
+          "crc32c": "Dw2G3A==",
+          "generation": 1787850706654963,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors.json",
+          "size": 111618
+        },
+        {
+          "crc32c": "t89D3g==",
+          "generation": 1787850706818549,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors.json",
+          "size": 111618
+        },
+        {
+          "crc32c": "ixmRxg==",
+          "generation": 1787851337695414,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors.json",
+          "size": 111619
+        },
+        {
+          "crc32c": "ynvBZA==",
+          "generation": 1787851337869344,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors.json",
+          "size": 111619
+        },
+        {
+          "crc32c": "A51Bgw==",
+          "generation": 1787851362599904,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors.json",
+          "size": 128667
+        },
+        {
+          "crc32c": "lFn3NQ==",
+          "generation": 1787851362772886,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors.json",
+          "size": 128667
+        },
+        {
+          "crc32c": "Nl0RmA==",
+          "generation": 1787850699757317,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_08/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "wMcjFg==",
+          "generation": 1787850699927799,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_08/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "lclDtA==",
+          "generation": 1787850685084561,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_09/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "YxNP9g==",
+          "generation": 1787850685258833,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_09/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "3EA3Eg==",
+          "generation": 1787850700233907,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_10/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "/V81xQ==",
+          "generation": 1787850700400310,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_10/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "A8J5xA==",
+          "generation": 1787850695585360,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_11/device_slot_00.safetensors.json",
+          "size": 128668
+        },
+        {
+          "crc32c": "+lRpNA==",
+          "generation": 1787850695751214,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_11/device_slot_01.safetensors.json",
+          "size": 128668
+        },
+        {
+          "crc32c": "KrdYlA==",
+          "generation": 1787851370527514,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_12/device_slot_00.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "8UHp1Q==",
+          "generation": 1787851370671127,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_12/device_slot_01.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "QJPpmA==",
+          "generation": 1787851369127962,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_13/device_slot_00.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "4tBRQw==",
+          "generation": 1787851369278171,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_13/device_slot_01.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "G3VPuw==",
+          "generation": 1787851353221936,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_14/device_slot_00.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "ce2gLQ==",
+          "generation": 1787851353391165,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_14/device_slot_01.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "aP+hEQ==",
+          "generation": 1787851331011061,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_15/device_slot_00.safetensors.json",
+          "size": 112534
+        },
+        {
+          "crc32c": "IdhBWw==",
+          "generation": 1787851331175467,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_15/device_slot_01.safetensors.json",
+          "size": 112534
+        },
+        {
+          "crc32c": "MLQPdA==",
+          "generation": 1787849377562612,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/runtime_layout.json",
+          "size": 4805264
+        },
+        {
+          "crc32c": "BoG+wQ==",
+          "generation": 1787851422132475,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/runtime_manifest.json",
+          "size": 4457238
+        }
+      ],
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/",
+      "preserve_metadata_objects": [],
+      "recipe": {
+        "code_hash": "44501082b9ce414c5938c2193d695200c14429c5",
+        "dependencies": [
+          {
+            "artifact_id": "old_pp16_feature_metadata",
+            "required_objects": [
+              "SUCCESS",
+              "control.json",
+              "runtime_layout.json",
+              "runtime_manifest.json"
+            ],
+            "required_scope": "metadata_only"
+          }
+        ],
+        "entrypoint": "scripts/greenfield/run_feature_fused_qkv_derivative_pp16.sh"
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "bytes": 54358734349,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_incomplete_direct_pp16_attempt",
+      "object_count": 6,
+      "objects": [
+        {
+          "crc32c": "Nq0a+w==",
+          "generation": 1787849038044137,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "rO/F3Q==",
+          "generation": 1787849038581071,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "DrDoGQ==",
+          "generation": 1787848378290527,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/control.json",
+          "size": 2003
+        },
+        {
+          "crc32c": "6iNOrQ==",
+          "generation": 1787849038789371,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+          "size": 150669
+        },
+        {
+          "crc32c": "+YIykw==",
+          "generation": 1787849038945971,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+          "size": 150669
+        },
+        {
+          "crc32c": "MLQPdA==",
+          "generation": 1787848378511523,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/runtime_layout.json",
+          "size": 4805264
+        }
+      ],
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/",
+      "preserve_metadata_objects": [
+        "control.json",
+        "evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+        "evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+        "runtime_layout.json"
+      ],
+      "retirement": {
+        "owner_scope": "Abandoned incomplete PP16 derivative attempt superseded by the active complete runtime.",
+        "reason": "Only stage 0 slots exist; there is no runtime_manifest.json or SUCCESS, no current repository reference, and a complete active generation subsequently superseded it.",
+        "recovery": "Permanent payload retirement; the exact six-object generation ledger and four small control/layout/evidence files are archived before deletion.",
+        "reference_audit": [
+          "current four-repository exact-tag audit",
+          "live process census",
+          "complete active-runtime inspection"
+        ]
+      },
+      "terminal_objects": []
+    }
+  ],
+  "bucket": "driftbench-dsv4-uc",
+  "bucket_location": "US-CENTRAL2",
+  "capsule_sha256": "84eb369ac337a7d3eaea30aa80b8ea656ab88d3214b87c8d81a1fbc7679e39c9",
+  "created_utc": "2026-09-04T12:48:36Z",
+  "format_version": 1,
+  "generator_code_hash": "3ed9d1600ac4ab5f87ae30d95d04916ab7f07bf7",
+  "proof": {
+    "artifact_kind": "urgent_storage_cleanup_phase2_adjudication",
+    "bucket": "driftbench-dsv4-uc",
+    "bucket_location": "US-CENTRAL2",
+    "checks": {
+      "active_direct_pp16_manifest_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+      "active_direct_pp16_post_cleanup_inspector": {
+        "file_count": 32,
+        "runtime_file_bytes": 869658011904,
+        "source_verification_mode": "feature_runtime_with_metadata_parent",
+        "tensor_count": 6496,
+        "verified": true
+      },
+      "candidate_bytes": 54358734349,
+      "candidate_has_runtime_manifest": false,
+      "candidate_has_success": false,
+      "candidate_objects": 6,
+      "candidate_payload_scope": "stage_00 device_slot_00 and device_slot_01 only",
+      "candidate_reference_audit": "No exact tag or prefix reference in the four current repositories.",
+      "candidate_superseded_by": "greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z",
+      "candidate_updated_utc_max": "2026-08-27T16:43:58.950000Z",
+      "current_live_bytes": 2203986112509,
+      "current_soft_deleted_bytes": 3681290733167,
+      "prior_inventory_reconciliation": "The earlier 5,877,908,918,585-byte headline retained no object ledger and cannot be treated as exact: after subtracting the exact phase-1 receipt and adding the exact metadata archive it underpredicts the generation-ledgered current inventory by 3,225,904,353 bytes. No current checkpoint has an update after 2026-08-27 and the only recurring writer targets repos/. Current generation-ledgered measurements, not the unreproducible headline, are authoritative.",
+      "recurring_writers": [
+        "/home/gianl/bin/sync-glm.sh -> repos/ only"
+      ],
+      "soft_delete_seconds": 604800,
+      "tpu_workflows_active": false
+    },
+    "decision": "Archive the four small control/layout/evidence generations, then retire all six objects in the incomplete PP16 attempt by exact generation. Preserve the later complete active runtime and its metadata lineage.",
+    "proof_sha256": "3fd8d8b50fa4657cc1da7af93dc1789b34f888023a44a5484636ea80af467118",
+    "review": {
+      "p0": [],
+      "p1": [],
+      "reviewer": "independent Sol adversarial review"
+    },
+    "status": "passed"
+  },
+  "protected_prefixes": [
+    "models/GLM-5.2-FP8/",
+    "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/",
+    "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/",
+    "checkpoints/greenfield/glm52/plans/",
+    "checkpoints/greenfield/glm52/layer3/",
+    "checkpoints/greenfield/glm52/gate_c/",
+    "checkpoints/greenfield/glm52/discriminators/",
+    "checkpoints/greenfield/glm52/overlays/",
+    "checkpoints/greenfield/glm52/probes/",
+    "results/",
+    "oracles/",
+    "repos/"
+  ]
+}
