@@ -1,0 +1,48 @@
+{
+  "artifact_kind": "gate_d_m2048_v10_unit_extent_reduce_failure",
+  "schema_version": 1,
+  "classification": "PROTECTED_COMPILE_AND_HLO_ACQUISITION_COMPLETE;OUTPUT_LINTER_FALSE_REJECTED_EXACT_UNIT_EXTENT_RESHAPE_REDUCTION;NO_NUMERICAL_INVOCATION;TAG_BURNED;GATE_D_OPEN",
+  "failed_run": {
+    "code_hash": "b7708936416452a7b453908abc729bfacbcb00c8",
+    "run_tag": "greenfield_m2048_strategy_nd_20260904T143657392861243Z",
+    "exit_status": 1,
+    "elapsed_seconds": 15,
+    "jax_distributed_initialization": true,
+    "compiled_executable": true,
+    "hlo_acquired": true,
+    "compiled_executable_invocations": 0,
+    "numerical_output": false,
+    "performance_claim": false,
+    "gate_d_closed": false
+  },
+  "remote_diagnostic_authority": {
+    "terminal_uri": "gs://driftbench-dsv4-uc/results/greenfield/glm52/m2048_strategy_nd/greenfield_m2048_strategy_nd_20260904T143657392861243Z/diagnostic/diagnostic_objects.json",
+    "terminal_generation": "1788535490689471",
+    "terminal_size": 1984,
+    "terminal_sha256": "5335c322a86b96fdc9862b515e2225e55f749531e3675ffc80692f86318882f4",
+    "terminal_crc32c": "2UAJKA==",
+    "generation_pinned_objects_replayed_exactly": 12,
+    "pre_census": "8/8 CENSUS_OK",
+    "failure_exit_census": "8/8 CENSUS_OK"
+  },
+  "acquired_graphs": {
+    "optimized_hlo_sha256": "a96ff87a934afeac31df9218bb4436230924584c4775d8b4f943d68a20c39ab2",
+    "optimized_hlo_bytes": 8311,
+    "stablehlo_sha256": "960c75c7f4bb627bc03241ec833245607d72a1e6bd13dc2c36a1d06645f751b0",
+    "stablehlo_bytes": 1960,
+    "communication": "exactly one synchronous bf16[2048,6144] all-reduce over global device ids 0..31",
+    "algorithm": "RotatedPincerEmitter/StrategyND",
+    "source": "process-0 M2048_ACQUISITION record in generation-pinned distributed.raw.log"
+  },
+  "root_cause": {
+    "failure": "BenchmarkValidationError: M2048 representation fusion structure drifted",
+    "observed_live_row0_path": "bf16[2048,6144] parameter -> slice [0:1,0:6144] -> bitcast-convert u16[1,6144] -> reduce dimension 0 with u16 scalar zero and exact scalar u16 add -> u16[6144] root",
+    "why_representation_only": "The sole reduced dimension has extent exactly one. Its only element plus the exact u16 zero initializer is bit-identical; no two payload rows are associated.",
+    "why_the_validator_refused": "The reviewed validator allowed only unary representation opcodes inside the row-zero fusion and therefore rejected the compiler-generated constant/reduce pair before numerical execution.",
+    "offline_replay": "A successor validator accepting only the exact extent-one u16 zero/add form accepts the protected optimized HLO while retaining all existing collective, output-liveness, row-zero and no-extra-communication checks."
+  },
+  "review": {
+    "fable_5_max": "HARD_USAGE_LIMIT_NO_TECHNICAL_OPINION"
+  },
+  "successor_requirement": "Permit the TPU unit-extent u16 reduction only on the already exact row-zero slice path; require exact shapes, dimension 0, zero initializer, exact scalar u16 add reducer, one caller operand and no dead/alternate callee instructions. Mutation-test nonzero init, non-unit extent, wrong dimension/reducer/operands and dead paths. Publish changed runtime bytes to fresh immutable V4 paths and use a fresh tag only after one Sol review, exact commit/push/US-CENTRAL2 mirror replay and clean live preflight."
+}

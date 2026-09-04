@@ -1301,3 +1301,7 @@ normalized-state cause.
   shapes. DB533 measures M32 decode row zero; legacy prefill reduces `bf16[2048,6144]`. Before reusing a
   measured tree at another shape, run one model-free shape-identical fingerprint and solve the decisive
   row. After-codegen HLO can prove shape/layout/backend but not the hidden element association.
+- TPU codegen may lower removal of a unit dimension after a bitcast as a reduction. Treat it as a
+  representation-only row view only when the slice, extent-one dimension, zero initializer, exact
+  same-dtype scalar add, output shape, sole operand and live path all match; reject generic reductions,
+  dead/alternate paths and any mutation. This false rejection burned V10 before numerical invocation.

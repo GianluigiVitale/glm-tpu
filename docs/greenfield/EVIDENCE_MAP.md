@@ -3926,3 +3926,18 @@ persistence only; review and persistence precede any v2 installation.
 
 - Final Sol delta: no P0/P1/P2; safe to persist, safe to install after future-pin push/mirror, and
   safe to execute once under the fresh tag and normal live preflights. No mutation preceded verdict.
+
+## V10 M2048 protected compile/HLO failure — 2026-09-04
+
+- Code pin `b7708936416452a7b453908abc729bfacbcb00c8` was committed, pushed and replayed from the
+  US-CENTRAL2 mirror. Focused tests were 46/46 and immutable V3 install-only passed 8/8.
+- Burned tag: `greenfield_m2048_strategy_nd_20260904T143657392861243Z`. It compiled and acquired
+  after-codegen HLO but invoked the numerical executable zero times.
+- Remote terminal diagnostic: generation `1788535490689471`, SHA `5335c322…882f4`; 12/12 pinned
+  objects replayed; pre/failure censuses were independently 8/8 clean.
+- Optimized HLO SHA `a96ff87a…9ab2`; StableHLO SHA `960c75c…1b0`. The sole collective is the intended
+  synchronous full-group `bf16[2048,6144]` all-reduce using RotatedPincerEmitter/StrategyND.
+- The terminal output fusion performs the exact row-0 slice, bitcasts to u16 `[1,6144]`, and removes
+  the unit dimension with u16-zero/scalar-u16-add reduction. V10's unary-only representation linter
+  rejected this before numerics. Full facts and successor constraints are in
+  `docs/artifacts/gate-d-m2048-v10-unit-extent-reduce-failure.json`.

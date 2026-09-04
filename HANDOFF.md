@@ -12108,3 +12108,24 @@ The final independent Sol delta returned exactly `P0: NONE`, `P1: NONE`, `P2: NO
 `SAFE_TO_EXECUTE_ONCE_FRESH_TAG: YES`. Install and execution remain conditional on the future merged
 pin, origin/US-CENTRAL2 replay and existing live-state preflights. No persistence or mutation had
 occurred at this verdict.
+
+## 2026-09-04 14:36--15:25Z — V10 installed; protected HLO acquired; linter false rejection
+
+V10 was committed, pushed and same-region mirrored at `b7708936416452a7b453908abc729bfacbcb00c8`.
+The focused suite passed 46/46. Immutable V3 install-only passed all hosts (8 runtime/bootstrap/install,
+7 non-coordinator transfer-clean); report SHA is `b349f093…c0e5` and no launcher ran. Protected tag
+`greenfield_m2048_strategy_nd_20260904T143657392861243Z` passed origin/mirror replay, vacancy, all
+four locks, both 8/8 censuses, JAX geometry, compile and HLO acquisition, then failed closed before
+numerical invocation. Its terminal diagnostic is generation `1788535490689471`, SHA
+`5335c322…882f4`; all 12 generation-pinned objects replayed exactly.
+
+The optimized HLO (`a96ff87a…9ab2`, 8,311 bytes) contains the sole intended synchronous
+`bf16[2048,6144]` all-reduce over devices 0--31. XLA emits row zero as exact `[0:1,0:6144]` slice,
+u16 bitcast, then dimension-0 reduction with u16 zero and exact scalar u16 add. Because that dimension
+has extent one, this does not associate payload rows; V10's unary-only representation validator falsely
+rejected it. The exact failure is recorded in
+`docs/artifacts/gate-d-m2048-v10-unit-extent-reduce-failure.json`. A local successor prototype and
+hostile tests worked offline but were reverted before pause pending a coherent immutable V11 batch and
+review. Fable returned a hard usage limit/no technical opinion. Next: exact unit-extent validator,
+hostile mutations, fresh V4 paths/certificate/tag, full SHA cascade, Sol review, persist/install, then
+one M2048 rerun. V10's tag is burned; no 8K run is authorized yet.
