@@ -11902,3 +11902,36 @@ vacant install targets. Exact verdict: `P0: NONE`, `P1: NONE`, `P2: NONE`,
 `APPROVE INSTALL ONLY 5fcb8bde7de7bf2057dd75d24e10ae4efa78f27ed9f4b273221819007e1cb1a2`,
 and `APPROVE EXECUTE ONCE greenfield_original_db518_prompt_key_chunk0_20260903T233327590939916Z
 <future merged pin condition>`. No V9 persistence, install or execution had occurred at this record.
+
+## 2026-09-03 23:58Z — V9 numerically exact; publisher refused JSON representation, V10 CPU-green
+
+V9 was committed/pushed as `33c85baf508f5aa6d7e67050326205cebe99a84a`, replayed exactly from
+origin and US-CENTRAL2 (41 bound blobs), and installed without launch. Its one approved tag
+`greenfield_original_db518_prompt_key_chunk0_20260903T233327590939916Z` completed the protected
+probe in 12 s with zero mismatched rows/lanes, exact bits SHA `96d261cb…887c`, one normalizer and
+one key-control invocation, and no device-to-host transfer between them. Success publication then
+failed closed because JSON had converted validator tuples to lists and the publisher compared the
+recomputed Python objects directly. A generation-replayed diagnostic was published: terminal
+generation `1788479258358293`, SHA `82c0eb80…e7661d`; pre/post censuses are 8/8 clean. Therefore the
+numerical result remains diagnostic rather than accepted. Record:
+`docs/artifacts/gate-d-original-db518-v9-publisher-contract-failure.json`.
+
+Local review also found the V9 publisher still pinned the preceding mirror-verifier digest, which
+would have refused later. V10 changes publication only: strict canonical JSON bytes make tuple/list
+transport equivalent while rejecting non-JSON/nonfinite values, and the publisher pins the exact
+current verifier. Numerical/HLO logic is unchanged. The actual V9 runner, arrays and four boundary
+HLO files now replay through `_validate_runner_and_outputs`; hostile nested shape, source-order,
+boolean and digest mutations reject. A cross-file assertion also binds the publisher's verifier digest
+to the actual verifier bytes. Focused suite passes 105/105. Staging tree
+`efbfebca…51af8`; fresh unstarted tag `…20260903T235409426942147Z`; certificate
+`docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v10-source.json`. Independent Sol agreed
+with the diagnosis (no P0/P1; P2 only against overstating the unpublished V9 result). Exact next:
+one full V10 Sol batch; only exact approval permits persistence/install/one run. Never reuse V9 tag.
+
+### V10 final Sol approval
+
+After the final test delta, the independent Sol reviewer returned `P0: NONE`, `P1: NONE`,
+`P2: NONE`, `APPROVE PERSISTENCE`,
+`APPROVE INSTALL ONLY efbfebcac6267f835ac0be0bfb5b8cbfa570db4a179132a6619b01fa80851af8`,
+and `APPROVE EXECUTE ONCE greenfield_original_db518_prompt_key_chunk0_20260903T235409426942147Z
+<future merged pin condition>`. No V10 persistence, install or execution had occurred at this record.

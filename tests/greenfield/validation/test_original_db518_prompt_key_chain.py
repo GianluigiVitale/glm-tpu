@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import ast
 from hashlib import sha256
+import importlib
 import importlib.util
 from io import BytesIO
 import json
+import math
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -29,10 +33,15 @@ V6_EXACT_SUCCESS = REPO / "docs/artifacts/gate-d-original-db518-v6-exact-success
 V5_PIN = "ae79a3fdcf877a8123f34b08411e4f6d0a5584a7"
 V5_VERIFIER_SHA256 = (
     "288bfa0b707b041467f4b0f0686cc3e29207c0c71ad4b992139e238d29a7c084")
-CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v9-source.json"
+CERTIFICATE = REPO / "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v10-source.json"
 STAGING = Path(
-    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v9-staging"
+    "/home/gianl/gate-d-runs/gate-d-original-db518-prompt-key-install-v10-staging"
 )
+V9_RUN = Path(
+    "/home/gianl/gate-d-runs/"
+    "greenfield_original_db518_prompt_key_chunk0_20260903T233327590939916Z"
+)
+V9_PIN = "33c85baf508f5aa6d7e67050326205cebe99a84a"
 
 
 def _load(path: Path):
@@ -74,6 +83,7 @@ def test_exact_cross_file_hash_chain_and_paths():
     assert launcher.PROBE_SHA256 == _digest(PROBE)
     assert launcher.PUBLISHER_SHA256 == _digest(PUBLISHER)
     assert launcher.MIRROR_VERIFIER_SHA256 == _digest(VERIFIER)
+    assert publisher.MIRROR_VERIFIER_SHA256 == _digest(VERIFIER)
     assert payloads == {
         "chunk0_embedding_hlo.py": _digest(PARSER_CONTRACT),
         "original_db518_normalized_boundary_hlo.py": _digest(BOUNDARY_CONTRACT),
@@ -117,6 +127,8 @@ def test_mirror_verifier_exact_authority_membership():
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v7-source.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v8-source.json",
         "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v9-source.json",
+        "docs/artifacts/gate-d-original-db518-prompt-key-chunk0-v10-source.json",
+        "docs/artifacts/gate-d-original-db518-v9-publisher-contract-failure.json",
         "docs/artifacts/gate-d-original-db518-v8-key-placement-failure.json",
         "docs/artifacts/gate-d-original-db518-v7-tpu-hlo-placement-failure.json",
         "docs/artifacts/gate-d-original-db518-v5-mirror-authority-failure.json",
@@ -370,6 +382,98 @@ def test_publisher_accepts_exact_helper_boundaries_and_rejects_drift():
     with pytest.raises(RuntimeError, match="forbidden communication"):
         publisher._validate_helper_hlo(parent, decode, "all-reduce(",
                                        "decode")
+
+
+def test_contract_comparison_is_json_semantic_strict_and_mutation_sensitive():
+    import pytest
+
+    publisher = _load(PUBLISHER)
+    tuple_record = {
+        "passed": True,
+        "shapes": (("bf16", (2048, 6144)),),
+        "sources": (("%positions",), ("%completed",)),
+    }
+    list_record = json.loads(json.dumps(tuple_record))
+    assert publisher._canonical_contract(tuple_record) == (
+        publisher._canonical_contract(list_record))
+
+    for hostile in (
+        {**list_record, "passed": False},
+        {**list_record, "shapes": [["bf16", [2047, 6144]]]},
+        {**list_record, "sources": list(reversed(list_record["sources"]))},
+    ):
+        assert publisher._canonical_contract(hostile) != (
+            publisher._canonical_contract(tuple_record))
+
+    with pytest.raises(RuntimeError, match="not strict JSON"):
+        publisher._canonical_contract({"bad": {1, 2}})
+    with pytest.raises(RuntimeError, match="not strict JSON"):
+        publisher._canonical_contract({"bad": math.nan})
+
+
+def test_actual_v9_runner_and_hlo_replay_after_json_transport(tmp_path):
+    import pytest
+
+    assert V9_RUN.is_dir()
+    publisher = _load(PUBLISHER)
+    parent = _load(PUBLISHER_PARENT)
+    contract = importlib.import_module(
+        "glm_tpu.greenfield.validation.original_db518_normalized_boundary_hlo")
+
+    class Base:
+
+        @staticmethod
+        def snapshot_member(run_fd: int, name: str, *, limit: int) -> bytes:
+            descriptor = os.open(name, os.O_RDONLY | os.O_CLOEXEC,
+                                 dir_fd=run_fd)
+            try:
+                raw = b""
+                while block := os.read(descriptor, 1 << 20):
+                    raw += block
+                    if len(raw) > limit:
+                        raise RuntimeError("test snapshot exceeds limit")
+                return raw
+            finally:
+                os.close(descriptor)
+
+    replay = tmp_path / "v9"
+    replay.mkdir()
+    shutil.copy2(V9_RUN / "runner.json", replay / "runner.json")
+    os.chmod(replay / "runner.json", 0o600)
+    shutil.copy2(V9_RUN / "boundary_arrays.npz", replay / "boundary_arrays.npz")
+    shutil.copytree(V9_RUN / "hlo", replay / "hlo")
+
+    def validate() -> bool:
+        descriptor = os.open(replay, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            _, _, exact = publisher._validate_runner_and_outputs(
+                parent, contract, Base, descriptor, V9_PIN, V9_RUN.name)
+            return exact
+        finally:
+            os.close(descriptor)
+
+    assert validate() is True
+    pristine = json.loads((replay / "runner.json").read_text())
+    mutations = []
+    bad_shape = json.loads(json.dumps(pristine))
+    bad_shape["hlo"]["normalization_contract"][
+        "optimized_parameter_shapes"][0][0][1][0] = 36
+    mutations.append(bad_shape)
+    bad_order = json.loads(json.dumps(pristine))
+    bad_order["hlo"]["key_control_contract"][
+        "optimized_initial_sources"].reverse()
+    mutations.append(bad_order)
+    bad_boolean = json.loads(json.dumps(pristine))
+    bad_boolean["hlo"]["normalization_contract"]["passed"] = False
+    mutations.append(bad_boolean)
+    bad_hash = json.loads(json.dumps(pristine))
+    bad_hash["hlo"]["normalization_optimized_sha256"] = "0" * 64
+    mutations.append(bad_hash)
+    for hostile in mutations:
+        (replay / "runner.json").write_text(
+            json.dumps(hostile, indent=2, sort_keys=True) + "\n")
+        with pytest.raises(RuntimeError):
+            validate()
 
 
 def _npy_header(raw: bytes) -> tuple[tuple[int, ...], str]:

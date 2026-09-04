@@ -13,7 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 
 INSTALL_PATH = Path(
-    "/opt/glm-tpu/bin/launch_gate_d_original_db518_prompt_key_chunk0_v9.py")
+    "/opt/glm-tpu/bin/launch_gate_d_original_db518_prompt_key_chunk0_v10.py")
 PYTHON = Path("/usr/bin/python3.10")
 PYTHON_SHA256 = "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
 SEALED_PYTHON = Path(
@@ -27,9 +27,9 @@ ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/launch_gate_d_original_db518_prompt_key_chunk0.py"
 WRAPPER_PATH = WORKTREE / "scripts/greenfield/run_original_db518_prompt_key_chunk0.sh"
 WRAPPER_SOURCE_PATH = "scripts/greenfield/run_original_db518_prompt_key_chunk0.sh"
-WRAPPER_SHA256 = "74fff24e713135312672e2aa8e7a2f244c0974396891d9bb917b07e5e895cb7d"
+WRAPPER_SHA256 = "9d14c4e5d838908b9af43c79f0f329b639e2177d00357b5ca587ea1367837046"
 CAPSULE_ROOT = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v9")
+    "/usr/local/libexec/glm-tpu/gate-d-original-db518-prompt-key-v10")
 HLO_CONTRACT_PATH = CAPSULE_ROOT / "original_db518_prompt_key.py"
 HLO_CONTRACT_SOURCE_PATH = "glm_tpu/greenfield/validation/original_db518_prompt_key.py"
 HLO_CONTRACT_SHA256 = "e86196b39acd075deca1abbfb645ff3264307158b50ce89fcfe60e26c75be95c"
@@ -42,13 +42,13 @@ BOUNDARY_CONTRACT_SOURCE_PATH = (
 BOUNDARY_CONTRACT_SHA256 = "35757aab4a616a2f1073f78503c29075c3e43cb684e4e1faf7d835630876809e"
 PROBE_PATH = CAPSULE_ROOT / "probe_original_db518_prompt_key_chunk0.py"
 PROBE_SOURCE_PATH = "scripts/greenfield/probe_original_db518_prompt_key_chunk0.py"
-PROBE_SHA256 = "3b6aab0d51bff446576135b7855005ebf8d4d823d9600d40f52373095cdd81d8"
+PROBE_SHA256 = "a64b8466e2507ee5376464fff4469f287a7c2575f8e33603a5fcf4e2b267f8ea"
 PUBLISHER_PATH = CAPSULE_ROOT / "publish_gate_d_original_db518_prompt_key_chunk0.py"
 PUBLISHER_SOURCE_PATH = "scripts/greenfield/publish_gate_d_original_db518_prompt_key_chunk0.py"
-PUBLISHER_SHA256 = "a4c418ccf758261f62506067b77200f1b7df0fd748e68a20572bc3c97f33915e"
+PUBLISHER_SHA256 = "ff4f5a49ed47018a8bbbd4fed58ac18c7a824ced41a73476779e51cfac511ed5"
 MIRROR_VERIFIER_PATH = CAPSULE_ROOT / "verify_gate_d_original_db518_same_region_git_mirror.py"
 MIRROR_VERIFIER_SOURCE_PATH = "scripts/greenfield/verify_gate_d_original_db518_same_region_git_mirror.py"
-MIRROR_VERIFIER_SHA256 = "3f69ca0185d18c20a0512e3e6cc092497e49922f3e5ed844570e73b67e8ae388"
+MIRROR_VERIFIER_SHA256 = "c8fccad494bf732824973606687b2c6c77dbaa8c3868b356aefe96982a71d114"
 LOCK_ROOT = Path("/opt/glm-tpu/locks")
 LOCK_NAMES = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")
 LOCK_FDS = (11, 12)

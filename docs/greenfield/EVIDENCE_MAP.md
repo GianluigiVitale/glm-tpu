@@ -3808,3 +3808,15 @@ persistence only; review and persistence precede any v2 installation.
 - The independent Sol V9 batch returned `P0: NONE`, `P1: NONE`, `P2: NONE` and explicitly approved
   persistence, install-only tree `5fcb8bde…b1a2`, and that execute-once tag conditional on its future
   merged pin. No V9 persistence, install, execution or numerical claim existed at this record.
+
+## 2026-09-03 — V9 diagnostic-exact output / V10 publication repair
+
+- V9 pin `33c85baf…a84a` completed numerically with 0/2,048 rows and 0/262,144 lanes mismatched,
+  bits SHA `96d261cb…887c`, but success publication refused tuple/list representation drift. Diagnostic
+  terminal generation `1788479258358293`, SHA `82c0eb80…e7661d`; pre/post census 8/8. It is not an
+  accepted success. Record `gate-d-original-db518-v9-publisher-contract-failure.json`.
+- V10 canonicalizes both contract records to strict JSON bytes and repins the publisher to verifier
+  `c8fccad4…d114`; numerical/HLO code is unchanged. Actual V9 replay passes, mutations reject, focused
+  suite 105/105. Staging `efbfebca…51af8`, fresh tag `…20260903T235409426942147Z`; Sol batch pending.
+- Final Sol delta returned no P0–P2 and approved persistence, exact install-only tree
+  `efbfebca…51af8`, and that execute-once tag conditional on the future merged pin.

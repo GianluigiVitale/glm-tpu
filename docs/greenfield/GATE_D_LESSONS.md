@@ -1290,3 +1290,7 @@ normalized-state cause.
   argument, including required absence; removing annotations globally proves graph identity but not which
   argument carried them. Capture every boundary graph before the first check, because the same failed run
   also exposed the backend-added invariant while slot and avoided another TPU discriminator.
+- JSON transport changes tuples to lists. When a producer records a validator contract and a publisher
+  recomputes it, compare strict canonical JSON bytes rather than raw Python objects; mutation-test nested
+  values and reject nonfinite/non-JSON types. Also repin every inherited verifier digest in the publisher,
+  not only in the launcher and wrapper.
