@@ -869,6 +869,20 @@ installed/source provisioner and runtime-tree SHAs are `2b9c8c2b...0594` and
 `308748a9...d616`; full admission coverage is 140/140. PP16 plan authority is
 `98b4fa21...7880`, content SHA `d824c19c...5833`.
 
+### Recreated-pod M2048 provisioner bootstrap
+
+The model-free exact-M2048 discriminator reuses the reviewed generic provisioner and sealed
+Python/JAX/libtpu trees. Workers 1--7 on the recreated pod lack the root provisioner and immutable
+runtime directories, so the fleet installer adapts the existing no-replacement boundary without
+passing a mutable repository pathname to root. It loads the exact helper from the future commit into
+a sealed memfd; that helper reads the provisioner from the same exact Git object, verifies SHA
+`2b9c8c2b...0594`, seals it in a second memfd, and invokes the root entry point through proc
+descriptors. Root validates both seal sets, prepares only the missing fixed directories, publishes
+with `RENAME_NOREPLACE`, and removes only the exact staging inode on failure. Hostile tests replace
+the original source pathname after sealing and prove the retained payload is immutable. This is an
+install-only prerequisite and grants no JAX import, TPU execution, numerical, model, performance or
+Gate-D claim.
+
 For the missing real causal-HLO authority, reuse the source/plan pins above through the default-off
 `scripts/greenfield/build_gate_d_jax_site_capsule.py` (`5334dd1e...00d2`) and
 `scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py` (`2513a305...2182`). The builder's
