@@ -1,0 +1,23 @@
+{
+  "archive_sha256": "e4f3bfce82f35f7fbe43b33b4b08190016dae7c062fe8570b4f3dbd9e663d296",
+  "artifact_kind": "greenfield_checkpoint_reproduction_metadata_receipt",
+  "bucket": "driftbench-dsv4-uc",
+  "capsule_sha256": "84eb369ac337a7d3eaea30aa80b8ea656ab88d3214b87c8d81a1fbc7679e39c9",
+  "destination_prefix": "results/greenfield_checkpoint_reproduction_capsule_20260904T124907Z/",
+  "format_version": 1,
+  "metadata_index": {
+    "crc32c": "beMNXA==",
+    "generation": 1788526155048572,
+    "name": "results/greenfield_checkpoint_reproduction_capsule_20260904T124907Z/metadata_index.json",
+    "size": 3282
+  },
+  "receipt_sha256": "e12a2cbf50104b9b0937d95e93ca6e825898603324b0d5dfa2f9dd29feb772a1",
+  "source_bytes": 5108605,
+  "source_objects": 4,
+  "success": {
+    "crc32c": "Gfcdwg==",
+    "generation": 1788526155136769,
+    "name": "results/greenfield_checkpoint_reproduction_capsule_20260904T124907Z/SUCCESS",
+    "size": 753
+  }
+}
