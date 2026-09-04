@@ -3820,3 +3820,11 @@ persistence only; review and persistence precede any v2 installation.
   suite 105/105. Staging `efbfebca…51af8`, fresh tag `…20260903T235409426942147Z`; Sol batch pending.
 - Final Sol delta returned no P0–P2 and approved persistence, exact install-only tree
   `efbfebca…51af8`, and that execute-once tag conditional on the future merged pin.
+
+## 2026-09-04 — accepted completed-normalization → key boundary
+
+- V10 pin `583e678b…3b9f6`, tag `…20260903T235409426942147Z`: 0 rows/lanes mismatch,
+  exact bits `96d261cb…887c`, one normalizer/key call, zero intermediate host transfer, accepted
+  terminal generation `1788480414028848`/`7babccea…f8967`, pre/post 8/8 clean.
+- Record `gate-d-original-db518-v10-normalized-key-exact-success.json`. Classification remains
+  `LAYER_CONSUMER_UNPROVEN;DECODER_UNPROVEN;GATE_D_OPEN`; next is a separate real consumer.

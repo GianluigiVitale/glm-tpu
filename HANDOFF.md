@@ -11935,3 +11935,20 @@ After the final test delta, the independent Sol reviewer returned `P0: NONE`, `P
 `APPROVE INSTALL ONLY efbfebcac6267f835ac0be0bfb5b8cbfa570db4a179132a6619b01fa80851af8`,
 and `APPROVE EXECUTE ONCE greenfield_original_db518_prompt_key_chunk0_20260903T235409426942147Z
 <future merged pin condition>`. No V10 persistence, install or execution had occurred at this record.
+
+## 2026-09-04 00:07Z — V10 normalization-to-key boundary formally accepted exact
+
+Commit `583e678bf3db7519295273732e39cd051bc3b9f6` was pushed and replayed exactly from
+origin/US-CENTRAL2 with 43 bound blobs. Immutable V10 installed with `launcher_invoked=false`.
+The one approved tag `greenfield_original_db518_prompt_key_chunk0_20260903T235409426942147Z`
+completed in 12 s and published `ORIGINAL_DB518_NORMALIZED_KEY_CONTROL_EXACT`: 0/2,048 rows and
+0/262,144 lanes mismatch; accepted and boundary bits SHA `96d261cb…887c`; exactly one normalization
+and one key-control invocation; zero device-to-host transfers between them. The output-live HLO
+contracts passed. Terminal generation `1788480414028848`, SHA `7babccea…f8967`; ledger generation
+`1788480412962488`, SHA `620ed5a2…b9c00`; pre/post 8/8 clean. Independent record:
+`docs/artifacts/gate-d-original-db518-v10-normalized-key-exact-success.json`.
+
+Claim remains deliberately bounded: real layer consumer, decoder and performance are unproven;
+Gate D is open. Exact next: build a separate real layer consumer accepting this completed buffer,
+and prove in HLO that it does not recompute input RMS. Its exact protected result is only a
+prerequisite; the 8K decoder still requires a separate review and fresh-tag execution authority.

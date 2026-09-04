@@ -1,0 +1,38 @@
+{
+  "artifact_kind": "gate_d_original_db518_v10_normalized_key_exact_success",
+  "claim_boundary": "The separately completed M2048 normalization buffer composes bitwise through the separately compiled M64 key control. A real layer consumer, the decoder, Gate D and performance remain unproven.",
+  "classification": "NORMALIZATION_TO_KEY_BOUNDARY_COMPOSABLE_BITWISE;NORMALIZED_TENSOR_INDEPENDENT_EXACTNESS_UNPROVEN;LAYER_CONSUMER_UNPROVEN;DECODER_UNPROVEN;GATE_D_OPEN",
+  "code_hash": "583e678bf3db7519295273732e39cd051bc3b9f6",
+  "hlo": {
+    "normalized_boundary_optimized_sha256": "f1df43c8b5b014213c6901239e7be25be48762408a90887bb80bf3b24a1b017f",
+    "normalized_boundary_stablehlo_sha256": "87255de0625ad7b9ebd930c13db52df5ab3efcc2a4eb4b5382fcdf62836a683d",
+    "normalized_key_optimized_sha256": "b266b6d3eb9edfb58bb4f88284d19246b154fab8366e9d3265d3760ab0894cd4",
+    "normalized_key_stablehlo_sha256": "8695b34940fac0ff8474babc20a50888c3501932f220c8881df63f84cc733df5"
+  },
+  "integrity": {
+    "evidence_sha256": "d3d4f8fd504b7dface68760e0af007690e4b26ff7651e494320dc5322d5d8334",
+    "pre_census": "8/8 authenticated zero work",
+    "post_census": "8/8 authenticated zero work",
+    "remote_ledger_generation": "1788480412962488",
+    "remote_ledger_sha256": "620ed5a218d23c8c128292e7820722c6f1fe88e5d6a9555eef53e116f5ab9c00",
+    "terminal_generation": "1788480414028848",
+    "terminal_sha256": "7babccead841dff8e729ce8d717584cae739a628046e185b2944b8fdeb4f8967"
+  },
+  "numerical_result": {
+    "accepted_bits_sha256": "96d261cbef56bccc20c3d2bee275b995f168e0ff7609713baae21d0a6ea3887c",
+    "boundary_key_bits_sha256": "96d261cbef56bccc20c3d2bee275b995f168e0ff7609713baae21d0a6ea3887c",
+    "key_control_invocation_count": 1,
+    "mismatched_lanes": 0,
+    "mismatched_rows": 0,
+    "normalization_device_to_host_transfer_count": 0,
+    "normalization_invocation_count": 1,
+    "peak_bytes_in_use": 33476096
+  },
+  "performance_claim": false,
+  "protected_run": {
+    "elapsed_seconds": 12,
+    "run_tag": "greenfield_original_db518_prompt_key_chunk0_20260903T235409426942147Z",
+    "status": "ORIGINAL_DB518_NORMALIZED_KEY_CONTROL_EXACT"
+  },
+  "result_marker_sha256": "5fdaf91686ee8a9600f8127da99ebbf6063497f586c303fdf3436d991cdeb98d"
+}

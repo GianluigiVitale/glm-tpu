@@ -28,10 +28,10 @@ weaken history. Optimizations default off. Targets: useful <=200, strong <=125, 
   plus US-CENTRAL2 mirror before protected work. Never use EU.
 - Report result, percentage and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-03 23:58Z
+## Resume checkpoint — 2026-09-04 00:07Z
 
 Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; current
-pushed V9 pin `33c85baf508f5aa6d7e67050326205cebe99a84a`. Gate D is open.
+pushed V10 pin `583e678bf3db7519295273732e39cd051bc3b9f6`. Gate D is open.
 
 Accepted V6 proves the original DB518 layer-0 producer bitwise exact for all 2,048×128 lanes (SHA
 `96d261cb…887c`), with exact remote set and 8/8 cleanup; record
@@ -45,17 +45,15 @@ while also has an exact seventh passthrough scalar slot. Diagnostic terminal gen
 `1788478038656464`, SHA `a212559e…a9d5`; pre/failure censuses 8/8. Records:
 `docs/artifacts/gate-d-original-db518-v{7-tpu-hlo-placement,8-key-placement}-failure.json`.
 
-V9 protected probe completed in 12 s with 0/2,048 rows and 0/262,144 lanes mismatched, exact bits
-SHA `96d261cb…887c`, one normalizer/key invocation and no intermediate host transfer. Publication
-failed closed only because JSON changed contract tuples to lists; diagnostic generation
-`1788479258358293`, SHA `82c0eb80…e7661d`; pre/post 8/8 clean. Result is diagnostic, not accepted.
+V10 protected tag `…20260903T235409426942147Z` is formally accepted exact: 0/2,048 rows and
+0/262,144 lanes mismatch, bits SHA `96d261cb…887c`, one normalizer/key invocation, no intermediate
+host transfer, terminal generation `1788480414028848`/SHA `7babccea…f8967`, pre/post 8/8 clean.
+Record `docs/artifacts/gate-d-original-db518-v10-normalized-key-exact-success.json`.
 
-Local V10 changes publication only: strict JSON comparison plus exact mirror-verifier repin; actual
-V9 artifacts replay, hostile mutations reject, focused suite 105/105. Sol returned no P0–P2 and
-approved staging `efbfebca…51af8` plus fresh tag `…20260903T235409426942147Z`. Exact next:
-commit/push/mirror/install and one run. Do not run 8K.
-If exact, build a separate real layer consumer that takes the same completed buffer and whose HLO
-proves no input-RMS recomputation; only then authorize the exact 8K decoder.
+This proves the completed normalization buffer composes through the key control only. Exact next:
+build a separate real layer consumer that accepts it and whose HLO proves no input-RMS recomputation;
+its exact protected result is only a prerequisite for a separately reviewed, fresh-tag 8K run.
+Do not run 8K yet.
 
 ## After Gate D
 
