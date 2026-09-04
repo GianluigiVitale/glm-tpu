@@ -1,61 +1,64 @@
-# Goal — GLM-5.2-FP8 TPU v4: urgent minimal storage, then close Gate D and §18
+# Goal — GLM-5.2-FP8 TPU v4: <2 TB, Gate D, §18
 
-FULL ACCESS. Keep this <4000 chars; compaction-safe authority. At start/compaction read it and
+FULL ACCESS. Keep <4000 chars. At start/compaction read it and
 `docs/glm-tpu-revolution.md` in full, then tails of `HANDOFF.md` and
-`docs/greenfield/{EVIDENCE_MAP,GATE_D_LESSONS}.md`; inspect live state. Numerical fallback:
+`docs/greenfield/{EVIDENCE_MAP,GATE_D_LESSONS}.md`; inspect state. Numerical fallback:
 `docs/greenfield/compass_artifact_wf-f6f3c189-f49a-5169-bc82-8adefac958df_text_markdown.md`.
 
-## Immediate priority: storage cost
+## Storage
 
-Before creating or executing more Gate-D work, reduce live storage in **only**
-`gs://driftbench-dsv4-uc` to the smallest resumable GLM working set. Never touch TPU/queued-resource
-infrastructure, especially `db-v4-64-od-qr4`. Inspect live readers/writers and exact dependencies;
-delete only name+generation+size+CRC-bound objects. Preserve Git, compact evidence/recipes and
-current dependencies. No full-size backup or moving cost elsewhere. Never change soft-delete policy
-without specific user approval; report live and
-soft-deleted bytes separately. Rsync writes only `repos/`; prevent recreation. Before any future
-hundreds-of-GB artifact, state need, temporary/retained size and what it replaces.
+Keep live storage in **only** `gs://driftbench-dsv4-uc` at the smallest resumable set. Never touch
+TPU/queued-resource infrastructure, especially `db-v4-64-od-qr4`. Inspect dependencies;
+delete only name+generation+size+CRC-bound objects. Preserve Git, compact evidence and dependencies.
+**Hard ceiling: live bytes must stay below 2,000,000,000,000; >2 TB is unacceptable.** No full-size
+backup or moving cost elsewhere. Soft delete is user-authorized off
+from 2026-09-04; report live and retained soft-deleted bytes separately. Rsync writes only `repos/`.
+Before any >100-GB artifact, state need, size and what it replaces.
 
-## Engine priority after cleanup
+## Then Gate D
 
 Close **Gate D**: correct 78-layer decoder at 8K with exact tokens/DSA order, state/cache integrity,
 local collectives, HBM, trace and wall. Plan adjudication, long contexts and §18 follow.
 
-## Hard invariants
+## Invariants
 
-Native-JAX greenfield only; legacy `tpu-inference` is oracle/utilities only. Never create/manage
+Native-JAX greenfield; legacy `tpu-inference` is oracle/utilities only. Never create/manage
 infra. Serialize TPU work under both leases; every protected run ends with authenticated 8/8
 zero-work census. Evidence is append-only,
 fail-closed and SHA/code/plan/input bound. CPU/HLO/labels/throughput alone are not proof. Never
 weaken history. Optimizations default off.
 
-## Efficiency/review contract
+## Efficiency/review
 
 - Smallest decisive test first; instrument boundaries and stop on first invariant failure. Never
-  run 8K while a row/chunk probe can decide the hypothesis.
+  run 8K while a row/chunk probe can decide.
 - Use an independent Sol adversarial reviewer before persistence, install, execution or destructive
-  storage apply; resolve every P0–P2. Fable-max may replace it when available.
+  storage apply; resolve every P0–P2. Fable-max may replace it.
 - Cron `/home/gianl/bin/sync-glm.sh` runs every 5 min. Commit/push/same-region mirror; verify origin
   plus US-CENTRAL2 mirror before protected work. Never use EU.
-- Report result, percentage and blockers plainly; never claim unproven.
+- Report result and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-04
+## Resume — 2026-09-04
 
-Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; pushed HEAD
-`43ba8f7c477d47829b520d4467b8baad5cfb9507`. TPU is 8/8 zero-work. V7 install-only passed 8/8,
+Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; storage pin
+`d33b9a7`. TPU was 8/8 zero-work at pause. V7 install-only passed 8/8,
 but its protected M2048 run failed before backend/numerics:
 probe initialization omitted `local_device_ids`, entered Cloud TPU autodetection and lacked
 `requests`. Preserve the V7 failure record/tag. Local uncommitted V8 adds explicit local IDs plus
 `cluster_detection_method="deactivate"`, sealed regression and V2 immutable install paths; focused
-suite was 42/42. Do not install/run it until cleanup, final certificate, review and persistence.
+suite was 42/42. Do not install/run it until final certificate, review and persistence.
 
-Live bucket inventory is 5,877,908,918,585 bytes. Keep canonical GLM source (755,663,676,164) and
-direct PP16 runtime `...qkv_direct_pp16_20260827T164842844148623Z`
-(869,671,243,535), plus compact lineage/results/oracles. Generation-pinned cleanup preparation covers
-three superseded runtime payloads, three unrelated DeepSeek models and 68 SICK/INFRA tarballs;
-expected removal is 3.677 TB while retaining old PP16/PP8 root metadata. Keep 77.96-GB layer3
-packs until recipes are separately proven. Current soft-deleted inventory is 4,049,225,835 bytes;
-new deletes remain billable seven days unless the user specifically authorizes a policy change.
+Cleanup is complete; receipts/capsules are committed/pushed. Three phases deleted
+528 objects/3,936,205,948,614 bytes: superseded runtimes, unrelated DeepSeek models, an incomplete
+PP16 derivative and tar dumps. Tar payloads are unrecoverable. Post-state is 55,266 live
+objects/1,945,025,989,379 bytes (1.945 TB/1.769 TiB), leaving 54,974,010,621 bytes below the cap.
+Keep canonical GLM 150/755,663,676,164; active direct PP16 68/869,671,243,535; PP16 lineage
+metadata 4/11,059,060; all NPZ dumps 4,636/28,158,360,488; results/oracles/repos/evidence.
+Active runtime reverified 32 files/6496 tensors. Soft delete is 0. Pre-disable retained versions
+were 11,750/3,681,290,733,167; each remains billable until its expiry; phase-1 expires around
+2026-09-11; none can be purged retroactively. Keep 77.96-GB layer3 until
+recipes are proven. Future large
+artifacts must stream or replace a runtime; never accumulate another full copy or breach 2 TB.
 
 After cleanup: finish V8 M2048, localize layer-0 consumer arithmetic, then exact protected 8K. After
 Gate D finish §18: protected PP8/PP16, WS32 result/rejection, 128K four-depth, 256K E0,
