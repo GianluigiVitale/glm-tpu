@@ -40,7 +40,7 @@ import zipfile
 
 PROBE_REPOSITORY_PATH = "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v7/"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v8/"
     "probe_layer1_prompt_chunk0_geometry.py"
 )
 RUN_ROOT = Path("/home/gianl/gate-d-runs")

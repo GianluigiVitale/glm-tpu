@@ -22,7 +22,7 @@ from .original_db518_normalized_boundary_hlo import (
 )
 
 _REAL_CONSUMER_STABLEHLO_SHA256 = (
-    "fdc207c69be05b936c4a16b65a5970708ce9193e850d085ee6b2606b5c15b44e"
+    "3344e6193632eaf0654eaf4ecf02b7dc95ed4110dcc51b709c6d1e49303c9435"
 )
 
 
@@ -78,7 +78,7 @@ _EXPECTED_PARAMETERS = (
     (("f32", (32, 16, 4)),),
     (("u8", (32, 6144, 82)),),
     (("f32", (32, 48, 82)),),
-    (("bf16", (256, 64)),),
+    (("bf16", (8192, 64)),),
     (("bf16", (32, 2, 192, 512)),),
     (("bf16", (32, 2, 512, 256)),),
     (("f32", (128, 6144)),),

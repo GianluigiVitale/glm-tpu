@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import partial
+from pathlib import Path
 import re
 
 import jax
@@ -16,6 +17,12 @@ from glm_tpu.greenfield.validation.chunk0_real_layer_consumer_hlo import (
 from glm_tpu.greenfield.validation.original_db518_normalized_boundary_hlo import (
     _boundary_entry,
     _entry_sources,
+)
+
+
+V8_DIAGNOSTIC_HLO = Path(
+    "/home/gianl/gate-d-runs/"
+    "greenfield_layer1_prompt_chunk0_geometry_20260904T010811826771181Z/hlo"
 )
 
 
@@ -41,7 +48,7 @@ def _consumer_avals():
         "down_bits": shape((32, 384, 6144), jnp.uint8),
         "down_scale": shape((32, 3, 48), jnp.float32),
         "wk1": shape((128, 6144), jnp.float32),
-        "rope_table": shape((256, 64), jnp.bfloat16),
+        "rope_table": shape((8192, 64), jnp.bfloat16),
     }
     return (
         shape((37, 6144), jnp.bfloat16),
@@ -205,6 +212,28 @@ def test_real_layer_consumer_hlo_accepts_exact_cpu_graph(consumer_hlo):
     ]
     assert report["stable_hidden_rms_reduce_count"] == 2
     assert report["stable_rsqrt_count"] == 4
+
+
+@pytest.mark.skipif(
+    not V8_DIAGNOSTIC_HLO.is_dir(),
+    reason="protected V8 diagnostic HLO is not present",
+)
+def test_real_layer_consumer_hlo_accepts_protected_v8_diagnostic_graph():
+    report = require_real_layer_consumer_hlo(
+        (V8_DIAGNOSTIC_HLO / "real_layer_consumer.optimized_hlo.txt").read_text(),
+        (V8_DIAGNOSTIC_HLO / "real_layer_consumer.stablehlo.mlir").read_text(),
+    )
+    assert report["passed"]
+    assert report["optimized_backend_form"] == "tpu_v4_single_device"
+    assert report["stable_raw_sha256"] == (
+        "06c8a067694d3d506308ec40d5ec93efb468af8519eb6cdc3fb987a373d2bd3f"
+    )
+    assert report["stable_sha256"] == (
+        "3344e6193632eaf0654eaf4ecf02b7dc95ed4110dcc51b709c6d1e49303c9435"
+    )
+    assert report["optimized_qkv_projection"]["projection_kind"] == (
+        "fused_convolution"
+    )
 
 
 def test_real_layer_consumer_hlo_rejects_keys1_boundary_bypass(consumer_hlo):

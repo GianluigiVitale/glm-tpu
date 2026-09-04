@@ -13,7 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 
 INSTALL_PATH = Path(
-    "/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v8.py"
+    "/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v9.py"
 )
 PYTHON = Path("/usr/bin/python3.10")
 PYTHON_SHA256 = "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
@@ -26,9 +26,9 @@ WRAPPER_PATH = (
     WORKTREE / "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
 )
 WRAPPER_SOURCE_PATH = "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
-WRAPPER_SHA256 = "a46ba0588eaf3c175885de4e882bd41eebc8d817ac6e4b73049d9178884961c9"
+WRAPPER_SHA256 = "a8da97514f226d37d9384f2a64bb72705a41116119841a7622f88ae0bc80d72b"
 CAPSULE_ROOT = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v7"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v8"
 )
 PARSER_CONTRACT_PATH = CAPSULE_ROOT / "chunk0_embedding_hlo.py"
 PARSER_CONTRACT_SOURCE_PATH = "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py"
@@ -47,22 +47,22 @@ CONSUMER_CONTRACT_SOURCE_PATH = (
     "glm_tpu/greenfield/validation/chunk0_real_layer_consumer_hlo.py"
 )
 CONSUMER_CONTRACT_SHA256 = (
-    "4ef7bbb0dbd74e5317cc653e67ef72dc5fd6ea472b9e486fc99c9ed410422aec"
+    "790594d3068987ea323601e1b4677ed7f9cf6d1315ea7fc82e8930fee7da6d3b"
 )
 PROBE_PATH = CAPSULE_ROOT / "probe_layer1_prompt_chunk0_geometry.py"
 PROBE_SOURCE_PATH = "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"
-PROBE_SHA256 = "4eb5ee0c11530f3e2ed7be4f25de92f729d39694ae50d531fd57968e948e691c"
+PROBE_SHA256 = "6326b38ca00a971c7c5121b7ad1655acf5bca56dd18ef5267a232e0b2a7b0425"
 PUBLISHER_PATH = CAPSULE_ROOT / "publish_gate_d_layer1_prompt_chunk0_geometry.py"
 PUBLISHER_SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
 )
-PUBLISHER_SHA256 = "09808a13a2c5d19538abf6da59d4225cde149637f5a404a5c00052ef4d2f84e8"
+PUBLISHER_SHA256 = "4c1b717bad1fee4809a8c096145db1e04d50f0de1f0ca3aaa8b1c1ec73780be2"
 MIRROR_VERIFIER_PATH = CAPSULE_ROOT / "verify_gate_d_rewrite_same_region_git_mirror.py"
 MIRROR_VERIFIER_SOURCE_PATH = (
     "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
 )
 MIRROR_VERIFIER_SHA256 = (
-    "0f61a5a6108b1d931cc19ce247e1d88b7db76ed32029260bd6273cb4d4ca8d4e"
+    "62eda6849de3f449471609de7f4abc0bf0ca9497122ebdfbb658c153780a236a"
 )
 LOCK_ROOT = Path("/opt/glm-tpu/locks")
 LOCK_NAMES = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")

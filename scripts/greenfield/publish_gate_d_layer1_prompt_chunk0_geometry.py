@@ -22,7 +22,7 @@ from typing import Any
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v7/"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v8/"
     "publish_gate_d_layer1_prompt_chunk0_geometry.py"
 )
 SOURCE_PATH = "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
@@ -41,7 +41,7 @@ BOUNDARY_CONTRACT_SHA256 = (
     "35757aab4a616a2f1073f78503c29075c3e43cb684e4e1faf7d835630876809e"
 )
 CONSUMER_CONTRACT_SHA256 = (
-    "4ef7bbb0dbd74e5317cc653e67ef72dc5fd6ea472b9e486fc99c9ed410422aec"
+    "790594d3068987ea323601e1b4677ed7f9cf6d1315ea7fc82e8930fee7da6d3b"
 )
 BASE_PATH = "scripts/greenfield/publish_gate_d_projection_contraction_pp16_hlo.py"
 BASE_PIN = "986378238ac6458307aea69ef1f5e12bf82bc020"

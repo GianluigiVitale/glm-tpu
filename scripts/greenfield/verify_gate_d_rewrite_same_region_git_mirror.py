@@ -16,7 +16,7 @@ BRANCH = "rewrite/topology-first-decode"
 ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v7/"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v8/"
     "verify_gate_d_rewrite_same_region_git_mirror.py"
 )
 BASE_PATH = "scripts/greenfield/verify_gate_d_same_region_git_mirror.py"
@@ -31,6 +31,8 @@ BOUND_PATHS = (
     "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v6-source.json",
     "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v7-source.json",
     "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v8-source.json",
+    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v8-rope-capacity-hlo-failure.json",
+    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v9-source.json",
     "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py",
     "glm_tpu/greenfield/validation/chunk0_real_layer_consumer_hlo.py",
     "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py",

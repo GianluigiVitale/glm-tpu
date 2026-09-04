@@ -66,7 +66,7 @@ def test_runner_pins_inputs_digests_and_sealed_interpreter():
     assert "unsafe Gate-D chunk-0 geometry tag" in runner
     # The only executed probe pathname is the root-owned immutable capsule.
     assert (
-        "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v7"
+        "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v8"
         in runner
     )
     assert '"$SEALED_PYTHON" -I -S -B -u "$PROBE"' in runner
@@ -362,7 +362,7 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
         "/usr/local/libexec/glm-tpu/"
     )
     assert str(installer_module.LAUNCHER_TARGET).endswith(
-        "launch_gate_d_layer1_prompt_chunk0_geometry_v8.py"
+        "launch_gate_d_layer1_prompt_chunk0_geometry_v9.py"
     )
     assert str(installer_module.LAUNCHER_TARGET).startswith("/opt/glm-tpu/bin/")
     assert installer.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
@@ -420,6 +420,8 @@ def test_mirror_verifier_is_bound_to_the_rewrite_branch_and_reviewed_base():
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v6-source.json",
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v7-source.json",
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v8-source.json",
+        "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v8-rope-capacity-hlo-failure.json",
+        "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v9-source.json",
         "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py",
         "glm_tpu/greenfield/validation/chunk0_real_layer_consumer_hlo.py",
         "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py",

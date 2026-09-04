@@ -12,12 +12,12 @@ from collections.abc import Mapping
 from hashlib import sha256
 from pathlib import Path
 
-SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v8")
+SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v9")
 INSTALLER_PATH = SOURCE_ROOT / "install_gate_d_layer1_prompt_chunk0_geometry_runtime.py"
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
-LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_layer1_prompt_chunk0_geometry_v8.py"
+LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_layer1_prompt_chunk0_geometry_v9.py"
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-prompt-chunk0-geometry-v7"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-prompt-chunk0-geometry-v8"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -28,12 +28,12 @@ EXPECTED_ENVIRONMENT = {
 PAYLOADS = {
     "chunk0_embedding_hlo.py": "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757",
     "original_db518_normalized_boundary_hlo.py": "35757aab4a616a2f1073f78503c29075c3e43cb684e4e1faf7d835630876809e",
-    "chunk0_real_layer_consumer_hlo.py": "4ef7bbb0dbd74e5317cc653e67ef72dc5fd6ea472b9e486fc99c9ed410422aec",
-    "probe_layer1_prompt_chunk0_geometry.py": "4eb5ee0c11530f3e2ed7be4f25de92f729d39694ae50d531fd57968e948e691c",
-    "publish_gate_d_layer1_prompt_chunk0_geometry.py": "09808a13a2c5d19538abf6da59d4225cde149637f5a404a5c00052ef4d2f84e8",
-    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "6ba25afc0597fdfaa932317e171189ca5f82b80159ed7e77cad04bef6f31b24f",
+    "chunk0_real_layer_consumer_hlo.py": "790594d3068987ea323601e1b4677ed7f9cf6d1315ea7fc82e8930fee7da6d3b",
+    "probe_layer1_prompt_chunk0_geometry.py": "6326b38ca00a971c7c5121b7ad1655acf5bca56dd18ef5267a232e0b2a7b0425",
+    "publish_gate_d_layer1_prompt_chunk0_geometry.py": "4c1b717bad1fee4809a8c096145db1e04d50f0de1f0ca3aaa8b1c1ec73780be2",
+    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "788f84c0e04a84cb6d1a65bcbee7d77859c99f32f4f86995cefde2a907e8561b",
     "verify_gate_d_rewrite_same_region_git_mirror.py": (
-        "0f61a5a6108b1d931cc19ce247e1d88b7db76ed32029260bd6273cb4d4ca8d4e"
+        "62eda6849de3f449471609de7f4abc0bf0ca9497122ebdfbb658c153780a236a"
     ),
 }
 CAPSULE_NAMES = (

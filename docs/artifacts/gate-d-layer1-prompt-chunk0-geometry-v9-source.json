@@ -1,0 +1,80 @@
+{
+  "artifact_kind": "gate_d_layer1_prompt_chunk0_geometry_v9_source",
+  "schema_version": 1,
+  "authorization": {
+    "cloud_write": false,
+    "full_dsa_or_8k": false,
+    "launcher_invocation": false,
+    "persistence_only": true,
+    "privileged_install": false,
+    "tpu_compile": false,
+    "tpu_execution": false
+  },
+  "claim_scope": "Append-only V8 failure record, exact RoPE-capacity HLO correction, CPU/HLO tests, immutable staging, and proposed commands only. No protected numerical, decoder, Gate-D, DB, or performance standing.",
+  "classification": "REAL_LAYER_CONSUMER_ROPE_CAPACITY_CONTRACT_CORRECTED;ARCHIVED_TPU_HLO_ACCEPTED_OFFLINE;CPU_HLO_VALIDATED;SOL_BATCH_REVIEW_PENDING;INSTALL_EXECUTION_UNAUTHORIZED;GATE_D_OPEN",
+  "parent_code_hash": "022ddfb7b5895222e1abee711920665b545b985e",
+  "failed_predecessor": {
+    "record": "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v8-rope-capacity-hlo-failure.json",
+    "record_sha256": "3d57a5f55894f485b3b07511080fc2aca2a2a4b1a5ae8e7821c22fea6d1c4af3",
+    "run_tag": "greenfield_layer1_prompt_chunk0_geometry_20260904T010811826771181Z",
+    "diagnostic_terminal_generation": "1788486747519890",
+    "diagnostic_terminal_sha256": "e86675b0d87e881e3f2bc474429f9c204327e0eb6f56dec074ca77124d999971"
+  },
+  "correction": {
+    "expected_rope_table_shape": "bf16[8192,64]",
+    "protected_runtime_rope_table_shape": "bf16[8192,64]",
+    "canonical_stablehlo_sha256": "3344e6193632eaf0654eaf4ecf02b7dc95ed4110dcc51b709c6d1e49303c9435",
+    "numerical_or_model_code_changed": false,
+    "protected_fix_proven": false
+  },
+  "offline_diagnostic_hlo_replay": {
+    "accepted": true,
+    "diagnostic_only": true,
+    "optimized_hlo_sha256": "ca70734ae52e29526689144958fb29c09125de75d783df72dc0323499d15bc2f",
+    "stablehlo_raw_sha256": "06c8a067694d3d506308ec40d5ec93efb468af8519eb6cdc3fb987a373d2bd3f",
+    "stablehlo_canonical_sha256": "3344e6193632eaf0654eaf4ecf02b7dc95ed4110dcc51b709c6d1e49303c9435",
+    "projection_kind": "fused_convolution",
+    "selected_source_roles_exact": true,
+    "selected_result_dominates_normalized_qkv_sources": true,
+    "all_24_parameters_reach_key_root": true
+  },
+  "gate_d_closed": false,
+  "performance_claim": false,
+  "planned_fresh_tag": "greenfield_layer1_prompt_chunk0_geometry_20260904T015629267912157Z",
+  "proposed_commands": {
+    "provision_install_source": "/usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/provision_gate_d_python_runtime.py --source /home/gianl/gate-d-runs/gate-d-layer1-prompt-chunk0-geometry-install-v9-staging --target /opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v9 --expected-tree-sha256 86696c4141d77a288d5d70dea6cd7a1b453acf5d69e9eea98089226d1c7f6dbe",
+    "install_only": "/usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v9/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py",
+    "execute_once": "/usr/bin/env -i GLM_GATE_D_CHUNK0_GEOMETRY=1 GLM_GATE_D_CHUNK0_GEOMETRY_MODE=execute_once GLM_GATE_D_CHUNK0_GEOMETRY_TAG=greenfield_layer1_prompt_chunk0_geometry_20260904T015629267912157Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v9.py"
+  },
+  "review": {
+    "sol": "PENDING"
+  },
+  "runtime_staging": {
+    "path": "/home/gianl/gate-d-runs/gate-d-layer1-prompt-chunk0-geometry-install-v9-staging",
+    "tree_sha256": "86696c4141d77a288d5d70dea6cd7a1b453acf5d69e9eea98089226d1c7f6dbe",
+    "root_mode": "0755",
+    "file_mode": "0555"
+  },
+  "source_sha256s": {
+    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v8-rope-capacity-hlo-failure.json": "3d57a5f55894f485b3b07511080fc2aca2a2a4b1a5ae8e7821c22fea6d1c4af3",
+    "glm_tpu/greenfield/benchmarking/legacy_prefill_chunk_probe.py": "876502e6ec2b0e0026b9ae7b7e99f83567133d44a93865fc6916fd5a31b93828",
+    "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py": "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757",
+    "glm_tpu/greenfield/validation/chunk0_real_layer_consumer_hlo.py": "790594d3068987ea323601e1b4677ed7f9cf6d1315ea7fc82e8930fee7da6d3b",
+    "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py": "35757aab4a616a2f1073f78503c29075c3e43cb684e4e1faf7d835630876809e",
+    "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py": "2c062e02d1e4146e293204dd284c896ab29d0125de957fce5b64295df631a961",
+    "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py": "788f84c0e04a84cb6d1a65bcbee7d77859c99f32f4f86995cefde2a907e8561b",
+    "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py": "6326b38ca00a971c7c5121b7ad1655acf5bca56dd18ef5267a232e0b2a7b0425",
+    "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py": "4c1b717bad1fee4809a8c096145db1e04d50f0de1f0ca3aaa8b1c1ec73780be2",
+    "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh": "a8da97514f226d37d9384f2a64bb72705a41116119841a7622f88ae0bc80d72b",
+    "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py": "62eda6849de3f449471609de7f4abc0bf0ca9497122ebdfbb658c153780a236a",
+    "tests/greenfield/benchmarking/test_legacy_prefill_chunk_probe.py": "988467360ff29820b83ad35b301db15b939635f06441fb461d315631aefdb7a2",
+    "tests/greenfield/validation/test_chunk0_geometry_probe_runner.py": "282133eebdcc1bc4f0f2d6ffe1edc09419152f2311934ac22ecbd142594dc858",
+    "tests/greenfield/validation/test_chunk0_real_layer_consumer_hlo.py": "ca8fc5b85ea416ef3a4901c000bdd33ce60b18fbdde2f1d720ee9efc70d8021f"
+  },
+  "tests": {
+    "command": "JAX_PLATFORMS=cpu XLA_PYTHON_CLIENT_PREALLOCATE=false PYTHONDONTWRITEBYTECODE=1 /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/benchmarking/test_legacy_prefill_geometry.py tests/greenfield/benchmarking/test_legacy_prefill_owner_packing.py tests/greenfield/benchmarking/test_legacy_prefill_chunk_probe.py tests/greenfield/kernels/test_original_db518_normalized_boundary.py tests/greenfield/validation/test_chunk0_real_layer_consumer_hlo.py tests/greenfield/validation/test_chunk0_geometry_probe_runner.py",
+    "passed": 84,
+    "seconds": 47.38,
+    "tpu_compile_or_execution_performed": false
+  }
+}
