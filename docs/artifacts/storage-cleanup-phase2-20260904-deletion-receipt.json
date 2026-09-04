@@ -1,0 +1,64 @@
+{
+  "artifact_kind": "greenfield_checkpoint_deletion_receipt",
+  "bucket": "driftbench-dsv4-uc",
+  "capsule_sha256": "84eb369ac337a7d3eaea30aa80b8ea656ab88d3214b87c8d81a1fbc7679e39c9",
+  "completed": true,
+  "completed_utc": "2026-09-04T12:52:41Z",
+  "deleted": [
+    {
+      "artifact_id": "retired_incomplete_direct_pp16_attempt",
+      "crc32c": "Nq0a+w==",
+      "generation": 1787849038044137,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors",
+      "size": 27176812872,
+      "terminal": false
+    },
+    {
+      "artifact_id": "retired_incomplete_direct_pp16_attempt",
+      "crc32c": "rO/F3Q==",
+      "generation": 1787849038581071,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors",
+      "size": 27176812872,
+      "terminal": false
+    },
+    {
+      "artifact_id": "retired_incomplete_direct_pp16_attempt",
+      "crc32c": "DrDoGQ==",
+      "generation": 1787848378290527,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/control.json",
+      "size": 2003,
+      "terminal": false
+    },
+    {
+      "artifact_id": "retired_incomplete_direct_pp16_attempt",
+      "crc32c": "6iNOrQ==",
+      "generation": 1787849038789371,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+      "size": 150669,
+      "terminal": false
+    },
+    {
+      "artifact_id": "retired_incomplete_direct_pp16_attempt",
+      "crc32c": "+YIykw==",
+      "generation": 1787849038945971,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+      "size": 150669,
+      "terminal": false
+    },
+    {
+      "artifact_id": "retired_incomplete_direct_pp16_attempt",
+      "crc32c": "MLQPdA==",
+      "generation": 1787848378511523,
+      "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/runtime_layout.json",
+      "size": 4805264,
+      "terminal": false
+    }
+  ],
+  "deleted_bytes": 54358734349,
+  "deleted_objects": 6,
+  "format_version": 1,
+  "planned_bytes": 54358734349,
+  "planned_objects": 6,
+  "receipt_sha256": "e565db1e464039a28df330145a0c4f809e5932c1b31e949d0e93d0cfdc250b3f",
+  "started_utc": "2026-09-04T12:52:40Z"
+}
