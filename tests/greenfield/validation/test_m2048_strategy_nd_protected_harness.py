@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import shlex
+import stat
 import subprocess
 from types import SimpleNamespace
 
@@ -38,7 +39,7 @@ REPO_REFRESHER = ROOT / (
     "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py"
 )
 MIRROR = ROOT / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
-CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v5-source.json"
+CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v6-source.json"
 
 
 def _load_publisher():
@@ -354,9 +355,11 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
         "docs/artifacts/gate-d-m2048-strategy-nd-v3-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v4-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v5-source.json",
+        "docs/artifacts/gate-d-m2048-strategy-nd-v6-source.json",
         "docs/artifacts/gate-d-m2048-v2-install-repository-prestate-failure.json",
         "docs/artifacts/gate-d-m2048-v3-install-loader-quoting-failure.json",
         "docs/artifacts/gate-d-m2048-v4-install-runtime-loader-quoting-failure.json",
+        "docs/artifacts/gate-d-m2048-v5-install-missing-libexec-parent-failure.json",
         "scripts/greenfield/bootstrap_gate_d_provisioner.py",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py",
@@ -382,7 +385,7 @@ def test_fleet_installer_is_install_only_and_restores_exact_runtime_trees() -> N
         "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616",
         "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df",
         "db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca",
-        "8fcd33c335578a0e2b8e25827745653ea6ea0de63ffc799b4ee193538f61ddda",
+        "5ef7c0eec7ef58e86454166647511b0d836adfc5446409274a212fd9d6bff15a",
     ):
         assert value in source
     assert '[[ -d $path && $path == /home/gianl/gate-d-m2048-runtime-source-' in source
@@ -402,7 +405,7 @@ def test_fleet_installer_is_install_only_and_restores_exact_runtime_trees() -> N
 
 def test_fleet_serializes_exact_worker_repository_refresh() -> None:
     source = FLEET_INSTALLER.read_text(encoding="ascii")
-    assert "WORKER_REPO_PRESTATE_PIN=b835e0f5b101e17c686b290cd5843b60d2765dca" in source
+    assert "WORKER_REPO_PRESTATE_PIN=80bcd0edab9f4a1d7b0085af89dc4159cbf2254c" in source
     assert "REPO_REFRESHER_B64=$(git_local show" in source
     assert 'os.memfd_create(\\"gate-d-m2048-repo-refresher\\"' in source
     assert "for worker in 1 2 3 4 5 6 7; do" in source
@@ -796,6 +799,64 @@ def test_bootstrap_source_and_fleet_hash_are_exact() -> None:
     assert 'PROVISIONER_REPO_PATH = "scripts/greenfield/provision_gate_d_python_runtime.py"' in helper
     assert "_read_sealed_path(payload_path, PROVISIONER_SHA256)" in helper
     assert "_publish_provisioner(payload, PROVISIONER_SHA256)" in helper
+
+
+def test_bootstrap_prepares_only_the_fixed_root_directory_chain() -> None:
+    assert BOOTSTRAP_MODULE.DIRECTORIES == (
+        (Path("/opt/glm-tpu"), "bin"),
+        (Path("/usr/local"), "libexec"),
+        (Path("/usr/local/libexec"), "glm-tpu"),
+    )
+
+
+def test_bootstrap_creates_a_missing_intermediate_directory_idempotently(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local = tmp_path / "usr" / "local"
+    local.mkdir(parents=True, mode=0o755)
+    checked: list[Path] = []
+
+    def require_test_chain(path: Path) -> None:
+        checked.append(path)
+        assert path in {local, local / "libexec"}
+        assert path.is_dir() and not path.is_symlink()
+
+    def require_test_directory(descriptor: int, *, mode: int) -> None:
+        metadata = os.fstat(descriptor)
+        assert stat.S_ISDIR(metadata.st_mode)
+        assert metadata.st_uid == os.getuid()
+        assert metadata.st_gid == os.getgid()
+        assert stat.S_IMODE(metadata.st_mode) == mode
+        assert not os.listxattr(descriptor)
+
+    monkeypatch.setattr(BOOTSTRAP_MODULE, "_require_root_chain", require_test_chain)
+    monkeypatch.setattr(
+        BOOTSTRAP_MODULE, "_require_directory_fd", require_test_directory
+    )
+    for _ in range(2):
+        BOOTSTRAP_MODULE._ensure_root_directory(local, "libexec")
+        BOOTSTRAP_MODULE._ensure_root_directory(local / "libexec", "glm-tpu")
+    assert checked == [local, local / "libexec", local, local / "libexec"]
+    assert (local / "libexec").is_dir()
+    assert (local / "libexec" / "glm-tpu").is_dir()
+
+
+def test_bootstrap_refuses_symlink_in_missing_intermediate_slot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local = tmp_path / "usr" / "local"
+    local.mkdir(parents=True, mode=0o755)
+    alternate = tmp_path / "alternate"
+    alternate.mkdir(mode=0o755)
+    (local / "libexec").symlink_to(alternate, target_is_directory=True)
+
+    monkeypatch.setattr(BOOTSTRAP_MODULE, "_require_root_chain", lambda _path: None)
+    monkeypatch.setattr(
+        BOOTSTRAP_MODULE, "_require_directory_fd", lambda _descriptor, *, mode: None
+    )
+    with pytest.raises(OSError):
+        BOOTSTRAP_MODULE._ensure_root_directory(local, "libexec")
+    assert not (alternate / "glm-tpu").exists()
 
 
 def test_bootstrap_publication_is_no_replace_and_accepts_exact_race_winner(
@@ -1220,7 +1281,7 @@ def test_source_certificate_binds_every_listed_file_and_grants_no_authority() ->
     assert record["runtime_recovery"]["missing_workers_observed_read_only"] == list(
         range(1, 8)
     )
-    assert record["test_evidence"]["passed"] == 31
+    assert record["test_evidence"]["passed"] == 34
     assert record["proposed_fresh_tag"] in record[
         "protected_run_command_after_approved_install"
     ]

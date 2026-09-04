@@ -29,6 +29,7 @@ PROVISIONER_SHA256 = (
 )
 DIRECTORIES = (
     (Path("/opt/glm-tpu"), "bin"),
+    (Path("/usr/local"), "libexec"),
     (Path("/usr/local/libexec"), "glm-tpu"),
 )
 UNPRIVILEGED_ENVIRONMENT = {

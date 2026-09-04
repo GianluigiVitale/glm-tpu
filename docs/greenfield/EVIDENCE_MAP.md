@@ -3870,3 +3870,19 @@ persistence only; review and persistence precede any v2 installation.
   SHA `06932679…4399c7`; fresh tag `greenfield_m2048_strategy_nd_20260904T072057405273776Z`.
 - V5 remains unreviewed/uncommitted/uninstalled/unexecuted; no numerical, decoder, performance or
   Gate-D claim.
+
+## 2026-09-04 — exact-M2048 V5 fixed-parent refusal and V6 source correction
+
+- Sol approved and pin `80bcd0ed…c4159` was pushed/mirrored. V5 completed seven serialized repo
+  refreshes, 8/8 exact-repository checks and seven runtime transfers. Both embedded loaders ran.
+  Worker 0 verified all three sealed runtimes; workers 1--7 failed closed before capsule/JAX/TPU
+  because `/usr/local/libexec` was absent. Report `4154687f…ca506`; census 8/8 clean; transfers
+  cleaned 7/7 (`17eb2990…b533`). Failure record
+  `gate-d-m2048-v5-install-missing-libexec-parent-failure.json` SHA `03b4e764…e061f`; tag retired.
+- V6 prepares the exact fixed `/usr/local -> libexec -> glm-tpu` chain in order and preserves root
+  ownership, 0755 mode, xattr-free descriptors and O_NOFOLLOW symlink refusal. It accepts only the
+  clean detached `80bcd0ed` worker poststate and repins the full provenance chain. Focused CPU tests
+  pass 34/34. Certificate `gate-d-m2048-strategy-nd-v6-source.json` SHA
+  `3b821143…4a7f71`; fresh tag `greenfield_m2048_strategy_nd_20260904T081918746174545Z`.
+- V6 is unreviewed/uncommitted/uninstalled/unexecuted. No numerical, decoder, performance or Gate-D
+  claim. One complete Sol batch is required before persistence.

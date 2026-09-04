@@ -1173,3 +1173,13 @@ v5's token-374 diagnostic as negative evidence; it is not a reference cache or r
 Reuse V6's on-device gather and archived diagnostic HLO only as an offline compiler-shaped regression, never as
 numerical success. Reuse the validator only with V7 output-sensitive GTE/while traversal, ordered four-slice
 reassembly and the all-witness cut. Do not reuse V6 standalone-node dominance or its burned tag.
+
+## 2026-09-04 exact-M2048 v6 recreated-worker bootstrap boundary
+
+Reuse V5's two rendered-loader regressions, exact detached-repository refresher, sealed memfd
+bootstrap/provisioner handoff, three sealed runtime trees and transfer cleanup. Preserve V5's
+missing-`/usr/local/libexec` refusal as operational evidence only; it reached no JAX or TPU. V6 adds
+only the fixed ordered `/usr/local -> libexec -> glm-tpu` directory preparation needed by recreated
+workers. Every existing/created component remains root:root, mode 0755, xattr-free and opened with
+O_NOFOLLOW; never generalize the helper to an arbitrary root path. Reuse the M2048 numerical probe
+only after reviewed install-only reports 8/8 `RUNTIME_OK` and 8/8 `M2048_INSTALL_OK`.

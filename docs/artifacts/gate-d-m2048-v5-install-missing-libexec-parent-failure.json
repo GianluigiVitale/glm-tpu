@@ -1,0 +1,50 @@
+{
+  "artifact_kind": "gate_d_m2048_v5_install_missing_libexec_parent_failure",
+  "authorization": {
+    "install_only": true,
+    "jax_import": false,
+    "protected_execution": false,
+    "tpu_initialization": false
+  },
+  "classification": "INSTALL_ONLY_REFRESHED_REPOSITORIES_AND_COPIED_RUNTIME_SOURCE_THEN_FAILED_CLOSED_AT_MISSING_FIXED_ROOT_PARENT;NO_CAPSULE_INSTALL_ON_WORKERS1_7;NO_JAX;NO_TPU;NO_MODEL_OR_GATE_D_CLAIM",
+  "code_pin": "80bcd0edab9f4a1d7b0085af89dc4159cbf2254c",
+  "failure": {
+    "all_host_exact_repository_preflight": "8/8 REPO_OK at 80bcd0edab9f4a1d7b0085af89dc4159cbf2254c",
+    "boundary": "all-host root provisioner bootstrap while preparing the fixed /usr/local/libexec/glm-tpu capsule parent",
+    "controller_report": "/home/gianl/gate-d-runs/m2048-install-80bcd0edab9f4a1d7b0085af89dc4159cbf2254c.log",
+    "controller_report_sha256": "4154687f3fc8e1f062c9f9e64f4c6e7d72232a2067af1e1a1fc5f3c5e20ca506",
+    "exact_cause": "workers 1-7 were recreated without /usr/local/libexec; the bootstrap attempted to validate /usr/local/libexec as an existing parent before creating only its glm-tpu child, so os.stat failed closed with FileNotFoundError",
+    "immutable_capsule_installed_on_workers1_7": false,
+    "launcher_invoked": false,
+    "privileged_runtime_restoration_started_workers1_7": false,
+    "repository_refresh_completed_workers": 7,
+    "runtime_source_transfer_completed_workers": 7,
+    "runtime_verified_hosts": 1
+  },
+  "path_survey": {
+    "worker0": "/usr/local/libexec and /usr/local/libexec/glm-tpu existed; root provisioner and all three sealed runtimes were exact",
+    "workers1_7": "/usr/local was root:root mode 0755; /usr/local/libexec and /usr/local/libexec/glm-tpu were absent; /opt/glm-tpu and /opt/glm-tpu/bin were root:root mode 0755; root provisioner, three sealed runtimes, install capsule and launcher targets were absent"
+  },
+  "post_failure_cleanup": {
+    "action": "removed only /home/gianl/gate-d-m2048-runtime-source-80bcd0edab9f4a1d7b0085af89dc4159cbf2254c on workers 1-7 after exact directory/type/owner/mode checks",
+    "result": "7/7 unique TRANSFER_CLEAN",
+    "sorted_markers_sha256": "17eb2990b3639f4befd89a13ab2aca9227b72b596fcb62304d4b1ba4c79db533"
+  },
+  "post_failure_minimal_census": {
+    "coverage": "dependency-free pgrep including Ray/vLLM/M2048/decoder/GLM processes, libtpu lock holder and container census",
+    "result": "8/8 unique MINIMAL_CENSUS_OK",
+    "sorted_markers_sha256": "42d6f2f5fcf6345821dd3f8ef412756936634bf7b7bedac9cbb12e4c4c107580",
+    "strict_ray_python_census_available": false
+  },
+  "repository_poststate": {
+    "worker0": "clean branch rewrite/topology-first-decode at 80bcd0edab9f4a1d7b0085af89dc4159cbf2254c per bound REPO_OK marker",
+    "workers1_7": "clean detached full repositories at 80bcd0edab9f4a1d7b0085af89dc4159cbf2254c; local-config SHA bcc0d9c7525ee1afe2c476062aa3b62a88dbf66725e09a631ed6a6bd672bef51"
+  },
+  "schema_version": 1,
+  "source_certificate": {
+    "path": "docs/artifacts/gate-d-m2048-strategy-nd-v5-source.json",
+    "sha256": "06932679ad6b017c5919b404f15ba3128a03f66ef8bdf6f05cab6fb95e4399c7"
+  },
+  "successor_requirement": "Preserve this failure and the unused v5 tag. Prepare the fixed /usr/local to libexec to glm-tpu chain in order, validating every existing or created component as root-owned, non-group/world-writable, mode 0755, xattr-free and non-symlink. Accept only the exact clean detached 80bcd0ed worker poststate. Review, persist and same-region mirror-bind an append-only v6 certificate with a fresh tag before another install-only attempt.",
+  "unused_retired_tag": "greenfield_m2048_strategy_nd_20260904T072057405273776Z"
+}

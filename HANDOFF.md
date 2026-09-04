@@ -12023,3 +12023,28 @@ V5 certificate `docs/artifacts/gate-d-m2048-strategy-nd-v5-source.json` SHA
 `06932679…4399c7`; fresh tag `greenfield_m2048_strategy_nd_20260904T072057405273776Z`.
 Nothing V5 is reviewed, committed, installed or executed. Exact next: one Sol batch over the full
 delta; only a clean verdict permits persistence/install/one execution.
+
+## 2026-09-04 08:07--08:20Z — V5 exposes missing fixed parent; V6 CPU-green
+
+Sol approved V5 with no P0--P2. It was committed/pushed as
+`80bcd0edab9f4a1d7b0085af89dc4159cbf2254c` and replayed from the US-CENTRAL2 mirror. Install-only
+successfully refreshed workers 1--7, proved 8/8 exact clean repositories and copied all three
+runtime source trees. Both repaired embedded loaders executed. Worker 0 verified its three existing
+sealed runtimes; workers 1--7 then failed closed in the root bootstrap because the recreated images
+have `/usr/local` but not `/usr/local/libexec`. The helper tried to validate the absent path before
+creating its `glm-tpu` child. No capsule, launcher, JAX or TPU was reached on those workers. Report
+SHA `4154687f…ca506`; post-failure census 8/8 dependency-free clean; exact transfer trees removed
+7/7 (`17eb2990…b533`). Failure record
+`docs/artifacts/gate-d-m2048-v5-install-missing-libexec-parent-failure.json` SHA
+`03b4e764…e061f`; V5 tag retired unused.
+
+V6 changes only the fixed bootstrap chain and its bound provenance. Root now prepares
+`/usr/local/libexec` from the already-surveyed root:root 0755 `/usr/local`, then prepares
+`/usr/local/libexec/glm-tpu`; each held parent/child remains O_NOFOLLOW-opened, root:root, exact
+0755 and xattr-free. Tests prove the exact fixed order, idempotent missing-parent creation and
+symlink refusal. Workers 1--7 must begin clean/detached at `80bcd0ed`; the complete SHA cascade is
+repinned. Focused suite passes 34/34 in 6.77 s. Certificate
+`docs/artifacts/gate-d-m2048-strategy-nd-v6-source.json` SHA `3b821143…4a7f71`; fresh unstarted tag
+`greenfield_m2048_strategy_nd_20260904T081918746174545Z`. Exact next: complete syntax/JSON/source-
+chain/history validation, then one Sol batch; resolve all P0--P2 before persistence, install or
+execution. Gate D remains open; no 8K.

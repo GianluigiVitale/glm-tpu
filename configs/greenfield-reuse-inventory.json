@@ -801,7 +801,7 @@
       "id": "gate-d-m2048-provisioner-bootstrap",
       "category": "Gate-D recreated-pod immutable runtime prerequisite",
       "source_repo": "glm-tpu greenfield",
-      "source_pin": "bootstrap 3c55731464c4c84283522d946a5b01e89282dca7f237be84f0a0794093d9bbd2 / provisioner 2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594 / original source certificate 308642ec0234c2d600096c337852c6252c166521e988bb6347bdb318a5e1efe7 / mirror-capsule successor certificate 7ae9a6075c697a2eff4e6b99c289eb3889fac02578864881b217973db6938f2e / repository-refresh successor certificate f7502e48967a74f447e4aa3674d430e4e7350448288b4612be81a810c10e5327 / first-loader successor certificate c1f46892142caf76df6b20e9d5f66b7a696926531111a391c6048408428907a3 / all-loader successor certificate 06932679ad6b017c5919b404f15ba3128a03f66ef8bdf6f05cab6fb95e4399c7",
+      "source_pin": "bootstrap 8ca7e0c1ca878e249fc9ecc3b4c2227696ae53232af4bd2a46eb6c07a44aba1f / provisioner 2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594 / original source certificate 308642ec0234c2d600096c337852c6252c166521e988bb6347bdb318a5e1efe7 / mirror-capsule successor certificate 7ae9a6075c697a2eff4e6b99c289eb3889fac02578864881b217973db6938f2e / repository-refresh successor certificate f7502e48967a74f447e4aa3674d430e4e7350448288b4612be81a810c10e5327 / first-loader successor certificate c1f46892142caf76df6b20e9d5f66b7a696926531111a391c6048408428907a3 / all-loader successor certificate 06932679ad6b017c5919b404f15ba3128a03f66ef8bdf6f05cab6fb95e4399c7 / fixed-root-parent successor certificate 3b821143f4e4cec418ee3650e98dbde416cd81a475171e265c725945c44a7f71",
       "source_paths": [
         "scripts/greenfield/bootstrap_gate_d_provisioner.py",
         "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py",
@@ -813,16 +813,18 @@
         "docs/artifacts/gate-d-m2048-strategy-nd-v3-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v4-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v5-source.json",
+        "docs/artifacts/gate-d-m2048-strategy-nd-v6-source.json",
         "docs/artifacts/gate-d-m2048-v2-install-repository-prestate-failure.json",
         "docs/artifacts/gate-d-m2048-v3-install-loader-quoting-failure.json",
-        "docs/artifacts/gate-d-m2048-v4-install-runtime-loader-quoting-failure.json"
+        "docs/artifacts/gate-d-m2048-v4-install-runtime-loader-quoting-failure.json",
+        "docs/artifacts/gate-d-m2048-v5-install-missing-libexec-parent-failure.json"
       ],
       "disposition": "adapted",
       "greenfield_consumers": [
         "one reviewed install-only restoration of the exact M2048 discriminator runtime on the recreated pod"
       ],
       "gate": "D diagnostic prerequisite",
-      "reason": "Workers 1-7 lost the root provisioner and immutable runtime directories when the pod was recreated. The M2048 fleet installer executes exact future-commit helpers from sealed memfds and uses the generic root provisioner with RENAME_NOREPLACE. V2 failed on unmodeled clean detached repository prestates. V3 safely refreshed only that exact prestate but its first embedded Python loader lost string delimiters in outer-shell parsing. V4 fixed and regressed that first loader, refreshed workers 1-7 to b835e0f5, proved all eight repositories exact and copied the runtime source, then failed before bootstrap-helper invocation because the second embedded loader retained the same quoting defect. V5 accepts only the new exact clean detached prestate, escapes the provisioner-bootstrap loader too, and renders and compiles every embedded Python loader assignment in tests. The exact V4 transfer trees were removed 7/7 after failure. Root-owned config/info/hooks isolation, hostile include/filter/attribute and synchronized metadata-swap coverage remain intact. This source-only install prerequisite imports no JAX, initializes no TPU and grants no numerical, model, performance or Gate-D claim."
+      "reason": "Workers 1-7 lost the root provisioner and immutable runtime directories when the pod was recreated. The M2048 fleet installer executes exact future-commit helpers from sealed memfds and uses the generic root provisioner with RENAME_NOREPLACE. V2 failed on unmodeled clean detached repository prestates. V3 and V4 exposed two distinct embedded-loader quote-loss bugs. V5 repaired and regressed both loaders, refreshed workers 1-7 to 80bcd0ed, proved all eight repositories exact and copied runtime source, then failed at the root bootstrap because recreated workers lacked /usr/local/libexec. V6 accepts only that exact clean detached poststate and prepares the fixed /usr/local to libexec to glm-tpu chain in order; every existing or created component is held through O_NOFOLLOW directory descriptors and validated root:root, mode 0755 and xattr-free. The exact V5 transfer trees were removed 7/7. Root-owned config/info/hooks isolation, hostile include/filter/attribute, symlink refusal and synchronized metadata-swap coverage remain intact. This source-only install prerequisite imports no JAX, initializes no TPU and grants no numerical, model, performance or Gate-D claim."
     },
     {
       "id": "gate-d-libtpu-site-capsule",
