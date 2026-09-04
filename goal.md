@@ -10,7 +10,7 @@ FULL ACCESS. Keep <4000 chars. At start/compaction read it and
 Keep live storage in **only** `gs://driftbench-dsv4-uc` at the smallest resumable set. Never touch
 TPU/queued-resource infrastructure, especially `db-v4-64-od-qr4`. Inspect dependencies;
 delete only name+generation+size+CRC-bound objects. Preserve Git, compact evidence and dependencies.
-**Hard ceiling: live bytes must stay below 2,000,000,000,000; >2 TB is unacceptable.** No full-size
+**Hard ceiling: live <2,000,000,000,000 bytes; >2 TB is unacceptable.** No full-size
 backup or moving cost elsewhere. Soft delete is user-authorized off
 from 2026-09-04; report live and retained soft-deleted bytes separately. Rsync writes only `repos/`.
 Before any >100-GB artifact, state need, size and what it replaces.
@@ -50,7 +50,7 @@ suite was 42/42. Do not install/run it until final certificate, review and persi
 
 Cleanup is complete; receipts/capsules are committed/pushed. Three phases deleted
 528 objects/3,936,205,948,614 bytes: superseded runtimes, unrelated DeepSeek models, an incomplete
-PP16 derivative and tar dumps. Tar payloads are unrecoverable. Post-state is 55,266 live
+PP16 derivative and tar dumps. Tar payloads are unrecoverable. Post-delete baseline: 55,266 live
 objects/1,945,025,989,379 bytes (1.945 TB/1.769 TiB), leaving 54,974,010,621 bytes below the cap.
 Keep canonical GLM 150/755,663,676,164; active direct PP16 68/869,671,243,535; PP16 lineage
 metadata 4/11,059,060; all NPZ dumps 4,636/28,158,360,488; results/oracles/repos/evidence.
