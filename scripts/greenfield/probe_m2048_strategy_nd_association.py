@@ -33,7 +33,7 @@ import zipfile
 
 SOURCE_PATH = "scripts/greenfield/probe_m2048_strategy_nd_association.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v2/"
+    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v3/"
     "probe_m2048_strategy_nd_association.py"
 )
 REPOSITORY = Path("/home/gianl/glm-tpu-topology-rewrite")
@@ -361,12 +361,24 @@ def main() -> int:
     )
     try:
         if (
-            jax.process_count() != 8
+            jax.default_backend() != "tpu"
+            or jax.process_count() != 8
             or jax.local_device_count() != 4
             or jax.device_count() != 32
-            or jax.process_index() != arguments.process_id
         ):
-            raise RuntimeError("protected M2048 fleet geometry drifted")
+            raise RuntimeError(
+                "protected M2048 fleet geometry drifted: "
+                f"backend={jax.default_backend()} "
+                f"process_count={jax.process_count()} "
+                f"local_device_count={jax.local_device_count()} "
+                f"device_count={jax.device_count()} "
+                f"jax_process_index={jax.process_index()} "
+                f"launch_process_id={arguments.process_id}"
+            )
+        # TPU JAX topology-orders processes independently of TPU-VM worker
+        # suffixes.  The launch id is the distributed-client identity; the JAX
+        # process index is physical-topology identity.  Preserve both and let
+        # the publisher authenticate the complete DB555 fleet permutation.
         topology, fleet_local_ids = _runtime_topology(
             jax, multihost_utils, arguments.num_processes
         )
@@ -482,6 +494,7 @@ def main() -> int:
             "hlo": hlo_report.to_dict(),
             "hostname": socket.gethostname(),
             "jax_process_index": jax.process_index(),
+            "launch_process_id": arguments.process_id,
             "jax_version": jax.__version__,
             "member_device_ids": list(members),
             "optimized_hlo_sha256": optimized_hlo_sha,

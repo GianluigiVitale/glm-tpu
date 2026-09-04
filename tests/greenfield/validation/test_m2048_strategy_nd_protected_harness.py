@@ -44,7 +44,7 @@ REPO_REFRESHER = ROOT / (
     "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py"
 )
 MIRROR = ROOT / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
-CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v9-source.json"
+CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v10-source.json"
 
 
 def _load_publisher():
@@ -163,6 +163,8 @@ def test_driver_has_no_mutable_result_path_or_cloud_transport() -> None:
 
 def test_driver_binds_local_devices_and_deactivates_cluster_autodetection() -> None:
     source = DRIVER.read_text(encoding="ascii")
+    assert "jax.process_index() != arguments.process_id" not in source
+    assert '"launch_process_id": arguments.process_id' in source
     calls = [
         node
         for node in ast.walk(ast.parse(source))
@@ -251,19 +253,30 @@ else:
 
 def test_marker_parser_requires_canonical_unique_records() -> None:
     lines = []
+    expected_mapping = PUBLISHER_MODULE.EXPECTED_LAUNCH_TO_JAX_PROCESS
     for rank in reversed(range(8)):
         lines.append(
             f"M2048_RECORD process={rank} "
-            f"json_b64={_encoded({'jax_process_index': rank})}"
+            f"json_b64={_encoded({'jax_process_index': expected_mapping[rank], 'launch_process_id': rank})}"
         )
     raw = ("\n".join(lines) + "\n").encode("ascii")
-    assert [item["jax_process_index"] for item in PUBLISHER_MODULE._record_markers(raw)] == list(
-        range(8)
-    )
+    records = PUBLISHER_MODULE._record_markers(raw)
+    assert [item["launch_process_id"] for item in records] == list(range(8))
+    assert [item["jax_process_index"] for item in records] == list(expected_mapping)
     with pytest.raises(RuntimeError, match="one record per process"):
         PUBLISHER_MODULE._record_markers(raw + lines[0].encode("ascii") + b"\n")
     with pytest.raises(RuntimeError, match="one record per process"):
         PUBLISHER_MODULE._record_markers(b"\n".join(raw.splitlines()[:-1]))
+
+
+def test_marker_parser_rejects_launcher_jax_identity_assumption() -> None:
+    lines = [
+        f"M2048_RECORD process={rank} "
+        f"json_b64={_encoded({'jax_process_index': rank, 'launch_process_id': rank})}"
+        for rank in range(8)
+    ]
+    with pytest.raises(RuntimeError, match="marker/process mapping drifted"):
+        PUBLISHER_MODULE._record_markers(("\n".join(lines) + "\n").encode("ascii"))
 
 
 def test_marker_parser_rejects_duplicate_keys_and_noncanonical_json() -> None:
@@ -561,9 +574,13 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
     launcher = load("gate_d_m2048_launcher_path_test", LAUNCHER)
     installer = load("gate_d_m2048_installer_path_test", INSTALLER)
     mirror = load("gate_d_m2048_mirror_path_test", MIRROR)
+    probe = load("gate_d_m2048_probe_path_test", DRIVER)
+    publisher = load("gate_d_m2048_publisher_path_test", PUBLISHER)
     expected = launcher.CAPSULE_ROOT / MIRROR.name
     assert installer.CAPSULE_TARGET == launcher.CAPSULE_ROOT
     assert mirror.INSTALL_PATH == expected
+    assert probe.INSTALL_PATH == launcher.PROBE_PATH
+    assert publisher.INSTALL_PATH == launcher.PUBLISHER_PATH
     assert set(mirror.BOUND_PATHS) >= {
         "docs/artifacts/gate-d-m2048-strategy-nd-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v2-source.json",
@@ -574,6 +591,7 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
         "docs/artifacts/gate-d-m2048-strategy-nd-v7-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v8-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v9-source.json",
+        "docs/artifacts/gate-d-m2048-strategy-nd-v10-source.json",
         "docs/artifacts/gate-d-m2048-v2-install-repository-prestate-failure.json",
         "docs/artifacts/gate-d-m2048-v3-install-loader-quoting-failure.json",
         "docs/artifacts/gate-d-m2048-v4-install-runtime-loader-quoting-failure.json",
@@ -581,6 +599,7 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
         "docs/artifacts/gate-d-m2048-v6-install-scp-symlink-dereference-failure.json",
         "docs/artifacts/gate-d-m2048-v7-missing-requests-auto-detection-failure.json",
         "docs/artifacts/gate-d-m2048-v8-zero-retention-preflight-incompatibility.json",
+        "docs/artifacts/gate-d-m2048-v9-fleet-process-identity-failure.json",
         "scripts/greenfield/bootstrap_gate_d_provisioner.py",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py",
@@ -968,7 +987,7 @@ def test_archive_provisioner_refuses_dangling_output_and_replaced_cleanup(
 
 def test_fleet_serializes_exact_worker_repository_refresh() -> None:
     source = FLEET_INSTALLER.read_text(encoding="ascii")
-    assert "WORKER_REPO_PRESTATE_PIN=43ba8f7c477d47829b520d4467b8baad5cfb9507" in source
+    assert "WORKER_REPO_PRESTATE_PIN=b185404bebaba2ef785b381dfbe45154b594b669" in source
     assert "REPO_REFRESHER_B64=$(git_local show" in source
     assert 'os.memfd_create(\\"gate-d-m2048-repo-refresher\\"' in source
     assert "for worker in 1 2 3 4 5 6 7; do" in source
@@ -1697,6 +1716,7 @@ def _synthetic_success_fixture(monkeypatch: pytest.MonkeyPatch):
         "row0_slice_after_collective": True,
         "this_process_host_transfer_bytes": 3145728,
     }
+    launch_to_jax = PUBLISHER_MODULE.EXPECTED_LAUNCH_TO_JAX_PROCESS
     fleet_ids = [list(range(index * 4, index * 4 + 4)) for index in range(8)]
     records = []
     for rank in range(8):
@@ -1721,7 +1741,8 @@ def _synthetic_success_fixture(monkeypatch: pytest.MonkeyPatch):
                 "gate_d_closed": False,
                 "hlo": report,
                 "hostname": f"db-v4-64-od-w-{rank}",
-                "jax_process_index": rank,
+                "jax_process_index": launch_to_jax[rank],
+                "launch_process_id": rank,
                 "jax_version": "0.10.1",
                 "member_device_ids": list(range(32)),
                 "optimized_hlo_sha256": optimized_sha,
@@ -1870,15 +1891,15 @@ def test_source_certificate_binds_every_listed_file_and_grants_no_authority() ->
     assert record["future_persistence_contract"]["future_merged_pin_required"] is True
     assert record["runtime_recovery"]["existing_verified_runtime_hosts"] == 8
     assert record["immutable_successor_paths"] == {
-        "capsule": "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v2",
-        "install_source": "/opt/glm-tpu/gate-d-m2048-install-v2",
-        "launcher": "/opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v2.py",
+        "capsule": "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v3",
+        "install_source": "/opt/glm-tpu/gate-d-m2048-install-v3",
+        "launcher": "/opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v3.py",
     }
-    assert record["test_evidence"]["passed"] == 45
+    assert record["test_evidence"]["passed"] >= 46
     assert record["proposed_fresh_tag"] in record[
         "protected_run_command_after_approved_install"
     ]
-    for field in ("predecessor_preflight", "predecessor_source_certificate"):
+    for field in ("root_cause_evidence", "predecessor_source_certificate"):
         item = record[field]
         assert sha256((ROOT / item["path"]).read_bytes()).hexdigest() == item[
             "sha256"

@@ -23,7 +23,7 @@ import zipfile
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v2/"
+    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v3/"
     "publish_gate_d_m2048_strategy_nd_association.py"
 )
 SOURCE_PATH = (
@@ -44,6 +44,7 @@ TAG_PATTERN = re.compile(
 EXPECTED_TOPOLOGY_HASH = (
     "294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559"
 )
+EXPECTED_LAUNCH_TO_JAX_PROCESS = (3, 5, 1, 2, 0, 6, 7, 4)
 JAX_SITE_ROOT = "/opt/glm-tpu/gate-d-jax-site-55233c63939e"
 LIBTPU_SITE_ROOT = "/opt/glm-tpu/gate-d-libtpu-site-db7598c867f3"
 PYTHON_RUNTIME_ROOT = "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95"
@@ -441,7 +442,12 @@ def _record_markers(raw: bytes) -> list[Mapping[str, Any]]:
         _decode_json_b64(payload, label=f"record {rank}")
         for rank, payload in sorted(matches, key=lambda item: int(item[0]))
     ]
-    if any(record["jax_process_index"] != index for index, record in enumerate(records)):
+    if any(
+        record.get("launch_process_id") != index
+        or record.get("jax_process_index")
+        != EXPECTED_LAUNCH_TO_JAX_PROCESS[index]
+        for index, record in enumerate(records)
+    ):
         raise RuntimeError("M2048 record marker/process mapping drifted")
     return records
 
@@ -640,6 +646,7 @@ def _prepare_success(
         "captured_utc",
         "hostname",
         "jax_process_index",
+        "launch_process_id",
         "provenance",
     }
     if any(set(record) != expected_record_fields for record in records):
@@ -761,6 +768,7 @@ def _prepare_success(
         "elapsed_seconds": elapsed,
         "gate_d_closed": False,
         "input_row0_bits_sha256": input_sha,
+        "launch_to_jax_process": list(EXPECTED_LAUNCH_TO_JAX_PROCESS),
         "optimized_hlo_sha256": reference["optimized_hlo_sha256"],
         "output_row0_bits_sha256": output_sha,
         "performance_claim": False,

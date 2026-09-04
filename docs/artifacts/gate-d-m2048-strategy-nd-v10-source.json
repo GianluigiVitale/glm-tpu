@@ -1,0 +1,84 @@
+{
+  "artifact_kind": "gate_d_m2048_strategy_nd_v10_source_certificate",
+  "schema_version": 1,
+  "classification": "DB555_NONIDENTITY_LAUNCH_TO_JAX_MAPPING_RESTORED;EXPLICIT_DISTRIBUTED_PARAMETERS_RETAINED;IMMUTABLE_V3_CHAIN_CPU_VALIDATED;SOL_REVIEW_APPROVED;INSTALL_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;NO_MODEL_OR_GATE_D_CLAIM",
+  "code_pin_before_persistence": "b185404bebaba2ef785b381dfbe45154b594b669",
+  "root_cause_evidence": {
+    "path": "docs/artifacts/gate-d-m2048-v9-fleet-process-identity-failure.json",
+    "sha256": "5e626f5d31b906cf4682b97036d3c4f34b058a8b4a139196a88c00ec705c1b6c"
+  },
+  "predecessor_source_certificate": {
+    "path": "docs/artifacts/gate-d-m2048-strategy-nd-v9-source.json",
+    "sha256": "de951f786f952f12deb3d9575886c80d06e5219aa64665eae385dbf64c58531a",
+    "status": "preserved; installed successfully to immutable V2 paths, then failed closed on the invalid launcher/JAX identity predicate before HLO acquisition or numerics; V9 tag burned"
+  },
+  "correction": {
+    "accepted_topology_run_id": 555,
+    "accepted_topology_hash": "294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559",
+    "launch_to_jax_process": [3, 5, 1, 2, 0, 6, 7, 4],
+    "probe": "Requires TPU plus exact 8-process/4-local/32-global geometry, preserves launch_process_id and jax_process_index independently, and prints every observed geometry value on failure.",
+    "publisher": "Requires one record for each launch id, exact hostname suffix binding and the complete DB555 launch-to-JAX permutation; identity mapping and any permutation drift are rejected.",
+    "distributed_initialization": "Retains local_device_ids=(0,1,2,3) and cluster_detection_method=deactivate solely to bypass Cloud TPU cluster auto-detection in the sealed runtime. The inspected JAX 0.10.1 source applies these IDs only to CUDA/ROCm visibility, not TPU visibility."
+  },
+  "immutable_successor_paths": {
+    "capsule": "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v3",
+    "install_source": "/opt/glm-tpu/gate-d-m2048-install-v3",
+    "launcher": "/opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v3.py"
+  },
+  "runtime_recovery": {
+    "existing_verified_runtime_hosts": 8,
+    "worker_repository_prestate": "b185404bebaba2ef785b381dfbe45154b594b669",
+    "install_only": true,
+    "jax_import_or_tpu_initialization": false,
+    "sealed_trees": {
+      "jax": "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df",
+      "libtpu": "db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca",
+      "python": "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616"
+    }
+  },
+  "install_source_tree_sha256": "304a9411b231adc1b4f0e2b1b95639da443ad2afc651753e35590e7ba2b8ac28",
+  "future_persistence_contract": {
+    "branch": "rewrite/topology-first-decode",
+    "origin": "git@github.com:GianluigiVitale/glm-tpu.git",
+    "future_merged_pin_required": true,
+    "condition": "Commit the exact correction, V9 failure evidence and this certificate together; push to origin and replay the exact US-CENTRAL2 mirror before install or execution."
+  },
+  "adversarial_review": {
+    "reviewer": "independent Codex Sol",
+    "verdict_sha256": "730882842df2cfd54427787932b4bc626f5c8a91256bc8ab2ea04f39608e04bf",
+    "verdict_bytes": 133,
+    "p0": "NONE",
+    "p1": "NONE",
+    "p2": "NONE",
+    "safe_to_persist": true,
+    "safe_to_install_after_future_pin_push_mirror": true,
+    "safe_to_execute_once_fresh_tag": true
+  },
+  "proposed_fresh_tag": "greenfield_m2048_strategy_nd_20260904T143657392861243Z",
+  "install_only_command_after_approved_persistence": "/usr/bin/env -i HOME=/home/gianl LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B -c 'import fcntl,hashlib,os,subprocess,sys; pin=sys.argv[1]; expected=sys.argv[2]; git_env={\"GIT_CONFIG_GLOBAL\":\"/dev/null\",\"GIT_CONFIG_NOSYSTEM\":\"1\",\"GIT_NO_LAZY_FETCH\":\"1\",\"GIT_NO_REPLACE_OBJECTS\":\"1\",\"GIT_OPTIONAL_LOCKS\":\"0\",\"GIT_PROTOCOL_FROM_USER\":\"0\",\"GIT_SSH_COMMAND\":\"/bin/false\",\"GIT_TERMINAL_PROMPT\":\"0\",\"HOME\":\"/nonexistent\",\"LANG\":\"C\",\"LC_ALL\":\"C\",\"PATH\":\"/usr/bin:/bin\"}; result=subprocess.run([\"/usr/bin/git\",\"-c\",\"core.fsmonitor=false\",\"-c\",\"core.untrackedCache=false\",\"-c\",\"core.hooksPath=/dev/null\",\"-c\",\"core.attributesFile=/dev/null\",\"-C\",\"/home/gianl/glm-tpu-topology-rewrite\",\"show\",f\"{pin}:scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh\"],check=False,env=git_env,stderr=subprocess.PIPE,stdout=subprocess.PIPE); assert result.returncode==0 and not result.stderr; raw=result.stdout; assert hashlib.sha256(raw).hexdigest()==expected; fd=os.memfd_create(\"gate-d-m2048-fleet-installer\",os.MFD_CLOEXEC|getattr(os,\"MFD_ALLOW_SEALING\",2)); stream=os.fdopen(os.dup(fd),\"wb\",closefd=True); written=stream.write(raw); stream.flush(); stream.close(); assert written==len(raw); os.fchmod(fd,0o400); seals=getattr(fcntl,\"F_SEAL_SEAL\",1)|getattr(fcntl,\"F_SEAL_SHRINK\",2)|getattr(fcntl,\"F_SEAL_GROW\",4)|getattr(fcntl,\"F_SEAL_WRITE\",8); fcntl.fcntl(fd,getattr(fcntl,\"F_ADD_SEALS\",1033),seals); assert fcntl.fcntl(fd,getattr(fcntl,\"F_GET_SEALS\",1034))==seals; os.set_inheritable(fd,True); path=f\"/proc/self/fd/{fd}\"; os.execve(\"/usr/bin/bash\",[\"/usr/bin/bash\",\"--noprofile\",\"--norc\",path],{\"GLM_GATE_D_M2048_INSTALL\":\"1\",\"GLM_GATE_D_M2048_INSTALL_MODE\":\"install_only\",\"GLM_GATE_D_M2048_INSTALL_PIN\":pin,\"HOME\":\"/home/gianl\",\"LANG\":\"C\",\"LC_ALL\":\"C\",\"PATH\":\"/snap/bin:/usr/bin:/bin\",\"PYTHONDONTWRITEBYTECODE\":\"1\"})' <FUTURE_MERGED_PIN> 6098f35e5781d868988bf97712822058b201eab6ae9de6de2b87067dd853196c",
+  "protected_run_command_after_approved_install": "/usr/bin/env -i GLM_GATE_D_M2048=1 GLM_GATE_D_M2048_MODE=execute_once GLM_GATE_D_M2048_TAG=greenfield_m2048_strategy_nd_20260904T143657392861243Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v3.py",
+  "sources": [
+    {"path":"glm_tpu/greenfield/benchmarking/__init__.py","sha256":"f72bebb28652bdfc19f192c50d0659f97f3a5a8b67ebd2a4e251786b95bafd75"},
+    {"path":"glm_tpu/greenfield/benchmarking/m2048_association_fingerprint.py","sha256":"86ad8a1f73ef7ad36e1b4ff5700ec24f805d41d4b51f79161bc478fbc915369f"},
+    {"path":"scripts/greenfield/bootstrap_gate_d_provisioner.py","sha256":"d70e550adce72a7699142763099292cd60f09416b7f467e8a11f4c86ebd1b137"},
+    {"path":"scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh","sha256":"6098f35e5781d868988bf97712822058b201eab6ae9de6de2b87067dd853196c"},
+    {"path":"scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py","sha256":"67d294dc4c35efd8b0f28119e0f9c7c730a0e7f5f7c749ee19940e9e40164f24"},
+    {"path":"scripts/greenfield/launch_gate_d_m2048_strategy_nd_association.py","sha256":"b219e04fb54cc502de6d8bb200b9adaee8a8f40ce23b613b0ffccec6a9dc1ae0"},
+    {"path":"scripts/greenfield/probe_m2048_strategy_nd_association.py","sha256":"0eb543cb85919f5541f2f8e1cf206eeb07630293ea4ba707d1728376fa6a1502"},
+    {"path":"scripts/greenfield/publish_gate_d_m2048_strategy_nd_association.py","sha256":"f6472b2cb43318fad9ece2396c0b079e73ad9840b7bf5b3dd7c131586a52479a"},
+    {"path":"scripts/greenfield/provision_gate_d_runtime_archive.py","sha256":"2582e9b6c91fe11a8489a2359f830ab786b5856463ea896172da1f7ab79b4319"},
+    {"path":"scripts/greenfield/refresh_gate_d_m2048_worker_repository.py","sha256":"f248ff6717113c2376e19e4495fd2b33314280b181b97c783996ec510b7f5b0e"},
+    {"path":"scripts/greenfield/run_gate_d_m2048_strategy_nd_association.sh","sha256":"f09f523995ad1ff6c34f7709931026ff2a9e48be23d8a55eab137c8c1947bf68"},
+    {"path":"scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py","sha256":"d49bff51355d88e353d81f0c8c3aafa0457068567f2bb845ae165efc70a7e465"},
+    {"path":"tests/greenfield/benchmarking/test_m2048_association_fingerprint.py","sha256":"a17bedd76b2d7b333757145663cda2bcad682bf3f3c17cb902cd15dc76f320e2"},
+    {"path":"tests/greenfield/validation/test_m2048_strategy_nd_protected_harness.py","sha256":"3a58754f7ab631e66344fe191365b06719f0dffeb0cf825fbe4dad01aa5c24bd"}
+  ],
+  "test_evidence": {
+    "command": "JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_m2048_strategy_nd_protected_harness.py tests/greenfield/benchmarking/test_m2048_association_fingerprint.py",
+    "duration_seconds": 9.28,
+    "passed": 46,
+    "result": "46 passed",
+    "shell_syntax": "passed: Python py_compile, Bash -n, strict JSON parsing and git diff --check"
+  },
+  "validation_scope": "Exact-shape model-free StrategyND row-zero association source, DB555 launcher/JAX mapping correction, output-sensitive HLO contract, zero-retention publication, fresh immutable V3 installation chain and hostile CPU tests only. No V10 install, TPU initialization, numerical/model/performance result or Gate-D closure is claimed."
+}

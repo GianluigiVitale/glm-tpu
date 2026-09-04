@@ -1,0 +1,50 @@
+{
+  "artifact_kind": "gate_d_m2048_v9_fleet_process_identity_failure",
+  "schema_version": 1,
+  "classification": "PROTECTED_RUN_FAILED_CLOSED_BEFORE_GRAPH_ACQUISITION_OR_NUMERICS;LAUNCHER_JAX_IDENTITY_ASSUMPTION_CONTRADICTS_DB555;ROOT_CAUSE_PROVEN_OFFLINE;TAG_BURNED;GATE_D_OPEN",
+  "failed_run": {
+    "code_hash": "b185404bebaba2ef785b381dfbe45154b594b669",
+    "run_tag": "greenfield_m2048_strategy_nd_20260904T134042540940823Z",
+    "exit_status": 1,
+    "failure": "all eight hosts raised RuntimeError: protected M2048 fleet geometry drifted at probe line 369",
+    "graph_acquisition": false,
+    "compiled_executable_invocations": 0,
+    "numerical_result": false,
+    "performance_claim": false,
+    "gate_d_closed": false
+  },
+  "remote_diagnostic_authority": {
+    "terminal_uri": "gs://driftbench-dsv4-uc/results/greenfield/glm52/m2048_strategy_nd/greenfield_m2048_strategy_nd_20260904T134042540940823Z/diagnostic/diagnostic_objects.json",
+    "terminal_generation": "1788531202518590",
+    "terminal_size": 1983,
+    "terminal_sha256": "ffc084731d81061ddb2dfa2dea795c27c91f01d5023dd5e6688663ebbb8d0271",
+    "terminal_crc32c": "mcGzrg==",
+    "generation_pinned_children_replayed_exactly": 11,
+    "pre_census": "8/8 CENSUS_OK",
+    "failure_exit_census": "8/8 CENSUS_OK"
+  },
+  "root_cause": {
+    "rejected_v9_predicate": "jax.process_index() == launch_process_id",
+    "why_all_hosts_failed": "DB555 proves the launch-worker to JAX-process permutation [3,5,1,2,0,6,7,4], which has no fixed points. V9 therefore rejected every host before _runtime_topology, HLO acquisition, compilation or numerical execution.",
+    "counts_not_the_cause": {
+      "jax_process_count": 8,
+      "jax_local_device_count": 4,
+      "jax_device_count": 32
+    },
+    "sealed_jax_source_finding": "State.initialize uses local_device_ids only to set jax_cuda_visible_devices and jax_rocm_visible_devices; it does not restrict TPU visibility. cluster_detection_method=deactivate remains required to bypass unavailable Cloud TPU auto-detection dependencies.",
+    "accepted_precedent": "scripts/greenfield/inspect_topology.py and probe_layer0_distributed_q_a_norm.py preserve launch_process_id and jax_process_index independently and explicitly forbid assuming equality."
+  },
+  "db555_authority": {
+    "run_id": 555,
+    "tag": "greenfield_topology_20260826T194116460015528Z",
+    "summary_uri": "gs://driftbench-dsv4-uc/results/greenfield_topology_20260826T194116460015528Z/summary.json",
+    "summary_generation": "1787773332629623",
+    "summary_size": 991,
+    "summary_sha256": "1631eeb0102036319eef19af4be4f5cc165b889a70b51b36fe41b4996d7462d2",
+    "success_generation": "1787773332573003",
+    "topology_hash": "294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559",
+    "launch_to_jax_process": [3, 5, 1, 2, 0, 6, 7, 4],
+    "local_device_ids_by_launch_worker": [[12,13,14,15],[20,21,22,23],[4,5,6,7],[8,9,10,11],[0,1,2,3],[24,25,26,27],[28,29,30,31],[16,17,18,19]]
+  },
+  "successor_requirement": "Retain explicit distributed parameters and auto-detection deactivation. Remove only the invalid identity predicate; record both identities; require the exact DB555 permutation in the publisher; publish changed bytes to fresh immutable V3 paths; use a fresh tag after one batched adversarial review and exact commit/push/US-CENTRAL2 mirror replay."
+}

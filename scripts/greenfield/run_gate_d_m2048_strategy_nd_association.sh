@@ -11,7 +11,7 @@ import stat
 from pathlib import Path
 
 root = Path("/opt/glm-tpu/locks")
-launcher = Path("/opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v2.py")
+launcher = Path("/opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v3.py")
 parent_fd = os.open(root, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW)
 parent = os.fstat(parent_fd)
 if not stat.S_ISDIR(parent.st_mode) or parent.st_uid != 0 or parent.st_gid != 0 or stat.S_IMODE(parent.st_mode) & 0o022:
@@ -130,13 +130,13 @@ readonly ORIGIN=git@github.com:GianluigiVitale/glm-tpu.git
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly BUCKET=gs://driftbench-dsv4-uc
 readonly LOCATION=US-CENTRAL2
-readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v2
+readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v3
 readonly PROBE=$CAPSULE/probe_m2048_strategy_nd_association.py
-readonly PROBE_SHA=f364134360800566d7a6c9c56da261c5c5ffca13408e4b6ddb27022c902d71ff
+readonly PROBE_SHA=0eb543cb85919f5541f2f8e1cf206eeb07630293ea4ba707d1728376fa6a1502
 readonly PUBLISHER=$CAPSULE/publish_gate_d_m2048_strategy_nd_association.py
-readonly PUBLISHER_SHA=0b4a810169ffdc808457d99d33f3ed02295b675ed09dc013839ce0fe35e9ce06
+readonly PUBLISHER_SHA=f6472b2cb43318fad9ece2396c0b079e73ad9840b7bf5b3dd7c131586a52479a
 readonly MIRROR_VERIFIER=$CAPSULE/verify_gate_d_rewrite_same_region_git_mirror.py
-readonly MIRROR_VERIFIER_SHA=1972a26ebf7f6d2294f12f54287c831f656d31be4b62a80d57fa9fa70981c0eb
+readonly MIRROR_VERIFIER_SHA=d49bff51355d88e353d81f0c8c3aafa0457068567f2bb845ae165efc70a7e465
 readonly SEALED_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12
 readonly SEALED_PYTHON_SHA=021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7
 readonly VACANCY_EXPECTED='ERROR: (gcloud.storage.ls) One or more URLs matched no objects.'
