@@ -1,0 +1,4439 @@
+{
+  "artifact_kind": "greenfield_checkpoint_reproducibility_capsule",
+  "artifacts": [
+    {
+      "bytes": 755663676164,
+      "disposition": "keep",
+      "expected_manifest_sha256": null,
+      "id": "canonical_glm_source",
+      "object_count": 150,
+      "objects": [
+        {
+          "crc32c": "6HZyOw==",
+          "generation": 1783384168989279,
+          "name": "models/GLM-5.2-FP8/.gitattributes",
+          "size": 1682
+        },
+        {
+          "crc32c": "Yov7mA==",
+          "generation": 1783384170973058,
+          "name": "models/GLM-5.2-FP8/LICENSE",
+          "size": 1065
+        },
+        {
+          "crc32c": "Lx6MjQ==",
+          "generation": 1783384161830320,
+          "name": "models/GLM-5.2-FP8/README.md",
+          "size": 10909
+        },
+        {
+          "crc32c": "I0Sqlg==",
+          "generation": 1783384163868537,
+          "name": "models/GLM-5.2-FP8/chat_template.jinja",
+          "size": 5076
+        },
+        {
+          "crc32c": "djQWpg==",
+          "generation": 1783384156632832,
+          "name": "models/GLM-5.2-FP8/config.json",
+          "size": 29464
+        },
+        {
+          "crc32c": "bSGKog==",
+          "generation": 1783384178112268,
+          "name": "models/GLM-5.2-FP8/generation_config.json",
+          "size": 194
+        },
+        {
+          "crc32c": "F4Vk/w==",
+          "generation": 1783382593522370,
+          "name": "models/GLM-5.2-FP8/model-00001-of-00141.safetensors",
+          "size": 5363940952
+        },
+        {
+          "crc32c": "SY7i2A==",
+          "generation": 1783383012200562,
+          "name": "models/GLM-5.2-FP8/model-00002-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "6B3RLA==",
+          "generation": 1783382846118640,
+          "name": "models/GLM-5.2-FP8/model-00003-of-00141.safetensors",
+          "size": 5363339120
+        },
+        {
+          "crc32c": "VMxLXg==",
+          "generation": 1783383416698247,
+          "name": "models/GLM-5.2-FP8/model-00004-of-00141.safetensors",
+          "size": 5361736640
+        },
+        {
+          "crc32c": "VowhVw==",
+          "generation": 1783381955460842,
+          "name": "models/GLM-5.2-FP8/model-00005-of-00141.safetensors",
+          "size": 5366353560
+        },
+        {
+          "crc32c": "UxPtkg==",
+          "generation": 1783383655990591,
+          "name": "models/GLM-5.2-FP8/model-00006-of-00141.safetensors",
+          "size": 5361736504
+        },
+        {
+          "crc32c": "w4jHtw==",
+          "generation": 1783381841761849,
+          "name": "models/GLM-5.2-FP8/model-00007-of-00141.safetensors",
+          "size": 5366353704
+        },
+        {
+          "crc32c": "4xwo5Q==",
+          "generation": 1783383814056313,
+          "name": "models/GLM-5.2-FP8/model-00008-of-00141.safetensors",
+          "size": 5361736368
+        },
+        {
+          "crc32c": "cgSzAQ==",
+          "generation": 1783381741238404,
+          "name": "models/GLM-5.2-FP8/model-00009-of-00141.safetensors",
+          "size": 5366353832
+        },
+        {
+          "crc32c": "KUWkKA==",
+          "generation": 1783384037352826,
+          "name": "models/GLM-5.2-FP8/model-00010-of-00141.safetensors",
+          "size": 5361736232
+        },
+        {
+          "crc32c": "hX+JnA==",
+          "generation": 1783382634944766,
+          "name": "models/GLM-5.2-FP8/model-00011-of-00141.safetensors",
+          "size": 5363339600
+        },
+        {
+          "crc32c": "kYImIQ==",
+          "generation": 1783382271496663,
+          "name": "models/GLM-5.2-FP8/model-00012-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "6A6r3g==",
+          "generation": 1783383016661560,
+          "name": "models/GLM-5.2-FP8/model-00013-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "p/jnpA==",
+          "generation": 1783382180245548,
+          "name": "models/GLM-5.2-FP8/model-00014-of-00141.safetensors",
+          "size": 5366353496
+        },
+        {
+          "crc32c": "ZTssCA==",
+          "generation": 1783383327334340,
+          "name": "models/GLM-5.2-FP8/model-00015-of-00141.safetensors",
+          "size": 5361736680
+        },
+        {
+          "crc32c": "UQGZJw==",
+          "generation": 1783382066038516,
+          "name": "models/GLM-5.2-FP8/model-00016-of-00141.safetensors",
+          "size": 5366353520
+        },
+        {
+          "crc32c": "rcvQ0w==",
+          "generation": 1783383554924928,
+          "name": "models/GLM-5.2-FP8/model-00017-of-00141.safetensors",
+          "size": 5361736544
+        },
+        {
+          "crc32c": "qr75zg==",
+          "generation": 1783382763332881,
+          "name": "models/GLM-5.2-FP8/model-00018-of-00141.safetensors",
+          "size": 5363339264
+        },
+        {
+          "crc32c": "iGifUg==",
+          "generation": 1783383761522537,
+          "name": "models/GLM-5.2-FP8/model-00019-of-00141.safetensors",
+          "size": 5361736408
+        },
+        {
+          "crc32c": "VdxHDg==",
+          "generation": 1783382594453577,
+          "name": "models/GLM-5.2-FP8/model-00020-of-00141.safetensors",
+          "size": 5364805840
+        },
+        {
+          "crc32c": "wS06Lw==",
+          "generation": 1783383883892371,
+          "name": "models/GLM-5.2-FP8/model-00021-of-00141.safetensors",
+          "size": 5361736336
+        },
+        {
+          "crc32c": "IDf/tA==",
+          "generation": 1783381730107452,
+          "name": "models/GLM-5.2-FP8/model-00022-of-00141.safetensors",
+          "size": 5366353872
+        },
+        {
+          "crc32c": "1BdOjw==",
+          "generation": 1783384201761648,
+          "name": "models/GLM-5.2-FP8/model-00023-of-00141.safetensors",
+          "size": 5357948328
+        },
+        {
+          "crc32c": "oEubIg==",
+          "generation": 1783384203419345,
+          "name": "models/GLM-5.2-FP8/model-00024-of-00141.safetensors",
+          "size": 5357555688
+        },
+        {
+          "crc32c": "rvj2AA==",
+          "generation": 1783382877435045,
+          "name": "models/GLM-5.2-FP8/model-00025-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "qImJIQ==",
+          "generation": 1783383099833254,
+          "name": "models/GLM-5.2-FP8/model-00026-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "UH5qzQ==",
+          "generation": 1783382119374212,
+          "name": "models/GLM-5.2-FP8/model-00027-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "rGGiqQ==",
+          "generation": 1783383371517341,
+          "name": "models/GLM-5.2-FP8/model-00028-of-00141.safetensors",
+          "size": 5361736648
+        },
+        {
+          "crc32c": "fNMcQQ==",
+          "generation": 1783382000410180,
+          "name": "models/GLM-5.2-FP8/model-00029-of-00141.safetensors",
+          "size": 5366353560
+        },
+        {
+          "crc32c": "itV8rQ==",
+          "generation": 1783383598240307,
+          "name": "models/GLM-5.2-FP8/model-00030-of-00141.safetensors",
+          "size": 5361736512
+        },
+        {
+          "crc32c": "/JfK9w==",
+          "generation": 1783381849540044,
+          "name": "models/GLM-5.2-FP8/model-00031-of-00141.safetensors",
+          "size": 5366353688
+        },
+        {
+          "crc32c": "yQUrvw==",
+          "generation": 1783383778340964,
+          "name": "models/GLM-5.2-FP8/model-00032-of-00141.safetensors",
+          "size": 5361736376
+        },
+        {
+          "crc32c": "72Xbiw==",
+          "generation": 1783382657063672,
+          "name": "models/GLM-5.2-FP8/model-00033-of-00141.safetensors",
+          "size": 5363339440
+        },
+        {
+          "crc32c": "cYpQmQ==",
+          "generation": 1783384037851770,
+          "name": "models/GLM-5.2-FP8/model-00034-of-00141.safetensors",
+          "size": 5361736240
+        },
+        {
+          "crc32c": "ygslkQ==",
+          "generation": 1783381609768003,
+          "name": "models/GLM-5.2-FP8/model-00035-of-00141.safetensors",
+          "size": 5366353976
+        },
+        {
+          "crc32c": "3FPW4g==",
+          "generation": 1783382286990112,
+          "name": "models/GLM-5.2-FP8/model-00036-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "XbMyOw==",
+          "generation": 1783383055849682,
+          "name": "models/GLM-5.2-FP8/model-00037-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "Ggj7hA==",
+          "generation": 1783382395903345,
+          "name": "models/GLM-5.2-FP8/model-00038-of-00141.safetensors",
+          "size": 5366353304
+        },
+        {
+          "crc32c": "cNIjiQ==",
+          "generation": 1783384099403947,
+          "name": "models/GLM-5.2-FP8/model-00039-of-00141.safetensors",
+          "size": 5361735832
+        },
+        {
+          "crc32c": "t1WXEw==",
+          "generation": 1783382487059867,
+          "name": "models/GLM-5.2-FP8/model-00040-of-00141.safetensors",
+          "size": 5366353016
+        },
+        {
+          "crc32c": "uBlNXQ==",
+          "generation": 1783383549336797,
+          "name": "models/GLM-5.2-FP8/model-00041-of-00141.safetensors",
+          "size": 5361736552
+        },
+        {
+          "crc32c": "MJLmww==",
+          "generation": 1783382802461224,
+          "name": "models/GLM-5.2-FP8/model-00042-of-00141.safetensors",
+          "size": 5363339264
+        },
+        {
+          "crc32c": "Yfgs3Q==",
+          "generation": 1783383706985498,
+          "name": "models/GLM-5.2-FP8/model-00043-of-00141.safetensors",
+          "size": 5361736416
+        },
+        {
+          "crc32c": "Fz7X2Q==",
+          "generation": 1783381839642266,
+          "name": "models/GLM-5.2-FP8/model-00044-of-00141.safetensors",
+          "size": 5366353776
+        },
+        {
+          "crc32c": "Nxwb8g==",
+          "generation": 1783383990128915,
+          "name": "models/GLM-5.2-FP8/model-00045-of-00141.safetensors",
+          "size": 5361736280
+        },
+        {
+          "crc32c": "7fHaqA==",
+          "generation": 1783381611357775,
+          "name": "models/GLM-5.2-FP8/model-00046-of-00141.safetensors",
+          "size": 5366353920
+        },
+        {
+          "crc32c": "AspFWA==",
+          "generation": 1783382192407616,
+          "name": "models/GLM-5.2-FP8/model-00047-of-00141.safetensors",
+          "size": 5366353496
+        },
+        {
+          "crc32c": "QPDRFg==",
+          "generation": 1783383076356326,
+          "name": "models/GLM-5.2-FP8/model-00048-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "MK8FPA==",
+          "generation": 1783382908777387,
+          "name": "models/GLM-5.2-FP8/model-00049-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "82gdfw==",
+          "generation": 1783383121684301,
+          "name": "models/GLM-5.2-FP8/model-00050-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "pmQnqA==",
+          "generation": 1783382072437891,
+          "name": "models/GLM-5.2-FP8/model-00051-of-00141.safetensors",
+          "size": 5366353512
+        },
+        {
+          "crc32c": "iqNmBA==",
+          "generation": 1783383481004888,
+          "name": "models/GLM-5.2-FP8/model-00052-of-00141.safetensors",
+          "size": 5361736584
+        },
+        {
+          "crc32c": "bafxng==",
+          "generation": 1783381945770140,
+          "name": "models/GLM-5.2-FP8/model-00053-of-00141.safetensors",
+          "size": 5366353608
+        },
+        {
+          "crc32c": "6qCZPw==",
+          "generation": 1783383673529125,
+          "name": "models/GLM-5.2-FP8/model-00054-of-00141.safetensors",
+          "size": 5361736448
+        },
+        {
+          "crc32c": "GMGRmA==",
+          "generation": 1783381844289713,
+          "name": "models/GLM-5.2-FP8/model-00055-of-00141.safetensors",
+          "size": 5366353744
+        },
+        {
+          "crc32c": "y4QPCA==",
+          "generation": 1783383921688119,
+          "name": "models/GLM-5.2-FP8/model-00056-of-00141.safetensors",
+          "size": 5361736312
+        },
+        {
+          "crc32c": "L/ymbQ==",
+          "generation": 1783382640996927,
+          "name": "models/GLM-5.2-FP8/model-00057-of-00141.safetensors",
+          "size": 5363339496
+        },
+        {
+          "crc32c": "yNHByw==",
+          "generation": 1783384147524206,
+          "name": "models/GLM-5.2-FP8/model-00058-of-00141.safetensors",
+          "size": 5357950744
+        },
+        {
+          "crc32c": "ZwVreg==",
+          "generation": 1783384231977882,
+          "name": "models/GLM-5.2-FP8/model-00059-of-00141.safetensors",
+          "size": 5357552376
+        },
+        {
+          "crc32c": "e2rJhw==",
+          "generation": 1783382499397792,
+          "name": "models/GLM-5.2-FP8/model-00060-of-00141.safetensors",
+          "size": 5366352776
+        },
+        {
+          "crc32c": "lmyWtw==",
+          "generation": 1783383144111853,
+          "name": "models/GLM-5.2-FP8/model-00061-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "v9EYpg==",
+          "generation": 1783382166226636,
+          "name": "models/GLM-5.2-FP8/model-00062-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "pcozpQ==",
+          "generation": 1783383435442965,
+          "name": "models/GLM-5.2-FP8/model-00063-of-00141.safetensors",
+          "size": 5361736624
+        },
+        {
+          "crc32c": "0aA/oQ==",
+          "generation": 1783381950910441,
+          "name": "models/GLM-5.2-FP8/model-00064-of-00141.safetensors",
+          "size": 5366353576
+        },
+        {
+          "crc32c": "nscigw==",
+          "generation": 1783383657741984,
+          "name": "models/GLM-5.2-FP8/model-00065-of-00141.safetensors",
+          "size": 5361736488
+        },
+        {
+          "crc32c": "lUkVRg==",
+          "generation": 1783382725846897,
+          "name": "models/GLM-5.2-FP8/model-00066-of-00141.safetensors",
+          "size": 5363339320
+        },
+        {
+          "crc32c": "/F54gA==",
+          "generation": 1783383866827676,
+          "name": "models/GLM-5.2-FP8/model-00067-of-00141.safetensors",
+          "size": 5361736360
+        },
+        {
+          "crc32c": "Ylfisw==",
+          "generation": 1783381737908725,
+          "name": "models/GLM-5.2-FP8/model-00068-of-00141.safetensors",
+          "size": 5366353848
+        },
+        {
+          "crc32c": "hMO5lw==",
+          "generation": 1783384039248766,
+          "name": "models/GLM-5.2-FP8/model-00069-of-00141.safetensors",
+          "size": 5361736224
+        },
+        {
+          "crc32c": "SGgmFw==",
+          "generation": 1783381615595016,
+          "name": "models/GLM-5.2-FP8/model-00070-of-00141.safetensors",
+          "size": 5366353992
+        },
+        {
+          "crc32c": "0Hpdqg==",
+          "generation": 1783382280954064,
+          "name": "models/GLM-5.2-FP8/model-00071-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "vnb21Q==",
+          "generation": 1783383149955165,
+          "name": "models/GLM-5.2-FP8/model-00072-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "ZK9s+A==",
+          "generation": 1783382842840702,
+          "name": "models/GLM-5.2-FP8/model-00073-of-00141.safetensors",
+          "size": 5363339112
+        },
+        {
+          "crc32c": "2nX9fQ==",
+          "generation": 1783383338618306,
+          "name": "models/GLM-5.2-FP8/model-00074-of-00141.safetensors",
+          "size": 5361736672
+        },
+        {
+          "crc32c": "Bpi0hg==",
+          "generation": 1783382067272489,
+          "name": "models/GLM-5.2-FP8/model-00075-of-00141.safetensors",
+          "size": 5366353528
+        },
+        {
+          "crc32c": "++vXCQ==",
+          "generation": 1783383571562250,
+          "name": "models/GLM-5.2-FP8/model-00076-of-00141.safetensors",
+          "size": 5361736528
+        },
+        {
+          "crc32c": "ZWbaSQ==",
+          "generation": 1783381846257857,
+          "name": "models/GLM-5.2-FP8/model-00077-of-00141.safetensors",
+          "size": 5366353672
+        },
+        {
+          "crc32c": "R81gwQ==",
+          "generation": 1783383768423478,
+          "name": "models/GLM-5.2-FP8/model-00078-of-00141.safetensors",
+          "size": 5361736392
+        },
+        {
+          "crc32c": "eAH0UA==",
+          "generation": 1783382397049642,
+          "name": "models/GLM-5.2-FP8/model-00079-of-00141.safetensors",
+          "size": 5366353168
+        },
+        {
+          "crc32c": "J1rWTw==",
+          "generation": 1783384141801539,
+          "name": "models/GLM-5.2-FP8/model-00080-of-00141.safetensors",
+          "size": 5361735408
+        },
+        {
+          "crc32c": "7fiFVw==",
+          "generation": 1783381741149905,
+          "name": "models/GLM-5.2-FP8/model-00081-of-00141.safetensors",
+          "size": 5366353872
+        },
+        {
+          "crc32c": "8IOnfA==",
+          "generation": 1783382906486973,
+          "name": "models/GLM-5.2-FP8/model-00082-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "YCjHhQ==",
+          "generation": 1783383217881622,
+          "name": "models/GLM-5.2-FP8/model-00083-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "GXzEoA==",
+          "generation": 1783382260884170,
+          "name": "models/GLM-5.2-FP8/model-00084-of-00141.safetensors",
+          "size": 5366353496
+        },
+        {
+          "crc32c": "R5JGdA==",
+          "generation": 1783383198045921,
+          "name": "models/GLM-5.2-FP8/model-00085-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "pPrj7w==",
+          "generation": 1783382077155975,
+          "name": "models/GLM-5.2-FP8/model-00086-of-00141.safetensors",
+          "size": 5366353512
+        },
+        {
+          "crc32c": "d3z6IQ==",
+          "generation": 1783383487321401,
+          "name": "models/GLM-5.2-FP8/model-00087-of-00141.safetensors",
+          "size": 5361736568
+        },
+        {
+          "crc32c": "69osPA==",
+          "generation": 1783381944689580,
+          "name": "models/GLM-5.2-FP8/model-00088-of-00141.safetensors",
+          "size": 5366353632
+        },
+        {
+          "crc32c": "rmxIew==",
+          "generation": 1783383704666229,
+          "name": "models/GLM-5.2-FP8/model-00089-of-00141.safetensors",
+          "size": 5361736432
+        },
+        {
+          "crc32c": "LZ5h2w==",
+          "generation": 1783382695888107,
+          "name": "models/GLM-5.2-FP8/model-00090-of-00141.safetensors",
+          "size": 5363339376
+        },
+        {
+          "crc32c": "k4v29g==",
+          "generation": 1783383919781532,
+          "name": "models/GLM-5.2-FP8/model-00091-of-00141.safetensors",
+          "size": 5361736296
+        },
+        {
+          "crc32c": "uSQLdw==",
+          "generation": 1783381610512924,
+          "name": "models/GLM-5.2-FP8/model-00092-of-00141.safetensors",
+          "size": 5366353904
+        },
+        {
+          "crc32c": "SiBw7A==",
+          "generation": 1783382286245925,
+          "name": "models/GLM-5.2-FP8/model-00093-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "mAZccA==",
+          "generation": 1783383216703924,
+          "name": "models/GLM-5.2-FP8/model-00094-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "D1KdOA==",
+          "generation": 1783382337394093,
+          "name": "models/GLM-5.2-FP8/model-00095-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "OhB+wg==",
+          "generation": 1783383228093679,
+          "name": "models/GLM-5.2-FP8/model-00096-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "ub/slA==",
+          "generation": 1783382860134613,
+          "name": "models/GLM-5.2-FP8/model-00097-of-00141.safetensors",
+          "size": 5363339112
+        },
+        {
+          "crc32c": "srs3Mw==",
+          "generation": 1783383443187214,
+          "name": "models/GLM-5.2-FP8/model-00098-of-00141.safetensors",
+          "size": 5361736616
+        },
+        {
+          "crc32c": "T6XqKQ==",
+          "generation": 1783382443485355,
+          "name": "models/GLM-5.2-FP8/model-00099-of-00141.safetensors",
+          "size": 5366353168
+        },
+        {
+          "crc32c": "fH/P7w==",
+          "generation": 1783384123012365,
+          "name": "models/GLM-5.2-FP8/model-00100-of-00141.safetensors",
+          "size": 5361735624
+        },
+        {
+          "crc32c": "siMEaA==",
+          "generation": 1783382966124896,
+          "name": "models/GLM-5.2-FP8/model-00101-of-00141.safetensors",
+          "size": 5363339032
+        },
+        {
+          "crc32c": "C+Y4qA==",
+          "generation": 1783383872397287,
+          "name": "models/GLM-5.2-FP8/model-00102-of-00141.safetensors",
+          "size": 5361736344
+        },
+        {
+          "crc32c": "AvL1zA==",
+          "generation": 1783381735876584,
+          "name": "models/GLM-5.2-FP8/model-00103-of-00141.safetensors",
+          "size": 5366353856
+        },
+        {
+          "crc32c": "sE5TuQ==",
+          "generation": 1783382552286262,
+          "name": "models/GLM-5.2-FP8/model-00104-of-00141.safetensors",
+          "size": 5364883208
+        },
+        {
+          "crc32c": "lgviFg==",
+          "generation": 1783382980721252,
+          "name": "models/GLM-5.2-FP8/model-00105-of-00141.safetensors",
+          "size": 5363207032
+        },
+        {
+          "crc32c": "WJrOHw==",
+          "generation": 1783382948721603,
+          "name": "models/GLM-5.2-FP8/model-00106-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "73+6jQ==",
+          "generation": 1783383257400035,
+          "name": "models/GLM-5.2-FP8/model-00107-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "xO+W/w==",
+          "generation": 1783382176785247,
+          "name": "models/GLM-5.2-FP8/model-00108-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "72QVPQ==",
+          "generation": 1783383377789554,
+          "name": "models/GLM-5.2-FP8/model-00109-of-00141.safetensors",
+          "size": 5361736648
+        },
+        {
+          "crc32c": "xSP0qw==",
+          "generation": 1783382056550218,
+          "name": "models/GLM-5.2-FP8/model-00110-of-00141.safetensors",
+          "size": 5366353552
+        },
+        {
+          "crc32c": "L/tmow==",
+          "generation": 1783383602180677,
+          "name": "models/GLM-5.2-FP8/model-00111-of-00141.safetensors",
+          "size": 5361736512
+        },
+        {
+          "crc32c": "0qEzsA==",
+          "generation": 1783381890937959,
+          "name": "models/GLM-5.2-FP8/model-00112-of-00141.safetensors",
+          "size": 5366353688
+        },
+        {
+          "crc32c": "Su2huQ==",
+          "generation": 1783383812611029,
+          "name": "models/GLM-5.2-FP8/model-00113-of-00141.safetensors",
+          "size": 5361736376
+        },
+        {
+          "crc32c": "WaTP1Q==",
+          "generation": 1783382704800650,
+          "name": "models/GLM-5.2-FP8/model-00114-of-00141.safetensors",
+          "size": 5363339432
+        },
+        {
+          "crc32c": "qQXsrg==",
+          "generation": 1783384015541829,
+          "name": "models/GLM-5.2-FP8/model-00115-of-00141.safetensors",
+          "size": 5361736240
+        },
+        {
+          "crc32c": "fd1yNw==",
+          "generation": 1783381613391912,
+          "name": "models/GLM-5.2-FP8/model-00116-of-00141.safetensors",
+          "size": 5366353976
+        },
+        {
+          "crc32c": "h5j6tQ==",
+          "generation": 1783382376791006,
+          "name": "models/GLM-5.2-FP8/model-00117-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "T7wHmg==",
+          "generation": 1783383260304807,
+          "name": "models/GLM-5.2-FP8/model-00118-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "y4c5/Q==",
+          "generation": 1783382391042265,
+          "name": "models/GLM-5.2-FP8/model-00119-of-00141.safetensors",
+          "size": 5366353304
+        },
+        {
+          "crc32c": "Lmbu5w==",
+          "generation": 1783384099157151,
+          "name": "models/GLM-5.2-FP8/model-00120-of-00141.safetensors",
+          "size": 5361735832
+        },
+        {
+          "crc32c": "E4Relg==",
+          "generation": 1783382500455366,
+          "name": "models/GLM-5.2-FP8/model-00121-of-00141.safetensors",
+          "size": 5366353016
+        },
+        {
+          "crc32c": "rWgtFQ==",
+          "generation": 1783383551187436,
+          "name": "models/GLM-5.2-FP8/model-00122-of-00141.safetensors",
+          "size": 5361736552
+        },
+        {
+          "crc32c": "1PEYLw==",
+          "generation": 1783382804149532,
+          "name": "models/GLM-5.2-FP8/model-00123-of-00141.safetensors",
+          "size": 5363339256
+        },
+        {
+          "crc32c": "RyC2Pw==",
+          "generation": 1783383761245181,
+          "name": "models/GLM-5.2-FP8/model-00124-of-00141.safetensors",
+          "size": 5361736416
+        },
+        {
+          "crc32c": "AwOp6A==",
+          "generation": 1783381742955247,
+          "name": "models/GLM-5.2-FP8/model-00125-of-00141.safetensors",
+          "size": 5366353784
+        },
+        {
+          "crc32c": "Z7JGnQ==",
+          "generation": 1783383988451191,
+          "name": "models/GLM-5.2-FP8/model-00126-of-00141.safetensors",
+          "size": 5361736288
+        },
+        {
+          "crc32c": "DWocGg==",
+          "generation": 1783381610904402,
+          "name": "models/GLM-5.2-FP8/model-00127-of-00141.safetensors",
+          "size": 5366353920
+        },
+        {
+          "crc32c": "nlsP3w==",
+          "generation": 1783382379001482,
+          "name": "models/GLM-5.2-FP8/model-00128-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "vp1eJg==",
+          "generation": 1783383308892795,
+          "name": "models/GLM-5.2-FP8/model-00129-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "IVoO4Q==",
+          "generation": 1783382949989727,
+          "name": "models/GLM-5.2-FP8/model-00130-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "i9u42w==",
+          "generation": 1783383329904535,
+          "name": "models/GLM-5.2-FP8/model-00131-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "hOvtpA==",
+          "generation": 1783382173666175,
+          "name": "models/GLM-5.2-FP8/model-00132-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "aaIcxw==",
+          "generation": 1783383456842134,
+          "name": "models/GLM-5.2-FP8/model-00133-of-00141.safetensors",
+          "size": 5361736592
+        },
+        {
+          "crc32c": "mOz5Zg==",
+          "generation": 1783381951985889,
+          "name": "models/GLM-5.2-FP8/model-00134-of-00141.safetensors",
+          "size": 5366353608
+        },
+        {
+          "crc32c": "ifmujA==",
+          "generation": 1783383663663786,
+          "name": "models/GLM-5.2-FP8/model-00135-of-00141.safetensors",
+          "size": 5361736456
+        },
+        {
+          "crc32c": "mLbBdg==",
+          "generation": 1783382502235730,
+          "name": "models/GLM-5.2-FP8/model-00136-of-00141.safetensors",
+          "size": 5366338752
+        },
+        {
+          "crc32c": "8Ri9qQ==",
+          "generation": 1783383898984028,
+          "name": "models/GLM-5.2-FP8/model-00137-of-00141.safetensors",
+          "size": 5361736352
+        },
+        {
+          "crc32c": "YEE88A==",
+          "generation": 1783382605070926,
+          "name": "models/GLM-5.2-FP8/model-00138-of-00141.safetensors",
+          "size": 5363351176
+        },
+        {
+          "crc32c": "mKBIaA==",
+          "generation": 1783384139802935,
+          "name": "models/GLM-5.2-FP8/model-00139-of-00141.safetensors",
+          "size": 5361735376
+        },
+        {
+          "crc32c": "EmQ5Sw==",
+          "generation": 1783382488416547,
+          "name": "models/GLM-5.2-FP8/model-00140-of-00141.safetensors",
+          "size": 5366353160
+        },
+        {
+          "crc32c": "NE3icw==",
+          "generation": 1783384235245206,
+          "name": "models/GLM-5.2-FP8/model-00141-of-00141.safetensors",
+          "size": 4724454592
+        },
+        {
+          "crc32c": "DtboPA==",
+          "generation": 1783384154820062,
+          "name": "models/GLM-5.2-FP8/model.safetensors.index.json",
+          "size": 11359251
+        },
+        {
+          "crc32c": "CJhfpQ==",
+          "generation": 1783384149331440,
+          "name": "models/GLM-5.2-FP8/tokenizer.json",
+          "size": 20217442
+        },
+        {
+          "crc32c": "s6fUuQ==",
+          "generation": 1783384176301056,
+          "name": "models/GLM-5.2-FP8/tokenizer_config.json",
+          "size": 761
+        }
+      ],
+      "prefix": "models/GLM-5.2-FP8/",
+      "preserve_metadata_objects": [],
+      "recipe": {
+        "code_hash": "61475d30a708252bc64aaf50fec2c2ea1ea03c63",
+        "dependencies": [],
+        "entrypoint": "scripts/greenfield/pack_checkpoint_streaming.py",
+        "notes": "Canonical GLM source retained as the root for all derived plan layouts."
+      },
+      "terminal_objects": [
+        "model.safetensors.index.json"
+      ]
+    },
+    {
+      "bytes": 869671243535,
+      "disposition": "keep",
+      "expected_manifest_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+      "id": "active_direct_pp16_runtime",
+      "object_count": 68,
+      "objects": [
+        {
+          "crc32c": "gEYRtQ==",
+          "generation": 1787851422189249,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/SUCCESS",
+          "size": 88
+        },
+        {
+          "crc32c": "Nq0a+w==",
+          "generation": 1787849998524258,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "rO/F3Q==",
+          "generation": 1787849998853042,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "pOv6ug==",
+          "generation": 1787850708602863,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "nyEptA==",
+          "generation": 1787850709002263,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "ObMP8w==",
+          "generation": 1787850693469479,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "ZW01LA==",
+          "generation": 1787850693801956,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "+/JYGw==",
+          "generation": 1787850697704541,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "s6OojQ==",
+          "generation": 1787850698199202,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "Ton6bQ==",
+          "generation": 1787851320618630,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "1PtDXw==",
+          "generation": 1787851321134717,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "y92diA==",
+          "generation": 1787850706143452,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "2lZ1fQ==",
+          "generation": 1787850706453375,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "/XYYPA==",
+          "generation": 1787851336925438,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "QSmFDQ==",
+          "generation": 1787851337515763,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "08TQCA==",
+          "generation": 1787851361950356,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "1aCtXw==",
+          "generation": 1787851362396345,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "hV66nA==",
+          "generation": 1787850698925967,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_08/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "sHo5EA==",
+          "generation": 1787850699567031,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_08/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "UicxiA==",
+          "generation": 1787850684434110,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_09/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "XQCJsw==",
+          "generation": 1787850684891845,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_09/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "Kdt1hw==",
+          "generation": 1787850699450409,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_10/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "VpeEQA==",
+          "generation": 1787850700031752,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_10/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "A+1PQQ==",
+          "generation": 1787850694841807,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_11/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "slclXQ==",
+          "generation": 1787850695398986,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_11/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "V/TnLQ==",
+          "generation": 1787851369769861,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_12/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "pSdz4Q==",
+          "generation": 1787851370278074,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_12/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "j4Bh0g==",
+          "generation": 1787851368601124,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_13/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "BdNs6A==",
+          "generation": 1787851368934735,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_13/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "em3Jdg==",
+          "generation": 1787851352563194,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_14/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "uvRtcA==",
+          "generation": 1787851353046429,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_14/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "fHjXRQ==",
+          "generation": 1787851330152937,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_15/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "lL6OwQ==",
+          "generation": 1787851330818130,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_15/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "LFIAvQ==",
+          "generation": 1787849377407332,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/control.json",
+          "size": 2003
+        },
+        {
+          "crc32c": "ik8AAQ==",
+          "generation": 1787849999057560,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+          "size": 150669
+        },
+        {
+          "crc32c": "RDgwxA==",
+          "generation": 1787849999226360,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+          "size": 150669
+        },
+        {
+          "crc32c": "GQy8aA==",
+          "generation": 1787850709185021,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors.json",
+          "size": 125346
+        },
+        {
+          "crc32c": "tHK2EQ==",
+          "generation": 1787850709372345,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors.json",
+          "size": 125346
+        },
+        {
+          "crc32c": "gDuapw==",
+          "generation": 1787850694002821,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "eJinGw==",
+          "generation": 1787850694166058,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "PLB4EQ==",
+          "generation": 1787850698380329,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "kugbjQ==",
+          "generation": 1787850698548186,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "2+GHgA==",
+          "generation": 1787851321360180,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors.json",
+          "size": 111619
+        },
+        {
+          "crc32c": "dHWmRw==",
+          "generation": 1787851321536591,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors.json",
+          "size": 111619
+        },
+        {
+          "crc32c": "Dw2G3A==",
+          "generation": 1787850706654963,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors.json",
+          "size": 111618
+        },
+        {
+          "crc32c": "t89D3g==",
+          "generation": 1787850706818549,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors.json",
+          "size": 111618
+        },
+        {
+          "crc32c": "ixmRxg==",
+          "generation": 1787851337695414,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors.json",
+          "size": 111619
+        },
+        {
+          "crc32c": "ynvBZA==",
+          "generation": 1787851337869344,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors.json",
+          "size": 111619
+        },
+        {
+          "crc32c": "A51Bgw==",
+          "generation": 1787851362599904,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors.json",
+          "size": 128667
+        },
+        {
+          "crc32c": "lFn3NQ==",
+          "generation": 1787851362772886,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors.json",
+          "size": 128667
+        },
+        {
+          "crc32c": "Nl0RmA==",
+          "generation": 1787850699757317,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_08/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "wMcjFg==",
+          "generation": 1787850699927799,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_08/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "lclDtA==",
+          "generation": 1787850685084561,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_09/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "YxNP9g==",
+          "generation": 1787850685258833,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_09/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "3EA3Eg==",
+          "generation": 1787850700233907,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_10/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "/V81xQ==",
+          "generation": 1787850700400310,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_10/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "A8J5xA==",
+          "generation": 1787850695585360,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_11/device_slot_00.safetensors.json",
+          "size": 128668
+        },
+        {
+          "crc32c": "+lRpNA==",
+          "generation": 1787850695751214,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_11/device_slot_01.safetensors.json",
+          "size": 128668
+        },
+        {
+          "crc32c": "KrdYlA==",
+          "generation": 1787851370527514,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_12/device_slot_00.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "8UHp1Q==",
+          "generation": 1787851370671127,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_12/device_slot_01.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "QJPpmA==",
+          "generation": 1787851369127962,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_13/device_slot_00.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "4tBRQw==",
+          "generation": 1787851369278171,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_13/device_slot_01.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "G3VPuw==",
+          "generation": 1787851353221936,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_14/device_slot_00.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "ce2gLQ==",
+          "generation": 1787851353391165,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_14/device_slot_01.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "aP+hEQ==",
+          "generation": 1787851331011061,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_15/device_slot_00.safetensors.json",
+          "size": 112534
+        },
+        {
+          "crc32c": "IdhBWw==",
+          "generation": 1787851331175467,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_15/device_slot_01.safetensors.json",
+          "size": 112534
+        },
+        {
+          "crc32c": "MLQPdA==",
+          "generation": 1787849377562612,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/runtime_layout.json",
+          "size": 4805264
+        },
+        {
+          "crc32c": "BoG+wQ==",
+          "generation": 1787851422132475,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/runtime_manifest.json",
+          "size": 4457238
+        }
+      ],
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/",
+      "preserve_metadata_objects": [],
+      "recipe": {
+        "code_hash": "44501082b9ce414c5938c2193d695200c14429c5",
+        "dependencies": [
+          {
+            "artifact_id": "old_pp16_feature_runtime",
+            "required_objects": [
+              "SUCCESS",
+              "control.json",
+              "runtime_layout.json",
+              "runtime_manifest.json"
+            ],
+            "required_scope": "metadata_only"
+          }
+        ],
+        "entrypoint": "scripts/greenfield/run_feature_fused_qkv_derivative_pp16.sh",
+        "notes": "Only full runtime used by current Gate D runners; payload and all metadata stay live."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "bytes": 869561965562,
+      "disposition": "delete_payloads",
+      "expected_manifest_sha256": "0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1",
+      "id": "old_pp16_feature_runtime",
+      "object_count": 68,
+      "objects": [
+        {
+          "crc32c": "C3l7fQ==",
+          "generation": 1787831512488772,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/SUCCESS",
+          "size": 88
+        },
+        {
+          "crc32c": "E5imZQ==",
+          "generation": 1787825803814243,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "eiKiAA==",
+          "generation": 1787825804141404,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "u5TNMg==",
+          "generation": 1787827214683027,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "3yr73w==",
+          "generation": 1787827215314132,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "/rYS8g==",
+          "generation": 1787827297637202,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "JuZ/kg==",
+          "generation": 1787827298059020,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "nFImnw==",
+          "generation": 1787827353226708,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "SXrzPQ==",
+          "generation": 1787827353697683,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "TwZ0nw==",
+          "generation": 1787828495336133,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "xt0LWQ==",
+          "generation": 1787828495774009,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "H8mzUQ==",
+          "generation": 1787827242576434,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "17Roag==",
+          "generation": 1787827243099353,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "kQ21aQ==",
+          "generation": 1787828354711998,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "hv5MiQ==",
+          "generation": 1787828355170440,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "RCadVQ==",
+          "generation": 1787828568852693,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "ZlIRTw==",
+          "generation": 1787828569168454,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "xbff6w==",
+          "generation": 1787827307124947,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_08/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "zD/98A==",
+          "generation": 1787827307628956,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_08/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "qjXyDg==",
+          "generation": 1787827309492462,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_09/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "7TYI+g==",
+          "generation": 1787827309887186,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_09/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "8j3yzA==",
+          "generation": 1787827260772321,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_10/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "sbwZ+w==",
+          "generation": 1787827261167824,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_10/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "HpVwmQ==",
+          "generation": 1787827279321659,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_11/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "RNEgkw==",
+          "generation": 1787827279869445,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_11/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "PX3flQ==",
+          "generation": 1787828638975492,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_12/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "yZX6mw==",
+          "generation": 1787828639395069,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_12/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "7PkT0w==",
+          "generation": 1787828573916956,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_13/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "QB/O5w==",
+          "generation": 1787828574236907,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_13/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "MwT/DA==",
+          "generation": 1787828582715957,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_14/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "OakJwA==",
+          "generation": 1787828583049868,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_14/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "30gSvA==",
+          "generation": 1787828464010439,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_15/device_slot_00.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "dTWm7A==",
+          "generation": 1787828464742187,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/base_decoder_runtime_feature/stage_15/device_slot_01.safetensors",
+          "size": 27173315848
+        },
+        {
+          "crc32c": "dy9JRw==",
+          "generation": 1787824499109869,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/control.json",
+          "size": 1720
+        },
+        {
+          "crc32c": "QiKaUA==",
+          "generation": 1787825804377542,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+          "size": 172785
+        },
+        {
+          "crc32c": "nHW/dA==",
+          "generation": 1787825804531885,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+          "size": 172881
+        },
+        {
+          "crc32c": "35Ym5Q==",
+          "generation": 1787827215494279,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors.json",
+          "size": 152846
+        },
+        {
+          "crc32c": "GCDRmg==",
+          "generation": 1787827215667178,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors.json",
+          "size": 152966
+        },
+        {
+          "crc32c": "eegcdA==",
+          "generation": 1787827298267044,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors.json",
+          "size": 152847
+        },
+        {
+          "crc32c": "feee9g==",
+          "generation": 1787827298412157,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors.json",
+          "size": 152967
+        },
+        {
+          "crc32c": "jQeiNw==",
+          "generation": 1787827353897997,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors.json",
+          "size": 152847
+        },
+        {
+          "crc32c": "lgOEKw==",
+          "generation": 1787827354057780,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors.json",
+          "size": 152967
+        },
+        {
+          "crc32c": "IXKpMA==",
+          "generation": 1787828495950713,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors.json",
+          "size": 134313
+        },
+        {
+          "crc32c": "veDkvQ==",
+          "generation": 1787828496098557,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors.json",
+          "size": 134409
+        },
+        {
+          "crc32c": "SBj8Eg==",
+          "generation": 1787827243267029,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors.json",
+          "size": 134312
+        },
+        {
+          "crc32c": "EX52lw==",
+          "generation": 1787827243416727,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors.json",
+          "size": 134408
+        },
+        {
+          "crc32c": "dNyOaQ==",
+          "generation": 1787828355351152,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors.json",
+          "size": 134313
+        },
+        {
+          "crc32c": "UoifZw==",
+          "generation": 1787828355508785,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors.json",
+          "size": 134409
+        },
+        {
+          "crc32c": "zi/OQQ==",
+          "generation": 1787828569347763,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors.json",
+          "size": 156111
+        },
+        {
+          "crc32c": "Ga2G7Q==",
+          "generation": 1787828569506419,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors.json",
+          "size": 156231
+        },
+        {
+          "crc32c": "2TBvkw==",
+          "generation": 1787827307792769,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_08/device_slot_00.safetensors.json",
+          "size": 152847
+        },
+        {
+          "crc32c": "x7mcUw==",
+          "generation": 1787827307942784,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_08/device_slot_01.safetensors.json",
+          "size": 152967
+        },
+        {
+          "crc32c": "dV28TQ==",
+          "generation": 1787827310102744,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_09/device_slot_00.safetensors.json",
+          "size": 152847
+        },
+        {
+          "crc32c": "FIivTQ==",
+          "generation": 1787827310244879,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_09/device_slot_01.safetensors.json",
+          "size": 152967
+        },
+        {
+          "crc32c": "6eWMyg==",
+          "generation": 1787827261341491,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_10/device_slot_00.safetensors.json",
+          "size": 152847
+        },
+        {
+          "crc32c": "1T6Xsg==",
+          "generation": 1787827261472684,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_10/device_slot_01.safetensors.json",
+          "size": 152967
+        },
+        {
+          "crc32c": "40k84g==",
+          "generation": 1787827280026087,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_11/device_slot_00.safetensors.json",
+          "size": 156112
+        },
+        {
+          "crc32c": "5AADew==",
+          "generation": 1787827280179545,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_11/device_slot_01.safetensors.json",
+          "size": 156232
+        },
+        {
+          "crc32c": "aPyPgA==",
+          "generation": 1787828639563111,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_12/device_slot_00.safetensors.json",
+          "size": 152848
+        },
+        {
+          "crc32c": "/ZNK4A==",
+          "generation": 1787828639724723,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_12/device_slot_01.safetensors.json",
+          "size": 152968
+        },
+        {
+          "crc32c": "hMg1nA==",
+          "generation": 1787828574419472,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_13/device_slot_00.safetensors.json",
+          "size": 152848
+        },
+        {
+          "crc32c": "/SLddg==",
+          "generation": 1787828574565847,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_13/device_slot_01.safetensors.json",
+          "size": 152968
+        },
+        {
+          "crc32c": "8YWseA==",
+          "generation": 1787828583216878,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_14/device_slot_00.safetensors.json",
+          "size": 152848
+        },
+        {
+          "crc32c": "hMuUQQ==",
+          "generation": 1787828583373720,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_14/device_slot_01.safetensors.json",
+          "size": 152968
+        },
+        {
+          "crc32c": "fq3hgg==",
+          "generation": 1787828464920038,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_15/device_slot_00.safetensors.json",
+          "size": 135212
+        },
+        {
+          "crc32c": "OOfYIg==",
+          "generation": 1787828465074605,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/evidence/base_decoder_runtime_feature/stage_15/device_slot_01.safetensors.json",
+          "size": 135308
+        },
+        {
+          "crc32c": "c0tPgw==",
+          "generation": 1787824499284395,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/runtime_layout.json",
+          "size": 5640785
+        },
+        {
+          "crc32c": "sKXI5Q==",
+          "generation": 1787831512430298,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/runtime_manifest.json",
+          "size": 5416467
+        }
+      ],
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "runtime_layout.json",
+        "runtime_manifest.json"
+      ],
+      "recipe": {
+        "code_hash": "a973425cd235758142c55c5a0127ddb9a36b45a9",
+        "dependencies": [
+          {
+            "artifact_id": "canonical_glm_source",
+            "required_scope": "full_payload"
+          }
+        ],
+        "entrypoint": "scripts/greenfield/pack_feature_runtime_checkpoint.py",
+        "notes": "Payload is superseded by active_direct_pp16_runtime. Root metadata remains because current runners verify its lineage. Upstream packed/base parents can be regenerated from canonical source."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "bytes": 834574250016,
+      "disposition": "delete_payloads",
+      "expected_manifest_sha256": "5b48a1f66be359cc70e8bb59e0ce77ed813f835305fd38ac9befc2eeaf8e2268",
+      "id": "superseded_pp8_qkv_dense_runtime",
+      "object_count": 68,
+      "objects": [
+        {
+          "crc32c": "hEqZIQ==",
+          "generation": 1787914803759624,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/SUCCESS",
+          "size": 88
+        },
+        {
+          "crc32c": "2ND8TQ==",
+          "generation": 1787914799186456,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "fuXqkQ==",
+          "generation": 1787914799269494,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "KH1x/w==",
+          "generation": 1787914799353816,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_00/device_slot_02.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "TTl6OA==",
+          "generation": 1787914799434246,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_00/device_slot_03.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "XsPi/Q==",
+          "generation": 1787914799529314,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "LDFDoQ==",
+          "generation": 1787914799613292,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "UYaHbw==",
+          "generation": 1787914799655098,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_01/device_slot_02.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "5WLdMA==",
+          "generation": 1787914799741498,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_01/device_slot_03.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "SC0Ocg==",
+          "generation": 1787914799822836,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "m5XV7w==",
+          "generation": 1787914799892907,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "FM+1bQ==",
+          "generation": 1787914800015626,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_02/device_slot_02.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "CAPnbw==",
+          "generation": 1787914800122320,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_02/device_slot_03.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "7g9YLw==",
+          "generation": 1787914800207415,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "pobLZw==",
+          "generation": 1787914800282844,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "KdKjYA==",
+          "generation": 1787914800362790,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_03/device_slot_02.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "7xZSdw==",
+          "generation": 1787914800438286,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_03/device_slot_03.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "WCYpwA==",
+          "generation": 1787914800517902,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "+deZBg==",
+          "generation": 1787914800554179,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "ZR0/Jw==",
+          "generation": 1787914800624253,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_04/device_slot_02.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "7miPmA==",
+          "generation": 1787914800684409,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_04/device_slot_03.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "4yWQnw==",
+          "generation": 1787914800736648,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "5pHMHQ==",
+          "generation": 1787914800794213,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "p/xHBw==",
+          "generation": 1787914800854947,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_05/device_slot_02.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "mOzK/A==",
+          "generation": 1787914800896133,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_05/device_slot_03.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "gHOm+w==",
+          "generation": 1787914800957570,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "Nx7nkg==",
+          "generation": 1787914801028149,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "y9fS0A==",
+          "generation": 1787914801120774,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_06/device_slot_02.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "e2bl2g==",
+          "generation": 1787914801202965,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_06/device_slot_03.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "kF2GjQ==",
+          "generation": 1787914801280482,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "7IKf9Q==",
+          "generation": 1787914801340697,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "iuZP+A==",
+          "generation": 1787914801419690,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_07/device_slot_02.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "eakheg==",
+          "generation": 1787914801501048,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/base_decoder_runtime_feature/stage_07/device_slot_03.safetensors",
+          "size": 26079343680
+        },
+        {
+          "crc32c": "ebklTg==",
+          "generation": 1787914801553869,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/control.json",
+          "size": 1867
+        },
+        {
+          "crc32c": "Hg9E/Q==",
+          "generation": 1787914801589855,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+          "size": 370207
+        },
+        {
+          "crc32c": "s6+apg==",
+          "generation": 1787914801701105,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+          "size": 370531
+        },
+        {
+          "crc32c": "rayNkA==",
+          "generation": 1787914801797343,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_02.safetensors.json",
+          "size": 370747
+        },
+        {
+          "crc32c": "joki0g==",
+          "generation": 1787914801875852,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_03.safetensors.json",
+          "size": 370855
+        },
+        {
+          "crc32c": "1PHgBQ==",
+          "generation": 1787914801971143,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors.json",
+          "size": 358240
+        },
+        {
+          "crc32c": "/0fSrQ==",
+          "generation": 1787914802042762,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors.json",
+          "size": 358601
+        },
+        {
+          "crc32c": "q8bOgQ==",
+          "generation": 1787914802105589,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_02.safetensors.json",
+          "size": 358840
+        },
+        {
+          "crc32c": "bQFRuQ==",
+          "generation": 1787914802161433,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_03.safetensors.json",
+          "size": 358961
+        },
+        {
+          "crc32c": "WfIANQ==",
+          "generation": 1787914802194328,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors.json",
+          "size": 335109
+        },
+        {
+          "crc32c": "Xe8lCg==",
+          "generation": 1787914802249201,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors.json",
+          "size": 335433
+        },
+        {
+          "crc32c": "i9F32w==",
+          "generation": 1787914802329842,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_02.safetensors.json",
+          "size": 335649
+        },
+        {
+          "crc32c": "vO6jRQ==",
+          "generation": 1787914802357577,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_03.safetensors.json",
+          "size": 335757
+        },
+        {
+          "crc32c": "xGxAUg==",
+          "generation": 1787914802404707,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors.json",
+          "size": 331849
+        },
+        {
+          "crc32c": "WXAvTA==",
+          "generation": 1787914802457642,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors.json",
+          "size": 332173
+        },
+        {
+          "crc32c": "K46wQw==",
+          "generation": 1787914802546210,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_02.safetensors.json",
+          "size": 332389
+        },
+        {
+          "crc32c": "fvtRmA==",
+          "generation": 1787914802626928,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_03.safetensors.json",
+          "size": 332497
+        },
+        {
+          "crc32c": "sd5TRg==",
+          "generation": 1787914802709928,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors.json",
+          "size": 358241
+        },
+        {
+          "crc32c": "khqlGg==",
+          "generation": 1787914802777461,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors.json",
+          "size": 358601
+        },
+        {
+          "crc32c": "ZUcLlQ==",
+          "generation": 1787914802814779,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_02.safetensors.json",
+          "size": 358841
+        },
+        {
+          "crc32c": "aux/5g==",
+          "generation": 1787914802895894,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_03.safetensors.json",
+          "size": 358961
+        },
+        {
+          "crc32c": "VWQdAg==",
+          "generation": 1787914802930207,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors.json",
+          "size": 335109
+        },
+        {
+          "crc32c": "IMxu2Q==",
+          "generation": 1787914802965100,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors.json",
+          "size": 335433
+        },
+        {
+          "crc32c": "xW80uA==",
+          "generation": 1787914803003563,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_02.safetensors.json",
+          "size": 335649
+        },
+        {
+          "crc32c": "l/E0RA==",
+          "generation": 1787914803088051,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_03.safetensors.json",
+          "size": 335757
+        },
+        {
+          "crc32c": "gPUx8g==",
+          "generation": 1787914803127104,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors.json",
+          "size": 358241
+        },
+        {
+          "crc32c": "E8CIcg==",
+          "generation": 1787914803174084,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors.json",
+          "size": 358601
+        },
+        {
+          "crc32c": "KFlvwA==",
+          "generation": 1787914803281989,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_02.safetensors.json",
+          "size": 358841
+        },
+        {
+          "crc32c": "rOy64A==",
+          "generation": 1787914803394407,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_03.safetensors.json",
+          "size": 358961
+        },
+        {
+          "crc32c": "C/DOFg==",
+          "generation": 1787914803433302,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors.json",
+          "size": 332747
+        },
+        {
+          "crc32c": "jJ7+3Q==",
+          "generation": 1787914803505480,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors.json",
+          "size": 333071
+        },
+        {
+          "crc32c": "4CObXw==",
+          "generation": 1787914803543590,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_02.safetensors.json",
+          "size": 333287
+        },
+        {
+          "crc32c": "uZ706w==",
+          "generation": 1787914803590927,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_03.safetensors.json",
+          "size": 333395
+        },
+        {
+          "crc32c": "Y5UXTQ==",
+          "generation": 1787914803629490,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/runtime_layout.json",
+          "size": 11524145
+        },
+        {
+          "crc32c": "hMnE+Q==",
+          "generation": 1787914803686066,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/runtime_manifest.json",
+          "size": 12594582
+        }
+      ],
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_dense_pack_pp8_20260813T152037261372350Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "runtime_layout.json",
+        "runtime_manifest.json"
+      ],
+      "recipe": {
+        "code_hash": "5dc58b0607173d5aa842b22405cb45c2b334073c",
+        "dependencies": [
+          {
+            "artifact_id": "canonical_glm_source",
+            "required_scope": "full_payload"
+          }
+        ],
+        "entrypoint": "scripts/greenfield/run_feature_runtime_checkpoint_pack_pp8.sh",
+        "notes": "Inactive PP8 generation, reproducible sequentially from canonical source and retained Git recipes."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "bytes": 834405892809,
+      "disposition": "delete_payloads",
+      "expected_manifest_sha256": "123394906a153238e464fc096b626c77996b7cf22b95077b9377b8dcafbe699a",
+      "id": "superseded_pp8_qkv_runtime",
+      "object_count": 68,
+      "objects": [
+        {
+          "crc32c": "akY9uA==",
+          "generation": 1787858543408417,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/SUCCESS",
+          "size": 88
+        },
+        {
+          "crc32c": "qGHnTA==",
+          "generation": 1787858538327929,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "UxsQxw==",
+          "generation": 1787858538407945,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "PafpLg==",
+          "generation": 1787858538480726,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_00/device_slot_02.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "LfAa7Q==",
+          "generation": 1787858538527847,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_00/device_slot_03.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "e2IrsA==",
+          "generation": 1787858538621109,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "Aefj2A==",
+          "generation": 1787858538699543,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "odraTA==",
+          "generation": 1787858538742344,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_01/device_slot_02.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "/3fwDw==",
+          "generation": 1787858538848198,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_01/device_slot_03.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "ZUp6aA==",
+          "generation": 1787858538954353,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "PIKOJQ==",
+          "generation": 1787858539008807,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "kleXgw==",
+          "generation": 1787858539094446,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_02/device_slot_02.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "4pm7Ww==",
+          "generation": 1787858539192386,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_02/device_slot_03.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "4y9/yA==",
+          "generation": 1787858539282280,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "gwYv9A==",
+          "generation": 1787858539376820,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "PlbFow==",
+          "generation": 1787858539459997,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_03/device_slot_02.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "YNiuPw==",
+          "generation": 1787858539529418,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_03/device_slot_03.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "NxzaLQ==",
+          "generation": 1787858539636847,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "EQCEyg==",
+          "generation": 1787858539727423,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "RFwMyg==",
+          "generation": 1787858539777369,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_04/device_slot_02.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "VqxQ6g==",
+          "generation": 1787858539840909,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_04/device_slot_03.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "avy2lw==",
+          "generation": 1787858539929122,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "W+ZS2Q==",
+          "generation": 1787858539983040,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "uBi7PA==",
+          "generation": 1787858540032449,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_05/device_slot_02.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "krEflg==",
+          "generation": 1787858540121128,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_05/device_slot_03.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "beboZw==",
+          "generation": 1787858540223349,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "waqd5w==",
+          "generation": 1787858540268603,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "rG430Q==",
+          "generation": 1787858540351965,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_06/device_slot_02.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "JAlD6g==",
+          "generation": 1787858540444635,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_06/device_slot_03.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "VWdFvg==",
+          "generation": 1787858540519030,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "MZPO9w==",
+          "generation": 1787858540589061,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "iw0xjg==",
+          "generation": 1787858540671625,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_07/device_slot_02.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "Lhuqag==",
+          "generation": 1787858540718218,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/base_decoder_runtime_feature/stage_07/device_slot_03.safetensors",
+          "size": 26074077168
+        },
+        {
+          "crc32c": "fsb1NQ==",
+          "generation": 1787858540776917,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/control.json",
+          "size": 1788
+        },
+        {
+          "crc32c": "E2zuvg==",
+          "generation": 1787858540871687,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+          "size": 371566
+        },
+        {
+          "crc32c": "jzFmFQ==",
+          "generation": 1787858540981435,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+          "size": 371890
+        },
+        {
+          "crc32c": "IkxiqA==",
+          "generation": 1787858541039196,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_02.safetensors.json",
+          "size": 372106
+        },
+        {
+          "crc32c": "xxb3Ew==",
+          "generation": 1787858541157293,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_03.safetensors.json",
+          "size": 372214
+        },
+        {
+          "crc32c": "Cknl4g==",
+          "generation": 1787858541269550,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors.json",
+          "size": 359587
+        },
+        {
+          "crc32c": "l4/f2g==",
+          "generation": 1787858541362542,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors.json",
+          "size": 359948
+        },
+        {
+          "crc32c": "9A42Nw==",
+          "generation": 1787858541414858,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_02.safetensors.json",
+          "size": 360187
+        },
+        {
+          "crc32c": "SWXTSQ==",
+          "generation": 1787858541472802,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_03.safetensors.json",
+          "size": 360308
+        },
+        {
+          "crc32c": "fy2DYQ==",
+          "generation": 1787858541550039,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors.json",
+          "size": 336456
+        },
+        {
+          "crc32c": "MDKOUA==",
+          "generation": 1787858541595995,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors.json",
+          "size": 336780
+        },
+        {
+          "crc32c": "TP5yZQ==",
+          "generation": 1787858541711311,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_02.safetensors.json",
+          "size": 336996
+        },
+        {
+          "crc32c": "0Y9n2g==",
+          "generation": 1787858541811785,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_03.safetensors.json",
+          "size": 337104
+        },
+        {
+          "crc32c": "iHrLwg==",
+          "generation": 1787858541882622,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors.json",
+          "size": 333196
+        },
+        {
+          "crc32c": "LKOUfQ==",
+          "generation": 1787858541946820,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors.json",
+          "size": 333520
+        },
+        {
+          "crc32c": "B30lCg==",
+          "generation": 1787858542021829,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_02.safetensors.json",
+          "size": 333736
+        },
+        {
+          "crc32c": "XZ41Hg==",
+          "generation": 1787858542110403,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_03.safetensors.json",
+          "size": 333844
+        },
+        {
+          "crc32c": "+Ksrcg==",
+          "generation": 1787858542167211,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors.json",
+          "size": 359588
+        },
+        {
+          "crc32c": "e5lS2w==",
+          "generation": 1787858542236189,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors.json",
+          "size": 359948
+        },
+        {
+          "crc32c": "10w/cA==",
+          "generation": 1787858542298697,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_02.safetensors.json",
+          "size": 360188
+        },
+        {
+          "crc32c": "hPD1TQ==",
+          "generation": 1787858542377436,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_03.safetensors.json",
+          "size": 360308
+        },
+        {
+          "crc32c": "FFXHfQ==",
+          "generation": 1787858542422018,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors.json",
+          "size": 336456
+        },
+        {
+          "crc32c": "2SFM6Q==",
+          "generation": 1787858542485583,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors.json",
+          "size": 336780
+        },
+        {
+          "crc32c": "ds8GAw==",
+          "generation": 1787858542534375,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_02.safetensors.json",
+          "size": 336996
+        },
+        {
+          "crc32c": "d4RGSQ==",
+          "generation": 1787858542571511,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_03.safetensors.json",
+          "size": 337104
+        },
+        {
+          "crc32c": "dDQdkA==",
+          "generation": 1787858542631587,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors.json",
+          "size": 359588
+        },
+        {
+          "crc32c": "TppFUQ==",
+          "generation": 1787858542687801,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors.json",
+          "size": 359948
+        },
+        {
+          "crc32c": "+/BCrA==",
+          "generation": 1787858542798844,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_02.safetensors.json",
+          "size": 360188
+        },
+        {
+          "crc32c": "ZQMQyw==",
+          "generation": 1787858542836147,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_03.safetensors.json",
+          "size": 360308
+        },
+        {
+          "crc32c": "FH5KRw==",
+          "generation": 1787858542915871,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors.json",
+          "size": 334094
+        },
+        {
+          "crc32c": "B0twQw==",
+          "generation": 1787858542976112,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors.json",
+          "size": 334418
+        },
+        {
+          "crc32c": "trtyMg==",
+          "generation": 1787858543057848,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_02.safetensors.json",
+          "size": 334634
+        },
+        {
+          "crc32c": "VY3ozQ==",
+          "generation": 1787858543132729,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_03.safetensors.json",
+          "size": 334742
+        },
+        {
+          "crc32c": "FZPj1w==",
+          "generation": 1787858543204534,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/runtime_layout.json",
+          "size": 11602936
+        },
+        {
+          "crc32c": "BU8PgA==",
+          "generation": 1787858543346865,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/runtime_manifest.json",
+          "size": 12643895
+        }
+      ],
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP8_LP4/greenfield_runtime_feature_qkv_pack_pp8_20260808T141032190315066Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "runtime_layout.json",
+        "runtime_manifest.json"
+      ],
+      "recipe": {
+        "code_hash": "7d5dfb9ded22f1f7d66801a9ea63eabaaf36b4b7",
+        "dependencies": [
+          {
+            "artifact_id": "canonical_glm_source",
+            "required_scope": "full_payload"
+          }
+        ],
+        "entrypoint": "scripts/greenfield/run_feature_runtime_checkpoint_pack_pp8.sh",
+        "notes": "Inactive PP8 generation, reproducible sequentially from canonical source and retained Git recipes."
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "bytes": 294692678949,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_deepseek_v4_flash_base",
+      "object_count": 52,
+      "objects": [
+        {
+          "crc32c": "6smNrw==",
+          "generation": 1781789822602123,
+          "name": "models/DeepSeek-V4-Flash-Base/.gitattributes",
+          "size": 1603
+        },
+        {
+          "crc32c": "iASM3g==",
+          "generation": 1781789823931591,
+          "name": "models/DeepSeek-V4-Flash-Base/LICENSE",
+          "size": 1084
+        },
+        {
+          "crc32c": "vwbBgA==",
+          "generation": 1781787643171933,
+          "name": "models/DeepSeek-V4-Flash-Base/config.json",
+          "size": 1749
+        },
+        {
+          "crc32c": "i3sX/Q==",
+          "generation": 1781789824671100,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00001-of-00046.safetensors",
+          "size": 1059061856
+        },
+        {
+          "crc32c": "Ok7uXA==",
+          "generation": 1781789800442985,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00002-of-00046.safetensors",
+          "size": 6587813512
+        },
+        {
+          "crc32c": "IGeJIA==",
+          "generation": 1781789816691643,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00003-of-00046.safetensors",
+          "size": 6587813512
+        },
+        {
+          "crc32c": "0wtKSw==",
+          "generation": 1781787839822136,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00004-of-00046.safetensors",
+          "size": 6617722944
+        },
+        {
+          "crc32c": "oYNfSA==",
+          "generation": 1781789642047993,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00005-of-00046.safetensors",
+          "size": 6590260568
+        },
+        {
+          "crc32c": "BVZLuw==",
+          "generation": 1781788777923108,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00006-of-00046.safetensors",
+          "size": 6611517496
+        },
+        {
+          "crc32c": "5FVOfg==",
+          "generation": 1781789669011150,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00007-of-00046.safetensors",
+          "size": 6590260568
+        },
+        {
+          "crc32c": "TezDlQ==",
+          "generation": 1781788736215507,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00008-of-00046.safetensors",
+          "size": 6611517496
+        },
+        {
+          "crc32c": "OUVRtg==",
+          "generation": 1781789684530362,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00009-of-00046.safetensors",
+          "size": 6590260568
+        },
+        {
+          "crc32c": "S2aD1g==",
+          "generation": 1781788778000542,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00010-of-00046.safetensors",
+          "size": 6611517496
+        },
+        {
+          "crc32c": "+ZPJnQ==",
+          "generation": 1781789770731586,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00011-of-00046.safetensors",
+          "size": 6590260568
+        },
+        {
+          "crc32c": "tvdVtw==",
+          "generation": 1781787922705599,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00012-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "w4xzbg==",
+          "generation": 1781788867084391,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00013-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "6UMdRw==",
+          "generation": 1781787969061899,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00014-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "Phdbyw==",
+          "generation": 1781788906702880,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00015-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "1d4bKA==",
+          "generation": 1781788015971919,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00016-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "WQjXsg==",
+          "generation": 1781788917005685,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00017-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "wCP7Ww==",
+          "generation": 1781788048507821,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00018-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "738EvA==",
+          "generation": 1781789008807206,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00019-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "eKkQYQ==",
+          "generation": 1781788100556907,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00020-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "HCSgww==",
+          "generation": 1781789044768302,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00021-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "/R+4CQ==",
+          "generation": 1781788192212475,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00022-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "P/SLAA==",
+          "generation": 1781789106382947,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00023-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "FSt8kQ==",
+          "generation": 1781788179371866,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00024-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "ulOtWw==",
+          "generation": 1781789150212631,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00025-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "vr5BIw==",
+          "generation": 1781788231001289,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00026-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "CCbYiw==",
+          "generation": 1781789186511923,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00027-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "6JOXyQ==",
+          "generation": 1781788308919911,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00028-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "6NSEnQ==",
+          "generation": 1781789264678659,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00029-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "9UCMDQ==",
+          "generation": 1781788383994135,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00030-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "eEPGgg==",
+          "generation": 1781789284235649,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00031-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "8PPwGw==",
+          "generation": 1781788352981852,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00032-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "KLGcoA==",
+          "generation": 1781789323879996,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00033-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "CwzI5w==",
+          "generation": 1781788432395619,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00034-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "mdIKbg==",
+          "generation": 1781789402466104,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00035-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "By1GcQ==",
+          "generation": 1781788478228192,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00036-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "IpVghQ==",
+          "generation": 1781789419707386,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00037-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "NaTEGg==",
+          "generation": 1781788515897769,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00038-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "PPvtmw==",
+          "generation": 1781789455528823,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00039-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "86qW5Q==",
+          "generation": 1781788564023589,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00040-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "UCuWLw==",
+          "generation": 1781789540808085,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00041-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "TWBNRQ==",
+          "generation": 1781788608235413,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00042-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "KgSJBQ==",
+          "generation": 1781789559334667,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00043-of-00046.safetensors",
+          "size": 6590262136
+        },
+        {
+          "crc32c": "ShtPlw==",
+          "generation": 1781788645918906,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00044-of-00046.safetensors",
+          "size": 6611519072
+        },
+        {
+          "crc32c": "jy37Gg==",
+          "generation": 1781789797794656,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00045-of-00046.safetensors",
+          "size": 1059332516
+        },
+        {
+          "crc32c": "SL0b5g==",
+          "generation": 1781787887330454,
+          "name": "models/DeepSeek-V4-Flash-Base/model-00046-of-00046.safetensors",
+          "size": 8733577556
+        },
+        {
+          "crc32c": "dzP0/A==",
+          "generation": 1781789815246638,
+          "name": "models/DeepSeek-V4-Flash-Base/model.safetensors.index.json",
+          "size": 5371510
+        },
+        {
+          "crc32c": "GzNzSA==",
+          "generation": 1781789807853821,
+          "name": "models/DeepSeek-V4-Flash-Base/tokenizer.json",
+          "size": 6367146
+        },
+        {
+          "crc32c": "MkUptg==",
+          "generation": 1781789829842912,
+          "name": "models/DeepSeek-V4-Flash-Base/tokenizer_config.json",
+          "size": 801
+        }
+      ],
+      "prefix": "models/DeepSeek-V4-Flash-Base/",
+      "preserve_metadata_objects": [
+        ".gitattributes",
+        "LICENSE",
+        "config.json",
+        "model.safetensors.index.json",
+        "tokenizer.json",
+        "tokenizer_config.json"
+      ],
+      "retirement": {
+        "owner_scope": "Prior DeepSeek-V4 experiment; outside the active GLM-5.2-FP8 project.",
+        "reason": "No running command or current GLM runner references this model prefix.",
+        "recovery": "Payload is intentionally retired; exact GCS object ledger and compact model metadata are retained, but exact upstream redownload is not promised.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "current and historical Git audit",
+          "live process census"
+        ]
+      },
+      "terminal_objects": [
+        "model.safetensors.index.json"
+      ]
+    },
+    {
+      "bytes": 568695882408,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_deepseek_v4_flash_bf16",
+      "object_count": 51,
+      "objects": [
+        {
+          "crc32c": "5Kr3cg==",
+          "generation": 1781456346044592,
+          "name": "models/DeepSeek-V4-Flash-bf16/config.json",
+          "size": 1403
+        },
+        {
+          "crc32c": "5o8+Rw==",
+          "generation": 1781456345987258,
+          "name": "models/DeepSeek-V4-Flash-bf16/generation_config.json",
+          "size": 170
+        },
+        {
+          "crc32c": "RYgKcg==",
+          "generation": 1781456399777012,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00001-of-00046.safetensors",
+          "size": 1059061856
+        },
+        {
+          "crc32c": "cif/2g==",
+          "generation": 1781456774484139,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00002-of-00046.safetensors",
+          "size": 13159127036
+        },
+        {
+          "crc32c": "SbRWbw==",
+          "generation": 1781456772998773,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00003-of-00046.safetensors",
+          "size": 13159127036
+        },
+        {
+          "crc32c": "lyiIGQ==",
+          "generation": 1781456793686130,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00004-of-00046.safetensors",
+          "size": 13197412692
+        },
+        {
+          "crc32c": "mnBrAQ==",
+          "generation": 1781456777208111,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00005-of-00046.safetensors",
+          "size": 13161443220
+        },
+        {
+          "crc32c": "sq25Xg==",
+          "generation": 1781456780595488,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00006-of-00046.safetensors",
+          "size": 13191207740
+        },
+        {
+          "crc32c": "UhALRw==",
+          "generation": 1781456780403009,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00007-of-00046.safetensors",
+          "size": 13161443220
+        },
+        {
+          "crc32c": "3i27pw==",
+          "generation": 1781456766407518,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00008-of-00046.safetensors",
+          "size": 13191207740
+        },
+        {
+          "crc32c": "yYkDAA==",
+          "generation": 1781456779037275,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00009-of-00046.safetensors",
+          "size": 13161443220
+        },
+        {
+          "crc32c": "IL6OeA==",
+          "generation": 1781456787753964,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00010-of-00046.safetensors",
+          "size": 13191207740
+        },
+        {
+          "crc32c": "kERXgw==",
+          "generation": 1781456781330282,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00011-of-00046.safetensors",
+          "size": 13161443220
+        },
+        {
+          "crc32c": "ymuTRg==",
+          "generation": 1781456787046813,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00012-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "Cx5D2w==",
+          "generation": 1781456777821922,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00013-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "6IIfbA==",
+          "generation": 1781456794228502,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00014-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "wD/Aww==",
+          "generation": 1781456783222739,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00015-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "Jht3Cg==",
+          "generation": 1781456768809710,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00016-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "4+ylag==",
+          "generation": 1781456777269515,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00017-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "iirPJA==",
+          "generation": 1781456777353135,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00018-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "SDGMuw==",
+          "generation": 1781456779986583,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00019-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "ijgAYQ==",
+          "generation": 1781456768583811,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00020-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "Qd/cZQ==",
+          "generation": 1781456779044624,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00021-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "WRbgQQ==",
+          "generation": 1781456766451387,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00022-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "arpXLQ==",
+          "generation": 1781456761849893,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00023-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "saTMfg==",
+          "generation": 1781456771004134,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00024-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "VonzoQ==",
+          "generation": 1781456773198394,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00025-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "276C7A==",
+          "generation": 1781456786639728,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00026-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "zLaomA==",
+          "generation": 1781456769065729,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00027-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "2ZoONg==",
+          "generation": 1781456774682089,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00028-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "55ff0g==",
+          "generation": 1781456775692042,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00029-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "biia+Q==",
+          "generation": 1781456753571361,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00030-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "fHNWWA==",
+          "generation": 1781456763207707,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00031-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "vxfVbw==",
+          "generation": 1781456772858831,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00032-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "krz8RQ==",
+          "generation": 1781456769591118,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00033-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "n1Yeqg==",
+          "generation": 1781456783666405,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00034-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "aosiKQ==",
+          "generation": 1781456778329871,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00035-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "TLYI0Q==",
+          "generation": 1781456782184108,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00036-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "OvQhew==",
+          "generation": 1781456786772740,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00037-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "l5Esmg==",
+          "generation": 1781456786398075,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00038-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "uoNbyw==",
+          "generation": 1781456764122794,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00039-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "hHFoQg==",
+          "generation": 1781456780138232,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00040-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "Zsps9A==",
+          "generation": 1781456769898304,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00041-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "Mr7R4g==",
+          "generation": 1781456782680941,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00042-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "ngmOYA==",
+          "generation": 1781456767151751,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00043-of-00046.safetensors",
+          "size": 13161444012
+        },
+        {
+          "crc32c": "q42YgA==",
+          "generation": 1781456777752743,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00044-of-00046.safetensors",
+          "size": 13191208540
+        },
+        {
+          "crc32c": "on1y/A==",
+          "generation": 1781456403528863,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00045-of-00046.safetensors",
+          "size": 1059201434
+        },
+        {
+          "crc32c": "bu7a0w==",
+          "generation": 1781456346090538,
+          "name": "models/DeepSeek-V4-Flash-bf16/model-00046-of-00046.safetensors",
+          "size": 16
+        },
+        {
+          "crc32c": "XOOSgQ==",
+          "generation": 1781456346152346,
+          "name": "models/DeepSeek-V4-Flash-bf16/model.safetensors.index.json",
+          "size": 2537346
+        },
+        {
+          "crc32c": "GzNzSA==",
+          "generation": 1781456346366878,
+          "name": "models/DeepSeek-V4-Flash-bf16/tokenizer.json",
+          "size": 6367146
+        },
+        {
+          "crc32c": "MkUptg==",
+          "generation": 1781456346033324,
+          "name": "models/DeepSeek-V4-Flash-bf16/tokenizer_config.json",
+          "size": 801
+        }
+      ],
+      "prefix": "models/DeepSeek-V4-Flash-bf16/",
+      "preserve_metadata_objects": [
+        "config.json",
+        "generation_config.json",
+        "model.safetensors.index.json",
+        "tokenizer.json",
+        "tokenizer_config.json"
+      ],
+      "retirement": {
+        "owner_scope": "Prior DeepSeek-V4 experiment; outside the active GLM-5.2-FP8 project.",
+        "reason": "No running command or current GLM runner references this model prefix.",
+        "recovery": "Payload is intentionally retired; exact GCS object ledger and compact model metadata are retained, but exact upstream redownload is not promised.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "current and historical Git audit",
+          "live process census"
+        ]
+      },
+      "terminal_objects": [
+        "model.safetensors.index.json"
+      ]
+    },
+    {
+      "bytes": 159628890287,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_deepseek_v4_flash",
+      "object_count": 51,
+      "objects": [
+        {
+          "crc32c": "RSoZxQ==",
+          "generation": 1781464189719780,
+          "name": "models/DeepSeek-V4-Flash/config.json",
+          "size": 1749
+        },
+        {
+          "crc32c": "5o8+Rw==",
+          "generation": 1781464193950941,
+          "name": "models/DeepSeek-V4-Flash/generation_config.json",
+          "size": 170
+        },
+        {
+          "crc32c": "RYgKcg==",
+          "generation": 1781464272056023,
+          "name": "models/DeepSeek-V4-Flash/model-00001-of-00046.safetensors",
+          "size": 1059061856
+        },
+        {
+          "crc32c": "4okApQ==",
+          "generation": 1781464502918201,
+          "name": "models/DeepSeek-V4-Flash/model-00002-of-00046.safetensors",
+          "size": 3566321192
+        },
+        {
+          "crc32c": "dQxQkw==",
+          "generation": 1781464714809506,
+          "name": "models/DeepSeek-V4-Flash/model-00003-of-00046.safetensors",
+          "size": 3566321192
+        },
+        {
+          "crc32c": "QQkBDw==",
+          "generation": 1781464928123193,
+          "name": "models/DeepSeek-V4-Flash/model-00004-of-00046.safetensors",
+          "size": 3596229272
+        },
+        {
+          "crc32c": "va2qZA==",
+          "generation": 1781465131296501,
+          "name": "models/DeepSeek-V4-Flash/model-00005-of-00046.safetensors",
+          "size": 3568768976
+        },
+        {
+          "crc32c": "qv1roA==",
+          "generation": 1781465342447973,
+          "name": "models/DeepSeek-V4-Flash/model-00006-of-00046.safetensors",
+          "size": 3590024776
+        },
+        {
+          "crc32c": "aito0Q==",
+          "generation": 1781465537077380,
+          "name": "models/DeepSeek-V4-Flash/model-00007-of-00046.safetensors",
+          "size": 3568768976
+        },
+        {
+          "crc32c": "Nfircw==",
+          "generation": 1781465718094442,
+          "name": "models/DeepSeek-V4-Flash/model-00008-of-00046.safetensors",
+          "size": 3590024776
+        },
+        {
+          "crc32c": "S4xOIg==",
+          "generation": 1781465886076360,
+          "name": "models/DeepSeek-V4-Flash/model-00009-of-00046.safetensors",
+          "size": 3568768976
+        },
+        {
+          "crc32c": "Og6eag==",
+          "generation": 1781466063962963,
+          "name": "models/DeepSeek-V4-Flash/model-00010-of-00046.safetensors",
+          "size": 3590024776
+        },
+        {
+          "crc32c": "yFYKGA==",
+          "generation": 1781466217932914,
+          "name": "models/DeepSeek-V4-Flash/model-00011-of-00046.safetensors",
+          "size": 3568768976
+        },
+        {
+          "crc32c": "F/3GXw==",
+          "generation": 1781466362107125,
+          "name": "models/DeepSeek-V4-Flash/model-00012-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "ZU1lWw==",
+          "generation": 1781466386192043,
+          "name": "models/DeepSeek-V4-Flash/model-00013-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "77XuxA==",
+          "generation": 1781466411830514,
+          "name": "models/DeepSeek-V4-Flash/model-00014-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "djb5bQ==",
+          "generation": 1781466439927027,
+          "name": "models/DeepSeek-V4-Flash/model-00015-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "kxZ9aA==",
+          "generation": 1781466465984853,
+          "name": "models/DeepSeek-V4-Flash/model-00016-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "lnCMaw==",
+          "generation": 1781466493384724,
+          "name": "models/DeepSeek-V4-Flash/model-00017-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "KJ9RxA==",
+          "generation": 1781466519953431,
+          "name": "models/DeepSeek-V4-Flash/model-00018-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "VToBqA==",
+          "generation": 1781466544508565,
+          "name": "models/DeepSeek-V4-Flash/model-00019-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "kTxnuA==",
+          "generation": 1781466568273541,
+          "name": "models/DeepSeek-V4-Flash/model-00020-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "7YJwWw==",
+          "generation": 1781466592813040,
+          "name": "models/DeepSeek-V4-Flash/model-00021-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "q9cH5w==",
+          "generation": 1781466625288831,
+          "name": "models/DeepSeek-V4-Flash/model-00022-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "sXdGxw==",
+          "generation": 1781466658954326,
+          "name": "models/DeepSeek-V4-Flash/model-00023-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "rBU8HQ==",
+          "generation": 1781466684404037,
+          "name": "models/DeepSeek-V4-Flash/model-00024-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "Fj45Tg==",
+          "generation": 1781466710512701,
+          "name": "models/DeepSeek-V4-Flash/model-00025-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "D39p/w==",
+          "generation": 1781466735971807,
+          "name": "models/DeepSeek-V4-Flash/model-00026-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "M0LQ/A==",
+          "generation": 1781466763538165,
+          "name": "models/DeepSeek-V4-Flash/model-00027-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "ViiWxg==",
+          "generation": 1781466789213742,
+          "name": "models/DeepSeek-V4-Flash/model-00028-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "HwVMZA==",
+          "generation": 1781466815299974,
+          "name": "models/DeepSeek-V4-Flash/model-00029-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "t+7cJQ==",
+          "generation": 1781466842052166,
+          "name": "models/DeepSeek-V4-Flash/model-00030-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "++TmaA==",
+          "generation": 1781466867876693,
+          "name": "models/DeepSeek-V4-Flash/model-00031-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "S+aYMw==",
+          "generation": 1781466894958689,
+          "name": "models/DeepSeek-V4-Flash/model-00032-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "l9mftQ==",
+          "generation": 1781466921294320,
+          "name": "models/DeepSeek-V4-Flash/model-00033-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "lB+KjA==",
+          "generation": 1781466946536074,
+          "name": "models/DeepSeek-V4-Flash/model-00034-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "Ow0UNw==",
+          "generation": 1781466971605776,
+          "name": "models/DeepSeek-V4-Flash/model-00035-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "vq1E6w==",
+          "generation": 1781466998170760,
+          "name": "models/DeepSeek-V4-Flash/model-00036-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "fKPlnw==",
+          "generation": 1781467024205032,
+          "name": "models/DeepSeek-V4-Flash/model-00037-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "zIpETw==",
+          "generation": 1781467051247047,
+          "name": "models/DeepSeek-V4-Flash/model-00038-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "tn7GNQ==",
+          "generation": 1781467076461028,
+          "name": "models/DeepSeek-V4-Flash/model-00039-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "sDVVFw==",
+          "generation": 1781467102259434,
+          "name": "models/DeepSeek-V4-Flash/model-00040-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "sGfKtw==",
+          "generation": 1781467126468587,
+          "name": "models/DeepSeek-V4-Flash/model-00041-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "JTaGCg==",
+          "generation": 1781467153550028,
+          "name": "models/DeepSeek-V4-Flash/model-00042-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "yfN6nQ==",
+          "generation": 1781467179040645,
+          "name": "models/DeepSeek-V4-Flash/model-00043-of-00046.safetensors",
+          "size": 3568770544
+        },
+        {
+          "crc32c": "rDCZOw==",
+          "generation": 1781467204972231,
+          "name": "models/DeepSeek-V4-Flash/model-00044-of-00046.safetensors",
+          "size": 3590026352
+        },
+        {
+          "crc32c": "RKl/kg==",
+          "generation": 1781467216870401,
+          "name": "models/DeepSeek-V4-Flash/model-00045-of-00046.safetensors",
+          "size": 1059332516
+        },
+        {
+          "crc32c": "nPZflg==",
+          "generation": 1781467239401691,
+          "name": "models/DeepSeek-V4-Flash/model-00046-of-00046.safetensors",
+          "size": 3593956092
+        },
+        {
+          "crc32c": "67ct9w==",
+          "generation": 1781464198296604,
+          "name": "models/DeepSeek-V4-Flash/model.safetensors.index.json",
+          "size": 5371381
+        },
+        {
+          "crc32c": "GzNzSA==",
+          "generation": 1781464202694607,
+          "name": "models/DeepSeek-V4-Flash/tokenizer.json",
+          "size": 6367146
+        },
+        {
+          "crc32c": "MkUptg==",
+          "generation": 1781464206341101,
+          "name": "models/DeepSeek-V4-Flash/tokenizer_config.json",
+          "size": 801
+        }
+      ],
+      "prefix": "models/DeepSeek-V4-Flash/",
+      "preserve_metadata_objects": [
+        "config.json",
+        "generation_config.json",
+        "model.safetensors.index.json",
+        "tokenizer.json",
+        "tokenizer_config.json"
+      ],
+      "retirement": {
+        "owner_scope": "Prior DeepSeek-V4 experiment; outside the active GLM-5.2-FP8 project.",
+        "reason": "No running command or current GLM runner references this model prefix.",
+        "recovery": "Payload is intentionally retired; exact GCS object ledger and compact model metadata are retained, but exact upstream redownload is not promised.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "current and historical Git audit",
+          "live process census"
+        ]
+      },
+      "terminal_objects": [
+        "model.safetensors.index.json"
+      ]
+    },
+    {
+      "bytes": 29549863875,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_sick_hunt_draw1",
+      "object_count": 8,
+      "objects": [
+        {
+          "crc32c": "Q6xLng==",
+          "generation": 1784444135719822,
+          "name": "dumps/hunt_20260719T040702Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-0.tar.gz",
+          "size": 3597192213
+        },
+        {
+          "crc32c": "ZJXIqA==",
+          "generation": 1784444155742192,
+          "name": "dumps/hunt_20260719T040702Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-1.tar.gz",
+          "size": 3790257782
+        },
+        {
+          "crc32c": "uontLQ==",
+          "generation": 1784444151807731,
+          "name": "dumps/hunt_20260719T040702Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 3790255537
+        },
+        {
+          "crc32c": "Msxc9g==",
+          "generation": 1784444136038763,
+          "name": "dumps/hunt_20260719T040702Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-3.tar.gz",
+          "size": 3597203287
+        },
+        {
+          "crc32c": "47H07A==",
+          "generation": 1784444156815442,
+          "name": "dumps/hunt_20260719T040702Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-4.tar.gz",
+          "size": 3790280916
+        },
+        {
+          "crc32c": "69EVqg==",
+          "generation": 1784444189859921,
+          "name": "dumps/hunt_20260719T040702Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-5.tar.gz",
+          "size": 3790273012
+        },
+        {
+          "crc32c": "glDXPA==",
+          "generation": 1784444133548893,
+          "name": "dumps/hunt_20260719T040702Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-6.tar.gz",
+          "size": 3597196084
+        },
+        {
+          "crc32c": "Zupmuw==",
+          "generation": 1784444134171730,
+          "name": "dumps/hunt_20260719T040702Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-7.tar.gz",
+          "size": 3597205044
+        }
+      ],
+      "prefix": "dumps/hunt_20260719T040702Z/draw1_SICK/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Failed legacy diagnostic",
+        "reason": "Directory is explicitly classified SICK and has no current repository reference.",
+        "recovery": "Permanent retirement; exact object identities remain in the cleanup capsule.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "legacy RESEARCH_LOG classification",
+          "live process census"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 7938369165,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_sick_hunt_draw2",
+      "object_count": 8,
+      "objects": [
+        {
+          "crc32c": "iSSIGQ==",
+          "generation": 1784457639900489,
+          "name": "dumps/hunt_20260719T040702Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-0.tar.gz",
+          "size": 979355860
+        },
+        {
+          "crc32c": "T+W+vA==",
+          "generation": 1784457618619233,
+          "name": "dumps/hunt_20260719T040702Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-1.tar.gz",
+          "size": 1014983605
+        },
+        {
+          "crc32c": "+l9gTA==",
+          "generation": 1784457608957820,
+          "name": "dumps/hunt_20260719T040702Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 1014973639
+        },
+        {
+          "crc32c": "GHa8eg==",
+          "generation": 1784457608937975,
+          "name": "dumps/hunt_20260719T040702Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-3.tar.gz",
+          "size": 979322981
+        },
+        {
+          "crc32c": "6oLLSQ==",
+          "generation": 1784457615103074,
+          "name": "dumps/hunt_20260719T040702Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-4.tar.gz",
+          "size": 976101243
+        },
+        {
+          "crc32c": "SnrgyQ==",
+          "generation": 1784457608762491,
+          "name": "dumps/hunt_20260719T040702Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-5.tar.gz",
+          "size": 1014984593
+        },
+        {
+          "crc32c": "aLRIPw==",
+          "generation": 1784457608027978,
+          "name": "dumps/hunt_20260719T040702Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-6.tar.gz",
+          "size": 979324251
+        },
+        {
+          "crc32c": "+xeXSA==",
+          "generation": 1784457608112168,
+          "name": "dumps/hunt_20260719T040702Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-7.tar.gz",
+          "size": 979322993
+        }
+      ],
+      "prefix": "dumps/hunt_20260719T040702Z/draw2_SICK/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Failed legacy diagnostic",
+        "reason": "Directory is explicitly classified SICK and has no current repository reference.",
+        "recovery": "Permanent retirement; exact object identities remain in the cleanup capsule.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "legacy RESEARCH_LOG classification",
+          "live process census"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 13440656705,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_infra_fixval2_draw4",
+      "object_count": 1,
+      "objects": [
+        {
+          "crc32c": "O7o64g==",
+          "generation": 1784707764177324,
+          "name": "dumps/hunt_fixval2_20260721T211506Z/draw4_INFRA/hunt_d4_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 13440656705
+        }
+      ],
+      "prefix": "dumps/hunt_fixval2_20260721T211506Z/draw4_INFRA/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Failed legacy diagnostic",
+        "reason": "Directory is explicitly classified INFRA and has no current repository reference.",
+        "recovery": "Permanent retirement; exact object identities remain in the cleanup capsule.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "legacy RESEARCH_LOG classification",
+          "live process census"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 18805882766,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_sick_lscan3_draw2",
+      "object_count": 1,
+      "objects": [
+        {
+          "crc32c": "K/Kf6w==",
+          "generation": 1784753543249326,
+          "name": "dumps/hunt_lscan3_20260722T142319Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 18805882766
+        }
+      ],
+      "prefix": "dumps/hunt_lscan3_20260722T142319Z/draw2_SICK/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Failed legacy diagnostic",
+        "reason": "Directory is explicitly classified SICK and has no current repository reference.",
+        "recovery": "Permanent retirement; exact object identities remain in the cleanup capsule.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "legacy RESEARCH_LOG classification",
+          "live process census"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 15144955038,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_sick_statepair_draw3",
+      "object_count": 1,
+      "objects": [
+        {
+          "crc32c": "2xGlcg==",
+          "generation": 1784795178561532,
+          "name": "dumps/hunt_statepair_20260722T231703Z/draw3_SICK/hunt_d3_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 15144955038
+        }
+      ],
+      "prefix": "dumps/hunt_statepair_20260722T231703Z/draw3_SICK/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Failed legacy diagnostic",
+        "reason": "Directory is explicitly classified SICK and has no current repository reference.",
+        "recovery": "Permanent retirement; exact object identities remain in the cleanup capsule.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "legacy RESEARCH_LOG classification",
+          "live process census"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 15122110995,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_sick_topkdump_draw6",
+      "object_count": 1,
+      "objects": [
+        {
+          "crc32c": "UkKk+A==",
+          "generation": 1784627891709222,
+          "name": "dumps/hunt_topkdump_20260720T164806Z/draw6_SICK/hunt_d6_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 15122110995
+        }
+      ],
+      "prefix": "dumps/hunt_topkdump_20260720T164806Z/draw6_SICK/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Failed legacy diagnostic",
+        "reason": "Directory is explicitly classified SICK and has no current repository reference.",
+        "recovery": "Permanent retirement; exact object identities remain in the cleanup capsule.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "legacy RESEARCH_LOG classification",
+          "live process census"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 3154858505,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_sick_v1b_draw2",
+      "object_count": 8,
+      "objects": [
+        {
+          "crc32c": "nYrsbg==",
+          "generation": 1784555778460347,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-0.tar.gz",
+          "size": 379472685
+        },
+        {
+          "crc32c": "71lrcQ==",
+          "generation": 1784555780631735,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-1.tar.gz",
+          "size": 409241261
+        },
+        {
+          "crc32c": "27hUeg==",
+          "generation": 1784555780536828,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 409243655
+        },
+        {
+          "crc32c": "6uLwRQ==",
+          "generation": 1784555777831235,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-3.tar.gz",
+          "size": 379473490
+        },
+        {
+          "crc32c": "vFrL7g==",
+          "generation": 1784555780503907,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-4.tar.gz",
+          "size": 409241317
+        },
+        {
+          "crc32c": "zIXXDA==",
+          "generation": 1784555780620852,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-5.tar.gz",
+          "size": 409239452
+        },
+        {
+          "crc32c": "R8Y2Ww==",
+          "generation": 1784555777558343,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-6.tar.gz",
+          "size": 379474400
+        },
+        {
+          "crc32c": "NhFwEw==",
+          "generation": 1784555777427027,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-7.tar.gz",
+          "size": 379472245
+        }
+      ],
+      "prefix": "dumps/hunt_v1b_20260720T094945Z/draw2_SICK/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Failed legacy diagnostic",
+        "reason": "Directory is explicitly classified SICK and has no current repository reference.",
+        "recovery": "Permanent retirement; exact object identities remain in the cleanup capsule.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "legacy RESEARCH_LOG classification",
+          "live process census"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 1558218462,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_sick_v1sel_draw1",
+      "object_count": 8,
+      "objects": [
+        {
+          "crc32c": "eijPcg==",
+          "generation": 1784516852513294,
+          "name": "dumps/hunt_v1sel_20260720T003151Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-0.tar.gz",
+          "size": 181202188
+        },
+        {
+          "crc32c": "ex41kg==",
+          "generation": 1784516852150341,
+          "name": "dumps/hunt_v1sel_20260720T003151Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-1.tar.gz",
+          "size": 208352137
+        },
+        {
+          "crc32c": "wBYIfw==",
+          "generation": 1784516852137701,
+          "name": "dumps/hunt_v1sel_20260720T003151Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 208349699
+        },
+        {
+          "crc32c": "bIY2iA==",
+          "generation": 1784516849779135,
+          "name": "dumps/hunt_v1sel_20260720T003151Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-3.tar.gz",
+          "size": 181203471
+        },
+        {
+          "crc32c": "uKvk5w==",
+          "generation": 1784516852160479,
+          "name": "dumps/hunt_v1sel_20260720T003151Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-4.tar.gz",
+          "size": 208351130
+        },
+        {
+          "crc32c": "FtVJ5g==",
+          "generation": 1784516852316081,
+          "name": "dumps/hunt_v1sel_20260720T003151Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-5.tar.gz",
+          "size": 208350460
+        },
+        {
+          "crc32c": "fZwRPg==",
+          "generation": 1784516849418125,
+          "name": "dumps/hunt_v1sel_20260720T003151Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-6.tar.gz",
+          "size": 181205126
+        },
+        {
+          "crc32c": "AP3Zdw==",
+          "generation": 1784516849260472,
+          "name": "dumps/hunt_v1sel_20260720T003151Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-7.tar.gz",
+          "size": 181204251
+        }
+      ],
+      "prefix": "dumps/hunt_v1sel_20260720T003151Z/draw1_SICK/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Failed legacy diagnostic",
+        "reason": "Directory is explicitly classified SICK and has no current repository reference.",
+        "recovery": "Permanent retirement; exact object identities remain in the cleanup capsule.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "legacy RESEARCH_LOG classification",
+          "live process census"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 3155337561,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_infra_v2ctrl_draw1",
+      "object_count": 8,
+      "objects": [
+        {
+          "crc32c": "YFdaKw==",
+          "generation": 1784524095592458,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw1_INFRA/hunt_d1_t1v-n-6c15e171-w-0.tar.gz",
+          "size": 379461346
+        },
+        {
+          "crc32c": "nfY00Q==",
+          "generation": 1784524095750409,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw1_INFRA/hunt_d1_t1v-n-6c15e171-w-1.tar.gz",
+          "size": 409374884
+        },
+        {
+          "crc32c": "vaPReg==",
+          "generation": 1784524095273412,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw1_INFRA/hunt_d1_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 409371598
+        },
+        {
+          "crc32c": "JPJYiQ==",
+          "generation": 1784524093227915,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw1_INFRA/hunt_d1_t1v-n-6c15e171-w-3.tar.gz",
+          "size": 379461047
+        },
+        {
+          "crc32c": "xTQpKw==",
+          "generation": 1784524095767345,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw1_INFRA/hunt_d1_t1v-n-6c15e171-w-4.tar.gz",
+          "size": 409372156
+        },
+        {
+          "crc32c": "kn3DSg==",
+          "generation": 1784524095580125,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw1_INFRA/hunt_d1_t1v-n-6c15e171-w-5.tar.gz",
+          "size": 409372103
+        },
+        {
+          "crc32c": "7h/0Uw==",
+          "generation": 1784524093297566,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw1_INFRA/hunt_d1_t1v-n-6c15e171-w-6.tar.gz",
+          "size": 379464179
+        },
+        {
+          "crc32c": "LeoxMQ==",
+          "generation": 1784524092208888,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw1_INFRA/hunt_d1_t1v-n-6c15e171-w-7.tar.gz",
+          "size": 379460248
+        }
+      ],
+      "prefix": "dumps/hunt_v2ctrl_20260720T030744Z/draw1_INFRA/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Failed legacy diagnostic",
+        "reason": "Directory is explicitly classified INFRA and has no current repository reference.",
+        "recovery": "Permanent retirement; exact object identities remain in the cleanup capsule.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "legacy RESEARCH_LOG classification",
+          "live process census"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 3155655289,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_sick_v2ctrl_draw2",
+      "object_count": 8,
+      "objects": [
+        {
+          "crc32c": "lU+dGA==",
+          "generation": 1784531265768627,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-0.tar.gz",
+          "size": 379442387
+        },
+        {
+          "crc32c": "1L+krg==",
+          "generation": 1784531267846363,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-1.tar.gz",
+          "size": 409469944
+        },
+        {
+          "crc32c": "/dFJUw==",
+          "generation": 1784531268305941,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 409467422
+        },
+        {
+          "crc32c": "t4yVgg==",
+          "generation": 1784531265495306,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-3.tar.gz",
+          "size": 379445140
+        },
+        {
+          "crc32c": "74JuFQ==",
+          "generation": 1784531268047389,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-4.tar.gz",
+          "size": 409468595
+        },
+        {
+          "crc32c": "7i61Uw==",
+          "generation": 1784531268181793,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-5.tar.gz",
+          "size": 409469200
+        },
+        {
+          "crc32c": "qRE3xA==",
+          "generation": 1784531265126798,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-6.tar.gz",
+          "size": 379446374
+        },
+        {
+          "crc32c": "M2/5SQ==",
+          "generation": 1784531265439665,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw2_SICK/hunt_d2_t1v-n-6c15e171-w-7.tar.gz",
+          "size": 379446227
+        }
+      ],
+      "prefix": "dumps/hunt_v2ctrl_20260720T030744Z/draw2_SICK/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Failed legacy diagnostic",
+        "reason": "Directory is explicitly classified SICK and has no current repository reference.",
+        "recovery": "Permanent retirement; exact object identities remain in the cleanup capsule.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "legacy RESEARCH_LOG classification",
+          "live process census"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 3155529797,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_infra_v2ctrl_draw3",
+      "object_count": 8,
+      "objects": [
+        {
+          "crc32c": "7u/8aA==",
+          "generation": 1784538294252314,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw3_INFRA/hunt_d3_t1v-n-6c15e171-w-0.tar.gz",
+          "size": 379461301
+        },
+        {
+          "crc32c": "lULmSw==",
+          "generation": 1784538293924979,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw3_INFRA/hunt_d3_t1v-n-6c15e171-w-1.tar.gz",
+          "size": 409421009
+        },
+        {
+          "crc32c": "YOWzNQ==",
+          "generation": 1784538294194522,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw3_INFRA/hunt_d3_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 409416969
+        },
+        {
+          "crc32c": "OyGYGA==",
+          "generation": 1784538291403344,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw3_INFRA/hunt_d3_t1v-n-6c15e171-w-3.tar.gz",
+          "size": 379461658
+        },
+        {
+          "crc32c": "932ezw==",
+          "generation": 1784538294124668,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw3_INFRA/hunt_d3_t1v-n-6c15e171-w-4.tar.gz",
+          "size": 409422151
+        },
+        {
+          "crc32c": "GQhA7A==",
+          "generation": 1784538293940212,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw3_INFRA/hunt_d3_t1v-n-6c15e171-w-5.tar.gz",
+          "size": 409421787
+        },
+        {
+          "crc32c": "TaBSpw==",
+          "generation": 1784538290876151,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw3_INFRA/hunt_d3_t1v-n-6c15e171-w-6.tar.gz",
+          "size": 379464334
+        },
+        {
+          "crc32c": "KInD9w==",
+          "generation": 1784538290832428,
+          "name": "dumps/hunt_v2ctrl_20260720T030744Z/draw3_INFRA/hunt_d3_t1v-n-6c15e171-w-7.tar.gz",
+          "size": 379460588
+        }
+      ],
+      "prefix": "dumps/hunt_v2ctrl_20260720T030744Z/draw3_INFRA/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Failed legacy diagnostic",
+        "reason": "Directory is explicitly classified INFRA and has no current repository reference.",
+        "recovery": "Permanent retirement; exact object identities remain in the cleanup capsule.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "legacy RESEARCH_LOG classification",
+          "live process census"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 1558977955,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "retired_sick_xattend_draw1",
+      "object_count": 8,
+      "objects": [
+        {
+          "crc32c": "3c7R9Q==",
+          "generation": 1784507443979003,
+          "name": "dumps/hunt_xattend32k_20260719T220242Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-0.tar.gz",
+          "size": 181188227
+        },
+        {
+          "crc32c": "x6zsQA==",
+          "generation": 1784507446397355,
+          "name": "dumps/hunt_xattend32k_20260719T220242Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-1.tar.gz",
+          "size": 208554840
+        },
+        {
+          "crc32c": "Mjdidg==",
+          "generation": 1784507446079579,
+          "name": "dumps/hunt_xattend32k_20260719T220242Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 208554622
+        },
+        {
+          "crc32c": "dgeLEA==",
+          "generation": 1784507443748528,
+          "name": "dumps/hunt_xattend32k_20260719T220242Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-3.tar.gz",
+          "size": 181189365
+        },
+        {
+          "crc32c": "x4anLg==",
+          "generation": 1784507446590440,
+          "name": "dumps/hunt_xattend32k_20260719T220242Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-4.tar.gz",
+          "size": 208553711
+        },
+        {
+          "crc32c": "FAIuAA==",
+          "generation": 1784507445434590,
+          "name": "dumps/hunt_xattend32k_20260719T220242Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-5.tar.gz",
+          "size": 208555274
+        },
+        {
+          "crc32c": "Bz7N2Q==",
+          "generation": 1784507446386428,
+          "name": "dumps/hunt_xattend32k_20260719T220242Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-6.tar.gz",
+          "size": 181191655
+        },
+        {
+          "crc32c": "aExlRw==",
+          "generation": 1784507443238057,
+          "name": "dumps/hunt_xattend32k_20260719T220242Z/draw1_SICK/hunt_d1_t1v-n-6c15e171-w-7.tar.gz",
+          "size": 181190261
+        }
+      ],
+      "prefix": "dumps/hunt_xattend32k_20260719T220242Z/draw1_SICK/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Failed legacy diagnostic",
+        "reason": "Directory is explicitly classified SICK and has no current repository reference.",
+        "recovery": "Permanent retirement; exact object identities remain in the cleanup capsule.",
+        "reference_audit": [
+          "current four-repository rg audit",
+          "legacy RESEARCH_LOG classification",
+          "live process census"
+        ]
+      },
+      "terminal_objects": []
+    }
+  ],
+  "bucket": "driftbench-dsv4-uc",
+  "bucket_location": "US-CENTRAL2",
+  "capsule_sha256": "486eb11f4ae99ad57942a17c501e539b1773c528c27b5584f5db2ed17cb08ce4",
+  "created_utc": "2026-09-04T12:36:53Z",
+  "format_version": 1,
+  "generator_code_hash": "e78d101c0f3c20f26c2ea9fb56e7da4822e49db1",
+  "proof": {
+    "artifact_kind": "urgent_storage_cleanup_adjudication",
+    "bucket": "driftbench-dsv4-uc",
+    "bucket_location": "US-CENTRAL2",
+    "checks": {
+      "active_direct_pp16_manifest_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+      "active_direct_pp16_self_contained_payloads": 32,
+      "active_direct_pp16_standalone_inspection": {
+        "file_count": 32,
+        "runtime_file_bytes": 869658011904,
+        "source_verification_mode": "feature_runtime_with_metadata_parent",
+        "tensor_count": 6496,
+        "verified": true
+      },
+      "active_large_runtime_prefixes": [
+        "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/"
+      ],
+      "canonical_model_prefixes": [
+        "models/GLM-5.2-FP8/"
+      ],
+      "current_runner_dependency": "Direct PP16 full payload plus compact PP16 packed/base/feature lineage metadata; no PP8 or DeepSeek payload.",
+      "deepseek_reference_audit": "No running process or current GLM execution path names any of the three model prefixes; source mentions are historical documentation or generic model-support code.",
+      "live_bytes_before": 5877908918585,
+      "live_checkpoint_bytes_before": 3541244313111,
+      "live_model_bytes_before": 1778693787808,
+      "recurring_writers": [
+        "/home/gianl/bin/sync-glm.sh -> repos/ only"
+      ],
+      "sick_infra_objects": 68,
+      "sick_infra_reference_audit": "No exact SICK/INFRA object or draw directory is referenced by current code, certificates, installers, recovery scripts, or runbooks.",
+      "soft_delete_seconds": 604800,
+      "tpu_workflows_active": false
+    },
+    "decision": "Keep canonical GLM and the active direct PP16 runtime. Preserve compact lineage/model metadata and exact object ledgers. Delete only generation-pinned superseded runtimes, retired DeepSeek models, and explicitly failed SICK/INFRA dump directories.",
+    "proof_sha256": "84e98d15a8924d0266d92abb72dcf5fee0616b81e59596dbf80af14cbf9f93ed",
+    "review": {
+      "p0": [],
+      "p1_resolved_by": [
+        "mechanical direct-runtime lineage and runner audit",
+        "generation-bound capsule before mutation",
+        "fresh current/historical reference audit",
+        "explicit permanent-retirement records for unrelated models and failed dumps"
+      ],
+      "reviewer": "independent Sol adversarial review"
+    },
+    "status": "passed"
+  },
+  "protected_prefixes": [
+    "models/GLM-5.2-FP8/",
+    "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/",
+    "checkpoints/greenfield/glm52/plans/",
+    "checkpoints/greenfield/glm52/layer3/",
+    "checkpoints/greenfield/glm52/gate_c/",
+    "checkpoints/greenfield/glm52/discriminators/",
+    "checkpoints/greenfield/glm52/overlays/",
+    "checkpoints/greenfield/glm52/probes/",
+    "results/",
+    "oracles/",
+    "repos/"
+  ]
+}
