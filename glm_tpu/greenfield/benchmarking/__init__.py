@@ -22,6 +22,24 @@ from .association_fingerprint import (
     replay_db533_strategy_nd_row0_bits,
     validate_strategy_nd_fingerprint_hlo,
 )
+from .m2048_association_fingerprint import (
+    ACCEPTED_M2048_HLO_GZIP_SHA256,
+    ACCEPTED_M2048_HLO_RAW_SHA256,
+    ACCEPTED_M2048_SOURCE_TAG,
+    M2048_ROWS,
+    M2048_SEED,
+    M2048_TRIALS,
+    M2048_WIDTH,
+    CompiledM2048StrategyNdFingerprint,
+    M2048StrategyNdFingerprintConfig,
+    analyze_m2048_row0_association,
+    build_m2048_strategy_nd_fingerprint,
+    execute_m2048_strategy_nd_fingerprint,
+    generate_m2048_row0_input_bits,
+    m2048_source_identity,
+    m2048_strategy_nd_hlo_policy,
+    validate_m2048_strategy_nd_fingerprint_hlo,
+)
 from .collective_chain import (
     CollectiveChainConfig,
     CollectiveKind,
