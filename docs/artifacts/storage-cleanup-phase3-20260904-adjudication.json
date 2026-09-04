@@ -1,0 +1,32 @@
+{
+  "artifact_kind": "urgent_storage_cleanup_phase3_adjudication",
+  "bucket": "driftbench-dsv4-uc",
+  "bucket_location": "US-CENTRAL2",
+  "checks": {
+    "active_direct_pp16_manifest_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+    "candidate_bytes": 204606666570,
+    "candidate_objects": 108,
+    "candidate_prefixes": 11,
+    "candidate_type": "legacy tar.gz diagnostic payloads only",
+    "current_live_bytes": 2149632628547,
+    "current_reader_audit": "No current Gate D reader consumes any candidate prefix. Historical documentation and producer-script references remain and are not misrepresented as active dependencies.",
+    "preserved_dump_bytes": 28158360488,
+    "preserved_dump_objects": 4636,
+    "preserved_dump_scope": "All four NPZ-only prefixes: rung2-originals, rung2fix-w0, rung2fix-w2, and rung4.",
+    "projected_live_bytes_before_small_archive_overhead": 1945025961977,
+    "recurring_writers": ["/home/gianl/bin/sync-glm.sh -> repos/ only"],
+    "soft_delete_seconds": 0,
+    "soft_deleted_prior_generations": "The last authenticated pre-disable census was 11,750 objects / 3,681,290,733,167 bytes. Google Cloud no longer permits listing them with the policy disabled; they retain their original expiration and are not erased by this policy change.",
+    "tpu_workflows_active": false,
+    "user_live_storage_ceiling_bytes": 2000000000000
+  },
+  "decision": "Permanently abandon the exact 108 legacy tar generations after a generation-bound capsule and authenticated empty metadata archive. Their raw contents may be unique and are explicitly not claimed reproducible; this is an irreversible cost-constrained retirement. Preserve all NPZ dumps, compact conclusions, results, oracles, Git history, the canonical GLM source, PP16 metadata lineage, and the active direct PP16 runtime.",
+  "proof_sha256": "9e8d66e5b8a4b17b94ce91de9b07a53e2bcf3b60af6aa92d4659b99102795ad4",
+  "review": {
+    "p0": [],
+    "p1": [],
+    "reviewer": "independent Sol adversarial review",
+    "verdict": "Existing user authorization is sufficient; safe after exact capsule/archive/no-writer/policy controls."
+  },
+  "status": "passed"
+}

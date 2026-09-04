@@ -1,0 +1,239 @@
+{
+  "artifact_kind": "greenfield_checkpoint_retention_policy",
+  "artifacts": [
+    {
+      "disposition": "keep",
+      "expected_bytes": 755663676164,
+      "expected_object_count": 150,
+      "id": "canonical_glm_source",
+      "prefix": "models/GLM-5.2-FP8/",
+      "recipe": {
+        "code_hash": "61475d30a708252bc64aaf50fec2c2ea1ea03c63",
+        "dependencies": [],
+        "entrypoint": "scripts/greenfield/pack_checkpoint_streaming.py"
+      },
+      "terminal_objects": ["model.safetensors.index.json"]
+    },
+    {
+      "disposition": "keep",
+      "expected_bytes": 11059060,
+      "expected_manifest_sha256": "0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1",
+      "expected_object_count": 4,
+      "id": "old_pp16_feature_metadata",
+      "manifest_object": "runtime_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/",
+      "preserve_metadata_objects": ["SUCCESS", "control.json", "runtime_layout.json", "runtime_manifest.json"],
+      "recipe": {
+        "code_hash": "a973425cd235758142c55c5a0127ddb9a36b45a9",
+        "dependencies": [{"artifact_id": "canonical_glm_source", "required_scope": "full_payload"}],
+        "entrypoint": "scripts/greenfield/pack_feature_runtime_checkpoint.py"
+      },
+      "terminal_objects": ["SUCCESS", "runtime_manifest.json", "control.json"]
+    },
+    {
+      "disposition": "keep",
+      "expected_bytes": 869671243535,
+      "expected_manifest_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+      "expected_object_count": 68,
+      "id": "active_direct_pp16_runtime",
+      "manifest_object": "runtime_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/",
+      "recipe": {
+        "code_hash": "44501082b9ce414c5938c2193d695200c14429c5",
+        "dependencies": [{
+          "artifact_id": "old_pp16_feature_metadata",
+          "required_objects": ["SUCCESS", "control.json", "runtime_layout.json", "runtime_manifest.json"],
+          "required_scope": "metadata_only"
+        }],
+        "entrypoint": "scripts/greenfield/run_feature_fused_qkv_derivative_pp16.sh"
+      },
+      "terminal_objects": ["SUCCESS", "runtime_manifest.json", "control.json"]
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 60207728177,
+      "expected_object_count": 4,
+      "id": "abandon_legacy_hunt_topkdump",
+      "prefix": "dumps/hunt_topkdump_20260720T164806Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": ["four-repository current-reader search", "live process census", "user-authorized obsolete-dump retirement"]
+      },
+      "terminal_objects": []
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 30188271964,
+      "expected_object_count": 2,
+      "id": "abandon_legacy_hunt_fixval2",
+      "prefix": "dumps/hunt_fixval2_20260721T211506Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": ["four-repository current-reader search", "live process census", "user-authorized obsolete-dump retirement"]
+      },
+      "terminal_objects": []
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 30118403615,
+      "expected_object_count": 2,
+      "id": "abandon_legacy_hunt_fixval",
+      "prefix": "dumps/hunt_fixval_20260721T123126Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": ["four-repository current-reader search", "live process census", "user-authorized obsolete-dump retirement"]
+      },
+      "terminal_objects": []
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 30110359602,
+      "expected_object_count": 2,
+      "id": "abandon_legacy_hunt_statepair",
+      "prefix": "dumps/hunt_statepair_20260722T231703Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": ["four-repository current-reader search", "live process census", "user-authorized obsolete-dump retirement"]
+      },
+      "terminal_objects": []
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 28456318555,
+      "expected_object_count": 64,
+      "id": "abandon_legacy_probe_lottery_035115",
+      "prefix": "dumps/probe_lottery_20260717T035115Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": ["four-repository current-reader search", "historical documentation references only", "user-authorized obsolete-dump retirement"]
+      },
+      "terminal_objects": []
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 18714325164,
+      "expected_object_count": 1,
+      "id": "abandon_legacy_hunt_lscan3",
+      "prefix": "dumps/hunt_lscan3_20260722T142319Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": ["four-repository current-reader search", "live process census", "user-authorized obsolete-dump retirement"]
+      },
+      "terminal_objects": []
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 3155530000,
+      "expected_object_count": 8,
+      "id": "abandon_legacy_hunt_v1b",
+      "prefix": "dumps/hunt_v1b_20260720T094945Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": ["four-repository current-reader search", "live process census", "user-authorized obsolete-dump retirement"]
+      },
+      "terminal_objects": []
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 2366927087,
+      "expected_object_count": 8,
+      "id": "abandon_legacy_probe_timeline",
+      "prefix": "dumps/probe_timeline_20260717T165934Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": ["four-repository current-reader search", "historical documentation references only", "user-authorized obsolete-dump retirement"]
+      },
+      "terminal_objects": []
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 1000977680,
+      "expected_object_count": 8,
+      "id": "abandon_legacy_probe_lottery_024007",
+      "prefix": "dumps/probe_lottery_20260717T024007Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": ["four-repository current-reader search", "live process census", "user-authorized obsolete-dump retirement"]
+      },
+      "terminal_objects": []
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 188025250,
+      "expected_object_count": 1,
+      "id": "abandon_legacy_disk_pressure_dump",
+      "prefix": "dumps/disk_pressure_pre_dsa_internal_20260808T0055Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payload; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": ["four-repository current-reader search", "live process census", "user-authorized obsolete-dump retirement"]
+      },
+      "terminal_objects": []
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 99799476,
+      "expected_object_count": 8,
+      "id": "abandon_legacy_gate128k_dump",
+      "prefix": "dumps/gate128k_20260718T110127Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": ["four-repository current-reader search", "historical documentation references only", "user-authorized obsolete-dump retirement"]
+      },
+      "terminal_objects": []
+    }
+  ],
+  "bucket": "driftbench-dsv4-uc",
+  "bucket_location": "US-CENTRAL2",
+  "format_version": 1,
+  "protected_prefixes": [
+    "models/GLM-5.2-FP8/",
+    "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/",
+    "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/",
+    "checkpoints/greenfield/glm52/plans/",
+    "checkpoints/greenfield/glm52/layer3/",
+    "checkpoints/greenfield/glm52/gate_c/",
+    "checkpoints/greenfield/glm52/discriminators/",
+    "checkpoints/greenfield/glm52/overlays/",
+    "checkpoints/greenfield/glm52/probes/",
+    "dumps/rung2-originals/",
+    "dumps/rung2fix-w0/",
+    "dumps/rung2fix-w2/",
+    "dumps/rung4/",
+    "results/",
+    "oracles/",
+    "repos/"
+  ]
+}
