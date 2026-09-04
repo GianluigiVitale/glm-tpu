@@ -1,0 +1,37 @@
+{
+  "artifact_kind": "urgent_storage_cleanup_phase2_adjudication",
+  "bucket": "driftbench-dsv4-uc",
+  "bucket_location": "US-CENTRAL2",
+  "checks": {
+    "active_direct_pp16_manifest_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+    "active_direct_pp16_post_cleanup_inspector": {
+      "file_count": 32,
+      "runtime_file_bytes": 869658011904,
+      "source_verification_mode": "feature_runtime_with_metadata_parent",
+      "tensor_count": 6496,
+      "verified": true
+    },
+    "candidate_bytes": 54358734349,
+    "candidate_has_runtime_manifest": false,
+    "candidate_has_success": false,
+    "candidate_objects": 6,
+    "candidate_payload_scope": "stage_00 device_slot_00 and device_slot_01 only",
+    "candidate_reference_audit": "No exact tag or prefix reference in the four current repositories.",
+    "candidate_superseded_by": "greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z",
+    "candidate_updated_utc_max": "2026-08-27T16:43:58.950000Z",
+    "current_live_bytes": 2203986112509,
+    "current_soft_deleted_bytes": 3681290733167,
+    "prior_inventory_reconciliation": "The earlier 5,877,908,918,585-byte headline retained no object ledger and cannot be treated as exact: after subtracting the exact phase-1 receipt and adding the exact metadata archive it underpredicts the generation-ledgered current inventory by 3,225,904,353 bytes. No current checkpoint has an update after 2026-08-27 and the only recurring writer targets repos/. Current generation-ledgered measurements, not the unreproducible headline, are authoritative.",
+    "recurring_writers": ["/home/gianl/bin/sync-glm.sh -> repos/ only"],
+    "soft_delete_seconds": 604800,
+    "tpu_workflows_active": false
+  },
+  "decision": "Archive the four small control/layout/evidence generations, then retire all six objects in the incomplete PP16 attempt by exact generation. Preserve the later complete active runtime and its metadata lineage.",
+  "proof_sha256": "3fd8d8b50fa4657cc1da7af93dc1789b34f888023a44a5484636ea80af467118",
+  "review": {
+    "p0": [],
+    "p1": [],
+    "reviewer": "independent Sol adversarial review"
+  },
+  "status": "passed"
+}

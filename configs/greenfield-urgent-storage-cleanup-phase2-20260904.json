@@ -1,0 +1,92 @@
+{
+  "artifact_kind": "greenfield_checkpoint_retention_policy",
+  "artifacts": [
+    {
+      "disposition": "keep",
+      "expected_bytes": 755663676164,
+      "expected_object_count": 150,
+      "id": "canonical_glm_source",
+      "prefix": "models/GLM-5.2-FP8/",
+      "recipe": {
+        "code_hash": "61475d30a708252bc64aaf50fec2c2ea1ea03c63",
+        "dependencies": [],
+        "entrypoint": "scripts/greenfield/pack_checkpoint_streaming.py"
+      },
+      "terminal_objects": ["model.safetensors.index.json"]
+    },
+    {
+      "disposition": "keep",
+      "expected_bytes": 11059060,
+      "expected_manifest_sha256": "0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1",
+      "expected_object_count": 4,
+      "id": "old_pp16_feature_metadata",
+      "manifest_object": "runtime_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/",
+      "preserve_metadata_objects": ["SUCCESS", "control.json", "runtime_layout.json", "runtime_manifest.json"],
+      "recipe": {
+        "code_hash": "a973425cd235758142c55c5a0127ddb9a36b45a9",
+        "dependencies": [{"artifact_id": "canonical_glm_source", "required_scope": "full_payload"}],
+        "entrypoint": "scripts/greenfield/pack_feature_runtime_checkpoint.py"
+      },
+      "terminal_objects": ["SUCCESS", "runtime_manifest.json", "control.json"]
+    },
+    {
+      "disposition": "keep",
+      "expected_bytes": 869671243535,
+      "expected_manifest_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+      "expected_object_count": 68,
+      "id": "active_direct_pp16_runtime",
+      "manifest_object": "runtime_manifest.json",
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/",
+      "recipe": {
+        "code_hash": "44501082b9ce414c5938c2193d695200c14429c5",
+        "dependencies": [
+          {
+            "artifact_id": "old_pp16_feature_metadata",
+            "required_objects": ["SUCCESS", "control.json", "runtime_layout.json", "runtime_manifest.json"],
+            "required_scope": "metadata_only"
+          }
+        ],
+        "entrypoint": "scripts/greenfield/run_feature_fused_qkv_derivative_pp16.sh"
+      },
+      "terminal_objects": ["SUCCESS", "runtime_manifest.json", "control.json"]
+    },
+    {
+      "disposition": "delete_now",
+      "expected_bytes": 54358734349,
+      "expected_object_count": 6,
+      "id": "retired_incomplete_direct_pp16_attempt",
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T163203521646921Z/",
+      "preserve_metadata_objects": [
+        "control.json",
+        "evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+        "evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+        "runtime_layout.json"
+      ],
+      "retirement": {
+        "owner_scope": "Abandoned incomplete PP16 derivative attempt superseded by the active complete runtime.",
+        "reason": "Only stage 0 slots exist; there is no runtime_manifest.json or SUCCESS, no current repository reference, and a complete active generation subsequently superseded it.",
+        "recovery": "Permanent payload retirement; the exact six-object generation ledger and four small control/layout/evidence files are archived before deletion.",
+        "reference_audit": ["current four-repository exact-tag audit", "live process census", "complete active-runtime inspection"]
+      },
+      "terminal_objects": []
+    }
+  ],
+  "bucket": "driftbench-dsv4-uc",
+  "bucket_location": "US-CENTRAL2",
+  "format_version": 1,
+  "protected_prefixes": [
+    "models/GLM-5.2-FP8/",
+    "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/",
+    "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/",
+    "checkpoints/greenfield/glm52/plans/",
+    "checkpoints/greenfield/glm52/layer3/",
+    "checkpoints/greenfield/glm52/gate_c/",
+    "checkpoints/greenfield/glm52/discriminators/",
+    "checkpoints/greenfield/glm52/overlays/",
+    "checkpoints/greenfield/glm52/probes/",
+    "results/",
+    "oracles/",
+    "repos/"
+  ]
+}
