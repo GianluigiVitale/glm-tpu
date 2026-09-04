@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import base64
 from copy import deepcopy
 import fcntl
@@ -43,7 +44,7 @@ REPO_REFRESHER = ROOT / (
     "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py"
 )
 MIRROR = ROOT / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
-CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v7-source.json"
+CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v8-source.json"
 
 
 def _load_publisher():
@@ -158,6 +159,94 @@ def test_driver_has_no_mutable_result_path_or_cloud_transport() -> None:
     assert "sealed_runtime.verify_import_closure(" in source
     assert '"fleet_host_transfer_bytes": 25165824' not in source
     assert "M2048_RECORD process=" in source
+
+
+def test_driver_binds_local_devices_and_deactivates_cluster_autodetection() -> None:
+    source = DRIVER.read_text(encoding="ascii")
+    calls = [
+        node
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "initialize"
+        and isinstance(node.func.value, ast.Attribute)
+        and node.func.value.attr == "distributed"
+        and isinstance(node.func.value.value, ast.Name)
+        and node.func.value.value.id == "jax"
+    ]
+    assert len(calls) == 1
+    keywords = {keyword.arg: keyword.value for keyword in calls[0].keywords}
+    assert set(keywords) == {
+        "cluster_detection_method",
+        "coordinator_address",
+        "local_device_ids",
+        "num_processes",
+        "process_id",
+    }
+    assert ast.literal_eval(keywords["local_device_ids"]) == (0, 1, 2, 3)
+    assert ast.literal_eval(keywords["cluster_detection_method"]) == "deactivate"
+
+    sealed_python = Path(
+        "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12"
+    )
+    sealed_jax = "/opt/glm-tpu/gate-d-jax-site-55233c63939e"
+    runtime = "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95"
+    regression = f"""
+import sys
+sys.path[:] = [
+    {sealed_jax!r},
+    {runtime + '/lib/python312.zip'!r},
+    {runtime + '/lib/python3.12'!r},
+    {runtime + '/lib/python3.12/lib-dynload'!r},
+]
+from jax._src import clusters
+from jax._src import distributed
+
+class ExpectedStop(Exception):
+    pass
+
+def forbidden_autodetect(cls, *args, **kwargs):
+    raise RuntimeError("cluster autodetection was called")
+
+def stop_before_transport(address, process_id, **kwargs):
+    assert address == "192.0.2.1:8476"
+    assert process_id == 3
+    raise ExpectedStop
+
+clusters.ClusterEnv.auto_detect_unset_distributed_params = classmethod(
+    forbidden_autodetect
+)
+distributed._jax.get_distributed_runtime_client = stop_before_transport
+try:
+    distributed.State().initialize(
+        coordinator_address="192.0.2.1:8476",
+        num_processes=8,
+        process_id=3,
+        local_device_ids=(0, 1, 2, 3),
+        cluster_detection_method="deactivate",
+    )
+except ExpectedStop:
+    print("EXPLICIT_CLUSTER_PARAMETERS_BYPASS_AUTODETECTION")
+else:
+    raise AssertionError("regression did not reach the transport boundary")
+"""
+    completed = subprocess.run(
+        [str(sealed_python), "-I", "-S", "-B", "-c", regression],
+        check=False,
+        capture_output=True,
+        env={
+            "HOME": "/home/gianl",
+            "JAX_PLATFORMS": "cpu",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+            "PYTHONDONTWRITEBYTECODE": "1",
+        },
+        text=True,
+        timeout=60,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout == "EXPLICIT_CLUSTER_PARAMETERS_BYPASS_AUTODETECTION\n"
 
 
 def test_marker_parser_requires_canonical_unique_records() -> None:
@@ -374,11 +463,13 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
         "docs/artifacts/gate-d-m2048-strategy-nd-v5-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v6-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v7-source.json",
+        "docs/artifacts/gate-d-m2048-strategy-nd-v8-source.json",
         "docs/artifacts/gate-d-m2048-v2-install-repository-prestate-failure.json",
         "docs/artifacts/gate-d-m2048-v3-install-loader-quoting-failure.json",
         "docs/artifacts/gate-d-m2048-v4-install-runtime-loader-quoting-failure.json",
         "docs/artifacts/gate-d-m2048-v5-install-missing-libexec-parent-failure.json",
         "docs/artifacts/gate-d-m2048-v6-install-scp-symlink-dereference-failure.json",
+        "docs/artifacts/gate-d-m2048-v7-missing-requests-auto-detection-failure.json",
         "scripts/greenfield/bootstrap_gate_d_provisioner.py",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py",
@@ -766,7 +857,7 @@ def test_archive_provisioner_refuses_dangling_output_and_replaced_cleanup(
 
 def test_fleet_serializes_exact_worker_repository_refresh() -> None:
     source = FLEET_INSTALLER.read_text(encoding="ascii")
-    assert "WORKER_REPO_PRESTATE_PIN=71b14bc52ba9faea10035771afdafa61bf807209" in source
+    assert "WORKER_REPO_PRESTATE_PIN=43ba8f7c477d47829b520d4467b8baad5cfb9507" in source
     assert "REPO_REFRESHER_B64=$(git_local show" in source
     assert 'os.memfd_create(\\"gate-d-m2048-repo-refresher\\"' in source
     assert "for worker in 1 2 3 4 5 6 7; do" in source
@@ -1666,10 +1757,13 @@ def test_source_certificate_binds_every_listed_file_and_grants_no_authority() ->
         "INSTALL_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;NO_MODEL_OR_GATE_D_CLAIM"
     )
     assert record["future_persistence_contract"]["future_merged_pin_required"] is True
-    assert record["runtime_recovery"]["missing_workers_observed_read_only"] == list(
-        range(1, 8)
-    )
-    assert record["test_evidence"]["passed"] == 41
+    assert record["runtime_recovery"]["existing_verified_runtime_hosts"] == 8
+    assert record["immutable_successor_paths"] == {
+        "capsule": "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v2",
+        "install_source": "/opt/glm-tpu/gate-d-m2048-install-v2",
+        "launcher": "/opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v2.py",
+    }
+    assert record["test_evidence"]["passed"] == 42
     assert record["proposed_fresh_tag"] in record[
         "protected_run_command_after_approved_install"
     ]

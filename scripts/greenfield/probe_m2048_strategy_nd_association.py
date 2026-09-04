@@ -33,7 +33,7 @@ import zipfile
 
 SOURCE_PATH = "scripts/greenfield/probe_m2048_strategy_nd_association.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v1/"
+    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v2/"
     "probe_m2048_strategy_nd_association.py"
 )
 REPOSITORY = Path("/home/gianl/glm-tpu-topology-rewrite")
@@ -356,6 +356,8 @@ def main() -> int:
         coordinator_address=arguments.coordinator_address,
         num_processes=arguments.num_processes,
         process_id=arguments.process_id,
+        local_device_ids=(0, 1, 2, 3),
+        cluster_detection_method="deactivate",
     )
     try:
         if (

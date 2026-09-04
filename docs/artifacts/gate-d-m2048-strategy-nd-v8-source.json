@@ -1,0 +1,72 @@
+{
+  "artifact_kind": "gate_d_m2048_strategy_nd_v8_source_certificate",
+  "classification": "EXACT_M2048_EXPLICIT_LOCAL_DEVICE_TOPOLOGY_AND_DEACTIVATED_CLUSTER_AUTODETECTION_PROTECTED_HARNESS_CPU_VALIDATED;SOL_REVIEW_PENDING;INSTALL_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;NO_MODEL_OR_GATE_D_CLAIM",
+  "code_pin_before_persistence": "43ba8f7c477d47829b520d4467b8baad5cfb9507",
+  "future_persistence_contract": {
+    "branch": "rewrite/topology-first-decode",
+    "condition": "Every listed source byte, the preserved V7 failure record and this certificate must be committed together; the resulting full commit must be pushed to origin and replayed by the US-CENTRAL2 mirror before installation or protected execution.",
+    "future_merged_pin_required": true,
+    "origin": "git@github.com:GianluigiVitale/glm-tpu.git"
+  },
+  "immutable_successor_paths": {
+    "capsule": "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v2",
+    "install_source": "/opt/glm-tpu/gate-d-m2048-install-v2",
+    "launcher": "/opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v2.py"
+  },
+  "install_only_command_after_approved_persistence": "/usr/bin/env -i HOME=/home/gianl LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B -c 'import fcntl,hashlib,os,subprocess,sys; pin=sys.argv[1]; expected=sys.argv[2]; git_env={\"GIT_CONFIG_GLOBAL\":\"/dev/null\",\"GIT_CONFIG_NOSYSTEM\":\"1\",\"GIT_NO_LAZY_FETCH\":\"1\",\"GIT_NO_REPLACE_OBJECTS\":\"1\",\"GIT_OPTIONAL_LOCKS\":\"0\",\"GIT_PROTOCOL_FROM_USER\":\"0\",\"GIT_SSH_COMMAND\":\"/bin/false\",\"GIT_TERMINAL_PROMPT\":\"0\",\"HOME\":\"/nonexistent\",\"LANG\":\"C\",\"LC_ALL\":\"C\",\"PATH\":\"/usr/bin:/bin\"}; result=subprocess.run([\"/usr/bin/git\",\"-c\",\"core.fsmonitor=false\",\"-c\",\"core.untrackedCache=false\",\"-c\",\"core.hooksPath=/dev/null\",\"-c\",\"core.attributesFile=/dev/null\",\"-C\",\"/home/gianl/glm-tpu-topology-rewrite\",\"show\",f\"{pin}:scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh\"],check=False,env=git_env,stderr=subprocess.PIPE,stdout=subprocess.PIPE); assert result.returncode==0 and not result.stderr; raw=result.stdout; assert hashlib.sha256(raw).hexdigest()==expected; fd=os.memfd_create(\"gate-d-m2048-fleet-installer\",os.MFD_CLOEXEC|getattr(os,\"MFD_ALLOW_SEALING\",2)); stream=os.fdopen(os.dup(fd),\"wb\",closefd=True); written=stream.write(raw); stream.flush(); stream.close(); assert written==len(raw); os.fchmod(fd,0o400); seals=getattr(fcntl,\"F_SEAL_SEAL\",1)|getattr(fcntl,\"F_SEAL_SHRINK\",2)|getattr(fcntl,\"F_SEAL_GROW\",4)|getattr(fcntl,\"F_SEAL_WRITE\",8); fcntl.fcntl(fd,getattr(fcntl,\"F_ADD_SEALS\",1033),seals); assert fcntl.fcntl(fd,getattr(fcntl,\"F_GET_SEALS\",1034))==seals; os.set_inheritable(fd,True); path=f\"/proc/self/fd/{fd}\"; os.execve(\"/usr/bin/bash\",[\"/usr/bin/bash\",\"--noprofile\",\"--norc\",path],{\"GLM_GATE_D_M2048_INSTALL\":\"1\",\"GLM_GATE_D_M2048_INSTALL_MODE\":\"install_only\",\"GLM_GATE_D_M2048_INSTALL_PIN\":pin,\"HOME\":\"/home/gianl\",\"LANG\":\"C\",\"LC_ALL\":\"C\",\"PATH\":\"/snap/bin:/usr/bin:/bin\",\"PYTHONDONTWRITEBYTECODE\":\"1\"})' <FUTURE_MERGED_PIN> 9ead0fbb5b92ab9e7ae36432790a460084fd4c5622cd47ccc49967a597627085",
+  "install_source_tree_sha256": "a8f7175575e71b6ad614b82903557ce4520234d121888563c203a5179bec761c",
+  "predecessor_failure": {
+    "path": "docs/artifacts/gate-d-m2048-v7-missing-requests-auto-detection-failure.json",
+    "sha256": "f2e20d28c940e30afd1737f84f3d8c348b138b72c5bda5ca320afec90bcc35b0"
+  },
+  "predecessor_source_certificate": {
+    "path": "docs/artifacts/gate-d-m2048-strategy-nd-v7-source.json",
+    "sha256": "55594da17889f70d0d6e5377d692a6f9a5cbcfcb1263232270fc47b47943a9c6",
+    "status": "preserved; install-only succeeded on all eight hosts and the protected run then failed before backend initialization because unset local_device_ids triggered Cloud TPU auto-detection and an unavailable requests import; V7 tag burned"
+  },
+  "protected_run_command_after_approved_install": "/usr/bin/env -i GLM_GATE_D_M2048=1 GLM_GATE_D_M2048_MODE=execute_once GLM_GATE_D_M2048_TAG=greenfield_m2048_strategy_nd_20260904T113524757900454Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v2.py",
+  "proposed_fresh_tag": "greenfield_m2048_strategy_nd_20260904T113524757900454Z",
+  "runtime_recovery": {
+    "existing_verified_runtime_hosts": 8,
+    "install_only": true,
+    "jax_import_or_tpu_initialization": false,
+    "repository_refresh": "workers 1-7 must start as clean full detached repositories at 43ba8f7c477d47829b520d4467b8baad5cfb9507; the future-commit refresher executes from a sealed memfd and fetches each worker serially",
+    "sealed_trees": {
+      "jax": "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df",
+      "libtpu": "db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca",
+      "python": "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616"
+    },
+    "successor_publication": "The V1 capsule and launcher are immutable historical evidence. V8 publishes changed bytes only to fresh V2 source/capsule/launcher targets and reuses or independently verifies the exact sealed Python/JAX/libtpu trees."
+  },
+  "schema_version": 1,
+  "sources": [
+    {"path": "glm_tpu/greenfield/benchmarking/__init__.py", "sha256": "f72bebb28652bdfc19f192c50d0659f97f3a5a8b67ebd2a4e251786b95bafd75"},
+    {"path": "glm_tpu/greenfield/benchmarking/m2048_association_fingerprint.py", "sha256": "86ad8a1f73ef7ad36e1b4ff5700ec24f805d41d4b51f79161bc478fbc915369f"},
+    {"path": "scripts/greenfield/bootstrap_gate_d_provisioner.py", "sha256": "d70e550adce72a7699142763099292cd60f09416b7f467e8a11f4c86ebd1b137"},
+    {"path": "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh", "sha256": "9ead0fbb5b92ab9e7ae36432790a460084fd4c5622cd47ccc49967a597627085"},
+    {"path": "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py", "sha256": "7c3e5eb3cd590ff89d15b94a4a029268489b65167320159c4259e07f96d3387d"},
+    {"path": "scripts/greenfield/launch_gate_d_m2048_strategy_nd_association.py", "sha256": "fe3bb6afd85324b3638f8acab1a031360044b88b791e2ab488f5fbf5be0d03c4"},
+    {"path": "scripts/greenfield/probe_m2048_strategy_nd_association.py", "sha256": "f364134360800566d7a6c9c56da261c5c5ffca13408e4b6ddb27022c902d71ff"},
+    {"path": "scripts/greenfield/publish_gate_d_m2048_strategy_nd_association.py", "sha256": "db8e7f6e2efb6607cdc906b6f957499ad5bbbc93b60477aec717aa98d6d42f17"},
+    {"path": "scripts/greenfield/provision_gate_d_runtime_archive.py", "sha256": "2582e9b6c91fe11a8489a2359f830ab786b5856463ea896172da1f7ab79b4319"},
+    {"path": "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py", "sha256": "f248ff6717113c2376e19e4495fd2b33314280b181b97c783996ec510b7f5b0e"},
+    {"path": "scripts/greenfield/run_gate_d_m2048_strategy_nd_association.sh", "sha256": "d296a22b92b1efb5ae7906bd72e17b572414e65571a8fa41c299317e0b70c32f"},
+    {"path": "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py", "sha256": "bc8186c2d0930e26ff13f09e3acdd84144ffe27ef6ed3e497a41d848a98414a9"},
+    {"path": "tests/greenfield/benchmarking/test_m2048_association_fingerprint.py", "sha256": "a17bedd76b2d7b333757145663cda2bcad682bf3f3c17cb902cd15dc76f320e2"},
+    {"path": "tests/greenfield/validation/test_m2048_strategy_nd_protected_harness.py", "sha256": "5bec5017889fa15b32f6c77155dd06405de850868cc15b8ba734e18a3f1b02ff"}
+  ],
+  "test_evidence": {
+    "command": "JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_m2048_strategy_nd_protected_harness.py tests/greenfield/benchmarking/test_m2048_association_fingerprint.py",
+    "duration_seconds": 8.76,
+    "passed": 42,
+    "result": "42 passed",
+    "shell_syntax": "passed: Python py_compile, Bash -n, strict JSON parsing and git diff --check"
+  },
+  "topology_correction": {
+    "cluster_detection_method": "deactivate",
+    "local_device_ids": [0, 1, 2, 3],
+    "rationale": "All coordinator/process/local-device parameters are explicit and Cloud TPU metadata auto-detection is disabled. The sealed runtime remains dependency-minimal and does not add requests.",
+    "regression": "The exact sealed JAX State.initialize path is invoked with the five explicit fields while ClusterEnv.auto_detect_unset_distributed_params is replaced by a throwing sentinel; the test reaches a deliberately stopped distributed-client transport boundary without calling auto-detection."
+  },
+  "validation_scope": "Exact-shape model-free StrategyND row-zero association source, explicit one-process/four-local-device distributed initialization with cluster auto-detection disabled, sealed-JAX sentinel regression, output-sensitive HLO contract, stdout evidence retention, eight-host immutable V2 launcher/installer/wrapper, serialized exact-prestate repository refresh, existing sealed runtime verification, same-region mirror verifier, append-only publisher and hostile CPU tests only. No installation of V2, TPU initialization under V8, protected numerical execution, model result, performance result or Gate-D closure is claimed."
+}

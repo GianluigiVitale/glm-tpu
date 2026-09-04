@@ -16,7 +16,7 @@ BRANCH = "rewrite/topology-first-decode"
 ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v1/"
+    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v2/"
     "verify_gate_d_rewrite_same_region_git_mirror.py"
 )
 BASE_PATH = "scripts/greenfield/verify_gate_d_same_region_git_mirror.py"
@@ -31,11 +31,13 @@ BOUND_PATHS = (
     "docs/artifacts/gate-d-m2048-strategy-nd-v5-source.json",
     "docs/artifacts/gate-d-m2048-strategy-nd-v6-source.json",
     "docs/artifacts/gate-d-m2048-strategy-nd-v7-source.json",
+    "docs/artifacts/gate-d-m2048-strategy-nd-v8-source.json",
     "docs/artifacts/gate-d-m2048-v2-install-repository-prestate-failure.json",
     "docs/artifacts/gate-d-m2048-v3-install-loader-quoting-failure.json",
     "docs/artifacts/gate-d-m2048-v4-install-runtime-loader-quoting-failure.json",
     "docs/artifacts/gate-d-m2048-v5-install-missing-libexec-parent-failure.json",
     "docs/artifacts/gate-d-m2048-v6-install-scp-symlink-dereference-failure.json",
+    "docs/artifacts/gate-d-m2048-v7-missing-requests-auto-detection-failure.json",
     "docs/greenfield/REUSE_INVENTORY.md",
     "glm_tpu/greenfield/benchmarking/__init__.py",
     "glm_tpu/greenfield/benchmarking/m2048_association_fingerprint.py",

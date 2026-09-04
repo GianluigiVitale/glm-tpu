@@ -13,12 +13,12 @@ import stat
 import sys
 
 
-SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-m2048-install-v1")
+SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-m2048-install-v2")
 INSTALLER_PATH = SOURCE_ROOT / "install_gate_d_m2048_strategy_nd_runtime.py"
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
-LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_m2048_strategy_nd_v1.py"
+LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_m2048_strategy_nd_v2.py"
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-m2048-strategy-nd-v1"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-m2048-strategy-nd-v2"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -28,16 +28,16 @@ EXPECTED_ENVIRONMENT = {
 }
 PAYLOADS = {
     "launch_gate_d_m2048_strategy_nd_association.py": (
-        "3826bdb697c882de85c45515b37e1024e617156a18320336c5593b23eab9851a"
+        "fe3bb6afd85324b3638f8acab1a031360044b88b791e2ab488f5fbf5be0d03c4"
     ),
     "probe_m2048_strategy_nd_association.py": (
-        "1debe946e35311014e667fed863871eed4bf3afeaa9aeb27445f50b2ea233774"
+        "f364134360800566d7a6c9c56da261c5c5ffca13408e4b6ddb27022c902d71ff"
     ),
     "publish_gate_d_m2048_strategy_nd_association.py": (
-        "83602a623fd6392515c63a1017c89f7ed7c06f5d0a7e1ae4e6aca519f99db9be"
+        "db8e7f6e2efb6607cdc906b6f957499ad5bbbc93b60477aec717aa98d6d42f17"
     ),
     "verify_gate_d_rewrite_same_region_git_mirror.py": (
-        "ea7b9814af970a60d21047eb2698dc6bd420051a9e9982daeccdc372b3efa750"
+        "bc8186c2d0930e26ff13f09e3acdd84144ffe27ef6ed3e497a41d848a98414a9"
     ),
 }
 CAPSULE_NAMES = (
