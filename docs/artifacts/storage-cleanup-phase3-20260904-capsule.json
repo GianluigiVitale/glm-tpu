@@ -1,0 +1,2367 @@
+{
+  "artifact_kind": "greenfield_checkpoint_reproducibility_capsule",
+  "artifacts": [
+    {
+      "bytes": 755663676164,
+      "disposition": "keep",
+      "expected_manifest_sha256": null,
+      "id": "canonical_glm_source",
+      "object_count": 150,
+      "objects": [
+        {
+          "crc32c": "6HZyOw==",
+          "generation": 1783384168989279,
+          "name": "models/GLM-5.2-FP8/.gitattributes",
+          "size": 1682
+        },
+        {
+          "crc32c": "Yov7mA==",
+          "generation": 1783384170973058,
+          "name": "models/GLM-5.2-FP8/LICENSE",
+          "size": 1065
+        },
+        {
+          "crc32c": "Lx6MjQ==",
+          "generation": 1783384161830320,
+          "name": "models/GLM-5.2-FP8/README.md",
+          "size": 10909
+        },
+        {
+          "crc32c": "I0Sqlg==",
+          "generation": 1783384163868537,
+          "name": "models/GLM-5.2-FP8/chat_template.jinja",
+          "size": 5076
+        },
+        {
+          "crc32c": "djQWpg==",
+          "generation": 1783384156632832,
+          "name": "models/GLM-5.2-FP8/config.json",
+          "size": 29464
+        },
+        {
+          "crc32c": "bSGKog==",
+          "generation": 1783384178112268,
+          "name": "models/GLM-5.2-FP8/generation_config.json",
+          "size": 194
+        },
+        {
+          "crc32c": "F4Vk/w==",
+          "generation": 1783382593522370,
+          "name": "models/GLM-5.2-FP8/model-00001-of-00141.safetensors",
+          "size": 5363940952
+        },
+        {
+          "crc32c": "SY7i2A==",
+          "generation": 1783383012200562,
+          "name": "models/GLM-5.2-FP8/model-00002-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "6B3RLA==",
+          "generation": 1783382846118640,
+          "name": "models/GLM-5.2-FP8/model-00003-of-00141.safetensors",
+          "size": 5363339120
+        },
+        {
+          "crc32c": "VMxLXg==",
+          "generation": 1783383416698247,
+          "name": "models/GLM-5.2-FP8/model-00004-of-00141.safetensors",
+          "size": 5361736640
+        },
+        {
+          "crc32c": "VowhVw==",
+          "generation": 1783381955460842,
+          "name": "models/GLM-5.2-FP8/model-00005-of-00141.safetensors",
+          "size": 5366353560
+        },
+        {
+          "crc32c": "UxPtkg==",
+          "generation": 1783383655990591,
+          "name": "models/GLM-5.2-FP8/model-00006-of-00141.safetensors",
+          "size": 5361736504
+        },
+        {
+          "crc32c": "w4jHtw==",
+          "generation": 1783381841761849,
+          "name": "models/GLM-5.2-FP8/model-00007-of-00141.safetensors",
+          "size": 5366353704
+        },
+        {
+          "crc32c": "4xwo5Q==",
+          "generation": 1783383814056313,
+          "name": "models/GLM-5.2-FP8/model-00008-of-00141.safetensors",
+          "size": 5361736368
+        },
+        {
+          "crc32c": "cgSzAQ==",
+          "generation": 1783381741238404,
+          "name": "models/GLM-5.2-FP8/model-00009-of-00141.safetensors",
+          "size": 5366353832
+        },
+        {
+          "crc32c": "KUWkKA==",
+          "generation": 1783384037352826,
+          "name": "models/GLM-5.2-FP8/model-00010-of-00141.safetensors",
+          "size": 5361736232
+        },
+        {
+          "crc32c": "hX+JnA==",
+          "generation": 1783382634944766,
+          "name": "models/GLM-5.2-FP8/model-00011-of-00141.safetensors",
+          "size": 5363339600
+        },
+        {
+          "crc32c": "kYImIQ==",
+          "generation": 1783382271496663,
+          "name": "models/GLM-5.2-FP8/model-00012-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "6A6r3g==",
+          "generation": 1783383016661560,
+          "name": "models/GLM-5.2-FP8/model-00013-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "p/jnpA==",
+          "generation": 1783382180245548,
+          "name": "models/GLM-5.2-FP8/model-00014-of-00141.safetensors",
+          "size": 5366353496
+        },
+        {
+          "crc32c": "ZTssCA==",
+          "generation": 1783383327334340,
+          "name": "models/GLM-5.2-FP8/model-00015-of-00141.safetensors",
+          "size": 5361736680
+        },
+        {
+          "crc32c": "UQGZJw==",
+          "generation": 1783382066038516,
+          "name": "models/GLM-5.2-FP8/model-00016-of-00141.safetensors",
+          "size": 5366353520
+        },
+        {
+          "crc32c": "rcvQ0w==",
+          "generation": 1783383554924928,
+          "name": "models/GLM-5.2-FP8/model-00017-of-00141.safetensors",
+          "size": 5361736544
+        },
+        {
+          "crc32c": "qr75zg==",
+          "generation": 1783382763332881,
+          "name": "models/GLM-5.2-FP8/model-00018-of-00141.safetensors",
+          "size": 5363339264
+        },
+        {
+          "crc32c": "iGifUg==",
+          "generation": 1783383761522537,
+          "name": "models/GLM-5.2-FP8/model-00019-of-00141.safetensors",
+          "size": 5361736408
+        },
+        {
+          "crc32c": "VdxHDg==",
+          "generation": 1783382594453577,
+          "name": "models/GLM-5.2-FP8/model-00020-of-00141.safetensors",
+          "size": 5364805840
+        },
+        {
+          "crc32c": "wS06Lw==",
+          "generation": 1783383883892371,
+          "name": "models/GLM-5.2-FP8/model-00021-of-00141.safetensors",
+          "size": 5361736336
+        },
+        {
+          "crc32c": "IDf/tA==",
+          "generation": 1783381730107452,
+          "name": "models/GLM-5.2-FP8/model-00022-of-00141.safetensors",
+          "size": 5366353872
+        },
+        {
+          "crc32c": "1BdOjw==",
+          "generation": 1783384201761648,
+          "name": "models/GLM-5.2-FP8/model-00023-of-00141.safetensors",
+          "size": 5357948328
+        },
+        {
+          "crc32c": "oEubIg==",
+          "generation": 1783384203419345,
+          "name": "models/GLM-5.2-FP8/model-00024-of-00141.safetensors",
+          "size": 5357555688
+        },
+        {
+          "crc32c": "rvj2AA==",
+          "generation": 1783382877435045,
+          "name": "models/GLM-5.2-FP8/model-00025-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "qImJIQ==",
+          "generation": 1783383099833254,
+          "name": "models/GLM-5.2-FP8/model-00026-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "UH5qzQ==",
+          "generation": 1783382119374212,
+          "name": "models/GLM-5.2-FP8/model-00027-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "rGGiqQ==",
+          "generation": 1783383371517341,
+          "name": "models/GLM-5.2-FP8/model-00028-of-00141.safetensors",
+          "size": 5361736648
+        },
+        {
+          "crc32c": "fNMcQQ==",
+          "generation": 1783382000410180,
+          "name": "models/GLM-5.2-FP8/model-00029-of-00141.safetensors",
+          "size": 5366353560
+        },
+        {
+          "crc32c": "itV8rQ==",
+          "generation": 1783383598240307,
+          "name": "models/GLM-5.2-FP8/model-00030-of-00141.safetensors",
+          "size": 5361736512
+        },
+        {
+          "crc32c": "/JfK9w==",
+          "generation": 1783381849540044,
+          "name": "models/GLM-5.2-FP8/model-00031-of-00141.safetensors",
+          "size": 5366353688
+        },
+        {
+          "crc32c": "yQUrvw==",
+          "generation": 1783383778340964,
+          "name": "models/GLM-5.2-FP8/model-00032-of-00141.safetensors",
+          "size": 5361736376
+        },
+        {
+          "crc32c": "72Xbiw==",
+          "generation": 1783382657063672,
+          "name": "models/GLM-5.2-FP8/model-00033-of-00141.safetensors",
+          "size": 5363339440
+        },
+        {
+          "crc32c": "cYpQmQ==",
+          "generation": 1783384037851770,
+          "name": "models/GLM-5.2-FP8/model-00034-of-00141.safetensors",
+          "size": 5361736240
+        },
+        {
+          "crc32c": "ygslkQ==",
+          "generation": 1783381609768003,
+          "name": "models/GLM-5.2-FP8/model-00035-of-00141.safetensors",
+          "size": 5366353976
+        },
+        {
+          "crc32c": "3FPW4g==",
+          "generation": 1783382286990112,
+          "name": "models/GLM-5.2-FP8/model-00036-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "XbMyOw==",
+          "generation": 1783383055849682,
+          "name": "models/GLM-5.2-FP8/model-00037-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "Ggj7hA==",
+          "generation": 1783382395903345,
+          "name": "models/GLM-5.2-FP8/model-00038-of-00141.safetensors",
+          "size": 5366353304
+        },
+        {
+          "crc32c": "cNIjiQ==",
+          "generation": 1783384099403947,
+          "name": "models/GLM-5.2-FP8/model-00039-of-00141.safetensors",
+          "size": 5361735832
+        },
+        {
+          "crc32c": "t1WXEw==",
+          "generation": 1783382487059867,
+          "name": "models/GLM-5.2-FP8/model-00040-of-00141.safetensors",
+          "size": 5366353016
+        },
+        {
+          "crc32c": "uBlNXQ==",
+          "generation": 1783383549336797,
+          "name": "models/GLM-5.2-FP8/model-00041-of-00141.safetensors",
+          "size": 5361736552
+        },
+        {
+          "crc32c": "MJLmww==",
+          "generation": 1783382802461224,
+          "name": "models/GLM-5.2-FP8/model-00042-of-00141.safetensors",
+          "size": 5363339264
+        },
+        {
+          "crc32c": "Yfgs3Q==",
+          "generation": 1783383706985498,
+          "name": "models/GLM-5.2-FP8/model-00043-of-00141.safetensors",
+          "size": 5361736416
+        },
+        {
+          "crc32c": "Fz7X2Q==",
+          "generation": 1783381839642266,
+          "name": "models/GLM-5.2-FP8/model-00044-of-00141.safetensors",
+          "size": 5366353776
+        },
+        {
+          "crc32c": "Nxwb8g==",
+          "generation": 1783383990128915,
+          "name": "models/GLM-5.2-FP8/model-00045-of-00141.safetensors",
+          "size": 5361736280
+        },
+        {
+          "crc32c": "7fHaqA==",
+          "generation": 1783381611357775,
+          "name": "models/GLM-5.2-FP8/model-00046-of-00141.safetensors",
+          "size": 5366353920
+        },
+        {
+          "crc32c": "AspFWA==",
+          "generation": 1783382192407616,
+          "name": "models/GLM-5.2-FP8/model-00047-of-00141.safetensors",
+          "size": 5366353496
+        },
+        {
+          "crc32c": "QPDRFg==",
+          "generation": 1783383076356326,
+          "name": "models/GLM-5.2-FP8/model-00048-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "MK8FPA==",
+          "generation": 1783382908777387,
+          "name": "models/GLM-5.2-FP8/model-00049-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "82gdfw==",
+          "generation": 1783383121684301,
+          "name": "models/GLM-5.2-FP8/model-00050-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "pmQnqA==",
+          "generation": 1783382072437891,
+          "name": "models/GLM-5.2-FP8/model-00051-of-00141.safetensors",
+          "size": 5366353512
+        },
+        {
+          "crc32c": "iqNmBA==",
+          "generation": 1783383481004888,
+          "name": "models/GLM-5.2-FP8/model-00052-of-00141.safetensors",
+          "size": 5361736584
+        },
+        {
+          "crc32c": "bafxng==",
+          "generation": 1783381945770140,
+          "name": "models/GLM-5.2-FP8/model-00053-of-00141.safetensors",
+          "size": 5366353608
+        },
+        {
+          "crc32c": "6qCZPw==",
+          "generation": 1783383673529125,
+          "name": "models/GLM-5.2-FP8/model-00054-of-00141.safetensors",
+          "size": 5361736448
+        },
+        {
+          "crc32c": "GMGRmA==",
+          "generation": 1783381844289713,
+          "name": "models/GLM-5.2-FP8/model-00055-of-00141.safetensors",
+          "size": 5366353744
+        },
+        {
+          "crc32c": "y4QPCA==",
+          "generation": 1783383921688119,
+          "name": "models/GLM-5.2-FP8/model-00056-of-00141.safetensors",
+          "size": 5361736312
+        },
+        {
+          "crc32c": "L/ymbQ==",
+          "generation": 1783382640996927,
+          "name": "models/GLM-5.2-FP8/model-00057-of-00141.safetensors",
+          "size": 5363339496
+        },
+        {
+          "crc32c": "yNHByw==",
+          "generation": 1783384147524206,
+          "name": "models/GLM-5.2-FP8/model-00058-of-00141.safetensors",
+          "size": 5357950744
+        },
+        {
+          "crc32c": "ZwVreg==",
+          "generation": 1783384231977882,
+          "name": "models/GLM-5.2-FP8/model-00059-of-00141.safetensors",
+          "size": 5357552376
+        },
+        {
+          "crc32c": "e2rJhw==",
+          "generation": 1783382499397792,
+          "name": "models/GLM-5.2-FP8/model-00060-of-00141.safetensors",
+          "size": 5366352776
+        },
+        {
+          "crc32c": "lmyWtw==",
+          "generation": 1783383144111853,
+          "name": "models/GLM-5.2-FP8/model-00061-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "v9EYpg==",
+          "generation": 1783382166226636,
+          "name": "models/GLM-5.2-FP8/model-00062-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "pcozpQ==",
+          "generation": 1783383435442965,
+          "name": "models/GLM-5.2-FP8/model-00063-of-00141.safetensors",
+          "size": 5361736624
+        },
+        {
+          "crc32c": "0aA/oQ==",
+          "generation": 1783381950910441,
+          "name": "models/GLM-5.2-FP8/model-00064-of-00141.safetensors",
+          "size": 5366353576
+        },
+        {
+          "crc32c": "nscigw==",
+          "generation": 1783383657741984,
+          "name": "models/GLM-5.2-FP8/model-00065-of-00141.safetensors",
+          "size": 5361736488
+        },
+        {
+          "crc32c": "lUkVRg==",
+          "generation": 1783382725846897,
+          "name": "models/GLM-5.2-FP8/model-00066-of-00141.safetensors",
+          "size": 5363339320
+        },
+        {
+          "crc32c": "/F54gA==",
+          "generation": 1783383866827676,
+          "name": "models/GLM-5.2-FP8/model-00067-of-00141.safetensors",
+          "size": 5361736360
+        },
+        {
+          "crc32c": "Ylfisw==",
+          "generation": 1783381737908725,
+          "name": "models/GLM-5.2-FP8/model-00068-of-00141.safetensors",
+          "size": 5366353848
+        },
+        {
+          "crc32c": "hMO5lw==",
+          "generation": 1783384039248766,
+          "name": "models/GLM-5.2-FP8/model-00069-of-00141.safetensors",
+          "size": 5361736224
+        },
+        {
+          "crc32c": "SGgmFw==",
+          "generation": 1783381615595016,
+          "name": "models/GLM-5.2-FP8/model-00070-of-00141.safetensors",
+          "size": 5366353992
+        },
+        {
+          "crc32c": "0Hpdqg==",
+          "generation": 1783382280954064,
+          "name": "models/GLM-5.2-FP8/model-00071-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "vnb21Q==",
+          "generation": 1783383149955165,
+          "name": "models/GLM-5.2-FP8/model-00072-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "ZK9s+A==",
+          "generation": 1783382842840702,
+          "name": "models/GLM-5.2-FP8/model-00073-of-00141.safetensors",
+          "size": 5363339112
+        },
+        {
+          "crc32c": "2nX9fQ==",
+          "generation": 1783383338618306,
+          "name": "models/GLM-5.2-FP8/model-00074-of-00141.safetensors",
+          "size": 5361736672
+        },
+        {
+          "crc32c": "Bpi0hg==",
+          "generation": 1783382067272489,
+          "name": "models/GLM-5.2-FP8/model-00075-of-00141.safetensors",
+          "size": 5366353528
+        },
+        {
+          "crc32c": "++vXCQ==",
+          "generation": 1783383571562250,
+          "name": "models/GLM-5.2-FP8/model-00076-of-00141.safetensors",
+          "size": 5361736528
+        },
+        {
+          "crc32c": "ZWbaSQ==",
+          "generation": 1783381846257857,
+          "name": "models/GLM-5.2-FP8/model-00077-of-00141.safetensors",
+          "size": 5366353672
+        },
+        {
+          "crc32c": "R81gwQ==",
+          "generation": 1783383768423478,
+          "name": "models/GLM-5.2-FP8/model-00078-of-00141.safetensors",
+          "size": 5361736392
+        },
+        {
+          "crc32c": "eAH0UA==",
+          "generation": 1783382397049642,
+          "name": "models/GLM-5.2-FP8/model-00079-of-00141.safetensors",
+          "size": 5366353168
+        },
+        {
+          "crc32c": "J1rWTw==",
+          "generation": 1783384141801539,
+          "name": "models/GLM-5.2-FP8/model-00080-of-00141.safetensors",
+          "size": 5361735408
+        },
+        {
+          "crc32c": "7fiFVw==",
+          "generation": 1783381741149905,
+          "name": "models/GLM-5.2-FP8/model-00081-of-00141.safetensors",
+          "size": 5366353872
+        },
+        {
+          "crc32c": "8IOnfA==",
+          "generation": 1783382906486973,
+          "name": "models/GLM-5.2-FP8/model-00082-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "YCjHhQ==",
+          "generation": 1783383217881622,
+          "name": "models/GLM-5.2-FP8/model-00083-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "GXzEoA==",
+          "generation": 1783382260884170,
+          "name": "models/GLM-5.2-FP8/model-00084-of-00141.safetensors",
+          "size": 5366353496
+        },
+        {
+          "crc32c": "R5JGdA==",
+          "generation": 1783383198045921,
+          "name": "models/GLM-5.2-FP8/model-00085-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "pPrj7w==",
+          "generation": 1783382077155975,
+          "name": "models/GLM-5.2-FP8/model-00086-of-00141.safetensors",
+          "size": 5366353512
+        },
+        {
+          "crc32c": "d3z6IQ==",
+          "generation": 1783383487321401,
+          "name": "models/GLM-5.2-FP8/model-00087-of-00141.safetensors",
+          "size": 5361736568
+        },
+        {
+          "crc32c": "69osPA==",
+          "generation": 1783381944689580,
+          "name": "models/GLM-5.2-FP8/model-00088-of-00141.safetensors",
+          "size": 5366353632
+        },
+        {
+          "crc32c": "rmxIew==",
+          "generation": 1783383704666229,
+          "name": "models/GLM-5.2-FP8/model-00089-of-00141.safetensors",
+          "size": 5361736432
+        },
+        {
+          "crc32c": "LZ5h2w==",
+          "generation": 1783382695888107,
+          "name": "models/GLM-5.2-FP8/model-00090-of-00141.safetensors",
+          "size": 5363339376
+        },
+        {
+          "crc32c": "k4v29g==",
+          "generation": 1783383919781532,
+          "name": "models/GLM-5.2-FP8/model-00091-of-00141.safetensors",
+          "size": 5361736296
+        },
+        {
+          "crc32c": "uSQLdw==",
+          "generation": 1783381610512924,
+          "name": "models/GLM-5.2-FP8/model-00092-of-00141.safetensors",
+          "size": 5366353904
+        },
+        {
+          "crc32c": "SiBw7A==",
+          "generation": 1783382286245925,
+          "name": "models/GLM-5.2-FP8/model-00093-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "mAZccA==",
+          "generation": 1783383216703924,
+          "name": "models/GLM-5.2-FP8/model-00094-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "D1KdOA==",
+          "generation": 1783382337394093,
+          "name": "models/GLM-5.2-FP8/model-00095-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "OhB+wg==",
+          "generation": 1783383228093679,
+          "name": "models/GLM-5.2-FP8/model-00096-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "ub/slA==",
+          "generation": 1783382860134613,
+          "name": "models/GLM-5.2-FP8/model-00097-of-00141.safetensors",
+          "size": 5363339112
+        },
+        {
+          "crc32c": "srs3Mw==",
+          "generation": 1783383443187214,
+          "name": "models/GLM-5.2-FP8/model-00098-of-00141.safetensors",
+          "size": 5361736616
+        },
+        {
+          "crc32c": "T6XqKQ==",
+          "generation": 1783382443485355,
+          "name": "models/GLM-5.2-FP8/model-00099-of-00141.safetensors",
+          "size": 5366353168
+        },
+        {
+          "crc32c": "fH/P7w==",
+          "generation": 1783384123012365,
+          "name": "models/GLM-5.2-FP8/model-00100-of-00141.safetensors",
+          "size": 5361735624
+        },
+        {
+          "crc32c": "siMEaA==",
+          "generation": 1783382966124896,
+          "name": "models/GLM-5.2-FP8/model-00101-of-00141.safetensors",
+          "size": 5363339032
+        },
+        {
+          "crc32c": "C+Y4qA==",
+          "generation": 1783383872397287,
+          "name": "models/GLM-5.2-FP8/model-00102-of-00141.safetensors",
+          "size": 5361736344
+        },
+        {
+          "crc32c": "AvL1zA==",
+          "generation": 1783381735876584,
+          "name": "models/GLM-5.2-FP8/model-00103-of-00141.safetensors",
+          "size": 5366353856
+        },
+        {
+          "crc32c": "sE5TuQ==",
+          "generation": 1783382552286262,
+          "name": "models/GLM-5.2-FP8/model-00104-of-00141.safetensors",
+          "size": 5364883208
+        },
+        {
+          "crc32c": "lgviFg==",
+          "generation": 1783382980721252,
+          "name": "models/GLM-5.2-FP8/model-00105-of-00141.safetensors",
+          "size": 5363207032
+        },
+        {
+          "crc32c": "WJrOHw==",
+          "generation": 1783382948721603,
+          "name": "models/GLM-5.2-FP8/model-00106-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "73+6jQ==",
+          "generation": 1783383257400035,
+          "name": "models/GLM-5.2-FP8/model-00107-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "xO+W/w==",
+          "generation": 1783382176785247,
+          "name": "models/GLM-5.2-FP8/model-00108-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "72QVPQ==",
+          "generation": 1783383377789554,
+          "name": "models/GLM-5.2-FP8/model-00109-of-00141.safetensors",
+          "size": 5361736648
+        },
+        {
+          "crc32c": "xSP0qw==",
+          "generation": 1783382056550218,
+          "name": "models/GLM-5.2-FP8/model-00110-of-00141.safetensors",
+          "size": 5366353552
+        },
+        {
+          "crc32c": "L/tmow==",
+          "generation": 1783383602180677,
+          "name": "models/GLM-5.2-FP8/model-00111-of-00141.safetensors",
+          "size": 5361736512
+        },
+        {
+          "crc32c": "0qEzsA==",
+          "generation": 1783381890937959,
+          "name": "models/GLM-5.2-FP8/model-00112-of-00141.safetensors",
+          "size": 5366353688
+        },
+        {
+          "crc32c": "Su2huQ==",
+          "generation": 1783383812611029,
+          "name": "models/GLM-5.2-FP8/model-00113-of-00141.safetensors",
+          "size": 5361736376
+        },
+        {
+          "crc32c": "WaTP1Q==",
+          "generation": 1783382704800650,
+          "name": "models/GLM-5.2-FP8/model-00114-of-00141.safetensors",
+          "size": 5363339432
+        },
+        {
+          "crc32c": "qQXsrg==",
+          "generation": 1783384015541829,
+          "name": "models/GLM-5.2-FP8/model-00115-of-00141.safetensors",
+          "size": 5361736240
+        },
+        {
+          "crc32c": "fd1yNw==",
+          "generation": 1783381613391912,
+          "name": "models/GLM-5.2-FP8/model-00116-of-00141.safetensors",
+          "size": 5366353976
+        },
+        {
+          "crc32c": "h5j6tQ==",
+          "generation": 1783382376791006,
+          "name": "models/GLM-5.2-FP8/model-00117-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "T7wHmg==",
+          "generation": 1783383260304807,
+          "name": "models/GLM-5.2-FP8/model-00118-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "y4c5/Q==",
+          "generation": 1783382391042265,
+          "name": "models/GLM-5.2-FP8/model-00119-of-00141.safetensors",
+          "size": 5366353304
+        },
+        {
+          "crc32c": "Lmbu5w==",
+          "generation": 1783384099157151,
+          "name": "models/GLM-5.2-FP8/model-00120-of-00141.safetensors",
+          "size": 5361735832
+        },
+        {
+          "crc32c": "E4Relg==",
+          "generation": 1783382500455366,
+          "name": "models/GLM-5.2-FP8/model-00121-of-00141.safetensors",
+          "size": 5366353016
+        },
+        {
+          "crc32c": "rWgtFQ==",
+          "generation": 1783383551187436,
+          "name": "models/GLM-5.2-FP8/model-00122-of-00141.safetensors",
+          "size": 5361736552
+        },
+        {
+          "crc32c": "1PEYLw==",
+          "generation": 1783382804149532,
+          "name": "models/GLM-5.2-FP8/model-00123-of-00141.safetensors",
+          "size": 5363339256
+        },
+        {
+          "crc32c": "RyC2Pw==",
+          "generation": 1783383761245181,
+          "name": "models/GLM-5.2-FP8/model-00124-of-00141.safetensors",
+          "size": 5361736416
+        },
+        {
+          "crc32c": "AwOp6A==",
+          "generation": 1783381742955247,
+          "name": "models/GLM-5.2-FP8/model-00125-of-00141.safetensors",
+          "size": 5366353784
+        },
+        {
+          "crc32c": "Z7JGnQ==",
+          "generation": 1783383988451191,
+          "name": "models/GLM-5.2-FP8/model-00126-of-00141.safetensors",
+          "size": 5361736288
+        },
+        {
+          "crc32c": "DWocGg==",
+          "generation": 1783381610904402,
+          "name": "models/GLM-5.2-FP8/model-00127-of-00141.safetensors",
+          "size": 5366353920
+        },
+        {
+          "crc32c": "nlsP3w==",
+          "generation": 1783382379001482,
+          "name": "models/GLM-5.2-FP8/model-00128-of-00141.safetensors",
+          "size": 5366353488
+        },
+        {
+          "crc32c": "vp1eJg==",
+          "generation": 1783383308892795,
+          "name": "models/GLM-5.2-FP8/model-00129-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "IVoO4Q==",
+          "generation": 1783382949989727,
+          "name": "models/GLM-5.2-FP8/model-00130-of-00141.safetensors",
+          "size": 5363339104
+        },
+        {
+          "crc32c": "i9u42w==",
+          "generation": 1783383329904535,
+          "name": "models/GLM-5.2-FP8/model-00131-of-00141.safetensors",
+          "size": 5361736696
+        },
+        {
+          "crc32c": "hOvtpA==",
+          "generation": 1783382173666175,
+          "name": "models/GLM-5.2-FP8/model-00132-of-00141.safetensors",
+          "size": 5366353504
+        },
+        {
+          "crc32c": "aaIcxw==",
+          "generation": 1783383456842134,
+          "name": "models/GLM-5.2-FP8/model-00133-of-00141.safetensors",
+          "size": 5361736592
+        },
+        {
+          "crc32c": "mOz5Zg==",
+          "generation": 1783381951985889,
+          "name": "models/GLM-5.2-FP8/model-00134-of-00141.safetensors",
+          "size": 5366353608
+        },
+        {
+          "crc32c": "ifmujA==",
+          "generation": 1783383663663786,
+          "name": "models/GLM-5.2-FP8/model-00135-of-00141.safetensors",
+          "size": 5361736456
+        },
+        {
+          "crc32c": "mLbBdg==",
+          "generation": 1783382502235730,
+          "name": "models/GLM-5.2-FP8/model-00136-of-00141.safetensors",
+          "size": 5366338752
+        },
+        {
+          "crc32c": "8Ri9qQ==",
+          "generation": 1783383898984028,
+          "name": "models/GLM-5.2-FP8/model-00137-of-00141.safetensors",
+          "size": 5361736352
+        },
+        {
+          "crc32c": "YEE88A==",
+          "generation": 1783382605070926,
+          "name": "models/GLM-5.2-FP8/model-00138-of-00141.safetensors",
+          "size": 5363351176
+        },
+        {
+          "crc32c": "mKBIaA==",
+          "generation": 1783384139802935,
+          "name": "models/GLM-5.2-FP8/model-00139-of-00141.safetensors",
+          "size": 5361735376
+        },
+        {
+          "crc32c": "EmQ5Sw==",
+          "generation": 1783382488416547,
+          "name": "models/GLM-5.2-FP8/model-00140-of-00141.safetensors",
+          "size": 5366353160
+        },
+        {
+          "crc32c": "NE3icw==",
+          "generation": 1783384235245206,
+          "name": "models/GLM-5.2-FP8/model-00141-of-00141.safetensors",
+          "size": 4724454592
+        },
+        {
+          "crc32c": "DtboPA==",
+          "generation": 1783384154820062,
+          "name": "models/GLM-5.2-FP8/model.safetensors.index.json",
+          "size": 11359251
+        },
+        {
+          "crc32c": "CJhfpQ==",
+          "generation": 1783384149331440,
+          "name": "models/GLM-5.2-FP8/tokenizer.json",
+          "size": 20217442
+        },
+        {
+          "crc32c": "s6fUuQ==",
+          "generation": 1783384176301056,
+          "name": "models/GLM-5.2-FP8/tokenizer_config.json",
+          "size": 761
+        }
+      ],
+      "prefix": "models/GLM-5.2-FP8/",
+      "preserve_metadata_objects": [],
+      "recipe": {
+        "code_hash": "61475d30a708252bc64aaf50fec2c2ea1ea03c63",
+        "dependencies": [],
+        "entrypoint": "scripts/greenfield/pack_checkpoint_streaming.py"
+      },
+      "terminal_objects": [
+        "model.safetensors.index.json"
+      ]
+    },
+    {
+      "bytes": 11059060,
+      "disposition": "keep",
+      "expected_manifest_sha256": "0f1bb2718a700fb2eee23dc9f172cd9e5cbd1639396d8c8fa8421e1e3b52b6f1",
+      "id": "old_pp16_feature_metadata",
+      "object_count": 4,
+      "objects": [
+        {
+          "crc32c": "C3l7fQ==",
+          "generation": 1787831512488772,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/SUCCESS",
+          "size": 88
+        },
+        {
+          "crc32c": "dy9JRw==",
+          "generation": 1787824499109869,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/control.json",
+          "size": 1720
+        },
+        {
+          "crc32c": "c0tPgw==",
+          "generation": 1787824499284395,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/runtime_layout.json",
+          "size": 5640785
+        },
+        {
+          "crc32c": "sKXI5Q==",
+          "generation": 1787831512430298,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/runtime_manifest.json",
+          "size": 5416467
+        }
+      ],
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/",
+      "preserve_metadata_objects": [
+        "SUCCESS",
+        "control.json",
+        "runtime_layout.json",
+        "runtime_manifest.json"
+      ],
+      "recipe": {
+        "code_hash": "a973425cd235758142c55c5a0127ddb9a36b45a9",
+        "dependencies": [
+          {
+            "artifact_id": "canonical_glm_source",
+            "required_scope": "full_payload"
+          }
+        ],
+        "entrypoint": "scripts/greenfield/pack_feature_runtime_checkpoint.py"
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "bytes": 869671243535,
+      "disposition": "keep",
+      "expected_manifest_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+      "id": "active_direct_pp16_runtime",
+      "object_count": 68,
+      "objects": [
+        {
+          "crc32c": "gEYRtQ==",
+          "generation": 1787851422189249,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/SUCCESS",
+          "size": 88
+        },
+        {
+          "crc32c": "Nq0a+w==",
+          "generation": 1787849998524258,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "rO/F3Q==",
+          "generation": 1787849998853042,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "pOv6ug==",
+          "generation": 1787850708602863,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "nyEptA==",
+          "generation": 1787850709002263,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "ObMP8w==",
+          "generation": 1787850693469479,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "ZW01LA==",
+          "generation": 1787850693801956,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "+/JYGw==",
+          "generation": 1787850697704541,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "s6OojQ==",
+          "generation": 1787850698199202,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "Ton6bQ==",
+          "generation": 1787851320618630,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "1PtDXw==",
+          "generation": 1787851321134717,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "y92diA==",
+          "generation": 1787850706143452,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "2lZ1fQ==",
+          "generation": 1787850706453375,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "/XYYPA==",
+          "generation": 1787851336925438,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "QSmFDQ==",
+          "generation": 1787851337515763,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "08TQCA==",
+          "generation": 1787851361950356,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "1aCtXw==",
+          "generation": 1787851362396345,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "hV66nA==",
+          "generation": 1787850698925967,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_08/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "sHo5EA==",
+          "generation": 1787850699567031,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_08/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "UicxiA==",
+          "generation": 1787850684434110,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_09/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "XQCJsw==",
+          "generation": 1787850684891845,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_09/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "Kdt1hw==",
+          "generation": 1787850699450409,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_10/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "VpeEQA==",
+          "generation": 1787850700031752,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_10/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "A+1PQQ==",
+          "generation": 1787850694841807,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_11/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "slclXQ==",
+          "generation": 1787850695398986,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_11/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "V/TnLQ==",
+          "generation": 1787851369769861,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_12/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "pSdz4Q==",
+          "generation": 1787851370278074,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_12/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "j4Bh0g==",
+          "generation": 1787851368601124,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_13/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "BdNs6A==",
+          "generation": 1787851368934735,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_13/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "em3Jdg==",
+          "generation": 1787851352563194,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_14/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "uvRtcA==",
+          "generation": 1787851353046429,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_14/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "fHjXRQ==",
+          "generation": 1787851330152937,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_15/device_slot_00.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "lL6OwQ==",
+          "generation": 1787851330818130,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/base_decoder_runtime_feature/stage_15/device_slot_01.safetensors",
+          "size": 27176812872
+        },
+        {
+          "crc32c": "LFIAvQ==",
+          "generation": 1787849377407332,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/control.json",
+          "size": 2003
+        },
+        {
+          "crc32c": "ik8AAQ==",
+          "generation": 1787849999057560,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_00.safetensors.json",
+          "size": 150669
+        },
+        {
+          "crc32c": "RDgwxA==",
+          "generation": 1787849999226360,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_00/device_slot_01.safetensors.json",
+          "size": 150669
+        },
+        {
+          "crc32c": "GQy8aA==",
+          "generation": 1787850709185021,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_00.safetensors.json",
+          "size": 125346
+        },
+        {
+          "crc32c": "tHK2EQ==",
+          "generation": 1787850709372345,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_01/device_slot_01.safetensors.json",
+          "size": 125346
+        },
+        {
+          "crc32c": "gDuapw==",
+          "generation": 1787850694002821,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "eJinGw==",
+          "generation": 1787850694166058,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_02/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "PLB4EQ==",
+          "generation": 1787850698380329,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "kugbjQ==",
+          "generation": 1787850698548186,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_03/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "2+GHgA==",
+          "generation": 1787851321360180,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_00.safetensors.json",
+          "size": 111619
+        },
+        {
+          "crc32c": "dHWmRw==",
+          "generation": 1787851321536591,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_04/device_slot_01.safetensors.json",
+          "size": 111619
+        },
+        {
+          "crc32c": "Dw2G3A==",
+          "generation": 1787850706654963,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_00.safetensors.json",
+          "size": 111618
+        },
+        {
+          "crc32c": "t89D3g==",
+          "generation": 1787850706818549,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_05/device_slot_01.safetensors.json",
+          "size": 111618
+        },
+        {
+          "crc32c": "ixmRxg==",
+          "generation": 1787851337695414,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_00.safetensors.json",
+          "size": 111619
+        },
+        {
+          "crc32c": "ynvBZA==",
+          "generation": 1787851337869344,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_06/device_slot_01.safetensors.json",
+          "size": 111619
+        },
+        {
+          "crc32c": "A51Bgw==",
+          "generation": 1787851362599904,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_00.safetensors.json",
+          "size": 128667
+        },
+        {
+          "crc32c": "lFn3NQ==",
+          "generation": 1787851362772886,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_07/device_slot_01.safetensors.json",
+          "size": 128667
+        },
+        {
+          "crc32c": "Nl0RmA==",
+          "generation": 1787850699757317,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_08/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "wMcjFg==",
+          "generation": 1787850699927799,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_08/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "lclDtA==",
+          "generation": 1787850685084561,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_09/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "YxNP9g==",
+          "generation": 1787850685258833,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_09/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "3EA3Eg==",
+          "generation": 1787850700233907,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_10/device_slot_00.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "/V81xQ==",
+          "generation": 1787850700400310,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_10/device_slot_01.safetensors.json",
+          "size": 125347
+        },
+        {
+          "crc32c": "A8J5xA==",
+          "generation": 1787850695585360,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_11/device_slot_00.safetensors.json",
+          "size": 128668
+        },
+        {
+          "crc32c": "+lRpNA==",
+          "generation": 1787850695751214,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_11/device_slot_01.safetensors.json",
+          "size": 128668
+        },
+        {
+          "crc32c": "KrdYlA==",
+          "generation": 1787851370527514,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_12/device_slot_00.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "8UHp1Q==",
+          "generation": 1787851370671127,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_12/device_slot_01.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "QJPpmA==",
+          "generation": 1787851369127962,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_13/device_slot_00.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "4tBRQw==",
+          "generation": 1787851369278171,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_13/device_slot_01.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "G3VPuw==",
+          "generation": 1787851353221936,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_14/device_slot_00.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "ce2gLQ==",
+          "generation": 1787851353391165,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_14/device_slot_01.safetensors.json",
+          "size": 125348
+        },
+        {
+          "crc32c": "aP+hEQ==",
+          "generation": 1787851331011061,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_15/device_slot_00.safetensors.json",
+          "size": 112534
+        },
+        {
+          "crc32c": "IdhBWw==",
+          "generation": 1787851331175467,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/evidence/base_decoder_runtime_feature/stage_15/device_slot_01.safetensors.json",
+          "size": 112534
+        },
+        {
+          "crc32c": "MLQPdA==",
+          "generation": 1787849377562612,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/runtime_layout.json",
+          "size": 4805264
+        },
+        {
+          "crc32c": "BoG+wQ==",
+          "generation": 1787851422132475,
+          "name": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/runtime_manifest.json",
+          "size": 4457238
+        }
+      ],
+      "prefix": "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/",
+      "preserve_metadata_objects": [],
+      "recipe": {
+        "code_hash": "44501082b9ce414c5938c2193d695200c14429c5",
+        "dependencies": [
+          {
+            "artifact_id": "old_pp16_feature_metadata",
+            "required_objects": [
+              "SUCCESS",
+              "control.json",
+              "runtime_layout.json",
+              "runtime_manifest.json"
+            ],
+            "required_scope": "metadata_only"
+          }
+        ],
+        "entrypoint": "scripts/greenfield/run_feature_fused_qkv_derivative_pp16.sh"
+      },
+      "terminal_objects": [
+        "SUCCESS",
+        "runtime_manifest.json",
+        "control.json"
+      ]
+    },
+    {
+      "bytes": 60207728177,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "abandon_legacy_hunt_topkdump",
+      "object_count": 4,
+      "objects": [
+        {
+          "crc32c": "azFz4g==",
+          "generation": 1784577219166119,
+          "name": "dumps/hunt_topkdump_20260720T164806Z/draw1_HEALTHY/hunt_d1_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 15048698696
+        },
+        {
+          "crc32c": "eOfoyg==",
+          "generation": 1784588399366866,
+          "name": "dumps/hunt_topkdump_20260720T164806Z/draw2_HEALTHY/hunt_d2_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 15048660710
+        },
+        {
+          "crc32c": "xt+s6w==",
+          "generation": 1784599472319681,
+          "name": "dumps/hunt_topkdump_20260720T164806Z/draw3_HEALTHY/hunt_d3_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 15061686827
+        },
+        {
+          "crc32c": "GxE11g==",
+          "generation": 1784610475961964,
+          "name": "dumps/hunt_topkdump_20260720T164806Z/draw4_HEALTHY/hunt_d4_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 15048681944
+        }
+      ],
+      "prefix": "dumps/hunt_topkdump_20260720T164806Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": [
+          "four-repository current-reader search",
+          "live process census",
+          "user-authorized obsolete-dump retirement"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 30188271964,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "abandon_legacy_hunt_fixval2",
+      "object_count": 2,
+      "objects": [
+        {
+          "crc32c": "CMK+jw==",
+          "generation": 1784679517448787,
+          "name": "dumps/hunt_fixval2_20260721T211506Z/draw1_HEALTHY/hunt_d1_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 15139603165
+        },
+        {
+          "crc32c": "xL2cNQ==",
+          "generation": 1784690664154139,
+          "name": "dumps/hunt_fixval2_20260721T211506Z/draw2_HEALTHY/hunt_d2_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 15048668799
+        }
+      ],
+      "prefix": "dumps/hunt_fixval2_20260721T211506Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": [
+          "four-repository current-reader search",
+          "live process census",
+          "user-authorized obsolete-dump retirement"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 30118403615,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "abandon_legacy_hunt_fixval",
+      "object_count": 2,
+      "objects": [
+        {
+          "crc32c": "wEvrCw==",
+          "generation": 1784654495849780,
+          "name": "dumps/hunt_fixval_20260721T123126Z/draw2_HEALTHY/hunt_d2_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 15069711207
+        },
+        {
+          "crc32c": "D6RDZQ==",
+          "generation": 1784665646312902,
+          "name": "dumps/hunt_fixval_20260721T123126Z/draw3_HEALTHY/hunt_d3_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 15048692408
+        }
+      ],
+      "prefix": "dumps/hunt_fixval_20260721T123126Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": [
+          "four-repository current-reader search",
+          "live process census",
+          "user-authorized obsolete-dump retirement"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 30110359602,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "abandon_legacy_hunt_statepair",
+      "object_count": 2,
+      "objects": [
+        {
+          "crc32c": "/obcAg==",
+          "generation": 1784773253806330,
+          "name": "dumps/hunt_statepair_20260722T231703Z/draw1_HEALTHY/hunt_d1_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 15048699157
+        },
+        {
+          "crc32c": "oNwAEw==",
+          "generation": 1784784205886362,
+          "name": "dumps/hunt_statepair_20260722T231703Z/draw2_HEALTHY/hunt_d2_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 15061660445
+        }
+      ],
+      "prefix": "dumps/hunt_statepair_20260722T231703Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": [
+          "four-repository current-reader search",
+          "live process census",
+          "user-authorized obsolete-dump retirement"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 28456318555,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "abandon_legacy_probe_lottery_035115",
+      "object_count": 64,
+      "objects": [
+        {
+          "crc32c": "QniCAQ==",
+          "generation": 1784265400817963,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe1/t1v-n-6c15e171-w-0.tar.gz",
+          "size": 497213834
+        },
+        {
+          "crc32c": "tS/h2w==",
+          "generation": 1784265430984204,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe1/t1v-n-6c15e171-w-1.tar.gz",
+          "size": 500701841
+        },
+        {
+          "crc32c": "eltrUg==",
+          "generation": 1784265404966588,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe1/t1v-n-6c15e171-w-2.tar.gz",
+          "size": 500699745
+        },
+        {
+          "crc32c": "pt/+Hw==",
+          "generation": 1784265402765242,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe1/t1v-n-6c15e171-w-3.tar.gz",
+          "size": 484785966
+        },
+        {
+          "crc32c": "VHvcHQ==",
+          "generation": 1784265406689404,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe1/t1v-n-6c15e171-w-4.tar.gz",
+          "size": 476658651
+        },
+        {
+          "crc32c": "9ugAKA==",
+          "generation": 1784265410345137,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe1/t1v-n-6c15e171-w-5.tar.gz",
+          "size": 500701936
+        },
+        {
+          "crc32c": "wwGF6w==",
+          "generation": 1784265399963712,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe1/t1v-n-6c15e171-w-6.tar.gz",
+          "size": 484785366
+        },
+        {
+          "crc32c": "iM5vdg==",
+          "generation": 1784265413296091,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe1/t1v-n-6c15e171-w-7.tar.gz",
+          "size": 497212279
+        },
+        {
+          "crc32c": "VCLMsQ==",
+          "generation": 1784271457935562,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe2/t1v-n-6c15e171-w-0.tar.gz",
+          "size": 495002090
+        },
+        {
+          "crc32c": "c2YHVA==",
+          "generation": 1784271455441581,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe2/t1v-n-6c15e171-w-1.tar.gz",
+          "size": 498231282
+        },
+        {
+          "crc32c": "E3yo5A==",
+          "generation": 1784271459273343,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe2/t1v-n-6c15e171-w-2.tar.gz",
+          "size": 485369149
+        },
+        {
+          "crc32c": "vx6ipw==",
+          "generation": 1784271466972805,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe2/t1v-n-6c15e171-w-3.tar.gz",
+          "size": 470878627
+        },
+        {
+          "crc32c": "lc+6cw==",
+          "generation": 1784271572020361,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe2/t1v-n-6c15e171-w-4.tar.gz",
+          "size": 473866068
+        },
+        {
+          "crc32c": "BJrD6Q==",
+          "generation": 1784271452601195,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe2/t1v-n-6c15e171-w-5.tar.gz",
+          "size": 498231341
+        },
+        {
+          "crc32c": "0aggTg==",
+          "generation": 1784271473913185,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe2/t1v-n-6c15e171-w-6.tar.gz",
+          "size": 495000242
+        },
+        {
+          "crc32c": "JcHoqw==",
+          "generation": 1784271446563388,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe2/t1v-n-6c15e171-w-7.tar.gz",
+          "size": 470878503
+        },
+        {
+          "crc32c": "ozpyuQ==",
+          "generation": 1784273949841767,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe3/t1v-n-6c15e171-w-0.tar.gz",
+          "size": 117782257
+        },
+        {
+          "crc32c": "e8K6RQ==",
+          "generation": 1784274086620573,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe3/t1v-n-6c15e171-w-1.tar.gz",
+          "size": 124859029
+        },
+        {
+          "crc32c": "pdcb+A==",
+          "generation": 1784273946223027,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe3/t1v-n-6c15e171-w-2.tar.gz",
+          "size": 124857954
+        },
+        {
+          "crc32c": "HGIJiA==",
+          "generation": 1784273937338681,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe3/t1v-n-6c15e171-w-3.tar.gz",
+          "size": 117793272
+        },
+        {
+          "crc32c": "a+VHiw==",
+          "generation": 1784273952108950,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe3/t1v-n-6c15e171-w-4.tar.gz",
+          "size": 124861178
+        },
+        {
+          "crc32c": "4uoxzQ==",
+          "generation": 1784273944042261,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe3/t1v-n-6c15e171-w-5.tar.gz",
+          "size": 124859419
+        },
+        {
+          "crc32c": "iG7X0A==",
+          "generation": 1784273947670254,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe3/t1v-n-6c15e171-w-6.tar.gz",
+          "size": 120583176
+        },
+        {
+          "crc32c": "ybOcIA==",
+          "generation": 1784273940441148,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe3/t1v-n-6c15e171-w-7.tar.gz",
+          "size": 117792920
+        },
+        {
+          "crc32c": "0hvILg==",
+          "generation": 1784282459755901,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe4/t1v-n-6c15e171-w-0.tar.gz",
+          "size": 494114762
+        },
+        {
+          "crc32c": "6aLbiQ==",
+          "generation": 1784282450683585,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe4/t1v-n-6c15e171-w-1.tar.gz",
+          "size": 497587145
+        },
+        {
+          "crc32c": "+03/og==",
+          "generation": 1784282451546358,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe4/t1v-n-6c15e171-w-2.tar.gz",
+          "size": 497585733
+        },
+        {
+          "crc32c": "TeqBkA==",
+          "generation": 1784282449742237,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe4/t1v-n-6c15e171-w-3.tar.gz",
+          "size": 494114388
+        },
+        {
+          "crc32c": "o1qJQQ==",
+          "generation": 1784282451490574,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe4/t1v-n-6c15e171-w-4.tar.gz",
+          "size": 497587577
+        },
+        {
+          "crc32c": "+oNHwg==",
+          "generation": 1784282449729564,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe4/t1v-n-6c15e171-w-5.tar.gz",
+          "size": 486095005
+        },
+        {
+          "crc32c": "LkqEiA==",
+          "generation": 1784282450390811,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe4/t1v-n-6c15e171-w-6.tar.gz",
+          "size": 494115152
+        },
+        {
+          "crc32c": "yWcAhg==",
+          "generation": 1784282452126664,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe4/t1v-n-6c15e171-w-7.tar.gz",
+          "size": 494113988
+        },
+        {
+          "crc32c": "iU0ETQ==",
+          "generation": 1784288238469781,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe5/t1v-n-6c15e171-w-0.tar.gz",
+          "size": 481926563
+        },
+        {
+          "crc32c": "dENIWQ==",
+          "generation": 1784288247106377,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe5/t1v-n-6c15e171-w-1.tar.gz",
+          "size": 484645031
+        },
+        {
+          "crc32c": "ewCg9g==",
+          "generation": 1784288234943332,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe5/t1v-n-6c15e171-w-2.tar.gz",
+          "size": 496735792
+        },
+        {
+          "crc32c": "k7ZChg==",
+          "generation": 1784288239719318,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe5/t1v-n-6c15e171-w-3.tar.gz",
+          "size": 494005178
+        },
+        {
+          "crc32c": "iTaFEA==",
+          "generation": 1784288236609608,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe5/t1v-n-6c15e171-w-4.tar.gz",
+          "size": 496735156
+        },
+        {
+          "crc32c": "NVRthQ==",
+          "generation": 1784288241647266,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe5/t1v-n-6c15e171-w-5.tar.gz",
+          "size": 484645002
+        },
+        {
+          "crc32c": "ho7lJA==",
+          "generation": 1784288237692250,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe5/t1v-n-6c15e171-w-6.tar.gz",
+          "size": 481926505
+        },
+        {
+          "crc32c": "Gz419g==",
+          "generation": 1784288239024775,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe5/t1v-n-6c15e171-w-7.tar.gz",
+          "size": 476763486
+        },
+        {
+          "crc32c": "R+azjA==",
+          "generation": 1784293993813003,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe6/t1v-n-6c15e171-w-0.tar.gz",
+          "size": 483790082
+        },
+        {
+          "crc32c": "hSfx+g==",
+          "generation": 1784294006357202,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe6/t1v-n-6c15e171-w-1.tar.gz",
+          "size": 498577423
+        },
+        {
+          "crc32c": "UCAIwg==",
+          "generation": 1784293994640858,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe6/t1v-n-6c15e171-w-2.tar.gz",
+          "size": 498576463
+        },
+        {
+          "crc32c": "dsGAJA==",
+          "generation": 1784293998903270,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe6/t1v-n-6c15e171-w-3.tar.gz",
+          "size": 495162009
+        },
+        {
+          "crc32c": "WHFd1g==",
+          "generation": 1784293999016729,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe6/t1v-n-6c15e171-w-4.tar.gz",
+          "size": 498578249
+        },
+        {
+          "crc32c": "/9RjGg==",
+          "generation": 1784293997261359,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe6/t1v-n-6c15e171-w-5.tar.gz",
+          "size": 498577614
+        },
+        {
+          "crc32c": "2Ml6RQ==",
+          "generation": 1784293992658651,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe6/t1v-n-6c15e171-w-6.tar.gz",
+          "size": 495162384
+        },
+        {
+          "crc32c": "EgRwWg==",
+          "generation": 1784293996831207,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe6/t1v-n-6c15e171-w-7.tar.gz",
+          "size": 495161787
+        },
+        {
+          "crc32c": "brtWnw==",
+          "generation": 1784299837934297,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe7/t1v-n-6c15e171-w-0.tar.gz",
+          "size": 494386629
+        },
+        {
+          "crc32c": "9A2UTQ==",
+          "generation": 1784299857728805,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe7/t1v-n-6c15e171-w-1.tar.gz",
+          "size": 497530781
+        },
+        {
+          "crc32c": "sRaXEQ==",
+          "generation": 1784299842343348,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe7/t1v-n-6c15e171-w-2.tar.gz",
+          "size": 484990738
+        },
+        {
+          "crc32c": "1yLVGQ==",
+          "generation": 1784299840539093,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe7/t1v-n-6c15e171-w-3.tar.gz",
+          "size": 481961838
+        },
+        {
+          "crc32c": "2oD2KQ==",
+          "generation": 1784299848030799,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe7/t1v-n-6c15e171-w-4.tar.gz",
+          "size": 473480508
+        },
+        {
+          "crc32c": "bQ9tSg==",
+          "generation": 1784299843393390,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe7/t1v-n-6c15e171-w-5.tar.gz",
+          "size": 497530806
+        },
+        {
+          "crc32c": "TX7Wfg==",
+          "generation": 1784299849525739,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe7/t1v-n-6c15e171-w-6.tar.gz",
+          "size": 494387272
+        },
+        {
+          "crc32c": "fbPXrw==",
+          "generation": 1784299838322762,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe7/t1v-n-6c15e171-w-7.tar.gz",
+          "size": 494386755
+        },
+        {
+          "crc32c": "mSuThg==",
+          "generation": 1784305556980911,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe8/t1v-n-6c15e171-w-0.tar.gz",
+          "size": 476952837
+        },
+        {
+          "crc32c": "r77FqQ==",
+          "generation": 1784305560437007,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe8/t1v-n-6c15e171-w-1.tar.gz",
+          "size": 474096867
+        },
+        {
+          "crc32c": "yUXUTg==",
+          "generation": 1784305550314789,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe8/t1v-n-6c15e171-w-2.tar.gz",
+          "size": 485601979
+        },
+        {
+          "crc32c": "v4y1nQ==",
+          "generation": 1784305555852945,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe8/t1v-n-6c15e171-w-3.tar.gz",
+          "size": 494814583
+        },
+        {
+          "crc32c": "Goc7AQ==",
+          "generation": 1784305553382153,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe8/t1v-n-6c15e171-w-4.tar.gz",
+          "size": 498339907
+        },
+        {
+          "crc32c": "L/9FoQ==",
+          "generation": 1784305561889605,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe8/t1v-n-6c15e171-w-5.tar.gz",
+          "size": 498340112
+        },
+        {
+          "crc32c": "fcOTPA==",
+          "generation": 1784305566039493,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe8/t1v-n-6c15e171-w-6.tar.gz",
+          "size": 494813602
+        },
+        {
+          "crc32c": "yBop6A==",
+          "generation": 1784305562095708,
+          "name": "dumps/probe_lottery_20260717T035115Z/probe8/t1v-n-6c15e171-w-7.tar.gz",
+          "size": 494814742
+        }
+      ],
+      "prefix": "dumps/probe_lottery_20260717T035115Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": [
+          "four-repository current-reader search",
+          "historical documentation references only",
+          "user-authorized obsolete-dump retirement"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 18714325164,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "abandon_legacy_hunt_lscan3",
+      "object_count": 1,
+      "objects": [
+        {
+          "crc32c": "DJDoeQ==",
+          "generation": 1784742062869957,
+          "name": "dumps/hunt_lscan3_20260722T142319Z/draw1_HEALTHY/hunt_d1_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 18714325164
+        }
+      ],
+      "prefix": "dumps/hunt_lscan3_20260722T142319Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": [
+          "four-repository current-reader search",
+          "live process census",
+          "user-authorized obsolete-dump retirement"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 3155530000,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "abandon_legacy_hunt_v1b",
+      "object_count": 8,
+      "objects": [
+        {
+          "crc32c": "xZPszg==",
+          "generation": 1784548284175120,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw1_HEALTHY/hunt_d1_t1v-n-6c15e171-w-0.tar.gz",
+          "size": 379461211
+        },
+        {
+          "crc32c": "jE4sVQ==",
+          "generation": 1784548286529703,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw1_HEALTHY/hunt_d1_t1v-n-6c15e171-w-1.tar.gz",
+          "size": 409421468
+        },
+        {
+          "crc32c": "yJrgzw==",
+          "generation": 1784548286424186,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw1_HEALTHY/hunt_d1_t1v-n-6c15e171-w-2.tar.gz",
+          "size": 409417370
+        },
+        {
+          "crc32c": "LJ5t6w==",
+          "generation": 1784548283824267,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw1_HEALTHY/hunt_d1_t1v-n-6c15e171-w-3.tar.gz",
+          "size": 379460608
+        },
+        {
+          "crc32c": "yLsORQ==",
+          "generation": 1784548286792915,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw1_HEALTHY/hunt_d1_t1v-n-6c15e171-w-4.tar.gz",
+          "size": 409421330
+        },
+        {
+          "crc32c": "Q1dQSw==",
+          "generation": 1784548286803609,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw1_HEALTHY/hunt_d1_t1v-n-6c15e171-w-5.tar.gz",
+          "size": 409422591
+        },
+        {
+          "crc32c": "rLZhgw==",
+          "generation": 1784548283345684,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw1_HEALTHY/hunt_d1_t1v-n-6c15e171-w-6.tar.gz",
+          "size": 379463958
+        },
+        {
+          "crc32c": "0pO3Cg==",
+          "generation": 1784548283384353,
+          "name": "dumps/hunt_v1b_20260720T094945Z/draw1_HEALTHY/hunt_d1_t1v-n-6c15e171-w-7.tar.gz",
+          "size": 379461464
+        }
+      ],
+      "prefix": "dumps/hunt_v1b_20260720T094945Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": [
+          "four-repository current-reader search",
+          "live process census",
+          "user-authorized obsolete-dump retirement"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 2366927087,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "abandon_legacy_probe_timeline",
+      "object_count": 8,
+      "objects": [
+        {
+          "crc32c": "t/Wwcw==",
+          "generation": 1784314990569412,
+          "name": "dumps/probe_timeline_20260717T165934Z/probe3_MISS/t1v-n-6c15e171-w-0.tar.gz",
+          "size": 2628865
+        },
+        {
+          "crc32c": "58ATzw==",
+          "generation": 1784315032782870,
+          "name": "dumps/probe_timeline_20260717T165934Z/probe3_MISS/t1v-n-6c15e171-w-1.tar.gz",
+          "size": 394827457
+        },
+        {
+          "crc32c": "jUncuQ==",
+          "generation": 1784315033015119,
+          "name": "dumps/probe_timeline_20260717T165934Z/probe3_MISS/t1v-n-6c15e171-w-2.tar.gz",
+          "size": 394819015
+        },
+        {
+          "crc32c": "c9lEYA==",
+          "generation": 1784314990488099,
+          "name": "dumps/probe_timeline_20260717T165934Z/probe3_MISS/t1v-n-6c15e171-w-3.tar.gz",
+          "size": 2633781
+        },
+        {
+          "crc32c": "mpswiw==",
+          "generation": 1784315032392712,
+          "name": "dumps/probe_timeline_20260717T165934Z/probe3_MISS/t1v-n-6c15e171-w-4.tar.gz",
+          "size": 394825654
+        },
+        {
+          "crc32c": "xz2uDg==",
+          "generation": 1784315033614185,
+          "name": "dumps/probe_timeline_20260717T165934Z/probe3_MISS/t1v-n-6c15e171-w-5.tar.gz",
+          "size": 394822811
+        },
+        {
+          "crc32c": "19OJnQ==",
+          "generation": 1784315033662553,
+          "name": "dumps/probe_timeline_20260717T165934Z/probe3_MISS/t1v-n-6c15e171-w-6.tar.gz",
+          "size": 391184972
+        },
+        {
+          "crc32c": "JdRooQ==",
+          "generation": 1784315032049705,
+          "name": "dumps/probe_timeline_20260717T165934Z/probe3_MISS/t1v-n-6c15e171-w-7.tar.gz",
+          "size": 391184532
+        }
+      ],
+      "prefix": "dumps/probe_timeline_20260717T165934Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": [
+          "four-repository current-reader search",
+          "historical documentation references only",
+          "user-authorized obsolete-dump retirement"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 1000977680,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "abandon_legacy_probe_lottery_024007",
+      "object_count": 8,
+      "objects": [
+        {
+          "crc32c": "n+FoSQ==",
+          "generation": 1784260101913257,
+          "name": "dumps/probe_lottery_20260717T024007Z/probe2/t1v-n-6c15e171-w-0.tar.gz",
+          "size": 121510316
+        },
+        {
+          "crc32c": "vKI76w==",
+          "generation": 1784260105680759,
+          "name": "dumps/probe_lottery_20260717T024007Z/probe2/t1v-n-6c15e171-w-1.tar.gz",
+          "size": 128733998
+        },
+        {
+          "crc32c": "n+VctA==",
+          "generation": 1784260103936887,
+          "name": "dumps/probe_lottery_20260717T024007Z/probe2/t1v-n-6c15e171-w-2.tar.gz",
+          "size": 128737769
+        },
+        {
+          "crc32c": "pJimKw==",
+          "generation": 1784260102956766,
+          "name": "dumps/probe_lottery_20260717T024007Z/probe2/t1v-n-6c15e171-w-3.tar.gz",
+          "size": 121508041
+        },
+        {
+          "crc32c": "yUIKbg==",
+          "generation": 1784260110358149,
+          "name": "dumps/probe_lottery_20260717T024007Z/probe2/t1v-n-6c15e171-w-4.tar.gz",
+          "size": 128735340
+        },
+        {
+          "crc32c": "xi4edw==",
+          "generation": 1784260103208732,
+          "name": "dumps/probe_lottery_20260717T024007Z/probe2/t1v-n-6c15e171-w-5.tar.gz",
+          "size": 128734369
+        },
+        {
+          "crc32c": "fU0FMQ==",
+          "generation": 1784260103833341,
+          "name": "dumps/probe_lottery_20260717T024007Z/probe2/t1v-n-6c15e171-w-6.tar.gz",
+          "size": 121509310
+        },
+        {
+          "crc32c": "h05Jjg==",
+          "generation": 1784260103383907,
+          "name": "dumps/probe_lottery_20260717T024007Z/probe2/t1v-n-6c15e171-w-7.tar.gz",
+          "size": 121508537
+        }
+      ],
+      "prefix": "dumps/probe_lottery_20260717T024007Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": [
+          "four-repository current-reader search",
+          "live process census",
+          "user-authorized obsolete-dump retirement"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 188025250,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "abandon_legacy_disk_pressure_dump",
+      "object_count": 1,
+      "objects": [
+        {
+          "crc32c": "qttJRw==",
+          "generation": 1786150426462958,
+          "name": "dumps/disk_pressure_pre_dsa_internal_20260808T0055Z/t1v-n-6c15e171-w-0.tar.gz",
+          "size": 188025250
+        }
+      ],
+      "prefix": "dumps/disk_pressure_pre_dsa_internal_20260808T0055Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payload; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": [
+          "four-repository current-reader search",
+          "live process census",
+          "user-authorized obsolete-dump retirement"
+        ]
+      },
+      "terminal_objects": []
+    },
+    {
+      "bytes": 99799476,
+      "disposition": "delete_now",
+      "expected_manifest_sha256": null,
+      "id": "abandon_legacy_gate128k_dump",
+      "object_count": 8,
+      "objects": [
+        {
+          "crc32c": "tj0e+A==",
+          "generation": 1784406138156098,
+          "name": "dumps/gate128k_20260718T110127Z/depth_1.0_MISS/t1v-n-6c15e171-w-0.tar.gz",
+          "size": 12422705
+        },
+        {
+          "crc32c": "6x9PMw==",
+          "generation": 1784406140101301,
+          "name": "dumps/gate128k_20260718T110127Z/depth_1.0_MISS/t1v-n-6c15e171-w-1.tar.gz",
+          "size": 12527228
+        },
+        {
+          "crc32c": "EgFdnQ==",
+          "generation": 1784406141229906,
+          "name": "dumps/gate128k_20260718T110127Z/depth_1.0_MISS/t1v-n-6c15e171-w-2.tar.gz",
+          "size": 12527187
+        },
+        {
+          "crc32c": "jwIG1w==",
+          "generation": 1784406140964044,
+          "name": "dumps/gate128k_20260718T110127Z/depth_1.0_MISS/t1v-n-6c15e171-w-3.tar.gz",
+          "size": 12422615
+        },
+        {
+          "crc32c": "cQJoeg==",
+          "generation": 1784406140420998,
+          "name": "dumps/gate128k_20260718T110127Z/depth_1.0_MISS/t1v-n-6c15e171-w-4.tar.gz",
+          "size": 12527233
+        },
+        {
+          "crc32c": "LaWcmQ==",
+          "generation": 1784406141957340,
+          "name": "dumps/gate128k_20260718T110127Z/depth_1.0_MISS/t1v-n-6c15e171-w-5.tar.gz",
+          "size": 12527199
+        },
+        {
+          "crc32c": "VxV1Sg==",
+          "generation": 1784406139734577,
+          "name": "dumps/gate128k_20260718T110127Z/depth_1.0_MISS/t1v-n-6c15e171-w-6.tar.gz",
+          "size": 12422676
+        },
+        {
+          "crc32c": "H2YV/Q==",
+          "generation": 1784406140809226,
+          "name": "dumps/gate128k_20260718T110127Z/depth_1.0_MISS/t1v-n-6c15e171-w-7.tar.gz",
+          "size": 12422633
+        }
+      ],
+      "prefix": "dumps/gate128k_20260718T110127Z/",
+      "preserve_metadata_objects": [],
+      "retirement": {
+        "owner_scope": "Legacy pre-greenfield diagnostic tar payloads; no current Gate D reader or writer.",
+        "reason": "Retired under the user-authorized hard live-storage ceiling; compact conclusions remain in Git/results/oracles.",
+        "recovery": "Intentional irreversible abandonment. Raw tar members are unique, are not claimed reproducible, and cannot be recovered after deletion because soft delete is disabled.",
+        "reference_audit": [
+          "four-repository current-reader search",
+          "historical documentation references only",
+          "user-authorized obsolete-dump retirement"
+        ]
+      },
+      "terminal_objects": []
+    }
+  ],
+  "bucket": "driftbench-dsv4-uc",
+  "bucket_location": "US-CENTRAL2",
+  "capsule_sha256": "076ba7dd90b52d58b49e1966a9a4b7df2bd0ff61f21dc7da25df69a13cdd541a",
+  "created_utc": "2026-09-04T13:01:01Z",
+  "format_version": 1,
+  "generator_code_hash": "c9ef4be56907bae568d7caa31a4848dfc0d9cee7",
+  "proof": {
+    "artifact_kind": "urgent_storage_cleanup_phase3_adjudication",
+    "bucket": "driftbench-dsv4-uc",
+    "bucket_location": "US-CENTRAL2",
+    "checks": {
+      "active_direct_pp16_manifest_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+      "candidate_bytes": 204606666570,
+      "candidate_objects": 108,
+      "candidate_prefixes": 11,
+      "candidate_type": "legacy tar.gz diagnostic payloads only",
+      "current_live_bytes": 2149632628547,
+      "current_reader_audit": "No current Gate D reader consumes any candidate prefix. Historical documentation and producer-script references remain and are not misrepresented as active dependencies.",
+      "preserved_dump_bytes": 28158360488,
+      "preserved_dump_objects": 4636,
+      "preserved_dump_scope": "All four NPZ-only prefixes: rung2-originals, rung2fix-w0, rung2fix-w2, and rung4.",
+      "projected_live_bytes_before_small_archive_overhead": 1945025961977,
+      "recurring_writers": [
+        "/home/gianl/bin/sync-glm.sh -> repos/ only"
+      ],
+      "soft_delete_seconds": 0,
+      "soft_deleted_prior_generations": "The last authenticated pre-disable census was 11,750 objects / 3,681,290,733,167 bytes. Google Cloud no longer permits listing them with the policy disabled; they retain their original expiration and are not erased by this policy change.",
+      "tpu_workflows_active": false,
+      "user_live_storage_ceiling_bytes": 2000000000000
+    },
+    "decision": "Permanently abandon the exact 108 legacy tar generations after a generation-bound capsule and authenticated empty metadata archive. Their raw contents may be unique and are explicitly not claimed reproducible; this is an irreversible cost-constrained retirement. Preserve all NPZ dumps, compact conclusions, results, oracles, Git history, the canonical GLM source, PP16 metadata lineage, and the active direct PP16 runtime.",
+    "proof_sha256": "9e8d66e5b8a4b17b94ce91de9b07a53e2bcf3b60af6aa92d4659b99102795ad4",
+    "review": {
+      "p0": [],
+      "p1": [],
+      "reviewer": "independent Sol adversarial review",
+      "verdict": "Existing user authorization is sufficient; safe after exact capsule/archive/no-writer/policy controls."
+    },
+    "status": "passed"
+  },
+  "protected_prefixes": [
+    "models/GLM-5.2-FP8/",
+    "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_pack_pp16_20260827T095428043535926Z/",
+    "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/",
+    "checkpoints/greenfield/glm52/plans/",
+    "checkpoints/greenfield/glm52/layer3/",
+    "checkpoints/greenfield/glm52/gate_c/",
+    "checkpoints/greenfield/glm52/discriminators/",
+    "checkpoints/greenfield/glm52/overlays/",
+    "checkpoints/greenfield/glm52/probes/",
+    "dumps/rung2-originals/",
+    "dumps/rung2fix-w0/",
+    "dumps/rung2fix-w2/",
+    "dumps/rung4/",
+    "results/",
+    "oracles/",
+    "repos/"
+  ]
+}
