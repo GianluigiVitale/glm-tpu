@@ -12,14 +12,12 @@ from collections.abc import Mapping
 from hashlib import sha256
 from pathlib import Path
 
-SOURCE_ROOT = Path(
-    "/opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v7"
-)
+SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v8")
 INSTALLER_PATH = SOURCE_ROOT / "install_gate_d_layer1_prompt_chunk0_geometry_runtime.py"
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
-LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_layer1_prompt_chunk0_geometry_v7.py"
+LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_layer1_prompt_chunk0_geometry_v8.py"
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-prompt-chunk0-geometry-v6"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-prompt-chunk0-geometry-v7"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -29,15 +27,19 @@ EXPECTED_ENVIRONMENT = {
 }
 PAYLOADS = {
     "chunk0_embedding_hlo.py": "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757",
-    "probe_layer1_prompt_chunk0_geometry.py": "073c6b2a865d1f1936c27ba4dabbb54c9dfc1987e22fcdaa14657c612f5832bc",
-    "publish_gate_d_layer1_prompt_chunk0_geometry.py": "8b1e05534419661c9e69207c1cfab2794beaec03007f0fcb15a184977a33f15d",
-    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "4b0b32fa9756582b06aff767e98cb74dfde88941c610629f5d72bd00af26cb5b",
+    "original_db518_normalized_boundary_hlo.py": "35757aab4a616a2f1073f78503c29075c3e43cb684e4e1faf7d835630876809e",
+    "chunk0_real_layer_consumer_hlo.py": "4ef7bbb0dbd74e5317cc653e67ef72dc5fd6ea472b9e486fc99c9ed410422aec",
+    "probe_layer1_prompt_chunk0_geometry.py": "4eb5ee0c11530f3e2ed7be4f25de92f729d39694ae50d531fd57968e948e691c",
+    "publish_gate_d_layer1_prompt_chunk0_geometry.py": "09808a13a2c5d19538abf6da59d4225cde149637f5a404a5c00052ef4d2f84e8",
+    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "6ba25afc0597fdfaa932317e171189ca5f82b80159ed7e77cad04bef6f31b24f",
     "verify_gate_d_rewrite_same_region_git_mirror.py": (
-        "dfeaecede526676a08b3deacf3f2e58b8d040f4d7b8542f14eb8db18aef9bcea"
+        "0f61a5a6108b1d931cc19ce247e1d88b7db76ed32029260bd6273cb4d4ca8d4e"
     ),
 }
 CAPSULE_NAMES = (
     "chunk0_embedding_hlo.py",
+    "original_db518_normalized_boundary_hlo.py",
+    "chunk0_real_layer_consumer_hlo.py",
     "probe_layer1_prompt_chunk0_geometry.py",
     "publish_gate_d_layer1_prompt_chunk0_geometry.py",
     "verify_gate_d_rewrite_same_region_git_mirror.py",
@@ -106,7 +108,10 @@ def _read_regular(path: Path, *, expected_sha256: str | None, mode: int) -> byte
             len(raw) != before.st_size
             or identity(before) != identity(after)
             or (before.st_dev, before.st_ino) != (named.st_dev, named.st_ino)
-            or (expected_sha256 is not None and sha256(raw).hexdigest() != expected_sha256)
+            or (
+                expected_sha256 is not None
+                and sha256(raw).hexdigest() != expected_sha256
+            )
         ):
             raise RuntimeError(f"immutable file identity drifted: {path}")
         return raw
@@ -128,7 +133,16 @@ def _rename_noreplace(source: str, target: str, *, parent_fd: int) -> None:
         ctypes.c_uint,
     ]
     renameat2.restype = ctypes.c_int
-    if renameat2(parent_fd, os.fsencode(source), parent_fd, os.fsencode(target), _RENAME_NOREPLACE) != 0:
+    if (
+        renameat2(
+            parent_fd,
+            os.fsencode(source),
+            parent_fd,
+            os.fsencode(target),
+            _RENAME_NOREPLACE,
+        )
+        != 0
+    ):
         number = ctypes.get_errno()
         raise OSError(number, os.strerror(number), target)
 
@@ -162,7 +176,10 @@ def _create_file(parent_fd: int, name: str, raw: bytes) -> tuple[int, int]:
 
 def _cleanup_file(parent_fd: int, name: str, identity: tuple[int, int]) -> None:
     metadata = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-    if not stat.S_ISREG(metadata.st_mode) or (metadata.st_dev, metadata.st_ino) != identity:
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or (metadata.st_dev, metadata.st_ino) != identity
+    ):
         raise RuntimeError("refusing cleanup of unowned staging file")
     os.unlink(name, dir_fd=parent_fd)
     os.fsync(parent_fd)
@@ -209,7 +226,12 @@ def _verify_capsule(target: Path, payloads: Mapping[str, bytes]) -> None:
     if tuple(sorted(item.name for item in target.iterdir())) != tuple(sorted(payloads)):
         raise RuntimeError("immutable capsule membership drifted")
     for name, raw in payloads.items():
-        if _read_regular(target / name, expected_sha256=sha256(raw).hexdigest(), mode=0o555) != raw:
+        if (
+            _read_regular(
+                target / name, expected_sha256=sha256(raw).hexdigest(), mode=0o555
+            )
+            != raw
+        ):
             raise RuntimeError(f"immutable capsule payload drifted: {name}")
 
 
@@ -256,7 +278,10 @@ def _publish_capsule(parent: Path, target: Path, payloads: Mapping[str, bytes]) 
 def _publish_launcher(parent: Path, target: Path, raw: bytes) -> None:
     _require_directory(parent, mode=0o755)
     if target.exists() or target.is_symlink():
-        if _read_regular(target, expected_sha256=sha256(raw).hexdigest(), mode=0o555) != raw:
+        if (
+            _read_regular(target, expected_sha256=sha256(raw).hexdigest(), mode=0o555)
+            != raw
+        ):
             raise RuntimeError("immutable launcher payload drifted")
         return
     parent_fd = os.open(
@@ -276,7 +301,10 @@ def _publish_launcher(parent: Path, target: Path, raw: bytes) -> None:
         raise
     finally:
         os.close(parent_fd)
-    if _read_regular(target, expected_sha256=sha256(raw).hexdigest(), mode=0o555) != raw:
+    if (
+        _read_regular(target, expected_sha256=sha256(raw).hexdigest(), mode=0o555)
+        != raw
+    ):
         raise RuntimeError("installed launcher payload drifted")
 
 
@@ -287,9 +315,7 @@ def _load_payloads() -> tuple[bytes, dict[str, bytes]]:
         raise RuntimeError("root-owned installation source membership drifted")
     installer = _read_regular(INSTALLER_PATH, expected_sha256=None, mode=0o555)
     payloads = {
-        name: _read_regular(
-            SOURCE_ROOT / name, expected_sha256=expected, mode=0o555
-        )
+        name: _read_regular(SOURCE_ROOT / name, expected_sha256=expected, mode=0o555)
         for name, expected in PAYLOADS.items()
     }
     return installer, payloads

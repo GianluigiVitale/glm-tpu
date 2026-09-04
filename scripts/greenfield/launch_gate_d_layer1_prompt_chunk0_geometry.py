@@ -13,7 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 
 INSTALL_PATH = Path(
-    "/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v7.py"
+    "/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v8.py"
 )
 PYTHON = Path("/usr/bin/python3.10")
 PYTHON_SHA256 = "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
@@ -22,24 +22,48 @@ RUN_ROOT = Path("/home/gianl/gate-d-runs")
 BRANCH = "rewrite/topology-first-decode"
 ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py"
-WRAPPER_PATH = WORKTREE / "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
-WRAPPER_SOURCE_PATH = "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
-WRAPPER_SHA256 = "9f7c93c2f67528b06da9845ab3167ee7aaa0a6ba1e9801b21713f0581a30cff8"
-CAPSULE_ROOT = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v6"
+WRAPPER_PATH = (
+    WORKTREE / "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
 )
-HLO_CONTRACT_PATH = CAPSULE_ROOT / "chunk0_embedding_hlo.py"
-HLO_CONTRACT_SOURCE_PATH = "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py"
-HLO_CONTRACT_SHA256 = "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757"
+WRAPPER_SOURCE_PATH = "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
+WRAPPER_SHA256 = "a46ba0588eaf3c175885de4e882bd41eebc8d817ac6e4b73049d9178884961c9"
+CAPSULE_ROOT = Path(
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v7"
+)
+PARSER_CONTRACT_PATH = CAPSULE_ROOT / "chunk0_embedding_hlo.py"
+PARSER_CONTRACT_SOURCE_PATH = "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py"
+PARSER_CONTRACT_SHA256 = (
+    "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757"
+)
+BOUNDARY_CONTRACT_PATH = CAPSULE_ROOT / "original_db518_normalized_boundary_hlo.py"
+BOUNDARY_CONTRACT_SOURCE_PATH = (
+    "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py"
+)
+BOUNDARY_CONTRACT_SHA256 = (
+    "35757aab4a616a2f1073f78503c29075c3e43cb684e4e1faf7d835630876809e"
+)
+CONSUMER_CONTRACT_PATH = CAPSULE_ROOT / "chunk0_real_layer_consumer_hlo.py"
+CONSUMER_CONTRACT_SOURCE_PATH = (
+    "glm_tpu/greenfield/validation/chunk0_real_layer_consumer_hlo.py"
+)
+CONSUMER_CONTRACT_SHA256 = (
+    "4ef7bbb0dbd74e5317cc653e67ef72dc5fd6ea472b9e486fc99c9ed410422aec"
+)
 PROBE_PATH = CAPSULE_ROOT / "probe_layer1_prompt_chunk0_geometry.py"
 PROBE_SOURCE_PATH = "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"
-PROBE_SHA256 = "073c6b2a865d1f1936c27ba4dabbb54c9dfc1987e22fcdaa14657c612f5832bc"
+PROBE_SHA256 = "4eb5ee0c11530f3e2ed7be4f25de92f729d39694ae50d531fd57968e948e691c"
 PUBLISHER_PATH = CAPSULE_ROOT / "publish_gate_d_layer1_prompt_chunk0_geometry.py"
-PUBLISHER_SOURCE_PATH = "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
-PUBLISHER_SHA256 = "8b1e05534419661c9e69207c1cfab2794beaec03007f0fcb15a184977a33f15d"
+PUBLISHER_SOURCE_PATH = (
+    "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
+)
+PUBLISHER_SHA256 = "09808a13a2c5d19538abf6da59d4225cde149637f5a404a5c00052ef4d2f84e8"
 MIRROR_VERIFIER_PATH = CAPSULE_ROOT / "verify_gate_d_rewrite_same_region_git_mirror.py"
-MIRROR_VERIFIER_SOURCE_PATH = "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
-MIRROR_VERIFIER_SHA256 = "dfeaecede526676a08b3deacf3f2e58b8d040f4d7b8542f14eb8db18aef9bcea"
+MIRROR_VERIFIER_SOURCE_PATH = (
+    "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
+)
+MIRROR_VERIFIER_SHA256 = (
+    "0f61a5a6108b1d931cc19ce247e1d88b7db76ed32029260bd6273cb4d4ca8d4e"
+)
 LOCK_ROOT = Path("/opt/glm-tpu/locks")
 LOCK_NAMES = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")
 LOCK_FDS = (11, 12)
@@ -47,10 +71,22 @@ WRAPPER_FD = 10
 RUN_FD = 7
 CHILDREN = (
     (
-        "HLO_CONTRACT",
-        HLO_CONTRACT_PATH,
-        HLO_CONTRACT_SOURCE_PATH,
-        HLO_CONTRACT_SHA256,
+        "PARSER_CONTRACT",
+        PARSER_CONTRACT_PATH,
+        PARSER_CONTRACT_SOURCE_PATH,
+        PARSER_CONTRACT_SHA256,
+    ),
+    (
+        "BOUNDARY_CONTRACT",
+        BOUNDARY_CONTRACT_PATH,
+        BOUNDARY_CONTRACT_SOURCE_PATH,
+        BOUNDARY_CONTRACT_SHA256,
+    ),
+    (
+        "CONSUMER_CONTRACT",
+        CONSUMER_CONTRACT_PATH,
+        CONSUMER_CONTRACT_SOURCE_PATH,
+        CONSUMER_CONTRACT_SHA256,
     ),
     ("PROBE", PROBE_PATH, PROBE_SOURCE_PATH, PROBE_SHA256),
     ("PUBLISHER", PUBLISHER_PATH, PUBLISHER_SOURCE_PATH, PUBLISHER_SHA256),
@@ -118,7 +154,10 @@ def _read_stable_regular(
             or before.st_nlink != 1
             or (expected_uid is not None and before.st_uid != expected_uid)
             or (expected_gid is not None and before.st_gid != expected_gid)
-            or (expected_mode is not None and stat.S_IMODE(before.st_mode) != expected_mode)
+            or (
+                expected_mode is not None
+                and stat.S_IMODE(before.st_mode) != expected_mode
+            )
             or os.listxattr(path, follow_symlinks=False)
         ):
             raise RuntimeError(f"unsafe protected source identity: {path}")
@@ -130,8 +169,20 @@ def _read_stable_regular(
         named = os.stat(path, follow_symlinks=False)
         if (
             len(raw) != before.st_size
-            or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
-            != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+            or (
+                before.st_dev,
+                before.st_ino,
+                before.st_size,
+                before.st_mtime_ns,
+                before.st_ctime_ns,
+            )
+            != (
+                after.st_dev,
+                after.st_ino,
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            )
             or (named.st_dev, named.st_ino) != (before.st_dev, before.st_ino)
         ):
             raise RuntimeError(f"protected source changed while reading: {path}")

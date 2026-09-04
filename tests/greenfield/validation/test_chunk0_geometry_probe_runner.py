@@ -19,15 +19,23 @@ import pytest
 REPO = Path(__file__).resolve().parents[3]
 RUNNER = REPO / "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
 PROBE = REPO / "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"
-CHUNK_PIPELINE = (
-    REPO / "glm_tpu/greenfield/benchmarking/legacy_prefill_chunk_probe.py"
-)
+CHUNK_PIPELINE = REPO / "glm_tpu/greenfield/benchmarking/legacy_prefill_chunk_probe.py"
 DIGESTS = REPO / "docs/artifacts/gate-d-chunk0-probe-weight-digests.json"
 PUBLISHER = REPO / "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
 HLO_CONTRACT = REPO / "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py"
+BOUNDARY_CONTRACT = (
+    REPO / "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py"
+)
+CONSUMER_CONTRACT = (
+    REPO / "glm_tpu/greenfield/validation/chunk0_real_layer_consumer_hlo.py"
+)
 LAUNCHER = REPO / "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py"
-INSTALLER = REPO / "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py"
-REWRITE_MIRROR = REPO / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
+INSTALLER = (
+    REPO / "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py"
+)
+REWRITE_MIRROR = (
+    REPO / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
+)
 LAYER0_INPUT = Path(
     "/home/gianl/glm-run/greenfield_layer0_dsa_input_fused_qkv_20260807T202538052784486Z"
 )
@@ -38,14 +46,29 @@ LEGACY_LAYER1_CACHE = Path(
 
 def test_runner_pins_inputs_digests_and_sealed_interpreter():
     runner = RUNNER.read_text()
-    assert "readonly CHECKPOINT_INDEX_SHA=e0fe7f28c1f853d4824e4d796374e3dacf1fe470988773952c79b063768134bf" in runner
-    assert f"readonly WEIGHT_DIGESTS_SHA={sha256(DIGESTS.read_bytes()).hexdigest()}" in runner
-    assert "readonly SEALED_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12" in runner
-    assert "readonly SEALED_PYTHON_SHA=021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7" in runner
-    assert 'TAG=${GLM_GATE_D_CHUNK0_GEOMETRY_TAG:-}' in runner
+    assert (
+        "readonly CHECKPOINT_INDEX_SHA=e0fe7f28c1f853d4824e4d796374e3dacf1fe470988773952c79b063768134bf"
+        in runner
+    )
+    assert (
+        f"readonly WEIGHT_DIGESTS_SHA={sha256(DIGESTS.read_bytes()).hexdigest()}"
+        in runner
+    )
+    assert (
+        "readonly SEALED_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12"
+        in runner
+    )
+    assert (
+        "readonly SEALED_PYTHON_SHA=021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7"
+        in runner
+    )
+    assert "TAG=${GLM_GATE_D_CHUNK0_GEOMETRY_TAG:-}" in runner
     assert "unsafe Gate-D chunk-0 geometry tag" in runner
     # The only executed probe pathname is the root-owned immutable capsule.
-    assert "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v6" in runner
+    assert (
+        "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v7"
+        in runner
+    )
     assert '"$SEALED_PYTHON" -I -S -B -u "$PROBE"' in runner
     assert "$PROBE_LOCAL" not in runner and "/source/probe_layer1" not in runner
     assert '--code-pin "$PIN"' in runner and '--repository "$WORKTREE"' in runner
@@ -86,18 +109,27 @@ def test_runner_distinguishes_manifest_self_hashes_from_raw_file_hashes():
         assert self_hash == recorded_self_hash == sha256(canonical).hexdigest()
         assert file_hash == sha256(path.read_bytes()).hexdigest()
         assert self_hash != file_hash
-        assert f'manifest.json:${prefix}_MANIFEST_FILE_SHA' in runner
-        assert f'manifest.json:${prefix}_MANIFEST_SHA' not in runner
+        assert f"manifest.json:${prefix}_MANIFEST_FILE_SHA" in runner
+        assert f"manifest.json:${prefix}_MANIFEST_SHA" not in runner
 
 
 def test_runner_git_authentication_vacancy_grammar_and_atomic_run_dir():
     runner = RUNNER.read_text()
-    for token in ("GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "GIT_NO_LAZY_FETCH=1", "GIT_NO_REPLACE_OBJECTS=1", "GIT_TERMINAL_PROMPT=0"):
+    for token in (
+        "GIT_CONFIG_GLOBAL=/dev/null",
+        "GIT_CONFIG_NOSYSTEM=1",
+        "GIT_NO_LAZY_FETCH=1",
+        "GIT_NO_REPLACE_OBJECTS=1",
+        "GIT_TERMINAL_PROMPT=0",
+    ):
         assert token in runner
     assert "for-each-ref --format='%(refname)' refs/replace" in runner
     assert 'ls-remote --exit-code "$ORIGIN" "refs/heads/$BRANCH"' in runner
     assert '[[ $ORIGIN_TIP == "$PIN" ]]' in runner
-    assert "readonly VACANCY_EXPECTED='ERROR: (gcloud.storage.ls) One or more URLs matched no objects.'" in runner
+    assert (
+        "readonly VACANCY_EXPECTED='ERROR: (gcloud.storage.ls) One or more URLs matched no objects.'"
+        in runner
+    )
     assert '$live_rc -eq 1 && $live == "$VACANCY_EXPECTED"' in runner
     assert "PYTHONWARNINGS=ignore /usr/bin/timeout" in runner
     assert "vacancy_three_surfaces" in runner
@@ -112,10 +144,14 @@ def test_runner_git_authentication_vacancy_grammar_and_atomic_run_dir():
 def test_runner_publisher_census_and_descriptor_boundary():
     runner = RUNNER.read_text()
     assert '--run-dir "$RUN_DIR" --run-dir-fd 7' in runner
-    assert 'publish_member runner.log' in runner
+    assert "publish_member runner.log" in runner
     assert 'publisher diagnostic --run-dir "$RUN_DIR"' in runner
-    assert "storage cp --recursive" not in runner and "remote_objects.json" not in runner
-    assert runner.index("strict_census post ||") < runner.index("publisher success --run-dir")
+    assert (
+        "storage cp --recursive" not in runner and "remote_objects.json" not in runner
+    )
+    assert runner.index("strict_census post ||") < runner.index(
+        "publisher success --run-dir"
+    )
     # the census uses the proven carrier-marked enumerator and bracketed patterns only
     assert "GLM_CENSUS_CARRIER" in runner and "RAY_PROCESSES" in runner
     assert "[p]robe_layer1_prompt_chunk0_geometry[.]py" in runner
@@ -134,14 +170,20 @@ def _census_command() -> str:
 
 
 @pytest.mark.skipif(
-    shutil.which("pgrep") is None or subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode != 0,
+    shutil.which("pgrep") is None
+    or subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode != 0,
     reason="executed census regression needs pgrep and passwordless sudo",
 )
 def test_executed_census_does_not_match_its_own_shell():
     command, carrier = _census_command()
     # The census must not report itself busy: its own command line contains the
     # patterns it searches for, so a naive pgrep would self-match.
-    result = subprocess.run(["bash", "-c", command], capture_output=True, text=True, env={**os.environ, "GLM_CENSUS_CARRIER": carrier})
+    result = subprocess.run(
+        ["bash", "-c", command],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "GLM_CENSUS_CARRIER": carrier},
+    )
     lines = result.stdout.strip().splitlines()
     assert lines, result.stderr
     assert lines[0].split()[0] in {"CENSUS_OK", "CENSUS_BUSY"}, lines
@@ -153,28 +195,76 @@ def test_executed_census_does_not_match_its_own_shell():
 
 def test_probe_is_self_verifying_and_imports_from_a_sealed_archive():
     probe = PROBE.read_text()
-    assert 'PROBE_REPOSITORY_PATH = "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"' in probe
-    assert "def _verify_running_source(" in probe and 'raise RuntimeError("probe is not the committed blob at the approved pin")' in probe
-    assert "def _sealed_git_source_archive(" in probe and "os.memfd_create(" in probe and "_F_ADD_SEALS" in probe
-    assert 'sys.path[:] = [archive_path, JAX_SITE_ROOT, LIBTPU_SITE_ROOT, *EXPECTED_RUNTIME_PATH]' in probe
+    assert (
+        'PROBE_REPOSITORY_PATH = "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"'
+        in probe
+    )
+    assert "def _verify_running_source(" in probe
+    assert "probe is not the committed blob at the approved pin" in probe
+    assert (
+        "def _sealed_git_source_archive(" in probe
+        and "os.memfd_create(" in probe
+        and "_F_ADD_SEALS" in probe
+    )
+    assert "sys.path[:] = [" in probe
+    assert all(
+        token in probe
+        for token in (
+            "archive_path",
+            "JAX_SITE_ROOT",
+            "LIBTPU_SITE_ROOT",
+            "*EXPECTED_RUNTIME_PATH",
+        )
+    )
     assert "sealed_runtime.verify_import_closure(Path(archive_path))" in probe
-    for token in ("GIT_CONFIG_GLOBAL", "GIT_NO_REPLACE_OBJECTS", "GIT_NO_LAZY_FETCH", "GIT_CONFIG_NOSYSTEM"):
+    for token in (
+        "GIT_CONFIG_GLOBAL",
+        "GIT_NO_REPLACE_OBJECTS",
+        "GIT_NO_LAZY_FETCH",
+        "GIT_CONFIG_NOSYSTEM",
+    ):
         assert token in probe
     assert "refs/replace" in probe
     assert "probe is not executing from the immutable capsule" in probe
-    assert "def _open_inherited_run_dir(" in probe and "def _write_run_member_exclusive(" in probe
-    assert "dir_fd=run_fd" in probe and 'parser.add_argument("--run-dir-fd", type=int, choices=(7,)' in probe
+    assert (
+        "def _open_inherited_run_dir(" in probe
+        and "def _write_run_member_exclusive(" in probe
+    )
+    assert "dir_fd=run_fd" in probe
+    assert 'parser.add_argument("--run-dir-fd"' in probe and "choices=(7," in probe
     assert "args.output" not in probe and "args.hlo_dir" not in probe
-    assert "import torch" not in probe and "safe_open" not in probe and "_worktree_binding" not in probe
-    assert "db518_raw = _snapshot_regular(args.db518_result)" in probe and "np.load(BytesIO(db518_raw))" in probe
+    assert (
+        "import torch" not in probe
+        and "safe_open" not in probe
+        and "_worktree_binding" not in probe
+    )
+    assert (
+        "db518_raw = _snapshot_regular(args.db518_result)" in probe
+        and "np.load(BytesIO(db518_raw))" in probe
+    )
     assert "digests_raw = _snapshot_regular(args.weight_digests)" in probe
-    assert 'shard_digests={digest_record["shard"]["filename"]: digest_record["shard"]["sha256"]}' in probe
-    assert "layer1_keys_from_normalized" in probe and '"one_row_block_m64_keys_vs_legacy_lanes"' in probe
-    assert "embedding = jnp.take(" in probe
+    assert "shard_digests={" in probe
+    assert 'digest_record["shard"]["filename"]' in probe
+    assert 'digest_record["shard"]["sha256"]' in probe
+    assert "legacy_geometry_chunk_consumer_gather_from_normalized" in probe
+    assert "layer0_prompt_normalized_hidden_boundary_chunk" in probe
+    assert "layer0_prompt_index_key_from_normalized_boundary_chunk" in probe
+    assert "normalized_device.block_until_ready()" in probe
+    assert "normalization_to_consumer_host_transfers" in probe
+    assert "require_real_layer_consumer_hlo(" in probe
+    assert "result_row0" not in probe and "one_row_block" not in probe
     assert "pk.chunk_embeddings(" not in probe
-    assert '"embedding_gather_contract": embedding_gather_contract' in probe
+    for name in (
+        "normalization_contract",
+        "key_contract",
+        "real_layer_consumer_contract",
+    ):
+        assert name in probe
     record = json.loads(DIGESTS.read_text())
-    assert record["artifact_kind"] == "gate_d_chunk0_probe_weight_digests" and len(record["tensors"]) == 19
+    assert (
+        record["artifact_kind"] == "gate_d_chunk0_probe_weight_digests"
+        and len(record["tensors"]) == 19
+    )
 
 
 def test_wk_materialization_is_a_completed_executable_boundary():
@@ -183,7 +273,7 @@ def test_wk_materialization_is_a_completed_executable_boundary():
     publisher = PUBLISHER.read_text()
 
     assert "materialize_stage_local_prefill_index_wk" not in pipeline
-    assert '"wk0", "wk1", "rope_table"' in pipeline
+    assert all(f'"{name}"' in pipeline for name in ("wk0", "wk1", "rope_table"))
     assert 'w["wk0"]' in pipeline and 'w["wk1"]' in pipeline
     assert "decode_stage_local_prefill_index_wk_bf16" in probe
     assert "promote_stage_local_prefill_index_wk" in probe
@@ -191,10 +281,10 @@ def test_wk_materialization_is_a_completed_executable_boundary():
     assert probe.index("wk1_bf16.block_until_ready()") < probe.index(
         "promote_lowered ="
     )
-    assert probe.index("wk1.block_until_ready()") < probe.index(
-        'weights = {'
-    )
-    assert '"wk0": wk0' in probe and '"wk1": wk1' in probe
+    assert probe.index("wk1.block_until_ready()") < probe.index("consumer_weights = {")
+    assert '"wk1": wk1' in probe
+    assert '"wk0": wk0' not in probe
+    assert "key_compiled(" in probe and "consumer_compiled(" in probe
     for name in (
         "hlo/wk_decode.optimized_hlo.txt",
         "hlo/wk_decode.stablehlo.mlir",
@@ -202,8 +292,8 @@ def test_wk_materialization_is_a_completed_executable_boundary():
         "hlo/wk_promote.stablehlo.mlir",
     ):
         assert name in probe and name in publisher
-    assert 'hlo.get("main_raw_wk_parameters") != []' in publisher
-    assert '"w__wk0_bits__" in optimized_text' in publisher
+    assert "require_normalized_key_control_boundary_hlo" in publisher
+    assert "require_real_layer_consumer_hlo" in publisher
 
 
 def test_capsule_hash_chain_and_second_vacancy_check_are_bound():
@@ -213,23 +303,32 @@ def test_capsule_hash_chain_and_second_vacancy_check_are_bound():
     publisher = PUBLISHER.read_text()
     probe_sha = sha256(PROBE.read_bytes()).hexdigest()
     publisher_sha = sha256(PUBLISHER.read_bytes()).hexdigest()
-    hlo_contract_sha = sha256(HLO_CONTRACT.read_bytes()).hexdigest()
+    contract_shas = {
+        sha256(path.read_bytes()).hexdigest()
+        for path in (HLO_CONTRACT, BOUNDARY_CONTRACT, CONSUMER_CONTRACT)
+    }
     wrapper_sha = sha256(RUNNER.read_bytes()).hexdigest()
     launcher_sha = sha256(LAUNCHER.read_bytes()).hexdigest()
     assert probe_sha in runner and probe_sha in launcher and probe_sha in installer
-    assert publisher_sha in runner and publisher_sha in launcher and publisher_sha in installer
-    assert hlo_contract_sha in launcher and hlo_contract_sha in installer
+    assert (
+        publisher_sha in runner
+        and publisher_sha in launcher
+        and publisher_sha in installer
+    )
+    assert all(value in launcher and value in installer for value in contract_shas)
     assert wrapper_sha in launcher and launcher_sha in installer
     assert "__PROBE_SHA256__" not in "".join((runner, launcher, installer))
     assert "__PUBLISHER_SHA256__" not in "".join((runner, launcher, installer))
-    assert "__WRAPPER_SHA256__" not in launcher and "__LAUNCHER_SHA256__" not in installer
-    assert "base._require_never_used_prefix(bucket, prefix)" in publisher
-    assert publisher.index("base._require_never_used_prefix(bucket, prefix)") < publisher.index(
-        "for relative in sorted(payload)"
+    assert (
+        "__WRAPPER_SHA256__" not in launcher and "__LAUNCHER_SHA256__" not in installer
     )
+    assert "base._require_never_used_prefix(bucket, prefix)" in publisher
+    assert publisher.index(
+        "base._require_never_used_prefix(bucket, prefix)"
+    ) < publisher.index("for relative in sorted(payload)")
     assert "_RENAME_NOREPLACE = 1" in installer
     assert "os.MFD_ALLOW_SEALING" in launcher and "LOCK_NAMES" in launcher
-    assert "base._replay_bound(bucket, diagnostic_prefix + record[\"path\"], record)" in publisher
+    assert 'base._replay_bound(bucket, diagnostic_prefix + record["path"]' in publisher
     assert "chunk-0 diagnostic terminal object set drifted" in publisher
 
 
@@ -242,30 +341,58 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
     launcher = LAUNCHER.read_text()
     expected = {
         "chunk0_embedding_hlo.py": sha256(HLO_CONTRACT.read_bytes()).hexdigest(),
+        "original_db518_normalized_boundary_hlo.py": sha256(
+            BOUNDARY_CONTRACT.read_bytes()
+        ).hexdigest(),
+        "chunk0_real_layer_consumer_hlo.py": sha256(
+            CONSUMER_CONTRACT.read_bytes()
+        ).hexdigest(),
         PROBE.name: sha256(PROBE.read_bytes()).hexdigest(),
         PUBLISHER.name: sha256(PUBLISHER.read_bytes()).hexdigest(),
         LAUNCHER.name: sha256(LAUNCHER.read_bytes()).hexdigest(),
         "verify_gate_d_rewrite_same_region_git_mirror.py": sha256(
-            (REPO / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py").read_bytes()
+            (
+                REPO
+                / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
+            ).read_bytes()
         ).hexdigest(),
     }
     assert installer_module.PAYLOADS == expected
-    assert str(installer_module.CAPSULE_TARGET).startswith("/usr/local/libexec/glm-tpu/")
+    assert str(installer_module.CAPSULE_TARGET).startswith(
+        "/usr/local/libexec/glm-tpu/"
+    )
     assert str(installer_module.LAUNCHER_TARGET).endswith(
-        "launch_gate_d_layer1_prompt_chunk0_geometry_v7.py"
+        "launch_gate_d_layer1_prompt_chunk0_geometry_v8.py"
     )
     assert str(installer_module.LAUNCHER_TARGET).startswith("/opt/glm-tpu/bin/")
     assert installer.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
-    assert '"launcher_invoked": False' in installer
+    assert '"launcher_invoked"' in installer and "False" in installer
     assert "subprocess" not in installer and "execve" not in installer
     assert launcher.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
     assert str(launcher_module.INSTALL_PATH) == str(installer_module.LAUNCHER_TARGET)
     assert f'launcher = Path("{launcher_module.INSTALL_PATH}")' in RUNNER.read_text()
     assert probe_module.INSTALL_PATH == launcher_module.PROBE_PATH
     assert publisher_module.INSTALL_PATH == launcher_module.PUBLISHER_PATH
-    assert launcher_module.HLO_CONTRACT_PATH == launcher_module.CAPSULE_ROOT / "chunk0_embedding_hlo.py"
-    assert str(launcher_module.PROBE_PATH) == f"{launcher_module.CAPSULE_ROOT}/{PROBE.name}"
-    assert str(launcher_module.PUBLISHER_PATH) == f"{launcher_module.CAPSULE_ROOT}/{PUBLISHER.name}"
+    assert (
+        launcher_module.PARSER_CONTRACT_PATH
+        == launcher_module.CAPSULE_ROOT / "chunk0_embedding_hlo.py"
+    )
+    assert (
+        launcher_module.BOUNDARY_CONTRACT_PATH
+        == launcher_module.CAPSULE_ROOT / BOUNDARY_CONTRACT.name
+    )
+    assert (
+        launcher_module.CONSUMER_CONTRACT_PATH
+        == launcher_module.CAPSULE_ROOT / CONSUMER_CONTRACT.name
+    )
+    assert (
+        str(launcher_module.PROBE_PATH)
+        == f"{launcher_module.CAPSULE_ROOT}/{PROBE.name}"
+    )
+    assert (
+        str(launcher_module.PUBLISHER_PATH)
+        == f"{launcher_module.CAPSULE_ROOT}/{PUBLISHER.name}"
+    )
     assert launcher_module.WRAPPER_SHA256 == sha256(RUNNER.read_bytes()).hexdigest()
     assert "fcntl.LOCK_EX | fcntl.LOCK_NB" in launcher
     assert 'f"/proc/self/fd/{WRAPPER_FD}"' in launcher
@@ -279,7 +406,10 @@ def test_mirror_verifier_is_bound_to_the_rewrite_branch_and_reviewed_base():
     assert verifier.SOURCE_PATH.endswith(
         "verify_gate_d_rewrite_same_region_git_mirror.py"
     )
-    assert sha256((REPO / verifier.BASE_PATH).read_bytes()).hexdigest() == verifier.BASE_SHA256
+    assert (
+        sha256((REPO / verifier.BASE_PATH).read_bytes()).hexdigest()
+        == verifier.BASE_SHA256
+    )
     assert verifier.INSTALL_PATH == launcher.CAPSULE_ROOT / REWRITE_MIRROR.name
     assert set(verifier.BOUND_PATHS) == {
         "docs/artifacts/gate-d-chunk0-probe-weight-digests.json",
@@ -289,6 +419,10 @@ def test_mirror_verifier_is_bound_to_the_rewrite_branch_and_reviewed_base():
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v5-source.json",
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v6-source.json",
         "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v7-source.json",
+        "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v8-source.json",
+        "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py",
+        "glm_tpu/greenfield/validation/chunk0_real_layer_consumer_hlo.py",
+        "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py",
         "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py",
         "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py",
         "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py",
@@ -337,10 +471,13 @@ def _load_publisher():
 
 
 @pytest.mark.parametrize("terminal", ["PROBE_RESULT", "terminal_upload_receipt.json"])
-def test_publisher_rejects_reentry_after_its_own_terminal(tmp_path: Path, terminal: str):
+def test_publisher_rejects_reentry_after_its_own_terminal(
+    tmp_path: Path, terminal: str
+):
     publisher = _load_publisher()
 
     class Base:
+
         @staticmethod
         def require_preterminal(_run_fd: int) -> None:
             return None
@@ -374,13 +511,10 @@ def _synthetic_probe_archive(*, mismatch: bool, control_mismatch: bool = False):
         "attention_row0_db533_vs_pairwise_lanes": 0,
         "legacy_geometry_vs_greenfield_db518_lanes": int(mismatch),
         "legacy_geometry_vs_legacy_lanes": int(mismatch),
-        "legacy_geometry_vs_one_row_block_m64_keys_lanes": int(mismatch),
-        "one_row_block_m64_keys_vs_greenfield_db518_lanes": 0,
-        "one_row_block_m64_keys_vs_legacy_lanes": 0,
-        "one_row_block_one_row_keys_vs_legacy_lanes": 0,
     }
     runner = {
         "arrays_sha256": sha256(raw).hexdigest(),
+        "control_layer0_keys_vs_db518_mismatched_lanes": int(control_mismatch),
         "control_layer0_keys_vs_db518_mismatched_rows": int(control_mismatch),
         "row0": row0,
         "chunk0_vs_legacy": {
@@ -409,9 +543,9 @@ def _synthetic_probe_archive(*, mismatch: bool, control_mismatch: bool = False):
 @pytest.mark.parametrize("mismatch", [False, True])
 def test_publisher_rederives_row0_verdict_from_archived_arrays(mismatch: bool):
     publisher, raw, runner, references = _synthetic_probe_archive(mismatch=mismatch)
-    assert publisher._validate_npz(
-        raw, runner, reference_sha256s=references
-    ) is (not mismatch)
+    assert publisher._validate_npz(raw, runner, reference_sha256s=references) is (
+        not mismatch
+    )
 
 
 def test_publisher_rejects_a_forged_exact_row0_claim():
@@ -437,20 +571,6 @@ def test_publisher_requires_the_rederived_layer0_control_to_be_exact():
 
 def test_publisher_mutation_checks_wk_executable_boundaries():
     publisher = _load_publisher()
-    main = (
-        "HloModule main\n\n"
-        "ENTRY %main (w__wk0__.1: f32[128,6144], w__wk1__.1: f32[128,6144]) {\n"
-        "  %w__wk0__.1 = f32[128,6144] parameter(0)\n"
-        "  %w__wk1__.1 = f32[128,6144] parameter(1)\n"
-        "  %other = bf16[1] constant(0)\n"
-        "  %key0 = bf16[2048,128] custom-call(%w__wk0__.1)\n"
-        "  %key1 = bf16[2048,128] custom-call(%w__wk1__.1)\n"
-        "  ROOT %out = (bf16[1], bf16[1], bf16[1], bf16[1], bf16[1], "
-        "bf16[2048,128], bf16[2048,128], bf16[1], bf16[1], bf16[1], "
-        "bf16[1], bf16[1]) tuple(%other, %other, %other, %other, %other, "
-        "%key0, %key1, %other, %other, %other, %other, %other)\n"
-        "}\n"
-    )
     decode = (
         "HloModule decode\n\n"
         "ENTRY %decode (bits: u8[128,6144], scale: f32[1,48]) {\n"
@@ -467,12 +587,6 @@ def test_publisher_mutation_checks_wk_executable_boundaries():
         "  ROOT %promoted = f32[128,6144] convert(%value)\n"
         "}\n"
     )
-    main_stable = (
-        "module @main {\n"
-        "  func.func public @main(%arg0: tensor<128x6144xf32>, "
-        "%arg1: tensor<128x6144xf32>) -> tensor<1xbf16> {\n"
-        "  }\n}\n"
-    )
     decode_stable = (
         "module @decode {\n"
         "  func.func public @main(%arg0: tensor<128x6144xui8>, "
@@ -488,46 +602,15 @@ def test_publisher_mutation_checks_wk_executable_boundaries():
         "  }\n}\n"
     )
     arguments = (
-        main,
-        main_stable,
         decode,
         decode_stable,
         promote,
         promote_stable,
     )
     publisher._require_wk_hlo_boundaries(*arguments)
-    # A metadata decoy cannot rescue a renamed raw entry parameter.
-    with pytest.raises(RuntimeError, match="boundary drifted"):
-        publisher._require_wk_hlo_boundaries(
-            main.replace(
-                "%w__wk0__.1 = f32[128,6144] parameter(0)",
-                "%renamed = u8[128,6144] parameter(0), metadata={op_name=\"w__wk0__.1: f32[128,6144]\"}",
-            ).replace("%w__wk0__.1)", "%renamed)"),
-            main_stable,
-            decode,
-            decode_stable,
-            promote,
-            promote_stable,
-        )
-    # Wk may feed only its named key result, never another returned value.
-    leaking_main = main.replace(
-        "%key0, %key1, %other, %other, %other, %other, %other)",
-        "%key0, %key1, %w__wk0__.1, %other, %other, %other, %other)",
-    )
-    with pytest.raises(RuntimeError, match="boundary drifted"):
-        publisher._require_wk_hlo_boundaries(
-            leaking_main,
-            main_stable,
-            decode,
-            decode_stable,
-            promote,
-            promote_stable,
-        )
     # Decode parameters must both be live ancestors of the BF16 root.
     with pytest.raises(RuntimeError, match="boundary drifted"):
         publisher._require_wk_hlo_boundaries(
-            main,
-            main_stable,
             decode.replace(
                 "ROOT %decoded = bf16[128,6144] convert(%mixed)",
                 "ROOT %decoded = bf16[128,6144] constant(0)",
@@ -545,8 +628,6 @@ def test_publisher_mutation_checks_wk_executable_boundaries():
     )
     with pytest.raises(RuntimeError, match="boundary drifted"):
         publisher._require_wk_hlo_boundaries(
-            main,
-            main_stable,
             decode,
             decode_stable,
             alternate_promote,
@@ -555,8 +636,6 @@ def test_publisher_mutation_checks_wk_executable_boundaries():
     # Wrong helper root dtype and helper communication both fail closed.
     with pytest.raises(RuntimeError, match="boundary drifted"):
         publisher._require_wk_hlo_boundaries(
-            main,
-            main_stable,
             decode.replace("bf16[128,6144] convert", "f32[128,6144] convert"),
             decode_stable,
             promote,
@@ -564,24 +643,7 @@ def test_publisher_mutation_checks_wk_executable_boundaries():
         )
     with pytest.raises(RuntimeError, match="boundary drifted"):
         publisher._require_wk_hlo_boundaries(
-            main,
-            main_stable,
             decode.replace("custom-call(%bits, %scale)", "all-reduce(%bits)"),
-            decode_stable,
-            promote,
-            promote_stable,
-        )
-    # A live in-main BF16 rematerialization of wk is rejected.
-    rounded_main = main.replace(
-        "  %key0 = bf16[2048,128] custom-call(%w__wk0__.1)\n",
-        "  %rounded = bf16[128,6144] convert(%w__wk0__.1)\n"
-        "  %key0 = bf16[2048,128] custom-call(%rounded)\n",
-    )
-    with pytest.raises(RuntimeError, match="boundary drifted"):
-        publisher._require_wk_hlo_boundaries(
-            rounded_main,
-            main_stable,
-            decode,
             decode_stable,
             promote,
             promote_stable,
@@ -704,7 +766,7 @@ def _tiled_device_gather_hlo_fixture() -> tuple[str, str]:
         "  %slice_done1 = bf16[512,6144] slice-done(%slice_start1)\n"
         "  %slice_done2 = bf16[512,6144] slice-done(%slice_start2)\n"
         "  %slice_done3 = bf16[512,6144] slice-done(%slice_start3)\n"
-        "  %reassembled = bf16[2048,6144] custom-call(%slice_done0, %slice_done1, %slice_done2, %slice_done3), custom_call_target=\"ConcatBitcast\"\n"
+        '  %reassembled = bf16[2048,6144] custom-call(%slice_done0, %slice_done1, %slice_done2, %slice_done3), custom_call_target="ConcatBitcast"\n'
         "  %chunk_f32_tiled = f32[2048,6144] convert(%reassembled)\n"
         "  %chunk_tiled = f32[32,64,6144] bitcast(%chunk_f32_tiled)\n"
         "  %inverse_tiled = f32[32,64] reshape(%inverse)\n"
@@ -721,9 +783,9 @@ def _tiled_device_gather_hlo_fixture() -> tuple[str, str]:
 
 
 def test_publisher_requires_called_body_semantics_and_live_device_gather_rms():
-    publisher = _load_publisher()
+    contract = _load_module("chunk0_embedding_contract", HLO_CONTRACT)
     main, stable = _device_gather_hlo_fixture()
-    assert publisher._require_embedding_gather_hlo(main, stable) == {
+    assert contract.require_embedding_gather_hlo(main, stable) == {
         "direct_chunk_parameter_count": 0,
         "embedding_row_parameter_count": 2,
         "gather_coupled_input_rms": True,
@@ -737,7 +799,10 @@ def test_publisher_requires_called_body_semantics_and_live_device_gather_rms():
     hostile = (
         main.replace("gather(%table, %rows_copy)", "gather(%table, %table)"),
         main.replace("multiply(%chunk_f32, %chunk_f32)", "multiply(%zero, %zero)"),
-        main.replace("multiply(%chunk_f32, %inverse_broadcast)", "multiply(%chunk_f32, %chunk_f32)"),
+        main.replace(
+            "multiply(%chunk_f32, %inverse_broadcast)",
+            "multiply(%chunk_f32, %chunk_f32)",
+        ),
         main.replace("slice(%normalized), slice=", "slice(%alternate), slice=", 1),
         main.replace("calls=%take", "calls=%missing", 1),
         main.replace(
@@ -801,22 +866,22 @@ def test_publisher_requires_called_body_semantics_and_live_device_gather_rms():
     )
     for mutated in hostile:
         with pytest.raises(RuntimeError, match="embedding-gather boundary drifted"):
-            publisher._require_embedding_gather_hlo(mutated, stable)
+            contract.require_embedding_gather_hlo(mutated, stable)
     with pytest.raises(RuntimeError, match="embedding-gather boundary drifted"):
-        publisher._require_embedding_gather_hlo(
+        contract.require_embedding_gather_hlo(
             main,
             stable.replace("tensor<37x6144xbf16>", "tensor<2048x6144xbf16>"),
         )
     # Root 6 is intentionally outside this admission claim: it legitimately
     # carries the raw residual. Its row-0 legacy comparison is interpreted only
     # after the exact DB518 layer-0 key control at root 5 passes.
-    assert publisher._require_embedding_gather_hlo(main, stable)["passed"] is True
+    assert contract.require_embedding_gather_hlo(main, stable)["passed"] is True
 
 
 def test_publisher_accepts_only_exact_live_tiled_normalization_witnesses():
-    publisher = _load_publisher()
+    contract = _load_module("chunk0_embedding_contract_tiled", HLO_CONTRACT)
     main, stable = _tiled_device_gather_hlo_fixture()
-    assert publisher._require_embedding_gather_hlo(main, stable)["passed"] is True
+    assert contract.require_embedding_gather_hlo(main, stable)["passed"] is True
     both_normalized = main.replace(
         "  ROOT %key_slice = bf16[2048,128] slice(%normalized), slice=",
         "  %both_normalized = bf16[2048,6144] add(%normalized, %alternate)\n"
@@ -827,13 +892,21 @@ def test_publisher_accepts_only_exact_live_tiled_normalization_witnesses():
     )
     # Both independently admitted normalization outputs may be live, but all
     # of them must form the cut that removes gather ancestry from key0.
-    assert publisher._require_embedding_gather_hlo(both_normalized, stable)["passed"] is True
+    assert (
+        contract.require_embedding_gather_hlo(both_normalized, stable)["passed"] is True
+    )
     hostile = (
         # The selected tuple result, not merely the fusion body, is semantic.
-        main.replace("get-tuple-element(%tiled_pair), index=1", "get-tuple-element(%tiled_pair), index=0"),
+        main.replace(
+            "get-tuple-element(%tiled_pair), index=1",
+            "get-tuple-element(%tiled_pair), index=0",
+        ),
         main.replace("tuple(%unused, %normalized)", "tuple(%normalized, %unused)"),
         # Preserve an exact decoy but feed the raw gather to the key control.
-        main.replace("fusion(%tiled_normalized, %gather, %positions.1)", "fusion(%gather, %tiled_normalized, %positions.1)"),
+        main.replace(
+            "fusion(%tiled_normalized, %gather, %positions.1)",
+            "fusion(%gather, %tiled_normalized, %positions.1)",
+        ),
         # A valid witness cannot conceal a parallel raw-gather dependency.
         main.replace(
             "  ROOT %key_slice = bf16[2048,128] slice(%normalized), slice=",
@@ -848,15 +921,26 @@ def test_publisher_accepts_only_exact_live_tiled_normalization_witnesses():
             "custom-call(%slice_done0, %slice_done1, %slice_done2, %slice_done3)",
             "custom-call(%slice_done1, %slice_done0, %slice_done2, %slice_done3)",
         ),
-        main.replace("multiply(%chunk, %inverse_broadcast)", "multiply(%chunk, %chunk)"),
-        main.replace("%rounded_f32 = f32[32,64,6144] convert(%rounded)", "%rounded_f32 = f32[32,64,6144] add(%chunk, %chunk)"),
-        main.replace("multiply(%rounded_f32, %weight_broadcast)", "multiply(%rounded_f32, %rounded_f32)"),
-        main.replace("%normalized = bf16[32,64,6144] convert(%weighted)", "%normalized = bf16[32,64,6144] convert(%scaled)"),
+        main.replace(
+            "multiply(%chunk, %inverse_broadcast)", "multiply(%chunk, %chunk)"
+        ),
+        main.replace(
+            "%rounded_f32 = f32[32,64,6144] convert(%rounded)",
+            "%rounded_f32 = f32[32,64,6144] add(%chunk, %chunk)",
+        ),
+        main.replace(
+            "multiply(%rounded_f32, %weight_broadcast)",
+            "multiply(%rounded_f32, %rounded_f32)",
+        ),
+        main.replace(
+            "%normalized = bf16[32,64,6144] convert(%weighted)",
+            "%normalized = bf16[32,64,6144] convert(%scaled)",
+        ),
         main.replace("[32,64", "[31,64"),
     )
     for mutated in hostile:
         with pytest.raises(RuntimeError, match="embedding-gather boundary drifted"):
-            publisher._require_embedding_gather_hlo(mutated, stable)
+            contract.require_embedding_gather_hlo(mutated, stable)
 
 
 def test_output_sensitive_while_requires_condition_and_tracks_state_slots():
@@ -895,16 +979,16 @@ ENTRY %main (value: bf16[1]) -> bf16[1] {
     malformed = hlo.replace("condition=%condition, ", "")
     computations, entry = contract._module_graph(malformed)
     with pytest.raises(RuntimeError, match="while condition is unresolved"):
-        contract._semantic_ancestors(
-            computations, entry, computations[entry]["root"]
-        )
+        contract._semantic_ancestors(computations, entry, computations[entry]["root"])
 
 
 def test_sealed_archive_builds_from_committed_blobs_and_imports(tmp_path: Path):
     """Build the sealed archive from this repository's HEAD and import a module from it."""
 
-    head = subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True).strip()
-    program = f'''
+    head = subprocess.check_output(
+        ["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True
+    ).strip()
+    program = f"""
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("probe", {str(PROBE)!r})
 probe = importlib.util.module_from_spec(spec); spec.loader.exec_module(probe)
@@ -915,6 +999,11 @@ sys.path[:] = [archive_path, *sys.path]
 import glm_tpu.greenfield.benchmarking.legacy_prefill_owner_packing as pk
 assert pk.__file__.startswith(archive_path + "/"), pk.__file__
 print("ARCHIVE_IMPORT_OK", identity["file_manifest_count"], identity["archive_sha256"][:12])
-'''
-    result = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, env={**os.environ, "JAX_PLATFORMS": "cpu"})
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", program],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "JAX_PLATFORMS": "cpu"},
+    )
     assert "ARCHIVE_IMPORT_OK" in result.stdout, result.stderr

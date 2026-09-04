@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import importlib.util
 import json
 import os
 import re
@@ -23,12 +22,27 @@ from typing import Any
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v6/"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v7/"
     "publish_gate_d_layer1_prompt_chunk0_geometry.py"
 )
 SOURCE_PATH = "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
 PROBE_SOURCE_PATH = "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"
-HLO_CONTRACT_SOURCE_PATH = "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py"
+PARSER_CONTRACT_SOURCE_PATH = "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py"
+BOUNDARY_CONTRACT_SOURCE_PATH = (
+    "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py"
+)
+CONSUMER_CONTRACT_SOURCE_PATH = (
+    "glm_tpu/greenfield/validation/chunk0_real_layer_consumer_hlo.py"
+)
+PARSER_CONTRACT_SHA256 = (
+    "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757"
+)
+BOUNDARY_CONTRACT_SHA256 = (
+    "35757aab4a616a2f1073f78503c29075c3e43cb684e4e1faf7d835630876809e"
+)
+CONSUMER_CONTRACT_SHA256 = (
+    "4ef7bbb0dbd74e5317cc653e67ef72dc5fd6ea472b9e486fc99c9ed410422aec"
+)
 BASE_PATH = "scripts/greenfield/publish_gate_d_projection_contraction_pp16_hlo.py"
 BASE_PIN = "986378238ac6458307aea69ef1f5e12bf82bc020"
 BASE_SHA256 = "f3f20a01fd37bb82988cd77f69fa7b0a780d120568bab0db4162f42e7855bc97"
@@ -38,8 +52,9 @@ TAG_PATTERN = re.compile(
     r"greenfield_layer1_prompt_chunk0_geometry_[0-9]{8}T[0-9]{15}Z"
 )
 CLAIM_SCOPE = (
-    "Bounded diagnostic of prompt-row geometry; row 0 decisive, rows >= 1 use "
-    "a non-legacy softmax; no decoder, Gate-D, DB or performance claim."
+    "Completed device normalization consumed by a separate full layer-0 path; "
+    "row 0 is the only decisive legacy comparison, rows >= 1 use a non-legacy "
+    "softmax and are diagnostic only; no decoder, Gate-D, DB or performance claim."
 )
 INPUTS = {
     "checkpoint_index_sha256": "e0fe7f28c1f853d4824e4d796374e3dacf1fe470988773952c79b063768134bf",
@@ -54,22 +69,26 @@ INPUTS = {
     "softmax_scale": 0.0625,
     "weight_digests_sha256": "5a49ab9a8c6a6dc7ee41cf104856e4709c849b0c42cb68d00e52c33241552463",
 }
-STATUS_EXACT = "ROW0_LEGACY_GEOMETRY_EXACT"
-STATUS_NONEXACT = "ROW0_LEGACY_GEOMETRY_NONEXACT"
+STATUS_EXACT = "REAL_LAYER_CONSUMER_ROW0_EXACT"
+STATUS_NONEXACT = "REAL_LAYER_CONSUMER_ROW0_NONEXACT"
 CLASSIFICATION_EXACT = (
-    "ROW0_LEGACY_PREFILL_GEOMETRY_REPRODUCES_LEGACY_LAYER1_KEY;"
+    "COMPLETED_NORMALIZATION_REAL_LAYER_CONSUMER_REPRODUCES_LEGACY_LAYER1_KEY;"
     "ROWS_1_PLUS_NONLEGACY_ATTENTION_DIAGNOSTIC_ONLY;DECODER_UNPROVEN;GATE_D_OPEN"
 )
 CLASSIFICATION_NONEXACT = (
-    "ROW0_LEGACY_PREFILL_GEOMETRY_DOES_NOT_REPRODUCE_LEGACY_LAYER1_KEY;"
-    "GEOMETRY_HYPOTHESIS_INCOMPLETE;DECODER_UNPROVEN;GATE_D_OPEN"
+    "COMPLETED_NORMALIZATION_REAL_LAYER_CONSUMER_DOES_NOT_REPRODUCE_LEGACY_LAYER1_KEY;"
+    "CONSUMER_NUMERICS_INCOMPLETE;DECODER_UNPROVEN;GATE_D_OPEN"
 )
 SUCCESS_PAYLOAD = (
     "census_post.txt",
     "census_pre.txt",
     "evidence.json",
-    "hlo/legacy_geometry_chunk0.optimized_hlo.txt",
-    "hlo/legacy_geometry_chunk0.stablehlo.mlir",
+    "hlo/normalized_boundary.optimized_hlo.txt",
+    "hlo/normalized_boundary.stablehlo.mlir",
+    "hlo/normalized_key_control.optimized_hlo.txt",
+    "hlo/normalized_key_control.stablehlo.mlir",
+    "hlo/real_layer_consumer.optimized_hlo.txt",
+    "hlo/real_layer_consumer.stablehlo.mlir",
     "hlo/wk_decode.optimized_hlo.txt",
     "hlo/wk_decode.stablehlo.mlir",
     "hlo/wk_promote.optimized_hlo.txt",
@@ -101,8 +120,6 @@ EXPECTED_OUTPUT_LAYOUT = {
     "greenfield_layer0_bits": ((2048, 128), "<u2"),
     "greenfield_layer1_bits": ((2048, 128), "<u2"),
     "legacy_layer1_bits": ((2048, 128), "<u2"),
-    "keys1_row0_one_row_block_m64_keys_bits": ((128,), "<u2"),
-    "keys1_row0_one_row_block_one_row_keys_bits": ((128,), "<u2"),
     "normalized1_chunk_bits": ((2048, 6144), "<u2"),
 }
 ROW_WIDTHS = {
@@ -118,7 +135,6 @@ ROW_WIDTHS = {
 }
 for _name, _width in ROW_WIDTHS.items():
     EXPECTED_OUTPUT_LAYOUT[f"{_name}_bits"] = ((_width,), "<u2")
-    EXPECTED_OUTPUT_LAYOUT[f"one_row_{_name}_bits"] = ((_width,), "<u2")
 
 _GIT_ENVIRONMENT = {
     "GIT_CONFIG_GLOBAL": "/dev/null",
@@ -156,8 +172,20 @@ def _snapshot(path: Path) -> bytes:
         named = os.stat(path, follow_symlinks=False)
         if (
             len(raw) != before.st_size
-            or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
-            != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+            or (
+                before.st_dev,
+                before.st_ino,
+                before.st_size,
+                before.st_mtime_ns,
+                before.st_ctime_ns,
+            )
+            != (
+                after.st_dev,
+                after.st_ino,
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            )
             or (named.st_dev, named.st_ino) != (before.st_dev, before.st_ino)
         ):
             raise RuntimeError(f"publisher source changed while reading: {path}")
@@ -168,7 +196,9 @@ def _snapshot(path: Path) -> bytes:
 
 def _verify_running_source(code_pin: str, expected_sha256: str) -> None:
     if Path(__file__) != INSTALL_PATH:
-        raise RuntimeError("chunk-0 publisher is not executing from the immutable capsule")
+        raise RuntimeError(
+            "chunk-0 publisher is not executing from the immutable capsule"
+        )
     raw = _snapshot(INSTALL_PATH)
     metadata = os.stat(INSTALL_PATH, follow_symlinks=False)
     if (
@@ -289,7 +319,11 @@ def _validate_npz(
             elements = 1
             for dimension in expected_shape:
                 elements *= dimension
-            if shape != expected_shape or dtype != expected_dtype or len(payload) != elements * 2:
+            if (
+                shape != expected_shape
+                or dtype != expected_dtype
+                or len(payload) != elements * 2
+            ):
                 raise RuntimeError(f"chunk-0 NPZ member drifted: {key}")
             payloads[key] = payload
     keys0 = payloads["keys0_bits"]
@@ -297,8 +331,6 @@ def _validate_npz(
     greenfield0 = payloads["greenfield_layer0_bits"]
     greenfield1 = payloads["greenfield_layer1_bits"]
     legacy1 = payloads["legacy_layer1_bits"]
-    one_m64 = payloads["keys1_row0_one_row_block_m64_keys_bits"]
-    one_m1 = payloads["keys1_row0_one_row_block_one_row_keys_bits"]
     control = _mismatch_rows(keys0, greenfield0, 128)
     legacy = _mismatch_rows(keys1, legacy1, 128)
     greenfield = _mismatch_rows(keys1, greenfield1, 128)
@@ -333,14 +365,12 @@ def _validate_npz(
         )[0],
         "legacy_geometry_vs_greenfield_db518_lanes": greenfield[0],
         "legacy_geometry_vs_legacy_lanes": legacy[0],
-        "legacy_geometry_vs_one_row_block_m64_keys_lanes": _mismatch_rows(keys1[:256], one_m64, 128)[0],
-        "one_row_block_m64_keys_vs_greenfield_db518_lanes": _mismatch_rows(one_m64, greenfield1[:256], 128)[0],
-        "one_row_block_m64_keys_vs_legacy_lanes": _mismatch_rows(one_m64, legacy1[:256], 128)[0],
-        "one_row_block_one_row_keys_vs_legacy_lanes": _mismatch_rows(one_m1, legacy1[:256], 128)[0],
     }
     expected_chunk = {
         "lanes_mismatched": sum(legacy),
-        "per_64_row_block_mean": [sum(legacy[index : index + 64]) / 64 for index in range(0, 2048, 64)],
+        "per_64_row_block_mean": [
+            sum(legacy[index : index + 64]) / 64 for index in range(0, 2048, 64)
+        ],
         "per_row_first_16": legacy[:16],
         "rows": 2048,
         "rows_exact": sum(value == 0 for value in legacy),
@@ -352,7 +382,9 @@ def _validate_npz(
     if (
         any(control)
         or runner.get("arrays_sha256") != sha256(raw).hexdigest()
-        or runner.get("control_layer0_keys_vs_db518_mismatched_rows") != sum(value != 0 for value in control)
+        or runner.get("control_layer0_keys_vs_db518_mismatched_rows")
+        != sum(value != 0 for value in control)
+        or runner.get("control_layer0_keys_vs_db518_mismatched_lanes") != sum(control)
         or dict(row0) != expected_row0
         or dict(chunk) != expected_chunk
         or dict(chunk_greenfield) != expected_greenfield
@@ -368,7 +400,9 @@ def _entry_graph(
 
     lines = optimized.splitlines()
     try:
-        start = next(index for index, line in enumerate(lines) if line.startswith("ENTRY "))
+        start = next(
+            index for index, line in enumerate(lines) if line.startswith("ENTRY ")
+        )
     except StopIteration as error:
         raise RuntimeError("chunk-0 wk ENTRY computation is absent") from error
     nodes: dict[str, dict[str, Any]] = {}
@@ -439,49 +473,33 @@ def _ancestors(nodes: Mapping[str, Mapping[str, Any]], name: str) -> set[str]:
 
 
 def _stablehlo_main_signature(stablehlo: str) -> str:
-    match = re.search(r"^  func\.func public @main\((.*)\) -> (.*) \{$", stablehlo, re.M)
+    match = re.search(
+        r"^  func\.func public @main\((.*)\) -> (.*) \{$", stablehlo, re.M
+    )
     if match is None:
         raise RuntimeError("chunk-0 wk StableHLO public signature is absent")
     return match.group(0)
 
 
 def _require_wk_hlo_boundaries(
-    main_optimized: str,
-    main_stablehlo: str,
     decode_optimized: str,
     decode_stablehlo: str,
     promote_optimized: str,
     promote_stablehlo: str,
 ) -> None:
-    """Prove exact helper signatures and live FP32-only main wk lineage."""
+    """Prove the exact completed raw-to-BF16-to-FP32 wk helpers."""
 
-    main_nodes, main_root = _entry_graph(main_optimized)
     decode_nodes, decode_root = _entry_graph(decode_optimized)
     promote_nodes, promote_root = _entry_graph(promote_optimized)
     parameter = lambda nodes: {
         name: node for name, node in nodes.items() if node["opcode"] == "parameter"
     }
-    main_parameters = parameter(main_nodes)
     decode_parameters = parameter(decode_nodes)
     promote_parameters = parameter(promote_nodes)
-    by_shape = lambda nodes, wanted: {
-        name for name, node in nodes.items() if node["shapes"] == (wanted,)
-    }
     wk_shape = ("f32", (128, 6144))
     raw_shape = ("u8", (128, 6144))
     scale_shape = ("f32", (1, 48))
     bf16_shape = ("bf16", (128, 6144))
-    main_wk = by_shape(main_parameters, wk_shape)
-    raw_main = by_shape(main_parameters, raw_shape)
-    scale_main = by_shape(main_parameters, scale_shape)
-    wk0 = {name for name in main_wk if "wk0" in name}
-    wk1 = {name for name in main_wk if "wk1" in name}
-    root_operands = main_nodes[main_root]["operands"]
-    if main_nodes[main_root]["opcode"] != "tuple" or len(root_operands) != 12:
-        raise RuntimeError("chunk-0 main result boundary drifted")
-    result_live = tuple(_ancestors(main_nodes, operand) for operand in root_operands)
-    key0_live = result_live[5]
-    key1_live = result_live[6]
     helper_communication = (
         "all-gather(",
         "all-reduce(",
@@ -497,27 +515,10 @@ def _require_wk_hlo_boundaries(
     )
     decode_live = _ancestors(decode_nodes, decode_root)
     promote_live = _ancestors(promote_nodes, promote_root)
-    main_signature = _stablehlo_main_signature(main_stablehlo)
     decode_signature = _stablehlo_main_signature(decode_stablehlo)
     promote_signature = _stablehlo_main_signature(promote_stablehlo)
-    live_main = key0_live | key1_live
-    forbidden_live_shapes = {raw_shape, scale_shape, bf16_shape}
     if (
-        len(main_wk) != 2
-        or len(wk0) != 1
-        or len(wk1) != 1
-        or raw_main
-        or scale_main
-        or not wk0 <= key0_live
-        or not wk1 <= key1_live
-        or any(wk0 & live for index, live in enumerate(result_live) if index != 5)
-        or any(wk1 & live for index, live in enumerate(result_live) if index != 6)
-        or any(
-            node["shapes"] and node["shapes"][0] in forbidden_live_shapes
-            for name, node in main_nodes.items()
-            if name in live_main and node["opcode"] != "parameter"
-        )
-        or decode_parameter_shapes != [(("f32", (1, 48)),), (("u8", (128, 6144)),)]
+        decode_parameter_shapes != [(("f32", (1, 48)),), (("u8", (128, 6144)),)]
         or decode_nodes[decode_root]["shapes"] != (bf16_shape,)
         or decode_nodes[decode_root]["opcode"] != "convert"
         or len(decode_nodes[decode_root]["operands"]) != 1
@@ -528,12 +529,12 @@ def _require_wk_hlo_boundaries(
         or promote_nodes[promote_root]["operands"] != tuple(promote_parameters)
         or promote_live != {promote_root, *promote_parameters}
         or any(
-            token in decode_optimized or token in promote_optimized
+            token in decode_optimized
+            or token in decode_stablehlo
+            or token in promote_optimized
+            or token in promote_stablehlo
             for token in helper_communication
         )
-        or main_signature.count("tensor<128x6144xf32>") != 2
-        or "tensor<128x6144xui8>" in main_signature
-        or "tensor<1x48xf32>" in main_signature
         or decode_signature.count("tensor<128x6144xui8>") != 1
         or decode_signature.count("tensor<1x48xf32>") != 1
         or decode_signature.count("tensor<128x6144xbf16>") != 1
@@ -545,22 +546,71 @@ def _require_wk_hlo_boundaries(
         raise RuntimeError("chunk-0 wk executable boundary drifted")
 
 
-def _require_embedding_gather_hlo(
-    main_optimized: str, main_stablehlo: str
-) -> dict[str, Any]:
-    """Load the shared stdlib-only whole-module admission implementation."""
+def _load_hlo_contracts(code_pin: str) -> tuple[types.ModuleType, types.ModuleType]:
+    """Load exact committed boundary and real-consumer validators."""
 
-    adjacent = Path(__file__).with_name("chunk0_embedding_hlo.py")
-    source = REPO / HLO_CONTRACT_SOURCE_PATH
-    helper = adjacent if adjacent.is_file() else source
-    if Path(__file__) == INSTALL_PATH and helper != adjacent:
-        raise RuntimeError("installed chunk-0 HLO admission helper is absent")
-    spec = importlib.util.spec_from_file_location("_chunk0_embedding_hlo", helper)
-    if spec is None or spec.loader is None:
-        raise RuntimeError("chunk-0 HLO admission helper cannot be loaded")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.require_embedding_gather_hlo(main_optimized, main_stablehlo)
+    sources = (
+        (PARSER_CONTRACT_SOURCE_PATH, PARSER_CONTRACT_SHA256),
+        (BOUNDARY_CONTRACT_SOURCE_PATH, BOUNDARY_CONTRACT_SHA256),
+        (CONSUMER_CONTRACT_SOURCE_PATH, CONSUMER_CONTRACT_SHA256),
+    )
+    raw_by_source: dict[str, bytes] = {}
+    for source, expected_sha256 in sources:
+        adjacent = Path(__file__).with_name(Path(source).name)
+        path = adjacent if adjacent.is_file() else REPO / source
+        if Path(__file__) == INSTALL_PATH and path != adjacent:
+            raise RuntimeError("installed chunk-0 HLO contract is absent")
+        raw = _snapshot(path)
+        if sha256(raw).hexdigest() != expected_sha256 or raw != _git_bytes(
+            "show", f"{code_pin}:{source}"
+        ):
+            raise RuntimeError("chunk-0 HLO contract bytes drifted")
+        raw_by_source[source] = raw
+
+    for name in (
+        "glm_tpu",
+        "glm_tpu.greenfield",
+        "glm_tpu.greenfield.validation",
+    ):
+        if name not in sys.modules:
+            package = types.ModuleType(name)
+            package.__path__ = []  # type: ignore[attr-defined]
+            package.__package__ = name.rpartition(".")[0]
+            sys.modules[name] = package
+
+    loaded: dict[str, types.ModuleType] = {}
+    for source in (
+        PARSER_CONTRACT_SOURCE_PATH,
+        BOUNDARY_CONTRACT_SOURCE_PATH,
+        CONSUMER_CONTRACT_SOURCE_PATH,
+    ):
+        stem = Path(source).stem
+        name = f"glm_tpu.greenfield.validation.{stem}"
+        module = types.ModuleType(name)
+        module.__file__ = str(Path(__file__).with_name(Path(source).name))
+        module.__package__ = "glm_tpu.greenfield.validation"
+        sys.modules[name] = module
+        exec(
+            compile(raw_by_source[source], module.__file__, "exec"), module.__dict__
+        )  # noqa: S102
+        loaded[stem] = module
+    return (
+        loaded[Path(BOUNDARY_CONTRACT_SOURCE_PATH).stem],
+        loaded[Path(CONSUMER_CONTRACT_SOURCE_PATH).stem],
+    )
+
+
+def _same_json_value(left: Any, right: Any) -> bool:
+    """Compare a runner-restored value with a freshly computed contract."""
+
+    encode = lambda value: json.dumps(
+        value,
+        allow_nan=False,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("ascii")
+    return encode(left) == encode(right)
 
 
 def _prepare_success(
@@ -574,9 +624,13 @@ def _prepare_success(
 ) -> tuple[dict[str, bytes], str, str, bool]:
     runner_raw = base.snapshot_member(run_fd, "runner.json", limit=2 << 20)
     runner = json.loads(runner_raw)
-    if type(runner) is not dict or runner_raw != (json.dumps(runner, indent=2, sort_keys=True) + "\n").encode("ascii"):
+    if type(runner) is not dict or runner_raw != (
+        json.dumps(runner, indent=2, sort_keys=True) + "\n"
+    ).encode("ascii"):
         raise RuntimeError("chunk-0 runner report is not canonical")
-    expected_probe_sha = sha256(_git_bytes("show", f"{code_pin}:{PROBE_SOURCE_PATH}")).hexdigest()
+    expected_probe_sha = sha256(
+        _git_bytes("show", f"{code_pin}:{PROBE_SOURCE_PATH}")
+    ).hexdigest()
     provenance = runner.get("provenance")
     hlo = runner.get("hlo")
     if (
@@ -588,8 +642,10 @@ def _prepare_success(
             "chunk0_vs_legacy",
             "claim_scope",
             "code_hash",
+            "control_layer0_keys_vs_db518_mismatched_lanes",
             "control_layer0_keys_vs_db518_mismatched_rows",
             "elapsed_seconds",
+            "execution_boundary",
             "forbidden_hlo_tokens",
             "hlo",
             "import_closure_module_count",
@@ -599,10 +655,11 @@ def _prepare_success(
             "run_tag",
             "status",
         }
-        or runner.get("artifact_kind") != "greenfield_layer1_prompt_chunk0_legacy_geometry_probe"
+        or runner.get("artifact_kind")
+        != "greenfield_layer1_prompt_chunk0_legacy_geometry_probe"
         or runner.get("code_hash") != code_pin
         or runner.get("run_tag") != run_tag
-        or runner.get("status") != "SUCCESS"
+        or runner.get("status") not in {"SUCCESS", "DIAGNOSTIC"}
         or runner.get("claim_scope") != CLAIM_SCOPE
         or runner.get("inputs") != INPUTS
         or runner.get("forbidden_hlo_tokens") != []
@@ -613,16 +670,31 @@ def _prepare_success(
         or not isinstance(provenance, Mapping)
         or provenance.get("probe_sha256") != expected_probe_sha
         or not isinstance(hlo, Mapping)
+        or runner.get("execution_boundary")
+        != {
+            "final_host_transfers": 1,
+            "key_control_invocations": 1,
+            "normalization_to_consumer_host_transfers": 0,
+            "normalizer_invocations": 1,
+            "real_layer_consumer_invocations": 1,
+        }
         or set(hlo)
         != {
-            "convolution_lines_with_2048_rows",
-            "embedding_gather_contract",
-            "main_fp32_wk_parameters",
-            "main_raw_wk_parameters",
-            "optimized_byte_count",
-            "optimized_sha256",
-            "stablehlo_byte_count",
-            "stablehlo_sha256",
+            "key_contract",
+            "normalization_contract",
+            "normalized_boundary_optimized_byte_count",
+            "normalized_boundary_optimized_sha256",
+            "normalized_boundary_stablehlo_byte_count",
+            "normalized_boundary_stablehlo_sha256",
+            "normalized_key_control_optimized_byte_count",
+            "normalized_key_control_optimized_sha256",
+            "normalized_key_control_stablehlo_byte_count",
+            "normalized_key_control_stablehlo_sha256",
+            "real_layer_consumer_contract",
+            "real_layer_consumer_optimized_byte_count",
+            "real_layer_consumer_optimized_sha256",
+            "real_layer_consumer_stablehlo_byte_count",
+            "real_layer_consumer_stablehlo_sha256",
             "wk_decode_optimized_byte_count",
             "wk_decode_optimized_sha256",
             "wk_decode_stablehlo_byte_count",
@@ -634,77 +706,97 @@ def _prepare_success(
         }
     ):
         raise RuntimeError("chunk-0 runner claim boundary drifted")
-    optimized = base.snapshot_member(run_fd, "hlo/legacy_geometry_chunk0.optimized_hlo.txt", limit=512 << 20)
-    stablehlo = base.snapshot_member(run_fd, "hlo/legacy_geometry_chunk0.stablehlo.mlir", limit=512 << 20)
-    wk_decode_optimized = base.snapshot_member(run_fd, "hlo/wk_decode.optimized_hlo.txt", limit=32 << 20)
-    wk_decode_stablehlo = base.snapshot_member(run_fd, "hlo/wk_decode.stablehlo.mlir", limit=32 << 20)
-    wk_promote_optimized = base.snapshot_member(run_fd, "hlo/wk_promote.optimized_hlo.txt", limit=32 << 20)
-    wk_promote_stablehlo = base.snapshot_member(run_fd, "hlo/wk_promote.stablehlo.mlir", limit=32 << 20)
-    optimized_text = optimized.decode("utf-8", errors="strict")
-    stablehlo_text = stablehlo.decode("utf-8", errors="strict")
-    wk_decode_optimized_text = wk_decode_optimized.decode("utf-8", errors="strict")
-    wk_decode_stablehlo_text = wk_decode_stablehlo.decode("utf-8", errors="strict")
-    wk_promote_optimized_text = wk_promote_optimized.decode("utf-8", errors="strict")
-    wk_promote_stablehlo_text = wk_promote_stablehlo.decode("utf-8", errors="strict")
+    hlo_files = {
+        "normalized_boundary_optimized": (
+            "hlo/normalized_boundary.optimized_hlo.txt",
+            64 << 20,
+        ),
+        "normalized_boundary_stablehlo": (
+            "hlo/normalized_boundary.stablehlo.mlir",
+            64 << 20,
+        ),
+        "normalized_key_control_optimized": (
+            "hlo/normalized_key_control.optimized_hlo.txt",
+            64 << 20,
+        ),
+        "normalized_key_control_stablehlo": (
+            "hlo/normalized_key_control.stablehlo.mlir",
+            64 << 20,
+        ),
+        "real_layer_consumer_optimized": (
+            "hlo/real_layer_consumer.optimized_hlo.txt",
+            512 << 20,
+        ),
+        "real_layer_consumer_stablehlo": (
+            "hlo/real_layer_consumer.stablehlo.mlir",
+            512 << 20,
+        ),
+        "wk_decode_optimized": ("hlo/wk_decode.optimized_hlo.txt", 32 << 20),
+        "wk_decode_stablehlo": ("hlo/wk_decode.stablehlo.mlir", 32 << 20),
+        "wk_promote_optimized": ("hlo/wk_promote.optimized_hlo.txt", 32 << 20),
+        "wk_promote_stablehlo": ("hlo/wk_promote.stablehlo.mlir", 32 << 20),
+    }
+    hlo_raw = {
+        name: base.snapshot_member(run_fd, member, limit=limit)
+        for name, (member, limit) in hlo_files.items()
+    }
+    hlo_texts = {
+        name: raw.decode("utf-8", errors="strict") for name, raw in hlo_raw.items()
+    }
     forbidden = ("host_callback", 'CustomCall("xla_python', "python_callback")
-    convolution_count = sum(
-        "convolution(" in line and "[2048," in line
-        for line in optimized_text.splitlines()
-    )
     _require_wk_hlo_boundaries(
-        optimized_text,
-        stablehlo_text,
-        wk_decode_optimized_text,
-        wk_decode_stablehlo_text,
-        wk_promote_optimized_text,
-        wk_promote_stablehlo_text,
+        hlo_texts["wk_decode_optimized"],
+        hlo_texts["wk_decode_stablehlo"],
+        hlo_texts["wk_promote_optimized"],
+        hlo_texts["wk_promote_stablehlo"],
     )
-    embedding_gather_contract = _require_embedding_gather_hlo(
-        optimized_text, stablehlo_text
+    boundary_contract, consumer_contract = _load_hlo_contracts(code_pin)
+    normalization_contract = (
+        boundary_contract.require_completed_normalization_boundary_hlo(
+            hlo_texts["normalized_boundary_optimized"],
+            hlo_texts["normalized_boundary_stablehlo"],
+        )
+    )
+    key_contract = boundary_contract.require_normalized_key_control_boundary_hlo(
+        hlo_texts["normalized_key_control_optimized"],
+        hlo_texts["normalized_key_control_stablehlo"],
+    )
+    real_consumer_contract = consumer_contract.require_real_layer_consumer_hlo(
+        hlo_texts["real_layer_consumer_optimized"],
+        hlo_texts["real_layer_consumer_stablehlo"],
     )
     if (
-        any(
-            token in text
-            for token in forbidden
-            for text in (
-                optimized_text,
-                stablehlo_text,
-                wk_decode_optimized_text,
-                wk_decode_stablehlo_text,
-                wk_promote_optimized_text,
-                wk_promote_stablehlo_text,
-            )
+        any(token in text for token in forbidden for text in hlo_texts.values())
+        or not _same_json_value(
+            hlo.get("normalization_contract"), normalization_contract
         )
-        or convolution_count <= 0
-        or hlo.get("main_fp32_wk_parameters")
-        != ["w__wk0__.1: f32[128,6144]", "w__wk1__.1: f32[128,6144]"]
-        or hlo.get("main_raw_wk_parameters") != []
-        or hlo.get("embedding_gather_contract") != embedding_gather_contract
-        or "w__wk0_bits__" in optimized_text
-        or "w__wk1_bits__" in optimized_text
-        or hlo.get("convolution_lines_with_2048_rows") != convolution_count
-        or hlo.get("optimized_byte_count") != len(optimized)
-        or hlo.get("optimized_sha256") != sha256(optimized).hexdigest()
-        or hlo.get("stablehlo_byte_count") != len(stablehlo)
-        or hlo.get("stablehlo_sha256") != sha256(stablehlo).hexdigest()
-        or hlo.get("wk_decode_optimized_byte_count") != len(wk_decode_optimized)
-        or hlo.get("wk_decode_optimized_sha256") != sha256(wk_decode_optimized).hexdigest()
-        or hlo.get("wk_decode_stablehlo_byte_count") != len(wk_decode_stablehlo)
-        or hlo.get("wk_decode_stablehlo_sha256") != sha256(wk_decode_stablehlo).hexdigest()
-        or hlo.get("wk_promote_optimized_byte_count") != len(wk_promote_optimized)
-        or hlo.get("wk_promote_optimized_sha256") != sha256(wk_promote_optimized).hexdigest()
-        or hlo.get("wk_promote_stablehlo_byte_count") != len(wk_promote_stablehlo)
-        or hlo.get("wk_promote_stablehlo_sha256") != sha256(wk_promote_stablehlo).hexdigest()
+        or not _same_json_value(hlo.get("key_contract"), key_contract)
+        or not _same_json_value(
+            hlo.get("real_layer_consumer_contract"), real_consumer_contract
+        )
+        or any(
+            hlo.get(f"{name}_byte_count") != len(raw)
+            or hlo.get(f"{name}_sha256") != sha256(raw).hexdigest()
+            for name, raw in hlo_raw.items()
+        )
     ):
         raise RuntimeError("chunk-0 HLO evidence drifted")
     arrays = base.snapshot_member(run_fd, "probe_arrays.npz", limit=96 << 20)
     row0_exact = _validate_npz(arrays, runner)
     status = STATUS_EXACT if row0_exact else STATUS_NONEXACT
     classification = CLASSIFICATION_EXACT if row0_exact else CLASSIFICATION_NONEXACT
+    expected_runner_status = "SUCCESS" if row0_exact else "DIAGNOSTIC"
+    if runner.get("status") != expected_runner_status:
+        raise RuntimeError("chunk-0 runner status disagrees with archived arrays")
     mirror = base.snapshot_member(run_fd, "mirror.sha256", limit=2 << 20)
     base._validate_mirror_replay(mirror, code_pin)
     sync = base.snapshot_member(run_fd, "sync.txt", limit=1 << 20)
-    if sync != f"SYNC_OK {os.uname().nodename} {code_pin} origin_and_same_region_mirror\n".encode("ascii"):
+    if (
+        sync
+        != f"SYNC_OK {os.uname().nodename} {code_pin} origin_and_same_region_mirror\n".encode(
+            "ascii"
+        )
+    ):
         raise RuntimeError("chunk-0 host code authority drifted")
     vacancy_raw = base.snapshot_member(run_fd, "remote_vacancy.raw.txt", limit=1 << 20)
     vacancy_summary = base.snapshot_member(run_fd, "remote_vacancy.txt", limit=1 << 20)
@@ -722,7 +814,7 @@ def _prepare_success(
         "elapsed_seconds": elapsed,
         "gate_d_closed": False,
         "performance_claim": False,
-        "prefill_geometry_row0_exact": row0_exact,
+        "real_layer_consumer_row0_exact": row0_exact,
         "remote_prefix": remote,
         "root_cause_fix_proven": False,
         "run_tag": run_tag,
@@ -734,16 +826,13 @@ def _prepare_success(
     payload = {
         "census_post.txt": census_post,
         "census_pre.txt": census_pre,
-        "hlo/legacy_geometry_chunk0.optimized_hlo.txt": optimized,
-        "hlo/legacy_geometry_chunk0.stablehlo.mlir": stablehlo,
-        "hlo/wk_decode.optimized_hlo.txt": wk_decode_optimized,
-        "hlo/wk_decode.stablehlo.mlir": wk_decode_stablehlo,
-        "hlo/wk_promote.optimized_hlo.txt": wk_promote_optimized,
-        "hlo/wk_promote.stablehlo.mlir": wk_promote_stablehlo,
+        **{member: hlo_raw[name] for name, (member, _limit) in hlo_files.items()},
         "mirror.sha256": mirror,
         "orchestrator.sealed.log": orchestrator,
         "probe_arrays.npz": arrays,
-        "publisher_runtime.json": base.snapshot_member(run_fd, "publisher_runtime.json", limit=1 << 20),
+        "publisher_runtime.json": base.snapshot_member(
+            run_fd, "publisher_runtime.json", limit=1 << 20
+        ),
         "remote_vacancy.raw.txt": vacancy_raw,
         "remote_vacancy.txt": vacancy_summary,
         "runner.json": runner_raw,
@@ -772,7 +861,9 @@ def _prepare_success(
     return payload, status, classification, row0_exact
 
 
-def _result_authority_line(status: str, marker_sha256: str, terminal: Mapping[str, Any]) -> str:
+def _result_authority_line(
+    status: str, marker_sha256: str, terminal: Mapping[str, Any]
+) -> str:
     generation = terminal.get("generation")
     terminal_sha256 = terminal.get("sha256")
     if (
@@ -813,7 +904,9 @@ def _initialize_retained_run_dir(
     run_fd = base._run_fd(run_dir, run_dir_fd)
     try:
         with os.scandir(run_fd) as entries:
-            observed = {entry.name: entry.stat(follow_symlinks=False) for entry in entries}
+            observed = {
+                entry.name: entry.stat(follow_symlinks=False) for entry in entries
+            }
         hlo = observed.get("hlo")
         if (
             set(observed) != {"hlo"}
@@ -886,7 +979,7 @@ def _publish_success(
             "evidence_sha256": sha256(payload["evidence.json"]).hexdigest(),
             "gate_d_closed": False,
             "performance_claim": False,
-            "prefill_geometry_row0_exact": row0_exact,
+            "real_layer_consumer_row0_exact": row0_exact,
             "remote_ledger": ledger,
             "root_cause_fix_proven": False,
             "run_tag": run_tag,
@@ -947,13 +1040,22 @@ def _publish_diagnostic(
         base.write_member_exclusive(run_fd, "failure_status.json", failure_raw)
         orchestrator = base.snapshot_member(run_fd, "orchestrator.log", limit=16 << 20)
         base.write_member_exclusive(run_fd, "orchestrator.failure.log", orchestrator)
-        vacancy_raw = base.snapshot_member(run_fd, "remote_vacancy.raw.txt", limit=1 << 20)
-        vacancy_summary = base.snapshot_member(run_fd, "remote_vacancy.txt", limit=1 << 20)
+        vacancy_raw = base.snapshot_member(
+            run_fd, "remote_vacancy.raw.txt", limit=1 << 20
+        )
+        vacancy_summary = base.snapshot_member(
+            run_fd, "remote_vacancy.txt", limit=1 << 20
+        )
         base._validate_remote_vacancy_evidence(vacancy_raw, vacancy_summary, remote)
         members = [
             name
             for name in sorted(base.local_members(run_fd))
-            if name not in {"orchestrator.log", "diagnostic_objects.json", "diagnostic_upload_receipt.json"}
+            if name
+            not in {
+                "orchestrator.log",
+                "diagnostic_objects.json",
+                "diagnostic_upload_receipt.json",
+            }
         ]
         if not members or len(members) > 64:
             raise RuntimeError("chunk-0 diagnostic inventory is unsafe")
@@ -963,7 +1065,9 @@ def _publish_diagnostic(
         records = []
         diagnostic_prefix = prefix + "diagnostic/"
         for relative in sorted(payload):
-            record = base._upload_bound(bucket, diagnostic_prefix + relative, payload[relative])
+            record = base._upload_bound(
+                bucket, diagnostic_prefix + relative, payload[relative]
+            )
             record["path"] = relative
             records.append(record)
         for record in records:
@@ -978,9 +1082,13 @@ def _publish_diagnostic(
             }
         )
         base.write_member_exclusive(run_fd, "diagnostic_objects.json", ledger_raw)
-        terminal = base._upload_bound(bucket, diagnostic_prefix + "diagnostic_objects.json", ledger_raw)
+        terminal = base._upload_bound(
+            bucket, diagnostic_prefix + "diagnostic_objects.json", ledger_raw
+        )
         terminal["path"] = "diagnostic_objects.json"
-        base._replay_bound(bucket, diagnostic_prefix + "diagnostic_objects.json", terminal)
+        base._replay_bound(
+            bucket, diagnostic_prefix + "diagnostic_objects.json", terminal
+        )
         if base._observed_names(bucket, diagnostic_prefix) != set(payload) | {
             "diagnostic_objects.json"
         }:
@@ -1034,7 +1142,9 @@ def main() -> int:
         "gate_d_layer1_prompt_chunk0_geometry_publisher_runtime"
     )
     publication_runtime_raw = base._canonical(publication_runtime)
-    _verify_running_source(arguments.expected_code_hash, arguments.expected_source_sha256)
+    _verify_running_source(
+        arguments.expected_code_hash, arguments.expected_source_sha256
+    )
     if arguments.run_dir_fd != 7:
         raise RuntimeError("chunk-0 publisher requires run-directory fd 7")
     if arguments.mode == "init":

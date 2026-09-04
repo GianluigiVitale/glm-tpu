@@ -1,0 +1,64 @@
+{
+    "artifact_kind": "gate_d_layer1_prompt_chunk0_geometry_v8_source",
+    "authorization": {
+        "cloud_write": false,
+        "full_dsa_or_8k": false,
+        "launcher_invocation": false,
+        "persistence_only": true,
+        "privileged_install": false,
+        "tpu_compile": false,
+        "tpu_execution": false
+    },
+    "claim_scope": "Source, exact CPU/HLO tests, immutable staging, and proposed commands only. No TPU numerical, decoder, Gate-D, DB, or performance standing.",
+    "classification": "COMPLETED_NORMALIZATION_REAL_LAYER_CONSUMER_SOURCE_READY;CPU_HLO_VALIDATED;SOL_BATCH_REVIEW_PENDING;INSTALL_EXECUTION_UNAUTHORIZED;GATE_D_OPEN",
+    "design": {
+        "completed_normalization_separate_executable": true,
+        "consumer_accepts_completed_bf16_m2048_buffer": true,
+        "consumer_input_rms_recomputation_rejected": true,
+        "consumer_is_full_layer0_to_layer1_key_path": true,
+        "key_control_separate_executable": true,
+        "normalization_to_consumer_host_transfers": 0,
+        "row0_decisive": true,
+        "rows_1_plus_nonlegacy_attention_diagnostic_only": true
+    },
+    "gate_d_closed": false,
+    "parent_code_hash": "8188d59074fb2a9d359ab6fc10fde0e2b344fb52",
+    "performance_claim": false,
+    "planned_fresh_tag": "greenfield_layer1_prompt_chunk0_geometry_20260904T010811826771181Z",
+    "proposed_commands": {
+        "execute_once": "/usr/bin/env -i GLM_GATE_D_CHUNK0_GEOMETRY=1 GLM_GATE_D_CHUNK0_GEOMETRY_MODE=execute_once GLM_GATE_D_CHUNK0_GEOMETRY_TAG=greenfield_layer1_prompt_chunk0_geometry_20260904T010811826771181Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v8.py",
+        "install_only": "/usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v8/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py",
+        "provision_install_source": "/usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B /opt/glm-tpu/bin/provision_gate_d_python_runtime.py --source /home/gianl/gate-d-runs/gate-d-layer1-prompt-chunk0-geometry-install-v8c-staging --target /opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v8 --expected-tree-sha256 6105f4ef13b3441c89613def615bb4aaa8dbc0fc3f434f4ebee0e5cd5655b24c"
+    },
+    "review": {
+        "sol": "PENDING"
+    },
+    "runtime_staging": {
+        "file_mode": "0555",
+        "path": "/home/gianl/gate-d-runs/gate-d-layer1-prompt-chunk0-geometry-install-v8c-staging",
+        "root_mode": "0755",
+        "tree_sha256": "6105f4ef13b3441c89613def615bb4aaa8dbc0fc3f434f4ebee0e5cd5655b24c"
+    },
+    "schema_version": 1,
+    "source_sha256s": {
+        "glm_tpu/greenfield/benchmarking/legacy_prefill_chunk_probe.py": "876502e6ec2b0e0026b9ae7b7e99f83567133d44a93865fc6916fd5a31b93828",
+        "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py": "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757",
+        "glm_tpu/greenfield/validation/chunk0_real_layer_consumer_hlo.py": "4ef7bbb0dbd74e5317cc653e67ef72dc5fd6ea472b9e486fc99c9ed410422aec",
+        "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py": "35757aab4a616a2f1073f78503c29075c3e43cb684e4e1faf7d835630876809e",
+        "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py": "3a2dd02a1490abf1a889e6f3da503a9df487a7fb18f9da6e1043f0c521baebea",
+        "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py": "6ba25afc0597fdfaa932317e171189ca5f82b80159ed7e77cad04bef6f31b24f",
+        "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py": "4eb5ee0c11530f3e2ed7be4f25de92f729d39694ae50d531fd57968e948e691c",
+        "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py": "09808a13a2c5d19538abf6da59d4225cde149637f5a404a5c00052ef4d2f84e8",
+        "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh": "a46ba0588eaf3c175885de4e882bd41eebc8d817ac6e4b73049d9178884961c9",
+        "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py": "0f61a5a6108b1d931cc19ce247e1d88b7db76ed32029260bd6273cb4d4ca8d4e",
+        "tests/greenfield/benchmarking/test_legacy_prefill_chunk_probe.py": "988467360ff29820b83ad35b301db15b939635f06441fb461d315631aefdb7a2",
+        "tests/greenfield/validation/test_chunk0_geometry_probe_runner.py": "ac99169ab173ee6a1556fb3ff39c9aed55d507e48fda0f8ea7b7dbcfe1faa2a6",
+        "tests/greenfield/validation/test_chunk0_real_layer_consumer_hlo.py": "0afdd10a09b2d84be5ef3d7c44f190dfa322f47efdf70fe770e7f99e146a8f77"
+    },
+    "tests": {
+        "command": "JAX_PLATFORMS=cpu XLA_PYTHON_CLIENT_PREALLOCATE=false PYTHONDONTWRITEBYTECODE=1 /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/benchmarking/test_legacy_prefill_geometry.py tests/greenfield/benchmarking/test_legacy_prefill_owner_packing.py tests/greenfield/benchmarking/test_legacy_prefill_chunk_probe.py tests/greenfield/kernels/test_original_db518_normalized_boundary.py tests/greenfield/validation/test_chunk0_real_layer_consumer_hlo.py tests/greenfield/validation/test_chunk0_geometry_probe_runner.py",
+        "passed": 83,
+        "seconds": 47.56,
+        "tpu_compile_or_execution_performed": false
+    }
+}

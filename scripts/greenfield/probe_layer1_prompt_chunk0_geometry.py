@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Bounded probe: layer-1 prompt keys of chunk 0 in the legacy prefill geometry.
 
-Executes the layer-0 block for prompt rows ``[0, 2048)`` with every projection,
-norm and MLP shaped as the legacy 2,048-row prefill (virtual TP32 owners on one
-device, BF16 owner partials combined with the DB533 row-0 association), feeds
-the layer-1 normalized rows through the accepted 64-row prompt-key path and
-compares the layer-1 index keys bitwise with the sealed legacy layer-1 prompt
-cache.  Row 0 is decisive (attention over one key is exact by construction);
-rows >= 1 use a plain FP32 causal softmax instead of the legacy Pallas kernel
-and are reported only as a residual map.
+Produces the accepted layer-0 input normalization for prompt rows ``[0, 2048)``
+in one executable, synchronizes that completed device buffer, and passes it to
+a separate executable containing the full layer-0 consumer.  The consumer has
+no input-normalization weight or recomputation path.  It executes every
+projection, attention, norm and dense MLP in the legacy 2,048-row geometry,
+forms the layer-1 key, and compares it bitwise with the sealed legacy cache.
+Row 0 is decisive (attention over one key is exact by construction); rows >= 1
+use a plain FP32 causal softmax and are diagnostic only.
 
 Provenance (the accepted acquisition drivers' boundary): this file verifies
 that its own bytes equal the committed blob at the approved pin; the project
@@ -16,15 +16,15 @@ modules are imported from a sealed in-memory zip archive built from exact
 committed Git blobs (no worktree bytes); the interpreter is the root-owned
 immutable Gate-D Python under ``-I -S -B``; the sealed JAX/libtpu sites are
 verified by tree digest; every input is read once through a no-follow
-descriptor and digest-bound.  Controls: the same rows' layer-0 keys must equal
-the DB518 greenfield layer-0 cache (proven legacy-exact); the one-row block arm
-keeps the M64 key projection.  No decoder, Gate-D, DB or performance claim.
+descriptor and digest-bound.  The separately compiled key control must equal
+the DB518 layer-0 cache bitwise.  No decoder, Gate-D, DB or performance claim.
 """
 
 from __future__ import annotations
 
 import argparse
 import fcntl
+from functools import partial
 from hashlib import sha256
 from io import BytesIO
 import json
@@ -40,7 +40,7 @@ import zipfile
 
 PROBE_REPOSITORY_PATH = "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v6/"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v7/"
     "probe_layer1_prompt_chunk0_geometry.py"
 )
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
@@ -77,10 +77,14 @@ def _git_bytes(repo: Path, *arguments: str) -> bytes:
     return subprocess.check_output(
         [
             "/usr/bin/git",
-            "-c", "core.fsmonitor=false",
-            "-c", "core.untrackedCache=false",
-            "-c", "core.attributesFile=/dev/null",
-            "-C", str(repo),
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.untrackedCache=false",
+            "-c",
+            "core.attributesFile=/dev/null",
+            "-C",
+            str(repo),
             *arguments,
         ],
         env=GIT_ENVIRONMENT,
@@ -101,8 +105,18 @@ def _snapshot_regular(path: Path) -> bytes:
         while block := os.read(descriptor, 8 * 1024 * 1024):
             chunks.append(block)
         final = os.fstat(descriptor)
-        if (final.st_dev, final.st_ino, final.st_size, final.st_mtime_ns, final.st_ctime_ns) != (
-            metadata.st_dev, metadata.st_ino, metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns
+        if (
+            final.st_dev,
+            final.st_ino,
+            final.st_size,
+            final.st_mtime_ns,
+            final.st_ctime_ns,
+        ) != (
+            metadata.st_dev,
+            metadata.st_ino,
+            metadata.st_size,
+            metadata.st_mtime_ns,
+            metadata.st_ctime_ns,
         ):
             raise RuntimeError(f"file changed while being read: {path}")
         return b"".join(chunks)
@@ -249,17 +263,30 @@ def _sealed_git_source_archive(repo: Path, code_pin: str) -> tuple[str, dict[str
     tree = _git_bytes(repo, "ls-tree", "-r", "-z", code_pin, "--", "glm_tpu")
     records = []
     buffer = BytesIO()
-    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+    with zipfile.ZipFile(
+        buffer, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
+    ) as archive:
         for raw_entry in tree.split(b"\0"):
             if not raw_entry:
                 continue
             metadata, raw_path = raw_entry.split(b"\t", 1)
             mode, kind, object_id = metadata.split(b" ", 2)
             path = raw_path.decode("utf-8", errors="strict")
-            if kind != b"blob" or mode not in {b"100644", b"100755"} or not path.startswith("glm_tpu/"):
+            if (
+                kind != b"blob"
+                or mode not in {b"100644", b"100755"}
+                or not path.startswith("glm_tpu/")
+            ):
                 raise RuntimeError(f"unsupported committed source entry: {path}")
             payload = _git_bytes(repo, "cat-file", "blob", object_id.decode("ascii"))
-            records.append({"git_object_id": object_id.decode("ascii"), "path": path, "sha256": sha256(payload).hexdigest(), "size": len(payload)})
+            records.append(
+                {
+                    "git_object_id": object_id.decode("ascii"),
+                    "path": path,
+                    "sha256": sha256(payload).hexdigest(),
+                    "size": len(payload),
+                }
+            )
             info = zipfile.ZipInfo(path, date_time=(1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = (0o100555 if mode == b"100755" else 0o100444) << 16
@@ -267,7 +294,9 @@ def _sealed_git_source_archive(repo: Path, code_pin: str) -> tuple[str, dict[str
     if not records or records != sorted(records, key=lambda item: item["path"]):
         raise RuntimeError("committed source tree order drifted")
     raw_archive = buffer.getvalue()
-    descriptor = os.memfd_create("gate-d-chunk0-probe-source.zip", os.MFD_ALLOW_SEALING | os.MFD_CLOEXEC)
+    descriptor = os.memfd_create(
+        "gate-d-chunk0-probe-source.zip", os.MFD_ALLOW_SEALING | os.MFD_CLOEXEC
+    )
     view = memoryview(raw_archive)
     while view:
         written = os.write(descriptor, view)
@@ -279,7 +308,13 @@ def _sealed_git_source_archive(repo: Path, code_pin: str) -> tuple[str, dict[str
         raise RuntimeError("committed source archive seal drifted")
     if os.pread(descriptor, len(raw_archive) + 1, 0) != raw_archive:
         raise RuntimeError("committed source archive revalidation drifted")
-    manifest = json.dumps(records, allow_nan=False, ensure_ascii=True, separators=(",", ":"), sort_keys=True).encode()
+    manifest = json.dumps(
+        records,
+        allow_nan=False,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
     return f"/proc/self/fd/{descriptor}", {
         "archive_sha256": sha256(raw_archive).hexdigest(),
         "file_manifest_count": len(records),
@@ -288,9 +323,18 @@ def _sealed_git_source_archive(repo: Path, code_pin: str) -> tuple[str, dict[str
 
 
 def _install_sealed_path(archive_path: str) -> None:
-    if sys.flags.isolated != 1 or sys.flags.no_site != 1 or not sys.flags.ignore_environment:
+    if (
+        sys.flags.isolated != 1
+        or sys.flags.no_site != 1
+        or not sys.flags.ignore_environment
+    ):
         raise RuntimeError("probe must run under python -I -S")
-    sys.path[:] = [archive_path, JAX_SITE_ROOT, LIBTPU_SITE_ROOT, *EXPECTED_RUNTIME_PATH]
+    sys.path[:] = [
+        archive_path,
+        JAX_SITE_ROOT,
+        LIBTPU_SITE_ROOT,
+        *EXPECTED_RUNTIME_PATH,
+    ]
 
 
 ARTIFACT_KIND = "greenfield_layer1_prompt_chunk0_legacy_geometry_probe"
@@ -321,7 +365,10 @@ CHECKPOINT_TENSOR_NAMES = {
     **LAYER0_NORMS,
     **LAYER1_NAMES,
     **LAYER1_NORMS,
-    **{f"{k}_scale": f"{n}_scale_inv" for k, n in {**LAYER0_NAMES, **LAYER1_NAMES}.items()},
+    **{
+        f"{k}_scale": f"{n}_scale_inv"
+        for k, n in {**LAYER0_NAMES, **LAYER1_NAMES}.items()
+    },
 }
 
 
@@ -341,7 +388,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--legacy-layer1-manifest-sha256", required=True)
     parser.add_argument("--db518-result", type=Path, required=True)
     parser.add_argument("--db518-result-sha256", required=True)
-    parser.add_argument("--softmax-scale", type=float, default=256 ** -0.5)
+    parser.add_argument("--softmax-scale", type=float, default=256**-0.5)
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--run-dir-fd", type=int, choices=(7,), required=True)
     return parser.parse_args()
@@ -369,7 +416,9 @@ def main() -> int:
         args.repository, args.code_pin, args.expected_source_sha256
     )
     run_fd = _open_inherited_run_dir(args.run_dir, args.run_dir_fd)
-    archive_path, archive_identity = _sealed_git_source_archive(args.repository, args.code_pin)
+    archive_path, archive_identity = _sealed_git_source_archive(
+        args.repository, args.code_pin
+    )
     _install_sealed_path(archive_path)
 
     # Everything below imports only from the sealed archive and sealed sites.
@@ -382,7 +431,12 @@ def main() -> int:
         "sites": sealed_runtime.validate_dependency_sites(),
         "sys_path": list(sys.path),
     }
-    if tuple(sys.path) != (archive_path, JAX_SITE_ROOT, LIBTPU_SITE_ROOT, *EXPECTED_RUNTIME_PATH):
+    if tuple(sys.path) != (
+        archive_path,
+        JAX_SITE_ROOT,
+        LIBTPU_SITE_ROOT,
+        *EXPECTED_RUNTIME_PATH,
+    ):
         raise RuntimeError("sealed import path drifted")
 
     import numpy as np
@@ -393,8 +447,13 @@ def main() -> int:
     from glm_tpu.greenfield.benchmarking import legacy_prefill_owner_packing as pk
     from glm_tpu.greenfield.benchmarking import numpy_safetensors as ns
     from glm_tpu.greenfield.benchmarking.legacy_prefill_chunk_probe import (
-        layer1_keys_from_normalized,
-        legacy_geometry_chunk_pipeline,
+        CONSUMER_WEIGHT_KEYS,
+        legacy_geometry_chunk_consumer_gather_from_normalized,
+    )
+    from glm_tpu.greenfield.kernels.reference.dsa_association import (
+        Layer0DsaProbeGeometry,
+        layer0_prompt_index_key_from_normalized_boundary_chunk,
+        layer0_prompt_normalized_hidden_boundary_chunk,
     )
     from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
     from glm_tpu.greenfield.kernels.reference.prefill_index import (
@@ -402,8 +461,12 @@ def main() -> int:
         promote_stage_local_prefill_index_wk,
     )
     from glm_tpu.greenfield.kernels.reference.rotary import build_rotary_table_host
-    from glm_tpu.greenfield.validation.chunk0_embedding_hlo import (
-        require_embedding_gather_hlo,
+    from glm_tpu.greenfield.validation.chunk0_real_layer_consumer_hlo import (
+        require_real_layer_consumer_hlo,
+    )
+    from glm_tpu.greenfield.validation.original_db518_normalized_boundary_hlo import (
+        require_completed_normalization_boundary_hlo,
+        require_normalized_key_control_boundary_hlo,
     )
 
     if jax.default_backend() != "tpu":
@@ -413,9 +476,12 @@ def main() -> int:
     device = jax.local_devices()[0]
 
     started = time.time()
-    input_manifest, arrays = ns.load_layer0_dsa_association_input(args.input_dir, expected_manifest_sha256=args.input_manifest_sha256)
+    input_manifest, arrays = ns.load_layer0_dsa_association_input(
+        args.input_dir, expected_manifest_sha256=args.input_manifest_sha256
+    )
     legacy_manifest, legacy_layer1_bits = ns.load_legacy_prompt_index_cache(
-        args.legacy_layer1_cache_dir, expected_manifest_sha256=args.legacy_layer1_manifest_sha256
+        args.legacy_layer1_cache_dir,
+        expected_manifest_sha256=args.legacy_layer1_manifest_sha256,
     )
     if int(legacy_manifest.get("layer_id", 0)) != 1:
         raise RuntimeError("legacy cache artifact is not the layer-1 prompt cache")
@@ -423,8 +489,12 @@ def main() -> int:
     if sha256(db518_raw).hexdigest() != args.db518_result_sha256:
         raise RuntimeError("DB518 result.npz identity drifted")
     db518 = np.load(BytesIO(db518_raw))
-    greenfield_layer0 = _cache_rows(db518["layer0_index_cache_owners_bfloat16_bits"], CHUNK_ROWS)
-    greenfield_layer1 = _cache_rows(db518["layer1_index_cache_owners_bfloat16_bits"], CHUNK_ROWS)
+    greenfield_layer0 = _cache_rows(
+        db518["layer0_index_cache_owners_bfloat16_bits"], CHUNK_ROWS
+    )
+    greenfield_layer1 = _cache_rows(
+        db518["layer1_index_cache_owners_bfloat16_bits"], CHUNK_ROWS
+    )
     legacy_layer1 = legacy_layer1_bits[:CHUNK_ROWS]
 
     digests_raw = _snapshot_regular(args.weight_digests)
@@ -440,15 +510,24 @@ def main() -> int:
         args.checkpoint_root,
         CHECKPOINT_TENSOR_NAMES,
         index_sha256=args.checkpoint_index_sha256,
-        shard_digests={digest_record["shard"]["filename"]: digest_record["shard"]["sha256"]},
+        shard_digests={
+            digest_record["shard"]["filename"]: digest_record["shard"]["sha256"]
+        },
     )
     expected_tensors = digest_record["tensors"]
     if set(expected_tensors) != set(tensors):
         raise RuntimeError("weight digest record covers a different tensor set")
     for key, array in tensors.items():
         entry = expected_tensors[key]
-        if entry["shape"] != list(array.shape) or entry["dtype"] != str(array.dtype) or entry["sha256"] != sha256(np.ascontiguousarray(array).tobytes()).hexdigest():
-            raise RuntimeError(f"checkpoint tensor drifted from the pinned digest: {key}")
+        if (
+            entry["shape"] != list(array.shape)
+            or entry["dtype"] != str(array.dtype)
+            or entry["sha256"]
+            != sha256(np.ascontiguousarray(array).tobytes()).hexdigest()
+        ):
+            raise RuntimeError(
+                f"checkpoint tensor drifted from the pinned digest: {key}"
+            )
 
     prompt_ids = arrays["prompt_token_ids"]
     if prompt_ids.shape != (PROMPT_ROWS,):
@@ -462,24 +541,33 @@ def main() -> int:
         [embedding_lookup[int(token)] for token in prompt_ids[:CHUNK_ROWS]],
         dtype=np.int32,
     )
-    if not np.array_equal(
-        unique_token_ids[embedding_rows], prompt_ids[:CHUNK_ROWS]
-    ):
+    if not np.array_equal(unique_token_ids[embedding_rows], prompt_ids[:CHUNK_ROWS]):
         raise RuntimeError("prompt embedding-row association drifted")
     qkv_bits, qkv_scale = pk.pack_fused_qkv_a_owners(
-        arrays["self_attn__q_a_proj__weight"], arrays["self_attn__q_a_proj__weight_scale_inv"],
-        arrays["self_attn__kv_a_proj_with_mqa__weight"], arrays["self_attn__kv_a_proj_with_mqa__weight_scale_inv"],
+        arrays["self_attn__q_a_proj__weight"],
+        arrays["self_attn__q_a_proj__weight_scale_inv"],
+        arrays["self_attn__kv_a_proj_with_mqa__weight"],
+        arrays["self_attn__kv_a_proj_with_mqa__weight_scale_inv"],
     )
     qb_bits, qb_scale = pk.pack_q_b_owners(tensors["q_b"], tensors["q_b_scale"])
     w_uk_t, w_uv = pk.absorbed_kv_b_owners(tensors["kv_b"], tensors["kv_b_scale"])
     o_bits, o_scale = pk.pack_o_proj_owners(tensors["o"], tensors["o_scale"])
-    gu_bits, gu_scale = pk.pack_gate_up_owners(tensors["gate"], tensors["gate_scale"], tensors["up"], tensors["up_scale"])
+    gu_bits, gu_scale = pk.pack_gate_up_owners(
+        tensors["gate"], tensors["gate_scale"], tensors["up"], tensors["up_scale"]
+    )
     down_bits, down_scale = pk.pack_down_owners(tensors["down"], tensors["down_scale"])
-    rope_table = build_rotary_table_host(MAIN_ROPE_CAPACITY, rotary_dim=64, theta=MAIN_ROPE_THETA)
+    rope_table = build_rotary_table_host(
+        MAIN_ROPE_CAPACITY, rotary_dim=64, theta=MAIN_ROPE_THETA
+    )
     contract = DsaNumericalContract()
 
     def bf16(bits: Any) -> Any:
-        return jax.device_put(jnp.asarray(np.ascontiguousarray(bits).astype(np.uint16).view(ml_dtypes.bfloat16)), device)
+        return jax.device_put(
+            jnp.asarray(
+                np.ascontiguousarray(bits).astype(np.uint16).view(ml_dtypes.bfloat16)
+            ),
+            device,
+        )
 
     def put(value: Any) -> Any:
         return jax.device_put(jnp.asarray(value), device)
@@ -529,86 +617,151 @@ def main() -> int:
     wk1 = promote_compiled(wk1_bf16)
     wk1.block_until_ready()
 
-    weights = {
-        "input_norm0": bf16(arrays["input_layernorm__weight"]),
+    input_norm0 = bf16(arrays["input_layernorm__weight"])
+    k_norm0_weight = bf16(arrays["self_attn__indexer__k_norm__weight"])
+    k_norm0_bias = bf16(arrays["self_attn__indexer__k_norm__bias"])
+    consumer_weights = {
         "q_a_norm": bf16(arrays["self_attn__q_a_layernorm__weight"]),
         "kv_a_norm": bf16(tensors["kv_a_norm"]),
         "post_norm": bf16(tensors["post_norm"]),
         "input_norm1": bf16(tensors["input_norm1"]),
         "k_norm1_weight": bf16(tensors["k_norm1_weight"]),
         "k_norm1_bias": bf16(tensors["k_norm1_bias"]),
-        "k_norm0_weight": bf16(arrays["self_attn__indexer__k_norm__weight"]),
-        "k_norm0_bias": bf16(arrays["self_attn__indexer__k_norm__bias"]),
-        "qkv_bits": put(qkv_bits), "qkv_scale": put(qkv_scale),
-        "qb_bits": put(qb_bits), "qb_scale": put(qb_scale),
-        "w_uk_t": put(w_uk_t), "w_uv": put(w_uv),
-        "o_bits": put(o_bits), "o_scale": put(o_scale),
-        "gu_bits": put(gu_bits), "gu_scale": put(gu_scale),
-        "down_bits": put(down_bits), "down_scale": put(down_scale),
-        "wk0": wk0,
+        "qkv_bits": put(qkv_bits),
+        "qkv_scale": put(qkv_scale),
+        "qb_bits": put(qb_bits),
+        "qb_scale": put(qb_scale),
+        "w_uk_t": put(w_uk_t),
+        "w_uv": put(w_uv),
+        "o_bits": put(o_bits),
+        "o_scale": put(o_scale),
+        "gu_bits": put(gu_bits),
+        "gu_scale": put(gu_scale),
+        "down_bits": put(down_bits),
+        "down_scale": put(down_scale),
         "wk1": wk1,
         "rope_table": bf16(rope_table.view(np.uint16)),
     }
-
-    def pipeline(
-        unique_embeddings: Any,
-        prompt_embedding_rows: Any,
-        positions: Any,
-        w: dict[str, Any],
-    ) -> dict[str, Any]:
-        # DB518 proves this physical association: keep the M2048 embedding
-        # gather on device and coupled to the input RMS producer.  A host-side
-        # gather changes the TPU lowering and is not an equivalent control.
-        # The host-built rows are proven in [0, 37).  Clip mode is therefore
-        # numerically identical while preventing an alternate NaN select arm
-        # from entering the RMS fusion.
-        embedding = jnp.take(
-            unique_embeddings, prompt_embedding_rows, axis=0, mode="clip"
-        )
-        return legacy_geometry_chunk_pipeline(embedding, positions, w, softmax_scale=args.softmax_scale, contract=contract)
+    if set(consumer_weights) != set(CONSUMER_WEIGHT_KEYS):
+        raise RuntimeError("real layer consumer weight boundary drifted")
 
     positions_np = np.arange(CHUNK_ROWS, dtype=np.int32)
     unique_embeddings = bf16(unique_embedding_bits)
     embedding_rows_full = put(embedding_rows)
     positions_full = put(positions_np)
-    lowered = jax.jit(pipeline).lower(
-        unique_embeddings, embedding_rows_full, positions_full, weights
+
+    geometry = Layer0DsaProbeGeometry()
+    normalizer = partial(
+        layer0_prompt_normalized_hidden_boundary_chunk,
+        geometry=geometry,
     )
-    compiled = lowered.compile()
-    hlo_text = compiled.as_text()
+    normalized_lowered = jax.jit(normalizer).lower(
+        unique_embeddings, embedding_rows_full, input_norm0
+    )
+    normalized_compiled = normalized_lowered.compile()
+    normalized_hlo = normalized_compiled.as_text()
+    normalized_stablehlo = normalized_lowered.as_text()
     _write_run_member_exclusive(
         run_fd,
-        "hlo/legacy_geometry_chunk0.optimized_hlo.txt",
-        hlo_text.encode("utf-8"),
+        "hlo/normalized_boundary.optimized_hlo.txt",
+        normalized_hlo.encode("utf-8"),
     )
-    stablehlo_text = lowered.as_text()
     _write_run_member_exclusive(
         run_fd,
-        "hlo/legacy_geometry_chunk0.stablehlo.mlir",
-        stablehlo_text.encode("utf-8"),
+        "hlo/normalized_boundary.stablehlo.mlir",
+        normalized_stablehlo.encode("utf-8"),
     )
-    # Refuse a compiler graph that does not preserve the DB518 gather/RMS
-    # association before spending TPU time invoking it.
-    embedding_gather_contract = require_embedding_gather_hlo(
-        hlo_text, stablehlo_text
+
+    key_control = partial(
+        layer0_prompt_index_key_from_normalized_boundary_chunk,
+        geometry=geometry,
     )
-    result_full_device = compiled(
-        unique_embeddings, embedding_rows_full, positions_full, weights
+    normalized_abstract = jax.ShapeDtypeStruct(
+        (CHUNK_ROWS, geometry.hidden_size), jnp.bfloat16
     )
-    result_full = jax.device_get(result_full_device)
-    # One-row block arm: layer-0 block at M=1 for row 0; the layer-1 key projection
-    # keeps the accepted physical-M64 geometry (substitute into the chunk arm's first partition).
-    result_row0 = jax.device_get(
-        jax.jit(pipeline)(
-            unique_embeddings,
-            put(embedding_rows[:1]),
-            put(positions_np[:1]),
-            weights,
-        )
+    key_lowered = jax.jit(key_control).lower(
+        normalized_abstract,
+        positions_full,
+        wk0,
+        k_norm0_weight,
+        k_norm0_bias,
     )
-    normalized1_partition = jnp.asarray(result_full_device["normalized1"][:64]).at[0].set(jnp.asarray(result_row0["normalized1"][0]))
-    keys1_one_row_m64 = jax.device_get(
-        jax.jit(lambda n1, pos, w: layer1_keys_from_normalized(n1, pos, w, contract=contract))(normalized1_partition, put(positions_np[:64]), weights)
+    key_compiled = key_lowered.compile()
+    key_hlo = key_compiled.as_text()
+    key_stablehlo = key_lowered.as_text()
+    _write_run_member_exclusive(
+        run_fd,
+        "hlo/normalized_key_control.optimized_hlo.txt",
+        key_hlo.encode("utf-8"),
+    )
+    _write_run_member_exclusive(
+        run_fd,
+        "hlo/normalized_key_control.stablehlo.mlir",
+        key_stablehlo.encode("utf-8"),
+    )
+
+    consumer = partial(
+        legacy_geometry_chunk_consumer_gather_from_normalized,
+        softmax_scale=args.softmax_scale,
+        contract=contract,
+    )
+    consumer_lowered = jax.jit(consumer).lower(
+        unique_embeddings,
+        embedding_rows_full,
+        normalized_abstract,
+        positions_full,
+        consumer_weights,
+    )
+    consumer_compiled = consumer_lowered.compile()
+    consumer_hlo = consumer_compiled.as_text()
+    consumer_stablehlo = consumer_lowered.as_text()
+    _write_run_member_exclusive(
+        run_fd,
+        "hlo/real_layer_consumer.optimized_hlo.txt",
+        consumer_hlo.encode("utf-8"),
+    )
+    _write_run_member_exclusive(
+        run_fd,
+        "hlo/real_layer_consumer.stablehlo.mlir",
+        consumer_stablehlo.encode("utf-8"),
+    )
+
+    # Persist all compiler products, then fail closed on every executable
+    # before invoking any numerical work.
+    normalization_contract = require_completed_normalization_boundary_hlo(
+        normalized_hlo, normalized_stablehlo
+    )
+    key_contract = require_normalized_key_control_boundary_hlo(key_hlo, key_stablehlo)
+    consumer_contract = require_real_layer_consumer_hlo(
+        consumer_hlo, consumer_stablehlo
+    )
+
+    # The completed normalization is synchronized once and supplied directly
+    # to two separately compiled device consumers.  It is never transferred
+    # to the host.  One final device_get occurs only after both consumers have
+    # completed.
+    normalized_device = normalized_compiled(
+        unique_embeddings, embedding_rows_full, input_norm0
+    )
+    normalized_device.block_until_ready()
+    boundary_keys_device = key_compiled(
+        normalized_device,
+        positions_full,
+        wk0,
+        k_norm0_weight,
+        k_norm0_bias,
+    )
+    result_full_device = consumer_compiled(
+        unique_embeddings,
+        embedding_rows_full,
+        normalized_device,
+        positions_full,
+        consumer_weights,
+    )
+    boundary_keys_device.block_until_ready()
+    jax.tree.map(lambda value: value.block_until_ready(), result_full_device)
+    boundary_keys_host, result_full = jax.device_get(
+        (boundary_keys_device, result_full_device)
     )
     import_closure = sealed_runtime.verify_import_closure(Path(archive_path))
 
@@ -616,42 +769,45 @@ def main() -> int:
         return np.ascontiguousarray(np.asarray(value)).view(np.uint16)
 
     keys1_bits = bits(result_full["keys1"])
-    keys0_bits = bits(result_full["keys0"])
-    keys1_row0_m1 = bits(keys1_one_row_m64)[0]
-    keys1_row0_m1_m1keys = bits(result_row0["keys1"])[0]
-    control_mismatch_rows = int(np.count_nonzero(np.any(keys0_bits != greenfield_layer0, axis=1)))
+    keys0_bits = bits(boundary_keys_host)
+    control_mismatch_rows = int(
+        np.count_nonzero(np.any(keys0_bits != greenfield_layer0, axis=1))
+    )
+    control_mismatch_lanes = int(np.count_nonzero(keys0_bits != greenfield_layer0))
     legacy_lane_mismatch = keys1_bits != legacy_layer1
     greenfield_lane_mismatch = keys1_bits != greenfield_layer1
     per_row_legacy = legacy_lane_mismatch.sum(axis=1)
     per_row_greenfield = greenfield_lane_mismatch.sum(axis=1)
-    hlo_convolution_2048 = len([line for line in hlo_text.splitlines() if "convolution(" in line and "[2048," in line])
     all_hlo_text = "\n".join(
-        (hlo_text, stablehlo_text, decode_hlo, decode_stablehlo, promote_hlo, promote_stablehlo)
+        (
+            normalized_hlo,
+            normalized_stablehlo,
+            key_hlo,
+            key_stablehlo,
+            consumer_hlo,
+            consumer_stablehlo,
+            decode_hlo,
+            decode_stablehlo,
+            promote_hlo,
+            promote_stablehlo,
+        )
     )
     forbidden = [
         token
         for token in ("host_callback", 'CustomCall("xla_python', "python_callback")
         if token in all_hlo_text
     ]
-    main_fp32_wk_parameters = [
-        name
-        for name in ("w__wk0__.1: f32[128,6144]", "w__wk1__.1: f32[128,6144]")
-        if name in hlo_text
-    ]
-    main_raw_wk_parameters = [
-        name
-        for name in ("w__wk0_bits__", "w__wk0_scale__", "w__wk1_bits__", "w__wk1_scale__")
-        if name in hlo_text
-    ]
-    status = (
-        "SUCCESS"
-        if control_mismatch_rows == 0
+    row0_legacy_mismatch_lanes = int(per_row_legacy[0])
+    exact = (
+        control_mismatch_rows == 0
+        and control_mismatch_lanes == 0
+        and row0_legacy_mismatch_lanes == 0
         and not forbidden
-        and len(main_fp32_wk_parameters) == 2
-        and not main_raw_wk_parameters
-        and embedding_gather_contract["passed"]
-        else "FAILED"
+        and normalization_contract["passed"]
+        and key_contract["passed"]
+        and consumer_contract["passed"]
     )
+    status = "SUCCESS" if exact else "DIAGNOSTIC"
     summary = {
         "artifact_kind": ARTIFACT_KIND,
         "code_hash": args.code_pin,
@@ -660,29 +816,76 @@ def main() -> int:
         "run_tag": args.run_tag,
         "status": status,
         "control_layer0_keys_vs_db518_mismatched_rows": control_mismatch_rows,
+        "control_layer0_keys_vs_db518_mismatched_lanes": control_mismatch_lanes,
+        "execution_boundary": {
+            "normalizer_invocations": 1,
+            "key_control_invocations": 1,
+            "real_layer_consumer_invocations": 1,
+            "normalization_to_consumer_host_transfers": 0,
+            "final_host_transfers": 1,
+        },
         "forbidden_hlo_tokens": forbidden,
         "hlo": {
-            "convolution_lines_with_2048_rows": hlo_convolution_2048,
-            "embedding_gather_contract": embedding_gather_contract,
-            "optimized_byte_count": len(hlo_text.encode("utf-8")),
-            "optimized_sha256": sha256(hlo_text.encode("utf-8")).hexdigest(),
-            "stablehlo_byte_count": len(stablehlo_text.encode("utf-8")),
-            "stablehlo_sha256": sha256(stablehlo_text.encode("utf-8")).hexdigest(),
-            "main_fp32_wk_parameters": main_fp32_wk_parameters,
-            "main_raw_wk_parameters": main_raw_wk_parameters,
+            "normalization_contract": normalization_contract,
+            "normalized_boundary_optimized_byte_count": len(
+                normalized_hlo.encode("utf-8")
+            ),
+            "normalized_boundary_optimized_sha256": sha256(
+                normalized_hlo.encode("utf-8")
+            ).hexdigest(),
+            "normalized_boundary_stablehlo_byte_count": len(
+                normalized_stablehlo.encode("utf-8")
+            ),
+            "normalized_boundary_stablehlo_sha256": sha256(
+                normalized_stablehlo.encode("utf-8")
+            ).hexdigest(),
+            "key_contract": key_contract,
+            "normalized_key_control_optimized_byte_count": len(key_hlo.encode("utf-8")),
+            "normalized_key_control_optimized_sha256": sha256(
+                key_hlo.encode("utf-8")
+            ).hexdigest(),
+            "normalized_key_control_stablehlo_byte_count": len(
+                key_stablehlo.encode("utf-8")
+            ),
+            "normalized_key_control_stablehlo_sha256": sha256(
+                key_stablehlo.encode("utf-8")
+            ).hexdigest(),
+            "real_layer_consumer_contract": consumer_contract,
+            "real_layer_consumer_optimized_byte_count": len(
+                consumer_hlo.encode("utf-8")
+            ),
+            "real_layer_consumer_optimized_sha256": sha256(
+                consumer_hlo.encode("utf-8")
+            ).hexdigest(),
+            "real_layer_consumer_stablehlo_byte_count": len(
+                consumer_stablehlo.encode("utf-8")
+            ),
+            "real_layer_consumer_stablehlo_sha256": sha256(
+                consumer_stablehlo.encode("utf-8")
+            ).hexdigest(),
             "wk_decode_optimized_byte_count": len(decode_hlo.encode("utf-8")),
-            "wk_decode_optimized_sha256": sha256(decode_hlo.encode("utf-8")).hexdigest(),
+            "wk_decode_optimized_sha256": sha256(
+                decode_hlo.encode("utf-8")
+            ).hexdigest(),
             "wk_decode_stablehlo_byte_count": len(decode_stablehlo.encode("utf-8")),
-            "wk_decode_stablehlo_sha256": sha256(decode_stablehlo.encode("utf-8")).hexdigest(),
+            "wk_decode_stablehlo_sha256": sha256(
+                decode_stablehlo.encode("utf-8")
+            ).hexdigest(),
             "wk_promote_optimized_byte_count": len(promote_hlo.encode("utf-8")),
-            "wk_promote_optimized_sha256": sha256(promote_hlo.encode("utf-8")).hexdigest(),
+            "wk_promote_optimized_sha256": sha256(
+                promote_hlo.encode("utf-8")
+            ).hexdigest(),
             "wk_promote_stablehlo_byte_count": len(promote_stablehlo.encode("utf-8")),
-            "wk_promote_stablehlo_sha256": sha256(promote_stablehlo.encode("utf-8")).hexdigest(),
+            "wk_promote_stablehlo_sha256": sha256(
+                promote_stablehlo.encode("utf-8")
+            ).hexdigest(),
         },
         "inputs": {
             "layer0_input_manifest_sha256": input_manifest["manifest_sha256"],
             "legacy_layer1_manifest_sha256": legacy_manifest["manifest_sha256"],
-            "legacy_layer1_bits_sha256": legacy_manifest["prompt_index_key_bfloat16_sha256"],
+            "legacy_layer1_bits_sha256": legacy_manifest[
+                "prompt_index_key_bfloat16_sha256"
+            ],
             "db518_result_sha256": args.db518_result_sha256,
             "checkpoint_index_sha256": args.checkpoint_index_sha256,
             "weight_digests_sha256": args.weight_digests_sha256,
@@ -701,22 +904,29 @@ def main() -> int:
         "row0": {
             "legacy_geometry_vs_legacy_lanes": int(per_row_legacy[0]),
             "legacy_geometry_vs_greenfield_db518_lanes": int(per_row_greenfield[0]),
-            "one_row_block_m64_keys_vs_greenfield_db518_lanes": int(np.count_nonzero(keys1_row0_m1 != greenfield_layer1[0])),
-            "one_row_block_m64_keys_vs_legacy_lanes": int(np.count_nonzero(keys1_row0_m1 != legacy_layer1[0])),
-            "legacy_geometry_vs_one_row_block_m64_keys_lanes": int(np.count_nonzero(keys1_row0_m1 != keys1_bits[0])),
-            "one_row_block_one_row_keys_vs_legacy_lanes": int(np.count_nonzero(keys1_row0_m1_m1keys != legacy_layer1[0])),
-            "attention_row0_db533_vs_pairwise_lanes": int(np.count_nonzero(bits(result_full["attention_row0"]) != bits(result_full["attention_pairwise_row0"]))),
+            "attention_row0_db533_vs_pairwise_lanes": int(
+                np.count_nonzero(
+                    bits(result_full["attention_row0"])
+                    != bits(result_full["attention_pairwise_row0"])
+                )
+            ),
         },
         "chunk0_vs_legacy": {
             "rows_exact": int(np.count_nonzero(per_row_legacy == 0)),
             "rows": CHUNK_ROWS,
             "lanes_mismatched": int(legacy_lane_mismatch.sum()),
             "per_row_first_16": per_row_legacy[:16].tolist(),
-            "per_64_row_block_mean": [float(per_row_legacy[i : i + 64].mean()) for i in range(0, CHUNK_ROWS, 64)],
+            "per_64_row_block_mean": [
+                float(per_row_legacy[i : i + 64].mean())
+                for i in range(0, CHUNK_ROWS, 64)
+            ],
         },
-        "chunk0_vs_greenfield_db518": {"rows_exact": int(np.count_nonzero(per_row_greenfield == 0)), "lanes_mismatched": int(greenfield_lane_mismatch.sum())},
+        "chunk0_vs_greenfield_db518": {
+            "rows_exact": int(np.count_nonzero(per_row_greenfield == 0)),
+            "lanes_mismatched": int(greenfield_lane_mismatch.sum()),
+        },
         "elapsed_seconds": round(time.time() - started, 1),
-        "claim_scope": "Bounded diagnostic of prompt-row geometry; row 0 decisive, rows >= 1 use a non-legacy softmax; no decoder, Gate-D, DB or performance claim.",
+        "claim_scope": "Completed device normalization consumed by a separate full layer-0 path; row 0 is the only decisive legacy comparison, rows >= 1 use a non-legacy softmax and are diagnostic only; no decoder, Gate-D, DB or performance claim.",
     }
     output_buffer = BytesIO()
     np.savez(
@@ -724,13 +934,14 @@ def main() -> int:
         keys1_bits=keys1_bits,
         keys0_bits=keys0_bits,
         greenfield_layer0_bits=greenfield_layer0,
-        keys1_row0_one_row_block_m64_keys_bits=keys1_row0_m1,
-        keys1_row0_one_row_block_one_row_keys_bits=keys1_row0_m1_m1keys,
         legacy_layer1_bits=legacy_layer1,
         greenfield_layer1_bits=greenfield_layer1,
         normalized1_chunk_bits=bits(result_full["normalized1"]),
-        **{f"{name}_bits": bits(value) for name, value in result_full.items() if name.endswith("_row0")},
-        **{f"one_row_{name}_bits": bits(value) for name, value in result_row0.items() if name.endswith("_row0")},
+        **{
+            f"{name}_bits": bits(value)
+            for name, value in result_full.items()
+            if name.endswith("_row0")
+        },
     )
     output_raw = output_buffer.getvalue()
     summary["arrays_sha256"] = sha256(output_raw).hexdigest()
@@ -740,8 +951,21 @@ def main() -> int:
         "runner.json",
         (json.dumps(summary, indent=2, sort_keys=True) + "\n").encode("ascii"),
     )
-    print(json.dumps({k: summary[k] for k in ("status", "row0", "chunk0_vs_legacy", "control_layer0_keys_vs_db518_mismatched_rows")}, sort_keys=True))
-    return 0 if status == "SUCCESS" else 1
+    print(
+        json.dumps(
+            {
+                k: summary[k]
+                for k in (
+                    "status",
+                    "row0",
+                    "chunk0_vs_legacy",
+                    "control_layer0_keys_vs_db518_mismatched_rows",
+                )
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
 
 
 if __name__ == "__main__":

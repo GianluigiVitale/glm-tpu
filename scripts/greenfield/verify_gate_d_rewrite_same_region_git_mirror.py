@@ -16,7 +16,7 @@ BRANCH = "rewrite/topology-first-decode"
 ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v6/"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v7/"
     "verify_gate_d_rewrite_same_region_git_mirror.py"
 )
 BASE_PATH = "scripts/greenfield/verify_gate_d_same_region_git_mirror.py"
@@ -30,6 +30,10 @@ BOUND_PATHS = (
     "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v5-source.json",
     "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v6-source.json",
     "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v7-source.json",
+    "docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v8-source.json",
+    "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py",
+    "glm_tpu/greenfield/validation/chunk0_real_layer_consumer_hlo.py",
+    "glm_tpu/greenfield/validation/original_db518_normalized_boundary_hlo.py",
     "scripts/greenfield/install_gate_d_layer1_prompt_chunk0_geometry_runtime.py",
     "scripts/greenfield/launch_gate_d_layer1_prompt_chunk0_geometry.py",
     "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py",
@@ -88,8 +92,20 @@ def _snapshot(path: Path, *, root_owned: bool) -> bytes:
         named = os.stat(path, follow_symlinks=False)
         if (
             len(raw) != before.st_size
-            or (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
-            != (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+            or (
+                before.st_dev,
+                before.st_ino,
+                before.st_size,
+                before.st_mtime_ns,
+                before.st_ctime_ns,
+            )
+            != (
+                after.st_dev,
+                after.st_ino,
+                after.st_size,
+                after.st_mtime_ns,
+                after.st_ctime_ns,
+            )
             or (named.st_dev, named.st_ino) != (before.st_dev, before.st_ino)
         ):
             raise RuntimeError(f"rewrite mirror verifier source changed: {path}")
@@ -123,7 +139,9 @@ def _verify_running_source(code_pin: str, expected_sha256: str) -> bytes:
         or raw != _git_bytes("show", f"{code_pin}:{SOURCE_PATH}")
         or sha256(raw).hexdigest() != expected_sha256
     ):
-        raise RuntimeError("rewrite mirror verifier is not the committed immutable blob")
+        raise RuntimeError(
+            "rewrite mirror verifier is not the committed immutable blob"
+        )
     return raw
 
 
@@ -150,7 +168,11 @@ def _load_base(code_pin: str) -> types.ModuleType:
 
 def main() -> int:
     arguments = sys.argv[1:]
-    if len(arguments) != 4 or arguments[0] != "--expected-code-hash" or arguments[2] != "--expected-source-sha256":
+    if (
+        len(arguments) != 4
+        or arguments[0] != "--expected-code-hash"
+        or arguments[2] != "--expected-source-sha256"
+    ):
         raise RuntimeError("rewrite mirror verifier invocation drifted")
     code_pin = arguments[1]
     _verify_running_source(code_pin, arguments[3])

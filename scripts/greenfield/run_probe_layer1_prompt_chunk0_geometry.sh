@@ -11,7 +11,7 @@ import stat
 from pathlib import Path
 
 root = Path("/opt/glm-tpu/locks")
-launcher = Path("/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v7.py")
+launcher = Path("/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v8.py")
 parent_fd = os.open(root, os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW)
 parent = os.fstat(parent_fd)
 if not stat.S_ISDIR(parent.st_mode) or parent.st_uid != 0 or parent.st_gid != 0 or stat.S_IMODE(parent.st_mode) & 0o022:
@@ -142,13 +142,13 @@ readonly LEGACY_LAYER1_MANIFEST_SHA=d9058cc6584aca784212706789e72b4981754cb9880e
 readonly LEGACY_LAYER1_MANIFEST_FILE_SHA=c11b238edfb7efb4f807e397cbf70ea72a7569574029e68afb46a370d4b30193
 readonly DB518_RESULT=/home/gianl/glm-run/greenfield_pp16_feature2_layer0_db518_numerical_20260829T115022665987633Z/result.npz
 readonly DB518_RESULT_SHA=534bacc54d74992f5a8ab4d422f9fa0947523d59325b4bfa272d4fbeb56262f0
-readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v6
+readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v7
 readonly PROBE=$CAPSULE/probe_layer1_prompt_chunk0_geometry.py
-readonly PROBE_SHA=073c6b2a865d1f1936c27ba4dabbb54c9dfc1987e22fcdaa14657c612f5832bc
+readonly PROBE_SHA=4eb5ee0c11530f3e2ed7be4f25de92f729d39694ae50d531fd57968e948e691c
 readonly PUBLISHER=$CAPSULE/publish_gate_d_layer1_prompt_chunk0_geometry.py
-readonly PUBLISHER_SHA=8b1e05534419661c9e69207c1cfab2794beaec03007f0fcb15a184977a33f15d
+readonly PUBLISHER_SHA=09808a13a2c5d19538abf6da59d4225cde149637f5a404a5c00052ef4d2f84e8
 readonly MIRROR_VERIFIER=$CAPSULE/verify_gate_d_rewrite_same_region_git_mirror.py
-readonly MIRROR_VERIFIER_SHA=dfeaecede526676a08b3deacf3f2e58b8d040f4d7b8542f14eb8db18aef9bcea
+readonly MIRROR_VERIFIER_SHA=0f61a5a6108b1d931cc19ce247e1d88b7db76ed32029260bd6273cb4d4ca8d4e
 readonly SEALED_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12
 readonly SEALED_PYTHON_SHA=021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7
 readonly VACANCY_EXPECTED='ERROR: (gcloud.storage.ls) One or more URLs matched no objects.'
@@ -355,7 +355,7 @@ post_census_done=1
 say "publishing generation-bound archive after a fresh three-surface history check"
 result_authority=$(publisher success --run-dir "$RUN_DIR" \
   --remote-prefix "$REMOTE_PREFIX" --elapsed "$elapsed")
-if [[ $result_authority =~ ^PROBE_RESULT\ status=(ROW0_LEGACY_GEOMETRY_EXACT|ROW0_LEGACY_GEOMETRY_NONEXACT)\ marker_sha256=([0-9a-f]{64})\ terminal_generation=([0-9]+)\ terminal_sha256=([0-9a-f]{64})$ ]]; then
+if [[ $result_authority =~ ^PROBE_RESULT\ status=(REAL_LAYER_CONSUMER_ROW0_EXACT|REAL_LAYER_CONSUMER_ROW0_NONEXACT)\ marker_sha256=([0-9a-f]{64})\ terminal_generation=([0-9]+)\ terminal_sha256=([0-9a-f]{64})$ ]]; then
   readonly result_status=${BASH_REMATCH[1]}
 else
   echo "Gate-D chunk-0 publisher authority drifted" >&2; exit 2
@@ -363,10 +363,10 @@ fi
 terminal_written=1
 trap - EXIT
 case "$result_status" in
-  ROW0_LEGACY_GEOMETRY_EXACT)
-    /usr/bin/printf '%s\n' "$result_authority" "ROW0_EXACT gate_d_open=true"
+  REAL_LAYER_CONSUMER_ROW0_EXACT)
+    /usr/bin/printf '%s\n' "$result_authority" "REAL_LAYER_CONSUMER_ROW0_EXACT gate_d_open=true"
     exit 0 ;;
-  ROW0_LEGACY_GEOMETRY_NONEXACT)
-    /usr/bin/printf '%s\n' "$result_authority" "ROW0_NONEXACT gate_d_open=true"
+  REAL_LAYER_CONSUMER_ROW0_NONEXACT)
+    /usr/bin/printf '%s\n' "$result_authority" "REAL_LAYER_CONSUMER_ROW0_NONEXACT gate_d_open=true"
     exit 3 ;;
 esac
