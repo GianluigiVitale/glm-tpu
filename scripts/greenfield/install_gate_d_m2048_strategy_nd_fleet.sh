@@ -26,13 +26,15 @@ readonly BRANCH=rewrite/topology-first-decode
 readonly ORIGIN=git@github.com:GianluigiVitale/glm-tpu.git
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly EXPECTED_PIN=${GLM_GATE_D_M2048_INSTALL_PIN:-}
-readonly PROVISIONER_TARGET=/opt/glm-tpu/bin/provision_gate_d_python_runtime.py
-readonly PROVISIONER_SHA=2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594
+readonly PROVISIONER_TARGET=/opt/glm-tpu/bin/provision_gate_d_runtime_archive.py
+readonly PROVISIONER_SHA=2582e9b6c91fe11a8489a2359f830ab786b5856463ea896172da1f7ab79b4319
+readonly GENERIC_PROVISIONER_TARGET=/opt/glm-tpu/bin/provision_gate_d_python_runtime.py
+readonly GENERIC_PROVISIONER_SHA=2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594
 readonly BOOTSTRAP=bootstrap_gate_d_provisioner.py
-readonly BOOTSTRAP_SHA=8ca7e0c1ca878e249fc9ecc3b4c2227696ae53232af4bd2a46eb6c07a44aba1f
+readonly BOOTSTRAP_SHA=d70e550adce72a7699142763099292cd60f09416b7f467e8a11f4c86ebd1b137
 readonly REPO_REFRESHER=refresh_gate_d_m2048_worker_repository.py
 readonly REPO_REFRESHER_SHA=f248ff6717113c2376e19e4495fd2b33314280b181b97c783996ec510b7f5b0e
-readonly WORKER_REPO_PRESTATE_PIN=80bcd0edab9f4a1d7b0085af89dc4159cbf2254c
+readonly WORKER_REPO_PRESTATE_PIN=71b14bc52ba9faea10035771afdafa61bf807209
 readonly PYTHON_NAME=gate-d-python-3.12.13-021044895e95
 readonly PYTHON_TREE=308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616
 readonly JAX_NAME=gate-d-jax-site-55233c63939e
@@ -40,17 +42,17 @@ readonly JAX_TREE=55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0
 readonly LIBTPU_NAME=gate-d-libtpu-site-db7598c867f3
 readonly LIBTPU_TREE=db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca
 readonly INSTALL_SOURCE_NAME=gate-d-m2048-install-v1
-readonly INSTALL_SOURCE_TREE=5ef7c0eec7ef58e86454166647511b0d836adfc5446409274a212fd9d6bff15a
+readonly INSTALL_SOURCE_TREE=fbb9b383cce70c8852fb4d6dc700857b93837133a73b997f3dca72e3d05c76f6
 readonly INSTALLER=install_gate_d_m2048_strategy_nd_runtime.py
 readonly LAUNCHER=launch_gate_d_m2048_strategy_nd_association.py
 readonly PROBE=probe_m2048_strategy_nd_association.py
 readonly PUBLISHER=publish_gate_d_m2048_strategy_nd_association.py
 readonly MIRROR=verify_gate_d_rewrite_same_region_git_mirror.py
-readonly INSTALLER_SHA=4f87e989d6a2aef4a93609498c6929ade58adffc39cbf3592feb4a5168136221
-readonly LAUNCHER_SHA=31af1b772f45a33195fa6d87a8a10cbab5187a4a226b04139cf515e0e881c0eb
+readonly INSTALLER_SHA=edeca463646a41ce5068f24b3843722d6302a8fd880449999abef16e9ddb6442
+readonly LAUNCHER_SHA=3826bdb697c882de85c45515b37e1024e617156a18320336c5593b23eab9851a
 readonly PROBE_SHA=1debe946e35311014e667fed863871eed4bf3afeaa9aeb27445f50b2ea233774
 readonly PUBLISHER_SHA=83602a623fd6392515c63a1017c89f7ed7c06f5d0a7e1ae4e6aca519f99db9be
-readonly MIRROR_SHA=764013fbb101ec79f9822da10f057e33e58cccc0d3eeafa194d5b3bca2aed8c4
+readonly MIRROR_SHA=ea7b9814af970a60d21047eb2698dc6bd420051a9e9982daeccdc372b3efa750
 
 git_local() {
   /usr/bin/env -i GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
@@ -93,6 +95,8 @@ has_eight_unique_markers() {
 
 readonly REPORT=/home/gianl/gate-d-runs/m2048-install-$PIN.log
 [[ ! -e $REPORT ]]
+readonly PYTHON_ARCHIVE_NAME=$PYTHON_NAME-$PIN.tar
+readonly PYTHON_ARCHIVE=/opt/glm-tpu/$PYTHON_ARCHIVE_NAME
 
 # Workers 1..7 are clean, full, detached repositories at the observed sealed
 # prestate. Refresh them serially to avoid the previously observed corruption
@@ -118,6 +122,33 @@ sync_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; [[ $idx =~ ^[0-7]$ ]]; p
   --command="$sync_command" >>"$REPORT" 2>&1
 has_eight_unique_markers "$REPORT" REPO_OK
 
+# Publish the versioned archive provisioner from the exact future-commit blob
+# before any archive exists. The prior generic provisioner remains immutable
+# and is independently checked where it handles the symlink-free trees.
+# shellcheck disable=SC2016
+bootstrap_command='set -euo pipefail; wt='"$WORKTREE"'; pin='"$PIN"'; bootstrap='"$BOOTSTRAP"'; helper_sha='"$BOOTSTRAP_SHA"'; provisioner='"$PROVISIONER_TARGET"'; expected='"$PROVISIONER_SHA"'; generic='"$GENERIC_PROVISIONER_TARGET"'; generic_expected='"$GENERIC_PROVISIONER_SHA"'; git_local() { /usr/bin/env -i GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_NO_LAZY_FETCH=1 GIT_NO_REPLACE_OBJECTS=1 GIT_OPTIONAL_LOCKS=0 GIT_PROTOCOL_FROM_USER=0 GIT_SSH_COMMAND=/bin/false GIT_TERMINAL_PROMPT=0 HOME=/nonexistent LANG=C LC_ALL=C PATH=/usr/bin:/bin /usr/bin/git -c core.fsmonitor=false -c core.untrackedCache=false -c core.hooksPath=/dev/null -c core.attributesFile=/dev/null -C "$wt" "$@"; }; loader="import fcntl,hashlib,os,sys; raw=sys.stdin.buffer.read(); expected=sys.argv[1]; pin=sys.argv[2]; assert hashlib.sha256(raw).hexdigest()==expected; fd=os.memfd_create(\"gate-d-provisioner-bootstrap\",os.MFD_CLOEXEC|getattr(os,\"MFD_ALLOW_SEALING\",2)); stream=os.fdopen(os.dup(fd),\"wb\",closefd=True); written=stream.write(raw); stream.flush(); stream.close(); assert written==len(raw); os.fchmod(fd,0o400); seals=getattr(fcntl,\"F_SEAL_SEAL\",1)|getattr(fcntl,\"F_SEAL_SHRINK\",2)|getattr(fcntl,\"F_SEAL_GROW\",4)|getattr(fcntl,\"F_SEAL_WRITE\",8); fcntl.fcntl(fd,getattr(fcntl,\"F_ADD_SEALS\",1033),seals); assert fcntl.fcntl(fd,getattr(fcntl,\"F_GET_SEALS\",1034))==seals; os.set_inheritable(fd,True); path=f\"/proc/self/fd/{fd}\"; os.execve(\"/usr/bin/python3\",[\"/usr/bin/python3\",\"-I\",\"-S\",\"-B\",path,\"--bootstrap\",expected,pin],{\"HOME\":\"/home/gianl\",\"LANG\":\"C\",\"LC_ALL\":\"C\",\"PATH\":\"/usr/bin:/bin\",\"PYTHONDONTWRITEBYTECODE\":\"1\"})"; git_local show "$pin:scripts/greenfield/$bootstrap" | /usr/bin/env -i HOME=/home/gianl LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B -c "$loader" "$helper_sha" "$pin"; for binding in "$provisioner:$expected" "$generic:$generic_expected"; do path=${binding%%:*}; digest=${binding##*:}; [[ -f $path && ! -L $path && $(/usr/bin/readlink -f -- "$path") == "$path" ]]; [[ $(/usr/bin/stat -c "%F:%h:%U:%G:%a" -- "$path") == "regular file:1:root:root:555" ]]; [[ $(/usr/bin/sha256sum "$path" | /usr/bin/awk "{print \$1}") == "$digest" ]]; /usr/bin/python3 -I -S -B -c "import os,sys; assert not os.listxattr(sys.argv[1],follow_symlinks=False)" "$path"; done; echo "BOOTSTRAP_OK $(hostname)"'
+/snap/bin/gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+  --command="$bootstrap_command" >>"$REPORT" 2>&1
+has_eight_unique_markers "$REPORT" BOOTSTRAP_OK
+
+# The archive lives in the root-owned runtime directory. Its creator opens the
+# output with O_EXCL|O_NOFOLLOW, writes through the retained descriptor, checks
+# the source tree before and after, and returns the exact cleanup identity.
+archive_record=$(/usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C \
+  PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B \
+  "$PROVISIONER_TARGET" create --source "/opt/glm-tpu/$PYTHON_NAME" \
+  --archive-name "$PYTHON_ARCHIVE_NAME" --expected-tree-sha256 "$PYTHON_TREE")
+read -r archive_marker python_archive_sha python_archive_device \
+  python_archive_inode python_archive_size archive_extra <<<"$archive_record"
+[[ $archive_marker == ARCHIVE_READY && -z ${archive_extra:-} ]]
+[[ $python_archive_sha =~ ^[0-9a-f]{64}$ ]]
+[[ $python_archive_device =~ ^[0-9]+$ && $python_archive_inode =~ ^[0-9]+$ ]]
+[[ $python_archive_size =~ ^[1-9][0-9]*$ ]]
+readonly PYTHON_ARCHIVE_SHA=$python_archive_sha
+readonly PYTHON_ARCHIVE_DEVICE=$python_archive_device
+readonly PYTHON_ARCHIVE_INODE=$python_archive_inode
+readonly PYTHON_ARCHIVE_SIZE=$python_archive_size
+
 readonly TRANSFER_NAME=gate-d-m2048-runtime-source-$PIN
 prepare_transfer='set -euo pipefail; path=/home/gianl/'"$TRANSFER_NAME"'; [[ ! -e $path ]]; /usr/bin/mkdir -m 0700 "$path"; echo "TRANSFER_READY $(hostname)"'
 /snap/bin/gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=1-7 \
@@ -126,14 +157,14 @@ prepare_transfer='set -euo pipefail; path=/home/gianl/'"$TRANSFER_NAME"'; [[ ! -
 # All traffic remains inside the TPU pod's us-central2-b placement.
 /snap/bin/gcloud compute tpus tpu-vm scp --zone "$ZONE" --worker=1-7 \
   --recurse --compress \
-  "/opt/glm-tpu/$PYTHON_NAME" "/opt/glm-tpu/$JAX_NAME" "/opt/glm-tpu/$LIBTPU_NAME" \
+  "$PYTHON_ARCHIVE" "/opt/glm-tpu/$JAX_NAME" "/opt/glm-tpu/$LIBTPU_NAME" \
   "$POD:/home/gianl/$TRANSFER_NAME/" >>"$REPORT" 2>&1
 
-# Execute the bootstrap helper itself from an exact sealed Git blob. It passes
-# the provisioner to root through a second sealed memfd and publishes with
-# RENAME_NOREPLACE; no privileged process reads a mutable worktree pathname.
+# The archive helper reads the transferred tar through one retained no-follow
+# descriptor and publishes only an authenticated root-owned tree. No tar
+# extraction or Python-runtime materialization occurs in the user-writable root.
 # shellcheck disable=SC2016
-runtime_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; wt='"$WORKTREE"'; pin='"$PIN"'; bootstrap='"$BOOTSTRAP"'; helper_sha='"$BOOTSTRAP_SHA"'; provisioner='"$PROVISIONER_TARGET"'; expected='"$PROVISIONER_SHA"'; git_local() { /usr/bin/env -i GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_NO_LAZY_FETCH=1 GIT_NO_REPLACE_OBJECTS=1 GIT_OPTIONAL_LOCKS=0 GIT_PROTOCOL_FROM_USER=0 GIT_SSH_COMMAND=/bin/false GIT_TERMINAL_PROMPT=0 HOME=/nonexistent LANG=C LC_ALL=C PATH=/usr/bin:/bin /usr/bin/git -c core.fsmonitor=false -c core.untrackedCache=false -c core.hooksPath=/dev/null -c core.attributesFile=/dev/null -C "$wt" "$@"; }; loader="import fcntl,hashlib,os,sys; raw=sys.stdin.buffer.read(); expected=sys.argv[1]; pin=sys.argv[2]; assert hashlib.sha256(raw).hexdigest()==expected; fd=os.memfd_create(\"gate-d-provisioner-bootstrap\",os.MFD_CLOEXEC|getattr(os,\"MFD_ALLOW_SEALING\",2)); stream=os.fdopen(os.dup(fd),\"wb\",closefd=True); written=stream.write(raw); stream.flush(); stream.close(); assert written==len(raw); os.fchmod(fd,0o400); seals=getattr(fcntl,\"F_SEAL_SEAL\",1)|getattr(fcntl,\"F_SEAL_SHRINK\",2)|getattr(fcntl,\"F_SEAL_GROW\",4)|getattr(fcntl,\"F_SEAL_WRITE\",8); fcntl.fcntl(fd,getattr(fcntl,\"F_ADD_SEALS\",1033),seals); assert fcntl.fcntl(fd,getattr(fcntl,\"F_GET_SEALS\",1034))==seals; os.set_inheritable(fd,True); path=f\"/proc/self/fd/{fd}\"; os.execve(\"/usr/bin/python3\",[\"/usr/bin/python3\",\"-I\",\"-S\",\"-B\",path,\"--bootstrap\",expected,pin],{\"HOME\":\"/home/gianl\",\"LANG\":\"C\",\"LC_ALL\":\"C\",\"PATH\":\"/usr/bin:/bin\",\"PYTHONDONTWRITEBYTECODE\":\"1\"})"; git_local show "$pin:scripts/greenfield/$bootstrap" | /usr/bin/env -i HOME=/home/gianl LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B -c "$loader" "$helper_sha" "$pin"; [[ "$provisioner" == /opt/glm-tpu/bin/provision_gate_d_python_runtime.py ]]; [[ -f $provisioner && ! -L $provisioner ]]; [[ $(/usr/bin/readlink -f -- "$provisioner") == "$provisioner" ]]; [[ $(/usr/bin/stat -c "%F:%h:%U:%G:%a" -- "$provisioner") == "regular file:1:root:root:555" ]]; [[ $(/usr/bin/sha256sum "$provisioner" | /usr/bin/awk "{print \$1}") == "$expected" ]]; /usr/bin/python3 -I -S -B -c "import os,sys; assert not os.listxattr(sys.argv[1],follow_symlinks=False)" "$provisioner"; if [[ $idx == 0 ]]; then source_root=/opt/glm-tpu; else source_root=/home/gianl/'"$TRANSFER_NAME"'; fi; for binding in '"$PYTHON_NAME:$PYTHON_TREE"' '"$JAX_NAME:$JAX_TREE"' '"$LIBTPU_NAME:$LIBTPU_TREE"'; do name=${binding%%:*}; tree=${binding##*:}; /usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S "$provisioner" --source "$source_root/$name" --target "/opt/glm-tpu/$name" --expected-tree-sha256 "$tree"; done; echo "RUNTIME_OK $(hostname)"'
+runtime_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; [[ $idx =~ ^[0-7]$ ]]; archive_provisioner='"$PROVISIONER_TARGET"'; archive_expected='"$PROVISIONER_SHA"'; generic_provisioner='"$GENERIC_PROVISIONER_TARGET"'; generic_expected='"$GENERIC_PROVISIONER_SHA"'; source_root=/home/gianl/'"$TRANSFER_NAME"'; archive_name='"$PYTHON_ARCHIVE_NAME"'; archive_sha='"$PYTHON_ARCHIVE_SHA"'; archive_size='"$PYTHON_ARCHIVE_SIZE"'; python_name='"$PYTHON_NAME"'; python_tree='"$PYTHON_TREE"'; jax_name='"$JAX_NAME"'; jax_tree='"$JAX_TREE"'; libtpu_name='"$LIBTPU_NAME"'; libtpu_tree='"$LIBTPU_TREE"'; for binding in "$archive_provisioner:$archive_expected" "$generic_provisioner:$generic_expected"; do path=${binding%%:*}; digest=${binding##*:}; [[ -f $path && ! -L $path && $(/usr/bin/readlink -f -- "$path") == "$path" ]]; [[ $(/usr/bin/stat -c "%F:%h:%U:%G:%a" -- "$path") == "regular file:1:root:root:555" ]]; [[ $(/usr/bin/sha256sum "$path" | /usr/bin/awk "{print \$1}") == "$digest" ]]; /usr/bin/python3 -I -S -B -c "import os,sys; assert not os.listxattr(sys.argv[1],follow_symlinks=False)" "$path"; done; if [[ $idx == 0 ]]; then for binding in "$python_name:$python_tree" "$jax_name:$jax_tree" "$libtpu_name:$libtpu_tree"; do name=${binding%%:*}; tree=${binding##*:}; /usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S "$generic_provisioner" --source "/opt/glm-tpu/$name" --target "/opt/glm-tpu/$name" --expected-tree-sha256 "$tree"; done; else /usr/bin/python3 -I -S -B -c "import os,sys; assert set(os.listdir(sys.argv[1]))==set(sys.argv[2:])" "$source_root" "$archive_name" "$jax_name" "$libtpu_name"; /usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B "$archive_provisioner" install --archive "$source_root/$archive_name" --archive-sha256 "$archive_sha" --archive-size "$archive_size" --source-name "$python_name" --target-name "$python_name" --expected-tree-sha256 "$python_tree"; for binding in "$jax_name:$jax_tree" "$libtpu_name:$libtpu_tree"; do name=${binding%%:*}; tree=${binding##*:}; /usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S "$generic_provisioner" --source "$source_root/$name" --target "/opt/glm-tpu/$name" --expected-tree-sha256 "$tree"; done; fi; echo "RUNTIME_OK $(hostname)"'
 /snap/bin/gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$runtime_command" >>"$REPORT" 2>&1
 has_eight_unique_markers "$REPORT" RUNTIME_OK
@@ -151,6 +182,15 @@ has_eight_unique_markers "$REPORT" M2048_INSTALL_OK
 cleanup_command='set -euo pipefail; path=/home/gianl/'"$TRANSFER_NAME"'; [[ -d $path && $path == /home/gianl/gate-d-m2048-runtime-source-'"$PIN"' ]]; /usr/bin/rm -rf -- "$path"; [[ ! -e $path ]]; echo "TRANSFER_CLEAN $(hostname)"'
 /snap/bin/gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=1-7 \
   --command="$cleanup_command" >>"$REPORT" 2>&1
+
+/usr/bin/sudo -n /usr/bin/env -i HOME=/root LANG=C LC_ALL=C PATH=/usr/bin:/bin \
+  PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B "$PROVISIONER_TARGET" \
+  remove --archive-name "$PYTHON_ARCHIVE_NAME" \
+  --expected-sha256 "$PYTHON_ARCHIVE_SHA" \
+  --expected-device "$PYTHON_ARCHIVE_DEVICE" \
+  --expected-inode "$PYTHON_ARCHIVE_INODE" \
+  --expected-size "$PYTHON_ARCHIVE_SIZE"
+[[ ! -e $PYTHON_ARCHIVE ]]
 
 /usr/bin/printf 'M2048_FLEET_INSTALL_COMPLETE pin=%s report=%s launcher_invoked=false\n' \
   "$PIN" "$REPORT"

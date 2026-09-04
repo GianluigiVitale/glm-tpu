@@ -12048,3 +12048,63 @@ repinned. Focused suite passes 34/34 in 6.77 s. Certificate
 `greenfield_m2048_strategy_nd_20260904T081918746174545Z`. Exact next: complete syntax/JSON/source-
 chain/history validation, then one Sol batch; resolve all P0--P2 before persistence, install or
 execution. Gate D remains open; no 8K.
+
+## 2026-09-04 08:44--09:22Z — V6 proves bootstrap, exposes scp symlink drift; V7 CPU-green
+
+The independent Sol reviewer approved V6 with no P0--P2. It was committed and pushed as
+`71b14bc52ba9faea10035771afdafa61bf807209`; origin, cron and the full US-CENTRAL2 mirror replay
+were exact. Install-only completed seven serialized repository refreshes, 8/8 `REPO_OK`, seven
+same-zone transfers and 8/8 corrected root bootstraps. Worker 0 verified all three sealed runtimes.
+Workers 1--7 stopped before capsule/JAX/TPU because the exact provisioner rejected their Python
+source-tree digests. Controller report SHA is `4c69d707…4fec4`; exact transfers were removed 7/7
+(`17eb2990…b533`), and a fresh dependency-free census is 8/8 clean (`42d6f2f5…7580`).
+
+The corrected read-only tree survey localized the drift completely. Worker 0's exact Python tree
+has 1,048 symlinks, 4,031 regular files and 246 directories; every copied worker tree has zero
+symlinks, 5,079 regular files and 246 directories. All seven share drifted digest `b45b1941…d334`.
+Thus `gcloud tpu-vm scp --recurse` dereferenced exactly the 1,048 links. JAX and libtpu have no
+symlinks and remained exact on all hosts. Preserve
+`docs/artifacts/gate-d-m2048-v6-install-scp-symlink-dereference-failure.json` (`da3ffc41…6f0d`)
+and retire the unused V6 tag.
+
+Initial Sol review found a P1 in predictable user-writable archive and extraction pathnames. The
+corrected V7 publishes a separately versioned root-owned helper from a sealed future-commit blob.
+It creates the archive with O_EXCL|O_NOFOLLOW through a retained descriptor, rechecks the exact
+source tree, extracts a fully validated member grammar files-before-symlinks into root-owned staging,
+authenticates the full tree, publishes with RENAME_NOREPLACE, and cleans only the recorded inode.
+Tests cover internal symlink preservation, path traversal, dangling output links and synchronized
+cleanup replacement. The full chain is repinned; focused tests pass 37/37 in 6.89 s. Certificate
+`gate-d-m2048-strategy-nd-v7-source.json` SHA `260fba4d…d5856d`; fresh unstarted tag
+`greenfield_m2048_strategy_nd_20260904T091522542609599Z`. Nothing V7 is reviewed, committed,
+installed or executed. Exact next: one full Sol batch; resolve all P0--P2 before persistence,
+install-only, or execution. Do not run 8K.
+
+## 2026-09-04 10:26Z — Sol blocks direct user-owned archive parsing; sealed-snapshot V7 CPU-green
+
+The independent Sol V7 batch found one P1 and denied persistence, installation and execution. The
+root helper retained and authenticated the transferred archive descriptor, but then parsed that
+same user-owned inode. Its owner could mutate and restore bytes during extraction; the final tree
+digest prevented false publication, but root could still process transient unauthenticated bytes.
+
+The local V7 correction copies the retained source descriptor into a fresh memfd, proves the
+source's full identity stable across the copy, authenticates the snapshot digest/size/ownership,
+applies exact `SEAL_SEAL|SHRINK|GROW|WRITE`, verifies the seal set and parses only that immutable
+snapshot. One deterministic regression mutates and restores the source during the copy and requires
+refusal; another mutates and restores it during snapshot extraction and proves the exact tree is
+unaffected and the snapshot is unwritable. A final hardening pass rejects wrong-size or FIFO input
+before copying. Sol then found the EOF-driven copy could grow without bound; the correction copies
+and hashes exactly the authenticated size, rejects early EOF or one extra byte, and its synchronized
+growth regression proves the memfd never exceeds that size. The focused suite passes 41/41 in
+6.94 s. Helper SHA is `2582e9b6…9b4319`, bootstrap `d70e550a…d1b137`, fleet installer
+`15452d6e…9782ec`, and certificate `gate-d-m2048-strategy-nd-v7-source.json` SHA
+`55594da1…943a9c6`. The corrected helper
+also round-tripped the actual 117,227,520-byte Python archive to exact tree `308748a9…70d616`
+(1,048 symlinks, 4,031 files, 246 descendant directories), then automatically removed the temp.
+The tag `greenfield_m2048_strategy_nd_20260904T091522542609599Z` remains unstarted. Nothing is committed,
+installed or executed. Exact next: one final Sol delta review; all P0--P2 must clear before persistence.
+
+The final independent Sol delta returned exactly `P0: NONE`, `P1: NONE`, `P2: NONE`,
+`SAFE_TO_PERSIST: YES`, `SAFE_TO_INSTALL_AFTER_FUTURE_PIN_PUSH_MIRROR: YES`, and
+`SAFE_TO_EXECUTE_ONCE_FRESH_TAG: YES`. Install and execution remain conditional on the future merged
+pin, origin/US-CENTRAL2 replay and existing live-state preflights. No persistence or mutation had
+occurred at this verdict.

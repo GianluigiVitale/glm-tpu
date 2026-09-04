@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 from copy import deepcopy
+import fcntl
 from hashlib import sha256
 import importlib.util
 import json
@@ -35,11 +36,14 @@ FLEET_INSTALLER = ROOT / (
     "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh"
 )
 BOOTSTRAP = ROOT / "scripts/greenfield/bootstrap_gate_d_provisioner.py"
+ARCHIVE_PROVISIONER = ROOT / (
+    "scripts/greenfield/provision_gate_d_runtime_archive.py"
+)
 REPO_REFRESHER = ROOT / (
     "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py"
 )
 MIRROR = ROOT / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
-CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v6-source.json"
+CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v7-source.json"
 
 
 def _load_publisher():
@@ -79,6 +83,19 @@ def _load_repo_refresher():
 
 
 REPO_REFRESHER_MODULE = _load_repo_refresher()
+
+
+def _load_archive_provisioner():
+    specification = importlib.util.spec_from_file_location(
+        "gate_d_archive_provisioner_for_test", ARCHIVE_PROVISIONER
+    )
+    assert specification is not None and specification.loader is not None
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+ARCHIVE_PROVISIONER_MODULE = _load_archive_provisioner()
 
 
 def _encoded(value: object) -> str:
@@ -356,15 +373,18 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
         "docs/artifacts/gate-d-m2048-strategy-nd-v4-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v5-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v6-source.json",
+        "docs/artifacts/gate-d-m2048-strategy-nd-v7-source.json",
         "docs/artifacts/gate-d-m2048-v2-install-repository-prestate-failure.json",
         "docs/artifacts/gate-d-m2048-v3-install-loader-quoting-failure.json",
         "docs/artifacts/gate-d-m2048-v4-install-runtime-loader-quoting-failure.json",
         "docs/artifacts/gate-d-m2048-v5-install-missing-libexec-parent-failure.json",
+        "docs/artifacts/gate-d-m2048-v6-install-scp-symlink-dereference-failure.json",
         "scripts/greenfield/bootstrap_gate_d_provisioner.py",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py",
         "scripts/greenfield/launch_gate_d_m2048_strategy_nd_association.py",
         "scripts/greenfield/probe_m2048_strategy_nd_association.py",
+        "scripts/greenfield/provision_gate_d_runtime_archive.py",
         "scripts/greenfield/publish_gate_d_m2048_strategy_nd_association.py",
         "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py",
         "scripts/greenfield/run_gate_d_m2048_strategy_nd_association.sh",
@@ -385,7 +405,6 @@ def test_fleet_installer_is_install_only_and_restores_exact_runtime_trees() -> N
         "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616",
         "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df",
         "db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca",
-        "5ef7c0eec7ef58e86454166647511b0d836adfc5446409274a212fd9d6bff15a",
     ):
         assert value in source
     assert '[[ -d $path && $path == /home/gianl/gate-d-m2048-runtime-source-' in source
@@ -403,9 +422,351 @@ def test_fleet_installer_is_install_only_and_restores_exact_runtime_trees() -> N
     assert '"directory:gianl:gianl:700"' in source
 
 
+def test_fleet_python_runtime_uses_only_the_root_owned_archive_boundary() -> None:
+    source = FLEET_INSTALLER.read_text(encoding="ascii")
+    provisioner = ARCHIVE_PROVISIONER.read_text(encoding="ascii")
+    scp = source[source.index("/snap/bin/gcloud compute tpus tpu-vm scp") :]
+    scp = scp[: scp.index(">>\"$REPORT\" 2>&1")]
+    assert '"$PYTHON_ARCHIVE"' in scp
+    assert '"/opt/glm-tpu/$PYTHON_NAME"' not in scp
+    assert "/usr/bin/tar --extract" not in source
+    assert '"$PROVISIONER_TARGET" create' in source
+    assert '"$archive_provisioner" install' in source
+    assert 'remove --archive-name "$PYTHON_ARCHIVE_NAME"' in source
+    assert source.index("has_eight_unique_markers \"$REPORT\" M2048_INSTALL_OK") < source.index(
+        'remove --archive-name "$PYTHON_ARCHIVE_NAME"'
+    )
+    for token in (
+        "os.O_EXCL | os.O_NOFOLLOW",
+        "stdout=descriptor",
+        "_open_exact_archive",
+        "_copy_descriptor",
+        "os.memfd_create",
+        "_REQUIRED_SEALS",
+        "_validate_symlink_target",
+        "_rename_noreplace",
+        "_cleanup_named_inode",
+    ):
+        assert token in provisioner
+
+
+def test_archive_provisioner_round_trip_and_refuses_escaping_members(
+    tmp_path: Path,
+) -> None:
+    import io
+    import tarfile
+
+    runtime_root = tmp_path / "runtime-root"
+    runtime_root.mkdir(mode=0o755)
+    source = runtime_root / "python-runtime"
+    (source / "bin").mkdir(parents=True)
+    executable = source / "bin" / "python3.12"
+    executable.write_bytes(b"sealed runtime executable\n")
+    executable.chmod(0o555)
+    (source / "bin" / "python3").symlink_to("python3.12")
+    source.chmod(0o755)
+    (source / "bin").chmod(0o755)
+    tree = ARCHIVE_PROVISIONER_MODULE._tree_sha256(source)
+
+    digest, metadata = ARCHIVE_PROVISIONER_MODULE._create_archive(
+        source,
+        "runtime.tar",
+        tree,
+        runtime_root=runtime_root,
+    )
+    archive = runtime_root / "runtime.tar"
+    assert sha256(archive.read_bytes()).hexdigest() == digest
+    assert metadata.st_ino == archive.stat().st_ino
+    assert stat.S_IMODE(archive.stat().st_mode) == 0o444
+    descriptor = os.open(archive, os.O_RDONLY | os.O_NOFOLLOW)
+    extracted = tmp_path / "extracted"
+    extracted.mkdir(mode=0o700)
+    try:
+        ARCHIVE_PROVISIONER_MODULE._extract_archive(
+            descriptor, extracted, source.name
+        )
+    finally:
+        os.close(descriptor)
+    restored_link = extracted / "bin" / "python3"
+    assert restored_link.is_symlink()
+    assert os.readlink(restored_link) == "python3.12"
+    assert ARCHIVE_PROVISIONER_MODULE._tree_sha256(extracted) == tree
+
+    hostile = tmp_path / "hostile.tar"
+    with tarfile.open(hostile, "w") as output:
+        root = tarfile.TarInfo("python-runtime")
+        root.type = tarfile.DIRTYPE
+        root.mode = 0o755
+        output.addfile(root)
+        payload = b"escape\n"
+        member = tarfile.TarInfo("python-runtime/../../escape")
+        member.size = len(payload)
+        member.mode = 0o444
+        output.addfile(member, io.BytesIO(payload))
+    descriptor = os.open(hostile, os.O_RDONLY | os.O_NOFOLLOW)
+    hostile_target = tmp_path / "hostile-target"
+    hostile_target.mkdir(mode=0o700)
+    try:
+        with pytest.raises(RuntimeError, match="unsafe archive member path"):
+            ARCHIVE_PROVISIONER_MODULE._extract_archive(
+                descriptor, hostile_target, source.name
+            )
+    finally:
+        os.close(descriptor)
+    assert not (tmp_path / "escape").exists()
+
+
+def test_archive_snapshot_refuses_mutate_restore_during_source_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime_root = tmp_path / "runtime-root"
+    runtime_root.mkdir(mode=0o755)
+    source = runtime_root / "python-runtime"
+    source.mkdir(mode=0o755)
+    payload = source / "payload"
+    payload.write_bytes(b"exact runtime payload\n")
+    payload.chmod(0o444)
+    tree = ARCHIVE_PROVISIONER_MODULE._tree_sha256(source)
+    digest, _ = ARCHIVE_PROVISIONER_MODULE._create_archive(
+        source,
+        "runtime.tar",
+        tree,
+        runtime_root=runtime_root,
+    )
+    archive = runtime_root / "runtime.tar"
+    original = archive.read_bytes()
+    original_copy = ARCHIVE_PROVISIONER_MODULE._copy_descriptor
+
+    def mutate_copy_then_restore(
+        source_fd: int, snapshot_fd: int, expected_size: int
+    ) -> None:
+        archive.chmod(0o644)
+        with archive.open("r+b", buffering=0) as stream:
+            stream.write(b"X" * len(original))
+            stream.flush()
+            os.fsync(stream.fileno())
+        original_copy(source_fd, snapshot_fd, expected_size)
+        with archive.open("r+b", buffering=0) as stream:
+            stream.seek(0)
+            stream.write(original)
+            stream.flush()
+            os.fsync(stream.fileno())
+        archive.chmod(0o444)
+        assert archive.read_bytes() == original
+
+    monkeypatch.setattr(
+        ARCHIVE_PROVISIONER_MODULE,
+        "_copy_descriptor",
+        mutate_copy_then_restore,
+    )
+    with pytest.raises(
+        RuntimeError,
+        match="changed while snapshotting|snapshot identity or digest drifted",
+    ):
+        ARCHIVE_PROVISIONER_MODULE._open_exact_archive(
+            archive, digest, len(original)
+        )
+
+
+def test_archive_extraction_uses_sealed_snapshot_during_source_mutate_restore(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime_root = tmp_path / "runtime-root"
+    runtime_root.mkdir(mode=0o755)
+    source = runtime_root / "python-runtime"
+    source.mkdir(mode=0o755)
+    payload = source / "payload"
+    payload.write_bytes(b"exact runtime payload\n")
+    payload.chmod(0o444)
+    tree = ARCHIVE_PROVISIONER_MODULE._tree_sha256(source)
+    digest, _ = ARCHIVE_PROVISIONER_MODULE._create_archive(
+        source,
+        "runtime.tar",
+        tree,
+        runtime_root=runtime_root,
+    )
+    archive = runtime_root / "runtime.tar"
+    original = archive.read_bytes()
+    original_metadata = archive.stat()
+    snapshot = ARCHIVE_PROVISIONER_MODULE._open_exact_archive(
+        archive, digest, len(original)
+    )
+    extracted = tmp_path / "extracted"
+    extracted.mkdir(mode=0o700)
+    copied = False
+    original_copyfileobj = ARCHIVE_PROVISIONER_MODULE.shutil.copyfileobj
+
+    def mutate_restore_while_extracting(source_stream, target_stream, length=0):
+        nonlocal copied
+        if not copied:
+            copied = True
+            archive.chmod(0o644)
+            with archive.open("r+b", buffering=0) as stream:
+                stream.write(b"Y" * len(original))
+                stream.flush()
+                os.fsync(stream.fileno())
+                stream.seek(0)
+                stream.write(original)
+                stream.flush()
+                os.fsync(stream.fileno())
+            archive.chmod(0o444)
+            os.utime(
+                archive,
+                ns=(original_metadata.st_atime_ns, original_metadata.st_mtime_ns),
+            )
+        return original_copyfileobj(source_stream, target_stream, length)
+
+    monkeypatch.setattr(
+        ARCHIVE_PROVISIONER_MODULE.shutil,
+        "copyfileobj",
+        mutate_restore_while_extracting,
+    )
+    try:
+        assert (
+            fcntl.fcntl(snapshot, ARCHIVE_PROVISIONER_MODULE._F_GET_SEALS)
+            == ARCHIVE_PROVISIONER_MODULE._REQUIRED_SEALS
+        )
+        ARCHIVE_PROVISIONER_MODULE._extract_archive(
+            snapshot, extracted, source.name
+        )
+        assert copied
+        assert archive.read_bytes() == original
+        assert ARCHIVE_PROVISIONER_MODULE._tree_sha256(extracted) == tree
+        os.lseek(snapshot, 0, os.SEEK_SET)
+        with pytest.raises(OSError):
+            os.write(snapshot, b"mutate")
+    finally:
+        os.close(snapshot)
+
+
+def test_archive_snapshot_refuses_wrong_size_or_fifo_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    archive = tmp_path / "runtime.tar"
+    archive.write_bytes(b"exact archive bytes\n")
+    archive.chmod(0o444)
+    digest = sha256(archive.read_bytes()).hexdigest()
+
+    def forbidden_copy(_source: int, _target: int, _expected_size: int) -> None:
+        raise AssertionError("size mismatch reached archive copy")
+
+    monkeypatch.setattr(
+        ARCHIVE_PROVISIONER_MODULE, "_copy_descriptor", forbidden_copy
+    )
+    with pytest.raises(RuntimeError, match="identity or digest drifted"):
+        ARCHIVE_PROVISIONER_MODULE._open_exact_archive(
+            archive, digest, archive.stat().st_size + 1
+        )
+
+    fifo = tmp_path / "runtime.fifo"
+    os.mkfifo(fifo, mode=0o444)
+    with pytest.raises(RuntimeError, match="identity or digest drifted"):
+        ARCHIVE_PROVISIONER_MODULE._open_exact_archive(fifo, digest, 1)
+
+
+def test_archive_copy_is_bounded_under_synchronized_growth(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    archive = tmp_path / "runtime.tar"
+    original = b"A" * 4096
+    archive.write_bytes(original)
+    source_fd = os.open(archive, os.O_RDONLY | os.O_NONBLOCK)
+    snapshot_fd = os.memfd_create(
+        "bounded-archive-copy", os.MFD_CLOEXEC | os.MFD_ALLOW_SEALING
+    )
+    original_read = ARCHIVE_PROVISIONER_MODULE.os.read
+    growth_written = False
+
+    def read_then_grow(descriptor: int, size: int) -> bytes:
+        nonlocal growth_written
+        block = original_read(descriptor, size)
+        if descriptor == source_fd and not growth_written:
+            growth_written = True
+            with archive.open("ab", buffering=0) as stream:
+                stream.write(b"unbounded-growth")
+                os.fsync(stream.fileno())
+        return block
+
+    monkeypatch.setattr(ARCHIVE_PROVISIONER_MODULE.os, "read", read_then_grow)
+    try:
+        with pytest.raises(RuntimeError, match="exceeds expected size"):
+            ARCHIVE_PROVISIONER_MODULE._copy_descriptor(
+                source_fd, snapshot_fd, len(original)
+            )
+        assert growth_written
+        assert os.fstat(snapshot_fd).st_size == len(original)
+        with archive.open("wb", buffering=0) as stream:
+            stream.write(original)
+            os.fsync(stream.fileno())
+        growth_written = False
+        with pytest.raises(RuntimeError, match="exceeds expected size"):
+            ARCHIVE_PROVISIONER_MODULE._fd_sha256_exact(
+                source_fd, len(original)
+            )
+        assert growth_written
+    finally:
+        os.close(snapshot_fd)
+        os.close(source_fd)
+
+
+def test_archive_provisioner_refuses_dangling_output_and_replaced_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime_root = tmp_path / "runtime-root"
+    runtime_root.mkdir(mode=0o755)
+    source = runtime_root / "python-runtime"
+    source.mkdir(mode=0o755)
+    payload = source / "payload"
+    payload.write_bytes(b"exact\n")
+    payload.chmod(0o444)
+    tree = ARCHIVE_PROVISIONER_MODULE._tree_sha256(source)
+    victim = tmp_path / "victim"
+    victim.write_bytes(b"preserve\n")
+    (runtime_root / "runtime.tar").symlink_to(victim)
+    with pytest.raises(FileExistsError):
+        ARCHIVE_PROVISIONER_MODULE._create_archive(
+            source,
+            "runtime.tar",
+            tree,
+            runtime_root=runtime_root,
+        )
+    assert victim.read_bytes() == b"preserve\n"
+    (runtime_root / "runtime.tar").unlink()
+
+    digest, metadata = ARCHIVE_PROVISIONER_MODULE._create_archive(
+        source,
+        "runtime.tar",
+        tree,
+        runtime_root=runtime_root,
+    )
+    archive = runtime_root / "runtime.tar"
+    original_hash = ARCHIVE_PROVISIONER_MODULE._fd_sha256
+
+    def replace_after_hash(descriptor: int) -> str:
+        observed = original_hash(descriptor)
+        archive.unlink()
+        archive.write_bytes(b"replacement\n")
+        archive.chmod(0o444)
+        return observed
+
+    monkeypatch.setattr(
+        ARCHIVE_PROVISIONER_MODULE, "_fd_sha256", replace_after_hash
+    )
+    with pytest.raises(RuntimeError, match="archive changed|replaced archive inode"):
+        ARCHIVE_PROVISIONER_MODULE._remove_archive(
+            archive.name,
+            digest,
+            metadata.st_dev,
+            metadata.st_ino,
+            metadata.st_size,
+            runtime_root=runtime_root,
+        )
+    assert archive.read_bytes() == b"replacement\n"
+
+
 def test_fleet_serializes_exact_worker_repository_refresh() -> None:
     source = FLEET_INSTALLER.read_text(encoding="ascii")
-    assert "WORKER_REPO_PRESTATE_PIN=80bcd0edab9f4a1d7b0085af89dc4159cbf2254c" in source
+    assert "WORKER_REPO_PRESTATE_PIN=71b14bc52ba9faea10035771afdafa61bf807209" in source
     assert "REPO_REFRESHER_B64=$(git_local show" in source
     assert 'os.memfd_create(\\"gate-d-m2048-repo-refresher\\"' in source
     assert "for worker in 1 2 3 4 5 6 7; do" in source
@@ -471,7 +832,11 @@ def test_fleet_serializes_exact_worker_repository_refresh() -> None:
             "BOOTSTRAP=bootstrap.py; BOOTSTRAP_SHA=" + "e" * 64 + "; "
             "PROVISIONER_TARGET=/opt/glm-tpu/bin/provision.py; "
             "PROVISIONER_SHA=" + "f" * 64 + "; "
+            "GENERIC_PROVISIONER_TARGET=/opt/glm-tpu/bin/generic.py; "
+            "GENERIC_PROVISIONER_SHA=" + "0" * 64 + "; "
             "TRANSFER_NAME=transfer; PYTHON_NAME=python; PYTHON_TREE=" + "1" * 64 + "; "
+            "PYTHON_ARCHIVE_NAME=python.tar; PYTHON_ARCHIVE_SHA=" + "4" * 64 + "; "
+            "PYTHON_ARCHIVE_SIZE=117227520; "
             "JAX_NAME=jax; JAX_TREE=" + "2" * 64 + "; "
             "LIBTPU_NAME=libtpu; LIBTPU_TREE=" + "3" * 64 + "; "
             f"{runtime_assignment}; printf \"%s\" \"$runtime_command\"",
@@ -480,31 +845,54 @@ def test_fleet_serializes_exact_worker_repository_refresh() -> None:
         capture_output=True,
         env={"HOME": "/nonexistent", "LANG": "C", "LC_ALL": "C", "PATH": "/usr/bin:/bin"},
     ).stdout.decode("ascii")
-    runtime_prefix, runtime_separator, _runtime_suffix = runtime_rendered.partition(
-        '; git_local show "$pin:scripts/greenfield/$bootstrap"'
+    assert '"$archive_provisioner" install' in runtime_rendered
+    assert '--archive-size "$archive_size"' in runtime_rendered
+    assert "/usr/bin/tar --extract" not in runtime_rendered
+    assert (
+        'assert set(os.listdir(sys.argv[1]))==set(sys.argv[2:])'
+        in runtime_rendered
     )
-    assert runtime_separator
-    runtime_loader = subprocess.run(
+
+    bootstrap_assignment = next(
+        line for line in source.splitlines() if line.startswith("bootstrap_command=")
+    )
+    bootstrap_rendered = subprocess.run(
         [
             "/usr/bin/bash",
             "--noprofile",
             "--norc",
             "-c",
-            f'{runtime_prefix}; printf "%s" "$loader"',
+            "WORKTREE=/worktree; PIN=" + "d" * 40 + "; "
+            "BOOTSTRAP=bootstrap.py; BOOTSTRAP_SHA=" + "e" * 64 + "; "
+            "PROVISIONER_TARGET=/opt/glm-tpu/bin/provision.py; "
+            "PROVISIONER_SHA=" + "f" * 64 + "; "
+            "GENERIC_PROVISIONER_TARGET=/opt/glm-tpu/bin/generic.py; "
+            "GENERIC_PROVISIONER_SHA=" + "0" * 64 + "; "
+            f'{bootstrap_assignment}; printf "%s" "$bootstrap_command"',
         ],
         check=True,
         capture_output=True,
-        env={
-            "HOME": "/nonexistent",
-            "HOSTNAME": "test-w-0",
-            "LANG": "C",
-            "LC_ALL": "C",
-            "PATH": "/usr/bin:/bin",
-        },
+        env={"HOME": "/nonexistent", "LANG": "C", "LC_ALL": "C", "PATH": "/usr/bin:/bin"},
     ).stdout.decode("ascii")
-    compile(runtime_loader, "gate-d-m2048-runtime-loader", "exec")
-    assert 'os.memfd_create("gate-d-provisioner-bootstrap"' in runtime_loader
-    assert 'path=f"/proc/self/fd/{fd}"' in runtime_loader
+    bootstrap_prefix, separator, _suffix = bootstrap_rendered.partition(
+        '; git_local show "$pin:scripts/greenfield/$bootstrap"'
+    )
+    assert separator
+    bootstrap_loader = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            f'{bootstrap_prefix}; printf "%s" "$loader"',
+        ],
+        check=True,
+        capture_output=True,
+        env={"HOME": "/nonexistent", "LANG": "C", "LC_ALL": "C", "PATH": "/usr/bin:/bin"},
+    ).stdout.decode("ascii")
+    compile(bootstrap_loader, "gate-d-m2048-bootstrap-loader", "exec")
+    assert 'os.memfd_create("gate-d-provisioner-bootstrap"' in bootstrap_loader
+    assert 'path=f"/proc/self/fd/{fd}"' in bootstrap_loader
 
 
 def test_repository_refresher_moves_only_exact_clean_detached_prestate(
@@ -796,7 +1184,7 @@ def test_bootstrap_source_and_fleet_hash_are_exact() -> None:
     assert expected is not None
     assert sha256(BOOTSTRAP.read_bytes()).hexdigest() == expected.group(1)
     helper = BOOTSTRAP.read_text(encoding="ascii")
-    assert 'PROVISIONER_REPO_PATH = "scripts/greenfield/provision_gate_d_python_runtime.py"' in helper
+    assert 'PROVISIONER_REPO_PATH = "scripts/greenfield/provision_gate_d_runtime_archive.py"' in helper
     assert "_read_sealed_path(payload_path, PROVISIONER_SHA256)" in helper
     assert "_publish_provisioner(payload, PROVISIONER_SHA256)" in helper
 
@@ -1281,7 +1669,7 @@ def test_source_certificate_binds_every_listed_file_and_grants_no_authority() ->
     assert record["runtime_recovery"]["missing_workers_observed_read_only"] == list(
         range(1, 8)
     )
-    assert record["test_evidence"]["passed"] == 34
+    assert record["test_evidence"]["passed"] == 41
     assert record["proposed_fresh_tag"] in record[
         "protected_run_command_after_approved_install"
     ]
@@ -1312,14 +1700,15 @@ def test_remote_privilege_boundary_ignores_hostile_path_and_checks_full_identity
     fake_sudo.chmod(0o755)
     assert (hostile / "sudo").exists()
     assert re.search(r"(?<![/A-Za-z0-9_])sudo(?:\s|$)", remote) is None
-    assert remote.count("/usr/bin/sudo") == 3
+    assert remote.count("/usr/bin/sudo") == 5
     assert not marker.exists()
     for identity_check in (
-        '[[ -f $provisioner && ! -L $provisioner ]]',
-        '/usr/bin/readlink -f -- "$provisioner"',
-        '/usr/bin/stat -c "%F:%h:%U:%G:%a" -- "$provisioner"',
+        '[[ -f $path && ! -L $path',
+        '/usr/bin/readlink -f -- "$path"',
+        '/usr/bin/stat -c "%F:%h:%U:%G:%a" -- "$path"',
         '"regular file:1:root:root:555"',
         "os.listxattr(sys.argv[1],follow_symlinks=False)",
-        '"$provisioner" == /opt/glm-tpu/bin/provision_gate_d_python_runtime.py',
+        'archive_provisioner=',
+        'generic_provisioner=',
     ):
         assert identity_check in remote

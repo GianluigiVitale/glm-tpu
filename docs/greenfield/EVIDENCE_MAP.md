@@ -3886,3 +3886,43 @@ persistence only; review and persistence precede any v2 installation.
   `3b821143…4a7f71`; fresh tag `greenfield_m2048_strategy_nd_20260904T081918746174545Z`.
 - V6 is unreviewed/uncommitted/uninstalled/unexecuted. No numerical, decoder, performance or Gate-D
   claim. One complete Sol batch is required before persistence.
+
+## 2026-09-04 — exact-M2048 V6 symlink-dereference refusal and V7 source correction
+
+- Sol approved V6 with no P0--P2; pin `71b14bc5…07209` was committed, pushed and replayed exactly
+  from the US-CENTRAL2 mirror. Install-only proved seven serialized repository refreshes, 8/8 exact
+  repositories, seven same-zone transfers and 8/8 corrected root bootstraps. Worker 0 verified all
+  three runtimes; every other worker refused the Python source tree before capsule/JAX/TPU.
+- Read-only structure survey identified the exact cause: recursive `gcloud scp` changed worker 0's
+  1,048 symlinks + 4,031 files into 5,079 regular files + zero symlinks on workers 1--7. JAX and
+  libtpu remained exact and contain no symlinks. Report SHA `4c69d707…4fec4`; transfer cleanup 7/7;
+  post-failure census 8/8 clean. Failure record
+  `gate-d-m2048-v6-install-scp-symlink-dereference-failure.json` SHA `da3ffc41…6f0d`; tag retired.
+- Initial Sol review blocked predictable user-writable archive and extraction pathnames as a P1.
+  Corrected V7 uses a versioned root-owned helper: O_EXCL|O_NOFOLLOW archive creation through a
+  retained descriptor, source recheck, traversal-safe files-before-symlinks extraction into a
+  root-owned staging tree, exact-tree RENAME_NOREPLACE publication and inode-bound cleanup.
+  Symlink/traversal/dangling-link/synchronized-replacement regressions pass; focused CPU suite is
+  37/37 in 6.89 s. Certificate `gate-d-m2048-strategy-nd-v7-source.json` SHA `260fba4d…d5856d`;
+  fresh tag `greenfield_m2048_strategy_nd_20260904T091522542609599Z`.
+- V7 remains unreviewed/uncommitted/uninstalled/unexecuted. No numerical, decoder, performance or
+  Gate-D claim. One complete Sol batch is required before persistence.
+
+## 2026-09-04 — exact-M2048 V7 immutable-source snapshot correction
+
+- Sol found one P1: root authenticated but directly parsed the retained user-owned transferred
+  archive inode, permitting synchronized transient mutation before the final tree check. It denied
+  persistence, install and execution.
+- Corrected V7 copies the retained FD into an authenticated sealed memfd after a full source-identity
+  stability check and parses only the immutable snapshot. Deterministic source-copy mutate/restore
+  refuses; extraction-time mutate/restore cannot affect the exact extracted tree; sealed writes fail.
+- Wrong-size/FIFO inputs reject before copy. Sol then found the copy/hash could consume continuous
+  growth; both now read exactly the authenticated size, reject early EOF or one extra byte, and the
+  growth regression proves bounded refusal. Focused CPU suite is 41/41 in 6.94 s. Helper/bootstrap/
+  fleet hashes are `2582e9b6…9b4319`, `d70e550a…d1b137`, `15452d6e…9782ec`; the actual
+  117,227,520-byte runtime archive round-trips to exact tree `308748a9…70d616` with 1,048 links.
+  Certificate SHA is `55594da1…943a9c6`. The V7 tag
+  remains unstarted. Nothing is committed, installed or executed; a clean Sol delta is mandatory.
+
+- Final Sol delta: no P0/P1/P2; safe to persist, safe to install after future-pin push/mirror, and
+  safe to execute once under the fresh tag and normal live preflights. No mutation preceded verdict.

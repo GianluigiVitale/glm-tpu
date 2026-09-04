@@ -28,10 +28,10 @@ weaken history. Optimizations default off. Targets: useful <=200, strong <=125, 
   plus US-CENTRAL2 mirror before protected work. Never use EU.
 - Report result, percentage and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-04 08:20Z
+## Resume checkpoint — 2026-09-04 09:22Z
 
 Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; current
-pushed pin `80bcd0edab9f4a1d7b0085af89dc4159cbf2254c`. Latest dependency-free
+pushed pin `71b14bc52ba9faea10035771afdafa61bf807209`. Latest dependency-free
 pgrep/libtpu-lock/container census is 8/8 zero-work; no TPU workflow is active.
 
 The accepted completed-normalization→key boundary is exact: 0/2,048 rows and 0/262,144 lanes.
@@ -41,17 +41,20 @@ intermediate host transfer. The consumer's layer-1 key differs from legacy in al
 consumer arithmetic, not input normalization.
 
 Sealed legacy HLO `e7371f48…7216` proves prompt hidden reductions are exact `bf16[2048,6144]`
-global-32 StrategyND. The model-free exact-M2048 fingerprint is implemented. V5 repaired both
-remote loaders, refreshed workers 1–7, proved 8/8 exact repos and copied runtime source. It then
-failed closed before capsule/JAX/TPU because recreated workers lack `/usr/local/libexec`; worker 0
-alone verified its three sealed runtimes. Preserve
-`gate-d-m2048-v5-install-missing-libexec-parent-failure.json`; census is 8/8 clean, transfers
-cleaned 7/7, tag retired. Local V6 prepares only the fixed root-owned
-`/usr/local -> libexec -> glm-tpu` chain in order, accepts only clean `80bcd0ed` worker prestates,
-repins the full provenance chain and passes 34/34 focused tests. Certificate SHA
-`3b821143…4a7f71`; fresh tag `greenfield_m2048_strategy_nd_20260904T081918746174545Z`.
-Exact next: one Sol batch; only a clean verdict permits commit/push/US-CENTRAL2 replay and
-install-only, followed by a separately authenticated one-shot execution. Do not run 8K first.
+global-32 StrategyND. The model-free exact-M2048 fingerprint is implemented. Sol-approved V6 fixed
+the recreated workers' missing `/usr/local/libexec` and proved 8/8 corrected root bootstraps, then
+failed closed before capsule/JAX/TPU: recursive scp dereferenced all 1,048 Python-runtime symlinks.
+JAX/libtpu copies stayed exact; transfers cleaned 7/7 and census is 8/8 clean. Preserve
+`gate-d-m2048-v6-install-scp-symlink-dereference-failure.json`; V6 tag is retired.
+
+Sol then blocked V7 because root still parsed the retained but user-owned transferred inode. The
+local correction copies it into an exact-digest sealed memfd after proving source identity stable;
+only that immutable snapshot is parsed. Source-copy and extraction-time mutate/restore attacks now
+reject or cannot affect extraction; size/FIFO/growth are bounded. Suite 41/41 and the real
+117-MB/1,048-link round trip pass. Certificate SHA `55594da1…943a9c6`; tag
+`greenfield_m2048_strategy_nd_20260904T091522542609599Z` is unstarted. Final Sol review is clean
+(no P0–P2; all safety verdicts yes). Exact next: commit/push/US-CENTRAL2 replay and install-only,
+followed by separately authenticated one-shot execution. Do not run 8K first.
 
 ## After Gate D
 

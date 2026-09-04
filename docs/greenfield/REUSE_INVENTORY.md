@@ -1183,3 +1183,38 @@ only the fixed ordered `/usr/local -> libexec -> glm-tpu` directory preparation 
 workers. Every existing/created component remains root:root, mode 0755, xattr-free and opened with
 O_NOFOLLOW; never generalize the helper to an arbitrary root path. Reuse the M2048 numerical probe
 only after reviewed install-only reports 8/8 `RUNTIME_OK` and 8/8 `M2048_INSTALL_OK`.
+
+## 2026-09-04 exact-M2048 v7 symlink-preserving transport boundary
+
+Preserve V6's fixed-directory bootstrap proof and its install report as operational evidence only.
+V6 reached 8/8 exact repositories and 8/8 root provisioner bootstrap, but recursive `gcloud scp`
+dereferenced all 1,048 internal Python-runtime symlinks on workers 1--7. The copied Python trees
+therefore had 5,079 regular files and no symlinks instead of 4,031 regular files plus 1,048
+symlinks, and the exact generic provisioner correctly refused them before capsule/JAX/TPU.
+Failure record `gate-d-m2048-v6-install-scp-symlink-dereference-failure.json` has SHA
+`da3ffc41…6f0d`; the unused V6 tag is retired.
+
+V7 keeps JAX/libtpu direct transfers because both are symlink-free and exact. A separately versioned
+root-owned helper creates Python's archive with O_EXCL|O_NOFOLLOW through a retained descriptor,
+rechecks the source, validates every member before files-before-symlinks extraction into root-owned
+staging, verifies the complete tree, publishes with RENAME_NOREPLACE and cleans only the recorded
+inode. Tests preserve an internal relative symlink and reject traversal, dangling-output and
+synchronized replacement attacks. Source certificate
+`gate-d-m2048-strategy-nd-v7-source.json` has SHA `260fba4d…d5856d`. This remains source-only until
+Sol review; install and TPU execution are unauthorized.
+
+## 2026-09-04 exact-M2048 v7 immutable transferred-archive snapshot boundary
+
+Do not reuse V7's first direct parse of the retained user-owned archive FD; Sol correctly rejected
+that boundary. Reuse only the corrected helper SHA `2582e9b6…9b4319`: reject wrong-size/FIFO input,
+copy and hash exactly the authenticated size into a fresh memfd, reject early EOF or one extra byte,
+require full source identity stability, authenticate snapshot digest and size, never parse the source FD,
+apply and verify exact write/grow/shrink/seal seals, and parse only the snapshot. The synchronized
+copy-time mutate/restore refusal and extraction-time mutate/restore isolation tests are mandatory.
+The repinned bootstrap is `d70e550a…d1b137`, fleet installer `15452d6e…9782ec`, and source certificate
+`gate-d-m2048-strategy-nd-v7-source.json` SHA `55594da1…943a9c6`. The corrected helper also preserves
+the actual 117,227,520-byte runtime as exact tree `308748a9…70d616` with 1,048 symlinks. Source-only
+pending a clean Sol review; install and TPU execution remain unauthorized.
+
+Final Sol delta returned no P0--P2 and approved persistence, future-pin push/mirror-conditional
+install, and one fresh-tag execution under the existing live preflights. No mutation preceded review.

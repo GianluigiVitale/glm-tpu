@@ -22,10 +22,10 @@ import sys
 
 
 WORKTREE = Path("/home/gianl/glm-tpu-topology-rewrite")
-PROVISIONER_REPO_PATH = "scripts/greenfield/provision_gate_d_python_runtime.py"
-PROVISIONER_TARGET = Path("/opt/glm-tpu/bin/provision_gate_d_python_runtime.py")
+PROVISIONER_REPO_PATH = "scripts/greenfield/provision_gate_d_runtime_archive.py"
+PROVISIONER_TARGET = Path("/opt/glm-tpu/bin/provision_gate_d_runtime_archive.py")
 PROVISIONER_SHA256 = (
-    "2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594"
+    "2582e9b6c91fe11a8489a2359f830ab786b5856463ea896172da1f7ab79b4319"
 )
 DIRECTORIES = (
     (Path("/opt/glm-tpu"), "bin"),
