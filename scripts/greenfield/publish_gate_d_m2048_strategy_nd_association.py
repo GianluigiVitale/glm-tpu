@@ -36,6 +36,7 @@ BASE_PATH = "scripts/greenfield/publish_gate_d_projection_contraction_pp16_hlo.p
 BASE_PIN = "986378238ac6458307aea69ef1f5e12bf82bc020"
 BASE_SHA256 = "f3f20a01fd37bb82988cd77f69fa7b0a780d120568bab0db4162f42e7855bc97"
 BUCKET_NAME = "driftbench-dsv4-uc"
+BUCKET_LOCATION = "US-CENTRAL2"
 REMOTE_ROOT = "results/greenfield/glm52/m2048_strategy_nd/"
 TAG_PATTERN = re.compile(
     r"greenfield_m2048_strategy_nd_[0-9]{8}T[0-9]{15}Z"
@@ -217,7 +218,67 @@ def _load_base(code_pin: str) -> types.ModuleType:
         "PYTHONDONTWRITEBYTECODE": "1",
     }
     module._git_bytes = lambda *args: _git_bytes(*args)
+    module._validate_remote_vacancy_evidence = (
+        _validate_zero_retention_vacancy_evidence
+    )
+    module._require_never_used_prefix = lambda bucket, prefix: (
+        _require_zero_retention_unused_prefix(module, bucket, prefix)
+    )
     return module
+
+
+def _require_zero_retention_policy(bucket: Any) -> None:
+    bucket.reload()
+    if (
+        bucket.name != BUCKET_NAME
+        or bucket.location != BUCKET_LOCATION
+        or bucket.soft_delete_policy.retention_duration_seconds != 0
+    ):
+        raise RuntimeError("M2048 publication bucket zero-retention policy drifted")
+
+
+def _require_zero_retention_unused_prefix(
+    base: Any, bucket: Any, prefix: str
+) -> None:
+    _require_zero_retention_policy(bucket)
+    observations = {
+        "live": base._observed_names(bucket, prefix),
+        "all_versions": base._observed_names(bucket, prefix, versions=True),
+    }
+    occupied = {scope: names for scope, names in observations.items() if names}
+    if occupied:
+        raise RuntimeError(
+            "M2048 zero-retention prefix has prior live/versioned history: "
+            + ",".join(sorted(occupied))
+        )
+
+
+def _validate_zero_retention_vacancy_evidence(
+    raw: bytes, summary: bytes, remote: str
+) -> None:
+    no_objects = "ERROR: (gcloud.storage.ls) One or more URLs matched no objects."
+    policy_disabled = (
+        "ERROR: (gcloud.storage.ls) HTTPError 400: Soft delete policy is required "
+        "to list soft-deleted versions"
+    )
+    expected_raw = (
+        "soft_delete_retention_seconds=0\n"
+        "scope=live flags=none returncode=1\n"
+        f"{no_objects}\n"
+        "scope=all_versions flags=--all-versions returncode=1\n"
+        f"{no_objects}\n"
+        "scope=soft_deleted flags=--soft-deleted,--exhaustive returncode=1 "
+        "availability=policy_disabled\n"
+        f"{policy_disabled}\n"
+    ).encode("ascii")
+    expected_summary = (
+        "SOFT_DELETE_RETENTION_SECONDS 0\n"
+        f"VACANT live {remote}\n"
+        f"VACANT all_versions {remote}\n"
+        f"UNAVAILABLE_POLICY_DISABLED soft_deleted {remote}\n"
+    ).encode("ascii")
+    if raw != expected_raw or summary != expected_summary:
+        raise RuntimeError("M2048 zero-retention vacancy evidence drifted")
 
 
 def _sealed_source_archive(code_pin: str) -> tuple[str, Mapping[str, Any]]:

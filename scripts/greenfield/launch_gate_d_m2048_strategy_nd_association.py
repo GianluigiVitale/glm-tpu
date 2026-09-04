@@ -31,7 +31,7 @@ WRAPPER_PATH = WORKTREE / (
 WRAPPER_SOURCE_PATH = (
     "scripts/greenfield/run_gate_d_m2048_strategy_nd_association.sh"
 )
-WRAPPER_SHA256 = "d296a22b92b1efb5ae7906bd72e17b572414e65571a8fa41c299317e0b70c32f"
+WRAPPER_SHA256 = "4e5bf016cf1bced9ffb2348e42590f9835067a12b377f63107e006494d37980b"
 CAPSULE_ROOT = Path(
     "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v2"
 )
@@ -45,7 +45,7 @@ PUBLISHER_SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_m2048_strategy_nd_association.py"
 )
 PUBLISHER_SHA256 = (
-    "db8e7f6e2efb6607cdc906b6f957499ad5bbbc93b60477aec717aa98d6d42f17"
+    "0b4a810169ffdc808457d99d33f3ed02295b675ed09dc013839ce0fe35e9ce06"
 )
 MIRROR_VERIFIER_PATH = (
     CAPSULE_ROOT / "verify_gate_d_rewrite_same_region_git_mirror.py"
@@ -54,7 +54,7 @@ MIRROR_VERIFIER_SOURCE_PATH = (
     "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
 )
 MIRROR_VERIFIER_SHA256 = (
-    "bc8186c2d0930e26ff13f09e3acdd84144ffe27ef6ed3e497a41d848a98414a9"
+    "1972a26ebf7f6d2294f12f54287c831f656d31be4b62a80d57fa9fa70981c0eb"
 )
 LOCK_ROOT = Path("/opt/glm-tpu/locks")
 LOCK_NAMES = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")

@@ -44,7 +44,7 @@ REPO_REFRESHER = ROOT / (
     "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py"
 )
 MIRROR = ROOT / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
-CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v8-source.json"
+CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v9-source.json"
 
 
 def _load_publisher():
@@ -336,6 +336,111 @@ def test_publisher_source_binds_driver_and_loads_project_only_for_success() -> N
     assert source.index("base._require_never_used_prefix(bucket, prefix)") < source.index(
         "for relative in sorted(payload)"
     )
+    assert "module._validate_remote_vacancy_evidence = (" in source
+    assert "_validate_zero_retention_vacancy_evidence" in source
+    assert "module._require_never_used_prefix = lambda bucket, prefix:" in source
+
+
+def test_zero_retention_vacancy_contract_is_exact_and_does_not_claim_deleted_vacancy() -> None:
+    remote = (
+        "gs://driftbench-dsv4-uc/results/greenfield/glm52/"
+        "m2048_strategy_nd/greenfield_m2048_strategy_nd_20260904T123456123456789Z"
+    )
+    no_objects = "ERROR: (gcloud.storage.ls) One or more URLs matched no objects."
+    policy_disabled = (
+        "ERROR: (gcloud.storage.ls) HTTPError 400: Soft delete policy is required "
+        "to list soft-deleted versions"
+    )
+    raw = (
+        "soft_delete_retention_seconds=0\n"
+        "scope=live flags=none returncode=1\n"
+        f"{no_objects}\n"
+        "scope=all_versions flags=--all-versions returncode=1\n"
+        f"{no_objects}\n"
+        "scope=soft_deleted flags=--soft-deleted,--exhaustive returncode=1 "
+        "availability=policy_disabled\n"
+        f"{policy_disabled}\n"
+    ).encode("ascii")
+    summary = (
+        "SOFT_DELETE_RETENTION_SECONDS 0\n"
+        f"VACANT live {remote}\n"
+        f"VACANT all_versions {remote}\n"
+        f"UNAVAILABLE_POLICY_DISABLED soft_deleted {remote}\n"
+    ).encode("ascii")
+    PUBLISHER_MODULE._validate_zero_retention_vacancy_evidence(
+        raw, summary, remote
+    )
+    for hostile_raw, hostile_summary in (
+        (raw.replace(b"retention_seconds=0", b"retention_seconds=7"), summary),
+        (raw, summary.replace(b"UNAVAILABLE_POLICY_DISABLED", b"VACANT")),
+        (raw.replace(b"HTTPError 400", b"HTTPError 404"), summary),
+    ):
+        with pytest.raises(RuntimeError, match="zero-retention vacancy evidence drifted"):
+            PUBLISHER_MODULE._validate_zero_retention_vacancy_evidence(
+                hostile_raw, hostile_summary, remote
+            )
+
+
+def test_zero_retention_publication_preflight_checks_policy_and_only_listable_scopes() -> None:
+    class FakeBucket:
+        name = PUBLISHER_MODULE.BUCKET_NAME
+        location = PUBLISHER_MODULE.BUCKET_LOCATION
+        soft_delete_policy = SimpleNamespace(retention_duration_seconds=0)
+
+        def __init__(self) -> None:
+            self.reload_count = 0
+
+        def reload(self) -> None:
+            self.reload_count += 1
+
+    class FakeBase:
+        def __init__(self, occupied: str | None = None) -> None:
+            self.occupied = occupied
+            self.calls: list[tuple[bool, bool]] = []
+
+        def _observed_names(
+            self,
+            _bucket,
+            _prefix,
+            *,
+            versions: bool = False,
+            soft_deleted: bool = False,
+        ):
+            self.calls.append((versions, soft_deleted))
+            if self.occupied == ("all_versions" if versions else "live"):
+                return {"prior"}
+            return set()
+
+    bucket = FakeBucket()
+    base = FakeBase()
+    PUBLISHER_MODULE._require_zero_retention_unused_prefix(
+        base, bucket, "results/fresh/"
+    )
+    assert bucket.reload_count == 1
+    assert base.calls == [(False, False), (True, False)]
+    for scope in ("live", "all_versions"):
+        with pytest.raises(RuntimeError, match="prior live/versioned history"):
+            PUBLISHER_MODULE._require_zero_retention_unused_prefix(
+                FakeBase(scope), FakeBucket(), "results/occupied/"
+            )
+    for location, retention in (("EU", 0), (PUBLISHER_MODULE.BUCKET_LOCATION, 604800)):
+        hostile = FakeBucket()
+        hostile.location = location
+        hostile.soft_delete_policy = SimpleNamespace(
+            retention_duration_seconds=retention
+        )
+        with pytest.raises(RuntimeError, match="zero-retention policy drifted"):
+            PUBLISHER_MODULE._require_zero_retention_policy(hostile)
+
+
+def test_loaded_publisher_base_uses_the_zero_retention_overrides() -> None:
+    code_pin = PUBLISHER_MODULE._git_bytes("rev-parse", "HEAD").decode().strip()
+    base = PUBLISHER_MODULE._load_base(code_pin)
+    assert (
+        base._validate_remote_vacancy_evidence
+        is PUBLISHER_MODULE._validate_zero_retention_vacancy_evidence
+    )
+    assert base._require_never_used_prefix.__name__ == "<lambda>"
 
 
 def test_committed_source_archive_identity_is_reproducible() -> None:
@@ -371,6 +476,10 @@ def test_wrapper_is_full_pod_default_off_and_terminal_last() -> None:
     assert '--num-processes 8 --process-id "$idx"' in source
     assert "idx=${HOSTNAME##*-w-}" in source
     assert "M2048_OK" in source and "has_eight_unique_markers" in source
+    assert "soft_delete_policy.retentionDurationSeconds" in source
+    assert "[[ $SOFT_DELETE_RETENTION_SECONDS == 0 ]]" in source
+    assert "UNAVAILABLE_POLICY_DISABLED soft_deleted" in source
+    assert "VACANT soft_deleted" not in source
     assert source.index("strict_census pre") < source.index(
         "executing one exact-M2048 full-pod fingerprint"
     )
@@ -464,12 +573,14 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
         "docs/artifacts/gate-d-m2048-strategy-nd-v6-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v7-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v8-source.json",
+        "docs/artifacts/gate-d-m2048-strategy-nd-v9-source.json",
         "docs/artifacts/gate-d-m2048-v2-install-repository-prestate-failure.json",
         "docs/artifacts/gate-d-m2048-v3-install-loader-quoting-failure.json",
         "docs/artifacts/gate-d-m2048-v4-install-runtime-loader-quoting-failure.json",
         "docs/artifacts/gate-d-m2048-v5-install-missing-libexec-parent-failure.json",
         "docs/artifacts/gate-d-m2048-v6-install-scp-symlink-dereference-failure.json",
         "docs/artifacts/gate-d-m2048-v7-missing-requests-auto-detection-failure.json",
+        "docs/artifacts/gate-d-m2048-v8-zero-retention-preflight-incompatibility.json",
         "scripts/greenfield/bootstrap_gate_d_provisioner.py",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py",
@@ -1763,10 +1874,15 @@ def test_source_certificate_binds_every_listed_file_and_grants_no_authority() ->
         "install_source": "/opt/glm-tpu/gate-d-m2048-install-v2",
         "launcher": "/opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v2.py",
     }
-    assert record["test_evidence"]["passed"] == 42
+    assert record["test_evidence"]["passed"] == 45
     assert record["proposed_fresh_tag"] in record[
         "protected_run_command_after_approved_install"
     ]
+    for field in ("predecessor_preflight", "predecessor_source_certificate"):
+        item = record[field]
+        assert sha256((ROOT / item["path"]).read_bytes()).hexdigest() == item[
+            "sha256"
+        ]
     for item in record["sources"]:
         assert sha256((ROOT / item["path"]).read_bytes()).hexdigest() == item[
             "sha256"

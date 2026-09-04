@@ -134,12 +134,13 @@ readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v2
 readonly PROBE=$CAPSULE/probe_m2048_strategy_nd_association.py
 readonly PROBE_SHA=f364134360800566d7a6c9c56da261c5c5ffca13408e4b6ddb27022c902d71ff
 readonly PUBLISHER=$CAPSULE/publish_gate_d_m2048_strategy_nd_association.py
-readonly PUBLISHER_SHA=db8e7f6e2efb6607cdc906b6f957499ad5bbbc93b60477aec717aa98d6d42f17
+readonly PUBLISHER_SHA=0b4a810169ffdc808457d99d33f3ed02295b675ed09dc013839ce0fe35e9ce06
 readonly MIRROR_VERIFIER=$CAPSULE/verify_gate_d_rewrite_same_region_git_mirror.py
-readonly MIRROR_VERIFIER_SHA=bc8186c2d0930e26ff13f09e3acdd84144ffe27ef6ed3e497a41d848a98414a9
+readonly MIRROR_VERIFIER_SHA=1972a26ebf7f6d2294f12f54287c831f656d31be4b62a80d57fa9fa70981c0eb
 readonly SEALED_PYTHON=/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12
 readonly SEALED_PYTHON_SHA=021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7
 readonly VACANCY_EXPECTED='ERROR: (gcloud.storage.ls) One or more URLs matched no objects.'
+readonly SOFT_DELETE_DISABLED_EXPECTED='ERROR: (gcloud.storage.ls) HTTPError 400: Soft delete policy is required to list soft-deleted versions'
 
 [[ ${GLM_GATE_D_IMMUTABLE_LOCKS_HELD:-0} == 1 ]]
 /usr/bin/python3 -I -S -B -c "$RUNTIME_BOUNDARY_VERIFIER"
@@ -198,6 +199,9 @@ for binding in \
   }
 done
 [[ $(/snap/bin/gcloud storage buckets describe "$BUCKET" --format='value(location)') == "$LOCATION" ]]
+readonly SOFT_DELETE_RETENTION_SECONDS=$(/snap/bin/gcloud storage buckets describe \
+  "$BUCKET" --format='value(soft_delete_policy.retentionDurationSeconds)')
+[[ $SOFT_DELETE_RETENTION_SECONDS == 0 ]]
 [[ $(/snap/bin/gcloud compute tpus tpu-vm describe "$POD" --zone "$ZONE" --format='value(state)') == READY ]]
 
 publisher() {
@@ -208,7 +212,7 @@ publisher() {
 }
 publish_member() { publisher write --run-dir "$RUN_DIR" --member "$1"; }
 
-vacancy_three_surfaces() {
+vacancy_zero_retention_surfaces() {
   local live versions deleted live_rc versions_rc deleted_rc
   set +e
   live=$(PYTHONWARNINGS=ignore /usr/bin/timeout --signal=TERM --kill-after=10 60 \
@@ -218,19 +222,24 @@ vacancy_three_surfaces() {
   deleted=$(PYTHONWARNINGS=ignore /usr/bin/timeout --signal=TERM --kill-after=10 60 \
     /snap/bin/gcloud storage ls --soft-deleted --exhaustive "$REMOTE_PREFIX/**" 2>&1); deleted_rc=$?
   set -e
-  [[ $live_rc -eq 1 && $live == "$VACANCY_EXPECTED" && \
+  [[ $SOFT_DELETE_RETENTION_SECONDS == 0 && \
+     $live_rc -eq 1 && $live == "$VACANCY_EXPECTED" && \
      $versions_rc -eq 1 && $versions == "$VACANCY_EXPECTED" && \
-     $deleted_rc -eq 1 && $deleted == "$VACANCY_EXPECTED" ]] || return 1
+     $deleted_rc -eq 1 && $deleted == "$SOFT_DELETE_DISABLED_EXPECTED" ]] || return 1
   /usr/bin/printf '%s\n' \
+    'soft_delete_retention_seconds=0' \
     'scope=live flags=none returncode=1' "$live" \
     'scope=all_versions flags=--all-versions returncode=1' "$versions" \
-    'scope=soft_deleted flags=--soft-deleted,--exhaustive returncode=1' "$deleted"
+    'scope=soft_deleted flags=--soft-deleted,--exhaustive returncode=1 availability=policy_disabled' "$deleted"
 }
-readonly VACANCY_RAW=$(vacancy_three_surfaces) || {
-  echo "ABORT: append-only remote-prefix history is not canonically vacant" >&2; exit 2;
+readonly VACANCY_RAW=$(vacancy_zero_retention_surfaces) || {
+  echo "ABORT: zero-retention remote-prefix preflight is not canonical" >&2; exit 2;
 }
-readonly VACANCY_SUMMARY=$(/usr/bin/printf 'VACANT %s %s\n' \
-  live "$REMOTE_PREFIX" all_versions "$REMOTE_PREFIX" soft_deleted "$REMOTE_PREFIX")
+readonly VACANCY_SUMMARY=$(/usr/bin/printf '%s\n' \
+  'SOFT_DELETE_RETENTION_SECONDS 0' \
+  "VACANT live $REMOTE_PREFIX" \
+  "VACANT all_versions $REMOTE_PREFIX" \
+  "UNAVAILABLE_POLICY_DISABLED soft_deleted $REMOTE_PREFIX")
 
 run_identity=$(publisher init --run-dir "$RUN_DIR")
 [[ $run_identity =~ ^RUN_IDENTITY\ ([0-9]+:[0-9]+)$ ]]
@@ -343,7 +352,7 @@ say "probe exited successfully in ${elapsed}s"
 strict_census post || { say "ABORT: post-run census is not authenticated 8/8 zero work"; exit 1; }
 post_census_done=1
 
-say "publishing generation-bound archive after a fresh three-surface history check"
+say "publishing generation-bound archive after a fresh zero-retention vacancy check"
 result_authority=$(publisher success --run-dir "$RUN_DIR" \
   --remote-prefix "$REMOTE_PREFIX" --elapsed "$elapsed")
 if [[ $result_authority =~ ^M2048_RESULT\ status=M2048_ASSOCIATION_UNIQUE\ marker_sha256=([0-9a-f]{64})\ terminal_generation=([0-9]+)\ terminal_sha256=([0-9a-f]{64})$ ]]; then
