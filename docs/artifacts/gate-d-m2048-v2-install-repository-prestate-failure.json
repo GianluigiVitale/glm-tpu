@@ -1,0 +1,51 @@
+{
+  "artifact_kind": "gate_d_m2048_v2_install_repository_prestate_failure",
+  "authorization": {
+    "install_only": true,
+    "jax_import": false,
+    "protected_execution": false,
+    "tpu_initialization": false
+  },
+  "classification": "INSTALL_ONLY_FAILED_CLOSED_AT_WORKER_REPOSITORY_PRESTATE;NO_RUNTIME_RESTORATION;NO_CAPSULE_INSTALL;NO_JAX;NO_TPU;NO_MODEL_OR_GATE_D_CLAIM",
+  "code_pin": "0c5bd3e5b899389e8e47043b9729959cbcd44138",
+  "failure": {
+    "boundary": "eight-host repository exact-pin preflight before runtime transfer or immutable installation",
+    "controller_report": "/home/gianl/gate-d-runs/m2048-install-0c5bd3e5b899389e8e47043b9729959cbcd44138.log",
+    "controller_report_sha256": "62e089262fc85f2858a181f379bfcd4ceb91f3779bd446c1c8966cb5ef227c3a",
+    "exact_cause": "worker 0 was exact, but workers 1-7 were existing clean detached full repositories at 086d459a6acf4e3d1ec328e00e3e1b61be29ad2b; the v2 installer accepted only absent repositories or HEAD equal to the install pin",
+    "immutable_capsule_installed": false,
+    "launcher_invoked": false,
+    "runtime_transfer_started": false
+  },
+  "fleet_observation": {
+    "origin": "git@github.com:GianluigiVitale/glm-tpu.git",
+    "worker0": {
+      "branch": "rewrite/topology-first-decode",
+      "dirty_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "pin": "0c5bd3e5b899389e8e47043b9729959cbcd44138"
+    },
+    "workers1_7": {
+      "branch": "",
+      "count": 7,
+      "dirty_status_sha256_each": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "partial_clone_filter": null,
+      "pin_each": "086d459a6acf4e3d1ec328e00e3e1b61be29ad2b",
+      "promisor": null,
+      "replacement_ref_count_each": 0,
+      "shallow": false
+    }
+  },
+  "post_failure_minimal_census": {
+    "coverage": "dependency-free pgrep including Ray/GLM processes, libtpu lock holder and container census",
+    "result": "8/8 unique MINIMAL_CENSUS_OK",
+    "sorted_markers_sha256": "42d6f2f5fcf6345821dd3f8ef412756936634bf7b7bedac9cbb12e4c4c107580",
+    "strict_ray_python_census_available": false
+  },
+  "schema_version": 1,
+  "source_certificate": {
+    "path": "docs/artifacts/gate-d-m2048-strategy-nd-v2-source.json",
+    "sha256": "7ae9a6075c697a2eff4e6b99c289eb3889fac02578864881b217973db6938f2e"
+  },
+  "successor_requirement": "Preserve this failure and the unused v2 tag. Refresh only the exact clean detached worker prestate, serialize workers 1-7 to avoid concurrent GitHub fetches, then require an exact all-host pin/clean-state check before runtime restoration. Review, persist and mirror an append-only successor certificate with a new tag before another install-only attempt.",
+  "unused_retired_tag": "greenfield_m2048_strategy_nd_20260904T052811116126986Z"
+}

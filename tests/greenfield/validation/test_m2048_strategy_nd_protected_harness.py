@@ -34,8 +34,11 @@ FLEET_INSTALLER = ROOT / (
     "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh"
 )
 BOOTSTRAP = ROOT / "scripts/greenfield/bootstrap_gate_d_provisioner.py"
+REPO_REFRESHER = ROOT / (
+    "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py"
+)
 MIRROR = ROOT / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
-CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v2-source.json"
+CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v3-source.json"
 
 
 def _load_publisher():
@@ -62,6 +65,19 @@ def _load_bootstrap():
 
 
 BOOTSTRAP_MODULE = _load_bootstrap()
+
+
+def _load_repo_refresher():
+    specification = importlib.util.spec_from_file_location(
+        "gate_d_m2048_repo_refresher_for_test", REPO_REFRESHER
+    )
+    assert specification is not None and specification.loader is not None
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+REPO_REFRESHER_MODULE = _load_repo_refresher()
 
 
 def _encoded(value: object) -> str:
@@ -335,12 +351,15 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
     assert set(mirror.BOUND_PATHS) >= {
         "docs/artifacts/gate-d-m2048-strategy-nd-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v2-source.json",
+        "docs/artifacts/gate-d-m2048-strategy-nd-v3-source.json",
+        "docs/artifacts/gate-d-m2048-v2-install-repository-prestate-failure.json",
         "scripts/greenfield/bootstrap_gate_d_provisioner.py",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py",
         "scripts/greenfield/launch_gate_d_m2048_strategy_nd_association.py",
         "scripts/greenfield/probe_m2048_strategy_nd_association.py",
         "scripts/greenfield/publish_gate_d_m2048_strategy_nd_association.py",
+        "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py",
         "scripts/greenfield/run_gate_d_m2048_strategy_nd_association.sh",
         "tests/greenfield/validation/test_m2048_strategy_nd_protected_harness.py",
     }
@@ -359,7 +378,7 @@ def test_fleet_installer_is_install_only_and_restores_exact_runtime_trees() -> N
         "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616",
         "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df",
         "db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca",
-        "90eaea39335a7889a81c995bf6c7d962a4abdbf95bb69a877f414f0b5424062d",
+        "0451c126799ffd189d537bd4aab2fe91c3e784d91828449713589a7fddb4a133",
     ):
         assert value in source
     assert '[[ -d $path && $path == /home/gianl/gate-d-m2048-runtime-source-' in source
@@ -375,6 +394,280 @@ def test_fleet_installer_is_install_only_and_restores_exact_runtime_trees() -> N
     )
     assert "run_root=/home/gianl/gate-d-runs" in source
     assert '"directory:gianl:gianl:700"' in source
+
+
+def test_fleet_serializes_exact_worker_repository_refresh() -> None:
+    source = FLEET_INSTALLER.read_text(encoding="ascii")
+    assert "WORKER_REPO_PRESTATE_PIN=086d459a6acf4e3d1ec328e00e3e1b61be29ad2b" in source
+    assert "REPO_REFRESHER_B64=$(git_local show" in source
+    assert "os.memfd_create('gate-d-m2048-repo-refresher'" in source
+    assert "for worker in 1 2 3 4 5 6 7; do" in source
+    assert source.count('--worker="$worker"') == 1
+    assert "has_unique_markers \"$REPORT\" REPO_REFRESH_OK 7" in source
+    assert source.index("for worker in 1 2 3 4 5 6 7; do") < source.index(
+        '--command="$sync_command"'
+    )
+
+
+def test_repository_refresher_moves_only_exact_clean_detached_prestate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def git(path: Path, *arguments: str) -> str:
+        result = subprocess.run(
+            ["/usr/bin/git", "-C", str(path), *arguments],
+            check=True,
+            capture_output=True,
+            env={
+                "GIT_CONFIG_GLOBAL": "/dev/null",
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_TERMINAL_PROMPT": "0",
+                "HOME": str(tmp_path),
+                "LANG": "C",
+                "LC_ALL": "C",
+                "PATH": "/usr/bin:/bin",
+            },
+            text=True,
+        )
+        return result.stdout.strip()
+
+    origin = tmp_path / "origin.git"
+    seed = tmp_path / "seed"
+    worker = tmp_path / "worker"
+    subprocess.run(
+        ["/usr/bin/git", "init", "--bare", str(origin)],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["/usr/bin/git", "init", str(seed)], check=True, capture_output=True
+    )
+    git(seed, "config", "user.name", "Gate D test")
+    git(seed, "config", "user.email", "gate-d@example.invalid")
+    (seed / "payload.txt").write_text("prestate\n", encoding="ascii")
+    git(seed, "add", "payload.txt")
+    git(seed, "commit", "-m", "prestate")
+    git(seed, "branch", "-M", REPO_REFRESHER_MODULE.BRANCH)
+    git(seed, "remote", "add", "origin", str(origin))
+    git(seed, "push", "-u", "origin", REPO_REFRESHER_MODULE.BRANCH)
+    git(origin, "symbolic-ref", "HEAD", f"refs/heads/{REPO_REFRESHER_MODULE.BRANCH}")
+    subprocess.run(
+        [
+            "/usr/bin/git",
+            "clone",
+            "--branch",
+            REPO_REFRESHER_MODULE.BRANCH,
+            str(origin),
+            str(worker),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    prestate = git(worker, "rev-parse", "HEAD")
+    git(worker, "switch", "--detach", prestate)
+    (seed / "payload.txt").write_text("target\n", encoding="ascii")
+    git(seed, "add", "payload.txt")
+    git(seed, "commit", "-m", "target")
+    git(seed, "push", "origin", REPO_REFRESHER_MODULE.BRANCH)
+    target = git(seed, "rev-parse", "HEAD")
+    config_path = worker / ".git" / "config"
+    config_sha = sha256(config_path.read_bytes()).hexdigest()
+    config_mode = config_path.stat().st_mode & 0o777
+    tmp_path.chmod(0o755)
+    safe_common = tmp_path / "safe-common"
+    safe_common.mkdir()
+    for name in REPO_REFRESHER_MODULE.SAFE_COMMON_SUBDIRECTORIES:
+        child = safe_common / name
+        child.mkdir()
+        child.chmod(0o555)
+    (safe_common / "config").write_bytes(REPO_REFRESHER_MODULE.SAFE_COMMON_CONFIG)
+    (safe_common / "config").chmod(0o444)
+    safe_common.chmod(0o555)
+    compile(
+        REPO_REFRESHER_MODULE._ROOT_SAFE_COMMON_PROGRAM,
+        "gate-d-root-safe-common",
+        "exec",
+    )
+    switch_environment = REPO_REFRESHER_MODULE._safe_git_environment(
+        worker, safe_common, ssh_command="/bin/false"
+    )
+    assert switch_environment["GIT_COMMON_DIR"] == str(safe_common)
+    assert switch_environment["GIT_DIR"] == str(worker / ".git")
+    assert switch_environment["GIT_OBJECT_DIRECTORY"] == str(
+        worker / ".git" / "objects"
+    )
+    assert switch_environment["GIT_WORK_TREE"] == str(worker)
+
+    def refresh(path: Path, **kwargs: object) -> None:
+        REPO_REFRESHER_MODULE.refresh_repository(
+            path,
+            safe_common_directory=safe_common,
+            prepare_safe_common_directory=False,
+            expected_safe_common_uid=os.getuid(),
+            expected_safe_common_gid=os.getgid(),
+            **kwargs,
+        )
+
+    refresh(
+        worker,
+        target_pin=target,
+        prestate_pin=prestate,
+        origin=str(origin),
+        allow_file_transport=True,
+        expected_config_sha256=config_sha,
+        expected_config_mode=config_mode,
+    )
+    assert git(worker, "rev-parse", "HEAD") == target
+    assert git(worker, "branch", "--show-current") == ""
+    refresh(
+        worker,
+        target_pin=target,
+        prestate_pin=prestate,
+        origin=str(origin),
+        allow_file_transport=True,
+        expected_config_sha256=config_sha,
+        expected_config_mode=config_mode,
+    )
+
+    (worker / "untracked.txt").write_text("refuse\n", encoding="ascii")
+    with pytest.raises(RuntimeError, match="exact clean detached contract"):
+        refresh(
+            worker,
+            target_pin=target,
+            prestate_pin=prestate,
+            origin=str(origin),
+            allow_file_transport=True,
+            expected_config_sha256=config_sha,
+            expected_config_mode=config_mode,
+        )
+
+    (worker / "untracked.txt").unlink()
+    worker_include = tmp_path / "worker-include"
+    worker_attributes = tmp_path / "worker-attributes"
+    worker_race = tmp_path / "worker-race"
+    for clone in (worker_include, worker_attributes, worker_race):
+        subprocess.run(
+            [
+                "/usr/bin/git",
+                "clone",
+                "--branch",
+                REPO_REFRESHER_MODULE.BRANCH,
+                str(origin),
+                str(clone),
+            ],
+            check=True,
+            capture_output=True,
+        )
+        git(clone, "switch", "--detach", target)
+
+    include_marker = tmp_path / "include-filter-executed"
+    include = tmp_path / "hostile-filter.inc"
+    include.write_text(
+        f'[filter "owned"]\n\tsmudge = /usr/bin/touch {include_marker}\n',
+        encoding="ascii",
+    )
+    include_config = worker_include / ".git" / "config"
+    include_safe_sha = sha256(include_config.read_bytes()).hexdigest()
+    include_mode = include_config.stat().st_mode & 0o777
+    git(worker_include, "config", "include.path", str(include))
+    with pytest.raises(RuntimeError, match="local config is outside the sealed schema"):
+        refresh(
+            worker_include,
+            target_pin=target,
+            prestate_pin=target,
+            origin=str(origin),
+            allow_file_transport=True,
+            expected_config_sha256=include_safe_sha,
+            expected_config_mode=include_mode,
+        )
+    assert not include_marker.exists()
+
+    race_marker = tmp_path / "race-filter-executed"
+    race_config = worker_race / ".git" / "config"
+    race_config_raw = race_config.read_bytes()
+    race_config_sha = sha256(race_config_raw).hexdigest()
+    race_config_mode = race_config.stat().st_mode & 0o777
+    (seed / "payload.txt").write_text("race target\n", encoding="ascii")
+    git(seed, "add", "payload.txt")
+    git(seed, "commit", "-m", "race target")
+    git(seed, "push", "origin", REPO_REFRESHER_MODULE.BRANCH)
+    race_target = git(seed, "rev-parse", "HEAD")
+    real_git = REPO_REFRESHER_MODULE._git
+    attack_phases: list[str] = []
+
+    def racing_git(path: Path, *arguments: str, **kwargs: object) -> bytes:
+        if arguments and arguments[0] in {"fetch", "switch"}:
+            attack_phases.append(arguments[0])
+            hostile = race_config_raw + (
+                f'\n[filter "owned"]\n\tsmudge = /usr/bin/touch {race_marker}'
+                f'\n\tprocess = /usr/bin/touch {race_marker}\n'
+                f'[url "ext::/usr/bin/touch {race_marker}"]\n'
+                f'\tinsteadOf = {origin}\n'
+                '[protocol "ext"]\n\tallow = always\n'
+            ).encode("ascii")
+            race_config.write_bytes(hostile)
+            info_attributes = worker_race / ".git" / "info" / "attributes"
+            info_attributes.write_text("* filter=owned\n", encoding="ascii")
+            (worker_race / ".gitattributes").write_text(
+                "* filter=owned\n", encoding="ascii"
+            )
+            try:
+                return real_git(path, *arguments, **kwargs)
+            finally:
+                race_config.write_bytes(race_config_raw)
+                info_attributes.unlink()
+                (worker_race / ".gitattributes").unlink()
+        return real_git(path, *arguments, **kwargs)
+
+    monkeypatch.setattr(REPO_REFRESHER_MODULE, "_git", racing_git)
+    refresh(
+        worker_race,
+        target_pin=race_target,
+        prestate_pin=target,
+        origin=str(origin),
+        allow_file_transport=True,
+        expected_config_sha256=race_config_sha,
+        expected_config_mode=race_config_mode,
+    )
+    monkeypatch.setattr(REPO_REFRESHER_MODULE, "_git", real_git)
+    assert git(worker_race, "rev-parse", "HEAD") == race_target
+    assert attack_phases == ["fetch", "switch"]
+    assert not race_marker.exists()
+
+    filter_marker = tmp_path / "attribute-filter-executed"
+    git(
+        worker_attributes,
+        "config",
+        "filter.owned.smudge",
+        f"/usr/bin/touch {filter_marker}",
+    )
+    git(
+        worker_attributes,
+        "config",
+        "filter.owned.process",
+        f"/usr/bin/touch {filter_marker}",
+    )
+    hostile_config = worker_attributes / ".git" / "config"
+    hostile_config_sha = sha256(hostile_config.read_bytes()).hexdigest()
+    hostile_config_mode = hostile_config.stat().st_mode & 0o777
+    (seed / ".gitattributes").write_text("payload.txt filter=owned\n", encoding="ascii")
+    (seed / "payload.txt").write_text("attribute target\n", encoding="ascii")
+    git(seed, "add", ".gitattributes", "payload.txt")
+    git(seed, "commit", "-m", "attribute target")
+    git(seed, "push", "origin", REPO_REFRESHER_MODULE.BRANCH)
+    attribute_target = git(seed, "rev-parse", "HEAD")
+    with pytest.raises(RuntimeError, match="target tree contains .gitattributes"):
+        refresh(
+            worker_attributes,
+            target_pin=attribute_target,
+            prestate_pin=target,
+            origin=str(origin),
+            allow_file_transport=True,
+            expected_config_sha256=hostile_config_sha,
+            expected_config_mode=hostile_config_mode,
+        )
+    assert git(worker_attributes, "rev-parse", "HEAD") == target
+    assert not filter_marker.exists()
 
 
 def test_bootstrap_sealed_payload_survives_source_path_replacement(
@@ -832,7 +1125,7 @@ def test_source_certificate_binds_every_listed_file_and_grants_no_authority() ->
     assert record["runtime_recovery"]["missing_workers_observed_read_only"] == list(
         range(1, 8)
     )
-    assert record["test_evidence"]["passed"] == 29
+    assert record["test_evidence"]["passed"] == 31
     assert record["proposed_fresh_tag"] in record[
         "protected_run_command_after_approved_install"
     ]

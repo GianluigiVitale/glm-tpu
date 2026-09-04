@@ -890,6 +890,20 @@ chunk-0 capsule. Successor certificate `gate-d-m2048-strategy-nd-v2-source.json`
 mirror replay set, and adds a cross-file capsule-path regression. This correction is source-only;
 installation and TPU execution remain unauthorized pending independent review and exact-pin replay.
 
+The reviewed v2 install-only command then failed at its first all-host repository check, before
+runtime transfer or capsule installation: worker 0 was exact, while workers 1--7 were clean full
+detached repositories at sealed pin `086d459`. Failure record
+`gate-d-m2048-v2-install-repository-prestate-failure.json` (`bdd65aa6...4fa1`) preserves the report
+and 8/8 dependency-free zero-work census; the v2 tag remains unused. V3 certificate
+`gate-d-m2048-strategy-nd-v3-source.json` (`f7502e48...5327`) adds a sealed-blob worker refresher.
+It accepts only the exact clean detached prestate and local-config hash, rejects info/tracked
+attributes, serializes the seven GitHub fetches, requires `FETCH_HEAD` to equal the future pin,
+switches detached with hooks disabled and config/info/hooks sourced only from an exact root-owned
+common Git directory, then runs the existing all-host exact-pin/clean check. Behavioral tests cover
+success/idempotence/dirty-state refusal and prove hostile local include, smudge/process filters,
+target `.gitattributes` and a synchronized between-check-and-switch metadata swap cannot execute.
+No installation or TPU authority exists until the V3 batch is independently approved.
+
 For the missing real causal-HLO authority, reuse the source/plan pins above through the default-off
 `scripts/greenfield/build_gate_d_jax_site_capsule.py` (`5334dd1e...00d2`) and
 `scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py` (`2513a305...2182`). The builder's

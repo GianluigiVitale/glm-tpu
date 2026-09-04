@@ -30,6 +30,9 @@ readonly PROVISIONER_TARGET=/opt/glm-tpu/bin/provision_gate_d_python_runtime.py
 readonly PROVISIONER_SHA=2b9c8c2b981be639ad0eb16388c6fbfdd4765adfa2ef9a1986ae4b1b37ec0594
 readonly BOOTSTRAP=bootstrap_gate_d_provisioner.py
 readonly BOOTSTRAP_SHA=3c55731464c4c84283522d946a5b01e89282dca7f237be84f0a0794093d9bbd2
+readonly REPO_REFRESHER=refresh_gate_d_m2048_worker_repository.py
+readonly REPO_REFRESHER_SHA=f248ff6717113c2376e19e4495fd2b33314280b181b97c783996ec510b7f5b0e
+readonly WORKER_REPO_PRESTATE_PIN=086d459a6acf4e3d1ec328e00e3e1b61be29ad2b
 readonly PYTHON_NAME=gate-d-python-3.12.13-021044895e95
 readonly PYTHON_TREE=308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616
 readonly JAX_NAME=gate-d-jax-site-55233c63939e
@@ -37,17 +40,17 @@ readonly JAX_TREE=55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0
 readonly LIBTPU_NAME=gate-d-libtpu-site-db7598c867f3
 readonly LIBTPU_TREE=db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca
 readonly INSTALL_SOURCE_NAME=gate-d-m2048-install-v1
-readonly INSTALL_SOURCE_TREE=90eaea39335a7889a81c995bf6c7d962a4abdbf95bb69a877f414f0b5424062d
+readonly INSTALL_SOURCE_TREE=0451c126799ffd189d537bd4aab2fe91c3e784d91828449713589a7fddb4a133
 readonly INSTALLER=install_gate_d_m2048_strategy_nd_runtime.py
 readonly LAUNCHER=launch_gate_d_m2048_strategy_nd_association.py
 readonly PROBE=probe_m2048_strategy_nd_association.py
 readonly PUBLISHER=publish_gate_d_m2048_strategy_nd_association.py
 readonly MIRROR=verify_gate_d_rewrite_same_region_git_mirror.py
-readonly INSTALLER_SHA=b12b5bbae02cbb2f63e4aead33fb32167b3e8d9ec9ffd241e630d820014a2f4a
-readonly LAUNCHER_SHA=26d7199d773a5d16a167deeed16f1d247a830751dec5af9ca161ea59b7903206
+readonly INSTALLER_SHA=ed3e23a015d5943c3f6171cdfec2762a4d74a71f6a333e3cdb16a44daa8d5132
+readonly LAUNCHER_SHA=c2dd843de5ae89bf688b2916f60309f88bbc9a8d3cbfb4914a37505e599d2a74
 readonly PROBE_SHA=1debe946e35311014e667fed863871eed4bf3afeaa9aeb27445f50b2ea233774
 readonly PUBLISHER_SHA=83602a623fd6392515c63a1017c89f7ed7c06f5d0a7e1ae4e6aca519f99db9be
-readonly MIRROR_SHA=1f238fd59929ad320913ccd92d9a8dde7542be91b8ae3df6e799c8e7bb7d909e
+readonly MIRROR_SHA=251266405fe4b881113a34c7cf55e3f9be8273bbf8200e55233bcef17c24b5d6
 
 git_local() {
   /usr/bin/env -i GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
@@ -79,21 +82,40 @@ exec 9>/home/gianl/glm-run/.glm_pod_workload.lock
 exec 8>/home/gianl/.glm-tpu-rsync.lock
 /usr/bin/flock 8
 
+has_unique_markers() {
+  local file=$1 marker=$2 expected=$3
+  [[ $(/usr/bin/awk -v marker="$marker" '$1 == marker {print $2}' "$file" | /usr/bin/wc -l) -eq $expected ]] &&
+    [[ $(/usr/bin/awk -v marker="$marker" '$1 == marker {print $2}' "$file" | /usr/bin/sort -u | /usr/bin/wc -l) -eq $expected ]]
+}
 has_eight_unique_markers() {
-  local file=$1 marker=$2
-  [[ $(/usr/bin/awk -v marker="$marker" '$1 == marker {print $2}' "$file" | /usr/bin/wc -l) -eq 8 ]] &&
-    [[ $(/usr/bin/awk -v marker="$marker" '$1 == marker {print $2}' "$file" | /usr/bin/sort -u | /usr/bin/wc -l) -eq 8 ]]
+  has_unique_markers "$1" "$2" 8
 }
 
 readonly REPORT=/home/gianl/gate-d-runs/m2048-install-$PIN.log
 [[ ! -e $REPORT ]]
 
-# Restore an exact detached repository on workers 1..7. Worker 0 must remain the
-# clean branch authority used by the launcher.
+# Workers 1..7 are clean, full, detached repositories at the observed sealed
+# prestate. Refresh them serially to avoid the previously observed corruption
+# from simultaneous GitHub SSH fetches. The refresher itself is the exact
+# future-commit blob, transported in this command and executed from a sealed
+# memfd; it refuses dirty, linked, shallow, promisor, branch-attached, replaced
+# or unknown-prestate repositories before mutation.
+readonly REPO_REFRESHER_B64=$(git_local show "$PIN:scripts/greenfield/$REPO_REFRESHER" | /usr/bin/base64 -w0)
+[[ $(/usr/bin/printf '%s' "$REPO_REFRESHER_B64" | /usr/bin/base64 -d | /usr/bin/sha256sum | /usr/bin/awk '{print $1}') == "$REPO_REFRESHER_SHA" ]]
+# shellcheck disable=SC2016
+repo_refresh_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; [[ $idx == "$expected_worker" && $idx =~ ^[1-7]$ ]]; encoded='"$REPO_REFRESHER_B64"'; expected='"$REPO_REFRESHER_SHA"'; target='"$PIN"'; prestate='"$WORKER_REPO_PRESTATE_PIN"'; loader="import fcntl,hashlib,os,sys; raw=sys.stdin.buffer.read(); expected=sys.argv[1]; target=sys.argv[2]; prestate=sys.argv[3]; assert hashlib.sha256(raw).hexdigest()==expected; fd=os.memfd_create('gate-d-m2048-repo-refresher',os.MFD_CLOEXEC|getattr(os,'MFD_ALLOW_SEALING',2)); stream=os.fdopen(os.dup(fd),'wb',closefd=True); written=stream.write(raw); stream.flush(); stream.close(); assert written==len(raw); os.fchmod(fd,0o400); seals=getattr(fcntl,'F_SEAL_SEAL',1)|getattr(fcntl,'F_SEAL_SHRINK',2)|getattr(fcntl,'F_SEAL_GROW',4)|getattr(fcntl,'F_SEAL_WRITE',8); fcntl.fcntl(fd,getattr(fcntl,'F_ADD_SEALS',1033),seals); assert fcntl.fcntl(fd,getattr(fcntl,'F_GET_SEALS',1034))==seals; os.set_inheritable(fd,True); path=f'/proc/self/fd/{fd}'; os.execve('/usr/bin/python3',['/usr/bin/python3','-I','-S','-B',path,'--target-pin',target,'--prestate-pin',prestate],{'HOME':'/home/gianl','LANG':'C','LC_ALL':'C','PATH':'/usr/bin:/bin','PYTHONDONTWRITEBYTECODE':'1'})"; /usr/bin/printf "%s" "$encoded" | /usr/bin/base64 -d | /usr/bin/env -i HOME=/home/gianl LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B -c "$loader" "$expected" "$target" "$prestate"'
+for worker in 1 2 3 4 5 6 7; do
+  /snap/bin/gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker="$worker" \
+    --command="expected_worker=$worker; $repo_refresh_command" >>"$REPORT" 2>&1
+done
+has_unique_markers "$REPORT" REPO_REFRESH_OK 7
+
+# Verify all repositories together. Worker 0 remains the clean branch authority
+# used by the launcher; refreshed workers remain detached at the exact pin.
 # shellcheck disable=SC2016
 sync_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; [[ $idx =~ ^[0-7]$ ]]; pin='"$PIN"'; branch='"$BRANCH"'; origin='"$ORIGIN"'; wt='"$WORKTREE"'; run_root=/home/gianl/gate-d-runs; git_local() { /usr/bin/env -i GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_NO_LAZY_FETCH=1 GIT_NO_REPLACE_OBJECTS=1 GIT_OPTIONAL_LOCKS=0 GIT_PROTOCOL_FROM_USER=0 GIT_SSH_COMMAND=/bin/false GIT_TERMINAL_PROMPT=0 HOME=/nonexistent LANG=C LC_ALL=C PATH=/usr/bin:/bin /usr/bin/git -c core.fsmonitor=false -c core.untrackedCache=false -c core.hooksPath=/dev/null -c core.attributesFile=/dev/null -C "$wt" "$@"; }; if [[ $idx == 0 ]]; then [[ -e $wt/.git ]]; [[ $(git_local branch --show-current) == "$branch" ]]; elif [[ ! -e $wt ]]; then /usr/bin/env -i GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_NO_LAZY_FETCH=1 GIT_NO_REPLACE_OBJECTS=1 GIT_OPTIONAL_LOCKS=0 GIT_TERMINAL_PROMPT=0 HOME=/home/gianl LANG=C LC_ALL=C PATH=/usr/bin:/bin GIT_SSH_COMMAND="/usr/bin/ssh -oBatchMode=yes -oClearAllForwardings=yes -oForwardAgent=no" /usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null clone -q --filter=blob:none --single-branch --branch "$branch" "$origin" "$wt"; elif [[ ! -e $wt/.git ]]; then echo "stale non-repository worktree" >&2; exit 1; fi; [[ $(git_local rev-parse HEAD) == "$pin" ]]; [[ -z $(git_local status --porcelain=v1 --untracked-files=all) ]]; [[ -z $(git_local for-each-ref --format="%(refname)" refs/replace) ]]; if [[ ! -e $run_root ]]; then /usr/bin/mkdir -m 0700 "$run_root"; fi; [[ -d $run_root && ! -L $run_root ]]; [[ $(/usr/bin/readlink -f -- "$run_root") == "$run_root" ]]; [[ $(/usr/bin/stat -c "%F:%U:%G:%a" -- "$run_root") == "directory:gianl:gianl:700" ]]; /usr/bin/python3 -I -S -B -c "import os,sys; assert not os.listxattr(sys.argv[1],follow_symlinks=False)" "$run_root"; echo "REPO_OK $(hostname) $pin"'
 /snap/bin/gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-  --command="$sync_command" >"$REPORT" 2>&1
+  --command="$sync_command" >>"$REPORT" 2>&1
 has_eight_unique_markers "$REPORT" REPO_OK
 
 readonly TRANSFER_NAME=gate-d-m2048-runtime-source-$PIN
