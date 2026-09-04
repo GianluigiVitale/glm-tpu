@@ -26,6 +26,105 @@ class ReclamationError(ValueError):
     """A retention, identity, or deletion-safety invariant failed."""
 
 
+def _validate_retirement(value: Any, *, field: str) -> dict[str, Any]:
+    """Validate an explicit decision that an artifact is not reproducible state.
+
+    This is intentionally distinct from a reproduction recipe.  It is used for
+    unrelated or failed artifacts whose payload is being permanently retired,
+    while the generation ledger and compact metadata remain as audit evidence.
+    """
+
+    if not isinstance(value, Mapping) or set(value) != {
+        "owner_scope",
+        "reason",
+        "recovery",
+        "reference_audit",
+    }:
+        raise ReclamationError(f"{field} retirement record schema drifted")
+    for key in ("owner_scope", "reason", "recovery"):
+        item = value.get(key)
+        if not isinstance(item, str) or not item.strip():
+            raise ReclamationError(f"{field}.{key} must be nonempty")
+    references = value.get("reference_audit")
+    if (
+        not isinstance(references, list)
+        or not references
+        or any(not isinstance(item, str) or not item.strip() for item in references)
+    ):
+        raise ReclamationError(f"{field}.reference_audit must be nonempty")
+    return deepcopy(dict(value))
+
+
+def _lineage_record(artifact: Mapping[str, Any], *, field: str) -> dict[str, Any]:
+    """Return exactly one validated reproducibility or retirement record."""
+
+    recipe = artifact.get("recipe")
+    retirement = artifact.get("retirement")
+    if (recipe is None) == (retirement is None):
+        raise ReclamationError(
+            f"{field} must contain exactly one of recipe or retirement"
+        )
+    if retirement is not None:
+        if artifact.get("disposition") != "delete_now":
+            raise ReclamationError(f"{field} retirement is valid only for delete_now")
+        return {"retirement": _validate_retirement(retirement, field=field)}
+    if not isinstance(recipe, Mapping):
+        raise ReclamationError(f"{field} lacks a reproduction recipe")
+    _digest(recipe.get("code_hash"), field=f"{field}.recipe.code_hash", lengths=(40,))
+    entrypoint = recipe.get("entrypoint")
+    if not isinstance(entrypoint, str) or not entrypoint.startswith(
+        "scripts/greenfield/"
+    ):
+        raise ReclamationError(f"{field} recipe entrypoint is invalid")
+    dependencies = recipe.get("dependencies")
+    if not isinstance(dependencies, list):
+        raise ReclamationError(f"{field} recipe dependencies are invalid")
+    normalized_dependencies = []
+    for index, dependency in enumerate(dependencies):
+        dependency_field = f"{field}.recipe.dependencies[{index}]"
+        if not isinstance(dependency, Mapping):
+            raise ReclamationError(
+                f"{dependency_field} must declare artifact_id and required_scope"
+            )
+        required_scope = dependency.get("required_scope")
+        expected_keys = {"artifact_id", "required_scope"}
+        if required_scope == "metadata_only":
+            expected_keys.add("required_objects")
+        if set(dependency) != expected_keys:
+            raise ReclamationError(f"{dependency_field} schema drifted")
+        artifact_id = dependency.get("artifact_id")
+        if not isinstance(artifact_id, str) or not artifact_id:
+            raise ReclamationError(f"{dependency_field}.artifact_id is invalid")
+        if required_scope not in ("full_payload", "metadata_only"):
+            raise ReclamationError(f"{dependency_field}.required_scope is invalid")
+        normalized = {
+            "artifact_id": artifact_id,
+            "required_scope": required_scope,
+        }
+        if required_scope == "metadata_only":
+            required_objects = dependency.get("required_objects")
+            if (
+                not isinstance(required_objects, list)
+                or not required_objects
+                or any(
+                    not isinstance(name, str)
+                    or not name
+                    or name.startswith("/")
+                    or ".." in name.split("/")
+                    for name in required_objects
+                )
+                or len(set(required_objects)) != len(required_objects)
+            ):
+                raise ReclamationError(
+                    f"{dependency_field}.required_objects is invalid"
+                )
+            normalized["required_objects"] = list(required_objects)
+        normalized_dependencies.append(normalized)
+    normalized_recipe = deepcopy(dict(recipe))
+    normalized_recipe["dependencies"] = normalized_dependencies
+    return {"recipe": normalized_recipe}
+
+
 def _canonical_json(value: Any) -> str:
     return json.dumps(
         value,
@@ -87,10 +186,45 @@ def _object_identity(value: Mapping[str, Any], *, field: str) -> dict[str, Any]:
         raise ReclamationError(f"{field} object identity is invalid")
     return {
         "crc32c": crc32c,
-        "generation": _positive_int(value.get("generation"), field=f"{field}.generation"),
+        "generation": _positive_int(
+            value.get("generation"), field=f"{field}.generation"
+        ),
         "name": name,
         "size": _positive_int(value.get("size"), field=f"{field}.size"),
     }
+
+
+def _validate_dependency_safety(
+    artifact_by_id: Mapping[str, Mapping[str, Any]],
+) -> None:
+    """Reject lineage that would delete a retained artifact's required state."""
+
+    for artifact_id, artifact in artifact_by_id.items():
+        recipe = artifact.get("recipe")
+        if recipe is None:
+            continue
+        normalized_recipe = _lineage_record(artifact, field=artifact_id)["recipe"]
+        for dependency in normalized_recipe["dependencies"]:
+            dependency_id = dependency["artifact_id"]
+            if dependency_id not in artifact_by_id:
+                raise ReclamationError(
+                    f"{artifact_id} names unknown dependency {dependency_id}"
+                )
+            target = artifact_by_id[dependency_id]
+            if dependency["required_scope"] == "full_payload":
+                if target["disposition"] in ("delete_now", "delete_payloads"):
+                    raise ReclamationError(
+                        f"{artifact_id} full-payload dependency {dependency_id} "
+                        "is scheduled for deletion"
+                    )
+                continue
+            preserved = set(target.get("preserve_metadata_objects", []))
+            required = set(dependency["required_objects"])
+            if target["disposition"] == "delete_now" or not required <= preserved:
+                raise ReclamationError(
+                    f"{artifact_id} metadata-only dependency {dependency_id} is not "
+                    "preserved exactly"
+                )
 
 
 def validate_policy(policy: Mapping[str, Any]) -> None:
@@ -143,35 +277,26 @@ def validate_policy(policy: Mapping[str, Any]) -> None:
         if disposition in ("delete_now", "delete_payloads"):
             delete_count += 1
             for protected_prefix in protected_prefixes:
-                if prefix.startswith(protected_prefix) or protected_prefix.startswith(prefix):
+                if prefix.startswith(protected_prefix) or protected_prefix.startswith(
+                    prefix
+                ):
                     raise ReclamationError(
                         f"delete artifact {artifact_id} overlaps protected prefix"
                     )
-        _positive_int(artifact.get("expected_object_count"), field=f"{artifact_id}.expected_object_count")
-        _positive_int(artifact.get("expected_bytes"), field=f"{artifact_id}.expected_bytes")
-        recipe = artifact.get("recipe")
-        if not isinstance(recipe, Mapping):
-            raise ReclamationError(f"{artifact_id} lacks a reproduction recipe")
-        _digest(recipe.get("code_hash"), field=f"{artifact_id}.recipe.code_hash", lengths=(40,))
-        entrypoint = recipe.get("entrypoint")
-        if not isinstance(entrypoint, str) or not entrypoint.startswith("scripts/greenfield/"):
-            raise ReclamationError(f"{artifact_id} recipe entrypoint is invalid")
-        dependencies = recipe.get("dependencies")
-        if not isinstance(dependencies, list) or any(
-            not isinstance(item, str) for item in dependencies
-        ):
-            raise ReclamationError(f"{artifact_id} recipe dependencies are invalid")
+        _positive_int(
+            artifact.get("expected_object_count"),
+            field=f"{artifact_id}.expected_object_count",
+        )
+        _positive_int(
+            artifact.get("expected_bytes"), field=f"{artifact_id}.expected_bytes"
+        )
+        _lineage_record(artifact, field=artifact_id)
         ids.add(artifact_id)
         prefixes.add(prefix)
         artifact_by_id[artifact_id] = artifact
     if delete_count == 0:
         raise ReclamationError("retention policy authorizes no deletion candidates")
-    for artifact_id, artifact in artifact_by_id.items():
-        for dependency in artifact["recipe"]["dependencies"]:
-            if dependency not in artifact_by_id:
-                raise ReclamationError(
-                    f"{artifact_id} names unknown dependency {dependency}"
-                )
+    _validate_dependency_safety(artifact_by_id)
 
 
 def build_reproducibility_capsule(
@@ -234,13 +359,8 @@ def build_reproducibility_capsule(
             raise ReclamationError(
                 f"{artifact_id} preserved metadata object set is invalid"
             )
-        if artifact["disposition"] in (
-            "delete_now",
-            "delete_payloads",
-        ) and not preserve_metadata:
-            raise ReclamationError(
-                f"{artifact_id} deletion lacks preserved metadata"
-            )
+        if artifact["disposition"] == "delete_payloads" and not preserve_metadata:
+            raise ReclamationError(f"{artifact_id} deletion lacks preserved metadata")
         expected_manifest = artifact.get("expected_manifest_sha256")
         if expected_manifest is not None:
             _digest(
@@ -252,23 +372,20 @@ def build_reproducibility_capsule(
                 not isinstance(manifest_object, str)
                 or f"{prefix}{manifest_object}" not in names
             ):
-                raise ReclamationError(
-                    f"{artifact_id} manifest object is incomplete"
-                )
-        artifact_records.append(
-            {
-                "bytes": sum(item["size"] for item in objects),
-                "disposition": artifact["disposition"],
-                "expected_manifest_sha256": artifact.get("expected_manifest_sha256"),
-                "id": artifact_id,
-                "object_count": len(objects),
-                "objects": objects,
-                "prefix": prefix,
-                "preserve_metadata_objects": list(preserve_metadata),
-                "recipe": deepcopy(artifact["recipe"]),
-                "terminal_objects": list(terminal_objects),
-            }
-        )
+                raise ReclamationError(f"{artifact_id} manifest object is incomplete")
+        record = {
+            "bytes": sum(item["size"] for item in objects),
+            "disposition": artifact["disposition"],
+            "expected_manifest_sha256": artifact.get("expected_manifest_sha256"),
+            "id": artifact_id,
+            "object_count": len(objects),
+            "objects": objects,
+            "prefix": prefix,
+            "preserve_metadata_objects": list(preserve_metadata),
+            "terminal_objects": list(terminal_objects),
+        }
+        record.update(_lineage_record(artifact, field=artifact_id))
+        artifact_records.append(record)
     capsule: dict[str, Any] = {
         "artifact_kind": CAPSULE_ARTIFACT_KIND,
         "artifacts": artifact_records,
@@ -280,9 +397,7 @@ def build_reproducibility_capsule(
         "proof": deepcopy(dict(proof)),
         "protected_prefixes": list(policy["protected_prefixes"]),
     }
-    capsule["capsule_sha256"] = _mapping_hash(
-        capsule, hash_field="capsule_sha256"
-    )
+    capsule["capsule_sha256"] = _mapping_hash(capsule, hash_field="capsule_sha256")
     validate_capsule(capsule)
     return capsule
 
@@ -305,7 +420,9 @@ def validate_capsule(capsule: Mapping[str, Any]) -> None:
     observed_hash = capsule_sha256(capsule)
     if capsule.get("capsule_sha256") != observed_hash:
         raise ReclamationError("capsule SHA-256 drifted")
-    _digest(capsule.get("generator_code_hash"), field="generator_code_hash", lengths=(40,))
+    _digest(
+        capsule.get("generator_code_hash"), field="generator_code_hash", lengths=(40,)
+    )
     proof = capsule.get("proof")
     if not isinstance(proof, Mapping) or proof.get("status") != "passed":
         raise ReclamationError("capsule lacks a passed recreation proof")
@@ -319,6 +436,7 @@ def validate_capsule(capsule: Mapping[str, Any]) -> None:
     )
     seen_names: set[str] = set()
     seen_ids: set[str] = set()
+    artifact_by_id: dict[str, Mapping[str, Any]] = {}
     for artifact in artifacts:
         if not isinstance(artifact, Mapping):
             raise ReclamationError("capsule artifact record is invalid")
@@ -351,14 +469,7 @@ def validate_capsule(capsule: Mapping[str, Any]) -> None:
             for name in terminal_objects
         ):
             raise ReclamationError(f"{artifact_id} terminal object set drifted")
-        recipe = artifact.get("recipe")
-        if not isinstance(recipe, Mapping):
-            raise ReclamationError(f"{artifact_id} recipe is missing")
-        _digest(
-            recipe.get("code_hash"),
-            field=f"{artifact_id}.recipe.code_hash",
-            lengths=(40,),
-        )
+        _lineage_record(artifact, field=artifact_id)
         if artifact.get("object_count") != len(normalized):
             raise ReclamationError(f"{artifact_id} object count drifted")
         if artifact.get("bytes") != sum(item["size"] for item in normalized):
@@ -368,17 +479,19 @@ def validate_capsule(capsule: Mapping[str, Any]) -> None:
             not isinstance(name, str) or f"{prefix}{name}" not in names
             for name in preserve_metadata
         ):
-            raise ReclamationError(
-                f"{artifact_id} preserved metadata set drifted"
-            )
+            raise ReclamationError(f"{artifact_id} preserved metadata set drifted")
         if disposition in ("delete_now", "delete_payloads"):
             for protected_prefix in protected_prefixes:
-                if prefix.startswith(protected_prefix) or protected_prefix.startswith(prefix):
+                if prefix.startswith(protected_prefix) or protected_prefix.startswith(
+                    prefix
+                ):
                     raise ReclamationError(
                         f"delete artifact {artifact_id} overlaps protected prefix"
                     )
         seen_ids.add(artifact_id)
         seen_names.update(names)
+        artifact_by_id[artifact_id] = artifact
+    _validate_dependency_safety(artifact_by_id)
 
 
 def deletion_order(capsule: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
@@ -392,8 +505,7 @@ def deletion_order(capsule: Mapping[str, Any]) -> tuple[dict[str, Any], ...]:
         prefix = artifact["prefix"]
         terminal = {f"{prefix}{name}" for name in artifact["terminal_objects"]}
         preserved = {
-            f"{prefix}{name}"
-            for name in artifact["preserve_metadata_objects"]
+            f"{prefix}{name}" for name in artifact["preserve_metadata_objects"]
         }
         for item in artifact["objects"]:
             if (
@@ -423,17 +535,12 @@ def reconcile_live_objects(
 ) -> None:
     """Require exact name/size/generation/CRC identity before mutation."""
 
-    expected_values = [
-        _object_identity(item, field="expected") for item in expected
-    ]
-    observed_values = [
-        _object_identity(item, field="observed") for item in observed
-    ]
+    expected_values = [_object_identity(item, field="expected") for item in expected]
+    observed_values = [_object_identity(item, field="observed") for item in observed]
     expected_by_name = {item["name"]: item for item in expected_values}
     observed_by_name = {item["name"]: item for item in observed_values}
-    if (
-        len(expected_by_name) != len(expected_values)
-        or len(observed_by_name) != len(observed_values)
+    if len(expected_by_name) != len(expected_values) or len(observed_by_name) != len(
+        observed_values
     ):
         raise ReclamationError("live object identity contains duplicate names")
     if expected_by_name != observed_by_name:

@@ -1,0 +1,43 @@
+{
+  "artifact_kind": "urgent_storage_cleanup_adjudication",
+  "bucket": "driftbench-dsv4-uc",
+  "bucket_location": "US-CENTRAL2",
+  "checks": {
+    "active_direct_pp16_manifest_sha256": "b385458f233f21342855ac4c3373429c034a9e40bd85d638b16466199ff66bab",
+    "active_direct_pp16_self_contained_payloads": 32,
+    "active_direct_pp16_standalone_inspection": {
+      "file_count": 32,
+      "runtime_file_bytes": 869658011904,
+      "source_verification_mode": "feature_runtime_with_metadata_parent",
+      "tensor_count": 6496,
+      "verified": true
+    },
+    "active_large_runtime_prefixes": [
+      "checkpoints/greenfield/glm52/runtime_feature/PP16_LP2/greenfield_runtime_feature_qkv_direct_pp16_20260827T164842844148623Z/"
+    ],
+    "canonical_model_prefixes": ["models/GLM-5.2-FP8/"],
+    "current_runner_dependency": "Direct PP16 full payload plus compact PP16 packed/base/feature lineage metadata; no PP8 or DeepSeek payload.",
+    "deepseek_reference_audit": "No running process or current GLM execution path names any of the three model prefixes; source mentions are historical documentation or generic model-support code.",
+    "live_bytes_before": 5877908918585,
+    "live_checkpoint_bytes_before": 3541244313111,
+    "live_model_bytes_before": 1778693787808,
+    "recurring_writers": ["/home/gianl/bin/sync-glm.sh -> repos/ only"],
+    "sick_infra_objects": 68,
+    "sick_infra_reference_audit": "No exact SICK/INFRA object or draw directory is referenced by current code, certificates, installers, recovery scripts, or runbooks.",
+    "soft_delete_seconds": 604800,
+    "tpu_workflows_active": false
+  },
+  "decision": "Keep canonical GLM and the active direct PP16 runtime. Preserve compact lineage/model metadata and exact object ledgers. Delete only generation-pinned superseded runtimes, retired DeepSeek models, and explicitly failed SICK/INFRA dump directories.",
+  "proof_sha256": "84e98d15a8924d0266d92abb72dcf5fee0616b81e59596dbf80af14cbf9f93ed",
+  "review": {
+    "p0": [],
+    "p1_resolved_by": [
+      "mechanical direct-runtime lineage and runner audit",
+      "generation-bound capsule before mutation",
+      "fresh current/historical reference audit",
+      "explicit permanent-retirement records for unrelated models and failed dumps"
+    ],
+    "reviewer": "independent Sol adversarial review"
+  },
+  "status": "passed"
+}

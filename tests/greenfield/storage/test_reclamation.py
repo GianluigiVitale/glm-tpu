@@ -45,7 +45,12 @@ def _policy() -> dict:
                 "preserve_metadata_objects": ["SUCCESS"],
                 "recipe": {
                     "code_hash": CODE_HASH,
-                    "dependencies": ["canonical"],
+                    "dependencies": [
+                        {
+                            "artifact_id": "canonical",
+                            "required_scope": "full_payload",
+                        }
+                    ],
                     "entrypoint": "scripts/greenfield/pack.py",
                 },
                 "terminal_objects": ["SUCCESS"],
@@ -153,7 +158,9 @@ def test_capsule_refuses_missing_terminal_and_failed_proof() -> None:
 
 def test_policy_refuses_unknown_dependency_and_overlapping_artifacts() -> None:
     policy = _policy()
-    policy["artifacts"][1]["recipe"]["dependencies"] = ["missing"]
+    policy["artifacts"][1]["recipe"]["dependencies"] = [
+        {"artifact_id": "missing", "required_scope": "full_payload"}
+    ]
     with pytest.raises(ReclamationError, match="unknown dependency"):
         validate_policy(policy)
 
@@ -177,6 +184,74 @@ def test_payload_only_reclamation_preserves_named_metadata() -> None:
         proof=PROOF,
     )
     ordered = deletion_order(capsule)
-    assert [item["name"] for item in ordered] == [
-        "checkpoints/derived/tag/payload.bin"
+    assert [item["name"] for item in ordered] == ["checkpoints/derived/tag/payload.bin"]
+
+
+def test_policy_refuses_deleting_a_kept_artifacts_required_payload() -> None:
+    policy = _policy()
+    policy["artifacts"][0]["recipe"]["dependencies"] = [
+        {"artifact_id": "derived", "required_scope": "full_payload"}
     ]
+    with pytest.raises(ReclamationError, match="full-payload dependency"):
+        validate_policy(policy)
+
+
+def test_metadata_dependency_requires_exact_preserved_object_set() -> None:
+    policy = _policy()
+    policy["artifacts"][1]["disposition"] = "delete_payloads"
+    policy["artifacts"][0]["recipe"]["dependencies"] = [
+        {
+            "artifact_id": "derived",
+            "required_objects": ["SUCCESS"],
+            "required_scope": "metadata_only",
+        }
+    ]
+    validate_policy(policy)
+
+    policy["artifacts"][1]["preserve_metadata_objects"] = []
+    with pytest.raises(ReclamationError, match="not preserved exactly"):
+        validate_policy(policy)
+
+
+def test_retired_artifact_can_delete_without_a_fake_reproduction_recipe() -> None:
+    policy = _policy()
+    derived = policy["artifacts"][1]
+    derived.pop("recipe")
+    derived["preserve_metadata_objects"] = []
+    derived["retirement"] = {
+        "owner_scope": "superseded project outside the active goal",
+        "reason": "no current runner, manifest, or recovery tool references it",
+        "recovery": "permanent retirement; exact object ledger retained",
+        "reference_audit": ["git grep --all", "live process census"],
+    }
+    capsule = build_reproducibility_capsule(
+        policy,
+        _objects(),
+        generator_code_hash=CODE_HASH,
+        created_utc="2026-09-04T12:00:00Z",
+        proof=PROOF,
+    )
+    validate_capsule(capsule)
+    assert capsule["artifacts"][1]["retirement"] == derived["retirement"]
+    assert "recipe" not in capsule["artifacts"][1]
+    assert len(deletion_order(capsule)) == 2
+
+
+def test_retirement_is_delete_now_only_and_requires_a_reference_audit() -> None:
+    policy = _policy()
+    derived = policy["artifacts"][1]
+    derived.pop("recipe")
+    derived["retirement"] = {
+        "owner_scope": "old project",
+        "reason": "obsolete",
+        "recovery": "not required",
+        "reference_audit": ["current tree"],
+    }
+    derived["disposition"] = "delete_payloads"
+    with pytest.raises(ReclamationError, match="delete_now"):
+        validate_policy(policy)
+
+    derived["disposition"] = "delete_now"
+    derived["retirement"]["reference_audit"] = []
+    with pytest.raises(ReclamationError, match="reference_audit"):
+        validate_policy(policy)
