@@ -12,12 +12,12 @@ from collections.abc import Mapping
 from hashlib import sha256
 from pathlib import Path
 
-SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v9")
+SOURCE_ROOT = Path("/opt/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-install-v10")
 INSTALLER_PATH = SOURCE_ROOT / "install_gate_d_layer1_prompt_chunk0_geometry_runtime.py"
 LAUNCHER_PARENT = Path("/opt/glm-tpu/bin")
-LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_layer1_prompt_chunk0_geometry_v9.py"
+LAUNCHER_TARGET = LAUNCHER_PARENT / "launch_gate_d_layer1_prompt_chunk0_geometry_v10.py"
 CAPSULE_PARENT = Path("/usr/local/libexec/glm-tpu")
-CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-prompt-chunk0-geometry-v8"
+CAPSULE_TARGET = CAPSULE_PARENT / "gate-d-layer1-prompt-chunk0-geometry-v9"
 EXPECTED_ENVIRONMENT = {
     "HOME": "/root",
     "LANG": "C",
@@ -29,11 +29,11 @@ PAYLOADS = {
     "chunk0_embedding_hlo.py": "e239c20b1a206061c9116726421343d81d5ff989be5e8f8440d5c59106eb9757",
     "original_db518_normalized_boundary_hlo.py": "35757aab4a616a2f1073f78503c29075c3e43cb684e4e1faf7d835630876809e",
     "chunk0_real_layer_consumer_hlo.py": "790594d3068987ea323601e1b4677ed7f9cf6d1315ea7fc82e8930fee7da6d3b",
-    "probe_layer1_prompt_chunk0_geometry.py": "6326b38ca00a971c7c5121b7ad1655acf5bca56dd18ef5267a232e0b2a7b0425",
-    "publish_gate_d_layer1_prompt_chunk0_geometry.py": "4c1b717bad1fee4809a8c096145db1e04d50f0de1f0ca3aaa8b1c1ec73780be2",
-    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "788f84c0e04a84cb6d1a65bcbee7d77859c99f32f4f86995cefde2a907e8561b",
+    "probe_layer1_prompt_chunk0_geometry.py": "3bc2d70a96dbb656e8efc90ba68b6e50b9bfcf74b1d744d4dae1251a72867133",
+    "publish_gate_d_layer1_prompt_chunk0_geometry.py": "25ece6501095c0c71ec012badccf9233a2361cc13d6f30e278e657ff3d27ee52",
+    "launch_gate_d_layer1_prompt_chunk0_geometry.py": "1c2a6dcefb4a63e043345b64336832fc55aa187a47a3f4dd113b8d1bff518bb1",
     "verify_gate_d_rewrite_same_region_git_mirror.py": (
-        "62eda6849de3f449471609de7f4abc0bf0ca9497122ebdfbb658c153780a236a"
+        "c009032767f9996b6a9cbec7ba169e671b90eff216b14bc505c21e78215f1f13"
     ),
 }
 CAPSULE_NAMES = (

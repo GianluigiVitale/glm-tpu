@@ -42,6 +42,10 @@ LAYER0_INPUT = Path(
 LEGACY_LAYER1_CACHE = Path(
     "/home/gianl/glm-run/greenfield_legacy_layer1_prompt_index_cache_20260903T000356727206404Z/prompt_index_cache"
 )
+V9_DIAGNOSTIC = Path(
+    "/home/gianl/gate-d-runs/"
+    "greenfield_layer1_prompt_chunk0_geometry_20260904T015629267912157Z"
+)
 
 
 def test_runner_pins_inputs_digests_and_sealed_interpreter():
@@ -66,7 +70,7 @@ def test_runner_pins_inputs_digests_and_sealed_interpreter():
     assert "unsafe Gate-D chunk-0 geometry tag" in runner
     # The only executed probe pathname is the root-owned immutable capsule.
     assert (
-        "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v8"
+        "readonly CAPSULE=/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v9"
         in runner
     )
     assert '"$SEALED_PYTHON" -I -S -B -u "$PROBE"' in runner
@@ -362,7 +366,7 @@ def test_installer_and_launcher_have_a_strict_install_only_boundary():
         "/usr/local/libexec/glm-tpu/"
     )
     assert str(installer_module.LAUNCHER_TARGET).endswith(
-        "launch_gate_d_layer1_prompt_chunk0_geometry_v9.py"
+        "launch_gate_d_layer1_prompt_chunk0_geometry_v10.py"
     )
     assert str(installer_module.LAUNCHER_TARGET).startswith("/opt/glm-tpu/bin/")
     assert installer.startswith("#!/usr/bin/env -S /usr/bin/python3 -I -S -B\n")
@@ -610,6 +614,73 @@ def test_publisher_mutation_checks_wk_executable_boundaries():
         promote_stable,
     )
     publisher._require_wk_hlo_boundaries(*arguments)
+    fused_decode = (
+        "HloModule decode\n\n"
+        "%decode_convert (lhs: f32[786432], rhs: f32[786432]) "
+        "-> bf16[786432] {\n"
+        "  %lhs = f32[786432] parameter(0)\n"
+        "  %rhs = f32[786432] parameter(1)\n"
+        "  %product = f32[786432] multiply(%lhs, %rhs)\n"
+        "  ROOT %converted = bf16[786432] convert(%product)\n"
+        "}\n\n"
+        "ENTRY %decode (bits: u8[128,6144], scale: f32[1,48]) {\n"
+        "  %bits = u8[128,6144] parameter(0)\n"
+        "  %scale = f32[1,48] parameter(1)\n"
+        "  %lhs = f32[786432] custom-call(%bits)\n"
+        "  %rhs = f32[786432] custom-call(%scale)\n"
+        "  %fused = bf16[786432] fusion(%lhs, %rhs), "
+        "calls=%decode_convert\n"
+        "  ROOT %decoded = bf16[128,6144] reshape(%fused)\n"
+        "}\n"
+    )
+    publisher._require_wk_hlo_boundaries(
+        fused_decode, decode_stable, promote, promote_stable
+    )
+    # A shape-only fusion/reshape cannot stand in for the terminal BF16 cast.
+    with pytest.raises(RuntimeError, match="boundary drifted"):
+        publisher._require_wk_hlo_boundaries(
+            fused_decode.replace(
+                "ROOT %converted = bf16[786432] convert(%product)",
+                "ROOT %converted = bf16[786432] custom-call(%product)",
+            ),
+            decode_stable,
+            promote,
+            promote_stable,
+        )
+    # Both fused operands have exact, ordered, non-overlapping raw/scale roots.
+    for attacked_decode in (
+        fused_decode.replace(
+            "%rhs = f32[786432] custom-call(%scale)",
+            "%rhs = f32[786432] custom-call(%bits)",
+        ),
+        fused_decode.replace(
+            "%lhs = f32[786432] custom-call(%bits)\n"
+            "  %rhs = f32[786432] custom-call(%scale)",
+            "%lhs = f32[786432] custom-call(%bits, %scale)\n"
+            "  %rhs = f32[786432] custom-call(%bits)",
+        ),
+        fused_decode.replace(
+            "%lhs = f32[786432] custom-call(%bits)\n"
+            "  %rhs = f32[786432] custom-call(%scale)",
+            "%lhs = f32[786432] custom-call(%scale)\n"
+            "  %rhs = f32[786432] custom-call(%bits)",
+        ),
+        fused_decode.replace(
+            "%fused = bf16[786432] fusion(%lhs, %rhs)",
+            "%fused = bf16[786432] fusion(%lhs, %rhs, %bits)",
+        ),
+        fused_decode.replace(
+            "%lhs = f32[786432] parameter(0)\n" "  %rhs = f32[786432] parameter(1)",
+            "%lhs = f32[786432] parameter(1)\n" "  %rhs = f32[786432] parameter(0)",
+        ),
+    ):
+        with pytest.raises(RuntimeError, match="boundary drifted"):
+            publisher._require_wk_hlo_boundaries(
+                attacked_decode,
+                decode_stable,
+                promote,
+                promote_stable,
+            )
     # Decode parameters must both be live ancestors of the BF16 root.
     with pytest.raises(RuntimeError, match="boundary drifted"):
         publisher._require_wk_hlo_boundaries(
@@ -650,6 +721,20 @@ def test_publisher_mutation_checks_wk_executable_boundaries():
             promote,
             promote_stable,
         )
+
+
+@pytest.mark.skipif(
+    not (V9_DIAGNOSTIC / "hlo/wk_decode.optimized_hlo.txt").exists(),
+    reason="protected V9 diagnostic HLO is not present",
+)
+def test_publisher_accepts_protected_v9_wk_hlo_lineage():
+    publisher = _load_publisher()
+    publisher._require_wk_hlo_boundaries(
+        (V9_DIAGNOSTIC / "hlo/wk_decode.optimized_hlo.txt").read_text(),
+        (V9_DIAGNOSTIC / "hlo/wk_decode.stablehlo.mlir").read_text(),
+        (V9_DIAGNOSTIC / "hlo/wk_promote.optimized_hlo.txt").read_text(),
+        (V9_DIAGNOSTIC / "hlo/wk_promote.stablehlo.mlir").read_text(),
+    )
 
 
 def _device_gather_hlo_fixture() -> tuple[str, str]:

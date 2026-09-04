@@ -22,7 +22,7 @@ from typing import Any
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v8/"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v9/"
     "publish_gate_d_layer1_prompt_chunk0_geometry.py"
 )
 SOURCE_PATH = "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
@@ -393,18 +393,27 @@ def _validate_npz(
     return legacy[0] == 0
 
 
-def _entry_graph(
+def _computation_graph(
     optimized: str,
+    computation: str | None,
 ) -> tuple[dict[str, dict[str, Any]], str]:
-    """Parse the optimized ENTRY computation needed by the wk boundary audit."""
+    """Parse one optimized computation needed by the wk boundary audit."""
 
     lines = optimized.splitlines()
     try:
-        start = next(
-            index for index, line in enumerate(lines) if line.startswith("ENTRY ")
-        )
+        if computation is None:
+            start = next(
+                index for index, line in enumerate(lines) if line.startswith("ENTRY ")
+            )
+        else:
+            start = next(
+                index
+                for index, line in enumerate(lines)
+                if line.startswith(f"{computation} (")
+            )
     except StopIteration as error:
-        raise RuntimeError("chunk-0 wk ENTRY computation is absent") from error
+        label = "ENTRY" if computation is None else computation
+        raise RuntimeError(f"chunk-0 wk {label} computation is absent") from error
     nodes: dict[str, dict[str, Any]] = {}
     root = ""
     instruction = re.compile(
@@ -449,11 +458,19 @@ def _entry_graph(
         }
         if match.group("root"):
             if root:
-                raise RuntimeError("chunk-0 wk ENTRY has multiple roots")
+                raise RuntimeError("chunk-0 wk computation has multiple roots")
             root = name
     if not nodes or not root:
-        raise RuntimeError("chunk-0 wk ENTRY graph is incomplete")
+        raise RuntimeError("chunk-0 wk computation graph is incomplete")
     return nodes, root
+
+
+def _entry_graph(
+    optimized: str,
+) -> tuple[dict[str, dict[str, Any]], str]:
+    """Parse the optimized ENTRY computation needed by the wk boundary audit."""
+
+    return _computation_graph(optimized, None)
 
 
 def _ancestors(nodes: Mapping[str, Mapping[str, Any]], name: str) -> set[str]:
@@ -479,6 +496,97 @@ def _stablehlo_main_signature(stablehlo: str) -> str:
     if match is None:
         raise RuntimeError("chunk-0 wk StableHLO public signature is absent")
     return match.group(0)
+
+
+def _decode_root_is_bf16_conversion(
+    optimized: str,
+    nodes: Mapping[str, Mapping[str, Any]],
+    root: str,
+) -> bool:
+    """Accept a direct conversion or TPU's live reshape-of-conversion fusion."""
+
+    root_node = nodes[root]
+    if root_node["opcode"] == "convert":
+        return len(root_node["operands"]) == 1
+    if root_node["opcode"] != "reshape" or len(root_node["operands"]) != 1:
+        return False
+    fusion_name = root_node["operands"][0]
+    fusion = nodes.get(fusion_name)
+    if fusion is None or fusion["opcode"] != "fusion":
+        return False
+    entry_parameters = {
+        name: node for name, node in nodes.items() if node["opcode"] == "parameter"
+    }
+    raw_parameters = tuple(
+        name
+        for name, node in entry_parameters.items()
+        if node["shapes"] == (("u8", (128, 6144)),)
+    )
+    scale_parameters = tuple(
+        name
+        for name, node in entry_parameters.items()
+        if node["shapes"] == (("f32", (1, 48)),)
+    )
+    fusion_operands = fusion["operands"]
+    flat_f32 = (("f32", (786432,)),)
+    flat_bf16 = (("bf16", (786432,)),)
+    if (
+        len(raw_parameters) != 1
+        or len(scale_parameters) != 1
+        or fusion["shapes"] != flat_bf16
+        or len(fusion_operands) != 2
+        or any(
+            operand not in nodes or nodes[operand]["shapes"] != flat_f32
+            for operand in fusion_operands
+        )
+    ):
+        return False
+    outer_sources = tuple(
+        {
+            name
+            for name in _ancestors(nodes, operand)
+            if nodes[name]["opcode"] == "parameter"
+        }
+        for operand in fusion_operands
+    )
+    if outer_sources != ({raw_parameters[0]}, {scale_parameters[0]}):
+        return False
+    call_matches = re.findall(r"\bcalls=(%[A-Za-z0-9_.-]+)", fusion["raw"])
+    if len(call_matches) != 1:
+        return False
+    callee_nodes, callee_root = _computation_graph(optimized, call_matches[0])
+    callee_parameters_by_number: dict[int, str] = {}
+    for name, node in callee_nodes.items():
+        if node["opcode"] != "parameter":
+            continue
+        numbers = re.findall(r"\bparameter\(([0-9]+)\)", node["raw"])
+        if len(numbers) != 1 or node["shapes"] != flat_f32:
+            return False
+        number = int(numbers[0])
+        if number in callee_parameters_by_number:
+            return False
+        callee_parameters_by_number[number] = name
+    if set(callee_parameters_by_number) != {0, 1}:
+        return False
+    callee_parameters = tuple(callee_parameters_by_number[index] for index in range(2))
+    callee_root_node = callee_nodes[callee_root]
+    if (
+        callee_root_node["opcode"] != "convert"
+        or len(callee_root_node["operands"]) != 1
+        or callee_root_node["shapes"] != flat_bf16
+    ):
+        return False
+    converted_name = callee_root_node["operands"][0]
+    converted = callee_nodes.get(converted_name)
+    return (
+        converted is not None
+        and converted["opcode"] == "multiply"
+        and converted["shapes"] == flat_f32
+        and converted["operands"] == callee_parameters
+        and _ancestors(callee_nodes, callee_root)
+        == {callee_root, converted_name, *converted["operands"]}
+        and set(callee_nodes) == {callee_root, converted_name, *converted["operands"]}
+    )
 
 
 def _require_wk_hlo_boundaries(
@@ -520,8 +628,9 @@ def _require_wk_hlo_boundaries(
     if (
         decode_parameter_shapes != [(("f32", (1, 48)),), (("u8", (128, 6144)),)]
         or decode_nodes[decode_root]["shapes"] != (bf16_shape,)
-        or decode_nodes[decode_root]["opcode"] != "convert"
-        or len(decode_nodes[decode_root]["operands"]) != 1
+        or not _decode_root_is_bf16_conversion(
+            decode_optimized, decode_nodes, decode_root
+        )
         or not set(decode_parameters) <= decode_live
         or promote_parameter_shapes != [(bf16_shape,)]
         or promote_nodes[promote_root]["shapes"] != (wk_shape,)

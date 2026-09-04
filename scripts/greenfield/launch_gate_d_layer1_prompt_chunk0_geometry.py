@@ -13,7 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 
 INSTALL_PATH = Path(
-    "/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v9.py"
+    "/opt/glm-tpu/bin/launch_gate_d_layer1_prompt_chunk0_geometry_v10.py"
 )
 PYTHON = Path("/usr/bin/python3.10")
 PYTHON_SHA256 = "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
@@ -26,9 +26,9 @@ WRAPPER_PATH = (
     WORKTREE / "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
 )
 WRAPPER_SOURCE_PATH = "scripts/greenfield/run_probe_layer1_prompt_chunk0_geometry.sh"
-WRAPPER_SHA256 = "a8da97514f226d37d9384f2a64bb72705a41116119841a7622f88ae0bc80d72b"
+WRAPPER_SHA256 = "4a37a316a2c2efde3ac24ebc5c31120f11c0d1283d152e25d3cd1a7cd6639f5a"
 CAPSULE_ROOT = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v8"
+    "/usr/local/libexec/glm-tpu/gate-d-layer1-prompt-chunk0-geometry-v9"
 )
 PARSER_CONTRACT_PATH = CAPSULE_ROOT / "chunk0_embedding_hlo.py"
 PARSER_CONTRACT_SOURCE_PATH = "glm_tpu/greenfield/validation/chunk0_embedding_hlo.py"
@@ -51,18 +51,18 @@ CONSUMER_CONTRACT_SHA256 = (
 )
 PROBE_PATH = CAPSULE_ROOT / "probe_layer1_prompt_chunk0_geometry.py"
 PROBE_SOURCE_PATH = "scripts/greenfield/probe_layer1_prompt_chunk0_geometry.py"
-PROBE_SHA256 = "6326b38ca00a971c7c5121b7ad1655acf5bca56dd18ef5267a232e0b2a7b0425"
+PROBE_SHA256 = "3bc2d70a96dbb656e8efc90ba68b6e50b9bfcf74b1d744d4dae1251a72867133"
 PUBLISHER_PATH = CAPSULE_ROOT / "publish_gate_d_layer1_prompt_chunk0_geometry.py"
 PUBLISHER_SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_layer1_prompt_chunk0_geometry.py"
 )
-PUBLISHER_SHA256 = "4c1b717bad1fee4809a8c096145db1e04d50f0de1f0ca3aaa8b1c1ec73780be2"
+PUBLISHER_SHA256 = "25ece6501095c0c71ec012badccf9233a2361cc13d6f30e278e657ff3d27ee52"
 MIRROR_VERIFIER_PATH = CAPSULE_ROOT / "verify_gate_d_rewrite_same_region_git_mirror.py"
 MIRROR_VERIFIER_SOURCE_PATH = (
     "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
 )
 MIRROR_VERIFIER_SHA256 = (
-    "62eda6849de3f449471609de7f4abc0bf0ca9497122ebdfbb658c153780a236a"
+    "c009032767f9996b6a9cbec7ba169e671b90eff216b14bc505c21e78215f1f13"
 )
 LOCK_ROOT = Path("/opt/glm-tpu/locks")
 LOCK_NAMES = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")

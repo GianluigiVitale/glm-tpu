@@ -11952,3 +11952,29 @@ Claim remains deliberately bounded: real layer consumer, decoder and performance
 Gate D is open. Exact next: build a separate real layer consumer accepting this completed buffer,
 and prove in HLO that it does not recompute input RMS. Its exact protected result is only a
 prerequisite; the 8K decoder still requires a separate review and fresh-tag execution authority.
+
+## 2026-09-04 02:17--02:45Z — V9 localizes the first consumer mismatch; M2048 association unproven
+
+Reviewed/pushed pin `b0c333558fd6973f509b0d26b3164b0bef412bcb` was replayed from origin and
+US-CENTRAL2, installed without launch, and executed once under tag
+`greenfield_layer1_prompt_chunk0_geometry_20260904T015629267912157Z`. The numerical probe completed
+in 32 s. Its layer-0 key control is exact against DB518: 0/2,048 rows and 0/262,144 lanes differ.
+The separate real layer consumer is nonexact against the sealed legacy layer-1 key: every row differs,
+45,519/262,144 lanes total, and row zero differs in 46/128 lanes. Thus the completed input
+normalization/key producer is closed; the first open numerical boundary is inside layer-0 consumer
+arithmetic. Rows 1+ remain diagnostic because their softmax is not the legacy algorithm.
+
+Publication failed closed after the numerical result because TPU codegen ended WK decode in a live
+`reshape(%multiply_convert_fusion)` whose callee root is the BF16 conversion, while the publisher
+required the ENTRY root itself to be `convert`. Diagnostic terminal generation `1788488319565945`,
+SHA `cd214775…a456`, 22 prior objects; arrays SHA `3252aa11…dc0d`; pre/post censuses 8/8 clean.
+Append-only record: `docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v9-wk-publisher-and-consumer-failure.json`.
+A local V10 repair binds the reshape to the sole live fusion, its callee, the exact FP32 multiply and
+terminal BF16 conversion; shape-only fusion mutations reject and the preserved V9 HLO passes.
+
+The sealed accepted prefill HLO `e7371f48…7216` independently confirms its repeated hidden reduction
+is `bf16[2048,6144]{1,0:T(8,128)(2,1)S(3)}` with global 0--31
+`RotatedPincerEmitter/StrategyND`. The current probe instead applies DB533's decode-only M32 row-zero
+tree to each prompt row. The identical backend label does not expose payload association. Exact next:
+one model-free exact-M2048 fingerprint, solving row zero first, before altering consumer arithmetic or
+running 8K. No V9 SUCCESS, DB, decoder, performance or Gate-D claim exists.

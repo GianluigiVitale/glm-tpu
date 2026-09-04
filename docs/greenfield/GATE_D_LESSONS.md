@@ -1294,3 +1294,10 @@ normalized-state cause.
   recomputes it, compare strict canonical JSON bytes rather than raw Python objects; mutation-test nested
   values and reject nonfinite/non-JSON types. Also repin every inherited verifier digest in the publisher,
   not only in the launcher and wrapper.
+- Optimized TPU codegen may expose a semantic terminal conversion as a reshape of a live fusion rather
+  than as the ENTRY root opcode. Accept this only by binding root→fusion→callee→FP32 operation→BF16
+  convert lineage and exact shapes; accepting an arbitrary reshape/fusion is fail-open.
+- A collective's algorithm label and replica group do not determine schedule-sensitive BF16 bits across
+  shapes. DB533 measures M32 decode row zero; legacy prefill reduces `bf16[2048,6144]`. Before reusing a
+  measured tree at another shape, run one model-free shape-identical fingerprint and solve the decisive
+  row. After-codegen HLO can prove shape/layout/backend but not the hidden element association.

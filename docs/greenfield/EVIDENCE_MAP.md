@@ -3828,3 +3828,17 @@ persistence only; review and persistence precede any v2 installation.
   terminal generation `1788480414028848`/`7babccea…f8967`, pre/post 8/8 clean.
 - Record `gate-d-original-db518-v10-normalized-key-exact-success.json`. Classification remains
   `LAYER_CONSUMER_UNPROVEN;DECODER_UNPROVEN;GATE_D_OPEN`; next is a separate real consumer.
+
+## 2026-09-04 — completed normalization exact; first real-consumer boundary nonexact
+
+- Protected tag `greenfield_layer1_prompt_chunk0_geometry_20260904T015629267912157Z` at pushed pin
+  `b0c33355…12bcb` numerically invoked exactly one normalizer, key control and real consumer with zero
+  intermediate host transfers. The key control is exact (0 rows/lanes versus DB518); the real
+  layer-1 key differs from legacy in all 2,048 rows and 45,519 lanes, row zero 46/128.
+- The result is diagnostic-only because publication false-rejected TPU's live
+  reshape→multiply/convert-fusion WK root. Terminal generation/SHA `1788488319565945` /
+  `cd214775…a456`; arrays `3252aa11…dc0d`; pre/post 8/8 clean. Record:
+  `gate-d-layer1-prompt-chunk0-geometry-v9-wk-publisher-and-consumer-failure.json`.
+- Sealed legacy after-codegen HLO `e7371f48…7216` proves exact M2048 hidden reductions, global group
+  0--31 and StrategyND, but not the element association. Applying DB533's M32 row-zero tree per
+  prompt row is unproven. Next evidence is one model-free exact-shape M2048 fingerprint; no 8K yet.

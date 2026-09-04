@@ -28,32 +28,28 @@ weaken history. Optimizations default off. Targets: useful <=200, strong <=125, 
   plus US-CENTRAL2 mirror before protected work. Never use EU.
 - Report result, percentage and blockers plainly; never claim unproven.
 
-## Resume checkpoint — 2026-09-04 00:07Z
+## Resume checkpoint — 2026-09-04 02:45Z
 
-Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; current
-pushed V10 pin `583e678bf3db7519295273732e39cd051bc3b9f6`. Gate D is open.
+Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`; pushed pin
+`b0c333558fd6973f509b0d26b3164b0bef412bcb`. Pod READY; V9 ended authenticated 8/8 clean.
 
-Accepted V6 proves the original DB518 layer-0 producer bitwise exact for all 2,048×128 lanes (SHA
-`96d261cb…887c`), with exact remote set and 8/8 cleanup; record
-`docs/artifacts/gate-d-original-db518-v6-exact-success.json`. Classification remains producer exact,
-consumer/decoder unproven.
+The accepted completed-normalization→key boundary is exact: 0/2,048 rows and 0/262,144 lanes.
+V9 then invoked one normalizer, exact key control and separate real layer consumer with no
+intermediate host transfer. The consumer's layer-1 key differs from legacy in all 2,048 rows and
+45,519 lanes; decisive row 0 differs 46/128. The first open boundary is therefore inside layer-0
+consumer arithmetic, not input normalization.
 
-V7 diagnosed exact empty-mesh placement and TPU-specific fused normalization. V8 pin `73074bdd…b13d`
-then archived both boundary graphs and failed before normalization/key invocation: completed-buffer
-arg0 has no sharding annotation while the four independent key inputs are replicated; optimized TPU
-while also has an exact seventh passthrough scalar slot. Diagnostic terminal generation
-`1788478038656464`, SHA `a212559e…a9d5`; pre/failure censuses 8/8. Records:
-`docs/artifacts/gate-d-original-db518-v{7-tpu-hlo-placement,8-key-placement}-failure.json`.
+V9 publication false-rejected TPU's live reshape→multiply/convert-fusion WK root, so the numerical
+result is diagnostic only. Terminal generation/SHA `1788488319565945`/`cd214775…a456`; arrays
+`3252aa11…dc0d`; record
+`docs/artifacts/gate-d-layer1-prompt-chunk0-geometry-v9-wk-publisher-and-consumer-failure.json`.
+Local V10 publisher repair binds the full fused conversion lineage; unreviewed/uncommitted.
 
-V10 protected tag `…20260903T235409426942147Z` is formally accepted exact: 0/2,048 rows and
-0/262,144 lanes mismatch, bits SHA `96d261cb…887c`, one normalizer/key invocation, no intermediate
-host transfer, terminal generation `1788480414028848`/SHA `7babccea…f8967`, pre/post 8/8 clean.
-Record `docs/artifacts/gate-d-original-db518-v10-normalized-key-exact-success.json`.
-
-This proves the completed normalization buffer composes through the key control only. Exact next:
-build a separate real layer consumer that accepts it and whose HLO proves no input-RMS recomputation;
-its exact protected result is only a prerequisite for a separately reviewed, fresh-tag 8K run.
-Do not run 8K yet.
+Sealed legacy HLO `e7371f48…7216` proves prompt hidden reductions are exact `bf16[2048,6144]`
+global-32 StrategyND. Current probe reused DB533's M32 decode row-zero tree per prompt row; that
+cross-shape association is unproven. Exact next: model-free exact-M2048 fingerprint, row 0 first,
+then merge its result with consumer intermediates. One Sol batch before commit/install/run. Do not
+run 8K until this boundary is exact.
 
 ## After Gate D
 
