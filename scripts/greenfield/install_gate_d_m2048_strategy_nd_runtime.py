@@ -28,7 +28,7 @@ EXPECTED_ENVIRONMENT = {
 }
 PAYLOADS = {
     "launch_gate_d_m2048_strategy_nd_association.py": (
-        "4cf16a65af17a3a8c7ab2cf01ddf6d38f1515c03fe5913b4a4072231ea66fd35"
+        "00f2479aa12b4814dfb21850af4ceb9fb91547f88e8e996e5cd61658eda7a1af"
     ),
     "probe_m2048_strategy_nd_association.py": (
         "1debe946e35311014e667fed863871eed4bf3afeaa9aeb27445f50b2ea233774"
@@ -37,7 +37,7 @@ PAYLOADS = {
         "83602a623fd6392515c63a1017c89f7ed7c06f5d0a7e1ae4e6aca519f99db9be"
     ),
     "verify_gate_d_rewrite_same_region_git_mirror.py": (
-        "2bdee4a93c48004535463bb003d3c225098b72b81a03b87c449210e48507458b"
+        "9cb79b4c60c971a10be6856afd8c1e7e90a658cbe0a963672478f608f26169c1"
     ),
 }
 CAPSULE_NAMES = (

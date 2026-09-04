@@ -914,6 +914,17 @@ literals for the outer command and adds a regression that evaluates the exact sh
 renders the actual remote loader and compiles it. No installation or TPU authority exists until
 the complete V4 batch is independently approved, committed, pushed and same-region replayed.
 
+The reviewed V4 install passed its corrected first loader: workers 1--7 refreshed serially to
+`b835e0f5`, all eight repositories passed exact-pin/clean checks and the runtime source copied to
+seven temporary trees. It then failed before bootstrap-helper invocation because `runtime_command`
+still contained the same unescaped single-quoted Python literals. Failure record
+`gate-d-m2048-v4-install-runtime-loader-quoting-failure.json` preserves report SHA
+`cd851e53...a238`, the unused tag, 8/8 dependency-free zero-work census and exact 7/7 transfer-tree
+cleanup. V5 certificate `gate-d-m2048-strategy-nd-v5-source.json` (`06932679...4399c7`)
+accepts only the new clean detached `b835e0f5` worker prestate, corrects the second loader and
+renders/compiles every embedded Python loader assignment. It remains source-only and unauthorized
+until independent review, future-pin push and US-CENTRAL2 replay.
+
 For the missing real causal-HLO authority, reuse the source/plan pins above through the default-off
 `scripts/greenfield/build_gate_d_jax_site_capsule.py` (`5334dd1e...00d2`) and
 `scripts/greenfield/produce_gate_d_tuple_auxiliary_stablehlo.py` (`2513a305...2182`). The builder's

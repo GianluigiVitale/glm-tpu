@@ -12000,3 +12000,26 @@ historical V2/V3 certificate bytes are unchanged. V4 source certificate
 safe to persist, safe to install after future-pin push/mirror, safe to execute once under normal
 live-preflight conditions. Nothing V4 is yet committed, installed or executed. Exact next:
 commit/push/mirror, install-only, then separately authenticate live preflight and run the fresh tag.
+
+## 2026-09-04 07:05--07:45Z — V4 advances then exposes second loader; V5 CPU-green
+
+V4 was committed/pushed as `b835e0f5b101e17c686b290cd5843b60d2765dca`, matched origin and the
+US-CENTRAL2 cron mirror, then ran install-only. It passed the corrected repository loader, refreshed
+workers 1--7 serially, proved all eight repositories exact/clean at the pin and copied the three
+sealed runtime source trees. The all-host runtime bootstrap then failed before helper invocation:
+its separate embedded Python loader retained unescaped single-quoted literals and every host's
+`python3 -c` rejected the rendered code. No privileged runtime restoration, capsule, launcher,
+JAX or TPU was reached. Report SHA `cd851e53…a238`; fresh dependency-free census 8/8 zero-work.
+The exact seven per-pin transfer trees were verified and removed, producing 7/7 `TRANSFER_CLEAN`
+(sorted SHA `17eb2990…b533`). Preserve append-only failure
+`docs/artifacts/gate-d-m2048-v4-install-runtime-loader-quoting-failure.json` (`60a97f9e…1fa2`)
+and retire the unused V4 tag.
+
+Local V5 changes only the new worker prestate (`b835e0f5`) and second loader quoting, then extends
+the regression to render and compile both embedded Python loader assignments. The complete
+mirror→wrapper→launcher→installer→tree→fleet SHA cascade is rebuilt. Focused tests pass 31/31;
+shell/Python/JSON/source-chain/diff checks pass; historical V2/V3/V4 certificates are unchanged.
+V5 certificate `docs/artifacts/gate-d-m2048-strategy-nd-v5-source.json` SHA
+`06932679…4399c7`; fresh tag `greenfield_m2048_strategy_nd_20260904T072057405273776Z`.
+Nothing V5 is reviewed, committed, installed or executed. Exact next: one Sol batch over the full
+delta; only a clean verdict permits persistence/install/one execution.

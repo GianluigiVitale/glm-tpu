@@ -38,7 +38,7 @@ REPO_REFRESHER = ROOT / (
     "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py"
 )
 MIRROR = ROOT / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
-CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v4-source.json"
+CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v5-source.json"
 
 
 def _load_publisher():
@@ -353,8 +353,10 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
         "docs/artifacts/gate-d-m2048-strategy-nd-v2-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v3-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v4-source.json",
+        "docs/artifacts/gate-d-m2048-strategy-nd-v5-source.json",
         "docs/artifacts/gate-d-m2048-v2-install-repository-prestate-failure.json",
         "docs/artifacts/gate-d-m2048-v3-install-loader-quoting-failure.json",
+        "docs/artifacts/gate-d-m2048-v4-install-runtime-loader-quoting-failure.json",
         "scripts/greenfield/bootstrap_gate_d_provisioner.py",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py",
@@ -380,14 +382,14 @@ def test_fleet_installer_is_install_only_and_restores_exact_runtime_trees() -> N
         "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616",
         "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df",
         "db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca",
-        "bdc71d41d3ad1e7d281a3bff487164b0c7ef1a2fa2875a7cb63585ae2647529b",
+        "8fcd33c335578a0e2b8e25827745653ea6ea0de63ffc799b4ee193538f61ddda",
     ):
         assert value in source
     assert '[[ -d $path && $path == /home/gianl/gate-d-m2048-runtime-source-' in source
     assert '/usr/bin/rm -rf -- "$path"' in source
     assert '/usr/bin/install -m 0555 -o root -g root' not in source
     assert 'git_local show "$pin:scripts/greenfield/$bootstrap"' in source
-    assert "os.memfd_create('gate-d-provisioner-bootstrap'" in source
+    assert 'os.memfd_create(\\"gate-d-provisioner-bootstrap\\"' in source
     assert "F_ADD_SEALS" in source and "F_GET_SEALS" in source
     assert "--root-bootstrap" in BOOTSTRAP.read_text(encoding="ascii")
     assert "RENAME_NOREPLACE" in BOOTSTRAP.read_text(encoding="ascii")
@@ -400,7 +402,7 @@ def test_fleet_installer_is_install_only_and_restores_exact_runtime_trees() -> N
 
 def test_fleet_serializes_exact_worker_repository_refresh() -> None:
     source = FLEET_INSTALLER.read_text(encoding="ascii")
-    assert "WORKER_REPO_PRESTATE_PIN=086d459a6acf4e3d1ec328e00e3e1b61be29ad2b" in source
+    assert "WORKER_REPO_PRESTATE_PIN=b835e0f5b101e17c686b290cd5843b60d2765dca" in source
     assert "REPO_REFRESHER_B64=$(git_local show" in source
     assert 'os.memfd_create(\\"gate-d-m2048-repo-refresher\\"' in source
     assert "for worker in 1 2 3 4 5 6 7; do" in source
@@ -452,6 +454,54 @@ def test_fleet_serializes_exact_worker_repository_refresh() -> None:
     compile(loader, "gate-d-m2048-remote-loader", "exec")
     assert 'os.memfd_create("gate-d-m2048-repo-refresher"' in loader
     assert 'path=f"/proc/self/fd/{fd}"' in loader
+
+    runtime_assignment = next(
+        line for line in source.splitlines() if line.startswith("runtime_command=")
+    )
+    runtime_rendered = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "WORKTREE=/worktree; PIN=" + "d" * 40 + "; "
+            "BOOTSTRAP=bootstrap.py; BOOTSTRAP_SHA=" + "e" * 64 + "; "
+            "PROVISIONER_TARGET=/opt/glm-tpu/bin/provision.py; "
+            "PROVISIONER_SHA=" + "f" * 64 + "; "
+            "TRANSFER_NAME=transfer; PYTHON_NAME=python; PYTHON_TREE=" + "1" * 64 + "; "
+            "JAX_NAME=jax; JAX_TREE=" + "2" * 64 + "; "
+            "LIBTPU_NAME=libtpu; LIBTPU_TREE=" + "3" * 64 + "; "
+            f"{runtime_assignment}; printf \"%s\" \"$runtime_command\"",
+        ],
+        check=True,
+        capture_output=True,
+        env={"HOME": "/nonexistent", "LANG": "C", "LC_ALL": "C", "PATH": "/usr/bin:/bin"},
+    ).stdout.decode("ascii")
+    runtime_prefix, runtime_separator, _runtime_suffix = runtime_rendered.partition(
+        '; git_local show "$pin:scripts/greenfield/$bootstrap"'
+    )
+    assert runtime_separator
+    runtime_loader = subprocess.run(
+        [
+            "/usr/bin/bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            f'{runtime_prefix}; printf "%s" "$loader"',
+        ],
+        check=True,
+        capture_output=True,
+        env={
+            "HOME": "/nonexistent",
+            "HOSTNAME": "test-w-0",
+            "LANG": "C",
+            "LC_ALL": "C",
+            "PATH": "/usr/bin:/bin",
+        },
+    ).stdout.decode("ascii")
+    compile(runtime_loader, "gate-d-m2048-runtime-loader", "exec")
+    assert 'os.memfd_create("gate-d-provisioner-bootstrap"' in runtime_loader
+    assert 'path=f"/proc/self/fd/{fd}"' in runtime_loader
 
 
 def test_repository_refresher_moves_only_exact_clean_detached_prestate(

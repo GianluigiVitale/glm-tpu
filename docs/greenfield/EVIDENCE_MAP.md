@@ -3856,3 +3856,17 @@ persistence only; review and persistence precede any v2 installation.
 - Independent Sol returned no P0–P2 and approved persistence, install after future-pin origin plus
   US-CENTRAL2 replay, and one execution after normal live preflight. No V4 install/execution yet;
   no numerical, decoder, performance or Gate-D claim.
+
+## 2026-09-04 — exact-M2048 V4 second-loader refusal and V5 source correction
+
+- V4 pin `b835e0f5…5dca` refreshed workers 1--7, proved 8/8 exact repositories and copied runtime
+  source. The all-host provisioner-bootstrap loader then lost its unescaped Python string delimiters
+  and failed before helper/privileged runtime/capsule/JAX/TPU. Report `cd851e53…a238`; census 8/8
+  dependency-free clean; exact transfer trees cleaned 7/7 (`17eb2990…b533`). Failure record
+  `gate-d-m2048-v4-install-runtime-loader-quoting-failure.json` SHA `60a97f9e…1fa2`; tag retired.
+- V5 accepts only the new clean detached `b835e0f5` prestate, corrects the second loader and
+  renders/compiles every embedded loader assignment. Full bound SHA chain and 31/31 focused tests
+  pass; V2/V3/V4 certificates unchanged. Certificate `gate-d-m2048-strategy-nd-v5-source.json`
+  SHA `06932679…4399c7`; fresh tag `greenfield_m2048_strategy_nd_20260904T072057405273776Z`.
+- V5 remains unreviewed/uncommitted/uninstalled/unexecuted; no numerical, decoder, performance or
+  Gate-D claim.
