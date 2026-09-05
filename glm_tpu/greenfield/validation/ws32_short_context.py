@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, Mapping
@@ -159,6 +161,163 @@ def _descending_float32_key(values: np.ndarray) -> np.ndarray:
     return ~ascending
 
 
+@dataclass(frozen=True, slots=True)
+class Ws32AdjudicatedDivergence:
+    """Pre-registered first-divergent-event adjudication (spec §21.2, scope 2026-09-05).
+
+    Loaded from a committed, SHA-bound record.  ``expected_only``/``observed_only``
+    are the exact oracle-only/engine-only position sets adjudicated offline against
+    the independent FP64 reference.  Events before it must be exact; the event must
+    reproduce exactly these sets; later events are recorded, never adjudicated.
+    """
+
+    record_sha256: str
+    step: int
+    event_index: int
+    expected_only: tuple[int, ...]
+    observed_only: tuple[int, ...]
+    context: str
+    oracle_dsa_manifest_sha256: str
+    decode_position: int
+    producer_layer_id: int
+    later_event_alarm: int = 1024
+
+    def status(self, step: int, event: int) -> str:
+        if (step, event) < (self.step, self.event_index):
+            return "exact_required"
+        if (step, event) == (self.step, self.event_index):
+            return "adjudicated"
+        return "recorded"
+
+
+def load_ws32_adjudicated_divergence(
+    path: Path,
+    *,
+    expected_sha256: str,
+    repository_root: Path | None = None,
+) -> Ws32AdjudicatedDivergence:
+    raw = Path(path).read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != expected_sha256:
+        raise ValueError("WS32 adjudicated-divergence record identity drifted")
+    record = json.loads(raw)
+    required = {
+        "artifact_kind",
+        "schema_version",
+        "spec_section",
+        "date_utc",
+        "context",
+        "decode_position",
+        "step",
+        "event_index",
+        "producer_layer_id",
+        "expected_only",
+        "observed_only",
+        "later_event_alarm",
+        "basis",
+        "oracle",
+        "engine_source_run",
+        "semantics",
+        "gate_d_closed",
+        "performance_claim",
+    }
+    if (
+        not isinstance(record, dict)
+        or set(record) != required
+        or record["artifact_kind"] != "gate_d_ws32_8k_adjudicated_divergence"
+        or record["schema_version"] != 1
+        or record["gate_d_closed"] is not False
+        or record["performance_claim"] is not False
+        or not isinstance(record["step"], int)
+        or not isinstance(record["event_index"], int)
+        or not isinstance(record["later_event_alarm"], int)
+        or record["later_event_alarm"] <= 0
+    ):
+        raise ValueError("WS32 adjudicated-divergence record schema drifted")
+    expected_only = tuple(record["expected_only"])
+    observed_only = tuple(record["observed_only"])
+    for name, values in (("expected_only", expected_only), ("observed_only", observed_only)):
+        if (
+            not values
+            or any(type(item) is not int or item < 0 for item in values)
+            or list(values) != sorted(set(values))
+        ):
+            raise ValueError(f"WS32 adjudicated-divergence {name} is not a sorted positive set")
+    if set(expected_only) & set(observed_only) or len(expected_only) != len(observed_only):
+        raise ValueError("WS32 adjudicated-divergence sets must be disjoint and equal-sized")
+    oracle_record = record["oracle"]
+    if (
+        not isinstance(oracle_record, dict)
+        or set(oracle_record) != {"dsa_manifest_sha256", "token_manifest_sha256"}
+        or any(
+            not isinstance(value, str) or len(value) != 64
+            for value in oracle_record.values()
+        )
+        or record["context"] not in ("2k", "8k")
+    ):
+        raise ValueError("WS32 adjudicated-divergence oracle/context binding drifted")
+    basis = record["basis"]
+    if (
+        not isinstance(basis, list)
+        or not basis
+        or any(
+            not isinstance(item, dict)
+            or set(item) != {"path", "sha256"}
+            or not isinstance(item["path"], str)
+            or not item["path"].startswith("docs/artifacts/gate-d-")
+            or not item["path"].endswith((".json", ".npy"))
+            or not isinstance(item["sha256"], str)
+            or len(item["sha256"]) != 64
+            for item in basis
+        )
+    ):
+        raise ValueError("WS32 adjudicated-divergence basis must name committed gate-d artifacts")
+    if not isinstance(record["decode_position"], int) or not isinstance(record["producer_layer_id"], int):
+        raise ValueError("WS32 adjudicated-divergence position/producer drifted")
+    if repository_root is not None:
+        for item in basis:
+            basis_raw = (Path(repository_root) / item["path"]).read_bytes()
+            if hashlib.sha256(basis_raw).hexdigest() != item["sha256"]:
+                raise ValueError(f"WS32 adjudicated-divergence basis drifted: {item['path']}")
+    return Ws32AdjudicatedDivergence(
+        record_sha256=digest,
+        step=int(record["step"]),
+        event_index=int(record["event_index"]),
+        expected_only=expected_only,
+        observed_only=observed_only,
+        context=str(record["context"]),
+        oracle_dsa_manifest_sha256=oracle_record["dsa_manifest_sha256"],
+        decode_position=int(record["decode_position"]),
+        producer_layer_id=int(record["producer_layer_id"]),
+        later_event_alarm=int(record["later_event_alarm"]),
+    )
+
+
+def bind_ws32_adjudication(
+    adjudication: Ws32AdjudicatedDivergence,
+    oracle: Ws32ShortContextOracle,
+    *,
+    observer_steps: int,
+    context_label: str | None = None,
+) -> None:
+    """Fail closed unless the record binds this oracle, geometry and run."""
+
+    if adjudication.oracle_dsa_manifest_sha256 != oracle.dsa_manifest["manifest_sha256"]:
+        raise ValueError("WS32 adjudication record binds a different DSA oracle")
+    if not 0 <= adjudication.step < observer_steps:
+        raise ValueError("WS32 adjudication step is outside the observed steps")
+    if not 0 <= adjudication.event_index < int(oracle.producer_layer_ids.size):
+        raise ValueError("WS32 adjudication event is outside the oracle events")
+    if adjudication.decode_position != int(oracle.decode_positions[adjudication.step]):
+        raise ValueError("WS32 adjudication decode position differs from the oracle")
+    if adjudication.producer_layer_id != int(
+        oracle.producer_layer_ids[adjudication.event_index]
+    ):
+        raise ValueError("WS32 adjudication producer layer differs from the oracle")
+    if context_label is not None and adjudication.context != context_label:
+        raise ValueError("WS32 adjudication context differs from the run")
+
+
 def compare_ws32_dsa_step(
     *,
     producer_layer_ids: np.ndarray,
@@ -167,8 +326,17 @@ def compare_ws32_dsa_step(
     selected_scores: np.ndarray,
     oracle: Ws32ShortContextOracle,
     step: int,
+    adjudication: Ws32AdjudicatedDivergence | None = None,
 ) -> dict[str, Any]:
-    """Gate exact selected sets/tails and the executing program's tie order."""
+    """Gate selected sets/tails and the executing program's tie order.
+
+    Without ``adjudication`` every event must match the oracle exactly (the
+    pre-§21 contract).  With it, events before the pre-registered first
+    divergent event must be exact, that event must differ from the oracle by
+    exactly the adjudicated sets, and later events are recorded (sizes and an
+    alarm flag) but not adjudicated.  Counts, tails, producer identities and the
+    within-engine score order remain hard requirements in both modes.
+    """
 
     if not 0 <= step < oracle.decode_positions.size:
         raise ValueError("WS32 DSA step is outside the oracle")
@@ -194,6 +362,11 @@ def compare_ws32_dsa_step(
     set_mismatches = []
     tail_mismatches = []
     score_contract_mismatches = []
+    event_status = []
+    unexplained_set_mismatches = []
+    recorded_divergence_sizes = []
+    alarm_events = []
+    adjudicated_event_matches = None
     legacy_order_mismatches = int(
         np.count_nonzero(positions != oracle.selected_positions[step])
     )
@@ -217,7 +390,16 @@ def compare_ws32_dsa_step(
         ]
         expected_only = np.setdiff1d(expected_live, live)
         observed_only = np.setdiff1d(live, expected_live)
-        if observed_count != expected_count or expected_only.size or observed_only.size:
+        status = (
+            "exact_required"
+            if adjudication is None
+            else adjudication.status(step, event)
+        )
+        event_status.append(status)
+        differs = bool(
+            observed_count != expected_count or expected_only.size or observed_only.size
+        )
+        if differs:
             set_mismatches.append(
                 {
                     "event_index": event,
@@ -225,6 +407,24 @@ def compare_ws32_dsa_step(
                     "observed_only": observed_only[:8].tolist(),
                 }
             )
+        if status == "exact_required":
+            if differs:
+                unexplained_set_mismatches.append(event)
+        elif status == "adjudicated":
+            assert adjudication is not None
+            adjudicated_event_matches = bool(
+                observed_count == expected_count
+                and expected_only.tolist() == list(adjudication.expected_only)
+                and observed_only.tolist() == list(adjudication.observed_only)
+            )
+            if not adjudicated_event_matches:
+                unexplained_set_mismatches.append(event)
+        else:
+            assert adjudication is not None
+            size = int(expected_only.size + observed_only.size)
+            recorded_divergence_sizes.append({"event_index": event, "symmetric_difference": size})
+            if size > adjudication.later_event_alarm:
+                alarm_events.append(event)
         tail_positions = positions[event, safe_count:]
         tail_scores = scores[event, safe_count:]
         if observed_count < 0 or observed_count > width or (
@@ -272,13 +472,25 @@ def compare_ws32_dsa_step(
         (
             not producer_exact,
             count_mismatches,
-            set_mismatches,
+            unexplained_set_mismatches,
             tail_mismatches,
             score_contract_mismatches,
         )
     )
+    if adjudication is not None and adjudication.step == step:
+        # The pre-registered event must have been observed and must match.
+        passed = passed and adjudicated_event_matches is True
     return {
         "actual_device_score_order_and_ties": not score_contract_mismatches,
+        "adjudication": {
+            "mode": "exact" if adjudication is None else "first_divergent_event",
+            "record_sha256": None if adjudication is None else adjudication.record_sha256,
+            "event_status": event_status,
+            "adjudicated_event_matches_record": adjudicated_event_matches,
+            "recorded_divergence_sizes": recorded_divergence_sizes,
+            "alarm_events": alarm_events,
+            "unexplained_set_mismatch_events": unexplained_set_mismatches,
+        },
         "count_mismatch_events": count_mismatches,
         "decode_position": decode_position,
         "exact_selected_set_and_tail": not (set_mismatches or tail_mismatches),

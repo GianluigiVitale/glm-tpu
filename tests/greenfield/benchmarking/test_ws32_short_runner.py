@@ -72,6 +72,9 @@ def test_ws32_short_runner_is_default_off_and_independent() -> None:
     assert "--compile-only" in source
     assert "verify_ws32_runtime_checkpoint(" in source
     assert "compare_ws32_dsa_step(" in source
+    assert "--dsa-adjudication-record" in source
+    assert "load_ws32_adjudicated_divergence(" in source
+    assert '"dsa_adjudication": dsa_adjudication_record' in source
     assert "compare_ws32_raw_tokens(" in source
     assert "validate_ws32_cache_probe(" in source
     assert "jax.profiler.trace(" in source
@@ -109,3 +112,22 @@ def test_ws32_short_acquisition_preserves_all_graphs_before_refusal() -> None:
         RUNNER._require_graph_authorized(
             graphs["prefill"], compile_only=False
         )
+
+
+def test_ws32_wrapper_pins_the_committed_adjudication_record() -> None:
+    import hashlib
+    import re
+
+    root = Path(__file__).resolve().parents[3]
+    wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
+    sealer = (root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8")
+    record = root / "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json"
+    pinned = re.search(r"^readonly DSA_ADJUDICATION_RECORD_8K_SHA=([0-9a-f]{64})$", wrapper, re.M)
+    assert pinned is not None
+    assert pinned.group(1) == hashlib.sha256(record.read_bytes()).hexdigest()
+    assert "GLM_GREENFIELD_WS32_DSA_ADJUDICATION:-0" in wrapper
+    assert "GLM_GREENFIELD_WS32_LATER_EVENT_ALARM_ACK:-0" in wrapper
+    assert wrapper.count("$DSA_ADJUDICATION_CLI") >= 2
+    assert "--later-event-alarm-acknowledged" in sealer
+    assert "requires an acknowledged lessons entry before sealing" in sealer
+    assert "bind_ws32_adjudication(" in sealer

@@ -57,7 +57,9 @@ from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
 from glm_tpu.greenfield.types import ModelGeometry  # noqa: E402
 from glm_tpu.greenfield.validation import (  # noqa: E402
     compare_ws32_dsa_step,
+    bind_ws32_adjudication,
     compare_ws32_raw_tokens,
+    load_ws32_adjudicated_divergence,
     load_ws32_short_context_oracle,
     validate_ws32_cache_probe,
 )
@@ -130,6 +132,8 @@ def parse_args() -> argparse.Namespace:
         "--strategy-nd-dense-overlay-success-file-sha256",
         default=_ZERO_SHA,
     )
+    parser.add_argument("--dsa-adjudication-record", type=Path)
+    parser.add_argument("--dsa-adjudication-sha256", default=_ZERO_SHA)
     parser.add_argument("--observer-steps", default=14, type=int)
     parser.add_argument("--warmup", default=2, type=int)
     parser.add_argument("--iterations", default=10, type=int)
@@ -590,6 +594,31 @@ def main() -> int:
         expected_token_success_sha256=args.token_oracle_success_sha256,
         expected_dsa_success_sha256=args.dsa_oracle_success_sha256,
     )
+    # Spec §21.2 first-divergent-event adjudication: default off (exact mode).
+    if args.dsa_adjudication_record is None:
+        if args.dsa_adjudication_sha256 != _ZERO_SHA:
+            raise ValueError("WS32 adjudication SHA given without a record")
+        dsa_adjudication = None
+        dsa_adjudication_record = None
+    else:
+        repository_root = Path(__file__).resolve().parents[2]
+        dsa_adjudication = load_ws32_adjudicated_divergence(
+            args.dsa_adjudication_record,
+            expected_sha256=args.dsa_adjudication_sha256,
+            repository_root=repository_root,
+        )
+        bind_ws32_adjudication(
+            dsa_adjudication, oracle, observer_steps=args.observer_steps
+        )
+        dsa_adjudication_record = {
+            "event_index": dsa_adjudication.event_index,
+            "mode": "first_divergent_event",
+            "record_path": str(
+                args.dsa_adjudication_record.resolve().relative_to(repository_root)
+            ),
+            "record_sha256": dsa_adjudication.record_sha256,
+            "step": dsa_adjudication.step,
+        }
     required_capacity = (
         oracle.prompt_token_ids.size
         + args.observer_steps
@@ -845,6 +874,7 @@ def main() -> int:
                 selected_scores=scores,
                 oracle=oracle,
                 step=step,
+                adjudication=dsa_adjudication,
             )
             dsa_steps.append(comparison)
             observed_dsa_positions.append(positions)
@@ -924,6 +954,7 @@ def main() -> int:
         ),
         "device_memory_after_load": list(device_memory_after_load),
         "device_memory_before_load": list(device_memory_before_load),
+        "dsa_adjudication": dsa_adjudication_record,
         "dsa_oracle_manifest_sha256": oracle.dsa_manifest["manifest_sha256"],
         "dsa_oracle_success_sha256": oracle.dsa_success_sha256,
         "dsa_association_summary_sha256": (

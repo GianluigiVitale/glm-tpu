@@ -12277,3 +12277,38 @@ first-divergent-event divergence not equal to the pre-registered record; record 
 the alarm rule), CPU tests, review; (3) ONE protected 8K WS32 run with full
 trace/wall/HBM/DB/archive/cleanup protections. Its success closes Gate D. No TPU before (2) is
 reviewed.
+
+## 2026-09-05 03:30--04:20Z — §21.2 observer mode implemented (CPU-green, unreviewed)
+
+Reviewed reference batch persisted at `7764cb9baa91` (pushed). The §21.2 first-divergent-event
+observer mode is implemented and default-off: `Ws32AdjudicatedDivergence` plus
+`load_ws32_adjudicated_divergence` in `glm_tpu/greenfield/validation/ws32_short_context.py`;
+`compare_ws32_dsa_step(..., adjudication=None)` keeps the exact contract unchanged, and with a record
+requires events before the pre-registered `(step, event)` to be exact, that event to differ from the
+oracle by exactly the recorded oracle-only/engine-only sets, and records later events (symmetric
+difference sizes, alarm above `later_event_alarm`) without refusing; producer identities, counts,
+tails and within-engine score order stay hard everywhere. The pre-registered record
+`docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json` (step 0, event 1, position
+8155, `expected_only` {680,1052,2024,2436,6322,7473,7850}, `observed_only`
+{754,1904,2029,3651,4899,5536,6951}, alarm 1024) binds the oracle manifest `f8154c5f…` and the
+SHAs of the two adjudication records and the reference row. Runner and sealer take
+`--dsa-adjudication-record/--dsa-adjudication-sha256`, verify the record SHA, basis SHAs, oracle
+binding, context and step range, record `dsa_adjudication` in every rank record, and the sealer
+recomputes every step with the same record. The wrapper gains `GLM_GREENFIELD_WS32_DSA_ADJUDICATION`
+(default 0; 8k only) pinning the record path and SHA. Tests: adjudication semantics on the sealed 8K
+oracle (match passes; exact-but-predicted fails; different divergence fails; earlier-event divergence
+fails; later events recorded with alarm; duplicates still fail; other steps recorded), loader SHA/
+schema/basis refusals, runner source bindings. Validation and benchmarking suites pass. Nothing here
+authorizes a run; the next protected 8K WS32 run requires review of this batch, commit/push/mirror,
+and the wrapper's existing live preflights.
+
+The Fable review of this batch (`/home/gianl/gate-d-runs/reviews/ws32-s21-observer-fable-verdict.txt`,
+`c2cc04a3…fb08`) returned P0/P1 NONE and six P2s: O1–O4 are folded in here (sealer refuses to seal a
+run with a later-event alarm unless `--later-event-alarm-acknowledged 1`, wired to
+`GLM_GREENFIELD_WS32_LATER_EVENT_ALARM_ACK` default 0; loader requires a non-empty basis of committed
+gate-d artifacts; `bind_ws32_adjudication` cross-checks oracle manifest, step/event range, decode
+position, producer layer and context in runner and sealer; binding and wrapper-pin tests added).
+O5: program-defining code changed since the 08-27 acquisition pin `04d059b` (decoder, stage-local
+kernels, prefill, dense convolution contract), so the 08-27 HLO pins cannot be reused; a fresh 8K
+acquisition at the new pin precedes any numerical run. O6: the record is committed byte-identically
+(`4da05468…d26b`). Focused suites 10/10; validation and benchmarking suites pass.

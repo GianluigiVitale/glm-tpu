@@ -3997,3 +3997,13 @@ persistence only; review and persistence precede any v2 installation.
 - Section 18 row "Exact DSA sets and tie order": event 0 exact, event 1 adjudicated pass; later events
   recorded only (spec §21.2 scope). Remaining Gate D work is one protected 8K WS32 run under the §21.2
   observer with full performance protections. Classification `OFFLINE_CPU_ONLY;NO_TPU;NO_GATE_D_CLAIM`.
+
+## 2026-09-05 — §21.2 observer mode (code, CPU-green, review pending)
+
+- `docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json`: pre-registered first-divergent-
+  event record (step 0, event 1, position 8155; seven oracle-only / seven engine-only positions; alarm
+  1024), SHA-bound to the oracle manifest and the two adjudication records. Consumed by the WS32
+  runner and sealer via `--dsa-adjudication-record/--dsa-adjudication-sha256`; wrapper flag
+  `GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1` (8k only). Default off; exact contract unchanged otherwise.
+- Not evidence of correctness by itself; the next protected 8K WS32 run under this mode, if it passes
+  tokens/state/cache/locality/trace/wall/HBM/DB/archive/cleanup, is the Gate D closer (spec §21.5).

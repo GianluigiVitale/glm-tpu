@@ -96,9 +96,12 @@ from .short_context_logprob_oracle import (
     normalize_sample_logprobs,
 )
 from .ws32_short_context import (
+    Ws32AdjudicatedDivergence,
     Ws32ShortContextOracle,
+    bind_ws32_adjudication,
     compare_ws32_dsa_step,
     compare_ws32_raw_tokens,
+    load_ws32_adjudicated_divergence,
     load_ws32_short_context_oracle,
     validate_ws32_cache_probe,
 )
@@ -142,6 +145,8 @@ __all__ = (
     "ShortContextOracleConfig",
     "ShortContextDsaOracleConfig",
     "ShortContextLogprobOracleConfig",
+    "Ws32AdjudicatedDivergence",
+    "bind_ws32_adjudication",
     "Ws32ShortContextOracle",
     "capture_gate_c_oracle",
     "capture_accepted_attention_output_operand",
@@ -189,6 +194,7 @@ __all__ = (
     "inspect_short_context_oracle",
     "inspect_short_context_dsa_oracle",
     "inspect_short_context_logprob_oracle",
+    "load_ws32_adjudicated_divergence",
     "load_ws32_short_context_oracle",
     "normalize_sample_logprobs",
     "pack_stage_local_index_keys",

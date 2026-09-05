@@ -39,7 +39,9 @@ from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
     build_ws32_physical_mesh,
 )
 from glm_tpu.greenfield.validation import (  # noqa: E402
+    bind_ws32_adjudication,
     compare_ws32_dsa_step,
+    load_ws32_adjudicated_divergence,
     compare_ws32_raw_tokens,
     load_ws32_short_context_oracle,
     validate_ws32_cache_probe,
@@ -76,6 +78,11 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--iterations", required=True, type=int)
     validate.add_argument("--trace-steps", required=True, type=int)
     validate.add_argument("--exact-dsa", choices=(0, 1), required=True, type=int)
+    validate.add_argument("--dsa-adjudication-record", type=Path)
+    validate.add_argument("--dsa-adjudication-sha256", default="0" * 64)
+    validate.add_argument(
+        "--later-event-alarm-acknowledged", choices=(0, 1), default=0, type=int
+    )
     validate.add_argument(
         "--strategy-nd-dense", choices=(0, 1), required=True, type=int
     )
@@ -414,6 +421,36 @@ def _validate(args: argparse.Namespace) -> int:
         expected_token_success_sha256=args.token_oracle_success_sha256,
         expected_dsa_success_sha256=args.dsa_oracle_success_sha256,
     )
+    if args.dsa_adjudication_record is None:
+        if args.dsa_adjudication_sha256 != "0" * 64:
+            raise SystemExit("WS32 adjudication SHA given without a record")
+        dsa_adjudication = None
+        expected_dsa_adjudication = None
+    else:
+        repository_root = Path(__file__).resolve().parents[2]
+        dsa_adjudication = load_ws32_adjudicated_divergence(
+            args.dsa_adjudication_record,
+            expected_sha256=args.dsa_adjudication_sha256,
+            repository_root=repository_root,
+        )
+        try:
+            bind_ws32_adjudication(
+                dsa_adjudication,
+                oracle,
+                observer_steps=args.observer_steps,
+                context_label=args.context_label,
+            )
+        except ValueError as error:
+            raise SystemExit(f"WS32 adjudication record does not bind this run: {error}")
+        expected_dsa_adjudication = {
+            "event_index": dsa_adjudication.event_index,
+            "mode": "first_divergent_event",
+            "record_path": str(
+                args.dsa_adjudication_record.resolve().relative_to(repository_root)
+            ),
+            "record_sha256": dsa_adjudication.record_sha256,
+            "step": dsa_adjudication.step,
+        }
 
     common = {
         "checkpoint_manifest_sha256": args.checkpoint_manifest_sha256,
@@ -467,6 +504,7 @@ def _validate(args: argparse.Namespace) -> int:
         "device_memory_after_compile",
         "device_memory_after_load",
         "device_memory_before_load",
+        "dsa_adjudication",
         "dsa_oracle_manifest_sha256",
         "dsa_oracle_success_sha256",
         "dsa_association_summary_sha256",
@@ -769,10 +807,24 @@ def _validate(args: argparse.Namespace) -> int:
                         selected_scores=arrays["dsa_selected_scores"][step],
                         oracle=oracle,
                         step=step,
+                        adjudication=dsa_adjudication,
                     )
                 )
+            if not _same(record.get("dsa_adjudication"), expected_dsa_adjudication):
+                raise SystemExit(f"WS32 DSA adjudication binding drifted rank {rank}")
             if not _same(dsa, expected_dsa):
                 raise SystemExit(f"WS32 DSA recomputation drifted rank {rank}")
+            alarm_steps = [
+                step
+                for step, item in enumerate(dsa)
+                if item.get("adjudication", {}).get("alarm_events")
+            ]
+            if alarm_steps and not args.later_event_alarm_acknowledged:
+                # Spec §21.2: a later-event alarm requires a GATE_D_LESSONS entry before promotion.
+                raise SystemExit(
+                    "WS32 later-event divergence alarm at steps "
+                    f"{alarm_steps} requires an acknowledged lessons entry before sealing"
+                )
             expected_cache = validate_ws32_cache_probe(
                 position=arrays["cache_position"],
                 kv_rows=arrays["cache_kv_bfloat16_bits"].view(

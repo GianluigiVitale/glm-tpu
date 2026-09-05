@@ -106,3 +106,222 @@ def test_ws32_cache_probe_requires_every_layer_and_index_slot() -> None:
         index_width=4,
     )
     assert not refused["passed"]
+
+
+TOKEN_DIR_8K = Path(
+    "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/8k/"
+    "greenfield_short_context_oracle_8k_20260807T172307269147351Z/oracle"
+)
+DSA_DIR_8K = Path(
+    "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/"
+    "greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle"
+)
+TOKEN_SHA_8K = "e4fbcbdbf0fc8b1969e2f82ee457ab1563db4a8b37d2dea2bc4d1e828a13acf2"
+DSA_SHA_8K = "f8154c5f79b909efd9ebc14c8e004925482844d05ef28fcf0a4d29bb4a7b26da"
+TOKEN_SUCCESS_SHA_8K = "38c0aeb6c4833a0256d4e50152b645e85d24a4f00ca7b2b1731db2d892c5b3cc"
+DSA_SUCCESS_SHA_8K = "0b798974ae8a9f95c32d3aa2eff532213624f1e2ae7f1de809a161e18dbdf1b9"
+
+
+def _oracle():
+    # 8K: 2,048 of 8,156 causal positions are selected, so set divergences exist.
+    return load_ws32_short_context_oracle(
+        TOKEN_DIR_8K,
+        DSA_DIR_8K,
+        expected_token_manifest_sha256=TOKEN_SHA_8K,
+        expected_dsa_manifest_sha256=DSA_SHA_8K,
+        expected_token_success_sha256=TOKEN_SUCCESS_SHA_8K,
+        expected_dsa_success_sha256=DSA_SUCCESS_SHA_8K,
+    )
+
+
+def _swap_one(oracle, positions, event, count=1):
+    """Replace `count` selected positions of `event` with unselected valid ones.
+
+    Returns (expected_only, observed_only) sorted lists of the induced divergence.
+    """
+    decode_position = int(oracle.decode_positions[0])
+    valid = int(oracle.valid_counts[0, event])
+    live = set(positions[event, 0, :valid].tolist())
+    replacements = [p for p in range(decode_position + 1) if p not in live][:count]
+    removed = sorted(positions[event, 0, :valid].tolist())[-count:]
+    for slot, (old, new) in enumerate(zip(removed, replacements)):
+        index = int(np.flatnonzero(positions[event, 0, :valid] == old)[0])
+        positions[event, 0, index] = new
+    return sorted(removed), sorted(replacements)
+
+
+def _adjudication(expected_only, observed_only, *, step=0, event=1, alarm=1024):
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        Ws32AdjudicatedDivergence,
+    )
+
+    return Ws32AdjudicatedDivergence(
+        record_sha256="f" * 64,
+        step=step,
+        event_index=event,
+        expected_only=tuple(expected_only),
+        observed_only=tuple(observed_only),
+        context="8k",
+        oracle_dsa_manifest_sha256=DSA_SHA_8K,
+        decode_position=8155,
+        producer_layer_id=1,
+        later_event_alarm=alarm,
+    )
+
+
+def test_ws32_first_divergent_event_adjudication_is_exact_and_fail_closed() -> None:
+    oracle = _oracle()
+    base = oracle.selected_positions[0, :, None, :].copy()
+    scores = oracle.selected_scores[0, :, None, :]
+    counts = oracle.valid_counts[0, :, None]
+    kwargs = dict(
+        producer_layer_ids=oracle.producer_layer_ids,
+        selected_valid_counts=counts,
+        selected_scores=scores,
+        oracle=oracle,
+        step=0,
+    )
+    # Exact mode unchanged: no adjudication -> exact data passes with mode "exact".
+    exact = compare_ws32_dsa_step(selected_positions=base.copy(), **kwargs)
+    assert exact["passed"] and exact["adjudication"]["mode"] == "exact"
+
+    diverged = base.copy()
+    expected_only, observed_only = _swap_one(oracle, diverged, event=1)
+    record = _adjudication(expected_only, observed_only)
+
+    # The pre-registered divergence at (0, 1) passes and is reported as matching.
+    result = compare_ws32_dsa_step(selected_positions=diverged.copy(), adjudication=record, **kwargs)
+    assert result["passed"], result["adjudication"]
+    assert result["adjudication"]["mode"] == "first_divergent_event"
+    assert result["adjudication"]["adjudicated_event_matches_record"] is True
+    assert result["adjudication"]["event_status"][0] == "exact_required"
+    assert result["adjudication"]["event_status"][1] == "adjudicated"
+    assert result["adjudication"]["event_status"][2] == "recorded"
+    assert result["selected_set_mismatches"][0]["event_index"] == 1
+    assert result["exact_selected_set_and_tail"] is False
+
+    # Exact data under an adjudication record fails: the record predicts a divergence.
+    predicted_but_exact = compare_ws32_dsa_step(selected_positions=base.copy(), adjudication=record, **kwargs)
+    assert predicted_but_exact["passed"] is False
+    assert predicted_but_exact["adjudication"]["adjudicated_event_matches_record"] is False
+
+    # A different divergence at the adjudicated event fails.
+    other = base.copy()
+    _swap_one(oracle, other, event=1, count=2)
+    assert compare_ws32_dsa_step(selected_positions=other, adjudication=record, **kwargs)["passed"] is False
+
+    # Any divergence at an earlier (exact-required) event fails.
+    early = diverged.copy()
+    _swap_one(oracle, early, event=0)
+    early_result = compare_ws32_dsa_step(selected_positions=early, adjudication=record, **kwargs)
+    assert early_result["passed"] is False
+    assert early_result["adjudication"]["unexplained_set_mismatch_events"] == [0]
+
+    # Later-event divergence is recorded, not refused; the alarm flags large ones.
+    later = diverged.copy()
+    _swap_one(oracle, later, event=5, count=3)
+    later_result = compare_ws32_dsa_step(selected_positions=later.copy(), adjudication=record, **kwargs)
+    assert later_result["passed"] is True
+    assert later_result["adjudication"]["recorded_divergence_sizes"][:1] == [
+        {"event_index": 2, "symmetric_difference": 0}
+    ]
+    assert {"event_index": 5, "symmetric_difference": 6} in later_result["adjudication"]["recorded_divergence_sizes"]
+    assert later_result["adjudication"]["alarm_events"] == []
+    alarmed = compare_ws32_dsa_step(
+        selected_positions=later.copy(),
+        adjudication=_adjudication(expected_only, observed_only, alarm=5),
+        **kwargs,
+    )
+    assert alarmed["passed"] is True and alarmed["adjudication"]["alarm_events"] == [5]
+
+    # Structural failures stay hard in adjudication mode: a duplicate position.
+    duplicate = diverged.copy()
+    duplicate[7, 0, 0] = duplicate[7, 0, 1]
+    assert compare_ws32_dsa_step(selected_positions=duplicate, adjudication=record, **kwargs)["passed"] is False
+
+    # Steps other than the adjudicated step require exact sets.
+    step1 = oracle.selected_positions[1, :, None, :].copy()
+    _swap_one(oracle, step1, event=3)
+    step1_result = compare_ws32_dsa_step(
+        producer_layer_ids=oracle.producer_layer_ids,
+        selected_positions=step1,
+        selected_valid_counts=oracle.valid_counts[1, :, None],
+        selected_scores=oracle.selected_scores[1, :, None, :],
+        oracle=oracle,
+        step=1,
+        adjudication=record,
+    )
+    assert step1_result["passed"] is True  # later step: recorded only
+    assert step1_result["adjudication"]["event_status"] == ["recorded"] * 21
+
+
+def test_ws32_adjudicated_divergence_record_loader_binds_sha_and_schema(tmp_path: Path) -> None:
+    import hashlib
+    import json
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    repo = Path(__file__).resolve().parents[3]
+    committed = repo / "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json"
+    raw = committed.read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    loaded = load_ws32_adjudicated_divergence(committed, expected_sha256=digest, repository_root=repo)
+    assert loaded.step == 0 and loaded.event_index == 1 and loaded.context == "8k"
+    assert loaded.expected_only == (680, 1052, 2024, 2436, 6322, 7473, 7850)
+    assert loaded.observed_only == (754, 1904, 2029, 3651, 4899, 5536, 6951)
+    assert loaded.later_event_alarm == 1024
+    assert loaded.oracle_dsa_manifest_sha256 == "f8154c5f79b909efd9ebc14c8e004925482844d05ef28fcf0a4d29bb4a7b26da"
+    assert loaded.status(0, 0) == "exact_required"
+    assert loaded.status(0, 1) == "adjudicated"
+    assert loaded.status(0, 2) == "recorded" and loaded.status(3, 0) == "recorded"
+
+    with np.testing.assert_raises_regex(ValueError, "identity drifted"):
+        load_ws32_adjudicated_divergence(committed, expected_sha256="0" * 64)
+    record = json.loads(raw)
+    for mutate in (
+        lambda r: r.__setitem__("gate_d_closed", True),
+        lambda r: r.__setitem__("expected_only", [680, 680]),
+        lambda r: r.__setitem__("observed_only", [754]),
+        lambda r: r.__setitem__("later_event_alarm", 0),
+        lambda r: r.pop("semantics"),
+        lambda r: r.__setitem__("context", "4k"),
+    ):
+        hostile = json.loads(raw)
+        mutate(hostile)
+        path = tmp_path / "hostile.json"
+        payload = json.dumps(hostile).encode()
+        path.write_bytes(payload)
+        with np.testing.assert_raises_regex(ValueError, "adjudicated-divergence"):
+            load_ws32_adjudicated_divergence(path, expected_sha256=hashlib.sha256(payload).hexdigest())
+    tampered_basis = json.loads(raw)
+    tampered_basis["basis"][0]["sha256"] = "0" * 64
+    path = tmp_path / "basis.json"
+    payload = json.dumps(tampered_basis).encode()
+    path.write_bytes(payload)
+    with np.testing.assert_raises_regex(ValueError, "basis drifted"):
+        load_ws32_adjudicated_divergence(path, expected_sha256=hashlib.sha256(payload).hexdigest(), repository_root=repo)
+
+
+def test_ws32_adjudication_binding_refuses_foreign_oracle_and_geometry() -> None:
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        bind_ws32_adjudication,
+    )
+
+    oracle = _oracle()
+    record = _adjudication([680], [754])
+    bind_ws32_adjudication(record, oracle, observer_steps=14, context_label="8k")
+    from dataclasses import replace
+
+    for hostile, message in (
+        (replace(record, oracle_dsa_manifest_sha256="0" * 64), "different DSA oracle"),
+        (replace(record, step=14), "outside the observed steps"),
+        (replace(record, event_index=21), "outside the oracle events"),
+        (replace(record, decode_position=8154), "decode position differs"),
+        (replace(record, producer_layer_id=2), "producer layer differs"),
+    ):
+        with np.testing.assert_raises_regex(ValueError, message):
+            bind_ws32_adjudication(hostile, oracle, observer_steps=14, context_label="8k")
+    with np.testing.assert_raises_regex(ValueError, "context differs"):
+        bind_ws32_adjudication(record, oracle, observer_steps=14, context_label="2k")
