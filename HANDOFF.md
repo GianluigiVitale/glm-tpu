@@ -12418,3 +12418,14 @@ root retained and an explicit message, so a retry needs the cleanup script first
 shm sync marker check does not re-hash slots; ownership and byte identity are re-verified by the
 runner's local-slot verification on every host; D3 header pre-check declined; D4 the compile-only shm
 acquisition is the first consumer and proves the RAM headroom; D5 accepted.
+
+## 2026-09-05 05:06Z — first tmpfs pack launch failed closed before any host action; fixed
+
+Pin `86ae5bc` (streaming batch) is pushed and mirrored (cron 05:05:16Z). Launch tag
+`greenfield_ws32_runtime_shm_pack_20260905T050557362738788Z` aborted at the pre-pack census with
+`label: unbound variable`: `strict_census` declared `local label=$1 out="…${label}…"` in one
+statement, undefined under `set -u` (the same class of bug that cost the 08-16 2K acquisition). The
+failure preceded host sync, so no host, tmpfs or TPU state changed; the EXIT trap hit the same bug,
+so nothing was uploaded and the results prefix stays vacant; the fleet lease was released. The
+declarations are split and a static test now scans every WS32 shell wrapper for a `local` that
+references a name declared in the same statement. Relaunch follows with a fresh tag at the fixed pin.

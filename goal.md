@@ -58,8 +58,8 @@ tmpfs (hosts 400 GB RAM, 201 GB /dev/shm; 4 slots = 98 GB/host), sealed manifest
 verbatim (lineage `results/greenfield_ws32_runtime_pack_20260815T214050854386790Z`), per-slot byte
 identity enforced; PP16 direct stays. Code changed since acquisition pin `04d059b`.
 
-Next: (1) review+commit shm batch (`run_ws32_runtime_checkpoint_shm_pack.sh`, run-wrapper
-`GLM_GREENFIELD_WS32_CHECKPOINT_TRANSPORT=shm`, cleanup). (2) protected tmpfs pack (host CPU, ~3 h).
+Shm batch reviewed+pushed (`86ae5bc`+fix). Next: (2) protected tmpfs pack (host CPU, ~3 h;
+`GLM_GREENFIELD_WS32_SHM_PACK=1 scripts/greenfield/run_ws32_runtime_checkpoint_shm_pack.sh`).
 (3) compile-only 8K acquisition at HEAD. (4) ONE 8K numerical run with
 `GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1`, trace, wall, HBM, DB, archive, 8/8 cleanup → Gate D;
 tmpfs cleanup. Then Gate G, 128K, 256K, §18.

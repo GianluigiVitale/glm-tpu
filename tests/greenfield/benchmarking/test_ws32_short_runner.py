@@ -191,3 +191,26 @@ def test_ws32_shm_transport_is_pinned_to_the_sealed_checkpoint_identity() -> Non
     assert "trap fail ERR" in host and 'marker=Path(str(root)+".identity.json")' in host
     assert '[[ -f $shm.identity.json ]] || fail' in host
     assert 'chmod 0444 "$shm/manifest.json" "$shm/SUCCESS"' in host
+
+
+def test_ws32_shell_wrappers_never_reference_a_local_in_its_own_declaration() -> None:
+    """`local a=$1 b=${a}` is undefined under `set -u` (burned a tag on 2026-09-05 and 2026-08-16)."""
+    import re
+
+    root = Path(__file__).resolve().parents[3]
+    for script in (
+        "run_short_decoder_ws32.sh",
+        "run_ws32_runtime_checkpoint_shm_pack.sh",
+        "cleanup_ws32_runtime_checkpoint_shm.sh",
+        "run_ws32_runtime_checkpoint_pack.sh",
+    ):
+        for line in (root / "scripts/greenfield" / script).read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped.startswith("local "):
+                continue
+            names = re.findall(r"(?:^|\s)([A-Za-z_][A-Za-z0-9_]*)=", stripped[len("local "):])
+            for name in names:
+                assert not re.search(rf"\$\{{?{name}\b", stripped.split(f"{name}=", 1)[1] if f"{name}=" in stripped else ""), (
+                    script,
+                    line,
+                )

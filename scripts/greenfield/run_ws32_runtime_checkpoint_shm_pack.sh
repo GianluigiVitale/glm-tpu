@@ -67,7 +67,9 @@ has_eight_unique_markers() {
     [[ $(awk -v marker="$marker" '$1 == marker {print $2}' "$file" | sort -u | wc -l) -eq 8 ]]
 }
 strict_census() {
-  local label=$1 out="$RUN_DIR/census_${label}.txt" command
+  local label=$1
+  local out="$RUN_DIR/census_${label}.txt"
+  local command
   # shellcheck disable=SC2016
   command='tools=1; command -v pgrep >/dev/null || tools=0; command -v fuser >/dev/null || tools=0; sudo -n true >/dev/null 2>&1 || tools=0; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[r]un_short_decoder_ws32[.]py|[p]ack_ws32_runtime_checkpoint[.]py|[c]ompile_short_decoder[.]py|[m]icrobench_collectives[.]py" || true); holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; if [ "$tools" -ne 1 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname)"; elif [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; else echo "CENSUS_OK $(hostname)"; fi'
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 || return 1
