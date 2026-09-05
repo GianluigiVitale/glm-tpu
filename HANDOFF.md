@@ -12667,3 +12667,21 @@ closure checks unchanged: one source, exclusive start→done→concat consumers,
 tuple consumer); tests add the rotated case and a duplicate-quarter refusal. With the fix both acquired
 prefill graphs lint identity-only. Reviewed before re-acquisition (linter contract change).
 
+## 2026-09-05 16:33Z — five-graph 8K acquisition recovered (HLO_ACQUIRED); Step B launched
+
+Recovery of `greenfield_ws32_short_decoder_8k_acquire_20260905T150550783962907Z` (source pin `a91caca`,
+recovery pin `172ae03`; recovery tool now replays under the run's own variant flags and accepts
+identity-only originals — first attempt at `490723c` had refused because it replayed without the dense
+overlay flag) completed at 16:33Z: eight worker prevalidations collected, all seven graphs replayed
+identity-only under the widened W_K recognizer, materialized and sealed as `HLO_ACQUIRED` with no DB row
+or SUCCESS. Originals: decode/observer/cache_probe/exact_* were identity-only; only `prefill_chunk` and
+`prefill_tail` carried the rotated-quarter false positive (basis for the linter widening: 226 non-ascending
+ConcatBitcast groups in the sealed DB567 decode graph). Pin comparison with the DB567 acquisition
+(08:16Z): StableHLO identical for all five unchanged graphs; optimized HLO text differs only by
+instruction names, channel/stack-frame ids and metadata — normalized instruction multisets are
+identical (decode 238,607 lines / 4,682 distinct; observer 202,760; cache_probe 220; exact_* 5,620/907),
+so the recompiled graphs cannot introduce a numerical difference. New graphs: `prefill_chunk`
+StableHLO `d82ab668…`, `prefill_tail` `3f097c29…`. Step B (C=2048, run pin `172ae03`, adjudication on,
+alarm ack off → the expected later-event alarm refusal will be sealed by recovery after a lessons entry
+names the tag) launched 16:34Z.
+
