@@ -472,31 +472,26 @@ def _validate(args: argparse.Namespace) -> int:
     repository_root = Path(__file__).resolve().parents[2]
     if args.recovery_code_hash and not re.fullmatch(r"[0-9a-f]{40}", args.recovery_code_hash):
         raise SystemExit("WS32 recovery code hash must be a full commit id")
-    def _committed_record_path(path: Path) -> str:
-        """The record must be a committed artifact of this repository.
+    def _committed_in_run_pin(relative: str, label: str) -> None:
+        """Require an artifact to be committed in the pin the run executed at.
 
-        §21.2 pre-registration is only pre-registration if the record was under
-        review before the run it judges. The wrapper pins one path and SHA, but
-        §21.6 records seals driven by hand outside it, so the sealer checks the
-        property itself: inside the tree, committed at HEAD, and byte-identical
-        to the committed blob.
+        This is what makes §21.2 pre-registration a PROVEN property rather than
+        a convention: the run ran at `--code-hash`, so an artifact present in
+        that commit with these exact bytes existed before the run produced the
+        data it judges. Checking `HEAD` would not do it — HEAD moves after the
+        run. The sealed Gate D record satisfies this: its blob at pin 4286509 is
+        the blob on disk.
         """
 
-        resolved = Path(path).resolve()
-        try:
-            relative = str(resolved.relative_to(repository_root))
-        except ValueError:
-            raise SystemExit(
-                f"WS32 adjudication record is outside the repository: {path}"
-            )
         committed = subprocess.run(
-            ["git", "-C", str(repository_root), "rev-parse", f"HEAD:{relative}"],
+            ["git", "-C", str(repository_root), "rev-parse", f"{args.code_hash}:{relative}"],
             capture_output=True,
             text=True,
         )
         if committed.returncode != 0:
             raise SystemExit(
-                f"WS32 adjudication record is not committed at HEAD: {relative}"
+                f"WS32 {label} is not committed in the run's own pin {args.code_hash}: "
+                f"{relative}; a record written after the run is not a pre-registration"
             )
         working = subprocess.run(
             ["git", "-C", str(repository_root), "hash-object", "--", relative],
@@ -505,8 +500,18 @@ def _validate(args: argparse.Namespace) -> int:
         )
         if working.returncode != 0 or committed.stdout.strip() != working.stdout.strip():
             raise SystemExit(
-                f"WS32 adjudication record differs from the committed blob: {relative}"
+                f"WS32 {label} differs from the blob committed at {args.code_hash}: {relative}"
             )
+
+    def _committed_record_path(path: Path) -> str:
+        resolved = Path(path).resolve()
+        try:
+            relative = str(resolved.relative_to(repository_root))
+        except ValueError:
+            raise SystemExit(
+                f"WS32 adjudication record is outside the repository: {path}"
+            )
+        _committed_in_run_pin(relative, "adjudication record")
         return relative
 
     if args.dsa_adjudication_record is None:
@@ -534,6 +539,10 @@ def _validate(args: argparse.Namespace) -> int:
             )
         except ValueError as error:
             raise SystemExit(f"WS32 adjudication record does not bind this run: {error}")
+        if dsa_adjudication.analysis_path is not None:
+            # The analysis is the record's ground, so it must have existed
+            # before the run too; otherwise the numbers could be written to fit.
+            _committed_in_run_pin(dsa_adjudication.analysis_path, "adjudication analysis")
         if dsa_adjudication.engine_source_run == args.tag:
             # §21.2 pre-registration: a record derived from this very run would be
             # fitted to the data it judges and so could never fail. The source is

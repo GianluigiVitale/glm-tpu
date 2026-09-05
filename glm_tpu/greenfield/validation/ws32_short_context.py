@@ -223,6 +223,10 @@ class Ws32AdjudicatedDivergence:
     # The run this record was derived from. §21.2 pre-registration: the sealer
     # refuses a record whose source is the run being sealed.
     engine_source_run: str = ""
+    # Repository-relative path of the PASS §21.2 analysis this record stands on,
+    # which the sealer requires to be committed in the run's own pin. ``None``
+    # only for the grandfathered pre-amendment record.
+    analysis_path: str | None = None
 
     def status(self, step: int, event: int) -> str:
         if (step, event) < (self.step, self.event_index):
@@ -479,6 +483,7 @@ def load_ws32_adjudicated_divergence(
         producer_layer_id=int(record["producer_layer_id"]),
         later_event_alarm=int(record["later_event_alarm"]),
         engine_source_run=source_run,
+        analysis_path=None if analysis_entry is None else str(analysis_entry["path"]),
     )
 
 

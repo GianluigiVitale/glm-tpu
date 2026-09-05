@@ -1084,9 +1084,13 @@ def test_the_sealer_states_loader_refusals_and_requires_a_committed_record() -> 
     root = _Path(__file__).resolve().parents[3]
     source = (root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8")
     assert "WS32 adjudication record is not loadable" in source
-    assert "WS32 adjudication record is not committed at HEAD" in source
-    assert "WS32 adjudication record differs from the committed blob" in source
+    assert "is not committed in the run's own pin" in source
+    assert "differs from the blob committed at" in source
     assert "WS32 adjudication record is outside the repository" in source
+    assert 'f"{args.code_hash}:{relative}"' in source, (
+        "pre-registration is proven by the RUN's pin, not by HEAD, which moves after the run"
+    )
+    assert "HEAD:" not in source.split("def _committed_in_run_pin")[1].split("def ")[0]
 
     import ast
 
@@ -1115,3 +1119,31 @@ def test_the_sealer_states_loader_refusals_and_requires_a_committed_record() -> 
         for name in ast.walk(clause.type) if isinstance(name, ast.Name)
     }
     assert "ValueError" in caught
+
+
+def test_the_sealed_gate_d_record_is_committed_in_its_own_run_pin() -> None:
+    """The property the sealer now checks holds for the record that closed Gate D.
+
+    Gate D sealed at pin 4286509; the adjudication record's blob in that commit
+    is the blob on disk, so the record demonstrably existed before the run it
+    judges. A record written afterwards cannot satisfy this.
+    """
+    import subprocess
+    from pathlib import Path as _Path
+
+    run_worktree = _Path("/home/gianl/glm-tpu-topology-rewrite")
+    if not (run_worktree / ".git").exists():
+        import pytest
+
+        pytest.skip("the run worktree is unavailable")
+    relative = "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json"
+    at_pin = subprocess.run(
+        ["git", "-C", str(run_worktree), "rev-parse", f"4286509:{relative}"],
+        capture_output=True, text=True,
+    )
+    on_disk = subprocess.run(
+        ["git", "-C", str(run_worktree), "hash-object", "--", relative],
+        capture_output=True, text=True,
+    )
+    assert at_pin.returncode == 0, at_pin.stderr
+    assert at_pin.stdout.strip() == on_disk.stdout.strip() != ""

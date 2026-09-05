@@ -1679,8 +1679,14 @@ section grants no install or execution authority.
    is bound to the archive the declared source run itself published under its own tag, not to a
    directory name. Every one of these rules is enforced by the LOADER the sealer calls, not by the
    offline tool: a rule only the producer consults can be widened in a working tree, used once and
-   reverted without leaving a trace in the record. The sealer additionally requires the record to be
-   committed at `HEAD` and byte-identical to the committed blob.
+   reverted without leaving a trace in the record.
+
+   *Pre-registration is proven, not assumed.* The sealer requires the record AND the analysis it
+   stands on to be committed in the run's OWN pin (`--code-hash`), byte-identical to the blob on
+   disk. The run executed at that commit, so an artifact present in it with these bytes existed
+   before the run produced the data it judges; a record written to fit an observed divergence cannot
+   satisfy this, and checking `HEAD` would not do it because HEAD moves after the run. The sealed
+   Gate D record already satisfies it: its blob at pin `4286509` is the blob on disk.
 
    *Grandfathering, stated rather than hidden:* the one record that closed Gate D,
    `docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json`, SHA-256

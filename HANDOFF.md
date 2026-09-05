@@ -13103,3 +13103,21 @@ splice, including `test_reproduces_the_sealed_event1_adjudication_exactly`, whic
 D numbers against the real 08-27 archive. Comparing the test inventory against `HEAD` caught it and
 all three are restored. Never take a `str.index`-to-`str.index` region without listing what is inside
 it first.
+
+### Pre-registration is now proven rather than conventional (2026-09-05 23:55Z)
+
+Every control so far made a fabricated record *harder*; none made it *impossible*, because the record
+and its analysis are both authored by the operator, and a committed-at-HEAD check proves nothing about
+ordering — HEAD moves after the run. The property that does prove it was available all along: the run
+executes at a pinned commit. The sealer now requires the adjudication record and the analysis it
+stands on to be present in the RUN's own `--code-hash`, byte-identical to the file on disk. An
+artifact in that commit existed before the run produced the data it judges, so a record written to fit
+an observed divergence cannot satisfy the check.
+
+Verified against sealed history rather than asserted: the Gate D record's blob at pin `4286509` is
+`8bae3c501d6bd5c6e6dbe5fced8ddca03821e37c`, identical to the blob on disk, so the closed gate would
+pass the new check unchanged. A test pins that fact.
+
+This also makes the two-run B′ sequencing structural: run 1's observer arrays produce the analysis and
+the record, both are committed, and run 2 executes at a pin that contains them. There is no ordering
+in which a single run can seal against a record derived from itself.
