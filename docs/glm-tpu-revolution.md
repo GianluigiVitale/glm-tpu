@@ -2016,9 +2016,13 @@ bit-exact vs the legacy oracle, with it 2,046/2,048 scores moved). The legacy 12
    on the highest-frequency pairs for host tables too, so "accuracy vs FP64" is not the criterion —
    fidelity to the accepted legacy form is, and its cost is a new §21 adjudication (B′) plus re-based
    witnesses for Step C. Not paid until shown necessary.
-3. Zero-cost diagnostic folded into Step B's FIRST worker run (no extra lease; capacity-independent —
-   a 262,657-row positions array — so a fail is known before Step C and the fallback is B → A′(table)
-   → B′ → C with no wasted capacity run). It compiles and executes one extra small TPU program OUTSIDE
+3. Zero-cost diagnostic as a declared side program in a protected worker (no extra lease;
+   capacity-independent — a 262,657-row positions array). Amendment 2026-09-05 18:50Z: the design placed
+   it in Step B's first worker, but both Step B runs (C = 2048 at `172ae03`, C = 512 at `00c6eee`)
+   executed before the diagnostic existed; it therefore first runs in Step C's first capacity run, and if
+   it fails that capacity run is repeated with the main table (the accepted fallback). The diagnostic's
+   verifier pins the protocol (κ, bands, θ, rotary dim, the full window, 4 × 32 cells) and refuses any
+   record not computed on the TPU backend. It compiles and executes one extra small TPU program OUTSIDE
    the timed window and the traced steps (before the model programs compile), is declared in the run
    record with its SHA-pinned script and artifact path/SHA, and leaves the census/HLO/trace contracts
    untouched (the sealer sees a declared, pinned side program). Content: jitted `rotary_cos_sin` at
