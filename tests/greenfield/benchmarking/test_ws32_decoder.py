@@ -739,3 +739,102 @@ def test_ws32_prefill_contract_replays_protected_acquisition() -> None:
     assert report.maximum_group_size == 8
     assert report.async_collective_count == 0
     assert report.forbidden_full_hidden_values == ()
+
+
+def _exact_dsa_minimal_hlo(extra: tuple[str, str] | None = None) -> str:
+    """A graph whose instructions are all live (chained into ROOT), carrying the
+    four required exact-DSA scopes and exactly one 16-KiB tuple4 fusion, so at
+    ``full_indexer_count=1`` the two refusals under test stay silent unless the
+    mutation trips them."""
+    feature, _ = _groups()
+    scope = "jit(body)/shard_map/greenfield_ws32_complete_decoder/greenfield_ws32_exact_dsa"
+    steps: list[tuple[str, str, str]] = [
+        ("m0", "", f"{scope}/one_row_fused_qkv_a_n82_convolution"),
+        ("m1", "", f"{scope}/exact_current_key"),
+        ("m2", "", f"{scope}/default_score"),
+        ("tuple4", ' backend_config={"megacore_allreduce_bytes":16384},', f"{scope}/tuple4_query"),
+    ]
+    if extra is not None:
+        steps.append((extra[0], extra[1], extra[2]))
+    lines = []
+    previous = "%feature"
+    for name, config, op_name in steps:
+        lines.append(
+            f'  %{name} = f32[1,1536] copy({previous}),{config} metadata={{op_name="{op_name}"}}'
+        )
+        previous = f"%{name}"
+    body = "\n".join(lines)
+    return f'''HloModule ws32_exact_minimal, num_partitions=32
+
+feature_add {{
+  %a = f32[] parameter(0)
+  %b = f32[] parameter(1)
+  ROOT %sum = f32[] add(%a, %b)
+}}
+
+ENTRY main {{
+  %input = f32[1,1536] parameter(0)
+  %feature = f32[1,1536] all-reduce(%input), replica_groups={{{feature}}}, to_apply=feature_add, use_global_device_ids=true, metadata={{op_name="jit(body)/shard_map/greenfield_ws32_complete_decoder/greenfield_ws32_fused_rmsnorm/feature_square_reduce/psum"}}
+{body}
+  ROOT %out = f32[1,1536] add(%feature, {previous})
+}}
+'''
+
+
+def _exact_violations(hlo: str, *, host_main_rope_table: bool = False, exact_dsa: bool = True) -> list[str]:
+    stable = "module @main"
+    return list(
+        validate_ws32_decoder_hlo(
+            stable,
+            hlo,
+            expected_stablehlo_sha256=sha256(stable.encode()).hexdigest(),
+            expected_optimized_hlo_sha256=sha256(hlo.encode()).hexdigest(),
+            hidden_size=6144,
+            kind="decode",
+            expected_split_rmsnorm_collective_count=1,
+            exact_dsa=exact_dsa,
+            host_main_rope_table=host_main_rope_table,
+            full_indexer_count=1,
+        ).violations
+    )
+
+
+def test_ws32_exact_dsa_query_gather_and_fusion_refusals_still_fire() -> None:
+    """These two refusals were silently captured by the §23.8 table block on
+    2026-09-05; they must fire independently of the rotary-table declaration."""
+    base = _exact_violations(_exact_dsa_minimal_hlo())
+    assert "exact WS32 DSA retained expert-owned query gather" not in base
+    assert "exact WS32 DSA tuple4 16-KiB fusion count drifted" not in base
+    assert not any("lost live" in item for item in base)
+
+    scope = "jit(body)/shard_map/greenfield_ws32_complete_decoder/greenfield_ws32_exact_dsa"
+    for extra, expected in (
+        (("rogue", "", f"{scope}/query_expert_gather"),
+         "exact WS32 DSA retained expert-owned query gather"),
+        (("sixteen", ' backend_config={"megacore_allreduce_bytes":16384},', f"{scope}/tuple4_query"),
+         "exact WS32 DSA tuple4 16-KiB fusion count drifted"),
+    ):
+        for table in (False, True):
+            assert expected in _exact_violations(
+                _exact_dsa_minimal_hlo(extra), host_main_rope_table=table
+            ), (expected, table)
+
+
+def test_ws32_rotary_table_scope_is_required_exactly_when_declared() -> None:
+    lookup = (
+        "row",
+        "",
+        "jit(body)/shard_map/greenfield_ws32_complete_decoder/greenfield_ws32_main_rope_table_lookup",
+    )
+    missing = "WS32 main rotary host table scope is missing"
+    undeclared = "WS32 main rotary host table appears without a declaration"
+    assert missing in _exact_violations(_exact_dsa_minimal_hlo(), host_main_rope_table=True)
+    assert undeclared not in _exact_violations(_exact_dsa_minimal_hlo(), host_main_rope_table=True)
+    assert missing not in _exact_violations(
+        _exact_dsa_minimal_hlo(lookup), host_main_rope_table=True
+    )
+    assert undeclared in _exact_violations(_exact_dsa_minimal_hlo(lookup))
+    assert undeclared not in _exact_violations(_exact_dsa_minimal_hlo())
+    # The rule must hold for a non-exact-DSA graph too: the helper the captured
+    # code used was scoped to the exact block and would have raised NameError.
+    assert undeclared in _exact_violations(_exact_dsa_minimal_hlo(lookup), exact_dsa=False)

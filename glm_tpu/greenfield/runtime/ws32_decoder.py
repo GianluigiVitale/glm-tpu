@@ -1108,8 +1108,13 @@ def _ws32_decode_impl(
         ):
             raise ValueError("WS32 main rotary table geometry drifted")
         with jax.named_scope("greenfield_ws32_main_rope_table_lookup"):
+            # ``mode="clip"`` matches the PP16 sibling's basic indexing; JAX's
+            # default fill mode would put NaN in the cache for a position at or
+            # past the capacity.  The runner's capacity contract
+            # (context_capacity > prompt + every generated step) makes the clamp
+            # unreachable in a valid run.
             main_rope_table_row = jnp.take(
-                main_rope_table, state.position, axis=0
+                main_rope_table, state.position, axis=0, mode="clip"
             )[0]
     if token_ids.shape != (1,) or token_ids.dtype != jnp.int32:
         raise ValueError("WS32 decoder input must be one int32 token")

@@ -12812,3 +12812,34 @@ against a record derived from its own data — was rejected because it destroys 
 property that §21.2 rests on; the extra cost is one 45-minute run. Event 0 should stay bit-exact (its
 indexer input precedes any attention), which the first run will confirm.
 
+## 2026-09-05 22:10Z — P0 in the HLO linter found by review and fixed; A′/v2 rejections resolved
+
+The Opus 5 review of A′ found a P0 I introduced: the new §23.8 table check was written at the
+indentation of the `if exact_dsa and kind != "cache_probe":` body, so its `elif table_present:` captured
+the two refusals that followed — the expert-owned query gather and the tuple4 16-KiB fusion count — and
+made them dead in every configuration, flag on or off, while the graphs would still have been SHA-pinned.
+Nothing tested those refusals, which is why 53 green tests did not see it. Fixed: the exact-DSA checks
+are back inside their own guard, the table check is a separate top-level block, and two new tests build a
+minimal live-chained exact-DSA graph and assert each refusal fires with the table flag both off and on
+(and that the table rule holds on a non-exact graph, the path that would previously have raised
+NameError). An AST assertion of the guard structure was used to confirm the fix.
+
+Also fixed from the same review: a `set -u` defect in the worker upload helper — `local want have tmp`
+left `have` unset when the remote download failed, and nounset is not suppressed by `|| rc=1`, so the
+worker shell would die inside `upload` after the EXIT trap was removed, losing the remaining HLO objects
+and the XPlane trace of a completed protected run (reproduced, then fixed with `have=""` and a guarded
+`mktemp`); the rotary row gather now passes `mode="clip"` explicitly (JAX's default fill mode would have
+written NaN into the cache at a position past the capacity, whereas the PP16 sibling clamps); the sealer
+derives the rotary dimension from the committed geometry instead of a literal; the wrapper passes
+`--evidence-layout` and `--host-main-rope-table` so both pins land in `validate.log`; the census retry
+message no longer fires after the last attempt; EVIDENCE_MAP no longer attributes layout v2 to the merge
+base.
+
+Default-off neutrality of A′, checked rather than asserted: the flag-off branch of the main-attention
+site is statement-identical to the pre-change code (26 pre-change statements, 18 in the branch after the
+hoisted definitions, none added, none lost), `table_specs` is empty so no extra program input exists, and
+the rotary branch lowers to identical StableHLO in a worktree at the parent commit
+(`a5a67bab7c24c876…`). The row selection, cos|sin split and FP32-final-round rotation are now executed by
+a CPU test that also checks the clamp is finite at and past the capacity and that the table row is closer
+to FP64 than the on-device form at position 262,000.
+

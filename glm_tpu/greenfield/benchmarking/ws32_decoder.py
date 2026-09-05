@@ -695,22 +695,6 @@ def validate_ws32_decoder_hlo(
         for marker in exact_markers:
             if not any(scoped(item, marker) for item in live):
                 violations.append(f"exact WS32 DSA lost live {marker} scope")
-    # Spec §23.8: the legacy-faithful main-attention rotary consumes one
-    # replicated host BF16 cos|sin row per step; it is present iff declared and
-    # never appears in the cache probe.
-    table_scopes = {
-        "greenfield_ws32_main_rope_table",
-        "greenfield_ws32_main_rope_table_lookup",
-    }
-    table_present = any(
-        item.op_name is not None and table_scopes & set(item.op_name.split("/"))
-        for item in live
-    )
-    if host_main_rope_table and kind != "cache_probe":
-        if not table_present:
-            violations.append("WS32 main rotary host table scope is missing")
-    elif table_present:
-        violations.append("WS32 main rotary host table appears without a declaration")
         if any(scoped(item, "query_expert_gather") for item in live):
             violations.append("exact WS32 DSA retained expert-owned query gather")
         sixteen_kib = tuple(
@@ -725,6 +709,23 @@ def validate_ws32_decoder_hlo(
         )
         if len(sixteen_kib) != full_indexer_count:
             violations.append("exact WS32 DSA tuple4 16-KiB fusion count drifted")
+    # Spec §23.8: the legacy-faithful main-attention rotary consumes one
+    # replicated host BF16 cos|sin row per step; it is present iff declared and
+    # never appears in the cache probe.  This is a separate top-level block: it
+    # must not guard, or be guarded by, the exact-DSA structure checks above.
+    table_scopes = {
+        "greenfield_ws32_main_rope_table",
+        "greenfield_ws32_main_rope_table_lookup",
+    }
+    table_present = any(
+        item.op_name is not None and table_scopes & set(item.op_name.split("/"))
+        for item in live
+    )
+    if host_main_rope_table and kind != "cache_probe":
+        if not table_present:
+            violations.append("WS32 main rotary host table scope is missing")
+    elif table_present:
+        violations.append("WS32 main rotary host table appears without a declaration")
     return Ws32DecoderHloReport(
         kind=kind,
         stablehlo_sha256=stable_digest,

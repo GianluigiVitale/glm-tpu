@@ -4051,7 +4051,8 @@ persistence only; review and persistence precede any v2 installation.
 
 ## 2026-09-05 — evidence layout v2 (spec §23.10)
 
-- Runs from pin `d464a7f`+ upload `hlo/<graph>.<form>.gz` once per graph/form instead of eight
+- Runs from the pin at which layout v2 reaches the run branch (recorded with the first v2 run; it is
+  NOT the `d464a7f` merge base) upload `hlo/<graph>.<form>.gz` once per graph/form instead of eight
   per-rank text copies; each rank's runner record still carries both inflated SHA-256s, the ledger
   records the compressed object plus `inflated_sha256`, and the runner/summary declare
   `evidence_layout`. Prefixes sealed before that pin carry no `evidence_layout` field and are read as

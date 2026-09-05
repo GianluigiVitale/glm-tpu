@@ -1267,16 +1267,21 @@ def _require_main_rope_table(
     )
     from glm_tpu.greenfield.runtime import WS32_MAIN_ROPE_THETA
 
+    from glm_tpu.greenfield.types import ModelGeometry
+
+    rotary_dim = ModelGeometry.from_hf_config(
+        json.loads((REPO / "configs/glm-5.2-fp8-config.json").read_text(encoding="utf-8"))
+    ).qk_rope_head_dim
     if (
         value["rows"] != context_capacity
-        or value["rotary_dim"] != 64
+        or value["rotary_dim"] != rotary_dim
         or value["theta"] != WS32_MAIN_ROPE_THETA
-        or value["bytes_per_device"] != context_capacity * 64 * 2
+        or value["bytes_per_device"] != context_capacity * rotary_dim * 2
     ):
         raise SystemExit(f"WS32 main rotary table identity drifted at rank {rank}")
     expected = rotary_table_sha256(
         build_rotary_table_host(
-            context_capacity, rotary_dim=64, theta=WS32_MAIN_ROPE_THETA
+            context_capacity, rotary_dim=rotary_dim, theta=WS32_MAIN_ROPE_THETA
         )
     )
     if value["sha256"] != expected:
