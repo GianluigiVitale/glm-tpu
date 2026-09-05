@@ -61,6 +61,7 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--context-label", choices=("2k", "8k"), required=True)
     validate.add_argument("--tag", required=True)
     validate.add_argument("--prefill-chunk", type=int, default=DEFAULT_PREFILL_CHUNK)
+    validate.add_argument("--rotary-diagnostic", choices=(0, 1), default=0, type=int)
     validate.add_argument("--code-hash", required=True)
     validate.add_argument("--checkpoint-manifest-sha256", required=True)
     validate.add_argument("--checkpoint-success-sha256", required=True)
@@ -199,21 +200,31 @@ def _memory_valid(value: Any) -> bool:
 
 
 DEFAULT_PREFILL_CHUNK = 2048
+DEFAULT_CONTEXT_CAPACITY = 8192
 
 
 def _validate_run_tag(
-    tag: str, *, context_label: str, mode: str, prefill_chunk: int = DEFAULT_PREFILL_CHUNK
+    tag: str,
+    *,
+    context_label: str,
+    mode: str,
+    prefill_chunk: int = DEFAULT_PREFILL_CHUNK,
+    context_capacity: int = DEFAULT_CONTEXT_CAPACITY,
 ) -> None:
-    """Spec §23.3: a non-default prefill chunk is part of the run identity."""
+    """Spec §23.3: a non-default prefill chunk or context capacity is part of the run identity."""
     if type(prefill_chunk) is not int or prefill_chunk <= 0:
         raise SystemExit("WS32 prefill chunk must be a positive integer")
+    if type(context_capacity) is not int or context_capacity <= 0:
+        raise SystemExit("WS32 context capacity must be a positive integer")
     suffix = "" if prefill_chunk == DEFAULT_PREFILL_CHUNK else f"_c{prefill_chunk}"
+    if context_capacity != DEFAULT_CONTEXT_CAPACITY:
+        suffix += f"_cap{context_capacity}"
     pattern = (
         rf"greenfield_ws32_short_decoder_{re.escape(context_label)}_"
         rf"{re.escape(mode)}{re.escape(suffix)}_[0-9]{{8}}T[0-9]{{15}}Z"
     )
     if re.fullmatch(pattern, tag) is None:
-        raise SystemExit("WS32 run tag contradicts active context/mode/prefill chunk")
+        raise SystemExit("WS32 run tag contradicts active context/mode/prefill chunk/capacity")
 
 
 def _graph_valid(value: Any, *, mode: str) -> bool:
@@ -349,6 +360,7 @@ def _validate(args: argparse.Namespace) -> int:
         context_label=args.context_label,
         mode=args.mode,
         prefill_chunk=args.prefill_chunk,
+        context_capacity=args.context_capacity,
     )
     materializer_pin_names = {
         "expected_exact_materialize_stablehlo_sha256",
@@ -544,6 +556,7 @@ def _validate(args: argparse.Namespace) -> int:
         "prefill_chunk_length",
         "prefill_execution",
         "prompt_length",
+        "rotary_diagnostic",
         "source_inventory_sha256",
         "strategy_nd_dense",
         "strategy_nd_dense_overlay",
@@ -615,6 +628,9 @@ def _validate(args: argparse.Namespace) -> int:
             record.get("prefill_chunk_length"), records[0].get("prefill_chunk_length")
         ):
             raise SystemExit(f"WS32 prefill chunk length disagrees at rank {rank}")
+        _require_rotary_diagnostic(
+            record, enabled=bool(args.rotary_diagnostic), rank=rank, first=records[0]
+        )
         if (
             type(record.get("load_seconds")) is not float
             or not math.isfinite(record["load_seconds"])
@@ -992,7 +1008,20 @@ def _validate(args: argparse.Namespace) -> int:
             {
                 "cache_write_probe": records[0]["cache_write_probe"],
                 "dsa_steps": records[0]["dsa_steps"],
+                "capacity_measurement": (
+                    None
+                    if args.context_capacity == DEFAULT_CONTEXT_CAPACITY
+                    else {"context_capacity": int(args.context_capacity), "default": DEFAULT_CONTEXT_CAPACITY}
+                ),
                 "prefill_chunk_length": records[0]["prefill_chunk_length"],
+                "rotary_diagnostic": (
+                    None
+                    if records[0].get("rotary_diagnostic") is None
+                    else {
+                        key: records[0]["rotary_diagnostic"][key]
+                        for key in ("failing_cells", "positions", "record_sha256", "script_sha256", "verdict")
+                    }
+                ),
                 "prefill_execution": {
                     **records[0]["prefill_execution"],
                     "fleet_total_seconds_max": max(
@@ -1054,6 +1083,10 @@ def _validate(args: argparse.Namespace) -> int:
             if alarm_summary is not None:
                 basis.append("LATER_EVENT_ALARM_ACKNOWLEDGED_WITH_LESSONS_ENTRY")
         basis.append("PROTECTED_WALL_TRACE_HBM")
+        if summary.get("capacity_measurement") is not None:
+            basis.append(f"CAPACITY_MEASUREMENT_{summary['capacity_measurement']['context_capacity']}")
+        if summary.get("rotary_diagnostic") is not None:
+            basis.append(f"ROTARY_LONG_POSITION_DIAGNOSTIC_{summary['rotary_diagnostic']['verdict']}")
         summary["classification"] = ";".join(basis)
     else:
         summary["later_event_alarm"] = None
@@ -1166,6 +1199,29 @@ def _require_prefill_execution(
         raise SystemExit(f"WS32 prefill execution accounting drifted at rank {rank}")
 
 
+def _require_rotary_diagnostic(
+    record: Mapping[str, Any], *, enabled: bool, rank: int, first: Mapping[str, Any]
+) -> None:
+    """Spec §23.8: the declared side program's record must be present iff enabled,
+    self-consistent, produced by the committed script, and identical across ranks."""
+    from glm_tpu.greenfield.validation.rotary_diagnostic import (
+        script_sha256,
+        verify_rotary_diagnostic_record,
+    )
+
+    value = record.get("rotary_diagnostic")
+    if not enabled:
+        if value is not None:
+            raise SystemExit(f"WS32 rotary diagnostic present but not declared at rank {rank}")
+        return
+    try:
+        verify_rotary_diagnostic_record(value, expected_script_sha256=script_sha256())
+    except ValueError as error:
+        raise SystemExit(f"WS32 rotary diagnostic invalid at rank {rank}: {error}") from None
+    if rank and not _same(value, first.get("rotary_diagnostic")):
+        raise SystemExit(f"WS32 rotary diagnostic disagrees at rank {rank}")
+
+
 def _run_environment(summary: dict[str, Any]) -> dict[str, Any]:
     """The exact env_json identity shared by DB publication and rollback.
 
@@ -1199,6 +1255,8 @@ def _run_environment(summary: dict[str, Any]) -> dict[str, Any]:
         "later_event_alarm": summary.get("later_event_alarm"),
         "recovery_code_hash": summary.get("recovery_code_hash"),
         "prefill_chunk_length": summary.get("prefill_chunk_length"),
+        "capacity_measurement": summary.get("capacity_measurement"),
+        "rotary_diagnostic": summary.get("rotary_diagnostic"),
     }
 
 
@@ -1209,6 +1267,7 @@ def _run_rows(summary: dict[str, Any]) -> tuple[str, str, str]:
     both sides must derive the wording from this one function.
     """
     adjudicated = summary.get("dsa_adjudication") is not None
+    capacity = summary.get("capacity_measurement")
     note = (
         "Protected complete WS32 short-context decoder: exact tokens/DSA/state/cache/HLO/HBM/XPlane and profiler-free wall."
         if not adjudicated
@@ -1219,6 +1278,14 @@ def _run_rows(summary: dict[str, Any]) -> tuple[str, str, str]:
         + "; within-engine DSA order/tails exact; state/cache/HLO/HBM/XPlane and profiler-free wall."
     )
     item_id = "gate_d_exact_token_dsa_state_cache" if not adjudicated else "gate_d_s21_exact_tokens_adjudicated_dsa_state_cache"
+    if capacity:
+        # Spec §23.3 Step C: the same sealed workload at a long context capacity;
+        # a measurement record, never a Gate D record.
+        note = (
+            f"Capacity measurement at context_capacity={capacity['context_capacity']} (spec §23.3 Step C, "
+            "not a Gate D record): " + note
+        )
+        item_id = f"s23_capacity_measurement_cap{capacity['context_capacity']}_" + item_id
     gold = (
         "Exact sealed raw-token prefix, executing-program DSA set/ties, state/cache/HLO/HBM/XPlane and protected wall."
         if not adjudicated

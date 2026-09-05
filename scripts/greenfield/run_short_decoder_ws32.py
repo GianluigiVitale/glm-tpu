@@ -118,6 +118,10 @@ def parse_args() -> argparse.Namespace:
     # host can project the prefill wall and abort fail-closed.
     parser.add_argument("--prefill-chunk", type=int, required=True)
     parser.add_argument("--prefill-budget-seconds", type=float, required=True)
+    # Spec §23.8: declared side program measuring on-device rotary at long
+    # positions (default off); its record is embedded in the runner record.
+    parser.add_argument("--rotary-diagnostic", choices=(0, 1), default=0, type=int)
+    parser.add_argument("--rotary-diagnostic-positions", type=int, default=262_657)
     parser.add_argument("--context-capacity", required=True, type=int)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--tensor-output", required=True, type=Path)
@@ -650,6 +654,20 @@ def main() -> int:
         raise ValueError("WS32 observer steps exceed the sealed DSA oracle")
 
     jax, mesh, physical_mesh, topology, fleet_sha = _initialize_runtime(args)
+    rotary_diagnostic: dict[str, Any] | None = None
+    if args.rotary_diagnostic:
+        # Runs on this host's default local device before any model program is
+        # compiled or loaded; outside the timed window and the traced steps.
+        from glm_tpu.greenfield.validation.rotary_diagnostic import run_rotary_diagnostic
+
+        rotary_diagnostic = run_rotary_diagnostic(
+            positions=int(args.rotary_diagnostic_positions)
+        ).record
+        print(
+            "GREENFIELD_WS32_ROTARY_DIAGNOSTIC "
+            f"verdict={rotary_diagnostic['verdict']} failing={len(rotary_diagnostic['failing_cells'])}",
+            flush=True,
+        )
     inventory = inspect_source_inventory(args.source_inventory)
     local_device_ids = {int(device.id) for device in jax.local_devices()}
     local_hash_slots = tuple(
@@ -1097,6 +1115,7 @@ def main() -> int:
         "prefill_chunk_length": int(args.prefill_chunk),
         "prefill_execution": prefill_execution,
         "prompt_length": int(oracle.prompt_token_ids.size),
+        "rotary_diagnostic": rotary_diagnostic,
         "source_inventory_sha256": inventory.inventory_sha256,
         "strategy_nd_dense": config.strategy_nd_dense,
         "strategy_nd_dense_overlay": (

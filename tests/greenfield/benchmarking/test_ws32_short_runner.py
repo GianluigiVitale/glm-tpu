@@ -392,3 +392,68 @@ def test_ws32_sealer_binds_the_prefill_chunk_into_the_run_tag() -> None:
     assert '${MODE}${CHUNK_SUFFIX}_[0-9]{8}T[0-9]{15}Z$' in wrapper
     assert '--prefill-chunk "$PREFILL_CHUNK"' in wrapper
 
+
+def test_ws32_capacity_and_rotary_diagnostic_are_declared_and_bound() -> None:
+    """Spec §23.3 Step C / §23.8: capacity enters the tag and DB identity; the
+    rotary diagnostic is a declared side program whose record must be present
+    iff enabled, self-consistent, script-pinned and identical across ranks."""
+    import importlib.util
+
+    root = Path(__file__).resolve().parents[3]
+    sealer_path = root / "scripts/greenfield/seal_short_decoder_ws32.py"
+    specification = importlib.util.spec_from_file_location("ws32_sealer_cap_test", sealer_path)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    stamp = "20260905T085534575653049Z"
+    module._validate_run_tag(
+        f"greenfield_ws32_short_decoder_8k_numerical_cap131072_{stamp}",
+        context_label="8k", mode="numerical", context_capacity=131072,
+    )
+    module._validate_run_tag(
+        f"greenfield_ws32_short_decoder_8k_numerical_c512_cap262656_{stamp}",
+        context_label="8k", mode="numerical", prefill_chunk=512, context_capacity=262656,
+    )
+    for tag, chunk, capacity in (
+        (f"greenfield_ws32_short_decoder_8k_numerical_{stamp}", 2048, 131072),
+        (f"greenfield_ws32_short_decoder_8k_numerical_cap131072_{stamp}", 2048, 8192),
+        (f"greenfield_ws32_short_decoder_8k_numerical_cap131072_c512_{stamp}", 512, 131072),
+    ):
+        with pytest.raises(SystemExit, match="capacity"):
+            module._validate_run_tag(tag, context_label="8k", mode="numerical", prefill_chunk=chunk, context_capacity=capacity)
+    # DB identity for a capacity measurement is never a Gate D row.
+    base = {"dsa_adjudication": {"event_index": 1}, "later_event_alarm": {"acknowledged": True}}
+    note, item_id, gold = module._run_rows(base)
+    assert item_id == "gate_d_s21_exact_tokens_adjudicated_dsa_state_cache"
+    note_c, item_c, gold_c = module._run_rows({**base, "capacity_measurement": {"context_capacity": 131072, "default": 8192}})
+    assert item_c == "s23_capacity_measurement_cap131072_gate_d_s21_exact_tokens_adjudicated_dsa_state_cache"
+    assert note_c.startswith("Capacity measurement at context_capacity=131072") and "not a Gate D record" in note_c
+    assert gold_c == gold
+    env = module._run_environment({**base, "checkpoint_manifest_sha256": "1", "checkpoint_success_sha256": "2", "code_hash": "3",
+        "context_label": "8k", "dsa_oracle_manifest_sha256": "4", "dsa_oracle_success_sha256": "5", "mesh_sha256": "6",
+        "run_tag": "t", "strategy_nd_dense": False, "strategy_nd_dense_overlay_manifest_sha256": "0" * 64,
+        "token_oracle_manifest_sha256": "7", "token_oracle_success_sha256": "8", "xla_python_client_mem_fraction": ".95",
+        "capacity_measurement": {"context_capacity": 131072}, "rotary_diagnostic": {"verdict": "PASS"}})
+    assert env["capacity_measurement"] == {"context_capacity": 131072} and env["rotary_diagnostic"] == {"verdict": "PASS"}
+    # Rotary diagnostic presence must match the declaration.
+    from glm_tpu.greenfield.validation import rotary_diagnostic as rd
+    record = rd.run_rotary_diagnostic(positions=600).record
+    module._require_rotary_diagnostic({"rotary_diagnostic": record}, enabled=True, rank=0, first={"rotary_diagnostic": record})
+    with pytest.raises(SystemExit, match="present but not declared"):
+        module._require_rotary_diagnostic({"rotary_diagnostic": record}, enabled=False, rank=0, first={})
+    with pytest.raises(SystemExit, match="invalid"):
+        module._require_rotary_diagnostic({"rotary_diagnostic": None}, enabled=True, rank=0, first={})
+    other = dict(record); other["positions"] = 601
+    with pytest.raises(SystemExit, match="invalid"):
+        module._require_rotary_diagnostic({"rotary_diagnostic": other}, enabled=True, rank=1, first={"rotary_diagnostic": record})
+    module._require_rotary_diagnostic({"rotary_diagnostic": None}, enabled=False, rank=3, first={})
+    wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
+    runner = (root / "scripts/greenfield/run_short_decoder_ws32.py").read_text(encoding="utf-8")
+    assert "CONTEXT_CAPACITY=${GLM_GREENFIELD_WS32_CONTEXT_CAPACITY:-8192}" in wrapper
+    assert "CHUNK_SUFFIX=${CHUNK_SUFFIX}_cap${CONTEXT_CAPACITY}" in wrapper
+    assert "ROTARY_DIAGNOSTIC=${GLM_GREENFIELD_WS32_ROTARY_DIAGNOSTIC:-0}" in wrapper
+    assert "--rotary-diagnostic '\"$ROTARY_DIAGNOSTIC\"'" in wrapper and '--rotary-diagnostic "$ROTARY_DIAGNOSTIC"' in wrapper
+    assert '"--rotary-diagnostic", choices=(0, 1), default=0' in runner
+    assert '"rotary_diagnostic": rotary_diagnostic,' in runner
+    sealer = sealer_path.read_text(encoding="utf-8")
+    assert '"rotary_diagnostic",' in sealer and "ROTARY_LONG_POSITION_DIAGNOSTIC_" in sealer and "CAPACITY_MEASUREMENT_" in sealer
+
