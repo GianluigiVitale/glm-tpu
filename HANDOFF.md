@@ -12438,3 +12438,26 @@ and its tmpfs removed (nothing else touched; lease released; diagnostic evidence
 fact exposed a wrapper bug: the controller-side manifest/SUCCESS copy aborted if the tmpfs root
 already existed, which on worker 0 it always would after the host pack; the step now verifies the
 existing root's sealed identity instead. Relaunch follows with a fresh tag.
+
+## 2026-09-05 05:20Z — third tmpfs pack launch running
+
+Tag `greenfield_ws32_runtime_shm_pack_20260905T052030829387724Z` at pushed/mirrored pin `6832b0e`:
+pre-pack census 8/8 zero-work, eight-host code sync exact, distributed pack started 05:20:43Z into
+`/dev/shm/glm-ws32-runtime/greenfield_ws32_runtime_pack_20260815T214050854386790Z/` on every host
+(worker 0 is this controller). Budget about three hours (≈9 MB/s per host from the canonical
+checkpoint). Completion criteria: `SHM_PACK_OK` from all eight hosts with every owned slot byte-
+identical to the sealed manifest, controller reconciliation of all 32 slots, post census 8/8, then
+`SHM_PACK_COMPLETE`. Next after completion: commit/push/mirror this record, then the compile-only 8K
+acquisition with the environment recorded in the runbook above (`MODE=acquire`, transport `shm`).
+
+## 2026-09-05 08:07Z — tmpfs pack complete: all 32 slots byte-identical to the sealed checkpoint
+
+`greenfield_ws32_runtime_shm_pack_20260905T052030829387724Z` at `6832b0e` finished 05:20→08:07Z
+(2 h 47 min). All eight hosts reported `SHM_PACK_OK`; every owned slot hashed byte-identical to the
+sealed manifest `c04f800e…5ee08` (32/32 reconciled on the controller), the sealed manifest and
+SUCCESS are in place read-only, identity markers written, pre/post censuses 8/8, host records and the
+run archive uploaded to `results/<tag>/` (kilobytes). This also proves the current pack code
+reproduces the deleted 786,172,488,192-byte checkpoint exactly. Live GCS storage is unchanged in kind;
+the PP16 direct checkpoint stays. Slot ownership: w0 9/13/25/29, w1 10/14/26/30, w2 8/12/24/28,
+w3 1/5/17/21, w4 0/4/16/20, w5 3/7/19/23, w6 11/15/27/31, w7 2/6/18/22. Next: compile-only 8K
+acquisition at HEAD with transport `shm` (runbook step 2).
