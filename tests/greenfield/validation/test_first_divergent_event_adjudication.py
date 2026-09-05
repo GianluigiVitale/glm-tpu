@@ -403,17 +403,36 @@ def test_the_observer_archive_must_match_what_the_run_published(monkeypatch) -> 
     with tempfile.TemporaryDirectory() as directory:
         archive = Path(directory) / "runner.rank0.npz"
         archive.write_bytes(b"observer arrays")
-        local = MODULE._local_md5(archive)
+        local = MODULE._local_hashes(archive)
+        assert set(local) == {"crc32c", "md5"}
 
-        monkeypatch.setattr(MODULE, "_remote_archive_md5", lambda run_tag: local)
-        assert MODULE._require_archive_belongs_to_run(archive, tag) == local
+        monkeypatch.setattr(MODULE, "_remote_archive_hashes", lambda run_tag: dict(local))
+        witness = MODULE._require_archive_belongs_to_run(archive, tag)
+        assert local["md5"] in witness and local["crc32c"] in witness
 
-        monkeypatch.setattr(MODULE, "_remote_archive_md5", lambda run_tag: "0" * 32)
+        # A composite upload carries only CRC32C; that is still a binding.
+        monkeypatch.setattr(
+            MODULE, "_remote_archive_hashes", lambda run_tag: {"crc32c": local["crc32c"]}
+        )
+        assert MODULE._require_archive_belongs_to_run(archive, tag) == (
+            f"crc32c={local['crc32c']}"
+        )
+
+        monkeypatch.setattr(
+            MODULE, "_remote_archive_hashes", lambda run_tag: {"md5": "0" * 32}
+        )
         with pytest.raises(SystemExit, match="does not match the archive run"):
             MODULE._require_archive_belongs_to_run(archive, tag)
 
-        monkeypatch.setattr(MODULE, "_remote_archive_md5", lambda run_tag: None)
-        with pytest.raises(SystemExit, match="published no observer archive"):
+        # gcloud missing, unauthenticated, timed out or the object absent.
+        monkeypatch.setattr(MODULE, "_remote_archive_hashes", lambda run_tag: {})
+        with pytest.raises(SystemExit, match="published no readable observer archive"):
+            MODULE._require_archive_belongs_to_run(archive, tag)
+
+        monkeypatch.setattr(
+            MODULE, "_remote_archive_hashes", lambda run_tag: {"sha512": "f" * 128}
+        )
+        with pytest.raises(SystemExit, match="no hash this tool can compare"):
             MODULE._require_archive_belongs_to_run(archive, tag)
 
 

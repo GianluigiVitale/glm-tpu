@@ -574,33 +574,50 @@ def _resolve_event(
     return first_step, first_event
 
 
-def _remote_archive_md5(run_tag: str) -> str | None:
-    """MD5 of the observer archive this run itself uploaded, or None."""
+def _remote_archive_hashes(run_tag: str) -> dict[str, str]:
+    """Hashes of the observer archive this run itself uploaded.
+
+    Returns an empty mapping when the object does not exist or the command
+    fails for any reason, which the caller treats as a refusal.  A composite
+    upload carries no MD5, so CRC32C is read as well and either may be the
+    witness; both are computed locally the same way.
+    """
 
     uri = f"{REMOTE_RESULTS_PREFIX}/{run_tag}/host_records/runner.rank0.npz"
-    result = subprocess.run(
-        ["gcloud", "storage", "hash", "--hex", uri],
-        capture_output=True,
-        text=True,
-        timeout=900,
-    )
+    try:
+        result = subprocess.run(
+            ["gcloud", "storage", "hash", "--hex", uri],
+            capture_output=True,
+            text=True,
+            timeout=900,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return {}
     if result.returncode != 0:
-        return None
+        return {}
+    hashes: dict[str, str] = {}
     for line in result.stdout.splitlines():
         stripped = line.strip()
-        if stripped.startswith("md5_hash:"):
-            return stripped.split(":", 1)[1].strip()
-    return None
+        for name, key in (("md5_hash:", "md5"), ("crc32c_hash:", "crc32c")):
+            if stripped.startswith(name):
+                value = stripped.split(":", 1)[1].strip().lower()
+                if value:
+                    hashes[key] = value
+    return hashes
 
 
-def _local_md5(path: Path) -> str:
+def _local_hashes(path: Path) -> dict[str, str]:
     from hashlib import md5
 
+    import google_crc32c
+
     digest = md5()
+    crc = google_crc32c.Checksum()
     with open(path, "rb") as handle:
         for block in iter(lambda: handle.read(1 << 20), b""):
             digest.update(block)
-    return digest.hexdigest()
+            crc.update(block)
+    return {"crc32c": crc.digest().hex(), "md5": digest.hexdigest()}
 
 
 def _require_archive_belongs_to_run(archive: Path, run_tag: str) -> str:
@@ -614,20 +631,27 @@ def _require_archive_belongs_to_run(archive: Path, run_tag: str) -> str:
     is a refusal.
     """
 
-    remote = _remote_archive_md5(run_tag)
-    if remote is None:
+    remote = _remote_archive_hashes(run_tag)
+    if not remote:
         raise SystemExit(
-            f"run {run_tag} has published no observer archive at "
+            f"run {run_tag} has published no readable observer archive at "
             f"{REMOTE_RESULTS_PREFIX}/{run_tag}/host_records/runner.rank0.npz; the declared "
             "source run cannot be bound to this file"
         )
-    local = _local_md5(archive)
-    if local != remote:
+    local = _local_hashes(archive)
+    shared = sorted(set(remote) & set(local))
+    if not shared:
+        raise SystemExit(
+            f"the archive run {run_tag} published carries no hash this tool can compare "
+            f"(published {sorted(remote)})"
+        )
+    mismatched = [name for name in shared if remote[name] != local[name]]
+    if mismatched:
         raise SystemExit(
             f"observer archive {archive} does not match the archive run {run_tag} published "
-            f"(local md5 {local}, published {remote})"
+            + ", ".join(f"({name} local {local[name]}, published {remote[name]})" for name in mismatched)
         )
-    return remote
+    return "; ".join(f"{name}={local[name]}" for name in shared)
 
 
 def _require_prior_attempts_disclosed(analysis_output: Path, analysis: dict) -> list[dict]:
