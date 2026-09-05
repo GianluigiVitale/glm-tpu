@@ -1697,7 +1697,10 @@ section grants no install or execution authority.
    `4da05468120e3c2e9b82d03931018e0d14eebc5fc28e339381658a04457cd26b`, predates this amendment and
    carries neither `reference_row` nor `analysis`. It is exempt BY DIGEST, so the exemption covers
    exactly that file and cannot be transferred: `expected_sha256` is verified first, and the
-   exemption is then keyed on that verified digest. It is applied after the schema, basis, oracle and
+   exemption is then keyed on that verified digest. It exempts the record from CARRYING the
+   bindings, never from the re-derivation: its event has exactly one reviewed row in the registry,
+   so the sealer looks the row up and recomputes items 3-4 for it like any other record. Verified:
+   re-deriving event 1 from the Gate D run's own arrays passes and reproduces the sealed numbers. It is applied after the schema, basis, oracle and
    source-run checks, all of which the record satisfies, so any future tightening of those must be
    checked against it explicitly. A record claiming the exemption must also carry NEITHER binding,
    which is asserted rather than assumed. History is not weakened and no new record may use it.

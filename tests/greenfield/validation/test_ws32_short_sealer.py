@@ -1429,3 +1429,67 @@ def test_the_pre_registration_pin_refuses_when_git_is_unavailable(tmp_path, monk
     monkeypatch.setattr(module, "_GIT", str(tmp_path / "no-such-git"))
     with _pytest.raises(SystemExit, match="commitment cannot be checked"):
         check("docs/artifacts/gate-d-record.json", "adjudication record")
+
+
+def test_the_grandfathered_record_is_re_derived_from_the_reviewed_registry(tmp_path) -> None:
+    """No record escapes the re-derivation, including the pre-amendment one."""
+    import shutil
+    from pathlib import Path as _Path
+
+    import numpy as _np
+    import pytest as _pytest
+
+    module = _sealer_module()
+    root = _Path(__file__).resolve().parents[3]
+    oracle_dir = _Path(
+        "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/"
+        "greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle"
+    )
+    archive = _Path(
+        "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_"
+        "20260905T085534575653049Z/runner.rank0.npz"
+    )
+    if not (archive.is_file() and (oracle_dir / "dsa_events.safetensors").is_file()):
+        _pytest.skip("the sealed Gate D archive or the 8K DSA oracle is unavailable")
+    from safetensors.numpy import load_file
+
+    relative = "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
+    (tmp_path / "docs/artifacts").mkdir(parents=True)
+    shutil.copyfile(root / relative, tmp_path / relative)
+    oracle_arrays = load_file(str(oracle_dir / "dsa_events.safetensors"))
+
+    class _Oracle:
+        selected_positions = oracle_arrays["selected_positions"]
+        selected_scores = oracle_arrays["selected_scores"]
+        valid_counts = oracle_arrays["valid_counts"]
+
+    class _Grandfathered:
+        step = 0
+        event_index = 1
+        context = "8k"
+        decode_position = 8155
+        producer_layer_id = 1
+        expected_only = (680, 1052, 2024, 2436, 6322, 7473, 7850)
+        observed_only = (754, 1904, 2029, 3651, 4899, 5536, 6951)
+        reference_row_path = None  # the pre-amendment record names no row
+
+    arrays = dict(_np.load(archive, allow_pickle=False))
+    module._rederive_ws32_adjudication(
+        arrays=arrays,
+        oracle=_Oracle(),
+        adjudication=_Grandfathered(),
+        repository_root=tmp_path,
+        rank=0,
+    )
+
+    class _Unregistered(_Grandfathered):
+        decode_position = 4096
+
+    with _pytest.raises(SystemExit, match="reference row is not determined"):
+        module._rederive_ws32_adjudication(
+            arrays=arrays,
+            oracle=_Oracle(),
+            adjudication=_Unregistered(),
+            repository_root=tmp_path,
+            rank=0,
+        )

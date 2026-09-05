@@ -250,6 +250,31 @@ _ARTIFACT_DIRECTORY = ("docs", "artifacts")
 _ARTIFACT_PREFIX = "gate-"
 
 
+def reviewed_reference_row(
+    *, context: str, decode_position: int, producer_layer_id: int, convention: str | None = None
+) -> Mapping[str, str]:
+    """The reviewed FP64 row for one event, by convention or uniquely.
+
+    The grandfathered pre-amendment record names no row, but the event it
+    adjudicates has exactly one reviewed row, so the sealer can still re-derive
+    §21.2 items 3-4 for it rather than skipping the check.
+    """
+
+    key = (str(context), int(decode_position), int(producer_layer_id))
+    matches = [
+        entry
+        for (row_context, row_position, row_layer, row_convention), entry in REFERENCE_ROWS.items()
+        if (row_context, row_position, row_layer) == key
+        and (convention is None or row_convention == convention)
+    ]
+    if len(matches) != 1:
+        raise ValueError(
+            f"expected exactly one reviewed FP64 reference row for {key} "
+            f"{convention or '(any convention)'}, found {len(matches)}"
+        )
+    return matches[0]
+
+
 def committed_artifact_path(value: Any, *suffixes: str) -> bool:
     """A reviewed-tree relative path: no traversal, no absolute escape."""
 

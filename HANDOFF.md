@@ -13198,3 +13198,9 @@ alarm-acknowledgement check; both loader call sites are asserted to pass `reposi
 which every basis and row check silently does nothing; the six check names come from the computation
 module rather than being re-typed; and `--help` names the legal conventions and the alarm default
 again while still costing 0.12 s.
+
+The grandfathered record is not exempt from the re-derivation either. It names no reference row, but
+its event has exactly one reviewed row in the registry, so the sealer looks it up and recomputes
+items 3-4 for it like any other record. A test drives that path against the real sealed Gate D
+archive and the sealed 8K oracle: it passes, and an event with no registered row is refused. No
+record now reaches a seal with a verdict the sealer did not compute itself.

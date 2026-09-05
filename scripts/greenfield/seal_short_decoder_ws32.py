@@ -943,7 +943,7 @@ def _validate(args: argparse.Namespace) -> int:
                         adjudication=dsa_adjudication,
                     )
                 )
-            if dsa_adjudication is not None and dsa_adjudication.reference_row_path:
+            if dsa_adjudication is not None:
                 # §21.2 items 3-4 are RE-DERIVED here from the run being sealed,
                 # the sealed oracle and the pre-registered reference row. A
                 # verdict the sealer merely reads is a claim by whoever wrote
@@ -1260,10 +1260,23 @@ def _rederive_ws32_adjudication(
         event_arrays,
         oracle_event_arrays,
     )
+    from glm_tpu.greenfield.validation.ws32_short_context import reviewed_reference_row
 
     step = adjudication.step
     event = adjudication.event_index
-    reference_path = repository_root / adjudication.reference_row_path
+    relative = adjudication.reference_row_path
+    if relative is None:
+        # The grandfathered pre-amendment record names no row, but its event has
+        # exactly one reviewed row, so it is re-derived like everything else.
+        try:
+            relative = reviewed_reference_row(
+                context=adjudication.context,
+                decode_position=adjudication.decode_position,
+                producer_layer_id=adjudication.producer_layer_id,
+            )["path"]
+        except ValueError as error:
+            raise SystemExit(f"WS32 adjudication reference row is not determined: {error}")
+    reference_path = repository_root / relative
     try:
         reference = np.load(reference_path, allow_pickle=False).astype(np.float64)
     except (OSError, ValueError) as error:
