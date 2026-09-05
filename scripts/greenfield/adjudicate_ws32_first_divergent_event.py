@@ -142,116 +142,40 @@ def adjudicate(
     expected_producer_layer_id: int | None = None,
     kappa: float = KAPPA,
 ) -> dict:
+    """Path-based wrapper over the shared computation the SEALER re-derives.
+
+    The arithmetic lives in
+    ``glm_tpu.greenfield.validation.ws32_first_divergent_event`` so that the
+    sealer computes the same verdict from the run being sealed rather than
+    trusting the one written here.
+    """
+
+    from glm_tpu.greenfield.validation.ws32_first_divergent_event import (
+        AdjudicationError,
+        adjudicate_first_divergent_event,
+    )
+
     reference = np.load(reference_row).astype(np.float64)
-    if reference.ndim != 1:
-        raise SystemExit("reference row must be a one-dimensional score vector")
-    if decode_position is not None and reference.shape != (decode_position + 1,):
-        # The reference cutoff is the k-th largest over the whole row, so a row
-        # built for a different decode position silently shifts it.
-        raise SystemExit(
-            f"reference row length {reference.shape[0]} does not match decode position "
-            f"{decode_position} (expected {decode_position + 1})"
-        )
     oracle_positions, oracle_scores = _oracle_event(oracle_dir, step, event)
     engine_positions, engine_scores, producer = _engine_event(archive, step, event)
-    if expected_producer_layer_id is not None and producer != expected_producer_layer_id:
-        raise SystemExit(
-            f"adjudicated event produces layer {producer}, but the reference row was "
-            f"built for layer {expected_producer_layer_id}"
+    try:
+        analysis = adjudicate_first_divergent_event(
+            oracle_positions=oracle_positions,
+            oracle_scores=oracle_scores,
+            engine_positions=engine_positions,
+            engine_scores=engine_scores,
+            reference=reference,
+            producer_layer_id=producer,
+            step=step,
+            event=event,
+            decode_position=decode_position,
+            expected_producer_layer_id=expected_producer_layer_id,
+            kappa=kappa,
         )
-    if engine_positions.size != oracle_positions.size:
-        raise SystemExit(
-            f"engine selected {engine_positions.size} positions, oracle {oracle_positions.size}: "
-            "a count mismatch is not an adjudicable boundary swap"
-        )
-    expected = set(oracle_positions.tolist())
-    observed = set(engine_positions.tolist())
-    shared = sorted(expected & observed)
-    if not shared:
-        raise SystemExit("engine and oracle share no selected position")
-    if len(expected) != oracle_positions.size or len(observed) != engine_positions.size:
-        # dict(zip(...)) would silently keep the last score of a repeated
-        # position and shrink the comparison set.
-        raise SystemExit("selected positions repeat within an event")
-    oracle_by_position = dict(zip(oracle_positions.tolist(), oracle_scores))
-    engine_by_position = dict(zip(engine_positions.tolist(), engine_scores))
-    oracle_delta = np.array([oracle_by_position[p] for p in shared]) - reference[shared]
-    engine_delta = np.array([engine_by_position[p] for p in shared]) - reference[shared]
-    order = np.argsort(-reference, kind="stable")
-    top_k = int(oracle_positions.size)
-    cutoff = float(reference[order[top_k - 1]])
-    epsilon = float(np.abs(oracle_delta).max())
-    swapped = sorted(expected ^ observed)
-    band = {int(p): float(reference[p] - cutoff) for p in swapped}
-    count = len(shared)
-    band_size = int(np.count_nonzero(np.abs(reference - cutoff) <= epsilon))
-    bias_bound = kappa * abs(float(oracle_delta.mean())) + 3.0 * float(
-        engine_delta.std(ddof=STD_DDOF)
-    ) / np.sqrt(count)
-    checks = {
-        "cap_max_abs": {
-            "engine": float(np.abs(engine_delta).max()),
-            "bound": kappa * epsilon,
-            "pass": bool(np.abs(engine_delta).max() <= kappa * epsilon),
-        },
-        "cap_std": {
-            "engine": float(engine_delta.std(ddof=STD_DDOF)),
-            "bound": kappa * float(oracle_delta.std(ddof=STD_DDOF)),
-            "pass": bool(
-                engine_delta.std(ddof=STD_DDOF) <= kappa * oracle_delta.std(ddof=STD_DDOF)
-            ),
-        },
-        "bias": {
-            "engine_mean": float(engine_delta.mean()),
-            "bound": bias_bound,
-            "pass": bool(abs(float(engine_delta.mean())) <= bias_bound),
-        },
-        "reference_band": {
-            "maximum_abs_offset": max((abs(v) for v in band.values()), default=0.0),
-            "bound": epsilon,
-            "pass": all(abs(v) <= epsilon for v in band.values()),
-        },
-        "reference_band_capacity": {
-            # §21.2 item 3: the reference ambiguity band cannot explain more
-            # swaps than it holds.
-            "band_size": band_size,
-            "swapped": len(swapped),
-            "pass": len(swapped) <= band_size,
-        },
-        "equal_sized_disjoint_swap": {
-            "expected_only": len(expected - observed),
-            "observed_only": len(observed - expected),
-            "pass": len(expected - observed) == len(observed - expected) > 0,
-        },
-    }
-    return {
-        "artifact_kind": _contract().ANALYSIS_ARTIFACT_KIND,
-        "checks": checks,
-        "cutoff_reference_score": cutoff,
-        "epsilon_oracle_vs_reference": epsilon,
-        "event_index": event,
-        "expected_only": sorted(expected - observed),
-        "kappa": kappa,
-        "observed_only": sorted(observed - expected),
-        "oracle_delta": {
-            "max_abs": float(np.abs(oracle_delta).max()),
-            "mean": float(oracle_delta.mean()),
-            "std": float(oracle_delta.std(ddof=STD_DDOF)),
-        },
-        "engine_delta": {
-            "max_abs": float(np.abs(engine_delta).max()),
-            "mean": float(engine_delta.mean()),
-            "std": float(engine_delta.std(ddof=STD_DDOF)),
-        },
-        "reference_band_size": band_size,
-        "std_ddof": STD_DDOF,
-        "producer_layer_id": producer,
-        "shared_positions": count,
-        "step": step,
-        "swap_reference_offsets": band,
-        "top_k": top_k,
-        "verdict": "PASS" if all(item["pass"] for item in checks.values()) else "FAIL",
-    }
+    except AdjudicationError as error:
+        raise SystemExit(str(error))
+    analysis["artifact_kind"] = _contract().ANALYSIS_ARTIFACT_KIND
+    return analysis
 
 
 def main() -> int:
@@ -260,10 +184,14 @@ def main() -> int:
     parser.add_argument("--oracle-dir", type=Path, required=True)
     parser.add_argument("--reference-row", type=Path, required=True)
     parser.add_argument("--reference-row-sha256", required=True)
-    # The choices and the alarm default come from the contract module, which is
-    # imported only once the arguments parse, so `--help` and an argument error
-    # stay free of JAX.
-    parser.add_argument("--reference-convention", required=True)
+    # The values are validated against the contract module after parsing, which
+    # is imported only then, so `--help` and an argument error stay free of JAX.
+    # The help text still names them, and a test asserts the two agree.
+    parser.add_argument(
+        "--reference-convention",
+        required=True,
+        help="rms_norm_eps_1e-5 | rms_norm_eps_1e-6 (validated against the contract)",
+    )
     parser.add_argument("--engine-source-run", required=True)
     parser.add_argument("--context", choices=("2k", "8k"), required=True)
     parser.add_argument("--decode-position", type=int, required=True)
@@ -279,7 +207,12 @@ def main() -> int:
     # §21.2 fixes the later-event diagnostic threshold; raising it inside a
     # pre-registration record would silently skip the alarm, its acknowledgement
     # and the mandatory GATE_D_LESSONS.md entry.
-    parser.add_argument("--later-event-alarm", type=int, default=None)
+    parser.add_argument(
+        "--later-event-alarm",
+        type=int,
+        default=None,
+        help="§21.2 fixes this at 1024; any other value is refused (default: 1024)",
+    )
     parser.add_argument("--date-utc", required=True)
     parser.add_argument("--analysis-output", type=Path, required=True)
     parser.add_argument("--record-output", type=Path, required=True)

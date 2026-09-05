@@ -408,6 +408,7 @@ def _adjudication_record_fixture(root: Path) -> tuple[dict, dict]:
         },
         "engine_source_run": source_run,
         "event_index": 1,
+        "producer_layer_id": 1,
         "expected_only": [31],
         "observed_only": [32],
         "reference_row": reference_row,

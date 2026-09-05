@@ -43,6 +43,9 @@ from glm_tpu.greenfield.validation.ws32_evidence import (  # noqa: E402
     EVIDENCE_LAYOUT_V1,
     EVIDENCE_LAYOUT_V2,
 )
+from glm_tpu.greenfield.validation.ws32_short_context import (  # noqa: E402
+    committed_artifact_path as _committed_artifact_path,
+)
 from glm_tpu.greenfield.validation import (  # noqa: E402
     bind_ws32_adjudication,
     compare_ws32_dsa_step,
@@ -210,6 +213,9 @@ def _memory_valid(value: Any) -> bool:
     )
 
 
+# The alarm-acknowledgement check already used an absolute git; the
+# pre-registration check is the more security-critical of the two.
+_GIT = "/usr/bin/git"
 DEFAULT_PREFILL_CHUNK = 2048
 DEFAULT_CONTEXT_CAPACITY = 8192
 
@@ -472,41 +478,7 @@ def _validate(args: argparse.Namespace) -> int:
     repository_root = Path(__file__).resolve().parents[2]
     if args.recovery_code_hash and not re.fullmatch(r"[0-9a-f]{40}", args.recovery_code_hash):
         raise SystemExit("WS32 recovery code hash must be a full commit id")
-    def _committed_in_run_pin(relative: str, label: str) -> None:
-        """Require an artifact to be committed in the pin the run executed at.
-
-        This is what makes §21.2 pre-registration a PROVEN property rather than
-        a convention: the run ran at `--code-hash`, so an artifact present in
-        that commit with these exact bytes existed before the run produced the
-        data it judges. Checking `HEAD` would not do it — HEAD moves after the
-        run. The sealed Gate D record satisfies this: its blob at pin 4286509 is
-        the blob on disk.
-        """
-
-        try:
-            committed = subprocess.run(
-                ["git", "-C", str(repository_root), "rev-parse", f"{args.code_hash}:{relative}"],
-                capture_output=True,
-                text=True,
-            )
-            working = subprocess.run(
-                ["git", "-C", str(repository_root), "hash-object", "--", relative],
-                capture_output=True,
-                text=True,
-            )
-        except (OSError, subprocess.SubprocessError) as error:
-            # No git means the property cannot be established, which is a
-            # refusal, not a traceback and not a pass.
-            raise SystemExit(f"WS32 {label} commitment cannot be checked: {error}")
-        if committed.returncode != 0:
-            raise SystemExit(
-                f"WS32 {label} is not committed in the run's own pin {args.code_hash}: "
-                f"{relative}; a record written after the run is not a pre-registration"
-            )
-        if working.returncode != 0 or committed.stdout.strip() != working.stdout.strip():
-            raise SystemExit(
-                f"WS32 {label} differs from the blob committed at {args.code_hash}: {relative}"
-            )
+    _committed_in_run_pin = _make_pre_registration_check(args, repository_root)
 
     def _committed_record_path(path: Path) -> str:
         resolved = Path(path).resolve()
@@ -515,6 +487,13 @@ def _validate(args: argparse.Namespace) -> int:
         except ValueError:
             raise SystemExit(
                 f"WS32 adjudication record is outside the repository: {path}"
+            )
+        if not _committed_artifact_path(relative, ".json"):
+            # Otherwise a record committed elsewhere sidesteps the disclosure
+            # scan, which globs the reviewed directory.
+            raise SystemExit(
+                f"WS32 adjudication record must be a docs/artifacts/gate-*.json artifact: "
+                f"{relative}"
             )
         _committed_in_run_pin(relative, "adjudication record")
         return relative
@@ -964,6 +943,19 @@ def _validate(args: argparse.Namespace) -> int:
                         adjudication=dsa_adjudication,
                     )
                 )
+            if dsa_adjudication is not None and dsa_adjudication.reference_row_path:
+                # §21.2 items 3-4 are RE-DERIVED here from the run being sealed,
+                # the sealed oracle and the pre-registered reference row. A
+                # verdict the sealer merely reads is a claim by whoever wrote
+                # the file; the record's job is to fix the row and the expected
+                # divergence in advance, not to supply the answer.
+                _rederive_ws32_adjudication(
+                    arrays=arrays,
+                    oracle=oracle,
+                    adjudication=dsa_adjudication,
+                    repository_root=repository_root,
+                    rank=rank,
+                )
             if record.get("checkpoint_transport") != args.checkpoint_transport:
                 raise SystemExit(f"WS32 checkpoint transport drifted rank {rank}")
             if not _same(record.get("dsa_adjudication"), expected_dsa_adjudication):
@@ -1200,6 +1192,131 @@ def _validate(args: argparse.Namespace) -> int:
     _write_once(args.output, summary)
     print(json.dumps(summary, sort_keys=True))
     return 0
+
+
+def _make_pre_registration_check(args: Any, repository_root: Path):
+    """Return the check that proves §21.2 pre-registration from the run's pin.
+
+    A module-level factory rather than a closure inside ``_validate`` so the
+    property can be exercised by a test instead of asserted about the source.
+    """
+
+    def committed_in_run_pin(relative: str, label: str) -> None:
+        """Require an artifact to be committed in the pin the run executed at.
+
+        The run ran at ``--code-hash``, so an artifact present in that commit
+        with these exact bytes existed before the run produced the data it
+        judges. Checking ``HEAD`` would not do it: HEAD moves after the run.
+        The sealed Gate D record satisfies this — its blob at pin 4286509 is
+        the blob on disk.
+        """
+
+        try:
+            committed = subprocess.run(
+                [_GIT, "-C", str(repository_root), "rev-parse", f"{args.code_hash}:{relative}"],
+                capture_output=True,
+                text=True,
+            )
+            working = subprocess.run(
+                [_GIT, "-C", str(repository_root), "hash-object", "--", relative],
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            # No git means the property cannot be established, which is a
+            # refusal, not a traceback and not a pass.
+            raise SystemExit(f"WS32 {label} commitment cannot be checked: {error}")
+        if committed.returncode != 0:
+            raise SystemExit(
+                f"WS32 {label} is not committed in the run's own pin {args.code_hash}: "
+                f"{relative}; a record written after the run is not a pre-registration"
+            )
+        if working.returncode != 0 or committed.stdout.strip() != working.stdout.strip():
+            raise SystemExit(
+                f"WS32 {label} differs from the blob committed at {args.code_hash}: {relative}"
+            )
+
+    return committed_in_run_pin
+
+
+def _rederive_ws32_adjudication(
+    *,
+    arrays: Mapping[str, Any],
+    oracle: Any,
+    adjudication: Any,
+    repository_root: Path,
+    rank: int,
+) -> None:
+    """Recompute §21.2 items 3-4 for the adjudicated event and require a pass.
+
+    The pre-registered record supplies the reviewed FP64 reference row and the
+    divergence it predicted; the numbers come from this run's own observations.
+    A hand-written analysis asserting six passing checks changes nothing here.
+    """
+
+    from glm_tpu.greenfield.validation.ws32_first_divergent_event import (
+        AdjudicationError,
+        adjudicate_first_divergent_event,
+        event_arrays,
+        oracle_event_arrays,
+    )
+
+    step = adjudication.step
+    event = adjudication.event_index
+    reference_path = repository_root / adjudication.reference_row_path
+    try:
+        reference = np.load(reference_path, allow_pickle=False).astype(np.float64)
+    except (OSError, ValueError) as error:
+        raise SystemExit(f"WS32 adjudication reference row is unreadable: {error}")
+    engine_positions, engine_scores = event_arrays(
+        selected_positions=arrays["dsa_selected_positions"],
+        selected_scores=arrays["dsa_selected_scores"],
+        selected_valid_counts=arrays["dsa_selected_valid_counts"],
+        step=step,
+        event=event,
+    )
+    oracle_positions, oracle_scores = oracle_event_arrays(
+        {
+            "selected_positions": oracle.selected_positions,
+            "selected_scores": oracle.selected_scores,
+            "valid_counts": oracle.valid_counts,
+        },
+        step=step,
+        event=event,
+    )
+    try:
+        recomputed = adjudicate_first_divergent_event(
+            oracle_positions=oracle_positions,
+            oracle_scores=oracle_scores,
+            engine_positions=engine_positions,
+            engine_scores=engine_scores,
+            reference=reference,
+            producer_layer_id=int(
+                np.asarray(arrays["dsa_producer_layer_ids"])[event]
+            ),
+            step=step,
+            event=event,
+            decode_position=adjudication.decode_position,
+            expected_producer_layer_id=adjudication.producer_layer_id,
+        )
+    except AdjudicationError as error:
+        raise SystemExit(
+            f"WS32 §21.2 re-derivation refuses the adjudicated event rank {rank}: {error}"
+        )
+    if recomputed["verdict"] != "PASS":
+        failed = sorted(
+            name for name, item in recomputed["checks"].items() if not item["pass"]
+        )
+        raise SystemExit(
+            f"WS32 §21.2 items 3-4 fail on this run rank {rank}: {failed}"
+        )
+    if (
+        tuple(recomputed["expected_only"]) != adjudication.expected_only
+        or tuple(recomputed["observed_only"]) != adjudication.observed_only
+    ):
+        raise SystemExit(
+            f"WS32 §21.2 re-derivation disagrees with the pre-registered divergence rank {rank}"
+        )
 
 
 def _later_event_alarm_summary(

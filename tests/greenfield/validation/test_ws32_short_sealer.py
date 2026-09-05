@@ -1090,7 +1090,7 @@ def test_the_sealer_states_loader_refusals_and_requires_a_committed_record() -> 
     assert 'f"{args.code_hash}:{relative}"' in source, (
         "pre-registration is proven by the RUN's pin, not by HEAD, which moves after the run"
     )
-    assert "HEAD:" not in source.split("def _committed_in_run_pin")[1].split("def ")[0]
+    assert "HEAD:" not in source.split("def committed_in_run_pin")[1].split("\n\ndef ")[0]
 
     # Deleting the CALLS must fail this test, not just deleting the strings.
     import ast as _ast
@@ -1104,10 +1104,18 @@ def test_the_sealer_states_loader_refusals_and_requires_a_committed_record() -> 
         node for node in _ast.walk(validate)
         if isinstance(node, _ast.Call)
         and isinstance(node.func, _ast.Name)
-        and node.func.id in ("_committed_in_run_pin", "_committed_record_path")
+        and node.func.id in (
+            "_committed_in_run_pin",
+            "_committed_record_path",
+            "_make_pre_registration_check",
+        )
     ]
     called = {node.func.id for node in calls}
-    assert called == {"_committed_in_run_pin", "_committed_record_path"}, (
+    assert called == {
+        "_committed_in_run_pin",
+        "_committed_record_path",
+        "_make_pre_registration_check",
+    }, (
         f"the pre-registration checks are not called: {sorted(called)}"
     )
     literals = {
@@ -1177,3 +1185,247 @@ def test_the_sealed_gate_d_record_is_committed_in_its_own_run_pin() -> None:
     )
     assert at_pin.returncode == 0, at_pin.stderr
     assert at_pin.stdout.strip() == on_disk.stdout.strip() != ""
+
+
+def _sealer_module():
+    import importlib.util
+    from pathlib import Path as _Path
+
+    root = _Path(__file__).resolve().parents[3]
+    path = root / "scripts/greenfield/seal_short_decoder_ws32.py"
+    specification = importlib.util.spec_from_file_location("ws32_sealer_behaviour", path)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+def test_the_rederivation_reproduces_the_sealed_gate_d_adjudication() -> None:
+    """§21.2 items 3-4 are recomputed from the run being sealed.
+
+    The numbers must be the sealed ones, on the real 8K run, or the seal-time
+    re-derivation would refuse evidence that is already closed.
+    """
+    from pathlib import Path as _Path
+
+    import numpy as _np
+    import pytest as _pytest
+
+    from glm_tpu.greenfield.validation.ws32_first_divergent_event import (
+        adjudicate_first_divergent_event,
+        event_arrays,
+        oracle_event_arrays,
+    )
+
+    root = _Path(__file__).resolve().parents[3]
+    oracle_dir = _Path(
+        "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/"
+        "greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle"
+    )
+    archive = _Path(
+        "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_"
+        "20260905T085534575653049Z/runner.rank0.npz"
+    )
+    if not (archive.is_file() and (oracle_dir / "dsa_events.safetensors").is_file()):
+        _pytest.skip("the sealed Gate D archive or the 8K DSA oracle is unavailable")
+    from safetensors.numpy import load_file
+
+    oracle = load_file(str(oracle_dir / "dsa_events.safetensors"))
+    arrays = dict(_np.load(archive, allow_pickle=False))
+    engine_positions, engine_scores = event_arrays(
+        selected_positions=arrays["dsa_selected_positions"],
+        selected_scores=arrays["dsa_selected_scores"],
+        selected_valid_counts=arrays["dsa_selected_valid_counts"],
+        step=0,
+        event=1,
+    )
+    oracle_positions, oracle_scores = oracle_event_arrays(oracle, step=0, event=1)
+    reference = _np.load(
+        root / "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
+    ).astype(_np.float64)
+    result = adjudicate_first_divergent_event(
+        oracle_positions=oracle_positions,
+        oracle_scores=oracle_scores,
+        engine_positions=engine_positions,
+        engine_scores=engine_scores,
+        reference=reference,
+        producer_layer_id=int(arrays["dsa_producer_layer_ids"][1]),
+        step=0,
+        event=1,
+        decode_position=8155,
+        expected_producer_layer_id=1,
+    )
+    assert result["verdict"] == "PASS"
+    assert result["epsilon_oracle_vs_reference"] == 0.22697279652271618
+    assert result["reference_band_size"] == 451
+    assert result["shared_positions"] == 2041
+    assert result["checks"]["bias"]["bound"] == 0.22563715920821653
+    assert result["expected_only"] == [680, 1052, 2024, 2436, 6322, 7473, 7850]
+    assert result["observed_only"] == [754, 1904, 2029, 3651, 4899, 5536, 6951]
+
+
+def test_a_hand_asserted_pass_does_not_survive_the_rederivation(tmp_path) -> None:
+    """A record whose analysis claims six passes is still recomputed."""
+    import numpy as _np
+    import pytest as _pytest
+
+    module = _sealer_module()
+
+    class _Adjudication:
+        step = 0
+        event_index = 0
+        decode_position = 63
+        producer_layer_id = 1
+        expected_only = (31,)
+        observed_only = (32,)
+        reference_row_path = "docs/artifacts/gate-d-row.npy"
+
+    reference = _np.sort(_np.arange(64, dtype=_np.float64))[::-1].copy()
+    (tmp_path / "docs/artifacts").mkdir(parents=True)
+    _np.save(tmp_path / "docs/artifacts/gate-d-row.npy", reference)
+
+    top_k = 32
+    oracle_positions = _np.arange(top_k, dtype=_np.int32)
+    engine_positions = oracle_positions.copy()
+    engine_positions[top_k - 1] = top_k
+
+    class _Oracle:
+        selected_positions = oracle_positions.reshape(1, 1, top_k)
+        selected_scores = reference[:top_k].reshape(1, 1, top_k).astype(_np.float32)
+        valid_counts = _np.full((1, 1), top_k, dtype=_np.int32)
+
+    # The engine's scores are wildly biased, so the caps must fail no matter
+    # what any analysis file asserts.
+    engine_scores = (reference[engine_positions] + 50.0).astype(_np.float32)
+    arrays = {
+        "dsa_producer_layer_ids": _np.asarray([1], dtype=_np.int32),
+        "dsa_selected_positions": engine_positions.reshape(1, 1, 1, top_k),
+        "dsa_selected_scores": engine_scores.reshape(1, 1, 1, top_k),
+        "dsa_selected_valid_counts": _np.full((1, 1, 1), top_k, dtype=_np.int32),
+    }
+    with _pytest.raises(SystemExit, match="items 3-4 fail on this run"):
+        module._rederive_ws32_adjudication(
+            arrays=arrays,
+            oracle=_Oracle(),
+            adjudication=_Adjudication(),
+            repository_root=tmp_path,
+            rank=0,
+        )
+
+
+def test_the_rederivation_refuses_a_divergence_the_run_did_not_produce(tmp_path) -> None:
+    import numpy as _np
+    import pytest as _pytest
+
+    module = _sealer_module()
+    generator = _np.random.RandomState(7)
+    reference = _np.sort(generator.uniform(0.0, 1.0, size=64))[::-1].astype(_np.float64).copy()
+    top_k = 32
+    # Put the swapped pair inside the reference ambiguity band, so the event is
+    # genuinely adjudicable and only the DECLARED sets are wrong.
+    reference[top_k - 1] = reference[top_k] + 1e-6
+    (tmp_path / "docs/artifacts").mkdir(parents=True)
+    _np.save(tmp_path / "docs/artifacts/gate-d-row.npy", reference)
+    oracle_positions = _np.arange(top_k, dtype=_np.int32)
+    oracle_scores = reference[:top_k] + generator.normal(0.0, 1e-4, size=top_k)
+    engine_positions = oracle_positions.copy()
+    engine_positions[top_k - 1] = top_k
+
+    class _Oracle:
+        selected_positions = oracle_positions.reshape(1, 1, top_k)
+        selected_scores = oracle_scores.reshape(1, 1, top_k).astype(_np.float32)
+        valid_counts = _np.full((1, 1), top_k, dtype=_np.int32)
+
+    class _Adjudication:
+        step = 0
+        event_index = 0
+        decode_position = 63
+        producer_layer_id = 1
+        expected_only = (7,)          # not what the run produced
+        observed_only = (99,)
+        reference_row_path = "docs/artifacts/gate-d-row.npy"
+
+    arrays = {
+        "dsa_producer_layer_ids": _np.asarray([1], dtype=_np.int32),
+        "dsa_selected_positions": engine_positions.reshape(1, 1, 1, top_k),
+        "dsa_selected_scores": (
+            reference[engine_positions] + generator.normal(0.0, 1e-4, size=top_k)
+        )
+        .reshape(1, 1, 1, top_k)
+        .astype(_np.float32),
+        "dsa_selected_valid_counts": _np.full((1, 1, 1), top_k, dtype=_np.int32),
+    }
+    with _pytest.raises(SystemExit, match="disagrees with the pre-registered divergence"):
+        module._rederive_ws32_adjudication(
+            arrays=arrays,
+            oracle=_Oracle(),
+            adjudication=_Adjudication(),
+            repository_root=tmp_path,
+            rank=0,
+        )
+
+
+def test_the_pre_registration_pin_refuses_an_uncommitted_or_drifted_artifact(tmp_path) -> None:
+    """P1-2: the round's headline control, exercised rather than grepped."""
+    import subprocess
+
+    import pytest as _pytest
+
+    module = _sealer_module()
+    repository = tmp_path / "repo"
+    (repository / "docs" / "artifacts").mkdir(parents=True)
+    relative = "docs/artifacts/gate-d-record.json"
+    target = repository / relative
+    target.write_text('{"a": 1}', encoding="utf-8")
+    for command in (
+        ["init", "-q"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "add", "-A"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "record"],
+    ):
+        subprocess.run(["git", "-C", str(repository), *command], check=True, capture_output=True)
+    pin = subprocess.run(
+        ["git", "-C", str(repository), "rev-parse", "HEAD"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+
+    class _Args:
+        code_hash = pin
+        dsa_adjudication_record = target
+
+    check = module._make_pre_registration_check(_Args(), repository)
+    check(relative, "adjudication record")
+
+    # Committed at the pin, but the working tree drifted.
+    target.write_text('{"a": 2}', encoding="utf-8")
+    with _pytest.raises(SystemExit, match="differs from the blob committed at"):
+        check(relative, "adjudication record")
+    target.write_text('{"a": 1}', encoding="utf-8")
+
+    # Present on disk, absent from the pin.
+    later = repository / "docs/artifacts/gate-d-later.json"
+    later.write_text("{}", encoding="utf-8")
+    with _pytest.raises(SystemExit, match="is not committed in the run's own pin"):
+        check("docs/artifacts/gate-d-later.json", "adjudication record")
+
+    # A pin that does not exist at all.
+    class _Unknown:
+        code_hash = "0" * 40
+
+    unknown = module._make_pre_registration_check(_Unknown(), repository)
+    with _pytest.raises(SystemExit, match="is not committed in the run's own pin"):
+        unknown(relative, "adjudication record")
+
+
+def test_the_pre_registration_pin_refuses_when_git_is_unavailable(tmp_path, monkeypatch) -> None:
+    import subprocess
+
+    import pytest as _pytest
+
+    module = _sealer_module()
+
+    class _Args:
+        code_hash = "0" * 40
+
+    check = module._make_pre_registration_check(_Args(), tmp_path)
+    monkeypatch.setattr(module, "_GIT", str(tmp_path / "no-such-git"))
+    with _pytest.raises(SystemExit, match="commitment cannot be checked"):
+        check("docs/artifacts/gate-d-record.json", "adjudication record")

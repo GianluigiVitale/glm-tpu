@@ -735,3 +735,35 @@ def test_the_live_storage_census_parses_the_unseparated_du_output() -> None:
         text=True,
     )
     assert empty.stdout.strip() == "", "a non-numeric census must yield nothing, so the run aborts"
+
+
+def test_both_loader_call_sites_pass_the_repository_root() -> None:
+    """P2-3: `repository_root` gates every basis, analysis and row check.
+
+    Dropping it silently disables the reference-row registry, the analysis
+    binding, the set binding, the six-check requirement and the symlink-escape
+    check, and the substring assertion above would not notice.
+    """
+    import ast
+
+    root = Path(__file__).resolve().parents[3]
+    for relative in (
+        "scripts/greenfield/run_short_decoder_ws32.py",
+        "scripts/greenfield/seal_short_decoder_ws32.py",
+    ):
+        tree = ast.parse((root / relative).read_text(encoding="utf-8"))
+        calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "load_ws32_adjudicated_divergence"
+        ]
+        assert calls, f"{relative} no longer loads the adjudication record"
+        for call in calls:
+            keywords = {keyword.arg for keyword in call.keywords}
+            assert "repository_root" in keywords, (
+                f"{relative}:{call.lineno} loads the record without repository_root, "
+                "which disables every basis and reference-row check"
+            )
+            assert "expected_sha256" in keywords

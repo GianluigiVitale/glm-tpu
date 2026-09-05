@@ -49,16 +49,7 @@ LATER_EVENT_ALARM = 1024
 # §21.2 items 3-4, as computed by
 # scripts/greenfield/adjudicate_ws32_first_divergent_event.py. A PASS verdict
 # without these is a claim, not an adjudication.
-_REQUIRED_ADJUDICATION_CHECKS = frozenset(
-    {
-        "bias",
-        "cap_max_abs",
-        "cap_std",
-        "equal_sized_disjoint_swap",
-        "reference_band",
-        "reference_band_capacity",
-    }
-)
+from .ws32_first_divergent_event import ADJUDICATION_CHECKS as _REQUIRED_ADJUDICATION_CHECKS
 _GRANDFATHERED_RECORD_SHA256 = (
     "4da05468120e3c2e9b82d03931018e0d14eebc5fc28e339381658a04457cd26b"
 )
@@ -259,7 +250,7 @@ _ARTIFACT_DIRECTORY = ("docs", "artifacts")
 _ARTIFACT_PREFIX = "gate-"
 
 
-def _committed_artifact_path(value: Any, *suffixes: str) -> bool:
+def committed_artifact_path(value: Any, *suffixes: str) -> bool:
     """A reviewed-tree relative path: no traversal, no absolute escape."""
 
     if not isinstance(value, str) or not value.endswith(suffixes):
@@ -268,6 +259,9 @@ def _committed_artifact_path(value: Any, *suffixes: str) -> bool:
     if len(parts) != 3 or any(part in ("", ".", "..") for part in parts):
         return False
     return tuple(parts[:2]) == _ARTIFACT_DIRECTORY and parts[2].startswith(_ARTIFACT_PREFIX)
+
+
+_committed_artifact_path = committed_artifact_path
 
 
 def _artifact_bytes(repository_root: Path, relative: str) -> bytes:
@@ -488,6 +482,10 @@ def load_ws32_adjudicated_divergence(
                     basis_record.get("step") != record["step"]
                     or basis_record.get("event_index") != record["event_index"]
                     or basis_record.get("engine_source_run") != record["engine_source_run"]
+                    or basis_record.get("context", record["context"]) != record["context"]
+                    or basis_record.get("decode_position", record["decode_position"])
+                    != record["decode_position"]
+                    or basis_record.get("producer_layer_id") != record["producer_layer_id"]
                 ):
                     raise ValueError(
                         "WS32 adjudicated-divergence analysis adjudicates a different event"

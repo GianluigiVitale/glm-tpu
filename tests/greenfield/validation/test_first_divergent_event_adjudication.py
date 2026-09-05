@@ -147,6 +147,7 @@ def test_the_emitted_record_matches_the_loader_schema(tmp_path: Path) -> None:
         "event_index": 1,
         "expected_only": [31],
         "observed_only": [32],
+        "producer_layer_id": 1,
         "reference_row": reference_row,
         "step": 0,
         "verdict": "PASS",
@@ -263,6 +264,7 @@ def test_a_reference_row_outside_the_reviewed_registry_is_refused_by_the_loader(
         "event_index": 1,
         "expected_only": [31],
         "observed_only": [32],
+        "producer_layer_id": 1,
         "reference_row": reference_row,
         "step": 0,
         "verdict": "PASS",
@@ -753,3 +755,102 @@ def test_the_scan_window_uses_both_archives_step_counts(tmp_path: Path) -> None:
         str(oracle_dir / "dsa_events.safetensors"),
     )
     assert MODULE._scan_window(archive, oracle_dir) == (1, 4)
+
+
+def _main_ast() -> "object":
+    import ast
+
+    return ast.parse(SCRIPT.read_text(encoding="utf-8"))
+
+
+def _function(name: str):
+    import ast
+
+    for node in ast.walk(_main_ast()):
+        if isinstance(node, ast.FunctionDef) and node.name == name:
+            return node
+    raise AssertionError(f"{name} is absent")
+
+
+def _calls(node, name: str) -> list:
+    import ast
+
+    return [
+        item
+        for item in ast.walk(node)
+        if isinstance(item, ast.Call)
+        and (
+            (isinstance(item.func, ast.Name) and item.func.id == name)
+            or (isinstance(item.func, ast.Attribute) and item.func.attr == name)
+        )
+    ]
+
+
+def test_main_still_performs_every_guard_it_is_credited_with() -> None:
+    """P2-2: these guards had no test; deleting their CALLS left the suite green."""
+    import ast
+
+    main = _function("main")
+    for name in (
+        "_committed_reference_row",
+        "_require_archive_belongs_to_run",
+        "_resolve_event",
+        "_scan_window",
+        "_collect_prior_attempts",
+        "_committed_output_path",
+        "_write_once",
+    ):
+        assert _calls(main, name), f"main() no longer calls {name}"
+
+    source = SCRIPT.read_text(encoding="utf-8")
+    # The verdict gate must precede the record write, and must return non-zero.
+    verdict_gate = source.index('if analysis["verdict"] != "PASS":')
+    record_write = source.index("_write_once(args.record_output, record)")
+    assert verdict_gate < record_write, "a refused adjudication must not write a record"
+    assert "return 2" in source[verdict_gate:record_write]
+
+    # The convention and alarm guards replaced argparse-enforced ones.
+    assert "--reference-convention must be one of" in source
+    assert "fixes the later-event alarm at" in source
+
+    # The row and its validation record are named in the basis whether or not
+    # the operator passed them.
+    assert 'reference_entry["validation_path"]' in source
+    constants = {
+        node.value
+        for node in ast.walk(main)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    }
+    assert "prior_attempts" in constants and "analysis" in constants
+
+
+def test_the_analysis_check_names_are_the_computations_own() -> None:
+    """P3-6: the loader's required set must not drift from what is emitted."""
+    from glm_tpu.greenfield.validation.ws32_first_divergent_event import (
+        ADJUDICATION_CHECKS,
+    )
+
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as directory:
+        archive, oracle_dir, reference_row = _fixture(
+            Path(directory), engine_bias=0.0, swap=True
+        )
+        analysis = MODULE.adjudicate(
+            archive=archive, oracle_dir=oracle_dir, reference_row=reference_row,
+            step=0, event=0,
+        )
+    assert set(analysis["checks"]) == set(ADJUDICATION_CHECKS)
+
+
+def test_the_help_text_names_the_contract_values_it_validates_against() -> None:
+    """P3-8: the lazy import must not hide the legal values from --help."""
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        LATER_EVENT_ALARM,
+        REFERENCE_CONVENTIONS,
+    )
+
+    source = SCRIPT.read_text(encoding="utf-8")
+    for convention in REFERENCE_CONVENTIONS:
+        assert convention in source, f"--help no longer names {convention}"
+    assert f"(default: {LATER_EVENT_ALARM})" in source

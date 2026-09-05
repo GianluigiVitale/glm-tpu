@@ -1681,9 +1681,13 @@ section grants no install or execution authority.
    offline tool: a rule only the producer consults can be widened in a working tree, used once and
    reverted without leaving a trace in the record.
 
-   *Pre-registration is proven, not assumed.* The sealer requires the record AND the analysis it
-   stands on to be committed in the run's OWN pin (`--code-hash`), byte-identical to the blob on
-   disk. The run executed at that commit, so an artifact present in it with these bytes existed
+   *Pre-registration is proven, not assumed.* The sealer requires the record, the analysis it stands
+   on AND the FP64 reference row to be committed in the run's OWN pin (`--code-hash`),
+   byte-identical to the blob on disk. It then RE-DERIVES items 3-4 from the run's own observations,
+   the sealed oracle and that row, and refuses unless the re-derivation passes and reproduces the
+   pre-registered divergence: a verdict the sealer merely reads is a claim by whoever wrote the
+   file, so the record's job is to fix the row and the expected divergence in advance, never to
+   supply the answer. The run executed at that commit, so an artifact present in it with these bytes existed
    before the run produced the data it judges; a record written to fit an observed divergence cannot
    satisfy this, and checking `HEAD` would not do it because HEAD moves after the run. The sealed
    Gate D record already satisfies it: its blob at pin `4286509` is the blob on disk.

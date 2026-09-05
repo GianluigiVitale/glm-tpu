@@ -13158,3 +13158,43 @@ parse tree, that the checks are actually called and that both the analysis and t
 
 The §21.2 grandfathering paragraph no longer claims the digest is checked "before anything else"; it
 says where it is checked and what that implies for future tightening.
+
+## 2026-09-06 01:10Z — sixth Opus 5 rejection resolved: the verdict is re-derived, not read
+
+Round 5's P1 was the one that mattered and it was mine to have seen: every control so far bound the
+record's *inputs* — the row, the sets, the analysis, the commit — and then trusted the analysis's own
+`pass` flags. The reviewer hand-wrote an analysis whose six checks each read
+`{"engine": 1e9, "bound": 1e-9, "pass": true}`, with `kappa: 1e300` and a producer layer of 999, and
+it was accepted. The cheapest lever was worse: the tool writes the analysis before it examines the
+verdict, so a refused adjudication leaves a complete file on disk; copy it under a second name, flip
+six booleans, commit it before the run, and the §21.2 items 3-4 verdict is fabricated while every
+other binding is genuine.
+
+**The fix is that the sealer now computes items 3-4 itself.** The arithmetic moved to
+`glm_tpu/greenfield/validation/ws32_first_divergent_event.py`, the package the sealer imports; the
+offline tool is a path-based wrapper over it. At seal time the sealer loads the run's own DSA
+observations, the sealed oracle's event and the pre-registered FP64 row, recomputes the six checks,
+and refuses unless the re-derivation passes AND reproduces the pre-registered divergence exactly. The
+record's job is now what §21.2 always meant it to be: fix the row and the expected divergence in
+advance. It cannot supply the answer.
+
+Verified against sealed evidence before writing the check, not after: re-deriving event 1 from the
+Gate D run's own arrays gives PASS with eps 0.22697279652271618, band 451, n 2041, bias bound
+0.22563715920821653 and the sealed seven-swap sets, and the C=2048 Step B run reproduces the same
+numbers. The closed gate would pass the new check unchanged.
+
+Round 5's P1-2 was that the pin check itself was verified only by grepping the source: three
+independent mutants left it green. The check is now a module-level factory with behavioural tests
+that commit a file to a throwaway repository and exercise all four refusals — drifted working bytes,
+a path absent from the pin, an unknown pin, and a missing git binary. Two more tests drive the
+re-derivation directly: a biased run whose analysis claims six passes is refused, and a record
+declaring a divergence the run did not produce is refused.
+
+Also from the round: the record itself must be a `docs/artifacts/gate-*.json` artifact, so a record
+committed elsewhere can no longer sidestep the disclosure scan; the analysis must agree with the
+record on the producer layer, context and decode position, which are the keys that select the
+reviewed row; `/usr/bin/git` is used for the pre-registration check as it already was for the
+alarm-acknowledgement check; both loader call sites are asserted to pass `repository_root`, without
+which every basis and row check silently does nothing; the six check names come from the computation
+module rather than being re-typed; and `--help` names the legal conventions and the alarm default
+again while still costing 0.12 s.
