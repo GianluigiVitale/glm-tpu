@@ -13044,3 +13044,21 @@ which is what the 21:30Z abort cost a pod slot for.
 The §21.2 amendment now states the property rather than the mechanism: content-identical to the
 committed blob, registered for the exact event, validated per item 3, with prior attempts disclosed
 separately from the basis.
+
+### Test-suite baseline, measured rather than assumed (2026-09-05 22:20Z–22:55Z)
+
+`pytest tests/greenfield` was run at clean HEAD in the run worktree and on this change in the dev
+worktree, both `JAX_PLATFORMS=cpu`, ~34 minutes each:
+
+| tree | failed | passed |
+|---|---|---|
+| run worktree, `d8bc649` | 123 | 2,067 |
+| dev worktree, this change | 210 | 1,980 |
+
+Every failing file is legacy PP16 / Gate-D-projection material; none is a file this work touches. The
+87-failure difference is worktree-dependent, not change-dependent:
+`test_current_contract_admits_compile_only_review_without_tpu_authority` passes in the run worktree
+and fails in the dev worktree IN ISOLATION, at the same commit content, and neither
+`configs/greenfield-gate-d-precompile-admission-v2.json` nor
+`glm_tpu/greenfield/gate_d_precompile_admission.py` mentions any file this change edits. The number
+that governs the merge is therefore the run worktree's, which is re-measured after the merge.
