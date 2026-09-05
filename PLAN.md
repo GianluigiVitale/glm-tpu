@@ -15,8 +15,9 @@ The authoritative details, stop conditions, and Definition of Done are in
    values; no repeated 32-chip layer collective; fresh trace, wall result, and memory report.
 5. **Gates E/F — useful/strong base:** first `<=200 ms` and `>=4.5` wall tok/s; then target
    `<=125 ms`/`>=8 tok/s`, stretch `<=100 ms`/`>=10 tok/s`.
-6. **Gate G — plan adjudication:** protected identical-condition PP8, PP16, and WS32 comparison or
-   specified evidence-backed WS32 rejection; promote the fastest correct plan.
+6. **Gate G — plan adjudication (CLOSED 2026-09-05, spec §22):** protected identical-condition PP8 vs
+   WS32 at 2K (DB563 vs DB553, WS32 2.00× faster, both exact), WS32 8K (DB567); PP16 rejected with
+   evidence (§22.3); WS32_2D promoted.
 7. **Long-context gates:** protected four-depth 128K smoke and protected 256K E0 with DB/archive and
    authenticated zero-work cleanup.
 8. **Gate H — effective throughput:** only after base stability, add exact multi-token verification/

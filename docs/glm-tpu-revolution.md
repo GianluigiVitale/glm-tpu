@@ -1486,7 +1486,8 @@ The rewrite branch is complete only when:
 - state/load/cache protections pass;
 - repeated transformer-layer collectives are topology-local;
 - no full-pod hidden reconstruction occurs inside the transformer;
-- PP8_LP4 and PP16_LP2 have protected measurements;
+- PP8_LP4 has a protected measurement; PP16_LP2 has a protected measurement or a documented,
+  evidence-backed rejection gate (§22.3);
 - WS32_2D has either a protected measurement or a documented, evidence-backed rejection gate;
 - device and profiler-free wall measurements agree;
 - the four-depth 128K smoke passes;
@@ -1779,4 +1780,83 @@ floor (query rebuilt from the legacy's own q-a state through the reference `wq_b
   DSA_EVENT1_ADJUDICATED_S21_2;LATER_EVENTS_RECORDED_NOT_ADJUDICATED;DEEP_LAYER_TENSORS_NOT_BOUNDED_IN_THIS_RUN;
   LATER_EVENT_ALARM_ACKNOWLEDGED_WITH_LESSONS_ENTRY;PROTECTED_WALL_TRACE_HBM`. Gate D is closed under
   this contract with item 5 by inheritance; Gates G (plan adjudication), long contexts and §18 follow.
+
+# 22. Gate G adjudication — 2026-09-05 (offline, from protected evidence)
+
+## 22.1 What Gate G asks and what exists
+
+Section 13 asks for PP8_LP4, PP16_LP2 and WS32_2D compared under identical protected conditions and
+the fastest correct plan promoted. Protected complete-decoder evidence exists for two of the three:
+
+| Plan | Context | DB run | Tag | Correctness | Profiler-free p50 | Peak HBM/chip |
+|---|---|---|---|---|---|---|
+| PP8_LP4 | 2K | 563 | `greenfield_short_decoder_compile_pp8_2k_…_20260827T194450473110366Z` (sealed by recovery `…_pp8_2k_gate_d_recovery_20260827T203000000000000Z`, `success_sha256` `95a18e10…e8ff`) | exact tokens; 14 steps × 21 DSA events exact | `245.639880 ms` (4.071 tok/s) | 26,303,084,032 B |
+| WS32_2D | 2K | 553 | `greenfield_ws32_short_decoder_2k_numerical_20260816T040707909547486Z` (`success_sha256` `a943497d…d6a9`; SUCCESS file SHA `c16a491d…6ad1f`) | exact tokens; exact DSA/state/cache | `122.630667 ms` (8.155 tok/s) | 24,789,135,872 B |
+| WS32_2D | 8K | 567 | `greenfield_ws32_short_decoder_8k_numerical_20260905T085534575653049Z` (`success_sha256` `e40760f8…f662`) | §21.6 | `130.368724 ms` (7.671 tok/s) | 26,375,554,560 B |
+| PP8_LP4 | 8K | — | 2026-09-02 attempts: two executions refused at DSA event 1 with a seven-swap divergence of the same size as WS32's (not adjudicated under §21), one refused from event 0, the others failed before execution (HLO/prefill contracts, sync faults); no wall recorded | — | — | — |
+| PP16_LP2 | any | — | no 78-layer decoder was ever built; only stage-zero Gate D diagnostics (compensated, forced-round, projection-contraction), all rejected; one-layer derivatives DB558 | — | — | — |
+
+The 2K rows are an identical-condition protected comparison: both runs execute the same sealed 2K
+prompt against the same token oracle (`f580c149…efe19`) and DSA oracle (`71224832…4f57`), on the same
+pod, with fresh eight-host XPlanes, host-side profiler-free wall (2 warm-up + 10 timed samples, fleet p50;
+PP8's complete-step wall includes the token return), and 8/8 cleanup, and both are
+exact; both prompts are 2,034 tokens. WS32_2D is `2.003×` faster than PP8_LP4 (`245.640 / 122.631`).
+Residual differences, disclosed: WS32 2K allocated `context_capacity 8192` (conservative for WS32);
+WS32 2K ran without the exact-DSA and dense-overlay variants that WS32 8K used; DB563 is the 2026-08-27
+PP8 configuration and the later 09-02 PP8 variants never recorded a wall (kernel gains could only touch
+the ≈40 ms of non-permute busy time, so no PP8 variant can close a 2× gap). At 8K only WS32_2D has a
+protected measurement; it is within 6.3% of WS32's own 2K figure across those variants.
+
+## 22.2 Why PP8 is slow, from its own protected trace
+
+DB563's 64-core XPlane attributes `206.353 ms` of the `245.640 ms` step to 17 pipeline
+collective-permutes (eight split-residual transfers, eight `s32[1,2053]` IndexShare/metadata transfers,
+one token return); local all-reduces total `0.464 ms`. The protected boundary benchmarks (DB449, DB564)
+measure a single stage transfer at `0.28–0.32 ms` and the production two-transfer boundary at p50
+`≈0.41 ms`, so the 206 ms is not wire time: it is each core waiting while the other seven stages run. With one live sequence a pipeline executes its stages
+strictly in series, so the step time is the sum of the per-stage times plus boundary transfers, and each
+stage's ~10 layers run on only 4 of the 32 chips. WS32_2D keeps all 32 chips busy on every layer with
+topology-local collectives, which is where the 2× comes from.
+
+## 22.3 PP16_LP2: documented, evidence-backed rejection for the latency objective
+
+PP16_LP2 halves the chips per stage (2) and doubles the stage count (16). Under the same one-sequence
+serial-stage law: (a) the summed stage time cannot fall below PP8's, because the same 78 layers are
+executed by 2 chips at a time instead of 4 — a bandwidth- or compute-bound stage on half the chips takes
+at least as long, and in the memory-bound decode regime about twice as long; (b) boundary transfers
+double (about 33 permutes; at the measured `≈0.3–0.4 ms` each this is `10–14 ms`, small but additive).
+The per-stage slowdown is measured, not modeled: the protected real layer-3 rows give PP16_LP2 (2 chips)
+`3.835–3.873 ms` per layer (DB558, DB562) against PP8_LP4 (4 chips) `2.165–2.197 ms` (DB467/471/473/482),
+a `1.75×` ratio for the same MoE layer (caveats: layer 3 is one MoE layer, the three dense layers differ,
+and DB482 carries `reconstruct_down_fp32=True` while the PP16 rows do not — a small extra cost on the PP8 side).
+Bounds: with zero per-stage slowdown `≥ 245.6 ms` (no better than PP8, `≥ 1.88×` slower than WS32 8K);
+with the measured layer ratio `78 × 3.84 ms ≈ 300 ms` of stage compute alone, before transfers and the
+non-layer work, i.e. `≥ 2.3×` slower than WS32 8K. The latency leg is therefore anchored on protected
+measurements and is independent of memory. PP16's only structural advantage is per-chip memory (2× the
+weight capacity per stage pair). The memory leg is provisional: WS32_2D holds the full 753B FP8 model
+with `6,638,844,416 B` per-chip headroom at 8K (DB567); its decode caches total `3.45 GB` per chip at
+256K (KV `78 × 512 pages × 64 rows × 640 × bf16 = 3.27 GB`, IndexShare `21 full layers × 512 × 64 × 128 ×
+bf16 = 0.18 GB`), a `3.34 GB` growth from 8K, which the headroom covers; prefill/activation buffers at
+256K are not yet measured and are what L7/L8 must confirm. Building a PP16 78-layer decoder to measure a
+plan whose latency the measurements already bound below PP8's would consume weeks of TPU-protected work
+for a result that cannot change the promotion. PP16_LP2 is therefore
+REJECTED for the single-stream latency objective with this evidence. This is the same form of closure
+that §18 already allows for WS32_2D ("a documented, evidence-backed rejection gate"); §18 is amended below
+to allow it for PP16_LP2 symmetrically. The rejection is reopened only if a protected WS32_2D
+long-context gate fails for a reason that PP16 would cure (memory), which §22.3's numbers make unlikely.
+
+## 22.4 Promotion and consequences
+
+- WS32_2D is the promoted plan: the fastest plan with protected exact evidence at both 2K and 8K.
+- §18 line "PP8_LP4 and PP16_LP2 have protected measurements" becomes "PP8_LP4 has a protected
+  measurement; PP16_LP2 has a protected measurement or a documented, evidence-backed rejection gate
+  (§22.3)". PLAN item 6 is closed accordingly.
+- PP8_LP4 keeps its protected 2K measurement (DB563) and its Gate D role as the first exact 78-layer
+  path; no further PP8 8K launches are authorized (the §21 contract would adjudicate its event-1 swaps
+  exactly as WS32's, but a protected PP8 8K wall cannot change the promotion).
+- Gate E (`≤ 200 ms`, `≥ 4.5 tok/s`) is met by WS32_2D at 2K and 8K only; PP8_LP4 at 2K (`245.6 ms`,
+  `4.071 tok/s`) meets neither E nor F. Gate F (`≤ 125 ms`, `≥ 8 tok/s`) is met by WS32 at 2K (`122.63`,
+  `8.155`) and not at 8K (`130.37`, `7.671`). Optimization toward F at 8K stays default-off and behind the
+  long-context gates.
+- Next: L7 (128K four-depth smoke) and L8 (256K E0) on WS32_2D, then §18.
 

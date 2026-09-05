@@ -52,10 +52,12 @@ record `4da05468…`, later events recorded (alarm acked), item 5 by inheritance
 26.38 GB/chip, XPlane 8/64/2, censuses 8/8. Gate E met, F not. M2048 DEFERRED.
 
 State: live 1,952,694,918,629 bytes. Streamed WS32 checkpoint RETAINED in tmpfs on 8 hosts (98 GB/host,
-verified per run; needed by Gate G/128K/256K; cleanup script exists, run it before any host maintenance).
-Controller disk 96% full: free local space (archived traces) before the next numerical run.
+verified per run; needed by 128K/256K; cleanup script exists, run it before host maintenance).
 
-Next: (5) Gate G plan adjudication: protected identical-condition PP8/PP16/WS32 comparison or
-evidence-backed WS32 promotion (smallest decisive design first, offline where possible). (6) 128K
-four-depth smoke, (7) 256K E0 with DB/archive/8/8 cleanup, (8) §18 direct proof. Fix open P3s
-(census_failure_exit overwrite; decode module name from sealed HLO header) opportunistically.
+Gate G CLOSED offline (§22): PP8 2K DB563 245.6 ms vs WS32 2K DB553 122.6 ms (same oracles, both
+exact), WS32 8K DB567; PP16 rejected with evidence; WS32_2D promoted; §18 amended. Disk 62%.
+
+Next: (6) L7 128K four-depth smoke on WS32_2D (capacity 131072; depths 0/0.05/0.95/1.0; inventory
+128K oracles first; design reviewed before any TPU run), (7) L8 256K E0 with DB/archive/8/8 cleanup,
+(8) §18 direct proof. Fix open P3s (census_failure_exit overwrite; decode module name from sealed HLO
+header) opportunistically.

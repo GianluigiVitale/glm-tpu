@@ -4026,3 +4026,14 @@ persistence only; review and persistence precede any v2 installation.
   profiler-free wall p50 130.369 ms/token, HBM 26.38 GB/chip, DB/archive/8/8 cleanup. Classification in
   §21.6. Storage after sealing: 1,952,694,918,629 live bytes (< 2 TB ceiling).
 
+## 2026-09-05 — Gate G adjudication (offline, spec §22)
+
+- No new artifacts: adjudicated from protected DB rows 563 (PP8_LP4 2K, `245.639880 ms`, `success_sha256`
+  `95a18e10…e8ff`), 553 (WS32_2D 2K, `122.630667 ms`, SUCCESS file SHA `c16a491d…6ad1f`) — same 2,034-token
+  prompt, token oracle `f580c149…efe19` and DSA oracle `71224832…4f57` — and 567 (WS32_2D 8K,
+  `130.368724 ms`); DB563's XPlane permute-wait attribution (`206.353 ms` of `245.640`); boundary
+  benchmarks DB449/DB564 (single transfer `0.28–0.32 ms`, two-transfer boundary p50 `≈0.41 ms`); protected
+  one-layer rows PP16_LP2 DB558/562 (`3.835–3.873 ms`) vs PP8_LP4 DB467/471/473/482 (`2.165–2.197 ms`).
+  PP16_LP2 rejected on the measured serial-stage bound (§22.3), memory leg provisional; WS32_2D promoted.
+- Classification: `OFFLINE_FROM_PROTECTED_ROWS;NO_TPU;PLAN_PROMOTED_WS32_2D;PP16_REJECTED_EVIDENCE_BACKED`.
+

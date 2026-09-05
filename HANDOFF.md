@@ -12594,3 +12594,21 @@ and is required before any host reboot/maintenance or when host RAM is needed. `
 Next: Gate G plan adjudication (PP8/PP16/WS32 identical-condition, or evidence-backed WS32 promotion),
 then 128K smoke, 256K E0, §18.
 
+## 2026-09-05 12:30Z — Gate G closed offline (spec §22); disk freed; WS32_2D promoted
+
+Controller disk freed from 96% to 62% without touching evidence: temp/cache directories and the
+regenerable FP64 reference scratch were removed, and the local `packed/` payloads (27 GB) of the three
+2026-08-27 one-layer PP16 packs were removed after each slot file was matched by size and CRC32C to its
+generation-pinned copy under `checkpoints/greenfield/glm52/layer3/PP16_LP2/`; a `local_payload_removed.txt`
+note sits in each run directory. Gate G: §22 adjudicates from protected rows only — identical-condition 2K
+PP8 (DB563) vs WS32 (DB553) with the same sealed oracles and 2,034-token prompt, WS32 `2.003×` faster and
+both exact; WS32 8K DB567; PP16_LP2 rejected with evidence (one-sequence serial-stage law plus the
+protected one-layer rows DB558/562 vs DB467–482: the same layer takes `1.75×` longer on 2 chips, so
+`78 × 3.84 ms ≈ 300 ms` of stage compute alone; memory leg provisional — decode caches grow 3.34 GB to
+256K against 6.64 GB headroom, prefill buffers unmeasured). Gate E is met by WS32 only (PP8 2K misses
+it); Gate F by WS32 2K only. §18 amended symmetrically to the existing WS32 clause; PLAN item 6 closed.
+Fable review: REJECT (P1 Gate E inversion, three evidence P2s) → all applied in the delta. No TPU work.
+Next: L7 128K four-depth smoke on WS32_2D — design first: context capacity 131072 (pages 256), prompt
+depths 0.0/0.05/0.95/1.0 from the existing protected depth set, oracle availability for 128K to be
+inventoried; then L8 256K E0.
+
