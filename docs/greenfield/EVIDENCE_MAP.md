@@ -3975,3 +3975,25 @@ persistence only; review and persistence precede any v2 installation.
   WS32 run with the amended observer and full performance protections; a fail redirects to chunk/row
   localization.
 - Section 18 table row "Exact DSA sets and tie order" is now read as §21.2 items 2--4.
+
+## 2026-09-05 — offline event-1 adjudication diagnostic (CPU only)
+
+- `gate-d-event1-offline-adjudication-20260905.json`: legacy indexer arithmetic identified (BF16-rounded
+  query, BF16 keys including the current key, FP32 head weights; residual 1.9e-5 consistent with FP32
+  accumulation); an FP64 reference from the legacy inputs reproduces the oracle event-1 set with zero
+  swaps and exact cutoff; legacy layer-0 deviation vs reference +0.012 (eps 1e-5) / −0.006 (eps 1e-6), 4 boundary swaps. Engine row = oracle row − 0.118 mean (std 0.022); all
+  fourteen swapped positions are within 0.036 of a cutoff. Deviation originates in engine layer-1
+  inputs; legitimacy undecided pending the independent FP64 reference forward (spec §21.2/§21.4).
+- Classification: `OFFLINE_CPU_ONLY;NO_TPU;NO_GATE_D_CLAIM`.
+
+## 2026-09-05 — FP64 math-reference adjudication of event 1 (CPU only)
+
+- `gate-d-event1-math-reference-adjudication-20260905.json` + `gate-d-event1-fp64-reference-row-20260905.npy`
+  + `scripts/greenfield/reference_cpu/`: independent reference validated against legacy layer-0/1
+  captures (BF16 noise level; slopes 1.0000–1.0007). Event 1 vs reference: eps 1e-5 legacy +0.112/0.227,
+  engine −0.006/0.113; eps 1e-6 legacy +0.061/0.177, engine −0.057/0.156. §21.2 items 3–4 PASS for
+  the engine under both conventions (κ=2 and κ=1); bias signs convention-dependent; seven swaps are
+  boundary noise within the legacy's own error; no "more accurate" claim.
+- Section 18 row "Exact DSA sets and tie order": event 0 exact, event 1 adjudicated pass; later events
+  recorded only (spec §21.2 scope). Remaining Gate D work is one protected 8K WS32 run under the §21.2
+  observer with full performance protections. Classification `OFFLINE_CPU_ONLY;NO_TPU;NO_GATE_D_CLAIM`.

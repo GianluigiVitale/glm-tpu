@@ -12197,3 +12197,83 @@ wording P2s (goal length, WS32 set-identity overstatement, cap immutability), al
 SAFE_TO_PERSIST code+docs YES.
 
 Persisted pin for this entry: `9659af7d4abce527eda01561b21f2ed01c857be1` (V11 code, §21 amendment, goal.md).
+
+## 2026-09-05 01:10--02:10Z — first offline §21.2 adjudication: legacy scorer identified; swaps are boundary positions; input shift unadjudicated
+
+Feasibility confirmed with zero TPU time: the WS32 `…20260827T011711674195301Z` rank-0 NPZ
+(`2be686ff…eeb1`, verified) holds `dsa_selected_positions/scores[14,21,1,2048]`; the sealed 8K DSA
+oracle whose manifest self-hash `f8154c5f…` the run recorded is on the read-only mount; the legacy
+layer-1 internals at 8155 (`eb7a2500…a9da`: FP32 query/head weights/current key) and the legacy
+layer-1 BF16 prompt index cache (`afe683d8…52ec`, 8,155 rows) are archived. Record:
+`docs/artifacts/gate-d-event1-offline-adjudication-20260905.json`.
+
+Findings. Event 0 is bitwise identical. Event 1: `E−O = {754,1904,2029,3651,4899,5536,6951}`,
+`O−E = {680,1052,2024,2436,6322,7473,7850}`; engine cutoff `80.38292`, oracle cutoff `80.49651`.
+A scorer-variant search against the oracle row identifies the legacy indexer arithmetic: the FP32
+query is rounded to BF16 before the BF16 key dot (FP32 accumulate, ReLU, FP32 head weights,
+`128^-0.5`) and, as the Fable delta review found, the current key at 8155 is BF16-rounded too; with
+both roundings an FP64 reference from the legacy inputs reproduces the oracle set with zero swaps and
+the exact cutoff (aligned max `1.9e-5`, mean `−1.3e-6`, std `5.7e-6`, consistent with FP32
+accumulation; the FP64-query variant has mean `−0.077`). The engine row is the oracle row shifted by mean `−0.118`, std
+`0.022` (`s_e = 0.999656·s_o − 0.0897`); all fourteen swapped positions lie within `0.036` of a
+cutoff and far outside any scorer-only band (one position). Because the engine scorer is exact at
+event 0, the deviation originates in the engine's layer-1 inputs (layer-0 output → layer-1 norm →
+q-a/query/head weights/keys), a ≈0.15% effect.
+
+Contract correction: a reference built from legacy intermediate captures measures the legacy scorer
+only and cannot separate legitimate input rounding from a defect; §21.2 item 3 now defines `R` as
+an independent FP64 CPU reference forward from the sealed tokens and checkpoint weights through the
+producer layer (validated against the legacy captures), and §21.4 records this diagnostic. Exact
+next: build that reference (layer 0 dense + layer-1 indexer inputs at 8155 and the 8,155 keys) from
+the mounted canonical checkpoint (`/home/gianl/gcs-models/models/GLM-5.2-FP8`), validate it against
+the legacy layer-1 internals/cache, then compare legacy and engine deviations under §21.2 items 3–4.
+The M2048 association fingerprint remains deferred. No TPU run is authorized.
+
+The Fable §21.2-reference delta review (`/home/gianl/gate-d-runs/reviews/m2048-v11-fable-s21-r-verdict.txt`,
+`69769d51…d55e8`) found two docs P1s, both folded in: the current key is BF16 in the legacy scorer
+(residual `1.9e-5`, not `0.0426`; no 42-position band), and the absolute DB421 engine cap is
+scorer-only and mis-scaled for a full-forward reference, so items 3–4 now use relative caps `κ = 2`
+against the legacy's own error versus the same `R`, pre-registered before any layer-1 result exists.
+The independent FP64 reference forward (numpy/torch float64, HF model definition, config
+conventions) validated its indexer conventions against the exact legacy event-0 set from embeddings
+alone: interleaved RoPE gives 4 boundary swaps (oracle−reference mean `+0.0119`, max `0.030`), the
+half-split layout 296. Layer-0 full forward and layer-1 indexer inputs are being computed on CPU.
+
+## 2026-09-05 02:30--03:00Z — independent FP64 reference: engine passes §21.2 items 3–4 at event 1 under both eps conventions
+
+The independent FP64 CPU reference (`scripts/greenfield/reference_cpu/`, HF model definition + config
+conventions, numpy/torch float64, no engine or legacy-fork code; 173 s on 200 threads) computed
+layer 0 dense with its own top-2,048 selection, sparse MLA and MLP for positions 0..8155 from the
+archived token ids and shard `model-00001-of-00141.safetensors`, then the layer-1 norm and indexer
+inputs. Convention check: interleaved indexer RoPE reproduces the exact legacy event-0 set up to 4
+boundary swaps (half-split: 296). Against the legacy layer-1 captures the reference agrees at BF16
+noise level (relative RMS 0.04–0.38%) with least-squares slopes 1.0000–1.0007.
+
+Event 1 against the reference (eps 1e-5 convention): legacy row mean `+0.1118`, std `0.0310`, max
+`0.2270`; engine row mean `−0.0062`, std `0.0310`, max `0.1135`; `eps_event = 0.227`, all fourteen
+swapped positions inside the reference-cutoff band (451; reference set differs from oracle by 10,
+from engine by 13). The Fable review (`m2048-v11-fable-ref-verdict.txt`, `a8bc0466…d4c`) reproduced
+every number, validated the structure to the noise floor, and found the absolute calibration
+convention-dependent: with q-a/kv-a eps 1e-6 (HF default) the reference shifts `+0.0505` and the
+rows become legacy `+0.061/0.031/0.177`, engine `−0.057/0.031/0.156`. Legacy~reference slopes show
+a +0.04–0.07% systematic excess of unidentified mechanism. Items 3–4 pass for the engine under both
+conventions at `κ = 2` and `κ = 1`; no convention makes the engine fail or the legacy's bias smaller
+than the engine's. Claim: the engine's event-1 deviation is no larger than the legacy's and the seven
+swaps are boundary noise within the legacy's own error against the model; the layer-1 "defect"
+hypothesis is not supported. No "more accurate" claim is made. §21.2 item 3 was aligned to the
+computed reference-cutoff form (dated), later events gain a recording/alarm rule, and the §21.5
+consequence is conditional on review and persistence.
+Records: `docs/artifacts/gate-d-event1-math-reference-adjudication-20260905.json`, reference row
+`docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy`, outputs archived at
+`gs://driftbench-dsv4-uc/results/greenfield/glm52/offline_reference/event1_math_reference_20260905/`
+(8.06 MiB). Spec §21.2 gained a dated scope revision (cross-oracle adjudication through the first
+divergent event only; later events recorded) and §21.5 records this result.
+
+Exact next: (1) commit/push/mirror this reviewed batch (Fable final verdict
+`m2048-v11-fable-ref-final-verdict.txt`, `6602b0bd…b60b`: P0/P1 NONE, wording P2s folded in,
+SAFE_TO_PERSIST YES); (2) implement the §21.2 observer mode in the WS32 8K runner and sealer
+(refuse only on token mismatch, within-engine inexactness, cache/state structure, locality, or a
+first-divergent-event divergence not equal to the pre-registered record; record later events with
+the alarm rule), CPU tests, review; (3) ONE protected 8K WS32 run with full
+trace/wall/HBM/DB/archive/cleanup protections. Its success closes Gate D. No TPU before (2) is
+reviewed.

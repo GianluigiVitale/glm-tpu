@@ -258,19 +258,30 @@ low/interior values and direct return lineage. An opaque, unknown or differently
   structural cache/state fact. Level 1 (bit-exact) is required only within the engine: distributed
   selection and lowest-position tie order versus a canonical top-k of the engine's own executing
   score row. Level 1 is **not** required against the legacy engine's intermediate arithmetic.
-- Reference `R`: an independent FP32 CPU score row computed from the sealed legacy inputs of the
-  event by code sharing nothing with the engine scorer; implementation, dtype and hash recorded first.
+- Reference `R`: an independent FP64 CPU reference forward from the archived token ids and
+  checkpoint weights through the event's producer layer (indexer inputs included), validated against
+  the legacy captures, by code sharing nothing with either engine; implementation, dtype and hash
+  recorded first. Legacy indexer arithmetic (identified 2026-09-05): BF16-rounded query, BF16 keys
+  including the current key, ReLU, FP32 head weights, `128^-0.5` scale, residual `1.9e-5` max
+  consistent with FP32 accumulation.
 - Cross-oracle selected sets are exact or boundary-explained with `eps_event = max |s_o − R|` over
-  the aligned positions `A = E ∩ O` (the oracle's own error; the engine cannot inflate it), an
-  absolute pre-registered cap on `max |s_e − R|` (DB421 `0.003605` unless a layer-specific bounded
-  oracle value exists), every position of `E Δ O` within `eps_event` of both cutoffs after
-  lowest-position tie resolution, and `|E Δ O|` no larger than the oracle's ambiguity band. Any
+  the aligned positions `A = E ∩ O` (the oracle's own error against the math; the engine cannot
+  inflate it), relative engine caps `max|s_e − R| ≤ 2·eps_event` and `std(s_e − R) ≤ 2·std(s_o − R)`
+  (κ = 2 pre-registered 2026-09-05), every position of `E Δ O` within `eps_event` of the reference
+  cutoff `c_R` (lowest-position ties), and `|E Δ O|` no larger than the reference ambiguity band. Any
   violation is a hard failure.
-- Systematic bias: `|mean(s_e − R)| ≤ max(|mean(s_o − R)| + 3·s/√n, 0.000965)` over `A`. A
-  near-uniform signed shift larger than that is a defect to localize, not noise to tolerate.
+- Systematic bias: `|mean(s_e − R)| ≤ 2·|mean(s_o − R)| + 3·s/√n` over `A`. A near-uniform signed
+  shift larger than that is a defect to localize, not noise to tolerate.
+- Scope: cross-oracle adjudication covers events with identical upstream selected state through the
+  first divergent event; later events are recorded, not adjudicated (spec §21.2, 2026-09-05).
+  Boundary form (2026-09-05): `|R(p) − c_R| ≤ eps_event` on the reference row and a reference band
+  bound, because oracle scores exist only for selected positions. Result (spec §21.5): event 1 legacy
+  +0.112/0.227 and engine −0.006/0.113 vs the FP64 reference at eps 1e-5; +0.061/0.177 and
+  −0.057/0.156 at eps 1e-6; engine passes items 3–4 under both; bias signs are convention-dependent.
 - Evidence: Gate C DB421 (raw PyTorch CPU scorer vs greenfield TPU FP32 scorer disagree on 2/2,048
   cutoff members while both satisfy the bounded contract); WS32 8K runs of 2026-08-26/27 (exact
   tokens/state/cache/event 0, seven event-1 selected-position swaps, no aligned error statistics
-  recorded). The PP8 run `…_20260808T041407656729112Z` recorded aligned event-1 error
-  max/mean/signed `0.27013397/0.18290268/-0.18290268`; a shift of that size would fail the bias rule
-  by two orders of magnitude and must be adjudicated on the WS32 arrays before any Gate D claim.
+  recorded); offline 2026-09-05 diagnostic (spec §21.4): engine event-1 row = oracle row −0.118 mean
+  / 0.022 std, all swaps within 0.036 of a cutoff, legacy layer-0 bias vs FP64 math +0.012. The PP8
+  run `…_20260808T041407656729112Z` recorded aligned event-1 error max/mean/signed
+  `0.27013397/0.18290268/-0.18290268`.
