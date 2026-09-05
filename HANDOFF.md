@@ -12765,3 +12765,23 @@ branch now that the pod is idle. Next: Step C acquisitions at capacities 131,072
 diagnostic on, then the two capacity runs; storage reclamation plan before L7 (each numerical prefix
 ≈5.8 GB; live 1,972.7 GB before Step C).
 
+## 2026-09-05 21:00Z — rotary diagnostic result, decision A′, and its implementation
+
+The TPU diagnostic returned FAIL (45/128 cells) with the numbers now in spec §23.9 and the artifact
+`docs/artifacts/gate-l-ws32-rotary-long-position-diagnostic-20260905.json`. Decision taken under the
+goal's Decisions rule, with no owner round-trip: adopt A′ (legacy-faithful main-attention host BF16
+rotary table, default off) and keep the indexer on device. Alternative rejected: run L7 on the
+on-device form and fix only on failure. Implemented in the dev worktree: `Ws32DecoderConfig.host_main_rope_table`
+and `main_rope_table_shape`; `build_ws32_main_rope_table` using the accepted construction at
+`WS32_MAIN_ROPE_THETA = 8e6`; a per-step row gather under `greenfield_ws32_main_rope_table_lookup` in
+`_ws32_decode_impl` threaded through the transformer and attention layers to the single main-attention
+rotary site, which rotates the query and the current key with `apply_rotary_fp32_final_round` from the
+row; the table is one replicated trailing input of the decode, observer, prefill and chunked-prefill
+programs (absent entirely when the flag is off); the runner records `main_rope_table` (rows, dim, theta,
+bytes, SHA-256); the sealer requires it present iff declared, rebuilds the table at the sealing pin and
+compares the SHA, requires cross-rank identity, adds `_hrope` to the run tag and
+`MAIN_ROTARY_HOST_TABLE_LEGACY_FAITHFUL` to the classification; the HLO linter requires the table scope
+in decode/observer/prefill exactly when declared. The 131,072 acquisition's pins are superseded for the
+table-on path; its compiled memory (27.46 GB arguments + 1.23 GB temp per chip) confirms 128K fits.
+Awaiting Opus 5 review of both this and evidence layout v2 before any protected run.
+

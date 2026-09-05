@@ -41,12 +41,17 @@ from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     verify_ws32_strategy_nd_dense_overlay,
 )
 from glm_tpu.greenfield.partitioning import inspect_source_inventory  # noqa: E402
+from glm_tpu.greenfield.kernels.reference.rotary import (  # noqa: E402
+    rotary_table_sha256,
+)
 from glm_tpu.greenfield.runtime import (  # noqa: E402
     Ws32DecoderConfig,
     bind_ws32_decoder_weights,
     build_ws32_decoder_program,
     build_ws32_exact_dsa_materializer_program,
+    WS32_MAIN_ROPE_THETA,
     build_ws32_chunked_prefill_program,
+    build_ws32_main_rope_table,
     make_ws32_repaired_index_buffer,
     ws32_prefill_chunk_plan,
     make_ws32_initial_state,
@@ -121,6 +126,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prefill-budget-seconds", type=float, required=True)
     # Spec §23.8: declared side program measuring on-device rotary at long
     # positions (default off); its record is embedded in the runner record.
+    # Spec §23.8: default-off legacy-faithful main-attention rotary table.
+    parser.add_argument("--host-main-rope-table", choices=(0, 1), default=0, type=int)
     parser.add_argument("--rotary-diagnostic", choices=(0, 1), default=0, type=int)
     parser.add_argument("--rotary-diagnostic-positions", type=int, default=262_657)
     parser.add_argument("--context-capacity", required=True, type=int)
@@ -357,6 +364,7 @@ def _write_graph(
     hidden_size: int,
     exact_dsa: bool,
     strategy_nd_dense: bool,
+    host_main_rope_table: bool = False,
 ) -> tuple[dict[str, Any], str, str]:
     stable = str(lowered.compiler_ir(dialect="stablehlo"))
     optimized = compiled.as_text()
@@ -373,6 +381,7 @@ def _write_graph(
         kind=_linter_kind(graph),
         exact_dsa=exact_dsa,
         strategy_nd_dense=strategy_nd_dense,
+        host_main_rope_table=host_main_rope_table,
     )
     return report.to_dict(), stable, optimized
 
@@ -606,6 +615,7 @@ def main() -> int:
         context_capacity=args.context_capacity,
         exact_dsa=bool(args.exact_dsa),
         strategy_nd_dense=bool(args.strategy_nd_dense),
+        host_main_rope_table=bool(args.host_main_rope_table),
     )
     oracle = load_ws32_short_context_oracle(
         args.token_oracle_dir,
@@ -811,6 +821,19 @@ def main() -> int:
     state = make_ws32_initial_state(mesh, config)
     initial_token = _replicated(jax, mesh, np.asarray([-1], dtype=np.int32))
     repaired_buffer = make_ws32_repaired_index_buffer(mesh, config)
+    main_rope_table_record: dict[str, Any] | None = None
+    table_inputs: tuple[Any, ...] = ()
+    if config.host_main_rope_table:
+        host_table = build_ws32_main_rope_table(config)
+        main_rope_table_record = {
+            "bytes_per_device": int(host_table.nbytes),
+            "rotary_dim": int(config.geometry.qk_rope_head_dim),
+            "rows": int(config.context_capacity),
+            "sha256": rotary_table_sha256(host_table),
+            "theta": WS32_MAIN_ROPE_THETA,
+        }
+        table_inputs = (_replicated(jax, mesh, host_table),)
+        del host_table
     # Both prefill programs are compiled and pinned before any execution so an
     # acquisition preserves the complete graph set and a numerical run never
     # discovers a tail-program refusal after hours of chunk scanning.
@@ -835,7 +858,7 @@ def main() -> int:
         inputs = (chunk_ids, state, weights)
         if exact_dsa_weights is not None:
             inputs = (*inputs, exact_dsa_weights)
-        inputs = (*inputs, repaired_buffer)
+        inputs = (*inputs, repaired_buffer, *table_inputs)
         prefill_lowered[graph] = prefill_jits[graph].lower(*inputs)
         started = time.perf_counter()
         prefill_compiled[graph] = prefill_lowered[graph].compile()
@@ -853,6 +876,7 @@ def main() -> int:
             hidden_size=geometry.hidden_size,
             exact_dsa=config.exact_dsa,
             strategy_nd_dense=config.strategy_nd_dense,
+            host_main_rope_table=config.host_main_rope_table,
         )
         del chunk_ids
     for graph in ("prefill_chunk", "prefill_tail"):
@@ -885,7 +909,7 @@ def main() -> int:
             inputs = (chunk_ids, current_state, weights)
             if exact_dsa_weights is not None:
                 inputs = (*inputs, exact_dsa_weights)
-            inputs = (*inputs, current_buffer)
+            inputs = (*inputs, current_buffer, *table_inputs)
             chunk_started = time.perf_counter()
             result = prefill_compiled["prefill_chunk"](*inputs)
             jax.block_until_ready(result)
@@ -915,7 +939,7 @@ def main() -> int:
         inputs = (tail_ids, current_state, weights)
         if exact_dsa_weights is not None:
             inputs = (*inputs, exact_dsa_weights)
-        inputs = (*inputs, current_buffer)
+        inputs = (*inputs, current_buffer, *table_inputs)
         tail_started = time.perf_counter()
         result = prefill_compiled["prefill_tail"](*inputs)
         jax.block_until_ready(result)
@@ -963,6 +987,7 @@ def main() -> int:
     observer_inputs = (observer_token, observer_state, weights)
     if exact_dsa_weights is not None:
         observer_inputs = (*observer_inputs, exact_dsa_weights)
+    observer_inputs = (*observer_inputs, *table_inputs)
     observer_lowered = observer_jit.lower(*observer_inputs)
     started = time.perf_counter()
     observer_compiled = observer_lowered.compile()
@@ -978,6 +1003,7 @@ def main() -> int:
         hidden_size=geometry.hidden_size,
         exact_dsa=config.exact_dsa,
         strategy_nd_dense=config.strategy_nd_dense,
+        host_main_rope_table=config.host_main_rope_table,
     )
     _require_graph_authorized(
         graphs["observer"], compile_only=bool(args.compile_only)
@@ -997,6 +1023,7 @@ def main() -> int:
             observer_inputs = (current_token, current_state, weights)
             if exact_dsa_weights is not None:
                 observer_inputs = (*observer_inputs, exact_dsa_weights)
+            observer_inputs = (*observer_inputs, *table_inputs)
             observed = observer_compiled(*observer_inputs)
             jax.block_until_ready(observed)
             host_dsa = jax.device_get(observed.dsa)
@@ -1037,6 +1064,7 @@ def main() -> int:
     decode_inputs = (current_token, current_state, weights)
     if exact_dsa_weights is not None:
         decode_inputs = (*decode_inputs, exact_dsa_weights)
+    decode_inputs = (*decode_inputs, *table_inputs)
     decode_lowered = decode_jit.lower(*decode_inputs)
     started = time.perf_counter()
     decode_compiled = decode_lowered.compile()
@@ -1052,6 +1080,7 @@ def main() -> int:
         hidden_size=geometry.hidden_size,
         exact_dsa=config.exact_dsa,
         strategy_nd_dense=config.strategy_nd_dense,
+        host_main_rope_table=config.host_main_rope_table,
     )
     _require_graph_authorized(
         graphs["decode"], compile_only=bool(args.compile_only)
@@ -1072,6 +1101,7 @@ def main() -> int:
         hidden_size=geometry.hidden_size,
         exact_dsa=config.exact_dsa,
         strategy_nd_dense=config.strategy_nd_dense,
+        host_main_rope_table=config.host_main_rope_table,
     )
     _require_graph_authorized(
         graphs["cache_probe"], compile_only=bool(args.compile_only)
@@ -1114,6 +1144,7 @@ def main() -> int:
         "load_seconds": load_seconds,
         "local_device_slots": list(local_device_slots),
         "mesh_sha256": physical_mesh.mesh_hash,
+        "main_rope_table": main_rope_table_record,
         "prefill_chunk_length": int(args.prefill_chunk),
         "prefill_execution": prefill_execution,
         "prompt_length": int(oracle.prompt_token_ids.size),
@@ -1165,6 +1196,7 @@ def main() -> int:
         decode_inputs = (current_token, current_state, weights)
         if exact_dsa_weights is not None:
             decode_inputs = (*decode_inputs, exact_dsa_weights)
+        decode_inputs = (*decode_inputs, *table_inputs)
         result = decode_compiled(*decode_inputs)
         jax.block_until_ready(result)
         current_state = result.state
@@ -1177,6 +1209,7 @@ def main() -> int:
         decode_inputs = (current_token, current_state, weights)
         if exact_dsa_weights is not None:
             decode_inputs = (*decode_inputs, exact_dsa_weights)
+        decode_inputs = (*decode_inputs, *table_inputs)
         result = decode_compiled(*decode_inputs)
         jax.block_until_ready(result)
         samples_ms.append((time.perf_counter_ns() - started_ns) / 1_000_000.0)
@@ -1190,6 +1223,7 @@ def main() -> int:
             decode_inputs = (current_token, current_state, weights)
             if exact_dsa_weights is not None:
                 decode_inputs = (*decode_inputs, exact_dsa_weights)
+            decode_inputs = (*decode_inputs, *table_inputs)
             result = decode_compiled(*decode_inputs)
             jax.block_until_ready(result)
             current_state = result.state

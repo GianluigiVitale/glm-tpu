@@ -160,6 +160,7 @@ class Ws32DecoderConfig:
     rms_norm_epsilon: float = 1e-5
     exact_dsa: bool = False
     strategy_nd_dense: bool = False
+    host_main_rope_table: bool = False
 
     def __post_init__(self) -> None:
         geometry = self.geometry
@@ -191,6 +192,10 @@ class Ws32DecoderConfig:
             raise PlanValidationError(
                 "WS32 StrategyND dense flag must be boolean"
             )
+        if not isinstance(self.host_main_rope_table, bool):
+            raise PlanValidationError(
+                "WS32 host main-rotary table flag must be boolean"
+            )
         if self.strategy_nd_dense and (
             geometry.hidden_size != 6144
             or geometry.dense_intermediate_size != 12288
@@ -208,6 +213,11 @@ class Ws32DecoderConfig:
                 producer = layer_id
             elif producer is None or layer_id - producer >= geometry.index_share_group_size:
                 raise PlanValidationError("WS32 IndexShare schedule drifted")
+
+    @property
+    def main_rope_table_shape(self) -> tuple[int, int]:
+        """Replicated host BF16 ``cos|sin`` table, one row per position (§23.8)."""
+        return (self.context_capacity, self.geometry.qk_rope_head_dim)
 
     @property
     def page_count(self) -> int:
@@ -1080,6 +1090,7 @@ def _ws32_decode_impl(
     linear_interpret: bool = False,
     observe_dsa: bool,
     observe_prefill_inputs: bool = False,
+    main_rope_table: Any | None = None,
 ) -> tuple[
     Ws32DecodeStepResult,
     Ws32DsaObservation | None,
@@ -1088,6 +1099,18 @@ def _ws32_decode_impl(
     """Execute one complete batch-one step and optionally retain DSA events."""
 
     _validate_local_state(state, config)
+    if config.host_main_rope_table != (main_rope_table is not None):
+        raise ValueError("WS32 host main-rotary table flag/input presence drifted")
+    main_rope_table_row = None
+    if main_rope_table is not None:
+        if main_rope_table.shape != config.main_rope_table_shape or (
+            main_rope_table.dtype != jnp.bfloat16
+        ):
+            raise ValueError("WS32 main rotary table geometry drifted")
+        with jax.named_scope("greenfield_ws32_main_rope_table_lookup"):
+            main_rope_table_row = jnp.take(
+                main_rope_table, state.position, axis=0
+            )[0]
     if token_ids.shape != (1,) or token_ids.dtype != jnp.int32:
         raise ValueError("WS32 decoder input must be one int32 token")
     if len(weights.layers) != config.geometry.num_layers:
@@ -1146,6 +1169,7 @@ def _ws32_decode_impl(
             layer_weights.moe,
             health,
             exact_dsa_weights=exact_layer_weights,
+            main_rope_table_row=main_rope_table_row,
             indexer_kind=indexer_kind,
             mlp_kind=mlp_kind,
             dsa_contract=config.dsa_contract,
@@ -1230,6 +1254,7 @@ def ws32_decode_mapped(
     exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...] | None = None,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
+    main_rope_table: Any | None = None,
 ) -> Ws32DecodeStepResult:
     """Execute one complete batch-one target-model step on all 32 chips."""
 
@@ -1241,6 +1266,7 @@ def ws32_decode_mapped(
         exact_dsa_weights=exact_dsa_weights,
         sparse_attention_interpret=sparse_attention_interpret,
         linear_interpret=linear_interpret,
+        main_rope_table=main_rope_table,
         observe_dsa=False,
     )
     if observation is not None:
@@ -1259,6 +1285,7 @@ def ws32_decode_observed_mapped(
     exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...] | None = None,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
+    main_rope_table: Any | None = None,
 ) -> Ws32ObservedDecodeStepResult:
     """Execute one proof-only step returning all 21 full-indexer decisions."""
 
@@ -1270,6 +1297,7 @@ def ws32_decode_observed_mapped(
         exact_dsa_weights=exact_dsa_weights,
         sparse_attention_interpret=sparse_attention_interpret,
         linear_interpret=linear_interpret,
+        main_rope_table=main_rope_table,
         observe_dsa=True,
     )
     if observation is None:
@@ -1288,6 +1316,7 @@ def ws32_prefill_step_mapped(
     config: Ws32DecoderConfig,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
+    main_rope_table: Any | None = None,
 ) -> Ws32PrefillStepResult:
     """Execute one exact step and retain only full-indexer norm inputs."""
 
@@ -1299,6 +1328,7 @@ def ws32_prefill_step_mapped(
         exact_dsa_weights=exact_dsa_weights,
         sparse_attention_interpret=sparse_attention_interpret,
         linear_interpret=linear_interpret,
+        main_rope_table=main_rope_table,
         observe_dsa=False,
         observe_prefill_inputs=True,
     )
@@ -1381,11 +1411,15 @@ def build_ws32_decoder_program(
         raise PlanValidationError("WS32 decoder requires one exact expert8 x feature4 mesh")
     weight_specs = ws32_decoder_weight_specs(config)
     state_specs = ws32_decoder_state_specs()
+    # Spec §23.8: the replicated host BF16 main-rotary table is one extra
+    # trailing input; when the flag is off the bodies keep their default None.
+    table_specs = (P(),) if config.host_main_rope_table else ()
 
     def execute_body(
         token_ids: Any,
         state: Ws32DecoderState,
         weights: Ws32DecoderWeights,
+        main_rope_table: Any | None = None,
     ) -> Ws32DecodeStepResult:
         with jax.named_scope("greenfield_ws32_complete_decoder"):
             return ws32_decode_mapped(
@@ -1395,12 +1429,14 @@ def build_ws32_decoder_program(
                 config=config,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
+                main_rope_table=main_rope_table,
             )
 
     def observe_body(
         token_ids: Any,
         state: Ws32DecoderState,
         weights: Ws32DecoderWeights,
+        main_rope_table: Any | None = None,
     ) -> Ws32ObservedDecodeStepResult:
         with jax.named_scope("greenfield_ws32_complete_decoder_dsa_observer"):
             return ws32_decode_observed_mapped(
@@ -1410,6 +1446,7 @@ def build_ws32_decoder_program(
                 config=config,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
+                main_rope_table=main_rope_table,
             )
 
     def execute_exact_body(
@@ -1417,6 +1454,7 @@ def build_ws32_decoder_program(
         state: Ws32DecoderState,
         weights: Ws32DecoderWeights,
         exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...],
+        main_rope_table: Any | None = None,
     ) -> Ws32DecodeStepResult:
         with jax.named_scope("greenfield_ws32_complete_decoder"):
             return ws32_decode_mapped(
@@ -1427,6 +1465,7 @@ def build_ws32_decoder_program(
                 exact_dsa_weights=exact_dsa_weights,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
+                main_rope_table=main_rope_table,
             )
 
     def observe_exact_body(
@@ -1434,6 +1473,7 @@ def build_ws32_decoder_program(
         state: Ws32DecoderState,
         weights: Ws32DecoderWeights,
         exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...],
+        main_rope_table: Any | None = None,
     ) -> Ws32ObservedDecodeStepResult:
         with jax.named_scope("greenfield_ws32_complete_decoder_dsa_observer"):
             return ws32_decode_observed_mapped(
@@ -1444,6 +1484,7 @@ def build_ws32_decoder_program(
                 exact_dsa_weights=exact_dsa_weights,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
+                main_rope_table=main_rope_table,
             )
 
     def probe_body(state: Ws32DecoderState) -> Ws32CacheWriteProbe:
@@ -1455,14 +1496,14 @@ def build_ws32_decoder_program(
         execute = jax.shard_map(
             execute_exact_body,
             mesh=mesh,
-            in_specs=(P(), state_specs, weight_specs, exact_specs),
+            in_specs=(P(), state_specs, weight_specs, exact_specs, *table_specs),
             out_specs=ws32_decode_result_specs(),
             check_vma=False,
         )
         observe = jax.shard_map(
             observe_exact_body,
             mesh=mesh,
-            in_specs=(P(), state_specs, weight_specs, exact_specs),
+            in_specs=(P(), state_specs, weight_specs, exact_specs, *table_specs),
             out_specs=ws32_observed_decode_result_specs(),
             check_vma=False,
         )
@@ -1470,14 +1511,14 @@ def build_ws32_decoder_program(
         execute = jax.shard_map(
             execute_body,
             mesh=mesh,
-            in_specs=(P(), state_specs, weight_specs),
+            in_specs=(P(), state_specs, weight_specs, *table_specs),
             out_specs=ws32_decode_result_specs(),
             check_vma=False,
         )
         observe = jax.shard_map(
             observe_body,
             mesh=mesh,
-            in_specs=(P(), state_specs, weight_specs),
+            in_specs=(P(), state_specs, weight_specs, *table_specs),
             out_specs=ws32_observed_decode_result_specs(),
             check_vma=False,
         )
@@ -1514,6 +1555,8 @@ def build_ws32_teacher_forced_prefill_program(
         )
     import numpy as np
 
+    # Spec §23.8: replicated host BF16 main-rotary table as one trailing input.
+    table_specs = (P(),) if config.host_main_rope_table else ()
     if tuple(mesh.axis_names) != ("expert", "feature") or tuple(
         np.asarray(mesh.devices, dtype=object).shape
     ) != (8, 4):
@@ -1523,6 +1566,7 @@ def build_ws32_teacher_forced_prefill_program(
         prompt_token_ids: Any,
         state: Ws32DecoderState,
         weights: Ws32DecoderWeights,
+        main_rope_table: Any | None = None,
     ) -> Ws32PrefillResult:
         if prompt_token_ids.shape != (prompt_length,) or (
             prompt_token_ids.dtype != jnp.int32
@@ -1540,6 +1584,7 @@ def build_ws32_teacher_forced_prefill_program(
                 config=config,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
+                main_rope_table=main_rope_table,
             )
             return (result.state, result.next_token), None
 
@@ -1557,6 +1602,7 @@ def build_ws32_teacher_forced_prefill_program(
         state: Ws32DecoderState,
         weights: Ws32DecoderWeights,
         exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...],
+        main_rope_table: Any | None = None,
     ) -> Ws32PrefillResult:
         if prompt_token_ids.shape != (prompt_length,) or (
             prompt_token_ids.dtype != jnp.int32
@@ -1575,6 +1621,7 @@ def build_ws32_teacher_forced_prefill_program(
                 config=config,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
+                main_rope_table=main_rope_table,
             )
             return (
                 (step.result.state, step.result.next_token),
@@ -1643,6 +1690,7 @@ def build_ws32_teacher_forced_prefill_program(
                 ws32_decoder_state_specs(),
                 ws32_decoder_weight_specs(config),
                 ws32_exact_dsa_specs(config),
+                *table_specs,
             ),
             out_specs=ws32_prefill_result_specs(),
             check_vma=False,
@@ -1655,6 +1703,7 @@ def build_ws32_teacher_forced_prefill_program(
                 P(),
                 ws32_decoder_state_specs(),
                 ws32_decoder_weight_specs(config),
+                *table_specs,
             ),
             out_specs=ws32_prefill_result_specs(),
             check_vma=False,
@@ -1666,6 +1715,35 @@ def build_ws32_teacher_forced_prefill_program(
         prompt_length=prompt_length,
         execute=execute,
     )
+
+
+WS32_MAIN_ROPE_THETA = 8_000_000.0
+"""Accepted GLM main-attention rotary base (config `rope_parameters.rope_theta`).
+
+It is the default of every WS32 main-attention rotary site, so the host table
+(spec §23.8) must be built with the same value or the two forms diverge.
+"""
+
+
+def build_ws32_main_rope_table(config: Ws32DecoderConfig) -> Any:
+    """Host BF16 ``cos|sin`` table for the main-attention rotary (spec §23.8).
+
+    Built with the accepted GLM runtime's own construction
+    (:func:`build_rotary_table_host`: positive FP32 powers, reciprocal, NumPy
+    FP32 trigonometry, stored BF16), which DB531 proved reproduces the legacy
+    64-wide rotary suffix bitwise when applied with FP32 products and one final
+    BF16 round.
+    """
+    from ..kernels.reference.rotary import build_rotary_table_host
+
+    table = build_rotary_table_host(
+        config.context_capacity,
+        rotary_dim=config.geometry.qk_rope_head_dim,
+        theta=WS32_MAIN_ROPE_THETA,
+    )
+    if table.shape != config.main_rope_table_shape:
+        raise PlanValidationError("WS32 main rotary table geometry drifted")
+    return table
 
 
 def ws32_prefill_chunk_plan(prompt_length: int, chunk_length: int) -> tuple[int, int]:
@@ -1721,6 +1799,8 @@ def build_ws32_chunked_prefill_program(
         )
     import numpy as np
 
+    # Spec §23.8: replicated host BF16 main-rotary table as one trailing input.
+    table_specs = (P(),) if config.host_main_rope_table else ()
     if tuple(mesh.axis_names) != ("expert", "feature") or tuple(
         np.asarray(mesh.devices, dtype=object).shape
     ) != (8, 4):
@@ -1745,6 +1825,7 @@ def build_ws32_chunked_prefill_program(
         state: Ws32DecoderState,
         weights: Ws32DecoderWeights,
         repaired_index_local: Any,
+        main_rope_table: Any | None = None,
     ) -> Ws32ChunkedPrefillResult:
         _require_chunk(prompt_token_ids)
         _require_buffer(repaired_index_local, state)
@@ -1760,6 +1841,7 @@ def build_ws32_chunked_prefill_program(
                 config=config,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
+                main_rope_table=main_rope_table,
             )
             return (result.state, result.next_token), None
 
@@ -1778,6 +1860,7 @@ def build_ws32_chunked_prefill_program(
         weights: Ws32DecoderWeights,
         exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...],
         repaired_index_local: Any,
+        main_rope_table: Any | None = None,
     ) -> Ws32ChunkedPrefillResult:
         _require_chunk(prompt_token_ids)
         _require_buffer(repaired_index_local, state)
@@ -1797,6 +1880,7 @@ def build_ws32_chunked_prefill_program(
                 config=config,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
+                main_rope_table=main_rope_table,
             )
             return (
                 (step.result.state, step.result.next_token),
@@ -1856,6 +1940,7 @@ def build_ws32_chunked_prefill_program(
                 ws32_decoder_weight_specs(config),
                 ws32_exact_dsa_specs(config),
                 buffer_spec,
+                *table_specs,
             ),
             out_specs=ws32_chunked_prefill_result_specs(),
             check_vma=False,
@@ -1869,6 +1954,7 @@ def build_ws32_chunked_prefill_program(
                 ws32_decoder_state_specs(),
                 ws32_decoder_weight_specs(config),
                 buffer_spec,
+                *table_specs,
             ),
             out_specs=ws32_chunked_prefill_result_specs(),
             check_vma=False,

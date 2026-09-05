@@ -2042,3 +2042,59 @@ bit-exact vs the legacy oracle, with it 2,046/2,048 scores moved). The legacy 12
 4. Step B/C keep v3's contract (tables OFF, identity to DB567 witnesses). Site inventory for the
    record: on-device rotary at `ws32_layer.py:425, :511 (via dsa_index_keys_from_projection), :685,
    :734, :842` and `prefill_index.py:160`.
+
+## 23.9 Rotary measurement and the main-attention host table — 2026-09-05 (decision)
+
+The §23.8 diagnostic ran on the TPU inside the 131,072-capacity acquisition
+(`greenfield_ws32_short_decoder_8k_acquire_cap131072_20260905T200533413431414Z`, pin `00c6eee`,
+backend `tpu`, `TPU v4`, jax 0.10.1, libtpu 0.0.41) and returned `FAIL`: 45 of 128 pre-registered
+(pair, band) cells lie outside κ=2. Artifact:
+`docs/artifacts/gate-l-ws32-rotary-long-position-diagnostic-20260905.json`.
+
+Worst cell per position band, all at rotary pair 1 (maximum absolute error of the effective
+`cos`/`sin` against FP64):
+
+| positions | on-device main | legacy host table | ratio | on-device indexer |
+|---|---|---|---|---|
+| ≤ 8,192 | 0.0115 | 0.0022 | 5.3× | 0.0111 |
+| ≤ 32,768 | 0.0444 | 0.0031 | 14.1× | 0.0444 |
+| ≤ 131,072 | 0.1779 | 0.0071 | 24.2× | 0.1778 |
+| ≤ 262,656 | 0.3545 | 0.0134 | 26.6× | 0.3543 |
+
+Three readings, and the decision each supports.
+
+1. **The on-device error is a range-reduction effect, not a dtype effect.** The device indexer (FP32
+   output) and the device main path (BF16 output) carry the same error, so it originates in
+   `jnp.cos/jnp.sin` of a large argument, exactly as the PP8 V2/V3 replays found at position 8155.
+2. **The indexer stays on device.** The legacy indexer evaluates the same on-device form, and the
+   protected refusal record `gate-d-dsa-rope-table-8k-refusal-adjudication.json` showed event 0 is
+   bit-exact against the legacy oracle only without a host DSA table. Faithfulness is the criterion,
+   and the on-device form is the faithful one; the tombstone stands.
+3. **The main attention adopts the host table (A′).** The legacy main path consumes a host FP32→BF16
+   `cos|sin` table, applies FP32 products and one final BF16 round (DB531 reproduced the legacy
+   64-wide suffix bitwise). WS32 evaluates it on device and deviates from the legacy form by up to
+   26.6× the legacy's own deviation from FP64 at 256K positions, on essentially every BF16 component
+   (261,839 of 262,144 differ in the worst band). That is a divergence from the reference
+   implementation that grows with context, exactly where L7/L8 must claim correctness.
+
+Cost and alternative, recorded for the audit. A′ is a default-off flag: one replicated BF16
+`[capacity, 64]` table (33.6 MB per chip at 262,656), a per-step row gather, and
+`apply_rotary_fp32_final_round` at the two main-attention sites; it changes numerics, so it must be
+re-adjudicated at 8K under §21 (B′) and every graph must be re-acquired. The alternative — run L7 with
+the on-device form and fix only on failure — was rejected: a passkey failure costs ≈5 h of pod time per
+prompt and would not identify the rotary as the cause, and a pass would leave a known 27× divergence in
+the record at the moment §18 is claimed.
+
+Honest calibration: the pre-registered rule fails even in the ≤8,192 band, where the sealed Gate D runs
+(DB 567/568/569) produced exact 20/20 tokens and a bit-exact event 0 with the on-device form. The rule
+is therefore a *faithfulness* criterion, stricter than token exactness at 8K; it is not weakened
+retroactively, and A′ is adopted for faithfulness rather than because Gate D was wrong.
+
+Consequences: the 131,072 acquisition's HLO pins are superseded for the table-on path (its lasting
+value is this diagnostic and its compiled-memory report — 27.46 GB of arguments plus 1.23 GB of temp
+per chip for the chunked prefill at 131,072, so 128K fits with ≈4.3 GB of margin). Sequence becomes
+A′ (code, reviewed) → 8K acquisition with the table on → B′ 8K numerical adjudication under §21 →
+Step C acquisitions and capacity runs with the table on → L7 → L8. The diagnostic itself stays
+default-off in later runs: it measures the device form, which the main path no longer uses, and this
+artifact is its record.
+
