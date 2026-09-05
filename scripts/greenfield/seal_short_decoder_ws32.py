@@ -1058,6 +1058,67 @@ def _later_event_alarm_summary(
     }
 
 
+def _run_environment(summary: dict[str, Any]) -> dict[str, Any]:
+    """The exact env_json identity shared by DB publication and rollback.
+
+    Rollback resolves the run by equality against this dictionary, so both
+    sides must derive it from one function or a new publication key silently
+    makes the run unrecoverable.
+    """
+    return {
+        "GLM_ENGINE": "greenfield_ws32_2d",
+        "checkpoint_manifest_sha256": summary["checkpoint_manifest_sha256"],
+        "checkpoint_success_sha256": summary["checkpoint_success_sha256"],
+        "code_hash": summary["code_hash"],
+        "context_label": summary["context_label"],
+        "dsa_oracle_manifest_sha256": summary["dsa_oracle_manifest_sha256"],
+        "dsa_oracle_success_sha256": summary["dsa_oracle_success_sha256"],
+        "mesh_sha256": summary["mesh_sha256"],
+        "plan": "WS32_2D",
+        "run_tag": summary["run_tag"],
+        "strategy_nd_dense": summary["strategy_nd_dense"],
+        "strategy_nd_dense_overlay_manifest_sha256": summary[
+            "strategy_nd_dense_overlay_manifest_sha256"
+        ],
+        "token_oracle_manifest_sha256": summary["token_oracle_manifest_sha256"],
+        "token_oracle_success_sha256": summary["token_oracle_success_sha256"],
+        "xla_python_client_mem_fraction": summary[
+            "xla_python_client_mem_fraction"
+        ],
+        "checkpoint_transport": summary.get("checkpoint_transport"),
+        "classification": summary.get("classification"),
+        "dsa_adjudication": summary.get("dsa_adjudication"),
+        "later_event_alarm": summary.get("later_event_alarm"),
+        "recovery_code_hash": summary.get("recovery_code_hash"),
+    }
+
+
+def _run_rows(summary: dict[str, Any]) -> tuple[str, str, str]:
+    """The exact run note, item id and gold shared by DB publication and rollback.
+
+    Rollback refuses any row that does not equal what publication wrote, so
+    both sides must derive the wording from this one function.
+    """
+    adjudicated = summary.get("dsa_adjudication") is not None
+    note = (
+        "Protected complete WS32 short-context decoder: exact tokens/DSA/state/cache/HLO/HBM/XPlane and profiler-free wall."
+        if not adjudicated
+        else "Protected complete WS32 short-context decoder (spec §21): exact raw tokens; DSA event 0 exact, "
+        f"event {summary['dsa_adjudication']['event_index']} adjudicated against the pre-registered record, later events "
+        "recorded"
+        + (" (alarm acknowledged with a lessons entry)" if summary.get("later_event_alarm") else "")
+        + "; within-engine DSA order/tails exact; state/cache/HLO/HBM/XPlane and profiler-free wall."
+    )
+    item_id = "gate_d_exact_token_dsa_state_cache" if not adjudicated else "gate_d_s21_exact_tokens_adjudicated_dsa_state_cache"
+    gold = (
+        "Exact sealed raw-token prefix, executing-program DSA set/ties, state/cache/HLO/HBM/XPlane and protected wall."
+        if not adjudicated
+        else "Exact sealed raw-token prefix; within-engine DSA order/ties; cross-oracle DSA exact at event 0 and equal to the "
+        "pre-registered adjudicated divergence at the first divergent event, later events recorded; state/cache/HLO/HBM/XPlane and protected wall."
+    )
+    return note, item_id, gold
+
+
 def _publish_db(args: argparse.Namespace) -> int:
     summary = json.loads(args.summary.read_text(encoding="utf-8"))
     if summary.get("summary_sha256") != sha256(
@@ -1069,49 +1130,8 @@ def _publish_db(args: argparse.Namespace) -> int:
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("BEGIN IMMEDIATE")
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        env = {
-            "GLM_ENGINE": "greenfield_ws32_2d",
-            "checkpoint_manifest_sha256": summary["checkpoint_manifest_sha256"],
-            "checkpoint_success_sha256": summary["checkpoint_success_sha256"],
-            "code_hash": summary["code_hash"],
-            "context_label": summary["context_label"],
-            "dsa_oracle_manifest_sha256": summary["dsa_oracle_manifest_sha256"],
-            "dsa_oracle_success_sha256": summary["dsa_oracle_success_sha256"],
-            "mesh_sha256": summary["mesh_sha256"],
-            "plan": "WS32_2D",
-            "run_tag": summary["run_tag"],
-            "strategy_nd_dense": summary["strategy_nd_dense"],
-            "strategy_nd_dense_overlay_manifest_sha256": summary[
-                "strategy_nd_dense_overlay_manifest_sha256"
-            ],
-            "token_oracle_manifest_sha256": summary["token_oracle_manifest_sha256"],
-            "token_oracle_success_sha256": summary["token_oracle_success_sha256"],
-            "xla_python_client_mem_fraction": summary[
-                "xla_python_client_mem_fraction"
-            ],
-            "checkpoint_transport": summary.get("checkpoint_transport"),
-            "classification": summary.get("classification"),
-            "dsa_adjudication": summary.get("dsa_adjudication"),
-            "later_event_alarm": summary.get("later_event_alarm"),
-            "recovery_code_hash": summary.get("recovery_code_hash"),
-        }
-        adjudicated = summary.get("dsa_adjudication") is not None
-        note = (
-            "Protected complete WS32 short-context decoder: exact tokens/DSA/state/cache/HLO/HBM/XPlane and profiler-free wall."
-            if not adjudicated
-            else "Protected complete WS32 short-context decoder (spec §21): exact raw tokens; DSA event 0 exact, "
-            f"event {summary['dsa_adjudication']['event_index']} adjudicated against the pre-registered record, later events "
-            "recorded"
-            + (" (alarm acknowledged with a lessons entry)" if summary.get("later_event_alarm") else "")
-            + "; within-engine DSA order/tails exact; state/cache/HLO/HBM/XPlane and profiler-free wall."
-        )
-        item_id = "gate_d_exact_token_dsa_state_cache" if not adjudicated else "gate_d_s21_exact_tokens_adjudicated_dsa_state_cache"
-        gold = (
-            "Exact sealed raw-token prefix, executing-program DSA set/ties, state/cache/HLO/HBM/XPlane and protected wall."
-            if not adjudicated
-            else "Exact sealed raw-token prefix; within-engine DSA order/ties; cross-oracle DSA exact at event 0 and equal to the "
-            "pre-registered adjudicated divergence at the first divergent event, later events recorded; state/cache/HLO/HBM/XPlane and protected wall."
-        )
+        env = _run_environment(summary)
+        note, item_id, gold = _run_rows(summary)
         cursor = connection.execute(
             "INSERT INTO runs(created_utc,model,model_revision,harness_git,fork_git,env_json,pod,note) VALUES (?,?,?,?,?,?,?,?)",
             (
@@ -1192,23 +1212,7 @@ def _rollback_db(args: argparse.Namespace) -> int:
     ).hexdigest() or summary.get("status") != "SUCCESS":
         raise SystemExit("WS32 DB rollback summary drifted")
     benchmark = f"greenfield_78layer_{summary['context_label']}_ws32"
-    expected_env = {
-        "GLM_ENGINE": "greenfield_ws32_2d",
-        "checkpoint_manifest_sha256": summary["checkpoint_manifest_sha256"],
-        "checkpoint_success_sha256": summary["checkpoint_success_sha256"],
-        "code_hash": summary["code_hash"],
-        "context_label": summary["context_label"],
-        "dsa_oracle_manifest_sha256": summary["dsa_oracle_manifest_sha256"],
-        "dsa_oracle_success_sha256": summary["dsa_oracle_success_sha256"],
-        "mesh_sha256": summary["mesh_sha256"],
-        "plan": "WS32_2D",
-        "run_tag": summary["run_tag"],
-        "token_oracle_manifest_sha256": summary["token_oracle_manifest_sha256"],
-        "token_oracle_success_sha256": summary["token_oracle_success_sha256"],
-        "xla_python_client_mem_fraction": summary[
-            "xla_python_client_mem_fraction"
-        ],
-    }
+    expected_env = _run_environment(summary)
     linked_run_id = None
     if args.db_link.exists():
         link = json.loads(args.db_link.read_text(encoding="utf-8"))
@@ -1258,12 +1262,13 @@ def _rollback_db(args: argparse.Namespace) -> int:
             (run_id,),
         ).fetchall()
         created = run[1]
+        expected_note, expected_item_id, expected_gold = _run_rows(summary)
         expected_item = (
             benchmark,
-            "gate_d_exact_token_dsa_state_cache",
+            expected_item_id,
             created,
             f"Execute sealed {summary['context_label']} prompt through the complete WS32 decoder.",
-            "Exact sealed raw-token prefix, executing-program DSA set/ties, state/cache/HLO/HBM/XPlane and protected wall.",
+            expected_gold,
             json.dumps(summary, sort_keys=True),
             json.dumps(summary["observed_generated_token_ids"]),
             1,
@@ -1293,7 +1298,7 @@ def _rollback_db(args: argparse.Namespace) -> int:
                 "oracle-only",
                 json.dumps(expected_env, sort_keys=True),
                 "db-v4-64-od",
-                "Protected complete WS32 short-context decoder: exact tokens/DSA/state/cache/HLO/HBM/XPlane and profiler-free wall.",
+                expected_note,
             )
             or item != [expected_item]
             or final != [expected_final]

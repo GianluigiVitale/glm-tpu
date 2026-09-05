@@ -258,3 +258,20 @@ def test_ws32_sealer_binds_alarm_acknowledgement_and_states_adjudicated_basis() 
     assert module._later_event_alarm_summary(
         [{"adjudication": {"alarm_events": [], "recorded_divergence_sizes": []}}], producers
     ) is None
+
+
+def test_ws32_wrapper_recovery_archives_the_stale_source_ledger() -> None:
+    """A failed post-materialization attempt leaves a ledger bound to the old
+    recovery pin; recovery must move it aside instead of refusing forever."""
+    root = Path(__file__).resolve().parents[3]
+    wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
+    start = wrapper.index("archive_failed_publication() {")
+    body = wrapper[start : wrapper.index("\n}\n", start)]
+    assert 'with_ledger == with_ledger && -e $RUN_DIR/source_remote_objects.json' in body
+    # Only the recovery-start call site moves the ledger; on_exit keeps it as
+    # rollback authority for a later attempt.
+    assert wrapper.count("archive_failed_publication with_ledger") == 1
+    assert wrapper.index("archive_failed_publication with_ledger\nfi") < wrapper.index(
+        'say "materializing generation-pinned all-host evidence'
+    )
+    assert "a prior terminal SUCCESS verification exists; refusing recovery" in wrapper

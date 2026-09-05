@@ -262,6 +262,7 @@ archive_upload_started=0
 success_upload_started=0
 terminal_success_verified=0
 success_absent=1
+db_rollback_failed=0
 rollback_success() {
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
     "$RUN_DIR/SUCCESS" "$REMOTE_PREFIX" <<'PY'
@@ -330,7 +331,14 @@ rollback_recovery_seed() {
     --remote-prefix "$REMOTE_PREFIX"
 }
 archive_failed_publication() {
-  local destination="$RUN_DIR/recovery_failures/$(date -u +%Y%m%dT%H%M%S%NZ)"
+  # $1 == with_ledger: only at recovery start, after rollback_remote_nonterminal
+  # has proven the remote set equals the stale ledger.  The ledger binds the
+  # recovery pin, so a ledger written by a failed attempt is preserved here and
+  # regenerated against the same generation-pinned objects.  on_exit never
+  # moves it: a later attempt needs it as rollback authority.
+  local with_ledger=${1:-}
+  local destination
+  destination="$RUN_DIR/recovery_failures/$(date -u +%Y%m%dT%H%M%S%NZ)"
   mkdir -p "$destination"
   for name in summary.json validate.log census_post.txt census_recovery_pre.txt \
     materialize.log results.db db_link.json db_publish.log remote_objects.json \
@@ -338,6 +346,9 @@ archive_failed_publication() {
     recovery_publish.log; do
     [[ ! -e $RUN_DIR/$name ]] || mv "$RUN_DIR/$name" "$destination/$name"
   done
+  if [[ $with_ledger == with_ledger && -e $RUN_DIR/source_remote_objects.json ]]; then
+    mv "$RUN_DIR/source_remote_objects.json" "$destination/source_remote_objects.json"
+  fi
 }
 on_exit() {
   local status=$?
@@ -356,9 +367,11 @@ on_exit() {
     rollback_recovery_seed || say "ABORT: recovery seed objects could not be removed"
   fi
   if [[ $status -ne 0 && $db_published -eq 1 && $terminal_success_verified -eq 0 && $success_absent -eq 1 ]]; then
-    if rollback_db; then archive_failed_publication; fi
+    if rollback_db; then archive_failed_publication; else db_rollback_failed=1; fi
   fi
-  if [[ $status -ne 0 && ${RECOVER:-0} == 1 && $terminal_success_verified -eq 0 ]]; then
+  # A DB row that could not be rolled back keeps summary.json/db_link.json in
+  # place so the next recovery start can retry rollback_db with the link intact.
+  if [[ $status -ne 0 && ${RECOVER:-0} == 1 && $terminal_success_verified -eq 0 && $db_rollback_failed -eq 0 ]]; then
     archive_failed_publication
   fi
   if [[ $status -ne 0 && $terminal_success_verified -eq 0 ]]; then
@@ -386,9 +399,9 @@ if [[ $RECOVER == 1 ]]; then
   fi
   if [[ -e $RUN_DIR/db_link.json || -e $RUN_DIR/results.db ]]; then
     [[ -e $RUN_DIR/summary.json && -e $RUN_DIR/db_link.json ]]
-    rollback_db
+    rollback_db || { db_rollback_failed=1; exit 1; }
   fi
-  archive_failed_publication
+  archive_failed_publication with_ledger
 fi
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \

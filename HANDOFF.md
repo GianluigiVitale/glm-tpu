@@ -12533,3 +12533,30 @@ Delta verdict (`ws32-8k-alarm-ack-fable-delta-verdict.txt`, `ea2a55db…5644`): 
 lessons entry abbreviated the run tag, so the new binding check would have refused the seal) fixed by
 writing the full tag; P2 B2 (note wording conditional on an alarm) and B3 (recovery hash format
 check) fixed; B4 accepted; B5 satisfied by committing, pushing and mirroring before sealing.
+
+## 2026-09-05 — recovery seal refused on a stale source ledger; two publication-path fixes
+
+The first recovery-mode seal of `greenfield_ws32_short_decoder_8k_numerical_20260905T085534575653049Z`
+(09:55Z, recovery pin `de0e873`) failed in the materializer with "source ledger already exists with
+different bytes". Cause: the completed run wrote `source_remote_objects.json` with
+`recovery_code_hash` = its own pin `4286509…`; recovery legitimately rebinds the same 128
+generation-pinned objects under the new HEAD, so only `recovery_code_hash`/`ledger_sha256` differ,
+and `archive_failed_publication` never moved the stale ledger aside (second occurrence: the same
+failure was resolved by hand on 2026-08-26 for the 8K acquisition). Remote holds only the 128 fleet
+objects; no DB row, no SUCCESS; the local `recovery_failures/` directories retain the first attempt's
+alarm refusal (`validate.log`) and materialize logs. Fix (Fable-reviewed): the recovery-start call
+`archive_failed_publication with_ledger` quarantines the stale ledger under `recovery_failures/<ts>/`
+only after `rollback_remote_nonterminal` has proven the remote set equals it; `on_exit` never moves the
+ledger, so a failed attempt keeps its rollback authority (reviewer P2). Reviewer P1: the behavioural
+quarantine test asserted the old invariant; it now exercises both call sites. Reviewer P2 (pre-existing,
+since `1c1cb1f`): the sealer tests were red because fixtures lacked the dense-overlay keys; refreshing
+them exposed a real latent defect — `_rollback_db` matched an `env_json` identity that `_publish_db`
+had outgrown (`strategy_nd_dense*`, `checkpoint_transport`, `classification`, `dsa_adjudication`,
+`later_event_alarm`, `recovery_code_hash`), so a post-publication failure would have left the DB row
+in place ("did not resolve one exact run"). Both now derive the identity from one `_run_environment`.
+Delta review found the second half: rollback also hard-coded the non-adjudicated `note`/`item_id`/`gold`,
+so a §21-adjudicated row (the pending 8K seal) would have been refused as "nonexact"; publication and
+rollback now share `_run_rows`, and an adjudicated publish→rollback test covers it. Reviewer P2: in
+recovery mode `on_exit` no longer archives `summary.json`/`db_link.json` when `rollback_db` failed, so
+the next recovery start can retry the rollback with the link intact. WS32 suites: 39 passed.
+A second consecutive `rollback_db` failure at recovery start now exits with the link kept (`db_rollback_failed=1`). `census_failure_exit.txt` is still overwritten per failure (reviewer P3, open).

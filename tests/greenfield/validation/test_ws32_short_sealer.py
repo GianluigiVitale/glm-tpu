@@ -50,6 +50,8 @@ def _graph() -> dict[str, object]:
         "passed": True,
         "rounded_first_rmsnorm_collective_count": 0,
         "stablehlo_sha256": "1" * 64,
+        "strategy_nd_dense_expert_gather_count": 0,
+        "strategy_nd_dense_hidden_gather_count": 0,
         "violations": [],
     }
 
@@ -120,6 +122,8 @@ def test_ws32_short_db_publication_is_one_transaction(tmp_path: Path) -> None:
         "run_tag": "greenfield_ws32_short_decoder_2k_20260815T000000000000000Z",
         "status": "SUCCESS",
         "steady_wall_tokens_per_second": 10.0,
+        "strategy_nd_dense": False,
+        "strategy_nd_dense_overlay_manifest_sha256": "0" * 64,
         "token_oracle_manifest_sha256": "6" * 64,
         "token_oracle_success_sha256": "8" * 64,
         "verified_generated_token_count": 3,
@@ -159,6 +163,74 @@ def test_ws32_short_db_publication_is_one_transaction(tmp_path: Path) -> None:
             db_link=output,
             results_db=results_db,
         )
+    ) == 0
+    connection = provenance.connect(str(results_db))
+    try:
+        assert connection.execute("SELECT COUNT(*) FROM runs").fetchone() == (0,)
+        assert connection.execute("SELECT COUNT(*) FROM items").fetchone() == (0,)
+        assert connection.execute("SELECT COUNT(*) FROM summary").fetchone() == (0,)
+    finally:
+        connection.close()
+
+
+def test_ws32_short_db_rollback_resolves_the_adjudicated_row(tmp_path: Path) -> None:
+    """The §21 adjudicated publication writes a different note/item_id/gold and
+    extra env keys; rollback must derive the same identity or the row is orphaned."""
+    results_db = tmp_path / "results.db"
+    provenance.connect(str(results_db)).close()
+    summary = {
+        "artifact_kind": "greenfield_ws32_short_decoder_fleet",
+        "checkpoint_manifest_sha256": "1" * 64,
+        "checkpoint_success_sha256": "2" * 64,
+        "checkpoint_transport": "shm",
+        "classification": "EXACT_TOKENS;DSA_EVENT0_EXACT;LATER_EVENTS_RECORDED_NOT_ADJUDICATED",
+        "code_hash": "3" * 40,
+        "context_label": "8k",
+        "dsa_adjudication": {"event_index": 1, "record_sha256": "9" * 64},
+        "dsa_oracle_manifest_sha256": "4" * 64,
+        "dsa_oracle_success_sha256": "7" * 64,
+        "later_event_alarm": {"acknowledged": True, "alarmed_steps": [0, 1]},
+        "mesh_sha256": "5" * 64,
+        "mode": "numerical",
+        "observed_generated_token_ids": [7, 8, 9],
+        "observed_generated_token_count": 3,
+        "p50_ms_per_token": 130.0,
+        "recovery_code_hash": "a" * 40,
+        "run_tag": "greenfield_ws32_short_decoder_8k_numerical_20260905T000000000000000Z",
+        "status": "SUCCESS",
+        "steady_wall_tokens_per_second": 7.6,
+        "strategy_nd_dense": False,
+        "strategy_nd_dense_overlay_manifest_sha256": "0" * 64,
+        "token_oracle_manifest_sha256": "6" * 64,
+        "token_oracle_success_sha256": "8" * 64,
+        "verified_generated_token_count": 3,
+        "xla_python_client_mem_fraction": ".95",
+    }
+    summary["summary_sha256"] = sha256(SEALER._canonical(summary)).hexdigest()
+    summary_path = tmp_path / "summary.json"
+    summary_path.write_text(json.dumps(summary), encoding="utf-8")
+    output = tmp_path / "db_link.json"
+    assert SEALER._publish_db(
+        SimpleNamespace(
+            summary=summary_path,
+            results_db=results_db,
+            snapshot=tmp_path / "snapshot.db",
+            output=output,
+        )
+    ) == 0
+    connection = provenance.connect(str(results_db))
+    try:
+        note = connection.execute("SELECT note FROM runs").fetchone()[0]
+        item_id = connection.execute("SELECT item_id FROM items").fetchone()[0]
+        env = json.loads(connection.execute("SELECT env_json FROM runs").fetchone()[0])
+    finally:
+        connection.close()
+    assert "spec §21" in note and "alarm acknowledged" in note
+    assert item_id == "gate_d_s21_exact_tokens_adjudicated_dsa_state_cache"
+    assert env["recovery_code_hash"] == "a" * 40 and env["checkpoint_transport"] == "shm"
+    # With the link present the rollback must resolve exactly this run.
+    assert SEALER._rollback_db(
+        SimpleNamespace(summary=summary_path, db_link=output, results_db=results_db)
     ) == 0
     connection = provenance.connect(str(results_db))
     try:
@@ -721,9 +793,31 @@ def test_ws32_recovery_quarantines_derived_outputs_only(tmp_path: Path) -> None:
     )
     assert not (tmp_path / "summary.json").exists()
     assert not (tmp_path / "validate.log").exists()
+    # on_exit archives derived outputs only: the ledger stays as rollback
+    # authority for the next attempt.
     assert (tmp_path / "source_remote_objects.json").read_text() == "source"
     quarantined = list((tmp_path / "recovery_failures").glob("*/summary.json"))
     assert len(quarantined) == 1 and quarantined[0].read_text() == "summary"
+    # Recovery start (after the remote set was proven equal to the stale
+    # ledger) quarantines the ledger too, so it is regenerated under the new
+    # recovery pin instead of refusing forever with different bytes.
+    (tmp_path / "validate.log").write_text("validate2", encoding="utf-8")
+    subprocess.run(
+        [
+            "bash",
+            "-c",
+            f"RUN_DIR=$1; {function}; archive_failed_publication with_ledger",
+            "ws32-recovery-quarantine-ledger",
+            str(tmp_path),
+        ],
+        check=True,
+    )
+    assert not (tmp_path / "source_remote_objects.json").exists()
+    ledgers = list(
+        (tmp_path / "recovery_failures").glob("*/source_remote_objects.json")
+    )
+    assert len(ledgers) == 1 and ledgers[0].read_text() == "source"
+    assert len(list((tmp_path / "recovery_failures").glob("*/validate.log"))) == 2
 
 
 def test_ws32_verified_success_refuses_before_cleanup_trap(tmp_path: Path) -> None:
