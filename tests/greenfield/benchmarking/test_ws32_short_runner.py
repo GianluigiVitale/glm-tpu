@@ -457,3 +457,23 @@ def test_ws32_capacity_and_rotary_diagnostic_are_declared_and_bound() -> None:
     sealer = sealer_path.read_text(encoding="utf-8")
     assert '"rotary_diagnostic",' in sealer and "ROTARY_LONG_POSITION_DIAGNOSTIC_" in sealer and "CAPACITY_MEASUREMENT_" in sealer
 
+
+def test_ws32_evidence_layout_v2_is_declared_end_to_end() -> None:
+    """Storage plan 2026-09-05 (Proposal A): one gzip per graph/form uploaded
+    redundantly by every rank with --no-clobber and CRC-matched tolerance; the
+    record declares the layout; the wrapper refuses launches without storage
+    headroom."""
+    from glm_tpu.greenfield.validation import ws32_evidence
+
+    root = Path(__file__).resolve().parents[3]
+    wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
+    runner = (root / "scripts/greenfield/run_short_decoder_ws32.py").read_text(encoding="utf-8")
+    sealer = (root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8")
+    assert '"evidence_layout": EVIDENCE_LAYOUT_V2,' in runner and '"evidence_layout": EVIDENCE_LAYOUT_V2,' in sealer
+    assert 'record.get("evidence_layout") != EVIDENCE_LAYOUT_V2' in sealer and '"evidence_layout",' in sealer
+    assert "upload_shared(){" in wrapper and 'gzip -n -9 -c "$hlo/$graph.$form"' in wrapper
+    assert '"$remote/hlo/${graph}.${form}.gz"' in wrapper and ".rank${idx}.stablehlo.mlir" not in wrapper
+    assert "STORAGE_CEILING_BYTES=2000000000000" in wrapper and "STORAGE_RESERVE_BYTES=6000000000" in wrapper
+    assert "live storage plus reserve exceeds the ceiling" in wrapper
+    assert ws32_evidence.EVIDENCE_LAYOUT_V2 == "hlo_single_gzip_v2"
+

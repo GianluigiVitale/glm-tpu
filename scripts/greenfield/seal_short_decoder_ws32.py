@@ -39,6 +39,7 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
 from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
     build_ws32_physical_mesh,
 )
+from glm_tpu.greenfield.validation.ws32_evidence import EVIDENCE_LAYOUT_V2  # noqa: E402
 from glm_tpu.greenfield.validation import (  # noqa: E402
     bind_ws32_adjudication,
     compare_ws32_dsa_step,
@@ -545,6 +546,7 @@ def _validate(args: argparse.Namespace) -> int:
         "dsa_oracle_success_sha256",
         "dsa_association_summary_sha256",
         "dsa_association_success_sha256",
+        "evidence_layout",
         "exact_dsa",
         "graphs",
         "hostname",
@@ -617,6 +619,8 @@ def _validate(args: argparse.Namespace) -> int:
             raise SystemExit(f"WS32 fleet/process/HLO identity drifted at rank {rank}")
         if record.get("prompt_length") != expected_prompt_length:
             raise SystemExit(f"WS32 prompt length drifted at rank {rank}")
+        if record.get("evidence_layout") != EVIDENCE_LAYOUT_V2:
+            raise SystemExit(f"WS32 evidence layout drifted at rank {rank}")
         _require_prefill_execution(
             record,
             mode=args.mode,
@@ -982,6 +986,7 @@ def _validate(args: argparse.Namespace) -> int:
         },
         "checkpoint_transport": args.checkpoint_transport,
         "dsa_adjudication": expected_dsa_adjudication,
+        "evidence_layout": EVIDENCE_LAYOUT_V2,
         "mode": args.mode,
         "performance_claim": args.mode == "numerical",
         "recovery_code_hash": args.recovery_code_hash or None,

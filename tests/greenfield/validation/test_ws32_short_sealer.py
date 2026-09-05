@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+
+import pytest
 from types import SimpleNamespace
 
 import bench.provenance as provenance
@@ -356,9 +358,19 @@ def test_ws32_evidence_primary_object_schema_is_exact() -> None:
         "log",
     )
     # Spec §23.2: five base graphs (prefill_chunk, prefill_tail, observer,
-    # decode, cache_probe) x 8 ranks x 2 HLO forms = 80, plus 16 host records.
+    # decode, cache_probe) x 8 ranks x 2 HLO forms = 80, plus 16 host records
+    # (layout v1); layout v2 uploads one gzip per graph/form: 10 + 16 = 26.
     assert len(acquired) == 96
     assert len(numerical) == 112
+    v2 = ws32_evidence.EVIDENCE_LAYOUT_V2
+    assert len(ws32_evidence._expected_primary_names(numerical=False, layout=v2)) == 26
+    assert len(ws32_evidence._expected_primary_names(numerical=True, layout=v2)) == 42
+    assert len(ws32_evidence._expected_primary_names(numerical=True, exact_dsa=True, layout=v2)) == 46
+    assert {n for n in ws32_evidence._expected_primary_names(numerical=False, layout=v2) if n.startswith("hlo/")} == {
+        f"hlo/{g}.{s}.gz" for g in ws32_evidence.BASE_GRAPHS for s, _ in ws32_evidence.HLO_FORMS
+    }
+    with pytest.raises(SystemExit, match="unknown WS32 evidence layout"):
+        ws32_evidence._expected_primary_names(numerical=False, layout="v9")
     assert {name.split("/")[1].split(".")[0] for name in acquired if name.startswith("hlo/")} == {
         "prefill_chunk", "prefill_tail", "observer", "decode", "cache_probe"
     }
@@ -392,20 +404,23 @@ def test_ws32_acquisition_materializes_without_numerical_npz(
     remote = tmp_path / "remote"
     run_dir = tmp_path / "run"
     prefix = "results/acquire"
+    import gzip
+
     graph_records: dict[str, dict[str, str]] = {}
     for graph in ws32_evidence.GRAPHS:
         graph_records[graph] = {}
         for suffix, sha_key in ws32_evidence.HLO_FORMS:
             raw = f"{graph}:{suffix}\n".encode()
             graph_records[graph][sha_key] = sha256(raw).hexdigest()
-            for rank in ws32_evidence.RANKS:
-                path = remote / "hlo" / f"{graph}.rank{rank}.{suffix}"
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(raw)
+            # Layout v2: one gzip object per graph/form, rank-agnostic name.
+            path = remote / "hlo" / f"{graph}.{suffix}.gz"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(gzip.compress(raw, mtime=0))
     for rank in ws32_evidence.RANKS:
         record = {
             "code_hash": "a" * 40,
             "compile_only": True,
+            "evidence_layout": ws32_evidence.EVIDENCE_LAYOUT_V2,
             "exact_dsa": False,
             "graphs": graph_records,
             "launch_process_id": rank,
@@ -460,9 +475,19 @@ def test_ws32_acquisition_materializes_without_numerical_npz(
         output=output,
     )
     names = {item["name"] for item in result["objects"]}
-    assert names == ws32_evidence._expected_primary_names(numerical=False)
+    assert names == ws32_evidence._expected_primary_names(
+        numerical=False, layout=ws32_evidence.EVIDENCE_LAYOUT_V2
+    )
+    assert result["evidence_layout"] == ws32_evidence.EVIDENCE_LAYOUT_V2
     assert not any(name.endswith(".npz") for name in names)
-    assert len(list((run_dir / "fleet_hlo").iterdir())) == 80
+    # 10 compressed objects + 5 graphs x 8 ranks x 2 forms inflated/hard-linked.
+    assert len(list((run_dir / "fleet_hlo").iterdir())) == 10 + 80
+    for graph in ws32_evidence.GRAPHS:
+        for suffix, sha_key in ws32_evidence.HLO_FORMS:
+            inflated = run_dir / "fleet_hlo" / f"{graph}.rank3.{suffix}"
+            assert sha256(inflated.read_bytes()).hexdigest() == graph_records[graph][sha_key]
+            gz = [o for o in result["objects"] if o["name"] == f"hlo/{graph}.{suffix}.gz"][0]
+            assert gz["inflated_sha256"] == graph_records[graph][sha_key]
 
     for rank in ws32_evidence.RANKS:
         path = (
@@ -491,7 +516,9 @@ def test_ws32_acquisition_materializes_without_numerical_npz(
     }
     assert recovered["recovered_prevalidation"] is True
     assert {item["name"] for item in recovered["objects"]} == (
-        ws32_evidence._expected_primary_names(numerical=False)
+        ws32_evidence._expected_primary_names(
+            numerical=False, layout=ws32_evidence.EVIDENCE_LAYOUT_V2
+        )
         | recovery_names
     )
 

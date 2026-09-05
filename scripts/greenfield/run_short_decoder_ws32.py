@@ -57,6 +57,7 @@ from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
     build_ws32_physical_mesh,
 )
 from glm_tpu.greenfield.types import ModelGeometry  # noqa: E402
+from glm_tpu.greenfield.validation.ws32_evidence import EVIDENCE_LAYOUT_V2  # noqa: E402
 from glm_tpu.greenfield.validation import (  # noqa: E402
     compare_ws32_dsa_step,
     bind_ws32_adjudication,
@@ -1096,6 +1097,7 @@ def main() -> int:
         "device_memory_after_load": list(device_memory_after_load),
         "device_memory_before_load": list(device_memory_before_load),
         "dsa_adjudication": dsa_adjudication_record,
+        "evidence_layout": EVIDENCE_LAYOUT_V2,
         "dsa_oracle_manifest_sha256": oracle.dsa_manifest["manifest_sha256"],
         "dsa_oracle_success_sha256": oracle.dsa_success_sha256,
         "dsa_association_summary_sha256": (
