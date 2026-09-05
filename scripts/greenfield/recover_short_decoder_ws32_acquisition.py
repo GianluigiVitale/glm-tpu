@@ -33,7 +33,8 @@ from glm_tpu.greenfield.benchmarking.ws32_decoder import (
 GRAPHS = (
     "exact_materialize",
     "exact_promote",
-    "prefill",
+    "prefill_chunk",
+    "prefill_tail",
     "observer",
     "decode",
     "cache_probe",
@@ -62,11 +63,20 @@ ORIGINAL_VIOLATIONS = {
         *IDENTITY_VIOLATIONS,
         "optimized HLO reconstructs a full-pod hidden value",
     ),
-    "prefill": (
+    "prefill_chunk": (
+        *IDENTITY_VIOLATIONS,
+        "optimized HLO reconstructs a full-pod hidden value",
+    ),
+    "prefill_tail": (
         *IDENTITY_VIOLATIONS,
         "optimized HLO reconstructs a full-pod hidden value",
     ),
 }
+
+
+def _linter_kind(graph: str) -> str:
+    """Both prefill programs (chunk and tail) carry the ``prefill`` HLO contract."""
+    return "prefill" if graph.startswith("prefill") else graph
 
 
 def _canonical(value: object) -> bytes:
@@ -141,7 +151,7 @@ def _replay_graphs(run_dir: Path) -> dict[str, dict[str, Any]]:
                 expected_stablehlo_sha256="0" * 64,
                 expected_optimized_hlo_sha256="0" * 64,
                 hidden_size=6144,
-                kind=graph,
+                kind=_linter_kind(graph),
                 exact_dsa=True,
                 full_indexer_count=21,
             )

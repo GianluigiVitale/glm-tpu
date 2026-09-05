@@ -46,7 +46,9 @@ from glm_tpu.greenfield.runtime import (  # noqa: E402
     bind_ws32_decoder_weights,
     build_ws32_decoder_program,
     build_ws32_exact_dsa_materializer_program,
-    build_ws32_teacher_forced_prefill_program,
+    build_ws32_chunked_prefill_program,
+    make_ws32_repaired_index_buffer,
+    ws32_prefill_chunk_plan,
     make_ws32_initial_state,
     select_ws32_exact_dsa_raw_weights,
     ws32_decoder_weight_names,
@@ -99,7 +101,8 @@ def parse_args() -> argparse.Namespace:
     for graph in (
         "exact-materialize",
         "exact-promote",
-        "prefill",
+        "prefill-chunk",
+        "prefill-tail",
         "observer",
         "decode",
         "cache-probe",
@@ -110,6 +113,11 @@ def parse_args() -> argparse.Namespace:
         parser.add_argument(
             f"--expected-{graph}-optimized-hlo-sha256", required=True
         )
+    # Spec §23.2: the exact prefill runs as fixed-length chunks plus one tail
+    # program so the graph set is the same for every prompt length and the
+    # host can project the prefill wall and abort fail-closed.
+    parser.add_argument("--prefill-chunk", type=int, required=True)
+    parser.add_argument("--prefill-budget-seconds", type=float, required=True)
     parser.add_argument("--context-capacity", required=True, type=int)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--tensor-output", required=True, type=Path)
@@ -328,6 +336,11 @@ def _weight_name_leaves(value: object) -> tuple[str, ...]:
     raise TypeError("WS32 runner weight-name tree contains a non-string leaf")
 
 
+def _linter_kind(graph: str) -> str:
+    """Both prefill programs are lint-checked under the ``prefill`` contract."""
+    return "prefill" if graph.startswith("prefill") else graph
+
+
 def _write_graph(
     *,
     graph: str,
@@ -352,7 +365,7 @@ def _write_graph(
         expected_stablehlo_sha256=expected_stable,
         expected_optimized_hlo_sha256=expected_optimized,
         hidden_size=hidden_size,
-        kind=graph,
+        kind=_linter_kind(graph),
         exact_dsa=exact_dsa,
         strategy_nd_dense=strategy_nd_dense,
     )
@@ -401,7 +414,7 @@ def _require_acquisition_authorized(
     *,
     exact_dsa: bool,
 ) -> None:
-    expected = {"cache_probe", "decode", "observer", "prefill"}
+    expected = {"cache_probe", "decode", "observer", "prefill_chunk", "prefill_tail"}
     if exact_dsa:
         expected.update({"exact_materialize", "exact_promote"})
     if set(graphs) != expected:
@@ -772,54 +785,159 @@ def main() -> int:
         del raw_exact_weights
         gc.collect()
     program = build_ws32_decoder_program(mesh, config)
-    prefill_program = build_ws32_teacher_forced_prefill_program(
-        mesh,
-        config,
-        prompt_length=int(oracle.prompt_token_ids.size),
+    prompt_length = int(oracle.prompt_token_ids.size)
+    full_chunks, tail_length = ws32_prefill_chunk_plan(
+        prompt_length, args.prefill_chunk
     )
-    prompt = _replicated(jax, mesh, oracle.prompt_token_ids)
     state = make_ws32_initial_state(mesh, config)
     initial_token = _replicated(jax, mesh, np.asarray([-1], dtype=np.int32))
-    prefill_jit = jax.jit(prefill_program.execute, donate_argnums=(1,))
-    prefill_inputs = (prompt, state, weights)
-    if exact_dsa_weights is not None:
-        prefill_inputs = (*prefill_inputs, exact_dsa_weights)
-    prefill_lowered = prefill_jit.lower(*prefill_inputs)
-    started = time.perf_counter()
-    prefill_compiled = prefill_lowered.compile()
-    compile_seconds["prefill"] = time.perf_counter() - started
-    compiled_memory["prefill"] = _compiled_memory(prefill_compiled)
-    graphs["prefill"], _, _ = _write_graph(
-        graph="prefill",
-        lowered=prefill_lowered,
-        compiled=prefill_compiled,
-        hlo_dir=args.hlo_dir,
-        expected_stable=args.expected_prefill_stablehlo_sha256,
-        expected_optimized=args.expected_prefill_optimized_hlo_sha256,
-        hidden_size=geometry.hidden_size,
-        exact_dsa=config.exact_dsa,
-        strategy_nd_dense=config.strategy_nd_dense,
-    )
-    _require_graph_authorized(
-        graphs["prefill"], compile_only=bool(args.compile_only)
-    )
+    repaired_buffer = make_ws32_repaired_index_buffer(mesh, config)
+    # Both prefill programs are compiled and pinned before any execution so an
+    # acquisition preserves the complete graph set and a numerical run never
+    # discovers a tail-program refusal after hours of chunk scanning.
+    prefill_programs: dict[str, Any] = {}
+    prefill_compiled: dict[str, Any] = {}
+    prefill_lowered: dict[str, Any] = {}
+    prefill_jits: dict[str, Any] = {}
+    donate = (1, 4) if exact_dsa_weights is not None else (1, 3)
+    for graph, length in (
+        ("prefill_chunk", args.prefill_chunk),
+        ("prefill_tail", tail_length),
+    ):
+        prefill_programs[graph] = build_ws32_chunked_prefill_program(
+            mesh, config, chunk_length=length
+        )
+        prefill_jits[graph] = jax.jit(
+            prefill_programs[graph].execute, donate_argnums=donate
+        )
+        # Shape-only placeholder: the 2K prompt (2,034 tokens) is shorter than
+        # the default chunk, and trace values are irrelevant to lowering.
+        chunk_ids = _replicated(jax, mesh, np.zeros(length, dtype=np.int32))
+        inputs = (chunk_ids, state, weights)
+        if exact_dsa_weights is not None:
+            inputs = (*inputs, exact_dsa_weights)
+        inputs = (*inputs, repaired_buffer)
+        prefill_lowered[graph] = prefill_jits[graph].lower(*inputs)
+        started = time.perf_counter()
+        prefill_compiled[graph] = prefill_lowered[graph].compile()
+        compile_seconds[graph] = time.perf_counter() - started
+        compiled_memory[graph] = _compiled_memory(prefill_compiled[graph])
+        graphs[graph], _, _ = _write_graph(
+            graph=graph,
+            lowered=prefill_lowered[graph],
+            compiled=prefill_compiled[graph],
+            hlo_dir=args.hlo_dir,
+            expected_stable=getattr(args, f"expected_{graph}_stablehlo_sha256"),
+            expected_optimized=getattr(
+                args, f"expected_{graph}_optimized_hlo_sha256"
+            ),
+            hidden_size=geometry.hidden_size,
+            exact_dsa=config.exact_dsa,
+            strategy_nd_dense=config.strategy_nd_dense,
+        )
+        del chunk_ids
+    for graph in ("prefill_chunk", "prefill_tail"):
+        _require_graph_authorized(
+            graphs[graph], compile_only=bool(args.compile_only)
+        )
+    prefill_execution: dict[str, Any] | None = None
 
     if args.compile_only:
         observer_state = state
         observer_token = initial_token
     else:
-        prefill_result = prefill_compiled(*prefill_inputs)
-        jax.block_until_ready(prefill_result)
-        observer_state = prefill_result.state
-        observer_token = prefill_result.next_token
+        if not (args.prefill_budget_seconds > 0):
+            raise ValueError("WS32 numerical prefill requires a positive wall budget")
+        chunk_walls: list[float] = []
+        prefill_started = time.perf_counter()
+        current_state = state
+        current_buffer = repaired_buffer
+        next_token = initial_token
+        total_units = full_chunks + tail_length / args.prefill_chunk
+        projected_max = 0.0
+        for index in range(full_chunks):
+            chunk_ids = _replicated(
+                jax,
+                mesh,
+                oracle.prompt_token_ids[
+                    index * args.prefill_chunk : (index + 1) * args.prefill_chunk
+                ],
+            )
+            inputs = (chunk_ids, current_state, weights)
+            if exact_dsa_weights is not None:
+                inputs = (*inputs, exact_dsa_weights)
+            inputs = (*inputs, current_buffer)
+            chunk_started = time.perf_counter()
+            result = prefill_compiled["prefill_chunk"](*inputs)
+            jax.block_until_ready(result)
+            chunk_walls.append(time.perf_counter() - chunk_started)
+            current_state = result.state
+            current_buffer = result.repaired_index_local
+            next_token = result.next_token
+            del result, chunk_ids, inputs
+            # Fail closed on the projection, not on the worker timeout: the
+            # mean chunk wall so far, scaled to the whole prompt, must fit.
+            elapsed = time.perf_counter() - prefill_started
+            projected = elapsed / (index + 1) * total_units
+            projected_max = max(projected_max, projected)
+            print(
+                f"GREENFIELD_WS32_PREFILL_CHUNK {index + 1}/{full_chunks} "
+                f"wall_s={chunk_walls[-1]:.3f} projected_total_s={projected:.1f}",
+                flush=True,
+            )
+            if projected > args.prefill_budget_seconds:
+                raise RuntimeError(
+                    "WS32 prefill projection exceeds the wall budget: "
+                    f"{projected:.1f}s > {args.prefill_budget_seconds:.1f}s"
+                )
+        tail_ids = _replicated(
+            jax, mesh, oracle.prompt_token_ids[full_chunks * args.prefill_chunk :]
+        )
+        inputs = (tail_ids, current_state, weights)
+        if exact_dsa_weights is not None:
+            inputs = (*inputs, exact_dsa_weights)
+        inputs = (*inputs, current_buffer)
+        tail_started = time.perf_counter()
+        result = prefill_compiled["prefill_tail"](*inputs)
+        jax.block_until_ready(result)
+        tail_wall = time.perf_counter() - tail_started
+        current_state = result.state
+        current_buffer = result.repaired_index_local
+        next_token = result.next_token
+        del result, tail_ids, inputs
+        if config.exact_dsa:
+            # Install the exact M64-repaired prompt rows exactly once, after the
+            # last prompt step has scored the unrepaired rows (sealed semantics).
+            observer_state = current_state._replace(
+                index_cache_local=current_buffer
+            )
+        else:
+            observer_state = current_state
+        observer_token = next_token
+        prefill_execution = {
+            "budget_seconds": float(args.prefill_budget_seconds),
+            "chunk_length": int(args.prefill_chunk),
+            "chunk_wall_seconds": chunk_walls,
+            "full_chunks": int(full_chunks),
+            "projected_total_seconds_max": float(projected_max),
+            "repaired_index_installed": bool(config.exact_dsa),
+            "tail_length": int(tail_length),
+            "tail_wall_seconds": float(tail_wall),
+            "total_seconds": float(time.perf_counter() - prefill_started),
+        }
         state = None
-        del prefill_result
+        current_state = None
+        current_buffer = None
+        repaired_buffer = None
 
-    # The complete prefill executable is large and is never used again.  Do
-    # not retain three complete-model executables concurrently in 32 GiB HBM.
-    prefill_jit.clear_cache()
+    # The prefill executables are large and never used again.  Do not retain
+    # three complete-model executables concurrently in 32 GiB HBM.
+    for graph in ("prefill_chunk", "prefill_tail"):
+        prefill_jits[graph].clear_cache()
     del prefill_compiled
     del prefill_lowered
+    del prefill_jits
+    del prefill_programs
     gc.collect()
 
     observer_jit = jax.jit(program.observe, donate_argnums=(1,))
@@ -976,6 +1094,8 @@ def main() -> int:
         "load_seconds": load_seconds,
         "local_device_slots": list(local_device_slots),
         "mesh_sha256": physical_mesh.mesh_hash,
+        "prefill_chunk_length": int(args.prefill_chunk),
+        "prefill_execution": prefill_execution,
         "prompt_length": int(oracle.prompt_token_ids.size),
         "source_inventory_sha256": inventory.inventory_sha256,
         "strategy_nd_dense": config.strategy_nd_dense,

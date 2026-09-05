@@ -444,3 +444,41 @@ print(json.dumps({
         build_ws32_teacher_forced_prefill_program(
             object(), config, prompt_length=2048
         )
+
+
+def test_ws32_prefill_chunk_plan_always_has_a_tail_and_no_padding() -> None:
+    from glm_tpu.greenfield.runtime.ws32_decoder import (
+        ws32_prefill_chunk_plan,
+        ws32_repair_prompt_chunk,
+    )
+
+    assert ws32_prefill_chunk_plan(8155, 2048) == (3, 2011)
+    assert ws32_prefill_chunk_plan(2034, 2048) == (0, 2034)  # 2K profile: tail only
+    assert ws32_prefill_chunk_plan(8155, 512) == (15, 475)
+    assert ws32_prefill_chunk_plan(127363, 2048) == (62, 387)
+    assert ws32_prefill_chunk_plan(262144, 2048) == (127, 2048)
+    assert ws32_prefill_chunk_plan(5, 5) == (0, 5)
+    assert ws32_prefill_chunk_plan(1, 2048) == (0, 1)
+    for prompt_length in (1, 2, 511, 512, 513, 8155, 127363, 262144):
+        for chunk in (1, 64, 512, 2048):
+            full, tail = ws32_prefill_chunk_plan(prompt_length, chunk)
+            assert 1 <= tail <= chunk and full * chunk + tail == prompt_length
+    with pytest.raises(PlanValidationError):
+        ws32_prefill_chunk_plan(0, 2048)
+    with pytest.raises(PlanValidationError):
+        ws32_prefill_chunk_plan(2048, 0)
+    assert ws32_repair_prompt_chunk(2048) == 2048
+    assert ws32_repair_prompt_chunk(512) == 512
+    assert ws32_repair_prompt_chunk(387) == 448
+    assert ws32_repair_prompt_chunk(2011) == 2048
+    assert ws32_repair_prompt_chunk(4096) == 2048
+
+
+def test_ws32_chunked_prefill_builder_requires_capacity_and_mesh() -> None:
+    from glm_tpu.greenfield.runtime.ws32_decoder import build_ws32_chunked_prefill_program
+
+    config = Ws32DecoderConfig(geometry=_geometry(), context_capacity=2048)
+    with pytest.raises(PlanValidationError, match="leave decode capacity"):
+        build_ws32_chunked_prefill_program(object(), config, chunk_length=2048)
+    with pytest.raises(PlanValidationError, match="leave decode capacity"):
+        build_ws32_chunked_prefill_program(object(), config, chunk_length=0)

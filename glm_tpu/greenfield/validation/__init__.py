@@ -78,6 +78,11 @@ from .prompt_index_cache import (
     validate_prompt_index_key_probe_hlo,
     validate_prompt_projection_input_hlo,
 )
+from .long_context_oracle import (
+    LongContextOracleConfig,
+    capture_long_context_oracle,
+    inspect_long_context_oracle,
+)
 from .short_context_oracle import (
     ShortContextOracleConfig,
     capture_short_context_oracle,
@@ -142,7 +147,10 @@ __all__ = (
     "LegacyDsaInternalComparisonConfig",
     "LegacyPromptKeyInternalConfig",
     "LegacyPromptIndexCacheConfig",
+    "LongContextOracleConfig",
     "ShortContextOracleConfig",
+    "capture_long_context_oracle",
+    "inspect_long_context_oracle",
     "ShortContextDsaOracleConfig",
     "ShortContextLogprobOracleConfig",
     "Ws32AdjudicatedDivergence",

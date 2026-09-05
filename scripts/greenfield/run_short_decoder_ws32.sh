@@ -155,6 +155,21 @@ fi
 readonly TOKEN_ORACLE_ROOT=${TOKEN_ORACLE%/oracle}
 readonly DSA_ORACLE_ROOT=${DSA_ORACLE%/oracle}
 readonly CONTEXT_CAPACITY=8192
+# Spec §23.2: exact prefill runs as fixed chunks plus one tail program.  The
+# chunk length is a pinned run input (the equivalence record proves
+# C-independence at 2048 and 512); the wall budget bounds the projected
+# prefill so a run fails closed long before the worker timeout.
+PREFILL_CHUNK=${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-2048}
+[[ $PREFILL_CHUNK =~ ^[0-9]+$ && $PREFILL_CHUNK -ge 64 && $PREFILL_CHUNK -le 2048 && $((PREFILL_CHUNK % 64)) -eq 0 ]] || {
+  echo "WS32 prefill chunk must be a multiple of 64 in [64, 2048]" >&2
+  exit 2
+}
+readonly PREFILL_CHUNK
+readonly PREFILL_BUDGET_SECONDS=3600
+# A non-default chunk length is part of the run identity (spec §23.3 Step B
+# runs C=2048 and C=512): it appears in the tag and is cross-checked by the sealer.
+if [[ $PREFILL_CHUNK -eq 2048 ]]; then CHUNK_SUFFIX=; else CHUNK_SUFFIX=_c${PREFILL_CHUNK}; fi
+readonly CHUNK_SUFFIX
 readonly OBSERVER_STEPS=14
 readonly WARMUP=2
 readonly ITERATIONS=10
@@ -164,8 +179,10 @@ if [[ $MODE == acquire ]]; then
   EXACT_MATERIALIZE_OPTIMIZED_SHA=$ZERO_SHA
   EXACT_PROMOTE_STABLE_SHA=$ZERO_SHA
   EXACT_PROMOTE_OPTIMIZED_SHA=$ZERO_SHA
-  PREFILL_STABLE_SHA=$ZERO_SHA
-  PREFILL_OPTIMIZED_SHA=$ZERO_SHA
+  PREFILL_CHUNK_STABLE_SHA=$ZERO_SHA
+  PREFILL_CHUNK_OPTIMIZED_SHA=$ZERO_SHA
+  PREFILL_TAIL_STABLE_SHA=$ZERO_SHA
+  PREFILL_TAIL_OPTIMIZED_SHA=$ZERO_SHA
   OBSERVER_STABLE_SHA=$ZERO_SHA
   OBSERVER_OPTIMIZED_SHA=$ZERO_SHA
   DECODE_STABLE_SHA=$ZERO_SHA
@@ -184,8 +201,10 @@ else
     EXACT_PROMOTE_STABLE_SHA=$ZERO_SHA
     EXACT_PROMOTE_OPTIMIZED_SHA=$ZERO_SHA
   fi
-  PREFILL_STABLE_SHA=${GLM_GREENFIELD_WS32_PREFILL_STABLEHLO_SHA:?set acquired prefill StableHLO SHA}
-  PREFILL_OPTIMIZED_SHA=${GLM_GREENFIELD_WS32_PREFILL_OPTIMIZED_HLO_SHA:?set acquired prefill optimized HLO SHA}
+  PREFILL_CHUNK_STABLE_SHA=${GLM_GREENFIELD_WS32_PREFILL_CHUNK_STABLEHLO_SHA:?set acquired prefill-chunk StableHLO SHA}
+  PREFILL_CHUNK_OPTIMIZED_SHA=${GLM_GREENFIELD_WS32_PREFILL_CHUNK_OPTIMIZED_HLO_SHA:?set acquired prefill-chunk optimized HLO SHA}
+  PREFILL_TAIL_STABLE_SHA=${GLM_GREENFIELD_WS32_PREFILL_TAIL_STABLEHLO_SHA:?set acquired prefill-tail StableHLO SHA}
+  PREFILL_TAIL_OPTIMIZED_SHA=${GLM_GREENFIELD_WS32_PREFILL_TAIL_OPTIMIZED_HLO_SHA:?set acquired prefill-tail optimized HLO SHA}
   OBSERVER_STABLE_SHA=${GLM_GREENFIELD_WS32_OBSERVER_STABLEHLO_SHA:?set acquired observer StableHLO SHA}
   OBSERVER_OPTIMIZED_SHA=${GLM_GREENFIELD_WS32_OBSERVER_OPTIMIZED_HLO_SHA:?set acquired observer optimized HLO SHA}
   DECODE_STABLE_SHA=${GLM_GREENFIELD_WS32_DECODE_STABLEHLO_SHA:?set acquired decode StableHLO SHA}
@@ -193,7 +212,7 @@ else
   CACHE_PROBE_STABLE_SHA=${GLM_GREENFIELD_WS32_CACHE_PROBE_STABLEHLO_SHA:?set acquired cache-probe StableHLO SHA}
   CACHE_PROBE_OPTIMIZED_SHA=${GLM_GREENFIELD_WS32_CACHE_PROBE_OPTIMIZED_HLO_SHA:?set acquired cache-probe optimized HLO SHA}
 fi
-readonly PREFILL_STABLE_SHA PREFILL_OPTIMIZED_SHA OBSERVER_STABLE_SHA
+readonly PREFILL_CHUNK_STABLE_SHA PREFILL_CHUNK_OPTIMIZED_SHA PREFILL_TAIL_STABLE_SHA PREFILL_TAIL_OPTIMIZED_SHA OBSERVER_STABLE_SHA
 readonly EXACT_MATERIALIZE_STABLE_SHA EXACT_MATERIALIZE_OPTIMIZED_SHA
 readonly EXACT_PROMOTE_STABLE_SHA EXACT_PROMOTE_OPTIMIZED_SHA
 readonly OBSERVER_OPTIMIZED_SHA DECODE_STABLE_SHA DECODE_OPTIMIZED_SHA
@@ -205,9 +224,9 @@ if [[ $RECOVER == 1 ]]; then
   TAG=${GLM_GREENFIELD_WS32_SHORT_DECODER_TAG:?set the exact completed run tag}
 else
   PIN=$RECOVERY_PIN
-  TAG=${GLM_GREENFIELD_WS32_SHORT_DECODER_TAG:-greenfield_ws32_short_decoder_${CONTEXT}_${MODE}_$(date -u +%Y%m%dT%H%M%S%NZ)}
+  TAG=${GLM_GREENFIELD_WS32_SHORT_DECODER_TAG:-greenfield_ws32_short_decoder_${CONTEXT}_${MODE}${CHUNK_SUFFIX}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 fi
-[[ $TAG =~ ^greenfield_ws32_short_decoder_${CONTEXT}_${MODE}_[0-9]{8}T[0-9]{15}Z$ ]] || {
+[[ $TAG =~ ^greenfield_ws32_short_decoder_${CONTEXT}_${MODE}${CHUNK_SUFFIX}_[0-9]{8}T[0-9]{15}Z$ ]] || {
   echo "invalid WS32 short-decoder tag: $TAG" >&2
   exit 2
 }
@@ -536,7 +555,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching complete WS32 worker fleet coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; output="$run/runner.rank${idx}.json"; tensors="$run/runner.rank${idx}.npz"; hlo="$run/hlo"; trace="$run/trace"; log="$run/runner.rank${idx}.log"; mkdir -p "$run"; upload(){ local rc=0; [[ ! -f $output ]] || gcloud storage cp --no-clobber "$output" "$remote/host_records/runner.rank${idx}.json" >/dev/null 2>&1 || rc=1; [[ ! -f $tensors ]] || gcloud storage cp --no-clobber "$tensors" "$remote/host_records/runner.rank${idx}.npz" >/dev/null 2>&1 || rc=1; [[ ! -f $log ]] || gcloud storage cp --no-clobber "$log" "$remote/host_records/runner.rank${idx}.log" >/dev/null 2>&1 || rc=1; for graph in exact_materialize exact_promote prefill observer decode cache_probe; do [[ ! -f "$hlo/$graph.stablehlo.mlir" ]] || gcloud storage cp --no-clobber "$hlo/$graph.stablehlo.mlir" "$remote/hlo/${graph}.rank${idx}.stablehlo.mlir" >/dev/null 2>&1 || rc=1; [[ ! -f "$hlo/$graph.optimized_hlo.txt" ]] || gcloud storage cp --no-clobber "$hlo/$graph.optimized_hlo.txt" "$remote/hlo/${graph}.rank${idx}.optimized_hlo.txt" >/dev/null 2>&1 || rc=1; done; xplane=$(find "$trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); [[ -z $xplane ]] || gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || rc=1; return "$rc"; }; trap "upload || true" EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 14400 /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_short_decoder_ws32.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --topology-capture-root '"$TOPOLOGY_ROOT"' --checkpoint-root '"$CHECKPOINT_ROOT"' --source-inventory '"$INVENTORY"' --token-oracle-dir '"$TOKEN_ORACLE"' --dsa-oracle-dir '"$DSA_ORACLE"' --expected-code-hash '"$PIN"' --checkpoint-manifest-sha256 '"$CHECKPOINT_MANIFEST_SHA"' --checkpoint-success-sha256 '"$CHECKPOINT_SUCCESS_SHA"' --token-oracle-manifest-sha256 '"$TOKEN_ORACLE_SHA"' --dsa-oracle-manifest-sha256 '"$DSA_ORACLE_SHA"' --token-oracle-success-sha256 '"$TOKEN_ORACLE_SUCCESS_SHA"' --dsa-oracle-success-sha256 '"$DSA_ORACLE_SUCCESS_SHA"' --dsa-association-summary-sha256 '"$DSA_ASSOCIATION_SUMMARY_PIN"' --dsa-association-success-sha256 '"$DSA_ASSOCIATION_SUCCESS_PIN"' --topology-sha256 '"$TOPOLOGY_SHA"' --topology-fleet-sha256 '"$TOPOLOGY_FLEET_SHA"' --mesh-sha256 '"$MESH_SHA"' --expected-exact-materialize-stablehlo-sha256 '"$EXACT_MATERIALIZE_STABLE_SHA"' --expected-exact-materialize-optimized-hlo-sha256 '"$EXACT_MATERIALIZE_OPTIMIZED_SHA"' --expected-exact-promote-stablehlo-sha256 '"$EXACT_PROMOTE_STABLE_SHA"' --expected-exact-promote-optimized-hlo-sha256 '"$EXACT_PROMOTE_OPTIMIZED_SHA"' --expected-prefill-stablehlo-sha256 '"$PREFILL_STABLE_SHA"' --expected-prefill-optimized-hlo-sha256 '"$PREFILL_OPTIMIZED_SHA"' --expected-observer-stablehlo-sha256 '"$OBSERVER_STABLE_SHA"' --expected-observer-optimized-hlo-sha256 '"$OBSERVER_OPTIMIZED_SHA"' --expected-decode-stablehlo-sha256 '"$DECODE_STABLE_SHA"' --expected-decode-optimized-hlo-sha256 '"$DECODE_OPTIMIZED_SHA"' --expected-cache-probe-stablehlo-sha256 '"$CACHE_PROBE_STABLE_SHA"' --expected-cache-probe-optimized-hlo-sha256 '"$CACHE_PROBE_OPTIMIZED_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --compile-only '"$([[ $MODE == acquire ]] && echo 1 || echo 0)"' --exact-dsa '"$EXACT_DSA"' --checkpoint-transport '"$CHECKPOINT_TRANSPORT"''"$STRATEGY_ND_DENSE_CLI"''"$DSA_ADJUDICATION_CLI"' --observer-steps '"$OBSERVER_STEPS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --trace-steps '"$TRACE_STEPS"' --output "$output" --tensor-output "$tensors" --hlo-dir "$hlo" --trace-dir "$trace" >"$log" 2>&1; trap - EXIT; upload; echo "WS32_SHORT_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; output="$run/runner.rank${idx}.json"; tensors="$run/runner.rank${idx}.npz"; hlo="$run/hlo"; trace="$run/trace"; log="$run/runner.rank${idx}.log"; mkdir -p "$run"; upload(){ local rc=0; [[ ! -f $output ]] || gcloud storage cp --no-clobber "$output" "$remote/host_records/runner.rank${idx}.json" >/dev/null 2>&1 || rc=1; [[ ! -f $tensors ]] || gcloud storage cp --no-clobber "$tensors" "$remote/host_records/runner.rank${idx}.npz" >/dev/null 2>&1 || rc=1; [[ ! -f $log ]] || gcloud storage cp --no-clobber "$log" "$remote/host_records/runner.rank${idx}.log" >/dev/null 2>&1 || rc=1; for graph in exact_materialize exact_promote prefill_chunk prefill_tail observer decode cache_probe; do [[ ! -f "$hlo/$graph.stablehlo.mlir" ]] || gcloud storage cp --no-clobber "$hlo/$graph.stablehlo.mlir" "$remote/hlo/${graph}.rank${idx}.stablehlo.mlir" >/dev/null 2>&1 || rc=1; [[ ! -f "$hlo/$graph.optimized_hlo.txt" ]] || gcloud storage cp --no-clobber "$hlo/$graph.optimized_hlo.txt" "$remote/hlo/${graph}.rank${idx}.optimized_hlo.txt" >/dev/null 2>&1 || rc=1; done; xplane=$(find "$trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); [[ -z $xplane ]] || gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || rc=1; return "$rc"; }; trap "upload || true" EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 14400 /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_short_decoder_ws32.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --topology-capture-root '"$TOPOLOGY_ROOT"' --checkpoint-root '"$CHECKPOINT_ROOT"' --source-inventory '"$INVENTORY"' --token-oracle-dir '"$TOKEN_ORACLE"' --dsa-oracle-dir '"$DSA_ORACLE"' --expected-code-hash '"$PIN"' --checkpoint-manifest-sha256 '"$CHECKPOINT_MANIFEST_SHA"' --checkpoint-success-sha256 '"$CHECKPOINT_SUCCESS_SHA"' --token-oracle-manifest-sha256 '"$TOKEN_ORACLE_SHA"' --dsa-oracle-manifest-sha256 '"$DSA_ORACLE_SHA"' --token-oracle-success-sha256 '"$TOKEN_ORACLE_SUCCESS_SHA"' --dsa-oracle-success-sha256 '"$DSA_ORACLE_SUCCESS_SHA"' --dsa-association-summary-sha256 '"$DSA_ASSOCIATION_SUMMARY_PIN"' --dsa-association-success-sha256 '"$DSA_ASSOCIATION_SUCCESS_PIN"' --topology-sha256 '"$TOPOLOGY_SHA"' --topology-fleet-sha256 '"$TOPOLOGY_FLEET_SHA"' --mesh-sha256 '"$MESH_SHA"' --expected-exact-materialize-stablehlo-sha256 '"$EXACT_MATERIALIZE_STABLE_SHA"' --expected-exact-materialize-optimized-hlo-sha256 '"$EXACT_MATERIALIZE_OPTIMIZED_SHA"' --expected-exact-promote-stablehlo-sha256 '"$EXACT_PROMOTE_STABLE_SHA"' --expected-exact-promote-optimized-hlo-sha256 '"$EXACT_PROMOTE_OPTIMIZED_SHA"' --expected-prefill-chunk-stablehlo-sha256 '"$PREFILL_CHUNK_STABLE_SHA"' --expected-prefill-chunk-optimized-hlo-sha256 '"$PREFILL_CHUNK_OPTIMIZED_SHA"' --expected-prefill-tail-stablehlo-sha256 '"$PREFILL_TAIL_STABLE_SHA"' --expected-prefill-tail-optimized-hlo-sha256 '"$PREFILL_TAIL_OPTIMIZED_SHA"' --prefill-chunk '"$PREFILL_CHUNK"' --prefill-budget-seconds '"$PREFILL_BUDGET_SECONDS"' --expected-observer-stablehlo-sha256 '"$OBSERVER_STABLE_SHA"' --expected-observer-optimized-hlo-sha256 '"$OBSERVER_OPTIMIZED_SHA"' --expected-decode-stablehlo-sha256 '"$DECODE_STABLE_SHA"' --expected-decode-optimized-hlo-sha256 '"$DECODE_OPTIMIZED_SHA"' --expected-cache-probe-stablehlo-sha256 '"$CACHE_PROBE_STABLE_SHA"' --expected-cache-probe-optimized-hlo-sha256 '"$CACHE_PROBE_OPTIMIZED_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --compile-only '"$([[ $MODE == acquire ]] && echo 1 || echo 0)"' --exact-dsa '"$EXACT_DSA"' --checkpoint-transport '"$CHECKPOINT_TRANSPORT"''"$STRATEGY_ND_DENSE_CLI"''"$DSA_ADJUDICATION_CLI"' --observer-steps '"$OBSERVER_STEPS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --trace-steps '"$TRACE_STEPS"' --output "$output" --tensor-output "$tensors" --hlo-dir "$hlo" --trace-dir "$trace" >"$log" 2>&1; trap - EXIT; upload; echo "WS32_SHORT_OK $(hostname) rank=$idx"'
 launch_rc=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
   --command="$execute_command" >"$RUN_DIR/launch.txt" 2>&1 || launch_rc=$?
@@ -578,6 +597,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --recovery-code-hash "$RECOVERY_PIN" \
   ${LATER_EVENT_ALARM_CLI:+$LATER_EVENT_ALARM_CLI} \
   --checkpoint-transport "$CHECKPOINT_TRANSPORT" \
+  --prefill-chunk "$PREFILL_CHUNK" \
   --strategy-nd-dense "$STRATEGY_ND_DENSE" \
   --strategy-nd-dense-overlay-manifest-sha256 "$STRATEGY_ND_DENSE_OVERLAY_MANIFEST_SHA" \
   --strategy-nd-dense-overlay-manifest-file-sha256 "$STRATEGY_ND_DENSE_OVERLAY_MANIFEST_FILE_SHA" \
@@ -587,8 +607,10 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --expected-exact-materialize-optimized-hlo-sha256 "$EXACT_MATERIALIZE_OPTIMIZED_SHA" \
   --expected-exact-promote-stablehlo-sha256 "$EXACT_PROMOTE_STABLE_SHA" \
   --expected-exact-promote-optimized-hlo-sha256 "$EXACT_PROMOTE_OPTIMIZED_SHA" \
-  --expected-prefill-stablehlo-sha256 "$PREFILL_STABLE_SHA" \
-  --expected-prefill-optimized-hlo-sha256 "$PREFILL_OPTIMIZED_SHA" \
+  --expected-prefill-chunk-stablehlo-sha256 "$PREFILL_CHUNK_STABLE_SHA" \
+  --expected-prefill-chunk-optimized-hlo-sha256 "$PREFILL_CHUNK_OPTIMIZED_SHA" \
+  --expected-prefill-tail-stablehlo-sha256 "$PREFILL_TAIL_STABLE_SHA" \
+  --expected-prefill-tail-optimized-hlo-sha256 "$PREFILL_TAIL_OPTIMIZED_SHA" \
   --expected-observer-stablehlo-sha256 "$OBSERVER_STABLE_SHA" \
   --expected-observer-optimized-hlo-sha256 "$OBSERVER_OPTIMIZED_SHA" \
   --expected-decode-stablehlo-sha256 "$DECODE_STABLE_SHA" \

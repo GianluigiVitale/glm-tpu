@@ -16,15 +16,12 @@ bytes separately (3.681 TB retained expires per object, phase 1 ≈2026-09-11). 
 active direct PP16 (869.67 GB), 77.96-GB layer3, lineage/results/oracles/repos/evidence. Census
 2026-09-04: 1,945,027,232,816 live bytes.
 
-## Gate D (contract = spec §21, 2026-09-05)
+## Gate D (contract = spec §21) — CLOSED 2026-09-05 (§21.6)
 
-78-layer decoder at 8K: exact raw tokens vs sealed legacy oracle; within-engine exact DSA tie order
-vs canonical top-k of own scores; cross-oracle selected sets exact or boundary-explained with
-`eps` = oracle's own error vs an independent FP64 CPU reference, relative caps κ=2 on engine
-max/std, reference-band swap bound; bias rule |m_e| ≤ 2|m_o| + 3s/√n; first divergent event only; bounded
-internal tensors; exact cache/state structure; no repeated 32-chip layer collective; fresh trace,
-profiler-free wall, HBM, provenance, archive, 8/8 cleanup. Bit-exact legacy intermediate arithmetic
-is NOT required. Then plan adjudication, long contexts, §18.
+Exact raw tokens vs sealed legacy oracle; within-engine exact DSA order; cross-oracle sets exact or
+boundary-explained vs an FP64 reference (first divergent event only); exact cache/state; no repeated
+32-chip layer collective; fresh trace, profiler-free wall, HBM, archive, 8/8 cleanup. Bit-exact legacy
+arithmetic NOT required. Gate G CLOSED (§22): WS32_2D promoted; PP16 rejected with evidence.
 
 ## Invariants
 
@@ -54,10 +51,10 @@ record `4da05468…`, later events recorded (alarm acked), item 5 by inheritance
 State: live 1,952,694,918,629 bytes. Streamed WS32 checkpoint RETAINED in tmpfs on 8 hosts (98 GB/host,
 verified per run; needed by 128K/256K; cleanup script exists, run it before host maintenance).
 
-Gate G CLOSED offline (§22): PP8 2K DB563 245.6 ms vs WS32 2K DB553 122.6 ms (same oracles, both
-exact), WS32 8K DB567; PP16 rejected with evidence; WS32_2D promoted; §18 amended. Disk 62%.
-
-Next: (6) L7 128K four-depth smoke on WS32_2D (capacity 131072; depths 0/0.05/0.95/1.0; inventory
-128K oracles first; design reviewed before any TPU run), (7) L8 256K E0 with DB/archive/8/8 cleanup,
-(8) §18 direct proof. Fix open P3s (census_failure_exit overwrite; decode module name from sealed HLO
-header) opportunistically.
+Long context (spec §23, reviewed): chunked exact prefill (dual buffer, chunk+tail graphs) coded;
+128K/256K oracles rebuilt from DB 403/402 provenance (bit-exact). Indexer rotary stays on device
+(host DSA table is tombstoned); main-rotary long-position effect measured in Step B (§23.8).
+Next: commit Phase A → 8K acquisition (new schema) → Step B: 8K runs C=2048 and C=512 must reproduce
+DB567 witnesses → Step C: 8K prompt at capacities 131072 and 262656 (CAPACITY_MEASUREMENT) → L7 four
+128K runs (order 1.0, 0.0, 0.05, 0.95) → L8 256K E0 (capacity 262656) → §18 wording. pytest ALWAYS
+with JAX_PLATFORMS=cpu (tests/conftest.py enforces; controller = pod worker 0).

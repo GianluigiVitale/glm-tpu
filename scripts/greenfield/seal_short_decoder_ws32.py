@@ -60,6 +60,7 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--mode", choices=("acquire", "numerical"), required=True)
     validate.add_argument("--context-label", choices=("2k", "8k"), required=True)
     validate.add_argument("--tag", required=True)
+    validate.add_argument("--prefill-chunk", type=int, default=DEFAULT_PREFILL_CHUNK)
     validate.add_argument("--code-hash", required=True)
     validate.add_argument("--checkpoint-manifest-sha256", required=True)
     validate.add_argument("--checkpoint-success-sha256", required=True)
@@ -104,7 +105,8 @@ def _args() -> argparse.Namespace:
     for graph in (
         "exact-materialize",
         "exact-promote",
-        "prefill",
+        "prefill-chunk",
+        "prefill-tail",
         "observer",
         "decode",
         "cache-probe",
@@ -196,13 +198,22 @@ def _memory_valid(value: Any) -> bool:
     )
 
 
-def _validate_run_tag(tag: str, *, context_label: str, mode: str) -> None:
+DEFAULT_PREFILL_CHUNK = 2048
+
+
+def _validate_run_tag(
+    tag: str, *, context_label: str, mode: str, prefill_chunk: int = DEFAULT_PREFILL_CHUNK
+) -> None:
+    """Spec §23.3: a non-default prefill chunk is part of the run identity."""
+    if type(prefill_chunk) is not int or prefill_chunk <= 0:
+        raise SystemExit("WS32 prefill chunk must be a positive integer")
+    suffix = "" if prefill_chunk == DEFAULT_PREFILL_CHUNK else f"_c{prefill_chunk}"
     pattern = (
         rf"greenfield_ws32_short_decoder_{re.escape(context_label)}_"
-        rf"{re.escape(mode)}_[0-9]{{8}}T[0-9]{{15}}Z"
+        rf"{re.escape(mode)}{re.escape(suffix)}_[0-9]{{8}}T[0-9]{{15}}Z"
     )
     if re.fullmatch(pattern, tag) is None:
-        raise SystemExit("WS32 run tag contradicts active context/mode")
+        raise SystemExit("WS32 run tag contradicts active context/mode/prefill chunk")
 
 
 def _graph_valid(value: Any, *, mode: str) -> bool:
@@ -334,7 +345,10 @@ def _distribution(samples: list[float]) -> dict[str, float | int]:
 
 def _validate(args: argparse.Namespace) -> int:
     _validate_run_tag(
-        args.tag, context_label=args.context_label, mode=args.mode
+        args.tag,
+        context_label=args.context_label,
+        mode=args.mode,
+        prefill_chunk=args.prefill_chunk,
     )
     materializer_pin_names = {
         "expected_exact_materialize_stablehlo_sha256",
@@ -489,7 +503,8 @@ def _validate(args: argparse.Namespace) -> int:
         "cache_probe",
         "decode",
         "observer",
-        "prefill",
+        "prefill_chunk",
+        "prefill_tail",
     }
     if args.exact_dsa:
         expected_graphs.update({"exact_materialize", "exact_promote"})
@@ -526,6 +541,8 @@ def _validate(args: argparse.Namespace) -> int:
         "load_seconds",
         "local_device_slots",
         "mesh_sha256",
+        "prefill_chunk_length",
+        "prefill_execution",
         "prompt_length",
         "source_inventory_sha256",
         "strategy_nd_dense",
@@ -587,6 +604,17 @@ def _validate(args: argparse.Namespace) -> int:
             raise SystemExit(f"WS32 fleet/process/HLO identity drifted at rank {rank}")
         if record.get("prompt_length") != expected_prompt_length:
             raise SystemExit(f"WS32 prompt length drifted at rank {rank}")
+        _require_prefill_execution(
+            record,
+            mode=args.mode,
+            prompt_length=expected_prompt_length,
+            rank=rank,
+            expected_chunk=args.prefill_chunk,
+        )
+        if rank and not _same(
+            record.get("prefill_chunk_length"), records[0].get("prefill_chunk_length")
+        ):
+            raise SystemExit(f"WS32 prefill chunk length disagrees at rank {rank}")
         if (
             type(record.get("load_seconds")) is not float
             or not math.isfinite(record["load_seconds"])
@@ -639,7 +667,7 @@ def _validate(args: argparse.Namespace) -> int:
                         report["optimized_hlo_sha256"]
                     ),
                     hidden_size=6144,
-                    kind=graph,
+                    kind=_linter_kind(graph),
                     exact_dsa=bool(args.exact_dsa),
                     strategy_nd_dense=bool(args.strategy_nd_dense),
                 ).to_dict()
@@ -964,6 +992,14 @@ def _validate(args: argparse.Namespace) -> int:
             {
                 "cache_write_probe": records[0]["cache_write_probe"],
                 "dsa_steps": records[0]["dsa_steps"],
+                "prefill_chunk_length": records[0]["prefill_chunk_length"],
+                "prefill_execution": {
+                    **records[0]["prefill_execution"],
+                    "fleet_total_seconds_max": max(
+                        float(record["prefill_execution"]["total_seconds"])
+                        for record in records
+                    ),
+                },
                 "fleet_profiler_free_samples_ms": critical.tolist(),
                 "maximum_peak_hbm_bytes": peak_hbm,
                 "minimum_hbm_headroom_bytes": minimum_headroom,
@@ -1071,6 +1107,65 @@ def _decode_step_module_re(*, exact_dsa: bool) -> str:
     return rf"^jit_{body}\("
 
 
+def _linter_kind(graph: str) -> str:
+    """Both prefill programs (chunk and tail) carry the ``prefill`` HLO contract."""
+    return "prefill" if graph.startswith("prefill") else graph
+
+
+def _require_prefill_execution(
+    record: Mapping[str, Any],
+    *,
+    mode: str,
+    prompt_length: int,
+    rank: int,
+    expected_chunk: int | None = None,
+) -> None:
+    """Spec §23.2: chunked exact prefill accounting must be complete and consistent."""
+    chunk = record.get("prefill_chunk_length")
+    if type(chunk) is not int or chunk <= 0 or (
+        expected_chunk is not None and chunk != expected_chunk
+    ):
+        raise SystemExit(f"WS32 prefill chunk length drifted at rank {rank}")
+    full_chunks = (prompt_length - 1) // chunk
+    tail_length = prompt_length - full_chunks * chunk
+    execution = record.get("prefill_execution")
+    if mode != "numerical":
+        if execution is not None:
+            raise SystemExit(f"WS32 acquisition recorded a prefill execution at rank {rank}")
+        return
+    if type(execution) is not dict or set(execution) != {
+        "budget_seconds",
+        "chunk_length",
+        "chunk_wall_seconds",
+        "full_chunks",
+        "projected_total_seconds_max",
+        "repaired_index_installed",
+        "tail_length",
+        "tail_wall_seconds",
+        "total_seconds",
+    }:
+        raise SystemExit(f"WS32 prefill execution schema drifted at rank {rank}")
+    walls = execution["chunk_wall_seconds"]
+    positive = lambda value: type(value) is float and math.isfinite(value) and value > 0
+    if (
+        execution["chunk_length"] != chunk
+        or execution["full_chunks"] != full_chunks
+        or execution["tail_length"] != tail_length
+        or type(walls) is not list
+        or len(walls) != full_chunks
+        or any(not positive(value) for value in walls)
+        or not positive(execution["tail_wall_seconds"])
+        or not positive(execution["total_seconds"])
+        or not positive(execution["budget_seconds"])
+        or type(execution["projected_total_seconds_max"]) is not float
+        or execution["projected_total_seconds_max"] > execution["budget_seconds"]
+        or execution["total_seconds"] > execution["budget_seconds"]
+        or execution["total_seconds"] < sum(walls) + execution["tail_wall_seconds"]
+        or type(execution["repaired_index_installed"]) is not bool
+    ):
+        raise SystemExit(f"WS32 prefill execution accounting drifted at rank {rank}")
+
+
 def _run_environment(summary: dict[str, Any]) -> dict[str, Any]:
     """The exact env_json identity shared by DB publication and rollback.
 
@@ -1103,6 +1198,7 @@ def _run_environment(summary: dict[str, Any]) -> dict[str, Any]:
         "dsa_adjudication": summary.get("dsa_adjudication"),
         "later_event_alarm": summary.get("later_event_alarm"),
         "recovery_code_hash": summary.get("recovery_code_hash"),
+        "prefill_chunk_length": summary.get("prefill_chunk_length"),
     }
 
 

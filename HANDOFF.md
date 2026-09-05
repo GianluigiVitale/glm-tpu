@@ -12612,3 +12612,39 @@ Next: L7 128K four-depth smoke on WS32_2D — design first: context capacity 131
 depths 0.0/0.05/0.95/1.0 from the existing protected depth set, oracle availability for 128K to be
 inventoried; then L8 256K E0.
 
+## 2026-09-05 — Long-context Phase A (spec §23): chunked exact prefill, schema, oracles; two review corrections
+
+Design: §23 (v3) reviewed APPROVE; the rotary addendum went through a P0 correction — an earlier draft
+required the FP32 DSA host table, but the legacy indexer computes rotary ON DEVICE
+(`glm_dsa_indexer.py:1078-1086`) and that table is the tombstoned, refuted variant
+(`gate-d-dsa-rope-table-8k-refusal-adjudication.json`); §23.8 now keeps the indexer on device, states the
+main-attention gap vs legacy as unmeasured at long positions, and pre-registers a per-(pair, band)
+diagnostic inside Step B's first worker (APPROVE-WITH-P2, folded). Code (uncommitted at the time of
+writing, delta review pending): `repair_stage_local_prompt_index_cache` accepts a traced int32
+`position_offset`; `build_ws32_chunked_prefill_program` (chunk + tail programs, carried state never
+repaired, exact rows written into a separate zero buffer with `position_offset = state.position[0]`,
+installed by the runner after the last chunk; `named_scope` kept as `greenfield_ws32_teacher_forced_prefill`
+so the HLO linter's prefill contract is byte-stable); `ws32_prefill_chunk_plan` (always a tail, no padding
+token); graph schema `prefill_chunk`/`prefill_tail` in runner, sealer, wrapper (pins, upload, `PREFILL_CHUNK`
+env override multiple of 64 in [64, 2048], `_c<C>` tag suffix when non-default, sealer `--prefill-chunk`),
+materializer and acquisition recovery tool; runner records `prefill_chunk_length`/`prefill_execution`
+(per-chunk wall, fail-closed projection against `PREFILL_BUDGET_SECONDS=3600`); sealer verifies the
+accounting. Tests: traced==static offsets per owner; chunked==monolithic repair bit-identity on a
+synthetic cache for C=100/64/128 (the program-level identity remains Step B's DB567 witnesses — no tiny
+WS32 weight constructor exists for a CPU end-to-end test); schema/accounting/tag tests; 54 passed on CPU.
+Long-context oracles: `validation/long_context_oracle.py` + `capture_long_context_oracle.py` +
+`run_capture_long_context_oracle.sh` rebuild the four DB-403 128K passkey prompts (seed → `build_trial`,
+text SHA-256 == the digest embedded in the truncated DB field, stored field reproduced, key == gold,
+127,363 ids) and the DB-402 256K E0 prompt (int32-stream SHA == descriptor); legacy bench modules are
+loaded as pinned utilities with their file SHAs recorded. Incident: a background pytest without
+`JAX_PLATFORMS=cpu` opened the local TPU (this controller is worker 0) exactly as HANDOFF 2026-08 :696
+records; killed, no lease was held by anyone, libtpu released; `tests/conftest.py` now forces the CPU
+platform for every pytest session. Delta review: APPROVE-WITH-P2; folded before any oracle is sealed: the
+bench loader asserts the import boundary (no vllm/tpu_inference/torch/jax/ray loaded by the bench exec)
+and namespaces the modules, the manifest states plainly that passkey prompt ids are a client re-tokenization
+of the sha-verified text (count-matched, id identity unverified) and generated ids are re-tokenized
+diagnostics, each bench file is bound to the DB row's harness commit (`legacy_bench_git`), and the DB env
+identity carries `prefill_chunk_length`. Next: commit/push/mirror → 8K acquisition with the
+new schema → Step B (C=2048 then C=512, identity to DB567 witnesses `057af89f…`, `67d03f75…`,
+`a8724ce5…`, `909682cb…`) → Step C → L7 → L8.
+

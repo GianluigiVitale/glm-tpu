@@ -93,13 +93,18 @@ def test_ws32_short_acquisition_preserves_all_graphs_before_refusal() -> None:
     }
     graphs = {
         name: dict(vacant)
-        for name in ("cache_probe", "decode", "observer", "prefill")
+        for name in ("cache_probe", "decode", "observer", "prefill_chunk", "prefill_tail")
     }
     for report in graphs.values():
         RUNNER._require_graph_authorized(report, compile_only=True)
     RUNNER._require_acquisition_authorized(graphs, exact_dsa=False)
+    with pytest.raises(RuntimeError, match="did not preserve"):
+        RUNNER._require_acquisition_authorized(
+            {name: graphs[name] for name in graphs if name != "prefill_tail"},
+            exact_dsa=False,
+        )
 
-    graphs["prefill"] = {
+    graphs["prefill_tail"] = {
         "passed": False,
         "violations": [
             *sorted(RUNNER._VACANT_HLO_VIOLATIONS),
@@ -110,7 +115,7 @@ def test_ws32_short_acquisition_preserves_all_graphs_before_refusal() -> None:
         RUNNER._require_acquisition_authorized(graphs, exact_dsa=False)
     with pytest.raises(RuntimeError, match="failed before execution"):
         RUNNER._require_graph_authorized(
-            graphs["prefill"], compile_only=False
+            graphs["prefill_tail"], compile_only=False
         )
 
 
@@ -275,3 +280,115 @@ def test_ws32_wrapper_recovery_archives_the_stale_source_ledger() -> None:
         'say "materializing generation-pinned all-host evidence'
     )
     assert "a prior terminal SUCCESS verification exists; refusing recovery" in wrapper
+
+
+def test_ws32_chunked_prefill_schema_is_consistent_across_runner_wrapper_sealer() -> None:
+    """Spec §23.2: two prefill graphs (chunk + tail) everywhere, lint-checked as
+    ``prefill``; the wrapper pins both and passes the chunk length and wall budget."""
+    from glm_tpu.greenfield.validation import ws32_evidence
+
+    root = Path(__file__).resolve().parents[3]
+    wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
+    sealer = (root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8")
+    runner = (root / "scripts/greenfield/run_short_decoder_ws32.py").read_text(encoding="utf-8")
+    assert ws32_evidence.BASE_GRAPHS == (
+        "prefill_chunk", "prefill_tail", "observer", "decode", "cache_probe"
+    )
+    assert '"prefill",' not in runner and '"prefill",' not in sealer
+    for graph in ("prefill_chunk", "prefill_tail"):
+        assert RUNNER._linter_kind(graph) == "prefill"
+        dashed = graph.replace("_", "-")
+        assert f"--expected-{dashed}-stablehlo-sha256" in wrapper
+        assert f"--expected-{dashed}-optimized-hlo-sha256" in wrapper
+        assert f'"{dashed}",' in sealer and f'"{dashed}",' in runner
+        assert f"{graph.upper()}_STABLE_SHA=$ZERO_SHA" in wrapper
+    assert RUNNER._linter_kind("decode") == "decode"
+    assert "for graph in exact_materialize exact_promote prefill_chunk prefill_tail observer decode cache_probe" in wrapper
+    assert "--prefill-chunk '\"$PREFILL_CHUNK\"'" in wrapper
+    assert "--prefill-budget-seconds '\"$PREFILL_BUDGET_SECONDS\"'" in wrapper
+    assert "PREFILL_CHUNK=${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-2048}" in wrapper
+    assert '"prefill_chunk_length",' in sealer and '"prefill_execution",' in sealer
+    assert "_require_prefill_execution(" in sealer
+    assert "GLM_GREENFIELD_WS32_PREFILL_STABLEHLO_SHA" not in wrapper
+
+
+def test_ws32_sealer_prefill_execution_accounting_is_fail_closed() -> None:
+    import importlib.util
+
+    root = Path(__file__).resolve().parents[3]
+    sealer_path = root / "scripts/greenfield/seal_short_decoder_ws32.py"
+    specification = importlib.util.spec_from_file_location("ws32_sealer_prefill_test", sealer_path)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    good = {
+        "prefill_chunk_length": 2048,
+        "prefill_execution": {
+            "budget_seconds": 3600.0,
+            "chunk_length": 2048,
+            "chunk_wall_seconds": [270.5, 271.0, 269.9],
+            "full_chunks": 3,
+            "projected_total_seconds_max": 1090.0,
+            "repaired_index_installed": True,
+            "tail_length": 2011,
+            "tail_wall_seconds": 266.0,
+            "total_seconds": 1080.0,
+        },
+    }
+    module._require_prefill_execution(good, mode="numerical", prompt_length=8155, rank=0)
+    module._require_prefill_execution(
+        {"prefill_chunk_length": 2048, "prefill_execution": None},
+        mode="acquire",
+        prompt_length=8155,
+        rank=0,
+    )
+    with pytest.raises(SystemExit, match="recorded a prefill execution"):
+        module._require_prefill_execution(good, mode="acquire", prompt_length=8155, rank=0)
+    for mutate, message in (
+        (lambda e: e.update(tail_length=2010), "accounting"),
+        (lambda e: e.update(chunk_wall_seconds=[270.5, 271.0]), "accounting"),
+        (lambda e: e.update(total_seconds=3601.0), "accounting"),
+        (lambda e: e.update(projected_total_seconds_max=3600.5), "accounting"),
+        (lambda e: e.update(total_seconds=100.0), "accounting"),
+        (lambda e: e.pop("budget_seconds"), "schema"),
+    ):
+        record = {"prefill_chunk_length": 2048, "prefill_execution": dict(good["prefill_execution"])}
+        mutate(record["prefill_execution"])
+        with pytest.raises(SystemExit, match=message):
+            module._require_prefill_execution(record, mode="numerical", prompt_length=8155, rank=0)
+    with pytest.raises(SystemExit, match="chunk length"):
+        module._require_prefill_execution(
+            {"prefill_chunk_length": 0, "prefill_execution": None}, mode="acquire", prompt_length=8155, rank=0
+        )
+
+
+def test_ws32_sealer_binds_the_prefill_chunk_into_the_run_tag() -> None:
+    import importlib.util
+
+    root = Path(__file__).resolve().parents[3]
+    sealer_path = root / "scripts/greenfield/seal_short_decoder_ws32.py"
+    specification = importlib.util.spec_from_file_location("ws32_sealer_tag_test", sealer_path)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    stamp = "20260905T085534575653049Z"
+    module._validate_run_tag(f"greenfield_ws32_short_decoder_8k_numerical_{stamp}", context_label="8k", mode="numerical")
+    module._validate_run_tag(
+        f"greenfield_ws32_short_decoder_8k_numerical_c512_{stamp}", context_label="8k", mode="numerical", prefill_chunk=512
+    )
+    for tag, chunk in (
+        (f"greenfield_ws32_short_decoder_8k_numerical_{stamp}", 512),
+        (f"greenfield_ws32_short_decoder_8k_numerical_c512_{stamp}", 2048),
+        (f"greenfield_ws32_short_decoder_8k_numerical_c2048_{stamp}", 2048),
+        (f"greenfield_ws32_short_decoder_8k_acquire_c512_{stamp}", 512),
+    ):
+        with pytest.raises(SystemExit, match="prefill chunk"):
+            module._validate_run_tag(tag, context_label="8k", mode="numerical", prefill_chunk=chunk)
+    with pytest.raises(SystemExit, match="chunk length drifted"):
+        module._require_prefill_execution(
+            {"prefill_chunk_length": 2048, "prefill_execution": None},
+            mode="acquire", prompt_length=8155, rank=0, expected_chunk=512,
+        )
+    wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
+    assert 'CHUNK_SUFFIX=_c${PREFILL_CHUNK}' in wrapper
+    assert '${MODE}${CHUNK_SUFFIX}_[0-9]{8}T[0-9]{15}Z$' in wrapper
+    assert '--prefill-chunk "$PREFILL_CHUNK"' in wrapper
+

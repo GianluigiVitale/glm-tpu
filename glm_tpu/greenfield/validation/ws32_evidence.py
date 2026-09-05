@@ -21,7 +21,7 @@ import google_crc32c
 from google.cloud import storage
 
 
-BASE_GRAPHS = ("prefill", "observer", "decode", "cache_probe")
+BASE_GRAPHS = ("prefill_chunk", "prefill_tail", "observer", "decode", "cache_probe")
 EXACT_DSA_GRAPHS = ("exact_materialize", "exact_promote") + BASE_GRAPHS
 # Compatibility alias for callers inspecting the default-off graph contract.
 GRAPHS = BASE_GRAPHS

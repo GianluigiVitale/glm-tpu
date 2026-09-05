@@ -355,16 +355,21 @@ def test_ws32_evidence_primary_object_schema_is_exact() -> None:
         "npz",
         "log",
     )
-    assert len(acquired) == 80
-    assert len(numerical) == 96
+    # Spec §23.2: five base graphs (prefill_chunk, prefill_tail, observer,
+    # decode, cache_probe) x 8 ranks x 2 HLO forms = 80, plus 16 host records.
+    assert len(acquired) == 96
+    assert len(numerical) == 112
+    assert {name.split("/")[1].split(".")[0] for name in acquired if name.startswith("hlo/")} == {
+        "prefill_chunk", "prefill_tail", "observer", "decode", "cache_probe"
+    }
     exact_acquired = ws32_evidence._expected_primary_names(
         numerical=False, exact_dsa=True
     )
     exact_numerical = ws32_evidence._expected_primary_names(
         numerical=True, exact_dsa=True
     )
-    assert len(exact_acquired) == 112
-    assert len(exact_numerical) == 128
+    assert len(exact_acquired) == 128
+    assert len(exact_numerical) == 144
     assert exact_acquired - acquired == {
         f"hlo/{graph}.rank{rank}.{suffix}"
         for graph in ("exact_materialize", "exact_promote")
@@ -457,7 +462,7 @@ def test_ws32_acquisition_materializes_without_numerical_npz(
     names = {item["name"] for item in result["objects"]}
     assert names == ws32_evidence._expected_primary_names(numerical=False)
     assert not any(name.endswith(".npz") for name in names)
-    assert len(list((run_dir / "fleet_hlo").iterdir())) == 64
+    assert len(list((run_dir / "fleet_hlo").iterdir())) == 80
 
     for rank in ws32_evidence.RANKS:
         path = (

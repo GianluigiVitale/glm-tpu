@@ -377,3 +377,132 @@ def test_prompt_index_repair_supports_lp2_page_ownership() -> None:
         np.count_nonzero(np.asarray(value)[:8].view(np.uint16)) == 0
         for value in repaired
     )
+
+
+def test_prompt_index_repair_traced_offset_matches_static_offset() -> None:
+    """Chunked prefill passes the chunk start as a traced int32 scalar; every
+    owner's repaired rows must be bit-identical to the static-offset call and
+    the owners together must write exactly the chunk's valid positions."""
+    import jax
+    import pytest
+
+    contract = _contract()
+    prompt_chunk = 64
+    valid_rows = 37
+    offset = 128
+    logical_page_size, local_rows_per_page = 128, 16
+    history = jnp.asarray(
+        np.cos(np.arange(prompt_chunk * 8, dtype=np.float32).reshape(prompt_chunk, 8) / 13.0),
+        dtype=jnp.bfloat16,
+    )
+    initial = jnp.zeros((4, local_rows_per_page, 4), dtype=jnp.bfloat16)
+    block_tables = jnp.arange(4, dtype=jnp.int32)[None, :]
+    wk_weight = jnp.asarray(
+        np.sin(np.arange(4 * 8, dtype=np.float32).reshape(4, 8) / 7.0), dtype=jnp.float32
+    )
+    key_norm = jnp.asarray([1.0, 0.5, -0.75, 1.5], dtype=jnp.bfloat16)
+    key_bias = jnp.asarray([0.0, 0.125, -0.25, 0.5], dtype=jnp.bfloat16)
+
+    def repair(position_offset, owner):
+        return repair_stage_local_prompt_index_cache(
+            initial,
+            history,
+            block_tables,
+            wk_weight,
+            key_norm,
+            key_bias,
+            jnp.int32(owner),
+            contract=contract,
+            logical_page_size=logical_page_size,
+            local_rows_per_page=local_rows_per_page,
+            prompt_chunk=prompt_chunk,
+            physical_rows=64,
+            local_parallel_size=8,
+            position_offset=position_offset,
+            valid_rows=valid_rows,
+        )
+
+    written: set[int] = set()
+    for owner in range(8):
+        static = np.asarray(repair(offset, owner)).view(np.uint16)
+        traced = np.asarray(
+            jax.jit(lambda o, owner=owner: repair(o, owner))(jnp.int32(offset))
+        ).view(np.uint16)
+        assert np.array_equal(static, traced), owner
+        for page, row in zip(*np.nonzero(static.any(axis=-1))):
+            position = int(page) * logical_page_size + owner * local_rows_per_page + int(row)
+            assert position not in written
+            written.add(position)
+    assert written == set(range(offset, offset + valid_rows))
+    with pytest.raises(ValueError, match="static int or int32 scalar"):
+        repair(jnp.asarray([offset], dtype=jnp.int32), 0)
+    with pytest.raises(ValueError, match="nonnegative"):
+        repair(-1, 0)
+
+
+def test_chunked_prompt_index_repair_equals_monolithic_repair() -> None:
+    """Spec §23.2 dual buffer: repairing a prompt in fixed chunks (traced
+    offsets, static valid rows) into a zero buffer must reproduce the single
+    full-prompt repair bit-for-bit, for a chunk that divides the prompt and one
+    that leaves a short tail."""
+    import jax
+
+    contract = _contract()
+    prompt_length = 300
+    logical_page_size, local_rows_per_page = 128, 16
+    pages = 4
+    history = jnp.asarray(
+        np.cos(np.arange(prompt_length * 8, dtype=np.float32).reshape(prompt_length, 8) / 17.0),
+        dtype=jnp.bfloat16,
+    )
+    zeros = jnp.zeros((pages, local_rows_per_page, 4), dtype=jnp.bfloat16)
+    block_tables = jnp.arange(pages, dtype=jnp.int32)[None, :]
+    wk_weight = jnp.asarray(
+        np.sin(np.arange(4 * 8, dtype=np.float32).reshape(4, 8) / 5.0), dtype=jnp.float32
+    )
+    key_norm = jnp.asarray([1.0, 0.5, -0.75, 1.5], dtype=jnp.bfloat16)
+    key_bias = jnp.asarray([0.0, 0.125, -0.25, 0.5], dtype=jnp.bfloat16)
+
+    def repair(cache, inputs, owner, offset, valid_rows, prompt_chunk):
+        return repair_stage_local_prompt_index_cache(
+            cache,
+            inputs,
+            block_tables,
+            wk_weight,
+            key_norm,
+            key_bias,
+            jnp.int32(owner),
+            contract=contract,
+            logical_page_size=logical_page_size,
+            local_rows_per_page=local_rows_per_page,
+            prompt_chunk=prompt_chunk,
+            physical_rows=64,
+            local_parallel_size=8,
+            position_offset=offset,
+            valid_rows=valid_rows,
+        )
+
+    for chunk in (100, 64, 128):  # 3 chunks exact; 4 + tail 44; 2 + tail 44
+        full_chunks = (prompt_length - 1) // chunk
+        tail = prompt_length - full_chunks * chunk
+        assert 1 <= tail <= chunk
+        for owner in range(8):
+            monolithic = np.asarray(
+                repair(zeros, history, owner, 0, prompt_length, 2048)
+            ).view(np.uint16)
+            buffer = zeros
+            for index in range(full_chunks):
+                start = index * chunk
+                buffer = jax.jit(
+                    lambda b, h, o, owner=owner, chunk=chunk: repair(
+                        b, h, owner, o, chunk, min(2048, (chunk + 63) // 64 * 64)
+                    )
+                )(buffer, history[start : start + chunk], jnp.int32(start))
+            start = full_chunks * chunk
+            buffer = jax.jit(
+                lambda b, h, o, owner=owner, tail=tail: repair(
+                    b, h, owner, o, tail, min(2048, (tail + 63) // 64 * 64)
+                )
+            )(buffer, history[start : start + tail], jnp.int32(start))
+            assert np.array_equal(np.asarray(buffer).view(np.uint16), monolithic), (chunk, owner)
+        assert np.count_nonzero(monolithic) > 0

@@ -126,6 +126,21 @@ class Ws32PrefillResult(NamedTuple):
     next_token: Any
 
 
+class Ws32ChunkedPrefillResult(NamedTuple):
+    """One exact prompt chunk: carried state plus the separate repaired index buffer.
+
+    The carried ``state`` keeps the unrepaired on-device index rows every later
+    prompt step must score (the sealed monolithic semantics); the exact M64
+    repaired rows of this chunk's positions are written only into
+    ``repaired_index_local``, which the runner installs as the index cache once
+    the last chunk has been scanned.
+    """
+
+    state: Ws32DecoderState
+    next_token: Any
+    repaired_index_local: Any
+
+
 class Ws32CacheWriteProbe(NamedTuple):
     """Compact rows written at the most recently completed position."""
 
@@ -307,6 +322,17 @@ class Ws32TeacherForcedPrefillProgram:
     config: Ws32DecoderConfig
     mesh: Any
     prompt_length: int
+    execute: Any
+
+
+@dataclass(frozen=True, slots=True)
+class Ws32ChunkedPrefillProgram:
+    """One device-resident scan of a fixed-length prompt chunk (spec §23.2)."""
+
+    config: Ws32DecoderConfig
+    mesh: Any
+    chunk_length: int
+    repair_prompt_chunk: int
     execute: Any
 
 
@@ -980,6 +1006,12 @@ def ws32_prefill_result_specs() -> Ws32PrefillResult:
     return Ws32PrefillResult(ws32_decoder_state_specs(), P())
 
 
+def ws32_chunked_prefill_result_specs() -> Ws32ChunkedPrefillResult:
+    return Ws32ChunkedPrefillResult(
+        ws32_decoder_state_specs(), P(), P(None, None, "expert", None)
+    )
+
+
 def ws32_cache_write_probe_specs() -> Ws32CacheWriteProbe:
     return Ws32CacheWriteProbe(P(), P(), P(), P())
 
@@ -1634,3 +1666,234 @@ def build_ws32_teacher_forced_prefill_program(
         prompt_length=prompt_length,
         execute=execute,
     )
+
+
+def ws32_prefill_chunk_plan(prompt_length: int, chunk_length: int) -> tuple[int, int]:
+    """Return ``(full_chunks, tail_length)`` for a chunked exact prefill.
+
+    The tail program always exists (``1 <= tail_length <= chunk_length``) so the
+    compiled graph set is identical for every workload and no padding token is
+    ever teacher-forced: ``full_chunks * chunk_length + tail_length == prompt_length``.
+    """
+    for name, value in (("prompt_length", prompt_length), ("chunk_length", chunk_length)):
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise PlanValidationError(f"WS32 prefill {name} must be a positive integer")
+    full_chunks = (prompt_length - 1) // chunk_length
+    tail_length = prompt_length - full_chunks * chunk_length
+    if not 1 <= tail_length <= chunk_length or (
+        full_chunks * chunk_length + tail_length != prompt_length
+    ):
+        raise AssertionError("WS32 prefill chunk plan drifted")
+    return full_chunks, tail_length
+
+
+def ws32_repair_prompt_chunk(chunk_length: int) -> int:
+    """Repair tile width for one chunk: multiple of 64 rows, at most 2048."""
+    if not isinstance(chunk_length, int) or isinstance(chunk_length, bool) or chunk_length <= 0:
+        raise PlanValidationError("WS32 repair chunk requires a positive chunk length")
+    return min(2048, (chunk_length + 63) // 64 * 64)
+
+
+def build_ws32_chunked_prefill_program(
+    mesh: Any,
+    config: Ws32DecoderConfig,
+    *,
+    chunk_length: int,
+    sparse_attention_interpret: bool = False,
+    linear_interpret: bool = False,
+) -> Ws32ChunkedPrefillProgram:
+    """Build the exact teacher-forced scan of one fixed-length prompt chunk.
+
+    Semantics are those of :func:`build_ws32_teacher_forced_prefill_program`
+    split at chunk boundaries without changing what any step observes: the
+    scan carries the unrepaired index cache, and the exact M64 repair of this
+    chunk's positions (``position_offset`` = the state position at entry, a
+    traced int32) is written into the separate ``repaired_index_local`` buffer
+    that the caller threads through every chunk and installs after the last one.
+    Only the exact-DSA configuration has a repair; the default path returns the
+    buffer unchanged so both paths share one program signature.
+    """
+    if not isinstance(chunk_length, int) or isinstance(chunk_length, bool) or (
+        chunk_length <= 0 or chunk_length >= config.context_capacity
+    ):
+        raise PlanValidationError(
+            "WS32 prefill chunk must be positive and leave decode capacity"
+        )
+    import numpy as np
+
+    if tuple(mesh.axis_names) != ("expert", "feature") or tuple(
+        np.asarray(mesh.devices, dtype=object).shape
+    ) != (8, 4):
+        raise PlanValidationError("WS32 prefill requires one exact expert8 x feature4 mesh")
+    repair_prompt_chunk = ws32_repair_prompt_chunk(chunk_length)
+
+    def _require_chunk(prompt_token_ids: Any) -> None:
+        if prompt_token_ids.shape != (chunk_length,) or (
+            prompt_token_ids.dtype != jnp.int32
+        ):
+            raise ValueError("WS32 chunked prompt geometry drifted")
+
+    def _require_buffer(repaired_index_local: Any, state: Ws32DecoderState) -> None:
+        if (
+            repaired_index_local.shape != state.index_cache_local.shape
+            or repaired_index_local.dtype != state.index_cache_local.dtype
+        ):
+            raise ValueError("WS32 repaired index buffer geometry drifted")
+
+    def body(
+        prompt_token_ids: Any,
+        state: Ws32DecoderState,
+        weights: Ws32DecoderWeights,
+        repaired_index_local: Any,
+    ) -> Ws32ChunkedPrefillResult:
+        _require_chunk(prompt_token_ids)
+        _require_buffer(repaired_index_local, state)
+        initial_token = jnp.full((1,), -1, dtype=jnp.int32)
+
+        def scan_step(
+            carry: tuple[Ws32DecoderState, Any], token: Any
+        ) -> tuple[tuple[Ws32DecoderState, Any], None]:
+            result = ws32_decode_mapped(
+                token[None],
+                carry[0],
+                weights,
+                config=config,
+                sparse_attention_interpret=sparse_attention_interpret,
+                linear_interpret=linear_interpret,
+            )
+            return (result.state, result.next_token), None
+
+        with jax.named_scope("greenfield_ws32_teacher_forced_prefill"):
+            final, _ = jax.lax.scan(
+                scan_step,
+                (state, initial_token),
+                prompt_token_ids,
+                unroll=1,
+            )
+        return Ws32ChunkedPrefillResult(final[0], final[1], repaired_index_local)
+
+    def exact_body(
+        prompt_token_ids: Any,
+        state: Ws32DecoderState,
+        weights: Ws32DecoderWeights,
+        exact_dsa_weights: tuple[Ws32ExactDsaWeights, ...],
+        repaired_index_local: Any,
+    ) -> Ws32ChunkedPrefillResult:
+        _require_chunk(prompt_token_ids)
+        _require_buffer(repaired_index_local, state)
+        initial_token = jnp.full((1,), -1, dtype=jnp.int32)
+        # The state position at entry is the number of prompt tokens already
+        # scanned, i.e. this chunk's first absolute position.
+        chunk_start = jnp.asarray(state.position[0], dtype=jnp.int32)
+
+        def scan_step(
+            carry: tuple[Ws32DecoderState, Any], token: Any
+        ) -> tuple[tuple[Ws32DecoderState, Any], Any]:
+            step = ws32_prefill_step_mapped(
+                token[None],
+                carry[0],
+                weights,
+                exact_dsa_weights,
+                config=config,
+                sparse_attention_interpret=sparse_attention_interpret,
+                linear_interpret=linear_interpret,
+            )
+            return (
+                (step.result.state, step.result.next_token),
+                step.normalized_inputs_local,
+            )
+
+        with jax.named_scope("greenfield_ws32_teacher_forced_prefill"):
+            final, chunk_inputs_local = jax.lax.scan(
+                scan_step,
+                (state, initial_token),
+                prompt_token_ids,
+                unroll=1,
+            )
+        repaired = repaired_index_local
+        owner = lax.axis_index("expert")
+        for full_slot, layer_id in enumerate(config.full_index_slots):
+            dsa = weights.layers[layer_id].dsa
+            if dsa is None:
+                raise AssertionError("WS32 exact prefill lost DSA parameters")
+            with jax.named_scope(
+                f"greenfield_ws32_exact_dsa/prompt_m64_repair_layer_{layer_id}"
+            ):
+                chunk_inputs = lax.all_gather(
+                    chunk_inputs_local[:, full_slot, :],
+                    axis_name="feature",
+                    axis=1,
+                    tiled=True,
+                )
+                repaired_slot = repair_stage_local_prompt_index_cache(
+                    repaired[full_slot],
+                    chunk_inputs,
+                    final[0].block_tables,
+                    exact_dsa_weights[full_slot].wk_weight,
+                    dsa.key_norm_weight,
+                    dsa.key_norm_bias,
+                    owner,
+                    contract=config.dsa_contract,
+                    logical_page_size=config.logical_page_size,
+                    local_rows_per_page=config.local_rows_per_page,
+                    prompt_chunk=repair_prompt_chunk,
+                    physical_rows=64,
+                    local_parallel_size=8,
+                    position_offset=chunk_start,
+                    valid_rows=chunk_length,
+                )
+                repaired = repaired.at[full_slot].set(repaired_slot)
+        return Ws32ChunkedPrefillResult(final[0], final[1], repaired)
+
+    buffer_spec = P(None, None, "expert", None)
+    if config.exact_dsa:
+        execute = jax.shard_map(
+            exact_body,
+            mesh=mesh,
+            in_specs=(
+                P(),
+                ws32_decoder_state_specs(),
+                ws32_decoder_weight_specs(config),
+                ws32_exact_dsa_specs(config),
+                buffer_spec,
+            ),
+            out_specs=ws32_chunked_prefill_result_specs(),
+            check_vma=False,
+        )
+    else:
+        execute = jax.shard_map(
+            body,
+            mesh=mesh,
+            in_specs=(
+                P(),
+                ws32_decoder_state_specs(),
+                ws32_decoder_weight_specs(config),
+                buffer_spec,
+            ),
+            out_specs=ws32_chunked_prefill_result_specs(),
+            check_vma=False,
+        )
+    return Ws32ChunkedPrefillProgram(
+        config=config,
+        mesh=mesh,
+        chunk_length=chunk_length,
+        repair_prompt_chunk=repair_prompt_chunk,
+        execute=execute,
+    )
+
+
+def make_ws32_repaired_index_buffer(mesh: Any, config: Ws32DecoderConfig) -> Any:
+    """Allocate the zero repaired-index buffer with the index cache's sharding."""
+    import ml_dtypes
+    import numpy as np
+    from jax.sharding import NamedSharding
+
+    sharding = NamedSharding(mesh, P(None, None, "expert", None))
+    shape = config.index_cache_shape
+    local_shape = sharding.shard_shape(shape)
+    return jax.make_array_from_callback(
+        shape,
+        sharding,
+        lambda _: np.zeros(local_shape, dtype=ml_dtypes.bfloat16),
+    )
+

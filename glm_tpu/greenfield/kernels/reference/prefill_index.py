@@ -196,7 +196,7 @@ def repair_stage_local_prompt_index_cache(
     prompt_chunk: int = 2048,
     physical_rows: int = 64,
     local_parallel_size: int = 4,
-    position_offset: int = 0,
+    position_offset: int | Any = 0,
     valid_rows: int | None = None,
     dsa_rope_table: Any | None = None,
 ) -> Any:
@@ -231,10 +231,23 @@ def repair_stage_local_prompt_index_cache(
         raise ValueError("prompt repair page ownership geometry drifted")
     if prompt_chunk <= 0 or prompt_chunk % physical_rows:
         raise ValueError("prompt repair chunk must divide into physical rows")
-    if not isinstance(position_offset, int) or isinstance(position_offset, bool) or (
-        position_offset < 0
-    ):
+    if isinstance(position_offset, bool):
         raise ValueError("prompt repair position offset must be nonnegative")
+    if isinstance(position_offset, int):
+        if position_offset < 0:
+            raise ValueError("prompt repair position offset must be nonnegative")
+        offset_value = jnp.int32(position_offset)
+    else:
+        # Chunked prefill programs carry the chunk start as a traced int32
+        # scalar (the state position); the row/page arithmetic below is already
+        # traced, so only the static-vs-traced entry differs.
+        if getattr(position_offset, "shape", None) != () or not jnp.issubdtype(
+            jnp.asarray(position_offset).dtype, jnp.integer
+        ):
+            raise ValueError(
+                "prompt repair position offset must be a static int or int32 scalar"
+            )
+        offset_value = jnp.asarray(position_offset, dtype=jnp.int32)
     if wk_weight.shape != (contract.head_dim, contract.hidden_size) or (
         wk_weight.dtype != jnp.float32
     ):
@@ -258,7 +271,7 @@ def repair_stage_local_prompt_index_cache(
             chunk_start + prompt_chunk,
             dtype=jnp.int32,
         )
-        positions = local_positions + jnp.int32(position_offset)
+        positions = local_positions + offset_value
         safe_positions = jnp.minimum(
             local_positions, jnp.int32(valid_rows - 1)
         )

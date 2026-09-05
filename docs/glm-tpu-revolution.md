@@ -1860,3 +1860,159 @@ long-context gate fails for a reason that PP16 would cure (memory), which §22.3
   long-context gates.
 - Next: L7 (128K four-depth smoke) and L8 (256K E0) on WS32_2D, then §18.
 
+# 23. Long-context gates L7/L8 on WS32_2D — design (2026-09-05, reviewed: v3 APPROVE, rotary addendum v3.3 APPROVE-WITH-P2 folded)
+
+## 23.1 Workloads (reproduced offline, provenance-bound; no new legacy capture)
+- L7: the four legacy protected passkey prompts of DB run 403 (depths 0.0/0.05/0.95/1.0, seeds
+  16780345/16781195/16796495/16797345, 127,363 prompt ids each incl. prefix [154822,154824], gold
+  705269/824794/289958/891482, legacy 4/4 correct, legacy latency ≈600 s/item). Rebuilt with
+  `bench/glm_longctx.build_trial(tok, 128000, depth, seed)` + GLM tokenizer; verified 2026-09-05: keys ==
+  gold, id counts == DB, and the rebuilt text SHA-256 == the sha256 embedded in the DB's stored
+  head+tail prompt field for all four (byte-identical prompts). Sealed by a new CPU-only variant of
+  `capture_short_context_oracle` that rebuilds the prompt from the seed (the stored field is truncated at
+  65,536 chars), checks the embedded sha256, prepends the two special ids and records that the legacy
+  tokenized server-side; manifest/SUCCESS format unchanged; legacy `raw_output` (20 tokens) kept as a
+  diagnostic reference, not as the pass criterion.
+- L8: the legacy E0 prompt of DB run 402 (`dsa_throughput.build_prompt_ids/v1`: prefix + RandomState(
+  34353209).randint(256, 154820, 262142) → 262,144 ids; stored sha256 of the int32 stream; measure
+  window 256 tokens; legacy 1.263 tok/s = 791.83 ms/step, t_prefill 1337.7 s). Sealed the same way.
+
+## 23.2 Prefill: chunked exact teacher-forcing (required by memory), sealed semantics preserved
+The exact-DSA prefill scans one decode step per prompt token and stacks the per-token full-indexer
+normalized inputs `[L, 21, 1536]` bf16 per chip for ONE post-scan M64 index repair: 0.53 GB at 8K,
+8.2 GB at 128K, 16.9 GB at 256K — it cannot fit at long context (8K headroom 6.64 GB). The sealed
+semantics are: every prompt step scores the UNREPAIRED on-device index rows of all earlier positions;
+the repaired rows are visible only to decode. A chunked program must keep exactly that, so:
+- The chunk program takes a static chunk of C prompt tokens, scans them against the carried state
+  (whose index cache stays unrepaired, as today), and writes the repaired rows for exactly those C
+  positions into a SEPARATE repaired-index buffer (same shape as the index cache, zeros initially,
+  0.18 GB per chip at 256K) using the repair kernel's `position_offset` (an int32 scalar, traced) and
+  static `valid_rows`. The carried state is unchanged in kind; nothing scanned ever sees a repaired row.
+- After the last chunk the runner installs the repaired buffer as the state's index cache and frees
+  the unrepaired one — bit-for-bit what the monolithic program produced (it overwrote exactly the
+  prompt rows of an otherwise-zero cache). Numerics are therefore independent of C by construction.
+- Two programs, always both: `prefill_chunk` (length C) for the first ⌊(L−1)/C⌋ chunks and
+  `prefill_tail` (length L − ⌊(L−1)/C⌋·C ∈ [1, C]) for the last one, so the graph set is fixed for
+  every workload and no padding token is ever teacher-forced (8K: 3×2048 + 2011; 128K: 62×2048 + 387;
+  256K: 127×2048 + 2048).
+- Kernel API change (reviewed, tested): `repair_stage_local_prompt_index_cache` accepts a traced
+  int32 `position_offset` (static `valid_rows` unchanged); the linter's `kind="prefill"` expectations
+  (21 repair gathers, split-RMSNorm counts) apply to both programs and are verified on the tail graph.
+- Host loop: after each chunk the runner logs wall, projects total prefill time and aborts fail-closed
+  if the projection exceeds the worker budget minus margin; prefill wall is recorded separately.
+- Graph schema: `BASE_GRAPHS` becomes (`prefill_chunk`, `prefill_tail`, `observer`, `decode`,
+  `cache_probe`); wrapper upload list, acquisition pins (`--expected-prefill-chunk-*`, `--expected-
+  prefill-tail-*`), sealer expectations and evidence materializer updated together; 2k/8k acquisitions
+  re-pinned (the sealed DB553/DB567 records are untouched history).
+- `prefill_chunk` in the §5.2 sense (multi-row) remains the first post-DoD item; per-layer fixed
+  cost dominates the 130 ms step (45 ms collectives, 44 ms weight-format custom calls, 11 ms
+  gathers), so a multi-row body would amortize nearly linearly — that is what makes 256K
+  *interactive*; it is not required by L7/L8 and would delay the only gates that can still fail.
+
+## 23.3 Proving the chunked prefill before using it (identity, not just contract pass)
+- Step A0 is superseded by §23.8: the indexer rotary stays on device (legacy-faithful, tombstoned
+  host table); the main-attention long-position effect is measured by a zero-cost diagnostic inside
+  Step B's first worker with a pre-registered per-(pair, band) decision rule, and only a failing rule
+  triggers the main BF16 table path (B′) described there.
+- Step B (8K identity): two protected 8K numerical runs at capacity 8192 with the chunked prefill at
+  C = 2048 and C = 512 (acquisition first for each). Each must pass the unchanged §21 sealer AND
+  reproduce DB567's bit-level witnesses: `numerical_array_manifest_sha256` `057af89f…caac` (all 14×21
+  DSA observations), cache probe `kv_rows_sha256` `67d03f75…` / `index_rows_sha256` `a8724ce5…`, token
+  sha `909682cb…8173`. Identity at two chunk sizes proves C-independence and equivalence to the sealed
+  program; the chunked prefill is then accepted by a §23 equivalence record, not a new gate.
+- Step C (capacity pre-measurement): two protected runs with the 8K prompt at capacities 131,072
+  (256 pages) and 262,656 (513 pages) measure per-step wall and memory at long capacity (local top-k
+  and page-table gathers scale with capacity); tokens and the DB567 witnesses must stay identical
+  (capacity must not change numerics). Wrapper gets a capacity override; classification
+  `CAPACITY_MEASUREMENT` so these are never read as Gate D records. Prefill hours, worker timeouts
+  and the projection margin for L7/L8 are derived from these measurements.
+
+## 23.4 Capacities and memory
+- 128K: prompt 127,363 + observer 14 + warmup 2 + iterations 10 + trace 2 + 1 = 127,392 ≤ 131,072 ✓.
+- 256K: prompt 262,144 + observer 14 + warmup 2 + iterations 256 + trace 2 + 1 = 262,419 → capacity
+  262,656 (513 pages) (v1's 512 pages was wrong and would have refused after the acquisition).
+- Per-chip decode caches (bf16): 8K 0.108 GB, 128K 1.72 GB, 513 pages 3.46 GB; 8K peak 26.38 GB of
+  33.0. Chunked prefill temp at C = 2048 ≈ 2.0 GB regardless of L (2.37 − 0.53 + 0.13). Decode at 513
+  pages ≈ 29.1 GB of arguments plus temps → roughly 1.5 GB margin; the acquisition gates on compiled
+  memory before any numerical run.
+
+## 23.5 Correctness contracts (no legacy DSA oracle exists at these lengths; none is captured)
+- L7 (`--long-context passkey`): pass iff `extract_passkey(detok(first 20 greedy tokens)) == gold` for
+  each prompt, four of four runs; plus within-engine exact DSA order/ties at every observed step,
+  cache/state structure, locality/HLO contracts, fresh trace, profiler-free wall, HBM, DB, archive,
+  8/8 cleanup. The 20 tokens are compared with the legacy `raw_output` ids and recorded exact/inexact
+  as a diagnostic; nothing may be labelled "raw tokens exact". Classification
+  `PASSKEY_EXACT;DSA_WITHIN_ENGINE_EXACT;NO_CROSS_ORACLE`; item id `l7_128k_passkey_d<depth>`; DB rows
+  link legacy run 403.
+- L8 (`--long-context e0`): 256-step profiler-free decode window after the 262,144-token prefill,
+  preceded by the harness's 18 observer/warm-up/trace steps (legacy warm-up was 0; both recorded), with
+  fresh 8-file/64-core XPlane, p50/p99, HBM, generated ids recorded; no correctness oracle (legacy E0
+  had none) → `NO_CORRECTNESS_ORACLE`; within-engine DSA exactness and state/cache contracts still
+  enforced. Legacy vs WS32 prefill wall and ms/step recorded side by side. Item id `l8_256k_e0`.
+- Sealer mirrors both modes; the §21 token/DSA-oracle contract remains the only path for 2k/8k.
+
+## 23.6 Multi-hour protected runs (reviewer Q3)
+- Worker processes detached (`setsid nohup … timeout --kill-after`), runner process name unchanged so
+  the census pattern `[r]un_short_decoder_ws32[.]py` still sees them; per-rank completion marker files
+  `WS32_LONG_DONE tag rank status` written only after the EXIT-trap upload completes; the orchestrator
+  polls markers over fresh ssh sessions.
+- Attach/resume mode keyed by TAG: re-acquires the controller lease and re-polls markers, so an
+  orchestrator crash cannot orphan a run; on orchestrator failure workers are never blindly killed and
+  never abandoned — either attach, or `pkill` by tag followed by an 8/8 census proof.
+- The failure-exit census reporting BUSY while own workers run is expected and recorded as such.
+- Worker timeout = measured projection × 1.5 (set per context from step C), hard bound via `timeout`.
+
+## 23.7 Sequence and honesty
+A (CPU, reviewed): dual-buffer chunked prefill + kernel offset API + graph schema + runner loop/
+projection + sealer/wrapper contexts 128k/256k + capacity override + detached launch/attach + oracle
+builders + tests (CPU: chunk/tail program builders, schema, oracle builders; equality of chunked vs
+monolithic repair on a small synthetic cache). A0: rotary micro-check. B: two 8K identity runs
+(C = 2048, 512) against DB567 witnesses. C: two capacity runs. D: 128K acquisition, four L7 runs in order 1.0, 0.0, 0.05, 0.95 (first failure stops early).
+E: 513-page acquisition, one L8 run. F: §18 — "serves at 256K" is qualified in §18 itself as
+steady-state decode at 256K with prefill measured in hours and `prefill_chunk` (§5.2) an explicit
+open item; base vs effective throughput reported separately (Gate H untouched).
+
+## 23.8 Rotary at long positions: measure first, legacy-faithful by default (addendum v3.3)
+
+Facts established in review (correcting an earlier draft that proposed a DSA host table): the legacy indexer computes rotary ON DEVICE
+(`tpu_inference/.../glm_dsa_indexer.py:1078-1086`, `jnp.cos/sin(positions_f32 * inv_freq)`), the same
+formulation as WS32's `rotary.rotary_cos_sin` at its indexer sites; the FP32 DSA host table is a
+refuted, tombstoned variant (`docs/artifacts/gate-d-dsa-rope-table-8k-refusal-adjudication.json`,
+classification `HOST_ROTARY_TABLE_REFUTED_AS_LEGACY_FAITHFULNESS_FIX`: without the table event 0 was
+bit-exact vs the legacy oracle, with it 2,046/2,048 scores moved). The legacy 128K passkey (DB403) and
+256K E0 (DB402) both ran with on-device indexer rotary. Therefore:
+
+1. Indexer rotary stays on device (legacy-faithful). No DSA table. The tombstone stands.
+2. Main attention: legacy uses a host FP32→BF16 cos/sin table (`patch_rotary_cos_sin_cache_numpy`)
+   whose torch source multiplies BF16 tensors; the FP32-products-plus-one-final-round form is the
+   DB531-evidenced XLA lowering (DB531 reproduced the legacy 64-wide suffix bitwise with
+   `apply_rotary_fp32_final_round`). WS32 (`ws32_layer.py:842-866`) computes cos/sin on device in the
+   query dtype (BF16) and rotates in BF16 — the DB530 mismatch class. This is a legacy-faithfulness gap
+   that DB553/DB567 tolerated (exact tokens at 2K/8K under §21). Whether it matters at 128K/256K is
+   UNMEASURED: the only datum is 9.9e-3/4.0e-3 at 4,962 rad, measured on the indexer FP32 path at
+   position 8155 (not the main BF16 path); an FP32 angle at 2.6e5 rad has ulp ≈1.6e-2
+   on the highest-frequency pairs for host tables too, so "accuracy vs FP64" is not the criterion —
+   fidelity to the accepted legacy form is, and its cost is a new §21 adjudication (B′) plus re-based
+   witnesses for Step C. Not paid until shown necessary.
+3. Zero-cost diagnostic folded into Step B's FIRST worker run (no extra lease; capacity-independent —
+   a 262,657-row positions array — so a fail is known before Step C and the fallback is B → A′(table)
+   → B′ → C with no wasted capacity run). It compiles and executes one extra small TPU program OUTSIDE
+   the timed window and the traced steps (before the model programs compile), is declared in the run
+   record with its SHA-pinned script and artifact path/SHA, and leaves the census/HLO/trace contracts
+   untouched (the sealer sees a declared, pinned side program). Content: jitted `rotary_cos_sin` at
+   positions 0..262,656 for the main form (BF16 out, `apply_rotary` in BF16 on a fixed unit vector) and
+   the indexer form (F32 out), compared with FP64 rows AND with the legacy main form (host FP32→BF16 table
+   + FP32 products + final round) on the same vectors; recorded as an artifact with max/percentile error
+   per rotary pair index (32 pairs; pair 0 has exact FP32 integer angles, pair 1 carries ≈8e-3 rad of
+   FP32 angle ulp at 2.6e5 rad) and per position band (≤8,192 / ≤32,768 / ≤131,072 / ≤262,656), with the
+   count of bf16-cast components that differ, using the same measurement form on both sides (rotated
+   unit vector, BF16 output). Decision rule, pre-registered per (pair, band) cell: if in every cell the
+   on-device main form differs from the legacy form by no more than κ=2 times the legacy form's own
+   deviation from FP64 in that cell, L7/L8 run with the current path; otherwise the main BF16
+   table is implemented (default-off flag, `apply_rotary_fp32_final_round` at both `:842` query and
+   `:855-866` current-key sites, table SHA keyed by capacity, new acquisitions/pins), adjudicated at 8K as
+   B′ with in-run first-divergent-event adjudication against the archived FP64 reference rows (reviewed
+   sealer change; two-run fallback otherwise), and Step C witnesses re-based on B′.
+4. Step B/C keep v3's contract (tables OFF, identity to DB567 witnesses). Site inventory for the
+   record: on-device rotary at `ws32_layer.py:425, :511 (via dsa_index_keys_from_projection), :685,
+   :734, :842` and `prefill_index.py:160`.
