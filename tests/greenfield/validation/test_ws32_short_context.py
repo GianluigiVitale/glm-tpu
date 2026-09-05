@@ -627,6 +627,8 @@ def test_every_analysis_binding_is_enforced(tmp_path: Path) -> None:
          "does not carry the §21.2 checks"),
         (lambda a: a["checks"].pop("reference_band_capacity"),
          "does not carry the §21.2 checks"),
+        (lambda a: a["checks"].__setitem__("a_future_check", {"pass": False}),
+         "does not carry the §21.2 checks"),
     ):
         record, _ = _adjudication_record_fixture(tmp_path)
         analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
@@ -689,3 +691,29 @@ def test_a_basis_artifact_reached_through_a_symlink_is_refused(tmp_path: Path) -
             path, expected_sha256=hashlib.sha256(payload).hexdigest(),
             repository_root=tmp_path,
         )
+
+
+def test_an_adjudication_with_extra_passing_checks_is_accepted(tmp_path: Path) -> None:
+    """A future §21.2 check must not make a thorough adjudication unloadable."""
+    import hashlib
+    import json
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    record, _ = _adjudication_record_fixture(tmp_path)
+    analysis_path = tmp_path / "docs/artifacts/gate-d-analysis.json"
+    analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
+    analysis["checks"]["a_future_check"] = {"pass": True}
+    analysis_path.write_text(json.dumps(analysis), encoding="utf-8")
+    digest = hashlib.sha256(analysis_path.read_bytes()).hexdigest()
+    record["analysis"]["sha256"] = digest
+    record["basis"][1]["sha256"] = digest
+    payload = json.dumps(record).encode()
+    path = tmp_path / "record.json"
+    path.write_bytes(payload)
+    loaded = load_ws32_adjudicated_divergence(
+        path, expected_sha256=hashlib.sha256(payload).hexdigest(), repository_root=tmp_path
+    )
+    assert loaded.event_index == 1

@@ -505,7 +505,10 @@ def load_ws32_adjudicated_divergence(
                 checks = basis_record.get("checks")
                 if (
                     not isinstance(checks, dict)
-                    or set(checks) != _REQUIRED_ADJUDICATION_CHECKS
+                    # A superset is fine: §21.2 may gain a check, and refusing
+                    # an adjudication for being MORE thorough would be perverse.
+                    # Every check present must have passed.
+                    or not _REQUIRED_ADJUDICATION_CHECKS <= set(checks)
                     or not all(
                         isinstance(item, dict) and item.get("pass") is True
                         for item in checks.values()

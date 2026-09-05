@@ -483,21 +483,26 @@ def _validate(args: argparse.Namespace) -> int:
         the blob on disk.
         """
 
-        committed = subprocess.run(
-            ["git", "-C", str(repository_root), "rev-parse", f"{args.code_hash}:{relative}"],
-            capture_output=True,
-            text=True,
-        )
+        try:
+            committed = subprocess.run(
+                ["git", "-C", str(repository_root), "rev-parse", f"{args.code_hash}:{relative}"],
+                capture_output=True,
+                text=True,
+            )
+            working = subprocess.run(
+                ["git", "-C", str(repository_root), "hash-object", "--", relative],
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            # No git means the property cannot be established, which is a
+            # refusal, not a traceback and not a pass.
+            raise SystemExit(f"WS32 {label} commitment cannot be checked: {error}")
         if committed.returncode != 0:
             raise SystemExit(
                 f"WS32 {label} is not committed in the run's own pin {args.code_hash}: "
                 f"{relative}; a record written after the run is not a pre-registration"
             )
-        working = subprocess.run(
-            ["git", "-C", str(repository_root), "hash-object", "--", relative],
-            capture_output=True,
-            text=True,
-        )
         if working.returncode != 0 or committed.stdout.strip() != working.stdout.strip():
             raise SystemExit(
                 f"WS32 {label} differs from the blob committed at {args.code_hash}: {relative}"
