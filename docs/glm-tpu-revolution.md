@@ -1563,3 +1563,96 @@ Never reconstruct the hidden state across all 32 chips inside a transformer laye
 
 The initial recommendation is PP8_LP4, but evidence—not this document—must choose the final plan.
 
+
+---
+
+# 21. Amendment 2026-09-05 — Gate D correctness contract
+
+This amendment is binding. Where it conflicts with the exactness wording of §1.3, §5.5, §8.2,
+§11.1 (L6), §13 Gate D, §17 and §18, this section governs. Nothing else changes: plans,
+topology-local collectives, default-off optimizations, protected measurement, provenance, cleanup and
+all performance gates are unchanged. No historical evidence is reinterpreted or weakened, and this
+section grants no install or execution authority.
+
+## 21.1 Why
+
+- The protected WS32 8K numerical runs `greenfield_ws32_short_decoder_8k_numerical_20260826T213125786075567Z`
+  and `greenfield_ws32_short_decoder_8k_numerical_20260827T011711674195301Z` produced exact 20/20 raw
+  tokens, valid state/cache, bitwise-exact event-0 DSA and measured HBM, and were refused only because
+  DSA event 1 (layer 1) replaced seven of 2,048 selected positions relative to the legacy engine. No
+  aligned score statistics were recorded for those runs.
+- Gate C DB421 recorded that an independent raw PyTorch CPU scorer and the greenfield TPU FP32 scorer,
+  both correct under the bounded contract (score max/mean error `0.003605/0.000965`), disagree on two
+  of 2,048 cutoff members. Bit-identical selected sets across two correct implementations are
+  therefore not a correctness property; they depend on rounding history. The legacy TPU engine was not
+  a party to that comparison, so the legacy's own error against an FP32 reference has never been
+  measured and must be measured under §21.2.
+- The seven-swap event-1 signature is invariant across association changes: PP8 runs of 08-08, 08-09
+  and 09-02 with different norm schedules record identical seven-position sets, the WS32 plan with a
+  different sharding also refuses at event 1 with seven replaced positions (its records list counts,
+  not positions), and one PP8 run whose layer-1 RMS input was certified legacy-exact still had six
+  event-1 mismatches. This is evidence against attributing the swaps to reduction-association
+  rounding alone and for a deterministic layer-1 arithmetic difference of unknown sign. §21.2 item 4
+  exists to adjudicate exactly that; the swaps are not pre-declared benign or boundary-explained.
+- Bit-exact reproduction of the legacy prefill's 32-way partial-sum and reduction-tree order for every
+  projection in every layer is what "exact selected sets versus legacy" implies for an engine that
+  intentionally changes association. From 2026-08-16 to 2026-09-04 it consumed more than ten protected
+  tags with no decoder result. §5.5 already defines bounded internal error (level 2) and exact tokens
+  (level 3); this amendment applies those levels to Gate D.
+
+## 21.2 Gate D correctness contract
+
+1. **Raw tokens (level 3, exact).** The protected N-token greedy continuation must equal the sealed
+   legacy oracle tokens. Any divergence fails Gate D. The oracle's top-1/top-2 logit margin at the
+   divergent step is recorded as diagnostic only.
+2. **Within-engine DSA exactness (level 1, unchanged).** Distributed selection and lowest-position tie
+   order must have zero mismatches against a canonical top-k of the engine's own executing score row,
+   and that exact state must be what IndexShare and attention consume.
+3. **Cross-oracle DSA agreement (level 2, adjudicated).** For every observed event, with the engine set
+   `E`, the oracle set `O`, engine and oracle scores `s_e`, `s_o` over the same decode position and
+   the same key positions, and cutoff scores `c_e`, `c_o` (the 2,048th score under lowest-position
+   tie order):
+   - `R` is an independent FP32 CPU reference of the event's score row, computed from the sealed
+     legacy inputs of that event (legacy layer-1 key/index cache and FP32 query) by code that shares
+     nothing with the engine's scorer; its implementation, dtype and source hash are recorded before
+     the adjudication.
+   - Aligned positions `A = E ∩ O`. `eps_event = max_{p∈A} |s_o(p) − R(p)|`, the oracle's own
+     demonstrated error, which the engine cannot inflate. In addition `max_{p∈A} |s_e(p) − R(p)|`
+     must not exceed the pre-registered level-2 score cap for that layer class (the bounded one-layer
+     oracle value; DB421's `0.003605` where no layer-specific value exists).
+   - Every position in the symmetric difference `E Δ O` must satisfy `|s_e(p) − c_e| ≤ eps_event`
+     and `|s_o(p) − c_o| ≤ eps_event`, and `|E Δ O|` must not exceed the number of oracle positions
+     with `|s_o(p) − c_o| ≤ eps_event` (the ambiguity band cannot explain more swaps than it holds).
+   - Ties at either cutoff are resolved by lowest position on both sides before the comparison.
+   - Any violation is a hard failure. `eps_event` and the cap are recorded per run, never hand-chosen.
+4. **Systematic bias (hard).** Over `A`, `m_e = mean(s_e − R)`, `m_o = mean(s_o − R)`, `s` the
+   sample standard deviation of `s_e − R`, `n = |A|`. Require
+   `|m_e| ≤ max(|m_o| + 3·s/√n, mean_cap)` with `mean_cap` the pre-registered level-2 mean score
+   error for that layer class (DB421's `0.000965` where no layer-specific value exists). A larger
+   bias is a hard failure that localizes a real arithmetic defect; it is never tolerated.
+   The pre-registered caps in items 3 and 4 are fixed before an adjudication and may not be raised
+   after a failed one; a new cap requires a new protected bounded one-layer oracle record.
+5. **Internal tensors (level 2).** Layer outputs, residuals and caches are compared under the bounded
+   contracts in `docs/greenfield/NUMERICAL_CONTRACT.md`; cache/state structure (positions, tails,
+   validity, pages, manifests) remains exact.
+6. **Unchanged:** no repeated 32-chip layer collective, fresh eight-host trace, profiler-free steady
+   wall, measured HBM headroom, provenance, DB linkage, archive and authenticated 8/8 zero-work cleanup.
+
+## 21.3 Consequences
+
+- Bit-exact reproduction of legacy prefill or decode intermediate arithmetic is not a Gate D
+  requirement and not a prerequisite for a protected 8K run.
+- The exact-M2048 StrategyND association fingerprint and any legacy reduction-tree emulation are
+  optional research, default deferred. Their code, evidence and the V11 validator correction remain
+  committed history.
+- The standing prohibition "no complete WS32 rerun without a bounded layer-1 state-boundary proof"
+  is satisfied only by a passing offline §21.2 items 3–4 adjudication of the archived
+  `…20260827T011711674195301Z` event-1 arrays. A failing adjudication keeps the prohibition and
+  redirects work to localizing the layer-1 defect by chunk/row probes, not 8K runs.
+- Feasibility must be confirmed before promising zero TPU time: the engine event-1 score row (WS32
+  NPZ `2be686ff…eeb1`), the oracle event-1 score row, the sealed legacy layer-1 cache
+  (`d9058cc6…`, 8,155 rows) and the FP32 query at position 8155 (oracle `79b813da…`) must all be
+  archived and hash-verified. If any is missing, one bounded capture run (not a decoder run) is the
+  next step.
+- §17 "DSA selected sets or tie order change" is read as "fail §21.2 items 2–4". §1.3, §11.1 L6 and
+  §18 "exact DSA selected sets and tie order" are read as "§21.2 items 2–4 pass".

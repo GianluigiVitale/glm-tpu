@@ -3941,3 +3941,37 @@ persistence only; review and persistence precede any v2 installation.
   the unit dimension with u16-zero/scalar-u16-add reduction. V10's unary-only representation linter
   rejected this before numerics. Full facts and successor constraints are in
   `docs/artifacts/gate-d-m2048-v10-unit-extent-reduce-failure.json`.
+
+## 2026-09-04 — V11 exact unit-extent validator; V10 HLO accepted offline (CPU only)
+
+- Fixture `tests/greenfield/benchmarking/fixtures/m2048_v10_protected_optimized_hlo.txt` holds the
+  burned V10 tag's process-0 optimized HLO (8,311 bytes, SHA `a96ff87a…9ab2`) replayed from the
+  generation-pinned diagnostic log. The V11 validator accepts it; 20 hostile mutations of the same
+  bytes (nonzero/non-constant initializer, wrong/missing dimension, swapped/variadic operands, kept
+  dimension, maximum/multiply/degenerate/BF16 reducers, row one, slice bypass, two caller operands,
+  dead slice, constant in the pre-collective fusion, two-row reduce, s16, full-row reduce) reject,
+  as do synthetic alternate-root and chained-reduce forms.
+- Runtime moved to fresh immutable V4 paths; worker prestate pin `b7708936…` (worker 1 verified
+  read-only: clean, detached). Full SHA cascade repinned; focused suite 65/65. Certificate
+  `gate-d-m2048-strategy-nd-v11-source.json`; fresh tag
+  `greenfield_m2048_strategy_nd_20260904T232704581062072Z`.
+- Claim scope: CPU/HLO mechanism only. No install, TPU execution, numerical, decoder, performance or
+  Gate-D claim. Review verdict recorded in HANDOFF.
+
+## 2026-09-05 — Gate D correctness contract amended (spec §21); M2048 deferred
+
+- Decision recorded in `docs/glm-tpu-revolution.md` §21 and `docs/greenfield/NUMERICAL_CONTRACT.md`.
+  Grounds: WS32 8K runs `greenfield_ws32_short_decoder_8k_numerical_20260826T213125786075567Z` and
+  `greenfield_ws32_short_decoder_8k_numerical_20260827T011711674195301Z` had exact 20/20 tokens, valid
+  state/cache, exact event-0 DSA and measured HBM; the only refusal was seven event-1 selected-position
+  swaps (no aligned score statistics recorded). Gate C DB421: an independent PyTorch CPU scorer and the
+  greenfield TPU FP32 scorer disagree on 2/2,048 cutoff members while both satisfy the bounded contract.
+  The seven-swap signature is plan-invariant and survived a certified legacy-exact layer-1 RMS input
+  (six mismatches), so it is adjudicated under the §21.2 bias rule, not presumed benign.
+- V11 (exact unit-extent validator, V4 paths, fixture) is preserved and committed; its install and
+  M2048 execution are deferred, not authorized. Next decisive test is offline: confirm the archived
+  event-1 score rows and sealed legacy layer-1 inputs exist, then adjudicate under §21.2 items 3--4 with
+  an independent FP32 CPU reference; a pass is the required bounded layer-1 proof for one protected 8K
+  WS32 run with the amended observer and full performance protections; a fail redirects to chunk/row
+  localization.
+- Section 18 table row "Exact DSA sets and tie order" is now read as §21.2 items 2--4.

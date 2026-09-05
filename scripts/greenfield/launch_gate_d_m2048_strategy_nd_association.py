@@ -13,7 +13,7 @@ import subprocess
 import sys
 
 
-INSTALL_PATH = Path("/opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v3.py")
+INSTALL_PATH = Path("/opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v4.py")
 SYSTEM_PYTHON = Path("/usr/bin/python3.10")
 SYSTEM_PYTHON_SHA256 = (
     "7d51cd6b48b521277f5caa4610a82126e315fa2be4df069823a8b1eeb5bd4a86"
@@ -31,13 +31,13 @@ WRAPPER_PATH = WORKTREE / (
 WRAPPER_SOURCE_PATH = (
     "scripts/greenfield/run_gate_d_m2048_strategy_nd_association.sh"
 )
-WRAPPER_SHA256 = "f09f523995ad1ff6c34f7709931026ff2a9e48be23d8a55eab137c8c1947bf68"
+WRAPPER_SHA256 = "6f4c3164a2a321e13710ecb4736b601a91cbfeaf6f8b829a5f380f15cdb80172"
 CAPSULE_ROOT = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v3"
+    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v4"
 )
 PROBE_PATH = CAPSULE_ROOT / "probe_m2048_strategy_nd_association.py"
 PROBE_SOURCE_PATH = "scripts/greenfield/probe_m2048_strategy_nd_association.py"
-PROBE_SHA256 = "0eb543cb85919f5541f2f8e1cf206eeb07630293ea4ba707d1728376fa6a1502"
+PROBE_SHA256 = "f708163ab9731cfa8195c78d0bb4b458e3a44c1858faecab331716427c70c39b"
 PUBLISHER_PATH = (
     CAPSULE_ROOT / "publish_gate_d_m2048_strategy_nd_association.py"
 )
@@ -45,7 +45,7 @@ PUBLISHER_SOURCE_PATH = (
     "scripts/greenfield/publish_gate_d_m2048_strategy_nd_association.py"
 )
 PUBLISHER_SHA256 = (
-    "f6472b2cb43318fad9ece2396c0b079e73ad9840b7bf5b3dd7c131586a52479a"
+    "fbf02bd4216b20e21855d877837c972db98736c636608bf74262f20126e51148"
 )
 MIRROR_VERIFIER_PATH = (
     CAPSULE_ROOT / "verify_gate_d_rewrite_same_region_git_mirror.py"
@@ -54,7 +54,7 @@ MIRROR_VERIFIER_SOURCE_PATH = (
     "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
 )
 MIRROR_VERIFIER_SHA256 = (
-    "d49bff51355d88e353d81f0c8c3aafa0457068567f2bb845ae165efc70a7e465"
+    "8747647d88a4cf2d435a46b6ed94067ecc05910d1917c24122cba88f8d037c0a"
 )
 LOCK_ROOT = Path("/opt/glm-tpu/locks")
 LOCK_NAMES = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")

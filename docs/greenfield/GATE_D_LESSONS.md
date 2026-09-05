@@ -1305,3 +1305,22 @@ normalized-state cause.
   representation-only row view only when the slice, extent-one dimension, zero initializer, exact
   same-dtype scalar add, output shape, sole operand and live path all match; reject generic reductions,
   dead/alternate paths and any mutation. This false rejection burned V10 before numerical invocation.
+- Every fail-closed HLO contract must be executed offline against the real acquired TPU compiler
+  product before the next tag, and that product must be committed as a fixture with its SHA. The
+  V10 optimized HLO (`a96ff87a…9ab2`) was already in the diagnostic raw log; replaying the V11
+  validator against those 8,311 bytes, plus hostile mutations of the same bytes, proved acceptance
+  and rejection with zero TPU time. Synthetic HLO alone had let the unary-only assumption survive.
+- When admitting a compiler-generated non-unary op as "representation only", bind every fact that
+  makes it exact: the operand dtype (u16, so no rounding/NaN canonicalization), the reduced dimension
+  and its extent (one), the initializer literal (parsed operand `("0",)`, not a shape), the reducer
+  computation body (two scalar u16 parameters, one ROOT add), the result shape as the fusion root,
+  the single caller operand, and full callee liveness including the constant. Note the HLO text
+  parser reports `constant(0)` with operand names `("0",)` exactly like `parameter(0)`; bind the
+  opcode too.
+- Bit-identity against a differently-sharded oracle is not a correctness property. Gate C DB421's independent
+  PyTorch CPU scorer disagreed with the greenfield TPU FP32 scorer at the 2,048 cutoff (2/2,048)
+  while both met the bounded contract, yet the campaign kept
+  "exact selected sets versus legacy" as the Gate D bar and spent three weeks and more than ten
+  protected tags reproducing the legacy prefill's 32-way reduction association. Decide the criterion
+  first: exact where the model semantics are exact (tokens, structure, within-engine ties), bounded
+  and reference-adjudicated where association legitimately differs (spec §21).

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from hashlib import sha256
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -119,7 +121,7 @@ def test_hlo_contract_accepts_only_the_exact_live_m2048_collective() -> None:
         (hlo.replace("ROOT sum = bf16[] add(x, y)", "ROOT sum = bf16[] maximum(x, y)"), "exact scalar BF16 add"),
         (hlo.replace("slice={[0:1], [0:6144]}", "slice={[1:2], [0:6144]}"), "row-zero"),
         (hlo.replace("all-reduce(payload)", "all-reduce(flat)"), "operand/result"),
-        (hlo.replace("tuple(full, row-bits)", "tuple(full, full)"), "root order"),
+        (hlo.replace("tuple(full, row-bits)", "tuple(full, full)"), "root order|dead or alternate instructions"),
     )
     for drifted, message in mutations:
         with pytest.raises(BenchmarkValidationError, match=message):
@@ -212,3 +214,289 @@ def test_exact_m2048_bank_recovers_one_declared_candidate_per_lane() -> None:
     drifted[:, 0] ^= np.uint16(1)
     with pytest.raises(BenchmarkValidationError, match="not unique"):
         analyze_m2048_row0_association(inputs, drifted, MEMBERS, coordinates)
+
+
+PROTECTED_V10_HLO = (
+    Path(__file__).parent / "fixtures" / "m2048_v10_protected_optimized_hlo.txt"
+)
+PROTECTED_V10_HLO_SHA256 = (
+    "a96ff87a934afeac31df9218bb4436230924584c4775d8b4f943d68a20c39ab2"
+)
+
+
+def _protected_v10_hlo() -> str:
+    raw = PROTECTED_V10_HLO.read_bytes()
+    assert sha256(raw).hexdigest() == PROTECTED_V10_HLO_SHA256
+    assert len(raw) == 8311
+    return raw.decode("ascii")
+
+
+def test_protected_v10_tpu_hlo_unit_extent_u16_reduce_is_accepted() -> None:
+    """The exact bytes that V10 false-rejected before numerics must now pass."""
+
+    hlo = _protected_v10_hlo()
+    assert "reduce(%bitcast_convert_type.23, %constant.3), dimensions={0}" in hlo
+    report, algorithm = validate_m2048_strategy_nd_fingerprint_hlo(hlo, MEMBERS)
+    assert report.valid
+    assert algorithm == STRATEGY_ND_ALGORITHM
+    assert algorithm["emitter"] == "RotatedPincerEmitter"
+
+
+def _v10_mutation(hlo: str, old: str, new: str) -> str:
+    assert hlo.count(old) == 1, old
+    return hlo.replace(old, new)
+
+
+REDUCE_LINE = (
+    "ROOT %reduce.1 = u16[6144]{0:T(1024)(128)(2,1)} "
+    "reduce(%bitcast_convert_type.23, %constant.3), dimensions={0}, "
+    "to_apply=%bitcast_convert_type.18.reduce_sub_computation"
+)
+SLICE_LINE = (
+    "%slice.7 = bf16[1,6144]{1,0:T(2,128)(2,1)} slice(%param_0.7), "
+    "slice={[0:1], [0:6144]}"
+)
+BITCAST_LINE = (
+    "%bitcast_convert_type.23 = u16[1,6144]{1,0:T(2,128)(2,1)} "
+    "bitcast-convert(%slice.7)"
+)
+CONSTANT_LINE = "%constant.3 = u16[]{:T(256)} constant(0)"
+REDUCER_ROOT = "ROOT %add.2 = u16[] add(%lhs, %rhs)"
+
+
+@pytest.mark.parametrize(
+    ("label", "old", "new", "message"),
+    (
+        (
+            "nonzero initializer",
+            CONSTANT_LINE,
+            "%constant.3 = u16[]{:T(256)} constant(1)",
+            "exact u16 zero",
+        ),
+        (
+            "initializer is a parameter-shaped non-constant",
+            CONSTANT_LINE,
+            "%constant.3 = u16[]{:T(256)} copy(%param_0.7)",
+            "exact u16 zero",
+        ),
+        (
+            "wrong reduced dimension",
+            REDUCE_LINE,
+            REDUCE_LINE.replace("dimensions={0}", "dimensions={1}"),
+            "shape/dimension drifted",
+        ),
+        (
+            "missing dimensions attribute",
+            REDUCE_LINE,
+            REDUCE_LINE.replace(", dimensions={0}", ""),
+            "dimensions attribute is not unique|shape/dimension drifted",
+        ),
+        (
+            "swapped reduce operands",
+            REDUCE_LINE,
+            REDUCE_LINE.replace(
+                "reduce(%bitcast_convert_type.23, %constant.3)",
+                "reduce(%constant.3, %bitcast_convert_type.23)",
+            ),
+            "shape/dimension drifted",
+        ),
+        (
+            "variadic reduce",
+            REDUCE_LINE,
+            REDUCE_LINE.replace(
+                "reduce(%bitcast_convert_type.23, %constant.3)",
+                "reduce(%bitcast_convert_type.23, %bitcast_convert_type.23, "
+                "%constant.3, %constant.3)",
+            ),
+            "one value and one initializer",
+        ),
+        (
+            "reduce result keeps a dimension",
+            REDUCE_LINE,
+            REDUCE_LINE.replace(
+                "ROOT %reduce.1 = u16[6144]{0:T(1024)(128)(2,1)}",
+                "ROOT %reduce.1 = u16[1,6144]{1,0:T(2,128)(2,1)}",
+            ),
+            "shape/dimension drifted",
+        ),
+        (
+            "reducer maximum",
+            REDUCER_ROOT,
+            "ROOT %add.2 = u16[] maximum(%lhs, %rhs)",
+            "exact scalar u16 add",
+        ),
+        (
+            "reducer multiply",
+            REDUCER_ROOT,
+            "ROOT %add.2 = u16[] multiply(%lhs, %rhs)",
+            "exact scalar u16 add",
+        ),
+        (
+            "reducer ignores one parameter",
+            REDUCER_ROOT,
+            "ROOT %add.2 = u16[] add(%lhs, %lhs)",
+            "exact scalar u16 add",
+        ),
+        (
+            "reducer is the BF16 collective reducer",
+            REDUCE_LINE,
+            REDUCE_LINE.replace(
+                "to_apply=%bitcast_convert_type.18.reduce_sub_computation",
+                "to_apply=%region_0.0",
+            ),
+            "exact scalar u16 add",
+        ),
+        (
+            "row one instead of row zero",
+            SLICE_LINE,
+            SLICE_LINE.replace("slice={[0:1], [0:6144]}", "slice={[1:2], [0:6144]}"),
+            "row-zero slice drifted",
+        ),
+        (
+            "reduce bypasses the slice",
+            BITCAST_LINE,
+            "%bitcast_convert_type.23 = u16[1,6144]{1,0:T(2,128)(2,1)} "
+            "bitcast-convert(%param_0.7)",
+            "shape/dimension drifted|dead or alternate",
+        ),
+        (
+            "two caller operands",
+            "fusion(%psum.7), kind=kLoop, calls=%fused_computation.2",
+            "fusion(%psum.7, %psum.7), kind=kLoop, calls=%fused_computation.2",
+            "alternate operand|exactly one caller operand",
+        ),
+        (
+            "dead extra slice inside the fusion",
+            CONSTANT_LINE,
+            "%dead.9 = bf16[1,6144]{1,0:T(2,128)(2,1)} slice(%param_0.7), "
+            "slice={[1:2], [0:6144]}\n  " + CONSTANT_LINE,
+            "dead or alternate",
+        ),
+        (
+            "duplicate dimensions attribute",
+            REDUCE_LINE,
+            REDUCE_LINE.replace("dimensions={0}", "dimensions={1}, dimensions={0}"),
+            "dimensions attribute is not unique",
+        ),
+        (
+            "literal third reduce operand hidden from the parser",
+            REDUCE_LINE,
+            REDUCE_LINE.replace(
+                "reduce(%bitcast_convert_type.23, %constant.3)",
+                "reduce(%bitcast_convert_type.23, %constant.3, {1})",
+            ),
+            "one value and one initializer",
+        ),
+        (
+            "reduce is not the fusion root",
+            REDUCE_LINE,
+            REDUCE_LINE.replace("ROOT %reduce.1", "%reduce.1")
+            + "\n  ROOT %copy.9 = u16[6144]{0:T(1024)(128)(2,1)} copy(%reduce.1)",
+            "not the fusion root",
+        ),
+        (
+            "dead ENTRY instruction",
+            "  ROOT %tuple.5 =",
+            "  %dead.entry = u16[2048,6144]{1,0:T(8,128)(2,1)} "
+            "bitcast-convert(%psum.7)\n  ROOT %tuple.5 =",
+            "dead or alternate instructions",
+        ),
+        (
+            "constant inside the pre-collective fusion",
+            "ROOT %bitcast.1 = bf16[2048,6144]{1,0:T(8,128)(2,1)S(3)} "
+            "bitcast(%bitcast_convert_type.20)",
+            "%stray = u16[]{:T(256)} constant(0)\n  "
+            "ROOT %bitcast.1 = bf16[2048,6144]{1,0:T(8,128)(2,1)S(3)} "
+            "bitcast(%bitcast_convert_type.20)",
+            "structure drifted",
+        ),
+    ),
+)
+def test_protected_v10_hlo_hostile_unit_extent_mutations_reject(
+    label: str, old: str, new: str, message: str
+) -> None:
+    hostile = _v10_mutation(_protected_v10_hlo(), old, new)
+    with pytest.raises(BenchmarkValidationError, match=message):
+        validate_m2048_strategy_nd_fingerprint_hlo(hostile, MEMBERS)
+
+
+def test_protected_v10_hlo_rejects_non_unit_extent_payload_association() -> None:
+    """A two-row reduce would associate payload rows; it must never be accepted."""
+
+    hlo = _protected_v10_hlo()
+    hostile = _v10_mutation(
+        hlo,
+        SLICE_LINE,
+        "%slice.7 = bf16[2,6144]{1,0:T(2,128)(2,1)} slice(%param_0.7), "
+        "slice={[0:2], [0:6144]}",
+    )
+    hostile = _v10_mutation(
+        hostile,
+        BITCAST_LINE,
+        "%bitcast_convert_type.23 = u16[2,6144]{1,0:T(2,128)(2,1)} "
+        "bitcast-convert(%slice.7)",
+    )
+    with pytest.raises(BenchmarkValidationError, match="shape/dimension drifted"):
+        validate_m2048_strategy_nd_fingerprint_hlo(hostile, MEMBERS)
+
+    signed = _v10_mutation(hlo, BITCAST_LINE, BITCAST_LINE.replace("u16[1,6144]", "s16[1,6144]"))
+    with pytest.raises(BenchmarkValidationError, match="shape/dimension drifted"):
+        validate_m2048_strategy_nd_fingerprint_hlo(signed, MEMBERS)
+
+    full_rows = _v10_mutation(
+        hlo,
+        BITCAST_LINE,
+        "%bitcast_convert_type.23 = u16[2048,6144]{1,0:T(8,128)(2,1)} "
+        "bitcast-convert(%param_0.7)",
+    )
+    with pytest.raises(BenchmarkValidationError):
+        validate_m2048_strategy_nd_fingerprint_hlo(full_rows, MEMBERS)
+
+
+def test_synthetic_fused_row0_reduce_form_is_accepted_and_alternate_root_rejected() -> None:
+    hlo = _m2048_fused_row_hlo()
+    reduce_form = hlo.replace(
+        '''row_fusion {
+  p = bf16[2048,6144]{1,0:T(8,128)(2,1)S(3)} parameter(0)
+  s = bf16[1,6144]{1,0:T(8,128)(2,1)} slice(p), slice={[0:1], [0:6144]}
+  flat = bf16[6144]{0:T(1024)(128)(2,1)} reshape(s)
+  ROOT bits = u16[6144]{0:T(1024)(128)(2,1)} bitcast-convert(flat)
+}''',
+        '''u16_add {
+  a = u16[] parameter(0)
+  b = u16[] parameter(1)
+  ROOT s = u16[] add(a, b)
+}
+
+row_fusion {
+  p = bf16[2048,6144]{1,0:T(8,128)(2,1)S(3)} parameter(0)
+  s = bf16[1,6144]{1,0:T(8,128)(2,1)} slice(p), slice={[0:1], [0:6144]}
+  bits2 = u16[1,6144]{1,0:T(8,128)(2,1)} bitcast-convert(s)
+  zero = u16[] constant(0)
+  ROOT bits = u16[6144]{0:T(1024)(128)(2,1)} reduce(bits2, zero), dimensions={0}, to_apply=u16_add
+}''',
+    )
+    assert reduce_form != hlo
+    report, _ = validate_m2048_strategy_nd_fingerprint_hlo(reduce_form, MEMBERS)
+    assert report.valid
+
+    alternate_root = reduce_form.replace(
+        "  ROOT bits = u16[6144]{0:T(1024)(128)(2,1)} reduce(bits2, zero), dimensions={0}, to_apply=u16_add\n}",
+        "  bits = u16[6144]{0:T(1024)(128)(2,1)} reduce(bits2, zero), dimensions={0}, to_apply=u16_add\n"
+        "  wrong = bf16[1,6144]{1,0:T(8,128)(2,1)} slice(p), slice={[1:2], [0:6144]}\n"
+        "  wrong-flat = bf16[6144]{0:T(1024)(128)(2,1)} reshape(wrong)\n"
+        "  ROOT alternate = u16[6144]{0:T(1024)(128)(2,1)} bitcast-convert(wrong-flat)\n}",
+    )
+    assert alternate_root != reduce_form
+    with pytest.raises(BenchmarkValidationError, match="dead or alternate|row-zero slice drifted"):
+        validate_m2048_strategy_nd_fingerprint_hlo(alternate_root, MEMBERS)
+
+    chained = reduce_form.replace(
+        "  zero = u16[] constant(0)\n",
+        "  zero = u16[] constant(0)\n"
+        "  bits3 = u16[1,1,6144]{2,1,0:T(8,128)(2,1)} reshape(bits2)\n"
+        "  pre = u16[1,6144]{1,0:T(8,128)(2,1)} reduce(bits3, zero), dimensions={0}, to_apply=u16_add\n",
+    ).replace("reduce(bits2, zero), dimensions={0}, to_apply=u16_add\n}", "reduce(pre, zero), dimensions={0}, to_apply=u16_add\n}")
+    assert chained != reduce_form
+    with pytest.raises(BenchmarkValidationError, match="sole row-zero unit-extent removal"):
+        validate_m2048_strategy_nd_fingerprint_hlo(chained, MEMBERS)

@@ -1,0 +1,70 @@
+HloModule jit_fingerprint, is_scheduled=true, entry_computation_layout={(u16[1,2048,6144]{2,1,0:T(8,128)(2,1)})->(u16[2048,6144]{1,0:T(8,128)(2,1)}, u16[6144]{0:T(1024)(128)(2,1)})}, allow_spmd_sharding_propagation_to_output={true,true}, num_partitions=32
+
+FileNames
+1 "/proc/self/fd/3/glm_tpu/greenfield/benchmarking/m2048_association_fingerprint.py"
+2 "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v3/probe_m2048_strategy_nd_association.py"
+
+FunctionNames
+1 "_m2048_fingerprint_function.<locals>.fingerprint"
+2 "<module>"
+3 "main"
+4 "build_m2048_strategy_nd_fingerprint"
+
+FileLocations
+1 {file_name_id=1 function_name_id=1 line=597 end_line=597 column=22 end_column=22}
+2 {file_name_id=2 function_name_id=2 line=527 end_line=527 column=21 end_column=21}
+3 {file_name_id=2 function_name_id=3 line=394 end_line=394 column=19 end_column=19}
+4 {file_name_id=1 function_name_id=4 line=641 end_line=641 column=14 end_column=14}
+5 {file_name_id=1 function_name_id=1 line=596 end_line=596 column=22 end_column=22}
+6 {file_name_id=1 function_name_id=1 line=599 end_line=599 column=24 end_column=24}
+7 {file_name_id=1 function_name_id=1 line=600 end_line=600 column=24 end_column=24}
+8 {file_name_id=1 function_name_id=1 line=600 end_line=600 column=49 end_column=49}
+
+StackFrames
+1 {file_location_id=1 parent_frame_id=1}
+2 {file_location_id=1 parent_frame_id=2}
+3 {file_location_id=2 parent_frame_id=1}
+4 {file_location_id=3 parent_frame_id=4}
+5 {file_location_id=4 parent_frame_id=5}
+6 {file_location_id=5 parent_frame_id=6}
+7 {file_location_id=1 parent_frame_id=6}
+8 {file_location_id=6 parent_frame_id=6}
+9 {file_location_id=7 parent_frame_id=6}
+10 {file_location_id=8 parent_frame_id=6}
+
+
+%fused_computation (param_0.1: u16[1,2048,6144]) -> bf16[2048,6144] {
+  %param_0.1 = u16[1,2048,6144]{2,1,0:T(8,128)(2,1)} parameter(0)
+  %bitcast_convert_type.20 = bf16[1,2048,6144]{2,1,0:T(8,128)(2,1)} bitcast-convert(%param_0.1), metadata={op_name="jit(fingerprint)/shard_map/m2048_strategy_nd_association_fingerprint/bitcast_convert_type" stack_frame_id=6}
+  ROOT %bitcast.1 = bf16[2048,6144]{1,0:T(8,128)(2,1)S(3)} bitcast(%bitcast_convert_type.20), metadata={op_name="jit(fingerprint)/shard_map/m2048_strategy_nd_association_fingerprint/bitcast_convert_type" stack_frame_id=6}
+}
+
+%region_0.0 (psum.0: bf16[], psum.1: bf16[]) -> bf16[] {
+  %psum.1 = bf16[]{:T(256)} parameter(1), metadata={op_name="m2048_strategy_nd_association_fingerprint/psum"}
+  %psum.0 = bf16[]{:T(256)} parameter(0), metadata={op_name="m2048_strategy_nd_association_fingerprint/psum"}
+  ROOT %add.0 = bf16[]{:T(256)} add(%psum.0, %psum.1), metadata={op_name="m2048_strategy_nd_association_fingerprint/add" stack_frame_id=2}, backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"scoped_memory_configs":[],"used_scoped_memory_configs":[]}
+}
+
+%bitcast_convert_type.18.reduce_sub_computation (lhs: u16[], rhs: u16[]) -> u16[] {
+  %rhs = u16[] parameter(1)
+  %lhs = u16[] parameter(0)
+  ROOT %add.2 = u16[] add(%lhs, %rhs), backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"scoped_memory_configs":[],"used_scoped_memory_configs":[]}
+}
+
+%fused_computation.2 (param_0.7: bf16[2048,6144]) -> u16[6144] {
+  %param_0.7 = bf16[2048,6144]{1,0:T(8,128)(2,1)S(3)} parameter(0)
+  %slice.7 = bf16[1,6144]{1,0:T(2,128)(2,1)} slice(%param_0.7), slice={[0:1], [0:6144]}, metadata={op_name="jit(fingerprint)/shard_map/m2048_strategy_nd_association_fingerprint/slice" stack_frame_id=10}
+  %bitcast_convert_type.23 = u16[1,6144]{1,0:T(2,128)(2,1)} bitcast-convert(%slice.7), metadata={op_name="jit(fingerprint)/shard_map/m2048_strategy_nd_association_fingerprint/bitcast_convert_type" stack_frame_id=9}
+  %constant.3 = u16[]{:T(256)} constant(0), metadata={op_name="jit(fingerprint)/shard_map/m2048_strategy_nd_association_fingerprint/bitcast_convert_type" stack_frame_id=9}
+  ROOT %reduce.1 = u16[6144]{0:T(1024)(128)(2,1)} reduce(%bitcast_convert_type.23, %constant.3), dimensions={0}, to_apply=%bitcast_convert_type.18.reduce_sub_computation, metadata={op_name="jit(fingerprint)/shard_map/m2048_strategy_nd_association_fingerprint/bitcast_convert_type" stack_frame_id=9}
+}
+
+ENTRY %main.0_spmd (param.1: u16[1,2048,6144]) -> (u16[2048,6144], u16[6144]) {
+  %param.1 = u16[1,2048,6144]{2,1,0:T(8,128)(2,1)} parameter(0), sharding={devices=[32,1,1]<=[32]}, metadata={op_name="local_bits"}
+  %bitcast-convert_bitcast_fusion = bf16[2048,6144]{1,0:T(8,128)(2,1)S(3)} fusion(%param.1), kind=kLoop, calls=%fused_computation, metadata={op_name="jit(fingerprint)/shard_map/m2048_strategy_nd_association_fingerprint/bitcast_convert_type" stack_frame_id=6}, backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"megacore_config":{"megacore_split_dim":"0"},"retry_config":{"retry_count":"0"},"scoped_memory_configs":[],"used_scoped_memory_configs":[{"memory_space":"1","offset":"0","size":"8511488"}],"window_config":{"cost_model_type":"COST_MODEL_TYPE_INVALID","estimated_bundle_count":"0","estimated_cycles":"114246","estimated_scoped_vmem_bytes":"0","estimated_vmem_bytes":"0","input_window_bounds":[],"is_mask":false,"iteration_bounds":["4","3"],"kernel_window_bounds":[],"ml_estimated_microseconds":0,"output_window_bounds":["64","16"],"pad_input_on_minor_dim":"0","pad_output_on_minor_dim":"0"}}
+  %psum.7 = bf16[2048,6144]{1,0:T(8,128)(2,1)S(3)} all-reduce(%bitcast-convert_bitcast_fusion), channel_id=1, replica_groups={{0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31}}, use_global_device_ids=true, to_apply=%region_0.0, metadata={op_name="jit(fingerprint)/shard_map/m2048_strategy_nd_association_fingerprint/psum" stack_frame_id=7}, backend_config={"aliasing_operands":{"lists":[]},"barrier_config":{"barrier_type":"CUSTOM","id":"0"},"collective_algorithm_config":{"debug":"\nStrategyND{colors:3 phases:3 cores:{4 2 4},{2 4 4},{4 4 2} nophase0:0 reserved_sflags:1 cross_module_on_2d_plane:0 has_reordering_map:0 use_routing_table_indices:0 num_dims:3 active_dims:111 dim_sizes:4,2,4 dim_used:{0 1 2},{1 2 0},{2 0 1} use_ndnway:0 asymmetric_max_colors:1 devices:1,1,1 stride:1, 1, 1}","emitter":"RotatedPincerEmitter","strategy":"StrategyND"},"flag_configs":[],"retry_config":{"retry_count":"0"},"scoped_memory_configs":[{"memory_space":"0","offset":"0","size":"67108864"}],"used_scoped_memory_configs":[{"memory_space":"1","offset":"0","size":"10092544"}]}
+  %fusion = u16[6144]{0:T(1024)(128)(2,1)} fusion(%psum.7), kind=kLoop, calls=%fused_computation.2, metadata={op_name="jit(fingerprint)/shard_map/m2048_strategy_nd_association_fingerprint/bitcast_convert_type" stack_frame_id=9}, backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"megacore_config":{"megacore_allreduce_bytes":"24576","megacore_split_dim":"1"},"retry_config":{"retry_count":"0"},"scoped_memory_configs":[],"used_scoped_memory_configs":[{"memory_space":"1","offset":"0","size":"49152"}],"window_config":{"cost_model_type":"COST_MODEL_TYPE_INVALID","estimated_bundle_count":"0","estimated_cycles":"985","estimated_scoped_vmem_bytes":"0","estimated_vmem_bytes":"0","input_window_bounds":[],"is_mask":false,"iteration_bounds":["1","2"],"kernel_window_bounds":[],"ml_estimated_microseconds":0,"output_window_bounds":["1","24"],"pad_input_on_minor_dim":"0","pad_output_on_minor_dim":"0"}}
+  %bitcast_convert_type.17 = u16[2048,6144]{1,0:T(8,128)(2,1)} bitcast-convert(%psum.7), metadata={op_name="jit(fingerprint)/shard_map/m2048_strategy_nd_association_fingerprint/bitcast_convert_type" stack_frame_id=8}, backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"megacore_config":{"megacore_split_dim":"0"},"retry_config":{"retry_count":"0"},"scoped_memory_configs":[],"used_scoped_memory_configs":[{"memory_space":"1","offset":"0","size":"1572864"}],"window_config":{"cost_model_type":"COST_MODEL_TYPE_INVALID","estimated_bundle_count":"0","estimated_cycles":"136704","estimated_scoped_vmem_bytes":"0","estimated_vmem_bytes":"0","input_window_bounds":[],"is_mask":false,"iteration_bounds":["32","3"],"kernel_window_bounds":[],"ml_estimated_microseconds":0,"output_window_bounds":["8","16"],"pad_input_on_minor_dim":"0","pad_output_on_minor_dim":"0"}}
+  ROOT %tuple.5 = (u16[2048,6144]{1,0:T(8,128)(2,1)}, u16[6144]{0:T(1024)(128)(2,1)}) tuple(%bitcast_convert_type.17, %fusion)
+}
+

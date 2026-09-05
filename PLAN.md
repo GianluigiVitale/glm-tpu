@@ -9,8 +9,10 @@ The authoritative details, stop conditions, and Definition of Done are in
    FP8 scale ownership; direct loader; corruption refusal; measured per-chip HBM.
 3. **Gate C — one layer:** exact dense, full-DSA, IndexShare, and adversarial MoE equivalence against
    captured legacy-oracle inputs, with topology-local collectives only.
-4. **Gate D — full short context:** independent 78-layer 2K/8K decoder; exact tokens/DSA/cache/state;
-   no repeated 32-chip layer collective; fresh trace, wall result, and memory report.
+4. **Gate D — full short context:** independent 78-layer 2K/8K decoder; exact tokens; within-engine
+   exact DSA tie order; cross-oracle DSA agreement exact or boundary-explained against an FP32
+   reference with a systematic-bias check (spec §21); exact cache/state structure with bounded
+   values; no repeated 32-chip layer collective; fresh trace, wall result, and memory report.
 5. **Gates E/F — useful/strong base:** first `<=200 ms` and `>=4.5` wall tok/s; then target
    `<=125 ms`/`>=8 tok/s`, stretch `<=100 ms`/`>=10 tok/s`.
 6. **Gate G — plan adjudication:** protected identical-condition PP8, PP16, and WS32 comparison or

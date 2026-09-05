@@ -251,3 +251,26 @@ wiring layers, reassociating an add, or returning a bypass is a hard refusal. Th
 calls must also resolve to exact private helpers: scalar i32 zero converts to BF16/FP32, then pads
 `[1,512] -> [8,512]` with high `[7,0]` or `[4,48] -> [8,128]` with high `[4,80]`, both with zero
 low/interior values and direct return lineage. An opaque, unknown or differently placed pad refuses.
+
+## Gate D cross-oracle correctness (spec §21, 2026-09-05)
+
+- Level 3 (exact) applies to raw greedy tokens against the sealed legacy oracle and to every
+  structural cache/state fact. Level 1 (bit-exact) is required only within the engine: distributed
+  selection and lowest-position tie order versus a canonical top-k of the engine's own executing
+  score row. Level 1 is **not** required against the legacy engine's intermediate arithmetic.
+- Reference `R`: an independent FP32 CPU score row computed from the sealed legacy inputs of the
+  event by code sharing nothing with the engine scorer; implementation, dtype and hash recorded first.
+- Cross-oracle selected sets are exact or boundary-explained with `eps_event = max |s_o − R|` over
+  the aligned positions `A = E ∩ O` (the oracle's own error; the engine cannot inflate it), an
+  absolute pre-registered cap on `max |s_e − R|` (DB421 `0.003605` unless a layer-specific bounded
+  oracle value exists), every position of `E Δ O` within `eps_event` of both cutoffs after
+  lowest-position tie resolution, and `|E Δ O|` no larger than the oracle's ambiguity band. Any
+  violation is a hard failure.
+- Systematic bias: `|mean(s_e − R)| ≤ max(|mean(s_o − R)| + 3·s/√n, 0.000965)` over `A`. A
+  near-uniform signed shift larger than that is a defect to localize, not noise to tolerate.
+- Evidence: Gate C DB421 (raw PyTorch CPU scorer vs greenfield TPU FP32 scorer disagree on 2/2,048
+  cutoff members while both satisfy the bounded contract); WS32 8K runs of 2026-08-26/27 (exact
+  tokens/state/cache/event 0, seven event-1 selected-position swaps, no aligned error statistics
+  recorded). The PP8 run `…_20260808T041407656729112Z` recorded aligned event-1 error
+  max/mean/signed `0.27013397/0.18290268/-0.18290268`; a shift of that size would fail the bias rule
+  by two orders of magnitude and must be adjudicated on the WS32 arrays before any Gate D claim.

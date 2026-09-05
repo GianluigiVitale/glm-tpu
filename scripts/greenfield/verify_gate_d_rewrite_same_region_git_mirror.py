@@ -16,7 +16,7 @@ BRANCH = "rewrite/topology-first-decode"
 ORIGIN = "git@github.com:GianluigiVitale/glm-tpu.git"
 SOURCE_PATH = "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v3/"
+    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v4/"
     "verify_gate_d_rewrite_same_region_git_mirror.py"
 )
 BASE_PATH = "scripts/greenfield/verify_gate_d_same_region_git_mirror.py"
@@ -34,6 +34,7 @@ BOUND_PATHS = (
     "docs/artifacts/gate-d-m2048-strategy-nd-v8-source.json",
     "docs/artifacts/gate-d-m2048-strategy-nd-v9-source.json",
     "docs/artifacts/gate-d-m2048-strategy-nd-v10-source.json",
+    "docs/artifacts/gate-d-m2048-strategy-nd-v11-source.json",
     "docs/artifacts/gate-d-m2048-v2-install-repository-prestate-failure.json",
     "docs/artifacts/gate-d-m2048-v3-install-loader-quoting-failure.json",
     "docs/artifacts/gate-d-m2048-v4-install-runtime-loader-quoting-failure.json",
@@ -42,6 +43,7 @@ BOUND_PATHS = (
     "docs/artifacts/gate-d-m2048-v7-missing-requests-auto-detection-failure.json",
     "docs/artifacts/gate-d-m2048-v8-zero-retention-preflight-incompatibility.json",
     "docs/artifacts/gate-d-m2048-v9-fleet-process-identity-failure.json",
+    "docs/artifacts/gate-d-m2048-v10-unit-extent-reduce-failure.json",
     "docs/greenfield/REUSE_INVENTORY.md",
     "glm_tpu/greenfield/benchmarking/__init__.py",
     "glm_tpu/greenfield/benchmarking/m2048_association_fingerprint.py",
@@ -55,6 +57,7 @@ BOUND_PATHS = (
     "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py",
     "scripts/greenfield/run_gate_d_m2048_strategy_nd_association.sh",
     SOURCE_PATH,
+    "tests/greenfield/benchmarking/fixtures/m2048_v10_protected_optimized_hlo.txt",
     "tests/greenfield/benchmarking/test_m2048_association_fingerprint.py",
     "tests/greenfield/validation/test_m2048_strategy_nd_protected_harness.py",
 )

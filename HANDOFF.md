@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-09-01 UTC
+**Updated:** 2026-09-05 UTC
 
 ## 2026-09-01 Gate-D exact-pin recursion isolated; recovery v5 source prepared only
 
@@ -12129,3 +12129,69 @@ hostile tests worked offline but were reverted before pause pending a coherent i
 review. Fable returned a hard usage limit/no technical opinion. Next: exact unit-extent validator,
 hostile mutations, fresh V4 paths/certificate/tag, full SHA cascade, Sol review, persist/install, then
 one M2048 rerun. V10's tag is burned; no 8K run is authorized yet.
+
+## 2026-09-04 23:20--23:45Z — V11 exact unit-extent validator CPU-green; V4 paths; review pending
+
+Live storage census: 55,266-object baseline unchanged in kind, `gcloud storage du -s` reports
+1,945,027,232,816 live bytes (below the 2,000,000,000,000-byte ceiling); bucket US-CENTRAL2 with
+soft-delete retention 0. No storage mutation was performed.
+
+The V10 optimized HLO (`a96ff87a…9ab2`, 8,311 bytes) was replayed from the local copy of the
+generation-pinned diagnostic `distributed.raw.log` and committed as
+`tests/greenfield/benchmarking/fixtures/m2048_v10_protected_optimized_hlo.txt`. The current V10
+validator rejects it with exactly the recorded message. V11 replaces the unary-only fused row-zero
+rule with one exact admission: a single `reduce` whose operand is `u16[1,6144]` reached through the
+exact `[0:1],[0:6144]` bf16 slice, `dimensions={0}` (extent one), `u16[] constant(0)` initializer
+(parsed literal operand `("0",)`, opcode `constant`), reducer computation of exactly two `u16[]`
+parameters and one ROOT scalar `u16 add`, result `u16[6144]` as the fusion root, one caller operand,
+and all callee instructions live. The pre-collective fusion and the ENTRY path remain unary-only. The
+real fixture is accepted; 20 hostile mutations of the real bytes and synthetic alternate-root and
+chained-reduce forms reject. Probe, publisher, mirror verifier, launcher, installer, wrapper and fleet
+installer move to fresh immutable V4 paths (`…/gate-d-m2048-strategy-nd-v4`,
+`/opt/glm-tpu/gate-d-m2048-install-v4`, `launch_gate_d_m2048_strategy_nd_v4.py`); the worker
+prestate pin is `b7708936…` and a read-only check shows worker 1 clean and detached there. The full
+SHA cascade was recomputed (fleet installer `65647600…4551`, install tree `d764e13d…105d`); mirror
+BOUND_PATHS gained the V11 certificate, the V10 failure record and the fixture. Focused suite 65/65;
+py_compile, `bash -n`, JSON and `git diff --check` pass. Certificate
+`docs/artifacts/gate-d-m2048-strategy-nd-v11-source.json`; fresh unstarted tag
+`greenfield_m2048_strategy_nd_20260904T232704581062072Z`. Nothing is committed, installed or
+executed; an independent Fable 5.1 adversarial review is in progress and must clear all P0--P2 first.
+
+## 2026-09-05 00:00Z — Fable review clears V11 (P2s resolved); Gate D contract amended; M2048 deferred
+
+The independent Fable 5.1 adversarial review of V11 returned P0 NONE, P1 NONE and six P2 findings
+(verdict `/home/gianl/gate-d-runs/reviews/m2048-v11-fable-verdict.txt`, recorded in the V11
+certificate). All six are resolved: the reduce's `dimensions=` attribute must be unique; the reduce
+must be the fusion root instruction, not merely root-shaped; the reduce operand list text is
+re-parsed and must be exactly two `%name` tokens; every ENTRY instruction must be an ancestor of the
+ROOT tuple; the launcher path is bound across wrapper, launcher, installer and fleet installer by
+test; the unfused-ENTRY-slice codegen variant is an accepted fail-closed residual. Focused suite
+69/69; certificate source SHAs repinned; runtime SHA cascade unchanged.
+
+Plan decision (owner-authorized, recorded as spec §21): the protected WS32 8K runs
+`greenfield_ws32_short_decoder_8k_numerical_20260826T213125786075567Z` and
+`…20260827T011711674195301Z` were already exact on tokens, state/cache and event-0 DSA and were refused
+only on seven event-1 selected-position swaps (no aligned statistics recorded). Gate C DB421 shows an
+independent PyTorch CPU scorer and the greenfield TPU FP32 scorer disagreeing on 2/2,048 cutoff members
+while both meet the bounded contract, so cross-implementation set identity is not a correctness
+property. Bit-exact reproduction of the legacy prefill's 32-way reduction association is therefore
+removed as a Gate D requirement. Gate D now requires exact tokens, within-engine exact tie order,
+cross-oracle selected sets exact or boundary-explained with `eps` taken from the oracle's own error
+against an independent FP32 CPU reference plus a pre-registered absolute cap and an ambiguity-band
+swap bound, a systematic-bias rule with a pre-registered mean cap, bounded internal tensors, exact
+cache/state structure, and all unchanged locality/trace/wall/HBM/cleanup contracts. The seven-swap
+signature is plan-invariant and survived a certified legacy-exact layer-1 input, so it may be a real
+layer-1 arithmetic defect; the bias rule adjudicates it. The V11 M2048 install and rerun are deferred
+(unauthorized), code and evidence preserved. Exact next: confirm the archived engine/oracle event-1
+score rows and sealed legacy layer-1 inputs exist, build the offline §21.2 adjudicator with an
+independent reference, and run it on the `20260827…` arrays; a pass is the required bounded layer-1
+proof for one protected 8K WS32 run under the amended observer; a fail redirects to chunk/row
+localization of the layer-1 defect.
+
+The Fable delta review of the P2 resolutions and the amendment returned code SAFE_TO_PERSIST and two
+docs P1s (self-referential `eps`; misattributed DB421 framing and PP8 error statistics) plus P2s; all are
+corrected in this commit. Delta verdict:
+`/home/gianl/gate-d-runs/reviews/m2048-v11-fable-delta-verdict.txt` (`8ba34007…a853`). The final
+verdict (`…/m2048-v11-fable-final-verdict.txt`, `80fe9ac9…8a0ec`) returned P0/P1 NONE and three
+wording P2s (goal length, WS32 set-identity overstatement, cap immutability), all folded in here:
+SAFE_TO_PERSIST code+docs YES.

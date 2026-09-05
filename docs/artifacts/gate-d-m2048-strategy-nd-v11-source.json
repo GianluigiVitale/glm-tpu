@@ -1,0 +1,157 @@
+{
+  "artifact_kind": "gate_d_m2048_strategy_nd_v11_source_certificate",
+  "schema_version": 1,
+  "classification": "EXACT_UNIT_EXTENT_U16_REDUCE_ROW_ZERO_VALIDATOR;PROTECTED_V10_HLO_ACCEPTED_OFFLINE;HOSTILE_MUTATIONS_REJECTED;IMMUTABLE_V4_CHAIN_CPU_VALIDATED;FABLE_REVIEW_NO_P0_P1_P2_RESOLVED_DELTA_VERIFIED;EXECUTION_DEFERRED_BY_SPEC_S21_AMENDMENT;INSTALL_UNAUTHORIZED;TPU_EXECUTION_UNAUTHORIZED;NO_MODEL_OR_GATE_D_CLAIM",
+  "code_pin_before_persistence": "640502a1559b63ca1d0a8c2fdd04ef43b990afed",
+  "root_cause_evidence": {
+    "path": "docs/artifacts/gate-d-m2048-v10-unit-extent-reduce-failure.json",
+    "sha256": "9a7f582f7b31941ba8ca5c1971dddf3dc158413fe72b5e5939a8f48c571ed5b5"
+  },
+  "predecessor_source_certificate": {
+    "path": "docs/artifacts/gate-d-m2048-strategy-nd-v10-source.json",
+    "sha256": "91f7d885d5e5b6b30ac3720042e4421e509203565acbde2bfb8fee97ce73585d",
+    "status": "preserved; installed successfully to immutable V3 paths, passed locks/census/topology/compile/HLO acquisition, then the unary-only row-zero representation linter false-rejected the TPU unit-extent u16 reduce before numerical invocation; V10 tag burned"
+  },
+  "protected_v10_hlo_fixture": {
+    "path": "tests/greenfield/benchmarking/fixtures/m2048_v10_protected_optimized_hlo.txt",
+    "sha256": "a96ff87a934afeac31df9218bb4436230924584c4775d8b4f943d68a20c39ab2",
+    "bytes": 8311,
+    "origin": "process-0 M2048_ACQUISITION record of the burned V10 tag, replayed from the generation-pinned diagnostic distributed.raw.log (terminal generation 1788535490689471)",
+    "offline_result": "accepted by the V11 validator; every hostile unit-extent mutation rejected"
+  },
+  "correction": {
+    "validator": "The fused row-zero path may contain exactly one reduce, and only in the exact TPU form: operand u16[1,6144] produced through the exact [0:1,0:6144] bf16 slice, dimensions={0} of extent one, u16[] constant(0) initializer, reducer computation of exactly two u16[] parameters and one ROOT scalar u16 add, result u16[6144] as the fusion root, one caller operand, and every callee instruction live. Nonzero or non-constant initializers, non-unit or wrong dimensions, swapped or variadic operands, s16/bf16 dtypes, maximum/multiply/degenerate reducers, the BF16 collective reducer, row-one slices, slice bypass, dead or alternate callee paths, chained reduces, and any constant/reduce in the pre-collective fusion are rejected.",
+    "why_exact": "With extent one the reducer combines the single payload element with the exact u16 zero only; no payload rows are associated, and unsigned integer addition has no rounding or NaN canonicalization.",
+    "unchanged": "Sole synchronous full-group bf16[2048,6144] StrategyND all-reduce, exact scalar BF16 reducer, unbatched input/output geometry, output liveness of both roots, row-zero uniqueness, no extra communication and no host callbacks remain enforced.",
+    "paths": "Probe, publisher, mirror verifier, launcher, installer, wrapper and fleet installer move to fresh immutable V4 paths; the worker repository prestate is the V10 install pin b7708936416452a7b453908abc729bfacbcb00c8."
+  },
+  "immutable_successor_paths": {
+    "capsule": "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v4",
+    "install_source": "/opt/glm-tpu/gate-d-m2048-install-v4",
+    "launcher": "/opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v4.py"
+  },
+  "runtime_recovery": {
+    "existing_verified_runtime_hosts": 8,
+    "worker_repository_prestate": "b7708936416452a7b453908abc729bfacbcb00c8",
+    "install_only": true,
+    "jax_import_or_tpu_initialization": false,
+    "sealed_trees": {
+      "jax": "55233c63939ea28485cdf2f0fc3d9c1d2ce4d9d93aad828e94498d712a26a0df",
+      "libtpu": "db7598c867f370756813cbf1536ad8ef7b1d9c167975e9e1724bd9b4fee78eca",
+      "python": "308748a9a3c3758a6b4f233aa5c034e8cb419362dbeafe0322448be40170d616"
+    }
+  },
+  "install_source_tree_sha256": "d764e13dd3ee79f89345aee829496602341faa232c3958c7d6605b60e70f105d",
+  "future_persistence_contract": {
+    "branch": "rewrite/topology-first-decode",
+    "origin": "git@github.com:GianluigiVitale/glm-tpu.git",
+    "future_merged_pin_required": true,
+    "condition": "Commit the exact correction, V10 failure evidence, fixture and this certificate together; push to origin and replay the exact US-CENTRAL2 mirror before install or execution."
+  },
+  "adversarial_review": {
+    "reviewer": "independent Fable 5.1 (high) adversarial reviewer (replaces Sol)",
+    "verdict_path": "/home/gianl/gate-d-runs/reviews/m2048-v11-fable-verdict.txt",
+    "verdict_sha256": "e6cee25ee665e50dedde5087b6864714a448966a149afcb9f61468234ee89970",
+    "verdict_bytes": 10177,
+    "p0": "NONE",
+    "p1": "NONE",
+    "p2": "six findings, all resolved; delta review verified the resolutions",
+    "p2_resolutions": {
+      "1_dimensions_uniqueness": "validator now requires exactly one dimensions= attribute on the reduce; hostile test added",
+      "2_reduce_root_binding": "validator now requires roots[0] is the reduce instruction (not merely root shape); hostile ROOT copy(reduce) test added",
+      "3_operand_text_parsing": "validator re-parses the reduce operand list text and requires exactly two %name tokens matching the parsed operands; hostile literal third operand test added",
+      "4_unfused_entry_slice_variant": "accepted residual: any other codegen form fails closed (never accepts unsound HLO); the sealed runtime and identical program make a different lowering unlikely; not widened by design",
+      "5_dead_entry_instructions": "validator now requires every ENTRY instruction to be an ancestor of the ROOT tuple; hostile dead ENTRY test added",
+      "6_launcher_path_binding": "harness test now binds installer.LAUNCHER_TARGET == launcher.INSTALL_PATH, the wrapper launcher path and CAPSULE string, and the fleet INSTALL_SOURCE_NAME"
+    },
+    "safe_to_persist": true,
+    "safe_to_install_after_future_pin_push_mirror": true,
+    "safe_to_execute_once_fresh_tag": true,
+    "first_verdict_note": "first verdict SHA was computed over the pre-resolution source bytes; the delta verdict below covers the resolved sources",
+    "delta_verdict_path": "/home/gianl/gate-d-runs/reviews/m2048-v11-fable-delta-verdict.txt",
+    "delta_verdict_sha256": "8ba3400798ebacc393ac4d5ceecd0f941df160fcbc8e8a5d48a7e27b17a50853",
+    "delta_verdict_bytes": 13468,
+    "delta_code_verdict": "Part A clean: all six P2 resolutions verified on CPU; SAFE_TO_PERSIST code YES",
+    "final_verdict_path": "/home/gianl/gate-d-runs/reviews/m2048-v11-fable-final-verdict.txt",
+    "final_verdict_sha256": "80fe9ac9916e32063ee4ceacf8bc9ace41602865853ad7b0d72da3f658d8a0ec",
+    "final_verdict_bytes": 5696,
+    "final_verdict": "P0 NONE; P1 NONE; three wording P2s folded in; SAFE_TO_PERSIST code+docs YES"
+  },
+  "proposed_fresh_tag": "greenfield_m2048_strategy_nd_20260904T232704581062072Z",
+  "install_only_command_after_approved_persistence": "/usr/bin/env -i HOME=/home/gianl LANG=C LC_ALL=C PATH=/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3 -I -S -B -c 'import fcntl,hashlib,os,subprocess,sys; pin=sys.argv[1]; expected=sys.argv[2]; git_env={\"GIT_CONFIG_GLOBAL\":\"/dev/null\",\"GIT_CONFIG_NOSYSTEM\":\"1\",\"GIT_NO_LAZY_FETCH\":\"1\",\"GIT_NO_REPLACE_OBJECTS\":\"1\",\"GIT_OPTIONAL_LOCKS\":\"0\",\"GIT_PROTOCOL_FROM_USER\":\"0\",\"GIT_SSH_COMMAND\":\"/bin/false\",\"GIT_TERMINAL_PROMPT\":\"0\",\"HOME\":\"/nonexistent\",\"LANG\":\"C\",\"LC_ALL\":\"C\",\"PATH\":\"/usr/bin:/bin\"}; result=subprocess.run([\"/usr/bin/git\",\"-c\",\"core.fsmonitor=false\",\"-c\",\"core.untrackedCache=false\",\"-c\",\"core.hooksPath=/dev/null\",\"-c\",\"core.attributesFile=/dev/null\",\"-C\",\"/home/gianl/glm-tpu-topology-rewrite\",\"show\",f\"{pin}:scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh\"],check=False,env=git_env,stderr=subprocess.PIPE,stdout=subprocess.PIPE); assert result.returncode==0 and not result.stderr; raw=result.stdout; assert hashlib.sha256(raw).hexdigest()==expected; fd=os.memfd_create(\"gate-d-m2048-fleet-installer\",os.MFD_CLOEXEC|getattr(os,\"MFD_ALLOW_SEALING\",2)); stream=os.fdopen(os.dup(fd),\"wb\",closefd=True); written=stream.write(raw); stream.flush(); stream.close(); assert written==len(raw); os.fchmod(fd,0o400); seals=getattr(fcntl,\"F_SEAL_SEAL\",1)|getattr(fcntl,\"F_SEAL_SHRINK\",2)|getattr(fcntl,\"F_SEAL_GROW\",4)|getattr(fcntl,\"F_SEAL_WRITE\",8); fcntl.fcntl(fd,getattr(fcntl,\"F_ADD_SEALS\",1033),seals); assert fcntl.fcntl(fd,getattr(fcntl,\"F_GET_SEALS\",1034))==seals; os.set_inheritable(fd,True); path=f\"/proc/self/fd/{fd}\"; os.execve(\"/usr/bin/bash\",[\"/usr/bin/bash\",\"--noprofile\",\"--norc\",path],{\"GLM_GATE_D_M2048_INSTALL\":\"1\",\"GLM_GATE_D_M2048_INSTALL_MODE\":\"install_only\",\"GLM_GATE_D_M2048_INSTALL_PIN\":pin,\"HOME\":\"/home/gianl\",\"LANG\":\"C\",\"LC_ALL\":\"C\",\"PATH\":\"/snap/bin:/usr/bin:/bin\",\"PYTHONDONTWRITEBYTECODE\":\"1\"})' <FUTURE_MERGED_PIN> 65647600499097561926b590a0e6c99aec83dec7340df68fdea72b12a5884551",
+  "protected_run_command_after_approved_install": "/usr/bin/env -i GLM_GATE_D_M2048=1 GLM_GATE_D_M2048_MODE=execute_once GLM_GATE_D_M2048_TAG=greenfield_m2048_strategy_nd_20260904T232704581062072Z HOME=/home/gianl LANG=C LC_ALL=C PATH=/snap/bin:/usr/bin:/bin PYTHONDONTWRITEBYTECODE=1 /opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v4.py",
+  "sources": [
+    {
+      "path": "glm_tpu/greenfield/benchmarking/__init__.py",
+      "sha256": "f72bebb28652bdfc19f192c50d0659f97f3a5a8b67ebd2a4e251786b95bafd75"
+    },
+    {
+      "path": "glm_tpu/greenfield/benchmarking/m2048_association_fingerprint.py",
+      "sha256": "04f47f5a1653cf69454a7ef6e990a75792dbb4ec9c6d2d76b6fc454d11c756db"
+    },
+    {
+      "path": "scripts/greenfield/bootstrap_gate_d_provisioner.py",
+      "sha256": "d70e550adce72a7699142763099292cd60f09416b7f467e8a11f4c86ebd1b137"
+    },
+    {
+      "path": "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh",
+      "sha256": "65647600499097561926b590a0e6c99aec83dec7340df68fdea72b12a5884551"
+    },
+    {
+      "path": "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py",
+      "sha256": "f34955aa345f0e81a45c7249e3b6aad2a9b4869406891a48ec31a8b0ecb943e2"
+    },
+    {
+      "path": "scripts/greenfield/launch_gate_d_m2048_strategy_nd_association.py",
+      "sha256": "332128c5f91ed87d93021709b22e3690f7c2a06c1be62cf4acbd41b78e59382d"
+    },
+    {
+      "path": "scripts/greenfield/probe_m2048_strategy_nd_association.py",
+      "sha256": "f708163ab9731cfa8195c78d0bb4b458e3a44c1858faecab331716427c70c39b"
+    },
+    {
+      "path": "scripts/greenfield/publish_gate_d_m2048_strategy_nd_association.py",
+      "sha256": "fbf02bd4216b20e21855d877837c972db98736c636608bf74262f20126e51148"
+    },
+    {
+      "path": "scripts/greenfield/provision_gate_d_runtime_archive.py",
+      "sha256": "2582e9b6c91fe11a8489a2359f830ab786b5856463ea896172da1f7ab79b4319"
+    },
+    {
+      "path": "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py",
+      "sha256": "f248ff6717113c2376e19e4495fd2b33314280b181b97c783996ec510b7f5b0e"
+    },
+    {
+      "path": "scripts/greenfield/run_gate_d_m2048_strategy_nd_association.sh",
+      "sha256": "6f4c3164a2a321e13710ecb4736b601a91cbfeaf6f8b829a5f380f15cdb80172"
+    },
+    {
+      "path": "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py",
+      "sha256": "8747647d88a4cf2d435a46b6ed94067ecc05910d1917c24122cba88f8d037c0a"
+    },
+    {
+      "path": "tests/greenfield/benchmarking/fixtures/m2048_v10_protected_optimized_hlo.txt",
+      "sha256": "a96ff87a934afeac31df9218bb4436230924584c4775d8b4f943d68a20c39ab2"
+    },
+    {
+      "path": "tests/greenfield/benchmarking/test_m2048_association_fingerprint.py",
+      "sha256": "8424d4ff6e00820f4599eefcf2e77cf9d6e6602c1da7b2b297ab4615fe634465"
+    },
+    {
+      "path": "tests/greenfield/validation/test_m2048_strategy_nd_protected_harness.py",
+      "sha256": "568312d078320a39f3bdd566256ea10875fe0a79bc0a7042a102905cabb5afd2"
+    }
+  ],
+  "test_evidence": {
+    "command": "JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_m2048_strategy_nd_protected_harness.py tests/greenfield/benchmarking/test_m2048_association_fingerprint.py",
+    "duration_seconds": 8.46,
+    "passed": 69,
+    "result": "69 passed",
+    "shell_syntax": "passed: Python py_compile, Bash -n, strict JSON parsing and git diff --check"
+  },
+  "validation_scope": "Exact unit-extent u16 reduce row-zero validator, protected V10 HLO offline acceptance, hostile CPU mutations, fresh immutable V4 installation chain and full SHA cascade only. No V11 install, TPU initialization, numerical/model/performance result or Gate-D closure is claimed.",
+  "deferral": {
+    "date": "2026-09-05",
+    "reason": "Spec \u00a721 removes bit-exact legacy reduction-association reproduction from Gate D; the M2048 fingerprint is optional research. This certificate, its fresh tag and install command remain valid only if a future owner decision re-authorizes the run; nothing here grants authority."
+  }
+}

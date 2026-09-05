@@ -33,7 +33,7 @@ import zipfile
 
 SOURCE_PATH = "scripts/greenfield/probe_m2048_strategy_nd_association.py"
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v3/"
+    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v4/"
     "probe_m2048_strategy_nd_association.py"
 )
 REPOSITORY = Path("/home/gianl/glm-tpu-topology-rewrite")

@@ -284,6 +284,99 @@ def _entry_ancestors(
     return tuple(item for item in instructions if item.name in seen)
 
 
+def _validate_unit_extent_u16_reduce(
+    report: HloLintReport,
+    reduce: HloInstruction,
+    callee: Mapping[str, HloInstruction],
+) -> HloInstruction:
+    """Accept only the TPU unit-dimension removal lowered as a u16 reduction.
+
+    Protected V10 codegen emitted row zero as ``slice [0:1]`` then
+    ``bitcast-convert u16[1,6144]`` then ``reduce(value, u16 0)`` over the
+    extent-one dimension 0 with an exact scalar ``u16 add`` reducer.  With one
+    element per output lane the reducer combines that element with the exact
+    zero initializer only; no payload rows are associated and no rounding or
+    NaN canonicalization exists for u16.  Everything else is rejected.
+    """
+
+    plain = _unquoted(reduce.raw_line)
+    operand_text = re.findall(r"\breduce\(([^()]*)\)", plain)
+    if len(operand_text) != 1:
+        raise BenchmarkValidationError(
+            "M2048 unit-extent reduce operand list is not unique"
+        )
+    operand_tokens = tuple(item.strip() for item in operand_text[0].split(","))
+    if (
+        len(reduce.operand_names) != 2
+        or len(operand_tokens) != 2
+        or any(
+            re.fullmatch(r"%?[A-Za-z0-9_.-]+", token) is None
+            for token in operand_tokens
+        )
+        or tuple(token.removeprefix("%") for token in operand_tokens)
+        != tuple(name.removeprefix("%") for name in reduce.operand_names)
+    ):
+        raise BenchmarkValidationError(
+            "M2048 unit-extent reduce must have one value and one initializer"
+        )
+    if len(re.findall(r"(?:^|,\s*)dimensions=", plain)) != 1:
+        raise BenchmarkValidationError(
+            "M2048 unit-extent reduce dimensions attribute is not unique"
+        )
+    value_name, init_name = reduce.operand_names
+    value = callee.get(value_name)
+    init = callee.get(init_name)
+    if value is None or init is None:
+        raise BenchmarkValidationError(
+            "M2048 unit-extent reduce has an undefined operand"
+        )
+    if (
+        _shape(reduce) != (("u16", (M2048_WIDTH,)),)
+        or tuple((item.dtype, item.dimensions) for item in reduce.operand_shapes)
+        != (("u16", (1, M2048_WIDTH)), ("u16", ()))
+        or _shape(value) != (("u16", (1, M2048_WIDTH)),)
+        or re.search(r"(?:^|,\s*)dimensions=\{0\}(?:,|$)", plain) is None
+    ):
+        raise BenchmarkValidationError(
+            "M2048 unit-extent reduce shape/dimension drifted"
+        )
+    if (
+        init.raw_opcode != "constant"
+        or init.operand_names != ("0",)
+        or _shape(init) != (("u16", ()),)
+        or re.search(r"\bu16\[\](?:\{[^}]*\})? constant\(0\)(?:,|$)", _unquoted(init.raw_line))
+        is None
+    ):
+        raise BenchmarkValidationError(
+            "M2048 unit-extent reduce initializer is not the exact u16 zero"
+        )
+    reducer_name = _called_computation(reduce, "to_apply")
+    reducer = tuple(
+        item
+        for item in report.module.instructions
+        if _computation_id(item.computation) == reducer_name
+    )
+    parameters = tuple(item for item in reducer if item.raw_opcode == "parameter")
+    roots = tuple(
+        item for item in reducer if item.raw_line.lstrip().startswith("ROOT ")
+    )
+    if (
+        len(reducer) != 3
+        or len(parameters) != 2
+        or {item.operand_names for item in parameters} != {("0",), ("1",)}
+        or any(_shape(item) != (("u16", ()),) for item in parameters)
+        or len(roots) != 1
+        or roots[0].raw_opcode != "add"
+        or len(roots[0].operand_names) != 2
+        or set(roots[0].operand_names) != {item.name for item in parameters}
+        or _shape(roots[0]) != (("u16", ()),)
+    ):
+        raise BenchmarkValidationError(
+            "M2048 unit-extent reducer is not the exact scalar u16 add"
+        )
+    return value
+
+
 def _require_representation_only_fusion(
     report: HloLintReport,
     fusion: HloInstruction,
@@ -308,7 +401,7 @@ def _require_representation_only_fusion(
         "copy",
     }
     if require_row0_slice:
-        allowed.add("slice")
+        allowed.update({"slice", "reduce", "constant"})
     parameters = tuple(item for item in callee if item.raw_opcode == "parameter")
     roots = tuple(
         item for item in callee if item.raw_line.lstrip().startswith("ROOT ")
@@ -327,12 +420,33 @@ def _require_representation_only_fusion(
     live: set[str] = set()
     current = roots[0]
     slices: list[HloInstruction] = []
+    reduces: list[HloInstruction] = []
     while True:
         if current.name in live:
             raise BenchmarkValidationError("M2048 representation fusion is cyclic")
         live.add(current.name)
         if current.raw_opcode == "parameter":
             break
+        if current.raw_opcode == "reduce":
+            if not require_row0_slice or reduces or slices:
+                raise BenchmarkValidationError(
+                    "M2048 representation fusion reduce is not the sole "
+                    "row-zero unit-extent removal"
+                )
+            reduces.append(current)
+            value = _validate_unit_extent_u16_reduce(report, current, by_name)
+            init_name = current.operand_names[1]
+            if init_name in live:
+                raise BenchmarkValidationError(
+                    "M2048 representation fusion is cyclic"
+                )
+            live.add(init_name)
+            current = value
+            continue
+        if current.raw_opcode == "constant":
+            raise BenchmarkValidationError(
+                "M2048 representation fusion path reaches a constant"
+            )
         if len(current.operand_names) != 1:
             raise BenchmarkValidationError(
                 "M2048 representation fusion path is not unary"
@@ -364,9 +478,16 @@ def _require_representation_only_fusion(
             != (("bf16", (M2048_ROWS, M2048_WIDTH)),)
         ):
             raise BenchmarkValidationError("M2048 fused row-zero slice drifted")
-    elif slices:
+        if reduces and (
+            roots[0] is not reduces[0]
+            or _shape(roots[0]) != (("u16", (M2048_WIDTH,)),)
+        ):
+            raise BenchmarkValidationError(
+                "M2048 fused row-zero unit-extent reduce is not the fusion root"
+            )
+    elif slices or reduces:
         raise BenchmarkValidationError(
-            "M2048 representation-only fusion unexpectedly slices its input"
+            "M2048 representation-only fusion unexpectedly slices or reduces its input"
         )
     return len(slices)
 
@@ -546,6 +667,11 @@ def validate_m2048_strategy_nd_fingerprint_hlo(
             _require_representation_only_fusion(
                 report, item, require_row0_slice=False
             )
+    live_entry = {item.name for item in _entry_ancestors(entry, root)} | {root.name}
+    if live_entry != {item.name for item in entry}:
+        raise BenchmarkValidationError(
+            "M2048 ENTRY contains dead or alternate instructions"
+        )
     root_values = tuple(
         next((item for item in entry if item.name == name), None)
         for name in root.operand_names

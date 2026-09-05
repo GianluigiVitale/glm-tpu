@@ -44,7 +44,7 @@ REPO_REFRESHER = ROOT / (
     "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py"
 )
 MIRROR = ROOT / "scripts/greenfield/verify_gate_d_rewrite_same_region_git_mirror.py"
-CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v10-source.json"
+CERTIFICATE = ROOT / "docs/artifacts/gate-d-m2048-strategy-nd-v11-source.json"
 
 
 def _load_publisher():
@@ -581,6 +581,12 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
     assert mirror.INSTALL_PATH == expected
     assert probe.INSTALL_PATH == launcher.PROBE_PATH
     assert publisher.INSTALL_PATH == launcher.PUBLISHER_PATH
+    assert installer.LAUNCHER_TARGET == launcher.INSTALL_PATH
+    wrapper = WRAPPER.read_text(encoding="ascii")
+    assert f'launcher = Path("{launcher.INSTALL_PATH}")' in wrapper
+    assert f"readonly CAPSULE={launcher.CAPSULE_ROOT}" in wrapper
+    fleet = FLEET_INSTALLER.read_text(encoding="ascii")
+    assert f"readonly INSTALL_SOURCE_NAME={installer.SOURCE_ROOT.name}" in fleet
     assert set(mirror.BOUND_PATHS) >= {
         "docs/artifacts/gate-d-m2048-strategy-nd-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v2-source.json",
@@ -592,6 +598,7 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
         "docs/artifacts/gate-d-m2048-strategy-nd-v8-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v9-source.json",
         "docs/artifacts/gate-d-m2048-strategy-nd-v10-source.json",
+        "docs/artifacts/gate-d-m2048-strategy-nd-v11-source.json",
         "docs/artifacts/gate-d-m2048-v2-install-repository-prestate-failure.json",
         "docs/artifacts/gate-d-m2048-v3-install-loader-quoting-failure.json",
         "docs/artifacts/gate-d-m2048-v4-install-runtime-loader-quoting-failure.json",
@@ -600,6 +607,7 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
         "docs/artifacts/gate-d-m2048-v7-missing-requests-auto-detection-failure.json",
         "docs/artifacts/gate-d-m2048-v8-zero-retention-preflight-incompatibility.json",
         "docs/artifacts/gate-d-m2048-v9-fleet-process-identity-failure.json",
+        "docs/artifacts/gate-d-m2048-v10-unit-extent-reduce-failure.json",
         "scripts/greenfield/bootstrap_gate_d_provisioner.py",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_fleet.sh",
         "scripts/greenfield/install_gate_d_m2048_strategy_nd_runtime.py",
@@ -609,6 +617,7 @@ def test_mirror_verifier_install_path_matches_m2048_capsule() -> None:
         "scripts/greenfield/publish_gate_d_m2048_strategy_nd_association.py",
         "scripts/greenfield/refresh_gate_d_m2048_worker_repository.py",
         "scripts/greenfield/run_gate_d_m2048_strategy_nd_association.sh",
+        "tests/greenfield/benchmarking/fixtures/m2048_v10_protected_optimized_hlo.txt",
         "tests/greenfield/validation/test_m2048_strategy_nd_protected_harness.py",
     }
 
@@ -987,7 +996,7 @@ def test_archive_provisioner_refuses_dangling_output_and_replaced_cleanup(
 
 def test_fleet_serializes_exact_worker_repository_refresh() -> None:
     source = FLEET_INSTALLER.read_text(encoding="ascii")
-    assert "WORKER_REPO_PRESTATE_PIN=b185404bebaba2ef785b381dfbe45154b594b669" in source
+    assert "WORKER_REPO_PRESTATE_PIN=b7708936416452a7b453908abc729bfacbcb00c8" in source
     assert "REPO_REFRESHER_B64=$(git_local show" in source
     assert 'os.memfd_create(\\"gate-d-m2048-repo-refresher\\"' in source
     assert "for worker in 1 2 3 4 5 6 7; do" in source
@@ -1891,9 +1900,9 @@ def test_source_certificate_binds_every_listed_file_and_grants_no_authority() ->
     assert record["future_persistence_contract"]["future_merged_pin_required"] is True
     assert record["runtime_recovery"]["existing_verified_runtime_hosts"] == 8
     assert record["immutable_successor_paths"] == {
-        "capsule": "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v3",
-        "install_source": "/opt/glm-tpu/gate-d-m2048-install-v3",
-        "launcher": "/opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v3.py",
+        "capsule": "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v4",
+        "install_source": "/opt/glm-tpu/gate-d-m2048-install-v4",
+        "launcher": "/opt/glm-tpu/bin/launch_gate_d_m2048_strategy_nd_v4.py",
     }
     assert record["test_evidence"]["passed"] >= 46
     assert record["proposed_fresh_tag"] in record[

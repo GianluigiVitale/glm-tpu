@@ -23,7 +23,7 @@ import zipfile
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 RUN_ROOT = Path("/home/gianl/gate-d-runs")
 INSTALL_PATH = Path(
-    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v3/"
+    "/usr/local/libexec/glm-tpu/gate-d-m2048-strategy-nd-v4/"
     "publish_gate_d_m2048_strategy_nd_association.py"
 )
 SOURCE_PATH = (
