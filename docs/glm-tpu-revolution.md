@@ -1934,10 +1934,13 @@ run DB567 (`…8k_numerical_20260905T085534575653049Z`): numerical array manifes
 14 × 21 DSA observations, scores and sets), cache probe `kv_rows` `67d03f75…` / `index_rows` `a8724ce5…`,
 raw tokens `909682cb…8173`, all `dsa_steps` comparisons and the final state (position 8183, context 8184):
 
-| run | pin | chunk plan | prefill wall | decode p50 (rank 0) |
-|---|---|---|---|---|
-| `…8k_numerical_20260905T163437339905065Z` | `172ae03` | 3 × 2048 + 2011 | 1,004 s | 129.66 ms |
-| `…8k_numerical_c512_20260905T182725949766820Z` | `00c6eee` | 15 × 512 + 475 | 988 s | 130.01 ms |
+| run | pin | chunk plan | prefill wall | fleet p50 | sealed as |
+|---|---|---|---|---|---|
+| `…8k_numerical_20260905T163437339905065Z` | `172ae03` | 3 × 2048 + 2011 | 1,004 s | 129.73 ms | DB 568, `success_sha256` `066de64b…` |
+| `…8k_numerical_c512_20260905T182725949766820Z` | `00c6eee` | 15 × 512 + 475 | 988 s | 130.05 ms | DB 569, `success_sha256` `1d68c6be…` |
+
+Both were sealed by recovery at pin `b51c626` (alarm acknowledgement bound to the lessons entries naming
+each tag) with the §21 classification of DB567.
 
 Identity at two chunk sizes proves C-independence; the chunked program is the sealed program in pieces
 and is accepted on this record, not by a new gate. The five chunk-independent graphs of both acquisitions

@@ -12755,3 +12755,13 @@ later-event alarms. §23.3.1 records the equivalence; lessons entries name both 
 seals of both Step B runs (lessons pin = this commit), then merge Phase A2 and run the Step C acquisitions
 (capacities 131,072 and 262,656, diagnostic on).
 
+## 2026-09-05 19:52Z — Step B sealed: DB 568 (C = 2048) and DB 569 (C = 512); Phase A2 merged
+
+Recovery seals at pin `b51c626` completed 19:36Z and 19:52Z: SUCCESS `066de64b…` (DB 568, fleet p50
+129.73 ms, prefill 1,004 s / fleet max 1,015 s) and `1d68c6be…` (DB 569, fleet p50 130.05 ms, prefill
+988 s / fleet max 1,003 s); censuses 8/8; both carry DB567's §21 classification. Phase A2 (rotary
+diagnostic side program, capacity measurement identity) fast-forwarded from `phase-a2-dev` into the run
+branch now that the pod is idle. Next: Step C acquisitions at capacities 131,072 and 262,656 with the
+diagnostic on, then the two capacity runs; storage reclamation plan before L7 (each numerical prefix
+≈5.8 GB; live 1,972.7 GB before Step C).
+

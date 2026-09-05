@@ -4037,3 +4037,15 @@ persistence only; review and persistence precede any v2 installation.
   PP16_LP2 rejected on the measured serial-stage bound (§22.3), memory leg provisional; WS32_2D promoted.
 - Classification: `OFFLINE_FROM_PROTECTED_ROWS;NO_TPU;PLAN_PROMOTED_WS32_2D;PP16_REJECTED_EVIDENCE_BACKED`.
 
+## 2026-09-05 — Step B: chunked exact prefill equivalence records (spec §23.3.1)
+
+- `gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_8k_numerical_20260905T163437339905065Z/`
+  (C = 2048, run pin `172ae03`, acquisition `…8k_acquire_20260905T150550783962907Z` at `a91caca`, sealed by
+  recovery at `b51c626`): DB run 568, `success_sha256` `066de64b…`; every DB567 witness identical.
+- `gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_8k_numerical_c512_20260905T182725949766820Z/`
+  (C = 512, run pin `00c6eee`, acquisition `…8k_acquire_c512_20260905T174548496718267Z`): DB run 569,
+  `success_sha256` `1d68c6be…`; every DB567 witness identical.
+- Acquisitions: `…8k_acquire_20260905T150550783962907Z` (recovered HLO_ACQUIRED, recovery pin `172ae03`) and
+  `…8k_acquire_c512_20260905T174548496718267Z` (HLO_ACQUIRED at `00c6eee`). Each new results prefix costs
+  ≈3.4 GB (acquisition) / ≈5.8 GB (numerical); live storage 1,972.7 GB after these four.
+
