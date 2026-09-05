@@ -1374,3 +1374,13 @@ normalized-state cause.
   decode p50 129.66 ms (rank 0). Lesson: the chunked program is the sealed program in pieces; the
   identity witnesses, not the passing contract, are what made this acceptable without a new gate.
 
+- 2026-09-05 (spec §23.3 Step B, second chunk size): run
+  `greenfield_ws32_short_decoder_8k_numerical_c512_20260905T182725949766820Z` (run pin `00c6eee`, C = 512,
+  acquisition `…8k_acquire_c512_20260905T174548496718267Z` at `00c6eee`) — 15 × 512-token chunks plus a
+  475-token tail — reproduces DB567's witnesses exactly as the C = 2048 run did: array manifest `057af89f…`,
+  cache probe `67d03f75…`/`a8724ce5…`, tokens `909682cb…` (20/20), all 14 `dsa_steps`, state 8183/8184. The
+  chunked exact prefill is therefore chunk-size independent and equivalent to the sealed monolithic program
+  (the §23.3 equivalence record). Alarms are DB567's (steps 0–12, maximum 1948/2048 at step 2, event 17,
+  layer 62) and are acknowledged for this run on the identity basis. Prefill wall 988 s (chunks 94/60×14 s,
+  tail 56 s; ≈121 ms/token) against a 3,600 s budget; decode p50 130.01 ms (rank 0).
+

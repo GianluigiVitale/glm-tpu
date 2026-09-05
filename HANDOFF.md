@@ -12703,3 +12703,55 @@ programs from the 2048/2011 ones pinned by the acquisition); failure-exit census
 Correct fail-closed behaviour and my oversight in the plan: every chunk length needs its own compile-only
 acquisition. A C = 512 acquisition follows, then the C = 512 numerical run against its own pins.
 
+## 2026-09-05 18:27Z — C = 512 acquisition HLO_ACQUIRED; C = 512 identity run launched
+
+`greenfield_ws32_short_decoder_8k_acquire_c512_20260905T174548496718267Z` (pin `00c6eee`, compile-only)
+completed 18:26Z with all seven graphs. The five graphs that do not depend on the chunk length are
+identical to the C = 2048 acquisition in BOTH StableHLO and optimized HLO this time (the earlier
+recompile had differed in optimized text only by names/ids); `prefill_chunk`/`prefill_tail` differ as
+expected (512/475-token programs). C = 512 numerical run launched 18:27Z at pin `00c6eee` against its
+own pins. Deviation to record: §23.8 placed the rotary diagnostic in Step B's first worker; Step B ran
+before the diagnostic was implemented. It will run as a declared side program in Step C's workers
+(the reviewer's accepted fallback, with the stated consequence that Step C is repeated if it fails).
+
+## 2026-09-05 18:33Z — incident: worktree scripts edited during a running protected run (reverted in place)
+
+While the C = 512 numerical run was in its fleet phase, Phase A2 edits (rotary diagnostic side program,
+capacity override) were written into `run_short_decoder_ws32.sh`, `seal_short_decoder_ws32.py` and
+`run_short_decoder_ws32.py` in the run worktree. Bash reads a script incrementally through an open
+descriptor, so the running orchestrator would have resumed parsing modified bytes after the fleet
+command, and the sealer (executed from the worktree at run end) would have refused the run's record
+on a schema it did not know. Within four minutes the three files were rewritten in place with the exact
+HEAD bytes (same inode, so the orchestrator's descriptor sees the original content) and `git status`
+is clean for `scripts/`; the run's workers were unaffected (Python had already loaded the runner; the
+other hosts run their own pinned checkouts). Rule from here: never modify the run worktree while a
+protected run or seal is in progress; develop in a separate worktree (`/home/gianl/glm-tpu-dev`) and
+fast-forward the run worktree only when the pod is idle. The Phase A2 edits are preserved in the
+session scratchpad and re-applied in the dev worktree.
+
+## 2026-09-05 18:50Z — Phase A2 (rotary diagnostic side program, capacity measurement identity) reviewed
+
+Developed on branch `phase-a2-dev` in `/home/gianl/glm-tpu-dev` (commits `10b8f9c`, `5fb9f8b`): the §23.8
+diagnostic module (per-(pair, band) κ=2 rule, self-verifying record, platform attribution, protocol-pinned
+verifier that refuses shortened windows or non-TPU records), runner `--rotary-diagnostic` (declared side
+program on the local device before any model program; record embedded in the runner record — no new
+remote objects), sealer presence-iff-declared/script-pin/cross-rank checks and classification token
+`ROTARY_LONG_POSITION_DIAGNOSTIC_<verdict>` (recorded, not a refusal), wrapper
+`GLM_GREENFIELD_WS32_CONTEXT_CAPACITY` (multiple of 512 in [8192, 1048576]) with tag suffix `_cap<N>`,
+sealer capacity binding into tag/env/item id (`s23_capacity_measurement_cap<N>_…`, "not a Gate D record")
+and classification `CAPACITY_MEASUREMENT_<N>`. Fable review: APPROVE-WITH-P2; P2-1 (protocol pin) and P2-2
+(TPU attribution) folded in `5fb9f8b`; P2-3 (diagnostic ran neither in Step B run — first runs in Step C's
+first capacity run, repeated on fail) amended in §23.8. Cross-rank bit-identity of the diagnostic is
+required by the sealer: two chips disagreeing would refuse the run and would itself be a finding.
+Merge into the run worktree only after the C = 512 run and both Step B recovery seals have completed
+(the seals must use the `00c6eee` sealer whose record schema matches those runs).
+
+## 2026-09-05 19:14Z — Step B complete: C = 512 also bit-identical to DB567; §23.3.1 equivalence record
+
+`greenfield_ws32_short_decoder_8k_numerical_c512_20260905T182725949766820Z` (pin `00c6eee`): fleet 8/8,
+all witnesses identical to DB567 (array manifest, cache probe hashes, tokens, `dsa_steps`, state), prefill
+988 s (15 chunks 94/60 s + tail 56 s), decode p50 130.01 ms rank 0; sealer refused only on the expected
+later-event alarms. §23.3.1 records the equivalence; lessons entries name both Step B tags. Next: recovery
+seals of both Step B runs (lessons pin = this commit), then merge Phase A2 and run the Step C acquisitions
+(capacities 131,072 and 262,656, diagnostic on).
+

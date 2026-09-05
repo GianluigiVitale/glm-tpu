@@ -1927,6 +1927,25 @@ the repaired rows are visible only to decode. A chunked program must keep exactl
   `CAPACITY_MEASUREMENT` so these are never read as Gate D records. Prefill hours, worker timeouts
   and the projection margin for L7/L8 are derived from these measurements.
 
+### 23.3.1 Equivalence record — chunked exact prefill (2026-09-05)
+
+Two protected 8K runs with the chunked prefill reproduced every bit-level witness of the sealed Gate D
+run DB567 (`…8k_numerical_20260905T085534575653049Z`): numerical array manifest `057af89f…caac` (all
+14 × 21 DSA observations, scores and sets), cache probe `kv_rows` `67d03f75…` / `index_rows` `a8724ce5…`,
+raw tokens `909682cb…8173`, all `dsa_steps` comparisons and the final state (position 8183, context 8184):
+
+| run | pin | chunk plan | prefill wall | decode p50 (rank 0) |
+|---|---|---|---|---|
+| `…8k_numerical_20260905T163437339905065Z` | `172ae03` | 3 × 2048 + 2011 | 1,004 s | 129.66 ms |
+| `…8k_numerical_c512_20260905T182725949766820Z` | `00c6eee` | 15 × 512 + 475 | 988 s | 130.01 ms |
+
+Identity at two chunk sizes proves C-independence; the chunked program is the sealed program in pieces
+and is accepted on this record, not by a new gate. The five chunk-independent graphs of both acquisitions
+are byte-identical to DB567's in StableHLO (and, in the C = 512 acquisition, in optimized HLO too);
+the recompiled optimized texts of the first differ only by instruction names, channel/stack-frame ids and
+metadata (normalized instruction multisets identical). Teacher-forced prefill cost at 8K capacity:
+≈121–123 ms per prompt token. Each chunk length is a distinct graph pair and needs its own acquisition.
+
 ## 23.4 Capacities and memory
 - 128K: prompt 127,363 + observer 14 + warmup 2 + iterations 10 + trace 2 + 1 = 127,392 ≤ 131,072 ✓.
 - 256K: prompt 262,144 + observer 14 + warmup 2 + iterations 256 + trace 2 + 1 = 262,419 → capacity
