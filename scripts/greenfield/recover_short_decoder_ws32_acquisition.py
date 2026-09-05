@@ -186,11 +186,12 @@ def synthesize(
             / f"prevalidation.rank{rank}.json"
         )
         sources[rank] = json.loads(source_path.read_text(encoding="utf-8"))
+    for rank, source in sources.items():
+        for key in ("exact_dsa", "strategy_nd_dense"):
+            if type(source.get(key)) is not bool:
+                raise SystemExit(f"source prevalidation lacks a boolean {key} at rank {rank}")
     flags = {
-        (
-            bool(source.get("exact_dsa")),
-            bool(source.get("strategy_nd_dense", False)),
-        )
+        (bool(source["exact_dsa"]), bool(source["strategy_nd_dense"]))
         for source in sources.values()
     }
     if len(flags) != 1:
