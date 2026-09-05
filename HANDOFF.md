@@ -12429,3 +12429,12 @@ failure preceded host sync, so no host, tmpfs or TPU state changed; the EXIT tra
 so nothing was uploaded and the results prefix stays vacant; the fleet lease was released. The
 declarations are split and a static test now scans every WS32 shell wrapper for a `local` that
 references a name declared in the same statement. Relaunch follows with a fresh tag at the fixed pin.
+
+Second launch `greenfield_ws32_runtime_shm_pack_20260905T051033195073123Z` at `33d3f08` aborted at the
+pre-pack census: worker 0 reported BUSY because this controller VM is pod worker 0 and my own
+single-slot determinism pack (`pack_ws32_runtime_checkpoint.py pack-slots --slots 8` into
+`/dev/shm/glm-ws32-slot8-test`) was running there. The census behaved correctly; the test was killed
+and its tmpfs removed (nothing else touched; lease released; diagnostic evidence uploaded). The same
+fact exposed a wrapper bug: the controller-side manifest/SUCCESS copy aborted if the tmpfs root
+already existed, which on worker 0 it always would after the host pack; the step now verifies the
+existing root's sealed identity instead. Relaunch follows with a fresh tag.

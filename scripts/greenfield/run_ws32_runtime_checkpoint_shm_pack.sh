@@ -155,9 +155,17 @@ for path in sorted(run.glob("host_records/worker*/host_pack/identity.json")):
 if sorted(seen)!=list(range(32)): raise SystemExit(f"slot coverage drifted: {sorted(seen)}")
 Path(sys.argv[3]).write_text(json.dumps({"manifest_sha256":manifest["manifest_sha256"],"slot_hosts":seen,"slots_identical_to_sealed":32},indent=2,sort_keys=True)+"\n")
 PY
-# Controller copy of manifest/SUCCESS at the same path serves the run wrapper's controller preflight.
-[[ ! -e $SHM_ROOT ]] || { say "ABORT: controller tmpfs path exists"; exit 2; }
-mkdir -p "$SHM_ROOT" && cp "$SEALED_MANIFEST" "$SHM_ROOT/manifest.json" && cp "$SEALED_SUCCESS" "$SHM_ROOT/SUCCESS"
+# The run wrapper's controller preflight reads manifest/SUCCESS at the same path. When the controller
+# is itself a pod host (worker 0 here), the host pack already created the root: verify it; otherwise
+# create a manifest/SUCCESS-only copy.
+if [[ -e $SHM_ROOT ]]; then
+  [[ $(sha256sum "$SHM_ROOT/manifest.json" | cut -d' ' -f1) == "$SEALED_MANIFEST_FILE_SHA" ]] || { say "ABORT: controller tmpfs manifest drifted"; exit 2; }
+  [[ $(sha256sum "$SHM_ROOT/SUCCESS" | cut -d' ' -f1) == "$SEALED_SUCCESS_FILE_SHA" ]] || { say "ABORT: controller tmpfs SUCCESS drifted"; exit 2; }
+  say "controller is pod host $(hostname); tmpfs root already holds the sealed identity"
+else
+  mkdir -p "$SHM_ROOT" && cp "$SEALED_MANIFEST" "$SHM_ROOT/manifest.json" && cp "$SEALED_SUCCESS" "$SHM_ROOT/SUCCESS"
+  chmod 0444 "$SHM_ROOT/manifest.json" "$SHM_ROOT/SUCCESS"
+fi
 strict_census post || { say "ABORT: post-pack fleet is not authenticated zero-work"; exit 1; }
 post_census_done=1
 cp "$RUN_DIR/orchestrator.log" "$RUN_DIR/orchestrator.sealed.log"
