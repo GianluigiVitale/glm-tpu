@@ -12312,3 +12312,26 @@ O5: program-defining code changed since the 08-27 acquisition pin `04d059b` (dec
 kernels, prefill, dense convolution contract), so the 08-27 HLO pins cannot be reused; a fresh 8K
 acquisition at the new pin precedes any numerical run. O6: the record is committed byte-identically
 (`4da05468…d26b`). Focused suites 10/10; validation and benchmarking suites pass.
+
+## 2026-09-05 04:30Z — WS32 8K prerequisites: checkpoint re-pack needed; storage decision required
+
+Observer-mode batch persisted at `8d8759b`. Preparing the protected WS32 8K sequence exposed two
+prerequisites. (1) Program-defining code changed since the 08-27 acquisition pin `04d059b`, so a
+fresh compile-only 8K acquisition at the current pin must precede the numerical run. (2) The
+complete WS32 runtime checkpoint `greenfield_ws32_runtime_pack_20260815T214050854386790Z`
+(786,188,082,171 bytes, manifest `c04f800e…5ee08`) was deleted by the 2026-08-27T14:11Z checkpoint
+reclamation (`docs/artifacts/checkpoint-reclamation-deletion-receipt.json`) after the WS32 plan was
+"rejected on exactness", a rejection §21 now supersedes. Only its run lineage under
+`results/greenfield_ws32_runtime_pack_…` remains. Re-packing it with
+`scripts/greenfield/run_ws32_runtime_checkpoint_pack.sh` (protected eight-host pack from the
+canonical checkpoint, expected payload 786,172,488,192 bytes) would raise live storage from
+1,945,027,232,816 to ≈2,731 GB, above the hard 2 TB ceiling. Current composition (GB): PP16 direct
+runtime_feature 869.7, canonical GLM 755.7, results 125.9, oracles 81.5, layer3 78.0, dumps 28.2,
+overlays 2.1, other <2. The only replacement large enough is the PP16 direct checkpoint
+(869.7 GB; re-packable later from canonical). Deleting it is an owner decision; nothing has been
+deleted or packed. PP16 has no complete 8K decoder run, so it is not a shortcut to Gate D.
+
+Exact next, in order, each under the standing protections: owner decision on replacing the PP16
+direct checkpoint; if approved, delete it by name+generation+size+CRC-bound receipt, run the WS32
+runtime pack, then the compile-only 8K acquisition, then ONE 8K numerical run with
+`GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1`. Otherwise Gate D waits on storage.

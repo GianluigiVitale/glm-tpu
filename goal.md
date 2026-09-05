@@ -42,21 +42,22 @@ not proof. Never weaken history. Optimizations default off.
 - Cron `/home/gianl/bin/sync-glm.sh` every 5 min; verify origin + US-CENTRAL2 mirror before
   protected work. Never use EU. Re-version install chain only on reviewer finding.
 
-## Resume — 2026-09-05 03:00Z
+## Resume — 2026-09-05 04:30Z
 
-Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`. V11+§21 at
-`9659af7`/`dabfb3c`. M2048 DEFERRED. Workers 1–7 clean at `b7708936…`.
+Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`. Pins:
+V11+§21 `9659af7`, reference `7764cb9`, §21.2 observer mode `8d8759b` (all Fable-reviewed, pushed).
+M2048 DEFERRED. Workers 1–7 clean at `b7708936…`.
 
-Result (spec §21.5, `docs/artifacts/gate-d-event1-math-reference-adjudication-20260905.json`,
-Fable-reviewed): independent FP64 CPU reference (`scripts/greenfield/reference_cpu/`) gives event 1
-legacy +0.112/0.227, engine −0.006/0.113 (eps 1e-5) and +0.061/0.177, −0.057/0.156 (eps 1e-6); §21.2
-items 3–4 PASS for the engine under both (κ=2, κ=1). Bias signs convention-dependent; no "more
-accurate" claim. Seven swaps = boundary noise within legacy's own error; layer-1 defect unsupported.
-WS32 8K runs already had exact 20/20 tokens, state/cache, event 0, HBM.
+Result (§21.5): FP64 reference: event 1 legacy +0.112/0.227, engine −0.006/0.113 (eps 1e-5);
++0.061/0.177, −0.057/0.156 (eps 1e-6); §21.2 items 3–4 PASS for the engine under both. Seven swaps
+= boundary noise; layer-1 defect unsupported. WS32 8K runs had exact 20/20 tokens, state/cache,
+event 0, HBM. Record `docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json`.
 
-Next: (1) commit/push/mirror the reviewed reference + record. (2) Implement §21.2
-observer mode in the WS32 8K runner (refuse only on token mismatch, within-engine inexactness,
-cache/state structure, locality, unexplained first-divergent-event swaps; record later events), CPU
-tests, review, commit/push/mirror. (3) ONE protected 8K WS32 run with fresh trace, profiler-free
-wall, HBM, DB, archive, 8/8 cleanup → closes Gate D. Then Gate G, 128K, 256K, §18. No TPU before (2)
-is reviewed.
+BLOCKER: WS32 runtime checkpoint (786.19 GB) deleted 2026-08-27; re-pack → ≈2.73 TB live. Only the
+PP16 direct checkpoint (869.7 GB, re-packable) can be replaced. Owner decision pending; nothing
+deleted. Code changed since acquisition pin `04d059b` → fresh acquisition needed.
+
+Next (after decision): (1) bound-receipt delete of PP16 direct; (2)
+`run_ws32_runtime_checkpoint_pack.sh` (8-host protected pack); (3) compile-only 8K acquisition at
+HEAD; (4) ONE 8K numerical run with `GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1`, fresh trace,
+profiler-free wall, HBM, DB, archive, 8/8 cleanup → closes Gate D. Then Gate G, 128K, 256K, §18.
