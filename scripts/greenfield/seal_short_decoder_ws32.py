@@ -492,6 +492,14 @@ def _validate(args: argparse.Namespace) -> int:
             )
         except ValueError as error:
             raise SystemExit(f"WS32 adjudication record does not bind this run: {error}")
+        if dsa_adjudication.engine_source_run == args.tag:
+            # §21.2 pre-registration: a record derived from this very run would be
+            # fitted to the data it judges and so could never fail. The source is
+            # taken from the record the loader already SHA-bound, so there is no
+            # window between the identity check and this one.
+            raise SystemExit(
+                "WS32 adjudication record was derived from the run being sealed"
+            )
         expected_dsa_adjudication = {
             "event_index": dsa_adjudication.event_index,
             "mode": "first_divergent_event",

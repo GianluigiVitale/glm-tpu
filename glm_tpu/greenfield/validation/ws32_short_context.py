@@ -11,8 +11,16 @@ from typing import Any, Mapping
 
 import numpy as np
 
+import re
+
 from .short_context_dsa_oracle import inspect_short_context_dsa_oracle
 from .short_context_oracle import inspect_short_context_oracle
+
+_ANALYSIS_ARTIFACT_KIND = "gate_d_ws32_first_divergent_event_adjudication"
+_REFERENCE_CONVENTIONS = ("rms_norm_eps_1e-5", "rms_norm_eps_1e-6")
+_RUN_TAG_PATTERN = re.compile(
+    r"greenfield_ws32_short_decoder_[0-9a-z_]+_[0-9]{8}T[0-9]{15}Z"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,6 +189,9 @@ class Ws32AdjudicatedDivergence:
     decode_position: int
     producer_layer_id: int
     later_event_alarm: int = 1024
+    # The run this record was derived from. §21.2 pre-registration: the sealer
+    # refuses a record whose source is the run being sealed.
+    engine_source_run: str = ""
 
     def status(self, step: int, event: int) -> str:
         if (step, event) < (self.step, self.event_index):
@@ -221,9 +232,13 @@ def load_ws32_adjudicated_divergence(
         "gate_d_closed",
         "performance_claim",
     }
+    # ``reference_row`` is optional so records written before the reference row
+    # was bound (§21.2 amendment 2026-09-05 22:20Z) still load; when present it
+    # is validated in full.
+    optional = {"reference_row"}
     if (
         not isinstance(record, dict)
-        or set(record) != required
+        or not required <= set(record) <= required | optional
         or record["artifact_kind"] != "gate_d_ws32_8k_adjudicated_divergence"
         or record["schema_version"] != 1
         or record["gate_d_closed"] is not False
@@ -274,11 +289,53 @@ def load_ws32_adjudicated_divergence(
         raise ValueError("WS32 adjudicated-divergence basis must name committed gate-d artifacts")
     if not isinstance(record["decode_position"], int) or not isinstance(record["producer_layer_id"], int):
         raise ValueError("WS32 adjudicated-divergence position/producer drifted")
+    source_run = record["engine_source_run"]
+    if not isinstance(source_run, str) or _RUN_TAG_PATTERN.fullmatch(source_run) is None:
+        # The sealer refuses a record derived from the run being sealed. A
+        # record that does not name a well-formed source run would make that
+        # guard a no-op, so it is refused here instead.
+        raise ValueError("WS32 adjudicated-divergence engine_source_run is not a run tag")
+    reference = record.get("reference_row")
+    if reference is not None and (
+        not isinstance(reference, dict)
+        or set(reference) != {"convention", "path", "sha256"}
+        or not isinstance(reference["path"], str)
+        or not reference["path"].startswith("docs/artifacts/gate-d-")
+        or not reference["path"].endswith(".npy")
+        or not isinstance(reference["sha256"], str)
+        or len(reference["sha256"]) != 64
+        or reference["convention"] not in _REFERENCE_CONVENTIONS
+    ):
+        raise ValueError("WS32 adjudicated-divergence reference row binding drifted")
     if repository_root is not None:
         for item in basis:
-            basis_raw = (Path(repository_root) / item["path"]).read_bytes()
+            basis_path = Path(repository_root) / item["path"]
+            basis_raw = basis_path.read_bytes()
             if hashlib.sha256(basis_raw).hexdigest() != item["sha256"]:
                 raise ValueError(f"WS32 adjudicated-divergence basis drifted: {item['path']}")
+            if not item["path"].endswith(".json"):
+                continue
+            try:
+                basis_record = json.loads(basis_raw)
+            except ValueError:
+                raise ValueError(
+                    f"WS32 adjudicated-divergence basis is not readable JSON: {item['path']}"
+                )
+            if (
+                isinstance(basis_record, dict)
+                and basis_record.get("artifact_kind") == _ANALYSIS_ARTIFACT_KIND
+                and basis_record.get("verdict") != "PASS"
+            ):
+                # A refused attempt may be disclosed in the basis, but it may
+                # never be the ground the record stands on.
+                raise ValueError(
+                    "WS32 adjudicated-divergence basis names a refused adjudication: "
+                    f"{item['path']}"
+                )
+    if reference is not None and repository_root is not None:
+        reference_raw = (Path(repository_root) / reference["path"]).read_bytes()
+        if hashlib.sha256(reference_raw).hexdigest() != reference["sha256"]:
+            raise ValueError("WS32 adjudicated-divergence reference row drifted")
     return Ws32AdjudicatedDivergence(
         record_sha256=digest,
         step=int(record["step"]),
@@ -290,6 +347,7 @@ def load_ws32_adjudicated_divergence(
         decode_position=int(record["decode_position"]),
         producer_layer_id=int(record["producer_layer_id"]),
         later_event_alarm=int(record["later_event_alarm"]),
+        engine_source_run=source_run,
     )
 
 

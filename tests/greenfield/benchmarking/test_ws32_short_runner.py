@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 import importlib.util
+import json
 from pathlib import Path
 
 import numpy as np
@@ -567,3 +568,96 @@ def test_ws32_hlo_contract_requires_the_rope_table_scope_iff_declared() -> None:
     assert "greenfield_ws32_main_rope_table" in source
     assert "WS32 main rotary host table scope is missing" in source
     assert "WS32 main rotary host table appears without a declaration" in source
+
+
+def _sealer_validate_body() -> "ast.FunctionDef":
+    import ast
+
+    root = Path(__file__).resolve().parents[3]
+    tree = ast.parse((root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8"))
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name == "_validate":
+            return node
+    raise AssertionError("the sealer has no _validate function")
+
+
+def test_ws32_sealer_refuses_an_adjudication_record_derived_from_the_sealed_run() -> None:
+    """§21.2 pre-registration: the record must come from a different run.
+
+    Asserted on the parse tree, not on the source text, so the guard cannot be
+    disabled (``if False and ...``) or moved after the sealer writes anything
+    without this test failing.
+    """
+    import ast
+
+    validate = _sealer_validate_body()
+    guards = []
+    for node in ast.walk(validate):
+        if not isinstance(node, ast.If) or not isinstance(node.test, ast.Compare):
+            continue
+        test = node.test
+        left = test.left
+        if (
+            isinstance(left, ast.Attribute)
+            and left.attr == "engine_source_run"
+            and isinstance(left.value, ast.Name)
+            and left.value.id == "dsa_adjudication"
+            and len(test.ops) == 1
+            and isinstance(test.ops[0], ast.Eq)
+            and isinstance(test.comparators[0], ast.Attribute)
+            and test.comparators[0].attr == "tag"
+        ):
+            guards.append(node)
+    assert len(guards) == 1, "the anti-circularity guard is absent, duplicated or rewritten"
+    guard = guards[0]
+    raises = [
+        item
+        for item in ast.walk(guard)
+        if isinstance(item, ast.Raise)
+        and isinstance(item.exc, ast.Call)
+        and isinstance(item.exc.func, ast.Name)
+        and item.exc.func.id == "SystemExit"
+    ]
+    assert raises, "the guard must refuse, not warn"
+
+    forbidden = {"write_text", "write_bytes", "_write_once", "_publish_db", "_rollback_db"}
+    earlier = sorted(
+        item.lineno
+        for item in ast.walk(validate)
+        if isinstance(item, ast.Call)
+        and (
+            (isinstance(item.func, ast.Attribute) and item.func.attr in forbidden)
+            or (isinstance(item.func, ast.Name) and item.func.id in forbidden)
+        )
+        and item.lineno < guard.lineno
+    )
+    assert not earlier, f"the sealer writes before the guard runs, at lines {earlier}"
+
+
+def test_ws32_adjudication_record_without_a_source_run_is_refused(tmp_path: Path) -> None:
+    """A record that does not name a source would make the guard a no-op."""
+    from hashlib import sha256 as _sha256
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    root = Path(__file__).resolve().parents[3]
+    committed = root / "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json"
+    record = json.loads(committed.read_text(encoding="utf-8"))
+    good = tmp_path / "good.json"
+    good.write_text(json.dumps(record, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    loaded = load_ws32_adjudicated_divergence(
+        good, expected_sha256=_sha256(good.read_bytes()).hexdigest()
+    )
+    assert loaded.engine_source_run == record["engine_source_run"]
+
+    for bad_value in (None, "", "not a run tag", 17, ["a"]):
+        broken = dict(record)
+        broken["engine_source_run"] = bad_value
+        path = tmp_path / f"bad_{abs(hash(str(bad_value)))}.json"
+        path.write_text(json.dumps(broken, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="engine_source_run"):
+            load_ws32_adjudicated_divergence(
+                path, expected_sha256=_sha256(path.read_bytes()).hexdigest()
+            )

@@ -1652,7 +1652,16 @@ section grants no install or execution authority.
    same pre-registered `κ = 2`. A larger bias is a hard failure that localizes a real arithmetic
    defect; it is never tolerated. `κ` was fixed on 2026-09-05 before any layer-1 result against the
    full-forward `R` existed; it may not be raised after a failed adjudication, and any change requires
-   a new reviewed amendment.
+   a new reviewed amendment. *Amendment 2026-09-05 22:20Z:* `s` is the POPULATION standard
+   deviation (numpy `ddof=0`), which is what the sealed Gate D adjudication and §21.5 computed; the
+   original wording said "sample". `ddof=0` yields a smaller `s` and therefore a strictly tighter
+   bound, so no earlier result is weakened, and the difference at `n ≈ 2000` is 0.02%. The same `κ`
+   scales the caps in item 3 and the `|m_o|` term here: a rerun at a smaller `κ` tightens all three
+   tests together. `scripts/greenfield/adjudicate_ws32_first_divergent_event.py` implements this and
+   reproduces the sealed numbers bit-for-bit. The FP64 reference row `R` must be a git-tracked
+   `docs/artifacts/gate-d-*.npy` artifact, declared by SHA-256 on the command line together with its
+   norm-eps convention (§21.5 records two conventions whose rows are indistinguishable by shape), and
+   every earlier adjudication attempt on the same event must be named in the record's `basis`.
 5. **Internal tensors (level 2).** Layer outputs, residuals and caches are compared under the bounded
    contracts in `docs/greenfield/NUMERICAL_CONTRACT.md`; cache/state structure (positions, tails,
    validity, pages, manifests) remains exact.

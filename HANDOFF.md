@@ -12884,3 +12884,108 @@ the rotary branch lowers to identical StableHLO in a worktree at the parent comm
 a CPU test that also checks the clamp is finite at and past the capacity and that the table row is closer
 to FP64 than the on-device form at position 262,000.
 
+
+## 2026-09-05 22:35Z — neutrality flaw in A′ corrected; adjudicator hardened; census parse fixed
+
+The Opus 5 review of `b6f5a334` refused the neutrality claim above, and it was right. Statement *count*
+is not statement *order*: hoisting `half`, `current_latent` and `current_rope_input` above the rotary
+site put them ahead of `rotary_cos_sin` in the trace, and traced order is what determines the StableHLO
+text. A flag-off re-acquisition would therefore have produced different bytes and raised a false drift
+alarm against the sealed pins. Fixed by keeping the pre-A′ order inside the flag-off branch: it is now
+identical to `cb36cb74^` statement for statement, differing only by one blank line and the comment that
+says why the order is load-bearing. `half` is defined only in the table branch, where it is used, and
+each branch defines every name it reads.
+
+Adjudicator rulings applied:
+
+* P1-A **band capacity** — §21.2 item 3 said the swapped positions must lie inside the reference
+  ambiguity band, but not that the band can hold them. A band of width ε containing 3 positions cannot
+  explain 7 swaps. `reference_band_capacity` now counts the row entries within ε of the cutoff and
+  refuses when the swap count exceeds it.
+* P1-B **record only on PASS** — a failing adjudication used to write the record and exit 2. The
+  loader validates the schema, not the verdict, so a schema-valid record from a refused adjudication
+  could have been registered. The record is now written only on PASS; a refusal prints the failed check
+  names and writes nothing.
+* P1-C **reference-row binding** — the row is now bound to the event it judges: its length must equal
+  `decode_position + 1`, and `--reference-producer-layer-id` must match the producing layer of the
+  adjudicated event. A row built for another position silently shifts the k-th-largest cutoff.
+* P2 — `BIAS_FACTOR` and `STD_DDOF` are named constants with the reason they hold those values: the
+  Gate D closure computed the standard deviation with `ddof=0`, and the tool reproduces that computation
+  bit-for-bit rather than quietly changing the statistic. A regression test pins the sealed numbers
+  (ε 0.22697279652271618, engine max-abs 0.11345503529224743, bound 0.22563715920821653, band 451,
+  n 2041, cutoff 80.38919023564385).
+* P3 — an engine/oracle selected-count mismatch is refused rather than adjudicated as a swap, and the
+  first-divergent-event scan loads both archives once instead of per event.
+
+Sealer anti-circularity guard (review P2): `dsa_adjudication_record_source` reads the record's
+`engine_source_run`, and the sealer refuses a record whose source equals the tag being sealed. The
+two-run B′ property is now enforced by code rather than by discipline. The committed Gate D record names
+`greenfield_ws32_short_decoder_8k_numerical_20260827T011711674195301Z`, an earlier run than the sealed
+2026-09-05 one, so the guard is consistent with the closed gate.
+
+Storage census: `gcloud storage du -s` prints `<bytes><uri>` with no separator, so `awk '{print $1}'`
+returned `1976176085363gs://driftbench-dsv4-uc`, failed the numeric test three times and aborted the
+21:30Z tables-ON acquisition before it reached the pod. Parsing the leading digit run fixes it. Live is
+1,976,176,085,363 B against the 2,500,000,000,000 B ceiling: 523.8 GB of headroom, no deletion needed.
+
+Correction to two headings above, recorded here rather than by editing them: the entries dated
+21:40Z and 22:10Z were written at the commit times of `b6f5a334` (21:06Z) and `ebc95e13` (21:22Z).
+Both stamps run ahead of the wall clock. The headings are left as written; this line is the fix.
+
+## 2026-09-05 23:05Z — second Opus 5 rejection resolved: the reference row is now bound
+
+The reviewer refused the previous round with three P1s, and each was demonstrated rather than argued.
+
+* **P1-1 — the reference row was unbound and decided the verdict.** The reviewer built a row fitted to
+  the engine's own event-1 scores, saved it in `/tmp`, and obtained a six-check PASS with the sealed
+  divergence sets. `eps`, the cutoff, the band and every bound come from that file, so whoever chooses
+  it chooses the answer. Worse, §21.5 records two norm-eps conventions (1e-5 and 1e-6) whose rows have
+  the same length and the same producer layer, so the wrong one is indistinguishable by inspection.
+  The row must now be a git-TRACKED `docs/artifacts/gate-d-*.npy` artifact, its SHA-256 must be
+  declared on the command line and match, and its convention must be declared and carried into both
+  the analysis and the record. The reviewer's attack was replayed and is refused. Presence in the
+  directory is not enough: an untracked file is refused too.
+* **P1-2 — item 4's bias factor was decoupled from κ.** §21.2 requires "the same pre-registered
+  κ = 2" for the caps and the bias rule. The previous round introduced a separate constant, so a rerun
+  at κ = 1 would have tightened items 3 while item 4 silently stayed at 2 and the analysis recorded
+  κ = 1 beside a bound computed at 2. The bound now uses κ, and a test asserts it moves with it.
+* **P1-3 — the scan window was an operator choice.** `--observer-steps`/`--events` bounded the search
+  for the first divergent event with no reference to the array shapes: too small a window would print
+  "the run is exact against the oracle" when it is not, or pre-register a later event as the first.
+  The window is now read from the archives, the engine and oracle windows must agree, and a declared
+  value that disagrees is a refusal.
+
+P2s, all fixed: the sealer guard test was vacuous (it asserted source substrings, and both
+`if False and …` and moving the guard after a write left it green) and is now an AST test on
+`_validate` that fails under exactly those two mutations, verified; a record whose `engine_source_run`
+is absent, null or not a run tag is refused by the loader instead of silently disabling the guard;
+`--engine-source-run` must now be corroborated by the archive's own run directory or its
+`summary.json`; naming a later benign event is refused because the record asserts every earlier event
+is exact; every earlier adjudication attempt on the same event must be declared in `--basis`, and the
+loader refuses a basis entry that is a non-PASS adjudication analysis; §21.2 item 4 carries a dated
+amendment pinning `s` to the population standard deviation (`ddof=0`, what the sealed Gate D
+adjudication computed, and a strictly tighter bound than the sample form) instead of a Python comment
+asserting a spec change that did not exist.
+
+**The neutrality contradiction is resolved by measurement, and the earlier claim is withdrawn.** The
+21:22Z entry said the rotary branch "lowers to identical StableHLO in a worktree at the parent
+commit"; the 21:57Z entry said the hoisted order "would have produced different bytes". Both could not
+be true. Lowering the two orderings of exactly this pattern — two independent slices of the KV latent,
+either above or below `rotary_cos_sin` — with the project's own rotary helpers on CPU gives different
+StableHLO:
+
+| ordering | StableHLO SHA-256 |
+|---|---|
+| slices hoisted above the rotary | `12a94820326abcc80dfb112907ef76b37e79fd1aa4b900cfbf9a587a1aca1dd0` |
+| slices in the pre-A′ position | `51c581e47a4591d43adcde4e516caed3c924e0acbe767abe826862cf3f07e8cb` |
+
+So traced order is load-bearing, the hoist was a real defect, and the earlier "identical StableHLO"
+experiment was insensitive to the site it claimed to cover. Both facts are now tests: one lowers the
+two orderings and asserts they differ, the other extracts the flag-off branch and asserts it is
+statement-identical to `cb36cb74^`. Reordering one slice in the flag-off path fails the second test.
+
+Also from the same review: in the TABLE-ON branch the two KV-latent slices sat inside
+`jax.named_scope("greenfield_ws32_main_rope_table")`, labelling KV work as rotary work. They now sit
+outside it. No tables-on pins existed to invalidate, because the 21:30Z acquisition aborted on the
+census parse bug before reaching the pod. The sealer's guard reads the source run from the record the
+loader already SHA-bound rather than re-reading the file, closing the small window between the two.

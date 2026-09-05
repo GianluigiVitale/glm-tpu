@@ -504,8 +504,10 @@ fi
 say "PIN=$PIN recovery_pin=$RECOVERY_PIN mode=$MODE context=$CONTEXT recover=$RECOVER exact_dsa=$EXACT_DSA transport=$CHECKPOINT_TRANSPORT"
 live_bytes=
 for attempt in 1 2 3; do
+  # `gcloud storage du -s` prints "<bytes><uri>" with no separator, so take the
+  # leading digit run rather than awk's first field.
   live_bytes=$(timeout 900 gcloud storage du -s "$APPROVED_BUCKET" \
-    2>>"$RUN_DIR/orchestrator.log" | awk 'END {print $1}') || live_bytes=
+    2>>"$RUN_DIR/orchestrator.log" | tail -1 | grep -o '^[0-9]\+') || live_bytes=
   [[ $live_bytes =~ ^[0-9]+$ ]] && break
   [[ $attempt -eq 3 ]] && break
   say "live storage census attempt $attempt failed; retrying"

@@ -853,14 +853,10 @@ def ws32_index_share_attention_mapped(
     ).reshape(1, local_heads, contract.qk_head_dim)
     q_nope = q_states[..., : contract.qk_nope_head_dim]
     q_rope_unrotated = q_states[..., contract.qk_nope_head_dim :]
-    half = contract.qk_rope_head_dim // 2
-    current_latent = prepared.current_kv[..., : contract.kv_lora_rank]
-    current_rope_input = prepared.current_kv[
-        ...,
-        contract.kv_lora_rank : contract.kv_lora_rank
-        + contract.qk_rope_head_dim,
-    ][:, None, :]
     if main_rope_table_row is None:
+        # Statement order here is deliberately identical to the pre-§23.8 code:
+        # reordering independent traced operations changes the StableHLO text and
+        # therefore the acquired pins, so the default-off path stays byte-stable.
         cos, sin = rotary_cos_sin(
             position,
             rotary_dim=contract.qk_rope_head_dim,
@@ -873,6 +869,13 @@ def ws32_index_share_attention_mapped(
             sin[:, None, :],
             interleaved=True,
         )
+
+        current_latent = prepared.current_kv[..., : contract.kv_lora_rank]
+        current_rope_input = prepared.current_kv[
+            ...,
+            contract.kv_lora_rank : contract.kv_lora_rank
+            + contract.qk_rope_head_dim,
+        ][:, None, :]
         current_rope = apply_rotary(
             current_rope_input,
             cos[:, None, :],
@@ -884,6 +887,16 @@ def ws32_index_share_attention_mapped(
             main_rope_table_row.dtype != jnp.bfloat16
         ):
             raise ValueError("WS32 main rotary table row geometry drifted")
+        half = contract.qk_rope_head_dim // 2
+        # These two slices are KV-latent work, not rotary work; they stay
+        # outside the scope so `greenfield_ws32_main_rope_table` names only the
+        # operations the §23.8 linter rule is about.
+        current_latent = prepared.current_kv[..., : contract.kv_lora_rank]
+        current_rope_input = prepared.current_kv[
+            ...,
+            contract.kv_lora_rank : contract.kv_lora_rank
+            + contract.qk_rope_head_dim,
+        ][:, None, :]
         with jax.named_scope("greenfield_ws32_main_rope_table"):
             cos = main_rope_table_row[:half][None, :]
             sin = main_rope_table_row[half:][None, :]
