@@ -4007,3 +4007,22 @@ persistence only; review and persistence precede any v2 installation.
   `GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1` (8k only). Default off; exact contract unchanged otherwise.
 - Not evidence of correctness by itself; the next protected 8K WS32 run under this mode, if it passes
   tokens/state/cache/locality/trace/wall/HBM/DB/archive/cleanup, is the Gate D closer (spec §21.5).
+
+## 2026-09-05 — Gate D closed: protected 8K WS32 numerical run sealed (spec §21.6)
+
+- `gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_8k_numerical_20260905T085534575653049Z/` (5.05 GB): `SUCCESS` `e40760f8…f662`
+  (gen 1788607616743487), `remote_objects.json`, `orchestrator/` (summary `683fe2e1…08fa`, validate,
+  materialize, DB snapshot, ledgers, censuses), 128 fleet objects (24 host records, 96 graphs, 8 XPlanes)
+  bound by source ledger `c533af64…c0c8`. Local: `/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_20260905T085534575653049Z/` incl. `recovery_failures/`
+  (five directories: the by-design alarm refusal of the original seal, two refused recovery attempts and
+  the two quarantined stale ledgers; see spec §21.6). DB: `/home/gianl/glm-tpu/bench/results.db` run 567, item
+  `gate_d_s21_exact_tokens_adjudicated_dsa_state_cache`, `steady_wall_tok_s` 7.6706.
+- Pins: run code `4286509…`, sealing `579b13f…`, exact-DSA path, StrategyND dense overlay ON (manifest
+  `a8dc8791…4b6a`, file `c17194b6…5c8c`, SUCCESS `166566b9…32a6`), adjudication record `4da05468…cd26b`, alarm profile
+  `docs/artifacts/gate-d-ws32-8k-20260905-later-event-profile.json` (`9de530b5…5b93`), tmpfs checkpoint
+  lineage `results/greenfield_ws32_runtime_pack_20260815T214050854386790Z`.
+- Section 18 rows: exact tokens (oracle prefix 20 of 29 generated), within-engine DSA exact, cross-oracle DSA per §21.2 (event 0
+  exact, event 1 adjudicated, later recorded), cache/state exact structure, locality, fresh trace,
+  profiler-free wall p50 130.369 ms/token, HBM 26.38 GB/chip, DB/archive/8/8 cleanup. Classification in
+  §21.6. Storage after sealing: 1,952,694,918,629 live bytes (< 2 TB ceiling).
+

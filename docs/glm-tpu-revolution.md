@@ -1747,3 +1747,36 @@ floor (query rebuilt from the legacy's own q-a state through the reference `wq_b
   locality, or a first-divergent-event divergence not equal to the pre-registered adjudicated one;
   record later events with the alarm rule) with full trace/wall/HBM/DB/archive/cleanup protections.
   Its success closes Gate D.
+
+## 21.6 Gate D closed — 2026-09-05 (protected 8K WS32 run sealed under §21.2)
+
+- Run `greenfield_ws32_short_decoder_8k_numerical_20260905T085534575653049Z` (code pin `4286509…`, recovery/sealing pin `579b13f…`, WS32_2D on 8 hosts × 4
+  chips, exact-DSA path, StrategyND dense overlay ON (overlay manifest `a8dc8791…4b6a`, manifest file
+  `c17194b6…5c8c`, overlay SUCCESS `166566b9…32a6`), streaming tmpfs checkpoint transport, adjudication
+  record `4da05468…cd26b`) is sealed: remote `SUCCESS` (`e40760f8…f662`, generation 1788607616743487),
+  summary `683fe2e1…08fa`, source ledger `c533af64…c0c8` (128 generation/CRC/SHA-bound fleet objects),
+  protected DB run 567 (`greenfield_78layer_8k_ws32`, item
+  `gate_d_s21_exact_tokens_adjudicated_dsa_state_cache`, record `2c9b9d93…2295`), censuses pre,
+  recovery-pre and post 8/8 zero-work.
+- Contract items: (1) raw tokens exact over the sealed oracle prefix, 20 of 29 generated (`909682cb…8173`); (2) within-engine DSA order/ties
+  exact at all 14 observed steps; (3–4) event 0 exact, event 1 equal to the pre-registered adjudicated
+  divergence (§21.5), later events recorded with the alarm acknowledged against the committed profile
+  and a lessons entry (maximum 1948/2048 at step 2, event 17, layer 62); (5) satisfied BY INHERITANCE
+  from the Gate C bounded one-layer contracts (exact dense, full-DSA, IndexShare, adversarial MoE
+  equivalence against captured legacy inputs): no per-layer tensor of this 78-layer run was compared
+  against a reference, which the classification states as `DEEP_LAYER_TENSORS_NOT_BOUNDED_IN_THIS_RUN`;
+  (6) cache/state structure exact, no repeated 32-chip layer collective, fresh 8-file/64-core XPlane at
+  2 traced steps, profiler-free p50 `130.369 ms/token` (p99 `132.414`, 7.67 tok/s), peak HBM
+  `26,375,554,560` bytes/chip (headroom 6.64 GB). Gate E met; Gate F not.
+- Sealing history (`recovery_failures/`, five directories): the original 09:37Z seal refused by design
+  on the §21.2 later-event alarm (acknowledgement machinery then added under review); recovery attempt 1
+  (09:55Z) refused on a stale source ledger bound to the earlier recovery pin; recovery attempt 2
+  (10:35Z) materialized, then refused in the XPlane aggregation because the module regex named the
+  non-exact decode body; recovery attempt 3 (11:14Z) sealed. A latent DB-rollback identity defect was
+  found by tests during review, never by a refusal. None of these changed the run's evidence; fixes are
+  in `HANDOFF.md` and `GATE_D_LESSONS.md`.
+- Classification: `RAW_TOKENS_EXACT;DSA_WITHIN_ENGINE_EXACT;STATE_CACHE_EXACT_STRUCTURE;DSA_EVENT0_EXACT;
+  DSA_EVENT1_ADJUDICATED_S21_2;LATER_EVENTS_RECORDED_NOT_ADJUDICATED;DEEP_LAYER_TENSORS_NOT_BOUNDED_IN_THIS_RUN;
+  LATER_EVENT_ALARM_ACKNOWLEDGED_WITH_LESSONS_ENTRY;PROTECTED_WALL_TRACE_HBM`. Gate D is closed under
+  this contract with item 5 by inheritance; Gates G (plan adjudication), long contexts and §18 follow.
+

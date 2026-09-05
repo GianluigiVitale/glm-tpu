@@ -1342,3 +1342,20 @@ normalized-state cause.
   Alarms (`|E Δ O| > 1024`): step 0 events 14/17/18; steps 1–12 subsets of {14,17,18,19}; step 13
   none; 13 of 14 steps alarmed; maximum 1948/2048 symmetric difference at step 2, event 17
   (layer 62). Profile: `docs/artifacts/gate-d-ws32-8k-20260905-later-event-profile.json`.
+
+- 2026-09-05 (sealing of `greenfield_ws32_short_decoder_8k_numerical_20260905T085534575653049Z`): the run's evidence was correct at 09:37Z, when the sealer refused by
+  design on the §21.2 later-event alarm; the third recovery attempt sealed it. The two refused recovery
+  attempts and one latent defect came from sealing machinery never before exercised on an exact-DSA
+  numerical SUCCESS: (a) the source ledger binds the recovery pin, so a ledger left by a failed attempt
+  can never equal the regenerated one — recovery now quarantines it after proving the remote set equal
+  (refused attempt 1); (b) the XPlane step regex named `jit_execute_body` while the exact path traces
+  `jit_execute_exact_body` — selected by path now, anchored (refused attempt 2); (c) `_rollback_db`
+  compared an env/note/item identity that `_publish_db` had outgrown — found by refreshed tests during
+  review, never by a refusal; both now share `_run_environment`/`_run_rows`, with an adjudicated
+  round-trip test. Lessons: fail-closed machinery must be
+  exercised end-to-end by tests on the same shapes the protected path produces (adjudicated summary,
+  exact-DSA module names); a recovery path is only recoverable if every artifact it regenerates is
+  archived, not compared; and offline dry-runs of the CPU-only sealer against the run directory
+  (done before attempt 3) catch these without pod time. Open P3s: `census_failure_exit.txt` is
+  overwritten per failure; the decode module name should be derived from the sealed HLO header.
+

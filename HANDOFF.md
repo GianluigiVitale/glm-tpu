@@ -12572,3 +12572,25 @@ Fix: `_decode_step_module_re(exact_dsa)` returns an anchored `^jit_execute_exact
 `^jit_execute_body\(`, with a test binding both names to the decoder's shard_map bodies. Offline
 aggregation of the run's traces with the exact regex: 8 files, 64 cores, 2 steps/core.
 
+## 2026-09-05 11:27Z — GATE D CLOSED: `greenfield_ws32_short_decoder_8k_numerical_20260905T085534575653049Z` sealed (spec §21.6)
+
+Third recovery attempt (11:14Z, recovery pin `579b13f`, preceded by an offline CPU dry-run of the
+sealer `validate` step that returned SUCCESS): materialize, validate, post census 8/8, DB run 567,
+orchestrator archive, exact remote-set validation, `SUCCESS` last (`e40760f8…f662`, generation
+1788607616743487, verified). Summary `683fe2e1…08fa` (exact-DSA path, StrategyND dense overlay ON `a8dc8791…4b6a`, tmpfs transport): tokens exact over the 20-token oracle prefix (29 generated), within-engine DSA exact,
+event 0 exact, event 1 == adjudication record, later events recorded with acknowledged alarm,
+cache/state exact structure, p50 `130.3687 ms/token`, p99 `132.4140`, 7.6706 tok/s, peak HBM
+`26,375,554,560` bytes/chip, XPlane 8 files / 64 cores / 2 steps. DB row wording states the §21 basis.
+Storage: 1,952,694,918,629 live bytes; the sealed prefix is 5.05 GB. Fleet lease free. Controller disk
+is 96% full (4.5 GB free): the local run directory holds 2.3 GB of traces now archived remotely; do not
+start another numerical run before freeing space (the RECOVER=0 4-GiB gate would refuse).
+
+Decision (goal item "tmpfs cleanup"): the streamed WS32 checkpoint in `/dev/shm/glm-ws32-runtime/…`
+on all 8 hosts is RETAINED, not cleaned, because Gate G's WS32 arm and the 128K/256K long-context runs
+need the same checkpoint and re-streaming costs ~2.5 h of pod time; every run re-verifies per-slot byte
+identity to the sealed manifest, so a stale or partial tmpfs copy is refused, never trusted. Cleanup
+remains one command (`GLM_GREENFIELD_WS32_SHM_CLEANUP=1 scripts/greenfield/cleanup_ws32_runtime_checkpoint_shm.sh`)
+and is required before any host reboot/maintenance or when host RAM is needed. `goal.md` updated.
+Next: Gate G plan adjudication (PP8/PP16/WS32 identical-condition, or evidence-backed WS32 promotion),
+then 128K smoke, 256K E0, §18.
+

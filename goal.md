@@ -42,24 +42,20 @@ not proof. Never weaken history. Optimizations default off.
 - Cron `/home/gianl/bin/sync-glm.sh` every 5 min; verify origin + US-CENTRAL2 mirror before
   protected work. Never use EU.
 
-## Resume — 2026-09-05 04:30Z
+## Resume — 2026-09-05 11:30Z
 
-Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`. Pins:
-V11+§21 `9659af7`, reference `7764cb9`, §21.2 observer `8d8759b` (reviewed, pushed). M2048
-DEFERRED. Workers 1–7 clean at `b7708936…`.
+Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`, HEAD after
+`579b13f` (sealing pin). **GATE D CLOSED (spec §21.6):**
+`greenfield_ws32_short_decoder_8k_numerical_20260905T085534575653049Z`, run pin `4286509`, SUCCESS
+`e40760f8…f662`, summary `683fe2e1…08fa`, DB run 567, tokens 20/20 exact, event 0 exact, event 1 ==
+record `4da05468…`, later events recorded (alarm acked), item 5 by inheritance (Gate C), dense overlay ON, p50 130.369 ms/token (7.67 tok/s), HBM
+26.38 GB/chip, XPlane 8/64/2, censuses 8/8. Gate E met, F not. M2048 DEFERRED.
 
-Result (§21.5): FP64 reference: event 1 legacy +0.112/0.227, engine −0.006/0.113 (eps 1e-5);
-+0.061/0.177, −0.057/0.156 (eps 1e-6); §21.2 items 3–4 PASS under both; swaps = boundary noise.
-WS32 8K runs had exact 20/20 tokens, state/cache, event 0, HBM. Pre-registered record
-`docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json`.
+State: live 1,952,694,918,629 bytes. Streamed WS32 checkpoint RETAINED in tmpfs on 8 hosts (98 GB/host,
+verified per run; needed by Gate G/128K/256K; cleanup script exists, run it before any host maintenance).
+Controller disk 96% full: free local space (archived traces) before the next numerical run.
 
-Checkpoint: WS32 runtime pack (786 GB) deleted 08-27; re-upload breaches 2 TB. Route: STREAM into
-tmpfs (hosts 400 GB RAM, 201 GB /dev/shm; 4 slots = 98 GB/host), sealed manifest/SUCCESS reused
-verbatim (lineage `results/greenfield_ws32_runtime_pack_20260815T214050854386790Z`), per-slot byte
-identity enforced; PP16 direct stays. Code changed since acquisition pin `04d059b`.
-
-Shm batch pushed (`6832b0e`); tmpfs pack DONE 08:07Z (32/32 byte-identical,
-`greenfield_ws32_runtime_shm_pack_20260905T052030829387724Z`). Next:
-(3) 8K acquisition DONE 08:49Z (`…8k_acquire_20260905T081636975282487Z`, StableHLO = 08-27). (4) ONE 8K numerical run with
-`GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1`, trace, wall, HBM, DB, archive, 8/8 cleanup → Gate D;
-tmpfs cleanup. Then Gate G, 128K, 256K, §18.
+Next: (5) Gate G plan adjudication: protected identical-condition PP8/PP16/WS32 comparison or
+evidence-backed WS32 promotion (smallest decisive design first, offline where possible). (6) 128K
+four-depth smoke, (7) 256K E0 with DB/archive/8/8 cleanup, (8) §18 direct proof. Fix open P3s
+(census_failure_exit overwrite; decode module name from sealed HLO header) opportunistically.
