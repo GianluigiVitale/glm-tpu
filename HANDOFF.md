@@ -12765,3 +12765,45 @@ branch now that the pod is idle. Next: Step C acquisitions at capacities 131,072
 diagnostic on, then the two capacity runs; storage reclamation plan before L7 (each numerical prefix
 ≈5.8 GB; live 1,972.7 GB before Step C).
 
+## 2026-09-05 20:10Z — storage plan before the long-context runs; Step C acquisition started
+
+Live 1,972,722,227,769 bytes after the four Step B prefixes (each numerical prefix ≈5.8 GB: `hlo/` 3.4 GB of
+eight byte-identical per-rank copies, `traces/` 2.4 GB; each acquisition ≈3.4 GB). Step C + L7 + L8 need
+≈54 GB against 27.3 GB of headroom. Plan (scratch `storage_reclamation_plan_20260905.md`, under review):
+Proposal A — upload each graph's HLO once (rank 0) while every rank keeps both SHAs in its record and the
+sealer keeps all-rank equality and re-hashes the single copy (≈3.0 GB saved per prefix, no evidence content
+lost); Proposal B — only if needed, delete `traces/`+`hlo/` of five REFUSED greenfield runs and the orphan
+`xprof128k_20260718T085339Z` (≈21.6 GB), keeping records/logs/diagnostics; nothing legacy (every `e0cap_*`
+prefix backs a protected DB row 348–402; DB402 is the L8 baseline), nothing sealed, no acquisition. Step C
+fits today's headroom and proceeds: the 131,072-capacity acquisition (diagnostic on, pin `d464a7f`) launched
+20:05Z.
+
+## 2026-09-05 20:25Z — storage ruling; rotary diagnostic FAILED on the TPU
+
+Fable ruling on the storage plan: Proposal A APPROVE-WITH-P2 (version the evidence layout instead of
+flipping constants so sealed prefixes stay re-verifiable; make the single upload redundant — every rank
+uploads the rank-agnostic object with `--no-clobber` and a CRC-matched precondition failure counts as
+success; gzip the HLO text, ≈10×); Proposal B REJECTED except the refused C = 512 run's `hlo/` (1.72 GB):
+the 08-16/08-26/08-27 8K runs, the 02:29Z 2K run and `xprof128k` all back recorded numbers (PERFORMANCE_LOG,
+EVIDENCE_MAP, RESEARCH_LOG) and stay intact. Also required: a pre-launch bucket-headroom refusal in the
+wrapper (live + 6 GB ≤ ceiling) before the 262,656 numerical run, because at the ceiling the EXIT-trap
+upload would silently drop a completed run's evidence. Implementation ("Phase A3", dev worktree) in
+progress. Separately, the rotary long-position diagnostic ran on the TPU inside the 131,072-capacity
+acquisition and reported `verdict=FAIL failing=45` of 128 cells; per-cell magnitudes arrive with the
+run record when the acquisition completes. Under the pre-registered §23.8 rule this makes the main-
+attention BF16 host-table path (A′) necessary before L7/L8; its design mirrors the PP8 `main_rope_table_row`
+consumption (`apply_rotary_fp32_final_round` at the query and current-key sites).
+
+## 2026-09-05 20:35Z — owner decisions: 2.5 TB ceiling, Opus 5 reviewer
+
+The owner raised the live-storage hard ceiling from 2,000,000,000,000 to 2,500,000,000,000 bytes and
+replaced the adversarial reviewer model (Fable 5.1, which hit its usage limit mid-review) with Opus 5;
+the working model is Opus 5 as well. `goal.md` rewritten accordingly (Gate D/G closure and §23 Step B
+recorded as achieved, the rotary-diagnostic failure recorded as the blocker, worktree layout and the
+pytest/CPU and no-edit-during-run rules promoted to invariants). The dev worktree's
+`STORAGE_CEILING_BYTES` follows the new ceiling. Headroom is now ≈527 GB, which covers Step C, L7 and
+L8 (≈54 GB at current per-run cost, ≈21 GB with evidence layout v2) without any deletion; the reviewed
+deletion candidate (the refused C = 512 run's `hlo/`, 1.72 GB) is no longer needed and is not pursued.
+The pending Opus 5 reviews are: evidence layout v2 (`e58edc02`, unmerged) and, once written, the A′
+main-attention rotary table.
+
