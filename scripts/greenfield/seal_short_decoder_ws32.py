@@ -1215,7 +1215,10 @@ def _require_rotary_diagnostic(
             raise SystemExit(f"WS32 rotary diagnostic present but not declared at rank {rank}")
         return
     try:
-        verify_rotary_diagnostic_record(value, expected_script_sha256=script_sha256())
+        # Protocol-pinned and TPU-only: a CPU record or a shortened window can never seal.
+        verify_rotary_diagnostic_record(
+            value, expected_script_sha256=script_sha256(), expected_backend="tpu", pinned=True
+        )
     except ValueError as error:
         raise SystemExit(f"WS32 rotary diagnostic invalid at rank {rank}: {error}") from None
     if rank and not _same(value, first.get("rotary_diagnostic")):

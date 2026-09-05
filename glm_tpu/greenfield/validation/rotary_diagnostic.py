@@ -14,9 +14,12 @@ position band, for positions ``0 .. positions-1``:
   not depend on the accelerator.
 * ``fp64``          — exact FP64 angles and trigonometry.
 
-Every form rotates the same two unit probes per pair, ``(1, 0)`` and ``(0, 1)``,
-so the rotated components are the form's effective ``(cos, sin)`` and
-``(-sin, cos)`` per pair.  The pre-registered decision rule (§23.8): in every
+Every form rotates the same unit probe ``(1, 0)`` per pair, so the rotated
+components are the form's effective ``(cos, sin)`` per pair (the ``(0, 1)``
+probe would give ``(-sin, cos)`` and adds nothing under sign-symmetric BF16
+rounding).  By design the probe cannot see the position-independent BF16
+product rounding of the real attention site (the DB530 class); that is out of
+scope here.  The pre-registered decision rule (§23.8): in every
 (pair, band) cell the device main form must differ from the legacy main form by
 no more than ``kappa`` times the legacy form's own deviation from FP64.  A cell
 where the legacy form is exact (deviation 0) requires the device form to be
@@ -79,6 +82,26 @@ def legacy_main_cos_sin(positions: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     sin = rows[:, half:]
     # FP32 products with probe (1, 0): first*cos - second*sin = cos ; second*cos + first*sin = sin.
     return _bf16(cos), _bf16(sin)
+
+
+def platform_attribution() -> dict[str, Any]:
+    """Name the accelerator the device forms ran on (a CPU record must never pass as TPU)."""
+    import jax
+
+    device = jax.devices()[0]
+    try:
+        import libtpu  # type: ignore
+
+        libtpu_version = getattr(libtpu, "__version__", None)
+    except Exception:  # pragma: no cover - libtpu absent on CPU hosts
+        libtpu_version = None
+    return {
+        "backend": str(jax.default_backend()),
+        "device_kind": str(getattr(device, "device_kind", "")),
+        "jax_version": str(jax.__version__),
+        "libtpu_version": libtpu_version,
+        "platform": str(getattr(device, "platform", "")),
+    }
 
 
 def device_forms(positions: np.ndarray) -> dict[str, tuple[np.ndarray, np.ndarray]]:
@@ -157,6 +180,7 @@ def run_rotary_diagnostic(*, positions: int = DEFAULT_POSITIONS, kappa: float = 
                     np.abs(sin[sl, pair].astype(np.float64) - truth[1][sl, pair]),
                 )
                 cell[f"{name}_max_abs_error_vs_fp64"] = float(err.max())
+                cell[f"{name}_p99_abs_error_vs_fp64"] = float(np.percentile(err, 99))
             dm_cos, dm_sin = device["device_main"]
             lm_cos, lm_sin = legacy
             diff = np.maximum(np.abs(dm_cos[sl, pair] - lm_cos[sl, pair]), np.abs(dm_sin[sl, pair] - lm_sin[sl, pair]))
@@ -185,7 +209,9 @@ def run_rotary_diagnostic(*, positions: int = DEFAULT_POSITIONS, kappa: float = 
             "legacy_main": "host FP32 table stored BF16, FP32 products, final BF16 round (DB531 legacy main form)",
         },
         "kappa": float(kappa),
+        "platform": platform_attribution(),
         "positions": int(positions),
+        "probe": "(1, 0) per pair; position-independent BF16 product rounding of the real site is out of scope",
         "rotary_dim": ROTARY_DIM,
         "script_sha256": script_sha256(),
         "theta": THETA,
@@ -197,10 +223,38 @@ def run_rotary_diagnostic(*, positions: int = DEFAULT_POSITIONS, kappa: float = 
     return RotaryDiagnosticResult(record)
 
 
-def verify_rotary_diagnostic_record(record: Any, *, expected_script_sha256: str | None = None) -> None:
-    """Fail closed on a malformed or self-inconsistent diagnostic record."""
+def verify_rotary_diagnostic_record(
+    record: Any,
+    *,
+    expected_script_sha256: str | None = None,
+    expected_backend: str | None = "tpu",
+    pinned: bool = True,
+) -> None:
+    """Fail closed on a malformed, self-inconsistent or off-protocol diagnostic record.
+
+    ``pinned`` enforces the pre-registered protocol of §23.8 (kappa, bands,
+    theta, rotary dim, the full 262,657-position window, all 4 x 32 cells);
+    ``expected_backend`` refuses a record computed on any other platform.
+    """
     if type(record) is not dict or record.get("artifact_kind") != "greenfield_ws32_rotary_long_position_diagnostic":
         raise ValueError("rotary diagnostic record kind drifted")
+    if pinned:
+        if (
+            record.get("kappa") != KAPPA
+            or record.get("bands") != [list(b) for b in BANDS]
+            or record.get("theta") != THETA
+            or record.get("rotary_dim") != ROTARY_DIM
+            or type(record.get("positions")) is not int
+            or record["positions"] < DEFAULT_POSITIONS
+            or type(record.get("cells")) is not list
+            or len(record["cells"]) != len(BANDS) * (ROTARY_DIM // 2)
+        ):
+            raise ValueError("rotary diagnostic protocol differs from the pre-registered §23.8 rule")
+    platform = record.get("platform")
+    if type(platform) is not dict or not platform.get("backend"):
+        raise ValueError("rotary diagnostic record lacks platform attribution")
+    if expected_backend is not None and platform.get("backend") != expected_backend:
+        raise ValueError(f"rotary diagnostic ran on {platform.get('backend')!r}, expected {expected_backend!r}")
     body = {k: v for k, v in record.items() if k != "record_sha256"}
     digest = sha256(json.dumps(body, allow_nan=False, separators=(",", ":"), sort_keys=True).encode("utf-8")).hexdigest()
     if record.get("record_sha256") != digest:

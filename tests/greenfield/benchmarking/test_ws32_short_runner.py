@@ -437,15 +437,15 @@ def test_ws32_capacity_and_rotary_diagnostic_are_declared_and_bound() -> None:
     # Rotary diagnostic presence must match the declaration.
     from glm_tpu.greenfield.validation import rotary_diagnostic as rd
     record = rd.run_rotary_diagnostic(positions=600).record
-    module._require_rotary_diagnostic({"rotary_diagnostic": record}, enabled=True, rank=0, first={"rotary_diagnostic": record})
+    # A CPU-computed or shortened record can never seal (protocol pinned, TPU only).
+    with pytest.raises(SystemExit, match="invalid.*(pre-registered|expected 'tpu')"):
+        module._require_rotary_diagnostic({"rotary_diagnostic": record}, enabled=True, rank=0, first={"rotary_diagnostic": record})
     with pytest.raises(SystemExit, match="present but not declared"):
         module._require_rotary_diagnostic({"rotary_diagnostic": record}, enabled=False, rank=0, first={})
     with pytest.raises(SystemExit, match="invalid"):
         module._require_rotary_diagnostic({"rotary_diagnostic": None}, enabled=True, rank=0, first={})
-    other = dict(record); other["positions"] = 601
-    with pytest.raises(SystemExit, match="invalid"):
-        module._require_rotary_diagnostic({"rotary_diagnostic": other}, enabled=True, rank=1, first={"rotary_diagnostic": record})
     module._require_rotary_diagnostic({"rotary_diagnostic": None}, enabled=False, rank=3, first={})
+    assert "expected_backend=\"tpu\", pinned=True" in sealer_path.read_text(encoding="utf-8")
     wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
     runner = (root / "scripts/greenfield/run_short_decoder_ws32.py").read_text(encoding="utf-8")
     assert "CONTEXT_CAPACITY=${GLM_GREENFIELD_WS32_CONTEXT_CAPACITY:-8192}" in wrapper
