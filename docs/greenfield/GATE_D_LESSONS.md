@@ -1359,3 +1359,18 @@ normalized-state cause.
   (done before attempt 3) catch these without pod time. Open P3s: `census_failure_exit.txt` is
   overwritten per failure; the decode module name should be derived from the sealed HLO header.
 
+- 2026-09-05 (spec §23.3 Step B, chunked exact prefill identity): run
+  `greenfield_ws32_short_decoder_8k_numerical_20260905T163437339905065Z` (run pin `172ae03`, C = 2048,
+  acquisition `…8k_acquire_20260905T150550783962907Z` at `a91caca`) executed the same sealed 8K workload
+  as DB567 with the prefill split into 3 × 2048-token chunks plus a 2,011-token tail (dual repaired-index
+  buffer installed after the last chunk). Every bit-level witness equals DB567's: numerical array manifest
+  `057af89f…`, cache probe `kv_rows` `67d03f75…` / `index_rows` `a8724ce5…`, tokens `909682cb…` (20/20),
+  all 14 `dsa_steps` comparisons, state position 8183 / context 8184. Consequently the later-event alarms
+  are DB567's exactly — steps 0–12 (step 0 events 14/17/18; steps 1–12 subsets of {14,17,18,19}; step 13
+  none), maximum 1948/2048 at step 2, event 17, layer 62 — and the committed profile
+  `docs/artifacts/gate-d-ws32-8k-20260905-later-event-profile.json` describes this run too. The sealer's
+  alarm refusal is acknowledged for this run on that basis (no new numerics: identical arrays); prefill
+  wall 1,004 s for 8,155 tokens (chunks 292/239/239 s, tail 235 s; ≈123 ms/token) against a 3,600 s budget,
+  decode p50 129.66 ms (rank 0). Lesson: the chunked program is the sealed program in pieces; the
+  identity witnesses, not the passing contract, are what made this acceptable without a new gate.
+

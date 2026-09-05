@@ -12685,3 +12685,21 @@ StableHLO `d82ab668…`, `prefill_tail` `3f097c29…`. Step B (C=2048, run pin `
 alarm ack off → the expected later-event alarm refusal will be sealed by recovery after a lessons entry
 names the tag) launched 16:34Z.
 
+## 2026-09-05 17:22Z — Step B (C = 2048) is bit-identical to DB567; C = 512 launched
+
+`greenfield_ws32_short_decoder_8k_numerical_20260905T163437339905065Z` (pin `172ae03`, C = 2048): fleet
+8/8 `WS32_SHORT_OK`, rank-0 `correctness_passed`, and every witness identical to DB567 (array manifest
+`057af89f…`, cache probe `67d03f75…`/`a8724ce5…`, tokens `909682cb…`, all `dsa_steps`, state 8183/8184).
+Prefill: 3 chunks 292.3/238.8/238.6 s + tail 234.7 s = 1,004 s (≈123 ms/token; projection max 1,164 s
+≤ 3,600 s budget); decode p50 129.66 ms rank 0. Sealer refused only on the later-event alarms (steps
+0–12, as DB567) — the lessons entry above acknowledges them for this run; recovery seal follows the C = 512
+run. C = 512 run `greenfield_ws32_short_decoder_8k_numerical_c512_20260905T172247534591631Z` launched
+17:22Z at pin `bc08c26` (docs-only commit over `172ae03`; the wrapper requires a clean tree). Procedural
+note: it launched after the push to origin but before the mirror's next 5-minute cycle was confirmed — the
+mirror was verified at HEAD within minutes; recorded because the goal asks for both before protected work.
+Result of the C = 512 launch: refused BEFORE execution on all eight ranks — "StableHLO identity drifted;
+optimized HLO identity drifted" for the prefill graphs (a 512-token chunk and a 475-token tail are different
+programs from the 2048/2011 ones pinned by the acquisition); failure-exit census 8/8, no TPU work claimed.
+Correct fail-closed behaviour and my oversight in the plan: every chunk length needs its own compile-only
+acquisition. A C = 512 acquisition follows, then the C = 512 numerical run against its own pins.
+
