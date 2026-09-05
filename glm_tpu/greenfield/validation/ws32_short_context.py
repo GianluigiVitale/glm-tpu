@@ -15,8 +15,37 @@ import numpy as np
 from .short_context_dsa_oracle import inspect_short_context_dsa_oracle
 from .short_context_oracle import inspect_short_context_oracle
 
-_ANALYSIS_ARTIFACT_KIND = "gate_d_ws32_first_divergent_event_adjudication"
-_REFERENCE_CONVENTIONS = ("rms_norm_eps_1e-5", "rms_norm_eps_1e-6")
+ANALYSIS_ARTIFACT_KIND = "gate_d_ws32_first_divergent_event_adjudication"
+_ANALYSIS_ARTIFACT_KIND = ANALYSIS_ARTIFACT_KIND
+REFERENCE_CONVENTIONS = ("rms_norm_eps_1e-5", "rms_norm_eps_1e-6")
+_REFERENCE_CONVENTIONS = REFERENCE_CONVENTIONS
+REFERENCE_IMPLEMENTATION = "scripts/greenfield/reference_cpu"
+# §21.2 item 3: the FP64 reference row must be validated against the legacy
+# intermediate captures before use. Being committed under a plausible name is
+# not that validation, so the rows usable for adjudication are enumerated here,
+# keyed by the event they were built for, each naming the reviewed record that
+# validated it and the reference implementation it was produced with.
+#
+# This table lives in the package the SEALER imports, not in the offline tool,
+# because enforcement belongs at consumption: a registry that only the producer
+# consults can be edited in an operator's working tree, used once, and reverted
+# without leaving a trace in the record.
+REFERENCE_ROWS = {
+    ("8k", 8155, 1, "rms_norm_eps_1e-5"): {
+        "implementation_tree_sha1": "5998c64af893a46610731dbba55a3b59fa0fab02",
+        "path": "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy",
+        "sha256": "bfde8bd92d9f88452d68b3e9d3112a4848b0c0ef086c7207b2431021b233d9a0",
+        "validation_path": (
+            "docs/artifacts/gate-d-event1-math-reference-adjudication-20260905.json"
+        ),
+        "validation_sha256": (
+            "aeb6ddfa415f60894456cd79cda08d30b30d7994e48b85fc7c0a89e32e6c7e09"
+        ),
+    },
+}
+# §21.2 fixes the later-event diagnostic threshold; it is not an operator choice
+# inside a pre-registration record.
+LATER_EVENT_ALARM = 1024
 _GRANDFATHERED_RECORD_SHA256 = (
     "4da05468120e3c2e9b82d03931018e0d14eebc5fc28e339381658a04457cd26b"
 )
@@ -203,6 +232,17 @@ class Ws32AdjudicatedDivergence:
         return "recorded"
 
 
+def _committed_artifact_path(value: Any, *suffixes: str) -> bool:
+    """A reviewed-tree relative path: no traversal, no absolute escape."""
+
+    if not isinstance(value, str) or not value.endswith(suffixes):
+        return False
+    parts = value.split("/")
+    if any(part in ("", ".", "..") for part in parts):
+        return False
+    return parts[:2] == ["docs", "artifacts"] and parts[2].startswith("gate-d-") and len(parts) == 3
+
+
 def load_ws32_adjudicated_divergence(
     path: Path,
     *,
@@ -238,7 +278,7 @@ def load_ws32_adjudicated_divergence(
     # record that predates the §21.2 amendment of 2026-09-05 22:20Z, which is
     # grandfathered by digest below; every other record must carry the row
     # binding.
-    optional = {"prior_attempts", "reference_row"}
+    optional = {"analysis", "prior_attempts", "reference_row"}
     if (
         not isinstance(record, dict)
         or not required <= set(record) <= required | optional
@@ -249,7 +289,7 @@ def load_ws32_adjudicated_divergence(
         or not isinstance(record["step"], int)
         or not isinstance(record["event_index"], int)
         or not isinstance(record["later_event_alarm"], int)
-        or record["later_event_alarm"] <= 0
+        or record["later_event_alarm"] != LATER_EVENT_ALARM
     ):
         raise ValueError("WS32 adjudicated-divergence record schema drifted")
     expected_only = tuple(record["expected_only"])
@@ -281,9 +321,7 @@ def load_ws32_adjudicated_divergence(
         or any(
             not isinstance(item, dict)
             or set(item) != {"path", "sha256"}
-            or not isinstance(item["path"], str)
-            or not item["path"].startswith("docs/artifacts/gate-d-")
-            or not item["path"].endswith((".json", ".npy"))
+            or not _committed_artifact_path(item["path"], ".json", ".npy")
             or not isinstance(item["sha256"], str)
             or len(item["sha256"]) != 64
             for item in basis
@@ -298,17 +336,22 @@ def load_ws32_adjudicated_divergence(
         # record that does not name a well-formed source run would make that
         # guard a no-op, so it is refused here instead.
         raise ValueError("WS32 adjudicated-divergence engine_source_run is not a run tag")
+    grandfathered = digest == _GRANDFATHERED_RECORD_SHA256
     reference = record.get("reference_row")
-    if reference is None and digest != _GRANDFATHERED_RECORD_SHA256:
+    if reference is None and not grandfathered:
         raise ValueError(
             "WS32 adjudicated-divergence record does not bind its FP64 reference row"
         )
+    if not grandfathered:
+        for key in ("analysis", "prior_attempts"):
+            if key not in record:
+                raise ValueError(
+                    f"WS32 adjudicated-divergence record does not declare {key}"
+                )
     if reference is not None and (
         not isinstance(reference, dict)
         or set(reference) != {"convention", "implementation_tree_sha1", "path", "sha256"}
-        or not isinstance(reference["path"], str)
-        or not reference["path"].startswith("docs/artifacts/gate-d-")
-        or not reference["path"].endswith(".npy")
+        or not _committed_artifact_path(reference["path"], ".npy")
         or not isinstance(reference["sha256"], str)
         or len(reference["sha256"]) != 64
         or reference["convention"] not in _REFERENCE_CONVENTIONS
@@ -323,13 +366,46 @@ def load_ws32_adjudicated_divergence(
         # A declared row that the basis does not name is decorative: the
         # analysis could have been computed from a different row entirely.
         raise ValueError("WS32 adjudicated-divergence reference row is not in the basis")
+    if reference is not None:
+        # §21.2 item 3, enforced HERE rather than in the offline tool: a registry
+        # the producer alone consults can be widened in a working tree, used once
+        # and reverted, leaving the record indistinguishable from a reviewed one.
+        registered = REFERENCE_ROWS.get(
+            (
+                str(record["context"]),
+                int(record["decode_position"]),
+                int(record["producer_layer_id"]),
+                reference["convention"],
+            )
+        )
+        if registered is None:
+            raise ValueError(
+                "WS32 adjudicated-divergence names no reviewed FP64 reference row for this event"
+            )
+        if (
+            registered["path"] != reference["path"]
+            or registered["sha256"] != reference["sha256"]
+            or registered["implementation_tree_sha1"] != reference["implementation_tree_sha1"]
+        ):
+            raise ValueError(
+                "WS32 adjudicated-divergence reference row is not the reviewed row for this event"
+            )
+    analysis_entry = record.get("analysis")
+    if analysis_entry is not None and (
+        not isinstance(analysis_entry, dict)
+        or set(analysis_entry) != {"path", "sha256"}
+        or not _committed_artifact_path(analysis_entry["path"], ".json")
+        or not isinstance(analysis_entry["sha256"], str)
+        or len(analysis_entry["sha256"]) != 64
+    ):
+        raise ValueError("WS32 adjudicated-divergence analysis binding drifted")
+    if analysis_entry is not None and analysis_entry not in basis:
+        raise ValueError("WS32 adjudicated-divergence analysis is not in the basis")
     attempts = record.get("prior_attempts", [])
     if not isinstance(attempts, list) or any(
         not isinstance(item, dict)
         or set(item) != {"path", "sha256", "verdict"}
-        or not isinstance(item["path"], str)
-        or not item["path"].startswith("docs/artifacts/gate-d-")
-        or not item["path"].endswith(".json")
+        or not _committed_artifact_path(item["path"], ".json")
         or not isinstance(item["sha256"], str)
         or len(item["sha256"]) != 64
         or not isinstance(item["verdict"], str)
@@ -356,6 +432,21 @@ def load_ws32_adjudicated_divergence(
                 raise ValueError(
                     f"WS32 adjudicated-divergence basis is not readable JSON: {item['path']}"
                 )
+            if item == analysis_entry:
+                if not isinstance(basis_record, dict):
+                    raise ValueError("WS32 adjudicated-divergence analysis is not an object")
+                if basis_record.get("artifact_kind") != _ANALYSIS_ARTIFACT_KIND:
+                    raise ValueError(
+                        "WS32 adjudicated-divergence analysis is not a §21.2 adjudication"
+                    )
+                if (
+                    basis_record.get("step") != record["step"]
+                    or basis_record.get("event_index") != record["event_index"]
+                    or basis_record.get("engine_source_run") != record["engine_source_run"]
+                ):
+                    raise ValueError(
+                        "WS32 adjudicated-divergence analysis adjudicates a different event"
+                    )
             if (
                 isinstance(basis_record, dict)
                 and basis_record.get("artifact_kind") == _ANALYSIS_ARTIFACT_KIND

@@ -1075,3 +1075,43 @@ def test_ws32_v2_materialization_refuses_every_drift(tmp_path: Path, monkeypatch
             inflated = run_dir / "fleet_hlo" / f"{graph}.rank0.{suffix}"
             assert inflated.stat().st_ino == worker.stat().st_ino, (graph, suffix)
             assert sha256(inflated.read_bytes()).hexdigest() == records[graph][sha_key]
+
+
+def test_the_sealer_states_loader_refusals_and_requires_a_committed_record() -> None:
+    """P2-4 and P3: a loader ValueError is a refusal line, not a traceback."""
+    from pathlib import Path as _Path
+
+    root = _Path(__file__).resolve().parents[3]
+    source = (root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8")
+    assert "WS32 adjudication record is not loadable" in source
+    assert "WS32 adjudication record is not committed at HEAD" in source
+    assert "WS32 adjudication record differs from the committed blob" in source
+    assert "WS32 adjudication record is outside the repository" in source
+
+    import ast
+
+    tree = ast.parse(source)
+    validate = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_validate"
+    )
+    loads = [
+        node for node in ast.walk(validate)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "load_ws32_adjudicated_divergence"
+    ]
+    assert len(loads) == 1, "the record is loaded once"
+    handlers = [
+        node for node in ast.walk(validate)
+        if isinstance(node, ast.Try)
+        and any(loads[0] is item for item in ast.walk(node))
+    ]
+    assert handlers, "the load is not wrapped, so a refusal would be a traceback"
+    caught = {
+        name.id
+        for handler in handlers
+        for clause in handler.handlers
+        for name in ast.walk(clause.type) if isinstance(name, ast.Name)
+    }
+    assert "ValueError" in caught

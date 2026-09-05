@@ -1669,8 +1669,25 @@ section grants no install or execution authority.
    implementation's committed tree hash is recorded. A new event therefore requires a new REVIEWED
    registration, which is the pre-registration step. Every earlier adjudication attempt on the same
    event is disclosed in the record's `prior_attempts`; `basis` names only what the record stands on,
-   and a refused analysis may never appear there. The observer archive is bound to the archive the
-   declared source run itself published under its own tag, not to a directory name.
+   and a refused analysis may never appear there. Disclosure is best-effort by construction: attempt
+   files are untracked outputs, so an operator who moves one out of `docs/artifacts` leaves no trace.
+   What is enforced is that the key is always present, so "no earlier attempt" is asserted rather
+   than omitted, and that every declared attempt is SHA-bound. The record must name, in `analysis`,
+   the PASS §21.2 analysis it stands on, and that analysis must adjudicate the same run, step and
+   event and declare the same reference row. The later-event alarm threshold is fixed at 1024 and a
+   record that carries any other value is refused: it is not an operator choice. The observer archive
+   is bound to the archive the declared source run itself published under its own tag, not to a
+   directory name. Every one of these rules is enforced by the LOADER the sealer calls, not by the
+   offline tool: a rule only the producer consults can be widened in a working tree, used once and
+   reverted without leaving a trace in the record. The sealer additionally requires the record to be
+   committed at `HEAD` and byte-identical to the committed blob.
+
+   *Grandfathering, stated rather than hidden:* the one record that closed Gate D,
+   `docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json`, SHA-256
+   `4da05468120e3c2e9b82d03931018e0d14eebc5fc28e339381658a04457cd26b`, predates this amendment and
+   carries neither `reference_row` nor `analysis`. It is exempt BY DIGEST, so the exemption covers
+   exactly that file and cannot be transferred: the digest is checked before anything else in the
+   loader. History is not weakened and no new record may use the exemption.
 5. **Internal tensors (level 2).** Layer outputs, residuals and caches are compared under the bounded
    contracts in `docs/greenfield/NUMERICAL_CONTRACT.md`; cache/state structure (positions, tails,
    validity, pages, manifests) remains exact.

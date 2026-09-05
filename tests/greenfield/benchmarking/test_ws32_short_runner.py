@@ -632,15 +632,26 @@ def test_ws32_sealer_refuses_an_adjudication_record_derived_from_the_sealed_run(
             for item in ast.walk(node)
         )
 
-    # A write moved into a helper is still a write, so module-level helpers that
-    # write are treated as writes at their call sites.
+    # A write moved into a helper is still a write. The closure is taken to a
+    # fixpoint over every function in the module, nested and async included, so
+    # a helper that calls a helper that writes is caught whatever the order.
     root = Path(__file__).resolve().parents[3]
     tree = ast.parse(
         (root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8")
     )
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node is not validate and _writes(node):
-            forbidden.add(node.name)
+    functions = {
+        node.name: node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node is not validate
+    }
+    changed = True
+    while changed:
+        changed = False
+        for name, node in functions.items():
+            if name not in forbidden and _writes(node):
+                forbidden.add(name)
+                changed = True
 
     earlier = sorted(
         item.lineno

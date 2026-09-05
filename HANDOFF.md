@@ -13062,3 +13062,44 @@ and fails in the dev worktree IN ISOLATION, at the same commit content, and neit
 `configs/greenfield-gate-d-precompile-admission-v2.json` nor
 `glm_tpu/greenfield/gate_d_precompile_admission.py` mentions any file this change edits. The number
 that governs the merge is therefore the run worktree's, which is re-measured after the merge.
+
+## 2026-09-05 23:40Z — fourth Opus 5 rejection resolved: enforcement moved to the consumer
+
+Round 3 confirmed the sealed Gate D path intact and every earlier fix live, then broke the round on a
+structural point I had got wrong twice: **a rule only the producer consults is not a rule.**
+
+* **P1-1 — the loader never required a §21.2 analysis in `basis`,** so the reference-row cross-check
+  fired only for records that volunteered one. The reviewer loaded a wholly fabricated record with a
+  ten-position invented divergence and no analysis at all. The record must now declare, in a new
+  `analysis` field, the PASS analysis it stands on; that entry must be in `basis`, must be of the
+  §21.2 analysis kind, and must adjudicate the same run, step and event with the same reference row.
+* **P1-2 — `REFERENCE_ROWS` lived in the offline tool.** The reviewer added a registry key in the
+  working tree, ran the tool against a fitted row, reverted the edit, and the reviewed loader accepted
+  the resulting record: the registry left no trace in it. The registry now lives in
+  `glm_tpu/greenfield/validation/ws32_short_context.py`, the module the SEALER imports, the offline
+  tool imports it from there, and the loader checks `(context, position, layer, convention)` against
+  path, digest AND the reference implementation's tree hash. A row outside the registry is refused
+  where it matters.
+
+P2s: `gcloud storage hash` prints `md5_hash: null` for a composite upload rather than omitting the
+line, so the CRC32C fallback added an hour earlier was dead code and its test asserted a fiction
+against a stubbed function — the parser now drops `null`, and the test exercises the parser on
+captured output; the later-event alarm is pinned at 1024 in the loader and the tool, closing the same
+"whoever chooses it chooses the verdict" hole the reference row had; the sealer requires the record to
+be committed at HEAD and byte-identical to its blob, because §21.6 records seals driven by hand
+outside the wrapper that pins it; the prior-attempt collector is renamed `_collect_prior_attempts` and
+its docstring and the spec now say what it actually provides (best-effort disclosure, always-present
+key, SHA-bound entries) rather than a refusal it never performed; the grandfathering exemption is
+stated in §21.2 with its digest and the reason it cannot be transferred.
+
+Six mutants survived the round-3 test suite. All six now die: the two registry checks, the
+prior-attempt SHA verification, the oracle step count in the scan window, the sealer's wrapping of
+loader refusals, and the reference-implementation binding. Artifact paths are also normalised, so
+`..` components can no longer escape the reviewed directory, and the AST write detector is a fixpoint
+over every function in the sealer rather than a single ordered pass.
+
+One near-miss worth recording: while rewriting the record fixture I deleted three tests in the same
+splice, including `test_reproduces_the_sealed_event1_adjudication_exactly`, which pins the sealed Gate
+D numbers against the real 08-27 archive. Comparing the test inventory against `HEAD` caught it and
+all three are restored. Never take a `str.index`-to-`str.index` region without listing what is inside
+it first.

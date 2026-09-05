@@ -280,14 +280,20 @@ def test_ws32_adjudicated_divergence_record_loader_binds_sha_and_schema(tmp_path
     with np.testing.assert_raises_regex(ValueError, "identity drifted"):
         load_ws32_adjudicated_divergence(committed, expected_sha256="0" * 64)
 
+    from glm_tpu.greenfield.validation.ws32_short_context import REFERENCE_ROWS
+
+    registered = REFERENCE_ROWS[("8k", 8155, 1, "rms_norm_eps_1e-5")]
+
     def _bound(payload: dict) -> dict:
-        """Any record other than the grandfathered one must bind its row."""
+        """Any record other than the grandfathered one must bind row and analysis."""
         row = payload["basis"][2]
         return dict(
             payload,
+            analysis=dict(payload["basis"][1]),
+            prior_attempts=[],
             reference_row={
                 "convention": "rms_norm_eps_1e-5",
-                "implementation_tree_sha1": "5" * 40,
+                "implementation_tree_sha1": registered["implementation_tree_sha1"],
                 "path": row["path"],
                 "sha256": row["sha256"],
             },
@@ -362,6 +368,7 @@ def _adjudication_record_fixture(root: Path) -> tuple[dict, dict]:
     """A minimal repository holding a record plus its PASS analysis and row."""
     import hashlib
     import json
+    import shutil
 
     artifacts = root / "docs" / "artifacts"
     artifacts.mkdir(parents=True, exist_ok=True)
@@ -371,19 +378,39 @@ def _adjudication_record_fixture(root: Path) -> tuple[dict, dict]:
         "path": "docs/artifacts/gate-d-row.npy",
         "sha256": hashlib.sha256(row.read_bytes()).hexdigest(),
     }
-    reference_row = dict(
-        row_entry, convention="rms_norm_eps_1e-5", implementation_tree_sha1="5" * 40
+    from glm_tpu.greenfield.validation.ws32_short_context import REFERENCE_ROWS
+
+    registered = REFERENCE_ROWS[("8k", 8155, 1, "rms_norm_eps_1e-5")]
+    row.unlink()
+    (root / registered["path"]).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(
+        Path(__file__).resolve().parents[3] / registered["path"], root / registered["path"]
     )
+    row_entry = {"path": registered["path"], "sha256": registered["sha256"]}
+    reference_row = dict(
+        row_entry,
+        convention="rms_norm_eps_1e-5",
+        implementation_tree_sha1=registered["implementation_tree_sha1"],
+    )
+    source_run = "greenfield_ws32_short_decoder_8k_numerical_20260906T000000000000000Z"
     analysis = {
         "artifact_kind": "gate_d_ws32_first_divergent_event_adjudication",
+        "engine_source_run": source_run,
+        "event_index": 1,
         "reference_row": reference_row,
+        "step": 0,
         "verdict": "PASS",
     }
     passed = artifacts / "gate-d-analysis.json"
     passed.write_text(json.dumps(analysis), encoding="utf-8")
     refused = artifacts / "gate-d-attempt.json"
     refused.write_text(json.dumps(dict(analysis, verdict="FAIL")), encoding="utf-8")
+    analysis_entry = {
+        "path": "docs/artifacts/gate-d-analysis.json",
+        "sha256": hashlib.sha256(passed.read_bytes()).hexdigest(),
+    }
     record = {
+        "analysis": analysis_entry,
         "artifact_kind": "gate_d_ws32_8k_adjudicated_divergence",
         "schema_version": 1,
         "spec_section": "21.2 items 3-4 (scope: first divergent event)",
@@ -396,13 +423,7 @@ def _adjudication_record_fixture(root: Path) -> tuple[dict, dict]:
         "expected_only": [31],
         "observed_only": [32],
         "later_event_alarm": 1024,
-        "basis": [
-            row_entry,
-            {
-                "path": "docs/artifacts/gate-d-analysis.json",
-                "sha256": hashlib.sha256(passed.read_bytes()).hexdigest(),
-            },
-        ],
+        "basis": [row_entry, analysis_entry],
         "prior_attempts": [
             {
                 "path": "docs/artifacts/gate-d-attempt.json",
@@ -411,9 +432,7 @@ def _adjudication_record_fixture(root: Path) -> tuple[dict, dict]:
             }
         ],
         "oracle": {"dsa_manifest_sha256": "a" * 64, "token_manifest_sha256": "c" * 64},
-        "engine_source_run": (
-            "greenfield_ws32_short_decoder_8k_numerical_20260906T000000000000000Z"
-        ),
+        "engine_source_run": source_run,
         "reference_row": reference_row,
         "semantics": "test",
         "gate_d_closed": False,
@@ -478,3 +497,60 @@ def test_the_declared_reference_row_must_be_the_one_the_analysis_used(tmp_path: 
         load_ws32_adjudicated_divergence(
             path, expected_sha256=hashlib.sha256(payload).hexdigest(), repository_root=tmp_path
         )
+
+
+def test_a_prior_attempt_whose_bytes_drifted_is_refused(tmp_path: Path) -> None:
+    """P2-5: prior-attempt SHA verification survived mutation."""
+    import hashlib
+    import json
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    record, _ = _adjudication_record_fixture(tmp_path)
+    record["prior_attempts"][0]["sha256"] = "0" * 64
+    payload = json.dumps(record).encode()
+    path = tmp_path / "record.json"
+    path.write_bytes(payload)
+    with np.testing.assert_raises_regex(ValueError, "prior attempt drifted"):
+        load_ws32_adjudicated_divergence(
+            path, expected_sha256=hashlib.sha256(payload).hexdigest(), repository_root=tmp_path
+        )
+
+
+def test_an_unpinned_later_event_alarm_is_refused(tmp_path: Path) -> None:
+    """P2-3: §21.2 fixes the threshold; raising it skips the alarm entirely."""
+    import hashlib
+    import json
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    record, _ = _adjudication_record_fixture(tmp_path)
+    record["later_event_alarm"] = 4096
+    payload = json.dumps(record).encode()
+    path = tmp_path / "record.json"
+    path.write_bytes(payload)
+    with np.testing.assert_raises_regex(ValueError, "schema drifted"):
+        load_ws32_adjudicated_divergence(
+            path, expected_sha256=hashlib.sha256(payload).hexdigest(), repository_root=tmp_path
+        )
+
+
+def test_artifact_paths_may_not_escape_the_reviewed_directory() -> None:
+    """P3: `startswith` admitted `..` components."""
+    from glm_tpu.greenfield.validation.ws32_short_context import _committed_artifact_path
+
+    assert _committed_artifact_path("docs/artifacts/gate-d-row.npy", ".npy") is True
+    assert _committed_artifact_path("docs/artifacts/gate-d-a.json", ".json", ".npy") is True
+    for hostile in (
+        "docs/artifacts/gate-d-x/../../../etc/passwd.npy",
+        "docs/artifacts/gate-d-x/nested.npy",
+        "docs/artifacts/other.npy",
+        "/docs/artifacts/gate-d-row.npy",
+        "docs/artifacts/gate-d-row.txt",
+        17,
+    ):
+        assert _committed_artifact_path(hostile, ".json", ".npy") is False, hostile

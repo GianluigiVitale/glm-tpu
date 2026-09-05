@@ -472,12 +472,50 @@ def _validate(args: argparse.Namespace) -> int:
     repository_root = Path(__file__).resolve().parents[2]
     if args.recovery_code_hash and not re.fullmatch(r"[0-9a-f]{40}", args.recovery_code_hash):
         raise SystemExit("WS32 recovery code hash must be a full commit id")
+    def _committed_record_path(path: Path) -> str:
+        """The record must be a committed artifact of this repository.
+
+        §21.2 pre-registration is only pre-registration if the record was under
+        review before the run it judges. The wrapper pins one path and SHA, but
+        §21.6 records seals driven by hand outside it, so the sealer checks the
+        property itself: inside the tree, committed at HEAD, and byte-identical
+        to the committed blob.
+        """
+
+        resolved = Path(path).resolve()
+        try:
+            relative = str(resolved.relative_to(repository_root))
+        except ValueError:
+            raise SystemExit(
+                f"WS32 adjudication record is outside the repository: {path}"
+            )
+        committed = subprocess.run(
+            ["git", "-C", str(repository_root), "rev-parse", f"HEAD:{relative}"],
+            capture_output=True,
+            text=True,
+        )
+        if committed.returncode != 0:
+            raise SystemExit(
+                f"WS32 adjudication record is not committed at HEAD: {relative}"
+            )
+        working = subprocess.run(
+            ["git", "-C", str(repository_root), "hash-object", "--", relative],
+            capture_output=True,
+            text=True,
+        )
+        if working.returncode != 0 or committed.stdout.strip() != working.stdout.strip():
+            raise SystemExit(
+                f"WS32 adjudication record differs from the committed blob: {relative}"
+            )
+        return relative
+
     if args.dsa_adjudication_record is None:
         if args.dsa_adjudication_sha256 != "0" * 64:
             raise SystemExit("WS32 adjudication SHA given without a record")
         dsa_adjudication = None
         expected_dsa_adjudication = None
     else:
+        record_relative = _committed_record_path(args.dsa_adjudication_record)
         try:
             dsa_adjudication = load_ws32_adjudicated_divergence(
                 args.dsa_adjudication_record,
@@ -507,9 +545,7 @@ def _validate(args: argparse.Namespace) -> int:
         expected_dsa_adjudication = {
             "event_index": dsa_adjudication.event_index,
             "mode": "first_divergent_event",
-            "record_path": str(
-                args.dsa_adjudication_record.resolve().relative_to(repository_root)
-            ),
+            "record_path": record_relative,
             "record_sha256": dsa_adjudication.record_sha256,
             "step": dsa_adjudication.step,
         }

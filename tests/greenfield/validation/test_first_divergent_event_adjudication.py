@@ -15,6 +15,21 @@ SPEC = importlib.util.spec_from_file_location("ws32_event_adjudicator", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
+from glm_tpu.greenfield.validation.ws32_short_context import REFERENCE_ROWS  # noqa: E402
+
+REGISTERED = REFERENCE_ROWS[("8k", 8155, 1, "rms_norm_eps_1e-5")]
+
+ARCHIVE_0827 = Path(
+    "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_20260827T011711674195301Z/runner.rank0.npz"
+)
+ORACLE_8K = Path(
+    "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/"
+    "greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle"
+)
+REFERENCE_ROW = ROOT / "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
+
+
+
 
 def _fixture(tmp_path: Path, *, engine_bias: float, swap: bool) -> tuple[Path, Path, Path]:
     """One synthetic event: 64 reference scores, top-32 selected, optional boundary swap."""
@@ -93,15 +108,45 @@ def test_an_exact_event_is_not_adjudicable(tmp_path: Path) -> None:
 
 
 def test_the_emitted_record_matches_the_loader_schema(tmp_path: Path) -> None:
+    import shutil
+
     from glm_tpu.greenfield.validation.ws32_short_context import (
         load_ws32_adjudicated_divergence,
     )
 
+    artifacts = tmp_path / "docs" / "artifacts"
+    artifacts.mkdir(parents=True)
+    row_relative = REGISTERED["path"]
+    shutil.copyfile(ROOT / row_relative, tmp_path / row_relative)
+    row_entry = {"path": row_relative, "sha256": REGISTERED["sha256"]}
+    reference_row = {
+        "convention": "rms_norm_eps_1e-5",
+        "implementation_tree_sha1": REGISTERED["implementation_tree_sha1"],
+        "path": REGISTERED["path"],
+        "sha256": REGISTERED["sha256"],
+    }
+    analysis = {
+        "artifact_kind": MODULE.ANALYSIS_ARTIFACT_KIND,
+        "engine_source_run": (
+            "greenfield_ws32_short_decoder_8k_numerical_20260905T000000000000000Z"
+        ),
+        "event_index": 1,
+        "reference_row": reference_row,
+        "step": 0,
+        "verdict": "PASS",
+    }
+    analysis_relative = "docs/artifacts/gate-d-event1-analysis.json"
+    (tmp_path / analysis_relative).write_text(json.dumps(analysis), encoding="utf-8")
+    analysis_entry = {
+        "path": analysis_relative,
+        "sha256": sha256((tmp_path / analysis_relative).read_bytes()).hexdigest(),
+    }
     record = {
+        "analysis": analysis_entry,
         "artifact_kind": "gate_d_ws32_8k_adjudicated_divergence",
         "schema_version": 1,
         "spec_section": "21.2 items 3-4 (scope: first divergent event)",
-        "date_utc": "2026-09-05",
+        "date_utc": "2026-09-06",
         "context": "8k",
         "decode_position": 8155,
         "step": 0,
@@ -110,25 +155,11 @@ def test_the_emitted_record_matches_the_loader_schema(tmp_path: Path) -> None:
         "expected_only": [31],
         "observed_only": [32],
         "later_event_alarm": 1024,
-        "basis": [
-            {
-                "path": "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy",
-                "sha256": sha256(
-                    (ROOT / "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy").read_bytes()
-                ).hexdigest(),
-            }
-        ],
+        "basis": [row_entry, analysis_entry],
         "prior_attempts": [],
-        "reference_row": {
-            "convention": "rms_norm_eps_1e-5",
-            "implementation_tree_sha1": "5" * 40,
-            "path": "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy",
-            "sha256": sha256(
-                (ROOT / "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy").read_bytes()
-            ).hexdigest(),
-        },
+        "reference_row": reference_row,
         "oracle": {"dsa_manifest_sha256": "a" * 64, "token_manifest_sha256": "c" * 64},
-        "engine_source_run": "greenfield_ws32_short_decoder_8k_numerical_20260905T000000000000000Z",
+        "engine_source_run": analysis["engine_source_run"],
         "semantics": "test",
         "gate_d_closed": False,
         "performance_claim": False,
@@ -136,7 +167,7 @@ def test_the_emitted_record_matches_the_loader_schema(tmp_path: Path) -> None:
     path = tmp_path / "record.json"
     MODULE._write_once(path, record)
     loaded = load_ws32_adjudicated_divergence(
-        path, expected_sha256=sha256(path.read_bytes()).hexdigest(), repository_root=ROOT
+        path, expected_sha256=sha256(path.read_bytes()).hexdigest(), repository_root=tmp_path
     )
     assert loaded.step == 0 and loaded.event_index == 1
     assert loaded.expected_only == (31,) and loaded.observed_only == (32,)
@@ -144,20 +175,106 @@ def test_the_emitted_record_matches_the_loader_schema(tmp_path: Path) -> None:
         MODULE._write_once(path, record)
 
 
-ARCHIVE_0827 = Path(
-    "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_20260827T011711674195301Z/runner.rank0.npz"
-)
-ORACLE_8K = Path(
-    "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/"
-    "greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle"
-)
-REFERENCE_ROW = ROOT / "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
+def test_a_record_that_names_no_adjudication_analysis_is_refused(tmp_path: Path) -> None:
+    """P1-1: the cross-check is vacuous if no analysis need be named."""
+    import hashlib
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    committed = ROOT / "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json"
+    fabricated = json.loads(committed.read_text(encoding="utf-8"))
+    fabricated["date_utc"] = "2026-09-06"
+    fabricated["expected_only"] = list(range(1, 11))
+    fabricated["observed_only"] = list(range(11, 21))
+    fabricated["reference_row"] = {
+        "convention": "rms_norm_eps_1e-5",
+        "implementation_tree_sha1": REGISTERED["implementation_tree_sha1"],
+        "path": REGISTERED["path"],
+        "sha256": REGISTERED["sha256"],
+    }
+    fabricated["prior_attempts"] = []
+    path = tmp_path / "fabricated.json"
+    payload = json.dumps(fabricated).encode()
+    path.write_bytes(payload)
+    with pytest.raises(ValueError, match="does not declare analysis"):
+        load_ws32_adjudicated_divergence(
+            path, expected_sha256=hashlib.sha256(payload).hexdigest(), repository_root=ROOT
+        )
 
 
-@pytest.mark.skipif(
-    not (ARCHIVE_0827.is_file() and (ORACLE_8K / "dsa_events.safetensors").is_file()),
-    reason="the 2026-08-27 observer archive or the sealed 8K DSA oracle is unavailable",
-)
+def test_a_reference_row_outside_the_reviewed_registry_is_refused_by_the_loader(
+    tmp_path: Path,
+) -> None:
+    """P1-2: the registry is enforced where the sealer reads, not where the tool writes."""
+    import hashlib
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    artifacts = tmp_path / "docs" / "artifacts"
+    artifacts.mkdir(parents=True)
+    fitted = artifacts / "gate-d-fitted-reference-row.npy"
+    np.save(fitted, np.zeros(8, dtype=np.float64))
+    row_entry = {
+        "path": "docs/artifacts/gate-d-fitted-reference-row.npy",
+        "sha256": sha256(fitted.read_bytes()).hexdigest(),
+    }
+    reference_row = dict(
+        row_entry,
+        convention="rms_norm_eps_1e-5",
+        implementation_tree_sha1=REGISTERED["implementation_tree_sha1"],
+    )
+    analysis_relative = "docs/artifacts/gate-d-fitted-analysis.json"
+    analysis = {
+        "artifact_kind": MODULE.ANALYSIS_ARTIFACT_KIND,
+        "engine_source_run": (
+            "greenfield_ws32_short_decoder_8k_numerical_20260905T000000000000000Z"
+        ),
+        "event_index": 1,
+        "reference_row": reference_row,
+        "step": 0,
+        "verdict": "PASS",
+    }
+    (tmp_path / analysis_relative).write_text(json.dumps(analysis), encoding="utf-8")
+    analysis_entry = {
+        "path": analysis_relative,
+        "sha256": sha256((tmp_path / analysis_relative).read_bytes()).hexdigest(),
+    }
+    record = {
+        "analysis": analysis_entry,
+        "artifact_kind": "gate_d_ws32_8k_adjudicated_divergence",
+        "schema_version": 1,
+        "spec_section": "21.2 items 3-4 (scope: first divergent event)",
+        "date_utc": "2026-09-06",
+        "context": "8k",
+        "decode_position": 8155,
+        "step": 0,
+        "event_index": 1,
+        "producer_layer_id": 1,
+        "expected_only": [31],
+        "observed_only": [32],
+        "later_event_alarm": 1024,
+        "basis": [row_entry, analysis_entry],
+        "prior_attempts": [],
+        "reference_row": reference_row,
+        "oracle": {"dsa_manifest_sha256": "a" * 64, "token_manifest_sha256": "c" * 64},
+        "engine_source_run": analysis["engine_source_run"],
+        "semantics": "test",
+        "gate_d_closed": False,
+        "performance_claim": False,
+    }
+    path = tmp_path / "record.json"
+    payload = json.dumps(record).encode()
+    path.write_bytes(payload)
+    with pytest.raises(ValueError, match="not the reviewed row for this event"):
+        load_ws32_adjudicated_divergence(
+            path, expected_sha256=hashlib.sha256(payload).hexdigest(), repository_root=tmp_path
+        )
+
+
 def test_reproduces_the_sealed_event1_adjudication_exactly() -> None:
     """The tool must reproduce the numbers of the adjudication that closed Gate D
     (docs/artifacts/gate-d-event1-math-reference-adjudication-20260905.json)."""
@@ -467,7 +584,7 @@ def test_earlier_attempts_on_the_same_event_are_collected_for_disclosure(
     earlier.write_text(json.dumps(analysis), encoding="utf-8")
     output = tmp_path / "gate-d-attempt-two.json"
 
-    disclosed = MODULE._require_prior_attempts_disclosed(output, analysis)
+    disclosed = MODULE._collect_prior_attempts(output, analysis)
     assert [item["path"] for item in disclosed] == [
         f"{tmp_path.name}/gate-d-attempt-one.json"
     ]
@@ -478,9 +595,9 @@ def test_earlier_attempts_on_the_same_event_are_collected_for_disclosure(
     edited.write_text(
         json.dumps(dict(analysis, artifact_kind="something_else")), encoding="utf-8"
     )
-    assert len(MODULE._require_prior_attempts_disclosed(output, analysis)) == 2
+    assert len(MODULE._collect_prior_attempts(output, analysis)) == 2
 
-    assert MODULE._require_prior_attempts_disclosed(output, dict(analysis, event_index=2)) == []
+    assert MODULE._collect_prior_attempts(output, dict(analysis, event_index=2)) == []
 
 
 def test_the_bias_bound_moves_with_kappa(tmp_path: Path) -> None:
@@ -512,3 +629,98 @@ def test_repeated_selected_positions_are_refused(tmp_path: Path) -> None:
         MODULE.adjudicate(
             archive=broken, oracle_dir=oracle_dir, reference_row=reference_row, step=0, event=0
         )
+
+
+def test_the_published_hash_parser_rejects_a_null_md5() -> None:
+    """P2-1: a composite upload prints `md5_hash: null`, it does not omit it."""
+    captured = (
+        "---\n"
+        "crc32c_hash: 7fb43721\n"
+        "digest_format: hex\n"
+        "md5_hash: null\n"
+        "url: gs://driftbench-dsv4-uc/results/tag/host_records/runner.rank0.npz\n"
+    )
+
+    class _Completed:
+        returncode = 0
+        stdout = captured
+
+    import subprocess as sp
+
+    original = sp.run
+    try:
+        sp.run = lambda *a, **k: _Completed()
+        MODULE.subprocess.run = sp.run
+        hashes = MODULE._remote_archive_hashes("tag")
+    finally:
+        sp.run = original
+        MODULE.subprocess.run = original
+    assert hashes == {"crc32c": "7fb43721"}, "null is not a digest"
+
+
+def test_the_registry_path_and_digest_are_both_enforced_by_the_producer(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """P2-5: neither registry check had a test that could fail."""
+    import subprocess as sp
+
+    repository = tmp_path / "repo"
+    (repository / "docs" / "artifacts").mkdir(parents=True)
+    rival = "docs/artifacts/gate-d-event1-fp64-reference-row-v2-20260906.npy"
+    registered = "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
+    import shutil
+
+    shutil.copyfile(ROOT / registered, repository / registered)
+    shutil.copyfile(ROOT / registered, repository / rival)
+    validation = REGISTERED["validation_path"]
+    shutil.copyfile(ROOT / validation, repository / validation)
+    for command in (
+        ["init", "-q"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "add", "-A"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "rows"],
+    ):
+        sp.run(["git", "-C", str(repository), *command], check=True, capture_output=True)
+    monkeypatch.setattr(MODULE, "REPO_ROOT", repository)
+    monkeypatch.setattr(MODULE, "COMMITTED_ARTIFACT_DIR", repository / "docs" / "artifacts")
+    monkeypatch.setattr(MODULE, "_reference_implementation_tree",
+                        lambda: REGISTERED["implementation_tree_sha1"])
+    event = dict(context="8k", decode_position=8155, producer_layer_id=1,
+                 convention="rms_norm_eps_1e-5")
+
+    # A second, byte-identical copy under a plausible name is still not the
+    # reviewed row: the registry names one path.
+    with pytest.raises(SystemExit, match="the reviewed reference row for this event is"):
+        MODULE._committed_reference_row(repository / rival, REGISTERED["sha256"], **event)
+
+    # And the registered path must still carry the registered content.
+    monkeypatch.setitem(
+        MODULE.REFERENCE_ROWS, ("8k", 8155, 1, "rms_norm_eps_1e-5"),
+        dict(REGISTERED, sha256="0" * 64),
+    )
+    with pytest.raises(SystemExit, match="is not the reviewed row"):
+        MODULE._committed_reference_row(repository / registered, "0" * 64, **event)
+
+
+def test_the_reference_implementation_must_match_the_registered_one(
+    monkeypatch, tmp_path: Path
+) -> None:
+    committed = ROOT / REGISTERED["path"]
+    monkeypatch.setattr(MODULE, "_reference_implementation_tree", lambda: "0" * 40)
+    with pytest.raises(SystemExit, match="reference implementation at HEAD"):
+        MODULE._committed_reference_row(
+            committed, REGISTERED["sha256"], context="8k", decode_position=8155,
+            producer_layer_id=1, convention="rms_norm_eps_1e-5",
+        )
+
+
+def test_the_scan_window_uses_both_archives_step_counts(tmp_path: Path) -> None:
+    """P2-5: dropping the oracle's step count survived mutation."""
+    archive, oracle_dir = _multi_event_fixture(tmp_path, divergent_at=(2, 3))
+    from safetensors.numpy import load_file, save_file
+
+    data = load_file(str(oracle_dir / "dsa_events.safetensors"))
+    save_file(
+        {name: value[:1] for name, value in data.items()},
+        str(oracle_dir / "dsa_events.safetensors"),
+    )
+    assert MODULE._scan_window(archive, oracle_dir) == (1, 4)

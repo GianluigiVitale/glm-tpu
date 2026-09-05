@@ -23,6 +23,17 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+# The registry, the analysis kind, the conventions and the alarm threshold live
+# in the package the SEALER imports. The offline tool consults the same table
+# the consumer enforces, so an edit here cannot widen what will be accepted.
+from glm_tpu.greenfield.validation.ws32_short_context import (  # noqa: E402
+    ANALYSIS_ARTIFACT_KIND,
+    LATER_EVENT_ALARM,
+    REFERENCE_CONVENTIONS,
+    REFERENCE_IMPLEMENTATION,
+    REFERENCE_ROWS,
+)
+
 KAPPA = 2.0
 # §21.2 item 4 requires "the same pre-registered kappa = 2" as items 3's caps, so
 # the bias factor IS kappa and moves with it; a rerun at kappa = 1 tightens all
@@ -33,33 +44,11 @@ KAPPA = 2.0
 # tighter bound than the sample form; the tool reproduces the sealed number
 # bit-for-bit rather than silently changing the statistic.
 STD_DDOF = 0
-ANALYSIS_ARTIFACT_KIND = "gate_d_ws32_first_divergent_event_adjudication"
 # §21.5 records two reference conventions whose rows have identical length and
 # identical producer layer. The convention is therefore not inferable from the
 # row and must be declared and carried into the record.
-REFERENCE_CONVENTIONS = ("rms_norm_eps_1e-5", "rms_norm_eps_1e-6")
 COMMITTED_ARTIFACT_DIR = REPO_ROOT / "docs" / "artifacts"
 COMMITTED_ARTIFACT_PREFIX = "gate-d-"
-REFERENCE_IMPLEMENTATION = "scripts/greenfield/reference_cpu"
-# §21.2 item 3: the FP64 reference row must be "validated against the legacy
-# intermediate captures before use", with its implementation and source hash
-# recorded. Being committed under a plausible name is not that validation, so
-# the rows usable for adjudication are enumerated here, keyed by the event they
-# were built for, and each names the reviewed record that validated it. A new
-# event needs a new reviewed entry, which is exactly the pre-registration step
-# this table exists to force.
-REFERENCE_ROWS = {
-    ("8k", 8155, 1, "rms_norm_eps_1e-5"): {
-        "path": "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy",
-        "sha256": "bfde8bd92d9f88452d68b3e9d3112a4848b0c0ef086c7207b2431021b233d9a0",
-        "validation_path": (
-            "docs/artifacts/gate-d-event1-math-reference-adjudication-20260905.json"
-        ),
-        "validation_sha256": (
-            "aeb6ddfa415f60894456cd79cda08d30b30d7994e48b85fc7c0a89e32e6c7e09"
-        ),
-    },
-}
 REMOTE_RESULTS_PREFIX = "gs://driftbench-dsv4-uc/results"
 
 
@@ -278,7 +267,10 @@ def main() -> int:
     # operator believed it to be, and a disagreement is a refusal.
     parser.add_argument("--observer-steps", type=int, default=None)
     parser.add_argument("--events", type=int, default=None)
-    parser.add_argument("--later-event-alarm", type=int, default=1024)
+    # §21.2 fixes the later-event diagnostic threshold; raising it inside a
+    # pre-registration record would silently skip the alarm, its acknowledgement
+    # and the mandatory GATE_D_LESSONS.md entry.
+    parser.add_argument("--later-event-alarm", type=int, default=LATER_EVENT_ALARM)
     parser.add_argument("--date-utc", required=True)
     parser.add_argument("--analysis-output", type=Path, required=True)
     parser.add_argument("--record-output", type=Path, required=True)
@@ -291,6 +283,13 @@ def main() -> int:
     # append-only guard.
     args.analysis_output = _committed_output_path(args.analysis_output, ".json")
     args.record_output = _committed_output_path(args.record_output, ".json")
+    if args.analysis_output == args.record_output:
+        raise SystemExit("the analysis and the record must be different artifacts")
+    if args.later_event_alarm != LATER_EVENT_ALARM:
+        raise SystemExit(
+            f"§21.2 fixes the later-event alarm at {LATER_EVENT_ALARM}; "
+            f"{args.later_event_alarm} was requested"
+        )
 
     from glm_tpu.greenfield.validation.short_context_dsa_oracle import (  # noqa: E402
         inspect_short_context_dsa_oracle,
@@ -358,15 +357,14 @@ def main() -> int:
             basis.append(entry)
     # Prior attempts are DISCLOSED, not relied upon: they are a separate list so
     # that declaring a failed attempt cannot make the record unsealable.
-    prior_attempts = _require_prior_attempts_disclosed(args.analysis_output, analysis)
+    prior_attempts = _collect_prior_attempts(args.analysis_output, analysis)
     _write_once(args.analysis_output, analysis)
-    basis.append(
-        {
-            "path": str(args.analysis_output.relative_to(REPO_ROOT)),
-            "sha256": _digest(args.analysis_output),
-        }
-    )
+    analysis_entry = {
+        "path": str(args.analysis_output.relative_to(REPO_ROOT)),
+        "sha256": _digest(args.analysis_output),
+    }
     record = {
+        "analysis": analysis_entry,
         "artifact_kind": "gate_d_ws32_8k_adjudicated_divergence",
         "schema_version": 1,
         "spec_section": "21.2 items 3-4 (scope: first divergent event)",
@@ -379,7 +377,7 @@ def main() -> int:
         "expected_only": analysis["expected_only"],
         "observed_only": analysis["observed_only"],
         "later_event_alarm": args.later_event_alarm,
-        "basis": basis,
+        "basis": basis + [analysis_entry],
         "oracle": {
             "dsa_manifest_sha256": dsa_manifest["manifest_sha256"],
             "token_manifest_sha256": token_manifest,
@@ -499,6 +497,12 @@ def _committed_reference_row(
         raise SystemExit(
             f"reference row SHA-256 {digest} does not match the pre-registered {expected_sha256}"
         )
+    implementation = _reference_implementation_tree()
+    if implementation != entry["implementation_tree_sha1"]:
+        raise SystemExit(
+            f"the reference implementation at HEAD is {implementation}, but the reviewed row "
+            f"was produced with {entry['implementation_tree_sha1']}"
+        )
     _require_committed_content(entry["validation_path"])
     validation_digest = _digest(REPO_ROOT / entry["validation_path"])
     if validation_digest != entry["validation_sha256"]:
@@ -601,7 +605,9 @@ def _remote_archive_hashes(run_tag: str) -> dict[str, str]:
         for name, key in (("md5_hash:", "md5"), ("crc32c_hash:", "crc32c")):
             if stripped.startswith(name):
                 value = stripped.split(":", 1)[1].strip().lower()
-                if value:
+                # A composite upload prints `md5_hash: null` rather than
+                # omitting the line; "null" is not a digest.
+                if value and value not in {"null", "none", "-"}:
                     hashes[key] = value
     return hashes
 
@@ -609,7 +615,12 @@ def _remote_archive_hashes(run_tag: str) -> dict[str, str]:
 def _local_hashes(path: Path) -> dict[str, str]:
     from hashlib import md5
 
-    import google_crc32c
+    try:
+        import google_crc32c
+    except ImportError:  # pragma: no cover - environment defect, stated not raised
+        raise SystemExit(
+            "google_crc32c is not installed, so a composite-upload archive cannot be bound"
+        )
 
     digest = md5()
     crc = google_crc32c.Checksum()
@@ -654,15 +665,18 @@ def _require_archive_belongs_to_run(archive: Path, run_tag: str) -> str:
     return "; ".join(f"{name}={local[name]}" for name in shared)
 
 
-def _require_prior_attempts_disclosed(analysis_output: Path, analysis: dict) -> list[dict]:
-    """Return every earlier attempt on this event, refusing if any is hidden.
+def _collect_prior_attempts(analysis_output: Path, analysis: dict) -> list[dict]:
+    """Collect earlier attempts on this event found in the artifact directory.
 
-    ``_write_once`` only blocks re-use of one path, so an operator could
-    otherwise re-run until a PASS appeared.  Attempts are recognised by their
-    SHAPE — a JSON naming this run, step and event and carrying ``checks`` —
-    rather than by ``artifact_kind``, which an operator can edit.  They are
-    returned as ``prior_attempts`` and are disclosure, never ground: nothing
-    downstream requires them to have passed.
+    This is DISCLOSURE, not enforcement, and the difference matters: attempt
+    files are untracked outputs, so an operator who moves one out of
+    ``docs/artifacts`` leaves no trace and this returns an empty list.  What it
+    does buy is that an operator who does nothing special gets every earlier
+    attempt recorded, including refused ones, and that the record distinguishes
+    "no earlier attempt" from nothing at all, because the key is always written.
+    Attempts are recognised by SHAPE — a JSON naming this run, step and event
+    and carrying ``checks`` — because ``artifact_kind`` is operator-editable.
+    They are never ground: nothing downstream requires them to have passed.
     """
 
     attempts: list[dict] = []
