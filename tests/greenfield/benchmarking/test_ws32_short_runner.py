@@ -469,12 +469,21 @@ def test_ws32_evidence_layout_v2_is_declared_end_to_end() -> None:
     wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
     runner = (root / "scripts/greenfield/run_short_decoder_ws32.py").read_text(encoding="utf-8")
     sealer = (root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8")
-    assert '"evidence_layout": EVIDENCE_LAYOUT_V2,' in runner and '"evidence_layout": EVIDENCE_LAYOUT_V2,' in sealer
-    assert 'record.get("evidence_layout") != EVIDENCE_LAYOUT_V2' in sealer and '"evidence_layout",' in sealer
+    assert '"evidence_layout": EVIDENCE_LAYOUT_V2,' in runner
+    # The sealer pins the required layout instead of hard-coding v2, so a sealed
+    # v1 prefix stays re-verifiable with current code.
+    assert '"--evidence-layout",' in sealer and 'default=EVIDENCE_LAYOUT_V2,' in sealer
+    assert 'args.evidence_layout == EVIDENCE_LAYOUT_V1' in sealer
+    assert '"evidence_layout": args.evidence_layout,' in sealer
+    assert "layout_keys = (" in sealer and "pre_keys |= layout_keys" in sealer
     assert "upload_shared(){" in wrapper and 'gzip -n -9 -c "$hlo/$graph.$form"' in wrapper
     assert '"$remote/hlo/${graph}.${form}.gz"' in wrapper and ".rank${idx}.stablehlo.mlir" not in wrapper
+    # A precondition failure is tolerated only when the remote INFLATED evidence
+    # equals this rank's own text, never on a compressed-container comparison.
+    assert 'gzip -dc "$tmp.gz"' in wrapper and "crc32c_hash" not in wrapper
     assert "STORAGE_CEILING_BYTES=2500000000000" in wrapper and "STORAGE_RESERVE_BYTES=6000000000" in wrapper
     assert "live storage plus reserve exceeds the ceiling" in wrapper
+    assert "timeout 900 gcloud storage du -s" in wrapper and "census attempt $attempt failed" in wrapper
     assert ws32_evidence.EVIDENCE_LAYOUT_V2 == "hlo_single_gzip_v2"
 
 

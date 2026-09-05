@@ -654,10 +654,17 @@ def test_ws32_prelaunch_floor_covers_protected_unique_evidence_and_reserve() -> 
     # Current protected fleet: worker-0 local HLO/trace/NPZ are created before
     # materialization, then seven distinct traces and peer records remain to be
     # fetched. Keep at least one GiB free throughout sealing.
+    #
+    # Evidence layout v2 adds only the compressed HLO objects: this host's own
+    # gzip copies in ``hlo/`` and the materialized ``fleet_hlo/*.gz`` (each
+    # ≈10x smaller than the text). The inflated per-rank names are hard links to
+    # worker-0's own text (ws32_evidence: candidates_by_sha), so they cost no
+    # bytes; a fresh inflation only happens on a host that is not worker 0.
     rank0_generated = 311_539_059 + 277_949_672 + 4_952_000
+    compressed_hlo = 2 * 60_000_000
     remaining_unique = 1_946_790_017 + 35_000_000
     sealing_reserve = 1024**3
-    required = rank0_generated + remaining_unique + sealing_reserve
+    required = rank0_generated + compressed_hlo + remaining_unique + sealing_reserve
     assert required < 4 * 1024**3
     source = WRAPPER.read_text(encoding="utf-8")
     assert "available_bytes -ge 4294967296" in source
@@ -935,3 +942,136 @@ def test_ws32_short_sealer_selects_the_traced_decode_body_by_exact_dsa() -> None
     sealer = SCRIPT.read_text(encoding="utf-8")
     assert 'step_module_re=r"jit_execute_body"' not in sealer
     assert "step_module_re=_decode_step_module_re(exact_dsa=bool(args.exact_dsa))" in sealer
+
+
+def _v2_remote_fixture(remote: Path, *, layouts: list[str] | None = None,
+                       graph_sha_override: tuple[int, str, str] | None = None) -> dict:
+    """Build a fake v2 acquisition prefix; returns the per-graph SHA records."""
+    import gzip
+
+    graph_records: dict[str, dict[str, str]] = {}
+    for graph in ws32_evidence.GRAPHS:
+        graph_records[graph] = {}
+        for suffix, sha_key in ws32_evidence.HLO_FORMS:
+            raw = f"{graph}:{suffix}\n".encode()
+            graph_records[graph][sha_key] = sha256(raw).hexdigest()
+            path = remote / "hlo" / f"{graph}.{suffix}.gz"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(gzip.compress(raw, mtime=0))
+    root = remote / "host_records"
+    root.mkdir(parents=True, exist_ok=True)
+    for rank in ws32_evidence.RANKS:
+        graphs = json.loads(json.dumps(graph_records))
+        if graph_sha_override is not None and rank == graph_sha_override[0]:
+            graphs[graph_sha_override[1]][graph_sha_override[2]] = "9" * 64
+        record = {
+            "code_hash": "a" * 40,
+            "compile_only": True,
+            "evidence_layout": (
+                ws32_evidence.EVIDENCE_LAYOUT_V2 if layouts is None else layouts[rank]
+            ),
+            "exact_dsa": False,
+            "graphs": graphs,
+            "launch_process_id": rank,
+            "status": "HLO_ACQUIRED",
+        }
+        (root / f"runner.rank{rank}.json").write_text(json.dumps(record), encoding="utf-8")
+        (root / f"runner.rank{rank}.log").write_text(f"rank={rank}\n", encoding="utf-8")
+    return graph_records
+
+
+def _materialize_fake(tmp_path: Path, remote: Path, monkeypatch: object, name: str):
+    class FakeBlob:
+        def __init__(self, path: Path) -> None:
+            self.path = path
+            self.name = f"results/acquire/{path.relative_to(remote).as_posix()}"
+            self.generation = 1
+            self.size = path.stat().st_size
+            self.crc32c = ws32_evidence._crc32c_file(path)
+
+        def download_to_filename(self, destination: str, *, if_generation_match: int) -> None:
+            shutil.copyfile(self.path, destination)
+
+        def download_as_bytes(self, *, if_generation_match: int) -> bytes:
+            return self.path.read_bytes()
+
+    blobs = [FakeBlob(path) for path in remote.rglob("*") if path.is_file()]
+
+    class FakeClient:
+        def list_blobs(self, bucket: str, *, prefix: str) -> list[FakeBlob]:
+            return blobs
+
+    monkeypatch.setattr(ws32_evidence.storage, "Client", FakeClient)
+    run_dir = tmp_path / name
+    return lambda: ws32_evidence.materialize(
+        run_dir=run_dir,
+        remote_prefix="gs://unit/results/acquire",
+        mode="acquire",
+        tag="greenfield_ws32_short_decoder_8k_acquire_20260816T000000000000000Z",
+        code_hash="a" * 40,
+        recovery_code_hash="b" * 40,
+        exact_dsa=False,
+        allow_failure_diagnostics=False,
+        output=run_dir / "source_remote_objects.json",
+    )
+
+
+def test_ws32_v2_materialization_refuses_every_drift(tmp_path: Path, monkeypatch: object) -> None:
+    """Spec §23/storage plan: the single-copy HLO layout must fail closed on a
+    missing or unexpected object, a layout disagreement, a per-rank SHA
+    disagreement, and an inflated payload that differs from the recorded SHA."""
+    import gzip
+
+    # 1. missing object
+    remote = tmp_path / "missing"
+    _v2_remote_fixture(remote)
+    (remote / "hlo" / f"{ws32_evidence.GRAPHS[0]}.stablehlo.mlir.gz").unlink()
+    with pytest.raises(SystemExit, match="does not match layout"):
+        _materialize_fake(tmp_path, remote, monkeypatch, "run_missing")()
+
+    # 2. unexpected object
+    remote = tmp_path / "extra"
+    _v2_remote_fixture(remote)
+    (remote / "hlo" / "rogue.stablehlo.mlir.gz").write_bytes(gzip.compress(b"x", mtime=0))
+    with pytest.raises(SystemExit, match="does not match layout"):
+        _materialize_fake(tmp_path, remote, monkeypatch, "run_extra")()
+
+    # 3. ranks disagree on the layout
+    remote = tmp_path / "layout"
+    layouts = [ws32_evidence.EVIDENCE_LAYOUT_V2] * 8
+    layouts[5] = ws32_evidence.EVIDENCE_LAYOUT_V1
+    _v2_remote_fixture(remote, layouts=layouts)
+    with pytest.raises(SystemExit, match="disagree on the evidence layout"):
+        _materialize_fake(tmp_path, remote, monkeypatch, "run_layout")()
+
+    # 4. ranks disagree on a graph SHA
+    remote = tmp_path / "sha"
+    _v2_remote_fixture(remote, graph_sha_override=(3, ws32_evidence.GRAPHS[1], "stablehlo_sha256"))
+    with pytest.raises(SystemExit, match="disagree on"):
+        _materialize_fake(tmp_path, remote, monkeypatch, "run_sha")()
+
+    # 5. the compressed object inflates to bytes the records do not describe
+    remote = tmp_path / "payload"
+    _v2_remote_fixture(remote)
+    target = remote / "hlo" / f"{ws32_evidence.GRAPHS[0]}.stablehlo.mlir.gz"
+    target.write_bytes(gzip.compress(b"tampered\n", mtime=0))
+    with pytest.raises(SystemExit, match="inflated HLO differs from the recorded SHA"):
+        _materialize_fake(tmp_path, remote, monkeypatch, "run_payload")()
+
+    # The unmutated fixture still materializes, and worker-0's own text is reused
+    # by hard link rather than written a second time.
+    remote = tmp_path / "good"
+    records = _v2_remote_fixture(remote)
+    run_dir = tmp_path / "run_good"
+    (run_dir / "hlo").mkdir(parents=True)
+    for graph in ws32_evidence.GRAPHS:
+        for suffix, _ in ws32_evidence.HLO_FORMS:
+            (run_dir / "hlo" / f"{graph}.{suffix}").write_bytes(f"{graph}:{suffix}\n".encode())
+    result = _materialize_fake(tmp_path, remote, monkeypatch, "run_good")()
+    assert result["evidence_layout"] == ws32_evidence.EVIDENCE_LAYOUT_V2
+    for graph in ws32_evidence.GRAPHS:
+        for suffix, sha_key in ws32_evidence.HLO_FORMS:
+            worker = run_dir / "hlo" / f"{graph}.{suffix}"
+            inflated = run_dir / "fleet_hlo" / f"{graph}.rank0.{suffix}"
+            assert inflated.stat().st_ino == worker.stat().st_ino, (graph, suffix)
+            assert sha256(inflated.read_bytes()).hexdigest() == records[graph][sha_key]

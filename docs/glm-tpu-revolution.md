@@ -2043,6 +2043,29 @@ bit-exact vs the legacy oracle, with it 2,046/2,048 scores moved). The legacy 12
    record: on-device rotary at `ws32_layer.py:425, :511 (via dsa_index_keys_from_projection), :685,
    :734, :842` and `prefill_index.py:160`.
 
+## 23.10 Evidence layout v2 — one compressed HLO object per graph (2026-09-05)
+
+A protected run uploaded its HLO text once per rank: eight byte-identical copies of every graph and
+form, ≈3.4 GB of the ≈5.8 GB a numerical prefix costs. The sealer already treated them as one object
+(it requires every rank's recorded SHA-256 pair to agree and re-hashes each file), so seven copies were
+redundancy, not information.
+
+Layout `hlo_single_gzip_v2`: each graph/form is uploaded once, gzip-compressed, under the rank-agnostic
+name `hlo/<graph>.<form>.gz`; every rank still records both SHA-256s of the *inflated* text. The
+materializer reads the layout from the runner records (all ranks must agree; an absent field means the
+original `hlo_per_rank_v1`, so sealed prefixes stay re-materializable), requires the remote HLO object
+set to equal the layout's, binds each compressed object by size, CRC32C and SHA-256, inflates it once,
+requires the inflated SHA to equal the SHA every rank recorded, and hard-links the per-rank names so
+the sealer's per-rank replay is unchanged. The source ledger records the compressed object and its
+`inflated_sha256`, and the ledger hash is bound into SUCCESS. Because this controller is pod worker 0,
+the inflated file is a hard link to the worker's own text when the SHA matches, so the layout costs no
+extra controller disk. The sealer's required layout is a CLI pin, not a constant, so a v1 prefix can
+still be re-validated. Uploads are redundant: every rank writes the same object with `--no-clobber`,
+and a precondition failure is tolerated only when the remote object *inflates* to this rank's own text.
+
+Saving: ≈3.0 GB per acquisition and per numerical run. With it, the remaining long-context programme
+costs ≈21 GB rather than ≈54 GB.
+
 ## 23.9 Rotary measurement and the main-attention host table — 2026-09-05 (decision)
 
 The §23.8 diagnostic ran on the TPU inside the 131,072-capacity acquisition

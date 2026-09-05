@@ -39,7 +39,10 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
 from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
     build_ws32_physical_mesh,
 )
-from glm_tpu.greenfield.validation.ws32_evidence import EVIDENCE_LAYOUT_V2  # noqa: E402
+from glm_tpu.greenfield.validation.ws32_evidence import (  # noqa: E402
+    EVIDENCE_LAYOUT_V1,
+    EVIDENCE_LAYOUT_V2,
+)
 from glm_tpu.greenfield.validation import (  # noqa: E402
     bind_ws32_adjudication,
     compare_ws32_dsa_step,
@@ -64,6 +67,12 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--prefill-chunk", type=int, default=DEFAULT_PREFILL_CHUNK)
     validate.add_argument("--rotary-diagnostic", choices=(0, 1), default=0, type=int)
     validate.add_argument("--host-main-rope-table", choices=(0, 1), default=0, type=int)
+    # Sealed v1 prefixes stay re-verifiable: the required layout is a pin, not a constant.
+    validate.add_argument(
+        "--evidence-layout",
+        choices=(EVIDENCE_LAYOUT_V1, EVIDENCE_LAYOUT_V2),
+        default=EVIDENCE_LAYOUT_V2,
+    )
     validate.add_argument("--code-hash", required=True)
     validate.add_argument("--checkpoint-manifest-sha256", required=True)
     validate.add_argument("--checkpoint-success-sha256", required=True)
@@ -532,6 +541,9 @@ def _validate(args: argparse.Namespace) -> int:
     slots: set[int] = set()
     all_samples: list[list[float]] = []
     expected_prompt_length = {"2k": 2034, "8k": 8155}[args.context_label]
+    layout_keys = (
+        set() if args.evidence_layout == EVIDENCE_LAYOUT_V1 else {"evidence_layout"}
+    )
     pre_keys = {
         "artifact_kind",
         "base_device_memory_after_load",
@@ -552,7 +564,6 @@ def _validate(args: argparse.Namespace) -> int:
         "dsa_oracle_success_sha256",
         "dsa_association_summary_sha256",
         "dsa_association_success_sha256",
-        "evidence_layout",
         "exact_dsa",
         "graphs",
         "main_rope_table",
@@ -575,6 +586,7 @@ def _validate(args: argparse.Namespace) -> int:
         "topology_sha256",
         "xla_python_client_mem_fraction",
     }
+    pre_keys |= layout_keys
     numerical_keys = pre_keys | {
         "cache_write_probe",
         "correctness_passed",
@@ -626,7 +638,10 @@ def _validate(args: argparse.Namespace) -> int:
             raise SystemExit(f"WS32 fleet/process/HLO identity drifted at rank {rank}")
         if record.get("prompt_length") != expected_prompt_length:
             raise SystemExit(f"WS32 prompt length drifted at rank {rank}")
-        if record.get("evidence_layout") != EVIDENCE_LAYOUT_V2:
+        if args.evidence_layout == EVIDENCE_LAYOUT_V1:
+            if "evidence_layout" in record:
+                raise SystemExit(f"WS32 evidence layout drifted at rank {rank}")
+        elif record.get("evidence_layout") != args.evidence_layout:
             raise SystemExit(f"WS32 evidence layout drifted at rank {rank}")
         _require_prefill_execution(
             record,
@@ -1001,7 +1016,7 @@ def _validate(args: argparse.Namespace) -> int:
         },
         "checkpoint_transport": args.checkpoint_transport,
         "dsa_adjudication": expected_dsa_adjudication,
-        "evidence_layout": EVIDENCE_LAYOUT_V2,
+        "evidence_layout": args.evidence_layout,
         "mode": args.mode,
         "performance_claim": args.mode == "numerical",
         "recovery_code_hash": args.recovery_code_hash or None,

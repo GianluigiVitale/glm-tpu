@@ -116,15 +116,35 @@ def _runner_layout(runners: list[dict[str, Any]]) -> str:
     return layout
 
 
-def _inflate_gzip(source: Path, destination: Path) -> None:
+def _inflate_gzip(source: Path, destination: Path, *, maximum_bytes: int) -> None:
+    """Inflate one member, refusing to write more than ``maximum_bytes``.
+
+    The inflated SHA is checked afterwards, so an unbounded copy would let a
+    corrupt or pathological member fill the controller disk before the check
+    fires.
+    """
     import gzip
 
+    if maximum_bytes <= 0:
+        raise SystemExit("insufficient disk for verified HLO materialization")
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
         raise SystemExit(f"refusing to replace existing evidence: {destination}")
     partial = destination.with_name(destination.name + ".partial")
-    with gzip.open(source, "rb") as stream, partial.open("wb") as out:
-        shutil.copyfileobj(stream, out, 8 * 1024 * 1024)
+    written = 0
+    try:
+        with gzip.open(source, "rb") as stream, partial.open("wb") as out:
+            while True:
+                chunk = stream.read(8 * 1024 * 1024)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > maximum_bytes:
+                    raise SystemExit(f"inflated HLO exceeds the disk budget: {source}")
+                out.write(chunk)
+    except SystemExit:
+        partial.unlink(missing_ok=True)
+        raise
     partial.replace(destination)
 
 
@@ -253,8 +273,7 @@ def materialize(
     missing = layout_free - set(blobs)
     if missing:
         raise SystemExit(f"remote fleet evidence is incomplete: {sorted(missing)}")
-    primary = set(layout_free)
-    extras = set(blobs) - primary
+    extras = set(blobs) - layout_free
     hlo_objects = {name for name in extras if name.startswith("hlo/")}
     extras -= hlo_objects
     forbidden = {
@@ -324,7 +343,10 @@ def materialize(
             raise SystemExit(f"runner rank {rank} identity/status drifted")
         runners.append(runner)
     layout = _runner_layout(runners)
-    expected_hlo = _hlo_object_names(exact_dsa=exact_dsa, layout=layout)
+    primary = _expected_primary_names(
+        numerical=numerical, exact_dsa=exact_dsa, layout=layout
+    )
+    expected_hlo = primary - layout_free
     if hlo_objects != expected_hlo:
         missing_hlo = sorted(expected_hlo - hlo_objects)
         unexpected_hlo = sorted(hlo_objects - expected_hlo)
@@ -332,7 +354,6 @@ def materialize(
             f"remote HLO evidence does not match layout {layout}: "
             f"missing={missing_hlo} unexpected={unexpected_hlo}"
         )
-    primary.update(expected_hlo)
 
     candidates_by_sha: dict[str, Path] = {}
     candidate_inodes: set[tuple[int, int]] = set()
@@ -396,9 +417,18 @@ def materialize(
                 compressed_digest = _sha256_file(compressed)
                 _require_blob_identity(blob, compressed, compressed_digest, identity_cache)
                 inflated = fleet_hlo / f"{graph}.rank0.{suffix}"
-                if not inflated.exists():
-                    _inflate_gzip(compressed, inflated)
                 expected_digest = recorded_shas[(graph, suffix)]
+                if not inflated.exists():
+                    # This host is pod worker 0, so the run directory already
+                    # holds the worker's own uncompressed text; hard-link it
+                    # instead of writing a second copy (v1 did the same).
+                    source = candidates_by_sha.get(expected_digest)
+                    if source is None:
+                        free = shutil.disk_usage(run_dir).free - 1024 * 1024 * 1024
+                        _inflate_gzip(compressed, inflated, maximum_bytes=free)
+                        candidates_by_sha[expected_digest] = inflated
+                    else:
+                        _link_exact(source, inflated)
                 if _sha256_file(inflated) != expected_digest:
                     raise SystemExit(f"inflated HLO differs from the recorded SHA: {name}")
                 for rank in RANKS[1:]:
