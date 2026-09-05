@@ -12785,3 +12785,30 @@ in decode/observer/prefill exactly when declared. The 131,072 acquisition's pins
 table-on path; its compiled memory (27.46 GB arguments + 1.23 GB temp per chip) confirms 128K fits.
 Awaiting Opus 5 review of both this and evidence layout v2 before any protected run.
 
+## 2026-09-05 21:40Z — layout-v2 rejection resolved; offline event adjudicator; B′ sequencing decision
+
+Opus 5 review of evidence layout v2: REJECT on one measured P1 — the v2 path inflated a second copy of
+each HLO text (≈450 MB per run on the controller) instead of hard-linking worker-0's own file as v1 did,
+eating the 1 GiB sealing reserve behind the 4 GiB launch floor. Fixed by reusing `candidates_by_sha`
+(inflation is now only the fallback, and bounded by free disk); a test asserts inode identity between the
+worker's text and the materialized per-rank name. The five P2s are fixed as well: the sealer takes
+`--evidence-layout` as a pin so sealed v1 prefixes stay re-validatable; `upload_shared` tolerates a
+precondition failure only when the remote object INFLATES to this rank's own text; the storage census is
+bounded, retried and reports before aborting; five negative materialization tests; bounded inflation.
+Spec §23.10 and EVIDENCE_MAP now describe the layout.
+
+New tool `scripts/greenfield/adjudicate_ws32_first_divergent_event.py` (CPU only): given a run's observer
+npz, the sealed DSA oracle and the archived FP64 reference row, it locates the first divergent event,
+applies §21.2 items 3–4 (κ=2 caps, bias rule, reference-cutoff band, equal-sized disjoint swap) and emits
+both the analysis and a record in the loader's exact schema. Four tests cover an adjudicable boundary
+swap, a refused biased engine, a non-divergent event and loader-schema round-trip.
+
+Decision recorded (Decisions rule, no owner round-trip): B′ runs as TWO 8K runs, not one. The main
+rotary table changes layer-0 attention, so event 1 will very likely differ from the pre-registered record
+`4da05468…` and the sealer will refuse the first run by design. That run's observer arrays are uploaded
+anyway; they are adjudicated offline with the new tool, a new record is registered as a committed
+artifact, and a SECOND 8K run is sealed against it. The alternative — recovery-sealing the same run
+against a record derived from its own data — was rejected because it destroys the pre-registration
+property that §21.2 rests on; the extra cost is one 45-minute run. Event 0 should stay bit-exact (its
+indexer input precedes any attention), which the first run will confirm.
+
