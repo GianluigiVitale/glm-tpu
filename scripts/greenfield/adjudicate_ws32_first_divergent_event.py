@@ -40,6 +40,27 @@ ANALYSIS_ARTIFACT_KIND = "gate_d_ws32_first_divergent_event_adjudication"
 REFERENCE_CONVENTIONS = ("rms_norm_eps_1e-5", "rms_norm_eps_1e-6")
 COMMITTED_ARTIFACT_DIR = REPO_ROOT / "docs" / "artifacts"
 COMMITTED_ARTIFACT_PREFIX = "gate-d-"
+REFERENCE_IMPLEMENTATION = "scripts/greenfield/reference_cpu"
+# §21.2 item 3: the FP64 reference row must be "validated against the legacy
+# intermediate captures before use", with its implementation and source hash
+# recorded. Being committed under a plausible name is not that validation, so
+# the rows usable for adjudication are enumerated here, keyed by the event they
+# were built for, and each names the reviewed record that validated it. A new
+# event needs a new reviewed entry, which is exactly the pre-registration step
+# this table exists to force.
+REFERENCE_ROWS = {
+    ("8k", 8155, 1, "rms_norm_eps_1e-5"): {
+        "path": "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy",
+        "sha256": "bfde8bd92d9f88452d68b3e9d3112a4848b0c0ef086c7207b2431021b233d9a0",
+        "validation_path": (
+            "docs/artifacts/gate-d-event1-math-reference-adjudication-20260905.json"
+        ),
+        "validation_sha256": (
+            "aeb6ddfa415f60894456cd79cda08d30b30d7994e48b85fc7c0a89e32e6c7e09"
+        ),
+    },
+}
+REMOTE_RESULTS_PREFIX = "gs://driftbench-dsv4-uc/results"
 
 
 def _digest(path: Path) -> str:
@@ -84,12 +105,16 @@ def _scan_window(archive: Path, oracle_dir: Path) -> tuple[int, int]:
         raise SystemExit(
             f"unexpected observation geometry: engine {engine_shape}, oracle {oracle_shape}"
         )
-    if engine_shape[:2] != oracle_shape[:2]:
+    steps = min(int(engine_shape[0]), int(oracle_shape[0]))
+    events = min(int(engine_shape[1]), int(oracle_shape[1]))
+    if steps <= 0 or events <= 0:
         raise SystemExit(
-            f"engine observation window {engine_shape[:2]} does not match the oracle's "
-            f"{oracle_shape[:2]}"
+            f"empty observation window: engine {engine_shape[:2]}, oracle {oracle_shape[:2]}"
         )
-    return int(engine_shape[0]), int(engine_shape[1])
+    # The scan covers the prefix both archives hold. A shorter observation
+    # window is adjudicable over what it contains; it is recorded in the
+    # analysis so the scope of "first divergent" is never implicit.
+    return steps, events
 
 
 def _first_divergent_event(archive: Path, oracle_dir: Path) -> tuple[int, int]:
@@ -223,7 +248,6 @@ def adjudicate(
             "mean": float(engine_delta.mean()),
             "std": float(engine_delta.std(ddof=STD_DDOF)),
         },
-        "bias_factor": kappa,
         "reference_band_size": band_size,
         "std_ddof": STD_DDOF,
         "producer_layer_id": producer,
@@ -261,6 +285,13 @@ def main() -> int:
     parser.add_argument("--basis", action="append", default=[])
     args = parser.parse_args()
 
+    # Both outputs are validated before anything is computed or written: a
+    # relative or off-tree path used to raise from `relative_to` only after the
+    # analysis had already been written, and the retry then tripped the
+    # append-only guard.
+    args.analysis_output = _committed_output_path(args.analysis_output, ".json")
+    args.record_output = _committed_output_path(args.record_output, ".json")
+
     from glm_tpu.greenfield.validation.short_context_dsa_oracle import (  # noqa: E402
         inspect_short_context_dsa_oracle,
     )
@@ -271,17 +302,20 @@ def main() -> int:
     dsa_manifest = inspect_short_context_dsa_oracle(args.oracle_dir)
     token_manifest = dsa_manifest["token_oracle"]["manifest_sha256"]
 
-    reference_row, reference_relative, reference_digest = _committed_reference_row(
-        args.reference_row, args.reference_row_sha256
+    reference_row, reference_relative, reference_digest, reference_entry = (
+        _committed_reference_row(
+            args.reference_row,
+            args.reference_row_sha256,
+            context=args.context,
+            decode_position=args.decode_position,
+            producer_layer_id=args.reference_producer_layer_id,
+            convention=args.reference_convention,
+        )
     )
+    reference_implementation = _reference_implementation_tree()
 
     archive = args.observer_npz.resolve()
-    if not _archive_belongs_to_run(archive, args.engine_source_run):
-        # Without this the declared source run is free text and the sealer's
-        # anti-circularity guard can be walked past by mislabelling the archive.
-        raise SystemExit(
-            f"observer archive {archive} does not belong to run {args.engine_source_run}"
-        )
+    archive_md5 = _require_archive_belongs_to_run(archive, args.engine_source_run)
     archive_digest = _digest(archive)
 
     steps, events = _scan_window(archive, args.oracle_dir)
@@ -301,16 +335,30 @@ def main() -> int:
     )
     analysis["engine_source_run"] = args.engine_source_run
     analysis["observation_window"] = {"events": events, "steps": steps}
-    analysis["observer_archive"] = {"path": str(archive), "sha256": archive_digest}
+    analysis["observer_archive"] = {
+        "md5": archive_md5,
+        "path": str(archive),
+        "sha256": archive_digest,
+    }
     analysis["reference_row"] = {
         "convention": args.reference_convention,
+        "implementation_tree_sha1": reference_implementation,
         "path": str(reference_relative),
         "sha256": reference_digest,
     }
     basis = [
         {"path": item, "sha256": _digest(REPO_ROOT / item)} for item in args.basis
     ]
-    _require_prior_attempts_disclosed(args.analysis_output, analysis, basis)
+    # The row and the record that validated it are part of the ground the
+    # adjudication stands on, so they are named whether or not the operator
+    # remembered to pass them.
+    for path in (reference_relative, reference_entry["validation_path"]):
+        entry = {"path": path, "sha256": _digest(REPO_ROOT / path)}
+        if entry not in basis:
+            basis.append(entry)
+    # Prior attempts are DISCLOSED, not relied upon: they are a separate list so
+    # that declaring a failed attempt cannot make the record unsealable.
+    prior_attempts = _require_prior_attempts_disclosed(args.analysis_output, analysis)
     _write_once(args.analysis_output, analysis)
     basis.append(
         {
@@ -337,8 +385,10 @@ def main() -> int:
             "token_manifest_sha256": token_manifest,
         },
         "engine_source_run": args.engine_source_run,
+        "prior_attempts": prior_attempts,
         "reference_row": {
             "convention": args.reference_convention,
+            "implementation_tree_sha1": reference_implementation,
             "path": str(reference_relative),
             "sha256": reference_digest,
         },
@@ -390,15 +440,24 @@ def main() -> int:
 
 
 def _committed_reference_row(
-    reference_row: Path, expected_sha256: str
-) -> tuple[Path, str, str]:
-    """Bind the FP64 reference row to a committed, pre-registered artifact.
+    reference_row: Path,
+    expected_sha256: str,
+    *,
+    context: str,
+    decode_position: int,
+    producer_layer_id: int,
+    convention: str,
+) -> tuple[Path, str, str, dict]:
+    """Bind the FP64 reference row to a reviewed, pre-registered artifact.
 
-    The row fixes ``eps``, the cutoff, the band and every bound, so it decides
-    the verdict outright; §21.5 also records two conventions whose rows have the
-    same length and the same producer layer, so nothing about the file itself
-    distinguishes the right one. It must therefore be a committed artifact of
-    this repository AND match a SHA-256 declared on the command line.
+    The row fixes ``eps``, the cutoff, the band and every bound, so whoever
+    chooses it chooses the verdict.  Four things must hold, and each closes a
+    demonstrated attack: the path is a committed ``docs/artifacts/gate-d-*.npy``
+    artifact; its CONTENT is identical to the committed blob (a tracked path can
+    be overwritten in the working tree); the (event, convention) it is used for
+    appears in ``REFERENCE_ROWS`` with this exact path and digest (a fitted row
+    committed under a new plausible name is still not a reviewed row); and the
+    caller declares the digest it expected.
     """
 
     resolved = Path(reference_row).resolve()
@@ -416,25 +475,80 @@ def _committed_reference_row(
             "reference row must be a committed docs/artifacts/gate-d-*.npy artifact of this "
             f"repository: {reference_row}"
         )
-    if not _is_tracked(relative):
-        # Placing a file in docs/artifacts is not the same as committing it.
-        # A tracked row is reviewable; an untracked one is a local artefact
-        # that could have been fitted to the run under adjudication.
-        raise SystemExit(f"reference row is not tracked by git: {relative}")
+    if not resolved.exists():
+        raise SystemExit(f"reference row does not exist: {relative}")
+    _require_committed_content(relative)
+    key = (context, int(decode_position), int(producer_layer_id), convention)
+    entry = REFERENCE_ROWS.get(key)
+    if entry is None:
+        raise SystemExit(
+            "no reviewed FP64 reference row is registered for "
+            f"(context {context}, position {decode_position}, layer {producer_layer_id}, "
+            f"{convention}); §21.2 item 3 requires a reviewed row before adjudication"
+        )
+    if entry["path"] != relative:
+        raise SystemExit(
+            f"the reviewed reference row for this event is {entry['path']}, not {relative}"
+        )
     digest = _digest(resolved)
+    if digest != entry["sha256"]:
+        raise SystemExit(
+            f"reference row content {digest} is not the reviewed row {entry['sha256']}"
+        )
     if digest != expected_sha256:
         raise SystemExit(
             f"reference row SHA-256 {digest} does not match the pre-registered {expected_sha256}"
         )
-    return resolved, relative, digest
+    _require_committed_content(entry["validation_path"])
+    validation_digest = _digest(REPO_ROOT / entry["validation_path"])
+    if validation_digest != entry["validation_sha256"]:
+        raise SystemExit(
+            f"the reference row's validation record {entry['validation_path']} drifted"
+        )
+    return resolved, relative, digest, entry
 
 
-def _is_tracked(relative: str) -> bool:
-    result = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "ls-files", "--error-unmatch", "--", relative],
+def _require_committed_content(relative: str) -> None:
+    """Refuse a path whose working-tree bytes differ from the committed blob.
+
+    ``git ls-files`` only says the path is in the index; the demonstrated attack
+    overwrote a tracked artifact in place and kept a tracked path.
+    """
+
+    committed = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "rev-parse", f"HEAD:{relative}"],
         capture_output=True,
+        text=True,
     )
-    return result.returncode == 0
+    if committed.returncode != 0:
+        raise SystemExit(f"artifact is not committed at HEAD: {relative}")
+    working = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "hash-object", "--", relative],
+        capture_output=True,
+        text=True,
+    )
+    if working.returncode != 0:
+        raise SystemExit(f"artifact cannot be hashed: {relative}")
+    if committed.stdout.strip() != working.stdout.strip():
+        raise SystemExit(
+            f"artifact differs from the committed blob: {relative} "
+            f"(HEAD {committed.stdout.strip()[:12]}, working tree {working.stdout.strip()[:12]})"
+        )
+
+
+def _reference_implementation_tree() -> str:
+    """§21.2 item 3: record the reference implementation's source hash."""
+
+    result = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "rev-parse", f"HEAD:{REFERENCE_IMPLEMENTATION}"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise SystemExit(
+            f"the reference implementation {REFERENCE_IMPLEMENTATION} is not committed at HEAD"
+        )
+    return result.stdout.strip()
 
 
 def _resolve_event(
@@ -460,63 +574,117 @@ def _resolve_event(
     return first_step, first_event
 
 
-def _archive_belongs_to_run(archive: Path, run_tag: str) -> bool:
-    """True when the observer archive is demonstrably this run's own output.
+def _remote_archive_md5(run_tag: str) -> str | None:
+    """MD5 of the observer archive this run itself uploaded, or None."""
 
-    A protected run writes ``/home/gianl/glm-run/<tag>/runner.rank0.npz`` and a
-    ``summary.json`` naming the tag beside it; either witness is accepted, an
-    unlabelled copy is not.
+    uri = f"{REMOTE_RESULTS_PREFIX}/{run_tag}/host_records/runner.rank0.npz"
+    result = subprocess.run(
+        ["gcloud", "storage", "hash", "--hex", uri],
+        capture_output=True,
+        text=True,
+        timeout=900,
+    )
+    if result.returncode != 0:
+        return None
+    for line in result.stdout.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("md5_hash:"):
+            return stripped.split(":", 1)[1].strip()
+    return None
+
+
+def _local_md5(path: Path) -> str:
+    from hashlib import md5
+
+    digest = md5()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _require_archive_belongs_to_run(archive: Path, run_tag: str) -> str:
+    """Bind the archive to evidence the run itself published, not to a name.
+
+    A directory name and a hand-written ``summary.json`` are both operator
+    writable: copying the run being sealed into a directory named after some
+    other tag would defeat the sealer's anti-circularity guard.  The binding is
+    therefore the object the protected run uploaded under its own tag with
+    ``--no-clobber``; a mismatch, or an archive with no published counterpart,
+    is a refusal.
     """
 
-    if archive.parent.name == run_tag:
-        return True
-    summary = archive.parent / "summary.json"
-    try:
-        payload = json.loads(summary.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return False
-    return isinstance(payload, dict) and payload.get("run_tag") == run_tag
+    remote = _remote_archive_md5(run_tag)
+    if remote is None:
+        raise SystemExit(
+            f"run {run_tag} has published no observer archive at "
+            f"{REMOTE_RESULTS_PREFIX}/{run_tag}/host_records/runner.rank0.npz; the declared "
+            "source run cannot be bound to this file"
+        )
+    local = _local_md5(archive)
+    if local != remote:
+        raise SystemExit(
+            f"observer archive {archive} does not match the archive run {run_tag} published "
+            f"(local md5 {local}, published {remote})"
+        )
+    return remote
 
 
-def _require_prior_attempts_disclosed(
-    analysis_output: Path, analysis: dict, basis: list[dict]
-) -> None:
-    """Refuse to write unless every earlier attempt on this event is in the basis.
+def _require_prior_attempts_disclosed(analysis_output: Path, analysis: dict) -> list[dict]:
+    """Return every earlier attempt on this event, refusing if any is hidden.
 
     ``_write_once`` only blocks re-use of one path, so an operator could
-    otherwise re-run with a different output name until a PASS appeared and
-    register a record whose basis names only the attempt that passed.
+    otherwise re-run until a PASS appeared.  Attempts are recognised by their
+    SHAPE — a JSON naming this run, step and event and carrying ``checks`` —
+    rather than by ``artifact_kind``, which an operator can edit.  They are
+    returned as ``prior_attempts`` and are disclosure, never ground: nothing
+    downstream requires them to have passed.
     """
 
-    declared = {item["path"] for item in basis}
-    undisclosed = []
-    for candidate in sorted(analysis_output.parent.glob("*.json")):
+    attempts: list[dict] = []
+    for candidate in sorted(COMMITTED_ARTIFACT_DIR.glob("*.json")):
         if candidate.resolve() == analysis_output.resolve():
             continue
         try:
             payload = json.loads(candidate.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if not isinstance(payload, dict) or payload.get("artifact_kind") != ANALYSIS_ARTIFACT_KIND:
+        if not isinstance(payload, dict) or "checks" not in payload:
             continue
-        same_event = (
-            payload.get("engine_source_run") == analysis["engine_source_run"]
-            and payload.get("step") == analysis["step"]
-            and payload.get("event_index") == analysis["event_index"]
+        if (
+            payload.get("engine_source_run") != analysis["engine_source_run"]
+            or payload.get("step") != analysis["step"]
+            or payload.get("event_index") != analysis["event_index"]
+        ):
+            continue
+        relative = str(candidate.resolve().relative_to(REPO_ROOT))
+        attempts.append(
+            {
+                "path": relative,
+                "sha256": _digest(candidate),
+                "verdict": str(payload.get("verdict")),
+            }
         )
-        if not same_event:
-            continue
-        try:
-            relative = str(candidate.resolve().relative_to(REPO_ROOT))
-        except ValueError:
-            relative = str(candidate)
-        if relative not in declared:
-            undisclosed.append(relative)
-    if undisclosed:
+    return attempts
+
+
+def _committed_output_path(path: Path, suffix: str) -> Path:
+    """Every adjudication output lives in the reviewed artifact directory.
+
+    Writing an attempt elsewhere is how the disclosure scan was bypassed: it
+    globs one directory, so that directory is where outputs must go.
+    """
+
+    resolved = Path(path).resolve()
+    if (
+        resolved.parent != COMMITTED_ARTIFACT_DIR
+        or not resolved.name.startswith(COMMITTED_ARTIFACT_PREFIX)
+        or resolved.suffix != suffix
+    ):
         raise SystemExit(
-            "earlier adjudication attempts on this event are not declared in --basis: "
-            + ", ".join(undisclosed)
+            f"adjudication outputs must be docs/artifacts/gate-d-*{suffix} paths: {path}"
         )
+    return resolved
 
 
 def _write_once(path: Path, value: dict) -> None:

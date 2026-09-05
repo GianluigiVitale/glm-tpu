@@ -621,6 +621,27 @@ def test_ws32_sealer_refuses_an_adjudication_record_derived_from_the_sealed_run(
     assert raises, "the guard must refuse, not warn"
 
     forbidden = {"write_text", "write_bytes", "_write_once", "_publish_db", "_rollback_db"}
+
+    def _writes(node: "ast.AST") -> bool:
+        return any(
+            isinstance(item, ast.Call)
+            and (
+                (isinstance(item.func, ast.Attribute) and item.func.attr in forbidden)
+                or (isinstance(item.func, ast.Name) and item.func.id in forbidden)
+            )
+            for item in ast.walk(node)
+        )
+
+    # A write moved into a helper is still a write, so module-level helpers that
+    # write are treated as writes at their call sites.
+    root = Path(__file__).resolve().parents[3]
+    tree = ast.parse(
+        (root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8")
+    )
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node is not validate and _writes(node):
+            forbidden.add(node.name)
+
     earlier = sorted(
         item.lineno
         for item in ast.walk(validate)
@@ -645,15 +666,23 @@ def test_ws32_adjudication_record_without_a_source_run_is_refused(tmp_path: Path
     root = Path(__file__).resolve().parents[3]
     committed = root / "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json"
     record = json.loads(committed.read_text(encoding="utf-8"))
-    good = tmp_path / "good.json"
-    good.write_text(json.dumps(record, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    row = record["basis"][2]
+    bound = dict(
+        record,
+        reference_row={
+            "convention": "rms_norm_eps_1e-5",
+            "implementation_tree_sha1": "5" * 40,
+            "path": row["path"],
+            "sha256": row["sha256"],
+        },
+    )
     loaded = load_ws32_adjudicated_divergence(
-        good, expected_sha256=_sha256(good.read_bytes()).hexdigest()
+        committed, expected_sha256=_sha256(committed.read_bytes()).hexdigest()
     )
     assert loaded.engine_source_run == record["engine_source_run"]
 
     for bad_value in (None, "", "not a run tag", 17, ["a"]):
-        broken = dict(record)
+        broken = dict(bound)
         broken["engine_source_run"] = bad_value
         path = tmp_path / f"bad_{abs(hash(str(bad_value)))}.json"
         path.write_text(json.dumps(broken, indent=1, sort_keys=True) + "\n", encoding="utf-8")
@@ -661,3 +690,37 @@ def test_ws32_adjudication_record_without_a_source_run_is_refused(tmp_path: Path
             load_ws32_adjudicated_divergence(
                 path, expected_sha256=_sha256(path.read_bytes()).hexdigest()
             )
+
+
+def test_the_live_storage_census_parses_the_unseparated_du_output() -> None:
+    """`gcloud storage du -s` prints "<bytes><uri>" with no separator.
+
+    The 21:30Z acquisition aborted because `awk '{print $1}'` returned
+    `1976176085363gs://driftbench-dsv4-uc`, which failed the numeric test three
+    times. The pipeline is exercised here on captured output rather than on the
+    next protected run.
+    """
+    import subprocess
+
+    root = Path(__file__).resolve().parents[3]
+    wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
+    assert "tail -1 | grep -o '^[0-9]\\+'" in wrapper
+
+    for captured, expected in (
+        ("1976176085363gs://driftbench-dsv4-uc", "1976176085363"),
+        ("1976176085363  gs://driftbench-dsv4-uc", "1976176085363"),
+        ("12  gs://a\n1976176085363gs://driftbench-dsv4-uc", "1976176085363"),
+    ):
+        completed = subprocess.run(
+            ["bash", "-c", "printf '%s\\n' \"$1\" | tail -1 | grep -o '^[0-9]\\+'", "_", captured],
+            capture_output=True,
+            text=True,
+        )
+        assert completed.stdout.strip() == expected, captured
+
+    empty = subprocess.run(
+        ["bash", "-c", "printf '%s\\n' \"$1\" | tail -1 | grep -o '^[0-9]\\+'", "_", "gs://only"],
+        capture_output=True,
+        text=True,
+    )
+    assert empty.stdout.strip() == "", "a non-numeric census must yield nothing, so the run aborts"

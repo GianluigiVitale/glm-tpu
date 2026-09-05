@@ -7,17 +7,19 @@ import hashlib
 import json
 from hashlib import sha256
 from pathlib import Path
+import re
 from typing import Any, Mapping
 
 import numpy as np
-
-import re
 
 from .short_context_dsa_oracle import inspect_short_context_dsa_oracle
 from .short_context_oracle import inspect_short_context_oracle
 
 _ANALYSIS_ARTIFACT_KIND = "gate_d_ws32_first_divergent_event_adjudication"
 _REFERENCE_CONVENTIONS = ("rms_norm_eps_1e-5", "rms_norm_eps_1e-6")
+_GRANDFATHERED_RECORD_SHA256 = (
+    "4da05468120e3c2e9b82d03931018e0d14eebc5fc28e339381658a04457cd26b"
+)
 _RUN_TAG_PATTERN = re.compile(
     r"greenfield_ws32_short_decoder_[0-9a-z_]+_[0-9]{8}T[0-9]{15}Z"
 )
@@ -232,10 +234,11 @@ def load_ws32_adjudicated_divergence(
         "gate_d_closed",
         "performance_claim",
     }
-    # ``reference_row`` is optional so records written before the reference row
-    # was bound (§21.2 amendment 2026-09-05 22:20Z) still load; when present it
-    # is validated in full.
-    optional = {"reference_row"}
+    # ``reference_row`` and ``prior_attempts`` are optional only for the one
+    # record that predates the §21.2 amendment of 2026-09-05 22:20Z, which is
+    # grandfathered by digest below; every other record must carry the row
+    # binding.
+    optional = {"prior_attempts", "reference_row"}
     if (
         not isinstance(record, dict)
         or not required <= set(record) <= required | optional
@@ -296,18 +299,50 @@ def load_ws32_adjudicated_divergence(
         # guard a no-op, so it is refused here instead.
         raise ValueError("WS32 adjudicated-divergence engine_source_run is not a run tag")
     reference = record.get("reference_row")
+    if reference is None and digest != _GRANDFATHERED_RECORD_SHA256:
+        raise ValueError(
+            "WS32 adjudicated-divergence record does not bind its FP64 reference row"
+        )
     if reference is not None and (
         not isinstance(reference, dict)
-        or set(reference) != {"convention", "path", "sha256"}
+        or set(reference) != {"convention", "implementation_tree_sha1", "path", "sha256"}
         or not isinstance(reference["path"], str)
         or not reference["path"].startswith("docs/artifacts/gate-d-")
         or not reference["path"].endswith(".npy")
         or not isinstance(reference["sha256"], str)
         or len(reference["sha256"]) != 64
         or reference["convention"] not in _REFERENCE_CONVENTIONS
+        or not isinstance(reference.get("implementation_tree_sha1"), str)
+        or len(reference["implementation_tree_sha1"]) != 40
     ):
         raise ValueError("WS32 adjudicated-divergence reference row binding drifted")
+    if reference is not None and not any(
+        item["path"] == reference["path"] and item["sha256"] == reference["sha256"]
+        for item in basis
+    ):
+        # A declared row that the basis does not name is decorative: the
+        # analysis could have been computed from a different row entirely.
+        raise ValueError("WS32 adjudicated-divergence reference row is not in the basis")
+    attempts = record.get("prior_attempts", [])
+    if not isinstance(attempts, list) or any(
+        not isinstance(item, dict)
+        or set(item) != {"path", "sha256", "verdict"}
+        or not isinstance(item["path"], str)
+        or not item["path"].startswith("docs/artifacts/gate-d-")
+        or not item["path"].endswith(".json")
+        or not isinstance(item["sha256"], str)
+        or len(item["sha256"]) != 64
+        or not isinstance(item["verdict"], str)
+        for item in attempts
+    ):
+        raise ValueError("WS32 adjudicated-divergence prior attempts drifted")
     if repository_root is not None:
+        for item in attempts:
+            attempt_raw = (Path(repository_root) / item["path"]).read_bytes()
+            if hashlib.sha256(attempt_raw).hexdigest() != item["sha256"]:
+                raise ValueError(
+                    f"WS32 adjudicated-divergence prior attempt drifted: {item['path']}"
+                )
         for item in basis:
             basis_path = Path(repository_root) / item["path"]
             basis_raw = basis_path.read_bytes()
@@ -324,14 +359,19 @@ def load_ws32_adjudicated_divergence(
             if (
                 isinstance(basis_record, dict)
                 and basis_record.get("artifact_kind") == _ANALYSIS_ARTIFACT_KIND
-                and basis_record.get("verdict") != "PASS"
             ):
-                # A refused attempt may be disclosed in the basis, but it may
-                # never be the ground the record stands on.
-                raise ValueError(
-                    "WS32 adjudicated-divergence basis names a refused adjudication: "
-                    f"{item['path']}"
-                )
+                # The basis is the ground the record STANDS ON; a refused
+                # attempt belongs in prior_attempts, which carries no such rule.
+                if basis_record.get("verdict") != "PASS":
+                    raise ValueError(
+                        "WS32 adjudicated-divergence basis names a refused adjudication: "
+                        f"{item['path']}"
+                    )
+                if reference is not None and basis_record.get("reference_row") != reference:
+                    raise ValueError(
+                        "WS32 adjudicated-divergence declares a different reference row than "
+                        f"the analysis it stands on: {item['path']}"
+                    )
     if reference is not None and repository_root is not None:
         reference_raw = (Path(repository_root) / reference["path"]).read_bytes()
         if hashlib.sha256(reference_raw).hexdigest() != reference["sha256"]:

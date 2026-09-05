@@ -1658,10 +1658,19 @@ section grants no install or execution authority.
    bound, so no earlier result is weakened, and the difference at `n ≈ 2000` is 0.02%. The same `κ`
    scales the caps in item 3 and the `|m_o|` term here: a rerun at a smaller `κ` tightens all three
    tests together. `scripts/greenfield/adjudicate_ws32_first_divergent_event.py` implements this and
-   reproduces the sealed numbers bit-for-bit. The FP64 reference row `R` must be a git-tracked
-   `docs/artifacts/gate-d-*.npy` artifact, declared by SHA-256 on the command line together with its
-   norm-eps convention (§21.5 records two conventions whose rows are indistinguishable by shape), and
-   every earlier adjudication attempt on the same event must be named in the record's `basis`.
+   reproduces the sealed numbers bit-for-bit. The FP64 reference row `R` must be a
+   `docs/artifacts/gate-d-*.npy` artifact whose working-tree CONTENT is identical to the blob
+   committed at `HEAD` (a tracked path can be overwritten in place, which is not the same thing); it
+   must be the row this tool registers for the exact event `(context, decode position, producer
+   layer, norm-eps convention)` being adjudicated, and that registration must name the reviewed
+   validation record that checked `R` against the legacy intermediate captures per item 3 above. Its
+   digest is declared on the command line, its convention is declared and carried into the record
+   (§21.5 records two conventions whose rows are indistinguishable by shape), and the reference
+   implementation's committed tree hash is recorded. A new event therefore requires a new REVIEWED
+   registration, which is the pre-registration step. Every earlier adjudication attempt on the same
+   event is disclosed in the record's `prior_attempts`; `basis` names only what the record stands on,
+   and a refused analysis may never appear there. The observer archive is bound to the archive the
+   declared source run itself published under its own tag, not to a directory name.
 5. **Internal tensors (level 2).** Layer outputs, residuals and caches are compared under the bounded
    contracts in `docs/greenfield/NUMERICAL_CONTRACT.md`; cache/state structure (positions, tails,
    validity, pages, manifests) remains exact.

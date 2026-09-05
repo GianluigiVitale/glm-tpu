@@ -12989,3 +12989,58 @@ Also from the same review: in the TABLE-ON branch the two KV-latent slices sat i
 outside it. No tables-on pins existed to invalidate, because the 21:30Z acquisition aborted on the
 census parse bug before reaching the pod. The sealer's guard reads the source run from the record the
 loader already SHA-bound rather than re-reading the file, closing the small window between the two.
+
+## 2026-09-05 22:50Z — third Opus 5 rejection resolved: the reference row is bound to a reviewed row
+
+Round 2 confirmed P1-2 (κ) and P1-3 (scan window) closed, and five of the eight P2s. It refused the
+round on P1-1 and on two defects the round itself introduced.
+
+**P1-1 was not closed.** Requiring the row to be *git-tracked* asked whether the PATH is in the index,
+never whether the CONTENT matches the committed blob. The reviewer overwrote the real reference row in
+the working tree with one fitted to the engine's own event-1 scores and got a six-check PASS; and
+committing the same fitted row as `gate-d-event1-fp64-reference-row-v2-20260906.npy` gave a clean
+worktree and a loader-accepted record. The record's declared row was also decorative: nothing tied it
+to the analysis in its own basis. Four changes close this.
+
+1. `_require_committed_content` compares `git hash-object` against `git rev-parse HEAD:<path>`, so a
+   tracked path modified in place is refused.
+2. `REFERENCE_ROWS` registers the reviewed row for each `(context, decode position, producer layer,
+   norm-eps convention)`, with the path, the digest, and the §21.5 record that validated it against
+   the legacy captures. A fitted row under a new name matches no entry. A new event requires a new
+   reviewed entry, which is the pre-registration step §21.2 item 3 asks for.
+3. The row, and the record that validated it, are added to `basis` whether or not the operator passed
+   them; the reference implementation's committed tree hash is recorded.
+4. The loader requires the record's `reference_row` to appear in `basis` AND to equal the
+   `reference_row` of the PASS analysis the record stands on.
+
+**The disclosure control was self-defeating.** Forcing every earlier attempt into `basis` while the
+loader refused any non-PASS analysis in `basis` meant an honestly disclosed failed attempt made the
+record permanently unsealable: the only sealable moves were to delete the failed analysis or to have
+written it elsewhere. The control rewarded concealment. `prior_attempts` is now a separate list,
+SHA-bound and exempt from the PASS rule; `basis` still names only what the record stands on. This
+would have bitten immediately, since a first B′ attempt under the wrong convention is a realistic
+outcome.
+
+**The disclosure scan was bypassable** by writing the attempt to another directory. Both outputs must
+now be `docs/artifacts/gate-d-*.json` paths, validated at argument-parse time (which also fixes a P3:
+a relative path used to raise only after the analysis had been written, and the retry then tripped the
+append-only guard). Attempts are recognised by shape — a JSON naming this run, step and event and
+carrying `checks` — rather than by `artifact_kind`, which an operator can edit.
+
+**The archive binding was a speed bump.** A directory name and a hand-written `summary.json` are both
+operator-writable, so copying the run being sealed into a directory named after another tag defeated
+the sealer's anti-circularity guard. The archive is now bound to the object the declared source run
+itself uploaded under its own tag with `--no-clobber`; no published counterpart, or a digest
+mismatch, is a refusal.
+
+Also: the scan window takes the common prefix of the two archives instead of demanding exact equality,
+so a shorter observation window stays adjudicable and the window is recorded in the analysis; the
+sealer turns a loader `ValueError` into a stated refusal rather than a traceback; the AST write
+detector also treats module-level helpers that write as writes; the duplicated `bias_factor` is gone;
+the in-place-overwrite test runs against a throwaway git repository so a killed test can never leave
+the reviewed artifact tree modified; and the census parse has a unit test on captured `du -s` output,
+which is what the 21:30Z abort cost a pod slot for.
+
+The §21.2 amendment now states the property rather than the mechanism: content-identical to the
+committed blob, registered for the exact event, validated per item 3, with prior attempts disclosed
+separately from the basis.

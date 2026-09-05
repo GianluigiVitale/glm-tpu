@@ -478,11 +478,15 @@ def _validate(args: argparse.Namespace) -> int:
         dsa_adjudication = None
         expected_dsa_adjudication = None
     else:
-        dsa_adjudication = load_ws32_adjudicated_divergence(
-            args.dsa_adjudication_record,
-            expected_sha256=args.dsa_adjudication_sha256,
-            repository_root=repository_root,
-        )
+        try:
+            dsa_adjudication = load_ws32_adjudicated_divergence(
+                args.dsa_adjudication_record,
+                expected_sha256=args.dsa_adjudication_sha256,
+                repository_root=repository_root,
+            )
+        except (OSError, ValueError) as error:
+            # A loader refusal is a refusal to seal, not a traceback.
+            raise SystemExit(f"WS32 adjudication record is not loadable: {error}")
         try:
             bind_ws32_adjudication(
                 dsa_adjudication,

@@ -279,6 +279,37 @@ def test_ws32_adjudicated_divergence_record_loader_binds_sha_and_schema(tmp_path
 
     with np.testing.assert_raises_regex(ValueError, "identity drifted"):
         load_ws32_adjudicated_divergence(committed, expected_sha256="0" * 64)
+
+    def _bound(payload: dict) -> dict:
+        """Any record other than the grandfathered one must bind its row."""
+        row = payload["basis"][2]
+        return dict(
+            payload,
+            reference_row={
+                "convention": "rms_norm_eps_1e-5",
+                "implementation_tree_sha1": "5" * 40,
+                "path": row["path"],
+                "sha256": row["sha256"],
+            },
+        )
+
+    unbound = json.dumps(json.loads(raw)).encode()
+    path = tmp_path / "unbound.json"
+    path.write_bytes(unbound)
+    with np.testing.assert_raises_regex(ValueError, "does not bind its FP64 reference row"):
+        load_ws32_adjudicated_divergence(
+            path, expected_sha256=hashlib.sha256(unbound).hexdigest()
+        )
+    detached = _bound(json.loads(raw))
+    detached["reference_row"]["sha256"] = "0" * 64
+    payload = json.dumps(detached).encode()
+    path = tmp_path / "detached.json"
+    path.write_bytes(payload)
+    with np.testing.assert_raises_regex(ValueError, "reference row is not in the basis"):
+        load_ws32_adjudicated_divergence(
+            path, expected_sha256=hashlib.sha256(payload).hexdigest()
+        )
+
     record = json.loads(raw)
     for mutate in (
         lambda r: r.__setitem__("gate_d_closed", True),
@@ -288,14 +319,14 @@ def test_ws32_adjudicated_divergence_record_loader_binds_sha_and_schema(tmp_path
         lambda r: r.pop("semantics"),
         lambda r: r.__setitem__("context", "4k"),
     ):
-        hostile = json.loads(raw)
+        hostile = _bound(json.loads(raw))
         mutate(hostile)
         path = tmp_path / "hostile.json"
         payload = json.dumps(hostile).encode()
         path.write_bytes(payload)
         with np.testing.assert_raises_regex(ValueError, "adjudicated-divergence"):
             load_ws32_adjudicated_divergence(path, expected_sha256=hashlib.sha256(payload).hexdigest())
-    tampered_basis = json.loads(raw)
+    tampered_basis = _bound(json.loads(raw))
     tampered_basis["basis"][0]["sha256"] = "0" * 64
     path = tmp_path / "basis.json"
     payload = json.dumps(tampered_basis).encode()
@@ -325,3 +356,125 @@ def test_ws32_adjudication_binding_refuses_foreign_oracle_and_geometry() -> None
             bind_ws32_adjudication(hostile, oracle, observer_steps=14, context_label="8k")
     with np.testing.assert_raises_regex(ValueError, "context differs"):
         bind_ws32_adjudication(record, oracle, observer_steps=14, context_label="2k")
+
+
+def _adjudication_record_fixture(root: Path) -> tuple[dict, dict]:
+    """A minimal repository holding a record plus its PASS analysis and row."""
+    import hashlib
+    import json
+
+    artifacts = root / "docs" / "artifacts"
+    artifacts.mkdir(parents=True, exist_ok=True)
+    row = artifacts / "gate-d-row.npy"
+    row.write_bytes(b"reference row bytes")
+    row_entry = {
+        "path": "docs/artifacts/gate-d-row.npy",
+        "sha256": hashlib.sha256(row.read_bytes()).hexdigest(),
+    }
+    reference_row = dict(
+        row_entry, convention="rms_norm_eps_1e-5", implementation_tree_sha1="5" * 40
+    )
+    analysis = {
+        "artifact_kind": "gate_d_ws32_first_divergent_event_adjudication",
+        "reference_row": reference_row,
+        "verdict": "PASS",
+    }
+    passed = artifacts / "gate-d-analysis.json"
+    passed.write_text(json.dumps(analysis), encoding="utf-8")
+    refused = artifacts / "gate-d-attempt.json"
+    refused.write_text(json.dumps(dict(analysis, verdict="FAIL")), encoding="utf-8")
+    record = {
+        "artifact_kind": "gate_d_ws32_8k_adjudicated_divergence",
+        "schema_version": 1,
+        "spec_section": "21.2 items 3-4 (scope: first divergent event)",
+        "date_utc": "2026-09-06",
+        "context": "8k",
+        "decode_position": 8155,
+        "step": 0,
+        "event_index": 1,
+        "producer_layer_id": 1,
+        "expected_only": [31],
+        "observed_only": [32],
+        "later_event_alarm": 1024,
+        "basis": [
+            row_entry,
+            {
+                "path": "docs/artifacts/gate-d-analysis.json",
+                "sha256": hashlib.sha256(passed.read_bytes()).hexdigest(),
+            },
+        ],
+        "prior_attempts": [
+            {
+                "path": "docs/artifacts/gate-d-attempt.json",
+                "sha256": hashlib.sha256(refused.read_bytes()).hexdigest(),
+                "verdict": "FAIL",
+            }
+        ],
+        "oracle": {"dsa_manifest_sha256": "a" * 64, "token_manifest_sha256": "c" * 64},
+        "engine_source_run": (
+            "greenfield_ws32_short_decoder_8k_numerical_20260906T000000000000000Z"
+        ),
+        "reference_row": reference_row,
+        "semantics": "test",
+        "gate_d_closed": False,
+        "performance_claim": False,
+    }
+    return record, reference_row
+
+
+def test_a_disclosed_failed_attempt_does_not_make_a_record_unsealable(tmp_path: Path) -> None:
+    """Disclosure must not be punished: prior attempts are not the basis."""
+    import hashlib
+    import json
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    record, _ = _adjudication_record_fixture(tmp_path)
+    path = tmp_path / "record.json"
+    payload = json.dumps(record).encode()
+    path.write_bytes(payload)
+    loaded = load_ws32_adjudicated_divergence(
+        path, expected_sha256=hashlib.sha256(payload).hexdigest(), repository_root=tmp_path
+    )
+    assert loaded.step == 0 and loaded.event_index == 1
+
+    # The same refused analysis in the BASIS is a refusal, because the basis is
+    # the ground the record stands on.
+    hostile = json.loads(payload)
+    attempt = dict(hostile["prior_attempts"][0])
+    attempt.pop("verdict")
+    hostile["basis"].append(attempt)
+    payload = json.dumps(hostile).encode()
+    path = tmp_path / "hostile.json"
+    path.write_bytes(payload)
+    with np.testing.assert_raises_regex(ValueError, "names a refused adjudication"):
+        load_ws32_adjudicated_divergence(
+            path, expected_sha256=hashlib.sha256(payload).hexdigest(), repository_root=tmp_path
+        )
+
+
+def test_the_declared_reference_row_must_be_the_one_the_analysis_used(tmp_path: Path) -> None:
+    """A declared row the PASS analysis did not use is decorative."""
+    import hashlib
+    import json
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    record, reference_row = _adjudication_record_fixture(tmp_path)
+    analysis_path = tmp_path / "docs/artifacts/gate-d-analysis.json"
+    analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
+    analysis["reference_row"] = dict(reference_row, convention="rms_norm_eps_1e-6")
+    analysis_path.write_text(json.dumps(analysis), encoding="utf-8")
+    record["basis"][1]["sha256"] = hashlib.sha256(analysis_path.read_bytes()).hexdigest()
+
+    payload = json.dumps(record).encode()
+    path = tmp_path / "record.json"
+    path.write_bytes(payload)
+    with np.testing.assert_raises_regex(ValueError, "different reference row"):
+        load_ws32_adjudicated_divergence(
+            path, expected_sha256=hashlib.sha256(payload).hexdigest(), repository_root=tmp_path
+        )

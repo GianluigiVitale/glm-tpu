@@ -118,6 +118,15 @@ def test_the_emitted_record_matches_the_loader_schema(tmp_path: Path) -> None:
                 ).hexdigest(),
             }
         ],
+        "prior_attempts": [],
+        "reference_row": {
+            "convention": "rms_norm_eps_1e-5",
+            "implementation_tree_sha1": "5" * 40,
+            "path": "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy",
+            "sha256": sha256(
+                (ROOT / "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy").read_bytes()
+            ).hexdigest(),
+        },
         "oracle": {"dsa_manifest_sha256": "a" * 64, "token_manifest_sha256": "c" * 64},
         "engine_source_run": "greenfield_ws32_short_decoder_8k_numerical_20260905T000000000000000Z",
         "semantics": "test",
@@ -283,8 +292,9 @@ def test_the_scan_window_comes_from_the_archives_not_the_operator(tmp_path: Path
     assert MODULE._first_divergent_event(archive, oracle_dir) == (2, 3)
 
 
-def test_a_window_disagreement_between_engine_and_oracle_is_refused(tmp_path: Path) -> None:
-    archive, oracle_dir = _multi_event_fixture(tmp_path, divergent_at=(0, 1))
+def test_a_shorter_oracle_window_scans_the_common_prefix(tmp_path: Path) -> None:
+    """A shorter window is adjudicable over what both archives hold."""
+    archive, oracle_dir = _multi_event_fixture(tmp_path, divergent_at=(2, 3))
     from safetensors.numpy import load_file, save_file
 
     data = load_file(str(oracle_dir / "dsa_events.safetensors"))
@@ -292,8 +302,10 @@ def test_a_window_disagreement_between_engine_and_oracle_is_refused(tmp_path: Pa
         {name: value[:, :3] for name, value in data.items()},
         str(oracle_dir / "dsa_events.safetensors"),
     )
-    with pytest.raises(SystemExit, match="does not match the oracle"):
-        MODULE._scan_window(archive, oracle_dir)
+    assert MODULE._scan_window(archive, oracle_dir) == (3, 3)
+    # Event (2, 3) is outside the common prefix, so nothing divergent is in scope.
+    with pytest.raises(SystemExit, match="no divergent DSA event"):
+        MODULE._first_divergent_event(archive, oracle_dir)
 
 
 def test_naming_a_later_benign_event_is_refused(tmp_path: Path) -> None:
@@ -307,75 +319,149 @@ def test_naming_a_later_benign_event_is_refused(tmp_path: Path) -> None:
         MODULE._resolve_event(archive, oracle_dir, 0, None)
 
 
-def test_the_reference_row_must_be_a_committed_pre_registered_artifact(tmp_path: Path) -> None:
+def test_the_reference_row_must_be_a_reviewed_pre_registered_artifact(tmp_path: Path) -> None:
     """P1-1: an unbound row lets a fitted reference produce a clean PASS."""
     committed = ROOT / "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
     digest = sha256(committed.read_bytes()).hexdigest()
-    resolved, relative, seen = MODULE._committed_reference_row(committed, digest)
+    event = dict(context="8k", decode_position=8155, producer_layer_id=1,
+                 convention="rms_norm_eps_1e-5")
+    resolved, relative, seen, entry = MODULE._committed_reference_row(
+        committed, digest, **event
+    )
     assert resolved == committed.resolve()
     assert relative == "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
-    assert seen == digest
+    assert seen == digest == entry["sha256"]
+    assert entry["validation_path"].endswith("math-reference-adjudication-20260905.json")
 
     with pytest.raises(SystemExit, match="does not match the pre-registered"):
-        MODULE._committed_reference_row(committed, "0" * 64)
+        MODULE._committed_reference_row(committed, "0" * 64, **event)
 
     outside = tmp_path / "reference.npy"
     np.save(outside, np.zeros(4, dtype=np.float64))
     with pytest.raises(SystemExit, match="must be a committed"):
-        MODULE._committed_reference_row(outside, sha256(outside.read_bytes()).hexdigest())
+        MODULE._committed_reference_row(
+            outside, sha256(outside.read_bytes()).hexdigest(), **event
+        )
 
-    untracked = ROOT / "docs/artifacts/gate-d-untracked-probe-row.npy"
-    assert not untracked.exists(), "leftover probe artifact from an earlier run"
-    np.save(untracked, np.zeros(4, dtype=np.float64))
-    try:
-        with pytest.raises(SystemExit, match="not tracked by git"):
-            MODULE._committed_reference_row(
-                untracked, sha256(untracked.read_bytes()).hexdigest()
-            )
-    finally:
-        untracked.unlink()
+    # No reviewed row exists for another event or the other norm-eps convention.
+    with pytest.raises(SystemExit, match="no reviewed FP64 reference row"):
+        MODULE._committed_reference_row(
+            committed, digest, **dict(event, decode_position=8154)
+        )
+    with pytest.raises(SystemExit, match="no reviewed FP64 reference row"):
+        MODULE._committed_reference_row(
+            committed, digest, **dict(event, convention="rms_norm_eps_1e-6")
+        )
 
 
-def test_the_observer_archive_must_belong_to_the_declared_run(tmp_path: Path) -> None:
-    """P2-3: otherwise --engine-source-run is free text the seal guard trusts."""
+def test_a_tracked_artifact_overwritten_in_place_is_refused(monkeypatch, tmp_path: Path) -> None:
+    """The demonstrated attack: a tracked PATH is not committed CONTENT.
+
+    Run against a throwaway repository so a killed test can never leave the
+    reviewed artifact tree modified.
+    """
+    import subprocess as sp
+
+    repository = tmp_path / "repo"
+    (repository / "docs" / "artifacts").mkdir(parents=True)
+    relative = "docs/artifacts/gate-d-row.npy"
+    target = repository / relative
+    np.save(target, np.arange(8, dtype=np.float64))
+    for command in (
+        ["init", "-q"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "add", "--", relative],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "row"],
+    ):
+        sp.run(["git", "-C", str(repository), *command], check=True, capture_output=True)
+    monkeypatch.setattr(MODULE, "REPO_ROOT", repository)
+
+    MODULE._require_committed_content(relative)
+
+    np.save(target, np.zeros(8, dtype=np.float64))
+    with pytest.raises(SystemExit, match="differs from the committed blob"):
+        MODULE._require_committed_content(relative)
+
+    with pytest.raises(SystemExit, match="not committed at HEAD"):
+        MODULE._require_committed_content("docs/artifacts/gate-d-absent.npy")
+
+
+def test_the_reference_implementation_hash_is_recorded() -> None:
+    tree = MODULE._reference_implementation_tree()
+    assert len(tree) == 40 and all(c in "0123456789abcdef" for c in tree)
+
+
+def test_the_observer_archive_must_match_what_the_run_published(monkeypatch) -> None:
+    """P2-a: a directory name and a summary.json are both operator-writable.
+
+    The binding is the archive the protected run uploaded under its own tag, so
+    copying the run being sealed into a differently named directory no longer
+    walks past the sealer's anti-circularity guard.
+    """
+    import tempfile
+
     tag = "greenfield_ws32_short_decoder_8k_numerical_20260905T000000000000000Z"
-    run_dir = tmp_path / tag
-    run_dir.mkdir()
-    archive = run_dir / "runner.rank0.npz"
-    archive.write_bytes(b"")
-    assert MODULE._archive_belongs_to_run(archive, tag) is True
-    assert MODULE._archive_belongs_to_run(archive, "another_run") is False
+    with tempfile.TemporaryDirectory() as directory:
+        archive = Path(directory) / "runner.rank0.npz"
+        archive.write_bytes(b"observer arrays")
+        local = MODULE._local_md5(archive)
 
-    loose = tmp_path / "elsewhere"
-    loose.mkdir()
-    moved = loose / "runner.rank0.npz"
-    moved.write_bytes(b"")
-    assert MODULE._archive_belongs_to_run(moved, tag) is False
-    (loose / "summary.json").write_text(json.dumps({"run_tag": tag}), encoding="utf-8")
-    assert MODULE._archive_belongs_to_run(moved, tag) is True
+        monkeypatch.setattr(MODULE, "_remote_archive_md5", lambda run_tag: local)
+        assert MODULE._require_archive_belongs_to_run(archive, tag) == local
+
+        monkeypatch.setattr(MODULE, "_remote_archive_md5", lambda run_tag: "0" * 32)
+        with pytest.raises(SystemExit, match="does not match the archive run"):
+            MODULE._require_archive_belongs_to_run(archive, tag)
+
+        monkeypatch.setattr(MODULE, "_remote_archive_md5", lambda run_tag: None)
+        with pytest.raises(SystemExit, match="published no observer archive"):
+            MODULE._require_archive_belongs_to_run(archive, tag)
 
 
-def test_undisclosed_earlier_attempts_on_the_same_event_are_refused(tmp_path: Path) -> None:
-    """P2-5: otherwise an operator can re-run until a PASS appears."""
+def test_adjudication_outputs_must_live_in_the_reviewed_artifact_directory(tmp_path: Path) -> None:
+    """P1-3-new: the disclosure scan globs one directory, so outputs go there."""
+    good = ROOT / "docs/artifacts/gate-d-probe-analysis.json"
+    assert MODULE._committed_output_path(good, ".json") == good.resolve()
+    for bad in (
+        tmp_path / "analysis.json",
+        ROOT / "docs/artifacts/analysis.json",
+        ROOT / "docs/other/gate-d-analysis.json",
+    ):
+        with pytest.raises(SystemExit, match="must be docs/artifacts/gate-d-"):
+            MODULE._committed_output_path(bad, ".json")
+
+
+def test_earlier_attempts_on_the_same_event_are_collected_for_disclosure(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """P2-5 and P1-2-new: attempts are disclosed, never relied on."""
+    monkeypatch.setattr(MODULE, "COMMITTED_ARTIFACT_DIR", tmp_path)
+    monkeypatch.setattr(MODULE, "REPO_ROOT", tmp_path.parent)
     analysis = {
         "artifact_kind": MODULE.ANALYSIS_ARTIFACT_KIND,
+        "checks": {},
         "engine_source_run": "run_a",
         "event_index": 1,
         "step": 0,
         "verdict": "FAIL",
     }
-    earlier = tmp_path / "attempt-one.json"
+    earlier = tmp_path / "gate-d-attempt-one.json"
     earlier.write_text(json.dumps(analysis), encoding="utf-8")
-    output = tmp_path / "attempt-two.json"
+    output = tmp_path / "gate-d-attempt-two.json"
 
-    with pytest.raises(SystemExit, match="not declared in --basis"):
-        MODULE._require_prior_attempts_disclosed(output, analysis, [])
+    disclosed = MODULE._require_prior_attempts_disclosed(output, analysis)
+    assert [item["path"] for item in disclosed] == [
+        f"{tmp_path.name}/gate-d-attempt-one.json"
+    ]
+    assert disclosed[0]["verdict"] == "FAIL"
+    assert disclosed[0]["sha256"] == sha256(earlier.read_bytes()).hexdigest()
 
-    disclosed = [{"path": str(earlier), "sha256": "0" * 64}]
-    MODULE._require_prior_attempts_disclosed(output, analysis, disclosed)
+    edited = tmp_path / "gate-d-attempt-three.json"
+    edited.write_text(
+        json.dumps(dict(analysis, artifact_kind="something_else")), encoding="utf-8"
+    )
+    assert len(MODULE._require_prior_attempts_disclosed(output, analysis)) == 2
 
-    other_event = dict(analysis, event_index=2)
-    MODULE._require_prior_attempts_disclosed(output, other_event, [])
+    assert MODULE._require_prior_attempts_disclosed(output, dict(analysis, event_index=2)) == []
 
 
 def test_the_bias_bound_moves_with_kappa(tmp_path: Path) -> None:
@@ -392,7 +478,8 @@ def test_the_bias_bound_moves_with_kappa(tmp_path: Path) -> None:
     oracle_mean_abs = abs(at_two["oracle_delta"]["mean"])
     assert oracle_mean_abs > 0.0
     assert at_two["checks"]["bias"]["bound"] > at_one["checks"]["bias"]["bound"]
-    assert at_one["bias_factor"] == 1.0 and at_two["bias_factor"] == 2.0
+    assert at_one["kappa"] == 1.0 and at_two["kappa"] == 2.0
+    assert "bias_factor" not in at_two
 
 
 def test_repeated_selected_positions_are_refused(tmp_path: Path) -> None:
