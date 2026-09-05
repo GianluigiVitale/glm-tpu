@@ -214,3 +214,47 @@ def test_ws32_shell_wrappers_never_reference_a_local_in_its_own_declaration() ->
                     script,
                     line,
                 )
+
+
+def test_ws32_sealer_binds_alarm_acknowledgement_and_states_adjudicated_basis() -> None:
+    import importlib.util
+
+    root = Path(__file__).resolve().parents[3]
+    sealer_path = root / "scripts/greenfield/seal_short_decoder_ws32.py"
+    sealer = sealer_path.read_text(encoding="utf-8")
+    wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
+    for token in (
+        '"--later-event-alarm-profile"',
+        '"--later-event-alarm-lessons-pin"',
+        '"--recovery-code-hash"',
+        "alarm acknowledgement is not bound to a profile record and lessons pin",
+        "lacks a GATE_D_LESSONS entry naming this run",
+        '"dsa_adjudication": expected_dsa_adjudication,',
+        '"checkpoint_transport": args.checkpoint_transport,',
+        'summary["later_event_alarm"] = alarm_summary',
+        "DSA_EVENT0_EXACT",
+        "LATER_EVENTS_RECORDED_NOT_ADJUDICATED",
+        "DEEP_LAYER_TENSORS_NOT_BOUNDED_IN_THIS_RUN",
+        "gate_d_s21_exact_tokens_adjudicated_dsa_state_cache",
+    ):
+        assert token in sealer, token
+    assert "GLM_GREENFIELD_WS32_LATER_EVENT_ALARM_PROFILE_SHA" in wrapper
+    assert '--recovery-code-hash "$RECOVERY_PIN"' in wrapper
+    assert "${LATER_EVENT_ALARM_CLI:+$LATER_EVENT_ALARM_CLI}" in wrapper
+    specification = importlib.util.spec_from_file_location("ws32_sealer_for_test", sealer_path)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    steps = [
+        {"adjudication": {"alarm_events": [14, 17], "recorded_divergence_sizes": [
+            {"event_index": 2, "symmetric_difference": 16}, {"event_index": 14, "symmetric_difference": 1030}]}},
+        {"adjudication": {"alarm_events": [], "recorded_divergence_sizes": [
+            {"event_index": 17, "symmetric_difference": 1948}]}},
+    ]
+    producers = [0, 1, 2] + list(range(6, 78, 4))
+    summary = module._later_event_alarm_summary(steps, producers)
+    assert summary["alarmed_step_count"] == 1 and summary["events_by_step"] == {"0": [14, 17]}
+    assert summary["maximum_symmetric_difference"] == {
+        "event_index": 17, "producer_layer_id": 62, "step": 1, "symmetric_difference": 1948}
+    assert module._later_event_alarm_summary(
+        [{"adjudication": {"alarm_events": [], "recorded_divergence_sizes": []}}], producers
+    ) is None

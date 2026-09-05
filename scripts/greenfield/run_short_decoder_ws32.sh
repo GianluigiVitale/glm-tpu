@@ -85,6 +85,20 @@ readonly LATER_EVENT_ALARM_ACK=${GLM_GREENFIELD_WS32_LATER_EVENT_ALARM_ACK:-0}
   echo "WS32 alarm acknowledgement flag must be 0 or 1" >&2
   exit 2
 }
+# An acknowledgement must be bound to the committed divergence profile (path + SHA) and to the
+# pin whose GATE_D_LESSONS entry names the run; the sealer verifies both.
+if [[ $LATER_EVENT_ALARM_ACK == 1 ]]; then
+  LATER_EVENT_ALARM_PROFILE=$WORKTREE/${GLM_GREENFIELD_WS32_LATER_EVENT_ALARM_PROFILE:?set the committed alarm profile path (repo-relative)}
+  LATER_EVENT_ALARM_PROFILE_SHA=${GLM_GREENFIELD_WS32_LATER_EVENT_ALARM_PROFILE_SHA:?set the alarm profile SHA-256}
+  [[ -f $LATER_EVENT_ALARM_PROFILE && $(sha256sum "$LATER_EVENT_ALARM_PROFILE" | cut -d' ' -f1) == "$LATER_EVENT_ALARM_PROFILE_SHA" ]] || {
+    echo "WS32 alarm profile record drifted" >&2
+    exit 2
+  }
+  LATER_EVENT_ALARM_CLI="--later-event-alarm-profile $LATER_EVENT_ALARM_PROFILE --later-event-alarm-profile-sha256 $LATER_EVENT_ALARM_PROFILE_SHA --later-event-alarm-lessons-pin $(git -C "$WORKTREE" rev-parse HEAD)"
+else
+  LATER_EVENT_ALARM_CLI=''
+fi
+readonly LATER_EVENT_ALARM_CLI
 
 if [[ $STRATEGY_ND_DENSE == 1 ]]; then
   STRATEGY_ND_DENSE_OVERLAY_ROOT=${GLM_GREENFIELD_WS32_STRATEGY_ND_DENSE_OVERLAY_ROOT:?set sealed StrategyND dense overlay root}
@@ -548,6 +562,8 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --exact-dsa "$EXACT_DSA" \
   ${DSA_ADJUDICATION_CLI:+$DSA_ADJUDICATION_CLI} \
   --later-event-alarm-acknowledged "$LATER_EVENT_ALARM_ACK" \
+  --recovery-code-hash "$RECOVERY_PIN" \
+  ${LATER_EVENT_ALARM_CLI:+$LATER_EVENT_ALARM_CLI} \
   --checkpoint-transport "$CHECKPOINT_TRANSPORT" \
   --strategy-nd-dense "$STRATEGY_ND_DENSE" \
   --strategy-nd-dense-overlay-manifest-sha256 "$STRATEGY_ND_DENSE_OVERLAY_MANIFEST_SHA" \

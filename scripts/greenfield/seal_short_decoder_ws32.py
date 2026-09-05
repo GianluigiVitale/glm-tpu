@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import shutil
 import sqlite3
+import subprocess
 import sys
 from typing import Any, Mapping
 
@@ -84,6 +85,10 @@ def _args() -> argparse.Namespace:
     validate.add_argument(
         "--later-event-alarm-acknowledged", choices=(0, 1), default=0, type=int
     )
+    validate.add_argument("--later-event-alarm-profile", type=Path)
+    validate.add_argument("--later-event-alarm-profile-sha256", default="0" * 64)
+    validate.add_argument("--later-event-alarm-lessons-pin", default="")
+    validate.add_argument("--recovery-code-hash", default="")
     validate.add_argument(
         "--strategy-nd-dense", choices=(0, 1), required=True, type=int
     )
@@ -422,13 +427,15 @@ def _validate(args: argparse.Namespace) -> int:
         expected_token_success_sha256=args.token_oracle_success_sha256,
         expected_dsa_success_sha256=args.dsa_oracle_success_sha256,
     )
+    repository_root = Path(__file__).resolve().parents[2]
+    if args.recovery_code_hash and not re.fullmatch(r"[0-9a-f]{40}", args.recovery_code_hash):
+        raise SystemExit("WS32 recovery code hash must be a full commit id")
     if args.dsa_adjudication_record is None:
         if args.dsa_adjudication_sha256 != "0" * 64:
             raise SystemExit("WS32 adjudication SHA given without a record")
         dsa_adjudication = None
         expected_dsa_adjudication = None
     else:
-        repository_root = Path(__file__).resolve().parents[2]
         dsa_adjudication = load_ws32_adjudicated_divergence(
             args.dsa_adjudication_record,
             expected_sha256=args.dsa_adjudication_sha256,
@@ -829,6 +836,24 @@ def _validate(args: argparse.Namespace) -> int:
                     "WS32 later-event divergence alarm at steps "
                     f"{alarm_steps} requires an acknowledged lessons entry before sealing"
                 )
+            if alarm_steps and rank == 0:
+                # The acknowledgement must be bound to evidence: the committed divergence profile
+                # and the pin whose GATE_D_LESSONS entry names this run tag.
+                profile = args.later_event_alarm_profile
+                if (
+                    profile is None
+                    or not profile.is_file()
+                    or _digest_file(profile) != args.later_event_alarm_profile_sha256
+                    or not re.fullmatch(r"[0-9a-f]{40}", args.later_event_alarm_lessons_pin or "")
+                    or (args.recovery_code_hash and args.later_event_alarm_lessons_pin != args.recovery_code_hash)
+                ):
+                    raise SystemExit("WS32 alarm acknowledgement is not bound to a profile record and lessons pin")
+                lessons = subprocess.run(
+                    ["/usr/bin/git", "-C", str(REPO), "show", f"{args.later_event_alarm_lessons_pin}:docs/greenfield/GATE_D_LESSONS.md"],
+                    check=False, capture_output=True, text=True,
+                )
+                if lessons.returncode != 0 or args.tag not in lessons.stdout:
+                    raise SystemExit("WS32 alarm acknowledgement pin lacks a GATE_D_LESSONS entry naming this run")
             expected_cache = validate_ws32_cache_probe(
                 position=arrays["cache_position"],
                 kv_rows=arrays["cache_kv_bfloat16_bits"].view(
@@ -911,8 +936,11 @@ def _validate(args: argparse.Namespace) -> int:
             }
             for graph, report in sorted(first_graphs.items())
         },
+        "checkpoint_transport": args.checkpoint_transport,
+        "dsa_adjudication": expected_dsa_adjudication,
         "mode": args.mode,
         "performance_claim": args.mode == "numerical",
+        "recovery_code_hash": args.recovery_code_hash or None,
         "run_tag": args.tag,
         "schema_version": 1,
         "status": "HLO_ACQUIRED" if args.mode == "acquire" else "SUCCESS",
@@ -955,10 +983,79 @@ def _validate(args: argparse.Namespace) -> int:
                 "xplane": xplane,
             }
         )
+        alarm_summary = _later_event_alarm_summary(
+            records[0]["dsa_steps"], oracle.producer_layer_ids.tolist()
+        )
+        if alarm_summary is not None:
+            alarm_summary.update(
+                {
+                    "acknowledged": bool(args.later_event_alarm_acknowledged),
+                    "lessons_pin": args.later_event_alarm_lessons_pin or None,
+                    "profile_path": (
+                        str(args.later_event_alarm_profile.resolve().relative_to(repository_root))
+                        if args.later_event_alarm_profile is not None
+                        else None
+                    ),
+                    "profile_sha256": (
+                        args.later_event_alarm_profile_sha256
+                        if args.later_event_alarm_profile is not None
+                        else None
+                    ),
+                }
+            )
+        summary["later_event_alarm"] = alarm_summary
+        basis = ["RAW_TOKENS_EXACT", "DSA_WITHIN_ENGINE_EXACT", "STATE_CACHE_EXACT_STRUCTURE"]
+        if expected_dsa_adjudication is None:
+            basis.append("DSA_CROSS_ORACLE_EXACT_ALL_EVENTS")
+        else:
+            basis.append("DSA_EVENT0_EXACT")
+            basis.append(
+                f"DSA_EVENT{expected_dsa_adjudication['event_index']}_ADJUDICATED_S21_2"
+            )
+            basis.append("LATER_EVENTS_RECORDED_NOT_ADJUDICATED")
+            basis.append("DEEP_LAYER_TENSORS_NOT_BOUNDED_IN_THIS_RUN")
+            if alarm_summary is not None:
+                basis.append("LATER_EVENT_ALARM_ACKNOWLEDGED_WITH_LESSONS_ENTRY")
+        basis.append("PROTECTED_WALL_TRACE_HBM")
+        summary["classification"] = ";".join(basis)
+    else:
+        summary["later_event_alarm"] = None
+        summary["classification"] = "HLO_ACQUIRED_ONLY"
     summary["summary_sha256"] = sha256(_canonical(summary)).hexdigest()
     _write_once(args.output, summary)
     print(json.dumps(summary, sort_keys=True))
     return 0
+
+
+def _later_event_alarm_summary(
+    dsa_steps: list[dict[str, Any]], producer_layer_ids: list[int]
+) -> dict[str, Any] | None:
+    """Summarize spec §21.2 later-event alarms across observed steps (None when no alarm)."""
+    events_by_step: dict[str, list[int]] = {}
+    maximum: dict[str, Any] | None = None
+    for step, item in enumerate(dsa_steps):
+        adjudication = item.get("adjudication") or {}
+        alarms = list(adjudication.get("alarm_events") or [])
+        if alarms:
+            events_by_step[str(step)] = alarms
+        for entry in adjudication.get("recorded_divergence_sizes") or []:
+            size = int(entry["symmetric_difference"])
+            if maximum is None or size > maximum["symmetric_difference"]:
+                maximum = {
+                    "event_index": int(entry["event_index"]),
+                    "producer_layer_id": int(producer_layer_ids[int(entry["event_index"])]),
+                    "step": step,
+                    "symmetric_difference": size,
+                }
+    if not events_by_step:
+        return None
+    return {
+        "alarmed_step_count": len(events_by_step),
+        "events_by_step": events_by_step,
+        "maximum_symmetric_difference": maximum,
+        "observed_step_count": len(dsa_steps),
+        "rule": "spec §21.2: |E Δ O| > 1024 at a recorded later event is a diagnostic alarm requiring a GATE_D_LESSONS entry before promotion",
+    }
 
 
 def _publish_db(args: argparse.Namespace) -> int:
@@ -992,7 +1089,29 @@ def _publish_db(args: argparse.Namespace) -> int:
             "xla_python_client_mem_fraction": summary[
                 "xla_python_client_mem_fraction"
             ],
+            "checkpoint_transport": summary.get("checkpoint_transport"),
+            "classification": summary.get("classification"),
+            "dsa_adjudication": summary.get("dsa_adjudication"),
+            "later_event_alarm": summary.get("later_event_alarm"),
+            "recovery_code_hash": summary.get("recovery_code_hash"),
         }
+        adjudicated = summary.get("dsa_adjudication") is not None
+        note = (
+            "Protected complete WS32 short-context decoder: exact tokens/DSA/state/cache/HLO/HBM/XPlane and profiler-free wall."
+            if not adjudicated
+            else "Protected complete WS32 short-context decoder (spec §21): exact raw tokens; DSA event 0 exact, "
+            f"event {summary['dsa_adjudication']['event_index']} adjudicated against the pre-registered record, later events "
+            "recorded"
+            + (" (alarm acknowledged with a lessons entry)" if summary.get("later_event_alarm") else "")
+            + "; within-engine DSA order/tails exact; state/cache/HLO/HBM/XPlane and profiler-free wall."
+        )
+        item_id = "gate_d_exact_token_dsa_state_cache" if not adjudicated else "gate_d_s21_exact_tokens_adjudicated_dsa_state_cache"
+        gold = (
+            "Exact sealed raw-token prefix, executing-program DSA set/ties, state/cache/HLO/HBM/XPlane and protected wall."
+            if not adjudicated
+            else "Exact sealed raw-token prefix; within-engine DSA order/ties; cross-oracle DSA exact at event 0 and equal to the "
+            "pre-registered adjudicated divergence at the first divergent event, later events recorded; state/cache/HLO/HBM/XPlane and protected wall."
+        )
         cursor = connection.execute(
             "INSERT INTO runs(created_utc,model,model_revision,harness_git,fork_git,env_json,pod,note) VALUES (?,?,?,?,?,?,?,?)",
             (
@@ -1003,7 +1122,7 @@ def _publish_db(args: argparse.Namespace) -> int:
                 "oracle-only",
                 json.dumps(env, sort_keys=True),
                 "db-v4-64-od",
-                "Protected complete WS32 short-context decoder: exact tokens/DSA/state/cache/HLO/HBM/XPlane and profiler-free wall.",
+                note,
             ),
         )
         run_id = int(cursor.lastrowid)
@@ -1013,10 +1132,10 @@ def _publish_db(args: argparse.Namespace) -> int:
             (
                 run_id,
                 benchmark,
-                "gate_d_exact_token_dsa_state_cache",
+                item_id,
                 now,
                 f"Execute sealed {summary['context_label']} prompt through the complete WS32 decoder.",
-                "Exact sealed raw-token prefix, executing-program DSA set/ties, state/cache/HLO/HBM/XPlane and protected wall.",
+                gold,
                 json.dumps(summary, sort_keys=True),
                 json.dumps(summary["observed_generated_token_ids"]),
                 1,

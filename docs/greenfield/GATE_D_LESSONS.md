@@ -1324,3 +1324,21 @@ normalized-state cause.
   protected tags reproducing the legacy prefill's 32-way reduction association. Decide the criterion
   first: exact where the model semantics are exact (tokens, structure, within-engine ties), bounded
   and reference-adjudicated where association legitimately differs (spec §21).
+- Later-event divergence alarm, WS32 8K numerical run
+  `greenfield_ws32_short_decoder_8k_numerical_20260905T085534575653049Z` (spec §21.2 scope rule): with event 0 exact and event 1 equal to the pre-registered seven/seven divergence,
+  the recorded later events diverge progressively: step-0 swaps 8/10/21/49/54/51/101/201/338/385/
+  458/449/515/481/467/593/550/466/358 for events 2–20 (layers 2–74), i.e. up to 29% of the 2,048
+  selected positions per event, 47% at one event of step 2; aligned engine−oracle score error std
+  grows 0.02 (layer 1) → 0.2 (layer 10) → 8–12 (layers 34–62) on score ranges of ~140–150, with
+  signed means up to −8. Raw tokens stayed exact for all 20 protected steps and within-engine
+  ordering/tails/counts were exact everywhere. Reading: once selection diverges at a boundary,
+  discrete routing and selection amplify small differences downstream, so cross-oracle set
+  agreement at deep events is not a well-posed correctness test; exact tokens (item 1) are the
+  end-to-end backstop. Limitation stated plainly: deep-layer internal tensors of this run were not
+  bounded against a reference (item 5 was met only by the earlier bounded layer contracts), so a
+  deep-layer defect that leaves 20 greedy tokens unchanged is not excluded by this run. Follow-up
+  (not a Gate D blocker under §21): teacher-forced selection (feed the oracle's selected sets) to
+  measure deep-layer score error without cascade, and longer token comparisons/logprob deltas.
+  Alarms (`|E Δ O| > 1024`): step 0 events 14/17/18; steps 1–12 subsets of {14,17,18,19}; step 13
+  none; 13 of 14 steps alarmed; maximum 1948/2048 symmetric difference at step 2, event 17
+  (layer 62). Profile: `docs/artifacts/gate-d-ws32-8k-20260905-later-event-profile.json`.

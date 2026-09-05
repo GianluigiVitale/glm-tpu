@@ -12484,3 +12484,52 @@ re-pinned (materialize `b945c244…`, promote `a1d68429…`, prefill `a9e9af92�
 decode `f18d0914…`, cache probe `9f4413ec…`) and exported for the numerical run. Next: ONE 8K
 numerical run (`MODE=numerical`, transport `shm`, `GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1`, the six
 pin pairs above) under the full trace/wall/HBM/DB/archive/cleanup protections.
+
+## 2026-09-05 08:55Z — the single protected 8K numerical run launched
+
+`greenfield_ws32_short_decoder_8k_numerical_20260905T085534575653049Z` at pushed/mirrored pin
+`4286509`: mode numerical, context 8k, exact DSA, StrategyND dense overlay, transport `shm` (tmpfs
+checkpoint with sealed identity), the six acquired HLO pin pairs, and
+`GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1` (spec §21.2 first-divergent-event record `4da05468…`).
+Eight-host sync passed 08:55:46Z (tmpfs mount, pinned root, sealed manifest/SUCCESS bytes, four
+slots, identity marker on every host); fleet launched 08:56:35Z. Budget about 2.5 hours (load,
+compile, 8,155-token prefill, 14 observer steps, warm-up, 10 timed iterations, 2 traced steps, cache
+probe, then sealing, DB publication and archive). Success closes Gate D under §21.
+
+## 2026-09-05 09:37Z — numerical run SUCCESS on all correctness contracts; sealer paused on the later-event alarm
+
+`greenfield_ws32_short_decoder_8k_numerical_20260905T085534575653049Z` at `4286509`: fleet 08:56→09:35Z
+(39 min including tmpfs checkpoint load, six compiles, 8,155-token prefill, 14 observer steps, 2
+warm-up, 10 timed, 2 traced steps, cache probe). All eight ranks `WS32_SHORT_OK`; rank-0 record status
+`SUCCESS`, `correctness_passed` true: raw tokens exact 20/20 (`909682cb…`), event 0 exact, event 1
+equal to the pre-registered record (`4da05468…`), no unexplained set mismatch, counts/tails/producer
+identities/within-engine order exact at all 14 steps, cache probe valid, state position 8183 /
+context 8184 / healthy. Profiler-free p50 `130.328885 ms/token`, p99 `132.295274` (samples 127.0–
+132.3), peak HBM `26,375,554,560` bytes/chip, XPlane present, transport `shm`, censuses pre and
+failure-exit 8/8. The sealer refused to seal because later events raised the §21.2 alarm
+(`|E Δ O| > 1024` at some event of steps 0–12); the divergence profile is recorded in
+`GATE_D_LESSONS.md` and `docs/artifacts/gate-d-ws32-8k-20260905-later-event-profile.json`. Nothing
+remote was published beyond nonterminal diagnostics; no DB row or SUCCESS exists yet. Next: Fable
+review of the alarm acknowledgement, then recovery-mode sealing
+(`GLM_GREENFIELD_WS32_SHORT_DECODER_RECOVER=1`, `GLM_GREENFIELD_WS32_SOURCE_CODE_HASH=4286509…`,
+`GLM_GREENFIELD_WS32_LATER_EVENT_ALARM_ACK=1`) which validates, publishes the DB row, archives and
+writes SUCCESS last with a fresh census.
+
+The Fable review of the alarm acknowledgement (`ws32-8k-alarm-ack-fable-verdict.txt`, `f13277a8…3d50`)
+found acknowledging consistent with §21.2 and no defect evidence, but two P1s in publication: the
+sealer's summary/DB wording claimed exact DSA sets and the acknowledgement was an unbound flag.
+Fixed before any sealing: the sealer now records `checkpoint_transport`, `dsa_adjudication`,
+`recovery_code_hash` and a `later_event_alarm` summary (alarmed steps, events per step, maximum
+symmetric difference with step/event/layer, acknowledgement, lessons pin, profile path/SHA) in the
+summary and DB env; the acknowledgement requires the committed profile record (path+SHA) and a
+lessons pin equal to the recovery code hash whose `GATE_D_LESSONS.md` names the run tag; DB
+`note`/`item_id`/`gold` state the adjudicated basis ("exact raw tokens; DSA event 0 exact, event 1
+adjudicated, later events recorded"); the summary carries a classification string including
+`DEEP_LAYER_TENSORS_NOT_BOUNDED_IN_THIS_RUN`. A3 decision: `performance_claim` stays true for a sealed
+numerical SUCCESS because the wall/trace/HBM contract of §21.2 item 6 is fully met; the claim is the
+protected 8K WS32 p50 (Gate E met, Gate F not), never a Gate D exactness claim beyond §21. The lessons
+entry gained the per-step alarm list and the 1948/2048 maximum (step 2, event 17, layer 62).
+Delta verdict (`ws32-8k-alarm-ack-fable-delta-verdict.txt`, `ea2a55db…5644`): P0 NONE; P1 B1 (the
+lessons entry abbreviated the run tag, so the new binding check would have refused the seal) fixed by
+writing the full tag; P2 B2 (note wording conditional on an alarm) and B3 (recovery hash format
+check) fixed; B4 accepted; B5 satisfied by committing, pushing and mirroring before sealing.
