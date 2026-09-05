@@ -182,7 +182,7 @@ readonly PREFILL_BUDGET_SECONDS=3600
 # Storage ceiling (goal.md): refuse to launch when a run's evidence could not
 # be uploaded in full; at the ceiling the workers' EXIT-trap upload would drop a
 # completed run's trace/HLO silently.
-readonly STORAGE_CEILING_BYTES=2000000000000
+readonly STORAGE_CEILING_BYTES=2500000000000
 readonly STORAGE_RESERVE_BYTES=6000000000
 # A non-default chunk length is part of the run identity (spec §23.3 Step B
 # runs C=2048 and C=512): it appears in the tag and is cross-checked by the sealer.

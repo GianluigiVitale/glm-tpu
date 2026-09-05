@@ -473,7 +473,7 @@ def test_ws32_evidence_layout_v2_is_declared_end_to_end() -> None:
     assert 'record.get("evidence_layout") != EVIDENCE_LAYOUT_V2' in sealer and '"evidence_layout",' in sealer
     assert "upload_shared(){" in wrapper and 'gzip -n -9 -c "$hlo/$graph.$form"' in wrapper
     assert '"$remote/hlo/${graph}.${form}.gz"' in wrapper and ".rank${idx}.stablehlo.mlir" not in wrapper
-    assert "STORAGE_CEILING_BYTES=2000000000000" in wrapper and "STORAGE_RESERVE_BYTES=6000000000" in wrapper
+    assert "STORAGE_CEILING_BYTES=2500000000000" in wrapper and "STORAGE_RESERVE_BYTES=6000000000" in wrapper
     assert "live storage plus reserve exceeds the ceiling" in wrapper
     assert ws32_evidence.EVIDENCE_LAYOUT_V2 == "hlo_single_gzip_v2"
 
