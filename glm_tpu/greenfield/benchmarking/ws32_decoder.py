@@ -296,10 +296,16 @@ def _exact_wk_feature_slice_instructions(
             for match in matches
             if match is not None
         )
+        # ConcatBitcast operand order is not semantic: the sealed DB567 decode
+        # graph carries 226 groups with non-ascending operand order (FP8 weight
+        # tiles) and produced exact tokens; placement is carried by each
+        # slice-start's ``slice=`` attribute.  Require the exact set of four
+        # disjoint quarter spans in any order (a rotated W_K group appeared once
+        # in the 2026-09-05 chunked-prefill acquisition).
         if (
             len(matches) != 4
             or any(match is None for match in matches)
-            or spans != expected_spans
+            or tuple(sorted(spans)) != expected_spans
             or len({item.operand_names[0] for item in concrete_starts}) != 1
         ):
             continue

@@ -12648,3 +12648,22 @@ identity carries `prefill_chunk_length`. Next: commit/push/mirror → 8K acquisi
 new schema → Step B (C=2048 then C=512, identity to DB567 witnesses `057af89f…`, `67d03f75…`,
 `a8724ce5…`, `909682cb…`) → Step C → L7 → L8.
 
+## 2026-09-05 15:33Z — first five-graph 8K acquisition refused; linter quarter-slice order widened
+
+Acquisition `greenfield_ws32_short_decoder_8k_acquire_20260905T150550783962907Z` (pin `a91caca`,
+compile-only, shm transport) compiled all seven graphs on all eight hosts and then refused, as designed,
+because `prefill_chunk` and `prefill_tail` each carried one "optimized HLO reconstructs a full-pod hidden
+value" violation; failure-exit census 8/8 clean, no TPU work claimed. Offline lint of the local HLO: every
+other graph is identity-only; collective counts of both prefill graphs equal the monolithic prefill's
+(1,310; 111 all-gathers; 157 fused-RMSNorm). The flagged instructions are one W_K quarter-slice group
+(`slice-start/done` ×4 → `ConcatBitcast` f32[128,6144] → weight-carry `tuple` into the wide repair while
+loop) whose ConcatBitcast operands are listed in the rotated order [32:64],[64:96],[96:128],[0:32]; the
+recognizer `_exact_wk_feature_slice_instructions` demanded ascending order. Operand order is not semantic:
+the reviewer's scan of the sealed DB567 decode/observer graphs found 226 of 664 ConcatBitcast groups with
+non-ascending operand order (FP8 weight tiles) in graphs that produced exact tokens and bit-exact event 0;
+placement is carried by each slice-start's `slice=` attribute. The monolithic prefill happened to emit
+ascending W_K groups (79/79), the chunk graph 42/43. Fix: the recognizer requires the exact set of four disjoint quarter spans in any order (all other
+closure checks unchanged: one source, exclusive start→done→concat consumers, scoped fusion or prefill
+tuple consumer); tests add the rotated case and a duplicate-quarter refusal. With the fix both acquired
+prefill graphs lint identity-only. Reviewed before re-acquisition (linter contract change).
+

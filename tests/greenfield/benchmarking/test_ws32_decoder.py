@@ -642,8 +642,25 @@ def test_ws32_exact_wk_slice_exception_is_closed_and_consumer_scoped() -> None:
         )
 
     base = _exact_wk_slice_hlo()
+    # XLA sliced prefetch may list the quarters in schedule order (observed
+    # rotated once in the 2026-09-05 chunked-prefill acquisition): any
+    # permutation of the exact four disjoint spans is the same closed form.
+    rotated = base.replace(
+        "custom-call(%slice-done, %slice-done.1, %slice-done.2, %slice-done.3)",
+        "custom-call(%slice-done.1, %slice-done.2, %slice-done.3, %slice-done)",
+    )
+    assert rotated != base
+    module = parse_hlo_module(rotated)
+    allowed, group_count = _exact_wk_feature_slice_instructions(
+        module.instructions, hidden_size=6144, kind="decode"
+    )
+    assert group_count == 1 and len(allowed) == 9
+    assert _forbidden_full_hidden_values(
+        module.instructions, hidden_size=6144, allowed_instruction_indices=allowed
+    ) == ()
     mutations = (
         base.replace("[96:128]", "[95:127]"),
+        base.replace("[96:128]", "[0:32]"),  # duplicate quarter, missing one: not the closed form
         base.replace("exact_current_key", "unscoped_key"),
         base.replace(
             "  ROOT %use =",
