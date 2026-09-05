@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+from typing import Any
 
 import numpy as np
 
@@ -23,16 +24,21 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-# The registry, the analysis kind, the conventions and the alarm threshold live
-# in the package the SEALER imports. The offline tool consults the same table
-# the consumer enforces, so an edit here cannot widen what will be accepted.
-from glm_tpu.greenfield.validation.ws32_short_context import (  # noqa: E402
-    ANALYSIS_ARTIFACT_KIND,
-    LATER_EVENT_ALARM,
-    REFERENCE_CONVENTIONS,
-    REFERENCE_IMPLEMENTATION,
-    REFERENCE_ROWS,
-)
+
+
+def _contract() -> Any:
+    """The module the SEALER enforces, imported lazily.
+
+    The registry, the analysis kind, the conventions and the alarm threshold
+    live there, so an edit in this tool cannot widen what will be accepted. The
+    import is deferred because it pulls in JAX, and this tool is CPU-only and
+    is often run just to print a refusal.
+    """
+
+    from glm_tpu.greenfield.validation import ws32_short_context
+
+    return ws32_short_context
+
 
 KAPPA = 2.0
 # §21.2 item 4 requires "the same pre-registered kappa = 2" as items 3's caps, so
@@ -219,7 +225,7 @@ def adjudicate(
         },
     }
     return {
-        "artifact_kind": ANALYSIS_ARTIFACT_KIND,
+        "artifact_kind": _contract().ANALYSIS_ARTIFACT_KIND,
         "checks": checks,
         "cutoff_reference_score": cutoff,
         "epsilon_oracle_vs_reference": epsilon,
@@ -254,7 +260,10 @@ def main() -> int:
     parser.add_argument("--oracle-dir", type=Path, required=True)
     parser.add_argument("--reference-row", type=Path, required=True)
     parser.add_argument("--reference-row-sha256", required=True)
-    parser.add_argument("--reference-convention", choices=REFERENCE_CONVENTIONS, required=True)
+    # The choices and the alarm default come from the contract module, which is
+    # imported only once the arguments parse, so `--help` and an argument error
+    # stay free of JAX.
+    parser.add_argument("--reference-convention", required=True)
     parser.add_argument("--engine-source-run", required=True)
     parser.add_argument("--context", choices=("2k", "8k"), required=True)
     parser.add_argument("--decode-position", type=int, required=True)
@@ -270,7 +279,7 @@ def main() -> int:
     # §21.2 fixes the later-event diagnostic threshold; raising it inside a
     # pre-registration record would silently skip the alarm, its acknowledgement
     # and the mandatory GATE_D_LESSONS.md entry.
-    parser.add_argument("--later-event-alarm", type=int, default=LATER_EVENT_ALARM)
+    parser.add_argument("--later-event-alarm", type=int, default=None)
     parser.add_argument("--date-utc", required=True)
     parser.add_argument("--analysis-output", type=Path, required=True)
     parser.add_argument("--record-output", type=Path, required=True)
@@ -285,9 +294,15 @@ def main() -> int:
     args.record_output = _committed_output_path(args.record_output, ".json")
     if args.analysis_output == args.record_output:
         raise SystemExit("the analysis and the record must be different artifacts")
-    if args.later_event_alarm != LATER_EVENT_ALARM:
+    if args.reference_convention not in _contract().REFERENCE_CONVENTIONS:
         raise SystemExit(
-            f"§21.2 fixes the later-event alarm at {LATER_EVENT_ALARM}; "
+            f"--reference-convention must be one of {_contract().REFERENCE_CONVENTIONS}"
+        )
+    if args.later_event_alarm is None:
+        args.later_event_alarm = _contract().LATER_EVENT_ALARM
+    if args.later_event_alarm != _contract().LATER_EVENT_ALARM:
+        raise SystemExit(
+            f"§21.2 fixes the later-event alarm at {_contract().LATER_EVENT_ALARM}; "
             f"{args.later_event_alarm} was requested"
         )
 
@@ -477,7 +492,7 @@ def _committed_reference_row(
         raise SystemExit(f"reference row does not exist: {relative}")
     _require_committed_content(relative)
     key = (context, int(decode_position), int(producer_layer_id), convention)
-    entry = REFERENCE_ROWS.get(key)
+    entry = _contract().REFERENCE_ROWS.get(key)
     if entry is None:
         raise SystemExit(
             "no reviewed FP64 reference row is registered for "
@@ -544,13 +559,13 @@ def _reference_implementation_tree() -> str:
     """§21.2 item 3: record the reference implementation's source hash."""
 
     result = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "rev-parse", f"HEAD:{REFERENCE_IMPLEMENTATION}"],
+        ["git", "-C", str(REPO_ROOT), "rev-parse", f"HEAD:{_contract().REFERENCE_IMPLEMENTATION}"],
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
         raise SystemExit(
-            f"the reference implementation {REFERENCE_IMPLEMENTATION} is not committed at HEAD"
+            f"the reference implementation {_contract().REFERENCE_IMPLEMENTATION} is not committed at HEAD"
         )
     return result.stdout.strip()
 

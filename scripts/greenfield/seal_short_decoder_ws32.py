@@ -539,10 +539,15 @@ def _validate(args: argparse.Namespace) -> int:
             )
         except ValueError as error:
             raise SystemExit(f"WS32 adjudication record does not bind this run: {error}")
-        if dsa_adjudication.analysis_path is not None:
-            # The analysis is the record's ground, so it must have existed
-            # before the run too; otherwise the numbers could be written to fit.
-            _committed_in_run_pin(dsa_adjudication.analysis_path, "adjudication analysis")
+        for relative, label in (
+            # The analysis is the record's ground and the row decides its
+            # verdict, so both must have existed before the run too; otherwise
+            # the numbers could be written to fit what the run produced.
+            (dsa_adjudication.analysis_path, "adjudication analysis"),
+            (dsa_adjudication.reference_row_path, "adjudication reference row"),
+        ):
+            if relative is not None:
+                _committed_in_run_pin(relative, label)
         if dsa_adjudication.engine_source_run == args.tag:
             # §21.2 pre-registration: a record derived from this very run would be
             # fitted to the data it judges and so could never fail. The source is

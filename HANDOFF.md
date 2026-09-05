@@ -13121,3 +13121,40 @@ pass the new check unchanged. A test pins that fact.
 This also makes the two-run B′ sequencing structural: run 1's observer arrays produce the analysis and
 the record, both are committed, and run 2 executes at a pin that contains them. There is no ordering
 in which a single run can seal against a record derived from itself.
+
+## 2026-09-06 00:20Z — fifth Opus 5 rejection resolved: null is not absence
+
+Round 4 found round 3's two P1s both reachable again, and the way they came back is the lesson.
+
+* **`"analysis": null` skipped every control the round added.** I required the KEY to be present and
+  then read it with `.get()`, guarding each downstream check on `is not None`. The sibling fields were
+  not written that way, so only this one had the hole. The reviewer loaded a fabricated record with an
+  invented 10-position divergence, and then one with a 2,000-position "adjudicated" event that would
+  have put every later event out of scope and collapsed item 3 entirely. Presence of a key is now
+  never the requirement: `analysis`, `reference_row` and `prior_attempts` must all be non-null, and a
+  record claiming the grandfather exemption must carry none of them.
+* **The record's divergence sets were never tied to the analysis.** They are the only payload the
+  sealer enforces against the run, so they were exactly the wrong thing to leave unbound: a
+  hand-written analysis declaring the real swaps could accompany a record declaring fitted ones. The
+  loader now requires the record's `expected_only`/`observed_only` to be the analysis's own, and
+  requires the analysis to carry all six §21.2 checks with every one passed — a `verdict` string is a
+  claim, the checks are the adjudication.
+* **The reviewed tree could be left through a symlink.** `_committed_artifact_path` is a string
+  predicate; every basis, attempt and row read now resolves the path and refuses anything whose
+  parent is not the reviewed directory.
+* **`_committed_artifact_path` would have blocked B′.** It demanded a `gate-d-` prefix, but B′'s basis
+  includes the §23.9 rotary diagnostic, which is `gate-l-ws32-rotary-long-position-diagnostic-20260905.json`.
+  The rule is now the `gate-` prefix. No existing artifact is nested, so nothing else changes.
+* The sealer pins the reference row to the run's commit as well as the record and the analysis. The
+  offline tool imports the contract module lazily, so `--help` is 0.12 s again instead of 1.37 s and
+  the CPU-only tool no longer drags JAX in to print a refusal.
+
+Seven of fifteen new controls survived deletion with the suite green in round 4, including three of
+the four headline claims. All nine controls I re-tested this round now die under mutation: the
+analysis schema, its membership in the basis, its artifact kind, its event binding, its set binding,
+the registry lookup, the null-value rejection, the symlink escape, and the sealer's commitment check.
+The sealer test that previously asserted only that four string literals existed now asserts, on the
+parse tree, that the checks are actually called and that both the analysis and the row are pinned.
+
+The §21.2 grandfathering paragraph no longer claims the digest is checked "before anything else"; it
+says where it is checked and what that implies for future tightening.

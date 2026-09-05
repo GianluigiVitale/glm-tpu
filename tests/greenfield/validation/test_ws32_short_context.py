@@ -302,7 +302,7 @@ def test_ws32_adjudicated_divergence_record_loader_binds_sha_and_schema(tmp_path
     unbound = json.dumps(json.loads(raw)).encode()
     path = tmp_path / "unbound.json"
     path.write_bytes(unbound)
-    with np.testing.assert_raises_regex(ValueError, "does not bind its FP64 reference row"):
+    with np.testing.assert_raises_regex(ValueError, "does not declare analysis"):
         load_ws32_adjudicated_divergence(
             path, expected_sha256=hashlib.sha256(unbound).hexdigest()
         )
@@ -395,8 +395,21 @@ def _adjudication_record_fixture(root: Path) -> tuple[dict, dict]:
     source_run = "greenfield_ws32_short_decoder_8k_numerical_20260906T000000000000000Z"
     analysis = {
         "artifact_kind": "gate_d_ws32_first_divergent_event_adjudication",
+        "checks": {
+            name: {"pass": True}
+            for name in (
+                "bias",
+                "cap_max_abs",
+                "cap_std",
+                "equal_sized_disjoint_swap",
+                "reference_band",
+                "reference_band_capacity",
+            )
+        },
         "engine_source_run": source_run,
         "event_index": 1,
+        "expected_only": [31],
+        "observed_only": [32],
         "reference_row": reference_row,
         "step": 0,
         "verdict": "PASS",
@@ -423,7 +436,7 @@ def _adjudication_record_fixture(root: Path) -> tuple[dict, dict]:
         "expected_only": [31],
         "observed_only": [32],
         "later_event_alarm": 1024,
-        "basis": [row_entry, analysis_entry],
+        "basis": [dict(row_entry), dict(analysis_entry)],
         "prior_attempts": [
             {
                 "path": "docs/artifacts/gate-d-attempt.json",
@@ -488,7 +501,9 @@ def test_the_declared_reference_row_must_be_the_one_the_analysis_used(tmp_path: 
     analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
     analysis["reference_row"] = dict(reference_row, convention="rms_norm_eps_1e-6")
     analysis_path.write_text(json.dumps(analysis), encoding="utf-8")
-    record["basis"][1]["sha256"] = hashlib.sha256(analysis_path.read_bytes()).hexdigest()
+    digest = hashlib.sha256(analysis_path.read_bytes()).hexdigest()
+    record["basis"][1]["sha256"] = digest
+    record["analysis"]["sha256"] = digest
 
     payload = json.dumps(record).encode()
     path = tmp_path / "record.json"
@@ -554,3 +569,123 @@ def test_artifact_paths_may_not_escape_the_reviewed_directory() -> None:
         17,
     ):
         assert _committed_artifact_path(hostile, ".json", ".npy") is False, hostile
+
+
+def _hostile(tmp_path: Path, mutate) -> tuple[Path, str]:
+    import hashlib
+    import json
+
+    record, _ = _adjudication_record_fixture(tmp_path)
+    mutate(record)
+    payload = json.dumps(record).encode()
+    path = tmp_path / "hostile-record.json"
+    path.write_bytes(payload)
+    return path, hashlib.sha256(payload).hexdigest()
+
+
+def test_every_analysis_binding_is_enforced(tmp_path: Path) -> None:
+    """P2-1: each of these deletions previously left the suite green."""
+    import json
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    cases = (
+        # A null value would skip every check guarded on the field.
+        (lambda r: r.__setitem__("analysis", None), "does not declare analysis"),
+        (lambda r: r.__setitem__("reference_row", None), "does not declare reference_row"),
+        (lambda r: r.__setitem__("prior_attempts", None), "does not declare prior_attempts"),
+        # Schema, membership, kind, event and payload bindings.
+        (lambda r: r["analysis"].__setitem__("sha256", "zz"), "analysis binding drifted"),
+        (lambda r: r["analysis"].__setitem__("path", "docs/artifacts/other.json"),
+         "analysis binding drifted"),
+        (lambda r: r["basis"].pop(1), "analysis is not in the basis"),
+        (lambda r: r.__setitem__("expected_only", [999]), "not the analysis's own sets"),
+    )
+    for mutate, message in cases:
+        path, digest = _hostile(tmp_path, mutate)
+        with np.testing.assert_raises_regex(ValueError, message):
+            load_ws32_adjudicated_divergence(
+                path, expected_sha256=digest, repository_root=tmp_path
+            )
+        path.unlink()
+
+    # The analysis file itself must be a §21.2 adjudication of this event that
+    # passed, carrying the record's own sets.
+    analysis_path = tmp_path / "docs/artifacts/gate-d-analysis.json"
+    for mutate_analysis, message in (
+        (lambda a: a.__setitem__("artifact_kind", "something_else"),
+         "is not a §21.2 adjudication"),
+        (lambda a: a.__setitem__("event_index", 7), "adjudicates a different event"),
+        (lambda a: a.__setitem__("step", 3), "adjudicates a different event"),
+        (lambda a: a.__setitem__("engine_source_run", "other"), "adjudicates a different event"),
+        (lambda a: a.__setitem__("expected_only", [999]), "not the analysis's own sets"),
+        (lambda a: a.__setitem__("observed_only", [999]), "not the analysis's own sets"),
+        (lambda a: a.pop("checks"), "does not carry the §21.2 checks"),
+        (lambda a: a["checks"]["bias"].__setitem__("pass", False),
+         "does not carry the §21.2 checks"),
+        (lambda a: a["checks"].pop("reference_band_capacity"),
+         "does not carry the §21.2 checks"),
+    ):
+        record, _ = _adjudication_record_fixture(tmp_path)
+        analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
+        mutate_analysis(analysis)
+        analysis_path.write_text(json.dumps(analysis), encoding="utf-8")
+        import hashlib
+
+        record["analysis"]["sha256"] = hashlib.sha256(analysis_path.read_bytes()).hexdigest()
+        record["basis"][1] = record["analysis"]
+        payload = json.dumps(record).encode()
+        path = tmp_path / "hostile-analysis.json"
+        path.write_bytes(payload)
+        with np.testing.assert_raises_regex(ValueError, message):
+            load_ws32_adjudicated_divergence(
+                path, expected_sha256=hashlib.sha256(payload).hexdigest(),
+                repository_root=tmp_path,
+            )
+        path.unlink()
+
+
+def test_a_reference_row_for_an_unregistered_event_is_refused(tmp_path: Path) -> None:
+    """P2-1 M5: the registry must have an entry for THIS event."""
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    path, digest = _hostile(tmp_path, lambda r: r.__setitem__("decode_position", 4096))
+    with np.testing.assert_raises_regex(ValueError, "no reviewed FP64 reference row"):
+        load_ws32_adjudicated_divergence(
+            path, expected_sha256=digest, repository_root=tmp_path
+        )
+
+
+def test_a_basis_artifact_reached_through_a_symlink_is_refused(tmp_path: Path) -> None:
+    """A string predicate does not stop a symlink out of the reviewed tree."""
+    import hashlib
+    import json
+    import os
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    record, _ = _adjudication_record_fixture(tmp_path)
+    outside = tmp_path.parent / "outside-row.npy"
+    outside.write_bytes((tmp_path / record["reference_row"]["path"]).read_bytes())
+    link = tmp_path / "docs/artifacts/gate-d-linked-row.npy"
+    os.symlink(outside, link)
+    record["basis"].append(
+        {
+            "path": "docs/artifacts/gate-d-linked-row.npy",
+            "sha256": hashlib.sha256(link.read_bytes()).hexdigest(),
+        }
+    )
+    payload = json.dumps(record).encode()
+    path = tmp_path / "symlink-record.json"
+    path.write_bytes(payload)
+    with np.testing.assert_raises_regex(ValueError, "leaves the reviewed tree"):
+        load_ws32_adjudicated_divergence(
+            path, expected_sha256=hashlib.sha256(payload).hexdigest(),
+            repository_root=tmp_path,
+        )

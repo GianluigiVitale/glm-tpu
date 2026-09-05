@@ -46,6 +46,19 @@ REFERENCE_ROWS = {
 # §21.2 fixes the later-event diagnostic threshold; it is not an operator choice
 # inside a pre-registration record.
 LATER_EVENT_ALARM = 1024
+# §21.2 items 3-4, as computed by
+# scripts/greenfield/adjudicate_ws32_first_divergent_event.py. A PASS verdict
+# without these is a claim, not an adjudication.
+_REQUIRED_ADJUDICATION_CHECKS = frozenset(
+    {
+        "bias",
+        "cap_max_abs",
+        "cap_std",
+        "equal_sized_disjoint_swap",
+        "reference_band",
+        "reference_band_capacity",
+    }
+)
 _GRANDFATHERED_RECORD_SHA256 = (
     "4da05468120e3c2e9b82d03931018e0d14eebc5fc28e339381658a04457cd26b"
 )
@@ -227,6 +240,9 @@ class Ws32AdjudicatedDivergence:
     # which the sealer requires to be committed in the run's own pin. ``None``
     # only for the grandfathered pre-amendment record.
     analysis_path: str | None = None
+    # Repository-relative path of the reviewed FP64 reference row, which the
+    # sealer also requires to be committed in the run's own pin.
+    reference_row_path: str | None = None
 
     def status(self, step: int, event: int) -> str:
         if (step, event) < (self.step, self.event_index):
@@ -236,15 +252,39 @@ class Ws32AdjudicatedDivergence:
         return "recorded"
 
 
+# Evidence artifacts live directly in the reviewed directory and are named for
+# the gate they belong to. B′'s basis includes the §23.9 rotary diagnostic,
+# which is a `gate-l-*` artifact, so the rule is the gate prefix, not one gate.
+_ARTIFACT_DIRECTORY = ("docs", "artifacts")
+_ARTIFACT_PREFIX = "gate-"
+
+
 def _committed_artifact_path(value: Any, *suffixes: str) -> bool:
     """A reviewed-tree relative path: no traversal, no absolute escape."""
 
     if not isinstance(value, str) or not value.endswith(suffixes):
         return False
     parts = value.split("/")
-    if any(part in ("", ".", "..") for part in parts):
+    if len(parts) != 3 or any(part in ("", ".", "..") for part in parts):
         return False
-    return parts[:2] == ["docs", "artifacts"] and parts[2].startswith("gate-d-") and len(parts) == 3
+    return tuple(parts[:2]) == _ARTIFACT_DIRECTORY and parts[2].startswith(_ARTIFACT_PREFIX)
+
+
+def _artifact_bytes(repository_root: Path, relative: str) -> bytes:
+    """Read a basis artifact, refusing any path that leaves the reviewed tree.
+
+    ``_committed_artifact_path`` is a string predicate; a symlink in
+    ``docs/artifacts`` still resolves outside the repository, so the resolved
+    path is checked too.
+    """
+
+    root = Path(repository_root).resolve()
+    resolved = (root / relative).resolve()
+    if resolved.parent != (root / Path(*_ARTIFACT_DIRECTORY)).resolve():
+        raise ValueError(
+            f"WS32 adjudicated-divergence artifact leaves the reviewed tree: {relative}"
+        )
+    return resolved.read_bytes()
 
 
 def load_ws32_adjudicated_divergence(
@@ -341,17 +381,19 @@ def load_ws32_adjudicated_divergence(
         # guard a no-op, so it is refused here instead.
         raise ValueError("WS32 adjudicated-divergence engine_source_run is not a run tag")
     grandfathered = digest == _GRANDFATHERED_RECORD_SHA256
-    reference = record.get("reference_row")
-    if reference is None and not grandfathered:
-        raise ValueError(
-            "WS32 adjudicated-divergence record does not bind its FP64 reference row"
-        )
     if not grandfathered:
-        for key in ("analysis", "prior_attempts"):
-            if key not in record:
+        for key in ("analysis", "prior_attempts", "reference_row"):
+            # Presence of the KEY is not the requirement; a null value would
+            # skip every check guarded on it.
+            if record.get(key) is None:
                 raise ValueError(
                     f"WS32 adjudicated-divergence record does not declare {key}"
                 )
+    elif any(record.get(key) is not None for key in ("analysis", "reference_row")):
+        raise ValueError(
+            "the grandfathered WS32 adjudicated-divergence record carries no bindings"
+        )
+    reference = record.get("reference_row")
     if reference is not None and (
         not isinstance(reference, dict)
         or set(reference) != {"convention", "implementation_tree_sha1", "path", "sha256"}
@@ -418,14 +460,13 @@ def load_ws32_adjudicated_divergence(
         raise ValueError("WS32 adjudicated-divergence prior attempts drifted")
     if repository_root is not None:
         for item in attempts:
-            attempt_raw = (Path(repository_root) / item["path"]).read_bytes()
+            attempt_raw = _artifact_bytes(repository_root, item["path"])
             if hashlib.sha256(attempt_raw).hexdigest() != item["sha256"]:
                 raise ValueError(
                     f"WS32 adjudicated-divergence prior attempt drifted: {item['path']}"
                 )
         for item in basis:
-            basis_path = Path(repository_root) / item["path"]
-            basis_raw = basis_path.read_bytes()
+            basis_raw = _artifact_bytes(repository_root, item["path"])
             if hashlib.sha256(basis_raw).hexdigest() != item["sha256"]:
                 raise ValueError(f"WS32 adjudicated-divergence basis drifted: {item['path']}")
             if not item["path"].endswith(".json"):
@@ -451,6 +492,28 @@ def load_ws32_adjudicated_divergence(
                     raise ValueError(
                         "WS32 adjudicated-divergence analysis adjudicates a different event"
                     )
+                if (
+                    list(basis_record.get("expected_only", [])) != list(expected_only)
+                    or list(basis_record.get("observed_only", [])) != list(observed_only)
+                ):
+                    # The sets are the only payload the sealer enforces against
+                    # the run, so they are exactly what must come from the
+                    # analysis rather than from the record's author.
+                    raise ValueError(
+                        "WS32 adjudicated-divergence sets are not the analysis's own sets"
+                    )
+                checks = basis_record.get("checks")
+                if (
+                    not isinstance(checks, dict)
+                    or set(checks) != _REQUIRED_ADJUDICATION_CHECKS
+                    or not all(
+                        isinstance(item, dict) and item.get("pass") is True
+                        for item in checks.values()
+                    )
+                ):
+                    raise ValueError(
+                        "WS32 adjudicated-divergence analysis does not carry the §21.2 checks"
+                    )
             if (
                 isinstance(basis_record, dict)
                 and basis_record.get("artifact_kind") == _ANALYSIS_ARTIFACT_KIND
@@ -468,7 +531,7 @@ def load_ws32_adjudicated_divergence(
                         f"the analysis it stands on: {item['path']}"
                     )
     if reference is not None and repository_root is not None:
-        reference_raw = (Path(repository_root) / reference["path"]).read_bytes()
+        reference_raw = _artifact_bytes(repository_root, reference["path"])
         if hashlib.sha256(reference_raw).hexdigest() != reference["sha256"]:
             raise ValueError("WS32 adjudicated-divergence reference row drifted")
     return Ws32AdjudicatedDivergence(
@@ -484,6 +547,7 @@ def load_ws32_adjudicated_divergence(
         later_event_alarm=int(record["later_event_alarm"]),
         engine_source_run=source_run,
         analysis_path=None if analysis_entry is None else str(analysis_entry["path"]),
+        reference_row_path=None if reference is None else str(reference["path"]),
     )
 
 

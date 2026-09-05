@@ -15,7 +15,10 @@ SPEC = importlib.util.spec_from_file_location("ws32_event_adjudicator", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
-from glm_tpu.greenfield.validation.ws32_short_context import REFERENCE_ROWS  # noqa: E402
+from glm_tpu.greenfield.validation.ws32_short_context import (  # noqa: E402
+    ANALYSIS_ARTIFACT_KIND,
+    REFERENCE_ROWS,
+)
 
 REGISTERED = REFERENCE_ROWS[("8k", 8155, 1, "rms_norm_eps_1e-5")]
 
@@ -126,11 +129,24 @@ def test_the_emitted_record_matches_the_loader_schema(tmp_path: Path) -> None:
         "sha256": REGISTERED["sha256"],
     }
     analysis = {
-        "artifact_kind": MODULE.ANALYSIS_ARTIFACT_KIND,
+        "artifact_kind": ANALYSIS_ARTIFACT_KIND,
+        "checks": {
+            name: {"pass": True}
+            for name in (
+                "bias",
+                "cap_max_abs",
+                "cap_std",
+                "equal_sized_disjoint_swap",
+                "reference_band",
+                "reference_band_capacity",
+            )
+        },
         "engine_source_run": (
             "greenfield_ws32_short_decoder_8k_numerical_20260905T000000000000000Z"
         ),
         "event_index": 1,
+        "expected_only": [31],
+        "observed_only": [32],
         "reference_row": reference_row,
         "step": 0,
         "verdict": "PASS",
@@ -229,11 +245,24 @@ def test_a_reference_row_outside_the_reviewed_registry_is_refused_by_the_loader(
     )
     analysis_relative = "docs/artifacts/gate-d-fitted-analysis.json"
     analysis = {
-        "artifact_kind": MODULE.ANALYSIS_ARTIFACT_KIND,
+        "artifact_kind": ANALYSIS_ARTIFACT_KIND,
+        "checks": {
+            name: {"pass": True}
+            for name in (
+                "bias",
+                "cap_max_abs",
+                "cap_std",
+                "equal_sized_disjoint_swap",
+                "reference_band",
+                "reference_band_capacity",
+            )
+        },
         "engine_source_run": (
             "greenfield_ws32_short_decoder_8k_numerical_20260905T000000000000000Z"
         ),
         "event_index": 1,
+        "expected_only": [31],
+        "observed_only": [32],
         "reference_row": reference_row,
         "step": 0,
         "verdict": "PASS",
@@ -573,7 +602,7 @@ def test_earlier_attempts_on_the_same_event_are_collected_for_disclosure(
     monkeypatch.setattr(MODULE, "COMMITTED_ARTIFACT_DIR", tmp_path)
     monkeypatch.setattr(MODULE, "REPO_ROOT", tmp_path.parent)
     analysis = {
-        "artifact_kind": MODULE.ANALYSIS_ARTIFACT_KIND,
+        "artifact_kind": ANALYSIS_ARTIFACT_KIND,
         "checks": {},
         "engine_source_run": "run_a",
         "event_index": 1,
@@ -694,7 +723,7 @@ def test_the_registry_path_and_digest_are_both_enforced_by_the_producer(
 
     # And the registered path must still carry the registered content.
     monkeypatch.setitem(
-        MODULE.REFERENCE_ROWS, ("8k", 8155, 1, "rms_norm_eps_1e-5"),
+        REFERENCE_ROWS, ("8k", 8155, 1, "rms_norm_eps_1e-5"),
         dict(REGISTERED, sha256="0" * 64),
     )
     with pytest.raises(SystemExit, match="is not the reviewed row"):

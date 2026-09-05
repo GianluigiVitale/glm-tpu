@@ -1092,6 +1092,36 @@ def test_the_sealer_states_loader_refusals_and_requires_a_committed_record() -> 
     )
     assert "HEAD:" not in source.split("def _committed_in_run_pin")[1].split("def ")[0]
 
+    # Deleting the CALLS must fail this test, not just deleting the strings.
+    import ast as _ast
+
+    tree = _ast.parse(source)
+    validate = next(
+        node for node in tree.body
+        if isinstance(node, _ast.FunctionDef) and node.name == "_validate"
+    )
+    calls = [
+        node for node in _ast.walk(validate)
+        if isinstance(node, _ast.Call)
+        and isinstance(node.func, _ast.Name)
+        and node.func.id in ("_committed_in_run_pin", "_committed_record_path")
+    ]
+    called = {node.func.id for node in calls}
+    assert called == {"_committed_in_run_pin", "_committed_record_path"}, (
+        f"the pre-registration checks are not called: {sorted(called)}"
+    )
+    literals = {
+        node.value for node in _ast.walk(validate)
+        if isinstance(node, _ast.Constant) and isinstance(node.value, str)
+    }
+    assert {"adjudication analysis", "adjudication reference row"} <= literals, (
+        "the analysis and the reference row must both be pinned to the run's commit"
+    )
+    attributes = {
+        node.attr for node in _ast.walk(validate) if isinstance(node, _ast.Attribute)
+    }
+    assert {"analysis_path", "reference_row_path"} <= attributes
+
     import ast
 
     tree = ast.parse(source)
