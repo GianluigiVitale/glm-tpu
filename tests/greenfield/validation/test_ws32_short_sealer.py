@@ -509,15 +509,25 @@ def test_ws32_failed_acquisition_recovery_synthesizes_only_runner_envelope(
         }
         for index, graph in enumerate(RECOVERY.GRAPHS)
     }
-    monkeypatch.setattr(
-        RECOVERY, "_replay_graphs", lambda run_dir: recovered_graphs
-    )
+    seen_flags: list[tuple[bool, bool]] = []
+
+    def fake_replay(run_dir, *, exact_dsa, strategy_nd_dense):
+        seen_flags.append((exact_dsa, strategy_nd_dense))
+        return recovered_graphs
+
+    monkeypatch.setattr(RECOVERY, "_replay_graphs", fake_replay)
     source_hash = "a" * 40
     for rank in RECOVERY.RANKS:
+        # Mixed originals: the prefill graphs carried the documented false
+        # positive, every other graph was identity-only (2026-09-05 acquisition).
         graphs = {
             graph: {
                 **recovered_graphs[graph],
-                "violations": list(RECOVERY.ORIGINAL_VIOLATIONS[graph]),
+                "violations": list(
+                    RECOVERY.ORIGINAL_VIOLATIONS[graph]
+                    if graph.startswith("prefill")
+                    else RECOVERY.IDENTITY_VIOLATIONS
+                ),
             }
             for graph in RECOVERY.GRAPHS
         }
@@ -526,6 +536,7 @@ def test_ws32_failed_acquisition_recovery_synthesizes_only_runner_envelope(
             "code_hash": source_hash,
             "compile_only": True,
             "exact_dsa": True,
+            "strategy_nd_dense": True,
             "graphs": graphs,
             "hostname": f"worker-{rank}",
             "launch_process_id": rank,
@@ -541,6 +552,7 @@ def test_ws32_failed_acquisition_recovery_synthesizes_only_runner_envelope(
         run_dir=tmp_path, source_code_hash=source_hash
     )
     assert len(outputs) == 8
+    assert seen_flags == [(True, True)]
     for rank, path in enumerate(outputs):
         runner = json.loads(path.read_text(encoding="utf-8"))
         assert runner["launch_process_id"] == rank

@@ -126,7 +126,15 @@ def _split_gs(uri: str) -> tuple[str, str]:
     return bucket, prefix.rstrip("/")
 
 
-def _replay_graphs(run_dir: Path) -> dict[str, dict[str, Any]]:
+def _replay_graphs(
+    run_dir: Path, *, exact_dsa: bool = True, strategy_nd_dense: bool = False
+) -> dict[str, dict[str, Any]]:
+    """Replay the preserved graphs under the run's own variant flags.
+
+    The flags come from the workers' prevalidation records (all ranks must
+    agree); replaying a dense-overlay run without ``strategy_nd_dense`` would
+    report its overlay gathers as violations.
+    """
     result: dict[str, dict[str, Any]] = {}
     for graph in GRAPHS:
         stable = (run_dir / "hlo" / f"{graph}.stablehlo.mlir").read_text(
@@ -152,7 +160,8 @@ def _replay_graphs(run_dir: Path) -> dict[str, dict[str, Any]]:
                 expected_optimized_hlo_sha256="0" * 64,
                 hidden_size=6144,
                 kind=_linter_kind(graph),
-                exact_dsa=True,
+                exact_dsa=exact_dsa,
+                strategy_nd_dense=strategy_nd_dense,
                 full_indexer_count=21,
             )
         if report.violations != IDENTITY_VIOLATIONS:
@@ -169,16 +178,31 @@ def synthesize(
 ) -> tuple[Path, ...]:
     if len(source_code_hash) != 40:
         raise SystemExit("source code hash must be one full Git SHA")
-    recovered_graphs = _replay_graphs(run_dir)
-    outputs: list[Path] = []
-    common_graphs: dict[str, Any] | None = None
+    sources: dict[int, dict[str, Any]] = {}
     for rank in RANKS:
         source_path = (
             run_dir
             / "recovery_prevalidation"
             / f"prevalidation.rank{rank}.json"
         )
-        source = json.loads(source_path.read_text(encoding="utf-8"))
+        sources[rank] = json.loads(source_path.read_text(encoding="utf-8"))
+    flags = {
+        (
+            bool(source.get("exact_dsa")),
+            bool(source.get("strategy_nd_dense", False)),
+        )
+        for source in sources.values()
+    }
+    if len(flags) != 1:
+        raise SystemExit("source prevalidation variant flags disagree across ranks")
+    exact_dsa, strategy_nd_dense = next(iter(flags))
+    recovered_graphs = _replay_graphs(
+        run_dir, exact_dsa=exact_dsa, strategy_nd_dense=strategy_nd_dense
+    )
+    outputs: list[Path] = []
+    common_graphs: dict[str, Any] | None = None
+    for rank in RANKS:
+        source = sources[rank]
         original_graphs = source.get("graphs")
         if (
             source.get("artifact_kind")
@@ -194,9 +218,12 @@ def synthesize(
         for graph in GRAPHS:
             original = original_graphs[graph]
             recovered = recovered_graphs[graph]
+            # A graph either passed its original lint (identity-only, the
+            # acquisition's vacant pins) or carried exactly the documented
+            # structural false positive; anything else is not recoverable.
             if (
                 tuple(original.get("violations", ()))
-                != ORIGINAL_VIOLATIONS[graph]
+                not in (IDENTITY_VIOLATIONS, ORIGINAL_VIOLATIONS[graph])
                 or original.get("passed") is not False
                 or original.get("stablehlo_sha256")
                 != recovered["stablehlo_sha256"]
