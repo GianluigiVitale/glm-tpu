@@ -12195,3 +12195,5 @@ corrected in this commit. Delta verdict:
 verdict (`…/m2048-v11-fable-final-verdict.txt`, `80fe9ac9…8a0ec`) returned P0/P1 NONE and three
 wording P2s (goal length, WS32 set-identity overstatement, cap immutability), all folded in here:
 SAFE_TO_PERSIST code+docs YES.
+
+Persisted pin for this entry: `9659af7d4abce527eda01561b21f2ed01c857be1` (V11 code, §21 amendment, goal.md).
