@@ -4049,3 +4049,13 @@ persistence only; review and persistence precede any v2 installation.
   `…8k_acquire_c512_20260905T174548496718267Z` (HLO_ACQUIRED at `00c6eee`). Each new results prefix costs
   ≈3.4 GB (acquisition) / ≈5.8 GB (numerical); live storage 1,972.7 GB after these four.
 
+## 2026-09-05 — evidence layout v2 (spec §23.10)
+
+- Runs from the pin at which layout v2 reaches the run branch (recorded with the first v2 run; it is
+  NOT the `d464a7f` merge base) upload `hlo/<graph>.<form>.gz` once per graph/form instead of eight
+  per-rank text copies; each rank's runner record still carries both inflated SHA-256s, the ledger
+  records the compressed object plus `inflated_sha256`, and the runner/summary declare
+  `evidence_layout`. Prefixes sealed before that pin carry no `evidence_layout` field and are read as
+  `hlo_per_rank_v1`; the sealer takes the required layout as a pin so they stay re-validatable.
+- Affected prefixes so far: none sealed yet (Step B's DB 568/569 and every earlier record are v1).
+

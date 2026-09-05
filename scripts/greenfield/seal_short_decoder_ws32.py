@@ -39,6 +39,10 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
 from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
     build_ws32_physical_mesh,
 )
+from glm_tpu.greenfield.validation.ws32_evidence import (  # noqa: E402
+    EVIDENCE_LAYOUT_V1,
+    EVIDENCE_LAYOUT_V2,
+)
 from glm_tpu.greenfield.validation import (  # noqa: E402
     bind_ws32_adjudication,
     compare_ws32_dsa_step,
@@ -62,6 +66,13 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--tag", required=True)
     validate.add_argument("--prefill-chunk", type=int, default=DEFAULT_PREFILL_CHUNK)
     validate.add_argument("--rotary-diagnostic", choices=(0, 1), default=0, type=int)
+    validate.add_argument("--host-main-rope-table", choices=(0, 1), default=0, type=int)
+    # Sealed v1 prefixes stay re-verifiable: the required layout is a pin, not a constant.
+    validate.add_argument(
+        "--evidence-layout",
+        choices=(EVIDENCE_LAYOUT_V1, EVIDENCE_LAYOUT_V2),
+        default=EVIDENCE_LAYOUT_V2,
+    )
     validate.add_argument("--code-hash", required=True)
     validate.add_argument("--checkpoint-manifest-sha256", required=True)
     validate.add_argument("--checkpoint-success-sha256", required=True)
@@ -210,8 +221,10 @@ def _validate_run_tag(
     mode: str,
     prefill_chunk: int = DEFAULT_PREFILL_CHUNK,
     context_capacity: int = DEFAULT_CONTEXT_CAPACITY,
+    host_main_rope_table: bool = False,
 ) -> None:
-    """Spec §23.3: a non-default prefill chunk or context capacity is part of the run identity."""
+    """Spec §23.3/§23.8: a non-default prefill chunk, context capacity or the
+    legacy-faithful main rotary table is part of the run identity."""
     if type(prefill_chunk) is not int or prefill_chunk <= 0:
         raise SystemExit("WS32 prefill chunk must be a positive integer")
     if type(context_capacity) is not int or context_capacity <= 0:
@@ -219,6 +232,8 @@ def _validate_run_tag(
     suffix = "" if prefill_chunk == DEFAULT_PREFILL_CHUNK else f"_c{prefill_chunk}"
     if context_capacity != DEFAULT_CONTEXT_CAPACITY:
         suffix += f"_cap{context_capacity}"
+    if host_main_rope_table:
+        suffix += "_hrope"
     pattern = (
         rf"greenfield_ws32_short_decoder_{re.escape(context_label)}_"
         rf"{re.escape(mode)}{re.escape(suffix)}_[0-9]{{8}}T[0-9]{{15}}Z"
@@ -361,6 +376,7 @@ def _validate(args: argparse.Namespace) -> int:
         mode=args.mode,
         prefill_chunk=args.prefill_chunk,
         context_capacity=args.context_capacity,
+        host_main_rope_table=bool(args.host_main_rope_table),
     )
     materializer_pin_names = {
         "expected_exact_materialize_stablehlo_sha256",
@@ -525,6 +541,9 @@ def _validate(args: argparse.Namespace) -> int:
     slots: set[int] = set()
     all_samples: list[list[float]] = []
     expected_prompt_length = {"2k": 2034, "8k": 8155}[args.context_label]
+    layout_keys = (
+        set() if args.evidence_layout == EVIDENCE_LAYOUT_V1 else {"evidence_layout"}
+    )
     pre_keys = {
         "artifact_kind",
         "base_device_memory_after_load",
@@ -547,6 +566,7 @@ def _validate(args: argparse.Namespace) -> int:
         "dsa_association_success_sha256",
         "exact_dsa",
         "graphs",
+        "main_rope_table",
         "hostname",
         "jax_process_index",
         "launch_process_id",
@@ -566,6 +586,7 @@ def _validate(args: argparse.Namespace) -> int:
         "topology_sha256",
         "xla_python_client_mem_fraction",
     }
+    pre_keys |= layout_keys
     numerical_keys = pre_keys | {
         "cache_write_probe",
         "correctness_passed",
@@ -617,6 +638,11 @@ def _validate(args: argparse.Namespace) -> int:
             raise SystemExit(f"WS32 fleet/process/HLO identity drifted at rank {rank}")
         if record.get("prompt_length") != expected_prompt_length:
             raise SystemExit(f"WS32 prompt length drifted at rank {rank}")
+        if args.evidence_layout == EVIDENCE_LAYOUT_V1:
+            if "evidence_layout" in record:
+                raise SystemExit(f"WS32 evidence layout drifted at rank {rank}")
+        elif record.get("evidence_layout") != args.evidence_layout:
+            raise SystemExit(f"WS32 evidence layout drifted at rank {rank}")
         _require_prefill_execution(
             record,
             mode=args.mode,
@@ -628,6 +654,13 @@ def _validate(args: argparse.Namespace) -> int:
             record.get("prefill_chunk_length"), records[0].get("prefill_chunk_length")
         ):
             raise SystemExit(f"WS32 prefill chunk length disagrees at rank {rank}")
+        _require_main_rope_table(
+            record,
+            enabled=bool(args.host_main_rope_table),
+            context_capacity=args.context_capacity,
+            rank=rank,
+            first=records[0],
+        )
         _require_rotary_diagnostic(
             record, enabled=bool(args.rotary_diagnostic), rank=rank, first=records[0]
         )
@@ -686,6 +719,7 @@ def _validate(args: argparse.Namespace) -> int:
                     kind=_linter_kind(graph),
                     exact_dsa=bool(args.exact_dsa),
                     strategy_nd_dense=bool(args.strategy_nd_dense),
+                    host_main_rope_table=bool(args.host_main_rope_table),
                 ).to_dict()
             normalized_record = dict(report)
             if args.mode == "acquire":
@@ -982,6 +1016,7 @@ def _validate(args: argparse.Namespace) -> int:
         },
         "checkpoint_transport": args.checkpoint_transport,
         "dsa_adjudication": expected_dsa_adjudication,
+        "evidence_layout": args.evidence_layout,
         "mode": args.mode,
         "performance_claim": args.mode == "numerical",
         "recovery_code_hash": args.recovery_code_hash or None,
@@ -1013,6 +1048,7 @@ def _validate(args: argparse.Namespace) -> int:
                     if args.context_capacity == DEFAULT_CONTEXT_CAPACITY
                     else {"context_capacity": int(args.context_capacity), "default": DEFAULT_CONTEXT_CAPACITY}
                 ),
+                "main_rope_table": records[0].get("main_rope_table"),
                 "prefill_chunk_length": records[0]["prefill_chunk_length"],
                 "rotary_diagnostic": (
                     None
@@ -1085,6 +1121,8 @@ def _validate(args: argparse.Namespace) -> int:
         basis.append("PROTECTED_WALL_TRACE_HBM")
         if summary.get("capacity_measurement") is not None:
             basis.append(f"CAPACITY_MEASUREMENT_{summary['capacity_measurement']['context_capacity']}")
+        if summary.get("main_rope_table") is not None:
+            basis.append("MAIN_ROTARY_HOST_TABLE_LEGACY_FAITHFUL")
         if summary.get("rotary_diagnostic") is not None:
             basis.append(f"ROTARY_LONG_POSITION_DIAGNOSTIC_{summary['rotary_diagnostic']['verdict']}")
         summary["classification"] = ";".join(basis)
@@ -1199,6 +1237,59 @@ def _require_prefill_execution(
         raise SystemExit(f"WS32 prefill execution accounting drifted at rank {rank}")
 
 
+def _require_main_rope_table(
+    record: Mapping[str, Any],
+    *,
+    enabled: bool,
+    context_capacity: int,
+    rank: int,
+    first: Mapping[str, Any],
+) -> None:
+    """Spec §23.8: the legacy-faithful main-attention rotary table must be present
+    iff declared, built by this pin's own construction for this capacity, and
+    identical across ranks."""
+    value = record.get("main_rope_table")
+    if not enabled:
+        if value is not None:
+            raise SystemExit(f"WS32 main rotary table present but not declared at rank {rank}")
+        return
+    if type(value) is not dict or set(value) != {
+        "bytes_per_device",
+        "rotary_dim",
+        "rows",
+        "sha256",
+        "theta",
+    }:
+        raise SystemExit(f"WS32 main rotary table schema drifted at rank {rank}")
+    from glm_tpu.greenfield.kernels.reference.rotary import (
+        build_rotary_table_host,
+        rotary_table_sha256,
+    )
+    from glm_tpu.greenfield.runtime import WS32_MAIN_ROPE_THETA
+
+    from glm_tpu.greenfield.types import ModelGeometry
+
+    rotary_dim = ModelGeometry.from_hf_config(
+        json.loads((REPO / "configs/glm-5.2-fp8-config.json").read_text(encoding="utf-8"))
+    ).qk_rope_head_dim
+    if (
+        value["rows"] != context_capacity
+        or value["rotary_dim"] != rotary_dim
+        or value["theta"] != WS32_MAIN_ROPE_THETA
+        or value["bytes_per_device"] != context_capacity * rotary_dim * 2
+    ):
+        raise SystemExit(f"WS32 main rotary table identity drifted at rank {rank}")
+    expected = rotary_table_sha256(
+        build_rotary_table_host(
+            context_capacity, rotary_dim=rotary_dim, theta=WS32_MAIN_ROPE_THETA
+        )
+    )
+    if value["sha256"] != expected:
+        raise SystemExit(f"WS32 main rotary table bytes drifted at rank {rank}")
+    if rank and not _same(value, first.get("main_rope_table")):
+        raise SystemExit(f"WS32 main rotary table disagrees at rank {rank}")
+
+
 def _require_rotary_diagnostic(
     record: Mapping[str, Any], *, enabled: bool, rank: int, first: Mapping[str, Any]
 ) -> None:
@@ -1258,6 +1349,7 @@ def _run_environment(summary: dict[str, Any]) -> dict[str, Any]:
         "later_event_alarm": summary.get("later_event_alarm"),
         "recovery_code_hash": summary.get("recovery_code_hash"),
         "prefill_chunk_length": summary.get("prefill_chunk_length"),
+        "main_rope_table": summary.get("main_rope_table"),
         "capacity_measurement": summary.get("capacity_measurement"),
         "rotary_diagnostic": summary.get("rotary_diagnostic"),
     }

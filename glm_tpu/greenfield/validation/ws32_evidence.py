@@ -22,6 +22,14 @@ from google.cloud import storage
 
 
 BASE_GRAPHS = ("prefill_chunk", "prefill_tail", "observer", "decode", "cache_probe")
+# Evidence layouts (spec §23, storage plan 2026-09-05).  v1: every rank uploads
+# its own HLO text (eight byte-identical copies per graph/form).  v2: each
+# graph/form is uploaded once, gzip-compressed, under a rank-agnostic name;
+# every rank's record still carries both SHA-256s of the inflated text and the
+# sealer requires all ranks to agree and re-hashes the single inflated copy.
+EVIDENCE_LAYOUT_V1 = "hlo_per_rank_v1"
+EVIDENCE_LAYOUT_V2 = "hlo_single_gzip_v2"
+EVIDENCE_LAYOUTS = (EVIDENCE_LAYOUT_V1, EVIDENCE_LAYOUT_V2)
 EXACT_DSA_GRAPHS = ("exact_materialize", "exact_promote") + BASE_GRAPHS
 # Compatibility alias for callers inspecting the default-off graph contract.
 GRAPHS = BASE_GRAPHS
@@ -62,21 +70,82 @@ def _graphs(*, exact_dsa: bool) -> tuple[str, ...]:
     return EXACT_DSA_GRAPHS if exact_dsa else BASE_GRAPHS
 
 
-def _expected_primary_names(*, numerical: bool, exact_dsa: bool = False) -> set[str]:
+def _hlo_object_names(*, exact_dsa: bool, layout: str) -> set[str]:
+    if layout == EVIDENCE_LAYOUT_V1:
+        return {
+            f"hlo/{graph}.rank{rank}.{suffix}"
+            for rank in RANKS
+            for graph in _graphs(exact_dsa=exact_dsa)
+            for suffix, _ in HLO_FORMS
+        }
+    if layout == EVIDENCE_LAYOUT_V2:
+        return {
+            f"hlo/{graph}.{suffix}.gz"
+            for graph in _graphs(exact_dsa=exact_dsa)
+            for suffix, _ in HLO_FORMS
+        }
+    raise SystemExit(f"unknown WS32 evidence layout: {layout}")
+
+
+def _expected_primary_names(
+    *, numerical: bool, exact_dsa: bool = False, layout: str = EVIDENCE_LAYOUT_V1
+) -> set[str]:
+    names = _expected_layout_free_names(numerical=numerical)
+    names.update(_hlo_object_names(exact_dsa=exact_dsa, layout=layout))
+    return names
+
+
+def _expected_layout_free_names(*, numerical: bool) -> set[str]:
     names = {
         f"host_records/runner.rank{rank}.{suffix}"
         for rank in RANKS
         for suffix in _runner_suffixes(numerical=numerical)
     }
-    names.update(
-        f"hlo/{graph}.rank{rank}.{suffix}"
-        for rank in RANKS
-        for graph in _graphs(exact_dsa=exact_dsa)
-        for suffix, _ in HLO_FORMS
-    )
     if numerical:
         names.update(f"traces/trace.rank{rank}.xplane.pb" for rank in RANKS)
     return names
+
+
+def _runner_layout(runners: list[dict[str, Any]]) -> str:
+    layouts = {str(runner.get("evidence_layout", EVIDENCE_LAYOUT_V1)) for runner in runners}
+    if len(layouts) != 1:
+        raise SystemExit(f"runner records disagree on the evidence layout: {sorted(layouts)}")
+    layout = next(iter(layouts))
+    if layout not in EVIDENCE_LAYOUTS:
+        raise SystemExit(f"unknown WS32 evidence layout: {layout}")
+    return layout
+
+
+def _inflate_gzip(source: Path, destination: Path, *, maximum_bytes: int) -> None:
+    """Inflate one member, refusing to write more than ``maximum_bytes``.
+
+    The inflated SHA is checked afterwards, so an unbounded copy would let a
+    corrupt or pathological member fill the controller disk before the check
+    fires.
+    """
+    import gzip
+
+    if maximum_bytes <= 0:
+        raise SystemExit("insufficient disk for verified HLO materialization")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        raise SystemExit(f"refusing to replace existing evidence: {destination}")
+    partial = destination.with_name(destination.name + ".partial")
+    written = 0
+    try:
+        with gzip.open(source, "rb") as stream, partial.open("wb") as out:
+            while True:
+                chunk = stream.read(8 * 1024 * 1024)
+                if not chunk:
+                    break
+                written += len(chunk)
+                if written > maximum_bytes:
+                    raise SystemExit(f"inflated HLO exceeds the disk budget: {source}")
+                out.write(chunk)
+    except SystemExit:
+        partial.unlink(missing_ok=True)
+        raise
+    partial.replace(destination)
 
 
 def _expected_runner_status(mode: str) -> str:
@@ -198,13 +267,15 @@ def materialize(
         for blob in client.list_blobs(bucket_name, prefix=prefix + "/")
     }
     graph_names = _graphs(exact_dsa=exact_dsa)
-    primary = _expected_primary_names(
-        numerical=numerical, exact_dsa=exact_dsa
-    )
-    missing = primary - set(blobs)
+    # Layout-free objects first; the HLO layout is read from the runner records
+    # (sealed v1 prefixes stay re-materializable, new runs use v2).
+    layout_free = _expected_layout_free_names(numerical=numerical)
+    missing = layout_free - set(blobs)
     if missing:
         raise SystemExit(f"remote fleet evidence is incomplete: {sorted(missing)}")
-    extras = set(blobs) - primary
+    extras = set(blobs) - layout_free
+    hlo_objects = {name for name in extras if name.startswith("hlo/")}
+    extras -= hlo_objects
     forbidden = {
         name
         for name in extras
@@ -271,6 +342,18 @@ def materialize(
         ):
             raise SystemExit(f"runner rank {rank} identity/status drifted")
         runners.append(runner)
+    layout = _runner_layout(runners)
+    primary = _expected_primary_names(
+        numerical=numerical, exact_dsa=exact_dsa, layout=layout
+    )
+    expected_hlo = primary - layout_free
+    if hlo_objects != expected_hlo:
+        missing_hlo = sorted(expected_hlo - hlo_objects)
+        unexpected_hlo = sorted(hlo_objects - expected_hlo)
+        raise SystemExit(
+            f"remote HLO evidence does not match layout {layout}: "
+            f"missing={missing_hlo} unexpected={unexpected_hlo}"
+        )
 
     candidates_by_sha: dict[str, Path] = {}
     candidate_inodes: set[tuple[int, int]] = set()
@@ -286,6 +369,7 @@ def materialize(
         candidates_by_sha.setdefault(digest, path)
 
     fleet_hlo = run_dir / "fleet_hlo"
+    recorded_shas: dict[tuple[str, str], str] = {}
     for rank, runner in enumerate(runners):
         graphs = runner.get("graphs")
         if not isinstance(graphs, dict) or set(graphs) != set(graph_names):
@@ -298,6 +382,11 @@ def materialize(
                 digest = report.get(sha_key)
                 if not isinstance(digest, str) or len(digest) != 64:
                     raise SystemExit(f"runner rank {rank} graph SHA drifted")
+                previous = recorded_shas.setdefault((graph, suffix), digest)
+                if previous != digest:
+                    raise SystemExit(f"runner ranks disagree on {graph} {suffix} SHA")
+                if layout == EVIDENCE_LAYOUT_V2:
+                    continue
                 name = f"hlo/{graph}.rank{rank}.{suffix}"
                 blob = blobs[name]
                 source = candidates_by_sha.get(digest)
@@ -313,6 +402,40 @@ def materialize(
                     _link_exact(source, destination)
                 _require_blob_identity(blob, destination, digest, identity_cache)
                 records.append(_record(blob, name=name, digest=digest))
+
+    if layout == EVIDENCE_LAYOUT_V2:
+        for graph in graph_names:
+            for suffix, _ in HLO_FORMS:
+                name = f"hlo/{graph}.{suffix}.gz"
+                blob = blobs[name]
+                compressed = fleet_hlo / f"{graph}.{suffix}.gz"
+                if not compressed.is_file() or compressed.stat().st_size != int(blob.size):
+                    required = int(blob.size) + 1024 * 1024 * 1024
+                    if shutil.disk_usage(run_dir).free < required:
+                        raise SystemExit("insufficient disk for verified HLO materialization")
+                    _atomic_download(blob, compressed)
+                compressed_digest = _sha256_file(compressed)
+                _require_blob_identity(blob, compressed, compressed_digest, identity_cache)
+                inflated = fleet_hlo / f"{graph}.rank0.{suffix}"
+                expected_digest = recorded_shas[(graph, suffix)]
+                if not inflated.exists():
+                    # This host is pod worker 0, so the run directory already
+                    # holds the worker's own uncompressed text; hard-link it
+                    # instead of writing a second copy (v1 did the same).
+                    source = candidates_by_sha.get(expected_digest)
+                    if source is None:
+                        free = shutil.disk_usage(run_dir).free - 1024 * 1024 * 1024
+                        _inflate_gzip(compressed, inflated, maximum_bytes=free)
+                        candidates_by_sha[expected_digest] = inflated
+                    else:
+                        _link_exact(source, inflated)
+                if _sha256_file(inflated) != expected_digest:
+                    raise SystemExit(f"inflated HLO differs from the recorded SHA: {name}")
+                for rank in RANKS[1:]:
+                    _link_exact(inflated, fleet_hlo / f"{graph}.rank{rank}.{suffix}")
+                record = _record(blob, name=name, digest=compressed_digest)
+                record["inflated_sha256"] = expected_digest
+                records.append(record)
 
     if numerical:
         traces = run_dir / "traces"
@@ -365,6 +488,7 @@ def materialize(
     value: dict[str, object] = {
         "artifact_kind": "greenfield_ws32_short_decoder_source_ledger",
         "code_hash": code_hash,
+        "evidence_layout": layout,
         "failure_diagnostics_preserved": bool(extras),
         "recovered_prevalidation": bool(observed_recovery_prevalidation),
         "exact_dsa": exact_dsa,

@@ -25,6 +25,7 @@ from .prefill import (
     validate_teacher_forced_prefill_loops,
 )
 from .ws32_decoder import (
+    WS32_MAIN_ROPE_THETA,
     Ws32CacheWriteProbe,
     Ws32DecoderConfig,
     Ws32DecoderProgram,
@@ -43,6 +44,7 @@ from .ws32_decoder import (
     build_ws32_decoder_program,
     build_ws32_exact_dsa_materializer_program,
     build_ws32_chunked_prefill_program,
+    build_ws32_main_rope_table,
     build_ws32_teacher_forced_prefill_program,
     make_ws32_initial_state,
     make_ws32_repaired_index_buffer,
@@ -89,6 +91,8 @@ __all__ = [
     "build_ws32_decoder_program",
     "build_ws32_exact_dsa_materializer_program",
     "build_ws32_chunked_prefill_program",
+    "WS32_MAIN_ROPE_THETA",
+    "build_ws32_main_rope_table",
     "build_ws32_teacher_forced_prefill_program",
     "make_ws32_initial_state",
     "make_ws32_repaired_index_buffer",

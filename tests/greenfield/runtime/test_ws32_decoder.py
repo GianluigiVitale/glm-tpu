@@ -482,3 +482,220 @@ def test_ws32_chunked_prefill_builder_requires_capacity_and_mesh() -> None:
         build_ws32_chunked_prefill_program(object(), config, chunk_length=2048)
     with pytest.raises(PlanValidationError, match="leave decode capacity"):
         build_ws32_chunked_prefill_program(object(), config, chunk_length=0)
+
+
+def test_ws32_main_rope_table_is_the_accepted_legacy_construction() -> None:
+    """Spec §23.8: the host main-attention rotary table is the accepted GLM
+    runtime's own construction, sized by the run's context capacity."""
+    import ml_dtypes
+    import numpy as np
+
+    from glm_tpu.greenfield.kernels.reference.rotary import (
+        build_rotary_table_host,
+        rotary_table_sha256,
+    )
+    from glm_tpu.greenfield.runtime.ws32_decoder import (
+        WS32_MAIN_ROPE_THETA,
+        build_ws32_main_rope_table,
+    )
+
+    assert WS32_MAIN_ROPE_THETA == 8_000_000.0
+    config = Ws32DecoderConfig(geometry=_geometry(), context_capacity=8192)
+    assert config.main_rope_table_shape == (8192, 64)
+    assert config.host_main_rope_table is False
+    table = build_ws32_main_rope_table(config)
+    assert table.shape == (8192, 64) and table.dtype == ml_dtypes.bfloat16
+    assert rotary_table_sha256(table) == rotary_table_sha256(
+        build_rotary_table_host(8192, rotary_dim=64, theta=8_000_000.0)
+    )
+    # Row 0 is cos=1, sin=0 for every pair; rows are within BF16 of FP64 truth.
+    rows = np.asarray(table, dtype=np.float32)
+    assert np.array_equal(rows[0], np.concatenate([np.ones(32), np.zeros(32)]).astype(np.float32))
+    frequencies = np.power(
+        np.float64(8_000_000.0), -np.arange(0, 64, 2, dtype=np.float64) / np.float64(64)
+    )
+    positions = np.arange(8192, dtype=np.float64)
+    angles = positions[:, None] * frequencies[None, :]
+    truth = np.concatenate([np.cos(angles), np.sin(angles)], axis=-1)
+    assert np.max(np.abs(rows - truth)) <= 2 ** -8
+
+    capacity = Ws32DecoderConfig(
+        geometry=_geometry(), context_capacity=262_656, host_main_rope_table=True
+    )
+    assert capacity.main_rope_table_shape == (262_656, 64)
+    assert capacity.host_main_rope_table is True
+    with pytest.raises(PlanValidationError, match="host main-rotary table flag"):
+        Ws32DecoderConfig(
+            geometry=_geometry(), context_capacity=8192, host_main_rope_table=1
+        )
+
+
+def test_ws32_programs_accept_the_optional_main_rope_table_input() -> None:
+    """The table is one extra replicated trailing input; every program builder
+    accepts it only when the config declares it (spec §23.8)."""
+    program = r'''
+import json
+from dataclasses import replace
+
+import jax
+import numpy as np
+from jax.sharding import Mesh
+
+from glm_tpu.greenfield.runtime.ws32_decoder import (
+    Ws32DecoderConfig,
+    build_ws32_chunked_prefill_program,
+    build_ws32_decoder_program,
+    build_ws32_main_rope_table,
+    build_ws32_teacher_forced_prefill_program,
+)
+from glm_tpu.greenfield.types import ModelGeometry
+
+source = json.loads(open("configs/glm-5.2-fp8-config.json").read())
+base = ModelGeometry.from_hf_config(source)
+geometry = replace(
+    base,
+    num_layers=1,
+    first_dense_layers=1,
+    hidden_size=128,
+    dense_intermediate_size=256,
+    num_routed_experts=16,
+    routed_top_k=4,
+    moe_intermediate_size=128,
+    dsa_top_k=128,
+    dsa_indexer_heads=8,
+    dsa_indexer_head_dim=16,
+    attention_heads=8,
+    kv_heads=1,
+    kv_lora_rank=32,
+    q_lora_rank=64,
+    qk_nope_head_dim=16,
+    qk_rope_head_dim=16,
+    v_head_dim=16,
+    max_position_embeddings=256,
+    vocab_size=64,
+    fp8_block_shape=(16, 16),
+    mlp_layer_types=("dense",),
+    indexer_types=("full",),
+)
+mesh = Mesh(np.asarray(jax.devices(), dtype=object).reshape(8, 4), ("expert", "feature"))
+out = {}
+for enabled in (False, True):
+    config = Ws32DecoderConfig(
+        geometry=geometry,
+        context_capacity=256,
+        logical_page_size=128,
+        packed_cache_width=112,
+        sparse_segment_block=128,
+        host_main_rope_table=enabled,
+    )
+    decoder = build_ws32_decoder_program(mesh, config, sparse_attention_interpret=True, linear_interpret=True)
+    prefill = build_ws32_teacher_forced_prefill_program(mesh, config, prompt_length=2, sparse_attention_interpret=True, linear_interpret=True)
+    chunk = build_ws32_chunked_prefill_program(mesh, config, chunk_length=2, sparse_attention_interpret=True, linear_interpret=True)
+    table = build_ws32_main_rope_table(config)
+    out[str(enabled)] = {
+        "callables": all(callable(f) for f in (decoder.execute, decoder.observe, prefill.execute, chunk.execute)),
+        "table_shape": list(table.shape),
+        "table_dtype": str(table.dtype),
+    }
+print(json.dumps(out))
+'''
+    environment = dict(os.environ)
+    environment["JAX_PLATFORMS"] = "cpu"
+    existing = environment.get("XLA_FLAGS", "").strip()
+    environment["XLA_FLAGS"] = (
+        f"{existing} --xla_force_host_platform_device_count=32".strip()
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=ROOT,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=180,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result == {
+        "False": {"callables": True, "table_shape": [256, 16], "table_dtype": "bfloat16"},
+        "True": {"callables": True, "table_shape": [256, 16], "table_dtype": "bfloat16"},
+    }
+
+
+def test_ws32_main_rope_row_selection_and_rotation_match_the_device_form_at_low_positions() -> None:
+    """Execute the A′ math: row gather, cos|sin split and FP32-final-round
+    rotation. At small positions it must agree with the on-device form to BF16;
+    at long positions it must not, which is why §23.9 adopted it."""
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+
+    from glm_tpu.greenfield.kernels.reference.rotary import (
+        apply_rotary,
+        apply_rotary_fp32_final_round,
+        rotary_cos_sin,
+    )
+    from glm_tpu.greenfield.runtime.ws32_decoder import (
+        WS32_MAIN_ROPE_THETA,
+        build_ws32_main_rope_table,
+    )
+
+    capacity = 262_656
+    config = Ws32DecoderConfig(
+        geometry=_geometry(), context_capacity=capacity, host_main_rope_table=True
+    )
+    table = jnp.asarray(build_ws32_main_rope_table(config))
+    rotary_dim = config.geometry.qk_rope_head_dim
+    half = rotary_dim // 2
+    probe = jnp.asarray(
+        np.tile(np.asarray([1.0, 0.0], dtype=np.float32), rotary_dim // 2)[None, None, :],
+        dtype=jnp.bfloat16,
+    )
+
+    def table_form(position: int):
+        row = jnp.take(table, jnp.asarray([position], dtype=jnp.int32), axis=0, mode="clip")[0]
+        cos = row[:half][None, :]
+        sin = row[half:][None, :]
+        return apply_rotary_fp32_final_round(
+            probe, cos[:, None, :], sin[:, None, :], interleaved=True
+        )
+
+    def device_form(position: int):
+        cos, sin = rotary_cos_sin(
+            jnp.asarray([position], dtype=jnp.int32),
+            rotary_dim=rotary_dim,
+            theta=WS32_MAIN_ROPE_THETA,
+            dtype=jnp.bfloat16,
+        )
+        return apply_rotary(probe, cos[:, None, :], sin[:, None, :], interleaved=True)
+
+    for position in (0, 1, 17, 1024):
+        got = np.asarray(jax.jit(table_form, static_argnums=0)(position), dtype=np.float32)
+        expected = np.asarray(jax.jit(device_form, static_argnums=0)(position), dtype=np.float32)
+        assert np.max(np.abs(got - expected)) <= 2 ** -7, position
+    # Row 0 rotates the probe by the identity.
+    assert np.array_equal(
+        np.asarray(jax.jit(table_form, static_argnums=0)(0), dtype=np.float32),
+        np.asarray(probe, dtype=np.float32),
+    )
+    # The clamp is defined and finite at and beyond the capacity.
+    for position in (capacity - 1, capacity, capacity + 5):
+        assert np.all(np.isfinite(np.asarray(jax.jit(table_form, static_argnums=0)(position), dtype=np.float32)))
+    # Against FP64 the table row is the accurate one at a long position.
+    position = 262_000
+    frequencies = np.power(
+        np.float64(WS32_MAIN_ROPE_THETA),
+        -np.arange(0, rotary_dim, 2, dtype=np.float64) / np.float64(rotary_dim),
+    )
+    truth_cos = np.cos(np.float64(position) * frequencies)
+    row = np.asarray(table[position], dtype=np.float32)
+    device_cos = np.asarray(
+        rotary_cos_sin(
+            jnp.asarray([position], dtype=jnp.int32),
+            rotary_dim=rotary_dim,
+            theta=WS32_MAIN_ROPE_THETA,
+            dtype=jnp.bfloat16,
+        )[0],
+        dtype=np.float32,
+    )[0]
+    assert np.max(np.abs(row[:half] - truth_cos)) <= np.max(np.abs(device_cos - truth_cos)) + 1e-9

@@ -457,3 +457,113 @@ def test_ws32_capacity_and_rotary_diagnostic_are_declared_and_bound() -> None:
     sealer = sealer_path.read_text(encoding="utf-8")
     assert '"rotary_diagnostic",' in sealer and "ROTARY_LONG_POSITION_DIAGNOSTIC_" in sealer and "CAPACITY_MEASUREMENT_" in sealer
 
+
+def test_ws32_evidence_layout_v2_is_declared_end_to_end() -> None:
+    """Storage plan 2026-09-05 (Proposal A): one gzip per graph/form uploaded
+    redundantly by every rank with --no-clobber and CRC-matched tolerance; the
+    record declares the layout; the wrapper refuses launches without storage
+    headroom."""
+    from glm_tpu.greenfield.validation import ws32_evidence
+
+    root = Path(__file__).resolve().parents[3]
+    wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
+    runner = (root / "scripts/greenfield/run_short_decoder_ws32.py").read_text(encoding="utf-8")
+    sealer = (root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8")
+    assert '"evidence_layout": EVIDENCE_LAYOUT_V2,' in runner
+    # The sealer pins the required layout instead of hard-coding v2, so a sealed
+    # v1 prefix stays re-verifiable with current code.
+    assert '"--evidence-layout",' in sealer and 'default=EVIDENCE_LAYOUT_V2,' in sealer
+    assert 'args.evidence_layout == EVIDENCE_LAYOUT_V1' in sealer
+    assert '"evidence_layout": args.evidence_layout,' in sealer
+    assert "layout_keys = (" in sealer and "pre_keys |= layout_keys" in sealer
+    assert "upload_shared(){" in wrapper and 'gzip -n -9 -c "$hlo/$graph.$form"' in wrapper
+    assert '"$remote/hlo/${graph}.${form}.gz"' in wrapper and ".rank${idx}.stablehlo.mlir" not in wrapper
+    # A precondition failure is tolerated only when the remote INFLATED evidence
+    # equals this rank's own text, never on a compressed-container comparison.
+    assert 'gzip -dc "$tmp.gz"' in wrapper and "crc32c_hash" not in wrapper
+    assert "STORAGE_CEILING_BYTES=2500000000000" in wrapper and "STORAGE_RESERVE_BYTES=6000000000" in wrapper
+    assert "live storage plus reserve exceeds the ceiling" in wrapper
+    assert "timeout 900 gcloud storage du -s" in wrapper and "census attempt $attempt failed" in wrapper
+    assert ws32_evidence.EVIDENCE_LAYOUT_V2 == "hlo_single_gzip_v2"
+
+
+
+def test_ws32_host_main_rope_table_is_declared_and_bound_end_to_end() -> None:
+    """Spec §23.8 A′: the legacy-faithful main-attention rotary table is default
+    off, part of the run identity when on, verified byte-for-byte by the sealer,
+    and required by the HLO contract exactly when declared."""
+    import importlib.util
+
+    root = Path(__file__).resolve().parents[3]
+    wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
+    runner = (root / "scripts/greenfield/run_short_decoder_ws32.py").read_text(encoding="utf-8")
+    sealer_path = root / "scripts/greenfield/seal_short_decoder_ws32.py"
+    specification = importlib.util.spec_from_file_location("ws32_sealer_hrope_test", sealer_path)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+
+    assert "HOST_MAIN_ROPE_TABLE=${GLM_GREENFIELD_WS32_HOST_MAIN_ROPE_TABLE:-0}" in wrapper
+    assert "CHUNK_SUFFIX=${CHUNK_SUFFIX}_hrope" in wrapper
+    assert '--host-main-rope-table "$HOST_MAIN_ROPE_TABLE"' in wrapper
+    assert '"--host-main-rope-table", choices=(0, 1), default=0' in runner
+    assert '"main_rope_table": main_rope_table_record,' in runner
+    assert "host_main_rope_table=config.host_main_rope_table," in runner
+
+    stamp = "20260905T085534575653049Z"
+    module._validate_run_tag(
+        f"greenfield_ws32_short_decoder_8k_numerical_hrope_{stamp}",
+        context_label="8k", mode="numerical", host_main_rope_table=True,
+    )
+    module._validate_run_tag(
+        f"greenfield_ws32_short_decoder_8k_numerical_cap262656_hrope_{stamp}",
+        context_label="8k", mode="numerical", context_capacity=262656, host_main_rope_table=True,
+    )
+    for tag, enabled in (
+        (f"greenfield_ws32_short_decoder_8k_numerical_{stamp}", True),
+        (f"greenfield_ws32_short_decoder_8k_numerical_hrope_{stamp}", False),
+    ):
+        with pytest.raises(SystemExit, match="rope|chunk|capacity"):
+            module._validate_run_tag(tag, context_label="8k", mode="numerical", host_main_rope_table=enabled)
+
+    from glm_tpu.greenfield.kernels.reference.rotary import (
+        build_rotary_table_host,
+        rotary_table_sha256,
+    )
+
+    digest = rotary_table_sha256(build_rotary_table_host(8192, rotary_dim=64, theta=8_000_000.0))
+    good = {
+        "main_rope_table": {
+            "bytes_per_device": 8192 * 64 * 2,
+            "rotary_dim": 64,
+            "rows": 8192,
+            "sha256": digest,
+            "theta": 8_000_000.0,
+        }
+    }
+    module._require_main_rope_table(good, enabled=True, context_capacity=8192, rank=0, first=good)
+    module._require_main_rope_table({"main_rope_table": None}, enabled=False, context_capacity=8192, rank=0, first={})
+    with pytest.raises(SystemExit, match="present but not declared"):
+        module._require_main_rope_table(good, enabled=False, context_capacity=8192, rank=0, first={})
+    with pytest.raises(SystemExit, match="schema drifted"):
+        module._require_main_rope_table({"main_rope_table": None}, enabled=True, context_capacity=8192, rank=0, first={})
+    with pytest.raises(SystemExit, match="bytes drifted"):
+        bad = {"main_rope_table": {**good["main_rope_table"], "sha256": "0" * 64}}
+        module._require_main_rope_table(bad, enabled=True, context_capacity=8192, rank=0, first=bad)
+    with pytest.raises(SystemExit, match="identity drifted"):
+        module._require_main_rope_table(good, enabled=True, context_capacity=131072, rank=0, first=good)
+    with pytest.raises(SystemExit, match="disagrees"):
+        other = {"main_rope_table": {**good["main_rope_table"]}}
+        module._require_main_rope_table(good, enabled=True, context_capacity=8192, rank=1, first={"main_rope_table": None})
+
+
+def test_ws32_hlo_contract_requires_the_rope_table_scope_iff_declared() -> None:
+    """The graph must carry the table lookup exactly when the run declares it."""
+    from glm_tpu.greenfield.benchmarking.ws32_decoder import validate_ws32_decoder_hlo
+    import inspect
+
+    signature = inspect.signature(validate_ws32_decoder_hlo)
+    assert signature.parameters["host_main_rope_table"].default is False
+    source = inspect.getsource(validate_ws32_decoder_hlo)
+    assert "greenfield_ws32_main_rope_table" in source
+    assert "WS32 main rotary host table scope is missing" in source
+    assert "WS32 main rotary host table appears without a declaration" in source

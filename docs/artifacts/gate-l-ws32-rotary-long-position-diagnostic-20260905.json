@@ -1,0 +1,2402 @@
+{
+  "artifact_kind": "greenfield_ws32_rotary_long_position_diagnostic",
+  "bands": [
+    [
+      "le_8192",
+      0,
+      8192
+    ],
+    [
+      "le_32768",
+      8192,
+      32768
+    ],
+    [
+      "le_131072",
+      32768,
+      131072
+    ],
+    [
+      "le_262656",
+      131072,
+      262657
+    ]
+  ],
+  "cells": [
+    {
+      "band": "le_8192",
+      "bound": 0.00390571801304751,
+      "device_indexer_max_abs_error_vs_fp64": 1.0210029743884519e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 7.559511933652451e-08,
+      "device_main_max_abs_error_vs_fp64": 0.001952859006523755,
+      "device_main_p99_abs_error_vs_fp64": 0.0019400244182385463,
+      "device_main_vs_legacy_main_differing_bf16_components": 0,
+      "device_main_vs_legacy_main_max_abs": 0.0,
+      "legacy_main_max_abs_error_vs_fp64": 0.001952859006523755,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019400244182385463,
+      "pair": 0,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.004443563324417532,
+      "device_indexer_max_abs_error_vs_fp64": 0.011101291920752439,
+      "device_indexer_p99_abs_error_vs_fp64": 0.010468997237994732,
+      "device_main_max_abs_error_vs_fp64": 0.011514888555515967,
+      "device_main_p99_abs_error_vs_fp64": 0.01054315756953808,
+      "device_main_vs_legacy_main_differing_bf16_components": 11003,
+      "device_main_vs_legacy_main_max_abs": 0.01171875,
+      "legacy_main_max_abs_error_vs_fp64": 0.002221781662208766,
+      "legacy_main_p99_abs_error_vs_fp64": 0.00196296948193284,
+      "pair": 1,
+      "pass": false,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.004128763274445335,
+      "device_indexer_max_abs_error_vs_fp64": 0.0026991632169301727,
+      "device_indexer_p99_abs_error_vs_fp64": 0.002514847364144846,
+      "device_main_max_abs_error_vs_fp64": 0.00413224533417178,
+      "device_main_p99_abs_error_vs_fp64": 0.0033518671076427442,
+      "device_main_vs_legacy_main_differing_bf16_components": 5832,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0020643816372226675,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019471354680421315,
+      "pair": 2,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.003966793540961078,
+      "device_indexer_max_abs_error_vs_fp64": 0.0014863436999806648,
+      "device_indexer_p99_abs_error_vs_fp64": 0.001390651389866405,
+      "device_main_max_abs_error_vs_fp64": 0.0031938263324732263,
+      "device_main_p99_abs_error_vs_fp64": 0.002588347576395265,
+      "device_main_vs_legacy_main_differing_bf16_components": 4005,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001983396770480539,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019410113872256774,
+      "pair": 3,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.003964819159759436,
+      "device_indexer_max_abs_error_vs_fp64": 0.0002712737491854661,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0002342395377848156,
+      "device_main_max_abs_error_vs_fp64": 0.002141223368887779,
+      "device_main_p99_abs_error_vs_fp64": 0.001972469889584002,
+      "device_main_vs_legacy_main_differing_bf16_components": 1098,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001982409579879718,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001940296813275504,
+      "pair": 4,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.003973219456928634,
+      "device_indexer_max_abs_error_vs_fp64": 0.0017129240946107058,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0016222223282913015,
+      "device_main_max_abs_error_vs_fp64": 0.0032665574054376867,
+      "device_main_p99_abs_error_vs_fp64": 0.002748926272318328,
+      "device_main_vs_legacy_main_differing_bf16_components": 4309,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001986609728464317,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019385894330889953,
+      "pair": 5,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.003920164369053403,
+      "device_indexer_max_abs_error_vs_fp64": 0.0005524778567658484,
+      "device_indexer_p99_abs_error_vs_fp64": 0.000520601693683259,
+      "device_main_max_abs_error_vs_fp64": 0.0023756544865679574,
+      "device_main_p99_abs_error_vs_fp64": 0.002134027792388548,
+      "device_main_vs_legacy_main_differing_bf16_components": 2008,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019600821845267014,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019379121837455326,
+      "pair": 6,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.003942883103493555,
+      "device_indexer_max_abs_error_vs_fp64": 0.00029957252340685747,
+      "device_indexer_p99_abs_error_vs_fp64": 0.00028690441152727346,
+      "device_main_max_abs_error_vs_fp64": 0.0021736201048545567,
+      "device_main_p99_abs_error_vs_fp64": 0.0020234029100135286,
+      "device_main_vs_legacy_main_differing_bf16_components": 1376,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019714415517467776,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019380891176815206,
+      "pair": 7,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.00390605505517283,
+      "device_indexer_max_abs_error_vs_fp64": 0.00021927462475918036,
+      "device_indexer_p99_abs_error_vs_fp64": 0.000204576455893929,
+      "device_main_max_abs_error_vs_fp64": 0.0021009517278751666,
+      "device_main_p99_abs_error_vs_fp64": 0.001982353665660017,
+      "device_main_vs_legacy_main_differing_bf16_components": 979,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953027527586415,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019372807109853684,
+      "pair": 8,
+      "pass": false,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.0039061970722640282,
+      "device_indexer_max_abs_error_vs_fp64": 2.577463563920024e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 2.319918768798196e-05,
+      "device_main_max_abs_error_vs_fp64": 0.0019733894669509144,
+      "device_main_p99_abs_error_vs_fp64": 0.0019351584487011186,
+      "device_main_vs_legacy_main_differing_bf16_components": 156,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019530985361320141,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019351442747873205,
+      "pair": 9,
+      "pass": false,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.003907807040555822,
+      "device_indexer_max_abs_error_vs_fp64": 6.547863468767123e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 6.231125097116797e-05,
+      "device_main_max_abs_error_vs_fp64": 0.0019876828881302266,
+      "device_main_p99_abs_error_vs_fp64": 0.0019426552785999918,
+      "device_main_vs_legacy_main_differing_bf16_components": 430,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953903520277911,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019393585138046388,
+      "pair": 10,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.0039080243241620405,
+      "device_indexer_max_abs_error_vs_fp64": 7.938742611014737e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 7.564286429727049e-05,
+      "device_main_max_abs_error_vs_fp64": 0.002010261355665177,
+      "device_main_p99_abs_error_vs_fp64": 0.0019404545611732716,
+      "device_main_vs_legacy_main_differing_bf16_components": 419,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019540121620810202,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019361203781473634,
+      "pair": 11,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.003906254250933383,
+      "device_indexer_max_abs_error_vs_fp64": 7.888119390996734e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 7.732664682980062e-05,
+      "device_main_max_abs_error_vs_fp64": 0.0020069033338652176,
+      "device_main_p99_abs_error_vs_fp64": 0.001944405514794828,
+      "device_main_vs_legacy_main_differing_bf16_components": 471,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531271254666915,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019381584402888708,
+      "pair": 12,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.003905736754042266,
+      "device_indexer_max_abs_error_vs_fp64": 1.1216355090305774e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 1.0872280809738345e-05,
+      "device_main_max_abs_error_vs_fp64": 0.001960063430379577,
+      "device_main_p99_abs_error_vs_fp64": 0.0019382434007028959,
+      "device_main_vs_legacy_main_differing_bf16_components": 99,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001952868377021133,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019382434007028959,
+      "pair": 13,
+      "pass": false,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.003905404405990298,
+      "device_indexer_max_abs_error_vs_fp64": 1.2019131448631759e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 1.1608191062692648e-05,
+      "device_main_max_abs_error_vs_fp64": 0.001957623369357009,
+      "device_main_p99_abs_error_vs_fp64": 0.0019379984080558166,
+      "device_main_vs_legacy_main_differing_bf16_components": 71,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001952702202995149,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019379984080558166,
+      "pair": 14,
+      "pass": false,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.0039051710931921058,
+      "device_indexer_max_abs_error_vs_fp64": 9.265779428939414e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 8.981697718187243e-06,
+      "device_main_max_abs_error_vs_fp64": 0.0019542352932818696,
+      "device_main_p99_abs_error_vs_fp64": 0.001936118977787309,
+      "device_main_vs_legacy_main_differing_bf16_components": 88,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019525855465960529,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001936118977787309,
+      "pair": 15,
+      "pass": false,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.0039057644946891568,
+      "device_indexer_max_abs_error_vs_fp64": 6.107322447546082e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 5.896482666458147e-06,
+      "device_main_max_abs_error_vs_fp64": 0.0019550044094066577,
+      "device_main_p99_abs_error_vs_fp64": 0.0019384712644871373,
+      "device_main_vs_legacy_main_differing_bf16_components": 37,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019528822473445784,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019384712644871373,
+      "pair": 16,
+      "pass": false,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.003905564373579695,
+      "device_indexer_max_abs_error_vs_fp64": 1.3150020779506555e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 1.2715350182232465e-06,
+      "device_main_max_abs_error_vs_fp64": 0.001953604124496411,
+      "device_main_p99_abs_error_vs_fp64": 0.0019403405470435787,
+      "device_main_vs_legacy_main_differing_bf16_components": 21,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019527821867898476,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019403405470435787,
+      "pair": 17,
+      "pass": false,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.0039048910778567425,
+      "device_indexer_max_abs_error_vs_fp64": 1.7201690797330471e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 1.64631341262933e-06,
+      "device_main_max_abs_error_vs_fp64": 0.001953850451315242,
+      "device_main_p99_abs_error_vs_fp64": 0.0019361220888801812,
+      "device_main_vs_legacy_main_differing_bf16_components": 2,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019524455389283712,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019361220888801812,
+      "pair": 18,
+      "pass": false,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.0039057187571369667,
+      "device_indexer_max_abs_error_vs_fp64": 9.56456693623764e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 9.14350400060826e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0019533906214315166,
+      "device_main_p99_abs_error_vs_fp64": 0.0019378364268005399,
+      "device_main_vs_legacy_main_differing_bf16_components": 3,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019528593785684834,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019378364268005399,
+      "pair": 19,
+      "pass": false,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.003906304119463133,
+      "device_indexer_max_abs_error_vs_fp64": 8.111019256795693e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 7.795512567970731e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0019530979402684334,
+      "device_main_p99_abs_error_vs_fp64": 0.001932172858589065,
+      "device_main_vs_legacy_main_differing_bf16_components": 6,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531520597315666,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001932172858589065,
+      "pair": 20,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.003906076476148268,
+      "device_indexer_max_abs_error_vs_fp64": 3.153315943360546e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 3.007024085427412e-07,
+      "device_main_max_abs_error_vs_fp64": 0.001953038238074134,
+      "device_main_p99_abs_error_vs_fp64": 0.0019306060060460273,
+      "device_main_vs_legacy_main_differing_bf16_components": 0,
+      "device_main_vs_legacy_main_max_abs": 0.0,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953038238074134,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019306060060460273,
+      "pair": 21,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.0039062279589985316,
+      "device_indexer_max_abs_error_vs_fp64": 1.3414033889214139e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 1.23169971822934e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0019531580181734176,
+      "device_main_p99_abs_error_vs_fp64": 0.0019305977649020612,
+      "device_main_vs_legacy_main_differing_bf16_components": 1,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531139794992658,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019305977649020612,
+      "pair": 22,
+      "pass": false,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.003906271520412119,
+      "device_indexer_max_abs_error_vs_fp64": 5.951427980988022e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 5.444356872497114e-08,
+      "device_main_max_abs_error_vs_fp64": 0.0019531357602060595,
+      "device_main_p99_abs_error_vs_fp64": 0.0019250534865112824,
+      "device_main_vs_legacy_main_differing_bf16_components": 0,
+      "device_main_vs_legacy_main_max_abs": 0.0,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531357602060595,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019250534865112824,
+      "pair": 23,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.0029643641901133666,
+      "device_indexer_max_abs_error_vs_fp64": 8.384067966271669e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 7.98872774310927e-08,
+      "device_main_max_abs_error_vs_fp64": 0.0014821820950566833,
+      "device_main_p99_abs_error_vs_fp64": 0.001452693816572237,
+      "device_main_vs_legacy_main_differing_bf16_components": 1,
+      "device_main_vs_legacy_main_max_abs": 0.0001220703125,
+      "legacy_main_max_abs_error_vs_fp64": 0.0014821820950566833,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001452693816572237,
+      "pair": 24,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.0010978828713705813,
+      "device_indexer_max_abs_error_vs_fp64": 6.614189043685492e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 6.338894826818376e-08,
+      "device_main_max_abs_error_vs_fp64": 0.0005489414356852906,
+      "device_main_p99_abs_error_vs_fp64": 0.0005380184814377997,
+      "device_main_vs_legacy_main_differing_bf16_components": 4,
+      "device_main_vs_legacy_main_max_abs": 0.0001220703125,
+      "legacy_main_max_abs_error_vs_fp64": 0.0005489414356852906,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0005380184814377997,
+      "pair": 25,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.0004065724137691795,
+      "device_indexer_max_abs_error_vs_fp64": 3.027810890898763e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 2.949138818819641e-08,
+      "device_main_max_abs_error_vs_fp64": 0.00020328620688458976,
+      "device_main_p99_abs_error_vs_fp64": 0.00019924094595582422,
+      "device_main_vs_legacy_main_differing_bf16_components": 0,
+      "device_main_vs_legacy_main_max_abs": 0.0,
+      "legacy_main_max_abs_error_vs_fp64": 0.00020328620688458976,
+      "legacy_main_p99_abs_error_vs_fp64": 0.00019924094595582422,
+      "pair": 26,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 0.00015055807379726893,
+      "device_indexer_max_abs_error_vs_fp64": 3.865859874059574e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 3.7562338824192324e-08,
+      "device_main_max_abs_error_vs_fp64": 7.527903689863447e-05,
+      "device_main_p99_abs_error_vs_fp64": 7.378100257784515e-05,
+      "device_main_vs_legacy_main_differing_bf16_components": 2,
+      "device_main_vs_legacy_main_max_abs": 6.103515625e-05,
+      "legacy_main_max_abs_error_vs_fp64": 7.527903689863447e-05,
+      "legacy_main_p99_abs_error_vs_fp64": 7.378100257784515e-05,
+      "pair": 27,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 5.575250134737253e-05,
+      "device_indexer_max_abs_error_vs_fp64": 2.993678005491773e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 2.9457781662856066e-08,
+      "device_main_max_abs_error_vs_fp64": 2.7876250673686265e-05,
+      "device_main_p99_abs_error_vs_fp64": 2.7321515845418753e-05,
+      "device_main_vs_legacy_main_differing_bf16_components": 7,
+      "device_main_vs_legacy_main_max_abs": 3.0517578125e-05,
+      "legacy_main_max_abs_error_vs_fp64": 2.7876250673686265e-05,
+      "legacy_main_p99_abs_error_vs_fp64": 2.7321515845418753e-05,
+      "pair": 28,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 3.0127061529218804e-05,
+      "device_indexer_max_abs_error_vs_fp64": 2.983062652450741e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 2.948232587951516e-08,
+      "device_main_max_abs_error_vs_fp64": 1.5063530764609402e-05,
+      "device_main_p99_abs_error_vs_fp64": 1.4345719869554853e-05,
+      "device_main_vs_legacy_main_differing_bf16_components": 7,
+      "device_main_vs_legacy_main_max_abs": 7.62939453125e-06,
+      "legacy_main_max_abs_error_vs_fp64": 1.5063530764609402e-05,
+      "legacy_main_p99_abs_error_vs_fp64": 1.4345719869554853e-05,
+      "pair": 29,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 1.525456364144355e-05,
+      "device_indexer_max_abs_error_vs_fp64": 2.9798762679611457e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 2.948283714832023e-08,
+      "device_main_max_abs_error_vs_fp64": 7.627281820721775e-06,
+      "device_main_p99_abs_error_vs_fp64": 7.363809274417706e-06,
+      "device_main_vs_legacy_main_differing_bf16_components": 1,
+      "device_main_vs_legacy_main_max_abs": 7.62939453125e-06,
+      "legacy_main_max_abs_error_vs_fp64": 7.627281820721775e-06,
+      "legacy_main_p99_abs_error_vs_fp64": 7.363809274417706e-06,
+      "pair": 30,
+      "pass": true,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_8192",
+      "bound": 7.628979140500425e-06,
+      "device_indexer_max_abs_error_vs_fp64": 2.979463298302676e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 2.9476209126855223e-08,
+      "device_main_max_abs_error_vs_fp64": 3.816906739301067e-06,
+      "device_main_p99_abs_error_vs_fp64": 3.723859237837592e-06,
+      "device_main_vs_legacy_main_differing_bf16_components": 10,
+      "device_main_vs_legacy_main_max_abs": 7.62939453125e-06,
+      "legacy_main_max_abs_error_vs_fp64": 3.8144895702502124e-06,
+      "legacy_main_p99_abs_error_vs_fp64": 3.723859237837592e-06,
+      "pair": 31,
+      "pass": false,
+      "positions": [
+        0,
+        8191
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.003906293541066086,
+      "device_indexer_max_abs_error_vs_fp64": 1.0723809684698438e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 7.619951120085844e-08,
+      "device_main_max_abs_error_vs_fp64": 0.001953146770533043,
+      "device_main_p99_abs_error_vs_fp64": 0.0019381521525404233,
+      "device_main_vs_legacy_main_differing_bf16_components": 0,
+      "device_main_vs_legacy_main_max_abs": 0.0,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953146770533043,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019381521525404233,
+      "pair": 0,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.006118688282641616,
+      "device_indexer_max_abs_error_vs_fp64": 0.044353280674914924,
+      "device_indexer_p99_abs_error_vs_fp64": 0.042192529344512494,
+      "device_main_max_abs_error_vs_fp64": 0.044366373673330156,
+      "device_main_p99_abs_error_vs_fp64": 0.042195331510677676,
+      "device_main_vs_legacy_main_differing_bf16_components": 46521,
+      "device_main_vs_legacy_main_max_abs": 0.043212890625,
+      "legacy_main_max_abs_error_vs_fp64": 0.003059344141320808,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0023635829236345884,
+      "pair": 1,
+      "pass": false,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.0050339473898641796,
+      "device_indexer_max_abs_error_vs_fp64": 0.01078920055905306,
+      "device_indexer_p99_abs_error_vs_fp64": 0.010156764420181152,
+      "device_main_max_abs_error_vs_fp64": 0.011139591592788989,
+      "device_main_p99_abs_error_vs_fp64": 0.010322314272013682,
+      "device_main_vs_legacy_main_differing_bf16_components": 38209,
+      "device_main_vs_legacy_main_max_abs": 0.01171875,
+      "legacy_main_max_abs_error_vs_fp64": 0.0025169736949320898,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0021092175908891397,
+      "pair": 2,
+      "pass": false,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.0043946144992672576,
+      "device_indexer_max_abs_error_vs_fp64": 0.0059738500688793494,
+      "device_indexer_p99_abs_error_vs_fp64": 0.005588644004182571,
+      "device_main_max_abs_error_vs_fp64": 0.0068702019470615605,
+      "device_main_p99_abs_error_vs_fp64": 0.005943137404019531,
+      "device_main_vs_legacy_main_differing_bf16_components": 30641,
+      "device_main_vs_legacy_main_max_abs": 0.0078125,
+      "legacy_main_max_abs_error_vs_fp64": 0.0021973072496336288,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019812508714024957,
+      "pair": 3,
+      "pass": false,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.004371014773228765,
+      "device_indexer_max_abs_error_vs_fp64": 0.0010906512789524564,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0009589806326936387,
+      "device_main_max_abs_error_vs_fp64": 0.002771543644660923,
+      "device_main_p99_abs_error_vs_fp64": 0.0023405077329300694,
+      "device_main_vs_legacy_main_differing_bf16_components": 11116,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0021855073866143826,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001968551600571161,
+      "pair": 4,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.004268028334542429,
+      "device_indexer_max_abs_error_vs_fp64": 0.006824535110466906,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0065292904579984275,
+      "device_main_max_abs_error_vs_fp64": 0.007604098248464086,
+      "device_main_p99_abs_error_vs_fp64": 0.006799744360043146,
+      "device_main_vs_legacy_main_differing_bf16_components": 32272,
+      "device_main_vs_legacy_main_max_abs": 0.0078125,
+      "legacy_main_max_abs_error_vs_fp64": 0.0021340141672712143,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019750748910239424,
+      "pair": 5,
+      "pass": false,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.00399779696357716,
+      "device_indexer_max_abs_error_vs_fp64": 0.002202891857690986,
+      "device_indexer_p99_abs_error_vs_fp64": 0.002100808994383911,
+      "device_main_max_abs_error_vs_fp64": 0.003739650098672831,
+      "device_main_p99_abs_error_vs_fp64": 0.0031605089849988943,
+      "device_main_vs_legacy_main_differing_bf16_components": 18633,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.00199889848178858,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019406790182350253,
+      "pair": 6,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.004065694539185483,
+      "device_indexer_max_abs_error_vs_fp64": 0.0012187329226571314,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0011580742843703648,
+      "device_main_max_abs_error_vs_fp64": 0.0029548652663760056,
+      "device_main_p99_abs_error_vs_fp64": 0.0025184468269413285,
+      "device_main_vs_legacy_main_differing_bf16_components": 13285,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0020328472695927413,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001950126374749367,
+      "pair": 7,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.003933692502918307,
+      "device_indexer_max_abs_error_vs_fp64": 0.0008776124996156195,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0008256981953167035,
+      "device_main_max_abs_error_vs_fp64": 0.002612818008654205,
+      "device_main_p99_abs_error_vs_fp64": 0.0023247163146730976,
+      "device_main_vs_legacy_main_differing_bf16_components": 10119,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019668462514591534,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019378303435318989,
+      "pair": 8,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.003922105671773091,
+      "device_indexer_max_abs_error_vs_fp64": 0.00010505086661493496,
+      "device_indexer_p99_abs_error_vs_fp64": 9.418505334019694e-05,
+      "device_main_max_abs_error_vs_fp64": 0.0020137083321273286,
+      "device_main_p99_abs_error_vs_fp64": 0.001950698913451232,
+      "device_main_vs_legacy_main_differing_bf16_components": 1826,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019610528358865453,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019388901850980744,
+      "pair": 9,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.003931048582399788,
+      "device_indexer_max_abs_error_vs_fp64": 0.00026498824222787043,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0002506075445438359,
+      "device_main_max_abs_error_vs_fp64": 0.0021658396521350154,
+      "device_main_p99_abs_error_vs_fp64": 0.0020169440696181096,
+      "device_main_vs_legacy_main_differing_bf16_components": 4402,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001965524291199894,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019369621077899857,
+      "pair": 10,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.0039210429496823185,
+      "device_indexer_max_abs_error_vs_fp64": 0.00031718030128738417,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0003019176049708942,
+      "device_main_max_abs_error_vs_fp64": 0.002188718904829634,
+      "device_main_p99_abs_error_vs_fp64": 0.002036070779636495,
+      "device_main_vs_legacy_main_differing_bf16_components": 4755,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019605214748411592,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019392879339136526,
+      "pair": 11,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.003914326501694765,
+      "device_indexer_max_abs_error_vs_fp64": 0.0003209828963764913,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0003095413017723085,
+      "device_main_max_abs_error_vs_fp64": 0.0022072127112325868,
+      "device_main_p99_abs_error_vs_fp64": 0.0020421076012006323,
+      "device_main_vs_legacy_main_differing_bf16_components": 4888,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019571632508473824,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019381970727104236,
+      "pair": 12,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.0039091193713012284,
+      "device_indexer_max_abs_error_vs_fp64": 4.454560893261961e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 4.2294346337914956e-05,
+      "device_main_max_abs_error_vs_fp64": 0.0019836311988150612,
+      "device_main_p99_abs_error_vs_fp64": 0.001939566025353695,
+      "device_main_vs_legacy_main_differing_bf16_components": 993,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019545596856506142,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001937960477540246,
+      "pair": 13,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.003907907452198822,
+      "device_indexer_max_abs_error_vs_fp64": 4.762858531257019e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 4.527141198068106e-05,
+      "device_main_max_abs_error_vs_fp64": 0.0019879256674849577,
+      "device_main_p99_abs_error_vs_fp64": 0.0019399954466971792,
+      "device_main_vs_legacy_main_differing_bf16_components": 1063,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953953726099411,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019379366312173851,
+      "pair": 14,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.0039061564083888722,
+      "device_indexer_max_abs_error_vs_fp64": 3.680954188348823e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 3.5854912795813855e-05,
+      "device_main_max_abs_error_vs_fp64": 0.0019777520310712005,
+      "device_main_p99_abs_error_vs_fp64": 0.0019378420034933397,
+      "device_main_vs_legacy_main_differing_bf16_components": 860,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019530782041944361,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019372847184762065,
+      "pair": 15,
+      "pass": false,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.0039062254967165977,
+      "device_indexer_max_abs_error_vs_fp64": 2.410789585298445e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 2.3750219862971045e-05,
+      "device_main_max_abs_error_vs_fp64": 0.0019696350455845613,
+      "device_main_p99_abs_error_vs_fp64": 0.0019376543483151654,
+      "device_main_vs_legacy_main_differing_bf16_components": 649,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531127483582988,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019375769069749638,
+      "pair": 16,
+      "pass": false,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.003906400203181004,
+      "device_indexer_max_abs_error_vs_fp64": 4.861223923013913e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 4.75987890038998e-06,
+      "device_main_max_abs_error_vs_fp64": 0.0019561607072029474,
+      "device_main_p99_abs_error_vs_fp64": 0.001938335057434043,
+      "device_main_vs_legacy_main_differing_bf16_components": 155,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953200101590502,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001938335057434043,
+      "pair": 17,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.0039062262988964758,
+      "device_indexer_max_abs_error_vs_fp64": 7.089651448244361e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 6.739102882666326e-06,
+      "device_main_max_abs_error_vs_fp64": 0.0019558492587631315,
+      "device_main_p99_abs_error_vs_fp64": 0.0019355456295865325,
+      "device_main_vs_legacy_main_differing_bf16_components": 189,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531131494482379,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019355456295865325,
+      "pair": 18,
+      "pass": false,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.0039061923060952353,
+      "device_indexer_max_abs_error_vs_fp64": 4.055417737958145e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 3.857991390660009e-06,
+      "device_main_max_abs_error_vs_fp64": 0.0019561405702194223,
+      "device_main_p99_abs_error_vs_fp64": 0.0019388851446572042,
+      "device_main_vs_legacy_main_differing_bf16_components": 131,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019530961530476176,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019388851446572042,
+      "pair": 19,
+      "pass": false,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.003905809974276808,
+      "device_indexer_max_abs_error_vs_fp64": 3.456578569278196e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 3.384077214087927e-06,
+      "device_main_max_abs_error_vs_fp64": 0.0019542513850386856,
+      "device_main_p99_abs_error_vs_fp64": 0.0019392012134665237,
+      "device_main_vs_legacy_main_differing_bf16_components": 155,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001952904987138404,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019392012134665237,
+      "pair": 20,
+      "pass": false,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.003906247532664109,
+      "device_indexer_max_abs_error_vs_fp64": 1.1045644774387853e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 1.037902053496742e-06,
+      "device_main_max_abs_error_vs_fp64": 0.0019537227505294075,
+      "device_main_p99_abs_error_vs_fp64": 0.0019411750464340682,
+      "device_main_vs_legacy_main_differing_bf16_components": 5,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531237663320544,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019411750464340682,
+      "pair": 21,
+      "pass": false,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.003906135881624584,
+      "device_indexer_max_abs_error_vs_fp64": 4.6271496512151344e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 4.3019857370873993e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0019532610523405047,
+      "device_main_p99_abs_error_vs_fp64": 0.0019360016384046552,
+      "device_main_vs_legacy_main_differing_bf16_components": 7,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953067940812292,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019360016384046552,
+      "pair": 22,
+      "pass": false,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.003906246997138041,
+      "device_indexer_max_abs_error_vs_fp64": 2.272271780734414e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 2.0801355302135782e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0019531234985690205,
+      "device_main_p99_abs_error_vs_fp64": 0.0019332743611314152,
+      "device_main_vs_legacy_main_differing_bf16_components": 2,
+      "device_main_vs_legacy_main_max_abs": 0.0009765625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531234985690205,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019332743611314152,
+      "pair": 23,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.003906243341836202,
+      "device_indexer_max_abs_error_vs_fp64": 3.2755904932901814e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 3.1248849532983236e-07,
+      "device_main_max_abs_error_vs_fp64": 0.001953121670918101,
+      "device_main_p99_abs_error_vs_fp64": 0.001936172597040542,
+      "device_main_vs_legacy_main_differing_bf16_components": 5,
+      "device_main_vs_legacy_main_max_abs": 0.0009765625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953121670918101,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001936172597040542,
+      "pair": 24,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.003906158620295752,
+      "device_indexer_max_abs_error_vs_fp64": 2.6512827869251687e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 2.5251130235381947e-07,
+      "device_main_max_abs_error_vs_fp64": 0.001953079310147876,
+      "device_main_p99_abs_error_vs_fp64": 0.0019334115633204974,
+      "device_main_vs_legacy_main_differing_bf16_components": 11,
+      "device_main_vs_legacy_main_max_abs": 0.00048828125,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953079310147876,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019334115633204974,
+      "pair": 25,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.0039062980082824605,
+      "device_indexer_max_abs_error_vs_fp64": 4.0235707557401135e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 3.66327631111385e-08,
+      "device_main_max_abs_error_vs_fp64": 0.0019531490041412303,
+      "device_main_p99_abs_error_vs_fp64": 0.0019341747444669988,
+      "device_main_vs_legacy_main_differing_bf16_components": 0,
+      "device_main_vs_legacy_main_max_abs": 0.0,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531490041412303,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019341747444669988,
+      "pair": 26,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.0024089168439551667,
+      "device_indexer_max_abs_error_vs_fp64": 1.551268322616539e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 1.506668876345013e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0012044584219775833,
+      "device_main_p99_abs_error_vs_fp64": 0.0011864630390887032,
+      "device_main_vs_legacy_main_differing_bf16_components": 12,
+      "device_main_vs_legacy_main_max_abs": 0.000244140625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0012044584219775833,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0011864630390887032,
+      "pair": 27,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.0008921411974134319,
+      "device_indexer_max_abs_error_vs_fp64": 6.458139973838928e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 6.189964430261541e-08,
+      "device_main_max_abs_error_vs_fp64": 0.00044607059870671595,
+      "device_main_p99_abs_error_vs_fp64": 0.00043940518704679854,
+      "device_main_vs_legacy_main_differing_bf16_components": 11,
+      "device_main_vs_legacy_main_max_abs": 0.0001220703125,
+      "legacy_main_max_abs_error_vs_fp64": 0.00044607059870671595,
+      "legacy_main_p99_abs_error_vs_fp64": 0.00043940518704679854,
+      "pair": 28,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.0003303777595784485,
+      "device_indexer_max_abs_error_vs_fp64": 3.1923979557091364e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 3.030229125955408e-08,
+      "device_main_max_abs_error_vs_fp64": 0.00016518887978922425,
+      "device_main_p99_abs_error_vs_fp64": 0.0001627204304617269,
+      "device_main_vs_legacy_main_differing_bf16_components": 6,
+      "device_main_vs_legacy_main_max_abs": 0.0001220703125,
+      "legacy_main_max_abs_error_vs_fp64": 0.00016518887978922425,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0001627204304617269,
+      "pair": 29,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 0.00012234189662185813,
+      "device_indexer_max_abs_error_vs_fp64": 3.000233883554415e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 2.952446886972382e-08,
+      "device_main_max_abs_error_vs_fp64": 6.117094831092906e-05,
+      "device_main_p99_abs_error_vs_fp64": 6.0256843407324734e-05,
+      "device_main_vs_legacy_main_differing_bf16_components": 1,
+      "device_main_vs_legacy_main_max_abs": 6.103515625e-05,
+      "legacy_main_max_abs_error_vs_fp64": 6.117094831092906e-05,
+      "legacy_main_p99_abs_error_vs_fp64": 6.0256843407324734e-05,
+      "pair": 30,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_32768",
+      "bound": 4.530382519352116e-05,
+      "device_indexer_max_abs_error_vs_fp64": 2.9920107724734635e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 2.9495917819311046e-08,
+      "device_main_max_abs_error_vs_fp64": 2.265191259676058e-05,
+      "device_main_p99_abs_error_vs_fp64": 2.231341277122989e-05,
+      "device_main_vs_legacy_main_differing_bf16_components": 8,
+      "device_main_vs_legacy_main_max_abs": 3.0517578125e-05,
+      "legacy_main_max_abs_error_vs_fp64": 2.265191259676058e-05,
+      "legacy_main_p99_abs_error_vs_fp64": 2.231341277122989e-05,
+      "pair": 31,
+      "pass": true,
+      "positions": [
+        8192,
+        32767
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.003906293375918857,
+      "device_indexer_max_abs_error_vs_fp64": 1.2612897148933655e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 7.653495177284421e-08,
+      "device_main_max_abs_error_vs_fp64": 0.0019531466879594284,
+      "device_main_p99_abs_error_vs_fp64": 0.001937832767264971,
+      "device_main_vs_legacy_main_differing_bf16_components": 0,
+      "device_main_vs_legacy_main_max_abs": 0.0,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531466879594284,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001937832767264971,
+      "pair": 0,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.014187518227562368,
+      "device_indexer_max_abs_error_vs_fp64": 0.17784327900045413,
+      "device_indexer_p99_abs_error_vs_fp64": 0.16856834977537585,
+      "device_main_max_abs_error_vs_fp64": 0.17787398284309405,
+      "device_main_p99_abs_error_vs_fp64": 0.16859688608962128,
+      "device_main_vs_legacy_main_differing_bf16_components": 194427,
+      "device_main_vs_legacy_main_max_abs": 0.171875,
+      "legacy_main_max_abs_error_vs_fp64": 0.007093759113781184,
+      "legacy_main_p99_abs_error_vs_fp64": 0.005736290408040538,
+      "pair": 1,
+      "pass": false,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.008997446000043263,
+      "device_indexer_max_abs_error_vs_fp64": 0.04360551813935921,
+      "device_indexer_p99_abs_error_vs_fp64": 0.04062197957487502,
+      "device_main_max_abs_error_vs_fp64": 0.043557959220763894,
+      "device_main_p99_abs_error_vs_fp64": 0.04064802339993794,
+      "device_main_vs_legacy_main_differing_bf16_components": 186048,
+      "device_main_vs_legacy_main_max_abs": 0.043212890625,
+      "legacy_main_max_abs_error_vs_fp64": 0.004498723000021632,
+      "legacy_main_p99_abs_error_vs_fp64": 0.003300526707509132,
+      "pair": 2,
+      "pass": false,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.0060731843642334304,
+      "device_indexer_max_abs_error_vs_fp64": 0.023903704650518477,
+      "device_indexer_p99_abs_error_vs_fp64": 0.022358138040309387,
+      "device_main_max_abs_error_vs_fp64": 0.023896422677276083,
+      "device_main_p99_abs_error_vs_fp64": 0.022406308328986796,
+      "device_main_vs_legacy_main_differing_bf16_components": 177044,
+      "device_main_vs_legacy_main_max_abs": 0.02392578125,
+      "legacy_main_max_abs_error_vs_fp64": 0.0030365921821167152,
+      "legacy_main_p99_abs_error_vs_fp64": 0.002370738322805392,
+      "pair": 3,
+      "pass": false,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.006082181133392428,
+      "device_indexer_max_abs_error_vs_fp64": 0.0043982797571479534,
+      "device_indexer_p99_abs_error_vs_fp64": 0.003841694123775849,
+      "device_main_max_abs_error_vs_fp64": 0.0055734932697121264,
+      "device_main_p99_abs_error_vs_fp64": 0.004251846331065161,
+      "device_main_vs_legacy_main_differing_bf16_components": 100846,
+      "device_main_vs_legacy_main_max_abs": 0.005859375,
+      "legacy_main_max_abs_error_vs_fp64": 0.003041090566696214,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0022377032178087244,
+      "pair": 4,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.005679335246810302,
+      "device_indexer_max_abs_error_vs_fp64": 0.027441433125241256,
+      "device_indexer_p99_abs_error_vs_fp64": 0.026130419912202343,
+      "device_main_max_abs_error_vs_fp64": 0.027557216714832522,
+      "device_main_p99_abs_error_vs_fp64": 0.02618111077836227,
+      "device_main_vs_legacy_main_differing_bf16_components": 179293,
+      "device_main_vs_legacy_main_max_abs": 0.02685546875,
+      "legacy_main_max_abs_error_vs_fp64": 0.002839667623405151,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0022667301731546362,
+      "pair": 5,
+      "pass": false,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.004404529540732449,
+      "device_indexer_max_abs_error_vs_fp64": 0.008923084960711425,
+      "device_indexer_p99_abs_error_vs_fp64": 0.008414557760010521,
+      "device_main_max_abs_error_vs_fp64": 0.009479319068306569,
+      "device_main_p99_abs_error_vs_fp64": 0.008606446315627422,
+      "device_main_vs_legacy_main_differing_bf16_components": 143677,
+      "device_main_vs_legacy_main_max_abs": 0.009765625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0022022647703662246,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019788699305079084,
+      "pair": 6,
+      "pass": false,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.004647891323903419,
+      "device_indexer_max_abs_error_vs_fp64": 0.004885018801613735,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0046264383491787615,
+      "device_main_max_abs_error_vs_fp64": 0.006124359651896505,
+      "device_main_p99_abs_error_vs_fp64": 0.00509905306562751,
+      "device_main_vs_legacy_main_differing_bf16_components": 115316,
+      "device_main_vs_legacy_main_max_abs": 0.0078125,
+      "legacy_main_max_abs_error_vs_fp64": 0.0023239456619517096,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0020586933923762087,
+      "pair": 7,
+      "pass": false,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.004084800327861737,
+      "device_indexer_max_abs_error_vs_fp64": 0.0035092250667664027,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0033012316079083356,
+      "device_main_max_abs_error_vs_fp64": 0.004843243218560556,
+      "device_main_p99_abs_error_vs_fp64": 0.004012744128315237,
+      "device_main_vs_legacy_main_differing_bf16_components": 94729,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0020424001639308687,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001942924009703697,
+      "pair": 8,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.003993067441624865,
+      "device_indexer_max_abs_error_vs_fp64": 0.00041936340112180837,
+      "device_indexer_p99_abs_error_vs_fp64": 0.00037714753938619547,
+      "device_main_max_abs_error_vs_fp64": 0.002264033757956807,
+      "device_main_p99_abs_error_vs_fp64": 0.0020598180425861513,
+      "device_main_vs_legacy_main_differing_bf16_components": 21724,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019965337208124323,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019394690970967333,
+      "pair": 9,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.004031180351568686,
+      "device_indexer_max_abs_error_vs_fp64": 0.0010613958151905988,
+      "device_indexer_p99_abs_error_vs_fp64": 0.00100068846432443,
+      "device_main_max_abs_error_vs_fp64": 0.0028351962024593114,
+      "device_main_p99_abs_error_vs_fp64": 0.0024301598216924882,
+      "device_main_vs_legacy_main_differing_bf16_components": 48036,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.002015590175784343,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001943033459393182,
+      "pair": 10,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.00398055243414519,
+      "device_indexer_max_abs_error_vs_fp64": 0.0012725957558647125,
+      "device_indexer_p99_abs_error_vs_fp64": 0.001206027760951679,
+      "device_main_max_abs_error_vs_fp64": 0.0030072875481663708,
+      "device_main_p99_abs_error_vs_fp64": 0.0025624126485458663,
+      "device_main_vs_legacy_main_differing_bf16_components": 51623,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001990276217072595,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019383090460332885,
+      "pair": 11,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.003931431799449214,
+      "device_indexer_max_abs_error_vs_fp64": 0.0013018254713815444,
+      "device_indexer_p99_abs_error_vs_fp64": 0.001247543605776574,
+      "device_main_max_abs_error_vs_fp64": 0.0030494135427452385,
+      "device_main_p99_abs_error_vs_fp64": 0.002587758983053262,
+      "device_main_vs_legacy_main_differing_bf16_components": 53338,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001965715899724607,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019377748442669196,
+      "pair": 12,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.003921545302188578,
+      "device_indexer_max_abs_error_vs_fp64": 0.00018150405646718756,
+      "device_indexer_p99_abs_error_vs_fp64": 0.00017027871991783905,
+      "device_main_max_abs_error_vs_fp64": 0.0021000579788064133,
+      "device_main_p99_abs_error_vs_fp64": 0.001980086727076221,
+      "device_main_vs_legacy_main_differing_bf16_components": 12706,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001960772651094289,
+      "legacy_main_p99_abs_error_vs_fp64": 0.00193808560106563,
+      "pair": 13,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.00392320527491985,
+      "device_indexer_max_abs_error_vs_fp64": 0.00019070115069607513,
+      "device_indexer_p99_abs_error_vs_fp64": 0.00018231442819219846,
+      "device_main_max_abs_error_vs_fp64": 0.00210926499413977,
+      "device_main_p99_abs_error_vs_fp64": 0.0019843184320722787,
+      "device_main_vs_legacy_main_differing_bf16_components": 13513,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001961602637459925,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019381009209574385,
+      "pair": 14,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.003908598115848649,
+      "device_indexer_max_abs_error_vs_fp64": 0.00014715786581976503,
+      "device_indexer_p99_abs_error_vs_fp64": 0.00014016110333193725,
+      "device_main_max_abs_error_vs_fp64": 0.0020717918687055414,
+      "device_main_p99_abs_error_vs_fp64": 0.0019697688195732723,
+      "device_main_vs_legacy_main_differing_bf16_components": 10534,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019542990579243247,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019382251382455784,
+      "pair": 15,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.00391284546860815,
+      "device_indexer_max_abs_error_vs_fp64": 9.939884450183706e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 9.583827616581144e-05,
+      "device_main_max_abs_error_vs_fp64": 0.0020329893736501514,
+      "device_main_p99_abs_error_vs_fp64": 0.001953700381003097,
+      "device_main_vs_legacy_main_differing_bf16_components": 8020,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001956422734304075,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019380505958773787,
+      "pair": 16,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.003907259338286062,
+      "device_indexer_max_abs_error_vs_fp64": 2.130665294428069e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 1.9847408794243968e-05,
+      "device_main_max_abs_error_vs_fp64": 0.001967981234195171,
+      "device_main_p99_abs_error_vs_fp64": 0.0019382600175143906,
+      "device_main_vs_legacy_main_differing_bf16_components": 2057,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953629669143031,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019382600175143906,
+      "pair": 17,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.0039073348413460884,
+      "device_indexer_max_abs_error_vs_fp64": 3.085432643941399e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 2.8986030842186318e-05,
+      "device_main_max_abs_error_vs_fp64": 0.001973952063810791,
+      "device_main_p99_abs_error_vs_fp64": 0.0019370632640950346,
+      "device_main_vs_legacy_main_differing_bf16_components": 2726,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019536674206730442,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019369770939811415,
+      "pair": 18,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.003906511844236071,
+      "device_indexer_max_abs_error_vs_fp64": 1.6949367411867033e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 1.6655371246035445e-05,
+      "device_main_max_abs_error_vs_fp64": 0.00196637080731743,
+      "device_main_p99_abs_error_vs_fp64": 0.0019384126381168899,
+      "device_main_vs_legacy_main_differing_bf16_components": 1820,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019532559221180357,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019384126381168899,
+      "pair": 19,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.003906529663501468,
+      "device_indexer_max_abs_error_vs_fp64": 1.3818269837151398e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 1.3527268889885966e-05,
+      "device_main_max_abs_error_vs_fp64": 0.001961533291178319,
+      "device_main_p99_abs_error_vs_fp64": 0.0019379154262422428,
+      "device_main_vs_legacy_main_differing_bf16_components": 1545,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953264831750734,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019379154262422428,
+      "pair": 20,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.0039063493631184,
+      "device_indexer_max_abs_error_vs_fp64": 4.350721442059058e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 4.293011689277815e-06,
+      "device_main_max_abs_error_vs_fp64": 0.0019560286407492855,
+      "device_main_p99_abs_error_vs_fp64": 0.001937423852067005,
+      "device_main_vs_legacy_main_differing_bf16_components": 621,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531746815592,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001937423852067005,
+      "pair": 21,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.0039062001522205403,
+      "device_indexer_max_abs_error_vs_fp64": 1.635544974898373e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 1.5666851846518615e-06,
+      "device_main_max_abs_error_vs_fp64": 0.001954502724644591,
+      "device_main_p99_abs_error_vs_fp64": 0.0019389315058973833,
+      "device_main_vs_legacy_main_differing_bf16_components": 264,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531000761102701,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019389315058973833,
+      "pair": 22,
+      "pass": false,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.0039061868448690973,
+      "device_indexer_max_abs_error_vs_fp64": 8.897602070678801e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 8.3903802536478e-07,
+      "device_main_max_abs_error_vs_fp64": 0.001953536482702356,
+      "device_main_p99_abs_error_vs_fp64": 0.0019400329189285326,
+      "device_main_vs_legacy_main_differing_bf16_components": 30,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019530934224345486,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019400329189285326,
+      "pair": 23,
+      "pass": false,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.003906180388126179,
+      "device_indexer_max_abs_error_vs_fp64": 1.0750344314747196e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 9.988624685841608e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0019538900075357635,
+      "device_main_p99_abs_error_vs_fp64": 0.0019403382471455844,
+      "device_main_vs_legacy_main_differing_bf16_components": 31,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019530901940630896,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019403382471455844,
+      "pair": 24,
+      "pass": false,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.003906288697872906,
+      "device_indexer_max_abs_error_vs_fp64": 9.346030764856295e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 8.832109715878334e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0019534387783431972,
+      "device_main_p99_abs_error_vs_fp64": 0.001934063278281908,
+      "device_main_vs_legacy_main_differing_bf16_components": 30,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953144348936453,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001934063278281908,
+      "pair": 25,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.003906268965743864,
+      "device_indexer_max_abs_error_vs_fp64": 1.5476686082704916e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 1.3498276736689797e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0019531640461131206,
+      "device_main_p99_abs_error_vs_fp64": 0.0019326261347854213,
+      "device_main_vs_legacy_main_differing_bf16_components": 6,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953134482871932,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019326261347854213,
+      "pair": 26,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.0039061587852111668,
+      "device_indexer_max_abs_error_vs_fp64": 6.110354443533694e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 5.914013998625789e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0019531899774875017,
+      "device_main_p99_abs_error_vs_fp64": 0.0019363438244613684,
+      "device_main_vs_legacy_main_differing_bf16_components": 49,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019530793926055834,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019363438244613684,
+      "pair": 27,
+      "pass": false,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.003906250976050574,
+      "device_indexer_max_abs_error_vs_fp64": 2.5576721858489027e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 2.4596866287987516e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0019531245119747132,
+      "device_main_p99_abs_error_vs_fp64": 0.0019353860578673798,
+      "device_main_vs_legacy_main_differing_bf16_components": 28,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953125488025287,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019353860578673798,
+      "pair": 28,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.003906279523262501,
+      "device_indexer_max_abs_error_vs_fp64": 1.2769858594163797e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 1.2067545323304895e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0019531397616312507,
+      "device_main_p99_abs_error_vs_fp64": 0.001936091987706714,
+      "device_main_vs_legacy_main_differing_bf16_components": 26,
+      "device_main_vs_legacy_main_max_abs": 0.00048828125,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531397616312507,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001936091987706714,
+      "pair": 29,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.001957260591126664,
+      "device_indexer_max_abs_error_vs_fp64": 3.3354502715354784e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 3.119519418164074e-08,
+      "device_main_max_abs_error_vs_fp64": 0.000978630295563332,
+      "device_main_p99_abs_error_vs_fp64": 0.0009640082762631774,
+      "device_main_vs_legacy_main_differing_bf16_components": 13,
+      "device_main_vs_legacy_main_max_abs": 0.000244140625,
+      "legacy_main_max_abs_error_vs_fp64": 0.000978630295563332,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0009640082762631774,
+      "pair": 30,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_131072",
+      "bound": 0.000724853334128639,
+      "device_indexer_max_abs_error_vs_fp64": 5.4993611747766735e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 5.266089453091066e-08,
+      "device_main_max_abs_error_vs_fp64": 0.0003624266670643195,
+      "device_main_p99_abs_error_vs_fp64": 0.00035701098956600455,
+      "device_main_vs_legacy_main_differing_bf16_components": 37,
+      "device_main_vs_legacy_main_max_abs": 0.0001220703125,
+      "legacy_main_max_abs_error_vs_fp64": 0.0003624266670643195,
+      "legacy_main_p99_abs_error_vs_fp64": 0.00035701098956600455,
+      "pair": 31,
+      "pass": true,
+      "positions": [
+        32768,
+        131071
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.0039062438205765826,
+      "device_indexer_max_abs_error_vs_fp64": 1.205042794438782e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 7.67583174399178e-08,
+      "device_main_max_abs_error_vs_fp64": 0.0019531568458116544,
+      "device_main_p99_abs_error_vs_fp64": 0.0019379485607572812,
+      "device_main_vs_legacy_main_differing_bf16_components": 2,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531219102882913,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019379485607572812,
+      "pair": 0,
+      "pass": false,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.02670831328552281,
+      "device_indexer_max_abs_error_vs_fp64": 0.3543460638618864,
+      "device_indexer_p99_abs_error_vs_fp64": 0.33950293685378524,
+      "device_main_max_abs_error_vs_fp64": 0.3545400173759855,
+      "device_main_p99_abs_error_vs_fp64": 0.3395216902979819,
+      "device_main_vs_legacy_main_differing_bf16_components": 261839,
+      "device_main_vs_legacy_main_max_abs": 0.35498046875,
+      "legacy_main_max_abs_error_vs_fp64": 0.013354156642761406,
+      "legacy_main_p99_abs_error_vs_fp64": 0.011505258873557096,
+      "pair": 1,
+      "pass": false,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.014043521599755415,
+      "device_indexer_max_abs_error_vs_fp64": 0.08738468069930205,
+      "device_indexer_p99_abs_error_vs_fp64": 0.08229180874010006,
+      "device_main_max_abs_error_vs_fp64": 0.08739369031388888,
+      "device_main_p99_abs_error_vs_fp64": 0.08231888599952067,
+      "device_main_vs_legacy_main_differing_bf16_components": 258085,
+      "device_main_vs_legacy_main_max_abs": 0.0936279296875,
+      "legacy_main_max_abs_error_vs_fp64": 0.007021760799877708,
+      "legacy_main_p99_abs_error_vs_fp64": 0.005895558495444561,
+      "pair": 2,
+      "pass": false,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.008563777953179308,
+      "device_indexer_max_abs_error_vs_fp64": 0.04790669799836288,
+      "device_indexer_p99_abs_error_vs_fp64": 0.04528454483512706,
+      "device_main_max_abs_error_vs_fp64": 0.04797837630899558,
+      "device_main_p99_abs_error_vs_fp64": 0.0453214573675415,
+      "device_main_vs_legacy_main_differing_bf16_components": 253604,
+      "device_main_vs_legacy_main_max_abs": 0.05078125,
+      "legacy_main_max_abs_error_vs_fp64": 0.004281888976589654,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0032413120179136676,
+      "pair": 3,
+      "pass": false,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.00843526771848424,
+      "device_indexer_max_abs_error_vs_fp64": 0.008824170717616181,
+      "device_indexer_p99_abs_error_vs_fp64": 0.007905198561744957,
+      "device_main_max_abs_error_vs_fp64": 0.009352422752688938,
+      "device_main_p99_abs_error_vs_fp64": 0.00808912661411685,
+      "device_main_vs_legacy_main_differing_bf16_components": 200173,
+      "device_main_vs_legacy_main_max_abs": 0.0087890625,
+      "legacy_main_max_abs_error_vs_fp64": 0.00421763385924212,
+      "legacy_main_p99_abs_error_vs_fp64": 0.002944748805433629,
+      "pair": 4,
+      "pass": false,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.00759961735898429,
+      "device_indexer_max_abs_error_vs_fp64": 0.05495690778672796,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0528019495232414,
+      "device_main_max_abs_error_vs_fp64": 0.0550519503516086,
+      "device_main_p99_abs_error_vs_fp64": 0.05283441154185169,
+      "device_main_vs_legacy_main_differing_bf16_components": 254748,
+      "device_main_vs_legacy_main_max_abs": 0.05419921875,
+      "legacy_main_max_abs_error_vs_fp64": 0.003799808679492145,
+      "legacy_main_p99_abs_error_vs_fp64": 0.002900739681256091,
+      "pair": 5,
+      "pass": false,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.004995798211246516,
+      "device_indexer_max_abs_error_vs_fp64": 0.017854246557922088,
+      "device_indexer_p99_abs_error_vs_fp64": 0.017013685448147086,
+      "device_main_max_abs_error_vs_fp64": 0.018098889280752622,
+      "device_main_p99_abs_error_vs_fp64": 0.017103629000998256,
+      "device_main_vs_legacy_main_differing_bf16_components": 237193,
+      "device_main_vs_legacy_main_max_abs": 0.0185546875,
+      "legacy_main_max_abs_error_vs_fp64": 0.002497899105623258,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0021123061360239425,
+      "pair": 6,
+      "pass": false,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.00537017698617448,
+      "device_indexer_max_abs_error_vs_fp64": 0.009803422767139617,
+      "device_indexer_p99_abs_error_vs_fp64": 0.009354086751905135,
+      "device_main_max_abs_error_vs_fp64": 0.010377159293983584,
+      "device_main_p99_abs_error_vs_fp64": 0.009529282401156408,
+      "device_main_vs_legacy_main_differing_bf16_components": 217651,
+      "device_main_vs_legacy_main_max_abs": 0.01171875,
+      "legacy_main_max_abs_error_vs_fp64": 0.00268508849308724,
+      "legacy_main_p99_abs_error_vs_fp64": 0.002306128311466327,
+      "pair": 7,
+      "pass": false,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.004304441741724174,
+      "device_indexer_max_abs_error_vs_fp64": 0.00704063423684019,
+      "device_indexer_p99_abs_error_vs_fp64": 0.006680392454960464,
+      "device_main_max_abs_error_vs_fp64": 0.007840282101859053,
+      "device_main_p99_abs_error_vs_fp64": 0.006972229616088342,
+      "device_main_vs_legacy_main_differing_bf16_components": 192431,
+      "device_main_vs_legacy_main_max_abs": 0.0078125,
+      "legacy_main_max_abs_error_vs_fp64": 0.002152220870862087,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019650741110146222,
+      "pair": 8,
+      "pass": false,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.0041063662403271195,
+      "device_indexer_max_abs_error_vs_fp64": 0.0008421853248631803,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0007687139873275117,
+      "device_main_max_abs_error_vs_fp64": 0.0026426106109829206,
+      "device_main_p99_abs_error_vs_fp64": 0.0022999884383737078,
+      "device_main_vs_legacy_main_differing_bf16_components": 55996,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0020531831201635597,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019476010259039133,
+      "pair": 9,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.004194751133147934,
+      "device_indexer_max_abs_error_vs_fp64": 0.0021241216550642525,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0020244767185720438,
+      "device_main_max_abs_error_vs_fp64": 0.003739538679286336,
+      "device_main_p99_abs_error_vs_fp64": 0.0031699867038305703,
+      "device_main_vs_legacy_main_differing_bf16_components": 112920,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.002097375566573967,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019746486406492505,
+      "pair": 10,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.004071353358700902,
+      "device_indexer_max_abs_error_vs_fp64": 0.0025542227418927,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0024379661286637244,
+      "device_main_max_abs_error_vs_fp64": 0.004065261690217592,
+      "device_main_p99_abs_error_vs_fp64": 0.003465288564632725,
+      "device_main_vs_legacy_main_differing_bf16_components": 119963,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.002035676679350451,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019434183874603406,
+      "pair": 11,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.003973419333176409,
+      "device_indexer_max_abs_error_vs_fp64": 0.002610637860060522,
+      "device_indexer_p99_abs_error_vs_fp64": 0.002518601720938165,
+      "device_main_max_abs_error_vs_fp64": 0.004173570435149543,
+      "device_main_p99_abs_error_vs_fp64": 0.003526186194522816,
+      "device_main_vs_legacy_main_differing_bf16_components": 123140,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019867096665882045,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019384590293801329,
+      "pair": 12,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.003950704490216728,
+      "device_indexer_max_abs_error_vs_fp64": 0.0003659021527744402,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0003454846099329312,
+      "device_main_max_abs_error_vs_fp64": 0.0022588619428379753,
+      "device_main_p99_abs_error_vs_fp64": 0.00208131146699647,
+      "device_main_vs_legacy_main_differing_bf16_components": 33905,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001975352245108364,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019382529500852953,
+      "pair": 13,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.003942421190706202,
+      "device_indexer_max_abs_error_vs_fp64": 0.00038415987467656405,
+      "device_indexer_p99_abs_error_vs_fp64": 0.0003689836114845069,
+      "device_main_max_abs_error_vs_fp64": 0.0022684503470942197,
+      "device_main_p99_abs_error_vs_fp64": 0.0020957473958706447,
+      "device_main_vs_legacy_main_differing_bf16_components": 35891,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001971210595353101,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019380561602349556,
+      "pair": 14,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.003914086140781592,
+      "device_indexer_max_abs_error_vs_fp64": 0.00029721990254421085,
+      "device_indexer_p99_abs_error_vs_fp64": 0.000284321661359227,
+      "device_main_max_abs_error_vs_fp64": 0.0021853535957985226,
+      "device_main_p99_abs_error_vs_fp64": 0.0020492692313187582,
+      "device_main_vs_legacy_main_differing_bf16_components": 28551,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001957043070390796,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019383859581497288,
+      "pair": 15,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.003921221001802477,
+      "device_indexer_max_abs_error_vs_fp64": 0.00020215696588568935,
+      "device_indexer_p99_abs_error_vs_fp64": 0.00019486895161133612,
+      "device_main_max_abs_error_vs_fp64": 0.002111959245735706,
+      "device_main_p99_abs_error_vs_fp64": 0.0020022018116413335,
+      "device_main_vs_legacy_main_differing_bf16_components": 21951,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019606105009012387,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019381103492617502,
+      "pair": 16,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.0039087309186292,
+      "device_indexer_max_abs_error_vs_fp64": 4.2808650882797394e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 4.029161699810935e-05,
+      "device_main_max_abs_error_vs_fp64": 0.001986504540095857,
+      "device_main_p99_abs_error_vs_fp64": 0.0019403180818669563,
+      "device_main_vs_legacy_main_differing_bf16_components": 5994,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019543654593146,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019378433573774424,
+      "pair": 17,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.003907872276608604,
+      "device_indexer_max_abs_error_vs_fp64": 6.13572731555656e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 5.859184705410733e-05,
+      "device_main_max_abs_error_vs_fp64": 0.0020019608163670544,
+      "device_main_p99_abs_error_vs_fp64": 0.0019469845808722263,
+      "device_main_vs_legacy_main_differing_bf16_components": 8154,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953936138304302,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019396072233539919,
+      "pair": 18,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.003906961864894809,
+      "device_indexer_max_abs_error_vs_fp64": 3.650441706948976e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 3.5771006097742306e-05,
+      "device_main_max_abs_error_vs_fp64": 0.0019805366511657096,
+      "device_main_p99_abs_error_vs_fp64": 0.0019388949351626117,
+      "device_main_vs_legacy_main_differing_bf16_components": 5457,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019534809324474045,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019376578156975865,
+      "pair": 19,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.003906970830141132,
+      "device_indexer_max_abs_error_vs_fp64": 2.7478861610114036e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 2.714499298890116e-05,
+      "device_main_max_abs_error_vs_fp64": 0.0019747055261865043,
+      "device_main_p99_abs_error_vs_fp64": 0.0019383878638262477,
+      "device_main_vs_legacy_main_differing_bf16_components": 4227,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953485415070566,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019380015042390353,
+      "pair": 20,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.003906374522576472,
+      "device_indexer_max_abs_error_vs_fp64": 1.0135344100908883e-05,
+      "device_indexer_p99_abs_error_vs_fp64": 9.826474578102928e-06,
+      "device_main_max_abs_error_vs_fp64": 0.0019603630115186954,
+      "device_main_p99_abs_error_vs_fp64": 0.0019382886944637702,
+      "device_main_vs_legacy_main_differing_bf16_components": 1533,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953187261288236,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019382886944637702,
+      "pair": 21,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.0039062884336411585,
+      "device_indexer_max_abs_error_vs_fp64": 4.116077586613321e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 3.971243837770366e-06,
+      "device_main_max_abs_error_vs_fp64": 0.001955561345111656,
+      "device_main_p99_abs_error_vs_fp64": 0.0019379015056608263,
+      "device_main_vs_legacy_main_differing_bf16_components": 879,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531442168205793,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019379015056608263,
+      "pair": 22,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.0039062462616261673,
+      "device_indexer_max_abs_error_vs_fp64": 1.7345153091041787e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 1.6340486383903399e-06,
+      "device_main_max_abs_error_vs_fp64": 0.0019541085206614683,
+      "device_main_p99_abs_error_vs_fp64": 0.001938331167558216,
+      "device_main_vs_legacy_main_differing_bf16_components": 319,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531231308130836,
+      "legacy_main_p99_abs_error_vs_fp64": 0.001938331167558216,
+      "pair": 23,
+      "pass": false,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.0039062388412882676,
+      "device_indexer_max_abs_error_vs_fp64": 2.584616141776408e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 2.531764269542158e-06,
+      "device_main_max_abs_error_vs_fp64": 0.001954290908590006,
+      "device_main_p99_abs_error_vs_fp64": 0.0019360797951170961,
+      "device_main_vs_legacy_main_differing_bf16_components": 944,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531194206441338,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019360797951170961,
+      "pair": 24,
+      "pass": false,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.0039063147857612,
+      "device_indexer_max_abs_error_vs_fp64": 1.8738254364270013e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 1.7901137215003971e-06,
+      "device_main_max_abs_error_vs_fp64": 0.0019547063697884504,
+      "device_main_p99_abs_error_vs_fp64": 0.0019432762772546531,
+      "device_main_vs_legacy_main_differing_bf16_components": 60,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531573928806,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019432762772546531,
+      "pair": 25,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.003906257706038918,
+      "device_indexer_max_abs_error_vs_fp64": 2.7307789984831743e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 2.4324973964873207e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0019533004248792896,
+      "device_main_p99_abs_error_vs_fp64": 0.0019390477394150007,
+      "device_main_vs_legacy_main_differing_bf16_components": 25,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953128853019459,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019390477394150007,
+      "pair": 26,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.003906302564412378,
+      "device_indexer_max_abs_error_vs_fp64": 1.155854699785852e-06,
+      "device_indexer_p99_abs_error_vs_fp64": 1.1232109074654772e-06,
+      "device_main_max_abs_error_vs_fp64": 0.0019534585983813635,
+      "device_main_p99_abs_error_vs_fp64": 0.0019338209683846142,
+      "device_main_vs_legacy_main_differing_bf16_components": 75,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953151282206189,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019338209683846142,
+      "pair": 27,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.0039062373040088527,
+      "device_indexer_max_abs_error_vs_fp64": 5.017018833430864e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 4.843568771817353e-07,
+      "device_main_max_abs_error_vs_fp64": 0.001953197525814465,
+      "device_main_p99_abs_error_vs_fp64": 0.0019316168883423714,
+      "device_main_vs_legacy_main_differing_bf16_components": 50,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531186520044264,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019316168883423714,
+      "pair": 28,
+      "pass": false,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.003906278837837895,
+      "device_indexer_max_abs_error_vs_fp64": 2.549822508413069e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 2.4138578460841664e-07,
+      "device_main_max_abs_error_vs_fp64": 0.001953161318777097,
+      "device_main_p99_abs_error_vs_fp64": 0.0019308881699880809,
+      "device_main_vs_legacy_main_differing_bf16_components": 52,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0019531394189189477,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019308881699880809,
+      "pair": 29,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.003906271198943934,
+      "device_indexer_max_abs_error_vs_fp64": 6.602729499260995e-08,
+      "device_indexer_p99_abs_error_vs_fp64": 6.046500432232982e-08,
+      "device_main_max_abs_error_vs_fp64": 0.001953156686886892,
+      "device_main_p99_abs_error_vs_fp64": 0.0019392449384772936,
+      "device_main_vs_legacy_main_differing_bf16_components": 8,
+      "device_main_vs_legacy_main_max_abs": 0.00390625,
+      "legacy_main_max_abs_error_vs_fp64": 0.001953135599471967,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0019392449384772936,
+      "pair": 30,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    },
+    {
+      "band": "le_262656",
+      "bound": 0.0029102644099558983,
+      "device_indexer_max_abs_error_vs_fp64": 1.1002497490864016e-07,
+      "device_indexer_p99_abs_error_vs_fp64": 1.059620777688064e-07,
+      "device_main_max_abs_error_vs_fp64": 0.0014551322049779492,
+      "device_main_p99_abs_error_vs_fp64": 0.0014405925308578072,
+      "device_main_vs_legacy_main_differing_bf16_components": 48,
+      "device_main_vs_legacy_main_max_abs": 0.000244140625,
+      "legacy_main_max_abs_error_vs_fp64": 0.0014551322049779492,
+      "legacy_main_p99_abs_error_vs_fp64": 0.0014405925308578072,
+      "pair": 31,
+      "pass": true,
+      "positions": [
+        131072,
+        262656
+      ]
+    }
+  ],
+  "decision_rule": "per (pair, band): device_main_vs_legacy_main_max_abs <= kappa * legacy_main_max_abs_error_vs_fp64",
+  "failing_cells": [
+    "le_8192/pair1",
+    "le_8192/pair8",
+    "le_8192/pair9",
+    "le_8192/pair13",
+    "le_8192/pair14",
+    "le_8192/pair15",
+    "le_8192/pair16",
+    "le_8192/pair17",
+    "le_8192/pair18",
+    "le_8192/pair19",
+    "le_8192/pair22",
+    "le_8192/pair31",
+    "le_32768/pair1",
+    "le_32768/pair2",
+    "le_32768/pair3",
+    "le_32768/pair5",
+    "le_32768/pair15",
+    "le_32768/pair16",
+    "le_32768/pair18",
+    "le_32768/pair19",
+    "le_32768/pair20",
+    "le_32768/pair21",
+    "le_32768/pair22",
+    "le_131072/pair1",
+    "le_131072/pair2",
+    "le_131072/pair3",
+    "le_131072/pair5",
+    "le_131072/pair6",
+    "le_131072/pair7",
+    "le_131072/pair22",
+    "le_131072/pair23",
+    "le_131072/pair24",
+    "le_131072/pair27",
+    "le_262656/pair0",
+    "le_262656/pair1",
+    "le_262656/pair2",
+    "le_262656/pair3",
+    "le_262656/pair4",
+    "le_262656/pair5",
+    "le_262656/pair6",
+    "le_262656/pair7",
+    "le_262656/pair8",
+    "le_262656/pair23",
+    "le_262656/pair24",
+    "le_262656/pair28"
+  ],
+  "forms": {
+    "device_indexer": "rotary_cos_sin(f32) + apply_rotary f32 on device (WS32 and legacy indexer form; recorded only)",
+    "device_main": "rotary_cos_sin(bf16) + apply_rotary bf16 on device (WS32 main-attention form)",
+    "fp64": "float64 angles and trigonometry",
+    "legacy_main": "host FP32 table stored BF16, FP32 products, final BF16 round (DB531 legacy main form)"
+  },
+  "kappa": 2.0,
+  "platform": {
+    "backend": "tpu",
+    "device_kind": "TPU v4",
+    "jax_version": "0.10.1",
+    "libtpu_version": "0.0.41",
+    "platform": "tpu"
+  },
+  "positions": 262657,
+  "probe": "(1, 0) per pair; position-independent BF16 product rounding of the real site is out of scope",
+  "record_sha256": "260ddcde699f903db377fdcebc25df51ff6215f873377f45af479b17258ed46b",
+  "rotary_dim": 64,
+  "script_sha256": "a6d166fafbdbdeb9307f70e6021edfbbb71053e94c5f7b2eef764512b2a5d4fc",
+  "source_code_hash": "d464a7f6c57b05d19d514627b56bcde5ac68715b",
+  "source_run_tag": "greenfield_ws32_short_decoder_8k_acquire_cap131072_20260905T200533413431414Z",
+  "theta": 8000000.0,
+  "verdict": "FAIL"
+}

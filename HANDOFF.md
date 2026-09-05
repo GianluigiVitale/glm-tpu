@@ -12806,4 +12806,81 @@ L8 (≈54 GB at current per-run cost, ≈21 GB with evidence layout v2) without 
 deletion candidate (the refused C = 512 run's `hlo/`, 1.72 GB) is no longer needed and is not pursued.
 The pending Opus 5 reviews are: evidence layout v2 (`e58edc02`, unmerged) and, once written, the A′
 main-attention rotary table.
+## 2026-09-05 21:00Z — rotary diagnostic result, decision A′, and its implementation
+
+The TPU diagnostic returned FAIL (45/128 cells) with the numbers now in spec §23.9 and the artifact
+`docs/artifacts/gate-l-ws32-rotary-long-position-diagnostic-20260905.json`. Decision taken under the
+goal's Decisions rule, with no owner round-trip: adopt A′ (legacy-faithful main-attention host BF16
+rotary table, default off) and keep the indexer on device. Alternative rejected: run L7 on the
+on-device form and fix only on failure. Implemented in the dev worktree: `Ws32DecoderConfig.host_main_rope_table`
+and `main_rope_table_shape`; `build_ws32_main_rope_table` using the accepted construction at
+`WS32_MAIN_ROPE_THETA = 8e6`; a per-step row gather under `greenfield_ws32_main_rope_table_lookup` in
+`_ws32_decode_impl` threaded through the transformer and attention layers to the single main-attention
+rotary site, which rotates the query and the current key with `apply_rotary_fp32_final_round` from the
+row; the table is one replicated trailing input of the decode, observer, prefill and chunked-prefill
+programs (absent entirely when the flag is off); the runner records `main_rope_table` (rows, dim, theta,
+bytes, SHA-256); the sealer requires it present iff declared, rebuilds the table at the sealing pin and
+compares the SHA, requires cross-rank identity, adds `_hrope` to the run tag and
+`MAIN_ROTARY_HOST_TABLE_LEGACY_FAITHFUL` to the classification; the HLO linter requires the table scope
+in decode/observer/prefill exactly when declared. The 131,072 acquisition's pins are superseded for the
+table-on path; its compiled memory (27.46 GB arguments + 1.23 GB temp per chip) confirms 128K fits.
+Awaiting Opus 5 review of both this and evidence layout v2 before any protected run.
+
+## 2026-09-05 21:40Z — layout-v2 rejection resolved; offline event adjudicator; B′ sequencing decision
+
+Opus 5 review of evidence layout v2: REJECT on one measured P1 — the v2 path inflated a second copy of
+each HLO text (≈450 MB per run on the controller) instead of hard-linking worker-0's own file as v1 did,
+eating the 1 GiB sealing reserve behind the 4 GiB launch floor. Fixed by reusing `candidates_by_sha`
+(inflation is now only the fallback, and bounded by free disk); a test asserts inode identity between the
+worker's text and the materialized per-rank name. The five P2s are fixed as well: the sealer takes
+`--evidence-layout` as a pin so sealed v1 prefixes stay re-validatable; `upload_shared` tolerates a
+precondition failure only when the remote object INFLATES to this rank's own text; the storage census is
+bounded, retried and reports before aborting; five negative materialization tests; bounded inflation.
+Spec §23.10 and EVIDENCE_MAP now describe the layout.
+
+New tool `scripts/greenfield/adjudicate_ws32_first_divergent_event.py` (CPU only): given a run's observer
+npz, the sealed DSA oracle and the archived FP64 reference row, it locates the first divergent event,
+applies §21.2 items 3–4 (κ=2 caps, bias rule, reference-cutoff band, equal-sized disjoint swap) and emits
+both the analysis and a record in the loader's exact schema. Four tests cover an adjudicable boundary
+swap, a refused biased engine, a non-divergent event and loader-schema round-trip.
+
+Decision recorded (Decisions rule, no owner round-trip): B′ runs as TWO 8K runs, not one. The main
+rotary table changes layer-0 attention, so event 1 will very likely differ from the pre-registered record
+`4da05468…` and the sealer will refuse the first run by design. That run's observer arrays are uploaded
+anyway; they are adjudicated offline with the new tool, a new record is registered as a committed
+artifact, and a SECOND 8K run is sealed against it. The alternative — recovery-sealing the same run
+against a record derived from its own data — was rejected because it destroys the pre-registration
+property that §21.2 rests on; the extra cost is one 45-minute run. Event 0 should stay bit-exact (its
+indexer input precedes any attention), which the first run will confirm.
+
+## 2026-09-05 22:10Z — P0 in the HLO linter found by review and fixed; A′/v2 rejections resolved
+
+The Opus 5 review of A′ found a P0 I introduced: the new §23.8 table check was written at the
+indentation of the `if exact_dsa and kind != "cache_probe":` body, so its `elif table_present:` captured
+the two refusals that followed — the expert-owned query gather and the tuple4 16-KiB fusion count — and
+made them dead in every configuration, flag on or off, while the graphs would still have been SHA-pinned.
+Nothing tested those refusals, which is why 53 green tests did not see it. Fixed: the exact-DSA checks
+are back inside their own guard, the table check is a separate top-level block, and two new tests build a
+minimal live-chained exact-DSA graph and assert each refusal fires with the table flag both off and on
+(and that the table rule holds on a non-exact graph, the path that would previously have raised
+NameError). An AST assertion of the guard structure was used to confirm the fix.
+
+Also fixed from the same review: a `set -u` defect in the worker upload helper — `local want have tmp`
+left `have` unset when the remote download failed, and nounset is not suppressed by `|| rc=1`, so the
+worker shell would die inside `upload` after the EXIT trap was removed, losing the remaining HLO objects
+and the XPlane trace of a completed protected run (reproduced, then fixed with `have=""` and a guarded
+`mktemp`); the rotary row gather now passes `mode="clip"` explicitly (JAX's default fill mode would have
+written NaN into the cache at a position past the capacity, whereas the PP16 sibling clamps); the sealer
+derives the rotary dimension from the committed geometry instead of a literal; the wrapper passes
+`--evidence-layout` and `--host-main-rope-table` so both pins land in `validate.log`; the census retry
+message no longer fires after the last attempt; EVIDENCE_MAP no longer attributes layout v2 to the merge
+base.
+
+Default-off neutrality of A′, checked rather than asserted: the flag-off branch of the main-attention
+site is statement-identical to the pre-change code (26 pre-change statements, 18 in the branch after the
+hoisted definitions, none added, none lost), `table_specs` is empty so no extra program input exists, and
+the rotary branch lowers to identical StableHLO in a worktree at the parent commit
+(`a5a67bab7c24c876…`). The row selection, cos|sin split and FP32-final-round rotation are now executed by
+a CPU test that also checks the clamp is finite at and past the capacity and that the table row is closer
+to FP64 than the on-device form at position 262,000.
 

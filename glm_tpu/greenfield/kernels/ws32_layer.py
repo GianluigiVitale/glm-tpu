@@ -47,7 +47,11 @@ from .reference.qkv_a import (
     one_row_fused_qkv_a_convolution,
 )
 from .reference.rmsnorm import rms_norm
-from .reference.rotary import apply_rotary, rotary_cos_sin
+from .reference.rotary import (
+    apply_rotary,
+    apply_rotary_fp32_final_round,
+    rotary_cos_sin,
+)
 from .stage_local import _require_decode_metadata
 from .ws32 import (
     ws32_dense_pallas_mapped,
@@ -759,6 +763,7 @@ def ws32_index_share_attention_mapped(
     ),
     block_shape: tuple[int, int] = (128, 128),
     rope_theta: float = 8_000_000.0,
+    main_rope_table_row: Any | None = None,
     sparse_attention_config: SparseMlaConfig = SparseMlaConfig(
         segment_block=512
     ),
@@ -766,7 +771,16 @@ def ws32_index_share_attention_mapped(
     linear_interpret: bool = False,
     add_residual: bool = True,
 ) -> Ws32AttentionResult:
-    """Consume exact DSA state and execute one WS32 sparse-MLA update."""
+    """Consume exact DSA state and execute one WS32 sparse-MLA update.
+
+    ``main_rope_table_row`` is the accepted GLM runtime's host BF16 ``cos|sin``
+    row for this position (spec §23.8).  When it is None the main-attention
+    rotary is evaluated on device, which is what the 2K/8K Gate D records used;
+    on-device ``cos``/``sin`` lose accuracy with the rotary angle (measured
+    2026-09-05: 5.3x the legacy's FP64 deviation at 8K, 26.6x at 262,656), so
+    long-context runs pass the row and rotate with FP32 products and one final
+    BF16 round, reproducing the legacy main path (DB531).
+    """
 
     local_hidden = _require_ws32_layout(
         cache_layout, hidden_size=residual_local.shape[-1] * 4
@@ -839,31 +853,52 @@ def ws32_index_share_attention_mapped(
     ).reshape(1, local_heads, contract.qk_head_dim)
     q_nope = q_states[..., : contract.qk_nope_head_dim]
     q_rope_unrotated = q_states[..., contract.qk_nope_head_dim :]
-    cos, sin = rotary_cos_sin(
-        position,
-        rotary_dim=contract.qk_rope_head_dim,
-        theta=rope_theta,
-        dtype=q_rope_unrotated.dtype,
-    )
-    q_rope = apply_rotary(
-        q_rope_unrotated,
-        cos[:, None, :],
-        sin[:, None, :],
-        interleaved=True,
-    )
-
+    half = contract.qk_rope_head_dim // 2
     current_latent = prepared.current_kv[..., : contract.kv_lora_rank]
     current_rope_input = prepared.current_kv[
         ...,
         contract.kv_lora_rank : contract.kv_lora_rank
         + contract.qk_rope_head_dim,
     ][:, None, :]
-    current_rope = apply_rotary(
-        current_rope_input,
-        cos[:, None, :],
-        sin[:, None, :],
-        interleaved=True,
-    )[:, 0, :]
+    if main_rope_table_row is None:
+        cos, sin = rotary_cos_sin(
+            position,
+            rotary_dim=contract.qk_rope_head_dim,
+            theta=rope_theta,
+            dtype=q_rope_unrotated.dtype,
+        )
+        q_rope = apply_rotary(
+            q_rope_unrotated,
+            cos[:, None, :],
+            sin[:, None, :],
+            interleaved=True,
+        )
+        current_rope = apply_rotary(
+            current_rope_input,
+            cos[:, None, :],
+            sin[:, None, :],
+            interleaved=True,
+        )[:, 0, :]
+    else:
+        if main_rope_table_row.shape != (contract.qk_rope_head_dim,) or (
+            main_rope_table_row.dtype != jnp.bfloat16
+        ):
+            raise ValueError("WS32 main rotary table row geometry drifted")
+        with jax.named_scope("greenfield_ws32_main_rope_table"):
+            cos = main_rope_table_row[:half][None, :]
+            sin = main_rope_table_row[half:][None, :]
+            q_rope = apply_rotary_fp32_final_round(
+                q_rope_unrotated,
+                cos[:, None, :],
+                sin[:, None, :],
+                interleaved=True,
+            )
+            current_rope = apply_rotary_fp32_final_round(
+                current_rope_input,
+                cos[:, None, :],
+                sin[:, None, :],
+                interleaved=True,
+            )[:, 0, :]
     padding = contract.packed_cache_width - (
         contract.kv_lora_rank + contract.qk_rope_head_dim
     )
@@ -967,6 +1002,7 @@ def ws32_attention_layer_mapped(
     ),
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
+    main_rope_table_row: Any | None = None,
     precomputed_normalized_local: Any | None = None,
     add_residual: bool = True,
 ) -> Ws32AttentionLayerResult:
@@ -1014,6 +1050,7 @@ def ws32_attention_layer_mapped(
         contract=attention_contract,
         cache_layout=cache_layout,
         block_shape=block_shape,
+        main_rope_table_row=main_rope_table_row,
         sparse_attention_config=sparse_attention_config,
         sparse_attention_interpret=sparse_attention_interpret,
         linear_interpret=linear_interpret,
@@ -1067,6 +1104,7 @@ def ws32_transformer_layer_mapped(
     ),
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
+    main_rope_table_row: Any | None = None,
 ) -> Ws32TransformerLayerResult:
     """Execute one complete WS32 dense or sparse transformer layer.
 
@@ -1140,6 +1178,7 @@ def ws32_transformer_layer_mapped(
         sparse_attention_config=sparse_attention_config,
         sparse_attention_interpret=sparse_attention_interpret,
         linear_interpret=linear_interpret,
+        main_rope_table_row=main_rope_table_row,
         precomputed_normalized_local=normalized_input,
         add_residual=False,
     )
