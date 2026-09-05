@@ -822,7 +822,14 @@ def _verify_ws32_runtime_value(
     *,
     verify_file_hashes: bool,
     verify_file_hash_slots: frozenset[int] | None = None,
+    local_slot_layout: bool = False,
 ) -> Mapping[int, Mapping[str, Any]]:
+    if local_slot_layout and (
+        not verify_file_hashes or verify_file_hash_slots is None
+    ):
+        raise ValueError(
+            "WS32 local slot layout requires hash verification of the owned slots"
+        )
     if set(manifest) != _MANIFEST_KEYS:
         raise CheckpointValidationError("WS32 runtime manifest schema drifted")
     if manifest.get("artifact_kind") != WS32_RUNTIME_ARTIFACT_KIND or (
@@ -873,6 +880,15 @@ def _verify_ws32_runtime_value(
         for index, digest in enumerate(hashes):
             _digest(digest, field=f"slot{plan.device_slot}.tensor{index}")
         path = root / plan.filename
+        if local_slot_layout and plan.device_slot not in verify_file_hash_slots:
+            # Streaming tmpfs layout: only this host's owned slots are materialized.
+            # The manifest record was fully checked above; a non-owned file that is
+            # nevertheless present is refused so a root cannot mix layouts.
+            if path.exists():
+                raise CheckpointValidationError(
+                    f"WS32 local slot layout must not contain foreign slot {plan.filename!r}"
+                )
+            continue
         if not path.is_file() or path.stat().st_size != plan.file_bytes:
             raise CheckpointValidationError(
                 f"WS32 runtime file is missing or truncated: {plan.filename!r}"
@@ -910,6 +926,7 @@ def verify_ws32_runtime_checkpoint(
     geometry: ModelGeometry,
     verify_file_hashes: bool = True,
     verify_file_hash_slots: Sequence[int] | None = None,
+    local_slot_layout: bool = False,
 ) -> VerifiedWs32RuntimeCheckpoint:
     """Re-derive every layout field and verify a protected sealed artifact."""
 
@@ -1023,6 +1040,7 @@ def verify_ws32_runtime_checkpoint(
         plans,
         verify_file_hashes=verify_file_hashes,
         verify_file_hash_slots=selected_hash_slots,
+        local_slot_layout=local_slot_layout,
     )
     return VerifiedWs32RuntimeCheckpoint(
         root=root,

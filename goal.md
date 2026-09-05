@@ -9,12 +9,12 @@ NUMERICAL_CONTRACT}.md`; inspect state. Numerical fallback:
 
 Live storage only in `gs://driftbench-dsv4-uc`, smallest resumable set. Never touch TPU/queued-
 resource infra, esp. `db-v4-64-od-qr4`. Delete only name+generation+size+CRC-bound objects after
-dependency inspection. **Hard ceiling: live <2,000,000,000,000 bytes.** No full-size backup
-or moving cost elsewhere. Soft delete off since 2026-09-04; report live and retained soft-deleted
+dependency inspection. **Hard ceiling: live <2,000,000,000,000 bytes.** No full-size backup or
+moving cost elsewhere. Soft delete off since 2026-09-04; report live and retained soft-deleted
 bytes separately (3.681 TB retained expires per object, phase 1 ≈2026-09-11). Rsync writes only
 `repos/`. Before any >100-GB artifact state need/size/replacement. Keep canonical GLM (755.66 GB),
-active direct PP16 (869.67 GB), 77.96-GB layer3, lineage/results/oracles/repos/evidence until
-recipes are proven. Census 2026-09-04: 1,945,027,232,816 live bytes.
+active direct PP16 (869.67 GB), 77.96-GB layer3, lineage/results/oracles/repos/evidence. Census
+2026-09-04: 1,945,027,232,816 live bytes.
 
 ## Gate D (contract = spec §21, 2026-09-05)
 
@@ -35,29 +35,31 @@ not proof. Never weaken history. Optimizations default off.
 
 ## Efficiency/review
 
-- Smallest decisive test first; stop on first invariant failure; prefer offline adjudication of
-  archived arrays over TPU runs.
+- Smallest decisive test first; stop on first invariant failure; prefer offline adjudication
+  over TPU runs.
 - Adversarial reviewer = separate Fable 5.1 (high) agent (replaces Sol) before persistence,
-  install, execution or destructive storage apply; resolve every P0–P2.
+  install, execution or destructive storage apply; resolve all P0–P2.
 - Cron `/home/gianl/bin/sync-glm.sh` every 5 min; verify origin + US-CENTRAL2 mirror before
-  protected work. Never use EU. Re-version install chain only on reviewer finding.
+  protected work. Never use EU.
 
 ## Resume — 2026-09-05 04:30Z
 
 Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`. Pins:
-V11+§21 `9659af7`, reference `7764cb9`, §21.2 observer mode `8d8759b` (all Fable-reviewed, pushed).
-M2048 DEFERRED. Workers 1–7 clean at `b7708936…`.
+V11+§21 `9659af7`, reference `7764cb9`, §21.2 observer `8d8759b` (reviewed, pushed). M2048
+DEFERRED. Workers 1–7 clean at `b7708936…`.
 
 Result (§21.5): FP64 reference: event 1 legacy +0.112/0.227, engine −0.006/0.113 (eps 1e-5);
-+0.061/0.177, −0.057/0.156 (eps 1e-6); §21.2 items 3–4 PASS for the engine under both. Seven swaps
-= boundary noise; layer-1 defect unsupported. WS32 8K runs had exact 20/20 tokens, state/cache,
-event 0, HBM. Record `docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json`.
++0.061/0.177, −0.057/0.156 (eps 1e-6); §21.2 items 3–4 PASS under both; swaps = boundary noise.
+WS32 8K runs had exact 20/20 tokens, state/cache, event 0, HBM. Pre-registered record
+`docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json`.
 
-BLOCKER: WS32 runtime checkpoint (786.19 GB) deleted 2026-08-27; re-pack → ≈2.73 TB live. Only the
-PP16 direct checkpoint (869.7 GB, re-packable) can be replaced. Owner decision pending; nothing
-deleted. Code changed since acquisition pin `04d059b` → fresh acquisition needed.
+Checkpoint: WS32 runtime pack (786 GB) deleted 08-27; re-upload breaches 2 TB. Route: STREAM into
+tmpfs (hosts 400 GB RAM, 201 GB /dev/shm; 4 slots = 98 GB/host), sealed manifest/SUCCESS reused
+verbatim (lineage `results/greenfield_ws32_runtime_pack_20260815T214050854386790Z`), per-slot byte
+identity enforced; PP16 direct stays. Code changed since acquisition pin `04d059b`.
 
-Next (after decision): (1) bound-receipt delete of PP16 direct; (2)
-`run_ws32_runtime_checkpoint_pack.sh` (8-host protected pack); (3) compile-only 8K acquisition at
-HEAD; (4) ONE 8K numerical run with `GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1`, fresh trace,
-profiler-free wall, HBM, DB, archive, 8/8 cleanup → closes Gate D. Then Gate G, 128K, 256K, §18.
+Next: (1) review+commit shm batch (`run_ws32_runtime_checkpoint_shm_pack.sh`, run-wrapper
+`GLM_GREENFIELD_WS32_CHECKPOINT_TRANSPORT=shm`, cleanup). (2) protected tmpfs pack (host CPU, ~3 h).
+(3) compile-only 8K acquisition at HEAD. (4) ONE 8K numerical run with
+`GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1`, trace, wall, HBM, DB, archive, 8/8 cleanup → Gate D;
+tmpfs cleanup. Then Gate G, 128K, 256K, §18.

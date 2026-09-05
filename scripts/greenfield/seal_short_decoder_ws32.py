@@ -78,6 +78,7 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--iterations", required=True, type=int)
     validate.add_argument("--trace-steps", required=True, type=int)
     validate.add_argument("--exact-dsa", choices=(0, 1), required=True, type=int)
+    validate.add_argument("--checkpoint-transport", choices=("gcsfuse", "shm"), default="gcsfuse")
     validate.add_argument("--dsa-adjudication-record", type=Path)
     validate.add_argument("--dsa-adjudication-sha256", default="0" * 64)
     validate.add_argument(
@@ -495,6 +496,7 @@ def _validate(args: argparse.Namespace) -> int:
         "base_device_memory_after_load",
         "checkpoint_manifest_sha256",
         "checkpoint_success_sha256",
+        "checkpoint_transport",
         "checkpoint_verified_device_slots",
         "code_hash",
         "compile_only",
@@ -810,6 +812,8 @@ def _validate(args: argparse.Namespace) -> int:
                         adjudication=dsa_adjudication,
                     )
                 )
+            if record.get("checkpoint_transport") != args.checkpoint_transport:
+                raise SystemExit(f"WS32 checkpoint transport drifted rank {rank}")
             if not _same(record.get("dsa_adjudication"), expected_dsa_adjudication):
                 raise SystemExit(f"WS32 DSA adjudication binding drifted rank {rank}")
             if not _same(dsa, expected_dsa):

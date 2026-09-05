@@ -411,3 +411,66 @@ def test_ws32_runtime_pack_wrapper_is_fail_closed_at_both_terminal_boundaries(
     assert 'name.startswith("host_records/")' in source
     assert 'preflight_files!=terminal_files' in source
     assert 'int(blob.generation)!=prior["generation"]' in source
+
+
+def test_ws32_runtime_local_slot_layout_verifies_only_owned_slots(tmp_path: Path) -> None:
+    """Streaming tmpfs layout (spec §21.5 route): a host root holds only its four slots."""
+    import shutil
+
+    embedding, inventory, config = _fixture(tmp_path)
+    manifest = pack_ws32_runtime_checkpoint(config, inventory, _geometry())
+    success = _seal(config.output_dir, manifest)
+    owned = (8, 12, 24, 28)
+    local_root = tmp_path / "shm-root"
+    local_root.mkdir()
+    for name in ("manifest.json", "SUCCESS"):
+        shutil.copy(config.output_dir / name, local_root / name)
+    for slot in owned:
+        shutil.copy(
+            config.output_dir / f"device_slot_{slot:02d}.safetensors",
+            local_root / f"device_slot_{slot:02d}.safetensors",
+        )
+    common = dict(
+        expected_manifest_sha256=manifest["manifest_sha256"],
+        expected_success_sha256=success["success_sha256"],
+        expected_mesh_hash="b" * 64,
+        expected_topology_hash="c" * 64,
+        inventory=inventory,
+        geometry=_geometry(),
+    )
+    # The default (full) layout refuses a four-slot root.
+    with pytest.raises(CheckpointValidationError, match="missing or truncated"):
+        verify_ws32_runtime_checkpoint(local_root, verify_file_hash_slots=owned, **common)
+    verified = verify_ws32_runtime_checkpoint(
+        local_root, verify_file_hash_slots=owned, local_slot_layout=True, **common
+    )
+    assert len(verified.plans) == 32 and set(verified.records_by_slot) == set(range(32))
+    # Local layout still requires owned slots to be present, exact and hash-verified.
+    with pytest.raises(ValueError, match="requires hash verification"):
+        verify_ws32_runtime_checkpoint(local_root, local_slot_layout=True, **common)
+    with pytest.raises(ValueError, match="requires hash verification"):
+        verify_ws32_runtime_checkpoint(
+            local_root, verify_file_hashes=False, verify_file_hash_slots=owned, local_slot_layout=True, **common
+        )
+    # Wrong ownership: slot 28 is present but not owned (foreign) and slot 29 is absent.
+    with pytest.raises(CheckpointValidationError, match="foreign slot|missing or truncated"):
+        verify_ws32_runtime_checkpoint(
+            local_root, verify_file_hash_slots=(8, 12, 24, 29), local_slot_layout=True, **common
+        )
+    corrupt = local_root / "device_slot_12.safetensors"
+    with corrupt.open("r+b") as stream:
+        stream.seek(-1, 2)
+        value = stream.read(1)
+        stream.seek(-1, 2)
+        stream.write(bytes([value[0] ^ 1]))
+    with pytest.raises(CheckpointValidationError, match="checksum drifted"):
+        verify_ws32_runtime_checkpoint(
+            local_root, verify_file_hash_slots=owned, local_slot_layout=True, **common
+        )
+    shutil.copy(config.output_dir / "device_slot_12.safetensors", corrupt)
+    # A foreign slot file present in a local layout root is refused (no mixed layouts).
+    shutil.copy(config.output_dir / "device_slot_00.safetensors", local_root / "device_slot_00.safetensors")
+    with pytest.raises(CheckpointValidationError, match="foreign slot"):
+        verify_ws32_runtime_checkpoint(
+            local_root, verify_file_hash_slots=owned, local_slot_layout=True, **common
+        )

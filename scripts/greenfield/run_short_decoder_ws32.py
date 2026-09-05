@@ -132,6 +132,9 @@ def parse_args() -> argparse.Namespace:
         "--strategy-nd-dense-overlay-success-file-sha256",
         default=_ZERO_SHA,
     )
+    parser.add_argument(
+        "--checkpoint-transport", choices=("gcsfuse", "shm"), default="gcsfuse"
+    )
     parser.add_argument("--dsa-adjudication-record", type=Path)
     parser.add_argument("--dsa-adjudication-sha256", default=_ZERO_SHA)
     parser.add_argument("--observer-steps", default=14, type=int)
@@ -653,6 +656,7 @@ def main() -> int:
         geometry=geometry,
         verify_file_hashes=True,
         verify_file_hash_slots=local_hash_slots,
+        local_slot_layout=args.checkpoint_transport == "shm",
     )
     load_started = time.perf_counter()
     loaded = load_ws32_runtime_checkpoint(
@@ -940,6 +944,7 @@ def main() -> int:
         "artifact_kind": "greenfield_ws32_short_decoder_prevalidation",
         "checkpoint_manifest_sha256": checkpoint.manifest["manifest_sha256"],
         "checkpoint_success_sha256": checkpoint.success["success_sha256"],
+        "checkpoint_transport": args.checkpoint_transport,
         "checkpoint_verified_device_slots": list(local_hash_slots),
         "code_hash": args.expected_code_hash,
         "compile_only": bool(args.compile_only),

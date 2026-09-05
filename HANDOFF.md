@@ -12335,3 +12335,86 @@ Exact next, in order, each under the standing protections: owner decision on rep
 direct checkpoint; if approved, delete it by name+generation+size+CRC-bound receipt, run the WS32
 runtime pack, then the compile-only 8K acquisition, then ONE 8K numerical run with
 `GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1`. Otherwise Gate D waits on storage.
+
+## 2026-09-05 05:10Z — streaming (tmpfs) WS32 checkpoint path replaces the deletion decision (CPU-green, unreviewed)
+
+Facts: every TPU host has 400 GB RAM and a 201 GB `/dev/shm`; the original pack already staged each
+host's four slots (4 × 24.57 GB) in `/dev/shm` before uploading; the sealed WS32 manifest
+(`checkpoint_manifest/manifest.json`, file `88df4143…9cbf`, self-hash `c04f800e…5ee08`, 32 per-slot
+SHA-256/CRC32C and per-tensor hashes) and the sealed SUCCESS (`checkpoint_SUCCESS.json`, file
+`12703932…7ca2`, self-hash `1bfea5bd…f1760`, CRC32C equal to the deleted object) survive in
+`results/greenfield_ws32_runtime_pack_20260815T214050854386790Z/`. The runner hash-verifies its
+four local slots against the manifest and takes any root path, but its verification required all 32
+slot files to exist with exact sizes (a four-slot root would have failed closed and burned the tags);
+the run wrapper's host sync also insisted on the gcsfuse mount. Local disks (100 GB, ≤82 GB free, worker 0 6.7 GB) rule out a
+disk copy; tmpfs does not.
+
+Batch (uncommitted): `scripts/greenfield/run_ws32_runtime_checkpoint_shm_pack.sh` packs each host's
+owned slots into `/dev/shm/glm-ws32-runtime/<sealed tag>/`, copies the sealed manifest and SUCCESS
+verbatim after checking both file hashes and self-hashes, hashes every local slot and refuses unless
+byte-identical to the sealed manifest entry, reconciles all 32 slots on the controller, mirrors
+manifest/SUCCESS to the same controller path, and uploads only small host records; leases and 8/8
+censuses as usual; no TPU chip use. `run_short_decoder_ws32.sh` gains
+`GLM_GREENFIELD_WS32_CHECKPOINT_TRANSPORT` (default `gcsfuse`; `shm` requires the pinned tmpfs root,
+tmpfs mount, sealed manifest/SUCCESS byte identity and four slot files on every host, plus the
+controller identity check). `cleanup_ws32_runtime_checkpoint_shm.sh` removes only that exact path
+after refusing while a runner or pack process exists. Tests pin the transport constants to the
+lineage bytes and the sync/identity logic; WS32 suites 11/11. Live storage is unchanged by this path
+(only kilobyte host records), so the PP16 direct checkpoint stays; no deletion is needed.
+
+Determinism: the current pack code post-dates the sealed pack; the tmpfs pack fails closed on any
+slot whose bytes differ from the sealed manifest. A single-slot controller pack (slot 8, tmpfs) is
+running as a pre-check but reads the canonical shards at ~3 MB/s over the controller's gcsfuse mount
+(the 08-15 eight-host pack ran 21:40Z to 00:31Z, about 2 h 50 min, roughly 10 MB/s per host), so
+the protected pack itself is the decisive identity test and should be budgeted at about three hours. Exact next: Fable review of this batch; commit/push/mirror; protected tmpfs
+pack; compile-only 8K acquisition (transport shm) at HEAD; ONE 8K numerical run with
+`GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1`; sealing; tmpfs cleanup. No TPU chips before review.
+
+### Runbook for the streaming WS32 8K sequence (after review + push + mirror)
+
+1. tmpfs pack (host CPU only, ~3 h): `GLM_GREENFIELD_WS32_SHM_PACK=1
+   scripts/greenfield/run_ws32_runtime_checkpoint_shm_pack.sh` → must end with
+   `SHM_PACK_COMPLETE … slots=32 identical`.
+2. compile-only 8K acquisition at HEAD: `GLM_GREENFIELD_WS32_SHORT_DECODER=1
+   GLM_GREENFIELD_WS32_SHORT_DECODER_MODE=acquire GLM_GREENFIELD_WS32_SHORT_DECODER_CONTEXT=8k
+   GLM_GREENFIELD_WS32_EXACT_DSA=1 GLM_GREENFIELD_WS32_STRATEGY_ND_DENSE=1
+   GLM_GREENFIELD_WS32_STRATEGY_ND_DENSE_OVERLAY_ROOT=/home/gianl/gcs-models/checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z
+   GLM_GREENFIELD_WS32_STRATEGY_ND_DENSE_OVERLAY_MANIFEST_SHA=a8dc8791f034906d163d399b2393b89947e7aff25303e2c94b7dafbdf2694b6a
+   GLM_GREENFIELD_WS32_STRATEGY_ND_DENSE_OVERLAY_MANIFEST_FILE_SHA=c17194b6dbf2a41c5ae869c6184d6c88f04eb5adfe2105b94965e8434c2b5c8c
+   GLM_GREENFIELD_WS32_STRATEGY_ND_DENSE_OVERLAY_SUCCESS_FILE_SHA=166566b9b066aa4803dacf769c51a890c5e79690770a9582e9dbdccb085332a6
+   GLM_GREENFIELD_WS32_CHECKPOINT_TRANSPORT=shm
+   GLM_GREENFIELD_WS32_CHECKPOINT_ROOT=/dev/shm/glm-ws32-runtime/greenfield_ws32_runtime_pack_20260815T214050854386790Z
+   GLM_GREENFIELD_WS32_CHECKPOINT_MANIFEST_SHA=c04f800edf15651198ab2c5183fff8a8ae9a427609b59cc61ccabdab32f5ee08
+   GLM_GREENFIELD_WS32_CHECKPOINT_SUCCESS_SHA=1bfea5bd2dd8b096a3e551d7f96697496d8277bdaaa328ca1c35144feb8f1760
+   scripts/greenfield/run_short_decoder_ws32.sh` (overlay identities from the 08-27 run record).
+3. ONE 8K numerical run: same environment with `MODE=numerical`, the six acquired
+   StableHLO/optimized-HLO SHA pairs from step 2 exported as
+   `GLM_GREENFIELD_WS32_{EXACT_MATERIALIZE,EXACT_PROMOTE,PREFILL,OBSERVER,DECODE,CACHE_PROBE}_{STABLEHLO,OPTIMIZED_HLO}_SHA`,
+   and `GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1`. A later-event alarm blocks sealing until a
+   GATE_D_LESSONS entry exists and `GLM_GREENFIELD_WS32_LATER_EVENT_ALARM_ACK=1` is set.
+4. `GLM_GREENFIELD_WS32_SHM_CLEANUP=1 scripts/greenfield/cleanup_ws32_runtime_checkpoint_shm.sh`.
+
+The Fable review of the streaming batch (`/home/gianl/gate-d-runs/reviews/ws32-shm-transport-fable-verdict.txt`,
+`db5390ae…d209`) returned P0 NONE and two P1s, both fixed here: (T1) `verify_ws32_runtime_checkpoint`
+gains `local_slot_layout` (requires hashed owned slots; owned slots must exist, match size and hash;
+foreign slot files are refused; manifest records for all 32 slots still fully checked), the runner
+takes `--checkpoint-transport` and enables the layout only for `shm`, records `checkpoint_transport`,
+and the sealer verifies it; a CPU test packs the fixture, builds a four-slot root and exercises
+pass/refuse paths. (T2) the host pack now traps ERR into `fail()` (removes the tmpfs root and the
+marker), writes the identity marker `<root>.identity.json` only after all four slot hashes match the
+sealed manifest, and the run wrapper's shm sync requires that marker (manifest hash, root, four slots,
+`all_slots_identical`) in addition to tmpfs/root/manifest/SUCCESS identity. P2s: T6 manifest/SUCCESS
+are chmod 0444 in tmpfs; T4 slot ownership is derived from the live 20260826 topology capture on both
+the pack and run sides (mesh/topology hashes equal the 20260805 capture; host↔slot ownership moved
+with the 08-26 pod recreation); T3 header pre-check not added (the full-slot hash is the test); T5
+host RAM headroom (98 GB tmpfs plus decoder RSS within 400 GB) is unproven until the first run and
+is recorded as a risk; T9 cleanup runs under the fleet lease without a census (accepted). WS32
+checkpoint/runner/observer suites 18/18.
+
+Fable delta verdict (`ws32-shm-transport-fable-delta-verdict.txt`, `e9460aad…3a2b`): P0/P1 NONE;
+SAFE_TO_PERSIST and SAFE_TO_EXECUTE_PACK_AFTER_PUSH_MIRROR YES. P2 dispositions: D1 fixed (after the
+identity marker the ERR trap is released; a host-record upload failure now exits 1 with the verified
+root retained and an explicit message, so a retry needs the cleanup script first); D2 stated: the
+shm sync marker check does not re-hash slots; ownership and byte identity are re-verified by the
+runner's local-slot verification on every host; D3 header pre-check declined; D4 the compile-only shm
+acquisition is the first consumer and proves the RAM headroom; D5 accepted.
