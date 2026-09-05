@@ -953,7 +953,8 @@ def _validate(args: argparse.Namespace) -> int:
         import parse_xplane
 
         xplane = parse_xplane.aggregate_fleet(
-            args.run_dir / "traces", step_module_re=r"jit_execute_body"
+            args.run_dir / "traces",
+            step_module_re=_decode_step_module_re(exact_dsa=bool(args.exact_dsa)),
         )
         if xplane["n_files"] != 8 or xplane["n_cores"] != 64 or xplane["steps_per_core"] != args.trace_steps:
             raise SystemExit("WS32 fleet XPlane coverage drifted")
@@ -1056,6 +1057,18 @@ def _later_event_alarm_summary(
         "observed_step_count": len(dsa_steps),
         "rule": "spec §21.2: |E Δ O| > 1024 at a recorded later event is a diagnostic alarm requiring a GATE_D_LESSONS entry before promotion",
     }
+
+
+def _decode_step_module_re(*, exact_dsa: bool) -> str:
+    """Anchored XLA module name of one traced decode step.
+
+    The WS32 decoder shard_maps ``execute_exact_body`` on the exact-DSA path and
+    ``execute_body`` otherwise (``glm_tpu/greenfield/runtime/ws32_decoder.py``);
+    JAX names the module ``jit_<body>(<fingerprint>)``.  Selecting the wrong
+    body yields zero decode steps and the fleet XPlane aggregation refuses.
+    """
+    body = "execute_exact_body" if exact_dsa else "execute_body"
+    return rf"^jit_{body}\("
 
 
 def _run_environment(summary: dict[str, Any]) -> dict[str, Any]:

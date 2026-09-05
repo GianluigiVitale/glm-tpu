@@ -12560,3 +12560,15 @@ rollback now share `_run_rows`, and an adjudicated publish→rollback test cover
 recovery mode `on_exit` no longer archives `summary.json`/`db_link.json` when `rollback_db` failed, so
 the next recovery start can retry the rollback with the link intact. WS32 suites: 39 passed.
 A second consecutive `rollback_db` failure at recovery start now exits with the link kept (`db_rollback_failed=1`). `census_failure_exit.txt` is still overwritten per failure (reviewer P3, open).
+
+Second recovery attempt (10:35Z, recovery pin `176c13f`): materialization succeeded (new ledger binds
+the same 128 objects under the new pin) and the sealer then refused in the fleet XPlane aggregation
+with "inconsistent decode-step counts across cores: [0]". Cause: the sealer selected traced decode
+steps with the module regex `jit_execute_body`, the shard_map body of the default path; the exact-DSA
+path traces `jit_execute_exact_body` (verified on rank 0: the XLA Modules line holds exactly two
+`jit_execute_exact_body(...)` events). No exact-DSA numerical run had ever reached this check (the
+08-26/08-27 8K runs were refused earlier on DSA divergence; the sealed 2K run predates the exact path).
+Fix: `_decode_step_module_re(exact_dsa)` returns an anchored `^jit_execute_exact_body\(` or
+`^jit_execute_body\(`, with a test binding both names to the decoder's shard_map bodies. Offline
+aggregation of the run's traces with the exact regex: 8 files, 64 cores, 2 steps/core.
+

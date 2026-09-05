@@ -866,3 +866,28 @@ def test_ws32_wrapper_oracle_success_pins_match_all_four_trees() -> None:
     for path, expected in records:
         assert path.is_file()
         assert sha256(path.read_bytes()).hexdigest() == expected
+
+
+def test_ws32_short_sealer_selects_the_traced_decode_body_by_exact_dsa() -> None:
+    """The exact-DSA path traces jit_execute_exact_body; the default path traces
+    jit_execute_body.  The 8K exact-DSA seal refused with zero decode steps when
+    the module regex was hard-coded to the default body."""
+    import re
+
+    decoder = (ROOT / "glm_tpu/greenfield/runtime/ws32_decoder.py").read_text(encoding="utf-8")
+    for body in ("execute_body", "execute_exact_body"):
+        assert f"    def {body}(" in decoder
+        assert re.search(rf"execute = jax\.shard_map\(\s*{body},", decoder), body
+    exact = SEALER._decode_step_module_re(exact_dsa=True)
+    default = SEALER._decode_step_module_re(exact_dsa=False)
+    assert re.search(exact, "jit_execute_exact_body(868403939627541584)")
+    assert not re.search(exact, "jit_execute_body(1)")
+    assert re.search(default, "jit_execute_body(1)")
+    assert not re.search(default, "jit_execute_exact_body(1)")
+    for pattern in (exact, default):
+        assert not re.search(pattern, "jit_observe_exact_body(1)")
+        assert not re.search(pattern, "jit_probe_cache_write(1)")
+        assert not re.search(pattern, "prefix_jit_execute_body(1)")
+    sealer = SCRIPT.read_text(encoding="utf-8")
+    assert 'step_module_re=r"jit_execute_body"' not in sealer
+    assert "step_module_re=_decode_step_module_re(exact_dsa=bool(args.exact_dsa))" in sealer
