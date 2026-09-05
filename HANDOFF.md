@@ -12461,3 +12461,26 @@ reproduces the deleted 786,172,488,192-byte checkpoint exactly. Live GCS storage
 the PP16 direct checkpoint stays. Slot ownership: w0 9/13/25/29, w1 10/14/26/30, w2 8/12/24/28,
 w3 1/5/17/21, w4 0/4/16/20, w5 3/7/19/23, w6 11/15/27/31, w7 2/6/18/22. Next: compile-only 8K
 acquisition at HEAD with transport `shm` (runbook step 2).
+
+## 2026-09-05 08:10--08:17Z — first 8K acquisition attempt refused on transient ssh; second launched
+
+`greenfield_ws32_short_decoder_8k_acquire_20260905T081035793459019Z` at `822c9c6` aborted in the
+eight-host sync: the controller's ssh client intermittently failed to parse `/etc/ssh/ssh_config`
+(`no argument after keyword "<garbage>"`, varying bytes) so only 4/8 hosts answered; the file is
+intact (stable md5, dated 2022) and an 8/8 probe succeeded a minute later. No TPU/JAX/checkpoint
+action ran; nonterminal diagnostics uploaded; lease released. Relaunched as
+`greenfield_ws32_short_decoder_8k_acquire_20260905T081636975282487Z`: sync 8/8 with the tmpfs
+transport checks (tmpfs mount, pinned root, sealed manifest/SUCCESS bytes, four slots, identity
+marker), fleet launched 08:17:20Z (compile-only, transport shm, exact DSA, StrategyND dense overlay).
+
+## 2026-09-05 08:49Z — compile-only 8K acquisition sealed with the tmpfs checkpoint
+
+`greenfield_ws32_short_decoder_8k_acquire_20260905T081636975282487Z` at `822c9c6` completed
+08:16→08:49Z: 8/8 ranks acquired all six graphs from the tmpfs checkpoint (checkpoint load plus
+compile about 20 minutes per rank), `HLO_ACQUIRED`, pre/post censuses 8/8, evidence materialized
+with generation-pinned deduplication, no DB/SUCCESS created. Summary self-hash `928fe7de…`. The six
+StableHLO identities equal the 08-27 acquisition byte-for-byte; the optimized-HLO identities are
+re-pinned (materialize `b945c244…`, promote `a1d68429…`, prefill `a9e9af92…`, observer `1efc8083…`,
+decode `f18d0914…`, cache probe `9f4413ec…`) and exported for the numerical run. Next: ONE 8K
+numerical run (`MODE=numerical`, transport `shm`, `GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1`, the six
+pin pairs above) under the full trace/wall/HBM/DB/archive/cleanup protections.

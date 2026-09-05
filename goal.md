@@ -58,8 +58,8 @@ tmpfs (hosts 400 GB RAM, 201 GB /dev/shm; 4 slots = 98 GB/host), sealed manifest
 verbatim (lineage `results/greenfield_ws32_runtime_pack_20260815T214050854386790Z`), per-slot byte
 identity enforced; PP16 direct stays. Code changed since acquisition pin `04d059b`.
 
-Shm batch pushed (`6832b0e`); tmpfs pack DONE 08:07Z (32/32 slots byte-identical, tag
+Shm batch pushed (`6832b0e`); tmpfs pack DONE 08:07Z (32/32 byte-identical,
 `greenfield_ws32_runtime_shm_pack_20260905T052030829387724Z`). Next:
-(3) compile-only 8K acquisition at HEAD. (4) ONE 8K numerical run with
+(3) 8K acquisition DONE 08:49Z (`…8k_acquire_20260905T081636975282487Z`, StableHLO = 08-27). (4) ONE 8K numerical run with
 `GLM_GREENFIELD_WS32_DSA_ADJUDICATION=1`, trace, wall, HBM, DB, archive, 8/8 cleanup → Gate D;
 tmpfs cleanup. Then Gate G, 128K, 256K, §18.
