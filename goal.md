@@ -36,7 +36,7 @@ proof. Never weaken history. Optimizations default off. pytest ALWAYS `JAX_PLATF
 
 ## Decisions
 
-Never block on the owner. When a question arises, take the decision you would recommend — the one
+Never block the owner. When a question arises, take the decision you would recommend — the one
 best serving a correct, provable, finished project — record it with its reasoning and the alternative
 in `HANDOFF.md`, and proceed: scope, sequencing, cost/benefit, what to build or drop, pod time. The
 reviewer, not the owner, gates persistence, install, execution and destructive apply. Never ask.
