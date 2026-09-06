@@ -13249,3 +13249,41 @@ tokens. A fitted row committed with its registry entry into the run's own pin wo
 mechanical check, since choosing `R ≈ s_e` drives the engine deltas to zero. Items 3-4 therefore still
 rest on a human having reviewed that registry entry and the validation record — which is exactly what
 the registry exists to force into review.
+
+## 2026-09-06 03:00Z — eighth Opus 5 rejection resolved: eight ranks, and the sealer's own tree
+
+Round 7 confirmed the end-to-end tests are honest (it instrumented them and saw the re-derivation run
+on real evidence) and then found what moving the re-derivation earlier had cost.
+
+* **P1-1 — I had narrowed §21.2 from eight ranks to rank 0** and justified it with the cross-rank
+  agreement check, which has no failing fixture anywhere in the repository: mutating it away leaves
+  the suite green. A rank-5 replication defect — the class §21.2 item 2 exists for — would have been
+  adjudicated on rank 0 alone. The re-derivation now runs for every rank on that rank's own arrays,
+  in addition to the early rank-0 pass that the end-to-end test can reach. The agreement check is an
+  extracted function with its own failing fixture, and an AST test requires the loop re-derivation to
+  use each rank's own index.
+* **P2-4 — the declared limit understated the real one.** §21.2 said the residual risk was committing
+  a fitted row *plus its registry entry* into the run's pin; only the row was pinned. The registry and
+  the §21.2 arithmetic are read from this repository's source at seal time, so an operator could widen
+  `REFERENCE_ROWS` in the working tree, seal, and revert, leaving nothing in history. An adjudicated
+  seal now refuses to run from a modified enforcement surface: the sealer, the validation package and
+  the reviewed artifact tree. Edits elsewhere do not block a seal. The spec says so.
+* Four of the round's own advertised fixes had no failing fixture and are now tested: the acquire
+  guard (moved before the tag check so it is reachable, and now exercised through `_validate`), the
+  requirement that the basis name the record that validated the reference row, and the analysis's
+  agreement with the record on `context` and `decode_position` on both the loader and the tool side.
+* The tests no longer write into the reviewed evidence tree at all. Two of them briefly modified
+  `docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json` and restored it; a kill between
+  the writes would have left the sealed Gate D record altered in a way indistinguishable from
+  tampering. Drift is exercised against a throwaway repository instead.
+* `reviewed_reference_row` is deleted rather than left dead, and the unreachable grandfather
+  sub-clause with it; `_rank0_dsa_arrays` checks the key set and byte count and refuses instead of
+  raising; the sealer's decode-position binding at the re-derivation call site has both an AST test
+  and a behavioural one; the offline tool's absolute `git` is tested; and the argv helper reads the
+  evidence layout and the prefill chunk from the summary instead of hard-coding them.
+
+**Correction to the previous entry.** I wrote that all seven mutation-tested sealer controls died. The
+reviewer showed one did not at the commit under review: the record's own pin check was masked because
+the reference-row pin emits the same substring, and the drift test accepted the loader's SHA refusal
+through an `or`. It died only at the follow-up commit. The drift test is now a distinct check against
+a throwaway repository, and the substrings no longer overlap.

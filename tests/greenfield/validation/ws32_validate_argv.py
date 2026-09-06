@@ -34,6 +34,17 @@ def available(run_dir: Path = SEALED_C512_RUN) -> bool:
     )
 
 
+def _prefill_chunk(summary: dict) -> int:
+    """The chunk length is part of the run identity, so read it from the tag."""
+
+    import re
+
+    if "prefill_chunk" in summary:
+        return int(summary["prefill_chunk"])
+    match = re.search(r"_c(\d+)_", summary["run_tag"])
+    return int(match.group(1)) if match else 2048
+
+
 def build(run_dir: Path, output: Path, repository_root: Path, **overrides: str) -> list[str]:
     summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
     graphs = summary["graph_sha256"]
@@ -66,7 +77,7 @@ def build(run_dir: Path, output: Path, repository_root: Path, **overrides: str) 
         "--trace-steps", "3",
         "--exact-dsa", "1" if summary["exact_dsa"] else "0",
         "--checkpoint-transport", summary["checkpoint_transport"],
-        "--evidence-layout", "hlo_per_rank_v1",
+        "--evidence-layout", summary.get("evidence_layout", "hlo_per_rank_v1"),
         "--strategy-nd-dense", "1" if summary["strategy_nd_dense"] else "0",
         "--strategy-nd-dense-overlay-manifest-sha256",
         summary["strategy_nd_dense_overlay_manifest_sha256"],
@@ -79,7 +90,7 @@ def build(run_dir: Path, output: Path, repository_root: Path, **overrides: str) 
         "1" if summary["later_event_alarm"]["acknowledged"] else "0",
         "--later-event-alarm-lessons-pin",
         summary["later_event_alarm"].get("lessons_pin", ""),
-        "--prefill-chunk", "512",
+        "--prefill-chunk", str(_prefill_chunk(summary)),
         "--output", str(output),
     ]
     adjudication = summary.get("dsa_adjudication")

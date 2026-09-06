@@ -1711,10 +1711,14 @@ section grants no install or execution authority.
    zero and inflates `eps_event`. The soundness of items 3-4 therefore still rests on a human having
    reviewed that registry entry and the record that validated the row against the legacy captures —
    which is what the registry exists to force into review, and why a new event requires a new
-   reviewed entry rather than a new file. It is applied after the schema, basis, oracle and
+   reviewed entry rather than a new file. Because the registry and the §21.2 arithmetic are read
+   from this repository's source at seal time, an adjudicated seal additionally refuses to run from
+   a modified enforcement surface (`scripts/greenfield/seal_short_decoder_ws32.py`,
+   `glm_tpu/greenfield/validation/`, `docs/artifacts/`): an edit that widens what is accepted must
+   be committed, and therefore reviewable, rather than made and reverted around a seal. It is applied after the schema, basis, oracle and
    source-run checks, all of which the record satisfies, so any future tightening of those must be
-   checked against it explicitly. A record claiming the exemption must also carry NEITHER binding,
-   which is asserted rather than assumed. History is not weakened and no new record may use it.
+   checked against it explicitly. The exempt record provably carries neither binding, because the
+   exemption is keyed on its content digest. History is not weakened and no new record may use it.
 5. **Internal tensors (level 2).** Layer outputs, residuals and caches are compared under the bounded
    contracts in `docs/greenfield/NUMERICAL_CONTRACT.md`; cache/state structure (positions, tails,
    validity, pages, manifests) remains exact.

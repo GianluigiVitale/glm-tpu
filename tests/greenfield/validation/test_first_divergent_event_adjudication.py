@@ -960,3 +960,38 @@ def test_event_arrays_take_only_the_valid_prefix() -> None:
         pytest.approx(0.1, abs=1e-7),
     ]
     assert np.isfinite(got_scores).all()
+
+
+def test_the_tool_emits_the_event_identity_keys_the_loader_requires() -> None:
+    """P2-3, producer side: the loader compares these without defaults."""
+    source = SCRIPT.read_text(encoding="utf-8")
+    assert 'analysis["context"] = args.context' in source
+    assert 'analysis["decode_position"] = args.decode_position' in source
+
+    import ast
+
+    main = _function("main")
+    assigned = {
+        node.slice.value
+        for node in ast.walk(main)
+        if isinstance(node, ast.Subscript)
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "analysis"
+        and isinstance(node.slice, ast.Constant)
+    }
+    assert {"context", "decode_position", "engine_source_run"} <= assigned
+
+
+def test_the_tool_uses_an_absolute_git() -> None:
+    """P3-5: PATH decides what this family of calls resolves to."""
+    import ast
+
+    source = SCRIPT.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    literals = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and node.value == "git"
+    ]
+    assert not literals, "the adjudicator must call git by absolute path"
+    assert '_GIT = "/usr/bin/git"' in source

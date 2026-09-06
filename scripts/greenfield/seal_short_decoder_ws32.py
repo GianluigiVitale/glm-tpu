@@ -216,6 +216,15 @@ def _memory_valid(value: Any) -> bool:
 # The alarm-acknowledgement check already used an absolute git; the
 # pre-registration check is the more security-critical of the two.
 _GIT = "/usr/bin/git"
+# The files that decide what an adjudicated seal accepts: the sealer itself, the
+# validation package holding the reviewed reference-row registry and the §21.2
+# arithmetic, and the reviewed artifact tree. Edits elsewhere (tests, docs,
+# unrelated scripts) do not change the verdict and do not block a seal.
+_ENFORCEMENT_SURFACE = (
+    "scripts/greenfield/seal_short_decoder_ws32.py",
+    "glm_tpu/greenfield/validation",
+    "docs/artifacts",
+)
 DEFAULT_PREFILL_CHUNK = 2048
 DEFAULT_CONTEXT_CAPACITY = 8192
 
@@ -376,6 +385,12 @@ def _distribution(samples: list[float]) -> dict[str, float | int]:
 
 
 def _validate(args: argparse.Namespace) -> int:
+    if args.mode == "acquire" and args.dsa_adjudication_record is not None:
+        # An acquisition seals graphs, not numbers. Carrying an adjudication
+        # binding into an HLO_ACQUIRED SUCCESS would read as a correctness claim
+        # that nothing in an acquisition establishes. Checked before the tag so
+        # the refusal names the real problem.
+        raise SystemExit("WS32 acquisition seals carry no adjudication record")
     _validate_run_tag(
         args.tag,
         context_label=args.context_label,
@@ -476,6 +491,12 @@ def _validate(args: argparse.Namespace) -> int:
         expected_dsa_success_sha256=args.dsa_oracle_success_sha256,
     )
     repository_root = Path(__file__).resolve().parents[2]
+    if args.dsa_adjudication_record is not None:
+        # §21.2: the reviewed reference-row registry lives in this repository's
+        # own source, so a dirty working tree at seal time can widen what is
+        # accepted and then be reverted without leaving a trace in the record.
+        # An adjudicated seal therefore requires a clean tree.
+        _require_clean_worktree(repository_root)
     if args.recovery_code_hash and not re.fullmatch(r"[0-9a-f]{40}", args.recovery_code_hash):
         raise SystemExit("WS32 recovery code hash must be a full commit id")
     _committed_in_run_pin = _make_pre_registration_check(args, repository_root)
@@ -498,11 +519,6 @@ def _validate(args: argparse.Namespace) -> int:
         _committed_in_run_pin(relative, "adjudication record")
         return relative
 
-    if args.mode == "acquire" and args.dsa_adjudication_record is not None:
-        # An acquisition seals graphs, not numbers. Carrying an adjudication
-        # binding into an HLO_ACQUIRED SUCCESS would read as a correctness claim
-        # that nothing in an acquisition establishes.
-        raise SystemExit("WS32 acquisition seals carry no adjudication record")
     if args.dsa_adjudication_record is None:
         if args.dsa_adjudication_sha256 != "0" * 64:
             raise SystemExit("WS32 adjudication SHA given without a record")
@@ -944,10 +960,19 @@ def _validate(args: argparse.Namespace) -> int:
                 }
             if not _same(tensor_record.get("arrays"), array_records):
                 raise SystemExit(f"WS32 numerical tensor manifest drifted rank {rank}")
-            if rank and not _same(
-                array_records, records[0]["numerical_tensors"]["arrays"]
-            ):
-                raise SystemExit(f"WS32 numerical tensor values disagree rank {rank}")
+            _require_ranks_agree(array_records, records, rank=rank)
+            if dsa_adjudication is not None:
+                # Every rank is adjudicated on its OWN arrays. The rank-0 pass
+                # in the adjudication block runs earlier so it is reachable
+                # before the schema checks; this one restores the eight-rank
+                # property rather than resting it on the agreement check above.
+                _rederive_ws32_adjudication(
+                    arrays=arrays,
+                    oracle=oracle,
+                    adjudication=dsa_adjudication,
+                    repository_root=repository_root,
+                    rank=rank,
+                )
             expected_dsa = []
             for step in range(args.observer_steps):
                 expected_dsa.append(
@@ -1201,6 +1226,38 @@ def _validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _require_clean_worktree(repository_root: Path) -> None:
+    """Refuse to seal an adjudicated run from a modified checkout.
+
+    The enforcement of §21.2 items 3-4 reads `REFERENCE_ROWS` and the
+    adjudication arithmetic out of this repository's source. Both are ordinary
+    files: an operator could widen the registry in the working tree, seal, and
+    revert. Requiring the tree to be clean puts any such edit into history,
+    which is what "reviewed" means here.
+    """
+
+    try:
+        status = subprocess.run(
+            [_GIT, "-C", str(repository_root), "status", "--porcelain", "--"]
+            + list(_ENFORCEMENT_SURFACE),
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise SystemExit(f"WS32 seal cannot verify the working tree: {error}")
+    if status.returncode != 0:
+        raise SystemExit(
+            f"WS32 seal cannot verify the working tree: {status.stderr.strip()}"
+        )
+    modified = [line for line in status.stdout.splitlines() if line.strip()]
+    if modified:
+        raise SystemExit(
+            "WS32 adjudicated seal requires an unmodified enforcement surface; the "
+            "reviewed reference-row registry and the §21.2 arithmetic live in it. Modified: "
+            + ", ".join(sorted(item[3:] for item in modified)[:8])
+        )
+
+
 def _make_pre_registration_check(args: Any, repository_root: Path):
     """Return the check that proves §21.2 pre-registration from the run's pin.
 
@@ -1246,27 +1303,40 @@ def _make_pre_registration_check(args: Any, repository_root: Path):
     return committed_in_run_pin
 
 
+def _require_ranks_agree(
+    array_records: Mapping[str, Any], records: list[Mapping[str, Any]], *, rank: int
+) -> None:
+    """Every rank's observed arrays must be rank 0's, value for value."""
+
+    if rank and not _same(array_records, records[0]["numerical_tensors"]["arrays"]):
+        raise SystemExit(f"WS32 numerical tensor values disagree rank {rank}")
+
+
 def _rank0_dsa_arrays(run_dir: Path, record: Mapping[str, Any]) -> dict[str, Any]:
     """Rank 0's DSA observations, bound to rank 0's own runner record."""
 
     path = run_dir / "fleet" / "runner.rank0.npz"
     tensor_record = record.get("numerical_tensors")
+    if not path.is_file():
+        raise SystemExit(f"WS32 rank-0 numerical tensor file is missing: {path}")
     if (
         not isinstance(tensor_record, Mapping)
         or tensor_record.get("filename") != path.name
+        or tensor_record.get("byte_count") != path.stat().st_size
         or tensor_record.get("sha256") != _digest_file(path)
     ):
         raise SystemExit("WS32 rank-0 numerical tensor file is not bound to its record")
+    wanted = (
+        "dsa_producer_layer_ids",
+        "dsa_selected_positions",
+        "dsa_selected_scores",
+        "dsa_selected_valid_counts",
+    )
     with np.load(path, allow_pickle=False) as archive:
-        return {
-            name: np.ascontiguousarray(archive[name])
-            for name in (
-                "dsa_producer_layer_ids",
-                "dsa_selected_positions",
-                "dsa_selected_scores",
-                "dsa_selected_valid_counts",
-            )
-        }
+        missing = [name for name in wanted if name not in archive.files]
+        if missing:
+            raise SystemExit(f"WS32 rank-0 numerical tensor keys missing: {missing}")
+        return {name: np.ascontiguousarray(archive[name]) for name in wanted}
 
 
 def _rederive_ws32_adjudication(

@@ -745,3 +745,51 @@ def test_the_basis_reference_row_resolution_is_unambiguous_or_absent() -> None:
     assert _sole_basis_reference_row(two) is None
     assert _sole_basis_reference_row(one[:1]) is None
     assert _sole_basis_reference_row([]) is None
+
+
+def test_the_basis_must_name_the_record_that_validated_the_reference_row(tmp_path) -> None:
+    """P3-7 / §21.2 item 3: the row is usable only because a review checked it."""
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    path, digest = _hostile(
+        tmp_path, lambda r: r["basis"].__delitem__(1)  # the validation record
+    )
+    with np.testing.assert_raises_regex(ValueError, "record that validated"):
+        load_ws32_adjudicated_divergence(
+            path, expected_sha256=digest, repository_root=tmp_path
+        )
+
+
+def test_the_analysis_must_agree_on_the_event_identity_keys(tmp_path) -> None:
+    """P2-3: these clauses used to default to the record's own values."""
+    import hashlib
+    import json
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    analysis_path = tmp_path / "docs/artifacts/gate-d-analysis.json"
+    for key, value in (
+        ("context", "2k"),
+        ("decode_position", 2033),
+        ("producer_layer_id", 62),
+    ):
+        record, _ = _adjudication_record_fixture(tmp_path)
+        analysis = json.loads(analysis_path.read_text(encoding="utf-8"))
+        analysis[key] = value
+        analysis_path.write_text(json.dumps(analysis), encoding="utf-8")
+        digest = hashlib.sha256(analysis_path.read_bytes()).hexdigest()
+        record["analysis"]["sha256"] = digest
+        record["basis"][2]["sha256"] = digest
+        payload = json.dumps(record).encode()
+        path = tmp_path / f"hostile-{key}.json"
+        path.write_bytes(payload)
+        with np.testing.assert_raises_regex(ValueError, "adjudicates a different event"):
+            load_ws32_adjudicated_divergence(
+                path,
+                expected_sha256=hashlib.sha256(payload).hexdigest(),
+                repository_root=tmp_path,
+            )
