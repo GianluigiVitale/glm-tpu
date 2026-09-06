@@ -13479,3 +13479,12 @@ succeeds for any commit already in a worker's object database, so it is evidence
 to be fetched by another route, and the sentence now says that. The pre-run publication refusal covers
 the recovery pin too, and the wrapper says which of `RECOVERY_PIN`'s two meanings applies where:
 provenance in the evidence ledger, authorization in the seal.
+
+A consequence of the alarm rebinding worth stating before it surprises someone at 3am. On a
+non-recovery seal the lessons pin must now equal the run's own pin, and a lessons entry naming a run
+tag cannot exist at a pin that predates the run. So a first seal of a run whose later-event alarm
+fires WILL refuse, and the acknowledgement path is: run, observe the alarm, write the
+`GATE_D_LESSONS.md` entry naming the tag, commit, push, recovery-seal at that pin. That is exactly how
+Gate D and both Step B runs were sealed — DB567's lessons pin is its recovery pin `579b13f5`, DB569's
+is `b51c6268` — so this is the existing workflow made explicit rather than a new constraint. It is
+also the right semantics: you cannot acknowledge in advance a lesson about a run that has not happened.
