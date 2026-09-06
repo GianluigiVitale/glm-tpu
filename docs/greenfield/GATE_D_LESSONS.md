@@ -1415,3 +1415,24 @@ normalized-state cause.
   129.663 ms, +0.12%, inside the 10-sample spread. Lesson: a change that alters boundary selection
   needs its OWN pre-registration and its OWN alarm profile, and the two-run sequence is what keeps the
   record a prediction rather than a description — run 1 produces the arrays, run 2 is judged by them.
+
+- 2026-09-06 (spec §23.3 Step C, capacity 131,072): run
+  `greenfield_ws32_short_decoder_8k_numerical_cap131072_hrope_20260906T191737720789480Z` (run pin
+  `a04f6bde`, acquisition `…8k_acquire_cap131072_hrope_20260906T173812294848894Z` at `29d17690`,
+  C = 2048, rotary table on) executed the sealed 8K prompt with the context capacity raised from 8,192
+  to 131,072 — 256 pages instead of 16. **Capacity does not change the numerics, bit for bit.** The
+  numerical array manifest `4f4a8027…`, the raw tokens `909682cb…8173`, and the cache probe rows
+  (`kv` `d06ab831…`, `index` `1775bfe3…`) are all IDENTICAL to DB 570's at capacity 8,192;
+  `adjudicated_event_matches_record` is true against the same B′ pre-registration `5a9b6e2b…` and no
+  event is unexplained. Because the arrays are identical, the later-event alarm profile is identical
+  too, so this run acknowledges on `docs/artifacts/gate-d-ws32-8k-hrope-20260906-later-event-profile.json`
+  (`192469e2…`) on the identity basis — the same reasoning the two Step B runs used for DB567's profile.
+
+  What capacity DOES change is cost, and by a consistent ~10% on both axes: prefill 262.30 s per
+  2,048-token chunk against 238.46 s at 8,192 (≈128 ms per prompt token against ≈116, +10.0%), and
+  decode p50 142.968 ms against 129.816 ms (6.995 tok/s against 7.699, +10.1%). Peak HBM rises to
+  27,811,511,296 B/chip against 26,375,554,560, i.e. 5.20 GB of headroom left against the
+  33,014,398,976 B limit. Lesson for the L7/L8 projections: the per-capacity penalty is real and
+  linear-ish in neither direction that matters — it is a step from one capacity to another, not a
+  function of prompt length — so a 128K prefill should be budgeted at ~128 ms/token, and the 262,656
+  measurement is what decides whether 5.20 GB of headroom survives another doubling.
