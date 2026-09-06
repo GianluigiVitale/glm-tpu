@@ -2149,18 +2149,32 @@ def test_hidden_index_flags_on_the_enforcement_surface_are_refused(tmp_path) -> 
     module._require_clean_worktree(repository)
 
     relative = "glm_tpu/greenfield/validation/ws32_short_context.py"
-    subprocess.run(
-        ["git", "-C", str(repository), "update-index", "--assume-unchanged", relative],
-        check=True, capture_output=True,
-    )
-    target.write_text('REFERENCE_ROWS = {"fitted": 1}\n', encoding="utf-8")
-    status = subprocess.run(
-        ["git", "-C", str(repository), "status", "--porcelain"],
-        capture_output=True, text=True, check=True,
-    )
-    assert status.stdout.strip() == "", "the premise: git now reports the tree as clean"
-    with _pytest.raises(SystemExit, match="hidden index flags"):
-        module._require_clean_worktree(repository)
+    # `ls-files -v` tags assume-unchanged as a lowercase letter and
+    # skip-worktree as a capital S, so both must be refused, not just one.
+    for flag, undo in (
+        ("--assume-unchanged", "--no-assume-unchanged"),
+        ("--skip-worktree", "--no-skip-worktree"),
+    ):
+        subprocess.run(
+            ["git", "-C", str(repository), "update-index", flag, relative],
+            check=True, capture_output=True,
+        )
+        target.write_text('REFERENCE_ROWS = {"fitted": 1}\n', encoding="utf-8")
+        status = subprocess.run(
+            ["git", "-C", str(repository), "status", "--porcelain"],
+            capture_output=True, text=True, check=True,
+        )
+        assert status.stdout.strip() == "", (
+            f"the premise: git reports the tree as clean under {flag}"
+        )
+        with _pytest.raises(SystemExit, match="hidden index flags"):
+            module._require_clean_worktree(repository)
+        target.write_text("REFERENCE_ROWS = {}\n", encoding="utf-8")
+        subprocess.run(
+            ["git", "-C", str(repository), "update-index", undo, relative],
+            check=True, capture_output=True,
+        )
+    module._require_clean_worktree(repository)
 
 
 def test_untracked_adjudication_outputs_do_not_block_a_seal(tmp_path) -> None:

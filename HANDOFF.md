@@ -13368,3 +13368,11 @@ commit times are the accurate stamps: the entry headed 23:40Z is `55e431db` at 2
 `7ec741c5` at 01:56Z. I have now mislabelled handoff timestamps twice in one session by writing the
 time I expected the work to take rather than reading the clock; the commit timestamp is the record to
 trust, and future entries should be stamped from `git log`, not from memory.
+
+Caught mid-review, from watching the reviewer's own probe rather than waiting for its verdict: the
+index-flag refusal only caught `--assume-unchanged`. `git ls-files -v` tags assume-unchanged by
+LOWERCASING the tag letter but marks skip-worktree with a capital `S`, and my check tested
+`line[:1].islower()`. So `--skip-worktree` still hid an edit to the §21.2 arithmetic from `git status`
+with nothing committed — the exact hole the check was added for, closed on one of its two doors. The
+rule is now that only a plain cached `H` is acceptable, and the test drives both flags: it sets each,
+edits the registry, asserts git reports the tree clean, and asserts the refusal.

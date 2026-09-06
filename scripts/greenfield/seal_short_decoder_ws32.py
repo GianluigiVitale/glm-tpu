@@ -1307,7 +1307,9 @@ def _require_clean_worktree(repository_root: Path) -> None:
     )
     # `--assume-unchanged` and `--skip-worktree` make git report a modified file
     # as clean, so the flags themselves are a refusal: they hide exactly the edit
-    # this check exists to catch, and they leave nothing in history.
+    # this check exists to catch, and they leave nothing in history. `ls-files -v`
+    # tags assume-unchanged by LOWERCASING the tag letter and skip-worktree as a
+    # capital `S`; only `H` (plain cached) is acceptable here.
     hidden = [
         line[2:]
         for line in _git_lines(
@@ -1315,7 +1317,7 @@ def _require_clean_worktree(repository_root: Path) -> None:
             ["ls-files", "-v", "--"] + list(_ENFORCEMENT_SURFACE),
             "read the index",
         )
-        if line[:1].islower()
+        if line[:1] != "H"
     ]
     if hidden:
         raise SystemExit(
