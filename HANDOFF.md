@@ -13294,3 +13294,14 @@ now walk the tree themselves and drop any branch whose test is a constant or an 
 operand. Re-mutated: disabling the per-rank re-derivation, deleting it, disabling the
 enforcement-surface check and deleting its call all fail now. That technique, not the individual
 findings, is what three review rounds kept catching.
+
+Two further hardenings, taken from the reviewer's own list of things to attack next rather than
+waiting to be told. `_live_calls` now also drops `while False:` bodies, statements after an
+unconditional exit at the same level, and calls that have been moved into a nested definition, so the
+class of "disable it without removing the node" edits it accepts is much smaller. And a clean tree is
+not the same as a reviewed one: a seal driven from a scratch checkout carrying a widened registry on
+a scratch branch would pass the surface check, so an adjudicated seal now records the committed
+object id of each enforcement-surface path and of its own HEAD in the summary. That does not prevent
+the scratch-checkout route; it puts what the enforcement was run with into the sealed record, where a
+reviewer compares it against the reviewed branch. Prevention and evidence are different things and
+the record now carries both.

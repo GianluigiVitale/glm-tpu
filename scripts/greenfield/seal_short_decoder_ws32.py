@@ -497,6 +497,9 @@ def _validate(args: argparse.Namespace) -> int:
         # accepted and then be reverted without leaving a trace in the record.
         # An adjudicated seal therefore requires a clean tree.
         _require_clean_worktree(repository_root)
+        enforcement_surface = _enforcement_surface_identity(repository_root)
+    else:
+        enforcement_surface = None
     if args.recovery_code_hash and not re.fullmatch(r"[0-9a-f]{40}", args.recovery_code_hash):
         raise SystemExit("WS32 recovery code hash must be a full commit id")
     _committed_in_run_pin = _make_pre_registration_check(args, repository_root)
@@ -1096,6 +1099,10 @@ def _validate(args: argparse.Namespace) -> int:
 
     summary: dict[str, Any] = {
         "artifact_kind": "greenfield_ws32_short_decoder_fleet",
+        # What the §21.2 enforcement was actually run with, so a reviewer can
+        # compare it against the reviewed branch rather than trust the tree it
+        # happened to be sealed from.
+        **({} if enforcement_surface is None else {"enforcement_surface": enforcement_surface}),
         **common,
         "context_label": args.context_label,
         "graph_sha256": {
@@ -1224,6 +1231,42 @@ def _validate(args: argparse.Namespace) -> int:
     _write_once(args.output, summary)
     print(json.dumps(summary, sort_keys=True))
     return 0
+
+
+def _enforcement_surface_identity(repository_root: Path) -> dict[str, str]:
+    """The committed object ids of the code that decides what a seal accepts.
+
+    The clean-surface check stops an uncommitted edit, but a seal driven from a
+    different checkout — or from a scratch branch carrying a widened registry —
+    would still have a clean tree. Recording the object id of each surface path
+    puts what the seal was produced with into the sealed record, where it can be
+    compared against the reviewed branch.
+    """
+
+    identity: dict[str, str] = {}
+    for relative in _ENFORCEMENT_SURFACE:
+        try:
+            result = subprocess.run(
+                [_GIT, "-C", str(repository_root), "rev-parse", f"HEAD:{relative}"],
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            raise SystemExit(f"WS32 seal cannot identify its enforcement surface: {error}")
+        if result.returncode != 0:
+            raise SystemExit(
+                f"WS32 enforcement surface path is not committed at HEAD: {relative}"
+            )
+        identity[relative] = result.stdout.strip()
+    head = subprocess.run(
+        [_GIT, "-C", str(repository_root), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if head.returncode != 0:
+        raise SystemExit("WS32 seal cannot identify its own checkout")
+    identity["HEAD"] = head.stdout.strip()
+    return identity
 
 
 def _require_clean_worktree(repository_root: Path) -> None:

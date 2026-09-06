@@ -2000,12 +2000,13 @@ def _live_calls(function, name: str) -> list:
     found: list = []
 
     def visit(node) -> None:
-        if isinstance(node, ast.If):
+        if isinstance(node, (ast.If, ast.While)):
             if not dead(node.test):
-                for item in node.body:
-                    visit(item)
-            for item in node.orelse:
-                visit(item)
+                visit_body(node.body)
+            visit_body(getattr(node, "orelse", []))
+            return
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            # A call moved into a nested definition is not a call here.
             return
         if (
             isinstance(node, ast.Call)
@@ -2016,8 +2017,14 @@ def _live_calls(function, name: str) -> list:
         for child in ast.iter_child_nodes(node):
             visit(child)
 
-    for item in function.body:
-        visit(item)
+    def visit_body(body) -> None:
+        for item in body:
+            visit(item)
+            if isinstance(item, (ast.Return, ast.Raise, ast.Continue, ast.Break)):
+                # Nothing after an unconditional exit at this level runs.
+                return
+
+    visit_body(function.body)
     return found
 
 
@@ -2043,3 +2050,40 @@ def test_the_enforcement_surface_check_is_called_and_not_disabled() -> None:
         "_validate no longer calls the enforcement-surface check, or a dead guard "
         "disables it"
     )
+
+
+def test_the_seal_records_the_enforcement_surface_it_ran_with(tmp_path) -> None:
+    """A clean tree is not the same as a reviewed one.
+
+    A seal driven from a scratch checkout carrying a widened registry has a
+    clean tree, so the object ids of the enforcement surface are recorded and a
+    reviewer compares them against the reviewed branch.
+    """
+    import subprocess
+
+    import pytest as _pytest
+
+    module = _sealer_module()
+    identity = module._enforcement_surface_identity(
+        _Path_for_repository()
+    )
+    assert set(identity) == {"HEAD", *module._ENFORCEMENT_SURFACE}
+    for value in identity.values():
+        assert len(value) == 40 and all(c in "0123456789abcdef" for c in value)
+
+    repository = tmp_path / "bare"
+    repository.mkdir()
+    subprocess.run(["git", "-C", str(repository), "init", "-q"], check=True, capture_output=True)
+    with _pytest.raises(SystemExit, match="cannot identify its own checkout|not committed at HEAD"):
+        module._enforcement_surface_identity(repository)
+
+    validate = _sealer_function("_validate")
+    assert _live_calls(validate, "_enforcement_surface_identity"), (
+        "the surface identity is never computed, so nothing records it"
+    )
+
+
+def _Path_for_repository():
+    from pathlib import Path as _Path
+
+    return _Path(__file__).resolve().parents[3]
