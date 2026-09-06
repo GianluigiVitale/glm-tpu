@@ -13539,3 +13539,28 @@ clothes — a control asserted rather than measured, and a claim recorded rather
 I am least comfortable with are the ones where I wrote into this log that something was done when it
 was not: the neutrality argument in round 1 and the wrapper edits in round 12. Both were caught by the
 reviewer diffing, not by me re-reading. Re-read the file.
+
+## 2026-09-06 15:2xZ — the watcher stall, its root cause, and the fix
+
+The A′ tables-ON 8K acquisition finished cleanly at 05:08:11Z: `HLO_ACQUIRED_ONLY` at pin `48372a34`,
+all seven graphs, census clean on all eight hosts, and the runner records confirm the host rotary
+table was genuinely in effect (8192 rows x 64 rotary dim, 1,048,576 B/device, theta 8e6, sha
+`6a22140f…`). **Then the pod sat idle for ten hours.** The watch I set to tell me it had finished used
+`pgrep -f "run_short_decoder_ws32.sh"`, and `pgrep -f` matches against full command lines — including
+the watcher's own, which contains that string. It waited on itself. This is the third time in this
+session: twice earlier it cost minutes because I noticed; this time it cost ten hours of a free pod.
+
+Root cause, stated plainly so it is not re-derived: any wait or kill keyed on a PROCESS NAME PATTERN
+can match the waiting process. The fix is to key on a FILE. `/home/gianl/bin/wait-for-pod-run.sh`
+blocks on `flock -n` against the pod workload lease itself, which is the authoritative signal that a
+run is in progress and has no process name to collide with, then prints the orchestrator tail and the
+run's status. `goal.md` now carries this as its own section, above Storage, because an idle pod is the
+most expensive failure mode available here and it has now happened three times.
+
+B′ run 1 launched at 15:18:44Z. Decision recorded: it binds NO adjudication record
+(`GLM_GREENFIELD_WS32_DSA_ADJUDICATION=0`). The §23.8 host rotary table changes layer-0 attention, so
+the committed Gate D record's event-1 divergence will not reproduce; binding it would make the run
+refuse without producing anything. Run 1 exists to produce the observer arrays the offline §21.2
+adjudication reads. Its record is then committed and pushed, and run 2 is sealed against it. The
+alternative — one run, recovery-sealed against a record derived from its own arrays — is what the
+whole pre-registration apparatus exists to prevent, and the sealer now refuses it by construction.
