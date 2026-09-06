@@ -53,6 +53,8 @@ STD_DDOF = 0
 # §21.5 records two reference conventions whose rows have identical length and
 # identical producer layer. The convention is therefore not inferable from the
 # row and must be declared and carried into the record.
+# Absolute, like the sealer: this family of calls decides what is accepted.
+_GIT = "/usr/bin/git"
 COMMITTED_ARTIFACT_DIR = REPO_ROOT / "docs" / "artifacts"
 COMMITTED_ARTIFACT_PREFIX = "gate-d-"
 REMOTE_RESULTS_PREFIX = "gs://driftbench-dsv4-uc/results"
@@ -280,6 +282,8 @@ def main() -> int:
         decode_position=args.decode_position,
         expected_producer_layer_id=args.reference_producer_layer_id,
     )
+    analysis["context"] = args.context
+    analysis["decode_position"] = args.decode_position
     analysis["engine_source_run"] = args.engine_source_run
     analysis["observation_window"] = {"events": events, "steps": steps}
     analysis["observer_archive"] = {
@@ -468,14 +472,14 @@ def _require_committed_content(relative: str) -> None:
     """
 
     committed = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "rev-parse", f"HEAD:{relative}"],
+        [_GIT, "-C", str(REPO_ROOT), "rev-parse", f"HEAD:{relative}"],
         capture_output=True,
         text=True,
     )
     if committed.returncode != 0:
         raise SystemExit(f"artifact is not committed at HEAD: {relative}")
     working = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "hash-object", "--", relative],
+        [_GIT, "-C", str(REPO_ROOT), "hash-object", "--", relative],
         capture_output=True,
         text=True,
     )
@@ -492,7 +496,7 @@ def _reference_implementation_tree() -> str:
     """§21.2 item 3: record the reference implementation's source hash."""
 
     result = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "rev-parse", f"HEAD:{_contract().REFERENCE_IMPLEMENTATION}"],
+        [_GIT, "-C", str(REPO_ROOT), "rev-parse", f"HEAD:{_contract().REFERENCE_IMPLEMENTATION}"],
         capture_output=True,
         text=True,
     )

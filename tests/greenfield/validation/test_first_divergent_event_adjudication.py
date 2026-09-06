@@ -121,7 +121,12 @@ def test_the_emitted_record_matches_the_loader_schema(tmp_path: Path) -> None:
     artifacts.mkdir(parents=True)
     row_relative = REGISTERED["path"]
     shutil.copyfile(ROOT / row_relative, tmp_path / row_relative)
+    shutil.copyfile(ROOT / REGISTERED["validation_path"], tmp_path / REGISTERED["validation_path"])
     row_entry = {"path": row_relative, "sha256": REGISTERED["sha256"]}
+    validation_entry = {
+        "path": REGISTERED["validation_path"],
+        "sha256": REGISTERED["validation_sha256"],
+    }
     reference_row = {
         "convention": "rms_norm_eps_1e-5",
         "implementation_tree_sha1": REGISTERED["implementation_tree_sha1"],
@@ -141,6 +146,8 @@ def test_the_emitted_record_matches_the_loader_schema(tmp_path: Path) -> None:
                 "reference_band_capacity",
             )
         },
+        "context": "8k",
+        "decode_position": 8155,
         "engine_source_run": (
             "greenfield_ws32_short_decoder_8k_numerical_20260905T000000000000000Z"
         ),
@@ -172,7 +179,7 @@ def test_the_emitted_record_matches_the_loader_schema(tmp_path: Path) -> None:
         "expected_only": [31],
         "observed_only": [32],
         "later_event_alarm": 1024,
-        "basis": [row_entry, analysis_entry],
+        "basis": [row_entry, validation_entry, analysis_entry],
         "prior_attempts": [],
         "reference_row": reference_row,
         "oracle": {"dsa_manifest_sha256": "a" * 64, "token_manifest_sha256": "c" * 64},
@@ -258,6 +265,8 @@ def test_a_reference_row_outside_the_reviewed_registry_is_refused_by_the_loader(
                 "reference_band_capacity",
             )
         },
+        "context": "8k",
+        "decode_position": 8155,
         "engine_source_run": (
             "greenfield_ws32_short_decoder_8k_numerical_20260905T000000000000000Z"
         ),
@@ -274,6 +283,13 @@ def test_a_reference_row_outside_the_reviewed_registry_is_refused_by_the_loader(
         "path": analysis_relative,
         "sha256": sha256((tmp_path / analysis_relative).read_bytes()).hexdigest(),
     }
+    import shutil
+
+    shutil.copyfile(ROOT / REGISTERED["validation_path"], tmp_path / REGISTERED["validation_path"])
+    validation_entry = {
+        "path": REGISTERED["validation_path"],
+        "sha256": REGISTERED["validation_sha256"],
+    }
     record = {
         "analysis": analysis_entry,
         "artifact_kind": "gate_d_ws32_8k_adjudicated_divergence",
@@ -288,7 +304,7 @@ def test_a_reference_row_outside_the_reviewed_registry_is_refused_by_the_loader(
         "expected_only": [31],
         "observed_only": [32],
         "later_event_alarm": 1024,
-        "basis": [row_entry, analysis_entry],
+        "basis": [row_entry, validation_entry, analysis_entry],
         "prior_attempts": [],
         "reference_row": reference_row,
         "oracle": {"dsa_manifest_sha256": "a" * 64, "token_manifest_sha256": "c" * 64},
@@ -854,3 +870,93 @@ def test_the_help_text_names_the_contract_values_it_validates_against() -> None:
     for convention in REFERENCE_CONVENTIONS:
         assert convention in source, f"--help no longer names {convention}"
     assert f"(default: {LATER_EVENT_ALARM})" in source
+
+
+def _bare_event(*, reference, oracle_positions, oracle_scores, engine_positions, engine_scores):
+    from glm_tpu.greenfield.validation.ws32_first_divergent_event import (
+        adjudicate_first_divergent_event,
+    )
+
+    return adjudicate_first_divergent_event(
+        oracle_positions=np.asarray(oracle_positions),
+        oracle_scores=np.asarray(oracle_scores),
+        engine_positions=np.asarray(engine_positions),
+        engine_scores=np.asarray(engine_scores),
+        reference=np.asarray(reference),
+        producer_layer_id=1,
+        step=0,
+        event=0,
+    )
+
+
+def test_cap_std_refuses_an_engine_whose_spread_exceeds_the_oracles() -> None:
+    """§21.2 item 3's std cap had no fixture that could fail it."""
+    width = 8
+    reference = np.linspace(1.0, 0.0, width + 1)
+    oracle_positions = np.arange(width)
+    engine_positions = oracle_positions.copy()
+    engine_positions[-1] = width
+    # The oracle sits a constant epsilon above the reference, so its spread is
+    # zero; the engine alternates within the same max-abs bound.
+    epsilon = 0.01
+    oracle_scores = reference[oracle_positions] + epsilon
+    engine_scores = reference[engine_positions] + epsilon * np.where(
+        np.arange(width) % 2 == 0, 1.0, -1.0
+    )
+    result = _bare_event(
+        reference=reference,
+        oracle_positions=oracle_positions,
+        oracle_scores=oracle_scores,
+        engine_positions=engine_positions,
+        engine_scores=engine_scores,
+    )
+    assert result["checks"]["cap_max_abs"]["pass"] is True
+    assert result["checks"]["cap_std"]["pass"] is False
+    assert result["verdict"] == "FAIL"
+
+
+def test_reference_band_refuses_a_swap_far_from_the_cutoff() -> None:
+    """The clause carrying the whole boundary-explained claim had no fixture."""
+    width = 8
+    reference = np.concatenate([np.linspace(1.0, 0.5, width), np.asarray([-5.0])])
+    oracle_positions = np.arange(width)
+    engine_positions = oracle_positions.copy()
+    engine_positions[-1] = width  # the far-below-cutoff position
+    epsilon = 0.2
+    oracle_scores = reference[oracle_positions] + epsilon
+    engine_scores = reference[engine_positions] + epsilon
+    result = _bare_event(
+        reference=reference,
+        oracle_positions=oracle_positions,
+        oracle_scores=oracle_scores,
+        engine_positions=engine_positions,
+        engine_scores=engine_scores,
+    )
+    assert result["checks"]["reference_band"]["pass"] is False
+    assert result["verdict"] == "FAIL"
+
+
+def test_event_arrays_take_only_the_valid_prefix() -> None:
+    """A short event's padding tail would make every cap pass vacuously."""
+    from glm_tpu.greenfield.validation.ws32_first_divergent_event import event_arrays
+
+    width = 6
+    positions = np.full((1, 1, 1, width), -1, dtype=np.int32)
+    positions[0, 0, 0, :3] = [4, 5, 6]
+    scores = np.full((1, 1, 1, width), -np.inf, dtype=np.float32)
+    scores[0, 0, 0, :3] = [0.3, 0.2, 0.1]
+    counts = np.full((1, 1, 1), 3, dtype=np.int32)
+    got_positions, got_scores = event_arrays(
+        selected_positions=positions,
+        selected_scores=scores,
+        selected_valid_counts=counts,
+        step=0,
+        event=0,
+    )
+    assert got_positions.tolist() == [4, 5, 6]
+    assert got_scores.tolist() == [
+        pytest.approx(0.3, abs=1e-7),
+        pytest.approx(0.2, abs=1e-7),
+        pytest.approx(0.1, abs=1e-7),
+    ]
+    assert np.isfinite(got_scores).all()

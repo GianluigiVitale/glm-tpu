@@ -250,6 +250,19 @@ _ARTIFACT_DIRECTORY = ("docs", "artifacts")
 _ARTIFACT_PREFIX = "gate-"
 
 
+def _sole_basis_reference_row(basis: list[Mapping[str, Any]]) -> str | None:
+    """The record's own reference row when it declares no `reference_row`.
+
+    The grandfathered pre-amendment record names the row only in its basis, and
+    exactly one basis entry is an ``.npy``. Reading it from there is unambiguous
+    and, unlike a registry lookup keyed on the event, stays correct when §21.5's
+    second norm-eps convention row is registered for the same event.
+    """
+
+    rows = [item["path"] for item in basis if item["path"].endswith(".npy")]
+    return rows[0] if len(rows) == 1 else None
+
+
 def reviewed_reference_row(
     *, context: str, decode_position: int, producer_layer_id: int, convention: str | None = None
 ) -> Mapping[str, str]:
@@ -447,6 +460,18 @@ def load_ws32_adjudicated_divergence(
             raise ValueError(
                 "WS32 adjudicated-divergence names no reviewed FP64 reference row for this event"
             )
+        if not any(
+            item["path"] == registered["validation_path"]
+            and item["sha256"] == registered["validation_sha256"]
+            for item in basis
+        ):
+            # §21.2 item 3: the row is usable only because a reviewed record
+            # validated it against the legacy captures. That record is part of
+            # the ground, so it is named in the basis and digest-checked there.
+            raise ValueError(
+                "WS32 adjudicated-divergence basis does not name the record that validated "
+                "its FP64 reference row"
+            )
         if (
             registered["path"] != reference["path"]
             or registered["sha256"] != reference["sha256"]
@@ -507,9 +532,8 @@ def load_ws32_adjudicated_divergence(
                     basis_record.get("step") != record["step"]
                     or basis_record.get("event_index") != record["event_index"]
                     or basis_record.get("engine_source_run") != record["engine_source_run"]
-                    or basis_record.get("context", record["context"]) != record["context"]
-                    or basis_record.get("decode_position", record["decode_position"])
-                    != record["decode_position"]
+                    or basis_record.get("context") != record["context"]
+                    or basis_record.get("decode_position") != record["decode_position"]
                     or basis_record.get("producer_layer_id") != record["producer_layer_id"]
                 ):
                     raise ValueError(
@@ -573,7 +597,11 @@ def load_ws32_adjudicated_divergence(
         later_event_alarm=int(record["later_event_alarm"]),
         engine_source_run=source_run,
         analysis_path=None if analysis_entry is None else str(analysis_entry["path"]),
-        reference_row_path=None if reference is None else str(reference["path"]),
+        reference_row_path=(
+            str(reference["path"])
+            if reference is not None
+            else _sole_basis_reference_row(basis)
+        ),
     )
 
 

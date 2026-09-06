@@ -498,6 +498,11 @@ def _validate(args: argparse.Namespace) -> int:
         _committed_in_run_pin(relative, "adjudication record")
         return relative
 
+    if args.mode == "acquire" and args.dsa_adjudication_record is not None:
+        # An acquisition seals graphs, not numbers. Carrying an adjudication
+        # binding into an HLO_ACQUIRED SUCCESS would read as a correctness claim
+        # that nothing in an acquisition establishes.
+        raise SystemExit("WS32 acquisition seals carry no adjudication record")
     if args.dsa_adjudication_record is None:
         if args.dsa_adjudication_sha256 != "0" * 64:
             raise SystemExit("WS32 adjudication SHA given without a record")
@@ -539,6 +544,21 @@ def _validate(args: argparse.Namespace) -> int:
             # window between the identity check and this one.
             raise SystemExit(
                 "WS32 adjudication record was derived from the run being sealed"
+            )
+        if args.mode == "numerical":
+            # §21.2 items 3-4 are RE-DERIVED from the run being sealed, the
+            # sealed oracle and the pre-registered reference row. A verdict the
+            # sealer merely reads is a claim by whoever wrote the file; the
+            # record's job is to fix the row and the expected divergence in
+            # advance, never to supply the answer. Rank 0's archive is bound to
+            # rank 0's own record here; the rank loop below re-verifies every
+            # rank and proves they agree.
+            _rederive_ws32_adjudication(
+                arrays=_rank0_dsa_arrays(args.run_dir, records[0]),
+                oracle=oracle,
+                adjudication=dsa_adjudication,
+                repository_root=repository_root,
+                rank=0,
             )
         expected_dsa_adjudication = {
             "event_index": dsa_adjudication.event_index,
@@ -943,19 +963,6 @@ def _validate(args: argparse.Namespace) -> int:
                         adjudication=dsa_adjudication,
                     )
                 )
-            if dsa_adjudication is not None:
-                # §21.2 items 3-4 are RE-DERIVED here from the run being sealed,
-                # the sealed oracle and the pre-registered reference row. A
-                # verdict the sealer merely reads is a claim by whoever wrote
-                # the file; the record's job is to fix the row and the expected
-                # divergence in advance, not to supply the answer.
-                _rederive_ws32_adjudication(
-                    arrays=arrays,
-                    oracle=oracle,
-                    adjudication=dsa_adjudication,
-                    repository_root=repository_root,
-                    rank=rank,
-                )
             if record.get("checkpoint_transport") != args.checkpoint_transport:
                 raise SystemExit(f"WS32 checkpoint transport drifted rank {rank}")
             if not _same(record.get("dsa_adjudication"), expected_dsa_adjudication):
@@ -1239,6 +1246,29 @@ def _make_pre_registration_check(args: Any, repository_root: Path):
     return committed_in_run_pin
 
 
+def _rank0_dsa_arrays(run_dir: Path, record: Mapping[str, Any]) -> dict[str, Any]:
+    """Rank 0's DSA observations, bound to rank 0's own runner record."""
+
+    path = run_dir / "fleet" / "runner.rank0.npz"
+    tensor_record = record.get("numerical_tensors")
+    if (
+        not isinstance(tensor_record, Mapping)
+        or tensor_record.get("filename") != path.name
+        or tensor_record.get("sha256") != _digest_file(path)
+    ):
+        raise SystemExit("WS32 rank-0 numerical tensor file is not bound to its record")
+    with np.load(path, allow_pickle=False) as archive:
+        return {
+            name: np.ascontiguousarray(archive[name])
+            for name in (
+                "dsa_producer_layer_ids",
+                "dsa_selected_positions",
+                "dsa_selected_scores",
+                "dsa_selected_valid_counts",
+            )
+        }
+
+
 def _rederive_ws32_adjudication(
     *,
     arrays: Mapping[str, Any],
@@ -1260,22 +1290,15 @@ def _rederive_ws32_adjudication(
         event_arrays,
         oracle_event_arrays,
     )
-    from glm_tpu.greenfield.validation.ws32_short_context import reviewed_reference_row
 
     step = adjudication.step
     event = adjudication.event_index
     relative = adjudication.reference_row_path
     if relative is None:
-        # The grandfathered pre-amendment record names no row, but its event has
-        # exactly one reviewed row, so it is re-derived like everything else.
-        try:
-            relative = reviewed_reference_row(
-                context=adjudication.context,
-                decode_position=adjudication.decode_position,
-                producer_layer_id=adjudication.producer_layer_id,
-            )["path"]
-        except ValueError as error:
-            raise SystemExit(f"WS32 adjudication reference row is not determined: {error}")
+        raise SystemExit(
+            "WS32 adjudication record names no FP64 reference row, so §21.2 items 3-4 "
+            "cannot be re-derived"
+        )
     reference_path = repository_root / relative
     try:
         reference = np.load(reference_path, allow_pickle=False).astype(np.float64)

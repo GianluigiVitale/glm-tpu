@@ -1431,7 +1431,7 @@ def test_the_pre_registration_pin_refuses_when_git_is_unavailable(tmp_path, monk
         check("docs/artifacts/gate-d-record.json", "adjudication record")
 
 
-def test_the_grandfathered_record_is_re_derived_from_the_reviewed_registry(tmp_path) -> None:
+def test_the_grandfathered_record_is_re_derived_from_its_own_basis_row(tmp_path) -> None:
     """No record escapes the re-derivation, including the pre-amendment one."""
     import shutil
     from pathlib import Path as _Path
@@ -1471,7 +1471,9 @@ def test_the_grandfathered_record_is_re_derived_from_the_reviewed_registry(tmp_p
         producer_layer_id = 1
         expected_only = (680, 1052, 2024, 2436, 6322, 7473, 7850)
         observed_only = (754, 1904, 2029, 3651, 4899, 5536, 6951)
-        reference_row_path = None  # the pre-amendment record names no row
+        # The pre-amendment record declares no `reference_row`; the loader
+        # resolves it from the single `.npy` in the record's own basis.
+        reference_row_path = "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
 
     arrays = dict(_np.load(archive, allow_pickle=False))
     module._rederive_ws32_adjudication(
@@ -1483,9 +1485,9 @@ def test_the_grandfathered_record_is_re_derived_from_the_reviewed_registry(tmp_p
     )
 
     class _Unregistered(_Grandfathered):
-        decode_position = 4096
+        reference_row_path = None
 
-    with _pytest.raises(SystemExit, match="reference row is not determined"):
+    with _pytest.raises(SystemExit, match="names no FP64 reference row"):
         module._rederive_ws32_adjudication(
             arrays=arrays,
             oracle=_Oracle(),
@@ -1493,3 +1495,231 @@ def test_the_grandfathered_record_is_re_derived_from_the_reviewed_registry(tmp_p
             repository_root=tmp_path,
             rank=0,
         )
+
+
+def _run_validate(tmp_path, **overrides):
+    """Drive the sealer's `validate` over a real sealed run directory."""
+    import sys
+    from pathlib import Path as _Path
+
+    sys.path.insert(0, str(_Path(__file__).resolve().parent))
+    from ws32_validate_argv import SEALED_C512_RUN, available, build
+
+    if not available():
+        import pytest as _pytest
+
+        _pytest.skip("the sealed C=512 run directory or an 8K oracle is unavailable")
+    module = _sealer_module()
+    repository_root = _Path(__file__).resolve().parents[3]
+    argv = build(SEALED_C512_RUN, tmp_path / "summary.json", repository_root, **overrides)
+    original = sys.argv
+    try:
+        sys.argv = ["seal"] + argv
+        module.main()
+    except SystemExit as error:
+        return str(error)
+    finally:
+        sys.argv = original
+    return None
+
+
+def test_validate_reaches_the_run_records_with_the_genuine_adjudication(tmp_path) -> None:
+    """The adjudication block must PASS on real evidence, not refuse it.
+
+    The sealed C=512 run predates the current runner schema, so validation stops
+    there; the point is that it gets that far, which it cannot do if any
+    adjudication check refuses. Every refusal test below is anchored on this.
+    """
+    message = _run_validate(tmp_path)
+    assert message is not None
+    assert "runner schema drifted" in message, message
+
+
+def test_validate_refuses_an_adjudication_record_outside_the_reviewed_directory(tmp_path) -> None:
+    """The record-path guard, exercised rather than grepped."""
+    import shutil
+    from pathlib import Path as _Path
+
+    repository_root = _Path(__file__).resolve().parents[3]
+    source = repository_root / "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json"
+    elsewhere = repository_root / "docs/greenfield/gate-d-copied-record.json"
+    shutil.copyfile(source, elsewhere)
+    try:
+        message = _run_validate(tmp_path, dsa_adjudication_record=str(elsewhere))
+    finally:
+        elsewhere.unlink()
+    assert message is not None
+    assert "must be a docs/artifacts/gate-*.json artifact" in message, message
+
+
+def test_validate_refuses_a_record_absent_from_the_runs_own_pin(tmp_path) -> None:
+    """Pre-registration: the record must exist in the commit the run executed at."""
+    message = _run_validate(tmp_path, code_hash="9" * 40)
+    assert message is not None
+    assert "is not committed in the run's own pin" in message, message
+
+
+def test_validate_refuses_a_record_whose_bytes_drifted_from_the_pin(tmp_path) -> None:
+    """A record edited after it was committed is not the record that was reviewed."""
+    from pathlib import Path as _Path
+
+    repository_root = _Path(__file__).resolve().parents[3]
+    record = repository_root / "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json"
+    original = record.read_bytes()
+    try:
+        record.write_bytes(original + b"\n")
+        message = _run_validate(tmp_path)
+    finally:
+        record.write_bytes(original)
+    assert message is not None
+    # The SHA pin catches it first; either refusal is a refusal.
+    assert (
+        "identity drifted" in message
+        or "differs from the blob committed at" in message
+    ), message
+
+
+def _stub_adjudication(**overrides):
+    """A loaded record shaped like the sealed one, with fields overridden."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class _Stub:
+        record_sha256: str = (
+            "4da05468120e3c2e9b82d03931018e0d14eebc5fc28e339381658a04457cd26b"
+        )
+        step: int = 0
+        event_index: int = 1
+        expected_only: tuple = (680, 1052, 2024, 2436, 6322, 7473, 7850)
+        observed_only: tuple = (754, 1904, 2029, 3651, 4899, 5536, 6951)
+        context: str = "8k"
+        oracle_dsa_manifest_sha256: str = (
+            "f8154c5f79b909efd9ebc14c8e004925482844d05ef28fcf0a4d29bb4a7b26da"
+        )
+        decode_position: int = 8155
+        producer_layer_id: int = 1
+        later_event_alarm: int = 1024
+        engine_source_run: str = (
+            "greenfield_ws32_short_decoder_8k_numerical_20260827T011711674195301Z"
+        )
+        analysis_path: str | None = None
+        reference_row_path: str | None = (
+            "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
+        )
+
+        def status(self, step, event):
+            if (step, event) < (self.step, self.event_index):
+                return "exact_required"
+            if (step, event) == (self.step, self.event_index):
+                return "adjudicated"
+            return "recorded"
+
+    return _Stub(**overrides)
+
+
+def _run_validate_with_record(tmp_path, adjudication):
+    import sys
+    from pathlib import Path as _Path
+
+    sys.path.insert(0, str(_Path(__file__).resolve().parent))
+    from ws32_validate_argv import SEALED_C512_RUN, available, build
+
+    if not available():
+        import pytest as _pytest
+
+        _pytest.skip("the sealed C=512 run directory or an 8K oracle is unavailable")
+    module = _sealer_module()
+    module.load_ws32_adjudicated_divergence = lambda *a, **k: adjudication
+    repository_root = _Path(__file__).resolve().parents[3]
+    argv = build(SEALED_C512_RUN, tmp_path / "summary.json", repository_root)
+    original = sys.argv
+    try:
+        sys.argv = ["seal"] + argv
+        module.main()
+    except SystemExit as error:
+        return str(error)
+    finally:
+        sys.argv = original
+    return None
+
+
+def test_validate_re_derives_and_refuses_a_divergence_the_run_did_not_produce(tmp_path) -> None:
+    """The re-derivation is REACHED by the sealer, not merely defined.
+
+    The stub keeps everything the sealed record says except the divergence,
+    which is the one thing the run's own arrays decide.
+    """
+    message = _run_validate_with_record(
+        tmp_path, _stub_adjudication(expected_only=(7,), observed_only=(9,))
+    )
+    assert message is not None
+    assert "disagrees with the pre-registered divergence" in message, message
+
+
+def test_validate_pins_the_analysis_and_the_reference_row_to_the_runs_commit(tmp_path) -> None:
+    """The round-5 control, exercised through _validate rather than by grep."""
+    for field in ("analysis_path", "reference_row_path"):
+        message = _run_validate_with_record(
+            tmp_path,
+            _stub_adjudication(**{field: "docs/artifacts/gate-d-never-committed.json"}),
+        )
+        assert message is not None, field
+        assert "is not committed in the run's own pin" in message, (field, message)
+
+
+def test_the_rank0_archive_must_be_bound_to_its_own_runner_record(tmp_path) -> None:
+    """The re-derivation reads rank 0's arrays; they must be the record's."""
+    import numpy as _np
+    import pytest as _pytest
+
+    module = _sealer_module()
+    run_dir = tmp_path / "run"
+    (run_dir / "fleet").mkdir(parents=True)
+    archive = run_dir / "fleet" / "runner.rank0.npz"
+    _np.savez(
+        archive,
+        dsa_producer_layer_ids=_np.asarray([1], dtype=_np.int32),
+        dsa_selected_positions=_np.zeros((1, 1, 1, 2), dtype=_np.int32),
+        dsa_selected_scores=_np.zeros((1, 1, 1, 2), dtype=_np.float32),
+        dsa_selected_valid_counts=_np.full((1, 1, 1), 2, dtype=_np.int32),
+    )
+    digest = module._digest_file(archive)
+    arrays = module._rank0_dsa_arrays(
+        run_dir, {"numerical_tensors": {"filename": "runner.rank0.npz", "sha256": digest}}
+    )
+    assert set(arrays) == {
+        "dsa_producer_layer_ids",
+        "dsa_selected_positions",
+        "dsa_selected_scores",
+        "dsa_selected_valid_counts",
+    }
+    for record in (
+        {"numerical_tensors": {"filename": "runner.rank0.npz", "sha256": "0" * 64}},
+        {"numerical_tensors": {"filename": "other.npz", "sha256": digest}},
+        {"numerical_tensors": None},
+        {},
+    ):
+        with _pytest.raises(SystemExit, match="not bound to its record"):
+            module._rank0_dsa_arrays(run_dir, record)
+
+
+def test_an_acquisition_seal_carries_no_adjudication_record(tmp_path) -> None:
+    """P3-6: an acquisition establishes graphs, never a correctness claim.
+
+    The run tag encodes the mode, so a numerical run's record cannot be carried
+    into an acquisition seal at all; the explicit guard covers an acquisition
+    tag, which no sealed run directory here has.
+    """
+    from pathlib import Path as _Path
+
+    message = _run_validate(tmp_path, mode="acquire")
+    assert message is not None
+    assert "run tag contradicts active context/mode" in message, message
+
+    source = (
+        _Path(__file__).resolve().parents[3]
+        / "scripts/greenfield/seal_short_decoder_ws32.py"
+    ).read_text(encoding="utf-8")
+    guard = source.index("WS32 acquisition seals carry no adjudication record")
+    load = source.index("dsa_adjudication = load_ws32_adjudicated_divergence(")
+    assert guard < load, "the acquire guard must precede loading the record"

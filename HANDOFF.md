@@ -13204,3 +13204,48 @@ its event has exactly one reviewed row in the registry, so the sealer looks it u
 items 3-4 for it like any other record. A test drives that path against the real sealed Gate D
 archive and the sealed 8K oracle: it passes, and an event with no registered row is refused. No
 record now reaches a seal with a verdict the sealer did not compute itself.
+
+## 2026-09-06 02:00Z — seventh Opus 5 rejection resolved: `_validate` is now exercised, not grepped
+
+Round 6 confirmed the arithmetic (it re-derived the sealed numbers independently from three run
+archives) and then refused the round on the thing I had been avoiding: **`_validate` had no
+behavioural test at all.** Every control in it was verified by walking the parse tree for call nodes,
+and `if False:` keeps every node. Three controls survived: the re-derivation call site, the pin loop
+for the analysis and the reference row, and the new record-path guard.
+
+The fix is a real end-to-end exercise. `tests/greenfield/validation/ws32_validate_argv.py`
+reconstructs the sealer's `validate` argv from a sealed run's own summary, and the tests drive
+`_validate` over the C = 512 Step B run directory (DB 569) with the real oracles, the real topology
+captures and the real committed record. That run predates the current runner schema, so validation
+stops there — which is the anchor: it can only get that far if every adjudication check passed. Five
+tests hang off it: the genuine record reaches the run records; a record outside `docs/artifacts` is
+refused; a record absent from the run's pin is refused; a record whose bytes drifted is refused; and,
+with the loader stubbed to return a record naming an uncommitted analysis or row, each is refused.
+Two more stub the record's divergence sets and show the re-derivation refuses a divergence the run
+did not produce. The re-derivation moved into the adjudication block, reading rank 0's archive bound
+to rank 0's own record, so it is reachable before the schema check; the per-rank loop still verifies
+every rank and proves they agree.
+
+Mutation, clean baseline 95: the re-derivation call site, the analysis/row pin loop, the record-path
+guard, the record pin check, the verdict check, the set-equality check and the rank-0 digest binding
+all now die. Two §21.2 checks that no fixture could fail — `cap_std` and `reference_band` — have
+fixtures now: an engine whose spread exceeds the oracle's while its maximum stays inside the cap, and
+a swap far below the cutoff inside a wide band.
+
+`reviewed_reference_row` was a trap of my own making: it resolved the grandfathered record's row by
+event with `len(matches) != 1`, so registering §21.5's second norm-eps row — which the spec
+anticipates — would have made the sealed Gate D record permanently unsealable. The row now comes from
+the single `.npy` in the record's own basis, which is unambiguous and needs no registry guessing.
+
+Also: the analysis must now agree with the record on `context` and `decode_position`, which it does
+because the tool emits them (the previous clauses defaulted to the record's own values and were
+structurally vacuous); the basis must name the reviewed record that validated the row against the
+legacy captures, which was enforced only in the offline tool; `/usr/bin/git` in the tool as well as
+the sealer; and an acquisition seal refuses an adjudication record outright.
+
+**Stated plainly in §21.2, because it is the honest limit:** the re-derivation removes the operator's
+verdict from the chain, but it does not validate the reference row against the checkpoint or the
+tokens. A fitted row committed with its registry entry into the run's own pin would pass every
+mechanical check, since choosing `R ≈ s_e` drives the engine deltas to zero. Items 3-4 therefore still
+rest on a human having reviewed that registry entry and the validation record — which is exactly what
+the registry exists to force into review.

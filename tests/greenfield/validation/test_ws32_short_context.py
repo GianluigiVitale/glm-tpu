@@ -387,6 +387,14 @@ def _adjudication_record_fixture(root: Path) -> tuple[dict, dict]:
         Path(__file__).resolve().parents[3] / registered["path"], root / registered["path"]
     )
     row_entry = {"path": registered["path"], "sha256": registered["sha256"]}
+    shutil.copyfile(
+        Path(__file__).resolve().parents[3] / registered["validation_path"],
+        root / registered["validation_path"],
+    )
+    validation_entry = {
+        "path": registered["validation_path"],
+        "sha256": registered["validation_sha256"],
+    }
     reference_row = dict(
         row_entry,
         convention="rms_norm_eps_1e-5",
@@ -406,6 +414,8 @@ def _adjudication_record_fixture(root: Path) -> tuple[dict, dict]:
                 "reference_band_capacity",
             )
         },
+        "context": "8k",
+        "decode_position": 8155,
         "engine_source_run": source_run,
         "event_index": 1,
         "producer_layer_id": 1,
@@ -437,7 +447,7 @@ def _adjudication_record_fixture(root: Path) -> tuple[dict, dict]:
         "expected_only": [31],
         "observed_only": [32],
         "later_event_alarm": 1024,
-        "basis": [dict(row_entry), dict(analysis_entry)],
+        "basis": [dict(row_entry), dict(validation_entry), dict(analysis_entry)],
         "prior_attempts": [
             {
                 "path": "docs/artifacts/gate-d-attempt.json",
@@ -503,7 +513,7 @@ def test_the_declared_reference_row_must_be_the_one_the_analysis_used(tmp_path: 
     analysis["reference_row"] = dict(reference_row, convention="rms_norm_eps_1e-6")
     analysis_path.write_text(json.dumps(analysis), encoding="utf-8")
     digest = hashlib.sha256(analysis_path.read_bytes()).hexdigest()
-    record["basis"][1]["sha256"] = digest
+    record["basis"][2]["sha256"] = digest
     record["analysis"]["sha256"] = digest
 
     payload = json.dumps(record).encode()
@@ -601,7 +611,7 @@ def test_every_analysis_binding_is_enforced(tmp_path: Path) -> None:
         (lambda r: r["analysis"].__setitem__("sha256", "zz"), "analysis binding drifted"),
         (lambda r: r["analysis"].__setitem__("path", "docs/artifacts/other.json"),
          "analysis binding drifted"),
-        (lambda r: r["basis"].pop(1), "analysis is not in the basis"),
+        (lambda r: r["basis"].pop(2), "analysis is not in the basis"),
         (lambda r: r.__setitem__("expected_only", [999]), "not the analysis's own sets"),
     )
     for mutate, message in cases:
@@ -638,7 +648,7 @@ def test_every_analysis_binding_is_enforced(tmp_path: Path) -> None:
         import hashlib
 
         record["analysis"]["sha256"] = hashlib.sha256(analysis_path.read_bytes()).hexdigest()
-        record["basis"][1] = record["analysis"]
+        record["basis"][2] = record["analysis"]
         payload = json.dumps(record).encode()
         path = tmp_path / "hostile-analysis.json"
         path.write_bytes(payload)
@@ -710,7 +720,7 @@ def test_an_adjudication_with_extra_passing_checks_is_accepted(tmp_path: Path) -
     analysis_path.write_text(json.dumps(analysis), encoding="utf-8")
     digest = hashlib.sha256(analysis_path.read_bytes()).hexdigest()
     record["analysis"]["sha256"] = digest
-    record["basis"][1]["sha256"] = digest
+    record["basis"][2]["sha256"] = digest
     payload = json.dumps(record).encode()
     path = tmp_path / "record.json"
     path.write_bytes(payload)

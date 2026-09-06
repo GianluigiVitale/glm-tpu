@@ -1698,9 +1698,20 @@ section grants no install or execution authority.
    carries neither `reference_row` nor `analysis`. It is exempt BY DIGEST, so the exemption covers
    exactly that file and cannot be transferred: `expected_sha256` is verified first, and the
    exemption is then keyed on that verified digest. It exempts the record from CARRYING the
-   bindings, never from the re-derivation: its event has exactly one reviewed row in the registry,
-   so the sealer looks the row up and recomputes items 3-4 for it like any other record. Verified:
-   re-deriving event 1 from the Gate D run's own arrays passes and reproduces the sealed numbers. It is applied after the schema, basis, oracle and
+   bindings, never from the re-derivation: the loader resolves its reference row from the single
+   `.npy` in its own basis, which is unambiguous and stays correct when §21.5's second norm-eps
+   convention row is registered for the same event. Verified: re-deriving event 1 from the Gate D
+   run's own arrays passes and reproduces the sealed numbers.
+
+   *What the re-derivation does and does not establish.* It removes the operator's verdict from the
+   chain: the six checks are computed from the run's own observations, the sealed oracle and the
+   pre-registered row. It does not validate the ROW against the checkpoint or the tokens. An
+   operator who commits a fitted row together with its `REFERENCE_ROWS` entry into the run's own pin
+   would pass every mechanical check, because a row chosen as `R ≈ s_e` drives the engine deltas to
+   zero and inflates `eps_event`. The soundness of items 3-4 therefore still rests on a human having
+   reviewed that registry entry and the record that validated the row against the legacy captures —
+   which is what the registry exists to force into review, and why a new event requires a new
+   reviewed entry rather than a new file. It is applied after the schema, basis, oracle and
    source-run checks, all of which the record satisfies, so any future tightening of those must be
    checked against it explicitly. A record claiming the exemption must also carry NEITHER binding,
    which is asserted rather than assumed. History is not weakened and no new record may use it.
