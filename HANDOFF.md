@@ -13361,3 +13361,10 @@ ranks 0, 0, 1, 2, 3, 4, 5, 6, 7, and each loop pass is handed a distinct arrays 
 substituting rank 0's arrays for every rank, which no AST assertion could catch, fails this test.
 That is also the first end-to-end demonstration that a protected run sealed under the old code still
 seals under all of this round's controls.
+
+Correction to the headings of the last four entries, recorded here rather than by editing them. The
+commit times are the accurate stamps: the entry headed 23:40Z is `55e431db` at 23:29Z, 00:20Z is
+`1b7b5592` at 23:56Z, 02:00Z is `0d821815` at 00:24Z, 03:00Z is `1f5fdf99` at 00:54Z, and 04:20Z is
+`7ec741c5` at 01:56Z. I have now mislabelled handoff timestamps twice in one session by writing the
+time I expected the work to take rather than reading the clock; the commit timestamp is the record to
+trust, and future entries should be stamped from `git log`, not from memory.
