@@ -13687,3 +13687,46 @@ number above, and its arrays are on disk. Lesson for the log: a hardening sugges
 failure mode has to be checked against the contracts that depend on the thing being hardened. The
 reviewer's P3 was right that a capacity run must not be read as Gate D; my implementation reached for
 a refusal where the spec had already chosen a classification.
+
+## 2026-09-06 22:35Z — L7's prerequisite met, and a scope discovery that changes the ETA
+
+The five long-context oracles are captured and sealed, which L7 and L8 both required and which had not
+been done: four 128K passkey depths (manifests `c8771512…` d1.0, `f3112145…` d0.0, `71a94209…` d0.05,
+`bb71f3fa…` d0.95; 127,363 prompt ids and 20 generated each) and the 256K E0 prompt (`9dd17e69…`,
+262,144 ids, 256 generated). All rebuilt from seed and byte-verified against the digests the legacy
+harness stored, per §23.1.
+
+Two refusals on the way, both the tooling working. The 256K capture rejected the row on
+`harness_git expected a4a17ac observed 6032f14`: the wrapper pinned run 403's legacy harness commit
+for every profile, but the E0 prompt comes from run 402, which a different commit produced. Verified
+against `bench/results.db` — 402 is `6032f14`, 403 is `a4a17ac`, both fork `b3c25df47` — so the check
+was right and my pin was wrong; it is now per-profile. It then refused again for a dirty worktree,
+which is the invariant against sealing evidence from uncommitted code.
+
+**The scope discovery: §23.5's `--long-context passkey|e0` mode is specified but NOT implemented.**
+`grep` finds no `--long-context`, no `passkey` and no `e0` handling in either
+`run_short_decoder_ws32.py` or `seal_short_decoder_ws32.py`. The runner today loads a token oracle and
+a DSA oracle *mutually bound* (`load_ws32_short_context_oracle`), and §23.5 is explicit that **no
+legacy DSA oracle exists at 128K/256K and none will be captured** — so L7/L8 need a different
+correctness contract, not a longer prompt through the same path:
+
+* L7: pass iff `extract_passkey(detok(first 20 greedy tokens)) == gold`, four of four, PLUS
+  within-engine exact DSA order/ties, cache/state structure, HLO/locality, fresh trace, wall, HBM, DB,
+  archive, 8/8 census. The 20 ids are compared with legacy `raw_output` as a DIAGNOSTIC and nothing may
+  be labelled "raw tokens exact". Classification `PASSKEY_EXACT;DSA_WITHIN_ENGINE_EXACT;NO_CROSS_ORACLE`.
+* L8: a 256-step profiler-free window after the 262,144-token prefill, no correctness oracle at all
+  (`NO_CORRECTNESS_ORACLE`), within-engine DSA exactness and state/cache contracts still enforced.
+
+Decision (Decisions rule, no owner round-trip): **build the mode rather than bend the 8K path.**
+Loading a token-only oracle through the cross-oracle loader would mean either fabricating a DSA oracle
+at 128K — which §23.5 forbids and which would be the worst kind of evidence, an oracle with no source
+— or disabling the DSA comparison globally, which would silently weaken the 2K/8K contract that Gate D
+rests on. A separate mode keeps §21's cross-oracle path the only path for 2K/8K, which §23.5 requires
+in terms. The alternative considered and rejected: run L7 with `--exact-dsa 0` and no oracle binding
+at all, which would produce a wall-clock number and no correctness claim, i.e. exactly the
+"throughput alone is not proof" failure the invariants forbid.
+
+ETA impact, stated plainly because it moves the estimate: the remaining work is no longer only ~40 h
+of pod time. It now includes implementing and reviewing the long-context mode in the runner and the
+sealer first. That is a day of work before the first 128K run can start, and it is why the estimate
+moves to the upper half of the 4-7 day range.
