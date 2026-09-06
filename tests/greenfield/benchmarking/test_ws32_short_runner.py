@@ -272,6 +272,11 @@ def test_ws32_sealer_binds_alarm_acknowledgement_and_states_adjudicated_basis() 
         "the validate invocation must not hand the sealer its own HEAD as a recovery pin"
     )
     assert "--reviewed-ref" in validate_block
+    # §23.3 Step C binds the 8K record at 131,072 and 262,656 on purpose: the
+    # point is that capacity does not change the numerics, and the sealer
+    # re-derives items 3-4 from the run's own arrays, so a capacity that DID
+    # change them is caught there. A refusal here would block the test itself.
+    assert "WS32 DSA adjudication record applies only at capacity" not in wrapper
     # The pre-run publication refusal covers every pin the seal will demand, and
     # this is the class of wrapper edit that has silently gone missing before.
     assert 'for preflight_pin in "$PIN" $([[ $RECOVER == 1 ]] && echo "$RECOVERY_PIN"); do' in wrapper

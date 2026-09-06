@@ -13651,3 +13651,39 @@ Next: Step C. Acquisitions and capacity runs at 131,072 and 262,656, tables ON, 
 per-capacity per-step cost that every L7/L8 projection currently extrapolates from 8K. The wrapper
 now refuses to bind an 8K adjudication record at any other capacity, so Step C runs carry no §21.2
 claim, which is correct — they are measurements.
+
+## 2026-09-06 19:15Z — Step C: the first capacity measurement, and a control I had to reverse
+
+The 131,072 acquisition succeeded (`…acquire_cap131072_hrope_20260906T173812294848894Z`, seven
+graphs, rotary table now 131,072 x 64 = 16,777,216 B/device against 1 MB at 8192). The question that
+gated everything downstream is answered: **it compiles and fits.** The decode program's argument size
+is 27,390,124,544 B/chip plus 468,441,600 B temp against the chip's 32 GB, and the weights land at
+24,654,313,984 B after load. Real headroom, but visibly less than at 8K, which is why this was
+measured rather than extrapolated.
+
+**First per-capacity cost, from the run's prefill alone:** 262.29 s per 2048-token chunk at capacity
+131,072 against 238.46 s at 8192, so ~128 ms per prompt token against ~116, **+10.0%**. Projected
+prefill total 1,060 s against 974 s. That number is what the L7/L8 estimates should use: at 128K a
+prefill is ~4.7 h rather than the ~4.3 h an 8K extrapolation gives, and at 256K ~9.4 h.
+
+**The run then failed its correctness contract, and the cause was mine.** An hour earlier I hardened
+the wrapper on a reviewer P3 by refusing to bind an 8K adjudication record at any capacity other than
+8192. That reading was wrong, and it breaks §23.3's own Step C contract: Step C exists to show that
+"tokens and the DB567 witnesses stay identical — capacity must not change numerics", which requires
+binding the record at 131,072 and 262,656, not refusing to. With the record unbindable and the rotary
+table on, the run's DSA events legitimately diverge from the oracle and the exactness contract
+refuses — exactly as B′ run 1 did, for the same reason.
+
+Decision, recorded with its alternative: the refusal is removed. The record adjudicates one event of
+one prompt at one decode position; it is not capacity-scoped. The sealer re-derives items 3-4 from
+the run's own arrays, so a capacity that DID change the numerics is caught there — by the check that
+actually looks — rather than by declining to look. What stops a capacity run being read as a Gate D
+result is its `CAPACITY_MEASUREMENT` classification, which the sealer already emits. The alternative,
+keeping the refusal and running Step C without the record, was rejected because it cannot produce the
+identity evidence Step C is for: the run would fail its contract every time and seal nothing.
+
+Cost of the mistake: one 49-minute capacity run. It was not wasted — its prefill gave the +10.0%
+number above, and its arrays are on disk. Lesson for the log: a hardening suggested against one
+failure mode has to be checked against the contracts that depend on the thing being hardened. The
+reviewer's P3 was right that a capacity run must not be read as Gate D; my implementation reached for
+a refusal where the spec had already chosen a classification.

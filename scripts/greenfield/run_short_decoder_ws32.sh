@@ -169,11 +169,12 @@ else
 fi
 if [[ $DSA_ADJUDICATION == 1 ]]; then
   [[ $CONTEXT == 8k ]] || { echo "WS32 DSA adjudication record exists only for 8k" >&2; exit 2; }
-  # The record adjudicates one event at one decode position under one capacity;
-  # a Step C capacity run is a different measurement and binds no record.
-  [[ $CONTEXT_CAPACITY -eq 8192 ]] || {
-    echo "WS32 DSA adjudication record applies only at capacity 8192" >&2; exit 2;
-  }
+  # The record adjudicates one event of one prompt at one decode position. It is
+  # NOT capacity-scoped: §23.3 Step C requires the same witnesses at 131,072 and
+  # 262,656 precisely to show capacity does not change numerics, and the sealer
+  # re-derives items 3-4 from the run's own arrays, so a capacity that DID change
+  # them is caught there rather than by refusing to look. The classification, not
+  # a refusal, is what stops a capacity run being read as a Gate D record.
   [[ $(sha256sum "$DSA_ADJUDICATION_RECORD_8K" | awk '{print $1}') == "$DSA_ADJUDICATION_RECORD_8K_SHA" ]] || {
     echo "WS32 DSA adjudication record SHA drifted" >&2; exit 2;
   }
