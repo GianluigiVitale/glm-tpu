@@ -1723,3 +1723,64 @@ def test_an_acquisition_seal_carries_no_adjudication_record(tmp_path) -> None:
     guard = source.index("WS32 acquisition seals carry no adjudication record")
     load = source.index("dsa_adjudication = load_ws32_adjudicated_divergence(")
     assert guard < load, "the acquire guard must precede loading the record"
+
+
+def test_validate_actually_reaches_the_pin_checks_and_the_re_derivation(tmp_path) -> None:
+    """The anchor test's premise, instrumented rather than assumed.
+
+    "It stops at the schema check" only proves the controls passed if they ran.
+    This records which of them `_validate` actually invoked, on real evidence.
+    """
+    import sys
+    from pathlib import Path as _Path
+
+    sys.path.insert(0, str(_Path(__file__).resolve().parent))
+    from ws32_validate_argv import SEALED_C512_RUN, available, build
+
+    if not available():
+        import pytest as _pytest
+
+        _pytest.skip("the sealed C=512 run directory or an 8K oracle is unavailable")
+    module = _sealer_module()
+    reached = []
+
+    original_rederive = module._rederive_ws32_adjudication
+
+    def traced_rederive(**kwargs):
+        reached.append(("rederive", kwargs["adjudication"].reference_row_path))
+        return original_rederive(**kwargs)
+
+    original_pin = module._make_pre_registration_check
+
+    def traced_pin(args, repository_root):
+        inner = original_pin(args, repository_root)
+
+        def wrapper(relative, label):
+            reached.append(("pin", label, relative))
+            return inner(relative, label)
+
+        return wrapper
+
+    module._rederive_ws32_adjudication = traced_rederive
+    module._make_pre_registration_check = traced_pin
+    repository_root = _Path(__file__).resolve().parents[3]
+    original_argv = sys.argv
+    try:
+        sys.argv = ["seal"] + build(
+            SEALED_C512_RUN, tmp_path / "summary.json", repository_root
+        )
+        module.main()
+    except SystemExit as error:
+        message = str(error)
+    finally:
+        sys.argv = original_argv
+
+    assert "runner schema drifted" in message, message
+    row = "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
+    assert (
+        "pin",
+        "adjudication record",
+        "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json",
+    ) in reached
+    assert ("pin", "adjudication reference row", row) in reached
+    assert ("rederive", row) in reached

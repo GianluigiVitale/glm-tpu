@@ -728,3 +728,20 @@ def test_an_adjudication_with_extra_passing_checks_is_accepted(tmp_path: Path) -
         path, expected_sha256=hashlib.sha256(payload).hexdigest(), repository_root=tmp_path
     )
     assert loaded.event_index == 1
+
+
+def test_the_basis_reference_row_resolution_is_unambiguous_or_absent() -> None:
+    """The grandfathered row comes from the basis; ambiguity must be refused."""
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        _sole_basis_reference_row,
+    )
+
+    one = [
+        {"path": "docs/artifacts/gate-d-a.json", "sha256": "0" * 64},
+        {"path": "docs/artifacts/gate-d-row.npy", "sha256": "1" * 64},
+    ]
+    assert _sole_basis_reference_row(one) == "docs/artifacts/gate-d-row.npy"
+    two = one + [{"path": "docs/artifacts/gate-d-other.npy", "sha256": "2" * 64}]
+    assert _sole_basis_reference_row(two) is None
+    assert _sole_basis_reference_row(one[:1]) is None
+    assert _sole_basis_reference_row([]) is None
