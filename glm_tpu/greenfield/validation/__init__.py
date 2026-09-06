@@ -79,6 +79,7 @@ from .prompt_index_cache import (
     validate_prompt_projection_input_hlo,
 )
 from .long_context_oracle import (
+    load_legacy_bench_module,
     load_ws32_long_context_oracle,
     LongContextOracleConfig,
     capture_long_context_oracle,
@@ -190,6 +191,7 @@ __all__ = (
     "compare_dsa_association_scores",
     "compare_ws32_dsa_step",
     "compare_ws32_dsa_within_engine",
+    "load_legacy_bench_module",
     "load_ws32_long_context_oracle",
     "Ws32LongContextOracle",
     "compare_ws32_raw_tokens",

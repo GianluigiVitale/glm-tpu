@@ -31,8 +31,9 @@ STRATEGY_ND_DENSE=${GLM_GREENFIELD_WS32_STRATEGY_ND_DENSE:-0}
   echo "WS32 mode must be acquire or numerical" >&2
   exit 2
 }
-[[ $CONTEXT == 2k || $CONTEXT == 8k ]] || {
-  echo "WS32 context must be 2k or 8k" >&2
+[[ $CONTEXT == 2k || $CONTEXT == 8k || $CONTEXT == 128k_d0_0 || $CONTEXT == 128k_d0_05 \
+   || $CONTEXT == 128k_d0_95 || $CONTEXT == 128k_d1_0 || $CONTEXT == 256k_e0 ]] || {
+  echo "WS32 context must be 2k, 8k or a §23.5 long-context profile" >&2
   exit 2
 }
 [[ $RECOVER == 0 || $RECOVER == 1 ]] || {
@@ -118,7 +119,62 @@ if [[ $CHECKPOINT_TRANSPORT == shm ]]; then
 fi
 readonly CHECKPOINT_MANIFEST_SHA=${GLM_GREENFIELD_WS32_CHECKPOINT_MANIFEST_SHA:?set checkpoint manifest SHA}
 readonly CHECKPOINT_SUCCESS_SHA=${GLM_GREENFIELD_WS32_CHECKPOINT_SUCCESS_SHA:?set checkpoint SUCCESS SHA}
-if [[ $CONTEXT == 2k ]]; then
+# Spec §23.1/§23.5: the long-context profiles bind a TOKEN-ONLY oracle. Each is
+# pinned by manifest and terminal SUCCESS digest, and the label-to-identity table
+# lives on the enforcement surface
+# (glm_tpu/greenfield/validation/long_context_oracle.py), so this wrapper only
+# supplies paths. No DSA oracle exists at these lengths, so none is bound.
+LONG_CONTEXT_KIND=
+LONG_CONTEXT_PROFILE=
+LONG_CONTEXT_RUN=
+LONG_CONTEXT_MANIFEST_SHA=
+LONG_CONTEXT_SUCCESS_SHA=
+case "$CONTEXT" in
+  128k_d0_0)
+    LONG_CONTEXT_KIND=passkey
+    LONG_CONTEXT_PROFILE=128k_d0.0
+    LONG_CONTEXT_RUN=greenfield_long_context_oracle_128k_d0.0_20260906T222607982716875Z
+    LONG_CONTEXT_MANIFEST_SHA=f311214501093190226264a6821d5a9f331e91c76e4a1d812a92be34943e913b
+    LONG_CONTEXT_SUCCESS_SHA=6af757be0da515960d6ae870ea6c9b1edd7932233106bdda1c14c99f513dfee1 ;;
+  128k_d0_05)
+    LONG_CONTEXT_KIND=passkey
+    LONG_CONTEXT_PROFILE=128k_d0.05
+    LONG_CONTEXT_RUN=greenfield_long_context_oracle_128k_d0.05_20260906T222656030699137Z
+    LONG_CONTEXT_MANIFEST_SHA=71a94209f75e3e5602a07c66ab07641f34163a4c9cdfb07e60017f8de1e51c30
+    LONG_CONTEXT_SUCCESS_SHA=baa482838744ab3ee6672dc17988356fa4a45a436cdc6fe3a916b7830b63cd17 ;;
+  128k_d0_95)
+    LONG_CONTEXT_KIND=passkey
+    LONG_CONTEXT_PROFILE=128k_d0.95
+    LONG_CONTEXT_RUN=greenfield_long_context_oracle_128k_d0.95_20260906T222745260152402Z
+    LONG_CONTEXT_MANIFEST_SHA=bb71f3faf7ea972114818ea81e94a8084bd874c39bf96f72bafb750f20218764
+    LONG_CONTEXT_SUCCESS_SHA=47fa11cfd36b0b6ad8e6f3d9a3e6fa0542a426481cf2f7b7209c4a1684dd39ff ;;
+  128k_d1_0)
+    LONG_CONTEXT_KIND=passkey
+    LONG_CONTEXT_PROFILE=128k_d1.0
+    LONG_CONTEXT_RUN=greenfield_long_context_oracle_128k_d1.0_20260906T222513841445720Z
+    LONG_CONTEXT_MANIFEST_SHA=c8771512c25fa1faf46ac336b40ae3605daaf2b682dbd142a8937d1c09313415
+    LONG_CONTEXT_SUCCESS_SHA=24f1bc4eff8b63038629cb87daa982d51d38b5be6dc63f3a3ef41363e9fb2749 ;;
+  256k_e0)
+    LONG_CONTEXT_KIND=e0
+    LONG_CONTEXT_PROFILE=256k_e0
+    LONG_CONTEXT_RUN=greenfield_long_context_oracle_256k_e0_20260906T222934827440190Z
+    LONG_CONTEXT_MANIFEST_SHA=9dd17e69ca28d73bee09c175595039fdea6eed22499d2d9a547e341c5fbc0440
+    LONG_CONTEXT_SUCCESS_SHA=827421edae3fbe8db050a6d6d1fb42b8da601cbbd060fb0cb02bfce5e07eb236 ;;
+esac
+readonly TOKENIZER_ROOT=/home/gianl/gcs-models/models/GLM-5.2-FP8
+if [[ -n $LONG_CONTEXT_KIND ]]; then
+  readonly LONG_CONTEXT_ORACLE=/home/gianl/gcs-models/oracles/greenfield/glm52/long_context/${LONG_CONTEXT_PROFILE}/${LONG_CONTEXT_RUN}/oracle
+  LONG_CONTEXT_CLI=' --long-context '"$LONG_CONTEXT_KIND"' --long-context-oracle-dir '"$LONG_CONTEXT_ORACLE"' --long-context-manifest-sha256 '"$LONG_CONTEXT_MANIFEST_SHA"' --long-context-success-sha256 '"$LONG_CONTEXT_SUCCESS_SHA"' --tokenizer-root '"$TOKENIZER_ROOT"
+  # The eight-host presence/identity check below is generic over "the oracle
+  # directories this run reads"; at these lengths that is the one long-context
+  # oracle. The runner and sealer are given NO short-context oracle at all.
+  readonly TOKEN_ORACLE=$LONG_CONTEXT_ORACLE
+  readonly TOKEN_ORACLE_SHA=$LONG_CONTEXT_MANIFEST_SHA
+  readonly TOKEN_ORACLE_SUCCESS_SHA=$LONG_CONTEXT_SUCCESS_SHA
+  readonly DSA_ORACLE=$LONG_CONTEXT_ORACLE
+  readonly DSA_ORACLE_SHA=$LONG_CONTEXT_MANIFEST_SHA
+  readonly DSA_ORACLE_SUCCESS_SHA=$LONG_CONTEXT_SUCCESS_SHA
+elif [[ $CONTEXT == 2k ]]; then
   readonly TOKEN_ORACLE=/home/gianl/gcs-models/oracles/greenfield/glm52/short_context/2k/greenfield_short_context_oracle_20260806T202544155912103Z/oracle
   readonly TOKEN_ORACLE_SHA=f580c14954bcbd0d973b6fe8158520992a18a1375ed88cff9cceb8e01c7efe19
   readonly TOKEN_ORACLE_SUCCESS_SHA=07700db5a732f04663f0298625bbdbb68a1c73e63652a3aef27f398993e86eec
@@ -135,6 +191,16 @@ else
 fi
 readonly TOKEN_ORACLE_ROOT=${TOKEN_ORACLE%/oracle}
 readonly DSA_ORACLE_ROOT=${DSA_ORACLE%/oracle}
+LONG_CONTEXT_CLI=${LONG_CONTEXT_CLI:-}
+readonly LONG_CONTEXT_CLI
+# §23.5: a long-context run declares the short-context oracle pins VACANT, and
+# names no short-context oracle directory; the runner and sealer both refuse a
+# long-context mode that carries either.
+if [[ -n $LONG_CONTEXT_KIND ]]; then
+  readonly ORACLE_CLI=' --token-oracle-manifest-sha256 '"$ZERO_SHA"' --dsa-oracle-manifest-sha256 '"$ZERO_SHA"' --token-oracle-success-sha256 '"$ZERO_SHA"' --dsa-oracle-success-sha256 '"$ZERO_SHA"
+else
+  readonly ORACLE_CLI=' --token-oracle-dir '"$TOKEN_ORACLE"' --dsa-oracle-dir '"$DSA_ORACLE"' --token-oracle-manifest-sha256 '"$TOKEN_ORACLE_SHA"' --dsa-oracle-manifest-sha256 '"$DSA_ORACLE_SHA"' --token-oracle-success-sha256 '"$TOKEN_ORACLE_SUCCESS_SHA"' --dsa-oracle-success-sha256 '"$DSA_ORACLE_SUCCESS_SHA"
+fi
 # Spec §23.3 Step C: the sealed 8K workload may run at a long-context capacity
 # for capacity measurement; the capacity enters the tag and the DB item id.
 CONTEXT_CAPACITY=${GLM_GREENFIELD_WS32_CONTEXT_CAPACITY:-8192}
@@ -142,6 +208,20 @@ CONTEXT_CAPACITY=${GLM_GREENFIELD_WS32_CONTEXT_CAPACITY:-8192}
   echo "WS32 context capacity must be a multiple of 512 in [8192, 1048576]" >&2
   exit 2
 }
+# §23.5: each long-context profile runs at the capacity §23.3 Step C actually
+# measured — 131,072 and 262,656 — so the HBM headroom behind the run is the
+# measured one. A different capacity would be an unmeasured configuration.
+if [[ -n $LONG_CONTEXT_KIND ]]; then
+  case "$CONTEXT" in
+    256k_e0) REQUIRED_CAPACITY=262656 ;;
+    *) REQUIRED_CAPACITY=131072 ;;
+  esac
+  [[ $CONTEXT_CAPACITY -eq $REQUIRED_CAPACITY ]] || {
+    echo "WS32 $CONTEXT requires the Step C capacity $REQUIRED_CAPACITY" >&2
+    exit 2
+  }
+  unset REQUIRED_CAPACITY
+fi
 readonly CONTEXT_CAPACITY
 HOST_MAIN_ROPE_TABLE=${GLM_GREENFIELD_WS32_HOST_MAIN_ROPE_TABLE:-0}
 [[ $HOST_MAIN_ROPE_TABLE == 0 || $HOST_MAIN_ROPE_TABLE == 1 ]] || {
@@ -199,7 +279,15 @@ PREFILL_CHUNK=${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-2048}
   exit 2
 }
 readonly PREFILL_CHUNK
-readonly PREFILL_BUDGET_SECONDS=3600
+# §23.5 wall budgets. The projection guard must sit well above the cost §23.3
+# Step C measured at the run's own capacity (116.4 ms per prompt token at 8,192,
+# 128.1 at 131,072, 142.0 at 262,656) so a healthy long run is not failed for
+# being long, while a gross regression still fails closed early.
+case "$CONTEXT" in
+  256k_e0) readonly PREFILL_BUDGET_SECONDS=54000 ;;
+  128k_*) readonly PREFILL_BUDGET_SECONDS=27000 ;;
+  *) readonly PREFILL_BUDGET_SECONDS=3600 ;;
+esac
 # Storage ceiling (goal.md): refuse to launch when a run's evidence could not
 # be uploaded in full; at the ceiling the workers' EXIT-trap upload would drop a
 # completed run's trace/HLO silently.
@@ -211,10 +299,23 @@ if [[ $PREFILL_CHUNK -eq 2048 ]]; then CHUNK_SUFFIX=; else CHUNK_SUFFIX=_c${PREF
 [[ $CONTEXT_CAPACITY -eq 8192 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_cap${CONTEXT_CAPACITY}
 [[ $HOST_MAIN_ROPE_TABLE -eq 0 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_hrope
 readonly CHUNK_SUFFIX
-readonly OBSERVER_STEPS=14
+# The L7 pass criterion detokenises the first twenty greedy tokens (the legacy
+# capture holds exactly twenty), so a passkey run must observe at least twenty.
+if [[ $LONG_CONTEXT_KIND == passkey ]]; then
+  readonly OBSERVER_STEPS=20
+else
+  readonly OBSERVER_STEPS=14
+fi
 readonly WARMUP=2
 readonly ITERATIONS=10
 readonly TRACE_STEPS=2
+# The worker wall limit covers load, compile, the whole prefill and the timed
+# decode with margin above the prefill budget above.
+case "$CONTEXT" in
+  256k_e0) readonly WORKER_TIMEOUT_SECONDS=72000 ;;
+  128k_*) readonly WORKER_TIMEOUT_SECONDS=39600 ;;
+  *) readonly WORKER_TIMEOUT_SECONDS=14400 ;;
+esac
 if [[ $MODE == acquire ]]; then
   EXACT_MATERIALIZE_STABLE_SHA=$ZERO_SHA
   EXACT_MATERIALIZE_OPTIMIZED_SHA=$ZERO_SHA
@@ -636,10 +737,14 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching complete WS32 worker fleet coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; output="$run/runner.rank${idx}.json"; tensors="$run/runner.rank${idx}.npz"; hlo="$run/hlo"; trace="$run/trace"; log="$run/runner.rank${idx}.log"; mkdir -p "$run"; upload(){ local rc=0; [[ ! -f $output ]] || gcloud storage cp --no-clobber "$output" "$remote/host_records/runner.rank${idx}.json" >/dev/null 2>&1 || rc=1; [[ ! -f $tensors ]] || gcloud storage cp --no-clobber "$tensors" "$remote/host_records/runner.rank${idx}.npz" >/dev/null 2>&1 || rc=1; [[ ! -f $log ]] || gcloud storage cp --no-clobber "$log" "$remote/host_records/runner.rank${idx}.log" >/dev/null 2>&1 || rc=1; upload_shared(){ local src=$1 dst=$2 plain=$3; if gcloud storage cp --no-clobber "$src" "$dst" >/dev/null 2>&1; then return 0; fi; local want have="" tmp; want=$(sha256sum "$plain" | cut -d" " -f1) || return 1; tmp=$(mktemp -u) || return 1; if gcloud storage cp "$dst" "$tmp.gz" >/dev/null 2>&1; then have=$(gzip -dc "$tmp.gz" 2>/dev/null | sha256sum | cut -d" " -f1); fi; rm -f "$tmp.gz"; [[ -n $want && -n $have && $want == "$have" ]]; }; for graph in exact_materialize exact_promote prefill_chunk prefill_tail observer decode cache_probe; do for form in stablehlo.mlir optimized_hlo.txt; do [[ -f "$hlo/$graph.$form" ]] || continue; if [[ ! -f "$hlo/$graph.$form.gz" ]]; then gzip -n -9 -c "$hlo/$graph.$form" > "$hlo/$graph.$form.gz.partial" && mv -f "$hlo/$graph.$form.gz.partial" "$hlo/$graph.$form.gz"; fi; upload_shared "$hlo/$graph.$form.gz" "$remote/hlo/${graph}.${form}.gz" "$hlo/$graph.$form" || rc=1; done; done; xplane=$(find "$trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); [[ -z $xplane ]] || gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || rc=1; return "$rc"; }; trap "upload || true" EXIT; cd "$wt"; env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 14400 /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_short_decoder_ws32.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --topology-capture-root '"$TOPOLOGY_ROOT"' --checkpoint-root '"$CHECKPOINT_ROOT"' --source-inventory '"$INVENTORY"' --token-oracle-dir '"$TOKEN_ORACLE"' --dsa-oracle-dir '"$DSA_ORACLE"' --expected-code-hash '"$PIN"' --checkpoint-manifest-sha256 '"$CHECKPOINT_MANIFEST_SHA"' --checkpoint-success-sha256 '"$CHECKPOINT_SUCCESS_SHA"' --token-oracle-manifest-sha256 '"$TOKEN_ORACLE_SHA"' --dsa-oracle-manifest-sha256 '"$DSA_ORACLE_SHA"' --token-oracle-success-sha256 '"$TOKEN_ORACLE_SUCCESS_SHA"' --dsa-oracle-success-sha256 '"$DSA_ORACLE_SUCCESS_SHA"' --dsa-association-summary-sha256 '"$DSA_ASSOCIATION_SUMMARY_PIN"' --dsa-association-success-sha256 '"$DSA_ASSOCIATION_SUCCESS_PIN"' --topology-sha256 '"$TOPOLOGY_SHA"' --topology-fleet-sha256 '"$TOPOLOGY_FLEET_SHA"' --mesh-sha256 '"$MESH_SHA"' --expected-exact-materialize-stablehlo-sha256 '"$EXACT_MATERIALIZE_STABLE_SHA"' --expected-exact-materialize-optimized-hlo-sha256 '"$EXACT_MATERIALIZE_OPTIMIZED_SHA"' --expected-exact-promote-stablehlo-sha256 '"$EXACT_PROMOTE_STABLE_SHA"' --expected-exact-promote-optimized-hlo-sha256 '"$EXACT_PROMOTE_OPTIMIZED_SHA"' --expected-prefill-chunk-stablehlo-sha256 '"$PREFILL_CHUNK_STABLE_SHA"' --expected-prefill-chunk-optimized-hlo-sha256 '"$PREFILL_CHUNK_OPTIMIZED_SHA"' --expected-prefill-tail-stablehlo-sha256 '"$PREFILL_TAIL_STABLE_SHA"' --expected-prefill-tail-optimized-hlo-sha256 '"$PREFILL_TAIL_OPTIMIZED_SHA"' --prefill-chunk '"$PREFILL_CHUNK"' --prefill-budget-seconds '"$PREFILL_BUDGET_SECONDS"' --rotary-diagnostic '"$ROTARY_DIAGNOSTIC"' --host-main-rope-table '"$HOST_MAIN_ROPE_TABLE"' --expected-observer-stablehlo-sha256 '"$OBSERVER_STABLE_SHA"' --expected-observer-optimized-hlo-sha256 '"$OBSERVER_OPTIMIZED_SHA"' --expected-decode-stablehlo-sha256 '"$DECODE_STABLE_SHA"' --expected-decode-optimized-hlo-sha256 '"$DECODE_OPTIMIZED_SHA"' --expected-cache-probe-stablehlo-sha256 '"$CACHE_PROBE_STABLE_SHA"' --expected-cache-probe-optimized-hlo-sha256 '"$CACHE_PROBE_OPTIMIZED_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --compile-only '"$([[ $MODE == acquire ]] && echo 1 || echo 0)"' --exact-dsa '"$EXACT_DSA"' --checkpoint-transport '"$CHECKPOINT_TRANSPORT"''"$STRATEGY_ND_DENSE_CLI"''"$DSA_ADJUDICATION_CLI"' --observer-steps '"$OBSERVER_STEPS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --trace-steps '"$TRACE_STEPS"' --output "$output" --tensor-output "$tensors" --hlo-dir "$hlo" --trace-dir "$trace" >"$log" 2>&1; trap - EXIT; upload; echo "WS32_SHORT_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; output="$run/runner.rank${idx}.json"; tensors="$run/runner.rank${idx}.npz"; hlo="$run/hlo"; trace="$run/trace"; log="$run/runner.rank${idx}.log"; mkdir -p "$run"; upload(){ local rc=0; [[ ! -f $output ]] || gcloud storage cp --no-clobber "$output" "$remote/host_records/runner.rank${idx}.json" >/dev/null 2>&1 || rc=1; [[ ! -f $tensors ]] || gcloud storage cp --no-clobber "$tensors" "$remote/host_records/runner.rank${idx}.npz" >/dev/null 2>&1 || rc=1; [[ ! -f $log ]] || gcloud storage cp --no-clobber "$log" "$remote/host_records/runner.rank${idx}.log" >/dev/null 2>&1 || rc=1; upload_shared(){ local src=$1 dst=$2 plain=$3; if gcloud storage cp --no-clobber "$src" "$dst" >/dev/null 2>&1; then return 0; fi; local want have="" tmp; want=$(sha256sum "$plain" | cut -d" " -f1) || return 1; tmp=$(mktemp -u) || return 1; if gcloud storage cp "$dst" "$tmp.gz" >/dev/null 2>&1; then have=$(gzip -dc "$tmp.gz" 2>/dev/null | sha256sum | cut -d" " -f1); fi; rm -f "$tmp.gz"; [[ -n $want && -n $have && $want == "$have" ]]; }; for graph in exact_materialize exact_promote prefill_chunk prefill_tail observer decode cache_probe; do for form in stablehlo.mlir optimized_hlo.txt; do [[ -f "$hlo/$graph.$form" ]] || continue; if [[ ! -f "$hlo/$graph.$form.gz" ]]; then gzip -n -9 -c "$hlo/$graph.$form" > "$hlo/$graph.$form.gz.partial" && mv -f "$hlo/$graph.$form.gz.partial" "$hlo/$graph.$form.gz"; fi; upload_shared "$hlo/$graph.$form.gz" "$remote/hlo/${graph}.${form}.gz" "$hlo/$graph.$form" || rc=1; done; done; xplane=$(find "$trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); [[ -z $xplane ]] || gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || rc=1; return "$rc"; }; trap "upload || true" EXIT; cd "$wt"; nohup env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 '"$WORKER_TIMEOUT_SECONDS"' /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_short_decoder_ws32.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --topology-capture-root '"$TOPOLOGY_ROOT"' --checkpoint-root '"$CHECKPOINT_ROOT"' --source-inventory '"$INVENTORY"' --expected-code-hash '"$PIN"' --checkpoint-manifest-sha256 '"$CHECKPOINT_MANIFEST_SHA"' --checkpoint-success-sha256 '"$CHECKPOINT_SUCCESS_SHA"''"$ORACLE_CLI"''"$LONG_CONTEXT_CLI"' --dsa-association-summary-sha256 '"$DSA_ASSOCIATION_SUMMARY_PIN"' --dsa-association-success-sha256 '"$DSA_ASSOCIATION_SUCCESS_PIN"' --topology-sha256 '"$TOPOLOGY_SHA"' --topology-fleet-sha256 '"$TOPOLOGY_FLEET_SHA"' --mesh-sha256 '"$MESH_SHA"' --expected-exact-materialize-stablehlo-sha256 '"$EXACT_MATERIALIZE_STABLE_SHA"' --expected-exact-materialize-optimized-hlo-sha256 '"$EXACT_MATERIALIZE_OPTIMIZED_SHA"' --expected-exact-promote-stablehlo-sha256 '"$EXACT_PROMOTE_STABLE_SHA"' --expected-exact-promote-optimized-hlo-sha256 '"$EXACT_PROMOTE_OPTIMIZED_SHA"' --expected-prefill-chunk-stablehlo-sha256 '"$PREFILL_CHUNK_STABLE_SHA"' --expected-prefill-chunk-optimized-hlo-sha256 '"$PREFILL_CHUNK_OPTIMIZED_SHA"' --expected-prefill-tail-stablehlo-sha256 '"$PREFILL_TAIL_STABLE_SHA"' --expected-prefill-tail-optimized-hlo-sha256 '"$PREFILL_TAIL_OPTIMIZED_SHA"' --prefill-chunk '"$PREFILL_CHUNK"' --prefill-budget-seconds '"$PREFILL_BUDGET_SECONDS"' --rotary-diagnostic '"$ROTARY_DIAGNOSTIC"' --host-main-rope-table '"$HOST_MAIN_ROPE_TABLE"' --expected-observer-stablehlo-sha256 '"$OBSERVER_STABLE_SHA"' --expected-observer-optimized-hlo-sha256 '"$OBSERVER_OPTIMIZED_SHA"' --expected-decode-stablehlo-sha256 '"$DECODE_STABLE_SHA"' --expected-decode-optimized-hlo-sha256 '"$DECODE_OPTIMIZED_SHA"' --expected-cache-probe-stablehlo-sha256 '"$CACHE_PROBE_STABLE_SHA"' --expected-cache-probe-optimized-hlo-sha256 '"$CACHE_PROBE_OPTIMIZED_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --compile-only '"$([[ $MODE == acquire ]] && echo 1 || echo 0)"' --exact-dsa '"$EXACT_DSA"' --checkpoint-transport '"$CHECKPOINT_TRANSPORT"''"$STRATEGY_ND_DENSE_CLI"''"$DSA_ADJUDICATION_CLI"' --observer-steps '"$OBSERVER_STEPS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --trace-steps '"$TRACE_STEPS"' --output "$output" --tensor-output "$tensors" --hlo-dir "$hlo" --trace-dir "$trace" >"$log" 2>&1 </dev/null & pid=$!; beat=0; while kill -0 $pid 2>/dev/null; do sleep 30; beat=$((beat+1)); [[ $((beat % 10)) -ne 0 ]] || echo "WS32_HEARTBEAT rank=$idx elapsed=$((beat*30))s"; done; wait $pid; trap - EXIT; upload; echo "WS32_SHORT_OK $(hostname) rank=$idx"'
 launch_rc=0
+# A §23.5 prefill keeps the channel silent for hours; the worker heartbeat plus
+# these keepalives stop an idle-timeout drop from killing a healthy run, and the
+# worker python is nohup'd so a drop that does happen leaves evidence to recover.
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-  --command="$execute_command" >"$RUN_DIR/launch.txt" 2>&1 || launch_rc=$?
+  --command="$execute_command" >"$RUN_DIR/launch.txt" 2>&1 \
+  -- -o ServerAliveInterval=60 -o ServerAliveCountMax=15 || launch_rc=$?
 if [[ $launch_rc -ne 0 ]] || ! has_eight_unique_markers "$RUN_DIR/launch.txt" WS32_SHORT_OK; then
   say "ABORT: complete WS32 worker fleet did not finish 8/8"
   exit 1
@@ -667,14 +772,11 @@ git -C "$WORKTREE" fetch -q origin "$BRANCH" || {
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   "$WORKTREE/scripts/greenfield/seal_short_decoder_ws32.py" validate \
   --run-dir "$RUN_DIR" --topology-capture-root "$TOPOLOGY_ROOT" \
-  --token-oracle-dir "$TOKEN_ORACLE" --dsa-oracle-dir "$DSA_ORACLE" \
   --mode "$MODE" --context-label "$CONTEXT" --tag "$TAG" --code-hash "$PIN" \
   --checkpoint-manifest-sha256 "$CHECKPOINT_MANIFEST_SHA" \
   --checkpoint-success-sha256 "$CHECKPOINT_SUCCESS_SHA" \
-  --token-oracle-manifest-sha256 "$TOKEN_ORACLE_SHA" \
-  --dsa-oracle-manifest-sha256 "$DSA_ORACLE_SHA" \
-  --token-oracle-success-sha256 "$TOKEN_ORACLE_SUCCESS_SHA" \
-  --dsa-oracle-success-sha256 "$DSA_ORACLE_SUCCESS_SHA" \
+  $ORACLE_CLI \
+  ${LONG_CONTEXT_CLI:+$LONG_CONTEXT_CLI} \
   --dsa-association-summary-sha256 "$DSA_ASSOCIATION_SUMMARY_PIN" \
   --dsa-association-success-sha256 "$DSA_ASSOCIATION_SUCCESS_PIN" \
   --topology-sha256 "$TOPOLOGY_SHA" --topology-fleet-sha256 "$TOPOLOGY_FLEET_SHA" \

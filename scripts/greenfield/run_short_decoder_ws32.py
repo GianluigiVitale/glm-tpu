@@ -66,6 +66,7 @@ from glm_tpu.greenfield.validation.ws32_evidence import EVIDENCE_LAYOUT_V2  # no
 from glm_tpu.greenfield.validation import (  # noqa: E402
     compare_ws32_dsa_step,
     compare_ws32_dsa_within_engine,
+    load_legacy_bench_module,
     load_ws32_long_context_oracle,
     bind_ws32_adjudication,
     compare_ws32_raw_tokens,
@@ -101,8 +102,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--long-context-oracle-dir", type=Path, default=None)
     parser.add_argument("--long-context-manifest-sha256", default=_ZERO_SHA)
     parser.add_argument("--long-context-success-sha256", default=_ZERO_SHA)
-    parser.add_argument("--token-oracle-dir", required=True, type=Path)
-    parser.add_argument("--dsa-oracle-dir", required=True, type=Path)
+    # Not required: a §23.5 long-context run binds no short-context oracle and
+    # must not be able to name one (see the refusal in main()).
+    parser.add_argument("--token-oracle-dir", type=Path, default=None)
+    parser.add_argument("--dsa-oracle-dir", type=Path, default=None)
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--checkpoint-manifest-sha256", required=True)
     parser.add_argument("--checkpoint-success-sha256", required=True)
@@ -573,7 +576,7 @@ def _long_context_token_result(
         raise ValueError("WS32 passkey mode needs --tokenizer-root to detokenise")
     from transformers import AutoTokenizer
 
-    import bench.glm_longctx as longctx
+    longctx = load_legacy_bench_module("glm_longctx")
 
     tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_root), trust_remote_code=True)
     text = tokenizer.decode(observed_tokens[: int(legacy.size)], skip_special_tokens=True)
@@ -582,6 +585,36 @@ def _long_context_token_result(
     result["extracted_passkey"] = extracted
     result["passkey_matches_gold"] = bool(extracted == long_context.gold)
     return result
+
+
+def _require_passkey_tooling(long_context: Any, tokenizer_root: Path | None) -> None:
+    """Prove the L7 criterion is computable BEFORE a multi-hour prefill.
+
+    The pass criterion detokenises the engine's greedy tokens and extracts a
+    passkey, so it needs the tokenizer and the legacy extractor on every host.
+    Discovering a missing mount or import after the prefill would throw away
+    hours of pod time, so the tooling is exercised here on the ORACLE's own
+    stored ids: it must reproduce the legacy gold exactly.
+    """
+
+    if tokenizer_root is None:
+        raise ValueError("WS32 passkey mode needs --tokenizer-root to detokenise")
+    from transformers import AutoTokenizer
+
+    longctx = load_legacy_bench_module("glm_longctx")
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        str(tokenizer_root), trust_remote_code=True
+    )
+    text = tokenizer.decode(
+        np.asarray(long_context.generated_token_ids, dtype=np.int32).tolist(),
+        skip_special_tokens=True,
+    )
+    if longctx.extract_passkey(text) != long_context.gold:
+        raise ValueError(
+            "WS32 passkey tooling does not reproduce the sealed gold from the "
+            "oracle's own tokens; the criterion is not computable on this host"
+        )
 
 
 def main() -> int:
@@ -690,15 +723,36 @@ def main() -> int:
             # adjudicate against, and binding one would imply a cross-oracle
             # comparison that does not exist.
             raise ValueError("WS32 long-context runs bind no §21.2 adjudication record")
+        if (
+            args.token_oracle_dir is not None
+            or args.dsa_oracle_dir is not None
+            or args.token_oracle_manifest_sha256 != _ZERO_SHA
+            or args.token_oracle_success_sha256 != _ZERO_SHA
+            or args.dsa_oracle_manifest_sha256 != _ZERO_SHA
+            or args.dsa_oracle_success_sha256 != _ZERO_SHA
+        ):
+            raise ValueError("WS32 long-context runs bind no short-context oracle")
         long_context = load_ws32_long_context_oracle(
             args.long_context_oracle_dir,
             expected_manifest_sha256=args.long_context_manifest_sha256,
             expected_success_sha256=args.long_context_success_sha256,
             expected_kind=args.long_context,
         )
+        if long_context.kind == "passkey":
+            _require_passkey_tooling(long_context, args.tokenizer_root)
         oracle = None
         prompt_token_ids = long_context.prompt_token_ids
+        long_context_record = {
+            "depth": long_context.depth,
+            "item_row_id": long_context.item_row_id,
+            "kind": long_context.kind,
+            "manifest_sha256": long_context.manifest_sha256,
+            "source_run_id": long_context.source_run_id,
+            "success_sha256": args.long_context_success_sha256,
+        }
     else:
+        if args.token_oracle_dir is None or args.dsa_oracle_dir is None:
+            raise ValueError("WS32 short-context runs need both sealed oracles")
         oracle = load_ws32_short_context_oracle(
             args.token_oracle_dir,
             args.dsa_oracle_dir,
@@ -708,6 +762,7 @@ def main() -> int:
             expected_dsa_success_sha256=args.dsa_oracle_success_sha256,
         )
         prompt_token_ids = oracle.prompt_token_ids
+        long_context_record = None
     # Spec §21.2 first-divergent-event adjudication: default off (exact mode).
     if args.dsa_adjudication_record is None:
         if args.dsa_adjudication_sha256 != _ZERO_SHA:
@@ -1225,8 +1280,12 @@ def main() -> int:
         "device_memory_before_load": list(device_memory_before_load),
         "dsa_adjudication": dsa_adjudication_record,
         "evidence_layout": EVIDENCE_LAYOUT_V2,
-        "dsa_oracle_manifest_sha256": oracle.dsa_manifest["manifest_sha256"],
-        "dsa_oracle_success_sha256": oracle.dsa_success_sha256,
+        "dsa_oracle_manifest_sha256": (
+            None if oracle is None else oracle.dsa_manifest["manifest_sha256"]
+        ),
+        "dsa_oracle_success_sha256": (
+            None if oracle is None else oracle.dsa_success_sha256
+        ),
         "dsa_association_summary_sha256": (
             args.dsa_association_summary_sha256
         ),
@@ -1262,8 +1321,13 @@ def main() -> int:
                 "success_file_sha256": dense_overlay.success_file_sha256,
             }
         ),
-        "token_oracle_manifest_sha256": oracle.token_manifest["manifest_sha256"],
-        "token_oracle_success_sha256": oracle.token_success_sha256,
+        "long_context": long_context_record,
+        "token_oracle_manifest_sha256": (
+            None if oracle is None else oracle.token_manifest["manifest_sha256"]
+        ),
+        "token_oracle_success_sha256": (
+            None if oracle is None else oracle.token_success_sha256
+        ),
         "topology_fleet_sha256": fleet_sha,
         "topology_sha256": topology.topology_hash,
         "xla_python_client_mem_fraction": _XLA_MEMORY_FRACTION,

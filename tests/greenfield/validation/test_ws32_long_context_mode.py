@@ -136,3 +136,219 @@ def test_the_sealer_recomputes_the_runners_own_token_rule() -> None:
     body = source[start:end]
     assert "run_short_decoder_ws32.py" in body
     assert "_long_context_token_result(" in body
+
+
+WRAPPER = ROOT / "scripts/greenfield/run_short_decoder_ws32.sh"
+
+
+def _wrapper_profile_table() -> dict[str, dict[str, str]]:
+    """The wrapper's ``case "$CONTEXT"`` table, as {label: {var: value}}."""
+    source = WRAPPER.read_text(encoding="utf-8")
+    start = source.index('case "$CONTEXT" in\n  128k_d0_0)')
+    block = source[start : source.index("\nesac", start)]
+    table: dict[str, dict[str, str]] = {}
+    label: str | None = None
+    for line in block.splitlines()[1:]:
+        stripped = line.strip().rstrip(";;").strip()
+        if stripped.endswith(")") and "=" not in stripped:
+            label = stripped[:-1]
+            table[label] = {}
+        elif "=" in stripped and label is not None:
+            key, value = stripped.split("=", 1)
+            table[label][key] = value
+    return table
+
+
+def test_the_wrapper_binds_exactly_the_enforcement_surfaces_profiles() -> None:
+    """A wrapper pin the sealer's registry does not know is not a §23.5 run.
+
+    The wrapper supplies paths; the registry in
+    ``glm_tpu/greenfield/validation/long_context_oracle.py`` supplies identity,
+    and the sealer refuses an oracle that is not the label's. If the two tables
+    ever disagree, a run would be launched against one capture and sealed
+    against another's identity, so they are compared here.
+    """
+    from glm_tpu.greenfield.validation.long_context_oracle import (
+        WS32_LONG_CONTEXT_PROFILES,
+    )
+
+    table = _wrapper_profile_table()
+    assert set(table) == set(WS32_LONG_CONTEXT_PROFILES)
+    for label, entry in WS32_LONG_CONTEXT_PROFILES.items():
+        arm = table[label]
+        assert arm["LONG_CONTEXT_KIND"] == entry["kind"]
+        assert arm["LONG_CONTEXT_PROFILE"] == entry["profile"]
+        assert arm["LONG_CONTEXT_MANIFEST_SHA"] == entry["manifest_sha256"]
+        assert arm["LONG_CONTEXT_SUCCESS_SHA"] == entry["success_sha256"]
+        assert entry["profile"] in arm["LONG_CONTEXT_RUN"]
+
+
+def test_a_passkey_run_observes_at_least_the_tokens_its_criterion_reads() -> None:
+    """The L7 criterion detokenises the legacy twenty; fourteen would truncate it."""
+    from glm_tpu.greenfield.validation.long_context_oracle import (
+        WS32_LONG_CONTEXT_PROFILES,
+    )
+
+    source = WRAPPER.read_text(encoding="utf-8")
+    start = source.index("if [[ $LONG_CONTEXT_KIND == passkey ]]; then")
+    block = source[start : source.index("fi", start)]
+    assert "readonly OBSERVER_STEPS=20" in block
+    for entry in WS32_LONG_CONTEXT_PROFILES.values():
+        if entry["kind"] == "passkey":
+            assert entry["generated_token_count"] <= 20
+
+
+def test_the_wrapper_never_names_a_short_context_oracle_at_these_lengths() -> None:
+    """§23.5: the short-context pins are declared vacant, not merely unused."""
+    source = WRAPPER.read_text(encoding="utf-8")
+    start = source.index('if [[ -n $LONG_CONTEXT_KIND ]]; then\n  readonly ORACLE_CLI=')
+    long_arm = source[start : source.index("else", start)]
+    assert "--token-oracle-dir" not in long_arm
+    assert "--dsa-oracle-dir" not in long_arm
+    assert long_arm.count('"$ZERO_SHA"') == 4
+
+
+def test_the_registry_refuses_an_oracle_that_is_not_the_labels_capture() -> None:
+    """A label must not be sealable from another depth's sealed capture."""
+    from glm_tpu.greenfield.validation.long_context_oracle import (
+        WS32_LONG_CONTEXT_PROFILES,
+        require_ws32_long_context_profile,
+    )
+
+    class _Oracle:
+        def __init__(self, entry: dict) -> None:
+            self.kind = entry["kind"]
+            self.depth = entry["depth"]
+            self.prompt_token_ids = np.zeros(entry["prompt_token_count"], np.int32)
+            self.generated_token_ids = np.zeros(entry["generated_token_count"], np.int32)
+            self.source_run_id = entry["source_run_id"]
+            self.item_row_id = entry["item_row_id"]
+            self.manifest_sha256 = entry["manifest_sha256"]
+
+    entry = WS32_LONG_CONTEXT_PROFILES["128k_d1_0"]
+    oracle = _Oracle(dict(entry))
+    require_ws32_long_context_profile(
+        "128k_d1_0", oracle, success_sha256=entry["success_sha256"]
+    )
+    with pytest.raises(ValueError):
+        require_ws32_long_context_profile(
+            "128k_d0_0", oracle, success_sha256=entry["success_sha256"]
+        )
+    with pytest.raises(ValueError):
+        require_ws32_long_context_profile(
+            "128k_d1_0", oracle, success_sha256="0" * 64
+        )
+    with pytest.raises(ValueError):
+        require_ws32_long_context_profile(
+            "8k", oracle, success_sha256=entry["success_sha256"]
+        )
+
+
+def test_a_long_context_label_cannot_be_sealed_without_its_oracle() -> None:
+    """Otherwise a 128K label would seal a run holding a short-context oracle."""
+    source = SEALER.read_text(encoding="utf-8")
+    assert "WS32 long-context labels require the long-context oracle flags" in source
+    assert "WS32 long-context seals bind no short-context oracle" in source
+    assert "WS32 long-context runs bind no short-context oracle" in (
+        RUNNER.read_text(encoding="utf-8")
+    )
+
+
+def test_a_long_context_run_is_not_labelled_a_capacity_measurement() -> None:
+    """§23.3 Step C is the SHORT workload at a long capacity; §23.5 is not that."""
+    source = SEALER.read_text(encoding="utf-8")
+    start = source.index('"capacity_measurement": (')
+    block = source[start : source.index("),", start)]
+    assert "long_context is not None" in block
+
+
+def test_the_passkey_criterion_is_proven_computable_before_the_prefill() -> None:
+    """A missing tokenizer must fail in seconds, not after a multi-hour prefill."""
+    source = RUNNER.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    functions = {
+        node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)
+    }
+    assert "_require_passkey_tooling" in functions
+    main = functions["main"]
+    call_lines = [
+        node.lineno
+        for node in ast.walk(main)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in ("_require_passkey_tooling", "_initialize_runtime")
+    ]
+    assert len(call_lines) >= 2
+    preflight = min(
+        node.lineno
+        for node in ast.walk(main)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_require_passkey_tooling"
+    )
+    runtime = min(
+        node.lineno
+        for node in ast.walk(main)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_initialize_runtime"
+    )
+    assert preflight < runtime
+
+
+def test_the_passkey_preflight_reproduces_a_sealed_gold() -> None:
+    """The preflight is only meaningful if it runs the real detokenise+extract."""
+    spec = importlib.util.spec_from_file_location("_ws32_runner_lc", RUNNER)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    from glm_tpu.greenfield.validation.long_context_oracle import (
+        WS32_LONG_CONTEXT_PROFILES,
+    )
+
+    tokenizer_root = Path("/home/gianl/gcs-models/models/GLM-5.2-FP8")
+    if not (tokenizer_root / "tokenizer_config.json").exists():
+        pytest.skip("the sealed tokenizer is not mounted here")
+    entry = WS32_LONG_CONTEXT_PROFILES["128k_d1_0"]
+    oracle_dir = next(
+        (
+            Path("/home/gianl/gcs-models/oracles/greenfield/glm52/long_context")
+            / entry["profile"]
+        ).glob("*/oracle")
+    )
+    from glm_tpu.greenfield.validation.long_context_oracle import (
+        load_ws32_long_context_oracle,
+    )
+
+    oracle = load_ws32_long_context_oracle(
+        oracle_dir,
+        expected_manifest_sha256=entry["manifest_sha256"],
+        expected_success_sha256=entry["success_sha256"],
+        expected_kind=entry["kind"],
+    )
+    module._require_passkey_tooling(oracle, tokenizer_root)
+    broken = type(oracle)(**{**oracle.__dict__, "gold": "000000"})
+    with pytest.raises(ValueError):
+        module._require_passkey_tooling(broken, tokenizer_root)
+
+
+def test_the_criterion_loads_the_legacy_extractor_by_path_not_by_name() -> None:
+    """``bench`` is a namespace package another loader can already have shadowed.
+
+    ``inspect_long_context_oracle`` executes ``glm_longctx.py`` under a private
+    module name for provenance; a later ``import bench.glm_longctx`` can be
+    answered from that same import machinery and hand back a module without
+    ``extract_passkey``. The criterion must load the pinned file itself.
+    """
+    source = RUNNER.read_text(encoding="utf-8")
+    assert "import bench." not in source
+    assert source.count('load_legacy_bench_module("glm_longctx")') == 2
+
+    from glm_tpu.greenfield.validation import load_legacy_bench_module
+
+    module = load_legacy_bench_module("glm_longctx")
+    assert module.__name__ == "greenfield_legacy_bench_glm_longctx"
+    assert module.extract_passkey("the key is 891482.") == "891482"
+    assert load_legacy_bench_module("glm_longctx") is module
+    with pytest.raises(ValueError):
+        load_legacy_bench_module("os")

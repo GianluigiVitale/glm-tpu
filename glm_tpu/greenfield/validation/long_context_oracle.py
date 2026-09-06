@@ -46,6 +46,108 @@ from .short_context_oracle import (
 FORMAT_VERSION = 1
 ARTIFACT_KIND = "greenfield_long_context_legacy_oracle"
 KINDS = ("passkey", "e0")
+
+# Spec §23.5 L7/L8 profiles. The context label alone fixes which sealed oracle a
+# run may bind: the wrapper supplies a path, this table supplies the identity, so
+# a 128K seal cannot be produced from a different depth's capture or from a 2k/8k
+# artifact. ``prompt_token_count`` is the length the eight host records must all
+# report, and ``generated_token_count`` the number of greedy tokens the legacy
+# capture holds (20 for a passkey item, 256 for E0).
+WS32_LONG_CONTEXT_PROFILES: Mapping[str, Mapping[str, Any]] = {
+    "128k_d0_0": {
+        "profile": "128k_d0.0",
+        "kind": "passkey",
+        "depth": 0.0,
+        "prompt_token_count": 127363,
+        "generated_token_count": 20,
+        "source_run_id": 403,
+        "item_row_id": 1517,
+        "manifest_sha256": "f311214501093190226264a6821d5a9f331e91c76e4a1d812a92be34943e913b",
+        "success_sha256": "6af757be0da515960d6ae870ea6c9b1edd7932233106bdda1c14c99f513dfee1",
+    },
+    "128k_d0_05": {
+        "profile": "128k_d0.05",
+        "kind": "passkey",
+        "depth": 0.05,
+        "prompt_token_count": 127363,
+        "generated_token_count": 20,
+        "source_run_id": 403,
+        "item_row_id": 1518,
+        "manifest_sha256": "71a94209f75e3e5602a07c66ab07641f34163a4c9cdfb07e60017f8de1e51c30",
+        "success_sha256": "baa482838744ab3ee6672dc17988356fa4a45a436cdc6fe3a916b7830b63cd17",
+    },
+    "128k_d0_95": {
+        "profile": "128k_d0.95",
+        "kind": "passkey",
+        "depth": 0.95,
+        "prompt_token_count": 127363,
+        "generated_token_count": 20,
+        "source_run_id": 403,
+        "item_row_id": 1519,
+        "manifest_sha256": "bb71f3faf7ea972114818ea81e94a8084bd874c39bf96f72bafb750f20218764",
+        "success_sha256": "47fa11cfd36b0b6ad8e6f3d9a3e6fa0542a426481cf2f7b7209c4a1684dd39ff",
+    },
+    "128k_d1_0": {
+        "profile": "128k_d1.0",
+        "kind": "passkey",
+        "depth": 1.0,
+        "prompt_token_count": 127363,
+        "generated_token_count": 20,
+        "source_run_id": 403,
+        "item_row_id": 1520,
+        "manifest_sha256": "c8771512c25fa1faf46ac336b40ae3605daaf2b682dbd142a8937d1c09313415",
+        "success_sha256": "24f1bc4eff8b63038629cb87daa982d51d38b5be6dc63f3a3ef41363e9fb2749",
+    },
+    "256k_e0": {
+        "profile": "256k_e0",
+        "kind": "e0",
+        "depth": None,
+        "prompt_token_count": 262144,
+        "generated_token_count": 256,
+        "source_run_id": 402,
+        "item_row_id": 1516,
+        "manifest_sha256": "9dd17e69ca28d73bee09c175595039fdea6eed22499d2d9a547e341c5fbc0440",
+        "success_sha256": "827421edae3fbe8db050a6d6d1fb42b8da601cbbd060fb0cb02bfce5e07eb236",
+    },
+}
+
+# The short-context prompts are the sealed 2k/8k oracle lengths (§21).
+WS32_PROMPT_LENGTHS: Mapping[str, int] = {
+    "2k": 2034,
+    "8k": 8155,
+    **{
+        label: int(entry["prompt_token_count"])
+        for label, entry in WS32_LONG_CONTEXT_PROFILES.items()
+    },
+}
+WS32_CONTEXT_LABELS = ("2k", "8k", *WS32_LONG_CONTEXT_PROFILES)
+
+
+def require_ws32_long_context_profile(
+    label: str, oracle: "Ws32LongContextOracle", *, success_sha256: str
+) -> Mapping[str, Any]:
+    """Refuse a long-context seal whose oracle is not the label's sealed capture."""
+
+    entry = WS32_LONG_CONTEXT_PROFILES.get(label)
+    if entry is None:
+        raise ValueError(f"WS32 context label {label!r} is not a long-context profile")
+    observed = {
+        "kind": oracle.kind,
+        "depth": oracle.depth,
+        "prompt_token_count": int(oracle.prompt_token_ids.size),
+        "generated_token_count": int(oracle.generated_token_ids.size),
+        "source_run_id": int(oracle.source_run_id),
+        "item_row_id": int(oracle.item_row_id),
+        "manifest_sha256": oracle.manifest_sha256,
+        "success_sha256": success_sha256,
+    }
+    expected = {key: entry[key] for key in observed}
+    if observed != expected:
+        raise ValueError(
+            f"WS32 long-context oracle does not match profile {label!r}: "
+            f"{observed} != {expected}"
+        )
+    return entry
 _LEGACY_BENCH_MODULES = ("glm_longctx.py", "dsa_throughput.py", "extract.py", "provenance.py", "engine.py")
 _PROMPT_SHA_PATTERN = re.compile(r"sha256=([0-9a-f]{64})")
 
@@ -120,6 +222,58 @@ class LongContextOracleConfig:
 
 
 _FORBIDDEN_IMPORTS = ("vllm", "tpu_inference", "torch", "jax", "ray")
+_LEGACY_MODULE_CACHE: dict[str, Any] = {}
+
+
+def load_legacy_bench_module(name: str, *, repository_root: Path | None = None) -> Any:
+    """Load one legacy bench module from its FILE, under a private module name.
+
+    ``bench/`` is a namespace package whose modules put their own directory on
+    ``sys.path`` when imported, and this file already loads two of them under
+    private names for provenance. A plain ``import bench.<name>`` elsewhere can
+    therefore be answered from whatever a previous loader left in
+    ``sys.modules``. The §23.5 L7 criterion runs the legacy extractor, so it
+    loads the file itself rather than trusting the import system's cache.
+    """
+
+    if name not in _LEGACY_BENCH_MODULES and f"{name}.py" not in _LEGACY_BENCH_MODULES:
+        raise ValueError(f"{name!r} is not one of the pinned legacy bench modules")
+    cached = _LEGACY_MODULE_CACHE.get(name)
+    if cached is not None:
+        return cached
+    root = (
+        Path(__file__).resolve().parents[3]
+        if repository_root is None
+        else Path(repository_root)
+    ) / "bench"
+    path = root / f"{name}.py"
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    before = set(sys.modules)
+    inserted = str(root) not in sys.path
+    if inserted:
+        sys.path.insert(0, str(root))
+    try:
+        spec = importlib.util.spec_from_file_location(
+            f"greenfield_legacy_bench_{name}", path
+        )
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+    finally:
+        if inserted:
+            sys.path.remove(str(root))
+    offenders = sorted(
+        loaded
+        for loaded in set(sys.modules) - before
+        if loaded.split(".")[0] in _FORBIDDEN_IMPORTS
+    )
+    if offenders:
+        raise ImportError(
+            f"legacy bench import crossed the model-execution boundary: {offenders}"
+        )
+    _LEGACY_MODULE_CACHE[name] = module
+    return module
 
 
 def _legacy_bench_git_records(root: Path, harness_git: str) -> dict[str, Any]:

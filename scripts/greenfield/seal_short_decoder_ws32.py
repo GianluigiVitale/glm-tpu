@@ -61,6 +61,13 @@ from glm_tpu.greenfield.validation import (  # noqa: E402
     load_ws32_short_context_oracle,
     validate_ws32_cache_probe,
 )
+from glm_tpu.greenfield.validation.long_context_oracle import (
+    WS32_CONTEXT_LABELS,
+    WS32_PROMPT_LENGTHS,
+    require_ws32_long_context_profile,
+)
+
+_ZERO_SHA = "0" * 64
 
 
 def _args() -> argparse.Namespace:
@@ -69,7 +76,7 @@ def _args() -> argparse.Namespace:
     validate = sub.add_parser("validate")
     validate.add_argument("--run-dir", required=True, type=Path)
     validate.add_argument("--topology-capture-root", required=True, type=Path)
-    validate.add_argument("--token-oracle-dir", required=True, type=Path)
+    validate.add_argument("--token-oracle-dir", type=Path, default=None)
     # Spec §23.5: L7/L8 seal against a token-only long-context oracle. There is
     # no legacy DSA capture at these lengths, so the sealer mirrors the runner's
     # within-engine contract and makes no cross-oracle claim.
@@ -78,9 +85,11 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--long-context-manifest-sha256", default="0" * 64)
     validate.add_argument("--long-context-success-sha256", default="0" * 64)
     validate.add_argument("--tokenizer-root", type=Path, default=None)
-    validate.add_argument("--dsa-oracle-dir", required=True, type=Path)
+    validate.add_argument("--dsa-oracle-dir", type=Path, default=None)
     validate.add_argument("--mode", choices=("acquire", "numerical"), required=True)
-    validate.add_argument("--context-label", choices=("2k", "8k"), required=True)
+    validate.add_argument(
+        "--context-label", choices=WS32_CONTEXT_LABELS, required=True
+    )
     validate.add_argument("--tag", required=True)
     validate.add_argument("--prefill-chunk", type=int, default=DEFAULT_PREFILL_CHUNK)
     validate.add_argument("--rotary-diagnostic", choices=(0, 1), default=0, type=int)
@@ -531,14 +540,43 @@ def _validate(args: argparse.Namespace) -> int:
             )
         except (OSError, ValueError, KeyError) as error:
             raise SystemExit(f"WS32 long-context oracle is not loadable: {error}")
-    oracle = load_ws32_short_context_oracle(
-        args.token_oracle_dir,
-        args.dsa_oracle_dir,
-        expected_token_manifest_sha256=args.token_oracle_manifest_sha256,
-        expected_dsa_manifest_sha256=args.dsa_oracle_manifest_sha256,
-        expected_token_success_sha256=args.token_oracle_success_sha256,
-        expected_dsa_success_sha256=args.dsa_oracle_success_sha256,
-    )
+        try:
+            require_ws32_long_context_profile(
+                args.context_label,
+                long_context,
+                success_sha256=args.long_context_success_sha256,
+            )
+        except ValueError as error:
+            raise SystemExit(str(error))
+    elif args.context_label not in ("2k", "8k"):
+        raise SystemExit(
+            "WS32 long-context labels require the long-context oracle flags"
+        )
+    if long_context is None:
+        if args.token_oracle_dir is None or args.dsa_oracle_dir is None:
+            raise SystemExit("WS32 short-context seals need both sealed oracles")
+        oracle = load_ws32_short_context_oracle(
+            args.token_oracle_dir,
+            args.dsa_oracle_dir,
+            expected_token_manifest_sha256=args.token_oracle_manifest_sha256,
+            expected_dsa_manifest_sha256=args.dsa_oracle_manifest_sha256,
+            expected_token_success_sha256=args.token_oracle_success_sha256,
+            expected_dsa_success_sha256=args.dsa_oracle_success_sha256,
+        )
+    else:
+        # §23.5: there is no legacy capture at these lengths. Binding a
+        # short-context oracle here would let a 2k/8k artifact stand behind a
+        # long-context seal, so the run's pinned inputs record it as absent.
+        if (
+            args.token_oracle_dir is not None
+            or args.dsa_oracle_dir is not None
+            or args.token_oracle_manifest_sha256 != _ZERO_SHA
+            or args.token_oracle_success_sha256 != _ZERO_SHA
+            or args.dsa_oracle_manifest_sha256 != _ZERO_SHA
+            or args.dsa_oracle_success_sha256 != _ZERO_SHA
+        ):
+            raise SystemExit("WS32 long-context seals bind no short-context oracle")
+        oracle = None
     repository_root = Path(__file__).resolve().parents[2]
     if args.recovery_code_hash and not re.fullmatch(r"[0-9a-f]{40}", args.recovery_code_hash):
         raise SystemExit("WS32 recovery code hash must be a full commit id")
@@ -656,8 +694,12 @@ def _validate(args: argparse.Namespace) -> int:
         "code_hash": args.code_hash,
         "compile_only": args.mode == "acquire",
         "context_capacity": args.context_capacity,
-        "dsa_oracle_manifest_sha256": args.dsa_oracle_manifest_sha256,
-        "dsa_oracle_success_sha256": args.dsa_oracle_success_sha256,
+        "dsa_oracle_manifest_sha256": (
+            None if long_context is not None else args.dsa_oracle_manifest_sha256
+        ),
+        "dsa_oracle_success_sha256": (
+            None if long_context is not None else args.dsa_oracle_success_sha256
+        ),
         "dsa_association_summary_sha256": (
             args.dsa_association_summary_sha256
         ),
@@ -668,8 +710,24 @@ def _validate(args: argparse.Namespace) -> int:
         "mesh_sha256": args.mesh_sha256,
         "source_inventory_sha256": args.source_inventory_sha256,
         "strategy_nd_dense": bool(args.strategy_nd_dense),
-        "token_oracle_manifest_sha256": args.token_oracle_manifest_sha256,
-        "token_oracle_success_sha256": args.token_oracle_success_sha256,
+        "long_context": (
+            None
+            if long_context is None
+            else {
+                "depth": long_context.depth,
+                "item_row_id": long_context.item_row_id,
+                "kind": long_context.kind,
+                "manifest_sha256": long_context.manifest_sha256,
+                "source_run_id": long_context.source_run_id,
+                "success_sha256": args.long_context_success_sha256,
+            }
+        ),
+        "token_oracle_manifest_sha256": (
+            None if long_context is not None else args.token_oracle_manifest_sha256
+        ),
+        "token_oracle_success_sha256": (
+            None if long_context is not None else args.token_oracle_success_sha256
+        ),
         "topology_fleet_sha256": args.topology_fleet_sha256,
         "topology_sha256": args.topology_sha256,
         "xla_python_client_mem_fraction": ".95",
@@ -688,7 +746,7 @@ def _validate(args: argparse.Namespace) -> int:
         raise SystemExit("WS32 graph set drifted")
     slots: set[int] = set()
     all_samples: list[list[float]] = []
-    expected_prompt_length = {"2k": 2034, "8k": 8155}[args.context_label]
+    expected_prompt_length = WS32_PROMPT_LENGTHS[args.context_label]
     layout_keys = (
         set() if args.evidence_layout == EVIDENCE_LAYOUT_V1 else {"evidence_layout"}
     )
@@ -720,6 +778,7 @@ def _validate(args: argparse.Namespace) -> int:
         "launch_process_id",
         "load_seconds",
         "local_device_slots",
+        "long_context",
         "mesh_sha256",
         "prefill_chunk_length",
         "prefill_execution",
@@ -959,8 +1018,21 @@ def _validate(args: argparse.Namespace) -> int:
         if args.mode == "numerical":
             if record.get("status") != "SUCCESS" or record.get("correctness_passed") is not True or record.get("performance_claim") is not False:
                 raise SystemExit(f"WS32 numerical terminal status drifted rank {rank}")
-            if record.get("token_comparison", {}).get("exact_prefix_match") is not True:
-                raise SystemExit(f"WS32 raw tokens drifted rank {rank}")
+            comparison = record.get("token_comparison") or {}
+            if long_context is None:
+                if comparison.get("exact_prefix_match") is not True:
+                    raise SystemExit(f"WS32 raw tokens drifted rank {rank}")
+            else:
+                # §23.5: nothing is "raw tokens exact" here. L7 passes on the
+                # extracted passkey; L8 has no correctness oracle, and either way
+                # a key claiming token exactness must not be present.
+                if "exact_prefix_match" in comparison:
+                    raise SystemExit(f"WS32 long-context token claim drifted rank {rank}")
+                if long_context.kind == "passkey":
+                    if comparison.get("passkey_matches_gold") is not True:
+                        raise SystemExit(f"WS32 passkey drifted rank {rank}")
+                elif comparison.get("passkey_matches_gold") is not None:
+                    raise SystemExit(f"WS32 L8 declares a correctness verdict rank {rank}")
             observed_token_ids = record.get("observed_generated_token_ids")
             expected_observed_count = (
                 1
@@ -1234,8 +1306,12 @@ def _validate(args: argparse.Namespace) -> int:
                 "cache_write_probe": records[0]["cache_write_probe"],
                 "dsa_steps": records[0]["dsa_steps"],
                 "capacity_measurement": (
+                    # §23.3 Step C is the SEALED SHORT workload re-run at a long
+                    # capacity. A §23.5 run's capacity is intrinsic to its prompt,
+                    # so labelling it a capacity measurement would misdescribe it.
                     None
-                    if args.context_capacity == DEFAULT_CONTEXT_CAPACITY
+                    if long_context is not None
+                    or args.context_capacity == DEFAULT_CONTEXT_CAPACITY
                     else {"context_capacity": int(args.context_capacity), "default": DEFAULT_CONTEXT_CAPACITY}
                 ),
                 "main_rope_table": records[0].get("main_rope_table"),
@@ -1269,14 +1345,31 @@ def _validate(args: argparse.Namespace) -> int:
                 "p99_ms_per_token": float(np.percentile(critical, 99)),
                 "steady_wall_tokens_per_second": float(1000.0 / np.percentile(critical, 50)),
                 "token_comparison": records[0]["token_comparison"],
-                "verified_generated_token_count": int(
-                    records[0]["token_comparison"]["compared_count"]
+                "verified_generated_token_count": (
+                    # §23.5: L7 verifies the passkey extracted from the tokens its
+                    # criterion detokenised; L8 verifies no token at all.
+                    (
+                        None
+                        if long_context.kind != "passkey"
+                        else int(
+                            records[0]["token_comparison"]["legacy_diagnostic"]["compared"]
+                        )
+                    )
+                    if long_context is not None
+                    else int(records[0]["token_comparison"]["compared_count"])
                 ),
                 "xplane": xplane,
             }
         )
-        alarm_summary = _later_event_alarm_summary(
-            records[0]["dsa_steps"], oracle.producer_layer_ids.tolist()
+        alarm_summary = (
+            # §21.2's later-event alarm compares the engine against the legacy
+            # capture; §23.5 runs have none, and their within-engine step
+            # records carry no adjudication for it to read.
+            None
+            if long_context is not None
+            else _later_event_alarm_summary(
+                records[0]["dsa_steps"], oracle.producer_layer_ids.tolist()
+            )
         )
         if alarm_summary is not None:
             alarm_summary.update(
@@ -1326,6 +1419,9 @@ def _validate(args: argparse.Namespace) -> int:
         basis.append("PROTECTED_WALL_TRACE_HBM")
         if summary.get("capacity_measurement") is not None:
             basis.append(f"CAPACITY_MEASUREMENT_{summary['capacity_measurement']['context_capacity']}")
+        if long_context is not None:
+            basis.append(f"LONG_CONTEXT_{args.context_label.upper()}")
+            basis.append(f"CONTEXT_CAPACITY_{int(args.context_capacity)}")
         if summary.get("main_rope_table") is not None:
             basis.append("MAIN_ROTARY_HOST_TABLE_LEGACY_FAITHFUL")
         if summary.get("rotary_diagnostic") is not None:
@@ -1926,10 +2022,15 @@ def _run_environment(summary: dict[str, Any]) -> dict[str, Any]:
         "main_rope_table": summary.get("main_rope_table"),
         "capacity_measurement": summary.get("capacity_measurement"),
         "rotary_diagnostic": summary.get("rotary_diagnostic"),
+        # §23.5: which sealed long-context capture this run answered, so the DB
+        # row is bound to the profile and not merely to the context label.
+        "long_context": summary.get("long_context"),
     }
 
 
-def _run_rows(summary: dict[str, Any]) -> tuple[str, str, str]:
+def _run_rows(
+    summary: dict[str, Any]
+) -> tuple[str, str, str, int | None, float | None]:
     """The exact run note, item id and gold shared by DB publication and rollback.
 
     Rollback refuses any row that does not equal what publication wrote, so
@@ -1937,6 +2038,40 @@ def _run_rows(summary: dict[str, Any]) -> tuple[str, str, str]:
     """
     adjudicated = summary.get("dsa_adjudication") is not None
     capacity = summary.get("capacity_measurement")
+    long_context = summary.get("long_context")
+    if long_context:
+        # Spec §23.5: an L7/L8 record. There is no legacy capture to be exact
+        # against, so the wording must claim neither raw-token nor cross-oracle
+        # exactness, and must say what the run's own criterion actually was.
+        label = f"{long_context['kind']}"
+        if long_context["kind"] == "passkey":
+            note = (
+                "Protected complete WS32 long-context decoder (spec §23.5 L7): extracted passkey equals gold at "
+                f"depth {long_context['depth']}; within-engine DSA order/ties; state/cache/HLO/HBM/XPlane and "
+                "profiler-free wall. No legacy token or DSA capture exists at this length: nothing here is a "
+                "raw-tokens-exact or cross-oracle claim."
+            )
+            gold = (
+                "Extracted passkey equal to the sealed legacy gold; within-engine DSA order/ties; "
+                "state/cache/HLO/HBM/XPlane and protected wall. No cross-oracle claim."
+            )
+        else:
+            note = (
+                "Protected complete WS32 long-context decoder (spec §23.5 L8): NO correctness oracle exists at this "
+                "length; within-engine DSA order/ties; state/cache/HLO/HBM/XPlane and profiler-free wall. Nothing "
+                "here is a raw-tokens-exact or cross-oracle claim."
+            )
+            gold = (
+                "No correctness oracle (spec §23.5 L8); within-engine DSA order/ties; "
+                "state/cache/HLO/HBM/XPlane and protected wall."
+            )
+        item_id = (
+            f"s23_5_long_context_{label}_row{long_context['item_row_id']}_"
+            f"cap{summary['context_capacity']}"
+        )
+        # L8 has no correctness oracle, so it must not be recorded as correct.
+        verdict = (1, 1.0) if long_context["kind"] == "passkey" else (None, None)
+        return note, item_id, gold, verdict[0], verdict[1]
     note = (
         "Protected complete WS32 short-context decoder: exact tokens/DSA/state/cache/HLO/HBM/XPlane and profiler-free wall."
         if not adjudicated
@@ -1961,7 +2096,7 @@ def _run_rows(summary: dict[str, Any]) -> tuple[str, str, str]:
         else "Exact sealed raw-token prefix; within-engine DSA order/ties; cross-oracle DSA exact at event 0 and equal to the "
         "pre-registered adjudicated divergence at the first divergent event, later events recorded; state/cache/HLO/HBM/XPlane and protected wall."
     )
-    return note, item_id, gold
+    return note, item_id, gold, 1, 1.0
 
 
 def _publish_db(args: argparse.Namespace) -> int:
@@ -1976,7 +2111,7 @@ def _publish_db(args: argparse.Namespace) -> int:
         connection.execute("BEGIN IMMEDIATE")
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         env = _run_environment(summary)
-        note, item_id, gold = _run_rows(summary)
+        note, item_id, gold, correct, score = _run_rows(summary)
         cursor = connection.execute(
             "INSERT INTO runs(created_utc,model,model_revision,harness_git,fork_git,env_json,pod,note) VALUES (?,?,?,?,?,?,?,?)",
             (
@@ -2003,8 +2138,8 @@ def _publish_db(args: argparse.Namespace) -> int:
                 gold,
                 json.dumps(summary, sort_keys=True),
                 json.dumps(summary["observed_generated_token_ids"]),
-                1,
-                1.0,
+                correct,
+                score,
                 None,
                 summary["verified_generated_token_count"],
                 summary["p50_ms_per_token"],
@@ -2107,7 +2242,13 @@ def _rollback_db(args: argparse.Namespace) -> int:
             (run_id,),
         ).fetchall()
         created = run[1]
-        expected_note, expected_item_id, expected_gold = _run_rows(summary)
+        (
+            expected_note,
+            expected_item_id,
+            expected_gold,
+            expected_correct,
+            expected_score,
+        ) = _run_rows(summary)
         expected_item = (
             benchmark,
             expected_item_id,
@@ -2116,8 +2257,8 @@ def _rollback_db(args: argparse.Namespace) -> int:
             expected_gold,
             json.dumps(summary, sort_keys=True),
             json.dumps(summary["observed_generated_token_ids"]),
-            1,
-            1.0,
+            expected_correct,
+            expected_score,
             None,
             summary["verified_generated_token_count"],
             summary["p50_ms_per_token"],

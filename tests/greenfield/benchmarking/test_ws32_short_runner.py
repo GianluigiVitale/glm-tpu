@@ -458,9 +458,10 @@ def test_ws32_capacity_and_rotary_diagnostic_are_declared_and_bound() -> None:
             module._validate_run_tag(tag, context_label="8k", mode="numerical", prefill_chunk=chunk, context_capacity=capacity)
     # DB identity for a capacity measurement is never a Gate D row.
     base = {"dsa_adjudication": {"event_index": 1}, "later_event_alarm": {"acknowledged": True}}
-    note, item_id, gold = module._run_rows(base)
+    note, item_id, gold, correct, score = module._run_rows(base)
+    assert (correct, score) == (1, 1.0)
     assert item_id == "gate_d_s21_exact_tokens_adjudicated_dsa_state_cache"
-    note_c, item_c, gold_c = module._run_rows({**base, "capacity_measurement": {"context_capacity": 131072, "default": 8192}})
+    note_c, item_c, gold_c, _, _ = module._run_rows({**base, "capacity_measurement": {"context_capacity": 131072, "default": 8192}})
     assert item_c == "s23_capacity_measurement_cap131072_gate_d_s21_exact_tokens_adjudicated_dsa_state_cache"
     assert note_c.startswith("Capacity measurement at context_capacity=131072") and "not a Gate D record" in note_c
     assert gold_c == gold

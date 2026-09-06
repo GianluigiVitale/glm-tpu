@@ -144,6 +144,8 @@ SCHEMA_ADDED_SINCE_THE_SEALED_RUN = {
     # present and null to reach the rest of validation.
     "main_rope_table": None,
     "rotary_diagnostic": None,
+    # §23.5 long-context mode: a short-context run declares it absent.
+    "long_context": None,
 }
 
 
