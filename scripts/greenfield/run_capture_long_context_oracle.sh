@@ -30,6 +30,11 @@ case "$PROFILE" in
   256k_e0)
     KIND=e0
     SOURCE_RUN_ID=402
+    # DB run 402 was captured by a different legacy harness commit than run 403;
+    # the identity check refused on the shared pin, correctly. Verified against
+    # bench/results.db: run 402 harness_git 6032f14, run 403 a4a17ac, both fork
+    # b3c25df47.
+    SOURCE_HARNESS_GIT=6032f14
     SOURCE_ITEM_ROW_ID=1516
     SOURCE_PROMPT_TOKENS=262144
     SOURCE_GENERATED_TOKENS=256
