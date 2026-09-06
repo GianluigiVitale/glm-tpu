@@ -501,6 +501,22 @@ if [[ $EXACT_DSA == 1 ]]; then
     "$DSA_ASSOCIATION_SUCCESS_SHA" "$RUN_DIR/exact_dsa_source_SUCCESS" \
     | sha256sum -c - >/dev/null
 fi
+# A recovery seal declares the newer enforcement it is driven by; an ordinary
+# seal must not, because passing the sealing checkout's own HEAD would let the
+# surface always match itself and the check would never fire.
+if [[ $RECOVER == 1 ]]; then
+  RECOVERY_CODE_HASH_CLI="--recovery-code-hash $RECOVERY_PIN"
+else
+  RECOVERY_CODE_HASH_CLI=''
+fi
+readonly RECOVERY_CODE_HASH_CLI
+# The seal requires the run pin to be published; refusing here costs seconds
+# instead of a protected run.
+git -C "$WORKTREE" fetch -q origin "$BRANCH" 2>/dev/null || true
+git -C "$WORKTREE" merge-base --is-ancestor "$PIN" "refs/remotes/origin/$BRANCH" || {
+  echo "WS32 run pin $PIN is not published on origin/$BRANCH" >&2
+  exit 2
+}
 say "PIN=$PIN recovery_pin=$RECOVERY_PIN mode=$MODE context=$CONTEXT recover=$RECOVER exact_dsa=$EXACT_DSA transport=$CHECKPOINT_TRANSPORT"
 live_bytes=
 for attempt in 1 2 3; do
@@ -645,7 +661,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --exact-dsa "$EXACT_DSA" \
   ${DSA_ADJUDICATION_CLI:+$DSA_ADJUDICATION_CLI} \
   --later-event-alarm-acknowledged "$LATER_EVENT_ALARM_ACK" \
-  --recovery-code-hash "$RECOVERY_PIN" \
+  ${RECOVERY_CODE_HASH_CLI:+$RECOVERY_CODE_HASH_CLI} \
   --reviewed-ref refs/remotes/origin/$BRANCH \
   ${LATER_EVENT_ALARM_CLI:+$LATER_EVENT_ALARM_CLI} \
   --checkpoint-transport "$CHECKPOINT_TRANSPORT" \

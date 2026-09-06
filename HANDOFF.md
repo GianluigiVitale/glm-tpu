@@ -13427,3 +13427,35 @@ operator with shell access can write one. The containment check raises the bar f
 "forge a published branch or collude with the reviewer". It is not a cryptographic guarantee. I have
 overclaimed the strength of these controls in three separate rounds of this review; the spec should
 state what each one is not, and now does.
+
+## 2026-09-06 — eleventh Opus 5 round: the control I added never fired, and the ceiling named
+
+Round 10 found a **P0 of my own making**: the wrapper passed `--recovery-code-hash "$RECOVERY_PIN"` on
+every seal, recovery or not, and `RECOVERY_PIN` is the sealing checkout's own HEAD. The surface check
+compares the surface against the run pin OR the recovery pin, so the second comparison was always the
+checkout against itself and the check returned before it could refuse. I attached an authorization
+meaning to a field the wrapper had been filling with the operator's HEAD since `de0e873`. The only
+thing round 10 actually enforced was the ancestry test. Fixed: an ordinary seal declares no recovery
+pin, and a declared recovery pin must itself be published.
+
+Correction to this log: I wrote that the reviewed ref is one "which the cron mirror keeps current".
+That is wrong. `/home/gianl/bin/sync-glm.sh` contains no git at all — it is a GCS rsync of working
+directories. The ref moves only on an explicit push, which is why the wrapper now fetches before
+sealing and refuses an unpublished pin before the run instead of after four hours of it.
+
+Four mutation survivors closed: the surface comparison used `all`, but the test monkeypatched the
+surface to a single path so `any` was indistinguishable — it now uses two; the four surface entries
+added last round and the import-origin module list had no assertion at all and could be silently
+shrunk back, including the paths §23.8 reads to decide what an A′ seal accepts; and the summary's
+recorded surface could be replaced by an empty dict.
+
+**The ceiling, now written into §21.2 instead of a stronger claim.** I asserted there that "a scratch
+branch carrying a widened registry cannot seal even with a clean tree". Three executed attacks
+disprove it: the recovery-pin escape above, writing `refs/remotes/origin/...` locally, and simply
+pushing. The honest maximum is that a widening is in **published history**, never that it was
+**reviewed** — the operator pushes to the reviewed branch. A control the operator runs cannot bind the
+operator, and no further sealer control will change that. Ten rounds have been spent re-deriving that
+lesson at rising cost; the residual assurance for items 3-4 is a human reading the registry entry and
+the validation record, which is what the reviewed registry exists to force. I am stopping here on this
+axis: further work on §21.2 enforcement is not the best use of pod time or review budget, and the next
+work is the A′ acquisition and the B′ adjudication themselves.

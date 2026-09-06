@@ -515,6 +515,8 @@ def _validate(args: argparse.Namespace) -> int:
         expected_dsa_success_sha256=args.dsa_oracle_success_sha256,
     )
     repository_root = Path(__file__).resolve().parents[2]
+    if args.recovery_code_hash and not re.fullmatch(r"[0-9a-f]{40}", args.recovery_code_hash):
+        raise SystemExit("WS32 recovery code hash must be a full commit id")
     if args.dsa_adjudication_record is not None:
         # §21.2: the reviewed reference-row registry lives in this repository's
         # own source, so a dirty working tree at seal time can widen what is
@@ -1323,17 +1325,18 @@ def _require_reviewed_enforcement(
     driven by newer code declares itself).
     """
 
-    reachable = subprocess.run(
-        [_GIT, "-C", str(repository_root), "merge-base", "--is-ancestor", code_hash, reviewed_ref],
-        capture_output=True,
-        text=True,
-    )
-    if reachable.returncode != 0:
-        raise SystemExit(
-            f"WS32 adjudicated seal requires the run pin {code_hash} to be published on "
-            f"{reviewed_ref}; a pin only this checkout knows about is not reviewed"
-        )
     pins = [code_hash] + ([recovery_code_hash] if recovery_code_hash else [])
+    for pin in pins:
+        reachable = subprocess.run(
+            [_GIT, "-C", str(repository_root), "merge-base", "--is-ancestor", pin, reviewed_ref],
+            capture_output=True,
+            text=True,
+        )
+        if reachable.returncode != 0:
+            raise SystemExit(
+                f"WS32 adjudicated seal requires the pin {pin} to be published on "
+                f"{reviewed_ref}; a pin only this checkout knows about is not reviewed"
+            )
     for pin in pins:
         expected = {}
         for relative in _ENFORCEMENT_SURFACE:

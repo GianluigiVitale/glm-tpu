@@ -1722,12 +1722,20 @@ section grants no install or execution authority.
    refuses to run if the §21.2 modules resolve outside it. This check runs BEFORE the record's
    schema, basis and source-run checks. The run's pin must also be contained in the
    published reviewed branch, and the enforcement surface must be the surface committed at that pin
-   (or at a declared recovery pin), so a scratch branch carrying a widened registry cannot seal even
-   with a clean tree. Workers 1-7 fetch the pin from `origin` and check it out, so a pin that is not
-   published cannot have run at all; the controller refreshes its remote-tracking ref before sealing.
-   *What this is not:* a remote-tracking ref is an ordinary local ref and an operator with shell
-   access can write one, so this raises the bar from "edit a file" to "forge a published branch or
-   collude with the reviewer". It is not a cryptographic guarantee and must not be described as one. The digest comparison is made after the schema, basis, oracle
+   (or at a declared recovery pin, which must itself be published — an ordinary seal declares none).
+   Workers 1-7 fetch the pin from `origin` and check it out, so a pin that is not published cannot
+   have run at all; the controller refreshes its remote-tracking ref before sealing, and the wrapper
+   refuses an unpublished pin before the run rather than after it.
+
+   *What this is not, stated because the code does not have the stronger property.* A
+   remote-tracking ref is an ordinary local ref that an operator with shell access can write, and
+   `--reviewed-ref` is an operator argument. More fundamentally, the operator pushes to the reviewed
+   branch. **The maximum this control can establish is that the widening is in published history,
+   never that it was reviewed.** A fitted `REFERENCE_ROWS` entry that is committed and pushed will
+   seal. That is not a defect to be fixed by a further sealer control: a control the operator runs
+   cannot bind the operator. The residual assurance for items 3-4 is, and remains, a human reading
+   the registry entry and the record that validated the row — which is why the registry exists as a
+   reviewed table rather than as a file convention. The digest comparison is made after the schema, basis, oracle
    and source-run checks, all of which the record satisfies, so any future tightening of those must
    be checked against it explicitly. The exempt record provably carries neither binding, because the
    exemption is keyed on its content digest. History is not weakened and no new record may use it.

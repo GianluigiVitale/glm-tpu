@@ -1013,3 +1013,20 @@ def test_positions_outside_the_reference_row_are_refused() -> None:
                 engine_positions=engine_positions,
                 engine_scores=reference[[0, 1, 2, 3]],
             )
+
+
+def test_the_patched_run_helper_refuses_a_run_that_declares_the_keys(tmp_path) -> None:
+    """It exists to stop an A' table-ON run validating as table-off."""
+    import json
+    import sys
+
+    sys.path.insert(0, str(ROOT / "tests/greenfield/validation"))
+    from ws32_validate_argv import SCHEMA_ADDED_SINCE_THE_SEALED_RUN, patched_run_dir
+
+    source = tmp_path / "run"
+    (source / "fleet").mkdir(parents=True)
+    record = {"main_rope_table": {"rows": 8192}, "trace": {"steps": 2}}
+    (source / "fleet" / "runner.rank0.json").write_text(json.dumps(record), encoding="utf-8")
+    assert "main_rope_table" in SCHEMA_ADDED_SINCE_THE_SEALED_RUN
+    with pytest.raises(AssertionError, match="already declares"):
+        patched_run_dir(tmp_path / "copy", source)

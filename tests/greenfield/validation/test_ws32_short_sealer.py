@@ -2357,6 +2357,11 @@ def test_the_enforcement_code_must_be_the_pins_own_and_the_pin_published(tmp_pat
     surface = repository / "glm_tpu" / "greenfield" / "validation"
     surface.mkdir(parents=True)
     (surface / "ws32_short_context.py").write_text("REFERENCE_ROWS = {}\n", encoding="utf-8")
+    # TWO surface paths: with one, `all` and `any` over the comparison are
+    # indistinguishable, and widening one path while another matches would pass.
+    artifacts = repository / "docs" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "gate-d-row.npy").write_bytes(b"row")
     run = ["git", "-C", str(repository)]
     author = ["-c", "user.email=t@t", "-c", "user.name=t"]
     subprocess.run(run + ["init", "-q"], check=True, capture_output=True)
@@ -2369,7 +2374,7 @@ def test_the_enforcement_code_must_be_the_pins_own_and_the_pin_published(tmp_pat
                    capture_output=True)
 
     monkey = list(module._ENFORCEMENT_SURFACE)
-    module._ENFORCEMENT_SURFACE = ("glm_tpu/greenfield/validation",)
+    module._ENFORCEMENT_SURFACE = ("glm_tpu/greenfield/validation", "docs/artifacts")
     try:
         surface_identity = module._enforcement_surface_identity(repository)
         module._require_reviewed_enforcement(
@@ -2399,12 +2404,28 @@ def test_the_enforcement_code_must_be_the_pins_own_and_the_pin_published(tmp_pat
                 reviewed_ref="refs/remotes/origin/reviewed",
             )
 
-        # Declaring the newer code as the recovery pin is how a seal driven by
-        # newer enforcement says so.
+        # A recovery pin is how a seal driven by newer enforcement declares
+        # itself, but it must be published too, or the escape hatch is the hole.
+        with _pytest.raises(SystemExit, match="to be published on"):
+            module._require_reviewed_enforcement(
+                repository, scratch_identity, code_hash=pin, recovery_code_hash=scratch,
+                reviewed_ref="refs/remotes/origin/reviewed",
+            )
+        subprocess.run(run + ["update-ref", "refs/remotes/origin/reviewed", scratch], check=True,
+                       capture_output=True)
         module._require_reviewed_enforcement(
             repository, scratch_identity, code_hash=pin, recovery_code_hash=scratch,
             reviewed_ref="refs/remotes/origin/reviewed",
         )
+
+        # One surface path matching is not enough: every path must match.
+        partial = dict(scratch_identity)
+        partial["glm_tpu/greenfield/validation"] = "0" * 40
+        with _pytest.raises(SystemExit, match="not the code committed at the run's pin"):
+            module._require_reviewed_enforcement(
+                repository, partial, code_hash=pin, recovery_code_hash=scratch,
+                reviewed_ref="refs/remotes/origin/reviewed",
+            )
     finally:
         module._ENFORCEMENT_SURFACE = tuple(monkey)
 
@@ -2438,4 +2459,61 @@ def test_the_status_path_helper_handles_renames_and_quoting() -> None:
     # `git diff --name-only` emits a bare path with no status prefix.
     assert module._status_path("glm_tpu/greenfield/validation/x.py") == (
         "glm_tpu/greenfield/validation/x.py"
+    )
+
+
+def test_the_enforcement_surface_and_import_check_cover_the_deciding_code() -> None:
+    """P2-2/P2-3: both lists could be shrunk back with the suite green.
+
+    Every path here is read to decide what a seal accepts: §23.8's accepted
+    rotary-table digest is recomputed from the reference rotary construction,
+    the runtime theta and the model geometry, and the model config supplies that
+    geometry.
+    """
+    import ast
+
+    module = _sealer_module()
+    assert set(module._ENFORCEMENT_SURFACE) == {
+        "scripts/greenfield/seal_short_decoder_ws32.py",
+        "glm_tpu/greenfield/validation",
+        "glm_tpu/greenfield/benchmarking",
+        "glm_tpu/greenfield/sharding",
+        "glm_tpu/greenfield/kernels/reference",
+        "glm_tpu/greenfield/runtime",
+        "glm_tpu/greenfield/types.py",
+        "configs/glm-5.2-fp8-config.json",
+        "docs/artifacts",
+    }
+    assert set(module._TRACKED_ONLY_SURFACE) == {"docs/artifacts"}
+
+    imports = _sealer_function("_require_imports_come_from")
+    checked = {
+        node.id
+        for loop in ast.walk(imports)
+        if isinstance(loop, ast.For)
+        for node in ast.walk(loop.iter)
+        if isinstance(node, ast.Name)
+    }
+    assert checked == {
+        "ws32_short_context",
+        "ws32_first_divergent_event",
+        "reference_rotary",
+        "greenfield_types",
+    }
+
+
+def test_the_summary_records_the_surface_it_computed(tmp_path) -> None:
+    """P3-1: an AST spread check cannot tell a recorded surface from an empty one."""
+    import ast
+
+    validate = _sealer_function("_validate")
+    spreads = [
+        ast.unparse(node)
+        for node in ast.walk(validate)
+        if isinstance(node, ast.Dict) and any(key is None for key in node.keys)
+    ]
+    recorded = [text for text in spreads if "enforcement_surface" in text]
+    assert recorded, "the summary no longer records the enforcement surface"
+    assert any("enforcement_surface: enforcement_surface" in text.replace("'", "") for text in recorded), (
+        f"the summary records something other than the computed surface: {recorded}"
     )
