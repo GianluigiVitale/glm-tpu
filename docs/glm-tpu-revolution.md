@@ -1652,7 +1652,97 @@ section grants no install or execution authority.
    same pre-registered `κ = 2`. A larger bias is a hard failure that localizes a real arithmetic
    defect; it is never tolerated. `κ` was fixed on 2026-09-05 before any layer-1 result against the
    full-forward `R` existed; it may not be raised after a failed adjudication, and any change requires
-   a new reviewed amendment.
+   a new reviewed amendment. *Amendment 2026-09-05 22:20Z:* `s` is the POPULATION standard
+   deviation (numpy `ddof=0`), which is what the sealed Gate D adjudication and §21.5 computed; the
+   original wording said "sample". `ddof=0` yields a smaller `s` and therefore a strictly tighter
+   bound, so no earlier result is weakened, and the difference at `n ≈ 2000` is 0.02%. The same `κ`
+   scales the caps in item 3 and the `|m_o|` term here: a rerun at a smaller `κ` tightens all three
+   tests together. `scripts/greenfield/adjudicate_ws32_first_divergent_event.py` implements this and
+   reproduces the sealed numbers bit-for-bit. The FP64 reference row `R` must be a
+   `docs/artifacts/gate-d-*.npy` artifact whose working-tree CONTENT is identical to the blob
+   committed at `HEAD` (a tracked path can be overwritten in place, which is not the same thing); it
+   must be the row this tool registers for the exact event `(context, decode position, producer
+   layer, norm-eps convention)` being adjudicated, and that registration must name the reviewed
+   validation record that checked `R` against the legacy intermediate captures per item 3 above. Its
+   digest is declared on the command line, its convention is declared and carried into the record
+   (§21.5 records two conventions whose rows are indistinguishable by shape), and the reference
+   implementation's committed tree hash is recorded. A new event therefore requires a new REVIEWED
+   registration, which is the pre-registration step. Every earlier adjudication attempt on the same
+   event is disclosed in the record's `prior_attempts`; `basis` names only what the record stands on,
+   and a refused analysis may never appear there. Disclosure is best-effort by construction: attempt
+   files are untracked outputs, so an operator who moves one out of `docs/artifacts` leaves no trace.
+   What is enforced is that the key is always present, so "no earlier attempt" is asserted rather
+   than omitted, and that every declared attempt is SHA-bound. The record must name, in `analysis`,
+   the PASS §21.2 analysis it stands on, and that analysis must adjudicate the same run, step and
+   event and declare the same reference row. The later-event alarm threshold is fixed at 1024 and a
+   record that carries any other value is refused: it is not an operator choice. The observer archive
+   is bound to the archive the declared source run itself published under its own tag, not to a
+   directory name. Every one of these rules is enforced by the LOADER the sealer calls, not by the
+   offline tool: a rule only the producer consults can be widened in a working tree, used once and
+   reverted without leaving a trace in the record.
+
+   *Pre-registration is proven, not assumed.* The sealer requires the record, the analysis it stands
+   on AND the FP64 reference row to be committed in the run's OWN pin (`--code-hash`),
+   byte-identical to the blob on disk. It then RE-DERIVES items 3-4 from the run's own observations,
+   the sealed oracle and that row, and refuses unless the re-derivation passes and reproduces the
+   pre-registered divergence: a verdict the sealer merely reads is a claim by whoever wrote the
+   file, so the record's job is to fix the row and the expected divergence in advance, never to
+   supply the answer. The run executed at that commit, so an artifact present in it with these bytes existed
+   before the run produced the data it judges; a record written to fit an observed divergence cannot
+   satisfy this, and checking `HEAD` would not do it because HEAD moves after the run. The sealed
+   Gate D record already satisfies it: its blob at pin `4286509` is the blob on disk.
+
+   *Grandfathering, stated rather than hidden:* the one record that closed Gate D,
+   `docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json`, SHA-256
+   `4da05468120e3c2e9b82d03931018e0d14eebc5fc28e339381658a04457cd26b`, predates this amendment and
+   carries neither `reference_row` nor `analysis`. It is exempt BY DIGEST, so the exemption covers
+   exactly that file and cannot be transferred: `expected_sha256` is verified first, and the
+   exemption is then keyed on that verified digest. It exempts the record from CARRYING the
+   bindings, never from the re-derivation: the loader resolves its reference row from the single
+   `.npy` in its own basis, which is unambiguous and stays correct when §21.5's second norm-eps
+   convention row is registered for the same event. Verified: re-deriving event 1 from the Gate D
+   run's own arrays passes and reproduces the sealed numbers.
+
+   *What the re-derivation does and does not establish.* It removes the operator's verdict from the
+   chain: the six checks are computed from the run's own observations, the sealed oracle and the
+   pre-registered row. It does not validate the ROW against the checkpoint or the tokens. An
+   operator who commits a fitted row together with its `REFERENCE_ROWS` entry into the run's own pin
+   would pass every mechanical check, because a row chosen as `R ≈ s_e` drives the engine deltas to
+   zero and inflates `eps_event`. The soundness of items 3-4 therefore still rests on a human having
+   reviewed that registry entry and the record that validated the row against the legacy captures —
+   which is what the registry exists to force into review, and why a new event requires a new
+   reviewed entry rather than a new file. Because the registry and the §21.2 arithmetic are read
+   from this repository's source at seal time, an adjudicated seal additionally refuses to run from
+   a modified enforcement surface (the sealer, `glm_tpu/greenfield/{validation,benchmarking,sharding,
+   runtime,kernels/reference}`, `glm_tpu/greenfield/types.py`, the model config and
+   `docs/artifacts/`): an edit that widens what is accepted must
+   be committed, and therefore reviewable, rather than made and reverted around a seal. The refusal
+   also covers `--assume-unchanged` and `--skip-worktree`, which hide an edit from `git status`
+   without committing anything, and the sealer puts its own repository first on `sys.path` and
+   refuses to run if the §21.2 modules resolve outside it. This check runs BEFORE the record's
+   schema, basis and source-run checks. The run's pin must also be contained in the
+   published reviewed branch, and the enforcement surface must be the surface committed at that pin
+   (or at a declared recovery pin, which must itself be published — an ordinary seal declares none).
+   A worker with no prior checkout clones `--single-branch` and then checks the pin out, which
+   requires the pin to be reachable from `origin/<branch>`; a worker that already has the object
+   checks it out regardless, and worker 0 never fetches at all. So the fleet establishes publication
+   for a fresh worker only, and nothing for a warm one — the pre-run refusal, not the fleet, is what
+   makes publication a requirement. The controller refreshes its
+   remote-tracking ref before sealing, and the wrapper refuses an unpublished pin before the run
+   rather than after it.
+
+   *What this is not, stated because the code does not have the stronger property.* A
+   remote-tracking ref is an ordinary local ref that an operator with shell access can write, and
+   `--reviewed-ref` is an operator argument. More fundamentally, the operator pushes to the reviewed
+   branch. **The maximum this control can establish is that the widening is in published history,
+   never that it was reviewed.** A fitted `REFERENCE_ROWS` entry that is committed and pushed will
+   seal. That is not a defect to be fixed by a further sealer control: a control the operator runs
+   cannot bind the operator. The residual assurance for items 3-4 is, and remains, a human reading
+   the registry entry and the record that validated the row — which is why the registry exists as a
+   reviewed table rather than as a file convention. The digest comparison is made after the schema, basis, oracle
+   and source-run checks, all of which the record satisfies, so any future tightening of those must
+   be checked against it explicitly. The exempt record provably carries neither binding, because the
+   exemption is keyed on its content digest. History is not weakened and no new record may use it.
 5. **Internal tensors (level 2).** Layer outputs, residuals and caches are compared under the bounded
    contracts in `docs/greenfield/NUMERICAL_CONTRACT.md`; cache/state structure (positions, tails,
    validity, pages, manifests) remains exact.

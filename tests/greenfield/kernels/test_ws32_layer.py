@@ -1120,3 +1120,113 @@ print(json.dumps({
     assert result["rounded_first_rmsnorm_collectives"] == 0
     assert result["async"] == []
     assert not result["batch32_hidden"]
+
+
+PRE_A_PRIME_COMMIT = "cb36cb74"
+
+
+def _strip(lines: list[str]) -> list[str]:
+    """Statements only: comments and blank lines are not traced."""
+    kept = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        kept.append(stripped)
+    return kept
+
+
+def test_the_flag_off_rotary_path_keeps_the_pre_a_prime_statement_order() -> None:
+    """Spec §23.8 neutrality: the default-off path must trace as it did before.
+
+    Statement *order*, not statement count: JAX records equations in Python
+    execution order, so moving an independent slice across the rotary changes
+    the StableHLO text and would raise a false drift alarm against the sealed
+    pins at the next acquisition.  The companion test below measures that this
+    is true rather than assuming it.
+    """
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[3]
+    current = (root / "glm_tpu/greenfield/kernels/ws32_layer.py").read_text(encoding="utf-8")
+    previous = subprocess.run(
+        ["git", "-C", str(root), "show", f"{PRE_A_PRIME_COMMIT}^:glm_tpu/greenfield/kernels/ws32_layer.py"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+
+    start = previous.index("    q_rope_unrotated = q_states[")
+    end = previous.index("    padding = contract.packed_cache_width", start)
+    expected = _strip(previous[start:end].splitlines())
+    expected = expected[1:]  # the shared q_rope_unrotated assignment
+
+    marker = "    if main_rope_table_row is None:\n"
+    branch_start = current.index(marker) + len(marker)
+    branch_end = current.index("\n    else:\n", branch_start)
+    observed = _strip(current[branch_start:branch_end].splitlines())
+
+    assert observed == expected, (
+        "the default-off rotary path no longer traces in the pre-A' order; "
+        "re-acquiring with the flag off would produce different StableHLO"
+    )
+
+
+def test_moving_an_independent_slice_across_the_rotary_changes_the_stablehlo() -> None:
+    """The measurement behind the neutrality requirement above."""
+    program = r'''
+import hashlib
+import json
+
+import jax
+import jax.numpy as jnp
+
+from glm_tpu.greenfield.kernels.reference.rotary import rotary_cos_sin, apply_rotary
+
+ROTARY_DIM = 16
+
+
+def hoisted(kv, q, position):
+    latent = kv[..., :8]
+    rope_input = kv[..., 8 : 8 + ROTARY_DIM][:, None, :]
+    cos, sin = rotary_cos_sin(position, rotary_dim=ROTARY_DIM, theta=8e6, dtype=q.dtype)
+    rotated_q = apply_rotary(q, cos[:, None, :], sin[:, None, :], interleaved=True)
+    rotated = apply_rotary(rope_input, cos[:, None, :], sin[:, None, :], interleaved=True)
+    return latent, rotated_q, rotated[:, 0, :]
+
+
+def in_order(kv, q, position):
+    cos, sin = rotary_cos_sin(position, rotary_dim=ROTARY_DIM, theta=8e6, dtype=q.dtype)
+    rotated_q = apply_rotary(q, cos[:, None, :], sin[:, None, :], interleaved=True)
+    latent = kv[..., :8]
+    rope_input = kv[..., 8 : 8 + ROTARY_DIM][:, None, :]
+    rotated = apply_rotary(rope_input, cos[:, None, :], sin[:, None, :], interleaved=True)
+    return latent, rotated_q, rotated[:, 0, :]
+
+
+kv = jax.ShapeDtypeStruct((1, 8 + ROTARY_DIM), jnp.bfloat16)
+q = jax.ShapeDtypeStruct((1, 4, ROTARY_DIM), jnp.bfloat16)
+position = jax.ShapeDtypeStruct((1,), jnp.int32)
+digests = {
+    name: hashlib.sha256(jax.jit(fn).lower(kv, q, position).as_text().encode()).hexdigest()
+    for name, fn in (("hoisted", hoisted), ("in_order", in_order))
+}
+print(json.dumps(digests))
+'''
+    environment = dict(os.environ)
+    environment["JAX_PLATFORMS"] = "cpu"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=300,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    digests = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert digests["hoisted"] != digests["in_order"], (
+        "traced order no longer affects the StableHLO text; the neutrality "
+        "argument for the default-off rotary path needs to be re-derived"
+    )

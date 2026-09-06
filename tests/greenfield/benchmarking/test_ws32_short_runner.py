@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 import importlib.util
+import json
 from pathlib import Path
 
 import numpy as np
@@ -244,7 +245,23 @@ def test_ws32_sealer_binds_alarm_acknowledgement_and_states_adjudicated_basis() 
     ):
         assert token in sealer, token
     assert "GLM_GREENFIELD_WS32_LATER_EVENT_ALARM_PROFILE_SHA" in wrapper
-    assert '--recovery-code-hash "$RECOVERY_PIN"' in wrapper
+    # An ordinary seal must declare NO recovery pin: passing the sealing
+    # checkout's own HEAD made the sealer's enforcement-surface comparison the
+    # checkout against itself, so it could never refuse. The literal survives at
+    # the recovery-publish and evidence call sites, so assert the gate itself.
+    assert 'RECOVERY_CODE_HASH_CLI="--recovery-code-hash $RECOVERY_PIN"' in wrapper
+    assert "${RECOVERY_CODE_HASH_CLI:+$RECOVERY_CODE_HASH_CLI}" in wrapper
+    validate_block = wrapper.split("seal_short_decoder_ws32.py\" validate")[1].split(
+        "--output \"$RUN_DIR/summary.json\""
+    )[0]
+    assert '--recovery-code-hash "$RECOVERY_PIN"' not in validate_block, (
+        "the validate invocation must not hand the sealer its own HEAD as a recovery pin"
+    )
+    assert "--reviewed-ref" in validate_block
+    # The pre-run publication refusal covers every pin the seal will demand, and
+    # this is the class of wrapper edit that has silently gone missing before.
+    assert 'for preflight_pin in "$PIN" $([[ $RECOVER == 1 ]] && echo "$RECOVERY_PIN"); do' in wrapper
+    assert "is not published on origin/$BRANCH" in wrapper
     assert "${LATER_EVENT_ALARM_CLI:+$LATER_EVENT_ALARM_CLI}" in wrapper
     specification = importlib.util.spec_from_file_location("ws32_sealer_for_test", sealer_path)
     module = importlib.util.module_from_spec(specification)
@@ -567,3 +584,202 @@ def test_ws32_hlo_contract_requires_the_rope_table_scope_iff_declared() -> None:
     assert "greenfield_ws32_main_rope_table" in source
     assert "WS32 main rotary host table scope is missing" in source
     assert "WS32 main rotary host table appears without a declaration" in source
+
+
+def _sealer_validate_body() -> "ast.FunctionDef":
+    import ast
+
+    root = Path(__file__).resolve().parents[3]
+    tree = ast.parse((root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8"))
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name == "_validate":
+            return node
+    raise AssertionError("the sealer has no _validate function")
+
+
+def test_ws32_sealer_refuses_an_adjudication_record_derived_from_the_sealed_run() -> None:
+    """§21.2 pre-registration: the record must come from a different run.
+
+    Asserted on the parse tree, not on the source text, so the guard cannot be
+    disabled (``if False and ...``) or moved after the sealer writes anything
+    without this test failing.
+    """
+    import ast
+
+    validate = _sealer_validate_body()
+    guards = []
+    for node in ast.walk(validate):
+        if not isinstance(node, ast.If) or not isinstance(node.test, ast.Compare):
+            continue
+        test = node.test
+        left = test.left
+        if (
+            isinstance(left, ast.Attribute)
+            and left.attr == "engine_source_run"
+            and isinstance(left.value, ast.Name)
+            and left.value.id == "dsa_adjudication"
+            and len(test.ops) == 1
+            and isinstance(test.ops[0], ast.Eq)
+            and isinstance(test.comparators[0], ast.Attribute)
+            and test.comparators[0].attr == "tag"
+        ):
+            guards.append(node)
+    assert len(guards) == 1, "the anti-circularity guard is absent, duplicated or rewritten"
+    guard = guards[0]
+    raises = [
+        item
+        for item in ast.walk(guard)
+        if isinstance(item, ast.Raise)
+        and isinstance(item.exc, ast.Call)
+        and isinstance(item.exc.func, ast.Name)
+        and item.exc.func.id == "SystemExit"
+    ]
+    assert raises, "the guard must refuse, not warn"
+
+    forbidden = {"write_text", "write_bytes", "_write_once", "_publish_db", "_rollback_db"}
+
+    def _writes(node: "ast.AST") -> bool:
+        return any(
+            isinstance(item, ast.Call)
+            and (
+                (isinstance(item.func, ast.Attribute) and item.func.attr in forbidden)
+                or (isinstance(item.func, ast.Name) and item.func.id in forbidden)
+            )
+            for item in ast.walk(node)
+        )
+
+    # A write moved into a helper is still a write. The closure is taken to a
+    # fixpoint over every function in the module, nested and async included, so
+    # a helper that calls a helper that writes is caught whatever the order.
+    root = Path(__file__).resolve().parents[3]
+    tree = ast.parse(
+        (root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8")
+    )
+    functions = {
+        node.name: node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node is not validate
+    }
+    changed = True
+    while changed:
+        changed = False
+        for name, node in functions.items():
+            if name not in forbidden and _writes(node):
+                forbidden.add(name)
+                changed = True
+
+    earlier = sorted(
+        item.lineno
+        for item in ast.walk(validate)
+        if isinstance(item, ast.Call)
+        and (
+            (isinstance(item.func, ast.Attribute) and item.func.attr in forbidden)
+            or (isinstance(item.func, ast.Name) and item.func.id in forbidden)
+        )
+        and item.lineno < guard.lineno
+    )
+    assert not earlier, f"the sealer writes before the guard runs, at lines {earlier}"
+
+
+def test_ws32_adjudication_record_without_a_source_run_is_refused(tmp_path: Path) -> None:
+    """A record that does not name a source would make the guard a no-op."""
+    from hashlib import sha256 as _sha256
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    root = Path(__file__).resolve().parents[3]
+    committed = root / "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json"
+    record = json.loads(committed.read_text(encoding="utf-8"))
+    row = record["basis"][2]
+    bound = dict(
+        record,
+        reference_row={
+            "convention": "rms_norm_eps_1e-5",
+            "implementation_tree_sha1": "5" * 40,
+            "path": row["path"],
+            "sha256": row["sha256"],
+        },
+    )
+    loaded = load_ws32_adjudicated_divergence(
+        committed, expected_sha256=_sha256(committed.read_bytes()).hexdigest()
+    )
+    assert loaded.engine_source_run == record["engine_source_run"]
+
+    for bad_value in (None, "", "not a run tag", 17, ["a"]):
+        broken = dict(bound)
+        broken["engine_source_run"] = bad_value
+        path = tmp_path / f"bad_{abs(hash(str(bad_value)))}.json"
+        path.write_text(json.dumps(broken, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="engine_source_run"):
+            load_ws32_adjudicated_divergence(
+                path, expected_sha256=_sha256(path.read_bytes()).hexdigest()
+            )
+
+
+def test_the_live_storage_census_parses_the_unseparated_du_output() -> None:
+    """`gcloud storage du -s` prints "<bytes><uri>" with no separator.
+
+    The 21:30Z acquisition aborted because `awk '{print $1}'` returned
+    `1976176085363gs://driftbench-dsv4-uc`, which failed the numeric test three
+    times. The pipeline is exercised here on captured output rather than on the
+    next protected run.
+    """
+    import subprocess
+
+    root = Path(__file__).resolve().parents[3]
+    wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
+    assert "tail -1 | grep -o '^[0-9]\\+'" in wrapper
+
+    for captured, expected in (
+        ("1976176085363gs://driftbench-dsv4-uc", "1976176085363"),
+        ("1976176085363  gs://driftbench-dsv4-uc", "1976176085363"),
+        ("12  gs://a\n1976176085363gs://driftbench-dsv4-uc", "1976176085363"),
+    ):
+        completed = subprocess.run(
+            ["bash", "-c", "printf '%s\\n' \"$1\" | tail -1 | grep -o '^[0-9]\\+'", "_", captured],
+            capture_output=True,
+            text=True,
+        )
+        assert completed.stdout.strip() == expected, captured
+
+    empty = subprocess.run(
+        ["bash", "-c", "printf '%s\\n' \"$1\" | tail -1 | grep -o '^[0-9]\\+'", "_", "gs://only"],
+        capture_output=True,
+        text=True,
+    )
+    assert empty.stdout.strip() == "", "a non-numeric census must yield nothing, so the run aborts"
+
+
+def test_both_loader_call_sites_pass_the_repository_root() -> None:
+    """P2-3: `repository_root` gates every basis, analysis and row check.
+
+    Dropping it silently disables the reference-row registry, the analysis
+    binding, the set binding, the six-check requirement and the symlink-escape
+    check, and the substring assertion above would not notice.
+    """
+    import ast
+
+    root = Path(__file__).resolve().parents[3]
+    for relative in (
+        "scripts/greenfield/run_short_decoder_ws32.py",
+        "scripts/greenfield/seal_short_decoder_ws32.py",
+    ):
+        tree = ast.parse((root / relative).read_text(encoding="utf-8"))
+        calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "load_ws32_adjudicated_divergence"
+        ]
+        assert calls, f"{relative} no longer loads the adjudication record"
+        for call in calls:
+            keywords = {keyword.arg for keyword in call.keywords}
+            assert "repository_root" in keywords, (
+                f"{relative}:{call.lineno} loads the record without repository_root, "
+                "which disables every basis and reference-row check"
+            )
+            assert "expected_sha256" in keywords

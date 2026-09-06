@@ -244,6 +244,11 @@ readonly EXACT_PROMOTE_STABLE_SHA EXACT_PROMOTE_OPTIMIZED_SHA
 readonly OBSERVER_OPTIMIZED_SHA DECODE_STABLE_SHA DECODE_OPTIMIZED_SHA
 readonly CACHE_PROBE_STABLE_SHA CACHE_PROBE_OPTIMIZED_SHA
 
+# The sealing checkout's HEAD. It carries two different meanings and is passed
+# to two different places: PROVENANCE in the evidence ledger (which checkout
+# produced the upload, always) and AUTHORIZATION in the seal (which enforcement
+# code this seal declares, only on a recovery). Conflating them made the
+# sealer's enforcement-surface comparison the checkout against itself.
 RECOVERY_PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 if [[ $RECOVER == 1 ]]; then
   PIN=${GLM_GREENFIELD_WS32_SOURCE_CODE_HASH:?set the exact code hash used by the completed run}
@@ -501,11 +506,31 @@ if [[ $EXACT_DSA == 1 ]]; then
     "$DSA_ASSOCIATION_SUCCESS_SHA" "$RUN_DIR/exact_dsa_source_SUCCESS" \
     | sha256sum -c - >/dev/null
 fi
+# A recovery seal declares the newer enforcement it is driven by; an ordinary
+# seal must not, because passing the sealing checkout's own HEAD would let the
+# surface always match itself and the check would never fire.
+if [[ $RECOVER == 1 ]]; then
+  RECOVERY_CODE_HASH_CLI="--recovery-code-hash $RECOVERY_PIN"
+else
+  RECOVERY_CODE_HASH_CLI=''
+fi
+readonly RECOVERY_CODE_HASH_CLI
+# The seal requires the run pin to be published; refusing here costs seconds
+# instead of a protected run.
+git -C "$WORKTREE" fetch -q origin "$BRANCH" 2>/dev/null || true
+for preflight_pin in "$PIN" $([[ $RECOVER == 1 ]] && echo "$RECOVERY_PIN"); do
+  git -C "$WORKTREE" merge-base --is-ancestor "$preflight_pin" "refs/remotes/origin/$BRANCH" || {
+    echo "WS32 pin $preflight_pin is not published on origin/$BRANCH" >&2
+    exit 2
+  }
+done
 say "PIN=$PIN recovery_pin=$RECOVERY_PIN mode=$MODE context=$CONTEXT recover=$RECOVER exact_dsa=$EXACT_DSA transport=$CHECKPOINT_TRANSPORT"
 live_bytes=
 for attempt in 1 2 3; do
+  # `gcloud storage du -s` prints "<bytes><uri>" with no separator, so take the
+  # leading digit run rather than awk's first field.
   live_bytes=$(timeout 900 gcloud storage du -s "$APPROVED_BUCKET" \
-    2>>"$RUN_DIR/orchestrator.log" | awk 'END {print $1}') || live_bytes=
+    2>>"$RUN_DIR/orchestrator.log" | tail -1 | grep -o '^[0-9]\+') || live_bytes=
   [[ $live_bytes =~ ^[0-9]+$ ]] && break
   [[ $attempt -eq 3 ]] && break
   say "live storage census attempt $attempt failed; retrying"
@@ -616,6 +641,14 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --exact-dsa "$EXACT_DSA" \
   --output "$RUN_DIR/source_remote_objects.json" "${materialize_args[@]}" \
   >"$RUN_DIR/materialize.log" 2>&1
+# The seal requires every declared pin to be contained in the published branch,
+# so the controller's remote-tracking ref is refreshed first. The pre-run check
+# above has already refused an unpublished pin; this keeps the controller's view
+# current for the seal itself.
+git -C "$WORKTREE" fetch -q origin "$BRANCH" || {
+  say "ABORT: cannot refresh origin/$BRANCH before sealing"
+  exit 1
+}
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   "$WORKTREE/scripts/greenfield/seal_short_decoder_ws32.py" validate \
   --run-dir "$RUN_DIR" --topology-capture-root "$TOPOLOGY_ROOT" \
@@ -635,7 +668,8 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --exact-dsa "$EXACT_DSA" \
   ${DSA_ADJUDICATION_CLI:+$DSA_ADJUDICATION_CLI} \
   --later-event-alarm-acknowledged "$LATER_EVENT_ALARM_ACK" \
-  --recovery-code-hash "$RECOVERY_PIN" \
+  ${RECOVERY_CODE_HASH_CLI:+$RECOVERY_CODE_HASH_CLI} \
+  --reviewed-ref refs/remotes/origin/$BRANCH \
   ${LATER_EVENT_ALARM_CLI:+$LATER_EVENT_ALARM_CLI} \
   --checkpoint-transport "$CHECKPOINT_TRANSPORT" \
   --prefill-chunk "$PREFILL_CHUNK" \

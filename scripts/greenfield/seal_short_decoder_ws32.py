@@ -21,8 +21,13 @@ import numpy as np
 
 
 REPO = Path(__file__).resolve().parents[2]
-if str(REPO) not in sys.path:
-    sys.path.insert(0, str(REPO))
+# Unconditionally FIRST: a PYTHONPATH entry ahead of this repository would
+# otherwise shadow glm_tpu.greenfield.validation, so the sealer would check one
+# tree for modifications and import the §21.2 arithmetic and the reviewed
+# reference-row registry from another.
+while str(REPO) in sys.path:
+    sys.path.remove(str(REPO))
+sys.path.insert(0, str(REPO))
 
 _DSA_ASSOCIATION_SUMMARY_SHA256 = (
     "661142816aa64ec8d085553b427e99f62ab3f1f16b3fc87fc4fc24880d467203"
@@ -42,6 +47,9 @@ from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
 from glm_tpu.greenfield.validation.ws32_evidence import (  # noqa: E402
     EVIDENCE_LAYOUT_V1,
     EVIDENCE_LAYOUT_V2,
+)
+from glm_tpu.greenfield.validation.ws32_short_context import (  # noqa: E402
+    committed_artifact_path as _committed_artifact_path,
 )
 from glm_tpu.greenfield.validation import (  # noqa: E402
     bind_ws32_adjudication,
@@ -102,6 +110,11 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--later-event-alarm-profile-sha256", default="0" * 64)
     validate.add_argument("--later-event-alarm-lessons-pin", default="")
     validate.add_argument("--recovery-code-hash", default="")
+    validate.add_argument(
+        "--reviewed-ref",
+        default="refs/remotes/origin/rewrite/topology-first-decode",
+        help="the published branch an adjudicated seal's run pin must be contained in",
+    )
     validate.add_argument(
         "--strategy-nd-dense", choices=(0, 1), required=True, type=int
     )
@@ -210,6 +223,32 @@ def _memory_valid(value: Any) -> bool:
     )
 
 
+# The alarm-acknowledgement check already used an absolute git; the
+# pre-registration check is the more security-critical of the two.
+_GIT = "/usr/bin/git"
+# The files that decide what an adjudicated seal accepts: the sealer itself, the
+# validation package holding the reviewed reference-row registry and the §21.2
+# arithmetic, and the reviewed artifact tree. Edits elsewhere (tests, docs,
+# unrelated scripts) do not change the verdict and do not block a seal.
+_ENFORCEMENT_SURFACE = (
+    "scripts/greenfield/seal_short_decoder_ws32.py",
+    "glm_tpu/greenfield/validation",
+    "glm_tpu/greenfield/benchmarking",
+    "glm_tpu/greenfield/sharding",
+    # §23.8: `_require_main_rope_table` recomputes the accepted table digest from
+    # the reference rotary construction, the runtime's theta and the model
+    # geometry, so those decide acceptance too.
+    "glm_tpu/greenfield/kernels/reference",
+    "glm_tpu/greenfield/runtime",
+    "glm_tpu/greenfield/types.py",
+    "configs/glm-5.2-fp8-config.json",
+    "docs/artifacts",
+)
+# `docs/artifacts` legitimately holds untracked outputs of the offline
+# adjudicator (§21.2 calls prior attempts untracked and requires them to be left
+# in place), so only TRACKED modifications are refused there; a new file is not
+# a widening of what the seal accepts.
+_TRACKED_ONLY_SURFACE = ("docs/artifacts",)
 DEFAULT_PREFILL_CHUNK = 2048
 DEFAULT_CONTEXT_CAPACITY = 8192
 
@@ -370,6 +409,12 @@ def _distribution(samples: list[float]) -> dict[str, float | int]:
 
 
 def _validate(args: argparse.Namespace) -> int:
+    if args.mode == "acquire" and args.dsa_adjudication_record is not None:
+        # An acquisition seals graphs, not numbers. Carrying an adjudication
+        # binding into an HLO_ACQUIRED SUCCESS would read as a correctness claim
+        # that nothing in an acquisition establishes. Checked before the tag so
+        # the refusal names the real problem.
+        raise SystemExit("WS32 acquisition seals carry no adjudication record")
     _validate_run_tag(
         args.tag,
         context_label=args.context_label,
@@ -472,17 +517,61 @@ def _validate(args: argparse.Namespace) -> int:
     repository_root = Path(__file__).resolve().parents[2]
     if args.recovery_code_hash and not re.fullmatch(r"[0-9a-f]{40}", args.recovery_code_hash):
         raise SystemExit("WS32 recovery code hash must be a full commit id")
+    if args.dsa_adjudication_record is not None:
+        # §21.2: the reviewed reference-row registry lives in this repository's
+        # own source, so a dirty working tree at seal time can widen what is
+        # accepted and then be reverted without leaving a trace in the record.
+        # An adjudicated seal therefore requires a clean tree.
+        _require_imports_come_from(repository_root)
+        _require_clean_worktree(repository_root)
+        enforcement_surface = _enforcement_surface_identity(repository_root)
+        _require_reviewed_enforcement(
+            repository_root,
+            enforcement_surface,
+            code_hash=args.code_hash,
+            recovery_code_hash=args.recovery_code_hash,
+            reviewed_ref=args.reviewed_ref,
+        )
+    else:
+        enforcement_surface = None
+    if args.recovery_code_hash and not re.fullmatch(r"[0-9a-f]{40}", args.recovery_code_hash):
+        raise SystemExit("WS32 recovery code hash must be a full commit id")
+    _committed_in_run_pin = _make_pre_registration_check(args, repository_root)
+
+    def _committed_record_path(path: Path) -> str:
+        resolved = Path(path).resolve()
+        try:
+            relative = str(resolved.relative_to(repository_root))
+        except ValueError:
+            raise SystemExit(
+                f"WS32 adjudication record is outside the repository: {path}"
+            )
+        if not _committed_artifact_path(relative, ".json"):
+            # Otherwise a record committed elsewhere sidesteps the disclosure
+            # scan, which globs the reviewed directory.
+            raise SystemExit(
+                f"WS32 adjudication record must be a docs/artifacts/gate-*.json artifact: "
+                f"{relative}"
+            )
+        _committed_in_run_pin(relative, "adjudication record")
+        return relative
+
     if args.dsa_adjudication_record is None:
         if args.dsa_adjudication_sha256 != "0" * 64:
             raise SystemExit("WS32 adjudication SHA given without a record")
         dsa_adjudication = None
         expected_dsa_adjudication = None
     else:
-        dsa_adjudication = load_ws32_adjudicated_divergence(
-            args.dsa_adjudication_record,
-            expected_sha256=args.dsa_adjudication_sha256,
-            repository_root=repository_root,
-        )
+        record_relative = _committed_record_path(args.dsa_adjudication_record)
+        try:
+            dsa_adjudication = load_ws32_adjudicated_divergence(
+                args.dsa_adjudication_record,
+                expected_sha256=args.dsa_adjudication_sha256,
+                repository_root=repository_root,
+            )
+        except (OSError, ValueError, KeyError) as error:
+            # A loader refusal is a refusal to seal, not a traceback.
+            raise SystemExit(f"WS32 adjudication record is not loadable: {error}")
         try:
             bind_ws32_adjudication(
                 dsa_adjudication,
@@ -492,12 +581,46 @@ def _validate(args: argparse.Namespace) -> int:
             )
         except ValueError as error:
             raise SystemExit(f"WS32 adjudication record does not bind this run: {error}")
+        for relative, label in (
+            # The analysis is the record's ground and the row decides its
+            # verdict, so both must have existed before the run too; otherwise
+            # the numbers could be written to fit what the run produced.
+            (dsa_adjudication.analysis_path, "adjudication analysis"),
+            (dsa_adjudication.reference_row_path, "adjudication reference row"),
+            (
+                dsa_adjudication.reference_validation_path,
+                "adjudication reference validation record",
+            ),
+        ):
+            if relative is not None:
+                _committed_in_run_pin(relative, label)
+        if dsa_adjudication.engine_source_run == args.tag:
+            # §21.2 pre-registration: a record derived from this very run would be
+            # fitted to the data it judges and so could never fail. The source is
+            # taken from the record the loader already SHA-bound, so there is no
+            # window between the identity check and this one.
+            raise SystemExit(
+                "WS32 adjudication record was derived from the run being sealed"
+            )
+        if args.mode == "numerical":
+            # §21.2 items 3-4 are RE-DERIVED from the run being sealed, the
+            # sealed oracle and the pre-registered reference row. A verdict the
+            # sealer merely reads is a claim by whoever wrote the file; the
+            # record's job is to fix the row and the expected divergence in
+            # advance, never to supply the answer. Rank 0's archive is bound to
+            # rank 0's own record here; the rank loop below re-verifies every
+            # rank and proves they agree.
+            _rederive_ws32_adjudication(
+                arrays=_rank0_dsa_arrays(args.run_dir, records[0]),
+                oracle=oracle,
+                adjudication=dsa_adjudication,
+                repository_root=repository_root,
+                rank=0,
+            )
         expected_dsa_adjudication = {
             "event_index": dsa_adjudication.event_index,
             "mode": "first_divergent_event",
-            "record_path": str(
-                args.dsa_adjudication_record.resolve().relative_to(repository_root)
-            ),
+            "record_path": record_relative,
             "record_sha256": dsa_adjudication.record_sha256,
             "step": dsa_adjudication.step,
         }
@@ -878,10 +1001,19 @@ def _validate(args: argparse.Namespace) -> int:
                 }
             if not _same(tensor_record.get("arrays"), array_records):
                 raise SystemExit(f"WS32 numerical tensor manifest drifted rank {rank}")
-            if rank and not _same(
-                array_records, records[0]["numerical_tensors"]["arrays"]
-            ):
-                raise SystemExit(f"WS32 numerical tensor values disagree rank {rank}")
+            _require_ranks_agree(array_records, records, rank=rank)
+            if dsa_adjudication is not None:
+                # Every rank is adjudicated on its OWN arrays. The rank-0 pass
+                # in the adjudication block runs earlier so it is reachable
+                # before the schema checks; this one restores the eight-rank
+                # property rather than resting it on the agreement check above.
+                _rederive_ws32_adjudication(
+                    arrays=arrays,
+                    oracle=oracle,
+                    adjudication=dsa_adjudication,
+                    repository_root=repository_root,
+                    rank=rank,
+                )
             expected_dsa = []
             for step in range(args.observer_steps):
                 expected_dsa.append(
@@ -923,7 +1055,12 @@ def _validate(args: argparse.Namespace) -> int:
                     or not profile.is_file()
                     or _digest_file(profile) != args.later_event_alarm_profile_sha256
                     or not re.fullmatch(r"[0-9a-f]{40}", args.later_event_alarm_lessons_pin or "")
-                    or (args.recovery_code_hash and args.later_event_alarm_lessons_pin != args.recovery_code_hash)
+                    # Bound to the pin whose enforcement this seal declares:
+                    # the recovery pin when there is one, otherwise the run's
+                    # own. Both are required to be published, so the lessons
+                    # entry the acknowledgement rests on is published too.
+                    or args.later_event_alarm_lessons_pin
+                    != (args.recovery_code_hash or args.code_hash)
                 ):
                     raise SystemExit("WS32 alarm acknowledgement is not bound to a profile record and lessons pin")
                 lessons = subprocess.run(
@@ -1005,6 +1142,10 @@ def _validate(args: argparse.Namespace) -> int:
 
     summary: dict[str, Any] = {
         "artifact_kind": "greenfield_ws32_short_decoder_fleet",
+        # What the §21.2 enforcement was actually run with, so a reviewer can
+        # compare it against the reviewed branch rather than trust the tree it
+        # happened to be sealed from.
+        **({} if enforcement_surface is None else {"enforcement_surface": enforcement_surface}),
         **common,
         "context_label": args.context_label,
         "graph_sha256": {
@@ -1133,6 +1274,354 @@ def _validate(args: argparse.Namespace) -> int:
     _write_once(args.output, summary)
     print(json.dumps(summary, sort_keys=True))
     return 0
+
+
+def _enforcement_surface_identity(repository_root: Path) -> dict[str, str]:
+    """The committed object ids of the code that decides what a seal accepts.
+
+    The clean-surface check stops an uncommitted edit, but a seal driven from a
+    different checkout — or from a scratch branch carrying a widened registry —
+    would still have a clean tree. Recording the object id of each surface path
+    puts what the seal was produced with into the sealed record, where it can be
+    compared against the reviewed branch.
+    """
+
+    identity: dict[str, str] = {}
+    for relative in _ENFORCEMENT_SURFACE:
+        try:
+            result = subprocess.run(
+                [_GIT, "-C", str(repository_root), "rev-parse", f"HEAD:{relative}"],
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            raise SystemExit(f"WS32 seal cannot identify its enforcement surface: {error}")
+        if result.returncode != 0:
+            raise SystemExit(
+                f"WS32 enforcement surface path is not committed at HEAD: {relative}"
+            )
+        identity[relative] = result.stdout.strip()
+    head = subprocess.run(
+        [_GIT, "-C", str(repository_root), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if head.returncode != 0:
+        raise SystemExit("WS32 seal cannot identify its own checkout")
+    identity["HEAD"] = head.stdout.strip()
+    return identity
+
+
+def _require_reviewed_enforcement(
+    repository_root: Path,
+    surface: Mapping[str, str],
+    *,
+    code_hash: str,
+    recovery_code_hash: str,
+    reviewed_ref: str,
+) -> None:
+    """The enforcement must be the reviewed enforcement, at a published pin.
+
+    A clean tree proves only that the checkout matches its own HEAD. Every pin
+    this seal declares — the run's, and the recovery pin when there is one —
+    must be contained in the reviewed remote branch, and the enforcement surface
+    must be the surface committed at one of them.
+
+    This establishes that the enforcement code is in PUBLISHED history. It does
+    not establish that it was reviewed: the operator pushes to that branch. See
+    §21.2's ceiling paragraph; the residual assurance is a human reading the
+    registry entry.
+    """
+
+    pins = [code_hash] + ([recovery_code_hash] if recovery_code_hash else [])
+    for pin in pins:
+        reachable = subprocess.run(
+            [_GIT, "-C", str(repository_root), "merge-base", "--is-ancestor", pin, reviewed_ref],
+            capture_output=True,
+            text=True,
+        )
+        if reachable.returncode != 0:
+            raise SystemExit(
+                f"WS32 adjudicated seal requires the pin {pin} to be published on "
+                f"{reviewed_ref}; a pin only this checkout knows about is not reviewed"
+            )
+    for pin in pins:
+        expected = {}
+        for relative in _ENFORCEMENT_SURFACE:
+            result = subprocess.run(
+                [_GIT, "-C", str(repository_root), "rev-parse", f"{pin}:{relative}"],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                break
+            expected[relative] = result.stdout.strip()
+        else:
+            if all(surface.get(key) == value for key, value in expected.items()):
+                return
+    raise SystemExit(
+        "WS32 adjudicated seal runs enforcement code that is not the code committed at "
+        f"the run's pin {code_hash}"
+        + (f" or the declared recovery pin {recovery_code_hash}" if recovery_code_hash else "")
+    )
+
+
+def _require_clean_worktree(repository_root: Path) -> None:
+    """Refuse to seal an adjudicated run from a modified checkout.
+
+    The enforcement of §21.2 items 3-4 reads `REFERENCE_ROWS` and the
+    adjudication arithmetic out of this repository's source. Both are ordinary
+    files: an operator could widen the registry in the working tree, seal, and
+    revert. Requiring the tree to be clean puts any such edit into history,
+    which is what "reviewed" means here.
+    """
+
+    code = [item for item in _ENFORCEMENT_SURFACE if item not in _TRACKED_ONLY_SURFACE]
+    modified = _git_lines(
+        repository_root, ["status", "--porcelain", "--"] + code, "verify the working tree"
+    )
+    modified += _git_lines(
+        repository_root,
+        ["diff", "--name-only", "HEAD", "--"] + list(_TRACKED_ONLY_SURFACE),
+        "verify the artifact tree",
+    )
+    # `--assume-unchanged` and `--skip-worktree` make git report a modified file
+    # as clean, so the flags themselves are a refusal: they hide exactly the edit
+    # this check exists to catch, and they leave nothing in history. `ls-files -v`
+    # tags assume-unchanged by LOWERCASING the tag letter and skip-worktree as a
+    # capital `S`; only `H` (plain cached) is acceptable here.
+    hidden = [
+        line[2:]
+        for line in _git_lines(
+            repository_root,
+            ["ls-files", "-v", "--"] + list(_ENFORCEMENT_SURFACE),
+            "read the index",
+        )
+        if line[:1] != "H"
+    ]
+    if hidden:
+        raise SystemExit(
+            "WS32 adjudicated seal refuses an enforcement surface with hidden index flags "
+            "(--assume-unchanged / --skip-worktree): " + ", ".join(sorted(hidden)[:8])
+        )
+    if modified:
+        raise SystemExit(
+            "WS32 adjudicated seal requires an unmodified enforcement surface; the "
+            "reviewed reference-row registry and the §21.2 arithmetic live in it. Modified: "
+            + ", ".join(sorted(_status_path(item) for item in modified)[:8])
+        )
+
+
+def _status_path(line: str) -> str:
+    """The path out of a `status --porcelain` or `diff --name-only` line."""
+
+    text = line[3:] if len(line) > 3 and line[2] == " " else line
+    return text.split(" -> ")[-1].strip().strip('"')
+
+
+def _git_lines(repository_root: Path, arguments: list[str], purpose: str) -> list[str]:
+    try:
+        result = subprocess.run(
+            [_GIT, "-C", str(repository_root), *arguments], capture_output=True, text=True
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise SystemExit(f"WS32 seal cannot {purpose}: {error}")
+    if result.returncode != 0:
+        raise SystemExit(f"WS32 seal cannot {purpose}: {result.stderr.strip()}")
+    return [line for line in result.stdout.splitlines() if line.strip()]
+
+
+def _require_imports_come_from(repository_root: Path) -> None:
+    """The modules that enforce §21.2 must be this repository's own.
+
+    Checking one tree for modifications while importing the arithmetic from
+    another is the same defect as not checking at all.
+    """
+
+    from glm_tpu.greenfield import types as greenfield_types
+    from glm_tpu.greenfield.kernels.reference import rotary as reference_rotary
+    from glm_tpu.greenfield.validation import ws32_first_divergent_event, ws32_short_context
+
+    root = Path(repository_root).resolve()
+    for module in (
+        ws32_short_context,
+        ws32_first_divergent_event,
+        reference_rotary,
+        greenfield_types,
+    ):
+        origin = Path(getattr(module, "__file__", "")).resolve()
+        if not origin.is_relative_to(root):
+            raise SystemExit(
+                f"WS32 §21.2 enforcement is imported from outside the sealed repository: "
+                f"{origin}"
+            )
+
+
+def _make_pre_registration_check(args: Any, repository_root: Path):
+    """Return the check that proves §21.2 pre-registration from the run's pin.
+
+    A module-level factory rather than a closure inside ``_validate`` so the
+    property can be exercised by a test instead of asserted about the source.
+    """
+
+    def committed_in_run_pin(relative: str, label: str) -> None:
+        """Require an artifact to be committed in the pin the run executed at.
+
+        The run ran at ``--code-hash``, so an artifact present in that commit
+        with these exact bytes existed before the run produced the data it
+        judges. Checking ``HEAD`` would not do it: HEAD moves after the run.
+        The sealed Gate D record satisfies this — its blob at pin 4286509 is
+        the blob on disk.
+        """
+
+        try:
+            committed = subprocess.run(
+                [_GIT, "-C", str(repository_root), "rev-parse", f"{args.code_hash}:{relative}"],
+                capture_output=True,
+                text=True,
+            )
+            working = subprocess.run(
+                [_GIT, "-C", str(repository_root), "hash-object", "--", relative],
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            # No git means the property cannot be established, which is a
+            # refusal, not a traceback and not a pass.
+            raise SystemExit(f"WS32 {label} commitment cannot be checked: {error}")
+        if committed.returncode != 0:
+            raise SystemExit(
+                f"WS32 {label} is not committed in the run's own pin {args.code_hash}: "
+                f"{relative}; a record written after the run is not a pre-registration"
+            )
+        if working.returncode != 0 or committed.stdout.strip() != working.stdout.strip():
+            raise SystemExit(
+                f"WS32 {label} differs from the blob committed at {args.code_hash}: {relative}"
+            )
+
+    return committed_in_run_pin
+
+
+def _require_ranks_agree(
+    array_records: Mapping[str, Any], records: list[Mapping[str, Any]], *, rank: int
+) -> None:
+    """Every rank's observed arrays must be rank 0's, value for value."""
+
+    if rank and not _same(array_records, records[0]["numerical_tensors"]["arrays"]):
+        raise SystemExit(f"WS32 numerical tensor values disagree rank {rank}")
+
+
+def _rank0_dsa_arrays(run_dir: Path, record: Mapping[str, Any]) -> dict[str, Any]:
+    """Rank 0's DSA observations, bound to rank 0's own runner record."""
+
+    path = run_dir / "fleet" / "runner.rank0.npz"
+    tensor_record = record.get("numerical_tensors")
+    if not path.is_file():
+        raise SystemExit(f"WS32 rank-0 numerical tensor file is missing: {path}")
+    if (
+        not isinstance(tensor_record, Mapping)
+        or tensor_record.get("filename") != path.name
+        or tensor_record.get("byte_count") != path.stat().st_size
+        or tensor_record.get("sha256") != _digest_file(path)
+    ):
+        raise SystemExit("WS32 rank-0 numerical tensor file is not bound to its record")
+    wanted = (
+        "dsa_producer_layer_ids",
+        "dsa_selected_positions",
+        "dsa_selected_scores",
+        "dsa_selected_valid_counts",
+    )
+    with np.load(path, allow_pickle=False) as archive:
+        missing = [name for name in wanted if name not in archive.files]
+        if missing:
+            raise SystemExit(f"WS32 rank-0 numerical tensor keys missing: {missing}")
+        return {name: np.ascontiguousarray(archive[name]) for name in wanted}
+
+
+def _rederive_ws32_adjudication(
+    *,
+    arrays: Mapping[str, Any],
+    oracle: Any,
+    adjudication: Any,
+    repository_root: Path,
+    rank: int,
+) -> None:
+    """Recompute §21.2 items 3-4 for the adjudicated event and require a pass.
+
+    The pre-registered record supplies the reviewed FP64 reference row and the
+    divergence it predicted; the numbers come from this run's own observations.
+    A hand-written analysis asserting six passing checks changes nothing here.
+    """
+
+    from glm_tpu.greenfield.validation.ws32_first_divergent_event import (
+        AdjudicationError,
+        adjudicate_first_divergent_event,
+        event_arrays,
+        oracle_event_arrays,
+    )
+
+    step = adjudication.step
+    event = adjudication.event_index
+    relative = adjudication.reference_row_path
+    if relative is None:
+        raise SystemExit(
+            "WS32 adjudication record names no FP64 reference row, so §21.2 items 3-4 "
+            "cannot be re-derived"
+        )
+    reference_path = repository_root / relative
+    try:
+        reference = np.load(reference_path, allow_pickle=False).astype(np.float64)
+    except (OSError, ValueError) as error:
+        raise SystemExit(f"WS32 adjudication reference row is unreadable: {error}")
+    engine_positions, engine_scores = event_arrays(
+        selected_positions=arrays["dsa_selected_positions"],
+        selected_scores=arrays["dsa_selected_scores"],
+        selected_valid_counts=arrays["dsa_selected_valid_counts"],
+        step=step,
+        event=event,
+    )
+    oracle_positions, oracle_scores = oracle_event_arrays(
+        {
+            "selected_positions": oracle.selected_positions,
+            "selected_scores": oracle.selected_scores,
+            "valid_counts": oracle.valid_counts,
+        },
+        step=step,
+        event=event,
+    )
+    try:
+        recomputed = adjudicate_first_divergent_event(
+            oracle_positions=oracle_positions,
+            oracle_scores=oracle_scores,
+            engine_positions=engine_positions,
+            engine_scores=engine_scores,
+            reference=reference,
+            producer_layer_id=int(
+                np.asarray(arrays["dsa_producer_layer_ids"])[event]
+            ),
+            step=step,
+            event=event,
+            decode_position=adjudication.decode_position,
+            expected_producer_layer_id=adjudication.producer_layer_id,
+        )
+    except AdjudicationError as error:
+        raise SystemExit(
+            f"WS32 §21.2 re-derivation refuses the adjudicated event rank {rank}: {error}"
+        )
+    if recomputed["verdict"] != "PASS":
+        failed = sorted(
+            name for name, item in recomputed["checks"].items() if not item["pass"]
+        )
+        raise SystemExit(
+            f"WS32 §21.2 items 3-4 fail on this run rank {rank}: {failed}"
+        )
+    if (
+        tuple(recomputed["expected_only"]) != adjudication.expected_only
+        or tuple(recomputed["observed_only"]) != adjudication.observed_only
+    ):
+        raise SystemExit(
+            f"WS32 §21.2 re-derivation disagrees with the pre-registered divergence rank {rank}"
+        )
 
 
 def _later_event_alarm_summary(

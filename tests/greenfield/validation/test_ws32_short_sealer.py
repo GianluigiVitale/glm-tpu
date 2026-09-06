@@ -1075,3 +1075,1471 @@ def test_ws32_v2_materialization_refuses_every_drift(tmp_path: Path, monkeypatch
             inflated = run_dir / "fleet_hlo" / f"{graph}.rank0.{suffix}"
             assert inflated.stat().st_ino == worker.stat().st_ino, (graph, suffix)
             assert sha256(inflated.read_bytes()).hexdigest() == records[graph][sha_key]
+
+
+def test_the_sealer_states_loader_refusals_and_requires_a_committed_record() -> None:
+    """P2-4 and P3: a loader ValueError is a refusal line, not a traceback."""
+    from pathlib import Path as _Path
+
+    root = _Path(__file__).resolve().parents[3]
+    source = (root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8")
+    assert "WS32 adjudication record is not loadable" in source
+    assert "is not committed in the run's own pin" in source
+    assert "differs from the blob committed at" in source
+    assert "WS32 adjudication record is outside the repository" in source
+    assert 'f"{args.code_hash}:{relative}"' in source, (
+        "pre-registration is proven by the RUN's pin, not by HEAD, which moves after the run"
+    )
+    assert "HEAD:" not in source.split("def committed_in_run_pin")[1].split("\n\ndef ")[0]
+
+    # Deleting the CALLS must fail this test, not just deleting the strings.
+    import ast as _ast
+
+    tree = _ast.parse(source)
+    validate = next(
+        node for node in tree.body
+        if isinstance(node, _ast.FunctionDef) and node.name == "_validate"
+    )
+    calls = [
+        node for node in _ast.walk(validate)
+        if isinstance(node, _ast.Call)
+        and isinstance(node.func, _ast.Name)
+        and node.func.id in (
+            "_committed_in_run_pin",
+            "_committed_record_path",
+            "_make_pre_registration_check",
+        )
+    ]
+    called = {node.func.id for node in calls}
+    assert called == {
+        "_committed_in_run_pin",
+        "_committed_record_path",
+        "_make_pre_registration_check",
+    }, (
+        f"the pre-registration checks are not called: {sorted(called)}"
+    )
+    literals = {
+        node.value for node in _ast.walk(validate)
+        if isinstance(node, _ast.Constant) and isinstance(node.value, str)
+    }
+    assert {"adjudication analysis", "adjudication reference row"} <= literals, (
+        "the analysis and the reference row must both be pinned to the run's commit"
+    )
+    attributes = {
+        node.attr for node in _ast.walk(validate) if isinstance(node, _ast.Attribute)
+    }
+    assert {"analysis_path", "reference_row_path"} <= attributes
+
+    import ast
+
+    tree = ast.parse(source)
+    validate = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_validate"
+    )
+    loads = [
+        node for node in ast.walk(validate)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "load_ws32_adjudicated_divergence"
+    ]
+    assert len(loads) == 1, "the record is loaded once"
+    handlers = [
+        node for node in ast.walk(validate)
+        if isinstance(node, ast.Try)
+        and any(loads[0] is item for item in ast.walk(node))
+    ]
+    assert handlers, "the load is not wrapped, so a refusal would be a traceback"
+    caught = {
+        name.id
+        for handler in handlers
+        for clause in handler.handlers
+        for name in ast.walk(clause.type) if isinstance(name, ast.Name)
+    }
+    assert "ValueError" in caught
+
+
+def test_the_sealed_gate_d_record_is_committed_in_its_own_run_pin() -> None:
+    """The property the sealer now checks holds for the record that closed Gate D.
+
+    Gate D sealed at pin 4286509; the adjudication record's blob in that commit
+    is the blob on disk, so the record demonstrably existed before the run it
+    judges. A record written afterwards cannot satisfy this.
+    """
+    import subprocess
+    from pathlib import Path as _Path
+
+    run_worktree = _Path("/home/gianl/glm-tpu-topology-rewrite")
+    if not (run_worktree / ".git").exists():
+        import pytest
+
+        pytest.skip("the run worktree is unavailable")
+    relative = "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json"
+    at_pin = subprocess.run(
+        ["git", "-C", str(run_worktree), "rev-parse", f"4286509:{relative}"],
+        capture_output=True, text=True,
+    )
+    on_disk = subprocess.run(
+        ["git", "-C", str(run_worktree), "hash-object", "--", relative],
+        capture_output=True, text=True,
+    )
+    assert at_pin.returncode == 0, at_pin.stderr
+    assert at_pin.stdout.strip() == on_disk.stdout.strip() != ""
+
+
+def _sealer_module():
+    import importlib.util
+    from pathlib import Path as _Path
+
+    root = _Path(__file__).resolve().parents[3]
+    path = root / "scripts/greenfield/seal_short_decoder_ws32.py"
+    specification = importlib.util.spec_from_file_location("ws32_sealer_behaviour", path)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+def test_the_rederivation_reproduces_the_sealed_gate_d_adjudication() -> None:
+    """§21.2 items 3-4 are recomputed from the run being sealed.
+
+    The numbers must be the sealed ones, on the real 8K run, or the seal-time
+    re-derivation would refuse evidence that is already closed.
+    """
+    from pathlib import Path as _Path
+
+    import numpy as _np
+    import pytest as _pytest
+
+    from glm_tpu.greenfield.validation.ws32_first_divergent_event import (
+        adjudicate_first_divergent_event,
+        event_arrays,
+        oracle_event_arrays,
+    )
+
+    root = _Path(__file__).resolve().parents[3]
+    oracle_dir = _Path(
+        "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/"
+        "greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle"
+    )
+    archive = _Path(
+        "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_"
+        "20260905T085534575653049Z/runner.rank0.npz"
+    )
+    if not (archive.is_file() and (oracle_dir / "dsa_events.safetensors").is_file()):
+        _pytest.skip("the sealed Gate D archive or the 8K DSA oracle is unavailable")
+    from safetensors.numpy import load_file
+
+    oracle = load_file(str(oracle_dir / "dsa_events.safetensors"))
+    arrays = dict(_np.load(archive, allow_pickle=False))
+    engine_positions, engine_scores = event_arrays(
+        selected_positions=arrays["dsa_selected_positions"],
+        selected_scores=arrays["dsa_selected_scores"],
+        selected_valid_counts=arrays["dsa_selected_valid_counts"],
+        step=0,
+        event=1,
+    )
+    oracle_positions, oracle_scores = oracle_event_arrays(oracle, step=0, event=1)
+    reference = _np.load(
+        root / "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
+    ).astype(_np.float64)
+    result = adjudicate_first_divergent_event(
+        oracle_positions=oracle_positions,
+        oracle_scores=oracle_scores,
+        engine_positions=engine_positions,
+        engine_scores=engine_scores,
+        reference=reference,
+        producer_layer_id=int(arrays["dsa_producer_layer_ids"][1]),
+        step=0,
+        event=1,
+        decode_position=8155,
+        expected_producer_layer_id=1,
+    )
+    assert result["verdict"] == "PASS"
+    assert result["epsilon_oracle_vs_reference"] == 0.22697279652271618
+    assert result["reference_band_size"] == 451
+    assert result["shared_positions"] == 2041
+    assert result["checks"]["bias"]["bound"] == 0.22563715920821653
+    assert result["expected_only"] == [680, 1052, 2024, 2436, 6322, 7473, 7850]
+    assert result["observed_only"] == [754, 1904, 2029, 3651, 4899, 5536, 6951]
+
+
+def test_a_hand_asserted_pass_does_not_survive_the_rederivation(tmp_path) -> None:
+    """A record whose analysis claims six passes is still recomputed."""
+    import numpy as _np
+    import pytest as _pytest
+
+    module = _sealer_module()
+
+    class _Adjudication:
+        step = 0
+        event_index = 0
+        decode_position = 63
+        producer_layer_id = 1
+        expected_only = (31,)
+        observed_only = (32,)
+        reference_row_path = "docs/artifacts/gate-d-row.npy"
+
+    reference = _np.sort(_np.arange(64, dtype=_np.float64))[::-1].copy()
+    (tmp_path / "docs/artifacts").mkdir(parents=True)
+    _np.save(tmp_path / "docs/artifacts/gate-d-row.npy", reference)
+
+    top_k = 32
+    oracle_positions = _np.arange(top_k, dtype=_np.int32)
+    engine_positions = oracle_positions.copy()
+    engine_positions[top_k - 1] = top_k
+
+    class _Oracle:
+        selected_positions = oracle_positions.reshape(1, 1, top_k)
+        selected_scores = reference[:top_k].reshape(1, 1, top_k).astype(_np.float32)
+        valid_counts = _np.full((1, 1), top_k, dtype=_np.int32)
+
+    # The engine's scores are wildly biased, so the caps must fail no matter
+    # what any analysis file asserts.
+    engine_scores = (reference[engine_positions] + 50.0).astype(_np.float32)
+    arrays = {
+        "dsa_producer_layer_ids": _np.asarray([1], dtype=_np.int32),
+        "dsa_selected_positions": engine_positions.reshape(1, 1, 1, top_k),
+        "dsa_selected_scores": engine_scores.reshape(1, 1, 1, top_k),
+        "dsa_selected_valid_counts": _np.full((1, 1, 1), top_k, dtype=_np.int32),
+    }
+    with _pytest.raises(SystemExit, match="items 3-4 fail on this run"):
+        module._rederive_ws32_adjudication(
+            arrays=arrays,
+            oracle=_Oracle(),
+            adjudication=_Adjudication(),
+            repository_root=tmp_path,
+            rank=0,
+        )
+
+
+def test_the_rederivation_refuses_a_divergence_the_run_did_not_produce(tmp_path) -> None:
+    import numpy as _np
+    import pytest as _pytest
+
+    module = _sealer_module()
+    generator = _np.random.RandomState(7)
+    reference = _np.sort(generator.uniform(0.0, 1.0, size=64))[::-1].astype(_np.float64).copy()
+    top_k = 32
+    # Put the swapped pair inside the reference ambiguity band, so the event is
+    # genuinely adjudicable and only the DECLARED sets are wrong.
+    reference[top_k - 1] = reference[top_k] + 1e-6
+    (tmp_path / "docs/artifacts").mkdir(parents=True)
+    _np.save(tmp_path / "docs/artifacts/gate-d-row.npy", reference)
+    oracle_positions = _np.arange(top_k, dtype=_np.int32)
+    oracle_scores = reference[:top_k] + generator.normal(0.0, 1e-4, size=top_k)
+    engine_positions = oracle_positions.copy()
+    engine_positions[top_k - 1] = top_k
+
+    class _Oracle:
+        selected_positions = oracle_positions.reshape(1, 1, top_k)
+        selected_scores = oracle_scores.reshape(1, 1, top_k).astype(_np.float32)
+        valid_counts = _np.full((1, 1), top_k, dtype=_np.int32)
+
+    class _Adjudication:
+        step = 0
+        event_index = 0
+        decode_position = 63
+        producer_layer_id = 1
+        expected_only = (7,)          # not what the run produced
+        observed_only = (99,)
+        reference_row_path = "docs/artifacts/gate-d-row.npy"
+
+    arrays = {
+        "dsa_producer_layer_ids": _np.asarray([1], dtype=_np.int32),
+        "dsa_selected_positions": engine_positions.reshape(1, 1, 1, top_k),
+        "dsa_selected_scores": (
+            reference[engine_positions] + generator.normal(0.0, 1e-4, size=top_k)
+        )
+        .reshape(1, 1, 1, top_k)
+        .astype(_np.float32),
+        "dsa_selected_valid_counts": _np.full((1, 1, 1), top_k, dtype=_np.int32),
+    }
+    with _pytest.raises(SystemExit, match="disagrees with the pre-registered divergence"):
+        module._rederive_ws32_adjudication(
+            arrays=arrays,
+            oracle=_Oracle(),
+            adjudication=_Adjudication(),
+            repository_root=tmp_path,
+            rank=0,
+        )
+
+
+def test_the_pre_registration_pin_refuses_an_uncommitted_or_drifted_artifact(tmp_path) -> None:
+    """P1-2: the round's headline control, exercised rather than grepped."""
+    import subprocess
+
+    import pytest as _pytest
+
+    module = _sealer_module()
+    repository = tmp_path / "repo"
+    (repository / "docs" / "artifacts").mkdir(parents=True)
+    relative = "docs/artifacts/gate-d-record.json"
+    target = repository / relative
+    target.write_text('{"a": 1}', encoding="utf-8")
+    for command in (
+        ["init", "-q"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "add", "-A"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "record"],
+    ):
+        subprocess.run(["git", "-C", str(repository), *command], check=True, capture_output=True)
+    pin = subprocess.run(
+        ["git", "-C", str(repository), "rev-parse", "HEAD"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+
+    class _Args:
+        code_hash = pin
+        dsa_adjudication_record = target
+
+    check = module._make_pre_registration_check(_Args(), repository)
+    check(relative, "adjudication record")
+
+    # Committed at the pin, but the working tree drifted.
+    target.write_text('{"a": 2}', encoding="utf-8")
+    with _pytest.raises(SystemExit, match="differs from the blob committed at"):
+        check(relative, "adjudication record")
+    target.write_text('{"a": 1}', encoding="utf-8")
+
+    # Present on disk, absent from the pin.
+    later = repository / "docs/artifacts/gate-d-later.json"
+    later.write_text("{}", encoding="utf-8")
+    with _pytest.raises(SystemExit, match="is not committed in the run's own pin"):
+        check("docs/artifacts/gate-d-later.json", "adjudication record")
+
+    # A pin that does not exist at all.
+    class _Unknown:
+        code_hash = "0" * 40
+
+    unknown = module._make_pre_registration_check(_Unknown(), repository)
+    with _pytest.raises(SystemExit, match="is not committed in the run's own pin"):
+        unknown(relative, "adjudication record")
+
+
+def test_the_pre_registration_pin_refuses_when_git_is_unavailable(tmp_path, monkeypatch) -> None:
+    import subprocess
+
+    import pytest as _pytest
+
+    module = _sealer_module()
+
+    class _Args:
+        code_hash = "0" * 40
+
+    check = module._make_pre_registration_check(_Args(), tmp_path)
+    monkeypatch.setattr(module, "_GIT", str(tmp_path / "no-such-git"))
+    with _pytest.raises(SystemExit, match="commitment cannot be checked"):
+        check("docs/artifacts/gate-d-record.json", "adjudication record")
+
+
+def test_the_grandfathered_record_is_re_derived_from_its_own_basis_row(tmp_path) -> None:
+    """No record escapes the re-derivation, including the pre-amendment one."""
+    import shutil
+    from pathlib import Path as _Path
+
+    import numpy as _np
+    import pytest as _pytest
+
+    module = _sealer_module()
+    root = _Path(__file__).resolve().parents[3]
+    oracle_dir = _Path(
+        "/home/gianl/gcs-models/oracles/greenfield/glm52/short_context_dsa/8k/"
+        "greenfield_short_context_dsa_oracle_8k_recovery_20260807T174904381704076Z/oracle"
+    )
+    archive = _Path(
+        "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_"
+        "20260905T085534575653049Z/runner.rank0.npz"
+    )
+    if not (archive.is_file() and (oracle_dir / "dsa_events.safetensors").is_file()):
+        _pytest.skip("the sealed Gate D archive or the 8K DSA oracle is unavailable")
+    from safetensors.numpy import load_file
+
+    relative = "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
+    (tmp_path / "docs/artifacts").mkdir(parents=True)
+    shutil.copyfile(root / relative, tmp_path / relative)
+    oracle_arrays = load_file(str(oracle_dir / "dsa_events.safetensors"))
+
+    class _Oracle:
+        selected_positions = oracle_arrays["selected_positions"]
+        selected_scores = oracle_arrays["selected_scores"]
+        valid_counts = oracle_arrays["valid_counts"]
+
+    class _Grandfathered:
+        step = 0
+        event_index = 1
+        context = "8k"
+        decode_position = 8155
+        producer_layer_id = 1
+        expected_only = (680, 1052, 2024, 2436, 6322, 7473, 7850)
+        observed_only = (754, 1904, 2029, 3651, 4899, 5536, 6951)
+        # The pre-amendment record declares no `reference_row`; the loader
+        # resolves it from the single `.npy` in the record's own basis.
+        reference_row_path = "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
+
+    arrays = dict(_np.load(archive, allow_pickle=False))
+    module._rederive_ws32_adjudication(
+        arrays=arrays,
+        oracle=_Oracle(),
+        adjudication=_Grandfathered(),
+        repository_root=tmp_path,
+        rank=0,
+    )
+
+    class _Unregistered(_Grandfathered):
+        reference_row_path = None
+
+    with _pytest.raises(SystemExit, match="names no FP64 reference row"):
+        module._rederive_ws32_adjudication(
+            arrays=arrays,
+            oracle=_Oracle(),
+            adjudication=_Unregistered(),
+            repository_root=tmp_path,
+            rank=0,
+        )
+
+
+def _run_validate(tmp_path, **overrides):
+    """Drive the sealer's `validate` over a real sealed run directory."""
+    import sys
+    from pathlib import Path as _Path
+
+    sys.path.insert(0, str(_Path(__file__).resolve().parent))
+    from ws32_validate_argv import SEALED_C512_RUN, available, build
+
+    if not available():
+        import pytest as _pytest
+
+        _pytest.skip("the sealed C=512 run directory or an 8K oracle is unavailable")
+    module = _sealer_module()
+    # The enforcement-surface check is exercised directly by
+    # test_an_adjudicated_seal_requires_a_clean_checkout; a tree being
+    # edited is by definition modified while these tests are written.
+    module._require_clean_worktree = lambda root: None
+    module._require_reviewed_enforcement = lambda *a, **k: None
+    module._require_imports_come_from = lambda root: None
+    repository_root = _Path(__file__).resolve().parents[3]
+    argv = build(SEALED_C512_RUN, tmp_path / "summary.json", repository_root, **overrides)
+    original = sys.argv
+    try:
+        sys.argv = ["seal"] + argv
+        module.main()
+    except SystemExit as error:
+        return str(error)
+    finally:
+        sys.argv = original
+    return None
+
+
+def test_validate_reaches_the_run_records_with_the_genuine_adjudication(tmp_path) -> None:
+    """The adjudication block must PASS on real evidence, not refuse it.
+
+    The sealed C=512 run predates the current runner schema, so validation stops
+    there; the point is that it gets that far, which it cannot do if any
+    adjudication check refuses. Every refusal test below is anchored on this.
+    """
+    message = _run_validate(tmp_path)
+    assert message is not None
+    assert "runner schema drifted" in message, message
+
+
+def test_validate_refuses_an_adjudication_record_outside_the_reviewed_directory(tmp_path) -> None:
+    """The record-path guard, exercised rather than grepped.
+
+    Nothing here writes into the reviewed evidence tree: the out-of-repository
+    copy lives in the temporary directory, and the in-repository case uses a
+    path that does not exist, because the guard is a path predicate evaluated
+    before anything is read.
+    """
+    import shutil
+    from pathlib import Path as _Path
+
+    repository_root = _Path(__file__).resolve().parents[3]
+    source = repository_root / "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json"
+    elsewhere = tmp_path / "gate-d-copied-record.json"
+    shutil.copyfile(source, elsewhere)
+    message = _run_validate(tmp_path, dsa_adjudication_record=str(elsewhere))
+    assert message is not None
+    assert "is outside the repository" in message, message
+
+    # And an IN-REPOSITORY path outside the reviewed directory, which is the
+    # branch a tmp_path copy does not reach: such a record would be invisible to
+    # the offline adjudicator's prior-attempt scan, which globs docs/artifacts
+    # alone. The guard is a path predicate evaluated before any read, so the
+    # file need not exist and nothing is written into the reviewed tree.
+    inside = repository_root / "glm_tpu" / "gate-d-misplaced-record.json"
+    assert not inside.exists()
+    message = _run_validate(tmp_path, dsa_adjudication_record=str(inside))
+    assert message is not None
+    assert "must be a docs/artifacts/gate-*.json artifact" in message, message
+
+
+def test_validate_refuses_a_record_absent_from_the_runs_own_pin(tmp_path) -> None:
+    """Pre-registration: the record must exist in the commit the run executed at."""
+    message = _run_validate(tmp_path, code_hash="9" * 40)
+    assert message is not None
+    assert "is not committed in the run's own pin" in message, message
+
+
+def test_validate_refuses_a_record_whose_declared_digest_is_wrong(tmp_path) -> None:
+    """A record that is not the one the run was launched against is refused.
+
+    Drift is exercised against a throwaway repository in
+    test_the_pre_registration_pin_refuses_an_uncommitted_or_drifted_artifact;
+    the reviewed evidence tree is never written to.
+    """
+    message = _run_validate(tmp_path, dsa_adjudication_sha256="0" * 64)
+    assert message is not None
+    assert "identity drifted" in message, message
+
+
+def _stub_adjudication(**overrides):
+    """A loaded record shaped like the sealed one, with fields overridden."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class _Stub:
+        record_sha256: str = (
+            "4da05468120e3c2e9b82d03931018e0d14eebc5fc28e339381658a04457cd26b"
+        )
+        step: int = 0
+        event_index: int = 1
+        expected_only: tuple = (680, 1052, 2024, 2436, 6322, 7473, 7850)
+        observed_only: tuple = (754, 1904, 2029, 3651, 4899, 5536, 6951)
+        context: str = "8k"
+        oracle_dsa_manifest_sha256: str = (
+            "f8154c5f79b909efd9ebc14c8e004925482844d05ef28fcf0a4d29bb4a7b26da"
+        )
+        decode_position: int = 8155
+        producer_layer_id: int = 1
+        later_event_alarm: int = 1024
+        engine_source_run: str = (
+            "greenfield_ws32_short_decoder_8k_numerical_20260827T011711674195301Z"
+        )
+        analysis_path: str | None = None
+        reference_row_path: str | None = (
+            "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
+        )
+        reference_validation_path: str | None = None
+
+        def status(self, step, event):
+            if (step, event) < (self.step, self.event_index):
+                return "exact_required"
+            if (step, event) == (self.step, self.event_index):
+                return "adjudicated"
+            return "recorded"
+
+    return _Stub(**overrides)
+
+
+def _run_validate_with_record(tmp_path, adjudication):
+    import sys
+    from pathlib import Path as _Path
+
+    sys.path.insert(0, str(_Path(__file__).resolve().parent))
+    from ws32_validate_argv import SEALED_C512_RUN, available, build
+
+    if not available():
+        import pytest as _pytest
+
+        _pytest.skip("the sealed C=512 run directory or an 8K oracle is unavailable")
+    module = _sealer_module()
+    # The enforcement-surface check is exercised directly by
+    # test_an_adjudicated_seal_requires_a_clean_checkout; a tree being
+    # edited is by definition modified while these tests are written.
+    module._require_clean_worktree = lambda root: None
+    module._require_reviewed_enforcement = lambda *a, **k: None
+    module._require_imports_come_from = lambda root: None
+    module.load_ws32_adjudicated_divergence = lambda *a, **k: adjudication
+    repository_root = _Path(__file__).resolve().parents[3]
+    argv = build(SEALED_C512_RUN, tmp_path / "summary.json", repository_root)
+    original = sys.argv
+    try:
+        sys.argv = ["seal"] + argv
+        module.main()
+    except SystemExit as error:
+        return str(error)
+    finally:
+        sys.argv = original
+    return None
+
+
+def test_validate_re_derives_and_refuses_a_divergence_the_run_did_not_produce(tmp_path) -> None:
+    """The re-derivation is REACHED by the sealer, not merely defined.
+
+    The stub keeps everything the sealed record says except the divergence,
+    which is the one thing the run's own arrays decide.
+    """
+    message = _run_validate_with_record(
+        tmp_path, _stub_adjudication(expected_only=(7,), observed_only=(9,))
+    )
+    assert message is not None
+    assert "disagrees with the pre-registered divergence" in message, message
+
+
+def test_validate_pins_the_analysis_and_the_reference_row_to_the_runs_commit(tmp_path) -> None:
+    """The round-5 control, exercised through _validate rather than by grep."""
+    for field in ("analysis_path", "reference_row_path", "reference_validation_path"):
+        message = _run_validate_with_record(
+            tmp_path,
+            _stub_adjudication(**{field: "docs/artifacts/gate-d-never-committed.json"}),
+        )
+        assert message is not None, field
+        assert "is not committed in the run's own pin" in message, (field, message)
+
+
+def test_the_rank0_archive_must_be_bound_to_its_own_runner_record(tmp_path) -> None:
+    """The re-derivation reads rank 0's arrays; they must be the record's."""
+    import numpy as _np
+    import pytest as _pytest
+
+    module = _sealer_module()
+    run_dir = tmp_path / "run"
+    (run_dir / "fleet").mkdir(parents=True)
+    archive = run_dir / "fleet" / "runner.rank0.npz"
+    _np.savez(
+        archive,
+        dsa_producer_layer_ids=_np.asarray([1], dtype=_np.int32),
+        dsa_selected_positions=_np.zeros((1, 1, 1, 2), dtype=_np.int32),
+        dsa_selected_scores=_np.zeros((1, 1, 1, 2), dtype=_np.float32),
+        dsa_selected_valid_counts=_np.full((1, 1, 1), 2, dtype=_np.int32),
+    )
+    digest = module._digest_file(archive)
+    size = archive.stat().st_size
+    bound = {"byte_count": size, "filename": "runner.rank0.npz", "sha256": digest}
+    arrays = module._rank0_dsa_arrays(run_dir, {"numerical_tensors": dict(bound)})
+    assert set(arrays) == {
+        "dsa_producer_layer_ids",
+        "dsa_selected_positions",
+        "dsa_selected_scores",
+        "dsa_selected_valid_counts",
+    }
+    for record in (
+        {"numerical_tensors": dict(bound, sha256="0" * 64)},
+        {"numerical_tensors": dict(bound, filename="other.npz")},
+        {"numerical_tensors": dict(bound, byte_count=size + 1)},
+        {"numerical_tensors": None},
+        {},
+    ):
+        with _pytest.raises(SystemExit, match="not bound to its record"):
+            module._rank0_dsa_arrays(run_dir, record)
+
+    # A missing file and a short key set are refusals, not tracebacks.
+    with _pytest.raises(SystemExit, match="numerical tensor file is missing"):
+        module._rank0_dsa_arrays(tmp_path / "absent", {"numerical_tensors": dict(bound)})
+    short_run = tmp_path / "short"
+    (short_run / "fleet").mkdir(parents=True)
+    short_archive = short_run / "fleet" / "runner.rank0.npz"
+    _np.savez(short_archive, dsa_producer_layer_ids=_np.zeros(1, dtype=_np.int32))
+    short_record = {
+        "numerical_tensors": {
+            "byte_count": short_archive.stat().st_size,
+            "filename": "runner.rank0.npz",
+            "sha256": module._digest_file(short_archive),
+        }
+    }
+    with _pytest.raises(SystemExit, match="numerical tensor keys missing"):
+        module._rank0_dsa_arrays(short_run, short_record)
+
+
+def test_an_acquisition_seal_carries_no_adjudication_record(tmp_path) -> None:
+    """P3-6: an acquisition establishes graphs, never a correctness claim.
+
+    The guard runs before the tag check so it is reachable, and so the refusal
+    names the real problem rather than the tag it implies.
+    """
+    message = _run_validate(tmp_path, mode="acquire")
+    assert message is not None
+    assert "acquisition seals carry no adjudication record" in message, message
+
+
+def test_validate_actually_reaches_the_pin_checks_and_the_re_derivation(tmp_path) -> None:
+    """The anchor test's premise, instrumented rather than assumed.
+
+    "It stops at the schema check" only proves the controls passed if they ran.
+    This records which of them `_validate` actually invoked, on real evidence.
+    """
+    import sys
+    from pathlib import Path as _Path
+
+    sys.path.insert(0, str(_Path(__file__).resolve().parent))
+    from ws32_validate_argv import SEALED_C512_RUN, available, build
+
+    if not available():
+        import pytest as _pytest
+
+        _pytest.skip("the sealed C=512 run directory or an 8K oracle is unavailable")
+    module = _sealer_module()
+    # The enforcement-surface check is exercised directly by
+    # test_an_adjudicated_seal_requires_a_clean_checkout; a tree being
+    # edited is by definition modified while these tests are written.
+    module._require_clean_worktree = lambda root: None
+    module._require_reviewed_enforcement = lambda *a, **k: None
+    module._require_imports_come_from = lambda root: None
+    reached = []
+
+    original_rederive = module._rederive_ws32_adjudication
+
+    def traced_rederive(**kwargs):
+        reached.append(("rederive", kwargs["adjudication"].reference_row_path))
+        return original_rederive(**kwargs)
+
+    original_pin = module._make_pre_registration_check
+
+    def traced_pin(args, repository_root):
+        inner = original_pin(args, repository_root)
+
+        def wrapper(relative, label):
+            reached.append(("pin", label, relative))
+            return inner(relative, label)
+
+        return wrapper
+
+    module._rederive_ws32_adjudication = traced_rederive
+    module._make_pre_registration_check = traced_pin
+    repository_root = _Path(__file__).resolve().parents[3]
+    original_argv = sys.argv
+    try:
+        sys.argv = ["seal"] + build(
+            SEALED_C512_RUN, tmp_path / "summary.json", repository_root
+        )
+        module.main()
+    except SystemExit as error:
+        message = str(error)
+    finally:
+        sys.argv = original_argv
+
+    assert "runner schema drifted" in message, message
+    row = "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
+    assert (
+        "pin",
+        "adjudication record",
+        "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json",
+    ) in reached
+    assert ("pin", "adjudication reference row", row) in reached
+    assert ("rederive", row) in reached
+
+
+def test_ranks_that_disagree_on_their_observations_are_refused() -> None:
+    """P1-1: the eight-rank property rests on this, and nothing tested it."""
+    import pytest as _pytest
+
+    module = _sealer_module()
+    rank0 = {"dsa_selected_scores": {"dtype": "float32", "sha256": "a" * 64, "shape": [1]}}
+    records = [{"numerical_tensors": {"arrays": rank0}}]
+    module._require_ranks_agree(rank0, records, rank=0)
+    module._require_ranks_agree(dict(rank0), records, rank=5)
+    drifted = {"dsa_selected_scores": {"dtype": "float32", "sha256": "b" * 64, "shape": [1]}}
+    with _pytest.raises(SystemExit, match="numerical tensor values disagree rank 5"):
+        module._require_ranks_agree(drifted, records, rank=5)
+    # Rank 0 is the reference, so it is compared to nothing.
+    module._require_ranks_agree(drifted, records, rank=0)
+
+
+def test_every_rank_is_re_derived_not_only_rank_zero() -> None:
+    """The re-derivation must be applied inside the per-rank loop as well."""
+    import ast
+    from pathlib import Path as _Path
+
+    source = (
+        _Path(__file__).resolve().parents[3]
+        / "scripts/greenfield/seal_short_decoder_ws32.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    validate = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_validate"
+    )
+    loops = [node for node in ast.walk(validate) if isinstance(node, ast.For)]
+    rank_loops = [
+        node for node in loops
+        if isinstance(node.target, ast.Tuple)
+        and any(
+            isinstance(name, ast.Name) and name.id == "rank"
+            for name in ast.walk(node.target)
+        )
+    ]
+    assert rank_loops, "the per-rank loop is gone"
+    import types
+
+    inside = []
+    for loop in rank_loops:
+        inside += _live_calls(
+            types.SimpleNamespace(body=loop.body), "_rederive_ws32_adjudication"
+        )
+    assert inside, (
+        "the re-derivation runs only on rank 0; the other seven ranks would rest "
+        "entirely on the cross-rank agreement check"
+    )
+    passed = [
+        {keyword.arg: ast.unparse(keyword.value) for keyword in call.keywords}
+        for call in inside
+    ]
+    assert {item["rank"] for item in passed} == {"rank"}, (
+        f"the loop re-derivation must use each rank's own index: {passed}"
+    )
+    assert {item["arrays"] for item in passed} == {"arrays"}, (
+        "the loop re-derivation must use each rank's OWN arrays; substituting rank 0's "
+        f"reinstates the defect the loop exists to prevent: {passed}"
+    )
+
+
+def test_an_adjudicated_seal_requires_a_clean_checkout(tmp_path) -> None:
+    """P2-4: the registry and the arithmetic are read from this working tree.
+
+    An operator could widen `REFERENCE_ROWS` in place, seal, and revert. A
+    clean-tree requirement puts any such edit into history.
+    """
+    import subprocess
+
+    import pytest as _pytest
+
+    module = _sealer_module()
+    repository = tmp_path / "repo"
+    surface = repository / "glm_tpu" / "greenfield" / "validation"
+    surface.mkdir(parents=True)
+    (surface / "ws32_short_context.py").write_text("REFERENCE_ROWS = {}\n", encoding="utf-8")
+    (repository / "unrelated.txt").write_text("one", encoding="utf-8")
+    for command in (
+        ["init", "-q"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "add", "-A"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "one"],
+    ):
+        subprocess.run(["git", "-C", str(repository), *command], check=True, capture_output=True)
+
+    module._require_clean_worktree(repository)
+
+    # An edit to the registry is refused.
+    (surface / "ws32_short_context.py").write_text(
+        'REFERENCE_ROWS = {"fitted": 1}\n', encoding="utf-8"
+    )
+    with _pytest.raises(SystemExit, match="unmodified enforcement surface"):
+        module._require_clean_worktree(repository)
+    (surface / "ws32_short_context.py").write_text("REFERENCE_ROWS = {}\n", encoding="utf-8")
+
+    # A new, untracked file inside the surface is refused too.
+    (surface / "extra_registry.py").write_text("", encoding="utf-8")
+    with _pytest.raises(SystemExit, match="unmodified enforcement surface"):
+        module._require_clean_worktree(repository)
+    (surface / "extra_registry.py").unlink()
+
+    # An edit OUTSIDE the surface does not block a seal.
+    (repository / "unrelated.txt").write_text("two", encoding="utf-8")
+    module._require_clean_worktree(repository)
+    with _pytest.raises(SystemExit, match="cannot verify the working tree"):
+        module._require_clean_worktree(tmp_path / "not-a-repository")
+
+
+def test_the_rederivation_is_given_the_records_decode_position() -> None:
+    """P3-2: that argument is what stops a row built for another position."""
+    import ast
+    from pathlib import Path as _Path
+
+    source = (
+        _Path(__file__).resolve().parents[3]
+        / "scripts/greenfield/seal_short_decoder_ws32.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    function = next(
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "_rederive_ws32_adjudication"
+    )
+    calls = [
+        node for node in ast.walk(function)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "adjudicate_first_divergent_event"
+    ]
+    assert len(calls) == 1
+    passed = {
+        keyword.arg: ast.unparse(keyword.value) for keyword in calls[0].keywords
+    }
+    assert passed["decode_position"] == "adjudication.decode_position"
+    assert passed["expected_producer_layer_id"] == "adjudication.producer_layer_id"
+
+
+def test_the_rederivation_refuses_a_row_built_for_another_decode_position(tmp_path) -> None:
+    """The behaviour that argument buys, not just its presence."""
+    import numpy as _np
+    import pytest as _pytest
+
+    module = _sealer_module()
+    reference = _np.linspace(1.0, 0.0, 64)
+    (tmp_path / "docs/artifacts").mkdir(parents=True)
+    _np.save(tmp_path / "docs/artifacts/gate-d-row.npy", reference)
+    top_k = 32
+    positions = _np.arange(top_k, dtype=_np.int32)
+
+    class _Oracle:
+        selected_positions = positions.reshape(1, 1, top_k)
+        selected_scores = reference[:top_k].reshape(1, 1, top_k).astype(_np.float32)
+        valid_counts = _np.full((1, 1), top_k, dtype=_np.int32)
+
+    class _Adjudication:
+        step = 0
+        event_index = 0
+        context = "8k"
+        decode_position = 8155  # the row is 64 long, not 8156
+        producer_layer_id = 1
+        expected_only = (31,)
+        observed_only = (32,)
+        reference_row_path = "docs/artifacts/gate-d-row.npy"
+
+    arrays = {
+        "dsa_producer_layer_ids": _np.asarray([1], dtype=_np.int32),
+        "dsa_selected_positions": positions.reshape(1, 1, 1, top_k),
+        "dsa_selected_scores": reference[positions].reshape(1, 1, 1, top_k).astype(_np.float32),
+        "dsa_selected_valid_counts": _np.full((1, 1, 1), top_k, dtype=_np.int32),
+    }
+    with _pytest.raises(SystemExit, match="does not match decode position"):
+        module._rederive_ws32_adjudication(
+            arrays=arrays,
+            oracle=_Oracle(),
+            adjudication=_Adjudication(),
+            repository_root=tmp_path,
+            rank=0,
+        )
+
+
+def _live_calls(function, name: str) -> list:
+    """Calls to `name` inside `function` that no dead guard disables.
+
+    `ast.walk` cannot tell a live call from one under `if False:`, which is how
+    three controls stayed green through two review rounds. This walks the tree
+    itself and drops any branch whose test is a constant or a boolean operation
+    with a constant operand.
+    """
+    import ast
+
+    def dead(test) -> bool:
+        if isinstance(test, ast.Constant):
+            return not test.value
+        if isinstance(test, ast.BoolOp) and isinstance(test.op, ast.And):
+            return any(
+                isinstance(value, ast.Constant) and not value.value
+                for value in test.values
+            )
+        return False
+
+    found: list = []
+
+    def visit(node) -> None:
+        if isinstance(node, (ast.If, ast.While)):
+            if not dead(node.test):
+                visit_body(node.body)
+            visit_body(getattr(node, "orelse", []))
+            return
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            # A call moved into a nested definition is not a call here.
+            return
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == name
+        ):
+            found.append(node)
+        for child in ast.iter_child_nodes(node):
+            visit(child)
+
+    def visit_body(body) -> None:
+        for item in body:
+            visit(item)
+            if isinstance(item, (ast.Return, ast.Raise, ast.Continue, ast.Break)):
+                # Nothing after an unconditional exit at this level runs.
+                return
+
+    visit_body(function.body)
+    return found
+
+
+def _sealer_function(name: str):
+    import ast
+    from pathlib import Path as _Path
+
+    source = (
+        _Path(__file__).resolve().parents[3]
+        / "scripts/greenfield/seal_short_decoder_ws32.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    return next(
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == name
+    )
+
+
+def test_the_enforcement_surface_check_is_called_and_not_disabled() -> None:
+    """P2-4: removing the CALL must fail, not only removing the function."""
+    validate = _sealer_function("_validate")
+    assert _live_calls(validate, "_require_clean_worktree"), (
+        "_validate no longer calls the enforcement-surface check, or a dead guard "
+        "disables it"
+    )
+
+
+def test_the_seal_records_the_enforcement_surface_it_ran_with(tmp_path) -> None:
+    """A clean tree is not the same as a reviewed one.
+
+    A seal driven from a scratch checkout carrying a widened registry has a
+    clean tree, so the object ids of the enforcement surface are recorded and a
+    reviewer compares them against the reviewed branch.
+    """
+    import subprocess
+
+    import pytest as _pytest
+
+    module = _sealer_module()
+    identity = module._enforcement_surface_identity(
+        _Path_for_repository()
+    )
+    assert set(identity) == {"HEAD", *module._ENFORCEMENT_SURFACE}
+    for value in identity.values():
+        assert len(value) == 40 and all(c in "0123456789abcdef" for c in value)
+
+    repository = tmp_path / "bare"
+    repository.mkdir()
+    subprocess.run(["git", "-C", str(repository), "init", "-q"], check=True, capture_output=True)
+    with _pytest.raises(SystemExit, match="cannot identify its own checkout|not committed at HEAD"):
+        module._enforcement_surface_identity(repository)
+
+    validate = _sealer_function("_validate")
+    assert _live_calls(validate, "_enforcement_surface_identity"), (
+        "the surface identity is never computed, so nothing records it"
+    )
+
+
+def _Path_for_repository():
+    from pathlib import Path as _Path
+
+    return _Path(__file__).resolve().parents[3]
+
+
+def test_the_enforcement_modules_must_come_from_the_sealed_repository(tmp_path) -> None:
+    """P2-2: PYTHONPATH could shadow the package the sealer checks.
+
+    Checking one tree for modifications while importing the §21.2 arithmetic
+    from another is the same defect as not checking at all.
+    """
+    import pytest as _pytest
+
+    module = _sealer_module()
+    module._require_imports_come_from(_Path_for_repository())
+    with _pytest.raises(SystemExit, match="imported from outside the sealed repository"):
+        module._require_imports_come_from(tmp_path)
+
+    source = (
+        _Path_for_repository() / "scripts/greenfield/seal_short_decoder_ws32.py"
+    ).read_text(encoding="utf-8")
+    assert "while str(REPO) in sys.path:" in source, (
+        "the repository must be put FIRST on sys.path, not merely present"
+    )
+    validate = _sealer_function("_validate")
+    assert _live_calls(validate, "_require_imports_come_from")
+
+
+def test_hidden_index_flags_on_the_enforcement_surface_are_refused(tmp_path) -> None:
+    """P2-1: --assume-unchanged hides an edit and leaves nothing in history."""
+    import subprocess
+
+    import pytest as _pytest
+
+    module = _sealer_module()
+    repository = tmp_path / "repo"
+    surface = repository / "glm_tpu" / "greenfield" / "validation"
+    surface.mkdir(parents=True)
+    target = surface / "ws32_short_context.py"
+    target.write_text("REFERENCE_ROWS = {}\n", encoding="utf-8")
+    for command in (
+        ["init", "-q"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "add", "-A"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "one"],
+    ):
+        subprocess.run(["git", "-C", str(repository), *command], check=True, capture_output=True)
+    module._require_clean_worktree(repository)
+
+    relative = "glm_tpu/greenfield/validation/ws32_short_context.py"
+    # `ls-files -v` tags assume-unchanged as a lowercase letter and
+    # skip-worktree as a capital S, so both must be refused, not just one.
+    for flag, undo in (
+        ("--assume-unchanged", "--no-assume-unchanged"),
+        ("--skip-worktree", "--no-skip-worktree"),
+    ):
+        subprocess.run(
+            ["git", "-C", str(repository), "update-index", flag, relative],
+            check=True, capture_output=True,
+        )
+        target.write_text('REFERENCE_ROWS = {"fitted": 1}\n', encoding="utf-8")
+        status = subprocess.run(
+            ["git", "-C", str(repository), "status", "--porcelain"],
+            capture_output=True, text=True, check=True,
+        )
+        assert status.stdout.strip() == "", (
+            f"the premise: git reports the tree as clean under {flag}"
+        )
+        with _pytest.raises(SystemExit, match="hidden index flags"):
+            module._require_clean_worktree(repository)
+        target.write_text("REFERENCE_ROWS = {}\n", encoding="utf-8")
+        subprocess.run(
+            ["git", "-C", str(repository), "update-index", undo, relative],
+            check=True, capture_output=True,
+        )
+    module._require_clean_worktree(repository)
+
+
+def test_untracked_adjudication_outputs_do_not_block_a_seal(tmp_path) -> None:
+    """P2-4: §21.2 requires prior attempts to be LEFT in docs/artifacts."""
+    import subprocess
+
+    import pytest as _pytest
+
+    module = _sealer_module()
+    repository = tmp_path / "repo"
+    (repository / "docs" / "artifacts").mkdir(parents=True)
+    tracked = repository / "docs" / "artifacts" / "gate-d-record.json"
+    tracked.write_text("{}", encoding="utf-8")
+    for command in (
+        ["init", "-q"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "add", "-A"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "one"],
+    ):
+        subprocess.run(["git", "-C", str(repository), *command], check=True, capture_output=True)
+
+    # An untracked attempt file is exactly what the adjudicator leaves behind.
+    (repository / "docs" / "artifacts" / "gate-d-attempt-one.json").write_text(
+        "{}", encoding="utf-8"
+    )
+    module._require_clean_worktree(repository)
+
+    # A tracked artifact modified in place is still a refusal.
+    tracked.write_text('{"fitted": 1}', encoding="utf-8")
+    with _pytest.raises(SystemExit, match="unmodified enforcement surface"):
+        module._require_clean_worktree(repository)
+
+
+def _run_patched_validate(
+    tmp_path, *, stop_at_alarm: bool, trace=None, break_rank=None, **overrides
+):
+    """Drive `_validate` over a schema-patched copy of the sealed C=512 run.
+
+    Withholding the later-event alarm profile stops validation inside rank 0's
+    iteration, after the loop's re-derivation, which keeps the default suite
+    fast. Passing it lets all eight ranks run.
+    """
+    import sys
+    from pathlib import Path as _Path
+
+    sys.path.insert(0, str(_Path(__file__).resolve().parent))
+    from ws32_validate_argv import available, build, patched_run_dir
+
+    if not available():
+        import pytest as _pytest
+
+        _pytest.skip("the sealed C=512 run directory or an 8K oracle is unavailable")
+    run_dir = patched_run_dir(tmp_path / "run", break_rank=break_rank)
+    module = _sealer_module()
+    module._require_clean_worktree = lambda root: None
+    module._require_imports_come_from = lambda root: None
+    # Exercised directly by test_the_enforcement_code_must_be_the_pins_own; a
+    # sealed run predates the enforcement code under development here.
+    module._require_reviewed_enforcement = lambda *a, **k: None
+    if trace is not None:
+        original = module._rederive_ws32_adjudication
+
+        def traced(**kwargs):
+            import hashlib as _hashlib
+
+            digest = _hashlib.sha256()
+            for name in sorted(kwargs["arrays"]):
+                digest.update(kwargs["arrays"][name].tobytes())
+            trace.append((kwargs["rank"], digest.hexdigest()))
+            return original(**kwargs)
+
+        module._rederive_ws32_adjudication = traced
+    repository_root = _Path(__file__).resolve().parents[3]
+    argv = build(run_dir, tmp_path / "summary.json", repository_root, **overrides)
+    if stop_at_alarm:
+        for flag in ("--later-event-alarm-profile", "--later-event-alarm-profile-sha256"):
+            index = argv.index(flag)
+            del argv[index : index + 2]
+    original_argv = sys.argv
+    try:
+        sys.argv = ["seal"] + argv
+        return None, module.main()
+    except SystemExit as error:
+        return str(error), None
+    finally:
+        sys.argv = original_argv
+
+
+def test_validate_re_derives_inside_the_rank_loop_on_real_evidence(tmp_path) -> None:
+    """The loop's re-derivation is REACHED, on a real protected run directory.
+
+    An AST assertion cannot tell a live call from a disabled one; this can. The
+    copy differs from the sealed run only by two default-off schema keys added
+    after it was sealed, so every digest, pin and trace binding is the real one.
+    """
+    trace: list = []
+    # Rank 1's trace record is faulted at the very end of its iteration, so
+    # validation stops there: rank 1 must already have been re-derived, which a
+    # rank-0-only loop guard cannot satisfy.
+    message, code = _run_patched_validate(
+        tmp_path, stop_at_alarm=False, trace=trace, break_rank=1
+    )
+    assert message is not None and code is None
+    assert "trace identity drifted rank 1" in message, message
+    # One pass in the adjudication block, then rank 0 and rank 1 in the loop.
+    assert [rank for rank, _ in trace] == [0, 0, 1], trace
+
+
+def test_validate_re_derives_every_rank_end_to_end(tmp_path) -> None:
+    """The eight-rank property, end to end. Opt-in: it hashes ~2.4 GB of traces.
+
+    Set GLM_WS32_SLOW_SEAL_TEST=1 to run it. Recorded result on 2026-09-06:
+    `_validate` returns 0 on the patched C=512 run and re-derives ranks
+    0, 0, 1, 2, 3, 4, 5, 6, 7.
+    """
+    import os
+
+    import pytest as _pytest
+
+    if os.environ.get("GLM_WS32_SLOW_SEAL_TEST") != "1":
+        _pytest.skip("set GLM_WS32_SLOW_SEAL_TEST=1 to run the full eight-rank seal")
+    trace: list = []
+    message, code = _run_patched_validate(tmp_path, stop_at_alarm=False, trace=trace)
+    assert message is None, message
+    assert code == 0
+    assert [rank for rank, _ in trace] == [0, 0, 1, 2, 3, 4, 5, 6, 7], trace
+    # Each loop pass must be given that rank's own arrays, not rank 0's.
+    # Every rank's arrays are proved bit-identical by _require_ranks_agree, so
+    # the content digest is the same for all of them; what this pins is that the
+    # loop ran once per rank with that rank's index.
+    assert len({identity for _, identity in trace}) == 1, (
+        "the ranks disagree on their observations, which _require_ranks_agree should have refused"
+    )
+
+
+def test_the_surface_check_uses_an_absolute_git() -> None:
+    """P3-1: a `git` on PATH that prints nothing makes the check pass."""
+    import ast
+    from pathlib import Path as _Path
+
+    source = (
+        _Path(__file__).resolve().parents[3]
+        / "scripts/greenfield/seal_short_decoder_ws32.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    bare = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and node.value == "git"
+    ]
+    assert not bare, "every git call in the sealer must go through _GIT"
+    assert '_GIT = "/usr/bin/git"' in source
+
+
+def test_an_adjudication_sha_without_a_record_is_refused(tmp_path) -> None:
+    """P3-2: the stray-SHA guard had no fixture."""
+    message = _run_validate(
+        tmp_path, dsa_adjudication_record=None, dsa_adjudication_sha256="1" * 64
+    )
+    assert message is not None
+    assert "adjudication SHA given without a record" in message, message
+
+
+def test_the_enforcement_code_must_be_the_pins_own_and_the_pin_published(tmp_path) -> None:
+    """P1: a clean tree proves nothing about which branch it is on.
+
+    A scratch branch carrying a widened registry, run and sealed from its own
+    checkout, has a clean tree and matching imports. Two things close it: the
+    run's pin must be contained in the published reviewed branch, and the
+    enforcement surface must be the surface committed at that pin.
+    """
+    import subprocess
+
+    import pytest as _pytest
+
+    module = _sealer_module()
+    repository = tmp_path / "repo"
+    surface = repository / "glm_tpu" / "greenfield" / "validation"
+    surface.mkdir(parents=True)
+    (surface / "ws32_short_context.py").write_text("REFERENCE_ROWS = {}\n", encoding="utf-8")
+    # TWO surface paths: with one, `all` and `any` over the comparison are
+    # indistinguishable, and widening one path while another matches would pass.
+    artifacts = repository / "docs" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "gate-d-row.npy").write_bytes(b"row")
+    run = ["git", "-C", str(repository)]
+    author = ["-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run(run + ["init", "-q"], check=True, capture_output=True)
+    subprocess.run(run + author + ["add", "-A"], check=True, capture_output=True)
+    subprocess.run(run + author + ["commit", "-q", "-m", "reviewed"], check=True, capture_output=True)
+    pin = subprocess.run(
+        run + ["rev-parse", "HEAD"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    subprocess.run(run + ["update-ref", "refs/remotes/origin/reviewed", pin], check=True,
+                   capture_output=True)
+
+    monkey = list(module._ENFORCEMENT_SURFACE)
+    module._ENFORCEMENT_SURFACE = ("glm_tpu/greenfield/validation", "docs/artifacts")
+    try:
+        surface_identity = module._enforcement_surface_identity(repository)
+        module._require_reviewed_enforcement(
+            repository, surface_identity, code_hash=pin, recovery_code_hash="",
+            reviewed_ref="refs/remotes/origin/reviewed",
+        )
+
+        # A scratch commit that the reviewed branch does not contain.
+        (surface / "ws32_short_context.py").write_text(
+            'REFERENCE_ROWS = {"fitted": 1}\n', encoding="utf-8"
+        )
+        subprocess.run(run + author + ["commit", "-qam", "widened"], check=True, capture_output=True)
+        scratch = subprocess.run(
+            run + ["rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        scratch_identity = module._enforcement_surface_identity(repository)
+        with _pytest.raises(SystemExit, match="to be published on"):
+            module._require_reviewed_enforcement(
+                repository, scratch_identity, code_hash=scratch, recovery_code_hash="",
+                reviewed_ref="refs/remotes/origin/reviewed",
+            )
+
+        # Published pin, but the enforcement code is not that pin's.
+        with _pytest.raises(SystemExit, match="not the code committed at the run's pin"):
+            module._require_reviewed_enforcement(
+                repository, scratch_identity, code_hash=pin, recovery_code_hash="",
+                reviewed_ref="refs/remotes/origin/reviewed",
+            )
+
+        # A recovery pin is how a seal driven by newer enforcement declares
+        # itself, but it must be published too, or the escape hatch is the hole.
+        with _pytest.raises(SystemExit, match="to be published on"):
+            module._require_reviewed_enforcement(
+                repository, scratch_identity, code_hash=pin, recovery_code_hash=scratch,
+                reviewed_ref="refs/remotes/origin/reviewed",
+            )
+        subprocess.run(run + ["update-ref", "refs/remotes/origin/reviewed", scratch], check=True,
+                       capture_output=True)
+        module._require_reviewed_enforcement(
+            repository, scratch_identity, code_hash=pin, recovery_code_hash=scratch,
+            reviewed_ref="refs/remotes/origin/reviewed",
+        )
+
+        # One surface path matching is not enough: every path must match.
+        partial = dict(scratch_identity)
+        partial["glm_tpu/greenfield/validation"] = "0" * 40
+        with _pytest.raises(SystemExit, match="not the code committed at the run's pin"):
+            module._require_reviewed_enforcement(
+                repository, partial, code_hash=pin, recovery_code_hash=scratch,
+                reviewed_ref="refs/remotes/origin/reviewed",
+            )
+    finally:
+        module._ENFORCEMENT_SURFACE = tuple(monkey)
+
+    validate = _sealer_function("_validate")
+    assert _live_calls(validate, "_require_reviewed_enforcement")
+
+
+def test_the_summary_carries_the_enforcement_surface_it_ran_with() -> None:
+    """P3-1: the only durable output of the surface control was untested."""
+    import ast
+
+    validate = _sealer_function("_validate")
+    spreads = [
+        node for node in ast.walk(validate)
+        if isinstance(node, ast.Dict) and any(key is None for key in node.keys)
+    ]
+    unparsed = " ".join(ast.unparse(node) for node in spreads)
+    assert "enforcement_surface" in unparsed, (
+        "the summary no longer records the enforcement surface, so nothing downstream "
+        "can compare it against the reviewed branch"
+    )
+
+
+def test_the_status_path_helper_handles_renames_and_quoting() -> None:
+    """P3-4: the refusal message named the wrong path for a rename."""
+    module = _sealer_module()
+    assert module._status_path(" M glm_tpu/a.py") == "glm_tpu/a.py"
+    assert module._status_path("?? docs/artifacts/gate-d-x.json") == "docs/artifacts/gate-d-x.json"
+    assert module._status_path('R  old.py -> new.py') == "new.py"
+    assert module._status_path('?? "docs/artifacts/gate d.json"') == "docs/artifacts/gate d.json"
+    # `git diff --name-only` emits a bare path with no status prefix.
+    assert module._status_path("glm_tpu/greenfield/validation/x.py") == (
+        "glm_tpu/greenfield/validation/x.py"
+    )
+
+
+def test_the_enforcement_surface_and_import_check_cover_the_deciding_code() -> None:
+    """P2-2/P2-3: both lists could be shrunk back with the suite green.
+
+    Every path here is read to decide what a seal accepts: §23.8's accepted
+    rotary-table digest is recomputed from the reference rotary construction,
+    the runtime theta and the model geometry, and the model config supplies that
+    geometry.
+    """
+    import ast
+
+    module = _sealer_module()
+    assert set(module._ENFORCEMENT_SURFACE) == {
+        "scripts/greenfield/seal_short_decoder_ws32.py",
+        "glm_tpu/greenfield/validation",
+        "glm_tpu/greenfield/benchmarking",
+        "glm_tpu/greenfield/sharding",
+        "glm_tpu/greenfield/kernels/reference",
+        "glm_tpu/greenfield/runtime",
+        "glm_tpu/greenfield/types.py",
+        "configs/glm-5.2-fp8-config.json",
+        "docs/artifacts",
+    }
+    assert set(module._TRACKED_ONLY_SURFACE) == {"docs/artifacts"}
+
+    imports = _sealer_function("_require_imports_come_from")
+    checked = {
+        node.id
+        for loop in ast.walk(imports)
+        if isinstance(loop, ast.For)
+        for node in ast.walk(loop.iter)
+        if isinstance(node, ast.Name)
+    }
+    assert checked == {
+        "ws32_short_context",
+        "ws32_first_divergent_event",
+        "reference_rotary",
+        "greenfield_types",
+    }
+
+
+def test_the_summary_records_the_surface_it_computed(tmp_path) -> None:
+    """P3-1: an AST spread check cannot tell a recorded surface from an empty one."""
+    import ast
+
+    validate = _sealer_function("_validate")
+    spreads = [
+        ast.unparse(node)
+        for node in ast.walk(validate)
+        if isinstance(node, ast.Dict) and any(key is None for key in node.keys)
+    ]
+    recorded = [text for text in spreads if "enforcement_surface" in text]
+    assert recorded, "the summary no longer records the enforcement surface"
+    assert any("enforcement_surface: enforcement_surface" in text.replace("'", "") for text in recorded), (
+        f"the summary records something other than the computed surface: {recorded}"
+    )
+
+
+def test_an_alarm_acknowledgement_must_name_a_pin_this_seal_declares(tmp_path) -> None:
+    """The lessons pin binds to the recovery pin, or to the run's own pin.
+
+    This clause is an authorization control and it was silently unbound once by
+    an unrelated change to the wrapper, which is the entire reason it is written
+    the way it is. It had no behavioural test until now.
+    """
+    # An ORDINARY seal, declaring no recovery pin: that is the case the old
+    # clause short-circuited past, accepting any well-formed local commit as the
+    # acknowledgement's binding.
+    # The acknowledgement is checked inside rank 0's iteration, so no fault
+    # injection is needed to reach it.
+    message, code = _run_patched_validate(
+        tmp_path,
+        stop_at_alarm=False,
+        recovery_code_hash="",
+        later_event_alarm_lessons_pin="b" * 40,
+    )
+    assert message is not None and code is None
+    assert "alarm acknowledgement is not bound to a profile record and lessons pin" in message, (
+        message
+    )
