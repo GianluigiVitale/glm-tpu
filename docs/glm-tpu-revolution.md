@@ -1723,7 +1723,11 @@ section grants no install or execution authority.
    schema, basis and source-run checks. The run's pin must also be contained in the
    published reviewed branch, and the enforcement surface must be the surface committed at that pin
    (or at a declared recovery pin), so a scratch branch carrying a widened registry cannot seal even
-   with a clean tree. The digest comparison is made after the schema, basis, oracle
+   with a clean tree. Workers 1-7 fetch the pin from `origin` and check it out, so a pin that is not
+   published cannot have run at all; the controller refreshes its remote-tracking ref before sealing.
+   *What this is not:* a remote-tracking ref is an ordinary local ref and an operator with shell
+   access can write one, so this raises the bar from "edit a file" to "forge a published branch or
+   collude with the reviewer". It is not a cryptographic guarantee and must not be described as one. The digest comparison is made after the schema, basis, oracle
    and source-run checks, all of which the record satisfies, so any future tightening of those must
    be checked against it explicitly. The exempt record provably carries neither binding, because the
    exemption is keyed on its content digest. History is not weakened and no new record may use it.

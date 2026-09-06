@@ -618,6 +618,14 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --exact-dsa "$EXACT_DSA" \
   --output "$RUN_DIR/source_remote_objects.json" "${materialize_args[@]}" \
   >"$RUN_DIR/materialize.log" 2>&1
+# The seal requires the run pin to be contained in the published branch, so the
+# controller's remote-tracking ref is refreshed first. Workers 1-7 already fetch
+# and check the pin out from origin, so a pin that is not published cannot have
+# run at all; this only keeps the controller's view current.
+git -C "$WORKTREE" fetch -q origin "$BRANCH" || {
+  say "ABORT: cannot refresh origin/$BRANCH before sealing"
+  exit 1
+}
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   "$WORKTREE/scripts/greenfield/seal_short_decoder_ws32.py" validate \
   --run-dir "$RUN_DIR" --topology-capture-root "$TOPOLOGY_ROOT" \

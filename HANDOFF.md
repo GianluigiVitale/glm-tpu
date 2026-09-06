@@ -13414,3 +13414,16 @@ the malformed-registry `KeyError` all have fixtures or refusals now; the opt-in 
 arrays" assertion used `id()` of a rebound object, which CPython may reuse, and is a content digest
 now; and the last test that wrote into the reviewed tree does not, because the record-path guard is a
 predicate evaluated before anything is read.
+
+Two things I fixed before the review could raise them, and one claim I am deliberately weakening.
+
+The containment requirement needs a current remote-tracking ref, so the wrapper now fetches
+`origin/$BRANCH` before sealing and aborts if it cannot. This is not a new dependency: workers 1-7
+already fetch the pin from origin and check it out, so a pin that is not published cannot have run at
+all; the fetch only keeps the controller's view current.
+
+And the honest limit, now written into §21.2: a remote-tracking ref is an ordinary local ref, and an
+operator with shell access can write one. The containment check raises the bar from "edit a file" to
+"forge a published branch or collude with the reviewer". It is not a cryptographic guarantee. I have
+overclaimed the strength of these controls in three separate rounds of this review; the spec should
+state what each one is not, and now does.
