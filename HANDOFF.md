@@ -13564,3 +13564,30 @@ refuse without producing anything. Run 1 exists to produce the observer arrays t
 adjudication reads. Its record is then committed and pushed, and run 2 is sealed against it. The
 alternative — one run, recovery-sealed against a record derived from its own arrays — is what the
 whole pre-registration apparatus exists to prevent, and the sealer now refuses it by construction.
+
+## 2026-09-06 16:3xZ — B′ adjudicated: the rotary table passes §21.2 at 8K, at no cost
+
+The lease-based watcher fired at 16:05:56Z, seconds after the run ended. That is the fix working: the
+previous three stalls were all `pgrep -f` waiting on itself.
+
+B′ run 1 refused with `ORACLE_MISMATCH` after completing the model work, which is the designed
+outcome for a run with no pre-registration bound. Its arrays survived and were published, and the
+divergence is exactly where the reasoning said it would be: **event 0 exact, events 1-20 divergent**,
+so the first divergent event is `(0, 1)` at layer 1, position 8155 — the event the reviewed reference
+row is already registered for. No new reference row, no new §21.5 validation exercise.
+
+The offline adjudication PASSES all six checks. Against the sealed tables-OFF adjudication on the
+same row: engine Δ mean −0.006235 → +0.007830, max 0.113455 → 0.121001, std 0.031047 → 0.031034,
+swaps 7 → 6, with `eps_event` and band identical because the row and the oracle are unchanged. Both
+are an order of magnitude inside the oracle's own error. And the table costs nothing: 238.427 s for
+the same prefill chunk versus 238.636 s without it.
+
+That is the answer §23.9 was waiting for. The rotary diagnostic failed 45/128 cells, which forced the
+A′/B′ branch; the branch now shows the legacy-faithful table is adopted at 8K with no loss on either
+axis. §23.9.1 records it.
+
+One defect caught before it could run: the wrapper selects the record by rotary configuration, and I
+first placed that selection at line 73 while `HOST_MAIN_ROPE_TABLE` is defined at line 173 — it would
+have silently bound the tables-OFF record to a tables-ON run. Found by grepping the definition order
+rather than assuming, relocated below the definition, and both branches proved to resolve to a file
+whose SHA matches.

@@ -1,0 +1,104 @@
+{
+ "artifact_kind": "gate_d_ws32_first_divergent_event_adjudication",
+ "checks": {
+  "bias": {
+   "bound": 0.225591109686929,
+   "engine_mean": 0.00783006078373828,
+   "pass": true
+  },
+  "cap_max_abs": {
+   "bound": 0.45394559304543236,
+   "engine": 0.12100050648365368,
+   "pass": true
+  },
+  "cap_std": {
+   "bound": 0.062091661627014225,
+   "engine": 0.031034446348592343,
+   "pass": true
+  },
+  "equal_sized_disjoint_swap": {
+   "expected_only": 6,
+   "observed_only": 6,
+   "pass": true
+  },
+  "reference_band": {
+   "bound": 0.22697279652271618,
+   "maximum_abs_offset": 0.05446531274061783,
+   "pass": true
+  },
+  "reference_band_capacity": {
+   "band_size": 451,
+   "pass": true,
+   "swapped": 12
+  }
+ },
+ "context": "8k",
+ "cutoff_reference_score": 80.38919023564385,
+ "decode_position": 8155,
+ "engine_delta": {
+  "max_abs": 0.12100050648365368,
+  "mean": 0.00783006078373828,
+  "std": 0.031034446348592343
+ },
+ "engine_source_run": "greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T151844646077531Z",
+ "epsilon_oracle_vs_reference": 0.22697279652271618,
+ "event_index": 1,
+ "expected_only": [
+  1052,
+  2024,
+  6256,
+  7473,
+  7575,
+  7850
+ ],
+ "kappa": 2.0,
+ "observation_window": {
+  "events": 21,
+  "steps": 14
+ },
+ "observed_only": [
+  398,
+  2029,
+  3024,
+  4899,
+  5536,
+  6951
+ ],
+ "observer_archive": {
+  "md5": "crc32c=bea18c57; md5=46085ad4023f732e7bcefb401e9c9cdc",
+  "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T151844646077531Z/runner.rank0.npz",
+  "sha256": "4f4a80270cdc9c54be1806da76a5b5a4337c22c7bf0916eee72d2d366171a952"
+ },
+ "oracle_delta": {
+  "max_abs": 0.22697279652271618,
+  "mean": 0.11176538841639201,
+  "std": 0.031045830813507112
+ },
+ "producer_layer_id": 1,
+ "reference_band_size": 451,
+ "reference_row": {
+  "convention": "rms_norm_eps_1e-5",
+  "implementation_tree_sha1": "5998c64af893a46610731dbba55a3b59fa0fab02",
+  "path": "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy",
+  "sha256": "bfde8bd92d9f88452d68b3e9d3112a4848b0c0ef086c7207b2431021b233d9a0"
+ },
+ "shared_positions": 2042,
+ "std_ddof": 0,
+ "step": 0,
+ "swap_reference_offsets": {
+  "398": -0.045354442135263184,
+  "1052": -0.012371003736930675,
+  "2024": -0.0036452801001018997,
+  "2029": -0.046017712812613354,
+  "3024": -0.013613821308581464,
+  "4899": -0.0024355072029607072,
+  "5536": -0.006304413184992086,
+  "6256": 0.05446531274061783,
+  "6951": -0.017877834484011146,
+  "7473": -0.019556782366151992,
+  "7575": -0.011238132212000096,
+  "7850": 0.0056257670954948935
+ },
+ "top_k": 2048,
+ "verdict": "PASS"
+}

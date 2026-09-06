@@ -60,25 +60,6 @@ else
 fi
 readonly EXACT_DSA DSA_ASSOCIATION_SUMMARY_PIN DSA_ASSOCIATION_SUCCESS_PIN
 
-# Spec §21.2 first-divergent-event adjudication (default off). When on, the runner and sealer
-# bind the committed pre-registered record by path and SHA; only the 8k context has a record.
-readonly DSA_ADJUDICATION=${GLM_GREENFIELD_WS32_DSA_ADJUDICATION:-0}
-[[ $DSA_ADJUDICATION == 0 || $DSA_ADJUDICATION == 1 ]] || {
-  echo "WS32 DSA adjudication flag must be 0 or 1" >&2
-  exit 2
-}
-readonly DSA_ADJUDICATION_RECORD_8K=$WORKTREE/docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json
-readonly DSA_ADJUDICATION_RECORD_8K_SHA=4da05468120e3c2e9b82d03931018e0d14eebc5fc28e339381658a04457cd26b
-if [[ $DSA_ADJUDICATION == 1 ]]; then
-  [[ $CONTEXT == 8k ]] || { echo "WS32 DSA adjudication record exists only for 8k" >&2; exit 2; }
-  [[ $(sha256sum "$DSA_ADJUDICATION_RECORD_8K" | awk '{print $1}') == "$DSA_ADJUDICATION_RECORD_8K_SHA" ]] || {
-    echo "WS32 DSA adjudication record SHA drifted" >&2; exit 2;
-  }
-  DSA_ADJUDICATION_CLI=' --dsa-adjudication-record '"$DSA_ADJUDICATION_RECORD_8K"' --dsa-adjudication-sha256 '"$DSA_ADJUDICATION_RECORD_8K_SHA"
-else
-  DSA_ADJUDICATION_CLI=''
-fi
-readonly DSA_ADJUDICATION_CLI
 # Only after a GATE_D_LESSONS entry for a later-event alarm (spec §21.2); default off.
 readonly LATER_EVENT_ALARM_ACK=${GLM_GREENFIELD_WS32_LATER_EVENT_ALARM_ACK:-0}
 [[ $LATER_EVENT_ALARM_ACK == 0 || $LATER_EVENT_ALARM_ACK == 1 ]] || {
@@ -168,6 +149,34 @@ HOST_MAIN_ROPE_TABLE=${GLM_GREENFIELD_WS32_HOST_MAIN_ROPE_TABLE:-0}
   exit 2
 }
 readonly HOST_MAIN_ROPE_TABLE
+
+# Spec §21.2 first-divergent-event adjudication (default off). When on, the runner and sealer
+# bind the committed pre-registered record by path and SHA; only the 8k context has a record.
+readonly DSA_ADJUDICATION=${GLM_GREENFIELD_WS32_DSA_ADJUDICATION:-0}
+[[ $DSA_ADJUDICATION == 0 || $DSA_ADJUDICATION == 1 ]] || {
+  echo "WS32 DSA adjudication flag must be 0 or 1" >&2
+  exit 2
+}
+# One reviewed record per rotary configuration. The host main-attention table
+# changes layer-0 attention, so it diverges from the oracle differently and has
+# its own pre-registration, adjudicated offline from B' run 1's arrays.
+if [[ $HOST_MAIN_ROPE_TABLE == 1 ]]; then
+  readonly DSA_ADJUDICATION_RECORD_8K=$WORKTREE/docs/artifacts/gate-d-ws32-8k-bprime-adjudicated-divergence-20260906.json
+  readonly DSA_ADJUDICATION_RECORD_8K_SHA=5a9b6e2b39debac8fe1d77cb798b142a7472449a0d2e79f2be730e7cc5c09ba8
+else
+  readonly DSA_ADJUDICATION_RECORD_8K=$WORKTREE/docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json
+  readonly DSA_ADJUDICATION_RECORD_8K_SHA=4da05468120e3c2e9b82d03931018e0d14eebc5fc28e339381658a04457cd26b
+fi
+if [[ $DSA_ADJUDICATION == 1 ]]; then
+  [[ $CONTEXT == 8k ]] || { echo "WS32 DSA adjudication record exists only for 8k" >&2; exit 2; }
+  [[ $(sha256sum "$DSA_ADJUDICATION_RECORD_8K" | awk '{print $1}') == "$DSA_ADJUDICATION_RECORD_8K_SHA" ]] || {
+    echo "WS32 DSA adjudication record SHA drifted" >&2; exit 2;
+  }
+  DSA_ADJUDICATION_CLI=' --dsa-adjudication-record '"$DSA_ADJUDICATION_RECORD_8K"' --dsa-adjudication-sha256 '"$DSA_ADJUDICATION_RECORD_8K_SHA"
+else
+  DSA_ADJUDICATION_CLI=''
+fi
+readonly DSA_ADJUDICATION_CLI
 ROTARY_DIAGNOSTIC=${GLM_GREENFIELD_WS32_ROTARY_DIAGNOSTIC:-0}
 [[ $ROTARY_DIAGNOSTIC == 0 || $ROTARY_DIAGNOSTIC == 1 ]] || {
   echo "WS32 rotary diagnostic flag must be 0 or 1" >&2
