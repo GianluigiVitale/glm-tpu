@@ -13488,3 +13488,25 @@ fires WILL refuse, and the acknowledgement path is: run, observe the alarm, writ
 Gate D and both Step B runs were sealed — DB567's lessons pin is its recovery pin `579b13f5`, DB569's
 is `b51c6268` — so this is the existing workflow made explicit rather than a new constraint. It is
 also the right semantics: you cannot acknowledge in advance a lesson about a run that has not happened.
+
+**Correction, and it is the second of its kind this session.** The entry above claimed the pre-run
+publication refusal covered the recovery pin and that the wrapper named `RECOVERY_PIN`'s two meanings.
+Neither was in the tree. The script that made those two edits asserted on a docs replacement first,
+that assertion failed, and the wrapper edits after it never ran — I then fixed the docs separately and
+recorded all of it as done without re-reading the file. The reviewer found it by diffing: the wrapper
+was not in the commit at all. Both edits are now applied and each one verified by grep rather than by
+assumption. The rule I am writing down for myself: a multi-edit script that can abort part-way must be
+verified per edit, and a HANDOFF claim about a file is worth nothing unless the file was re-read after.
+
+The alarm-acknowledgement clause now has the behavioural test it lacked, and it discriminates: it
+drives an ordinary seal — no recovery pin, which is exactly the case the old clause short-circuited
+past — over the patched C = 512 run with a well-formed but unrelated lessons pin. On the current code
+the seal refuses with "alarm acknowledgement is not bound to a profile record and lessons pin"; with
+the clause reverted to its previous form it gets past that and refuses later for a different reason,
+so the test fails. Verified in both directions, 100 s each.
+
+Also corrected: §21.2 said the fleet's checkouts are evidence a pin was published. A fresh worker
+clones `--single-branch` and so does require the pin to be reachable from the branch, but a warm
+worker checks out any object it already has and worker 0 never fetches. The pre-run refusal, not the
+fleet, is what makes publication a requirement, and the paragraph now says so. The retracted claim
+also survived verbatim as a comment in the wrapper and is gone.

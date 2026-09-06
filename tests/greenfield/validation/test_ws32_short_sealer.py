@@ -2213,7 +2213,9 @@ def test_untracked_adjudication_outputs_do_not_block_a_seal(tmp_path) -> None:
         module._require_clean_worktree(repository)
 
 
-def _run_patched_validate(tmp_path, *, stop_at_alarm: bool, trace=None, break_rank=None):
+def _run_patched_validate(
+    tmp_path, *, stop_at_alarm: bool, trace=None, break_rank=None, **overrides
+):
     """Drive `_validate` over a schema-patched copy of the sealed C=512 run.
 
     Withholding the later-event alarm profile stops validation inside rank 0's
@@ -2251,7 +2253,7 @@ def _run_patched_validate(tmp_path, *, stop_at_alarm: bool, trace=None, break_ra
 
         module._rederive_ws32_adjudication = traced
     repository_root = _Path(__file__).resolve().parents[3]
-    argv = build(run_dir, tmp_path / "summary.json", repository_root)
+    argv = build(run_dir, tmp_path / "summary.json", repository_root, **overrides)
     if stop_at_alarm:
         for flag in ("--later-event-alarm-profile", "--later-event-alarm-profile-sha256"):
             index = argv.index(flag)
@@ -2516,4 +2518,27 @@ def test_the_summary_records_the_surface_it_computed(tmp_path) -> None:
     assert recorded, "the summary no longer records the enforcement surface"
     assert any("enforcement_surface: enforcement_surface" in text.replace("'", "") for text in recorded), (
         f"the summary records something other than the computed surface: {recorded}"
+    )
+
+
+def test_an_alarm_acknowledgement_must_name_a_pin_this_seal_declares(tmp_path) -> None:
+    """The lessons pin binds to the recovery pin, or to the run's own pin.
+
+    This clause is an authorization control and it was silently unbound once by
+    an unrelated change to the wrapper, which is the entire reason it is written
+    the way it is. It had no behavioural test until now.
+    """
+    # An ORDINARY seal, declaring no recovery pin: that is the case the old
+    # clause short-circuited past, accepting any well-formed local commit as the
+    # acknowledgement's binding.
+    message, code = _run_patched_validate(
+        tmp_path,
+        stop_at_alarm=False,
+        break_rank=1,
+        recovery_code_hash="",
+        later_event_alarm_lessons_pin="b" * 40,
+    )
+    assert message is not None and code is None
+    assert "alarm acknowledgement is not bound to a profile record and lessons pin" in message, (
+        message
     )

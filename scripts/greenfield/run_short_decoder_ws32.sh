@@ -244,6 +244,11 @@ readonly EXACT_PROMOTE_STABLE_SHA EXACT_PROMOTE_OPTIMIZED_SHA
 readonly OBSERVER_OPTIMIZED_SHA DECODE_STABLE_SHA DECODE_OPTIMIZED_SHA
 readonly CACHE_PROBE_STABLE_SHA CACHE_PROBE_OPTIMIZED_SHA
 
+# The sealing checkout's HEAD. It carries two different meanings and is passed
+# to two different places: PROVENANCE in the evidence ledger (which checkout
+# produced the upload, always) and AUTHORIZATION in the seal (which enforcement
+# code this seal declares, only on a recovery). Conflating them made the
+# sealer's enforcement-surface comparison the checkout against itself.
 RECOVERY_PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 if [[ $RECOVER == 1 ]]; then
   PIN=${GLM_GREENFIELD_WS32_SOURCE_CODE_HASH:?set the exact code hash used by the completed run}
@@ -513,10 +518,12 @@ readonly RECOVERY_CODE_HASH_CLI
 # The seal requires the run pin to be published; refusing here costs seconds
 # instead of a protected run.
 git -C "$WORKTREE" fetch -q origin "$BRANCH" 2>/dev/null || true
-git -C "$WORKTREE" merge-base --is-ancestor "$PIN" "refs/remotes/origin/$BRANCH" || {
-  echo "WS32 run pin $PIN is not published on origin/$BRANCH" >&2
-  exit 2
-}
+for preflight_pin in "$PIN" $([[ $RECOVER == 1 ]] && echo "$RECOVERY_PIN"); do
+  git -C "$WORKTREE" merge-base --is-ancestor "$preflight_pin" "refs/remotes/origin/$BRANCH" || {
+    echo "WS32 pin $preflight_pin is not published on origin/$BRANCH" >&2
+    exit 2
+  }
+done
 say "PIN=$PIN recovery_pin=$RECOVERY_PIN mode=$MODE context=$CONTEXT recover=$RECOVER exact_dsa=$EXACT_DSA transport=$CHECKPOINT_TRANSPORT"
 live_bytes=
 for attempt in 1 2 3; do
@@ -634,10 +641,10 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --exact-dsa "$EXACT_DSA" \
   --output "$RUN_DIR/source_remote_objects.json" "${materialize_args[@]}" \
   >"$RUN_DIR/materialize.log" 2>&1
-# The seal requires the run pin to be contained in the published branch, so the
-# controller's remote-tracking ref is refreshed first. Workers 1-7 already fetch
-# and check the pin out from origin, so a pin that is not published cannot have
-# run at all; this only keeps the controller's view current.
+# The seal requires every declared pin to be contained in the published branch,
+# so the controller's remote-tracking ref is refreshed first. The pre-run check
+# above has already refused an unpublished pin; this keeps the controller's view
+# current for the seal itself.
 git -C "$WORKTREE" fetch -q origin "$BRANCH" || {
   say "ABORT: cannot refresh origin/$BRANCH before sealing"
   exit 1
