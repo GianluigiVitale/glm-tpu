@@ -13287,3 +13287,10 @@ reviewer showed one did not at the commit under review: the record's own pin che
 the reference-row pin emits the same substring, and the drift test accepted the loader's SHA refusal
 through an `or`. It died only at the follow-up commit. The drift test is now a distinct check against
 a throwaway repository, and the substrings no longer overlap.
+
+Two of the twelve round-8 controls still survived `if False:` on the first pass, and both for the same
+reason: an AST test that walks for call nodes cannot tell a live call from a disabled one. The tests
+now walk the tree themselves and drop any branch whose test is a constant or an `and` with a constant
+operand. Re-mutated: disabling the per-rank re-derivation, deleting it, disabling the
+enforcement-surface check and deleting its call all fail now. That technique, not the individual
+findings, is what three review rounds kept catching.

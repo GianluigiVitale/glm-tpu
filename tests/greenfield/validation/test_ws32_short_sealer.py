@@ -1844,14 +1844,13 @@ def test_every_rank_is_re_derived_not_only_rank_zero() -> None:
         )
     ]
     assert rank_loops, "the per-rank loop is gone"
-    inside = [
-        item
-        for loop in rank_loops
-        for item in ast.walk(loop)
-        if isinstance(item, ast.Call)
-        and isinstance(item.func, ast.Name)
-        and item.func.id == "_rederive_ws32_adjudication"
-    ]
+    import types
+
+    inside = []
+    for loop in rank_loops:
+        inside += _live_calls(
+            types.SimpleNamespace(body=loop.body), "_rederive_ws32_adjudication"
+        )
     assert inside, (
         "the re-derivation runs only on rank 0; the other seven ranks would rest "
         "entirely on the cross-rank agreement check"
@@ -1976,3 +1975,71 @@ def test_the_rederivation_refuses_a_row_built_for_another_decode_position(tmp_pa
             repository_root=tmp_path,
             rank=0,
         )
+
+
+def _live_calls(function, name: str) -> list:
+    """Calls to `name` inside `function` that no dead guard disables.
+
+    `ast.walk` cannot tell a live call from one under `if False:`, which is how
+    three controls stayed green through two review rounds. This walks the tree
+    itself and drops any branch whose test is a constant or a boolean operation
+    with a constant operand.
+    """
+    import ast
+
+    def dead(test) -> bool:
+        if isinstance(test, ast.Constant):
+            return not test.value
+        if isinstance(test, ast.BoolOp) and isinstance(test.op, ast.And):
+            return any(
+                isinstance(value, ast.Constant) and not value.value
+                for value in test.values
+            )
+        return False
+
+    found: list = []
+
+    def visit(node) -> None:
+        if isinstance(node, ast.If):
+            if not dead(node.test):
+                for item in node.body:
+                    visit(item)
+            for item in node.orelse:
+                visit(item)
+            return
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == name
+        ):
+            found.append(node)
+        for child in ast.iter_child_nodes(node):
+            visit(child)
+
+    for item in function.body:
+        visit(item)
+    return found
+
+
+def _sealer_function(name: str):
+    import ast
+    from pathlib import Path as _Path
+
+    source = (
+        _Path(__file__).resolve().parents[3]
+        / "scripts/greenfield/seal_short_decoder_ws32.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    return next(
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == name
+    )
+
+
+def test_the_enforcement_surface_check_is_called_and_not_disabled() -> None:
+    """P2-4: removing the CALL must fail, not only removing the function."""
+    validate = _sealer_function("_validate")
+    assert _live_calls(validate, "_require_clean_worktree"), (
+        "_validate no longer calls the enforcement-surface check, or a dead guard "
+        "disables it"
+    )
