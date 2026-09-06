@@ -13459,3 +13459,23 @@ lesson at rising cost; the residual assurance for items 3-4 is a human reading t
 the validation record, which is what the reviewed registry exists to force. I am stopping here on this
 axis: further work on §21.2 enforcement is not the best use of pod time or review budget, and the next
 work is the A′ acquisition and the B′ adjudication themselves.
+
+Round 11's two P2s, both one-liners, and both worth naming because they are the same defect shape as
+the P0 they came from.
+
+The first: removing the unconditional `--recovery-code-hash` silently unbound the later-event alarm
+acknowledgement. The sealer required the lessons pin to equal the recovery pin *only when one was
+given*, so on an ordinary seal the clause short-circuited and any local 40-hex commit was accepted as
+the acknowledgement's binding. It now binds to the recovery pin when there is one and to the run's own
+pin otherwise, both of which must be published. That is a control I broke by fixing another one, which
+is exactly what happens when a field carries two meanings.
+
+The second: the wrapper change that closed the round-10 P0 was itself untested, and the assertion that
+looked like its guard was vacuous — the literal it checked for survives at two other call sites. The
+test now pins the gate and asserts the literal is absent from the validate invocation specifically.
+
+Also: the spec claimed workers 1-7 fetching the pin means an unpublished pin cannot have run; checkout
+succeeds for any commit already in a worker's object database, so it is evidence the pin did not have
+to be fetched by another route, and the sentence now says that. The pre-run publication refusal covers
+the recovery pin too, and the wrapper says which of `RECOVERY_PIN`'s two meanings applies where:
+provenance in the evidence ledger, authorization in the seal.

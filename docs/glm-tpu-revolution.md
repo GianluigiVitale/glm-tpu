@@ -1723,9 +1723,11 @@ section grants no install or execution authority.
    schema, basis and source-run checks. The run's pin must also be contained in the
    published reviewed branch, and the enforcement surface must be the surface committed at that pin
    (or at a declared recovery pin, which must itself be published — an ordinary seal declares none).
-   Workers 1-7 fetch the pin from `origin` and check it out, so a pin that is not published cannot
-   have run at all; the controller refreshes its remote-tracking ref before sealing, and the wrapper
-   refuses an unpublished pin before the run rather than after it.
+   Workers 1-7 fetch `origin/<branch>` and then check the pin out, which succeeds for any commit
+   already in that worker's object database; that is evidence the pin did not have to be fetched by
+   another route, NOT that an unpublished pin cannot have run. The controller refreshes its
+   remote-tracking ref before sealing, and the wrapper refuses an unpublished pin before the run
+   rather than after it.
 
    *What this is not, stated because the code does not have the stronger property.* A
    remote-tracking ref is an ordinary local ref that an operator with shell access can write, and

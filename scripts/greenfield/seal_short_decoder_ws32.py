@@ -1055,7 +1055,12 @@ def _validate(args: argparse.Namespace) -> int:
                     or not profile.is_file()
                     or _digest_file(profile) != args.later_event_alarm_profile_sha256
                     or not re.fullmatch(r"[0-9a-f]{40}", args.later_event_alarm_lessons_pin or "")
-                    or (args.recovery_code_hash and args.later_event_alarm_lessons_pin != args.recovery_code_hash)
+                    # Bound to the pin whose enforcement this seal declares:
+                    # the recovery pin when there is one, otherwise the run's
+                    # own. Both are required to be published, so the lessons
+                    # entry the acknowledgement rests on is published too.
+                    or args.later_event_alarm_lessons_pin
+                    != (args.recovery_code_hash or args.code_hash)
                 ):
                     raise SystemExit("WS32 alarm acknowledgement is not bound to a profile record and lessons pin")
                 lessons = subprocess.run(
@@ -1317,12 +1322,15 @@ def _require_reviewed_enforcement(
 ) -> None:
     """The enforcement must be the reviewed enforcement, at a published pin.
 
-    A clean tree proves only that the checkout matches its own HEAD. A scratch
-    branch carrying a widened `REFERENCE_ROWS`, run and sealed from its own
-    checkout, is clean. Two things close that: the run's pin must be contained
-    in the reviewed remote branch, and the enforcement surface must be the one
-    committed at that pin (or at the declared recovery pin, which is how a seal
-    driven by newer code declares itself).
+    A clean tree proves only that the checkout matches its own HEAD. Every pin
+    this seal declares — the run's, and the recovery pin when there is one —
+    must be contained in the reviewed remote branch, and the enforcement surface
+    must be the surface committed at one of them.
+
+    This establishes that the enforcement code is in PUBLISHED history. It does
+    not establish that it was reviewed: the operator pushes to that branch. See
+    §21.2's ceiling paragraph; the residual assurance is a human reading the
+    registry entry.
     """
 
     pins = [code_hash] + ([recovery_code_hash] if recovery_code_hash else [])

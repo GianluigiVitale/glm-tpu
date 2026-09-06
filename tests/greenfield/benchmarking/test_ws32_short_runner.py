@@ -245,7 +245,19 @@ def test_ws32_sealer_binds_alarm_acknowledgement_and_states_adjudicated_basis() 
     ):
         assert token in sealer, token
     assert "GLM_GREENFIELD_WS32_LATER_EVENT_ALARM_PROFILE_SHA" in wrapper
-    assert '--recovery-code-hash "$RECOVERY_PIN"' in wrapper
+    # An ordinary seal must declare NO recovery pin: passing the sealing
+    # checkout's own HEAD made the sealer's enforcement-surface comparison the
+    # checkout against itself, so it could never refuse. The literal survives at
+    # the recovery-publish and evidence call sites, so assert the gate itself.
+    assert 'RECOVERY_CODE_HASH_CLI="--recovery-code-hash $RECOVERY_PIN"' in wrapper
+    assert "${RECOVERY_CODE_HASH_CLI:+$RECOVERY_CODE_HASH_CLI}" in wrapper
+    validate_block = wrapper.split("seal_short_decoder_ws32.py\" validate")[1].split(
+        "--output \"$RUN_DIR/summary.json\""
+    )[0]
+    assert '--recovery-code-hash "$RECOVERY_PIN"' not in validate_block, (
+        "the validate invocation must not hand the sealer its own HEAD as a recovery pin"
+    )
+    assert "--reviewed-ref" in validate_block
     assert "${LATER_EVENT_ALARM_CLI:+$LATER_EVENT_ALARM_CLI}" in wrapper
     specification = importlib.util.spec_from_file_location("ws32_sealer_for_test", sealer_path)
     module = importlib.util.module_from_spec(specification)
