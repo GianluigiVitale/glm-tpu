@@ -13305,3 +13305,52 @@ object id of each enforcement-surface path and of its own HEAD in the summary. T
 the scratch-checkout route; it puts what the enforcement was run with into the sealed record, where a
 reviewer compares it against the reviewed branch. Prevention and evidence are different things and
 the record now carries both.
+
+## 2026-09-06 04:20Z — ninth Opus 5 rejection resolved: a run directory that reaches the loop
+
+Round 8 made the point I had been working around for three rounds: **an AST test that walks for call
+nodes cannot tell a live call from a disabled one, and no amount of hardening makes it sound.** It
+demonstrated five forms my helper accepted (`if not True:`, `for _ in []:`, `if True: … else:`,
+`try/except SystemExit: pass`, a module-level false flag), showed the eight-rank test pinned `rank=`
+but not `arrays=` so rank 0's arrays could be substituted with all tests green, and showed neither new
+control was reachable by any behavioural test.
+
+**The fix is a run directory that reaches the loop.** The sealed C = 512 Step B run (DB 569) differs
+from the current runner schema by exactly two keys, `main_rope_table` and `rotary_diagnostic`, both
+default-off features added after it was sealed. `patched_run_dir` symlinks every artifact and rewrites
+only the eight runner records to carry those keys as null, so every digest, HLO pin, trace binding and
+observation is the real protected evidence. With it, `_validate` runs to completion: **return code 0,
+and the §21.2 re-derivation runs for ranks 0, 0, 1, 2, 3, 4, 5, 6, 7** — the early adjudication-block
+pass and then every rank on its own arrays. The default suite gets the fast half of that (the alarm
+profile withheld, which stops inside rank 0's iteration after the loop's re-derivation, 101 s); the
+full eight-rank run is behind `GLM_WS32_SLOW_SEAL_TEST=1` because it hashes ~2.4 GB of traces.
+
+The reviewer is also right that the loop re-derivation is defence in depth rather than new evidence:
+`_require_ranks_agree` already proves every rank's arrays are bit-identical to rank 0's, and that
+check now has its own failing fixture. I am no longer claiming the AST assertions carry the property;
+they are tripwires on top of a behavioural anchor.
+
+Four ways a fitted pre-registration could still have reached a seal, all now closed:
+
+* **`--assume-unchanged` / `--skip-worktree`** made `git status` report a modified enforcement file as
+  clean, with no commit anywhere. The seal now refuses any lowercase index flag on the surface, and a
+  test sets the flag, edits the registry, asserts git reports the tree clean, and asserts the refusal.
+* **`PYTHONPATH` shadowing.** The sealer inserted its repository on `sys.path` only if absent, so an
+  earlier entry won: it would check one tree for modifications and import the §21.2 arithmetic and the
+  registry from another. The repository is now put first unconditionally, and the seal refuses if the
+  enforcement modules resolve outside it.
+* **The `REFERENCE_ROWS` entry need not have existed when the run executed.** The row was pinned to the
+  run's commit but the record that authorises it was not, so it could be written knowing what the run
+  produced. It is pinned now.
+* **A record committed inside the repository but outside `docs/artifacts`** would sidestep the
+  prior-attempt scan, which globs that one directory. The end-to-end test now uses an in-repository
+  path, which is the branch a temporary-directory copy never reaches.
+
+Also: the enforcement surface gained `glm_tpu/greenfield/benchmarking` and `glm_tpu/greenfield/sharding`,
+which enforce §21.2 item 6 and §21.6 and were as edit-and-revertable as the rest; `docs/artifacts` is
+checked for TRACKED modifications only, because §21.2 requires the adjudicator's untracked attempt
+files to be left there and the previous check refused them, whose cheapest unblock was deleting the
+very disclosure the spec mandates; selected positions outside the reference row are a refusal instead
+of a wrap or a traceback; the sealer's third `git` call site and the stray-adjudication-SHA guard have
+fixtures; and §21.2's ordering sentence no longer claims the surface refusal runs after the schema and
+basis checks, which it does not.

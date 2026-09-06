@@ -21,8 +21,13 @@ import numpy as np
 
 
 REPO = Path(__file__).resolve().parents[2]
-if str(REPO) not in sys.path:
-    sys.path.insert(0, str(REPO))
+# Unconditionally FIRST: a PYTHONPATH entry ahead of this repository would
+# otherwise shadow glm_tpu.greenfield.validation, so the sealer would check one
+# tree for modifications and import the §21.2 arithmetic and the reviewed
+# reference-row registry from another.
+while str(REPO) in sys.path:
+    sys.path.remove(str(REPO))
+sys.path.insert(0, str(REPO))
 
 _DSA_ASSOCIATION_SUMMARY_SHA256 = (
     "661142816aa64ec8d085553b427e99f62ab3f1f16b3fc87fc4fc24880d467203"
@@ -223,8 +228,15 @@ _GIT = "/usr/bin/git"
 _ENFORCEMENT_SURFACE = (
     "scripts/greenfield/seal_short_decoder_ws32.py",
     "glm_tpu/greenfield/validation",
+    "glm_tpu/greenfield/benchmarking",
+    "glm_tpu/greenfield/sharding",
     "docs/artifacts",
 )
+# `docs/artifacts` legitimately holds untracked outputs of the offline
+# adjudicator (§21.2 calls prior attempts untracked and requires them to be left
+# in place), so only TRACKED modifications are refused there; a new file is not
+# a widening of what the seal accepts.
+_TRACKED_ONLY_SURFACE = ("docs/artifacts",)
 DEFAULT_PREFILL_CHUNK = 2048
 DEFAULT_CONTEXT_CAPACITY = 8192
 
@@ -496,6 +508,7 @@ def _validate(args: argparse.Namespace) -> int:
         # own source, so a dirty working tree at seal time can widen what is
         # accepted and then be reverted without leaving a trace in the record.
         # An adjudicated seal therefore requires a clean tree.
+        _require_imports_come_from(repository_root)
         _require_clean_worktree(repository_root)
         enforcement_surface = _enforcement_surface_identity(repository_root)
     else:
@@ -553,6 +566,10 @@ def _validate(args: argparse.Namespace) -> int:
             # the numbers could be written to fit what the run produced.
             (dsa_adjudication.analysis_path, "adjudication analysis"),
             (dsa_adjudication.reference_row_path, "adjudication reference row"),
+            (
+                dsa_adjudication.reference_validation_path,
+                "adjudication reference validation record",
+            ),
         ):
             if relative is not None:
                 _committed_in_run_pin(relative, label)
@@ -1279,26 +1296,76 @@ def _require_clean_worktree(repository_root: Path) -> None:
     which is what "reviewed" means here.
     """
 
-    try:
-        status = subprocess.run(
-            [_GIT, "-C", str(repository_root), "status", "--porcelain", "--"]
-            + list(_ENFORCEMENT_SURFACE),
-            capture_output=True,
-            text=True,
+    code = [item for item in _ENFORCEMENT_SURFACE if item not in _TRACKED_ONLY_SURFACE]
+    modified = _git_lines(
+        repository_root, ["status", "--porcelain", "--"] + code, "verify the working tree"
+    )
+    modified += _git_lines(
+        repository_root,
+        ["diff", "--name-only", "HEAD", "--"] + list(_TRACKED_ONLY_SURFACE),
+        "verify the artifact tree",
+    )
+    # `--assume-unchanged` and `--skip-worktree` make git report a modified file
+    # as clean, so the flags themselves are a refusal: they hide exactly the edit
+    # this check exists to catch, and they leave nothing in history.
+    hidden = [
+        line[2:]
+        for line in _git_lines(
+            repository_root,
+            ["ls-files", "-v", "--"] + list(_ENFORCEMENT_SURFACE),
+            "read the index",
         )
-    except (OSError, subprocess.SubprocessError) as error:
-        raise SystemExit(f"WS32 seal cannot verify the working tree: {error}")
-    if status.returncode != 0:
+        if line[:1].islower()
+    ]
+    if hidden:
         raise SystemExit(
-            f"WS32 seal cannot verify the working tree: {status.stderr.strip()}"
+            "WS32 adjudicated seal refuses an enforcement surface with hidden index flags "
+            "(--assume-unchanged / --skip-worktree): " + ", ".join(sorted(hidden)[:8])
         )
-    modified = [line for line in status.stdout.splitlines() if line.strip()]
     if modified:
         raise SystemExit(
             "WS32 adjudicated seal requires an unmodified enforcement surface; the "
             "reviewed reference-row registry and the §21.2 arithmetic live in it. Modified: "
-            + ", ".join(sorted(item[3:] for item in modified)[:8])
+            + ", ".join(sorted(_status_path(item) for item in modified)[:8])
         )
+
+
+def _status_path(line: str) -> str:
+    """The path out of a `status --porcelain` or `diff --name-only` line."""
+
+    text = line[3:] if len(line) > 3 and line[2] == " " else line
+    return text.split(" -> ")[-1].strip().strip('"')
+
+
+def _git_lines(repository_root: Path, arguments: list[str], purpose: str) -> list[str]:
+    try:
+        result = subprocess.run(
+            [_GIT, "-C", str(repository_root), *arguments], capture_output=True, text=True
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise SystemExit(f"WS32 seal cannot {purpose}: {error}")
+    if result.returncode != 0:
+        raise SystemExit(f"WS32 seal cannot {purpose}: {result.stderr.strip()}")
+    return [line for line in result.stdout.splitlines() if line.strip()]
+
+
+def _require_imports_come_from(repository_root: Path) -> None:
+    """The modules that enforce §21.2 must be this repository's own.
+
+    Checking one tree for modifications while importing the arithmetic from
+    another is the same defect as not checking at all.
+    """
+
+    from glm_tpu.greenfield.validation import ws32_first_divergent_event, ws32_short_context
+
+    root = Path(repository_root).resolve()
+    for module in (ws32_short_context, ws32_first_divergent_event):
+        origin = Path(getattr(module, "__file__", "")).resolve()
+        if not origin.is_relative_to(root):
+            raise SystemExit(
+                f"WS32 §21.2 enforcement is imported from outside the sealed repository: "
+                f"{origin}"
+            )
 
 
 def _make_pre_registration_check(args: Any, repository_root: Path):

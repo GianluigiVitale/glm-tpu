@@ -234,6 +234,10 @@ class Ws32AdjudicatedDivergence:
     # Repository-relative path of the reviewed FP64 reference row, which the
     # sealer also requires to be committed in the run's own pin.
     reference_row_path: str | None = None
+    # And of the reviewed record that validated that row against the legacy
+    # captures. §21.2 item 3: the row is usable only because of it, so it must
+    # predate the run too, not be written once the divergence is known.
+    reference_validation_path: str | None = None
 
     def status(self, step: int, event: int) -> str:
         if (step, event) < (self.step, self.event_index):
@@ -415,6 +419,7 @@ def load_ws32_adjudicated_divergence(
         # A declared row that the basis does not name is decorative: the
         # analysis could have been computed from a different row entirely.
         raise ValueError("WS32 adjudicated-divergence reference row is not in the basis")
+    registered = None
     if reference is not None:
         # §21.2 item 3, enforced HERE rather than in the offline tool: a registry
         # the producer alone consults can be widened in a working tree, used once
@@ -572,6 +577,9 @@ def load_ws32_adjudicated_divergence(
             str(reference["path"])
             if reference is not None
             else _sole_basis_reference_row(basis)
+        ),
+        reference_validation_path=(
+            None if reference is None else str(registered["validation_path"])
         ),
     )
 

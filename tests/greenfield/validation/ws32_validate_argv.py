@@ -48,6 +48,11 @@ def _prefill_chunk(summary: dict) -> int:
 def build(run_dir: Path, output: Path, repository_root: Path, **overrides: str) -> list[str]:
     summary = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
     graphs = summary["graph_sha256"]
+    # The timing parameters are part of the run's identity but are recorded on
+    # the runner records, not the summary.
+    record = json.loads((run_dir / "fleet" / "runner.rank0.json").read_text(encoding="utf-8"))
+    timing = record["profiler_free_timing"]
+    trace_steps = record["trace"]["steps"]
     argv = [
         "validate",
         "--run-dir", str(run_dir),
@@ -72,9 +77,9 @@ def build(run_dir: Path, output: Path, repository_root: Path, **overrides: str) 
         "--source-inventory-sha256", summary["source_inventory_sha256"],
         "--context-capacity", str(summary["context_capacity"]),
         "--observer-steps", "14",
-        "--warmup", "3",
-        "--iterations", "20",
-        "--trace-steps", "3",
+        "--warmup", str(timing["warmup"]),
+        "--iterations", str(timing["iterations"]),
+        "--trace-steps", str(trace_steps),
         "--exact-dsa", "1" if summary["exact_dsa"] else "0",
         "--checkpoint-transport", summary["checkpoint_transport"],
         "--evidence-layout", summary.get("evidence_layout", "hlo_per_rank_v1"),
@@ -93,6 +98,12 @@ def build(run_dir: Path, output: Path, repository_root: Path, **overrides: str) 
         "--prefill-chunk", str(_prefill_chunk(summary)),
         "--output", str(output),
     ]
+    alarm = summary["later_event_alarm"]
+    if alarm.get("profile_path"):
+        argv += [
+            "--later-event-alarm-profile", str(repository_root / alarm["profile_path"]),
+            "--later-event-alarm-profile-sha256", alarm["profile_sha256"],
+        ]
     adjudication = summary.get("dsa_adjudication")
     if adjudication:
         argv += [
@@ -115,8 +126,53 @@ def build(run_dir: Path, output: Path, repository_root: Path, **overrides: str) 
             ]
     for key, value in overrides.items():
         flag = "--" + key.replace("_", "-")
+        if value is None:
+            if flag in argv:
+                index = argv.index(flag)
+                del argv[index : index + 2]
+            continue
         if flag in argv:
             argv[argv.index(flag) + 1] = value
         else:
             argv += [flag, value]
     return argv
+
+
+SCHEMA_ADDED_SINCE_THE_SEALED_RUN = {
+    # Default-off features added after the C=512 run was sealed. The sealer's
+    # runner schema is an exact key set, so a copy of that run needs the keys
+    # present and null to reach the rest of validation.
+    "main_rope_table": None,
+    "rotary_diagnostic": None,
+}
+
+
+def patched_run_dir(destination: Path, run_dir: Path = SEALED_C512_RUN) -> Path:
+    """A copy of a sealed run whose runner records match the current schema.
+
+    Everything except the eight runner records is symlinked, so the copy costs
+    nothing and every digest, HLO pin and trace binding still refers to the real
+    protected evidence.
+    """
+
+    import os
+
+    destination.mkdir(parents=True, exist_ok=True)
+    for item in run_dir.iterdir():
+        target = destination / item.name
+        if target.exists() or target.is_symlink():
+            continue
+        if item.name != "fleet":
+            os.symlink(item, target)
+            continue
+        target.mkdir()
+        for member in item.iterdir():
+            if member.suffix != ".json":
+                os.symlink(member, target / member.name)
+                continue
+            record = json.loads(member.read_text(encoding="utf-8"))
+            record.update(SCHEMA_ADDED_SINCE_THE_SEALED_RUN)
+            (target / member.name).write_text(
+                json.dumps(record, indent=2, sort_keys=True), encoding="utf-8"
+            )
+    return destination

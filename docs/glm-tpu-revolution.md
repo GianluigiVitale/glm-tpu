@@ -1715,7 +1715,12 @@ section grants no install or execution authority.
    from this repository's source at seal time, an adjudicated seal additionally refuses to run from
    a modified enforcement surface (`scripts/greenfield/seal_short_decoder_ws32.py`,
    `glm_tpu/greenfield/validation/`, `docs/artifacts/`): an edit that widens what is accepted must
-   be committed, and therefore reviewable, rather than made and reverted around a seal. It is applied after the schema, basis, oracle and
+   be committed, and therefore reviewable, rather than made and reverted around a seal. The refusal
+   also covers `--assume-unchanged` and `--skip-worktree`, which hide an edit from `git status`
+   without committing anything, and the sealer puts its own repository first on `sys.path` and
+   refuses to run if the §21.2 modules resolve outside it. This check runs BEFORE the record's
+   schema, basis and source-run checks; the ordering sentence in the grandfathering paragraph below
+   refers to the digest exemption, not to this refusal. It is applied after the schema, basis, oracle and
    source-run checks, all of which the record satisfies, so any future tightening of those must be
    checked against it explicitly. The exempt record provably carries neither binding, because the
    exemption is keyed on its content digest. History is not weakened and no new record may use it.

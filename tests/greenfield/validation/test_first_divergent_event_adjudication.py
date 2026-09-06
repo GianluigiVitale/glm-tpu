@@ -995,3 +995,21 @@ def test_the_tool_uses_an_absolute_git() -> None:
     ]
     assert not literals, "the adjudicator must call git by absolute path"
     assert '_GIT = "/usr/bin/git"' in source
+
+
+def test_positions_outside_the_reference_row_are_refused() -> None:
+    """P3-3: negative wraps silently and past-the-end raises a traceback."""
+    from glm_tpu.greenfield.validation.ws32_first_divergent_event import (
+        AdjudicationError,
+    )
+
+    reference = np.linspace(1.0, 0.0, 8)
+    for engine_positions in ([0, 1, 2, 99], [0, 1, 2, -3]):
+        with pytest.raises(AdjudicationError, match="outside the reference row"):
+            _bare_event(
+                reference=reference,
+                oracle_positions=[0, 1, 2, 3],
+                oracle_scores=reference[[0, 1, 2, 3]],
+                engine_positions=engine_positions,
+                engine_scores=reference[[0, 1, 2, 3]],
+            )

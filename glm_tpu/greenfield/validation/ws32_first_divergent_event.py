@@ -73,6 +73,18 @@ def adjudicate_first_divergent_event(
         # dict(zip(...)) would silently keep the last score of a repeated
         # position and shrink the comparison set.
         raise AdjudicationError("selected positions repeat within an event")
+    outside = sorted(
+        position
+        for position in expected | observed
+        if position < 0 or position >= reference.size
+    )
+    if outside:
+        # Indexing the FP64 row with these would wrap or raise; either way the
+        # verdict would be meaningless.
+        raise AdjudicationError(
+            f"selected positions fall outside the reference row of {reference.size}: "
+            f"{outside[:8]}"
+        )
     shared = sorted(expected & observed)
     if not shared:
         raise AdjudicationError("engine and oracle share no selected position")
