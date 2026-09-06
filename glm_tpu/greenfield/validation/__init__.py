@@ -79,6 +79,7 @@ from .prompt_index_cache import (
     validate_prompt_projection_input_hlo,
 )
 from .long_context_oracle import (
+    load_ws32_long_context_oracle,
     LongContextOracleConfig,
     capture_long_context_oracle,
     inspect_long_context_oracle,
@@ -105,6 +106,7 @@ from .ws32_short_context import (
     Ws32ShortContextOracle,
     bind_ws32_adjudication,
     compare_ws32_dsa_step,
+    compare_ws32_dsa_within_engine,
     compare_ws32_raw_tokens,
     load_ws32_adjudicated_divergence,
     load_ws32_short_context_oracle,
@@ -187,6 +189,9 @@ __all__ = (
     "compare_array_observations",
     "compare_dsa_association_scores",
     "compare_ws32_dsa_step",
+    "compare_ws32_dsa_within_engine",
+    "load_ws32_long_context_oracle",
+    "Ws32LongContextOracle",
     "compare_ws32_raw_tokens",
     "inspect_gate_c_oracle",
     "inspect_distributed_q_a_norm_artifact",

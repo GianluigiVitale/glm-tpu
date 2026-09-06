@@ -13730,3 +13730,38 @@ ETA impact, stated plainly because it moves the estimate: the remaining work is 
 of pod time. It now includes implementing and reviewing the long-context mode in the runner and the
 sealer first. That is a day of work before the first 128K run can start, and it is why the estimate
 moves to the upper half of the 4-7 day range.
+
+## 2026-09-06 23:2xZ — §23.5 long-context mode built, runner and sealer
+
+The mode L7/L8 need now exists. Five pieces, each exercised against the real sealed oracles rather
+than stubs:
+
+* `compare_ws32_dsa_within_engine` — the DSA contract when no legacy capture exists. It is not a
+  weakening: every selected position must be in range for the decode position and distinct, every
+  score finite, the padding tail exactly the sentinel, the live entries in the device's canonical
+  descending-score/lowest-position order, and the producer identities stable across steps. Six
+  violations are each tested and each refused. It reports `cross_oracle: False`.
+* `load_ws32_long_context_oracle` — binds a token-only oracle by manifest AND terminal SUCCESS digest
+  and by kind. Verified against the sealed 128K d1.0 artifact: 127,363 prompt ids, 20 legacy ids,
+  gold `891482`, legacy run 403 item 1520; a wrong manifest or a wrong kind is refused.
+* Runner `--long-context passkey|e0` — loads the token-only oracle, drops the cross-oracle DSA path,
+  and REFUSES a §21.2 record in this mode, because nothing at these lengths exists for one to
+  adjudicate against and binding one would imply a comparison that was never made.
+* `_long_context_token_result` — the §23.5 criterion. For L7 it detokenises the first 20 greedy ids
+  and compares `extract_passkey(...)` with gold; the legacy ids are compared as a DIAGNOSTIC and the
+  result deliberately carries NO `exact_prefix_match` key, because §23.5 forbids "raw tokens exact"
+  where the legacy stored text. Verified: the sealed oracle's own ids extract `891482` and match, and
+  perturbing one id makes it fail. For L8 the criterion is None — that legacy run had no oracle.
+* Sealer mirror — same oracle binding, the within-engine recomputation per rank, and §23.5's
+  classification: `PASSKEY_EXACT;DSA_WITHIN_ENGINE_EXACT;…;NO_CROSS_ORACLE` for L7,
+  `…;NO_CORRECTNESS_ORACLE` for L8, and never `RAW_TOKENS_EXACT` or any cross-oracle label. The
+  sealer IMPORTS the runner's token rule rather than reimplementing it: two copies of a correctness
+  criterion drift, and the sealer's job is to recompute the runner's claim with the same rule.
+
+One defect caught while wiring: after adding the long-context branch the existing
+`if … is None: … else:` for the classification fell through to the cross-oracle labels for
+long-context runs, which would have stamped `DSA_EVENT0_EXACT` on a run that compared against nothing.
+Found by reading the whole block after the edit rather than the diff. `test_ws32_long_context_mode.py`
+now asserts the long branch contains neither `RAW_TOKENS_EXACT` nor `DSA_CROSS_ORACLE_EXACT_ALL_EVENTS`.
+
+135 passed, 1 skipped across the five affected suites.

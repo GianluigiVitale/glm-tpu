@@ -444,6 +444,87 @@ def capture_long_context_oracle(config: LongContextOracleConfig) -> dict[str, An
     return manifest
 
 
+@dataclass(frozen=True)
+class Ws32LongContextOracle:
+    """A token-only long-context oracle (spec §23.1/§23.5).
+
+    There is deliberately no DSA field: the legacy harness captured no DSA
+    events at these lengths and §23.5 forbids inventing one. ``generated_token_ids``
+    are the legacy 20 (L7) or 256 (L8) ids and are a DIAGNOSTIC reference only —
+    §23.5 states that nothing may be labelled "raw tokens exact" at these
+    lengths. For L7 the pass criterion is ``gold``.
+    """
+
+    kind: str
+    manifest: Mapping[str, Any]
+    manifest_sha256: str
+    prompt_token_ids: np.ndarray
+    generated_token_ids: np.ndarray
+    gold: str | None
+    depth: float | None
+    source_run_id: int
+    item_row_id: int
+
+
+def load_ws32_long_context_oracle(
+    oracle_dir: Path,
+    *,
+    expected_manifest_sha256: str,
+    expected_success_sha256: str,
+    expected_kind: str,
+) -> Ws32LongContextOracle:
+    """Load a fully inspected long-context oracle, bound by manifest and SUCCESS."""
+
+    from safetensors import safe_open
+
+    oracle_dir = Path(oracle_dir)
+    manifest = inspect_long_context_oracle(oracle_dir)
+    if manifest.get("manifest_sha256") != expected_manifest_sha256:
+        raise ValueError("WS32 long-context oracle identity drifted")
+    if manifest.get("kind") != expected_kind:
+        raise ValueError(
+            f"WS32 long-context oracle kind is {manifest.get('kind')}, not {expected_kind}"
+        )
+
+    success = oracle_dir.parent / "SUCCESS"
+    raw = success.read_bytes()
+    if sha256(raw).hexdigest() != expected_success_sha256:
+        raise ValueError("WS32 long-context oracle terminal SUCCESS identity drifted")
+    fields: dict[str, str] = {}
+    for line in raw.decode("utf-8").splitlines():
+        if line.count("=") != 1:
+            raise ValueError("WS32 long-context oracle SUCCESS schema drifted")
+        key, value = line.split("=", 1)
+        if not key or key in fields:
+            raise ValueError("WS32 long-context oracle SUCCESS schema drifted")
+        fields[key] = value
+    if (
+        fields.get("artifact_kind") != ARTIFACT_KIND
+        or fields.get("manifest_sha256") != expected_manifest_sha256
+        or not fields.get("remote_prefix", "").startswith("gs://driftbench-dsv4-uc/")
+    ):
+        raise ValueError("WS32 long-context oracle SUCCESS binding drifted")
+
+    with safe_open(oracle_dir / "tokens.safetensors", framework="np") as handle:
+        prompt = np.asarray(handle.get_tensor("prompt_token_ids"), dtype=np.int32)
+        generated = np.asarray(handle.get_tensor("generated_token_ids"), dtype=np.int32)
+    source = manifest["source"]
+    gold = source.get("gold") if manifest["kind"] == "passkey" else None
+    if manifest["kind"] == "passkey" and not (isinstance(gold, str) and gold.isdigit()):
+        raise ValueError("WS32 long-context passkey oracle has no gold key")
+    return Ws32LongContextOracle(
+        kind=str(manifest["kind"]),
+        manifest=manifest,
+        manifest_sha256=str(manifest["manifest_sha256"]),
+        prompt_token_ids=prompt,
+        generated_token_ids=generated,
+        gold=gold,
+        depth=source.get("depth"),
+        source_run_id=int(source["run_id"]),
+        item_row_id=int(source["item_row_id"]),
+    )
+
+
 def inspect_long_context_oracle(output_dir: Path) -> dict[str, Any]:
     """Verify every long-context oracle identity without opening the source DB."""
     from safetensors import safe_open

@@ -55,7 +55,9 @@ from glm_tpu.greenfield.validation import (  # noqa: E402
     bind_ws32_adjudication,
     compare_ws32_dsa_step,
     load_ws32_adjudicated_divergence,
+    compare_ws32_dsa_within_engine,
     compare_ws32_raw_tokens,
+    load_ws32_long_context_oracle,
     load_ws32_short_context_oracle,
     validate_ws32_cache_probe,
 )
@@ -68,6 +70,14 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--run-dir", required=True, type=Path)
     validate.add_argument("--topology-capture-root", required=True, type=Path)
     validate.add_argument("--token-oracle-dir", required=True, type=Path)
+    # Spec §23.5: L7/L8 seal against a token-only long-context oracle. There is
+    # no legacy DSA capture at these lengths, so the sealer mirrors the runner's
+    # within-engine contract and makes no cross-oracle claim.
+    validate.add_argument("--long-context", choices=("passkey", "e0"), default=None)
+    validate.add_argument("--long-context-oracle-dir", type=Path, default=None)
+    validate.add_argument("--long-context-manifest-sha256", default="0" * 64)
+    validate.add_argument("--long-context-success-sha256", default="0" * 64)
+    validate.add_argument("--tokenizer-root", type=Path, default=None)
     validate.add_argument("--dsa-oracle-dir", required=True, type=Path)
     validate.add_argument("--mode", choices=("acquire", "numerical"), required=True)
     validate.add_argument("--context-label", choices=("2k", "8k"), required=True)
@@ -506,6 +516,21 @@ def _validate(args: argparse.Namespace) -> int:
     physical_mesh = build_ws32_physical_mesh(topology)
     if physical_mesh.mesh_hash != args.mesh_sha256 or fleet_hash != args.topology_fleet_sha256:
         raise SystemExit("WS32 topology/mesh identity drifted")
+    long_context = None
+    if args.long_context is not None:
+        if args.long_context_oracle_dir is None:
+            raise SystemExit("WS32 long-context seal needs its oracle directory")
+        if args.dsa_adjudication_record is not None:
+            raise SystemExit("WS32 long-context seals bind no §21.2 adjudication record")
+        try:
+            long_context = load_ws32_long_context_oracle(
+                args.long_context_oracle_dir,
+                expected_manifest_sha256=args.long_context_manifest_sha256,
+                expected_success_sha256=args.long_context_success_sha256,
+                expected_kind=args.long_context,
+            )
+        except (OSError, ValueError, KeyError) as error:
+            raise SystemExit(f"WS32 long-context oracle is not loadable: {error}")
     oracle = load_ws32_short_context_oracle(
         args.token_oracle_dir,
         args.dsa_oracle_dir,
@@ -948,13 +973,22 @@ def _validate(args: argparse.Namespace) -> int:
                 type(observed_token_ids) is not list
                 or len(observed_token_ids) != expected_observed_count
                 or any(type(token) is not int for token in observed_token_ids)
-                or len(observed_token_ids) < oracle.generated_token_ids.size
+                or len(observed_token_ids) < (
+                    long_context.generated_token_ids.size
+                    if long_context is not None
+                    else oracle.generated_token_ids.size
+                )
             ):
                 raise SystemExit(f"WS32 raw-token cardinality drifted rank {rank}")
-            expected_token_comparison = compare_ws32_raw_tokens(
-                observed_token_ids[: oracle.generated_token_ids.size],
-                oracle,
-            )
+            if long_context is not None:
+                expected_token_comparison = _long_context_token_result(
+                    observed_token_ids, long_context, tokenizer_root=args.tokenizer_root
+                )
+            else:
+                expected_token_comparison = compare_ws32_raw_tokens(
+                    observed_token_ids[: oracle.generated_token_ids.size],
+                    oracle,
+                )
             if not _same(record.get("token_comparison"), expected_token_comparison):
                 raise SystemExit(f"WS32 token comparison recomputation drifted rank {rank}")
             if rank and any(
@@ -1016,19 +1050,34 @@ def _validate(args: argparse.Namespace) -> int:
                 )
             expected_dsa = []
             for step in range(args.observer_steps):
-                expected_dsa.append(
-                    compare_ws32_dsa_step(
-                        producer_layer_ids=arrays["dsa_producer_layer_ids"],
-                        selected_positions=arrays["dsa_selected_positions"][step],
-                        selected_valid_counts=arrays[
-                            "dsa_selected_valid_counts"
-                        ][step],
-                        selected_scores=arrays["dsa_selected_scores"][step],
-                        oracle=oracle,
-                        step=step,
-                        adjudication=dsa_adjudication,
+                if long_context is not None:
+                    expected_dsa.append(
+                        compare_ws32_dsa_within_engine(
+                            producer_layer_ids=arrays["dsa_producer_layer_ids"],
+                            selected_positions=arrays["dsa_selected_positions"][step],
+                            selected_valid_counts=arrays[
+                                "dsa_selected_valid_counts"
+                            ][step],
+                            selected_scores=arrays["dsa_selected_scores"][step],
+                            decode_position=int(record["prompt_length"]) + step,
+                            step=step,
+                            expected_producer_layer_ids=arrays["dsa_producer_layer_ids"],
+                        )
                     )
-                )
+                else:
+                    expected_dsa.append(
+                        compare_ws32_dsa_step(
+                            producer_layer_ids=arrays["dsa_producer_layer_ids"],
+                            selected_positions=arrays["dsa_selected_positions"][step],
+                            selected_valid_counts=arrays[
+                                "dsa_selected_valid_counts"
+                            ][step],
+                            selected_scores=arrays["dsa_selected_scores"][step],
+                            oracle=oracle,
+                            step=step,
+                            adjudication=dsa_adjudication,
+                        )
+                    )
             if record.get("checkpoint_transport") != args.checkpoint_transport:
                 raise SystemExit(f"WS32 checkpoint transport drifted rank {rank}")
             if not _same(record.get("dsa_adjudication"), expected_dsa_adjudication):
@@ -1247,8 +1296,23 @@ def _validate(args: argparse.Namespace) -> int:
                 }
             )
         summary["later_event_alarm"] = alarm_summary
-        basis = ["RAW_TOKENS_EXACT", "DSA_WITHIN_ENGINE_EXACT", "STATE_CACHE_EXACT_STRUCTURE"]
-        if expected_dsa_adjudication is None:
+        if long_context is not None:
+            # §23.5: no legacy DSA capture exists at these lengths, so no
+            # cross-oracle claim may appear, and "raw tokens exact" is forbidden
+            # because the legacy stored text rather than ids.
+            basis = ["DSA_WITHIN_ENGINE_EXACT", "STATE_CACHE_EXACT_STRUCTURE", "NO_CROSS_ORACLE"]
+            if long_context.kind == "passkey":
+                basis.insert(0, "PASSKEY_EXACT")
+            else:
+                basis.append("NO_CORRECTNESS_ORACLE")
+        else:
+            basis = ["RAW_TOKENS_EXACT", "DSA_WITHIN_ENGINE_EXACT", "STATE_CACHE_EXACT_STRUCTURE"]
+        if long_context is not None:
+            # Nothing cross-oracle applies: no capture exists to be exact
+            # against, and no §21.2 record may be bound (refused at load).
+            if alarm_summary is not None:
+                basis.append("LATER_EVENT_ALARM_ACKNOWLEDGED_WITH_LESSONS_ENTRY")
+        elif expected_dsa_adjudication is None:
             basis.append("DSA_CROSS_ORACLE_EXACT_ALL_EVENTS")
         else:
             basis.append("DSA_EVENT0_EXACT")
@@ -1509,6 +1573,27 @@ def _require_ranks_agree(
 
     if rank and not _same(array_records, records[0]["numerical_tensors"]["arrays"]):
         raise SystemExit(f"WS32 numerical tensor values disagree rank {rank}")
+
+
+def _long_context_token_result(
+    observed_tokens: list[int], long_context: Any, *, tokenizer_root: Path | None
+) -> dict[str, Any]:
+    """Recompute §23.5's token result. Shared verbatim with the runner.
+
+    Imported from the runner rather than reimplemented: two copies of a
+    correctness criterion drift, and the sealer's job is to recompute the
+    runner's claim with the SAME rule, not a similar one.
+    """
+
+    import importlib.util
+
+    path = REPO / "scripts" / "greenfield" / "run_short_decoder_ws32.py"
+    specification = importlib.util.spec_from_file_location("ws32_runner_rules", path)
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module._long_context_token_result(
+        observed_tokens, long_context, tokenizer_root=tokenizer_root
+    )
 
 
 def _rank0_dsa_arrays(run_dir: Path, record: Mapping[str, Any]) -> dict[str, Any]:

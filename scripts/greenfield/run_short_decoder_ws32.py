@@ -65,6 +65,8 @@ from glm_tpu.greenfield.types import ModelGeometry  # noqa: E402
 from glm_tpu.greenfield.validation.ws32_evidence import EVIDENCE_LAYOUT_V2  # noqa: E402
 from glm_tpu.greenfield.validation import (  # noqa: E402
     compare_ws32_dsa_step,
+    compare_ws32_dsa_within_engine,
+    load_ws32_long_context_oracle,
     bind_ws32_adjudication,
     compare_ws32_raw_tokens,
     load_ws32_adjudicated_divergence,
@@ -90,6 +92,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--topology-capture-root", required=True, type=Path)
     parser.add_argument("--checkpoint-root", required=True, type=Path)
     parser.add_argument("--source-inventory", required=True, type=Path)
+    # Spec §23.5: L7/L8 run against a TOKEN-ONLY long-context oracle. The legacy
+    # harness captured no DSA events at 128K/256K and §23.5 forbids inventing
+    # one, so these modes carry the within-engine DSA contract and make no
+    # cross-oracle claim. §21's cross-oracle path stays the only path for 2k/8k.
+    parser.add_argument("--long-context", choices=("passkey", "e0"), default=None)
+    parser.add_argument("--tokenizer-root", type=Path, default=None)
+    parser.add_argument("--long-context-oracle-dir", type=Path, default=None)
+    parser.add_argument("--long-context-manifest-sha256", default=_ZERO_SHA)
+    parser.add_argument("--long-context-success-sha256", default=_ZERO_SHA)
     parser.add_argument("--token-oracle-dir", required=True, type=Path)
     parser.add_argument("--dsa-oracle-dir", required=True, type=Path)
     parser.add_argument("--expected-code-hash", required=True)
@@ -520,6 +531,59 @@ def _initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, A
     return jax, mesh, physical_mesh, topology, fleet_sha
 
 
+def _long_context_token_result(
+    observed_tokens: list[int],
+    long_context: Any,
+    *,
+    tokenizer_root: Path | None,
+) -> dict[str, Any]:
+    """Spec §23.5: the token result at a length with no legacy token oracle.
+
+    For L7 the pass criterion is the extracted passkey against gold. The legacy
+    ids are compared as a DIAGNOSTIC and the result deliberately carries no
+    ``exact_prefix_match`` key, because §23.5 forbids labelling anything "raw
+    tokens exact" at these lengths. For L8 there is no criterion at all and
+    ``passkey_matches_gold`` is None.
+    """
+
+    legacy = np.asarray(long_context.generated_token_ids, dtype=np.int32)
+    compared = min(len(observed_tokens), int(legacy.size))
+    observed = np.asarray(observed_tokens[:compared], dtype=np.int32)
+    diagnostic = {
+        "compared": int(compared),
+        "legacy_ids_match": bool(np.array_equal(observed, legacy[:compared])),
+        "note": (
+            "legacy ids are a diagnostic reference (§23.1/§23.5): the legacy stored "
+            "text, not ids, and nothing here is a raw-tokens-exact claim"
+        ),
+    }
+    result: dict[str, Any] = {
+        "kind": long_context.kind,
+        "legacy_diagnostic": diagnostic,
+        "observed_token_count": len(observed_tokens),
+        "passkey_matches_gold": None,
+    }
+    if long_context.kind != "passkey":
+        result["criterion"] = "none (§23.5: L8 has no correctness oracle)"
+        return result
+
+    result["criterion"] = "extract_passkey(detok(first 20 greedy tokens)) == gold"
+    result["gold"] = long_context.gold
+    if tokenizer_root is None:
+        raise ValueError("WS32 passkey mode needs --tokenizer-root to detokenise")
+    from transformers import AutoTokenizer
+
+    import bench.glm_longctx as longctx
+
+    tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_root), trust_remote_code=True)
+    text = tokenizer.decode(observed_tokens[: int(legacy.size)], skip_special_tokens=True)
+    extracted = longctx.extract_passkey(text)
+    result["detokenised"] = text
+    result["extracted_passkey"] = extracted
+    result["passkey_matches_gold"] = bool(extracted == long_context.gold)
+    return result
+
+
 def main() -> int:
     args = parse_args()
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
@@ -617,14 +681,33 @@ def main() -> int:
         strategy_nd_dense=bool(args.strategy_nd_dense),
         host_main_rope_table=bool(args.host_main_rope_table),
     )
-    oracle = load_ws32_short_context_oracle(
-        args.token_oracle_dir,
-        args.dsa_oracle_dir,
-        expected_token_manifest_sha256=args.token_oracle_manifest_sha256,
-        expected_dsa_manifest_sha256=args.dsa_oracle_manifest_sha256,
-        expected_token_success_sha256=args.token_oracle_success_sha256,
-        expected_dsa_success_sha256=args.dsa_oracle_success_sha256,
-    )
+    long_context = None
+    if args.long_context is not None:
+        if args.long_context_oracle_dir is None:
+            raise ValueError("WS32 long-context mode needs its oracle directory")
+        if args.dsa_adjudication_record is not None:
+            # §23.5: there is nothing at these lengths for a §21.2 record to
+            # adjudicate against, and binding one would imply a cross-oracle
+            # comparison that does not exist.
+            raise ValueError("WS32 long-context runs bind no §21.2 adjudication record")
+        long_context = load_ws32_long_context_oracle(
+            args.long_context_oracle_dir,
+            expected_manifest_sha256=args.long_context_manifest_sha256,
+            expected_success_sha256=args.long_context_success_sha256,
+            expected_kind=args.long_context,
+        )
+        oracle = None
+        prompt_token_ids = long_context.prompt_token_ids
+    else:
+        oracle = load_ws32_short_context_oracle(
+            args.token_oracle_dir,
+            args.dsa_oracle_dir,
+            expected_token_manifest_sha256=args.token_oracle_manifest_sha256,
+            expected_dsa_manifest_sha256=args.dsa_oracle_manifest_sha256,
+            expected_token_success_sha256=args.token_oracle_success_sha256,
+            expected_dsa_success_sha256=args.dsa_oracle_success_sha256,
+        )
+        prompt_token_ids = oracle.prompt_token_ids
     # Spec §21.2 first-divergent-event adjudication: default off (exact mode).
     if args.dsa_adjudication_record is None:
         if args.dsa_adjudication_sha256 != _ZERO_SHA:
@@ -651,7 +734,7 @@ def main() -> int:
             "step": dsa_adjudication.step,
         }
     required_capacity = (
-        oracle.prompt_token_ids.size
+        prompt_token_ids.size
         + args.observer_steps
         + args.warmup
         + args.iterations
@@ -661,7 +744,7 @@ def main() -> int:
         raise ValueError(
             "WS32 context capacity does not cover prompt plus proof/timing steps"
         )
-    if args.observer_steps > oracle.decode_positions.size:
+    if oracle is not None and args.observer_steps > oracle.decode_positions.size:
         raise ValueError("WS32 observer steps exceed the sealed DSA oracle")
 
     jax, mesh, physical_mesh, topology, fleet_sha = _initialize_runtime(args)
@@ -814,7 +897,7 @@ def main() -> int:
         del raw_exact_weights
         gc.collect()
     program = build_ws32_decoder_program(mesh, config)
-    prompt_length = int(oracle.prompt_token_ids.size)
+    prompt_length = int(prompt_token_ids.size)
     full_chunks, tail_length = ws32_prefill_chunk_plan(
         prompt_length, args.prefill_chunk
     )
@@ -902,7 +985,7 @@ def main() -> int:
             chunk_ids = _replicated(
                 jax,
                 mesh,
-                oracle.prompt_token_ids[
+                prompt_token_ids[
                     index * args.prefill_chunk : (index + 1) * args.prefill_chunk
                 ],
             )
@@ -934,7 +1017,7 @@ def main() -> int:
                     f"{projected:.1f}s > {args.prefill_budget_seconds:.1f}s"
                 )
         tail_ids = _replicated(
-            jax, mesh, oracle.prompt_token_ids[full_chunks * args.prefill_chunk :]
+            jax, mesh, prompt_token_ids[full_chunks * args.prefill_chunk :]
         )
         inputs = (tail_ids, current_state, weights)
         if exact_dsa_weights is not None:
@@ -1035,15 +1118,29 @@ def main() -> int:
                 observed_dsa_producers = producers
             elif not np.array_equal(observed_dsa_producers, producers):
                 raise RuntimeError("WS32 DSA producer identities changed by step")
-            comparison = compare_ws32_dsa_step(
-                producer_layer_ids=producers,
-                selected_positions=positions,
-                selected_valid_counts=counts,
-                selected_scores=scores,
-                oracle=oracle,
-                step=step,
-                adjudication=dsa_adjudication,
-            )
+            if oracle is None:
+                # §23.5: no legacy DSA capture exists at 128K/256K, so the
+                # engine is held to its own contract and nothing is claimed
+                # against a capture that was never taken.
+                comparison = compare_ws32_dsa_within_engine(
+                    producer_layer_ids=producers,
+                    selected_positions=positions,
+                    selected_valid_counts=counts,
+                    selected_scores=scores,
+                    decode_position=prompt_length + step,
+                    step=step,
+                    expected_producer_layer_ids=observed_dsa_producers,
+                )
+            else:
+                comparison = compare_ws32_dsa_step(
+                    producer_layer_ids=producers,
+                    selected_positions=positions,
+                    selected_valid_counts=counts,
+                    selected_scores=scores,
+                    oracle=oracle,
+                    step=step,
+                    adjudication=dsa_adjudication,
+                )
             dsa_steps.append(comparison)
             observed_dsa_positions.append(positions)
             observed_dsa_counts.append(counts)
@@ -1147,7 +1244,7 @@ def main() -> int:
         "main_rope_table": main_rope_table_record,
         "prefill_chunk_length": int(args.prefill_chunk),
         "prefill_execution": prefill_execution,
-        "prompt_length": int(oracle.prompt_token_ids.size),
+        "prompt_length": int(prompt_token_ids.size),
         "rotary_diagnostic": rotary_diagnostic,
         "source_inventory_sha256": inventory.inventory_sha256,
         "strategy_nd_dense": config.strategy_nd_dense,
@@ -1264,12 +1361,17 @@ def main() -> int:
         dsa_selected_scores=np.stack(observed_dsa_scores, axis=0),
         dsa_selected_valid_counts=np.stack(observed_dsa_counts, axis=0),
     )
-    oracle_token_count = min(
-        len(observed_tokens), int(oracle.generated_token_ids.size)
-    )
-    tokens = compare_ws32_raw_tokens(
-        observed_tokens[:oracle_token_count], oracle
-    )
+    if oracle is None:
+        tokens = _long_context_token_result(
+            observed_tokens, long_context, tokenizer_root=args.tokenizer_root
+        )
+    else:
+        oracle_token_count = min(
+            len(observed_tokens), int(oracle.generated_token_ids.size)
+        )
+        tokens = compare_ws32_raw_tokens(
+            observed_tokens[:oracle_token_count], oracle
+        )
     state_position = np.asarray(
         jax.device_get(current_state.position), dtype=np.int32
     ).tolist()
@@ -1279,8 +1381,14 @@ def main() -> int:
     state_health = np.asarray(
         jax.device_get(current_state.contract_valid), dtype=np.bool_
     ).tolist()
+    if oracle is None:
+        # §23.5: L7 passes iff the extracted passkey equals gold; L8 has no
+        # correctness oracle, so only the engine's own contracts gate it.
+        token_criterion = tokens["passkey_matches_gold"] is not False
+    else:
+        token_criterion = tokens["exact_prefix_match"]
     correctness_passed = bool(
-        tokens["exact_prefix_match"]
+        token_criterion
         and all(item["passed"] for item in dsa_steps)
         and cache["passed"]
         and state_position == [required_capacity]

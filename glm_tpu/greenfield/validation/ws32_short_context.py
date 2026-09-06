@@ -609,6 +609,111 @@ def bind_ws32_adjudication(
         raise ValueError("WS32 adjudication context differs from the run")
 
 
+def compare_ws32_dsa_within_engine(
+    *,
+    producer_layer_ids: np.ndarray,
+    selected_positions: np.ndarray,
+    selected_valid_counts: np.ndarray,
+    selected_scores: np.ndarray,
+    decode_position: int,
+    step: int,
+    expected_producer_layer_ids: np.ndarray | None = None,
+) -> dict[str, Any]:
+    """Spec §23.5: the DSA contract when NO legacy oracle exists at this length.
+
+    §23.1 records that the legacy harness captured no DSA events at 128K/256K
+    and §23.5 forbids inventing one, so L7/L8 cannot compare selected sets to
+    anything external. What remains is everything the engine must satisfy on its
+    own evidence, and it is not weak: every selected position is in range for
+    the decode position and distinct, every score is finite, the padding tail is
+    exactly the sentinel, and the live entries are in the executing program's
+    canonical order — descending score with lowest position breaking ties, which
+    is what actually pins the device's tie handling. Producer layer identities
+    must also be the same at every step of the run.
+
+    This deliberately makes NO cross-oracle claim. A result carrying it is
+    classified `DSA_WITHIN_ENGINE_EXACT;NO_CROSS_ORACLE` and may never be
+    labelled exact against a legacy capture.
+    """
+
+    producer_layer_ids = np.asarray(producer_layer_ids, dtype=np.int32)
+    positions = np.asarray(selected_positions, dtype=np.int32)
+    counts = np.asarray(selected_valid_counts, dtype=np.int32)
+    scores = np.asarray(selected_scores, dtype=np.float32)
+    events = producer_layer_ids.size
+    if positions.ndim != 3 or counts.ndim != 2 or scores.ndim != 3:
+        raise ValueError("WS32 DSA observation geometry drifted")
+    width = positions.shape[-1]
+    if (
+        positions.shape != (events, 1, width)
+        or counts.shape != (events, 1)
+        or scores.shape != (events, 1, width)
+    ):
+        raise ValueError("WS32 DSA observation geometry drifted")
+    if decode_position < 0:
+        raise ValueError("WS32 decode position must be non-negative")
+    positions = positions[:, 0]
+    counts = counts[:, 0]
+    scores = scores[:, 0]
+
+    producer_stable = True
+    if expected_producer_layer_ids is not None:
+        producer_stable = bool(
+            np.array_equal(
+                producer_layer_ids,
+                np.asarray(expected_producer_layer_ids, dtype=np.int32),
+            )
+        )
+
+    count_contract_mismatches: list[int] = []
+    tail_mismatches: list[int] = []
+    score_contract_mismatches: list[int] = []
+    selected_counts: list[int] = []
+    for event in range(events):
+        observed_count = int(counts[event])
+        selected_counts.append(observed_count)
+        if not 0 <= observed_count <= width:
+            count_contract_mismatches.append(event)
+        safe_count = min(max(observed_count, 0), width)
+        live = positions[event, :safe_count]
+        live_scores = scores[event, :safe_count]
+        tail_positions = positions[event, safe_count:]
+        tail_scores = scores[event, safe_count:]
+        if np.any(tail_positions != -1) or np.any(~np.isneginf(tail_scores)):
+            tail_mismatches.append(event)
+        canonical = np.lexsort(
+            (live.astype(np.int64, copy=False), _descending_float32_key(live_scores))
+        )
+        if (
+            np.any(live < 0)
+            or np.any(live > decode_position)
+            or np.unique(live).size != live.size
+            or np.any(~np.isfinite(live_scores))
+            or not np.array_equal(canonical, np.arange(live.size))
+        ):
+            score_contract_mismatches.append(event)
+
+    passed = not (
+        count_contract_mismatches
+        or tail_mismatches
+        or score_contract_mismatches
+        or not producer_stable
+    )
+    return {
+        "actual_device_score_order_and_ties": not score_contract_mismatches,
+        "contract": "within_engine_only",
+        "count_contract_mismatch_events": count_contract_mismatches,
+        "cross_oracle": False,
+        "decode_position": int(decode_position),
+        "passed": passed,
+        "producer_layer_ids_stable": producer_stable,
+        "score_contract_mismatch_events": score_contract_mismatches,
+        "selected_counts": selected_counts,
+        "step": int(step),
+        "tail_mismatch_events": tail_mismatches,
+    }
+
+
 def compare_ws32_dsa_step(
     *,
     producer_layer_ids: np.ndarray,
