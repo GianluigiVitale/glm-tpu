@@ -111,6 +111,11 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--later-event-alarm-lessons-pin", default="")
     validate.add_argument("--recovery-code-hash", default="")
     validate.add_argument(
+        "--reviewed-ref",
+        default="refs/remotes/origin/rewrite/topology-first-decode",
+        help="the published branch an adjudicated seal's run pin must be contained in",
+    )
+    validate.add_argument(
         "--strategy-nd-dense", choices=(0, 1), required=True, type=int
     )
     validate.add_argument(
@@ -230,6 +235,13 @@ _ENFORCEMENT_SURFACE = (
     "glm_tpu/greenfield/validation",
     "glm_tpu/greenfield/benchmarking",
     "glm_tpu/greenfield/sharding",
+    # §23.8: `_require_main_rope_table` recomputes the accepted table digest from
+    # the reference rotary construction, the runtime's theta and the model
+    # geometry, so those decide acceptance too.
+    "glm_tpu/greenfield/kernels/reference",
+    "glm_tpu/greenfield/runtime",
+    "glm_tpu/greenfield/types.py",
+    "configs/glm-5.2-fp8-config.json",
     "docs/artifacts",
 )
 # `docs/artifacts` legitimately holds untracked outputs of the offline
@@ -511,6 +523,13 @@ def _validate(args: argparse.Namespace) -> int:
         _require_imports_come_from(repository_root)
         _require_clean_worktree(repository_root)
         enforcement_surface = _enforcement_surface_identity(repository_root)
+        _require_reviewed_enforcement(
+            repository_root,
+            enforcement_surface,
+            code_hash=args.code_hash,
+            recovery_code_hash=args.recovery_code_hash,
+            reviewed_ref=args.reviewed_ref,
+        )
     else:
         enforcement_surface = None
     if args.recovery_code_hash and not re.fullmatch(r"[0-9a-f]{40}", args.recovery_code_hash):
@@ -548,7 +567,7 @@ def _validate(args: argparse.Namespace) -> int:
                 expected_sha256=args.dsa_adjudication_sha256,
                 repository_root=repository_root,
             )
-        except (OSError, ValueError) as error:
+        except (OSError, ValueError, KeyError) as error:
             # A loader refusal is a refusal to seal, not a traceback.
             raise SystemExit(f"WS32 adjudication record is not loadable: {error}")
         try:
@@ -1286,6 +1305,56 @@ def _enforcement_surface_identity(repository_root: Path) -> dict[str, str]:
     return identity
 
 
+def _require_reviewed_enforcement(
+    repository_root: Path,
+    surface: Mapping[str, str],
+    *,
+    code_hash: str,
+    recovery_code_hash: str,
+    reviewed_ref: str,
+) -> None:
+    """The enforcement must be the reviewed enforcement, at a published pin.
+
+    A clean tree proves only that the checkout matches its own HEAD. A scratch
+    branch carrying a widened `REFERENCE_ROWS`, run and sealed from its own
+    checkout, is clean. Two things close that: the run's pin must be contained
+    in the reviewed remote branch, and the enforcement surface must be the one
+    committed at that pin (or at the declared recovery pin, which is how a seal
+    driven by newer code declares itself).
+    """
+
+    reachable = subprocess.run(
+        [_GIT, "-C", str(repository_root), "merge-base", "--is-ancestor", code_hash, reviewed_ref],
+        capture_output=True,
+        text=True,
+    )
+    if reachable.returncode != 0:
+        raise SystemExit(
+            f"WS32 adjudicated seal requires the run pin {code_hash} to be published on "
+            f"{reviewed_ref}; a pin only this checkout knows about is not reviewed"
+        )
+    pins = [code_hash] + ([recovery_code_hash] if recovery_code_hash else [])
+    for pin in pins:
+        expected = {}
+        for relative in _ENFORCEMENT_SURFACE:
+            result = subprocess.run(
+                [_GIT, "-C", str(repository_root), "rev-parse", f"{pin}:{relative}"],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                break
+            expected[relative] = result.stdout.strip()
+        else:
+            if all(surface.get(key) == value for key, value in expected.items()):
+                return
+    raise SystemExit(
+        "WS32 adjudicated seal runs enforcement code that is not the code committed at "
+        f"the run's pin {code_hash}"
+        + (f" or the declared recovery pin {recovery_code_hash}" if recovery_code_hash else "")
+    )
+
+
 def _require_clean_worktree(repository_root: Path) -> None:
     """Refuse to seal an adjudicated run from a modified checkout.
 
@@ -1358,10 +1427,17 @@ def _require_imports_come_from(repository_root: Path) -> None:
     another is the same defect as not checking at all.
     """
 
+    from glm_tpu.greenfield import types as greenfield_types
+    from glm_tpu.greenfield.kernels.reference import rotary as reference_rotary
     from glm_tpu.greenfield.validation import ws32_first_divergent_event, ws32_short_context
 
     root = Path(repository_root).resolve()
-    for module in (ws32_short_context, ws32_first_divergent_event):
+    for module in (
+        ws32_short_context,
+        ws32_first_divergent_event,
+        reference_rotary,
+        greenfield_types,
+    ):
         origin = Path(getattr(module, "__file__", "")).resolve()
         if not origin.is_relative_to(root):
             raise SystemExit(

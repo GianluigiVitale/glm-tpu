@@ -1713,16 +1713,19 @@ section grants no install or execution authority.
    which is what the registry exists to force into review, and why a new event requires a new
    reviewed entry rather than a new file. Because the registry and the §21.2 arithmetic are read
    from this repository's source at seal time, an adjudicated seal additionally refuses to run from
-   a modified enforcement surface (`scripts/greenfield/seal_short_decoder_ws32.py`,
-   `glm_tpu/greenfield/validation/`, `docs/artifacts/`): an edit that widens what is accepted must
+   a modified enforcement surface (the sealer, `glm_tpu/greenfield/{validation,benchmarking,sharding,
+   runtime,kernels/reference}`, `glm_tpu/greenfield/types.py`, the model config and
+   `docs/artifacts/`): an edit that widens what is accepted must
    be committed, and therefore reviewable, rather than made and reverted around a seal. The refusal
    also covers `--assume-unchanged` and `--skip-worktree`, which hide an edit from `git status`
    without committing anything, and the sealer puts its own repository first on `sys.path` and
    refuses to run if the §21.2 modules resolve outside it. This check runs BEFORE the record's
-   schema, basis and source-run checks; the ordering sentence in the grandfathering paragraph below
-   refers to the digest exemption, not to this refusal. It is applied after the schema, basis, oracle and
-   source-run checks, all of which the record satisfies, so any future tightening of those must be
-   checked against it explicitly. The exempt record provably carries neither binding, because the
+   schema, basis and source-run checks. The run's pin must also be contained in the
+   published reviewed branch, and the enforcement surface must be the surface committed at that pin
+   (or at a declared recovery pin), so a scratch branch carrying a widened registry cannot seal even
+   with a clean tree. The digest comparison is made after the schema, basis, oracle
+   and source-run checks, all of which the record satisfies, so any future tightening of those must
+   be checked against it explicitly. The exempt record provably carries neither binding, because the
    exemption is keyed on its content digest. History is not weakened and no new record may use it.
 5. **Internal tensors (level 2).** Layer outputs, residuals and caches are compared under the bounded
    contracts in `docs/greenfield/NUMERICAL_CONTRACT.md`; cache/state structure (positions, tails,

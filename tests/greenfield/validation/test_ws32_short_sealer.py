@@ -1514,6 +1514,8 @@ def _run_validate(tmp_path, **overrides):
     # test_an_adjudicated_seal_requires_a_clean_checkout; a tree being
     # edited is by definition modified while these tests are written.
     module._require_clean_worktree = lambda root: None
+    module._require_reviewed_enforcement = lambda *a, **k: None
+    module._require_imports_come_from = lambda root: None
     repository_root = _Path(__file__).resolve().parents[3]
     argv = build(SEALED_C512_RUN, tmp_path / "summary.json", repository_root, **overrides)
     original = sys.argv
@@ -1542,9 +1544,10 @@ def test_validate_reaches_the_run_records_with_the_genuine_adjudication(tmp_path
 def test_validate_refuses_an_adjudication_record_outside_the_reviewed_directory(tmp_path) -> None:
     """The record-path guard, exercised rather than grepped.
 
-    Nothing here writes into the reviewed evidence tree: a copy of the record
-    outside the repository must be refused as well, and that is the branch the
-    guard shares with an in-repository path outside docs/artifacts.
+    Nothing here writes into the reviewed evidence tree: the out-of-repository
+    copy lives in the temporary directory, and the in-repository case uses a
+    path that does not exist, because the guard is a path predicate evaluated
+    before anything is read.
     """
     import shutil
     from pathlib import Path as _Path
@@ -1559,13 +1562,12 @@ def test_validate_refuses_an_adjudication_record_outside_the_reviewed_directory(
 
     # And an IN-REPOSITORY path outside the reviewed directory, which is the
     # branch a tmp_path copy does not reach: such a record would be invisible to
-    # the prior-attempt scan, which globs docs/artifacts alone.
+    # the offline adjudicator's prior-attempt scan, which globs docs/artifacts
+    # alone. The guard is a path predicate evaluated before any read, so the
+    # file need not exist and nothing is written into the reviewed tree.
     inside = repository_root / "glm_tpu" / "gate-d-misplaced-record.json"
-    shutil.copyfile(source, inside)
-    try:
-        message = _run_validate(tmp_path, dsa_adjudication_record=str(inside))
-    finally:
-        inside.unlink()
+    assert not inside.exists()
+    message = _run_validate(tmp_path, dsa_adjudication_record=str(inside))
     assert message is not None
     assert "must be a docs/artifacts/gate-*.json artifact" in message, message
 
@@ -1644,6 +1646,8 @@ def _run_validate_with_record(tmp_path, adjudication):
     # test_an_adjudicated_seal_requires_a_clean_checkout; a tree being
     # edited is by definition modified while these tests are written.
     module._require_clean_worktree = lambda root: None
+    module._require_reviewed_enforcement = lambda *a, **k: None
+    module._require_imports_come_from = lambda root: None
     module.load_ws32_adjudicated_divergence = lambda *a, **k: adjudication
     repository_root = _Path(__file__).resolve().parents[3]
     argv = build(SEALED_C512_RUN, tmp_path / "summary.json", repository_root)
@@ -1768,6 +1772,8 @@ def test_validate_actually_reaches_the_pin_checks_and_the_re_derivation(tmp_path
     # test_an_adjudicated_seal_requires_a_clean_checkout; a tree being
     # edited is by definition modified while these tests are written.
     module._require_clean_worktree = lambda root: None
+    module._require_reviewed_enforcement = lambda *a, **k: None
+    module._require_imports_come_from = lambda root: None
     reached = []
 
     original_rederive = module._rederive_ws32_adjudication
@@ -2207,7 +2213,7 @@ def test_untracked_adjudication_outputs_do_not_block_a_seal(tmp_path) -> None:
         module._require_clean_worktree(repository)
 
 
-def _run_patched_validate(tmp_path, *, stop_at_alarm: bool, trace=None):
+def _run_patched_validate(tmp_path, *, stop_at_alarm: bool, trace=None, break_rank=None):
     """Drive `_validate` over a schema-patched copy of the sealed C=512 run.
 
     Withholding the later-event alarm profile stops validation inside rank 0's
@@ -2224,15 +2230,23 @@ def _run_patched_validate(tmp_path, *, stop_at_alarm: bool, trace=None):
         import pytest as _pytest
 
         _pytest.skip("the sealed C=512 run directory or an 8K oracle is unavailable")
-    run_dir = patched_run_dir(tmp_path / "run")
+    run_dir = patched_run_dir(tmp_path / "run", break_rank=break_rank)
     module = _sealer_module()
     module._require_clean_worktree = lambda root: None
     module._require_imports_come_from = lambda root: None
+    # Exercised directly by test_the_enforcement_code_must_be_the_pins_own; a
+    # sealed run predates the enforcement code under development here.
+    module._require_reviewed_enforcement = lambda *a, **k: None
     if trace is not None:
         original = module._rederive_ws32_adjudication
 
         def traced(**kwargs):
-            trace.append((kwargs["rank"], id(kwargs["arrays"])))
+            import hashlib as _hashlib
+
+            digest = _hashlib.sha256()
+            for name in sorted(kwargs["arrays"]):
+                digest.update(kwargs["arrays"][name].tobytes())
+            trace.append((kwargs["rank"], digest.hexdigest()))
             return original(**kwargs)
 
         module._rederive_ws32_adjudication = traced
@@ -2260,11 +2274,16 @@ def test_validate_re_derives_inside_the_rank_loop_on_real_evidence(tmp_path) -> 
     after it was sealed, so every digest, pin and trace binding is the real one.
     """
     trace: list = []
-    message, code = _run_patched_validate(tmp_path, stop_at_alarm=True, trace=trace)
+    # Rank 1's trace record is faulted at the very end of its iteration, so
+    # validation stops there: rank 1 must already have been re-derived, which a
+    # rank-0-only loop guard cannot satisfy.
+    message, code = _run_patched_validate(
+        tmp_path, stop_at_alarm=False, trace=trace, break_rank=1
+    )
     assert message is not None and code is None
-    assert "alarm acknowledgement is not bound" in message, message
-    # One pass in the adjudication block, one inside rank 0's iteration.
-    assert [rank for rank, _ in trace] == [0, 0], trace
+    assert "trace identity drifted rank 1" in message, message
+    # One pass in the adjudication block, then rank 0 and rank 1 in the loop.
+    assert [rank for rank, _ in trace] == [0, 0, 1], trace
 
 
 def test_validate_re_derives_every_rank_end_to_end(tmp_path) -> None:
@@ -2286,8 +2305,12 @@ def test_validate_re_derives_every_rank_end_to_end(tmp_path) -> None:
     assert code == 0
     assert [rank for rank, _ in trace] == [0, 0, 1, 2, 3, 4, 5, 6, 7], trace
     # Each loop pass must be given that rank's own arrays, not rank 0's.
-    identities = {rank: identity for rank, identity in trace[1:]}
-    assert len(set(identities.values())) == 8, "a rank was adjudicated on another's arrays"
+    # Every rank's arrays are proved bit-identical by _require_ranks_agree, so
+    # the content digest is the same for all of them; what this pins is that the
+    # loop ran once per rank with that rank's index.
+    assert len({identity for _, identity in trace}) == 1, (
+        "the ranks disagree on their observations, which _require_ranks_agree should have refused"
+    )
 
 
 def test_the_surface_check_uses_an_absolute_git() -> None:
@@ -2315,3 +2338,104 @@ def test_an_adjudication_sha_without_a_record_is_refused(tmp_path) -> None:
     )
     assert message is not None
     assert "adjudication SHA given without a record" in message, message
+
+
+def test_the_enforcement_code_must_be_the_pins_own_and_the_pin_published(tmp_path) -> None:
+    """P1: a clean tree proves nothing about which branch it is on.
+
+    A scratch branch carrying a widened registry, run and sealed from its own
+    checkout, has a clean tree and matching imports. Two things close it: the
+    run's pin must be contained in the published reviewed branch, and the
+    enforcement surface must be the surface committed at that pin.
+    """
+    import subprocess
+
+    import pytest as _pytest
+
+    module = _sealer_module()
+    repository = tmp_path / "repo"
+    surface = repository / "glm_tpu" / "greenfield" / "validation"
+    surface.mkdir(parents=True)
+    (surface / "ws32_short_context.py").write_text("REFERENCE_ROWS = {}\n", encoding="utf-8")
+    run = ["git", "-C", str(repository)]
+    author = ["-c", "user.email=t@t", "-c", "user.name=t"]
+    subprocess.run(run + ["init", "-q"], check=True, capture_output=True)
+    subprocess.run(run + author + ["add", "-A"], check=True, capture_output=True)
+    subprocess.run(run + author + ["commit", "-q", "-m", "reviewed"], check=True, capture_output=True)
+    pin = subprocess.run(
+        run + ["rev-parse", "HEAD"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    subprocess.run(run + ["update-ref", "refs/remotes/origin/reviewed", pin], check=True,
+                   capture_output=True)
+
+    monkey = list(module._ENFORCEMENT_SURFACE)
+    module._ENFORCEMENT_SURFACE = ("glm_tpu/greenfield/validation",)
+    try:
+        surface_identity = module._enforcement_surface_identity(repository)
+        module._require_reviewed_enforcement(
+            repository, surface_identity, code_hash=pin, recovery_code_hash="",
+            reviewed_ref="refs/remotes/origin/reviewed",
+        )
+
+        # A scratch commit that the reviewed branch does not contain.
+        (surface / "ws32_short_context.py").write_text(
+            'REFERENCE_ROWS = {"fitted": 1}\n', encoding="utf-8"
+        )
+        subprocess.run(run + author + ["commit", "-qam", "widened"], check=True, capture_output=True)
+        scratch = subprocess.run(
+            run + ["rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        scratch_identity = module._enforcement_surface_identity(repository)
+        with _pytest.raises(SystemExit, match="to be published on"):
+            module._require_reviewed_enforcement(
+                repository, scratch_identity, code_hash=scratch, recovery_code_hash="",
+                reviewed_ref="refs/remotes/origin/reviewed",
+            )
+
+        # Published pin, but the enforcement code is not that pin's.
+        with _pytest.raises(SystemExit, match="not the code committed at the run's pin"):
+            module._require_reviewed_enforcement(
+                repository, scratch_identity, code_hash=pin, recovery_code_hash="",
+                reviewed_ref="refs/remotes/origin/reviewed",
+            )
+
+        # Declaring the newer code as the recovery pin is how a seal driven by
+        # newer enforcement says so.
+        module._require_reviewed_enforcement(
+            repository, scratch_identity, code_hash=pin, recovery_code_hash=scratch,
+            reviewed_ref="refs/remotes/origin/reviewed",
+        )
+    finally:
+        module._ENFORCEMENT_SURFACE = tuple(monkey)
+
+    validate = _sealer_function("_validate")
+    assert _live_calls(validate, "_require_reviewed_enforcement")
+
+
+def test_the_summary_carries_the_enforcement_surface_it_ran_with() -> None:
+    """P3-1: the only durable output of the surface control was untested."""
+    import ast
+
+    validate = _sealer_function("_validate")
+    spreads = [
+        node for node in ast.walk(validate)
+        if isinstance(node, ast.Dict) and any(key is None for key in node.keys)
+    ]
+    unparsed = " ".join(ast.unparse(node) for node in spreads)
+    assert "enforcement_surface" in unparsed, (
+        "the summary no longer records the enforcement surface, so nothing downstream "
+        "can compare it against the reviewed branch"
+    )
+
+
+def test_the_status_path_helper_handles_renames_and_quoting() -> None:
+    """P3-4: the refusal message named the wrong path for a rename."""
+    module = _sealer_module()
+    assert module._status_path(" M glm_tpu/a.py") == "glm_tpu/a.py"
+    assert module._status_path("?? docs/artifacts/gate-d-x.json") == "docs/artifacts/gate-d-x.json"
+    assert module._status_path('R  old.py -> new.py') == "new.py"
+    assert module._status_path('?? "docs/artifacts/gate d.json"') == "docs/artifacts/gate d.json"
+    # `git diff --name-only` emits a bare path with no status prefix.
+    assert module._status_path("glm_tpu/greenfield/validation/x.py") == (
+        "glm_tpu/greenfield/validation/x.py"
+    )

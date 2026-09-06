@@ -13376,3 +13376,41 @@ LOWERCASING the tag letter but marks skip-worktree with a capital `S`, and my ch
 with nothing committed — the exact hole the check was added for, closed on one of its two doors. The
 rule is now that only a plain cached `H` is acceptable, and the test drives both flags: it sets each,
 edits the registry, asserts git reports the tree clean, and asserts the refusal.
+
+## 2026-09-06 02:5xZ — tenth Opus 5 rejection resolved: a clean tree is not a reviewed branch
+
+Round 9 confirmed the `--skip-worktree` fix and left one P1 and five P2s.
+
+* **P1 — a scratch checkout still sealed a fitted pre-registration.** The clean-surface check proves
+  the tree matches its own HEAD, never which branch that is. Commit a fitted row, its registry entry,
+  its validation record and a PASS analysis onto a private branch, run at that pin, seal from that
+  checkout: the tree is clean, the imports are local, every pin check passes because the run's pin IS
+  the scratch commit, and the recorded surface identity was compared to nothing. Two requirements
+  close it. The run's pin must be contained in the published reviewed branch, which the cron mirror
+  keeps current and which the wrapper now declares. And the enforcement surface must be the surface
+  committed AT that pin, or at a declared recovery pin — which is how a seal driven by newer
+  enforcement code says so, and is exactly the mechanism the Gate D and Step B recovery seals already
+  used.
+* **The advertised `reference_validation_path` control had no behavioural coverage** and its mutation
+  survived: the only test fed a hand-built stub, so it proved the sealer pins whatever the loader
+  hands it and nothing about the loader ever filling it. Two loader tests now cover both shapes.
+* **The default-suite anchor could not tell an eight-rank loop from a rank-0-only one**, because it
+  stopped inside rank 0's iteration. `patched_run_dir` now takes `break_rank`, faulting rank 1's trace
+  record at the very end of its iteration, so the anchor asserts the re-derivation ran for the
+  adjudication block, rank 0 and rank 1, which a rank-0-only guard cannot satisfy.
+* **`patched_run_dir` would have disarmed the next seal it was written for.** It used `update`, so
+  applied to an A′ run that genuinely declares `main_rope_table` it would have nulled the declaration
+  and validated a table-ON run as table-off — with §23.9's host-table B′ adjudication being the very
+  next seal. It now refuses a record that already declares either key.
+* **The enforcement surface omitted the code that decides what an A′ seal accepts:** the accepted
+  rotary-table digest is recomputed from the reference rotary construction, the runtime theta, the
+  model geometry and the model config, none of which were on the surface. All four are now, and the
+  import-origin check covers four modules rather than two.
+* §21.2 stated two contradictory orderings for the refusal it had just amended; the stale sentence is
+  gone rather than pointed at.
+
+Smaller: the summary's `enforcement_surface` field, `_status_path`'s rename and quoting handling, and
+the malformed-registry `KeyError` all have fixtures or refusals now; the opt-in test's "distinct
+arrays" assertion used `id()` of a rebound object, which CPython may reuse, and is a content digest
+now; and the last test that wrote into the reviewed tree does not, because the record-path guard is a
+predicate evaluated before anything is read.

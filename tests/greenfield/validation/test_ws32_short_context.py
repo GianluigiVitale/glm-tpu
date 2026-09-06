@@ -793,3 +793,47 @@ def test_the_analysis_must_agree_on_the_event_identity_keys(tmp_path) -> None:
                 expected_sha256=hashlib.sha256(payload).hexdigest(),
                 repository_root=tmp_path,
             )
+
+
+def test_a_record_declaring_a_row_carries_its_validation_record_path(tmp_path) -> None:
+    """The sealer pins that path to the run's commit; the loader must fill it."""
+    import hashlib
+    import json
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        REFERENCE_ROWS,
+        load_ws32_adjudicated_divergence,
+    )
+
+    record, _ = _adjudication_record_fixture(tmp_path)
+    payload = json.dumps(record).encode()
+    path = tmp_path / "record.json"
+    path.write_bytes(payload)
+    loaded = load_ws32_adjudicated_divergence(
+        path, expected_sha256=hashlib.sha256(payload).hexdigest(), repository_root=tmp_path
+    )
+    registered = REFERENCE_ROWS[("8k", 8155, 1, "rms_norm_eps_1e-5")]
+    assert loaded.reference_validation_path == registered["validation_path"]
+    assert loaded.reference_row_path == registered["path"]
+
+
+def test_the_grandfathered_record_declares_no_validation_path() -> None:
+    """It predates the registry, so there is nothing to pin; the row still is."""
+    import hashlib
+    from pathlib import Path as _Path
+
+    from glm_tpu.greenfield.validation.ws32_short_context import (
+        load_ws32_adjudicated_divergence,
+    )
+
+    root = _Path(__file__).resolve().parents[3]
+    committed = root / "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json"
+    loaded = load_ws32_adjudicated_divergence(
+        committed,
+        expected_sha256=hashlib.sha256(committed.read_bytes()).hexdigest(),
+        repository_root=root,
+    )
+    assert loaded.reference_validation_path is None
+    assert loaded.reference_row_path == (
+        "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy"
+    )

@@ -147,7 +147,9 @@ SCHEMA_ADDED_SINCE_THE_SEALED_RUN = {
 }
 
 
-def patched_run_dir(destination: Path, run_dir: Path = SEALED_C512_RUN) -> Path:
+def patched_run_dir(
+    destination: Path, run_dir: Path = SEALED_C512_RUN, *, break_rank: int | None = None
+) -> Path:
     """A copy of a sealed run whose runner records match the current schema.
 
     Everything except the eight runner records is symlinked, so the copy costs
@@ -171,7 +173,21 @@ def patched_run_dir(destination: Path, run_dir: Path = SEALED_C512_RUN) -> Path:
                 os.symlink(member, target / member.name)
                 continue
             record = json.loads(member.read_text(encoding="utf-8"))
-            record.update(SCHEMA_ADDED_SINCE_THE_SEALED_RUN)
+            present = sorted(set(SCHEMA_ADDED_SINCE_THE_SEALED_RUN) & set(record))
+            if present:
+                # Nulling a key a run actually declared would validate an A'
+                # table-on run as table-off. Only ever ADD absent keys.
+                raise AssertionError(
+                    f"{member.name} already declares {present}; this helper is for runs "
+                    "sealed before those features existed"
+                )
+            for key, value in SCHEMA_ADDED_SINCE_THE_SEALED_RUN.items():
+                record.setdefault(key, value)
+            if break_rank is not None and member.name == f"runner.rank{break_rank}.json":
+                # A deliberate fault at the END of that rank's iteration, so
+                # validation stops there and the ranks before it are proven to
+                # have been processed.
+                record["trace"] = dict(record["trace"], steps=record["trace"]["steps"] + 1)
             (target / member.name).write_text(
                 json.dumps(record, indent=2, sort_keys=True), encoding="utf-8"
             )

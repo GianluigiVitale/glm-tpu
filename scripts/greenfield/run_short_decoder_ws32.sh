@@ -638,6 +638,7 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   ${DSA_ADJUDICATION_CLI:+$DSA_ADJUDICATION_CLI} \
   --later-event-alarm-acknowledged "$LATER_EVENT_ALARM_ACK" \
   --recovery-code-hash "$RECOVERY_PIN" \
+  --reviewed-ref refs/remotes/origin/$BRANCH \
   ${LATER_EVENT_ALARM_CLI:+$LATER_EVENT_ALARM_CLI} \
   --checkpoint-transport "$CHECKPOINT_TRANSPORT" \
   --prefill-chunk "$PREFILL_CHUNK" \
