@@ -2253,7 +2253,16 @@ sealed one, at no throughput cost. The record
 pre-registration for the tables-ON configuration; the wrapper selects it whenever
 `GLM_GREENFIELD_WS32_HOST_MAIN_ROPE_TABLE=1`, and the Gate D record otherwise.
 
-*Run 2 will raise a later-event alarm, and it is not Gate D's.* Tables ON, the maximum later-event
+**B′ CLOSED — DB 570, SUCCESS `72839860…`.** Run
+`…numerical_hrope_20260906T162720142039604Z`, run pin `0850fb99`, recovery pin `85337a2e`, sealed
+2026-09-06 17:36Z with classification `…;DSA_EVENT1_ADJUDICATED_S21_2;…;MAIN_ROTARY_HOST_TABLE_LEGACY_FAITHFUL`.
+`correctness_passed` true on all eight ranks, `adjudicated_event_matches_record` true against the
+pre-registration `5a9b6e2b…` derived from a DIFFERENT run, no unexplained set mismatch, raw tokens
+`909682cb…8173` bit-identical to DB567's, p50 129.892 ms (7.699 tok/s), peak HBM 26,375,554,560
+B/chip with 6,638,844,416 B headroom, censuses 8/8. The host main-attention rotary table is therefore
+adopted at 8K on adjudicated evidence, not on argument.
+
+*Run 2 raised a later-event alarm, and it was not Gate D's.* Tables ON, the maximum later-event
 symmetric difference is 1976 at (step 2, event 17, layer 62) over 21 alarming events, against 1948
 over 24 for tables OFF, so the Gate D profile does not describe this configuration. The tables-ON
 profile is `docs/artifacts/gate-d-ws32-8k-hrope-20260906-later-event-profile.json`

@@ -13623,3 +13623,31 @@ the profile but never compares it to the observed one, so binding Gate D's would
 description. `docs/artifacts/gate-d-ws32-8k-hrope-20260906-later-event-profile.json` (`192469e2…`) is
 derived from run 1's own arrays. Run 2 therefore follows the Gate D sequence: first seal refuses at
 the acknowledgement, a lessons entry naming its tag is committed and pushed, recovery-seal at that pin.
+
+## 2026-09-06 17:36Z — B′ CLOSED: DB 570, the rotary table adopted at 8K on adjudicated evidence
+
+`greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z`, run pin `0850fb99`,
+recovery pin `85337a2e`, DB 570, SUCCESS `72839860…`, classification carrying both
+`DSA_EVENT1_ADJUDICATED_S21_2` and `MAIN_ROTARY_HOST_TABLE_LEGACY_FAITHFUL`.
+
+What it establishes. `correctness_passed` true on all eight ranks;
+`adjudicated_event_matches_record` true against a pre-registration derived from a DIFFERENT run and
+committed at this run's own pin, which the sealer re-derived from this run's own arrays rather than
+reading; no unexplained set mismatch; **raw tokens `909682cb…8173`, bit-identical to DB567's**. p50
+129.892 ms (7.699 tok/s) against DB567's 130.369 (7.671) — the table is fractionally FASTER, well
+inside noise. Peak HBM unchanged at 26,375,554,560 B/chip.
+
+The headline: the legacy-faithful main-attention rotary table changes which positions sit at the
+top-2048 boundary and changes not one emitted token, at no measurable cost in prefill or decode. That
+closes the branch the §23.8 diagnostic failure opened. §23.9's decision is now supported by a sealed
+adjudicated run rather than by the diagnostic argument alone.
+
+The two-run sequence worked exactly as designed and is worth keeping for anything that moves a
+boundary: run 1 refuses by design and produces the arrays, the record is adjudicated offline from
+them and committed, run 2 is judged by it, and the sealer refuses a record whose source is the run
+being sealed. Neither run could have sealed itself.
+
+Next: Step C. Acquisitions and capacity runs at 131,072 and 262,656, tables ON, which measure the
+per-capacity per-step cost that every L7/L8 projection currently extrapolates from 8K. The wrapper
+now refuses to bind an 8K adjudication record at any other capacity, so Step C runs carry no §21.2
+claim, which is correct — they are measurements.
