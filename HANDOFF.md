@@ -13510,3 +13510,32 @@ clones `--single-branch` and so does require the pin to be reachable from the br
 worker checks out any object it already has and worker 0 never fetches. The pre-run refusal, not the
 fleet, is what makes publication a requirement, and the paragraph now says so. The retracted claim
 also survived verbatim as a comment in the wrapper and is gone.
+
+## 2026-09-06 04:0xZ — MERGE. Thirteen rounds, and what they were actually about
+
+Opus 5 returned MERGE on `3854f5b7`: no P0, P1 or P2; four P3s, all marked not blocking, of which two
+are applied here (the inert `break_rank` in the new alarm test, and a wrapper assertion for the
+pre-run publication refusal — the class of edit that silently went missing last round). It proved
+rather than assumed that sealed evidence is untouched: all nine enforcement-surface paths have
+byte-identical tree object ids across this round, and `docs/greenfield/` and `bench/` are unchanged.
+
+What the thirteen rounds actually established, since the count is the striking part:
+
+* §21.2 items 3-4 are **re-derived by the sealer** from the run's own observations, the sealed oracle
+  and a reviewed FP64 reference row, for every rank. A verdict written into a file no longer decides
+  anything. The re-derivation reproduces the sealed Gate D numbers exactly on DB567, DB568 and DB569.
+* Pre-registration is **proven from the run's own pin**: the record, its analysis and its reference row
+  must be committed in the commit the run executed at, so a record written to fit an observed
+  divergence cannot satisfy it.
+* The reviewed reference row is a **registry entry in the package the sealer imports**, checked at
+  consumption, not a convention in the offline tool.
+* Validation is exercised **end to end on real protected evidence** rather than asserted about by
+  reading its source, which is what retired a whole family of unsound parse-tree tests.
+* And §21.2 now states the **ceiling**: the maximum these controls establish is that a widening is in
+  published history, never that it was reviewed, because the operator pushes to the reviewed branch.
+
+The rounds were not thirteen defects in the design. Roughly half were the same mistake in different
+clothes — a control asserted rather than measured, and a claim recorded rather than verified. The two
+I am least comfortable with are the ones where I wrote into this log that something was done when it
+was not: the neutrality argument in round 1 and the wrapper edits in round 12. Both were caught by the
+reviewer diffing, not by me re-reading. Re-read the file.

@@ -258,6 +258,10 @@ def test_ws32_sealer_binds_alarm_acknowledgement_and_states_adjudicated_basis() 
         "the validate invocation must not hand the sealer its own HEAD as a recovery pin"
     )
     assert "--reviewed-ref" in validate_block
+    # The pre-run publication refusal covers every pin the seal will demand, and
+    # this is the class of wrapper edit that has silently gone missing before.
+    assert 'for preflight_pin in "$PIN" $([[ $RECOVER == 1 ]] && echo "$RECOVERY_PIN"); do' in wrapper
+    assert "is not published on origin/$BRANCH" in wrapper
     assert "${LATER_EVENT_ALARM_CLI:+$LATER_EVENT_ALARM_CLI}" in wrapper
     specification = importlib.util.spec_from_file_location("ws32_sealer_for_test", sealer_path)
     module = importlib.util.module_from_spec(specification)

@@ -2531,10 +2531,11 @@ def test_an_alarm_acknowledgement_must_name_a_pin_this_seal_declares(tmp_path) -
     # An ORDINARY seal, declaring no recovery pin: that is the case the old
     # clause short-circuited past, accepting any well-formed local commit as the
     # acknowledgement's binding.
+    # The acknowledgement is checked inside rank 0's iteration, so no fault
+    # injection is needed to reach it.
     message, code = _run_patched_validate(
         tmp_path,
         stop_at_alarm=False,
-        break_rank=1,
         recovery_code_hash="",
         later_event_alarm_lessons_pin="b" * 40,
     )
