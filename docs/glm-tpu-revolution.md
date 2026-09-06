@@ -2017,6 +2017,36 @@ the repaired rows are visible only to decode. A chunked program must keep exactl
   `CAPACITY_MEASUREMENT` so these are never read as Gate D records. Prefill hours, worker timeouts
   and the projection margin for L7/L8 are derived from these measurements.
 
+### 23.3.2 Step C CLOSED — capacity measurement (2026-09-06)
+
+Two protected capacity runs, both sealed, both classified `CAPACITY_MEASUREMENT_<capacity>` so neither
+can be read as a Gate D record: **DB 571** (`…cap131072_hrope_20260906T191737720789480Z`, run pin
+`a04f6bde`, recovery `d5304e6a`) and **DB 572** (`…cap262656_hrope_20260906T211233754818996Z`, run pin
+`d5304e6a`, recovery `035b4ca9`). Both ran the sealed 8K prompt with the §23.8 rotary table on and the
+B′ pre-registration `5a9b6e2b…` bound.
+
+**Capacity does not change the numerics.** At 131,072 and again at 262,656 — 16× and 32× the sealed
+capacity — the numerical array manifest, the raw tokens `909682cb…8173` and both cache probe rows are
+bit-identical to DB 570's, `adjudicated_event_matches_record` is true against the same record, and no
+event is unexplained. §23.3's Step C requirement is met exactly as written, which is what allows L7 and
+L8 to inherit the 8K correctness argument rather than needing a new one.
+
+| capacity | pages | prefill/chunk | ms per prompt token | decode p50 | tok/s | peak HBM/chip |
+|---|---|---|---|---|---|---|
+| 8,192 | 16 | 238.46 s | 116.4 | 129.816 ms | 7.699 | 26,375,554,560 |
+| 131,072 | 256 | 262.30 s | 128.1 | 142.968 ms | 6.995 | 27,811,511,296 |
+| 262,656 | 513 | 290.80 s | 142.0 | 160.288 ms | 6.239 | 29,655,086,080 |
+
+Cost rises ~10% per capacity step while capacity rises 16× then 2×: **strongly sublinear**, which is
+what a top-2048 selection over a page table predicts and is the quantitative case that WS32_2D carries
+to long context. Peak HBM at 262,656 leaves 3,359,312,896 B (3.13 GiB) of the 33,014,398,976 B limit.
+The 262,656 acquisition's compiled estimate was 27.70 GiB against a 29.66 GiB measurement — 0.4 GiB
+optimistic, close enough to plan with and not close enough to substitute for the run.
+
+Consequences for §23.6 and the L7/L8 budgets, which previously extrapolated from 8K: a 128K prefill is
+131,072 × 128.1 ms ≈ **4.7 h**, a 256K prefill 262,144 × 142.0 ms ≈ **10.3 h**, and the worker timeout
+and projection margin follow from those rather than from ~116 ms/token.
+
 ### 23.3.1 Equivalence record — chunked exact prefill (2026-09-05)
 
 Two protected 8K runs with the chunked prefill reproduced every bit-level witness of the sealed Gate D
