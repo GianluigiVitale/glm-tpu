@@ -13354,3 +13354,10 @@ very disclosure the spec mandates; selected positions outside the reference row 
 of a wrap or a traceback; the sealer's third `git` call site and the stray-adjudication-SHA guard have
 fixtures; and §21.2's ordering sentence no longer claims the surface refusal runs after the schema and
 basis checks, which it does not.
+
+The opt-in eight-rank run has now been executed rather than described: `GLM_WS32_SLOW_SEAL_TEST=1`,
+14 min 46 s, passed. `_validate` returns 0 on the patched C = 512 run, the re-derivation runs for
+ranks 0, 0, 1, 2, 3, 4, 5, 6, 7, and each loop pass is handed a distinct arrays object — so
+substituting rank 0's arrays for every rank, which no AST assertion could catch, fails this test.
+That is also the first end-to-end demonstration that a protected run sealed under the old code still
+seals under all of this round's controls.
