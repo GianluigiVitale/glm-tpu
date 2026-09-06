@@ -1384,3 +1384,34 @@ normalized-state cause.
   layer 62) and are acknowledged for this run on the identity basis. Prefill wall 988 s (chunks 94/60×14 s,
   tail 56 s; ≈121 ms/token) against a 3,600 s budget; decode p50 130.01 ms (rank 0).
 
+
+- 2026-09-06 (spec §23.9 B′, the host main-attention rotary table under §21.2): run
+  `greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z` (run pin `0850fb99`,
+  acquisition `…8k_acquire_hrope_20260906T042442856878159Z` at `48372a34`, C = 2048, capacity 8192)
+  executed the sealed 8K workload with `GLM_GREENFIELD_WS32_HOST_MAIN_ROPE_TABLE=1`, i.e. the
+  legacy-faithful host BF16 main-attention rotary table (`apply_rotary_fp32_final_round`, 8192 × 64
+  rows, θ = 8e6, table sha `6a22140f…`). It bound the pre-registration
+  `docs/artifacts/gate-d-ws32-8k-bprime-adjudicated-divergence-20260906.json` (`5a9b6e2b…`),
+  adjudicated offline from B′ run 1 (`…hrope_20260906T151844646077531Z`), which is a DIFFERENT run —
+  the sealer refuses a record whose `engine_source_run` is the run being sealed. The run passed:
+  `correctness_passed` true on all eight ranks, `adjudicated_event_matches_record` true, no unexplained
+  set mismatch, and raw tokens `909682cb…8173` — **bit-identical to DB567's**, so the rotary table
+  changes which positions sit at the top-2048 boundary without changing a single emitted token.
+
+  This run's later-event alarm is NOT DB567's and the distinction matters, because the sealer
+  digest-binds the acknowledgement profile but never compares it to the observed one: binding Gate D's
+  profile here would have sealed a false description. Measured with the same convention on both
+  archives, `max |E Δ O|` is **1976** at (step 2, event 17, layer 62) over **21** events above the
+  1024 alarm threshold, against **1948** at the same event over **24** events for DB567. Alarming
+  steps are 0-7, 10, 11 (step 0: events 17, 18; step 2: 14-19; the rest subsets of {17, 18}). The
+  profile committed for this run is `docs/artifacts/gate-d-ws32-8k-hrope-20260906-later-event-profile.json`
+  (`192469e2…`), derived from run 1's own arrays. The alarm is acknowledged on that basis: the
+  divergence is confined to deep indexer layers past the adjudicated first divergent event, §21.2
+  records those without adjudicating them, and end-to-end correctness rests on exact raw tokens, which
+  hold bitwise.
+
+  Cost: none. Prefill wall 974 s for 8,155 tokens (chunks 257/239/238 s, ≈116.4 ms/token) against
+  1,004 s for the identical chunk plan without the table (DB 568); decode p50 129.816 ms against
+  129.663 ms, +0.12%, inside the 10-sample spread. Lesson: a change that alters boundary selection
+  needs its OWN pre-registration and its OWN alarm profile, and the two-run sequence is what keeps the
+  record a prediction rather than a description — run 1 produces the arrays, run 2 is judged by them.
