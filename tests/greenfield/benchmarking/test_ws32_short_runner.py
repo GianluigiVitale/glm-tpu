@@ -127,10 +127,24 @@ def test_ws32_wrapper_pins_the_committed_adjudication_record() -> None:
     root = Path(__file__).resolve().parents[3]
     wrapper = (root / "scripts/greenfield/run_short_decoder_ws32.sh").read_text(encoding="utf-8")
     sealer = (root / "scripts/greenfield/seal_short_decoder_ws32.py").read_text(encoding="utf-8")
-    record = root / "docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json"
-    pinned = re.search(r"^readonly DSA_ADJUDICATION_RECORD_8K_SHA=([0-9a-f]{64})$", wrapper, re.M)
-    assert pinned is not None
-    assert pinned.group(1) == hashlib.sha256(record.read_bytes()).hexdigest()
+    # One pre-registration per rotary configuration, each pinned by path AND by
+    # digest. Both branches are checked: a single anchored search would silently
+    # pass by matching whichever branch happens to come first.
+    paths = re.findall(r"^\s*readonly DSA_ADJUDICATION_RECORD_8K=\$WORKTREE/(\S+)$", wrapper, re.M)
+    digests = re.findall(r"^\s*readonly DSA_ADJUDICATION_RECORD_8K_SHA=([0-9a-f]{64})$", wrapper, re.M)
+    assert len(paths) == len(digests) == 2, (paths, digests)
+    for relative, pinned in zip(paths, digests):
+        record = root / relative
+        assert record.is_file(), relative
+        assert pinned == hashlib.sha256(record.read_bytes()).hexdigest(), relative
+    assert {relative.rsplit("/", 1)[-1] for relative in paths} == {
+        "gate-d-ws32-8k-adjudicated-divergence-20260905.json",
+        "gate-d-ws32-8k-bprime-adjudicated-divergence-20260906.json",
+    }
+    # The selection is made by the rotary flag, and reads it after it is set.
+    assert wrapper.index("readonly HOST_MAIN_ROPE_TABLE\n") < wrapper.index(
+        "if [[ $HOST_MAIN_ROPE_TABLE == 1 ]]; then"
+    ), "the record is selected before the flag it selects on is defined"
     assert "GLM_GREENFIELD_WS32_DSA_ADJUDICATION:-0" in wrapper
     assert "GLM_GREENFIELD_WS32_LATER_EVENT_ALARM_ACK:-0" in wrapper
     assert wrapper.count("$DSA_ADJUDICATION_CLI") >= 2

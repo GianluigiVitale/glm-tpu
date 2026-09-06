@@ -13591,3 +13591,35 @@ first placed that selection at line 73 while `HOST_MAIN_ROPE_TABLE` is defined a
 have silently bound the tables-OFF record to a tables-ON run. Found by grepping the definition order
 rather than assuming, relocated below the definition, and both branches proved to resolve to a file
 whose SHA matches.
+
+Review of the B′ record: the reviewer re-derived every number independently, with its own numpy code
+rather than the repo's, and reproduced the record, the analysis and every figure in §23.9.1 exactly —
+including that event 0 is BITWISE exact (positions and FP32 scores, max score difference 0.0), and
+that `eps_event` and the band are bit-identical between the tables-ON and tables-OFF configurations
+because the row and the oracle are unchanged. It also established the property run 2 depends on:
+DSA `selected_positions`/`selected_scores` digests are bitwise identical across four tables-OFF runs
+at four different pins and across unchunked, C = 2048 and C = 512 prefill, so a second run at the same
+graphs will reproduce the pre-registered sets.
+
+Its P1 was mine: moving the record selection into an `if/else` indented both assignments, and the
+committed assertion that ties the wrapper's pinned SHA to the record's bytes is an ANCHORED regex, so
+it matched nothing and the guard silently vanished for BOTH records. Relaxing the anchor would not fix
+it — a plain search returns the first branch and compares it against the other record. The assertion
+now enumerates both branches, checks each path exists and each digest matches its file, and asserts
+the selection reads the rotary flag after that flag is defined. Mutation-tested: reverting the wrapper
+to a single record fails it.
+
+The P3s are folded in. The 238.636 s comparison wall is DB 568's, not DB 569's (569 is C = 512, 59.9 s
+chunks). The no-cost claim now covers decode, which is what §18 reports: p50 129.910 ms with the table
+against 129.663 ms without, +0.19%, inside each run's own sample spread. §23.9.1 moved to follow §23.9
+instead of preceding it. And an adjudication record is now gated on capacity 8192 as well as context
+8k, so a Step C capacity run cannot bind it — verified both ways: capacity 131,072 with the flag on is
+refused by name, capacity 8192 passes.
+
+Most important operationally, and it was not in my plan: **run 2 will raise a later-event alarm whose
+profile is not Gate D's.** Tables ON the maximum later-event symmetric difference is 1976 at (step 2,
+event 17, layer 62) over 21 alarming events, against 1948 over 24 tables OFF. The sealer digest-binds
+the profile but never compares it to the observed one, so binding Gate D's would have sealed a false
+description. `docs/artifacts/gate-d-ws32-8k-hrope-20260906-later-event-profile.json` (`192469e2…`) is
+derived from run 1's own arrays. Run 2 therefore follows the Gate D sequence: first seal refuses at
+the acknowledgement, a lessons entry naming its tag is committed and pushed, recovery-seal at that pin.

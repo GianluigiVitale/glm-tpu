@@ -2133,46 +2133,6 @@ bit-exact vs the legacy oracle, with it 2,046/2,048 scores moved). The legacy 12
    record: on-device rotary at `ws32_layer.py:425, :511 (via dsa_index_keys_from_projection), :685,
    :734, :842` and `prefill_index.py:160`.
 
-### 23.9.1 B′ result — the host main-rotary table passes §21.2 at 8K (2026-09-06)
-
-A′ acquired its own 8K graph set at pin `48372a34`
-(`…acquire_hrope_20260906T042442856878159Z`, seven graphs, table 8192 x 64 rows, 1,048,576 B/device,
-θ = 8e6, sha `6a22140f…`). B′ run 1 (`…numerical_hrope_20260906T151844646077531Z`) bound NO record and
-refused by design with `ORACLE_MISMATCH`, which is what a first divergent event looks like when no
-pre-registration exists. Its per-rank observer arrays were published and adjudicated offline.
-
-**Event 0 is exact and events 1-20 diverge**, exactly as predicted: the indexer's rotary path is
-unchanged, so the first event whose upstream state the main-attention table can touch is event 1.
-The first divergent event is therefore `(step 0, event 1)`, producer layer 1, decode position 8155 —
-the same event the reviewed FP64 reference row `bfde8bd9…` is registered for, so no new reference row
-is required and the §21.5 validation record still applies.
-
-Adjudication (`docs/artifacts/gate-d-bprime-event1-analysis-20260906.json`, verdict PASS, all six
-checks) against the tables-OFF Gate D adjudication on the same row and the same `eps_event`
-0.22697279652271618, band 451:
-
-| | tables OFF (Gate D) | tables ON (A′) |
-|---|---|---|
-| engine Δ mean | −0.006235 | +0.007830 |
-| engine Δ max abs | 0.113455 | 0.121001 |
-| engine Δ std | 0.031047 | 0.031034 |
-| swapped positions | 7 | 6 |
-| oracle Δ mean (unchanged) | +0.111788 | +0.111765 |
-
-Both configurations sit far inside the κ = 2 caps, and in both the engine's deviation from the FP64
-reference is an order of magnitude smaller than the legacy oracle's own. The swapped set differs
-because different rounding at the top-2048 boundary selects slightly different members; the count
-falls from seven to six. **Cost: none measurable.** The same chunk of the same chunked prefill plan
-took 238.427 s with the table and 238.636 s without it (DB 569's C = 2048 sibling), i.e. ~117 ms per
-prompt token either way.
-
-Consequence: §23.9's decision to adopt the legacy-faithful main-attention rotary table for WS32 is
-supported at 8K by an adjudication that passes the same reviewed row and the same bounds as the
-sealed one, at no throughput cost. The record
-`docs/artifacts/gate-d-ws32-8k-bprime-adjudicated-divergence-20260906.json` (`5a9b6e2b…`) is the
-pre-registration for the tables-ON configuration; the wrapper selects it whenever
-`GLM_GREENFIELD_WS32_HOST_MAIN_ROPE_TABLE=1`, and the Gate D record otherwise.
-
 ## 23.10 Evidence layout v2 — one compressed HLO object per graph (2026-09-05)
 
 A protected run uploaded its HLO text once per rank: eight byte-identical copies of every graph and
@@ -2251,3 +2211,55 @@ Step C acquisitions and capacity runs with the table on → L7 → L8. The diagn
 default-off in later runs: it measures the device form, which the main path no longer uses, and this
 artifact is its record.
 
+### 23.9.1 B′ result — the host main-rotary table passes §21.2 at 8K (2026-09-06)
+
+A′ acquired its own 8K graph set at pin `48372a34`
+(`…acquire_hrope_20260906T042442856878159Z`, seven graphs, table 8192 x 64 rows, 1,048,576 B/device,
+θ = 8e6, sha `6a22140f…`). B′ run 1 (`…numerical_hrope_20260906T151844646077531Z`) bound NO record and
+refused by design with `ORACLE_MISMATCH`, which is what a first divergent event looks like when no
+pre-registration exists. Its per-rank observer arrays were published and adjudicated offline.
+
+**Event 0 is exact and events 1-20 diverge**, exactly as predicted: the indexer's rotary path is
+unchanged, so the first event whose upstream state the main-attention table can touch is event 1.
+The first divergent event is therefore `(step 0, event 1)`, producer layer 1, decode position 8155 —
+the same event the reviewed FP64 reference row `bfde8bd9…` is registered for, so no new reference row
+is required and the §21.5 validation record still applies.
+
+Adjudication (`docs/artifacts/gate-d-bprime-event1-analysis-20260906.json`, verdict PASS, all six
+checks) against the tables-OFF Gate D adjudication on the same row and the same `eps_event`
+0.22697279652271618, band 451:
+
+| | tables OFF (Gate D) | tables ON (A′) |
+|---|---|---|
+| engine Δ mean | −0.006235 | +0.007830 |
+| engine Δ max abs | 0.113455 | 0.121001 |
+| engine Δ std | 0.031047 | 0.031034 |
+| swapped positions | 7 | 6 |
+| oracle Δ mean (unchanged) | +0.111788 | +0.111765 |
+
+Both configurations sit far inside the κ = 2 caps, and in both the engine's deviation from the FP64
+reference is an order of magnitude smaller than the legacy oracle's own. The swapped set differs
+because different rounding at the top-2048 boundary selects slightly different members; the count
+falls from seven to six. **Cost: none measurable.** The same chunk of the same chunked prefill plan
+took 238.427 s with the table and 238.636 s without it (DB 568, the C = 2048 Step B run), i.e. ~116.4 ms
+per prompt token either way. Decode, which is what §18 and Gate H report, is likewise unchanged: p50
+129.910 ms with the table against 129.663 ms without, +0.19%, well inside each run's own 10-sample
+spread (126.7-131.8 vs 126.4-132.4 ms).
+
+Consequence: §23.9's decision to adopt the legacy-faithful main-attention rotary table for WS32 is
+supported at 8K by an adjudication that passes the same reviewed row and the same bounds as the
+sealed one, at no throughput cost. The record
+`docs/artifacts/gate-d-ws32-8k-bprime-adjudicated-divergence-20260906.json` (`5a9b6e2b…`) is the
+pre-registration for the tables-ON configuration; the wrapper selects it whenever
+`GLM_GREENFIELD_WS32_HOST_MAIN_ROPE_TABLE=1`, and the Gate D record otherwise.
+
+*Run 2 will raise a later-event alarm, and it is not Gate D's.* Tables ON, the maximum later-event
+symmetric difference is 1976 at (step 2, event 17, layer 62) over 21 alarming events, against 1948
+over 24 for tables OFF, so the Gate D profile does not describe this configuration. The tables-ON
+profile is `docs/artifacts/gate-d-ws32-8k-hrope-20260906-later-event-profile.json`
+(`192469e2…`), derived from run 1's own arrays. The sealer digest-binds the profile but does not
+compare it to the observed one, so binding the wrong profile would seal — the profile is part of what
+a reviewer must check, not something the code catches. Run 2's first seal therefore refuses at the
+acknowledgement, a `GATE_D_LESSONS.md` entry naming its tag is committed and pushed, and it is
+recovery-sealed at that pin: the same sequence Gate D and both Step B runs used, and the one the
+amended alarm clause makes mandatory (a lessons entry naming a run cannot exist at a pin predating it).

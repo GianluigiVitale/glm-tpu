@@ -169,6 +169,11 @@ else
 fi
 if [[ $DSA_ADJUDICATION == 1 ]]; then
   [[ $CONTEXT == 8k ]] || { echo "WS32 DSA adjudication record exists only for 8k" >&2; exit 2; }
+  # The record adjudicates one event at one decode position under one capacity;
+  # a Step C capacity run is a different measurement and binds no record.
+  [[ $CONTEXT_CAPACITY -eq 8192 ]] || {
+    echo "WS32 DSA adjudication record applies only at capacity 8192" >&2; exit 2;
+  }
   [[ $(sha256sum "$DSA_ADJUDICATION_RECORD_8K" | awk '{print $1}') == "$DSA_ADJUDICATION_RECORD_8K_SHA" ]] || {
     echo "WS32 DSA adjudication record SHA drifted" >&2; exit 2;
   }
