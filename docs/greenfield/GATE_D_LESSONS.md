@@ -1436,3 +1436,30 @@ normalized-state cause.
   linear-ish in neither direction that matters — it is a step from one capacity to another, not a
   function of prompt length — so a 128K prefill should be budgeted at ~128 ms/token, and the 262,656
   measurement is what decides whether 5.20 GB of headroom survives another doubling.
+
+- 2026-09-06 (spec §23.3 Step C, capacity 262,656): run
+  `greenfield_ws32_short_decoder_8k_numerical_cap262656_hrope_20260906T211233754818996Z` (run pin
+  `d5304e6a`, acquisition `…8k_acquire_cap262656_hrope_20260906T202827351428949Z` at `d5304e6a`,
+  513 pages, rotary table 262,656 × 64 = 33,619,968 B/device) closes Step C. At **32× the sealed
+  capacity** every witness is again bit-identical to DB 570's: numerical array manifest, raw tokens
+  `909682cb…8173`, cache probe `kv`/`index` rows, `adjudicated_event_matches_record` true against the
+  same B′ pre-registration `5a9b6e2b…`, nothing unexplained. Capacity does not change the numerics at
+  8,192, 131,072 or 262,656. The alarm profile is therefore DB 570's on the identity basis, as at
+  131,072.
+
+  The three-point capacity curve, which is what L7/L8 and Gate H must use instead of an 8K
+  extrapolation:
+
+  | capacity | pages | prefill per chunk | ms/prompt token | decode p50 | tok/s | peak HBM/chip |
+  |---|---|---|---|---|---|---|
+  | 8,192 | 16 | 238.46 s | ~116.4 | 129.816 ms | 7.699 | 26,375,554,560 |
+  | 131,072 | 256 | 262.30 s | ~128.1 | 142.968 ms | 6.995 | 27,811,511,296 |
+  | 262,656 | 513 | 290.80 s | ~142.0 | 160.288 ms | 6.239 | 29,655,086,080 |
+
+  Cost grows ~10% per capacity step on both axes while capacity grows 16× then 2×, i.e. **strongly
+  sublinear**, which is what a top-2048 sparse selection over a page table predicts and is the
+  quantitative case that the design survives long context. Peak HBM at 262,656 is 29,655,086,080 B of
+  33,014,398,976, leaving **3.13 GiB**; the acquisition's compiled estimate was 27.70 GiB of 30.75 GiB
+  usable, so the estimate was 0.4 GiB optimistic against the measurement — close enough to plan with,
+  not close enough to skip measuring. Revised projections for the long runs: a 128K prefill is
+  131,072 × ~128 ms ≈ **4.7 h**, a 256K prefill 262,144 × ~142 ms ≈ **10.3 h**.
