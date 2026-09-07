@@ -1,5 +1,44 @@
 # Greenfield performance and mechanism log
 
+## Current protected standing — 2026-09-07
+
+Gate D is CLOSED under §21.6, and Gate G is CLOSED/WS32_2D promoted under §22 of
+`../glm-tpu-revolution.md`. Historical "Gate D remains open" entries below describe their own dates,
+not today's next action. No historical measurement or correctness classification is rewritten.
+
+These are fleet-critical profiler-free decode statistics from the sealed summaries, not rank-0
+statistics, compile latency, prefill throughput or speculative accepted-token throughput:
+
+| DB run | Workload | p50 ms/token | p99 ms/token | Wall tok/s | Maximum per-chip HBM bytes |
+|---|---|---:|---:|---:|---:|
+| 567 | 8K, Gate D §21.6 | 130.368724 | 132.414026 | 7.670551 | 26,375,554,560 |
+| 568 | 8K, chunk 2048 identity | 129.731765 | 132.362008 | 7.708212 | 26,375,554,560 |
+| 569 | 8K, chunk 512 identity | 130.051780 | 132.282893 | 7.689245 | 26,375,554,560 |
+| 570 | 8K, host main-rotary table B′ | 129.891701 | 131.590118 | 7.698721 | 26,375,554,560 |
+| 571 | **8K prompt**, capacity 131072 | 143.000802 | 144.142677 | 6.992968 | 27,811,511,296 |
+| 572 | **8K prompt**, capacity 262656 | 160.347078 | 161.461336 | 6.236472 | 29,655,086,080 |
+| 573 | 127363-token L7 prompt, depth 1.0 | 142.679610 | 146.917511 | 7.008710 | 27,810,852,864 |
+
+Rows 567–570 use §21 correctness; 571/572 are capacity measurements, not full long-prompt gates.
+DB573 uses §23.5: extracted passkey 891482 correct, within-engine DSA/state/cache checks, no
+cross-oracle/raw-token-exact claim. Its prefill was **16,353.754838 s** in the summary's rank-0 record,
+**16,390.757689 s fleet maximum** (about 4.55 h); this engine has not demonstrated interactive prefill.
+Fresh trace covers 8 files/64 cores, and the completed run has protected DB/archive/cleanup linkage.
+
+Source verification for this update: read-only `bench/results.db` rows 567–573; rehashed each local
+`summary.json` and `SUCCESS` canonical self-hash; matched terminal summary/DB ids against `db_link.json`.
+DB573 tag is `greenfield_ws32_short_decoder_128k_d1_0_numerical_cap131072_hrope_20260907T012156230341652Z`,
+summary SHA `1e007a69fd1d893aeaa99c3216605a6bf59b7db441589b279721560968afe3e1`, SUCCESS SHA
+`795245b420a9a52d049678b00d044a521da11776056eb82e6fee511952c9cdfd`. Its remote SUCCESS receipt binds
+generation `1788763301245387` under the same tag in `gs://driftbench-dsv4-uc/results/`.
+This documentation audit did not rerun the model or independently replay all remote payloads.
+
+L7 depth 0.0 is still in flight; depths 0.05/0.95 and full-prompt L8 E0 remain unsealed. No full
+256K performance or speculative effective-throughput claim exists. Use `TEST_MATRIX.md` and the
+latest `../../HANDOFF.md` for the remaining gates.
+
+## Historical measurements
+
 Protected pin `723512f` rejects the PP16 local-y / LP2-x / local-z graph when its leaves come from
 the fused I384 Pallas kernel. The HLO mechanism is correct and all samples/replicas agree, but the
 dense/carried/normalized rows miss in `3821/2302/2867` values. Its 7.727-second compile and

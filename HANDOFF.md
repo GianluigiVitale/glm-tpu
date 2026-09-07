@@ -14059,3 +14059,19 @@ Candidate persisted at `dd0f1c07` on its own published branch. Review also appro
 documentation pointers. Both branch refs are mirrored through the shared Git repository; the candidate
 does not need a second working-tree bucket copy. Resume with original-run collection/seal first,
 then merge the reviewed candidate and rerun its focused checks before the next protected launch.
+
+## 2026-09-07 08:37Z — verified wait and current gate/performance index reconciliation
+
+Five-minute observation window followed exact monitor PID2248787/start tick99565412; it remained
+live and authenticated receipts advanced all eight original workers from 18/62 to 19/62. Ending
+that observation window was not a runner/monitor termination. No new TPU workflow or seal started.
+
+Found stale current-status prose in `docs/greenfield/TEST_MATRIX.md` and `PERFORMANCE_LOG.md` that
+still described Gate D as open and old PP16 next actions. Added current-status sections while
+preserving the historical entries. Read-only DB567–573 identity checks and local summary/SUCCESS
+canonical rehashes passed, with terminal summary/DB ids matching their `db_link.json` files. The
+performance table explicitly uses fleet-critical statistics: DB571 p50 143.000802 ms, DB572
+160.347078 ms, DB573 142.679610 ms/7.008710 tok/s. DB573 prefill is 16353.754838 s for rank 0 and
+16390.757689 s fleet max. No full remote replay was performed or claimed by this documentation audit.
+L7 remains one sealed depth of four; L8/§18 remain open. Astra approved the two current-status
+sections with no material findings. Run supervision and the existing collection recipe remain next.

@@ -1,5 +1,29 @@
 # Greenfield test and gate matrix
 
+## Current gate standing — 2026-09-07
+
+This section supersedes the status/next-action wording of the historical rows below, not their
+measurements. The binding contract is `../glm-tpu-revolution.md`, including amendments §21–§23.
+
+| Requirement | Current evidence | Remaining work |
+|---|---|---|
+| Gate D, complete short-context decoder | CLOSED: DB567, §21.6; exact 20-token oracle prefix, within-engine exact DSA, first divergence adjudicated against independent FP64, protected state/cache/HLO/trace/wall/HBM/archive/cleanup | None for Gate D; later DSA events are diagnostic and deep-layer bounds are inherited from Gate C |
+| Gate G, plan selection | CLOSED: §22; protected PP8/WS32 2K comparison, WS32 promoted; PP16 evidence-backed rejection | Long-context validation of promoted WS32 |
+| Chunked prefill equivalence | CLOSED: DB568/569, two chunk sizes reproduce sealed witnesses | No repeat required |
+| Main rotary table | CLOSED: DB570, B′ adjudicated at 8K; indexer remains on device | Table enabled in long-context runs |
+| Capacity-independent numerics/HBM | CLOSED: DB571/572, 8K prompt at 131072/262656 capacity | These are not full 128K/256K prompt results |
+| L7, four-depth 128K passkey | Depth 1.0 sealed DB573; passkey exact, within-engine DSA exact, no cross-oracle claim | Depth 0.0 in flight; depths 0.05/0.95 not sealed |
+| L8, protected 256K E0 | No completed full-prompt E0 result | Acquisition then full prompt and 256 timed decode steps, complete evidence/DB/archive/cleanup |
+| §18 completion | Not yet proved | Finish L7/L8 and audit every item; report slow teacher-forced prefill honestly |
+| Gate H, speculation | No protected effective-throughput result | Keep base/effective figures separate; never imply a speculative speedup |
+
+Gate E is met at protected 2K/8K and the one completed L7 depth. Gate F's strong base target is
+met at 2K, not at 8K or that L7 depth. Neither capacity measurements nor CPU tests close L7/L8.
+Current run identities and recovery instructions are in `../../HANDOFF.md` and
+`WS32_ORPHAN_RECOVERY.md`; do not execute historical next actions below.
+
+## Historical implementation evidence
+
 | Level/gate | Current evidence | Status |
 |---|---|---|
 | L0 immutable geometry/plan | Canonical hashes/round trips/refusals | Pass |
