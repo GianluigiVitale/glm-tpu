@@ -14189,3 +14189,13 @@ the same controller; on controller loss, inspect original workers and use the sa
 Do not restart merely because a wait tool returns. Main execution/enforcement files are frozen.
 After this acquisition seals, adopt its graph hashes for numerical depth0.05 then0.95, followed by
 L8 acquisition/E0 and §18. `goal.md` and this entry are safe documentation-only progress updates.
+
+## 2026-09-07 13:06Z — final completion checklist prepared during acquisition
+
+`docs/greenfield/SECTION18_COMPLETION_AUDIT.md` maps every §18 requirement to existing evidence
+or an explicit remaining check. Independent Astra review: PASS, no P0–P2; documentation only,
+not final sign-off. Remaining work is still L7 depths0.05/0.95, L8 acquisition/E0 and final
+evidence verification, including device/wall comparison and DB/archive dependency linkage.
+No extra TPU workload was established necessary. The original acquisition controller2387478
+and worker2388437 remain active; all seven StableHLO files now exist. Model/enforcement source
+is unchanged. Do not treat this pending audit checklist as project completion.
