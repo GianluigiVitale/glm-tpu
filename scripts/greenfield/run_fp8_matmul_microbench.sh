@@ -12,6 +12,8 @@ readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
+BOUNDED_PREFILL=0
+[[ $KERNEL != ws32_prefill_baseline && $KERNEL != ws32_grouped_admission ]] || BOUNDED_PREFILL=1
 OUTPUT_TILE=${GLM_GREENFIELD_FP8_OUTPUT_TILE:-128}
 SELECTED_CASE=${GLM_GREENFIELD_FP8_SELECTED_CASE:-concentrated_eight}
 TAG_STEM=$KERNEL
@@ -21,8 +23,14 @@ BASELINE_ROWS=${GLM_GREENFIELD_FP8_BASELINE_ROWS:-8}
   TAG_STEM=${KERNEL}_${SELECTED_CASE}
 [[ $OUTPUT_TILE == 128 ]] || TAG_STEM=${TAG_STEM}_ot${OUTPUT_TILE}
 TAG=${GLM_GREENFIELD_FP8_MATMUL_TAG:-greenfield_fp8_${TAG_STEM}_$(date -u +%Y%m%dT%H%M%S%NZ)}
-WARMUP=${GLM_GREENFIELD_FP8_MATMUL_WARMUP:-200}
-ITERATIONS=${GLM_GREENFIELD_FP8_MATMUL_ITERATIONS:-1000}
+DEFAULT_WARMUP=200
+DEFAULT_ITERATIONS=1000
+if [[ $KERNEL == ws32_grouped_admission ]]; then
+  DEFAULT_WARMUP=0
+  DEFAULT_ITERATIONS=0
+fi
+WARMUP=${GLM_GREENFIELD_FP8_MATMUL_WARMUP:-$DEFAULT_WARMUP}
+ITERATIONS=${GLM_GREENFIELD_FP8_MATMUL_ITERATIONS:-$DEFAULT_ITERATIONS}
 DIAGNOSTIC_REFERENCE=${GLM_GREENFIELD_FP8_DIAGNOSTIC_REFERENCE:-0}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
@@ -49,10 +57,11 @@ fi
   $KERNEL == attention_output || $KERNEL == fused_attention_output || \
   $KERNEL == selected_up_gate || $KERNEL == selected_swiglu_down || \
   $KERNEL == structured_kv_b || $KERNEL == dsa_wq_b || \
-  $KERNEL == dsa_wk || $KERNEL == ws32_prefill_baseline ]] || {
+  $KERNEL == dsa_wk || $KERNEL == ws32_prefill_baseline || \
+  $KERNEL == ws32_grouped_admission ]] || {
   echo "FP8 kernel must be single_up, single_up_m1, attention_output," \
     "fused_attention_output, rmsnorm_linear, up_gate, selected_up_gate," \
-    "selected_swiglu_down, structured_kv_b, dsa_wq_b, dsa_wk, or ws32_prefill_baseline" >&2
+    "selected_swiglu_down, structured_kv_b, dsa_wq_b, dsa_wk, ws32_prefill_baseline, or ws32_grouped_admission" >&2
   exit 2
 }
 [[ $OUTPUT_TILE == 128 || $OUTPUT_TILE == 256 ]] || {
@@ -67,7 +76,9 @@ fi
   echo "selected route case must be normal_two or concentrated_eight" >&2
   exit 2
 }
-if [[ $DIAGNOSTIC_REFERENCE == 1 ]]; then
+if [[ $KERNEL == ws32_grouped_admission ]]; then
+  [[ $WARMUP == 0 && $ITERATIONS == 0 && $DIAGNOSTIC_REFERENCE == 0 ]] || exit 2
+elif [[ $DIAGNOSTIC_REFERENCE == 1 ]]; then
   [[ $KERNEL == single_up_m1 ]] || {
     echo "reference diagnostic requires single_up_m1" >&2
     exit 2
@@ -103,7 +114,7 @@ flock 8
   refs/heads/rewrite/topology-first-decode | awk '{print $1}') == "$PIN" ]]
 [[ $(gcloud storage buckets describe "$APPROVED_BUCKET" \
   --format='value(location)') == "$APPROVED_LOCATION" ]]
-if [[ $KERNEL == ws32_prefill_baseline ]]; then
+if [[ $BOUNDED_PREFILL == 1 ]]; then
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - "$TAG" <<'PY'
 from google.cloud import storage
 import sys
@@ -123,7 +134,7 @@ strict_census() {
   local label=$1
   local out="$RUN_DIR/census_${label}.txt"
   local carrier="${TAG}_${label}"
-  if [[ $KERNEL == ws32_prefill_baseline ]]; then
+  if [[ $BOUNDED_PREFILL == 1 ]]; then
     local idle_command
     idle_command=$(PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
       -m scripts.greenfield.fp8_baseline_guard census-command) || return 1
@@ -164,7 +175,7 @@ strict_census pre || {
   exit 1
 }
 
-say "compiling and timing GLM production $KERNEL projection on TPU v4"
+say "compiling/checking GLM $KERNEL on TPU v4 (grouped admission has no timing samples)"
 started=$(date +%s)
 ROWS=8
 [[ $KERNEL != rmsnorm_linear && $KERNEL != single_up_m1 ]] || ROWS=1
@@ -187,7 +198,14 @@ elif [[ $KERNEL == attention_output ]]; then
 fi
 (
   cd "$WORKTREE"
-  if [[ $KERNEL == fused_attention_output ]]; then
+  if [[ $KERNEL == ws32_grouped_admission ]]; then
+    RUNNER=(
+      scripts/greenfield/probe_prefill_grouped_fp8.py
+      --expected-code-hash "$PIN"
+      --output "$RUN_DIR/runner.json"
+      --hlo-output "$RUN_DIR/hlo/grouped_fp8.optimized_hlo.txt"
+    )
+  elif [[ $KERNEL == fused_attention_output ]]; then
     RUNNER=(
       scripts/greenfield/microbench_fused_attention_output.py
       --expected-code-hash "$PIN"
@@ -225,7 +243,7 @@ fi
     RUNNER+=(--diagnostic-reference-timing)
   fi
   PYTHON_RUN=(/home/gianl/vllm-env/bin/python)
-  if [[ $KERNEL == ws32_prefill_baseline ]]; then
+  if [[ $BOUNDED_PREFILL == 1 ]]; then
     # Bound this single-process mechanism probe, not an hours-long model run.
     PYTHON_RUN=(timeout --kill-after=30s 600s /home/gianl/vllm-env/bin/python)
   fi
@@ -246,7 +264,7 @@ strict_census post || {
 post_census_done=1
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
-  "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" <<'PY'
+  "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" "$KERNEL" <<'PY'
 from __future__ import annotations
 
 import json
@@ -254,11 +272,19 @@ from pathlib import Path
 import sqlite3
 import sys
 
-run_dir, pin, db_path, repo, elapsed = sys.argv[1:]
+run_dir, pin, db_path, repo, elapsed, expected_kernel = sys.argv[1:]
 run_dir = Path(run_dir)
 runner = json.loads((run_dir / "runner.json").read_text())
 if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
     raise SystemExit("runner status/code identity failed")
+if runner["kernel"] != expected_kernel:
+    raise SystemExit("runner kernel does not match launched kernel")
+admission = runner.get("admission_only", False)
+if admission != (expected_kernel == "ws32_grouped_admission"):
+    raise SystemExit("admission classification drifted")
+if admission:
+    from scripts.greenfield.probe_prefill_grouped_fp8 import validate_record
+    validate_record(runner)
 output_tile = runner.get("output_tile", 128)
 if output_tile not in (128, 256):
     raise SystemExit("runner output tile is invalid")
@@ -268,7 +294,7 @@ if not runner["hlo"]["contract"]["passed"]:
     raise SystemExit("Pallas custom-call/full-overlay HLO contract failed")
 if not runner["comparison"]["passed"]:
     raise SystemExit("Pallas/reference correctness failed")
-if not runner["profiler_free_timing"]:
+if not admission and not runner["profiler_free_timing"]:
     raise SystemExit("kernel wall distribution is not profiler-free")
 baseline = runner.get("baseline_only", False)
 if baseline != (runner["kernel"] == "ws32_prefill_baseline"):
@@ -323,7 +349,9 @@ shape_ids = {
     "dsa_wk": "m1_k6144_n128",
     "single_up_m1": "m1_k6144_n2048",
 }
-if baseline:
+if admission:
+    item_id = "arithmetic_v1_m136_k1536_n2048_g32_distributed_concentrated_empty"
+elif baseline:
     item_id = f"baseline_m{m}_k{k}_n{n}"
 elif runner["kernel"] == "structured_kv_b":
     item_id = "h16_p192_l512_v256"
@@ -356,7 +384,7 @@ pv.record_item(
     extracted=str(runner["checksum"]),
     correct=True,
     score=1.0,
-    latency_ms=runner["latency"]["p50_ms"],
+    latency_ms=None if admission else runner["latency"]["p50_ms"],
 )
 pv.finalize(
     conn,
@@ -375,7 +403,8 @@ summary = {
     "results_db_run_id": run_id,
     "runner": runner,
     "claim_scope": (
-        "diagnostic reference-vs-Pallas projection wall; no performance claim"
+        "single-chip synthetic grouped projection arithmetic admission; no timing or performance claim"
+        if admission else "diagnostic reference-vs-Pallas projection wall; no performance claim"
         if diagnostic_reference is not None
         else "standalone profiler-free kernel wall; no token-rate claim"
     ),
@@ -404,7 +433,7 @@ PY
 ) >"$RUN_DIR/evidence.sha256"
 
 sha256sum "$RUN_DIR/census_post.txt" >>"$RUN_DIR/evidence.sha256"
-if [[ $KERNEL == ws32_prefill_baseline ]]; then
+if [[ $BOUNDED_PREFILL == 1 ]]; then
   sha256sum "$RUN_DIR/devices_pre.txt" "$RUN_DIR/devices_post.txt" >>"$RUN_DIR/evidence.sha256"
   PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" <<'PY'
 import json
@@ -426,13 +455,15 @@ ledger = root / 'archive_receipts.json'
 ledger.write_text(json.dumps(receipts, indent=2, sort_keys=True) + '\n')
 publish_exact(bucket, f'results/{root.name}/{ledger.name}', ledger, digest_file(ledger), compressed=False)
 terminal = root / 'SUCCESS'
-terminal.write_text(json.dumps(dict(tag=root.name, code_hash=pin, baseline_only=True, performance_claim=False,
+runner = json.loads((root/'runner.json').read_text())
+terminal.write_text(json.dumps(dict(tag=root.name, code_hash=pin,
+    baseline_only=runner['baseline_only'], admission_only=runner.get('admission_only', False), performance_claim=False,
     summary_sha256=sha256((root/'summary.json').read_bytes()).hexdigest(),
     archive_receipts_sha256=sha256(ledger.read_bytes()).hexdigest()), sort_keys=True) + '\n')
 print(json.dumps(publish_exact(bucket, f'results/{root.name}/SUCCESS', terminal,
                               digest_file(terminal), compressed=False), sort_keys=True))
 PY
-  say "BASELINE_SUCCESS ARCHIVE=$REMOTE_PREFIX (not model performance proof)"
+  say "BOUNDED_PREFILL_SUCCESS ARCHIVE=$REMOTE_PREFIX (not model performance proof)"
   trap - EXIT
   exit 0
 fi

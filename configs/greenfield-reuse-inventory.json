@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-grouped-tpu-admission",
+      "category": "bounded grouped arithmetic admission",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "f278064010adfe9eb9bed49fe044087c595e1d72",
+      "source_paths": ["scripts/greenfield/run_fp8_matmul_microbench.sh", "scripts/greenfield/fp8_baseline_guard.py", "scripts/greenfield/collect_ws32_worker_evidence.py", "glm_tpu/greenfield/kernels/pallas/fp8_matmul.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/probe_prefill_grouped_fp8.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "tests/greenfield/hlo/test_prefill_grouped_admission.py"],
+      "gate": "24: grouped TPU arithmetic admission, not performance",
+      "reason": "Reuse bounded prefill safety/publication and exact old M1 raw-FP8 projection reference; synthetic local G32/N2048/K1536 at 136 sorted routes with distributed, concentrated-owner and empty-owner counts. Zero timed samples and NULL DB latency; no full checkpoint, production integration, full layer or performance claim. Exact HLO/raw-U8/no-full-overlay/no-collective and compiler memory admission precede execution; stop on first numerical mismatch."
+    },
+    {
       "id": "ws32-prefill-grouped-row-schedule",
       "category": "grouped raw-FP8 scheduling reference",
       "source_repo": "installed JAX 0.10.1",

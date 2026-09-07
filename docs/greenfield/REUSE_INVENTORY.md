@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Grouped TPU arithmetic admission now adapts `run_fp8_matmul_microbench.sh` through
+`ws32_grouped_admission`: same bounded prefill leases/censuses/publisher, no timed samples,
+NULL DB latency, explicit admission-only classification. `probe_prefill_grouped_fp8.py`
+uses the existing M1 F32 raw-FP8 primitive as the exact reference at local G32/N2048/K1536,
+136 sorted route rows. This is synthetic single-chip compilation/arithmetic, not a real layer.
+
 Grouped schedule implementation now uses the pinned JAX metadata directly, not stock gmm:
 `prefill_routes.py`, `pallas/prefill_grouped_fp8.py`, and `ws32_prefill_moe.py` are unwired.
 CPU comparisons cover route permutation/counts, empty/skewed owners, shared tile boundaries,

@@ -14383,3 +14383,19 @@ Combined routing/grouped/MoE/multirow-linear/primitive/registry CPU suite:32 pas
 Next: complete phase-budget DSA/attention/collective baselines and bounded grouped TPU arithmetic
 admission, before optimized performance promotion; then causal layers/short decoder and all
 efficient L7/L8. Do not promote current CPU mechanisms or DB576–579 to engine throughput.
+
+## 2026-09-07 — grouped TPU arithmetic admission ready
+
+`probe_prefill_grouped_fp8.py`, launched only through the existing FP8 wrapper's explicit
+`ws32_grouped_admission` mode: synthetic G32/N2048/K1536,136 sorted route rows, owner offset64,
+distributed/concentrated-owner/empty-owner cases. One candidate compilation; exact F32 bit
+comparison against existing M1 projection. HLO/no-full-weight-overlay/no-collective and512MiB
+compiler allocation ceiling precede execution. Zero warmup/timed samples, NULL DB latency,
+admission-only terminal. No checkpoint load/copy, real MoE layer or performance claim.
+
+Wrapper reuses bounded baseline pre/post root device checks and8-host census, both leases,
+600s+30s runner limit and generation-qualified CRC/SHA publication. CPU harness/old-contract/
+registry tests33 passed1.83s; bash syntax and diff checks pass. Independent Astra review PASS,
+no P0-P2, for persistence and one bounded admission after commit/push/mirror and preflight.
+Stop at the first compilation/arithmetic failure; diagnose exact retained evidence before
+another attempt. Do not launch serial128K/256K. New prefill is still unwired.
