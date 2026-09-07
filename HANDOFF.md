@@ -14117,3 +14117,44 @@ let two completed-fleet observations release leases, acquire collection leases, 
 root accelerator-device holder checks, eight original inventories, shared-HLO agreement, conditional
 publication/readback, post-census and original recovery seal. No model or enforcement surface edited.
 Then merge isolated reviewed sealer fixes `dd0f1c07` and proceed with remaining L7 depths/L8/§18.
+
+## 2026-09-07 12:27Z — L7 depth 0.0 CLOSED, DB574; no numerical rerun
+
+Original computation at `679e2392` was collected and recovery-sealed at published `ae994e5a`.
+The corrected monitor preserved the original eight-process baseline; replacement PID2363119 reached
+READY_FOR_CENSUS at 12:06:01Z and exited normally. Local receipts in
+`<run>/original_collection_20260907T120655Z` establish eight complete inventories before shared
+publication, generation-bound replay, and 8/8 process/container plus root `/dev/accel0..3` holder
+checks before and after collection. The reviewed one-run controller driver was
+`/tmp/ws32_d0_original_collection.py`; production collector source is committed at `ae994e5a`.
+
+Recovery completed 12:26:57Z. Protected DB574 (`greenfield_78layer_128k_d0_0_ws32`) records passkey
+705269 correct, within-engine DSA exact, cache/state valid, local HLO, fresh 8-file/64-core XPlane,
+fleet p50 **143.496482 ms**, p99 **146.1185879 ms**, **6.9688119601 wall tok/s**, peak HBM
+**27,810,852,864 B/chip**, minimum headroom **5,203,546,112 B**. Prefill rank0 **16394.50449181 s**,
+fleet max **16425.514997624 s**. Legacy 20 ids match diagnostically only; no raw-token-exact or
+cross-oracle long-context claim. L7 is now **two of four depths**, not closed overall.
+
+- summary `33912e8391dde6f0cfed53b608098d6782dc8c9469edc6675c2e7364207a83c2`
+- SUCCESS `f123beba8caab916e1307607ef28b294606c95338f3a7d431ce374a210900667`, remote generation
+  `1788784016426688`, 1021 B, CRC32C `hl2wZQ==`
+- source ledger `62cfc59a37423e6137589e8bee96ffe3da6d4543185059ab5c3c15d419ad6e29`
+- remote ledger `756c40f8704d96c3eaf0874706c937dd62fb42162d336a7cc926a308c5487fe0`, generation
+  `1788784013431999`
+- DB record `6de2cd493dd89d838609203d48284f39159666c407919c0b72aca402457da83e`
+
+Canonical summary/SUCCESS hashes, link identities, live DB574 tag and generation-pinned remote
+SUCCESS bytes independently rechecked after the wrapper exited 0. Live storage was
+**1,994,110,249,304 B** at 12:09Z, soft delete unchanged/off. No TPU infrastructure managed.
+
+The reviewed sealing-isolation candidate `dd0f1c07` is now merged for next-run preparation only,
+after the original run sealed. Its only merge conflict was adjacent append-only reuse documentation;
+both entries retained. Candidate executable/test files remain identical to its reviewed branch.
+Combined focused tests (source-isolation/E0 guard + both orphan guards/collector): **90 passed**.
+Long-context/oracle suites add **26 passed** (two existing SWIG warnings): **116 passed total**.
+The supplemental original collection receipts and reviewed one-run driver are preserved compactly
+in `docs/artifacts/gate-l-ws32-d0-original-collection-20260907.json`, not added to the sealed remote
+prefix. Independent integration review confirmed executable/test identity and local DB574 hashes;
+its one P2 stale "in flight" performance-log sentence was corrected.
+Next: merge review, publish/mirror, fresh 128K HLO acquisition, numerical depths 0.05/0.95, then
+513-page acquisition and full 256K E0 (256 timed steps), followed by §18 audit. No past tag is rerun.

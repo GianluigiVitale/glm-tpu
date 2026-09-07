@@ -1463,3 +1463,15 @@ normalized-state cause.
   usable, so the estimate was 0.4 GiB optimistic against the measurement — close enough to plan with,
   not close enough to skip measuring. Revised projections for the long runs: a 128K prefill is
   131,072 × ~128 ms ≈ **4.7 h**, a 256K prefill 262,144 × ~142 ms ≈ **10.3 h**.
+
+- 2026-09-07 (L7 depth 0.0, DB574): loss of the controller/remote shells did not terminate the
+  eight detached workers. Exact PID/start/boot/argv observations preserved the original run through
+  completion; missing shell-created `.ended` files were not treated as numerical failure. Normal
+  libtpu shutdown then removed `/tmp/libtpu_lockfile`, making fuser return 1 WITH a missing-path
+  diagnostic. The original monitor/collector correctly refused ambiguity but could never finish.
+  Fix only that observation: pre/post lstat absence plus the exact C-locale diagnostic and empty
+  holder output; permission/transition/unexpected errors remain unknown. Independent root device
+  holder checks exclude open-device use hidden by an unlinked lock. Eight original inventories and
+  shared-HLO agreement precede generation-bound publication. Recovery sealed the original run
+  without another 4.6-hour prefill. Lesson: process completion, idle hardware, complete original
+  evidence and a protected numerical seal are four separate facts. Preserve each boundary.

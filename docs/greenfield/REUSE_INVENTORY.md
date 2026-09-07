@@ -1239,3 +1239,15 @@ recovery stack. The original d0.0 workers removed `/tmp/libtpu_lockfile` on exit
 1 plus its missing-file diagnostic. Both guards now distinguish pre/post `lstat`-verified absence
 and the exact C-locale diagnostic from unknown/permission/transition errors. Original PID baseline,
 two observations, independent fleet census and original-byte collection remain required.
+
+## 2026-09-07 — pinned WS32 sealing checkout (isolated candidate)
+
+Reuse the current wrapper, sealer, materializer and their pin/clean-surface checks. Each future
+attempt creates a dedicated detached checkout at its frozen run/recovery pin; all controller Python
+uses both its cwd and PYTHONPATH, and only repository-local adjudication/profile paths are rebased.
+Worker execution and all evidence/checkpoint/oracle paths stay unchanged. No new remote objects or
+checkpoint copies are needed. The source directory is isolated/reserved, not filesystem-immutable;
+existing source checks still refuse changes. Do not edit the active workers' source during a run.
+This candidate also enforces the 256-step E0 window in the sealer, covers the extractor's imported
+engine/provenance modules, and generalizes refusal messages to both §21.2 and §23.5. Keep it off the
+active main worktree until depth-0.0 original evidence is collected and sealed.

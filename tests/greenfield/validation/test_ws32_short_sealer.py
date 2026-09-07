@@ -2495,6 +2495,8 @@ def test_the_enforcement_surface_and_import_check_cover_the_deciding_code() -> N
         "scripts/greenfield/run_short_decoder_ws32.py",
         "bench/glm_longctx.py",
         "bench/extract.py",
+        "bench/engine.py",
+        "bench/provenance.py",
     }
     assert set(module._TRACKED_ONLY_SURFACE) == {"docs/artifacts"}
 

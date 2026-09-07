@@ -1,8 +1,8 @@
 # PLAN — greenfield gates
 
 Continue autonomously to full project completion under §18.
-Existing L7 depth-0.0 test/monitor remain live (14/62 chunks at 08:13Z), not sealed. Follow
-`HANDOFF.md`'s latest resume entry and `docs/greenfield/WS32_ORPHAN_RECOVERY.md` before recovery.
+L7 depths 1.0/0.0 are sealed DB573/574; no original worker or recovery monitor remains live.
+Follow `HANDOFF.md` for the reviewed sealing fixes and remaining L7/L8 sequence.
 
 The authoritative details, stop conditions, and Definition of Done are in
 `docs/glm-tpu-revolution.md`. This is only the execution index.
@@ -24,7 +24,7 @@ The authoritative details, stop conditions, and Definition of Done are in
    evidence (§22.3); WS32_2D promoted.
 7. **Long-context gates (§23, IN PROGRESS):** §23.3 Step B chunked prefill (DB 568/569) and Step C
    capacity measurement at 131,072/262,656 (DB 571/572) CLOSED; §23.5 L7 protected four-depth 128K
-   passkey — depth 1.0 CLOSED (DB 573), depths 0.0/0.05/0.95 outstanding; §23.5 L8 protected 256K E0
+   passkey — depths 1.0/0.0 CLOSED (DB 573/574), depths 0.05/0.95 outstanding; §23.5 L8 protected 256K E0
    outstanding. L7/L8 claim nothing raw-token or cross-oracle exact: no legacy capture exists at
    these lengths, so L7 stands on the extracted passkey and L8 has no correctness oracle at all.
 8. **Gate H — effective throughput:** only after base stability, add exact multi-token verification/

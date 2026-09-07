@@ -12,13 +12,13 @@ measurements. The binding contract is `../glm-tpu-revolution.md`, including amen
 | Chunked prefill equivalence | CLOSED: DB568/569, two chunk sizes reproduce sealed witnesses | No repeat required |
 | Main rotary table | CLOSED: DB570, B′ adjudicated at 8K; indexer remains on device | Table enabled in long-context runs |
 | Capacity-independent numerics/HBM | CLOSED: DB571/572, 8K prompt at 131072/262656 capacity | These are not full 128K/256K prompt results |
-| L7, four-depth 128K passkey | Depth 1.0 sealed DB573; passkey exact, within-engine DSA exact, no cross-oracle claim | Depth 0.0 in flight; depths 0.05/0.95 not sealed |
+| L7, four-depth 128K passkey | Depths 1.0/0.0 sealed DB573/574; passkey exact, within-engine DSA exact, no cross-oracle claim | Depths 0.05/0.95 not sealed |
 | L8, protected 256K E0 | No completed full-prompt E0 result | Acquisition then full prompt and 256 timed decode steps, complete evidence/DB/archive/cleanup |
 | §18 completion | Not yet proved | Finish L7/L8 and audit every item; report slow teacher-forced prefill honestly |
 | Gate H, speculation | No protected effective-throughput result | Keep base/effective figures separate; never imply a speculative speedup |
 
-Gate E is met at protected 2K/8K and the one completed L7 depth. Gate F's strong base target is
-met at 2K, not at 8K or that L7 depth. Neither capacity measurements nor CPU tests close L7/L8.
+Gate E is met at protected 2K/8K and both completed L7 depths. Gate F's strong base target is
+met at 2K, not at 8K or those L7 depths. Neither capacity measurements nor CPU tests close L7/L8.
 Current run identities and recovery instructions are in `../../HANDOFF.md` and
 `WS32_ORPHAN_RECOVERY.md`; do not execute historical next actions below.
 

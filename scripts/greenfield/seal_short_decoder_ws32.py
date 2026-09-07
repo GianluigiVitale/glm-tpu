@@ -132,7 +132,7 @@ def _args() -> argparse.Namespace:
     validate.add_argument(
         "--reviewed-ref",
         default="refs/remotes/origin/rewrite/topology-first-decode",
-        help="the published branch an adjudicated seal's run pin must be contained in",
+        help="the published branch a protected seal's run pin must be contained in",
     )
     validate.add_argument(
         "--strategy-nd-dense", choices=(0, 1), required=True, type=int
@@ -245,9 +245,9 @@ def _memory_valid(value: Any) -> bool:
 # The alarm-acknowledgement check already used an absolute git; the
 # pre-registration check is the more security-critical of the two.
 _GIT = "/usr/bin/git"
-# The files that decide what an adjudicated seal accepts: the sealer itself, the
-# validation package holding the reviewed reference-row registry and the §21.2
-# arithmetic, and the reviewed artifact tree. Edits elsewhere (tests, docs,
+# The files that decide what a protected seal accepts: the sealer itself, the
+# validation packages enforcing §21.2/§23.5, and the reviewed artifact tree.
+# Edits elsewhere (tests, docs,
 # unrelated scripts) do not change the verdict and do not block a seal.
 _ENFORCEMENT_SURFACE = (
     "scripts/greenfield/seal_short_decoder_ws32.py",
@@ -268,6 +268,9 @@ _ENFORCEMENT_SURFACE = (
     "scripts/greenfield/run_short_decoder_ws32.py",
     "bench/glm_longctx.py",
     "bench/extract.py",
+    # Imported by glm_longctx when executing the SHA-pinned extraction utility.
+    "bench/engine.py",
+    "bench/provenance.py",
 )
 # `docs/artifacts` legitimately holds untracked outputs of the offline
 # adjudicator (§21.2 calls prior attempts untracked and requires them to be left
@@ -434,6 +437,11 @@ def _distribution(samples: list[float]) -> dict[str, float | int]:
 
 
 def _validate(args: argparse.Namespace) -> int:
+    # §23.5 fixes the E0 measurement window independently of caller-provided
+    # timing metadata. Reject an undersized plan even for acquisition, before
+    # reading artifacts or allowing hours of prefill to hide a ten-step window.
+    if args.context_label == "256k_e0" and args.iterations != 256:
+        raise SystemExit("WS32 E0 requires exactly 256 timed decode iterations (§23.5)")
     if args.mode == "acquire" and args.dsa_adjudication_record is not None:
         # An acquisition seals graphs, not numbers. Carrying an adjudication
         # binding into an HLO_ACQUIRED SUCCESS would read as a correctness claim
@@ -1519,8 +1527,8 @@ def _require_reviewed_enforcement(
         )
         if reachable.returncode != 0:
             raise SystemExit(
-                f"WS32 adjudicated seal requires the pin {pin} to be published on "
-                f"{reviewed_ref}; a pin only this checkout knows about is not reviewed"
+                f"WS32 protected seal requires the pin {pin} to be published on "
+                f"{reviewed_ref}; local history alone does not prove publication"
             )
     for pin in pins:
         expected = {}
@@ -1537,14 +1545,14 @@ def _require_reviewed_enforcement(
             if all(surface.get(key) == value for key, value in expected.items()):
                 return
     raise SystemExit(
-        "WS32 adjudicated seal runs enforcement code that is not the code committed at "
+        "WS32 protected seal runs enforcement code that is not the code committed at "
         f"the run's pin {code_hash}"
         + (f" or the declared recovery pin {recovery_code_hash}" if recovery_code_hash else "")
     )
 
 
 def _require_clean_worktree(repository_root: Path) -> None:
-    """Refuse to seal an adjudicated run from a modified checkout.
+    """Refuse to seal a protected run from a modified enforcement surface.
 
     The enforcement of §21.2 items 3-4 reads `REFERENCE_ROWS` and the
     adjudication arithmetic out of this repository's source. Both are ordinary
@@ -1578,13 +1586,13 @@ def _require_clean_worktree(repository_root: Path) -> None:
     ]
     if hidden:
         raise SystemExit(
-            "WS32 adjudicated seal refuses an enforcement surface with hidden index flags "
+            "WS32 protected seal refuses an enforcement surface with hidden index flags "
             "(--assume-unchanged / --skip-worktree): " + ", ".join(sorted(hidden)[:8])
         )
     if modified:
         raise SystemExit(
-            "WS32 adjudicated seal requires an unmodified enforcement surface; the "
-            "reviewed reference-row registry and the §21.2 arithmetic live in it. Modified: "
+            "WS32 protected seal requires an unmodified enforcement surface; "
+            "correctness and evidence validation depend on it. Modified: "
             + ", ".join(sorted(_status_path(item) for item in modified)[:8])
         )
 

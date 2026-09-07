@@ -2323,3 +2323,19 @@ a reviewer must check, not something the code catches. Run 2's first seal theref
 acknowledgement, a `GATE_D_LESSONS.md` entry naming its tag is committed and pushed, and it is
 recovery-sealed at that pin: the same sequence Gate D and both Step B runs used, and the one the
 amended alarm clause makes mandatory (a lessons entry naming a run cannot exist at a pin predating it).
+
+## 23.11 L7 partial completion — 2026-09-07
+
+Two of the four required depths are sealed; L7 and L8 remain open:
+
+| Depth | Protected DB | Correct passkey | Fleet p50 ms/token | Wall tok/s | Prefill fleet max seconds |
+|---|---|---|---|---|---|
+| 1.0 | 573 | 891482 | 142.679610 | 7.008710 | 16390.757689 |
+| 0.0 | 574 | 705269 | 143.496482 | 6.968812 | 16425.514998 |
+
+Both satisfy §23.5 with within-engine DSA/state/cache, local HLO, eight-host/64-core trace, measured
+HBM, DB/archive and authenticated cleanup; neither claims cross-oracle/raw-token exactness.
+DB574 preserved its original `679e2392` execution through controller loss and sealed at `ae994e5a`,
+SUCCESS `f123beba8caab916e1307607ef28b294606c95338f3a7d431ce374a210900667`. No numerical rerun.
+Depths 0.05/0.95 and full-prompt 256K E0 still require direct protected evidence. No acceptance
+condition or deferred-prefill/speculation scope changes in this status entry.

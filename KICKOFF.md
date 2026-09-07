@@ -1,8 +1,8 @@
 # KICKOFF — GLM-5.2 TPU-v4 topology-first rewrite
 
 Continue autonomously to full project completion under §18.
-Gate D/G closed; L7 depth 1.0 sealed, depth 0.0 still running under a detached monitor. Exact recovery: latest
-`HANDOFF.md`, `goal.md`, and `docs/greenfield/WS32_ORPHAN_RECOVERY.md`.
+Gate D/G closed; L7 depths 1.0/0.0 sealed as DB573/574. Next: depths 0.05/0.95, then L8/E0.
+Read current `HANDOFF.md` and `goal.md`; orphan recovery is completed history, not a live run.
 
 Build a new default-off native-JAX inference engine for `zai-org/GLM-5.2-FP8` on the existing
 8-host/32-chip TPU-v4 pod. Optimize protected batch-one 256K latency, not aggregate throughput.

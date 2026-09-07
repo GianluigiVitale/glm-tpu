@@ -9,7 +9,6 @@ readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly ORIGIN=git@github.com:GianluigiVitale/glm-tpu.git
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
-readonly RECOVERY_TOOL=$WORKTREE/scripts/greenfield/recover_short_decoder_ws32_acquisition.py
 readonly INVENTORY=/home/gianl/gcs-models/checkpoints/greenfield/glm52/plans/PP8_LP4/greenfield_checkpoint_plan_pp8_20260805T180552087295643Z/source_inventory.json
 readonly INVENTORY_SHA=a388627c08c8ff591903deb1fbf3198f43916e64a2295ed0e253f1e44a042fc4
 readonly TOPOLOGY_ROOT=/home/gianl/gcs-models/results/greenfield_topology_20260826T194116460015528Z/host_records
@@ -428,6 +427,32 @@ flock -n 9 || {
   say "ABORT: another protected workflow holds the fleet lease"
   exit 1
 }
+# BEGIN PINNED SEAL CHECKOUT
+# Controller evidence code must not follow edits to the worker-0 development
+# checkout during a multi-hour prefill. Each attempt owns a new detached source;
+# never update or remove an earlier attempt's source while evidence may need it.
+readonly SEAL_PIN=$RECOVERY_PIN
+SEAL_ROOT=$(mktemp -d "$RUN_DIR/sealing-source.XXXXXX")
+readonly SEAL_ROOT
+git -C "$WORKTREE" worktree add --quiet --detach "$SEAL_ROOT" "$SEAL_PIN"
+readonly RECOVERY_TOOL=$SEAL_ROOT/scripts/greenfield/recover_short_decoder_ws32_acquisition.py
+# Keep the worker arguments unchanged; sealer artifact paths must be in its OWN
+# checkout, while checkpoint/oracle/topology/run paths stay absolute and shared.
+readonly SEAL_DSA_ADJUDICATION_CLI=${DSA_ADJUDICATION_CLI//"$WORKTREE"/"$SEAL_ROOT"}
+readonly SEAL_LATER_EVENT_ALARM_CLI=${LATER_EVENT_ALARM_CLI//"$WORKTREE"/"$SEAL_ROOT"}
+seal_python() (
+  cd "$SEAL_ROOT"
+  [[ $(git rev-parse HEAD) == "$SEAL_PIN" && -z $(git status --porcelain) ]] || {
+    echo "WS32 sealing checkout changed: $SEAL_ROOT" >&2
+    exit 1
+  }
+  # cd matters for python -m and stdin: cwd otherwise outranks PYTHONPATH.
+  PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$SEAL_ROOT" JAX_PLATFORMS=cpu \
+    /home/gianl/vllm-env/bin/python "$@"
+)
+# END PINNED SEAL CHECKOUT
+say "sealing_source=$SEAL_ROOT sealing_pin=$SEAL_PIN"
+
 post_census_done=0
 db_published=0
 archive_upload_started=0
@@ -436,7 +461,7 @@ terminal_success_verified=0
 success_absent=1
 db_rollback_failed=0
 rollback_success() {
-  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+  seal_python - \
     "$RUN_DIR/SUCCESS" "$REMOTE_PREFIX" <<'PY'
 import base64,sys
 from pathlib import Path
@@ -455,13 +480,13 @@ raise SystemExit('remote SUCCESS remains after authenticated delete')
 PY
 }
 rollback_db() {
-  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
-    "$WORKTREE/scripts/greenfield/seal_short_decoder_ws32.py" rollback-db \
+  seal_python \
+    "$SEAL_ROOT/scripts/greenfield/seal_short_decoder_ws32.py" rollback-db \
     --summary "$RUN_DIR/summary.json" --db-link "$RUN_DIR/db_link.json" \
     --results-db "$RESULTS_DB"
 }
 rollback_remote_nonterminal() {
-  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+  seal_python - \
     "$RUN_DIR" "$REMOTE_PREFIX" "$MODE" <<'PY'
 import base64,hashlib,json,sys
 from pathlib import Path
@@ -497,7 +522,7 @@ for item in source['objects']:
 PY
 }
 rollback_recovery_seed() {
-  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+  seal_python \
     "$RECOVERY_TOOL" rollback \
     --seed "$RUN_DIR/recovery_seed_objects.json" \
     --remote-prefix "$REMOTE_PREFIX"
@@ -576,7 +601,7 @@ if [[ $RECOVER == 1 ]]; then
   archive_failed_publication with_ledger
 fi
 
-PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+seal_python - \
   "$RESULTS_DB" "$TAG" <<'PY'
 import json,sqlite3,sys
 database,tag=sys.argv[1:3]
@@ -593,7 +618,7 @@ try:
 finally: connection.close()
 PY
 
-PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+seal_python - \
   "$CHECKPOINT_ROOT" "$CHECKPOINT_MANIFEST_SHA" "$CHECKPOINT_SUCCESS_SHA" <<'PY'
 import hashlib,json,sys
 from pathlib import Path
@@ -702,7 +727,7 @@ if [[ $RECOVER == 1 && $MODE == acquire && ! -e $RUN_DIR/source_remote_objects.j
       mv "$partial" "$destination"
     fi
   done
-  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+  seal_python \
     "$RECOVERY_TOOL" publish --run-dir "$RUN_DIR" \
     --remote-prefix "$REMOTE_PREFIX" --source-code-hash "$PIN" \
     --recovery-code-hash "$RECOVERY_PIN" \
@@ -780,7 +805,7 @@ fi
 say "materializing generation-pinned all-host evidence with content deduplication"
 materialize_args=()
 [[ $RECOVER == 0 ]] || materialize_args+=(--allow-failure-diagnostics)
-PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+seal_python \
   -m glm_tpu.greenfield.validation.ws32_evidence \
   --run-dir "$RUN_DIR" --remote-prefix "$REMOTE_PREFIX" --mode "$MODE" \
   --tag "$TAG" --code-hash "$PIN" --recovery-code-hash "$RECOVERY_PIN" \
@@ -795,8 +820,8 @@ git -C "$WORKTREE" fetch -q origin "$BRANCH" || {
   say "ABORT: cannot refresh origin/$BRANCH before sealing"
   exit 1
 }
-PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
-  "$WORKTREE/scripts/greenfield/seal_short_decoder_ws32.py" validate \
+seal_python \
+  "$SEAL_ROOT/scripts/greenfield/seal_short_decoder_ws32.py" validate \
   --run-dir "$RUN_DIR" --topology-capture-root "$TOPOLOGY_ROOT" \
   --mode "$MODE" --context-label "$CONTEXT" --tag "$TAG" --code-hash "$PIN" \
   --checkpoint-manifest-sha256 "$CHECKPOINT_MANIFEST_SHA" \
@@ -809,11 +834,11 @@ PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
   --mesh-sha256 "$MESH_SHA" --source-inventory-sha256 "$INVENTORY_SHA" \
   --context-capacity "$CONTEXT_CAPACITY" --observer-steps "$OBSERVER_STEPS" \
   --exact-dsa "$EXACT_DSA" \
-  ${DSA_ADJUDICATION_CLI:+$DSA_ADJUDICATION_CLI} \
+  ${SEAL_DSA_ADJUDICATION_CLI:+$SEAL_DSA_ADJUDICATION_CLI} \
   --later-event-alarm-acknowledged "$LATER_EVENT_ALARM_ACK" \
   ${RECOVERY_CODE_HASH_CLI:+$RECOVERY_CODE_HASH_CLI} \
   --reviewed-ref refs/remotes/origin/$BRANCH \
-  ${LATER_EVENT_ALARM_CLI:+$LATER_EVENT_ALARM_CLI} \
+  ${SEAL_LATER_EVENT_ALARM_CLI:+$SEAL_LATER_EVENT_ALARM_CLI} \
   --checkpoint-transport "$CHECKPOINT_TRANSPORT" \
   --prefill-chunk "$PREFILL_CHUNK" \
   --rotary-diagnostic "$ROTARY_DIAGNOSTIC" \
@@ -859,7 +884,7 @@ if [[ $MODE == acquire ]]; then
     gcloud storage cp --no-clobber "$RUN_DIR/$name" \
       "$REMOTE_PREFIX/diagnostic/$name" >/dev/null
   done
-  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+  seal_python - \
     "$RUN_DIR" "$REMOTE_PREFIX" "${acquisition_files[@]}" <<'PY'
 import base64,json,sys
 from pathlib import Path
@@ -886,8 +911,8 @@ fi
 
 say "publishing one atomic DB linkage after correctness, trace, HBM and cleanup pass"
 db_published=1
-PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
-  "$WORKTREE/scripts/greenfield/seal_short_decoder_ws32.py" publish-db \
+seal_python \
+  "$SEAL_ROOT/scripts/greenfield/seal_short_decoder_ws32.py" publish-db \
   --summary "$RUN_DIR/summary.json" --results-db "$RESULTS_DB" \
   --snapshot "$RUN_DIR/results.db" --output "$RUN_DIR/db_link.json" \
   >"$RUN_DIR/db_publish.log"
@@ -903,7 +928,7 @@ orchestrator_files=(orchestrator.log remote_vacancy.txt sync.txt launch.txt cens
 for name in "${orchestrator_files[@]}"; do
   gcloud storage cp --no-clobber "$RUN_DIR/$name" "$REMOTE_PREFIX/orchestrator/$name" >/dev/null
 done
-PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+seal_python - \
   "$RUN_DIR" "$REMOTE_PREFIX" "$RUN_DIR/remote_objects.json" <<'PY'
 import base64,json,sys
 from pathlib import Path
@@ -938,7 +963,7 @@ PY
 gcloud storage cp --no-clobber "$RUN_DIR/remote_objects.json" \
   "$REMOTE_PREFIX/remote_objects.json" >/dev/null
 
-PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+seal_python - \
   "$RUN_DIR/summary.json" "$RUN_DIR/db_link.json" "$RUN_DIR/remote_objects.json" \
   "$RUN_DIR/source_remote_objects.json" \
   "$RUN_DIR/census_post.txt" "$RUN_DIR/SUCCESS" "$TAG" "$PIN" \
@@ -969,7 +994,7 @@ PY
 success_upload_started=1
 success_absent=0
 gcloud storage cp --no-clobber "$RUN_DIR/SUCCESS" "$REMOTE_PREFIX/SUCCESS" >/dev/null
-PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+seal_python - \
   "$RUN_DIR/SUCCESS" "$REMOTE_PREFIX" "$RUN_DIR/success_upload.json" <<'PY'
 import base64,json,sys
 from pathlib import Path

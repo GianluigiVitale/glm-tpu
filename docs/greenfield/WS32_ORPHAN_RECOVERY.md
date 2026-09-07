@@ -1,5 +1,12 @@
 # WS32 long-run recovery after controller loss
 
+**Completed 2026-09-07 12:26:57Z:** original depth-0.0 evidence sealed DB574, SUCCESS
+`f123beba8caab916e1307607ef28b294606c95338f3a7d431ce374a210900667`, source `679e2392`, recovery
+`ae994e5a`. No rerun occurred. Replacement monitor PID2363119 ended after two complete observations;
+original collection receipts `original_collection_20260907T120655Z` prove 8/8 process and root
+accelerator-device cleanup before/after publication. The text below is the preserved recovery recipe
+and its historical live-state observations, not instructions to recover this sealed tag again.
+
 Current case: `greenfield_ws32_short_decoder_128k_d0_0_numerical_cap131072_hrope_20260907T064941550123130Z`,
 source pin `679e2392b76caf1acb0a98ff87962c5b5c908e14`. The original workers are progressing;
 their detached timeout processes remain responsible for the original wall limit. Never restart them.

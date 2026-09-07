@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-pinned-sealing-checkout",
+      "category": "long-context evidence source isolation",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "8bf907e9f10ac301962218b1e0c9a07bfb288bed",
+      "source_paths": ["scripts/greenfield/run_short_decoder_ws32.sh", "scripts/greenfield/seal_short_decoder_ws32.py", "glm_tpu/greenfield/validation/ws32_evidence.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/run_short_decoder_ws32.sh", "tests/greenfield/validation/test_ws32_sealing_checkout.py"],
+      "gate": "L7/L8 sealing prerequisite; isolated candidate until the active L7 run seals",
+      "reason": "Keep worker source unchanged and reuse existing identity/provenance checks from a per-attempt detached sealing checkout at the frozen run/recovery pin. Controller Python changes cwd and PYTHONPATH together, validates the checkout before each call, rebases only repository-local adjudication/profile arguments, and preserves input/output locations and strict remote layout. This is reserved source isolation, not filesystem immutability or permission to edit active worker code. Also require the spec's 256 E0 timed steps and include legacy extractor engine/provenance dependencies in the checked surface. No new model execution, result or performance claim. Merge only after the current depth-0.0 run seals."
+    },
+    {
       "id": "ws32-orphan-original-evidence-collector",
       "category": "long-context recovery",
       "source_repo": "glm-tpu greenfield",

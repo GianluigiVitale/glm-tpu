@@ -18,12 +18,21 @@ statistics, compile latency, prefill throughput or speculative accepted-token th
 | 571 | **8K prompt**, capacity 131072 | 143.000802 | 144.142677 | 6.992968 | 27,811,511,296 |
 | 572 | **8K prompt**, capacity 262656 | 160.347078 | 161.461336 | 6.236472 | 29,655,086,080 |
 | 573 | 127363-token L7 prompt, depth 1.0 | 142.679610 | 146.917511 | 7.008710 | 27,810,852,864 |
+| 574 | 127363-token L7 prompt, depth 0.0 | 143.496482 | 146.118588 | 6.968812 | 27,810,852,864 |
 
 Rows 567–570 use §21 correctness; 571/572 are capacity measurements, not full long-prompt gates.
 DB573 uses §23.5: extracted passkey 891482 correct, within-engine DSA/state/cache checks, no
 cross-oracle/raw-token-exact claim. Its prefill was **16,353.754838 s** in the summary's rank-0 record,
 **16,390.757689 s fleet maximum** (about 4.55 h); this engine has not demonstrated interactive prefill.
 Fresh trace covers 8 files/64 cores, and the completed run has protected DB/archive/cleanup linkage.
+
+DB574 independently seals depth 0.0 under the same §23.5 contract: extracted passkey 705269 correct,
+prefill **16,394.504492 s rank 0 / 16,425.514998 s fleet maximum**, 5,203,546,112 B minimum HBM
+headroom, 8 files/64 cores and authenticated cleanup. Original computation survived controller loss;
+collection and recovery at `ae994e5a` preserved source `679e2392` and original bytes. Terminal SUCCESS
+`f123beba8caab916e1307607ef28b294606c95338f3a7d431ce374a210900667` was generation-replayed at
+`1788784016426688`; summary `33912e8391dde6f0cfed53b608098d6782dc8c9469edc6675c2e7364207a83c2`
+and DB574 identities verified. Two of four L7 depths are sealed; L8 remains open.
 
 Source verification for this update: read-only `bench/results.db` rows 567–573; rehashed each local
 `summary.json` and `SUCCESS` canonical self-hash; matched terminal summary/DB ids against `db_link.json`.
@@ -33,7 +42,7 @@ summary SHA `1e007a69fd1d893aeaa99c3216605a6bf59b7db441589b279721560968afe3e1`, 
 generation `1788763301245387` under the same tag in `gs://driftbench-dsv4-uc/results/`.
 This documentation audit did not rerun the model or independently replay all remote payloads.
 
-L7 depth 0.0 is still in flight; depths 0.05/0.95 and full-prompt L8 E0 remain unsealed. No full
+L7 depths 1.0/0.0 are sealed; depths 0.05/0.95 and full-prompt L8 E0 remain unsealed. No full
 256K performance or speculative effective-throughput claim exists. Use `TEST_MATRIX.md` and the
 latest `../../HANDOFF.md` for the remaining gates.
 

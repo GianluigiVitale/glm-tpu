@@ -1,8 +1,8 @@
 # CLAUDE — greenfield branch compatibility pointer
 
-Continue autonomously to full project completion under §18. Existing L7 depth-0.0 workers/monitor
-remain live; preserve them. Read the latest
-`HANDOFF.md` resume entry and `docs/greenfield/WS32_ORPHAN_RECOVERY.md` before action.
+Continue autonomously to full project completion under §18. L7 depths 1.0/0.0 are sealed DB573/574;
+their workers/monitor have ended. Read current `HANDOFF.md` and `goal.md` before action.
+Next: remaining L7 depths, L8/E0 and the §18 audit.
 
 This file applies only to branch `rewrite/topology-first-decode` in
 `/home/gianl/glm-tpu-topology-rewrite`.
