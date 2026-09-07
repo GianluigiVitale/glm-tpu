@@ -711,6 +711,7 @@ def _validate_structured_kv_b(
     *,
     qk_nope_head_dim: int,
     config: Fp8BlockMatmulConfig,
+    prefill: bool = False,
 ) -> tuple[int, int, int, int]:
     """Validate the production per-head MLA ``kv_b`` checkpoint layout."""
 
@@ -718,7 +719,11 @@ def _validate_structured_kv_b(
         raise ValueError("structured kv_b requires TPU-v4 128x128 blocks and row tile 8")
     if config.output_tile != 128 or config.contraction_tile != 128:
         raise ValueError("structured kv_b requires exact 128-wide MXU tiles")
-    if activation.ndim != 3 or activation.shape[0] != 1:
+    if type(prefill) is not bool:
+        raise ValueError("structured kv_b prefill flag must be boolean")
+    if prefill and (activation.ndim != 3 or not 1 <= activation.shape[0] <= 32):
+        raise ValueError("structured kv_b prefill requires1..32 rows")
+    if not prefill and (activation.ndim != 3 or activation.shape[0] != 1):
         raise ValueError("structured kv_b activation must contain one decode row")
     if activation.dtype != jnp.bfloat16:
         raise ValueError("structured kv_b activation must be BF16")
@@ -760,6 +765,7 @@ def fp8_structured_kv_b_q_absorb(
     *,
     config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
     interpret: bool = False,
+    prefill: bool = False,
 ) -> Any:
     """Apply the transposed per-head ``kv_b`` key slice from raw FP8.
 
@@ -769,6 +775,8 @@ def fp8_structured_kv_b_q_absorb(
     pads only the compact query activation into the two aligned source blocks,
     reads the original raw checkpoint blocks without a runtime weight
     transpose, and returns ``[1, heads, 512]`` BF16 absorbed queries.
+    Explicit prefill=True enables up to32 live rows sharing each weight tile;
+    the default decode contract stays one row.
     """
 
     heads, combined_width, latent, _ = _validate_structured_kv_b(
@@ -777,14 +785,17 @@ def fp8_structured_kv_b_q_absorb(
         scale,
         qk_nope_head_dim=q_nope.shape[-1],
         config=config,
+        prefill=prefill,
     )
-    if q_nope.shape != (1, heads, 192):
-        raise ValueError("structured kv_b q_nope must have shape [1, heads, 192]")
+    rows = q_nope.shape[0]
+    padded_rows = _ceil_div(rows, 8) * 8
+    if q_nope.shape != (rows, heads, 192):
+        raise ValueError("structured kv_b q_nope must have shape [rows, heads, 192]")
     output_tiles = latent // 128
     contraction_tiles = 2
 
     head_rows = jnp.transpose(q_nope, (1, 0, 2))
-    head_rows = jnp.pad(head_rows, ((0, 0), (0, 7), (0, 0)))
+    head_rows = jnp.pad(head_rows, ((0, 0), (0, padded_rows - rows), (0, 0)))
     aligned = jnp.where(
         ((jnp.arange(heads, dtype=jnp.int32) * combined_width) % 128)[
             :, None, None
@@ -794,8 +805,8 @@ def fp8_structured_kv_b_q_absorb(
         jnp.pad(head_rows, ((0, 0), (0, 0), (64, 0))),
     )
     aligned = jnp.transpose(
-        aligned.reshape(heads, 8, contraction_tiles, 128), (0, 2, 1, 3)
-    ).reshape(heads * contraction_tiles, 8, 128)
+        aligned.reshape(heads, padded_rows, contraction_tiles, 128), (0, 2, 1, 3)
+    ).reshape(heads * contraction_tiles, padded_rows, 128)
 
     head_ids = jnp.arange(heads, dtype=jnp.int32)[:, None]
     source_blocks = (
@@ -807,6 +818,7 @@ def fp8_structured_kv_b_q_absorb(
     selected_scale = selected_scale.reshape(
         heads * contraction_tiles * output_tiles, 1, 128
     )
+    # TPU tile layout remains eight rows; kernel consumes one scalar only.
     selected_scale = jnp.repeat(selected_scale, 8, axis=1)
     def kernel(
         query_ref: Any,
@@ -868,16 +880,16 @@ def fp8_structured_kv_b_q_absorb(
     call = pl.pallas_call(
         kernel,
         out_shape=jax.ShapeDtypeStruct(
-            (heads * output_tiles, 8, 128), jnp.bfloat16
+            (heads * output_tiles, padded_rows, 128), jnp.bfloat16
         ),
         grid=(heads * output_tiles, contraction_tiles),
         in_specs=(
-            pl.BlockSpec((1, 8, 128), query_index),
+            pl.BlockSpec((1, padded_rows, 128), query_index),
             pl.BlockSpec((128, 128), weight_index),
             pl.BlockSpec((1, 8, 128), scale_index),
         ),
-        out_specs=pl.BlockSpec((1, 8, 128), output_index),
-        scratch_shapes=(pltpu.VMEM((8, 128), jnp.float32),),
+        out_specs=pl.BlockSpec((1, padded_rows, 128), output_index),
+        scratch_shapes=(pltpu.VMEM((padded_rows, 128), jnp.float32),),
         compiler_params=pltpu.CompilerParams(
             dimension_semantics=("parallel", "arbitrary"),
             disable_bounds_checks=True,
@@ -886,22 +898,23 @@ def fp8_structured_kv_b_q_absorb(
         name=(
             "greenfield_fp8_structured_kv_b_q_absorb_"
             f"h{heads}_p192_l{latent}"
+            + (f"_prefill_m{rows}" if prefill else "")
         ),
         cost_estimate=pl.CostEstimate(
-            flops=2 * heads * 192 * latent,
+            flops=2 * rows * heads * 192 * latent,
             bytes_accessed=(
-                heads * contraction_tiles * 8 * 128 * 2
+                heads * contraction_tiles * padded_rows * 128 * 2
                 + heads * contraction_tiles * latent * 128
                 + selected_scale.size * 4
-                + heads * 8 * latent * 2
+                + heads * padded_rows * latent * 2
             ),
             transcendentals=0,
         ),
     )
     result = call(aligned, weight_bits, selected_scale)
-    result = result.reshape(heads, output_tiles, 8, 128)
-    result = jnp.transpose(result, (2, 0, 1, 3)).reshape(8, heads, latent)
-    return result[:1]
+    result = result.reshape(heads, output_tiles, padded_rows, 128)
+    result = jnp.transpose(result, (2, 0, 1, 3)).reshape(padded_rows, heads, latent)
+    return result[:rows]
 
 
 def fp8_structured_kv_b_value(
@@ -912,8 +925,9 @@ def fp8_structured_kv_b_value(
     qk_nope_head_dim: int = 192,
     config: Fp8BlockMatmulConfig = Fp8BlockMatmulConfig(),
     interpret: bool = False,
+    prefill: bool = False,
 ) -> Any:
-    """Apply the per-head ``kv_b`` value slice from raw FP8 tiles."""
+    """Apply the per-head ``kv_b`` value slice; prefill=True enables1..32 rows."""
 
     heads, combined_width, latent, value_width = _validate_structured_kv_b(
         attended_latent,
@@ -921,15 +935,18 @@ def fp8_structured_kv_b_value(
         scale,
         qk_nope_head_dim=qk_nope_head_dim,
         config=config,
+        prefill=prefill,
     )
-    if attended_latent.shape != (1, heads, latent):
+    rows = attended_latent.shape[0]
+    padded_rows = _ceil_div(rows, 8) * 8
+    if attended_latent.shape != (rows, heads, latent):
         raise ValueError(
-            "structured kv_b attended latent must have shape [1, heads, 512]"
+            "structured kv_b attended latent must have shape [rows, heads, 512]"
         )
     contraction_tiles = latent // 128
     output_blocks = 3
     head_rows = jnp.transpose(attended_latent, (1, 0, 2))
-    head_rows = jnp.pad(head_rows, ((0, 0), (0, 7), (0, 0)))
+    head_rows = jnp.pad(head_rows, ((0, 0), (0, padded_rows - rows), (0, 0)))
 
     head_ids = jnp.arange(heads, dtype=jnp.int32)[:, None]
     value_starts = head_ids * jnp.int32(combined_width) + jnp.int32(
@@ -949,6 +966,7 @@ def fp8_structured_kv_b_value(
     selected_scale = selected_scale.reshape(
         heads * output_blocks * contraction_tiles, 1, 128
     )
+    # Scale tile is independent of the live activation row count.
     selected_scale = jnp.repeat(selected_scale, 8, axis=1)
     def kernel(
         latent_ref: Any,
@@ -1011,16 +1029,16 @@ def fp8_structured_kv_b_value(
     call = pl.pallas_call(
         kernel,
         out_shape=jax.ShapeDtypeStruct(
-            (heads * output_blocks, 8, 128), jnp.bfloat16
+            (heads * output_blocks, padded_rows, 128), jnp.bfloat16
         ),
         grid=(heads * output_blocks, contraction_tiles),
         in_specs=(
-            pl.BlockSpec((1, 8, 128), latent_index),
+            pl.BlockSpec((1, padded_rows, 128), latent_index),
             pl.BlockSpec((128, 128), weight_index),
             pl.BlockSpec((1, 8, 128), scale_index),
         ),
-        out_specs=pl.BlockSpec((1, 8, 128), output_index),
-        scratch_shapes=(pltpu.VMEM((8, 128), jnp.float32),),
+        out_specs=pl.BlockSpec((1, padded_rows, 128), output_index),
+        scratch_shapes=(pltpu.VMEM((padded_rows, 128), jnp.float32),),
         compiler_params=pltpu.CompilerParams(
             dimension_semantics=("parallel", "arbitrary"),
             disable_bounds_checks=True,
@@ -1029,19 +1047,31 @@ def fp8_structured_kv_b_value(
         name=(
             "greenfield_fp8_structured_kv_b_value_"
             f"h{heads}_l{latent}_v{value_width}"
+            + (f"_prefill_m{rows}" if prefill else "")
         ),
         cost_estimate=pl.CostEstimate(
-            flops=2 * heads * latent * value_width,
+            flops=2 * rows * heads * latent * value_width,
             bytes_accessed=(
-                heads * output_blocks * 8 * latent * 2
+                heads * output_blocks * padded_rows * latent * 2
                 + heads * output_blocks * latent * 128
                 + selected_scale.size * 4
-                + heads * output_blocks * 8 * 128 * 2
+                + heads * output_blocks * padded_rows * 128 * 2
             ),
             transcendentals=0,
         ),
     )
     result = call(head_rows, weight_bits, selected_scale)
+    if prefill:
+        result = result.reshape(heads, output_blocks, padded_rows, 128)
+        aligned = jnp.concatenate((result[:, 0], result[:, 1]), axis=-1)
+        unaligned = jnp.concatenate(
+            (result[:, 0, :, 64:], result[:, 1], result[:, 2, :, :64]), axis=-1
+        )
+        value_offsets = (
+            jnp.arange(heads, dtype=jnp.int32) * combined_width + qk_nope_head_dim
+        ) % 128
+        output = jnp.where(value_offsets[:, None, None] == 0, aligned, unaligned)
+        return jnp.transpose(output, (1, 0, 2))[:rows].astype(jnp.bfloat16)
     result = result.reshape(heads, output_blocks, 8, 128)[:, :, 0, :]
     aligned = jnp.concatenate((result[:, 0], result[:, 1]), axis=-1)
     unaligned = jnp.concatenate(

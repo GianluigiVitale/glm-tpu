@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-causal-attention",
+      "category": "batched causal attention assembly",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b52fc0ee4e097968c0519c22bdd001bb979df92a",
+      "source_paths": ["glm_tpu/greenfield/kernels/ws32_layer.py", "glm_tpu/greenfield/kernels/prefill_cache.py", "glm_tpu/greenfield/kernels/ws32_prefill_linear.py", "glm_tpu/greenfield/kernels/reference/attention.py", "glm_tpu/greenfield/kernels/reference/rotary.py", "glm_tpu/greenfield/kernels/pallas/fp8_matmul.py", "glm_tpu/greenfield/kernels/pallas/sparse_attention.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/ws32_prefill_attention.py", "tests/greenfield/kernels/test_ws32_prefill_attention.py", "tests/greenfield/kernels/test_prefill_attention_primitives.py"],
+      "gate": "24: CPU causal attention assembly, TPU and decoder admission pending",
+      "reason": "Explicit default-off multirow structured q/value shares raw-FP8 tiles over1..32 rows; scale replication stays8. Sparse MLA has row-specific counts and scratch reset. Separate prefill qkv-a and attention consumer reuse weight types, norms, host main rotary and aligned gather. Write all block keys once, gather with each query's exclusive bound; exact count and finite output health, padded zero-output/no-write. Initial forced32 CPU test passes17-row serial comparison across stripe/page boundaries and partial tails, future-key perturbation, no-op and invalid selections, only2 expert8 all-reduces. New raw qkv-a is not legacy convolution association; requires own real-layer and section21 proof. Caller must bind committed frontier/populated prefix, all-chip health and dual index lifetimes. No decoder import, TPU arithmetic or prefill/TTFT performance claim."
+    },
+    {
       "id": "ws32-prefill-block-cache-write",
       "category": "causal block address and tail handling",
       "source_repo": "glm-tpu greenfield",

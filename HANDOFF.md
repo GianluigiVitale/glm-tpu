@@ -14653,3 +14653,38 @@ on-device, and current block keys must exist before causal reads. No TPU workflo
 
 Independent Astra review PASS for CPU-stage persistence of cache helper, no P0-P2; caller
 obligations above remain and no TPU/integrated decoder admission is implied.
+
+## 2026-09-07 — causal multirow attention assembled, CPU admission
+
+`kernels/ws32_prefill_attention.py` now provides multirow qkv-a preparation and the complete
+supplied-selection attention consumer: host BF16 main rotary, all-block KV writes, each
+query's exclusive causal bound, canonical aligned selected gather, absorbed query, sparse
+MLA, value and expert8 output projection. Up to32 rows share structured raw-FP8 weight
+tiles; scale replication remains8. Explicit `prefill=False` preserves default one-row
+structured/sparse APIs. The assembly enforces the expert8/feature4 mesh.
+
+Initial CPU32 test passed11.84s:17-row bitwise comparisons with old sequential attention
+and raw qkv-a preparation, owner63/64 and page511/512 crossings, reordered physical pages,
+11/17 tail, future live key/query perturbation, invalid counts/future selections/INTMAX,
+healthy zero-live no-op, two exact expert8 all-reduces. This is supplied-selection attention,
+not a full DSA/transformer layer or TPU result; latent/head geometry is real, hidden/q-rank
+and top-k are reduced for CPU admission. Raw qkv-a is NOT the production exact-DSA convolution
+association; own real-layer and §21 decoder comparisons remain mandatory.
+
+Independent Astra found P2: sparse MLA's finite-mask/null-sink fallback can turn NaN scores
+into zero output. Explicit live input/rotary/absorbed-query/selected-cache finite predicates
+now gate row health, separate from finite output. The added live-query NaN test failed
+before the fix (combined run1failed/27passed66.17s); corrected full CPU32 case including
+historical selected-cache, rotary and current-key NaNs passed12.98s. Review PASS for
+CPU-stage persistence, no P0-P2. Existing sparse pregathered tests2passed3.76s; primitive
+batch/old structured checks previously8passed38.36s. No TPU workflow launched.
+
+Next: DSA query/key producer and unrepaired/repaired cache lifecycle, compose attention
+with dense/grouped MoE into the causal layer, then one bounded real-layer TPU admission
+before short complete decoder. Serving caller must bind append frontier/populated prefix,
+consume all32 health flags and refuse proposed state on any failed row. New prefill/TTFT
+targets still need registration before performance trials; efficient L7/L8 remain open.
+
+Final regression suite32passed70.36s: assembly, multirow attention primitives, cache,
+existing sparse attention and reuse checks. Black on new files and git diff --check pass;
+goal.md is3971 chars. No model/runtime/enforcement integration or TPU performance claim.

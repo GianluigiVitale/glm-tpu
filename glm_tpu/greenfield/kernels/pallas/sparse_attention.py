@@ -606,6 +606,7 @@ def pregathered_sparse_mla_pallas(
     contract: MlaNumericalContract = MlaNumericalContract(),
     config: SparseMlaConfig = SparseMlaConfig(segment_block=512),
     interpret: bool = False,
+    prefill: bool = False,
 ) -> Any:
     """Attend one live row over an already ordered, topology-local segment.
 
@@ -614,6 +615,9 @@ def pregathered_sparse_mla_pallas(
     exact ascending 2,048-row BF16 segment already resident on the local stage.  The
     finite mask, online update, BF16 probability boundary and final BF16 round mirror
     the accepted flash association while remaining independent of legacy execution.
+    prefill=True enables up to32 independent causal query rows in one call.
+    Caller validates counts/ascending causal selection and sanitizes cache tails;
+    a masked score alone cannot protect the value dot from nonfinite padding.
     """
 
     heads = contract.num_heads
@@ -621,14 +625,19 @@ def pregathered_sparse_mla_pallas(
     rope_width = contract.qk_rope_head_dim
     segment_width = contract.top_k
     cache_width = contract.packed_cache_width
-    if query_nope_absorbed.shape != (1, heads, latent):
+    if type(prefill) is not bool:
+        raise ValueError("pregathered prefill flag must be boolean")
+    rows = query_nope_absorbed.shape[0] if query_nope_absorbed.ndim == 3 else 0
+    if not (1 <= rows <= 32 if prefill else rows == 1):
+        raise ValueError("pregathered rows require explicit prefill=True for1..32")
+    if query_nope_absorbed.shape != (rows, heads, latent):
         raise ValueError("pregathered sparse-MLA absorbed query shape drifted")
-    if query_rope.shape != (1, heads, rope_width):
+    if query_rope.shape != (rows, heads, rope_width):
         raise ValueError("pregathered sparse-MLA RoPE query shape drifted")
-    if selected_cache.shape != (1, segment_width, cache_width):
+    if selected_cache.shape != (rows, segment_width, cache_width):
         raise ValueError("pregathered sparse-MLA selected cache shape drifted")
-    if valid_counts.shape != (1,) or valid_counts.dtype != jnp.int32:
-        raise ValueError("pregathered sparse-MLA valid counts must be int32[1]")
+    if valid_counts.shape != (rows,) or valid_counts.dtype != jnp.int32:
+        raise ValueError("pregathered sparse-MLA valid counts must be int32[rows]")
     if (
         query_nope_absorbed.dtype != jnp.bfloat16
         or query_rope.dtype != jnp.bfloat16
@@ -648,12 +657,12 @@ def pregathered_sparse_mla_pallas(
         (
             query_nope_absorbed,
             query_rope,
-            jnp.zeros((1, heads, padding), dtype=jnp.bfloat16),
+            jnp.zeros((rows, heads, padding), dtype=jnp.bfloat16),
         ),
         axis=-1,
     )
     blocked_cache = selected_cache.reshape(
-        1, block_count, segment_block, cache_width
+        rows, block_count, segment_block, cache_width
     )
 
     def kernel(
@@ -693,7 +702,9 @@ def pregathered_sparse_mla_pallas(
             preferred_element_type=jnp.float32,
         ) * jnp.float32(contract.softmax_scale)
         scores = jnp.where(
-            slots < valid_count_ref[0], scores, _FINITE_MASK_VALUE
+            slots < valid_count_ref[pl.program_id(0) if prefill else 0],
+            scores,
+            _FINITE_MASK_VALUE,
         ).astype(jnp.float32)
         block_maximum = jnp.max(scores, axis=1, keepdims=True)
         maximum = jnp.maximum(maximum_ref[...], block_maximum)
@@ -750,7 +761,7 @@ def pregathered_sparse_mla_pallas(
         kernel,
         grid_spec=pltpu.PrefetchScalarGridSpec(
             num_scalar_prefetch=1,
-            grid=(1, block_count),
+            grid=(rows, block_count),
             in_specs=(
                 pl.BlockSpec((1, heads, cache_width), query_map),
                 pl.BlockSpec(
@@ -765,16 +776,17 @@ def pregathered_sparse_mla_pallas(
             ),
         ),
         out_shape=jax.ShapeDtypeStruct(
-            (1, heads, latent), query_nope_absorbed.dtype
+            (rows, heads, latent), query_nope_absorbed.dtype
         ),
         compiler_params=pltpu.CompilerParams(
-            dimension_semantics=("arbitrary", "arbitrary"),
+            dimension_semantics=("parallel" if prefill else "arbitrary", "arbitrary"),
             vmem_limit_bytes=config.vmem_limit_bytes,
         ),
         interpret=interpret,
         name=(
             "greenfield_pregathered_sparse_mla_"
             f"h{heads}_k{segment_width}_b{segment_block}_w{cache_width}"
+            + (f"_prefill_m{rows}" if prefill else "")
         ),
     )
     return call(valid_counts, packed_query, blocked_cache)

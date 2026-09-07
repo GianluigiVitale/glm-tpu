@@ -281,3 +281,15 @@ Peak HBM322160640B including reference, all8 clean, exact DB/archive links in HA
 `../artifacts/prefill-real-moe-fp32-bounded-admission-20260907.json`. E2's arithmetic obstacle
 is resolved for these cases, not its performance or full-model integration. Next E1 causal
 attention/cache/layer assembly; do not rerun this cleared MoE arithmetic diagnostic.
+
+Causal attention assembly now passes forced32 CPU admission:17 real prompt rows share
+structured kv-b tiles, use row-specific sparse counts/scratch and per-query causal bounds
+after a whole-block write. Output and final cache match old sequential attention bitwise
+across stripe/page boundaries and partial tails; future-row perturbations leave earlier
+outputs unchanged. Only two expert8 attention reductions. qkv-a preparation reuses raw
+multirow projections, not production exact-convolution association. The new API is unwired;
+DSA producer/dual index lifecycle/full layer, real TPU arithmetic and TTFT remain open.
+Adversarial review exposed a null-sink health hole: NaN scores could become finite zero
+attention. Explicit live operand finiteness now gates health, with query/rotary/old-cache
+NaN refusal tests. Corrected CPU32 test passed12.98s, reviewer PASS for CPU persistence.
+This closes a bounded assembly defect without a model run; it does not establish TPU speed.

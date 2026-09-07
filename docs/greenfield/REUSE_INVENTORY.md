@@ -2,6 +2,16 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+`kernels/ws32_prefill_attention.py` now assembles qkv-a preparation and causal attention
+from the existing norms/raw-FP8 owners, host main-RoPE, block writer and aligned gather.
+Structured q/value and sparse MLA gain explicit static `prefill=False`; old one-row APIs
+stay default. Up to32 query rows share weight tiles; scales stay8 rows. Each query uses
+its own causal bound after the full block write. Initial forced32 CPU test passes17-row
+bitwise old-path comparisons across stripe/page boundaries and partial tails; future-row
+perturbations leave earlier outputs unchanged. Only two expert8 attention reductions.
+This is unwired: DSA producer/repair, complete layers/decoder and TPU admission remain.
+Raw qkv-a preparation is not the legacy-convolution association; own §21 proof required.
+
 `kernels/prefill_cache.py` adapts StageLocalKvLayout and decode-metadata checks to a block:
 one shared page table, full-prefix page uniqueness once, owned vector writes, positive drop
 sentinel and invalid-input no-write. It returns per-query exclusive causal lengths.16 CPU

@@ -56,6 +56,6 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
-DB583 FP32 MoE bounded admission sealed; fleet8/8 clean21:07Z. HANDOFF has evidence.
-TPU FP8 baselines DB576-579; grouped up/down TPU-exact DB580-581. No full-prefill speedup.
-Causal DSA/cache CPU-admitted. Next: causal attention/layer integration; efficient L7/L8 open.
+DB583 real MoE bounded PASS. Last fleet8/8 clean21:07Z; evidence in HANDOFF.
+TPU FP8/grouped primitives DB576-581; causal attention/cache/DSA selector CPU-admitted.
+Next: DSA producer/repair -> layer TPU -> short decoder. Efficient L7/L8/TTFT unproved.
