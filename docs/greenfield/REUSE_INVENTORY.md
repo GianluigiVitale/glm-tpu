@@ -2,6 +2,16 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+`kernels/prefill_dsa.py` adapts the existing reference scorer/local selector/scored merge.
+It loops over bounded key tiles for up to32 causal query rows, skips wholly future tiles,
+retains exact candidate ties and exposes health. The WS32 mapped consumer performs two
+expert8 candidate gathers; no full cache or hidden exchange. Six CPU tests passed10.96s,
+including forced32 physical group/health checks. This is unwired correctness groundwork:
+no TPU performance claim, no key/query production or cache update/repair implemented here.
+Mapped health reuses `reference/attention.canonicalize_selected_positions` and adds live-score
+finiteness/causal bounds after review exposed missing coverage/duplicate candidate risks.
+Caller must separately validate disjoint complete cache coverage, including nonselected keys.
+
 Grouped TPU arithmetic admission now adapts `run_fp8_matmul_microbench.sh` through
 `ws32_grouped_admission`: same bounded prefill leases/censuses/publisher, no timed samples,
 NULL DB latency, explicit admission-only classification. `probe_prefill_grouped_fp8.py`
@@ -12,6 +22,8 @@ arithmetic is now admitted; BF16 down, real mapped MoE and end-to-end prefill re
 The same probe now has an explicit down protocol: K2048/N1536, BF16 output compared against
 the existing BF16 M1 primitive, same three distributions/guards and no timed samples. Up's
 protocol stays distinct; do not relabel DB580 as down evidence or rerun its cleared cases.
+Down has now passed separately as DB581: all three BF16 bit comparisons exact, runner9s,
+complete guarded workflow33s, exit0 and8/8 clean. Real mapped MoE remains unproved on TPU.
 
 Grouped schedule implementation now uses the pinned JAX metadata directly, not stock gmm:
 `prefill_routes.py`, `pallas/prefill_grouped_fp8.py`, and `ws32_prefill_moe.py` are unwired.

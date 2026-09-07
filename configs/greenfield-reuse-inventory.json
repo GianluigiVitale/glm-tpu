@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-causal-dsa-candidates",
+      "category": "bounded multirow causal selection reference",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "51a3858cdce8f42d38c8274d22ce8bc5c592e1c3",
+      "source_paths": ["glm_tpu/greenfield/kernels/reference/dsa.py", "glm_tpu/greenfield/kernels/reference/attention.py", "glm_tpu/greenfield/kernels/ws32_layer.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/prefill_dsa.py", "tests/greenfield/kernels/test_prefill_dsa.py", "tests/greenfield/kernels/test_ws32_prefill_dsa.py"],
+      "gate": "24: CPU causal DSA reference admission, not TPU performance",
+      "reason": "Reuse scorer, exact local candidate selection and scored candidate merge with a key-tile loop over up to32 query rows. Per-row causal lengths, increasing global positions with holes, finite live-score health and future-only tile skipping; bounded rows*heads*key_tile scratch, not full-context score materialization. Mapped consumer exchanges only scores/positions across expert8 and exports per-chip health for future serving admission. No cache write, key repair, query projection or legacy execution is imported. CPU tests cover tails/holes/signed weights/ties/invalid metadata and forced32 group membership; TPU arithmetic/scaling, actual block-table input preparation and full layer remain open."
+    },
+    {
       "id": "ws32-prefill-grouped-tpu-admission",
       "category": "bounded grouped arithmetic admission",
       "source_repo": "glm-tpu greenfield",
@@ -24,8 +35,8 @@
       "source_paths": ["scripts/greenfield/run_fp8_matmul_microbench.sh", "scripts/greenfield/fp8_baseline_guard.py", "scripts/greenfield/collect_ws32_worker_evidence.py", "glm_tpu/greenfield/kernels/pallas/fp8_matmul.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/probe_prefill_grouped_fp8.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "tests/greenfield/hlo/test_prefill_grouped_admission.py"],
-      "gate": "24: grouped TPU arithmetic admission, not performance; up F32 DB580, down BF16 explicit separate protocol",
-      "reason": "Reuse bounded prefill safety/publication and exact old M1 raw-FP8 projection reference; synthetic local G32/N2048/K1536 at 136 sorted routes with distributed, concentrated-owner and empty-owner counts. DB580 passed all three cases with zero F32 bit mismatches, runner8s, original wrapper exit0 and8/8 clean. Zero timed samples and NULL DB latency; no full checkpoint, production integration, full layer or performance claim. Exact HLO/raw-U8/no-full-overlay/no-collective and compiler memory admission precede execution; stop on first numerical mismatch. BF16 down and real mapped MoE remain open."
+      "gate": "24: grouped TPU arithmetic admission, not performance; up F32 DB580, down BF16 DB581",
+      "reason": "Reuse bounded prefill safety/publication and exact old M1 raw-FP8 projection reference; synthetic local G32/N2048/K1536 at 136 sorted routes with distributed, concentrated-owner and empty-owner counts. DB580 passed all three cases with zero F32 bit mismatches, runner8s, original wrapper exit0 and8/8 clean. DB581 separately passed BF16 down K2048/N1536 in9s, three cases exact. Zero timed samples and NULL DB latency; no full checkpoint, production integration, full layer or performance claim. Exact HLO/raw-U8/no-full-overlay/no-collective and compiler memory admission precede execution; stop on first numerical mismatch. Real mapped MoE remains open."
     },
     {
       "id": "ws32-prefill-grouped-row-schedule",

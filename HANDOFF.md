@@ -14437,3 +14437,60 @@ NULL DB latency and600s runner cap. Wrapper mode `ws32_grouped_down_admission` s
 the bounded safety/publication path. No kernel/model execution implementation changed.
 The old real-layer WS32 runner remains a reuse source; its historical launch pins/topology
 must not be replayed blindly on this pod. No additional checkpoint copy is needed.
+
+## 2026-09-07 19:51Z — grouped BF16 down TPU admission PASS, DB581
+
+Tag `greenfield_fp8_ws32_grouped_down_admission_20260907T195100892469765Z`, pin
+`51a3858cdce8f42d38c8274d22ce8bc5c592e1c3`. Original wrapper exit0 at19:51:33Z;
+runner9s, all three distributions zero BF16 bit mismatches at G32/N1536/K2048,M136.
+Compile1.338900169s; compiler arguments101320192/output418816/temp1032704B,
+peak process106439680B including reference (not VMEM). No timed samples; DB581 latencyNULL.
+Pre/post census8/8 with root device checks; no running model/controller from this campaign.
+No full checkpoint/real mapped MoE/full prefill/performance claim.
+
+Approved archive `gs://driftbench-dsv4-uc/results/<tag>/`, SUCCESS generation1788810693285872
+independently read back at that generation and byte-identical to local. SHA256:
+- SUCCESS `1bb8f04d4eae6a81bd37e06c009db84a986f9d0e5bf3b4bc82996919e27b2d08`
+- summary `b37f3236566b3bae2a5b2f9d62e52a936846ca9fc30eef4081b959f78acf70ae`
+- runner `b30b67888d39fdcd8ac29776f7fd9ff0eaf0c19f43ad382a8510cd0a4525fd9e`
+- receipts `c0e494329c49c05d21fb2e9c90c8877f79a32adb045416f71ac223095f053349`
+- optimized HLO `5c235cb415b18e1a59c611fc6fc5fd6da76e920268a012f1453498829d6b9389`
+
+## 2026-09-07 — bounded causal DSA reference CPU admission
+
+`kernels/prefill_dsa.py` reuses the old scorer and exact candidate selectors. Bounded key-tile
+loop across1..32 query rows; per-row absolute lengths, increasing live global positions/-1
+holes, signed scores, exact lowest-position tie merges, future-only tile skipping and
+explicit metadata/live-score health. Mapped consumer requires expert8/feature4 and exchanges
+only compact candidates over expert8. Caller must gate ALL32 health bits before serving.
+No cache producer, write/repair, query projection or full attention integration yet.
+
+Six CPU tests passed10.96s: random signed/tail/hole cases, zero-length rows, cross-tile ties,
+future NaN isolation, invalid metadata/visible NaN refusal and forced32 physical gathers and
+owner-local bad metadata health. Small random selected-score errors use1e-6 CPU comparison;
+positions/counts exact. Not bitwise TPU arithmetic or performance evidence. The reference
+caps per-head score tiles at16MiB; pad/candidate-sort costs still need measured attribution.
+Old one-row decoder/scorer untouched, new files remain unwired/default-off.
+
+Next: representative real-weight mapped MoE TPU correctness using current physical topology,
+causal query/key/attention/cache integration, phase baselines/registered performance targets,
+short decoder and efficient L7/L8. Reuse retained layer3 WS32 pack/oracle and loader if its
+exact manifest/files verify; do not blindly run the old wrapper's historical topology pins.
+
+Independent review caught a P2 in the new DSA mapped helper: locally valid metadata did not
+prove that the merged requested live slots were populated and unique. Reused the existing
+`canonicalize_selected_positions` health check plus live-score finiteness/causal upper bounds;
+tests now inject all-hole coverage and cross-owner duplicates. Full disjoint cache coverage
+remains a required caller page/cache invariant: candidate checks cannot detect missing
+nonselected keys, and no full-cache validation collective is added. Also corrected stale
+registry wording that still called standalone BF16 down open after DB581.
+
+After fixes: causal DSA/forced32/registry10 tests passed12.90s; Black and diff checks pass.
+Read-only next-layer inventory: retained layer3 WS32 pack
+`greenfield_ws32_one_layer_pack_20260815T070628458699950Z` has all32 payload paths present,
+manifest payload9971249152B, self-hash `4bf8679d…1f40`, mesh `de5f59cb…a88`, manifest-file
+SHA256 `3ad90eb83c7140a1d6c419292dac4b91766a3e28b01c688cdc6ab731a0c565cd`.
+This establishes presence only; exact file/tensor hashes must be checked by its loader.
+Current short-decoder topology captures are `greenfield_topology_20260826T194116460015528Z`,
+not the old one-layer wrapper's08-05 captures; physical mesh hash agrees. Fresh runtime
+device/host validation is still mandatory. No layer payload was read, copied or repacked.

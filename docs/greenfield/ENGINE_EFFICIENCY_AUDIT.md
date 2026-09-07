@@ -244,3 +244,12 @@ bit-exact against old M1 projections. Runner8s, entire protected workflow34s, no
 samples or performance claim. HLO contains one grouped raw-U8 Pallas call/no full table
 decode/no collectives; peak process HBM107012096B including reference. See grouped design
 and HANDOFF for exact evidence. BF16 down, real mapped MoE and causal full prefill remain open.
+
+DB581 subsequently closes grouped BF16 down projection arithmetic at G32/N1536/K2048:
+all three route cases bit-exact, runner9s, no timing samples. This is not a full MoE result.
+E4 now has an unwired bounded causal DSA reference: up to32 rows/key tiles up to4096,
+future-only tiles skip scoring/selection, exact local candidate merges and expert8 exchange.
+Six CPU tests passed including physical group membership, tails/holes/ties and bad metadata.
+The JAX reference may still be slow: repeated candidate sorts, padded key buffers and
+per-head tile temporaries need TPU attribution before promotion or Pallas replacement.
+Do not call this an efficient production scorer based on CPU correctness alone.
