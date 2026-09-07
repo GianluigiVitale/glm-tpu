@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bounded TPU arithmetic admission, NOT a prefill performance experiment.
 
-Synthetic local WS32 routed-up shape; three routing distributions, one compiled
+Synthetic local WS32 routed-up or down shape; three routing distributions, one compiled
 candidate, exact old M1 projection reference. No model checkpoint or timed loop.
 Launch only through run_fp8_matmul_microbench.sh's ws32_grouped_admission mode.
 """
@@ -37,6 +37,20 @@ M, K, N, LOCAL_GROUPS, GLOBAL_GROUPS, OFFSET = 136, 1536, 2048, 32, 256, 64
 CASES = ("distributed", "concentrated_owner", "empty_owner")
 
 
+def projection_contract(direction: str) -> tuple[str, str, int, int, str]:
+    if direction == "up":
+        return KERNEL, PROTOCOL, K, N, "float32"
+    if direction == "down":
+        return (
+            "ws32_grouped_down_admission",
+            "ws32-grouped-fp8-down-arithmetic-v1",
+            N,
+            K,
+            "bfloat16",
+        )
+    raise ValueError("grouped admission direction must be up or down")
+
+
 def counts_for_case(name: str) -> np.ndarray:
     counts = np.zeros(GLOBAL_GROUPS, np.int32)
     if name == "distributed":
@@ -50,7 +64,8 @@ def counts_for_case(name: str) -> np.ndarray:
     return counts
 
 
-def check_hlo(hlo: str) -> dict[str, Any]:
+def check_hlo(hlo: str, *, direction: str = "up") -> dict[str, Any]:
+    _, _, contraction, output, _ = projection_contract(direction)
     calls = [line.strip() for line in hlo.splitlines() if "custom-call(" in line]
     kernels = [line for line in calls if 'custom_call_target="tpu_custom_call"' in line]
     collectives = re.findall(
@@ -62,7 +77,7 @@ def check_hlo(hlo: str) -> dict[str, Any]:
     for match in re.finditer(r"\b(?:bf16|f32)\[([0-9,]+)\]", hlo):
         if np.prod([int(v) for v in match[1].split(",")]) >= LOCAL_GROUPS * N * K:
             full_overlays.append(match[0])
-    raw_shape = f"u8[{LOCAL_GROUPS},{N},{K}]"
+    raw_shape = f"u8[{LOCAL_GROUPS},{output},{contraction}]"
     return {
         "passed": len(kernels) == 1
         and "greenfield_prefill_grouped_raw_fp8" in kernels[0]
@@ -79,9 +94,10 @@ def check_hlo(hlo: str) -> dict[str, Any]:
 
 def validate_record(record: dict[str, Any]) -> None:
     """Reject performance classification and protocol drift before DB success."""
+    kernel, protocol, k, n, dtype = projection_contract(record.get("direction", "up"))
     if not (
-        record["kernel"] == KERNEL
-        and record["protocol"] == PROTOCOL
+        record["kernel"] == kernel
+        and record["protocol"] == protocol
         and record["admission_only"] is True
         and record["baseline_only"] is False
         and record["performance_claim"] is False
@@ -89,8 +105,8 @@ def validate_record(record: dict[str, Any]) -> None:
         and record["warmup"] == 0
         and record["iterations"] == 0
         and record["shape"]
-        == {"lhs": [M, K], "weights": [LOCAL_GROUPS, N, K], "output": [M, N]}
-        and record["dtype_contract"]["output"] == "float32"
+        == {"lhs": [M, k], "weights": [LOCAL_GROUPS, n, k], "output": [M, n]}
+        and record["dtype_contract"]["output"] == dtype
         and record["compiled_memory_estimate"]
         and record["comparison"]["passed"] is True
         and [v["case"] for v in record["comparison"]["cases"]] == list(CASES)
@@ -107,7 +123,9 @@ def main() -> int:
     parser.add_argument("--expected-code-hash", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--hlo-output", type=Path, required=True)
+    parser.add_argument("--direction", choices=("up", "down"), default="up")
     args = parser.parse_args()
+    kernel_name, protocol, k, n, dtype_name = projection_contract(args.direction)
     if (
         REPO != Path("/home/gianl/glm-tpu-topology-rewrite")
         or _git_head() != args.expected_code_hash
@@ -116,7 +134,10 @@ def main() -> int:
     import jax
     import jax.numpy as jnp
     import ml_dtypes
-    from glm_tpu.greenfield.kernels.pallas.fp8_matmul import fp8_block_matmul_f32
+    from glm_tpu.greenfield.kernels.pallas.fp8_matmul import (
+        fp8_block_matmul,
+        fp8_block_matmul_f32,
+    )
     from glm_tpu.greenfield.kernels.pallas.prefill_grouped_fp8 import (
         prefill_grouped_fp8_matmul,
     )
@@ -129,8 +150,9 @@ def main() -> int:
     record = dict(
         status="RUNNING",
         code_hash=args.expected_code_hash,
-        kernel=KERNEL,
-        protocol=PROTOCOL,
+        kernel=kernel_name,
+        protocol=protocol,
+        direction=args.direction,
         admission_only=True,
         baseline_only=False,
         performance_claim=False,
@@ -142,25 +164,25 @@ def main() -> int:
         selected_route_case=None,
         device_kind=device.device_kind,
         versions={"jax": version("jax"), "libtpu": version("libtpu")},
-        shape={"lhs": [M, K], "weights": [LOCAL_GROUPS, N, K], "output": [M, N]},
+        shape={"lhs": [M, k], "weights": [LOCAL_GROUPS, n, k], "output": [M, n]},
         dtype_contract={
             "lhs": "bfloat16",
             "weights": "uint8",
             "scales": "float32",
-            "output": "float32",
+            "output": dtype_name,
         },
     )
     try:
         rng = np.random.default_rng(243091)
-        lhs_host = rng.normal(0, 0.25, (M, K)).astype(ml_dtypes.bfloat16)
+        lhs_host = rng.normal(0, 0.25, (M, k)).astype(ml_dtypes.bfloat16)
         lhs_host[7] = 0
         # Quantize on CPU; no full BF16/FP32 expert table is sent to the TPU.
         bits_host = (
-            rng.normal(0, 0.15, (LOCAL_GROUPS, N, K))
+            rng.normal(0, 0.15, (LOCAL_GROUPS, n, k))
             .astype(ml_dtypes.float8_e4m3fn)
             .view(np.uint8)
         )
-        scales_host = rng.uniform(0.25, 2.0, (LOCAL_GROUPS, N // 128, K // 128)).astype(
+        scales_host = rng.uniform(0.25, 2.0, (LOCAL_GROUPS, n // 128, k // 128)).astype(
             np.float32
         )
         scales_host[1, 0, 8] = 0
@@ -179,17 +201,21 @@ def main() -> int:
             counts = jax.device_put(counts_for_case(CASES[0]), device)
             offset = jax.device_put(np.asarray(OFFSET, np.int32), device)
             started = time.monotonic()
-            compiled = (
-                jax.jit(prefill_grouped_fp8_matmul)
-                .lower(x, w, s, counts, offset)
-                .compile()
-            )
+            dtype = jnp.dtype(dtype_name)
+
+            def candidate(x, w, s, counts, offset):
+                return prefill_grouped_fp8_matmul(
+                    x, w, s, counts, offset, result_dtype=dtype
+                )
+
+            compiled = jax.jit(candidate).lower(x, w, s, counts, offset).compile()
             record["compile_seconds"] = time.monotonic() - started
             hlo = compiled.as_text()
             args.hlo_output.parent.mkdir(parents=True, exist_ok=True)
             args.hlo_output.write_text(hlo)
             record["hlo"] = dict(
-                sha256=sha256(hlo.encode()).hexdigest(), contract=check_hlo(hlo)
+                sha256=sha256(hlo.encode()).hexdigest(),
+                contract=check_hlo(hlo, direction=args.direction),
             )
             record["compiled_memory_estimate"] = memory = _compiled_memory(compiled)
             _atomic_json(args.output, record)
@@ -212,11 +238,13 @@ def main() -> int:
                     "grouped admission compiled allocation exceeds 512MiB"
                 )
             reference = (
-                jax.jit(fp8_block_matmul_f32)
+                jax.jit(
+                    fp8_block_matmul_f32 if args.direction == "up" else fp8_block_matmul
+                )
                 .lower(
-                    jax.ShapeDtypeStruct((1, K), jnp.bfloat16),
-                    jax.ShapeDtypeStruct((N, K), jnp.uint8),
-                    jax.ShapeDtypeStruct((N // 128, K // 128), jnp.float32),
+                    jax.ShapeDtypeStruct((1, k), jnp.bfloat16),
+                    jax.ShapeDtypeStruct((n, k), jnp.uint8),
+                    jax.ShapeDtypeStruct((n // 128, k // 128), jnp.float32),
                 )
                 .compile()
             )
@@ -233,7 +261,9 @@ def main() -> int:
                 )
                 jax.block_until_ready((actual, valid))
                 actual_host = np.asarray(actual)
-                expected = np.zeros((M, N), np.float32)
+                expected = np.zeros(
+                    (M, n), np.float32 if args.direction == "up" else ml_dtypes.bfloat16
+                )
                 owners = np.repeat(np.arange(GLOBAL_GROUPS), counts_host)
                 for row, group in enumerate(owners):
                     if OFFSET <= group < OFFSET + LOCAL_GROUPS:
@@ -248,7 +278,12 @@ def main() -> int:
                         )[0]
                 mismatches = int(
                     np.count_nonzero(
-                        actual_host.view(np.uint32) != expected.view(np.uint32)
+                        actual_host.view(
+                            np.uint32 if args.direction == "up" else np.uint16
+                        )
+                        != expected.view(
+                            np.uint32 if args.direction == "up" else np.uint16
+                        )
                     )
                 )
                 passed = (
@@ -261,7 +296,14 @@ def main() -> int:
                         case=case,
                         passed=passed,
                         bit_mismatches=mismatches,
-                        max_abs=float(np.max(np.abs(actual_host - expected))),
+                        max_abs=float(
+                            np.max(
+                                np.abs(
+                                    actual_host.astype(np.float32)
+                                    - expected.astype(np.float32)
+                                )
+                            )
+                        ),
                         output_sha256=sha256(actual_host.tobytes()).hexdigest(),
                         expected_sha256=sha256(expected.tobytes()).hexdigest(),
                         counts=counts_host.tolist(),

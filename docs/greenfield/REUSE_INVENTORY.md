@@ -9,6 +9,9 @@ uses the existing M1 F32 raw-FP8 primitive as the exact reference at local G32/N
 136 sorted route rows. This is synthetic single-chip compilation/arithmetic, not a real layer.
 DB580 passed all three cases bit-exact on TPU in8s runner/34s guarded workflow. F32 projection
 arithmetic is now admitted; BF16 down, real mapped MoE and end-to-end prefill remain open.
+The same probe now has an explicit down protocol: K2048/N1536, BF16 output compared against
+the existing BF16 M1 primitive, same three distributions/guards and no timed samples. Up's
+protocol stays distinct; do not relabel DB580 as down evidence or rerun its cleared cases.
 
 Grouped schedule implementation now uses the pinned JAX metadata directly, not stock gmm:
 `prefill_routes.py`, `pallas/prefill_grouped_fp8.py`, and `ws32_prefill_moe.py` are unwired.

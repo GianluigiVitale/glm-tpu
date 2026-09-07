@@ -14426,3 +14426,14 @@ Next: BF16 down and mapped real-MoE arithmetic admission, causal DSA/attention/I
 layers and baseline-derived phase budgets/targets; then short decoder and efficient L7/L8.
 Reuse existing harness and checkpoints. No retest of the cleared F32 cases without a
 specific changed dependency; correctness admission does not authorize performance promotion.
+
+## 2026-09-07 — bounded BF16 down admission prepared
+
+The existing grouped projection probe now accepts only two explicit protocols: historical
+up F32/K1536/N2048, and new down BF16/K2048/N1536. Down compares exact BF16 bits against
+`fp8_block_matmul` M1, not an F32 diagnostic or relabeled up result. Same136 route rows,
+three distributions, one compilation, raw-U8 HLO/allocation checks, zero timing samples,
+NULL DB latency and600s runner cap. Wrapper mode `ws32_grouped_down_admission` shares
+the bounded safety/publication path. No kernel/model execution implementation changed.
+The old real-layer WS32 runner remains a reuse source; its historical launch pins/topology
+must not be replayed blindly on this pod. No additional checkpoint copy is needed.

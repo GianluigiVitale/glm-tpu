@@ -12,8 +12,10 @@ readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
+GROUPED_ADMISSION=0
+[[ $KERNEL != ws32_grouped_admission && $KERNEL != ws32_grouped_down_admission ]] || GROUPED_ADMISSION=1
 BOUNDED_PREFILL=0
-[[ $KERNEL != ws32_prefill_baseline && $KERNEL != ws32_grouped_admission ]] || BOUNDED_PREFILL=1
+[[ $KERNEL != ws32_prefill_baseline && $GROUPED_ADMISSION != 1 ]] || BOUNDED_PREFILL=1
 OUTPUT_TILE=${GLM_GREENFIELD_FP8_OUTPUT_TILE:-128}
 SELECTED_CASE=${GLM_GREENFIELD_FP8_SELECTED_CASE:-concentrated_eight}
 TAG_STEM=$KERNEL
@@ -25,7 +27,7 @@ BASELINE_ROWS=${GLM_GREENFIELD_FP8_BASELINE_ROWS:-8}
 TAG=${GLM_GREENFIELD_FP8_MATMUL_TAG:-greenfield_fp8_${TAG_STEM}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 DEFAULT_WARMUP=200
 DEFAULT_ITERATIONS=1000
-if [[ $KERNEL == ws32_grouped_admission ]]; then
+if [[ $GROUPED_ADMISSION == 1 ]]; then
   DEFAULT_WARMUP=0
   DEFAULT_ITERATIONS=0
 fi
@@ -58,10 +60,10 @@ fi
   $KERNEL == selected_up_gate || $KERNEL == selected_swiglu_down || \
   $KERNEL == structured_kv_b || $KERNEL == dsa_wq_b || \
   $KERNEL == dsa_wk || $KERNEL == ws32_prefill_baseline || \
-  $KERNEL == ws32_grouped_admission ]] || {
+  $KERNEL == ws32_grouped_admission || $KERNEL == ws32_grouped_down_admission ]] || {
   echo "FP8 kernel must be single_up, single_up_m1, attention_output," \
     "fused_attention_output, rmsnorm_linear, up_gate, selected_up_gate," \
-    "selected_swiglu_down, structured_kv_b, dsa_wq_b, dsa_wk, ws32_prefill_baseline, or ws32_grouped_admission" >&2
+    "selected_swiglu_down, structured_kv_b, dsa_wq_b, dsa_wk, ws32_prefill_baseline, ws32_grouped_admission, or ws32_grouped_down_admission" >&2
   exit 2
 }
 [[ $OUTPUT_TILE == 128 || $OUTPUT_TILE == 256 ]] || {
@@ -76,7 +78,7 @@ fi
   echo "selected route case must be normal_two or concentrated_eight" >&2
   exit 2
 }
-if [[ $KERNEL == ws32_grouped_admission ]]; then
+if [[ $GROUPED_ADMISSION == 1 ]]; then
   [[ $WARMUP == 0 && $ITERATIONS == 0 && $DIAGNOSTIC_REFERENCE == 0 ]] || exit 2
 elif [[ $DIAGNOSTIC_REFERENCE == 1 ]]; then
   [[ $KERNEL == single_up_m1 ]] || {
@@ -198,9 +200,12 @@ elif [[ $KERNEL == attention_output ]]; then
 fi
 (
   cd "$WORKTREE"
-  if [[ $KERNEL == ws32_grouped_admission ]]; then
+  if [[ $GROUPED_ADMISSION == 1 ]]; then
+    DIRECTION=up
+    [[ $KERNEL != ws32_grouped_down_admission ]] || DIRECTION=down
     RUNNER=(
       scripts/greenfield/probe_prefill_grouped_fp8.py
+      --direction "$DIRECTION"
       --expected-code-hash "$PIN"
       --output "$RUN_DIR/runner.json"
       --hlo-output "$RUN_DIR/hlo/grouped_fp8.optimized_hlo.txt"
@@ -280,7 +285,7 @@ if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
 if runner["kernel"] != expected_kernel:
     raise SystemExit("runner kernel does not match launched kernel")
 admission = runner.get("admission_only", False)
-if admission != (expected_kernel == "ws32_grouped_admission"):
+if admission != (expected_kernel in ("ws32_grouped_admission", "ws32_grouped_down_admission")):
     raise SystemExit("admission classification drifted")
 if admission:
     from scripts.greenfield.probe_prefill_grouped_fp8 import validate_record
@@ -350,7 +355,9 @@ shape_ids = {
     "single_up_m1": "m1_k6144_n2048",
 }
 if admission:
-    item_id = "arithmetic_v1_m136_k1536_n2048_g32_distributed_concentrated_empty"
+    k = runner['shape']['lhs'][1]
+    n = runner['shape']['output'][1]
+    item_id = f"arithmetic_v1_m136_k{k}_n{n}_g32_distributed_concentrated_empty"
 elif baseline:
     item_id = f"baseline_m{m}_k{k}_n{n}"
 elif runner["kernel"] == "structured_kv_b":

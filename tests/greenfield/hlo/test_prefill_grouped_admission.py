@@ -85,7 +85,8 @@ def test_wrapper_reuses_bounded_guards_and_records_no_latency():
         Path(__file__).resolve().parents[3]
         / "scripts/greenfield/run_fp8_matmul_microbench.sh"
     ).read_text()
-    assert "ws32_grouped_admission ]] || BOUNDED_PREFILL=1" in source
+    assert "$GROUPED_ADMISSION != 1 ]] || BOUNDED_PREFILL=1" in source
+    assert "ws32_grouped_down_admission ]] || GROUPED_ADMISSION=1" in source
     assert source.count("if [[ $BOUNDED_PREFILL == 1 ]]; then") == 4
     assert (
         "[[ $WARMUP == 0 && $ITERATIONS == 0 && $DIAGNOSTIC_REFERENCE == 0 ]]" in source
@@ -93,3 +94,34 @@ def test_wrapper_reuses_bounded_guards_and_records_no_latency():
     assert "latency_ms=None if admission else" in source
     assert 'runner["kernel"] != expected_kernel' in source
     assert "validate_record(runner)" in source
+
+
+def test_down_is_distinct_bf16_transposed_geometry_not_up_relabeling():
+    kernel, protocol, k, n, dtype = probe.projection_contract("down")
+    assert (k, n, dtype) == (2048, 1536, "bfloat16")
+    record = valid_record()
+    record.update(
+        direction="down",
+        kernel=kernel,
+        protocol=protocol,
+        shape={"lhs": [136, k], "weights": [32, n, k], "output": [136, n]},
+        dtype_contract={"output": dtype},
+    )
+    probe.validate_record(record)
+    for key, value in (
+        ("kernel", probe.KERNEL),
+        ("direction", "up"),
+        ("dtype_contract", {"output": "float32"}),
+    ):
+        changed = copy.deepcopy(record)
+        changed[key] = value
+        with pytest.raises(ValueError):
+            probe.validate_record(changed)
+    hlo = (
+        "%call = bf16[136,1536] custom-call(%x, u8[32,1536,2048] %w), "
+        'custom_call_target="tpu_custom_call", name="greenfield_prefill_grouped_raw_fp8"'
+    )
+    assert probe.check_hlo(hlo, direction="down")["passed"]
+    assert not probe.check_hlo(hlo, direction="up")["passed"]
+    with pytest.raises(ValueError):
+        probe.projection_contract("other")
