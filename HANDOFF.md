@@ -14158,3 +14158,34 @@ prefix. Independent integration review confirmed executable/test identity and lo
 its one P2 stale "in flight" performance-log sentence was corrected.
 Next: merge review, publish/mirror, fresh 128K HLO acquisition, numerical depths 0.05/0.95, then
 513-page acquisition and full 256K E0 (256 timed steps), followed by §18 audit. No past tag is rerun.
+
+## 2026-09-07 12:43Z — fresh 128K acquisition live at integrated b5ac8130
+
+Merge and DB574 evidence persisted/pushed/mirrored as `b5ac81303db3de83f2ecb55af1e086ef00c6bf2e`.
+Astra approved integration, corrected P2 status prose and the compact collection artifact, then
+deployment/acquisition followed by remaining depths conditional on acquired pins and full preflights.
+
+Live tag: `greenfield_ws32_short_decoder_128k_d0_05_acquire_cap131072_hrope_20260907T123628447918058Z`.
+Detached controller **PID2387478/start101296030**, boot `4ebd122c-7b2a-4388-961f-021fae5f2a52`;
+log `/home/gianl/glm-run/controller_<tag>.log`. It is a Python carrier that records its child
+wrapper's exact exit status, takes the user sync lease with a bounded 60-second wait and runs the
+existing protected wrapper (which takes the workload lease). The first nonblocking launch at
+12:35:03 overlapped the recurring mirror, left an empty controller log and no run directory;
+its carrier was confirmed absent and no workflow started. That unused tag is not reused. No
+infrastructure action, model retry or protected failure occurred there.
+
+This acquisition keeps the original sealed tmpfs WS32 checkpoint, dense overlay, host-main rotary,
+exact DSA, 131072 capacity and chunk2048. Mode acquire, context128k_d0_05, RECOVER=0; old source/tag
+and all old HLO overrides removed. Existing wrapper supplies zero acquisition witnesses and the
+new oracle profile. User-approved storage ceiling/reserve checks passed at **1,994,146,951,591 B**;
+all8 sync markers carry `b5ac8130`. Dedicated sealing checkout is `<run>/sealing-source.yvM47i`,
+frozen at that same pin. This is acquisition, not a long-prompt numerical result.
+
+Authenticated 12:43:15Z snapshot sees exactly one original worker/libtpu holder per host:
+`[2388437,1282391,1316911,1265751,1313116,1289137,1282788,1262829]` for host ranks0..7. The complete
+PID/start/boot/argv baseline was saved as `<run>/watch.jsonl`, validated by `resume_baseline`.
+No second lease-holding watcher runs while the controller owns them. On observation timeout, poll
+the same controller; on controller loss, inspect original workers and use the saved baseline.
+Do not restart merely because a wait tool returns. Main execution/enforcement files are frozen.
+After this acquisition seals, adopt its graph hashes for numerical depth0.05 then0.95, followed by
+L8 acquisition/E0 and §18. `goal.md` and this entry are safe documentation-only progress updates.

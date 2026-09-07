@@ -52,13 +52,14 @@ Smallest decisive test first; stop on first invariant failure; prefer offline ad
 Adversarial reviewer = separate **gpt-6-astra** agent; resolve all P0–P2; avoid redundant review.
 Cron `sync-glm.sh` every 5 min; verify origin + mirror before protected work. Never EU.
 
-## Snapshot — 2026-09-07 12:27Z
+## Snapshot — 2026-09-07 12:43Z
 
 Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`.
-L7 depth 0.0 source `679e2392`, recovery `ae994e5a`, DB574, SUCCESS `f123beba…0667`;
-original workers and replacement monitor ended. Original evidence recovered without rerun;
-authenticated 8/8 process/device cleanup, remote generation replay and DB verified.
-Sealer fixes `dd0f1c07` now integrating: dedicated pinned sealing checkout, complete E0 window,
-extractor dependency coverage. Focused tests/review/publish/mirror before next protected launch.
-Next: acquire current HLO pins, L7 depths 0.05/0.95, L8 acquisition + 256-step E0, §18 audit.
-Recovery history: `docs/greenfield/WS32_ORPHAN_RECOVERY.md`; exact run details in HANDOFF.
+Sealer fixes integrated at `b5ac8130`: 116 tests, Astra PASS, pushed/mirrored; pinned sealing source.
+LIVE acquisition tag `greenfield_ws32_short_decoder_128k_d0_05_acquire_cap131072_hrope_20260907T123628447918058Z`
+at `b5ac8130`. Controller PID2387478/start101296030. All8 workers observed live;
+baseline saved in `watch.jsonl` (no second
+lease-holding monitor). Observe exact controller/log; do not restart on an observation timeout.
+After acquisition seals: use its pins for L7 0.05/0.95, then L8 acquisition + 256-step E0, §18.
+No model/enforcement edits while live. Paths/identities/history: HANDOFF and
+`docs/greenfield/WS32_ORPHAN_RECOVERY.md`. Never rerun/recover sealed DB574.
