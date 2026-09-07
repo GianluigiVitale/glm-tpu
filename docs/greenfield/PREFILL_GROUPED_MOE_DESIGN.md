@@ -109,3 +109,22 @@ generation-verified archive and DB580 with NULL latency. No timed samples/perfor
 Exact record hashes and archive terminal in HANDOFF. Next: BF16 down and mapped real-MoE
 TPU admission, causal DSA/attention/IndexShare layers and phase budgets, then short decoder.
 This does not prove end-to-end speedup or finish the prefill pivot.
+
+## Real-weight mapped admission prepared
+
+DB581 separately passed BF16 grouped down at K2048/N1536 (HANDOFF has exact evidence).
+Next mode `ws32_prefill_moe_admission` adapts the same bounded FP8 controller for8 workers.
+It loads only the retained layer3 WS32 pack (9,971,249,152 bytes total, no new copy), verifies
+current topology and every local final-owner file/tensor, and compiles one17-row candidate.
+Normal and concentrated cases preserve captured row0; the other rows are perturbed activations
+with supplied routes, NOT measured router occupancy. Concentrated routes all belong to one
+expert owner. Candidate outputs must match old M1 BF16 bits on all32 chips, and row0 M1 must
+pass the existing bounded legacy-output check. No model router or full-layer attention claim.
+
+Pre-execution checks require three raw-U8 grouped and three shared Pallas calls, only exact
+feature4/expert8 reduction groups, no full BF16 table, compiler allocation<=1GiB/chip.
+Both cases retain original candidate/reference NPZs; controller rechecks actual bits, HLO,
+input coherence, owner coverage and measured HBM. Zero timing samples, NULL DB latency;
+worker timeout600s, no full model. Existing leases, root-device census and generation-qualified
+publisher remain responsible for safety/archival. Focused11 CPU tests passed7.12s, including
+the exact worker builder on forced32 CPU. This is prepared source, not a real TPU MoE pass.

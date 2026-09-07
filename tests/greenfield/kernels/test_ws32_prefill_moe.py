@@ -19,6 +19,7 @@ from glm_tpu.greenfield.kernels.ws32 import ws32_moe_pallas_from_routes_mapped
 from glm_tpu.greenfield.kernels.ws32_prefill_moe import ws32_prefill_moe_from_routes_mapped
 from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from scripts.greenfield.probe_ws32_prefill_moe import build_mapped
 tpu_info.registry['cpu']=lambda:tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4,1)
 tpu_info.get_tpu_info.cache_clear()
 assert jax.default_backend()=='cpu'
@@ -41,13 +42,7 @@ specs=(P(None,'feature'),P(),P(),P('expert',None,'feature'),P('expert',None,'fea
        P('expert',None,'feature'),P('expert',None,'feature'),P('expert','feature',None),
        P('expert','feature',None),P(None,'feature'),P(None,'feature'),P(None,'feature'),
        P(None,'feature'),P('feature',None),P('feature',None))
-def batch_body(*v):
- y,valid=ws32_prefill_moe_from_routes_mapped(*v,contract=contract,interpret=True)
- return y,valid[None,None]
-batch=jax.jit(jax.shard_map(batch_body,mesh=mesh,in_specs=specs,
-                           out_specs=(P(None,'feature'),P('expert','feature')),check_vma=False))
-one=jax.jit(jax.shard_map(lambda *v:ws32_moe_pallas_from_routes_mapped(*v,contract=contract,interpret=True),
-                         mesh=mesh,in_specs=specs,out_specs=P(None,'feature'),check_vma=False))
+batch,one=build_mapped(mesh,contract=contract,interpret=True)
 report={}
 for case in ('distributed','one_owner'):
  if case=='distributed':

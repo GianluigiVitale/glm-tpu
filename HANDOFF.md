@@ -14494,3 +14494,25 @@ This establishes presence only; exact file/tensor hashes must be checked by its 
 Current short-decoder topology captures are `greenfield_topology_20260826T194116460015528Z`,
 not the old one-layer wrapper's08-05 captures; physical mesh hash agrees. Fresh runtime
 device/host validation is still mandatory. No layer payload was read, copied or repacked.
+
+## 2026-09-07 — real-weight batched MoE admission prepared
+
+New worker `probe_ws32_prefill_moe.py` and collection adapter `ws32_prefill_moe_campaign.py`
+reuse bounded FP8 wrapper mode `ws32_prefill_moe_admission`. Retained layer3 pack/oracle and
+current08-26 topology pins above; no full checkpoint or repack. Seventeen distinct rows with
+supplied normal/concentrated routes: original row0 legacy-bounded comparison, all17 candidate
+outputs bit-exact versus old M1 on all32 owners. HLO and1GiB/chip compiled budget before execute,
+600s worker timeout, original failure outputs, eight-host input coherence and HBM records,
+generation-bound collection, NULL DB latency/no timing or performance claim. No numerical
+contract or cleared kernel changed. New runtime path stays unwired/default-off.
+
+Focused11 CPU tests passed7.12s, including worker builder forced32 MoE. Preliminary adversarial
+review found two P2 evidence gaps: compare replicated input digests across8 workers; bind the
+original reference HLO bytes. Both fixed with controller checks. Final integration review and
+persistence are required before the one bounded TPU admission. Efficient prefill/TTFT and
+L7/L8 remain open; no serial long-run resumption.
+
+Final independent Astra review PASS for persistence and one bounded real-MoE TPU admission,
+no remaining P0-P2. Additional reuse/baseline23 tests passed1.80s (34 focused tests total);
+Black, shell syntax and diff checks pass. Review covers supplied-route arithmetic only,
+not router correctness, full prefill, performance or long-context execution.

@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Real-MoE arithmetic adapter reuses the bounded FP8 wrapper, current short-decoder topology
+initializer (utility only), retained layer3 final-owner loader/oracle and exact publisher.
+`probe_ws32_prefill_moe.py` compares17 real/perturbed rows with supplied routes against old
+M1 on32 chips, row0 against the legacy capture. `ws32_prefill_moe_campaign.py` deploys only
+existing worker repositories and collects generation-bound original outputs/HLO. No full
+checkpoint, new layout, performance samples or serving integration. CPU admission passes;
+real TPU result pending. Current topology pins replace the old one-layer wrapper's stale pins.
+
 `kernels/prefill_dsa.py` adapts the existing reference scorer/local selector/scored merge.
 It loops over bounded key tiles for up to32 causal query rows, skips wholly future tiles,
 retains exact candidate ties and exposes health. The WS32 mapped consumer performs two
