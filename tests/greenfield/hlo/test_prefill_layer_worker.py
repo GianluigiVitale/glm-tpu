@@ -32,6 +32,48 @@ def host(case):
     return host_case(case, build_rotary_table_host(1024, rotary_dim=64, theta=8e6))
 
 
+def test_fixture_transfer_preserves_nan_bits_and_checks_identity_first(monkeypatch):
+    import jax
+    from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+    from jax.experimental import multihost_utils
+    from scripts.greenfield.probe_ws32_prefill_layer import put_host_inputs
+
+    mesh = Mesh(np.asarray(jax.devices()), ("fixture",))
+    sharding = NamedSharding(mesh, P())
+    nan_bits = np.asarray([0x7FC1, 0xFFC1, 0x8000, 0x0000], dtype=np.uint16)
+    arrays = {"padding": nan_bits.view(BF16), "offset": np.asarray(505, np.int32)}
+    digests = []
+
+    def check_digest(value, fail_message):
+        assert value.shape == (32,) and value.dtype == np.uint8
+        digests.append(value.copy())
+
+    monkeypatch.setattr(multihost_utils, "assert_equal", check_digest)
+    mapped = {name: sharding for name in arrays}
+    result = put_host_inputs(arrays, mapped)
+    for name in arrays:
+        assert equal_bytes(np.asarray(result[name]), arrays[name])
+    changed = {**arrays, "padding": nan_bits.copy().view(BF16)}
+    changed["padding"].view(np.uint16)[0] = 0x7FC2
+    put_host_inputs(changed, mapped)
+    assert not np.array_equal(digests[0], digests[1])
+    put_host_inputs({**arrays, "padding": arrays["padding"].reshape(2, 2)}, mapped)
+    assert not np.array_equal(digests[0], digests[2])
+    put_host_inputs({**arrays, "padding": nan_bits}, mapped)
+    assert not np.array_equal(digests[0], digests[3])
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("fixture identity differs")
+
+    def no_transfer(*args, **kwargs):
+        pytest.fail("transferred data after failed cross-host identity")
+
+    monkeypatch.setattr(multihost_utils, "assert_equal", refuse)
+    monkeypatch.setattr(jax, "make_array_from_callback", no_transfer)
+    with pytest.raises(AssertionError, match="identity differs"):
+        put_host_inputs(arrays, mapped)
+
+
 def observations(inputs, *, slot, layer):
     own = owner_inputs(inputs, slot)
     count = int(inputs["count"])

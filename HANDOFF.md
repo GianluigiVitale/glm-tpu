@@ -14931,3 +14931,26 @@ against original metadata across32 owners. Compact bindings:
 Independent Astra implementation review PASS, no P0-P2, approves ONE fresh layer0 test
 after commit/push/verified mirror and fresh wrapper preflights. Source currently idle;
 next same bounded wrapper command above, then review actual result before layer3.
+
+## 2026-09-07 23:31Z — layer0 empty/boundary pass; tail input-transfer fix
+
+Tag `greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T232604277893112Z`,
+pin `ea93a4eef8827fdc809612e43f72483336b51892`, passes HLO and layer0 empty/boundary
+numerical+metamorphic cases. All8 original NPZ pairs independently generation/CRC/SHA
+verified and replayed against fixed inputs,32owners pass. Selected payload ledgers pass.
+Complete admission still FAILED: tail never executed. Global `jax.device_put` compared
+identical padded NaNs with `np.equal` via installed0.10.1 dispatch.py:510 and
+multihost_utils.py:180. Its default multihost equality treats NaNs as unequal.
+Wrapper terminal exit1 at23:27:59Z, normal+root8/8 clean. Original all8 receipt ledgers
+and120 files (including16 NPZs) verified; bindings in
+`docs/artifacts/prefill-layer-tail-transfer-failure-20260907.json`.
+
+Harness correction `put_host_inputs` snapshots host arrays, authenticates collective
+SHA256 of field/shape/dtype/bytes as finite uint8 digest, then initializes addressable
+slices via `make_array_from_callback` with UNCHANGED NamedSharding. No callback inside
+model executable. NaN payloads and signed zeros remain exact; mismatched identity
+refuses before transfer. No arithmetic, fixture, tolerance or checkpoint modification.
+78CPU tests13.76s pass including real-schema builders and bit-pattern/shape/dtype/drift
+tests. Independent Astra narrow correction PASS, no P0-P2; approves ONE new layer0 retry
+after persistence/mirror/fresh guards. Layer3 remains conditional and its compiler-helper
+inventory unregistered. No full-layer admission, full-prefill speedup or completion claim.

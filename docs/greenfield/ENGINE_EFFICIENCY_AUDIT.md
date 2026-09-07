@@ -358,3 +358,9 @@ omitted known TPU index/layout helper classes and refused before execution. Reus
 existing guards' distinction with exact layer0 shapes/counts/operands, not a broad
 allowlist.70tests and all8 acquired-HLO replays pass, independent review PASS. Both
 harness failures were bounded; no hours-long run. Real layer arithmetic is still open.
+
+Layer0 empty and page-boundary cases now pass32owners, original arrays independently
+replayed from all8 generation-bound publications. Tail failed at input transfer due to
+JAX's numerical cross-host equality (NaN!=NaN), not model arithmetic. Keep the NaN
+padding challenge: authenticate fixture bytes collectively, then transfer owned slices.
+78CPU tests+review pass; all3 cases still need a complete protected admission.

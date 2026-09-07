@@ -149,3 +149,12 @@ inventory is deliberately unregistered until its own acquired HLO is reviewed.
 70CPU tests8.59s and replay of all8 original HLOs PASS; independent narrow Astra review
 PASS. No numerical thresholds/model arithmetic changed. One corrected guarded layer0
 retry after persistence/preflights; layer3 stays conditional, no performance claim.
+
+Next layer0 tag at ea93a4ee executed empty/boundary successfully on all32 owners;
+all8 original NPZ pairs replay PASS. Tail failed before execution because global JAX
+device_put numerical cross-host equality rejects identical NaNs. Preserve intentional
+padded NaNs: input harness now collectively verifies shape/dtype/byte SHA and initializes
+owned slices with explicit sharding callbacks. This is initial fixture transfer outside
+all executables, not model transport.78CPU tests and narrow independent review pass.
+Original failed tag/bindings in `prefill-layer-tail-transfer-failure-20260907.json`;
+complete admission remains open until all three cases pass in a fresh protected tag.

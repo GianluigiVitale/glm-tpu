@@ -180,6 +180,40 @@ def input_specs(weights: Any, wk: Any) -> tuple[Any, ...]:
     )
 
 
+def put_host_inputs(
+    host: dict[str, np.ndarray], shardings: dict[str, Any]
+) -> dict[str, Any]:
+    """Bit-identity-checked fixture transfer, including intentional padded NaNs.
+
+    JAX 0.10.1 global device_put uses np.equal across hosts (NaN != NaN).
+    Authenticate shape/dtype/bytes collectively before local-shard callbacks.
+    This is harness input initialization, outside all candidate programs.
+    """
+    import jax
+    from jax.experimental import multihost_utils
+
+    arrays = {name: np.array(host[name], copy=True) for name in shardings}
+    identity = {
+        name: dict(
+            shape=value.shape,
+            dtype=value.dtype.str,
+            sha256=sha256(value.tobytes()).hexdigest(),
+        )
+        for name, value in arrays.items()
+    }
+    digest = sha256(json.dumps(identity, sort_keys=True).encode()).digest()
+    multihost_utils.assert_equal(
+        np.frombuffer(digest, dtype=np.uint8),
+        fail_message="prefill fixture shape/dtype/byte identity differs across hosts",
+    )
+    return {
+        name: jax.make_array_from_callback(
+            value.shape, shardings[name], lambda index, value=value: value[index]
+        )
+        for name, value in arrays.items()
+    }
+
+
 def device_inputs(
     host: dict[str, np.ndarray],
     specs: tuple[Any, ...],
@@ -191,10 +225,13 @@ def device_inputs(
     from jax.sharding import NamedSharding
 
     indices = (*range(11), 18, 19)
-    device = {
-        name: jax.device_put(host[name], NamedSharding(mesh, specs[i]))
-        for name, i in zip(INPUT_FIELDS, indices, strict=True)
-    }
+    device = put_host_inputs(
+        host,
+        {
+            name: NamedSharding(mesh, specs[i])
+            for name, i in zip(INPUT_FIELDS, indices, strict=True)
+        },
+    )
     return (
         *(device[name] for name in INPUT_FIELDS[:11]),
         weights.qkv_a,

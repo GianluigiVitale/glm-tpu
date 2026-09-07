@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Actual layer0 empty/boundary TPU cases pass all32 owners with original NPZ replay.
+Tail fixture transfer exposed JAX global device_put's NaN-unequal multihost assertion.
+Reuse JAX `make_array_from_callback` for explicitly sharded initial host fixtures after
+collective shape/dtype/byte-digest equality. Preserve NaNs, no model callback/arithmetic
+change.78CPU tests+review pass; fresh complete layer0 admission remains next.
+
 Layer0 retry loaded all32 selected ledgers and compiled; guard refused known compiler
 index/layout custom calls because it counted every custom-call as Pallas. Adapt existing
 `benchmarking/one_layer.py` local-U8 concat and `runtime/decoder.py` index-helper distinction
