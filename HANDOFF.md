@@ -13889,7 +13889,7 @@ only the wrapper changed, so no Python and no HLO change). Then depths 0.05 and 
 acquisition and its ~11.5 h run at capacity 262,656, then the §18 proof including base vs effective
 throughput (Gate H).
 
-## 2026-09-07 07:50Z — resumed actual long-context work; recovered monitoring gap
+## 2026-09-07 07:48Z — resumed actual long-context work; recovered monitoring gap
 
 The prior goal turn made progress (published handoff); the September 4 conversation was stale.
 Current authoritative HEAD on resume was `bb4d1a88`; §21--§23, goal, handoff and live state were read.
@@ -13917,3 +13917,12 @@ mode despite §23.6's design text, and RECOVER performs rollback/archive before 
 not be invoked during live work. Preserve local monitor receipts outside the strict remote evidence
 prefix. Apply the three previously deferred sealer fixes only after this run seals, then remaining
 L7 depths and L8. The monitor is an operational observation, not performance/exactness proof.
+
+Monitor code pin `889cb8f5d430041d2f702fe5453ff9c2f81736a1` was pushed and synced; origin and
+`gs://driftbench-dsv4-uc/repos/glm-tpu/.git/refs/heads/rewrite/topology-first-decode` both matched.
+Detached monitor PID **2248787**, parent 1, holds both canonical user locks. Its first fsynced
+`watch.jsonl` observation at **07:48:02Z** binds all eight live original workers and their libtpu
+holders, each at chunk 8/62. Durable stdout is `watch.stdout.log` in the same run directory. Re-read
+PID and receipt on continuation; resume the same CLI/tag/pin if the monitor itself is missing.
+Read-only DB query confirmed latest sealed row 573; no depth-0.0 verdict exists yet. Cron will skip
+while the monitor holds rsync; manual same-region checkpoint sync remains available between edits.

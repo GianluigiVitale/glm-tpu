@@ -49,13 +49,13 @@ Adversarial reviewer = separate **gpt-6-astra** agent; resolve all P0–P2, cap 
 (2 used) — past that state the residual risk and move to the runs. Cron `sync-glm.sh` every 5 min;
 verify origin + mirror before protected work. Never EU.
 
-## Resume — 2026-09-07 07:50Z
+## Resume — 2026-09-07 07:48Z
 
 Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`.
 L7 depth 0.0 tag `greenfield_ws32_short_decoder_128k_d0_0_numerical_cap131072_hrope_20260907T064941550123130Z`
 at pin `679e2392` is LIVE, 8/62 chunks observed. Its orchestrator/remote shells exited, leaving
-8 original Python workers running. Do not restart. New monitor reviewed by independent Astra,
-14 CPU tests passed; attach with original tag/pin. After READY_FOR_CENSUS: authenticate 8/8 cleanup,
+8 original Python workers running. Do not restart. Monitor `889cb8f5` reviewed by Astra, 14 tests;
+PID 2248787 holds both leases, first receipt 07:48Z 8/8 live. After READY_FOR_CENSUS: prove cleanup,
 collect original JSON/NPZ/HLO/log/trace with exact existing-object checks, then RECOVER=1 seal.
 Never recover while workers live. Surface unchanged; `.ended` may never appear after shell loss.
 Then apply 3 deferred review items in HANDOFF, L7 depths 0.05/0.95, L8 acquisition and 256K E0
