@@ -14075,3 +14075,23 @@ performance table explicitly uses fleet-critical statistics: DB571 p50 143.00080
 16390.757689 s fleet max. No full remote replay was performed or claimed by this documentation audit.
 L7 remains one sealed depth of four; L8/§18 remain open. Astra approved the two current-status
 sections with no material findings. Run supervision and the existing collection recipe remain next.
+
+## 2026-09-07 08:53Z — PP16 history correction and remaining-input preflight
+
+While preserving the live d0.0 run, found §22.1's claim that no 78-layer PP16 decoder was ever built
+contradicted the existing evidence map and original acquisition records. Added §22.5 as an explicit
+historical correction, preserving the original adjudication text. Read all eight local host records
+and the summary for `greenfield_short_decoder_compile_pp16_acquisition_20260827T132707782908362Z`
+at `309ee8b`: complete synthetic token path exists, but no protected oracle-checked decoder result,
+trace/performance claim or DB row. Summary file SHA
+`d4f0eca79d27651ae269372e24197753f6fd356daee9c7cdc04d7220e94a7056`.
+Astra independently checked the records and approved the limited correction. Gate G's rejection,
+WS32 promotion and L7/L8 sequence are unchanged; no remote replay or execution-source edit occurred.
+
+CPU-only read-only loads of the remaining `128k_d0_05`, `128k_d0_95` and `256k_e0` oracles passed
+`load_ws32_long_context_oracle` and `require_ws32_long_context_profile`: manifest/SUCCESS pins,
+file and token-array hashes, prompt counts 127363/127363/262144 and source DB403/403/402 identities
+match. These are local input-readiness checks, not TPU evidence or new gate closures.
+Verified monitor PID2248787/start tick99565412 remains live; the 08:52:25Z receipt has all eight
+original workers at 23/62 chunks. Continue original-run supervision and the existing idle-only
+collection/seal recipe, then merge the already-reviewed isolated sealer fixes.

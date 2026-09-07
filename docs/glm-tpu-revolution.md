@@ -1950,6 +1950,27 @@ long-context gate fails for a reason that PP16 would cure (memory), which §22.3
   long-context gates.
 - Next: L7 (128K four-depth smoke) and L8 (256K E0) on WS32_2D, then §18.
 
+## 22.5 Historical wording correction — 2026-09-07
+
+The §22.1 PP16 row's "no 78-layer decoder was ever built" and §22.3's suggestion that one
+must be built from scratch are incorrect. A complete 78-layer PP16 token path WAS compiled and
+executed with synthetic state in the nonterminal acquisition
+`greenfield_short_decoder_compile_pp16_acquisition_20260827T132707782908362Z`, pin
+`309ee8b4bef6ed99fec8384a81ec8251b5ea90dd`. All eight preserved `host_records/decoder.rankN.json`
+files report `complete_token_path=true`, `body_only=false`, `metadata_passed=true` and
+`token_passed=true`. Their launcher-to-JAX mapping is `[3,5,1,2,0,6,7,4]`, not identity order.
+The local acquisition summary's file SHA-256 is
+`d4f0eca79d27651ae269372e24197753f6fd356daee9c7cdc04d7220e94a7056`.
+
+These records establish implementation/acquisition history, NOT a protected complete-decoder
+comparison. The summary explicitly has `diagnostic_only=true`, `gate_d_passed=false`,
+`numerical_claim=false`, `performance_claim=false`, `trace_claim=false` and no DB run id.
+Its single synthetic-state diagnostic sample is not admissible performance evidence. The missing
+PP16 evidence is a protected oracle-checked end-to-end measurement, not the existence of code.
+This correction supersedes only those historical assertions; it neither promotes the acquisition
+nor changes §22.3's documented rejection, §22.4's WS32 promotion or the L7/L8 sequence. Historical
+records and the original adjudication text remain preserved. No new remote replay is claimed.
+
 # 23. Long-context gates L7/L8 on WS32_2D — design (2026-09-05, reviewed: v3 APPROVE, rotary addendum v3.3 APPROVE-WITH-P2 folded)
 
 ## 23.1 Workloads (reproduced offline, provenance-bound; no new legacy capture)
