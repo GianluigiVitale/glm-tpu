@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+`kernels/ws32_prefill_dsa.py` connects raw multirow q/key/head projection to the existing
+causal selector and block writer. Prompt scoring consumes only updated UNREPAIRED keys.
+The exact same BF16 normalization crosses feature4 for existing M64 repair, with the
+already-completed FP32 wk leaf; repaired keys go to a distinct returned cache, never
+promoted here. Index rotary remains on-device, key norm divide-sqrt, scorer DEFAULT.
+CPU head GEMM/GEMV differs by ≤1.49e-8 in the first case; both are judged against FP64
+with an analytical dimension-derived rounding bound, not a fitted tolerance. No change
+to protected numerical contracts. Complete layer/TPU/decoder admission remains next.
+
 `kernels/ws32_prefill_attention.py` now assembles qkv-a preparation and causal attention
 from the existing norms/raw-FP8 owners, host main-RoPE, block writer and aligned gather.
 Structured q/value and sparse MLA gain explicit static `prefill=False`; old one-row APIs

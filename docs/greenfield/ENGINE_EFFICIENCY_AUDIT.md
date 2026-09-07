@@ -293,3 +293,12 @@ Adversarial review exposed a null-sink health hole: NaN scores could become fini
 attention. Explicit live operand finiteness now gates health, with query/rotary/old-cache
 NaN refusal tests. Corrected CPU32 test passed12.98s, reviewer PASS for CPU persistence.
 This closes a bounded assembly defect without a model run; it does not establish TPU speed.
+
+DSA query/key production and separate M64 repair are now CPU-admitted in
+`ws32_prefill_dsa.py`:23tests32.02s,17rows with stripe/page/tail boundaries and own-score
+exact sets/values/ties. Replacing repaired history leaves prompt selections unchanged;
+the selector reads only unrepaired storage. Future rows remain causally invisible.
+Raw projection/head-sum association is a new numerical path. FP32 GEMM/GEMV head sums
+are bounded against independent FP64 by a dimension-derived forward-error bound, not
+declared bit-identical. Existing M64 repair is CPU-bit-identical for supplied normalization.
+The complete layer and actual TPU allocation/arithmetic/performance remain unproved.

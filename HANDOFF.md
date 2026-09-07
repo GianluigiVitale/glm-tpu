@@ -14688,3 +14688,41 @@ targets still need registration before performance trials; efficient L7/L8 remai
 Final regression suite32passed70.36s: assembly, multirow attention primitives, cache,
 existing sparse attention and reuse checks. Black on new files and git diff --check pass;
 goal.md is3971 chars. No model/runtime/enforcement integration or TPU performance claim.
+
+## 2026-09-07 — DSA producer and separate M64 repair CPU-admitted
+
+`kernels/ws32_prefill_dsa.py` connects1..32 rows to raw-FP8 query/key projection,
+feature4 head/key sums, expert8 packed-query/head exchange with row-correct transpose,
+on-device indexer rotary, divide-sqrt key normalization and the existing causal tiled
+DEFAULT scorer/own-score exact selector. It writes unrepaired keys in a block and uses
+ONLY that cache for prompt scoring. Exact BF16 normalized inputs cross feature4 into
+existing `physical_m64_prompt_index_key_chunk` with an already-completed FP32 wk leaf;
+repeat both lastlive input and position to64, and write only a separate repaired buffer.
+No buffer promotion exists here. Safe offset/count arithmetic, per-query lengths and
+whole-prefix page range/uniqueness checks precede selection. Live nonfinite inputs and
+historical keys fail health; padded NaNs/empty blocks do not write.
+
+First CPU test exposed a too-strong test assertion, not a protected failure: head-weight
+GEMM versus GEMV differed276/544 F32 values, max1.49e-8. Both now independently compared
+to FP64 from actual BF16 operands using gamma_(hidden+8),unit-roundoff2^-24 times absolute
+product sum and32^-0.5. No error threshold is fitted and no Gate C/§21 bound changes.
+Query/key/full normalization comparisons remain bit-exact. The next test passed all
+semantics but expected two physical reductions: CPU correctly merges head/key into ONE
+feature4 tuple carrying F32[17,4] and F32[17,128]. Test pins that payload and the full
+collective set: one feature4 reduction, one feature4 normalized gather, three expert8
+gathers. Final23-test suite passed32.02s (producer, local/mapped selector and block cache).
+
+CPU32 cases:17rows at offsets55/505 and11/17tail at0; exact own fullscore selected
+positions/values/ties; old M64 repair identity; repaired-history replacement cannot change
+any prompt selection; future input isolation; invalid INT/pagealias no-write on both
+caches; live query/normalization/historical-key NaNs; healthy empty blocks. Geometry uses
+real32 index heads×128, reduced hidden512/qrank128/topk16. Repair weights intentionally
+differ in test to expose alias contamination, NOT checkpoint provenance evidence.
+Independent Astra design/implementation/numerical-test review PASS for CPU persistence,
+no P0-P2. No TPU run, old exact-path numerical or full-decoder/performance claim.
+
+Next: compose split-residual norms + preparation + DSA/IndexShare attention + dense or
+grouped MoE, adding multirow router from current shard implementation and exact router
+reference. Caller must bind frontier/populated prefix, provenance of completed wk,
+dual-cache lifetime/final promotion and all32 health flags. Then bounded real-layer TPU
+admission; short decoder/own§21 and efficient L7/L8 remain open. No new large artifact.

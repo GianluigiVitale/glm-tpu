@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-dsa-producer-dual-cache",
+      "category": "causal DSA production and separate M64 repair",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "d80aeb4841a7009391853a4b1617f2a04db9de75",
+      "source_paths": ["glm_tpu/greenfield/kernels/ws32_layer.py", "glm_tpu/greenfield/kernels/prefill_dsa.py", "glm_tpu/greenfield/kernels/prefill_cache.py", "glm_tpu/greenfield/kernels/reference/prefill_index.py", "glm_tpu/greenfield/kernels/reference/dsa.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/ws32_prefill_dsa.py", "tests/greenfield/kernels/test_ws32_prefill_dsa_producer.py"],
+      "gate": "24: CPU producer/repair component; layer TPU and decoder evidence pending",
+      "reason": "Multirow raw-FP8 q/key projections, feature head/key sums, row-correct expert8 query/head gather, on-device indexer rotary and divide-sqrt key norm feed the existing tiled DEFAULT scorer. Only updated UNREPAIRED cache is scored. Feature4 gathers exact BF16 normalization for existing physical-M64 repair with completed wk; padded input AND position repeat the last live row. Repaired output remains separate and is never promoted here. CPU tests compare own full score sets/values/ties, scalar query/key geometry, existing repair, altered repaired history, future rows and invalid metadata/NaNs. FP32 head sums checked against independent FP64 with dimension-derived rounding bound, not bit-identity. CPU merges head/key sums into one feature4 tuple; no all32 collective. Frontiers/prefix population, completed wk provenance, dual-state lifetimes, allchip health and final promotion remain caller obligations. No TPU or old exact-path equivalence claim."
+    },
+    {
       "id": "ws32-prefill-causal-attention",
       "category": "batched causal attention assembly",
       "source_repo": "glm-tpu greenfield",
