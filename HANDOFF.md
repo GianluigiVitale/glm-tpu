@@ -14846,3 +14846,39 @@ not guessed counts. Candidate Pallas calls inferred layer0=12/layer3=13; validat
 actual HLO before execution, not declare inferred inventory measured. Reuse existing
 bounded8-host transport/publisher/leases/root+normalcensuses; fresh retained-slot checks,
 review and persistence before deployment. No CPU/TPU process from this work remains live.
+
+## 2026-09-07 — complete-layer TPU worker/collector CPU-admitted
+
+Distinct `ws32_prefill_layer_admission` mode now connects the actual layer/scalar/M64
+builders, selected-only retained loader and original-array comparator to the existing
+FP8 wrapper. All8 retained headers/sizes are checked before JAX; runtime binds actual
+physical slots, loader checks original per-tensor ledger indices, controller independently
+checks all32 selected ledgers and replays original arrays. No full753B load/new checkpoint.
+
+New `prefill_layer_evidence.py` fixes synthetic host fixtures and exact intervention
+replays; the raw scalar reference carries its own KV/index rows and reconstructs M64
+from its actual normalization via an explicitly declared local-shard host roundtrip.
+Candidate remains a single17-row device layer. Both programs and all side programs retain
+StableHLO/optimized HLO/compiler allocation. New `prefill_layer_hlo.py` checks exact
+physical groups/payload multiplicity and12/13 candidate calls; reduction INPUT dtypes
+are bound because TPU can fold BF16 result casts into FP32-input reductions (observed
+in DB583). The FP32 MoE route-sum proof gains an optional named expert scope; old default
+is unchanged. Controller generation/CRC/SHA replay, DB latencyNULL, same-region final
+publication and both leases/root+normal censuses stay in the existing wrapper.
+
+Tests111passed12.68s (worker, schema, layer campaign/comparator, bounded/old MoE protocols).
+Real retained layer0/3 schemas additionally traced directly on CPU32: all20 actual worker
+inputs and12 candidate/reference outputs valid; no tensor payload load/TPU. The16.9KB
+schema fixture is hash-labelled shape metadata only. Reviewer caught table shape(2,)
+instead of(1,2), fixed both normal/bad_page fixtures; real-schema regression passes.
+Initial fake HLO tests omitted operand definitions, corrected locally; no TPU failure.
+Independent Astra final PASS: CPU-suite + clean commit/push/mirror + full preflights
+conditional approval for ONE layer0 test. Layer3 requires layer0 terminal evidence review
+and clean census first. No full-layer hardware result/performance/full-decoder claim yet.
+
+Next exact command after persistence (auto fresh tag, no direct worker launch):
+`GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_layer_admission GLM_GREENFIELD_PREFILL_LAYER=0 bash scripts/greenfield/run_fp8_matmul_microbench.sh`.
+600s worker limit,2GiB/chip candidate compiled cap, retained layer0 payload21,557,920B/chip.
+On success inspect actual HLO/results/HBM/original receipts/DB/cleanup with reviewer, then3.
+On failure preserve tag and diagnose the smallest boundary; do not retry unchanged.
+Last authenticated fleet census still21:07Z: wrapper must obtain fresh full preflight.

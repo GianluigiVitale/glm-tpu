@@ -98,3 +98,31 @@ HLO and original generation/size/CRC/SHA receipts. Timing fields remainNULL: exe
 duration is operational accounting, not a speedup. New prefill/TTFT targets must be
 registered before candidate performance experiments. Complete-layer trace/warmed wall
 and later full-decoder protections remain distinct follow-up evidence.
+
+## Worker implementation / CPU admission — 2026-09-07
+
+The distinct guarded mode is `GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_layer_admission`,
+with `GLM_GREENFIELD_PREFILL_LAYER=0` (then3 only after layer0 outcome review/cleanup).
+Use `scripts/greenfield/run_fp8_matmul_microbench.sh`, never the worker/campaign directly.
+The wrapper still owns both leases, root+normal8-host censuses, DB and terminal publication.
+Current worker budget600s. Candidate compiled allocation cap2GiB/chip. No warmup/timing.
+
+Before any worker initializes JAX, all8 hosts authenticate retained metadata and four
+file sizes/headers. Runtime then binds those slots to actual JAX physical owners and
+hashes/loads only the selected layer. The controller checks every observed tensor digest
+against its original index in the fixed full manifest. Unselected payload integrity is
+explicitly outside this admission; no full checkpoint copy or full-file hash is needed.
+
+Actual candidate and scalar normalization are retained. Reference normalization alone
+has a declared observer host roundtrip into the separate M64 reconstruction program,
+using local addressable shards (not a global tensor fetch). This is untimed reference
+harness work, not candidate transport or a production design. Each program's StableHLO,
+optimized HLO and compiler allocation are retained, including separate completed BF16
+wk decode/FP32 promotion. Controller comparisons use original NPZ bytes, not verdicts.
+
+111CPU tests12.68s: fixed-input tampering, per-owner tensors/causality/cache interventions,
+full-layer HLO/fleet/ledger refusal and real-shape20-input CPU32 tracing. Shape fixture
+is16.9KB metadata with original manifest SHA, NOT weights/integrity evidence. Independent
+review found a page-table rank error; corrected to[1,2] and tested through actual builders
+before TPU. Second review found no P0-P2; approves one layer0 launch after clean commit,
+push/mirror and preflights. Layer3 remains conditional. No TPU result is claimed here.

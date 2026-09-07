@@ -15,12 +15,17 @@ KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
 GROUPED_ADMISSION=0
 [[ $KERNEL != ws32_grouped_admission && $KERNEL != ws32_grouped_down_admission && \
    $KERNEL != ws32_prefill_moe_admission && $KERNEL != ws32_prefill_moe_boundary_diagnostic && \
-   $KERNEL != ws32_prefill_moe_bounded_admission ]] || GROUPED_ADMISSION=1
+   $KERNEL != ws32_prefill_moe_bounded_admission && $KERNEL != ws32_prefill_layer_admission ]] || GROUPED_ADMISSION=1
 BOUNDED_PREFILL=0
 [[ $KERNEL != ws32_prefill_baseline && $GROUPED_ADMISSION != 1 ]] || BOUNDED_PREFILL=1
 OUTPUT_TILE=${GLM_GREENFIELD_FP8_OUTPUT_TILE:-128}
 SELECTED_CASE=${GLM_GREENFIELD_FP8_SELECTED_CASE:-concentrated_eight}
 TAG_STEM=$KERNEL
+LAYER=${GLM_GREENFIELD_PREFILL_LAYER:-0}
+if [[ $KERNEL == ws32_prefill_layer_admission ]]; then
+  [[ $LAYER == 0 || $LAYER == 3 ]] || exit 2
+  TAG_STEM=${KERNEL}_l${LAYER}
+fi
 BASELINE_ROWS=${GLM_GREENFIELD_FP8_BASELINE_ROWS:-8}
 [[ $KERNEL != ws32_prefill_baseline ]] || TAG_STEM=${KERNEL}_m${BASELINE_ROWS}
 [[ $KERNEL != selected_up_gate && $KERNEL != selected_swiglu_down ]] || \
@@ -64,10 +69,10 @@ fi
   $KERNEL == dsa_wk || $KERNEL == ws32_prefill_baseline || \
   $KERNEL == ws32_grouped_admission || $KERNEL == ws32_grouped_down_admission || \
   $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic || \
-  $KERNEL == ws32_prefill_moe_bounded_admission ]] || {
+  $KERNEL == ws32_prefill_moe_bounded_admission || $KERNEL == ws32_prefill_layer_admission ]] || {
   echo "FP8 kernel must be single_up, single_up_m1, attention_output," \
     "fused_attention_output, rmsnorm_linear, up_gate, selected_up_gate," \
-    "selected_swiglu_down, structured_kv_b, dsa_wq_b, dsa_wk, ws32_prefill_baseline, ws32_grouped_admission, ws32_grouped_down_admission, ws32_prefill_moe_admission, ws32_prefill_moe_boundary_diagnostic, or ws32_prefill_moe_bounded_admission" >&2
+    "selected_swiglu_down, structured_kv_b, dsa_wq_b, dsa_wk, ws32_prefill_baseline, ws32_grouped_admission, ws32_grouped_down_admission, ws32_prefill_moe_admission, ws32_prefill_moe_boundary_diagnostic, ws32_prefill_moe_bounded_admission, or ws32_prefill_layer_admission" >&2
   exit 2
 }
 [[ $OUTPUT_TILE == 128 || $OUTPUT_TILE == 256 ]] || {
@@ -204,6 +209,12 @@ elif [[ $KERNEL == attention_output ]]; then
 fi
 (
   cd "$WORKTREE"
+  if [[ $KERNEL == ws32_prefill_layer_admission ]]; then
+    [[ $TAG == greenfield_fp8_ws32_prefill_layer_admission_l${LAYER}_* ]] || exit 2
+    JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+      -m scripts.greenfield.ws32_prefill_layer_campaign campaign --tag "$TAG" --pin "$PIN"
+    exit 0
+  fi
   if [[ $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic || $KERNEL == ws32_prefill_moe_bounded_admission ]]; then
     # Distributed worker runtime must not inherit the single-process bounds below.
     JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
@@ -295,13 +306,17 @@ if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
 if runner["kernel"] != expected_kernel:
     raise SystemExit("runner kernel does not match launched kernel")
 admission = runner.get("admission_only", False)
-if admission != (expected_kernel in ("ws32_grouped_admission", "ws32_grouped_down_admission", "ws32_prefill_moe_admission", "ws32_prefill_moe_bounded_admission")):
+if admission != (expected_kernel in ("ws32_grouped_admission", "ws32_grouped_down_admission", "ws32_prefill_moe_admission", "ws32_prefill_moe_bounded_admission", "ws32_prefill_layer_admission")):
     raise SystemExit("admission classification drifted")
 boundary = expected_kernel == "ws32_prefill_moe_boundary_diagnostic"
 bounded = expected_kernel == "ws32_prefill_moe_bounded_admission"
 fleet_moe = expected_kernel == "ws32_prefill_moe_admission" or boundary or bounded
+fleet_layer = expected_kernel == "ws32_prefill_layer_admission"
 untimed = admission or boundary
-if fleet_moe:
+if fleet_layer:
+    from scripts.greenfield.ws32_prefill_layer_campaign import validate_record
+    validate_record(runner, pin)
+elif fleet_moe:
     from scripts.greenfield.ws32_prefill_moe_campaign import validate_record
     validate_record(runner, pin, boundary=boundary, bounded=bounded)
 elif admission:
@@ -371,7 +386,9 @@ shape_ids = {
     "dsa_wk": "m1_k6144_n128",
     "single_up_m1": "m1_k6144_n2048",
 }
-if fleet_moe:
+if fleet_layer:
+    item_id = f"complete_layer{runner['layer']}_b17_raw_reference_empty_boundary_tail_v1"
+elif fleet_moe:
     item_id = ("real_layer3_b17_boundaries_v1_normal" if boundary else
                "real_layer3_b17_fp32_route_sum_bounded_v1_normal_concentrated" if bounded else
                "real_layer3_b17_arithmetic_v1_normal_concentrated")
@@ -420,7 +437,7 @@ pv.finalize(
     benchmark=f"greenfield_fp8_{runner['kernel']}",
     metric="diagnostic_evidence_complete" if boundary else "contract_valid",
     value=1.0,
-    note="Instrumented real-MoE boundary evidence; no numerical acceptance or performance claim." if boundary else "Standalone kernel microbenchmark; not layer latency or token throughput.",
+    note="Complete batched layer with real weights/synthetic state; bounded raw scalar reference, causal/cache interventions; no legacy/full-model or performance claim." if fleet_layer else "Instrumented real-MoE boundary evidence; no numerical acceptance or performance claim." if boundary else "Standalone kernel microbenchmark; not layer latency or token throughput.",
 )
 conn.close()
 
@@ -431,6 +448,8 @@ summary = {
     "results_db_run_id": run_id,
     "runner": runner,
     "claim_scope": (
+        "32-chip complete batched layer, real weights/synthetic state; bounded raw scalar reference, exact cache structure/causal interventions; no legacy/full-model or performance claim"
+        if fleet_layer else
         "32-chip real layer3 boundary diagnostic; instrumentation may perturb outputs; no arithmetic acceptance or performance claim"
         if boundary else "32-chip real layer3 FP32 route sum, per-row/aggregate bounded M1 and direct row0 legacy comparison; not bit-exact, no timing or model-performance claim"
         if bounded else "32-chip real layer3 MoE, supplied routes/perturbed activations, exact M1 comparison; no timing or model-performance claim"

@@ -2,6 +2,20 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+`probe_ws32_prefill_layer.py` and `ws32_prefill_layer_campaign.py` now connect the
+reviewed layer builders/subset loader to the existing FP8 wrapper's leases/censuses,
+SSH and exact generation publisher. No complete model copy/load. A before-JAX fleet
+header/size preflight is bound to actual runtime slots; complete selected tensor hashes
+are checked against the original full manifest ledger. `prefill_layer_evidence.py`
+replays fixed synthetic inputs, original candidate/reference bytes and exact causal,
+repair-history, padded-input, health and invalid-metadata interventions. The raw scalar
+reference alone uses a host row loop and observed-normalization roundtrip for M64 keys.
+The candidate has no host stage dispatch. Distinct HLO payload/call inventory checks
+actual reduction operands (TPU can fuse BF16 result casts), not MoE's six-call contract.
+111 CPU tests12.68s pass, including real-schema20-input CPU32 tracing; independent
+Astra PASS for one layer0 launch after clean push/mirror/preflights. Layer3 requires
+layer0 outcome review and clean census. No full-layer TPU or speedup result yet.
+
 `scripts/greenfield/prefill_layer_programs.py` wraps the actual batched layer and existing
 raw scalar layer for a distinct bounded admission, with actual normalized inputs exposed
 for own-input M64 reconstruction. `prefill_layer_numerical.py` fixes per-row bounds and

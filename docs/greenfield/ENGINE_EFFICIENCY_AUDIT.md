@@ -334,3 +334,13 @@ is divide_sqrt/DEFAULT. Both are now disclosed in the preregistered component co
 and result, with no reference or threshold change. `PREFILL_FULL_LAYER_ADMISSION.md`
 states the real-weight/synthetic-state scope and pending worker/HLO/fleet evidence.
 No full-layer TPU run or speedup has been claimed.
+
+The hardware admission worker/collector is now connected to the actual layer. Reuses
+existing fleet guards/transport/publication instead of a new full-model campaign.
+Before-JAX retained-header checks and selected-only payload loading avoid booting the
+753B model for a one-layer question. Original-array controller replay covers fixed
+synthetic inputs, per-row bounded comparisons and exact causal/cache interventions.
+111CPU tests12.68s pass; real production schemas traced on CPU32. Review caught the
+block-table rank mismatch before TPU; fixed with actual20-input regression coverage.
+Conditional one layer0 launch approved after clean persistence/preflights; no hardware
+result or E1 speedup yet. Next layer0/fullDSA+dense, then layer3/IndexShare+MoE.

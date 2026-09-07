@@ -24,7 +24,7 @@ host/device synchronization, loading/caches, compilation/revalidation, storage a
 Each finding needs file/trace evidence, confirmed vs hypothesis, benefit mechanism,
 smallest test, correctness/HBM risk, priority and decision evidence.
 Maintain ENGINE_EFFICIENCY_AUDIT.md. Resolve major avoidable costs or justify measured tradeoffs.
-Seek best measured feasible performance; never claim an unproved global maximum.
+Seek best measured feasible performance; no unproved global maximum claims.
 Resolve review P0-P2; no repeated cleared-code review or speculative hardening loops.
 
 ## Performance and proof
@@ -58,4 +58,5 @@ Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-dec
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB583 real MoE bounded PASS. Last fleet8/8 clean21:07Z; evidence in HANDOFF.
 TPU primitives DB576-581; batched layer/router/dual-cache CPU-pass.
-Subset loader+layer admission builders CPU-pass; next TPU worker -> short decoder. L7/L8 open.
+Layer worker/collector111 CPU tests+review PASS; next TPU layer0/3 -> short decoder.
+Efficient L7/L8 open; prefill speedup unmeasured.

@@ -6,7 +6,7 @@ import re
 from typing import Any
 
 
-def check_fp32_route_sum(module: Any) -> dict[str, Any]:
+def check_fp32_route_sum(module: Any, *, expert_scope: str | None = None) -> dict[str, Any]:
     """Follow actual SSA/fusion roots; metadata only identifies the intended sum.
 
     Unknown forwarding fails closed. This is not a general numerical HLO proof:
@@ -100,6 +100,7 @@ def check_fp32_route_sum(module: Any) -> dict[str, Any]:
             op
             for op in module.instructions
             if op.opcode == "all-reduce" and op.maximum_group_size == 8
+            and (expert_scope is None or expert_scope in (op.op_name or ""))
         ]
         if len(experts) != 1 or len(experts[0].operand_names) != 1:
             raise ValueError("expected one expert combine")
