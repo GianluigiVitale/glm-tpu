@@ -14022,3 +14022,40 @@ Owner clarification: remove stale usage-exhaustion and session-stop rules from c
 autonomous continuation to full §18 completion, with no account-quota prerequisite. Historical
 reviewer availability and session records below/above are evidence only, not current restrictions.
 No scientific gate, independent review requirement, run protection or infrastructure limit changed.
+
+## 2026-09-07 08:27Z — deferred sealing fixes prepared without touching the live surface
+
+Active L7 depth-0.0 workers and monitor remain intact; worker 0 reached chunk 17/62 by 08:24Z.
+The live worktree's enforcement paths remain byte-identical to source pin `679e2392`.
+
+Prepared branch `tooling/ws32-sealer-isolation` in `/home/gianl/glm-tpu-ws32-sealer-isolation`, based
+on `8bf907e9`. It must NOT merge into the live worktree until this depth-0.0 run's original evidence
+has sealed. Four deferred fixes are implemented there:
+
+1. Each future wrapper attempt creates a dedicated detached sealing checkout at its frozen producing
+   pin. Controller Python changes cwd and PYTHONPATH together and forces CPU, covering materializer,
+   validation, acquisition recovery, DB publication/rollback and inline evidence operations. Only
+   sealer-local artifact paths are rebased; worker CLI and run/checkpoint/oracle paths stay unchanged.
+   Ordinary vs recovery pin semantics and exact remote layouts are preserved. This is checked source
+   isolation, not filesystem immutability, and does not authorize editing active worker code.
+2. Add the passkey extractor's imported `bench/engine.py` and `bench/provenance.py` to the sealer's
+   enforcement surface; existing SHA-bound legacy loading remains unchanged.
+3. Make generic refusal messages cover protected seals, including §23.5 long context.
+4. Reject E0 iteration plans other than 256 before artifact reads, for acquisition and numerical
+   validation; existing actual rank timing/sample checks still enforce that plan. L7 stays at 10.
+
+The new behavior tests execute the production shell block in temporary Git repositories and prove
+source isolation, artifact rebasing, CPU selection, unique attempt checkouts and modified-source
+refusal; E0-window and added-dependency regressions also pass (26 tests). No runner/model module
+changed. Independent Astra found no P0–P2, verified both actual 8K adjudication records load from
+the isolated checkout, and approved isolated persistence conditional on the broader suite passing.
+The broader short-sealer/long-context suite passed **78 tests, 1 skipped** in 321.80 s; the opt-in
+full-eight-rank replay was skipped, while the default real-evidence rank-loop replay passed.
+Together with the new suite: **104 passed, 1 skipped**. Candidate rationale and reuse mapping are
+in its `docs/greenfield/WS32_SEALING_SOURCE.md`
+and reuse registry. No new TPU workflow, protected result or performance claim exists in this batch.
+
+Candidate persisted at `dd0f1c07` on its own published branch. Review also approved these main-worktree
+documentation pointers. Both branch refs are mirrored through the shared Git repository; the candidate
+does not need a second working-tree bucket copy. Resume with original-run collection/seal first,
+then merge the reviewed candidate and rerun its focused checks before the next protected launch.

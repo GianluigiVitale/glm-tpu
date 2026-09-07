@@ -60,4 +60,5 @@ PID 2248787 holds both leases. Preserve this live run. After READY_FOR_CENSUS: p
 collect original JSON/NPZ/HLO/log/trace with exact existing-object checks, then RECOVER=1 seal.
 Never recover while workers live. Surface unchanged; `.ended` may never appear after shell loss.
 Recipe: `docs/greenfield/WS32_ORPHAN_RECOVERY.md`; argv/env capsule in `configs/`.
-Then sealer fixes (incl. E0 256-step guard; wrapper fixed), L7 0.05/0.95, L8/E0, §18.
+Sealer fixes: `tooling/ws32-sealer-isolation`; merge after this seal (HANDOFF).
+Then L7 0.05/0.95, L8/E0, §18.
