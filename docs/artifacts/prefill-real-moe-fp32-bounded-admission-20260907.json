@@ -1,0 +1,57 @@
+{
+  "classification": "REAL_LAYER3_B17_FP32_ROUTE_SUM_BOUNDED_INTERNAL_ADMISSION",
+  "tag": "greenfield_fp8_ws32_prefill_moe_bounded_admission_20260907T210616212681016Z",
+  "code_hash": "6ac4b17007e37be817757095d2748395dec7dce6",
+  "results_db_run_id": 583,
+  "protocol": "ws32-prefill-real-moe-fp32-route-sum-bounded-v1",
+  "success_generation": "1788815250047703",
+  "success_sha256": "dbb77c627bc5082f12eb91f2baccc3221aaac37b3d470e8c29df914372af619d",
+  "summary_sha256": "f7e93765cfb2bdffadde87170ffaca4560eafecfd60468cc33bb4c05effbcee6",
+  "archive_receipts_sha256": "f41e6e0eb32d7e1a4c017ba148e7c49fe68de8d1d1a6fa586f136575a5f86a50",
+  "runner_sha256": "7804bf4c9b3d121b62b8680b8f12b531bea4649f39e16edfdfcda4fa29378ead",
+  "archive": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_moe_bounded_admission_20260907T210616212681016Z/",
+  "wrapper_exit": 0,
+  "worker_phase_seconds": 39,
+  "peak_hbm_bytes_including_reference": 322160640,
+  "normal": {
+    "all_32_owners_pass": true,
+    "bit_mismatches_per_unique_feature_shard": [3, 2, 6, 5],
+    "candidate_vs_m1_worst_max_abs": 0.0078125,
+    "candidate_vs_m1_worst_p99_abs": 0.0,
+    "candidate_vs_m1_worst_mean_abs": 4.3008841998926073e-7,
+    "candidate_row0_vs_legacy_worst_max_abs": 0.03125,
+    "candidate_row0_vs_legacy_worst_p99_abs": 0.0078125,
+    "candidate_row0_vs_legacy_worst_mean_abs": 0.0018864074954763055
+  },
+  "concentrated": {
+    "all_32_owners_pass": true,
+    "bit_mismatches_per_unique_feature_shard": [0, 0, 0, 0],
+    "candidate_vs_m1_worst_max_abs": 0.0,
+    "candidate_row0_vs_legacy_worst_max_abs": 0.03125,
+    "candidate_row0_vs_legacy_worst_p99_abs": 0.0078125,
+    "candidate_row0_vs_legacy_worst_mean_abs": 0.0019388794898986816
+  },
+  "contract": {
+    "per_row_and_aggregate": true,
+    "direct_candidate_row0_vs_authenticated_legacy": true,
+    "max_abs": 0.125,
+    "p99_abs": 0.0625,
+    "mean_abs": 0.02,
+    "physical_collective_group_sizes": [4, 8],
+    "grouped_raw_u8_calls": 3,
+    "shared_calls": 3,
+    "actual_fp32_sum_to_expert_operand_proof": true,
+    "full_weight_overlay": false
+  },
+  "pre_and_post_root_device_and_ordinary_census": "8/8 clean",
+  "remote_success_generation_independently_replayed": true,
+  "performance_claim": false,
+  "timed_samples": 0,
+  "latency_ms": null,
+  "full_prefill_admitted": false,
+  "limitations": [
+    "Supplied routes and perturbed activations; does not validate model-router production.",
+    "Normal outputs are bounded, not bit-exact; the earlier exact refusal stays failed.",
+    "Not full-layer causal attention, complete decoder, TTFT or long-context evidence."
+  ]
+}

@@ -272,3 +272,12 @@ sum is proposed under `PREFILL_MOE_FP32_ROUTE_SUM_ADMISSION.md`, retaining exist
 bounds and a separate two-case numerical test. The original exact test stays FAILED. Avoid
 another compiler-tree investigation over64 routed feature-rounding differences. This is
 numerical progress only; E1 end-to-end prefill and TTFT are still unproved.
+
+DB583 now closes that supplied-route real-MoE bounded admission (39s worker phase): normal
+bit differences shrink to3/2/6/5 per unique feature, worstabs.0078125/p990/mean4.30e-7;
+concentrated routing is M1-bit-exact. Every row/aggregate/direct-legacy test passes unchanged
+Gate C bounds. HLO binds FP32 sum to actual expert input; groups4/8, no full-weight expansion.
+Peak HBM322160640B including reference, all8 clean, exact DB/archive links in HANDOFF and
+`../artifacts/prefill-real-moe-fp32-bounded-admission-20260907.json`. E2's arithmetic obstacle
+is resolved for these cases, not its performance or full-model integration. Next E1 causal
+attention/cache/layer assembly; do not rerun this cleared MoE arithmetic diagnostic.

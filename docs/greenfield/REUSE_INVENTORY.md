@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+DB583 seals the new FP32 route-sum candidate's real17-row normal/concentrated bounded
+arithmetic on all32 owners. Reuse it for prefill layer integration (default-off); no further
+MoE boundary campaign is needed. Exact record is in HANDOFF and
+`../artifacts/prefill-real-moe-fp32-bounded-admission-20260907.json`. Not routing production,
+causal attention/cache, full decoder or performance. Historical strict test remains failed.
+
 DB582 sealed the diagnostic in46s worker time. Reviewed CPU replay v2 binds exact aggregate
 workers/all32 owners and verifies collective replica equality; it demonstrates an extra
 BF16 local route-sum round in the captured batched path. The new static fp32_route_sum=False

@@ -24,7 +24,7 @@
       "source_paths": ["glm_tpu/greenfield/kernels/ws32_prefill_moe.py", "glm_tpu/greenfield/benchmarking/one_layer.py", "scripts/greenfield/probe_ws32_prefill_moe.py", "scripts/greenfield/ws32_prefill_moe_campaign.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/prefill_moe_numerical.py", "scripts/greenfield/analyze_prefill_moe_boundaries.py", "tests/greenfield/hlo/test_prefill_moe_bounded.py", "docs/greenfield/PREFILL_MOE_FP32_ROUTE_SUM_ADMISSION.md"],
-      "gate": "24: separate default-off FP32 route sum, bounded real-layer admission pending",
+      "gate": "24: DB583 real-layer bounded FP32 route sum admitted; causal/full-prefill integration next, performance unmeasured",
       "reason": "DB582 captured tensors and CPU replay show an additional BF16 local sum round relative to the captured reference. New flag retains BF16 weighted parts and FP32 sum/expert input without changing default behavior, grouping, weights or sealed decoder. Reuse fixed Gate C max/p99/mean bounds per row and aggregate plus candidate row0 directly against authenticated legacy. Controller re-derives all comparisons from original NPZs. Distinct two-case protocol, no timing or historical promotion; first exact refusal stays FAILED. Diagnostic instrumentation perturbed reference16/32, so no original first-boundary claim. Review, tests and persistence precede one bounded TPU test. No checkpoint copy or full prefill claim."
     },
     {

@@ -84,3 +84,13 @@ checks both scalar-add reducers and rejects intervening BF16/correction or unkno
 Connected/fusion-forward positives and disconnected/round/correction negatives pass. Broader
 CPU check had41 passes and one stale shell-string assertion; updated for the added mode,
 all5 affected tests pass0.17s. No numerical tolerance was changed.
+
+## Outcome — DB583 sealed2026-09-07 21:07Z
+
+Both preregistered cases pass all32 owners, every row/aggregate and direct row0 legacy check.
+Normal differs from M1 in3/2/6/5 values per unique feature shard, concentrated in zero.
+HLO precision/locality and measured HBM pass; worker phase39s, no timing samples, all8 clean.
+Exact generation/DB/archive identities and numerical totals:
+`../artifacts/prefill-real-moe-fp32-bounded-admission-20260907.json`.
+Independent Astra outcome review confirms bounded component admission only; no P0-P2.
+Proceed to causal-layer integration. Full prefill/short-decoder/TTFT/L7/L8 remain open.

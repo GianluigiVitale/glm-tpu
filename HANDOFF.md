@@ -14604,3 +14604,27 @@ Replay v2 rechecks aggregate→worker binding,32 unique owners and collective re
 totals unchanged. Use `prefill-real-moe-boundary-replay-v2-20260907.json` as current analysis.
 Next after commit/push/verified same-region mirror: existing bounded FP8 wrapper with
 GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_moe_bounded_admission. No long model run.
+
+## 2026-09-07 21:07Z — DB583 closes bounded real MoE component admission
+
+The reviewed two-case run `greenfield_fp8_ws32_prefill_moe_bounded_admission_20260907T210616212681016Z`
+at `6ac4b17007e37be817757095d2748395dec7dce6` sealed DB583 and wrapper exit0. Worker phase39s;
+no timed samples or latency. Compact exact record:
+`docs/artifacts/prefill-real-moe-fp32-bounded-admission-20260907.json`.
+SUCCESS generation1788815250047703, independently byte-replayed from US-CENTRAL2,
+SHA `dbb77c627bc5082f12eb91f2baccc3221aaac37b3d470e8c29df914372af619d`.
+Both authenticated root accelerator and ordinary pre/post censuses8/8 clean. Source freeze
+released only after exit0. Peak HBM322160640B/chip including one-row reference outputs.
+
+Both normal and concentrated17-row cases pass on all32 owners, per-row and aggregate versus
+old uninstrumented M1 plus candidate row0 directly versus legacy under the unchanged Gate C
+bounds. Normal per-feature bit mismatches3/2/6/5 (previous2345/2183/2151/2243), worstmax.0078125,
+p990,mean4.3008842e-7. Concentrated outputs bit-exact M1, all32. Directlegacy worstmax.03125,
+p99.0078125,mean.0019388795 across cases. Actual optimizedHLO FP32 sum→expert input proof
+passes;3 grouped/3 shared calls, only feature4/expert8 groups, no full-weight overlay.
+
+This closes supplied-route real MoE bounded numerical admission, not router correctness,
+attention/cache integration, full prefill, short decoder or performance. Original strict
+refusal remains FAILED. Next causal layer integration with the already CPU-admitted selector,
+exact cache addressing/dual-index semantics and existing projection/attention utilities;
+then short decoder/own§21 evidence and efficient L7/L8. No serial long-run fallback.
