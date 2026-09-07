@@ -57,5 +57,5 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB575 exit0/8-host cleanup18:42Z; no model/controller live. HANDOFF has exact evidence.
-Multirow CPU admission passes; TPU FP8 baselines8/32/128/256 sealed DB576-579 (~0.24ms/batch).
-Grouped MoE CPU-exact/unwired. Next: bounded TPU arithmetic, causal layers/budgets; L7/L8 open.
+TPU FP8 baselines DB576-579; grouped F32 projection TPU-exact DB580 (not full MoE/prefill).
+Next: BF16 down/real MoE TPU, causal layers/phase budgets; efficient L7/L8 remain open.

@@ -14399,3 +14399,30 @@ registry tests33 passed1.83s; bash syntax and diff checks pass. Independent Astr
 no P0-P2, for persistence and one bounded admission after commit/push/mirror and preflight.
 Stop at the first compilation/arithmetic failure; diagnose exact retained evidence before
 another attempt. Do not launch serial128K/256K. New prefill is still unwired.
+
+## 2026-09-07 19:42Z — grouped F32 projection TPU admission PASS, DB580
+
+Original wrapper completed exit0 at19:42:36Z, runner8s. Tag
+`greenfield_fp8_ws32_grouped_admission_20260907T194202909841356Z`, run pin
+`5d6e99d8225fe82e5dab59293175e5d29f34a82b`. All three cases zero F32 bit mismatches.
+Candidate compilation1.447563314s, one grouped raw-U8 Pallas call, no full decoded table
+or collective; compact gather annotation and two u32[256] auxiliary allocations only.
+Compiler arguments101180928/output1115136/temp1097216B, peak process107012096B including
+reference, not measured VMEM peak. DB580 item arithmetic_v1 has correctness1/latencyNULL.
+Both authenticated censuses8/8 with root device checks; no model/controller left by wrapper.
+No full checkpoint loaded/copied. This is synthetic single-chip F32 projection admission,
+NOT real MoE/decoder/performance/TTFT evidence. No new serial long-context run.
+
+Approved archive `gs://driftbench-dsv4-uc/results/<tag>/`; terminal generation1788810155979993
+independently downloaded at that generation and byte-identical to local SUCCESS.
+SHA256:
+- SUCCESS `a3bb0333ca3b6a623c470ba48c12016489ef4aef8fd29b2243b06db3232ef0b3`
+- summary `3425d84fd2fb9078ec149e0b8d041e4ce8d92ed1b1b84bb69cf2ac198e3e0476`
+- runner `52b8f77485b0f3fa268dc9dbf09d096bef13bd5607e3a4dd0b73ebf32a5727ce`
+- receipts `12790bca2aa9e32a42b698f73c13da1423f8ae8a3ec1d15bbc011e92ed16f0b8`
+- optimized HLO `a12fdca88f7261b15a42d3cc637aba0be1d81759682526e1d823db51c3fff5ae`
+
+Next: BF16 down and mapped real-MoE arithmetic admission, causal DSA/attention/IndexShare
+layers and baseline-derived phase budgets/targets; then short decoder and efficient L7/L8.
+Reuse existing harness and checkpoints. No retest of the cleared F32 cases without a
+specific changed dependency; correctness admission does not authorize performance promotion.

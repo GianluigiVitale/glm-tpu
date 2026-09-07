@@ -1,7 +1,8 @@
 # Grouped MoE prefill — bounded implementation design
 
 2026-09-07. Main-agent implementation plus independent Astra scheduling/code review.
-CPU-admitted, unwired; no TPU or production admission. §24 and existing contracts govern.
+CPU-admitted, unwired; F32 grouped projection TPU-admitted DB580, not full MoE/production.
+§24 and existing contracts govern.
 
 ## Decision and sources
 
@@ -91,3 +92,20 @@ the two independent feature sums. Initial test expected three source-level calls
 only at that count, after numerical identity passed; it now verifies the actual optimized
 count and exact membership. No collective exemption or production linter changed. Independent
 Astra review PASS for CPU-stage persistence after the offset fix; not TPU execution approval.
+
+## First TPU arithmetic admission — DB580
+
+`greenfield_fp8_ws32_grouped_admission_20260907T194202909841356Z`, pin
+`5d6e99d8225fe82e5dab59293175e5d29f34a82b`: synthetic local G32/N2048/K1536,
+136 sorted route rows, F32 output, row tile8. Distributed136 singleton experts,
+all136 routes on one owner (eight experts ×17 rows) and empty-owner cases all have
+zero bit mismatches against the existing per-row TPU FP8 projection. No tolerance widening.
+One grouped Pallas call, raw U8 table, no full decoded table or collectives. Auxiliary
+calls are one compact integer gather annotation and two u32[256] allocations.
+Compile1.448s; runner8s, entire guarded workflow34s. Compiler arguments101180928B,
+outputs1115136B, temp1097216B; process peak107012096B including reference, not VMEM peak.
+Both pre/post censuses8/8, independent root accelerator-holder checks, wrapper exit0,
+generation-verified archive and DB580 with NULL latency. No timed samples/performance claim.
+Exact record hashes and archive terminal in HANDOFF. Next: BF16 down and mapped real-MoE
+TPU admission, causal DSA/attention/IndexShare layers and phase budgets, then short decoder.
+This does not prove end-to-end speedup or finish the prefill pivot.

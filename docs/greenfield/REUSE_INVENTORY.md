@@ -7,6 +7,8 @@ Grouped TPU arithmetic admission now adapts `run_fp8_matmul_microbench.sh` throu
 NULL DB latency, explicit admission-only classification. `probe_prefill_grouped_fp8.py`
 uses the existing M1 F32 raw-FP8 primitive as the exact reference at local G32/N2048/K1536,
 136 sorted route rows. This is synthetic single-chip compilation/arithmetic, not a real layer.
+DB580 passed all three cases bit-exact on TPU in8s runner/34s guarded workflow. F32 projection
+arithmetic is now admitted; BF16 down, real mapped MoE and end-to-end prefill remain open.
 
 Grouped schedule implementation now uses the pinned JAX metadata directly, not stock gmm:
 `prefill_routes.py`, `pallas/prefill_grouped_fp8.py`, and `ws32_prefill_moe.py` are unwired.

@@ -237,3 +237,10 @@ active expert-row tile schedule, raw-FP8 tile reuse and original route-slot rest
 Forced32 CPU output equals the existing MoE path bitwise for distributed and worst-owner
 routing, with only physical subgroup4/8 collectives. This resolves the CPU mechanism part of
 E2; it does not establish TPU arithmetic, grouped performance, full prefill or TTFT.
+
+DB580 now closes the narrow F32 grouped-projection TPU arithmetic question:136 sorted route
+rows, local32 experts/N2048/K1536, distributed/concentrated-owner/empty-owner cases all
+bit-exact against old M1 projections. Runner8s, entire protected workflow34s, no timing
+samples or performance claim. HLO contains one grouped raw-U8 Pallas call/no full table
+decode/no collectives; peak process HBM107012096B including reference. See grouped design
+and HANDOFF for exact evidence. BF16 down, real mapped MoE and causal full prefill remain open.

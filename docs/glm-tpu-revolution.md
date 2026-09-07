@@ -2350,16 +2350,14 @@ prefill implementation. Efficient prompt ingestion is now part of §18, not opti
 
 ## 24.1 Immediate sequence
 
-Preserve the already-running depth0.05 numerical run at `a9bfbbb3` (full identity in HANDOFF);
-finish its original evidence collection/seal or diagnose its failure without changing its running
-model/enforcement source. Do NOT automatically launch the remaining serial depth0.95 or serial
+The original depth0.05 numerical run at `a9bfbbb3` has sealed as DB575; preserve its evidence
+(full identity in HANDOFF), do not rerun it. Do NOT launch the remaining serial depth0.95 or serial
 256K E0. No additional long serial reference run without a specific missing-evidence question,
 projected cost, independent review and an explanation of why a bounded test cannot answer it.
 
 Next: ranked efficiency audit and design → bounded CPU/reference checks → representative real
 multi-row layer/kernel TPU tests → short complete decoder → efficient four-depth L7 and full L8.
-Documentation/design can proceed while the original run finishes; TPU work remains serialized.
-Do not wait for an old serial campaign to finish before beginning this engineering work.
+The old serial campaign is no longer the critical path; TPU work remains serialized.
 
 ## 24.2 Genuine prefill, not a renamed token scan
 

@@ -25,7 +25,7 @@
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/probe_prefill_grouped_fp8.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "tests/greenfield/hlo/test_prefill_grouped_admission.py"],
       "gate": "24: grouped TPU arithmetic admission, not performance",
-      "reason": "Reuse bounded prefill safety/publication and exact old M1 raw-FP8 projection reference; synthetic local G32/N2048/K1536 at 136 sorted routes with distributed, concentrated-owner and empty-owner counts. Zero timed samples and NULL DB latency; no full checkpoint, production integration, full layer or performance claim. Exact HLO/raw-U8/no-full-overlay/no-collective and compiler memory admission precede execution; stop on first numerical mismatch."
+      "reason": "Reuse bounded prefill safety/publication and exact old M1 raw-FP8 projection reference; synthetic local G32/N2048/K1536 at 136 sorted routes with distributed, concentrated-owner and empty-owner counts. DB580 passed all three cases with zero F32 bit mismatches, runner8s, original wrapper exit0 and8/8 clean. Zero timed samples and NULL DB latency; no full checkpoint, production integration, full layer or performance claim. Exact HLO/raw-U8/no-full-overlay/no-collective and compiler memory admission precede execution; stop on first numerical mismatch. BF16 down and real mapped MoE remain open."
     },
     {
       "id": "ws32-prefill-grouped-row-schedule",
