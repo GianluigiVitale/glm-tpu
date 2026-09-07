@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Layer3 actual HLO acquired: bias gather lowered to expert8 F32[256] disjoint-insert
+sum; register that exact opcode, not a generic alternative. Six U32[256] scratch
+allocations are paired local searchsorted scan initializers. Exact helpers and all
+other payloads/groups/Pallas contracts now pass captured-HLO replay;90CPU tests,
+independent narrow Astra PASS. Original40 files/all8 ledgers verified; numerical
+admission remains next. No model/numerical threshold change or layer0 rerun.
+
 DB584 now closes complete real layer0 bounded admission:3cases32owners, all original
 numeric/cache/causal/intervention replays pass, local HLO and measured HBM, durable
 archive+8/8 clean. Reuse for next layer3/IndexShare+MoE; no more layer0 arithmetic probe.

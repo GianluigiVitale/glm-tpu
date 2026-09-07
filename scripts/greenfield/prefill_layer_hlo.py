@@ -18,15 +18,52 @@ FEATURE = tuple(tuple(range(e * 4, e * 4 + 4)) for e in range(8))
 EXPERT = tuple(tuple(e * 4 + f for e in range(8)) for f in range(4))
 
 
-def _compiler_helpers(calls, *, layer: int) -> dict[str, Any]:
+def _searchsorted_scratch(module, allocations) -> bool:
+    """Six local scratch buffers, paired only in three searchsorted scan inits."""
+    if len(allocations) != 6:
+        return False
+    pairs = set()
+    for allocation in allocations:
+        local = [
+            op for op in module.instructions if op.computation == allocation.computation
+        ]
+        users = [op for op in local if allocation.name in op.operand_names]
+        if len(users) != 1 or users[0].opcode != "tuple":
+            return False
+        init = users[0]
+        names = {op.name for op in allocations if op.computation == init.computation}
+        if (
+            len(init.operand_names) != 8
+            or len(set(init.operand_names[1:3])) != 2
+            or set(init.operand_names[1:3]) != set(init.operand_names) & names
+            or allocation.name not in init.operand_names[1:3]
+        ):
+            return False
+        loops = [op for op in local if init.name in op.operand_names]
+        if not (
+            len(loops) == 1
+            and loops[0].opcode == "while"
+            and loops[0].operand_names == (init.name,)
+            and loops[0].result_shapes == init.result_shapes
+            and "jit(searchsorted)/jit(_searchsorted_scan_impl)"
+            in (loops[0].op_name or "")
+        ):
+            return False
+        pairs.add((init.computation, init.name))
+    return len(pairs) == 3
+
+
+def _compiler_helpers(calls, *, layer: int, module=None) -> dict[str, Any]:
     """Bind TPU layout/index annotations separately from model Pallas calls.
 
     Layer0 signatures acquired at 4a15234c, candidate HLO dc1d5a94...a13d9f3.
     Same compiler mechanisms as one_layer.py and runtime/decoder.py guards.
-    Layer3 remains unregistered until its own pre-execution HLO is inspected.
+    Layer3 acquired at43d95bd8, candidate HLO4403cc27...1186fcc. Its six
+    AllocateBuffers are searchsorted scan scratch, not model weight buffers.
     """
     observed = Counter()
     operands_valid = True
+    allocations = []
     for op in calls:
         match = re.search(r'custom_call_target="([^"]+)"', op.raw_line)
         target = match.group(1) if match else "<missing>"
@@ -56,6 +93,15 @@ def _compiler_helpers(calls, *, layer: int) -> dict[str, Any]:
                     for s in op.operand_shapes
                 )
             )
+        elif target == "AllocateBuffer":
+            operands_valid &= (
+                layer == 3
+                and shape.dtype == "u32"
+                and shape.dimensions == (256,)
+                and not op.operand_names
+                and not op.operand_shapes
+            )
+            allocations.append(op)
         else:
             operands_valid = False
     expected = (
@@ -73,8 +119,28 @@ def _compiler_helpers(calls, *, layer: int) -> dict[str, Any]:
             }
         )
         if layer == 0
-        else None
+        else (
+            Counter(
+                {
+                    ("AssumeGatherIndicesInBound", "s32", (1024,)): 8,
+                    ("AssumeGatherIndicesInBound", "s32", (34816,)): 1,
+                    ("GatherScatterIndicesBitpacked", "s32", (17, 2048, 2)): 1,
+                    ("GatherScatterIndicesBitpacked", "s32", (17, 8, 2)): 1,
+                    ("ConcatBitcast", "u8", (2048, 2048)): 1,
+                    ("ConcatBitcast", "u8", (3584, 512)): 1,
+                    ("ConcatBitcast", "u8", (1536, 2048)): 2,
+                    ("ConcatBitcast", "u8", (2048, 1536)): 2,
+                    ("AllocateBuffer", "u32", (256,)): 6,
+                }
+            )
+            if layer == 3
+            else None
+        )
     )
+    if layer == 3:
+        operands_valid &= module is not None and _searchsorted_scratch(
+            module, allocations
+        )
     return dict(
         passed=expected is not None and observed == expected and operands_valid,
         registered=expected is not None,
@@ -130,12 +196,18 @@ def check_layer_hlo(hlo: str, *, layer: int) -> dict[str, Any]:
         add("all-reduce", 4, "f32", 2 * 136 * 2048)
         add("all-reduce", 4, "f32", 2 * 17 * 2048)
         add("all-gather", 8, "f32", 17 * 256)
-        add("all-gather", 8, "f32", 256)
+        # The compiler lowers the bias gather to disjoint insertion into zeros
+        # then expert8 sum, tuple-merged with attention output. Exact acquired
+        # opcode/payload, not a generic gather-or-reduce allowance. Source and
+        # StableHLO still declare all_gather; route IDs remain a numerical gate.
+        add("all-reduce", 8, "f32", 256)
     calls = [op for op in module.instructions if op.opcode == "custom-call"]
     pallas = [
         op for op in calls if 'custom_call_target="tpu_custom_call"' in op.raw_line
     ]
-    helpers = _compiler_helpers([op for op in calls if op not in pallas], layer=layer)
+    helpers = _compiler_helpers(
+        [op for op in calls if op not in pallas], layer=layer, module=module
+    )
     raw = [op for op in pallas if "greenfield_fp8_block_matmul" in op.raw_line]
     grouped = [
         op for op in pallas if "greenfield_prefill_grouped_raw_fp8" in op.raw_line

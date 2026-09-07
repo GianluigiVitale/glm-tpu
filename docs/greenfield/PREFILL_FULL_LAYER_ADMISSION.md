@@ -169,3 +169,24 @@ DB584, same-region terminal SUCCESS, authenticated root+normal8/8 clean. Compact
 in `../artifacts/prefill-complete-layer0-admission-20260907.json`; HANDOFF has exact tag.
 No warm timings/full-model/legacy equivalence claim. Layer3 remains required; its helper
 inventory needs its own bounded compile acquisition before numerical execution.
+
+## Layer3 HLO acquired and registered — 2026-09-07 23:50Z
+
+Tag `greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T233943669220540Z`,
+pin43d95bd8. All32 selected tensor ledgers pass; candidate compiled4.79s. Before
+execution the guard refused the unregistered helper inventory and one compiler
+lowering: the router bias gather became expert8 F32[256] all-reduce, tuple merged
+with attention output. Source still declares the gather. Actual graph inserts the
+32-value local bias into256 zeros at32 times an owner lookup, then FP32-add reduces.
+The lookup literal is elided in HLO; its exact values are inferred, not decoded.
+Exact numerical route-ID comparison remains mandatory. No other collective delta.
+
+Register exact9 index assumptions,2 bitpacked index helpers,6 local U8 concat helpers
+and6 zero-operand U32[256] AllocateBuffers, paired in slots1/2 of three local
+searchsorted scan initializers. Reject other helper shapes/counts/uses/side effects.
+Do not treat these scratch buffers as grouped-kernel inputs or model weights.
+All8 generation ledgers/40 original files independently verified; all8 normal/root
+failure cleanup clean. Artifact `../artifacts/prefill-layer3-hlo-acquisition-20260907.json`.
+90CPU tests13.72s and actual8-host-identical HLO/mutation replay pass. Independent
+Astra narrow review PASS, no P0-P2; one numerical retry after persistence and fresh
+guards. No model/reference/bounds changes and no numerical or performance result yet.

@@ -370,3 +370,10 @@ original-array replay, exact causal/cache/health tests, local HLO and47.5MB peak
 including reference. Written cache/carried errors0; output worstabs6.10e-5. All8 clean,
 terminal archived. This is E1's first complete-layer hardware correctness proof, not
 full-model/legacy numerical admission or a speedup. Next layer3 then short decoder.
+
+Layer3 bounded acquisition compiled4.79s and stopped before execution on exact graph
+inventory. Actual bias gather lowered to local expert8 zero-insert+F32 sum; no pod-wide
+collective. Register this payload plus exact local indexing/scan scratch helpers, not
+a blanket allowlist. All8 originals verified,90CPU tests and captured graph replay PASS,
+independent review PASS. Numerical route IDs remain exact; no model/bounds change.
+This is graph admission progress, not layer3 numerical success or a prefill speedup.

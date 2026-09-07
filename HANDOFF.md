@@ -14991,3 +14991,28 @@ unregistered, so expect pre-execution structural refusal, inspect actual origina
 register exact helpers with narrow review, then numerical admission. No blind helper
 allowlist, no repeated layer0 test. After layer3: short complete decoder/own§21,
 registered prefill/TTFT targets, all4 efficientL7 and fullL8. No TPU workflow now live.
+
+## 2026-09-07 23:50Z — layer3 actual HLO acquired; numerical retry authorized
+
+Tag `greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T233943669220540Z`,
+pin43d95bd85ae524639e8e806e7b4f346161344d2c, wrapper exit1 at23:41:22Z.
+All8 before-JAX headers/runtime ownership and original selected layer3 hashes32owners
+pass. Candidate compile4.79s; no numerical cases executed. Two failed checks: exact
+compiler helpers (deliberately unregistered) and collective payload. Actual bias
+all-gather becomes expert8 F32[256] sum after disjoint32-value insertion into zeros,
+tuple merged with attention output. Source/StableHLO gather unchanged. Owner lookup
+literal elided in HLO; exact values inferred, not decoded. Exact route IDs still gate.
+All remaining payload/groups/Pallas/FP32 route-sum/no-host/no-full-overlay checks pass.
+
+Register exact23 helpers:9 index assumptions,2 bitpacked indices,6 local U8 concat,
+6 U32[256] zero-operand buffers paired only in three searchsorted scan initializer
+slots1/2. Acquired optimized SHA4403cc27f1ee1f7cd7d007ba6cb4971d43814137b71057da8b4d4b0491186fcc,
+StableHLO ef6fc6714e27d017c2f267ed813e945ef07004f08ca9593cabe38db7dd0c0ba7.
+All8 receipt ledgers and40 originals verified generation/size/CRC/SHA, all32 selected
+tensor digests against original manifest. Normal/root failure cleanup8/8 confirmed.
+Artifact `docs/artifacts/prefill-layer3-hlo-acquisition-20260907.json` binds receipts.
+
+90CPU tests13.72s plus actual8-host-identical HLO and5 mutation refusals PASS. Independent
+Astra current-diff review PASS, no P0-P2. No numerical/reference/model changes. Next ONE
+guarded layer3 numerical retry after clean commit/push/same-region mirror+fresh guards.
+No layer0 rerun. Full-layer numerical evidence and short-decoder integration still open.
