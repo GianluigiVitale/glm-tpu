@@ -13961,3 +13961,45 @@ the current run seals:** the sealer must explicitly reject E0 iteration counts o
 current caller-provided count would permit undermeasurement; fixing the wrapper prevents the normal
 launch mistake but is not the complete enforcement fix. Add this to the existing three idle-gap
 items. No L8 run has launched. No runtime or sealer enforcement-surface file changed during this run.
+
+## 2026-09-07 08:10Z — owner-requested session stop / durable resume checkpoint
+
+Owner has 1% usage left and requests a clean stop, updated Markdown, commit and push. Stop agent
+implementation/launches now; do not resume autonomous work until the owner resumes. This is a
+SESSION stop, not a finished run or a clean fleet. No TPU/VM/queued-resource operation, process signal,
+new numerical run, collector publication or recovery was performed for this stop.
+
+Authoritative worktree remains `/home/gianl/glm-tpu-topology-rewrite`, branch
+`rewrite/topology-first-decode`. The IDE's `glm-tpu-gate-d-pp16-numerical/goal.md` describes a historical
+campaign; do not use it to restart Gate D. Gate D is CLOSED (DB567), Gate G CLOSED/WS32 promoted,
+Step B/B′/C CLOSED, L7 depth 1.0 sealed DB573. L7 depth 0.0 is not yet sealed; 0.05/0.95 and L8 remain.
+
+Live observation at **08:07:21Z**: all eight original workers, exact pinned identities and libtpu
+holders unchanged, **13/62** prefill chunks, ~263.173 s/chunk. Tag:
+`greenfield_ws32_short_decoder_128k_d0_0_numerical_cap131072_hrope_20260907T064941550123130Z`.
+Source pin `679e2392b76caf1acb0a98ff87962c5b5c908e14`; local root `/home/gianl/glm-run/<tag>`.
+At 08:09Z, detached monitor PID **2248787** still holds both user leases; worker-0 PID **2135816**
+remains under its original timeout. Leave these processes running; the monitor launches no work and
+does not collect/seal results automatically. It records observations then exits after two idle
+observations. Neither a free lease nor its exit proves numerical success or authenticated cleanup.
+
+Resume by reading `goal.md`, full spec and this tail, then the latest `watch.jsonl` and actual process
+identities. If monitor is missing while original workers remain, restart ONLY the reviewed watcher
+with this tag/source pin; it resumes the original baseline. If workers have finished, follow
+`docs/greenfield/WS32_ORPHAN_RECOVERY.md` and `configs/greenfield-ws32-l7-d0-recovery.json`:
+both leases, authenticated 8/8 census, eight original inventories/shared-HLO check, conditional
+publication/readback, then existing RECOVER=1 with original source and published recovery pins.
+Never fabricate `.ended`, exit codes or numerical JSON. Never invoke RECOVER while workers live.
+
+Implementation through `5dd108c920880a6b905559d9c3fb5b51d9e33ab6` was already reviewed/pushed/mirrored;
+the preceding entry records 50 passing CPU tests. No isolated sealer-fix worktree or patch was created.
+Four fixes remain AFTER this run seals: immutable sealing source; enforcement coverage for
+`bench/engine.py` and `bench/provenance.py`; generic refusal wording; sealer rejection of E0 windows
+other than 256 iterations. Wrapper's 256-step selection is already fixed. No enforcement source is
+edited at this stop. Historical evidence and other worktrees stay unchanged.
+
+Backup: cron mirrors only `repos/` to US-CENTRAL2, but skips while the monitor holds the user rsync
+lease. This stop explicitly runs the existing same-region mirror after the docs commit and verifies
+GitHub and bucket branch refs. Live `glm-run` files are not covered by that repo cron; the compact
+stop receipt is separately archived, while original numerical payload collection remains pending
+the completed run. Closing the IDE is not permission to shut down the host or TPU.

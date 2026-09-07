@@ -1,5 +1,9 @@
 # PLAN — greenfield gates
 
+Owner-requested session stop, 2026-09-07 08:10Z: no new launches until owner resumes. Existing
+L7 depth-0.0 test/monitor remain live (13/62 chunks at 08:07Z), not sealed. Follow `HANDOFF.md`'s
+latest stop entry and `docs/greenfield/WS32_ORPHAN_RECOVERY.md` before collection/recovery.
+
 The authoritative details, stop conditions, and Definition of Done are in
 `docs/glm-tpu-revolution.md`. This is only the execution index.
 

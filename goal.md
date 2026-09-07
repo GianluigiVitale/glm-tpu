@@ -49,15 +49,15 @@ Adversarial reviewer = separate **gpt-6-astra** agent; resolve all P0–P2, cap 
 (2 used) — past that state the residual risk and move to the runs. Cron `sync-glm.sh` every 5 min;
 verify origin + mirror before protected work. Never EU.
 
-## Resume — 2026-09-07 07:48Z
+## Owner stop — 2026-09-07 08:10Z
 
 Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`.
 L7 depth 0.0 tag `greenfield_ws32_short_decoder_128k_d0_0_numerical_cap131072_hrope_20260907T064941550123130Z`
-at pin `679e2392` is LIVE, 8/62 chunks observed. Its orchestrator/remote shells exited, leaving
-8 original Python workers running. Do not restart. Monitor `889cb8f5` reviewed by Astra, 14 tests;
-PID 2248787 holds both leases, first receipt 07:48Z 8/8 live. After READY_FOR_CENSUS: prove cleanup,
+at pin `679e2392` is LIVE, 13/62 chunks observed at 08:07Z. Its orchestrator/remote shells exited, leaving
+8 original workers running. Do not restart. Monitor `889cb8f5` Astra-reviewed;
+PID 2248787 holds both leases. Owner paused agent work; no new runs until owner resumes.
+Leave workers/monitor intact; session stop is NOT fleet cleanup. After READY_FOR_CENSUS: prove cleanup,
 collect original JSON/NPZ/HLO/log/trace with exact existing-object checks, then RECOVER=1 seal.
 Never recover while workers live. Surface unchanged; `.ended` may never appear after shell loss.
 Recipe: `docs/greenfield/WS32_ORPHAN_RECOVERY.md`; argv/env capsule in `configs/`.
-Then deferred sealer fixes incl. E0's 256-step guard (wrapper fixed), L7 depths 0.05/0.95,
-L8 acquisition/E0, §18 and base/effective throughput.
+Then sealer fixes (incl. E0 256-step guard; wrapper fixed), L7 0.05/0.95, L8/E0, §18.

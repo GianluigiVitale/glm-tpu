@@ -1,5 +1,9 @@
 # CLAUDE — greenfield branch compatibility pointer
 
+Owner paused the agent session on 2026-09-07 08:10Z. No new work until owner resumes. The existing
+L7 depth-0.0 workers and detached monitor remain running; this is not a clean-fleet claim.
+Read the latest `HANDOFF.md` stop entry and `docs/greenfield/WS32_ORPHAN_RECOVERY.md` before action.
+
 This file applies only to branch `rewrite/topology-first-decode` in
 `/home/gianl/glm-tpu-topology-rewrite`.
 

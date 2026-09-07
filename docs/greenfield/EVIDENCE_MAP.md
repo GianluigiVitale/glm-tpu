@@ -1,5 +1,14 @@
 # Greenfield evidence and reusable protection map
 
+## Current resume pointer — owner stop 2026-09-07 08:10Z
+
+Gate D CLOSED DB567 (§21.6), Gate G CLOSED (§22), WS32 promoted. L7 depth 1.0 sealed DB573;
+depth 0.0 live at 13/62 chunks at 08:07Z, not sealed. Agent work is paused until owner resumes;
+existing workers/monitor remain intact. Current authority is this topology-rewrite worktree, not the
+historical PP16 numerical worktree open in the IDE. Read the latest `HANDOFF.md`, `goal.md`,
+`WS32_ORPHAN_RECOVERY.md`, and `configs/greenfield-ws32-l7-d0-recovery.json`. Entries below preserve
+historical campaigns; old Gate D next actions are not current instructions.
+
 The cross-repository reuse decisions and pinned implementation candidates are indexed in
 [`REUSE_INVENTORY.md`](REUSE_INVENTORY.md) and
 `configs/greenfield-reuse-inventory.json`. They define what is directly reused, independently
@@ -4058,4 +4067,3 @@ persistence only; review and persistence precede any v2 installation.
   `evidence_layout`. Prefixes sealed before that pin carry no `evidence_layout` field and are read as
   `hlo_per_rank_v1`; the sealer takes the required layout as a pin so they stay re-validatable.
 - Affected prefixes so far: none sealed yet (Step B's DB 568/569 and every earlier record are v1).
-
