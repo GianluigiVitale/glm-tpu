@@ -1,6 +1,7 @@
 # Goal — GLM-5.2-FP8 TPU v4: long context, §18
 
-FULL ACCESS. Keep <4000 chars. At start/compaction read this, `docs/glm-tpu-revolution.md` in full
+FULL ACCESS. Continue autonomously until full project completion is proved under §18.
+Keep <4000 chars. At start/compaction read this, `docs/glm-tpu-revolution.md` in full
 (incl. §21–§23), tails of `HANDOFF.md` and `docs/greenfield/GATE_D_LESSONS.md`; inspect state.
 
 ## Never idle on a running job
@@ -49,14 +50,13 @@ Adversarial reviewer = separate **gpt-6-astra** agent; resolve all P0–P2, cap 
 (2 used) — past that state the residual risk and move to the runs. Cron `sync-glm.sh` every 5 min;
 verify origin + mirror before protected work. Never EU.
 
-## Owner stop — 2026-09-07 08:10Z
+## Resumed — 2026-09-07 08:14Z
 
 Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`.
 L7 depth 0.0 tag `greenfield_ws32_short_decoder_128k_d0_0_numerical_cap131072_hrope_20260907T064941550123130Z`
-at pin `679e2392` is LIVE, 13/62 chunks observed at 08:07Z. Its orchestrator/remote shells exited, leaving
+at pin `679e2392` is LIVE, 14/62 chunks observed at 08:13Z. Its orchestrator/remote shells exited, leaving
 8 original workers running. Do not restart. Monitor `889cb8f5` Astra-reviewed;
-PID 2248787 holds both leases. Owner paused agent work; no new runs until owner resumes.
-Leave workers/monitor intact; session stop is NOT fleet cleanup. After READY_FOR_CENSUS: prove cleanup,
+PID 2248787 holds both leases. Preserve this live run. After READY_FOR_CENSUS: prove cleanup,
 collect original JSON/NPZ/HLO/log/trace with exact existing-object checks, then RECOVER=1 seal.
 Never recover while workers live. Surface unchanged; `.ended` may never appear after shell loss.
 Recipe: `docs/greenfield/WS32_ORPHAN_RECOVERY.md`; argv/env capsule in `configs/`.

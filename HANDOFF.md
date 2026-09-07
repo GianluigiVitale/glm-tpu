@@ -14003,3 +14003,22 @@ lease. This stop explicitly runs the existing same-region mirror after the docs 
 GitHub and bucket branch refs. Live `glm-run` files are not covered by that repo cron; the compact
 stop receipt is separately archived, while original numerical payload collection remains pending
 the completed run. Closing the IDE is not permission to shut down the host or TPU.
+
+## 2026-09-07 08:14Z — owner explicitly resumes to full project completion
+
+Owner: "what are this stopped instructions? i want you to continue until 100% project completition".
+This supersedes the 08:10Z pause instructions, including the preceding historical stop entry. Continue
+autonomously toward the full specification; preserve all correctness/review/storage/infra limits.
+The six current navigation documents now say resumed; the stop entry remains historical evidence.
+
+Revalidated actual monitor PID2248787 and worker-0 PID2135816 at 08:14Z. Latest authenticated fleet
+receipt 08:13:47Z has all eight original identities/libtpu holders unchanged, 14/62 chunks (~263.17s).
+The running depth-0.0 tag/pin and recovery capsule are unchanged. Do not restart or call RECOVER yet.
+While it progresses, prepare the deferred sealer fixes in an isolated worktree; do not change the
+live worktree's enforcement surface before this run seals. Then finish remaining L7, L8 and §18.
+
+Owner clarification: remove stale usage-exhaustion and session-stop rules from current guidance.
+`goal.md`, `CLAUDE.md`, `KICKOFF.md`, `PLAN.md` and the current evidence-map pointer now direct
+autonomous continuation to full §18 completion, with no account-quota prerequisite. Historical
+reviewer availability and session records below/above are evidence only, not current restrictions.
+No scientific gate, independent review requirement, run protection or infrastructure limit changed.
