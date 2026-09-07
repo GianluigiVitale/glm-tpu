@@ -35,6 +35,7 @@ from scripts.greenfield.microbench_fp8_matmul import (
 
 PROTOCOL = "ws32-prefill-real-moe-arithmetic-v1"
 BOUNDARY_PROTOCOL = "ws32-prefill-real-moe-boundary-diagnostic-v1"
+BOUNDED_PROTOCOL = "ws32-prefill-real-moe-fp32-route-sum-bounded-v1"
 ROWS = 17
 CASES = ("normal", "concentrated")
 PACK = Path(
@@ -84,7 +85,7 @@ def case_rows(
     return values, indices, probabilities
 
 
-def check_hlo(hlo: str) -> dict[str, Any]:
+def check_hlo(hlo: str, *, fp32_route_sum: bool = False) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 
     module = parse_hlo_module(hlo)
@@ -104,9 +105,13 @@ def check_hlo(hlo: str) -> dict[str, Any]:
         if np.prod([int(v) for v in m[1].split(",")]) >= 32 * 2048 * 1536
     ]
     groups = sorted(op.maximum_group_size for op in collectives)
+    from scripts.greenfield.prefill_moe_precision_hlo import check_fp32_route_sum
+
+    precision = check_fp32_route_sum(module) if fp32_route_sum else None
     return dict(
         passed=(
-            len(calls) == 6
+            (not fp32_route_sum or precision["passed"])
+            and len(calls) == 6
             and len(grouped) == 3
             and len(shared) == 3
             and groups in ([4, 8], [4, 4, 8])
@@ -123,6 +128,8 @@ def check_hlo(hlo: str) -> dict[str, Any]:
         grouped_calls=len(grouped),
         shared_calls=len(shared),
         full_weight_overlays=overlays,
+        fp32_route_sum_required=fp32_route_sum,
+        fp32_route_sum_proof=precision,
         scope="arithmetic admission structure, not performance or acquired full-model HLO",
     )
 
@@ -133,6 +140,7 @@ def build_mapped(
     contract: Any,
     interpret: bool = False,
     capture_boundaries: bool = False,
+    fp32_route_sum: bool = False,
 ) -> tuple[Any, Any]:
     import jax
     from jax.sharding import PartitionSpec as P
@@ -150,6 +158,7 @@ def build_mapped(
             contract=contract,
             interpret=interpret,
             capture_boundaries=capture_boundaries,
+            fp32_route_sum=fp32_route_sum,
         )
         result, health = returned[:2]
         if capture_boundaries:
@@ -204,7 +213,9 @@ def main() -> int:
     parser.add_argument("--coordinator-address", required=True)
     parser.add_argument("--process-id", required=True, type=int)
     parser.add_argument("--output-dir", required=True, type=Path)
-    parser.add_argument("--boundary-diagnostic", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--boundary-diagnostic", action="store_true")
+    mode.add_argument("--bounded-admission", action="store_true")
     args = parser.parse_args()
     if (
         not 0 <= args.process_id < 8
@@ -215,7 +226,11 @@ def main() -> int:
     tag = os.environ.get("GLM_GREENFIELD_RUN_TAG", "")
     if not re.fullmatch(
         r"greenfield_fp8_ws32_prefill_moe_"
-        + ("boundary_diagnostic" if args.boundary_diagnostic else "admission")
+        + (
+            "boundary_diagnostic"
+            if args.boundary_diagnostic
+            else "bounded_admission" if args.bounded_admission else "admission"
+        )
         + r"_[a-zA-Z0-9_]+",
         tag,
     ):
@@ -235,7 +250,11 @@ def main() -> int:
     )
     record = dict(
         status="RUNNING",
-        protocol=BOUNDARY_PROTOCOL if args.boundary_diagnostic else PROTOCOL,
+        protocol=(
+            BOUNDARY_PROTOCOL
+            if args.boundary_diagnostic
+            else BOUNDED_PROTOCOL if args.bounded_admission else PROTOCOL
+        ),
         code_hash=args.expected_code_hash,
         launch_rank=args.process_id,
         hostname=socket.gethostname(),
@@ -246,6 +265,8 @@ def main() -> int:
         boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
         admission_only=not args.boundary_diagnostic,
         boundary_diagnostic=args.boundary_diagnostic,
+        bounded_admission=args.bounded_admission,
+        fp32_route_sum=args.bounded_admission,
         performance_claim=False,
         iterations=0,
         latency=None,
@@ -306,6 +327,7 @@ def main() -> int:
             mesh,
             contract=GlmMoeNumericalContract(stage_size=8),
             capture_boundaries=args.boundary_diagnostic,
+            fp32_route_sum=args.bounded_admission,
         )
         slot_by_device = {
             d: s for s, d in enumerate(physical_mesh.flattened_device_ids)
@@ -335,7 +357,8 @@ def main() -> int:
                 (args.output_dir / "candidate.optimized_hlo.txt").write_text(hlo)
                 record["phases"]["compile_seconds"] = time.monotonic() - started
                 record["hlo"] = dict(
-                    sha256=sha256(hlo.encode()).hexdigest(), contract=check_hlo(hlo)
+                    sha256=sha256(hlo.encode()).hexdigest(),
+                    contract=check_hlo(hlo, fp32_route_sum=args.bounded_admission),
                 )
                 record["compiled_memory_estimate"] = memory = _compiled_memory(compiled)
                 _atomic_json(output, record)
@@ -400,9 +423,20 @@ def main() -> int:
                         observed.view(np.uint16) != expected.view(np.uint16)
                     )
                 )
+                bounded = None
+                if args.bounded_admission:
+                    from scripts.greenfield.prefill_moe_numerical import compare_outputs
+
+                    feature = slot_by_device[device_id] % 4
+                    legacy_row = _bfloat16_numpy(oracle[f"{case}_output"])
+                    bounded = compare_outputs(
+                        observed,
+                        expected,
+                        legacy_row[:, feature * 1536 : (feature + 1) * 1536],
+                    )
                 passed = (
                     health_by_device[device_id]
-                    and mismatch == 0
+                    and (bounded["passed"] if args.bounded_admission else mismatch == 0)
                     and bool(np.isfinite(observed).all())
                 )
                 shards.append(
@@ -415,6 +449,7 @@ def main() -> int:
                         bit_mismatches=mismatch,
                         output_sha256=sha256(observed.tobytes()).hexdigest(),
                         reference_sha256=sha256(expected.tobytes()).hexdigest(),
+                        bounded_comparison=bounded,
                     )
                 )
                 tensors[f"actual_{device_id}"] = observed.view(np.uint16)

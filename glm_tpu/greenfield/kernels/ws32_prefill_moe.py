@@ -43,6 +43,7 @@ def ws32_prefill_moe_from_routes_mapped(
     row_tile: int = 8,
     interpret: bool = False,
     capture_boundaries: bool = False,
+    fp32_route_sum: bool = False,
 ) -> tuple[Any, Any] | tuple[Any, Any, dict[str, Any]]:
     """Return (local hidden shard, local health); caller must gate on all chips.
 
@@ -51,6 +52,8 @@ def ws32_prefill_moe_from_routes_mapped(
     No router or full decoder is replaced by adding this building block.
     capture_boundaries is diagnostic-only and may change compiled rounding;
     captured results do not certify the uninstrumented execution.
+    fp32_route_sum is a separate numerical candidate: sum BF16 weighted route
+    values in FP32 without an intermediate BF16 round before expert reduction.
     """
     if contract.stage_size != 8:
         raise ValueError("WS32 prefill MoE requires stage_size=8")
@@ -131,9 +134,17 @@ def ws32_prefill_moe_from_routes_mapped(
     route_outputs = restore_prefill_route_rows(weighted, routes, top_k=contract.top_k)
     # Preserve the original [route,live rows,hidden] expression and reduction
     # axis. Expert execution order must not become route accumulation order.
-    local_routed = jnp.sum(
-        jnp.swapaxes(route_outputs, 0, 1), axis=0, dtype=jnp.bfloat16
-    )
+    if fp32_route_sum:
+        with jax.named_scope("greenfield_ws32_prefill_moe/fp32_route_sum"):
+            local_routed = jnp.sum(
+                jnp.swapaxes(route_outputs, 0, 1).astype(jnp.float32),
+                axis=0,
+                dtype=jnp.float32,
+            )
+    else:
+        local_routed = jnp.sum(
+            jnp.swapaxes(route_outputs, 0, 1), axis=0, dtype=jnp.bfloat16
+        )
     with jax.named_scope("greenfield_ws32_prefill_moe/expert_reduce"):
         local_sum_operand = local_routed.astype(jnp.float32)
         routed = lax.psum(local_sum_operand, axis_name="expert").astype(jnp.bfloat16)

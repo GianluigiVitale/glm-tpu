@@ -14,7 +14,8 @@ PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
 GROUPED_ADMISSION=0
 [[ $KERNEL != ws32_grouped_admission && $KERNEL != ws32_grouped_down_admission && \
-   $KERNEL != ws32_prefill_moe_admission && $KERNEL != ws32_prefill_moe_boundary_diagnostic ]] || GROUPED_ADMISSION=1
+   $KERNEL != ws32_prefill_moe_admission && $KERNEL != ws32_prefill_moe_boundary_diagnostic && \
+   $KERNEL != ws32_prefill_moe_bounded_admission ]] || GROUPED_ADMISSION=1
 BOUNDED_PREFILL=0
 [[ $KERNEL != ws32_prefill_baseline && $GROUPED_ADMISSION != 1 ]] || BOUNDED_PREFILL=1
 OUTPUT_TILE=${GLM_GREENFIELD_FP8_OUTPUT_TILE:-128}
@@ -62,10 +63,11 @@ fi
   $KERNEL == structured_kv_b || $KERNEL == dsa_wq_b || \
   $KERNEL == dsa_wk || $KERNEL == ws32_prefill_baseline || \
   $KERNEL == ws32_grouped_admission || $KERNEL == ws32_grouped_down_admission || \
-  $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic ]] || {
+  $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic || \
+  $KERNEL == ws32_prefill_moe_bounded_admission ]] || {
   echo "FP8 kernel must be single_up, single_up_m1, attention_output," \
     "fused_attention_output, rmsnorm_linear, up_gate, selected_up_gate," \
-    "selected_swiglu_down, structured_kv_b, dsa_wq_b, dsa_wk, ws32_prefill_baseline, ws32_grouped_admission, ws32_grouped_down_admission, or ws32_prefill_moe_admission" >&2
+    "selected_swiglu_down, structured_kv_b, dsa_wq_b, dsa_wk, ws32_prefill_baseline, ws32_grouped_admission, ws32_grouped_down_admission, ws32_prefill_moe_admission, ws32_prefill_moe_boundary_diagnostic, or ws32_prefill_moe_bounded_admission" >&2
   exit 2
 }
 [[ $OUTPUT_TILE == 128 || $OUTPUT_TILE == 256 ]] || {
@@ -202,7 +204,7 @@ elif [[ $KERNEL == attention_output ]]; then
 fi
 (
   cd "$WORKTREE"
-  if [[ $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic ]]; then
+  if [[ $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic || $KERNEL == ws32_prefill_moe_bounded_admission ]]; then
     # Distributed worker runtime must not inherit the single-process bounds below.
     JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
       -m scripts.greenfield.ws32_prefill_moe_campaign campaign --tag "$TAG" --pin "$PIN"
@@ -293,14 +295,15 @@ if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
 if runner["kernel"] != expected_kernel:
     raise SystemExit("runner kernel does not match launched kernel")
 admission = runner.get("admission_only", False)
-if admission != (expected_kernel in ("ws32_grouped_admission", "ws32_grouped_down_admission", "ws32_prefill_moe_admission")):
+if admission != (expected_kernel in ("ws32_grouped_admission", "ws32_grouped_down_admission", "ws32_prefill_moe_admission", "ws32_prefill_moe_bounded_admission")):
     raise SystemExit("admission classification drifted")
 boundary = expected_kernel == "ws32_prefill_moe_boundary_diagnostic"
-fleet_moe = expected_kernel == "ws32_prefill_moe_admission" or boundary
+bounded = expected_kernel == "ws32_prefill_moe_bounded_admission"
+fleet_moe = expected_kernel == "ws32_prefill_moe_admission" or boundary or bounded
 untimed = admission or boundary
 if fleet_moe:
     from scripts.greenfield.ws32_prefill_moe_campaign import validate_record
-    validate_record(runner, pin, boundary=boundary)
+    validate_record(runner, pin, boundary=boundary, bounded=bounded)
 elif admission:
     from scripts.greenfield.probe_prefill_grouped_fp8 import validate_record
     validate_record(runner)
@@ -369,7 +372,9 @@ shape_ids = {
     "single_up_m1": "m1_k6144_n2048",
 }
 if fleet_moe:
-    item_id = "real_layer3_b17_boundaries_v1_normal" if boundary else "real_layer3_b17_arithmetic_v1_normal_concentrated"
+    item_id = ("real_layer3_b17_boundaries_v1_normal" if boundary else
+               "real_layer3_b17_fp32_route_sum_bounded_v1_normal_concentrated" if bounded else
+               "real_layer3_b17_arithmetic_v1_normal_concentrated")
 elif admission:
     k = runner['shape']['lhs'][1]
     n = runner['shape']['output'][1]
@@ -427,7 +432,8 @@ summary = {
     "runner": runner,
     "claim_scope": (
         "32-chip real layer3 boundary diagnostic; instrumentation may perturb outputs; no arithmetic acceptance or performance claim"
-        if boundary else "32-chip real layer3 MoE, supplied routes/perturbed activations, exact M1 comparison; no timing or model-performance claim"
+        if boundary else "32-chip real layer3 FP32 route sum, per-row/aggregate bounded M1 and direct row0 legacy comparison; not bit-exact, no timing or model-performance claim"
+        if bounded else "32-chip real layer3 MoE, supplied routes/perturbed activations, exact M1 comparison; no timing or model-performance claim"
         if fleet_moe else "single-chip synthetic grouped projection arithmetic admission; no timing or performance claim"
         if admission else "diagnostic reference-vs-Pallas projection wall; no performance claim"
         if diagnostic_reference is not None
@@ -484,6 +490,7 @@ runner = json.loads((root/'runner.json').read_text())
 terminal.write_text(json.dumps(dict(tag=root.name, code_hash=pin,
     baseline_only=runner['baseline_only'], admission_only=runner.get('admission_only', False),
     boundary_diagnostic=runner.get('boundary_diagnostic', False), performance_claim=False,
+    bounded_admission=runner.get('bounded_admission', False),
     summary_sha256=sha256((root/'summary.json').read_bytes()).hexdigest(),
     archive_receipts_sha256=sha256(ledger.read_bytes()).hexdigest()), sort_keys=True) + '\n')
 print(json.dumps(publish_exact(bucket, f'results/{root.name}/SUCCESS', terminal,

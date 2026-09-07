@@ -35,10 +35,12 @@ from scripts.greenfield.probe_ws32_prefill_moe import (
     TOPOLOGY_SHA,
     check_hlo,
     BOUNDARY_PROTOCOL,
+    BOUNDED_PROTOCOL,
 )
 
 KERNEL = "ws32_prefill_moe_admission"
 BOUNDARY_KERNEL = "ws32_prefill_moe_boundary_diagnostic"
+BOUNDED_KERNEL = "ws32_prefill_moe_bounded_admission"
 FILES = (
     "runner.json",
     "worker.log",
@@ -52,7 +54,7 @@ FILES = (
 
 def run_root(tag: str) -> Path:
     if not re.fullmatch(
-        r"greenfield_fp8_ws32_prefill_moe_(?:admission|boundary_diagnostic)_[a-zA-Z0-9_]+",
+        r"greenfield_fp8_ws32_prefill_moe_(?:admission|boundary_diagnostic|bounded_admission)_[a-zA-Z0-9_]+",
         tag,
     ):
         raise ValueError("invalid real-MoE admission tag")
@@ -62,6 +64,11 @@ def run_root(tag: str) -> Path:
 def is_boundary(tag: str) -> bool:
     run_root(tag)
     return tag.startswith("greenfield_fp8_" + BOUNDARY_KERNEL + "_")
+
+
+def is_bounded(tag: str) -> bool:
+    run_root(tag)
+    return tag.startswith("greenfield_fp8_" + BOUNDED_KERNEL + "_")
 
 
 def evidence_files(tag: str) -> tuple[str, ...]:
@@ -96,8 +103,14 @@ def ssh(command: str, *, output: Path, worker: str = "all", timeout: int = 120) 
 
 
 def validate_workers(
-    records: list[dict[str, Any]], pin: str, *, boundary: bool = False
+    records: list[dict[str, Any]],
+    pin: str,
+    *,
+    boundary: bool = False,
+    bounded: bool = False,
 ) -> None:
+    if boundary and bounded:
+        raise ValueError("diagnostic and bounded admission are mutually exclusive")
     if len(records) != 8 or {r["launch_rank"] for r in records} != set(range(8)):
         raise ValueError("need eight unique launch ranks")
     if len({r["hostname"] for r in records}) != 8 or {
@@ -121,10 +134,17 @@ def validate_workers(
     for r in records:
         if not (
             r["status"] == "SUCCESS"
-            and r["protocol"] == (BOUNDARY_PROTOCOL if boundary else PROTOCOL)
+            and r["protocol"]
+            == (
+                BOUNDARY_PROTOCOL
+                if boundary
+                else BOUNDED_PROTOCOL if bounded else PROTOCOL
+            )
             and r["code_hash"] == pin
             and r["admission_only"] is (not boundary)
             and r.get("boundary_diagnostic", False) is boundary
+            and r.get("bounded_admission", False) is bounded
+            and r.get("fp32_route_sum", False) is bounded
             and r["performance_claim"] is False
             and r["iterations"] == 0
             and r["latency"] is None
@@ -185,8 +205,14 @@ def validate_workers(
                         if boundary
                         else (
                             s["passed"] is True
-                            and s["bit_mismatches"] == 0
-                            and s["output_sha256"] == s["reference_sha256"]
+                            and (
+                                s["bounded_comparison"]["passed"] is True
+                                if bounded
+                                else (
+                                    s["bit_mismatches"] == 0
+                                    and s["output_sha256"] == s["reference_sha256"]
+                                )
+                            )
                         )
                     )
                     for s in c["shards"]
@@ -198,15 +224,21 @@ def validate_workers(
 
 
 def validate_record(
-    record: dict[str, Any], pin: str, *, boundary: bool = False
+    record: dict[str, Any], pin: str, *, boundary: bool = False, bounded: bool = False
 ) -> None:
     if not (
         record["status"] == "SUCCESS"
         and record["code_hash"] == pin
-        and record["kernel"] == (BOUNDARY_KERNEL if boundary else KERNEL)
-        and record["protocol"] == (BOUNDARY_PROTOCOL if boundary else PROTOCOL)
+        and record["kernel"]
+        == (BOUNDARY_KERNEL if boundary else BOUNDED_KERNEL if bounded else KERNEL)
+        and record["protocol"]
+        == (
+            BOUNDARY_PROTOCOL if boundary else BOUNDED_PROTOCOL if bounded else PROTOCOL
+        )
         and record["admission_only"] is (not boundary)
         and record.get("boundary_diagnostic", False) is boundary
+        and record.get("bounded_admission", False) is bounded
+        and record.get("fp32_route_sum", False) is bounded
         and record["performance_claim"] is False
         and record["baseline_only"] is False
         and record["diagnostic_only"] is boundary
@@ -215,17 +247,22 @@ def validate_record(
         and record["profiler_free_timing"] is False
     ):
         raise ValueError("real-MoE aggregate classification differs")
-    validate_workers(record["workers"], pin, boundary=boundary)
+    validate_workers(record["workers"], pin, boundary=boundary, bounded=bounded)
 
 
 def validate_files(
-    destination: Path, record: dict[str, Any], *, boundary: bool = False
+    destination: Path,
+    record: dict[str, Any],
+    *,
+    boundary: bool = False,
+    bounded: bool = False,
+    legacy_outputs: dict[str, np.ndarray] | None = None,
 ) -> None:
     """Recheck original tensor bytes and actual graph, not just worker verdicts."""
     hlo = (destination / "candidate.optimized_hlo.txt").read_text()
     if (
         sha256(hlo.encode()).hexdigest() != record["hlo"]["sha256"]
-        or not check_hlo(hlo)["passed"]
+        or not check_hlo(hlo, fp32_route_sum=bounded)["passed"]
     ):
         raise ValueError("candidate HLO bytes/contract differ")
     if (
@@ -251,7 +288,7 @@ def validate_files(
                 if not (
                     a.shape == b.shape == (ROWS, 1536)
                     and a.dtype == b.dtype == np.uint16
-                    and (boundary or np.array_equal(a, b))
+                    and (boundary or bounded or np.array_equal(a, b))
                     and np.all((a & 0x7F80) != 0x7F80)
                     and np.all((b & 0x7F80) != 0x7F80)
                     and sha256(a.tobytes()).hexdigest() == s["output_sha256"]
@@ -260,6 +297,20 @@ def validate_files(
                     raise ValueError("original BF16 output evidence differs")
                 if int(np.count_nonzero(a != b)) != s["bit_mismatches"]:
                     raise ValueError("original output mismatch count differs")
+                if bounded:
+                    import ml_dtypes
+                    from scripts.greenfield.prefill_moe_numerical import compare_outputs
+
+                    if legacy_outputs is None:
+                        raise ValueError("authenticated legacy outputs required")
+                    feature = s["device_slot"] % 4
+                    replay = compare_outputs(
+                        a.view(ml_dtypes.bfloat16),
+                        b.view(ml_dtypes.bfloat16),
+                        legacy_outputs[case][:, feature * 1536 : (feature + 1) * 1536],
+                    )
+                    if replay != s["bounded_comparison"] or not replay["passed"]:
+                        raise ValueError("original bounded comparison differs or fails")
     if boundary:
         from scripts.greenfield.prefill_moe_boundaries import validate_boundaries
 
@@ -308,6 +359,12 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     bucket = storage.Client().bucket("driftbench-dsv4-uc")
     records = []
     boundary = is_boundary(tag)
+    bounded = is_bounded(tag)
+    legacy_outputs = None
+    if bounded:
+        from scripts.greenfield.prefill_moe_numerical import load_legacy_outputs
+
+        legacy_outputs = load_legacy_outputs()
     files = evidence_files(tag)
     for rank in range(8):
         prefix = f"results/{tag}/workers/rank{rank}/"
@@ -338,7 +395,13 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         record = json.loads((destination / "runner.json").read_text())
         if record["launch_rank"] != rank:
             raise ValueError("record rank differs from published path")
-        validate_files(destination, record, boundary=boundary)
+        validate_files(
+            destination,
+            record,
+            boundary=boundary,
+            bounded=bounded,
+            legacy_outputs=legacy_outputs,
+        )
         if boundary:
             from scripts.greenfield.prefill_moe_boundaries import original_comparison
 
@@ -346,13 +409,15 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
                 bucket, destination, record
             )
         records.append(record)
-    validate_workers(records, pin, boundary=boundary)
+    validate_workers(records, pin, boundary=boundary, bounded=bounded)
     return dict(
         status="SUCCESS",
         code_hash=pin,
-        kernel=BOUNDARY_KERNEL if boundary else KERNEL,
+        kernel=BOUNDARY_KERNEL if boundary else BOUNDED_KERNEL if bounded else KERNEL,
         admission_only=not boundary,
         boundary_diagnostic=boundary,
+        bounded_admission=bounded,
+        fp32_route_sum=bounded,
         baseline_only=False,
         diagnostic_only=boundary,
         performance_claim=False,
@@ -362,7 +427,9 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         iterations=0,
         selected_route_case=None,
         device_kind="TPU v4",
-        protocol=BOUNDARY_PROTOCOL if boundary else PROTOCOL,
+        protocol=(
+            BOUNDARY_PROTOCOL if boundary else BOUNDED_PROTOCOL if bounded else PROTOCOL
+        ),
         workers=records,
         hlo={"sha256": records[0]["hlo"]["sha256"], "contract": {"passed": True}},
         comparison={"passed": None if boundary else True},
@@ -425,7 +492,11 @@ def campaign(tag: str, pin: str) -> None:
         + pin
         + " --coordinator-address "
         + shlex.quote(address)
-        + (" --boundary-diagnostic " if is_boundary(tag) else " ")
+        + (
+            " --boundary-diagnostic "
+            if is_boundary(tag)
+            else " --bounded-admission " if is_bounded(tag) else " "
+        )
         + ' --process-id "$idx" --output-dir "$out" '
         '>"$out/worker.log" 2>&1'
     )

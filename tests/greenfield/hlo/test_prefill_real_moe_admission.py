@@ -197,7 +197,7 @@ def test_wrapper_dispatches_fleet_before_single_process_bounds():
     assert source.index("ws32_prefill_moe_campaign campaign") < source.index(
         "TPU_PROCESS_BOUNDS=1,1,1"
     )
-    assert "validate_record(runner, pin, boundary=boundary)" in source
+    assert "validate_record(runner, pin, boundary=boundary, bounded=bounded)" in source
     assert "real_layer3_b17_arithmetic_v1_normal_concentrated" in source
     with pytest.raises(ValueError):
         campaign.run_root("../../other")

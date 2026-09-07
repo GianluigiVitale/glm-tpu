@@ -44,6 +44,8 @@ specs=(P(None,'feature'),P(),P(),P('expert',None,'feature'),P('expert',None,'fea
        P(None,'feature'),P('feature',None),P('feature',None))
 batch,one=build_mapped(mesh,contract=contract,interpret=True)
 captured_batch,captured_one=build_mapped(mesh,contract=contract,interpret=True,capture_boundaries=True)
+fp32_batch,_=build_mapped(mesh,contract=contract,interpret=True,fp32_route_sum=True)
+fp32_capture,_=build_mapped(mesh,contract=contract,interpret=True,capture_boundaries=True,fp32_route_sum=True)
 report={}
 for case in ('distributed','one_owner'):
  if case=='distributed':
@@ -63,6 +65,14 @@ for case in ('distributed','one_owner'):
  np.testing.assert_array_equal(np.asarray(captured_y).view(np.uint16),np.asarray(actual).view(np.uint16))
  np.testing.assert_array_equal(np.asarray(jnp.concatenate([v[0] for v in cr])).view(np.uint16),np.asarray(reference).view(np.uint16))
  assert np.asarray(captured_health).all()
+ fp32_y,fp32_health,fp32_cb=fp32_capture(*values)
+ fp32_plain,fp32_plain_health=fp32_batch(*values)
+ np.testing.assert_array_equal(np.asarray(fp32_y).view(np.uint16),np.asarray(fp32_plain).view(np.uint16))
+ assert np.asarray(fp32_health).all() and np.asarray(fp32_plain_health).all()
+ parts=np.asarray(fp32_cb['weighted_routes']).astype(np.float32)
+ expected_sum=parts.sum(axis=3,dtype=np.float32)
+ np.testing.assert_array_equal(np.asarray(fp32_cb['local_sum_operand']),expected_sum)
+ assert np.asarray(fp32_cb['local_sum_operand']).dtype==np.float32
  for name,array in cb.items():
   expected=np.concatenate([np.asarray(v[1][name]) for v in cr],axis=2)
   observed=np.asarray(array)

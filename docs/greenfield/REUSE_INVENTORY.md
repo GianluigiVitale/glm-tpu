@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+DB582 sealed the diagnostic in46s worker time. Reviewed CPU replay v2 binds exact aggregate
+workers/all32 owners and verifies collective replica equality; it demonstrates an extra
+BF16 local route-sum round in the captured batched path. The new static fp32_route_sum=False
+candidate reuses the same grouped kernels and existing Gate C bounded comparator, with a
+distinct `ws32_prefill_moe_bounded_admission` protocol. Worker/controller both check every
+row, aggregate and direct row0 legacy output using authenticated original tensors. No
+historical exact comparator changes. New forced32/protocol tests14 passed16.15s; final
+implementation review and one bounded two-case TPU admission remain pending.
+
 One normal-only B17 boundary diagnostic now extends the existing real-MoE adapter.
 Both greenfield MoE functions expose optional static capture_boundaries=False; no arithmetic
 intervention is added. Captures remain owner-local through leading expert/feature axes.

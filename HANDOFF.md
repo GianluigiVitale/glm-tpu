@@ -14566,3 +14566,41 @@ exception-type mismatch (KeyError rather than ValueError for absent concentrated
 Added explicit case-inventory refusal before digest comparison; subsequent37 protocol/
 baseline/reuse tests passed1.91s. Independent Astra conditional PASS, no P0-P2; scope only
 this bounded diagnostic and persistence, not arithmetic admission or performance.
+
+## 2026-09-07 20:55Z — DB582 sealed; route-sum replay localizes a numerical gap
+
+Tag `greenfield_fp8_ws32_prefill_moe_boundary_diagnostic_20260907T204127593566771Z`,
+pin `725160bf8314bdbeeb9006668bd97dc693d40a7b`: wrapper exit0, DB582 diagnostic-only,
+NULL correctness/score/latency. Worker phase46s, peak HBM330872320B including reference.
+SUCCESS generation1788813771079477, SHA256
+`249d4b5bb82853ea12f38f2e2da7875132e4dec7e87ae1254ec19a355163b993`;
+summary SHA `d5448901475cde7c701fd091b56b02449b4382d43cb139a4b1553c5cbfc4fe5f`.
+Post-census8/8 clean; fresh read-only root accelerator census20:55Z also8/8 idle.
+
+Candidate final witnesses match the original failed test on32/32 chips; reference capture
+perturbed16/32. Thus this is not the original graph's exact first-divergence proof.
+All captured routed/shared FP32 projection partials agree; shared outputs agree.64 routed
+post-feature BF16 entries differ. CPU replay on actual captured weighted routes proves the
+candidate rounds its local route sum once to BF16; reference retains the FP32 sum (zero
+replay mismatches in each case,835584 entries). The original uninstrumented normal candidate
+fits EXISTING Gate C bounds on all32 owners, directly against M1 and row0 against legacy;
+this does not retroactively pass the original strict test or cover concentrated routing.
+
+Evidence: `docs/artifacts/prefill-real-moe-boundary-replay-20260907.json`; reproducer
+`scripts/greenfield/analyze_prefill_moe_boundaries.py`. Focused CPU tests5 passed1.15s.
+Independent review in progress on `PREFILL_MOE_FP32_ROUTE_SUM_ADMISSION.md`: a NEW default-off
+FP32 sum with separate two-case bounded admission, per-row and aggregate, original failure
+preserved. Do not chase old collective trees. Next implement/review this candidate and its
+untimed real-layer test, then causal layer integration/short decoder. Efficient L7/L8 open.
+
+Implementation ready: static fp32_route_sum=False, distinct bounded-admission worker/controller
+and DB classification, per-row/aggregate/direct-legacy replay from original NPZs. HLO checker
+binds actual expert operand through fusion forwarding to FP32 route sum and checks both
+reducers; old strict protocol remains exact. Independent Astra final PASS for persistence
+and one bounded two-case TPU run, no remaining P0-P2. CPU14 tests passed16.15s including
+forced32. Subsequent42-test protocol/reuse check had41 passes and a stale shell-string test;
+the corrected affected5 tests pass0.17s. Black/bash syntax/diff checks pass.
+Replay v2 rechecks aggregate→worker binding,32 unique owners and collective replica equality;
+totals unchanged. Use `prefill-real-moe-boundary-replay-v2-20260907.json` as current analysis.
+Next after commit/push/verified same-region mirror: existing bounded FP8 wrapper with
+GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_moe_bounded_admission. No long model run.

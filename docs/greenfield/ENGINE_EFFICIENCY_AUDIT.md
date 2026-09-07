@@ -263,3 +263,12 @@ Next is one B17 first-boundary diagnostic, not an unchanged retry or relaxed com
 Reviewer warns that F32 HLO with original-BF16 correction metadata is not proof of F32
 rounding semantics. Synthetic projection identity also cannot stand in for real operands.
 This is the intended cheap discriminator: no multi-hour model run was needed to expose it.
+
+DB582 boundary diagnostic sealed20:42Z (46s worker phase). Captured projection partials match;
+CPU replay proves an additional BF16 local route-sum round in the batched path compared with
+the captured reference's FP32 operand. Candidate finals match original32/32; reference finals
+changed16/32 under capture, so do not claim original first-boundary causality. New FP32 route
+sum is proposed under `PREFILL_MOE_FP32_ROUTE_SUM_ADMISSION.md`, retaining existing Gate C
+bounds and a separate two-case numerical test. The original exact test stays FAILED. Avoid
+another compiler-tree investigation over64 routed feature-rounding differences. This is
+numerical progress only; E1 end-to-end prefill and TTFT are still unproved.

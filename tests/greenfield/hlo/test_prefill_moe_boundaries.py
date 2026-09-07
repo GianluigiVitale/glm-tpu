@@ -105,3 +105,16 @@ def test_lowering_manifest_is_review_evidence_not_equivalence_proof():
     assert record["hlo_sha256"] == sha256(hlo.encode()).hexdigest()
     assert len(record["collectives"]) == 2
     assert record["original_lowering_equivalent"] == "REQUIRES_REVIEW"
+
+
+def test_offline_route_replay_separates_fp32_and_bf16_rounding():
+    from scripts.greenfield.analyze_prefill_moe_boundaries import route_replays, bf16
+    parts = np.zeros((1, 8, 2), dtype=np.float32)
+    parts[:, 0] = 1
+    parts[:, 1] = 1 / 256
+    fp32 = parts.sum(axis=1)
+    exact = route_replays(parts, fp32)
+    rounded = route_replays(parts, bf16(fp32))
+    assert exact["exact_f32"] == exact["left_f32"] == 0
+    assert exact["bf16_once"] == 2
+    assert rounded["bf16_once"] == 0 and rounded["exact_f32"] == 2
