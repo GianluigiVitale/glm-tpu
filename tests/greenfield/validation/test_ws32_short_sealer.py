@@ -280,7 +280,11 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     assert "TOKEN_ORACLE_SUCCESS_SHA=" in source
     assert "DSA_ORACLE_SUCCESS_SHA=" in source
     assert '|| sync_rc=$?' in source
-    assert '[[ $sync_rc -ne 0 ]] || ! has_eight_unique_markers' in source
+    # The synchronization is retried for a client-side ssh fault, but each
+    # attempt is whole and must still show all EIGHT markers before the run
+    # proceeds; the retry must never become "accept fewer hosts".
+    assert '[[ $sync_rc -eq 0 ]] && has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK' in source
+    assert 'ABORT: exact eight-host synchronization failed' in source
     assert '|| launch_rc=$?' in source
     assert '[[ $launch_rc -ne 0 ]] || ! has_eight_unique_markers' in source
     assert "(strict_census failure_exit) || true" in source
@@ -2505,6 +2509,9 @@ def test_the_enforcement_surface_and_import_check_cover_the_deciding_code() -> N
     assert checked == {
         "ws32_short_context",
         "ws32_first_divergent_event",
+        # §23.5: the label-to-identity table and the profile refusal decide
+        # which sealed capture a long-context label may bind.
+        "long_context_oracle",
         "reference_rotary",
         "greenfield_types",
     }

@@ -342,7 +342,19 @@ def test_the_criterion_loads_the_legacy_extractor_by_path_not_by_name() -> None:
     """
     source = RUNNER.read_text(encoding="utf-8")
     assert "import bench." not in source
-    assert source.count('load_legacy_bench_module(\n        "glm_longctx"') == 2
+    # Assert the CALLS, not their formatting: every call must name the module
+    # and carry the capture's digests.
+    calls = [
+        node
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "load_legacy_bench_module"
+    ]
+    assert len(calls) == 2
+    for call in calls:
+        assert [ast.literal_eval(arg) for arg in call.args] == ["glm_longctx"]
+        assert [kw.arg for kw in call.keywords] == ["pinned_files"]
 
     from glm_tpu.greenfield.validation import load_legacy_bench_module
 
@@ -364,14 +376,35 @@ def _pinned_legacy_files() -> dict:
     )
 
     entry = WS32_LONG_CONTEXT_PROFILES["128k_d1_0"]
-    oracle_dir = next(
-        (
-            Path("/home/gianl/gcs-models/oracles/greenfield/glm52/long_context")
-            / entry["profile"]
-        ).glob("*/oracle")
+    manifest = json.loads(
+        (_oracle_dir(entry) / "manifest.json").read_text(encoding="utf-8")
     )
-    manifest = json.loads((oracle_dir / "manifest.json").read_text(encoding="utf-8"))
     return manifest["legacy_bench_files"]
+
+
+def _oracle_dir(entry) -> Path:
+    """The sealed capture's directory, or a skip when the mount is absent."""
+    root = (
+        Path("/home/gianl/gcs-models/oracles/greenfield/glm52/long_context")
+        / entry["profile"]
+    )
+    found = sorted(root.glob("*/oracle"))
+    if not found:
+        pytest.skip("the sealed long-context oracle mount is absent here")
+    return found[0]
+
+
+def _wrapper_observer_steps(kind: str) -> int:
+    """OBSERVER_STEPS the wrapper gives a profile of this kind."""
+    source = WRAPPER.read_text(encoding="utf-8")
+    start = source.index("if [[ $LONG_CONTEXT_KIND == passkey ]]; then")
+    block = source[start : source.index("fi", start)]
+    passkey, other = (
+        int(line.split("=")[1])
+        for line in block.splitlines()
+        if "readonly OBSERVER_STEPS=" in line
+    )
+    return passkey if kind == "passkey" else other
 
 
 def test_the_legacy_extractor_must_be_the_captures_own_bytes() -> None:
@@ -410,15 +443,71 @@ def test_an_l8_run_is_not_required_to_emit_the_legacy_two_hundred_fifty_six() ->
 
     entry = WS32_LONG_CONTEXT_PROFILES["256k_e0"]
     assert entry["generated_token_count"] == 256
-    observed = 1 + 14 + 2 + 10 + 2
+    observed = 1 + _wrapper_observer_steps("e0") + 2 + 10 + 2
     assert observed < entry["generated_token_count"]
 
-    source = SEALER.read_text(encoding="utf-8")
-    start = source.index("or len(observed_token_ids) < (")
-    block = source[start : source.index("raise SystemExit", start)]
-    assert 'long_context.kind != "passkey"' in block
+    # Grepping for the guard would pass with the two arms swapped, which would
+    # reinstate this P0 for L8 and create it for L7. The sealer's OWN condition
+    # is extracted and evaluated instead.
+    verdict = _cardinality_verdict()
     passkey = WS32_LONG_CONTEXT_PROFILES["128k_d1_0"]
-    assert 1 + 20 + 2 + 10 + 2 >= passkey["generated_token_count"]
+
+    class _LC:
+        def __init__(self, kind, generated):
+            self.kind = kind
+            self.generated_token_ids = np.zeros(generated, np.int32)
+
+    e0 = _LC("e0", entry["generated_token_count"])
+    l7 = _LC("passkey", passkey["generated_token_count"])
+    # L8 observes 29 tokens against a 256-id diagnostic capture: it must PASS.
+    assert verdict([0] * observed, observed, long_context=e0, oracle=None) is False
+    # L7 observes 35 and needs its twenty: passes; starved of them, refuses.
+    assert verdict([0] * 35, 35, long_context=l7, oracle=None) is False
+    assert verdict([0] * 10, 10, long_context=l7, oracle=None) is True
+    # Short context keeps its own bound against the sealed oracle.
+    assert verdict([0] * 10, 10, long_context=None, oracle=l7) is True
+    assert verdict([0] * 35, 35, long_context=None, oracle=l7) is False
+    # A wrong cardinality is still refused in every mode.
+    assert verdict([0] * 34, 35, long_context=e0, oracle=None) is True
+    assert verdict("not-a-list", 35, long_context=e0, oracle=None) is True
+
+
+def _cardinality_verdict():
+    """The sealer's raw-token cardinality condition, as a callable.
+
+    Extracted from the sealer's AST by finding the ``if`` whose body raises the
+    cardinality refusal, so the test evaluates the shipped expression rather
+    than a copy of it.
+    """
+    tree = ast.parse(SEALER.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.If) or len(node.body) != 1:
+            continue
+        raised = node.body[0]
+        if not isinstance(raised, ast.Raise):
+            continue
+        if "raw-token cardinality drifted" not in ast.dump(raised):
+            continue
+        expression = compile(
+            ast.Expression(body=node.test), "<cardinality>", "eval"
+        )
+
+        def verdict(observed_token_ids, expected_observed_count, *, long_context, oracle):
+            return bool(
+                eval(  # noqa: S307 - the sealer's own expression, by construction
+                    expression,
+                    {"type": type, "list": list, "len": len, "any": any, "int": int},
+                    {
+                        "observed_token_ids": observed_token_ids,
+                        "expected_observed_count": expected_observed_count,
+                        "long_context": long_context,
+                        "oracle": oracle,
+                    },
+                )
+            )
+
+        return verdict
+    raise AssertionError("the sealer's cardinality refusal was not found")
 
 
 def test_a_long_context_seal_checks_the_enforcement_surface() -> None:
@@ -466,3 +555,63 @@ def test_a_long_context_run_never_reports_a_verified_token_count() -> None:
     assert "legacy_diagnostic" not in block
     condensed = " ".join(block.split())
     assert "None if long_context is not None" in condensed
+
+
+def test_an_l8_row_records_no_correctness_verdict_at_all() -> None:
+    """L8 has no oracle, so the DB row must not say the run was correct.
+
+    Exercised here rather than left to the L8 run itself: the branch is
+    reachable only for ``kind != "passkey"`` and no L8 run has been sealed.
+    """
+    spec = importlib.util.spec_from_file_location("_ws32_sealer_rows", SEALER)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    e0 = {
+        "long_context": {
+            "kind": "e0",
+            "depth": None,
+            "item_row_id": 1516,
+            "manifest_sha256": "9" * 64,
+            "source_run_id": 402,
+            "success_sha256": "8" * 64,
+        },
+        "context_capacity": 262656,
+    }
+    note, item_id, gold, correct, score = module._run_rows(e0)
+    assert (correct, score) == (None, None)
+    assert item_id == "s23_5_long_context_e0_row1516_cap262656"
+    for text in (note, gold):
+        assert "NO correctness oracle" in text or "No correctness oracle" in text
+        assert "raw-tokens-exact" not in text.replace(
+            "Nothing here is a raw-tokens-exact or cross-oracle claim", ""
+        )
+    passkey = {
+        "long_context": dict(e0["long_context"], kind="passkey", depth=1.0, item_row_id=1520),
+        "context_capacity": 131072,
+    }
+    _, item_passkey, _, correct_passkey, score_passkey = module._run_rows(passkey)
+    assert (correct_passkey, score_passkey) == (1, 1.0)
+    assert item_passkey == "s23_5_long_context_passkey_row1520_cap131072"
+
+    # A short-context row keeps its own verdict and its env stays byte-identical
+    # to what rows published before §23.5 carry, or rollback cannot find them.
+    short = {"dsa_adjudication": None, "capacity_measurement": None}
+    assert module._run_rows(short)[3:] == (1, 1.0)
+    base = {
+        "checkpoint_manifest_sha256": "1",
+        "checkpoint_success_sha256": "2",
+        "code_hash": "3",
+        "context_label": "8k",
+        "dsa_oracle_manifest_sha256": "4",
+        "dsa_oracle_success_sha256": "5",
+        "mesh_sha256": "6",
+        "run_tag": "t",
+        "strategy_nd_dense": False,
+        "strategy_nd_dense_overlay_manifest_sha256": "0" * 64,
+        "token_oracle_manifest_sha256": "7",
+        "token_oracle_success_sha256": "8",
+        "xla_python_client_mem_fraction": ".95",
+    }
+    assert "long_context" not in module._run_environment(base)
+    assert "long_context" in module._run_environment({**base, **e0})
