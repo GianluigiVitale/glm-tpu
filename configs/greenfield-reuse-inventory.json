@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-multirow-prefill-fp8-admission",
+      "category": "efficient prefill primitive reuse",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "6644dea8f8e832a98671baa21f28eeebe1258f44",
+      "source_paths": ["glm_tpu/greenfield/kernels/pallas/fp8_matmul.py", "glm_tpu/greenfield/kernels/ws32.py", "tests/greenfield/kernels/test_pallas_fp8_matmul.py"],
+      "disposition": "research_candidate",
+      "greenfield_consumers": ["tests/greenfield/kernels/test_prefill_multirow_fp8.py"],
+      "gate": "24: CPU primitive admission before real multirow layer tests",
+      "reason": "Reuse the existing raw-FP8 multirow primitive without changing the frozen one-row decoder. Its row_tile=8 is a padding quantum: the Pallas grid spans output/contraction tiles and the complete padded row block shares each weight tile in VMEM. CPU interpretation at 8/17/32 distinct rows checks exact F32 per-row equality, BF16 result rounding, K/N tails, zero row/scales and row permutations. This proves only the primitive's CPU semantics, not TPU association, routing, causal attention, full-layer correctness or performance. Grouped MoE must restore original route-slot order before the BF16 per-token sum; changing expert dispatch order cannot silently change that association. No new checkpoint or legacy execution dependency. Historical frozen WS32 retry restrictions predate and do not override spec24's new multirow architecture. TPU numerical/performance admission remains open."
+    },
+    {
       "id": "ws32-pinned-sealing-checkout",
       "category": "long-context evidence source isolation",
       "source_repo": "glm-tpu greenfield",

@@ -14254,3 +14254,28 @@ No new full checkpoint, infrastructure mutation or numerical-contract relaxation
 findings have explicit confirmed/hypothesis labels so secondary speculation does not delay the
 dominant prefill change. Historical D/G/B/B′/C and DB573/574 remain sealed reference evidence;
 new prefill must prove its own short and all-four-depth long-context correctness.
+
+## 2026-09-07 — first multirow primitive admission and cost model
+
+Previous goal turn was progress: §24 pivot reviewed/persisted as6644dea8, origin and same-region
+mirror verified. This turn adds a bounded CPU discriminator using the EXISTING raw-FP8 primitive,
+not new model/enforcement code while the original depth0.05 sealer is active. Initial3 cases
+passed; Astra approved persistence and noted zero-only output-tail coverage. Added nonzero-tail
+cases;6 kernel tests +4 reuse-registry tests pass in9.38s. No TPU performance claim.
+
+`docs/greenfield/PREFILL_COST_MODEL.md` reproduces the independent audit's useful arithmetic
+and expert-occupancy formulas from config: actual L7≈14.20PFLOP, full256K≈32.29PFLOP, neither
+physical instruction counts nor time predictions. Uniform routing gives only1.57 rows/active
+expert at B32 versus8 at B256, so a small correctness tile is not the production routing window.
+Preserve original token/route-slot order through expert regrouping. Existing raw-FP8 kernels
+already share each weight tile across the whole padded row block; row_tile8 is padding only.
+
+Final prefill/TTFT targets remain unregistered pending the bounded existing-kernel baseline
+campaign specified there. The old FP8 microbench validates one fixed shape per kernel; do not
+try unsupported --rows flags or bypass its HLO/shape checks. Next code work: isolated batched
+linear/dense and route-grouping consumers plus reviewed bounded harness adaptation; real-layer
+causality/DSA/repair and short decoder follow. Keep the decode one-row path unchanged.
+
+At18:36Z the original controller2410602 and its exact sealer child2459871 were live; the sealer
+had accumulated approximately10min CPU time from its pinned checkout. Numerical rank0 reports
+OK, but no SUCCESS was observed. Preserve/seal that run; no next serial long run is authorized.

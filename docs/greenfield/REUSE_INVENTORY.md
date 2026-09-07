@@ -1,5 +1,24 @@
 # Greenfield reuse inventory
 
+## Current pivot — 2026-09-07 (§24)
+
+Historical no-rerun/one-row instructions below describe the old Gate D campaigns; §21/§22 closed
+those gates and §24 now requires a new multirow prefill architecture. Keep the old evidence, not
+its obsolete next-action sequence. Decode still has exactly one live row.
+
+First reuse admission: existing `kernels/pallas/fp8_matmul.py` at `6644dea8` already consumes
+multiple rows. `row_tile=8` rounds the row count; the grid is output×contraction, while each
+VMEM block contains ALL padded input rows, enabling weight-tile reuse across them. Do not infer
+an eight-row maximum or an eightfold speedup. `test_prefill_multirow_fp8.py` compares batches of
+8/17/32 distinct rows against individual calls, including K130/N135 tails, zero rows/scale blocks,
+FP32/BF16 boundaries and permutations: initial3 CPU tests passed in5.07s; independent review
+requested complementary nonzero output-tail coverage. Final6 cases plus4 registry checks passed
+in9.38s, not TPU proof. No runtime
+or enforcement source changed during the current depth0.05 seal. The JSON asset
+`ws32-multirow-prefill-fp8-admission` records the candidate and remaining real-layer admission.
+For grouped MoE, preserve original per-token route-slot order at the BF16 sum even if execution
+is reordered by expert. Do not import legacy GMM execution or create another weight layout.
+
 This is the pre-implementation audit requested on 2026-08-07: use the substantial work already on
 disk before creating another kernel, harness, loader, protection, or architecture prototype. The
 machine-readable authority is `configs/greenfield-reuse-inventory.json`; this document explains the

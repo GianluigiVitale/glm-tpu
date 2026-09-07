@@ -176,6 +176,8 @@ not yet an implemented or accepted interface.
 
 Final quantitative prefill/TTFT targets are **not yet registered**. This prevents performance
 promotion, not source inspection, design, CPU correctness or bounded baseline measurements.
+The reproduced arithmetic, routing-reuse model and minimal baseline campaign are in
+[`PREFILL_COST_MODEL.md`](PREFILL_COST_MODEL.md). Its planning bands are not acceptance targets.
 Before candidate performance experiments, record same-hardware baseline definitions and
 compute/weight-traffic/collective/DSA budgets, then fixed128K/256K targets and wall budgets.
 
@@ -212,3 +214,7 @@ No candidate speedup or completion ETA is established by this audit.
   reason to pay for the same computation again.
 - Review the current diff and evidence, resolve material findings, then move forward. Neither
   speculative hardening nor renewed full-pod numerical archaeology is the new critical path.
+
+First admission update: six CPU multirow FP8 cases (8/17/32 rows, zero/nonzero output tails)
+plus four reuse-registry checks passed,10 total in9.38s. No runtime/enforcement file changed
+while the original d0.05 seal was active. TPU association and performance remain unmeasured.
