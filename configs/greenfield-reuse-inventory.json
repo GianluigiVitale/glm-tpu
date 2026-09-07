@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-block-cache-write",
+      "category": "causal block address and tail handling",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "f9788b0b02d7d6f7b719991782ffb2cf96f24a5d",
+      "source_paths": ["glm_tpu/greenfield/kernels/stage_local.py", "glm_tpu/greenfield/kernels/reference/attention.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/prefill_cache.py", "tests/greenfield/kernels/test_prefill_cache.py"],
+      "gate": "24: CPU block-cache correctness; layer integration pending",
+      "reason": "Adapt decode metadata and StageLocalKvLayout striping to1..32 prompt rows with one shared page table. Full live-prefix page uniqueness checked once per block, safe quotient/remainder and bounded additions, explicit positive dropped scatter indices, invalid-input no-write and per-query exclusive causal lengths.16 CPU cases pass across owner/page boundaries, reordered/aliased pages, partial/empty tails, INTMAX, invalid owners and nonfinite data. Caller must separately bind committed append frontier, prefix population, all-chip health and unrepaired/repaired index lifetime. No cache gather, TPU run or decoder change; unwired building block."
+    },
+    {
       "id": "ws32-prefill-fp32-route-sum-admission",
       "category": "new bounded numerical implementation",
       "source_repo": "glm-tpu greenfield",

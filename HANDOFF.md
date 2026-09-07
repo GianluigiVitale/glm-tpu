@@ -14628,3 +14628,28 @@ attention/cache integration, full prefill, short decoder or performance. Origina
 refusal remains FAILED. Next causal layer integration with the already CPU-admitted selector,
 exact cache addressing/dual-index semantics and existing projection/attention utilities;
 then short decoder/own§21 evidence and efficient L7/L8. No serial long-run fallback.
+
+## 2026-09-07 — causal block cache groundwork
+
+New unwired `glm_tpu/greenfield/kernels/prefill_cache.py` adapts StageLocalKvLayout striping
+and `_require_decode_metadata` page checks for up to32 rows in one sequence. One shared
+page table, one full-prefix uniqueness check, vector owned writes/drop sentinel, safe
+offset/count arithmetic, invalid metadata/nonfinite live input leaves the entire cache
+unchanged. Explicit per-query exclusive lengths prevent whole-block future visibility.
+Zero-live blocks are no-ops after prefix validation; padded NaNs are ignored.
+Tests16 passed6.34s for stripe63/64,page511/512,reordered pages, alias to an untouched old
+page, empty/partial tails, INT extremes, bad owner and live nonfinite. Independent review
+pending. Caller still must bind append frontier/populated prefix, allchiphealth and separate
+unrepaired/repaired index buffers; this helper does not establish those state properties.
+
+Next integration inventory: `ws32_rms_norm_mapped` already accepts multiple rows;
+`ws32_prefill_linear.py` provides multirow q-a/kv-a and reciprocal dense candidates;
+`gather_stage_local_selected_kv_aligned` already accepts multiple rows and per-row lengths.
+Adapt `ws32_prepare_attention_mapped`/`ws32_index_share_attention_mapped` in separate prefill
+module, reusing weight types and numerical utilities, not modifying one-row APIs. Before
+using Pallas absorbed-q/value/sparse MLA, inspect their actual row constraints; no blind
+vmap of mutable decode state. Main rotary host rows remain legacy-faithful, indexer remains
+on-device, and current block keys must exist before causal reads. No TPU workflow active.
+
+Independent Astra review PASS for CPU-stage persistence of cache helper, no P0-P2; caller
+obligations above remain and no TPU/integrated decoder admission is implied.

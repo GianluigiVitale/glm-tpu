@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+`kernels/prefill_cache.py` adapts StageLocalKvLayout and decode-metadata checks to a block:
+one shared page table, full-prefix page uniqueness once, owned vector writes, positive drop
+sentinel and invalid-input no-write. It returns per-query exclusive causal lengths.16 CPU
+cases pass6.34s. It is unwired: caller must bind append frontier/populated prefix, all-chip
+health and separate repaired/unrepaired lifetimes. Existing aligned selected-KV gather
+already accepts multiple query rows and can be reused in the next attention assembly.
+
 DB583 seals the new FP32 route-sum candidate's real17-row normal/concentrated bounded
 arithmetic on all32 owners. Reuse it for prefill layer integration (default-off); no further
 MoE boundary campaign is needed. Exact record is in HANDOFF and
