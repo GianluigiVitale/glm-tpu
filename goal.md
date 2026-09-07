@@ -1,10 +1,12 @@
 # Goal — GLM-5.2-FP8 TPU v4: long context, §18
 
 FULL ACCESS. Continue autonomously until full project completion is proved under §18.
+Old pause notes are historical only. Diagnose, fix, resume; pause only on a new owner stop
+or a genuine authority blocker.
 Keep <4000 chars. At start/compaction read this, `docs/glm-tpu-revolution.md` in full
 (incl. §21–§23), tails of `HANDOFF.md` and `docs/greenfield/GATE_D_LESSONS.md`; inspect state.
 
-## Never idle on a running job
+## Supervise running jobs
 
 Never wait on process-name patterns. Re-read actual files and process identities. A free lease
 does NOT prove an orphaned fleet stopped. `scripts/greenfield/watch_ws32_run.py` observes exact
@@ -17,7 +19,7 @@ Live storage only in `gs://driftbench-dsv4-uc`, smallest resumable set. Never to
 resource infra, esp. `db-v4-64-od-qr4`. Delete only name+generation+size+CRC-bound objects after
 review. **Hard ceiling: live <2,500,000,000,000 bytes.** No full-size backup, no moving
 cost elsewhere. Soft delete off; report live and soft-deleted separately. Rsync writes only `repos/`.
-Before any >100-GB artifact state need/size/replacement. Live 1,991,594,668,825 B at 09-07 06:51Z.
+Before any >100-GB artifact state need/size/replacement. Latest storage inventory: `HANDOFF.md`.
 
 ## Achieved
 
@@ -25,7 +27,7 @@ Before any >100-GB artifact state need/size/replacement. Live 1,991,594,668,825 
 Step B (DB568/569 chunk identity), §21.2 per-rank enforcement; B′ (DB570 legacy-faithful main rotary);
 Step C (DB571/572 capacity-independent numerics; decode 129.9/143.0/160.3 ms, peak
 26.4/27.8/29.7 GB/chip at 8K/128K/256K capacity). L7 depth 1.0 DB573: passkey 891482 correct,
-prefill 16,354 s, decode 142.68 ms. Legacy ids matched diagnostically only. Two review rounds resolved.
+prefill 16,354 s, decode 142.68 ms. Legacy ids matched diagnostically only.
 
 ## Invariants
 
@@ -41,20 +43,19 @@ code-pin-specific (StableHLO is not): re-acquire whenever Python changes.
 ## Decisions
 
 Decide autonomously toward a correct, provable finished project; record reasoning/alternatives in
-`HANDOFF.md`. Reviewer gates persistence, install, execution and destructive apply. Never block owner.
+`HANDOFF.md`. Reviewer gates persistence, install, execution and destructive apply.
 
 ## Efficiency/review
 
 Smallest decisive test first; stop on first invariant failure; prefer offline adjudication to runs.
-Adversarial reviewer = separate **gpt-6-astra** agent; resolve all P0–P2, cap hardening at 3 rounds
-(2 used) — past that state the residual risk and move to the runs. Cron `sync-glm.sh` every 5 min;
-verify origin + mirror before protected work. Never EU.
+Adversarial reviewer = separate **gpt-6-astra** agent; resolve all P0–P2; avoid redundant review.
+Cron `sync-glm.sh` every 5 min; verify origin + mirror before protected work. Never EU.
 
-## Resumed — 2026-09-07 08:14Z
+## Snapshot — 2026-09-07 08:40Z; recheck live
 
 Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`.
 L7 depth 0.0 tag `greenfield_ws32_short_decoder_128k_d0_0_numerical_cap131072_hrope_20260907T064941550123130Z`
-at pin `679e2392` is LIVE, 14/62 chunks observed at 08:13Z. Its orchestrator/remote shells exited, leaving
+at pin `679e2392` is LIVE, 20/62 chunks observed. Its orchestrator/remote shells exited, leaving
 8 original workers running. Do not restart. Monitor `889cb8f5` Astra-reviewed;
 PID 2248787 holds both leases. Preserve this live run. After READY_FOR_CENSUS: prove cleanup,
 collect original JSON/NPZ/HLO/log/trace with exact existing-object checks, then RECOVER=1 seal.
