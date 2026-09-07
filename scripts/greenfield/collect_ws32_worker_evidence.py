@@ -113,6 +113,36 @@ def require_fleet_inventories(rows: list[dict], tag: str, pin: str) -> None:
         shared = graphs
 
 
+def libtpu_holders() -> list[int]:
+    """Mirror the standalone SSH monitor guard; a separate fleet census is required."""
+    lock = Path('/tmp/libtpu_lockfile')
+    def identity():
+        try:
+            value = lock.lstat()
+        except FileNotFoundError:
+            return None
+        return (value.st_dev, value.st_ino, value.st_mode)
+    before = identity()
+    result = subprocess.run(['sudo', '-n', 'env', 'LC_ALL=C', 'fuser', str(lock)],
+        capture_output=True, text=True, timeout=15)
+    after = identity()
+    if before != after:
+        raise RuntimeError('libtpu lock changed during observation')
+    if before is None:
+        if (result.returncode == 1 and not result.stdout.strip()
+                and result.stderr.strip() == 'Specified filename /tmp/libtpu_lockfile does not exist.'):
+            return []
+        raise RuntimeError('cannot establish absent libtpu lock state')
+    if (result.returncode not in (0, 1)
+            or (result.returncode == 1 and result.stderr.strip())
+            or (result.returncode == 0 and result.stderr.strip() != str(lock) + ':')):
+        raise RuntimeError('cannot establish libtpu holder state')
+    holders = sorted(int(p) for p in result.stdout.split())
+    if bool(holders) != (result.returncode == 0) or any(p <= 0 for p in holders):
+        raise RuntimeError('inconsistent fuser output')
+    return holders
+
+
 def require_local_idle() -> None:
     """This is a local guard; the outer workflow still needs its eight-host census."""
     for path in Path("/proc").iterdir():
@@ -124,9 +154,7 @@ def require_local_idle() -> None:
             continue
         if any(arg.endswith(b"/run_short_decoder_ws32.py") for arg in argv[1:3]):
             raise ValueError("WS32 runner remains live; no collection")
-    result = subprocess.run(["sudo", "-n", "fuser", "/tmp/libtpu_lockfile"],
-                            capture_output=True, text=True, timeout=15)
-    if result.returncode != 1 or result.stdout.strip() or result.stderr.strip():
+    if libtpu_holders():
         raise ValueError("libtpu idle state is not established")
 
 

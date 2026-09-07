@@ -32,6 +32,37 @@ PREFIX = "WS32_WATCH "
 # individual argv element, so the observer cannot match its own command text.
 REMOTE = r'''
 import hashlib, json, os, pathlib, socket, subprocess, sys
+
+def libtpu_holders():
+    # Kept standalone for authenticated source-only SSH deployment. Mirror the
+    # collector guard; neither this snapshot nor path absence is a fleet census.
+    lock = pathlib.Path('/tmp/libtpu_lockfile')
+    def identity():
+        try:
+            value = lock.lstat()
+        except FileNotFoundError:
+            return None
+        return (value.st_dev, value.st_ino, value.st_mode)
+    before = identity()
+    result = subprocess.run(['sudo', '-n', 'env', 'LC_ALL=C', 'fuser', str(lock)],
+        capture_output=True, text=True, timeout=15)
+    after = identity()
+    if before != after:
+        raise RuntimeError('libtpu lock changed during observation')
+    if before is None:
+        if (result.returncode == 1 and not result.stdout.strip()
+                and result.stderr.strip() == 'Specified filename /tmp/libtpu_lockfile does not exist.'):
+            return []
+        raise RuntimeError('cannot establish absent libtpu lock state')
+    if (result.returncode not in (0, 1)
+            or (result.returncode == 1 and result.stderr.strip())
+            or (result.returncode == 0 and result.stderr.strip() != str(lock) + ':')):
+        raise RuntimeError('cannot establish libtpu holder state')
+    holders = sorted(int(p) for p in result.stdout.split())
+    if bool(holders) != (result.returncode == 0) or any(p <= 0 for p in holders):
+        raise RuntimeError('inconsistent fuser output')
+    return holders
+
 tag, pin = sys.argv[1:]
 hostname = socket.gethostname()
 rank = int(hostname.rsplit("-w-", 1)[1])
@@ -65,13 +96,7 @@ for path in pathlib.Path("/proc").iterdir():
                 argv_sha256=hashlib.sha256(raw).hexdigest()))
     except (FileNotFoundError, ProcessLookupError):
         continue
-holder = subprocess.run(["sudo", "-n", "fuser", "/tmp/libtpu_lockfile"],
-    capture_output=True, text=True, timeout=15)
-if holder.returncode not in (0, 1) or (holder.returncode == 1 and holder.stderr.strip()):
-    raise RuntimeError("cannot establish libtpu holder state")
-holders = sorted(int(p) for p in holder.stdout.split())
-if bool(holders) != (holder.returncode == 0):
-    raise RuntimeError("inconsistent fuser output")
+holders = libtpu_holders()
 progress = ""
 log = root / ("runner.rank%d.log" % rank)
 if log.exists():

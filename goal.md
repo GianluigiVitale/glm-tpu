@@ -51,13 +51,13 @@ Smallest decisive test first; stop on first invariant failure; prefer offline ad
 Adversarial reviewer = separate **gpt-6-astra** agent; resolve all P0–P2; avoid redundant review.
 Cron `sync-glm.sh` every 5 min; verify origin + mirror before protected work. Never EU.
 
-## Snapshot — 2026-09-07 08:40Z; recheck live
+## Snapshot — 2026-09-07 12:00Z
 
 Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`.
 L7 depth 0.0 tag `greenfield_ws32_short_decoder_128k_d0_0_numerical_cap131072_hrope_20260907T064941550123130Z`
-at pin `679e2392` is LIVE, 20/62 chunks observed. Its orchestrator/remote shells exited, leaving
-8 original workers running. Do not restart. Monitor `889cb8f5` Astra-reviewed;
-PID 2248787 holds both leases. Preserve this live run. After READY_FOR_CENSUS: prove cleanup,
+at pin `679e2392` finished model execution 8/8; NOT YET SEALED. Do not rerun. Monitor PID2248787
+holds both leases but retries missing-lockfile state; fix/review its guard and restart ONLY
+the monitor with its original receipt baseline. After READY_FOR_CENSUS: prove cleanup,
 collect original JSON/NPZ/HLO/log/trace with exact existing-object checks, then RECOVER=1 seal.
 Never recover while workers live. Surface unchanged; `.ended` may never appear after shell loss.
 Recipe: `docs/greenfield/WS32_ORPHAN_RECOVERY.md`; argv/env capsule in `configs/`.

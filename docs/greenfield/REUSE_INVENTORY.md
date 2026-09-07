@@ -1233,3 +1233,9 @@ NPZ/trace/graph bindings, preserving original JSON bytes and per-host topology m
 inventories precede any shared publication; generation-zero upload and generation-pinned replay replace
 blind no-clobber retries. The unchanged materializer and sealer remain the sole numerical authorities.
 `docs/greenfield/WS32_ORPHAN_RECOVERY.md` records the complete workflow and its live-run prohibition.
+
+2026-09-07 completion guard correction: adapt these same two standalone observers, not a new
+recovery stack. The original d0.0 workers removed `/tmp/libtpu_lockfile` on exit; `fuser` returned
+1 plus its missing-file diagnostic. Both guards now distinguish pre/post `lstat`-verified absence
+and the exact C-locale diagnostic from unknown/permission/transition errors. Original PID baseline,
+two observations, independent fleet census and original-byte collection remain required.

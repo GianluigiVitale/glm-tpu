@@ -34,7 +34,7 @@
       "source_pin": "679e2392b76caf1acb0a98ff87962c5b5c908e14",
       "source_paths": ["scripts/greenfield/run_short_decoder_ws32.sh", "/home/gianl/bin/wait-for-pod-run.sh"],
       "disposition": "adapted",
-      "greenfield_consumers": ["scripts/greenfield/watch_ws32_run.py"],
+      "greenfield_consumers": ["scripts/greenfield/watch_ws32_run.py", "scripts/greenfield/collect_ws32_worker_evidence.py", "tests/greenfield/validation/test_ws32_libtpu_holder_guard.py"],
       "gate": "L7/L8 supervision only",
       "reason": "Reuse the existing user workload/rsync leases and authenticated SSH, but observe exact argv/PID/start-time/boot identities and libtpu holders. A lost orchestrator leaves those leases free while detached numerical workers continue. Missing remote-shell .ended markers and a free lease cannot establish completion. Preserve and resume the first eight-process baseline, retry unknown observations, and report only readiness for the separate census/collection/recovery workflow. Never launch, signal, recreate numerical results, or infer correctness. No execution or sealer surface is changed."
     },

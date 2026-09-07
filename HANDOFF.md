@@ -14095,3 +14095,25 @@ match. These are local input-readiness checks, not TPU evidence or new gate clos
 Verified monitor PID2248787/start tick99565412 remains live; the 08:52:25Z receipt has all eight
 original workers at 23/62 chunks. Continue original-run supervision and the existing idle-only
 collection/seal recipe, then merge the already-reviewed isolated sealer fixes.
+
+## 2026-09-07 12:00Z — d0.0 computation finished; narrow observation guard correction
+
+Original tag `greenfield_ws32_short_decoder_128k_d0_0_numerical_cap131072_hrope_20260907T064941550123130Z`
+at `679e2392` completed its 62 chunks, tail, observer, decode and checks. Authenticated 11:54Z
+SSH found all eight original PIDs absent and all eight logs ending in `GREENFIELD_WS32_SHORT_DECODER_OK`.
+Worker-0 JSON reports SUCCESS/correctness true, prefill 16394.5045 s and p50 143.4668145 ms. These
+are original runner reports, NOT a protected seal, new DB row or final passkey adjudication.
+
+Monitor PID2248787/start99565412 retains both leases but emits UNKNOWN_RETRYING: each worker removed
+`/tmp/libtpu_lockfile` on exit and fuser rc1 reports its missing-file diagnostic. The collector had
+the same refusal. Narrow fix in the two standalone guards requires pre/post lstat absence, exactly
+that C-locale diagnostic, rc1 and no stdout; all permission/unknown/presence-transition errors still
+refuse. Present-path identity and holder consistency are checked too. Focused CPU suite: 64 passed.
+Independent Astra reviewed the actual diff with no P0–P2 and approved persistence and monitor-only
+restart, requiring the supplemental root accelerator-device census before collection.
+
+Next: persist reviewed correction; restart ONLY the authenticated monitor with its existing receipt,
+let two completed-fleet observations release leases, acquire collection leases, strict8 census plus
+root accelerator-device holder checks, eight original inventories, shared-HLO agreement, conditional
+publication/readback, post-census and original recovery seal. No model or enforcement surface edited.
+Then merge isolated reviewed sealer fixes `dd0f1c07` and proceed with remaining L7 depths/L8/§18.

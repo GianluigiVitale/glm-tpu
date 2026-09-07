@@ -4,6 +4,16 @@ Current case: `greenfield_ws32_short_decoder_128k_d0_0_numerical_cap131072_hrope
 source pin `679e2392b76caf1acb0a98ff87962c5b5c908e14`. The original workers are progressing;
 their detached timeout processes remain responsible for the original wall limit. Never restart them.
 
+Update 2026-09-07 11:54Z: all eight original worker PIDs are absent and each original log ends in
+`GREENFIELD_WS32_SHORT_DECODER_OK`. Model execution is finished, not yet sealed. The old monitor
+cannot reach readiness because the workers removed `/tmp/libtpu_lockfile` on exit. The corrected
+standalone monitor/collector guards accept absence only with pre/post `lstat` absence, fuser rc1,
+empty stdout and its exact C-locale missing-path diagnostic. Unknown errors still refuse/retry.
+Restart only the exact authenticated monitor, preserving its original receipt/baseline. No model
+rerun or fabricated exit marker. After two observations, collect under both leases and the existing
+strict census, supplemented with root accelerator-device holder checks: absent lock paths cannot
+exclude an open-but-unlinked inode. Publication and sealing prerequisites below are unchanged.
+
 ## Observe the original workers
 
 `scripts/greenfield/watch_ws32_run.py` holds the workload and user rsync leases. Its first receipt
