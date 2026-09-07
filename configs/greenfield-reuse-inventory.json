@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-transformer-layer",
+      "category": "complete causal batched layer and router",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "df92d382dfd452308ff2ad47172170fecc102e14",
+      "source_paths": ["glm_tpu/greenfield/kernels/ws32.py", "glm_tpu/greenfield/kernels/ws32_layer.py", "glm_tpu/greenfield/kernels/ws32_prefill_attention.py", "glm_tpu/greenfield/kernels/ws32_prefill_dsa.py", "glm_tpu/greenfield/kernels/ws32_prefill_linear.py", "glm_tpu/greenfield/kernels/ws32_prefill_moe.py", "glm_tpu/greenfield/kernels/reference/moe.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/ws32_prefill_layer.py", "tests/greenfield/kernels/test_ws32_prefill_layer.py"],
+      "gate": "24: CPU full layer composition; bounded real-layer TPU next",
+      "reason": "Compose split-residual norms, raw qkv-a, full DSA or IndexShare, causal attention, dense or DB583 FP32 grouped MoE. New router adapts feature4/expert8 placement and exact noaux_tc own-logit selection with BF16 weights/F32 correction bias (bias affects IDs only). Four static branches CPU-pass at17rows/11live; shared+dense output/carried/cache CPU-bit-exact against old complete row path. Health propagation, future-row isolation, repaired-history independence, padded NaNs, correction-bias/ties and only group4/8 collectives tested. CPU factory late-binding bug corrected before admission. Static padded routes use legal IDs/zero weights but still execute bounded work; do not claim tail elimination. Whole-decoder frontier/block identity, allchip commit and repaired-index promotion remain external obligations. No TPU/full-model equivalence or performance claim."
+    },
+    {
       "id": "ws32-prefill-dsa-producer-dual-cache",
       "category": "causal DSA production and separate M64 repair",
       "source_repo": "glm-tpu greenfield",

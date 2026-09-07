@@ -14726,3 +14726,49 @@ grouped MoE, adding multirow router from current shard implementation and exact 
 reference. Caller must bind frontier/populated prefix, provenance of completed wk,
 dual-cache lifetime/final promotion and all32 health flags. Then bounded real-layer TPU
 admission; short decoder/own§21 and efficient L7/L8 remain open. No new large artifact.
+
+## 2026-09-07 — complete batched layer CPU composition admitted
+
+`kernels/ws32_prefill_layer.py` assembles all four static full/shared-indexer × dense/MoE
+branches. Both split-residual norms preserve unrounded FP32 sum for normalization and
+return MLP update/post-attention residual separately. Full DSA returns both cache versions;
+IndexShare preserves supplied positions/counts/scores and incoming per-row producer health.
+Attention remains causal; MLP uses raw dense or DB583's explicit FP32 grouped route sum.
+New multirow router adapts feature4/expert8 placement and exact noaux_tc own-logit selection.
+Checkpoint schema confirms router weight BF16, correction bias F32 (not BF16); bias only
+affects selected IDs. Padded rows retain legal route IDs with zero weights; bounded static
+tail compute still exists and must not be reported eliminated. Final runtime should use
+narrow final blocks. All32 local health flags must reach the decoder's commit/refusal.
+
+Initial test factory accidentally captured the last branch in every lambda; its shared
+comparison failed24.31s. Corrected static default captures exercise four distinct graphs.
+CPU32 test then passed25.83s:17rows/11live, all four branches, shared+dense output/carried/
+cache bitwise equal to old complete one-row layer, incoming health not erased, live shared
+score NaN refusal, altered repaired history leaves prompt output unchanged, future input
+isolation, padded NaNs, exact router dense-logit reference/ties/correction-only ID changes.
+All physical collectives are only exact feature4/expert8 groups. Real latent/structured
+head dimensions but hidden512/qrank128/topk16/experts64; synthetic inputs/weights, no TPU
+numerical or performance claim. Final combined7 tests (layer, causal attention, DSA producer,
+reuse) passed54.14s. Black/diff checks pass; independent Astra implementation PASS, no P0-P2.
+
+Next bounded TPU input inventory (read-only, no new payload): retained one-layer WS32 pack
+used by DB583 is MoE ONLY, not full attention. The old bucket runtime prefix is absent
+(gcloud exact-prefix ls returns no objects), consistent with derivative retention cleanup;
+do not try to load it or recreate its786GB for this test. The current full-model source is
+the existing per-host tmpfs layout used by DB575:
+`/dev/shm/glm-ws32-runtime/greenfield_ws32_runtime_pack_20260815T214050854386790Z`.
+Controller metadata files independently verified now: manifest-file88df4143…cbf,
+SUCCESS-file12703932…ca2; selfmanifestc04f800e…ee08, selfSUCCESS1bfea5bd…1760.
+Controller has slots09/13/25/29; runtime mapping is NOT hostname slot order. Manifest has
+2310tensor schema entries/32owner records. Layer0(full DSA+dense):27leaves,
+21,557,920B/chip. Layer3(IndexShare+MoE):28leaves,324,821,552B/chip. Both together are
+346,379,472B/chip in selected weights, before compiled/scratch/cache/reference overhead.
+These are manifest payload counts, not measured HBM. No tensor payload has been reread.
+
+Adapt the existing verified final-owner loader for a DISTINCT explicitly named one-layer
+subset, authenticating manifest/SUCCESS/topology/schema and every selected leaf digest;
+do not call its current all-leaf loader (loads all753B) or hash entire24GB owner files just
+to read21MB. This subset must never masquerade as a verified complete model. Reuse the
+existing bounded eight-host FP8 campaign/census/publisher, add a distinct layer protocol.
+Fresh authenticated fleet/retained-slot checks before launch, review/persistence before
+deployment. Own short-decoder§21, efficient L7/L8 and registered prefill/TTFT targets remain.

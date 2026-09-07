@@ -2,6 +2,16 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+`kernels/ws32_prefill_layer.py` composes existing admitted primitives into all four
+full/shared-indexer × dense/MoE branches, preserving split residuals and both index
+caches. New multirow router adapts `ws32_router_from_shards_mapped` and exact noaux_tc
+selection; F32 correction bias affects IDs only. CPU32 first complete test25.83s passes
+17rows/11live, shared+dense bitwise old complete-row comparison, future-row isolation,
+repair-history independence, incoming/score health and router bias/ties. Independent
+review PASS for CPU persistence; real TPU layer arithmetic/HBM remains the next gate.
+No production decoder change. Static padded routes still execute bounded work with zero
+weights; final-block runtime should use narrow rows. No claimed end-to-end speedup.
+
 `kernels/ws32_prefill_dsa.py` connects raw multirow q/key/head projection to the existing
 causal selector and block writer. Prompt scoring consumes only updated UNREPAIRED keys.
 The exact same BF16 normalization crosses feature4 for existing M64 repair, with the

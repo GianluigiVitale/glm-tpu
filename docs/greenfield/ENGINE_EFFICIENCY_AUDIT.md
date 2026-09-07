@@ -302,3 +302,12 @@ Raw projection/head-sum association is a new numerical path. FP32 GEMM/GEMV head
 are bounded against independent FP64 by a dimension-derived forward-error bound, not
 declared bit-identical. Existing M64 repair is CPU-bit-identical for supplied normalization.
 The complete layer and actual TPU allocation/arithmetic/performance remain unproved.
+
+The complete layer is now assembled in `ws32_prefill_layer.py`: all four static
+full/shared-indexer × dense/MoE branches pass CPU32 at17rows/11live; shared+dense matches
+the old full one-row layer's output/carried/cache bitwise on synthetic inputs. Router
+has exact own-logit noaux_tc semantics with BF16 weights/F32 bias, explicit finiteness and
+zero-weight valid dummy routes for padded rows. Split residuals and local incoming health
+remain intact. Padded static MoE rows still execute bounded work; narrow final-block
+executables are required to minimize that cost. Real-layer TPU admission is next, not
+more algorithm design or a full-model launch. End-to-end prefill/TTFT remains unmeasured.
