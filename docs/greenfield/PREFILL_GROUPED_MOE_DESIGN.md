@@ -128,3 +128,8 @@ input coherence, owner coverage and measured HBM. Zero timing samples, NULL DB l
 worker timeout600s, no full model. Existing leases, root-device census and generation-qualified
 publisher remain responsible for safety/archival. Focused11 CPU tests passed7.12s, including
 the exact worker builder on forced32 CPU. This is prepared source, not a real TPU MoE pass.
+
+The subsequent bounded trial at31a2f917 REFUSED normal-case bit equality, cleanup8/8.
+See `../artifacts/prefill-real-moe-arithmetic-refusal-20260907.json` and HANDOFF for original
+evidence and the reviewed first-boundary diagnostic. The result does not admit the candidate;
+keep the exact failure, no unchanged retry or retrospective tolerance change.

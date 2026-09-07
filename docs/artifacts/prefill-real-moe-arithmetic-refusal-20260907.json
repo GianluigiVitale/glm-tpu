@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "classification": "REAL_MOE_EXACT_ARITHMETIC_ADMISSION_FAILED",
+  "tag": "greenfield_fp8_ws32_prefill_moe_admission_20260907T202144037691528Z",
+  "code_hash": "31a2f917e239946cbb1c5eff908a19273d17a9e8",
+  "archive_prefix": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_moe_admission_20260907T202144037691528Z/",
+  "wrapper_exit": 1,
+  "failure_exit_utc": "2026-09-07T20:22:43Z",
+  "results_db_run_id": null,
+  "performance_claim": false,
+  "case": "normal",
+  "concentrated_case_executed": false,
+  "rows": 17,
+  "fleet_input_digests_agree": true,
+  "fleet_hlo_digests_agree": true,
+  "reference_vs_captured_legacy_passed_all_workers": true,
+  "mismatches_per_feature_shard": [2345, 2183, 2151, 2243],
+  "elements_per_feature_shard": 26112,
+  "rank0_feature1_error": {
+    "max_abs": 0.015625,
+    "mean_abs": 0.00019260247063357383,
+    "mismatches_per_row": [162, 74, 115, 138, 0, 112, 138, 105, 158, 144, 179, 141, 143, 135, 162, 159, 118]
+  },
+  "rank0_phases_seconds": {
+    "runtime": 2.6100912500405684,
+    "load": 11.845090468064882,
+    "compile": 2.619599148980342
+  },
+  "rank0_compiled_memory": {
+    "arguments": 311828480,
+    "outputs": 74752,
+    "temporary": 7108608,
+    "generated_code": 5312000
+  },
+  "hlo_contract_passed": true,
+  "collective_group_sizes": [4, 8],
+  "grouped_raw_fp8_calls": 3,
+  "shared_raw_fp8_calls": 3,
+  "full_weight_overlays": [],
+  "candidate_hlo_sha256": "8754e14d206c465cd239c1705facab7d74a1f093ca42b85a599f289bd178b022",
+  "rank0_reference_hlo_sha256": "8dc2d90b9c5ee16b1d691e09720b7bc655b174670761f8764821f5b341e3ba37",
+  "rank0_normal_npz_sha256": "11136b5d1f6e3f11b54199656599aff7430f9ac3ebb99cff73b1af9258b3814f",
+  "failure_exit_census_sha256": "2610c22bfb453c8e95fd72e76f60f3041159c2047ac2c21eb8f4431f9b4dfac8",
+  "failure_exit_root_devices_sha256": "07fc58b99286c2bf52f93fe024e599a4f7e7d552ee819abd0faf8e2e47271e74",
+  "cleanup": "AUTHENTICATED_8_OF_8_ZERO_WORK_AND_ROOT_ACCELERATOR_HOLDERS_EMPTY",
+  "verified_runner_objects": [
+    {"rank": 0, "generation": "1788812553681102", "sha256": "3a282edc37d470dced77c4e1c2083d87de7c1b87c33ccc421424a07c3b0142b0"},
+    {"rank": 1, "generation": "1788812553775351", "sha256": "ab78687b24acce3090616d57bf86c88e9736947b57233f11398463f70732fc65"},
+    {"rank": 2, "generation": "1788812553759089", "sha256": "856cc9b292312dee197e4c44019a4c5b2f148871379fea606a6577e240bd383c"},
+    {"rank": 3, "generation": "1788812553796215", "sha256": "099f4e42a0d293f632bbf5aede95b21d221122865af275c1b3cb863c27d47000"},
+    {"rank": 4, "generation": "1788812553642001", "sha256": "d54c83a7f925a8b1fe6b3a39420f08a4008d54df533dd2a8d26d66f383fe4a21"},
+    {"rank": 5, "generation": "1788812553629300", "sha256": "3159e239c062bc3abe3c3e98f82127fe9ea35d79771b2dc97655823b5493f98f"},
+    {"rank": 6, "generation": "1788812553767312", "sha256": "8b345aa4e94f2d41d8372dee33e147ac1e7ec9c0e47116763ac68fd990cfc6ed"},
+    {"rank": 7, "generation": "1788812553925610", "sha256": "c95327c6453b9bf9988f659c26960ff78b0bf58ed1cf0c73dc7ef7a8ec9abfb8"}
+  ],
+  "causal_status": "UNRESOLVED: changed feature-collective strategy and route reduction lowering; no first-divergent-boundary captures",
+  "next": "One reviewed B17 normal-only boundary diagnostic, original inputs/weights/mesh; no unchanged rerun, no tolerance widening, no long serial prefill"
+}

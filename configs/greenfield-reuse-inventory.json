@@ -24,7 +24,7 @@
       "source_paths": ["scripts/greenfield/run_fp8_matmul_microbench.sh", "scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/run_real_one_layer_ws32.py", "glm_tpu/greenfield/checkpoint/ws32_one_layer.py", "scripts/greenfield/collect_ws32_worker_evidence.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/probe_ws32_prefill_moe.py", "scripts/greenfield/ws32_prefill_moe_campaign.py", "tests/greenfield/hlo/test_prefill_real_moe_admission.py"],
-      "gate": "24: real layer arithmetic, no performance claim",
+      "gate": "24: real layer arithmetic refused 2026-09-07; first-boundary diagnostic next, no performance claim",
       "reason": "Reuse bounded FP8 leases/census/DB/archive and current short-decoder runtime topology utility, retained 9.97GB layer3 final-owner pack, verified loader and captured oracle. Test17 distinct perturbed activations with supplied normal/concentrated routes, exact batched-versus-M1 BF16 outputs on all32 owners, unchanged row0 versus bounded legacy capture. No full model, new checkpoint, production routing claim, timing samples or decoder change. Controller checks fleet input coherence, original NPZ bits and reference/candidate HLO hashes; compiler allocation budget1GiB/chip and worker600s timeout. Forced32 CPU worker-builder and protocol tests pass; real TPU layer result remains pending."
     },
     {

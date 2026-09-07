@@ -253,3 +253,13 @@ Six CPU tests passed including physical group membership, tails/holes/ties and b
 The JAX reference may still be slow: repeated candidate sorts, padded key buffers and
 per-head tile temporaries need TPU attribution before promotion or Pallas replacement.
 Do not call this an efficient production scorer based on CPU correctness alone.
+
+Real layer3 batched arithmetic trial at31a2f917 refused within one minute (20:22Z), before
+concentrated case. Input/topology/checkpoint/HLO pass; actual BF16 outputs differ from old M1
+by small amounts. Record `../artifacts/prefill-real-moe-arithmetic-refusal-20260907.json` binds
+all8 original runner generations; failure census8/8 clean. Changed feature collective strategy
+and local route reduction lowering are confirmed graph differences, NOT a proved cause.
+Next is one B17 first-boundary diagnostic, not an unchanged retry or relaxed comparator.
+Reviewer warns that F32 HLO with original-BF16 correction metadata is not proof of F32
+rounding semantics. Synthetic projection identity also cannot stand in for real operands.
+This is the intended cheap discriminator: no multi-hour model run was needed to expose it.

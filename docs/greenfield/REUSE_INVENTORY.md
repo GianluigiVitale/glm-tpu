@@ -8,7 +8,8 @@ initializer (utility only), retained layer3 final-owner loader/oracle and exact 
 M1 on32 chips, row0 against the legacy capture. `ws32_prefill_moe_campaign.py` deploys only
 existing worker repositories and collects generation-bound original outputs/HLO. No full
 checkpoint, new layout, performance samples or serving integration. CPU admission passes;
-real TPU result pending. Current topology pins replace the old one-layer wrapper's stale pins.
+real TPU normal case refused20:22Z on BF16 differences; HANDOFF binds evidence and next
+boundary diagnostic. Current topology pins replace the old one-layer wrapper's stale pins.
 
 `kernels/prefill_dsa.py` adapts the existing reference scorer/local selector/scored merge.
 It loops over bounded key tiles for up to32 causal query rows, skips wholly future tiles,

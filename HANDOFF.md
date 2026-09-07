@@ -14516,3 +14516,34 @@ Final independent Astra review PASS for persistence and one bounded real-MoE TPU
 no remaining P0-P2. Additional reuse/baseline23 tests passed1.80s (34 focused tests total);
 Black, shell syntax and diff checks pass. Review covers supplied-route arithmetic only,
 not router correctness, full prefill, performance or long-context execution.
+
+## 2026-09-07 20:22Z — real MoE admission REFUSED; fleet8/8 clean
+
+Run `greenfield_fp8_ws32_prefill_moe_admission_20260907T202144037691528Z`, reviewed source
+`31a2f917e239946cbb1c5eff908a19273d17a9e8`, stopped at normal-case BF16 mismatch, wrapperexit1.
+No concentrated execution, SUCCESS or DB row. Exact compact record:
+`docs/artifacts/prefill-real-moe-arithmetic-refusal-20260907.json`. Original per-worker files
+were generation-zero published by EXIT traps; controller independently read all8 original
+runner JSONs at receipt generations/SHA. All agree on input digests/HLO; M1-vslegacy passes
+on all8. Candidate-vsM1 unique feature shards have2345/2183/2151/2243 mismatches of26112.
+Rank0 feature1 maxabs0.015625/meanabs0.0001926025; zero row exact. Rank0 runtime2.61s,
+load11.85s,compile2.62s; HLO passes3grouped+3shared,onlygroups4/8,nooverlay; compiled
+args311828480/output74752/temp7108608B. Not a full-layer or prefill PASS.
+
+Failure-exit census AND independent root accelerator-holder observations confirm8/8 clean.
+No model/controller remains from this run; source freeze released after wrapper exit.
+
+Narrow independent review: changed feature tuple collective strategy and opaque BF16 route
+reduction versus reference add-chain are hypotheses, not a localized root cause. F32-typed
+reference adds carry original-BF16 float_type_correction_info; displayed F32 alone cannot
+prove omitted rounding. Synthetic DB580/581 do not prove arbitrary real-input projection
+identity. Do not relabel this failure or loosen its exact comparator.
+
+Next decisive work: ONE normal-only B17 boundary diagnostic, same inputs/weights/routes/mesh,
+capture routed/shared gate/up partials, post-feature BF16s, restored weighted per-route down,
+local sum, post-expert routed, shared and final outputs. Compare first divergence; retain HLO
+and check whether instrumentation changes the relevant lowering before causal attribution.
+Then fix a proved bug or separately preregister bounded-internal adjudication under§21;
+do not spend days reproducing an old compiler when the existing contract permits bounded
+internals. No instrumentation implemented or new TPU launch yet. Continue causal layers,
+phase budgets/targets and short decoder after this boundary. Serial long runs remain banned.
