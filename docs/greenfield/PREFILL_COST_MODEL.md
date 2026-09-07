@@ -122,3 +122,25 @@ FP32 equality versus individual calls, BF16 rounding and row permutations. Toget
 registry checks: **10 CPU tests passed in9.38s**. Independent review accepted the initial test;
 its nonzero-tail coverage suggestion was implemented before persistence. This supplies CPU
 semantic evidence only. No TPU baseline, new prefill execution or speedup has been measured.
+
+## Bounded harness protocol — 2026-09-07
+
+Opt-in `GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_baseline` with
+`GLM_GREENFIELD_FP8_BASELINE_ROWS=8` (then32/128/256 after admission) uses the existing
+`run_fp8_matmul_microbench.sh`. Exact local shape K1536 N2048, raw-FP8 F32 partial, one chip
+on the existing four-chip host; synthetic distinct input rows, not captured model activations.
+No subgroup reduction or expert routing in this baseline.200 warmups/1000 timed samples,
+600s runner deadline plus30s kill grace; stop and diagnose the first failed shape.
+No512-row trial is admitted yet. Four serialized invocations are simpler than a new sweep
+controller; no numerical full-model load or checkpoint artifact is needed.
+
+Existing HLO/no-full-weight-overlay and tolerance-based reference checks remain. Record HLO,
+compiler allocation estimate, device memory stats, useful/padded rows, JAX/libtpu versions,
+compile wall and warmed host-dispatch-through-completion distribution. The intersample scalar
+transfer is outside timing; this is not sustained throughput. Compiler/device HBM accounting
+includes reference work and does not measure VMEM peak or bitwise batched/serial TPU identity.
+DB identity names the baseline and exact M/K/N. Supplemental authenticated root checks cover
+the libtpu lock, actual accelerator holders and starting greenfield runners; existing fleet
+census/leases remain. Post-census precedes successful DB finalization; archive readback binds
+every object's generation/size/CRC/SHA and terminal identities. This does not replace protected
+real-layer/full-model traces or other §24 budget components.

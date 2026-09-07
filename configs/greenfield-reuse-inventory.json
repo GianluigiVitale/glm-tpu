@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-real-shape-baseline",
+      "category": "bounded prefill mechanism baseline",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "676d1764c069e14a3e086111672cbf57acad2d53",
+      "source_paths": ["scripts/greenfield/microbench_fp8_matmul.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "scripts/greenfield/watch_ws32_run.py", "scripts/greenfield/collect_ws32_worker_evidence.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/microbench_fp8_matmul.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "scripts/greenfield/fp8_baseline_guard.py", "tests/greenfield/hlo/test_fp8_prefill_baseline.py"],
+      "gate": "24: baseline measurement before final target registration",
+      "reason": "Distinct opt-in ws32_prefill_baseline reuses raw-FP8 F32 projection at rows8/32/128/256 K1536 N2048 with unchanged old kernel shapes, 200/1000 samples, a 600s runner cap, compiler memory estimate and tolerance-based reference comparison. Supplemental authenticated root census reuses the reviewed lock observer and independently checks canonical accelerator device holders and starting greenfield runners. Both leases and existing Ray/container census remain; post-census precedes DB finalization. Baseline publication reuses generation-zero, generation-qualified size/CRC/SHA readback. No full checkpoint, legacy execution, end-to-end performance or bitwise TPU admission claim. Compiler HBM/device statistics do not establish VMEM peak."
+    },
+    {
       "id": "ws32-multirow-prefill-fp8-admission",
       "category": "efficient prefill primitive reuse",
       "source_repo": "glm-tpu greenfield",

@@ -57,5 +57,5 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB575 exit0/8-host cleanup18:42Z; no model/controller live. HANDOFF has exact evidence.
-Multirow FP8/linear/dense CPU admission passes; no TPU speedup yet. Next: bounded real-shape
-baseline (PREFILL_COST_MODEL.md), grouped MoE/causal layers. Efficient L7/L8 remain open.
+Multirow CPU admission passes; reviewed real-shape baseline harness ready (PREFILL_COST_MODEL.md).
+Next: bounded TPU baseline, grouped MoE/causal layers. No speedup yet; efficient L7/L8 open.

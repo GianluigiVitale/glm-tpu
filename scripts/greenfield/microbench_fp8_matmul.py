@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from importlib.metadata import version
 import json
 import os
 import subprocess
@@ -18,6 +19,41 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
+
+F32_OUTPUT_KERNELS = ("dsa_wq_b", "dsa_wk", "ws32_prefill_baseline")
+
+
+def _validate_shape_contract(
+    *, kernel: str, rows: int, contraction: int, output_width: int
+) -> None:
+    """Keep old decode shapes fixed; admit only one explicit baseline family."""
+    if kernel == "ws32_prefill_baseline":
+        if rows not in (8, 32, 128, 256) or (contraction, output_width) != (1536, 2048):
+            raise ValueError("WS32 baseline requires rows=8/32/128/256, K1536 N2048")
+        return
+    production_shapes = {
+        "attention_output": (1, 4096, 6144),
+        "dsa_wq_b": (1, 2048, 1024),
+        "dsa_wk": (1, 6144, 128),
+        "single_up_m1": (1, 6144, 2048),
+    }
+    expected = production_shapes.get(
+        kernel, (1 if kernel == "rmsnorm_linear" else 8, 6144, 2048)
+    )
+    if (rows, contraction, output_width) != expected:
+        raise ValueError(f"protected metal proof is fixed to its production decode shape: {expected}")
+
+
+def _compiled_memory(compiled: Any) -> dict[str, int]:
+    """Compiler allocation estimate, explicitly not measured peak device HBM."""
+    stats = compiled.memory_analysis()
+    if stats is None:
+        raise RuntimeError("compiled memory analysis is unavailable")
+    names = (
+        "argument_size_in_bytes", "output_size_in_bytes", "alias_size_in_bytes",
+        "temp_size_in_bytes", "generated_code_size_in_bytes",
+    )
+    return {name: int(getattr(stats, name)) for name in names}
 
 
 def _git_head() -> str:
@@ -81,6 +117,10 @@ def _custom_call_result_name(line: str) -> str:
 def _validate_sampling_contract(
     *, kernel: str, diagnostic_reference_timing: bool, warmup: int, iterations: int
 ) -> None:
+    if kernel == "ws32_prefill_baseline":
+        if diagnostic_reference_timing or (warmup, iterations) != (200, 1000):
+            raise ValueError("WS32 baseline requires exactly 200/1000 samples and no reference timing")
+        return
     if diagnostic_reference_timing:
         if kernel != "single_up_m1":
             raise ValueError(
@@ -155,6 +195,7 @@ def parse_args() -> argparse.Namespace:
             "selected_swiglu_down",
             "dsa_wq_b",
             "dsa_wk",
+            "ws32_prefill_baseline",
         ),
         default="single_up",
     )
@@ -184,22 +225,10 @@ def main() -> int:
         raise RuntimeError(
             f"stale code hash: expected={args.expected_code_hash} found={code_hash}"
         )
-    production_shapes = {
-        "attention_output": (1, 4096, 6144),
-        "dsa_wq_b": (1, 2048, 1024),
-        "dsa_wk": (1, 6144, 128),
-        "single_up_m1": (1, 6144, 2048),
-    }
-    expected_shape = production_shapes.get(
-        args.kernel,
-        (1 if args.kernel == "rmsnorm_linear" else 8, 6144, 2048),
+    _validate_shape_contract(
+        kernel=args.kernel, rows=args.rows, contraction=args.contraction,
+        output_width=args.output_width,
     )
-    if (args.rows, args.contraction, args.output_width) != expected_shape:
-        raise ValueError(
-            "protected metal proof is fixed to its production decode shape: "
-            f"rows={expected_shape[0]}, hidden={expected_shape[1]}, "
-            f"output={expected_shape[2]}"
-        )
     if args.kernel != "attention_output" and args.output_tile != 128:
         raise ValueError(
             "a non-default output tile requires the attention-output kernel"
@@ -376,7 +405,7 @@ def main() -> int:
                 )
             else:
                 kernel_hlo_name = "greenfield_fp8_block_matmul"
-        elif args.kernel in ("dsa_wq_b", "dsa_wk"):
+        elif args.kernel in F32_OUTPUT_KERNELS:
             kernel = fp8_block_matmul_f32
             kernel_inputs = (lhs, weight_bits, scale)
             reference_inputs = ((args.kernel, weight_bits, scale),)
@@ -460,12 +489,22 @@ def main() -> int:
         lower_started = time.monotonic()
         compiled = jax.jit(kernel).lower(*kernel_inputs).compile()
         compile_seconds = time.monotonic() - lower_started
+        compiled_memory = (
+            _compiled_memory(compiled) if args.kernel == "ws32_prefill_baseline" else None
+        )
         hlo = compiled.as_text()
         hlo_sha256 = sha256(hlo.encode()).hexdigest()
         # Preserve compiler output even when the fail-closed HLO contract
         # rejects a diagnostic before correctness or timing.
         args.hlo_output.parent.mkdir(parents=True, exist_ok=True)
         args.hlo_output.write_text(hlo)
+        if args.kernel == "ws32_prefill_baseline" and any(
+            op in hlo for op in (
+                "all-reduce(", "all-gather(", "reduce-scatter(",
+                "collective-permute(", "all-to-all(",
+            )
+        ):
+            raise RuntimeError("single-chip baseline unexpectedly contains a collective")
 
         custom_calls = [
             line.strip()
@@ -791,6 +830,7 @@ def main() -> int:
             "selected_swiglu_down",
             "dsa_wq_b",
             "dsa_wk",
+            "ws32_prefill_baseline",
         )
         actual_values = (actual_raw,) if single_output_kernel else tuple(actual_raw)
         jax.block_until_ready(actual_values)
@@ -808,12 +848,12 @@ def main() -> int:
                 projection = lax.dot_general(
                     (
                         reference_lhs.astype(jnp.float32)
-                        if args.kernel in ("dsa_wq_b", "dsa_wk")
+                        if args.kernel in F32_OUTPUT_KERNELS
                         else reference_lhs
                     ),
                     (
                         decoded.astype(jnp.float32)
-                        if args.kernel in ("dsa_wq_b", "dsa_wk")
+                        if args.kernel in F32_OUTPUT_KERNELS
                         else decoded
                     ),
                     dimension_numbers=(((1,), (1,)), ((), ())),
@@ -821,7 +861,7 @@ def main() -> int:
                 )
                 expected_values.append(
                     projection
-                    if args.kernel in ("dsa_wq_b", "dsa_wk")
+                    if args.kernel in F32_OUTPUT_KERNELS
                     else projection.astype(jnp.bfloat16)
                 )
                 continue
@@ -1000,7 +1040,7 @@ def main() -> int:
             "accumulator": "float32",
             "output": (
                 "float32"
-                if args.kernel in ("dsa_wq_b", "dsa_wk")
+                if args.kernel in F32_OUTPUT_KERNELS
                 else "bfloat16"
             ),
         },
@@ -1012,6 +1052,24 @@ def main() -> int:
         },
         "comparison": comparison,
         "diagnostic_only": args.diagnostic_reference_timing,
+        "baseline_only": args.kernel == "ws32_prefill_baseline",
+        "baseline_scope": (
+            "synthetic-input single-chip raw-FP8 feature-shard projection; "
+            "not a MoE layer, fleet throughput, or end-to-end prefill result"
+            if args.kernel == "ws32_prefill_baseline" else None
+        ),
+        "compiled_memory_estimate": compiled_memory,
+        "baseline_protocol": (
+            {
+                "useful_rows": rows,
+                "padded_rows": ((rows + 7) // 8) * 8,
+                "jax_version": jax.__version__,
+                "libtpu_version": version("libtpu"),
+                "timing": "host dispatch through device completion; scalar D2H between samples excluded",
+                "correctness": "tolerance-based dequantized-matmul comparison; not bitwise row admission",
+                "memory": "compiler HBM estimate and process device stats including reference; VMEM peak unmeasured",
+            } if args.kernel == "ws32_prefill_baseline" else None
+        ),
         "performance_claim": False,
         "profiler_free_timing": True,
         "warmup": args.warmup,

@@ -15,6 +15,8 @@ KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
 OUTPUT_TILE=${GLM_GREENFIELD_FP8_OUTPUT_TILE:-128}
 SELECTED_CASE=${GLM_GREENFIELD_FP8_SELECTED_CASE:-concentrated_eight}
 TAG_STEM=$KERNEL
+BASELINE_ROWS=${GLM_GREENFIELD_FP8_BASELINE_ROWS:-8}
+[[ $KERNEL != ws32_prefill_baseline ]] || TAG_STEM=${KERNEL}_m${BASELINE_ROWS}
 [[ $KERNEL != selected_up_gate && $KERNEL != selected_swiglu_down ]] || \
   TAG_STEM=${KERNEL}_${SELECTED_CASE}
 [[ $OUTPUT_TILE == 128 ]] || TAG_STEM=${TAG_STEM}_ot${OUTPUT_TILE}
@@ -24,6 +26,15 @@ ITERATIONS=${GLM_GREENFIELD_FP8_MATMUL_ITERATIONS:-1000}
 DIAGNOSTIC_REFERENCE=${GLM_GREENFIELD_FP8_DIAGNOSTIC_REFERENCE:-0}
 RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
+[[ $TAG =~ ^greenfield_fp8_[a-zA-Z0-9_]+$ ]] || {
+  echo "unsafe FP8 run tag" >&2
+  exit 2
+}
+if [[ $KERNEL == ws32_prefill_baseline ]]; then
+  [[ $BASELINE_ROWS == 8 || $BASELINE_ROWS == 32 || \
+     $BASELINE_ROWS == 128 || $BASELINE_ROWS == 256 ]] || exit 2
+  [[ $WARMUP == 200 && $ITERATIONS == 1000 && $DIAGNOSTIC_REFERENCE == 0 ]] || exit 2
+fi
 
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]] || {
   echo "refusing FP8 kernel run outside $BRANCH" >&2
@@ -38,10 +49,10 @@ REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
   $KERNEL == attention_output || $KERNEL == fused_attention_output || \
   $KERNEL == selected_up_gate || $KERNEL == selected_swiglu_down || \
   $KERNEL == structured_kv_b || $KERNEL == dsa_wq_b || \
-  $KERNEL == dsa_wk ]] || {
+  $KERNEL == dsa_wk || $KERNEL == ws32_prefill_baseline ]] || {
   echo "FP8 kernel must be single_up, single_up_m1, attention_output," \
     "fused_attention_output, rmsnorm_linear, up_gate, selected_up_gate," \
-    "selected_swiglu_down, structured_kv_b, dsa_wq_b, or dsa_wk" >&2
+    "selected_swiglu_down, structured_kv_b, dsa_wq_b, dsa_wk, or ws32_prefill_baseline" >&2
   exit 2
 }
 [[ $OUTPUT_TILE == 128 || $OUTPUT_TILE == 256 ]] || {
@@ -86,10 +97,21 @@ flock -n 9 || {
 exec 8>/home/gianl/.glm-tpu-rsync.lock
 flock 8
 
+[[ $(git -C "$WORKTREE" rev-parse HEAD) == "$PIN" && \
+   -z $(git -C "$WORKTREE" status --porcelain) ]] || exit 2
 [[ $(git -C "$WORKTREE" ls-remote origin \
   refs/heads/rewrite/topology-first-decode | awk '{print $1}') == "$PIN" ]]
 [[ $(gcloud storage buckets describe "$APPROVED_BUCKET" \
   --format='value(location)') == "$APPROVED_LOCATION" ]]
+if [[ $KERNEL == ws32_prefill_baseline ]]; then
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - "$TAG" <<'PY'
+from google.cloud import storage
+import sys
+client = storage.Client()
+if next(iter(client.list_blobs('driftbench-dsv4-uc', prefix=f'results/{sys.argv[1]}/', max_results=1)), None):
+    raise SystemExit('baseline remote prefix already exists')
+PY
+fi
 
 has_eight_unique_markers() {
   local file=$1 marker=$2
@@ -101,6 +123,16 @@ strict_census() {
   local label=$1
   local out="$RUN_DIR/census_${label}.txt"
   local carrier="${TAG}_${label}"
+  if [[ $KERNEL == ws32_prefill_baseline ]]; then
+    local idle_command
+    idle_command=$(PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+      -m scripts.greenfield.fp8_baseline_guard census-command) || return 1
+    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+      --command="$idle_command" >"$RUN_DIR/devices_${label}.txt" 2>&1 || return 1
+    PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+      -m scripts.greenfield.fp8_baseline_guard validate-fleet \
+      --file "$RUN_DIR/devices_${label}.txt" || return 1
+  fi
   local ray_enum
   # shellcheck disable=SC2016
   ray_enum='GLM_CENSUS_CARRIER='"$carrier"' /home/gianl/vllm-env/bin/python -c "import os,psutil,subprocess; from ray.autoscaler._private.constants import RAY_PROCESSES; carrier=os.environ[\"GLM_CENSUS_CARRIER\"]; marked={p.pid for p in psutil.process_iter([\"environ\"]) if (p.info[\"environ\"] or {}).get(\"GLM_CENSUS_CARRIER\")==carrier}; me=psutil.Process(); skip={me.pid}|{p.pid for p in me.parents()}|marked; out={p.pid for p in psutil.process_iter([\"name\",\"cmdline\"]) if p.pid not in skip and any(k in ((p.info[\"name\"] or \"\") if f else subprocess.list2cmdline(p.info[\"cmdline\"] or [])) for k,f in RAY_PROCESSES)}; print(\" \".join(map(str,sorted(out))))"'
@@ -138,7 +170,10 @@ ROWS=8
 [[ $KERNEL != rmsnorm_linear && $KERNEL != single_up_m1 ]] || ROWS=1
 CONTRACTION=6144
 OUTPUT_WIDTH=2048
-if [[ $KERNEL == dsa_wq_b ]]; then
+if [[ $KERNEL == ws32_prefill_baseline ]]; then
+  ROWS=$BASELINE_ROWS
+  CONTRACTION=1536
+elif [[ $KERNEL == dsa_wq_b ]]; then
   ROWS=1
   CONTRACTION=2048
   OUTPUT_WIDTH=1024
@@ -189,15 +224,26 @@ fi
   if [[ $DIAGNOSTIC_REFERENCE == 1 ]]; then
     RUNNER+=(--diagnostic-reference-timing)
   fi
+  PYTHON_RUN=(/home/gianl/vllm-env/bin/python)
+  if [[ $KERNEL == ws32_prefill_baseline ]]; then
+    # Bound this single-process mechanism probe, not an hours-long model run.
+    PYTHON_RUN=(timeout --kill-after=30s 600s /home/gianl/vllm-env/bin/python)
+  fi
   JAX_PLATFORMS=tpu \
     TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1 \
     TPU_PROCESS_BOUNDS=1,1,1 \
     TPU_VISIBLE_DEVICES=0,1,2,3 \
     PYTHONPATH="$WORKTREE" \
-    /home/gianl/vllm-env/bin/python "${RUNNER[@]}"
+    "${PYTHON_RUN[@]}" "${RUNNER[@]}"
 ) >"$RUN_DIR/runner.log" 2>&1
 elapsed=$(( $(date +%s) - started ))
 say "runner completed in ${elapsed}s"
+
+strict_census post || {
+  say "ABORT: post-run census is not eight-host zero work"
+  exit 1
+}
+post_census_done=1
 
 PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" <<'PY'
@@ -224,6 +270,18 @@ if not runner["comparison"]["passed"]:
     raise SystemExit("Pallas/reference correctness failed")
 if not runner["profiler_free_timing"]:
     raise SystemExit("kernel wall distribution is not profiler-free")
+baseline = runner.get("baseline_only", False)
+if baseline != (runner["kernel"] == "ws32_prefill_baseline"):
+    raise SystemExit("baseline classification drifted")
+if baseline:
+    from scripts.greenfield.microbench_fp8_matmul import _validate_shape_contract, _validate_sampling_contract
+    m, k = runner['shape']['lhs']
+    n = runner['shape']['output'][1]
+    _validate_shape_contract(kernel=runner['kernel'], rows=m, contraction=k, output_width=n)
+    _validate_sampling_contract(kernel=runner['kernel'], diagnostic_reference_timing=runner['diagnostic_only'],
+                                warmup=runner['warmup'], iterations=runner['iterations'])
+    if runner['dtype_contract']['output'] != 'float32' or not runner['compiled_memory_estimate']:
+        raise SystemExit('baseline dtype/memory evidence missing')
 diagnostic_reference = runner.get("reference_diagnostic")
 if bool(diagnostic_reference) != runner.get("diagnostic_only"):
     raise SystemExit("reference diagnostic identity drifted")
@@ -265,7 +323,9 @@ shape_ids = {
     "dsa_wk": "m1_k6144_n128",
     "single_up_m1": "m1_k6144_n2048",
 }
-if runner["kernel"] == "structured_kv_b":
+if baseline:
+    item_id = f"baseline_m{m}_k{k}_n{n}"
+elif runner["kernel"] == "structured_kv_b":
     item_id = "h16_p192_l512_v256"
 elif runner["kernel"] == "selected_swiglu_down":
     item_id = "m8_k2048_n6144"
@@ -343,12 +403,39 @@ PY
   sha256sum runner.json runner.log summary.json results_ckpt.db census_pre.txt
 ) >"$RUN_DIR/evidence.sha256"
 
-strict_census post || {
-  say "ABORT: post-run census is not eight-host zero work"
-  exit 1
-}
-post_census_done=1
 sha256sum "$RUN_DIR/census_post.txt" >>"$RUN_DIR/evidence.sha256"
+if [[ $KERNEL == ws32_prefill_baseline ]]; then
+  sha256sum "$RUN_DIR/devices_pre.txt" "$RUN_DIR/devices_post.txt" >>"$RUN_DIR/evidence.sha256"
+  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" <<'PY'
+import json
+from hashlib import sha256
+from pathlib import Path
+import sys
+from google.cloud import storage
+from scripts.greenfield.collect_ws32_worker_evidence import digest_file, publish_exact
+root, pin = Path(sys.argv[1]), sys.argv[2]
+bucket = storage.Client().bucket('driftbench-dsv4-uc')
+receipts = []
+for path in sorted(root.rglob('*')):
+    if not path.is_file() or path.name in ('SUCCESS', 'archive_receipts.json'):
+        continue
+    facts = digest_file(path)
+    receipts.append(publish_exact(bucket, f'results/{root.name}/{path.relative_to(root)}',
+                                  path, facts, compressed=False))
+ledger = root / 'archive_receipts.json'
+ledger.write_text(json.dumps(receipts, indent=2, sort_keys=True) + '\n')
+publish_exact(bucket, f'results/{root.name}/{ledger.name}', ledger, digest_file(ledger), compressed=False)
+terminal = root / 'SUCCESS'
+terminal.write_text(json.dumps(dict(tag=root.name, code_hash=pin, baseline_only=True, performance_claim=False,
+    summary_sha256=sha256((root/'summary.json').read_bytes()).hexdigest(),
+    archive_receipts_sha256=sha256(ledger.read_bytes()).hexdigest()), sort_keys=True) + '\n')
+print(json.dumps(publish_exact(bucket, f'results/{root.name}/SUCCESS', terminal,
+                              digest_file(terminal), compressed=False), sort_keys=True))
+PY
+  say "BASELINE_SUCCESS ARCHIVE=$REMOTE_PREFIX (not model performance proof)"
+  trap - EXIT
+  exit 0
+fi
 touch "$RUN_DIR/SUCCESS"
 
 gcloud storage cp --recursive --no-clobber "$RUN_DIR/hlo" \

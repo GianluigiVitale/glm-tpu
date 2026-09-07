@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+The `ws32-prefill-real-shape-baseline` registry entry adapts the old FP8 microbenchmark with
+a distinct default-off mode: rows8/32/128/256, K1536 N2048, F32 local partial. Old decode
+shapes and tolerances stay fixed. It reuses the WS32 lock observer and generation-qualified
+publisher, adds independent root accelerator-holder checks, and caps each runner at600s.
+This is a synthetic-input single-chip baseline, not a whole expert, layer or engine result.
+VMEM peak and bitwise batched-versus-serial TPU agreement remain separate open evidence.
+
 Historical no-rerun/one-row instructions below describe the old Gate D campaigns; §21/§22 closed
 those gates and §24 now requires a new multirow prefill architecture. Keep the old evidence, not
 its obsolete next-action sequence. Decode still has exactly one live row.

@@ -14323,3 +14323,23 @@ Existing one-row decoder/weight paths remain byte-unchanged. Formatting used ins
 Next: bounded real-shape baseline harness extension and grouped-MoE/causal-layer implementation.
 `PREFILL_COST_MODEL.md` explains the required baseline shapes/budgets; no final TTFT target is
 registered and no optimized TPU trial is launched. No next serial depth0.95 or256K campaign.
+
+## 2026-09-07 — bounded real-shape prefill baseline harness ready
+
+Added the explicit `ws32_prefill_baseline` kernel mode to the existing FP8 runner/wrapper:
+synthetic distinct rows8/32/128/256, local routed-up projection K1536 N2048, existing F32
+raw-FP8 primitive,200/1000 sampling,600s runner deadline+30s grace. Historical shapes remain
+fixed. HLO/reference checks retained; baseline classification and exact M/K/N DB identity.
+Compiler HBM estimate and device stats are not VMEM peak; no bitwise TPU row claim.
+
+Baseline-only root census reuses the reviewed lock observer and checks actual accelerator
+holders independently, with stable canonical four-device identities and current greenfield
+Python entrypoint rejection. Both leases/full Ray-container census stay. Recheck source after
+leases, post-census before successful DB finalization, empty remote prefix before launch;
+baseline archive uses existing generation-qualified size/CRC/SHA publisher and bound SUCCESS.
+Independent Astra review: PASS for persistence/first bounded TPU baseline, no P0-P2 findings.
+29 CPU admission/legacy harness/registry tests passed1.84s; bash syntax and git diff checks pass.
+
+Next after commit/push/mirror: one serialized rows8 baseline; inspect HLO, correctness,
+compiled/device memory and timing before32/128/256. Stop/diagnose first failure. No full-model
+load, new checkpoint, serial L7/L8, production promotion or final TTFT target follows from this.
