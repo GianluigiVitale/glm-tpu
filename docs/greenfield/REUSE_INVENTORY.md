@@ -2,6 +2,16 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Grouped schedule implementation now uses the pinned JAX metadata directly, not stock gmm:
+`prefill_routes.py`, `pallas/prefill_grouped_fp8.py`, and `ws32_prefill_moe.py` are unwired.
+CPU comparisons cover route permutation/counts, empty/skewed owners, shared tile boundaries,
+F32/BF16 projection, ninth contraction scale block and complete mapped MoE arithmetic.
+Forced32 CPU MoE equals the old one-row path bitwise at17 rows, distributed and all8B routes
+on one owner. Exact groups4/8 only; CPU XLA merges independent feature sums into one tuple.
+Explicit validity must enter all-chip serving health before any integration. Reviewer caught
+an int32 offset-addition overflow; fixed with a static subtraction bound and extreme tests.
+TPU arithmetic/VMEM/real-layer performance remain open. No model loader/decoder changed.
+
 The `ws32-prefill-real-shape-baseline` registry entry adapts the old FP8 microbenchmark with
 a distinct default-off mode: rows8/32/128/256, K1536 N2048, F32 local partial. Old decode
 shapes and tolerances stay fixed. It reuses the WS32 lock observer and generation-qualified

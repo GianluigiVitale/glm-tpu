@@ -14360,3 +14360,26 @@ Megablox `make_group_metadata`/dynamic active-tile schedule is the selected impl
 reference, not its BF16-weight gmm execution. Design in PREFILL_GROUPED_MOE_DESIGN.md.
 Keep flat original token/route-slot identity, skip empty groups, zero unowned rows, allow all8B
 routes on one expert owner, and restore the exact existing BF16 route reduction expression.
+
+## 2026-09-07 — grouped raw-FP8 MoE implemented, CPU-admitted, unwired
+
+New `kernels/prefill_routes.py`, `pallas/prefill_grouped_fp8.py`, `ws32_prefill_moe.py`.
+Native stable route permutation/counts; pinned installed JAX metadata schedules active group
+row tiles only; raw-U8 checkpoint indexing, FP32 scale metadata, initialized output alias and
+masked shared-row-tile stores. No full-B compute per expert or decoded expert-table overlay.
+F32 feature4 gate/up reduction, original BF16 activation/down/route-slot sum, expert8 combine.
+Invalid dynamic inputs propagate explicit health; future serving must gate all chips on it.
+
+Initial17 CPU tests passed8.01s. Adversarial review caught int32 group-offset addition overflow;
+fixed with subtraction bound, extreme-value tests. Expanded grouped projection suite6 passed
+6.46s (multiple output blocks and ninth K-scale block). Forced32 MoE test passed6.37s,17 rows,
+64 experts/top8, distributed and all8B routes on one owner; bitwise old one-row output and
+physical groups4/8. CPU optimizer combines two independent feature sums into one tuple call;
+the initial test's source-level count expectation was corrected after inspecting lowering.
+Reviewer PASS for persistence; production-sized TPU arithmetic/HBM/performance remain OPEN.
+No decoder/loader/old kernel changed, no TPU work launched for this implementation.
+Combined routing/grouped/MoE/multirow-linear/primitive/registry CPU suite:32 passed27.35s.
+
+Next: complete phase-budget DSA/attention/collective baselines and bounded grouped TPU arithmetic
+admission, before optimized performance promotion; then causal layers/short decoder and all
+efficient L7/L8. Do not promote current CPU mechanisms or DB576–579 to engine throughput.

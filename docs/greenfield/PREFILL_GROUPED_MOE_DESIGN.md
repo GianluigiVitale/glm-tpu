@@ -1,7 +1,7 @@
 # Grouped MoE prefill — bounded implementation design
 
-2026-09-07. Main-agent inspection plus independent Astra scheduling advice. Design only;
-not implemented/admitted. §24 and existing numerical/locality contracts govern.
+2026-09-07. Main-agent implementation plus independent Astra scheduling/code review.
+CPU-admitted, unwired; no TPU or production admission. §24 and existing contracts govern.
 
 ## Decision and sources
 
@@ -66,3 +66,28 @@ forced32 CPU collective tests. Real-shape one-layer TPU comes before a short ful
 Both CPU and real TPU must test skew, tails, zero scales and exact restoration; no whole-model
 performance claim from metadata tests or a single projection. In parallel, bounded existing
 DSA/attention/collective baseline measurements complete the §24 target-registration budget.
+
+## CPU implementation admission
+
+Implemented `kernels/prefill_routes.py`, `kernels/pallas/prefill_grouped_fp8.py`, and
+`kernels/ws32_prefill_moe.py`. No decoder imports them. Routing sort/inverse/counts retain
+every route; grouped calls use dynamic active tile count, initialized output alias, masked
+boundary revisits and group-indexed U8 weight/FP32 scale tiles. Invalid counts/offsets skip
+the grouped call and return zeros/false health. Invalid/duplicate routes and bad route weights
+propagate false health from MoE. Every future serving caller must collect all-chip health;
+these APIs do not claim standalone exception-based runtime enforcement.
+
+Initial routing/primitive suite17 tests passed8.01s. Review found int32 overflow in the offset
+upper-bound addition; changed to `offset <= global_groups-local_groups` with INT_MAX tests.
+Expanded primitive suite6 tests passed6.46s, including two output blocks and K1152 crossing
+the ninth scale block. Forced32 CPU MoE test passed6.37s:17 rows,64 experts/top8,
+hidden128/intermediate32/block32, distributed routes and all136 routes on one owner. Outputs
+are bit-identical to the old one-row Pallas MoE path, including zero hidden/scales/route weight.
+Small geometry is CPU semantic admission only; production128×128 blocks and real weights
+still require TPU proof.
+
+CPU HLO has exactly one feature4 tuple all-reduce and one expert8 all-reduce: XLA combined
+the two independent feature sums. Initial test expected three source-level calls and failed
+only at that count, after numerical identity passed; it now verifies the actual optimized
+count and exact membership. No collective exemption or production linter changed. Independent
+Astra review PASS for CPU-stage persistence after the offset fix; not TPU execution approval.

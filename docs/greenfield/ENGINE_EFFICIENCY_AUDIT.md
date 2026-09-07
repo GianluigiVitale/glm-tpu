@@ -231,3 +231,9 @@ and `../artifacts/prefill-fp8-real-shape-baseline-20260907.json`. This resolves 
 question whether the existing raw-FP8 primitive can execute these live row counts efficiently
 at this local shape. It does NOT resolve E1, grouped expert reuse, causal layers or TTFT.
 Next use grouped-row scheduling; do not write another standalone matmul just to obtain rows.
+
+Grouped execution is now implemented as an unwired candidate (`PREFILL_GROUPED_MOE_DESIGN.md`):
+active expert-row tile schedule, raw-FP8 tile reuse and original route-slot restoration.
+Forced32 CPU output equals the existing MoE path bitwise for distributed and worst-owner
+routing, with only physical subgroup4/8 collectives. This resolves the CPU mechanism part of
+E2; it does not establish TPU arithmetic, grouped performance, full prefill or TTFT.
