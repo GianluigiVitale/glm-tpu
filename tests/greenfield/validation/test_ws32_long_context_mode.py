@@ -342,13 +342,127 @@ def test_the_criterion_loads_the_legacy_extractor_by_path_not_by_name() -> None:
     """
     source = RUNNER.read_text(encoding="utf-8")
     assert "import bench." not in source
-    assert source.count('load_legacy_bench_module("glm_longctx")') == 2
+    assert source.count('load_legacy_bench_module(\n        "glm_longctx"') == 2
 
     from glm_tpu.greenfield.validation import load_legacy_bench_module
 
-    module = load_legacy_bench_module("glm_longctx")
+    pinned = _pinned_legacy_files()
+    module = load_legacy_bench_module("glm_longctx", pinned_files=pinned)
     assert module.__name__ == "greenfield_legacy_bench_glm_longctx"
     assert module.extract_passkey("the key is 891482.") == "891482"
-    assert load_legacy_bench_module("glm_longctx") is module
+    assert load_legacy_bench_module("glm_longctx", pinned_files=pinned) is module
     with pytest.raises(ValueError):
-        load_legacy_bench_module("os")
+        load_legacy_bench_module("os", pinned_files=pinned)
+
+
+def _pinned_legacy_files() -> dict:
+    """The legacy bench digests the 128K d1.0 capture recorded."""
+    import json
+
+    from glm_tpu.greenfield.validation.long_context_oracle import (
+        WS32_LONG_CONTEXT_PROFILES,
+    )
+
+    entry = WS32_LONG_CONTEXT_PROFILES["128k_d1_0"]
+    oracle_dir = next(
+        (
+            Path("/home/gianl/gcs-models/oracles/greenfield/glm52/long_context")
+            / entry["profile"]
+        ).glob("*/oracle")
+    )
+    manifest = json.loads((oracle_dir / "manifest.json").read_text(encoding="utf-8"))
+    return manifest["legacy_bench_files"]
+
+
+def test_the_legacy_extractor_must_be_the_captures_own_bytes() -> None:
+    """A criterion computed from other bytes is not the legacy criterion."""
+    from glm_tpu.greenfield.validation import load_legacy_bench_module
+
+    pinned = _pinned_legacy_files()
+    tampered = {
+        name: (dict(record, sha256="0" * 64) if name == "extract.py" else record)
+        for name, record in pinned.items()
+    }
+    with pytest.raises(ValueError, match="not the pinned capture"):
+        load_legacy_bench_module("glm_longctx", pinned_files=tampered)
+    with pytest.raises(ValueError, match="pins no digest"):
+        load_legacy_bench_module(
+            "glm_longctx",
+            pinned_files={
+                name: record
+                for name, record in pinned.items()
+                if name != "provenance.py"
+            },
+        )
+    with pytest.raises(ValueError):
+        load_legacy_bench_module("glm_longctx", pinned_files={})
+
+
+def test_an_l8_run_is_not_required_to_emit_the_legacy_two_hundred_fifty_six() -> None:
+    """The E0 capture holds 256 diagnostic ids; the run observes 29 tokens.
+
+    Requiring the engine to emit as many tokens as a capture it does not answer
+    would refuse every sealable L8 run AFTER its ten-hour prefill.
+    """
+    from glm_tpu.greenfield.validation.long_context_oracle import (
+        WS32_LONG_CONTEXT_PROFILES,
+    )
+
+    entry = WS32_LONG_CONTEXT_PROFILES["256k_e0"]
+    assert entry["generated_token_count"] == 256
+    observed = 1 + 14 + 2 + 10 + 2
+    assert observed < entry["generated_token_count"]
+
+    source = SEALER.read_text(encoding="utf-8")
+    start = source.index("or len(observed_token_ids) < (")
+    block = source[start : source.index("raise SystemExit", start)]
+    assert 'long_context.kind != "passkey"' in block
+    passkey = WS32_LONG_CONTEXT_PROFILES["128k_d1_0"]
+    assert 1 + 20 + 2 + 10 + 2 >= passkey["generated_token_count"]
+
+
+def test_a_long_context_seal_checks_the_enforcement_surface() -> None:
+    """The §23.5 rules are source in this tree; a §23.5 seal must check it.
+
+    A long-context run binds no §21.2 record, so before this the runs those
+    rules govern were the only ones sealing with the tree unchecked.
+    """
+    source = SEALER.read_text(encoding="utf-8")
+    assert (
+        "if args.dsa_adjudication_record is not None or long_context is not None:"
+        in source
+    )
+    start = source.index(
+        "if args.dsa_adjudication_record is not None or long_context is not None:"
+    )
+    block = source[start : source.index("enforcement_surface = None", start)]
+    for check in (
+        "_require_imports_come_from",
+        "_require_clean_worktree",
+        "_enforcement_surface_identity",
+        "_require_reviewed_enforcement",
+    ):
+        assert check in block
+
+
+def test_the_criterions_own_code_is_on_the_enforcement_surface() -> None:
+    """The sealer executes the runner's rule, which runs the legacy extractor."""
+    from importlib import util as _util
+
+    spec = _util.spec_from_file_location("_ws32_sealer_surface", SEALER)
+    module = _util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    surface = set(module._ENFORCEMENT_SURFACE)
+    assert "scripts/greenfield/run_short_decoder_ws32.py" in surface
+    assert "bench/glm_longctx.py" in surface
+    assert "bench/extract.py" in surface
+
+
+def test_a_long_context_run_never_reports_a_verified_token_count() -> None:
+    """A cardinality independent of any match must not read as verification."""
+    source = SEALER.read_text(encoding="utf-8")
+    start = source.index('"verified_generated_token_count": (')
+    block = source[start : source.index("),", start)]
+    assert "legacy_diagnostic" not in block
+    condensed = " ".join(block.split())
+    assert "None if long_context is not None" in condensed

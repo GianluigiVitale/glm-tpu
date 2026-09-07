@@ -222,10 +222,15 @@ class LongContextOracleConfig:
 
 
 _FORBIDDEN_IMPORTS = ("vllm", "tpu_inference", "torch", "jax", "ray")
-_LEGACY_MODULE_CACHE: dict[str, Any] = {}
+_LEGACY_MODULE_CACHE: dict[tuple[str, str, str], Any] = {}
 
 
-def load_legacy_bench_module(name: str, *, repository_root: Path | None = None) -> Any:
+def load_legacy_bench_module(
+    name: str,
+    *,
+    pinned_files: Mapping[str, Mapping[str, Any]],
+    repository_root: Path | None = None,
+) -> Any:
     """Load one legacy bench module from its FILE, under a private module name.
 
     ``bench/`` is a namespace package whose modules put their own directory on
@@ -236,19 +241,38 @@ def load_legacy_bench_module(name: str, *, repository_root: Path | None = None) 
     loads the file itself rather than trusting the import system's cache.
     """
 
-    if name not in _LEGACY_BENCH_MODULES and f"{name}.py" not in _LEGACY_BENCH_MODULES:
+    if f"{name}.py" not in _LEGACY_BENCH_MODULES:
         raise ValueError(f"{name!r} is not one of the pinned legacy bench modules")
-    cached = _LEGACY_MODULE_CACHE.get(name)
-    if cached is not None:
-        return cached
     root = (
         Path(__file__).resolve().parents[3]
         if repository_root is None
         else Path(repository_root)
     ) / "bench"
+    # The capture recorded the sha256 of every legacy bench file it ran. The
+    # module loaded here imports its siblings, so ALL of them are bound, not
+    # just the named one: a criterion computed from different bytes than the
+    # capture used is not the legacy criterion.
+    if not pinned_files:
+        raise ValueError("legacy bench modules need the capture's pinned digests")
+    digests: dict[str, str] = {}
+    for filename in sorted(_LEGACY_BENCH_MODULES):
+        record = pinned_files.get(filename)
+        if record is None:
+            raise ValueError(f"the capture pins no digest for {filename}")
+        path = root / filename
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        observed = sha256(path.read_bytes()).hexdigest()
+        if observed != record.get("sha256"):
+            raise ValueError(
+                f"legacy bench module {filename} is not the pinned capture's bytes"
+            )
+        digests[filename] = observed
+    key = (str(root), name, digests[f"{name}.py"])
+    cached = _LEGACY_MODULE_CACHE.get(key)
+    if cached is not None:
+        return cached
     path = root / f"{name}.py"
-    if not path.is_file():
-        raise FileNotFoundError(path)
     before = set(sys.modules)
     inserted = str(root) not in sys.path
     if inserted:
@@ -272,7 +296,7 @@ def load_legacy_bench_module(name: str, *, repository_root: Path | None = None) 
         raise ImportError(
             f"legacy bench import crossed the model-execution boundary: {offenders}"
         )
-    _LEGACY_MODULE_CACHE[name] = module
+    _LEGACY_MODULE_CACHE[key] = module
     return module
 
 

@@ -262,6 +262,12 @@ _ENFORCEMENT_SURFACE = (
     "glm_tpu/greenfield/types.py",
     "configs/glm-5.2-fp8-config.json",
     "docs/artifacts",
+    # The sealer recomputes the §23.5 token verdict by executing the runner's
+    # own rule, and that rule runs the legacy extractor; both decide what a
+    # seal accepts, so both are part of what a reviewer must have reviewed.
+    "scripts/greenfield/run_short_decoder_ws32.py",
+    "bench/glm_longctx.py",
+    "bench/extract.py",
 )
 # `docs/artifacts` legitimately holds untracked outputs of the offline
 # adjudicator (§21.2 calls prior attempts untracked and requires them to be left
@@ -580,11 +586,17 @@ def _validate(args: argparse.Namespace) -> int:
     repository_root = Path(__file__).resolve().parents[2]
     if args.recovery_code_hash and not re.fullmatch(r"[0-9a-f]{40}", args.recovery_code_hash):
         raise SystemExit("WS32 recovery code hash must be a full commit id")
-    if args.dsa_adjudication_record is not None:
+    if args.dsa_adjudication_record is not None or long_context is not None:
         # §21.2: the reviewed reference-row registry lives in this repository's
         # own source, so a dirty working tree at seal time can widen what is
         # accepted and then be reverted without leaving a trace in the record.
         # An adjudicated seal therefore requires a clean tree.
+        #
+        # §23.5 seals require it for the same reason: the label-to-identity
+        # table and the profile refusal that keep a long-context label bound to
+        # its own sealed capture are source in this tree, and a §23.5 run binds
+        # no adjudication record, so without this clause the runs those rules
+        # govern would be the only ones sealing with them unchecked.
         _require_imports_come_from(repository_root)
         _require_clean_worktree(repository_root)
         enforcement_surface = _enforcement_surface_identity(repository_root)
@@ -1046,9 +1058,17 @@ def _validate(args: argparse.Namespace) -> int:
                 or len(observed_token_ids) != expected_observed_count
                 or any(type(token) is not int for token in observed_token_ids)
                 or len(observed_token_ids) < (
-                    long_context.generated_token_ids.size
-                    if long_context is not None
-                    else oracle.generated_token_ids.size
+                    # §23.5: the legacy ids are a diagnostic reference, not an
+                    # answer key. Only L7 reads a fixed number of them (the
+                    # twenty its criterion detokenises); requiring an L8 run to
+                    # emit the legacy 256 would refuse every sealable L8 run.
+                    0
+                    if long_context is not None and long_context.kind != "passkey"
+                    else (
+                        long_context.generated_token_ids.size
+                        if long_context is not None
+                        else oracle.generated_token_ids.size
+                    )
                 )
             ):
                 raise SystemExit(f"WS32 raw-token cardinality drifted rank {rank}")
@@ -1346,15 +1366,12 @@ def _validate(args: argparse.Namespace) -> int:
                 "steady_wall_tokens_per_second": float(1000.0 / np.percentile(critical, 50)),
                 "token_comparison": records[0]["token_comparison"],
                 "verified_generated_token_count": (
-                    # §23.5: L7 verifies the passkey extracted from the tokens its
-                    # criterion detokenised; L8 verifies no token at all.
-                    (
-                        None
-                        if long_context.kind != "passkey"
-                        else int(
-                            records[0]["token_comparison"]["legacy_diagnostic"]["compared"]
-                        )
-                    )
+                    # §23.5 verifies NO token at these lengths. L7 verifies an
+                    # extracted passkey; the count of ids its criterion happened
+                    # to detokenise is a cardinality, independent of whether any
+                    # id matched, and reporting it here would read as a
+                    # raw-token claim the run is forbidden to make.
+                    None
                     if long_context is not None
                     else int(records[0]["token_comparison"]["compared_count"])
                 ),
@@ -1600,12 +1617,18 @@ def _require_imports_come_from(repository_root: Path) -> None:
 
     from glm_tpu.greenfield import types as greenfield_types
     from glm_tpu.greenfield.kernels.reference import rotary as reference_rotary
-    from glm_tpu.greenfield.validation import ws32_first_divergent_event, ws32_short_context
+    from glm_tpu.greenfield.validation import (
+        long_context_oracle,
+        ws32_first_divergent_event,
+        ws32_short_context,
+    )
 
     root = Path(repository_root).resolve()
     for module in (
         ws32_short_context,
         ws32_first_divergent_event,
+        # §23.5: the label-to-identity table and the profile refusal.
+        long_context_oracle,
         reference_rotary,
         greenfield_types,
     ):
@@ -2023,8 +2046,16 @@ def _run_environment(summary: dict[str, Any]) -> dict[str, Any]:
         "capacity_measurement": summary.get("capacity_measurement"),
         "rotary_diagnostic": summary.get("rotary_diagnostic"),
         # §23.5: which sealed long-context capture this run answered, so the DB
-        # row is bound to the profile and not merely to the context label.
-        "long_context": summary.get("long_context"),
+        # row is bound to the profile and not merely to the context label. Rows
+        # are resolved for rollback by exact equality on this dictionary, so the
+        # key is present only when there IS a long context: adding it
+        # unconditionally would make every previously published row
+        # unresolvable, and rollback reports "nothing to do" rather than failing.
+        **(
+            {}
+            if summary.get("long_context") is None
+            else {"long_context": summary["long_context"]}
+        ),
     }
 
 

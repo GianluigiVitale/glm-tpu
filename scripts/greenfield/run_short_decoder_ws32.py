@@ -576,7 +576,9 @@ def _long_context_token_result(
         raise ValueError("WS32 passkey mode needs --tokenizer-root to detokenise")
     from transformers import AutoTokenizer
 
-    longctx = load_legacy_bench_module("glm_longctx")
+    longctx = load_legacy_bench_module(
+        "glm_longctx", pinned_files=long_context.manifest["legacy_bench_files"]
+    )
 
     tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_root), trust_remote_code=True)
     text = tokenizer.decode(observed_tokens[: int(legacy.size)], skip_special_tokens=True)
@@ -601,7 +603,9 @@ def _require_passkey_tooling(long_context: Any, tokenizer_root: Path | None) -> 
         raise ValueError("WS32 passkey mode needs --tokenizer-root to detokenise")
     from transformers import AutoTokenizer
 
-    longctx = load_legacy_bench_module("glm_longctx")
+    longctx = load_legacy_bench_module(
+        "glm_longctx", pinned_files=long_context.manifest["legacy_bench_files"]
+    )
 
     tokenizer = AutoTokenizer.from_pretrained(
         str(tokenizer_root), trust_remote_code=True
