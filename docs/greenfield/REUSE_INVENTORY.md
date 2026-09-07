@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+DB584 now closes complete real layer0 bounded admission:3cases32owners, all original
+numeric/cache/causal/intervention replays pass, local HLO and measured HBM, durable
+archive+8/8 clean. Reuse for next layer3/IndexShare+MoE; no more layer0 arithmetic probe.
+Compact record `../artifacts/prefill-complete-layer0-admission-20260907.json`. Layer3
+compiler helper profile still requires acquisition; full-prefill speed is unmeasured.
+
 Actual layer0 empty/boundary TPU cases pass all32 owners with original NPZ replay.
 Tail fixture transfer exposed JAX global device_put's NaN-unequal multihost assertion.
 Reuse JAX `make_array_from_callback` for explicitly sharded initial host fixtures after

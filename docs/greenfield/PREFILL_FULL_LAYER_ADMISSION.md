@@ -158,3 +158,14 @@ owned slices with explicit sharding callbacks. This is initial fixture transfer 
 all executables, not model transport.78CPU tests and narrow independent review pass.
 Original failed tag/bindings in `prefill-layer-tail-transfer-failure-20260907.json`;
 complete admission remains open until all three cases pass in a fresh protected tag.
+
+## Layer0 closed — DB584, 2026-09-07 23:34Z
+
+Fresh tag `greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T233201686218983Z`
+atf2fb1141 passes all3 cases/all32 owners with generation-bound original-array replay,
+exact HLO/local groups and47,517,696B maximum per-chip measured HBM including reference.
+Written KV/index/repair and carried residual cross-path errors0; output worstabs6.10e-5.
+DB584, same-region terminal SUCCESS, authenticated root+normal8/8 clean. Compact pins
+in `../artifacts/prefill-complete-layer0-admission-20260907.json`; HANDOFF has exact tag.
+No warm timings/full-model/legacy equivalence claim. Layer3 remains required; its helper
+inventory needs its own bounded compile acquisition before numerical execution.

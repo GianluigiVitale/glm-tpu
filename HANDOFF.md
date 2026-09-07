@@ -14954,3 +14954,40 @@ refuses before transfer. No arithmetic, fixture, tolerance or checkpoint modific
 tests. Independent Astra narrow correction PASS, no P0-P2; approves ONE new layer0 retry
 after persistence/mirror/fresh guards. Layer3 remains conditional and its compiler-helper
 inventory unregistered. No full-layer admission, full-prefill speedup or completion claim.
+
+## 2026-09-07 23:38Z — complete real layer0 admission SEALED DB584
+
+`greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T233201686218983Z`,
+pin `f2fb11418a82a09d11dff43499dce6b4c9da0f9c`, wrapper exit0 at23:34:43Z.
+All3 cases (empty17, boundary505/17, padded-tail505/11), original-array numerical and
+metamorphic checks pass32owners. Full DSA+dense real weights, synthetic input/cache
+state; raw scalar reference, NOT promoted decoder/legacy/full-model equivalence.
+All cases' written KV/index/repair and carried residual comparisons max error0;
+worst output max6.103515625e-5, per-owner aggregate p99<=1.52587890625e-5,
+mean<=2.767939804471098e-6. Own-input M64, own-score selection/ties, exact untouched
+bytes, future-row isolation, repaired-history independence, padding and bad-metadata
+no-write/health gates pass. Below-top2048 prefixes do not prove cutoff stability.
+
+Exact HLO feature4/expert8 payloads,12 Pallas+registered22 compiler helpers pass.
+Candidate StableHLO b2cbcddf35612bba3f45d1c05a2aa0e573e5134d4bf3a96aedf6f8fc04fef35e;
+optimized febaf009c14629283f58ce2b46ca9a7e03e38f4bd1b369239ec98742312f05f6.
+Measured max peak HBM47,517,696B/chip INCLUDING reference/side programs,32device records.
+Selected tensor hashes pass original ledger on32 owners. No full model/checkpoint copy.
+Worker/collector phase108s; NULL latency/no timed samples/no performance claim.
+
+DB584 item `complete_layer0_b17_raw_reference_empty_boundary_tail_v1`, correctness1,
+latencyNULL. Remote SUCCESS generation1788824083760646,
+SHA b43adbdaeffb00a5ec10535d6c45a9098cc86ab5a4d9a4f586723f7fbaed35e9;
+summary86593800c98970b7af3e3228fc280d6ecd23ca300487e9be9a9d693d07b53785;
+archive ledger11bee08842c8e607334c8a84236244710bf4139866098d4f4599c9e5b37c3e7e.
+Parent independently read terminal/summary/ledger at exact generations, replayed all8
+local originals through validate_files and aggregate against original checkpoint ledger,
+checked DB item and generation-bound normal/root8/8 clean postcensuses. Compact record:
+`docs/artifacts/prefill-complete-layer0-admission-20260907.json`.
+
+Independent Astra terminal-result audit PASS, no P0-P2. Next ONE layer3 acquisition through same guarded wrapper
+with GLM_GREENFIELD_PREFILL_LAYER=3. Its compiler-helper profile is intentionally
+unregistered, so expect pre-execution structural refusal, inspect actual original HLO,
+register exact helpers with narrow review, then numerical admission. No blind helper
+allowlist, no repeated layer0 test. After layer3: short complete decoder/own§21,
+registered prefill/TTFT targets, all4 efficientL7 and fullL8. No TPU workflow now live.

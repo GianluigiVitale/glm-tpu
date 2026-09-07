@@ -364,3 +364,9 @@ replayed from all8 generation-bound publications. Tail failed at input transfer 
 JAX's numerical cross-host equality (NaN!=NaN), not model arithmetic. Keep the NaN
 padding challenge: authenticate fixture bytes collectively, then transfer owned slices.
 78CPU tests+review pass; all3 cases still need a complete protected admission.
+
+DB584 completes real layer0/fullDSA+dense bounded TPU admission: all3 cases32owners,
+original-array replay, exact causal/cache/health tests, local HLO and47.5MB peak HBM
+including reference. Written cache/carried errors0; output worstabs6.10e-5. All8 clean,
+terminal archived. This is E1's first complete-layer hardware correctness proof, not
+full-model/legacy numerical admission or a speedup. Next layer3 then short decoder.
