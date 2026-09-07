@@ -14279,3 +14279,47 @@ causality/DSA/repair and short decoder follow. Keep the decode one-row path unch
 At18:36Z the original controller2410602 and its exact sealer child2459871 were live; the sealer
 had accumulated approximately10min CPU time from its pinned checkout. Numerical rank0 reports
 OK, but no SUCCESS was observed. Preserve/seal that run; no next serial long run is authorized.
+
+## 2026-09-07 18:42Z — original depth0.05 sealed DB575; source freeze ended
+
+Original tag `greenfield_ws32_short_decoder_128k_d0_05_numerical_cap131072_hrope_20260907T132148212467000Z`
+sealed with original execution AND sealing pin `a9bfbbb3c42c7bf46662b5b91cad19bbacb18668`.
+Controller2410602 exited0 at18:42:05; its pidfd observer completed and sealer2459871 ended.
+No recovery or numerical rerun. `census_post.txt` has8 distinct authenticated CENSUS_OK hosts.
+No model/controller remains live. Do not restart, recover or extend this tag.
+
+Protected result: passkey824794 correct, classification
+`PASSKEY_EXACT;DSA_WITHIN_ENGINE_EXACT;STATE_CACHE_EXACT_STRUCTURE;NO_CROSS_ORACLE;PROTECTED_WALL_TRACE_HBM;LONG_CONTEXT_128K_D0_05;CONTEXT_CAPACITY_131072;MAIN_ROTARY_HOST_TABLE_LEGACY_FAITHFUL`.
+Fleet p50 **141.626199ms**, p99 **144.71568376ms**, **7.0608404876 wall tok/s**;
+prefill rank0 **16373.59536371s**, fleet max **16404.818166352s**. Peak **27810852864B/chip**,
+headroom **5203546112B**.8 XPlanes/64 cores. Serial reference only under §24.
+
+Local root `/home/gianl/glm-run/<tag>`; approved remote `gs://driftbench-dsv4-uc/results/<tag>`.
+
+- Summary identity `ac781ce018cf498d734a7db534fe3560b960d81583a2cedc5220c2b3c93f37f9`.
+- SUCCESS identity `5c1cd033d9036f8bc913360a21ee98339323e5195f5f1ce82d96a55fbd1d0cbb`.
+- SUCCESS file SHA `a783a0f43e363c4407d2174d02b72152eae8e703438b69c6fd036b7b41e6e79a`,
+ 1023B, remote generation **1788806524332216**; generation-qualified remote bytes independently
+ hashed to the same SHA. Source ledger `6beef31b517d749acec6661ba6c75c2e334f260eae9f623e512ae7666fad7cbd`.
+- Remote ledger `6b2eb933f02ecea9e44b1db0db4066121ac4fc37443949c0f88243ea5df68f0c`, generation1788806521341862.
+- DB575 record `a5128523badd517387e2d8a9278445a4534eef0dde2a6a56e874e1b6c386300f`, snapshot
+ `7d57c5abe8ede9a19b8a25a244a5d37eb8c9e55046e31ce0ea9657fa685ee00c`.
+ Live DB row checked at `/home/gianl/glm-tpu/bench/results.db`, `runs.run_id=575`, harness pin
+ `a9bfbbb`; the rewrite's local DB is not that live ledger. Repositories remain backed up by the
+ approved mirror, including the main checkout's live DB.
+
+## 2026-09-07 — first actual multirow consumers, CPU-admitted and unwired
+
+After the original seal completed, added `glm_tpu/greenfield/kernels/ws32_prefill_linear.py`:
+feature/expert projections and reciprocal dense MLP reuse existing multirow raw-FP8 calls,
+with exact old BF16/FP32 boundaries and no per-token scan. No decoder imports this module.
+This is NOT the StrategyND dense overlay; do not replace that path or borrow its correctness.
+New forced32 CPU test uses17 distinct rows and real subgroup topology semantics, compares
+both linear directions and dense against old one-row primitives bitwise and checks all
+collective memberships/sizes4/8 in compiled CPU HLO. Three new tests passed in4.53s; independent
+Astra review PASS for persistence only, explicitly not production-sized TPU or performance proof.
+Existing one-row decoder/weight paths remain byte-unchanged. Formatting used installed Black.
+
+Next: bounded real-shape baseline harness extension and grouped-MoE/causal-layer implementation.
+`PREFILL_COST_MODEL.md` explains the required baseline shapes/budgets; no final TTFT target is
+registered and no optimized TPU trial is launched. No next serial depth0.95 or256K campaign.

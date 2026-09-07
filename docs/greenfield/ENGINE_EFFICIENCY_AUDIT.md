@@ -218,3 +218,8 @@ No candidate speedup or completion ETA is established by this audit.
 First admission update: six CPU multirow FP8 cases (8/17/32 rows, zero/nonzero output tails)
 plus four reuse-registry checks passed,10 total in9.38s. No runtime/enforcement file changed
 while the original d0.05 seal was active. TPU association and performance remain unmeasured.
+
+After DB575 sealed, multirow feature/expert linear and reciprocal dense building blocks were
+added in `kernels/ws32_prefill_linear.py`, unwired/default-off. Three new tests passed in4.53s,
+including forced32 CPU bitwise row comparisons and exact subgroup4/8 HLO membership. They are
+not the StrategyND dense overlay and cannot replace it without new numerical evidence.

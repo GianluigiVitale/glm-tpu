@@ -11,10 +11,10 @@ GATE_D_LESSONS tails, docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md, then inspect l
 Native-JAX independent of legacy execution, existing8-host/32-chip pod. Efficient multi-token
 prefill AND protected batch-one decode at256K are required. Serial teacher-forcing is a reference,
 not production prefill; memory chunking is not token-parallel prefill.
-Preserve/seal the nearly finished d0.05 run without editing its code. DO NOT launch the next
+The original d0.05 run sealed DB575; do not rerun it. DO NOT launch the next
 serial128K/256K run. Pivot to batched prefill now: audit/design -> small exact layer/kernel
-experiments -> short full decoder -> efficient long-context proofs. No two-day serial campaign
-first. Long reference runs require an evidence gap, cost and review.
+experiments -> short decoder -> efficient long-context proofs.
+Long reference runs require an evidence gap, cost and review.
 
 ## Adversarial efficiency audit
 
@@ -55,7 +55,7 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 ## Snapshot
 
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
-D/G closed DB567/§22; B/B'/C closed DB568-572. L7 depths1.0/0.0 sealed DB573/574.
-d0.05 at a9bfbbb3: controller2410602/start101568006; original8 baseline watch.jsonl.
-HANDOFF has exact tag/paths/identities. Preserve this run, not the old serial-test sequence.
-L7/L8 and efficient-prefill completion remain open.
+D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
+DB575 exit0/8-host cleanup18:42Z; no model/controller live. HANDOFF has exact evidence.
+Multirow FP8/linear/dense CPU admission passes; no TPU speedup yet. Next: bounded real-shape
+baseline (PREFILL_COST_MODEL.md), grouped MoE/causal layers. Efficient L7/L8 remain open.

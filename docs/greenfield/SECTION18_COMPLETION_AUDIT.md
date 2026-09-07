@@ -20,7 +20,7 @@ the old §23 scope only; it is NOT approval of the expanded completion contract.
 | PP8 protected measurement; PP16 measurement or rejection | DB563 PP8 2K; §22.3 PP16 evidence-backed rejection | Closed under §22. Do not confuse historical PP16 synthetic full-decoder acquisition with protected numerical evidence (§22.5) |
 | WS32 measurement and fastest correct plan | DB553 versus DB563 at protected 2K; WS32 promoted §22 | Long-context gates must not expose a reason to reopen the documented plan decision |
 | Device and profiler-free wall agree | DB574 diagnostic comparison below; coverage alone is not numerical agreement | Compare final L8 trace durations and profiler-free distribution, disclose different windows/statistics, investigate material unexplained disagreement |
-| Four-depth 128K smoke | Serial DB573 depth1.0 and DB574 depth0.0 sealed | All four depths on the changed prefill candidate; old serial passes are reference evidence only |
+| Four-depth 128K smoke | Serial DB573 depth1.0, DB574 depth0.0 and DB575 depth0.05 sealed | All four depths on the changed prefill candidate; old serial passes are reference evidence only |
 | 256K E0 | Input capsule exists; capacity measured only | Full prompt, 256 profiler-free timed steps, p50/p99, generated IDs, HBM and eight-file/64-core XPlane; legacy comparison per §23.5 |
 | DB linkage and approved archive | Existing numerical rows have protected local/remote evidence | Final dependency map: run → inputs/checkpoint/overlay/acquisition → source/config/ledgers → DB/SUCCESS generation |
 | Authenticated eight-host zero-work cleanup | Existing sealed rows; DB574 original collection includes supplemental device-holder checks | Terminal final-run census; a free lease, dead controller or missing lockfile is not enough |
@@ -55,6 +55,7 @@ All archives below use `gs://driftbench-dsv4-uc/results/<tag>/`.
 |---|---|---|---|---|
 | 573 | 1.0 | `128k_d1_0_numerical_cap131072_hrope_20260907T012156230341652Z` | `795245b420a9a52d049678b00d044a521da11776056eb82e6fee511952c9cdfd` | `1788763301245387` |
 | 574 | 0.0 | `128k_d0_0_numerical_cap131072_hrope_20260907T064941550123130Z` | `f123beba8caab916e1307607ef28b294606c95338f3a7d431ce374a210900667` | `1788784016426688` |
+| 575 | 0.05 | `128k_d0_05_numerical_cap131072_hrope_20260907T132148212467000Z` | `5c1cd033d9036f8bc913360a21ee98339323e5195f5f1ce82d96a55fbd1d0cbb` | `1788806524332216` |
 
 Full summary/ledger/DB identities and the original recovery chain are in HANDOFF and
 [PERFORMANCE_LOG](PERFORMANCE_LOG.md). The compact supplemental collection record is
@@ -72,7 +73,7 @@ Use the same explicit definitions for the final run, including any observed host
 
 ## Finalization checklist
 
-1. Preserve/seal the current original depth0.05 run; no next serial long run. Complete the
+1. Original depth0.05 is sealed DB575; no next serial long run. Complete the
    efficiency audit/design, register targets and prove real multirow layers then the short decoder.
 2. Acquire the new candidate's graph sets and memory before efficient four-depth L7 and full L8.
    Do not reuse serial HLO hashes or serial L7 passes to certify the changed implementation.

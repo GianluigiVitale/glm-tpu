@@ -2,9 +2,9 @@
 
 Continue autonomously to full project completion under §18 amended by §24.
 Owner pivot 2026-09-07: efficient token-batched prefill is REQUIRED, not post-completion work.
-Preserve/seal the current depth0.05 run; no next serial128K/256K run. Audit → bounded multi-row
+Original depth0.05 sealed DB575; no next serial128K/256K run. Audit → bounded multi-row
 layers → short decoder → efficient L7/L8. See `docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md`.
-Gate D/G and DB573/574 remain valid history. Read `HANDOFF.md` and `goal.md` for live identities.
+Gate D/G and DB573–575 remain valid history. Read `HANDOFF.md` and `goal.md` for current state.
 
 Build a new default-off native-JAX inference engine for `zai-org/GLM-5.2-FP8` on the existing
 8-host/32-chip TPU-v4 pod. Optimize protected batch-one 256K latency, not aggregate throughput.

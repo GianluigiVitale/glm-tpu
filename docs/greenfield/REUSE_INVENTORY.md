@@ -19,6 +19,15 @@ or enforcement source changed during the current depth0.05 seal. The JSON asset
 For grouped MoE, preserve original per-token route-slot order at the BF16 sum even if execution
 is reordered by expert. Do not import legacy GMM execution or create another weight layout.
 
+After DB575 sealed18:42Z, the first consumer `kernels/ws32_prefill_linear.py` was added:
+multirow feature/expert raw-FP8 projections and a reciprocal dense MLP, unchanged FP32 local
+partial → subgroup sum → BF16 boundaries, no token scan or full-weight decode. It is UNWIRED
+and does not replace the promoted StrategyND dense overlay. Forced32 CPU tests at17 rows compare
+both projection directions and dense against the old one-row paths bitwise, checking exact
+feature4/expert8 group membership in CPU HLO;3 tests passed in4.53s. Astra approved persistence
+as a building block only. Real128-block TPU shapes, VMEM, association, routing and causal layers
+remain open. Old decoder APIs and source locations are unchanged.
+
 This is the pre-implementation audit requested on 2026-08-07: use the substantial work already on
 disk before creating another kernel, harness, loader, protection, or architecture prototype. The
 machine-readable authority is `configs/greenfield-reuse-inventory.json`; this document explains the

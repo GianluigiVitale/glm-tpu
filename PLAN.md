@@ -2,9 +2,9 @@
 
 Continue autonomously to full project completion under §18 amended by §24 (owner pivot 2026-09-07).
 PRIORITY: genuine batched prefill and the ranked `docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md`.
-Preserve/seal the original depth0.05 run; do not launch another serial128K/256K campaign.
-Next: bounded multi-row layer tests, short decoder, then efficient-prefill L7/L8 proofs.
-Follow `HANDOFF.md` for exact live identities; DB573/574 remain sealed reference evidence.
+Original depth0.05 sealed DB575; do not launch another serial128K/256K campaign.
+Multirow projections/dense CPU-admitted; next bounded real-shape baseline and grouped MoE/causal
+layers, short decoder, efficient L7/L8 proofs. HANDOFF has evidence; DB573–575 are serial references.
 
 The authoritative details, stop conditions, and Definition of Done are in
 `docs/glm-tpu-revolution.md`. This is only the execution index.
@@ -28,7 +28,7 @@ The authoritative details, stop conditions, and Definition of Done are in
    prefill/TTFT targets first; bounded multi-row kernels/layers, short decoder, then all four L7
    depths and full L8 on the new candidate. Historical serial §23.3 Step B (DB 568/569) and Step C
    capacity measurement at 131,072/262,656 (DB 571/572) CLOSED; §23.5 L7 protected four-depth 128K
-   passkey — depths 1.0/0.0 CLOSED (DB 573/574), depths 0.05/0.95 outstanding; §23.5 L8 protected 256K E0
+   passkey — depths 1.0/0.0/0.05 CLOSED (DB573–575), depth0.95 outstanding; §23.5 L8 protected 256K E0
    outstanding on the serial reference; those old runs do not certify changed prefill.
    L7/L8 claim nothing raw-token or cross-oracle exact: no legacy capture exists at
    these lengths, so L7 stands on the extracted passkey and L8 has no correctness oracle at all.

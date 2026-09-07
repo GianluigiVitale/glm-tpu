@@ -2,9 +2,17 @@
 
 ## Current protected standing — 2026-09-07
 
-Owner pivot (§24): serial prefill is now reference-only. Preserve the current depth0.05 run;
+Owner pivot (§24): serial prefill is now reference-only. Original depth0.05 sealed DB575;
 no next serial128K/256K campaign. Efficient token-batched prefill and measured TTFT are required
 before completion; see `ENGINE_EFFICIENCY_AUDIT.md`. No speedup for the new path is measured yet.
+
+DB575 (2026-09-07 18:42Z): L7 depth0.05 passkey824794 correct; within-engine own-score DSA exact;
+state/cache structure exact; no cross-oracle claim.
+Fleet p50 **141.626199ms**, p99 **144.715684ms**, **7.060840 wall tok/s**;
+prefill fleet max **16404.818166s**. Peak **27810852864B/chip**, headroom **5203546112B**.
+Fresh8-file/64-core XPlane, DB/archive, authenticated8/8 cleanup. Original source/sealing pin
+`a9bfbbb3`, no recovery/rerun. SUCCESS `5c1cd033d9036f8bc913360a21ee98339323e5195f5f1ce82d96a55fbd1d0cbb`,
+remote generation1788806524332216. This is serial reference evidence, not batched-prefill success.
 
 Gate D is CLOSED under §21.6, and Gate G is CLOSED/WS32_2D promoted under §22 of
 `../glm-tpu-revolution.md`. Historical "Gate D remains open" entries below describe their own dates,
