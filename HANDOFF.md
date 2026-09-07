@@ -14343,3 +14343,20 @@ Independent Astra review: PASS for persistence/first bounded TPU baseline, no P0
 Next after commit/push/mirror: one serialized rows8 baseline; inspect HLO, correctness,
 compiled/device memory and timing before32/128/256. Stop/diagnose first failure. No full-model
 load, new checkpoint, serial L7/L8, production promotion or final TTFT target follows from this.
+
+## 2026-09-07 19:10Z — four real-shape FP8 baselines sealed, DB576–579
+
+Source `4708f007cc0d438cb3beb1863de79234574f4303`. Rows8/32/128/256 at K1536 N2048 all pass;
+p50ms/batch0.237765/0.2317355/0.248200/0.2477045. Existing reference max abs0 each.
+Runner8–9s each, full campaign≈3min. All four original wrappers exited0 with post-census8/8
+and supplemental root device/lock checks; generation-readback SUCCESS and per-object receipts.
+DB576–579 are standalone synthetic mechanism baselines, NOT real-layer/full-prefill results.
+Compact exact tags/hashes/memory in `docs/artifacts/prefill-fp8-real-shape-baseline-20260907.json`.
+No live model/controller remains. No next serial long run. No full checkpoint was loaded/copied.
+
+Next: grouped routing metadata and raw-FP8 grouped kernels, causal DSA/attention baselines and
+phase budgets; then fixed targets, real-layer admission and short decoder. Installed JAX0.10.1
+Megablox `make_group_metadata`/dynamic active-tile schedule is the selected implementation
+reference, not its BF16-weight gmm execution. Design in PREFILL_GROUPED_MOE_DESIGN.md.
+Keep flat original token/route-slot identity, skip empty groups, zero unowned rows, allow all8B
+routes on one expert owner, and restore the exact existing BF16 route reduction expression.

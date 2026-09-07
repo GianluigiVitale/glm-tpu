@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-grouped-row-schedule",
+      "category": "grouped raw-FP8 scheduling reference",
+      "source_repo": "installed JAX 0.10.1",
+      "source_pin": "sha256:9fe9f9807d73d9c63c4f2749e6f6eeb61645fee2793c9dbdd3f15f2e992cd209",
+      "source_paths": ["jax/experimental/pallas/ops/tpu/megablox/gmm.py", "jax/experimental/pallas/ops/tpu/megablox/common.py"],
+      "disposition": "research_candidate",
+      "greenfield_consumers": ["docs/greenfield/PREFILL_GROUPED_MOE_DESIGN.md"],
+      "gate": "24: grouped routing metadata before raw-FP8 layer admission",
+      "reason": "Reuse/adapt make_group_metadata and active-tile scheduling with group-dependent raw-U8 checkpoint block/scale indexing. Stock gmm needs BF16/FP32 weights and is not the execution candidate. Preserve BF16/F32 arithmetic, original token/slot reduction expression, zero-owner behavior, masked shared row tiles and worst-case all8B routes per owner. Design only; no implementation or performance admission. Exact installed source SHA and JAX version recorded in the design."
+    },
+    {
       "id": "ws32-prefill-real-shape-baseline",
       "category": "bounded prefill mechanism baseline",
       "source_repo": "glm-tpu greenfield",

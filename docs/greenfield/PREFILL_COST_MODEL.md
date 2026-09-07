@@ -121,7 +121,8 @@ budgets conservatively with stated overhead/straggler allowances before launchin
 FP32 equality versus individual calls, BF16 rounding and row permutations. Together with
 registry checks: **10 CPU tests passed in9.38s**. Independent review accepted the initial test;
 its nonzero-tail coverage suggestion was implemented before persistence. This supplies CPU
-semantic evidence only. No TPU baseline, new prefill execution or speedup has been measured.
+semantic evidence only. At that CPU-admission checkpoint no TPU baseline existed; the bounded
+baseline result below is subsequent evidence, still not a new model-prefill execution.
 
 ## Bounded harness protocol — 2026-09-07
 
@@ -144,3 +145,31 @@ the libtpu lock, actual accelerator holders and starting greenfield runners; exi
 census/leases remain. Post-census precedes successful DB finalization; archive readback binds
 every object's generation/size/CRC/SHA and terminal identities. This does not replace protected
 real-layer/full-model traces or other §24 budget components.
+
+## Existing-kernel TPU baseline completed — DB576–579
+
+All four runs sealed at source `4708f007cc0d438cb3beb1863de79234574f4303`, with authenticated
+8/8 post-census and independent root device/lock checks, generation-verified same-region archive.
+Compact provenance: `../artifacts/prefill-fp8-real-shape-baseline-20260907.json`; each run lives
+under `gs://driftbench-dsv4-uc/results/<tag>` and is linked to the live main-checkout DB.
+
+| Live rows | DB | Warm p50 ms/batch | p99 ms/batch | Compile seconds | Process peak HBM bytes |
+|---|---|---|---|---|---|
+| 8 | 576 | 0.237765 | 0.267770 | 0.3917 | 79,825,920 |
+| 32 | 577 | 0.2317355 | 0.260702 | 0.3906 | 80,096,256 |
+| 128 | 578 | 0.248200 | 0.288193 | 0.3952 | 81,180,672 |
+| 256 | 579 | 0.2477045 | 0.278888 | 0.4007 | 82,626,048 |
+
+Runner8–9s per case; complete serialized campaign19:07–19:10Z, not hours. Every comparison
+observed max absolute difference0 against the existing dequantized-matmul reference and passed
+the unchanged tolerance. That does not establish bitwise batched-versus-serial admission for
+arbitrary inputs. Every HLO passed the raw-U8/no-full-weight-overlay/one-kernel contract.
+
+Decision: the existing kernel already amortizes this one projection's host dispatch/completion
+cost over256 live rows. No new standalone matmul or full checkpoint repack is needed before
+grouped-MoE admission. Do not extrapolate this near-flat curve to a full layer/model: routing
+usually gives much fewer rows per expert, and DSA/attention/collectives remain unmeasured.
+Compiler custom-call scoped-memory metadata grows with rows (the FP8 call reports73,728 /
+122,880 /319,488 /581,632B in memory space1), but is not measured VMEM peak. Process HBM above
+includes reference work and cannot establish long-context headroom. Final TTFT targets remain
+unregistered pending the other phase-budget inputs.

@@ -2,7 +2,7 @@
 
 Status: 2026-09-07, engineering audit/design, NOT performance proof of a new implementation.
 Authority: [specification §24](../glm-tpu-revolution.md), owner directive to stop the remaining
-serial long-context campaign. The current depth0.05 run is preserved through its original seal.
+serial long-context campaign. Original depth0.05 sealed DB575; its evidence is preserved.
 The next experiment is bounded batched prefill, not serial depth0.95 or serial256K E0.
 
 ## Outcome and root cause
@@ -223,3 +223,11 @@ After DB575 sealed, multirow feature/expert linear and reciprocal dense building
 added in `kernels/ws32_prefill_linear.py`, unwired/default-off. Three new tests passed in4.53s,
 including forced32 CPU bitwise row comparisons and exact subgroup4/8 HLO membership. They are
 not the StrategyND dense overlay and cannot replace it without new numerical evidence.
+
+Real-shape primitive baseline now sealed DB576–579: rows8/32/128/256, K1536 N2048,
+F32 output, p50≈0.232–0.248ms per batch, synthetic reference max difference0 in all four.
+Each runner took8–9s. Exact pins/archive/memory and limitations are in PREFILL_COST_MODEL.md
+and `../artifacts/prefill-fp8-real-shape-baseline-20260907.json`. This resolves the narrow
+question whether the existing raw-FP8 primitive can execute these live row counts efficiently
+at this local shape. It does NOT resolve E1, grouped expert reuse, causal layers or TTFT.
+Next use grouped-row scheduling; do not write another standalone matmul just to obtain rows.
