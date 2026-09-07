@@ -14907,3 +14907,27 @@ Independent Astra narrow correction review PASS, no P0-P2. Next: commit/push/ver
 same-region mirror, then ONE fresh layer0 tag through the wrapper/preflights. Layer3 requires
 layer0 terminal evidence review and clean census. Do not relaunch the failed tag or
 reopen the cleared DB583 MoE arithmetic boundary. Efficient short decoder/L7/L8 remain.
+
+## 2026-09-07 23:24Z — selected layer load and compilation proven; helper guard corrected
+
+Retry `greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T231756351264474Z`
+at4a15234c fixed inventory validation and loaded layer0: original tensor SHA ledger
+passes on all32 owners. Controller load41.59s, candidate compile6.44s, compiled
+arguments25,143,808B/output853,504B/temp8,788,480B (not measured peak HBM).
+Candidate HLO dc1d5a94…a13d9f3 has exact collective payloads/groups and all12 expected
+Pallas calls. Pre-execution guard refused22 additional compiler index/layout helpers.
+No candidate result/reference comparison. Wrapper terminal exit1 at23:19:37Z and
+root+normal8/8 clean. Original tag remains failed, no rerun/relabel.
+
+Local diagnosis/review:9 index assumptions+7 bitpacked annotations+6 U8 local parameter
+quarter-slice reassemblies. Existing one_layer/runtime guards already recognize these
+classes. New exact layer0 signature/operand gate separates helpers from12 Pallas calls,
+refuses unknown/side-effect/shape/count drift. Layer3 helper profile unregistered until
+its own acquired HLO exists. No numerical/model change.70CPU tests8.59s and independently
+downloaded all8 original HLOs replay PASS with corrected checker. All8 receipt ledgers
+and72 original files generation/size/CRC/SHA verified; selected per-tensor hashes checked
+against original metadata across32 owners. Compact bindings:
+`docs/artifacts/prefill-layer-compiler-helper-failure-20260907.json`.
+Independent Astra implementation review PASS, no P0-P2, approves ONE fresh layer0 test
+after commit/push/verified mirror and fresh wrapper preflights. Source currently idle;
+next same bounded wrapper command above, then review actual result before layer3.

@@ -52,6 +52,31 @@ def valid_layer0_hlo():
         lines.append(
             f'%call{number} = bf16[17,1536] custom-call(%w), custom_call_target="tpu_custom_call", metadata={{op_name="{name}"}}'
         )
+    helpers = [
+        ("AssumeGatherIndicesInBound", "s32", (1024,), 7),
+        ("AssumeGatherIndicesInBound", "s32", (34816,), 2),
+        ("GatherScatterIndicesBitpacked", "s32", (17, 4096, 2), 2),
+        ("GatherScatterIndicesBitpacked", "s32", (17, 16384, 2), 2),
+        ("GatherScatterIndicesBitpacked", "s32", (17, 2048, 2), 3),
+        ("ConcatBitcast", "u8", (2048, 2048), 1),
+        ("ConcatBitcast", "u8", (3584, 512), 1),
+        ("ConcatBitcast", "u8", (1536, 2048), 1),
+        ("ConcatBitcast", "u8", (1536, 1536), 3),
+    ]
+    number = 0
+    for target, dtype, shape, count in helpers:
+        dims = ",".join(map(str, shape))
+        partial = (shape[0] // 4, shape[1]) if target == "ConcatBitcast" else shape
+        pdims = ",".join(map(str, partial))
+        for _ in range(count):
+            lines.append(f"%helper_input{number} = {dtype}[{pdims}] parameter(99)")
+            args = ", ".join(
+                [f"%helper_input{number}"] * (4 if target == "ConcatBitcast" else 1)
+            )
+            lines.append(
+                f'%helper{number} = {dtype}[{dims}] custom-call({args}), custom_call_target="{target}", metadata={{op_name="jit(candidate)/shard_map/gather"}}'
+            )
+            number += 1
     return "\n".join(lines + ["}"])
 
 
@@ -59,7 +84,36 @@ def test_full_layer_hlo_inventory_is_distinct_from_moe():
     proof = check_layer_hlo(valid_layer0_hlo(), layer=0)
     assert proof["passed"], proof["checks"]
     assert len(proof["collectives"]) == 14
-    assert len(proof["custom_calls"]) == 12
+    assert len(proof["custom_calls"]) == 34
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ('custom_call_target="ConcatBitcast"', 'custom_call_target="HostCallback"'),
+        ("s32[1024]", "s32[1025]"),
+        ("s32[17,4096,2]", "s32[17,4096,3]"),
+        ("u8[512,2048]", "u8[511,2048]"),
+        ("u8[2048,2048]", "bf16[2048,2048]"),
+        (
+            'custom_call_target="AssumeGatherIndicesInBound",',
+            'custom_call_target="AssumeGatherIndicesInBound", custom_call_has_side_effect=true,',
+        ),
+        ("custom-call(%helper_input0)", "custom-call(%w)"),
+    ],
+)
+def test_compiler_helper_shape_operand_and_target_drift_refused(old, new):
+    assert not check_layer_hlo(valid_layer0_hlo().replace(old, new), layer=0)["passed"]
+
+
+def test_compiler_helper_missing_or_duplicate_refused():
+    hlo = valid_layer0_hlo()
+    row = next(line for line in hlo.splitlines() if line.startswith("%helper0 ="))
+    for changed in (
+        hlo.replace(row, ""),
+        hlo.replace(row, row + "\n" + row.replace("%helper0 =", "%extra =")),
+    ):
+        assert not check_layer_hlo(changed, layer=0)["passed"]
 
 
 @pytest.mark.parametrize(

@@ -8,6 +8,7 @@ This is structural admission, not a trace, numerical or performance proof.
 from __future__ import annotations
 
 from collections import Counter
+import re
 from typing import Any
 
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
@@ -15,6 +16,74 @@ from scripts.greenfield.prefill_moe_precision_hlo import check_fp32_route_sum
 
 FEATURE = tuple(tuple(range(e * 4, e * 4 + 4)) for e in range(8))
 EXPERT = tuple(tuple(e * 4 + f for e in range(8)) for f in range(4))
+
+
+def _compiler_helpers(calls, *, layer: int) -> dict[str, Any]:
+    """Bind TPU layout/index annotations separately from model Pallas calls.
+
+    Layer0 signatures acquired at 4a15234c, candidate HLO dc1d5a94...a13d9f3.
+    Same compiler mechanisms as one_layer.py and runtime/decoder.py guards.
+    Layer3 remains unregistered until its own pre-execution HLO is inspected.
+    """
+    observed = Counter()
+    operands_valid = True
+    for op in calls:
+        match = re.search(r'custom_call_target="([^"]+)"', op.raw_line)
+        target = match.group(1) if match else "<missing>"
+        if (
+            len(op.result_shapes) != 1
+            or "custom_call_has_side_effect=true" in op.raw_line
+        ):
+            operands_valid = False
+            continue
+        shape = op.result_shapes[0]
+        observed[(target, shape.dtype, shape.dimensions)] += 1
+        if target in ("AssumeGatherIndicesInBound", "GatherScatterIndicesBitpacked"):
+            operands_valid &= (
+                len(op.operand_names) == 1
+                and op.operand_shapes == op.result_shapes
+                and shape.dtype == "s32"
+                and bool(op.op_name and op.op_name.endswith("/gather"))
+            )
+        elif target == "ConcatBitcast":
+            operands_valid &= (
+                shape.dtype == "u8"
+                and len(shape.dimensions) == 2
+                and len(op.operand_names) == len(op.operand_shapes) == 4
+                and all(
+                    s.dtype == "u8"
+                    and s.dimensions == (shape.dimensions[0] // 4, shape.dimensions[1])
+                    for s in op.operand_shapes
+                )
+            )
+        else:
+            operands_valid = False
+    expected = (
+        Counter(
+            {
+                ("AssumeGatherIndicesInBound", "s32", (1024,)): 7,
+                ("AssumeGatherIndicesInBound", "s32", (34816,)): 2,
+                ("GatherScatterIndicesBitpacked", "s32", (17, 4096, 2)): 2,
+                ("GatherScatterIndicesBitpacked", "s32", (17, 16384, 2)): 2,
+                ("GatherScatterIndicesBitpacked", "s32", (17, 2048, 2)): 3,
+                ("ConcatBitcast", "u8", (2048, 2048)): 1,
+                ("ConcatBitcast", "u8", (3584, 512)): 1,
+                ("ConcatBitcast", "u8", (1536, 2048)): 1,
+                ("ConcatBitcast", "u8", (1536, 1536)): 3,
+            }
+        )
+        if layer == 0
+        else None
+    )
+    return dict(
+        passed=expected is not None and observed == expected and operands_valid,
+        registered=expected is not None,
+        operands_valid=operands_valid,
+        signatures=[
+            dict(target=k[0], dtype=k[1], dimensions=k[2], count=v)
+            for k, v in sorted(observed.items())
+        ],
+    )
 
 
 def check_layer_hlo(hlo: str, *, layer: int) -> dict[str, Any]:
@@ -66,6 +135,7 @@ def check_layer_hlo(hlo: str, *, layer: int) -> dict[str, Any]:
     pallas = [
         op for op in calls if 'custom_call_target="tpu_custom_call"' in op.raw_line
     ]
+    helpers = _compiler_helpers([op for op in calls if op not in pallas], layer=layer)
     raw = [op for op in pallas if "greenfield_fp8_block_matmul" in op.raw_line]
     grouped = [
         op for op in pallas if "greenfield_prefill_grouped_raw_fp8" in op.raw_line
@@ -97,9 +167,8 @@ def check_layer_hlo(hlo: str, *, layer: int) -> dict[str, Any]:
     checks = dict(
         physical_groups=valid_groups,
         exact_collective_payload_inventory=payloads == expected,
-        only_declared_pallas_calls=len(calls)
-        == len(pallas)
-        == (12 if layer == 0 else 13),
+        only_declared_pallas_calls=len(pallas) == (12 if layer == 0 else 13),
+        exact_compiler_helpers=helpers["passed"],
         raw_calls=len(raw) == (9 if layer == 0 else 7),
         grouped_calls=len(grouped) == (0 if layer == 0 else 3),
         structured_calls=len(structured) == 2,
@@ -128,6 +197,7 @@ def check_layer_hlo(hlo: str, *, layer: int) -> dict[str, Any]:
         ],
         collectives=[op.to_dict() for op in collectives],
         custom_calls=[op.to_dict() for op in calls],
+        compiler_helpers=helpers,
         full_weight_overlays=overlays,
         fp32_route_sum_proof=precision,
         performance_claim=False,

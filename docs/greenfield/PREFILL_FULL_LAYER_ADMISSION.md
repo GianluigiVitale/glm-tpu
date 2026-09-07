@@ -126,3 +126,26 @@ is16.9KB metadata with original manifest SHA, NOT weights/integrity evidence. In
 review found a page-table rank error; corrected to[1,2] and tested through actual builders
 before TPU. Second review found no P0-P2; approves one layer0 launch after clean commit,
 push/mirror and preflights. Layer3 remains conditional. No TPU result is claimed here.
+
+## Layer0 compiler acquisition correction — 2026-09-07
+
+Tag `greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T231756351264474Z`,
+pin4a15234c, loaded selected real layer0 and compiled candidate6.44s on controller.
+All32 original selected tensor ledgers pass. Candidate HLO `dc1d5a94…a13d9f3` has
+the12 intended Pallas calls and exact declared collective payloads/groups. The initial
+guard wrongly required EVERY custom-call to be Pallas: compiler-emitted indexing/layout
+helpers are not model kernels. Execution stopped before candidate arithmetic,8/8 clean.
+
+Register layer0's exact helper inventory separately:9 AssumeGatherIndicesInBound
+(7×s32[1024],2×s32[34816]);7 GatherScatterIndicesBitpacked
+(2×s32[17,4096,2],2×s32[17,16384,2],3×s32[17,2048,2]);6 ConcatBitcast
+(U8[2048,2048],[3584,512],[1536,2048],3×[1536,1536]). Each concat reconstructs
+four contiguous local quarter slices of one U8 parameter, not BF16/global weights.
+Index input/output types/shapes match; concat arity/quarter shapes match. Unknown targets,
+side effects, missing/extra/wrong-shaped helpers remain refused. Existing one_layer and
+runtime/decoder guards already distinguish these compiler helper classes. Layer3 helper
+inventory is deliberately unregistered until its own acquired HLO is reviewed.
+
+70CPU tests8.59s and replay of all8 original HLOs PASS; independent narrow Astra review
+PASS. No numerical thresholds/model arithmetic changed. One corrected guarded layer0
+retry after persistence/preflights; layer3 stays conditional, no performance claim.

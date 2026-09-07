@@ -56,7 +56,7 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
-DB583 real MoE bounded PASS. Last fleet8/8 clean23:04Z; evidence in HANDOFF.
+DB583 real MoE bounded PASS. Last fleet8/8 clean23:19Z; evidence in HANDOFF.
 TPU primitives DB576-581; batched layer/router/dual-cache CPU-pass.
-Layer0 failed pre-load on inventory digest kind; fix+68 CPU tests pass. Retry0, then3.
+Layer0 loaded/compiled; compiler-helper HLO guard corrected+70 tests/review pass. Retry0.
 Efficient L7/L8 open; prefill speedup unmeasured.

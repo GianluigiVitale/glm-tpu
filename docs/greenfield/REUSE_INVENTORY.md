@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Layer0 retry loaded all32 selected ledgers and compiled; guard refused known compiler
+index/layout custom calls because it counted every custom-call as Pallas. Adapt existing
+`benchmarking/one_layer.py` local-U8 concat and `runtime/decoder.py` index-helper distinction
+with this layer's exact shapes/counts/operands.70tests and all8 original HLO replay pass,
+independent Astra PASS; original failure preserved, next guarded retry. Layer3 compiler
+helper profile remains unregistered. No layer arithmetic or performance success yet.
+
 Layer0 first hardware attempt failed before load/compile on raw-file versus canonical
 inventory digest confusion. Worker now directly reuses `inspect_source_inventory` and
 checks the unchanged canonical pin;68 CPU tests plus actual retained metadata pass.

@@ -351,3 +351,10 @@ generation-verified, all8 cleanup confirmed23:04Z. Corrected via the existing va
 inventory parser, not a changed pin or disabled check;68 CPU regressions pass. This
 avoidable harness error would have been caught by exercising the actual inventory
 authentication on CPU, which now passes. No layer arithmetic or speed result yet.
+
+Corrected inventory path now loads layer0 on32owners, all selected tensor ledgers
+verified; candidate compiled6.44s. All collectives/Pallas counts match, but the linter
+omitted known TPU index/layout helper classes and refused before execution. Reuse the
+existing guards' distinction with exact layer0 shapes/counts/operands, not a broad
+allowlist.70tests and all8 acquired-HLO replays pass, independent review PASS. Both
+harness failures were bounded; no hours-long run. Real layer arithmetic is still open.
