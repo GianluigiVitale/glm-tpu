@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+One normal-only B17 boundary diagnostic now extends the existing real-MoE adapter.
+Both greenfield MoE functions expose optional static capture_boundaries=False; no arithmetic
+intervention is added. Captures remain owner-local through leading expert/feature axes.
+Controller compares original failed final witnesses and HLO before any causal conclusion;
+the diagnostic has NULL correctness/score/latency and cannot close arithmetic admission.
+
 Real-MoE arithmetic adapter reuses the bounded FP8 wrapper, current short-decoder topology
 initializer (utility only), retained layer3 final-owner loader/oracle and exact publisher.
 `probe_ws32_prefill_moe.py` compares17 real/perturbed rows with supplied routes against old

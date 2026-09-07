@@ -42,12 +42,15 @@ def ws32_prefill_moe_from_routes_mapped(
     contract: GlmMoeNumericalContract = GlmMoeNumericalContract(stage_size=8),
     row_tile: int = 8,
     interpret: bool = False,
-) -> tuple[Any, Any]:
+    capture_boundaries: bool = False,
+) -> tuple[Any, Any] | tuple[Any, Any, dict[str, Any]]:
     """Return (local hidden shard, local health); caller must gate on all chips.
 
     Requires the validated expert8/feature4 mesh and replicated routing inputs.
     A false health bit forbids serving; it must not be discarded by a caller.
     No router or full decoder is replaced by adding this building block.
+    capture_boundaries is diagnostic-only and may change compiled rounding;
+    captured results do not certify the uninstrumented execution.
     """
     if contract.stage_size != 8:
         raise ValueError("WS32 prefill MoE requires stage_size=8")
@@ -132,9 +135,8 @@ def ws32_prefill_moe_from_routes_mapped(
         jnp.swapaxes(route_outputs, 0, 1), axis=0, dtype=jnp.bfloat16
     )
     with jax.named_scope("greenfield_ws32_prefill_moe/expert_reduce"):
-        routed = lax.psum(local_routed.astype(jnp.float32), axis_name="expert").astype(
-            jnp.bfloat16
-        )
+        local_sum_operand = local_routed.astype(jnp.float32)
+        routed = lax.psum(local_sum_operand, axis_name="expert").astype(jnp.bfloat16)
 
     config = Fp8BlockMatmulConfig(
         block_shape=contract.fp8_block_shape,
@@ -173,4 +175,25 @@ def ws32_prefill_moe_from_routes_mapped(
         routed * jnp.asarray(contract.routed_scaling_factor, jnp.bfloat16) + shared
     ).astype(jnp.bfloat16)
     valid = valid & gate_ok & up_ok & down_ok & jnp.all(jnp.isfinite(output))
+    if capture_boundaries:
+
+        def restore(value):
+            return restore_prefill_route_rows(value, routes, top_k=contract.top_k)
+
+        return (
+            output,
+            valid,
+            {
+                "routed_partial": jnp.stack((restore(gate), restore(up)), axis=2),
+                "routed_reduced": jnp.stack(
+                    (restore(gate_up[0]), restore(gate_up[1])), axis=2
+                ),
+                "weighted_routes": route_outputs,
+                "local_sum_operand": local_sum_operand,
+                "routed": routed,
+                "shared_partial": jnp.stack((shared_gate, shared_up), axis=1),
+                "shared_reduced": jnp.swapaxes(shared_gate_up, 0, 1),
+                "shared": shared,
+            },
+        )
     return output, valid

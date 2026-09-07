@@ -284,6 +284,7 @@ def ws32_moe_pallas_from_routes_mapped(
     expert_axis: str = "expert",
     feature_axis: str = "feature",
     interpret: bool = False,
+    capture_boundaries: bool = False,
 ) -> Any:
     """Run the WS32 one-row MoE using the existing raw-FP8 Pallas kernels.
 
@@ -295,6 +296,8 @@ def ws32_moe_pallas_from_routes_mapped(
     route weighting retain the reference BF16 boundaries before the expert-8
     combine.  This is a distinct default-off challenger, not a replacement
     for :func:`ws32_moe_fp8_from_routes_mapped`.
+    capture_boundaries is a diagnostic-only return of intermediate arrays;
+    it may perturb compiled lowering and is never a production optimization.
     """
 
     # Local imports deliberately keep the frozen reference function's source
@@ -369,11 +372,10 @@ def ws32_moe_pallas_from_routes_mapped(
     )
     expert_start = lax.axis_index(expert_axis) * local_experts
     routed_parts = []
+    routed_captures = []
     for route_position in range(contract.top_k):
         expert_id = route_indices[0, route_position]
-        owns = (expert_id >= expert_start) & (
-            expert_id < expert_start + local_experts
-        )
+        owns = (expert_id >= expert_start) & (expert_id < expert_start + local_experts)
         local_expert = jnp.clip(
             expert_id - expert_start,
             jnp.int32(0),
@@ -420,9 +422,9 @@ def ws32_moe_pallas_from_routes_mapped(
                     jnp.stack((gate_partial, up_partial), axis=0),
                     axis_name=feature_axis,
                 ).astype(jnp.bfloat16)
-            activated = (
-                gate_up[0] * jax.nn.sigmoid(gate_up[0]) * gate_up[1]
-            ).astype(jnp.bfloat16)
+            activated = (gate_up[0] * jax.nn.sigmoid(gate_up[0]) * gate_up[1]).astype(
+                jnp.bfloat16
+            )
             output = fp8_block_matmul(
                 activated,
                 down_bits,
@@ -430,19 +432,29 @@ def ws32_moe_pallas_from_routes_mapped(
                 config=config,
                 interpret=interpret,
             )
-            return (
-                output
-                * route_weights[0, route_position].astype(jnp.bfloat16)
+            weighted = (
+                output * route_weights[0, route_position].astype(jnp.bfloat16)
             ).astype(jnp.bfloat16)
+            if capture_boundaries:
+                return weighted, jnp.stack((gate_partial, up_partial)), gate_up
+            return weighted
 
-        routed_parts.append(
-            lax.cond(
-                owns,
-                compute,
-                lambda _: jnp.zeros_like(hidden_local),
-                operand=None,
-            )
-        )
+        def unowned(_: None) -> Any:
+            zero = jnp.zeros_like(hidden_local)
+            if capture_boundaries:
+                shape = (2, 1, contract.intermediate_size)
+                return (
+                    zero,
+                    jnp.zeros(shape, jnp.float32),
+                    jnp.zeros(shape, jnp.bfloat16),
+                )
+            return zero
+
+        part = lax.cond(owns, compute, unowned, operand=None)
+        if capture_boundaries:
+            routed_captures.append(part[1:])
+            part = part[0]
+        routed_parts.append(part)
 
     local_routed = jnp.sum(
         jnp.stack(tuple(routed_parts), axis=0),
@@ -450,9 +462,8 @@ def ws32_moe_pallas_from_routes_mapped(
         dtype=jnp.bfloat16,
     )
     with jax.named_scope("greenfield_ws32_moe_pallas/routed_expert_reduce"):
-        routed = lax.psum(
-            local_routed.astype(jnp.float32), axis_name=expert_axis
-        ).astype(jnp.bfloat16)
+        local_sum_operand = local_routed.astype(jnp.float32)
+        routed = lax.psum(local_sum_operand, axis_name=expert_axis).astype(jnp.bfloat16)
 
     shared_gate_partial = fp8_block_matmul_f32(
         hidden_local,
@@ -474,9 +485,7 @@ def ws32_moe_pallas_from_routes_mapped(
             axis_name=feature_axis,
         ).astype(jnp.bfloat16)
     shared_activated = (
-        shared_gate_up[0]
-        * jax.nn.sigmoid(shared_gate_up[0])
-        * shared_gate_up[1]
+        shared_gate_up[0] * jax.nn.sigmoid(shared_gate_up[0]) * shared_gate_up[1]
     ).astype(jnp.bfloat16)
     shared = fp8_block_matmul(
         shared_activated,
@@ -485,10 +494,22 @@ def ws32_moe_pallas_from_routes_mapped(
         config=config,
         interpret=interpret,
     )
-    routed_scale = jnp.asarray(
-        contract.routed_scaling_factor, dtype=jnp.bfloat16
-    )
-    return (routed * routed_scale + shared).astype(jnp.bfloat16)
+    routed_scale = jnp.asarray(contract.routed_scaling_factor, dtype=jnp.bfloat16)
+    output = (routed * routed_scale + shared).astype(jnp.bfloat16)
+    if capture_boundaries:
+        return output, {
+            "routed_partial": jnp.stack([p[0][:, 0, :] for p in routed_captures])[None],
+            "routed_reduced": jnp.stack([p[1][:, 0, :] for p in routed_captures])[None],
+            "weighted_routes": jnp.stack(routed_parts, axis=1),
+            "local_sum_operand": local_sum_operand,
+            "routed": routed,
+            "shared_partial": jnp.stack(
+                (shared_gate_partial, shared_up_partial), axis=1
+            ),
+            "shared_reduced": jnp.swapaxes(shared_gate_up, 0, 1),
+            "shared": shared,
+        }
+    return output
 
 
 # New complete-decoder primitives are intentionally appended below the

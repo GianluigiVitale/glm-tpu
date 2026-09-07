@@ -14547,3 +14547,22 @@ Then fix a proved bug or separately preregister bounded-internal adjudication un
 do not spend days reproducing an old compiler when the existing contract permits bounded
 internals. No instrumentation implemented or new TPU launch yet. Continue causal layers,
 phase budgets/targets and short decoder after this boundary. Serial long runs remain banned.
+
+## 2026-09-07 — B17 boundary diagnostic source prepared
+
+New opt-in wrapper mode `ws32_prefill_moe_boundary_diagnostic` uses original normal case only,
+same pack/mesh17 rows, no arithmetic or tolerance intervention. Existing greenfield functions
+gain static capture_boundaries=False; diagnostic returns owner-local intermediates with
+explicit leading expert/feature axes. Capture FP32 expert-psum input rather than exposing the
+BF16 source sum as a new output. `prefill_moe_boundaries.py` verifies boundary NPZs, compares
+both final candidate/reference digests to the generation/SHA-bound original refusal, and emits
+raw HLO lowering manifests for review. Changed final/lowering means perturbed evidence.
+NULL DB correctness/score/latency, no arithmetic acceptance;600s and1GiB/chip admission budget.
+No model checkpoint copy. Do not launch before final review, commit/push and mirror.
+
+CPU results: forced32 captured/ordinary outputs and all eight boundaries match for both
+route distributions; the combined first run had14 passing tests and one protocol-refusal
+exception-type mismatch (KeyError rather than ValueError for absent concentrated case).
+Added explicit case-inventory refusal before digest comparison; subsequent37 protocol/
+baseline/reuse tests passed1.91s. Independent Astra conditional PASS, no P0-P2; scope only
+this bounded diagnostic and persistence, not arithmetic admission or performance.

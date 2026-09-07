@@ -34,6 +34,7 @@ from scripts.greenfield.microbench_fp8_matmul import (
 )
 
 PROTOCOL = "ws32-prefill-real-moe-arithmetic-v1"
+BOUNDARY_PROTOCOL = "ws32-prefill-real-moe-boundary-diagnostic-v1"
 ROWS = 17
 CASES = ("normal", "concentrated")
 PACK = Path(
@@ -127,7 +128,11 @@ def check_hlo(hlo: str) -> dict[str, Any]:
 
 
 def build_mapped(
-    mesh: Any, *, contract: Any, interpret: bool = False
+    mesh: Any,
+    *,
+    contract: Any,
+    interpret: bool = False,
+    capture_boundaries: bool = False,
 ) -> tuple[Any, Any]:
     import jax
     from jax.sharding import PartitionSpec as P
@@ -140,26 +145,56 @@ def build_mapped(
     )
 
     def candidate(*values):
-        result, health = ws32_prefill_moe_from_routes_mapped(
-            *values, contract=contract, interpret=interpret
+        returned = ws32_prefill_moe_from_routes_mapped(
+            *values,
+            contract=contract,
+            interpret=interpret,
+            capture_boundaries=capture_boundaries,
         )
+        result, health = returned[:2]
+        if capture_boundaries:
+            return (
+                result,
+                health[None, None],
+                jax.tree.map(lambda x: x[None, None], returned[2]),
+            )
         return result, health[None, None]
 
     def reference(*values):
-        return ws32_moe_pallas_from_routes_mapped(
-            *values, contract=contract, interpret=interpret
+        returned = ws32_moe_pallas_from_routes_mapped(
+            *values,
+            contract=contract,
+            interpret=interpret,
+            capture_boundaries=capture_boundaries,
         )
+        if capture_boundaries:
+            return returned[0], jax.tree.map(lambda x: x[None, None], returned[1])
+        return returned
 
     common = dict(mesh=mesh, in_specs=WS32_ONE_LAYER_INPUT_SPECS, check_vma=False)
     return (
         jax.jit(
             jax.shard_map(
                 candidate,
-                out_specs=(P(None, "feature"), P("expert", "feature")),
+                out_specs=(
+                    (P(None, "feature"), P("expert", "feature"), P("expert", "feature"))
+                    if capture_boundaries
+                    else (P(None, "feature"), P("expert", "feature"))
+                ),
                 **common,
             )
         ),
-        jax.jit(jax.shard_map(reference, out_specs=P(None, "feature"), **common)),
+        jax.jit(
+            jax.shard_map(
+                reference,
+                out_specs=(
+                    (P(None, "feature"), P("expert", "feature"))
+                    if capture_boundaries
+                    else P(None, "feature")
+                ),
+                **common,
+            )
+        ),
     )
 
 
@@ -169,6 +204,7 @@ def main() -> int:
     parser.add_argument("--coordinator-address", required=True)
     parser.add_argument("--process-id", required=True, type=int)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--boundary-diagnostic", action="store_true")
     args = parser.parse_args()
     if (
         not 0 <= args.process_id < 8
@@ -178,7 +214,10 @@ def main() -> int:
         raise RuntimeError("worker code/rank/worktree identity drifted")
     tag = os.environ.get("GLM_GREENFIELD_RUN_TAG", "")
     if not re.fullmatch(
-        r"greenfield_fp8_ws32_prefill_moe_admission_[a-zA-Z0-9_]+", tag
+        r"greenfield_fp8_ws32_prefill_moe_"
+        + ("boundary_diagnostic" if args.boundary_diagnostic else "admission")
+        + r"_[a-zA-Z0-9_]+",
+        tag,
     ):
         raise ValueError("a scoped controller run tag is required")
     if args.output_dir != Path("/home/gianl/glm-run") / tag / f"rank{args.process_id}":
@@ -196,7 +235,7 @@ def main() -> int:
     )
     record = dict(
         status="RUNNING",
-        protocol=PROTOCOL,
+        protocol=BOUNDARY_PROTOCOL if args.boundary_diagnostic else PROTOCOL,
         code_hash=args.expected_code_hash,
         launch_rank=args.process_id,
         hostname=socket.gethostname(),
@@ -205,7 +244,8 @@ def main() -> int:
             Path("/proc/self/stat").read_text().rsplit(")", 1)[1].split()[19]
         ),
         boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
-        admission_only=True,
+        admission_only=not args.boundary_diagnostic,
+        boundary_diagnostic=args.boundary_diagnostic,
         performance_claim=False,
         iterations=0,
         latency=None,
@@ -262,12 +302,16 @@ def main() -> int:
         record["phases"]["load_seconds"] = time.monotonic() - started
         _atomic_json(output, record)
         print(f"PREFILL_MOE rank={args.process_id} weights_verified", flush=True)
-        batch, one = build_mapped(mesh, contract=GlmMoeNumericalContract(stage_size=8))
+        batch, one = build_mapped(
+            mesh,
+            contract=GlmMoeNumericalContract(stage_size=8),
+            capture_boundaries=args.boundary_diagnostic,
+        )
         slot_by_device = {
             d: s for s, d in enumerate(physical_mesh.flattened_device_ids)
         }
         compiled = reference = None
-        for case in CASES:
+        for case in ("normal",) if args.boundary_diagnostic else CASES:
             host_inputs = case_rows(
                 _bfloat16_numpy(oracle["hidden_states"]),
                 oracle[f"{case}_route_indices"].numpy(),
@@ -319,12 +363,17 @@ def main() -> int:
                 record["reference_hlo_sha256"] = sha256(
                     reference_hlo.encode()
                 ).hexdigest()
-            actual, health = compiled(*inputs)
-            jax.block_until_ready((actual, health))
+            returned = compiled(*inputs)
+            jax.block_until_ready(returned)
+            actual, health = returned[:2]
             references = []
+            boundary_references = []
             for row in range(ROWS):
                 result = reference(*[v[row : row + 1] for v in inputs[:3]], *inputs[3:])
                 jax.block_until_ready(result)
+                if args.boundary_diagnostic:
+                    boundary_references.append(result[1])
+                    result = result[0]
                 references.append(result)
             legacy = _case_result(jax, references[0], oracle, case, slot_by_device)
             ref_by_device = [
@@ -361,6 +410,8 @@ def main() -> int:
                         device_id=device_id,
                         device_slot=slot_by_device[device_id],
                         passed=passed,
+                        finite_and_healthy=health_by_device[device_id]
+                        and bool(np.isfinite(observed).all()),
                         bit_mismatches=mismatch,
                         output_sha256=sha256(observed.tobytes()).hexdigest(),
                         reference_sha256=sha256(expected.tobytes()).hexdigest(),
@@ -369,9 +420,18 @@ def main() -> int:
                 tensors[f"actual_{device_id}"] = observed.view(np.uint16)
                 tensors[f"reference_{device_id}"] = expected.view(np.uint16)
             np.savez_compressed(args.output_dir / f"{case}.npz", **tensors)
+            if args.boundary_diagnostic:
+                from scripts.greenfield.prefill_moe_boundaries import save_boundaries
+
+                record["boundaries"] = save_boundaries(
+                    returned[2], boundary_references, args.output_dir / "boundaries.npz"
+                )
             local_passed = (
                 len(shards) == 4
-                and all(s["passed"] for s in shards)
+                and all(
+                    s["finite_and_healthy"] if args.boundary_diagnostic else s["passed"]
+                    for s in shards
+                )
                 and legacy["passed"]
             )
             # Scalar harness consensus OUTSIDE the candidate graph, not a layer collective.
@@ -384,6 +444,7 @@ def main() -> int:
             )
             record["cases"][case] = dict(
                 passed=local_passed,
+                arithmetic_passed=all(s["passed"] for s in shards),
                 fleet_passed=fleet_passed,
                 shards=shards,
                 reference_vs_legacy=legacy,

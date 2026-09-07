@@ -133,3 +133,25 @@ The subsequent bounded trial at31a2f917 REFUSED normal-case bit equality, cleanu
 See `../artifacts/prefill-real-moe-arithmetic-refusal-20260907.json` and HANDOFF for original
 evidence and the reviewed first-boundary diagnostic. The result does not admit the candidate;
 keep the exact failure, no unchanged retry or retrospective tolerance change.
+
+## Single boundary diagnostic protocol
+
+`ws32_prefill_moe_boundary_diagnostic` executes normal only, original17 rows/routes/weights
+and physical mesh. Opt-in captures return routed/shared F32 gate/up partials, BF16 post-feature
+values, restored weighted route outputs, the existing F32 expert-psum input, routed and shared
+results. No cast or arithmetic intervention is introduced solely to align a boundary's dtype.
+Capture tensors have explicit leading expert/feature owner axes; no hidden reconstruction.
+
+CPU tests compare capture-on/off final outputs and all eight boundary arrays against one-row
+captures on forced32 devices, distributed and concentrated routes. TPU association remains
+separate. The controller compares instrumented final candidate AND reference digests to the
+exact original failed runner's witnesses, and retains raw relevant HLO instructions/computations
+with hashes, shapes, replica groups, strategies and original-type metadata. These manifests
+require review; equal strategy names alone do not establish equal numerical lowering.
+Changed witnesses/lowering mean instrumentation-perturbed evidence, not original root cause.
+
+The existing wrapper/leases/censuses/publisher are reused. Normal arithmetic mismatch is
+recorded, not changed into a pass. A successful diagnostic means complete finite capture only:
+DB correctness/score/latency NULL, metric diagnostic_evidence_complete, no performance claim.
+Exact-admission mode remains unchanged in scope and still refuses any bit mismatch.
+Worker600s and compiled1GiB/chip bounds remain; no checkpoint copy or full-model run.

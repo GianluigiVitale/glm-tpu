@@ -43,6 +43,7 @@ specs=(P(None,'feature'),P(),P(),P('expert',None,'feature'),P('expert',None,'fea
        P('expert','feature',None),P(None,'feature'),P(None,'feature'),P(None,'feature'),
        P(None,'feature'),P('feature',None),P('feature',None))
 batch,one=build_mapped(mesh,contract=contract,interpret=True)
+captured_batch,captured_one=build_mapped(mesh,contract=contract,interpret=True,capture_boundaries=True)
 report={}
 for case in ('distributed','one_owner'):
  if case=='distributed':
@@ -57,6 +58,16 @@ for case in ('distributed','one_owner'):
  assert np.asarray(health).shape==(8,4) and np.asarray(health).all()
  reference=jnp.concatenate([one(values[0][i:i+1],values[1][i:i+1],values[2][i:i+1],*values[3:]) for i in range(B)])
  np.testing.assert_array_equal(np.asarray(actual).view(np.uint16),np.asarray(reference).view(np.uint16))
+ captured_y,captured_health,cb=captured_batch(*values)
+ cr=[captured_one(values[0][i:i+1],values[1][i:i+1],values[2][i:i+1],*values[3:]) for i in range(B)]
+ np.testing.assert_array_equal(np.asarray(captured_y).view(np.uint16),np.asarray(actual).view(np.uint16))
+ np.testing.assert_array_equal(np.asarray(jnp.concatenate([v[0] for v in cr])).view(np.uint16),np.asarray(reference).view(np.uint16))
+ assert np.asarray(captured_health).all()
+ for name,array in cb.items():
+  expected=np.concatenate([np.asarray(v[1][name]) for v in cr],axis=2)
+  observed=np.asarray(array)
+  dtype=np.uint32 if observed.dtype==np.float32 else np.uint16
+  np.testing.assert_array_equal(observed.view(dtype),expected.view(dtype),err_msg=name)
  hlo=parse_hlo_module(compiled.as_text())
  cs=[i for i in hlo.instructions if i.is_collective]
  feature=tuple(tuple(range(e*4,e*4+4)) for e in range(8))

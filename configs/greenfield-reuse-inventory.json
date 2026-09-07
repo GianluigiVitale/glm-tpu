@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-moe-boundary-diagnostic",
+      "category": "first-divergent-boundary observability",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "82b3f794d41cab5567090b73839ba3f8b0b31fa7",
+      "source_paths": ["glm_tpu/greenfield/kernels/ws32.py", "glm_tpu/greenfield/kernels/ws32_prefill_moe.py", "scripts/greenfield/probe_ws32_prefill_moe.py", "scripts/greenfield/ws32_prefill_moe_campaign.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_moe_boundaries.py", "tests/greenfield/hlo/test_prefill_moe_boundaries.py"],
+      "gate": "24: one normal-only B17 diagnostic, never arithmetic acceptance",
+      "reason": "Optional static capture return reuses actual greenfield arithmetic, not a duplicate model. Capture original-route-order gate/up partials/reduced, weighted down, existing FP32 expert-psum operand, routed/shared/final. Explicit leading expert/feature output axes preserve owner locality. Original refused runner is read at its registered generation/SHA; compare candidate AND reference final witnesses and retain raw HLO lowering manifests before claiming original causality. Instrumentation may perturb lowering; no arithmetic fix or tolerance change is made. Existing bounded controller retains leases/census/checkpoint checks/600s caps/generation archive; diagnostic DB correctness, score and latency are NULL. CPU capture on/off and boundary comparison tests do not prove TPU equivalence."
+    },
+    {
       "id": "ws32-prefill-real-moe-admission",
       "category": "bounded real-weight mapped MoE arithmetic",
       "source_repo": "glm-tpu greenfield",

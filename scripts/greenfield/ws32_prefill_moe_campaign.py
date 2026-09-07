@@ -34,9 +34,11 @@ from scripts.greenfield.probe_ws32_prefill_moe import (
     ROWS,
     TOPOLOGY_SHA,
     check_hlo,
+    BOUNDARY_PROTOCOL,
 )
 
 KERNEL = "ws32_prefill_moe_admission"
+BOUNDARY_KERNEL = "ws32_prefill_moe_boundary_diagnostic"
 FILES = (
     "runner.json",
     "worker.log",
@@ -50,10 +52,24 @@ FILES = (
 
 def run_root(tag: str) -> Path:
     if not re.fullmatch(
-        r"greenfield_fp8_ws32_prefill_moe_admission_[a-zA-Z0-9_]+", tag
+        r"greenfield_fp8_ws32_prefill_moe_(?:admission|boundary_diagnostic)_[a-zA-Z0-9_]+",
+        tag,
     ):
         raise ValueError("invalid real-MoE admission tag")
     return Path("/home/gianl/glm-run") / tag
+
+
+def is_boundary(tag: str) -> bool:
+    run_root(tag)
+    return tag.startswith("greenfield_fp8_" + BOUNDARY_KERNEL + "_")
+
+
+def evidence_files(tag: str) -> tuple[str, ...]:
+    return (
+        tuple(n for n in FILES if n != "concentrated.npz") + ("boundaries.npz",)
+        if is_boundary(tag)
+        else FILES
+    )
 
 
 def ssh(command: str, *, output: Path, worker: str = "all", timeout: int = 120) -> None:
@@ -79,7 +95,9 @@ def ssh(command: str, *, output: Path, worker: str = "all", timeout: int = 120) 
         raise RuntimeError(f"worker command failed; see {output}")
 
 
-def validate_workers(records: list[dict[str, Any]], pin: str) -> None:
+def validate_workers(
+    records: list[dict[str, Any]], pin: str, *, boundary: bool = False
+) -> None:
     if len(records) != 8 or {r["launch_rank"] for r in records} != set(range(8)):
         raise ValueError("need eight unique launch ranks")
     if len({r["hostname"] for r in records}) != 8 or {
@@ -88,7 +106,11 @@ def validate_workers(records: list[dict[str, Any]], pin: str) -> None:
         raise ValueError("fleet hostname/process mapping differs")
     if len({r["hlo"]["sha256"] for r in records}) != 1:
         raise ValueError("fleet candidate HLO hashes differ")
-    for case in CASES:
+    if any(
+        set(r["cases"]) != ({"normal"} if boundary else set(CASES)) for r in records
+    ):
+        raise ValueError("worker case inventory differs from protocol")
+    for case in ("normal",) if boundary else CASES:
         inputs = {tuple(r["cases"][case]["input_sha256"]) for r in records}
         if len(inputs) != 1 or any(
             len(h) != 3 or any(not re.fullmatch("[0-9a-f]{64}", v) for v in h)
@@ -99,9 +121,10 @@ def validate_workers(records: list[dict[str, Any]], pin: str) -> None:
     for r in records:
         if not (
             r["status"] == "SUCCESS"
-            and r["protocol"] == PROTOCOL
+            and r["protocol"] == (BOUNDARY_PROTOCOL if boundary else PROTOCOL)
             and r["code_hash"] == pin
-            and r["admission_only"] is True
+            and r["admission_only"] is (not boundary)
+            and r.get("boundary_diagnostic", False) is boundary
             and r["performance_claim"] is False
             and r["iterations"] == 0
             and r["latency"] is None
@@ -112,7 +135,7 @@ def validate_workers(records: list[dict[str, Any]], pin: str) -> None:
             and r["topology_sha256"] == TOPOLOGY_SHA
             and r["topology_fleet_sha256"] == FLEET_SHA
             and r["hlo"]["contract"]["passed"] is True
-            and set(r["cases"]) == set(CASES)
+            and set(r["cases"]) == ({"normal"} if boundary else set(CASES))
             and len(r["local_device_slots"]) == 4
             and len(r["device_memory_stats_including_reference"]) == 4
             and r["pid"] > 0
@@ -157,9 +180,15 @@ def validate_workers(records: list[dict[str, Any]], pin: str) -> None:
                 and len(c["shards"]) == 4
                 and {s["device_slot"] for s in c["shards"]} == own_slots
                 and all(
-                    s["passed"] is True
-                    and s["bit_mismatches"] == 0
-                    and s["output_sha256"] == s["reference_sha256"]
+                    (
+                        s["finite_and_healthy"] is True
+                        if boundary
+                        else (
+                            s["passed"] is True
+                            and s["bit_mismatches"] == 0
+                            and s["output_sha256"] == s["reference_sha256"]
+                        )
+                    )
                     for s in c["shards"]
                 )
             ):
@@ -168,25 +197,30 @@ def validate_workers(records: list[dict[str, Any]], pin: str) -> None:
         raise ValueError("real-MoE fleet does not cover all32 final owners")
 
 
-def validate_record(record: dict[str, Any], pin: str) -> None:
+def validate_record(
+    record: dict[str, Any], pin: str, *, boundary: bool = False
+) -> None:
     if not (
         record["status"] == "SUCCESS"
         and record["code_hash"] == pin
-        and record["kernel"] == KERNEL
-        and record["protocol"] == PROTOCOL
-        and record["admission_only"] is True
+        and record["kernel"] == (BOUNDARY_KERNEL if boundary else KERNEL)
+        and record["protocol"] == (BOUNDARY_PROTOCOL if boundary else PROTOCOL)
+        and record["admission_only"] is (not boundary)
+        and record.get("boundary_diagnostic", False) is boundary
         and record["performance_claim"] is False
         and record["baseline_only"] is False
-        and record["diagnostic_only"] is False
+        and record["diagnostic_only"] is boundary
         and record["latency"] is None
         and record["warmup"] == record["iterations"] == 0
         and record["profiler_free_timing"] is False
     ):
         raise ValueError("real-MoE aggregate classification differs")
-    validate_workers(record["workers"], pin)
+    validate_workers(record["workers"], pin, boundary=boundary)
 
 
-def validate_files(destination: Path, record: dict[str, Any]) -> None:
+def validate_files(
+    destination: Path, record: dict[str, Any], *, boundary: bool = False
+) -> None:
     """Recheck original tensor bytes and actual graph, not just worker verdicts."""
     hlo = (destination / "candidate.optimized_hlo.txt").read_text()
     if (
@@ -199,7 +233,7 @@ def validate_files(destination: Path, record: dict[str, Any]) -> None:
         != record["reference_hlo_sha256"]
     ):
         raise ValueError("reference HLO bytes differ")
-    for case in CASES:
+    for case in ("normal",) if boundary else CASES:
         shards = record["cases"][case]["shards"]
         with np.load(destination / f"{case}.npz", allow_pickle=False) as arrays:
             expected_keys = {
@@ -217,12 +251,19 @@ def validate_files(destination: Path, record: dict[str, Any]) -> None:
                 if not (
                     a.shape == b.shape == (ROWS, 1536)
                     and a.dtype == b.dtype == np.uint16
-                    and np.array_equal(a, b)
+                    and (boundary or np.array_equal(a, b))
                     and np.all((a & 0x7F80) != 0x7F80)
+                    and np.all((b & 0x7F80) != 0x7F80)
                     and sha256(a.tobytes()).hexdigest() == s["output_sha256"]
                     and sha256(b.tobytes()).hexdigest() == s["reference_sha256"]
                 ):
                     raise ValueError("original BF16 output evidence differs")
+                if int(np.count_nonzero(a != b)) != s["bit_mismatches"]:
+                    raise ValueError("original output mismatch count differs")
+    if boundary:
+        from scripts.greenfield.prefill_moe_boundaries import validate_boundaries
+
+        validate_boundaries(destination / "boundaries.npz", record)
 
 
 def publish_rank(tag: str, rank: int) -> None:
@@ -237,7 +278,7 @@ def publish_rank(tag: str, rank: int) -> None:
     root = run_root(tag) / f"rank{rank}"
     bucket = storage.Client().bucket("driftbench-dsv4-uc")
     receipts = []
-    for name in FILES:
+    for name in evidence_files(tag):
         path = root / name
         if path.is_file():
             receipts.append(
@@ -266,6 +307,8 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     root = run_root(tag)
     bucket = storage.Client().bucket("driftbench-dsv4-uc")
     records = []
+    boundary = is_boundary(tag)
+    files = evidence_files(tag)
     for rank in range(8):
         prefix = f"results/{tag}/workers/rank{rank}/"
         ledger_blob = bucket.get_blob(prefix + "worker_receipts.json")
@@ -275,9 +318,9 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             if_generation_match=ledger_blob.generation
         )
         receipts = json.loads(ledger_bytes)
-        if {r["name"] for r in receipts} != {prefix + n for n in FILES} or len(
+        if {r["name"] for r in receipts} != {prefix + n for n in files} or len(
             receipts
-        ) != len(FILES):
+        ) != len(files):
             raise ValueError(f"rank{rank} evidence set is incomplete")
         destination = root / "fleet" / f"rank{rank}"
         destination.mkdir(parents=True, exist_ok=False)
@@ -295,16 +338,23 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         record = json.loads((destination / "runner.json").read_text())
         if record["launch_rank"] != rank:
             raise ValueError("record rank differs from published path")
-        validate_files(destination, record)
+        validate_files(destination, record, boundary=boundary)
+        if boundary:
+            from scripts.greenfield.prefill_moe_boundaries import original_comparison
+
+            record["original_comparison"] = original_comparison(
+                bucket, destination, record
+            )
         records.append(record)
-    validate_workers(records, pin)
+    validate_workers(records, pin, boundary=boundary)
     return dict(
         status="SUCCESS",
         code_hash=pin,
-        kernel=KERNEL,
-        admission_only=True,
+        kernel=BOUNDARY_KERNEL if boundary else KERNEL,
+        admission_only=not boundary,
+        boundary_diagnostic=boundary,
         baseline_only=False,
-        diagnostic_only=False,
+        diagnostic_only=boundary,
         performance_claim=False,
         latency=None,
         profiler_free_timing=False,
@@ -312,10 +362,11 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         iterations=0,
         selected_route_case=None,
         device_kind="TPU v4",
-        protocol=PROTOCOL,
+        protocol=BOUNDARY_PROTOCOL if boundary else PROTOCOL,
         workers=records,
         hlo={"sha256": records[0]["hlo"]["sha256"], "contract": {"passed": True}},
-        comparison={"passed": True},
+        comparison={"passed": None if boundary else True},
+        diagnostic_evidence_complete=boundary,
         checksum=sha256(json.dumps(records, sort_keys=True).encode()).hexdigest(),
     )
 
@@ -374,6 +425,7 @@ def campaign(tag: str, pin: str) -> None:
         + pin
         + " --coordinator-address "
         + shlex.quote(address)
+        + (" --boundary-diagnostic " if is_boundary(tag) else " ")
         + ' --process-id "$idx" --output-dir "$out" '
         '>"$out/worker.log" 2>&1'
     )

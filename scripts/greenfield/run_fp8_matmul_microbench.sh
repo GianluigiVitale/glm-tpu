@@ -14,7 +14,7 @@ PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
 GROUPED_ADMISSION=0
 [[ $KERNEL != ws32_grouped_admission && $KERNEL != ws32_grouped_down_admission && \
-   $KERNEL != ws32_prefill_moe_admission ]] || GROUPED_ADMISSION=1
+   $KERNEL != ws32_prefill_moe_admission && $KERNEL != ws32_prefill_moe_boundary_diagnostic ]] || GROUPED_ADMISSION=1
 BOUNDED_PREFILL=0
 [[ $KERNEL != ws32_prefill_baseline && $GROUPED_ADMISSION != 1 ]] || BOUNDED_PREFILL=1
 OUTPUT_TILE=${GLM_GREENFIELD_FP8_OUTPUT_TILE:-128}
@@ -62,7 +62,7 @@ fi
   $KERNEL == structured_kv_b || $KERNEL == dsa_wq_b || \
   $KERNEL == dsa_wk || $KERNEL == ws32_prefill_baseline || \
   $KERNEL == ws32_grouped_admission || $KERNEL == ws32_grouped_down_admission || \
-  $KERNEL == ws32_prefill_moe_admission ]] || {
+  $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic ]] || {
   echo "FP8 kernel must be single_up, single_up_m1, attention_output," \
     "fused_attention_output, rmsnorm_linear, up_gate, selected_up_gate," \
     "selected_swiglu_down, structured_kv_b, dsa_wq_b, dsa_wk, ws32_prefill_baseline, ws32_grouped_admission, ws32_grouped_down_admission, or ws32_prefill_moe_admission" >&2
@@ -202,7 +202,7 @@ elif [[ $KERNEL == attention_output ]]; then
 fi
 (
   cd "$WORKTREE"
-  if [[ $KERNEL == ws32_prefill_moe_admission ]]; then
+  if [[ $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic ]]; then
     # Distributed worker runtime must not inherit the single-process bounds below.
     JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
       -m scripts.greenfield.ws32_prefill_moe_campaign campaign --tag "$TAG" --pin "$PIN"
@@ -295,10 +295,12 @@ if runner["kernel"] != expected_kernel:
 admission = runner.get("admission_only", False)
 if admission != (expected_kernel in ("ws32_grouped_admission", "ws32_grouped_down_admission", "ws32_prefill_moe_admission")):
     raise SystemExit("admission classification drifted")
-fleet_moe = expected_kernel == "ws32_prefill_moe_admission"
+boundary = expected_kernel == "ws32_prefill_moe_boundary_diagnostic"
+fleet_moe = expected_kernel == "ws32_prefill_moe_admission" or boundary
+untimed = admission or boundary
 if fleet_moe:
     from scripts.greenfield.ws32_prefill_moe_campaign import validate_record
-    validate_record(runner, pin)
+    validate_record(runner, pin, boundary=boundary)
 elif admission:
     from scripts.greenfield.probe_prefill_grouped_fp8 import validate_record
     validate_record(runner)
@@ -309,9 +311,9 @@ if runner["kernel"] != "attention_output" and output_tile != 128:
     raise SystemExit("non-default output tile requires attention_output")
 if not runner["hlo"]["contract"]["passed"]:
     raise SystemExit("Pallas custom-call/full-overlay HLO contract failed")
-if not runner["comparison"]["passed"]:
+if not boundary and not runner["comparison"]["passed"]:
     raise SystemExit("Pallas/reference correctness failed")
-if not admission and not runner["profiler_free_timing"]:
+if not untimed and not runner["profiler_free_timing"]:
     raise SystemExit("kernel wall distribution is not profiler-free")
 baseline = runner.get("baseline_only", False)
 if baseline != (runner["kernel"] == "ws32_prefill_baseline"):
@@ -326,7 +328,7 @@ if baseline:
     if runner['dtype_contract']['output'] != 'float32' or not runner['compiled_memory_estimate']:
         raise SystemExit('baseline dtype/memory evidence missing')
 diagnostic_reference = runner.get("reference_diagnostic")
-if bool(diagnostic_reference) != runner.get("diagnostic_only"):
+if not boundary and bool(diagnostic_reference) != runner.get("diagnostic_only"):
     raise SystemExit("reference diagnostic identity drifted")
 if diagnostic_reference is not None:
     if (
@@ -367,7 +369,7 @@ shape_ids = {
     "single_up_m1": "m1_k6144_n2048",
 }
 if fleet_moe:
-    item_id = "real_layer3_b17_arithmetic_v1_normal_concentrated"
+    item_id = "real_layer3_b17_boundaries_v1_normal" if boundary else "real_layer3_b17_arithmetic_v1_normal_concentrated"
 elif admission:
     k = runner['shape']['lhs'][1]
     n = runner['shape']['output'][1]
@@ -403,17 +405,17 @@ pv.record_item(
     gold="Bounded exact-fallback output and required compact Pallas calls.",
     raw_output=json.dumps(runner, sort_keys=True),
     extracted=str(runner["checksum"]),
-    correct=True,
-    score=1.0,
-    latency_ms=None if admission else runner["latency"]["p50_ms"],
+    correct=None if boundary else True,
+    score=None if boundary else 1.0,
+    latency_ms=None if untimed else runner["latency"]["p50_ms"],
 )
 pv.finalize(
     conn,
     run_id,
     benchmark=f"greenfield_fp8_{runner['kernel']}",
-    metric="contract_valid",
+    metric="diagnostic_evidence_complete" if boundary else "contract_valid",
     value=1.0,
-    note="Standalone kernel microbenchmark; not layer latency or token throughput.",
+    note="Instrumented real-MoE boundary evidence; no numerical acceptance or performance claim." if boundary else "Standalone kernel microbenchmark; not layer latency or token throughput.",
 )
 conn.close()
 
@@ -424,7 +426,8 @@ summary = {
     "results_db_run_id": run_id,
     "runner": runner,
     "claim_scope": (
-        "32-chip real layer3 MoE, supplied routes/perturbed activations, exact M1 comparison; no timing or model-performance claim"
+        "32-chip real layer3 boundary diagnostic; instrumentation may perturb outputs; no arithmetic acceptance or performance claim"
+        if boundary else "32-chip real layer3 MoE, supplied routes/perturbed activations, exact M1 comparison; no timing or model-performance claim"
         if fleet_moe else "single-chip synthetic grouped projection arithmetic admission; no timing or performance claim"
         if admission else "diagnostic reference-vs-Pallas projection wall; no performance claim"
         if diagnostic_reference is not None
@@ -479,7 +482,8 @@ publish_exact(bucket, f'results/{root.name}/{ledger.name}', ledger, digest_file(
 terminal = root / 'SUCCESS'
 runner = json.loads((root/'runner.json').read_text())
 terminal.write_text(json.dumps(dict(tag=root.name, code_hash=pin,
-    baseline_only=runner['baseline_only'], admission_only=runner.get('admission_only', False), performance_claim=False,
+    baseline_only=runner['baseline_only'], admission_only=runner.get('admission_only', False),
+    boundary_diagnostic=runner.get('boundary_diagnostic', False), performance_claim=False,
     summary_sha256=sha256((root/'summary.json').read_bytes()).hexdigest(),
     archive_receipts_sha256=sha256(ledger.read_bytes()).hexdigest()), sort_keys=True) + '\n')
 print(json.dumps(publish_exact(bucket, f'results/{root.name}/SUCCESS', terminal,
