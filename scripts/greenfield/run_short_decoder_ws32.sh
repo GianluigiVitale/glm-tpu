@@ -724,10 +724,30 @@ for s in m["slots"]:
     if not p.is_file() or p.stat().st_size!=s["file_bytes"]: raise SystemExit(f"tmpfs slot missing: {p}")
 PY
 else findmnt -T "$checkpoint" -n -o SOURCE,FSTYPE | grep -q "driftbench-dsv4-uc fuse.gcsfuse"; fi; echo "SYNC_OK $(hostname) $pin"'
-sync_rc=0
-gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-  --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1 || sync_rc=$?
-if [[ $sync_rc -ne 0 ]] || ! has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK; then
+# The synchronization command is idempotent by construction: it CHECKS the pin
+# and cleanliness, and clones or fetches only when it must. The controller's own
+# ssh client intermittently fails to parse its system configuration before the
+# command even runs -- observed twice as `/etc/ssh/ssh_config line 54: no
+# argument after keyword "<garbage>"` on a 53-line file whose bytes hash
+# identically on re-read, always for worker 0, the controller reaching itself.
+# Each attempt is kept whole and must still produce all EIGHT markers, so the
+# retry widens nothing: it only refuses to throw a run away for a client fault
+# that costs the pod an idle hour and disappears on the next attempt.
+sync_ok=0
+for sync_attempt in 1 2 3; do
+  sync_rc=0
+  gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+    --command="$sync_command" >"$RUN_DIR/sync.attempt${sync_attempt}.txt" 2>&1 \
+    -- -o ServerAliveInterval=60 -o ServerAliveCountMax=15 || sync_rc=$?
+  cp -f "$RUN_DIR/sync.attempt${sync_attempt}.txt" "$RUN_DIR/sync.txt"
+  if [[ $sync_rc -eq 0 ]] && has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK; then
+    sync_ok=1
+    break
+  fi
+  say "eight-host synchronization attempt $sync_attempt failed (rc=$sync_rc); every attempt is retained"
+  sleep 30
+done
+if [[ $sync_ok -ne 1 ]]; then
   say "ABORT: exact eight-host synchronization failed"
   exit 1
 fi
