@@ -1227,3 +1227,9 @@ the L7 depth-0.0 controller and remote shells exited, all eight original workers
 `.ended` marker cannot recover their exit status. The new tool persists/resumes its first eight-worker
 baseline, retains leases on unknown observations, and reports readiness for a separate authenticated
 census, original-file collection and recovery seal. No model or enforcement code is changed.
+
+The paired `collect_ws32_worker_evidence.py` adapts the existing v2 compressed-HLO layout and runner
+NPZ/trace/graph bindings, preserving original JSON bytes and per-host topology mapping. Eight validated
+inventories precede any shared publication; generation-zero upload and generation-pinned replay replace
+blind no-clobber retries. The unchanged materializer and sealer remain the sole numerical authorities.
+`docs/greenfield/WS32_ORPHAN_RECOVERY.md` records the complete workflow and its live-run prohibition.

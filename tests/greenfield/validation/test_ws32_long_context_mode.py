@@ -431,11 +431,11 @@ def test_the_legacy_extractor_must_be_the_captures_own_bytes() -> None:
         load_legacy_bench_module("glm_longctx", pinned_files={})
 
 
-def test_an_l8_run_is_not_required_to_emit_the_legacy_two_hundred_fifty_six() -> None:
-    """The E0 capture holds 256 diagnostic ids; the run observes 29 tokens.
+def test_l8_cardinality_is_independent_of_the_legacy_diagnostic_length() -> None:
+    """The diagnostic oracle length is not a correctness criterion.
 
-    Requiring the engine to emit as many tokens as a capture it does not answer
-    would refuse every sealable L8 run AFTER its ten-hour prefill.
+    Exercise the cardinality predicate with a short hypothetical observation;
+    actual §23.5 E0 independently requires 256 timed steps (tested below).
     """
     from glm_tpu.greenfield.validation.long_context_oracle import (
         WS32_LONG_CONTEXT_PROFILES,
@@ -459,7 +459,8 @@ def test_an_l8_run_is_not_required_to_emit_the_legacy_two_hundred_fifty_six() ->
 
     e0 = _LC("e0", entry["generated_token_count"])
     l7 = _LC("passkey", passkey["generated_token_count"])
-    # L8 observes 29 tokens against a 256-id diagnostic capture: it must PASS.
+    # A 29-token observation does not fail this diagnostic-cardinality predicate;
+    # it is not proof of the separate E0 timed-window contract.
     assert verdict([0] * observed, observed, long_context=e0, oracle=None) is False
     # L7 observes 35 and needs its twenty: passes; starved of them, refuses.
     assert verdict([0] * 35, 35, long_context=l7, oracle=None) is False
@@ -470,6 +471,25 @@ def test_an_l8_run_is_not_required_to_emit_the_legacy_two_hundred_fifty_six() ->
     # A wrong cardinality is still refused in every mode.
     assert verdict([0] * 34, 35, long_context=e0, oracle=None) is True
     assert verdict("not-a-list", 35, long_context=e0, oracle=None) is True
+
+
+def test_wrapper_runs_the_full_e0_timed_window_without_changing_l7() -> None:
+    import os
+    import subprocess
+
+    source = WRAPPER.read_text()
+    iteration_line = source.index("readonly ITERATIONS=")
+    start = source.rfind('case "$CONTEXT" in', 0, iteration_line)
+    end = source.index("esac", iteration_line) + len("esac")
+    assert start >= 0
+    block = source[start:end]
+    for context, expected in (("256k_e0", 256), ("128k_d0_0", 10),
+                              ("128k_d1_0", 10), ("8k", 10), ("2k", 10)):
+        result = subprocess.run(["/bin/bash", "-eu", "-c", block + '\nprintf "%s" "$ITERATIONS"'],
+                                env={**os.environ, "CONTEXT": context}, capture_output=True, text=True, check=True)
+        assert int(result.stdout) == expected
+    assert 262144 + _wrapper_observer_steps("e0") + 2 + 256 + 2 + 1 == 262419
+    assert 262419 <= 262656
 
 
 def _cardinality_verdict():

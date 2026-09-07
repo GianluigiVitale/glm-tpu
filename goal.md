@@ -58,5 +58,6 @@ at pin `679e2392` is LIVE, 8/62 chunks observed. Its orchestrator/remote shells 
 PID 2248787 holds both leases, first receipt 07:48Z 8/8 live. After READY_FOR_CENSUS: prove cleanup,
 collect original JSON/NPZ/HLO/log/trace with exact existing-object checks, then RECOVER=1 seal.
 Never recover while workers live. Surface unchanged; `.ended` may never appear after shell loss.
-Then apply 3 deferred review items in HANDOFF, L7 depths 0.05/0.95, L8 acquisition and 256K E0
-(~11.5 h), then §18 and separate base/effective throughput. Gate D and G remain closed.
+Recipe: `docs/greenfield/WS32_ORPHAN_RECOVERY.md`; argv/env capsule in `configs/`.
+Then deferred sealer fixes incl. E0's 256-step guard (wrapper fixed), L7 depths 0.05/0.95,
+L8 acquisition/E0, §18 and base/effective throughput.

@@ -13926,3 +13926,38 @@ holders, each at chunk 8/62. Durable stdout is `watch.stdout.log` in the same ru
 PID and receipt on continuation; resume the same CLI/tag/pin if the monitor itself is missing.
 Read-only DB query confirmed latest sealed row 573; no depth-0.0 verdict exists yet. Cron will skip
 while the monitor holds rsync; manual same-region checkpoint sync remains available between edits.
+
+## 2026-09-07 08:05Z — collection prepared; caught E0's undersized window before launch
+
+Previous turn made progress by restoring authenticated process monitoring. The same eight workers
+remain live, past chunk 10/62; monitor PID 2248787 still owns both user leases. No collection or
+model restart was performed. The new `collect_ws32_worker_evidence.py` prepares original-file
+recovery outside the enforcement surface. Pinned topology is essential: host 0 maps to JAX process 3,
+so matching those integers would falsely refuse a finished run. It inventories original SUCCESS
+JSON/NPZ/log/trace and all fourteen raw HLO files, requires eight identical shared-graph inventories
+before writes, and conditionally publishes only the existing 46-object v2 layout. Existing gzip
+containers remain untouched and are checked by bounded inflation to the raw graph SHA. Every object
+is generation-readback checked with size/CRC/SHA. Full operating sequence is
+`docs/greenfield/WS32_ORPHAN_RECOVERY.md`; collection receipts stay local, never extra remote objects.
+
+The exact original worker argv was captured while PID 2135816 remained live and its SHA matched the
+first monitor baseline (`3033bbc5…c9f`). `configs/greenfield-ws32-l7-d0-recovery.json` preserves it,
+all 36 recovery environment entries and the eight topology capture hashes. The reviewer independently
+recomputed the argv digest and verified those topology files. The original sealer still decides the
+result; no numerical JSON is reconstructed and no missing exit code is invented.
+
+Smallest-test evidence: collector invocation while the actual worker was live refused immediately
+before inventory/cloud writes. Offline inventory of the previous sealed DB573 host-0 directory passed
+with 18 files (`a5141368…c3f8a`). Combined monitor/collector/long-context tests: **50 passed**;
+shell syntax and diff checks passed. Independent Astra approved collector persistence and later idle
+collection conditional on both leases and an authenticated 8/8 zero-work census.
+
+Found a separate real L8 blocker while preparing recovery: the wrapper set `ITERATIONS=10` for every
+context, despite §23.5 requiring 256 timed E0 steps. It now selects 256 for `256k_e0` and 10 otherwise.
+The test executes the actual shell block for five contexts and checks 262,419 required positions fit
+262,656. The previous 29-token L8 test is now explicitly a hypothetical diagnostic-cardinality test,
+not a claim that 29 tokens satisfy E0. Astra independently approved this delta. **Still deferred until
+the current run seals:** the sealer must explicitly reject E0 iteration counts other than 256. Its
+current caller-provided count would permit undermeasurement; fixing the wrapper prevents the normal
+launch mistake but is not the complete enforcement fix. Add this to the existing three idle-gap
+items. No L8 run has launched. No runtime or sealer enforcement-surface file changed during this run.

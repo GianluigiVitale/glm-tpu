@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-orphan-original-evidence-collector",
+      "category": "long-context recovery",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "679e2392b76caf1acb0a98ff87962c5b5c908e14",
+      "source_paths": ["scripts/greenfield/run_short_decoder_ws32.sh", "glm_tpu/greenfield/validation/ws32_evidence.py", "scripts/greenfield/seal_short_decoder_ws32.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/collect_ws32_worker_evidence.py", "docs/greenfield/WS32_ORPHAN_RECOVERY.md"],
+      "gate": "L7/L8 original-file recovery only",
+      "reason": "Reuse the exact 46-object compressed-HLO numerical evidence layout, original runner NPZ/trace/graph identities, per-host topology mapping and existing recovery sealer. Inventory all eight original sets before publishing any shared graph. Missing objects use generation-zero writes, existing objects require generation-pinned CRC/SHA replay, and compressed containers are compared through bounded original raw HLO. No numerical envelope, exit marker, SUCCESS or verdict is created. Keep controller receipts local; authenticated zero-work plus both leases are prerequisites."
+    },
+    {
       "id": "ws32-orphan-process-monitor",
       "category": "long-context observability",
       "source_repo": "glm-tpu greenfield",

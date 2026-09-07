@@ -308,7 +308,12 @@ else
   readonly OBSERVER_STEPS=14
 fi
 readonly WARMUP=2
-readonly ITERATIONS=10
+# §23.5 E0 measures 256 profiler-free target steps. The short-context and
+# passkey ladder retain their established ten-sample protocol.
+case "$CONTEXT" in
+  256k_e0) readonly ITERATIONS=256 ;;
+  *) readonly ITERATIONS=10 ;;
+esac
 readonly TRACE_STEPS=2
 # The worker wall limit covers load, compile, the whole prefill and the timed
 # decode with margin above the prefill budget above.
