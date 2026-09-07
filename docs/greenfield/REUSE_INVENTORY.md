@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Layer0 first hardware attempt failed before load/compile on raw-file versus canonical
+inventory digest confusion. Worker now directly reuses `inspect_source_inventory` and
+checks the unchanged canonical pin;68 CPU tests plus actual retained metadata pass.
+Original all8 generation-bound failures and cleanup are recorded in HANDOFF. No model
+arithmetic changed; retry requires narrow review and fresh guarded preflight.
+
 `probe_ws32_prefill_layer.py` and `ws32_prefill_layer_campaign.py` now connect the
 reviewed layer builders/subset loader to the existing FP8 wrapper's leases/censuses,
 SSH and exact generation publisher. No complete model copy/load. A before-JAX fleet

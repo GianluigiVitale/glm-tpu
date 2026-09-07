@@ -1,0 +1,300 @@
+{
+  "classification": "PRE_LOAD_INVENTORY_DIGEST_KIND_FAILURE",
+  "tag": "greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z",
+  "workers": [
+    {
+      "error": "ValueError: layer source inventory hash drifted",
+      "hostname": "t1v-n-ae271d05-w-0",
+      "jax_process_index": 3,
+      "ledger": {
+        "crc32c": "qQyBUA==",
+        "generation": "1788822285769864",
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank0/worker_receipts.json",
+        "sha256": "de74814df90399f7accc4e3dbc803c5a0ecb5f2db051d25d57bcfaf99153abc1",
+        "size": 842
+      },
+      "rank": 0,
+      "receipts": [
+        {
+          "crc32c": "54gkiA==",
+          "generation": "1788822285203941",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank0/runner.json",
+          "original_sha256": "c5b65ab44d696fbf8f282896e70f70e8142bab6c55a48f8d7017991434668c00",
+          "size": 1606
+        },
+        {
+          "crc32c": "W9yG8Q==",
+          "generation": "1788822285376026",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank0/retained_preflight.json",
+          "original_sha256": "300cb2319e83f7a1ef029224752fd005b0064721ab334d81d572ca80dac0cac8",
+          "size": 1162
+        },
+        {
+          "crc32c": "hvNSgQ==",
+          "generation": "1788822285587723",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank0/worker.log",
+          "original_sha256": "59b2e5037f3c3e6e5e88ec501c648a9c55cc55a5dde0bf4cc8e78fb7fcf73dd8",
+          "size": 479
+        }
+      ]
+    },
+    {
+      "error": "ValueError: layer source inventory hash drifted",
+      "hostname": "t1v-n-ae271d05-w-1",
+      "jax_process_index": 5,
+      "ledger": {
+        "crc32c": "lDGrVw==",
+        "generation": "1788822285685020",
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank1/worker_receipts.json",
+        "sha256": "e4e1f02e87a675c0f64a78121c39abc16f0311c65651215e4180aa8caf654ee4",
+        "size": 842
+      },
+      "rank": 1,
+      "receipts": [
+        {
+          "crc32c": "KhOCkw==",
+          "generation": "1788822285234864",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank1/runner.json",
+          "original_sha256": "1e0c491c0130aa7c89c15898e69355df801102f243bc84ece1fe862c6612df9b",
+          "size": 1606
+        },
+        {
+          "crc32c": "KmY3ug==",
+          "generation": "1788822285392128",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank1/retained_preflight.json",
+          "original_sha256": "2a887a0e42501b532c343832ddd60a7441190c55c86b5ce931d6636a6edf1244",
+          "size": 1163
+        },
+        {
+          "crc32c": "hxhZdg==",
+          "generation": "1788822285532366",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank1/worker.log",
+          "original_sha256": "895a5edf709523ea6f53d53132da2ebc86deb3f3514a9b78cccc89a1432bda62",
+          "size": 479
+        }
+      ]
+    },
+    {
+      "error": "ValueError: layer source inventory hash drifted",
+      "hostname": "t1v-n-ae271d05-w-2",
+      "jax_process_index": 1,
+      "ledger": {
+        "crc32c": "Wa0Zcg==",
+        "generation": "1788822285666416",
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank2/worker_receipts.json",
+        "sha256": "a776c45a1520eca82f1b3f9f64bf1329d6e9e5b3da5b66beb14d528048822ae2",
+        "size": 842
+      },
+      "rank": 2,
+      "receipts": [
+        {
+          "crc32c": "L1igtg==",
+          "generation": "1788822285115476",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank2/runner.json",
+          "original_sha256": "d07aa22e25cd3783093037f5247abd14010ec23a8270799cf4680312b5ea0301",
+          "size": 1606
+        },
+        {
+          "crc32c": "hGwvWA==",
+          "generation": "1788822285271602",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank2/retained_preflight.json",
+          "original_sha256": "7d80248ce0295fb8073da28f678ca433579fe151164bb9d0827d5a78c36a7325",
+          "size": 1162
+        },
+        {
+          "crc32c": "hSVFbw==",
+          "generation": "1788822285506848",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank2/worker.log",
+          "original_sha256": "5f107110496946018112171936e3a481817222e4c0a1f1637d0e47190316d2e7",
+          "size": 479
+        }
+      ]
+    },
+    {
+      "error": "ValueError: layer source inventory hash drifted",
+      "hostname": "t1v-n-ae271d05-w-3",
+      "jax_process_index": 2,
+      "ledger": {
+        "crc32c": "8GanFA==",
+        "generation": "1788822285606762",
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank3/worker_receipts.json",
+        "sha256": "8fe5959509bf7d3fd5f490070897bd343b0000aaae1f5584aa86b2775c4a5b07",
+        "size": 842
+      },
+      "rank": 3,
+      "receipts": [
+        {
+          "crc32c": "LHVenw==",
+          "generation": "1788822285115659",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank3/runner.json",
+          "original_sha256": "2cd2e10a01220534dc39a77d426fd171f3fc0f8bf66aede5d3ae1d02e56affd4",
+          "size": 1606
+        },
+        {
+          "crc32c": "Y7WE4g==",
+          "generation": "1788822285304042",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank3/retained_preflight.json",
+          "original_sha256": "e20a4c58550f1555748064d9520b04b7a09350b85256ee0abc1a13632d7d5ea2",
+          "size": 1161
+        },
+        {
+          "crc32c": "hM5OmA==",
+          "generation": "1788822285460035",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank3/worker.log",
+          "original_sha256": "7c792aa0739604a5b111dd5f2b4b6e07dae33c1e3fbabfdccf71d0cccbf6cf43",
+          "size": 479
+        }
+      ]
+    },
+    {
+      "error": "ValueError: layer source inventory hash drifted",
+      "hostname": "t1v-n-ae271d05-w-4",
+      "jax_process_index": 0,
+      "ledger": {
+        "crc32c": "NdtdQA==",
+        "generation": "1788822285709221",
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank4/worker_receipts.json",
+        "sha256": "0dabfbd2f8035d1fd6656bd40c42db1e54e1d8990de7c8e990c6062b034f258b",
+        "size": 842
+      },
+      "rank": 4,
+      "receipts": [
+        {
+          "crc32c": "RRxYMg==",
+          "generation": "1788822285230668",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank4/runner.json",
+          "original_sha256": "8e6dd2178af0ab8f76df23507998f41b4b8faa0e0ea879f3cacd39c3742d4849",
+          "size": 1607
+        },
+        {
+          "crc32c": "N1sXHw==",
+          "generation": "1788822285404015",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank4/retained_preflight.json",
+          "original_sha256": "765353cccfb1627540520bd6f72d52512b954e046d0c7a01f8078c4497abd676",
+          "size": 1161
+        },
+        {
+          "crc32c": "gV99XQ==",
+          "generation": "1788822285556856",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank4/worker.log",
+          "original_sha256": "acd2cd93c430c100a65bb037c38b88b3045bcba586f54e6b4a29d2a44a8a1032",
+          "size": 479
+        }
+      ]
+    },
+    {
+      "error": "ValueError: layer source inventory hash drifted",
+      "hostname": "t1v-n-ae271d05-w-5",
+      "jax_process_index": 6,
+      "ledger": {
+        "crc32c": "XcR4yQ==",
+        "generation": "1788822285567245",
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank5/worker_receipts.json",
+        "sha256": "776486b8c0c9564d320196c6be2381a73160c616422a7900ae48adeb7cd627e5",
+        "size": 842
+      },
+      "rank": 5,
+      "receipts": [
+        {
+          "crc32c": "THY3tw==",
+          "generation": "1788822285107098",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank5/runner.json",
+          "original_sha256": "4439607f83ee9295cbdd438929293a666518317e2c4c5e24e546feffd254b1b6",
+          "size": 1606
+        },
+        {
+          "crc32c": "0SeoHw==",
+          "generation": "1788822285263968",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank5/retained_preflight.json",
+          "original_sha256": "9a3655ae10437b6ea12a68f57e295a6baa2cef7278ed40b317cdd905db4ecd9f",
+          "size": 1161
+        },
+        {
+          "crc32c": "gLR2qg==",
+          "generation": "1788822285426449",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank5/worker.log",
+          "original_sha256": "50abede348d051d769272865c99e81a715b1f53078c62806651f98e77b583768",
+          "size": 479
+        }
+      ]
+    },
+    {
+      "error": "ValueError: layer source inventory hash drifted",
+      "hostname": "t1v-n-ae271d05-w-6",
+      "jax_process_index": 7,
+      "ledger": {
+        "crc32c": "6oLqEA==",
+        "generation": "1788822285725077",
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank6/worker_receipts.json",
+        "sha256": "04d8bd7e0cc9d8f8d2e5a038859a62eee4f26586d5041a0c81623bdc62cf2a13",
+        "size": 842
+      },
+      "rank": 6,
+      "receipts": [
+        {
+          "crc32c": "Lrd0Iw==",
+          "generation": "1788822285229839",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank6/runner.json",
+          "original_sha256": "6007de43c24146983408cdb83b1d3e9cc7d2966f5d09ef5be64d3e5bc6c11943",
+          "size": 1606
+        },
+        {
+          "crc32c": "kH5uzw==",
+          "generation": "1788822285416111",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank6/retained_preflight.json",
+          "original_sha256": "336f6e846ff8564d7f86a8d9062fc2facdfb3050277455a019bc97fb10dea74f",
+          "size": 1163
+        },
+        {
+          "crc32c": "golqsw==",
+          "generation": "1788822285578859",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank6/worker.log",
+          "original_sha256": "c7fa7fa57722307c1e2f746dc08aae4a51accb917d92d4345ce76a9927b0cbef",
+          "size": 479
+        }
+      ]
+    },
+    {
+      "error": "ValueError: layer source inventory hash drifted",
+      "hostname": "t1v-n-ae271d05-w-7",
+      "jax_process_index": 4,
+      "ledger": {
+        "crc32c": "ZgTLmw==",
+        "generation": "1788822285549552",
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank7/worker_receipts.json",
+        "sha256": "d43428f4e1b3fd0175103f9466fd543a2be0e2205b8c4436881da3c86f66bc93",
+        "size": 842
+      },
+      "rank": 7,
+      "receipts": [
+        {
+          "crc32c": "rBacXQ==",
+          "generation": "1788822285098305",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank7/runner.json",
+          "original_sha256": "7821e30c1d5814c4264a2dd77ff48767a73702f5eb9dc1be6d32d33d86f430da",
+          "size": 1606
+        },
+        {
+          "crc32c": "QGN3bg==",
+          "generation": "1788822285248937",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank7/retained_preflight.json",
+          "original_sha256": "6cdf86af3cff075a0cc643a7210376d63a69661b90c2055a0882e84d73ac1e82",
+          "size": 1161
+        },
+        {
+          "crc32c": "g2JhRA==",
+          "generation": "1788822285401207",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z/workers/rank7/worker.log",
+          "original_sha256": "554ee1fbe520db6ac5afdfe0ba1ac708aa62e86852418419f1fd21573e262980",
+          "size": 479
+        }
+      ]
+    }
+  ],
+  "code_hash": "207471d78ba0c87c1efd6096d1cba1bb147eaec2",
+  "numerical_claim": false,
+  "performance_claim": false,
+  "canonical_inventory_sha256": "a388627c08c8ff591903deb1fbf3198f43916e64a2295ed0e253f1e44a042fc4",
+  "raw_inventory_file_sha256": "3186e50a945ecd268c6d6418f210fbf3488cfd02f7b4038a76069ef861a06938",
+  "diagnosis": "Raw JSON file digest was compared to canonical self-authenticating inventory digest. All eight workers failed before selected payload load or model compilation. Correction reuses inspect_source_inventory and compares the derived canonical digest to the unchanged pin."
+}

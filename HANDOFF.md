@@ -14882,3 +14882,28 @@ Next exact command after persistence (auto fresh tag, no direct worker launch):
 On success inspect actual HLO/results/HBM/original receipts/DB/cleanup with reviewer, then3.
 On failure preserve tag and diagnose the smallest boundary; do not retry unchanged.
 Last authenticated fleet census still21:07Z: wrapper must obtain fresh full preflight.
+
+## 2026-09-07 23:19Z — layer0 pre-load checksum-kind failure corrected
+
+First tag `greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z`,
+pin `207471d78ba0c87c1efd6096d1cba1bb147eaec2`, stopped before selected weight load or
+model compilation. All8 workers initialized JAX then failed on `layer source inventory
+hash drifted`; programs/cases empty. Wrapper exit1, normal+root failure censuses8/8
+clean23:04:55Z. No numerical result, new checkpoint or model performance evidence.
+All8 original receipt ledgers and their24 referenced files independently downloaded at
+exact generations and size/CRC/SHA-verified; compact original bindings preserved in
+`docs/artifacts/prefill-layer-inventory-digest-failure-20260907.json`.
+
+Root cause: worker compared raw JSON SHA `3186e50a…a06938` to the inventory's canonical
+self-digest `a388627c…042fc4`. The pinned inventory is valid. Correction directly reuses
+`inspect_source_inventory` (structure and recomputed self-digest verification), checks
+its canonical digest against the unchanged pin, and passes that same parsed object to
+the subset loader. No arithmetic, tolerances, checkpoint pins or loader policy changed.
+Regression covers two JSON encodings, wrong digest kind, changed content with stale
+self-digest and self-consistent replacement against old pin.68 CPU tests pass10.51s;
+the corrected helper also authenticates the actual retained36MB inventory without JAX.
+
+Independent Astra narrow correction review PASS, no P0-P2. Next: commit/push/verified
+same-region mirror, then ONE fresh layer0 tag through the wrapper/preflights. Layer3 requires
+layer0 terminal evidence review and clean census. Do not relaunch the failed tag or
+reopen the cleared DB583 MoE arithmetic boundary. Efficient short decoder/L7/L8 remain.

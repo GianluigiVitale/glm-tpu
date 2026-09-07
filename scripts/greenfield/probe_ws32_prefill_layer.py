@@ -54,6 +54,10 @@ from scripts.greenfield.prefill_layer_evidence import (
     stack_reference,
 )
 from scripts.greenfield.prefill_layer_hlo import check_layer_hlo
+from glm_tpu.greenfield.partitioning.source_inventory import (
+    SourceInventory,
+    inspect_source_inventory,
+)
 from scripts.greenfield.probe_ws32_prefill_moe import (
     TOPOLOGY,
     TOPOLOGY_SHA,
@@ -64,6 +68,14 @@ from scripts.greenfield.probe_ws32_prefill_moe import (
 KERNEL = "ws32_prefill_layer_admission"
 PINS = REPO / "docs/artifacts/prefill-selected-layer-host-admission-20260907.json"
 PAYLOAD_BYTES = {0: 21_557_920, 3: 324_821_552}
+
+
+def authenticated_inventory(path: Path, expected_sha256: str) -> SourceInventory:
+    """Validate the inventory and its pinned canonical digest, not JSON file bytes."""
+    inventory = inspect_source_inventory(path)
+    if inventory.inventory_sha256 != expected_sha256:
+        raise ValueError("layer source inventory canonical hash drifted")
+    return inventory
 
 
 def layer_from_tag(tag: str) -> int:
@@ -285,7 +297,6 @@ def main() -> int:
             read_ws32_layer_subset_metadata,
             load_ws32_layer_subset,
         )
-        from glm_tpu.greenfield.partitioning import inspect_source_inventory
         from glm_tpu.greenfield.runtime.ws32_decoder import (
             Ws32DecoderConfig,
             ws32_decoder_weight_names,
@@ -342,12 +353,9 @@ def main() -> int:
         phase("runtime_seconds", started)
         started = time.monotonic()
         pins = json.loads(PINS.read_text())
-        inventory_path = Path(pins["source_inventory"])
-        if (
-            sha256(inventory_path.read_bytes()).hexdigest()
-            != pins["source_inventory_sha256"]
-        ):
-            raise ValueError("layer source inventory hash drifted")
+        inventory = authenticated_inventory(
+            Path(pins["source_inventory"]), pins["source_inventory_sha256"]
+        )
         for name, key in (
             ("manifest.json", "manifest_file_sha256"),
             ("SUCCESS", "success_file_sha256"),
@@ -368,7 +376,7 @@ def main() -> int:
             expected_success_sha256=pins["expected_success_sha256"],
             expected_mesh_hash=MESH_SHA,
             expected_topology_hash=TOPOLOGY_SHA,
-            inventory=inspect_source_inventory(inventory_path),
+            inventory=inventory,
             geometry=geometry,
         )
         loaded = load_ws32_layer_subset(subset, mesh=mesh, physical_mesh=physical)

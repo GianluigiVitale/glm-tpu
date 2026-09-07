@@ -1475,3 +1475,11 @@ normalized-state cause.
   shared-HLO agreement precede generation-bound publication. Recovery sealed the original run
   without another 4.6-hour prefill. Lesson: process completion, idle hardware, complete original
   evidence and a protected numerical seal are four separate facts. Preserve each boundary.
+
+- 2026-09-07 prefill layer0 admission `greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T230407800375430Z`:
+  all8 failed before load/compile because the worker used raw JSON SHA where its pin names
+  a canonical inventory digest. Use the existing self-authenticating inventory parser,
+  then compare the recomputed digest to the unchanged pin. Test both serialization changes
+  and actual content/replacement drift. Run cheap real-metadata authentication on CPU
+  before TPU; shape-only tracing cannot exercise it. Original generations are preserved
+  in `prefill-layer-inventory-digest-failure-20260907.json`; failure cleanup8/8 clean.

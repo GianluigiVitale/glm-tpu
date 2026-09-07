@@ -344,3 +344,10 @@ synthetic inputs, per-row bounded comparisons and exact causal/cache interventio
 block-table rank mismatch before TPU; fixed with actual20-input regression coverage.
 Conditional one layer0 launch approved after clean persistence/preflights; no hardware
 result or E1 speedup yet. Next layer0/fullDSA+dense, then layer3/IndexShare+MoE.
+
+First layer0 worker failed before load/compile on a digest-kind wiring error: raw JSON
+SHA was compared to canonical inventory self-digest. All8 original failure records
+generation-verified, all8 cleanup confirmed23:04Z. Corrected via the existing validated
+inventory parser, not a changed pin or disabled check;68 CPU regressions pass. This
+avoidable harness error would have been caught by exercising the actual inventory
+authentication on CPU, which now passes. No layer arithmetic or speed result yet.

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
@@ -85,6 +87,36 @@ def test_inventory_manifest_is_append_only_and_self_authenticating(
     output.write_text(json.dumps(decoded))
     with pytest.raises(CheckpointValidationError, match="SHA-256 mismatch"):
         inspect_source_inventory(output)
+
+
+def test_layer_worker_authenticates_canonical_inventory_not_file_digest(
+    tmp_path: Path,
+) -> None:
+    from scripts.greenfield.probe_ws32_prefill_layer import authenticated_inventory
+
+    root = tmp_path / "source"
+    output = tmp_path / "inventory.json"
+    write_source(root)
+    original = inventory(root)
+    for indent in (None, 2):
+        output.write_text(json.dumps(original.to_dict(), indent=indent))
+        raw_digest = sha256(output.read_bytes()).hexdigest()
+        assert raw_digest != original.inventory_sha256
+        assert authenticated_inventory(output, original.inventory_sha256) == original
+        with pytest.raises(ValueError, match="canonical hash drifted"):
+            authenticated_inventory(output, raw_digest)
+
+    edited = original.to_dict()
+    edited["source_revision"] = "tampered"
+    output.write_text(json.dumps(edited))
+    with pytest.raises(CheckpointValidationError, match="SHA-256 mismatch"):
+        authenticated_inventory(output, original.inventory_sha256)
+
+    # A self-consistent replacement must still be refused against the original pin.
+    replacement = replace(original, source_revision="replacement")
+    output.write_text(json.dumps(replacement.to_dict()))
+    with pytest.raises(ValueError, match="canonical hash drifted"):
+        authenticated_inventory(output, original.inventory_sha256)
 
 
 def test_inventory_refuses_index_header_file_disagreement(tmp_path: Path) -> None:
