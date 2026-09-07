@@ -14808,3 +14808,41 @@ check before launch and bothleases. No full checkpoint recreation. New prefill/T
 remain unregistered; bounded correctness is allowed, performance trials require registration.
 Then short complete decoder/own§21, all4efficientL7 depths and fullL8. No live local process
 remains from the host check or CPU suite; last authenticated fleet census remains21:07Z.
+
+## 2026-09-07 — complete-layer admission programs and replay CPU-admitted
+
+`docs/greenfield/PREFILL_FULL_LAYER_ADMISSION.md` preregisters the next bounded real-weight,
+synthetic-state layer0/fullDSA+dense then layer3/IndexShare+MoE experiment.17static rows,
+capacity1024, page table[1,0], offset0/live17 then505/live17 and505/live11. No timing
+or full-model/legacy proof. Output and written KV/index bounds are per-live-row+aggregate;
+the cache bounds are explicitly this NEW experiment's contract, not historical Gate C
+cache guarantees. Untouched bytes, padding, own-score order/causal coverage and route IDs
+are exact. Prefix<2048 cannot prove cutoff stability. Own-input repair reconstruction
+must be exact, cross-path repair remains bounded. Full§21/L7/L8 proof still required.
+
+`scripts/greenfield/prefill_layer_programs.py` builds the ACTUAL batched layer and existing
+raw-layout scalar layer, plus a separate existing M64 key reconstruction program. The
+new layer result appends actual `normalized_input_local`; existing mapped consumers
+retain their prior selected outputs. This is explicit admission observability, not
+evidence that an executable without the observation is identical. No old decoder edit.
+`prefill_layer_numerical.py` independently resolves host cache addresses and replays
+production-shaped original arrays; fixed fields/dtypes, exact untouched bytes/padding,
+per-row output/cache/route-weight bounds, exact routes before MoE output acceptance,
+own-input M64 identity and truthful scope metadata. Hardware worker/collector NOT yet wired.
+
+Tests:39host cases1.58s; combined40tests33.76s includes CPU32 builder-versus-existing-layer
+identity and own-M64-repair identity across the stripe/page boundary. Reviewer found P2
+scope omission: raw scalar DSA uses multiply_rsqrt key normalization and HIGHEST scoring,
+candidate uses divide_sqrt and DEFAULT. Independently confirmed in ws32_layer.py/reference
+dsa.py; now in preregistration/results. No reference change or tolerance relaxation.
+Independent Astra otherwise PASS for CPU persistence; no TPU launch approval yet.
+
+Next implement distinct bounded complete-layer hardware worker/evidence collector and
+wrapper mode using these builders/replay and the selected loader. Do not clone the full
+model execution or reuse MoE's6-call gate. Source expectations: bothlayers3expert8
+reductions; layer0 threeexpert8 gathers+onefeature4 gather; layer3 twoexpert8 router
+gathers/no feature4 gather. Feature4 tuple merging: bind actual payloads/dependencies,
+not guessed counts. Candidate Pallas calls inferred layer0=12/layer3=13; validate against
+actual HLO before execution, not declare inferred inventory measured. Reuse existing
+bounded8-host transport/publisher/leases/root+normalcensuses; fresh retained-slot checks,
+review and persistence before deployment. No CPU/TPU process from this work remains live.

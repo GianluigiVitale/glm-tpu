@@ -323,3 +323,14 @@ Reversed CPU32 ownership, sparse local files, selected corruption, hash-correct 
 wrong metadata/header/slots and incomplete layers are covered.39tests21.80s; independent
 Astra review PASS for CPU persistence. This enables the bounded layer test without a new
 checkpoint copy; it is not a loader-performance or complete-layer TPU result.
+
+Complete-layer admission now has actual candidate/raw-scalar program builders and a
+fixed original-array comparator, not another implementation of the layer. Both expose
+their actual normalization for separate own-input M64 reconstruction.39 host comparator
+tests and the extended CPU32 layer/repair checks pass40total33.76s. Written-row bounds
+and exact untouched bytes avoid hiding local errors in huge unchanged cache averages.
+Review caught a scope ambiguity: raw scalar DSA is multiply_rsqrt/HIGHEST; new prefill
+is divide_sqrt/DEFAULT. Both are now disclosed in the preregistered component contract
+and result, with no reference or threshold change. `PREFILL_FULL_LAYER_ADMISSION.md`
+states the real-weight/synthetic-state scope and pending worker/HLO/fleet evidence.
+No full-layer TPU run or speedup has been claimed.

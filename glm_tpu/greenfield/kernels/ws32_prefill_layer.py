@@ -46,6 +46,7 @@ class Ws32PrefillLayerResult(NamedTuple):
     route_indices: Any
     route_weights: Any
     contract_valid: Any
+    normalized_input_local: Any
 
 
 def ws32_prefill_router_mapped(
@@ -312,4 +313,5 @@ def ws32_prefill_transformer_layer_mapped(
         route_indices,
         route_weights,
         valid,
+        normalized,
     )

@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+`scripts/greenfield/prefill_layer_programs.py` wraps the actual batched layer and existing
+raw scalar layer for a distinct bounded admission, with actual normalized inputs exposed
+for own-input M64 reconstruction. `prefill_layer_numerical.py` fixes per-row bounds and
+exact untouched-byte/route/selection/address checks for real geometry. Cache bounds are
+explicit NEW experiment assumptions, not inherited cache guarantees. Raw scalar DSA uses
+multiply_rsqrt/HIGHEST, candidate divide_sqrt/DEFAULT; no cross-score identity claim.
+`PREFILL_FULL_LAYER_ADMISSION.md` registers cases and limitations.40CPU tests33.76s,
+independent review P2 disclosure corrected. Hardware worker/collector still pending.
+
 `checkpoint/ws32_layer_subset.py` adapts the retained final-owner loader for bounded
 real-layer admission. Complete metadata/placement authentication and raw finiteness checks
 are reused; full-runtime file/hash policy stays intact. Distinct subset types, exact complete

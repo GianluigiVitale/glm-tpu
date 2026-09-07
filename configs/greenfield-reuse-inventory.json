@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-complete-layer-admission-programs",
+      "category": "complete batched layer numerical admission protocol",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "a21a11fdb876bd510219abfc465d69d5fe60075d",
+      "source_paths": ["glm_tpu/greenfield/kernels/ws32_prefill_layer.py", "glm_tpu/greenfield/kernels/ws32_layer.py", "glm_tpu/greenfield/kernels/reference/prefill_index.py", "glm_tpu/greenfield/benchmarking/one_layer.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_layer_programs.py", "scripts/greenfield/prefill_layer_numerical.py", "tests/greenfield/hlo/test_prefill_layer_admission.py", "docs/greenfield/PREFILL_FULL_LAYER_ADMISSION.md"],
+      "gate": "24: CPU complete-layer admission builders/comparator; hardware worker/collector next",
+      "reason": "Build actual batched layer versus existing raw scalar layer, observing each actual normalization for own-input separate M64 reconstruction. Fixed17-row layer0/fullDSA+dense and layer3/IndexShare+MoE protocol: explicit new KV/index bounded contract, per-live-row plus aggregate comparisons, exact untouched bytes/padding/route IDs and own-score complete causal coverage below top2048. Raw reference differs in multiply_rsqrt/HIGHEST versus divide_sqrt/DEFAULT, recorded explicitly. Synthetic prefix/activations with real retained weights, not legacy/promoted decoder equivalence.39 host tests pass; combined40 with CPU32 graph/own-M64 checks pass33.76s. No hardware workflow, cutoff/fullmodel proof or speedup."
+    },
+    {
       "id": "ws32-prefill-selected-layer-loader",
       "category": "bounded retained final-owner checkpoint access",
       "source_repo": "glm-tpu greenfield",

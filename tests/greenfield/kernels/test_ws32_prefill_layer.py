@@ -139,6 +139,25 @@ biased=router(rv[0],jnp.zeros_like(rv[1]),rv[2].at[32:40].set(10),rv[3])
 np.testing.assert_array_equal(np.sort(np.asarray(biased[0][:11]),axis=1),np.broadcast_to(np.arange(32,40),(11,8)))
 np.testing.assert_array_equal(biased[1][:11],np.full((11,8),.125,np.float32))
 assert not np.asarray(router(rv[0],rv[1],rv[2].at[0].set(jnp.nan),rv[3])[-1])[:,:,:11].any()
+
+# The distinct TPU-admission builders must execute these same layer helpers,
+# retaining actual normalization for independent per-path M64 reconstruction.
+from scripts.greenfield.prefill_layer_programs import build_layer_programs,build_repair_program
+candidate,_=build_layer_programs(mesh,ins,full_indexer=True,sparse_mlp=False,key_tile=128,**kw)
+admitted=candidate(*values); prior=functions[(True,False)](*values)
+for idx in range(11):np.testing.assert_array_equal(admitted[idx],prior[idx])
+assert admitted[11].shape==(R,512)
+repair_fn=build_repair_program(mesh,contract=dc)
+own_keys=repair_fn(admitted[11],values[8],values[9],values[14],values[13].key_norm_weight,values[13].key_norm_bias)
+for row in range(count):
+    logical,within=divmod(offset+row,512);owner,local=divmod(within,64)
+    np.testing.assert_array_equal(admitted[4][owner,int(values[10][0,logical]),local],own_keys[row])
+_,scalar=build_layer_programs(mesh,ins,full_indexer=False,sparse_mlp=False,**kw)
+sv=list(values)
+for idx in (0,1,5,6,7,19):sv[idx]=sv[idx][:1]
+sv[18]=sv[18][:,:,:1]
+admitted_one=scalar(*sv);prior_one=old(*sv)
+for idx in range(11):np.testing.assert_array_equal(admitted_one[idx],prior_one[idx])
 print(json.dumps({'branches':4,'shared_dense_old_cpu_exact':True,'router_exact':True,'groups':report}))
 """
     env = dict(os.environ, JAX_PLATFORMS="cpu")
