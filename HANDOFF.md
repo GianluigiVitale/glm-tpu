@@ -13765,3 +13765,126 @@ Found by reading the whole block after the edit rather than the diff. `test_ws32
 now asserts the long branch contains neither `RAW_TOKENS_EXACT` nor `DSA_CROSS_ORACLE_EXACT_ALL_EVENTS`.
 
 135 passed, 1 skipped across the five affected suites.
+
+## 2026-09-07 07:25Z — §23.5 launchable and sealable; L7 depth 1.0 CLOSED (DB 573)
+
+The mode built above could not be launched or sealed. Four commits closed that, two adversarial
+rounds found real defects in them, and the first L7 run is sealed.
+
+**`d7200d6f` — the mode became reachable.** The wrapper had no long-context labels at all, and the
+runner's record dereferenced the short-context oracle unconditionally (`oracle.token_manifest[…]`
+with `oracle is None`), so an L7 run would have died building its record AFTER the prefill. Five
+profiles are now context labels (`128k_d0_0|d0_05|d0_95|d1_0`, `256k_e0`). The wrapper supplies
+paths; `WS32_LONG_CONTEXT_PROFILES` on the enforcement surface supplies identity (kind, depth,
+prompt/generated counts, source row, manifest and SUCCESS digests) and `require_ws32_long_context_-`
+`profile` refuses an oracle that is not the label's, so a 128K seal cannot be produced from another
+depth's capture or from a 2k/8k artifact. Long-context runs declare the short-context pins VACANT
+and name no short-context directory; runner and sealer each refuse a mode carrying either. Budgets
+scale with the profile (128K 27,000 s guard / 39,600 s worker limit; 256K 54,000 / 72,000), the
+capacity is fixed to the one Step C measured, and the fleet SSH gained keepalives plus a worker
+heartbeat with the python `nohup`'d.
+
+**`df1695af` — round 1 (BLOCK, all findings verified before acting).**
+
+* **P0: every L8 seal was impossible.** `validate` required every run to emit at least as many
+  tokens as the legacy capture holds. For 256K E0 that pin is 256 while an E0 run observes 29, so
+  every L8 seal would have aborted after a ~10 h prefill, deterministically. The legacy ids are a
+  diagnostic reference at these lengths and nothing compares against them, so only L7's twenty are
+  bounded now.
+* **P1: L7 overstated its verified token count.** `verified_generated_token_count` reported
+  `min(len(observed), 20)` — a cardinality independent of any match, with `legacy_ids_match`
+  recorded but never required — so a run whose ids disagreed everywhere still published 20 as the
+  DB's `n_gen_tokens`. §23.5 verifies NO token at these lengths: it is None for both kinds.
+* **P2: the new rules were unenforced for the runs they govern.** The clean-tree, import-origin,
+  enforcement-surface and reviewed-pin checks all sat inside the §21.2 adjudication branch, and a
+  §23.5 run is FORBIDDEN to bind such a record. They now also fire on a long context, and
+  `long_context_oracle` joined the import-origin check.
+* **P2: the criterion's own code was unbound.** The sealer executes the runner's rule, which runs
+  the legacy extractor, yet neither was on the surface and the extractor was loaded by path without
+  checking its bytes. The capture pins a sha256 for all five legacy bench files; all five are
+  byte-identical to this worktree's copies, so `load_legacy_bench_module` verifies every pinned
+  digest before executing and the runner script plus `bench/{glm_longctx,extract}.py` joined the
+  surface.
+* **P2 (mine): `nohup` created a write-once hazard.** A dropped channel now kills the remote bash
+  while the run continues, and its EXIT trap would `cp --no-clobber` a PARTIAL log into the slot the
+  complete one needs. The log uploads only once the runner has terminated — including by failing, so
+  failure diagnostics survive.
+* **P3: `_run_environment` gained a key unconditionally**, which would have made every previously
+  published DB row unresolvable on rollback (which reports success while deleting nothing). The key
+  is present only when there is a long context.
+
+**`679e2392` — the synchronization retries.** Two numerical launches aborted at the sync step with
+7/8 markers, both missing worker 0, the controller reaching itself. The ssh client failed BEFORE
+running the command: `/etc/ssh/ssh_config line 54: no argument after keyword "<garbage>"`, the
+garbage differing per retry, on a file that is 53 lines, 1650 bytes, unmodified since 2022 and
+identical across repeated reads — ssh parsed a line past EOF out of uninitialized memory. Both
+acquisitions and two `--worker=all` probes reached all eight hosts, and the rank-0 predicate passes
+on demand, so it is intermittent and client-side. The sync command is idempotent by construction, so
+it retries 3×; each attempt is whole and must still produce all EIGHT markers, and each attempt's
+output is retained as `sync.attempt<n>.txt` (the archived orchestrator set is an allowlist, so they
+cannot make the remote object set drift). **Decision:** retry rather than diagnose an OpenSSH bug —
+the alternative was leaving a healthy launch to die and the pod idle for an hour. Reversible.
+
+**`95a96c6a` — round 2 (BLOCK on the guards, not the fixes).** It confirmed every round-1 repair
+correct and complete and found no false claim in the commit messages, then caught: (a) `df1695af`
+left the paired import-origin guard test RED — it added the module to the check but updated only the
+surface half, and that test exists so the check cannot be shrunk back with the suite green. My
+error: the edit went in with the commit and I did not re-run the suite covering it. (b) `679e2392`
+broke the wrapper guard by rewriting the line it asserts. (c) The new L8 test grepped for the
+guard's text, so swapping the two arms would reinstate the P0 for L8 and create one for L7 with the
+test still green; it now extracts the sealer's OWN condition from its AST and evaluates it, and I
+confirmed the swapped variant fails two assertions. The L8 DB row is now tested rather than
+reasoned about: no correctness verdict at all, its own item id, wording claiming neither raw-token
+nor cross-oracle exactness.
+
+**Pod results.** Two 128K d1.0 acquisitions, ~28 min of fleet compile each, 7 graphs, census 8/8.
+All seven StableHLO digests are bit-identical across the two pins; all seven OPTIMIZED digests
+differ, because the optimized text carries source metadata and my edits shifted line numbers in the
+runner. **Optimized-HLO pins are therefore code-pin-specific and StableHLO is not: re-acquire
+whenever Python changes.** Reusing the older pins would have failed the numerical run's prevalidation
+after ~30 min of compile.
+
+**L7 depth 1.0 CLOSED — DB 573**, tag `…128k_d1_0_numerical_cap131072_hrope_20260907T012156…`, pin
+`df1695af`, census 8/8. Detokenised ` 891482. Do not forget it. …` → extracted `891482` == gold.
+`legacy_ids_match` came back TRUE: the engine reproduced the legacy generation id-for-id at 128K,
+recorded as a diagnostic because §23.5 forbids labelling it. Classification
+`PASSKEY_EXACT;DSA_WITHIN_ENGINE_EXACT;STATE_CACHE_EXACT_STRUCTURE;NO_CROSS_ORACLE;PROTECTED_WALL_-`
+`TRACE_HBM;LONG_CONTEXT_128K_D1_0;CONTEXT_CAPACITY_131072;MAIN_ROTARY_HOST_TABLE_LEGACY_FAITHFUL`,
+`verified_generated_token_count` null, `capacity_measurement` null. Prefill 62×2048 + 387 tail =
+16,354 s = 128.4 ms/prompt token against Step C's predicted 128.1 (0.3%); decode p50 142.68 ms
+against 142.97 predicted (0.2%); projection peaked at 17,210 s against the 27,000 s guard.
+
+**Learned, and now in `goal.md`:** the seal's clean-tree check is scoped to the enforcement-surface
+pathspecs, so editing a surface file mid-run VOIDS its seal hours later, while tests, `goal.md` and
+`HANDOFF.md` are safe (verified: all twelve surface entries byte-identical between HEAD and the run
+pin while depth 0.0 was live). §23.5 runs also proved the 256K plan has no degenerate tail:
+`ws32_prefill_chunk_plan(262144, 2048) = (127, 2048)`.
+
+### Deferred review items — apply in the next gap between runs
+
+The sealer and the runner are on the enforcement surface and a live run's worker 0 executes from
+this tree, so these three wait for an idle pod rather than being rushed in mid-run:
+
+1. **P2 — a launch-time surface capture.** The seal runs 5–20 h after launch in the worktree
+   development continues in, so one unrelated edit to a surface file voids a finished run
+   (recoverable via `RECOVER=1`, so it costs an operator cycle, not the evidence). Capture
+   `_enforcement_surface_identity` into `$RUN_DIR` at launch and have the sealer compare that against
+   the run pin, or seal from a throwaway `git worktree add --detach "$PIN"`.
+2. **P3 — surface completeness.** `bench/glm_longctx.py` imports `engine` and `provenance` at module
+   scope, so the executed L7 criterion is those four files; only `glm_longctx` and `extract` are
+   listed. Add `bench/{engine,provenance}.py` and update the pinned-set test. Bounded today because
+   the digest pin refuses execution outright, so such a change can only fail runs, never alter a
+   verdict.
+3. **P3 — refusal wording.** Two refusals a §23.5 seal can now trigger still say "adjudicated
+   seal"/"the reviewed reference-row registry and the §21.2 arithmetic", but a §23.5 run is
+   forbidden to bind a §21.2 record, so an operator is told their run is adjudicated. Reword.
+
+Also open, lower value: after a channel drop there is no automated way to collect the complete host
+logs — `RECOVER=1` skips the launch block while the evidence layout still requires all eight
+`host_records/runner.rank{n}.log`, so a post-drop recovery aborts until they are uploaded by hand. A
+collect-only wrapper mode would close it.
+
+**Next:** L7 depth 0.0 is RUNNING at pin `679e2392` since 06:52Z (reusing the `df1695af` HLO pins —
+only the wrapper changed, so no Python and no HLO change). Then depths 0.05 and 0.95, the L8 256K E0
+acquisition and its ~11.5 h run at capacity 262,656, then the §18 proof including base vs effective
+throughput (Gate H).

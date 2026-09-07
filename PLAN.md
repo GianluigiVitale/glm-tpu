@@ -18,8 +18,11 @@ The authoritative details, stop conditions, and Definition of Done are in
 6. **Gate G — plan adjudication (CLOSED 2026-09-05, spec §22):** protected identical-condition PP8 vs
    WS32 at 2K (DB563 vs DB553, WS32 2.00× faster, both exact), WS32 8K (DB567); PP16 rejected with
    evidence (§22.3); WS32_2D promoted.
-7. **Long-context gates:** protected four-depth 128K smoke and protected 256K E0 with DB/archive and
-   authenticated zero-work cleanup.
+7. **Long-context gates (§23, IN PROGRESS):** §23.3 Step B chunked prefill (DB 568/569) and Step C
+   capacity measurement at 131,072/262,656 (DB 571/572) CLOSED; §23.5 L7 protected four-depth 128K
+   passkey — depth 1.0 CLOSED (DB 573), depths 0.0/0.05/0.95 outstanding; §23.5 L8 protected 256K E0
+   outstanding. L7/L8 claim nothing raw-token or cross-oracle exact: no legacy capture exists at
+   these lengths, so L7 stands on the extracted passkey and L8 has no correctness oracle at all.
 8. **Gate H — effective throughput:** only after base stability, add exact multi-token verification/
    speculation and report base versus accepted effective tok/s separately.
 

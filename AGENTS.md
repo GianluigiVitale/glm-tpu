@@ -37,8 +37,9 @@ checkout. Preserve historical evidence.
 - Use only the existing `db-v4-64-od` 32-chip pod and `gs://driftbench-dsv4-uc`; never create compute.
 - Serialize TPU workflows. Prove ownership before cleanup and finish protected runs with an
   authenticated eight-host zero-work census.
-- Do not load the complete checkpoint before the topology, device-resident PP8/PP16 transport, and
-  exact topology-local MoE-layer gates pass.
+- The topology, device-resident transport and exact topology-local MoE-layer gates have passed, and
+  `WS32_2D` is promoted (§22), so the complete sealed checkpoint is loaded by protected runs. A NEW
+  plan or transport re-enters that order: mechanisms first, full checkpoint only after its gates.
 - CPU, synthetic, or HLO evidence proves mechanisms only. Performance claims require the protected
   profiler-free wall, correctness, provenance, DB, archive, trace, HBM, and cleanup contract.
 - Continue until every Section 18 Definition-of-Done item in the binding specification has direct

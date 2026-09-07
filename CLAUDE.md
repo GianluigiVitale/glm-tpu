@@ -19,10 +19,13 @@ Build the new model-execution path only under the isolated greenfield tree. The 
 `tpu-inference` engine is a correctness/measurement oracle and source of isolated validation
 utilities, never an execution dependency. Preserve all historical evidence and protection tools.
 
+`WS32_2D` is the promoted plan (§22); the PP8/PP16 pipeline sequence is retained history.
+
 Use only the existing `db-v4-64-od` 32-chip pod and `gs://driftbench-dsv4-uc`. Never create compute.
 Serialize TPU workflows, prove exact ownership before cleanup, and keep every optimization
-default-off until its required gates pass. Do not load the full checkpoint before the topology,
-device-resident stage transport, and exact topology-local MoE-layer gates pass.
+default-off until its required gates pass. The topology, device-resident stage transport and exact
+topology-local MoE-layer gates have passed, so protected runs load the complete sealed checkpoint; a
+NEW plan or transport re-enters that order, mechanisms first.
 
 Work autonomously, commit and push reviewable greenfield changes, update `HANDOFF.md` and the
 greenfield performance log as evidence changes, and continue until Section 18 of the full

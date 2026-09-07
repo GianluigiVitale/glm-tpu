@@ -7,11 +7,11 @@ The complete, binding specification is `docs/glm-tpu-revolution.md`; read it in 
 the compact compaction-safe pointer. Both supersede the old incremental TP32 campaign and old
 pipeline-parallelism prohibition.
 
-Start with `PP8_LP4`, challenge it with `PP16_LP2`, and protect or evidence-reject `WS32_2D`.
-Distribute capacity with depth, keep repeated layer communication topology-local, move only live
-residual/compact metadata between stages, and never reconstruct hidden state over all 32 chips
-inside a transformer layer.
+That contest is decided: `WS32_2D` is PROMOTED (§22/Gate G, 2.00x faster than `PP8_LP4` at 2K under
+identical protected conditions, both exact; `PP16_LP2` rejected with evidence). `PP8_LP4` and
+`PP16_LP2` are retained history. Keep repeated layer communication inside the promoted group.
 
-Before loading the full checkpoint, prove physical topology/groups, device-resident PP8/PP16
-transport, and one exact topology-local MoE layer. Finish only when every Definition-of-Done item in
-Section 18 has direct protected evidence.
+The topology/group, device-resident transport and exact topology-local MoE-layer gates have passed,
+so protected runs load the complete sealed checkpoint; a NEW plan or transport re-enters that order,
+mechanisms first. Finish only when every Definition-of-Done item in Section 18 has direct protected
+evidence.
