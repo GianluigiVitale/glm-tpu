@@ -1,8 +1,10 @@
 # PLAN — greenfield gates
 
-Continue autonomously to full project completion under §18.
-L7 depths 1.0/0.0 are sealed DB573/574; no original worker or recovery monitor remains live.
-Follow `HANDOFF.md` for the reviewed sealing fixes and remaining L7/L8 sequence.
+Continue autonomously to full project completion under §18 amended by §24 (owner pivot 2026-09-07).
+PRIORITY: genuine batched prefill and the ranked `docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md`.
+Preserve/seal the original depth0.05 run; do not launch another serial128K/256K campaign.
+Next: bounded multi-row layer tests, short decoder, then efficient-prefill L7/L8 proofs.
+Follow `HANDOFF.md` for exact live identities; DB573/574 remain sealed reference evidence.
 
 The authoritative details, stop conditions, and Definition of Done are in
 `docs/glm-tpu-revolution.md`. This is only the execution index.
@@ -22,10 +24,13 @@ The authoritative details, stop conditions, and Definition of Done are in
 6. **Gate G — plan adjudication (CLOSED 2026-09-05, spec §22):** protected identical-condition PP8 vs
    WS32 at 2K (DB563 vs DB553, WS32 2.00× faster, both exact), WS32 8K (DB567); PP16 rejected with
    evidence (§22.3); WS32_2D promoted.
-7. **Long-context gates (§23, IN PROGRESS):** §23.3 Step B chunked prefill (DB 568/569) and Step C
+7. **Efficient prefill and long-context gates (§24, IN PROGRESS):** audit/design and registered
+   prefill/TTFT targets first; bounded multi-row kernels/layers, short decoder, then all four L7
+   depths and full L8 on the new candidate. Historical serial §23.3 Step B (DB 568/569) and Step C
    capacity measurement at 131,072/262,656 (DB 571/572) CLOSED; §23.5 L7 protected four-depth 128K
    passkey — depths 1.0/0.0 CLOSED (DB 573/574), depths 0.05/0.95 outstanding; §23.5 L8 protected 256K E0
-   outstanding. L7/L8 claim nothing raw-token or cross-oracle exact: no legacy capture exists at
+   outstanding on the serial reference; those old runs do not certify changed prefill.
+   L7/L8 claim nothing raw-token or cross-oracle exact: no legacy capture exists at
    these lengths, so L7 stands on the extracted passkey and L8 has no correctness oracle at all.
 8. **Gate H — effective throughput:** only after base stability, add exact multi-token verification/
    speculation and report base versus accepted effective tok/s separately.

@@ -1,8 +1,10 @@
 # CLAUDE — greenfield branch compatibility pointer
 
-Continue autonomously to full project completion under §18. L7 depths 1.0/0.0 are sealed DB573/574;
-their workers/monitor have ended. Read current `HANDOFF.md` and `goal.md` before action.
-Next: remaining L7 depths, L8/E0 and the §18 audit.
+Continue autonomously to full project completion under §18 amended by §24. Efficient multi-token
+prefill is now required. Preserve/seal the current depth0.05 run; DO NOT launch the next serial
+128K/256K run. Next: ranked efficiency audit, bounded batched layers, short decoder, efficient L7/L8.
+Read `HANDOFF.md`, `goal.md` and `docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md` before action.
+Historical D/G and L7 DB573/574 remain valid, not proof of a changed prefill implementation.
 
 This file applies only to branch `rewrite/topology-first-decode` in
 `/home/gianl/glm-tpu-topology-rewrite`.

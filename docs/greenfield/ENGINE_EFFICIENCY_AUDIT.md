@@ -1,0 +1,214 @@
+# Engine efficiency audit — prefill-first pivot
+
+Status: 2026-09-07, engineering audit/design, NOT performance proof of a new implementation.
+Authority: [specification §24](../glm-tpu-revolution.md), owner directive to stop the remaining
+serial long-context campaign. The current depth0.05 run is preserved through its original seal.
+The next experiment is bounded batched prefill, not serial depth0.95 or serial256K E0.
+
+## Outcome and root cause
+
+The long wait is device computation, not prompt upload. Current prefill feeds one token at a
+time through all 78 layers using the batch-one step. The outer chunks reduce temporary memory
+and host dispatch count; they do not reuse a layer's weights across multiple prompt rows.
+DB574 measured **16,425.514998 seconds** fleet-max prefill for **127,363 prompt tokens**.
+At 256K, the existing capacity measurement projects approximately 10.3 hours; that is a
+projection, not a completed full-prompt 256K measurement.
+
+This was deliberately accepted as a correctness/memory bridge in §23. Treating that bridge as
+sufficient to finish the engine was the planning mistake. §24 now requires an efficient
+prefill path before completion. We retain every existing correctness result and its limitations.
+
+Independent adversarial audit: `/root/astra_long_run_recovery_review`, gpt-6-astra, 2026-09-07.
+The main agent independently inspected the scan, FP8 row tile, DSA page/score ordering, loader
+waits and host chunk loop. Agreement: prioritize layer-major multirow prefill. Do not mistake
+an independent review for a TPU measurement. Source paths below refer to the current source,
+unchanged from run pin `a9bfbbb3` (documentation changes only at this audit).
+
+## Evidence anchors and limits
+
+- DB574: `greenfield_ws32_short_decoder_128k_d0_0_numerical_cap131072_hrope_20260907T064941550123130Z`.
+  Summary SHA `33912e8391dde6f0cfed53b608098d6782dc8c9469edc6675c2e7364207a83c2`.
+  SUCCESS `f123beba8caab916e1307607ef28b294606c95338f3a7d431ce374a210900667`.
+  Approved archive: `gs://driftbench-dsv4-uc/results/<tag>/`.
+- DB574 protected decode: fleet p50 143.496482 ms; 6.968812 wall tok/s;
+  peak HBM 27,810,852,864 B/chip. These are NOT prefill throughput figures.
+- DB574 trace attribution (decode, not prefill): collectives 44.075 ms/step;
+  custom-call-other (including FP8 formatting) 44.235; gather/scatter 17.493;
+  sort/top-k 7.299; movement 9.638. The first two total approximately 65% of recorded
+  135.343 ms busy time. Do not relabel the entire custom-call category as dequantization,
+  the entire movement category as cache copies, or any of these as prefill measurements.
+- DB574 rank0 load 139.297 s, summed graph compilation approximately 699.122 s. Cold-start
+  costs matter but cannot account for 16,425 s measured inside prefill.
+- DB572: an 8K prompt at capacity262656, not full256K. Peak 29,655,086,080 B/chip,
+  3,359,312,896 B headroom; serial chunk2048 approximately290.8 s. New batched scratch must
+  be budgeted and measured independently; this margin is not automatically available to it.
+- DB403 legacy128K approximately600 s/item and DB402 legacy256K prefill1337.7 s are historical
+  orientation with different timing definitions. They do not establish matched warm TTFT.
+
+## Ranked findings and decisions
+
+### E1 — serial token-major prefill (confirmed; first implementation priority)
+
+Evidence: `glm_tpu/greenfield/runtime/ws32_decoder.py`,
+`build_ws32_chunked_prefill_program`, `exact_body`/`scan_step` (around lines1780,1867–1910):
+`lax.scan(unroll=1)` calls `ws32_prefill_step_mapped(token[None], ...)`, which calls the full
+decoder body. `scripts/greenfield/run_short_decoder_ws32.py:1043` dispatches approximately63
+chunks/tail for128K. Roughly263 seconds of device work per main chunk dwarfs host dispatch.
+
+Decision: build a separate layer-major path over real token rows, retaining the existing path
+as reference. Larger serial chunks, more host workers or a blind `vmap` of mutable decode state
+do not solve this. Use existing checkpoints, physical groups and numerics where possible.
+
+Smallest test: representative dense, full-indexer and MoE layers at 8–32 causal rows against
+sequential reference evaluation on identical inputs and prior cache. Compare intermediates,
+per-row selection/ties, routing, cache addresses/values and continuation. Initial row counts
+are experiment candidates, not promised production tile sizes. Require useful weight reuse in
+HLO/trace before assembling all78 layers. CPU success alone is not TPU performance evidence.
+
+### E2 — one-row linear/MoE wrappers (confirmed structure; gain unmeasured)
+
+Evidence: `kernels/ws32_layer.py:1083` and `kernels/ws32.py:266` enforce one live row in
+decode; `kernels/pallas/fp8_matmul.py`, `Fp8BlockMatmulConfig.row_tile=8`, pads input rows
+to that tile. The underlying raw-FP8 primitive already accepts multiple rows.
+
+Decision: reuse the primitive for prompt rows, then group routed token/expert pairs for
+weight-tile reuse. Do not remove the correct one-row invariant from decode. Do not duplicate
+the entire checkpoint in BF16 or repack terabytes to test this hypothesis.
+
+Test/risk: captured multirow FP8 inputs against the existing per-row path; keep output dtypes,
+BF16/FP32 rounding boundaries and routing ties. Test all routes on one expert owner, uneven
+dispatch and tails. No dropping tokens, truncated capacity or silent fallback. Matrix row
+geometry can change TPU association; adjudicate numerics rather than assuming bit identity.
+
+### E3 — collectives and FP8 formatting (measured decode cost; prefill attribution pending)
+
+Evidence: DB574 categories above. Prefill's decoder reuse makes repeated fixed overhead a
+credible target, but the fraction of prefill saved is not measured.
+
+Test: trace a bounded multirow real layer, classify actual custom-call names, physical group
+sizes/counts, useful rows and weight loads. Compare weight-tile reuse and, where numerically
+valid, reductions over multiple rows. Preserve feature4/expert8 groups. A fused operation that
+changes association needs review and correctness proof. Do not promise linear speedup with
+row count: expert coverage, compute, DSA and scratch growth can change the limiting resource.
+
+### E4 — DSA scores allocated history before masking (confirmed structure)
+
+Evidence: `kernels/ws32_layer.py:543–575` gathers logical pages and calls `dsa_scores` on
+flattened allocated keys; `kernels/reference/dsa.py` masks valid lengths at local top-k.
+Early prompt rows therefore pay for invalid future capacity in the source program. Optimized
+HLO/trace must determine retained physical work and savings.
+
+Test: tiled causal scorer/exact top-k across several prefix lengths, page boundaries and tied
+cutoffs. Bound score tiles; merge candidates with the canonical lowest-position tie order.
+No dense `[rows,heads,context]` temporary. Consider a small number of prefix buckets only if
+saved execution outweighs compile cost; avoid a new executable per prompt length.
+
+### E5 — IndexShare address reuse (hypothesis; inspect before implementing)
+
+Evidence: attention boundary in `kernels/ws32_layer.py` around line753. Reused selected
+positions can imply reusable sort/page-address metadata, but each layer owns DIFFERENT KV.
+Inventory a four-layer group's actual HLO before claiming redundant operations.
+
+Test: reuse only invariant addresses/order/masks; require exact address and attention-result
+comparison. Never reuse gathered KV values across layers. Lower priority than E1/E2.
+
+### E6 — cache copies and donation (hypothesis; do not assume all movement is copying)
+
+Evidence: `_ws32_decode_impl` updates whole-state cache containers with
+`kv_cache.at[layer_id].set(...)`; no explicit state donation at the audited entry compile.
+DB574's movement total is not an attribution to these source expressions.
+
+Test: inspect optimized copy/alias allocation and input/output ownership first. Donation is
+safe only when no runner/observer still consumes the old state. Then adversarial cache probes,
+measured peak HBM and clean wall A/B. Do not create use-after-donation to save a hypothetical copy.
+
+### E7 — cold load, compile and validation (confirmed waits; optimization benefit pending)
+
+Evidence: `checkpoint/ws32_runtime_checkpoint.py:1175` hashes each tensor and calls
+`device_put(...).block_until_ready()` before advancing. Full file integrity checks also exist.
+Acquisition and numerical runs compile separately; their provenance purpose is real.
+
+Test: phase timings first, then bounded asynchronous transfers with a strict in-flight byte cap
+if the data supports it. Executable-cache reuse requires code/config/topology/compiler identity
+and acquired-HLO validation. Do not disable hashes or dirty-source refusal to save startup time.
+Batch compatible small tests in one protected workload where its declared protocol permits it;
+never overlap TPU workflows. These improvements must not delay the E1 discriminator.
+
+### E8 — TTFT and possibly unnecessary prompt heads (timing gap confirmed; head cost hypothesis)
+
+Evidence: the runner times prefill but compiles observer/decode later; it is an evidence harness,
+not a first-token streaming interface. `_ws32_decode_impl` calls final sampling even when used
+for teacher forcing. Determine which unused head work survives compiler elimination first.
+
+Test: instrument request input ready, transfer/cache initialization, prefill completion and
+actual first-token delivery. Remove nonfinal head work only if it is physically present and
+the retained health/final-token contract is equivalent. Report harness-only observation,
+tracing and sealing separately from production latency, without hiding required serving work.
+
+### E9 — artifact and experiment overhead (standing constraint)
+
+Reuse current final-layout weights. Live bucket ceiling2.5e12 B, US-CENTRAL2 only, no full-size
+safety copies. Explain >100GB artifacts before creation, including temporary/retained bytes
+and replacement. Keep compact source/config/manifests/results; do not retain every generation.
+Shared gzip HLO layout §23.10 already avoids seven redundant copies; keep that protection.
+Preserve authenticated observations and original runs across controller failure: DB574 saved
+another4.6h prefill by recovering evidence, not rerunning compute. No infra action is authorized.
+
+## Minimal implementation shape and hardest correctness boundary
+
+For each bounded block of known prompt IDs, embed rows, then execute each layer over those rows.
+Construct the layer's current-block keys before causal attention over prior cache plus this
+block. Carry per-row position/valid length and `[rows,top_k]` IndexShare state across layers;
+group MoE routes without losing token/expert identity. Commit only valid cache rows.
+
+Preserve the TWO index caches: all prompt rows attend using unrepaired keys, including earlier
+blocks. Write repaired M64 keys to the separate destination; promote that destination only
+after the whole prompt. Repair changes from batching need their own comparison against the
+current repair kernel. Main-attention host rotary stays as adopted in B′; indexer rotary stays
+on device. Do not reopen the refuted host-indexer-table path because of the pivot.
+
+Before code work, read/update `REUSE_INVENTORY.md` and
+`../../configs/greenfield-reuse-inventory.json`. Reuse/adapt APIs deliberately rather than
+copying a second complete decoder or importing legacy execution. This is a design direction,
+not yet an implemented or accepted interface.
+
+## Performance registration and staged experiments
+
+Final quantitative prefill/TTFT targets are **not yet registered**. This prevents performance
+promotion, not source inspection, design, CPU correctness or bounded baseline measurements.
+Before candidate performance experiments, record same-hardware baseline definitions and
+compute/weight-traffic/collective/DSA budgets, then fixed128K/256K targets and wall budgets.
+
+Reviewer suggested ≤600s128K/≤1500s256K as INTERIM engineering milestones. Main-agent decision:
+do not adopt those as completion thresholds or imply they are interactive. They are historical
+orientation, not an expert promise of what this hardware should deliver. Choose justified
+final targets before trials and do not relax them to fit a disappointing candidate.
+
+1. Inventory reuse and specify multirow state/causality/repair with reference tests.
+2. Bound live/scratch bytes at selected row counts and long capacity; inspect generated HLO.
+3. Register targets from baselines/budgets; run the smallest real multirow layer discriminator
+   with separate warmed wall and trace, compare outputs and decide before full decoder work.
+4. Assemble the short decoder, prove §21 on its own outputs. New first divergence requires
+   its own valid preregistration/review; do not mechanically reuse B′'s record.
+5. Measure prefix-length scaling and acquire long-capacity memory/HLO. Project full-test cost
+   and fail early if the candidate still executes serial full-decoder work per prompt row.
+6. Run all four L7 depths and full L8 on the candidate with full protections. Old serial depths
+   are useful references, not substitutes for changed-prefill coverage.
+
+Measurements: warm TTFT includes input transfer, cache initialization, prefill and actual
+first-token delivery, resident weights/executables but no prefix-cache hit. Cold latency adds
+load/compile. Disclose tokenization/transport boundaries. Report prefill tok/s, warm TTFT,
+decode p50/p99 and total request wall separately; exclude profiling from measured steady wall.
+No candidate speedup or completion ETA is established by this audit.
+
+## Lessons retained
+
+- A memory-safe token scan is not efficient prefill; inspect the loop body, not its name.
+- Use cheap structural/correctness discriminators before long end-to-end tests.
+- Decode timing cannot stand in for prefill or TTFT; profile the phase being optimized.
+- Mathematical equivalence does not guarantee TPU BF16/FP8 identity. Keep existing acceptance
+  contracts and judge differences using independent evidence, not implementation familiarity.
+- Preserve successful work through process-identity-aware recovery; a tool timeout is not a
+  reason to pay for the same computation again.
+- Review the current diff and evidence, resolve material findings, then move forward. Neither
+  speculative hardening nor renewed full-pod numerical archaeology is the new critical path.

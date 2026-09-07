@@ -2,6 +2,10 @@
 
 ## Current protected standing — 2026-09-07
 
+Owner pivot (§24): serial prefill is now reference-only. Preserve the current depth0.05 run;
+no next serial128K/256K campaign. Efficient token-batched prefill and measured TTFT are required
+before completion; see `ENGINE_EFFICIENCY_AUDIT.md`. No speedup for the new path is measured yet.
+
 Gate D is CLOSED under §21.6, and Gate G is CLOSED/WS32_2D promoted under §22 of
 `../glm-tpu-revolution.md`. Historical "Gate D remains open" entries below describe their own dates,
 not today's next action. No historical measurement or correctness classification is rewritten.

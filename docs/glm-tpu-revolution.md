@@ -2339,3 +2339,81 @@ DB574 preserved its original `679e2392` execution through controller loss and se
 SUCCESS `f123beba8caab916e1307607ef28b294606c95338f3a7d431ce374a210900667`. No numerical rerun.
 Depths 0.05/0.95 and full-prompt 256K E0 still require direct protected evidence. No acceptance
 condition or deferred-prefill/speculation scope changes in this status entry.
+
+# 24. Owner pivot — efficient end-to-end prefill required (2026-09-07)
+
+This amendment supersedes §23.2's post-DoD multi-row deferral, §23.7's decode-only completion
+and its remaining serial-run sequence. The owner explicitly rejects spending another two days
+on serial prompt processing. Historical results, §21 numerical contracts, §22 plan adjudication
+and §23.5 long-context correctness classifications remain intact. They do not certify a new
+prefill implementation. Efficient prompt ingestion is now part of §18, not optional follow-up.
+
+## 24.1 Immediate sequence
+
+Preserve the already-running depth0.05 numerical run at `a9bfbbb3` (full identity in HANDOFF);
+finish its original evidence collection/seal or diagnose its failure without changing its running
+model/enforcement source. Do NOT automatically launch the remaining serial depth0.95 or serial
+256K E0. No additional long serial reference run without a specific missing-evidence question,
+projected cost, independent review and an explanation of why a bounded test cannot answer it.
+
+Next: ranked efficiency audit and design → bounded CPU/reference checks → representative real
+multi-row layer/kernel TPU tests → short complete decoder → efficient four-depth L7 and full L8.
+Documentation/design can proceed while the original run finishes; TPU work remains serialized.
+Do not wait for an old serial campaign to finish before beginning this engineering work.
+
+## 24.2 Genuine prefill, not a renamed token scan
+
+Implement a separate, default-off token-batched, layer-major prefill executable for WS32_2D.
+Prompt tokens are already known: process multiple causal positions together within a layer and
+reuse its weight tiles across rows. An outer chunk loop may bound memory; calling the entire
+batch-one decoder once per prompt token inside that chunk is only the reference path. Merely
+increasing chunk size or applying `vmap` to a stateful decode step does not establish this design.
+
+Required semantics: per-row absolute positions/valid lengths, causal access to prior and current
+block keys, per-row DSA top-k/ties and IndexShare state, routing with no dropped/overflowed tokens,
+and exact cache addresses/tails/validity. MoE must handle all selected routes concentrating on one
+expert owner. Preserve BF16/FP32 boundaries or adjudicate changes under the existing contract.
+The dual index-cache rule remains: prompt attention consumes UNREPAIRED index keys; M64-repaired
+prompt keys become visible only after the whole prefill. Reusing IndexShare indices does not
+permit reusing a different layer's KV values. Bound score/activation scratch: no unbudgeted
+`[rows, heads, full_context]` allocation or full BF16 weight expansion.
+
+## 24.3 Measure costs before escalating tests
+
+Maintain `docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md`, independently reviewed, covering prefill,
+DSA/attention/IndexShare, MoE/FP8, physical collectives and movement, cache ownership/aliasing,
+host synchronization, load/integrity checks, compilation, observability and artifact retention.
+Every finding distinguishes code-confirmed behavior, measured attribution and untested hypothesis,
+with evidence, benefit mechanism, correctness/HBM risks and the smallest decisive experiment.
+Prioritize the dominant avoidable costs; do not turn speculative micro-optimizations or repeated
+reviews of unchanged code into prerequisites. No claim of a proven global optimum.
+
+Before candidate performance experiments, register quantitative 128K/256K prefill and warm
+time-to-first-token targets, workload definitions, hardware/precision/configuration pins and
+compute/memory/communication budgets. Use existing same-hardware evidence and bounded baseline
+measurements where needed; collecting these baselines does not require a new hours-long run.
+Do not loosen targets after candidate failures. Historical legacy ~600 s/item and 1337.7 s
+prefill are orientation only, not matched TTFT measurements or final acceptance thresholds.
+An interim speedup milestone must not silently become the completion criterion.
+
+Report separately: input transfer, cache initialization, device prefill, warm request TTFT
+(request input ready to actual first-token delivery with weights/executables resident but NO
+prefix-cache hit), cold load/compile, base decode distribution, and total request wall. Disclose
+tokenization/transport inclusion and any harness-only observer/trace/sealer work. Trace prefill
+separately from profiler-free timing; decode traces cannot establish prefill cost attribution.
+No device-only gain that hides request-wall regression and no cache-hit-only demonstration.
+
+## 24.4 Completion and unchanged protections
+
+The final candidate must provide efficient-prefill evidence at all four L7 depths and full L8,
+with its own short-context §21 proof, acquired/executed HLO, per-chip measured peak HBM,
+state/load/cache integrity, fresh eight-host XPlanes, profiler-free wall, DB/provenance/archive
+and authenticated cleanup. Existing serial L7 passes remain reference evidence; do not combine
+them with changed-prefill results to claim four-depth coverage of the new path. Numerical
+thresholds, first-divergent-event review and raw-token/quality rules are not relaxed for speed.
+The one-row restriction applies to decode, not to genuinely live prompt rows in prefill.
+
+§18 now requires measured attainment of the registered prefill/TTFT criteria as well as its
+existing decode/quality/integrity requirements. Base targets and unmeasured speculation remain
+separate. All infrastructure, storage, source-freeze, ownership and review constraints in goal.md
+remain in force. No additional checkpoint copy is authorized by this pivot.

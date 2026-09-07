@@ -1,10 +1,12 @@
 # Greenfield evidence and reusable protection map
 
-## Current resume pointer — 2026-09-07 12:27Z
+## Current resume pointer — owner pivot 2026-09-07
 
 Gate D CLOSED DB567 (§21.6), Gate G CLOSED (§22), WS32 promoted. L7 depths 1.0/0.0 sealed DB573/574;
-depth 0.0's original evidence was recovered without rerun. Workers and monitor ended cleanly.
-Continue with depths 0.05/0.95, L8/E0, §18. Authority is this worktree, not the
+depth 0.0's original evidence was recovered without rerun. Its workers/monitor ended cleanly.
+Preserve/seal the current depth0.05 run (HANDOFF has identities); do not launch the next serial
+long run. §24 requires efficient batched prefill BEFORE completing L7/L8/§18; see
+`ENGINE_EFFICIENCY_AUDIT.md`. Authority is this worktree, not the
 historical PP16 numerical worktree open in the IDE. Read the latest `HANDOFF.md`, `goal.md`,
 `WS32_ORPHAN_RECOVERY.md`, and `configs/greenfield-ws32-l7-d0-recovery.json`. Entries below preserve
 historical campaigns; old Gate D next actions are not current instructions.

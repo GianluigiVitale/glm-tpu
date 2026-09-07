@@ -2,24 +2,25 @@
 
 Status: **NOT COMPLETE**, 2026-09-07. This is an evidence checklist, not a new acceptance
 contract or final sign-off. Authority remains [the specification](../glm-tpu-revolution.md),
-including its accepted §21–§23 amendments. The current run/next action is in
+including §24's owner-directed efficient-prefill requirement. Earlier readiness review covered
+the old §23 scope only; it is NOT approval of the expanded completion contract. The current run/next action is in
 [HANDOFF](../../HANDOFF.md). Do not rerun an accepted gate merely to populate this table.
 
 ## Requirement-by-requirement standing
 
 | §18 requirement | Existing evidence and scope | Remaining proof |
 |---|---|---|
-| GLM serves at 256K on the existing 32 chips | DB572: 8K prompt at 262656 capacity; not full 256K prompt evidence | Fresh 513-page acquisition, then full 262144-token L8 E0; §23.7 qualifies serving as steady-state decode with hours-long prefill |
+| GLM serves efficiently at 256K on the existing 32 chips | DB572: 8K prompt at 262656 capacity; not full 256K prompt evidence | §24: genuine batched prefill, registered prefill/TTFT targets, new short proof/acquisition and full L8; hours-long serial prefill cannot close §18 |
 | Independent native execution | Greenfield WS32 model/runtime; protected consumers DB553/567/570/573/574; legacy reference and extraction utilities are not model execution | Bind final L8 source and dependency identities |
 | Plan-aware final-layout checkpoint | WS32 32-owner runtime, manifest and SUCCESS below; direct loader checks each host's four payload hashes before loading | Bind the final consuming run to the same checkpoint and dense overlay; no new full pack required |
 | DSA selected sets and tie order | DB567 under §21.6: own-score canonical selection exact; event 0 legacy-exact, first divergent event independently adjudicated; later events recorded, not adjudicated | Remaining long runs must pass within-engine exactness under §23.5; no cross-oracle DSA claim at long context |
-| Raw tokens and quality | DB567: 20-token exact oracle prefix; B′ DB570; L7 DB573/574 correct passkeys | Correct keys at depths 0.05/0.95. L8 has NO_CORRECTNESS_ORACLE; diagnostic IDs are not a quality result |
+| Raw tokens and quality | DB567: 20-token exact oracle prefix; B′ DB570; serial L7 DB573/574 correct passkeys | New prefill's own §21 short proof and all four L7 keys. L8 has NO_CORRECTNESS_ORACLE; diagnostic IDs are not a quality result |
 | State/load/cache protections | Gate C contracts, direct checkpoint validation, short-context and capacity runs; L7 sealed summaries | Full L7/L8 state/cache/load records. Deep per-layer tensor comparisons were inherited from Gate C, not performed in DB567 |
 | Local repeated collectives; no full-pod hidden reconstruction | Protected WS32 HLO and physical trace evidence; Gate D §21.6 | Final acquired/executed HLO hashes and physical groups/counts agree; fresh L8 trace |
 | PP8 protected measurement; PP16 measurement or rejection | DB563 PP8 2K; §22.3 PP16 evidence-backed rejection | Closed under §22. Do not confuse historical PP16 synthetic full-decoder acquisition with protected numerical evidence (§22.5) |
 | WS32 measurement and fastest correct plan | DB553 versus DB563 at protected 2K; WS32 promoted §22 | Long-context gates must not expose a reason to reopen the documented plan decision |
 | Device and profiler-free wall agree | DB574 diagnostic comparison below; coverage alone is not numerical agreement | Compare final L8 trace durations and profiler-free distribution, disclose different windows/statistics, investigate material unexplained disagreement |
-| Four-depth 128K smoke | DB573 depth1.0 and DB574 depth0.0 sealed | Depth0.05 and depth0.95, each independently sealed |
+| Four-depth 128K smoke | Serial DB573 depth1.0 and DB574 depth0.0 sealed | All four depths on the changed prefill candidate; old serial passes are reference evidence only |
 | 256K E0 | Input capsule exists; capacity measured only | Full prompt, 256 profiler-free timed steps, p50/p99, generated IDs, HBM and eight-file/64-core XPlane; legacy comparison per §23.5 |
 | DB linkage and approved archive | Existing numerical rows have protected local/remote evidence | Final dependency map: run → inputs/checkpoint/overlay/acquisition → source/config/ledgers → DB/SUCCESS generation |
 | Authenticated eight-host zero-work cleanup | Existing sealed rows; DB574 original collection includes supplemental device-holder checks | Terminal final-run census; a free lease, dead controller or missing lockfile is not enough |
@@ -71,17 +72,19 @@ Use the same explicit definitions for the final run, including any observed host
 
 ## Finalization checklist
 
-1. Finish the fresh 128K acquisition and bind its actual graph hashes; never borrow hashes
-   from a different Python pin. Then seal depths0.05/0.95 in order, stopping on first failure.
-2. Acquire the full E0 graph set at capacity262656 and check compiled memory before the long run.
-3. Seal L8 with its 256-step window; compare legacy DB402 prefill/decode against WS32 with
+1. Preserve/seal the current original depth0.05 run; no next serial long run. Complete the
+   efficiency audit/design, register targets and prove real multirow layers then the short decoder.
+2. Acquire the new candidate's graph sets and memory before efficient four-depth L7 and full L8.
+   Do not reuse serial HLO hashes or serial L7 passes to certify the changed implementation.
+3. Seal the candidate's L8 with its 256-step window; compare legacy DB402 prefill/decode against WS32 with
    both warm-up protocols disclosed. No correctness oracle is available for this synthetic E0.
 4. Populate final DB/source/config/input/ledger/SUCCESS-generation dependencies and verify
    the surviving working set, same-region archive and terminal 8/8 cleanup.
 5. Obtain the independent final requirement-by-requirement audit. Only then declare §18
-   complete, retaining the explicit slow-prefill, later-DSA, tensor-inheritance and
-   unmeasured-speculation qualifications. No acceptance threshold is changed here.
+   complete, after §24 prefill/TTFT criteria are met, retaining the later-DSA, tensor-inheritance
+   and unmeasured-speculation qualifications. No numerical acceptance threshold is changed here.
 
-Readiness basis: independent Astra review of current source and evidence, 2026-09-07,
+Historical readiness basis (BEFORE the §24 owner pivot): independent Astra review of current source and evidence, 2026-09-07,
 performed while the fresh acquisition ran. That review identified the remaining checks
-above; it was not a final approval and did not require any additional TPU workload beyond L7/L8.
+then outstanding; it was not a final approval. The new prefill path requires additional bounded
+proofs and its own long-context evidence; see `ENGINE_EFFICIENCY_AUDIT.md`.

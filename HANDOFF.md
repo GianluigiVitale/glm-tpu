@@ -14231,3 +14231,26 @@ a pidfd-bound read-only controller/worker-log observer, not the model controller
 After a successful numerical seal: depth0.95 under the same unchanged source/graph contract;
 then full E0 acquisition at513pages, numerical256steps, final §18 audit. Preserve original
 workers if controller observation fails; never restart on a wait timeout.
+
+## 2026-09-07 — OWNER PIVOT: efficient prefill before any next long run
+
+This supersedes ALL earlier next-action instructions to launch serial depth0.95/256K E0.
+The owner rejects another two days spent on serial prefill. Spec §24 and the compact goal now
+require efficient end-to-end prefill before §18 completion; §23's deferral is no longer current.
+Read `docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md` for the independent Astra findings and the main
+agent's decisions. The serial scan is confirmed in code; no batched speedup is measured yet.
+
+Preserve the original depth0.05 run and its frozen `a9bfbbb3` source through completion/sealing;
+the full tag, controller2410602/start101568006 and eight-host baseline are in the preceding entry.
+At the pivot, all62 main chunks had finished; this is not a numerical pass or terminal seal.
+Controller was still present at18:21Z. Read its actual terminal record before updating outcome.
+The read-only pidfd observer is still separate from the actual controller; no next-run chaining
+has been launched. Do not terminate or restart original workers merely to accelerate the pivot.
+
+Next work: reuse inventory and multirow state/causality/repair design, smallest dense/full-indexer/
+MoE tests, short complete decoder, efficient L7/L8. Register quantitative prefill/TTFT targets
+from same-hardware baseline definitions and budgets before candidate performance experiments.
+No new full checkpoint, infrastructure mutation or numerical-contract relaxation. Broader audit
+findings have explicit confirmed/hypothesis labels so secondary speculation does not delay the
+dominant prefill change. Historical D/G/B/B′/C and DB573/574 remain sealed reference evidence;
+new prefill must prove its own short and all-four-depth long-context correctness.
