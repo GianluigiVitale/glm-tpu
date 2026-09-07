@@ -14772,3 +14772,39 @@ to read21MB. This subset must never masquerade as a verified complete model. Reu
 existing bounded eight-host FP8 campaign/census/publisher, add a distinct layer protocol.
 Fresh authenticated fleet/retained-slot checks before launch, review/persistence before
 deployment. Own short-decoder§21, efficient L7/L8 and registered prefill/TTFT targets remain.
+
+## 2026-09-07 22:12Z — selected-layer loader CPU and controller bytes admitted
+
+`checkpoint/ws32_layer_subset.py` is a DISTINCT bounded loader: complete manifest/SUCCESS,
+source/geometry/placement/topology authentication; exact selected-layer schema, original
+full-ledger indices, explicit payload budget, actual headers, and direct physical owners.
+It reuses existing metadata and finite-byte validators, reads only selected leaf intervals,
+and never calls the full753B loader or hashes entire owner payloads. Full verifier keeps
+its file/hash policy; metadata-only types are refused by the full loader. Evidence labels
+expected whole-file hashes as NOT verified. Live/scratch HBM remains a separate TPU proof.
+
+CPU suite39passed21.80s (new loader, existing full checkpoint and reuse tests), including
+reversed32-device physical mesh, sparse four-file root, parsed layer1 versus10, exact
+complete leaf set, metadata/header/hash/ledger/ownership/budget refusal, hash-correct
+NaNs inBF16/F32/FP8 and instrumented selected-only reads. Initial test collection import,
+BF16 memoryview and same-header-length assumptions failed locally and were corrected;
+no protected run failed. Astra independent implementation review PASS, no P0-P2, CPU-stage
+persistence only, not TPU deployment admission.
+
+Read-only controller host-byte check then authenticated the CURRENT retained tmpfs root
+from the preceding entry. Layer0+layer3:55leaves/chip × slots09/13/25/29 =220 checked
+tensors,346,379,472B/chip;1,385,517,888 selected payload bytes read and allSHA/finite PASS.
+Complete metadata rederivation40.58s, total42.72s; these are diagnostic startup times, not
+protected loader benchmarks. No TPU initialization, checkpoint copy or remote mutation.
+Compact record `docs/artifacts/prefill-selected-layer-host-admission-20260907.json` binds
+the source file digests, checkpoint pins, exact input roots, aggregate observed ledger and
+reproduction recipe. This proves only this controller's selected bytes, not all8 hosts.
+
+Next: distinct complete-layer TPU admission worker/protocol using this loader, the existing
+bounded8-host FP8 campaign/census/publisher and current layer APIs. Start with real layer0
+(full DSA+dense), then layer3(IndexShare+MoE); keep selected scope explicit. Reuse known
+topology/owner mapping, not hostname rank; fresh authenticated8-host census/retained-slot
+check before launch and bothleases. No full checkpoint recreation. New prefill/TTFT targets
+remain unregistered; bounded correctness is allowed, performance trials require registration.
+Then short complete decoder/own§21, all4efficientL7 depths and fullL8. No live local process
+remains from the host check or CPU suite; last authenticated fleet census remains21:07Z.

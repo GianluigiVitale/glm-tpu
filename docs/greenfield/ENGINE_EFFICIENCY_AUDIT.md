@@ -311,3 +311,15 @@ zero-weight valid dummy routes for padded rows. Split residuals and local incomi
 remain intact. Padded static MoE rows still execute bounded work; narrow final-block
 executables are required to minimize that cost. Real-layer TPU admission is next, not
 more algorithm design or a full-model launch. End-to-end prefill/TTFT remains unmeasured.
+
+Selected-layer loader now removes a concrete admission cost: the full loader would place
+all2310 leaves and local-layout verification would hash entire24GB owner files. The new
+`checkpoint/ws32_layer_subset.py` authenticates the same full metadata but reads/hashes only
+complete explicitly selected layers, with a mandatory payload budget. Actual file headers,
+original tensor-ledger indices and same-byte finiteness remain checked. Its separate types
+and evidence scope cannot certify a complete checkpoint. CPU tests instrument file reads;
+unselected corruption is explicitly out of scope and still refused by the full verifier.
+Reversed CPU32 ownership, sparse local files, selected corruption, hash-correct NaNs,
+wrong metadata/header/slots and incomplete layers are covered.39tests21.80s; independent
+Astra review PASS for CPU persistence. This enables the bounded layer test without a new
+checkpoint copy; it is not a loader-performance or complete-layer TPU result.

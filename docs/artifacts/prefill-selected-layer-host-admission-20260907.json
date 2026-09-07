@@ -1,0 +1,39 @@
+{
+  "classification": "CONTROLLER_SELECTED_LAYER_HOST_BYTES_VERIFIED_NOT_TPU_OR_FULL_STATE",
+  "recorded_utc": "2026-09-07T22:12:15Z",
+  "base_code_hash": "2f49e0d787cfd0736e9d8060a1815c9d46628716",
+  "source_sha256": {
+    "glm_tpu/greenfield/checkpoint/ws32_layer_subset.py": "57fdf09de40ba63bdc19bd1ee2be7a6d96ac1b8964c79ece41a2220d11f77f55",
+    "glm_tpu/greenfield/checkpoint/ws32_runtime_checkpoint.py": "2b2326d4832afd7d7eab6d2d20cbf59976179e78f5f59b88379e792f4d88ae1e"
+  },
+  "checkpoint_root": "/dev/shm/glm-ws32-runtime/greenfield_ws32_runtime_pack_20260815T214050854386790Z",
+  "source_inventory": "/home/gianl/gcs-models/checkpoints/greenfield/glm52/plans/PP8_LP4/greenfield_checkpoint_plan_pp8_20260805T180552087295643Z/source_inventory.json",
+  "source_inventory_sha256": "a388627c08c8ff591903deb1fbf3198f43916e64a2295ed0e253f1e44a042fc4",
+  "expected_manifest_sha256": "c04f800edf15651198ab2c5183fff8a8ae9a427609b59cc61ccabdab32f5ee08",
+  "expected_success_sha256": "1bfea5bd2dd8b096a3e551d7f96697496d8277bdaaa328ca1c35144feb8f1760",
+  "expected_mesh_sha256": "de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88",
+  "expected_topology_sha256": "294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559",
+  "manifest_file_sha256": "88df414301e0d303506163c078484ec14cdb15ff03972789df58960b091a7cbf",
+  "success_file_sha256": "12703932637a9330f97ae0282b26dd7105d68793b3ae6620e109a10c7b0c7ca2",
+  "layers": [0, 3],
+  "local_slots": [9, 13, 25, 29],
+  "max_payload_bytes_per_chip": 400000000,
+  "selected_tensors_per_chip": 55,
+  "observed_tensor_count": 220,
+  "selected_payload_bytes_per_chip": 346379472,
+  "observed_selected_payload_bytes": 1385517888,
+  "metadata_seconds": 40.57983812596649,
+  "elapsed_seconds": 42.72112980496604,
+  "selected_ledger_sha256": "61cd368a77e585b7d113d4b189d3216202ace80044a4e5566026e478d24c4932",
+  "ledger_definition": "Iterate selected original tensor indices ascending, then sorted local slots; append dict(index,name,slot,bytes,sha256) from actual read bytes; SHA256 of json.dumps(ledger,sort_keys=True,separators=(',',':')).encode().",
+  "reproduction": "Read the geometry from configs/glm-5.2-fp8-config.json and inspect_source_inventory at the named path. Call read_ws32_layer_subset_metadata with recorded pins, layers, local slots and byte budget; iterate iter_ws32_layer_subset_host_tensors, summing host.nbytes and computing the ledger digest as defined. JAX_PLATFORMS=cpu. Do not initialize JAX or load onto TPU for this host-only check.",
+  "limitations": [
+    "Only the controller's four retained owner files were checked, not the other seven hosts.",
+    "Only selected layer payloads were hashed and checked finite; whole-file hashes and unselected payloads were not verified.",
+    "Pinned topology metadata was authenticated; no fresh live physical topology or accelerator census was performed by this check.",
+    "This is host-byte admission, not full-layer TPU arithmetic, measured HBM, protected performance or full-decoder admission."
+  ],
+  "tpu_initialized": false,
+  "performance_claim": false,
+  "new_checkpoint_bytes": 0
+}

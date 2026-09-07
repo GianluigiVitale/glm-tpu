@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-selected-layer-loader",
+      "category": "bounded retained final-owner checkpoint access",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "2f49e0d787cfd0736e9d8060a1815c9d46628716",
+      "source_paths": ["glm_tpu/greenfield/checkpoint/ws32_runtime_checkpoint.py", "glm_tpu/greenfield/checkpoint/ws32_runtime.py", "glm_tpu/greenfield/runtime/ws32_decoder.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/checkpoint/ws32_layer_subset.py", "tests/greenfield/checkpoint/test_ws32_layer_subset.py"],
+      "gate": "24: CPU selected-layer load admission; real-layer TPU next",
+      "reason": "Extract and directly reuse complete metadata/placement authentication and finite raw-byte validation, preserving full verifier file/hash policy. Distinct metadata/result types admit explicitly budgeted complete selected layers only; exact parsed IDs, independently checked decoder leaf sets, original ledger indices, same-open-file exact headers and immutable selected payload hashes/finite checks. No unselected payload read, full-file hash or checkpoint copy. Direct physical final-owner placement binds actual addressable devices, not host rank; records label full-file digests as expected/unverified. CPU32 reversed mesh and sparse four-slot tests cover ownership, corruption, metadata/header/ledger drift, nonfinite hash-correct payload, missing leaves and read intervals. Metadata cannot enter full loader. No TPU, complete-model integrity or performance claim."
+    },
+    {
       "id": "ws32-prefill-transformer-layer",
       "category": "complete causal batched layer and router",
       "source_repo": "glm-tpu greenfield",

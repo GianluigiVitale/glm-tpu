@@ -208,12 +208,19 @@ class Ws32RuntimePackConfig:
 
 
 @dataclass(frozen=True, slots=True)
-class VerifiedWs32RuntimeCheckpoint:
+class Ws32RuntimeMetadata:
+    """Authenticated layout ledger; no claim about on-disk tensor payloads."""
+
     root: Path
     manifest: Mapping[str, Any]
     success: Mapping[str, Any]
     plans: tuple[Ws32RuntimeFilePlan, ...]
     records_by_slot: Mapping[int, Mapping[str, Any]]
+
+
+@dataclass(frozen=True, slots=True)
+class VerifiedWs32RuntimeCheckpoint(Ws32RuntimeMetadata):
+    """Checkpoint admitted by the existing full-runtime verification policy."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -716,11 +723,16 @@ def _build_ws32_runtime_manifest(
     manifest["manifest_sha256"] = _mapping_hash(
         manifest, field="manifest_sha256"
     )
-    _verify_ws32_runtime_value(
+    by_slot = _verify_ws32_runtime_value(
         config.output_dir,
         manifest,
         plans,
+    )
+    _verify_ws32_runtime_files(
+        Ws32RuntimeMetadata(config.output_dir, manifest, {}, tuple(plans), by_slot),
         verify_file_hashes=False,
+        verify_file_hash_slots=None,
+        local_slot_layout=False,
     )
     return manifest
 
@@ -819,17 +831,7 @@ def _verify_ws32_runtime_value(
     root: Path,
     manifest: Mapping[str, Any],
     plans: Sequence[Ws32RuntimeFilePlan],
-    *,
-    verify_file_hashes: bool,
-    verify_file_hash_slots: frozenset[int] | None = None,
-    local_slot_layout: bool = False,
 ) -> Mapping[int, Mapping[str, Any]]:
-    if local_slot_layout and (
-        not verify_file_hashes or verify_file_hash_slots is None
-    ):
-        raise ValueError(
-            "WS32 local slot layout requires hash verification of the owned slots"
-        )
     if set(manifest) != _MANIFEST_KEYS:
         raise CheckpointValidationError("WS32 runtime manifest schema drifted")
     if manifest.get("artifact_kind") != WS32_RUNTIME_ARTIFACT_KIND or (
@@ -879,6 +881,31 @@ def _verify_ws32_runtime_value(
             raise CheckpointValidationError("WS32 runtime tensor hash ledger drifted")
         for index, digest in enumerate(hashes):
             _digest(digest, field=f"slot{plan.device_slot}.tensor{index}")
+    if manifest.get("packed_payload_bytes") != sum(
+        plan.payload_bytes for plan in plans
+    ) or manifest.get("packed_file_bytes") != sum(
+        plan.file_bytes for plan in plans
+    ):
+        raise CheckpointValidationError("WS32 runtime byte totals drifted")
+    return by_slot
+
+
+def _verify_ws32_runtime_files(
+    metadata: Ws32RuntimeMetadata,
+    *,
+    verify_file_hashes: bool,
+    verify_file_hash_slots: frozenset[int] | None,
+    local_slot_layout: bool,
+) -> None:
+    if local_slot_layout and (
+        not verify_file_hashes or verify_file_hash_slots is None
+    ):
+        raise ValueError(
+            "WS32 local slot layout requires hash verification of the owned slots"
+        )
+    root = metadata.root
+    for plan in metadata.plans:
+        record = metadata.records_by_slot[plan.device_slot]
         path = root / plan.filename
         if local_slot_layout and plan.device_slot not in verify_file_hash_slots:
             # Streaming tmpfs layout: only this host's owned slots are materialized.
@@ -906,13 +933,6 @@ def _verify_ws32_runtime_value(
                 raise CheckpointValidationError(
                     f"WS32 runtime file/tensor checksum drifted: {plan.filename!r}"
                 )
-    if manifest.get("packed_payload_bytes") != sum(
-        plan.payload_bytes for plan in plans
-    ) or manifest.get("packed_file_bytes") != sum(
-        plan.file_bytes for plan in plans
-    ):
-        raise CheckpointValidationError("WS32 runtime byte totals drifted")
-    return by_slot
 
 
 def verify_ws32_runtime_checkpoint(
@@ -948,6 +968,46 @@ def verify_ws32_runtime_checkpoint(
             )
         ):
             raise ValueError("WS32 runtime verification slot subset is invalid")
+    metadata = _read_ws32_runtime_metadata(
+        root,
+        expected_manifest_sha256=expected_manifest_sha256,
+        expected_success_sha256=expected_success_sha256,
+        expected_mesh_hash=expected_mesh_hash,
+        expected_topology_hash=expected_topology_hash,
+        inventory=inventory,
+        geometry=geometry,
+    )
+    _verify_ws32_runtime_files(
+        metadata,
+        verify_file_hashes=verify_file_hashes,
+        verify_file_hash_slots=selected_hash_slots,
+        local_slot_layout=local_slot_layout,
+    )
+    return VerifiedWs32RuntimeCheckpoint(
+        root=metadata.root,
+        manifest=metadata.manifest,
+        success=metadata.success,
+        plans=metadata.plans,
+        records_by_slot=metadata.records_by_slot,
+    )
+
+
+def _read_ws32_runtime_metadata(
+    root: Path,
+    *,
+    expected_manifest_sha256: str,
+    expected_success_sha256: str,
+    expected_mesh_hash: str,
+    expected_topology_hash: str,
+    inventory: SourceInventory,
+    geometry: ModelGeometry,
+) -> Ws32RuntimeMetadata:
+    """Re-derive/authenticate all metadata without opening any owner payload."""
+
+    _digest(expected_manifest_sha256, field="expected_manifest_sha256")
+    _digest(expected_success_sha256, field="expected_success_sha256")
+    _digest(expected_mesh_hash, field="expected_mesh_hash")
+    _digest(expected_topology_hash, field="expected_topology_hash")
     root = Path(root)
     path = root / "manifest.json"
     if not path.is_file():
@@ -1038,11 +1098,8 @@ def verify_ws32_runtime_checkpoint(
         root,
         manifest,
         plans,
-        verify_file_hashes=verify_file_hashes,
-        verify_file_hash_slots=selected_hash_slots,
-        local_slot_layout=local_slot_layout,
     )
-    return VerifiedWs32RuntimeCheckpoint(
+    return Ws32RuntimeMetadata(
         root=root,
         manifest=manifest,
         success=success,
@@ -1100,6 +1157,9 @@ def load_ws32_runtime_checkpoint(
     physical_mesh: object,
 ) -> LoadedWs32RuntimeCheckpoint:
     """Direct-load only this host's final-owner files onto its four chips."""
+
+    if not isinstance(checkpoint, VerifiedWs32RuntimeCheckpoint):
+        raise CheckpointValidationError("WS32 full loader requires full-runtime verification")
 
     import jax
     import numpy as np

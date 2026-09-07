@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+`checkpoint/ws32_layer_subset.py` adapts the retained final-owner loader for bounded
+real-layer admission. Complete metadata/placement authentication and raw finiteness checks
+are reused; full-runtime file/hash policy stays intact. Distinct subset types, exact complete
+layer names, original ledger indices, explicit per-chip byte budget, actual header bytes and
+physical addressable owners prevent partial state from being mistaken for a complete model.
+Only selected payload bytes are read/hashed; full-file hashes are labelled expected/unverified.
+CPU admission39tests21.80s, including existing full-loader tests and reversed32-device mesh.
+Independent Astra PASS for CPU persistence, no P0-P2; real-layer TPU admission still pending.
+
 `kernels/ws32_prefill_layer.py` composes existing admitted primitives into all four
 full/shared-indexer × dense/MoE branches, preserving split residuals and both index
 caches. New multirow router adapts `ws32_router_from_shards_mapped` and exact noaux_tc
