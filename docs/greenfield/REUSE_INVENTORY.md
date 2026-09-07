@@ -1218,3 +1218,12 @@ pending a clean Sol review; install and TPU execution remain unauthorized.
 
 Final Sol delta returned no P0--P2 and approved persistence, future-pin push/mirror-conditional
 install, and one fresh-tag execution under the existing live preflights. No mutation preceded review.
+
+## 2026-09-07 — WS32 orphan monitoring
+
+`watch_ws32_run.py` reuses the established workload/rsync leases and authenticated fleet SSH, but
+replaces lease-only waiting with exact argv/PID/start-time/boot identities and libtpu holders. After
+the L7 depth-0.0 controller and remote shells exited, all eight original workers continued. A missing
+`.ended` marker cannot recover their exit status. The new tool persists/resumes its first eight-worker
+baseline, retains leases on unknown observations, and reports readiness for a separate authenticated
+census, original-file collection and recovery seal. No model or enforcement code is changed.

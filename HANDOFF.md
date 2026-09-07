@@ -13888,3 +13888,32 @@ collect-only wrapper mode would close it.
 only the wrapper changed, so no Python and no HLO change). Then depths 0.05 and 0.95, the L8 256K E0
 acquisition and its ~11.5 h run at capacity 262,656, then the §18 proof including base vs effective
 throughput (Gate H).
+
+## 2026-09-07 07:50Z — resumed actual long-context work; recovered monitoring gap
+
+The prior goal turn made progress (published handoff); the September 4 conversation was stale.
+Current authoritative HEAD on resume was `bb4d1a88`; §21--§23, goal, handoff and live state were read.
+L7 depth 0.0 tag `greenfield_ws32_short_decoder_128k_d0_0_numerical_cap131072_hrope_20260907T064941550123130Z`
+continues at `679e2392b76caf1acb0a98ff87962c5b5c908e14`, originally launched 06:52Z. At 07:39Z fresh
+authenticated SSH observed all eight original Python/timeout pairs; rank 0 PID 2135816/start tick
+99229744. They advanced to 8/62 chunks, ~263 s each. The orchestrator and remote shell supervisors
+had exited, leaving the workload lease free while libtpu was held on every host. The historical
+shell-generated `.ended` file may never appear. No worker was signalled or restarted.
+
+Decision: add `scripts/greenfield/watch_ws32_run.py`, a monitoring-only controller outside the seal's
+enforcement surface, instead of waiting on a free lease or rerunning the model. It acquires both user
+leases; cron's outer root lock also takes the same user rsync lock, so cron is excluded. It polls
+authenticated SSH with exact argv/run-pin/output, PID/start-time/boot/executable identity and fuser,
+retains leases on unknown observations, and records small fsynced append-only `watch.jsonl` receipts.
+The first eight-worker baseline survives restart; malformed history refuses. Two fully observed idle
+fleets produce READY_FOR_CENSUS, not success. Fourteen CPU tests pass; independent gpt-6-astra review
+cleared all P0--P2 after fixing the initially non-resumable receipt. Starting this tool is approved.
+No runtime/sealer/enforcement file has changed relative to the live run pin.
+
+After monitoring completes: collect the workers' ORIGINAL numerical JSON/NPZ, HLO, logs and traces,
+checking exact equality of existing remote objects; do not fabricate exit status or numerical records.
+Require authenticated 8/8 zero-work before the existing RECOVER=1 path. The wrapper has no live attach
+mode despite §23.6's design text, and RECOVER performs rollback/archive before its census, so it must
+not be invoked during live work. Preserve local monitor receipts outside the strict remote evidence
+prefix. Apply the three previously deferred sealer fixes only after this run seals, then remaining
+L7 depths and L8. The monitor is an operational observation, not performance/exactness proof.

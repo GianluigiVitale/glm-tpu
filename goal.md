@@ -5,11 +5,10 @@ FULL ACCESS. Keep <4000 chars. At start/compaction read this, `docs/glm-tpu-revo
 
 ## Never idle on a running job
 
-**Never wait with `pgrep -f`/`pkill -f`: the pattern matches the WAITER'S OWN command line, so it
-waits on itself forever.** 3 stalls, the last 10 idle hours. Wait on the lease, a file
-lock with no process name: `/home/gianl/bin/wait-for-pod-run.sh [run_dir]`, backgrounded, or run the
-wrapper backgrounded so its exit notifies. Any watcher matches a FILE, never a process pattern.
-Never claim anything about a file without re-reading it.
+Never wait on process-name patterns. Re-read actual files and process identities. A free lease
+does NOT prove an orphaned fleet stopped. `scripts/greenfield/watch_ws32_run.py` observes exact
+PID/start-time/boot identities and libtpu holders, holding both user leases; unknown SSH retries.
+Its resumable `watch.jsonl` proves only observation, never numerical success or clean census.
 
 ## Storage
 
@@ -21,14 +20,11 @@ Before any >100-GB artifact state need/size/replacement. Live 1,991,594,668,825 
 
 ## Achieved
 
-**CLOSED:** Gate D §21.6 (DB 567, tokens 20/20 exact, event 1 == `4da05468…`); Gate G §22 (WS32_2D
-promoted); §23 Step B (DB 568 C=2048, 569 C=512); §21.2 enforcement `48372a34` (sealer re-derives
-items 3–4 from each rank's own arrays); B′ §23.8/9 (DB 570, host BF16 main rotary table
-legacy-faithful, tokens == DB 567); Step C (DB 571/572 — capacity costs time, not
-numerics; decode p50 129.9/143.0/160.3 ms, peak 26.4/27.8/29.7 GB/chip at cap
-8,192/131,072/262,656); §23.5 L7 depth 1.0 (DB 573, pin `df1695af`, passkey 891482 == gold, legacy
-ids matched as a diagnostic only; prefill 16,354 s = 128.4 ms/prompt token vs 128.1 predicted;
-decode p50 142.68 ms). 2 adversarial rounds resolved.
+**CLOSED:** Gate D §21.6 (DB567, 20/20 exact tokens, adjudicated event 1); Gate G §22 (WS32_2D);
+Step B (DB568/569 chunk identity), §21.2 per-rank enforcement; B′ (DB570 legacy-faithful main rotary);
+Step C (DB571/572 capacity-independent numerics; decode 129.9/143.0/160.3 ms, peak
+26.4/27.8/29.7 GB/chip at 8K/128K/256K capacity). L7 depth 1.0 DB573: passkey 891482 correct,
+prefill 16,354 s, decode 142.68 ms. Legacy ids matched diagnostically only. Two review rounds resolved.
 
 ## Invariants
 
@@ -43,10 +39,8 @@ code-pin-specific (StableHLO is not): re-acquire whenever Python changes.
 
 ## Decisions
 
-Never block the owner. When a question arises, take the decision you would recommend — the one best
-serving a correct, provable, finished project — record it with its reasoning and the alternative in
-`HANDOFF.md`, and proceed: scope, sequencing, cost/benefit, what to build or drop, pod time. The
-reviewer, not the owner, gates persistence, install, execution, destructive apply. Never ask.
+Decide autonomously toward a correct, provable finished project; record reasoning/alternatives in
+`HANDOFF.md`. Reviewer gates persistence, install, execution and destructive apply. Never block owner.
 
 ## Efficiency/review
 
@@ -55,10 +49,14 @@ Adversarial reviewer = separate **gpt-6-astra** agent; resolve all P0–P2, cap 
 (2 used) — past that state the residual risk and move to the runs. Cron `sync-glm.sh` every 5 min;
 verify origin + mirror before protected work. Never EU.
 
-## Resume — 2026-09-07 07:20Z
+## Resume — 2026-09-07 07:50Z
 
-Worktree `95a96c6a`, pushed. L7 depth 0.0 RUNNING at pin `679e2392` since 06:52Z (~5 h; reuses the
-`df1695af` HLO pins, only the wrapper changed). Next: (1) L7 depths 0.05, 0.95; (2) L8 256K E0
-acquisition at 262,656 then its run (127 chunks + 2048 tail, ~11.5 h); (3) §18 proof, base vs
-effective throughput (Gate H). In the next gap between runs apply the 3 deferred review items at
-the tail of `HANDOFF.md`, which also records the worker-0 ssh flake the sync step now retries.
+Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`.
+L7 depth 0.0 tag `greenfield_ws32_short_decoder_128k_d0_0_numerical_cap131072_hrope_20260907T064941550123130Z`
+at pin `679e2392` is LIVE, 8/62 chunks observed. Its orchestrator/remote shells exited, leaving
+8 original Python workers running. Do not restart. New monitor reviewed by independent Astra,
+14 CPU tests passed; attach with original tag/pin. After READY_FOR_CENSUS: authenticate 8/8 cleanup,
+collect original JSON/NPZ/HLO/log/trace with exact existing-object checks, then RECOVER=1 seal.
+Never recover while workers live. Surface unchanged; `.ended` may never appear after shell loss.
+Then apply 3 deferred review items in HANDOFF, L7 depths 0.05/0.95, L8 acquisition and 256K E0
+(~11.5 h), then §18 and separate base/effective throughput. Gate D and G remain closed.
