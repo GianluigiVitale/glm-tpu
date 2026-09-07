@@ -14199,3 +14199,35 @@ evidence verification, including device/wall comparison and DB/archive dependenc
 No extra TPU workload was established necessary. The original acquisition controller2387478
 and worker2388437 remain active; all seven StableHLO files now exist. Model/enforcement source
 is unchanged. Do not treat this pending audit checklist as project completion.
+
+## 2026-09-07 13:25Z — fresh acquisition complete; numerical depth0.05 live
+
+Acquisition `greenfield_ws32_short_decoder_128k_d0_05_acquire_cap131072_hrope_20260907T123628447918058Z`
+at `b5ac8130` finished13:20:32Z with controller exit0, archive catalogue/bytes verified and
+authenticated 8/8 post-census. Summary `03d45bf3ad39fd490fc2cd40656f7513cdb4920d223356356824bd5ec372b489`
+was independently generation-replayed at `1788787215676047` under `diagnostic/summary.json`.
+Classification `HLO_ACQUIRED_ONLY`, no DB or terminal SUCCESS, no numerical/performance claim.
+All8 graph sets agree. Acquisition rank0 prefill compiled arguments+outputs−aliases+temporary
+total28,742,676,992 B; this is a planning estimate, not execution peak-HBM proof.
+
+Numerical tag `greenfield_ws32_short_decoder_128k_d0_05_numerical_cap131072_hrope_20260907T132148212467000Z`
+source pin `a9bfbbb3c42c7bf46662b5b91cad19bbacb18668`, separately pinned sealing checkout
+`<run>/sealing-source.wEiEMT`. Only goal/HANDOFF/audit-doc changes separate this source from the
+acquisition pin; all model/enforcement source is identical. Independent Astra conditionally approved
+the exact parameters; acquisition exit/archive/census and published/mirrored source were verified
+before launch. Actual seven acquired hash pairs supplied; same weights/overlay/exactDSA/host-main
+rotary/capacity131072/chunk2048, RECOVER0, no source override, fresh tag.
+
+Detached controller **PID2410602/start101568006**, boot `4ebd122c-7b2a-4388-961f-021fae5f2a52`,
+log `/home/gianl/glm-run/controller_<tag>.log`; carrier records exact wrapper exit and holds sync
+lease while wrapper holds workload lease. Preflight live storage13:23:45Z **1,994,203,019,268 B**,
+reserve6GB within2.5TB ceiling. All8 sync and pre-census passed; workers launched13:23:59Z.
+
+Authenticated observation13:25:15Z stored/validated as the original baseline in `<run>/watch.jsonl`:
+host ranks0..7 workerPIDs `[2411583,1289995,1324616,1273344,1320674,1296726,1290339,1270395]`,
+each exactly matching that host's libtpu holder. Worker0 start101581471; full8 start/boot/argv
+identities in the receipt. No second lease-holding watcher is running. Tool session34585 is only
+a pidfd-bound read-only controller/worker-log observer, not the model controller.
+After a successful numerical seal: depth0.95 under the same unchanged source/graph contract;
+then full E0 acquisition at513pages, numerical256steps, final §18 audit. Preserve original
+workers if controller observation fails; never restart on a wait timeout.

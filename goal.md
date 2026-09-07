@@ -52,14 +52,14 @@ Smallest decisive test first; stop on first invariant failure; prefer offline ad
 Adversarial reviewer = separate **gpt-6-astra** agent; resolve all P0–P2; avoid redundant review.
 Cron `sync-glm.sh` every 5 min; verify origin + mirror before protected work. Never EU.
 
-## Snapshot — 2026-09-07 12:43Z
+## Snapshot — 2026-09-07 13:25Z
 
 Worktree `/home/gianl/glm-tpu-topology-rewrite`, branch `rewrite/topology-first-decode`.
-Sealer fixes integrated at `b5ac8130`: 116 tests, Astra PASS, pushed/mirrored; pinned sealing source.
-LIVE acquisition tag `greenfield_ws32_short_decoder_128k_d0_05_acquire_cap131072_hrope_20260907T123628447918058Z`
-at `b5ac8130`. Controller PID2387478/start101296030. All8 workers observed live;
-baseline saved in `watch.jsonl` (no second
-lease-holding monitor). Observe exact controller/log; do not restart on an observation timeout.
-After acquisition seals: use its pins for L7 0.05/0.95, then L8 acquisition + 256-step E0, §18.
-No model/enforcement edits while live. Paths/identities/history: HANDOFF and
-`docs/greenfield/WS32_ORPHAN_RECOVERY.md`. Never rerun/recover sealed DB574.
+128K acquisition `b5ac8130` finished13:20Z, archived, 8/8 clean; pins adopted.
+LIVE numerical tag `greenfield_ws32_short_decoder_128k_d0_05_numerical_cap131072_hrope_20260907T132148212467000Z`
+at `a9bfbbb3`. Controller PID2410602/start101568006. All8 workers/holders verified13:25Z;
+Baseline `watch.jsonl`; no second lease-holding monitor. Observe exact controller/log;
+never restart on an observation timeout. After this seal: depth0.95, L8 acquisition +256-step E0,
+then §18: `docs/greenfield/SECTION18_COMPLETION_AUDIT.md` (pending).
+No model/enforcement edits while live. HANDOFF and `docs/greenfield/WS32_ORPHAN_RECOVERY.md`
+hold identities. Never rerun/recover DB574. Sealing checkout pinned.
