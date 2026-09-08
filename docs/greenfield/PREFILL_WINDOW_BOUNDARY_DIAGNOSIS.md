@@ -221,3 +221,35 @@ as if it necessarily changes production attention order, or adding redundant
 tie repair. The current captures include both original outputs and operands;
 row2 selected scores cover its entire live history, so another scorer tap is
 not automatically needed. Research does not replace numerical evidence.
+
+## 14:57Z — fixed DB591 graph and simultaneous-memory admission
+
+`scripts/greenfield/prefill_window_boundary_admission.py` registers all four
+DB591 graphs, not DB590's uninstrumented model. Exact StableHLO and optimized
+bytes except the same seven outer host coordinates; model metadata, stack
+topology and opaque bodies remain bound. Original compiler output schema
+digests bind all12 original and96/33 capture fields and shardings. Existing
+physical paired collective schedule is unchanged; both actual FP32 expert
+combine proofs pass. No new symbolic arithmetic project or reacquisition.
+
+All four executable code allocations total67,827,200B. Per-dispatch budget
+reuses all-live buffer accounting, adds active output/scratch plus all resident
+code, retains the1GiB reserve and subtracts no aliases. Captures and earlier
+cache generations must remain counted. This is CPU admission, not a measured
+numerical peak or launch permission.
+
+50CPU tests pass9.85s (46new plus4registry), none skipped, including all four
+actual original graph replays, strict serialized report/schema/type mutations,
+host-only coordinate shifts and all-live memory refusal. Independent existing
+Astra reviewer finds no substantiveP0-P2, approves CPU persistence. First test
+run caught a512-byte typo in the test's expected code sum; corrected against
+the fixed allocations, not by changing the budget or acquired evidence.
+
+NEXT: wire a distinct boundary-only numerical mode through existing worker/
+collector/protected wrapper. Keep original compile call stack. Bind original
+failed generations/32owners, reuse completedWK and BudgetedCalls with this
+new memory profile, preserve actual12outputs AND captured operands before any
+fallible publication/comparison. Exactly2WK+1candidate+4causallycarried controls;
+no numerical verdict from the old failed comparator. Compare original signatures
+first, report perturbation explicitly. Same-input replay is a separate graph
+requiring its own admission if later evidence calls for it. No launch yet.

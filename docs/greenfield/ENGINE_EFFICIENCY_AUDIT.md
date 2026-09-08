@@ -792,3 +792,11 @@ PREFILL_RESEARCH_V3_ADJUDICATION.md. Existing top_k lower-index ties and attenti
 position canonicalization invalidate two proposed unnecessary experiments.
 Expert-relative panels, exact vectorized merges and rolled prefixscan remain
 separate challengers; no new performance or precision claim.
+
+DB591 fixed graph/schema/memory admission now passes50CPUtests9.85s; independent
+review noP0-P2. Reuse unchanged physical schedule/FP32 combine and seven exact
+host-location coordinates, but bind new model hashes, allocations and all96/33
+capture fields. All-live budget includes67.8272MB resident code plus active
+outputs/scratch and retained capture/cache generations. Numerical peak remains
+unmeasured. Next existing-worker boundary-only diagnostic integration, not another
+graph acquisition or structural-proof expansion. No TPU launched in this step.

@@ -16852,3 +16852,28 @@ merge isnot measuredTPUwin. Alignedexpertpanels/N256/logicalfetchcounts are usef
 later refinements. No INT8download, precision/tile/threshold change. Keep current
 captures; row2 selectedscores alreadycoveralllivekeys. Review approves docs,
 not numerical launch. Efficientown8K/fourdepthL7/L8/TTFT stillopen.
+
+## 2026-09-08 14:57Z — DB591 exact graph/schema/memory admission, CPU only
+
+Starting163af394 (DB591/researchv3 docs committed/pushed and same-region branch
+readback verified). Newprefill_window_boundary_admission.py binds exactDB591
+receipt SHA dc8a9572539a1670a526e74d7969c299aa616a754f3df51156fefb6ce4b9b931,
+fourrawgraph pairs, same seven outer host-coordinate equivalence, new compiler
+allocations and96/33capture schema hashes. Existing paired4/8collective schedule
+unchanged; bothactualFP32combine proofs pass. All-live memory reuses fixed1GiB
+reserve/noalias deductions; fourresidentprogramcodes67,827,200B. Doesnotenable
+numericaldispatch or claim measuredpeak/originalsignatures.
+
+50CPUtests9.85s allPASS/noneskipped (46new plus4reuse); originalgraphs replayed,
+strictJSON/report/schema/coordinate/memorymutations. Initial4failureswerea512B
+typo inexpectedtestcodesum, fixed against unchangedacquiredallocations. Independent
+existingAstra reviewer noP0-P2, approvesCPU persistence. NoTPU/newcheckpoint;
+lastnormal/root8clean remainsDB59114:42:09Z; localprocesschecknocampaign.
+Localfree1,803,681,792B: boundedfloorfits, fullmodel4GiBfloordoesnot.
+
+NEXT distinctboundarynumericalmode withinexisting worker/campaign/wrapper,
+originalcompilecallstack retained. ReuseBudgetedCallswithnewprofile, bindoriginal
+failedgenerations/32owners, savebothoriginal12outputs+capturesbeforefallible
+publication,2WK+1candidate+4causalcontrols only. Originalsignaturecomparison
+beforeattribution; nooldfailedcomparatorpromotion, noextraunacquiredroutergraph,
+no unchangedacquisition/fullmodeltrial. SeePREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md.

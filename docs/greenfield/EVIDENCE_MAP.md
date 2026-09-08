@@ -2,6 +2,14 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST14:57Z2026-09-08: fixed DB591 graph/schema and simultaneous-memory
+admission now passes50CPUtests, including all4original replays; independent
+Astra review noP0-P2. `prefill_window_boundary_admission.py` reuses old physical
+schedule/host-location identity/budget but binds new rawmodel bytes, allocations
+and96/33capture schema hashes. No numerical launch or measuredpeak. NEXT existing
+worker boundary-only integration with originalgeneration/32owner binding and
+signature reproduction; no unchanged acquisition. See boundary diagnosis.
+
 LATEST14:42:09Z2026-09-08: DB591 instrumented B128/B32 plus WK graphs SEALED
 at5e714375,119sworker/collector,0model/WK calls,normal/root8/8clean. Candidate/
 control expose96/33 capture fields; actual allocations201.56/95.90MBtemp and

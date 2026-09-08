@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+DB591 fixed graph/schema and simultaneous-memory admission now passes CPU;
+`prefill_window_boundary_admission.py` adapts existing host-coordinate identity,
+paired collective schedule, FP32 combine checker and all-live budget. New model
+hashes/allocations/schema digests; no DB590 model admission inheritance.50tests
+including originals pass, review clears CPU persistence. Boundary-only worker
+and original-generation/owner binding remain next; no numerical launch yet.
+
 DB591 has now acquired the instrumented4graphs at5e714375, zeroexecution and
 8/8clean. Reuse actual rawgraph pairs/allocations/schemas from
 prefill-window-boundary-four-graph-acquisition-20260908.json for the numerical

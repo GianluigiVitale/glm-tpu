@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-boundary-db591-admission",
+      "category": "fixed capture graph/schema and simultaneous numerical memory admission",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "163af394ce104fc3fc2a847cfce9a2f6ec993908",
+      "source_paths": ["scripts/greenfield/prefill_window_admission.py", "scripts/greenfield/prefill_window_locations.py", "scripts/greenfield/prefill_window_boundary.py", "glm_tpu/greenfield/validation/ws32_prefill_memory.py", "scripts/greenfield/prefill_moe_precision_hlo.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_window_boundary_admission.py", "tests/greenfield/hlo/test_prefill_window_boundary_admission.py"],
+      "gate": "24: CPU-only fixed DB591 graph/memory admission; numerical capture execution remains unwired",
+      "reason": "Reuse seven exact outer host-coordinate equivalence, unchanged paired physical collective schedule, actual FP32 route-sum proof and all-live four-executable memory budget with1GiB reserve/no alias deduction. Separate SHA-bound DB591 receipt/model hashes/allocations and exact compiled output-schema digests; cannot inherit DB590 model admission. All4original graphs and JSON/schema/type/coordinate/allocation/memory mutations pass;50tests9.85s including4registry. Independent Astra noP0-P2 for CPU persistence. Original generation/32owner binding, diagnostic worker/publication and original-signature reproduction remain separate; no numerical or performance authority."
+    },
+    {
       "id": "ws32-prefill-research-v3-adjudication",
       "category": "owner report with actual-source numerical and performance corrections",
       "source_repo": "glm-tpu greenfield owner report",
