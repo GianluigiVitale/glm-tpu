@@ -15113,3 +15113,23 @@ numerical admission. No v2 tag/campaign/collector yet; source remains default-of
 Independent Astra implementation review PASS for CPU persistence, no P0-P2; no deployment approval.
 Next wire distinct v2 reference identity, preserve both graphs and unchanged candidate
 checks, review then bounded admission. Do not reuse v1 label or route overrides.
+
+## 2026-09-08 — completed-BF16 reference v2 fleet wiring
+
+New mode `ws32_prefill_layer_materialized_admission`, layer3 only, protocol
+`ws32-prefill-layer-materialized-bf16-reference-v2`. Candidate/comparator unchanged.
+Worker compiles `reference_prefix` and `reference` separately before execution;
+suffix compile uses actual prefix abstract outputs, then consumes completedBF16
+device arrays without host reconstruction. All3 cases retain original per-owner
+`*.reference_input.npz` bytes/digests, both graph forms, ownKV carry and original
+numeric/cache/intervention replay. Collector and DB require distinctv2 classification.
+Reference HLO budgets derive from original scalar graph: prefix7calls/suffix27raw
+calls, source feature4/expert8 payloads, rawU8 owner arrays allowed but fullBF16
+expansion refused. Candidate exact HLO gate unchanged; all3programs <=2GiB compiled.
+CPU regression exercises real lower/compile from abstract boundary and then actual
+completedBF16 execution, in addition to real20-field CPU32 schema tracing.
+Independent Astra wiring review: no P0-P2; bounded launch after tests/persistence/guards.
+Command: GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_layer_materialized_admission
+GLM_GREENFIELD_PREFILL_LAYER=3 bash scripts/greenfield/run_fp8_matmul_microbench.sh
+(same command). No v2 hardware result yet. Failedv1 remainsFAILED; no model/TTFT claim.
+Final156CPU tests15.71s PASS; bash syntax/diff whitespace PASS. Reviewer final delta PASS.

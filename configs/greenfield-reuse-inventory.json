@@ -18,13 +18,13 @@
   "assets": [
     {
       "id": "ws32-prefill-materialized-bf16-reference",
-      "category": "unwired untimed scalar reference realization v2",
+      "category": "bounded untimed scalar reference realization v2",
       "source_repo": "glm-tpu greenfield",
       "source_pin": "2bdf7bd574afbcc5927069a4ff76ecf7df95452e",
       "source_paths": ["glm_tpu/greenfield/kernels/ws32.py", "glm_tpu/greenfield/kernels/ws32_layer.py", "scripts/greenfield/prefill_layer_programs.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/prefill_materialized_reference.py", "tests/greenfield/hlo/test_prefill_layer_worker_schema.py", "docs/greenfield/PREFILL_MATERIALIZED_ROUTER_REFERENCE.md"],
-      "gate": "24: CPU32 schema and reference state carry only; no v2 numerical admission",
+      "gate": "24: CPU32 schema, state carry, actual abstract-boundary compilation and fleet wiring; no v2 TPU numerical admission",
       "reason": "DB585 original17-row route reproduction and same-input replay localize a fused scalar prefix discrepancy against captured-input FP64. HLO has BF16 casts; mechanism unproved. Separate existing scalar attention/postnorm and MLP executables materialize BF16 input, no recomputed norm or candidate route override. Preserve v1 refusal, exact route comparison and all bounds. Two-device-program boundary belongs only to untimed reference. Distinct v2 identity/collector and bounded TPU evidence remain required.20CPU tests8.02s pass."
     },
     {

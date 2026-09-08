@@ -2,6 +2,11 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Materialized-BF16 v2 reference now wired through the existing selected-layer campaign:
+separate prefix/suffix executables, original input captures all3cases, unchanged candidate
+and numerical comparator, distinctprotocol/DBitem. Reference ownKV carry and abstract
+compile→completedBF16 execution tested. Next one guarded bounded admission; no v2TPU result.
+
 DB585 router capture now sealed. Same-input M17/M1 agree with FP64 while the fused
 scalar prefix differs despite identical observedBF16 row4input. Preserve originalv1
 failure; new unwired `prefill_materialized_reference.py` reuses scalar norm/attention

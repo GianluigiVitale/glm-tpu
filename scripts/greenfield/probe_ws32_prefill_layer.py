@@ -54,6 +54,7 @@ from scripts.greenfield.prefill_layer_evidence import (
     stack_reference,
 )
 from scripts.greenfield.prefill_layer_hlo import check_layer_hlo
+from scripts.greenfield import prefill_materialized_reference as materialized_ref
 from glm_tpu.greenfield.partitioning.source_inventory import (
     SourceInventory,
     inspect_source_inventory,
@@ -81,7 +82,7 @@ def authenticated_inventory(path: Path, expected_sha256: str) -> SourceInventory
 def layer_from_tag(tag: str) -> int:
     from scripts.greenfield.prefill_router_protocol import is_router_tag
 
-    if is_router_tag(tag):
+    if is_router_tag(tag) or materialized_ref.is_materialized_tag(tag):
         return 3
     match = re.fullmatch(
         r"greenfield_fp8_ws32_prefill_layer_admission_l([03])_[a-zA-Z0-9_]+", tag
@@ -299,9 +300,14 @@ def main() -> int:
     from scripts.greenfield import prefill_router_protocol as router_protocol
 
     diagnostic = router_protocol.is_router_tag(tag)
+    materialized = materialized_ref.is_materialized_tag(tag)
     record = dict(
         status="RUNNING",
-        protocol=router_protocol.PROTOCOL if diagnostic else PROTOCOL,
+        protocol=(
+            router_protocol.PROTOCOL
+            if diagnostic
+            else materialized_ref.PROTOCOL if materialized else PROTOCOL
+        ),
         layer=layer,
         code_hash=args.expected_code_hash,
         launch_rank=args.process_id,
@@ -320,7 +326,11 @@ def main() -> int:
         cases={},
         phases={},
         programs={},
-        reference_scope="RAW_SCALAR_NOT_PROMOTED_DECODER_OR_LEGACY",
+        reference_scope=(
+            materialized_ref.REFERENCE_SCOPE
+            if materialized
+            else "RAW_SCALAR_NOT_PROMOTED_DECODER_OR_LEGACY"
+        ),
         state_scope="REAL_WEIGHTS_SYNTHETIC_PREFIX_AND_ACTIVATIONS",
     )
     _atomic_json(output, record)
@@ -486,8 +496,17 @@ def main() -> int:
             moe_contract=config.moe_contract,
             rms_norm_epsilon=config.rms_norm_epsilon,
         )
+        if materialized:
+            reference_prefix_fn, scalar = materialized_ref.build_materialized_reference(
+                mesh,
+                specs,
+                dsa_contract=config.dsa_contract,
+                attention_contract=config.attention_contract,
+                moe_contract=config.moe_contract,
+                rms_norm_epsilon=config.rms_norm_epsilon,
+            )
         table = build_rotary_table_host(1024, rotary_dim=64, theta=8e6)
-        compiled = reference = repair = None
+        compiled = reference = reference_prefix = repair = None
         for case, (offset, count) in CASES.items():
             started = time.monotonic()
             host = host_case(case, table)
@@ -520,26 +539,97 @@ def main() -> int:
                     > 2 * 1024**3
                 ):
                     raise RuntimeError("candidate compiled allocation exceeds2GiB/chip")
-                reference = compile_program(
-                    scalar,
-                    scalar_inputs(values, 0),
-                    "reference",
-                    args.output_dir,
-                    record,
-                )
+                if materialized:
+                    reference_prefix = compile_program(
+                        reference_prefix_fn,
+                        scalar_inputs(values, 0),
+                        "reference_prefix",
+                        args.output_dir,
+                        record,
+                    )
+                    # Compile from the actual prefix output schema; no prefix execution
+                    # is needed before admitting both distinct reference graphs.
+                    shapes = jax.eval_shape(
+                        reference_prefix_fn, *scalar_inputs(values, 0)
+                    )
+                    reference = compile_program(
+                        scalar,
+                        (shapes[0], shapes[1], values[15], values[17]),
+                        "reference",
+                        args.output_dir,
+                        record,
+                    )
+                    for name in ("reference_prefix", "reference"):
+                        proof = materialized_ref.check_reference_hlo(
+                            (args.output_dir / f"{name}.optimized_hlo.txt").read_text(),
+                            name,
+                        )
+                        record["programs"][name]["hlo_contract"] = proof
+                        _atomic_json(output, record)
+                        memory = record["programs"][name]["compiled_memory"]
+                        if (
+                            not proof["passed"]
+                            or sum(
+                                memory[n]
+                                for n in (
+                                    "argument_size_in_bytes",
+                                    "output_size_in_bytes",
+                                    "temp_size_in_bytes",
+                                )
+                            )
+                            > 2 * 1024**3
+                        ):
+                            raise ValueError(
+                                f"materialized reference HLO refuses {name}"
+                            )
+                else:
+                    reference = compile_program(
+                        scalar,
+                        scalar_inputs(values, 0),
+                        "reference",
+                        args.output_dir,
+                        record,
+                    )
             returned = compiled(*values)
             jax.block_until_ready(returned)
             observed = local_observations(returned)
             by_device = {device: [] for device in local_slots}
             previous = None
+            materialized_inputs = {d: [] for d in local_slots}
             for row in range(count):
-                previous = reference(*scalar_inputs(values, row, previous))
+                row_values = scalar_inputs(values, row, previous)
+                if materialized:
+                    prefix = reference_prefix(*row_values)
+                    jax.block_until_ready(prefix)
+                    mlp = reference(
+                        prefix[0], prefix[1], row_values[15], row_values[17]
+                    )
+                    jax.block_until_ready(mlp)
+                    previous = materialized_ref.assemble_reference_result(
+                        row_values, prefix, mlp
+                    )
+                    for shard in prefix[0].addressable_shards:
+                        materialized_inputs[int(shard.device.id)].append(
+                            np.asarray(shard.data).copy()
+                        )
+                else:
+                    previous = reference(*row_values)
                 jax.block_until_ready(previous)
                 for device, observation in local_observations(previous).items():
                     by_device[device].append(observation)
             expected = {
                 device: stack_reference(rows) for device, rows in by_device.items()
             }
+            if materialized:
+                capture_path = args.output_dir / f"{case}.reference_input.npz"
+                capture = {
+                    f"device_{d}": np.concatenate(rows).view(np.uint16)
+                    for d, rows in materialized_inputs.items()
+                }
+                np.savez_compressed(capture_path, **capture)
+                record.setdefault("reference_input_sha256", {})[case] = sha256(
+                    capture_path.read_bytes()
+                ).hexdigest()
             keys = {"actual": {}, "reference": {}}
             if layer == 0:
                 if repair is None:

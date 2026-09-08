@@ -78,3 +78,13 @@ No forced-round or optimization-barrier variant is authorized by this design. Th
 existing forced-BF16 RMS helper is only a possible future cheaper implementation;
 its source annotation is not physical rounding proof. No production model changes,
 full checkpoint reload or long serial test is required to answer the current question.
+
+## Wiring readiness
+
+Mode `ws32_prefill_layer_materialized_admission` uses this v2 protocol and a distinct DB
+item. Prefix and suffix are separately compiled before execution, including a real CPU
+regression of abstract-prefix suffix compilation. Candidate executable/comparator remain
+unchanged. Original per-owner BF16 suffix inputs are archived for each of the three cases.
+Reference graphs have their own local subgroup payload/call/memory guards; the original
+candidate guard is not weakened. Independent implementation review permits one bounded
+launch after tests, persistence and fresh fleet guards. Hardware admission remains open.
