@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-pallas-interface-schedule",
+      "category": "whole-model raw FP8, grouped, structured and sparse call interfaces",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "6b49b3301b13ebd1f208887259d05c2af5b68644",
+      "source_paths": ["glm_tpu/greenfield/kernels/pallas/fp8_matmul.py", "glm_tpu/greenfield/kernels/pallas/prefill_grouped_fp8.py", "glm_tpu/greenfield/kernels/pallas/sparse_attention.py", "glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_helper_hlo.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_batched_kernel_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py", "tests/greenfield/benchmarking/test_ws32_batched_kernel_hlo.py"],
+      "gate": "24: B17/B11 Pallas interfaces and schedule only; numerical admission disabled",
+      "reason": "Source-derived 1047-call per-layer multiset:588raw,225grouped,156structured,78sparse. Shared computation/live index binds actual operand producers, shapes/dtypes, aliases and absent/false side effects. Compiler prepends dynamic grid scalar so grouped source alias7 becomes compiled operand8; grouping metadata length is rows+255. Short-only full floating expert expansion guard is not a long-capacity HBM policy. Opaque arithmetic, model-leaf ownership and route schedule values remain separate proof obligations. Existing real-layer admissions and future own short numerical evidence are required; no model/worker change or TPU launch."
+    },
+    {
       "id": "ws32-batched-compiler-helper-structure",
       "category": "local index annotations, search scratch and closed slice scaffolding",
       "source_repo": "glm-tpu greenfield",

@@ -309,3 +309,21 @@ User indexes cover only watched slice handles or allocation-bearing computations
 there is no full-module scan for each of hundreds of helpers. Pallas calls are
 explicitly out of scope, not admitted by the helper result. Full-profile remains
 UNREGISTERED and protected numerical execution/sealing remain disabled.
+
+### Pallas interfaces and source schedule — 2026-09-08
+
+`benchmarking/ws32_batched_kernel_hlo.py` binds1047 actual live calls per graph:
+588raw FP8,225grouped routed projections,156structured kv-b and78sparse attention.
+The per-layer multiset records exact names, paired operand/result shapes/dtypes
+and aliases. Producer instructions must supply the recorded shapes. Grouped
+compiled calls include a dynamic-grid scalar, so output alias is operand8, not
+source-level7; scheduling metadata arrays have rows+255 entries. Side effects
+must be absent/false. Short graphs refuse floating tensors at full local expert
+table size; this size rule is explicitly not a long-capacity allocation policy.
+
+This shares the existing parsed computation index and live closure. It does NOT
+inspect opaque kernel arithmetic, prove the correct same-shaped checkpoint leaf
+or route schedule values. The full HLO/code pins, admitted layer evidence and own
+short numerical proof are still required. Full profile remains UNREGISTERED.
+Next: repaired and unrepaired cache ownership, all-layer health, actual memory
+admission and numerical worker/sealer wiring. No unchanged graph acquisition.

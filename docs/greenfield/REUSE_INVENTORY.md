@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Pallas interface profile now adapts the admitted raw/grouped/structured/sparse
+primitives into an exact1047-call per-layer B17/B11 inventory. Same parsed index
+and liveness; actual operand/result shapes, rawU8 storage, compiled grouped alias8
+and absent/false side effects. This is interface/schedule proof, not opaque
+arithmetic, checkpoint-leaf ownership or route-value correctness. Original full
+graphs are the positive replay, synthetic mutations only test refusal mechanics.
+Full numerical admission remains disabled; no reacquisition is needed.
+
 Compiler helper profile now adapts the one-layer annotation/search-scratch guard
 and existing decoder WK asynchronous-slice proof. Exact B17/B11 families;450
 allocations contained in225 local search loops; same-source complete disjoint

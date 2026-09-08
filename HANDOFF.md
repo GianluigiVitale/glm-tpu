@@ -15810,3 +15810,37 @@ provenance, proposed nonfinal unrepaired cache ownership and all-layer health;
 then actual memory reserve/census, numerical worker/sealer and OWN§21 short proof.
 No reacquisition or cleared layer0/3 arithmetic rerun. Keep larger-row reuse,
 quantitative phase targets and efficient four-depthL7/fullL8 on the critical path.
+
+## 2026-09-08 — batched Pallas interfaces pass both original graphs
+
+Starting6b49b330. Previous status-only turn was NO PROGRESS; this continuation
+finishes the pending kernel profile, not another acquisition. Local process
+inspection found no model runner; latest authenticated fleet census remains
+04:23:07Z from133fe71f, not a fresh idle claim. No TPU workflow this turn.
+
+New `benchmarking/ws32_batched_kernel_hlo.py` derives the exact per-layer
+1047-call multiset:588raw FP8,225grouped,156structured kv-b,78sparse attention.
+Actual producer/result shapes, dtypes, liveness, side effects and aliases bound.
+Grouped compiled dynamic-grid argument shifts source alias7 to operand8; routing
+metadata arrays are rows+255. Short floating expansion guard is NOT a long-HBM
+policy. Report excludes opaque arithmetic, model-leaf ownership and route-value
+correctness. Full graph/code hashes, real-layer evidence and own§21 still needed.
+
+Fixed the pending original-replay test's `.stablehlo.txt` lookup to the actual
+`.stablehlo.mlir`; prior2SKIPs were NOT passes. Combined test44PASS98.05s includes
+both SHA-bound B17/B11 original integrated profiles,22kernel mechanism/mutation
+tests and20mode/refusal tests. Full-profile violations remain exactly UNREGISTERED,
+passedFalse; no worker/sealer numerical enablement or performanceDB row.
+Independent reviewer found noP0-P2 and approved CPU persistence conditional on
+these original replays; that condition is now satisfied. No cleared-code re-review.
+Reuse-registry4PASS1.85s; Black/diffcheckPASS; goal3998chars.
+
+Next ownership proof uses actual tuple leaves, not metadata-layer attribution:
+21completedWK inputs are ENTRY2324..2344, mapped to0,1,2,6,...74. Acquired
+projection fusions take repeated BF16[64,6144] normalized rows and own
+F32[128,6144] WK, with projected keys in tuple leaf1. Downstream compiler fusions
+mix different layers' keys and health; whole-tuple dependency is insufficient.
+Trace each actual writer to its own outer index-cache slot, prove nonfinal
+unrepaired ownership and all-layer health; then actual memory reserve/census,
+numerical wiring and own short§21. Larger-row weight reuse, quantitative targets
+and efficientL7/L8 remain open; no prefill speedup established.

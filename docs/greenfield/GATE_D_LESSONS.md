@@ -1565,3 +1565,12 @@ normalized-state cause.
   keep identity/consumer ownership separate, and account for RoPE's axis1 split
   and uneven cache tails. Validate450scratch allocations with local user indexes,
   not450full scans; containment alone is not search-algorithm correctness.
+
+- 2026-09-08 kernel profile: source-level Pallas argument positions can differ
+  from compiled positions (grouped output alias7 becomes8 after grid scalar).
+  Derive source schedule, then replay actual full graphs; synthetic fixtures
+  generated from the expected inventory only prove mutation/refusal mechanics.
+  A test looking for `.stablehlo.txt` skipped present `.stablehlo.mlir` evidence;
+  corrected and both original replays passed. SKIP is not positive evidence.
+  Mixed-layer compiler tuple fusions likewise require leaf-sensitive ownership,
+  not scope labels or whole-tuple reachability to a desired projection.

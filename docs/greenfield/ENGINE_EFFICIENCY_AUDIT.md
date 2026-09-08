@@ -534,3 +534,12 @@ evidence explains permuted concat operands; no new generic identity assumption.
 Watched-user indexes avoid hundreds of whole-module scans. This is structural
 progress, not cache ownership, search/Pallas numerical proof or measured speed.
 Next actual repair/cache/health lineage and kernel profiles before execution.
+
+Pallas interface/schedule inventory now covers1047calls across all78layers using
+the same index/live closure: raw588, grouped225, structured156, sparse78. Exact
+paired shapes/dtypes, compiled alias8 and side-effect/liveness checks replace
+guessing from kernel labels alone. Full floating expert expansion refuses at the
+short-profile size bound; long-memory admission remains separate. Opaque bodies,
+correct model-leaf ownership and route schedule values are not established by
+this inventory. Full numerical admission stays disabled; existing original HLO
+is replayed locally, with no new TPU acquisition or performance claim.
