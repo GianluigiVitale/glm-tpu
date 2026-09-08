@@ -689,3 +689,13 @@ competitive2553 and boundary505; output/route/cache bounds are unchanged and
 per-row. Selected-score order plus B32 control agreement is explicitly not an
 independent canonical score-row proof. Next protected fleet/HLO/memory/timing
 integration, not another layer implementation or scalar-reference investigation.
+
+Layer6 now has compile-only acquisition wiring through the existing protected
+worker/campaign/wrapper. Abstract B128/B32 cache/prompt/WK inputs prevent any model
+or WK executable dispatch; all4actual graphs and compiler allocations are preserved
+before parsing. Reused fsynced journal, matched fleet error votes, generation-bound
+collector and NULL correctness/score/latency accounting pass composed CPU tests.
+Parser failures retain both layer graphs rather than paying another load just to
+collect the second. Exact profiles/numerical memory remain unregistered. Independent
+review permits one bounded acquisition after fresh preflights; no hardware result
+or prefill speedup claimed at this wiring step. See PREFILL_LAYER_WINDOW.md.

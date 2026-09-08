@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Layer6 four-graph acquisition now adapts the existing layer worker/campaign/FP8
+wrapper and fsynced Ws32AcquisitionJournal. Explicit35-leaf load, B128/B32/WK
+compile-only shapes, phase-matched fleet votes, original compiler record replay
+and diagnostic NULL DB accounting. No layer or WK executable dispatch. Composed
+CPU tests/review permit one bounded capture after fresh preflights; exact execution
+profiles and numerical memory remain unregistered. No new checkpoint/protection stack.
+
 Layer6 window protocol now reuses20-input/12-output layer programs, physical
 owner array capture/byte encoding and fixed bounded comparison. B128 versus
 4xB32 carries all3cache outputs; cap4096 includes competitiveDSA offset2553.

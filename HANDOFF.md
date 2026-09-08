@@ -16450,3 +16450,37 @@ occupancy. Reset immutableinitialcaches per timing sample. Reuse generation-boun
 collector and normal/root8census, not a newprotection stack. No more B17 scalar
 reference archaeology, fullmodel acquisition or newcheckpoint for this layer.
 Final128K/256K targets/own8K/efficientL7/L8 remain open; goal active.
+
+## 2026-09-08 11:47Z — layer6 four-graph acquisition wired, reviewed, CPU PASS
+
+Baseb27f2ea7. Distinct kernel/tag `ws32_prefill_layer_window_acquisition_l6` in
+existing FP8wrapper/layercampaign/worker; old17-row modes unchanged. Explicit
+layer6 pins35leaves326079840B/chip; actual metadata reader now verifies32owners/
+35tensors (host metadata only). Matched post-runtime binding/load/compile/error
+votes. Actual B128/B32 programs plus separate WKdecode/promote lower from abstract
+prompt/cache/WK arrays; NO layer or WK executable dispatch. Selected real weights
+still load directly so checkpoint owners/bytes are authenticated, no new pack.
+
+Fsynced existing acquisition journal preserves allocations BEFORE parsing and
+raw graph bytes before fallible inspection. Parser refusals are recorded without
+losing the other graph; true compile failure stops peers. All4executables remain
+resident for keyed per-chip snapshot. This is compile residency, NOT numerical
+scratch/output memory or permission to execute. Exact profiles UNREGISTERED.
+Collector checks actual journal/raw graph/memory identity and32physical owners;
+actual shell DB consumer writes NULL correctness/score/latency, acquisition scope.
+
+Tests45PASS50.49s (newprotocol/acquisition + actualCPU32 layer/schema),55historical
+PASS37.80s,final12acquisitionPASS2.32s includes shell expansion. Actual generation-
+bound collector uses in-memory bucket fixtures, not mock aggregate records; no
+cloud writes or realDB modification. New original-array protocol unchanged.
+Independent Astra finaldelta/testreview noP0-P2, conditional ONE acquisition approval
+after cleancommit/push/mirror and fresh wrapper normal/root8host preflight.
+
+NEXT persistence then one `GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_layer_window_acquisition`
+`GLM_GREENFIELD_PREFILL_LAYER=6 bash scripts/greenfield/run_fp8_matmul_microbench.sh`.
+Wrapper owns bothleases, no outer duplicateflock.600sworker cap,1GiBbounded evidence
+floor; lastcontrollerfree2322411520B, fullmodel4GiBfloor still not met. No TPU launch
+yet, lastprotectedcleanupDB589. Small compiler records only, no NPZ/newcheckpoint.
+Then actual HLO/counts/groups/FP32sum and numerical resident budget, followed by
+original-array B128vs4B32 execution/timing/actualoccupancy. Do not repeat cleared
+B17 arithmetic or seriallongruns. Own8K/targets/efficientL7/L8 remain open.

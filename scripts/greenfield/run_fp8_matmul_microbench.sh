@@ -12,6 +12,8 @@ readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
+WINDOW_ACQUISITION=0
+[[ $KERNEL != ws32_prefill_layer_window_acquisition ]] || WINDOW_ACQUISITION=1
 GROUPED_ADMISSION=0
 [[ $KERNEL != ws32_grouped_admission && $KERNEL != ws32_grouped_down_admission && \
    $KERNEL != ws32_prefill_moe_admission && $KERNEL != ws32_prefill_moe_boundary_diagnostic && \
@@ -19,11 +21,16 @@ GROUPED_ADMISSION=0
    $KERNEL != ws32_prefill_router_boundary_diagnostic && $KERNEL != ws32_prefill_prefix_mlp_diagnostic && \
    $KERNEL != ws32_prefill_layer_observed_admission && $KERNEL != ws32_prefill_layer_materialized_admission ]] || GROUPED_ADMISSION=1
 BOUNDED_PREFILL=0
+[[ $WINDOW_ACQUISITION == 0 ]] || GROUPED_ADMISSION=1
 [[ $KERNEL != ws32_prefill_baseline && $KERNEL != ws32_prefill_moe_scaling_baseline && $GROUPED_ADMISSION != 1 ]] || BOUNDED_PREFILL=1
 OUTPUT_TILE=${GLM_GREENFIELD_FP8_OUTPUT_TILE:-128}
 SELECTED_CASE=${GLM_GREENFIELD_FP8_SELECTED_CASE:-concentrated_eight}
 TAG_STEM=$KERNEL
 LAYER=${GLM_GREENFIELD_PREFILL_LAYER:-0}
+if [[ $WINDOW_ACQUISITION == 1 ]]; then
+  [[ $LAYER == 6 ]] || exit 2
+  TAG_STEM=${KERNEL}_l6
+fi
 if [[ $KERNEL == ws32_prefill_layer_admission || $KERNEL == ws32_prefill_prefix_mlp_diagnostic || $KERNEL == ws32_prefill_router_boundary_diagnostic || $KERNEL == ws32_prefill_layer_materialized_admission || $KERNEL == ws32_prefill_layer_observed_admission ]]; then
   [[ $LAYER == 0 || $LAYER == 3 ]] || exit 2
   [[ $KERNEL != ws32_prefill_router_boundary_diagnostic || $LAYER == 3 ]] || exit 2
@@ -79,7 +86,7 @@ fi
   $KERNEL == ws32_grouped_admission || $KERNEL == ws32_grouped_down_admission || \
   $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic || \
   $KERNEL == ws32_prefill_moe_bounded_admission || $KERNEL == ws32_prefill_layer_admission || \
-  $KERNEL == ws32_prefill_moe_scaling_baseline || \
+  $KERNEL == ws32_prefill_moe_scaling_baseline || $WINDOW_ACQUISITION == 1 || \
   $KERNEL == ws32_prefill_router_boundary_diagnostic || $KERNEL == ws32_prefill_prefix_mlp_diagnostic || $KERNEL == ws32_prefill_layer_materialized_admission || $KERNEL == ws32_prefill_layer_observed_admission ]] || {
   echo "FP8 kernel must be single_up, single_up_m1, attention_output," \
     "fused_attention_output, rmsnorm_linear, up_gate, selected_up_gate," \
@@ -118,6 +125,16 @@ fi
   echo "results DB missing or append-only run path already exists" >&2
   exit 2
 }
+if [[ $WINDOW_ACQUISITION == 1 ]]; then
+  [[ $TAG == greenfield_fp8_${KERNEL}_l6_* ]] || exit 2
+  # Compiler text/journals only; no case NPZs, checkpoint copy or model outputs.
+  # This bounded floor is not the full-model4GiB admission floor.
+  JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - <<'PY'
+import shutil
+if shutil.disk_usage('/home/gianl/glm-run').free < 1024**3:
+    raise SystemExit('window acquisition requires1GiB controller evidence space')
+PY
+fi
 mkdir -p "$RUN_DIR/hlo"
 
 say() {
@@ -222,7 +239,7 @@ elif [[ $KERNEL == attention_output ]]; then
 fi
 (
   cd "$WORKTREE"
-  if [[ $KERNEL == ws32_prefill_layer_admission || $KERNEL == ws32_prefill_prefix_mlp_diagnostic || $KERNEL == ws32_prefill_router_boundary_diagnostic || $KERNEL == ws32_prefill_layer_materialized_admission || $KERNEL == ws32_prefill_layer_observed_admission ]]; then
+  if [[ $WINDOW_ACQUISITION == 1 || $KERNEL == ws32_prefill_layer_admission || $KERNEL == ws32_prefill_prefix_mlp_diagnostic || $KERNEL == ws32_prefill_router_boundary_diagnostic || $KERNEL == ws32_prefill_layer_materialized_admission || $KERNEL == ws32_prefill_layer_observed_admission ]]; then
     [[ $TAG == greenfield_fp8_${KERNEL}_l${LAYER}_* ]] || exit 2
     JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
       -m scripts.greenfield.ws32_prefill_layer_campaign campaign --tag "$TAG" --pin "$PIN"
@@ -326,11 +343,12 @@ prefix_mlp = expected_kernel == "ws32_prefill_prefix_mlp_diagnostic"
 router_boundary = expected_kernel == "ws32_prefill_router_boundary_diagnostic" or prefix_mlp
 observed = expected_kernel == "ws32_prefill_layer_observed_admission"
 materialized = expected_kernel == "ws32_prefill_layer_materialized_admission" or observed
-diagnostic_boundary = boundary or router_boundary
+window_acquisition = expected_kernel == "ws32_prefill_layer_window_acquisition"
+diagnostic_boundary = boundary or router_boundary or window_acquisition
 bounded = expected_kernel == "ws32_prefill_moe_bounded_admission"
 scaling = expected_kernel == "ws32_prefill_moe_scaling_baseline"
 fleet_moe = expected_kernel == "ws32_prefill_moe_admission" or boundary or bounded or scaling
-fleet_layer = expected_kernel == "ws32_prefill_layer_admission" or router_boundary or materialized
+fleet_layer = expected_kernel == "ws32_prefill_layer_admission" or router_boundary or materialized or window_acquisition
 untimed = admission or diagnostic_boundary
 if fleet_layer:
     from scripts.greenfield.ws32_prefill_layer_campaign import validate_record
@@ -408,7 +426,9 @@ shape_ids = {
     "dsa_wk": "m1_k6144_n128",
     "single_up_m1": "m1_k6144_n2048",
 }
-if router_boundary:
+if window_acquisition:
+    item_id = "layer6_b128_b32_cap4096_four_graph_compile_only_v1"
+elif router_boundary:
     item_id = "layer3_b17_db585_prefix_completed_mlp_diagnostic_v1" if prefix_mlp else "layer3_b17_router_prefix_same_input_diagnostic_v1"
 elif fleet_layer:
     item_id = "complete_layer3_b17_db585_observed_reference_empty_boundary_tail_v3" if observed else ("complete_layer3_b17_materialized_bf16_reference_empty_boundary_tail_v2" if materialized else f"complete_layer{runner['layer']}_b17_raw_reference_empty_boundary_tail_v1")
@@ -450,7 +470,7 @@ pv.record_item(
         "Raw-U8 E4M3FN 128x128 block-scaled expert projection: "
         + runner["kernel"]
     ),
-    gold="Bounded exact-fallback output and required compact Pallas calls.",
+    gold="Four original compiled graphs and selected32-owner provenance; no numerical execution/admission." if window_acquisition else "Bounded exact-fallback output and required compact Pallas calls.",
     raw_output=json.dumps(runner, sort_keys=True),
     extracted=str(runner["checksum"]),
     correct=None if diagnostic_boundary else True,
@@ -464,7 +484,7 @@ pv.finalize(
     benchmark=f"greenfield_fp8_{runner['kernel']}",
     metric="diagnostic_evidence_complete" if diagnostic_boundary else "contract_valid",
     value=1.0,
-    note="Complete layer3 with actual13-output PREnorm and DB585 prefix reproduction; completed MLP, unchanged numerical bounds/interventions; not legacy or model/performance proof." if observed else "DB585 complete scalar prefix fingerprint reproduction followed by completed-input MLP; no full-layer numerical admission or performance claim." if prefix_mlp else "Router prefix reproduction and identical-input arithmetic diagnostic; no numerical admission or performance claim." if router_boundary else "Complete layer3 with completed BF16 scalar-reference MLP input (v2), NOT v1 fused-reference identity; unchanged numerical bounds and exact route/cache interventions; no model/performance claim." if materialized else "Complete batched layer with real weights/synthetic state; bounded raw scalar reference, causal/cache interventions; no legacy/full-model or performance claim." if fleet_layer else "Instrumented real-MoE boundary evidence; no numerical acceptance or performance claim." if boundary else "Standalone kernel microbenchmark; not layer latency or token throughput.",
+    note="Layer6 B128/B32 plus WK decode/promote compiled only; exact HLO and numerical memory admission remain pending. No model or WK execution, correctness or performance claim." if window_acquisition else "Complete layer3 with actual13-output PREnorm and DB585 prefix reproduction; completed MLP, unchanged numerical bounds/interventions; not legacy or model/performance proof." if observed else "DB585 complete scalar prefix fingerprint reproduction followed by completed-input MLP; no full-layer numerical admission or performance claim." if prefix_mlp else "Router prefix reproduction and identical-input arithmetic diagnostic; no numerical admission or performance claim." if router_boundary else "Complete layer3 with completed BF16 scalar-reference MLP input (v2), NOT v1 fused-reference identity; unchanged numerical bounds and exact route/cache interventions; no model/performance claim." if materialized else "Complete batched layer with real weights/synthetic state; bounded raw scalar reference, causal/cache interventions; no legacy/full-model or performance claim." if fleet_layer else "Instrumented real-MoE boundary evidence; no numerical acceptance or performance claim." if boundary else "Standalone kernel microbenchmark; not layer latency or token throughput.",
 )
 conn.close()
 
@@ -475,6 +495,8 @@ summary = {
     "results_db_run_id": run_id,
     "runner": runner,
     "claim_scope": (
+        "Layer6 B128/B32/WK original compiler evidence; no model or WK execution, numerical admission, exact HLO profile or performance claim"
+        if window_acquisition else
         "32-chip real layer3 MoE equal128 B16/B128 summed completed-call phase baselines; supplied routes, no full-prefill/TTFT or sustained-throughput claim"
         if scaling else
         "32-chip complete layer3 with actual13-output PREnorm, DB585 prefix reproduction and completed MLP; unchanged bounded cases/interventions, not legacy/full-model/performance proof"

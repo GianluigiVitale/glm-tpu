@@ -3,6 +3,41 @@
 Status: 2026-09-08. CPU integration PASS, default-off; not TPU admission.
 Starting pin: `51dc69404b06efa5f24052d86a597e74b89bfa89`.
 
+## Four-graph acquisition wiring — 2026-09-08 11:47Z
+
+Distinct `ws32_prefill_layer_window_acquisition` mode in the EXISTING protected
+FP8 wrapper/layer campaign. Layer6 explicitly binds the retained35-leaf metadata
+and326079840B/chip; post-runtime owner validation, selected loading and compilation
+failures vote across the fleet before the next phase. No numerical input transfer:
+actual B128/B32 programs compile from abstract prompt/cache/WK arrays. Separate
+BF16 WK decode and FP32 promote graphs compile too, but are not called. Neither
+layer executable is called. Old B17 defaults/admission are unchanged.
+
+Reused fsynced acquisition journal records compiler memory before fallible graph
+inspection. Raw StableHLO/optimized text is durable before parsing. Parser failures
+are preserved and do not prevent acquiring the other graph; actual compile errors
+stop through a matched fleet vote. Final device snapshot retains all four compiled
+programs plus selected weights, NOT numerical scratch/outputs or full-model HBM.
+All exact execution profiles remain UNREGISTERED. A successful acquisition means
+compiler evidence captured, never permission to execute; DB correctness/score/
+latency are NULL and the classification is diagnostic-only.
+
+CPU45PASS50.49s covers actual32-device production graph preparation, existing
+layer6 numerical composition and original compiler/journal→JSON→generation-bound
+collector→shell-accounting tests. Historical55PASS37.80s; final acquisition12PASS
+2.32s includes real shell-default routing, local/peer/compile/parser failures and
+raw graph/memory/journal mutation refusals. Black/diff/shell syntax pass. Independent
+Astra found no P0-P2 and conditionally approved ONE compile-only acquisition after
+clean persistence/mirror and fresh normal/root8host preflights. No launch yet.
+
+Acquisition: fixed600s worker cap,1GiB controller evidence floor (not the full-model
+4GiB floor), no NPZ payloads/newcheckpoint. Controller last free2,322,411,520B.
+Use `GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_layer_window_acquisition`
+and `GLM_GREENFIELD_PREFILL_LAYER=6` with `run_fp8_matmul_microbench.sh`; wrapper
+owns both leases and authenticated pre/post census. Do not nest the same locks.
+Then inspect actual graph inventories, physical counts/groups and allocations
+locally; finish numerical/timing/occupancy admission from this evidence, not guesses.
+
 ## Layer6 discriminator preparation — 2026-09-08
 
 At base806a455d, the selected-only host loader verified35layer6 tensors/chip

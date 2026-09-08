@@ -33,6 +33,7 @@ from scripts.greenfield.probe_ws32_prefill_layer import (
     PAYLOAD_BYTES,
     REPO,
     layer_from_tag,
+    pins_for_layer,
 )
 from scripts.greenfield.probe_ws32_prefill_moe import FLEET_SHA, MESH_SHA, TOPOLOGY_SHA
 from scripts.greenfield.ws32_prefill_moe_campaign import ssh
@@ -40,6 +41,7 @@ from scripts.greenfield import prefill_router_protocol as router_protocol
 from scripts.greenfield import prefill_materialized_reference as materialized_ref
 from scripts.greenfield import prefill_prefix_mlp_protocol as prefix_mlp_protocol
 from scripts.greenfield import prefill_observed_reference as observed_ref
+from scripts.greenfield import prefill_window_acquisition as window_acquisition
 
 
 def materialized_protocol(materialized: bool, observed: bool) -> Any:
@@ -69,6 +71,8 @@ def program_names(
 ) -> tuple[str, ...]:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
+    if layer == 6 and not any((diagnostic, materialized, prefix_mlp, observed)):
+        return window_acquisition.PROGRAMS
     if layer not in (0, 3):
         raise ValueError("unregistered layer")
     if materialized:
@@ -98,6 +102,7 @@ def evidence_files(
         "runner.json",
         "retained_preflight.json",
         "worker.log",
+        *(("compile_journal.jsonl",) if layer == 6 else ()),
         *(("boundary_prefix.npz",) if observed else ()),
         *(
             f"{name}.{form}"
@@ -110,14 +115,17 @@ def evidence_files(
             )
             for form in ("stablehlo.mlir", "optimized_hlo.txt")
         ),
-        *(f"{case}.npz" for case in (("boundary",) if diagnostic else CASES)),
+        *(
+            f"{case}.npz"
+            for case in (() if layer == 6 else ("boundary",) if diagnostic else CASES)
+        ),
         *(f"{case}.reference_input.npz" for case in (CASES if materialized else ())),
     )
 
 
 def checkpoint_ledger(layer: int) -> tuple[dict[str, Any], dict[int, dict[str, Any]]]:
     """Read only fixed hash-bound metadata, no checkpoint payload or full copy."""
-    pins = json.loads(PINS.read_text())
+    pins = json.loads(pins_for_layer(layer).read_text())
     root = Path(pins["checkpoint_root"])
     data = (root / "manifest.json").read_bytes()
     if sha256(data).hexdigest() != pins["manifest_file_sha256"]:
@@ -133,7 +141,7 @@ def checkpoint_ledger(layer: int) -> tuple[dict[str, Any], dict[int, dict[str, A
         for i, t in enumerate(manifest["tensor_schema"])
         if t["name"].startswith(f"model.layers.{layer}.")
     }
-    if len(selected) != (27 if layer == 0 else 28):
+    if len(selected) != {0: 27, 3: 28, 6: 35}[layer]:
         raise ValueError("retained selected tensor inventory differs")
     return pins, {
         r["device_slot"]: {
@@ -243,6 +251,11 @@ def validate_workers(
     order = next(iter(device_orders))
     if len(order) != 32 or len(set(order)) != 32:
         raise ValueError("physical mesh does not name32 distinct devices")
+    if layer == 6:
+        window_acquisition.validate_workers(
+            records, pin=pin, pins=pins, ledger=ledger, order=order
+        )
+        return
     slots = []
     for r in records:
         if not (
@@ -412,6 +425,9 @@ def validate_files(
         != {s["device_slot"] for s in record["local_device_slots"]}
     ):
         raise ValueError("retained preflight is not bound to the executing owners")
+    if record["layer"] == 6:
+        window_acquisition.validate_files(root, record)
+        return
     for name in program_names(
         record["layer"],
         diagnostic=diagnostic,
@@ -510,6 +526,11 @@ def validate_record(
 ) -> None:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
+    if record.get("kernel") == window_acquisition.KERNEL:
+        if any((diagnostic, materialized, prefix_mlp, observed)):
+            raise ValueError("window acquisition cannot use an historical layer mode")
+        window_acquisition.validate_record(record, pin)
+        return
     if not (
         record["status"] == "SUCCESS"
         and record["kernel"]
@@ -588,6 +609,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
 
     root = run_root(tag)
     layer = layer_from_tag(tag)
+    window = window_acquisition.is_acquisition_tag(tag)
     prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
@@ -663,7 +685,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     )
     if diagnostic:
         rp.verify_fleet_replicas(root / "fleet", records)
-    return dict(
+    result = dict(
         status="SUCCESS",
         code_hash=pin,
         kernel=(rp.KERNEL if diagnostic else mr.KERNEL if materialized else KERNEL),
@@ -689,6 +711,24 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         },
         checksum=sha256(json.dumps(records, sort_keys=True).encode()).hexdigest(),
     )
+    if window:
+        result.update(
+            kernel=window_acquisition.KERNEL,
+            protocol=window_acquisition.PROTOCOL,
+            admission_only=False,
+            diagnostic_only=True,
+            compile_only=True,
+            numerical_execution_authorized=False,
+            hlo=dict(
+                sha256=records[0]["hlo"]["sha256"],
+                contract=dict(
+                    passed=True,
+                    scope="COMPILER_EVIDENCE_PRESENT_NOT_EXECUTION_ADMISSION",
+                ),
+            ),
+            comparison=dict(passed=None, diagnostic_evidence_complete=True),
+        )
+    return result
 
 
 def campaign(tag: str, pin: str) -> None:

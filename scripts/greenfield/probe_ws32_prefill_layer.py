@@ -57,6 +57,7 @@ from scripts.greenfield.prefill_layer_hlo import check_layer_hlo
 from scripts.greenfield import prefill_materialized_reference as materialized_ref
 from scripts.greenfield import prefill_prefix_mlp_protocol as prefix_mlp_protocol
 from scripts.greenfield import prefill_observed_reference as observed_ref
+from scripts.greenfield import prefill_window_acquisition as window_acquisition
 from glm_tpu.greenfield.partitioning.source_inventory import (
     SourceInventory,
     inspect_source_inventory,
@@ -70,7 +71,13 @@ from scripts.greenfield.probe_ws32_prefill_moe import (
 
 KERNEL = "ws32_prefill_layer_admission"
 PINS = REPO / "docs/artifacts/prefill-selected-layer-host-admission-20260907.json"
-PAYLOAD_BYTES = {0: 21_557_920, 3: 324_821_552}
+PAYLOAD_BYTES = {0: 21_557_920, 3: 324_821_552, 6: 326_079_840}
+
+
+def pins_for_layer(layer: int) -> Path:
+    if layer not in PAYLOAD_BYTES:
+        raise ValueError("unregistered selected layer")
+    return window_acquisition.PINS if layer == 6 else PINS
 
 
 def authenticated_inventory(path: Path, expected_sha256: str) -> SourceInventory:
@@ -84,6 +91,8 @@ def authenticated_inventory(path: Path, expected_sha256: str) -> SourceInventory
 def layer_from_tag(tag: str) -> int:
     from scripts.greenfield.prefill_router_protocol import is_router_tag
 
+    if window_acquisition.is_acquisition_tag(tag):
+        return 6
     if (
         is_router_tag(tag)
         or materialized_ref.is_materialized_tag(tag)
@@ -100,21 +109,47 @@ def layer_from_tag(tag: str) -> int:
 
 
 def compile_program(
-    fn: Any, inputs: tuple[Any, ...], name: str, root: Path, record: dict[str, Any]
+    fn: Any,
+    inputs: tuple[Any, ...],
+    name: str,
+    root: Path,
+    record: dict[str, Any],
+    *,
+    journal: Any = None,
 ) -> Any:
     """Preserve both actual graph forms and compiler memory for every program."""
     start = time.monotonic()
+    if journal is not None:
+        journal.begin(name)
     lowered = fn.lower(*inputs)
     stable = str(lowered.compiler_ir(dialect="stablehlo"))
     (root / f"{name}.stablehlo.mlir").write_text(stable)
     compiled = lowered.compile()
+    memory = _compiled_memory(compiled)
+    seconds = time.monotonic() - start
+    if journal is not None:
+        import jax
+
+        journal.compiled(
+            name,
+            seconds=seconds,
+            memory=memory,
+            device_memory=[
+                dict(device_id=int(d.id), stats=_memory_stats(d))
+                for d in jax.local_devices()
+            ],
+        )
     hlo = compiled.as_text()
     (root / f"{name}.optimized_hlo.txt").write_text(hlo)
+    if journal is not None:
+        for form in ("stablehlo.mlir", "optimized_hlo.txt"):
+            with (root / f"{name}.{form}").open("rb") as stream:
+                os.fsync(stream.fileno())
     record.setdefault("programs", {})[name] = {
         "stablehlo_sha256": sha256(stable.encode()).hexdigest(),
         "optimized_hlo_sha256": sha256(hlo.encode()).hexdigest(),
-        "compiled_memory": _compiled_memory(compiled),
-        "compile_seconds": time.monotonic() - start,
+        "compiled_memory": memory,
+        "compile_seconds": seconds,
     }
     _atomic_json(root / "runner.json", record)
     return compiled
@@ -307,6 +342,7 @@ def main() -> int:
     from scripts.greenfield import prefill_router_protocol as router_protocol
 
     prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)
+    window = window_acquisition.is_acquisition_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
     observed_reference = observed_ref.is_observed_tag(tag)
     materialized = materialized_ref.is_materialized_tag(tag) or observed_reference
@@ -351,6 +387,19 @@ def main() -> int:
         ),
         state_scope="REAL_WEIGHTS_SYNTHETIC_PREFIX_AND_ACTIVATIONS",
     )
+    if window:
+        record.update(
+            protocol=window_acquisition.PROTOCOL,
+            rows=128,
+            control_rows=32,
+            context_capacity=4096,
+            key_tile=512,
+            compile_only=True,
+            numerical_execution_authorized=False,
+            admission_only=False,
+            diagnostic_only=True,
+            reference_scope=window_acquisition.REFERENCE_SCOPE,
+        )
     _atomic_json(output, record)
 
     def phase(name: str, start: float) -> None:
@@ -394,76 +443,116 @@ def main() -> int:
                 ).all()
             )
 
-        slot_by_id = {
-            int(device): slot
-            for slot, device in enumerate(physical.flattened_device_ids)
-        }
-        local_slots = {int(d.id): slot_by_id[int(d.id)] for d in jax.local_devices()}
-        preflight_bytes = (args.output_dir / "retained_preflight.json").read_bytes()
-        preflight = json.loads(preflight_bytes)
-        if (
-            preflight["code_hash"] != args.expected_code_hash
-            or preflight["layer"] != layer
-            or preflight["launch_rank"] != args.process_id
-            or preflight["hostname"] != socket.gethostname()
-            or {h["device_slot"] for h in preflight["headers"]}
-            != set(local_slots.values())
-        ):
-            raise ValueError(
-                "preflight retained slots differ from actual runtime owners"
-            )
-        record["retained_preflight_sha256"] = sha256(preflight_bytes).hexdigest()
-        if len(local_slots) != 4 or jax.default_backend() != "tpu":
-            raise ValueError("layer admission requires four local TPU owners")
-        record.update(
-            jax_process_index=jax.process_index(),
-            physical_device_ids=physical.device_ids,
-            mesh_sha256=physical.mesh_hash,
-            topology_sha256=topology.topology_hash,
-            topology_fleet_sha256=fleet,
-            versions={"jax": version("jax"), "libtpu": version("libtpu")},
-        )
-        phase("runtime_seconds", started)
-        started = time.monotonic()
-        pins = json.loads(PINS.read_text())
-        inventory = authenticated_inventory(
-            Path(pins["source_inventory"]), pins["source_inventory_sha256"]
-        )
-        for name, key in (
-            ("manifest.json", "manifest_file_sha256"),
-            ("SUCCESS", "success_file_sha256"),
-        ):
+        def bind_runtime():
+            slot_by_id = {
+                int(device): slot
+                for slot, device in enumerate(physical.flattened_device_ids)
+            }
+            local_slots = {
+                int(d.id): slot_by_id[int(d.id)] for d in jax.local_devices()
+            }
+            preflight_bytes = (args.output_dir / "retained_preflight.json").read_bytes()
+            preflight = json.loads(preflight_bytes)
             if (
-                sha256((Path(pins["checkpoint_root"]) / name).read_bytes()).hexdigest()
-                != pins[key]
+                preflight["code_hash"] != args.expected_code_hash
+                or preflight["layer"] != layer
+                or preflight["launch_rank"] != args.process_id
+                or preflight["hostname"] != socket.gethostname()
+                or {h["device_slot"] for h in preflight["headers"]}
+                != set(local_slots.values())
             ):
-                raise ValueError("retained runtime metadata file hash drifted")
-        geometry = _geometry()
-        config = Ws32DecoderConfig(geometry=geometry, context_capacity=1024)
-        subset = read_ws32_layer_subset_metadata(
-            Path(pins["checkpoint_root"]),
-            layer_ids=(layer,),
-            local_slots=tuple(local_slots.values()),
-            max_payload_bytes_per_chip=PAYLOAD_BYTES[layer],
-            expected_manifest_sha256=pins["expected_manifest_sha256"],
-            expected_success_sha256=pins["expected_success_sha256"],
-            expected_mesh_hash=MESH_SHA,
-            expected_topology_hash=TOPOLOGY_SHA,
-            inventory=inventory,
-            geometry=geometry,
-        )
-        loaded = load_ws32_layer_subset(subset, mesh=mesh, physical_mesh=physical)
-        weights = _bind_weight_name_tree(
-            ws32_decoder_weight_names(config).layers[layer], loaded.arrays
-        )
-        record.update(
-            local_device_slots=loaded.local_device_slots,
-            integrity_scope=loaded.integrity_scope,
-            payload_bytes_per_chip=loaded.payload_bytes_per_chip,
-            checkpoint_pins=pins,
-            selected_layer_ids=list(loaded.layer_ids),
-        )
-        phase("selected_load_seconds", started)
+                raise ValueError(
+                    "preflight retained slots differ from actual runtime owners"
+                )
+            record["retained_preflight_sha256"] = sha256(preflight_bytes).hexdigest()
+            if len(local_slots) != 4 or jax.default_backend() != "tpu":
+                raise ValueError("layer admission requires four local TPU owners")
+            record.update(
+                jax_process_index=jax.process_index(),
+                physical_device_ids=physical.device_ids,
+                mesh_sha256=physical.mesh_hash,
+                topology_sha256=topology.topology_hash,
+                topology_fleet_sha256=fleet,
+                versions={"jax": version("jax"), "libtpu": version("libtpu")},
+            )
+            phase("runtime_seconds", started)
+            return local_slots
+
+        def guarded(name, action):
+            return (
+                window_acquisition.fleet_step(
+                    name,
+                    action,
+                    record=record,
+                    root=args.output_dir,
+                    consensus=consensus,
+                )
+                if window
+                else action()
+            )
+
+        local_slots = guarded("bind_runtime", bind_runtime)
+        started = time.monotonic()
+
+        def load_selected():
+            pins = json.loads(pins_for_layer(layer).read_text())
+            inventory = authenticated_inventory(
+                Path(pins["source_inventory"]), pins["source_inventory_sha256"]
+            )
+            for name, key in (
+                ("manifest.json", "manifest_file_sha256"),
+                ("SUCCESS", "success_file_sha256"),
+            ):
+                if (
+                    sha256(
+                        (Path(pins["checkpoint_root"]) / name).read_bytes()
+                    ).hexdigest()
+                    != pins[key]
+                ):
+                    raise ValueError("retained runtime metadata file hash drifted")
+            geometry = _geometry()
+            config = Ws32DecoderConfig(
+                geometry=geometry, context_capacity=4096 if window else 1024
+            )
+            subset = read_ws32_layer_subset_metadata(
+                Path(pins["checkpoint_root"]),
+                layer_ids=(layer,),
+                local_slots=tuple(local_slots.values()),
+                max_payload_bytes_per_chip=PAYLOAD_BYTES[layer],
+                expected_manifest_sha256=pins["expected_manifest_sha256"],
+                expected_success_sha256=pins["expected_success_sha256"],
+                expected_mesh_hash=MESH_SHA,
+                expected_topology_hash=TOPOLOGY_SHA,
+                inventory=inventory,
+                geometry=geometry,
+            )
+            loaded = load_ws32_layer_subset(subset, mesh=mesh, physical_mesh=physical)
+            weights = _bind_weight_name_tree(
+                ws32_decoder_weight_names(config).layers[layer], loaded.arrays
+            )
+            record.update(
+                local_device_slots=loaded.local_device_slots,
+                integrity_scope=loaded.integrity_scope,
+                payload_bytes_per_chip=loaded.payload_bytes_per_chip,
+                checkpoint_pins=pins,
+                selected_layer_ids=list(loaded.layer_ids),
+            )
+            phase("selected_load_seconds", started)
+            return config, weights
+
+        config, weights = guarded("load_selected", load_selected)
+        if window:
+            window_acquisition.execute_acquisition(
+                args=args,
+                record=record,
+                mesh=mesh,
+                config=config,
+                weights=weights,
+                consensus=consensus,
+            )
+            record["status"] = "SUCCESS"
+            guarded("terminal", lambda: _atomic_json(output, record))
+            return 0
         from scripts.greenfield.prefill_router_protocol import is_router_tag
 
         if diagnostic:

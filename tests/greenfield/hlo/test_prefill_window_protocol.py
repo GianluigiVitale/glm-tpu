@@ -299,6 +299,37 @@ for fn,args,rows in ((wide,values,128),(small,p.control_inputs(values,0),32)):
     assert result[2].shape==(8,8,64,640) and result[3].shape==result[4].shape==(8,8,64,128)
     assert result[5].shape==result[7].shape==(rows,2048)
     assert result[8].shape==result[9].shape==(rows,8) and result[10].shape==(8,4,rows)
+# Exercise actual acquisition preparation, not a separately rebuilt schema.
+# The compilation boundary is intercepted for CPU shape checks: it must receive
+# the same real B128/B32 programs and separate BF16/F32 WK programs.
+import tempfile
+from types import SimpleNamespace
+from scripts.greenfield import prefill_window_acquisition as acquire
+seen=[]
+def shape_compiler(programs, *, root, record, **kwargs):
+    for name,fn,args in programs:
+        out=jax.eval_shape(fn,*args)
+        if name in ('wk_decode','wk_promote'):
+            assert out.shape==(128,6144)
+            assert out.dtype==(jnp.bfloat16 if name=='wk_decode' else jnp.float32)
+        else:
+            rows=128 if name=='candidate' else 32
+            assert len(args)==20 and len(out)==12 and out[0].shape==(rows,6144)
+            assert isinstance(args[0],jax.ShapeDtypeStruct)
+            assert isinstance(args[14],jax.ShapeDtypeStruct)
+        seen.append(name)
+        record.setdefault('programs',{})[name]={'optimized_hlo_sha256':'a'*64}
+    (root/'compile_journal.jsonl').write_text('CPU_SCHEMA_FIXTURE_ONLY\n')
+    return (object(),)*4
+acquire.acquire_programs=shape_compiler
+acquire._memory_stats=lambda _:dict(bytes_in_use=1,peak_bytes_in_use=1,bytes_limit=2)
+with tempfile.TemporaryDirectory() as tmp:
+    record={'protocol':acquire.PROTOCOL,'code_hash':'a'*40,'launch_rank':0}
+    acquire.execute_acquisition(args=SimpleNamespace(output_dir=Path(tmp)),record=record,
+        mesh=mesh,config=config,weights=w,consensus=lambda ok:ok)
+    assert seen==list(acquire.PROGRAMS)
+    assert record['model_executable_calls']==record['wk_executable_calls']==0
+    assert record['resident_programs_at_snapshot']==list(acquire.PROGRAMS)
 print('PRODUCTION_LAYER6_WINDOW_SCHEMA_PASS')
 """
     result = subprocess.run(
