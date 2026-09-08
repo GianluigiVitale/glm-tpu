@@ -1704,3 +1704,14 @@ normalized-state cause.
   another handle-escape route beyond operand users; reject it explicitly.
   Original TPU graph replay plus malformed-copy mutations complement CPU32
   execution. This is a compiler-storage checker fix, not numerical progress.
+
+- 2026-09-08 phase profile at302c142c, tag
+  greenfield_fp8_ws32_prefill_completed_phase_baseline_l6_20260908T195053038759898Z:
+  287calls completed onall8, but traced1 exceeded180s inclusive phase budget.
+  Default Python tracing captured host census/hash/compression work; XSpace
+  reached3,424,948,194B onrank0 and could not serialize (>2GB protobuf limit).
+  Export leftzero-byteXPlane; run remainsFAILED, normal/root8/8cleanup19:59Z.
+  Existing real-layer/transport runners already use python_tracer_level=0;
+  reuse that setting, retaining host/device/HLO tracing and unchanged budgets.
+  Missing this existing setting caused avoidable profiling overhead. Unprofiled
+  samples/firstNPZ/287witnesses survived; recover those, never invent a validtrace.

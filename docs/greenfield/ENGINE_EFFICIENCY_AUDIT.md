@@ -979,3 +979,14 @@ conditionally permits one bounded phase profile after clean persistence and fres
 preflights. No model arithmetic change or full-prefill speed claim. Latest measured
 full prefill remainsDB588~19.9tok/s;10K requested target unproved. No more numerical
 tap/refinement loops; use actual prefill trace to rank the next kernel change.
+
+20:02Z actual phase run302c142c completed287calls but FAILED traced180sbudget
+and3.425GBXSpace protobuf overflow. Default Python tracing of hostchecks was
+an avoidable observability cost; existing protected layerprofiler disablesit.
+Correction reusespython_tracer_level=0, no other option/model/budget change;
+actualvotedstart test/reviewPASS. All8 unprofiled samples authenticated: p50
+sharedprefix129.523ms, B128suffix10.498ms versusfourB32suffix24.710ms. Partial
+paths140.088/154.100ms omit independentassembly; notfullmodelperformance.
+Prefix is~92% of the wide partialsum; device attribution still requires valid
+XPlanes. PreserveFAILED/8/8cleanup and originalsample receipt, then onecorrected
+profile afterfreshpreflights. Do not optimizeMoE alone basedonits isolatedgain.

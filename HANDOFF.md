@@ -17465,3 +17465,24 @@ no-runner/root-open-holder checks; archived originals untouched. Controller
 free1,151,680,512B at19:49Z; recheck before launch. Authenticated fleet lastDB594
 8/8clean is historical; fresh pre/post census is mandatory. Latest real full
 prefill remains DB588~19.9tok/s; requested10K target is unproved, not a promise.
+
+## 2026-09-08 20:02Z — phase samples preserved; Python profiler overflow diagnosed
+
+302c142c published/mirrored exactgoal/code/refreadbacks, run
+greenfield_fp8_ws32_prefill_completed_phase_baseline_l6_20260908T195053038759898Z
+FAILED at traced1/sample_complete180s inclusive budget; Python profiling inflated
+XSpace to3,424,948,194B (protobuf limit2GB), zero-byte trace. All287calls completed,
+10unprofiled samples remain in each generation/CRC/SHA-bound originalrunner;
+firstNPZ/callgzip published. Normal/root8/8clean19:59:42Z, no blind restart.
+Receipt prefill-phase-python-trace-refusal-20260908.json records exact8sources.
+Worsthostsample p50prefix129.523ms, B128suffix10.498ms, fourB32suffix24.710ms;
+partialpaths140.088/154.100ms, NOT independently assembled wholelayer/fullmodel
+performance. Prefix now dominates this partial workload; need actual device
+trace to distinguish sorts/scoring/gathers/attention. No new throughput claim.
+
+Narrow correction reuses existing run_real_one_layer/run_gate_c_equivalence
+ProfileOptions.python_tracer_level=0. Host/device/HLO defaults and180s budget
+unchanged; actual ninecompile/WK/votedtrace option testPASS11.50s. Reviewer
+noP0-P2, conditional ONEcorrected profile afterpersistence/mirror/freshpreflights.
+Unused pytest36 fixture removedafterrootnoholdercheck; original evidence intact,
+free1,157,517,312B. No TPUinfrastructure operation, newweights or numericalchange.

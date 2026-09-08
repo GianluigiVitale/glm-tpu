@@ -61,7 +61,7 @@ Target:10K prefill tok/s; unproved, no deadline guarantee.
 DB594 completedprefix/B128suffix3cases PASS;8/8clean; NOT independent full-layer.
 No more taps. PREFILL_COMPLETED_WINDOW_CANDIDATE.md.
 Maximize feasible prefill AND batch-one decode.
-Phase launch/trace/DB wired; next TPU profile after fresh preflights;
+Phase profile failed: Python trace overflow; corrected profiler next;
 PREFILL_THROUGHPUT_ACTION_PLAN.md. DB588:97.6% blockcall wall; no100%util claim.
 PREFILL_RESEARCH_V3_ADJUDICATION.md.
 Own8K/L7/L8/TTFT open.

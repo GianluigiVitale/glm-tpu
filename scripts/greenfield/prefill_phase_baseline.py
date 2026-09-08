@@ -406,7 +406,7 @@ def run_competitive(
         tiles=tiles,
         verify_component=verifier.component,
         verify_assembly=verifier.assembly,
-        trace_start=jax.profiler.start_trace,
+        trace_start=start_device_trace,
         trace_stop=jax.profiler.stop_trace,
     )
     calls.phase(
@@ -415,6 +415,16 @@ def run_competitive(
     calls.record["phase_trace_file"] = calls.phase(
         "phase_trace/finalize", lambda: finalize_trace(calls.root)
     )
+
+
+def start_device_trace(path: str) -> None:
+    """Reuse protected layer profiler settings; avoid Python-check event explosion."""
+    import jax
+
+    options = jax.profiler.ProfileOptions()
+    options.python_tracer_level = 0
+    # Keep host and device/HLO tracing at their original defaults.
+    jax.profiler.start_trace(path, profiler_options=options)
 
 
 def trace_groups(programs: dict[str, str]) -> dict[str, dict]:

@@ -77,7 +77,10 @@ def test_actual_nine_compiler_wk_sampler_and_trace_finalization(tmp_path, monkey
 
     monkeypatch.setattr(originals, "OriginalVerifier", Verifier)
 
-    def trace_start(path):
+    def trace_start(path, *, profiler_options):
+        defaults = jax.profiler.ProfileOptions()
+        assert profiler_options.python_tracer_level == 0
+        assert profiler_options.host_tracer_level == defaults.host_tracer_level
         Path(path).mkdir()
         (Path(path) / "fixture.xplane.pb").write_bytes(b"CPU fixture, not protobuf")
 

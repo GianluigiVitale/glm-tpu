@@ -2,6 +2,11 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+20:02Z reuse run_real_one_layer/run_gate_c_equivalence profiler setting:
+python_tracer_level=0, otherdefaults unchanged. Firstphaseprofile302c142c
+FAILED180s budget/3.425GBXSpace overflow; allsamplespreserved,8/8clean.
+Actualvoted-start option propagation testPASS11.50s; correctedprofile afterreview.
+
 19:49Z phase mode now adapts original acquisition/probe/campaign and DB wrapper.
 Exact five-model compile stack plus fourhelpers, typed PhaseJournal; one closed
 XPlane is hardlinked to fixed name, generation-bound original stream/NPZ and

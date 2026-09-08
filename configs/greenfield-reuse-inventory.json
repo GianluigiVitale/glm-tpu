@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-phase-profiler-options",
+      "category": "reuse protected device profiling without Python event explosion",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "302c142c6386618d3eb386e7722bd5ca73517380",
+      "source_paths": ["scripts/greenfield/run_real_one_layer.py", "scripts/greenfield/run_gate_c_equivalence.py", "scripts/greenfield/trace_pipeline_transport.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_phase_baseline.py", "tests/greenfield/hlo/test_prefill_phase_launch.py"],
+      "gate": "24: failed phase trace diagnosed; narrow correction before reviewed rerun",
+      "reason": "First phase run completed287calls but default Python tracing of host census/hashing exceeded180s and produced3.425GB XSpace, beyond protobuf2GB. PreserveFAILED and original unprofiled samples. Existing protected layer runners disable Python tracer only; reuse that setting with host/device/HLO defaults and budgets unchanged. Actual ninecompiler/voted-trace test validates propagation. No model arithmetic, tolerance or performance-claim change."
+    },
+    {
       "id": "ws32-prefill-phase-protected-launch",
       "category": "protected phase launch and original trace publication",
       "source_repo": "glm-tpu greenfield",

@@ -2,6 +2,13 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+20:02Z first phase run302c142c FAILED tracedbudget/3.425GB Python XSpace overflow,
+all287calls/10unprofiled samples preserved,8/8normal-rootclean. Exact8original
+runner sources and partialwall in prefill-phase-python-trace-refusal-20260908.json.
+Next corrected profiling using existing python_tracer_level=0; no model change
+or sealed performance claim. Actualoptionpropagation test/reviewerPASS; fresh
+preflights/persistence beforeonecorrectedbaseline. See HANDOFF.
+
 19:49Z phase launch/probe/trace/collector/DB integration CPU-complete. Actual
 eight-rank original-array/publication/collector/DB PASS30.36s;89focused tests
 PASS154.22s,2publication-cap cases/4reuse PASS. Independent conditional one
