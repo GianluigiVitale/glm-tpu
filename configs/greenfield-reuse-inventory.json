@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-boundary-diagnostic-worker",
+      "category": "bounded actual-operand capture and original failure reproduction",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "d661a477a7f6735c615187eae9012541221d9d49",
+      "source_paths": ["scripts/greenfield/prefill_window_worker.py", "scripts/greenfield/prefill_window_boundary.py", "scripts/greenfield/prefill_window_protocol.py", "scripts/greenfield/prefill_layer_evidence.py", "docs/artifacts/prefill-window-boundary-refusal-v2-20260908.json"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_window_boundary_worker.py", "scripts/greenfield/prefill_window_worker.py", "tests/greenfield/hlo/test_prefill_window_boundary_worker.py"],
+      "gate": "24: CPU-only diagnostic worker staged; collector/compiler/launcher integration and actual numerical capture pending",
+      "reason": "Reuse original completedWK and budgeted call/fleet-vote/finalization path with explicit defaultFalse diagnostic mode and DB591 budget injection. ExactlyoneB128/fourB32 controls carry original12 cache outputs, preserve individual original12 plus owner-local captures and BF16-bit manifests before fallible checks. Fixed original-v2 receipt binds32slot fingerprints and originalgeneration sources; fullfield hashes versus five-field signature reproduction remain separate, perturbation is not numericalPASS. Independent reviewer found missing new-capture finiteness; corrected after persistence, NaN/Inf healthy-output injections refuse aftercontrol0 with originals retained.34CPU cases pass including actual archived4owner fingerprint replay, cache carry and wrongscope preWK refusal. No new model/reference/precision/performance loop or TPU launch."
+    },
+    {
       "id": "ws32-prefill-boundary-db591-admission",
       "category": "fixed capture graph/schema and simultaneous numerical memory admission",
       "source_repo": "glm-tpu greenfield",

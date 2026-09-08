@@ -16877,3 +16877,34 @@ failedgenerations/32owners, savebothoriginal12outputs+capturesbeforefallible
 publication,2WK+1candidate+4causalcontrols only. Originalsignaturecomparison
 beforeattribution; nooldfailedcomparatorpromotion, noextraunacquiredroutergraph,
 no unchangedacquisition/fullmodeltrial. SeePREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md.
+
+## 2026-09-08 15:09Z — boundary-only numerical worker staged, not launched
+
+Startingd661a477 clean. Newprefill_window_boundary_worker.py providesdistinct
+diagnosticjournal/protocol, fixedv2receiptSHA bindingoriginal32slotfingerprints/
+generation sources, canonicalfixturehash check and1candidate+4causalcontrol
+executor. Existingexecute_numerical explicitboundary_diagnostic=False retains
+WKcompletion/fleetvotes/finalization; BudgetedCalls default remainsDB590, new
+modeinjectsDB591memorybudget. Newmodeearlyrefuseswrongprofile/protocol/scope/
+mesh beforeWK. All3caches carry actualoriginal12outputs, extrasneverstate.
+
+Original12savedfirst, allcapturebytesnext, thenschema/health/finiteness. BF16
+bitsuint16plusperfielddtype/shape/SHA; individualcontroloutputsretainedalongside
+stackedcontrol. Originalsignatureandall12fieldreproductionseparate; perturbation
+recordedwithoutnumericalPASS. IndependentAstrareviewP2: healthyfinaloutputs
+donotimplyfinitecapturednorm/routeroperands. Correctedafterpersistence; NaN/Inf
+withhealthyoriginalsrefuseaftercontrol0withbytesretained,nosuccessor/classification.
+ReviewerconditionalCPUpersistenceapproval; allconditionssatisfied.
+
+30CPUtests77.50s(newworker+historicalworker),4additionalearlyscopecases1.21s:
+34distinct/noneskipped;initial28suiteissuperseded,notadditive. Archivedoriginal
+rank0runner/NPZhashescheckedagainstgenerationreceipt;4owners×2pathsall12hashes
+reproduce,everyfieldmutationrefusescorrectreport. No newfleetdownloadclaimed.
+NoTPU/modelrun; last8/8cleanupDB59114:42:09Z. No largeartifact/checkpointcreated.
+
+NEXT independentoriginalNPZ/capturemanifest/callbudget/journalreplayconsumer,
+explicitnewmodeinexistingacquisition/probe/campaign/wrapper,composedtests/review,
+persist/mirror/freshpreflights,thenoneoriginalboundarycapture. Retaincurrent
+compilecallframes/sevenhost-coordinatenormalization; nonewacquisition. Current
+consumer/launcherremainunwired; doNOTcalloldwindow_evidenceonthediagnostic.
+Own8K/efficientfourdepthL7/L8/TTFT remainopen. Goalupdated<4000chars.

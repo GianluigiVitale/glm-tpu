@@ -253,3 +253,46 @@ fallible publication/comparison. Exactly2WK+1candidate+4causallycarried controls
 no numerical verdict from the old failed comparator. Compare original signatures
 first, report perturbation explicitly. Same-input replay is a separate graph
 requiring its own admission if later evidence calls for it. No launch yet.
+
+## 15:09Z — boundary-only capture worker staged, CPU only
+
+`prefill_window_boundary_worker.py` now provides the distinct diagnostic journal,
+fixed original-v2 receipt binding and boundary-case executor. It verifies the
+synthetic fixture against archived hashes, binds original fingerprint slots to
+the physical mesh (not device-id==slot), and retains original generation/CRC/SHA
+sources in the run record. Fingerprint comparison checks all12 fixed-shape/dtype
+outputs separately from the five signature fields. Perturbation is an explicit
+diagnostic outcome, never a numerical PASS or permission to attribute the old
+failure to a new boundary. Attribution must inspect relevant full-output matches.
+
+The existing numerical continuation gains an explicit defaultFalse diagnostic
+mode and reuses completedWK, per-call census/votes and journal finalization.
+BudgetedCalls receives the DB591 budget function, leaving the old default intact.
+Only1candidate+4controls execute after2WK. Each control carries actual original
+KV/unrepaired/repaired outputs; captured extras cannot replace cache state.
+Every original12 and captured operand is saved before health/schema checks;
+individual control originals remain alongside their concatenated comparison.
+BF16 captures use rawuint16 storage with dtype/shape/SHA manifest, no host fetch
+of global arrays. No same-input router program or timing sweep is dispatched.
+
+Independent Astra review found a missing finiteness check on new observations:
+healthy final outputs do not imply finite norm/router intermediates. Fixed after
+persistence for all BF16/F32 capture fields of this fully live128/32 fixture;
+original score padding is separate and legitimately contains negative infinity.
+Injected NaN/Inf with healthy originals refuses aftercontrol0, retains bytes,
+and dispatches no successor. Review clears CPU persistence after tests.
+
+Evidence:30tests77.50s (newcapture+historicalworker), plus4new early continuation
+scope/profile/protocol/mesh refusal tests1.21s;34distinct cases, none skipped.
+Archived original rank0's4owners×2paths reproduce all12 fingerprints against
+generation-bound runner/NPZ hashes; every-field mutations fail the right report.
+All32 original fingerprints remain bound by the reviewed v2 receipt; this step
+does not claim a new fleet download. Earlier28tests are superseded, not additive.
+
+NEXT: independent NPZ/manifest/7call/journal replay in the existing collector,
+then explicit compiler/worker/controller/wrapper mode wiring and composed tests.
+Preserve original acquire_programs compile frames so only the already-admitted
+seven host coordinates move. Mixed compile-only/numerical scopes must refuse.
+Review current integration, persist/mirror and fresh protected preflights before
+one bounded run. Last live model execution remains the13:25Z refusal; DB591 was
+compile-only. Own8K/efficientL7/L8/TTFT stayopen; no new numerical result.

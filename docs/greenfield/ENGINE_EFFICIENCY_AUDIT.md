@@ -800,3 +800,12 @@ capture fields. All-live budget includes67.8272MB resident code plus active
 outputs/scratch and retained capture/cache generations. Numerical peak remains
 unmeasured. Next existing-worker boundary-only diagnostic integration, not another
 graph acquisition or structural-proof expansion. No TPU launched in this step.
+
+Boundary diagnostic worker now reuses completedWK/budgeted calls with DB591
+profile and a fixed2WK+5modelcall protocol; not yet wired to launcher. Original12
+and owner-local captures are preserved before health/schema checks; v2 receipt
+fingerprints distinguish reproduction from instrumentation perturbation. Review
+caught a useful operand-health gap: finite outputs do not imply finite captured
+normalization/router statistics. New NaN/Inf tests preserve offending bytes and
+refuse before a successor.34CPU cases pass, review clears persistence. Collector
+and protected launch integration next; no new hardware/numerical/performance claim.

@@ -82,10 +82,12 @@ class BudgetedCalls:
         consensus: Callable[[bool], bool],
         journal: WindowNumericalJournal,
         local_slots: Mapping[int, int],
+        budgeter: Callable[..., dict[str, Any]] | None = None,
     ) -> None:
         self.root, self.record = root, record
         self.consensus, self.journal = consensus, journal
         self.local_slots = local_slots
+        self.budgeter = admission.memory_budget if budgeter is None else budgeter
         self.programs: dict[str, Any] = {}
         self.record["call_evidence"] = []
 
@@ -138,7 +140,7 @@ class BudgetedCalls:
                 local_slots=self.local_slots,
                 process_index=int(self.record["jax_process_index"]),
             )
-            budget = admission.memory_budget(census, analyses, active_graph=name)
+            budget = self.budgeter(census, analyses, active_graph=name)
             entry.update(census=census, compiled_memory=analyses, budget=budget)
             if not budget["estimate_fits"]:
                 raise ValueError("window predispatch memory reserve failed")
@@ -282,10 +284,17 @@ def execute_numerical(
     consensus: Callable[[bool], bool],
     compiled: tuple[Any, ...],
     journal: WindowNumericalJournal,
+    boundary_diagnostic: bool = False,
 ) -> None:
     """Execute only AFTER the original acquisition call chain compiled/admitted."""
     from scripts.greenfield.probe_ws32_prefill_layer import input_specs
 
+    selected_admission = admission
+    if boundary_diagnostic:
+        from scripts.greenfield import prefill_window_boundary_admission
+        from scripts.greenfield import prefill_window_boundary_worker as boundary
+
+        selected_admission = prefill_window_boundary_admission
     root = args.output_dir
     calls = BudgetedCalls(
         root=root,
@@ -293,6 +302,7 @@ def execute_numerical(
         consensus=consensus,
         journal=journal,
         local_slots=local_slots,
+        budgeter=selected_admission.memory_budget,
     )
     try:
 
@@ -300,11 +310,22 @@ def execute_numerical(
             if len(compiled) != 4 or set(record["programs"]) != set(admission.PROGRAMS):
                 raise ValueError("window continuation lacks four acquired programs")
             if (
-                record.get("profile") != admission.PROFILE
+                record.get("profile") != selected_admission.PROFILE
                 or record.get("compile_only") is not False
             ):
                 raise ValueError("window continuation requires numerical profile")
             calls.programs = dict(zip(admission.PROGRAMS, compiled))
+            if boundary_diagnostic:
+                if (
+                    record.get("protocol") != boundary.PROTOCOL
+                    or record.get("diagnostic_only") is not True
+                    or record.get("reference_scope") != boundary.REFERENCE_SCOPE
+                    or not isinstance(journal, boundary.BoundaryJournal)
+                ):
+                    raise ValueError("boundary continuation requires diagnostic scope")
+                record["original_binding"] = boundary.bind_originals(
+                    record, local_slots
+                )
 
         calls.phase("bind_compiled", bind)
 
@@ -366,7 +387,10 @@ def execute_numerical(
         calls.phase("wk_boundary", capture_wk)
         del decoded
         specs = calls.phase("input_specs", lambda: input_specs(weights, wk))
-        execute_cases(calls, weights=weights, wk=wk, mesh=mesh, specs=specs)
+        case_executor = (
+            boundary.execute_boundary_case if boundary_diagnostic else execute_cases
+        )
+        case_executor(calls, weights=weights, wk=wk, mesh=mesh, specs=specs)
         record["model_executable_calls"] = sum(
             e["completed"]
             for e in record["call_evidence"]
@@ -377,7 +401,10 @@ def execute_numerical(
             for e in record["call_evidence"]
             if e["graph"].startswith("wk_")
         )
-        calls.phase("numerical_complete", lambda: None)
+        calls.phase(
+            "boundary_complete" if boundary_diagnostic else "numerical_complete",
+            lambda: None,
+        )
     finally:
         from scripts.greenfield.prefill_window_acquisition import fleet_step
 

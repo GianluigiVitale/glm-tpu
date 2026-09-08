@@ -2,6 +2,13 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST15:09Z2026-09-08: boundary-only capture worker CPU-staged,34distinct
+tests pass; review P2 on capturedoperand finiteness fixed before persistence.
+Original12+capture bytes survive refusal; fixed v2generation/32slotfingerprints,
+DB591budget,2WK+5modelcalls only. No TPU launch or originalsignaturereproduction
+claimed. NEXT collector originalNPZ/manifest/call/journal replay and explicit
+compiler/controller/launcher integration. SeePREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md.
+
 LATEST14:57Z2026-09-08: fixed DB591 graph/schema and simultaneous-memory
 admission now passes50CPUtests, including all4original replays; independent
 Astra review noP0-P2. `prefill_window_boundary_admission.py` reuses old physical

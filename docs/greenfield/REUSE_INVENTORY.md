@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+15:09Z boundary-only worker staged: reuse completedWK, BudgetedCalls/fleet votes,
+save_arrays/local owner capture, fixed window fixture/three-cache control carry,
+and v2 original32slot fingerprints/generation sources. Distinct diagnostic mode
+defaults off; old numerical default unchanged. Original12 and capture manifests
+survive refusal; finite captures checked separately from original output health.
+34CPU cases pass, review clears persistence. Collector/compiler/launcher wiring
+and actual protected capture still pending; no new hardware/numerical result.
+
 DB591 fixed graph/schema and simultaneous-memory admission now passes CPU;
 `prefill_window_boundary_admission.py` adapts existing host-coordinate identity,
 paired collective schedule, FP32 combine checker and all-live budget. New model
