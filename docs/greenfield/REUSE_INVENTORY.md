@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+The whole-model route proof adapts `prefill_moe_precision_hlo.py` into indexed
+`benchmarking/ws32_batched_moe_hlo.py`, leaving historical single-layer checks
+unchanged. One computation/root index and exact entry liveness feed all75 scoped
+MoE combines, each traced to its own FP32 eight-route sum. Actual main/tail need
+no tuple-forwarding extension. The acquisition inventory now reports this narrow
+proof but remains UNREGISTERED; health/helper/cache-allocation admission and own
+numerical evidence are still required. Latest HANDOFF records local replay/tests.
+
 Per-compile diagnostic journal now reuses the existing worker graph writers and
 remote failure-diagnostic namespace. Fsynced compile memory/device snapshots
 precede raw HLO inspection; failure retains original exception and raw hashes.

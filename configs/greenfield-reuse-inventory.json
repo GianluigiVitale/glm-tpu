@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-all-layer-fp32-route-sum-hlo",
+      "category": "whole-model per-layer numerical boundary proof",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "1e33fe798bfa7d70fb3d65c8a12842482bc883f9",
+      "source_paths": ["scripts/greenfield/prefill_moe_precision_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_pallas_one_layer.py", "glm_tpu/greenfield/benchmarking/ws32_decoder.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py", "tests/greenfield/benchmarking/test_ws32_batched_moe_hlo.py"],
+      "gate": "24: per-layer FP32 route boundary only; full HLO/allocation profile stays UNREGISTERED",
+      "reason": "Adapt the historical single-layer SSA proof without changing it: index computations/roots once, require one live scoped combine per layer3..77, exact expert8 groups and F32 inputs, same-layer Bx8x1536 axis1 route sums, positive-zero F32 initializer and scalar F32 ADD reducers. Allow observed post-collective BF16 output rounding, never intervening BF16/original_type correction. Parameterize B17/B11 from captured main/tail; no speculative tuple forwarding. Missing/duplicate/dead/cross-layer/decoy/precision failures tested. Health/helper/cache ownership and numerical execution remain separate unfinished obligations. No TPU launch or model arithmetic change."
+    },
+    {
       "id": "ws32-batched-per-compile-diagnostic-journal",
       "category": "partial compiler evidence preservation",
       "source_repo": "glm-tpu greenfield",

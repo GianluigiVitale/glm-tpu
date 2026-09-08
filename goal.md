@@ -58,7 +58,7 @@ Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-dec
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB583 MoE/DB584 layer0/DB587 layer3 PASS; CPU composition/78-layer adapter PASS.
 133fe71f acquisition: all7 graphs/8 journals archived,8/8clean04:23Z Sep8.
-Expected HLO_REFUSED; no numerical execution. Main/tail memory preserved.
-Next actual-HLO/unique-buffer admission, numerical wiring and OWN §21.
+HLO_REFUSED; no model execution. Main/tail75 route proofs pass offline.
+Next health/helper/memory admission, numerical wiring and OWN §21.
 No acquisition/layer0/3 rerun. Targets/larger-row reuse open; pins in HANDOFF.
 Efficient L7/L8 open; speedup unmeasured.

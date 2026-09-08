@@ -213,3 +213,9 @@ then parameterize B and require all75 scoped FP32 route reductions. Health
 proof must follow subgroupMIN→predicate→commit/rollback/token sentinel, not labels.
 Next strict profiles and unique-buffer allocation budget, numerical wiring and
 own §21 short proof. This evidence does not require another acquisition launch.
+
+The indexed75-layer route-sum proof is implemented and replayed on both captured
+graphs.61focused tests including those original HLOs pass88.91s; independent CPU
+review noP0-P2. It deliberately leaves full-profile registration false. Next
+health/commit/rollback, exact compiler helpers/payloads and cache/repair/memory
+ownership checks; original single-layer guards and model arithmetic stay unchanged.

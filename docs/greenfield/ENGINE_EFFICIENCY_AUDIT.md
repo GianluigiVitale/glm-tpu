@@ -487,3 +487,10 @@ Use the actual unique physical buffer union plus active scratch/outputs/code;
 do not sum seven argument trees or extrapolate short-cache headroom to256K.
 Next strict whole-model profiles, own short numerical proof and phase budgets.
 Receipt `../artifacts/prefill-batched-seven-graph-acquisition-20260908.json`.
+
+Indexed whole-model FP32 route proof now passes original acquired B17/B11 graphs,
+each75 live scoped MoE combines. Computation/root index and live closure are built
+once, not75 times; exact F32 SSA/reducers/axis/zero/groups and layer coverage are
+checked.61focused tests88.91s,8historical/reuse tests3.02s, independent review noP0-P2.
+Only diagnostic inspection changes; model/worker unchanged, full profile remains
+UNREGISTERED. Next health/commit and helper/cache/memory admission, not another load.

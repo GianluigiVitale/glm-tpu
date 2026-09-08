@@ -15604,3 +15604,31 @@ refusal receipt instead of synthesizing success or invoking numerical recovery.
 Persistence checks: receipt JSON/44 unique names/32 unique device IDs and slots,
 claim flags, goal3998characters and git diff check PASS. Independent current
 docs/receipt audit found no P0-P2 and approved CPU evidence persistence only.
+
+## 2026-09-08 — indexed75-layer FP32 route HLO proof
+
+Starting1e33fe79; no TPU workflow since the complete acquisition. New
+`benchmarking/ws32_batched_moe_hlo.py` adapts the single-layer proof without
+changing its historical implementation. Index computations/roots once, consume
+the existing exact entry-live closure, require exactly75 unique layers3..77 and
+actual expert8 global groups. Each single F32 B×1536 input must resolve through
+F32-only SSA/fusion/parameter forwarding to THAT layer's B×8×1536 axis1 reduction,
+positive-zero F32 initializer and scalar F32 ADD route/expert reducers. Acquired
+BF16 collective result is the post-sum round, not evidence of a BF16 accumulator.
+No tuple forwarding guessed; unknown/dead/missing/duplicate/cross-layer paths refuse.
+
+Diagnostic `ws32_batched_prefill.py` now includes this narrow result but remains
+UNREGISTERED/passedFalse unconditionally. Health/commit, exact helper/payload
+inventory, cache/repair lineage and unique-buffer memory admission remain open;
+passing this proof never authorizes numerical execution or a new TPU acquisition.
+
+61testsPASS88.91s:27 fast mutation tests, original generation-bound mainB17 and
+tailB11 HLO replay (hashes from committed acquisition receipt), mode isolation and
+partial-journal regressions.8 historical one-layer/reuse checksPASS3.02s. An initial
+quoted-callee test expected a returned failure, but the reused live-closure guard
+already raised before reaching the new proof; the test now checks that refusal
+and separately tests the new binding guard. No production refusal weakened.
+Independent reviewer found no P0-P2, CPU persistence approved after both captured
+replays passed. No model/kernel/worker/wrapper change; no numerical/performance claim.
+Next finish health→atomiccommit/rollback/token SSA, exact helpers/payloads and
+cache/repair ownership/memory using acquired main/tail, then numerical wiring/§21.
