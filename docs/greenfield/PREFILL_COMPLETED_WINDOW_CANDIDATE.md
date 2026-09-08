@@ -164,3 +164,48 @@ from sealedcollector. Next register these fixed original graphs and simultaneous
 five-executable/live-prefix-output budget, then separately reviewed numerical
 protocol. No reacquisition or expanded symbolic proof. B128 suffix agreement
 on sharedcompletedprefixes still cannot certify independent full-layer DSA.
+
+## Fixed admission and staged numerical worker — 2026-09-08 17:10Z
+
+`prefill_completed_window_admission.py` registers the actual DB593 five graph
+pairs, allocations and physical paired payloads, reusing the established seven
+host-coordinate exception and actual FP32 route-sum checker. Allfive resident
+code bytes (25,306,624) plus live buffers and active outputs/scratch count toward
+the conservative1GiB-reserve estimate.51 CPU original-graph/report/mutation and
+memory tests PASS3.89s; independent review noP0-P2. No new compilation needed.
+
+`prefill_completed_window_worker.py` now stages the three existing cases in
+order: boundary505/128live, competitive2553/128live, tail2553/33live. Each executes
+four completed prefixes, one B128 suffix and four B32 suffixes (27 model calls;
+with the caller's two completedWK calls the fixed campaign will total29).
+It reuses BudgetedCalls and its pre/post-call memory/fleet phases. Every actual
+10-field prefix and4-field suffix is preserved before health/comparison; all
+prefix outputs remain device-resident for input assembly. The original caches
+remain proposals, not a committed decoder state. This broadens the illustrative
+single-case11-call recipe above into one fixed three-case protocol, not three
+separate acquisition campaigns. Stop on the first failure.
+
+`prefill_completed_window_protocol.py` independently reconstructs both12-field
+device assemblies from their saved components, verifies their byte identity,
+and applies the existing per-row output/route/cache bounds and ordered routes.
+The scope explicitly says SHARED_COMPLETED_PREFIX_SUFFIX_ONLY: shared DSA/cache
+equality is by construction, never independent full-layer or canonical-row proof.
+No reference/bounds change, original failure repair or performance claim.
+
+15CPU tests PASS146.03s exercise actual BudgetedCalls/journal/JSON/NPZ and replay
+with fixture executable math/device counters; cover allthree cases, malformed
+owners, wrong bindings, mutated component/assembly bytes, nonfinite prefix inputs,
+and preserved failure outputs before successors. They are not actual TPU numerical
+results. Existing CPU32 actual prefix/suffix arithmetic tests are unchanged and
+were not repeated. Reuse-registry4tests PASS1.86s. Independent review noP0-P2 for
+staged CPU persistence, NOT deployment.
+
+Remaining integration BEFORE launch: completedWK continuation in the SAME
+acquisition compile stack, distinct numerical mode, original journal/29-call and
+32-owner collector replay, protected wrapper/DB identity. Explicitly budget/check
+eager device assembly and its executable overhead, including the FINAL assembly
+peak (there is no later model call to catch it). The five main compiled analyses
+alone do not bound incidental eager assembly code. Do not mark runtime memory
+admitted from the CPU estimate. No numerical entry point or TPU launch added here.
+Inclusive prefix+assembly+suffix wall still needs its own performance protocol;
+this staged numerical-only worker's diagnostic intervals cannot promote speed.

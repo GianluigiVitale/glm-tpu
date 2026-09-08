@@ -872,3 +872,14 @@ No numericalpeak or performance measurement. Independent evidence review agrees:
 register these existingoriginals and simultaneous livebudget, then numerical
 protocol; no duplicate acquisition or symbolicproof expansion. Exact receipt
 prefill-completed-window-five-graph-acquisition-20260908.json bindsDB/archive.
+
+17:10Z: DB593 exact five-graph admission and live-budget tests pass51/3.89s;
+no new TPU acquisition. New staged case worker reuses BudgetedCalls, preserving
+every completed prefix/suffix before health/replay. Consumer reconstructs both
+12-field device assemblies from components, keeps unchanged bounds and explicit
+shared-prefix scope. Three cases,27modelcalls plus2WK once wired.15CPUtests
+146.03s pass actual journal/JSON/NPZ lifecycle with fixture math/counters; no TPU
+arithmetic or timing. Independent review clears staged persistence only.
+Next existing WK/compile/campaign/collector integration and eager assembly memory
+accounting, including last assembly peak. Allfive main code sizes alone do not
+bound incidental assembly executables. No new formal proof or model retry.

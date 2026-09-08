@@ -2,6 +2,16 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+DB593 fixed admission now reuses the original five graph pairs/allocations,
+seven-host-coordinate identity, physical paired payloads and FP32 route sum.
+51 CPU original/replay/mutation/live-budget tests pass; independent review clear.
+Completed-window case worker/protocol staged using existing BudgetedCalls,
+journals, fixtures and array bounds. Preserve each actual prefix/suffix before
+checks; rederive both device assemblies from original component bytes. Shared
+prefix DSA/cache agreement is BY CONSTRUCTION, not independent layer admission.
+No launcher or new compiler stack. Exact29-call WK/fleet/collector integration
+and preassembly/eager-executable memory accounting remain before deployment.
+
 DB593 now seals those five originalgraphs at2bb606cd,0WK/modelcalls,8/8clean.
 Reuse acquired rawpairs/allocations and existing FP32 route-sum proof; no
 another acquisition. Exactprofile and livebudget precede numericalprotocol.

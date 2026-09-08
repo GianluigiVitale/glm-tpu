@@ -17118,3 +17118,41 @@ budgetedcalls/selectedowneroriginalpublication, not anotherprotectionstack.
 No more acquisitions of unchangedgraphs, no symbolicproof expansion, no
 originalfailurecauseclaim. Own8K/efficientL7/L8/TTFT remainopen. Persist/mirror
 this receipt/status before advancing; last fullown2K isDB588, notthisacquisition.
+
+## 2026-09-08 17:10Z — DB593 admission and completed-window numerical cases staged
+
+Previous user reply was status only (no progress). This continuation registers
+the actual DB593 five graph pairs and compiler allocations in
+scripts/greenfield/prefill_completed_window_admission.py. Reuses seven exact host
+coordinates, physical paired collective parser and FP32 suffix route-sum proof.
+Allfive code25,306,624B plus actual live buffers/active outputs/scratch under1GiB
+reserve.51testsPASS3.89s, actual original graphs required (no skipped admission),
+JSON roundtrip/type mutation, role/hash/allocation drift and retained-memory tests.
+
+New prefill_completed_window_worker.py/protocol.py stage THREE cases from the
+existing window fixture: boundary, competitive, tail.4prefix+1wide+4narrow each,
+27modelcalls plus2WK at future entry. Actual10prefix/4suffix components saved
+before health/comparison, host replay reconstructs12 device assemblies and binds
+their bytes. Uses existing bounded comparison unchanged, but scope explicitly
+shared-prefix/suffix-only, not independent DSA/full-layer PASS or original repair.
+All actual model inputs remain device arrays; host copies are evidence only.
+15testsPASS146.03s exercising actual BudgetedCalls/journal/JSON/NPZ with fixture
+math/device counters, allthreecases and early-failure preservation/mutations.
+No production CPU32 arithmetic source changed; its cleared tests not repeated.
+Reuse4testsPASS1.86s; formatting/diffcheck clean. Existing independent Astra
+review noP0-P2 in both bounded deltas; CPU persistence only, NOT deployment.
+
+NEXT: wire completedWK continuation through SAME original acquisition compile
+chain, distinct numerical mode and strict29-call/journal/32-owner original-array
+collector+wrapper/DB identity. Budget eager assembly and incidental executable
+overhead, including final assembly peak (no following model call catches it).
+Five main compiled analyses are not complete eager-code accounting. No another
+DB593 acquisition, generic symbolic proof, precision/refactor experiment or
+fullmodel/longcontext launch. Current worker has no launch/compile entry point.
+Its diagnostic call times are not inclusive performance; prefix+assembly+suffix
+wall remains separate required proof. Own8K/efficientL7/L8/TTFT remainOPEN.
+
+No TPU launched or infrastructure managed this turn. Last authenticated8host
+normal/root post remainsDB59316:47:58Z; local process check17:09Z no model/
+controller. Source branch rewrite/topology-first-decode, ownorigin only. Current
+goal3995chars. Persist/push then verify same-region repo mirror before advancing.

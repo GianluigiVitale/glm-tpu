@@ -2,6 +2,14 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST17:10Z: DB593 fixed graph/live-budget registration CPU PASS51tests3.89s;
+completed-prefix numerical worker/original-component replay staged PASS15tests
+146.03s (fixture math/counters, actual BudgetedCalls/journal/JSON/NPZ). Reuse4PASS.
+Independent review noP0-P2 for CPU persistence. No new TPU execution. See
+PREFILL_COMPLETED_WINDOW_CANDIDATE.md. Next SAME-stack WK/numerical/fleet/29-call
+collector integration and eager assembly/final-peak budget, not reacquisition.
+Shared-prefix equality is not independent layer/DSA proof; no speed promotion.
+
 LATEST16:47:58Z: DB593 completed-window FIVEgraph acquisition sealed at2bb606cd,
 98s worker/collector, zeroWK/modelcalls, normal/root8/8clean. Receipt
 `../artifacts/prefill-completed-window-five-graph-acquisition-20260908.json`

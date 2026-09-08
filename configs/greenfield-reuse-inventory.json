@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-completed-window-admission-worker",
+      "category": "fixed five-graph admission and completed-component numerical replay",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "1f9a3ef66459d26c01770eaefe4ead53eb5b2cde",
+      "source_paths": ["scripts/greenfield/prefill_window_locations.py", "scripts/greenfield/prefill_moe_precision_hlo.py", "glm_tpu/greenfield/validation/ws32_prefill_memory.py", "scripts/greenfield/prefill_window_worker.py", "scripts/greenfield/prefill_window_protocol.py", "scripts/greenfield/prefill_completed_window.py", "docs/artifacts/prefill-completed-window-five-graph-acquisition-20260908.json"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_completed_window_admission.py", "scripts/greenfield/prefill_completed_window_protocol.py", "scripts/greenfield/prefill_completed_window_worker.py", "tests/greenfield/hlo/test_prefill_completed_window_admission.py", "tests/greenfield/hlo/test_prefill_completed_window_worker.py"],
+      "gate": "24: DB593 fixed graph/live-budget CPU admission and staged case worker; no deployment or numerical result",
+      "reason": "Exact receipt and raw graphs except existing seven host coordinates; actual compiler allocations, paired physical payloads and FP32 suffix combines. All five resident code allocations plus live buffers/active outputs/scratch, no numerical peak claim. Reuse actual BudgetedCalls/journal/fixture/bounds for three cases of four completed prefixes, one wide and four narrow suffixes. Preserve original components before checks; independent replay reconstructs12 device outputs and explicitly marks shared-prefix DSA/cache agreement by construction. No original failure repair, full-layer admission or speed claim. Existing WK/fleet/collector integration and eager assembly code/preassembly/final-peak accounting remain mandatory; no duplicate acquisition or new symbolic proof. Independent review clears staged CPU persistence subject to tests."
+    },
+    {
       "id": "ws32-prefill-completed-window-acquisition",
       "category": "five-program compile-only protected integration",
       "source_repo": "glm-tpu greenfield",
