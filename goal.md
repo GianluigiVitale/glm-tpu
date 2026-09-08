@@ -62,4 +62,4 @@ DB589 MoE B128 baseline PASS:3.33x distributed/1.28x concentrated;8/8clean.
 PREFILL_COST_MODEL.md has evidence. Next B128 layer-window CPU/real-layer test,
 <=32 attention/DSA tiles/M64 repair; then remaining phase budgets/targets.
 PREFILL_SHORT_NUMERICAL_ADMISSION.md; no cleared reruns.
-L7/L8 open; speedup unmeasured.
+L7/L8 open; no model speedup.
