@@ -55,6 +55,7 @@ from scripts.greenfield.prefill_layer_evidence import (
 )
 from scripts.greenfield.prefill_layer_hlo import check_layer_hlo
 from scripts.greenfield import prefill_materialized_reference as materialized_ref
+from scripts.greenfield import prefill_prefix_mlp_protocol as prefix_mlp_protocol
 from glm_tpu.greenfield.partitioning.source_inventory import (
     SourceInventory,
     inspect_source_inventory,
@@ -82,7 +83,11 @@ def authenticated_inventory(path: Path, expected_sha256: str) -> SourceInventory
 def layer_from_tag(tag: str) -> int:
     from scripts.greenfield.prefill_router_protocol import is_router_tag
 
-    if is_router_tag(tag) or materialized_ref.is_materialized_tag(tag):
+    if (
+        is_router_tag(tag)
+        or materialized_ref.is_materialized_tag(tag)
+        or prefix_mlp_protocol.is_prefix_mlp_tag(tag)
+    ):
         return 3
     match = re.fullmatch(
         r"greenfield_fp8_ws32_prefill_layer_admission_l([03])_[a-zA-Z0-9_]+", tag
@@ -299,14 +304,19 @@ def main() -> int:
     )
     from scripts.greenfield import prefill_router_protocol as router_protocol
 
-    diagnostic = router_protocol.is_router_tag(tag)
+    prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)
+    diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
     materialized = materialized_ref.is_materialized_tag(tag)
     record = dict(
         status="RUNNING",
         protocol=(
-            router_protocol.PROTOCOL
-            if diagnostic
-            else materialized_ref.PROTOCOL if materialized else PROTOCOL
+            prefix_mlp_protocol.PROTOCOL
+            if prefix_mlp
+            else (
+                router_protocol.PROTOCOL
+                if diagnostic
+                else materialized_ref.PROTOCOL if materialized else PROTOCOL
+            )
         ),
         layer=layer,
         code_hash=args.expected_code_hash,
@@ -329,7 +339,11 @@ def main() -> int:
         reference_scope=(
             materialized_ref.REFERENCE_SCOPE
             if materialized
-            else "RAW_SCALAR_NOT_PROMOTED_DECODER_OR_LEGACY"
+            else (
+                prefix_mlp_protocol.REFERENCE_SCOPE
+                if prefix_mlp
+                else "RAW_SCALAR_NOT_PROMOTED_DECODER_OR_LEGACY"
+            )
         ),
         state_scope="REAL_WEIGHTS_SYNTHETIC_PREFIX_AND_ACTIVATIONS",
     )
@@ -448,8 +462,13 @@ def main() -> int:
         phase("selected_load_seconds", started)
         from scripts.greenfield.prefill_router_protocol import is_router_tag
 
-        if is_router_tag(tag):
-            from scripts.greenfield.prefill_router_worker import execute_diagnostic
+        if diagnostic:
+            if prefix_mlp:
+                from scripts.greenfield.prefill_prefix_mlp_worker import (
+                    execute_diagnostic,
+                )
+            else:
+                from scripts.greenfield.prefill_router_worker import execute_diagnostic
 
             execute_diagnostic(
                 args=args,

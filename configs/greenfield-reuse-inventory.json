@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-db585-prefix-completed-mlp",
+      "category": "bounded two-program reference boundary diagnostic",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "2bdf7bd574afbcc5927069a4ff76ecf7df95452e",
+      "source_paths": ["scripts/greenfield/prefill_router_boundary.py", "scripts/greenfield/prefill_router_worker.py", "scripts/greenfield/prefill_materialized_reference.py", "scripts/greenfield/ws32_prefill_layer_campaign.py"],
+      "disposition": "direct_reuse",
+      "greenfield_consumers": ["scripts/greenfield/prefill_prefix_mlp_protocol.py", "scripts/greenfield/prefill_prefix_mlp_worker.py", "tests/greenfield/hlo/test_prefill_prefix_mlp.py"],
+      "gate": "24: original32-owner fingerprint replay and CPU schema/tests; bounded hardware discriminator pending, not numerical admission",
+      "reason": "Keep exact scalar prefix all12 outputs; verify full17-row BF16 input and all observed fields against receipt-bound DB585 originals before existing scalar MLP consumes completed device output0/9. OwnKV output10, no host input reconstruction or route override. Distinct fused-prefix and standalone scalar route expectations. Two programs, no repeated candidate/router baseline or full-layer reference assembly. Reuse loader/guards/generation publisher/DB NULL diagnostic. PREattention norm remains unobserved."
+    },
+    {
       "id": "ws32-prefill-materialized-bf16-reference",
       "category": "bounded untimed scalar reference realization v2",
       "source_repo": "glm-tpu greenfield",

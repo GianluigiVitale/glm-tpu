@@ -18,7 +18,7 @@ tpu_info._get_tpu_info=lambda:tpu_info.TpuInfo.from_tpu_info_for_chip(tpu_info.C
 tpu_info.get_tpu_info.cache_clear()
 from scripts.greenfield.probe_ws32_prefill_layer import input_specs,device_inputs,scalar_inputs,build_wk_programs
 from scripts.greenfield.prefill_layer_programs import build_layer_programs
-from scripts.greenfield.prefill_router_boundary import build_router_prefix_program
+from scripts.greenfield.prefill_router_boundary import build_router_prefix_program,scalar_prefix_inputs
 from scripts.greenfield.prefill_materialized_reference import build_materialized_reference,assemble_reference_result
 from scripts.greenfield.prefill_layer_evidence import host_case,mutate_case
 from scripts.greenfield.run_short_decoder_ws32 import _geometry
@@ -87,6 +87,12 @@ for layer in (0,3):
             assert all(result[i].shape==(rows,6144) for i in (7,8,9))
             assert result[10].shape==(8,2,64,640)
             assert result[11].shape==(8,4,rows)
+            if not batched:
+                assert scalar_prefix_inputs(values,9,result)[2] is result[10]
+                mlp_from_original=jax.eval_shape(suffix,result[0],result[9],values[15],values[17])
+                assert len(mlp_from_original)==3
+                assert mlp_from_original[0].shape==(1,6144)
+                assert mlp_from_original[1].shape==mlp_from_original[2].shape==(1,8)
             graph=str(jax.make_jaxpr(fn)(*args))
             assert 'greenfield_prefill_grouped_raw_fp8' not in graph
 print('REAL_SCHEMA_CPU32_WORKER_TREE_PASS')

@@ -111,3 +111,34 @@ BF16 output0 with the existing MLP. Prefix router IDs cannot override the suffix
 This remains a boundary diagnostic, NOT immediate authorization for another full-layer
 trial. DB585 prefix does not expose pre-attention normalization: future full-reference
 assembly cannot relabel its post-attention output as that missing observation.
+
+## DB585 prefix → completed MLP discriminator (not v3 layer admission)
+
+Distinct kernel `ws32_prefill_prefix_mlp_diagnostic`, protocol
+`ws32-prefill-db585-prefix-completed-mlp-v1`. Only TWO graphs: unchanged DB585
+scalar prefix with all12 outputs (campaign graph name `candidate`, explicitly NOT
+a batched candidate), and the existing v2 scalar MLP suffix (`reference`). The
+unused v2 prefix builder is not compiled or executed. No repeated candidate/M17
+router run is needed: their completed-input evidence already exists in DB585.
+
+`prefill_prefix_mlp_protocol.py` derives a compact fixture from all8 original NPZ
+and runner files, each checked against the generation/size/CRC/SHA receipts in
+the pinned DB585 analysis. It records hashes of ALL12 captured prefix fields per
+logical owner, plus the two different complete17x8 route signatures. Original
+fused-prefix routes have41-before98 at row4; completed-input scalar replay has
+98-before41. These are different expected observations, not route overrides.
+
+`prefill_prefix_mlp_worker.py` retains all17 completed device result tuples and
+carries its own KV through output10. After preserving prefix captures, every host
+must reproduce all12-field fingerprints, fixed inputs and checkpoint-bound router
+weights; a fleet consensus precedes ANY MLP execution. The suffix receives the
+same resident output0 and output9 arrays directly, never a host reconstruction.
+Archive actual suffix inputs, finite outputs and routes/weights. Refuse changed
+input bytes, changed expected route order or replica disagreement. MLP outputs
+are not compared against a full-layer oracle, so no bounded output admission is
+claimed. Correctness/latency remain NULL in DB, regardless of diagnostic success.
+
+Original v1/v2 failures and thresholds remain unchanged. A successful result
+would establish this specific reference boundary only. Full-layer reference
+assembly still owes actual PREattention normalization, then all original layer
+cases/interventions and the short decoder's independent §21 proof.

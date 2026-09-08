@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+New boundary-only `prefill_prefix_mlp_{protocol,worker}.py` directly reuses the
+UNCHANGED DB585 scalar prefix/all12 outputs and the existing materialized scalar
+MLP suffix. Two graphs only; retains17 completed device tuples, ownKV output10,
+all32 original-owner fingerprints before suffix input0/9 execution. Distinct
+diagnostic campaign/kernel/DB identity; no candidate rerun or fake PREnorm.
+All32 original captured fingerprints replay offline. Hardware result pending.
+
 V2 materialized reference now refused sameboundaryrow4, but CPUFP64 exactly reproduces
 its entire17x8 suffixroute array on capturedinputs32owners. Prefix produced20963 BF16
 values different from DB585. Next boundeddiscriminator must preserve originalDB585

@@ -15174,3 +15174,27 @@ loosen route thresholds, or try compiler barriers blindly. DB585 prefix lacks PR
 norm in its outputs; a future full-layer reference must resolve that observation honestly,
 not substitute zeros/candidate values or pretend output0 is preattention normalization.
 No TPU/controller live. Original goal/efficient short decoder/L7/L8 still open.
+
+## 2026-09-08 — exact DB585 prefix→MLP diagnostic ready
+
+Distinct `ws32_prefill_prefix_mlp_diagnostic`, layer3 only. Two programs: unchanged
+DB585 scalar prefix/all12 outputs (`candidate` in generic campaign file naming),
+existing scalar MLP (`reference`). Retain17 completed device tuples, ownKV output10.
+All-host exact prefix fingerprints gate suffix execution on resident output0/9.
+The compact preregistered fixture derives from all8 DB585 NPZ/runner files checked
+against the pinned analysis's generation-bound original receipts, covers32 owners
+and distinguishes original fused-prefix routes from completed-input replay routes.
+No repeated batched candidate/router run, input host reconstruction, route override,
+fake PREnorm, new full checkpoint or numerical-threshold change.
+
+183CPU regressions18.34s PASS plus4 reuse tests1.80s. Actual20-field CPU32 tracing
+covers original12-output prefix→suffix and output10KV carry. All32 original-owner
+fingerprints regenerate/replay exactly offline; both captured original HLO guards
+pass. Independent Astra current-diff review: no P0-P2, permits ONE bounded launch
+after clean persistence/mirror and fresh wrapper guards. Hardware result pending.
+
+Next command (only via existing dual-lease, normal/root-census wrapper):
+`GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_prefix_mlp_diagnostic GLM_GREENFIELD_PREFILL_LAYER=3 bash scripts/greenfield/run_fp8_matmul_microbench.sh`.
+Correctness/latency NULL in DB; successful diagnostic is NOT full-layer admission
+or a compiler-cause proof. If fingerprints refuse, suffix does not run and originals
+remain preserved. Full-layer reference PREattention observation remains unresolved.

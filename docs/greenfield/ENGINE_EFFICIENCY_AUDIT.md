@@ -410,3 +410,11 @@ the completed suffix is not the current discrepancy: prefix realization changed.
 Both graphs contain BF16 casts; hardware cast omission remains unproved. Preserve
 failedv2 and test exact DB585 observable prefix reproduction before any further layer
 admission. No threshold relaxation, blind barrier trials or long full-model run.
+
+The next discriminator now uses only TWO existing programs: exact DB585 scalar
+prefix/all12 outputs plus completed-input scalar MLP. All17-row per-owner input
+and observed-field hashes must reproduce on every host before suffix execution.
+This avoids rerunning the candidate/router baselines already sealed in DB585.
+183CPU regressions plus4 reuse tests pass, original32-owner fingerprints replay,
+and independent Astra current-diff review finds no P0-P2. Hardware result pending;
+full-layer reference assembly, short decoder and E1/TTFT remain open.
