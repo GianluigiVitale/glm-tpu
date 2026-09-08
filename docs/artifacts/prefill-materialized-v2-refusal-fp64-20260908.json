@@ -1,0 +1,1278 @@
+{
+  "analysis_source_sha256": "59564d88251495123526303157325439a00a9601e055a1bc8f3559797d7da6b0",
+  "diagnostic_only": true,
+  "empty_pass32": true,
+  "fp64_row4_margin41_minus98": 4.113220306578569e-06,
+  "fp64_row4_routes": [
+    166,
+    117,
+    233,
+    223,
+    37,
+    41,
+    98,
+    15
+  ],
+  "fp64_scope": "CAPTURED_BF16_INPUT_AND_CHECKPOINT_ROUTER_WEIGHTS_NOT_FULL_FORWARD",
+  "hlo_sha256": {
+    "candidate": "9089e995d74b6cedc0c5ac4765b98aa1d5af0023e11a00d609b26595724b7e98",
+    "reference": "171462d1a1253adababde2557eabf89e3b85aaa9fc9c48f5cf9562173e5abe74",
+    "reference_prefix": "90f762af998d93f13f9db613fa2eff9e5ed8e533ad61f61ed0e4b68d55c59c2a"
+  },
+  "numerical_admission": false,
+  "owners": {
+    "0": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5294,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 307,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "1": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5285,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 314,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "10": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5300,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 325,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "11": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5084,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 284,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "12": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5294,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 307,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "13": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5285,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 314,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "14": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5300,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 325,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "15": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5084,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 284,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "16": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5294,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 307,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "17": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5285,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 314,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "18": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5300,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 325,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "19": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5084,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 284,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "2": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5300,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 325,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "20": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5294,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 307,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "21": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5285,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 314,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "22": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5300,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 325,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "23": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5084,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 284,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "24": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5294,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 307,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "25": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5285,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 314,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "26": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5300,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 325,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "27": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5084,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 284,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "28": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5294,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 307,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "29": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5285,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 314,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "3": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5084,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 284,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "30": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5300,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 325,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "31": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5084,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 284,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "4": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5294,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 307,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "5": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5285,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 314,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "6": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5300,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 325,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "7": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5084,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 284,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "8": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5294,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 307,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    },
+    "9": {
+      "candidate_reference_route_differences": [
+        [
+          4,
+          5
+        ],
+        [
+          4,
+          6
+        ]
+      ],
+      "input_diff_vs_db585": 5285,
+      "reference_fp64_route_differences": [],
+      "row4_input_diff": 314,
+      "row4_reference": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        41,
+        98,
+        15
+      ]
+    }
+  },
+  "performance_claim": false,
+  "pin": "e7ba4a9eca914d80fb12254dff283521544d39d5",
+  "tag": "greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z",
+  "verified_original_receipts": [
+    {
+      "ledger_generation": "1788829006582986",
+      "ledger_sha256": "43e351adb223b1df2e885283ebcc62789d4141ea2c625e0834bc6159d08735d4",
+      "originals": [
+        {
+          "crc32c": "KyRozw==",
+          "generation": "1788829004423407",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank0/runner.json",
+          "original_sha256": "4fcd052f1342a3a5938c4deae4fbb84264eb2e00ddea9c8c7c23b613edf21cd5",
+          "size": 772148
+        },
+        {
+          "crc32c": "JBJZyg==",
+          "generation": "1788829005133373",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank0/candidate.optimized_hlo.txt",
+          "original_sha256": "9089e995d74b6cedc0c5ac4765b98aa1d5af0023e11a00d609b26595724b7e98",
+          "size": 1395581
+        },
+        {
+          "crc32c": "H75Yhw==",
+          "generation": "1788829005436683",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank0/reference_prefix.optimized_hlo.txt",
+          "original_sha256": "90f762af998d93f13f9db613fa2eff9e5ed8e533ad61f61ed0e4b68d55c59c2a",
+          "size": 369777
+        },
+        {
+          "crc32c": "HelCIg==",
+          "generation": "1788829005779108",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank0/reference.optimized_hlo.txt",
+          "original_sha256": "171462d1a1253adababde2557eabf89e3b85aaa9fc9c48f5cf9562173e5abe74",
+          "size": 653908
+        },
+        {
+          "crc32c": "cHcJBg==",
+          "generation": "1788829005945844",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank0/empty.npz",
+          "original_sha256": "37cc6184cdc43133b1d37c2f4c115360572ab46eb920472888af576a04cd472b",
+          "size": 1367475
+        },
+        {
+          "crc32c": "Sd+KhA==",
+          "generation": "1788829006133463",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank0/boundary.npz",
+          "original_sha256": "b90dd0d9dfc8cc299560dedac475262f143a585b5b6668c7acf245bef03098f3",
+          "size": 2723769
+        },
+        {
+          "crc32c": "AtGKMA==",
+          "generation": "1788829006438048",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank0/boundary.reference_input.npz",
+          "original_sha256": "73a693646ecbee732ac25a10bb976f87ab23a414575a447c322fa61cf7103dd3",
+          "size": 167606
+        }
+      ],
+      "rank": 0
+    },
+    {
+      "ledger_generation": "1788829006624767",
+      "ledger_sha256": "30de2113261667226e806b2e9d305cc8d7652f9982c556eb6ba39d1bab001715",
+      "originals": [
+        {
+          "crc32c": "4K4nTQ==",
+          "generation": "1788829004441696",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank1/runner.json",
+          "original_sha256": "71b7aa649bbd1957ec187a50be29e692a9279062521756cdd91e238d39f8b425",
+          "size": 772965
+        },
+        {
+          "crc32c": "JBJZyg==",
+          "generation": "1788829005159325",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank1/candidate.optimized_hlo.txt",
+          "original_sha256": "9089e995d74b6cedc0c5ac4765b98aa1d5af0023e11a00d609b26595724b7e98",
+          "size": 1395581
+        },
+        {
+          "crc32c": "H75Yhw==",
+          "generation": "1788829005503944",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank1/reference_prefix.optimized_hlo.txt",
+          "original_sha256": "90f762af998d93f13f9db613fa2eff9e5ed8e533ad61f61ed0e4b68d55c59c2a",
+          "size": 369777
+        },
+        {
+          "crc32c": "HelCIg==",
+          "generation": "1788829005791415",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank1/reference.optimized_hlo.txt",
+          "original_sha256": "171462d1a1253adababde2557eabf89e3b85aaa9fc9c48f5cf9562173e5abe74",
+          "size": 653908
+        },
+        {
+          "crc32c": "WXDQSg==",
+          "generation": "1788829005948256",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank1/empty.npz",
+          "original_sha256": "d2a5d706be5e72007d04465fd7765349854a5ae17c30411fba6930e85ff44b7e",
+          "size": 1366151
+        },
+        {
+          "crc32c": "UHidVg==",
+          "generation": "1788829006188978",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank1/boundary.npz",
+          "original_sha256": "f3869c247766f34f54c25aa21f4c4fd720ac769ecfd0276e08bffe1e54082911",
+          "size": 2723845
+        },
+        {
+          "crc32c": "+rm6nw==",
+          "generation": "1788829006501613",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank1/boundary.reference_input.npz",
+          "original_sha256": "15eeb1e60b8e70dcdf59317c95fec2238de2b9f73e58906112b2c201eabe5e5d",
+          "size": 167398
+        }
+      ],
+      "rank": 1
+    },
+    {
+      "ledger_generation": "1788829006530628",
+      "ledger_sha256": "2a3c078f1de06b942f235e933c46b316637ee14215ee20657283a8a4f8662dde",
+      "originals": [
+        {
+          "crc32c": "x+afIg==",
+          "generation": "1788829004432964",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank2/runner.json",
+          "original_sha256": "a829988f651395174dceaff8d1c4c3e43b5122028f70726584d0361a1ac50477",
+          "size": 771855
+        },
+        {
+          "crc32c": "JBJZyg==",
+          "generation": "1788829005147866",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank2/candidate.optimized_hlo.txt",
+          "original_sha256": "9089e995d74b6cedc0c5ac4765b98aa1d5af0023e11a00d609b26595724b7e98",
+          "size": 1395581
+        },
+        {
+          "crc32c": "H75Yhw==",
+          "generation": "1788829005475202",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank2/reference_prefix.optimized_hlo.txt",
+          "original_sha256": "90f762af998d93f13f9db613fa2eff9e5ed8e533ad61f61ed0e4b68d55c59c2a",
+          "size": 369777
+        },
+        {
+          "crc32c": "HelCIg==",
+          "generation": "1788829005782505",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank2/reference.optimized_hlo.txt",
+          "original_sha256": "171462d1a1253adababde2557eabf89e3b85aaa9fc9c48f5cf9562173e5abe74",
+          "size": 653908
+        },
+        {
+          "crc32c": "VAgGJQ==",
+          "generation": "1788829005930134",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank2/empty.npz",
+          "original_sha256": "9d7957aeea700380734e29a3fc8fcfa1fd170043cca997aa1da2933d9f87f308",
+          "size": 1366227
+        },
+        {
+          "crc32c": "Efu3ug==",
+          "generation": "1788829006097054",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank2/boundary.npz",
+          "original_sha256": "224c877cf9f428746fc570fe779d9ccc26d98b696f1a314215fbd8b6588514ae",
+          "size": 2723229
+        },
+        {
+          "crc32c": "K01rHw==",
+          "generation": "1788829006394158",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank2/boundary.reference_input.npz",
+          "original_sha256": "f2e2a1c63e8dd4eb380bfc3e7f31885067f81126b4225e978a89c65c79154379",
+          "size": 167566
+        }
+      ],
+      "rank": 2
+    },
+    {
+      "ledger_generation": "1788829006570183",
+      "ledger_sha256": "63216ca828d37ed289e63beb9a148bc880f084bf2628348784692c91bdde029e",
+      "originals": [
+        {
+          "crc32c": "XZ9JKA==",
+          "generation": "1788829004376897",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank3/runner.json",
+          "original_sha256": "139f04a1898dcc69101125407cb80ca6698fb2b2a286b306b5315f41f7331b42",
+          "size": 804364
+        },
+        {
+          "crc32c": "JBJZyg==",
+          "generation": "1788829005059240",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank3/candidate.optimized_hlo.txt",
+          "original_sha256": "9089e995d74b6cedc0c5ac4765b98aa1d5af0023e11a00d609b26595724b7e98",
+          "size": 1395581
+        },
+        {
+          "crc32c": "H75Yhw==",
+          "generation": "1788829005428084",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank3/reference_prefix.optimized_hlo.txt",
+          "original_sha256": "90f762af998d93f13f9db613fa2eff9e5ed8e533ad61f61ed0e4b68d55c59c2a",
+          "size": 369777
+        },
+        {
+          "crc32c": "HelCIg==",
+          "generation": "1788829005740029",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank3/reference.optimized_hlo.txt",
+          "original_sha256": "171462d1a1253adababde2557eabf89e3b85aaa9fc9c48f5cf9562173e5abe74",
+          "size": 653908
+        },
+        {
+          "crc32c": "rqiDyA==",
+          "generation": "1788829005906093",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank3/empty.npz",
+          "original_sha256": "75c793883eb505105bd282d5a59a4770e32a4832ae70800d20b4243b26af9cdf",
+          "size": 1400865
+        },
+        {
+          "crc32c": "JPySnQ==",
+          "generation": "1788829006111003",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank3/boundary.npz",
+          "original_sha256": "23d915d989615fa27f1677d9265b3357fb35cd2e5ffc327f949ec64e1e33db84",
+          "size": 2748203
+        },
+        {
+          "crc32c": "v6uZCA==",
+          "generation": "1788829006439195",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank3/boundary.reference_input.npz",
+          "original_sha256": "11bc088556a71d4e467fbf2771d041d5b34ee83c179cd75cdfb55fcd17d3e3b7",
+          "size": 167602
+        }
+      ],
+      "rank": 3
+    },
+    {
+      "ledger_generation": "1788829006677086",
+      "ledger_sha256": "1995dddbcdde6ce6b4e3b6c19f5dacf4584f1977ce1ed067b89bcca4b70eb3d8",
+      "originals": [
+        {
+          "crc32c": "7JrpYA==",
+          "generation": "1788829004414445",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank4/runner.json",
+          "original_sha256": "516e6eeca3a6ed9f4c11fc7ab0cb43332acbb0d0b3ca0dac13e9a8f5772f60f3",
+          "size": 804078
+        },
+        {
+          "crc32c": "JBJZyg==",
+          "generation": "1788829005091643",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank4/candidate.optimized_hlo.txt",
+          "original_sha256": "9089e995d74b6cedc0c5ac4765b98aa1d5af0023e11a00d609b26595724b7e98",
+          "size": 1395581
+        },
+        {
+          "crc32c": "H75Yhw==",
+          "generation": "1788829005429473",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank4/reference_prefix.optimized_hlo.txt",
+          "original_sha256": "90f762af998d93f13f9db613fa2eff9e5ed8e533ad61f61ed0e4b68d55c59c2a",
+          "size": 369777
+        },
+        {
+          "crc32c": "HelCIg==",
+          "generation": "1788829005746569",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank4/reference.optimized_hlo.txt",
+          "original_sha256": "171462d1a1253adababde2557eabf89e3b85aaa9fc9c48f5cf9562173e5abe74",
+          "size": 653908
+        },
+        {
+          "crc32c": "ZJw1xg==",
+          "generation": "1788829005964805",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank4/empty.npz",
+          "original_sha256": "40a11d8a29b40442b3b259f68c239219a21fb626690d24ec107eccdbb6b09c60",
+          "size": 1399713
+        },
+        {
+          "crc32c": "8rE6ng==",
+          "generation": "1788829006190159",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank4/boundary.npz",
+          "original_sha256": "7ff6d263d9b5331e42451a79b3741b0024b2abb2604c0ccaa70f43eecd888cfc",
+          "size": 2747759
+        },
+        {
+          "crc32c": "s3ncMg==",
+          "generation": "1788829006551901",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank4/boundary.reference_input.npz",
+          "original_sha256": "216d7174af6083e64153e31a6e2d6508a1ca8ed86d584213088a84a8e03905e3",
+          "size": 167566
+        }
+      ],
+      "rank": 4
+    },
+    {
+      "ledger_generation": "1788829006380808",
+      "ledger_sha256": "5867f00b941f3dd56c2bb224952e0cc8add519b5cfa83eed87f4022cbfaa9138",
+      "originals": [
+        {
+          "crc32c": "s9uSeA==",
+          "generation": "1788829004246126",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank5/runner.json",
+          "original_sha256": "af00c47ec89bf6390bb20cdd592a715f402e6516bdcab47fd6836a45fa39b012",
+          "size": 804564
+        },
+        {
+          "crc32c": "JBJZyg==",
+          "generation": "1788829004918049",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank5/candidate.optimized_hlo.txt",
+          "original_sha256": "9089e995d74b6cedc0c5ac4765b98aa1d5af0023e11a00d609b26595724b7e98",
+          "size": 1395581
+        },
+        {
+          "crc32c": "H75Yhw==",
+          "generation": "1788829005268005",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank5/reference_prefix.optimized_hlo.txt",
+          "original_sha256": "90f762af998d93f13f9db613fa2eff9e5ed8e533ad61f61ed0e4b68d55c59c2a",
+          "size": 369777
+        },
+        {
+          "crc32c": "HelCIg==",
+          "generation": "1788829005592023",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank5/reference.optimized_hlo.txt",
+          "original_sha256": "171462d1a1253adababde2557eabf89e3b85aaa9fc9c48f5cf9562173e5abe74",
+          "size": 653908
+        },
+        {
+          "crc32c": "aIvwCw==",
+          "generation": "1788829005732981",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank5/empty.npz",
+          "original_sha256": "2fbd0322b222ac6b1d3afbd4ff9bbdb5c3451c2acd2cc4fb3240a39f04dd7ff4",
+          "size": 1400669
+        },
+        {
+          "crc32c": "EflRFQ==",
+          "generation": "1788829005933715",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank5/boundary.npz",
+          "original_sha256": "e88bb72c608f995bbea52e7ce1052ff10b0ce6ae5c05950117c14bdca473a46b",
+          "size": 2748819
+        },
+        {
+          "crc32c": "XZeM7w==",
+          "generation": "1788829006244338",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank5/boundary.reference_input.npz",
+          "original_sha256": "e1b9206191145135692e9368435442fe7e63a37e221d8f05e0ed999a7b223f0d",
+          "size": 167782
+        }
+      ],
+      "rank": 5
+    },
+    {
+      "ledger_generation": "1788829006547426",
+      "ledger_sha256": "7d9119a17a70ccaf844243defb972641410ae0405c67ca75fe36721c1e75ec2f",
+      "originals": [
+        {
+          "crc32c": "88ca9w==",
+          "generation": "1788829004301953",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank6/runner.json",
+          "original_sha256": "3aa770f62ea8ce7231961f68db560bed3789e41c2221333345f8ebfc9d950ed6",
+          "size": 772342
+        },
+        {
+          "crc32c": "JBJZyg==",
+          "generation": "1788829005073005",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank6/candidate.optimized_hlo.txt",
+          "original_sha256": "9089e995d74b6cedc0c5ac4765b98aa1d5af0023e11a00d609b26595724b7e98",
+          "size": 1395581
+        },
+        {
+          "crc32c": "H75Yhw==",
+          "generation": "1788829005388545",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank6/reference_prefix.optimized_hlo.txt",
+          "original_sha256": "90f762af998d93f13f9db613fa2eff9e5ed8e533ad61f61ed0e4b68d55c59c2a",
+          "size": 369777
+        },
+        {
+          "crc32c": "HelCIg==",
+          "generation": "1788829005725036",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank6/reference.optimized_hlo.txt",
+          "original_sha256": "171462d1a1253adababde2557eabf89e3b85aaa9fc9c48f5cf9562173e5abe74",
+          "size": 653908
+        },
+        {
+          "crc32c": "l6BAQA==",
+          "generation": "1788829005885039",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank6/empty.npz",
+          "original_sha256": "e53db2a670e5a8e4af4cf905888320f2f73560fba7e7b52eda6c00177eac65f0",
+          "size": 1367183
+        },
+        {
+          "crc32c": "PaEbfA==",
+          "generation": "1788829006056376",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank6/boundary.npz",
+          "original_sha256": "f393551fa687d04d1ba31191a8a16cd15c9954835630310398c0e934727d05a5",
+          "size": 2724289
+        },
+        {
+          "crc32c": "p4SdEg==",
+          "generation": "1788829006402879",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank6/boundary.reference_input.npz",
+          "original_sha256": "1f673f00ec0fa146c5f0def0505190d940272cc8094c681063d8a82fff8c672c",
+          "size": 167782
+        }
+      ],
+      "rank": 6
+    },
+    {
+      "ledger_generation": "1788829006590870",
+      "ledger_sha256": "d7830c859ae1c368732f68ffe33491cb7bba573b1dba231ec46714407a0dd110",
+      "originals": [
+        {
+          "crc32c": "mIoIaQ==",
+          "generation": "1788829004373307",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank7/runner.json",
+          "original_sha256": "7d30a1b3285477ff6a976d8b945b45d9a18052d60077b096e8b7984b156e0137",
+          "size": 805185
+        },
+        {
+          "crc32c": "JBJZyg==",
+          "generation": "1788829005044070",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank7/candidate.optimized_hlo.txt",
+          "original_sha256": "9089e995d74b6cedc0c5ac4765b98aa1d5af0023e11a00d609b26595724b7e98",
+          "size": 1395581
+        },
+        {
+          "crc32c": "H75Yhw==",
+          "generation": "1788829005464938",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank7/reference_prefix.optimized_hlo.txt",
+          "original_sha256": "90f762af998d93f13f9db613fa2eff9e5ed8e533ad61f61ed0e4b68d55c59c2a",
+          "size": 369777
+        },
+        {
+          "crc32c": "HelCIg==",
+          "generation": "1788829005781956",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank7/reference.optimized_hlo.txt",
+          "original_sha256": "171462d1a1253adababde2557eabf89e3b85aaa9fc9c48f5cf9562173e5abe74",
+          "size": 653908
+        },
+        {
+          "crc32c": "+PnczA==",
+          "generation": "1788829005932531",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank7/empty.npz",
+          "original_sha256": "5379f32b63fa10cd30a142a23df6b40dd453c58900cb21e2f1f017aca315f3bc",
+          "size": 1399637
+        },
+        {
+          "crc32c": "n9okTg==",
+          "generation": "1788829006103765",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank7/boundary.npz",
+          "original_sha256": "976c24675e00ad7709162dd05492173b936499b9cc288d0fa89ea6bd8018bd7e",
+          "size": 2748375
+        },
+        {
+          "crc32c": "VYhbVw==",
+          "generation": "1788829006439483",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z/workers/rank7/boundary.reference_input.npz",
+          "original_sha256": "4f3f6a5dcd49049d553c96809e3515280b4c207ef4a70c483a7a6c09fc1ccaff",
+          "size": 167398
+        }
+      ],
+      "rank": 7
+    }
+  ]
+}
