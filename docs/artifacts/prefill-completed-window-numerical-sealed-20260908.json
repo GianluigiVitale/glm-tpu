@@ -1,0 +1,210 @@
+{
+  "artifact_kind": "completed_window_suffix_numerical_sealed_index",
+  "tag": "greenfield_fp8_ws32_prefill_completed_window_numerical_l6_20260908T181818988387132Z",
+  "code_hash": "bae39c99dec418bc7c679ea31d3f7c207d3e235c",
+  "results_db_run_id": 594,
+  "status": "SEALED",
+  "terminal_utc": "2026-09-08T18:26:01Z",
+  "readbacks": {
+    "SUCCESS": {
+      "generation": "1788891960476977",
+      "size": 493,
+      "crc32c": "eZIq/A==",
+      "sha256": "80a0c7a6ccc6f9d6c35597e7fbcc7c425e2fb2369ae431a37135537b49503a55"
+    },
+    "summary.json": {
+      "generation": "1788891957269602",
+      "size": 171923721,
+      "crc32c": "xnhYVQ==",
+      "sha256": "5d79158da466864521750b77d26c6ecf6d722cb2085de67fc05ebc4b96c8396a"
+    },
+    "archive_receipts.json": {
+      "generation": "1788891958999110",
+      "size": 91660,
+      "crc32c": "9WNLgg==",
+      "sha256": "c348b39e34e5d960a20811ad10151a49de9dc5442fc46e41cabbf77797826d02"
+    }
+  },
+  "archive_objects_verified": 284,
+  "archive_bytes": 1708766880,
+  "complete_remote_prefix_objects": 518,
+  "complete_remote_prefix_bytes": 2802533016,
+  "storage_note": "Complete prefix includes worker publications and collected copies; exceeded preregistered under1GB estimate, no checkpoint added. Compact future baseline evidence; preserve this sealed result.",
+  "model_calls": 27,
+  "wk_calls": 2,
+  "assembly_calls": 30,
+  "cases_worst_absolute_errors": {
+    "boundary": {
+      "index": 0,
+      "kv": 0,
+      "output": 3.0517578125e-05,
+      "repair": 0,
+      "residual": 0,
+      "route_weights": 2.9802322387695312e-08
+    },
+    "competitive": {
+      "index": 0,
+      "kv": 0,
+      "output": 3.0517578125e-05,
+      "repair": 0,
+      "residual": 0,
+      "route_weights": 2.9802322387695312e-08
+    },
+    "tail": {
+      "index": 0,
+      "kv": 0,
+      "output": 1.52587890625e-05,
+      "repair": 0,
+      "residual": 0,
+      "route_weights": 2.9802322387695312e-08
+    }
+  },
+  "physical_device_peaks": {
+    "12": 409606656,
+    "13": 409606656,
+    "14": 409606656,
+    "15": 409606656,
+    "20": 409606656,
+    "21": 409606656,
+    "22": 409606656,
+    "23": 409606656,
+    "4": 409606656,
+    "5": 409606656,
+    "6": 409606656,
+    "7": 409606656,
+    "8": 409606656,
+    "9": 409606656,
+    "10": 409606656,
+    "11": 409606656,
+    "0": 409606656,
+    "1": 409606656,
+    "2": 409606656,
+    "3": 409606656,
+    "24": 409606656,
+    "25": 409606656,
+    "26": 409606656,
+    "27": 409606656,
+    "28": 409606656,
+    "29": 409606656,
+    "30": 409606656,
+    "31": 409606656,
+    "16": 409606656,
+    "17": 409606656,
+    "18": 409606656,
+    "19": 409606656
+  },
+  "peak_hbm_bytes": 409606656,
+  "programs": {
+    "assemble": {
+      "stablehlo_sha256": "fdd00e1a4126eb294372c9ff86550564d351516494f9d3a1f429436a205c5b88",
+      "optimized_hlo_sha256": "f899cec9e6f3eee38a7574f2dbd3aff06c80698666075362e2a9b4db52e89080",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 3715584,
+        "generated_code_size_in_bytes": 254976,
+        "output_size_in_bytes": 6572544,
+        "temp_size_in_bytes": 0
+      }
+    },
+    "candidate": {
+      "stablehlo_sha256": "65fb1dd3bffe2875fc4a99e6e48d6764bcb76ed965c9cad637f0cebd73da9456",
+      "optimized_hlo_sha256": "df359f2a10ec51b1d155a6a9a5919cda1c56ee69f9211b2fb6d31cbc31514086",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 312239616,
+        "generated_code_size_in_bytes": 7553024,
+        "output_size_in_bytes": 402432,
+        "temp_size_in_bytes": 31054336
+      }
+    },
+    "control": {
+      "stablehlo_sha256": "33fcbb9a4044cf0a81780404e6c1525070acd90dad7265b3391f33f4f6efe1f2",
+      "optimized_hlo_sha256": "6874dc1f6f0b2761aeff9545e394b0e59c62df04ec2a6e403a90d37f9140db58",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 311944704,
+        "generated_code_size_in_bytes": 6473728,
+        "output_size_in_bytes": 107520,
+        "temp_size_in_bytes": 11256320
+      }
+    },
+    "prefix": {
+      "stablehlo_sha256": "2f0c50253ee60f164305d0af7cec0ddff89c0691bf6c75c875acf563ddb99655",
+      "optimized_hlo_sha256": "cfac24ab88a178c57d2f9e4428d3324725b4a2789dffa97b3ffbebbf9da99ca1",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 18780672,
+        "generated_code_size_in_bytes": 10686464,
+        "output_size_in_bytes": 1738240,
+        "temp_size_in_bytes": 91736576
+      }
+    },
+    "prepare_narrow": {
+      "stablehlo_sha256": "8e75cff45c257100ea4ee5a07c91b1cf499a082e168aa84799b5b36472014105",
+      "optimized_hlo_sha256": "769206e242f4ed0403a8b9b711b8c3a708878cda80d0f6239aab7908963f3a7d",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 99840,
+        "generated_code_size_in_bytes": 61952,
+        "output_size_in_bytes": 99840,
+        "temp_size_in_bytes": 0
+      }
+    },
+    "prepare_prefix": {
+      "stablehlo_sha256": "c85ccde83e6bfc778530768c55c40d2d7c74b8f390ed5b88d4e85eed4d10bdf7",
+      "optimized_hlo_sha256": "255c3bba3d6d469b2f7d9913466da097a0a2bd9859002d1da693184d3e179dea",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 2902528,
+        "generated_code_size_in_bytes": 114176,
+        "output_size_in_bytes": 731648,
+        "temp_size_in_bytes": 0
+      }
+    },
+    "prepare_wide": {
+      "stablehlo_sha256": "32e3db30eb73e8e0ae78f242055da42468020be704864f811dab7f8da24b075f",
+      "optimized_hlo_sha256": "6edc8a95d62dcceac779721b3870ed7c0732cca74cbd87f10c235c058c682784",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 395776,
+        "generated_code_size_in_bytes": 70144,
+        "output_size_in_bytes": 394752,
+        "temp_size_in_bytes": 0
+      }
+    },
+    "wk_decode": {
+      "stablehlo_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+      "optimized_hlo_sha256": "93e75e8344a2ba1bee3065e3259e79449dcaef9e385255bbf328094185f7788b",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 197120,
+        "generated_code_size_in_bytes": 527872,
+        "output_size_in_bytes": 1572864,
+        "temp_size_in_bytes": 3371520
+      }
+    },
+    "wk_promote": {
+      "stablehlo_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+      "optimized_hlo_sha256": "8909803326b1b42bd9cd40b7109c0c1f1275d74791616a2397314a4f79484e1d",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 1572864,
+        "generated_code_size_in_bytes": 65536,
+        "output_size_in_bytes": 3145728,
+        "temp_size_in_bytes": 0
+      }
+    }
+  },
+  "cleanup_hosts": 8,
+  "root_device_cleanup_hosts": 8,
+  "independent_full_layer_admission": false,
+  "performance_claim": false,
+  "scope": "Real layer6 completed B32 prefixes with B128 versus four B32 MLP suffixes; 27 model, 2 WK and 30 assembly calls. Synthetic history; shared-prefix DSA/cache agreement is by construction, NOT independent full-layer DSA or original-failure repair. No full-model or performance claim.",
+  "db_item": [
+    "greenfield_fp8_ws32_prefill_completed_window_numerical",
+    "layer6_completed_prefix_b128_four_b32_suffix_numerical_59calls_v1",
+    1,
+    1.0,
+    null
+  ]
+}

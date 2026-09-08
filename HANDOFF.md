@@ -17302,3 +17302,45 @@ bounded numerical using existing wrapper/kernel/layer6. Remainingthree helper
 graphs must still pass actualinspection; noautomaticretry. Scope remains shared
 completedprefix suffix-only,59calls and no performanceclaim. Own8K/efficientL7/L8/
 TTFTopen. goal3997chars; no checkpoint or infrastructure action.
+
+## 2026-09-08 18:30Z — DB594 sealed; throughput/observability is next priority
+
+Concrete progress: reviewed helper-copy correction bae39c99 pushed/mirrored with
+exact branch/goal/HANDOFF/source readbacks. FreshUS-CENTRAL2/softdelete0 storage
+2,004,716,818,970B before run, freshnormal/root8census and bothleases. Correctedtag
+greenfield_fp8_ws32_prefill_completed_window_numerical_l6_20260908T181818988387132Z
+completed332sworker/collector and SEALED18:26:01Z, DB594, no model retry aftersuccess.
+Sourcefrozen through terminal;8normal/rootpostchecks and no remaining modelworkflow.
+
+Verified exact remoteSUCCESS/summary/archiveledger readbacks,284archivegenerations/
+size/CRC and localoriginalSHA; orchestrator uses archivedprefix because terminal
+append follows upload. All8records SUCCESS/27model+2WK+30assembly,32postpeakowners,
+all3cases pass. DB594 item layer6_completed_prefix_b128_four_b32_suffix_numerical_59calls_v1,
+correct1/score1/latencyNULL. SUCCESSsha80a0c7a6ccc6f9d6c35597e7fbcc7c425e2fb2369ae431a37135537b49503a55,
+generation1788891960476977. Receipt prefill-completed-window-numerical-sealed-20260908.json
+binds ninegraphs/actualallocations/terminal/DB and scope. Peak409606656B/chip;
+maxoutput3.0517578125e-5, routeweights2.9802322388e-8. Sharedprefix DSA/cache is
+byconstruction, not independentfull-layer proof/originalfailure repair/performance.
+Allfour actualhelpers passed; modelgraphs remainedDB593-identical except allowed
+hostmetadata. No additional numerical/reference/precision trial is warranted here.
+
+Storage prediction was wrong: archiveledger1,708,766,880B, fullprefix518objects/
+2,802,533,016B including duplicate worker/fleetpayloads. Summary171,923,721B of
+nested per-row stats. Preserve seal; nextphasebaseline must keep originalarrays
+once and compact generation-bound reports, not repeat this per timing sample.
+
+Owner urgently requests maximum feasible utilization/throughput for bothprefill
+anddecode, not a slow correct endpoint. Read suggestions.md FULL38lines. Direct
+DB588 rank0 accounting:99.716047s in120blockcalls,0.080847transfers,0.225099cacheinit,
+1.327408one-timeHBMcheck,0.853311remaininghostcontrol =102.202712s.97.5669% inside
+dispatch-through-completion, not a measureddevicebreakdown;19.902prompttok/s real
+forB17, NOT hardwarelimit. Existing129.171ms/7.7417tok/sdecode separate.
+
+Next implement bounded prefill phasebaseline+fresh8hosttrace via EXISTING profiler/
+parse_xplane.aggregate_fleet and selectedDB594kernels; no fullmodelload yet.
+PREFILL_THROUGHPUT_ACTION_PLAN.md supplies exact scope/risks/observabilitylinks.
+Reviewer noP0-P2 on evidence/plan, documentationpersistence approved, NOT launch:
+same initialcaches/offsets; profile separately; existingassemble needs BOTH
+suffixes so cannot mislabel combinedcontrol+candidatewall asB128latency. Compare
+genuine independentpaths or explicitly labelled phase-summedestimates. Own8K,
+efficientfourdepthL7/L8/deliveredTTFT remainOPEN. goal3981chars. Noinfra/newweights.

@@ -923,3 +923,16 @@ pass original TPU replay/mutations plus realCPU32 helper compile/runtime. Existi
 model code/bounds unchanged. Otherthree helpers remain unacquired; no numerical
 or performance conclusion. Composed replay/review/persistence/freshpreflights
 precede one corrected bounded numerical test, not a new research campaign.
+
+18:26:01Z DB594 seals allthree numerical cases/32owners after the narrowcopyfix,
+59calls, allnine actualgraphs, normal/root8cleanup. Maxoutput3.05176e-5 and
+routeweights2.98023e-8; peak409606656B/chip including reference. Sharedcompleted
+prefix DSA/cache agreement remains byconstruction; no independentlayer/speedclaim.
+The next obstacle is measured phase throughput, not further scalar archaeology.
+Owner asks maximum feasible prefill AND decode; read suggestions.md in full and
+PREFILL_THROUGHPUT_ACTION_PLAN.md. Independent review agrees on actual prefill
+XPlanes and equalwork phases, with genuine per-path assembly (current comparison
+helper consumes bothsuffixes). DB588 rank0 breakdown directly rules out majorhost
+control/transfer cost: blockcalls99.716s of102.203s. Internal device attribution
+still missing; no MXU/HBM utilization claim. Archiveestimate corrected:2.803GB
+completeprefix,1.709GBledger; futurebaseline must avoid repeated perrow summaries.

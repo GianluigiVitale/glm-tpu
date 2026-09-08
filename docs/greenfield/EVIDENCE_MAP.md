@@ -2,6 +2,16 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST18:26:01Z DB594 SEALED completed-prefix/B128suffix numerical, pinbae39c99,
+all3cases/32owners/59calls; normal/root8/8clean. Maxoutput3.05176e-5, routeweights
+2.98023e-8, peak409606656B/chip including reference. Sharedprefix suffix-only,
+NOT independent full-layer DSA or performance. Receipt
+`../artifacts/prefill-completed-window-numerical-sealed-20260908.json` binds actual
+terminal/DB/archive. Complete prefix2.803GB exceeds<1GBestimate; preserve evidence,
+compact nextbaseline. Owner throughput priority: PREFILL_THROUGHPUT_ACTION_PLAN.md.
+DB588 rank0 blockcalls99.716/102.203s; prefill trace attribution next, not another
+numerical taploop. Own8K/efficientL7/L8/TTFT remain open.
+
 LATEST18:16Z: completed numerical66a65448 stopped BEFORE WK/model on helper
 copy-start/copy-done inspection; normal/root8/8clean18:04:02Z. All8 ledgers and
 128objects generation/size/CRC/SHA verified (28,382,137B). Receipt:
