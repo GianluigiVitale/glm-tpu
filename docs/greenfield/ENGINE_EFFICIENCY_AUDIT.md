@@ -474,3 +474,16 @@ archives journals in its diagnostic namespace.42CPU tests1.72s exercise actual
 writers and uploader including failures; independent review cleared the delta.
 One reviewed acquisition of missing tail/remaining graphs/memory is next, not an
 unchanged automatic retry. No numerical-prefill peak or speedup is claimed.
+
+The reviewed acquisition133fe71f now preserves all7 actual graph pairs and8
+complete journals/envelopes,44 generation-verified originals (61.47MB), expected
+HLO_REFUSED and normal/root8clean04:23Z. Main/tail compile334–376s; all32 chips
+report identical compiled memory. Main/tail temp855.35/802.25MB, outputs113.27MB,
+alias0 at8192capacity. No prefill/decoder numerical graph executed. This resolves
+the missing compiler-evidence step, not E1 performance or E6 allocation admission.
+Main/tail device current25.896GB/peak26.397GB stays unchanged despite both compiled
+programs residing: executable overhead is not established by that counter.
+Use the actual unique physical buffer union plus active scratch/outputs/code;
+do not sum seven argument trees or extrapolate short-cache headroom to256K.
+Next strict whole-model profiles, own short numerical proof and phase budgets.
+Receipt `../artifacts/prefill-batched-seven-graph-acquisition-20260908.json`.

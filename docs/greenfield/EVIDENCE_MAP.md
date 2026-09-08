@@ -2,6 +2,15 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST04:23Z2026-09-08: complete compile-only acquisition at133fe71f preserved
+all7 main/tail/support graph pairs,8 HLO_REFUSED runner envelopes and8 journals.
+All44 archived objects (61,467,637B) generation/CRC/SHA-verified; every rank agrees
+on graph hashes/compiled allocations. Normal/root8/8clean. Receipt:
+`../artifacts/prefill-batched-seven-graph-acquisition-20260908.json`.
+Expected UNREGISTERED refusal, not numerical success or performance. Next actual-HLO
+and unique-buffer memory admission, numerical adapter/sealer, own §21 short proof.
+No repeat acquisition or cleared layer0/3 trial. Later entries are historical snapshots.
+
 LATEST CPU2026-09-08: `runtime/ws32_batched_prefill.py` passes actual eight-layer
 two-chunk composition and raw decode handoff; production78-layer B17/B11 schema
 traces without allocating weights. Independent review no remaining P0-P2 for

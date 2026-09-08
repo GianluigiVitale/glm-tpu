@@ -199,3 +199,17 @@ worker ceiling. Original launch→mainHLO took~13min; complete graph duration st
 unmeasured, planning25–40min only, upload/cleanup separately observed.
 Require all8 complete refused envelopes,7graph pairs, per-compile journals and
 authenticated cleanup. No model numerical execution, sealing or automatic retry.
+
+### Complete acquired graph set — 04:23Z2026-09-08
+
+Run133fe71f `...acquire_c17_hrope_bp1_20260908T034734466845101Z` completed
+all7 graph inspections with expected HLO_REFUSED,44 original archived objects,
+all8 complete envelopes/journals and normal/root8/8clean. Receipt and every
+graph hash/allocation: `../artifacts/prefill-batched-seven-graph-acquisition-20260908.json`.
+All ranks agree. Main B17/temp855351808B and tail B11/temp802251264B each output
+113267200B and alias0, atcapacity8192; neither model graph executed. Actual
+main/tail route proofs need no tuple forwarding; index computations/roots once,
+then parameterize B and require all75 scoped FP32 route reductions. Health
+proof must follow subgroupMIN→predicate→commit/rollback/token sentinel, not labels.
+Next strict profiles and unique-buffer allocation budget, numerical wiring and
+own §21 short proof. This evidence does not require another acquisition launch.

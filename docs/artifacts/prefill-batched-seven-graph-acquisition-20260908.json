@@ -1,0 +1,1962 @@
+{
+  "artifact_kind": "greenfield_batched_compile_only_acquisition_receipt",
+  "classification": "EXPECTED_HLO_REFUSED_COMPLETE_GRAPH_EVIDENCE",
+  "code_hash": "133fe71fff18c6514ab76ca89d432a90c03b01dd",
+  "controller_exit_code": 1,
+  "execution_authorized": false,
+  "fleet": [
+    {
+      "compiled": {
+        "cache_probe": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 107743232,
+            "generated_code_size_in_bytes": 314368,
+            "output_size_in_bytes": 110080,
+            "temp_size_in_bytes": 290304
+          },
+          "seconds": 0.5645310978870839
+        },
+        "decode": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 97930240,
+            "output_size_in_bytes": 107767296,
+            "temp_size_in_bytes": 433682432
+          },
+          "seconds": 179.28793214284815
+        },
+        "exact_materialize": {
+          "device_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "device_peak_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 111358464,
+            "generated_code_size_in_bytes": 40934912,
+            "output_size_in_bytes": 566329856,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 5.276410731952637
+        },
+        "exact_promote": {
+          "device_bytes_in_use": [
+            25261580288,
+            25261580288,
+            25261580288,
+            25261580288
+          ],
+          "device_peak_bytes_in_use": [
+            25261581312,
+            25261581312,
+            25261581312,
+            25261581312
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 566329344,
+            "generated_code_size_in_bytes": 7437824,
+            "output_size_in_bytes": 1127842816,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 1.3591362689621747
+        },
+        "observer": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 98294784,
+            "output_size_in_bytes": 108112384,
+            "temp_size_in_bytes": 434790400
+          },
+          "seconds": 170.19413410802372
+        },
+        "prefill_chunk": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 137076224,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 855351808
+          },
+          "seconds": 334.0892206111457
+        },
+        "prefill_tail": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 131705344,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 802251264
+          },
+          "seconds": 345.19334593997337
+        }
+      },
+      "jax_process_index": 3,
+      "load_seconds": 140.71812511608005,
+      "local_device_ids": [
+        12,
+        13,
+        14,
+        15
+      ],
+      "local_device_slots": [
+        {
+          "device_id": 12,
+          "device_slot": 9,
+          "expert_coordinate": 2,
+          "feature_coordinate": 1,
+          "file_sha256": "10ca861eb5a4c718da6468e9f767448e82bc4c9cd1b60cd0d39c08834ad75a22"
+        },
+        {
+          "device_id": 14,
+          "device_slot": 13,
+          "expert_coordinate": 3,
+          "feature_coordinate": 1,
+          "file_sha256": "c732fa3c030bcb58db34ab3b4c292d0151979e2c2780616b5bb6f5b9eead26c3"
+        },
+        {
+          "device_id": 13,
+          "device_slot": 25,
+          "expert_coordinate": 6,
+          "feature_coordinate": 1,
+          "file_sha256": "edd1db609b3194151ed7cc688a5a439d650e35d48cc90f69e6ae3f62aa49aa19"
+        },
+        {
+          "device_id": 15,
+          "device_slot": 29,
+          "expert_coordinate": 7,
+          "feature_coordinate": 1,
+          "file_sha256": "65a953aea8905606ccbcedfb6cd41ee9ccbbec33183d0fbb5e657d1db76a1415"
+        }
+      ],
+      "rank": 0
+    },
+    {
+      "compiled": {
+        "cache_probe": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 107743232,
+            "generated_code_size_in_bytes": 314368,
+            "output_size_in_bytes": 110080,
+            "temp_size_in_bytes": 290304
+          },
+          "seconds": 0.5276981259230524
+        },
+        "decode": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 97930240,
+            "output_size_in_bytes": 107767296,
+            "temp_size_in_bytes": 433682432
+          },
+          "seconds": 162.53732635406777
+        },
+        "exact_materialize": {
+          "device_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "device_peak_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 111358464,
+            "generated_code_size_in_bytes": 40934912,
+            "output_size_in_bytes": 566329856,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 5.470248125959188
+        },
+        "exact_promote": {
+          "device_bytes_in_use": [
+            25261580288,
+            25261580288,
+            25261580288,
+            25261580288
+          ],
+          "device_peak_bytes_in_use": [
+            25261581312,
+            25261581312,
+            25261581312,
+            25261581312
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 566329344,
+            "generated_code_size_in_bytes": 7437824,
+            "output_size_in_bytes": 1127842816,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 1.382991440128535
+        },
+        "observer": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 98294784,
+            "output_size_in_bytes": 108112384,
+            "temp_size_in_bytes": 434790400
+          },
+          "seconds": 164.27811517799273
+        },
+        "prefill_chunk": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 137076224,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 855351808
+          },
+          "seconds": 351.34457396599464
+        },
+        "prefill_tail": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 131705344,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 802251264
+          },
+          "seconds": 348.17559344903566
+        }
+      },
+      "jax_process_index": 5,
+      "load_seconds": 143.33025719504803,
+      "local_device_ids": [
+        20,
+        21,
+        22,
+        23
+      ],
+      "local_device_slots": [
+        {
+          "device_id": 20,
+          "device_slot": 10,
+          "expert_coordinate": 2,
+          "feature_coordinate": 2,
+          "file_sha256": "ad897cf3d8f0b549874c48cdcb469806d5a5324e3abb1c1cc619fad30d6475ca"
+        },
+        {
+          "device_id": 22,
+          "device_slot": 14,
+          "expert_coordinate": 3,
+          "feature_coordinate": 2,
+          "file_sha256": "8106fa53feb2c90f39b1523c06ad5cedf32d05c178731ea159d3e9c0fa634b11"
+        },
+        {
+          "device_id": 21,
+          "device_slot": 26,
+          "expert_coordinate": 6,
+          "feature_coordinate": 2,
+          "file_sha256": "2b71cd665582c5fef60e78cd7c07b5d250f849b59b2fab298372af09f964cee3"
+        },
+        {
+          "device_id": 23,
+          "device_slot": 30,
+          "expert_coordinate": 7,
+          "feature_coordinate": 2,
+          "file_sha256": "db70f0e9435135b7f678cf32d4693582ace048e245cac04157193b70f2bbe0e1"
+        }
+      ],
+      "rank": 1
+    },
+    {
+      "compiled": {
+        "cache_probe": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 107743232,
+            "generated_code_size_in_bytes": 314368,
+            "output_size_in_bytes": 110080,
+            "temp_size_in_bytes": 290304
+          },
+          "seconds": 0.5246651868801564
+        },
+        "decode": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 97930240,
+            "output_size_in_bytes": 107767296,
+            "temp_size_in_bytes": 433682432
+          },
+          "seconds": 166.0604320091661
+        },
+        "exact_materialize": {
+          "device_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "device_peak_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 111358464,
+            "generated_code_size_in_bytes": 40934912,
+            "output_size_in_bytes": 566329856,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 5.286920705111697
+        },
+        "exact_promote": {
+          "device_bytes_in_use": [
+            25261580288,
+            25261580288,
+            25261580288,
+            25261580288
+          ],
+          "device_peak_bytes_in_use": [
+            25261581312,
+            25261581312,
+            25261581312,
+            25261581312
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 566329344,
+            "generated_code_size_in_bytes": 7437824,
+            "output_size_in_bytes": 1127842816,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 1.3654072941280901
+        },
+        "observer": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 98294784,
+            "output_size_in_bytes": 108112384,
+            "temp_size_in_bytes": 434790400
+          },
+          "seconds": 169.98470394103788
+        },
+        "prefill_chunk": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 137076224,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 855351808
+          },
+          "seconds": 372.475876203971
+        },
+        "prefill_tail": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 131705344,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 802251264
+          },
+          "seconds": 366.5536423008889
+        }
+      },
+      "jax_process_index": 1,
+      "load_seconds": 140.21593079902232,
+      "local_device_ids": [
+        4,
+        5,
+        6,
+        7
+      ],
+      "local_device_slots": [
+        {
+          "device_id": 4,
+          "device_slot": 8,
+          "expert_coordinate": 2,
+          "feature_coordinate": 0,
+          "file_sha256": "a4629d8a0320dd36e32920eb662aeb906615f2389115e0233941447e3f65e855"
+        },
+        {
+          "device_id": 6,
+          "device_slot": 12,
+          "expert_coordinate": 3,
+          "feature_coordinate": 0,
+          "file_sha256": "8ab34dae8bdd275b1bd659047165363614c3b1d7ee630da6b61897bd21da5330"
+        },
+        {
+          "device_id": 5,
+          "device_slot": 24,
+          "expert_coordinate": 6,
+          "feature_coordinate": 0,
+          "file_sha256": "a3cf02dcee5af6bcc87f0f718f7b29c8e293567e5564109d2215cd1bad5622f1"
+        },
+        {
+          "device_id": 7,
+          "device_slot": 28,
+          "expert_coordinate": 7,
+          "feature_coordinate": 0,
+          "file_sha256": "f6ae92763b6c93e1e0da240b1eb1894f68718413a8f3a974fc7254ea66298da2"
+        }
+      ],
+      "rank": 2
+    },
+    {
+      "compiled": {
+        "cache_probe": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 107743232,
+            "generated_code_size_in_bytes": 314368,
+            "output_size_in_bytes": 110080,
+            "temp_size_in_bytes": 290304
+          },
+          "seconds": 0.5292651108466089
+        },
+        "decode": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 97930240,
+            "output_size_in_bytes": 107767296,
+            "temp_size_in_bytes": 433682432
+          },
+          "seconds": 161.2499435020145
+        },
+        "exact_materialize": {
+          "device_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "device_peak_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 111358464,
+            "generated_code_size_in_bytes": 40934912,
+            "output_size_in_bytes": 566329856,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 5.584770580986515
+        },
+        "exact_promote": {
+          "device_bytes_in_use": [
+            25261580288,
+            25261580288,
+            25261580288,
+            25261580288
+          ],
+          "device_peak_bytes_in_use": [
+            25261581312,
+            25261581312,
+            25261581312,
+            25261581312
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 566329344,
+            "generated_code_size_in_bytes": 7437824,
+            "output_size_in_bytes": 1127842816,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 1.3789833050686866
+        },
+        "observer": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 98294784,
+            "output_size_in_bytes": 108112384,
+            "temp_size_in_bytes": 434790400
+          },
+          "seconds": 162.02180317998864
+        },
+        "prefill_chunk": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 137076224,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 855351808
+          },
+          "seconds": 345.11144864489324
+        },
+        "prefill_tail": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 131705344,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 802251264
+          },
+          "seconds": 344.6209149651695
+        }
+      },
+      "jax_process_index": 2,
+      "load_seconds": 141.02259603398852,
+      "local_device_ids": [
+        8,
+        9,
+        10,
+        11
+      ],
+      "local_device_slots": [
+        {
+          "device_id": 8,
+          "device_slot": 1,
+          "expert_coordinate": 0,
+          "feature_coordinate": 1,
+          "file_sha256": "6097df34f56ec1b89d7b5d839b235b5c6228b50b8b2c6c2646da923b802144bc"
+        },
+        {
+          "device_id": 10,
+          "device_slot": 5,
+          "expert_coordinate": 1,
+          "feature_coordinate": 1,
+          "file_sha256": "352a90d54a792c14b437e214359f425fbe108da59f184b9e6339a4f3fe5ccc24"
+        },
+        {
+          "device_id": 9,
+          "device_slot": 17,
+          "expert_coordinate": 4,
+          "feature_coordinate": 1,
+          "file_sha256": "e9003e67dd698f48c2fe23aa64751f3bfa841684f86bf25ef1bdbca9eac3bac3"
+        },
+        {
+          "device_id": 11,
+          "device_slot": 21,
+          "expert_coordinate": 5,
+          "feature_coordinate": 1,
+          "file_sha256": "8db74936dbb37af36b650cf5a3351f8d1ff0211567528d470e4223ae32e54604"
+        }
+      ],
+      "rank": 3
+    },
+    {
+      "compiled": {
+        "cache_probe": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 107743232,
+            "generated_code_size_in_bytes": 314368,
+            "output_size_in_bytes": 110080,
+            "temp_size_in_bytes": 290304
+          },
+          "seconds": 0.5434979770798236
+        },
+        "decode": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 97930240,
+            "output_size_in_bytes": 107767296,
+            "temp_size_in_bytes": 433682432
+          },
+          "seconds": 162.7232124209404
+        },
+        "exact_materialize": {
+          "device_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "device_peak_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 111358464,
+            "generated_code_size_in_bytes": 40934912,
+            "output_size_in_bytes": 566329856,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 5.456338101066649
+        },
+        "exact_promote": {
+          "device_bytes_in_use": [
+            25261580288,
+            25261580288,
+            25261580288,
+            25261580288
+          ],
+          "device_peak_bytes_in_use": [
+            25261581312,
+            25261581312,
+            25261581312,
+            25261581312
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 566329344,
+            "generated_code_size_in_bytes": 7437824,
+            "output_size_in_bytes": 1127842816,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 1.3814164770301431
+        },
+        "observer": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 98294784,
+            "output_size_in_bytes": 108112384,
+            "temp_size_in_bytes": 434790400
+          },
+          "seconds": 166.31775850080885
+        },
+        "prefill_chunk": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 137076224,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 855351808
+          },
+          "seconds": 355.6971722180024
+        },
+        "prefill_tail": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 131705344,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 802251264
+          },
+          "seconds": 367.1566130327992
+        }
+      },
+      "jax_process_index": 0,
+      "load_seconds": 144.91792395687662,
+      "local_device_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "local_device_slots": [
+        {
+          "device_id": 0,
+          "device_slot": 0,
+          "expert_coordinate": 0,
+          "feature_coordinate": 0,
+          "file_sha256": "cb8d5f3af098eb4f9e9e3c8604e35977618a6ce429ffce29eb32e2ef3a2a3774"
+        },
+        {
+          "device_id": 2,
+          "device_slot": 4,
+          "expert_coordinate": 1,
+          "feature_coordinate": 0,
+          "file_sha256": "5120d924639bf0e147cc55727e02840a6e0614e9a4bd21cff993d56d47a9a7bb"
+        },
+        {
+          "device_id": 1,
+          "device_slot": 16,
+          "expert_coordinate": 4,
+          "feature_coordinate": 0,
+          "file_sha256": "f62c89dc4c9e9a21333935d5cf403bd32bbd0b10c0539f97b9d27bb8a309a4f1"
+        },
+        {
+          "device_id": 3,
+          "device_slot": 20,
+          "expert_coordinate": 5,
+          "feature_coordinate": 0,
+          "file_sha256": "432e0e81df57b2d84263b8df62c8006cfa75089ea89e2a46e497c47f8a4be465"
+        }
+      ],
+      "rank": 4
+    },
+    {
+      "compiled": {
+        "cache_probe": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 107743232,
+            "generated_code_size_in_bytes": 314368,
+            "output_size_in_bytes": 110080,
+            "temp_size_in_bytes": 290304
+          },
+          "seconds": 0.5211089828517288
+        },
+        "decode": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 97930240,
+            "output_size_in_bytes": 107767296,
+            "temp_size_in_bytes": 433682432
+          },
+          "seconds": 162.5422566800844
+        },
+        "exact_materialize": {
+          "device_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "device_peak_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 111358464,
+            "generated_code_size_in_bytes": 40934912,
+            "output_size_in_bytes": 566329856,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 5.227644018828869
+        },
+        "exact_promote": {
+          "device_bytes_in_use": [
+            25261580288,
+            25261580288,
+            25261580288,
+            25261580288
+          ],
+          "device_peak_bytes_in_use": [
+            25261581312,
+            25261581312,
+            25261581312,
+            25261581312
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 566329344,
+            "generated_code_size_in_bytes": 7437824,
+            "output_size_in_bytes": 1127842816,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 1.3683335948735476
+        },
+        "observer": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 98294784,
+            "output_size_in_bytes": 108112384,
+            "temp_size_in_bytes": 434790400
+          },
+          "seconds": 167.41766897100024
+        },
+        "prefill_chunk": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 137076224,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 855351808
+          },
+          "seconds": 372.32717456598766
+        },
+        "prefill_tail": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 131705344,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 802251264
+          },
+          "seconds": 362.47110863612033
+        }
+      },
+      "jax_process_index": 6,
+      "load_seconds": 142.53975438000634,
+      "local_device_ids": [
+        24,
+        25,
+        26,
+        27
+      ],
+      "local_device_slots": [
+        {
+          "device_id": 24,
+          "device_slot": 3,
+          "expert_coordinate": 0,
+          "feature_coordinate": 3,
+          "file_sha256": "93d6495e0749e62b6b46fe4bfa56b15cd80196ce71a19b9dfc098909b8e19f71"
+        },
+        {
+          "device_id": 26,
+          "device_slot": 7,
+          "expert_coordinate": 1,
+          "feature_coordinate": 3,
+          "file_sha256": "647da7b4f4ecd4f90255eb32c6c148a3dced32ddbf9855ccfbf1356a4b33954f"
+        },
+        {
+          "device_id": 25,
+          "device_slot": 19,
+          "expert_coordinate": 4,
+          "feature_coordinate": 3,
+          "file_sha256": "8d703305867ccb596e1dc9966d6cacf085c795f167f49a1164a7a866a3b772c5"
+        },
+        {
+          "device_id": 27,
+          "device_slot": 23,
+          "expert_coordinate": 5,
+          "feature_coordinate": 3,
+          "file_sha256": "4a68f3dbede05c5b0ac2cd8f12b435e82f7e1d59af75d81d7c1ca8972eaa3211"
+        }
+      ],
+      "rank": 5
+    },
+    {
+      "compiled": {
+        "cache_probe": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 107743232,
+            "generated_code_size_in_bytes": 314368,
+            "output_size_in_bytes": 110080,
+            "temp_size_in_bytes": 290304
+          },
+          "seconds": 0.5481823871377856
+        },
+        "decode": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 97930240,
+            "output_size_in_bytes": 107767296,
+            "temp_size_in_bytes": 433682432
+          },
+          "seconds": 172.78384393593296
+        },
+        "exact_materialize": {
+          "device_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "device_peak_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 111358464,
+            "generated_code_size_in_bytes": 40934912,
+            "output_size_in_bytes": 566329856,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 5.31947205401957
+        },
+        "exact_promote": {
+          "device_bytes_in_use": [
+            25261580288,
+            25261580288,
+            25261580288,
+            25261580288
+          ],
+          "device_peak_bytes_in_use": [
+            25261581312,
+            25261581312,
+            25261581312,
+            25261581312
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 566329344,
+            "generated_code_size_in_bytes": 7437824,
+            "output_size_in_bytes": 1127842816,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 1.366287836804986
+        },
+        "observer": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 98294784,
+            "output_size_in_bytes": 108112384,
+            "temp_size_in_bytes": 434790400
+          },
+          "seconds": 176.5720472401008
+        },
+        "prefill_chunk": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 137076224,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 855351808
+          },
+          "seconds": 346.64022984495386
+        },
+        "prefill_tail": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 131705344,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 802251264
+          },
+          "seconds": 375.50961604714394
+        }
+      },
+      "jax_process_index": 7,
+      "load_seconds": 143.86772050405852,
+      "local_device_ids": [
+        28,
+        29,
+        30,
+        31
+      ],
+      "local_device_slots": [
+        {
+          "device_id": 28,
+          "device_slot": 11,
+          "expert_coordinate": 2,
+          "feature_coordinate": 3,
+          "file_sha256": "b331416251c6e675427c4aa4ad7274e6c955e914154355befa14efe09018f3b9"
+        },
+        {
+          "device_id": 30,
+          "device_slot": 15,
+          "expert_coordinate": 3,
+          "feature_coordinate": 3,
+          "file_sha256": "b48eb111e848b8910a8c3f548b4b79b48a627d19a1a2d51fdc8f38baa2c5a301"
+        },
+        {
+          "device_id": 29,
+          "device_slot": 27,
+          "expert_coordinate": 6,
+          "feature_coordinate": 3,
+          "file_sha256": "83385d3a1ce7fe443e3ff661ab5d78ced97544b6535a249b268a39e4e09d2cd9"
+        },
+        {
+          "device_id": 31,
+          "device_slot": 31,
+          "expert_coordinate": 7,
+          "feature_coordinate": 3,
+          "file_sha256": "bbe95825efd8e9a283b1cfa57644e7c7138b7094f8bb1bd2eb77cc5bfbd15e37"
+        }
+      ],
+      "rank": 6
+    },
+    {
+      "compiled": {
+        "cache_probe": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 107743232,
+            "generated_code_size_in_bytes": 314368,
+            "output_size_in_bytes": 110080,
+            "temp_size_in_bytes": 290304
+          },
+          "seconds": 0.544104530941695
+        },
+        "decode": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 97930240,
+            "output_size_in_bytes": 107767296,
+            "temp_size_in_bytes": 433682432
+          },
+          "seconds": 160.4038909820374
+        },
+        "exact_materialize": {
+          "device_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "device_peak_bytes_in_use": [
+            24654313984,
+            24654313984,
+            24654313984,
+            24654313984
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 111358464,
+            "generated_code_size_in_bytes": 40934912,
+            "output_size_in_bytes": 566329856,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 5.348882168065757
+        },
+        "exact_promote": {
+          "device_bytes_in_use": [
+            25261580288,
+            25261580288,
+            25261580288,
+            25261580288
+          ],
+          "device_peak_bytes_in_use": [
+            25261581312,
+            25261581312,
+            25261581312,
+            25261581312
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 566329344,
+            "generated_code_size_in_bytes": 7437824,
+            "output_size_in_bytes": 1127842816,
+            "temp_size_in_bytes": 0
+          },
+          "seconds": 1.3523234638851136
+        },
+        "observer": {
+          "device_bytes_in_use": [
+            25896471040,
+            25896471040,
+            25896471040,
+            25896471040
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 107743232,
+            "argument_size_in_bytes": 25758277632,
+            "generated_code_size_in_bytes": 98294784,
+            "output_size_in_bytes": 108112384,
+            "temp_size_in_bytes": 434790400
+          },
+          "seconds": 161.4097459190525
+        },
+        "prefill_chunk": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 137076224,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 855351808
+          },
+          "seconds": 340.79180028196424
+        },
+        "prefill_tail": {
+          "device_bytes_in_use": [
+            25896472064,
+            25896472064,
+            25896472064,
+            25896472064
+          ],
+          "device_peak_bytes_in_use": [
+            26396861952,
+            26396861952,
+            26396861952,
+            26396861952
+          ],
+          "memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 131705344,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 802251264
+          },
+          "seconds": 344.6522952329833
+        }
+      },
+      "jax_process_index": 4,
+      "load_seconds": 142.74210598692298,
+      "local_device_ids": [
+        16,
+        17,
+        18,
+        19
+      ],
+      "local_device_slots": [
+        {
+          "device_id": 16,
+          "device_slot": 2,
+          "expert_coordinate": 0,
+          "feature_coordinate": 2,
+          "file_sha256": "88f18c5b48b4b4ad3f67d90fa39c86ea049ace87f6de4829fca13b1aeed68264"
+        },
+        {
+          "device_id": 18,
+          "device_slot": 6,
+          "expert_coordinate": 1,
+          "feature_coordinate": 2,
+          "file_sha256": "a942cbf167e3ab473c95217df499999220c51a30acb79da0eb31c5711cc6a04c"
+        },
+        {
+          "device_id": 17,
+          "device_slot": 18,
+          "expert_coordinate": 4,
+          "feature_coordinate": 2,
+          "file_sha256": "95246350f8f17589cd258b8e858854a33a2ff5299adfd780efb2cc3e5448f714"
+        },
+        {
+          "device_id": 19,
+          "device_slot": 22,
+          "expert_coordinate": 5,
+          "feature_coordinate": 2,
+          "file_sha256": "92d4f870366051662cb516a5525be1ba0f586f4773a89c3cb3a16935d5147061"
+        }
+      ],
+      "rank": 7
+    }
+  ],
+  "graphs": {
+    "cache_probe": {
+      "optimized_hlo_sha256": "55406dc3407e48501eb352239419b613495fc5c3355822926581c478961df22e",
+      "stablehlo_sha256": "664c331aeca3593811b6c8c22ab18b2dec615f047eb0c345942da332f8b9eb14"
+    },
+    "decode": {
+      "optimized_hlo_sha256": "851266eeb2816b1465fe4277a1cdb2c624b1d4157785fc0115d499089f1edd9a",
+      "stablehlo_sha256": "954e815b7f845dd958598ddc2657af0282d64d92c4e94567d88b0b549a4c4d66"
+    },
+    "exact_materialize": {
+      "optimized_hlo_sha256": "72cf26b553b331cec0378c62b8d47b050bd74639459b6c1c185401fac4d17388",
+      "stablehlo_sha256": "1d925d96f4770e6edd5cef41e1c6f8f4071e039ad93b1cf7d96380fbfdf6f36e"
+    },
+    "exact_promote": {
+      "optimized_hlo_sha256": "b6b7d014629382ef9476c2d8e0331eff3b1988d58e734ea10eaf3d626b64e567",
+      "stablehlo_sha256": "e38eb7a45472107a383114c25039b9cfa58c2120fe98592f62d8f47996d3ffff"
+    },
+    "observer": {
+      "optimized_hlo_sha256": "2c954d9268bdc7acebedc83fff53f6b0fa984b51660b1355fe1caea30bc728dd",
+      "stablehlo_sha256": "088c9e01caa8ec8ceb12e90c309d11102e4ecdc0ef7980092ff22aaf7eb9cab4"
+    },
+    "prefill_chunk": {
+      "optimized_hlo_sha256": "b3e6435ffca7d16b6b8278dd34146eb0d06584fdf0164479d05f3ed5656ad398",
+      "stablehlo_sha256": "38f6521f938a21fda5dc5e78c272e5859c68d329c3027d23756de9ea84a47afa"
+    },
+    "prefill_tail": {
+      "optimized_hlo_sha256": "bc759ceeed2831db7ee12bfd744675e21970afae7f8f123fe33363545a1fa75e",
+      "stablehlo_sha256": "960c0bc30927a0aa1346ba23fb8c237e97c2e128dd3233aa2279aa0f27a56780"
+    }
+  },
+  "normal_clean_hosts": [
+    "t1v-n-ae271d05-w-0",
+    "t1v-n-ae271d05-w-1",
+    "t1v-n-ae271d05-w-2",
+    "t1v-n-ae271d05-w-3",
+    "t1v-n-ae271d05-w-4",
+    "t1v-n-ae271d05-w-5",
+    "t1v-n-ae271d05-w-6",
+    "t1v-n-ae271d05-w-7"
+  ],
+  "notes": [
+    "Zero expected SHA pins deliberately cause identity refusals during acquisition.",
+    "Both prefill graphs additionally remain UNREGISTERED; this receipt never authorizes numerical execution.",
+    "Compile-only device peaks include loading and exact materializers, not executed prefill/decode.",
+    "Device stats unchanged across main/tail residency cannot establish executable-memory overhead.",
+    "No SUCCESS, model tokens, performance DB row or new checkpoint was produced."
+  ],
+  "numerical_claim": false,
+  "objects": [
+    {
+      "crc32c": "KwyBoA==",
+      "generation": 1788841326280834,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/acquisition_journal.rank0.jsonl",
+      "sha256": "661aa5f2ad2fc598d6f7accd0165b605e40fa4b8b9476355b546705df590721f",
+      "size": 40981
+    },
+    {
+      "crc32c": "PbS1UA==",
+      "generation": 1788841325896450,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/acquisition_journal.rank1.jsonl",
+      "sha256": "d37674bf25d671610d3914b8b1ee8b25da5db8cfeec7b9235228d59e9a2b4b0a",
+      "size": 40985
+    },
+    {
+      "crc32c": "VlBkgA==",
+      "generation": 1788841326210491,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/acquisition_journal.rank2.jsonl",
+      "sha256": "09612a244ca7ecd6f8390ba39a86c7b632dfff360ec6ecdda7f8f8862318633c",
+      "size": 40972
+    },
+    {
+      "crc32c": "OqG5pg==",
+      "generation": 1788841325942770,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/acquisition_journal.rank3.jsonl",
+      "sha256": "5e6ac15f07f9151bda4ef110e8fb39a75677f7e195069e7fcba5fb1106c11c8b",
+      "size": 40976
+    },
+    {
+      "crc32c": "KssZgQ==",
+      "generation": 1788841326068382,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/acquisition_journal.rank4.jsonl",
+      "sha256": "ec8e581d4fef602d6ac4b7468db20e92c2adb16a35bfaa17d73a1ec2a998fb7f",
+      "size": 40970
+    },
+    {
+      "crc32c": "LQZd0A==",
+      "generation": 1788841326165952,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/acquisition_journal.rank5.jsonl",
+      "sha256": "35dddc7df6d537fe0ce013da7847c3223b92b3aaaf770c70cd0e673d3326f031",
+      "size": 40983
+    },
+    {
+      "crc32c": "TY8v1Q==",
+      "generation": 1788841326790939,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/acquisition_journal.rank6.jsonl",
+      "sha256": "7454e806a1fc03c33a810abe241763f8ac4e038a9ad0a7905edba5d15d6534ff",
+      "size": 40983
+    },
+    {
+      "crc32c": "ez28Jg==",
+      "generation": 1788841325870281,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/acquisition_journal.rank7.jsonl",
+      "sha256": "019a0a2373fc7b6ff90965415ac7acc2b4178353184a46d9874565a22671d06a",
+      "size": 40977
+    },
+    {
+      "crc32c": "Rj1RGA==",
+      "generation": 1788841402216510,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/census_failure_exit.txt",
+      "sha256": "81e7f5cf8b6a84656d4727f5c8113a9889585774041fa296f41324dcb68efef1",
+      "size": 3122
+    },
+    {
+      "crc32c": "4fuhcA==",
+      "generation": 1788841399610147,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/census_pre.txt",
+      "sha256": "840f33d2a0bdd8adcf3cab3796e112163942761127467c4fa8a5930e53fe4078",
+      "size": 3122
+    },
+    {
+      "crc32c": "y2M9dA==",
+      "generation": 1788841396980140,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/launch.txt",
+      "sha256": "464a99077ee7a780ddb471e932e552e6d2ce954f41dc55b433e9f9491b7f6ed4",
+      "size": 2725
+    },
+    {
+      "crc32c": "gEonyA==",
+      "generation": 1788841389234576,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/orchestrator.log",
+      "sha256": "a96d550fc4d3cf8c6a3ed9c46f8642833d0ffacd5e6ba2aae97f577176b4d03a",
+      "size": 1245
+    },
+    {
+      "crc32c": "AAAAAA==",
+      "generation": 1788841391801226,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/remote_vacancy.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "crc32c": "UP5W5g==",
+      "generation": 1788841394404511,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z/sync.txt",
+      "sha256": "2bce7a6acf0de740f3913570e60253f0a1b2a66c2742a1fbc7ed4be027b6e9a4",
+      "size": 965
+    },
+    {
+      "crc32c": "vmbebA==",
+      "generation": 1788841374280735,
+      "inflated_sha256": "55406dc3407e48501eb352239419b613495fc5c3355822926581c478961df22e",
+      "name": "hlo/cache_probe.optimized_hlo.txt.gz",
+      "sha256": "de6a79f497d517c2a99290010e39a9be1a466c37e6dee71b1190df26b6944aaf",
+      "size": 6062
+    },
+    {
+      "crc32c": "Uug6Dg==",
+      "generation": 1788841371737708,
+      "inflated_sha256": "664c331aeca3593811b6c8c22ab18b2dec615f047eb0c345942da332f8b9eb14",
+      "name": "hlo/cache_probe.stablehlo.mlir.gz",
+      "sha256": "e2960d1afe7f2c12427444f6c5fd11e165c1da18b884adf6f1d97e69ca6e8cd5",
+      "size": 2674
+    },
+    {
+      "crc32c": "YON1SA==",
+      "generation": 1788841369218715,
+      "inflated_sha256": "851266eeb2816b1465fe4277a1cdb2c624b1d4157785fc0115d499089f1edd9a",
+      "name": "hlo/decode.optimized_hlo.txt.gz",
+      "sha256": "d4d57eb6c031e125dc728d696d53157f74c6408dec8201350eb11c6b25056eef",
+      "size": 11018962
+    },
+    {
+      "crc32c": "JgDuPg==",
+      "generation": 1788841364936420,
+      "inflated_sha256": "954e815b7f845dd958598ddc2657af0282d64d92c4e94567d88b0b549a4c4d66",
+      "name": "hlo/decode.stablehlo.mlir.gz",
+      "sha256": "39402e320b1115a34bd5994ddcbb534571a11a0318be0830063884580c808cea",
+      "size": 2703958
+    },
+    {
+      "crc32c": "oXECdg==",
+      "generation": 1788841331114224,
+      "inflated_sha256": "72cf26b553b331cec0378c62b8d47b050bd74639459b6c1c185401fac4d17388",
+      "name": "hlo/exact_materialize.optimized_hlo.txt.gz",
+      "sha256": "e9c6bc9315339d91857987fa90ea654cfce03a0b04e1f79224fffc9e862881c5",
+      "size": 59192
+    },
+    {
+      "crc32c": "p7zw+g==",
+      "generation": 1788841328501537,
+      "inflated_sha256": "1d925d96f4770e6edd5cef41e1c6f8f4071e039ad93b1cf7d96380fbfdf6f36e",
+      "name": "hlo/exact_materialize.stablehlo.mlir.gz",
+      "sha256": "fb22af82e4daa47ffd92c93eacc58ad9b220e5a0165b242c5fcd6072bcbcf2b6",
+      "size": 32100
+    },
+    {
+      "crc32c": "4+1LYg==",
+      "generation": 1788841336165790,
+      "inflated_sha256": "b6b7d014629382ef9476c2d8e0331eff3b1988d58e734ea10eaf3d626b64e567",
+      "name": "hlo/exact_promote.optimized_hlo.txt.gz",
+      "sha256": "1b9132d1355ef0f0c9bb234151d7fe3104f8755dcee6f1ebd0b8e73be47b6c3e",
+      "size": 11047
+    },
+    {
+      "crc32c": "FTMEAw==",
+      "generation": 1788841333535022,
+      "inflated_sha256": "e38eb7a45472107a383114c25039b9cfa58c2120fe98592f62d8f47996d3ffff",
+      "name": "hlo/exact_promote.stablehlo.mlir.gz",
+      "sha256": "7355f94445c08fd7da2985af36b336d485855ee6613e48caaa78966673e9a874",
+      "size": 3019
+    },
+    {
+      "crc32c": "A9CgsA==",
+      "generation": 1788841361662522,
+      "inflated_sha256": "2c954d9268bdc7acebedc83fff53f6b0fa984b51660b1355fe1caea30bc728dd",
+      "name": "hlo/observer.optimized_hlo.txt.gz",
+      "sha256": "efaab2ada1f55489188f85b3f8c19300741735dd2d05693f348705ea36ebbbed",
+      "size": 11052520
+    },
+    {
+      "crc32c": "5j/qRg==",
+      "generation": 1788841357381862,
+      "inflated_sha256": "088c9e01caa8ec8ceb12e90c309d11102e4ecdc0ef7980092ff22aaf7eb9cab4",
+      "name": "hlo/observer.stablehlo.mlir.gz",
+      "sha256": "4752cdff96f7c6c0683f8e7074a4952f85d5a3f11998b5a5a25e43bf3ab35309",
+      "size": 2705104
+    },
+    {
+      "crc32c": "k5yOtg==",
+      "generation": 1788841345214011,
+      "inflated_sha256": "b3e6435ffca7d16b6b8278dd34146eb0d06584fdf0164479d05f3ed5656ad398",
+      "name": "hlo/prefill_chunk.optimized_hlo.txt.gz",
+      "sha256": "1700c789575f3b06eab99d58906820fb4e82e07534db6e423c74c58fbaa84a3b",
+      "size": 12669202
+    },
+    {
+      "crc32c": "fW9ttw==",
+      "generation": 1788841339828580,
+      "inflated_sha256": "38f6521f938a21fda5dc5e78c272e5859c68d329c3027d23756de9ea84a47afa",
+      "name": "hlo/prefill_chunk.stablehlo.mlir.gz",
+      "sha256": "2829758b4794d08edcd4557291419586aac4e3c41d3e979a752462c6bab08de1",
+      "size": 4142780
+    },
+    {
+      "crc32c": "NscghQ==",
+      "generation": 1788841354100549,
+      "inflated_sha256": "bc759ceeed2831db7ee12bfd744675e21970afae7f8f123fe33363545a1fa75e",
+      "name": "hlo/prefill_tail.optimized_hlo.txt.gz",
+      "sha256": "563d4abfc8bc73018a416e93deae4b23559c1a8de8553b420bd1ef286fcf9f41",
+      "size": 12160955
+    },
+    {
+      "crc32c": "WkE/bQ==",
+      "generation": 1788841348826203,
+      "inflated_sha256": "960c0bc30927a0aa1346ba23fb8c237e97c2e128dd3233aa2279aa0f27a56780",
+      "name": "hlo/prefill_tail.stablehlo.mlir.gz",
+      "sha256": "daaa5662a250dfcb7e6cea66bfedfe0653102ebf96d61b0e4075fe7dde833905",
+      "size": 4141823
+    },
+    {
+      "crc32c": "I9NwZw==",
+      "generation": 1788841320866940,
+      "name": "host_records/runner.rank0.json",
+      "sha256": "eff085420c4698c82b47e93c027d4a43fc39e187e4bb3c8f8cbc3e28e9035789",
+      "size": 49677
+    },
+    {
+      "crc32c": "cMtaQw==",
+      "generation": 1788841323579365,
+      "name": "host_records/runner.rank0.log",
+      "sha256": "ed8e1346c205f9079a59e201ff53a663f81312fe37821ad08d21c9ee4a1047a2",
+      "size": 2734
+    },
+    {
+      "crc32c": "M90ZNg==",
+      "generation": 1788841320841353,
+      "name": "host_records/runner.rank1.json",
+      "sha256": "3599a8397f67eeb4f24f81755bcbe43d6036d121ee829c5c13ba57b02d5443ef",
+      "size": 49679
+    },
+    {
+      "crc32c": "cMtaQw==",
+      "generation": 1788841323280642,
+      "name": "host_records/runner.rank1.log",
+      "sha256": "ed8e1346c205f9079a59e201ff53a663f81312fe37821ad08d21c9ee4a1047a2",
+      "size": 2734
+    },
+    {
+      "crc32c": "YsDKGg==",
+      "generation": 1788841320907538,
+      "name": "host_records/runner.rank2.json",
+      "sha256": "908b813df3642f93d4b7d5b20f99cbe3b50232d1e0956f7ffe362668f999c314",
+      "size": 49658
+    },
+    {
+      "crc32c": "cMtaQw==",
+      "generation": 1788841323490940,
+      "name": "host_records/runner.rank2.log",
+      "sha256": "ed8e1346c205f9079a59e201ff53a663f81312fe37821ad08d21c9ee4a1047a2",
+      "size": 2734
+    },
+    {
+      "crc32c": "Spfxow==",
+      "generation": 1788841320890478,
+      "name": "host_records/runner.rank3.json",
+      "sha256": "bae2e245376ae92ef2cd076f8a6d27f8a3cce1f98030cc8e07c89e42e2834036",
+      "size": 49666
+    },
+    {
+      "crc32c": "cMtaQw==",
+      "generation": 1788841323327554,
+      "name": "host_records/runner.rank3.log",
+      "sha256": "ed8e1346c205f9079a59e201ff53a663f81312fe37821ad08d21c9ee4a1047a2",
+      "size": 2734
+    },
+    {
+      "crc32c": "P4aIcQ==",
+      "generation": 1788841320906952,
+      "name": "host_records/runner.rank4.json",
+      "sha256": "33529aa45c44b621ad8f66fbc230ff2a1c91581c289fe4eb788c1e4ef9bfc394",
+      "size": 49657
+    },
+    {
+      "crc32c": "cMtaQw==",
+      "generation": 1788841323376801,
+      "name": "host_records/runner.rank4.log",
+      "sha256": "ed8e1346c205f9079a59e201ff53a663f81312fe37821ad08d21c9ee4a1047a2",
+      "size": 2734
+    },
+    {
+      "crc32c": "s8v7KQ==",
+      "generation": 1788841320898734,
+      "name": "host_records/runner.rank5.json",
+      "sha256": "dc32ecd3e902a0ce068ad4736d070e6b10c36c725ae438acb0e915470a788178",
+      "size": 49675
+    },
+    {
+      "crc32c": "cMtaQw==",
+      "generation": 1788841323467705,
+      "name": "host_records/runner.rank5.log",
+      "sha256": "ed8e1346c205f9079a59e201ff53a663f81312fe37821ad08d21c9ee4a1047a2",
+      "size": 2734
+    },
+    {
+      "crc32c": "9lA6xQ==",
+      "generation": 1788841321732491,
+      "name": "host_records/runner.rank6.json",
+      "sha256": "dbdfc42a630691a946a62b4e8c7ee966e3408111eff47fa93ff79bb0473295fe",
+      "size": 49677
+    },
+    {
+      "crc32c": "cMtaQw==",
+      "generation": 1788841324169590,
+      "name": "host_records/runner.rank6.log",
+      "sha256": "ed8e1346c205f9079a59e201ff53a663f81312fe37821ad08d21c9ee4a1047a2",
+      "size": 2734
+    },
+    {
+      "crc32c": "cWoY1g==",
+      "generation": 1788841320838875,
+      "name": "host_records/runner.rank7.json",
+      "sha256": "0d4428d80254eea75cd437d5b5a55052790c96c7bb07e8f3798a55d1b65ec82f",
+      "size": 49672
+    },
+    {
+      "crc32c": "cMtaQw==",
+      "generation": 1788841323268105,
+      "name": "host_records/runner.rank7.log",
+      "sha256": "ed8e1346c205f9079a59e201ff53a663f81312fe37821ad08d21c9ee4a1047a2",
+      "size": 2734
+    }
+  ],
+  "observed_storage_before_bytes": 1998649161274,
+  "performance_claim": false,
+  "remote_prefix": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z",
+  "root_clean_hosts": 8,
+  "tag": "greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z"
+}

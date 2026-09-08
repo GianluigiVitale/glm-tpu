@@ -3,8 +3,10 @@
 Continue autonomously to full project completion under §18 amended by §24 (owner pivot 2026-09-07).
 PRIORITY: genuine batched prefill and the ranked `docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md`.
 Original depth0.05 sealed DB575; do not launch another serial128K/256K campaign.
-Multirow projections/dense CPU-admitted; next bounded real-shape baseline and grouped MoE/causal
-layers, short decoder, efficient L7/L8 proofs. HANDOFF has evidence; DB573–575 are serial references.
+Real MoE/layer0/layer3 admitted DB583/584/587; CPU composition/78-layer adapter pass.
+All7 actual graphs and8 compile journals archived at133fe71f; expected HLO_REFUSED,8/8clean.
+Next strict HLO/memory admission and own short numerical proof, then targets/larger-row reuse
+and efficient L7/L8. HANDOFF has evidence; DB573–575 remain serial references.
 
 The authoritative details, stop conditions, and Definition of Done are in
 `docs/glm-tpu-revolution.md`. This is only the execution index.

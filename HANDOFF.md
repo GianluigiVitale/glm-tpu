@@ -1,6 +1,6 @@
 # HANDOFF — topology-first greenfield rewrite
 
-**Updated:** 2026-09-05 UTC
+**Updated:** 2026-09-08 UTC. Latest chronological entry is at the end.
 
 ## 2026-09-01 Gate-D exact-pin recursion isolated; recovery v5 source prepared only
 
@@ -15550,3 +15550,57 @@ profiles on actual main+tail. Do not invent a profile or repeat layer0/3.
 Expected all8 HLO_REFUSED/UNREGISTERED envelopes,7graph pairs, per-compile journals,
 normal/root8clean. No numerical, sealing, performanceDB or automatic retry.
 Launch tag/live handle will be recorded after launch; no TPU result yet.
+
+## 2026-09-08 04:23Z — complete batched acquisition evidence retained, no numerical run
+
+Run `greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T034734466845101Z`,
+pin133fe71fff18c6514ab76ca89d432a90c03b01dd, same retained tmpfs/overlay capsule.
+Controller session51133 TERMINAL exit1. All7 graphs compiled/inspected on all8 hosts,
+then EXPECTED HLO_REFUSED because batched profiles remain UNREGISTERED. Acquire
+deliberately supplies zero expected graph hashes, so identity refusals are expected
+too; no other violation is present. No prompt/model-decode execution, numerical
+result, SUCCESS, performance DB row or new checkpoint. Do not rerun acquisition.
+
+Source stayed frozen through upload/cleanup. Original PID/start/boot/argv identities
+matched8/8 mid-run; normal and authenticated root8/8clean04:23:07Z. Wrapper source/
+input sync and both leases covered the run. Storage before1,998,649,161,274B.
+44 original remote objects totaling61,467,637B generation/size/CRC/SHA-verified:
+8 HLO_REFUSED envelopes,8 logs,8 journals,14 gzip HLO forms,6 diagnostics. Every gzip
+inflates byte-identically to local originals; all8 envelopes/journals agree on
+each graph hash and compiled allocation. Each journal contains29 records: identity
+then begin/compiled/raw-written/inspected for all7 graphs. Original RecursionError
+is absent. Receipt `docs/artifacts/prefill-batched-seven-graph-acquisition-20260908.json`.
+Remote prefix `gs://driftbench-dsv4-uc/results/<full tag above>/`.
+
+Fleet load140.22–144.92s. Compile-only measurements, per chip:
+- main B17: arguments24,768,994,304B; outputs113,267,200B; temp855,351,808B;
+  alias0; generated code137,076,224B; compile334.09–372.48s across hosts.
+- tail B11: same arguments/outputs, temp802,251,264B; alias0;
+  generated code131,705,344B; compile344.62–375.51s.
+- both-prefill residency snapshot: current25,896,472,064B; cumulative peak
+  26,396,861,952B; limit33,014,398,976B, identical32chips. Stats did not rise on
+  tail compilation, so these cannot establish executable-memory overhead.
+These are NOT executed-prefill peaks or a long-context feasibility proof. Do not
+sum graph argument trees: raw/exact/overlay views share most physical buffers;
+account for retained nonargument weights, active outputs/temp and resident code.
+Zero prefill aliases mean old/proposed long caches need explicit budgeting.
+
+Independent read-only main/tail inspection finds75 per-layer FP32 fusion→reduce
+route sums (B17/B11×1536), followed by BF16 collective output rounding, plus the
+same feature4→expert8 scalarMIN→atomiccommit/token-sentinel chain. No tuple
+forwarding extension is needed for the route proof. Follow SSA, not instruction
+names; only the exact scoped75 MoE combines qualify. This advice is not admission.
+
+Next: implement strict main/tail HLO profiles from these originals (indexed once,
+exact helpers/payloads,75 route reducers, health/rollback/commit lineage and cache
+ownership), plus unique-buffer memory admission; reuse existing numerical adapter
+with real fleet AND, sealer/own §21 short proof. Register phase-budget/TTFT targets
+and larger routing-row reuse before performance promotion, then efficientL7/L8.
+No repeated cleared layers or unchanged acquisition, no serial long run. D/G history
+unchanged. Collection helper ws32_evidence expects HLO_ACQUIRED and cannot consume
+these refused envelopes, even with allow-failure-diagnostics; retain the original
+refusal receipt instead of synthesizing success or invoking numerical recovery.
+
+Persistence checks: receipt JSON/44 unique names/32 unique device IDs and slots,
+claim flags, goal3998characters and git diff check PASS. Independent current
+docs/receipt audit found no P0-P2 and approved CPU evidence persistence only.

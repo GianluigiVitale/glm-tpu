@@ -1,6 +1,6 @@
 # Goal — GLM-5.2-FP8 TPU v4: efficient end-to-end inference
 
-FULL ACCESS. Continue autonomously to §18 completion as amended by §24. Owner directive
+FULL ACCESS. Continue autonomously to §18 completion under §24. Owner directive
 2026-09-07 supersedes §23's deferred-prefill/decode-only completion: hours-long serial prefill
 is NOT a finished engine. Preserve historical evidence. Keep <4000 chars.
 At start/compaction read this and docs/glm-tpu-revolution.md IN FULL; read HANDOFF and
@@ -23,7 +23,7 @@ prefill, DSA/IndexShare, attention/MoE, FP8 layout/dequantization, collectives/g
 host/device synchronization, loading/caches, compilation/revalidation, storage and benchmarks.
 Findings: file/trace evidence, fact vs hypothesis, benefit,
 smallest test, correctness/HBM risk, priority and decision evidence.
-Maintain ENGINE_EFFICIENCY_AUDIT.md. Resolve major avoidable costs or justify measured tradeoffs.
+Maintain ENGINE_EFFICIENCY_AUDIT.md. Resolve major costs or justify measured tradeoffs.
 Seek measured performance; no unproved global maximum claims.
 Resolve review P0-P2; no repeated cleared-code review or speculative hardening loops.
 
@@ -56,9 +56,9 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
-DB583 MoE/DB584 layer0/DB587 layer3 PASS. Latest acquisition8/8clean03:25Z.
-CPU8-layer/two-chunk/handoff +78-layer adapter B17/B11 PASS.
-Main78 compiled; host recursion fixed offline. Partial journal tested/reviewed.
-Next approved acquisition of missing graphs/HBM; then OWN §21. HANDOFF has pins.
-No layer0/3 rerun; targets open. HANDOFF has pins.
-Efficient L7/L8 open; prefill speedup unmeasured.
+DB583 MoE/DB584 layer0/DB587 layer3 PASS; CPU composition/78-layer adapter PASS.
+133fe71f acquisition: all7 graphs/8 journals archived,8/8clean04:23Z Sep8.
+Expected HLO_REFUSED; no numerical execution. Main/tail memory preserved.
+Next actual-HLO/unique-buffer admission, numerical wiring and OWN §21.
+No acquisition/layer0/3 rerun. Targets/larger-row reuse open; pins in HANDOFF.
+Efficient L7/L8 open; speedup unmeasured.

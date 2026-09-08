@@ -1518,3 +1518,13 @@ normalized-state cause.
   compile memory must be journaled before inspection, with partial status that
   cannot authorize execution. Original20 remote objects retained,8/8clean03:25Z;
   no model arithmetic failure or measured prefill speed is established.
+
+- 2026-09-08 second batched acquisition133fe71f completed all7 graph inspections,
+  preserving8 complete refused envelopes and8 per-compile journals, then8/8clean.
+  Zero identity pins plus UNREGISTERED are the expected acquisition refusal, not
+  an execution result. The success materializer still requires HLO_ACQUIRED:
+  allow-failure-diagnostics does not waive runner status. Preserve/verify original
+  refused bytes separately; never manufacture success to reuse that helper.
+  Compile-only HBM counters exclude unexecuted prefill scratch/output peaks and
+  did not expose the second executable's residency; budget unique buffers/code
+  explicitly before short numerical work and remeasure at long capacity.
