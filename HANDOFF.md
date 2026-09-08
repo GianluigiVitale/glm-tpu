@@ -17486,3 +17486,18 @@ unchanged; actual ninecompile/WK/votedtrace option testPASS11.50s. Reviewer
 noP0-P2, conditional ONEcorrected profile afterpersistence/mirror/freshpreflights.
 Unused pytest36 fixture removedafterrootnoholdercheck; original evidence intact,
 free1,157,517,312B. No TPUinfrastructure operation, newweights or numericalchange.
+
+## 2026-09-08 20:12Z — corrected phase workers finish; collect same run
+
+Corrected run at a76eb23e:
+greenfield_fp8_ws32_prefill_completed_phase_baseline_l6_20260908T200408874805057Z.
+Allnineprograms/287calls/3warmup+10wall+2trace and DB594 reproductions finished;
+rank0validXPlane22MiB. Collector refused BEFORE anypayload download because
+789,367,202B of receipts +256MiB reserve =1,057,802,658B, only1,048,711,168Bfree.
+Normal/root8/8clean20:08:13. No modelrerun; same-run recovery next. Evict only
+verified171,923,721B DB594 local summary cache (remote generation retained),
+receipt db594-local-summary-eviction-20260908.json. Original fleets/weights stay.
+Recovery script reuses original wrapper census/accounting/archive, holdsboth
+leases and refuses existing recovery/summary/terminal; freshregion/pre/post
+checks. Current result notsealed until actualtrace/originalcollector/DB/archive
+passes. This is controller recovery, not another hardwareexperiment.

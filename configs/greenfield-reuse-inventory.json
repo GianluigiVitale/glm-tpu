@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-phase-same-run-recovery",
+      "category": "controller-only original phase collection and accounting",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "a76eb23e8e8be591843683f55d562d2df7580dcc",
+      "source_paths": ["scripts/greenfield/run_fp8_matmul_microbench.sh", "scripts/greenfield/ws32_prefill_layer_campaign.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/recover_prefill_phase.py"],
+      "gate": "24: controller recovery only; original numerical run finished",
+      "reason": "Read original committed wrapper census/account/archive blocks and call existing collector underbothleases. No worker launch, model rerun or infrastructure action. Fresh region/pre/postcensus, dirty/ancestor guards, in-lease summary/terminal/recovery checks and exact worker-checksum DB duplicate refusal. Restore local space only from generation/CRC/SHA-verified redundant summary cache; all originals retained remotely. Existing collector still checks exact8host trace and all numerical/memory evidence."
+    },
+    {
       "id": "ws32-prefill-phase-profiler-options",
       "category": "reuse protected device profiling without Python event explosion",
       "source_repo": "glm-tpu greenfield",
