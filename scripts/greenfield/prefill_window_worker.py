@@ -286,6 +286,7 @@ def execute_numerical(
     journal: WindowNumericalJournal,
     boundary_diagnostic: bool = False,
     completed_numerical: bool = False,
+    phase_baseline: bool = False,
 ) -> None:
     """Execute only AFTER the original acquisition call chain compiled/admitted."""
     from scripts.greenfield.probe_ws32_prefill_layer import input_specs
@@ -299,7 +300,7 @@ def execute_numerical(
 
         selected_admission = prefill_window_boundary_admission
         budgeter = selected_admission.memory_budget
-    if completed_numerical:
+    if completed_numerical or phase_baseline:
         from scripts.greenfield import prefill_completed_window_admission
         from scripts.greenfield import prefill_completed_window_assembly as assembly
         from scripts.greenfield import prefill_completed_window_worker as completed
@@ -308,7 +309,10 @@ def execute_numerical(
         names = (*selected_admission.PROGRAMS, *assembly.PROGRAMS)
         budgeter = assembly.memory_budget
     root = args.output_dir
-    calls = BudgetedCalls(
+    if phase_baseline:
+        from scripts.greenfield import prefill_phase_baseline as phase
+        from scripts.greenfield import prefill_phase_originals as originals
+    calls = (phase.CompactPhaseCalls if phase_baseline else BudgetedCalls)(
         root=root,
         record=record,
         consensus=consensus,
@@ -319,7 +323,7 @@ def execute_numerical(
     try:
 
         def bind():
-            if boundary_diagnostic and completed_numerical:
+            if sum((boundary_diagnostic, completed_numerical, phase_baseline)) > 1:
                 raise ValueError("boundary and completed numerical modes are exclusive")
             if len(compiled) != len(names) or set(record["programs"]) != set(names):
                 raise ValueError("window continuation lacks its acquired programs")
@@ -329,6 +333,21 @@ def execute_numerical(
             ):
                 raise ValueError("window continuation requires numerical profile")
             calls.programs = dict(zip(names, compiled, strict=True))
+            if phase_baseline:
+                if (
+                    record.get("protocol") != phase.PROTOCOL
+                    or record.get("reference_scope") != phase.SCOPE
+                    or record.get("performance_claim") is not False
+                    or record.get("independent_full_layer_admission") is not False
+                    or not isinstance(journal, phase.PhaseJournal)
+                ):
+                    raise ValueError(
+                        "phase continuation requires distinct baseline scope"
+                    )
+                calls.originals = originals.load_capsule()
+                record["original_binding"] = originals.bind_originals(
+                    record, local_slots, calls.originals
+                )
             if completed_numerical and (
                 record.get("protocol") != completed.protocol.PROTOCOL
                 or record.get("reference_scope") != completed.protocol.REFERENCE_SCOPE
@@ -366,6 +385,14 @@ def execute_numerical(
             )
             if set(shards) != set(local_slots):
                 raise ValueError("WK original output owners differ")
+            if phase_baseline:
+                for device, array in arrays.items():
+                    originals.check_observation(
+                        calls.originals,
+                        slot=local_slots[int(device)],
+                        kind=name,
+                        values={"wk": array},
+                    )
 
         decoded = calls.call(
             "wk_decode",
@@ -410,31 +437,40 @@ def execute_numerical(
         del decoded
         specs = calls.phase("input_specs", lambda: input_specs(weights, wk))
         case_executor = (
-            completed.execute_cases
-            if completed_numerical
+            phase.run_competitive
+            if phase_baseline
             else (
-                boundary.execute_boundary_case if boundary_diagnostic else execute_cases
+                completed.execute_cases
+                if completed_numerical
+                else (
+                    boundary.execute_boundary_case
+                    if boundary_diagnostic
+                    else execute_cases
+                )
             )
         )
         case_executor(calls, weights=weights, wk=wk, mesh=mesh, specs=specs)
+        evidence = calls.samples if phase_baseline else record["call_evidence"]
         record["model_executable_calls"] = sum(
             e["completed"]
-            for e in record["call_evidence"]
+            for e in evidence
             if e["graph"] in ("prefix", "candidate", "control")
         )
         record["wk_executable_calls"] = sum(
-            e["completed"]
-            for e in record["call_evidence"]
-            if e["graph"].startswith("wk_")
+            e["completed"] for e in evidence if e["graph"].startswith("wk_")
         )
-        if completed_numerical:
+        if completed_numerical or phase_baseline:
             record["assembly_executable_calls"] = sum(
-                e["completed"]
-                for e in record["call_evidence"]
-                if e["graph"] in assembly.PROGRAMS
+                e["completed"] for e in evidence if e["graph"] in assembly.PROGRAMS
             )
         calls.phase(
-            "boundary_complete" if boundary_diagnostic else "numerical_complete",
+            (
+                "phase_numerical_complete"
+                if phase_baseline
+                else (
+                    "boundary_complete" if boundary_diagnostic else "numerical_complete"
+                )
+            ),
             lambda: None,
         )
     finally:
@@ -444,6 +480,17 @@ def execute_numerical(
             try:
                 journal.close()
             finally:
+                if phase_baseline:
+                    for key, selected in (
+                        ("model_executable_calls", ("prefix", "candidate", "control")),
+                        ("wk_executable_calls", ("wk_decode", "wk_promote")),
+                        ("assembly_executable_calls", assembly.PROGRAMS),
+                    ):
+                        record[key] = sum(
+                            e["completed"]
+                            for e in (*calls.samples, *record["call_evidence"])
+                            if e["graph"] in selected
+                        )
                 record["compile_journal_sha256"] = sha256(
                     (root / "compile_journal.jsonl").read_bytes()
                 ).hexdigest()

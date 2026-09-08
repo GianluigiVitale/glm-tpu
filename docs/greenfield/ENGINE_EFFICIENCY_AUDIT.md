@@ -946,3 +946,13 @@ Parser cycle/idle fields include othergraphs/checks, not resource utilization;
 category means are not critical-path sums. No new speed result. Next DB594
 authentication, WK/collector/launcher/DB integration and complete-publication
 budget. See PREFILL_THROUGHPUT_ACTION_PLAN.md; no new numerical archaeology.
+
+19:08Z phase original authentication and existing-worker continuation now CPU
+tested:805220B DB594 capsule all32slots, actual field/selected-weight hashes,
+one retained first capture plus exact repeats, two existingWK then competitive
+sampler. Bounded gzip replay avoids reconstructing huge report inventories.
+Review fixed partial execution undercount when stream archival fails.69focused
+tests PASS7.50s plus original3case worker/consumer PASS88.32s. No launch/speedup;
+acquisition/collector/DB/trace publication still pending. Controller local
+recoverable aggregate runner/DB snapshot eviction306885280B restores1.216GB
+free without changing any cloud evidence or primaryDB. Receipt in artifacts.

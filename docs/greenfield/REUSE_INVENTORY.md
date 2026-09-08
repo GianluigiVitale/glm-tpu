@@ -2,6 +2,17 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+19:08Z phase authentication adapts DB594 generation-bound runner/case/WK
+originals into805220B capsule, all32physical slots/35weight hashes/components.
+Existing observe/encode/host fixture and BudgetedCalls now support distinct
+phase_baseline=False continuation: twoWK then competitive sampler, not3cases.
+One first capture retained, repeat bytes exact; mismatches retained before refusal.
+Bounded gzip-member replay rejects holes/overlap/trailing/oversize data.69CPU
+tests+original3case regression pass, independent review CPU persistence only.
+Acquisition/probe/campaign/stream-budget consumer/trace publication still unwired.
+Local duplicate aggregate report/DB snapshot evicted306885280B after exact
+remote generation/size/CRC/SHA and root no-holder checks; cloud originals intact.
+
 Phase sampler reuses actual completed-window traversal, BudgetedCalls and
 parse_xplane.aggregate_fleet; no duplicate model or launcher. Same initial
 caches across3warmup/10wall/2trace,19calls each; separate partial phase sums,

@@ -154,3 +154,45 @@ only. Next: DB594 original-output authentication, WK/worker continuation,
 compact evidence consumer/generation-qualified collector/DB/trace publication,
 complete storage preflight and current-diff launch review. No TPU run or new
 speed claim. Do not repeat cleared numerical or graph-acquisition experiments.
+
+## Original authentication and worker continuation — 2026-09-08 19:08Z
+
+`prefill_phase_originals.py` derives an805220B capsule from32 SHA-bound DB594
+files (runner, competitive original NPZ and two WK NPZs per host), retaining
+their generation/size/CRC/SHA provenance. Every32physical slot has exact
+component shape/storage-dtype/byte hashes and35selected-weight hashes. Capsule
+SHA706813a99acb3095b4782e68ebfbd94b8a342d4f9d2bddf6b65982a0fe258ffa.
+No new math reference or numerical verdict; these are sealed executing outputs.
+
+OriginalVerifier retains one first-traversal capture; all repeats must match
+the same DB594 bytes. First or later mismatches are retained before refusal.
+Existing execute_numerical now has explicit phase_baseline=False opt-in:
+distinct protocol/journal, CompactPhaseCalls selected before the two existingWK
+calls, exact WK reproduction, then only the fixed competitive adapter. Partial
+execution totals include the retained current entry if its archival fails.
+No model/kernel/compiler changes. The acquisition and launcher do NOT yet
+select this mode, so this is not hardware launch authority.
+
+Stream reader validates one bounded gzip member at a time and its compact
+pointer; refuses gaps, overlap, extra members, unindexed suffix, truncation,
+SHA/field mismatch and oversize inflation. Semantic call-budget/journal replay
+must still be connected to the collector; do not trust these byte checks as
+memory admission. Tests69PASS7.50s, including all32 local archived outputs,
+typed runtime binding, repeat/mismatch retention, stream mutations and actual
+WK/phase routing with fixture devices; unchanged original three-case worker
+consumer regressionPASS88.32s. Independent Astra P2 partial-counter finding
+corrected and reviewed, CPU persistence only.
+
+Next minimal integration: preserve existing five-model compile frames, select
+the phase journal plus four helper compiles, consume streamed witnesses with
+the existing budget/owner logic, fixed first-capture/trace publication and
+generation-qualified collector. Exactly135model+150helper+2WK calls. Test actual
+composition before launch. Whole-layer latency remainsNULL: phase sums are
+not independent end-to-end performance. Restore current controller headroom
+before launch if necessary; no weakened floor or new checkpoint.
+
+Local disk recovery: root aggregate runner.json and results_ckpt.db copies of
+DB594 evicted306885280B after exact remote generation/size/CRC/SHA and root
+no-open-holder checks. All fleet originals, summary/terminal/ledger and primary
+DB remain. Exact restoration recipe in
+`../artifacts/db594-local-summary-cache-eviction-20260908.json`.

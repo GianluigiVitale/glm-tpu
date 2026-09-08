@@ -2,6 +2,15 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+19:08Z phase originals/WK continuation CPU-tested:805220B DB594 capsule binds
+all32owners/components/selected weights to archived generations. One capture,
+exact repeats; bounded gzip member replay and correct partial failure counts.
+69focused tests+original3case regression PASS; independent CPU review clear.
+Acquisition/collector/trace/launcher integration remains; no new TPU result.
+See PREFILL_THROUGHPUT_ACTION_PLAN.md. DB594 root aggregate runner and DBsnapshot
+local copies evicted306885280B, exact remote generations retained; restoration
+receipt db594-local-summary-cache-eviction-20260908.json. Fleet originals intact.
+
 18:50Z phase sampler CPU-staged/reviewed, no TPU run: shared actual19-call
 traversal, reset caches, separate warmup/wall/trace, compact budget stream,
 voted summary/trace failures and exact module counts.27phase+4reuse tests pass;

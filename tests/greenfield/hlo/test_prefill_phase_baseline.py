@@ -394,6 +394,9 @@ def test_compact_calls_reuse_real_budgeted_timing_and_preserve_failures(
         assert calls.record["call_evidence"] and not calls.samples
     else:
         original = json.loads(gzip.decompress(calls.evidence_path.read_bytes()))
+        assert list(phase.read_call_witnesses(calls.evidence_path, calls.samples)) == [
+            original
+        ]
         assert not calls.record["call_evidence"] and len(calls.samples) == 1
         if failure != "dispatch":
             assert (
@@ -402,3 +405,84 @@ def test_compact_calls_reuse_real_budgeted_timing_and_preserve_failures(
             assert captures
         else:
             assert not original["completed"] and not captures
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "none",
+        "overlap",
+        "gap",
+        "missing",
+        "duplicate",
+        "suffix",
+        "truncated",
+        "hash",
+        "field",
+        "extra_member",
+        "raw_cap",
+        "byte_cap",
+    ],
+)
+def test_stream_reader_requires_exact_members_and_compact_bindings(
+    tmp_path, monkeypatch, change
+):
+    from hashlib import sha256
+    from copy import deepcopy
+
+    rows = [
+        dict(
+            phase=f"p{i}",
+            graph="prefix",
+            completed=True,
+            completed_call_seconds=0.25,
+            census={"large": "x" * 100},
+        )
+        for i in range(2)
+    ]
+    members, index = [], []
+    offset = 0
+    for row in rows:
+        raw = (json.dumps(row) + "\n").encode()
+        member = gzip.compress(raw)
+        members.append(member)
+        compact = {
+            k: row[k] for k in ("phase", "graph", "completed", "completed_call_seconds")
+        }
+        compact.update(
+            offset=offset,
+            compressed_bytes=len(member),
+            raw_sha256=sha256(raw).hexdigest(),
+        )
+        index.append(compact)
+        offset += len(member)
+    raw = b"".join(members)
+    if change == "overlap":
+        index[1]["offset"] -= 1
+    elif change == "gap":
+        index[1]["offset"] += 1
+    elif change == "missing":
+        index.pop()
+    elif change == "duplicate":
+        index.append(deepcopy(index[-1]))
+    elif change == "suffix":
+        raw += b"extra"
+    elif change == "truncated":
+        raw = raw[:-1]
+    elif change == "hash":
+        index[0]["raw_sha256"] = "0" * 64
+    elif change == "field":
+        index[0]["completed_call_seconds"] = 0.5
+    elif change == "extra_member":
+        index[0]["compressed_bytes"] = len(raw)
+    elif change == "raw_cap":
+        monkeypatch.setattr(phase, "MAX_WITNESS_RECORD_BYTES", 8)
+    elif change == "byte_cap":
+        monkeypatch.setattr(phase, "MAX_WITNESS_BYTES", 8)
+    path = tmp_path / "calls.gz"
+    path.write_bytes(raw)
+    if change == "none":
+        assert list(phase.read_call_witnesses(path, index)) == rows
+    else:
+        with pytest.raises(ValueError):
+            list(phase.read_call_witnesses(path, index))

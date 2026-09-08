@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-phase-original-authentication",
+      "category": "compact original reproduction and worker continuation",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "8f9b467bf73eb3735176e6a7b32c59cbb2406706",
+      "source_paths": ["scripts/greenfield/prefill_completed_window_protocol.py", "scripts/greenfield/prefill_layer_evidence.py", "scripts/greenfield/prefill_window_worker.py", "scripts/greenfield/prefill_phase_baseline.py", "docs/artifacts/prefill-completed-window-numerical-sealed-20260908.json"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_phase_originals.py", "scripts/greenfield/prefill_phase_baseline.py", "scripts/greenfield/prefill_window_worker.py", "tests/greenfield/hlo/test_prefill_phase_originals.py", "tests/greenfield/hlo/test_prefill_phase_continuation.py"],
+      "gate": "24: CPU original authentication and explicit WK/phase adapter; no launcher or performance result",
+      "reason": "805220B capsule derived from32 SHA-bound archived runner/case/WK files on8hosts;32slots and35selected-weight hashes each. Reuse actual observe/encode/fixture and WK/budgeted continuation, distinct default-off phase protocol/journal; no numerical3case rerun. Retain first capture, require exact field shape/dtype/byte reproduction thereafter; save mismatch before refusal. Stream gzip members with bounded inflation and no overlap/gap/trailing bytes; semantic budget consumer still pending. Final partial call counts include retained current witness on archive failure.69focused CPU tests plus original3case regression pass; independent review CPU persistence only. Acquisition/probe/campaign/collector/DB/trace publication remains before hardware."
+    },
+    {
       "id": "ws32-prefill-phase-baseline-staging",
       "category": "bounded phase sampling and prefill trace attribution",
       "source_repo": "glm-tpu greenfield",

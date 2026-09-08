@@ -15,10 +15,15 @@ import os
 from pathlib import Path
 import re
 import time
+import zlib
 from typing import Any, Callable, Iterator
 
 from scripts.greenfield.prefill_completed_window_worker import execute_window
 from scripts.greenfield.prefill_window_worker import BudgetedCalls
+from scripts.greenfield.ws32_acquisition_journal import Ws32NumericalJournal
+
+PROTOCOL = "ws32-layer6-db594-competitive-phase-baseline-v1"
+KERNEL = "ws32_prefill_completed_phase_baseline"
 
 WARMUP = 3
 SAMPLES = 10
@@ -43,6 +48,21 @@ SEQUENCE = (
 )
 MAX_WITNESS_CALLS = (WARMUP + SAMPLES + TRACED) * len(SEQUENCE) + 2  # optional WK
 MAX_WITNESS_BYTES = 32 << 20  # per host; no repeated full inventories in summaries
+MAX_WITNESS_RECORD_BYTES = 8 << 20
+
+
+class PhaseJournal(Ws32NumericalJournal):
+    artifact_kind = "greenfield_ws32_prefill_phase_baseline_journal_v1"
+
+    def _check_identity(self, identity: dict) -> None:
+        from scripts.greenfield.prefill_completed_window_admission import PROFILE
+
+        if (
+            identity.get("protocol") != PROTOCOL
+            or identity.get("profile") != PROFILE
+            or identity.get("compile_only") is not False
+        ):
+            raise ValueError("phase baseline requires distinct journal identity")
 
 
 def phase_summary(entries: list[dict]) -> dict:
@@ -111,7 +131,7 @@ class CompactPhaseCalls(BudgetedCalls):
                     )
                     + "\n"
                 ).encode()
-                if len(raw) > 8 << 20:
+                if len(raw) > MAX_WITNESS_RECORD_BYTES:
                     raise ValueError("phase witness exceeds bounded8MiB record")
                 member = gzip.compress(raw, mtime=0)
                 with self.evidence_path.open("ab") as stream:
@@ -136,6 +156,61 @@ class CompactPhaseCalls(BudgetedCalls):
                 entries.clear()
 
             self.phase(phase + "/archive_call", archive)
+
+
+def read_call_witnesses(path: Path, index: list[dict]) -> Iterator[dict]:
+    """Stream exact gzip members; no overlap, gaps, hidden suffix or zip bombs.
+
+    Callers must exhaust this iterator and separately validate memory/phase
+    semantics. This authenticates the compact pointers, not a worker verdict.
+    """
+    if (
+        not index
+        or len(index) > MAX_WITNESS_CALLS
+        or path.stat().st_size > MAX_WITNESS_BYTES
+    ):
+        raise ValueError("phase witness inventory/storage budget differs")
+    offset = 0
+    with path.open("rb") as stream:
+        for compact in index:
+            length = compact.get("compressed_bytes")
+            if (
+                type(compact.get("offset")) is not int
+                or compact["offset"] != offset
+                or type(length) is not int
+                or not 0 < length <= MAX_WITNESS_BYTES
+            ):
+                raise ValueError("phase witness offsets/lengths differ")
+            packed = stream.read(length)
+            inflater = zlib.decompressobj(wbits=31)
+            raw = inflater.decompress(packed, MAX_WITNESS_RECORD_BYTES + 1)
+            if (
+                len(packed) != length
+                or len(raw) > MAX_WITNESS_RECORD_BYTES
+                or not inflater.eof
+                or inflater.unused_data
+                or inflater.unconsumed_tail
+                or sha256(raw).hexdigest() != compact.get("raw_sha256")
+            ):
+                raise ValueError("phase witness member/digest differs")
+            entry = json.loads(raw)
+            expected = {k: entry[k] for k in ("phase", "graph", "completed")}
+            if "completed_call_seconds" in entry:
+                expected["completed_call_seconds"] = entry["completed_call_seconds"]
+            expected.update(
+                offset=offset,
+                compressed_bytes=length,
+                raw_sha256=sha256(raw).hexdigest(),
+            )
+            # JSON types matter (True must not stand in for an integer/time).
+            if json.dumps(compact, sort_keys=True, allow_nan=False) != json.dumps(
+                expected, sort_keys=True, allow_nan=False
+            ):
+                raise ValueError("phase witness compact fields differ")
+            yield entry
+            offset += length
+        if stream.read(1):
+            raise ValueError("phase witness has unindexed trailing bytes")
 
 
 @contextmanager
@@ -246,6 +321,65 @@ def run_samples(
     result["complete"] = True
     calls.phase("phase_baseline/complete", lambda: None)
     return result
+
+
+def run_competitive(
+    calls: CompactPhaseCalls, *, weights: Any, wk: Any, mesh: Any, specs: tuple
+) -> None:
+    """Existing worker continuation: fixed DB594 fixture, not three-case rerun."""
+    import jax
+    from glm_tpu.greenfield.kernels.reference.rotary import build_rotary_table_host
+    from scripts.greenfield import prefill_completed_window_admission as admission
+    from scripts.greenfield import prefill_completed_window_assembly as assembly
+    from scripts.greenfield import prefill_phase_originals as originals
+    from scripts.greenfield.prefill_window_protocol import CAPACITY, host_case
+    from scripts.greenfield.probe_ws32_prefill_layer import device_inputs
+
+    def bind():
+        if (
+            not isinstance(calls, CompactPhaseCalls)
+            or not isinstance(calls.journal, PhaseJournal)
+            or calls.budgeter is not assembly.memory_budget
+            or set(calls.programs) != set((*admission.PROGRAMS, *assembly.PROGRAMS))
+            or calls.record.get("protocol") != PROTOCOL
+            or calls.record.get("reference_scope") != SCOPE
+            or calls.record.get("independent_full_layer_admission") is not False
+            or calls.record.get("profile") != admission.PROFILE
+            or calls.record.get("compile_only") is not False
+            or calls.record.get("performance_claim") is not False
+        ):
+            raise ValueError("phase baseline lacks distinct protected continuation")
+        original = originals.load_capsule()
+        originals.bind_originals(calls.record, calls.local_slots, original)
+        return original
+
+    original = calls.phase("phase_original_bind", bind)
+    host = calls.phase(
+        "phase_fixture",
+        lambda: host_case(
+            "competitive", build_rotary_table_host(CAPACITY, rotary_dim=64, theta=8e6)
+        ),
+    )
+    verifier = calls.phase(
+        "phase_verifier", lambda: originals.OriginalVerifier(calls, original, host)
+    )
+    values = calls.phase(
+        "phase_inputs", lambda: device_inputs(host, specs, weights, wk, mesh)
+    )
+    tiles = calls.phase("phase_tiles", lambda: assembly.place_tiles(mesh))
+    calls.phase("phase_inputs_ready", lambda: jax.block_until_ready((values, tiles)))
+    run_samples(
+        calls,
+        values=values,
+        tiles=tiles,
+        verify_component=verifier.component,
+        verify_assembly=verifier.assembly,
+        trace_start=jax.profiler.start_trace,
+        trace_stop=jax.profiler.stop_trace,
+    )
+    calls.phase(
+        "phase_original_complete", lambda: verifier.finish(WARMUP + SAMPLES + TRACED)
+    )
 
 
 def trace_groups(programs: dict[str, str]) -> dict[str, dict]:

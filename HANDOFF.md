@@ -17370,3 +17370,42 @@ CPU composition then launch review/fresh leases+census/storage. No duplicate
 acquisition or numerical trial. DB594 latest protected result, own8K/efficient
 L7/L8/deliveredTTFT open. Local controller/model check empty; last authenticated
 fleet state remains DB594 normal/root8clean, not a fresh census. No newweights.
+
+## 2026-09-08 19:08Z — original authentication and WK/phase adapter
+
+Previous goal turn was PROGRESS:8f9b467b pushed/mirrored with exact readbacks,
+not a wait. This turn derives805220B compact original capsule from32 archived
+DB594 runner/competitive/WK files, all32slots/components and35selected tensors
+perowner. Source files size/SHA match pinned archiveledger, compact source
+generations/CRC retained. Capsule SHA706813a99acb3095b4782e68ebfbd94b8a342d4f9d2bddf6b65982a0fe258ffa.
+prefill_phase_originals.py provides typed physical+weight binding, exact
+shape/storage-dtype/byte output checks and one-first-capture verifier; later
+mismatches preserved separately. No new numerical oracle/threshold or model.
+
+Existing execute_numerical explicit phase_baseline=False chooses distinct
+PhaseJournal/CompactPhaseCalls, existing twoWK and exact originalWK checks,
+then run_competitive fixed DB594 fixture/15traversals, not3numericalcases.
+This adapter remains unselected by acquisition/probe/campaign/launcher.
+Strict gzip stream reader rejects missing/overlap/gap/trailing/extra members,
+pointer/byte/schema mismatch and oversize inflation, retaining one record at
+a time. Memory/journal semantic consumer and protected publication still need
+integration. Reviewer found partial counters omitted completed current call
+when archival failed; finalization counts compact+retained entries, tested.
+
+69focused CPU tests PASS7.50s (phase/original/continuation/reuse), original
+actual3case worker→consumer regression PASS88.32s. All32 original NPZ fields
+replayed locally against capsule, no fresh cloud payload downloads or TPU.
+Existing Astra noP0-P2 after narrow correction; CPU persistence only.
+Next preserve original five-model compile stack, select phase mode/journal
+and fourhelpers, stream existing budget validation, firstcapture/XPlane
+publication/collector/DB composition and launch review. Expected287calls:
+135model+150helper+2WK. Do not mislabel partial phase sums as whole-layer wall.
+
+Controller disk had913MBfree. Exact DB594 root runner.json162452128B and
+results_ckpt.db144433152B local duplicates evicted after sourceSHA/freshremote
+generation/size/CRC/root no-holder and inode/mtime checks, independent review.
+Receipt db594-local-summary-cache-eviction-20260908.json contains exact restore
+generations. Fleet originals/summary/SUCCESS/ledger and primaryDB unchanged;
+remote objects retained. After eviction1,215,545,344Bfree, still remeasure
+before launch. No model/controller live locally; no fresh fleet census claim.
+DB594 latest protected result; own8K/efficientL7/L8/deliveredTTFT stillOPEN.
