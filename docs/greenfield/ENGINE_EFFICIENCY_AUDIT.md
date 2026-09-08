@@ -936,3 +936,13 @@ helper consumes bothsuffixes). DB588 rank0 breakdown directly rules out majorhos
 control/transfer cost: blockcalls99.716s of102.203s. Internal device attribution
 still missing; no MXU/HBM utilization claim. Archiveestimate corrected:2.803GB
 completeprefix,1.709GBledger; futurebaseline must avoid repeated perrow summaries.
+
+18:50Z bounded phase sampler CPU-tested/reviewed, not wired for TPU: actual
+19-call traversal reused, immutable initial caches,3warmup/10wall/2trace and
+32MiB/host witness stream.27phase+4reuse PASS3.15s; original three-case
+worker/consumer regression PASS88.47s. Review fixed unvoted summary failure.
+B128/B32 modules both jit_suffix: trace explicitly mixed, wall separate.
+Parser cycle/idle fields include othergraphs/checks, not resource utilization;
+category means are not critical-path sums. No new speed result. Next DB594
+authentication, WK/collector/launcher/DB integration and complete-publication
+budget. See PREFILL_THROUGHPUT_ACTION_PLAN.md; no new numerical archaeology.

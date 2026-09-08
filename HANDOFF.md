@@ -17344,3 +17344,29 @@ same initialcaches/offsets; profile separately; existingassemble needs BOTH
 suffixes so cannot mislabel combinedcontrol+candidatewall asB128latency. Compare
 genuine independentpaths or explicitly labelled phase-summedestimates. Own8K,
 efficientfourdepthL7/L8/deliveredTTFT remainOPEN. goal3981chars. Noinfra/newweights.
+
+## 2026-09-08 18:50Z — phase profiler staged, no TPU launch
+
+New prefill_phase_baseline.py reuses execute_window extracted unchanged from
+completed numerical worker. Same initial caches across3warmup/10wall/2trace,
+exact19-call order. BudgetedCalls retains live/owner/pre/post/failure checks;
+dispatch-through-completion timing excludes checks/capture/votes. Phase sums
+omit independent final assembly and cannot claim end-to-end latency. Compact
+gzip witnesses32MiB/host/287calls includes optional2WK; archive failure retains
+full current entry. Complete run arrays/trace/publication still need budgeting.
+
+Actual B128/B32 both jit_suffix: trace combined10calls per2traversals, wall
+separate. Reuse parse_xplane.aggregate_fleet with exact8files/64cores/counts;
+fleet means are not critical path, cycle/idle includes othergraphs/checks and
+is NOT hardware utilization. Reviewer P2 unvoted sample summary fixed; actual
+phase-publication tests cover local/peer summary refusal and nonfinite clock,
+matched trace stop and no traced1.27phase+4reuse PASS3.15s; original actual
+three-case worker→consumer PASS88.47s. Independent existing Astra noP0-P2,
+CPU persistence only. No kernel/compiler change or hardware launch approval.
+
+Next DB594 original competitive-output authentication, existingWK/worker,
+compact stream consumer/generation-bound collector/DB/trace publication;
+CPU composition then launch review/fresh leases+census/storage. No duplicate
+acquisition or numerical trial. DB594 latest protected result, own8K/efficient
+L7/L8/deliveredTTFT open. Local controller/model check empty; last authenticated
+fleet state remains DB594 normal/root8clean, not a fresh census. No newweights.

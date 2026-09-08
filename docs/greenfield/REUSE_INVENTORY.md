@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Phase sampler reuses actual completed-window traversal, BudgetedCalls and
+parse_xplane.aggregate_fleet; no duplicate model or launcher. Same initial
+caches across3warmup/10wall/2trace,19calls each; separate partial phase sums,
+bounded32MiB/host call-witness stream, voted trace/summary failures. B128/B32
+both jit_suffix: trace explicitly mixes them, wall separate. Module cycle/idle
+includes intervening useful work, not hardware utilization.27phase+4reuse tests
+pass, original three-case replay passes; independent review CPU persistence only.
+DB594 authentication and protected collector/launcher/DB integration remain.
+
 18:14Z compiler-copy fix adapts the existing row-helper inspector and HLO parser.
 Actual66a65448 prepare_prefix has four closed same-layout HBM/VMEM copy pairs,
 not host transport. Bind source/destination/handle/unique completion; retain

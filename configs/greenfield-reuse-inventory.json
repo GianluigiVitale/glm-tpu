@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-phase-baseline-staging",
+      "category": "bounded phase sampling and prefill trace attribution",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "4365261ab84cd42e26e13c7b968510a4c6748b25",
+      "source_paths": ["scripts/greenfield/prefill_completed_window_worker.py", "scripts/greenfield/prefill_window_worker.py", "scripts/analysis/parse_xplane.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_phase_baseline.py", "scripts/greenfield/prefill_completed_window_worker.py", "tests/greenfield/hlo/test_prefill_phase_baseline.py"],
+      "gate": "24: staged CPU phase sampling, no protected launcher or performance result",
+      "reason": "Extract unchanged19-call traversal; retain all-live budget/owner/failure votes and completion timing. Reset initial caches, bound witness stream32MiB/host and287calls, preserve full current record on archive failure. Summary and trace failures vote. Actual acquired names combine wide/narrow suffix traces, never wall; raw parser cycle/idle metrics include intervening useful work, not hardware utilization. Partial phase sums exclude independent final assembly. CPU state/lifetimes/counts/order/timing/failures and original three-case replay pass. DB594 authentication, WK continuation and protected publication/collector/DB integration remain before deployment."
+    },
+    {
       "id": "ws32-prefill-completed-window-device-copy-inspection",
       "category": "bounded helper compiler-storage inspection",
       "source_repo": "glm-tpu greenfield",

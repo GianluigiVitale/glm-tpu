@@ -2,6 +2,14 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+18:50Z phase sampler CPU-staged/reviewed, no TPU run: shared actual19-call
+traversal, reset caches, separate warmup/wall/trace, compact budget stream,
+voted summary/trace failures and exact module counts.27phase+4reuse tests pass;
+original three-case worker replay passes. DB594 authentication/protected
+collector/launcher integration remains. See PREFILL_THROUGHPUT_ACTION_PLAN.md.
+No new utilization/throughput evidence; raw parser mixed-cycle idle fields are
+not resource utilization. Latest protected result remains DB594 below.
+
 LATEST18:26:01Z DB594 SEALED completed-prefix/B128suffix numerical, pinbae39c99,
 all3cases/32owners/59calls; normal/root8/8clean. Maxoutput3.05176e-5, routeweights
 2.98023e-8, peak409606656B/chip including reference. Sharedprefix suffix-only,

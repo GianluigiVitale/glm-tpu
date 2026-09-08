@@ -31,6 +31,99 @@ class CompletedJournal(Ws32NumericalJournal):
             raise ValueError("completed window requires distinct numerical journal")
 
 
+def execute_window(
+    calls: BudgetedCalls,
+    *,
+    case: str,
+    values: tuple,
+    tiles: tuple,
+    capture: Any,
+    preserve_assembly: Any,
+) -> tuple:
+    """Shared device traversal: four completed prefixes, both suffix paths, assembly.
+
+    Every invocation starts from values (immutable initial caches); results never
+    carry into a later traversal. Callbacks run after completion, outside timing.
+    """
+    import jax
+
+    prefixes = []
+    for tile in range(4):
+        prepared = calls.call(
+            case + f"/prepare_prefix{tile}",
+            "prepare_prefix",
+            assembly.prefix_arguments(values, tiles[tile]),
+            preserve=lambda result: None,
+        )
+        inputs = calls.phase(
+            case + f"/prefix{tile}_inputs",
+            lambda: assembly.attach_prefix(
+                values, prepared, prefixes[-1] if prefixes else None
+            ),
+        )
+        calls.phase(
+            case + f"/prefix{tile}_ready", lambda: jax.block_until_ready(inputs)
+        )
+        result = calls.call(
+            case + f"/prefix{tile}",
+            "prefix",
+            inputs,
+            preserve=lambda result: capture(
+                f"prefix{tile}", result, protocol.PREFIX_FIELDS
+            ),
+        )
+        prefixes.append(result)
+
+    prepared = calls.call(
+        case + "/prepare_wide",
+        "prepare_wide",
+        assembly.suffix_arguments(tuple(prefixes), values[9]),
+        preserve=lambda result: None,
+    )
+    inputs = calls.phase(
+        case + "/wide_inputs",
+        lambda: assembly.attach_suffix(values, prepared),
+    )
+    calls.phase(case + "/wide_ready", lambda: jax.block_until_ready(inputs))
+    wide = calls.call(
+        case + "/wide",
+        "candidate",
+        inputs,
+        preserve=lambda result: capture("wide", result, protocol.SUFFIX_FIELDS),
+    )
+    narrow = []
+    for tile in range(4):
+        prepared = calls.call(
+            case + f"/prepare_narrow{tile}",
+            "prepare_narrow",
+            assembly.suffix_arguments((prefixes[tile],), values[9], tiles[tile]),
+            preserve=lambda result: None,
+        )
+        inputs = calls.phase(
+            case + f"/narrow{tile}_inputs",
+            lambda: assembly.attach_suffix(values, prepared),
+        )
+        calls.phase(
+            case + f"/narrow{tile}_ready", lambda: jax.block_until_ready(inputs)
+        )
+        result = calls.call(
+            case + f"/narrow{tile}",
+            "control",
+            inputs,
+            preserve=lambda result: capture(
+                f"narrow{tile}", result, protocol.SUFFIX_FIELDS
+            ),
+        )
+        narrow.append(result)
+
+    return calls.call(
+        case + "/assemble",
+        "assemble",
+        assembly.assembly_arguments(tuple(prefixes), wide, tuple(narrow)),
+        preserve=lambda result: preserve_assembly(result, prefixes[-1]),
+    )
+
+
 def execute_cases(
     calls: BudgetedCalls, *, weights: Any, wk: Any, mesh: Any, specs: tuple[Any, ...]
 ) -> None:
@@ -102,78 +195,9 @@ def execute_cases(
             ):
                 raise ValueError("completed nonfinite operand; originals preserved")
 
-        prefixes = []
-        for tile in range(4):
-            prepared = calls.call(
-                case + f"/prepare_prefix{tile}",
-                "prepare_prefix",
-                assembly.prefix_arguments(values, tiles[tile]),
-                preserve=lambda result: None,
-            )
-            inputs = calls.phase(
-                case + f"/prefix{tile}_inputs",
-                lambda: assembly.attach_prefix(
-                    values, prepared, prefixes[-1] if prefixes else None
-                ),
-            )
-            calls.phase(
-                case + f"/prefix{tile}_ready", lambda: jax.block_until_ready(inputs)
-            )
-            result = calls.call(
-                case + f"/prefix{tile}",
-                "prefix",
-                inputs,
-                preserve=lambda result: capture(
-                    f"prefix{tile}", result, protocol.PREFIX_FIELDS
-                ),
-            )
-            prefixes.append(result)
-
-        prepared = calls.call(
-            case + "/prepare_wide",
-            "prepare_wide",
-            assembly.suffix_arguments(tuple(prefixes), values[9]),
-            preserve=lambda result: None,
-        )
-        inputs = calls.phase(
-            case + "/wide_inputs",
-            lambda: assembly.attach_suffix(values, prepared),
-        )
-        calls.phase(case + "/wide_ready", lambda: jax.block_until_ready(inputs))
-        wide = calls.call(
-            case + "/wide",
-            "candidate",
-            inputs,
-            preserve=lambda result: capture("wide", result, protocol.SUFFIX_FIELDS),
-        )
-        narrow = []
-        for tile in range(4):
-            prepared = calls.call(
-                case + f"/prepare_narrow{tile}",
-                "prepare_narrow",
-                assembly.suffix_arguments((prefixes[tile],), values[9], tiles[tile]),
-                preserve=lambda result: None,
-            )
-            inputs = calls.phase(
-                case + f"/narrow{tile}_inputs",
-                lambda: assembly.attach_suffix(values, prepared),
-            )
-            calls.phase(
-                case + f"/narrow{tile}_ready", lambda: jax.block_until_ready(inputs)
-            )
-            result = calls.call(
-                case + f"/narrow{tile}",
-                "control",
-                inputs,
-                preserve=lambda result: capture(
-                    f"narrow{tile}", result, protocol.SUFFIX_FIELDS
-                ),
-            )
-            narrow.append(result)
-
-        def preserve_assembly(result):
+        def preserve_assembly(result, last_prefix):
             for kind, rows in zip(("actual", "control"), result, strict=True):
-                assembled = assembly.attach_result(rows, prefixes[-1])
+                assembled = assembly.attach_result(rows, last_prefix)
                 observed = local_observations(assembled)
                 for device, fields in observed.items():
                     arrays.update(protocol.encode(f"{kind}_{device}", fields))
@@ -183,11 +207,13 @@ def execute_cases(
                         "completed assembly owner differs; originals preserved"
                     )
 
-        assembled = calls.call(
-            case + "/assemble",
-            "assemble",
-            assembly.assembly_arguments(tuple(prefixes), wide, tuple(narrow)),
-            preserve=preserve_assembly,
+        assembled = execute_window(
+            calls,
+            case=case,
+            values=values,
+            tiles=tiles,
+            capture=capture,
+            preserve_assembly=preserve_assembly,
         )
 
         def finish():
@@ -200,13 +226,7 @@ def execute_cases(
 
         calls.phase(case + "/comparison", finish)
         del (
-            prefixes,
-            wide,
-            narrow,
             values,
-            inputs,
-            result,
-            prepared,
             assembled,
             arrays,
             host,

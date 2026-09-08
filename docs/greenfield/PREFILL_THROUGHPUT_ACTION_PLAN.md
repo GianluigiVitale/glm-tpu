@@ -123,3 +123,34 @@ different kernels/schedules. Speculation remains separate effective throughput.
 Stop expanding formal checker proofs once the existing bounded contracts admit
 the real graph; spend the next hardware budget on measured bottlenecks. A profile
 must lead to a ranked change, not become another open-ended tooling project.
+
+## Phase sampler staged — 2026-09-08 18:50Z (CPU only)
+
+`scripts/greenfield/prefill_phase_baseline.py` reuses the numerical worker's
+extracted `execute_window`; no duplicate kernel or altered compiler stack.
+Three warmups, ten untraced samples and two separately traced traversals reset
+to the same initial caches. Each validates the exact19-call order. Partial
+phase sums include preparation but exclude independent final assembly; the
+existing comparison assembly consumes both paths and is reported separately.
+
+BudgetedCalls still times dispatch through all-leaf completion, excluding
+checks/capture/votes and separately reporting excluded costs. Full call-budget
+witnesses stream once to bounded gzip32MiB/host,287calls including optional2WK;
+JSON keeps compact offsets/SHA pointers. This does not yet bound the entire
+future run's arrays/XPlanes/publication. Trace entry/exit and summary failures
+vote; review caught and fixed an unvoted summary exception. Tests cover local/
+peer summary refusal and nonfinite clock, trace cleanup and no successor.
+
+Both actual suffix widths are named jit_suffix: trace reports their combined
+10executions per two traversals; wall samples keep widths separate. Parser
+categories are fleet means, not critical-path sums. Between-module cycle/idle
+fields include intervening useful graphs and host checks, not hardware-idle
+or MXU utilization. Preserve raw unclassified events and qualify FLOP/byte
+estimates rather than assuming they are measured hardware counters.
+
+27phase+4reuse tests PASS3.15s; original three-case worker/consumer replay
+PASS88.47s. Existing independent Astra: no remaining P0-P2, CPU persistence
+only. Next: DB594 original-output authentication, WK/worker continuation,
+compact evidence consumer/generation-qualified collector/DB/trace publication,
+complete storage preflight and current-diff launch review. No TPU run or new
+speed claim. Do not repeat cleared numerical or graph-acquisition experiments.
