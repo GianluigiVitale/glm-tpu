@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-layer-major-prefill-decoder-assembly",
+      "category": "batched prompt runtime and final decode handoff",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "a6a3bba9e23622969fd6ded488f542904b273a91",
+      "source_paths": ["glm_tpu/greenfield/runtime/ws32_decoder.py", "glm_tpu/greenfield/kernels/ws32_prefill_layer.py", "glm_tpu/greenfield/kernels/ws32_io.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "tests/greenfield/runtime/test_ws32_batched_prefill.py", "docs/greenfield/PREFILL_DECODER_ASSEMBLY.md"],
+      "gate": "24: default-off CPU decoder composition; own short-model TPU admission and performance pending",
+      "reason": "Reuses admitted layer kernels and existing raw weight/state specs without altering decode. One embedding reduction/block, explicit layer-major composition, producer slots0/1/2/6..., per-layer KV, dual index buffers, split residual, final-only last-live head and repaired promotion. Two scalar subgroup health reductions gate atomic state commit; failure preserves caches/frontiers and latches false. Typed prompt length/finished state and host finish check forbid premature serving or continued prefill after repair promotion. B1..32 is initial correctness window, not promised final performance geometry. CPU synthetic real-schema composition is not checkpoint resume/legacy numerical proof; complete short decoder must earn own section21 evidence. No new pack or TPU launch."
+    },
+    {
       "id": "ws32-prefill-db585-observed-full-layer-reference",
       "category": "actual PREnorm observed scalar reference v3",
       "source_repo": "glm-tpu greenfield",

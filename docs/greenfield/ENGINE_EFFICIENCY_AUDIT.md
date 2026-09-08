@@ -429,3 +429,16 @@ v1/v2 remainFAILED, no hardware fusion mechanism or performance claim. Alongside
 DB584 layer0 this permits cross-layer/dual-cache assembly and short-decoder proof;
 do not spend another trial on cleared layer0/3 arithmetic. First CPU compositions
 are2→3 and6→7, with two chunks/tails and repaired-index promotion at prompt end.
+
+CPU assembly now passes: separate `runtime/ws32_batched_prefill.py`, actual eight
+layers/two chunks and raw decode handoff; production78-layer B17/B11 abstract tree
+also passes without weight allocation. One embedding/block, layer-major kernel
+calls, only final-live-row head, dual-cache prompt phase and scalar subgroup
+all-owner commit. Invalid proposals preserve both caches/frontier and latch false.
+This closes the CPU integration part of E1, not protected short-model admission.
+B<=32 remains a correctness window, not sufficient measured MoE reuse. Next
+protected runner wiring, acquired HLO/memory, own §21 proof and phase baselines.
+E6 caveat: atomic rollback retains old/proposed caches; compiler aliasing/copies
+must be inspected and budgeted on the ACTUAL full-model graph before numerical
+execution. No assumption that old3.36GB long-capacity headroom covers this path.
+No candidate timing, TTFT speedup, long-context result or new checkpoint claimed.

@@ -2,6 +2,12 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST CPU2026-09-08: `runtime/ws32_batched_prefill.py` passes actual eight-layer
+two-chunk composition and raw decode handoff; production78-layer B17/B11 schema
+traces without allocating weights. Independent review no remaining P0-P2 for
+CPU persistence. `PREFILL_DECODER_ASSEMBLY.md` records state/repair/health contracts
+and limits. No TPU/performance result; next protected wiring then HLO/HBM/OWN §21.
+
 LATEST2026-09-08: DB587 full layer3 v3 admission PASSED all3cases32owners,
 including13thactualPREnorm/first12DB585 boundary reproduction. Artifact
 `docs/artifacts/prefill-complete-layer3-observed-admission-20260908.json`,

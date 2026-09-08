@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+New assembly: `runtime/ws32_batched_prefill.py` reuses admitted layer kernels,
+raw decoder weight/state specs and final sampling. Typed dual-cache/prompt-phase
+state, explicit producer slot map, all-owner atomic commit, final-only head and
+repair promotion. CPU8-layer/two-chunk/handoff and real78-layer schema PASS;
+no new hardware admission.
+See `PREFILL_DECODER_ASSEMBLY.md`. B1..32 is not a final throughput promise.
+
 LATEST: DB587 seals observed-reference full layer3 admission, all3cases32owners,
 actual13thPREnorm/first12DB585 fingerprints and original cache/causal/intervention
 replays. DB584 layer0 and DB583 MoE remain admitted. Next reuse in layer-major

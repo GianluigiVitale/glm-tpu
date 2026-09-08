@@ -15284,3 +15284,72 @@ of full prompt. Then short complete decoder must earn OWN protected raw-token,
 cutoff-active own-score DSA, cache/state and §21 adjudication. DB587 cannot replace
 that proof. Fixed prefill/TTFT targets and efficient four-depthL7/fullL8 stillopen.
 No model/controller live; latest run ended with authenticated8/8zero-work.
+
+## 2026-09-08 — layer-major decoder CPU composition PASSED
+
+Starting pin `a6a3bba9e23622969fd6ded488f542904b273a91`, same worktree/branch.
+Previous user-status turn was informational/no progress; this continuation makes
+implementation and CPU evidence progress, not a new protected hardware result.
+Fresh read-only root accelerator/libtpu/runner census authenticated eight distinct
+hosts idle before edits. No TPU/model/controller run, infrastructure action,
+checkpoint copy, large artifact or new results.db performance row in this turn.
+
+New `glm_tpu/greenfield/runtime/ws32_batched_prefill.py` composes admitted raw-layout
+layers into one default-off block program. Existing decode execution is untouched.
+Typed state holds existing decoder state, separate repaired buffer, prompt length
+and finished phase. B1..32 embedding once; layer-major split-residual execution;
+explicit full producer0/1/2/6... slots, per-layerKV, unrepaired prompt scoring;
+only last live row of final block runs head. Scalar feature4 then expert8 health
+agreement gates atomic cache/frontier commit. Failure preserves old cache state
+and latches false globally. Final commit promotes repaired keys; finished state
+refuses further prefill; host finish check releases one-row decode state/token.
+Raw config only: exact aliases and StrategyND overlay inputs are explicitly refused.
+Completed per-producer wk remains an explicit input, not per-block reconstruction.
+
+CPU evidence:
+- Actual eight-layer reduced-geometry weight tree/kernels, two chunks from synthetic
+  populated prefix505:17live then11live, nonidentity pages, layer2→3 and6→7.
+  Composition cache/selected outputs match independently wired completed layer calls.
+  Producer replacement/shared selection, distinct KV/index/repair, final-live head,
+  NaN padding, unrepaired-history independence, invalid metadata/count/token/page
+  rollback and final-block single-owner health poison all pass. A real raw CPU
+  one-row decoder step consumes the returned repaired state/next token successfully.
+- Production78-layer raw weight/state schemas trace forB17 and narrowB11 using
+  `jax.ShapeDtypeStruct` and retained layer0/3 metadata fixture, no full weight
+  allocation. Later full+MoE producers and unsupported configs are covered.
+- Initial fixture violated existing kv-head and segment constraints; corrected to
+  kv_heads16/topK128/segment128, no production validation weakened. First actual
+  composition pass160.38s; standalone production schema38.74s. After removing
+  redundant per-layer reference recompiles, final combined suite **18passed162.08s**:
+  `JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python -m pytest -q --tb=short
+  tests/greenfield/runtime/test_ws32_batched_prefill.py
+  tests/greenfield/runtime/test_ws32_decoder.py
+  tests/greenfield/unit/test_reuse_inventory.py`.
+- Independent `/root/prefill_inventory_fix_review` (Astra) reviewed runtime/current
+  test/docs delta: fixture P2 fixed, no remaining P0-P2 for CPU persistence,
+  conditional suite/schema pass now satisfied. No TPU launch approval implied.
+
+Limits: synthetic prefix and synthetic materializedwk in CPU composition do not
+certify checkpoint-bound resume or independent model arithmetic; production
+schema proves shape integration only. B32 is a correctness window, NOT a final
+efficient routing tile. No measured prefill/TTFT speedup or new §21 admission.
+Atomic rollback may retain old/proposed caches; inspect actual full-model HLO
+alias/copy allocation and measured per-chip HBM before hardware numerical work.
+
+Next concrete bulk work (not another layer0/3 trial):
+1. Wire a separate default-off prefill mode through existing protected worker,
+   wrapper, HLO validator, evidence graph registry and sealer together. Worker
+   `run_short_decoder_ws32.py` must bind a raw-prefill weight view BEFORE deleting
+   `all_arrays` aroundline895; promoted decode uses its existing exact/StrategyND
+   view. Both views share original arrays, no new full checkpoint or duplicate pack.
+2. Reuse existing completed `exact_dsa_weights[slot].wk_weight`/host rotary table.
+   Use independent prefill config (raw/host-RoPE), own main/tail graphs and explicit
+   typed phase state; do not feed it the old serial builder's donation indices.
+   Extend the acquired/compiled HLO and allocation contract for this actual graph,
+   all physical groups and useful rows. Do not label serial-loop HLO as batched.
+3. Protected short decoder earns OWN §21 proof. This prefill changes upstream
+   scores, so do not bind B′'s divergence record automatically. Raw tokens/own-score
+   DSA/caches and event adjudication need this candidate's evidence. No long run.
+4. Phase baseline/target registration and sufficient routing-row reuse still open;
+   then efficient four-depthL7/fullL8. See `PREFILL_DECODER_ASSEMBLY.md`, audit/cost
+   model and §24. Goal remains active; existing D/G closure is unchanged.
