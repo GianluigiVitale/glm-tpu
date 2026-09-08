@@ -2,6 +2,12 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST17:59Z completed numerical fleet/probe/tag/publication/wrapper/DB wired.
+ActualCPU producer + explicit synthetic8rank capsules pass originalreplay/DB;
+earlyprobe and finalization/refusal regressionspass. Currentreview conditional
+ONEbounded numericaltest afterpersistence/freshpreflights, nothardwareadmission.
+See HANDOFF;9graphs/28files/rank/59calls, sharedprefixsuffix-only, NULLlatency.
+
 LATEST17:47Z: existing acquisition→9graph→WK→59call numerical continuation and
 full graph/journal/WK/NPZ consumer integrated,87unique focused CPUtestsPASS.
 FiveactualDB593 graphs, helper/model math/counter fixtures; no hardware result.

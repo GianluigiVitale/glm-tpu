@@ -22,6 +22,7 @@ from scripts.greenfield.prefill_layer_evidence import (
 from scripts.greenfield.prefill_layer_numerical import FIELDS
 
 PROTOCOL = "ws32-prefill-layer6-completed-prefix-suffix128-control4x32-v1"
+KERNEL = "ws32_prefill_completed_window_numerical"
 REFERENCE_SCOPE = "SHARED_COMPLETED_PREFIX_SUFFIX_ONLY_NOT_INDEPENDENT_FULL_LAYER_DSA"
 PREFIX_FIELDS = (
     "mlp_input",

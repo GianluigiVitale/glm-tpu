@@ -341,6 +341,7 @@ def test_completed_close_failure_votes_before_snapshot(tmp_path, monkeypatch):
         acquisition.window.KERNEL,
         acquisition.BOUNDARY_KERNEL,
         acquisition.COMPLETED_KERNEL,
+        "ws32_prefill_completed_window_numerical",
         "ws32_prefill_window_boundary_diagnostic",
     ],
 )

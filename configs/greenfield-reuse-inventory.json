@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-completed-window-fleet-integration",
+      "category": "distinct numerical fleet publication and database integration",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "5b27fad583c95d25aa58dbd5b243308c41beb891",
+      "source_paths": ["scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/prefill_window_evidence.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_completed_window_protocol.py", "scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/prefill_window_evidence.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "tests/greenfield/hlo/test_prefill_completed_window_campaign.py"],
+      "gate": "24: CPU composed fleet/publication/DB and default-off protected numerical mode; hardware result pending",
+      "reason": "Reuse selected35-leaf preflight/loader, exact DB593 profile, existing nine-program59-call replay,32owner ledger/generation-qualified publication/collector and bounded shell with bothleases/freshnormal-rootcensus. Distinct KERNEL/tag and28artifacts/rank, explicit shared-prefix suffix-only scope and untimed DB item prevent full-layer/performance claims. CPU one real continuation with fixture math plus explicit synthetic other-rank capsules tests actual publication/collection/accounting and mutation refusals, avoiding eight identical59-call generators. Early probe flag forwarding and local/peer finalization failure preservation tested. No original failure repair, independent DSA or speed claim. Independent review allows one bounded numerical test after clean persistence and fresh preflights; no automatic retry."
+    },
+    {
       "id": "ws32-prefill-completed-window-wk-continuation",
       "category": "nine-program numerical continuation and original evidence replay",
       "source_repo": "glm-tpu greenfield",

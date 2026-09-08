@@ -114,6 +114,16 @@ def is_window_tag(tag: str) -> bool:
         is_acquisition_tag(tag)
         or is_numerical_tag(tag)
         or is_boundary_diagnostic_tag(tag)
+        or is_completed_numerical_tag(tag)
+    )
+
+
+def is_completed_numerical_tag(tag: str) -> bool:
+    from scripts.greenfield.prefill_completed_window_protocol import KERNEL
+
+    return (
+        re.fullmatch(r"greenfield_fp8_" + KERNEL + r"_l6_[a-zA-Z0-9_]+", tag)
+        is not None
     )
 
 

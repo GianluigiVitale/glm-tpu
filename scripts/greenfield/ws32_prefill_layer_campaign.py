@@ -46,6 +46,7 @@ from scripts.greenfield import prefill_window_protocol as window_protocol
 from scripts.greenfield import prefill_window_evidence as window_evidence
 from scripts.greenfield import prefill_window_boundary_evidence as boundary_evidence
 from scripts.greenfield import prefill_window_boundary_worker as boundary_protocol
+from scripts.greenfield import prefill_completed_window_protocol as completed_protocol
 
 
 def materialized_protocol(materialized: bool, observed: bool) -> Any:
@@ -73,9 +74,20 @@ def program_names(
     prefix_mlp: bool = False,
     observed: bool = False,
     completed_window: bool = False,
+    completed_numerical: bool = False,
 ) -> tuple[str, ...]:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
+    if completed_numerical:
+        if layer != 6 or any(
+            (diagnostic, materialized, prefix_mlp, observed, completed_window)
+        ):
+            raise ValueError("completed numerical requires distinct layer6 mode")
+        from scripts.greenfield.prefill_completed_window_assembly import (
+            PROGRAMS as helpers,
+        )
+
+        return (*window_acquisition.COMPLETED_PROGRAMS, *helpers)
     if layer == 6 and not any((diagnostic, materialized, prefix_mlp, observed)):
         return window_acquisition.acquisition_mode(completed=completed_window)[3]
     if completed_window:
@@ -107,7 +119,23 @@ def evidence_files(
     window_numerical: bool = False,
     boundary_diagnostic: bool = False,
     completed_window: bool = False,
+    completed_numerical: bool = False,
 ) -> tuple[str, ...]:
+    if completed_numerical and (
+        layer != 6
+        or any(
+            (
+                diagnostic,
+                materialized,
+                prefix_mlp,
+                observed,
+                window_numerical,
+                boundary_diagnostic,
+                completed_window,
+            )
+        )
+    ):
+        raise ValueError("completed numerical evidence requires distinct layer6 mode")
     if completed_window and (
         layer != 6
         or any(
@@ -138,7 +166,7 @@ def evidence_files(
         *(("compile_journal.jsonl",) if layer == 6 else ()),
         *(
             ("wk_decode.npz", "wk_promote.npz", "wk_boundary.npz")
-            if window_numerical or boundary_diagnostic
+            if window_numerical or boundary_diagnostic or completed_numerical
             else ()
         ),
         *(("boundary_prefix.npz",) if observed else ()),
@@ -151,6 +179,7 @@ def evidence_files(
                 prefix_mlp=prefix_mlp,
                 observed=observed,
                 completed_window=completed_window,
+                completed_numerical=completed_numerical,
             )
             for form in ("stablehlo.mlir", "optimized_hlo.txt")
         ),
@@ -161,7 +190,7 @@ def evidence_files(
                 if boundary_diagnostic
                 else (
                     window_protocol.CASES
-                    if window_numerical
+                    if window_numerical or completed_numerical
                     else () if layer == 6 else ("boundary",) if diagnostic else CASES
                 )
             )
@@ -211,6 +240,12 @@ def retained_preflight(tag: str, rank: int, pin: str) -> None:
         from scripts.greenfield.prefill_window_admission import registered_programs
 
         registered_programs()  # All eight checks finish before any TPU initialization.
+    if window_acquisition.is_completed_numerical_tag(tag):
+        from scripts.greenfield.prefill_completed_window_admission import (
+            registered_programs,
+        )
+
+        registered_programs()
     if window_acquisition.is_boundary_diagnostic_tag(tag):
         from scripts.greenfield.prefill_window_boundary_admission import (
             registered_programs,
@@ -283,7 +318,24 @@ def validate_workers(
     window_boundary: bool = False,
     boundary_diagnostic: bool = False,
     completed_window: bool = False,
+    completed_numerical: bool = False,
 ) -> None:
+    if completed_numerical and (
+        layer != 6
+        or any(
+            (
+                diagnostic,
+                materialized,
+                prefix_mlp,
+                observed,
+                window_numerical,
+                window_boundary,
+                boundary_diagnostic,
+                completed_window,
+            )
+        )
+    ):
+        raise ValueError("completed numerical fleet requires distinct layer6 mode")
     if completed_window and (
         layer != 6
         or any(
@@ -337,6 +389,7 @@ def validate_workers(
         prefix_mlp=prefix_mlp,
         observed=observed,
         completed_window=completed_window,
+        completed_numerical=completed_numerical,
     ):
         for form in ("stablehlo_sha256", "optimized_hlo_sha256"):
             hashes = {r["programs"][name][form] for r in records}
@@ -356,13 +409,22 @@ def validate_workers(
         module = (
             boundary_evidence
             if boundary_diagnostic
-            else window_evidence if window_numerical else window_acquisition
+            else (
+                window_evidence
+                if window_numerical or completed_numerical
+                else window_acquisition
+            )
         )
         options = (
-            {}
-            if window_numerical or boundary_diagnostic
-            else dict(
-                capture_boundaries=window_boundary, completed_window=completed_window
+            {"completed_numerical": True}
+            if completed_numerical
+            else (
+                {}
+                if window_numerical or boundary_diagnostic
+                else dict(
+                    capture_boundaries=window_boundary,
+                    completed_window=completed_window,
+                )
             )
         )
         module.validate_workers(
@@ -539,6 +601,9 @@ def validate_files(
     ):
         raise ValueError("retained preflight is not bound to the executing owners")
     if record["layer"] == 6:
+        if record.get("protocol") == completed_protocol.PROTOCOL:
+            window_evidence.validate_files(root, record, completed_numerical=True)
+            return
         module = (
             boundary_evidence
             if record.get("protocol") == boundary_protocol.PROTOCOL
@@ -648,6 +713,11 @@ def validate_record(
 ) -> None:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
+    if record.get("kernel") == completed_protocol.KERNEL:
+        if any((diagnostic, materialized, prefix_mlp, observed)):
+            raise ValueError("completed numerical cannot use historical layer mode")
+        window_evidence.validate_record(record, pin, completed_numerical=True)
+        return
     if record.get("kernel") == boundary_protocol.KERNEL:
         if any((diagnostic, materialized, prefix_mlp, observed)):
             raise ValueError("boundary diagnostic cannot use historical layer mode")
@@ -720,6 +790,7 @@ def publish_rank(tag: str, rank: int) -> None:
         window_numerical=window_acquisition.is_numerical_tag(tag),
         boundary_diagnostic=window_acquisition.is_boundary_diagnostic_tag(tag),
         completed_window=window_acquisition.is_completed_tag(tag),
+        completed_numerical=window_acquisition.is_completed_numerical_tag(tag),
     ):
         path = root / name
         if path.is_file():
@@ -752,6 +823,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     window_numerical = window_acquisition.is_numerical_tag(tag)
     window_boundary = window_acquisition.is_boundary_tag(tag)
     completed_window = window_acquisition.is_completed_tag(tag)
+    completed_numerical = window_acquisition.is_completed_numerical_tag(tag)
     boundary_diagnostic = window_acquisition.is_boundary_diagnostic_tag(tag)
     prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
@@ -777,6 +849,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             window_numerical=window_numerical,
             boundary_diagnostic=boundary_diagnostic,
             completed_window=completed_window,
+            completed_numerical=completed_numerical,
         )
         if len(receipts) != len(files) or {r["name"] for r in receipts} != {
             prefix + n for n in files
@@ -832,6 +905,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         window_boundary=window_boundary,
         boundary_diagnostic=boundary_diagnostic,
         completed_window=completed_window,
+        completed_numerical=completed_numerical,
     )
     if diagnostic:
         rp.verify_fleet_replicas(root / "fleet", records)
@@ -892,6 +966,19 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             profile=PROFILE,
             compile_only=False,
             numerical_execution_authorized=True,
+            hlo=records[0]["hlo"],
+        )
+    if completed_numerical:
+        from scripts.greenfield.prefill_completed_window_admission import PROFILE
+
+        result.update(
+            kernel=completed_protocol.KERNEL,
+            protocol=completed_protocol.PROTOCOL,
+            profile=PROFILE,
+            compile_only=False,
+            numerical_execution_authorized=True,
+            reference_scope=completed_protocol.REFERENCE_SCOPE,
+            independent_full_layer_admission=False,
             hlo=records[0]["hlo"],
         )
     if boundary_diagnostic:

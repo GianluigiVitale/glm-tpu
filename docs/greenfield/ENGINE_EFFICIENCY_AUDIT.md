@@ -904,3 +904,12 @@ eight scope/mixed-mode refusals stop beforeWK.87unique focused CPUtests pass
 (HANDOFF has selections/timings), including original ordinary/boundary consumers.
 No TPU run or speedup. Fleet/tag/probe/publication/wrapper/DB integration remains;
 do not repeat model acquisition or extend symbolic arithmetic proofs.
+
+17:59Z fleet/launcher integration closes that operational gap: distinct numerical
+kernel/tag, early preJAX profile and selectedowner validation,9graph/28file
+generation-qualified publication/collector and untimed suffix-only DBitem.
+CPU one actual59-call fixture plus freshslot-correct synthetic capsules tests
+all8owner consumers/DB without repeating8identical producers.46unique tests
+before reuse, including actual earlyprobe flags and finalization refusals.
+Independent review conditionally clears ONEbounded test afterpersistence/fresh
+preflights. No numerical/TPU result or speed claim yet; failure stops escalation.

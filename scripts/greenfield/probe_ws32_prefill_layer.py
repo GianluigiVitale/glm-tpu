@@ -346,6 +346,7 @@ def main() -> int:
     window_numerical = window_acquisition.is_numerical_tag(tag)
     window_boundary = window_acquisition.is_boundary_tag(tag)
     completed_window = window_acquisition.is_completed_tag(tag)
+    completed_numerical = window_acquisition.is_completed_numerical_tag(tag)
     boundary_diagnostic = window_acquisition.is_boundary_diagnostic_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
     observed_reference = observed_ref.is_observed_tag(tag)
@@ -422,6 +423,21 @@ def main() -> int:
                 admission_only=True,
                 diagnostic_only=False,
                 reference_scope=wp.REFERENCE_SCOPE,
+            )
+        if completed_numerical:
+            from scripts.greenfield import prefill_completed_window_protocol as cp
+            from scripts.greenfield import prefill_completed_window_admission as ca
+
+            ca.registered_programs()
+            record.update(
+                protocol=cp.PROTOCOL,
+                profile=ca.PROFILE,
+                compile_only=False,
+                numerical_execution_authorized=True,
+                admission_only=True,
+                diagnostic_only=False,
+                reference_scope=cp.REFERENCE_SCOPE,
+                independent_full_layer_admission=False,
             )
         if boundary_diagnostic:
             from scripts.greenfield import prefill_window_boundary_admission as ba
@@ -591,11 +607,14 @@ def main() -> int:
                 weights=weights,
                 consensus=consensus,
                 local_slots=(
-                    local_slots if window_numerical or boundary_diagnostic else None
+                    local_slots
+                    if window_numerical or boundary_diagnostic or completed_numerical
+                    else None
                 ),
                 capture_boundaries=window_boundary or boundary_diagnostic,
                 boundary_diagnostic=boundary_diagnostic,
-                completed_window=completed_window,
+                completed_window=completed_window or completed_numerical,
+                completed_numerical=completed_numerical,
             )
             record["status"] = "SUCCESS"
             guarded("terminal", lambda: _atomic_json(output, record))

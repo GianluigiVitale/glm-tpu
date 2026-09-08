@@ -39,6 +39,7 @@ def validate_workers(
     ledger: dict[int, Any],
     order: tuple[int, ...],
     boundary_diagnostic: bool = False,
+    completed_numerical: bool = False,
 ) -> None:
     """Join numerical memory/arrays to the existing selected32-owner ledger.
 
@@ -51,12 +52,25 @@ def validate_workers(
         TOPOLOGY_SHA,
     )
 
+    if boundary_diagnostic and completed_numerical:
+        raise ValueError("window numerical modes are exclusive")
     selected_admission = admission
+    names = admission.PROGRAMS
     if boundary_diagnostic:
         from scripts.greenfield import (
             prefill_window_boundary_admission as selected_admission,
         )
         from scripts.greenfield import prefill_window_boundary_worker as boundary
+    if completed_numerical:
+        from scripts.greenfield import (
+            prefill_completed_window_admission as selected_admission,
+        )
+        from scripts.greenfield import prefill_completed_window_protocol as completed
+        from scripts.greenfield.prefill_completed_window_assembly import (
+            PROGRAMS as helpers,
+        )
+
+        names = (*selected_admission.PROGRAMS, *helpers)
     slots = []
     for record in records:
         exact = dict(
@@ -102,6 +116,15 @@ def validate_workers(
                 boundary_capture_complete=True,
                 numerical_admission=False,
             )
+        if completed_numerical:
+            exact.update(
+                protocol=completed.PROTOCOL,
+                profile=selected_admission.PROFILE,
+                reference_scope=completed.REFERENCE_SCOPE,
+                independent_full_layer_admission=False,
+                model_executable_calls=27,
+                assembly_executable_calls=30,
+            )
         same_json({k: record.get(k) for k in exact}, exact, "worker scope/provenance")
         if not all(
             type(record.get(k)) is int and record[k] > 0 for k in ("pid", "start_ticks")
@@ -122,14 +145,15 @@ def validate_workers(
             )
             same_json({k: s.get(k) for k in expected}, expected, "selected bytes/owner")
             slots.append(slot)
-        if set(record["programs"]) != set(admission.PROGRAMS) or set(
-            record["cases"]
-        ) != (set() if boundary_diagnostic else set(protocol.CASES)):
+        if set(record["programs"]) != set(names) or set(record["cases"]) != (
+            set() if boundary_diagnostic else set(protocol.CASES)
+        ):
             raise ValueError("window numerical program/case inventory differs")
         validate_calls(
             record,
             local_slots={s["device_id"]: s["device_slot"] for s in local},
             boundary_diagnostic=boundary_diagnostic,
+            completed_numerical=completed_numerical,
         )
         same_json(
             record["hlo"],
@@ -161,7 +185,9 @@ def validate_workers(
         raise ValueError("window numerical requires32 distinct selected owners")
 
 
-def validate_record(record: dict[str, Any], pin: str) -> None:
+def validate_record(
+    record: dict[str, Any], pin: str, *, completed_numerical: bool = False
+) -> None:
     """Existing wrapper's untimed numerical-only DB classification check."""
     from scripts.greenfield.ws32_prefill_layer_campaign import (
         checkpoint_ledger,
@@ -187,10 +213,27 @@ def validate_record(record: dict[str, Any], pin: str) -> None:
         profiler_free_timing=False,
         comparison=dict(passed=True, diagnostic_evidence_complete=False),
     )
+    if completed_numerical:
+        from scripts.greenfield import prefill_completed_window_protocol as completed
+        from scripts.greenfield.prefill_completed_window_admission import PROFILE
+
+        exact.update(
+            kernel=completed.KERNEL,
+            protocol=completed.PROTOCOL,
+            profile=PROFILE,
+            reference_scope=completed.REFERENCE_SCOPE,
+            independent_full_layer_admission=False,
+        )
     same_json({k: record.get(k) for k in exact}, exact, "aggregate numerical scope")
     pins, ledger = checkpoint_ledger(6)
     validate_fleet(
-        record["workers"], pin, layer=6, pins=pins, ledger=ledger, window_numerical=True
+        record["workers"],
+        pin,
+        layer=6,
+        pins=pins,
+        ledger=ledger,
+        window_numerical=not completed_numerical,
+        completed_numerical=completed_numerical,
     )
     same_json(record["hlo"], record["workers"][0]["hlo"], "aggregate HLO")
     if (

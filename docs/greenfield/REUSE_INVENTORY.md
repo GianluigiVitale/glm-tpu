@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+17:59Z distinct completed numerical mode reuses the existing selected-layer
+probe/preflight, fleet owner/generation publication/collector, full59-call file
+consumer and protected shell/DB. Ninegraph28files/rank, suffix-only scope, NULL
+latency. One actualCPU continuation plus explicit synthetic other-rank capsules
+exercise publication→collector→DB without8identical generators. Early probe and
+finalization failures tested. Independent review conditionally clears ONEbounded
+numerical run after persistence/freshsafety preflights; no hardware result yet.
+
 Completed numerical continuation now reuses original acquisition compile frames,
 explicit assembly compiler, WK publication and existing BudgetedCalls. Allnine
 remain resident;59call replay and full graph/journal/original-array consumer

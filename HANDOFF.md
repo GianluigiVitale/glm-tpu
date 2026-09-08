@@ -17238,3 +17238,39 @@ Localfree17:42Z2,631,081,984B; fullmodel4GiBfloor remains unmet. goal3994chars.
 Independent existing Astra reviewed handoff and new file-consumer deltas separately:
 noP0-P2, CPU persistence approved after the now-passing regressions; no launch
 approval. Commit/push ownbranch then same-region mirror with exact readbacks.
+
+## 2026-09-08 17:59Z — completed numerical fleet/launcher/DB wired; one test next
+
+Previous turn made progress at5b27fad5, ownbranch pushed and exactsame-region
+branch/goal/HANDOFF/consumer hashes verified17:47Z. This turn adds distinct kernel
+ws32_prefill_completed_window_numerical and tag family; same selected-layer probe,
+preJAX admission, source/retained-header/35leaf loading, existing campaign and
+protected shell. Allnine graphs/28files perrank,32physical owners and59call budgets
+bind through original-generation publication, local raw-file replay and aggregate.
+Shared completedprefix DSA/cache agreement remains byconstruction. Only suffix
+numerical admission: independent_full_layer_admission=False, performanceFalse,
+zero timingiterations, NULL DB latency. Newitem:
+layer6_completed_prefix_b128_four_b32_suffix_numerical_59calls_v1.
+
+CPUtests: actual one59-call producer then seven EXPLICIT synthetic rank capsules
+(freshslot-correct arrays, copied journalstructure and fixturecounters) exercise
+publish_rank→generationmock→collect→all8originalreplays→actualshellDB. No claim
+of eight actual distributed executions.2testsPASS177.95s includingmodeinventory;
+five finalization/error-vote tests use tiny completedcasefixture (do not repeat
+whole59callgeneration) plus mode/acquisitionselection19PASS6.84s; remaining25old
+acquisitiontests4.46s. Actual preJAX probe scope/continuationflags1PASS1.23s.
+Counts before reuse:46unique, firstmode pass overlaps. Diffcheck/bash-npass.
+Reuse4PASS1.91s:50unique focused tests total. goal3996chars. Fresh livebucket
+18:00Z2,004,683,765,989B, US-CENTRAL2/softdelete0; below2.5e12 ceiling.
+Independent existing Astra noP0-P2, conditionally permits ONEbounded numerical
+run after these tests, cleancommit/push/mirror and freshbothleases/storage/
+normal-root8hostpreflights. No automaticretry or new modelacquisition.
+
+Launch only existing wrapper with GLM_GREENFIELD_FP8_MATMUL_KERNEL=
+ws32_prefill_completed_window_numerical and GLM_GREENFIELD_PREFILL_LAYER=6.
+Wrapper owns bothleases, authenticatednormal/rootdevice census and600sworker cap.
+No extra checkpoint; selected326079840B/chip, numerical originals/HLO below1GB
+expected archive, not a new largeweightartifact. Checkfresh live<2.5e12 andlocal
+bounded1GiBfloor; fullmodel4GiBfloor is separate. Freeze source during run/seal.
+If suffixpasses, it does NOT close own8K, independentfull-layer, efficientL7/L8
+orTTFT. Preserve any failure, diagnose only actual firstboundary, no taploop.
