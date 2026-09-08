@@ -17764,3 +17764,12 @@ generation/CRC/SHA-verified gzippedcloud originalsretained. Exactinode/size/
 mtime/ctime, noholders andbothleases guardunlinks. Review/action manifests
 paired-failed-main-local-cache-{eviction-review,evicted}-20260908.json.
 BeforeONEretry: cleanpublishedpin/mirror andfreshwrappercensuses/storage.
+
+22:50Z tag224805141704663Z at91c027e2 ABORTED beforeworkers: snapshotgrowth
+left4.280GB, below4GiBfloor. Normal/root8/8clean22:50:33. No TPUload/compile.
+Prior165MBcleanupwas too marginal. Reuse exactgeneration-qualified localtrace
+cacheeviction for DB588 rank1..7,2087733919B; sealedSUCCESS/canonicalledger,
+CRC/SHA/inodes/noholders/bothleases checked. Rank0/cloud/NPZ/HLO/DBretained.
+Review/action db588-local-trace-cache-{eviction-review,evicted}-20260908.json.
+Require>=6GB controllerfree BEFORElaunch, notjust4GiBthreshold. Model/enforcement
+unchanged; bothactualgraph/JSON passes at91c027e2 remainvalid. ONEguardedrun next.
