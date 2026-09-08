@@ -19,6 +19,7 @@ from typing import Any, Iterable
 
 import google_crc32c
 from google.cloud import storage
+from .ws32_prefill import require_fleet_prefill_mode
 
 
 BASE_GRAPHS = ("prefill_chunk", "prefill_tail", "observer", "decode", "cache_probe")
@@ -107,6 +108,10 @@ def _expected_layout_free_names(*, numerical: bool) -> set[str]:
 
 
 def _runner_layout(runners: list[dict[str, Any]]) -> str:
+    try:
+        require_fleet_prefill_mode(runners)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     layouts = {str(runner.get("evidence_layout", EVIDENCE_LAYOUT_V1)) for runner in runners}
     if len(layouts) != 1:
         raise SystemExit(f"runner records disagree on the evidence layout: {sorted(layouts)}")

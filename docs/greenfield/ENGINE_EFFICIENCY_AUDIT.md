@@ -442,3 +442,15 @@ E6 caveat: atomic rollback retains old/proposed caches; compiler aliasing/copies
 must be inspected and budgeted on the ACTUAL full-model graph before numerical
 execution. No assumption that old3.36GB long-capacity headroom covers this path.
 No candidate timing, TTFT speedup, long-context result or new checkpoint claimed.
+
+Protected acquisition-only integration now compiles the distinct main/tail API
+from shared raw weights, reusing completed wk and exact narrow rows. The host
+adapter's local budget decision was a real distributed hang risk: independent
+review caught it before deployment; health and budget/logging now require all-host
+AND before continuation, including final block. Peer-only refusals are tested.
+Another review caught loss of memory/provenance on planned HLO refusal; failed
+acquisition now writes the complete runner envelope before raising so the existing
+uploader preserves it. Actual compiler helper/route-sum/health/cache-allocation
+profiles remain unregistered; new mode cannot execute numerically or seal. This
+is protected integration progress, not a TPU or performance result. See assembly
+document for exact next acquisition and source-derived full-model inventory.

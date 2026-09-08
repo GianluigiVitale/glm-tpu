@@ -63,6 +63,9 @@ from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
 )
 from glm_tpu.greenfield.types import ModelGeometry  # noqa: E402
 from glm_tpu.greenfield.validation.ws32_evidence import EVIDENCE_LAYOUT_V2  # noqa: E402
+from glm_tpu.greenfield.validation.ws32_prefill import (  # noqa: E402
+    PREFILL_MODE, PREFILL_MODES, SERIAL_PREFILL_MODE, require_batched_profile,
+)
 from glm_tpu.greenfield.validation import (  # noqa: E402
     compare_ws32_dsa_step,
     compare_ws32_dsa_within_engine,
@@ -137,6 +140,7 @@ def parse_args() -> argparse.Namespace:
     # program so the graph set is the same for every prompt length and the
     # host can project the prefill wall and abort fail-closed.
     parser.add_argument("--prefill-chunk", type=int, required=True)
+    parser.add_argument("--prefill-mode", choices=PREFILL_MODES, default=SERIAL_PREFILL_MODE)
     parser.add_argument("--prefill-budget-seconds", type=float, required=True)
     # Spec §23.8: declared side program measuring on-device rotary at long
     # positions (default off); its record is embedded in the runner record.
@@ -379,6 +383,8 @@ def _write_graph(
     exact_dsa: bool,
     strategy_nd_dense: bool,
     host_main_rope_table: bool = False,
+    prefill_mode: str = SERIAL_PREFILL_MODE,
+    block_rows: int | None = None,
 ) -> tuple[dict[str, Any], str, str]:
     stable = str(lowered.compiler_ir(dialect="stablehlo"))
     optimized = compiled.as_text()
@@ -386,6 +392,13 @@ def _write_graph(
     optimized_path = hlo_dir / f"{graph}.optimized_hlo.txt"
     _atomic_text(stable_path, stable)
     _atomic_text(optimized_path, optimized)
+    if prefill_mode == PREFILL_MODE and graph in ("prefill_chunk", "prefill_tail"):
+        from glm_tpu.greenfield.benchmarking.ws32_batched_prefill import inspect_ws32_batched_prefill_hlo
+        return inspect_ws32_batched_prefill_hlo(
+            stable, optimized, block_rows=block_rows,
+            expected_stablehlo_sha256=expected_stable,
+            expected_optimized_hlo_sha256=expected_optimized,
+        ), stable, optimized
     report = validate_ws32_decoder_hlo(
         stable,
         optimized,
@@ -452,6 +465,31 @@ def _require_acquisition_authorized(
         for value in graphs.values()
     ):
         raise RuntimeError("WS32 HLO acquisition found structural violations")
+
+
+def _publish_acquisition_result(
+    prevalidation: Mapping[str, Any], *, output: Path, exact_dsa: bool,
+) -> dict[str, Any]:
+    """Preserve all seven graphs' compact evidence even on planned refusal.
+
+    The wrapper uploads runner.rankN.json, not hlo/prevalidation.json. Losing
+    that envelope would force another model load just to recover allocations.
+    HLO_REFUSED is never a SUCCESS or an execution authorization.
+    """
+    try:
+        _require_acquisition_authorized(prevalidation["graphs"], exact_dsa=exact_dsa)
+    except RuntimeError as exc:
+        _atomic_json(output, {
+            **prevalidation, "performance_claim": False, "schema_version": 1,
+            "status": "HLO_REFUSED", "failure": str(exc),
+        })
+        raise
+    result = {
+        **prevalidation, "performance_claim": False,
+        "schema_version": 1, "status": "HLO_ACQUIRED",
+    }
+    _atomic_json(output, result)
+    return result
 
 
 def _trace_files(trace_dir: Path) -> list[dict[str, Any]]:
@@ -623,6 +661,16 @@ def _require_passkey_tooling(long_context: Any, tokenizer_root: Path | None) -> 
 
 def main() -> int:
     args = parse_args()
+    require_batched_profile(
+        args.prefill_mode, exact_dsa=bool(args.exact_dsa),
+        host_main_rope_table=bool(args.host_main_rope_table),
+        block_rows=args.prefill_chunk, long_context=args.long_context,
+        adjudication_record=args.dsa_adjudication_record,
+        adjudication_sha256=args.dsa_adjudication_sha256,
+    )
+    batched_prefill = args.prefill_mode == PREFILL_MODE
+    if batched_prefill and not args.compile_only:
+        raise ValueError("batched numerical execution awaits registered production HLO/memory profiles")
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("WS32 short decoder requires eight launch processes")
     if min(args.observer_steps, args.warmup, args.iterations, args.trace_steps) < 1:
@@ -886,6 +934,10 @@ def main() -> int:
     weights = bind_ws32_decoder_weights(
         {name: all_arrays[name] for name in expected_names}, config
     )
+    raw_prefill_config = raw_prefill_weights = None
+    if batched_prefill:
+        from scripts.greenfield import ws32_batched_prefill_runner as batched
+        raw_prefill_config, raw_prefill_weights = batched.bind_raw_prefill_weights(all_arrays, config)
     device_memory_after_load = tuple(
         _memory_stats(device) for device in jax.local_devices()
     )
@@ -984,23 +1036,40 @@ def main() -> int:
     prefill_lowered: dict[str, Any] = {}
     prefill_jits: dict[str, Any] = {}
     donate = (1, 4) if exact_dsa_weights is not None else (1, 3)
+    if batched_prefill:
+        from glm_tpu.greenfield.runtime.ws32_batched_prefill import Ws32BatchedPrefillState
+        batched_plan = batched.BatchedPrefillPlan(prompt_length, args.prefill_chunk, config.context_capacity)
+        prefill_programs = batched.build_graph_pair(mesh, raw_prefill_config, batched_plan)
+        batched_wk = batched.completed_repair_weights(exact_dsa_weights, raw_prefill_config)
+        # Shape placeholders share the existing fresh buffers; no second cache allocation.
+        batched_state = Ws32BatchedPrefillState(
+            state, repaired_buffer,
+            batched.replicated(mesh, np.asarray(prompt_length, np.int32)),
+            batched.replicated(mesh, np.asarray(False, np.bool_)),
+        )
     for graph, length in (
         ("prefill_chunk", args.prefill_chunk),
         ("prefill_tail", tail_length),
     ):
-        prefill_programs[graph] = build_ws32_chunked_prefill_program(
-            mesh, config, chunk_length=length
-        )
-        prefill_jits[graph] = jax.jit(
-            prefill_programs[graph].execute, donate_argnums=donate
-        )
-        # Shape-only placeholder: the 2K prompt (2,034 tokens) is shorter than
-        # the default chunk, and trace values are irrelevant to lowering.
-        chunk_ids = _replicated(jax, mesh, np.zeros(length, dtype=np.int32))
-        inputs = (chunk_ids, state, weights)
-        if exact_dsa_weights is not None:
-            inputs = (*inputs, exact_dsa_weights)
-        inputs = (*inputs, repaired_buffer, *table_inputs)
+        if batched_prefill:
+            prefill_jits[graph] = prefill_programs[graph].execute
+            inputs = batched.graph_inputs(
+                mesh, np.zeros(length, np.int32), batched_state,
+                raw_prefill_weights, batched_wk, table_inputs[0],
+            )
+        else:
+            prefill_programs[graph] = build_ws32_chunked_prefill_program(
+                mesh, config, chunk_length=length
+            )
+            prefill_jits[graph] = jax.jit(
+                prefill_programs[graph].execute, donate_argnums=donate
+            )
+            # Shape-only placeholder; no prompt value is executed during acquisition.
+            chunk_ids = _replicated(jax, mesh, np.zeros(length, dtype=np.int32))
+            inputs = (chunk_ids, state, weights)
+            if exact_dsa_weights is not None:
+                inputs = (*inputs, exact_dsa_weights)
+            inputs = (*inputs, repaired_buffer, *table_inputs)
         prefill_lowered[graph] = prefill_jits[graph].lower(*inputs)
         started = time.perf_counter()
         prefill_compiled[graph] = prefill_lowered[graph].compile()
@@ -1019,8 +1088,12 @@ def main() -> int:
             exact_dsa=config.exact_dsa,
             strategy_nd_dense=config.strategy_nd_dense,
             host_main_rope_table=config.host_main_rope_table,
+            prefill_mode=args.prefill_mode,
+            block_rows=length,
         )
-        del chunk_ids
+        del inputs
+        if not batched_prefill:
+            del chunk_ids
     for graph in ("prefill_chunk", "prefill_tail"):
         _require_graph_authorized(
             graphs[graph], compile_only=bool(args.compile_only)
@@ -1306,6 +1379,7 @@ def main() -> int:
         "mesh_sha256": physical_mesh.mesh_hash,
         "main_rope_table": main_rope_table_record,
         "prefill_chunk_length": int(args.prefill_chunk),
+        **({"prefill_mode": args.prefill_mode, "batched_prefill_plan": batched_plan.identity()} if batched_prefill else {}),
         "prefill_execution": prefill_execution,
         "prompt_length": int(prompt_token_ids.size),
         "rotary_diagnostic": rotary_diagnostic,
@@ -1339,16 +1413,9 @@ def main() -> int:
     _atomic_json(args.hlo_dir / "prevalidation.json", prevalidation)
     graph_passed = all(value["passed"] for value in graphs.values())
     if args.compile_only:
-        _require_acquisition_authorized(
-            graphs, exact_dsa=config.exact_dsa
+        _publish_acquisition_result(
+            prevalidation, output=args.output, exact_dsa=config.exact_dsa
         )
-        result = {
-            **prevalidation,
-            "performance_claim": False,
-            "schema_version": 1,
-            "status": "HLO_ACQUIRED",
-        }
-        _atomic_json(args.output, result)
         print(
             f"GREENFIELD_WS32_SHORT_HLO_ACQUIRED rank={args.process_id}",
             flush=True,

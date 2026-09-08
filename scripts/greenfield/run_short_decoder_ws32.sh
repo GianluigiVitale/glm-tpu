@@ -26,6 +26,23 @@ CONTEXT=${GLM_GREENFIELD_WS32_SHORT_DECODER_CONTEXT:-off}
 RECOVER=${GLM_GREENFIELD_WS32_SHORT_DECODER_RECOVER:-0}
 EXACT_DSA=${GLM_GREENFIELD_WS32_EXACT_DSA:-0}
 STRATEGY_ND_DENSE=${GLM_GREENFIELD_WS32_STRATEGY_ND_DENSE:-0}
+readonly PREFILL_MODE=${GLM_GREENFIELD_WS32_PREFILL_MODE:-serial_teacher_forced_v1}
+case "$PREFILL_MODE" in
+  serial_teacher_forced_v1) ;;
+  layer_major_raw_v1)
+    [[ $MODE == acquire && ( $CONTEXT == 2k || $CONTEXT == 8k ) && $EXACT_DSA == 1 && ${GLM_GREENFIELD_WS32_HOST_MAIN_ROPE_TABLE:-0} == 1 && ${GLM_GREENFIELD_WS32_DSA_ADJUDICATION:-0} == 0 ]] || {
+      echo "Batched prefill currently permits short acquisition only: exact decode, host main RoPE, no inherited adjudication" >&2
+      exit 2
+    }
+    ;;
+  *) echo "Unknown WS32 prefill mode" >&2; exit 2 ;;
+esac
+# §24 forbids spending more hours on serial prompt ingestion. Historical
+# evidence recovery remains available; it does not dispatch model work.
+if [[ $PREFILL_MODE == serial_teacher_forced_v1 && $RECOVER == 0 && ( $CONTEXT == 128k_* || $CONTEXT == 256k_e0 ) ]]; then
+  echo "§24 refuses new serial long-context runs; recover existing evidence only" >&2
+  exit 2
+fi
 [[ $MODE == acquire || $MODE == numerical ]] || {
   echo "WS32 mode must be acquire or numerical" >&2
   exit 2
@@ -273,11 +290,18 @@ readonly ROTARY_DIAGNOSTIC
 # chunk length is a pinned run input (the equivalence record proves
 # C-independence at 2048 and 512); the wall budget bounds the projected
 # prefill so a run fails closed long before the worker timeout.
-PREFILL_CHUNK=${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-2048}
-[[ $PREFILL_CHUNK =~ ^[0-9]+$ && $PREFILL_CHUNK -ge 64 && $PREFILL_CHUNK -le 2048 && $((PREFILL_CHUNK % 64)) -eq 0 ]] || {
-  echo "WS32 prefill chunk must be a multiple of 64 in [64, 2048]" >&2
-  exit 2
-}
+if [[ $PREFILL_MODE == layer_major_raw_v1 ]]; then
+  PREFILL_CHUNK=${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-17}
+  [[ $PREFILL_CHUNK =~ ^[0-9]+$ && $PREFILL_CHUNK -ge 1 && $PREFILL_CHUNK -le 32 ]] || {
+    echo "WS32 batched prefill block must have1..32 live rows" >&2; exit 2;
+  }
+else
+  PREFILL_CHUNK=${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-2048}
+  [[ $PREFILL_CHUNK =~ ^[0-9]+$ && $PREFILL_CHUNK -ge 64 && $PREFILL_CHUNK -le 2048 && $((PREFILL_CHUNK % 64)) -eq 0 ]] || {
+    echo "WS32 prefill chunk must be a multiple of 64 in [64, 2048]" >&2
+    exit 2
+  }
+fi
 readonly PREFILL_CHUNK
 # §23.5 wall budgets. The projection guard must sit well above the cost §23.3
 # Step C measured at the run's own capacity (116.4 ms per prompt token at 8,192,
@@ -298,6 +322,7 @@ readonly STORAGE_RESERVE_BYTES=6000000000
 if [[ $PREFILL_CHUNK -eq 2048 ]]; then CHUNK_SUFFIX=; else CHUNK_SUFFIX=_c${PREFILL_CHUNK}; fi
 [[ $CONTEXT_CAPACITY -eq 8192 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_cap${CONTEXT_CAPACITY}
 [[ $HOST_MAIN_ROPE_TABLE -eq 0 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_hrope
+[[ $PREFILL_MODE == serial_teacher_forced_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_bp1
 readonly CHUNK_SUFFIX
 # The L7 pass criterion detokenises the first twenty greedy tokens (the legacy
 # capture holds exactly twenty), so a passkey run must observe at least twenty.
@@ -788,7 +813,7 @@ coordinator=$(gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=0 \
 coordinator="$coordinator:8476"
 say "launching complete WS32 worker fleet coordinator=$coordinator"
 # shellcheck disable=SC2016
-execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; output="$run/runner.rank${idx}.json"; tensors="$run/runner.rank${idx}.npz"; hlo="$run/hlo"; trace="$run/trace"; log="$run/runner.rank${idx}.log"; ended="$run/runner.rank${idx}.ended"; mkdir -p "$run"; upload(){ local rc=0; [[ ! -f $output ]] || gcloud storage cp --no-clobber "$output" "$remote/host_records/runner.rank${idx}.json" >/dev/null 2>&1 || rc=1; [[ ! -f $tensors ]] || gcloud storage cp --no-clobber "$tensors" "$remote/host_records/runner.rank${idx}.npz" >/dev/null 2>&1 || rc=1; [[ ! -f $log || ! -f $ended ]] || gcloud storage cp --no-clobber "$log" "$remote/host_records/runner.rank${idx}.log" >/dev/null 2>&1 || rc=1; upload_shared(){ local src=$1 dst=$2 plain=$3; if gcloud storage cp --no-clobber "$src" "$dst" >/dev/null 2>&1; then return 0; fi; local want have="" tmp; want=$(sha256sum "$plain" | cut -d" " -f1) || return 1; tmp=$(mktemp -u) || return 1; if gcloud storage cp "$dst" "$tmp.gz" >/dev/null 2>&1; then have=$(gzip -dc "$tmp.gz" 2>/dev/null | sha256sum | cut -d" " -f1); fi; rm -f "$tmp.gz"; [[ -n $want && -n $have && $want == "$have" ]]; }; for graph in exact_materialize exact_promote prefill_chunk prefill_tail observer decode cache_probe; do for form in stablehlo.mlir optimized_hlo.txt; do [[ -f "$hlo/$graph.$form" ]] || continue; if [[ ! -f "$hlo/$graph.$form.gz" ]]; then gzip -n -9 -c "$hlo/$graph.$form" > "$hlo/$graph.$form.gz.partial" && mv -f "$hlo/$graph.$form.gz.partial" "$hlo/$graph.$form.gz"; fi; upload_shared "$hlo/$graph.$form.gz" "$remote/hlo/${graph}.${form}.gz" "$hlo/$graph.$form" || rc=1; done; done; xplane=$(find "$trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); [[ -z $xplane ]] || gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || rc=1; return "$rc"; }; trap "upload || true" EXIT; cd "$wt"; nohup env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 '"$WORKER_TIMEOUT_SECONDS"' /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_short_decoder_ws32.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --topology-capture-root '"$TOPOLOGY_ROOT"' --checkpoint-root '"$CHECKPOINT_ROOT"' --source-inventory '"$INVENTORY"' --expected-code-hash '"$PIN"' --checkpoint-manifest-sha256 '"$CHECKPOINT_MANIFEST_SHA"' --checkpoint-success-sha256 '"$CHECKPOINT_SUCCESS_SHA"''"$ORACLE_CLI"''"$LONG_CONTEXT_CLI"' --dsa-association-summary-sha256 '"$DSA_ASSOCIATION_SUMMARY_PIN"' --dsa-association-success-sha256 '"$DSA_ASSOCIATION_SUCCESS_PIN"' --topology-sha256 '"$TOPOLOGY_SHA"' --topology-fleet-sha256 '"$TOPOLOGY_FLEET_SHA"' --mesh-sha256 '"$MESH_SHA"' --expected-exact-materialize-stablehlo-sha256 '"$EXACT_MATERIALIZE_STABLE_SHA"' --expected-exact-materialize-optimized-hlo-sha256 '"$EXACT_MATERIALIZE_OPTIMIZED_SHA"' --expected-exact-promote-stablehlo-sha256 '"$EXACT_PROMOTE_STABLE_SHA"' --expected-exact-promote-optimized-hlo-sha256 '"$EXACT_PROMOTE_OPTIMIZED_SHA"' --expected-prefill-chunk-stablehlo-sha256 '"$PREFILL_CHUNK_STABLE_SHA"' --expected-prefill-chunk-optimized-hlo-sha256 '"$PREFILL_CHUNK_OPTIMIZED_SHA"' --expected-prefill-tail-stablehlo-sha256 '"$PREFILL_TAIL_STABLE_SHA"' --expected-prefill-tail-optimized-hlo-sha256 '"$PREFILL_TAIL_OPTIMIZED_SHA"' --prefill-chunk '"$PREFILL_CHUNK"' --prefill-budget-seconds '"$PREFILL_BUDGET_SECONDS"' --rotary-diagnostic '"$ROTARY_DIAGNOSTIC"' --host-main-rope-table '"$HOST_MAIN_ROPE_TABLE"' --expected-observer-stablehlo-sha256 '"$OBSERVER_STABLE_SHA"' --expected-observer-optimized-hlo-sha256 '"$OBSERVER_OPTIMIZED_SHA"' --expected-decode-stablehlo-sha256 '"$DECODE_STABLE_SHA"' --expected-decode-optimized-hlo-sha256 '"$DECODE_OPTIMIZED_SHA"' --expected-cache-probe-stablehlo-sha256 '"$CACHE_PROBE_STABLE_SHA"' --expected-cache-probe-optimized-hlo-sha256 '"$CACHE_PROBE_OPTIMIZED_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --compile-only '"$([[ $MODE == acquire ]] && echo 1 || echo 0)"' --exact-dsa '"$EXACT_DSA"' --checkpoint-transport '"$CHECKPOINT_TRANSPORT"''"$STRATEGY_ND_DENSE_CLI"''"$DSA_ADJUDICATION_CLI"' --observer-steps '"$OBSERVER_STEPS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --trace-steps '"$TRACE_STEPS"' --output "$output" --tensor-output "$tensors" --hlo-dir "$hlo" --trace-dir "$trace" >"$log" 2>&1 </dev/null & pid=$!; beat=0; while kill -0 $pid 2>/dev/null; do sleep 30; beat=$((beat+1)); [[ $((beat % 10)) -ne 0 ]] || echo "WS32_HEARTBEAT rank=$idx elapsed=$((beat*30))s"; done; rc_py=0; wait $pid || rc_py=$?; touch "$ended"; [[ $rc_py -eq 0 ]] || exit $rc_py; trap - EXIT; upload; echo "WS32_SHORT_OK $(hostname) rank=$idx"'
+execute_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; remote='"$REMOTE_PREFIX"'; run=/home/gianl/glm-run/$tag; output="$run/runner.rank${idx}.json"; tensors="$run/runner.rank${idx}.npz"; hlo="$run/hlo"; trace="$run/trace"; log="$run/runner.rank${idx}.log"; ended="$run/runner.rank${idx}.ended"; mkdir -p "$run"; upload(){ local rc=0; [[ ! -f $output ]] || gcloud storage cp --no-clobber "$output" "$remote/host_records/runner.rank${idx}.json" >/dev/null 2>&1 || rc=1; [[ ! -f $tensors ]] || gcloud storage cp --no-clobber "$tensors" "$remote/host_records/runner.rank${idx}.npz" >/dev/null 2>&1 || rc=1; [[ ! -f $log || ! -f $ended ]] || gcloud storage cp --no-clobber "$log" "$remote/host_records/runner.rank${idx}.log" >/dev/null 2>&1 || rc=1; upload_shared(){ local src=$1 dst=$2 plain=$3; if gcloud storage cp --no-clobber "$src" "$dst" >/dev/null 2>&1; then return 0; fi; local want have="" tmp; want=$(sha256sum "$plain" | cut -d" " -f1) || return 1; tmp=$(mktemp -u) || return 1; if gcloud storage cp "$dst" "$tmp.gz" >/dev/null 2>&1; then have=$(gzip -dc "$tmp.gz" 2>/dev/null | sha256sum | cut -d" " -f1); fi; rm -f "$tmp.gz"; [[ -n $want && -n $have && $want == "$have" ]]; }; for graph in exact_materialize exact_promote prefill_chunk prefill_tail observer decode cache_probe; do for form in stablehlo.mlir optimized_hlo.txt; do [[ -f "$hlo/$graph.$form" ]] || continue; if [[ ! -f "$hlo/$graph.$form.gz" ]]; then gzip -n -9 -c "$hlo/$graph.$form" > "$hlo/$graph.$form.gz.partial" && mv -f "$hlo/$graph.$form.gz.partial" "$hlo/$graph.$form.gz"; fi; upload_shared "$hlo/$graph.$form.gz" "$remote/hlo/${graph}.${form}.gz" "$hlo/$graph.$form" || rc=1; done; done; xplane=$(find "$trace" -type f -name "*.xplane.pb" 2>/dev/null | head -1 || true); [[ -z $xplane ]] || gcloud storage cp --no-clobber "$xplane" "$remote/traces/trace.rank${idx}.xplane.pb" >/dev/null 2>&1 || rc=1; return "$rc"; }; trap "upload || true" EXIT; cd "$wt"; nohup env JAX_PLATFORMS=tpu XLA_PYTHON_CLIENT_MEM_FRACTION=.95 PYTHONPATH="$wt" GLM_GREENFIELD_RUN_TAG="$tag" timeout --signal=TERM --kill-after=60 '"$WORKER_TIMEOUT_SECONDS"' /home/gianl/vllm-env/bin/python -u scripts/greenfield/run_short_decoder_ws32.py --coordinator-address '"$coordinator"' --num-processes 8 --process-id "$idx" --slice-name '"$POD"' --topology-capture-root '"$TOPOLOGY_ROOT"' --checkpoint-root '"$CHECKPOINT_ROOT"' --source-inventory '"$INVENTORY"' --expected-code-hash '"$PIN"' --checkpoint-manifest-sha256 '"$CHECKPOINT_MANIFEST_SHA"' --checkpoint-success-sha256 '"$CHECKPOINT_SUCCESS_SHA"''"$ORACLE_CLI"''"$LONG_CONTEXT_CLI"' --dsa-association-summary-sha256 '"$DSA_ASSOCIATION_SUMMARY_PIN"' --dsa-association-success-sha256 '"$DSA_ASSOCIATION_SUCCESS_PIN"' --topology-sha256 '"$TOPOLOGY_SHA"' --topology-fleet-sha256 '"$TOPOLOGY_FLEET_SHA"' --mesh-sha256 '"$MESH_SHA"' --expected-exact-materialize-stablehlo-sha256 '"$EXACT_MATERIALIZE_STABLE_SHA"' --expected-exact-materialize-optimized-hlo-sha256 '"$EXACT_MATERIALIZE_OPTIMIZED_SHA"' --expected-exact-promote-stablehlo-sha256 '"$EXACT_PROMOTE_STABLE_SHA"' --expected-exact-promote-optimized-hlo-sha256 '"$EXACT_PROMOTE_OPTIMIZED_SHA"' --expected-prefill-chunk-stablehlo-sha256 '"$PREFILL_CHUNK_STABLE_SHA"' --expected-prefill-chunk-optimized-hlo-sha256 '"$PREFILL_CHUNK_OPTIMIZED_SHA"' --expected-prefill-tail-stablehlo-sha256 '"$PREFILL_TAIL_STABLE_SHA"' --expected-prefill-tail-optimized-hlo-sha256 '"$PREFILL_TAIL_OPTIMIZED_SHA"' --prefill-mode '"$PREFILL_MODE"' --prefill-chunk '"$PREFILL_CHUNK"' --prefill-budget-seconds '"$PREFILL_BUDGET_SECONDS"' --rotary-diagnostic '"$ROTARY_DIAGNOSTIC"' --host-main-rope-table '"$HOST_MAIN_ROPE_TABLE"' --expected-observer-stablehlo-sha256 '"$OBSERVER_STABLE_SHA"' --expected-observer-optimized-hlo-sha256 '"$OBSERVER_OPTIMIZED_SHA"' --expected-decode-stablehlo-sha256 '"$DECODE_STABLE_SHA"' --expected-decode-optimized-hlo-sha256 '"$DECODE_OPTIMIZED_SHA"' --expected-cache-probe-stablehlo-sha256 '"$CACHE_PROBE_STABLE_SHA"' --expected-cache-probe-optimized-hlo-sha256 '"$CACHE_PROBE_OPTIMIZED_SHA"' --context-capacity '"$CONTEXT_CAPACITY"' --compile-only '"$([[ $MODE == acquire ]] && echo 1 || echo 0)"' --exact-dsa '"$EXACT_DSA"' --checkpoint-transport '"$CHECKPOINT_TRANSPORT"''"$STRATEGY_ND_DENSE_CLI"''"$DSA_ADJUDICATION_CLI"' --observer-steps '"$OBSERVER_STEPS"' --warmup '"$WARMUP"' --iterations '"$ITERATIONS"' --trace-steps '"$TRACE_STEPS"' --output "$output" --tensor-output "$tensors" --hlo-dir "$hlo" --trace-dir "$trace" >"$log" 2>&1 </dev/null & pid=$!; beat=0; while kill -0 $pid 2>/dev/null; do sleep 30; beat=$((beat+1)); [[ $((beat % 10)) -ne 0 ]] || echo "WS32_HEARTBEAT rank=$idx elapsed=$((beat*30))s"; done; rc_py=0; wait $pid || rc_py=$?; touch "$ended"; [[ $rc_py -eq 0 ]] || exit $rc_py; trap - EXIT; upload; echo "WS32_SHORT_OK $(hostname) rank=$idx"'
 launch_rc=0
 # A §23.5 prefill keeps the channel silent for hours; the worker heartbeat plus
 # these keepalives stop an idle-timeout drop from killing a healthy run, and the
@@ -841,6 +866,7 @@ seal_python \
   ${SEAL_LATER_EVENT_ALARM_CLI:+$SEAL_LATER_EVENT_ALARM_CLI} \
   --checkpoint-transport "$CHECKPOINT_TRANSPORT" \
   --prefill-chunk "$PREFILL_CHUNK" \
+  --prefill-mode "$PREFILL_MODE" \
   --rotary-diagnostic "$ROTARY_DIAGNOSTIC" \
   --host-main-rope-table "$HOST_MAIN_ROPE_TABLE" \
   --evidence-layout hlo_single_gzip_v2 \

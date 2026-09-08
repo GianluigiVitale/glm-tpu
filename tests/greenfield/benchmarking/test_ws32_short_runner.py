@@ -147,7 +147,11 @@ def test_ws32_wrapper_pins_the_committed_adjudication_record() -> None:
     ), "the record is selected before the flag it selects on is defined"
     assert "GLM_GREENFIELD_WS32_DSA_ADJUDICATION:-0" in wrapper
     assert "GLM_GREENFIELD_WS32_LATER_EVENT_ALARM_ACK:-0" in wrapper
-    assert wrapper.count("$DSA_ADJUDICATION_CLI") >= 2
+    # The worker uses the worktree path; the isolated sealing checkout must
+    # use the same pinned artifact remapped to SEAL_ROOT (already true at61860d94).
+    assert "$DSA_ADJUDICATION_CLI" in wrapper
+    assert 'SEAL_DSA_ADJUDICATION_CLI=${DSA_ADJUDICATION_CLI//"$WORKTREE"/"$SEAL_ROOT"}' in wrapper
+    assert "${SEAL_DSA_ADJUDICATION_CLI:+$SEAL_DSA_ADJUDICATION_CLI}" in wrapper
     assert "--later-event-alarm-acknowledged" in sealer
     assert "requires an acknowledged lessons entry before sealing" in sealer
     assert "bind_ws32_adjudication(" in sealer
@@ -281,7 +285,8 @@ def test_ws32_sealer_binds_alarm_acknowledgement_and_states_adjudicated_basis() 
     # this is the class of wrapper edit that has silently gone missing before.
     assert 'for preflight_pin in "$PIN" $([[ $RECOVER == 1 ]] && echo "$RECOVERY_PIN"); do' in wrapper
     assert "is not published on origin/$BRANCH" in wrapper
-    assert "${LATER_EVENT_ALARM_CLI:+$LATER_EVENT_ALARM_CLI}" in wrapper
+    assert 'SEAL_LATER_EVENT_ALARM_CLI=${LATER_EVENT_ALARM_CLI//"$WORKTREE"/"$SEAL_ROOT"}' in wrapper
+    assert "${SEAL_LATER_EVENT_ALARM_CLI:+$SEAL_LATER_EVENT_ALARM_CLI}" in wrapper
     specification = importlib.util.spec_from_file_location("ws32_sealer_for_test", sealer_path)
     module = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(module)

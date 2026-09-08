@@ -8,23 +8,23 @@ GATE_D_LESSONS tails, docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md, then inspect l
 
 ## PIVOT NOW
 
-Native-JAX independent of legacy execution, existing8-host/32-chip pod. Efficient multi-token
+Native-JAX; no legacy execution. Existing8-host/32-chip pod. Efficient multi-token
 prefill AND protected batch-one decode at256K are required. Serial teacher-forcing is a reference,
 not production prefill; memory chunking is not token-parallel prefill.
-Original d0.05 sealed DB575; no rerun or serial128K/256K run.
+No serial128K/256K run or DB575 rerun.
 Pivot to batched prefill: audit/design -> small exact layer/kernel
 experiments -> short decoder -> efficient long-context proofs.
 Long reference runs require an evidence gap, cost and review.
 
 ## Adversarial efficiency audit
 
-Independent gpt-6-astra audit of design AND execution:
+Independent gpt-6-astra design/execution audit:
 prefill, DSA/IndexShare, attention/MoE, FP8 layout/dequantization, collectives/gathers,
 host/device synchronization, loading/caches, compilation/revalidation, storage and benchmarks.
-Each finding needs file/trace evidence, confirmed vs hypothesis, benefit mechanism,
+Findings: file/trace evidence, fact vs hypothesis, benefit,
 smallest test, correctness/HBM risk, priority and decision evidence.
 Maintain ENGINE_EFFICIENCY_AUDIT.md. Resolve major avoidable costs or justify measured tradeoffs.
-Seek best measured performance; no unproved global maximum claims.
+Seek measured performance; no unproved global maximum claims.
 Resolve review P0-P2; no repeated cleared-code review or speculative hardening loops.
 
 ## Performance and proof
@@ -57,7 +57,8 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB583 MoE/DB584 layer0/DB587 layer3 PASS. DB586 boundary proved;8/8clean01:49Z.
-CPU8-layer/two-chunk/handoff + real78-layer B17/B11 schema PASS.
-Next protected wiring/HLO/HBM, OWN §21; docs/greenfield/PREFILL_DECODER_ASSEMBLY.md.
-No layer0/3 rerun. Targets open. HANDOFF has pins.
+CPU8-layer/two-chunk/handoff +78-layer adapter B17/B11 PASS.
+Acquisition-only wiring; HLO profiles unregistered, no numerical launch/seal.
+Next real graphs/HBM then OWN §21; docs/greenfield/PREFILL_DECODER_ASSEMBLY.md.
+No layer0/3 rerun; targets open. HANDOFF has pins.
 Efficient L7/L8 open; prefill speedup unmeasured.

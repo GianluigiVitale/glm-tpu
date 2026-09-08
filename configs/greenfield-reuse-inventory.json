@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-prefill-protected-acquisition-adapter",
+      "category": "mode-bound host adapter and protected graph acquisition",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "61860d940ce74473ec8cf023a6449be877f32922",
+      "source_paths": ["glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "glm_tpu/greenfield/runtime/ws32_decoder.py", "scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "glm_tpu/greenfield/benchmarking/ws32_decoder.py", "glm_tpu/greenfield/validation/ws32_evidence.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_batched_prefill_runner.py", "glm_tpu/greenfield/validation/ws32_prefill.py", "glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py", "scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/run_short_decoder_ws32.sh", "scripts/greenfield/seal_short_decoder_ws32.py", "tests/greenfield/validation/test_ws32_batched_prefill_mode.py"],
+      "gate": "24: acquisition-only integration; numerical execution/seal refused until actual HLO/allocations registered",
+      "reason": "Raw prefill and promoted decode bind views of the same loaded arrays before disposal, no checkpoint copy; reuse completed producer wk and host main RoPE. Main/tail six-input programs have exact live row sizes and no serial donation indices. New mode/tag cannot inherit serial adjudication or long-context evidence. Host adapter requires fleet-wide health and budget/logging continuation, including final block. First-acquisition inventory deliberately cannot authorize execution: compiler helper, health/route-sum lineage and cache allocation profiles require actual complete graphs. Expected refusal publishes full runner envelope for all-host memory/provenance preservation. Historical serial schemas and DB rollback identities stay unchanged. No new hardware or speed claim."
+    },
+    {
       "id": "ws32-layer-major-prefill-decoder-assembly",
       "category": "batched prompt runtime and final decode handoff",
       "source_repo": "glm-tpu greenfield",

@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Protected acquisition adapter now binds the raw view before array disposal and
+compiles distinct main/narrow-tail programs with the six-input runtime API.
+`validation/ws32_prefill.py` owns shared mode/plan/accounting; first-acquisition
+HLO inventory is diagnostic-only. Numerical execution/sealing remains refused
+until full-model compiler/lineage/allocation profiles exist. The host execution
+adapter requires fleet-wide health and budget/logging agreement. Expected
+acquisition refusal preserves the complete runner envelope remotely. No new TPU
+result; see `PREFILL_DECODER_ASSEMBLY.md` and latest HANDOFF.
+
 New assembly: `runtime/ws32_batched_prefill.py` reuses admitted layer kernels,
 raw decoder weight/state specs and final sampling. Typed dual-cache/prompt-phase
 state, explicit producer slot map, all-owner atomic commit, final-only head and

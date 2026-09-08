@@ -181,6 +181,8 @@ from glm_tpu.greenfield.runtime import ws32_batched_prefill as b
 from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig,Ws32DecoderState,ws32_decoder_weight_names,_bind_weight_name_tree
 from glm_tpu.greenfield.types import ModelGeometry
 from glm_tpu.greenfield.errors import PlanValidationError
+from scripts.greenfield import ws32_batched_prefill_runner as adapter
+from types import SimpleNamespace
 tpu_info._get_tpu_info=lambda:tpu_info.TpuInfo.from_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4,1)
 tpu_info.get_tpu_info.cache_clear()
 assert jax.default_backend()=='cpu'
@@ -202,7 +204,8 @@ for layer in range(78):
         arrays[name]=abstract(tuple(t['global_shape']),types[t['dtype']],P(*t['partition_spec']))
 for name in (names.embedding_local,names.lm_head_local):arrays[name]=abstract((geometry.vocab_size,geometry.hidden_size),jnp.bfloat16,P('expert','feature'))
 arrays[names.final_norm_weight_local]=abstract((geometry.hidden_size,),jnp.bfloat16,P('feature'))
-weights=_bind_weight_name_tree(names,arrays)
+raw_config,weights=adapter.bind_raw_prefill_weights(arrays,replace(config,exact_dsa=True,strategy_nd_dense=True))
+assert raw_config==config
 ds=Ws32DecoderState(
     abstract(config.kv_cache_shape,jnp.bfloat16,P(None,None,'expert',None)),
     abstract(config.index_cache_shape,jnp.bfloat16,P(None,None,'expert',None)),
@@ -211,10 +214,16 @@ ds=Ws32DecoderState(
 )
 state=b.Ws32BatchedPrefillState(ds,ds.index_cache_local,abstract((),jnp.int32),abstract((),jnp.bool_))
 wk=tuple(abstract((128,6144),jnp.float32) for _ in config.full_index_slots)
+assert adapter.completed_repair_weights(tuple(SimpleNamespace(wk_weight=w) for w in wk),config)==wk
 rope=abstract(config.main_rope_table_shape,jnp.bfloat16)
-for rows in (17,11):
-    fn=b.build_ws32_batched_prefill_program(mesh,config,block_rows=rows).execute
-    out=jax.eval_shape(fn,abstract((rows,),jnp.int32),abstract((),jnp.int32),state,weights,wk,rope)
+plan=adapter.BatchedPrefillPlan(2034,17,8192)
+programs=adapter.build_graph_pair(mesh,config,plan)
+for graph,rows in plan.graph_rows:
+    fn=programs[graph].execute
+    assert callable(fn.lower)
+    inputs=adapter.graph_inputs(mesh,np.zeros(rows,np.int32),state,weights,wk,rope)
+    assert len(inputs)==6 and inputs[1].shape==()
+    out=jax.eval_shape(fn,*inputs)
     assert out.state.decoder.kv_cache_local.shape==config.kv_cache_shape
     assert out.state.decoder.index_cache_local.shape==out.state.repaired_index_local.shape==config.index_cache_shape
     assert out.state.decoder.selected_positions.shape==(1,2048)

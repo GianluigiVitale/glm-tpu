@@ -48,6 +48,10 @@ from glm_tpu.greenfield.validation.ws32_evidence import (  # noqa: E402
     EVIDENCE_LAYOUT_V1,
     EVIDENCE_LAYOUT_V2,
 )
+from glm_tpu.greenfield.validation.ws32_prefill import (  # noqa: E402
+    PREFILL_MODE, PREFILL_MODES, SERIAL_PREFILL_MODE,
+    require_fleet_prefill_mode, require_prefill_mode,
+)
 from glm_tpu.greenfield.validation.ws32_short_context import (  # noqa: E402
     committed_artifact_path as _committed_artifact_path,
 )
@@ -92,6 +96,7 @@ def _args() -> argparse.Namespace:
     )
     validate.add_argument("--tag", required=True)
     validate.add_argument("--prefill-chunk", type=int, default=DEFAULT_PREFILL_CHUNK)
+    validate.add_argument("--prefill-mode", choices=PREFILL_MODES, default=SERIAL_PREFILL_MODE)
     validate.add_argument("--rotary-diagnostic", choices=(0, 1), default=0, type=int)
     validate.add_argument("--host-main-rope-table", choices=(0, 1), default=0, type=int)
     # Sealed v1 prefixes stay re-verifiable: the required layout is a pin, not a constant.
@@ -289,6 +294,7 @@ def _validate_run_tag(
     prefill_chunk: int = DEFAULT_PREFILL_CHUNK,
     context_capacity: int = DEFAULT_CONTEXT_CAPACITY,
     host_main_rope_table: bool = False,
+    prefill_mode: str = SERIAL_PREFILL_MODE,
 ) -> None:
     """Spec §23.3/§23.8: a non-default prefill chunk, context capacity or the
     legacy-faithful main rotary table is part of the run identity."""
@@ -301,6 +307,9 @@ def _validate_run_tag(
         suffix += f"_cap{context_capacity}"
     if host_main_rope_table:
         suffix += "_hrope"
+    require_prefill_mode(prefill_mode)
+    if prefill_mode == PREFILL_MODE:
+        suffix += "_bp1"
     pattern = (
         rf"greenfield_ws32_short_decoder_{re.escape(context_label)}_"
         rf"{re.escape(mode)}{re.escape(suffix)}_[0-9]{{8}}T[0-9]{{15}}Z"
@@ -437,6 +446,12 @@ def _distribution(samples: list[float]) -> dict[str, float | int]:
 
 
 def _validate(args: argparse.Namespace) -> int:
+    prefill_mode = getattr(args, "prefill_mode", SERIAL_PREFILL_MODE)
+    require_prefill_mode(prefill_mode)
+    if prefill_mode == PREFILL_MODE:
+        # Compilation inventory is diagnostic, not HLO authorization. Do not
+        # turn the new graph's acquisition refusal into a serial SUCCESS.
+        raise SystemExit("batched seals await registered production HLO/memory profiles")
     # §23.5 fixes the E0 measurement window independently of caller-provided
     # timing metadata. Reject an undersized plan even for acquisition, before
     # reading artifacts or allowing hours of prefill to hide a ten-step window.
@@ -455,6 +470,7 @@ def _validate(args: argparse.Namespace) -> int:
         prefill_chunk=args.prefill_chunk,
         context_capacity=args.context_capacity,
         host_main_rope_table=bool(args.host_main_rope_table),
+        prefill_mode=prefill_mode,
     )
     materializer_pin_names = {
         "expected_exact_materialize_stablehlo_sha256",
@@ -522,6 +538,8 @@ def _validate(args: argparse.Namespace) -> int:
     if len(runner_paths) != 8:
         raise SystemExit(f"expected eight WS32 runner records, got {len(runner_paths)}")
     records = [json.loads(path.read_text(encoding="utf-8")) for path in runner_paths]
+    if require_fleet_prefill_mode(records) != prefill_mode:
+        raise SystemExit("WS32 runner prefill mode contradicts sealer pin")
     captures = tuple(
         json.loads(
             (
@@ -1893,6 +1911,8 @@ def _require_prefill_execution(
     expected_chunk: int | None = None,
 ) -> None:
     """Spec §23.2: chunked exact prefill accounting must be complete and consistent."""
+    if record.get("prefill_mode", SERIAL_PREFILL_MODE) != SERIAL_PREFILL_MODE:
+        raise SystemExit("serial prefill accounting cannot authorize batched evidence")
     chunk = record.get("prefill_chunk_length")
     if type(chunk) is not int or chunk <= 0 or (
         expected_chunk is not None and chunk != expected_chunk
@@ -2053,6 +2073,9 @@ def _run_environment(summary: dict[str, Any]) -> dict[str, Any]:
         "main_rope_table": summary.get("main_rope_table"),
         "capacity_measurement": summary.get("capacity_measurement"),
         "rotary_diagnostic": summary.get("rotary_diagnostic"),
+        # Preserve historical DB rollback identity exactly when the field is absent.
+        **({"prefill_mode": require_prefill_mode(summary["prefill_mode"])}
+           if "prefill_mode" in summary else {}),
         # §23.5: which sealed long-context capture this run answered, so the DB
         # row is bound to the profile and not merely to the context label. Rows
         # are resolved for rollback by exact equality on this dictionary, so the

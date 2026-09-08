@@ -15353,3 +15353,79 @@ Next concrete bulk work (not another layer0/3 trial):
 4. Phase baseline/target registration and sufficient routing-row reuse still open;
    then efficient four-depthL7/fullL8. See `PREFILL_DECODER_ASSEMBLY.md`, audit/cost
    model and §24. Goal remains active; existing D/G closure is unchanged.
+
+## 2026-09-08 — batched host adapter and acquisition-only protected wiring
+
+Starting HEAD61860d940ce74473ec8cf023a6449be877f32922. Prior user-status turn
+was informational/no progress; this continuation changes implementation and CPU
+evidence. Fresh authenticated root accelerator/libtpu/runner census confirmed
+8distinct idle hosts before edits. No model/TPU/controller run, new checkpoint,
+infrastructure change or results.db performance row in this work segment.
+
+Implemented `scripts/greenfield/ws32_batched_prefill_runner.py` and shared
+`validation/ws32_prefill.py`: raw-prefill view before loaded-array disposal,
+completed FP32 producer wk reuse, exact main/tail sizes, six-input signature with
+scalar count, initial cache/state setup and final healthy repaired-state handoff.
+No weight/pack copies or serial donation indexes. Host wall reports input transfer,
+cache initialization, blocks and request-prefill completion; explicitly NOT actual
+first-token-delivery TTFT. B1..32 remains initial correctness geometry, not final
+MoE reuse/performance admission.
+
+Independent `/root/prefill_inventory_fix_review` (Astra) found P1: host-local wall
+budget decisions could split collective participation. Fixed with mandatory
+fleet_all callback around structural health and budget/logging continuation on
+EVERY block, including final. Peer-only refusal and log exceptions prevent next
+dispatch; reviewer cleared correction. Numerical worker has not yet enabled this
+adapter, and must supply genuine all-host AND, not the CPU identity test callback.
+
+Worker/wrapper now accept separate `layer_major_raw_v1` mode, `_bp1` tag. Only
+short ACQUISITION is permitted, requiring exact decode+host main RoPE and no old
+adjudication record. B17 default, B1..32 bounded. Worker binds raw views BEFORE
+del all_arrays and compiles actual main/tail builders without donation, retaining
+existing exact materializer/observer/decode/cache graphs. Reuses existing initial
+cache buffers for acquisition placeholders. `benchmarking/ws32_batched_prefill.py`
+collects compact actual collective/helper/reducer/live-layer inventory but ALWAYS
+refuses as UNREGISTERED; it does not pretend the production linter is complete.
+Sealer refuses new-mode sealing, materializer refuses mixed mode fleets, serial
+accounting cannot authorize batched records. Historical schemas and absent-mode
+DB rollback identity are preserved. §24 now mechanically refuses new serial long
+launches, while allowing historical evidence recovery.
+
+Review found P2: expected acquisition refusal occurred before runner JSON existed;
+upload trap would lose memory/provenance despite preserving HLO. New
+`_publish_acquisition_result` writes complete HLO_REFUSED envelope before raising,
+so all8 original inventory/allocation/provenance records can be uploaded without
+inventing HLO_ACQUIRED/SUCCESS. Two publication regressions pass; reviewer cleared.
+
+Tests:
+-44 adapter tests passed1.14s after P1; later shared-module factoring preserved them.
+-65tests41.64s: new mode/guards/publication tests +44 adapter tests +production78
+  schema, now exercising actual raw binding/completedwk/build_graph_pair/graph_inputs
+  for B17/B11 without allocating weights. Both execute functions expose .lower.
+-Broader existing worker/sealer/enforcement/registry suite:148PASS/1SKIP,2FAIL,
+  317.64s. Both failures are stale string assertions already contradicted by HEAD:
+  isolated sealing checkout remaps adjudication/alarm CLI to SEAL_ROOT, rather than
+  reusing WORKTREE paths. Corrected tests now assert actual mapping and worker/sealer
+  dispatch separately; no production historical behavior changed to pass them.
+-Final focused mode/adapter/worker/registry suite88PASS4.05s. Broader already-passing
+  five-minute evidence replays not repeated. Bash syntax and git diff checks pass.
+
+Exact next:
+1. One reviewed protected2K/cap8192 acquisition of complete B17/B11 graphs using
+   retained tmpfs checkpoint and existing StrategyND overlay (for decode only).
+   No prefill/decoder model graph executes; known UNREGISTERED refusal is EXPECTED,
+   not an excuse to rerun the load. Preserve all8 runner JSON/HLO/logs and cleanup;
+   inspect memory before trying numerical execution. Wrapper handles both leases,
+   published pins, authenticated normal/root fleet census and compressed HLO upload.
+2. Use actual graph evidence to implement/register strict batched HLO and allocation
+   profiles: exact payloads/groups/reducers; all75 FP32 route-sum SSA proofs; two
+   health MINs bound feature→expert→commit; compiler helper operands/counts; cache
+   alias/copy budget and intentional21 repair gather consumer lineage. Detailed
+   source-derived counts and caveats in PREFILL_DECODER_ASSEMBLY.md. Do not guess a
+   broad allowlist from layer0/3 or old serial graphs.
+3. Then numerical adapter/real fleet consensus, independent sealer replay, own §21
+   observations/adjudication. Quantitative targets and larger routing-row reuse
+   remain open, then efficient four-depthL7/fullL8. No repeated layer0/3 test.
+
+No fresh launch approval or hardware result is claimed by this CPU persistence.
+Existing D/G closure unchanged. Goal stays active and below4000characters.

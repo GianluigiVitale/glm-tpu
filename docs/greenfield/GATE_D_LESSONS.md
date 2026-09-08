@@ -1498,3 +1498,13 @@ normalized-state cause.
   math to separate input realization from downstream arithmetic, then bind the actual
   reference boundary before integration. No compiler mechanism, full-model accuracy
   or prefill speedup is established by these component results.
+
+- 2026-09-08 prefill acquisition/host adapter review: per-host wall clocks cannot
+  independently stop a collective workload. A local budget pass with peer refusal
+  must refuse on every rank before the next block; health and logging errors also
+  enter the fleet decision. CPU peer-only refusal tests caught this before TPU.
+  Planned graph-profile refusal must publish its runner envelope BEFORE raising:
+  the existing uploader carries runner JSON, not local hlo/prevalidation.json.
+  Otherwise original graph bytes survive but their per-host memory/provenance is
+  lost, inviting a redundant full-model load. Tests now preserve HLO_REFUSED with
+  all original inventory/allocation fields, never a fabricated HLO_ACQUIRED.

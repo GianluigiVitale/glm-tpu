@@ -90,3 +90,64 @@ The short decoder must earn its OWN §21 raw-token, cutoff-active own-score DSA,
 first-divergent-event adjudication and cache/state protection; DB587 cannot stand
 in for that proof. Preregister quantitative prefill/TTFT criteria before candidate
 performance trials. Efficient four-depth L7 and full L8 remain open.
+
+## Protected acquisition wiring — 2026-09-08
+
+Starting pin61860d94. `GLM_GREENFIELD_WS32_PREFILL_MODE=layer_major_raw_v1`
+selects separate short-context ACQUISITION ONLY, with exact decode/host main
+RoPE required, B17 default/B1..32 permitted, `_bp1` tag suffix. Numerical runs,
+inherited serial adjudication and all long-context runs are refused for this
+mode until its actual compiler/allocation profiles and short proof exist.
+New serial long-context launches are also refused (§24); recovery of existing
+serial evidence is preserved. Serial mode remains the historical default.
+
+Worker binds raw-prefill views BEFORE discarding loaded arrays. Promoted decode
+keeps its original view. Both share original objects; no full checkpoint or
+weight copy. Completed producer wk arrays are reused. The two compiled programs
+use six inputs (IDs, scalar live count, typed state, raw weights, completed wk,
+host RoPE), with no old serial donation indices. Acquisition state placeholders
+share existing initial cache buffers. Both actual prefill graphs and the five
+existing materializer/decoder/observer/cache graphs are preserved before final
+structural authorization. No model-prefill graph executes in this acquisition.
+
+`benchmarking/ws32_batched_prefill.py` currently collects exact payload families,
+shapes, helper signatures, live layers and non-ADD reducers from the actual graph.
+It ALWAYS reports UNREGISTERED and passedFalse: it is NOT the completed linter.
+Matching hashes/labels/local groups cannot approve it. Expected refusal writes
+the complete per-host runner envelope with HLO_REFUSED before raising, so the
+existing upload trap retains HLO, memory/inventory/provenance and logs remotely.
+No HLO_ACQUIRED/SUCCESS/DB performance row is manufactured from that refusal.
+
+Independent review's source-derived inventory for later registration:
+
+- Common attention/norm branch78×; full DSA21×; dense3×; MoE75×; one embedding
+  and one conditional final one-row head. Do not multiply whole layer0/3 profiles:
+  eighteen full-DSA+MoE layers combine independent branches.
+- Raw FP8 semantic callsites588, grouped225, structured156, sparse78:1047 total.
+  Acquisition must determine actual textual multiplicity/CSE/shared callees.
+- Count tuple reduction operand leaves, not guessed psum counts. Exact physical
+  feature4/expert8 groups/global IDs and ADD reducers for all model sums.
+- Two S32 scalar MIN health reductions require feature→expert→actual commit
+  predicate lineage; names alone do not authorize MIN anywhere else.
+- Adapt actual FP32 route-sum SSA/fusion proof to every75 MoE layer and actualB;
+  handle tuple leaf forwarding without treating an unrelated attention sum as
+  route evidence. No BF16 intermediate/original_type correction is allowed there.
+- Acquire exact compiler-helper operands/counts, bias lowering, conditional-head
+  realization and cache aliases. Do not reuse single-layer capacity1024/B17
+  helpers blindly at8192 or narrow tail. Full cache arrays legitimately exceed
+  the old layer-only element ceiling; distinguish them from weight expansion by
+  shape AND lineage. Intentional21 repair hidden gathers need their exact consumer.
+
+The host execution adapter is tested but not yet enabled in the numerical worker.
+It requires two all-host AND decisions per block: structural health, then budget/
+logging continuation. Every rank participates even on final block; a peer-only
+refusal prevents the next dispatch. Logging errors vote false before raising.
+Actual runtime wiring must supply genuine multihost consensus (existing protected
+layer worker uses process_allgather of a compact integer), not identity/host-local
+bool. These checks are outside layer execution and inside reported request wall.
+This accounting ends at token readiness, explicitly NOT actual-delivery TTFT.
+
+Next: review the concrete acquisition cost/preflight and compile actual main/tail
+graphs once; use its preserved per-host evidence to implement the strict linter
+and allocation admission. Then wire the numerical adapter/sealer and candidate's
+own §21 observation/adjudication. No representative layer arithmetic rerun.
