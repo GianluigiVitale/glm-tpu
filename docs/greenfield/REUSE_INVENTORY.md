@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+20:28Z DB595 phase sealed; reuse existing scored merge with default-off
+paired_position_sort. Stable positions-only tuple sort carries unchanged score
+bits and removes two permutation gathers in CPU StableHLO. Both prefill merges
+and completed-prefix builder opt in; decode/scalar/default remain unchanged.
+33 CPU tests pass, including actual CPU32 completed-prefix equality and local
+groups. Hardware gain unmeasured; next one combined changed-prefix reproduction
+and profile through existing protected workflow, not another baseline.
+
 20:02Z reuse run_real_one_layer/run_gate_c_equivalence profiler setting:
 python_tracer_level=0, otherdefaults unchanged. Firstphaseprofile302c142c
 FAILED180s budget/3.425GBXSpace overflow; allsamplespreserved,8/8clean.

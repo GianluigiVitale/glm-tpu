@@ -2,6 +2,14 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+20:29Z DB595 phase SEALED at original a76eb23e/recoverydd2bca21,8/8clean.
+`../artifacts/prefill-phase-db595-sealed-20260908.json` binds terminal/originals.
+8host/64core trace: candidate permutation gathers dominate prefix (25.764ms
+gather/scatter,84.23%meanbusy). Default-off paired stable sort now CPU-exact,
+33 tests + independent review; next ONE changed-prefix reproduction+profile,
+not another baseline/acquisition. Full-model speed remains DB588~19.9tok/s.
+Earlier entries below are history, not current next actions.
+
 20:02Z first phase run302c142c FAILED tracedbudget/3.425GB Python XSpace overflow,
 all287calls/10unprofiled samples preserved,8/8normal-rootclean. Exact8original
 runner sources and partialwall in prefill-phase-python-trace-refusal-20260908.json.

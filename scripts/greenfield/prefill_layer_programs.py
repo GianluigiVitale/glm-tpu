@@ -21,6 +21,7 @@ def build_layer_programs(
     candidate_window: bool = False,
     capture_boundaries: bool = False,
     completed_prefix: bool = False,
+    paired_position_sort: bool = False,
     **numerical_options: Any,
 ) -> tuple[Any, Any]:
     """Build batched candidate and existing raw-layout scalar reference.
@@ -129,6 +130,7 @@ def build_layer_programs(
             health[0, 0],
             main_rope_table_rows=rope,
             key_tile=key_tile,
+            paired_position_sort=paired_position_sort,
             **({"_observe": observe} if capture_boundaries else {}),
             **({"prefix_only": True} if completed_prefix else {}),
             **numerical_options,

@@ -1,7 +1,6 @@
 # Goal — GLM-5.2-FP8 TPU v4: efficient end-to-end inference
 
-FULL ACCESS. Continue to §18 under §24. Owner pivot2026-09-07 supersedes
-§23's deferred-prefill completion: hours-long serial prefill is NOT finished.
+FULL ACCESS. Continue to §18 under §24; efficient prefill is mandatory.
 Preserve historical evidence. Keep <4000 chars.
 At start/compaction read this and docs/glm-tpu-revolution.md IN FULL; read HANDOFF and
 GATE_D_LESSONS tails, docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md, then inspect live state.
@@ -21,8 +20,7 @@ Long reference runs require an evidence gap, cost and review.
 Independent gpt-6-astra design/execution audit:
 prefill, DSA/IndexShare, attention/MoE, FP8 layout/dequantization, collectives/gathers,
 host/device synchronization, loading/caches, compilation/revalidation, storage and benchmarks.
-Findings: file/trace evidence, fact vs hypothesis, benefit,
-smallest test, correctness/HBM risk, priority and decision evidence.
+Findings: evidence, fact vs hypothesis, benefit, smallest test, correctness/HBM risk.
 Maintain ENGINE_EFFICIENCY_AUDIT.md. Resolve major costs or justify measured tradeoffs.
 No unproved global maximum claims.
 Resolve review P0-P2; no repeated cleared-code review or speculative hardening loops.
@@ -61,7 +59,8 @@ Target:10K prefill tok/s; unproved, no deadline guarantee.
 DB594 completedprefix/B128suffix3cases PASS;8/8clean; NOT independent full-layer.
 No more taps. PREFILL_COMPLETED_WINDOW_CANDIDATE.md.
 Maximize feasible prefill AND batch-one decode.
-Phase TPU passed; disk-only collection recovery next; no model rerun.
+DB595 phase SEALED/8/8clean: DSA permutation gathers84%prefix busy.
+Paired stable sort CPU-exact/default-off. Next ONE changed-prefix reproduction+profile;
+no baseline/acquisition-only rerun. 10K/full-model gain NOT proved.
 PREFILL_THROUGHPUT_ACTION_PLAN.md. DB588:97.6% blockcall wall; no100%util claim.
-PREFILL_RESEARCH_V3_ADJUDICATION.md.
 Own8K/L7/L8/TTFT open.

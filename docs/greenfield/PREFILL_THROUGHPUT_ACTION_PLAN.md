@@ -243,3 +243,21 @@ including duplicate publications/summaries/DB budget<5GiB. Bucket fresh
 unused pytest fixtures removed; actual prelaunch recheck remains necessary.
 10K prefilltok/s is the owner's requested target, not measured feasibility or
 a one-hour guarantee. This wiring produces no new speed result by itself.
+
+## Measured decision — 2026-09-08 20:29Z
+
+DB595 SEALED: eight-host actual prefix trace locates84.23% of meanbusy in
+gather/scatter, dominated by argsort-result permutation of candidate scores
+17.051ms and positions4.447ms perB32. SparseMLA itself0.062ms. No claim that
+84% of all modelwall or chip utilization is explained. Profiler-free fourB32
+prefixes129.546ms per128rows; wide suffix10.460ms, narrow24.515ms. No end-to-end
+speed promotion; independent assembly is absent from partial sums.
+
+Next implementation replaces only those two permutation gathers with paired
+stable sort (positions sole key, scores payload). It is now default-off and
+CPU-exact through the real completed-prefix builder;33 tests pass, independent
+review clear. Do ONE combined changed-prefix compilation/admission, DB594
+reproduction, wall+trace run. Refuse before timing if reproduction changes;
+inspect actual memory/physical groups. Do not run another baseline, separate
+acquisition or progressively smaller numerical taps. Then integrate measured
+winner into full prefill and run its own short decoder before8K/longcontext.

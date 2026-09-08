@@ -39,6 +39,7 @@ def causal_dsa_local_candidates(
     top_k: int = 2048,
     key_tile: int = 4096,
     precision: Literal["default", "highest"] = "highest",
+    paired_position_sort: bool = False,
 ) -> PrefillDsaCandidates:
     """Select each row's exact local candidates from its own causal score row.
 
@@ -115,6 +116,7 @@ def causal_dsa_local_candidates(
                 valid_lengths,
                 top_k=top_k,
                 global_context_size=global_context_size,
+                paired_position_sort=paired_position_sort,
             )
             # This is local coverage, not a global valid-count declaration.
             return merged.scores, merged.positions, ok
@@ -140,6 +142,7 @@ def ws32_prefill_dsa_from_query_mapped(
     top_k: int = 2048,
     key_tile: int = 4096,
     precision: Literal["default", "highest"] = "highest",
+    paired_position_sort: bool = False,
 ) -> tuple[Any, Any]:
     """Expert8 candidate exchange, returning scored positions and local health.
 
@@ -163,6 +166,7 @@ def ws32_prefill_dsa_from_query_mapped(
         top_k=top_k,
         key_tile=key_tile,
         precision=precision,
+        paired_position_sort=paired_position_sort,
     )
     with jax.named_scope("greenfield_ws32_prefill_dsa/candidates"):
         scores = lax.all_gather(local.scores, "expert", axis=0, tiled=False)
@@ -173,6 +177,7 @@ def ws32_prefill_dsa_from_query_mapped(
         valid_lengths,
         top_k=top_k,
         global_context_size=global_context_size,
+        paired_position_sort=paired_position_sort,
     )
     canonical = canonicalize_selected_positions(
         SelectedPositions(selected.positions, selected.valid_counts)

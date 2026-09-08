@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "prefill-dsa-paired-position-sort",
+      "category": "DB595 measured candidate permutation bottleneck",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "a76eb23e8e8be591843683f55d562d2df7580dcc",
+      "source_paths": ["glm_tpu/greenfield/kernels/reference/dsa.py", "glm_tpu/greenfield/kernels/prefill_dsa.py", "scripts/greenfield/prefill_layer_programs.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/ws32_prefill_dsa.py", "glm_tpu/greenfield/kernels/ws32_prefill_layer.py", "glm_tpu/greenfield/kernels/ws32_prefill_window.py", "scripts/greenfield/prefill_completed_window.py", "tests/greenfield/kernels/test_prefill_paired_sort.py"],
+      "gate": "24: default-off CPU-exact candidate; protected changed-prefix reproduction/profile pending",
+      "reason": "DB595 eight-host trace measures candidate argsort permutation gathers as dominant prefix cost. Reuse exact existing merge and replace only argsort plus two take_along_axis operations with stable tuple sort keyed solely by positions. Preserve flattening, payload score bits, top_k, final gather and masking. Both local and expert-union prefill merges opt in; unchanged decode/default/scalar path. 25 kernel regressions plus8 mapped/builder/reuse tests pass; actual CPU32 completed prefix returns byte-identical fields. StableHLO removes two gathers; no TPU speed or full-model claim. Independent review no P0-P2; next combined changed-prefix numerical/profile, no acquisition-only rerun."
+    },
+    {
       "id": "ws32-prefill-phase-same-run-recovery",
       "category": "controller-only original phase collection and accounting",
       "source_repo": "glm-tpu greenfield",

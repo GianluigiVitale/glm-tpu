@@ -4,9 +4,11 @@ import json
 import os
 import subprocess
 import sys
+import pytest
 
 
-def test_causal_multitoken_dsa_candidates_stay_in_expert8_groups():
+@pytest.mark.parametrize("paired_position_sort", [False, True])
+def test_causal_multitoken_dsa_candidates_stay_in_expert8_groups(paired_position_sort):
     program = r"""
 import json
 import jax
@@ -27,7 +29,7 @@ lengths = jnp.asarray([0,1,129,1300,2048],jnp.int32)
 specs=(P(),P('expert',None,None),P(),P('expert',None),P())
 values=tuple(jax.device_put(v,NamedSharding(mesh,s)) for v,s in zip((q,keys,weights,pos,lengths),specs))
 def body(q,k,w,p,l):
-    selected,health=ws32_prefill_dsa_from_query_mapped(q,k[0],w,p[0],l,global_context_size=2048,top_k=64,key_tile=128)
+    selected,health=ws32_prefill_dsa_from_query_mapped(q,k[0],w,p[0],l,global_context_size=2048,top_k=64,key_tile=128,paired_position_sort=PAIRED_SORT)
     return selected.positions,selected.valid_counts,selected.scores,health[None,None]
 mapped=jax.jit(jax.shard_map(body,mesh=mesh,in_specs=specs,out_specs=(P(),P(),P(),P('expert','feature')),check_vma=False))
 compiled=mapped.lower(*values).compile()
@@ -56,6 +58,7 @@ duplicate=values[3].at[1].set(values[3][0])
 assert not np.asarray(mapped(values[0],values[1],values[2],duplicate,values[4])[3]).any()
 print(json.dumps({'rows':5,'groups':[8,8],'all_chip_health':True}))
 """
+    program = program.replace("PAIRED_SORT", repr(paired_position_sort))
     env = dict(os.environ, JAX_PLATFORMS="cpu")
     env["XLA_FLAGS"] = (
         env.get("XLA_FLAGS", "") + " --xla_force_host_platform_device_count=32"

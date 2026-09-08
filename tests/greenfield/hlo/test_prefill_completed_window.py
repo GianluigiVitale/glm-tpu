@@ -28,6 +28,7 @@ opts=dict(full_indexer=True,sparse_mlp=True,key_tile=128,
  dsa_contract=config.dsa_contract,attention_contract=config.attention_contract,
  moe_contract=config.moe_contract,linear_interpret=True,sparse_attention_interpret=True)
 prefix,suffix=build_completed_window_programs(mesh,specs,**opts)
+paired_prefix,_=build_completed_window_programs(mesh,specs,**opts,paired_position_sort=True)
 old,_=build_layer_programs(mesh,specs,**opts)
 rng=np.random.RandomState(77)
 host={
@@ -48,6 +49,9 @@ prefixes=[];narrow=[]
 for tile in range(4):
  inputs=prefix_inputs(values,tile,prefixes[-1] if prefixes else None)
  p=prefix(*inputs);jax.block_until_ready(p)
+ pp=paired_prefix(*inputs);jax.block_until_ready(pp)
+ for got,want in zip(pp,p):
+  assert np.asarray(got).tobytes()==np.asarray(want).tobytes()
  assert len(p)==10 and p[0].dtype==jnp.bfloat16
  prefixes.append(p)
  s=suffix(*suffix_inputs([p],jnp.int32(32),w.dense,w.moe));jax.block_until_ready(s)

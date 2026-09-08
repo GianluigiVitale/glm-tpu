@@ -1715,3 +1715,11 @@ normalized-state cause.
   reuse that setting, retaining host/device/HLO tracing and unchanged budgets.
   Missing this existing setting caused avoidable profiling overhead. Unprofiled
   samples/firstNPZ/287witnesses survived; recover those, never invent a validtrace.
+
+- DB595 valid eight-host phase trace corrected the optimization priority:
+  candidate permutation gathers, not FP8 matmul or sparseMLA, dominate this
+  B32 prefix. Sorting keys with payloads can avoid argsort-then-gather overhead;
+  preserve sole-key stable semantics and measure actual new graph/wall before
+  claiming a gain. Trace busy percentages are not utilization or fullmodelwall.
+  A controller9MB disk shortfall was recovered from the same successful workers,
+  not a model rerun. Fresh collection budgeting and compact artifacts matter.

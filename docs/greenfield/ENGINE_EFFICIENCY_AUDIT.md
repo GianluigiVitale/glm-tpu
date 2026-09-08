@@ -990,3 +990,19 @@ paths140.088/154.100ms omit independentassembly; notfullmodelperformance.
 Prefix is~92% of the wide partialsum; device attribution still requires valid
 XPlanes. PreserveFAILED/8/8cleanup and originalsample receipt, then onecorrected
 profile afterfreshpreflights. Do not optimizeMoE alone basedonits isolatedgain.
+
+20:29Z DB595 finally provides actual valid prefix attribution (8files/64cores),
+same-run disk recovery, no model rerun. Prefix30.587ms meanbusy: permutation
+gathers at reference/dsa.py:438/439 take17.051/4.447ms; all gather/scatter25.764ms
+(84.23%). Actual KVgather0.192ms, sparseMLA0.062ms. These are traced means,
+not utilization or full-model critical-path sums. Unprofiled four-prefix p50
+129.546ms and B128suffix10.460ms explain why suffix-only tuning is insufficient.
+Receipt prefill-phase-db595-sealed-20260908.json binds originals/DB/SUCCESS.
+
+First measured-cost optimization now implemented: default-off paired stable
+position+score sort replaces argsort and two permutation gathers, same sole
+position key/top_k/masking/scorebits.33 CPU tests pass including production
+union and actual CPU32 completed prefix; independent reviewer no P0-P2.
+No TPU gain claimed. NEXT one changed-prefix reproduction+profile with actual
+graph/allocation checks and DB594 equality before timing, not another baseline
+or acquisition-only campaign. Full-model~19.9tok/s remains latest measured.

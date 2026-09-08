@@ -17501,3 +17501,41 @@ Recovery script reuses original wrapper census/accounting/archive, holdsboth
 leases and refuses existing recovery/summary/terminal; freshregion/pre/post
 checks. Current result notsealed until actualtrace/originalcollector/DB/archive
 passes. This is controller recovery, not another hardwareexperiment.
+
+## 2026-09-08 20:29Z — DB595 sealed; measured bottleneck and first targeted fix
+
+Same original phase run recovered without model rerun at dd2bca21, DB595,
+SUCCESS 2026-09-08T20:19:04Z generation1788898744637072. Compact receipt:
+docs/artifacts/prefill-phase-db595-sealed-20260908.json. Normal/root8/8clean;
+8 XPlanes/64cores and287calls checked. Controller archive ledger289objects,
+1,049,088,818B (not whole remote prefix; worker publications also retained).
+Original disk refusal and first Python-profiler failure remain evidence.
+
+Max-host unprofiled sample p50 per128rows: four B32prefixes129.546ms,
+B128suffix10.460ms versus four B32suffixes24.515ms. Partialpaths139.958/
+154.118ms omit independent final assembly; not full-model throughput.
+Actual prefix trace:30.587ms meanbusy,25.764ms gather/scatter=84.23%.
+Two candidate-permutation gathers at reference/dsa.py:438/439 (run pin)
+cost17.051/4.447ms perB32. SparseMLA0.062ms and actualKVgather0.192ms:
+do not prioritize guessed FP8 emulation or KVfetch instead of measured cost.
+Category means are NOT device utilization or wholemodel critical-path sums.
+
+Implemented default-off paired_position_sort: existing merge stably sorts
+positions with scores as payload, eliminating argsort plus two row gathers.
+Position remains the sole key; flattening/top_k/finalgather/masking unchanged.
+Both local/global prefill merges and actual completed-prefix builder opt in;
+decode/default/scalar reference unchanged. CPU25 kernel/reference regressions
+PASS17.19s and8 CPU32 builder/mapped/reuse testsPASS46.97s. Includes production
+32x16384 union bit equality, duplicates/ties/sentinels/signedzeros/tails;
+StableHLO gather count3→1 and CPU32 ten-field prefix byte identity.
+Independent existing reviewer no P0-P2, CPU persistence only. No TPU gain yet.
+
+NEXT: one combined changed-prefix original reproduction and profile using
+existing protected workflow; compile/inspect actual changed graph/allocation
+before dispatch, require DB594 first-boundary equality before timing. No new
+baseline-only/acquisition-only campaign, symbolic proof expansion or cleared
+numerical archaeology. Changed-graph launch admission remains to wire; never
+run it through unchanged DB593 identity pins. Controller free269MB at20:21Z:
+restore headroom from reviewed generation-verifiable local duplicate caches,
+not weights or cloud evidence. No worker/controller currently held by this task.
+Latest full-model prefill remains DB588~19.9tok/s;10K target NOT achieved.

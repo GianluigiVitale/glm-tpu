@@ -409,6 +409,7 @@ def _merge_topk_candidates_scored(
     *,
     top_k: int,
     global_context_size: int,
+    paired_position_sort: bool = False,
 ) -> ScoredSelectedPositions:
     """Merge candidates and retain the scores selected by the same top-k.
 
@@ -434,9 +435,19 @@ def _merge_topk_candidates_scored(
     positions = jnp.transpose(candidate_positions, (1, 0, 2)).reshape(
         rows, groups * candidates
     )
-    position_order = jnp.argsort(positions, axis=1, stable=True)
-    sorted_scores = jnp.take_along_axis(scores, position_order, axis=1)
-    sorted_positions = jnp.take_along_axis(positions, position_order, axis=1)
+    if type(paired_position_sort) is not bool:
+        raise ValueError("paired_position_sort must be a static bool")
+    if paired_position_sort:
+        # Position is the ONLY key. Scores are bit-preserving payloads, so equal
+        # positions retain input order exactly as in the reference argsort.
+        # Avoid two row-wise permutation gathers (DB595's dominant prefix cost).
+        sorted_positions, sorted_scores = lax.sort(
+            (positions, scores), dimension=1, is_stable=True, num_keys=1
+        )
+    else:
+        position_order = jnp.argsort(positions, axis=1, stable=True)
+        sorted_scores = jnp.take_along_axis(scores, position_order, axis=1)
+        sorted_positions = jnp.take_along_axis(positions, position_order, axis=1)
     selected_scores, selected_slots = lax.top_k(sorted_scores, top_k)
     selected = jnp.take_along_axis(sorted_positions, selected_slots, axis=1)
     valid_counts = jnp.clip(
@@ -486,11 +497,14 @@ def merge_topk_candidates_with_scores(
     *,
     top_k: int,
     global_context_size: int,
+    paired_position_sort: bool = False,
 ) -> ScoredSelectedPositions:
     """Return exact positions and their executing-device FP32 scores.
 
     This is an observer surface, not a second selector: the scores are the
     values emitted by the same ``lax.top_k`` that chose ``positions``.
+    ``paired_position_sort`` is a default-off prefill experiment; it changes
+    only how the stable position permutation is applied, not score arithmetic.
     """
 
     return _merge_topk_candidates_scored(
@@ -499,6 +513,7 @@ def merge_topk_candidates_with_scores(
         valid_lengths,
         top_k=top_k,
         global_context_size=global_context_size,
+        paired_position_sort=paired_position_sort,
     )
 
 
