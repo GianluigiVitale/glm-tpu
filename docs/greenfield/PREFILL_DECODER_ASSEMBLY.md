@@ -327,3 +327,39 @@ or route schedule values. The full HLO/code pins, admitted layer evidence and ow
 short numerical proof are still required. Full profile remains UNREGISTERED.
 Next: repaired and unrepaired cache ownership, all-layer health, actual memory
 admission and numerical worker/sealer wiring. No unchanged graph acquisition.
+
+### Repair/cache ownership frontier — original B11 graph, 2026-09-08
+
+Independent reviewer traced the concrete layer0 repaired path; main-agent raw
+instruction inspection confirms the projection, selected mixed tuple leaf and
+writer linkage below. This is a research map, NOT an implemented passing proof.
+Use the existing133fe71f acquisition receipt to bind the exact graph bytes; names
+below are lookup anchors for that original tail, not a general name allowlist.
+
+`fusion.10982` projected-key leaf1 → `multiply_add_fusion.245` F32[64,128].
+Its nonrotary half is `slice.66920` BF16[64,64] (cast folded into slice), forwarded
+by `copy-done.1976`; rotary half arrives via `copy.16569`. They feed operands5/6
+of `is-finite_reduce_fusion.1065`, whose metadata names layer2. Only ROOT leaf7
+is this layer0's repaired BF16[11,128] keys: disjoint -inf-padded halves combine
+with maximum and final conversion. `get-tuple-element.88808` selects leaf7.
+
+That result enters `tuple.28446` slot3 → `conditional.940` true branch
+`region_9478.9495_spmd` → nested update-returning `scatter.5732` (own old rows,
+indices and owner/live-selected update). The conditional's result is passed to
+`constant_dynamic-update-slice_fusion.247`; its ROOT `scatter.6000` is actually
+opcode dynamic-update-slice with four zero indices, inserting outer slot0.
+An instruction called scatter is not necessarily a scatter opcode.
+
+Reviewer traced outer repaired slots0..19 through fusions247..228; slot20 is
+inserted inside the accepted commit branch from conditional960. Its original
+base is repaired ENTRY leaf11. The other same-shaped chain (fusions344/342/...)
+is UNREPAIRED. Verify both main/tail with actual operand/tuple bindings, not scope
+metadata, equal dimensions, or the fact that one projection appears somewhere
+among all operands of a mixed fusion.
+
+Implementation obligations: selected-leaf fusion forwarding; exact disjoint
+half assembly; update-returning scatter reducer/dimensions, old-cache slice and
+owner/live index selection; unique outer slots0..20 with preserved remaining
+axes and correct original base; bind final tree to accepted repaired output.
+The unimplemented mask/index arithmetic and rotary correctness checks are not
+established by this research chain. No new capture or unchanged TPU run needed.
