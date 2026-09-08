@@ -290,3 +290,14 @@ The new research report is adjudicated in
 After numerical admission, measure actual route/group tiles and equal-work layer
 timing. B512/1024 and larger grouped row tiles remain hypotheses with separate
 numerical/VMEM/HBM/code-size obligations, not an automatic size increase.
+
+## First numerical result — 2026-09-08 13:25Z
+
+FAILED at boundary/comparison, after all4graph identities and seven executable
+calls. All8clean; no unchanged retry. See
+[original refusal and next discriminator](PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md)
+and `../artifacts/prefill-window-boundary-refusal-v2-20260908.json` for all32
+generation-bound findings:6DSAorder rows,5router-set changes, bounded written
+KV/index differences, exact repair/untouched state. Existing output bounds pass
+but admission remainsFAILED. No competitive/tail/performance/fullmodel claim.
+Next actualDSA/attention→MLP/router boundary capture, not sizeguard increases.

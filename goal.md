@@ -1,6 +1,6 @@
 # Goal — GLM-5.2-FP8 TPU v4: efficient end-to-end inference
 
-FULL ACCESS. Continue to §18 completion under §24. Owner directive
+FULL ACCESS. Continue to §18 under §24. Owner directive
 2026-09-07 supersedes §23's deferred-prefill/decode-only completion: hours-long serial prefill
 is NOT a finished engine. Preserve historical evidence. Keep <4000 chars.
 At start/compaction read this and docs/glm-tpu-revolution.md IN FULL; read HANDOFF and
@@ -29,8 +29,8 @@ Resolve review P0-P2; no repeated cleared-code review or speculative hardening l
 
 ## Performance and proof
 
-Before optimization runs preregister quantitative128K/256K prefill and time-to-first-token
-targets from same-hardware baselines and compute/memory/communication budgets; no post-failure
+Preregister128K/256K prefill and time-to-first-token targets before optimization runs,
+from same-hardware baselines and compute/memory/communication budgets; no post-failure
 loosening. Measure prefill, warm TTFT, decode p50/p99, cold load/compile and total request wall
 separately. No cache-hit-only claims or device win hiding end-to-end regression.
 Base minimum <=200ms/>=4.5 wall tok/s; strong <=125ms/>=8; stretch <=100ms/>=10.
@@ -58,8 +58,9 @@ Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-dec
 D/G DB567/§22; B/B'/C DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
 DB589 MoE B128 baseline PASS:3.33x distributed/1.28x concentrated;8/8clean.
-PREFILL_LAYER_WINDOW.md: B128 CPU schema PASS; default off.
-DB590 graphs acquired; numerical wiring/tests before TPU.
-PREFILL_RESEARCH_REPORT_ADJUDICATION.md: grouping/row-tile reuse/DSA priorities.
-<=32 attention/DSA tiles/M64 repair; no cleared reruns.
-L7/L8 open; no model speedup.
+PREFILL_LAYER_WINDOW.md: default off.
+DB590 graphs admitted. B128 layer6 failed13:25Z;8/8clean.
+PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md:5router-set swaps; capture DSA/MLP inputs next.
+PREFILL_RESEARCH_REPORT_ADJUDICATION.md has research decisions.
+<=32 attention/DSA/M64 repair; no blind retry.
+L7/L8 open; no speedup claim.

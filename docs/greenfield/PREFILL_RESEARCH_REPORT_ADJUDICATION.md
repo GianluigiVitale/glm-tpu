@@ -5,7 +5,8 @@ Source: [owner-supplied report](research_report_prefillv4.md), read in full,
 not independently resolvable evidence here. Its bibliography supplies source leads;
 external implementation claims still need pinned-source verification before reuse.
 This note does not change the numerical contract, authorize a TPU launch, or set
-performance targets. Implementation baseline: `b5ff369c` plus current launch WIP.
+performance targets. First numerical implementation pin: `0f994e37`; see the
+updated failure boundary below before following any earlier launch recommendation.
 
 ## Decisions that change the next engineering work
 
@@ -65,13 +66,15 @@ performance targets. Implementation baseline: `b5ff369c` plus current launch WIP
 
 ## Immediate engineering boundary
 
-Current numerical-only launcher/collector changes are uncommitted WIP. Independent
-review found unvoted final journal/report failures that could strand peers at the
-next rendezvous. The fix uses existing matched fleet phases and original-output
-preservation; composed CPU tests include final-publication/peer failure and all8
-worker→files→generation collector→DB. This is necessary integration work, not a
-new mathematical proof campaign or a reason to repeat cleared kernel tests.
+The reviewed numerical-only launch at0f994e37 executed after all4graph admission
+and failed at its first boundary comparison13:25Z. Matched finalization retained
+originals and all8hosts cleaned successfully. All128partial worker files are now
+generation/CRC/SHA-bound. DSA order differs6rows and router sets5rows; written
+KV/index differences pass existing bounds, repair/untouched state is exact.
+No competitive/tail case or timing campaign ran. No benign-rounding conclusion.
 
-Next: complete that review/test/persistence, one protected selected-layer numerical
-discriminator, then equal-work phase attribution and routing/grouping decisions.
+Next: [actual numerical-boundary diagnosis](PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md),
+including DSA query/head and completed MLP/router inputs, then resume equal-work
+phase attribution/grouping after the specific failure is resolved. Do not repeat
+the unchanged numerical trial or treat report throughput scenarios as evidence.
 No full-model speedup, delivered TTFT, B512 admission or 10K promise is established.

@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Current13:25Z2026-09-08: layer6 B128 numerical FAILED, not staging anymore.
+`analyze_prefill_window_failure.py` adapts the existing generation-bound refusal
+reader, selected checkpoint ledger, original-array protocol and unchanged tensor
+bounds. Physical32slot/process mapping revalidated after review. No TPU/copies/
+comparator edits. See PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md and v2 receipt for
+5router-set changes and next bounded completed-input discriminator. Prior notes
+below preserve history; they do not authorize an unchanged retry.
+
 Layer6 numerical launch now adapts existing worker/campaign/wrapper publication
 and DB accounting, distinct `ws32_prefill_layer_window_numerical` opt-in. Reuses
 original DB590 outer compilation chain, with ONLY seven exact host-location

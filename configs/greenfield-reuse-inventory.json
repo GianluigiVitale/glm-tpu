@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-window-boundary-refusal",
+      "category": "read-only first-failure numerical localization",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "0f994e373dade76ede59da179da6856d17234e5d",
+      "source_paths": ["scripts/greenfield/analyze_prefill_materialized_failure.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/prefill_layer_evidence.py", "scripts/greenfield/prefill_window_protocol.py", "glm_tpu/greenfield/benchmarking/one_layer.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/analyze_prefill_window_failure.py", "tests/greenfield/hlo/test_prefill_window_failure_analysis.py", "docs/greenfield/PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md"],
+      "gate": "24: B128 numerical FAILED; all128 partial originals verified, no promotion",
+      "reason": "Reuse exact generation/CRC/SHA original readback and checkpoint metadata without payload copies or TPU execution. Separate ordered route differences from selected-set swaps and align route weights by expert only on matching-set rows, explicitly diagnostic. Preserve unchanged per-row/aggregate bounds, cache addresses and original failed comparator. Independent review adds exact common physical mesh/device-slot/process binding, with mutations. Next actual completed MLP-input/router capture must reproduce original signatures before attribution; no automatic retry or changed reference/tolerance."
+    },
+    {
       "id": "ws32-prefill-window-numerical-launch",
       "category": "fixed selected-layer numerical integration and host-location identity",
       "source_repo": "glm-tpu greenfield",

@@ -1659,3 +1659,16 @@ normalized-state cause.
   a timeout on healthy hosts. Existing matched fleet_step now covers finalization,
   close and HLO snapshot, with original NPZs retained first. CPU injected local
   and peer failures plus actual8rank producer/collector/DB composition pass.
+
+- 2026-09-08 B128 numerical failed at boundary/comparison on orderedDSA, tag
+  greenfield_fp8_ws32_prefill_layer_window_numerical_l6_20260908T132240925858058Z.
+  Original16files/rank preserved, matched finalization and8/8cleanup worked.
+  Compare router sets separately from order and align weights by expert only
+  diagnostically:15order rows include5set swaps, not merely a permutation.
+  All32 originals, not rank0, are needed for cache conclusions: writtenKV/index
+  differ at slots0–3/0–7 within bounds, while repair/untouched bytes stay exact.
+  The first analysis omitted physical device-slot rebinding; reviewer fixed it
+  in append-onlyv2 and caught the rank0-to-fleet overgeneralization. Neither
+  correction changes the failed comparator. Observe actual MLP inputs and DSA
+  query/head operands before guessing the first arithmetic cause. Require
+  original-signature reproduction under instrumentation; no blind barrier trials.

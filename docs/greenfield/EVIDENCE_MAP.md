@@ -2,6 +2,15 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST13:25Z2026-09-08: B128 layer6 numerical at0f994e37 FAILED on orderedDSA
+boundary comparison, after4graph admission and7calls. Normal/root8/8clean.
+All128 partial worker files generation/CRC/SHA-bound in
+`../artifacts/prefill-window-boundary-refusal-v2-20260908.json`.
+Five router SET changes, sixDSA ORDER rows; writtenKV/index differ within bounds,
+untouched/repair exact; output bounds pass. Not benign/promotion. Next capture:
+`PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md`. No unchanged retry, newpack or fullmodel.
+Earlier pointers below are historical, superseded by this failure evidence.
+
 LATEST2026-09-08 after DB590: fixed raw4graph admission passes original graphs
 locally, including B128/B32 FP32 route sums and paired collective payloads.
 `scripts/greenfield/prefill_window_admission.py` binds the acquisition receipt,

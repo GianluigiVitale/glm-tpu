@@ -744,3 +744,16 @@ already-existing tiled DSA rather than implementing it twice. B128 traffic roofs
 depend on uniform-routing/one-load assumptions; 3K–12K forecasts remain speculative.
 Reject final target setting after256K, invalid pre-reduction SwiGLU fusion and
 new checkpoint/environment campaigns. No numerical contract or target relaxed.
+
+2026-09-08 13:25Z: B128 layer6 numerical at0f994e37 passes all4graph admission
+and executes only boundary (2WK+5model calls), then refuses orderedDSA. Normal/root
+8/8cleanup. Offline128generation-bound originals show6DSA order rows but identical
+sets below2048,15router order rows including5set changes; fixed output/residual
+bounds pass. Slotwise route-weight errors are largely permutation-sensitive:
+expert-aligned123same-set rows pass, not promotion. WrittenKV/index differ within
+bounds at slots0–3/0–7; repair and untouched bytes are exact. Rank0-only cache
+exactness must not be generalized to the fleet. Reviewer caught that interpretation.
+PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md fixes the next scope: actual DSA query/head
+and attention→completed MLP input/router capture, original signature reproduction,
+then same-input router/own-input FP64. No blind rerun, new reference, tolerance
+relaxation, fullmodel or performance claim. This is E1/E2 numerical localization.

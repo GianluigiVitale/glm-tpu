@@ -16658,3 +16658,50 @@ NEXT review/commit/push/same-region mirror then one protected numerical-only
 layer6 run through bothleases and fresh normal/root8census. If refused, preserve
 originals and diagnose locally, never blindly repeat. After pass, equal-work
 timing/actualroute occupancy and long-capacity/own8K/efficientL7/L8 remain open.
+
+## 2026-09-08 13:25Z failure / 13:46Z original-array diagnosis — no retry
+
+Run `greenfield_fp8_ws32_prefill_layer_window_numerical_l6_20260908T132240925858058Z`
+at `0f994e373dade76ede59da179da6856d17234e5d` terminated exit1 at13:25:07Z.
+All4graphs pass v2 identity/allocations; WK decode/promote then boundary candidate
+and fourB32 controls complete (7calls total). Failure at boundary/comparison:
+`window/control ordered DSA selection differs`. Competitive/tail unexecuted;
+no timing, fullmodel, DB row or SUCCESS. Normal and root/libtpu censuses8/8clean.
+No protected job was restarted; local process check13:32Z found no campaign/pytest.
+
+Read-only diagnosis verifies all128original partial files against worker-recorded
+generation/size/CRC/SHA, fixed fixture, graph identities, selected tensor ledger,
+32physicaldevice→slot assignments and8uniqueprocesses. Receipt
+`docs/artifacts/prefill-window-boundary-refusal-v2-20260908.json`, SHA256
+`2b5e556dfeea92071859650b70c7ca51d882ab1d5a26d54845beee6d0e273fff`.
+V1 remains disclosed: review found missing physicalmapping validation, corrected
+with focused mutation tests; v2 re-read every original and reproduced findings.
+
+DSA ORDER differs rows2/52/69/82/101/121; sets identical because causal506–633
+keys all fit under2048. Router ORDER differs15rows, SETS differ2/10/32/62/113.
+Output/residual fixed aggregate AND every-row bounds pass (worstabs.00195694/
+.000244141). Rawslot routeweights fail; expert-aligned123same-setrows pass with
+max8.44449e-5, onlydiagnostic, excludesfivechangedsets. No relaxed comparator.
+Pre-attention normalized inputs identical. **Caches NOT all exact:** writtenKV
+differs slots0–3 max3.72529e-9; indexslots0–7 max.001953125; fixed bounds pass.
+Repair and untouched bytes exact. Reviewer corrected initialrank0-to-fleet
+overgeneralization. Rank4 originals put soleKVdiff atrow38, indexdiffs42/98;
+these later writes cannot explain firstDSArow2 under causal semantics.
+
+Receipt `prefill-window-boundary-cleanup-20260908.json`, SHA256
+`863a581325276140071dadefe5b07e41dff90cb17a5295e4fc6b9a2dcfb9c7c0`, binds
+publishedv1/v2 and both8hostcleancensuses under same-tag `failure_diagnosis/`:
+4objects/1,155,507B, generation-readback, no checkpoint/policy/infra changes.
+Originals remain under `results/<tag>/workers/rankN/`; localroot
+`/home/gianl/glm-run/<tag>`, originalrank0 present. No full-size local downloads.
+
+13CPU focuseddiagnostic/mapping/per-row/reuse tests PASS3.03s. No execution or
+enforcement code changed. Independent review cleared mapping fix and numerical
+classification with cache correction; next design is boundeddiagnostic only.
+`PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md` specifies actualDSAquery/head operands,
+attention update/pre-norm and completedBF16MLP/router captures; reproduceoriginal
+observable signatures before attribution, then same-input router replay/own-input
+FP64. This is the exact next action, NOT another all-model/GateD arithmetic campaign.
+No automatic retry, barrier/precision guess, changedreference or tolerance.
+Persist/review ownbranch and same-regionmirror; then implement that focusedcapture.
+Efficient larger-window/own8K/targets/4depthL7/L8/TTFT remain open; goal active.
