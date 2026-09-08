@@ -15896,3 +15896,55 @@ registered actual projection leaves/ENTRY inputs. Bind WK to ENTRY2324+slot via
 checked scaffolding and normalized input to own feature gather/repeated-row
 gather; inspect actual dot rather than its label. Dependency is not arithmetic
 equivalence. Larger-row reuse, quantitative targets and efficientL7/L8 stay open.
+
+## 2026-09-08 — actual repair inputs and writer-key provenance pass
+
+Startingb9016073. Previous goal turn PROGRESS: both index-cache storage stacks
+persisted. This turn adds `ws32_hlo_leaf_dependencies.py` and
+`ws32_batched_repair_hlo.py`; same parsed index, no model/worker or TPU change.
+Local process inspection found no model runner; latest authenticated fleet
+census remains04:23:07Z from133fe71f, not a fresh idle claim.
+
+All21 actual repair convolution inputs bind to completedWK ENTRY2324+slot and
+their own normalized gather/repetition. Memoryspace-only matrix bitcast wrappers
+require exact shapes/tiles; convolution labels bf_oi->bf and default/highest
+precision are actual attributes. Same-source WK slice scaffold reused unchanged.
+Actual key supplies scatter update, and selected-leaf dependencies contain only
+own projection leaves0/1. Memoized local computation/leaf summaries substitute
+each caller's actual parameters using an explicit stack; B17 uses2336memo nodes,
+not21complete module rescans.3000-node depth regression passes.
+
+Reviewer P2 fixed, not deferred: a correctly labelled gather could read another
+layer's normalized value. Now its actual input must be the identical SSA value
+feeding its own raw index-key FP8 call BEFORE exact BF16 zero row-padding
+(17→24/11→16). Both originals share this identity across all21 producers, no
+forwarding exceptions. The mutation swaps input below an unchanged gather label.
+No new claim that the normalization arithmetic itself is proven by this identity.
+Initial local implementation errors (nonexistent gather_dimension property and
+constant -inf lexed as an operand) were corrected before hardware; dimensions
+come from existing raw attributes and constants have no dependency edges.
+
+Final25PASS66.89s covers both original graphs/5same-shape and precision mutations,
+row-profile refusals and8dependency mechanism/depth tests. Original combined
+main/tail inspection2PASS100.39s: all profiles compose and only UNREGISTERED
+remains; old duplicate kernel/mode tests were deselected by that narrow command.
+Separate mode20+reuse4PASS3.27s. Black/diffcheckPASS,goal3998chars. Independent
+review P2 resolved, no remainingP0-P2; CPU persistence approved conditional on
+these original replays, now satisfied. No numericalDB row or prefill speed claim.
+
+Next all-layer health MUST-GATE proof, not ordinary dependency. Reviewer actual
+frontier both graphs: span_valid AND all(~live OR accumulated_health) AND
+head_health. B11 or_reduce_fusion141 calls35526; B17 calls36867. Both231operands,
+ROOT reduce_and24978 is true-initialized axis0 AND, exact live mask
+iota<clip(count,0,B). Only layers66..77 occur directly in finalfusion; earlier
+health arrives through selected parameter leaves. Follow caller/leaf bindings.
+AND unions required health obligations; OR intersects, except explicitly proven
+inactive-row exemption. Unknown boolean ops are barriers. Actual42index-writer
+and78KV-writer validity selectors plus per-layer finite/router/attention health
+are useful anchors. Mutation AND→OR, dropped writer/layer obligation, wrong mask
+and wrong tuple leaf must refuse. Do not use ancestry as implication.
+
+After health: real memory census/reserve and executable/state lifetime, numerical
+worker/sealer wiring and bounded own§21. No exhaustive symbolic rotary/mask math
+prerequisite. No unchanged acquisition or cleared-layer arithmetic rerun. Targets,
+larger-row weight reuse and efficientL7/L8 remain open.

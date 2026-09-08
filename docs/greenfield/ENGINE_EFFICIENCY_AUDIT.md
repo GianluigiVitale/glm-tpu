@@ -557,3 +557,11 @@ re-prove every rotary/mask/index operation before the bounded2K numerical test.
 Finish ownWK/gather→repair dependency, all-layer health and actual memory budget;
 use unchanged admitted source, targeted CPU interventions and the candidate's own
 protected§21 test for arithmetic. No threshold relaxation or hardware claim.
+
+Repair-input provenance is now checked via own completedWK, actual matrix
+operands, same normalized input as the actual index-key projection and selected
+writer-key dependencies. Review caught that a labelled gather could read another
+layer's input; exact shared SSA before zero row-padding fixes that gap. Memoized
+computation/leaf summaries and an explicit stack avoid whole-model rescans and
+recursion-depth failure. This proves provenance only, not arithmetic or health
+implication. Next actual health gating, memory preflight and bounded own§21.

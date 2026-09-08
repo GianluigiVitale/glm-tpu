@@ -22,6 +22,7 @@ from .ws32_batched_collective_hlo import check_batched_collectives
 from .ws32_batched_helper_hlo import check_batched_helpers
 from .ws32_batched_kernel_hlo import check_batched_kernels
 from .ws32_batched_cache_hlo import check_batched_index_cache_stacks
+from .ws32_batched_repair_hlo import check_batched_repair_lineage
 
 
 UNREGISTERED = "batched prefill production HLO/allocation profile is not registered"
@@ -92,6 +93,13 @@ def inspect_ws32_batched_prefill_hlo(
     )
     if not cache_proof["passed"]:
         violations.append("batched index-cache storage ownership failed")
+    repair_proof = (
+        check_batched_repair_lineage(index, block_rows=block_rows)
+        if block_rows in (11, 17)
+        else {"passed": False, "error": "unregistered repair row count"}
+    )
+    if not repair_proof["passed"]:
+        violations.append("batched repair input/writer provenance failed")
     if stable_sha != expected_stablehlo_sha256:
         violations.append("StableHLO identity drifted")
     if optimized_sha != expected_optimized_hlo_sha256:
@@ -190,6 +198,7 @@ def inspect_ws32_batched_prefill_hlo(
         "compiler_helper_proof": helper_proof,
         "pallas_interface_proof": kernel_proof,
         "index_cache_storage_proof": cache_proof,
+        "repair_lineage_proof": repair_proof,
         "passed": False,
         "violations": violations,
         "performance_claim": False,

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-repair-input-writer-provenance",
+      "category": "selected-leaf repair projection dependency and own normalized input",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b901607340b449ca7eb5d485ddf517a069167088",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_prefill_hlo_identity.py", "glm_tpu/greenfield/benchmarking/ws32_batched_cache_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_helper_hlo.py", "glm_tpu/greenfield/kernels/ws32_prefill_dsa.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_hlo_leaf_dependencies.py", "glm_tpu/greenfield/benchmarking/ws32_batched_repair_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py", "tests/greenfield/benchmarking/test_ws32_hlo_leaf_dependencies.py", "tests/greenfield/benchmarking/test_ws32_batched_repair_hlo.py"],
+      "gate": "24: B17/B11 ownWK/normalized/projection-to-writer provenance; numerical admission disabled",
+      "reason": "All21 actual repair convolutions bind completedWK ENTRY2324+slot through checked copy/slice scaffolding and exact memoryspace-only projection wrappers. Repeated normalized gather must use same-layer feature4 gather whose input is EXACT same SSA value as its actual raw index-key Pallas call before BF16 zero row-padding (7/5rows). Selected-leaf iterative dependency summaries bind shared fusion parameters per caller; actual writer key depends on only own projection leaves0/1 and supplies actual row scatter. Constant literal tokens are not graph edges; known gather annotation forwarding is narrow. No arithmetic equivalence, repetition/rotary values or health implication claimed; same-source hashes/CPU interventions and own hardware§21 still needed. No model/worker/TPU change."
+    },
+    {
       "id": "ws32-batched-index-cache-storage-ownership",
       "category": "actual accepted dual-cache stacks and own-slot row writers",
       "source_repo": "glm-tpu greenfield",

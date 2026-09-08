@@ -1583,3 +1583,11 @@ normalized-state cause.
   cache flatten/unflatten and leave arbitrary bitcasts refused. Do not turn
   pre-run admission into symbolic proof of every arithmetic operation; after
   ownership/health/memory checks, the bounded own§21 hardware test is decisive.
+
+- 2026-09-08 repair lineage: correctly labelled gather + correct dimensions
+  does not establish source ownership. Bind its actual input to the same-layer
+  key projection's pre-padding input, and mutate beneath an unchanged label.
+  Mixed-fusion dependency summaries must retain selected tuple paths and actual
+  caller bindings; use an explicit stack for deep graphs. Treat -inf/0 constant
+  spellings as literals, never operand names. Dependency cannot prove health
+  gating: an OR can preserve ancestry while allowing failure to commit.

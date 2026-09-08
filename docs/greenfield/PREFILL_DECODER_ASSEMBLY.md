@@ -401,3 +401,36 @@ Before dispatch still require registered reserve, actual fleet-wide memory censu
 audited executable/state lifetime, bounded failure publication and cleanup; measure
 execution peak rather than promote compilation counters. This decision changes
 the verification method, not thresholds, storage invariants or launch authority.
+
+### Repair-input and writer provenance — 2026-09-08
+
+`ws32_batched_repair_hlo.py` binds each actual repaired writer to its own21-slot
+projection and completedWK ENTRY2324+slot. Actual multiplication is inspected:
+F32[64,128] convolution, bf_oi->bf, default/highest operand precision, explicit
+same-index tiled input wrappers. WK Concat uses checked same-source complete
+slice scaffolding, not assumed concatenation identity. Source normalized rows
+come through the row-repeat gather from the same-layer feature4 gather.
+
+Review found and fixed an important scope gap: the feature gather's label and
+shape do not prove its input belongs to the producer. The check now binds that
+input to the identical SSA value feeding the actual same-layer raw index-key
+FP8 Pallas call, before exact zero padding (B17→24 adds7 rows;B11→16 adds5).
+The mutation replaces the input underneath the unchanged gather label and must
+refuse. Changing the gather reference or label alone would not cover this bug.
+
+`ws32_hlo_leaf_dependencies.py` memoizes each computation/selected-leaf dependency
+summary with symbolic parameter paths and substitutes actual caller operands.
+Traversal uses an explicit work stack; a3000-node test checks depth safety.
+Mixed output tuples cannot attribute another leaf's projection to this writer.
+The actual scatter's live update uses the bound key; that key's projection
+terminals must be exactly own leaves0/1, never another producer. Constants,
+including -inf, do not have graph operands even if a lexer accepts the spelling
+as a name. Unknown control/custom operations refuse; one exact gather annotation
+forwards dependency only. Completed copies remain distinct from unfinished data.
+
+This is provenance, not arithmetic equivalence: multiplying a dependent value
+by zero still has syntactic ancestry. In particular it is NOT the next health
+proof. Health must establish that failure prevents commit: AND unions required
+obligations; OR/unknown choices cannot inherit an obligation from just one input.
+The exact inactive-row exemption (~live OR health) needs its real mask bound.
+Actual memory census/reserve and own§21 numerical evidence remain mandatory.

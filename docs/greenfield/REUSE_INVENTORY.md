@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Repair provenance now adapts the same selected-leaf and slice scaffolding checks.
+All21 completedWK owners, actual matrix operands and writer-key projection
+dependencies are bound. A new iterative memoized dependency engine substitutes
+each fusion's selected-leaf parameter summary at its actual callsite. This is
+ancestry, NOT arithmetic identity or health implication. Crucially, repair gather
+input equals actual same-layer index-key input before exact zero row-padding;
+labels alone cannot prove normalized ownership. Next health implication/memory
+and own numerical§21; no exhaustive symbolic arithmetic prerequisite.
+
 Index-cache storage proof reuses selected tuple/fusion/branch binding for both
 actual accepted stacks:21repaired slots from ENTRY11,21unrepaired from ENTRY3.
 Exact own old slices, earlier disjoint writes, selected conditional storage leaf,
