@@ -42,10 +42,17 @@ def run_cases(root, failure=None):
         consensus=lambda ok: ok,
         journal=journal,
         local_slots={9: 0, 13: 1, 25: 2, 29: 3},
-        budgeter=admission.memory_budget,
+        budgeter=worker.assembly.memory_budget,
     )
     state, observations, prefixes, suffix_results, sequence = {}, {}, [], [], []
     pins = admission.registered_programs()
+    for name in worker.assembly.PROGRAMS:
+        pins[name] = dict(
+            compiled_memory={
+                key: 0 if key == "alias_size_in_bytes" else 1024
+                for key in worker.assembly.ALLOCATION_CAPS
+            }
+        )
 
     def inputs(host, *args):
         state.clear()
@@ -95,16 +102,32 @@ def run_cases(root, failure=None):
         assert previous is (prefixes[-1] if tile else None)
         return (np.int32(tile),)
 
-    def suffix_inputs(parts, valid, dense, moe):
+    def suffix_inputs(parts, valid, tile=None):
         if len(parts) == 4:
             assert all(a is b for a, b in zip(parts, prefixes))
             return (np.int32(-1),)
-        tile = next(i for i, p in enumerate(prefixes) if parts[0] is p)
-        assert int(valid) == max(0, min(32, int(state["count"]) - tile * 32))
+        tile = int(tile)
+        assert parts[0] is prefixes[tile]
+        assert int(valid) == int(state["count"])
         return (np.int32(tile),)
 
-    patches.setattr(worker.programs, "prefix_inputs", prefix_inputs)
-    patches.setattr(worker.programs, "suffix_inputs", suffix_inputs)
+    patches.setattr(
+        worker.assembly,
+        "place_tiles",
+        lambda mesh: tuple(np.int32(i) for i in range(4)),
+    )
+    patches.setattr(worker.assembly, "prefix_arguments", lambda values, tile: (tile,))
+    patches.setattr(
+        worker.assembly,
+        "attach_prefix",
+        lambda values, prepared, previous: prefix_inputs(
+            values, int(prepared), previous
+        ),
+    )
+    patches.setattr(worker.assembly, "suffix_arguments", suffix_inputs)
+    patches.setattr(
+        worker.assembly, "attach_suffix", lambda values, prepared: (prepared,)
+    )
 
     class Program:
         def __init__(self, name):
@@ -113,9 +136,14 @@ def run_cases(root, failure=None):
         def memory_analysis(self):
             return SimpleNamespace(**pins[self.name]["compiled_memory"])
 
-        def __call__(self, tile):
+        def __call__(self, tile, *extra):
+            if self.name == "assemble":
+                sequence.append((self.name, -1))
+                return assembled(tile, extra[0]), assembled(tile, None)
             tile = int(tile)
             sequence.append((self.name, tile))
+            if self.name.startswith("prepare_"):
+                return np.int32(tile)
             fields = (
                 protocol.PREFIX_FIELDS
                 if self.name == "prefix"
@@ -161,7 +189,9 @@ def run_cases(root, failure=None):
                 suffix_results.append(result)
             return result
 
-    calls.programs = {n: Program(n) for n in admission.PROGRAMS}
+    calls.programs = {
+        n: Program(n) for n in (*admission.PROGRAMS, *worker.assembly.PROGRAMS)
+    }
 
     def assembled(parts, suffix):
         assert all(a is b for a, b in zip(parts, prefixes))
@@ -185,7 +215,12 @@ def run_cases(root, failure=None):
         observations[id(result)] = observed
         return result
 
-    patches.setattr(worker.programs, "assemble_result", assembled)
+    patches.setattr(
+        worker.assembly,
+        "assembly_arguments",
+        lambda prefixes, wide, narrow: (prefixes, wide, narrow),
+    )
+    patches.setattr(worker.assembly, "attach_result", lambda rows, last: rows)
     try:
         yield calls, sequence
     finally:
@@ -196,11 +231,18 @@ def run_cases(root, failure=None):
 def test_actual_budgeted_worker_three_cases_original_replay(tmp_path):
     with run_cases(tmp_path) as (calls, sequence):
         worker.execute_cases(calls, weights=None, wk=None, mesh=None, specs=())
-        assert len(sequence) == 27
-        assert sequence[:9] == [("prefix", t) for t in range(4)] + [
+        assert len(sequence) == 57
+        model_sequence = [
+            entry
+            for entry in sequence
+            if entry[0] in ("prefix", "candidate", "control")
+        ]
+        assert model_sequence[:9] == [("prefix", t) for t in range(4)] + [
             ("candidate", -1)
         ] + [("control", t) for t in range(4)]
-        assert len(calls.record["call_evidence"]) == 27
+        assert len(calls.record["call_evidence"]) == 57
+        assert calls.record["call_evidence"][-1]["graph"] == "assemble"
+        assert len(calls.record["call_evidence"][-1]["post_memory"]) == 4
         serialized = json.loads(json.dumps(calls.record))
         for case in protocol.CASES:
             replay = protocol.replay_case(
@@ -216,7 +258,7 @@ def test_failure_preserves_completed_components_before_successor(tmp_path, failu
     with run_cases(tmp_path, failure) as (calls, sequence):
         with pytest.raises(ValueError, match="originals preserved"):
             worker.execute_cases(calls, weights=None, wk=None, mesh=None, specs=())
-        assert len(sequence) == (9 if failure == "narrow_health" else 2)
+        assert len(sequence) == (18 if failure == "narrow_health" else 4)
         assert set(calls.record["cases"]) == {"boundary"}
         with np.load(tmp_path / "boundary.npz", allow_pickle=False) as saved:
             if failure == "prefix_nan":
@@ -230,10 +272,7 @@ def test_failure_preserves_completed_components_before_successor(tmp_path, failu
                 assert not saved[key][0]
 
 
-@pytest.mark.parametrize(
-    "change", ["assembly", "component", "dtype", "missing", "extra", "nan"]
-)
-def test_consumer_refuses_component_or_assembly_changes(tmp_path, change):
+def test_consumer_refuses_component_or_assembly_changes(tmp_path):
     with run_cases(tmp_path) as (calls, _):
         # One fixture output is sufficient for every consumer mutation.
         with pytest.MonkeyPatch.context() as patch:
@@ -241,26 +280,28 @@ def test_consumer_refuses_component_or_assembly_changes(tmp_path, change):
             worker.execute_cases(calls, weights=None, wk=None, mesh=None, specs=())
         path = tmp_path / "boundary.npz"
         with np.load(path, allow_pickle=False) as saved:
-            values = {n: saved[n].copy() for n in saved.files}
-        if change == "assembly":
-            values["actual_9__output"][0, 0] += 1
-        elif change == "component":
-            values["wide_9__output"][0, 0] += 1
-        elif change == "dtype":
-            values["prefix0_9__mlp_input"] = values["prefix0_9__mlp_input"].astype(
-                np.float32
-            )
-        elif change == "missing":
-            values.pop("prefix1_9__mlp_input")
-        elif change == "extra":
-            values["unexpected"] = np.zeros(1)
-        else:
-            values["prefix1_9__mlp_input"].view(window.BF16)[0, 0] = np.nan
-        base.save_arrays(path, values)
-        with pytest.raises((ValueError, KeyError)):
-            protocol.replay_case(
-                path, case="boundary", slots_by_device=calls.local_slots
-            )
+            originals = {n: saved[n].copy() for n in saved.files}
+        for change in ("assembly", "component", "dtype", "missing", "extra", "nan"):
+            values = deepcopy(originals)
+            if change == "assembly":
+                values["actual_9__output"][0, 0] += 1
+            elif change == "component":
+                values["wide_9__output"][0, 0] += 1
+            elif change == "dtype":
+                values["prefix0_9__mlp_input"] = values["prefix0_9__mlp_input"].astype(
+                    np.float32
+                )
+            elif change == "missing":
+                values.pop("prefix1_9__mlp_input")
+            elif change == "extra":
+                values["unexpected"] = np.zeros(1)
+            else:
+                values["prefix1_9__mlp_input"].view(window.BF16)[0, 0] = np.nan
+            base.save_arrays(path, values)
+            with pytest.raises((ValueError, KeyError)):
+                protocol.replay_case(
+                    path, case="boundary", slots_by_device=calls.local_slots
+                )
 
 
 def test_capture_uses_addressable_shards_and_strict_leaf_owners():
@@ -300,3 +341,32 @@ def test_binding_refuses_before_model_dispatch(tmp_path, change):
         with pytest.raises(ValueError):
             worker.execute_cases(calls, weights=None, wk=None, mesh=None, specs=())
         assert not sequence
+
+
+def test_last_assembly_originals_survive_postpeak_refusal(tmp_path, monkeypatch):
+    with run_cases(tmp_path) as (calls, sequence):
+        original = base.capture_identified_device_memory
+
+        def post(*args):
+            if calls.record["call_evidence"][-1]["graph"] == "assemble":
+                with np.load(tmp_path / "boundary.npz", allow_pickle=False) as saved:
+                    assert "actual_9__output" in saved and "control_9__output" in saved
+                raise ValueError("final assembly peak refused")
+            return original(*args)
+
+        monkeypatch.setattr(base, "capture_identified_device_memory", post)
+        with pytest.raises(ValueError, match="final assembly peak"):
+            worker.execute_cases(calls, weights=None, wk=None, mesh=None, specs=())
+        assert len(sequence) == 19 and sequence[-1][0] == "assemble"
+        assert set(calls.record["cases"]) == {"boundary"}
+
+
+def test_peer_memory_refusal_before_helper_prevents_dispatch(tmp_path):
+    with run_cases(tmp_path) as (calls, sequence):
+        calls.consensus = (
+            lambda ok: ok
+            and calls.record.get("current_phase") != "boundary/prepare_prefix0/memory"
+        )
+        with pytest.raises(RuntimeError, match="peer refused"):
+            worker.execute_cases(calls, weights=None, wk=None, mesh=None, specs=())
+        assert not sequence and calls.record["call_evidence"][0]["completed"] is False

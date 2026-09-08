@@ -883,3 +883,14 @@ arithmetic or timing. Independent review clears staged persistence only.
 Next existing WK/compile/campaign/collector integration and eager assembly memory
 accounting, including last assembly peak. Allfive main code sizes alone do not
 bound incidental assembly executables. No new formal proof or model retry.
+
+17:28Z: that staged assembly gap is addressed with four explicit row-only
+programs and pure tuple cache/weight attachment, not hidden eager operations.
+Reuse original suffix/assembly policy, compiler writer/journal/fleet votes and
+BudgetedCalls. Allnine actual analyses enter every live budget; preparation
+and final assembly receive postpeak checks. No full cache/weight JIT passthrough.
+CPU32 actual helpers/sharding/metadata/HLO and compiler publication3PASS5.33s;
+caseworker5+7testsPASS77.33/39.30s, including finalpeak originals and peerrefusal.
+Six mutation checks share a single fixture, avoiding redundant producer runs.
+Independent review clears CPU persistence; no TPU allocation/speed proof yet.
+Next WK/fleet/59-call consumer integration. Original five model graphs unchanged.

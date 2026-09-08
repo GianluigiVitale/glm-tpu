@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-completed-window-explicit-assembly",
+      "category": "row-only device assembly and simultaneous nine-executable budgeting",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "ff59a1e1c971b7a32ce66b6714620dd72f593f05",
+      "source_paths": ["scripts/greenfield/prefill_completed_window.py", "scripts/greenfield/prefill_completed_window_worker.py", "scripts/greenfield/prefill_window_worker.py", "scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "glm_tpu/greenfield/validation/ws32_prefill_memory.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_completed_window_assembly.py", "scripts/greenfield/prefill_completed_window_worker.py", "tests/greenfield/hlo/test_prefill_completed_window_assembly.py", "tests/greenfield/hlo/test_prefill_completed_window_worker.py"],
+      "gate": "24: four explicit helper CPU compilation/execution and staged nine-graph worker; no TPU numerical or deployment admission",
+      "reason": "Replace incidental eager JAX assembly with four small compiled row-only helpers: dynamic prefix preparation, wide/narrow suffix preparation and final assembly. Pure tuple attachment preserves weights/caches without passing them into helper executables. Abstract production preparation reuses actual compiler writer/fsynced journal/matched fleet phases; no execution during compile. Narrow row-operation inventory rejects collectives/model calls, predeclared small allocation caps refuse only, actual analyses enter nine-program live budgets. BudgetedCalls covers all30helper calls and final postpeak with originals preserved before refusal. CPU32 actual shapes/sharding/tails/invalid metadata/cache identity, JSON/NPZ worker and local/peer failure tests pass. Six consumer mutations share one fixture to avoid redundant setup. Original DB593 model graphs unchanged; WK continuation and59-call/32-owner collector/wrapper integration still required before protected execution."
+    },
+    {
       "id": "ws32-prefill-completed-window-admission-worker",
       "category": "fixed five-graph admission and completed-component numerical replay",
       "source_repo": "glm-tpu greenfield",

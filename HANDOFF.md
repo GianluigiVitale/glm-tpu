@@ -17156,3 +17156,44 @@ No TPU launched or infrastructure managed this turn. Last authenticated8host
 normal/root post remainsDB59316:47:58Z; local process check17:09Z no model/
 controller. Source branch rewrite/topology-first-decode, ownorigin only. Current
 goal3995chars. Persist/push then verify same-region repo mirror before advancing.
+
+## 2026-09-08 17:28Z — explicit assembly programs and final memory checks staged
+
+Previous goal turn was progress atff59a1e1, pushed and mirrored with exact branch/
+goal/HANDOFF/worker readback hashes. This turn replaces staged eager JAX slicing/
+concatenation with FOUR small explicit helpers in prefill_completed_window_assembly.py:
+prepare_prefix(dynamic tile), prepare_wide, prepare_narrow(dynamic tile), assemble.
+No weights/cache arguments or outputs; pure tuple attach forwards existing device
+refs. Reuses actual suffix_inputs/assemble_result semantics; CPU32 tests compare
+prefix slicing/offset/health to the existing helper, including bad spans/metadata.
+
+prepare_programs emits abstract production shapes only. compile_programs reuses
+existing probe compiler, fsynced journal and matched fleet_step, with zero helper/
+model execution. Original DB5935graph compile stack unchanged. Narrow helper HLO
+inventory rejects model ops/customcalls/collectives; caps are refusal ceilings
+(32MiB args/out/temp,8MiBcode,alias0), not measured allocations. Budget all NINE
+actual compiled analyses plus all-live buffers and active scratch/output/code.
+Model/WK source and completed numerical comparator unchanged.
+
+Staged worker uses BudgetedCalls for each helper including FINALassembly. Both
+assembled originals survive a final-postpeak refusal; peer refusal stops before
+helper dispatch. Four tile scalars device_put once, no eager arithmetic. Protocol
+will total59completed calls:2WK+27model+30helpers (three existingcases). Reuse
+CPU fixture once for six consumer mutation arms; no repeatedsetup six times.
+
+Tests: actualCPU32 helper/sharding/metadata/referenceidentity and real existing
+prepare→compiler→journal→rawHLO publication3PASS5.33s; allthreecaseworker/binding
+5PASS77.33s; remaining7worker testsPASS39.30s. Earlier1/3helperpasses overlap.
+Independent existing Astra reviewed assembly/worker then narrowcompileraddition,
+noP0-P2; CPU persistence only, NO launch approval. No actual TPU helper graphs,
+runtimepeak or speed claim. Diagnostic intervals do not establish inclusivewall.
+
+NEXT: connect this9-executable set to existing completedWK numerical continuation
+while preserving DB593 original5compileframes. Add distinct numerical mode,
+59-call/journal/32-owner original-array consumer and protected wrapper/DB identity.
+Caller must retain allnine compiledobjects and finalizejournal even if helper
+compile refuses. Do NOT reacquire the five model graphs or expand symbolic proof.
+Only after composedCPUintegration/currentreview/persist/freshleases+fleet+storage
+preflights launch one bounded numerical campaign. Own8K/efficientL7/L8/TTFTopen.
+No TPU/infrastructure action this turn; last authenticatedpostDB59316:47:58Z8clean.
+Persist ownbranch and verify same-region mirror before continuing.

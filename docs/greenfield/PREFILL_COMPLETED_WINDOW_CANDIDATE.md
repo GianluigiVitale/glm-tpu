@@ -209,3 +209,44 @@ alone do not bound incidental eager assembly code. Do not mark runtime memory
 admitted from the CPU estimate. No numerical entry point or TPU launch added here.
 Inclusive prefix+assembly+suffix wall still needs its own performance protocol;
 this staged numerical-only worker's diagnostic intervals cannot promote speed.
+
+## Explicit assembly closes the staged memory-accounting gap — 17:28Z
+
+The eager operations above are superseded in the staged worker by four compiled
+row-only helpers in `prefill_completed_window_assembly.py`: prepare_prefix,
+prepare_wide, prepare_narrow, assemble. Dynamic tile/count reuse means four
+helpers total across allcases, not four new compilations per case. Original
+suffix/assembly semantics are reused; prefix slicing preserves the same checked
+span, causal offset and per-owner health. Weights/caches NEVER enter these helper
+executables: pure host tuple attachment forwards their original device references.
+No full-size passthrough outputs/copies. Four tiny tile constants use device_put
+once, not incidental eager arithmetic. Model arithmetic and DB593 are unchanged.
+
+The existing compiler writer, fsynced journal and matched fleet phases compile
+the abstract production interfaces without helper/model execution. Narrow HLO
+inventory accepts row/layout/scalar operations only, no model calls/collectives.
+Predeclared per-helper refusal ceilings:32MiB each arguments/output/scratch,
+8MiB code, zero donated aliases. These are NOT measured allocation predictions;
+actual compiler analyses are what enter the live budget. Allnine resident
+executables are required at every call. Runtime/compiler allocations outside
+those APIs remain covered by actual post-call peaks/reserve checks, not a claim
+of mathematical upper bounds from these ceilings.
+
+The staged worker now budgets preparation and final assembly through the same
+BudgetedCalls pre/post/fleet path. Original assembled outputs are preserved before
+the final postpeak check, so a last-assembly failure cannot hide behind the absence
+of another model call. Total future protocol59calls:2WK+27model+30helpers; model
+work and original3cases unchanged. This remains numerical-only: summing diagnostic
+intervals is NOT a warmed inclusive performance result.
+
+CPU evidence:3assembly tests PASS5.33s, including actual CPU32 production helper
+execution versus existing operations, explicit sharding, invalid count/tile/offset,
+cache/weight identity, raw helper HLO inspection and actual prepare→compiler→journal
+publication (fourcompiled/fourinspected/ninevotes, no execution in this compilation
+path). Worker5tests PASS77.33s for allthreecases/binding; remaining7 PASS39.30s for
+failure preservation, component mutations and finalpeak/peer refusal. Six mutation
+arms now share one producer fixture instead of repeating that worker six times.
+Earlier helper passes overlap. No actual TPU helper graph or numerical result.
+Independent current-diff review noP0-P2, CPU persistence only. Future caller must
+retain allnine executables and finalize the journal even when a helper compile
+refuses. Next: WK continuation and59-call/32-owner fleet/collector/wrapper integration.

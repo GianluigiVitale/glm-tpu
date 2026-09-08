@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+17:28Z explicit assembly replaces staged eager operations. Four row-only helpers
+reuse suffix/assembly definitions and existing compiler writer/journal/fleet votes;
+no caches or weights enter helper executables. Nine actual compiled analyses now
+join all-live budgets, including final assembly postpeak/original preservation.
+CPU32 production shapes/metadata/identity/HLO and actual compile publication pass.
+Runtime integration is59calls (27model+2WK+30helpers), not the old29-only recipe.
+WK/fleet/collector/wrapper remain unwired; no TPU or numerical/speed promotion.
+
 DB593 fixed admission now reuses the original five graph pairs/allocations,
 seven-host-coordinate identity, physical paired payloads and FP32 route sum.
 51 CPU original/replay/mutation/live-budget tests pass; independent review clear.

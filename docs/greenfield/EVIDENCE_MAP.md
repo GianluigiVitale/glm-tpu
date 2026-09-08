@@ -2,6 +2,12 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST17:28Z: explicit row-only assembly helpers now CPU-tested and staged in
+BudgetedCalls (nine resident executables; final assembly postpeak protected).
+Actual CPU32 helper compiler/journal/HLO tests3PASS5.33s, worker5+7testsPASS.
+No new TPU execution. WK/fleet/59-call collector/wrapper integration remains;
+details in PREFILL_COMPLETED_WINDOW_CANDIDATE.md. Independent review CPU-only.
+
 LATEST17:10Z: DB593 fixed graph/live-budget registration CPU PASS51tests3.89s;
 completed-prefix numerical worker/original-component replay staged PASS15tests
 146.03s (fixture math/counters, actual BudgetedCalls/journal/JSON/NPZ). Reuse4PASS.

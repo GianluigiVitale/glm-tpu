@@ -10,8 +10,8 @@ from typing import Any, Mapping
 
 import numpy as np
 
-from scripts.greenfield import prefill_completed_window as programs
 from scripts.greenfield import prefill_completed_window_admission as admission
+from scripts.greenfield import prefill_completed_window_assembly as assembly
 from scripts.greenfield import prefill_completed_window_protocol as protocol
 from scripts.greenfield import prefill_window_protocol as window
 from scripts.greenfield.prefill_layer_evidence import encode_arrays, local_observations
@@ -41,18 +41,17 @@ def execute_cases(
     the next per-call all-live census. No host arrays feed any model executable.
     """
     import jax
-    import jax.numpy as jnp
     from glm_tpu.greenfield.kernels.reference.rotary import build_rotary_table_host
     from scripts.greenfield.probe_ws32_prefill_layer import device_inputs
 
     def bind():
         if (
-            set(calls.programs) != set(admission.PROGRAMS)
-            or calls.budgeter is not admission.memory_budget
+            set(calls.programs) != set((*admission.PROGRAMS, *assembly.PROGRAMS))
+            or calls.budgeter is not assembly.memory_budget
             or not isinstance(calls.journal, CompletedJournal)
         ):
             raise ValueError(
-                "completed cases require five-graph memory/journal binding"
+                "completed cases require nine-graph memory/journal binding"
             )
         if (
             calls.record.get("protocol") != protocol.PROTOCOL
@@ -67,6 +66,8 @@ def execute_cases(
         )
 
     calls.phase("completed_case_bind", bind)
+    tiles = calls.phase("assembly_tiles", lambda: assembly.place_tiles(mesh))
+    calls.phase("assembly_tiles_ready", lambda: jax.block_until_ready(tiles))
     rope = calls.phase(
         "rotary_fixture",
         lambda: build_rotary_table_host(window.CAPACITY, rotary_dim=64, theta=8e6),
@@ -103,10 +104,16 @@ def execute_cases(
 
         prefixes = []
         for tile in range(4):
+            prepared = calls.call(
+                case + f"/prepare_prefix{tile}",
+                "prepare_prefix",
+                assembly.prefix_arguments(values, tiles[tile]),
+                preserve=lambda result: None,
+            )
             inputs = calls.phase(
                 case + f"/prefix{tile}_inputs",
-                lambda: programs.prefix_inputs(
-                    values, tile, prefixes[-1] if prefixes else None
+                lambda: assembly.attach_prefix(
+                    values, prepared, prefixes[-1] if prefixes else None
                 ),
             )
             calls.phase(
@@ -122,9 +129,15 @@ def execute_cases(
             )
             prefixes.append(result)
 
+        prepared = calls.call(
+            case + "/prepare_wide",
+            "prepare_wide",
+            assembly.suffix_arguments(tuple(prefixes), values[9]),
+            preserve=lambda result: None,
+        )
         inputs = calls.phase(
             case + "/wide_inputs",
-            lambda: programs.suffix_inputs(prefixes, values[9], values[16], values[17]),
+            lambda: assembly.attach_suffix(values, prepared),
         )
         calls.phase(case + "/wide_ready", lambda: jax.block_until_ready(inputs))
         wide = calls.call(
@@ -135,14 +148,15 @@ def execute_cases(
         )
         narrow = []
         for tile in range(4):
+            prepared = calls.call(
+                case + f"/prepare_narrow{tile}",
+                "prepare_narrow",
+                assembly.suffix_arguments((prefixes[tile],), values[9], tiles[tile]),
+                preserve=lambda result: None,
+            )
             inputs = calls.phase(
                 case + f"/narrow{tile}_inputs",
-                lambda: programs.suffix_inputs(
-                    [prefixes[tile]],
-                    jnp.clip(values[9] - tile * 32, 0, 32),
-                    values[16],
-                    values[17],
-                ),
+                lambda: assembly.attach_suffix(values, prepared),
             )
             calls.phase(
                 case + f"/narrow{tile}_ready", lambda: jax.block_until_ready(inputs)
@@ -157,14 +171,9 @@ def execute_cases(
             )
             narrow.append(result)
 
-        def finish():
-            control_suffix = tuple(
-                jnp.concatenate([p[i] for p in narrow], axis=2 if i == 3 else 0)
-                for i in range(4)
-            )
-            for kind, suffix in (("actual", wide), ("control", control_suffix)):
-                assembled = programs.assemble_result(prefixes, suffix)
-                jax.block_until_ready(assembled)
+        def preserve_assembly(result):
+            for kind, rows in zip(("actual", "control"), result, strict=True):
+                assembled = assembly.attach_result(rows, prefixes[-1])
                 observed = local_observations(assembled)
                 for device, fields in observed.items():
                     arrays.update(protocol.encode(f"{kind}_{device}", fields))
@@ -173,6 +182,15 @@ def execute_cases(
                     raise ValueError(
                         "completed assembly owner differs; originals preserved"
                     )
+
+        assembled = calls.call(
+            case + "/assemble",
+            "assemble",
+            assembly.assembly_arguments(tuple(prefixes), wide, tuple(narrow)),
+            preserve=preserve_assembly,
+        )
+
+        def finish():
             replay = protocol.replay_case(
                 path, case=case, slots_by_device=calls.local_slots
             )
@@ -181,4 +199,15 @@ def execute_cases(
                 raise ValueError("completed suffix numerical comparison failed")
 
         calls.phase(case + "/comparison", finish)
-        del prefixes, wide, narrow, values, inputs, result, arrays, host
+        del (
+            prefixes,
+            wide,
+            narrow,
+            values,
+            inputs,
+            result,
+            prepared,
+            assembled,
+            arrays,
+            host,
+        )
