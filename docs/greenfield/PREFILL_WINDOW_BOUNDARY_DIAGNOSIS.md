@@ -193,3 +193,31 @@ fresh protected preflights. No new TPU run at this entry.
 NEXT acquire these4 actual graphs, then budget/register the instrumented
 numerical diagnostic and capture only the original boundary case. No full-model
 trial, precision change, relaxed comparator or claimed cause.
+
+## 14:42:09Z — actual capture graphs acquired, DB591
+
+Run `greenfield_fp8_ws32_prefill_window_boundary_acquisition_l6_20260908T143917951158196Z`
+at5e7143759b6563237751b55c89007bd506d59bb1 sealed after119sworker/collector.
+All8 workers compiled4 programs and executed0; normal/root cleanup8/8. Actual
+capture schemas96/33 agree across the fleet with no schema/inspection errors.
+Candidate/control:28/13 local collectives, no host transport/full weight expansion;
+temp201,563,136/95,899,136B; output11,830,272/3,758,592B;
+code49,949,184/17,284,608B. Compile-residency peak326,458,368B is NOT numerical
+peak. Original graph hashes, SUCCESS/summary generations and cleanup digests:
+`../artifacts/prefill-window-boundary-four-graph-acquisition-20260908.json`.
+
+Do not reacquire unchanged graphs. Next numerical admission must use these
+actual raw identities, simultaneous program/buffer/scratch budget, selected
+checkpoint ownership, original failure generations, and original-signature
+reproduction before interpretation. Existing one-layer protection/publication
+path remains the implementation base. First-case only; no competitive/tail or
+performance sweep yet. Own8K/efficientL7/L8 remain open.
+
+Owner researchv3 was read in full while this acquisition ran; see
+PREFILL_RESEARCH_V3_ADJUDICATION.md. Important new corrections: actual attention
+canonicalizes selected positions, both scorer paths are B32, and installed
+top_k already guarantees lower-index ties. Avoid replaying a raw permutation
+as if it necessarily changes production attention order, or adding redundant
+tie repair. The current captures include both original outputs and operands;
+row2 selected scores cover its entire live history, so another scorer tap is
+not automatically needed. Research does not replace numerical evidence.

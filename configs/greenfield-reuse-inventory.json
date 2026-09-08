@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-research-v3-adjudication",
+      "category": "owner report with actual-source numerical and performance corrections",
+      "source_repo": "glm-tpu greenfield owner report",
+      "source_pin": "5e7143759b6563237751b55c89007bd506d59bb1",
+      "source_paths": ["docs/greenfield/research-prefill-v3.md", "glm_tpu/greenfield/kernels/reference/dsa.py", "glm_tpu/greenfield/kernels/reference/attention.py", "glm_tpu/greenfield/kernels/ws32_prefill_attention.py", "glm_tpu/greenfield/kernels/pallas/prefill_grouped_fp8.py"],
+      "disposition": "research_candidate",
+      "greenfield_consumers": ["docs/greenfield/PREFILL_RESEARCH_V3_ADJUDICATION.md"],
+      "gate": "24: read-only hypotheses, no kernel/precision/checkpoint change or numerical promotion",
+      "reason": "Read all1222logical lines59847B, preserve SHA5ad5a7b7e66e2a88f2c3f007f0b7ac3b4ab93050c23642a6beca9ab6132a70a9. Independent reviewer and main source audit correct absent-is_stable versus guaranteed lower-index ties, actual position-canonical attention, B32 scorer geometry, all-competitor router margins and scalar linear-merge latency claims. Expert-relative aligned workspaces/N256 and logical fetch counters refine prior panel proposals; both128x128 checkpoint scale rows and tails require correct addressing. Keep acquired DB591 captures rather than a new narrower graph by default; row2 selected scores already cover all live keys. No automatic INT8 migration, butterfly promotion, threshold relaxation or broad proof project."
+    },
+    {
       "id": "ws32-prefill-window-boundary-acquisition",
       "category": "explicit compiler-only executing-boundary graph acquisition",
       "source_repo": "glm-tpu greenfield",

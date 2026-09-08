@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+DB591 has now acquired the instrumented4graphs at5e714375, zeroexecution and
+8/8clean. Reuse actual rawgraph pairs/allocations/schemas from
+prefill-window-boundary-four-graph-acquisition-20260908.json for the numerical
+diagnostic; do not reacquire unchanged graphs or inherit DB590. Researchv3
+read in full1222lines and adjudicated separately: current top_k lower-index
+ties and canonicalized attention already avoid two proposed extra experiments.
+
 Boundary compiler acquisition now adapts the SAME selected-layer worker/campaign/
 wrapper and four-program journal; explicit capture_boundaries opt-in, distinct
 kernel/protocol/DB item. New compiled.out_info schemas preserve actual outputs

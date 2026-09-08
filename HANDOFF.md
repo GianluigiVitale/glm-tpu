@@ -16821,3 +16821,34 @@ INT8/tile/precision/comparator changes. Efficient own8K/L7/L8/TTFT stayopen.
 Localfree2.168GB; no campaign live. Review conditions now satisfied for clean
 persistence/mirror and one protected compiler-only invocation; fleetpreflight
 remains the wrapper's mandatory fresh normal/root/device/libtpu census.
+
+## 2026-09-08 14:42Z — DB591 sealed; researchv3 fully read
+
+Boundary compile-only tag
+greenfield_fp8_ws32_prefill_window_boundary_acquisition_l6_20260908T143917951158196Z
+at5e7143759b6563237751b55c89007bd506d59bb1 exits0,119sworker/collector. Both
+leases held through publication; source unchanged. All8 compiled4graphs,0WK/
+modelcalls; capture schemas96/33identical, no errors. Normal/root8/8clean,
+terminal14:42:09Z. DB591 item layer6_b128_b32_actual_boundary_four_graph_compile_only_v1
+has NULL correctness/score/latency, checked read-only. Remote SUCCESS generation
+1788878529299941 SHA24fb9f1de6b40748f2b22979af5be53e4963489c39cdf5bdaa011fc7053c72be;
+summary generation1788878528856873 SHA51501d1c5b1c0748d69d19cd74f94c8cb3d8d93fe81f16be193dd937eb1e310d.
+Both generation-readback byteidentical. Prefix246objects/274573907B, no checkpoint.
+Compactreceipt docs/artifacts/prefill-window-boundary-four-graph-acquisition-20260908.json.
+Actual candidate/control temp201563136/95899136B,output11830272/3758592B,
+code49949184/17284608B,28/13localcollectives,nohost/fullweight expansion.
+Compile-residency peak326458368B is NOT numerical memory or original-reproduction
+evidence. Next exactnewgraph/runtimebudget and original-boundary-only capture;
+no unchanged acquisition, fullmodeltrial or performance sweep.
+
+Owner added research-prefill-v3.md while acquisition ran; left all source frozen.
+Read all1222logical lines/1221newlines59847B through EOF, originalSHA
+5ad5a7b7e66e2a88f2c3f007f0b7ac3b4ab93050c23642a6beca9ab6132a70a9.
+PREFILL_RESEARCH_V3_ADJUDICATION.md incorporates independent Astra review and
+main-source audit. Corrections avoid extra work: installedtop_k alreadyhas
+lower-index ties; attentioncanonicalization removes rawDSApermutationorder;
+bothscorersB32; allcompetitors/internalpairs matter forroutebounds; O(K) scalar
+merge isnot measuredTPUwin. Alignedexpertpanels/N256/logicalfetchcounts are useful
+later refinements. No INT8download, precision/tile/threshold change. Keep current
+captures; row2 selectedscores alreadycoveralllivekeys. Review approves docs,
+not numerical launch. Efficientown8K/fourdepthL7/L8/TTFT stillopen.

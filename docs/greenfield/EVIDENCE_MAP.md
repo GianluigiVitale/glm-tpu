@@ -2,6 +2,17 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST14:42:09Z2026-09-08: DB591 instrumented B128/B32 plus WK graphs SEALED
+at5e714375,119sworker/collector,0model/WK calls,normal/root8/8clean. Candidate/
+control expose96/33 capture fields; actual allocations201.56/95.90MBtemp and
+11.83/3.76MBoutput perchip. Capture numerical memory and original-signature
+reproduction are NOT admitted. Receipt
+`../artifacts/prefill-window-boundary-four-graph-acquisition-20260908.json`.
+Archive274,573,907B; no checkpoint. Next actual graph registration and bounded
+original-boundary numerical capture. `PREFILL_RESEARCH_V3_ADJUDICATION.md` records
+full1222-line owner report and local corrections; no automatic performance or
+INT8/tile/precision changes. Earlier pointers below retain their history.
+
 LATEST13:25Z2026-09-08: B128 layer6 numerical at0f994e37 FAILED on orderedDSA
 boundary comparison, after4graph admission and7calls. Normal/root8/8clean.
 All128 partial worker files generation/CRC/SHA-bound in

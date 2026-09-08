@@ -59,8 +59,8 @@ D/G DB567/§22; B/B'/C DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
 DB589 MoE B128 baseline PASS:3.33x distributed/1.28x concentrated;8/8clean.
 PREFILL_LAYER_WINDOW.md: default off.
-DB590 historical. B128 layer6 failed13:25Z;8/8clean.
-PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md:5router-set swaps; acquisition wired, TPU pending.
-PREFILL_RESEARCH_REPORT_ADJUDICATION.md has research decisions.
+DB591 captures compiled;0model/WK calls;8/8clean.
+PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md:5router-set swaps; numerical capture next.
+PREFILL_RESEARCH_V3_ADJUDICATION.md has current research decisions.
 <=32 attention/DSA/M64 repair; no blind retry.
 L7/L8 open; no speedup claim.

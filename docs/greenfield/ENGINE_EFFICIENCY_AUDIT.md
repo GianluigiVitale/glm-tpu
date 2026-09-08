@@ -783,3 +783,12 @@ caught and corrected a path that lost malformed schemas before collecting contro
 38 CPU tests cover production abstract preparation, installed compiled.out_info,
 schema failures and complete collector/DB composition. This prepares the bounded
 numerical discriminator, not a new arithmetic proof, optimization or TPU result.
+
+DB591 now seals instrumented4graph acquisition119s,0WK/model calls,8/8clean.
+Actual B128/B32 captures96/33 fields agree across8hosts; compiler temp201.56/
+95.90MB and output11.83/3.76MB. Capture numerical peak/identity remain pending.
+Owner researchv3 fully read1222lines, independently reviewed and adjudicated in
+PREFILL_RESEARCH_V3_ADJUDICATION.md. Existing top_k lower-index ties and attention
+position canonicalization invalidate two proposed unnecessary experiments.
+Expert-relative panels, exact vectorized merges and rolled prefixscan remain
+separate challengers; no new performance or precision claim.
