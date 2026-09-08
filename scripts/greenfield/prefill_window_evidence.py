@@ -10,7 +10,7 @@ from hashlib import sha256
 import json
 import math
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Iterable, Mapping
 
 import numpy as np
 
@@ -319,8 +319,32 @@ def validate_calls(
     )
     if len(calls) != len(expected):
         raise ValueError("window requires its exact WK and model call inventory")
+    validate_call_sequence(
+        record,
+        calls,
+        expected=expected,
+        local_slots=local_slots,
+        names=names,
+        budgeter=selected_admission.memory_budget,
+    )
+
+
+def validate_call_sequence(
+    record: Mapping[str, Any],
+    calls: Iterable[Mapping[str, Any]],
+    *,
+    expected: Iterable[tuple[str, str]],
+    local_slots: Mapping[int, int],
+    names: tuple[str, ...],
+    budgeter: Callable[..., dict],
+) -> None:
+    """Replay ordinary or streamed witnesses with the same memory/owner rules.
+
+    Strict exhaustion matters: the stream checks its trailing bytes only after
+    its final yielded record. Never stop after just the expected call count.
+    """
     last: dict[int, dict[str, int]] = {}
-    for call, (phase, name) in zip(calls, expected):
+    for call, (phase, name) in zip(calls, expected, strict=True):
         seconds = call.get("completed_call_seconds")
         if (
             call.get("phase") != phase
@@ -346,9 +370,7 @@ def validate_calls(
             for d in last
         ):
             raise ValueError("window between-call lifetime memory counters regressed")
-        budget = selected_admission.memory_budget(
-            census, call["compiled_memory"], active_graph=name
-        )
+        budget = budgeter(census, call["compiled_memory"], active_graph=name)
         same_json(
             call["compiled_memory"],
             {n: record["programs"][n]["compiled_memory"] for n in names},
@@ -425,51 +447,8 @@ def validate_files(
     )
     slots = {s["device_id"]: s["device_slot"] for s in record["local_device_slots"]}
     validate_calls(record, local_slots=slots, completed_numerical=completed_numerical)
-    raw = (root / "compile_journal.jsonl").read_bytes()
-    if sha256(raw).hexdigest() != record["compile_journal_sha256"]:
-        raise ValueError("window numerical journal bytes differ")
-    journal = [json.loads(line) for line in raw.splitlines()]
-    same_json(
-        journal[0]["identity"],
-        dict(
-            protocol=selected_protocol.PROTOCOL,
-            profile=selected_admission.PROFILE,
-            compile_only=False,
-            code_hash=record["code_hash"],
-            launch_rank=record["launch_rank"],
-        ),
-        "journal identity",
-    )
-    if any(
-        r.get("artifact_kind") != journal_type.artifact_kind
-        or r.get("status") != journal_type.status
-        or r.get("performance_claim") is not False
-        or r.get("numerical_claim") is not False
-        or r.get("passed", True) is not True
-        for r in journal
-    ):
-        raise ValueError("window journal scope or failed phase")
-    # Compile stages must precede any numerical dispatch. Phase events retain
-    # the last graph ID; distinguish them by their exact stage, not graph alone.
-    compile_stages = ("lower_compile_started", "compiled", "raw_written", "inspected")
-    observed = [
-        (r["graph"], r["stage"]) for r in journal if r["stage"] in compile_stages
-    ]
-    same_json(
-        [list(v) for v in observed],
-        [[n, s] for n in names for s in compile_stages],
-        "compile journal order",
-    )
-    for name in names:
-        p = record["programs"][name]
-        stable = (root / f"{name}.stablehlo.mlir").read_text()
-        optimized = (root / f"{name}.optimized_hlo.txt").read_text()
-        for text, key in (
-            (stable, "stablehlo_sha256"),
-            (optimized, "optimized_hlo_sha256"),
-        ):
-            if sha256(text.encode()).hexdigest() != p[key]:
-                raise ValueError("window original graph bytes differ")
+
+    def inspect(name, p, stable, optimized):
         if completed_numerical and name in assembly.PROGRAMS:
             same_json(
                 p["admission"],
@@ -480,16 +459,17 @@ def validate_files(
             selected_admission.validate_program_report(
                 p["admission"], name, stable, optimized, p["compiled_memory"]
             )
-        stages = [
-            r for r in journal if r["graph"] == name and r["stage"] in compile_stages
-        ]
-        same_json(
-            stages[1]["compiled_memory"], p["compiled_memory"], "compile allocation"
-        )
-        same_json(stages[1]["seconds"], p["compile_seconds"], "compile duration")
-        for key in ("stablehlo_sha256", "optimized_hlo_sha256"):
-            same_json(stages[2][key], p[key], "journal graph SHA")
-        same_json(stages[3]["report"], p["admission"], "journal graph report")
+
+    journal = validate_graph_journal(
+        root,
+        record,
+        protocol_id=selected_protocol.PROTOCOL,
+        profile=selected_admission.PROFILE,
+        names=names,
+        journal_type=journal_type,
+        inspect=inspect,
+    )
+    compile_stages = ("lower_compile_started", "compiled", "raw_written", "inspected")
     stages = [r["stage"] for r in journal]
     required = ["identity", "prepare"]
     for name in names:
@@ -547,6 +527,76 @@ def validate_files(
         ):
             raise ValueError("window original case comparison refused")
     validate_wk(root, record, slots)
+
+
+def validate_graph_journal(
+    root: Path,
+    record: Mapping[str, Any],
+    *,
+    protocol_id: str,
+    profile: str,
+    names: tuple[str, ...],
+    journal_type: type,
+    inspect: Callable[..., None],
+) -> list[dict]:
+    """Shared original graph/compile replay; caller checks full phase order."""
+    raw = (root / "compile_journal.jsonl").read_bytes()
+    if sha256(raw).hexdigest() != record["compile_journal_sha256"]:
+        raise ValueError("window numerical journal bytes differ")
+    journal = [json.loads(line) for line in raw.splitlines()]
+    same_json(
+        journal[0]["identity"],
+        dict(
+            protocol=protocol_id,
+            profile=profile,
+            compile_only=False,
+            code_hash=record["code_hash"],
+            launch_rank=record["launch_rank"],
+        ),
+        "journal identity",
+    )
+    if any(
+        r.get("artifact_kind") != journal_type.artifact_kind
+        or r.get("status") != journal_type.status
+        or r.get("performance_claim") is not False
+        or r.get("numerical_claim") is not False
+        or r.get("passed", True) is not True
+        for r in journal
+    ):
+        raise ValueError("window journal scope or failed phase")
+    # Compile stages must precede any numerical dispatch. Phase events retain
+    # the last graph ID; distinguish them by their exact stage, not graph alone.
+    compile_stages = ("lower_compile_started", "compiled", "raw_written", "inspected")
+    observed = [
+        (r["graph"], r["stage"]) for r in journal if r["stage"] in compile_stages
+    ]
+    same_json(
+        [list(v) for v in observed],
+        [[n, s] for n in names for s in compile_stages],
+        "compile journal order",
+    )
+    for name in names:
+        p = record["programs"][name]
+        stable = (root / f"{name}.stablehlo.mlir").read_text()
+        optimized = (root / f"{name}.optimized_hlo.txt").read_text()
+        for text, key in (
+            (stable, "stablehlo_sha256"),
+            (optimized, "optimized_hlo_sha256"),
+        ):
+            if sha256(text.encode()).hexdigest() != p[key]:
+                raise ValueError("window original graph bytes differ")
+        inspect(name, p, stable, optimized)
+        stages = [
+            r for r in journal if r["graph"] == name and r["stage"] in compile_stages
+        ]
+        same_json(
+            stages[1]["compiled_memory"], p["compiled_memory"], "compile allocation"
+        )
+        same_json(stages[1]["seconds"], p["compile_seconds"], "compile duration")
+        for key in ("stablehlo_sha256", "optimized_hlo_sha256"):
+            same_json(stages[2][key], p[key], "journal graph SHA")
+        same_json(stages[3]["report"], p["admission"], "journal graph report")
+    return journal
 
 
 def validate_wk(

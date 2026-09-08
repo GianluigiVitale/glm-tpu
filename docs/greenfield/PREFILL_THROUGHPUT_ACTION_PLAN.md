@@ -196,3 +196,28 @@ DB594 evicted306885280B after exact remote generation/size/CRC/SHA and root
 no-open-holder checks. All fleet originals, summary/terminal/ledger and primary
 DB remain. Exact restoration recipe in
 `../artifacts/db594-local-summary-cache-eviction-20260908.json`.
+
+## Compact consumer — 2026-09-08 19:25Z (CPU only)
+
+`prefill_phase_evidence.py` now reuses the ordinary consumer's graph/journal
+and per-call memory checks. It exhausts287 gzip witnesses; lifetime peaks
+remain continuous across all15traversals, including WK and final assembly.
+Exact phase names/order and separate warmup/wall/trace inventories bind the
+recomputed sums. First-capture input/component arrays and WK are independently
+replayed against the capsule. Later repeat equality is the pinned worker's
+checked execution record, NOT15independently replayed NPZs.
+
+14CPU testsPASS13.34s use actual DB594 ninegraph pairs, first originals/WK and
+real CompactPhaseCalls/PhaseJournal/run_samples with fixture traversal/math/
+counters. Mutations cover missing final assembly, partial witness, wrong sums,
+bool wall/visits, trace-vs-wall mixup, owner/scope/count changes, cross-sample
+peak regression and failed/reordered/extra journal events. Existing independent
+Astra finds noP0-P2; CPU persistence only. No TPU execution or new speed result.
+Regressions66PASS92.55s (original actual3case worker/consumer plus prior phase
+tests), ordinary window consumer16PASS60.61s. No repeated model acquisition.
+
+Next connect the explicit mode through the ORIGINAL acquisition frames and
+existing probe/campaign, publish bounded first-capture/witness/XPlane files,
+join eight owners' records and distinct phase-estimate DB accounting. Actual
+launch-chain composition and storage/preflight/review remain before hardware.
+Do not repeat this local graph/numerical replay as a new TPU acquisition.

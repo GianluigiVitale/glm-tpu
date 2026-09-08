@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-phase-compact-consumer",
+      "category": "streamed memory timing and original evidence replay",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "08c3b6f54ed8a4321ce03faa0d1a41d066d72424",
+      "source_paths": ["scripts/greenfield/prefill_window_evidence.py", "scripts/greenfield/prefill_phase_baseline.py", "scripts/greenfield/prefill_phase_originals.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_phase_evidence.py", "scripts/greenfield/prefill_window_evidence.py", "tests/greenfield/hlo/test_prefill_phase_evidence.py"],
+      "gate": "24: CPU compact consumer, no deployment or performance result",
+      "reason": "Extract existing call-budget/owner and graph/journal replay without changing rules. Exhaust287 streamed witnesses with cross-traversal lifetime-counter continuity; recompute separate warmup/wall/trace sums and fixed phase order. Replay actual first capture and WK against DB594 capsule, strict physical owners and fixture. Later repeat equality is pinned worker attestation, not independently retained arrays.14CPU tests use original nine graph pairs/first arrays/WK and actual compact writer/journal/sampler with fixture traversal/math/counters. Acquisition/campaign/trace publication/DB composition remains next; no launch or new utilization claim."
+    },
+    {
       "id": "ws32-prefill-phase-original-authentication",
       "category": "compact original reproduction and worker continuation",
       "source_repo": "glm-tpu greenfield",

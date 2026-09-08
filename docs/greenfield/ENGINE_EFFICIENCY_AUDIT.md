@@ -956,3 +956,15 @@ tests PASS7.50s plus original3case worker/consumer PASS88.32s. No launch/speedup
 acquisition/collector/DB/trace publication still pending. Controller local
 recoverable aggregate runner/DB snapshot eviction306885280B restores1.216GB
 free without changing any cloud evidence or primaryDB. Receipt in artifacts.
+
+19:25Z compact consumer now replays287calls with existing ninegraph budget/
+owner rules and continuous peak counters, exact journal/sample inventories,
+recomputed phase sums and DB594 first capture/WK.14CPUtestsPASS13.34s on actual
+archived graphs/arrays and compact producer with fixture math/counters. Existing
+independent reviewer noP0-P2. Prior phase/original3case regressions66PASS92.55s;
+ordinary consumer16PASS60.61s. No new device attribution or speed evidence;
+later repeated equality is a worker assertion, not15saved-array replays.
+Remaining operational path: original acquisition/probe/campaign, actual8host
+trace publication/collector/DB and composed launch test. Do not expand model
+proofs or repeat clearednumerical trials. HLO alone still cannot identify the
+dominant prefill resource; that is what the next bounded profile must measure.

@@ -17409,3 +17409,31 @@ generations. Fleet originals/summary/SUCCESS/ledger and primaryDB unchanged;
 remote objects retained. After eviction1,215,545,344Bfree, still remeasure
 before launch. No model/controller live locally; no fresh fleet census claim.
 DB594 latest protected result; own8K/efficientL7/L8/deliveredTTFT stillOPEN.
+
+## 2026-09-08 19:25Z — compact phase evidence consumer, no TPU launch
+
+Prior status-only turn was NO PROGRESS; this continuation implemented the next
+safe collector component. prefill_phase_evidence.py reuses extracted existing
+validate_call_sequence and validate_graph_journal. Strict iterable exhaustion
+replays287gzip witnesses with continuous between-sample peak counters; exact
+phase labels/order, distinct warmup/wall/traced sums and full journal replay.
+Allnine graph/compile records and first NPZ/WK are independently checked against
+DB594. Later repeat equality is pinned-worker attestation, not15retained arrays.
+No model/compiler/threshold change, no new acquisition or performance claim.
+
+14newCPUtestsPASS13.34s: actual DB594 ninegraph pairs/first originals/WK,
+actual compact writer/journal/sampler with fixture traversal/math/counters;
+mutations missing final assembly, partial witness, sums/bool wall/visits,
+trace/wall mixup, owner/scope/count, cross-traversal peak regression and journal
+failure/order/extra events. Old actual3case continuation plus prior phase tests
+66PASS92.55s; ordinary window consumer16PASS60.61s. Independent existing Astra
+noP0-P2, CPU persistence only. No all8host publication or launch-chain claim.
+
+Next: add explicit phase mode through ORIGINAL five-model compile frames plus
+fourhelpers/PhaseJournal, existing probe/campaign, compact witness/firstcapture/
+actual XPlane publication, eight-rank owner/trace join and distinct DB phase
+estimate accounting; composed test/review and fresh leases/census/storage before
+ONEbounded baseline. Do not repeat clearednumerical or graph acquisitions.
+Latest protected result remains DB594; no new TPU run or speed result. Local
+controller/model check empty; last authenticated fleet census DB5948/8clean
+is historical, not fresh. Disk1,208,184,832Bfree at19:22Z; remeasurebeforelaunch.

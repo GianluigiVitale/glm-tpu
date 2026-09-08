@@ -61,7 +61,7 @@ DB589 MoE B128:3.33x distributed/1.28x concentrated;8/8clean.
 DB594 completedprefix/B128suffix3cases PASS;8/8clean; NOT independent full-layer.
 No more taps. PREFILL_COMPLETED_WINDOW_CANDIDATE.md.
 Maximize feasible prefill AND batch-one decode.
-Phase originals/WK adapter tested; next collector/launch wiring;
+Phase stream/original replay tested; next launch/trace/DB wiring;
 PREFILL_THROUGHPUT_ACTION_PLAN.md. DB588:97.6% blockcall wall; no100%util claim.
 PREFILL_RESEARCH_V3_ADJUDICATION.md.
 Own8K/L7/L8/TTFT open.

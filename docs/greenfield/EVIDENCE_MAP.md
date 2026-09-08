@@ -2,6 +2,13 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+19:25Z phase compact consumer CPU-tested/reviewed: actual DB594 ninegraph and
+first-capture/WK replay,287streamed budgets with continuous lifetime peaks,
+rederived warmup/wall/traced sums and exact journal.14testsPASS13.34s; model/
+counters are fixtures, not new TPU samples. Later repeats are worker-checked,
+not independent saved captures. Protected launch/trace/DB wiring still pending.
+See PREFILL_THROUGHPUT_ACTION_PLAN.md; latest hardware evidence remains DB594.
+
 19:08Z phase originals/WK continuation CPU-tested:805220B DB594 capsule binds
 all32owners/components/selected weights to archived generations. One capture,
 exact repeats; bounded gzip member replay and correct partial failure counts.

@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+19:25Z compact phase consumer reuses existing call-memory/owner validation and
+graph/compile-journal replay. Strict stream exhaustion checks287calls including
+WK/final assembly, retaining memory-counter continuity across15traversals.
+Recompute sample sums separately for warmup/wall/trace; independently replay
+first capture/WK against DB594. Later repeat equality remains worker attestation,
+not15independent NPZ replays.14CPU collector tests pass using actual archived
+graphs/arrays and real compact writer/journal with fixture model/counters.
+Acquisition/probe/campaign/trace publication/DB remains before hardware.
+
 19:08Z phase authentication adapts DB594 generation-bound runner/case/WK
 originals into805220B capsule, all32physical slots/35weight hashes/components.
 Existing observe/encode/host fixture and BudgetedCalls now support distinct
