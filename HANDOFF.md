@@ -16367,3 +16367,46 @@ including real router occupancy and attention/DSA/cache costs. Do not raise
 all32-row guards blindly (repair implementation has64-row bound), rerunDB589,
 or repeat clearedB17 arithmetic. Competitive cutoff/own8K and efficientL7/L8,
 other phase budgets and fixed final128K/256K targets remain open. Goal active.
+
+## 2026-09-08 11:08Z — B128 layer-window CPU integration PASS
+
+Starting pin51dc69404b06efa5f24052d86a597e74b89bfa89, same rewrite branch.
+Default-off `mlp_window=False` option in the existing batched runtime; distinct
+typed prefix-only return in actual layer, shared existing MLP suffix, new small
+window composer. Each layer processes <=32 attention/DSA rows at a time and
+then one128-row router/dense/groupedMoE window. FixedM64 repair, BF16 boundaries,
+FP32 route sum, ownKV/producer cache carry, all-owner atomic rollback and final
+repair promotion retained. Only router/embedding guards expand; original worker,
+adapter, acquisition/sealer/DB admission and one-row decode remain unchanged.
+
+CPU32 original4-test batch PASS510.69s (initial window + old B17 layer/decoder/
+production schema). Expanded final window PASS325.67s: two128 windows versus
+explicit4x32 completed decoder blocks, eight layers/full0/1/2/6/shared2->3/6->7,
+reordered pages, tails31/32/33/127, near-capacity empty tiles, poisoned padding,
+repaired-history isolation, malformed counts/offsets, late invalid token and
+single-owner row110 proposed-layer health failure with complete rollback.
+Full production78-layer B128/B33 abstract shape PASS78.32s, no weight allocation.
+Default schema+registry5PASS57.62s; initial new schema mistakenly used old host
+adapter's32-row-only graph_inputs and failed before tracing. Test now uses new
+runtime API directly; old admission remains restricted. Black/diffcheck PASS.
+
+Independent Astra read actual source/tests/design, found no P0-P2 and approved
+persistence conditional on these passing CPU checks (now satisfied). Helper
+extraction can change compiled source metadata/fusion; no identical TPU-HLO or
+numerical claim. Do not rerun cleared B17 metal just for this refactor.
+
+Next: distinct bounded selected-layer B128 vs4xB32 complete-layer protocol,
+actual128-row router occupancy and original output/cache/health replay, page
+crossing and competitiveDSA prefix>2048. Use real full-indexer+MoE **layer6**:
+review suggested layer3 but main corrected it from actual schedule (3 is shared).
+Reuse existing20-input/12-output schema, selected-only loader and protected
+controller, not historicalB17 scalar reference protocol. Confirm layer6 manifest
+and per-chip payload budget; no new checkpoint. Separately compiled prefix timing
+is diagnostic, not exact full-layer phase decomposition. See
+docs/greenfield/PREFILL_LAYER_WINDOW.md. Full-layer TPU, actual full-model B128
+memory/HLO, own8K, final budgets/TTFT and efficientL7/L8 remain open.
+
+All CPU sessions terminal; no TPU/model/controller was launched in this change.
+Last protected cleanup remainsDB5898/8; latest controller free1,989,017,600B,
+so a fresh full-model4GiB local-evidence admission is NOT satisfied. Storage
+weights/policy/infrastructure unchanged. Goal active; no performance promotion.

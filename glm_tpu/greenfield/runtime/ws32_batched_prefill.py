@@ -24,6 +24,7 @@ from ..kernels.ws32_io import (
     ws32_split_final_sample_mapped,
 )
 from ..kernels.ws32_prefill_layer import ws32_prefill_transformer_layer_mapped
+from ..kernels.ws32_prefill_window import ws32_prefill_layer_window_mapped
 from .ws32_decoder import (
     Ws32DecoderConfig,
     Ws32DecoderState,
@@ -54,6 +55,7 @@ class Ws32BatchedPrefillProgram:
     config: Ws32DecoderConfig
     block_rows: int
     execute: Any
+    mlp_window: bool = False
 
 
 def ws32_batched_prefill_state_specs() -> Ws32BatchedPrefillState:
@@ -115,10 +117,10 @@ def ws32_prefill_embedding_mapped(
     )
     if (
         token_ids.ndim != 1
-        or not 1 <= token_ids.shape[0] <= 32
+        or not 1 <= token_ids.shape[0] <= 128
         or token_ids.dtype != jnp.int32
     ):
-        raise ValueError("batched embedding requires1..32 int32 token IDs")
+        raise ValueError("batched embedding requires1..128 int32 token IDs")
     if valid_rows.shape != () or valid_rows.dtype != jnp.int32:
         raise ValueError("batched embedding live count must be int32 scalar")
     live = jnp.arange(token_ids.shape[0]) < jnp.clip(valid_rows, 0, token_ids.shape[0])
@@ -152,6 +154,7 @@ def ws32_batched_prefill_mapped(
     key_tile: int = 4096,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
+    mlp_window: bool = False,
 ) -> Ws32BatchedPrefillResult:
     """Propose one complete layer-major block; commit only all-owner success.
 
@@ -167,10 +170,10 @@ def ws32_batched_prefill_mapped(
         raise ValueError("batched prefill requires expert8/feature4")
     if (
         token_ids.ndim != 1
-        or not 1 <= token_ids.shape[0] <= 32
+        or not 1 <= token_ids.shape[0] <= (128 if mlp_window else 32)
         or token_ids.dtype != jnp.int32
     ):
-        raise ValueError("batched prefill requires1..32 int32 token IDs")
+        raise ValueError("batched prefill row count/dtype exceeds selected mode")
     for value, dtype in (
         (valid_rows, jnp.int32),
         (state.prompt_length, jnp.int32),
@@ -252,13 +255,18 @@ def ws32_batched_prefill_mapped(
     counts = jnp.zeros((rows,), jnp.int32)
     scores = jnp.full(selected.shape, -jnp.inf, jnp.float32)
     sparse = SparseMlaConfig(segment_block=config.sparse_segment_block)
+    layer_program = (
+        ws32_prefill_layer_window_mapped
+        if mlp_window
+        else ws32_prefill_transformer_layer_mapped
+    )
     for layer_id, layer in enumerate(weights.layers):
         slot = config.full_index_slot_by_layer[layer_id]
         # Shared layers never use/write this placeholder index buffer. Their
         # selections come from the actual preceding producer; KV is always OWN.
         source_slot = 0 if slot is None else slot
         with jax.named_scope(f"greenfield_ws32_batched_prefill/layer_{layer_id}"):
-            result = ws32_prefill_transformer_layer_mapped(
+            result = layer_program(
                 update,
                 residual,
                 kv[layer_id],
@@ -389,17 +397,19 @@ def build_ws32_batched_prefill_program(
     key_tile: int = 4096,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
+    mlp_window: bool = False,
 ) -> Ws32BatchedPrefillProgram:
-    """Build, but do not promote, the raw-layout1..32-row prompt candidate."""
+    """Build raw prefill; <=128 MLP rows require explicit window opt-in."""
     import numpy as np
 
     _require_config(config)
     if (
         isinstance(block_rows, bool)
         or not isinstance(block_rows, int)
-        or not 1 <= block_rows <= 32
+        or not isinstance(mlp_window, bool)
+        or not 1 <= block_rows <= (128 if mlp_window else 32)
     ):
-        raise PlanValidationError("batched prefill block rows must be1..32")
+        raise PlanValidationError("batched prefill block rows exceed selected mode")
     if tuple(mesh.axis_names) != ("expert", "feature") or np.asarray(
         mesh.devices
     ).shape != (8, 4):
@@ -428,6 +438,7 @@ def build_ws32_batched_prefill_program(
             key_tile=key_tile,
             sparse_attention_interpret=sparse_attention_interpret,
             linear_interpret=linear_interpret,
+            mlp_window=mlp_window,
         )
 
     specs = ws32_batched_prefill_state_specs()
@@ -447,4 +458,4 @@ def build_ws32_batched_prefill_program(
             check_vma=False,
         )
     )
-    return Ws32BatchedPrefillProgram(config, block_rows, execute)
+    return Ws32BatchedPrefillProgram(config, block_rows, execute, mlp_window)

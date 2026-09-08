@@ -4,6 +4,8 @@ import os
 import subprocess
 import sys
 
+import pytest
+
 
 def test_layer_major_two_chunk_state_and_decode_handoff_cpu32():
     code = r"""
@@ -167,7 +169,8 @@ print('CPU32_LAYER_MAJOR_TWO_CHUNKS_HANDOFF_PASS')
     assert "CPU32_LAYER_MAJOR_TWO_CHUNKS_HANDOFF_PASS" in result.stdout
 
 
-def test_production_78_layer_schema_without_allocating_weights():
+@pytest.mark.parametrize("mlp_window", [False, True])
+def test_production_78_layer_schema_without_allocating_weights(mlp_window):
     code = r"""
 import json
 from pathlib import Path
@@ -218,10 +221,19 @@ assert adapter.completed_repair_weights(tuple(SimpleNamespace(wk_weight=w) for w
 rope=abstract(config.main_rope_table_shape,jnp.bfloat16)
 plan=adapter.BatchedPrefillPlan(2034,17,8192)
 programs=adapter.build_graph_pair(mesh,config,plan)
-for graph,rows in plan.graph_rows:
+graph_rows=plan.graph_rows
+if MLP_WINDOW:
+    graph_rows=(('prefill_chunk',128),('prefill_tail',33))
+    programs={name:b.build_ws32_batched_prefill_program(mesh,config,block_rows=rows,mlp_window=True) for name,rows in graph_rows}
+for graph,rows in graph_rows:
     fn=programs[graph].execute
     assert callable(fn.lower)
-    inputs=adapter.graph_inputs(mesh,np.zeros(rows,np.int32),state,weights,wk,rope)
+    if MLP_WINDOW:
+        # Worker/host adapter remains deliberately restricted to sealed B17.
+        # Exercise the new runtime API directly without widening its admission.
+        inputs=(abstract((rows,),jnp.int32),abstract((),jnp.int32),state,weights,wk,rope)
+    else:
+        inputs=adapter.graph_inputs(mesh,np.zeros(rows,np.int32),state,weights,wk,rope)
     assert len(inputs)==6 and inputs[1].shape==()
     out=jax.eval_shape(fn,*inputs)
     assert out.state.decoder.kv_cache_local.shape==config.kv_cache_shape
@@ -242,7 +254,7 @@ print('REAL_78_LAYER_BATCHED_PREFILL_SCHEMA_PASS')
         XLA_FLAGS="--xla_force_host_platform_device_count=32",
     )
     result = subprocess.run(
-        [sys.executable, "-c", code],
+        [sys.executable, "-c", f"MLP_WINDOW={mlp_window!r}\n" + code],
         env=env,
         text=True,
         capture_output=True,

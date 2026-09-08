@@ -49,6 +49,21 @@ class Ws32PrefillLayerResult(NamedTuple):
     normalized_input_local: Any
 
 
+class Ws32PrefillPrefixResult(NamedTuple):
+    """Proposed attention state and actual split-residual MLP boundary."""
+
+    normalized_mlp_local: Any
+    carried_residual_local: Any
+    cache_local: Any
+    unrepaired_index_cache: Any
+    repaired_index_cache: Any
+    selected_positions: Any
+    selected_valid_counts: Any
+    selected_scores: Any
+    contract_valid: Any
+    normalized_input_local: Any
+
+
 def ws32_prefill_router_mapped(
     hidden_local: Any,
     router_weight_local: Any,
@@ -67,10 +82,10 @@ def ws32_prefill_router_mapped(
         raise ValueError("prefill router requires WS32 expert8/feature4 mesh")
     if (
         hidden_local.ndim != 2
-        or not 1 <= hidden_local.shape[0] <= 32
+        or not 1 <= hidden_local.shape[0] <= 128
         or hidden_local.dtype != jnp.bfloat16
     ):
-        raise ValueError("prefill router requires1..32 BF16 feature rows")
+        raise ValueError("prefill router requires1..128 BF16 feature rows")
     rows = hidden_local.shape[0]
     if live.shape != (rows,) or live.dtype != jnp.bool_:
         raise ValueError("prefill router requires boolean live rows")
@@ -106,6 +121,61 @@ def ws32_prefill_router_mapped(
     return indices, jnp.where(live[:, None], weights, 0), valid
 
 
+def ws32_prefill_mlp_mapped(
+    normalized_mlp: Any,
+    live: Any,
+    dense_weights: Ws32DenseWeights | None,
+    moe_weights: Ws32MoeWeights | None,
+    *,
+    moe_contract: GlmMoeNumericalContract,
+    linear_interpret: bool = False,
+) -> tuple[Any, Any, Any, Any]:
+    """Shared suffix for a small layer or a <=128-row MLP window.
+
+    No normalization or residual addition here: the prefix has already applied
+    both split-residual norms. The caller must retain prefix health and state.
+    """
+    if (
+        normalized_mlp.ndim != 2
+        or not 1 <= normalized_mlp.shape[0] <= 128
+        or normalized_mlp.dtype != jnp.bfloat16
+        or normalized_mlp.shape[1] * 4 != moe_contract.hidden_size
+        or live.shape != (normalized_mlp.shape[0],)
+        or live.dtype != jnp.bool_
+        or (dense_weights is None) == (moe_weights is None)
+    ):
+        raise ValueError("prefill MLP boundary geometry/branch drifted")
+    rows = normalized_mlp.shape[0]
+    mlp_valid = jnp.ones((rows,), jnp.bool_)
+    if dense_weights is not None:
+        output = ws32_prefill_dense_mapped(
+            normalized_mlp, *dense_weights, interpret=linear_interpret
+        )
+        route_indices = jnp.full((rows, moe_contract.top_k), -1, jnp.int32)
+        route_weights = jnp.zeros((rows, moe_contract.top_k), jnp.float32)
+    else:
+        if moe_weights.router_weight_local.shape[0] * 8 != moe_contract.num_experts:
+            raise ValueError("prefill router and grouped expert counts disagree")
+        route_indices, route_weights, router_valid = ws32_prefill_router_mapped(
+            normalized_mlp,
+            moe_weights.router_weight_local,
+            moe_weights.correction_bias_local,
+            live,
+            top_k=moe_contract.top_k,
+        )
+        output, grouped_valid = ws32_prefill_moe_from_routes_mapped(
+            normalized_mlp,
+            route_indices,
+            route_weights,
+            *moe_weights[2:],
+            contract=moe_contract,
+            interpret=linear_interpret,
+            fp32_route_sum=True,
+        )
+        mlp_valid = router_valid & grouped_valid
+    return output, route_indices, route_weights, mlp_valid
+
+
 def ws32_prefill_transformer_layer_mapped(
     hidden_update_local: Any,
     carried_residual_local: Any,
@@ -136,7 +206,8 @@ def ws32_prefill_transformer_layer_mapped(
     sparse_attention_config: SparseMlaConfig = SparseMlaConfig(segment_block=512),
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
-) -> Ws32PrefillLayerResult:
+    prefix_only: bool = False,
+) -> Ws32PrefillLayerResult | Ws32PrefillPrefixResult:
     """Execute one full/shared-indexer × dense/MoE layer on a prompt block.
 
     Static weight presence selects branches; inactive branches do not trace model
@@ -253,33 +324,45 @@ def ws32_prefill_transformer_layer_mapped(
         epsilon=rms_norm_epsilon,
     )
     normalized_mlp = jnp.where(live[:, None], normalized_mlp, 0)
-    mlp_valid = jnp.ones((rows,), jnp.bool_)
-    if dense_weights is not None:
-        output = ws32_prefill_dense_mapped(
-            normalized_mlp, *dense_weights, interpret=linear_interpret
+    if prefix_only:
+        post_residual = jnp.where(live[:, None], post_residual, 0)
+        selected_live = (
+            jnp.arange(dsa_contract.top_k)[None] < selected_valid_counts[:, None]
         )
-        route_indices = jnp.full((rows, moe_contract.top_k), -1, jnp.int32)
-        route_weights = jnp.zeros((rows, moe_contract.top_k), jnp.float32)
-    else:
-        if moe_weights.router_weight_local.shape[0] * 8 != moe_contract.num_experts:
-            raise ValueError("prefill router and grouped expert counts disagree")
-        route_indices, route_weights, router_valid = ws32_prefill_router_mapped(
+        prefix_valid = (
+            incoming_contract_valid
+            & dsa_valid
+            & attention.contract_valid
+            & (
+                ~live
+                | (
+                    jnp.all(jnp.isfinite(normalized), axis=1)
+                    & jnp.all(jnp.isfinite(normalized_mlp), axis=1)
+                    & jnp.all(jnp.isfinite(post_residual), axis=1)
+                    & jnp.all(~selected_live | jnp.isfinite(selected_scores), axis=1)
+                )
+            )
+        )
+        return Ws32PrefillPrefixResult(
             normalized_mlp,
-            moe_weights.router_weight_local,
-            moe_weights.correction_bias_local,
-            live,
-            top_k=moe_contract.top_k,
+            post_residual,
+            attention.cache_local,
+            unrepaired_index_cache,
+            repaired_index_cache,
+            selected_positions,
+            selected_valid_counts,
+            selected_scores,
+            prefix_valid,
+            normalized,
         )
-        output, grouped_valid = ws32_prefill_moe_from_routes_mapped(
-            normalized_mlp,
-            route_indices,
-            route_weights,
-            *moe_weights[2:],
-            contract=moe_contract,
-            interpret=linear_interpret,
-            fp32_route_sum=True,
-        )
-        mlp_valid = router_valid & grouped_valid
+    output, route_indices, route_weights, mlp_valid = ws32_prefill_mlp_mapped(
+        normalized_mlp,
+        live,
+        dense_weights,
+        moe_weights,
+        moe_contract=moe_contract,
+        linear_interpret=linear_interpret,
+    )
     output = jnp.where(live[:, None], output, 0)
     post_residual = jnp.where(live[:, None], post_residual, 0)
     selected_live = (

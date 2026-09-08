@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+B128 window now adapts the actual layer prefix and shared MLP suffix, retaining
+<=32attention/DSA tiles and fixedM64 repair. Runtime opt-in `mlp_window=False`
+reuses final head/atomic all-owner commit/dual-cache lifetimes; default worker
+path unchanged. See PREFILL_LAYER_WINDOW.md for source/test/admission boundaries.
+No new checkpoint, hardware admission or full-model speedup claim.
+
 Equal128 MoE phase baseline now adapts the existing B17 real-MoE worker and
 bounded fleet controller, not a second engine/protection stack. Fixed8xB16
 versus1xB128 on identical real-weight/supplied-route cases; grouped metadata,

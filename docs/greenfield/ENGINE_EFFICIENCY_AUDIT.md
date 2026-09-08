@@ -668,3 +668,15 @@ actual-evidence review agrees: proceed to CPU B128 layer window, keep <=32
 attention/DSA/M64repair, then one equivalent-work complete-layer discriminator.
 No repeat of this baseline or clearedB17 arithmetic. Exact receipt/costmodel
 bind DB589 and234.19MB archive; no checkpoint was added.
+
+B128 layer-window integration now reuses the actual typed attention prefix and
+shared MLP suffix. Four <=32-row causal prefixes carry own KV/unrepaired/repaired
+state, then one128-row router/grouped suffix; the existing all-owner whole-window
+commit and final-only repair promotion remain unchanged. No attention/DSA/repair
+guard increase. Runtime `mlp_window=False` keeps worker admission unchanged.
+Independent actual-source/test review finds no P0-P2; CPU evidence is recorded in
+PREFILL_LAYER_WINDOW.md and HANDOFF. This advances E1/E2 integration, not TPU
+numerical/performance promotion. Next selected real full-indexer+MoE layer6
+(layer3 is shared), candidate B128 versus4xB32 with exact causal carry, actual
+route occupancy and competitive prefix>2048. Separate-prefix timing is diagnostic,
+not a fusion-invariant full-layer cost decomposition. No clearedB17 hardware rerun.

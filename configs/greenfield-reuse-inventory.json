@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-layer-window",
+      "category": "bounded attention prefix and larger MLP window composition",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "51dc69404b06efa5f24052d86a597e74b89bfa89",
+      "source_paths": ["glm_tpu/greenfield/kernels/ws32_prefill_layer.py", "glm_tpu/greenfield/kernels/ws32_prefill_moe.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/ws32_prefill_window.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "tests/greenfield/runtime/test_ws32_prefill_window.py", "docs/greenfield/PREFILL_LAYER_WINDOW.md"],
+      "gate": "24: default-off CPU window integration; no B128 full-layer TPU or full-model performance admission",
+      "reason": "Reuse actual typed attention/norm prefix and shared dense/router/grouped suffix, not a copied transformer. Four32-row causal prefixes carry own KV and separate unrepaired/repaired producer buffers, then one128-row MLP with unchanged FP32 route sum. FixedM64 repair and attention/DSA guards unchanged. Explicit mlp_window=False opt-in reuses whole-model final-only head, all-owner atomic commit and final-only repair promotion. CPU tests cover two windows, producer/shared transitions, page boundaries, partial/empty tails, malformed metadata and late single-owner rollback. Independent actual-source review found no P0-P2 before tests; new hardware numerics, real routing occupancy, full graph memory and phase budgets remain pending. Historical B17/DB588 and supplied-route DB589 evidence are not promoted to B128 model proof."
+    },
+    {
       "id": "ws32-prefill-moe-equal128-phase-baseline",
       "category": "bounded MoE performance-budget baseline",
       "source_repo": "glm-tpu greenfield",
