@@ -16705,3 +16705,43 @@ FP64. This is the exact next action, NOT another all-model/GateD arithmetic camp
 No automatic retry, barrier/precision guess, changedreference or tolerance.
 Persist/review ownbranch and same-regionmirror; then implement that focusedcapture.
 Efficient larger-window/own8K/targets/4depthL7/L8/TTFT remain open; goal active.
+
+## 2026-09-08 13:53Z — second owner report read completely, mechanisms adjudicated
+
+Owner added `docs/greenfield/research2-prefill.md`; read first line toEOF,
+858logical lines/857newlines (no terminalnewline),47,947B, unchangedSHA
+`c4c873346d2afe7959a2f4ef783d42e1cd871fc3ef93aa2f10351b7d8d085acb`.
+`PREFILL_RESEARCH2_ADJUDICATION.md` records expert-alignedTM32/TM64 weightpanels,
+exact bitonic half-merge with optionalexpert8XOR exchange, and rolled32-row
+prefixscan as three separate hypotheses. InstalledJAX0.10.1 rejects report's
+top_k is_stable kwarg; currentonline docs differ. Primary BlockSpec/scan docs
+checked againstlocalcode. NumPy half-merge sanity200rows matcheslexsort, not
+JAX/TPU/performance proof. No API upgrade, model/worker/kernel/TPU change.
+
+Independent Astra review agrees: missing unaligned panel addressing/safe tail
+stores, VMEM/physicaltraffic and numericalproof remain; K512 currentfixture is
+not report's4096default; WhileOp alone cannot prove cachealiasing. SameKorder
+does not guarantee bitidentity. Preserve allgather and globalTM32 controls when
+testing separatemechanisms. No blanketpaddedtail rule or checkpointcopy.
+
+Report predates failedB128 and does not answer its numericalcause. Existing
+PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md remains exactnext. Captureimplementation
+was not started before owner suppliednewresearch; read/adjudication completed
+first. No failedtest rerun or silent change of reference/tolerance/architecture.
+Research2 index added to existing researchadjudication/reuse registry; goal
+remains3996chars with sameactualfailure pointer. Lastprotectedcleanup13:25Z,
+localprocess check foundnoactivecampaign. Persist ownbranch/same-regionmirror.
+
+## 2026-09-08 — focused external research request
+
+Owner offered to commission another report if useful. Created
+`docs/greenfield/PREFILL_NUMERICAL_BOUNDARY_RESEARCH_BRIEF.md`: self-contained
+currentB128 failure facts, actualDSA/router arithmetic, instrumentation-perturbation
+lesson, same-input/own-inputFP64 discriminators, causalrow2 test and narrowfix
+questions. Research2's performance proposals are not repeated. No claim that
+rounding, router or compiler is the cause; no changed comparator/threshold.
+Linked from current boundarydiagnosis (already reachable from goal.md).
+Goal stays3996chars and numericalcapture remains next; research is not a wait
+condition. This documentation task does not implement or launch that capture.
+Independent existing Astra reviewer approved both report2 adjudication and the
+new brief for documentation persistence only, no material corrections remaining.

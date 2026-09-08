@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Owner research2-prefill.md read in full858logical lines47,947B, preservedunchanged.
+PREFILL_RESEARCH2_ADJUDICATION.md reserves expert-aligned panels, exact local
+bitonic merge and rolled prefix loops as separate measured challengers. Installed
+JAX0.10.1 has no top_k is_stable kwarg; unaligned panel stores/tails and physical
+cache carry still need implementation proof. Current B128failure diagnosis first.
+
 Current13:25Z2026-09-08: layer6 B128 numerical FAILED, not staging anymore.
 `analyze_prefill_window_failure.py` adapts the existing generation-bound refusal
 reader, selected checkpoint ledger, original-array protocol and unchanged tensor

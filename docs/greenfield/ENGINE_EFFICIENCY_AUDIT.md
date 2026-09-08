@@ -757,3 +757,12 @@ PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md fixes the next scope: actual DSA query/head
 and attention→completed MLP input/router capture, original signature reproduction,
 then same-input router/own-input FP64. No blind rerun, new reference, tolerance
 relaxation, fullmodel or performance claim. This is E1/E2 numerical localization.
+
+Ownerresearch2 now read completely858logical lines and adjudicated in
+PREFILL_RESEARCH2_ADJUDICATION.md. Expert-aligned panels target actual source
+groupvisits; exact bitonic merge targets generic repeated selection; rolled
+prefixscan targets graph/code growth. All remain separate unmeasured challengers.
+Primarydocs/localJAX expose API/addressing caveats before TPU: no is_stable kwarg
+in0.10.1, arbitraryexpert starts need valid BlockSpecs/nonoverlappingtailwrites,
+singleWhileOp does notprove cachealiasing. Numericalfailure diagnosis staysfirst;
+no kernel/environment/checkpoint change or new performance claim.

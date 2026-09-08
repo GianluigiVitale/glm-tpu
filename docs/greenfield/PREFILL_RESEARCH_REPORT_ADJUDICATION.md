@@ -66,6 +66,10 @@ updated failure boundary below before following any earlier launch recommendatio
 
 ## Immediate engineering boundary
 
+Follow-up: [second report adjudication](PREFILL_RESEARCH2_ADJUDICATION.md) covers
+expert-aligned panels, exact bitonic merge/XOR exchange and rolled prefix windows,
+including installed-JAX API and address/aliasing caveats. Current failure stays first.
+
 The reviewed numerical-only launch at0f994e37 executed after all4graph admission
 and failed at its first boundary comparison13:25Z. Matched finalization retained
 originals and all8hosts cleaned successfully. All128partial worker files are now

@@ -111,6 +111,10 @@ do not build another engine or repeat full-model/cleared layer0/3 tests.
    captures only if the first differing boundary justifies them.
 
 This is a bounded **diagnostic**, not a replacement numerical-admission protocol.
+The owner-facing external research request is
+[`PREFILL_NUMERICAL_BOUNDARY_RESEARCH_BRIEF.md`](PREFILL_NUMERICAL_BOUNDARY_RESEARCH_BRIEF.md).
+It asks for targeted compiler/numerical localization advice; local work does not
+wait for that report and its proposals do not automatically change this protocol.
 Its new graphs, output schema, memory budget, provenance and original-signature
 reproduction need focused CPU composition and independent review before launch.
 No new model/weights, full decoder, competitive/tail rerun or performance sweep

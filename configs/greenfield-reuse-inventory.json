@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-research2-panel-merge-scan",
+      "category": "owner research with locally checked implementation caveats",
+      "source_repo": "glm-tpu greenfield owner report",
+      "source_pin": "ed0a3e05aa8908313d6730062e9d0af0a8e85e92",
+      "source_paths": ["docs/greenfield/research2-prefill.md", "glm_tpu/greenfield/kernels/pallas/prefill_grouped_fp8.py", "glm_tpu/greenfield/kernels/prefill_dsa.py", "glm_tpu/greenfield/kernels/ws32_prefill_window.py"],
+      "disposition": "research_candidate",
+      "greenfield_consumers": ["docs/greenfield/PREFILL_RESEARCH2_ADJUDICATION.md"],
+      "gate": "24: mechanism hypotheses only; current B128 numerical failure remains first",
+      "reason": "Read report completely and preserve original SHA c4c873346d2afe7959a2f4ef783d42e1cd871fc3ef93aa2f10351b7d8d085acb. Expert-aligned TM32/64 panels require supported unaligned addressing, nonoverlapping tail stores and real VMEM/rounding proof. Isolated exact bitonic merges precede optional expert8 butterfly; installed JAX0.10.1 lacks top_k is_stable keyword and current layer6 key tile is512 not4096. Rolled prefix scan carries three proposal caches with row-only outputs, safe offsets and unchanged final commit; no serial model scan/donation of required rollback state. Independent review confirms caveats. No kernel/TPU/environment/checkpoint change or speed claim."
+    },
+    {
       "id": "ws32-prefill-window-boundary-refusal",
       "category": "read-only first-failure numerical localization",
       "source_repo": "glm-tpu greenfield",
